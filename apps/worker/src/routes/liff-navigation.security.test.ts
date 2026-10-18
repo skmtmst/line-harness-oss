@@ -49,6 +49,8 @@ describe('OAuth and cross-account navigation', () => {
     expect(f.raw.prepare('SELECT user_id FROM friends WHERE id=?').get('friend')).toEqual({ user_id: null });
   });
   it('F4/F25: unsigned external redirects fail while authenticated wrapped destinations still work', async () => {
+    f.raw.exec(`INSERT INTO account_styles(line_account_id,style,selection_mode,selected_at,updated_at,answers_json)
+      VALUES('a','consult','configured',datetime('now'),datetime('now'),'{"privateAnswer":"hidden"}')`);
     const target = 'https://business.example/thanks';
     const unsigned = await callback({ account: 'ch-a', redirect: target });
     expect(unsigned.headers.get('location')).toBeNull();
@@ -56,9 +58,13 @@ describe('OAuth and cross-account navigation', () => {
     const signed = await callback({ account: 'ch-a', redirect: target, redirectProof: proof });
     expect(signed.headers.get('location')).toBe(target);
     const config = await instance.request(`/api/liff/config?liffId=100-a&redirect=${encodeURIComponent(target)}&redirectProof=${proof}`, {}, env);
-    expect(await config.json()).toMatchObject({ data: { redirectTarget: target } });
+    expect(config.status).toBe(200);
+    expect(config.headers.get('Cache-Control')).toBe('no-store');
+    const body = await config.json();
+    expect(body).toMatchObject({ data: { style: 'consult', accountId: 'a', redirectTarget: target } });
+    expect(JSON.stringify(body)).not.toMatch(/privateAnswer|answers_json|selection_mode|login-secret/);
     const changed = await instance.request(`/api/liff/config?liffId=100-a&redirect=https://evil.example&redirectProof=${proof}`, {}, env);
-    expect(await changed.json()).toMatchObject({ data: { redirectTarget: null } });
+    expect(await changed.json()).toMatchObject({ data: { style: 'consult', redirectTarget: null } });
   });
   async function link(token: string, cookie = 'browser-secret', confirmed = true) {
     return instance.request('/api/liff/link', { method: 'POST', headers: { 'content-type': 'application/json', Cookie: `__Host-lh_cross_account=${cookie}` }, body: JSON.stringify({ idToken: 'mock', crossAccountToken: token, confirmCrossAccountLink: confirmed }) }, env);

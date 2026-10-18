@@ -53,7 +53,7 @@ describe('processDueMeetConsultationReminders', () => {
         INSERT INTO friends(id,line_user_id,line_account_id,is_following) VALUES('f','U1','a',1);
         INSERT INTO meet_consultations(id,external_event_id,friend_id,title,starts_at,ends_at,meet_url,status)
           VALUES('c','event','f','Consultation','2030-01-02T01:00:00Z','2030-01-02T02:00:00Z','https://meet.google.com/abc-defg-hij','confirmed');
-        INSERT INTO meet_consultation_reminders(id,consultation_id,kind,scheduled_at)
+        INSERT INTO meet_consultation_notification_runs(id,consultation_id,kind,scheduled_at)
           VALUES('6db37bc2-f0c4-4fa8-baa6-5ec7069e1165','c','hour_before','2030-01-02T00:00:00Z');`);
       const base=Date.parse('2030-01-02T00:00:00Z'),circuit=new BookingExternalCircuits(db);
       const scope={accountId:'a',storeId:'a',destination:'line',connectionId:'a'};
@@ -62,7 +62,7 @@ describe('processDueMeetConsultationReminders', () => {
       const options={now:new Date(base),proxyBaseUrl:'https://proxy.example.com',proxyDispatch:dispatch};
       for(let n=0;n<4;n++)expect(await processDueMeetConsultationReminders(db,{...options,now:new Date(base+n*1000)})).toEqual({sent:0,failed:0});
       expect(dispatch).not.toHaveBeenCalled();
-      expect(raw.prepare('SELECT status,retry_count FROM meet_consultation_reminders').get()).toEqual({status:'pending',retry_count:0});
+      expect(raw.prepare('SELECT status,retry_count FROM meet_consultation_notification_runs').get()).toEqual({status:'pending',retry_count:0});
       expect(await processDueMeetConsultationReminders(db,{...options,now:new Date(base+31_000)})).toEqual({sent:1,failed:0});
       expect(dispatch).toHaveBeenCalledTimes(1);
     } finally {raw.close();}
@@ -74,7 +74,7 @@ describe('processDueMeetConsultationReminders', () => {
         INSERT INTO friends(id,line_user_id,line_account_id,is_following) VALUES('friend-1','U00000000000000000000000000000000','a',1);
         INSERT INTO meet_consultations(id,external_event_id,friend_id,title,starts_at,ends_at,meet_url,status)
           VALUES('consultation-1','google-event','friend-1','個別相談','2026-08-09T01:00:00.000Z','2026-08-09T02:00:00.000Z','https://meet.google.com/abc-defg-hij','confirmed');
-        INSERT INTO meet_consultation_reminders(id,consultation_id,kind,scheduled_at)
+        INSERT INTO meet_consultation_notification_runs(id,consultation_id,kind,scheduled_at)
           VALUES('6db37bc2-f0c4-4fa8-baa6-5ec7069e1165','consultation-1','hour_before','2026-08-09T00:00:00.000Z');`);
       const dispatch=vi.fn(async(request:Request)=>{
         expect(request.url).toBe('https://proxy.example.com/line-api/v2/bot/message/push');
@@ -83,13 +83,13 @@ describe('processDueMeetConsultationReminders', () => {
         return new Response('{}',{status:200});
       });
       const options={now:new Date('2026-08-09T00:00:00.000Z'),proxyBaseUrl:'https://proxy.example.com',proxyDispatch:dispatch};
-      if(failResultSave)raw.exec(`CREATE TRIGGER stop_result BEFORE UPDATE ON meet_consultation_reminders
+      if(failResultSave)raw.exec(`CREATE TRIGGER stop_result BEFORE UPDATE ON meet_consultation_notification_runs
         WHEN NEW.status='sent' BEGIN SELECT RAISE(ABORT,'fixture'); END`);
       expect(await processDueMeetConsultationReminders(db,options)).toEqual(failResultSave?{sent:0,failed:1}:{sent:1,failed:0});
       if(failResultSave)raw.exec('DROP TRIGGER stop_result');
       expect(await processDueMeetConsultationReminders(db,options)).toEqual({sent:0,failed:0});
       expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(raw.prepare('SELECT status FROM meet_consultation_reminders').get()).toEqual({status:failResultSave?'failed':'sent'});
+      expect(raw.prepare('SELECT status FROM meet_consultation_notification_runs').get()).toEqual({status:failResultSave?'failed':'sent'});
       expect(raw.prepare("SELECT status FROM workflow_steps WHERE process_kind='booking_line_delivery'").get())
         .toEqual({status:failResultSave?'unknown':'succeeded'});
     }finally{raw.close();}
@@ -107,7 +107,7 @@ describe('processDueMeetConsultationReminders', () => {
                 return null;
               },
               async all() {
-                if (!sql.includes('FROM meet_consultation_reminders r')) return { results: [] };
+                if (!sql.includes('FROM meet_consultation_notification_runs r')) return { results: [] };
                 return {
                   results: [{
                     id: 'reminder-cancelled-1',
@@ -148,6 +148,7 @@ describe('processDueMeetConsultationReminders', () => {
       '2026-08-09T00:00:00.000Z',
       'reminder-cancelled-1',
       'consultation-9',
+      0,
       null,
       null,
       null,

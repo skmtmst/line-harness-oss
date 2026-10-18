@@ -78,7 +78,7 @@ export const bookingPassPlansApi={
  list:(a:string,q='',offset=0,limit:10|20|50=20)=>fetchApi<Result<Page<BookingPassPlan>&{summary:unknown}>>(query(account('/api/booking/admin/pass-plans',a),{q,offset,limit})),
  create:(a:string,b:BookingPassPlanWrite,key:string)=>fetchApi<Result<BookingPassPlan>>(account('/api/booking/admin/pass-plans',a),json('POST',b,key)),
  save:(a:string,id:string,b:BookingPassPlanWrite&{expectedVersion:number})=>fetchApi<Result<BookingPassPlan>>(account(`/api/booking/admin/pass-plans/${e(id)}`,a),json('PUT',b)),
- start:(a:string,id:string,expectedVersion:number)=>fetchApi<Result<{status:'on_sale';version:number}>>(account(`/api/booking/admin/pass-plans/${e(id)}/start`,a),json('POST',{expectedVersion})),
+ start:(a:string,id:string,expectedVersion:number,eventIds?:string[]|null)=>fetchApi<Result<{status:'on_sale';version:number}>>(account(`/api/booking/admin/pass-plans/${e(id)}/start`,a),json('POST',{expectedVersion,...(eventIds===undefined?{}:{eventIds})})),
  stop:(a:string,id:string,expectedVersion:number)=>fetchApi<Result<{status:'stopped';version:number}>>(account(`/api/booking/admin/pass-plans/${e(id)}/stop`,a),json('POST',{expectedVersion})),
  holders:(a:string,id:string,offset=0,limit:10|20|50=20)=>fetchApi<Result<Page<unknown>>>(query(account(`/api/booking/admin/pass-plans/${e(id)}/holders`,a),{offset,limit})),
  grant:(a:string,planId:string,friendId:string,reason:string,key:string)=>fetchApi<Result<unknown>>(account('/api/booking/admin/entitlements',a),json('POST',{planId,friendId,reason},key)),

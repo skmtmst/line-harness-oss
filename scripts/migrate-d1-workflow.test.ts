@@ -6,7 +6,7 @@ const manualWorkflow = readFileSync(
   'utf8',
 );
 const productionWorkflow = readFileSync(
-  new URL('../.github/workflows/deploy-cloudflare-worker.yml', import.meta.url),
+  new URL('../.github/workflows/migrate-d1-production.yml', import.meta.url),
   'utf8',
 );
 const applyScript = readFileSync(
@@ -14,7 +14,9 @@ const applyScript = readFileSync(
   'utf8',
 );
 
-const workflows = [manualWorkflow, productionWorkflow];
+const databaseScript = readFileSync(new URL('./deploy/production/database.ts', import.meta.url), 'utf8');
+const backupScript = readFileSync(new URL('./deploy/production/backup.ts', import.meta.url), 'utf8');
+const workflows = [manualWorkflow];
 
 describe('D1 migration workflow safety', () => {
   it('dry-run lists via SELECT-only CLI; ledger DDL is behind the apply gate and backup', () => {
@@ -58,7 +60,7 @@ describe('D1 migration workflow safety', () => {
     }
   });
 
-  it('passes one fixed pending list to the same apply script in both workflows', () => {
+  it('passes one fixed pending list to the shared apply script, separated from Worker deploy', () => {
     for (const workflow of workflows) {
       expect(workflow).toContain(
         '"$RUNNER_TEMP/d1-pending-migrations.txt"',
@@ -70,6 +72,9 @@ describe('D1 migration workflow safety', () => {
         'SELECT name FROM _migrations WHERE name =',
       );
     }
+    expect(databaseScript).toContain("'d1-pending-migrations.txt'");
+    expect(databaseScript).toContain("'scripts/deploy/apply-d1-migrations.sh'");
+    expect(productionWorkflow).toContain('production/run.ts apply');
   });
 
   it('records migrations idempotently in the shared script', () => {
@@ -79,7 +84,9 @@ describe('D1 migration workflow safety', () => {
     );
   });
 
-  it('keeps Time Travel fail-closed in both workflows', () => {
+  it('keeps Time Travel fail-closed in manual staging and production backup', () => {
+    expect(backupScript).toContain("'time-travel', 'info'");
+    expect(backupScript).toContain("throw new Error('backup_bookmark')");
     for (const workflow of workflows) {
       expect(workflow).toContain('d1 time-travel info');
       expect(workflow).toContain(

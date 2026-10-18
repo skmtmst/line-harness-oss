@@ -108,10 +108,11 @@ export const LOOK_CHOICES: ReadonlyArray<{ value: 'keep' | 'change' | 'existing'
 
 export function questionsFor(style: AccountStyle): Question[] {
   const host = bookingHost(style)
-  const words = (value: string) => value.replaceAll('お店', host).replaceAll('お客さま', styleTerm(style, 'V12').split('（')[0])
+  const words = (value: string) => value.split('お店で払う').map(part => part.replaceAll('お店', host).replaceAll('お客さま', styleTerm(style, 'V12').split('（')[0])).join(styleTerm(style, 'V25'))
   return BY_STYLE[style].map((key) => {
     const question = Q[key]
-    return { ...question, title: words(question.title), description: words(question.description), info: question.info ? words(question.info) : undefined, manualNote: words(question.manualNote), todo: { ...question.todo, title: words(question.todo.title), note: words(question.todo.note) }, choices: question.choices.map((choice) => ({ ...choice, label: words(choice.label), note: words(choice.note) })) }
+    if (key === 'content' && (style === 'standard' || style === 'ec')) return { ...question, description: style === 'ec' ? 'ごあいさつ・商品のお知らせ・購入へのお礼・再入荷の見本を入れます。自動のLINEは止めた状態です。' : 'ごあいさつ・ご案内・お問い合わせの見本を入れます。' }
+    return { ...question, title: words(question.title), description: words(question.description), info: question.info ? words(question.info) : undefined, manualNote: words(question.manualNote), todo: { ...question.todo, title: words(question.todo.title), note: words(question.todo.note) }, choices: question.choices.map((choice) => ({ ...choice, label: words(choice.label), note: key === 'payment' && choice.value === 'store' && style === 'consult' ? '面談の当日に払います。' : words(choice.note) })) }
   })
 }
 
@@ -186,7 +187,11 @@ export const FEATURES: Record<string, { name: string; opens: string; settingHref
   coupons: { name: 'クーポン', opens: 'クーポンの一覧を開く', settingHref: '/templates', preparing: 'クーポン' },
   menu: { name: 'メニュー', opens: 'メニューのページを開く', settingHref: '/restaurant-test/menu' },
   stamps: { name: '来店スタンプ', opens: '来店スタンプを開く', settingHref: '/visit-stamps' },
-  tickets: { name: '回数券', opens: '回数券を開く', settingHref: '/booking/menus', preparing: '回数券' },
+  tickets: { name: '回数券・月謝', opens: '回数券・月謝の残りを開く', settingHref: '/booking/menus?tab=passes' },
+  forms: { name: 'お申し込み', opens: '設定した回答フォームを開く', settingHref: '/form-submissions' },
+  mypage: { name: 'マイページ', opens: '本人のマイページを開く', settingHref: '/rich-menus' },
+  news: { name: 'お知らせ', opens: '設定したお知らせを見る', settingHref: '/templates' },
+  shop: { name: '商品', opens: '設定したECサイトを開く', settingHref: '/ec-commerce?tab=connector' },
   contact: { name: 'お問い合わせ', opens: 'トークを開く', settingHref: '/chats' },
   photos: { name: 'スタイル写真', opens: '写真のページを開く', settingHref: '/rich-menus' },
   faq: { name: 'よくある質問', opens: 'よくある質問を開く', settingHref: '/auto-replies' },
@@ -201,7 +206,10 @@ export function featureName(feature: string): string {
 }
 
 /** 機能の設定の画面。口の href は今の画面に無い道（/booking/settings 等）があるので、画面の表を先に使う。 */
-export function featureHref(feature: string, fallback?: string): string {
+export function featureHref(feature: string, fallback?: string, style?: AccountStyle): string {
+  if (style === 'lesson' && (feature === 'booking' || feature === 'history')) return '/events'
+  if (feature === 'meeting') return '/booking/menus?tab=staff'
+  if (feature === 'auto_line') return '/ec-commerce?tab=auto-line'
   return FEATURES[feature]?.settingHref ?? fallback ?? '/'
 }
 
@@ -211,6 +219,14 @@ export type SampleTile = { label: string; icon: string; feature: string }
 export type SampleMenu = { account: string; greeting: string; tone: { bg: string; ink: string }; tiles: SampleTile[] }
 
 export const SAMPLE_MENUS: Partial<Record<AccountStyle, SampleMenu>> = {
+  standard: {
+    account: 'ご案内', greeting: '友だち追加ありがとうございます。ご案内やお申し込みは、下のメニューからご確認いただけます。', tone: { bg: 'var(--sample-consult-bg)', ink: 'var(--sample-consult-ink)' },
+    tiles: [{ label: 'ご案内', icon: 'file', feature: 'docs' }, { label: 'お申し込み', icon: 'file', feature: 'forms' }, { label: 'よくある質問', icon: 'bulb', feature: 'faq' }, { label: 'マイページ', icon: 'user', feature: 'mypage' }, { label: 'お知らせ', icon: 'bell', feature: 'news' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' }],
+  },
+  ec: {
+    account: 'オンラインストア', greeting: '友だち追加ありがとうございます。商品やご利用ガイドは、下のメニューからご覧いただけます。', tone: { bg: 'var(--sample-salon-bg)', ink: 'var(--sample-salon-ink)' },
+    tiles: [{ label: '商品を見る', icon: 'bag', feature: 'shop' }, { label: 'お買い物を続ける', icon: 'bag', feature: 'shop' }, { label: 'マイページ', icon: 'user', feature: 'mypage' }, { label: 'クーポン', icon: 'ticket', feature: 'coupons' }, { label: 'ご利用ガイド', icon: 'file', feature: 'docs' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' }],
+  },
   restaurant: {
     account: '然 - 和食 -', greeting: '友だち追加ありがとうございます。ご予約・クーポンは下のメニューからどうぞ。', tone: { bg: 'var(--sample-restaurant-bg)', ink: 'var(--sample-restaurant-ink)' },
     tiles: [
@@ -241,7 +257,7 @@ export const SAMPLE_MENUS: Partial<Record<AccountStyle, SampleMenu>> = {
   },
 }
 
-export const SAMPLE_STYLES: AccountStyle[] = ['restaurant', 'salon', 'consult', 'lesson']
+export const SAMPLE_STYLES: AccountStyle[] = ['restaurant', 'salon', 'consult', 'lesson', 'standard', 'ec']
 
 export function sampleMenuFor(style: AccountStyle): SampleMenu {
   return SAMPLE_MENUS[style] ?? SAMPLE_MENUS.restaurant!
@@ -249,10 +265,10 @@ export function sampleMenuFor(style: AccountStyle): SampleMenu {
 
 /* ── 入った物（starter-items）と初期セットの中身（definition）の突き合わせ ────────── */
 
-export type StarterItemState = { target_id: string; kind: string; is_sample: number; status: string | null; draftRevision: string | null }
+export type StarterItemState = { target_id: string; kind: string; is_sample: number; status: string | null; draftRevision: string | null; key?: string; name?: string | null; activationAllowed?: boolean; requiresActivation?: boolean }
 
 /**
- * 口の starter-items は item_key を返さない（API-CONTRACT-4 §10）。種類ごとに、初期セットの中身の並びと
+ * 口の starter-items が返す key で初期セットの中身と対応させる。旧応答にkeyが無い場合だけ、種類ごとに
  * 入った物の並びを前から対応させて名前を付ける。入った物より中身が多い（未定で入れなかった）ときは名前だけ余る。
  */
 export function pairStarterItems(definition: StarterSetItem[], items: StarterItemState[]): Array<{ item: StarterSetItem; state: StarterItemState }> {
@@ -260,7 +276,9 @@ export function pairStarterItems(definition: StarterSetItem[], items: StarterIte
   for (const kind of [...new Set(items.map((state) => state.kind))]) {
     const defs = definition.filter((item) => item.kind === kind)
     items.filter((state) => state.kind === kind).forEach((state, index) => {
-      out.push({ item: defs[index] ?? { key: state.target_id, kind: kind as StarterSetItem['kind'], name: kind }, state })
+      const matched = state.key ? defs.find(item => item.key === state.key) : defs[index]
+      if (state.key && !matched) return
+      out.push({ item: matched ?? { key: state.target_id, kind: kind as StarterSetItem['kind'], name: state.name ?? kind }, state })
     })
   }
   return out
@@ -269,7 +287,7 @@ export function pairStarterItems(definition: StarterSetItem[], items: StarterIte
 /** 動かす前に確かめる物（オートメーションの下書き・止めた予約メニュー）。 */
 export function needsActivation(state: StarterItemState): boolean {
   /* 予約確定の見本は名前で判定するので、一覧側（isBookingConfirmSample）で外す。 */
-  return (state.kind === 'automation' || state.kind === 'booking_menu') && state.status !== 'active'
+  return state.activationAllowed !== false && state.requiresActivation !== false && (state.kind === 'automation' || state.kind === 'booking_menu') && state.status !== 'active'
 }
 
 /* ── はじめにやること（Bdfxm） ─────────────────────────────────── */
@@ -313,7 +331,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
       note: 'リッチメニューにボタンがあるのに中身が未設定です',
       badge: { tone: 'warning', label: '未設定' },
       alert: true,
-      action: preparing ? { label: '決まりを入れる', preparing } : { label: '決まりを入れる', href: featureHref(warning.feature, warning.href) },
+      action: preparing ? { label: '決まりを入れる', preparing } : { label: '決まりを入れる', href: featureHref(warning.feature, warning.href, state.style) },
     })
   }
   if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '選ぶ', step: 'style' } })

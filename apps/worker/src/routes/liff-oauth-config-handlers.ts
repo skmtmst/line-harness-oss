@@ -1,6 +1,7 @@
 import { getCookie, deleteCookie } from 'hono/cookie';
 import { verifyNavigationProof } from '../lib/navigation-proof.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { accountCustomerStyle } from '../services/customer-style.js';
 import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 
@@ -548,7 +549,7 @@ export const get__api_liff_customer_look_2 = async (c: Context<Env, "/api/liff/c
  const stopped=await stoppedLineAccountResponse(c,account.id);if(stopped)return stopped;
  const value=await accountCustomerLook(c.env.DB,account.id);
  c.header('Cache-Control','no-store');
- return c.json({success:true,data:{...value,settings:customerLookPublicSettings(value.look)}});
+ return c.json({success:true,data:{...value,settings:customerLookPublicSettings(value.look),style:await accountCustomerStyle(c.env.DB,account.id)}});
 };
 
 export const get__api_liff_config_3 = async (c: Context<Env, "/api/liff/config">) => {
@@ -591,9 +592,17 @@ export const get__api_liff_config_3 = async (c: Context<Env, "/api/liff/config">
       // non-blocking
     }
 
+    c.header('Cache-Control', 'no-store');
     return c.json({
       success: true,
-      data: { botBasicId, accountName, accountId, redirectTarget: await verifyNavigationProof(c.env.LINE_CHANNEL_SECRET, `redirect:${liffId}`, c.req.query('redirect') || '', c.req.query('redirectProof') || '') ? storedRedirectTarget(c.req.query('redirect')) : null, customerLook: account ? (await accountCustomerLook(c.env.DB,account.id)).look : DEFAULT_CUSTOMER_LOOK },
+      data: {
+        style: account ? await accountCustomerStyle(c.env.DB, account.id) : null,
+        botBasicId,
+        accountName,
+        accountId,
+        redirectTarget: await verifyNavigationProof(c.env.LINE_CHANNEL_SECRET, `redirect:${liffId}`, c.req.query('redirect') || '', c.req.query('redirectProof') || '') ? storedRedirectTarget(c.req.query('redirect')) : null,
+        customerLook: account ? (await accountCustomerLook(c.env.DB, account.id)).look : DEFAULT_CUSTOMER_LOOK,
+      },
     });
   } catch (err) {
     logger.error("routes_liff_failed");
@@ -619,9 +628,11 @@ export const post__api_liff_profile_4 = async (c: Context<Env, "/api/liff/profil
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
+    c.header('Cache-Control', 'no-store');
     return c.json({
       success: true,
       data: {
+        style: identity.lineAccountId ? await accountCustomerStyle(c.env.DB, identity.lineAccountId) : null,
         id: friend.id,
         displayName: friend.display_name,
         isFollowing: Boolean(friend.is_following),

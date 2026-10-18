@@ -6,7 +6,8 @@ import type { BookingRequest } from '@/lib/api'
 import type { BookingLedgerModel } from './page'
 import Page from './page'
 
-const m = vi.hoisted(() => ({ latest: null as unknown as BookingLedgerModel, realView: false, account: 'A', liff: 'liff-a', query: 'view=list&status=confirmed', list: vi.fn(), summary: vi.fn(), menus: vi.fn(), staff: vi.fn(), me: vi.fn(), decide: vi.fn(), csv: vi.fn(), get: vi.fn(), replace: vi.fn() }))
+const m = vi.hoisted(() => ({ latest: null as unknown as BookingLedgerModel, realView: false, style: 'standard' as 'standard' | 'consult' | 'lesson', account: 'A', liff: 'liff-a', query: 'view=list&status=confirmed', list: vi.fn(), summary: vi.fn(), menus: vi.fn(), staff: vi.fn(), me: vi.fn(), decide: vi.fn(), csv: vi.fn(), get: vi.fn(), replace: vi.fn() }))
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: m.style }, error: null, reload: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: m.account, selectedAccount: { id: m.account, name: m.account, liffId: m.liff } }) }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => new URLSearchParams(m.query), useRouter: () => ({ replace: m.replace, push: vi.fn() }) }))
 vi.mock('@/lib/api', async original => {
@@ -27,13 +28,23 @@ const counts = { total: 51, requested: 1, monthTotal: 1, monthConfirmed: 1, mont
 const row = (id: string): BookingRequest => ({ id, starts_at: '2026-10-18T01:00:00Z', ends_at: '2026-10-18T02:00:00Z', status: 'confirmed', friend_id: null, friend_name: id, booking_customer_id: null, menu_name: 'カット', staff_name: '担当', staff_id: 'staff', requested_at: '2026-10-17T00:00:00Z', decided_at: null, customer_note: null, internal_note: null, price_at_booking: 5000, external_event_id: null, source: 'phone' })
 const defer = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r }); return { promise, resolve } }
 beforeEach(() => {
-  vi.resetAllMocks(); m.realView = false; window.sessionStorage.clear(); window.history.replaceState(null, '', '/booking/bookings'); m.account = 'A'; m.liff = 'liff-a'; m.query = 'view=list&status=confirmed'
+  vi.resetAllMocks(); m.realView = false; m.style = 'standard'; window.sessionStorage.clear(); window.history.replaceState(null, '', '/booking/bookings'); m.account = 'A'; m.liff = 'liff-a'; m.query = 'view=list&status=confirmed'
   m.me.mockResolvedValue({ success: true, data: { role: 'owner', permissionKeys: [] } })
   m.list.mockResolvedValue({ requests: [row('current')], total: 51 }); m.summary.mockResolvedValue(counts)
   m.menus.mockResolvedValue({ menus: [] }); m.staff.mockResolvedValue({ staff: [] }); m.csv.mockResolvedValue(undefined)
   m.get.mockResolvedValue({ booking: null }); m.decide.mockResolvedValue({})
 })
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
+it.each([['consult', '相談者'], ['lesson', '会員']] as const)('%sでは検索と予約詳細も同じ業種の人の呼び方を使う', async (style, person) => {
+  m.realView = true; m.style = style
+  render(<Page />)
+  const cell = await screen.findByText('current')
+  expect(screen.getByPlaceholderText(`${person}名で検索`)).toBeTruthy()
+  fireEvent.click(cell.closest('tr')!)
+  await screen.findByRole('dialog')
+  expect(screen.getByText(`${person}からのご希望`)).toBeTruthy()
+  expect(m.list).toHaveBeenCalledWith('A', 'confirmed', expect.anything())
+})
 it('ページ分だけ取得して総数でページを決め、一覧とCSVに同じ絞り込みを渡す', async () => {
   const h = mountController()
   await waitFor(() => expect(h.result.current.total).toBe(51))

@@ -33,6 +33,8 @@ const fixture = vi.hoisted(() => ({
   downloadLedgerCsv: vi.fn(),
 }))
 
+// 業種読取はこの試験の対象外。元の予約状態・権限・再読込の条件を保つ。
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'standard' }, error: null, reload: vi.fn() }) }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(nav.search),
   useRouter: () => ({ replace: nav.replace, push: nav.push }),

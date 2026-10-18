@@ -296,6 +296,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `binding_exists` | [宣言](../apps/worker/src/services/common-actions-find-by-request-key.ts)（1か所） |
 | `binding_not_found` | [宣言](../apps/worker/src/services/common-actions-find-by-request-key.ts)（1か所） |
 | `body_too_large` | [宣言](../apps/worker/src/routes/booking-pass-billing.ts)（4か所） |
+| `booking_changed` | [宣言](../apps/worker/src/services/event-entitlements.ts)（1か所） |
 | `booking_circuit_conflict` | [宣言](../apps/worker/src/services/booking-external-circuits.ts)（1か所） |
 | `booking_circuit_invalid` | [宣言](../apps/worker/src/services/booking-external-circuits.ts)（1か所） |
 | `booking_conflict_notification_failed` | [宣言](../apps/worker/src/services/booking-channels.ts)（1か所） |
@@ -503,6 +504,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `ec_auth_failed` | [宣言](../apps/worker/src/services/tiktok-pnl.ts)（1か所） |
 | `ec_endpoint_missing` | [宣言](../apps/worker/src/services/tiktok-pnl.ts)（1か所） |
 | `ec_fetch_failed` | [宣言](../apps/worker/src/services/tiktok-pnl.ts)（1か所） |
+| `ec_summary_unavailable` | [宣言](../apps/worker/src/services/style-ec-summary.ts)（1か所） |
 | `email_channel_required` | [宣言](../apps/worker/src/routes/support-inbox.ts)（1か所） |
 | `EMAIL_NOT_CONFIGURED` | [宣言](../apps/worker/src/services/support-email.ts)（1か所） |
 | `email_registered` | [宣言](../apps/worker/src/routes/auth-email.ts)（1か所） |
@@ -513,7 +515,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `enabled_rule_required` | [宣言](../packages/db/src/action-score-rules.ts)（1か所） |
 | `encryption_key_missing` | [宣言](../apps/worker/src/routes/google-sheets.ts)（4か所） |
 | `entitlement_not_found` | [宣言](../apps/worker/src/services/booking-entitlements.ts)（1か所） |
-| `entitlement_unavailable` | [宣言](../apps/worker/src/routes/booking/register-decisions.ts)（4か所） |
+| `entitlement_unavailable` | [宣言](../apps/worker/src/routes/booking/register-decisions.ts)（7か所） |
 | `entry_closed` | [宣言](../apps/worker/src/routes/events/register-liff-change.ts)（2か所） |
 | `entry_coupon_fenced_out` | [宣言](../apps/worker/src/routes/webhook-follow-event.ts)（1か所） |
 | `entry_coupon_payload_invalid` | [宣言](../apps/worker/src/services/entry-route-coupon.ts)（1か所） |
@@ -786,9 +788,11 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `invalid_duration` | [宣言](../apps/worker/src/lib/input-errors.ts)（1か所） |
 | `invalid_duration_seconds` | [宣言](../apps/worker/src/lib/input-errors.ts)（1か所） |
 | `invalid_edited_action` | [宣言](../apps/worker/src/services/style-starter-distribution.ts)（1か所） |
+| `invalid_entitlement` | [宣言](../apps/worker/src/routes/events/register-liff-create.ts)（1か所） |
 | `invalid_entitlement_id` | [宣言](../apps/worker/src/routes/booking/register-liff-create.ts)（1か所） |
 | `invalid_entitlement_input` | [宣言](../apps/worker/src/services/booking-entitlements.ts)（1か所） |
-| `invalid_event` | [宣言](../apps/worker/src/routes/booking-cancellation.ts)（5か所） |
+| `invalid_event` | [宣言](../apps/worker/src/routes/booking-cancellation.ts)（7か所） |
+| `invalid_event_scope` | [宣言](../apps/worker/src/routes/booking-pass-plans.ts)（2か所） |
 | `invalid_event_type` | [宣言](../apps/worker/src/routes/instagram-engagement.ts)（1か所） |
 | `invalid_expected_version` | [宣言](../apps/worker/src/routes/webinars-management-handlers.ts)（1か所） |
 | `invalid_failure_policy` | [宣言](../packages/db/src/mileage-rewards-validation.ts)（1か所） |
@@ -952,7 +956,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `INVALID_STATUS` | [宣言](../apps/worker/src/routes/identity-candidates.ts)（3か所） |
 | `invalid_status_transition` | [宣言](../apps/worker/src/routes/contents-common-variables-handlers.ts)（1か所） |
 | `invalid_stored_assignment_settings` | [宣言](../apps/worker/src/services/booking-assignment-settings.ts)（1か所） |
-| `invalid_style` | [宣言](../apps/worker/src/services/style-setup-core.ts)（2か所） |
+| `invalid_style` | [宣言](../apps/worker/src/routes/line-accounts.ts)（4か所） |
 | `invalid_style_mode` | [宣言](../apps/worker/src/services/style-setup.ts)（2か所） |
 | `invalid_subscription` | [宣言](../apps/worker/src/routes/operator-push.ts)（1か所） |
 | `invalid_subscription_keys` | [宣言](../apps/worker/src/routes/operator-push.ts)（1か所） |
@@ -1141,7 +1145,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `not_connected` | [宣言](../apps/worker/src/routes/google-sheets.ts)（3か所） |
 | `not_draft` | [宣言](../packages/db/src/conversion-definitions-revisions-lifecycle.ts)（1か所） |
 | `not_editable` | [宣言](../apps/worker/src/routes/booking/register-liff-changes.ts)（3か所） |
-| `not_found` | [宣言](../apps/worker/src/routes/ai-answer-logs.ts)（239か所） |
+| `not_found` | [宣言](../apps/worker/src/routes/ai-answer-logs.ts)（241か所） |
 | `NOT_FOUND` | [宣言](../apps/worker/src/middleware/api-contract.ts)（24か所） |
 | `not_live` | [宣言](../apps/worker/src/routes/webinars-public-view-handlers.ts)（3か所） |
 | `NOT_PENDING` | [宣言](../apps/worker/src/routes/broadcast-approvals.ts)（4か所） |
@@ -1199,7 +1203,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `pagination_invalid` | [宣言](../apps/worker/src/routes/common-actions.ts)（1か所） |
 | `partial_tables` | [宣言](../apps/worker/src/routes/restaurant-google-profile.ts)（1か所） |
 | `party_size_not_allowed` | [宣言](../apps/worker/src/services/booking-bulk.ts)（1か所） |
-| `pass_required` | [宣言](../apps/worker/src/services/booking-pass-plans.ts)（1か所） |
+| `pass_required` | [宣言](../apps/worker/src/services/booking-pass-plans.ts)（2か所） |
 | `past_cutoff` | [宣言](../apps/worker/src/routes/booking/update.ts)（1か所） |
 | `past_datetime` | [宣言](../apps/worker/src/lib/input-errors.ts)（7か所） |
 | `payload_too_large` | [宣言](../apps/worker/src/routes/instagram.ts)（3か所） |
@@ -1446,6 +1450,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `sender_forbidden` | [宣言](../apps/worker/src/services/line-senders.ts)（1か所） |
 | `sender_limit` | [宣言](../apps/worker/src/routes/line-senders.ts)（1か所） |
 | `sender_not_found` | [宣言](../apps/worker/src/services/line-senders.ts)（1か所） |
+| `sender_unavailable` | [宣言](../apps/worker/src/routes/events/register-admin-lifecycle.ts)（1か所） |
 | `sending_stopped` | [宣言](../apps/worker/src/services/ad-conversion.ts)（2か所） |
 | `series_conflict` | [宣言](../apps/worker/src/routes/booking-series.ts)（3か所） |
 | `server` | [宣言](../apps/worker/src/services/openai-images.ts)（7か所） |
@@ -1531,6 +1536,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `stripe_connect_test_only` | [宣言](../apps/worker/src/routes/booking-stripe-connect.ts)（3か所） |
 | `STRIPE_NOT_CONFIGURED` | [宣言](../apps/worker/src/services/billing-invoices-sync.ts)（1か所） |
 | `STRIPE_PAGING_CURSOR_MISSING` | [宣言](../apps/worker/src/services/billing-invoices-sync.ts)（1か所） |
+| `style_save_failed` | [宣言](../apps/worker/src/routes/line-accounts.ts)（2か所） |
 | `subject_key_required` | [宣言](../packages/db/src/action-score-rules.ts)（1か所） |
 | `subscription_required` | [宣言](../apps/worker/src/services/booking-pass-billing.ts)（2か所） |
 | `subscription_unavailable` | [宣言](../apps/worker/src/routes/operator-push.ts)（1か所） |

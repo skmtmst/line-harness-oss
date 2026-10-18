@@ -30,7 +30,7 @@ events.get('/api/liff/events/me', async (c) => {
   const nowIso = new Date().toISOString();
   const sql =
     tab === 'upcoming'
-      ? `SELECT b.id, b.event_id, b.status, b.customer_note, b.requested_at, b.decided_at, b.cancelled_at,
+      ? `SELECT b.id,b.lock_version,(SELECT entitlement_id FROM event_booking_entitlement_uses u WHERE u.event_booking_id=b.id) AS entitlement_id, b.event_id, b.status, b.customer_note, b.requested_at, b.decided_at, b.cancelled_at,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
@@ -47,7 +47,7 @@ events.get('/api/liff/events/me', async (c) => {
             AND b.status IN ('requested','confirmed')
             AND CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END >= ?
           ORDER BY slot_starts_at ASC`
-      : `SELECT b.id, b.event_id, b.status, b.customer_note, b.requested_at, b.decided_at, b.cancelled_at,
+      : `SELECT b.id,b.lock_version,(SELECT entitlement_id FROM event_booking_entitlement_uses u WHERE u.event_booking_id=b.id) AS entitlement_id, b.event_id, b.status, b.customer_note, b.requested_at, b.decided_at, b.cancelled_at,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
@@ -119,7 +119,7 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
 
   const row = await c.env.DB
     .prepare(
-      `SELECT b.id, b.event_id, b.status, b.customer_note, b.requested_at, b.decided_at, b.cancelled_at,
+      `SELECT b.id,b.lock_version,(SELECT entitlement_id FROM event_booking_entitlement_uses u WHERE u.event_booking_id=b.id) AS entitlement_id, b.event_id, b.status, b.customer_note, b.requested_at, b.decided_at, b.cancelled_at,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventName') ELSE e.name END AS event_name,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventImageUrl') ELSE e.image_url END AS event_image_url,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueName') ELSE e.venue_name END AS venue_name,
@@ -156,7 +156,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
 
   const row = await c.env.DB
     .prepare(
-      `SELECT b.id, b.status, b.line_account_id, b.event_id, b.slot_id,
+      `SELECT b.id,b.lock_version, b.status, b.line_account_id, b.event_id, b.slot_id,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at
          FROM event_bookings b
@@ -168,6 +168,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
     .first<{
       id: string;
       status: string;
+      lock_version:number;
       line_account_id: string;
       event_id: string;
       slot_id: string;
@@ -221,9 +222,9 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
     .prepare(
       `UPDATE event_bookings
           SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend', updated_at = ?
-        WHERE id = ? AND status IN ('requested', 'confirmed')`,
+        WHERE id = ? AND status IN ('requested', 'confirmed') AND lock_version=?`,
     )
-    .bind(nowIso, nowIso, row.id)
+    .bind(nowIso, nowIso, row.id,row.lock_version)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
   // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
@@ -247,9 +248,9 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
         .prepare(
           `UPDATE event_bookings
               SET status = ?, cancelled_at = NULL, cancelled_by = NULL, updated_at = ?
-            WHERE id = ? AND status = 'cancelled'`,
+            WHERE id = ? AND status = 'cancelled' AND lock_version=? AND NOT EXISTS(SELECT 1 FROM event_booking_transition_runs t WHERE t.booking_id=event_bookings.id AND t.booking_version=event_bookings.lock_version AND t.status='complete') AND NOT EXISTS(SELECT 1 FROM event_booking_entitlement_uses u WHERE u.event_booking_id=event_bookings.id AND u.returned_at IS NOT NULL)`,
         )
-        .bind(priorStatus, nowIso, row.id)
+        .bind(priorStatus, nowIso, row.id,row.lock_version+1)
         .run();
       return bad(c, 'send_in_flight_retry', 409);
     }

@@ -33,3 +33,7 @@
 
 ## 権限
 - オーナー・管理者だけ（窓・はじめにやること・帯）。閲覧のみ・スタッフには出さない。サーバの 403 が最後の守り。
+
+## 業種別の設定先と見本
+
+回数券/月謝は `/booking/menus?tab=passes`、手動の支払い設定は `?tab=payments`。面談の会い方/固定URLはメニュー、担当のカレンダーは `?tab=staff`、クラス/振替は `/events`、ECはconnector/auto-lineの既存画面へ案内する。実カード請求・自動会議発行の準備中は保つ。見本はT01のstarter-setのpreviewを読み、保存と同じ解決済みボタンだけを描く。応答が未提供・失敗の場合は再読込を出し、静的な6ボタンへ補完しない。保存済みの初期項目はkeyで対応付け、APIがactivationAllowed/requiresActivationをfalseにした物をまとめて動かさない。

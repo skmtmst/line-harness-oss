@@ -55,11 +55,33 @@ https://developer.uber.com/docs/eats/guides/going-live
 **この手続きは musubo 1回で済みます。店舗ごとに Uber と打ち合わせる必要はありません。**
 手続き後に店舗ごとに必要なのは、上の表の 2・3・6（ログインと店舗選択）だけです。
 
-## 4. 検証環境
+## 4. 検証環境（2026-10-17 訂正）
 
-Sandbox のテスト店舗は自分で作れず、Integration Tech Support へ依頼して払い出してもらいます。
-テスト用アプリの作成と権限付与は自分でできます。
+テスト用アプリの作成と Sandbox の権限付与は自分でできます。弊社は
+**`Sandbox Access Granted` まで4つすべて完了済み**（Application Created／Organization Linked／
+Legal Agreement(s) Signed／Sandbox Access Granted）。
 出典：https://developer.uber.com/docs/eats/guides/sandbox
+
+### 「テスト店舗の払い出し」を前提として扱っていたのは誤りでした
+
+公式の手引きに**払い出しの手順は書かれていません。** 書かれているのは
+"What happens next" の箇条書きの1行 `Request test stores from Integration Tech Support`
+だけで、申請書式・所要日数・受け取り方の定義はありません。同じページは
+Sandbox で **「模擬の店舗と注文（simulated stores and orders）が使える」**とも書いています。
+
+にもかかわらず、この台帳は「テスト接続の待ち物はテスト店舗の払い出し1つ」（§4-2）と書き、
+残作業全体の前提にしていました。**これは誤りです。** 実際には権限は付与済みで、
+トークン取得（§6-4）も受信の確認（§6-5）もテスト店舗を待たずに成功しています。
+
+| 残る工程 | 店舗IDが要るか |
+| --- | --- |
+| 店舗を選ぶ画面の設計と承認（新規UI） | **要らない** |
+| 30日で切れるトークンの取り直し | **要らない** |
+| 注文の取り込み（通知→台帳）の実装と試験 | **要らない** |
+| `GET /v1/eats/stores` の実データ確認 | 要る（模擬店舗が返るなら不要） |
+| `POST /pos_data` の実行 | 要る |
+
+**Uber の返信を全体の待ち物にしません。** 上の「要らない」3つを先に進めます。
 
 ## 4-2. 弊社の本番 Uber アカウント（店舗）をテストに使えるか（2026-10-16 判定）
 
@@ -103,10 +125,14 @@ Sandbox で `GET /v1/eats/stores` に出るのは Uber が払い出すテスト�
 弊社の本番 Uber アカウントと実店舗が必要になります。
 いまの段階で使う先が無いだけで、順番が後ろにあるという関係です。
 
-### 結論と待ち物
+### 結論（待ち物の書き方を 2026-10-17 に訂正）
 
-テスト接続の待ち物は **Sandbox のテスト店舗の払い出し（Uber からの返信）1つ**で、
-本番アカウントで代替することはできません（§8 項目6）。利用者の操作は不要です。
+**本番アカウントは Sandbox の代わりになりません。** これは上の壁1・壁2のとおりで変わりません。
+
+ただし当初ここには「テスト接続の待ち物は Sandbox のテスト店舗の払い出し1つ」と書いていました。
+**この書き方は誤りでした**（§4 の訂正）。Uber からの返信が要るのは
+`GET /v1/eats/stores` の実データ確認と `POST /pos_data` の2つだけで、
+残りの工程はいま進められます。利用者の操作は不要です。
 
 ## 4-3. Uber の連絡先（2026-10-16 調査・出典の有無で分けた）
 
@@ -266,6 +292,9 @@ Sandbox 側の**認可画面**のURLは公式の手引きに載っていない�
   | --- | --- |
   | `POST /api/restaurant-test/delivery/ubereats/connect/start` | 認可画面のURLを作って返す。店舗管理者以上だけ |
   | `GET /api/restaurant-test/delivery/ubereats/oauth/callback` | 戻ってきた認可コードをトークンへ交換して保存する |
+  | `GET /api/restaurant-test/delivery/ubereats/connection` | いまの接続状態を画面へ返す。Uber へは問い合わせない |
+  | `GET /api/restaurant-test/delivery/ubereats/stores` | ログイン済みの店舗の一覧を Uber から取り、候補として控える |
+  | `POST /api/restaurant-test/delivery/ubereats/stores/select` | 選ばれた1店舗で Uber 側の連携を有効にし、接続中にする |
 
   入口は `state` を1件作り、1回使い切り・10分で失効させます（Cookie `lh_uber_state` は
   `HttpOnly`／`Secure`／`SameSite=Lax`／`Max-Age=600`）。すでにつながっている店舗からの開始は
@@ -279,30 +308,78 @@ Sandbox 側の**認可画面**のURLは公式の手引きに載っていない�
   同じ `state` の戻りが同時に二度来ても通るのは片方だけです。使用済みへの更新を
   「まだ使われていない」条件付きで行い、**1件書き換えられたときだけ**符号の交換へ進みます
   （Google Sheets 連携の R448 と同じ形）。更新が0件だった側は交換を試さず `invalid_state` で終わります。
-  試験は `src/routes/restaurant-delivery.test.ts`（デリバリー受注と合わせて55件。
-  うちログイン連携が16件。同時に来た戻りの試験2件を含む）。
-- 通知の受け口は `apps/worker/src/routes/restaurant-delivery.ts:1794`
-  （`/api/restaurant-test/delivery/webhooks/:service`）。署名の確かめ方は musubo 独自の方式のままで、
-  Uber Eats の仕様に合わせた差し替えはまだ行っていません（層の側は実装済み）。
+- つなぐお店を選ぶ道（**追加済み**・2026-10-17）。ログイン（`pending_store`）から
+  接続中（`connected`）へ進む最後の1段です。
+  - 一覧は**加盟店のトークン**（`authorization_code` で得たもの）で `GET /v1/eats/stores` を叩きます。
+    アプリ単位のトークンは使いません。権限の追加も不要です（`eats.pos_provisioning` のまま）。
+  - 取れた店舗は `rt_delivery_uber_store_candidates` へ**控え**として入れ替えます（取り直すと前回分は残らない）。
+    店舗IDが無い行は候補にしません。住所は「郵便番号 市区町村 住所」をつないだ1行だけを持ちます。
+  - 確定では、画面から来た店舗IDを**その控えと突き合わせ**、入っていなければ Uber へ送らずに
+    `store_not_candidate`（404）で止めます。控えにある場合だけ
+    `POST /v1/eats/stores/{id}/pos_data`（`is_order_manager: true`）で連携を有効にします。
+    この送信は**再試行しません**（二重に送ると連携が重なるため）。
+  - 成功したら `status='connected'`・`provisioned_at` を入れ、控えを消します。`connected_at` は
+    最初の値を保ちます（`COALESCE`）。失敗したら接続中にせず理由の符号だけを残し、
+    控えは**消しません**（取り直さずにもう一度選べるように）。
+  - トークンの期限が3日前を切っていれば Uber へ問い合わせず、`auth_expired`（409）で
+    状態を `expired` に入れ替えて、ログインのやり直しを促します（更新用トークンは返らないため）。
+  - 鍵が無い環境は `encryption_key_missing`、ID・Secret が無い環境は `oauth_not_configured`（503）。
+    いずれも Uber へは送りません。
+  - 操作は監査台帳へ `restaurant.delivery.ubereats.store.select` として残します。
+  - 試験は `src/routes/restaurant-delivery.test.ts`（デリバリー受注と合わせて**100件**。
+    うち Uber のログイン連携が33件＝認可の往復16件・接続状態の読み取り5件・つなぐお店を選ぶ12件。
+    同時に来た戻りの試験2件を含む。別に Sandbox 接続確認の口が7件）。
+    2026-10-17 実測：`npx vitest run src/routes/restaurant-delivery.test.ts` → 100 passed。
+    画面側は `src/v8/settings/delivery/delivery.test.tsx` → 16 passed。型検査は両方とも通ります。
+- 通知の受け口は `apps/worker/src/routes/restaurant-delivery.ts`
+  （`/api/restaurant-test/delivery/webhooks/:service`）。Uber Eats 向けの署名の確かめ方は
+  **2026-10-16 に Uber の仕様へ差し替え済み**（詳細は 8-4(d)）。自社方式のサービスは従来の方式のままです。
 - 設定画面（設定 › デリバリー連携）は**実装済み**。
   `apps/web/src/app/settings/delivery/page.tsx`／`apps/web/src/v8/settings/delivery/delivery.tsx`。
   基準は `新規デザイン/2026-10-12_デリバリー管理_デリバリー連携/デリバリー連携_v03.pen`
   （**2026-10-12 承認済み**・DL-1 `dF4Ov`／DL-2 `OIY4Z`／DL-3 `kJLks`／DL-4 `X5d8UF`）。
-  承認された範囲のとおり、3社の「つなぐ」ボタンは**押せない状態**で置いてあり、
-  回答が来た会社から中身をつなぎます。飲食店向け（テスト）が使える環境だけに出ます。
+  飲食店向け（テスト）が使える環境だけに出ます。
+  - **Uber Eats**：承認済みの DL-4 `X5d8UF`（つなぐお店を選ぶ）まで**中身がつながっています**。
+    「つなぐ」→ Uber のログイン → 戻り → お店の一覧 → 確定、までが動きます。
+  - **出前館・ロケットナウ**：承認された範囲のとおり「つなぐ」は**押せない状態**のままです。
+    回答が来た会社から中身をつなぎます。
 
-## 7. Uber 開発者ダッシュボードの進み（2026-10-12 時点）
+## 7. Uber 開発者ダッシュボードの進み（2026-10-17 時点）
 
 利用者がダッシュボードを操作し、こちらは手順をご案内しています。秘密値（`client_secret`）と
 Application ID はこの文書にも会話にも書きません。
+2026-10-17 に利用者からダッシュボードの画面を3枚いただき、以下を読み取りました。
+（画面には `client_id` と `client_secret` が写っていたため、値は一切書き写していません。
+ 同じ画像をこれ以上ほかへ共有しないよう利用者へお伝え済みです。）
 
 | 手順 | 状態 |
 | --- | --- |
 | API Suite の選択（Eats Marketplace） | 済み |
 | アプリの登録（musubo POS Integration／TEST APP） | 済み |
 | 認証方式の選択（Client Secret） | 選択済み |
+| Sandbox Access | **付与済み** |
+| Integration Verification Requested | **緑（申請済み）** |
 | 6手順のうち5つ | 緑（完了） |
-| Integration Verification Result | **未完了**（残り1つ） |
+| Integration Verification Result | **未完了**（残り1つ・Uber 側の審査待ち） |
+
+### 7-1. 画面に出ていた権限（2026-10-17）
+
+| 認証の種類 | 許されている権限 |
+| --- | --- |
+| `client_credentials`（アプリとして使う） | `eats.store`／`eats.report`／`eats.store.orders.read`／`eats.store.orders.cancel`／`eats.store.orders.restaurantdelivery.status`／`eats.store.status.write`／`eats.order` |
+| `authorization_code`（店舗の代理で使う） | `eats.pos_provisioning` |
+
+読み取れたこと。
+
+- **つなぐお店を選ぶ流れに足りない権限はありません。** 一覧（`GET /v1/eats/stores`）と
+  有効化（`POST /v1/eats/stores/{id}/pos_data`）は `authorization_code` の
+  `eats.pos_provisioning` で行うため、`client_credentials` 側の権限を広げる必要はありません。
+- 2026-10-16 に実機で得たトークンの権限が `["eats.order"]` 1つだけだったのは、
+  こちらの下見の口が `UBER_PROBE_SCOPES`（`eats.order` のみ）で要求しているからです。
+  **権限が足りないわけではありません。** 画面の一覧のほうが広いことが裏付けになります。
+- Playground には「Token generation is not supported for sandbox apps」と出ます。
+  つまり TEST APP のトークンは**画面からは作れず**、こちらの Worker の口から取るのが正しい手順です。
+  （実際に 2026-10-16 01:43 JST に `client_credentials` のトークンを取得できています。§6-4）
 
 ## 7-2. 実機で出た認可エラー（2026-10-13）
 
@@ -424,12 +501,14 @@ requesting production access.
    前提ではありません**（§5-2）。`Sandbox Access Granted` は済んでいます。依頼の口は
    Integration Tech Support Form（`http://t.uber.com/integration-support`）で、
    Uber 立ち会いの通し試験を経て本番アカウントが開きます。
-3. Sandbox のテスト店舗を Integration Tech Support へ依頼（上の下書き）。
-   店舗一覧・`POST /pos_data`・注文の通知まで通すときに必要になります。
-   トークンを1回取るだけの確認（下の 6）には要りません。
+3. Sandbox のテスト店舗を Integration Tech Support へ依頼（上の控え）。
    → **送信済み**。2026-10-13 ごろのやりとりで利用者が Integration Tech Support Form から
-   送信しており、**2026-10-16 現在 Uber からの返信はありません**（送信日の記録は残していません）。
-   **再送・利用者への再依頼は不要**です。返信が来たら店舗IDを受け取って先へ進みます。
+   送信しており、**2026-10-17 現在 Uber からの返信はありません**（送信日の記録は残していません）。
+   **再送・利用者への再依頼は不要**です。返信が来たら店舗IDを受け取ります。
+
+   **この返信は残作業の前提ではありません**（§4 の訂正・2026-10-17）。
+   店舗IDが実際に要るのは `GET /v1/eats/stores` の実データ確認と `POST /pos_data` の2つだけです。
+   それ以外は返信を待たずに進めます。
 4. ログイン連携の裏側（認可画面への受け渡し、戻り先の受け口、トークンの保存と30日ごとの更新、
    店舗一覧の取得、`POST /pos_data`）を実装。
    → **通信の層・設定の受け口・接続の保存先・認可の入口と戻り先まで実装済み**（上の 6 節）。
@@ -439,9 +518,10 @@ requesting production access.
    (c) 認可の入口と戻り先の受け口 → **済み**。
    (d) 受信の署名を Uber の方式へ差し替え
    → **済み（2026-10-16）。検証環境への配備と配備後確認まで完了**。詳しくは §8-4(d) と §6-5。
-   さらに先は、つなぐ店舗を選ぶ画面（`GET /v1/eats/stores` の一覧→選択→`POST /pos_data`）と、
-   30日で切れるトークンの取り直し。店舗を選ぶ画面は新規UIなので、先に新しい Pencil
-   ファイルを作って利用者の承認を得る。
+   (e) つなぐ店舗を選ぶ道（`GET /v1/eats/stores` の一覧→選択→`POST /pos_data`）
+   → **済み（2026-10-17）。ローカル試験まで完了**（§6 の該当項目）。画面は 2026-10-12 に
+   承認済みの DL-4 `X5d8UF` をそのまま使うため、新しい Pencil の承認は不要だった。
+   残るのは、30日で切れるトークンの取り直しと、Sandbox／検証環境での実接続の確認。
 5. ~~利用者が Cloudflare の画面で秘密設定**2件**を自分で登録する~~ → **済み**。
    `nen-line-stg` の Settings → Variables and Secrets に **Encrypted** で2件登録済み
    （値はエージェントを通していません。暗号化で入れているので再配備で消えません）。
@@ -457,17 +537,28 @@ requesting production access.
    最小の実接続（トークン1回）→ **済み**（§6-4）。
    受信の確かめ方の差し替えと検証環境での配備後確認 → **済み**（§8-4(d)・§6-5）。
 
-   上の 3（Sandbox テスト店舗の払い出し依頼）は**送信済みで、Uber の返信待ち**。
-   テスト店舗が用意されると、店舗一覧（`GET /v1/eats/stores`）・`POST /pos_data`・
-   実物の注文通知の受信まで通せる。**利用者の操作は不要**（再送もしない）。
-
    異常系の確認（503・403・413）→ **済み**（§8-5）。
 
-   返信を待つ間に進められる作業（これが次の1手）。
+   上の 3（Sandbox テスト店舗の払い出し依頼）は送信済みで Uber の返信待ちだが、
+   **これを残作業全体の前提にしない**（§4 の訂正・2026-10-17）。
+   返信が要るのは `GET /v1/eats/stores` の実データ確認と `POST /pos_data` だけ。
 
-   - 出前館 手順2（連携希望の連絡）。Uber の返信とは独立に進められる。
-   - 30日で切れるトークンの取り直し。§6-4 のトークンは 2026-10-16 取得・
-     有効 2,592,000 秒なので**期限は 2026-11-15 ごろ**。いま急ぐ必要はない。
+   ### 次の1手（2026-10-17・Uber の返信に依存しない順）
+
+   | 順 | 作業 | 要るもの | 状態 |
+   | --- | --- | --- | --- |
+   | 1 | ~~つなぐ店舗を選ぶ画面を新しい Pencil で設計し承認を得る~~ | — | **不要だった**。2026-10-12 承認の DL-4 `X5d8UF` がその画面。新規UIではない |
+   | 2 | つなぐ店舗を選ぶ道の実装（`GET /v1/eats/stores` の一覧→選択→`POST /pos_data`） | なし | **済み（2026-10-17）**。ローカル試験 100件／画面16件／型検査 |
+   | 3 | 検証環境・Sandbox での実接続の確認（一覧が実データで取れるか、確定が通るか） | Uber のテスト店舗 | **Codex へ引き継ぎ**（遠隔は Claude が触らない） |
+   | 4 | 30日で切れるトークンの取り直し（期限前の自動取得） | なし | 未着手 |
+   | 5 | 注文の通知を受けてデリバリー受注の台帳へ取り込む経路の試験 | なし（模擬の本文で確認） | 未着手 |
+
+   1 を「新規UIなので承認が先」としていたのは誤りで、承認済みフレームの中身をつなぐ作業でした
+   （2026-10-17 訂正）。
+   4 の対象である §6-4 のトークンは 2026-10-16 取得・有効 2,592,000 秒で
+   **期限は 2026-11-15 ごろ**。実害が出る前に入れる。
+
+   出前館 手順2（連携希望の連絡）は Uber とは独立に並行して進む。
 
    ### 6-1. 接続確認（トークン1回）の口
 

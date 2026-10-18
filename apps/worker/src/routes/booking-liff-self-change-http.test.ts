@@ -588,7 +588,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       T1, '2026-11-02T16:00:00.000Z', 'https://meet.google.com/aaa-bbbb-ccc',
     );
     sqlite.prepare(
-      `INSERT INTO meet_consultation_reminders
+      `INSERT INTO meet_consultation_notification_runs
          (id, consultation_id, kind, scheduled_at, status)
        VALUES (?, ?, ?, ?, 'pending'), (?, ?, ?, ?, 'pending')`,
     ).run(
@@ -616,7 +616,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     ).get('consult-1') as { status: string };
     expect(consult.status).toBe('cancelled');
     const meetPending = sqlite.prepare(
-      "SELECT COUNT(*) AS n FROM meet_consultation_reminders WHERE consultation_id = ? AND status IN ('pending','failed')",
+      "SELECT COUNT(*) AS n FROM meet_consultation_notification_runs WHERE consultation_id = ? AND status IN ('pending','failed')",
     ).get('consult-1') as { n: number };
     expect(meetPending.n).toBe(0);
     const calOps = sqlite.prepare(
@@ -672,7 +672,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(consult.status).toBe('confirmed');
     // 前日・1時間前の予定が新日時に組み直される。
     const reminders = sqlite.prepare(
-      'SELECT kind, scheduled_at, status FROM meet_consultation_reminders WHERE consultation_id = ? ORDER BY kind',
+      'SELECT kind, scheduled_at, status FROM meet_consultation_notification_runs WHERE consultation_id = ? AND schedule_revision=(SELECT schedule_revision FROM meet_consultations WHERE id=consultation_id) ORDER BY kind',
     ).all('consult-1') as Array<{ kind: string; scheduled_at: string; status: string }>;
     expect(reminders).toEqual([
       { kind: 'day_before', scheduled_at: '2026-11-01T16:00:00.000Z', status: 'pending' },
@@ -849,7 +849,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(next.starts_at).toBe(T2);
     expect(next.meet_url).toBe('https://meet.google.com/aaa-bbbb-ccc');
     const reminders = sqlite.prepare(
-      'SELECT kind, scheduled_at, status FROM meet_consultation_reminders WHERE consultation_id = ? ORDER BY kind',
+      'SELECT kind, scheduled_at, status FROM meet_consultation_notification_runs WHERE consultation_id = ? AND schedule_revision=(SELECT schedule_revision FROM meet_consultations WHERE id=consultation_id) ORDER BY kind',
     ).all(next.id) as Array<{ kind: string; scheduled_at: string; status: string }>;
     expect(reminders).toEqual([
       { kind: 'day_before', scheduled_at: '2026-11-01T16:00:00.000Z', status: 'pending' },
@@ -883,7 +883,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     ).all() as Array<{ status: string }>;
     expect(consults.every((c) => c.status === 'cancelled')).toBe(true);
     const pending = sqlite.prepare(
-      "SELECT COUNT(*) AS n FROM meet_consultation_reminders WHERE status IN ('pending','failed')",
+      "SELECT COUNT(*) AS n FROM meet_consultation_notification_runs WHERE status IN ('pending','failed')",
     ).get() as { n: number };
     expect(pending.n).toBe(0);
     await drainWaits();
@@ -996,7 +996,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(row.starts_at).toBe(T2);
     expect(row.booking_version).toBe(1);
     const pending = sqlite.prepare(
-      `SELECT kind, scheduled_at, status FROM meet_consultation_reminders
+      `SELECT kind, scheduled_at, status FROM meet_consultation_notification_runs
         WHERE consultation_id = ? AND status IN ('pending','failed') ORDER BY kind`,
     ).all(row.id) as Array<{ kind: string; scheduled_at: string; status: string }>;
     expect(pending).toEqual([
@@ -1078,7 +1078,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(winner.starts_at).toBe(T4);
     expect(winner.booking_version).toBe(3);
     const pending = sqlite.prepare(
-      `SELECT COUNT(*) AS n FROM meet_consultation_reminders
+      `SELECT COUNT(*) AS n FROM meet_consultation_notification_runs
         WHERE consultation_id = ? AND status IN ('pending','failed')`,
     ).get(winner.id) as { n: number };
     expect(pending.n).toBe(2);
@@ -1140,7 +1140,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     ).get('evt-race') as { starts_at: string; booking_version: number; status: string };
     expect(kept).toEqual({ starts_at: T2, booking_version: 2, status: 'confirmed' });
     const children = sqlite.prepare(
-      'SELECT COUNT(*) AS n FROM meet_consultation_reminders WHERE consultation_id = ?',
+      'SELECT COUNT(*) AS n FROM meet_consultation_notification_runs WHERE consultation_id = ?',
     ).get('consult-w') as { n: number };
     expect(children.n).toBe(0);
     const frAfter = (
@@ -1157,7 +1157,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     const dueAt = '2026-10-20T11:00:00.000Z';
     const dueify = (evt: string) => {
       sqlite.prepare(
-        `UPDATE meet_consultation_reminders SET scheduled_at = ?
+        `UPDATE meet_consultation_notification_runs SET scheduled_at = ?
           WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
       ).run(dueAt, evt);
     };
@@ -1192,7 +1192,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       '2026-10-21T00:00:00.000Z', '2026-10-21T01:00:00.000Z', MEET,
     );
     sqlite.prepare(
-      `INSERT INTO meet_consultation_reminders
+      `INSERT INTO meet_consultation_notification_runs
          (id, consultation_id, kind, scheduled_at, status)
        VALUES (?, ?, ?, ?, 'pending')`,
     ).run('mr-legacy', 'consult-legacy', 'hour_before', dueAt);
@@ -1216,7 +1216,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(sent[0].headers.get('x-line-harness-source')).toBeNull();
     // 古い版の通知は送られず pending のまま残る。
     const stalePending = sqlite.prepare(
-      `SELECT COUNT(*) AS n FROM meet_consultation_reminders
+      `SELECT COUNT(*) AS n FROM meet_consultation_notification_runs
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
           AND status IN ('pending','failed')`,
     ).get('evt-linked-stale') as { n: number };
@@ -1282,7 +1282,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       'bk-ab', 5,
     );
     sqlite.prepare(
-      `INSERT INTO meet_consultation_reminders
+      `INSERT INTO meet_consultation_notification_runs
          (id, consultation_id, kind, scheduled_at, status)
        VALUES (?, ?, ?, ?, 'pending'), (?, ?, ?, ?, 'pending')`,
     ).run(
@@ -1359,7 +1359,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(finalRow.status).toBe('cancelled');
     expect(finalRow.cancel_claim_id).toBe(uuidB);
     const pending = sqlite.prepare(
-      "SELECT COUNT(*) AS n FROM meet_consultation_reminders WHERE consultation_id = ? AND status IN ('pending','failed')",
+      "SELECT COUNT(*) AS n FROM meet_consultation_notification_runs WHERE consultation_id = ? AND status IN ('pending','failed')",
     ).get('consult-ab') as { n: number };
     expect(pending.n).toBe(0);
   });
@@ -1436,7 +1436,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     const MEET = 'https://meet.google.com/aaa-bbbb-ccc';
     const dueify = (evt: string, at: string) => {
       sqlite.prepare(
-        `UPDATE meet_consultation_reminders SET scheduled_at = ?
+        `UPDATE meet_consultation_notification_runs SET scheduled_at = ?
           WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
       ).run(at, evt);
     };
@@ -1488,13 +1488,13 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(((await sent[0].json()) as { to: string }).to).toBe('U-self-1');
     expect(((await sent[1].json()) as { to: string }).to).toBe('U-self-1');
     const r1sent = sqlite.prepare(
-      `SELECT status FROM meet_consultation_reminders
+      `SELECT status FROM meet_consultation_notification_runs
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
     ).all('evt-push-r1') as Array<{ status: string }>;
     expect(r1sent.every((r) => r.status === 'sent')).toBe(true);
     // R2 の旧通知は送られず、取消として整理される (旧本文の送信0)。
     const r2all = sqlite.prepare(
-      `SELECT status FROM meet_consultation_reminders
+      `SELECT status FROM meet_consultation_notification_runs
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
     ).all('evt-push-r2') as Array<{ status: string }>;
     expect(r2all.every((r) => r.status === 'cancelled')).toBe(true);
@@ -1534,11 +1534,11 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       startsAt: T2, endsAt: T3, meetUrl: MEET, bookingId: r3, bookingVersion: 0,
     });
     sqlite.prepare(
-      `UPDATE meet_consultation_reminders SET scheduled_at = ?
+      `UPDATE meet_consultation_notification_runs SET scheduled_at = ?
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
     ).run('2026-10-20T10:00:00.000Z', 'evt-push-both');
     const before = sqlite.prepare(
-      `SELECT id, kind FROM meet_consultation_reminders
+      `SELECT id, kind FROM meet_consultation_notification_runs
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
     ).all('evt-push-both') as Array<{ id: string; kind: string }>;
     expect(before).toHaveLength(2);
@@ -1568,11 +1568,13 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(((await sent[0].json()) as { to: string }).to).toBe('U-self-1');
     // 旧sent確定は新版へ再利用ずみの行に当たらず、子ID・新日時・pendingが不変。
     const after = sqlite.prepare(
-      `SELECT id, kind, status, scheduled_at FROM meet_consultation_reminders
-        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
+      `SELECT id, kind, status, scheduled_at FROM meet_consultation_notification_runs
+        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?) AND schedule_revision=(SELECT schedule_revision FROM meet_consultations WHERE id=consultation_id)
         ORDER BY kind`,
     ).all('evt-push-both') as Array<{ id: string; kind: string; status: string; scheduled_at: string }>;
-    expect(after.map((r) => r.id).sort()).toEqual(before.map((r) => r.id).sort());
+    expect(after).toHaveLength(2);
+    expect(after.every(r=>!before.some(old=>old.id===r.id))).toBe(true);
+    expect(sqlite.prepare('SELECT COUNT(*) n FROM meet_consultation_notification_runs WHERE id IN(?,?)').get(before[0].id,before[1].id)).toEqual({n:2});
     expect(after).toEqual([
       { id: after[0].id, kind: 'day_before', status: 'pending', scheduled_at: '2026-11-01T17:00:00.000Z' },
       { id: after[1].id, kind: 'hour_before', status: 'pending', scheduled_at: '2026-11-02T16:00:00.000Z' },
@@ -1598,11 +1600,11 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       startsAt: T2, endsAt: T3, meetUrl: MEET, bookingId: r4, bookingVersion: 0,
     });
     sqlite.prepare(
-      `UPDATE meet_consultation_reminders SET scheduled_at = ?
+      `UPDATE meet_consultation_notification_runs SET scheduled_at = ?
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
     ).run('2026-10-20T10:00:00.000Z', 'evt-push-both-fail');
     const before = sqlite.prepare(
-      `SELECT id FROM meet_consultation_reminders
+      `SELECT id FROM meet_consultation_notification_runs
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)`,
     ).all('evt-push-both-fail') as Array<{ id: string }>;
     // push が落ちる前に実再登録で新版へ進める。旧catchのfailed確定は
@@ -1625,13 +1627,15 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(run.sent).toBe(0);
     expect(run.failed).toBe(1);
     const after = sqlite.prepare(
-      `SELECT id, kind, status, scheduled_at, retry_count FROM meet_consultation_reminders
-        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
+      `SELECT id, kind, status, scheduled_at, retry_count FROM meet_consultation_notification_runs
+        WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?) AND schedule_revision=(SELECT schedule_revision FROM meet_consultations WHERE id=consultation_id)
         ORDER BY kind`,
     ).all('evt-push-both-fail') as Array<{ id: string; kind: string; status: string; scheduled_at: string; retry_count: number }>;
     // 旧dueの2行のうち、落ちた行は新版pendingのまま (failedにしない)。
     // もう1行は旧候補のまま整理されるが、新版へ再利用ずみなら残る。
-    expect(after.map((r) => r.id).sort()).toEqual(before.map((r) => r.id).sort());
+    expect(after).toHaveLength(2);
+    expect(after.every(r=>!before.some(old=>old.id===r.id))).toBe(true);
+    expect(sqlite.prepare('SELECT COUNT(*) n FROM meet_consultation_notification_runs WHERE id IN(?,?)').get(before[0].id,before[1].id)).toEqual({n:2});
     const failedRows = after.filter((r) => r.status === 'failed');
     expect(failedRows).toHaveLength(0);
     expect(after.every((r) => r.status === 'pending')).toBe(true);
@@ -1678,8 +1682,8 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       sqlite.prepare('SELECT id FROM meet_consultations WHERE external_event_id = ?').get(evt) as { id: string }
     ).id;
     const children = sqlite.prepare(
-      `SELECT kind, scheduled_at, status FROM meet_consultation_reminders
-        WHERE consultation_id = ? ORDER BY kind`,
+      `SELECT kind, scheduled_at, status FROM meet_consultation_notification_runs
+        WHERE consultation_id = ? AND schedule_revision=(SELECT schedule_revision FROM meet_consultations WHERE id=consultation_id) ORDER BY kind`,
     ).all(cid) as Array<{ kind: string; scheduled_at: string; status: string }>;
     expect(children).toEqual([
       { kind: 'day_before', scheduled_at: '2026-11-01T16:00:00.000Z', status: 'pending' },
@@ -1741,7 +1745,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       `UPDATE meet_consultations SET starts_at = ?, ends_at = ? WHERE external_event_id = ?`,
     ).run('2026-10-21T00:00:00.000Z', '2026-10-21T01:00:00.000Z', 'evt-dead');
     sqlite.prepare(
-      `UPDATE meet_consultation_reminders SET scheduled_at = ? WHERE consultation_id = ?`,
+      `UPDATE meet_consultation_notification_runs SET scheduled_at = ? WHERE consultation_id = ?`,
     ).run('2026-10-20T11:00:00.000Z', 'consult-1');
     // 対照：有効な予約の相談は送られる。
     const liveId = await adminCreate('menu-ok', T1, 'due-live');
@@ -1755,7 +1759,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       '2026-10-21T00:00:00.000Z', '2026-10-21T01:00:00.000Z', 'https://meet.google.com/aaa-bbbb-ccc',
     );
     sqlite.prepare(
-      `INSERT INTO meet_consultation_reminders
+      `INSERT INTO meet_consultation_notification_runs
          (id, consultation_id, kind, scheduled_at, status)
        VALUES (?, ?, ?, ?, 'pending')`,
     ).run('mr-live', 'consult-2', 'hour_before', '2026-10-20T11:00:00.000Z');
@@ -1776,7 +1780,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
     expect(sent[0].headers.get('x-line-harness-source')).toBeNull();
     // 取消ずみ側は送られず、pending のまま残る（回収は取消再送の役目）。
     const dead = sqlite.prepare(
-      "SELECT COUNT(*) AS n FROM meet_consultation_reminders WHERE consultation_id = ? AND status IN ('pending','failed')",
+      "SELECT COUNT(*) AS n FROM meet_consultation_notification_runs WHERE consultation_id = ? AND status IN ('pending','failed')",
     ).get('consult-1') as { n: number };
     expect(dead.n).toBe(2);
   });
