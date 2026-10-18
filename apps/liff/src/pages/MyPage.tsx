@@ -87,7 +87,7 @@ export default function MyPage() {
   const go = (pathname: string) => navigate({ pathname, search });
 
   const [name, setName] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ upcoming: BookingHistoryItem[] } | null>(null);
+  const [history, setHistory] = useState<{ upcoming: BookingHistoryItem[]; hasPast: boolean } | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [nextPayment, setNextPayment] = useState<PaymentView | null>(null);
@@ -113,7 +113,7 @@ export default function MyPage() {
   useEffect(() => {
     setFailed(false);
     api.me().then((r) => {
-      setHistory({ upcoming: r.upcoming });
+      setHistory({ upcoming: r.upcoming, hasPast: r.past.length > 0 });
       const next = r.upcoming[0];
       if (next) void loadPaymentViews(r.upcoming).then((views) => {
         setNextPayment(views[next.id] ?? null);
@@ -215,6 +215,8 @@ export default function MyPage() {
   }
 
   const next = history?.upcoming[0] ?? null;
+  const visiblePrefs = prefs && typeof prefs === 'object'
+    ? prefs.items.filter((item) => !(style === 'ec' && !next && item.purpose === 'booking_reminders')) : null;
 
   /** ［お支払いへ進む］：予約の 5 段目と同じ口（同じ申込は同じページ）。支払いのページは外のブラウザで開く。 */
   async function runPay(booking: BookingHistoryItem) {
@@ -243,7 +245,7 @@ export default function MyPage() {
       <div data-design-node="L5g75" className="mx-auto w-full max-w-md space-y-3 px-4 pt-3 pb-10">
         <PageHeading title={name ?? undefined}>{name ? `${name} さん` : 'マイページ'}</PageHeading>
         {failed ? (
-          <LoadErrorView note="予約はなくなっていません。" onRetry={() => setReloadKey((k) => k + 1)} />
+          <LoadErrorView note={style === 'ec' ? '情報はなくなっていません。' : '予約はなくなっていません。'} onRetry={() => setReloadKey((k) => k + 1)} />
         ) : !history ? (
           <LoadingView />
         ) : (
@@ -252,15 +254,16 @@ export default function MyPage() {
             {unpaid ? <UnpaidCard booking={unpaid.booking} payment={unpaid.payment} busy={payBusy} onPay={() => void runPay(unpaid.booking)} /> : null}
             {next ? (
               <NextBookingCard booking={next} payment={nextPayment} onChange={() => go('/booking/history')} onDetail={() => go('/booking/history')} />
-            ) : (
+            ) : style !== 'ec' ? (
               <Card className="flex items-center justify-between gap-3 p-3.5">
                 <p className="text-sm text-ink-secondary">次の予約はありません</p>
                 {style !== 'ec' && style !== 'lesson' ? <Button variant="compact-secondary" className="w-auto shrink-0" onClick={() => go('/booking')}>予約する</Button> : null}
               </Card>
-            )}
+            ) : null}
 
             <Card className="py-0.5">
               <ul>
+                {style === 'ec' && (history.hasPast || next) ? <MenuRow icon="calendar" label="予約の履歴" state={{ kind: 'value', text: '' }} onPress={() => go('/booking/history')} /> : null}
                 {style === 'lesson' ? <MenuRow icon="calendar" label="予約の確認・振替" state={{ kind: 'value', text: '' }} onPress={() => go('/events/me')} /> : null}
                 <MenuRow icon="hourglass" label="キャンセル待ち" state={waitlist}
                   onPress={() => waitlist.kind === 'error' ? setReloadKey((k) => k + 1) : go('/booking/history')} />
@@ -285,7 +288,7 @@ export default function MyPage() {
             </Card>
             {notice && <p role="status" className="text-[13px] leading-5 text-ink-secondary">{notice}</p>}
 
-            <Card className="space-y-2.5 p-3.5">
+            {style !== 'ec' || visiblePrefs?.length !== 0 ? <Card className="space-y-2.5 p-3.5">
               <h2 className="text-sm font-bold text-ink">お知らせの受け取り</h2>
               {prefs === null ? (
                 <p className="text-[13px] text-liff-sub">読み込んでいます…</p>
@@ -295,13 +298,13 @@ export default function MyPage() {
                 <p className="text-[13px] leading-5 text-liff-sub">{`お知らせごとの受け取りの設定は${COMING_SOON}。`}</p>
               ) : (
                 <ul className="space-y-2">
-                  {prefs.items.map((item) => (
+                  {visiblePrefs?.map((item) => (
                     <PrefRow key={item.purpose} item={item} busy={prefBusy} onToggle={() => void togglePref(item)} />
                   ))}
                 </ul>
               )}
               {prefError && <FieldError>{prefError}</FieldError>}
-            </Card>
+            </Card> : null}
           </>
         )}
       </div>

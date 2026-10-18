@@ -52,10 +52,13 @@ it.each(['standard', 'restaurant', 'salon', 'consult'])('%s の入口は同じ�
 });
 
 it('ECの入口はマイページで、新しい予約ボタンを出さない', async () => {
+  vi.mocked(api.notificationPreferences).mockResolvedValue({ purposeSpecificEnforcement: true, items: [{ purpose: 'booking_reminders', enabled: true, version: 1, label: '予約のお知らせ' }] } as never);
   mount('ec');
-  await screen.findByText('次の予約はありません');
+  await screen.findByRole('button', { name: /クーポン/ });
   expect(screen.getByTestId('location').textContent).toBe('/mypage?liffId=fixture');
   expect(screen.queryByRole('button', { name: '予約する' })).toBeNull();
+  expect(screen.queryByText('次の予約はありません')).toBeNull();
+  expect(screen.queryByText('予約のお知らせ')).toBeNull();
 });
 
 it('ECの古い予約リンクを開いてもメニュー・送信を出さない', async () => {
@@ -64,7 +67,16 @@ it('ECの古い予約リンクを開いてもメニュー・送信を出さな�
   expect(api.menus).not.toHaveBeenCalled();
   expect(api.createRequest).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'マイページを見る' }));
-  await screen.findByText('次の予約はありません');
+  await screen.findByRole('button', { name: /クーポン/ });
+});
+
+it('ECで予約を使った記録があれば、予約を新規作成させず履歴を開ける', async () => {
+  vi.mocked(api.me).mockResolvedValue({ upcoming: [], past: [{ id: 'old', menu_name: '前の予約', status: 'completed', starts_at: '2020-01-01T01:00:00Z', staff_name: '担当', profile_image_url: null }] });
+  mount('ec');
+  fireEvent.click(await screen.findByRole('button', { name: /予約の履歴/ }));
+  fireEvent.click(await screen.findByRole('tab', { name: 'これまで' }));
+  expect(await screen.findByText('前の予約')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '新しく予約する' })).toBeNull();
 });
 
 it('ECでも過去の予約は読めるが、新しく予約する入口は出さない', async () => {
