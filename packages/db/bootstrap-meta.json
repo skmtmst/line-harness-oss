@@ -641,7 +641,8 @@
     "723_ec_auto_line_attribution.sql",
     "724_booking_pass_purchases.sql",
     "725_broadcast_execution_contexts.sql",
-    "726_auth_known_devices.sql"
+    "726_auth_known_devices.sql",
+    "735_booking_photos.sql"
   ],
-  "migrationCount": 642
+  "migrationCount": 643
 }

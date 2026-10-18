@@ -24,7 +24,7 @@ import { createFeatureJobGate } from './feature-enforcement.js';
  */
 
 /** どのテーブルの、どの列を見るか。 */
-const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; columns: string[] }> = [
+const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; columns: string[]; mediaIdMatch?: boolean; activeOnly?: boolean }> = [
   {
     refKind: 'template',
     table: 'templates',
@@ -48,10 +48,14 @@ const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; c
   { refKind: 'nen_column', table: 'nen_columns', idColumn: 'id', columns: ['image_url'] },
   { refKind: 'event', table: 'events', idColumn: 'id', columns: ['image_url', 'og_image_url'] },
   { refKind: 'webinar', table: 'webinars', idColumn: 'id', columns: ['video_prefix'] },
+  { refKind: 'booking_menu', table: 'menus', idColumn: 'id', columns: ['photo_media_id'], mediaIdMatch: true, activeOnly: true },
+  { refKind: 'booking_staff', table: 'staff', idColumn: 'id', columns: ['photo_media_id'], mediaIdMatch: true, activeOnly: true },
+  { refKind: 'booking_settings', table: 'booking_settings', idColumn: 'id', columns: ['store_photo_media_id', 'store_photo_interior_media_id', 'store_photo_waiting_media_id'], mediaIdMatch: true },
 ];
 
 /** 店の6種類は同じテンプレート参照として点検する。 */
 function sourceTable(source: typeof SOURCES[number]): string {
+  if (source.activeOnly) return `(SELECT id,${source.columns.join(',')} FROM ${source.table} WHERE deleted_at IS NULL)`;
   if (source.refKind !== 'template') return source.table;
   return `(SELECT id, message_content, draft_message_content FROM templates
     UNION ALL SELECT id, payload_json AS message_content,
@@ -65,7 +69,7 @@ export interface ScanResult {
   source?: MediaRefKind;
   sourceRows?: number;
   cycleCompleted?: boolean;
-  /** 表そのものが無くて読めなかった読み口（R34）。空なら7種類すべて読めた。 */
+  /** 表そのものが無くて読めなかった読み口（R34）。空ならすべての使用先読めた。 */
   skippedTables?: string[];
 }
 
@@ -96,6 +100,7 @@ function usageMatchTokens(item: MediaToScan, versionTokens: string[]): string[] 
 async function findMatches(
   db: D1Database,
   tokens: string[],
+  mediaId: string,
 ): Promise<{
   matches: Array<{ refKind: MediaRefKind; refId: string }>;
   /** 表そのものが無くて読めなかった読み口（R34）。 */
@@ -106,8 +111,9 @@ async function findMatches(
   const seen = new Set<string>();
   for (const source of SOURCES) {
     try {
-      for (let index = 0; index < tokens.length; index += MATCH_TOKEN_CHUNK) {
-        const chunk = tokens.slice(index, index + MATCH_TOKEN_CHUNK);
+      const sourceTokens = source.mediaIdMatch ? [mediaId] : tokens;
+      for (let index = 0; index < sourceTokens.length; index += MATCH_TOKEN_CHUNK) {
+        const chunk = sourceTokens.slice(index, index + MATCH_TOKEN_CHUNK);
         // LIKE '%...%' だと、R2キーやライブURLのような長いトークンでD1が
         // 「LIKE or GLOB pattern too complex」を返して全読み口が503になる
         // （staging実測：85文字のR2キーで発生、D1側のLIKEパターン長の壁は50文字）。
@@ -115,7 +121,7 @@ async function findMatches(
         // 副作用として、トークンに %・_ が含まれていても誤ってワイルドカード
         // 扱いされなくなる（以前は意図せずヒットが広がる可能性があった）。
         const conditions = source.columns
-          .flatMap((col) => chunk.map(() => `instr(${col}, ?) > 0`))
+          .flatMap((col) => chunk.map(() => source.mediaIdMatch ? `${col} = ?` : `instr(${col}, ?) > 0`))
           .join(' OR ');
         const binds = source.columns.flatMap(() => chunk.map((token) => token));
         const rows = await db
@@ -166,7 +172,7 @@ export async function scanSingleMediaUsage(
     logger.error("services_media_usage_scan_failed");
     skippedTables.push('media_versions');
   }
-  const found = await findMatches(db, usageMatchTokens(item, versionTokens));
+  const found = await findMatches(db, usageMatchTokens(item, versionTokens), item.id);
   skippedTables.push(...found.skippedTables);
   for (const match of found.matches) {
     await recordMediaUsage(db, {
@@ -222,7 +228,7 @@ export async function scanMediaUsage(
   const lastRefId = stateIsValid ? state.lastRefId : '';
 
   // 参照走査と古い記録の整理を同じcronへ載せると、整理件数分だけ上限を超える。
-  // 7種類を読み終えた次のcronから、整理だけを上限付きで続ける。
+  // すべての使用先を読み終えた次のcronから、整理だけを上限付きで続ける。
   if (sourceIndex === SOURCES.length) {
     const pruned = await pruneStaleMediaUsagesBatch(
       db,
@@ -291,7 +297,10 @@ export async function scanMediaUsage(
     const rowUsages: typeof usages = [];
     for (const item of media.results) {
       const tokens = usageMatchTokens(item, tokenMap.get(item.id) ?? []);
-      if (tokens.some((token) => searchable.includes(token))) {
+      const matches = source.mediaIdMatch
+        ? source.columns.some(column => row[column] === item.id)
+        : tokens.some((token) => searchable.includes(token));
+      if (matches) {
         rowUsages.push({ mediaId: item.id, refKind: source.refKind, refId: String(row.ref_id) });
       }
     }
