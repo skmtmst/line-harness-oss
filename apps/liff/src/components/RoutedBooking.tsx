@@ -11,7 +11,7 @@ import Icon from './ui/Icon.js';
 export function RoutedBanner({ target }: { target: RoutedTarget }) {
   const words = useCustomerWords();
   const mode = target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : target.meetingMode === 'in_person' ? '対面' : null;
-  const meta = [target.staffName ? `担当：${target.staffName}` : null, mode, bookingPriceText(target.price, target.price > 0 ? 'fixed' : 'free')].filter(Boolean).join(' ・ ');
+  const meta = [target.staffName ? `${words.staff}：${target.staffName}` : null, mode, bookingPriceText(target.price, target.price > 0 ? 'fixed' : 'free')].filter(Boolean).join(' ・ ');
   return (
     <section data-routed-banner aria-label="ご案内" className="space-y-2 rounded-(--liff-radius-lg) bg-liff-soft p-3.5 outline-2 -outline-offset-1 outline-liff-primary">
       <p className="text-[15px] leading-6 font-bold text-ink">{`ご相談の内容に合わせて〈${target.menuName}〉をご案内します`}</p>
@@ -41,7 +41,7 @@ export function RoutedConfirm({ target, whenText }: { target: RoutedTarget; when
   const rows: Array<[string, string]> = [
     [words.bookingContent, target.menuName],
     ['日時', whenText],
-    ...(target.staffName ? [['担当', target.staffName] as [string, string]] : []),
+    ...(target.staffName ? [[words.staff, target.staffName] as [string, string]] : []),
     ...(target.meetingMode ? [['形式', target.meetingMode === 'online' ? 'オンライン（Zoom・Meet）' : '対面'] as [string, string]] : []),
     ['料金', bookingPriceText(target.price, target.price > 0 ? 'fixed' : 'free')],
   ];

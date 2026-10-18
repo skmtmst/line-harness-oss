@@ -1,4 +1,4 @@
-import { useCustomerWords } from '../components/CustomerStyleScope.js';
+import { useCustomerWords, useCustomerStyle } from '../components/CustomerStyleScope.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import SeatBookingBlock from '../components/SeatBookingBlock.js';
 import { restaurantBookingApi } from '../lib/api.js';
@@ -41,6 +41,13 @@ import { type AddressDraft, AddressFields } from "../components/form-address-fie
  */
 
 type Answers = Record<string, unknown>;
+
+/** 予約欄の追加情報。既存の回答の日時・担当と同じ単位で保持する。 */
+function formMeetingMode(value: unknown): 'online' | 'in_person' | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const mode = (value as Record<string, unknown>).meetingMode;
+  return mode === 'online' || mode === 'in_person' ? mode : null;
+}
 
 /** 選択肢を選んだ状態から、はじめの値を作る。 */
 function initialAnswers(layout: FormLayout, availability?: FormAvailability): Answers {
@@ -94,6 +101,7 @@ function OtherTextInput({
 
 export default function Form() {
   const words = useCustomerWords();
+  const style = useCustomerStyle();
   const route = useParams<{ id: string }>();
   const [search] = useSearchParams();
   const id = route.id ?? search.get('id') ?? undefined;
@@ -306,6 +314,10 @@ export default function Form() {
       if (block.name in errors) continue;
       const message = validateAnswer(block, answers[block.name]);
       if (message) errors[block.name] = message;
+      const picked = block.type === 'booking' ? normalizeBookingValue(answers[block.name]) : null;
+      if (style === 'consult' && picked && picked.kind !== 'seats' && !formMeetingMode(answers[block.name])) {
+        errors[block.name] = '会い方を選んでから日時を選び直してください。';
+      }
     }
     return { errors, first: Object.values(errors)[0] ?? null };
   };
@@ -379,11 +391,14 @@ export default function Form() {
     for (const { block, picked } of targets) {
       if (!request.isCurrent(generation)) return null;
       const slot = picked!;
+      const meetingMode = formMeetingMode(answers[block.name])
+        ?? (routingBlock?.id === block.id && routed?.status === 'ready' ? routed.target.meetingMode : null);
+      if (style === 'consult' && slot.kind !== 'seats' && !meetingMode) return '会い方を確かめてから日時を選び直してください。回答は保存されています。';
       try {
         const res = slot.kind === 'seats'
           ? (await restaurantBookingApi.formBooking({formId:id!,blockId:block.id,submissionKey:key})).data
           : await api.createRequest(
-          { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt, ...(routingToken.current && routingBlock?.id === block.id ? { routingToken: routingToken.current } : {}) },
+          { menu_id: slot.menuId, staff_id: slot.staffId, starts_at: slot.startsAt, ...(meetingMode ? { meeting_mode: meetingMode } : {}), ...(routingToken.current && routingBlock?.id === block.id ? { routingToken: routingToken.current } : {}) },
           `${key}:booking:${block.id}`,
         );
         if (!request.isCurrent(generation)) return null;
@@ -785,6 +800,7 @@ function PeopleBookingSlotPicker({
   onRoutedEmpty?: (empty: boolean) => void;
 }) {
   const words = useCustomerWords();
+  const style = useCustomerStyle();
   /* 答えで行き先が決まったら、フォームで決めたメニュー・担当より答えの行き先が先（担当は選ばせない）。 */
   const target = routed?.status === 'ready' ? routed.target : null;
   const menuId = target?.menuId ?? block.booking?.menuId ?? '';
@@ -801,6 +817,12 @@ function PeopleBookingSlotPicker({
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [draftMode, setChosenMode] = useState<'online' | 'in_person' | null>(null);
+  const chosenMode = formMeetingMode(value) ?? draftMode;
+  const modeSetting = target?.meetingMode ?? menu?.meeting_mode;
+  const meetingMode = modeSetting === 'customer_choice' ? chosenMode
+    : modeSetting === 'online' || modeSetting === 'in_person' ? modeSetting : null;
+  const missingMode = (style === 'consult' || modeSetting === 'customer_choice') && !meetingMode;
 
   // メニューと担当を読む。担当の指定が無いときは選べるように出す。
   useEffect(() => {
@@ -916,6 +938,20 @@ function PeopleBookingSlotPicker({
         </p>
       )}
       {target ? <RoutedBanner target={target} /> : null}
+      {modeSetting === 'customer_choice' ? <fieldset className="space-y-2">
+        <legend className="mb-2 text-sm font-bold text-ink">会い方を選んでください</legend>
+        {(['online', 'in_person'] as const).map(mode => <FormChoiceRow key={mode} selected={meetingMode === mode}>
+          <ChoiceInput type="radio" name={`meeting-mode-${block.id}`} value={mode} checked={meetingMode === mode} onChange={() => {
+            setChosenMode(mode);
+            // 会い方を変えたときも、同じ日時の回答に結び付ける。
+            if (picked) {
+              const next = { ...picked, meetingMode: mode };
+              onChange(next);
+            }
+          }} />{mode === 'online' ? 'オンライン' : '対面'}
+        </FormChoiceRow>)}
+      </fieldset> : style === 'consult' && !meetingMode ? <p role="alert" className="text-sm text-danger">会い方を読み込めませんでした。時間をおいて開き直してください。</p>
+        : meetingMode && !target && (style === 'consult' || meetingMode === 'online') ? <p className="text-xs text-liff-sub">会い方：{meetingMode === 'online' ? 'オンライン' : '対面'}</p> : null}
       {target && !emptyRouted ? <h2 className="pt-1 text-xl font-bold text-ink">日時を選んでください</h2> : null}
       {!target && !fixedStaffId && staffList.length > 1 && (
         <div className="flex flex-wrap gap-2">
@@ -939,12 +975,13 @@ function PeopleBookingSlotPicker({
         days={dates.map((d) => ({ date: d, weekday: formatWeekday(d), day: Number(d.slice(8, 10)), open: hasOpen(d) }))}
         selectedDate={selectedDate ?? ''}
         onDate={setSelectedDate}
-        times={selectedDate ? daySlots.map((t) => ({ start: t.start, open: t.open, selected: picked?.startsAt === slotStartsAtIso({ date: selectedDate, start: t.start, startUtc: t.startUtc }) })) : []}
+        times={selectedDate ? daySlots.map((t) => ({ start: t.start, open: t.open && !missingMode, selected: picked?.startsAt === slotStartsAtIso({ date: selectedDate, start: t.start, startUtc: t.startUtc }) })) : []}
         onTime={(start) => {
           const t = daySlots.find((slot) => slot.start === start);
-          if (!t || !t.open || !selectedDate) return;
+          if (!t || !t.open || !selectedDate || missingMode) return;
           const startsAt = slotStartsAtIso({ date: selectedDate, start: t.start, startUtc: t.startUtc });
-          onChange(picked?.startsAt === startsAt ? '' : { menuId, staffId: fixedStaffId ?? staffId, startsAt });
+          const next = { menuId, staffId: fixedStaffId ?? staffId, startsAt, ...(meetingMode ? { meetingMode } : {}) };
+          onChange(picked?.startsAt === startsAt ? '' : next);
         }}
       />{target ? <p className="mt-2 text-xs text-liff-sub">灰色の日は空きがありません</p> : null}</div>}
       {!dates.some(hasOpen) && (target

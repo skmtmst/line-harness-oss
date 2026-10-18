@@ -224,7 +224,7 @@ export default function Confirm({
           value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, party ? totals(party, menu).minutes : staff.duration_minutes)}`}
         />
         {party ? null : <Row alignEnd={policy !== null} label={words.staff} value={staff.display_name} />}
-        {meetingMode ? <Row alignEnd={policy !== null} label="会い方" value={meetingMode === 'online' ? 'オンライン' : '対面'} /> : null}
+        {meetingMode && (style === 'consult' || menu.meeting_mode === 'customer_choice' || meetingMode === 'online') ? <Row alignEnd={policy !== null} label="会い方" value={meetingMode === 'online' ? 'オンライン' : '対面'} /> : null}
         <Row
           alignEnd={policy !== null}
           label="料金"
