@@ -256,7 +256,7 @@ export default function EventBookings() {
             )}
             {style === 'lesson' && tab === 'upcoming' ? <>
               <Button variant="secondary" onClick={() => navigate({ pathname: '/mypage', search })}>回数券と月謝を見る</Button>
-              <LessonHistorySection key={lessonRevision} creditsOnly onPicking={setPickingMakeup} onLater={() => navigate({ pathname: '/mypage', search })} />
+              <LessonHistorySection key={lessonRevision} creditsOnly onPicking={setPickingMakeup} onBookingChanged={() => void refresh()} onLater={() => navigate({ pathname: '/mypage', search })} />
             </> : null}
             {items.length === 0 ? (
               tab === 'upcoming' && pickingMakeup ? null : tab === 'upcoming' ? (

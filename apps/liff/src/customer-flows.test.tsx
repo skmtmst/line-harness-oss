@@ -167,3 +167,23 @@ it.each([false, true])('通常の申込が空でも、振替の選択中=%sで�
     expect(await screen.findByText('これからのクラスはありません')).toBeTruthy();
   }
 });
+
+it('振替を使い終えたら本人の最新一覧を読み直し、新しい申込を表示する', async () => {
+  let used = false;
+  vi.mocked(api.myEventBookings).mockImplementation(async () => ({ items: used
+    ? [{ ...booking, id: 'after-makeup', event_name: '振替後のクラス' }] : [] }));
+  vi.mocked(api.makeupCredits).mockImplementation(async () => ({ credits: used ? []
+    : [{ id: 'credit', status: 'open', expires_at: '2099-12-31T00:00:00Z' }] } as never));
+  vi.mocked(api.makeupOptions).mockResolvedValue({ options: [{
+    slot_id: 'next-slot', event_id: 'e', starts_at: slot.starts_at, ends_at: slot.ends_at,
+    name: '振替後のクラス', full: false, remaining: 3,
+  }] });
+  vi.mocked(api.useMakeup).mockImplementation(async () => { used = true; return { id: 'after-makeup', status: 'confirmed' }; });
+  mount('lesson');
+  fireEvent.click(await screen.findByRole('button', { name: /に振り替える$/ }));
+  expect(await screen.findByRole('button', { name: /^キャンセルする$/ })).toBeTruthy();
+  await vi.waitFor(() => expect(screen.queryByRole('heading', { name: '振替先を選ぶ' })).toBeNull());
+  expect(screen.getByText('振替後のクラス')).toBeTruthy();
+  expect(screen.queryByText('これからのクラスはありません')).toBeNull();
+  expect(api.useMakeup).toHaveBeenCalledTimes(1);
+});

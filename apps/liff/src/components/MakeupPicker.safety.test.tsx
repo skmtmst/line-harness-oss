@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import MakeupPicker from './MakeupPicker.js';
 import { api, type MakeupCredit } from '../lib/api.js';
@@ -53,5 +53,19 @@ it.each([403, 404])('別人・別店の拒否 (%s) を成功にせず残りを�
   render(<MakeupPicker credit={credit} onUsed={used} />);
   fireEvent.click(await screen.findByRole('button', { name: /に振り替える/ }));
   expect(await screen.findByText(/振替を予約できませんでした。振替は残っています/)).toBeTruthy();
+  expect(used).not.toHaveBeenCalled();
+});
+
+it('画面を離れた後の完了で、古い画面の一覧を読み直さない', async () => {
+  let finish: (() => void) | undefined;
+  vi.mocked(api.useMakeup).mockImplementation(() => new Promise(resolve => {
+    finish = () => resolve({ id: 'new', status: 'confirmed' });
+  }));
+  const used = vi.fn();
+  const view = render(<MakeupPicker credit={credit} onUsed={used} />);
+  fireEvent.click(await screen.findByRole('button', { name: /に振り替える/ }));
+  expect(api.useMakeup).toHaveBeenCalledTimes(1);
+  view.unmount();
+  await act(async () => { finish!(); });
   expect(used).not.toHaveBeenCalled();
 });

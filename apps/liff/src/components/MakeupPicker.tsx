@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type MakeupCredit, type MakeupOption } from '../lib/api.js';
 import { addDays, formatMd, formatWeekday, jstToday, utcToJstHm } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
+import { useRequestGeneration } from '../lib/use-request-generation.js';
 import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import Icon from './ui/Icon.js';
@@ -42,6 +43,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   const [error, setError] = useState<string | null>(null);
   const key = useRef(crypto.randomUUID());
   const generation = useRef(0);
+  const request = useRequestGeneration(credit.id);
 
   const load = useCallback(() => {
     const version = ++generation.current;
@@ -72,13 +74,15 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   async function use() {
     if (!chosen || chosen.full || busy || credit.status !== 'open' || !Number.isFinite(expires) || Date.now() >= expires || Date.parse(chosen.starts_at) > expires || Date.parse(chosen.starts_at) <= Date.now()) return;
     setBusy(true); setError(null);
-    try { await api.useMakeup(credit.id, chosen.slot_id, key.current); onUsed(); }
+    const version = request.begin();
+    try { await api.useMakeup(credit.id, chosen.slot_id, key.current); if (request.isCurrent(version)) onUsed(); }
     catch (e) {
+      if (!request.isCurrent(version)) return;
       logFailure('makeup-use', e);
       const code = (e as { body?: { error?: string } }).body?.error;
       if (code === 'slot_full' || code === 'slot_conflict') { key.current = crypto.randomUUID(); setError('この回は埋まりました。ほかの回を選んでください。振替は残っています。'); load(); }
       else setError('振替を予約できませんでした。振替は残っています。もう一度お試しください。');
-    } finally { setBusy(false); }
+    } finally { if (request.isCurrent(version)) setBusy(false); }
   }
 
   if (!usable) return <StatusView icon="calendar-x" title={credit.status !== 'open' ? 'この振替は使えません' : Number.isFinite(expires) ? '振替の期限を過ぎています' : '振替の期限を読み込めませんでした'} body="教室にLINEでご連絡ください。" />;
