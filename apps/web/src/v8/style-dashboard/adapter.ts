@@ -72,7 +72,7 @@ function newKpi(s: StyleSnapshot, href: string, range: DashboardRange): StyleKpi
 
 /** 支払いの数は決済の口（API 組3）から。まだ無いので値を作らず、押すと準備中の窓（画面側で開く）。 */
 function paymentKpi(range: DashboardRange): StyleKpi {
-  return { id: 'income', title: `${RANGE_WORD[range]}の入金`, value: null, unit: '', delta: null, detail: 'カードの請求は準備中です', link: { label: 'くわしく', href: '#preparing-payment' }, help: 'オンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。' }
+  return { id: 'income', title: `${RANGE_WORD[range]}の入金`, value: null, unit: '', delta: null, detail: `カードの請求は${term('S24')}`, link: { label: 'くわしく', href: '#preparing-payment' }, help: 'オンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。' }
 }
 
 export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: DashboardRange): StyleKpi[] {

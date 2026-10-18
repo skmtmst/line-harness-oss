@@ -23,7 +23,7 @@ export async function loadFirstRunSteps(accountId: string | null): Promise<StepR
 }
 
 export function useFirstRun(accountId: string | null, enabled = true) {
-  const [snapshot, setSnapshot] = useState<{ accountId: string | null; steps: StepResult[]; status: 'ready' | 'error'; error: unknown } | null>(null)
+  const [snapshot, setSnapshot] = useState<{ accountId: string | null; steps: StepResult[]; status: 'ready'; error: null } | { accountId: string | null; status: 'error'; error: unknown } | null>(null)
   const [tick, setTick] = useState(0)
   const generation = useRef(0)
   const reload = useCallback(() => { generation.current += 1; setSnapshot(null); setTick((n) => n + 1) }, [])
@@ -34,7 +34,7 @@ export function useFirstRun(accountId: string | null, enabled = true) {
     void loadFirstRunSteps(accountId).then((steps) => {
       if (generation.current === at) setSnapshot({ accountId, steps, status: 'ready', error: null })
     }).catch((error: unknown) => {
-      if (generation.current === at) setSnapshot({ accountId, steps: [], status: 'error', error })
+      if (generation.current === at) setSnapshot({ accountId, status: 'error', error })
     })
     return () => { generation.current += 1 }
   }, [accountId, enabled, tick])
@@ -43,5 +43,5 @@ export function useFirstRun(accountId: string | null, enabled = true) {
     return () => window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, reload)
   }, [reload])
   const current = enabled && snapshot?.accountId === accountId ? snapshot : null
-  return { steps: current?.steps ?? [], status: current?.status ?? 'loading' as const, error: current?.error ?? null, reload }
+  return { steps: current?.status === 'ready' ? current.steps : [], status: current?.status ?? 'loading' as const, error: current?.error ?? null, reload }
 }

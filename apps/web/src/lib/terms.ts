@@ -1,3 +1,5 @@
+import { PREPARING_TITLE } from '@/components/shared/preparing-dialog'
+
 // 言葉の正本: docs/v8-requirements/terms.md。UI用の写し（SELL-15）。
 import type { AccountStyle } from '@line-crm/shared'
 
@@ -65,7 +67,7 @@ export const terms = {
   S21: "試験モード",
   S22: "接続済み／未接続／接続の異常",
   S23: "設定済み／未設定",
-  S24: "現在準備中です",
+  S24: PREPARING_TITLE,
   S25: "読み込んでいます",
   S26: "読み込めませんでした",
   S27: "見る権限がありません",
