@@ -1,3 +1,4 @@
+import { withDisplayReadCache } from './display-read-cache.js';
 import { type DashboardPeriod, type AccountStatsScope, type DashboardOverview, type DashboardSectionStatus, type DashboardMetricState, type DashboardMetricReason } from './dashboard-types.js';
 import { periodStart, monthStart, oldestDashboardTime, dashboardFreshness, summarizeDashboardFreshness } from './dashboard-freshness.js';
 import { accountScopeSql, count, friendBreakdown, inboxState, ZERO_BREAKDOWN } from './dashboard-inbox.js';
@@ -21,6 +22,15 @@ export async function getDashboardOverview(
    * 合わせて数える。呼び出し側（ルート）が staff の可視範囲で渡す。
    */
   inboxScope: AccountStatsScope = scope,
+): Promise<DashboardOverview> {
+  return withDisplayReadCache(db, displayDb => dashboardOverview(displayDb, period, scope, inboxScope));
+}
+
+async function dashboardOverview(
+  db: D1Database,
+  period: DashboardPeriod,
+  scope: AccountStatsScope,
+  inboxScope: AccountStatsScope,
 ): Promise<DashboardOverview> {
   const start = periodStart(period);
   const month = monthStart();
@@ -84,12 +94,12 @@ export async function getDashboardOverview(
         GROUP BY name ORDER BY count DESC LIMIT 3`,
     ).bind(start, ...friendAccount.binds).all<{ name: string | null; count: number }>(),
     count(db,
-      `WITH funnel AS (
+      `SELECT COUNT(*) n FROM (
          SELECT f.ref_code, COUNT(DISTINCT f.id) additions, COUNT(ce.id) conversions
            FROM friends f LEFT JOIN conversion_events ce ON ce.friend_id=f.id
           WHERE f.created_at >= ? AND ${friendAccount.sql}
           GROUP BY f.ref_code
-       ) SELECT COUNT(*) n FROM funnel WHERE additions >= 3 AND conversions = 0`,
+       ) funnel WHERE additions >= 3 AND conversions = 0`,
       start, ...friendAccount.binds),
     count(db,
       `SELECT COUNT(*) n FROM automation_logs al

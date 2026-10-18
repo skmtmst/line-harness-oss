@@ -13,6 +13,7 @@ import {
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
+import TruncatedText from '@/components/shared/truncated-text'
 import Select from '@/components/shared/select'
 import styles from './frame.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
@@ -50,10 +51,10 @@ export function BoundaryBanner({ note = '予約媒体は受信専用・外部更
   return (
     <div className={styles.boundary}>
       <span className={styles.boundaryBadge}>検証環境専用</span>
-      <p className={styles.boundaryText}>既存の然-NEN運用とは分離された飲食店向けテスト領域です。</p>
+      <p className={styles.boundaryText}><TruncatedText value="既存の然-NEN運用とは分離された飲食店向けテスト領域です。" /></p>
       <span className={styles.boundarySpacer} aria-hidden="true" />
       <span className={styles.boundaryDot} aria-hidden="true" />
-      <span className={styles.boundaryNote}>{note}</span>
+      <span className={styles.boundaryNote}><TruncatedText value={note} /></span>
     </div>
   )
 }

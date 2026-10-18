@@ -1,13 +1,16 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { readImplementationSource } from '../../../../worker/src/test-utils/implementation-source'
 
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const UPLOAD = readFileSync(new URL('../../v8/contents/media-upload-dialog.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('../../v8/contents/media-detail-dialog.tsx', import.meta.url), 'utf8')
 const REPLACEMENT = readFileSync(new URL('../../v8/contents/media-replacement-dialog.tsx', import.meta.url), 'utf8')
-const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
-const WORKER = readFileSync(new URL('../../../../worker/src/routes/contents.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const WORKER = readImplementationSource(fileURLToPath(new URL('../../../../worker/src/routes/contents.ts', import.meta.url)))
 const GUIDANCE = readFileSync(new URL('../../v8/contents/media-quota-guidance.tsx', import.meta.url), 'utf8')
 const FOLDERS = readUiSource(new URL('../../components/shared/managed-folder-panel.tsx', import.meta.url), 'utf8')
 

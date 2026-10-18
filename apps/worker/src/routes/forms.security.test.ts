@@ -1,3 +1,4 @@
+import { emptyLayout } from '@line-crm/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import { Hono } from 'hono';
@@ -6,6 +7,7 @@ import type { Env } from '../index.js';
 const mocks = vi.hoisted(() => ({
   getFormsWithStats: vi.fn(),
   getFormById: vi.fn(),
+  getLatestFormSubmission: vi.fn(),
   getFormAccountIds: vi.fn(),
   getFormDeleteImpact: vi.fn(),
   archiveFormAtRevision: vi.fn(),
@@ -32,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   getFormVersionContentsByIds: vi.fn(),
   getFormSubmissionById: vi.fn(),
   createForm: vi.fn(),
+  updateForm: vi.fn(),
   getFormSubmissions: vi.fn(),
   getFormSubmissionsPage: vi.fn(),
   getFormSubmissionAnalytics: vi.fn(),
@@ -51,6 +54,7 @@ vi.mock('@line-crm/db', () => ({
   getForms: vi.fn(),
   getFormsWithStats: mocks.getFormsWithStats,
   getFormById: mocks.getFormById,
+  getLatestFormSubmission: mocks.getLatestFormSubmission,
   getFormLatestEdit:vi.fn(async()=>null),
   getFormAccountIds: mocks.getFormAccountIds,
   listLineAccountsWithTenantStatus: vi.fn(async () => [
@@ -60,7 +64,7 @@ vi.mock('@line-crm/db', () => ({
   getFormDeleteImpact: mocks.getFormDeleteImpact,
   formBelongsToLineAccount: mocks.formBelongsToLineAccount,
   createForm: mocks.createForm,
-  updateForm: vi.fn(),
+  updateForm: mocks.updateForm,
   archiveFormAtRevision: mocks.archiveFormAtRevision,
   deleteFormAtRevision: mocks.deleteFormAtRevision,
   getFormSubmissions: mocks.getFormSubmissions,
@@ -1165,4 +1169,59 @@ test('Content-Typeの申告なしでも保管本文の上限を守る', async ()
   }, bindings);
   expect(response.status).toBe(413);
   expect(mocks.archiveFormAtRevision).not.toHaveBeenCalled();
+});
+
+// Keep the real URL/private-IP policy and webhook fetch. Only DNS is synthetic,
+// so concurrency/event-id assertions still count actual webhook attempts.
+vi.mock('../services/form-webhook.js', async original => {
+  const actual = await original<typeof import('../services/form-webhook.js')>();
+  return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
+    actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
+});
+
+// A URL-only edit must not carry a saved, redacted credential to another origin.
+describe('F01 saved webhook credential origin', () => {
+  test.each([
+    ['different host', 'https://other.example.com/check', null],
+    ['disabled destination', null, null],
+    ['same origin path', 'https://verify.example.test/another/check', undefined],
+  ])('%s keeps credentials bound to their existing origin', async (_label, url, expected) => {
+    mocks.updateForm.mockResolvedValue({ kind: 'updated', form: { ...baseForm, content_revision: 2 } });
+    const { bindings } = env();
+    const response = await app(true).fetch(new Request('https://worker.example.test/api/forms/form-1?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedContentRevision: 1, onSubmitWebhookUrl: url }),
+    }), bindings);
+    expect(response.status).toBe(200);
+    const updates = mocks.updateForm.mock.calls.at(-1)![2];
+    if (expected === undefined) expect(updates).not.toHaveProperty('onSubmitWebhookHeaders');
+    else expect(updates.onSubmitWebhookHeaders).toBeNull();
+  });
+  test('allows an explicit replacement credential for a new destination under the existing revision check', async () => {
+    mocks.updateForm.mockResolvedValue({ kind: 'updated', form: { ...baseForm, content_revision: 2 } });
+    const { bindings } = env();
+    const headers = JSON.stringify({ Authorization: 'Bearer new-synthetic-credential' });
+    const response = await app(true).fetch(new Request('https://worker.example.test/api/forms/form-1?account_id=account-a', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedContentRevision: 1, onSubmitWebhookUrl: 'https://other.example.com/check', onSubmitWebhookHeaders: headers }),
+    }), bindings);
+    expect(response.status).toBe(200);
+    expect(mocks.updateForm).toHaveBeenLastCalledWith(expect.anything(), 'form-1', expect.objectContaining({ onSubmitWebhookHeaders: headers }), 1, 'owner-1');
+  });
+});
+
+test('never restores a persisted upstream result through the public previous-answer API', async () => {
+  const layout = emptyLayout(); layout.options.restorePrevious = true;
+  mocks.getFormById.mockResolvedValue({ ...baseForm, layout: JSON.stringify(layout) });
+  mocks.verifyCallerLineIdentity.mockResolvedValue({ lineUserId: 'U-real', lineAccountId: 'account-a' });
+  mocks.getFriendByLineUserIdForAccount.mockResolvedValue({ id: 'friend-real', line_account_id: 'account-a' });
+  const saved = { x_username: 'answer', _webhookResult: { eligible: false, secret: 'synthetic-private-upstream' } };
+  mocks.getLatestFormSubmission.mockResolvedValue({ data: JSON.stringify(saved), created_at: '2026-10-18' });
+  const { bindings } = env();
+  const response = await app().request('/api/forms/form-1/my-latest', { headers: { Authorization: 'Bearer verified' } }, bindings);
+  expect(response.status).toBe(200);
+  const body = await response.json() as { data: { answers: Record<string, unknown> } };
+  expect(body.data.answers).toEqual({ x_username: 'answer' });
+  expect(JSON.stringify(body)).not.toContain('synthetic-private-upstream');
+  expect(saved._webhookResult.secret).toBe('synthetic-private-upstream');
 });

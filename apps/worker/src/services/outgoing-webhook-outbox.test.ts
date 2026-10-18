@@ -196,7 +196,7 @@ describe('N-374: Retry-After を再送スケジュールでも尊重する', () 
       attemptsDone: 1, maxAttempts: 8, queuedAt, now: NOW,
       responseStatus: 429, retryAfterMs: 6 * 60 * 60_000, jitterKey: 'd:1',
     });
-    expect(clamped!.getTime() - NOW.getTime()).toBe(30 * 60_000);
+    expect(clamped).toBeNull();
   });
 
   it('自動再送は 425・429・5xx・接続失敗だけ。408/409/その他4xxは恒久失敗', () => {
@@ -380,4 +380,23 @@ describe('N-375: 連続失敗で自動停止して運用者へ通知する', () 
     expect(webhook.is_active).toBe(1);
     expect(webhook.auto_stopped_at).toBeNull();
   });
+});
+
+it('stops an over-budget provider wait without claiming that the 24-hour window expired', async () => {
+  const testDb = createTestD1(); seed(testDb);
+  try {
+    const queued = (await enqueueOutgoingWebhookDelivery(testDb.db, {
+      lineAccountId: ACCOUNT, webhookId: 'wh-1', eventType: 'friend_add', body: '{}',
+      idempotencyKey: 'retry-after-over-budget', maxAttempts: 4, now: NOW,
+    }))!;
+    const lease = (await claimOutgoingDelivery(testDb.db, queued, NOW))!;
+    expect(await finishOutgoingDelivery(testDb.db, queued, lease, {
+      kind: 'retry', responseStatus: 429, retryAfterMs: 3600000,
+      errorCode: 'response_429', errorMessage: 'busy',
+    }, NOW)).toBe('failed');
+    expect(deliveryRow(testDb, queued.id)).toMatchObject({
+      status: 'failed', attempts: 1, next_retry_at: null, error_code: 'retry_after_exceeds_budget',
+      error_message_safe: expect.stringContaining('待ち時間'),
+    });
+  } finally { testDb.raw.close(); }
 });

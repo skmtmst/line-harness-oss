@@ -1,4 +1,5 @@
-import { fetchApi, bookingApi } from './api';
+import { fetchApi } from './api'
+import { bookingApi } from './api'
 import { restaurantTestApi } from './restaurant-test-api';
 import { root, url, write, Result, StyleMember } from './api-styles-common';
 export const methods2 = {

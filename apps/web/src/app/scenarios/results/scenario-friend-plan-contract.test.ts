@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
@@ -6,7 +7,7 @@ const DIALOG = readFileSync(
   new URL('../../../components/scenarios/scenario-dialogs.tsx', import.meta.url),
   'utf8',
 )
-const API = readFileSync(new URL('../../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../../lib/api.ts', import.meta.url), 'utf8')
 
 /*
  * IDEA-05（B段階導入）：既存のシナリオ確認（配信結果画面）の中で、

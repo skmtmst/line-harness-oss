@@ -1,3 +1,4 @@
+import { lineTransport } from '../lib/external-call/line.js';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { normalizeTimeZone, tzDateStr, tzHHMM } from './availability.js';
@@ -102,11 +103,12 @@ export interface SendNotificationParams {
   retryKey?: string;
   /** 組み立て済みの通知。予約リマインダの再送は保存した本文をそのまま使う。 */
   messages?: Message[];
+  signal?: AbortSignal;
 }
 
 export async function sendBookingNotification(params: SendNotificationParams): Promise<void> {
   const messages = params.messages ?? [{ type: 'text' as const, text: renderNotificationText(params.kind, params.ctx) }];
-  const client = new LineClient(params.channelAccessToken);
+  const client = new LineClient(params.channelAccessToken, params.signal ? { transport: lineTransport(params.signal) } : undefined);
   await client.pushMessage(params.toLineUserId, messages, params.retryKey);
 }
 

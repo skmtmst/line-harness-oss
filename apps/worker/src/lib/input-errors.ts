@@ -88,7 +88,7 @@ export async function readBoundedText(request: Request, maxBytes: number): Promi
 }
 
 /** Read only the allowed body bytes; never allocate the full incoming upload. */
-export async function readBoundedBytes(request: Request, maxBytes: number): Promise<Uint8Array | null> {
+export async function readBoundedBytes(request: Pick<Request, 'headers' | 'body'>, maxBytes: number): Promise<Uint8Array | null> {
   const declared = Number(request.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) return null;
   const reader = request.body?.getReader();

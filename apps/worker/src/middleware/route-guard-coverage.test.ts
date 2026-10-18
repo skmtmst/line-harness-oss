@@ -25,7 +25,7 @@ vi.mock('@line-crm/db', async (original) => ({
 }));
 import { app } from '../index.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { collectSecurityRoutes } from '../test-utils/route-security-inventory.js';
+import { collectSecurityRoutes, routeSourceFiles } from '../test-utils/route-security-inventory.js';
 import { isLegacyGlobalApi } from './tenant-scope.js';
 
 beforeEach(() => { authState.role = 'staff'; authState.readOnly = false; authState.permissionKeys = []; authState.viewKeys = []; });
@@ -44,6 +44,10 @@ const ROUTES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'routes')
 type Finding = { file: string; method: string; path: string };
 
 function collectUnguarded(fixtures?: Record<string, string>): Finding[] {
+  if (!fixtures) return collectSecurityRoutes(join(ROUTES_DIR, '..'))
+    .filter(route => ['POST', 'PUT', 'PATCH', 'DELETE', 'ALL'].includes(route.method)
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path) && !route.guarded)
+    .map(route => ({ file: route.file.replace(/\.ts$/, ''), method: route.method.toLowerCase(), path: route.path }));
   const sources = fixtures ?? Object.fromEntries(readdirSync(ROUTES_DIR)
     .filter((entry) => entry.endsWith('.ts') && !entry.includes('.test.'))
     .map((entry) => [entry, readFileSync(join(ROUTES_DIR, entry), 'utf8')]));
@@ -290,9 +294,7 @@ function isStaffApiFailClosed(entry: string): boolean {
 
 function collectStaffApiClassification(extraRoutes: string[] = []): { all: string[]; failClosed: string[] } {
   const srcDir = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const files = readdirSync(join(srcDir, 'routes'))
-    .filter((entry) => entry.endsWith('.ts') && !entry.includes('.test.'))
-    .map((entry) => join(srcDir, 'routes', entry));
+  const files = routeSourceFiles(join(srcDir, 'routes'));
   files.push(join(srcDir, 'index.ts'));
   const seen = new Set<string>();
   for (const file of files) {
