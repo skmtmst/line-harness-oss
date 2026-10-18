@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,10 +8,10 @@ import { describe,expect,it,vi } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const LIST_PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const PUBLISH_HISTORY = readFileSync(join(HERE, '../../v8/rich-menu-edit/detail.tsx'), 'utf8')
 const TEST_APPLY = readFileSync(join(HERE, '../../v8/rich-menu-edit/test-apply.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
+const NEW_PAGE = readUiSource(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
 const CREATE_FORM = readFileSync(
   join(HERE, '../../v8/rich-menu-edit/compatibility-form.tsx'),
   'utf8',
@@ -60,7 +61,7 @@ describe('作成画面の登録メディア選択', () => {
   it('アカウントを切り替えたら前のアカウントの選択を持ち込まない', () => {
     expect(NEW_PAGE).toContain('pendingMediaAccountRef.current === accountId')
     expect(NEW_PAGE).toMatch(/setPendingImages\(\(previous\) => \{[\s\S]*?return \[\]/)
-    expect(NEW_PAGE).toContain('[accountId, host]')
+    expect(NEW_PAGE).toContain('[accountId, host, setPendingImages]')
   })
 
   it('選んだメディアも未保存の入力として数える', () => {
