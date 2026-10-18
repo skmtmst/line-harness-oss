@@ -311,10 +311,41 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
 }
 
 export const isTest = path => /^apps\/web\/(?:src\/.*\.test\.tsx?|scripts\/.*\.test\.mjs)$/.test(path)
-export function newSourceAssertions(before, after) {
-  const remaining=new Map()
-  for(const hit of before)remaining.set(hit.key,(remaining.get(hit.key)??0)+1)
-  return after.filter(hit=>{const count=remaining.get(hit.key)??0;if(count){remaining.set(hit.key,count-1);return false}return true})
+export function newSourceAssertions(before, after, moves = new Map()) {
+  const identity = (hit, plainReader = false, remap = true) => {
+    const parts = JSON.parse(hit.key)
+    if (remap) {
+      parts[0] = moves.get(parts[0]) ?? parts[0]
+      parts[1] = moves.get(parts[1]) ?? parts[1]
+    }
+    if (plainReader) parts[3] = parts[3].map(path => path.replace(/\|helper:[a-f0-9]+$/, ''))
+    return JSON.stringify(parts)
+  }
+  const remaining = new Map()
+  for (const hit of before) {
+    const key = identity(hit)
+    const list = remaining.get(key) ?? []
+    list.push(hit)
+    remaining.set(key, list)
+  }
+  const unmatched = after.filter(hit => {
+    // after already uses the new paths; only remap the base side.
+    const list = remaining.get(hit.key)
+    if (!list?.length) return true
+    list.pop()
+    return false
+  })
+  return unmatched.filter(hit => {
+    if (!hit.reads.some(path => /\|helper:/.test(path))) return true
+    // readUiSource preserves the requested root while following its split files.
+    // Changing an existing helper, a read root, a test or an assertion still fails.
+    const plain = identity(hit, true, false)
+    for (const list of remaining.values()) {
+      const index = list.findIndex(old => old.reads.every(path => !/\|helper:/.test(path)) && identity(old, true) === plain)
+      if (index >= 0) { list.splice(index, 1); return false }
+    }
+    return true
+  })
 }
 
 export function checkRepository(root, base) {
@@ -336,7 +367,9 @@ export function checkRepository(root, base) {
     return result
   }
   const before=analyzeSourceTests(load(baseNames,base)),after=analyzeSourceTests(load([...new Set([...names,...untracked])]))
-  return {base,examined:after.length,findings:newSourceAssertions(before,after)}
+  const changes=git('diff','--name-status','-z','-M50%',base).split('\0'),moves=new Map()
+  for(let i=0;i<changes.length;){const status=changes[i++];if(!status)break;const from=changes[i++];if(status.startsWith('R'))moves.set(from,changes[i++])}
+  return {base,examined:after.length,moves:Object.fromEntries(moves),findings:newSourceAssertions(before,after,moves)}
 }
 
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){

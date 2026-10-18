@@ -1,6 +1,10 @@
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { analyzeSourceTests, newSourceAssertions } from './verify-no-source-visual-contracts.mjs'
+import { analyzeSourceTests, newSourceAssertions, checkRepository } from './verify-no-source-visual-contracts.mjs'
 
 const entry = 'apps/web/src/example.test.tsx'
 const analyze = (body, extras = new Map(), file = entry) => analyzeSourceTests(new Map([
@@ -167,4 +171,50 @@ test('class readers trace constructor fields, methods and getters',()=>{
   assert.equal(run('view.tsx').length,2)
   assert.equal(newSourceAssertions(run('old.tsx'),run('new.tsx')).length,2)
   assert.deepEqual(run('data.json'),[])
+})
+
+
+test('git renames consume identical assertions once; a copied or changed assertion stays new', () => {
+  const before = analyze(`expect(src).toContain('styles.row')`)
+  const moved = analyze(`expect(src).toContain('styles.row')`, new Map(), 'apps/web/src/moved.test.ts')
+  const moves = new Map([[entry, 'apps/web/src/moved.test.ts']])
+  assert.equal(newSourceAssertions(before, moved, moves).length, 0)
+  assert.equal(newSourceAssertions(before, [...moved, ...moved], moves).length, 1)
+  assert.equal(newSourceAssertions(before, analyze(`expect(src).toContain('styles.new')`, new Map(), 'apps/web/src/moved.test.ts'), moves).length, 1)
+})
+
+test('adopting the split-file reader retains old assertions and detects new strings, copies and roots', () => {
+  const helper = 'apps/web/src/helper.mjs'
+  const run = (body, path = 'apps/web/src/example.tsx') => analyzeSourceTests(new Map([
+    [entry, `import {readUiSource} from './helper.mjs';import {it,expect}from'vitest';const src=readUiSource('${path}');it('case',()=>{${body}})`],
+    [helper, `import{readFileSync}from'node:fs';export function readUiSource(path){return readFileSync(path,'utf8')}`],
+  ]))
+  const before = analyze(`expect(src).toContain('styles.row')`)
+  assert.equal(newSourceAssertions(before, run(`expect(src).toContain('styles.row')`)).length, 0)
+  assert.equal(newSourceAssertions(before, run(`expect(src).toContain('styles.row');expect(src).toContain('styles.new')`)).length, 1)
+  assert.equal(newSourceAssertions(before, run(`expect(src).toContain('styles.row');expect(src).toContain('styles.row')`)).length, 1)
+  assert.equal(newSourceAssertions(before, run(`expect(src).toContain('styles.row')`, 'different.tsx')).length, 1)
+})
+
+
+test('repository git rename detection preserves a moved test but fails a deliberately added source assertion', () => {
+  const root = mkdtempSync(join(tmpdir(), 'source-contract-rename-'))
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
+  try {
+    git('init', '-q'); git('config', 'user.name', 'Fixture'); git('config', 'user.email', 'fixture@example.invalid')
+    mkdirSync(join(root, 'apps/web/src'), { recursive: true })
+    const source = `import{readFileSync}from'node:fs';import{it,expect}from'vitest';const src=readFileSync('view.tsx');it('case',()=>{expect(src).toContain('styles.row')})`
+    writeFileSync(join(root, entry), source)
+    git('add', '.'); git('commit', '-qm', 'base')
+    const base = git('rev-parse', 'HEAD'), moved = 'apps/web/src/renamed.test.tsx'
+    git('mv', entry, moved)
+    assert.equal(checkRepository(root, base).findings.length, 0)
+    writeFileSync(join(root, moved), source.replace("expect(src).toContain('styles.row')", "expect(src).toContain('styles.row');expect(src).toContain('styles.deliberateRegression')"))
+    const broken = checkRepository(root, base)
+    assert.equal(broken.findings.length, 1)
+    assert.match(broken.findings[0].expression, /deliberateRegression/)
+    writeFileSync(join(root, moved), source)
+    writeFileSync(join(root, entry), source)
+    assert.equal(checkRepository(root, base).findings.length, 1)
+  } finally { rmSync(root, { recursive: true, force: true }) }
 })
