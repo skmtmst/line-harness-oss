@@ -1,7 +1,6 @@
 'use client'
 
 import { duplicateAutoReply } from './list-duplicate-action'
-import { loadAutoReplies } from './list-load'
 import { AutoReply,displayName,PAGE_SIZE_OPTIONS,PendingDelete,PendingToggle,SAVED_FILTER_OPTIONS,TemplateLite,UNFILED,VIEW_ONLY_MENU_IDS } from './list-model'
 import { renderAutoReplyList } from './list-table'
 import { toggleAutoReply } from './list-toggle-action'
@@ -12,7 +11,7 @@ import ListToolbar,{ ListToolbarOptional,ListToolbarSort as SortSelect } from '@
 import { useStaffRole } from '@/lib/staff-role'
 import { Activity,Ban,Bookmark,ChevronDown,CircleCheck,CircleHelp,Copy,Folder as FolderIcon,Layers,MessageCircle,Pause,Pencil,Play,Plus,Trash2,TriangleAlert,Zap } from 'lucide-react'
 import { SORT_OPTIONS,type SortKey } from './list-options'
-import { autoReplyMatchesQuery,LOAD_STATE_WORDS,NO_WRITE_PERMISSION,visibleAutoReplyLoadState,type LoadState } from './words'
+import { autoReplyMatchesQuery,isCurrentAutoReplyLoad,LOAD_STATE_WORDS,NO_WRITE_PERMISSION,visibleAutoReplyLoadState,type LoadState } from './words'
 
 
 
@@ -156,7 +155,60 @@ export default function AutoRepliesListV8() {
   const loadGenerationRef = useRef(0)
   const [loadedAccountId, setLoadedAccountId] = useState<string | null | undefined>(undefined)
 
-  const load = useCallback(() => loadAutoReplies({ loadGenerationRef, saveErrors, selectedAccountId, selectedAccountIdRef, setConflictCount, setItems, setLoadedAccountId, setLoadError, setLoadState, setTemplateListAvailable, setTemplates }), [selectedAccountId, saveErrors])
+  const load = useCallback(async () => {
+    const requestAccountId = selectedAccountId
+    const requestGeneration = ++loadGenerationRef.current
+    setLoadState('loading')
+    setLoadError(null)
+    setConflictCount(null)
+    try {
+      const [arRes, tplRes, summaryRes] = await Promise.all([
+        api.autoReplies.list({ accountId: selectedAccountId || undefined }),
+        api.templates.list(undefined, selectedAccountId || undefined),
+        selectedAccountId
+          ? api.autoReplies.summary(selectedAccountId).catch(() => null)
+          : Promise.resolve(null),
+      ])
+      if (!isCurrentAutoReplyLoad(
+        requestAccountId,
+        selectedAccountIdRef.current,
+        requestGeneration,
+        loadGenerationRef.current,
+      )) return
+      if (!arRes.success) {
+        setLoadedAccountId(requestAccountId)
+        setLoadState('error')
+        return
+      }
+      setItems(arRes.data as AutoReply[])
+      setConflictCount(summaryRes?.success ? summaryRes.data.conflictCount : null)
+      setTemplateListAvailable(tplRes.success)
+      setTemplates(tplRes.success
+        ? tplRes.data.map((t) => ({
+            id: t.id,
+            name: t.name,
+            messageType: t.messageType,
+            messageContent: t.messageContent,
+          }))
+        : [])
+      setLoadedAccountId(requestAccountId)
+      setLoadState('ready')
+    } catch (reason) {
+      if (!isCurrentAutoReplyLoad(
+        requestAccountId,
+        selectedAccountIdRef.current,
+        requestGeneration,
+        loadGenerationRef.current,
+      )) return
+      const fieldFailure = saveErrors.capture(reason)
+      setLoadedAccountId(requestAccountId)
+      { if (!fieldFailure)
+      setLoadError(reason) }
+      { if (!fieldFailure)
+      setLoadState(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
+    }
+  }
+  }, [selectedAccountId, saveErrors])
 
   const loadFolders = useCallback(async () => {
     try {

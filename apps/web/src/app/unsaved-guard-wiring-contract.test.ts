@@ -156,7 +156,6 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   'v8/reminders/edit-confirm.tsx': 'v8/reminders/edit.tsx',
   'v8/reminders/edit-messages.tsx': 'v8/reminders/edit.tsx',
   'v8/reminders/edit-schedule.tsx': 'v8/reminders/edit.tsx',
-  'v8/reminders/edit-target.tsx': 'v8/reminders/edit.tsx',
   'v8/common-vars-edit/edit-value-fields.tsx': 'v8/common-vars-edit/edit.tsx',
   // 統合後の入力の持ち主。各画面が dirty を型／番兵へ渡す。
   'v8/booking-gap/series-drawer.tsx': 'components/shared/form-leave-guard.tsx',
