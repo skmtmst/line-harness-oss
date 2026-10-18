@@ -5,7 +5,7 @@
 ## 実装
 
 - `booking.ts` は7,571→126行、38モジュール、最大595行。`events.ts` は4,014→59行、18モジュール、最大582行。本人確認・枠検証・入力・資源/メニュー・作成・変更・台帳・勤務・申込・開催回・待機/承認を分離。同じHonoインスタンスへ元の順序で登録し、共通middleware・個別の権限・公開exportを保った。
-- 一時のAST照合で予約105経路とイベント40経路のメソッド・パス・middleware・登録順が同一。root middlewareも同一。Worker全体のruntime importは890→952モジュール、既存循環9→9、新規循環0。製品87ファイル17,859→19,102行、明示anyは0→0。照合結果を新たな凍結試験にはしない。
+- 一時のAST照合で予約105経路とイベント40経路のメソッド・パス・middleware・登録順が同一。root middlewareも同一。Worker全体のruntime importは890→954モジュール、既存循環9→9、新規循環0。製品89ファイル17,859→19,182行、明示anyは0→0。照合結果を新たな凍結試験にはしない。
 - 既存の `workflow_steps` にA06のCallState/不変の入力snapshot/結果を保存し、送信前CASと業務結果の同一batchを接続。started/unknownはlease切れでも自動再取得しない。既存のbooking操作記録と成功/取消履歴も保持。
 - 予約系の共有遮断を既存checkpointで永続化。同じaccount/store/destination/connectionのopenは要求0、half-openは同時1回。期限切れprobe回収と世代による古い結果の拒否。A06のMemoryCircuitStoreを全Worker共有と誤認する実装にはしなかった。他束の全外部呼出しへの接続完了は主張しない。
 - 予約通知、予約/イベント/Meetリマインダ、イベント確定/変更/待機案内、重複予約の通知、支払開始、Stripe接続を接続。準備失敗と送信後の不明を分け、秘密を含む例外文を保存しない。予約通知の手動再試行もdelivery_unknownは409。同じ通知のキーを手動再試行で変えない。
@@ -14,6 +14,7 @@
 - 遮断で外部要求0のイベント/Meetリマインダは、4回のcronでも試行数0を保つ。遮断が開いた後は元の予定を1回だけ送る。通知済みの業務記録と共通checkpointを同じbatchに保存し、その保存が失敗したら不明で停止する。
 - 接続確認のGoogle読取りも同じ店/接続先の共有遮断へ接続。遮断中0要求・別店の確認1要求を模擬した。
 - 前日/1時間前のMeet登録・日時変更/取消の既存フェンスを保持。送信後の不明を同じ行の再利用で再送しない。下記の通知世代の不足は未解決。
+- イベントの作成・管理者確定・待ちからの承諾は、正本/CASと通知・既存リマインダ予定を同じ取引で保存する。予定保存失敗時は取引全体を戻し、保存後の停止はcronが元の通知を1回だけ回収する。通知回収時は開催日時も照合する。共有席数の最終検査も作成SQLへ含めた。
 - 自動通知のmanualヘッダー追加なし。画面/画面部品/Web APIクライアントは未変更。1152/1440の新しい画面撮影対象は0。全体の崩れ確認は通常ci-localの既存工程で行う。
 
 ## F04 在庫失効
@@ -35,6 +36,7 @@
 
 1. **728案**：`meet_consultations.schedule_revision`（非負整数）と、追記型 `meet_consultation_notification_runs`。列案：id、consultation_id、schedule_revision、booking_id/version、kind、scheduled_at、recipient/sender snapshot、retry_key、status、attempts、next_at、call_state/result、created_at/updated_at。`UNIQUE(consultation_id,schedule_revision,kind)`・retry_keyの一意性。理由：既存の子は`UNIQUE(consultation_id,kind)`で、送信済みの子を残しながら変更後の同種通知を追加できない。送信済みをpendingへ戻す・履歴を消す・汎用checkpointを第三の通知スケジューラにする変更はしない。確定/変更と同じbatchで世代と2通知の予定をそろえる。既存pendingの同じ行を変更後に再利用した場合も、過去の不明を新しい送信へ読み替えないため、安全側で停止する。この部分は完了扱いにしない。
 2. **729案**：在庫の既存trigger（`rt_inventory_reservation_insert/update/delete` 等）の対象を、OLD/NEWの店と重なる時間帯へ限定するmigration。新表/列は不要。取消・退店・卓の連結・休業・同時更新も含めて整合を確かめる。適用済み628等は書き換えない。F04の残りはここまで停止。
+3. **730案**：`event_bookings.lock_version`（単調に増える整数）と、追記型の `event_booking_transition_runs`。列案：id、line_account_id、event_id、booking_id、期待/確定したbooking_version、event_version、operation_key、action、status、input_snapshot、各段/通知の結果、before/afterの参照、作成/更新日時。所属/予約のFKと `UNIQUE(line_account_id,booking_id,expected_booking_version,operation_key)`。取消・却下はV6の送信中に正本を元へ戻すため、現在の状態と時刻列だけでは戻った後の世代を判別できない。開催回変更の既存ログも集計件数が中心で、各予約の版に結び付いた開始前の記録ではない。汎用checkpointを別の予約版で代用せず、取消/却下の正本から通知計画までの停止回収・開催回変更の全段の原子化/補償は、この保存先と版の承認後に進める。既存の巻き戻し・履歴・通常の機能は保ち、この部分も完了扱いにしない。SQL未作成、番号未予約。
 
 予約リマインダの既存予算は初回込み3回を維持。共通の既定4回へ増やしていない。1/5/30分の待機方針を共通実行器へ渡し、結果不明や認証失敗を再送可能にはしていない。D01で残された3回/4回の仕様差は司令塔の判断へ残す。
 
@@ -42,6 +44,7 @@
 
 初回ci-localのB-273は、Webの旧ソース固定試験を分割先へ移したことを新規の固定として検出した。検査は変更せず、該当するWebの1件をWorkerの実HTTP取消2ケースへ移し、案内ジョブの同じキーと1回だけの登録を確認する。Webの画面文言2件は保持。IDEA-07の旧Workerソース固定3条件も、Workerの実一覧応答・取得1回・表示ページのIDだけという動作へ移した。WebのAPI型と表示3件は保持。Worker129件・Web2件・B-273新規0を再確認。
 
+- イベント27ファイルでは438件成功、並行試験5件は古い仕掛けが取引の途中で停止したため、取引を開く前で待つ形へ移し、26件すべて成功。待ち順/人数/上限/通知/rollbackのassertと5秒上限は保持。通知計画のSQLite保存/回収/rollbackの追加43件・隣接19件も成功。
 - 関連119ファイル1,471件成功。その後のCalendar/CAS/D1/境界の追加検査は外部のA07-EVIDENCEに生ログを保持。実送信・実課金・実返金なし。
 - 実D1のcheckpoint/Circuit 2件成功。SQLiteの並行CAS、外部成功後の業務保存失敗、不明の停止→GET照合、認証/別店/停止、3回予算とRetry-After、古いprobeの拒否を確認。
 - 故障対照：正常6件成功。CAS fence除去、不明→ready、保存障害を成功と偽る、半開CAS除去の4故障は全て赤。製品ソースを変更せず/tmpのコピーで実施。環境準備で失敗した最初の生ログも残した。
