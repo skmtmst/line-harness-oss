@@ -250,8 +250,13 @@ jobs:
 
           sys.exit(1 if failed else 0)
           PY
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_production_workflows.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/check_production_workflows.py
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_workflow_commands.py
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/check_workflow_commands.py
+
+      - name: Lint production release workflows
+        run: bash scripts/security/lint-production-workflows.sh
 
   repository-checks:
     name: Repository and shared checks
@@ -376,6 +381,8 @@ jobs:
           VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
         run: pnpm --filter worker build
+      - name: Verify built production Worker config and security headers (offline)
+        run: pnpm exec tsx scripts/deploy/production/check-build.ts worker
       - name: Install browser for deployed LIFF entry guard
         run: pnpm exec playwright install --with-deps chromium
       - name: Guard customer waitlist entry, theme and short actions (B-247 E3)
@@ -531,6 +538,8 @@ jobs:
           --filter @line-harness/update-engine
           build
       - run: pnpm --filter web build
+      - name: Verify exported Admin headers and all external bootstrap scripts (offline)
+        run: pnpm exec tsx scripts/deploy/production/check-build.ts admin
       # 画面の権限は「文字列がある」では確かめられない。書き出した `out` を
       # 本番と同じ当て方で配り、実ブラウザで owner/admin/staff を動かす（N-197）。
       # vitest は `.test.ts(x)` しか見ないので、ここから呼ばないと必須ゲートの
