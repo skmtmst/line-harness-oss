@@ -257,7 +257,7 @@ export default function MyPage() {
             ) : style !== 'ec' ? (
               <Card className="flex items-center justify-between gap-3 p-3.5">
                 <p className="text-sm text-ink-secondary">次の予約はありません</p>
-                {style !== 'ec' && style !== 'lesson' ? <Button variant="compact-secondary" className="w-auto shrink-0" onClick={() => go('/booking')}>予約する</Button> : null}
+                {style !== 'lesson' ? <Button variant="compact-secondary" className="w-auto shrink-0" onClick={() => go('/booking')}>予約する</Button> : null}
               </Card>
             ) : null}
 

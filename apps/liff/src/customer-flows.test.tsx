@@ -71,7 +71,7 @@ it('ECの古い予約リンクを開いてもメニュー・送信を出さな�
 });
 
 it('ECで予約を使った記録があれば、予約を新規作成させず履歴を開ける', async () => {
-  vi.mocked(api.me).mockResolvedValue({ upcoming: [], past: [{ id: 'old', menu_name: '前の予約', status: 'completed', starts_at: '2020-01-01T01:00:00Z', staff_name: '担当', profile_image_url: null }] });
+  vi.mocked(api.me).mockResolvedValue({ upcoming: [], past: [{ id: 'old', menu_name: '前の予約', status: 'completed', starts_at: '2020-01-01T01:00:00Z', staff_name: '担当', profile_image_url: null, lock_version: 1, menu_id: 'old-menu', staff_id: 'old-staff' }] });
   mount('ec');
   fireEvent.click(await screen.findByRole('button', { name: /予約の履歴/ }));
   fireEvent.click(await screen.findByRole('tab', { name: 'これまで' }));
