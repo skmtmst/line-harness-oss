@@ -15,6 +15,8 @@ import { UBER_PROBE_CHECK_BODY, platformCooldownStore, probeUberSandboxToken, ub
 import { fail, staffTenantId } from './restaurant-google.js';
 import { UBER_OAUTH_CALLBACK_PATH, uberOAuthClient } from '../services/restaurant-delivery.js';
 import { isoFromMs, deliveryStore } from './restaurant-delivery-common.js';
+import { registerUberStoreRoutes } from './restaurant-delivery-ubereats-stores.js';
+import { posActivationUnresolved, POS_ACTIVATION_STARTED, POS_ACTIVATION_UNKNOWN } from '../services/uber-pos-activation.js';
 
 export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
   // ---------- Uber Eats のログイン連携（店舗が自分でつなぐ経路） ----------
@@ -147,6 +149,9 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
       if (!store.lineAccountId) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
 
       const existing = await uberConnectionFor(c, store.id);
+      if (posActivationUnresolved(existing?.last_error)) {
+        return fail(c, 409, 'お店をつないだ結果の確認が必要です。送り直さず musubo へお知らせください', { code: POS_ACTIVATION_UNKNOWN });
+      }
       const mode =
         existing && existing.status !== 'disconnected' ? 'reconnect' : 'connect';
       const state = randomToken(32);
@@ -255,6 +260,9 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
         .bind(stateRow.store_id, staffTenantId(c))
         .first<{ id: string; line_account_id: string | null }>();
       if (!store) return c.redirect(uberReturnUrl(c, lineAccountId, 'error:store_missing'));
+      if (posActivationUnresolved((await uberConnectionFor(c, store.id))?.last_error)) {
+        return c.redirect(uberReturnUrl(c, lineAccountId, `error:${POS_ACTIVATION_UNKNOWN}`));
+      }
 
       const client = uberOAuthClient(c.env);
       if (!client) return c.redirect(uberReturnUrl(c, lineAccountId, 'error:oauth_not_configured'));
@@ -271,7 +279,7 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
         const accessEnc = await encryptCredential(token.accessToken, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
         const now = Date.now();
         // つなぐ店舗を選ぶ手順（設計 DL-4）が残っているので、まだ `connected` にしない。
-        await db
+        const saved = await db
           .prepare(
             `INSERT INTO rt_delivery_uber_connections
              (store_id, account_id, access_token_enc, access_token_expires_at, granted_scope,
@@ -289,7 +297,8 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
              disconnected_at = NULL,
              last_error = NULL,
              version = rt_delivery_uber_connections.version + 1,
-             updated_at = excluded.updated_at`,
+             updated_at = excluded.updated_at
+           WHERE COALESCE(rt_delivery_uber_connections.last_error, '') NOT IN ('${POS_ACTIVATION_STARTED}', '${POS_ACTIVATION_UNKNOWN}')`,
           )
           .bind(
             store.id,
@@ -303,6 +312,9 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
             now,
           )
           .run();
+        if (Number(saved.meta?.changes ?? 0) !== 1) {
+          return c.redirect(uberReturnUrl(c, lineAccountId, `error:${POS_ACTIVATION_UNKNOWN}`));
+        }
         auditLog(
           c,
           'restaurant.delivery.ubereats.connect',
@@ -319,7 +331,8 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
         // すでにある接続だけに理由を残す。新規の失敗では行を作らない。
         await db
           .prepare(
-            'UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ?',
+            `UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ?
+             AND COALESCE(last_error, '') NOT IN ('${POS_ACTIVATION_STARTED}', '${POS_ACTIVATION_UNKNOWN}')`,
           )
           .bind(code_, Date.now(), store.id)
           .run();
@@ -328,6 +341,8 @@ export function registerDeliveryUber(restaurantDelivery: Hono<Env>): void {
       }
     },
   );
+
+  registerUberStoreRoutes(restaurantDelivery, { deliveryStore, uberConnectionFor, isoFromMs });
 
   /**
    * Uber Eats Sandbox への最小の実接続（トークン1回）を配備先の中から行う口。画面は持たない。
