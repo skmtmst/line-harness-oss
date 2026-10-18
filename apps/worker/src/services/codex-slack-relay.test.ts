@@ -1187,3 +1187,56 @@ test('F18: a GitHub title TASK-ID cannot redirect completion to another task', a
   expect(writes.every(write => write.channel !== 'CFOREIGN123')).toBe(true);
   expect(writes.filter(write => write.ts === '300.001')).toEqual([]);
 });
+
+test.each([
+  ['saved PR binding', 'session:original', { pr_number: '220', pr_url: 'https://github.com/owner/repo/pull/220' }, 'codex/current', true, 'turn_completed'],
+  ['same dedicated branch', 'branch:owner/repo:codex/current', {}, 'codex/current', true, 'turn_completed'],
+  ['another PR repository', 'session:original', { pr_number: '220', pr_url: 'https://github.com/other/repo/pull/220' }, 'codex/current', false, 'turn_completed'],
+  ['another PR number', 'session:original', { pr_number: '221', pr_url: 'https://github.com/owner/repo/pull/220' }, 'codex/current', false, 'turn_completed'],
+  ['another branch repository', 'branch:other/repo:codex/current', {}, 'codex/current', false, 'turn_completed'],
+  ['shared base branch', 'branch:owner/repo:main', {}, 'main', false, 'turn_completed'],
+  ['saved PR when opening', 'session:original', { pr_number: '220', pr_url: 'https://github.com/owner/repo/pull/220' }, 'codex/current', true, 'prompt_submitted'],
+  ['dedicated branch when opening', 'branch:owner/repo:codex/current', {}, 'codex/current', true, 'prompt_submitted'],
+  ['foreign PR when opening', 'session:original', { pr_number: '220', pr_url: 'https://github.com/other/repo/pull/220' }, 'codex/current', false, 'prompt_submitted'],
+  ['foreign branch when opening', 'branch:other/repo:codex/current', {}, 'codex/current', false, 'prompt_submitted'],
+] as const)('F18: GitHub inherits only a verified task relationship (%s)', async (_name, key, binding, branch, inherited, eventType) => {
+  const sourceChannel = 'C0ERROR123', sourceThread = '1787326497.583159';
+  const target = { ts: '300.001', metadata: { event_type: 'line_harness_task', event_payload: {
+    work_key: key, task_id: taskIdForKey(key), source_channel: sourceChannel,
+    source_thread_ts: sourceThread, session_id: 'old-session', ...binding,
+  } } };
+  const parent = { ts: sourceThread, text: '状態：確認待ち', metadata: {
+    event_type: 'line_harness_codex', event_payload: { work_key: key, category: 'error' },
+  } };
+  const writes: Array<{ method: string; body: Record<string, unknown> }> = [];
+  const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+    const method = String(input).split('/').at(-1)!;
+    const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+    if (method === 'conversations.history') {
+      return slackResponse({ messages: body.channel === 'CTASK123' ? [target] : body.channel === sourceChannel ? [parent] : [] });
+    }
+    if (method.startsWith('chat.')) writes.push({ method, body });
+    return slackResponse({ ts: '1787334034.300149', messages: [], permalink: 'https://slack.test/thread' });
+  });
+  const result = await relayCodexSlackEvent({
+    SLACK_BOT_TOKEN: 'fixture', SLACK_DEFAULT_PR_CHANNEL_ID: 'COWN123',
+    SLACK_ERROR_CHANNEL_ID: sourceChannel, SLACK_TASK_CHANNEL_ID: 'CTASK123',
+  }, event({ eventSource: 'github', eventType, prNumber: 220,
+    prUrl: 'https://github.com/owner/repo/pull/220', repository: 'owner/repo', branch,
+    content: `fix ${taskIdForKey(key)}`, refreshCommandCenter: false }), fetcher);
+  if (inherited) {
+    expect(result).toMatchObject({ channelId: sourceChannel, threadTs: sourceThread });
+    if (eventType === 'turn_completed') {
+      expect(writes).toContainEqual({ method: 'chat.delete', body: { channel: 'CTASK123', ts: target.ts } });
+    } else {
+      expect(writes).toContainEqual({ method: 'chat.update', body: expect.objectContaining({
+        channel: 'CTASK123', ts: target.ts, metadata: expect.objectContaining({ event_payload: expect.objectContaining({
+          work_key: key, pr_number: '220', pr_url: 'https://github.com/owner/repo/pull/220',
+        }) }),
+      }) });
+    }
+  } else {
+    expect(result.channelId).toBe('COWN123');
+    expect(writes.some(write => write.body.channel === sourceChannel || write.body.ts === target.ts)).toBe(false);
+  }
+});
