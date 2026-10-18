@@ -89,3 +89,12 @@ ci-local主実行 `20261018-101811-61d6c90b68-99417` は42工程成功後、MCP�
 主実行との対応・ファイル保持証拠・コピーは `~/lh-work/design/v8/review/CLEANUP-1017/A07-EVIDENCE/merge-1018/`。
 DONE-A07.tsvの4種類の記録も更新する。728/729/730の未予約番号案、実返金adapter不足、3回/4回の判断待ちは前回から保持し、今回もSQLは作成していない。
 push/PR/DB更新/配備/実送信/実決済/実返金は行っていない。
+
+## まとめ枝の再取り込み（2026-10-18 16:18 JST 指示）
+
+開始b702ddb449、まとめ枝7fe9fe7cac2362b7edeb5151ae7eb8dc2618e9e0を取り込んだ。開始時clean・doctor合格。検査前fetchの本線e9b423eb7c798f7d5a530a05a6e86a0c26dd56f9は既に包含済み。
+競合はWorkerのautomation-trigger-wiring.test.tsの1件。まとめ枝の同系列モジュールを読むreadImplementationSourceと、A07の予約フォルダ内の実importだけをたどるrouteSourceを両立させ、分割後のcron/scheduled.tsへの接続も保持した。assertの削除・弱化、対象や上限・許可の追加はない。
+競合試験・読取器試験・イベント通知/待機回収の4ファイル18件はNode22.23.3で成功。差分検査成功、migration差分0。
+mergeは4cc56ff3d0で保存した。記録追記のPython入力に文字コードエラーがあったため、記録は別コミットにしてからci-localを実行する。製品と試験の取り込みには影響しない。
+ci-localはcleanなコミットを必要とするため、指定の全体検査をこの記録を含むSHAで実行し、結果を完了後に追記する。
+728/729/730案、実返金adapter不足、リマインダ3回/共通4回の判断待ちは保持。SQL作成・実送信/決済・DB更新・配備・push/PRなし。
