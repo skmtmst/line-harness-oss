@@ -3,6 +3,15 @@ import { afterEach, expect, it, vi } from 'vitest';
 vi.mock('@line/liff', () => ({ default: { getAccessToken: () => 'self-token' } }));
 import { affiliateSelfApi } from './affiliate-self-api.js';
 afterEach(() => vi.unstubAllGlobals());
+it.each(['rewards', 'bank', 'statements'] as const)('F02: %s の認証はURLに入れず、保存・参照元・転送を止める', async (method) => {
+  const fetcher = vi.fn().mockResolvedValue(new Response('{"data":[],"rewards":[],"availableMiles":0}'));
+  vi.stubGlobal('fetch', fetcher);
+  await affiliateSelfApi[method]();
+  const [url, init] = fetcher.mock.calls[0];
+  expect(String(url)).not.toContain('self-token');
+  expect(new URL(String(url)).searchParams.has('lineAccessToken')).toBe(false);
+  expect(init).toMatchObject({ headers: { Authorization: 'Bearer self-token' }, cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
+});
 it('本人トークンと再送キーを既存の交換と振込先の口へ渡す', async () => {
   const fetcher = vi.fn().mockImplementation(async () => new Response('{"data":null,"status":"succeeded"}'));
   vi.stubGlobal('fetch', fetcher);
