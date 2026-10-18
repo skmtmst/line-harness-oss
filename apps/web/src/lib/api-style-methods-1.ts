@@ -22,6 +22,8 @@ import {
   StyleClassDetails,
 } from './api-styles-common';
 export const methods1 = {
+  ecSummary: (accountId: string, query: { range?: 'today' | 'week' | 'month'; date?: string; from?: string; to?: string } = {}) =>
+    fetchApi<Result<import('@line-crm/shared').EcStyleSummary>>(url(root + '/ec-summary', accountId, query)),
   get: (accountId: string) =>
     fetchApi<
       Result<{

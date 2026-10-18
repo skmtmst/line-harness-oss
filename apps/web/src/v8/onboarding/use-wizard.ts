@@ -3,6 +3,7 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { notifySaved } from '@/components/shared/toast'
+import { accountStyleUpdated } from '@/hooks/use-account-style'
 import { styleApi } from '@/lib/api-styles'
 import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
 import { useEffect,useMemo,useState } from 'react'
@@ -69,6 +70,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
     if (options.skipSettings) changed = Object.fromEntries(Object.entries(changed).filter(([key]) => !SETTINGS_KEYS.includes(key)))
     const res = await styleApi.save(accountId, { expectedVersion: version, style, answers: changed, choices: Object.keys(nextChoices).length ? nextChoices : undefined })
     if (!res.success) throw new Error('save failed')
+    accountStyleUpdated(accountId)
     setVersion(res.data.version)
     setSaved((prev) => ({ ...prev, ...changed }))
     setDirty(false)

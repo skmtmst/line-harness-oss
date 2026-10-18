@@ -334,6 +334,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/dashboard/style/bookings',
   'GET /api/dashboard/style/bookings/{id}',
   'GET /api/dashboard/style/classes/{id}',
+  'GET /api/dashboard/style/ec-summary',
   'GET /api/dashboard/style/members',
   'GET /api/dashboard/style/menus/{id}',
   'GET /api/dashboard/style/people',

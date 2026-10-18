@@ -1,66 +1,46 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { unstable_readConfig } from 'wrangler';
+import { assertWorkerConfig, workerArtifactPath } from './deploy/production/artifacts.js';
 
-// 本番配備 workflow は worker build が実際に作った wrangler.json だけを
-// 参照する。置き場所の決め打ちは改名のたびにずれるので契約で禁じる。
-const workflow = readFileSync(
-  new URL('../.github/workflows/deploy-cloudflare-worker.yml', import.meta.url),
-  'utf8',
-);
-const workerSourceConfig = readFileSync(
-  new URL('../apps/worker/wrangler.toml', import.meta.url),
-  'utf8',
-);
+const source = unstable_readConfig({ config: 'apps/worker/wrangler.toml' });
+const candidate = () => JSON.parse(JSON.stringify(source));
 
-// 正本は apps/worker/wrangler.toml の name。
-// @cloudflare/vite-plugin は worker 名の - を _ に直した名前の Vite 環境を
-// 作り、その環境名のフォルダへ wrangler.json を出す
-// (workerNameToEnvironmentName → dist/<環境名>/wrangler.json)。
-function expectedArtifactDir(): string {
-  const match = workerSourceConfig.match(/^name\s*=\s*"([^"]+)"$/m);
-  const workerName = match?.[1] ?? '';
-  if (!workerName) {
-    throw new Error('apps/worker/wrangler.toml から name を読めません');
-  }
-  return workerName.replaceAll('-', '_');
-}
-
-describe('deploy-cloudflare-worker artifact path', () => {
-  it('does not hardcode any dist/<name>/wrangler.json path', () => {
-    expect(workflow).not.toMatch(/dist\/[A-Za-z0-9_]+\/wrangler\.json/);
+describe('production Worker generated artifact safety', () => {
+  it('derives the Vite artifact path from the canonical worker name, including renames', () => {
+    expect(workerArtifactPath(source.name)).toBe(`apps/worker/dist/${source.name.replaceAll('-', '_')}/wrangler.json`);
+    expect(workerArtifactPath('new-worker')).toBe('apps/worker/dist/new_worker/wrangler.json');
+    expect(() => workerArtifactPath('../escape')).toThrow();
   });
-
-  it('derives the artifact path from the canonical worker name', () => {
-    expect(workflow).toContain('Resolve worker build artifact path');
-    expect(workflow).toContain('apps/worker/wrangler.toml');
-    expect(workflow).toContain("tr '-' '_'");
-    expect(workflow).toContain('WORKER_DEPLOY_CONFIG');
+  it('accepts the existing production settings without changing workers_dev', () => {
+    expect(() => assertWorkerConfig(source, candidate())).not.toThrow();
+    const reordered = candidate(); reordered.routes = reordered.routes.map((route: Record<string, unknown>) => Object.fromEntries(Object.entries(route).reverse()));
+    expect(() => assertWorkerConfig(source, reordered)).not.toThrow();
+    expect(source.workers_dev).toBe(true);
   });
-
-  it('fails closed with a clear error when the artifact is missing', () => {
-    expect(workflow).toContain('Verify worker build artifact');
-    expect(workflow).toContain('apps/worker/$WORKER_DEPLOY_CONFIG');
-    expect(workflow).toContain('::error::');
-    expect(workflow).toContain('exit 1');
+  it.each(['workers_dev', 'preview_urls', 'routes', 'name'])('rejects generated %s drift', key => {
+    const built = candidate();
+    built[key] = key === 'routes' ? [{ pattern: 'unexpected.invalid', custom_domain: true }] : key === 'name' ? 'wrong' : false;
+    expect(() => assertWorkerConfig(source, built)).toThrow();
   });
-
-  it('verifies both compatibility flags in the generated artifact before patching', () => {
-    expect(workflow).toContain('compatibility_flags');
-    expect(workflow).toContain('nodejs_compat');
-    expect(workflow).toContain('global_fetch_strictly_public');
+  it.each(['nodejs_compat', 'global_fetch_strictly_public'])('rejects a missing %s flag', flag => {
+    const built = candidate();
+    built.compatibility_flags = built.compatibility_flags.filter((value: string) => value !== flag);
+    expect(() => assertWorkerConfig(source, built)).toThrow();
   });
-
-  it('deploys only the derived artifact config', () => {
-    expect(workflow).toContain(
-      'deploy --config ${{ env.WORKER_DEPLOY_CONFIG }}',
-    );
+  it.each([['d1_databases', 'database_name'], ['d1_databases', 'database_id'], ['r2_buckets', 'bucket_name']])('rejects a wrong production %s %s', (collection, field) => {
+    const built = candidate();
+    built[collection][0][field] = 'staging';
+    expect(() => assertWorkerConfig(source, built)).toThrow();
   });
-
-  it('derives the same directory the real build produces', () => {
-    // 改名したらこの期待値の更新が要る。黙ってずれるよりは
-    // 目に見えて落ちる方を選ぶ。
-    expect(`dist/${expectedArtifactDir()}/wrangler.json`).toBe(
-      'dist/nen_line/wrangler.json',
-    );
+  it('rejects extra/missing bindings and deploys only the verified generated config', () => {
+    for (const collection of ['d1_databases', 'r2_buckets']) {
+      const built = candidate();
+      built[collection].push({ ...built[collection][0], binding: 'UNEXPECTED' });
+      expect(() => assertWorkerConfig(source, built)).toThrow();
+    }
+    const workflow = readFileSync('.github/workflows/deploy-cloudflare-worker.yml', 'utf8');
+    expect(workflow).toContain('production/run.ts deploy-worker');
+    expect(workflow.indexOf('production/run.ts worker-artifact')).toBeLessThan(workflow.indexOf('production/run.ts deploy-worker'));
   });
 });

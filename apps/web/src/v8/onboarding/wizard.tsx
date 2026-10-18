@@ -28,6 +28,8 @@ import { SampleMenuTiles } from './sample-menu'
 import { useWizard } from './use-wizard'
 import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
+import { useStarterMenu } from './use-starter-menu'
+import SetupLinks from './setup-links'
 
 
 
@@ -64,6 +66,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   const { style, answers, step, setStep, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, close, activate } = useWizard({ accountId, state, initialStep, onClose })
 
   const label = styleLabel(style)
+  const menu = useStarterMenu(accountId, style)
   const head = step === 0
     ? { title: 'はじめに、使い方を教えてください', description: '答えに合わせて、メニュー・見本・設定をまとめて入れます。1 分ほどで終わります。' }
     : step === 1
@@ -136,7 +139,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
           </RadioCardGroup>
           <Card surface="muted" layout="vertical" contentPadding="var(--polish-space-card)" gap="var(--ob-panel-gap)" role="complementary" aria-label="入る見本">
             <div className={styles.panelHead}><span className={styles.panelTitle}>入る見本</span><StatusBadge tone="neutral" dot>見本</StatusBadge></div>
-            <SampleMenuTiles style={style} />
+            {menu.error ? <ListState kind="error" title="見本を読み込めませんでした" error={menu.error} onRetry={menu.reload} /> : menu.loading ? <ListState kind="loading" title="見本を確認しています" /> : <SampleMenuTiles style={style} buttons={menu.buttons} />}
             <p className={styles.panelNote}>{`中身が決まっていないボタンは、お客さまには「${PREPARING_WORD}」と出します。`}</p>
           </Card>
         </div>
@@ -163,6 +166,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
             </div>
           </RadioCardGroup>
           {where(`あとから変えられます（${question.where}）。`)}
+          {!question.preparing ? <Link href={question.manualHref} className={styles.link}>設定の画面を開く</Link> : null}
         </div>
       </div>
     )
@@ -199,6 +203,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
             <p className={styles.cardFoot}>自動で送る物は全部止めて入れています。オンにした物だけ、［まとめて動かす］で動き始めます。</p>
           </section>
         </div>
+        <SetupLinks style={style} />
         {skipped.length > 0 ? (
           <section className={styles.skipped} aria-labelledby="setup-skipped">
             <div className={styles.cardHead}><h3 id="setup-skipped" className={styles.cardTitle}>入れなかった物（あとで設定する）</h3><span className={styles.cardMetaEnd}>はじめにやることに残ります</span></div>

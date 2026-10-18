@@ -202,9 +202,9 @@ test.each(['read-only', 'staff', 'other-account'])('%s cannot save profile or in
   expect(rows()).toEqual([]);
 });
 
-test('registration initialization and reads leave flags absent and retain standard samples', async () => {
+test('registration initialization and reads leave flags absent and keep the standard non-reservation starter samples', async () => {
   expect(rows()).toEqual([]);
-  expect(sql.raw.prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'").get()).toEqual({ n: 16 });
+  expect(sql.raw.prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'").get()).toEqual({ n: 5 });
   expect((await app.request('/api/dashboard/style?account_id=a', {}, { DB: sql.db } as Env['Bindings'])).status).toBe(200);
   expect(rows()).toEqual([]);
   await expect(saveProfile(sql.db, 'a', 't', 'owner', { expectedVersion: 0 })).rejects.toMatchObject({ code: 'version_conflict' });

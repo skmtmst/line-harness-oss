@@ -190,6 +190,8 @@ export type AuditAction =
   // Uber Eats のログイン連携。店舗の代理で使えるトークンを得る操作なので必ず残す。
   | 'restaurant.delivery.ubereats.connect.start'
   | 'restaurant.delivery.ubereats.connect'
+  // つなぐお店の確定。Uber 側で連携が有効になる取り消しにくい操作なので必ず残す。
+  | 'restaurant.delivery.ubereats.store.select'
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'
   | 'ad_cost.import'
