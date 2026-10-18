@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, chmodSync, symlinkSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, chmodSync, symlinkSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -22,4 +22,16 @@ describe('F32: isolated credential directory', () => {
       }
     } finally { rmSync(parent, { recursive: true, force: true }); }
   });
+  it('keeps a private workspace reusable when dependency files contain symlinks', () => {
+    const parent = mkdtempSync(join(tmpdir(), 'sandbox-reuse-'));
+    try {
+      const root = join(parent, 'root'); mkdirSync(root, { mode: 0o700 });
+      const work = join(root, 'work'); mkdirSync(work, { mode: 0o700 });
+      writeFileSync(join(work, 'ordinary-file'), 'source', { mode: 0o644 });
+      symlinkSync(join(work, 'ordinary-file'), join(work, 'dependency-link'));
+      const result = spawnSync('bash', ['scripts/run-create-line-harness-sandbox.sh', '--root', root, '--', 'true'], { encoding: 'utf8' });
+      expect(result.status, result.stderr).toBe(0);
+    } finally { rmSync(parent, { recursive: true, force: true }); }
+  });
+
 });

@@ -107,15 +107,20 @@ fi
 SANDBOX_ROOT="${SANDBOX_ROOT%/}"
 # Validate before either reusing or deleting a caller-supplied root. Never follow links.
 node --input-type=module - "$SANDBOX_ROOT" <<'NODE'
-import { lstatSync, readdirSync, realpathSync } from 'node:fs';
+import { lstatSync, realpathSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 const root = resolve(process.argv[2]);
-function check(path) {
-  const stat = lstatSync(path);
-  if (stat.isSymbolicLink() || stat.uid !== process.getuid() || (stat.mode & 0o077)) throw new Error('Unsafe sandbox path');
-  if (stat.isDirectory()) for (const name of readdirSync(path)) check(join(path, name));
+function check(path, directory = true) {
+  try {
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink() || stat.uid !== process.getuid() || (directory && !stat.isDirectory()) || (stat.mode & 0o077)) throw new Error('Unsafe sandbox path');
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
-try { check(root); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+check(root);
+// Protect credential/cache ancestors; ordinary files and node_modules links in
+// the private workspace do not grant access to another OS user.
+for (const relative of ['home', 'xdg', 'xdg/config', 'xdg/cache', 'xdg/data', 'npm-cache', 'pnpm-home', 'corepack', 'work']) check(join(root, relative));
+check(join(root, 'home/.npmrc'), false);
 // A hostile non-sticky parent can rename a private root to replace it.
 let parent = dirname(root);
 while (true) {
