@@ -1,4 +1,0 @@
-board	change	commits	widths	validation
-PUWyq	本文幅を3列へ等分しカード越境を解消	a2ace8b43a	1440,1152,1920	3 columns; excess 0
-RwVo5	一覧/詳細とも削除窓と同じ480/上260	0877946cf9	1440,1152,1920	width 480; top 260; background timing at 1152 remains 10/60px
-YZ57z	注意帯を全幅/上12/1行、解除対象の詳細は本文	a2ace8b43a,aedaaf8d85	1440,1152,1920	band 432; gap 12; warning text 17px

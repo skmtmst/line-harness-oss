@@ -1,7 +1,0 @@
- ✓ src/app/contents/vars/list-v8-parity.react.test.tsx (3 tests) 338ms
- ✓ src/v8/mileage/score-adjust-field-errors.test.tsx (1 test) 36ms
-
- Test Files  23 passed (23)
-      Tests  97 passed (97)
-   Start at  03:50:27
-   Duration  15.32s (transform 2.42s, setup 105ms, collect 8.28s, tests 10.72s, environment 3.01s, prepare 756ms)

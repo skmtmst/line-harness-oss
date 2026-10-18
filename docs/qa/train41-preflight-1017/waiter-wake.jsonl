@@ -1,5 +1,0 @@
-{"event": "started-through-heavy", "script": "/tmp/train41-api-preflight/web-recheck.sh", "pid": 99690, "slot": "slot2", "at": "2026-10-17T00:04:34.500305"}
-{"event": "watch-ended", "started": ["/tmp/train41-api-preflight/web-recheck.sh"]}
-{"event": "wake-own-idle-timer", "script": "/tmp/train41-api-preflight/workspace-types.sh", "wrapper": 38197, "timer": 71863, "at": "2026-10-17T00:08:15.738619"}
-{"event": "started-through-heavy", "script": "/tmp/train41-api-preflight/workspace-types.sh", "pid": 38197, "slot": "slot2", "at": "2026-10-17T00:08:15.945324"}
-{"event": "watch-ended", "started": ["/tmp/train41-api-preflight/workspace-types.sh"]}
