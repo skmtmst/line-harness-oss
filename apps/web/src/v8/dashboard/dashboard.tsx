@@ -73,6 +73,7 @@ export default function DashboardV8() {
   const setupRest = setupSummary(setup.data)
   const params = useSearchParams()
   const setupParam = params.get('setup')
+  const qrRequested = params.has('qr')
   const closedWizardAccount = useRef<string | null>(null)
   const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
   useEffect(() => {
@@ -83,10 +84,10 @@ export default function DashboardV8() {
   useEffect(() => {
     const state = setup.data?.state
     /* 「あとで」「手動」は口の styleMode に残る（別の人・別の端末でも自動では開かない）。 */
-    if (!state || !canManage || state.styleSelected || !d.selectedAccountId || closedWizardAccount.current === d.selectedAccountId) return
+    if (!state || !canManage || state.styleSelected || !d.selectedAccountId || qrRequested || closedWizardAccount.current === d.selectedAccountId) return
     if (state.styleMode === 'later' || state.styleMode === 'manual') return
     setWizardStep((current) => current ?? 0)
-  }, [setup.data, canManage, d.selectedAccountId])
+  }, [setup.data, canManage, d.selectedAccountId, qrRequested])
   const openSetupStep = (step: string | number) => {
     if (typeof step === 'number') { setWizardStep(step); return }
     const names = setup.data ? ['style', 'image'] : []
