@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,6 +7,7 @@ import { toDraft, toVersionDraft } from '@/components/auto-replies/edit-dialog'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
+const readApi = (...parts: string[]) => readApiSource(join(HERE, ...parts), 'utf8')
 const LIST = read('../../v8/auto-replies/list.tsx')
 const EDIT = read('edit/wizard-v8.tsx')
 const DIALOG = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
@@ -40,7 +42,7 @@ describe('自動応答の編集に渡す中身', () => {
     // 保存本文に必ず載せる。新規作成・一覧の編集・URL 編集のどれでも送れる
     // ように、共通の body へ入れる（版管理の口へだけ入れると一覧経由で消える）。
     expect(DIALOG).toContain('internalMemo: internalMemo.trim() || null')
-    const API = read('..', '..', 'lib', 'api.ts')
+    const API = readApi('..', '..', 'lib', 'api.ts')
     expect(API).toContain('internalMemo: string | null')
     expect(API).toContain('internalMemo?: string | null')
   })

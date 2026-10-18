@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 /*
  * #941（N-385〜N-388）の構造契約。
@@ -14,7 +15,7 @@ const INTERACTIONS = readFileSync(join(import.meta.dirname, '../../v8/webhooks/i
 const STYLES = readFileSync(join(import.meta.dirname, '../../v8/webhooks/interactions.module.css'), 'utf8')
 const ROW_MENU = readFileSync(join(import.meta.dirname, '../../components/shared/row-actions.tsx'), 'utf8')
 const MENU = readFileSync(join(import.meta.dirname, '../../components/shared/action-menu.tsx'), 'utf8')
-const API = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('N-385: 設定メニューはキーボードだけで開いて選べ、Escape・外側で閉じる', () => {
   it('menu / menuitem の役割と矢印キー移動を持つ', () => {

@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,7 +16,7 @@ const CREATE_FORM = readFileSync(
   join(HERE, '../../v8/rich-menu-edit/compatibility-form.tsx'),
   'utf8',
 )
-const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 /** #898 / N-163: ボタン名でも見つかる検索 */
 describe('一覧の検索はボタン名にも当たる', () => {

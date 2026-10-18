@@ -15,7 +15,7 @@
  * 同じパスに GET（一覧＝配列）と POST（作成＝1件）が並ぶことがあるので、
  * **GET だけを見る**。
  */
-import { readFileSync } from 'node:fs'
+import { readApiSource } from '../../apps/web/scripts/test-api-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -65,7 +65,7 @@ function staticPath(literal) {
  */
 const MINIMUM = 40
 
-export function readArrayGetPaths(source = readFileSync(API_TS, 'utf8')) {
+export function readArrayGetPaths(source = readApiSource(API_TS, 'utf8')) {
   const paths = new Set()
   let cursor = 0
   for (;;) {
