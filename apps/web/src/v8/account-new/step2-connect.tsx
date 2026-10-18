@@ -32,9 +32,13 @@ function AcOutline({ sub }: { sub: number }) {
       <div className={styles.outlineGap} aria-hidden="true" />
       {AC_OUTLINE.map((row, index) => {
         const number = index + 1
-        const state = number < sub ? styles.outlineDone : number === sub ? styles.outlineCurrent : styles.outlineFuture
         return (
-          <div key={row.title} className={`${styles.outlineRow} ${state}`} aria-current={number === sub ? 'step' : undefined}>
+          /* 札は三項をそのまま書く。変数に入れると design-debt の見張りが追えなくなる。 */
+          <div
+            key={row.title}
+            className={`${styles.outlineRow} ${number < sub ? styles.outlineDone : number === sub ? styles.outlineCurrent : styles.outlineFuture}`}
+            aria-current={number === sub ? 'step' : undefined}
+          >
             <span className={styles.outlineNum} aria-hidden="true">{number}</span>
             <div className={styles.outlineText}>
               <p className={styles.outlineRowTitle}>{row.title}</p>
