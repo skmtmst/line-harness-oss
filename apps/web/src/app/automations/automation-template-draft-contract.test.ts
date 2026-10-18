@@ -1,10 +1,11 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const GALLERY = readFileSync(new URL('../../v8/automations/templates.tsx', import.meta.url), 'utf8')
 const EDITOR = readFileSync(new URL('../../v8/automations/create/create.tsx', import.meta.url), 'utf8')
-const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 25-1-C 見本から下書きを作る', () => {
   it('見本タブを実Nodeへ接続し、サーバーから使える見本だけを読む', () => {

@@ -1,10 +1,11 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAYMENT = readFileSync(new URL('../../v8/affiliates/payment.tsx', import.meta.url), 'utf8')
 const PAYMENT_DIALOGS = readFileSync(new URL('../../v8/affiliates/payment-dialogs.tsx', import.meta.url), 'utf8')
 const DIALOGS = readFileSync(new URL('../../v8/affiliates/dialogs.tsx', import.meta.url), 'utf8')
-const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const PAYOUTS = readFileSync(new URL('../../../../worker/src/routes/affiliate-payouts.ts', import.meta.url), 'utf8')
 
 describe('V6 支払いの追記台帳契約', () => {

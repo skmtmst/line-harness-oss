@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,7 +13,7 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 const baseRule = {
   keyword: '予約',

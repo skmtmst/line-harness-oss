@@ -79,4 +79,17 @@ describe('#548-7 会話詳細のメッセージは実応答の形で返る', () 
       expect(message).not.toHaveProperty('senderType');
     }
   });
+
+  it('本名と注目印を実際の友だち情報から返し、未設定と区別する', async () => {
+    testDb.raw.prepare('UPDATE friends SET real_name = ?, metadata = ? WHERE id = ?')
+      .run('実名の見本', JSON.stringify({ __attention: '1' }), 'friend-shape');
+    const getDetail = async () => {
+      const response = await chatsApp(testDb.db).request('/api/chats/friend-shape', {}, { DB: testDb.db } as Env['Bindings']);
+      expect(response.status).toBe(200);
+      return (await response.json() as { data: Record<string, unknown> }).data;
+    };
+    expect(await getDetail()).toMatchObject({ friendRealName: '実名の見本', isAttention: true });
+    testDb.raw.prepare("UPDATE friends SET real_name = NULL, metadata = '{}' WHERE id = ?").run('friend-shape');
+    expect(await getDetail()).toMatchObject({ friendRealName: null, isAttention: false });
+  });
 });

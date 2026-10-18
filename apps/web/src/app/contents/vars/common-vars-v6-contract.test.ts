@@ -1,15 +1,17 @@
+import { readApiSource } from '../../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { readImplementationSource } from '../../../../../worker/src/test-utils/implementation-source'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const NEW_PAGE = readUiSource(join(HERE, 'new', 'page.tsx'), 'utf8')
 const EDIT_PAGE = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
-const WORKER = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'contents.ts'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
+const WORKER = readImplementationSource(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'contents.ts'))
 
 describe('V6共通情報一覧', () => {
   it('次回予約は一覧APIで受け取り、行ごとのAPI呼出をしない', () => {

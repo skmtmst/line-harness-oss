@@ -11,7 +11,7 @@ beforeAll(async () => {
       const get = url.searchParams.get('get') === '1';
       const endpoint = 'https://verify.example.com' + url.pathname + url.search + (get ? '&answer={answer}' : '');
       return Response.json(await callFormWebhook({ on_submit_webhook_url: endpoint,
-        on_submit_webhook_headers: JSON.stringify({ 'X-Api-Key': 'synthetic-webhook-token' }) }, { answer: 'yes' }, 'event-1'));
+        on_submit_webhook_headers: JSON.stringify({ 'X-Api-Key': 'synthetic-webhook-token' }) }, { answer: 'yes' }, 'event-1', { lookupHost: async () => ['93.184.216.34'] }));
     } }
   `);
 });
@@ -21,7 +21,7 @@ async function seen() { return (await (await mf.getWorker('destination')).fetch(
 
 describe('form webhook actual workerd fetch', () => {
   it.each([false, true])('preserves normal webhook eligibility (GET: %s)', async get => {
-    expect(await (await mf.dispatchFetch(`https://caller.test/check?get=${get ? 1 : 0}`)).json()).toEqual({ passed: true, data: { verdict: 'clean', eligible: true } });
+    expect(await (await mf.dispatchFetch(`https://caller.test/check?get=${get ? 1 : 0}`)).json()).toEqual({ passed: true, data: { eligible: true } });
     expect(await seen()).toEqual([{ host: 'verify.example.com', path: '/check', method: get ? 'GET' : 'POST',
       authenticated: false, customAuthenticated: true, body: get ? '' : '{"answer":"yes"}' }]);
   });

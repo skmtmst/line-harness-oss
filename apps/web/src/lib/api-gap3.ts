@@ -1,5 +1,6 @@
-import {fetchApi,downloadApiFile} from './api';
-import type {MemberCard,AccountAiFeature,AccountAiSetting,SavedSearchConditions,DepositRule,CancellationOptions,BookingGroupView,InboxRoutingTarget,InboxStrategy,CustomerSegments,RankProgram,RankTier,StoreComparisonResult,AutoLineKind,AutoLineRule,BookingPassPlan,BookingPassPlanWrite,McpConnection,AiAnswerLog,QaEntry,BookingRecurrence} from '@line-crm/shared';
+import { bookingAdvancedApi } from './api-booking-advanced'
+import { fetchApi, downloadApiFile } from './api'
+import type {MemberCard,AccountAiFeature,AccountAiSetting,SavedSearchConditions,CancellationOptions,InboxRoutingTarget,InboxStrategy,CustomerSegments,RankProgram,RankTier,StoreComparisonResult,AutoLineKind,AutoLineRule,BookingPassPlan,BookingPassPlanWrite,McpConnection,AiAnswerLog,QaEntry} from '@line-crm/shared';
 type Result<T>={success:true;data:T};
 type Page<T>={items:T[];total:number};
 const e=encodeURIComponent;
@@ -13,25 +14,26 @@ export const gap3InboxApi={
  presence:(away:boolean)=>fetchApi<Result<{away:boolean}>>('/api/me/presence',json('PUT',{away})),
  icons:(a:string,offset=0)=>fetchApi<Result<{items:Array<{id:string;url:string;name:string}>;nextOffset:number|null}>>(query(`/api/line-accounts/${e(a)}/sender-icons`,{offset})),
 };
-export const gap3BookingApi={
- createGroup:(a:string,b:{friendId:string;members:Array<{menuId:string;staffId?:string;label?:string;addonIds?:string[]}>;starts_at:string;startMode:'parallel'|'sequential'},key:string)=>fetchApi<Result<{groupId:string;bookings:unknown[];total:number;replayed:boolean;notificationsAvailable:false}>>(account('/api/booking/admin/groups',a),json('POST',b,key)),
- depositRule:(a:string)=>fetchApi<Result<DepositRule>>(account('/api/booking/admin/deposit-rules',a)),
- saveDepositRule:(a:string,b:Omit<DepositRule,'version'>&{expectedVersion:number})=>fetchApi<Result<DepositRule>>(account('/api/booking/admin/deposit-rules',a),json('PUT',b)),
- menuDeposit:(a:string,id:string)=>fetchApi<Result<DepositRule&{inherit:boolean}>>(account(`/api/booking/admin/menus/${e(id)}/deposit`,a)),
- saveMenuDeposit:(a:string,id:string,b:Omit<DepositRule,'version'>&{inherit:boolean;expectedVersion:number})=>fetchApi<Result<DepositRule&{inherit:boolean}>>(account(`/api/booking/admin/menus/${e(id)}/deposit`,a),json('PUT',b)),
- cancellationOptions:(a:string)=>fetchApi<Result<CancellationOptions>>(account('/api/booking/admin/cancellation-options',a)),
- saveCancellationOptions:(a:string,b:{cardRequiredFor:CancellationOptions['cardRequiredFor'];chargeMode:'manual';expectedVersion:number})=>fetchApi<Result<CancellationOptions>>(account('/api/booking/admin/cancellation-options',a),json('PUT',b)),
- card:(a:string,id:string)=>fetchApi<Result<{brand:string;last4:string;registeredAt:string}|null>>(account(`/api/booking/admin/bookings/${e(id)}/payment-method`,a)),
- group:(a:string,id:string)=>fetchApi<Result<BookingGroupView|null>>(account(`/api/booking/admin/bookings/${e(id)}/group`,a)),
- series:(a:string,id:string)=>fetchApi<Result<unknown>>(account(`/api/booking/admin/bookings/${e(id)}/series`,a)),
- cancelGroup:(a:string,id:string,reason:string,expectedVersion:number)=>fetchApi<Result<{cancelled:number;version:number}>>(account(`/api/booking/admin/groups/${e(id)}/cancel`,a),json('POST',{reason,expectedVersion})),
- impact:(a:string,id:string,b:{scope:'this'|'following';fromBookingId:string;expectedVersion?:number;change?:{startsAt?:string}})=>fetchApi<Result<{items:Array<{bookingId:string;startsAt:string;after:string|null;blocked:boolean;fee:unknown}>}>>(account(`/api/booking/admin/series/${e(id)}/impact`,a),json('POST',b)),
- meetingCapabilities:(a:string)=>fetchApi<Result<unknown>>(account('/api/booking/admin/meeting-capabilities',a)),
- costEstimate:(liffId:string,token:string,menuId:string,startsAt:string,partySize=1)=>fetchApi<Result<unknown>>(query('/api/liff/booking/cost-estimate',{liffId,menu_id:menuId,starts_at:startsAt,party_size:partySize}),{headers:{Authorization:`Bearer ${token}`}}),
- seriesPreview:(liffId:string,token:string,b:{menuId:string;staffId?:string;startsAt:string;rule:BookingRecurrence})=>fetchApi<Result<unknown>>(query('/api/liff/booking/series/preview',{liffId}),{...json('POST',b),headers:{Authorization:`Bearer ${token}`}}),
- groupAvailability:(liffId:string,token:string,members:unknown[],from:string,to=from,startMode='parallel')=>fetchApi<Result<unknown>>(query('/api/liff/booking/group-availability',{liffId,members:JSON.stringify(members),from,to,startMode}),{headers:{Authorization:`Bearer ${token}`}}),
- request:(liffId:string,token:string,b:{menu_id?:string;starts_at:string;members?:Array<{menuId:string;staffId?:string;label?:string;addonIds?:string[]}>;staff_id?:string;startMode?:'parallel'|'sequential';recurrence?:BookingRecurrence;routing_token?:string;entitlement_id?:string},key:string)=>fetchApi<Result<unknown>>(query('/api/liff/booking/requests',{liffId}),{...json('POST',b),headers:{Authorization:`Bearer ${token}`,'Idempotency-Key':key}}),
-};
+export const gap3BookingApi = {
+  createGroup: bookingAdvancedApi.createGroup,
+  depositRule: bookingAdvancedApi.depositRule,
+  saveDepositRule: bookingAdvancedApi.saveDepositRule,
+  menuDeposit: bookingAdvancedApi.menuDeposit,
+  saveMenuDeposit: bookingAdvancedApi.saveMenuDeposit,
+  cancellationOptions: bookingAdvancedApi.cancellationOptions,
+  saveCancellationOptions: bookingAdvancedApi.saveCancellationOptions as (accountId: string, input: { cardRequiredFor: CancellationOptions['cardRequiredFor']; chargeMode: 'manual'; expectedVersion: number }) => ReturnType<typeof bookingAdvancedApi.saveCancellationOptions>,
+  card: bookingAdvancedApi.card,
+  group: bookingAdvancedApi.group,
+  series: bookingAdvancedApi.series,
+  cancelGroup: bookingAdvancedApi.cancelGroup,
+  impact: bookingAdvancedApi.impact,
+  meetingCapabilities: bookingAdvancedApi.meetingCapabilities,
+  costEstimate: bookingAdvancedApi.costEstimate,
+  seriesPreview: bookingAdvancedApi.seriesPreview,
+  groupAvailability: bookingAdvancedApi.groupAvailability,
+  request: bookingAdvancedApi.request,
+}
+
 export const customerSegmentsApi={
  get:(a:string,basis='both',measure='count')=>fetchApi<Result<CustomerSegments>>(query(account('/api/analytics/customer-segments',a),{basis,measure})),
  friends:(a:string,r:number,f:number,basis='both',measure='count',cursor?:string)=>fetchApi<Result<Page<{id:string;display_name:string;activity_count:number;amount:number}>&{optedOutCount:number;nextCursor:string|null}>>(query(account(`/api/analytics/customer-segments/cells/${r}/${f}/friends`,a),{basis,measure,cursor})),

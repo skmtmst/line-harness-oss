@@ -14,11 +14,18 @@
 
 import { Download, Funnel } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import DateField from '@/components/shared/date-field'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Pagination, { paginationSummary } from '@/components/shared/pagination'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
+import TruncatedText from '@/components/shared/truncated-text'
 import {
   DELIVERY_SERVICES,
   DELIVERY_SERVICE_LABELS,
@@ -56,78 +63,6 @@ const SERVICE_OPTIONS = [
   })),
 ]
 
-/* ── 板の頭の右（日付・サービス・CSV） ───────────────────────────── */
-
-export interface HistoryHeaderActionsProps {
-  /** `YYYY-MM-DD`。 */
-  date: string
-  service: DeliveryService | ''
-  csvBusy: boolean
-  /** 1件も無いときは保存するものが無いので押せない。 */
-  csvDisabled: boolean
-  onDateChange: (value: string) => void
-  onServiceChange: (value: DeliveryService | '') => void
-  onCsv: () => void
-}
-
-/** 板の頭の右。親が RestaurantPage の picker へ置く。 */
-export function HistoryHeaderActions({
-  date,
-  service,
-  csvBusy,
-  csvDisabled,
-  onDateChange,
-  onServiceChange,
-  onCsv,
-}: HistoryHeaderActionsProps) {
-  return (
-    <div className={`${styles.filterRow} ${styles.filterRowOneLine}`}>
-      <DateField
-        aria-label="日付"
-        size="compact"
-        className={styles.filterDate}
-        value={date}
-        onChange={onDateChange}
-      />
-      {/*
-        * 絵（OzHLO）のサービスの箱は先頭に漏斗の印がある（箱 x1085 幅195・余白12・印15 →
-        * 文字 x1120）。印が無いと文字が x1098 に寄って絵と22ずれる。画面CSSで足さず、
-        * 共通の箱が持つ `icon` へ渡す（★V8 §24 部品の見た目は部品側で決める）。
-        * さらに決まった幅の箱は値が両端に釣り合って真ん中へ浮くので、`valueAlign="start"` で
-        * 絵と同じ「印のすぐ右から文字」にする（余白12＋印16＋間6＝x1120）。
-        */}
-      <Select
-        aria-label="サービス"
-        icon={<Funnel size={15} aria-hidden="true" />}
-        valueAlign="start"
-        className={styles.filterService}
-        value={service}
-        onChange={(value) => {
-          const next = DELIVERY_SERVICES.find((item) => item === value)
-          onServiceChange(next ?? '')
-        }}
-        options={SERVICE_OPTIONS}
-      />
-      {/*
-        * 絵（OzHLO）の「CSVで保存」は幅112（余白14・印15・間6）。共通の既定（余白16・印13）
-        * だと131になり、左の絞り込み2つを19ずつ押し出してしまう。板の頭の操作は
-        * `size="delivery-head"`（絵 kDQHr と同じ値）で絵へ合わせる。
-        * また「保存しました」は出さないので、結果の文字の分の幅を控えない（widthReserve="idle"）。
-        */}
-      <Button
-        size="delivery-head"
-        widthReserve="idle"
-        onClick={onCsv}
-        busy={csvBusy}
-        busyLabel="保存中…"
-        disabled={csvDisabled}
-      >
-        <Download size={15} aria-hidden="true" />CSVで保存
-      </Button>
-    </div>
-  )
-}
-
 /* ── 表の行 ───────────────────────────────────────────────── */
 
 function HistoryRow({
@@ -139,7 +74,7 @@ function HistoryRow({
 }) {
   const reason = order.cancelReasonCode ? CANCEL_REASON_LABELS[order.cancelReasonCode] : null
   return (
-    <Tr>
+    <Tr data-table-layout="columns">
       <Td>
         <Button
           variant="text"
@@ -156,16 +91,14 @@ function HistoryRow({
           {order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]}
         </StatusBadge>
       </Td>
-      <Td>
+      <Td data-list-number>
         <span className={styles.elapsed}>{formatClock(order.receivedAt)}</span>
       </Td>
-      <Td>
-        {/* 絵（OzHLO）の注文内容は1行だけ。点数は注文の詳細（hjdqV）で出す。 */}
-        <span className={styles.items} title={order.itemSummary || undefined}>
-          {order.itemSummary || DASH}
-        </span>
+      <Td grow>
+        {/* 注文内容は1行だけ。点数は注文の詳細（hjdqV）で出す。 */}
+        <TruncatedText value={order.itemSummary || DASH} />
       </Td>
-      <Td align="right">
+      <Td align="right" data-list-number>
         <span className={styles.amount}>{formatYen(order.totalAmount)}</span>
       </Td>
       <Td>
@@ -189,12 +122,23 @@ export interface HistoryBoardProps {
   error: string | null
   /** きょうを選んでいるか（足もとの「本日」の出し分け）。 */
   isToday: boolean
-  shown: number
+  page: number
+  perPage: number
   /** 上限で切れたときの案内。切れていないときは null。 */
   csvNote: string | null
   onOpenOrder: (id: string) => void
   onRetry: () => void
-  onShowMore: () => void
+  onPage: (page: number) => void
+  onPerPage: (perPage: number) => void
+  /** 日付・サービス・CSV は道具の段（ListToolbar）に置く。 */
+  date: string
+  service: DeliveryService | ''
+  csvBusy: boolean
+  /** 1件も無いときは保存するものが無いので押せない。 */
+  csvDisabled: boolean
+  onDateChange: (value: string) => void
+  onServiceChange: (value: DeliveryService | '') => void
+  onCsv: () => void
 }
 
 export default function HistoryBoard({
@@ -202,14 +146,26 @@ export default function HistoryBoard({
   loading,
   error,
   isToday,
-  shown,
+  page,
+  perPage,
   csvNote,
   onOpenOrder,
   onRetry,
-  onShowMore,
+  onPage,
+  onPerPage,
+  date,
+  service,
+  csvBusy,
+  csvDisabled,
+  onDateChange,
+  onServiceChange,
+  onCsv,
 }: HistoryBoardProps) {
   const orders = data?.orders ?? []
-  const visible = orders.slice(0, shown)
+  const pageCount = Math.max(1, Math.ceil(orders.length / perPage))
+  const currentPage = Math.min(page, pageCount)
+  const firstIndex = (currentPage - 1) * perPage
+  const visible = orders.slice(firstIndex, firstIndex + perPage)
   const totals = data?.totals ?? null
   const prefix = isToday ? '本日 ' : ''
   const canceled = totals ? totals.canceledCount : null
@@ -230,12 +186,38 @@ export default function HistoryBoard({
 
   return (
     <>
+      <ListToolbar
+        filters={(
+          <>
+            {/* 日付は共通の日付の欄。狭い幅でも切れないよう月日の書き方（10/01）で出す。 */}
+            <span className={styles.filterDate}>
+              <DateField aria-label="日付" displayFormat="short" value={date} onChange={onDateChange} />
+            </span>
+            <Select
+              aria-label="サービス"
+              icon={<Funnel size={16} aria-hidden="true" />}
+              value={service}
+              onChange={(value) => {
+                const next = DELIVERY_SERVICES.find((item) => item === value)
+                onServiceChange(next ?? '')
+              }}
+              options={SERVICE_OPTIONS}
+            />
+          </>
+        )}
+        trailing={(
+          <>
+            <Button onClick={onCsv} busy={csvBusy} busyLabel="書き出し中…" disabled={csvDisabled}>
+              <Download size={16} aria-hidden="true" />CSVで書き出す
+            </Button>
+            <PageSizeSelect value={perPage} onChange={onPerPage} />
+          </>
+        )}
+      />
       {csvNote ? <p className={styles.muted}>{csvNote}</p> : null}
 
       {loading && !data ? (
-        <div className={styles.stateBox}>
-          <ListState kind="loading" title="注文履歴を読み込んでいます" />
-        </div>
+        <ListState kind="loading" title="注文履歴を読み込んでいます" />
       ) : null}
       {error && !data ? (
         <ListState
@@ -248,38 +230,37 @@ export default function HistoryBoard({
 
       {data ? (
         <>
-          {/* 絵（`ZuE0v`）は枠付きの別々の札4枚。大きい値は売上金額で、件数は題の右に小さく出す。 */}
-          <div className={styles.sumRow} data-design="ZuE0v">
-            <div className={styles.sumCard}>
-              <div className={styles.sumHead}>
-                <span className={styles.sumTitle}>{isToday ? '本日の合計' : '合計'}</span>
-                {/* 絵（ZuE0v）の札に細い横線は無いので、線は置かず件数を右端へ寄せるだけにする。 */}
-                <span className={styles.sumCount} title={countNote}>
-                  {totals ? `${totals.count}件` : DASH}
-                </span>
-              </div>
-              <p className={styles.sumAmount}>{formatYen(totals ? totals.amount : null)}</p>
-            </div>
+          {/* 売上の4つの数は、線で区切った1本の帯（共通の KpiBand）。合計＋サービス3つ。 */}
+          <KpiBand data-design="ZuE0v" aria-label="売上の集計">
+            <KpiCard
+              title={isToday ? '本日の合計' : '合計'}
+              icon={null}
+              value={null}
+              unit=""
+              valueText={formatYen(totals ? totals.amount : null)}
+              detail={<span title={countNote}>{totals ? `${totals.count}件` : DASH}</span>}
+            />
             {byService.map((row) => (
-              <div key={row.service} className={styles.sumCard}>
-                <div className={styles.sumHead}>
-                  <StatusBadge tone={SERVICE_TONES[row.service]} size="compact" dot={false}>{row.label}</StatusBadge>
-                  <span className={styles.sumCount}>{row.count}件</span>
-                </div>
-                <p className={styles.sumAmount}>{formatYen(row.amount)}</p>
-              </div>
+              <KpiCard
+                key={row.service}
+                title={row.label}
+                icon={null}
+                value={null}
+                unit=""
+                valueText={formatYen(row.amount)}
+                detail={`${row.count}件`}
+              />
             ))}
-          </div>
+          </KpiBand>
 
-          <DataTable className={styles.table} data-design="OzHLO" presentation="delivery" label="デリバリーの注文履歴"><thead>
-            <TableHeadRow>
-              <Th className={styles.th}>注文番号</Th>
-              <Th className={styles.th}>サービス</Th>
-              <Th className={styles.th}>時刻</Th>
-              <Th className={styles.th}>注文内容</Th>
-              {/* 絵（OzHLO）の見出しは全部左。中の金額だけ右に寄せる。 */}
-              <Th className={styles.th}>金額</Th>
-              <Th className={styles.th}>状態</Th>
+          <Card overflow="hidden"><DataTable density="reviews" columnSizing="content" data-design="OzHLO" label="デリバリーの注文履歴"><thead>
+            <TableHeadRow data-table-layout="columns">
+              <Th>注文番号</Th>
+              <Th>サービス</Th>
+              <Th>時刻</Th>
+              <Th grow>注文内容</Th>
+              <Th align="right">金額</Th>
+              <Th>状態</Th>
             </TableHeadRow></thead><tbody>
             {visible.length === 0 ? (
               <TableStateRow
@@ -294,17 +275,17 @@ export default function HistoryBoard({
                 <HistoryRow key={order.id} order={order} onOpenOrder={onOpenOrder} />
               ))
             )}
-          </tbody></DataTable>
+          </tbody></DataTable></Card>
 
           {orders.length > 0 ? (
-            <div className={styles.tableFoot}>
-              <p className={styles.muted}>
-                {prefix}{orders.length}件中 1〜{visible.length}件を表示
-              </p>
-              {visible.length < orders.length ? (
-                <Button variant="text" size="compact" onClick={onShowMore}>さらに表示</Button>
-              ) : null}
-            </div>
+            <>
+              <Pagination
+                page={currentPage}
+                pageCount={pageCount}
+                onPageChange={onPage}
+                summary={`${prefix}${paginationSummary(orders.length, firstIndex + 1, firstIndex + visible.length)}`}
+              />
+            </>
           ) : null}
         </>
       ) : null}

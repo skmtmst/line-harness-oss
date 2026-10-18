@@ -1,9 +1,10 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('クロス分析の待ち順と処理目安 (Issue #633)', () => {
   it('待ち順・目安・現在状態を日本語で出し、再実行を誘発しない', () => {

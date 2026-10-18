@@ -104,6 +104,7 @@ type DueJobRow = {
   channel_access_token: string | null;
   channel_access_token_encrypted: string | null;
   line_account_active: number | null;
+  liff_id: string | null;
   viewed: number;
   missed_window_days: number | null;
 };
@@ -565,7 +566,7 @@ export async function processWebinarNotificationJobs(
             w.title, w.slug, w.duration_seconds, w.account_id,
             f.line_user_id, f.is_following, f.line_account_id,
             la.channel_access_token, la.channel_access_token_encrypted,
-            la.is_active AS line_account_active,
+            la.is_active AS line_account_active, la.liff_id,
             EXISTS (
               SELECT 1 FROM webinar_viewers v
                WHERE v.webinar_id=j.webinar_id AND v.friend_id=j.friend_id
@@ -704,10 +705,7 @@ export async function processWebinarNotificationJobs(
       }
       const lineAccountId = row.line_account_id;
       if (!lineAccountId) continue;
-      const account = await db.prepare(
-        'SELECT liff_id FROM line_accounts WHERE id=?',
-      ).bind(lineAccountId).first<{ liff_id: string | null }>();
-      const liffId = account?.liff_id ?? options.defaultLiffId;
+      const liffId = row.liff_id ?? options.defaultLiffId;
       if (!liffId) throw new Error('missing_liff_id');
       const accessToken = await resolveLineCredential(
         row.channel_access_token_encrypted,

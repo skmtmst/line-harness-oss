@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('../../v8/events/list.tsx', import.meta.url), 'utf8')
-const WORKER = readFileSync(new URL('../../../../worker/src/index.ts', import.meta.url), 'utf8')
+// cronからの実行は Worker cron-event-waitlist.test.ts、回収は event-waitlist.test.ts で守る。
 const WAITLIST = readFileSync(new URL('../../../../worker/src/services/event-waitlist.ts', import.meta.url), 'utf8')
 
 describe('V8 イベント予約の件数状態', () => {
@@ -41,7 +41,6 @@ describe('V8 イベント予約の件数状態', () => {
 
   it('席が空いたあとの自動案内を、実際の定期処理があるときだけ案内する', () => {
     expect(PAGE).toContain('キャンセルが出たら、キャンセル待ちの人に自動で順番が回ります。')
-    expect(WORKER).toContain('processEventWaitlistPromotionJobs')
     expect(WAITLIST).toContain('enqueueEventWaitlistPromotion')
     expect(WAITLIST).toContain('DEFAULT_OFFER_HOURS = 24')
   })

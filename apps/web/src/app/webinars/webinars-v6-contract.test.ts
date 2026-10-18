@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -10,7 +11,7 @@ const PARTICIPANTS = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit
 const REVIEW = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/review.tsx'), 'utf8')
 const ANALYTICS = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/analytics.tsx'), 'utf8')
 const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
-const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
+const API = readApiSource(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
 /** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
 const FAILURE = fs.readFileSync(path.join(__dirname, '../../v8/webinars/helpers.ts'), 'utf8')

@@ -1,3 +1,4 @@
+import { readApiSource } from '../../scripts/test-api-source.mjs'
 /*
  * セッションが届かないときの合図。
  *
@@ -10,6 +11,7 @@
  * 「ログインが届いていません」と案内すると、別の原因を探しに行かせる。
  */
 import { SESSION_LOST_EVENT } from './session-events'
+import { SESSION_LOST_EVENT as API_SESSION_LOST_EVENT } from './api'
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -20,13 +22,13 @@ const SRC = join(__dirname, '..')
 
 // api.ts は読み込むだけで NEXT_PUBLIC_API_URL を要求するので、
 // 中身を文字列として読む。見たいのは「名前が揃っているか」だけ。
-const apiSource = readFileSync(join(SRC, 'lib/api.ts'), 'utf8')
+const apiSource = readApiSource(join(SRC, 'lib/api.ts'), 'utf8')
 const noticeSource = readFileSync(join(SRC, 'components/session-lost-notice.tsx'), 'utf8')
 
 describe('合図の名前', () => {
   it('出す側と受ける側で揃っている', () => {
     expect(SESSION_LOST_EVENT).toBe('lh-session-lost')
-    expect(apiSource).toContain("export { SESSION_LOST_EVENT } from './session-events'")
+    expect(API_SESSION_LOST_EVENT).toBe(SESSION_LOST_EVENT)
     expect(noticeSource).toContain("SESSION_LOST_EVENT")
     expect(noticeSource).toContain("addEventListener(SESSION_LOST_EVENT")
   })
