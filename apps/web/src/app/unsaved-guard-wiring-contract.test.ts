@@ -141,6 +141,13 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  // U04: 入力状態と番兵は元の入口が持つ。分割先も親の番兵の検査対象にする（対象外にはしない）。
+  'v8/automations/create/automation-dialogs.tsx': 'v8/automations/create/create.tsx',
+  'v8/automations/create/use-automation-draft-resume.tsx': 'v8/automations/create/create.tsx',
+  'v8/automations/create/use-automation-save.tsx': 'v8/automations/create/create.tsx',
+  'v8/scenario-detail/scenario-detail-body.tsx': 'v8/scenario-detail/detail.tsx',
+  'v8/scenario-detail/scenario-detail-dialogs.tsx': 'v8/scenario-detail/detail.tsx',
+  'v8/scenario-detail/use-scenario-settings.tsx': 'v8/scenario-detail/detail.tsx',
   // 統合後の入力の持ち主。各画面が dirty を型／番兵へ渡す。
   'v8/booking-gap/series-drawer.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/booking-menus/meeting-mode.tsx': 'v8/booking-menus/menu-form.tsx',

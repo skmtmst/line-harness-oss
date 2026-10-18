@@ -35,7 +35,7 @@ function slice(source: string, start: string, end: string): string {
   return source.slice(from, to + end.length)
 }
 
-const saveStep = slice(DETAIL, 'const handleSaveStep = async', 'setStepSaving(true)')
+const saveStep = slice(DETAIL, 'export function validateScenarioStep(', '\n}\n')
 
 describe('SCENARIO-21: 直接作った質問はテンプレート必須にかからない', () => {
   it('質問・直接入力・テンプレートの検査は独立した枝', () => {
