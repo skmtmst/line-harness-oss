@@ -57,6 +57,22 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }
 /** ②の中だけ進むボタンの名前が違う（v06 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
+const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name }))
+
+/**
+ * ①事前確認（v06 p6zMkA）を最短で通す。質問は1つずつ出るので、答えるたびに「次へ」を押す。
+ * Q1=はい → Q2=いいえ（Q3は尋ねない）→ Q4=使っていません（Q5は尋ねない）→ チェック結果 → ②へ。
+ */
+function passPrecheck() {
+  pick('はい、あります')
+  next()
+  pick('いいえ、引き継ぎません')
+  next()
+  pick('使っていません')
+  next()
+  expect(screen.getByText('あなたの接続前チェック結果')).toBeTruthy()
+  next()
+}
 
 /**
  * v06（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
@@ -64,7 +80,7 @@ const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { nam
  */
 function enterCheckStep() {
   render(<NewLineAccountPage />)
-  next()
+  passPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
   nextStep()
@@ -96,10 +112,11 @@ async function saveAndFinish() {
 }
 
 describe('LINEアカウント作成ウィザード', () => {
-  it('①から②の3つの小さな段へ順に進む', () => {
+  it('①の質問に答えてから②の3つの小さな段へ順に進む', () => {
     render(<NewLineAccountPage />)
-    expect(screen.getByText('アカウントの用意方法')).toBeTruthy()
-    next()
+    expect(screen.getByText('ご利用環境の確認', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('質問 1')).toBeTruthy()
+    passPrecheck()
     expect(screen.getByText('Messaging API のチャネル', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 1 / 3')).toBeTruthy()
     fill('v8-channel-id', '123456789')
@@ -117,7 +134,7 @@ describe('LINEアカウント作成ウィザード', () => {
 
   it('LINE側でやることの印が残っていると次の段へ進めない', () => {
     render(<NewLineAccountPage />)
-    next()
+    passPrecheck()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
     nextStep()
@@ -135,18 +152,44 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(step().disabled).toBe(false)
   })
 
-  it('用意方法を切り替えても公式アカウント作成リンクを別タブで開ける', () => {
+  it('①-1 Q1がいいえなら公式アカウント作成リンクを別タブで出し、先へ進めない', () => {
     render(<NewLineAccountPage />)
-    expect(screen.getByRole('link', { name: /LINE公式アカウントを作る/ }).getAttribute('href')).toBe('https://manager.line.biz/')
-    fireEvent.click(screen.getByLabelText('新しく公式アカウントを作る'))
+    pick('いいえ、まだありません')
     const link = screen.getByRole('link', { name: /LINE公式アカウントを作る/ })
     expect(link.getAttribute('href')).toBe('https://manager.line.biz/')
     expect(link.getAttribute('target')).toBe('_blank')
+    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('①-9 Q2がはいなら認証済みアカウントの印にチェックするまで進めない', () => {
+    render(<NewLineAccountPage />)
+    pick('はい、あります')
+    next()
+    pick('はい、引き継ぎます')
+    const step = () => screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement
+    expect(step().disabled).toBe(true)
+    ack('認証済みアカウントであることを確認した')
+    expect(step().disabled).toBe(false)
+  })
+
+  it('①-2 Q3がはいなら相談の案内を出し、先へ進めない', () => {
+    render(<NewLineAccountPage />)
+    pick('はい、あります')
+    next()
+    pick('はい、引き継ぎます')
+    ack('認証済みアカウントであることを確認した')
+    next()
+    expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
+    pick('はい、超えています')
+    const link = screen.getByRole('link', { name: /サポートへ問い合わせる/ })
+    expect(link.getAttribute('href')).toBe('/hq/support')
+    expect(link.getAttribute('target')).toBeNull()
+    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('②Step1は Messaging API の2項目だけを必須にし、マニュアルを別タブで開く', () => {
     render(<NewLineAccountPage />)
-    next()
+    passPrecheck()
     const ids = ['v8-channel-id', 'v8-channel-secret']
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
     expect(document.getElementById('channel-access-token')).toBeNull()
