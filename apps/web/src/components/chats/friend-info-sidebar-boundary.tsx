@@ -1,7 +1,10 @@
 'use client'
 
 import { Component, Fragment, type ReactNode } from 'react'
+import { createClientLogger } from '@line-crm/shared'
 import ListState from '@/components/shared/list-state'
+
+const clientLogger = createClientLogger('admin')
 
 interface Props {
   /** 表示中の友だち。変わったら失敗の表示を捨てて、新しい相手で描き直す。 */
@@ -38,7 +41,7 @@ export default class FriendInfoSidebarBoundary extends Component<Props, State> {
 
   componentDidCatch() {
     // 起きたことだけを決まった印で残す。例外の中身（顧客の情報が混ざりうる）は書かない。
-    console.error(JSON.stringify({ code: 'inbox_customer_panel_failed', route: '/chats' }))
+    clientLogger.error('inbox_customer_panel_failed')
   }
 
   private retry = () => {

@@ -15,7 +15,10 @@ it('相手・アカウント切替で失敗を解除し、捕捉ログには固�
     expect(host.textContent).toContain('顧客情報を読み込めませんでした')
     // React自身の開発ログとは分け、境界が発行するJSON1行の引数を検査する。
     const emitted = log.mock.calls.filter(args => typeof args[0] === 'string' && args[0].startsWith('{'))
-    expect(emitted).toEqual([[JSON.stringify({ code: 'inbox_customer_panel_failed', route: '/chats' })]])
+    expect(emitted).toHaveLength(1)
+    expect(emitted[0]).toHaveLength(1)
+    expect(JSON.parse(emitted[0][0] as string)).toEqual({ timestamp: expect.any(String), level: 'error', code: 'inbox_customer_panel_failed', requestId: null, invocationId: null, source: 'admin' })
+    expect(JSON.stringify(emitted)).not.toMatch(/customer@example|secret-token|顧客名/)
     await act(async () => { root.render(<><p>会話と一覧</p><FriendInfoSidebarBoundary resetKey="account-b:friend-a"><p>切替先の顧客</p></FriendInfoSidebarBoundary></>) })
     expect(host.textContent).toContain('切替先の顧客')
     expect(host.textContent).not.toContain('顧客情報を読み込めませんでした')
