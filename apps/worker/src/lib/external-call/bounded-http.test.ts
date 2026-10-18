@@ -41,3 +41,27 @@ it('keeps the Stripe adapter connected to the streamed response byte limit',asyn
  await expect(stripeRequest({STRIPE_SECRET_KEY:'synthetic'},'POST','/v1/customers',{}, {fetchImpl:send})).rejects.toMatchObject({status:502,resultUnknown:true});
  expect(send).toHaveBeenCalledOnce();expect(cancel).toHaveBeenCalledOnce();
 });
+
+it('keeps the Stripe caller cancellation connected without raising its own deadline',async()=>{
+ const controller=new AbortController();const send=vi.fn<typeof fetch>(()=>new Promise<Response>(()=>{}));
+ const result=stripeRequest({STRIPE_SECRET_KEY:'synthetic'},'POST','/v1/customers',{}, {fetchImpl:send,signal:controller.signal});
+ const rejected=expect(result).rejects.toMatchObject({resultUnknown:true});controller.abort();await rejected;
+ expect(send).toHaveBeenCalledOnce();expect(send.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+});
+
+it('keeps Google connected to the streamed byte limit and never retries inside its transport',async()=>{
+ const {GoogleCalendarClient}=await import('../../services/google-calendar.js');const cancel=vi.fn();
+ const send=vi.fn<typeof fetch>(async()=>new Response(new ReadableStream({start(c){c.enqueue(new Uint8Array(1024*1024+1));},cancel})));
+ const client=new GoogleCalendarClient({calendarId:'synthetic',accessToken:'synthetic',transport:send});
+ await expect(client.getEvent('synthetic-event')).rejects.toThrow('external_response_too_large');
+ expect(send).toHaveBeenCalledOnce();expect(cancel).toHaveBeenCalledOnce();
+});
+
+it('bounds a stalled Google response body even when its transport ignores abort',async()=>{
+ vi.useFakeTimers();const {GoogleCalendarClient}=await import('../../services/google-calendar.js');const cancel=vi.fn();
+ const send=vi.fn<typeof fetch>(async()=>new Response(new ReadableStream({start(c){c.enqueue(new TextEncoder().encode('{'));},cancel})));
+ const client=new GoogleCalendarClient({calendarId:'synthetic',accessToken:'synthetic',transport:send});
+ const result=client.getEvent('synthetic-event');const rejected=expect(result).rejects.toThrow('external_request_interrupted');
+ await vi.advanceTimersByTimeAsync(10_000);await rejected;
+ expect(send).toHaveBeenCalledOnce();expect(cancel).toHaveBeenCalledOnce();
+});
