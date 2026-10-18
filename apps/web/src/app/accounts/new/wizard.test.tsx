@@ -17,6 +17,7 @@ const friends = vi.hoisted(() => ({ list: vi.fn() }))
 // 登録完了直後の契約者専用LINEの登録案内（★V6 37-7）。既定は「運営側で未設定」なので何も出ない
 const accountTags = vi.hoisted(() => ({ list: vi.fn(async () => ({success:true,data:[{id:'tag-own',name:'店舗',color:null}]})) }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
+vi.mock('@/lib/api-styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })), save: vi.fn(async () => ({ success: true, data: { version: 1 } })) } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
 vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, lineAccountTags: accountTags, hqNotices: notices, friends, staff: { list: async () => ({ success: true, data: [] }) } } }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
@@ -45,6 +46,7 @@ const checked = {
 
 afterEach(() => { cleanup(); window.localStorage?.clear(); delete document.documentElement.dataset.theme })
 beforeEach(() => {
+  sessionStorage.clear()
   vi.clearAllMocks(); document.documentElement.dataset.theme='v8'
   calls.list.mockResolvedValue({success:true,data:[]}); calls.followerInsight.mockResolvedValue({success:true,data:{total:null}});
   calls.connectCheck.mockResolvedValue(checked)
@@ -108,7 +110,8 @@ async function saveAndFinish() {
   fireEvent.click(screen.getByRole('button', { name: '登録する' }))
   await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
   next()
-  fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
+  fireEvent.click(screen.getByRole('radio', { name: /飲食店/ }))
+  await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
   next()
 }
 
