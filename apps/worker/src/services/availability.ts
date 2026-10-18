@@ -1,3 +1,4 @@
+import {toMin,fromMin,overlaps,intInRange,isHhmm} from './availability-time-values.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 // Booking availability calculation.
 // `computeSlots` is a pure function over Interval[]; `getAvailability`
@@ -40,34 +41,10 @@ export interface ComputeSlotsInput {
   capacity?: number;
 }
 
-function toMin(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
-  return h * 60 + m;
-}
 
-function fromMin(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
 
-function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
-  return aStart < bEnd && bStart < aEnd;
-}
 
-/**
- * R92: 店舗共通ルールの値を範囲検査して読む。手編集で壊れた値・
- * 型違いは「未設定」と同じ扱いにし、メニュー値だけを見る。
- */
-function intInRange(value: unknown, min: number, max: number): number | null {
-  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
-    ? value
-    : null;
-}
 
-function isHhmm(value: string): boolean {
-  return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
-}
 
 /** 重なる稼働区間をまとめる。例外日が複数ある日の union 用。 */
 function mergeIntervals(intervals: Interval[]): Interval[] {
@@ -278,6 +255,7 @@ function eachDate(from: string, to: string): string[] {
 }
 
 export interface GetAvailabilityParams {
+  additionalDurationMinutes?:number;
   lineAccountId: string;
   menuId: string;
   staffId?: string;
@@ -292,6 +270,7 @@ export interface GetAvailabilityParams {
    */
   applyStoreRules?: boolean;
   googleCredentials?: GoogleServiceAccountCredentials;
+  forceCalendarRefresh?: boolean;
   /**
    * 予約内容の変更で、変更対象そのものを空き枠計算から外す。
    * 自予約の古い枠が重なり判定に残ると、同じ担当のまま少しずらす
@@ -795,7 +774,7 @@ async function loadAvailabilityData(
     ).bind(params.menuId,params.lineAccountId,rangeEnd.toISOString(),rangeStart.toISOString(),params.excludeBookingId??null,params.excludeBookingId??null,params.excludeWaitlistId??null,params.excludeWaitlistId??null).all<{ resource_id: string; quantity: number; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {
-    duration_minutes: menu.override_duration ?? menu.duration_minutes,
+    duration_minutes: (menu.override_duration ?? menu.duration_minutes)+(params.additionalDurationMinutes??0),
     buffer_after_minutes: menu.buffer_after_minutes,
   };
   // 受付の締め切り。全体の最短リード時間とメニューごとの締め切りの、
@@ -834,6 +813,7 @@ async function loadAvailabilityData(
       const busy = await getStaffGoogleBusy(db, params.googleCredentials ?? {}, {
         lineAccountId: params.lineAccountId,
         staffId: staff.id,
+        fresh: params.forceCalendarRefresh,
         timeMin: new Date(zonedTimeToUtcMs(timeZone, params.from, '00:00')).toISOString(),
         timeMax: new Date(zonedTimeToUtcMs(timeZone, addDays(params.to, 1), '00:00')).toISOString(),
       });

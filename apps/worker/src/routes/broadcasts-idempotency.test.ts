@@ -43,7 +43,7 @@ const requestBody = {
   messageType: 'text',
   messageContent: '{{name}}さん、おはようございます',
   targetType: 'all',
-  scheduledAt: '2026-08-12T09:00:00.000+09:00',
+  scheduledAt: '2099-08-12T09:00:00.000+09:00',
   lineAccountId: 'account-1',
   trackLinks: true,
 };
@@ -76,7 +76,7 @@ function setupApp({
   role = 'owner',
 }: { changes?: number; role?: 'owner' | 'admin' | 'staff' } = {}) {
   d1Prepare.mockImplementation(() => ({
-    bind: vi.fn(() => ({ run: vi.fn(async () => ({ success: true, meta: { changes } })) })),
+    bind: vi.fn(() => ({ first:vi.fn(async()=>null),run: vi.fn(async () => ({ success: true, meta: { changes } })) })),
   }));
   const app = new Hono<{ Bindings: { DB: D1Database } }>();
   app.use('*', async (c, next) => {

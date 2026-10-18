@@ -33,7 +33,7 @@ import { notificationTeams } from './notification-teams.js';
 const notifications = new Hono<Env>();
 notifications.route('/', notificationTeams);
 
-const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line']);
+const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line','push']);
 
 function serializeRule(item: Awaited<ReturnType<typeof getNotificationRuleById>> extends infer T
   ? Exclude<T, null>

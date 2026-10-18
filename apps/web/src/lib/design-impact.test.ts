@@ -179,6 +179,9 @@ describe('共通部品の影響範囲', () => {
       // ★V8 予約設定のメニュー・担当スタッフのタブ（owaS3）。src/v8/booking-menus に書き直した。
       'v8/booking-menus/tabs/menus-tab.tsx',
       'v8/booking-menus/tabs/staff-tab.tsx',
+      // ③-2 第3波：予約設定の回数券・月謝の表、統括の店の比較の表。
+      'v8/booking-passes/passes-tab.tsx',
+      'v8/hq-store-compare/list.tsx',
       // ★V8 統括のアカウント（JKjsE）。新しい置き場（src/v8）に一から書いた。
       'v8/hq/home.tsx',
       // ★V8 統括のひな形の一覧・一括配信の一覧（i0Ao0R・U4Eep0）。店の一覧と同じ形で表の下にページ送り（2026-10-08）。
@@ -187,6 +190,10 @@ describe('共通部品の影響範囲', () => {
       // ★V8 成果とアフィリエイト（nJlxX・h7dmB・OylSV・aINnz）。src/v8 に一から書いた。
       'v8/affiliates/affiliators.tsx',
       'v8/affiliates/report.tsx',
+      // G2 自動応答の Q&A・AI が答えた記録（y4nixm・LPkKH）と G9 AI の操作の記録（hqhj5）。src/v8 に一から書いた表の下のページ送り。
+      'v8/ai-reply/qa-list.tsx',
+      'v8/ai-reply/answer-log.tsx',
+      'v8/mcp-connect/log.tsx',
       // ★V8-B NEN配信の一覧（MuhWR・Jxmqh・Tj7n4）。新しい置き場（src/v8）に一から書いた。表の下にページ送りを置く。
       'v8/nen-campaigns/list.tsx',
       // ★V8 外部連携の送る一覧（ZSbFY）。新しい置き場（src/v8）に一から書いた。

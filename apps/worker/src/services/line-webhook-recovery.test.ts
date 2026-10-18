@@ -8,7 +8,7 @@ import { lineWebhookCanRetry, retryLineWebhookEvent, processDueLineWebhookRetrie
 const wire = vi.hoisted(() => ({replyMessage:vi.fn(),replyMessageWithRequestId:vi.fn(),pushMessage:vi.fn(),getProfile:vi.fn(),linkRichMenuToUser:vi.fn()}));
 vi.mock('@line-crm/line-sdk', async () => ({
   ...await vi.importActual<typeof import('@line-crm/line-sdk')>('@line-crm/line-sdk'),
-  verifySignature:vi.fn().mockResolvedValue(true),LineClient:vi.fn().mockImplementation(()=>wire),
+  verifySignature:vi.fn().mockResolvedValue(true),LineClient:vi.fn().mockImplementation(function () { return wire; }),
 }));
 const {webhook} = await import('../routes/webhook.js');
 let item:SqliteD1;

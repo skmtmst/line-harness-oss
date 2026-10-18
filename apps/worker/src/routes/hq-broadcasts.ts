@@ -1,3 +1,6 @@
+import { getBroadcastApprovalThreshold } from '../services/broadcast-approval.js';
+import { sendAudienceCounts } from '../services/gap-send-preview.js';
+import { resolveHqBroadcastAudience } from '../services/hq-broadcast-audience.js';
 import { copyHqBroadcast,hqBroadcastReactions } from '../services/hq-broadcast-reactions.js';
 import { listHqBroadcastViews, saveHqBroadcastView, archiveHqBroadcastView } from '../services/hq-broadcast-saved-views.js';
 import { listHqBroadcasts,hqBroadcastQuota } from '../services/hq-broadcast-list.js';
@@ -86,6 +89,16 @@ hqBroadcasts.delete('/api/hq/broadcasts/folders/:id',async c=>{
 });
 hqBroadcasts.get('/api/hq/broadcasts/:id',async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method));return c.json({success:true,data:await readHqBroadcastResult(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')))});
+});
+hqBroadcasts.get('/api/hq/broadcasts/:id/send-preview',async c=>{
+  const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),true);
+  const run=await getHqBroadcastRun(db,a.tenantId,c.req.param('id')), input=JSON.parse(run.input_json) as HqBroadcastInput;
+  const targets=(await db.prepare('SELECT line_account_id FROM hq_broadcast_targets WHERE run_id=? AND excluded=0 ORDER BY line_account_id').bind(run.id).all<{line_account_id:string}>()).results;
+  const perAccount=await Promise.all(targets.map(async t=>({accountId:t.line_account_id,...await sendAudienceCounts(db,t.line_account_id,await resolveHqBroadcastAudience(db,a.tenantId,t.line_account_id,input))})));
+  const thresholds=await Promise.all(perAccount.map(p=>getBroadcastApprovalThreshold(db,{target_type:'all',line_account_id:p.accountId} as import('@line-crm/db').Broadcast)));
+  return c.json({success:true,data:{recipients:perAccount.reduce((n,p)=>n+p.recipients,0),perAccount,
+    excluded:{blocked:perAccount.reduce((n,p)=>n+p.excluded.blocked,0),optedOut:perAccount.reduce((n,p)=>n+p.excluded.optedOut,0),duplicate:0},
+    purpose:'marketing',scheduledAt:run.scheduled_at,quietHoursShiftTo:null,firstText:(input.messageContent??'').slice(0,200),sender:null,expectedVersion:run.version,needsApproval:perAccount.reduce((n,p)=>n+p.recipients,0)>=Math.min(...thresholds)}});
 });
 hqBroadcasts.post('/api/hq/broadcasts/:id/preflight',inputJsonBoundary(), async c=>{
   const db=dbFor(c.env),a=await hqBroadcastAuthority(db,c.get('staff'),['GET','HEAD'].includes(c.req.method));return c.json({success:true,data:await preflightHqBroadcast(db,await getHqBroadcastRun(db,a.tenantId,c.req.param('id')),true,mediaRuntime(c))});

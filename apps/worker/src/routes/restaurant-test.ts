@@ -77,7 +77,7 @@ restaurantTest.onError((error, c) => {
   throw error;
 });
 
-restaurantTest.use('*',async(c,next)=>{await next();if(!['GET','HEAD','OPTIONS'].includes(c.req.method)&&!c.req.path.endsWith('/closures/preview')&&c.res.status<400&&!(c.req.path.endsWith('/seat-waitlist')&&c.req.method==='POST')){try{const org=await organizationFor(c);if(org){const stores=await dbFor(c.env).prepare('SELECT id,line_account_id FROM rt_stores WHERE organization_id=? AND (? IS NULL OR id=?)').bind(org.id,org.scopedStoreId,org.scopedStoreId).all<{id:string;line_account_id:string|null}>();for(const store of stores.results)await processBookingWaitlists(c.env,store.line_account_id??undefined,store.id);}}catch{console.error(JSON.stringify({"code":"seat_waitlist_reconcile_failed"}));}}});
+restaurantTest.use('*',async(c,next)=>{await next();if(!c.req.path.startsWith('/api/restaurant-test/google/')&&!['GET','HEAD','OPTIONS'].includes(c.req.method)&&!c.req.path.endsWith('/closures/preview')&&c.res.status<400&&!(c.req.path.endsWith('/seat-waitlist')&&c.req.method==='POST')){try{const org=await organizationFor(c);if(org){const stores=await dbFor(c.env).prepare('SELECT id,line_account_id FROM rt_stores WHERE organization_id=? AND (? IS NULL OR id=?)').bind(org.id,org.scopedStoreId,org.scopedStoreId).all<{id:string;line_account_id:string|null}>();for(const store of stores.results)await processBookingWaitlists(c.env,store.line_account_id??undefined,store.id);}}catch{console.error(JSON.stringify({"code":"seat_waitlist_reconcile_failed"}));}}});
 
 const RESTAURANT_TERMS_DOCUMENT_KEY = 'musubo-terms';
 const RESTAURANT_TERMS_DOCUMENT_VERSION = 'v0.1-draft';
@@ -112,6 +112,8 @@ function authenticatedTenantId(c: Context<Env>): string {
 }
 
 restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
+  // Google の各ルートは専用の旗・ログイン・統括・アカウントの guard で守る。
+  if (c.req.path.startsWith('/api/restaurant-test/google/')) return next();
   if (!restaurantTestEnabled(c.env)) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }

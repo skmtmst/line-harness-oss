@@ -1,3 +1,4 @@
+import { petCard } from './nen-pet-card.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -9,7 +10,6 @@ import {
   completePhotoNotificationDelivery,
   findRewardedAdoptedDuplicate,
   getEffectivePhotoRewardPolicy,
-  getFriendByLineUserIdForAccount,
   getPhotoNotificationState,
   jstNow,
   publishPhoto,
@@ -22,7 +22,7 @@ import * as dbPackage from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requirePhotoPermission } from './nen-photo-operations.js';
-import { verifyCallerLineIdentity } from '../services/liff-auth.js';
+import { currentFriend, type FriendRow } from '../services/nen-member-identity.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { classifyExternalDeliveryError } from '../services/external-delivery-retry.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
@@ -119,29 +119,6 @@ function detectedImageMime(bytes: Uint8Array): keyof typeof IMAGE_TYPES | null {
   return null;
 }
 
-type FriendRow = {
-  id: string; line_user_id: string; display_name: string | null; user_id: string | null;
-  line_account_id: string | null; channel_access_token: string | null;
-  channel_access_token_encrypted: string | null;
-};
-
-async function currentFriend(c: Context<Env>): Promise<FriendRow | null> {
-  const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
-  if (!identity) return null;
-  const friend = await getFriendByLineUserIdForAccount(
-    c.env.DB,
-    identity.lineUserId,
-    identity.lineAccountId,
-  );
-  if (!friend?.is_following) return null;
-  return c.env.DB.prepare(
-    `SELECT f.id, f.line_user_id, f.display_name, f.user_id, f.line_account_id,
-            a.channel_access_token, a.channel_access_token_encrypted
-       FROM friends f LEFT JOIN line_accounts a ON a.id = f.line_account_id
-      WHERE f.id = ? AND f.is_following = 1 LIMIT 1`,
-  ).bind(friend.id).first<FriendRow>();
-}
-
 function dateOnly(value: unknown): string | null {
   return isExistingCalendarDate(value) ? value : null;
 }
@@ -161,34 +138,6 @@ function feedingGuide(animalType: string, weightKg: number) {
     venison: Math.max(1, Math.round(daily * 0.1)),
     cycleDays: Math.max(1, Math.round(1000 / daily)),
   };
-}
-
-function petCard(pet: Record<string, unknown>): Message {
-  // DEEP-24: 「その他」は犬へ倒さず「その他」と出す。フード目安の計算は
-  // 犬・猫専用なので、対象外の子には数値の代わりにその旨を添える。
-  const supported = isFeedingSupportedAnimal(toPetAnimalType(pet.animal_type));
-  const guide = `${pet.recommended_daily_min_grams}〜${pet.recommended_daily_max_grams}g/日`;
-  const feedingLines = supported
-    ? [
-        { type: 'text', text: `1日のフード目安：${guide}`, size: 'sm', color: '#334155', wrap: true },
-        { type: 'text', text: `鹿肉をトッピングする場合の目安：${pet.venison_daily_grams}g/日まで`, size: 'sm', color: '#334155', wrap: true },
-        { type: 'text', text: `1kgのフード：約${pet.food_cycle_days}日分`, size: 'sm', color: '#334155', wrap: true },
-      ]
-    : [{ type: 'text', text: 'フード目安の自動計算は犬・猫が対象です。かかりつけの獣医師にご相談ください。', size: 'sm', color: '#334155', wrap: true }];
-  return {
-    type: 'flex', altText: `${pet.name}ちゃんのマイペット登録が完了しました`,
-    contents: {
-      type: 'bubble',
-      body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [
-        { type: 'text', text: 'MY PET CARD', size: 'xs', weight: 'bold', color: '#16815B' },
-        { type: 'text', text: `${pet.name}ちゃん`, size: 'xl', weight: 'bold', color: '#123F2B' },
-        { type: 'text', text: `${petAnimalTypeLabel(pet.animal_type)}・${pet.breed || '品種未登録'}・${pet.weight_kg}kg`, size: 'sm', color: '#64748B', wrap: true },
-        { type: 'separator' },
-        ...feedingLines,
-        { type: 'text', text: '※年齢・活動量・体調・商品の熱量で変わる一般的な目安です。心配な症状は獣医師へご相談ください。', size: 'xs', color: '#94A3B8', wrap: true },
-      ] },
-    },
-  } as Message;
 }
 
 async function pushPetCard(c: Context<Env>, friend: FriendRow, pet: Record<string, unknown>) {
@@ -242,7 +191,7 @@ function photoReviewMessage(
     return [
       'お写真をご投稿いただきありがとうございます。',
       options.pointsQueued
-        ? '今回のお写真を採用し、5ポイントを付ける手続きを始めました。'
+        ? '今回のお写真を採用し、ポイントを付ける手続きを始めました。'
         : '今回のお写真を採用しました。',
       '公開への同意をいただいている場合だけ、公開ギャラリーへ掲載します。',
     ].join('\n');
@@ -649,11 +598,15 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const [pets, snapshot, photos, photoStats, consultations] = await Promise.all([
-    c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE friend_id = ? ORDER BY created_at`).bind(friend.id).all<Record<string, unknown>>(),
+    c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE archived_at IS NULL AND friend_id = ? ORDER BY created_at`).bind(friend.id).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friend.id).first<Record<string, unknown>>(),
-    c.env.DB.prepare(`SELECT ps.id, ps.pet_id, ps.image_url, ps.caption, ps.status, ps.awarded_points,
+    c.env.DB.prepare(`SELECT ps.id, ps.pet_id, CASE WHEN EXISTS(SELECT 1 FROM media_file_scans scan WHERE scan.subject_kind='photo' AND scan.subject_id=ps.id AND scan.line_account_id=ps.line_account_id AND scan.status='clean') THEN ps.image_url ELSE NULL END AS image_url, ps.caption, ps.status, ps.awarded_points,
       ps.publication_consent_at, ps.publication_withdrawn_at, ps.public_pet_name,
-      ps.created_at, p.name pet_name
+      ps.created_at, p.name pet_name,
+      COALESCE((SELECT pub.status FROM nen_photo_publications pub WHERE pub.photo_id=ps.id AND pub.line_account_id=ps.line_account_id),'unpublished') AS publication_status,
+      EXISTS(SELECT 1 FROM nen_photo_publications pub JOIN nen_photo_publication_placements place ON place.publication_id=pub.id AND place.line_account_id=pub.line_account_id
+        WHERE pub.photo_id=ps.id AND pub.line_account_id=ps.line_account_id AND pub.status='published' AND place.placement_type='site' AND place.active=1
+          AND ps.publication_consent_at IS NOT NULL AND ps.publication_withdrawn_at IS NULL) AS site_published
       FROM nen_photo_submissions ps JOIN nen_pet_profiles p ON p.id = ps.pet_id
       WHERE ps.friend_id = ?
       ORDER BY ps.created_at DESC LIMIT 30`).bind(friend.id).all<Record<string, unknown>>(),
@@ -685,6 +638,8 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
       id: r.id, petId: r.pet_id, petName: r.pet_name, imageUrl: r.image_url,
       caption: r.caption, status: r.status, awardedPoints: r.awarded_points,
       publicationConsent: Boolean(r.publication_consent_at) && !r.publication_withdrawn_at,
+      publicationStatus: String(r.publication_status ?? 'unpublished'),
+      sitePublished: r.site_published === 1,
       publicPetName: r.public_pet_name === 1,
       createdAt: r.created_at,
     })),
@@ -842,7 +797,7 @@ nenMembers.post('/api/liff/nen/pets', inputJsonBoundary({}, { maxBytes: Math.cei
   }, products, new Date(), catalog.treatLimitPercent);
   await refreshStoredFeeding(c.env.DB, id, plan, now);
   await syncNenPetTags(c.env.DB, friend.id);
-  const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(id).first<Record<string, unknown>>();
+  const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ?`).bind(id).first<Record<string, unknown>>();
   if (saved) c.executionCtx.waitUntil(pushPetCard(c, friend, saved).catch((err: unknown) => console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"POST /api/liff/nen/pets"}))));
   return c.json({ success: true, data: mapPet(saved || { id }, products, catalog.treatLimitPercent) }, 201);
 });
@@ -855,7 +810,7 @@ nenMembers.put('/api/liff/nen/pets/:id', inputJsonBoundary(), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const petId = c.req.param('id');
-  const current = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(petId, friend.id).first<Record<string, unknown>>();
+  const current = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ? AND friend_id = ?`).bind(petId, friend.id).first<Record<string, unknown>>();
   if (!current) return c.json({ success: false, error: 'Pet not found' }, 404);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body || typeof body !== 'object') return inputError(c, { success: false, error: '入力内容を確認してください' }, 400, []);
@@ -930,7 +885,7 @@ nenMembers.put('/api/liff/nen/pets/:id', inputJsonBoundary(), async (c) => {
       ).bind(now, `birthday:${petId}:%`).run();
     }
   }
-  const updated = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(petId).first<Record<string, unknown>>();
+  const updated = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ?`).bind(petId).first<Record<string, unknown>>();
   if (!updated) return c.json({ success: false, error: 'Pet not found' }, 404);
   const plan = planForPetRow({
     id: petId, animal_type: String(updated.animal_type), weight_kg: updated.weight_kg as number | null, birthday: (updated.birthday as string | null) ?? null,
@@ -939,14 +894,14 @@ nenMembers.put('/api/liff/nen/pets/:id', inputJsonBoundary(), async (c) => {
   }, products, new Date(), catalog.treatLimitPercent);
   await refreshStoredFeeding(c.env.DB, petId, plan, now);
   await syncNenPetTags(c.env.DB, friend.id);
-  const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE id = ?`).bind(petId).first<Record<string, unknown>>();
+  const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ?`).bind(petId).first<Record<string, unknown>>();
   return c.json({ success: true, data: mapPet(saved || updated, products, catalog.treatLimitPercent) });
 });
 
 nenMembers.post('/api/liff/nen/pets/:id/photo', inputJsonBoundary({"data":["string"]}, { maxBytes: Math.ceil(1_500_000 / 3) * 4 + 4096 }), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
-  const pet = await c.env.DB.prepare(`SELECT id, image_r2_key FROM nen_pet_profiles WHERE id=? AND friend_id=?`)
+  const pet = await c.env.DB.prepare(`SELECT id, image_r2_key FROM nen_pet_profiles WHERE archived_at IS NULL AND id=? AND friend_id=?`)
     .bind(c.req.param('id'), friend.id).first<{ id: string; image_r2_key: string | null }>();
   if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
   const body = await c.req.json<{ data?: string }>().catch(() => null);
@@ -967,7 +922,7 @@ nenMembers.post('/api/liff/nen/health-logs', inputJsonBoundary(), async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
-  const pet = await c.env.DB.prepare(`SELECT id FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(String(body?.petId || ''), friend.id).first();
+  const pet = await c.env.DB.prepare(`SELECT id FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ? AND friend_id = ?`).bind(String(body?.petId || ''), friend.id).first();
   if (body?.loggedOn != null && body.loggedOn !== '' && !dateOnly(body.loggedOn)) {
     return inputError(c, { success: false, error: '日付が正しくありません' }, 400, ['loggedOn']);
   }
@@ -1003,7 +958,7 @@ nenMembers.post('/api/liff/nen/health-logs', inputJsonBoundary(), async (c) => {
     if (newestWeightLog?.d && loggedOn >= newestWeightLog.d) {
       const [current, catalog] = await Promise.all([
         c.env.DB.prepare(
-          `SELECT animal_type, birthday, neutered, activity_level, feeding_product_id FROM nen_pet_profiles WHERE id = ?`,
+          `SELECT animal_type, birthday, neutered, activity_level, feeding_product_id FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ?`,
         ).bind(body!.petId).first<Record<string, unknown>>(),
         accountFeedingProducts(c, friend),
       ]);
@@ -1057,7 +1012,7 @@ nenMembers.get('/api/liff/nen/health-logs/summary', async (c) => {
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const petId = (c.req.query('petId') ?? '').trim();
-  const pet = await c.env.DB.prepare(`SELECT id, name, gender, animal_type, breed, birthday, weight_kg FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`)
+  const pet = await c.env.DB.prepare(`SELECT id, name, gender, animal_type, breed, birthday, weight_kg FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ? AND friend_id = ?`)
     .bind(petId, friend.id).first<{ id: string; name: string; gender: string | null; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null }>();
   if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
   const today = new Date();
@@ -1079,7 +1034,7 @@ nenMembers.post('/api/liff/nen/photos', inputJsonBoundary({"petId":["string"],"d
   const friend = await currentFriend(c);
   if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
   const body = await c.req.json<{ petId?: string; data?: string; mimeType?: string; caption?: string }>().catch(() => null);
-  const pet = await c.env.DB.prepare(`SELECT id FROM nen_pet_profiles WHERE id = ? AND friend_id = ?`).bind(body?.petId || '', friend.id).first();
+  const pet = await c.env.DB.prepare(`SELECT id FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ? AND friend_id = ?`).bind(body?.petId || '', friend.id).first();
   if (!pet || !body?.data || !body.mimeType || !IMAGE_TYPES[body.mimeType]) return inputError(c, { success: false, error: '画像またはペットを確認してください' }, 400, ["petId","data","mimeType"]);
   const raw = body.data.replace(/^data:[^;]+;base64,/, '');
   if (raw.length > 11_200_000) return inputError(c, { success: false, error: '画像は8MB以下にしてください' }, 400, ["data"]);
@@ -1162,7 +1117,8 @@ nenMembers.post('/api/liff/nen/photos', inputJsonBoundary({"petId":["string"],"d
     }).catch((err) => console.error(JSON.stringify({"code":"routes_nen_members_failed","route":"POST /api/liff/nen/photos"})));
   }
   await syncNenPhotoTags(c.env.DB, friend.id);
-  return c.json({ success: true, data: { id, imageUrl: reviewImageUrl, status: 'pending' } }, 201);
+  const scanState = await c.env.DB.prepare("SELECT status FROM media_file_scans WHERE subject_kind='photo' AND subject_id=? AND line_account_id=?").bind(id, friend.line_account_id).first<{status: string}>();
+  return c.json({ success: true, data: { id, imageUrl: scanState?.status === 'clean' ? reviewImageUrl : null, scanStatus: scanState?.status ?? 'pending', status: 'pending' } }, 201);
 });
 
 nenMembers.put('/api/liff/nen/photos/:id/publication-consent', inputJsonBoundary({"consent":["boolean"],"consentVersion":["string"],"showPetName":["boolean"]}), async (c) => {
@@ -1345,6 +1301,8 @@ nenMembers.get('/api/nen-members/photos', requirePhotoPermission('photo.submissi
        JOIN nen_pet_profiles p ON p.id = ps.pet_id
        JOIN friends f ON f.id = ps.friend_id
       WHERE ps.line_account_id = ? AND f.line_account_id = ?
+        AND EXISTS (SELECT 1 FROM media_file_scans scan WHERE scan.subject_kind='photo'
+          AND scan.subject_id=ps.id AND scan.line_account_id=ps.line_account_id AND scan.status='clean')
         ${q ? `AND (ps.caption LIKE ? ESCAPE '\\' OR p.name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\')` : ''}
       ORDER BY ps.created_at DESC, ps.id DESC LIMIT ? OFFSET ?`,
   ).bind(staleCutoff, ...(q ? [accountId, accountId, like, like, like] : [accountId, accountId]), limit, offset).all<Record<string, unknown>>();
@@ -1666,6 +1624,9 @@ nenMembers.get('/api/nen-members/photos/:id', requirePhotoPermission('photo.subm
       WHERE ps.id = ? AND ps.line_account_id = ? AND f.line_account_id = ?`,
   ).bind(c.req.param('id'), accountId, accountId).first<Record<string, unknown>>();
   if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+  const scan = await getFileScanBySubject(c.env.DB,'photo',c.req.param('id')!);
+  if(scan?.status!=='clean') return c.json({success:false,code:'PHOTO_SCAN_PENDING',error:'写真の安全性を確認中です'},409);
+
   /*
    * 採用履歴・報酬・公開先を一緒に返す（Issue #1040 IDEA-22）。
    * 「通した1回につきポイントの手続きが1回」か、撤回後にどの掲載先が
@@ -2306,7 +2267,7 @@ nenMembers.get('/api/nen-members/friends/:friendId', requireRole('owner', 'admin
 
   const [member, pets, healthLogs, photos, pointLedger, ecEvents] = await Promise.all([
     c.env.DB.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friendId).first<Record<string, unknown>>(),
-    c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE friend_id = ? ORDER BY created_at ASC`).bind(friendId).all<Record<string, unknown>>(),
+    c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE archived_at IS NULL AND friend_id = ? ORDER BY created_at ASC`).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_health_logs WHERE friend_id = ? ORDER BY logged_on DESC LIMIT 100`).bind(friendId).all<Record<string, unknown>>(),
     c.env.DB.prepare(
       `SELECT ps.id, ps.friend_id, ps.pet_id, ps.caption, ps.status, ps.awarded_points,

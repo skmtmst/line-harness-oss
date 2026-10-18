@@ -1,9 +1,27 @@
-import type { AccountStyle, SetupAnswer, StyleCard, StyleSnapshot, StyleDisplay, StyleCalendarView, StyleSchedule, StyleTemplateSample } from '@line-crm/shared';
+import type {
+  AccountStyle,
+  SetupAnswer,
+  StyleCard,
+  StyleSnapshot,
+  StyleDisplay,
+  StyleCalendarView,
+  StyleSchedule,
+  StyleTemplateSample,
+} from '@line-crm/shared';
 import { fetchApi } from './api';
 
-import { root, url, write, Result, StyleQuery, StyleSelection, StarterSetItem, StyleBookingDetails, StyleClassDetails } from './api-styles-common';
+import {
+  root,
+  url,
+  write,
+  Result,
+  StyleQuery,
+  StyleSelection,
+  StarterSetItem,
+  StyleBookingDetails,
+  StyleClassDetails,
+} from './api-styles-common';
 export const methods1 = {
-
   get: (accountId: string) =>
     fetchApi<
       Result<{
@@ -14,6 +32,8 @@ export const methods1 = {
         answers: Record<string, SetupAnswer>;
         settings: Record<string, number>;
         cards: StyleCard[];
+        metricIds: string[];
+        visibleTabs: string[];
         questions: Array<{
           key: string;
           changeAt?: string;
@@ -31,8 +51,13 @@ export const methods1 = {
         styleMode: SetupAnswer['mode'];
         styleSelected: boolean;
         version: number;
+        changedAnswers: Record<string, SetupAnswer>;
+        bookingSettingsChanges: Array<{ key: string; answer: SetupAnswer }>;
         inserted: Array<{
           key: string;
+          name: string;
+          setId: string;
+          setVersion: number;
           kind: string;
           id: string;
           isSample: boolean;
@@ -77,6 +102,32 @@ export const methods1 = {
       Result<{
         items: Array<{
           target_id: string;
+          key: string;
+          name: string | null;
+          isSample: boolean;
+          setId: string | null;
+          setVersion: number;
+          pendingUpdate: {
+            setId: string;
+            setVersion: number;
+            item: StarterSetItem;
+          } | null;
+          currentSnapshot: string | null;
+          activationAllowed: boolean;
+          requiresActivation: boolean;
+          definition: {
+            buttons?: Array<{
+              label: string;
+              actionType: string;
+              actionData: string;
+            }>;
+            steps?: Array<{
+              offsetMinutes: number;
+              offsetDays: number | null;
+              sendAtTime: string | null;
+              text: string;
+            }>;
+          } | null;
           kind: string;
           is_sample: number;
           status: string | null;
@@ -85,11 +136,28 @@ export const methods1 = {
       }>
     >(url(root + '/starter-items', accountId)),
 
+  acceptStarterUpdate: (
+    accountId: string,
+    key: string,
+    body: {
+      confirmed: true;
+      expectedSetVersion: number;
+      expectedSnapshot: string | null;
+    },
+  ) =>
+    fetchApi<{ success: true }>(
+      url(
+        root + '/starter-items/' + encodeURIComponent(key) + '/accept-update',
+        accountId,
+      ),
+      write('POST', body),
+    ),
+
   activate: (
     accountId: string,
     items: Array<{
       id: string;
-      kind: 'automation' | 'booking_menu';
+      kind: 'automation' | 'reminder' | 'booking_menu';
       expectedDraftVersionId?: string;
       expectedVersion?: number;
     }>,
@@ -111,7 +179,17 @@ export const methods1 = {
 
   resources: (accountId: string) =>
     fetchApi<
-      Result<{ items: Array<{ id: string; name: string; kind: string }> }>
+      Result<{
+        items: Array<{
+          id: string;
+          name: string;
+          kind: string;
+          isSample?: boolean;
+          key?: string | null;
+          setId?: string | null;
+          setVersion?: number | null;
+        }>;
+      }>
     >(url(root + '/resources', accountId)),
 
   summary: (accountId: string, query: StyleQuery) =>
@@ -175,17 +253,37 @@ export const methods1 = {
       write('POST', { sourceKind: 'booking', friendIds }),
     ),
 
-  saveCards: (accountId: string, expectedVersion: number, cards: StyleCard[]) =>
-    fetchApi<Result<{ cards: StyleCard[]; version: number }>>(
+  saveCards: (
+    accountId: string,
+    expectedVersion: number,
+    cards: StyleCard[],
+    metricIds?: string[],
+  ) =>
+    fetchApi<
+      Result<{
+        cards: StyleCard[];
+        version: number;
+        metricIds: string[];
+        visibleTabs: string[];
+      }>
+    >(
       url(root + '/cards', accountId),
-      write('PUT', { expectedVersion, cards }),
+      write('PUT', {
+        expectedVersion,
+        cards,
+        ...(metricIds === undefined ? {} : { metricIds }),
+      }),
     ),
 
   resetCards: (accountId: string, expectedVersion: number) =>
-    fetchApi<Result<{ cards: StyleCard[]; version: number }>>(
-      url(root + '/cards', accountId),
-      write('DELETE', { expectedVersion }),
-    ),
+    fetchApi<
+      Result<{
+        cards: StyleCard[];
+        version: number;
+        metricIds: string[];
+        visibleTabs: string[];
+      }>
+    >(url(root + '/cards', accountId), write('DELETE', { expectedVersion })),
 
   menu: (accountId: string, id: string) =>
     fetchApi<
@@ -220,5 +318,5 @@ export const methods1 = {
         accountId,
       ),
       write('PATCH', { expectedVersion, staffId }),
-    )
+    ),
 };

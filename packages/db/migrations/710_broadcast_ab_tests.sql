@@ -1,0 +1,13 @@
+CREATE TABLE broadcast_variants(id TEXT PRIMARY KEY,broadcast_id TEXT NOT NULL REFERENCES broadcasts(id),variant_key TEXT NOT NULL CHECK(variant_key IN('A','B')),messages_json TEXT NOT NULL CHECK(json_valid(messages_json)),version INTEGER NOT NULL DEFAULT 1,created_at TEXT NOT NULL,UNIQUE(broadcast_id,variant_key));
+CREATE TABLE broadcast_ab_tests(broadcast_id TEXT PRIMARY KEY REFERENCES broadcasts(id),test_ratio_pct INTEGER NOT NULL CHECK(test_ratio_pct IN(10,20,30,50)),metric TEXT NOT NULL DEFAULT 'click' CHECK(metric='click'),decide_after_minutes INTEGER NOT NULL CHECK(decide_after_minutes IN(60,120,240,480,1440)),undecided_policy TEXT NOT NULL DEFAULT 'stop' CHECK(undecided_policy IN('stop','send_a')),status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN('draft','testing','decided','undecided','finished','expired','stopped')),winner TEXT CHECK(winner IN('A','B')),decided_at TEXT,decided_by TEXT,remainder_scheduled_at TEXT,remainder_sent_at TEXT,stats_json TEXT,started_at TEXT,decide_at TEXT,version INTEGER NOT NULL DEFAULT 1,test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),choice_key TEXT,choice_value TEXT);
+ALTER TABLE broadcast_send_claims ADD COLUMN variant_key TEXT CHECK(variant_key IN('A','B','R'));
+CREATE TABLE broadcast_ab_recipients(broadcast_id TEXT NOT NULL REFERENCES broadcasts(id),friend_id TEXT NOT NULL REFERENCES friends(id),variant_key TEXT NOT NULL CHECK(variant_key IN('A','B','R')),state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN('pending','sent','failed','unknown')),sent_at TEXT,test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),PRIMARY KEY(broadcast_id,friend_id));
+ALTER TABLE broadcast_ab_tests ADD COLUMN start_key TEXT;
+ALTER TABLE broadcast_ab_tests ADD COLUMN start_request_json TEXT CHECK(start_request_json IS NULL OR json_valid(start_request_json));
+ALTER TABLE broadcast_ab_tests ADD COLUMN start_result_json TEXT CHECK(start_result_json IS NULL OR json_valid(start_result_json));
+CREATE TRIGGER ab_block_standard_send BEFORE UPDATE OF status ON broadcasts WHEN NEW.status IN('sending','scheduled') AND EXISTS(SELECT 1 FROM broadcast_ab_tests WHERE broadcast_id=NEW.id)
+BEGIN SELECT RAISE(ABORT,'ab_test_requires_test_transport'); END;
+CREATE TRIGGER ab_block_active_edit BEFORE UPDATE OF message_content,message_bubbles_json,message_options_json ON broadcasts WHEN EXISTS(SELECT 1 FROM broadcast_ab_tests WHERE broadcast_id=NEW.id AND status!='draft')
+BEGIN SELECT RAISE(ABORT,'ab_test_active'); END;
+CREATE TRIGGER ab_stop_broadcast AFTER UPDATE OF stopped_at ON broadcasts WHEN NEW.stopped_at IS NOT NULL
+BEGIN UPDATE broadcast_ab_tests SET status='stopped',version=version+1 WHERE broadcast_id=NEW.id AND status NOT IN('finished','expired','stopped'); END;

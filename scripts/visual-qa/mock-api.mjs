@@ -30,6 +30,8 @@ const QRCode = createRequire(new URL('../../apps/web/package.json', import.meta.
 
 import { QA_CLOCK, storeAt, storeYmd } from './qa-clock.mjs'
 import { mockFingerprint } from './mock-fingerprint.mjs'
+import { gap3Respond } from './mock-gap3.mjs'
+import { gap2Respond } from './mock-gap2.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
@@ -2231,6 +2233,25 @@ const UID_MIGRATION_DONE = {
   rolledBackAt: null, failureReason: null, rollbackable: true,
 }
 
+/* G1 A/B テスト（要件 G1 §3 の口の案。gap2 が作るまでの見本）。broadcast-2＝勝ちが決まった（n4kwM）・broadcast-3＝決められない（Eoi7q）。 */
+function broadcastAbRead(method, pathname) {
+  const m = method === 'GET' && pathname.match(/^\/api\/broadcasts\/([^/]+)\/ab-result$/)
+  if (!m) return null
+  const variants = (bClick, bBook) => [
+    { key: 'A', label: '写真 1 枚', sent: 405, failed: 0, clicks: 25, clickRate: 0.062, bookings: 3, purchases: null, purchaseAmount: null },
+    { key: 'B', label: 'カルーセル 3 枚', sent: 405, failed: 0, clicks: Math.round(405 * bClick), clickRate: bClick, bookings: bBook, purchases: null, purchaseAmount: null },
+  ]
+  if (m[1] === 'broadcast-2') return { success: true, data: { status: 'decided', testMode: true, metric: 'click', decideAfterMinutes: 240, variants: variants(0.098, 7), winner: 'B', confidence: 0.98, decideAt: '2026-11-20T05:00:00.000Z', remainder: { count: 3240, scheduledAt: '2026-11-20T05:00:00.000Z', sentAt: '2026-11-20T05:00:00.000Z' } } }
+  if (m[1] === 'broadcast-3') return { success: true, data: { status: 'undecided', testMode: true, metric: 'click', decideAfterMinutes: 240, variants: variants(0.066, 4), winner: null, confidence: 0.61, decideAt: '2026-11-20T05:00:00.000Z', chooseUntil: '2026-11-21T05:00:00.000Z', remainder: { count: 3240, scheduledAt: null, sentAt: null } } }
+  return { success: true, data: null }
+}
+function broadcastAbWrite(method, pathname) {
+  if (method === 'PUT' && /^\/api\/broadcasts\/[^/]+\/ab-test$/.test(pathname)) return { version: 4, testMode: true }
+  if (method === 'DELETE' && /^\/api\/broadcasts\/[^/]+\/ab-test$/.test(pathname)) return { deleted: true, version: 4 }
+  if (method === 'PUT' && /^\/api\/broadcasts\/[^/]+\/variants\/[AB]$/.test(pathname)) return { key: pathname.slice(-1), version: 3 }
+  if (method === 'POST' && /^\/api\/broadcasts\/[^/]+\/ab-test\/choose$/.test(pathname)) return { variant: 'A', testMode: true }
+  return null
+}
 /*
  * B-311〜B-313（はじめの質問・スタイルの初期セット・対応が要るもの）の見本。本物の口は組4（codex/kenta-api4-1015）が作り中。
  * 絵：VHp7p の Bdfxm（7 / 11 済み・警告 1・あとで 2・止めている自動の送信 3）・oKSsG・cAaGY・J6647・Kyf8U。
@@ -2295,6 +2316,8 @@ function styleSetupWrite(method, pathname) {
 }
 
 function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
+  { const gapuiC = gapuiCWrite(method, pathname, query); if (gapuiC) return gapuiC }
+  { const ab = broadcastAbWrite(method, pathname); if (ab) return ab }
   { const style = styleSetupWrite(method, pathname); if (style) return style }
   /*
    * B-6 受信箱の添付（API-15・M0393「7. 添付」）：画像以外の準備（アップロード）は保存しないで同じ形を返す。
@@ -2970,7 +2993,107 @@ function visitStampRead(pathname, query) {
   return null
 }
 
+/*
+ * G2（AI の要約・返信案・Q&A の自動応答：板 l1i3v・y4nixm・LPkKH・V5WpQ・NmTj4）と
+ * G9（AI とつなぐ：板 Xb0yc・Ge1vp・hqhj5）の見本。口は要件 G2・G9 §3 の案（Worker は Codex が作る途中）。
+ * 撮るときは 環境変数 GAPUI_AI_MODE=off で「使っていない」（UbRQ4）、=suspended で「止まっている」（OmV7B）にできる（既定は返信案だけ）。
+ */
+const GAPUI_C_QA = [
+  { id: 'qa-1', questions: ['発送の目安はいつですか', '発送はいつ？'], answerText: 'ご注文から 3 営業日以内に発送します。発送したら LINE でお知らせします。土日・祝日は発送をお休みしています。', status: 'published', source: 'manual', useCount: 128, version: 3, updatedAt: '2026-10-02T01:00:00.000Z' },
+  { id: 'qa-2', questions: ['定期便を止めたい'], answerText: 'マイページの［定期便］から止められます。次回のお届けの 5 日前までに手続きしてください。', status: 'published', source: 'manual', useCount: 64, version: 1, updatedAt: '2026-09-20T01:00:00.000Z' },
+  { id: 'qa-3', questions: ['駐車場はありますか'], answerText: '店の裏に 3 台あります。満車のときは近くのコインパーキングをご利用ください。', status: 'published', source: 'manual', useCount: 31, version: 1, updatedAt: '2026-09-18T01:00:00.000Z' },
+  { id: 'qa-4', questions: ['ポイントの期限'], answerText: '最後のご利用から 1 年です。', status: 'stopped', source: 'manual', useCount: 12, version: 2, updatedAt: '2026-09-10T01:00:00.000Z' },
+  { id: 'qa-5', questions: ['返品のしかた'], answerText: '商品到着から 8 日以内にご連絡ください。', status: 'draft', source: 'import_pdf', useCount: 0, version: 1, updatedAt: '2026-10-15T01:00:00.000Z' },
+]
+const GAPUI_C_LOGS = [
+  { id: 'ail-1', createdAt: '2026-10-15T12:04:00.000Z', chatId: 'chat-1', friendId: 'friend-1', friendName: '山田 花子', questionText: '発送はいつ？', action: 'answered', handoffReason: null, qaEntryId: 'qa-1', qaTitle: '発送の目安', qaVersion: 3 },
+  { id: 'ail-2', createdAt: '2026-10-15T11:51:00.000Z', chatId: 'chat-2', friendId: 'friend-2', friendName: '佐藤 健', questionText: '返品できますか', action: 'handed_off', handoffReason: 'low_confidence', qaEntryId: null, qaTitle: null, qaVersion: null },
+  { id: 'ail-3', createdAt: '2026-10-15T10:12:00.000Z', chatId: 'chat-3', friendId: 'friend-3', friendName: '田中 優子', questionText: '駐車場ある？', action: 'answered', handoffReason: null, qaEntryId: 'qa-3', qaTitle: '駐車場', qaVersion: 1 },
+  { id: 'ail-4', createdAt: '2026-10-15T09:40:00.000Z', chatId: 'chat-4', friendId: 'friend-4', friendName: '鈴木 亜美', questionText: 'ギフト包装は', action: 'handed_off', handoffReason: 'low_confidence', qaEntryId: null, qaTitle: null, qaVersion: null },
+]
+const GAPUI_C_MCP = [
+  { id: 'mcp-1', name: 'Claude（Kenta）', level: 'draft', accounts: [{ id: 'acc-1', name: '然-NEN-TEST' }], keyPrefix: 'mcp_', expiresAt: '2027-01-15T00:00:00.000Z', lastUsedAt: '2026-10-15T13:45:00.000Z', status: 'active', previousKeyExpiresAt: null, version: 1 },
+]
+const GAPUI_C_MCP_LOGS = [
+  { id: 'mcl-1', at: '2026-10-15T13:41:00.000Z', connectionId: 'mcp-1', connectionName: 'Claude（Kenta）', kind: 'read', result: 'ok', summary: '友だち 1,284 人の一覧', targetType: 'friends', targetId: null },
+  { id: 'mcl-2', at: '2026-10-15T13:43:00.000Z', connectionId: 'mcp-1', connectionName: 'Claude（Kenta）', kind: 'draft', result: 'ok', summary: '一斉配信「秋の新メニュー」', targetType: 'broadcast', targetId: 'bc-ai-1' },
+  { id: 'mcl-3', at: '2026-10-15T13:45:00.000Z', connectionId: 'mcp-1', connectionName: 'Claude（Kenta）', kind: 'send_request', result: 'refused', summary: '送る依頼（この接続は下書きまで）', targetType: 'broadcast', targetId: 'bc-ai-1' },
+  { id: 'mcl-4', at: '2026-10-14T01:02:00.000Z', connectionId: 'mcp-1', connectionName: 'Claude（Kenta）', kind: 'read', result: 'ok', summary: '予約の件数（10/14）', targetType: 'bookings', targetId: null },
+]
+/* 撮るときの状態は環境変数か、GAPUI_STATE_FILE の JSON（{role,mode,auto,busy}）。ファイルなら動かしたまま切り替えられる。 */
+function gapuiState() {
+  const base = { role: process.env.GAPUI_ROLE, mode: process.env.GAPUI_AI_MODE, auto: process.env.GAPUI_AUTO, busy: process.env.GAPUI_AI_BUSY }
+  const file = process.env.GAPUI_STATE_FILE
+  if (!file) return base
+  try { return { ...base, ...JSON.parse(readFileSync(file, 'utf8')) } } catch { return base }
+}
+function gapuiCAiSettings() {
+  const mode = gapuiState().mode || 'draft_only'
+  return { mode, suspendedReason: mode === 'suspended' ? 'provider' : null, publishedQaCount: 18, draftQaCount: 1, version: 4, autoReplyAvailable: gapuiState().auto === '1' }
+}
+function gapuiCQaRow(row) {
+  return { id: row.id, account_id: 'visual-qa-account', questions_json: JSON.stringify(row.questions), answer_messages_json: JSON.stringify([{ type: 'text', text: row.answerText }]), status: row.status, version: row.version, updated_at: row.updatedAt }
+}
+function gapuiCRead(method, pathname, query) {
+  if (method !== 'GET') return null
+  if (pathname === '/api/ai-settings') return { success: true, data: gapuiCAiSettings() }
+  if (pathname === '/api/qa-entries') {
+    const q = query.get('q') ?? '', status = query.get('status') ?? ''
+    const items = GAPUI_C_QA.filter((row) => (!status || row.status === status) && (!q || row.questions.some((text) => text.includes(q)) || row.answerText.includes(q)))
+    /* 組2 の形：行は questions_json・answer_messages_json、件数は外側の total（20 件ずつ）。 */
+    return { success: true, data: items.map(gapuiCQaRow), total: items.length, nextOffset: null }
+  }
+  if (pathname === '/api/ai-answer-logs') {
+    const action = query.get('action') ?? ''
+    const items = GAPUI_C_LOGS.filter((row) => !action || row.action === action)
+    return { success: true, data: { items, total: items.length, summary: { answered: 412, handedOff: 38, askedAgainRate: 6 } } }
+  }
+  const log = /^\/api\/ai-answer-logs\/([^/]+)$/.exec(pathname)
+  if (log) {
+    const row = GAPUI_C_LOGS.find((item) => item.id === decodeURIComponent(log[1])) ?? GAPUI_C_LOGS[0]
+    const qa = GAPUI_C_QA.find((item) => item.id === row.qaEntryId) ?? null
+    return { success: true, data: { ...row, answerText: qa ? qa.answerText : null, qa: qa ? { id: qa.id, title: qa.questions[0], status: qa.status, useCount: qa.useCount, updatedAt: qa.updatedAt, version: qa.version, currentAnswerText: qa.answerText } : null, afterNote: qa ? 'お客さまから「ありがとう」の返事（21:06）。聞き直しはありません。' : '担当の Kenta が 21:10 に返信しました。' } }
+  }
+  if (pathname === '/api/mcp-connections') return { success: true, data: GAPUI_C_MCP }
+  if (pathname === '/api/mcp-connections/logs') {
+    const kind = query.get('kind') ?? '', result = query.get('result') ?? ''
+    const items = GAPUI_C_MCP_LOGS.filter((row) => (!kind || row.kind === kind) && (!result || row.result === result))
+    return { success: true, data: { items, total: items.length, connection: query.get('connectionId') ? GAPUI_C_MCP[0] : null } }
+  }
+  return null
+}
+function gapuiCWrite(method, pathname, query) {
+  if (method === 'POST' && /^\/api\/chats\/[^/]+\/ai\/summary$/.test(pathname)) {
+    return { lines: ['秋の新商品がいつ届くかと、定期便に追加できるかを聞いた', '10:20 に Kenta が発送日（10月4日）を案内した', '10:24 に追加を自動で受け付けた。いまはお礼の返事待ち'], generatedAt: '2026-08-19T01:24:00.000Z', basedOnMessageId: null, messageCount: 12 }
+  }
+  if (method === 'POST' && /^\/api\/chats\/[^/]+\/ai\/draft$/.test(pathname)) {
+    return { text: 'ご追加ありがとうございます。秋の新商品は 10月4日の発送分に入りました。届く日が決まりましたら、またご連絡します。', sources: [{ type: 'qa', id: 'qa-1', title: '発送の目安' }, { type: 'qa', id: 'qa-2', title: '定期便' }], generatedAt: '2026-08-19T01:24:00.000Z' }
+  }
+  if (method === 'PUT' && pathname === '/api/ai-settings') return { ...gapuiCAiSettings(), version: 5 }
+  if (method === 'POST' && pathname === '/api/ai-settings/test') return { qaTitle: '駐車場はありますか', handoffReason: null }
+  if (method === 'POST' && pathname === '/api/qa-entries') return gapuiCQaRow({ ...GAPUI_C_QA[4], id: 'qa-new', status: 'draft' })
+  if (method === 'POST' && pathname === '/api/qa-entries/import') return { jobId: 'qa-import-1' }
+  const qa = /^\/api\/qa-entries\/([^/]+)(?:\/(publish|stop))?$/.exec(pathname)
+  if (qa && (method === 'PUT' || method === 'POST' || method === 'DELETE')) {
+    const row = GAPUI_C_QA.find((item) => item.id === qa[1]) ?? GAPUI_C_QA[0]
+    if (method === 'DELETE') return { version: row.version + 1, status: 'stopped' }
+    return { status: qa[2] === 'publish' ? 'published' : qa[2] === 'stop' ? 'stopped' : 'draft', version: row.version + 1 }
+  }
+  if (method === 'POST' && pathname === '/api/mcp-connections') {
+    return { connection: { ...GAPUI_C_MCP[0], id: 'mcp-new', level: 'read', lastUsedAt: null }, url: 'https://api.musubo.app/mcp/acc_7Q2K', key: 'mcp_live_7c1e4b2a9d0f3f9a' }
+  }
+  const mcp = /^\/api\/mcp-connections\/([^/]+)\/(stop|rotate)$/.exec(pathname)
+  if (method === 'POST' && mcp) {
+    const row = GAPUI_C_MCP.find((item) => item.id === mcp[1]) ?? GAPUI_C_MCP[0]
+    if (mcp[2] === 'stop') return { ...row, status: 'stopped', version: row.version + 1 }
+    return { connection: { ...row, previousKeyExpiresAt: '2026-10-17T13:45:00.000Z', version: row.version + 1 }, url: 'https://api.musubo.app/mcp/acc_7Q2K', key: 'mcp_live_0b9e2c7d1a4f5e6b' }
+  }
+  return null
+}
+
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  { const gapuiC = gapuiCRead(method, pathname, query); if (gapuiC) return gapuiC }
+  { const ab = broadcastAbRead(method, pathname); if (ab) return ab }
   { const style = styleSetupRead(method, pathname, query); if (style) return style }
   { const stamps = method === 'GET' ? visitStampRead(pathname, query) : null; if (stamps) return stamps }
   if (method === 'GET' && pathname === '/api/restaurant-test/media-links') return { success: true, data: RESTAURANT_MEDIA_LINKS }
@@ -4889,9 +5012,33 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       pagination: { limit: 50, cursor: 0, nextCursor: null },
     }
   }
+  /* 統括の一括配信の確かめ（板 i7TdtN）：店ごとの内訳つき。数は絵のとおり。 */
+  if (/^\/api\/hq\/broadcasts\/[^/]+\/send-preview$/.test(pathname)) {
+    const ex = (optedOut) => ({ blocked: 0, optedOut, duplicate: 0, hidden: 0, missingDestination: 0 })
+    return { success: true, data: { recipients: 15131, excluded: ex(20), purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '【秋の新メニュー】10/18 からトリートメント 20%OFF', sender: { name: '渋谷店 予約係' }, expectedVersion: 2,
+      perAccount: [
+        { accountId: 'visual-qa-account-store', recipients: 1272, excluded: ex(12) }, { accountId: 'visual-qa-account-prod', recipients: 864, excluded: ex(5) },
+        { accountId: 'visual-qa-account', recipients: 2010, excluded: ex(0) }, { accountId: 'visual-qa-account-event-2025', recipients: 1105, excluded: ex(3) },
+      ] } }
+  }
+  /* U1 送る前の確かめ（板 F94nep・RxxfO）：契約 API-CONTRACT-GAP1 の send-preview。 */
+  if (/^\/api\/(hq\/)?broadcasts\/[^/]+\/send-preview$/.test(pathname)) {
+    return { success: true, data: { recipients: 1272, excluded: { blocked: 0, optedOut: 12, duplicate: 0, hidden: 0, missingDestination: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '【秋の新メニュー】10/18 からトリートメント 20%OFF', sender: { name: '渋谷店 予約係' }, expectedVersion: 2 } }
+  }
+  /* G8 送り手（板 Asa6v）：契約 API-CONTRACT-GAP1 の LineSender。 */
+  if (/^\/api\/line-accounts\/[^/]+\/senders$/.test(pathname)) {
+    return { success: true, data: [
+      { id: 'snd-1', name: '佐藤（然）', iconMediaId: null, iconUrl: null, visibility: 'all', ownerStaffId: null, status: 'active', version: 1 },
+      { id: 'snd-2', name: '店長 Kenta', iconMediaId: null, iconUrl: null, visibility: 'owner_only', ownerStaffId: 'visual-qa-owner', status: 'active', version: 1 },
+    ] }
+  }
   const broadcastOne = pathname.match(/^\/api\/broadcasts\/([^/]+)$/)
   if (broadcastOne) {
-    const found = broadcastOne[1] === 'visual-compose' ? VISUAL_COMPOSE_DRAFT : BROADCASTS.find((item) => item.id === broadcastOne[1])
+    /* 送る前の確かめの撮影用（板 F94nep・RxxfO）：確認の段まで進める、入力ずみの下書き。 */
+    const confirmFixture = broadcastOne[1].startsWith('visual-confirm')
+      ? { ...BROADCASTS[1], id: broadcastOne[1], title: '秋の新メニューのお知らせ', messageType: 'text', messageContent: '【秋の新メニュー】10/18 からトリートメント 20%OFF\nご予約はリッチメニューの［予約する］から。期間：10/18〜10/31', targetType: broadcastOne[1] === 'visual-confirm-all' ? 'all' : 'tag', targetTagId: broadcastOne[1] === 'visual-confirm-all' ? null : 'tag-0', status: 'draft', scheduledAt: '2099-10-18T01:00:00.000Z', totalCount: 1284, version: 2, draftStep: 'confirm' }
+      : null
+    const found = confirmFixture ?? (broadcastOne[1] === 'visual-compose' ? VISUAL_COMPOSE_DRAFT : BROADCASTS.find((item) => item.id === broadcastOne[1]))
     return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/broadcasts') {
@@ -4909,7 +5056,20 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
     }
     return { success: true, data: FRIEND_SAVED_VIEWS }
   }
-  if (pathname === '/api/chats') return { success: true, data: CHATS }
+  /* 返事の期限（G3。契約 API-CONTRACT-GAP1.md）。口が足す slaDueAt・slaState・assignedBy を最初の4件に付け、sort=sla_due と slaState=overdue も受ける。 */
+  if (pathname === '/api/inbox/routing-settings') return { success: true, data: { strategy: 'none', enabled: true, firstResponseMinutes: 30, businessHoursOnly: true, version: 3, escalateTeamId: null } }
+  if (pathname === '/api/chats') {
+    const minutes = [-60, -20, -8, 12]
+    const withSla = CHATS.map((chat, index) => {
+      if (index >= minutes.length) return { ...chat, slaDueAt: null, slaState: 'none', assignedBy: null }
+      return { ...chat, slaDueAt: new Date(Date.now() + minutes[index] * 60000).toISOString(), slaState: minutes[index] < 0 ? 'overdue' : 'soon', assignedBy: index < 2 ? 'auto' : index === 2 ? 'manual' : null }
+    })
+    let rows = withSla
+    if (query.get('slaState') === 'overdue') rows = rows.filter((chat) => chat.slaState === 'overdue')
+    if (query.get('sort') === 'sla_due') rows = [...rows].sort((a, b) => (a.slaDueAt ? Date.parse(a.slaDueAt) : Infinity) - (b.slaDueAt ? Date.parse(b.slaDueAt) : Infinity))
+    const limit = Number(query.get('limit') ?? 0)
+    return { success: true, data: limit > 0 && query.get('sort') === 'sla_due' && query.get('slaState') === 'overdue' && limit === 1 ? rows.slice(0, 1) : rows, total: rows.length }
+  }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
   /* 受信箱の件数（実口 /api/chats/quick-counts と同じ形）。状態で絞ると、その状態の会話だけ数える。 */
   if (pathname === '/api/chats/quick-counts') {
@@ -5113,7 +5273,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/staff/me') {
     // tenantId は統括のテンプレート（LRc93）の所属先の確認に要る（無いと「所属先を確認できません」で止まる）。
-    return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null, tenantId: 'visual-tenant-1' } }
+    return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null, tenantId: 'visual-tenant-1', ...(gapuiState().role === 'viewer' ? { role: 'staff', readOnly: true, roleBundle: 'view_only' } : {}) } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
   if (method === 'GET' && pathname === '/api/webhooks/outgoing/owh-slack-order') {
@@ -6584,6 +6744,20 @@ const server = createServer((req, res) => {
     return
   }
 
+  /* ③-2 第2弾（繰り返し・同伴・行き先を分ける）の見本。送られた回数・間隔から返す。保存はしない。 */
+  if (/^\/api\/booking\/admin\/(series|bookings\/[^/]+\/group)/.test(url.pathname)) {
+    let raw = ''
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      let body = {}
+      try { body = JSON.parse(raw || '{}') } catch { body = {} }
+      const hit = gap2Respond(method, url.pathname, body)
+      if (hit) res.writeHead(hit[0]).end(JSON.stringify(hit[1]))
+      else res.writeHead(404).end(JSON.stringify({ success: false, error: 'not_found' }))
+    })
+    return
+  }
+
   /*
     **いま動いているモックが、いまのファイルかを言う。**
 
@@ -6669,6 +6843,20 @@ const server = createServer((req, res) => {
       }
       scenarioDraftRows.set(key, next)
       res.writeHead(row ? 200 : 201).end(JSON.stringify({ success: true, data: next }))
+    })
+    return
+  }
+
+  /* ③-2 第3波（お客さまの分け方・会員ランク・店の比較・自動の LINE・回数券・月謝）の見本。保存はしない。 */
+  if (/^\/api\/(analytics\/customer-segments|member-ranks|hq\/store-comparison|ec\/auto-line|booking\/admin\/pass-plans|friends\/[^/]+\/member-rank|friends\/[^/]+\/delivery-consents)/.test(url.pathname)) {
+    let raw = ''
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      let body = {}
+      try { body = JSON.parse(raw || '{}') } catch { body = {} }
+      const hit = gap3Respond(method, url.pathname, body, url.searchParams)
+      if (hit) res.writeHead(hit[0]).end(JSON.stringify(hit[1]))
+      else res.writeHead(404).end(JSON.stringify({ success: false, error: 'not_found' }))
     })
     return
   }
@@ -7639,6 +7827,14 @@ const server = createServer((req, res) => {
       HTTP状態と器を返す。編集・公開・予約・適用・削除の画面検証用。
       409/400 の代表例つき (削除ブロック・冪等キーなし・順序の形違い)。
     */
+    /* 送る前の確かめの撮影用：確認の下書きの保存（版を 1 つ進めて返す）。 */
+    if (method === 'PUT' && url.pathname.startsWith('/api/broadcasts/visual-confirm')) {
+      const found = BROADCASTS[1]
+      res.writeHead(200).end(JSON.stringify({
+        success: true, data: { ...found, id: url.pathname.split('/').pop(), title: '秋の新メニューのお知らせ', targetType: url.pathname.endsWith('-all') ? 'all' : 'tag', targetTagId: url.pathname.endsWith('-all') ? null : 'tag-0', status: 'draft', scheduledAt: '2099-10-18T01:00:00.000Z', version: 2 },
+      }))
+      return
+    }
     if (method === 'POST' && url.pathname === '/api/rich-menu-groups') {
       res.writeHead(201).end(JSON.stringify({
         success: true, data: { id: 'rmg-new', pages: [{ id: 'rmg-new-top' }] },
@@ -7773,6 +7969,11 @@ const server = createServer((req, res) => {
     /* 変更の確認（hmr2P・qUdNh）の口は実APIが器で包まずに返す。包むと人数が読めず「確定 0 人」になる。 */
     if (method === 'POST' && /^\/api\/events\/admin\/events\/[^/]+\/change-review(\/apply)?$/.test(url.pathname)) {
       res.writeHead(200).end(JSON.stringify(url.pathname.endsWith('/apply') ? EVENT_CHANGE_APPLY_RESULT : EVENT_CHANGE_PREVIEW))
+      return
+    }
+    /* 口が「今は使えない」を返す撮影用の状態（受信箱の OmV7B）。 */
+    if (gapuiState().busy === '1' && method === 'POST' && /^\/api\/chats\/[^/]+\/ai\/(summary|draft)$/.test(url.pathname)) {
+      res.writeHead(503).end(JSON.stringify({ success: false, error: 'ai_rate_limit' }))
       return
     }
     const fixedResult = visualQaWriteBody(method, url.pathname, url.searchParams)

@@ -563,6 +563,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
          (id, calendar_id, line_account_id, staff_id, access_token, auth_type, is_active)
        VALUES (?, ?, ?, ?, ?, ?, 1)`,
     ).run('conn-1', 'cal-1', 'account-ny', 'staff-ny', 'tok-test', 'oauth');
+    sqlite.exec("INSERT INTO booking_calendar_switches(line_account_id,scope_id,write_enabled,updated_by,updated_at) VALUES('account-ny','',1,'test',datetime('now')),('account-ny','staff-ny',1,'test',datetime('now'))");
   }
 
   function useRealGoogleRunner() {

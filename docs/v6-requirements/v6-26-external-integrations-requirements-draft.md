@@ -171,11 +171,17 @@ event typeを自由入力させない。内部event registryのIDとschemaを選
 - retryはWorker内sleepで待たない
 - 連続失敗でcircuit open、運用者通知
 
+**B-365①（2026-10-17）**：共通の外部呼出しへの接続は [段2 §3・§4](../v8-requirements/cleanup-stage2-contract.md#retry)。送信 Webhook の最大8回・24時間と既存の timeout/本文/送信先の上限は増やさない。`Retry-After` より早く送らず、待ちが1回の上限を超える場合は次回期限として記録する。結果不明は照合を先に行い、同じ event ID・本文 snapshot を保つ。HTTP番号だけで副作用の再実行を決めない。
+
 at-least-once配送であり、相手にもevent IDの冪等処理を求める。exactly-onceとは表示しない。
 
 - **決定 B-337（Q-35）**：送り先の自動停止は連続 5 回（今のまま）。署名の失敗が 1 時間に 10 回、外部受信の拒否が 1 時間に 10 件で運用者へ知らせる。
 
 ## 7. こちらで受け取る
+
+### B-358 の x-nen 署名5系統（2026-10-17）
+
+デリバリー・ECの自動LINE・お問い合わせの中継・EC連携・キャンペーンは、[段2 §2-2](../v8-requirements/cleanup-stage2-contract.md#store-flags) の共通検証にまとめる。正しい `verifyNenWebhook` を基に、元の本文・timestamp・時刻許容幅・形式・本文上限・アカウントごとの鍵を保つ。§6-3 の送信 Webhook 署名、LINE・Stripe・Slack の署名と混同しない。
 
 ### 7-1. 受信口
 

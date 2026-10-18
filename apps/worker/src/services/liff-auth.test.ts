@@ -59,3 +59,26 @@ test('B-173: LIFFで指定したアカウントのチャンネルだけで本人
  expect(verify).toHaveBeenCalledTimes(1);expect(new URLSearchParams(String(verify.mock.calls[0][1]?.body)).get('client_id')).toBe('login-b');
  expect(await verifyCallerLineIdentity('Bearer token',{DB},'missing')).toBeNull();expect(verify).toHaveBeenCalledTimes(1);
 });
+
+test('S15 an account without its login channel never falls back to another store environment channel', async () => {
+  dbMocks.getLineAccounts.mockResolvedValue([{ id: 'a', login_channel_id: null }]);
+  const verify = vi.fn(async () => Response.json({ sub: 'Ufixture' }));
+  vi.stubGlobal('fetch', verify);
+  await expect(verifyCallerLineUserId('Bearer fixture', { DB, LINE_LOGIN_CHANNEL_ID: 'other-login' }, 'a')).resolves.toBeNull();
+  expect(verify).not.toHaveBeenCalled();
+});
+
+test('S15 an unassigned legacy resource only accepts channels from the default tenant', async () => {
+  dbMocks.getLineAccounts.mockResolvedValue([
+    { id: 'default', tenant_id: null, login_channel_id: 'default-login' },
+    { id: 'other', tenant_id: 'other-tenant', login_channel_id: 'other-login' },
+  ]);
+  const verify = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    return new URLSearchParams(String(init?.body)).get('client_id') === 'other-login'
+      ? Response.json({ sub: 'Ufixture' }) : new Response('invalid', { status: 400 });
+  });
+  vi.stubGlobal('fetch', verify);
+  expect(await verifyCallerLineUserId('Bearer fixture', { DB, LINE_LOGIN_CHANNEL_ID: 'other-login' }, null)).toBeNull();
+  expect(verify).toHaveBeenCalledTimes(1);
+  expect(new URLSearchParams(String(verify.mock.calls[0][1]?.body)).get('client_id')).toBe('default-login');
+});

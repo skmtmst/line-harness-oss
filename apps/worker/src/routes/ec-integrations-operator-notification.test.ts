@@ -31,10 +31,10 @@ vi.mock('@line-crm/db', () => ({
   upsertEcEventReadModels: mocks.upsertReadModels,
 }));
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({
+  LineClient: vi.fn().mockImplementation(function () { return ({
     pushMessage: mocks.pushMessage,
     pushMessageWithRequestId: mocks.pushMessage,
-  })),
+  }); }),
 }));
 vi.mock('../services/event-bus.js', () => ({
   fireEvent: vi.fn(),

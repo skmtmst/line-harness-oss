@@ -5,6 +5,7 @@ export interface BookingEntitlement {
   created_at: string; updated_at: string;
 }
 export interface BookingEntitlementGrant {
+  planId?: string;
   friendId: string; menuId?: string | null; kind: 'ticket' | 'monthly'; name: string;
   remaining?: number; monthlyLimit?: number; validFrom: string; expiresAt: string; reason: string;
 }

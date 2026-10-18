@@ -1,3 +1,4 @@
+import {requireAccountAi} from './account-ai-features.js';
 import {
   bannerReferencesFromRow,claimWorkflowStep,ensureWorkflowStep,failWorkflowStep,finishWorkflowStep,
   getBannerGeneration,getBannerImageWithDetail,getBannerUsageThisMonth,getBannerUsageToday,getTenantBilling,
@@ -36,6 +37,7 @@ export async function processBannerGeneration(env:Env['Bindings'],generationId:s
     if(!generation || generation.stop_requested_at || !['queued','running'].includes(generation.status)){
       await finishWorkflowStep(db,ref,owner);return null;
     }
+    await requireAccountAi(db,generation.ai_account_id,'banner',tenantId);
     const imageId=await processNextImage(env,generation,ref,owner);
     await reconcileBannerProgress(db,generation);
     const latest=await getBannerGeneration(db,generationId,tenantId);
@@ -106,6 +108,7 @@ async function processNextImage(env:Env['Bindings'],g:BannerGeneration,root:Work
           if(latest?.stop_requested_at){await releaseWorkflowStep(db,render,renderClaim.lease_owner!);await releaseWorkflowStep(db,slot,slotOwner);return null;}
           await db.batch([workflowFence(db,root,owner),workflowFence(db,render,renderClaim.lease_owner!)]);
           providerStarted=true;
+          await requireAccountAi(db,g.ai_account_id,'banner',g.tenant_id);
           const result=await generateOpenAIImage({apiKey:env.OPENAI_API_KEY,model:g.model_name || env.OPENAI_IMAGE_MODEL || DEFAULT_OPENAI_IMAGE_MODEL,
             prompt:g.final_prompt,size:g.api_size as '1024x1024'|'1536x1024'|'1024x1536',quality:g.quality,referenceImages:references});
           await env.IMAGES.put(rawKey,result.bytes,{httpMetadata:{contentType:result.mimeType},customMetadata:{generationId:g.id}});

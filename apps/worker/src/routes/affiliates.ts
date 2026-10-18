@@ -1,3 +1,4 @@
+import { serializeAffiliate } from './affiliate-serialization.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
 import { Hono, type Context, type MiddlewareHandler } from 'hono';
@@ -84,42 +85,6 @@ function commissionRateError(value: unknown): string | null {
   return null;
 }
 
-function serializeAffiliate(row: {
-  id: string;
-  tenant_id?: string;
-  folder_id?: string | null;
-  line_account_id?: string | null;
-  name: string;
-  code: string;
-  commission_rate: number;
-  reward_mode?: 'none' | 'fixed' | 'rate' | null;
-  is_active: number;
-  created_at: string;
-  friend_id?: string | null;
-  email?: string | null;
-  hold_days?: number | null;
-  payout_cycle?: string | null;
-  notify_on_conversion?: number;
-}) {
-  return {
-    id: row.id,
-    folderId: row.folder_id ?? null,
-    tenantId: row.tenant_id ?? null,
-    lineAccountId: row.line_account_id ?? null,
-    name: row.name,
-    code: row.code,
-    commissionRate: row.commission_rate,
-    rewardMode: row.reward_mode ?? (row.commission_rate > 0 ? 'rate' : 'fixed'),
-    isActive: Boolean(row.is_active),
-    createdAt: row.created_at,
-    friendId: row.friend_id ?? null,
-    email: row.email ?? null,
-    holdDays: row.hold_days ?? null,
-    payoutCycle: row.payout_cycle ?? null,
-    notifyOnConversion: Boolean(row.notify_on_conversion),
-  };
-}
-
 /**
  * 支払いの取り決めを検証して取り出す。送られた項目だけを含める。
  *
@@ -174,8 +139,17 @@ function readAffiliateSettlement(
 // GET /api/affiliates - list all
 affiliates.get('/api/affiliates', async (c) => {
   try {
-    const { scope } = await getAffiliateScope(c);
-    const items = await getAffiliates(c.env.DB, scope);
+    const accountId = c.req.query('accountId') ?? c.req.query('lineAccountId');
+    if (!accountId || (c.req.query('lineAccountId') && c.req.query('lineAccountId') !== accountId)) {
+      return inputError(c, { success: false, error: 'LINE公式アカウントを1つ選んでください', code: 'ACCOUNT_REQUIRED' }, 400, ['accountId']);
+    }
+    const { visible, scope } = await getAffiliateScope(c);
+    if (!visible.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'このアカウントを閲覧する権限がありません' }, 403);
+    }
+    const items = await getAffiliates(c.env.DB, {
+      ...scope, allowedLineAccountIds: [accountId], includeUnassigned: false,
+    });
     return c.json({ success: true, data: items.map(serializeAffiliate) });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliates"}));

@@ -160,7 +160,7 @@ describe('N-188 予約配信の共通情報snapshot', () => {
           targetType: 'all',
           targetTagId: null,
           lineAccountId: 'account-a',
-          scheduledAt: '2026-09-16T04:00:00.000Z',
+          scheduledAt: '2026-09-16T06:00:00.000Z',
           expectedVersion: 1,
         }),
       },
@@ -173,6 +173,7 @@ describe('N-188 予約配信の共通情報snapshot', () => {
     `).get() as { common_var_snapshot: string; common_var_snapshot_at: string };
     expect(retried.common_var_snapshot_at).toBe('2026-09-16T02:00:00.000Z');
     expect(JSON.parse(retried.common_var_snapshot).accounts['account-a'].values.shop_name).toBe('本店A');
+    vi.setSystemTime(new Date('2026-09-16T06:01:00.000Z'));
     await processScheduledBroadcasts(store.db, {} as never);
 
     expect(line.broadcasts).toHaveLength(2);
@@ -199,7 +200,7 @@ describe('N-188 予約配信の共通情報snapshot', () => {
         method: 'PUT', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           messageContent: '更新={{var.shop_name}}',
-          scheduledAt: '2026-09-16T02:30:00.000Z',
+          scheduledAt: '2026-09-16T03:01:00.000Z',
           expectedVersion: 1,
         }),
       },
@@ -210,10 +211,11 @@ describe('N-188 予約配信の共通情報snapshot', () => {
       SELECT common_var_snapshot, common_var_snapshot_at FROM broadcasts WHERE id = 'broadcast-edit'
     `).get()).toEqual({ common_var_snapshot: null, common_var_snapshot_at: null });
 
+    vi.setSystemTime(new Date('2026-09-16T03:01:00.000Z'));
     await processScheduledBroadcasts(store.db, {} as never);
     expect(sentText()).toBe('更新=編集後');
     expect(store.raw.prepare(`SELECT common_var_snapshot_at FROM broadcasts WHERE id = 'broadcast-edit'`).get())
-      .toEqual({ common_var_snapshot_at: '2026-09-16T03:00:00.000Z' });
+      .toEqual({ common_var_snapshot_at: '2026-09-16T03:01:00.000Z' });
   });
 
   it('provider失敗後に対象を実際に変えた更新も旧snapshotを捨てる', async () => {
@@ -230,7 +232,7 @@ describe('N-188 予約配信の共通情報snapshot', () => {
         method: 'PUT', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           targetType: 'tag', targetTagId: 'tag-new',
-          scheduledAt: '2026-09-16T04:00:00.000Z', expectedVersion: 1,
+          scheduledAt: '2026-09-16T06:00:00.000Z', expectedVersion: 1,
         }),
       },
       { DB: store.db } as Env['Bindings'],
@@ -298,7 +300,7 @@ describe('N-188 予約配信の共通情報snapshot', () => {
       '/api/broadcasts/broadcast-rebook',
       {
         method: 'PUT', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ scheduledAt: '2026-09-16T02:30:00.000Z', expectedVersion: 1 }),
+        body: JSON.stringify({ scheduledAt: '2026-09-16T03:01:00.000Z', expectedVersion: 1 }),
       },
       { DB: store.db } as Env['Bindings'],
     );
@@ -308,13 +310,14 @@ describe('N-188 予約配信の共通情報snapshot', () => {
         FROM broadcasts WHERE id = 'broadcast-rebook'
     `).get()).toEqual({ status: 'scheduled', common_var_snapshot: null, common_var_snapshot_at: null });
 
+    vi.setSystemTime(new Date('2026-09-16T03:01:00.000Z'));
     await processScheduledBroadcasts(store.db, {} as never);
     expect(line.broadcasts).toHaveLength(1);
     expect(sentText()).toBe('店舗=新案内');
     const final = store.raw.prepare(`
       SELECT status, common_var_snapshot_at FROM broadcasts WHERE id = 'broadcast-rebook'
     `).get() as { status: string; common_var_snapshot_at: string };
-    expect(final).toEqual({ status: 'sent', common_var_snapshot_at: '2026-09-16T03:00:00.000Z' });
+    expect(final).toEqual({ status: 'sent', common_var_snapshot_at: '2026-09-16T03:01:00.000Z' });
     expect(store.raw.prepare(`
       SELECT reason, execution_at FROM common_var_resolution_failures
        WHERE source_id = 'broadcast-rebook'

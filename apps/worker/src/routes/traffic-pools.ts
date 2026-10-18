@@ -18,7 +18,7 @@ import {
 import type { TrafficPoolWithAccount, PoolAccountWithDetails } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const trafficPools = new Hono<Env>();
 
@@ -71,7 +71,8 @@ trafficPools.get('/pool/:slug', async (c) => {
 trafficPools.get('/api/traffic-pools', async (c) => {
   try {
     const pools = await getTrafficPools(c.env.DB);
-    return c.json({ success: true, data: pools.map(serialize) });
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    return c.json({ success: true, data: pools.filter(pool => scope.allowedAccountIds.includes(pool.active_account_id)).map(serialize) });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"GET /api/traffic-pools"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);

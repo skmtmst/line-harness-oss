@@ -2,12 +2,18 @@ import { validateStampSettings } from './visit-stamps.js';
 
 import type { VisitStampSettings } from '@line-crm/shared';
 
-import { StyleError, features, featureLink, questionsForStyle } from './style-setup-core.js';
+import {
+  StyleError,
+  features,
+  featureLink,
+  questionsForStyle,
+} from './style-setup-core.js';
 import { profile, profileAnswers } from './style-setup.js';
 export async function featureReadiness(
   db: D1Database,
   account: string,
   feature: string,
+  styleOverride?: import('@line-crm/shared').AccountStyle,
 ) {
   const p = await profile(db, account),
     answers = profileAnswers(p);
@@ -17,12 +23,14 @@ export async function featureReadiness(
     answers[feature]?.mode === 'configured' &&
     answers[feature]?.value !== false;
   if (feature === 'booking') {
-    configured = !!(await db
-      .prepare(
-        `SELECT 1 FROM menus m JOIN booking_settings s ON s.line_account_id=m.line_account_id WHERE m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL AND s.business_hours_configured=1 LIMIT 1`,
-      )
-      .bind(account)
-      .first());
+    const selectedStyle = styleOverride ?? p?.style;
+    const sql =
+      selectedStyle === 'restaurant'
+        ? `SELECT 1 FROM rt_stores s JOIN rt_tables t ON t.store_id=s.id JOIN rt_opening_hours_settings h ON h.store_id=s.id WHERE s.line_account_id=? AND s.status='active' AND t.is_active=1 AND json_array_length(h.hours_json)>0 LIMIT 1`
+        : selectedStyle === 'lesson'
+          ? `SELECT 1 FROM events e JOIN event_slots s ON s.event_id=e.id WHERE e.line_account_id=? AND e.is_published=1 AND e.deleted_at IS NULL AND s.deleted_at IS NULL AND s.is_active=1 LIMIT 1`
+          : `SELECT 1 FROM menus m JOIN booking_settings b ON b.line_account_id=m.line_account_id JOIN staff_menus sm ON sm.menu_id=m.id AND sm.is_offered=1 JOIN staff s ON s.id=sm.staff_id AND s.line_account_id=m.line_account_id WHERE m.line_account_id=? AND m.is_active=1 AND m.deleted_at IS NULL AND s.is_active=1 AND s.deleted_at IS NULL AND b.business_hours_configured=1 LIMIT 1`;
+    configured = !!(await db.prepare(sql).bind(account).first());
   }
   if (feature === 'stamps') {
     const cards = (

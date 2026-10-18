@@ -1092,6 +1092,33 @@ describe('Codex Slack relay', () => {
     expect(String(fetcher.mock.calls[3]?.[0])).toContain('chat.delete');
   });
 
+  test('S23 自動起票の全送信本文とmetadataから自由文・顧客情報・秘密を除く', async () => {
+    const fetcher = vi.fn<typeof fetch>(async input => {
+      const url = String(input);
+      if (url.includes('getPermalink')) return slackResponse({ permalink: 'https://slack.example/error' });
+      if (url.includes('history') || url.includes('replies')) return slackResponse({ messages: [] });
+      return slackResponse({ ts: '1787327000.000001' });
+    });
+    await reportHarnessErrorToSlack({
+      SLACK_BOT_TOKEN: 'fixture-bot', SLACK_ERROR_CHANNEL_ID: 'C-ERROR', SLACK_TASK_CHANNEL_ID: 'C-TASK',
+    }, {
+      source: 'admin',
+      message: '山田架空 fixture-person@example.invalid 090-0000-1234 HTTP 500 password=fixture-secret',
+      path: 'https://fixture-person.example.invalid/api/friends/山田架空?token=fixture-query#fixture-fragment',
+      stack: 'Error fixture-stack 氏名:山田架空\nAuthorization: fixture-authorization',
+      occurredAt: 'fixture-invalid-date',
+    }, fetcher);
+    const writes = fetcher.mock.calls.filter(([, init]) => init?.body);
+    expect(writes.length).toBeGreaterThan(0);
+    const payloads = writes.map(([, init]) => String(init?.body)).join('\n');
+    for (const forbidden of ['山田架空', 'fixture-person', '090-0000-1234', 'fixture-secret', 'fixture-query',
+      'fixture-fragment', 'fixture-stack', 'fixture-authorization', 'fixture-invalid-date']) {
+      expect(payloads).not.toContain(forbidden);
+    }
+    expect(payloads).toContain('HTTP 500');
+    expect(payloads).toContain('/api/friends');
+  });
+
   test('LINE Harnessの実行時エラーをエラー報告と要対応へ自動起票する', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [] }))

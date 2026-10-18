@@ -1,7 +1,7 @@
-import type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
-export type { BroadcastPreflight } from './api-broadcast-preflight-types.js';
-import type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
-export type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types.js';
+import type { BroadcastPreflight } from './api-broadcast-preflight-types';
+export type { BroadcastPreflight } from './api-broadcast-preflight-types';
+import type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types';
+export type { AccountHealthSummary, PhotoAssetRun } from './api-publication-types';
 import { type RichMenuPublishRun } from './api-rich-menu-publish-types'
 export { type RichMenuPublishRun } from './api-rich-menu-publish-types'
 import { SESSION_LOST_EVENT } from './session-events'
@@ -2906,7 +2906,7 @@ export async function fetchApiBlob(path: string, init?: { method?: string; accou
  * R495: 上限で切れたCSVを見分けるため、応答の頭の件数も返す。
  * 既存の呼び出しは戻り値を使わないので、そのまま動く。
  */
-export async function downloadApiFile(path: string, fallbackFilename: string): Promise<{
+export async function downloadApiFile(path: string, fallbackFilename: string, options?: { stepUpToken?: string }): Promise<{
   totalCount: number | null
   returnedCount: number | null
   truncated: boolean
@@ -2914,7 +2914,7 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   const context = apiAccountContext(path)
   const res = await fetchWithNetworkMessage(`${API_URL}${path}`, {
     credentials: 'include',
-    headers: adminSessionHeaders(),
+    headers: { ...adminSessionHeaders(), ...(options?.stepUpToken ? { 'X-Step-Up-Token': options.stepUpToken } : {}) },
   })
   if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) {
@@ -2952,7 +2952,15 @@ export async function downloadApiFile(path: string, fallbackFilename: string): P
   try {
     const anchor = document.createElement('a')
     anchor.href = href
-    anchor.download = /\.csv$/i.test(fallbackFilename) ? csvFileName(fallbackFilename) : named ? decodeURIComponent(named) : fallbackFilename
+    const exportActor = res.headers.get('X-Exported-By') ?? ''
+    const exportedAt = res.headers.get('X-Exported-At') ?? ''
+    const stamped = /^[A-Za-z0-9_-]{1,100}$/.test(exportActor)
+      && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(exportedAt)
+      && Number.isFinite(Date.parse(exportedAt))
+    const csvName = csvFileName(fallbackFilename, stamped ? new Date(exportedAt) : undefined)
+    anchor.download = /\.csv$/i.test(fallbackFilename)
+      ? stamped ? `${csvName.slice(0, -4)}-by-${exportActor}-${exportedAt.replace(/[^0-9TZ]/g, '')}.csv` : csvName
+      : named ? decodeURIComponent(named) : fallbackFilename
     anchor.click()
   } finally {
     URL.revokeObjectURL(href)
@@ -3997,7 +4005,7 @@ export type RichMenuTapStats = {
   total: number
 }
 
-export type RichMenuGroupListItem = {
+export type RichMenuGroupListItem = Partial<import('@line-crm/shared').StyleSampleMetadata> & {
   id: string
   accountId: string
   name: string
@@ -6184,6 +6192,12 @@ export type OpsSupportDetail = {
 
 /** 大事な操作の直前再確認（V）が対象にする操作の名前。Workerの STEP_UP_PURPOSES と一致させる。 */
 export type StepUpPurpose =
+  | 'auth.api_key'
+  | 'privacy.retention'
+  | 'data.export'
+  | 'broadcast.send'
+  | 'ops.impersonation'
+  | 'secrets.reveal'
   | 'auth.mfa.policy'
   | 'auth.mfa.recovery'
   | 'auth.mfa.reenroll'
@@ -6199,6 +6213,8 @@ export type StepUpPurpose =
   | 'broadcast.approval'
   | 'webhook.api_token'
   | 'webhook.secret'
+  | 'ai.settings'
+  | 'mcp.connection'
 
 /** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。 */
 export type LineAccountTag = { id: string; name: string; color: string | null; displayOrder: number }
@@ -7361,6 +7377,7 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
+    exportResponses: (formId: string, accountId: string) => fetchApiBlob(`/api/forms/${encodeURIComponent(formId)}/exports?account_id=${encodeURIComponent(accountId)}`, { method: 'POST', accountId }),
     submission: (formId: string, submissionId: string, accountId: string) =>
       fetchApi<ApiResponse<FormSubmissionDetail>>(
         `/api/forms/${encodeURIComponent(formId)}/submissions/${encodeURIComponent(submissionId)}?account_id=${encodeURIComponent(accountId)}`,
@@ -7715,6 +7732,7 @@ export const api = {
       { method: 'POST', body: JSON.stringify(data) },
     ),
     update: (id: string, accountId: string, data: {
+      expectedRevision?: number
       filename?: string
       folderId?: string | null
       /** 既知の利用期限（YYYY-MM-DD）。null で記録を消して「不明」へ戻す。 */
@@ -7724,6 +7742,7 @@ export const api = {
     }) =>
       fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
+        headers: data.expectedRevision === undefined ? undefined : { 'If-Match': String(data.expectedRevision) },
         body: JSON.stringify(data),
       }),
     /** 削除確認を開くたびに、現在の使用先と削除可否を読み直す。 */
@@ -9785,8 +9804,8 @@ export const api = {
       ),
   },
   affiliates: {
-    list: () =>
-      fetchApi<ApiResponse<Affiliate[]>>('/api/affiliates'),
+    list: (accountId?: string) =>
+      fetchApi<ApiResponse<Affiliate[]>>('/api/affiliates' + (accountId ? `?accountId=${encodeURIComponent(accountId)}` : '')),
     get: (id: string) =>
       fetchApi<ApiResponse<Affiliate>>(`/api/affiliates/${id}`),
     // Admin-side create. Codes are auto-generated (random) — no manual `code`
@@ -12090,6 +12109,7 @@ export const api = {
       fetchApi<ApiResponse<FriendScoreDetail>>(`/api/friends/${friendId}/score`),
   },
   mileage: {
+    exportCsv: (accountId: string, kind: 'balances' | 'history' | 'rewards' | 'scores', reason: string) => fetchApiBlob('/api/mileage/exports', { method: 'POST', accountId, body: JSON.stringify({ accountId, kind, reason }) }),
     rewardFolders: (accountId: string) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>(`/api/mileage/reward-folders?accountId=${encodeURIComponent(accountId)}`),
     createRewardFolder: (accountId: string, name: string) => fetchApi<ApiResponse<{ id: string; name: string; displayOrder: number; count: number }>>('/api/mileage/reward-folders', { method: 'POST', body: JSON.stringify({ accountId, name }) }),
     reorderRewardFolders: (accountId: string, ids: string[]) => fetchApi<ApiResponse<Array<{ id: string; name: string; displayOrder: number; count: number }>>>('/api/mileage/reward-folders/order', { method: 'PUT', body: JSON.stringify({ accountId, ids }) }),
@@ -12471,14 +12491,14 @@ export const api = {
         fetchApi<ApiResponse<IncomingWebhookDetail>>(
           `/api/webhooks/incoming/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret: string } & WebhookCreateState, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; sourceType?: string; secret?: string } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
         }),
       update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string; folderId?: string | null }, stepUpToken?: string) =>
-        fetchApi<ApiResponse<IncomingWebhook>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
+        fetchApi<ApiResponse<IncomingWebhook & { secret?: string }>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
@@ -12529,7 +12549,7 @@ export const api = {
         fetchApi<ApiResponse<OutgoingWebhook>>(
           `/api/webhooks/outgoing/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
         ),
-      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number } & WebhookCreateState, stepUpToken?: string) =>
+      create: (data: { lineAccountId: string; folderId?: string | null; name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number } & WebhookCreateState, stepUpToken?: string) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
@@ -12541,7 +12561,7 @@ export const api = {
         data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string; expectedVersion?: number; folderId?: string | null },
         stepUpToken?: string,
       ) =>
-        fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
+        fetchApi<ApiResponse<OutgoingWebhook & { secret?: string }>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           body: JSON.stringify(data),
@@ -14250,6 +14270,7 @@ export interface BookingTodayResponse {
 
 /** キャンセル待ちの1件（booking-plus 2）。 */
 export interface BookingWaitlistEntry {
+  position?: number | null
   id: string;
   staff_id: string;
   menu_id: string;

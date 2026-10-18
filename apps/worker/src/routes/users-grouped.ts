@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { computeUsersGrouped, type UsersGroupedOptions } from '../services/users-grouped.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 export const usersGrouped = new Hono<Env>();
 
@@ -14,8 +15,10 @@ usersGrouped.get('/api/users-grouped', requireRole('owner', 'admin', 'staff'), a
     const pageStr = c.req.query('page');
     const pageSizeStr = c.req.query('pageSize');
     const forceRefresh = c.req.query('refresh') === '1';
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
 
     const opts: UsersGroupedOptions = {
+      allowedAccountIds: scope.allowedAccountIds,
       q: q || undefined,
       onlyDups,
       account,

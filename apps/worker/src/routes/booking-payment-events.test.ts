@@ -152,9 +152,22 @@ describe('署名済みStripe試験通知の入口',()=>{
     expect(JSON.stringify(saved())).not.toContain('secret-customer');
     expect(fetch).not.toHaveBeenCalled();
   });
-  it('部分返金を全額返金へ変えず、試験用プロバイダで全額だけを受け付ける',async()=>{
+  it('charge.succeededから署名済みの領収書だけを保存し、入金・確定を重ねない',async()=>{
+    await receive();
+    const event={id:'evt_receipt',type:'charge.succeeded',livemode:false,data:{object:{id:'ch_test',payment_intent:'pi_test_p',
+      amount:1000,currency:'jpy',receipt_url:'https://pay.stripe.com/receipts/test'}}};
+    expect((await send(event)).status).toBe(200);
+    expect(f.raw.prepare('SELECT receipt_url FROM booking_payments').get()).toEqual({receipt_url:event.data.object.receipt_url});
+    expect(f.raw.prepare("SELECT COUNT(*) n FROM booking_audit_logs WHERE action='confirmed'").get()).toEqual({n:1});
+    event.id='evt_bad_receipt';event.data.object.receipt_url='https://pay.stripe.com.evil.test/secret';
+    expect((await send(event)).status).toBe(200);
+    expect(f.raw.prepare('SELECT receipt_url FROM booking_payments').get()).toEqual({receipt_url:'https://pay.stripe.com/receipts/test'});
+  });
+  it('部分返金の累計額と全額返金の累計額を区別して受け付ける',async()=>{
     const event={id:'evt_refund',type:'charge.refunded',data:{object:{id:'ch_test',payment_intent:'pi_test_p',amount:1000,amount_refunded:500,currency:'jpy'}}};
-    expect((await send(event)).status).toBe(401);
+    f.raw.exec("UPDATE booking_payments SET status='paid'");
+    expect((await send(event)).status).toBe(200);
+    expect(f.raw.prepare('SELECT status,refunded_amount FROM booking_payments').get()).toEqual({status:'paid',refunded_amount:500});
     event.data.object.amount_refunded=1000;
     const body=JSON.stringify(event),timestamp=Math.floor(Date.now()/1000),signature=createHmac('sha256',secret).update(`${timestamp}.${body}`).digest('hex');
     expect(await createStripeTestProvider({webhookSecret:secret}).verifyWebhook(body,`t=${timestamp},v1=${signature}`)).toMatchObject({status:'refunded',providerPaymentId:'pi_test_p',amount:1000});

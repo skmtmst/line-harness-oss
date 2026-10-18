@@ -14,10 +14,13 @@
 */
 import { defineConfig, devices } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
+import { allocateTestPort } from '../../../scripts/test-port.mjs'
 
 const HERE = fileURLToPath(new URL('.', import.meta.url))
-const PORT = Number(process.env.EC_685_PORT ?? 3151)
+const PORT = await allocateTestPort(process.env.EC_685_PORT)
 const BASE = process.env.EC_685_BASE ?? `http://127.0.0.1:${PORT}`
+process.env.EC_685_PORT = String(PORT)
+process.env.EC_685_BASE = BASE
 
 export default defineConfig({
   testDir: HERE,

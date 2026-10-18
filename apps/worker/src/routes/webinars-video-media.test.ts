@@ -91,7 +91,7 @@ function put(webinarId: string, apiKey: string | null, body: Record<string, unkn
       'Content-Type': 'application/json',
       ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ expectedVersion: (sqlite.raw.prepare('SELECT version FROM webinar_editor_settings WHERE webinar_id = ?').get(webinarId) as {version:number} | undefined)?.version ?? 0, ...body }),
   }, env());
 }
 

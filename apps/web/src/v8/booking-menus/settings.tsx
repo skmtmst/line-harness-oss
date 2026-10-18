@@ -28,7 +28,14 @@ export function useBookingSettings(accountId: string | null) {
   usePageCrumbs(null)
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
-  const rawTab = searchParams.get('tab')
+  const requestedTab = searchParams.get('tab')
+  const rawTab = requestedTab === 'tickets' ? 'passes' : requestedTab
+  useEffect(() => {
+    if (requestedTab !== 'tickets') return
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', 'passes')
+    samePageUrl.replace(`?${params.toString()}`)
+  }, [requestedTab, searchParams, samePageUrl])
   const tab: V8TabKey = V8_TAB_KEYS.has(rawTab ?? '') ? (rawTab as V8TabKey) : 'menus'
   const tabRef = useRef(tab)
   tabRef.current = tab

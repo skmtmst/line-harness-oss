@@ -1,3 +1,4 @@
+import { getEcDispatchStatus, markEcDispatch } from './ec-dispatch-ledger.js';
 import { upsertEcEventReadModels } from '@line-crm/db';
 import { acquireWorkflow, runWorkflowStep, type WorkflowExecution } from './workflow-execution.js';
 import {
@@ -35,38 +36,6 @@ import { syncMemberSnapshot, type EcEvent } from '../routes/ec-integrations.js';
  */
 
 export type EcDispatchSubscriber = 'notification' | 'v6';
-
-async function getEcDispatchStatus(
-  db: D1Database, eventId: string, subscriber: EcDispatchSubscriber,
-): Promise<string | null> {
-  const row = await db.prepare(
-    `SELECT status FROM ec_v6_dispatches WHERE event_id = ? AND subscriber = ?`,
-  ).bind(eventId, subscriber).first<{ status: string }>();
-  return row?.status ?? null;
-}
-
-async function markEcDispatch(
-  db: D1Database,
-  input: {
-    eventId: string; subscriber: EcDispatchSubscriber; status: 'pending' | 'sent' | 'failed';
-    error?: string | null; idempotencyKey: string; now: string;
-  },
-): Promise<void> {
-  await db.prepare(
-    `INSERT INTO ec_v6_dispatches
-       (event_id, subscriber, status, attempt_count, last_error, idempotency_key, updated_at)
-     VALUES (?, ?, ?, 1, ?, ?, ?)
-     ON CONFLICT(event_id, subscriber) DO UPDATE SET
-       status = excluded.status,
-       attempt_count = ec_v6_dispatches.attempt_count + 1,
-       last_error = excluded.last_error,
-       idempotency_key = excluded.idempotency_key,
-       updated_at = excluded.updated_at`,
-  ).bind(
-    input.eventId, input.subscriber, input.status,
-    input.error ?? null, input.idempotencyKey, input.now,
-  ).run();
-}
 
 /**
  * V6へ1回分の連携を行い、購読台帳へ結果を残す。V6側の失敗は台帳へ
@@ -126,10 +95,25 @@ export async function processEcEvent(
     eventRowId: string;
     now: string;
     credentialKey?: string;
+    identityRecovery?: 'analytics_snapshot'|'non_delivery_actions';
   },
 ): Promise<EcEventOutcome> {
   const { account, lineAccountId, event, now, credentialKey } = input;
   const row = { id: input.eventRowId };
+  const connector = await db.prepare('SELECT status,event_types_json FROM ec_connectors WHERE line_account_id=?').bind(lineAccountId).first<{status:string;event_types_json:string}>();
+  if (connector && (connector.status==='paused' || !(JSON.parse(connector.event_types_json) as string[]).includes(event.event_type))) {
+    await db.prepare("UPDATE ec_events SET status='skipped',error_message=?,updated_at=? WHERE id=? AND status IN ('received','failed')").bind(connector.status==='paused'?'connector_paused':'event_not_subscribed',now,row.id).run();
+    await setEcActionExecutionStatus(db,{eventId:row.id,lineAccountId,status:'skipped',errorCode:connector.status==='paused'?'connector_paused':'event_not_subscribed',now});
+    return 'skipped';
+  }
+  // Explicit links are scoped by source, shop and account; an event's customer id alone is never global.
+  if(event.customer_id!=null) {
+    const linked = await db.prepare(`SELECT f.line_user_id FROM ec_identity_links l JOIN friends f ON f.id=l.friend_id AND f.line_account_id=l.line_account_id
+      JOIN ec_connectors c ON c.line_account_id=l.line_account_id AND c.shop_domain=l.shop_key
+      WHERE l.line_account_id=? AND l.external_customer_id=? AND l.source_key=(SELECT source FROM ec_events WHERE id=?) AND l.unlinked_at IS NULL`).bind(lineAccountId,String(event.customer_id),row.id).first<{line_user_id:string}>();
+    if(linked) event.line_user_id=linked.line_user_id;
+  }
+
   const claim = await db.prepare(
     `UPDATE ec_events SET status = 'processing', error_message = NULL, updated_at = ?
      WHERE id = ? AND status IN ('received', 'failed')`,
@@ -137,9 +121,9 @@ export async function processEcEvent(
   if (!claim.meta.changes) return 'duplicate';
 
   // W11-B adds checkpoints after A's existing event/version claim. It never reclaims event ownership.
-  const execution=await acquireWorkflow(db,{scopeId:`line:${lineAccountId}`,processKind:'ec_event',subjectId:row.id},{maxAttempts:50});
+  const execution=await acquireWorkflow(db,{scopeId:`line:${lineAccountId}`,processKind:input.identityRecovery?'ec_identity_recovery':'ec_event',subjectId:row.id},{maxAttempts:50});
   if(!execution) {
-    const done=await getWorkflowStep(db,{scopeId:`line:${lineAccountId}`,processKind:'ec_event',subjectId:row.id,stepKey:'__run'});
+    const done=await getWorkflowStep(db,{scopeId:`line:${lineAccountId}`,processKind:input.identityRecovery?'ec_identity_recovery':'ec_event',subjectId:row.id,stepKey:'__run'});
     if(done?.status==='succeeded') {
       if(await getEcDispatchStatus(db,row.id,'notification')==='sent' && event.line_user_id){
         const friend=await getFriendByLineUserIdForAccount(db,event.line_user_id,lineAccountId);
@@ -158,6 +142,7 @@ export async function processEcEvent(
   try {
     // Receipt replay and cron recovery share this checkpoint. Display data must
     // exist before the event can report success, even if the first receipt failed.
+    if(event.customer_id!=null) await (await import('./ec-identity-recovery.js')).detectEcIdentityCandidates(db,row.id,event,lineAccountId);
     await execution.step('read_models', async () => {
       const source = await execution.db.prepare('SELECT source FROM ec_events WHERE id=?').bind(row.id).first<{source:string}>();
       await upsertEcEventReadModels(execution.db, {
@@ -248,8 +233,14 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
     const accessToken = account.channel_access_token;
     if (!accessToken) throw new Error('LINE access token is not configured');
 
+    if(input.identityRecovery==='analytics_snapshot') {
+      await attachEcOrderFriend(db,{eventId:row.id,lineAccountId,friendId:friend.id,now});
+      await db.prepare("UPDATE ec_events SET status='processed',friend_id=?,processed_at=?,updated_at=? WHERE id=?").bind(friend.id,now,now,row.id).run();
+      await setEcActionExecutionStatus(db,{eventId:row.id,lineAccountId,status:'succeeded',now});
+      return 'processed';
+    }
     await execution.step('member_snapshot',()=>syncMemberSnapshot(execution.mutationDb('member_snapshot'),friend.id,event,now));
-    await execution.step('member_tags',()=>syncNenEcTags(execution.mutationDb('member_tags'),friend.id));
+    await execution.step('member_tags',()=>syncNenEcTags(execution.mutationDb('member_tags'),friend.id,new Date(now),input.identityRecovery?`ec-history:${lineAccountId}:${event.event_id}`:undefined));
 
     // 注文の確定を成果計測へ接続する(#648)。「注文が確定した」を起点に選んだ
     // 地点は、ここを通らないと 0 件のままになる。
@@ -293,6 +284,11 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
       }
     }
 
+    if(input.identityRecovery) {
+      await db.prepare("UPDATE ec_events SET status='processed',friend_id=?,processed_at=?,updated_at=? WHERE id=?").bind(friend.id,now,now,row.id).run();
+      await setEcActionExecutionStatus(db,{eventId:row.id,lineAccountId,status:'succeeded',now});
+      return 'processed';
+    }
     if (event.event_type === 'ec.customer.profile_updated') {
       const { syncNenPetProfiles } = await import('./nen-engagement.js');
       await execution.step('pet_profiles',()=>syncNenPetProfiles(execution.mutationDb('pet_profiles'),event,friend.id));

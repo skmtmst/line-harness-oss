@@ -9,7 +9,6 @@ import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
 import { Activity, BellRing, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
-import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
@@ -155,7 +154,6 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    * 設定の中のメニュー）。出し分けの決まりは左のメニューと同じ。
    */
   const itemVisible = (item: MenuItem): boolean => {
-    if ((item.href === '/settings/booking-media' || item.href === '/settings/delivery') && !restaurantTestUiEnabled()) return false
     if ((item.href === '/staff' || item.href === '/settings/customer-look') && staffRole !== 'owner' && staffRole !== 'admin') return false
     if (item.href === '/accounts' && staffRole === 'staff') return false
     const permissionKey = item.permissionKey ?? item.href

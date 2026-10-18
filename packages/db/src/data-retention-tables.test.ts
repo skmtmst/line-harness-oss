@@ -140,6 +140,41 @@ describe('削除する行を選ぶ条件', () => {
     }
   });
 
+  it('公開受信の記録は種類と統括を両方照合し、両方の親より先に消す', () => {
+    sqlite.exec('SAVEPOINT ingress_retention');
+    try {
+      sqlite.exec(`
+        INSERT INTO tenants(id,name) VALUES('ingress-a','A'),('ingress-b','B');
+        INSERT INTO line_accounts(id,tenant_id,name,channel_id,channel_access_token,channel_secret)
+          VALUES('ingress-account-a','ingress-a','A','ingress-channel-a','test','test'),
+                ('ingress-account-b','ingress-b','B','ingress-channel-b','test','test');
+        INSERT INTO conversion_points(id,name,event_type,tenant_id)
+          VALUES('ingress-point-a','A','manual','ingress-a'),('ingress-point-b','B','manual','ingress-b');
+        INSERT INTO measurement_sites(id,line_account_id,label)
+          VALUES('ingress-point-b','ingress-account-a','A'),('ingress-point-a','ingress-account-b','B');
+        INSERT INTO public_ingress_receipts(kind,scope_id,receipt_key,received_at)
+          VALUES('conversion_nonce','ingress-point-a','one','2026-10-16'),
+                ('conversion_nonce','ingress-point-b','two','2026-10-16'),
+                ('site_event','ingress-point-b','three','2026-10-16'),
+                ('site_event','ingress-point-a','four','2026-10-16');
+      `);
+      const predicate = tenantScopeCondition('public_ingress_receipts');
+      sqlite.prepare(`DELETE FROM public_ingress_receipts WHERE ${predicate}`).run('ingress-a');
+      expect(sqlite.prepare('SELECT kind,scope_id FROM public_ingress_receipts ORDER BY kind').all()).toEqual([
+        { kind: 'conversion_nonce', scope_id: 'ingress-point-b' },
+        { kind: 'site_event', scope_id: 'ingress-point-a' },
+      ]);
+      const order = purgeTablesChildFirst();
+      for (const parent of ['conversion_points', 'measurement_sites', 'line_accounts']) {
+        expect(order.indexOf('public_ingress_receipts')).toBeLessThan(order.indexOf(parent));
+      }
+      expect(order.indexOf('incoming_webhook_queue')).toBeLessThan(order.indexOf('incoming_webhooks'));
+      expect(order.indexOf('operator_notification_occurrences')).toBeLessThan(order.indexOf('notification_instances'));
+    } finally {
+      sqlite.exec('ROLLBACK TO ingress_retention; RELEASE ingress_retention');
+    }
+  });
+
   it('子の表が親より先に消される順番で返る', () => {
     const order = purgeTablesChildFirst();
     const position = new Map(order.map((name, index) => [name, index]));

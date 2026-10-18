@@ -673,13 +673,13 @@ export const FORM_THEME_MIN_CONTRAST = 4.5;
  *
  * P（回答フォームの読みにくい色）：お客さま画面は文字（text）を背景（sub）
  * の上に置く（`apps/liff/src/pages/Form.tsx`・`form-preview.tsx`）。この2色の
- * 差が 4.5:1 未満なら保存できない。測った比を文に入れて返す。問題なければ null。
+ * 差が 4.5:1 未満なら注意を返す。保存・公開は妨げない。問題なければ null。
  */
 export function formThemeContrastError(theme: FormTheme): string | null {
   const ratio = contrastRatio(theme.text, theme.sub);
   if (ratio >= FORM_THEME_MIN_CONTRAST) return null;
   const shown = Math.floor(ratio * 10) / 10;
-  return `文字と背景の色の組み合わせが読みにくいため保存できません（いま ${shown}:1、4.5:1以上が必要です）。文字か背景の色を変えてください`;
+  return `文字と背景の色が近く、読みづらい可能性があります（いま ${shown}:1、4.5:1以上を推奨します）。文字か背景の色を変えると読みやすくなります`;
 }
 
 /** 主ボタンの背景に対して、4.5:1以上を優先して読みやすい文字色を返す。 */
@@ -1543,8 +1543,7 @@ export function validateFormForPublish(layout: FormLayout): string | null {
     validateFormActionsReady(layout) ??
     validateFormBranchGraph(layout) ??
     validateFormDefaultValues(layout) ??
-    validateFormBookingReady(layout) ??
-    (layout.options.customerDesign && (layout.options.customerDesign.mode === 'account' || layout.options.customerDesign.preset !== 'custom') ? null : formThemeContrastError(normalizeFormTheme(layout.options?.theme)))
+    validateFormBookingReady(layout)
   );
 }
 

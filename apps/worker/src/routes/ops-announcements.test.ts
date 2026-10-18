@@ -9,7 +9,7 @@ vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.send }));
 const line = vi.hoisted(() => ({ pushMessage: vi.fn(async (_to: string, _messages: unknown[]) => ({})), replyMessage: vi.fn(async () => ({})) }));
 vi.mock('@line-crm/line-sdk', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/line-sdk')>('@line-crm/line-sdk');
-  return { ...actual, LineClient: vi.fn().mockImplementation(() => line) };
+  return { ...actual, LineClient: vi.fn().mockImplementation(function () { return line; }) };
 });
 
 const { opsAnnouncements } = await import('./ops-announcements.js');

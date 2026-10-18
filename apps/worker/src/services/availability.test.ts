@@ -199,6 +199,7 @@ function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>):
             };
           }
           if (sql.includes('FROM menus')) return data.menu ?? null;
+          if (sql.includes('FROM booking_calendar_switches')) return data.calendarConnection ? { read_enabled: 1, write_enabled: 0, version: 1 } : null;
           if (sql.includes('FROM google_calendar_connections')) return data.calendarConnection ?? null;
           return null;
         },
@@ -384,7 +385,7 @@ describe('getAvailability', () => {
 
   test('Googleカレンダーのbusy時間を予約候補から除外する', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy: [{ start: '2026-05-09T02:00:00Z', end: '2026-05-09T03:00:00Z' }] } },
+      items: [{ start: '2026-05-09T02:00:00Z', end: '2026-05-09T03:00:00Z' }].map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     try {
       const db = stubDB({
@@ -1254,7 +1255,7 @@ describe('getAvailability のタイムゾーン（非JST）', () => {
 
   test('Google 予定は店舗TZの日へ落とす（New York）', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy: [{ start: '2026-05-09T14:00:00Z', end: '2026-05-09T15:00:00Z' }] } },
+      items: [{ start: '2026-05-09T14:00:00Z', end: '2026-05-09T15:00:00Z' }].map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     try {
       const db = stubDB({
@@ -1306,7 +1307,7 @@ describe('getAvailability の夏時間切替日（New York）', () => {
 
   function googleDb(busy: Array<{ start: string; end: string }>, extra: Partial<StubData> = {}) {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy } },
+      items: busy.map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     return stubDB({
       menu: MENU_60_HOURLY,
@@ -1410,7 +1411,7 @@ describe('getAvailability の夏時間切替日（New York）', () => {
   test('fold を跨ぐ Google 予定は instant で塞ぐ（壁 01:30→01:30 でも消えない）', async () => {
     // 05:30Z-06:30Z = 壁 01:30(EDT)→01:30(EST)。壁だけ見ると長さ 0 で消える。
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      calendars: { 'cal@example.com': { busy: [{ start: '2026-11-01T05:30:00Z', end: '2026-11-01T06:30:00Z' }] } },
+      items: [{ start: '2026-11-01T05:30:00Z', end: '2026-11-01T06:30:00Z' }].map((entry,index)=>({id:'external-'+index,start:{dateTime:entry.start},end:{dateTime:entry.end}})),
     }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
     try {
       const db = stubDB({

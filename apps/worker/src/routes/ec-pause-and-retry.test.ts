@@ -23,7 +23,7 @@ vi.mock('@line-crm/line-sdk', () => {
   const pushMessageWithRequestId = vi.fn().mockResolvedValue({ ok: true, requestId: 'req-1' });
   const replyMessageWithRequestId = vi.fn().mockResolvedValue({ ok: true });
   return {
-    LineClient: vi.fn().mockImplementation(() => ({ pushMessage, pushMessageWithRequestId, replyMessageWithRequestId })),
+    LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage, pushMessageWithRequestId, replyMessageWithRequestId }); }),
     __pushMessage: pushMessageWithRequestId,
   };
 });
@@ -66,6 +66,7 @@ beforeEach(() => {
     INSERT INTO ec_connectors (id, line_account_id, provider, shop_domain, status, version, created_at, updated_at)
     VALUES ('connector-1', 'account-a', 'ec_cube', 'shop.example.com', 'connected', 1, '${NOW_JST}', '${NOW_JST}');
   `);
+  db.raw.prepare("UPDATE ec_connectors SET event_types_json='[\"ec.order.confirmed\"]'").run();
 });
 afterEach(() => { db.raw.close(); });
 

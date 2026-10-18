@@ -158,7 +158,7 @@ it('決済をつないでいない店は、お支払いの段を押せない形�
   render(<MenuFormV8 />)
   await settle()
   expect(await screen.findByRole('link', { name: /お支払いをつなぐ/ })).toBeTruthy()
-  expect(screen.queryByRole('radio', { name: /いつもの方法を使う/ })).toBeNull()
+  expect(screen.queryByRole('radio', { name: /いつもの方法/ })).toBeNull()
   net.paymentMode = 'online'
 })
 
@@ -202,12 +202,11 @@ it('メニュー固有ルールの操作と支払いは共通の部品で、選�
   fireEvent.click(screen.getByRole('button', { name: 'お店のきまりに戻す', exact: true }))
   expect(screen.queryByRole('spinbutton', { name: '受付の締め切り（時間前）' })).toBeNull()
   expect(screen.getByRole('heading', { name: /^お支払い/ }).closest('[data-design-node="t0jk8p"]')).toBeTruthy()
-  // 絵 mauOC・QqER7（B-305）：決済がつながっている店は「いつもの方法を使う／このメニューだけ変える」を選べる。
-  const usual = await screen.findByRole('radio', { name: /いつもの方法を使う/ }) as HTMLInputElement
+  // 絵 CnV1I（B1）：決済がつながっている店は「いつもの方法／先払い／お店で払う／デポジット（一部）」の 4 つから選ぶ。
+  const usual = await screen.findByRole('radio', { name: /いつもの方法/ }) as HTMLInputElement
   expect(usual.checked).toBe(true)
-  expect(screen.queryByRole('radio', { name: 'お客さまが選ぶ' })).toBeNull()
-  fireEvent.click(screen.getByRole('radio', { name: /このメニューだけ変える/ }))
-  expect((screen.getByRole('radio', { name: 'お店で払う' }) as HTMLInputElement).checked).toBe(true)
-  expect(screen.getByRole('radio', { name: 'オンラインで先払い' })).toBeTruthy()
-  expect(screen.getByRole('radio', { name: 'お客さまが選ぶ' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('radio', { name: /お店で払う/ }))
+  expect((screen.getByRole('radio', { name: /お店で払う/ }) as HTMLInputElement).checked).toBe(true)
+  expect(screen.getByRole('radio', { name: /先払い/ })).toBeTruthy()
+  expect(screen.getByRole('radio', { name: /デポジット/ })).toBeTruthy()
 })

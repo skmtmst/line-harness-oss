@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -25,19 +26,17 @@ describe('予約メール原文の環境分離', () => {
     expect(staging).toMatch(/^RESTAURANT_INTAKE_DOMAIN = "rs\.musubo\.jp"$/m);
   });
 
-  // Googleの機密スコープ審査（デモ動画と実運用）のため、飲食店向けは両環境で有効。
-  // ここで守るのは「APIと画面のフラグがずれていないこと」。片方だけ有効だと
-  // 画面はあるのにAPIが404、またはAPIはあるのに画面が無い状態になる。
-  it('飲食店向けのフラグはAPIと管理画面で同じ値にする', () => {
+  it('設定がtrueでも本番は閉じ、検証だけAPIと画面のフラグが有効になる', () => {
     const repoRoot = join(workerRoot, '../..');
     const production = readFileSync(join(workerRoot, 'wrangler.toml'), 'utf8');
     const staging = readFileSync(join(workerRoot, 'wrangler.staging.toml'), 'utf8');
-    const adminWorkflow = readFileSync(join(repoRoot, '.github/workflows/deploy-cloudflare-admin.yml'), 'utf8');
     const stagingWorkflow = readFileSync(join(repoRoot, '.github/workflows/deploy-cloudflare-staging.yml'), 'utf8');
-
-    expect(production).toMatch(/^RESTAURANT_TEST_ENABLED = "true"$/m);
-    expect(staging).toMatch(/^RESTAURANT_TEST_ENABLED = "true"$/m);
-    expect(adminWorkflow).toMatch(/^\s*NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'$/m);
+    const configured = (source: string) => ({
+      DEPLOY_ENV: source.match(/^DEPLOY_ENV = "([^"]+)"$/m)?.[1],
+      RESTAURANT_TEST_ENABLED: source.match(/^RESTAURANT_TEST_ENABLED = "([^"]+)"$/m)?.[1],
+    });
+    expect(restaurantTestEnabled(configured(production))).toBe(false);
+    expect(restaurantTestEnabled(configured(staging))).toBe(true);
     expect(stagingWorkflow).toMatch(/^\s*NEXT_PUBLIC_RESTAURANT_TEST_ENABLED: 'true'$/m);
   });
 

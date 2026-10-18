@@ -1,0 +1,3 @@
+'use client'
+
+export { default } from '@/v8/hq-store-compare/list'

@@ -1,6 +1,13 @@
 import type { StyleBooking } from '@line-crm/shared';
 
-import { DAY, instant, cancelled, eligible, countMetric, ratio } from './style-analytics-core.js';
+import {
+  DAY,
+  instant,
+  cancelled,
+  eligible,
+  countMetric,
+  ratio,
+} from './style-analytics-core.js';
 export function personMetrics(
   rows: StyleBooking[],
   from: number,
@@ -8,6 +15,13 @@ export function personMetrics(
   now: number,
   settings: Record<string, number> = {},
 ) {
+  // Daily comparisons call this for many periods. Index a customer's records once per call.
+  const byPerson = new Map<string, StyleBooking[]>();
+  for (const row of rows) {
+    const group = byPerson.get(row.personKey);
+    if (group) group.push(row);
+    else byPerson.set(row.personKey, [row]);
+  }
   const histories = new Map<string, StyleBooking[]>();
   for (const r of rows.filter(
     (r) => r.visited && !cancelled(r) && instant(r.startsAt) < now,
@@ -42,13 +56,15 @@ export function personMetrics(
         2
       : null;
     const last = history.at(-1)!;
-    const future = rows.find(
-      (r) =>
-        r.personKey === key &&
-        eligible(r) &&
-        r.status !== 'no_show' &&
-        instant(r.startsAt) >= now,
-    );
+    const future = byPerson
+      .get(key)!
+      .find(
+        (r) =>
+          r.personKey === key &&
+          eligible(r) &&
+          r.status !== 'no_show' &&
+          instant(r.startsAt) >= now,
+      );
     const isRecall =
       now - instant(last.startsAt) >
         (median === null
@@ -85,17 +101,19 @@ export function personMetrics(
     )) {
       visits++;
       if (
-        rows.some(
-          (r) =>
-            r.personKey === key &&
-            r.id !== visit.id &&
-            eligible(r) &&
-            instant(r.startsAt) > instant(visit.endsAt) &&
-            instant(r.requestedAt) >= instant(visit.endsAt) &&
-            instant(r.requestedAt) <=
-              instant(visit.endsAt) +
-                (settings.nextBookingHours ?? 24) * 3600000,
-        )
+        byPerson
+          .get(key)!
+          .some(
+            (r) =>
+              r.personKey === key &&
+              (r.kind !== visit.kind || r.id !== visit.id) &&
+              eligible(r) &&
+              instant(r.startsAt) > instant(visit.endsAt) &&
+              instant(r.requestedAt) >= instant(visit.endsAt) &&
+              instant(r.requestedAt) <=
+                instant(visit.endsAt) +
+                  (settings.nextBookingHours ?? 24) * 3600000,
+          )
       )
         next++;
     }

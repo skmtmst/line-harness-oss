@@ -55,6 +55,25 @@ async function member(lineUserId: string) {
 }
 
 describe('GET /api/liff/nen/member membership', () => {
+  it.each(['suspended', 'archived', 'inactive', 'missing-tenant'])('S15 %s membership owner is rejected even without an account or LIFF query', async state => {
+    sql.exec("INSERT INTO tenants(id,name,status) VALUES ('fixture-tenant','Fixture','active'); UPDATE line_accounts SET tenant_id='fixture-tenant' WHERE id='account-nen'");
+    if (state === 'inactive') sql.exec("UPDATE line_accounts SET is_active=0 WHERE id='account-nen'");
+    else if (state === 'missing-tenant') sql.exec("UPDATE line_accounts SET tenant_id='missing' WHERE id='account-nen'");
+    else sql.prepare("UPDATE tenants SET status=? WHERE id='fixture-tenant'").run(state);
+    const target = app('U-a');
+    for (const [method, path] of [
+      ['GET','/api/liff/nen/member'], ['POST','/api/liff/nen/pets'], ['PUT','/api/liff/nen/pets/fixture'],
+      ['POST','/api/liff/nen/pets/fixture/photo'], ['POST','/api/liff/nen/health-logs'],
+      ['GET','/api/liff/nen/health-logs'], ['GET','/api/liff/nen/health-logs/summary'],
+      ['POST','/api/liff/nen/photos'], ['PUT','/api/liff/nen/photos/fixture/publication-consent'],
+    ]) {
+      const response = await target.request(path, { method, headers: { Authorization: 'Bearer fixture', 'Content-Type': 'application/json' },
+        ...(method === 'GET' ? {} : { body: JSON.stringify({ petId: 'fixture', data: 'fixture', mimeType: 'image/jpeg', caption: 'fixture', consent: false, consentVersion: 'fixture', showPetName: false }) }) });
+      expect(response.status, `${method} ${path}`).toBe(401);
+      expect(JSON.stringify(await response.json())).not.toContain('membership');
+    }
+  });
+
   it('ECからランクが届いている友だちはその値を返す', async () => {
     const body = await member('U-a');
     expect(body.data.membership).toMatchObject({
@@ -75,4 +94,16 @@ describe('GET /api/liff/nen/member membership', () => {
     const body = await member('U-c');
     expect(body.data.membership).toMatchObject({ rankKey: 'regular', rankName: 'レギュラー', annualMilesYen: 0, lifetimeMilesYen: 0, mileBalance: 0, next: { name: 'シルバー' } });
   });
+  it('B-333 写真の同意と実際のサイト掲載を分け、採用点を返す',async()=>{
+    sql.prepare("INSERT INTO nen_pet_profiles(id,friend_id,name,created_at,updated_at) VALUES('p','friend-a','犬','2026-01-01','2026-01-01')").run();
+    sql.prepare(`INSERT INTO nen_photo_submissions(id,friend_id,pet_id,r2_key,image_url,content_type,status,awarded_points,publication_consent_at,created_at,updated_at,line_account_id)
+      VALUES('photo','friend-a','p','photo.jpg','https://image.test/photo.jpg','image/jpeg','adopted',100,'2026-01-01','2026-01-01','2026-01-01','account-nen')`).run();
+    expect((await member('U-a')).data.photos[0]).toMatchObject({awardedPoints:100,publicationConsent:true,publicationStatus:'unpublished',sitePublished:false});
+    sql.prepare("INSERT INTO nen_photo_publications(id,photo_id,line_account_id,status,published_at,updated_at) VALUES('pub','photo','account-nen','published','2026-01-01','2026-01-01')").run();
+    sql.prepare("INSERT INTO nen_photo_publication_placements(id,publication_id,line_account_id,placement_type,placement_label,created_at) VALUES('place','pub','account-nen','site','サイト','2026-01-01')").run();
+    expect((await member('U-a')).data.photos[0]).toMatchObject({publicationStatus:'published',sitePublished:true});
+    sql.prepare("UPDATE nen_photo_publications SET status='withdrawn'").run();
+    expect((await member('U-a')).data.photos[0]).toMatchObject({publicationConsent:true,publicationStatus:'withdrawn',sitePublished:false});
+  });
+
 });

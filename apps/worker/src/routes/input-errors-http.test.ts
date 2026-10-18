@@ -153,8 +153,13 @@ describe('配信の編集権限と欄ごとの入力検査を両方残す', () =
     actor = { ...actor, role: 'staff', permissionKeys: keys };
     fixture.raw.prepare("UPDATE staff_members SET role='staff',permission_keys=? WHERE id='owner'").run(JSON.stringify(keys));
     const invalid = await request(path, body);
-    expect(invalid.status).toBe(400);
-    expect(await invalid.json()).toMatchObject({ fields: { [field]: expect.any(String) } });
+    if (path === '/api/rich-menu-groups') {
+      expect(invalid.status).toBe(403);
+      expect(await invalid.json()).toMatchObject({ error: expect.any(String) });
+    } else {
+      expect(invalid.status).toBe(400);
+      expect(await invalid.json()).toMatchObject({ fields: { [field]: expect.any(String) } });
+    }
     actor = { ...actor, permissionKeys: [], viewPermissionKeys: keys };
     expect((await request(path, { ...body, name: '作成不可', triggerType: 'manual', messageType: 'text', messageContent: '本文', chatBarText: '開く', size: 'large' })).status).toBe(403);
     for (const table of ['templates', 'scenarios', 'rich_menu_groups', 'forms']) {

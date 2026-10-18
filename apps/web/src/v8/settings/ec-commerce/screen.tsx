@@ -36,6 +36,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import EcConnector from './connector'
 import EcSubscriptions from './subscriptions'
+import EcAutoLine from '../../ec-auto-line/auto-line'
 import { Tabs } from '@/components/shared/tabs'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
@@ -48,12 +49,13 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /** 出来事ごとの取り込みを表示し、再実行時も版と対象アカウントを保持する。 */
 
-export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'connector'
+export type EcTabKey = 'events' | 'identity' | 'subscriptions' | 'auto-line' | 'connector'
 
 const TABS: ReadonlyArray<{ key: EcTabKey; label: string; href: string }> = [
   { key: 'events', label: '取り込みの記録', href: '/ec-commerce' },
   { key: 'identity', label: '会員のつき合わせ', href: '/ec-commerce/identity-candidates' },
   { key: 'subscriptions', label: '定期便', href: '/ec-commerce?tab=subscriptions' },
+  { key: 'auto-line', label: '自動の LINE', href: '/ec-commerce?tab=auto-line' },
   { key: 'connector', label: 'つなぎ先', href: '/ec-commerce?tab=connector' },
 ]
 
@@ -508,7 +510,7 @@ export function EcTabsV8({ accountId, active, actions }: { accountId: string | n
   }, [accountId])
   return (
     <Tabs size="settings" actions={actions} label="EC連携の中の切り替え" items={TABS.map((tab) => {
-      const count = tab.key === 'connector' || tab.key === 'subscriptions' ? undefined : counts[tab.key]
+      const count = tab.key === 'connector' || tab.key === 'subscriptions' || tab.key === 'auto-line' ? undefined : counts[tab.key]
       return { label: count === undefined ? tab.label : `${tab.label} ${formatNumber(count)}`, href: tab.href, current: active === tab.key }
     })} />
   )
@@ -527,7 +529,7 @@ export default function EcCommerceScreen({
   const actions = <Button href="/ec-commerce?tab=connector" variant="secondary"><Plug className={styles.btnIcon} aria-hidden="true" />つなぎ先の設定</Button>
   return (
     <SbSettingsScreen
-      boardId={tab === 'subscriptions' ? 'wqC8x' : tab === 'connector' ? 'iLJmw' : 'GmVR5'}
+      boardId={tab === 'subscriptions' ? 'wqC8x' : tab === 'connector' ? 'iLJmw' : tab === 'auto-line' ? 'TSRlY' : 'GmVR5'}
       layout="narrow-nav"
       contentLayout="wide"
       title="EC連携"
@@ -537,6 +539,7 @@ export default function EcCommerceScreen({
       <EcTabsV8 accountId={selectedAccountId} active={tab} />
       {tab === 'events' ? <EventsPanel accountId={selectedAccountId} canEdit={canEdit} /> : null}
       {tab === 'subscriptions' ? <EcSubscriptions accountId={selectedAccountId} canEdit={canEdit} /> : null}
+      {tab === 'auto-line' ? <EcAutoLine accountId={selectedAccountId} canEdit={canEdit} /> : null}
       {tab === 'connector' ? (renderConnector ? renderConnector(selectedAccountId, canEdit) : <EcConnector accountId={selectedAccountId} canEdit={canEdit} />) : null}
     </SbSettingsScreen>
   )

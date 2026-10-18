@@ -1,19 +1,19 @@
 'use client'
-import CopyTextButton from '@/components/shared/copy-text-button'
+
+import CopyTextButton from '@/components/shared/copy-text-button';
 import { notifySaved } from '@/components/shared/toast';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation';
 import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react';
-import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, normalizeFormTheme, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
+import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
 import { CreatePage } from '@/components/templates';
-import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import Notice from '@/components/shared/notice'
+import Button from '@/components/shared/button';
+import Dialog from '@/components/shared/dialog';
+import Notice from '@/components/shared/notice';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
-import ListState from '@/components/shared/list-state'
-import TargetMissing from '@/components/shared/target-missing'
+import ListState from '@/components/shared/list-state';
+import TargetMissing from '@/components/shared/target-missing';
 import { Tabs } from '@/components/shared/tabs';
 import { classifyApiFailure, describeApiFailure } from '@/components/shared/api-error-message';
 import { validateFormLayoutForSave } from '@/components/forms/form-definition-validation';
@@ -39,42 +39,13 @@ import { FormEditAttemptContext } from './field-issues';
 import { focusFieldById } from '@/lib/use-form-errors';
 import { useCustomerLook } from '@/components/shared/use-customer-look';
 import { FormPhone } from './phone';
-import styles from './edit.module.css'
+import styles from './edit.module.css';
+import { routingError, routingOf, withRouting, type FormRouting } from './routing-model';
 import { formatNumber as polishFormatNumber } from '@/lib/format';
-import TextLink from '@/components/shared/text-link'
+import TextLink from '@/components/shared/text-link';
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
-
-/*
- * 回答フォームの編集（★V8）。板：中身 m1cWEy・1152 ITBAB・予約を入れるブロック ijxur・
- * 答え終わったあと XXFT4・受付と見た目 tpRRT・競合 J1pdB・この版を公開 Z9wXm。
- *
- * 作る型（CreatePage）に、上の3つのタブ・左の段・右の「回答用URL」と
- * 「お客さまに見える形」（スマホ）を載せる。データの読み書き・保存・公開・
- * 競合・試しのURLは今までの画面（app/form-submissions/edit/page.tsx）と同じ。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
-
-const TAB_ITEMS: { key: EditTab; label: string }[] = [
-  { key: 'content', label: '中身' },
-  { key: 'after', label: '答え終わったあと' },
-  { key: 'appearance', label: '受付と見た目' },
-]
-
-/** 板の印（撮影と見比べのため）。1152 は ITBAB。 */
-const TAB_NODE: Record<EditTab, string> = { content: 'm1cWEy', after: 'XXFT4', appearance: 'tpRRT' }
-
-type Snapshot = {
-  name: string
-  description: string
-  isActive: boolean
-  onSubmitTagId: string
-  ogTitle: string
-  ogDescription: string
-  ogImageUrl: string
-  layout: FormLayout
-}
-
+import ReadOnlyNotice from '@/components/shared/read-only-notice';
+import { TAB_ITEMS, TAB_NODE, type Snapshot } from "./edit-gap-parts"
 function FormEditInner({ host }: { host?: FormEditHost }) {
   const saveErrors = useSaveFormErrors()
   const params = useSearchParams()
@@ -472,6 +443,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   const inputCount = layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input').length, layout.header.filter((b) => b.kind === 'input').length)
 
+  const patchRouting = (next: FormRouting) => setLayout((prev) => withRouting(prev, next))
   const patchOptions = (next: Partial<FormOptions>) => setLayout((prev) => ({ ...prev, options: { ...prev.options, ...next } }))
 
   /* ---------------- 未保存の確認 ---------------- */
@@ -542,6 +514,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (dup) return { message: '回答キーが重なっています。複製した入力欄を確認してください' }
     const layoutError = validateFormLayoutForSave(layout)
     if (layoutError) return { message: layoutError }
+    const routingProblem = routingError(routingOf(layout))
+    if (routingProblem) return { message: routingProblem.message }
     const ogImageError = ogImageUrlError(ogImageUrl)
     if (ogImageError) return { message: ogImageError, tab: 'appearance', target: 'fe-og-image', inline: true }
     // 文字と背景の差が 4.5:1 未満の組み合わせは保存できない（保存APIも同じ検査をする）。
@@ -945,6 +919,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             onMoveBlock={moveBlock}
             onDuplicateBlock={duplicateBlock}
             onRemoveBlock={removeBlock}
+            routing={routingOf(layout)}
+            onChangeRouting={host ? undefined : patchRouting}
           />
         ) : editTab === 'after' ? (
           <AfterTab readOnly={!canEdit} options={layout.options} refs={refs} onSubmitTagId={onSubmitTagId} onChangeOptions={patchOptions} onChangeSubmitTag={setOnSubmitTagId} />

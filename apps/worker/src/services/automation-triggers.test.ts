@@ -67,7 +67,7 @@ function addAutomation(
 
 describe('V6オートメーションのきっかけ接続', () => {
   let testDb: SqliteD1;
-  let record: ReturnType<typeof vi.fn>;
+  let record: ReturnType<typeof vi.fn<AutomationActionExecutor>>;
   let executors: Record<string, AutomationActionExecutor>;
 
   beforeEach(() => {
@@ -330,6 +330,16 @@ describe('V6オートメーションのきっかけ接続', () => {
     expect(await processScheduledAutomationTriggers(testDb.db, { now: NOW, executors }))
       .toMatchObject({ due: 1, results: [{ automationId: 'due-last', kind: 'created' }] });
     expect(record).toHaveBeenCalledTimes(1);
+  });
+
+  it('B-333 各100人の2ルールを同じ回で起動し、先のルールで後を落とさない',async()=>{
+    const ids=Array.from({length:100},(_,i)=>`batch-${i}`);
+    for(const id of ids) addFriend(testDb.raw,id,'account-1');
+    for(const id of ['first','second']) addAutomation(testDb.raw,{id,triggerType:'datetime',triggerConfig:{at:'2026-08-26T00:00:00Z',friendIds:ids}});
+    const result=await processScheduledAutomationTriggers(testDb.db,{now:NOW,limit:100,executors});
+    expect(result.due).toBe(2);expect(result.results).toHaveLength(200);
+    expect(result.results.every(row=>row.status==='success')).toBe(true);
+    expect(record).toHaveBeenCalledTimes(200);
   });
 
 });

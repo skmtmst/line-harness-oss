@@ -33,6 +33,7 @@ export interface OpenAITextRequest {
   temperature?: number;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  store?:false;
 }
 
 function classifyFailure(status: number, body: string): OpenAITextError {
@@ -60,6 +61,7 @@ export async function generateOpenAIText(request: OpenAITextRequest): Promise<st
     ],
     max_completion_tokens: request.maxOutputTokens,
   };
+  if(request.store===false)payload.store=false;
   // 文章を書くだけなので、考える量は少なめにして待ち時間と費用を抑える。
   if (reasoning) payload.reasoning_effort = 'low';
   else if (typeof request.temperature === 'number') payload.temperature = request.temperature;

@@ -7,6 +7,13 @@ const responses = {
 };
 const body = (properties: Record<string, unknown>, required: string[]) => ({ required: true, content: { 'application/json': { schema: { type: 'object', properties, required } } } });
 export const api2FollowupPaths = {
+  '/api/booking/admin/pass-plans/{id}/notice-settings': {
+    get:{summary:'残り1回・期限14日前の知らせの設定（初期オフ、模擬専用）',parameters:[account,id],responses},
+    put:{summary:'管理者が読込版つきで知らせを設定。代理・閲覧のみ不可',parameters:[account,id],requestBody:body({remainingOne:{type:'boolean'},expiry14Days:{type:'boolean'},expectedVersion:{type:'integer'},testMode:{type:'boolean',enum:[true]}},['remainingOne','expiry14Days','expectedVersion','testMode']),responses},
+  },
+  '/api/booking/admin/pass-notices': {get:{summary:'回数券・月謝の模擬の知らせの記録（実送信なし）',parameters:[account],responses}},
+  '/api/booking/admin/pass-notices/simulate': {post:{summary:'管理者が期限・残り・受取停止を直前確認して模擬処理する。送信しない',parameters:[account],requestBody:body({testMode:{type:'boolean',enum:[true]}},['testMode']),responses}},
+  '/api/friends/{id}/delivery-consents/history': {get:{summary:'目的別の受け取り変更履歴。前後の値・本人/店/システム・理由・日時。担当範囲のみ、カーソルでページ送り。',parameters:[id],responses}},
   '/api/friends/{id}/delivery-consents': {get:{summary:'担当範囲の友だちの配信停止・同意を読む。未登録は明示同意の証拠ではない。',parameters:[id],responses}},
   '/api/friends/{id}/delivery-consents/{purpose}': {put:{
     summary:'owner/adminが配信停止・同意の状態を理由と読込版付きで保存。全ての目的のうち1つでもunknown/revokedなら自動配信を止める。',

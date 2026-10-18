@@ -14,7 +14,7 @@ const lineClientMocks = vi.hoisted(() => ({
 
 vi.mock('@line-crm/line-sdk', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/line-sdk')>('@line-crm/line-sdk');
-  return { ...actual, LineClient: vi.fn().mockImplementation(() => lineClientMocks) };
+  return { ...actual, LineClient: vi.fn().mockImplementation(function () { return lineClientMocks; }) };
 });
 
 const { friendAddRules } = await import('./friend-add-rules.js');

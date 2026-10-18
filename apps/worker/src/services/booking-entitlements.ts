@@ -1,3 +1,4 @@
+import {expandPlanGrant,passUnusable} from './booking-pass-plans.js';
 import type { BookingEntitlement, BookingEntitlementGrant, BookingEntitlementOperation, BookingEntitlementView } from '@line-crm/shared';
 import { getAccountTimeZone, tzDateStr } from './availability.js';
 import { restaurantCivilTime } from './restaurant-booking.js';
@@ -18,8 +19,8 @@ export function entitlementMonth(at: string, timezone: string) {
 export async function entitlementViews(db: D1Database, accountId: string, friendId: string, at: string): Promise<BookingEntitlementView[]> {
   const period=entitlementMonth(at,await getAccountTimeZone(db,accountId));
   const rows=await db.prepare(`SELECT e.*, COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=?),e.monthly_limit) AS monthAllowance, (SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id
-    WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND julianday(b.starts_at)>=julianday(?) AND julianday(b.starts_at)<julianday(?)) AS monthUsed
-    FROM booking_entitlements e WHERE e.line_account_id=? AND e.friend_id=? ORDER BY e.created_at DESC,e.id`)
+    WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(b.starts_at)>=julianday(?) AND julianday(b.starts_at)<julianday(?)) AS monthUsed
+    FROM booking_entitlements e WHERE e.line_account_id=? AND e.friend_id=? ORDER BY e.expires_at,e.id`)
     .bind(period.periodStart,period.periodStart,period.periodEnd,accountId,friendId).all<BookingEntitlement & {monthUsed:number;monthAllowance:number|null}>();
   return rows.results.map(e=>({...e,...period,monthRemaining:e.kind==='monthly'?Math.max(0,e.monthAllowance!-e.monthUsed):null}));
 }
@@ -37,19 +38,22 @@ function event(db: D1Database, id: string, account: string, action: string, reas
     .bind(crypto.randomUUID(),action,reason.trim(),actorId,key,request,before,id,account,version);
 }
 export async function grantEntitlement(db:D1Database, account:string, actor:string, key:string, value:unknown) {
-  const b=value as BookingEntitlementGrant;
+  let b=value as BookingEntitlementGrant;
+  const planRequest=b?.planId?JSON.stringify({action:'grant',planId:b.planId,friendId:b.friendId,reason:b.reason,validFrom:b.validFrom??null}):null;
+  if(planRequest){const existing=await replay(db,account,key,planRequest);if(existing)return {data:existing,replayed:true};b=await expandPlanGrant(db,account,b as unknown as Record<string,unknown>) as unknown as BookingEntitlementGrant;}
+
   if(!b || !text(b.friendId,128)||!text(b.name,100)||!text(b.reason,1000)||!instant(b.validFrom)||!instant(b.expiresAt)||Date.parse(b.expiresAt)<=Date.parse(b.validFrom)
     ||!['ticket','monthly'].includes(b.kind)|| (b.kind==='ticket'? !integer(b.remaining,0)||b.monthlyLimit!==undefined : !integer(b.monthlyLimit,1)||b.remaining!==undefined)
     ||!(b.menuId==null||text(b.menuId,128))) invalid();
-  const request=JSON.stringify({action:'grant',friendId:b.friendId,menuId:b.menuId??null,kind:b.kind,name:b.name.trim(),remaining:b.remaining??null,monthlyLimit:b.monthlyLimit??null,validFrom:new Date(b.validFrom).toISOString(),expiresAt:new Date(b.expiresAt).toISOString(),reason:b.reason.trim()});
+  const request=planRequest??JSON.stringify({action:'grant',friendId:b.friendId,menuId:b.menuId??null,kind:b.kind,name:b.name.trim(),remaining:b.remaining??null,monthlyLimit:b.monthlyLimit??null,validFrom:new Date(b.validFrom).toISOString(),expiresAt:new Date(b.expiresAt).toISOString(),reason:b.reason.trim()});
   const existing=await replay(db,account,key,request); if(existing) return {data:existing,replayed:true};
   if(!await db.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=?').bind(b.friendId,account).first()) throw new EntitlementError('friend_not_found',404);
   if(b.menuId && !await db.prepare('SELECT id FROM menus WHERE id=? AND line_account_id=? AND deleted_at IS NULL').bind(b.menuId,account).first()) throw new EntitlementError('menu_not_found',404);
   const id=crypto.randomUUID(),now=new Date().toISOString();
   await db.batch([
-    db.prepare(`INSERT INTO booking_entitlements(id,line_account_id,friend_id,menu_id,kind,name,remaining,monthly_limit,valid_from,expires_at,created_at,updated_at)
-      SELECT ?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM booking_entitlement_events WHERE line_account_id=? AND request_key=?)`)
-      .bind(id,account,b.friendId,b.menuId??null,b.kind,b.name.trim(),b.remaining??null,b.monthlyLimit??null,new Date(b.validFrom).toISOString(),new Date(b.expiresAt).toISOString(),now,now,account,key),
+    db.prepare(`INSERT INTO booking_entitlements(id,line_account_id,friend_id,menu_id,kind,name,remaining,monthly_limit,valid_from,expires_at,created_at,updated_at,plan_id)
+      SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM booking_entitlement_events WHERE line_account_id=? AND request_key=?)`)
+      .bind(id,account,b.friendId,b.menuId??null,b.kind,b.name.trim(),b.remaining??null,b.monthlyLimit??null,new Date(b.validFrom).toISOString(),new Date(b.expiresAt).toISOString(),now,now,b.planId??null,account,key),
     event(db,id,account,'grant',b.reason,actor,key,request,1,null),
   ]);
   return {data:(await replay(db,account,key,request))!,replayed:false};
@@ -91,5 +95,6 @@ export async function validateEntitlementSelection(db:D1Database,accountId:strin
   const e=rows.find(r=>r.id===id);
   if(!e||e.status!=='active'||e.menu_id&&e.menu_id!==menuId||Date.parse(at)<Date.parse(e.valid_from)||Date.parse(at)>=Date.parse(e.expires_at)
     ||(e.kind==='ticket'?e.remaining!<=0:e.monthRemaining!<=0))throw new EntitlementError('entitlement_unavailable',409);
+  if(await passUnusable(db,e,accountId,menuId,at))throw new EntitlementError('entitlement_unavailable',409);
   return e;
 }

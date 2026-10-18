@@ -227,3 +227,7 @@
 
 /* 題の横の「？」・札（準備中）は字から 6 空ける。 */
 .titleWithMark { display: inline-flex; align-items: center; gap: var(--space-6); }
+
+.audienceRow { display: flex; align-items: center; gap: var(--space-8); font-size: var(--text-caption); cursor: pointer; }
+.audiencePreview { display: flex; align-items: center; gap: var(--space-8); }
+.audiencePreview > span { flex: none; white-space: nowrap; }

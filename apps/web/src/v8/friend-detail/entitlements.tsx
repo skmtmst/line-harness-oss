@@ -1,5 +1,14 @@
 'use client'
 
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+
+import EntitySelect from '@/components/shared/entity-select'
+
+import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
+
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Ban, CalendarPlus, Info, Pencil, Plus, Ticket } from 'lucide-react'
 import type { BookingEntitlementEvent, BookingEntitlementOperation, BookingEntitlementView } from '@line-crm/shared'
@@ -8,17 +17,12 @@ import Card, { CardHeader } from '@/components/shared/card'
 import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
 import Drawer from '@/components/shared/drawer'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import { isSaveConflict } from '@/components/shared/save-conflict'
 import Select from '@/components/shared/select'
-import EntitySelect from '@/components/shared/entity-select'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import StatusBadge from '@/components/shared/status-badge'
 import TruncatedText from '@/components/shared/truncated-text'
 import { TextField } from '@/components/shared/text-field'
@@ -133,6 +137,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
   onClose: () => void
   onDone: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [action, setAction] = useState<Action>('give')
   const [targetId, setTargetId] = useState(NEW_TICKET)
   const [count, setCount] = useState('')
@@ -142,7 +147,6 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
-  const saveErrors = useSaveFormErrors()
   const key = useRef(uuid())
 
   useEffect(() => {
@@ -187,8 +191,8 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
       notifySaved(action === 'revoke' ? '回数券を取り消しました' : '回数券を更新しました')
       onDone()
     } catch (cause) {
-      if (saveErrors.capture(cause)) return
-      setError(isSaveConflict(cause) ? 'ほかの人が先に直しました。閉じて開き直してから、もう一度お試しください。'
+      saveErrors.capture(cause)
+      setError(isConflictResponse(cause) ? CONFLICT_TEXT.reopen
         : cause instanceof ApiError && cause.status === 403 ? '回数券を変える権限がありません。'
           : isNotReadyError(cause) ? 'データの準備が済むと保存できます。'
             : '保存できませんでした。もう一度お試しください。')
@@ -197,10 +201,10 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
     }
   }
 
-  return (
+  return (<SaveErrorScope errors={saveErrors}>{(
     <Dialog open={open} title="回数券を手で入れる" titleNote={`${friendName || 'この友だち'} さん・店頭で売った・紙の回数券の引き継ぎなど`} onCancel={onClose} size="medium" busy={busy}
       cancelLabel="キャンセル" confirmLabel={submitLabel} onConfirm={() => void submit()}>
-      <SaveErrorScope errors={saveErrors}><div className={styles.dialogBody}>
+      <div className={styles.dialogBody}>
         <RadioCardGroup legend="すること" legendVisible columns={2}>
           {ACTIONS.map((choice) => (
             <RadioCard key={choice.value} name="entitlement-action" value={choice.value} title={choice.title} note={choice.note} icon={choice.icon}
@@ -220,18 +224,18 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
           <div className={styles.twoCols}>
             {needsCount ? (
               <Field label={action === 'adjust' ? '直したあとの残り' : isNew ? '回数' : '足す回数'} required error={submitted && !countValid ? '回数を入れてください' : undefined}>
-                <SaveErrorField names={['remaining', 'count']}><NumberInput aria-label="回数" unit="回" type="number" min={action === 'adjust' ? 0 : 1} value={count} onChange={(event) => setCount(event.target.value)} /></SaveErrorField>
+                <SaveErrorField names={["count","remaining"]}><NumberInput aria-label="回数" unit="回" type="number" min={action === 'adjust' ? 0 : 1} value={count} onChange={(event) => setCount(event.target.value)} /></SaveErrorField>
               </Field>
             ) : null}
             <Field label="期限" required={action === 'extend' || isNew} error={submitted && !expiryValid ? '今の期限より後の日を選んでください' : undefined}>
               {expiry === '' && !isNew && action !== 'extend'
                 ? <Select aria-label="期限" value="" onChange={() => setExpiry(target ? jstDate(new Date(target.expires_at)) : '')} options={[...expiryChoices, { value: 'change', label: '日付を選ぶ' }]} />
-                : <SaveErrorField names={['expiresAt', 'expires_at']}><DateField aria-label="期限" value={expiry} onChange={setExpiry} min={jstDate(new Date())} /></SaveErrorField>}
+                : <SaveErrorField names={["expiresAt","expires_at","expiry"]}><DateField aria-label="期限" value={expiry} onChange={setExpiry} min={jstDate(new Date())} /></SaveErrorField>}
             </Field>
           </div>
         ) : null}
         <Field label="理由" required error={submitted && !reason.trim() ? '理由を入れてください（履歴に残ります）' : undefined}>
-          <SaveErrorField names={['reason']}><TextField aria-label="理由" value={reason} maxLength={1000} placeholder="例：店頭で現金で買った（10/15 ¥22,000）" onChange={(event) => setReason(event.target.value)} /></SaveErrorField>
+          <SaveErrorField names={["reason"]}><TextField aria-label="理由" value={reason} maxLength={1000} placeholder="例：店頭で現金で買った（10/15 ¥22,000）" onChange={(event) => setReason(event.target.value)} /></SaveErrorField>
         </Field>
         {target || isNew ? (
           <div className={styles.preview}>
@@ -240,9 +244,9 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
           </div>
         ) : null}
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
-      </div></SaveErrorScope>
+      </div>
     </Dialog>
-  )
+  )}</SaveErrorScope>)
 }
 
 function eventLabel(event: BookingEntitlementEvent, before: number | null, after: number | null): { label: string; tone?: 'used' } {

@@ -1,14 +1,15 @@
+import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affiliate-self-auth.js';
+import { customerDownloadEntry } from '../services/download-entrypoints.js';
+import { signDownload, validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { Hono, type Context } from 'hono';
+import { Hono } from 'hono';
 import {
-  getFriendByLineUserIdForAccount,
   getAffiliateByFriendId,
   createAffiliate,
   createAffiliateLink,
   listAffiliateLinks,
   countAffiliateLinks,
   generateRefSlug,
-  listLineAccountsWithTenantStatus,
   getAffiliateLinkStats,
   listAffiliateOffers,
   getCurrentOfferVersion,
@@ -31,7 +32,7 @@ import {
   type AffiliateLink,
   type AffiliateLinkStat,
 } from '@line-crm/db';
-import { affiliateBankFields, DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { affiliateBankFields } from '@line-crm/shared';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import { signCrossAccountToken } from '../lib/cross-account-token.js';
 import type { Env } from '../index.js';
@@ -55,104 +56,6 @@ const affiliateSelfRoutes = new Hono<Env>();
 
 /** Max self-issued links per affiliate. The 21st issuance is a 400. */
 const MAX_SELF_LINKS = 20;
-
-type ResolvedFriend = {
-  id: string;
-  display_name: string;
-  user_id: string | null;
-  line_account_id: string | null;
-};
-
-/**
- * Verify a LINE access token and resolve the backing friend row.
- *
- * Returns a discriminated result so callers can pick the right HTTP status in
- * a single pass:
- *   - 'invalid_token' → 401 (token could not be verified against LINE)
- *   - 'no_friend'     → 404 (token verified, but no friend row exists)
- *   - 'ok'            → proceed with the resolved friend
- */
-async function resolveFriendFromLineToken(
-  env: Env['Bindings'],
-  accessToken: string,
-): Promise<
-  | { status: 'invalid_token' }
-  | { status: 'no_friend' }
-  | { status: 'tenant_suspended' }
-  | { status: 'ok'; friend: ResolvedFriend; lineAccountId: string | null; tenantId: string }
-> {
-  const db = env.DB;
-  const v = await fetch(
-    'https://api.line.me/oauth2/v2.1/verify?access_token=' +
-      encodeURIComponent(accessToken),
-  );
-  if (!v.ok) return { status: 'invalid_token' };
-
-  // The verify response carries the LINE Login channel (`client_id`) that
-  // minted this token. Reject any token issued by a channel this deployment
-  // does not own — otherwise a token from an unrelated LINE Login app whose
-  // user happens to share a lineUserId could impersonate an affiliate.
-  // Allowed channels = env default + every DB account's login channel, mirroring
-  // the multi-account verification pattern in liff.ts.
-  const verifyBody = await v
-    .json<{ client_id?: string }>()
-    .catch((): { client_id?: string } => ({}));
-  const tokenClientId = verifyBody.client_id;
-  if (!tokenClientId) return { status: 'invalid_token' };
-
-  const allowedChannelIds = new Set<string>();
-  if (env.LINE_LOGIN_CHANNEL_ID) allowedChannelIds.add(env.LINE_LOGIN_CHANNEL_ID);
-  const dbAccounts = await listLineAccountsWithTenantStatus(db);
-  for (const acct of dbAccounts) {
-    if (acct.login_channel_id) allowedChannelIds.add(acct.login_channel_id);
-  }
-  if (!allowedChannelIds.has(tokenClientId)) return { status: 'invalid_token' };
-
-  const prof = await fetch('https://api.line.me/v2/profile', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!prof.ok) return { status: 'invalid_token' };
-
-  const { userId } = await prof.json<{ userId: string }>();
-  if (!userId) return { status: 'invalid_token' };
-
-  const lineAccount = dbAccounts.find(
-    (account) => account.login_channel_id === tokenClientId,
-  );
-  if (lineAccount && lineAccount.tenant_status !== 'active') {
-    return { status: 'tenant_suspended' };
-  }
-  const lineAccountId = lineAccount?.id ?? null;
-  const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
-  if (!friend) return { status: 'no_friend' };
-  return {
-    status: 'ok',
-    friend: friend as unknown as ResolvedFriend,
-    lineAccountId,
-    tenantId: lineAccount?.tenant_id ?? DEFAULT_TENANT_ID,
-  };
-}
-
-/** Map a non-ok resolution to its JSON error response. */
-function unresolvedResponse(
-  c: Context<Env>,
-  result:
-    | { status: 'invalid_token' }
-    | { status: 'no_friend' }
-    | { status: 'tenant_suspended' },
-) {
-  if (result.status === 'tenant_suspended') {
-    return c.json({
-      success: false,
-      code: 'TENANT_SUSPENDED',
-      error: '現在ご利用いただけません',
-    }, 503);
-  }
-  if (result.status === 'invalid_token') {
-    return c.json({ success: false, error: 'Invalid LINE access token' }, 401);
-  }
-  return c.json({ success: false, error: 'Friend not found' }, 404);
-}
 
 /**
  * Shape each affiliate link into the client-facing row. `stats` maps ref_code →
@@ -568,7 +471,9 @@ affiliateSelfRoutes.put('/api/liff/affiliate/bank', inputJsonBoundary(), async (
 /** 本人の支払明細一覧。 */
 affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    c.header('Cache-Control', 'private, no-store');
+    c.header('Referrer-Policy', 'no-referrer');
+    const token = /^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1];
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -580,7 +485,9 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
     const data = await listAffiliateStatementsForSelf(c.env.DB, {
       tenantId: resolved.tenantId, lineAccountId: resolved.lineAccountId, affiliateId: affiliate.id,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: data.map(statement => ({ ...statement,
+      renewalUrl: customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', statement.id),
+    })) });
   } catch (error) {
     console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"GET /api/liff/affiliate/statements"}));
     return c.json({ success: false, error: '支払明細を確認できませんでした' }, 500);
@@ -590,7 +497,13 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
 /** 本人の有効な明細だけをR2から返す。 */
 affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    c.header('Cache-Control', 'private, no-store');
+    c.header('Referrer-Policy', 'no-referrer');
+    // Old emailed/LINE links guide to LIFF, without copying token/query values.
+    if (!c.req.header('Authorization') && !c.req.query('signature') && !c.req.query('expires') && c.req.query('issue') !== '1') {
+      return c.redirect(customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', c.req.param('id')), 303);
+    }
+    const token = /^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1];
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -604,6 +517,17 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
       affiliateId: affiliate.id, statementId: c.req.param('id'),
     });
     if (!file) return c.json({ success: false, error: '支払明細が見つからないか期限切れです' }, 404);
+    if (!c.env.API_KEY) return c.json({ success: false, error: '取得用の鍵が未設定です' }, 503);
+    const binding = JSON.stringify([resolved.tenantId, resolved.lineAccountId, affiliate.id, resolved.friend.id]);
+    if (c.req.query('issue') === '1') {
+      if (!await c.env.IMAGES.head(file.objectKey)) return c.json({ success: false, error: '支払明細が見つかりません' }, 404);
+      const url = await signDownload(new URL(c.req.url), c.env.API_KEY, 'affiliate-statement', file.statement.id, binding,
+        file.statement.expiresAt ? Date.parse(file.statement.expiresAt) : undefined);
+      return c.json({ success: true, data: { url, expiresAt: new Date(Number(new URL(url).searchParams.get('expires')) * 1000).toISOString() } });
+    }
+    if (!await validDownload(new URL(c.req.url), c.env.API_KEY, 'affiliate-statement', file.statement.id, binding)) {
+      return c.json({ success: false, error: '取得用URLが無効か期限切れです' }, 403);
+    }
     const object = await c.env.IMAGES.get(file.objectKey);
     if (!object) return c.json({ success: false, error: '支払明細が見つかりません' }, 404);
     console.log(JSON.stringify({"code":"routes_affiliate_self_log","route":"GET /api/liff/affiliate/statements/:id/download"}));
@@ -612,6 +536,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="affiliate-statement-${file.statement.id}.pdf"`,
         'Cache-Control': 'private, no-store',
+        'Referrer-Policy': 'no-referrer',
       },
     });
   } catch (error) {
