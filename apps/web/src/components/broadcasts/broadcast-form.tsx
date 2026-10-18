@@ -147,6 +147,9 @@ export default function BroadcastForm({
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
   const [recentBroadcasts, setRecentBroadcasts] = useState<ApiBroadcast[]>([])
+  const [recentState, setRecentState] = useState<'unselected' | 'loading' | 'error' | 'ready'>('unselected')
+  const [recentRetry, setRecentRetry] = useState(0)
+  const retryRecent = () => setRecentRetry((value) => value + 1)
   const [inlineComposer, setInlineComposer] = useState<{ index: number; kind: 'carousel' | 'rich_message' | 'rich_video' } | null>(null)
   const [composerBusy, setComposerBusy] = useState(false)
   /** 吹き出しの［テンプレートから選ぶ］で開いたときだけ何通目か。作り方の「テンプレート」から開いたときは null（末尾へ足す・WEB256）。 */
@@ -512,11 +515,18 @@ export default function BroadcastForm({
     // 以前は一覧を全件取って先頭3件に絞っていた。
     let cancelled = false
     setRecentBroadcasts([])
+    if (accountLoading || !selectedAccountId) { setRecentState('unselected'); return }
+    setRecentState('loading')
     api.broadcasts.list({ accountId: selectedAccountId || undefined, limit: 3 })
-      .then((res) => { if (!cancelled && res.success) setRecentBroadcasts(res.data.slice(0, 3)) })
-      .catch(() => undefined)
+      .then((res) => {
+        if (cancelled) return
+        if (!res.success) throw new Error('recent_broadcasts_failed')
+        setRecentBroadcasts(res.data.slice(0, 3))
+        setRecentState('ready')
+      })
+      .catch(() => { if (!cancelled) setRecentState('error') })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [selectedAccountId, accountLoading, recentRetry])
 
   /*
    * 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
@@ -1361,7 +1371,7 @@ export default function BroadcastForm({
             </section>
           </section>
         ) : null}
-        <BroadcastBasicStep {...{ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }} />
+        <BroadcastBasicStep {...{ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }} />
         <BroadcastAudienceStep {...{ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }} />
         <div className={shows('message') ? 'contents' : 'hidden'}>
         <BroadcastMessageStep {...{ ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }} />
