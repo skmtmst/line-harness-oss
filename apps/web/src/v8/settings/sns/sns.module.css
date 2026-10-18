@@ -7,19 +7,6 @@
   padding: var(--tpl-e1-sns-body-pad);
 }
 
-/* カードは1列で横幅いっぱい（上下左右20・行の間12・角丸12） */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-e1-sns-gap-2);
-  padding: var(--tpl-e1-sns-padding-3);
-
-  border-radius: var(--tpl-e1-radius-l);
-  border: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-  background: var(--color-canvas);
-}
-
 /* 段の頭：頭文字の四角・題・（余白）・状態の札・「…」の横並び */
 .cardHead {
   display: flex;
@@ -56,37 +43,6 @@
   line-height: var(--tpl-e1-sns-sub-lh);
 }
 
-/* 行：ことば＋余白＋こたえ（12/700） */
-.row {
-  display: flex;
-  align-items: baseline;
-  gap: var(--tpl-e1-sns-row-gap);
-  min-width: 0;
-  font-size: var(--text-caption);
-  line-height: var(--tpl-e1-sns-row-lh);
-  min-height: var(--tpl-e1-sns-row-min);
-  align-items: center;
-}
-
-.rowLabel {
-  flex: 0 0 var(--tpl-e1-sns-key-w);
-  color: var(--color-ink-secondary);
-}
-
-.rowSpacer {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.rowValue {
-  overflow: hidden;
-  color: var(--color-ink);
-  font-weight: 700;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* ボタンの行：左に主な操作、右端に解除 */
 .actions {
   display: flex;
@@ -102,8 +58,6 @@
   line-height: var(--tpl-e1-sns-note-lh);
 }
 
-/* 行は「ことば（幅96）＋こたえ（左そろえ）」。余白は入れず、こたえを左に置く。 */
-.row .rowSpacer { display: none; }
 .links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-e1-sns-gap-4); min-height: var(--tpl-e1-sns-min-height-5); }
 .listTitle { margin: var(--polish-space-none); color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); }
 .checks { display: flex; flex-direction: column; gap: var(--tpl-e1-sns-gap-6); margin: var(--polish-space-none); padding: var(--polish-space-none); list-style: none; font-size: var(--text-caption); line-height: var(--tpl-e1-sns-row-lh); color: var(--color-ink); }
@@ -112,3 +66,6 @@
 
 .link { display: inline-flex; align-items: center; gap: var(--tpl-e1-sns-gap-7); color: var(--color-action); font-size: var(--text-caption); font-weight: 700; line-height: var(--tpl-e1-sns-row-lh); text-decoration: none; }
 .link:hover { text-decoration: underline; }
+
+/* 段の頭：題と札の間をあけて札を右へ寄せる。 */
+.rowSpacer { flex: 1 1 0; min-width: 0; }

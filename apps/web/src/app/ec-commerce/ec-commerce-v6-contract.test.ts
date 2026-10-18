@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -8,7 +9,7 @@ const tabsView = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-co
 const identity = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/identity.tsx'), 'utf8')
 const subscriptions = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/subscriptions.tsx'), 'utf8')
 const connector = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/connector.tsx'), 'utf8')
-const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
+const api = readApiSource(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V8 EC integration screens', () => {
   it('connects all four EC tabs to real routes', () => {

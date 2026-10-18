@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -11,7 +12,7 @@ import { describe, expect, it } from 'vitest'
  * - 成果地点への利用先記録の失敗を静かに成功に見せない
  */
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(
   new URL('../../../../worker/src/routes/analytics.ts', import.meta.url),
   'utf8',

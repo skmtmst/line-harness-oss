@@ -4,10 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Check, LogIn, Plug, Send, X } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { PageFooter } from '@/components/templates/page-footer'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
+import { usePreparingDialog } from '@/components/shared/preparing-dialog'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -49,8 +52,8 @@ type DeliveryStatus = 'disconnected' | 'connected' | 'error' | 'applying'
 
 const STATUS: Record<DeliveryStatus, { label: string; tone: StatusBadgeTone }> = {
   disconnected: { label: '未接続', tone: 'neutral' },
-  connected: { label: '接続中', tone: 'success' },
-  error: { label: '接続エラー', tone: 'danger' },
+  connected: { label: '接続済み', tone: 'success' },
+  error: { label: '接続の異常', tone: 'danger' },
   applying: { label: '申し込み受付中', tone: 'warning' },
 }
 
@@ -147,7 +150,7 @@ const UBER_DESIGN_STATUS: Record<UberConnectionStatus, DeliveryStatus> = {
 /** サーバの状態そのものを説明する帯。 */
 const UBER_STATE_NOTE: Partial<Record<UberConnectionStatus, StateNote>> = {
   pending_store: {
-    text: 'Uber Eats へのログインは受け取りました。つなぐお店を選ぶ手続きは musubo 側で続けています。選び終わると、この段が「接続中」に変わります。',
+    text: 'Uber Eats へのログインは受け取りました。つなぐお店を選ぶ手続きは musubo 側で続けています。選び終わると、この段が「接続済み」に変わります。',
     tone: 'warn',
   },
   expired: {
@@ -201,16 +204,6 @@ function uberPatch(data: UberConnectionData, flash: string): Partial<DeliverySer
   }
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.row}>
-      <span className={styles.rowLabel}>{label}</span>
-      <span className={styles.rowSpacer} />
-      <span className={styles.rowValue}>{value}</span>
-    </div>
-  )
-}
-
 export default function DeliverySettingsPage({ services: initialServices = SERVICES }: { services?: DeliveryService[] } = {}) {
   usePageTitle('デリバリー連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
@@ -230,6 +223,8 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   /** つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻ったときに開く。 */
   const [picking, setPicking] = useState<{ service: DeliveryService; stores: DeliveryStore[] } | null>(null)
   const [pickedStoreId, setPickedStoreId] = useState('')
+  /** 受け口がまだ無い操作（申し込み・取り消し・確かめる・お店を選ぶ・解除）は、押すと「現在準備中です」の窓を出す。 */
+  const preparing = usePreparingDialog()
 
   const anyConnected = services.some((service) => service.status !== 'disconnected')
 
@@ -285,49 +280,29 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       }
       return
     }
-    patch(service.id, {
-      status: 'applying',
-      appliedAt: new Date().toISOString(),
-      stateNote: `musubo が${service.name}へ連携の申し込みを行いました。手続きが終わるまでお待ちください。`,
-      stateNoteTone: undefined,
-    })
-  }, [patch, selectedAccountId])
+    preparing.open(`${service.name}の連携の申し込み`)
+  }, [patch, preparing, selectedAccountId])
 
-  /** 選んだお店でつなぐ（`X5d8UF` の確定）。 */
+  /** 選んだお店でつなぐ（`X5d8UF` の確定）。受け口ができるまでは「現在準備中です」を出す。 */
   const pickStore = useCallback(() => {
     if (!picking) return
-    const store = picking.stores.find((candidate) => candidate.id === pickedStoreId)
-    const now = new Date().toISOString()
-    patch(picking.service.id, {
-      status: 'connected',
-      storeName: store?.name,
-      connectedAt: now,
-      checkedAt: now,
-      stateNote: undefined,
-      stateNoteTone: undefined,
-    })
+    const name = picking.service.name
     setPicking(null)
     setPickedStoreId('')
-  }, [patch, picking, pickedStoreId])
+    preparing.open(`${name}のお店の選択`)
+  }, [picking, preparing])
 
-  /** 連携を解除する（`kJLks` の確定）。 */
+  /** 連携を解除する（`kJLks` の確定）。受け口ができるまでは「現在準備中です」を出す。 */
   const disconnect = useCallback(() => {
     if (!disconnecting) return
-    patch(disconnecting.id, {
-      status: 'disconnected',
-      storeName: undefined,
-      connectedAt: undefined,
-      checkedAt: undefined,
-      appliedAt: undefined,
-      stateNote: undefined,
-      stateNoteTone: undefined,
-    })
+    const name = disconnecting.name
     setDisconnecting(null)
-  }, [disconnecting, patch])
+    preparing.open(`${name}の連携の解除`)
+  }, [disconnecting, preparing])
 
   return (
     <>
-      <PageFrame kind="settings" boardId="dF4Ov" hasFooter={canManage}>
+      <PageFrame kind="settings" boardId="dF4Ov">
         {/* 板の頭は型の PageHeading だけ。頭の下に説明の行を置かず、説明は題の横の「？」へ入れる
             （docs/v8-design-rules.md:66・§6.12-2／B-158・B-172 page-head）。承認案 v03 の説明文は
             つながっている会社があるかどうかで書き分け、そのまま「？」の中身にする。 */}
@@ -341,9 +316,11 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           }`}
         />
         <div className={styles.body}>
+          {role !== null && !canManage ? <ReadOnlyNotice /> : null}
           {services.map((service) => {
             const state = STATUS[service.status]
-            const usable = service.ready && canManage
+            /** ログインでつなぐ会社は、この環境に接続の設定があるときだけ押せる。申し込む会社は押すと準備中の窓を出す。 */
+            const connectable = service.connect !== 'login' || service.ready
             return (
               /* 角丸・線・影は共通の Card に任せる（B-168）。中の間と余白だけ承認案 v03 の寸法で足す。 */
               <Card key={service.id} appearance="outlined" layout="vertical" className={styles.card} aria-labelledby={`delivery-${service.id}-title`}>
@@ -352,11 +329,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                   <p className={styles.cardSub}>{service.sub}</p>
                 </div>
 
-                <div className={`${styles.row} ${styles.rowCenter}`}>
-                  <span className={styles.rowLabel}>いまの状態</span>
-                  <span className={styles.rowSpacer} />
-                  <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>
-                </div>
+                <CustomerInfoRows rows={[{ label: 'いまの状態', value: <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge> }]} />
 
                 {/* 状態の注記は自作の色分け（`.note[data-tone]`）をやめ、共通の帯（Notice）に任せる
                     （B-172 status-badge）。つなぐ手順の案内は色の意味を持たないので真珠色の囲みのまま。 */}
@@ -369,13 +342,15 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                 ) : null}
 
                 {service.status === 'applying' ? (
-                  <Row label="申し込んだ日" value={formatDate(service.appliedAt, { style: 'detail', fallback: '—' })} />
+                  <CustomerInfoRows rows={[{ label: '申し込んだ日', value: formatDate(service.appliedAt, { style: 'detail', fallback: '—' }) }]} />
                 ) : service.status === 'disconnected' ? null : (
-                  <>
-                    {service.storeName ? <Row label="つないだお店" value={service.storeName} /> : null}
-                    <Row label="つないだ日" value={formatDate(service.connectedAt, { style: 'detail', fallback: '—' })} />
-                    <Row label="最後に確かめた時刻" value={formatDate(service.checkedAt, { style: 'detail', fallback: '—' })} />
-                  </>
+                  <CustomerInfoRows
+                    rows={[
+                      ...(service.storeName ? [{ label: 'つないだお店', value: service.storeName }] : []),
+                      { label: 'つないだ日', value: formatDate(service.connectedAt, { style: 'detail', fallback: '—' }) },
+                      { label: '最後に確かめた時刻', value: formatDate(service.checkedAt, { style: 'detail', fallback: '—' }) },
+                    ]}
+                  />
                 )}
 
                 {canManage ? (
@@ -383,13 +358,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                     {service.status === 'disconnected' ? (
                       <Button
                         variant="primary"
-                        disabled={!usable}
-                        title={usable ? undefined : WAITING}
+                        disabled={!connectable}
+                        title={connectable ? undefined : WAITING}
                         busy={busy === service.id}
                         busyLabel="開いています…"
                         onClick={() => void connect(service)}
                       >
-                        {service.connect === 'login' ? <LogIn size={15} aria-hidden="true" /> : <Send size={15} aria-hidden="true" />}
+                        {service.connect === 'login' ? <LogIn size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
                         {connectLabel(service)}
                       </Button>
                     ) : service.status === 'applying' ? (
@@ -397,11 +372,9 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                         <span className={styles.rowSpacer} />
                         <Button
                           variant="secondary"
-                          disabled={!usable}
-                          title={usable ? undefined : WAITING}
-                          onClick={() => patch(service.id, { status: 'disconnected', appliedAt: undefined, stateNote: undefined })}
+                          onClick={() => preparing.open(`${service.name}の申し込みの取り消し`)}
                         >
-                          <X size={15} aria-hidden="true" />
+                          <X size={16} aria-hidden="true" />
                           申し込みを取り消す
                         </Button>
                       </>
@@ -409,15 +382,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                       <>
                         <Button
                           variant="secondary"
-                          disabled={!usable}
-                          title={usable ? undefined : WAITING}
-                          onClick={() => patch(service.id, { checkedAt: new Date().toISOString() })}
+                          onClick={() => preparing.open(`${service.name}の接続の確認`)}
                         >
-                          <Plug size={15} aria-hidden="true" />
+                          <Plug size={16} aria-hidden="true" />
                           接続を確かめる
                         </Button>
                         <span className={styles.rowSpacer} />
-                        <Button variant="danger" disabled={!usable} title={usable ? undefined : WAITING} onClick={() => setDisconnecting(service)}>
+                        <Button variant="danger" onClick={() => setDisconnecting(service)}>
                           連携を解除する
                         </Button>
                       </>
@@ -429,29 +400,14 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           })}
         </div>
 
-        {canManage ? (
-          <PageFooter
-            actions={(
-              <>
-                <Button disabled>キャンセル</Button>
-                <Button variant="primary" disabled title="この画面はボタンを押すとすぐ反映されます。保存する内容はまだありません。">
-                  <Check size={15} aria-hidden="true" />
-                  保存する
-                </Button>
-              </>
-            )}
-          />
-        ) : null}
       </PageFrame>
 
-      {/* 解除を確かめる窓（`kJLks`）。幅480は共通の small。 */}
-      <Dialog
+      {/* 解除を確かめる窓（`kJLks`）。幅480は共通の ConfirmDialog。 */}
+      <ConfirmDialog
         open={disconnecting !== null}
         size="small"
-        confirmation
-        footerDivider
-        tone="destructive"
-        title={`${disconnecting?.name ?? ''}の連携を解除しますか`}
+        destructive
+        title={`${disconnecting?.name ?? ''}の連携を解除しますか？`}
         description={`${disconnecting?.name ?? ''}とのつなぎを外します。これから入る注文は「デリバリー受注」に届かなくなります。すでに届いている注文はそのまま残ります。`}
         confirmLabel="解除する"
         onConfirm={disconnect}
@@ -460,7 +416,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         <p className={styles.note}>
           もう一度つなぐときは、この画面の「{disconnecting ? connectLabel(disconnecting) : ''}」からやり直してください。鍵を調べたり入力したりする必要はありません。
         </p>
-      </Dialog>
+      </ConfirmDialog>
 
       {/* つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻り、許可されたお店が2件以上あるときに開く。 */}
       <Dialog
@@ -471,7 +427,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         title="つなぐお店を選んでください"
         description={`${picking?.service.name ?? ''}での許可をいただきました。${picking?.service.name ?? ''}に登録されているお店が${picking?.stores.length ?? 0}件見つかりました。musubo につなぐお店を選んでください。`}
         confirmLabel="このお店につなぐ"
-        confirmIcon={<Check size={15} aria-hidden="true" />}
+        confirmIcon={<Check size={16} aria-hidden="true" />}
         confirmDisabled={pickedStoreId === ''}
         onConfirm={pickStore}
         onCancel={() => { setPicking(null); setPickedStoreId('') }}
@@ -497,6 +453,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           選んだお店の注文が「デリバリー受注」に届きます。あとから変えるときは、この画面で一度解除してからもう一度ログインしてください。
         </p>
       </Dialog>
+      {preparing.dialog}
     </>
   )
 }

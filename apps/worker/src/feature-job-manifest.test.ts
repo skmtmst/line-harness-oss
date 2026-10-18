@@ -12,12 +12,15 @@ const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 describe('feature job manifest', () => {
   test('named scheduled job を全件分類する', () => {
-    const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
-    const scheduledSection = source.slice(
-      source.indexOf('async function runFrequentHeavyJobs'),
-      source.indexOf('// Scheduled handler for cron triggers'),
-    );
+    const frequent = readFileSync(new URL('./cron/frequent.ts', import.meta.url), 'utf8');
+    const sixHourly = readFileSync(new URL('./cron/six-hourly.ts', import.meta.url), 'utf8');
+    const start = frequent.indexOf('async function runFrequentHeavyJobs');
+    const next = sixHourly.indexOf('async function runSixHourlyHeavyJobs');
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(next).toBeGreaterThanOrEqual(0);
+    const scheduledSection = frequent.slice(start) + sixHourly.slice(next);
     const names = [...scheduledSection.matchAll(/\bname:\s*'([^']+)'/g)].map((match) => match[1]!);
+    expect(names.length).toBeGreaterThan(0);
     const classified = new Set(FEATURE_JOB_MANIFEST.map(({ name }) => name));
     expect(names.filter((name) => !classified.has(name))).toEqual([]);
   });
@@ -42,8 +45,10 @@ describe('feature job manifest', () => {
   });
 
   test('delivery dispatcherは全件heartbeat観測を通る', () => {
-    const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
-    const scheduledSection = source.slice(source.indexOf('async function scheduled('));
+    const source = readFileSync(new URL('./cron/scheduled.ts', import.meta.url), 'utf8');
+    const start = source.indexOf('async function scheduled(');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const scheduledSection = source.slice(start);
     const observed = [...scheduledSection.matchAll(/observeDispatch\('([^']+)'/g)]
       .map((match) => match[1]!);
     expect(new Set(observed).size).toBe(observed.length);

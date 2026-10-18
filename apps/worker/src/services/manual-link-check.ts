@@ -1,3 +1,5 @@
+import type { WebhookSafetyOptions } from './outgoing-webhook-delivery.js';
+import { publicHttpsRequest } from './public-https-request.js';
 import {
   listManualLinks,
   recordCheck,
@@ -59,7 +61,7 @@ export interface ManualLinkCheckResult {
  */
 export async function checkAllManualLinks(
   db: D1Database,
-  opts: { checkedBy?: string | null } = {},
+  opts: { checkedBy?: string | null } & WebhookSafetyOptions = {},
 ): Promise<ManualLinkCheckResult> {
   const rows = await listManualLinks(db);
   const targets = rows.filter((row) => row.url && isSafePublicHttpsUrl(row.url));
@@ -71,11 +73,11 @@ export async function checkAllManualLinks(
     let httpStatus: number | undefined;
     let errorCode: string | null = null;
     try {
-      const res = await fetch(row.url!, {
+      const res = await publicHttpsRequest(row.url!, {
         method: 'HEAD',
         redirect: 'manual',
         signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
-      });
+      }, opts);
       okNow = res.ok;
       httpStatus = res.status;
       if (!okNow) errorCode = `HTTP_${res.status}`;
