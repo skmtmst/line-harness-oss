@@ -95,10 +95,23 @@
 }
 
 /* ① 事前確認（p6zMkA）。カードの頭は 題・？・のび・札 の順（B2SpuV）。 */
+/* 字の塊の初期余白はここで一度だけ消す。段ごとに margin: 0 を書くと
+   画面側の余白の数が増える（apps/web/scripts/screen-css-budget.mjs）。 */
+.precheckLead,
+.precheckSummaryText,
+.precheckQuestionTitle,
+.precheckNote p,
+.precheckNoteTitle,
+.precheckUpcomingTitle,
+.precheckUpcomingItem,
+.precheckResultHeading,
+.precheckResultTitle,
+.precheckResultBody,
+.ackNote { margin: 0; }
 .precheckHead { display: flex; align-items: center; gap: var(--tpl-htn6-pre-head-gap); }
 .precheckHead .subBadge { margin-inline-start: auto; }
 .precheckHelpMark { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--color-ink-faint); }
-.precheckLead { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
+.precheckLead { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
 
 /* 答えた質問の一覧。1行ずつ「ラベル　→　答え」と「変更」。 */
 .precheckSummary { display: flex; flex-direction: column; gap: var(--tpl-htn6-pre-row-gap); }
@@ -107,18 +120,18 @@
   padding: var(--tpl-htn6-pre-row-pad); border-radius: var(--tpl-htn-radius-m);
   background: var(--color-surface-pearl);
 }
-.precheckSummaryText { margin: 0; min-width: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink); }
+.precheckSummaryText { min-width: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink); }
 
 /* いまの質問。題・補足・選択肢・案内・チェックを縦に積む。 */
 .precheckQuestion { display: flex; flex-direction: column; gap: var(--tpl-htn6-pre-group-gap); }
-.precheckQuestionTitle { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
+.precheckQuestionTitle { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
 
 /* 選択肢の下の案内。v06 は白地の案内（SwjOv・細枠あり）と砂色の注意（Z0v3c・枠なし）で地が違う。 */
 .precheckNote {
   display: flex; flex-direction: column; border-radius: var(--radius-control);
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink);
 }
-.precheckNote p { margin: 0; min-width: 0; }
+.precheckNote p { min-width: 0; }
 .precheckNoteInfo {
   padding: var(--tpl-htn-note-pad); gap: var(--tpl-htn6-pre-note-gap);
   background: var(--color-canvas); border: 1px solid var(--color-hairline);
@@ -129,17 +142,17 @@
   background: var(--color-caution-band);
 }
 .precheckNoteWarn .precheckNoteTitle { color: var(--color-warning); }
-.precheckNoteTitle { margin: 0; font-weight: 700; }
+.precheckNoteTitle { font-weight: 700; }
 .precheckNoteLink { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-htn6-pre-link-gap); }
 .precheckAck { padding: var(--tpl-htn-ack-pad); }
 
 /* このあとの質問。進む前に全体の見通しを出す（nGlq4）。 */
 .precheckUpcoming { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); }
-.precheckUpcomingTitle { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink-secondary); }
-.precheckUpcomingItem { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-faint); }
+.precheckUpcomingTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink-secondary); }
+.precheckUpcomingItem { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-faint); }
 
 /* チェック結果（eOQAo）。印の箱と文を横に並べる。字と色は行ごとに持つ。 */
-.precheckResultHeading { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
+.precheckResultHeading { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
 .precheckResultItem { display: flex; align-items: flex-start; gap: var(--tpl-htn6-pre-mark-gap); }
 .precheckResultMark {
   flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
@@ -148,13 +161,13 @@
   box-shadow: var(--tpl-htn-ring); color: var(--color-accent-deep);
 }
 .precheckResultText { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); }
-.precheckResultTitle { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--color-ink); }
-.precheckResultBody { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
+.precheckResultTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--color-ink); }
+.precheckResultBody { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 
 /* ② 確認のチェック。印の下に理由の一文を置く。 */
 .ackList { display: flex; flex-direction: column; gap: var(--tpl-htn6-ack-gap); }
 .ackNote {
-  margin: 0; padding-inline-start: var(--tpl-htn6-ack-note-pad);
+  padding-inline-start: var(--tpl-htn6-ack-note-pad);
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary);
 }
 

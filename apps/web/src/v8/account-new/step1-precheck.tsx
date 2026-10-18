@@ -89,7 +89,7 @@ export default function Step1Precheck({
               ))}
             </RadioCardGroup>
             {guide && (
-              <div className={[styles.precheckNote, guide.tone === 'warn' ? styles.precheckNoteWarn : styles.precheckNoteInfo].join(' ')}>
+              <div className={`${styles.precheckNote} ${guide.tone === 'warn' ? styles.precheckNoteWarn : styles.precheckNoteInfo}`}>
                 {guide.title && <p className={styles.precheckNoteTitle}>{guide.title}</p>}
                 <p>{guide.body}</p>
                 {guide.link && (
