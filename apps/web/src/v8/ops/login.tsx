@@ -1,4 +1,6 @@
 'use client'
+
+import { beginAdminLoginHandoff, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 import { LogIn, MessageCircle } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import { useEffect, useState, type FormEvent } from 'react'
@@ -74,11 +76,11 @@ export default function OpsLoginV8() {
     }
     resetAuthSelectionCleared(localStorage, sessionStorage)
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor/setup?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken, lh_method: 'password' }).toString()}`)
+      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup?next=ops', res.data.challengeToken))
       return
     }
     if (res.data.twoFactor && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken, lh_method: 'password' }).toString()}`)
+      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor?next=ops', res.data.challengeToken))
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
@@ -118,7 +120,7 @@ export default function OpsLoginV8() {
     resetAuthSelectionCleared(localStorage, sessionStorage)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     if (!apiUrl) return setBusy(null)
-    window.location.assign(`${apiUrl}/api/auth/line?next=ops`)
+    window.location.assign(`${apiUrl}/api/auth/line?${new URLSearchParams({ next: 'ops', handoff: beginAdminLoginHandoff() })}`)
   }
 
   return (

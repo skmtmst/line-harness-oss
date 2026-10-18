@@ -1,3 +1,4 @@
+import { safeNavigationPath } from '@/lib/safe-navigation'
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -25,7 +26,7 @@ export default function FieldNew() {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const params = useSearchParams()
-  const back = params.get('back')
+  const back = safeNavigationPath(params.get('back'))
   const { selectedAccountId } = useAccount()
 
   const [folders, setFolders] = useState<Folder[]>([])

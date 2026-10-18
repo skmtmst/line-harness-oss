@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
   routerPush: vi.fn(),
+  back: null as string | null,
   fieldsList: vi.fn(),
   fieldsCreate: vi.fn(),
   foldersList: vi.fn(),
@@ -14,7 +15,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => '/tags',
   useRouter: () => ({ push: fixture.routerPush }),
-  useSearchParams: () => new URLSearchParams(''),
+  useSearchParams: () => new URLSearchParams(fixture.back ? { back: fixture.back } : {}),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn(), usePageCrumbs: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({
@@ -42,6 +43,7 @@ function createButton(): HTMLButtonElement {
 }
 
 beforeEach(() => {
+  fixture.back = null;
   fixture.fieldsList.mockResolvedValue({ success: true, data: [] })
   fixture.foldersList.mockResolvedValue({ success: true, data: [] })
   fixture.fieldsCreate.mockResolvedValue({ success: true, data: { id: 'ff-9' } })
@@ -107,4 +109,13 @@ describe('R515 応答消失後の再試行は同じ要求キーで送る', () =>
     const secondKey = fixture.fieldsCreate.mock.calls[1][2] as string
     expect(secondKey).toBe(firstKey)
   })
+})
+
+
+it.each(['https://evil.example/login', 'javascript:alert(1)', '/\\evil.example'])('F19: cancel with unsafe back=%s stays on the field list', async back => {
+  fixture.back = back
+  render(<NewFriendFieldPage />)
+  await waitFor(() => expect(createButton().disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: 'キャンセル', exact: true }))
+  expect(fixture.routerPush).toHaveBeenCalledWith('/tags?tab=fields')
 })
