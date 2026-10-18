@@ -1,20 +1,12 @@
 import { activeTenantLineAccountSql, resolveLineCredential } from '@line-crm/db';
-import { LineClient, type Message } from '@line-crm/line-sdk';
-import { lineTransport } from '../lib/external-call/index.js';
+import { type Message } from '@line-crm/line-sdk';
+import { currentEventNotificationSubject, type EventNotificationSubject } from './event-notification-subject.js';
+import { sendPreparedEventBookingNotification } from './event-booking-notifier.js';
 import { deliverBookingLine } from './booking-line-delivery.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { isOperationCapabilityStopped } from '@line-crm/db';
 
-export type EventNotificationSubject = {bookingId:string;slotId:string;status:string;startsAt?:string};
-export async function currentEventNotificationSubject(db:D1Database,account:string,subject:EventNotificationSubject,to:string) {
-  return !!await db.prepare(`SELECT 1 ok FROM event_bookings b JOIN friends f ON f.id=b.friend_id
-    JOIN event_slots s ON s.id=b.slot_id
-    WHERE b.id=? AND b.line_account_id=? AND b.slot_id=? AND b.status=?
-      AND f.line_account_id=b.line_account_id AND f.line_user_id=? AND f.is_following=1
-      AND (? IS NULL OR julianday(s.starts_at)=julianday(?))
-      AND ${activeTenantLineAccountSql('b.line_account_id')}`)
-    .bind(subject.bookingId,account,subject.slotId,subject.status,to,subject.startsAt??null,subject.startsAt??null).first();
-}
+export { currentEventNotificationSubject, type EventNotificationSubject } from './event-notification-subject.js';
 /** 確定/受付の未実行通知は既存cron内で回収。不明の通知は対象にしない。 */
 export async function recoverEventBookingNotifications(db:D1Database,now:Date,limit:number) {
   const result={sent:0,failed:0};if(limit<=0)return result;
@@ -46,7 +38,7 @@ export async function recoverEventBookingNotifications(db:D1Database,now:Date,li
         authorize:async snapshot=>await currentEventNotificationSubject(db,account,snapshot.subject,snapshot.to)
           && !await isOperationCapabilityStopped(db,account,'reminder_dispatch')
           && await featureJobCanRun(db,{accountId:account,featureId:'events',job:'event notification recovery'}),
-        send:(signal,snapshot,key)=>new LineClient(token,{transport:lineTransport(signal)}).pushMessage(snapshot.to,snapshot.messages,key),
+        send:(signal,snapshot,key)=>sendPreparedEventBookingNotification(token,snapshot,signal,key),
       });
       result.sent++;
     }catch{result.failed++;}

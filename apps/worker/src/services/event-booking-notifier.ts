@@ -1,9 +1,9 @@
-import { currentEventNotificationSubject,type EventNotificationSubject } from './event-notification-recovery.js';
+import { currentEventNotificationSubject,type EventNotificationSubject } from './event-notification-subject.js';
 import { activeTenantLineAccountSql, isOperationCapabilityStopped } from '@line-crm/db';
 import { lineTransport } from '../lib/external-call/line.js';
 import { deliverBookingLine } from './booking-line-delivery.js';
 import { featureJobCanRun } from './feature-enforcement.js';
-import { LineClient } from '@line-crm/line-sdk';
+import { LineClient, type Message } from '@line-crm/line-sdk';
 
 export type EventNotificationKind =
   | 'received_pending'
@@ -100,6 +100,14 @@ export interface SendEventNotificationParams {
   ctx: EventNotificationContext;
 }
 
+/** Both live delivery and recovery send the same already rendered, immutable payload. */
+export async function sendPreparedEventBookingNotification(
+  channelAccessToken: string, snapshot: { to: string; messages: Message[] }, signal?: AbortSignal, retryKey?: string,
+): Promise<void> {
+  const client = new LineClient(channelAccessToken, signal ? { transport: lineTransport(signal) } : undefined);
+  await client.pushMessage(snapshot.to, snapshot.messages, retryKey);
+}
+
 export async function sendEventBookingNotification(
   params: SendEventNotificationParams,
 ): Promise<void> {
@@ -107,8 +115,7 @@ export async function sendEventBookingNotification(
     messages:[{type:'text' as const,text:renderEventNotificationText(params.kind,params.ctx)}],
     ...(params.delivery?.subject?{subject:params.delivery.subject}:{}) };
   const send = async (signal: AbortSignal | undefined, saved: typeof snapshot, key?: string) => {
-    const client = new LineClient(params.channelAccessToken, signal ? { transport: lineTransport(signal) } : undefined);
-    await client.pushMessage(saved.to, saved.messages, key);
+    await sendPreparedEventBookingNotification(params.channelAccessToken, saved, signal, key);
   };
   if (!params.delivery) return send(params.signal, snapshot, params.retryKey);
   const { db, accountId, operationId } = params.delivery;
