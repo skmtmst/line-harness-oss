@@ -26,13 +26,17 @@
 
 ## 検証の版と結果
 
-関連107ファイル695試験は成功。手元の共有SQLite部品はNode 26のABIなので、この対象試験は既存のNode 26で実行した。共有依存を勝手に再構築していない。型検査・lintはNode 22で成功（lintエラー0、変更ファイルの既存の警告3）。全体ci-localは専用の新しい作業ツリーとNode 22で再実行する。
+関連107ファイル695試験は成功。手元の共有SQLite部品はNode 26のABIなので、この対象試験は既存のNode 26で実行した。共有依存を勝手に再構築していない。型検査・lintはNode 22で成功（lintエラー0、変更ファイルの既存の警告3）。全体ci-localは製品版92398bfd9dを専用の新しい作業ツリーとNode 22で最後まで実行した。
 
 初回ci-localは製品版f381ed1663で実行。DB2309試験、スクリプト1047試験、Worker13156試験、管理画面全体のlint/型/V8固定検査は成功。LIFF工程はexit1後に一時ファイルpath-17欠落で元ログが失われた。同じ製品版を独立して再検査し、LIFF92ファイル531試験は成功（liff-recheck.log）。Worker本体はvars.VITE_LIFF_IDが不明で未実行、その後の画面サーバーとヘッダー成果物の2検査も失敗した。値を推測して合格にしていない。
 
 管理画面の全体試験は、分割先の読込・保存エラーの持ち主・未保存の持ち主など7ファイル9試験が失敗。今回の修正版で全て再確認した。古い版を最終結果に使わず、初回を中断して修正版で全体をやり直す。初回の片付けにOSのPermissionErrorが出たことも原本へ保持し、その実行の生きたプロセスと登録済み作業ツリーが残っていないことを確認した。検査環境の再確認はG01/司令塔へ渡す。元結果は改変しない。初回の原本は `tools/hq/ci-local/logs/20261018-075258-f381ed1663-54651`、控えはU04-EVIDENCE/attempts/ci-1。
 
-本番形式build/verify:designと3幅30場面の撮影は、初回の製品版で成功。公開確認の長文は既存ConfirmDialogのcontentLayoutとTruncatedTextを使い、3幅で全文の焦点表示とEscape後も窓を保持することを確認した。CSSと配置の値は変更していない。修正版のbuild・撮影・全体ci-localは終了後に追記する。
+再実行92398bfd9dではDB2309、LIFF531、Worker13156、管理画面2301ファイル13630試験が成功（既存skip1/todo1）。全体のlint・型・旧画面再混入検査も成功し、初回の7ファイル9件の失敗は解消した。Workerビルドは再びvars.VITE_LIFF_ID不明で未実行、後続の画面サーバー/ヘッダー成果物の2検査は失敗した。SDK/MCPの試験・型・build、文書6試験、CI側の管理画面build・verify:design・ビルド後ブラウザ操作も成功。全体は成功56・失敗3・skip53でexit1。失敗3は上記2つと総合判定。skip53のうち26は値不明で手元未対応（PR情報、Workerの値、V8_SPEED_ENFORCEMENTと後続scope）。V8全体の崩れ/速度は実行されていない。原本は20261018-122954-92398bfd9d-8512。
+
+製品版92398bfd9dの本番形式build/verify:designは成功（208静的ページ、外出し639スクリプト、違反0）。通知を閉じた1152/1440/1920の各10場面、合計30場面の撮影も成功し、崩れ/横はみ出し/例外/未到達は0。公開確認の長文は既存ConfirmDialogのcontentLayoutとTruncatedTextを使い、3幅で全文の焦点表示とEscape後も窓を保持することを確認した。CSSと配置の値は変更していない。補助画像を含む33枚中24枚はf381の画像と同一ハッシュ、残り9枚は各1〜4画素だけの差で、構成と文字の位置は維持した。差のある9枚も目視した。build-product-inputs.jsonに版と入力ハッシュ、scenario-image-comparison.jsonに画像別の比較を残す。Pencilの正式な90%合格記録は付けていない。全体ci-localの未実行を、この個別30場面の成功で置き換えない。
+
+環境不足の確認：GitHubのorigin（skmtmst/line-harness-oss、個人所有・環境指定なし）の4変数VITE_LIFF_ID・VITE_BOT_BASIC_ID・VITE_CALENDAR_CONNECTION_ID・V8_SPEED_ENFORCEMENTは、読み取りで全て未設定と確認した。設定を変更せず、GitHub Actionsと同じ空値を明示してworker-build/v8-screen-guardを補足検査する。未確認の値やPR番号を作っていない。根拠はci-repository-variables.json。補足は全体CI合格を意味しない。実行器のクリーン必須ゲートに従い、この記録を先にコミットする。
 
 通知が消える前の1152幅では、自動化の競合後に通知が「…」へ重なる既存1件を検出。指定土台とU04を同じ条件で再現し、同じ位置で同じ1件、通知を閉じると双方0（toast-comparison.jsonと前後画像）。共通通知はU02の所有なので変更せず、未解消として渡す。通知を閉じた安定状態の30場面は崩れ/横はみ出し0、例外0/未到達0。全場面が無条件0とは主張しない。失敗記録はattempts/browser-1・browser-2へ保持する。
 
