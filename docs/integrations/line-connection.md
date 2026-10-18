@@ -561,6 +561,16 @@ PR #1751 は必須CIをすべて通過して**マージ済み**（マージSHA `
 
 **6b（大量件数での途中再開）は未確認のまま。** 実データで使える対象アカウントの友だちが13人しかなく、途中再開が起きる件数に届かないため実測できていない。
 
+### 2026-10-19 ②Step2 の Webhook URL は利用者が貼り付ける必要がある（v07デザイン）
+
+利用者が検証環境の `/accounts/new` を実機で確認した結果、**LINE Developers の「Messaging API設定」へ Webhook URL を貼り付けて「更新」を押すまで、その下の3つのスイッチ（Webhookの利用／再送／エラーの統計情報）が画面に出てこない**ことが分かった。
+
+- v06 の前提（`PUT /v2/bot/channel/webhook/endpoint` があるので URL 入力欄は不要）は**接続チェック（段3）の時点では正しいが、段2 Step2 の時点では成り立たない**。Step2 は③の接続チェックより前なので、musubo はまだ URL を登録していない。
+- 画面に出す URL の形は `apps/worker/src/lib/webhook-endpoint.ts` の `expectedWebhookUrl(workerUrl)` ＝ `{WorkerのURL}/webhook`。**アカウントごとではなく共通の1本**（`apps/worker/src/routes/webhook.ts` の `POST /webhook`）。検証環境は `https://nen-line-stg.skmtmst.workers.dev/webhook`。
+- デザイン：`/Users/masatosakamoto/Documents/LINE-Harness-Design/新規デザイン/2026-10-12_LINE追加画面のアップデート_LINE新規追加/LINE新規追加_v07.pen`（v06 は承認済みの版として未変更で保持）。段2 `Fqy29` の Step2 `f4AgA` に、Webhook URL の読み取り専用欄＋「コピー」ボタンのカード `Ds3E2` と、確認チェック `dqe2M`（3つ→4つ）を追加。Step1/2/3 の「musubo が自動で行うこと」から「Webhook URL の登録／」を削除。
+- **状態＝未承認。** 利用者へ提示済み・回答待ち。承認を受けるまで `apps/web/src/v8/account-new/` の実装・PR・配備は行わない。
+- 対象外として残した点：段3 `Lwxyh` の「musubo が自動で行う5つのこと」には「Webhook URL の登録」が残っている。③の接続チェックでは実際に API で上書きするため今も正しい可能性があり、今回の指示に含まれないので変更していない。
+
 ## 4. 気づいた不具合
 
 ### 4-1・4-2 は修正済み（2026-10-16・Claude）
