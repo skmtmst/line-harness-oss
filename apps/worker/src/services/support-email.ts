@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {createBroadcastRetryKey} from './broadcast-retry-key.js';
 import PostalMime, { type Address } from 'postal-mime';
 import {
@@ -182,7 +183,7 @@ export async function storeSupportEmail(
     return {threadId:saved.thread_id,duplicate:true};
   }
 
-  console.log(JSON.stringify({"code":"support_email_received"}));
+  logger.log("support_email_received");
   return { threadId, duplicate: false };
 }
 
@@ -353,6 +354,6 @@ export async function sendSupportEmailReply(
     }),
   ]);
 
-  console.log(JSON.stringify({"code":"support_email_replied"}));
+  logger.log("support_email_replied");
   return { messageId: sentMessageId };
 }

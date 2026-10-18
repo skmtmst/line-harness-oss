@@ -1,3 +1,5 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 import {requireAccountAi} from '../services/account-ai-features.js';
 import {GapError} from '../services/gap-common.js';
 import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
@@ -460,7 +462,7 @@ export function googleErrorResponse(c: Context<Env>, error: unknown) {
         return fail(c, 502, 'Googleとの通信に失敗しました', { code: error.kind });
     }
   }
-  console.error(JSON.stringify({"code":"routes_restaurant_google_failed"}));
+  logger.error("routes_restaurant_google_failed");
   return fail(c, 500, '予期しないエラーが発生しました');
 }
 
@@ -790,7 +792,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     return c.redirect(adminReturnUrl(c, lineAccountId, 'connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
-    console.error(JSON.stringify({"code":"routes_restaurant_google_failed","route":"GET /api/restaurant-test/google/oauth/callback"}));
+    logger.error("routes_restaurant_google_failed");
     await writeLog(c, store.id, { kind: stateRow.mode, result: 'failed', error: code });
     return c.redirect(adminReturnUrl(c, lineAccountId, `error:${code}`));
   }
@@ -1049,7 +1051,7 @@ export async function runReplyDraftAi(c: Context<Env>, prompt: { system: string;
       });
     } catch (error) {
       // 鍵やモデルの設定ちがい・混雑・時間切れで画面が止まらないよう、Workers AI で作り直す。
-      console.error(JSON.stringify({"code":"routes_restaurant_google_failed"}));
+      logger.error("routes_restaurant_google_failed");
       if (!c.env.AI) throw error instanceof OpenAITextError && error.kind === 'timeout' ? new GoogleAiTimeout() : error;
     }
   }
@@ -1090,7 +1092,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
     text = await runReplyDraftAi(c, prompt);
   } catch (error) {
     const timedOut = error instanceof GoogleAiTimeout || (error instanceof OpenAITextError && error.kind === 'timeout');
-    console.error(JSON.stringify({"code":"routes_restaurant_google_failed","route":"POST /api/restaurant-test/google/reviews/:id/draft/generate"}));
+    logger.error("routes_restaurant_google_failed");
     return fail(c, timedOut ? 504 : 502, 'AIの下書き作成に失敗しました。もう一度お試しください', { code: timedOut ? 'ai_timeout' : 'ai_failed' });
   }
   const validated = validateReplyText(text);

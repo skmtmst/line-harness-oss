@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, readBoundedBytes } from '../lib/input-errors.js';
 
 import { getRichMenuGroupById, getRichMenuGroupWithPages, setRichMenuPageImage, pageBelongsToGroup, acquirePublishLease, releasePublishLease, renewPublishLease, markRichMenuGroupUnpublished, getLineAccountById, clearRichMenuAssignmentsForGroup, getRichMenuManualPublishRequestById, getRichMenuManualPublishShells, listRichMenuManualPublishRequests, getLatestRichMenuVersion, recordRichMenuDeviceConfirmation, findRichMenuDeviceConfirmation, ensureRichMenuPublishRun, markRichMenuPublishRun, getLatestRichMenuPublishRun, listRichMenuPublishRunPages, recordAuditEvent, maskAuditIp, auditDeviceFamily, jstNow } from '@line-crm/db';
@@ -68,9 +69,9 @@ export const post__api_rich_menu_groups_groupId_pages_pageId_image_1 = async (c:
       await c.env.IMAGES.delete(key);
     } catch {
       // 片付けの失敗は元の失敗に付けない。ログだけ残す。
-      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/pages/:pageId/image"}));
+      logger.error("routes_rich_menu_groups_failed");
     }
-    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/pages/:pageId/image"}));
+    logger.error("routes_rich_menu_groups_failed");
     return c.json(
       {
         success: false,
@@ -456,7 +457,7 @@ export const post__api_rich_menu_groups_groupId_reconcile_10 = async (c: Context
         deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
       });
     } catch (auditError) {
-      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/reconcile"}));
+      logger.error("routes_rich_menu_groups_failed");
     }
 
     return c.json({

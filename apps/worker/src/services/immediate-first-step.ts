@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { decorateTapExtras } from './tap-extras.js';
 import {
   getScenarioById,
@@ -277,7 +278,7 @@ export async function pushImmediateFirstStep(
       try {
         await addTagToFriend(db, friendId, firstStep.on_reach_tag_id);
       } catch (err) {
-        console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+        logger.error("services_immediate_first_step_failed");
       }
     };
 
@@ -495,7 +496,7 @@ export async function pushImmediateFirstStep(
          * 扱いにして先へ進める。到達タグは付けない（届いた確証がない）。
          * 呼ぶ側は台帳へ送達不明を残し、人が確かめる。
          */
-        console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+        logger.error("services_immediate_first_step_failed");
         // 進める先は、この購読が固定している版の通で決める（351）。live の
         // 下書きを見ると、公開後に順序を変えたぶんだけ飛ばし先がずれる。
         await advancePastFirstStep(advanceTargetId, source, firstStep);
@@ -503,7 +504,7 @@ export async function pushImmediateFirstStep(
         return false;
       }
       // 届いていない（4xx）・従来どおりの呼び出しは claim を返して cron へ。
-      console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+      logger.error("services_immediate_first_step_failed");
       await releaseClaim();
       return false;
     }
@@ -549,7 +550,7 @@ export async function pushImmediateFirstStep(
     settleAfterSend = null;
     return true;
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+    logger.error("services_immediate_first_step_failed");
     try {
       if (sent && settleAfterSend) {
         // The message went out but logging/advancing threw — advance anyway
@@ -561,7 +562,7 @@ export async function pushImmediateFirstStep(
         await releaseClaimById(db, claimedEnrollmentId);
       }
     } catch (settleErr) {
-      console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+      logger.error("services_immediate_first_step_failed");
     }
     return sent;
   }

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -116,7 +117,7 @@ accountHandovers.post('/api/account-handovers', requireRole('owner', 'admin'), i
     });
     return c.json({ success: true, data: serialize(handover) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"POST /api/account-handovers"}));
+    logger.error("routes_account_handovers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -153,7 +154,7 @@ accountHandovers.post('/api/account-handovers/link', requireRole('owner', 'admin
     if (!linked.ok) return inputError(c, { success: false, error: linked.error }, 422, ["code","toAccountId"]);
     return c.json({ success: true, data: serialize(linked.handover) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"POST /api/account-handovers/link"}));
+    logger.error("routes_account_handovers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -171,7 +172,7 @@ accountHandovers.get('/api/account-handovers/:id', requireRole('owner', 'admin',
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"GET /api/account-handovers/:id"}));
+    logger.error("routes_account_handovers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -185,7 +186,7 @@ accountHandovers.get('/api/line-accounts/:id/handovers', requireRole('owner', 'a
     const rows = await listHandoversForAccount(c.env.DB, accountId);
     return c.json({ success: true, data: rows.map(serialize) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"GET /api/line-accounts/:id/handovers"}));
+    logger.error("routes_account_handovers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -254,7 +255,7 @@ accountHandovers.post('/api/account-handovers/:id/preview', requireRole('owner',
     if (!saved.ok) return inputError(c, { success: false, error: saved.error }, 422, ["sourceFriendTotal","counts","declaredFriendTotal"]);
     return c.json({ success: true, data: serialize((await getHandoverById(c.env.DB, handover.id))!) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"POST /api/account-handovers/:id/preview"}));
+    logger.error("routes_account_handovers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -320,7 +321,7 @@ accountHandovers.put('/api/account-handovers/:id/decisions', requireRole('owner'
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"PUT /api/account-handovers/:id/decisions"}));
+    logger.error("routes_account_handovers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -378,7 +379,7 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
         if (result.meta.changes === 1) moved += 1;
         else failed += 1;
       } catch (err) {
-        console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"POST /api/account-handovers/:id/execute"}));
+        logger.error("routes_account_handovers_failed");
         failed += 1;
       }
     }
@@ -401,7 +402,7 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"POST /api/account-handovers/:id/execute"}));
+    logger.error("routes_account_handovers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -416,7 +417,7 @@ accountHandovers.post('/api/account-handovers/:id/cancel', requireRole('owner', 
     await cancelHandover(c.env.DB, handover.id);
     return c.json({ success: true, data: serialize((await getHandoverById(c.env.DB, handover.id))!) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"POST /api/account-handovers/:id/cancel"}));
+    logger.error("routes_account_handovers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -450,7 +451,7 @@ accountHandovers.post('/api/account-handovers/:id/rollback', requireRole('owner'
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"POST /api/account-handovers/:id/rollback"}));
+    logger.error("routes_account_handovers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

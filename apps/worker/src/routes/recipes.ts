@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -292,7 +293,7 @@ recipes.get('/api/recipes', requireRole('owner', 'admin', 'staff'), async (c) =>
     const features = accountId ? await readFeatures(c.env.DB, accountId) : {};
     return c.json({ success: true, data: rows.map((r) => serialize(r, counts, features)) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_recipes_failed","route":"GET /api/recipes"}));
+    logger.error("routes_recipes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -340,7 +341,7 @@ recipes.post('/api/recipes', requireRole('owner', 'admin'), inputJsonBoundary({"
     });
     return c.json({ success: true, data: serialize(recipe, {}, {}) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_recipes_failed","route":"POST /api/recipes"}));
+    logger.error("routes_recipes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -359,7 +360,7 @@ recipes.get('/api/recipes/:id', requireRole('owner', 'admin', 'staff'), async (c
     ]);
     return c.json({ success: true, data: serialize(recipe, counts, features) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_recipes_failed","route":"GET /api/recipes/:id"}));
+    logger.error("routes_recipes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -528,7 +529,7 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), i
         202,
       );
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_recipes_failed","route":"POST /api/recipes/:id/clone"}));
+      logger.error("routes_recipes_failed");
       await finishCloneRun(c.env.DB, run.id, {
         status: 'rolled_back',
         createdCount: 0,
@@ -542,7 +543,7 @@ recipes.post('/api/recipes/:id/clone', requireRole('owner', 'admin', 'staff'), i
       }, 500);
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_recipes_failed","route":"POST /api/recipes/:id/clone"}));
+    logger.error("routes_recipes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -571,7 +572,7 @@ recipes.get('/api/recipes/clone-runs/:runId', requireRole('owner', 'admin', 'sta
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_recipes_failed","route":"GET /api/recipes/clone-runs/:runId"}));
+    logger.error("routes_recipes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

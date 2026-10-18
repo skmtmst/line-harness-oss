@@ -1,3 +1,5 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 import { safeWorkerIncidentId, normalizedHarnessErrorPath, harnessErrorCode, harnessErrorIncidentKey, type HarnessErrorReport } from './slack-error-summary.js';
 export type CodexSlackCategory = 'error' | 'idea' | 'fix' | 'decision';
 export type SlackTaskStatus = 'working' | 'review' | 'done';
@@ -441,7 +443,7 @@ async function ensureSlackChannelMembers(
       // channel from being used or block invitations for the remaining
       // operators. Keep the failure visible in Worker logs and retry it on
       // the next PR event.
-      console.warn(JSON.stringify({"code":"slack_pr_channel_member_invite_failed"}));
+      logger.warn("slack_pr_channel_member_invite_failed");
     }
   }
 }
@@ -526,7 +528,7 @@ async function ensureUpcomingPrRangeChannelWithoutBlocking(
     // Preparing the next 100-PR channel is preventive maintenance. A missing
     // Slack scope or a temporary API failure must never suppress the current
     // PR report. Every event from #x90 through #x00 retries the preparation.
-    console.warn(JSON.stringify({"code":"slack_upcoming_pr_range_prepare_failed"}));
+    logger.warn("slack_upcoming_pr_range_prepare_failed");
   }
 }
 
@@ -593,7 +595,7 @@ async function updateTrackedParentStatus(
       },
     }, fetcher);
   } catch (error) {
-    console.warn(JSON.stringify({"code":"slack_parent_status_update_failed"}));
+    logger.warn("slack_parent_status_update_failed");
     if (strict) throw error;
   }
 }
@@ -965,7 +967,7 @@ async function refreshSlackCommandCenter(
       }, fetcher);
     }
   } catch (error) {
-    console.warn(JSON.stringify({"code":"slack_command_center_refresh_failed"}));
+    logger.warn("slack_command_center_refresh_failed");
     if (strict) throw error;
   }
 }
@@ -1071,7 +1073,7 @@ async function ensureOpenTask(
     }, fetcher);
     permalink = permalinkResult.permalink || permalink;
   } catch (error) {
-    console.warn(JSON.stringify({"code":"slack_permalink_fallback"}));
+    logger.warn("slack_permalink_fallback");
   }
   await slackApi(token, 'chat.postMessage', {
     channel: taskChannel,

@@ -615,7 +615,7 @@ describe('LINE token verification', () => {
     });
 
     expect(reg.status).toBe(503);
-    await expect(reg.json()).resolves.toMatchObject({ code: 'TENANT_SUSPENDED' });
+    await expect(reg.json()).resolves.toMatchObject({ success: false, error: { code: 'TENANT_SUSPENDED' } });
     expect(dbMocks.getFriendByLineUserIdForAccount).not.toHaveBeenCalled();
     expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
   });
@@ -672,8 +672,8 @@ describe('LIFF affiliate bank and statements', () => {
   it('誤った振込先は欄ごとの理由を400で返し、秘密値を返さない', async () => {
     const res = await call('/api/liff/affiliate/bank', { method: 'PUT', headers: { 'content-type': 'application/json', 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ lineAccessToken: 'tok-alice', bankCode: '1', bankName: '', branchCode: 'abc', branchName: '', accountType: 'invalid', accountNumber: 'secret', accountHolderName: '', expectedVersion: 0 }) });
     expect(res.status).toBe(400);
-    const body = await res.json() as { fields: Record<string, string> };
-    expect(Object.keys(body.fields).sort()).toEqual(['bankCode', 'bankName', 'branchCode', 'branchName', 'accountType', 'accountNumber', 'accountHolderName'].sort());
+    const body = await res.json() as { error: { fieldErrors: { field: string; message: string }[] } };
+    expect(body.error.fieldErrors.map(item => item.field).sort()).toEqual(['bankCode', 'bankName', 'branchCode', 'branchName', 'accountType', 'accountNumber', 'accountHolderName'].sort());
     expect(JSON.stringify(body)).not.toContain('secret');
     expect(dbMocks.saveAffiliateBankProfile).not.toHaveBeenCalled();
   });

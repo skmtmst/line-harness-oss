@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { parseCookieHeader } from '../middleware/auth-http.js';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
@@ -109,7 +110,7 @@ async function notifyUnfamiliarLogin(
       after: { note: 'いつもと違う端末・場所からのログイン' },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
+    logger.error("services_admin_session_failed");
   }
   try {
     if (c.env.DEPLOY_ENV === 'staging' || c.env.DEPLOY_ENV === 'test') {
@@ -139,7 +140,7 @@ async function notifyUnfamiliarLogin(
       ].join('\n'),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
+    logger.error("services_admin_session_failed");
   }
 }
 
@@ -167,7 +168,7 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
     }
   } catch (error) {
     unfamiliarAt = new Date().toISOString();
-    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
+    logger.error("services_admin_session_failed");
   }
   await c.env.DB.prepare(`INSERT INTO auth_known_devices(staff_id, device_hash, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?)
     ON CONFLICT(staff_id, device_hash) DO UPDATE SET last_seen_at=excluded.last_seen_at`).bind(staffId, knownDeviceHash, new Date().toISOString(), new Date().toISOString()).run();
@@ -241,6 +242,6 @@ export async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: strin
     });
   } catch (error) {
     if (onFailure) onFailure();
-    else console.error(JSON.stringify({"code":"routes_auth_email_failed"}));
+    else logger.error("routes_auth_email_failed");
   }
 }

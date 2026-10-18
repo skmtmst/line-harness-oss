@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getFriendById, jstNow } from '@line-crm/db';
@@ -163,7 +164,7 @@ export const get__api_friends_id_timeline_1 = async (c: Context<Env, "/api/frien
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/:id/timeline"}));
+      logger.error("routes_friends_failed");
       return c.json({ success: false, error: '友だちの履歴を読み込めませんでした' }, 500);
     }
   };
@@ -322,7 +323,7 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
         nextRetryAt: null,
         now: failedAt,
       });
-      console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/:id/messages"}));
+      logger.error("routes_friends_failed");
       return c.json({
         success: false,
         error: '送信の準備に失敗しました',
@@ -397,7 +398,7 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
 
     return c.json({ success: true, data: { messageId: logId } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friends_failed","route":"POST /api/friends/:id/messages"}));
+    logger.error("routes_friends_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { postMileageEntry, claimInitialFriendAddActionRun, claimFriendAddEventForActionRetry, claimFailedFriendAddActionRuns, finishFriendAddActionRun, finishFriendAddEventActionRetry, type FriendAddActionRunRow, type FriendAddRoutingStatus, type FriendScenario, type FriendAddRuleDefinition } from '@line-crm/db';
 import { type FriendAddAction, type FriendAddRowActionType, type FriendAddTiming } from '@line-crm/shared';
 import { toJstString } from '@line-crm/db';
@@ -104,7 +105,7 @@ export async function evaluateFriendAddFriendCondition(
 }> {
   const ast = parseFriendAddConditionAst(definition.friendCondition);
   if (!ast.ok) {
-    console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
+    logger.error("services_friend_add_routing_failed");
     // 旧形式の自由文は「作り直してほしい」を画面へ出すため従来の理由のまま。
     // 木の形が壊れているものは別の理由で分ける。
     return {
@@ -121,7 +122,7 @@ export async function evaluateFriendAddFriendCondition(
       ? { matched: true, reason: null }
       : { matched: false, reason: 'friend_condition_not_met' };
   } catch {
-    console.error('[friend-add-routing] friendCondition evaluation failed — skipped the rule');
+    logger.error("friend_add_routing_friendCondition_evaluation_failed_skipped_the_rule");
     return { matched: false, reason: 'friend_condition_invalid' };
   }
 }
@@ -192,7 +193,7 @@ export async function evaluateFriendAddRuleConditions(
    */
   const ast = parseFriendAddConditionAst(input.definition.friendCondition);
   if (!ast.ok) {
-    console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
+    logger.error("services_friend_add_routing_failed");
     return {
       matched: false,
       reason: ast.error === 'legacy_text' || ast.error === 'not_json'
@@ -213,7 +214,7 @@ export async function evaluateFriendAddRuleConditions(
     collectFriendAddReferences(input.definition),
   );
   if (unusable.length > 0) {
-    console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
+    logger.error("services_friend_add_routing_failed");
     return { matched: false, reason: 'reference_out_of_account' };
   }
   const condition = await evaluateFriendAddFriendCondition(db, input.definition, input.friendId);
@@ -314,7 +315,7 @@ export async function runActions(
       }
     } catch (err) {
       // 1つ失敗しても残りは実行する。配信そのものは止めない。
-      console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
+      logger.error("services_friend_add_routing_failed");
       failed += 1;
       if (actionRunId) {
         await finishFriendAddActionRun(db, {
@@ -395,7 +396,7 @@ export async function retryFailedFriendAddActions(
       });
       await finishFriendAddActionRun(db, { id: run.id, status: 'completed' });
     } catch (error) {
-      console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
+      logger.error("services_friend_add_routing_failed");
       await finishFriendAddActionRun(db, {
         id: run.id,
         status: 'failed',

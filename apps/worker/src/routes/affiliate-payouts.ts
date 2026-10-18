@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { simplePdf } from '../services/affiliate-statement-pdf.js';
 import { customerDownloadEntry } from '../services/download-entrypoints.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -95,7 +96,7 @@ affiliatePayouts.get(
       });
       return c.json({ success: true, data });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"GET /api/affiliate-settlements/preview"}));
+      logger.error("routes_affiliate_payouts_failed");
       return c.json({ success: false, error: '締め対象を確認できませんでした' }, 500);
     }
   },
@@ -124,7 +125,7 @@ affiliatePayouts.get(
       });
       return c.json({ success: true, data });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"GET /api/affiliate-settlements/current"}));
+      logger.error("routes_affiliate_payouts_failed");
       return c.json({ success: false, error: '締め済みの記録を確認できませんでした' }, 500);
     }
   },
@@ -165,7 +166,7 @@ affiliatePayouts.post(
       if (result.kind === 'idempotency_conflict') return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
       return c.json({ success: true, data: result }, result.kind === 'created' ? 201 : 200);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"POST /api/affiliate-settlements"}));
+      logger.error("routes_affiliate_payouts_failed");
       return c.json({ success: false, error: '締め処理を完了できませんでした' }, 500);
     }
   },
@@ -205,7 +206,7 @@ affiliatePayouts.post(
       }
       return c.json({ success: true, data: result.batch }, result.kind === 'created' ? 201 : 200);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"POST /api/affiliate-payout-batches"}));
+      logger.error("routes_affiliate_payouts_failed");
       return c.json({ success: false, error: '支払バッチを作成できませんでした' }, 500);
     }
   },
@@ -284,7 +285,7 @@ affiliatePayouts.post(
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"POST /api/affiliate-payout-batches/:id/export"}));
+      logger.error("routes_affiliate_payouts_failed");
       return c.json({ success: false, error: '銀行CSVを出力できませんでした' }, 500);
     }
   },
@@ -374,7 +375,7 @@ affiliatePayouts.post(
       );
       return c.json({ success: true, data: statement, notificationAttempted: true }, 201);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_affiliate_payouts_failed","route":"POST /api/affiliate-statements"}));
+      logger.error("routes_affiliate_payouts_failed");
       return c.json({ success: false, error: '支払明細を発行できませんでした' }, 500);
     }
   },

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { KeywordRule } from './auto-reply-keyword-types.js';
 export type { KeywordRule } from './auto-reply-keyword-types.js';
 import { replyToUnmatchedLine } from './auto-reply-unmatched.js';
@@ -100,7 +101,7 @@ export function resolveKeywordRules(rule: {
     });
     return rules.length > 0 ? rules : fallback;
   } catch {
-    console.error('[auto-reply] unreadable keywords_json — fell back to the single keyword');
+    logger.error("auto_reply_unreadable_keywords_json_fell_back_to_the_single_keyword");
     return fallback;
   }
 }
@@ -239,7 +240,7 @@ export function parseAutoReplyActions(raw: string | null | undefined): AutoReply
   try {
     parsed = JSON.parse(raw);
   } catch {
-    console.error('[auto-reply] unreadable actions_json — ignored');
+    logger.error("auto_reply_unreadable_actions_json_ignored");
     return [];
   }
   if (!Array.isArray(parsed)) return [];
@@ -672,7 +673,7 @@ export async function matchAndReply(
           // 動作は済んだのに完了の記録だけ書けなかった。ここで
           // permanent_failed を書くと、成功した動作が「もう一度実行」の
           // 対象になり二度動いてしまう。行は claimed のまま残す。
-          console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
+          logger.error("services_auto_reply_failed");
         }
       } catch (err) {
         actionSummary.failed += 1;
@@ -684,9 +685,9 @@ export async function matchAndReply(
             errorCode: safeErrorCode(err),
           });
         } catch (finishError) {
-          console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
+          logger.error("services_auto_reply_failed");
         }
-        console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
+        logger.error("services_auto_reply_failed");
       }
       if (actionFailed && action.onFailure === 'stop' && !continueAfterEventBookingStop) break;
     }
@@ -752,7 +753,7 @@ export async function matchAndReply(
     });
   } catch (err) {
     replyError = err;
-    console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
+    logger.error("services_auto_reply_failed");
   }
 
   if (replyTokenConsumed) {
@@ -774,7 +775,7 @@ export async function matchAndReply(
       });
     } catch (error) {
       // LINEへの返信は既に成功している。集計の失敗を「返信失敗」へ書き換えない。
-      console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
+      logger.error("services_auto_reply_failed");
     }
   } else {
     await markAutoReplyEvaluationFinished(db, {
@@ -948,7 +949,7 @@ export async function retryAutoReplyActionRuns(
           errorCode: safeErrorCode(error),
         });
       } catch (finishError) {
-        console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
+        logger.error("services_auto_reply_failed");
       }
       continue;
     }
@@ -962,7 +963,7 @@ export async function retryAutoReplyActionRuns(
     } catch (finishError) {
       // 動作は済んだのに完了の記録だけ書けなかった。行は claimed のまま
       // 残す——permanent_failed へ戻すと、成功した動作がもう一度動く。
-      console.error(JSON.stringify({"code":"services_auto_reply_failed"}));
+      logger.error("services_auto_reply_failed");
       continue;
     }
     retriedCount += 1;

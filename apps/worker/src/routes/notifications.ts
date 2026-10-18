@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -74,7 +75,7 @@ notifications.get('/api/notifications/rules', requireRole('owner', 'admin'), asy
       data: items.map((item) => serializeRule(item)),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed","route":"GET /api/notifications/rules"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -141,7 +142,7 @@ const listOperatorRules = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -180,7 +181,7 @@ const previewOperatorRecipients = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -229,7 +230,7 @@ const previewOperatorRuleRecipients = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -277,7 +278,7 @@ const publishOperatorRule = async (c: Context<Env>) => {
     auditLog(c, 'operator_notification.rule.publish', { kind: 'notification_rule', id: rule.id });
     return c.json({ success: true, data: updated ? serializeRule(updated) : null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -304,7 +305,7 @@ const stopOperatorRule = async (c: Context<Env>) => {
     auditLog(c, 'operator_notification.rule.stop', { kind: 'notification_rule', id: rule.id });
     return c.json({ success: true, data: updated ? serializeRule(updated) : null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -333,7 +334,7 @@ const testOperatorRule = async (c: Context<Env>) => {
     auditLog(c, 'operator_notification.rule.test', { kind: 'notification_rule', id: rule.id });
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -367,7 +368,7 @@ const dispatchOperatorEventRoute = async (c: Context<Env>) => {
       throw err;
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -403,7 +404,7 @@ const listOperatorEventTypesRoute = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -425,7 +426,7 @@ const sweepOperatorOutbox = async (c: Context<Env>) => {
     });
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -490,7 +491,7 @@ const exportOperatorDeliveriesCsv = async (c: Context<Env>) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -512,7 +513,7 @@ const getOperatorRule = async (c: Context<Env>) => {
       data: serializeRule(item),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -549,7 +550,7 @@ const createOperatorRule = async (c: Context<Env>) => {
       data: serializeRule(item),
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -600,7 +601,7 @@ const updateOperatorRule = async (c: Context<Env>) => {
       data: serializeRule(updated),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -674,7 +675,7 @@ const updateOperatorRuleDraft = async (c: Context<Env>) => {
     if (!updated) return c.json({ success: false, error: 'お知らせが見つかりません' }, 404);
     return c.json({ success: true, data: serializeRule(updated) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -693,7 +694,7 @@ notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin
     await deleteNotificationRule(c.env.DB, c.req.param('id') ?? '', lineAccountId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed","route":"DELETE /api/notifications/rules/:id"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -728,7 +729,7 @@ notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), 
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notifications_failed","route":"GET /api/notifications"}));
+    logger.error("routes_notifications_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

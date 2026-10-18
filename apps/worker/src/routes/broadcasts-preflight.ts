@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
@@ -130,7 +131,7 @@ export const post__api_broadcasts_preflight_1 = async (c: Context<Env, "/api/bro
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/preflight"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -324,7 +325,7 @@ export const post__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">)
     await recordLifecycle(c.env.DB, broadcast.id, c.get('staff')?.id, 'created');
     return c.json({ success: true, data: serializeBroadcast(broadcast) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

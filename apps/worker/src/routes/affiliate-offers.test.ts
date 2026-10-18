@@ -143,8 +143,8 @@ describe('POST /api/affiliate-offers', () => {
     ]);
     const res = await req('POST', '/api/affiliate-offers', { name: 'x' });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { success: boolean; error: string };
-    expect(body.error).toContain('LINEアカウントを選んでください');
+    const body = (await res.json()) as { success: boolean; error: { code: string; message: string } };
+    expect(body.error.message).toContain('LINEアカウントを選んでください');
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
 });
@@ -287,8 +287,8 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
       name: 'キャンペーンA', tagId: 'tag-2',
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('タグ');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('タグ');
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
 
@@ -324,8 +324,8 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
       name: 'キャンペーンA', tagId: 'tag-archived',
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('保管済み');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('保管済み');
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
 
@@ -334,8 +334,8 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
       name: 'キャンペーンA', scenarioId: 'sc-stopped',
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('停止中');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('停止中');
     expect(dbMocks.createAffiliateOffer).not.toHaveBeenCalled();
   });
 
@@ -343,8 +343,8 @@ describe('タグ・シナリオの所属検査（#554 点検#505中3）', () => 
     dbMocks.getAffiliateOfferById.mockResolvedValue({ ...OFFER_ROW, line_account_id: 'account-1' });
     const res = await reqWithDb('PUT', '/api/affiliate-offers/off-1', { tagId: 'tag-archived' });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('保管済み');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('保管済み');
     expect(dbMocks.updateAffiliateOffer).not.toHaveBeenCalled();
   });
 });

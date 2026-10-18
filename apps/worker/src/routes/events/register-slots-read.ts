@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -134,7 +135,7 @@ events.get(
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_events_failed","route":"GET /api/events/admin/occurrences/:id/applicants.csv"}));
+      logger.error("routes_events_failed");
       return c.json({ error: 'applicants_export_failed' }, 500);
     }
   },

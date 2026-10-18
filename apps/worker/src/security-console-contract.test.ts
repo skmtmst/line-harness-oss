@@ -32,6 +32,31 @@ function unsafeConsoleCalls(source: string): number[] {
     }
     return false;
   }
+  // 共通serializerだけは、自由な文を含まない厳密な構造と採番元を検査する。
+  function safeEnvelope(node:ts.Expression,at:ts.Node):boolean {
+    if(ts.isIdentifier(node)){const value=binding(node.text,at);return !!value&&safeEnvelope(value,at);}
+    if(!ts.isObjectLiteralExpression(node))return false;
+    const fields=new Map<string,string>();
+    for(const property of node.properties){
+      if(ts.isSpreadAssignment(property)){
+        const expression=ts.isParenthesizedExpression(property.expression)?property.expression.expression:property.expression;
+        const text=expression.getText(file).replace(/\s+/g,'');
+        if(!/^Number\.isInteger\(metrics\.status\).*\?\{status:metrics\.status\}:\{\}$/.test(text)
+          &&!/^Number\.isFinite\(metrics\.durationMs\).*\?\{durationMs:Math\.round\(metrics\.durationMs!\)\}:\{\}$/.test(text))return false;
+        continue;
+      }
+      if(!ts.isPropertyAssignment(property)&&!ts.isShorthandPropertyAssignment(property))return false;
+      fields.set(property.name.getText(file), (ts.isPropertyAssignment(property)?property.initializer:property.name).getText(file).replace(/\s+/g,''));
+    }
+    if(fields.size!==6||fields.get('timestamp')!=="newDate().toISOString()"||fields.get('level')!=="level==='log'?'info':level")return false;
+    const code=fields.get('code')??'';
+    if(!/^\/\^\[.*\]\[.*\]\{0,95\}\$\/\.test\(code\)\?code:'invalid_log_event'$/.test(code))return false;
+    const server=fields.get('requestId')==='context?.requestId??null'&&fields.get('invocationId')==='context?.invocationId??null'&&fields.get('source')==="context?.source??'background'";
+    const clientId=binding('requestId',at)?.getText(file).replace(/\s+/g,'')??'';
+    const client=fields.get('requestId')==='requestId'&&fields.get('invocationId')==='null'&&fields.get('source')==='source'
+      &&clientId.includes("typeofid==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)?id:null");
+    return server||client;
+  }
   // An incident ID is safe only when this lexical scope proves it was minted
   // by the global Web Crypto API. Caller IDs, mutable aliases and shadowed
   // bindings remain forbidden; this is not a file/path exception list.
@@ -76,7 +101,9 @@ function unsafeConsoleCalls(source: string): number[] {
   }
   function safePayload(node:ts.Expression,at:ts.Node):boolean {
     if(ts.isStringLiteral(node))return true;
-    if(!ts.isCallExpression(node)||node.expression.getText(file)!=='JSON.stringify'||node.arguments.length!==1||!ts.isObjectLiteralExpression(node.arguments[0]))return false;
+    if(!ts.isCallExpression(node)||node.expression.getText(file)!=='JSON.stringify'||node.arguments.length!==1)return false;
+    if(safeEnvelope(node.arguments[0],at))return true;
+    if(!ts.isObjectLiteralExpression(node.arguments[0]))return false;
     let hasCode=false;
     return node.arguments[0].properties.every(property=>{
       if(!ts.isPropertyAssignment(property)&&!ts.isShorthandPropertyAssignment(property))return false;

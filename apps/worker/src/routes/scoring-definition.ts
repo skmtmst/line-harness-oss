@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { type Context, type MiddlewareHandler } from 'hono';
 import { getFriendById, MileageV6Error, getMileageRedemption, updateMileageRewardDraft, MileageRewardError } from '@line-crm/db';
@@ -10,7 +11,7 @@ export function mileageRewardError(c: Parameters<typeof auditLog>[0], error: unk
   if (error instanceof MileageRewardError) {
     return inputError(c, { success: false, error: error.message, code: error.code }, error.status as 400, []);
   }
-  console.error(JSON.stringify({"code":"routes_scoring_failed"}));
+  logger.error("routes_scoring_failed");
   return c.json({ success: false, error: '使い道を処理できませんでした' }, 500);
 }
 
@@ -23,7 +24,7 @@ export function mileageV6Error(c: Parameters<typeof auditLog>[0], error: unknown
       ...(error.field ? { field: error.field } : {}),
     }, error.status as 400, []);
   }
-  console.error(JSON.stringify({"code":"routes_scoring_failed"}));
+  logger.error("routes_scoring_failed");
   return c.json({ success: false, error: 'マイル情報を処理できませんでした' }, 500);
 }
 

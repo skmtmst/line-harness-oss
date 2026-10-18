@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -63,7 +64,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
   try {
     return await runChangeFlow();
   } catch (e) {
-    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/liff/bookings/:id/change"}));
+    logger.error("routes_events_failed");
     return finalize(500, { error: 'internal_error' });
   }
 
@@ -255,7 +256,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
         sourceEventId: newId,
         eventId: event.id,
         lineAccountId: account_id,
-      }).catch((err) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/events/liff/bookings/:id/change"})));
+      }).catch((err) => logger.error("routes_events_failed"));
     }
     // 空いた旧回の席を待ちへ回す（取消と同じ1回だけの起動）。
     await enqueueEventWaitlistPromotion(c.env.DB, {

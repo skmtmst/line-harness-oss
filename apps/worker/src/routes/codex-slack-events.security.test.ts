@@ -1,3 +1,4 @@
+import { apiContractMiddleware } from '../middleware/api-contract.js';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -477,4 +478,25 @@ describe('Codex Slack relay security boundary', () => {
     expect(current.queueSend).not.toHaveBeenCalled();
     expect(current.prepare).not.toHaveBeenCalled();
   });
+});
+
+test('署名済みHTTP依頼の番号を既存キューへ渡し、成功本文と待機は変えない', async () => {
+  const current = monitorEnv();
+  const instance = new Hono<Env>();
+  instance.use('*', apiContractMiddleware); instance.route('/', codexSlackEvents);
+  const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+  const body = JSON.stringify({ type: 'event_callback', event_id: 'Ev-trace', team_id: 'T-1',
+    requestId: 'untrusted-customer', event: { type: 'app_mention', user: 'U-MASATO',
+      text: '[claude->codex] <@U-CODEX> fixture', channel: 'C-1', ts: '100.1' } });
+  const response = await instance.request('/api/integrations/slack/events', {
+    method: 'POST', headers: { ...await slackHeaders(body), 'X-Request-ID': 'untrusted-customer' }, body,
+  }, current.bindings);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ success: true, queued: true, autoMergeQueued: false });
+  const id = response.headers.get('X-Request-ID');
+  expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  expect(current.queueSend).toHaveBeenCalledExactlyOnceWith({ kind: 'inspect_official', slackEventId: 'Ev-trace',
+    teamId: 'T-1', channelId: 'C-1', messageTs: '100.1', threadTs: '100.1', requesterUserId: 'U-MASATO',
+    prompt: '[claude->codex] <@U-CODEX> fixture', requestId: id }, { delaySeconds: 30 });
+  expect(fetcher).not.toHaveBeenCalled();
 });

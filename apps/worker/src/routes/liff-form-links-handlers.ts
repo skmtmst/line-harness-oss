@@ -1,5 +1,6 @@
 import { navigationProof } from '../lib/navigation-proof.js';
 import { storedRedirectTarget } from '../lib/safe-redirect.js';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getFriendByLineUserIdForAccount, getLineAccountById, getLineAccounts, getTrackedLinkById, getMessageTemplateById } from '@line-crm/db';
@@ -112,7 +113,7 @@ export const get__api_analytics_ref_refCode_orders_1 = async (c: Context<Env, "/
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /api/analytics/ref/:refCode/orders"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -141,7 +142,7 @@ export const post__api_links_wrap_2 = async (c: Context<Env, "/api/links/wrap">)
     const wrappedUrl = `${liffUrl}?${params.toString()}`;
     return c.json({ success: true, data: { url: wrappedUrl } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/links/wrap"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -274,7 +275,7 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
           const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
           await setFriendFirstTrackedLinkIfNull(c.env.DB, friend.id, trackedLink.id);
         } catch (e) {
-          console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/send-form-link"}));
+          logger.error("routes_liff_failed");
         }
       }
       if (trackedLink?.intro_template_id) {
@@ -301,7 +302,7 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
 
     return c.json({ success: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/send-form-link"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

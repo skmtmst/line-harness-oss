@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { isDeclaredWebhookBodyTooLarge, isWebhookBodyTooLarge } from '../lib/webhook-body.js';
 import type { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -155,7 +156,7 @@ export function registerDeliveryWebhooks(restaurantDelivery: Hono<Env>): void {
       });
       if (!isDeliveryWebhookIpAllowed(sourceIp, allowlist)) {
         // 符号と道筋だけを記録する。相手のIPやサービス名は記録に残さない。
-        console.error(JSON.stringify({"code":"routes_restaurant_delivery_webhook_ip_not_allowed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
+        logger.error("routes_restaurant_delivery_webhook_ip_not_allowed");
         return c.json({ success: false, error: 'Forbidden' }, 403);
       }
     }
@@ -163,7 +164,7 @@ export function registerDeliveryWebhooks(restaurantDelivery: Hono<Env>): void {
     const secret = deliveryWebhookSigningSecret(c.env, service);
     if (!secret) {
       // 合言葉が未設定・短すぎる場合は検証できない。受け取らずに設定不足として返す。
-      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
+      logger.error("routes_restaurant_delivery_failed");
       return c.json({ success: false, error: 'Integration is not configured' }, 503);
     }
 
@@ -265,7 +266,7 @@ export function registerDeliveryWebhooks(restaurantDelivery: Hono<Env>): void {
       return c.json({ success: true, result: 'ignored' });
     } catch (error) {
       // 例外の本文は残さない。種類だけを符号にして台帳へ入れ、相手には再試行を促す。
-      console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed","route":"POST /api/restaurant-test/delivery/webhooks/:service"}));
+      logger.error("routes_restaurant_delivery_failed");
       await closeEvent('retryable_failed', 'processing_failed');
       return c.json({ success: false, error: 'Processing failed' }, 503);
     }

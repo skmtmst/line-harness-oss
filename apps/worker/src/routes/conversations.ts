@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -186,7 +187,7 @@ conversations.get('/api/conversations', async (c) => {
 
     return c.json({ success: true, data: { total: countRow?.total ?? 0, items } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_conversations_failed","route":"GET /api/conversations"}));
+    logger.error("routes_conversations_failed");
     return c.json({ success: false, error: String(err) }, 500);
   }
 });
@@ -294,7 +295,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_conversations_failed","route":"GET /api/conversations/:friendId"}));
+    logger.error("routes_conversations_failed");
     return c.json({ success: false, error: String(err) }, 500);
   }
 });

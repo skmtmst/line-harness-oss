@@ -1,3 +1,4 @@
+import { responseLiffError } from '../../../../liff/src/lib/api-error.js';
 // main.tsx — Event booking LIFF entry. Loaded via dynamic import from
 // apps/worker/src/client/main.ts (?page=event&id=<eventId> or ?page=event-me).
 // Mirrors salon-booking design language (LINE 緑 + sb-card + fade animations).
@@ -82,15 +83,7 @@ function apiGet<T>(path: string, ctx: EventBookingContext): Promise<T> {
   const url = new URL(path, window.location.origin);
   url.searchParams.set('liffId', ctx.liffId);
   return fetch(url.toString(), { headers: buildAuthHeaders(ctx) }).then(async (r) => {
-    if (!r.ok) {
-      const text = await r.text();
-      let parsed: unknown = null;
-      try { parsed = JSON.parse(text); } catch { /* ignore */ }
-      const err = new Error(`API ${r.status}`) as Error & { status: number; body: unknown };
-      err.status = r.status;
-      err.body = parsed ?? text;
-      throw err;
-    }
+    if (!r.ok) throw await responseLiffError(r);
     return r.json() as Promise<T>;
   });
 }
@@ -108,15 +101,7 @@ async function apiPost<T>(
     headers: buildAuthHeaders(ctx, { 'Content-Type': 'application/json', ...extraHeaders }),
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    let parsed: unknown = null;
-    try { parsed = JSON.parse(text); } catch { /* ignore */ }
-    const err = new Error(`API ${res.status}`) as Error & { status: number; body: unknown };
-    err.status = res.status;
-    err.body = parsed ?? text;
-    throw err;
-  }
+  if (!res.ok) throw await responseLiffError(res);
   return res.json();
 }
 

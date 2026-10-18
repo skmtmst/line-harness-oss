@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   RICH_MENU_SCHEDULE_MAX_ATTEMPTS,
   acquirePublishLease,
@@ -945,7 +946,7 @@ export async function processDueRichMenuSchedules(
   try {
     result.reclaimed = await reclaimStaleClaims(db, leaseClock(), limit);
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_rich_menu_schedule_executor_failed"}));
+    logger.error("services_rich_menu_schedule_executor_failed");
   }
 
   const due = await getDueRichMenuSchedules(db, now.toISOString(), limit);

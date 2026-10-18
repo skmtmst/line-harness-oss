@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
@@ -99,7 +100,7 @@ booking.get('/api/booking/admin/settings', async (c) => {
     if (!settings) return c.json({ success: false, error: 'not_found' }, 404);
     return c.json({ success: true, data: settings });
   } catch {
-    console.error(JSON.stringify({"code":"booking_settings_read_failed","route":"GET /api/booking/admin/settings"}));
+    logger.error("booking_settings_read_failed");
     return c.json({ success: false, error: 'booking_settings_unavailable' }, 503);
   }
 });
@@ -149,7 +150,7 @@ booking.put('/api/booking/admin/settings', requirePermission(BOOKING_SETTINGS_KE
       result.status === 'created' ? 201 : 200,
     );
   } catch {
-    console.error(JSON.stringify({"code":"booking_settings_save_failed","route":"PUT /api/booking/admin/settings"}));
+    logger.error("booking_settings_save_failed");
     return c.json({ success: false, error: 'booking_settings_save_failed' }, 503);
   }
 });
@@ -161,7 +162,7 @@ booking.get('/api/booking/admin/resources', async (c) => {
     const resources = await listBookingAdminResources(c.env.DB, accountId);
     return c.json({ success: true, data: { resources } });
   } catch {
-    console.error(JSON.stringify({"code":"booking_resources_read_failed","route":"GET /api/booking/admin/resources"}));
+    logger.error("booking_resources_read_failed");
     return c.json({ success: false, error: 'booking_resources_unavailable' }, 503);
   }
 });
@@ -183,7 +184,7 @@ booking.post('/api/booking/admin/resources', requirePermission(BOOKING_SETTINGS_
     };
     return c.json({ success: true, data: item }, 201);
   } catch {
-    console.error(JSON.stringify({"code":"booking_resource_create_failed","route":"POST /api/booking/admin/resources"}));
+    logger.error("booking_resource_create_failed");
     return c.json({ success: false, error: 'booking_resource_save_failed' }, 503);
   }
 });
@@ -239,7 +240,7 @@ booking.patch('/api/booking/admin/resources/:id', requirePermission(BOOKING_SETT
     };
     return c.json({ success: true, data: item });
   } catch {
-    console.error(JSON.stringify({"code":"booking_resource_update_failed","route":"PATCH /api/booking/admin/resources/:id"}));
+    logger.error("booking_resource_update_failed");
     return c.json({ success: false, error: 'booking_resource_save_failed' }, 503);
   }
 });
@@ -273,7 +274,7 @@ booking.delete('/api/booking/admin/resources/:id', requirePermission(BOOKING_SET
     }
     return c.json({ success: true, data: { id: c.req.param('id') } });
   } catch {
-    console.error(JSON.stringify({"code":"booking_resource_delete_failed","route":"DELETE /api/booking/admin/resources/:id"}));
+    logger.error("booking_resource_delete_failed");
     return c.json({ success: false, error: 'booking_resource_delete_failed' }, 503);
   }
 });
@@ -285,7 +286,7 @@ booking.get('/api/booking/admin/exceptions', async (c) => {
     const items = await listBookingAvailabilityExceptions(c.env.DB, accountId);
     return c.json({ success: true, data: { items } });
   } catch {
-    console.error(JSON.stringify({"code":"booking_exceptions_read_failed","route":"GET /api/booking/admin/exceptions"}));
+    logger.error("booking_exceptions_read_failed");
     return c.json({ success: false, error: 'booking_exceptions_unavailable' }, 503);
   }
 });
@@ -305,7 +306,7 @@ booking.post('/api/booking/admin/exceptions', requirePermission(BOOKING_SETTINGS
     if (!item) return inputError(c, { success: false, error: 'scope_not_found' }, 422, ["scopeKind","kind","dateFrom","dateTo","scopeId","reason","intervals"]);
     return c.json({ success: true, data: item }, 201);
   } catch {
-    console.error(JSON.stringify({"code":"booking_exception_create_failed","route":"POST /api/booking/admin/exceptions"}));
+    logger.error("booking_exception_create_failed");
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
   }
 });
@@ -351,7 +352,7 @@ booking.patch('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SET
     }
     return c.json({ success: true, data: result.item });
   } catch {
-    console.error(JSON.stringify({"code":"booking_exception_update_failed","route":"PATCH /api/booking/admin/exceptions/:id"}));
+    logger.error("booking_exception_update_failed");
     return c.json({ success: false, error: 'booking_exception_save_failed' }, 503);
   }
 });
@@ -387,7 +388,7 @@ booking.delete('/api/booking/admin/exceptions/:id', requirePermission(BOOKING_SE
     }
     return c.json({ success: true, data: { id: c.req.param('id') } });
   } catch {
-    console.error(JSON.stringify({"code":"booking_exception_delete_failed","route":"DELETE /api/booking/admin/exceptions/:id"}));
+    logger.error("booking_exception_delete_failed");
     return c.json({ success: false, error: 'booking_exception_delete_failed' }, 503);
   }
 });

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { liffActionUrl, type AccountStyle } from '@line-crm/shared';
 import { activeTenantLineAccountSql, isOperationCapabilityStopped, resolveLineCredential } from '@line-crm/db';
 import { bookingCancellationQuote } from './booking-cancellation.js';
@@ -59,7 +60,7 @@ export async function previewBookingConfirmation(db:D1Database,bookingId:string,
     if(!row||!row.line_user_id||!['requested','confirmed'].includes(row.status))return null;
     return renderNotificationText('approved',await notificationContext(db,bookingId,row,now.getTime()));
   } catch {
-    console.warn(JSON.stringify({code:'booking_confirmation_preview_failed'}));
+    logger.warn('booking_confirmation_preview_failed');
     return null;
   }
 }

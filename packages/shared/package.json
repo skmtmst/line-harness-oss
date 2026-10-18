@@ -6,6 +6,11 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js",
+      "default": "./src/server/index.ts"
+    },
     "./audit4-api": {
       "types": "./dist/audit4-api.d.ts",
       "import": "./dist/audit4-api.js",

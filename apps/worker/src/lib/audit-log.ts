@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
 import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -253,7 +254,7 @@ export function auditLog(
   // 認証前に呼ばれることはない想定だが、ログのために例外を投げたくない。
   const actorRole = staff?.role ?? 'unknown';
   c.set('auditRecorded', true);
-  console.log(JSON.stringify({ code: 'audit.recorded', route: c.req.routePath || '(unmatched)' }));
+  logger.log("audit.recorded");
 
   const db = c.env?.DB;
   const writer = commonAuditWriter();
@@ -274,7 +275,7 @@ export function auditLog(
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error(JSON.stringify({"code":"lib_audit_log_failed"}));
+    logger.error("lib_audit_log_failed");
   });
   try {
     c.executionCtx.waitUntil(task);

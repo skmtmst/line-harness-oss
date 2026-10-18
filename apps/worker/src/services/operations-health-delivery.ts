@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 /**
  * 稼働確認（operations-health）の「外部連携」の行だけを切り出した層。
  *
@@ -80,7 +81,7 @@ export async function deliveryIntegrationFailures(
     };
   } catch {
     // 符号だけ残す。例外の本文・相手の注文の中身は記録に出さない。
-    console.error(JSON.stringify({"code":"services_operations_health_delivery_failed"}));
+    logger.error("services_operations_health_delivery_failed");
     return { activeCount: 0, failingCount: 0, maxFailures: 0 };
   }
 }

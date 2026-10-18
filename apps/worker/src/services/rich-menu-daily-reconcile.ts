@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   countScheduledReconcileSince,
   ensureRichMenuPublishRun,
@@ -72,7 +73,7 @@ export async function processDailyRichMenuReconcile(
       if (computed.diffs.length > 0) withDiffs += 1;
     } catch (error) {
       // LINE障害など。直さず数えるだけ。次の tick でまた見る。
-      console.error(JSON.stringify({"code":"rich_menu_daily_reconcile_failed"}));
+      logger.error("rich_menu_daily_reconcile_failed");
       failed += 1;
     }
   }

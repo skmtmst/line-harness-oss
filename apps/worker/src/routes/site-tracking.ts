@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { visibleAccountId } from './site-tracking-scope.js';
 import { consumePublicIngressReceipt, getMeasurementSite, siteAllowsHost, normalizeSiteHost } from '@line-crm/db';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
@@ -138,7 +139,7 @@ siteTracking.post('/api/site/collect', inputJsonBoundary(), async (c) => {
   } catch (err) {
     // 記録に失敗しても 204。外のサイトの画面が、こちらの都合で
     // エラーを出すべきではない。
-    console.error(JSON.stringify({"code":"routes_site_tracking_failed","route":"POST /api/site/collect"}));
+    logger.error("routes_site_tracking_failed");
     return c.body(null, 204, corsHeaders());
   }
 });
@@ -320,7 +321,7 @@ siteTracking.post('/api/site/link', requireRole('owner', 'admin', 'staff'), inpu
     // 「結びつかなかった」ことだけ伝える。
     return c.json({ success: true, data: { linked } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_site_tracking_failed","route":"POST /api/site/link"}));
+    logger.error("routes_site_tracking_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -333,7 +334,7 @@ siteTracking.get('/api/site/tracking-key', requireRole('owner', 'admin', 'staff'
     const trackingKey = await getOrCreateSiteTrackingKey(c.env.DB, accountId);
     return c.json({ success: true, data: { accountId, trackingKey } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_site_tracking_failed","route":"GET /api/site/tracking-key"}));
+    logger.error("routes_site_tracking_failed");
     return c.json({ success: false, error: '計測鍵を取得できませんでした' }, 500);
   }
 });
@@ -348,7 +349,7 @@ siteTracking.get('/api/site/summary', requireRole('owner', 'admin', 'staff'), as
     ]);
     return c.json({ success: true, data: { ...summary, consent } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_site_tracking_failed","route":"GET /api/site/summary"}));
+    logger.error("routes_site_tracking_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -371,7 +372,7 @@ siteTracking.get('/api/site/pages', requireRole('owner', 'admin', 'staff'), asyn
     });
     return c.json({ success: true, data: items });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_site_tracking_failed","route":"GET /api/site/pages"}));
+    logger.error("routes_site_tracking_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -400,7 +401,7 @@ siteTracking.get('/api/friends/:id/site-events', requireRole('owner', 'admin', '
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_site_tracking_failed","route":"GET /api/friends/:id/site-events"}));
+    logger.error("routes_site_tracking_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

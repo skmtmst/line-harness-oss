@@ -1,3 +1,4 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import type { Env } from '../worker-env.js';
 
 import { processRestaurantEvents } from '../services/restaurant-events.js';
@@ -99,19 +100,19 @@ export async function scheduled(
       queue: env.CODEX_MENTION_QUEUE, security: env,
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   try {
     await processOperationNotificationOutbox(env);
   } catch (error) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   try {
     await processOperationAlertNotificationOutbox(env);
   } catch (error) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // N-327 (#663): 公開済み運用者通知ルールの送り残しを回収する。
@@ -130,10 +131,10 @@ export async function scheduled(
       now: new Date(event.scheduledTime),
     });
     if (result.swept > 0) {
-      console.log(JSON.stringify({"code":"operator_notification_sweep"}));
+      logger.log("operator_notification_sweep");
     }
   } catch (error) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // N-369/N-370 (#938): 送信Webhookの送り残しを回収する。
@@ -151,16 +152,16 @@ export async function scheduled(
       now: new Date(event.scheduledTime),
     });
     if (result.swept > 0) {
-      console.log(JSON.stringify({"code":"outgoing_webhook_delivery_sweep"}));
+      logger.log("outgoing_webhook_delivery_sweep");
     }
   } catch (error) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   try {
     const { processAutoReplyDeliveries } = await import('../services/auto-reply-delivery.js');
     await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
-  } catch (error) { console.error(JSON.stringify({"code":"src_index_failed"})); }
+  } catch (error) { logger.error("src_index_failed"); }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const dispatchObservedAt = new Date(event.scheduledTime).toISOString();
@@ -170,7 +171,7 @@ export async function scheduled(
   // 配信系は1回だけ実行（内部でfriendのline_account_idから正しいlineClientを動的解決）
   // 以前はアカウントごとにループしていたが、アカウントフィルタなしのDBクエリで
   // 全アカウントの配信が各ループで重複実行されていたバグを修正
-  ctx.waitUntil(import('../routes/webhooks.js').then(({processIncomingWebhookQueue})=>processIncomingWebhookQueue(env)).catch(()=>console.error(JSON.stringify({code:'incoming_queue_failed'}))));
+  ctx.waitUntil(import('../routes/webhooks.js').then(({processIncomingWebhookQueue})=>processIncomingWebhookQueue(env)).catch(()=>logger.error("incoming_queue_failed")));
 
   // Phase 1: 復旧処理 (batch_offset=-1 → 0 にする軽量な UPDATE のみ) を queue 処理より
   // 先に await 完了させる。これで stalled/stuck から復旧した配信が同じ cron tick の
@@ -192,7 +193,7 @@ export async function scheduled(
   try {
     await refreshLineAccessTokens(env.DB);
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // V6オートメーションの日時指定を起動し、待機・一時失敗中の実行を再開する。
@@ -212,18 +213,18 @@ export async function scheduled(
       });
       for (const result of [...scheduledResult.results, ...overdueResults]) {
         if (result.kind === 'configuration_error') {
-          console.error(JSON.stringify({"code":"automation_v6_scheduled_trigger_failed"}));
+          logger.error("automation_v6_scheduled_trigger_failed");
         }
       }
       const dueResult = await processDueAutomationRuns(env.DB, {
         now, executors, limit: 100,
       });
       if (scheduledResult.results.length + overdueResults.length + dueResult.processed > 0) {
-        console.log(JSON.stringify({"code":"automation_v6_cron"}));
+        logger.log("automation_v6_cron");
       }
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   try {
@@ -233,11 +234,11 @@ export async function scheduled(
         sender: sendBookingNotification,
       });
       if (result.sent + result.failed > 0) {
-        console.log(JSON.stringify({"code":"src_index_log"}));
+        logger.log("src_index_log");
       }
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   try {
@@ -247,11 +248,11 @@ export async function scheduled(
         sender: sendEventBookingNotification,
       });
       if (result.sent + result.failed > 0) {
-        console.log(JSON.stringify({"code":"src_index_log"}));
+        logger.log("src_index_log");
       }
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // 取消・拒否・期限切れで空いた席を、同意が必要な24時間の保留として先頭へ案内する。
@@ -262,10 +263,10 @@ export async function scheduled(
       sender: createEventWaitlistOfferSender(env.DB, { liffUrl: env.LIFF_URL }),
     });
     if (result.processed > 0) {
-      console.log(JSON.stringify({"code":"src_index_log"}));
+      logger.log("src_index_log");
     }
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // 来店スタンプの期限通知。配信の見張り（observeDispatch）の対応表には未登録なので、
@@ -276,7 +277,7 @@ export async function scheduled(
       proxyDispatch: request => Promise.resolve(lineProxy.fetch(request, env, ctx)),
     });
   } catch {
-    console.error(JSON.stringify({"code":"visit_stamp_reminders_pending"}));
+    logger.error("visit_stamp_reminders_pending");
   }
 
   // 外部Google Calendarで確定したMeet個別相談。前日・1時間前のLINE通知を
@@ -290,11 +291,11 @@ export async function scheduled(
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
       if (result.sent + result.failed > 0) {
-        console.log(JSON.stringify({"code":"src_index_log"}));
+        logger.log("src_index_log");
       }
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // ウェビナー予約リマインド (セッション選択メニュー)。時刻厳守・軽量なので
@@ -314,11 +315,11 @@ export async function scheduled(
         },
       );
       if (result.sent + result.failed > 0) {
-        console.log(JSON.stringify({"code":"src_index_log"}));
+        logger.log("src_index_log");
       }
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // V6で設定した複数時点の通知。既存の5分前通知とはDB上で排他的にし、
@@ -335,11 +336,11 @@ export async function scheduled(
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
       if (result.sent + result.failed + result.skipped > 0) {
-        console.log(JSON.stringify({"code":"src_index_log"}));
+        logger.log("src_index_log");
       }
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
@@ -388,11 +389,11 @@ export async function scheduled(
       if (birthday.queued + birthday.failed + result.sent + result.failed + result.skipped
         + result.deferred + photoRewards.synced + photoRewards.failed + photoRewards.skipped
         + publicationRewards.synced + publicationRewards.failed > 0) {
-        console.log(JSON.stringify({"code":"nen_campaign_tick"}));
+        logger.log("nen_campaign_tick");
       }
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // 共通情報の日付での切り替え。
@@ -406,10 +407,10 @@ export async function scheduled(
       const { applyDueCommonVarSchedules } = await import('@line-crm/db');
       const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
       const applied = await applyDueCommonVarSchedules(env.DB, jstNowIso);
-      if (applied > 0) console.log(JSON.stringify({"code":"common_var_schedule_applied"}));
+      if (applied > 0) logger.log("common_var_schedule_applied");
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // E-08 (#621): 保存済みリッチメニュー公開予約を時刻到来時に実行する。
@@ -745,10 +746,10 @@ export async function scheduled(
       },
     }, { now: new Date(event.scheduledTime) });
     if (result.processed > 0) {
-      console.log(JSON.stringify({"code":"rich_menu_schedule_tick"}));
+      logger.log("rich_menu_schedule_tick");
     }
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // 予約画面の未予約、予約後の未視聴、フォーム途中離脱、回答後の相談未予約を
@@ -765,11 +766,11 @@ export async function scheduled(
         proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
       });
       if (result.sent + result.failed > 0) {
-        console.log(JSON.stringify({"code":"src_index_log"}));
+        logger.log("src_index_log");
       }
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"src_index_failed"}));
+    logger.error("src_index_failed");
   }
 
   // Phase 2: 配信系と定期ジョブを並列実行する。processScheduledBroadcasts は tag/all の
@@ -792,10 +793,10 @@ export async function scheduled(
         const { sweepBroadcastAfterActions } = await import('../services/broadcast-after-actions.js');
         const swept = await sweepBroadcastAfterActions(env.DB);
         if (swept.done + swept.failed > 0) {
-          console.log(JSON.stringify({"code":"broadcast_after_actions_sweep"}));
+          logger.log("broadcast_after_actions_sweep");
         }
       } catch (sweepError) {
-        console.error(JSON.stringify({"code":"src_index_failed"}));
+        logger.error("src_index_failed");
       }
     }),
     observeDispatch('reminder deliveries',

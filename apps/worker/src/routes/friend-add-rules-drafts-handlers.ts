@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { archiveFriendAddRule, restoreFriendAddRule, createFriendAddRuleDraft, ensureFriendAddFallbackRules, getFriendAddRule, getFriendByLineUserIdForAccount, getLineAccountById, jstNow, listFriendAddRules, publishFriendAddRule, saveFriendAddRuleDraft, stopFriendAddRule, type FriendAddRuleKind, type FriendAddRuleRow } from '@line-crm/db';
@@ -86,7 +87,7 @@ export const get__api_friend_add_rules_conflicts_1 = async (c: Context<Env, "/ap
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"GET /api/friend-add-rules/conflicts"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: '競合と優先順位を取得できませんでした' }, 500);
   }
 };
@@ -357,7 +358,7 @@ export const post__api_friend_add_rules_id_test_send_8 = async (c: Context<Env, 
       await new LineClient(account.channel_access_token)
         .pushMessage(friend.line_user_id, [{ type: 'text', text }], idempotencyKey);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"POST /api/friend-add-rules/:id/test-send"}));
+      logger.error("routes_friend_add_rules_failed");
       return c.json({ success: false, error: 'LINEへ送信できませんでした' }, 502);
     }
     await c.env.DB.prepare(
@@ -375,7 +376,7 @@ export const post__api_friend_add_rules_id_test_send_8 = async (c: Context<Env, 
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_friend_add_rules_failed","route":"POST /api/friend-add-rules/:id/test-send"}));
+    logger.error("routes_friend_add_rules_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
