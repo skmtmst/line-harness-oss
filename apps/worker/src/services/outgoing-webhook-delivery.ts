@@ -1043,9 +1043,11 @@ export async function claimOutgoingDelivery(
       `UPDATE outgoing_webhook_deliveries
           SET status = 'sending', lease_token = ?, lease_until = ?, updated_at = ?
         WHERE id = ? AND status = ? AND attempts = ? AND updated_at = ?
-          AND (lease_until IS NULL OR lease_until <= ?)`,
+          AND (lease_until IS NULL OR lease_until <= ?)
+          AND (next_retry_at IS NULL OR julianday(next_retry_at) <= julianday(?))
+          AND NOT (COALESCE(error_code,'')='retry_after_exceeds_budget' AND next_retry_at IS NULL)`,
     )
-    .bind(leaseToken, leaseUntil, nowIso, delivery.id, delivery.status, delivery.attempts, delivery.updated_at, nowIso)
+    .bind(leaseToken, leaseUntil, nowIso, delivery.id, delivery.status, delivery.attempts, delivery.updated_at, nowIso, nowIso)
     .run();
   return Number(result.meta?.changes ?? 1) === 1 ? leaseToken : null;
 }
@@ -1180,10 +1182,13 @@ export async function finishOutgoingDelivery(
     responseStatus = attempt.responseStatus;
     if (retryAt === null) {
       status = 'failed';
-      errorCode = attemptsDone >= delivery.max_attempts ? 'retry_exhausted'
-        : attempt.responseStatus === 429 && typeof attempt.retryAfterMs === 'number'
-          && attempt.retryAfterMs > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000
-          ? 'retry_after_exceeds_budget' : 'retry_window_expired';
+      const overWait=attempt.responseStatus===429&&typeof attempt.retryAfterMs==='number'
+        &&attempt.retryAfterMs>EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES*60_000;
+      errorCode = overWait?'retry_after_exceeds_budget':attemptsDone>=delivery.max_attempts?'retry_exhausted':'retry_window_expired';
+      if(attempt.responseStatus===429&&typeof attempt.retryAfterMs==='number'&&attempt.retryAfterMs>=0){
+        const notBefore=new Date(now.getTime()+attempt.retryAfterMs);
+        if(Number.isFinite(notBefore.getTime()))nextRetryAt=notBefore.toISOString();
+      }
       errorMessage = outgoingDeliverySafeMessage(errorCode);
     } else {
       status = 'retry_wait';
@@ -1407,7 +1412,8 @@ export async function sweepOutgoingWebhookDeliveries(
       attempt = outgoingAttemptOf(sendResult);
       await logSweptDeliveryAttempt(db, row, webhook.name, sendResult, Date.now() - started);
     }
-    const outcome = await finishOutgoingDelivery(db, row, lease, attempt, now);
+    // Retry-After delta seconds begin at the response, not sweep start.
+    const outcome = await finishOutgoingDelivery(db, row, lease, attempt, input.now ?? new Date());
     if (outcome === 'delivered') {
       result.delivered += 1;
       try {

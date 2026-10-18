@@ -58,6 +58,7 @@ export default function FileOpen() {
 
   const load = useCallback(async () => {
     const mine = ++generation.current;
+    if (blobUrl.current) { URL.revokeObjectURL(blobUrl.current); blobUrl.current = null; }
     setState({ name: 'loading' });
     try {
       const file = await issueFile(id);
@@ -79,19 +80,22 @@ export default function FileOpen() {
 
   const open = useCallback(async (file: IssuedFile) => {
     // 取得リンクは最長15分。過ぎていたら通信せず期限切れにする。
-    if (Date.parse(file.expiresAt) <= Date.now()) {
+    if (!Number.isFinite(Date.parse(file.expiresAt)) || Date.parse(file.expiresAt) <= Date.now()) {
       setState({ name: 'failed', kind: 'expired' });
       return;
     }
+    const mine = generation.current;
     setState({ name: 'fetching', file });
     try {
       const blob = await fetchFileBlob(file);
+      if (mine !== generation.current) return;
       const url = URL.createObjectURL(blob);
       blobUrl.current = url;
       setState({ name: 'opened', file, blobUrl: url });
       // 画像・動画は画面の中で見せる。書類 (PDF など) は端末の表示に渡す。
       if (file.kind === 'file') window.location.assign(url);
     } catch (err) {
+      if (mine !== generation.current) return;
       logFailure('file-fetch', err);
       const e = err instanceof FileDownloadError ? err : new FileDownloadError('retry');
       setState({ name: 'failed', kind: e.kind, waitSeconds: e.retryAfterSeconds });

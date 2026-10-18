@@ -460,10 +460,10 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `delivery_consent_reconciliation_missing` | [宣言](../packages/db/src/friend-delivery-consents.ts)（1か所） |
 | `delivery_consent_suppressed` | [宣言](../apps/worker/src/services/reminder-delivery.ts)（1か所） |
 | `DELIVERY_CONSENT_SUPPRESSED` | [宣言](../apps/worker/src/routes/line-proxy.ts)（1か所） |
-| `delivery_failed` | [宣言](../apps/worker/src/services/external-delivery-retry.ts)（2か所） |
+| `delivery_failed` | [宣言](../apps/worker/src/services/external-delivery-retry.ts)（1か所） |
 | `delivery_ledger_unavailable` | [宣言](../apps/worker/src/services/webhook-interactions.ts)（1か所） |
 | `delivery_unconfirmed` | [宣言](../apps/worker/src/services/automation-action-executors.ts)（6か所） |
-| `delivery_unknown` | [宣言](../apps/worker/src/routes/booking/register-change-actions.ts)（10か所） |
+| `delivery_unknown` | [宣言](../apps/worker/src/routes/booking/register-change-actions.ts)（12か所） |
 | `deposit_collection_not_available` | [宣言](../apps/worker/src/routes/booking/register-liff-create.ts)（2か所） |
 | `device_registered` | [宣言](../apps/worker/src/routes/auth-email.ts)（2か所） |
 | `disconnected` | [宣言](../apps/worker/src/routes/instagram.ts)（1か所） |
@@ -543,6 +543,8 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `export_not_ready` | [宣言](../apps/worker/src/routes/store-comparison.ts)（1か所） |
 | `export_scope_changed` | [宣言](../apps/worker/src/services/store-comparison-export.ts)（1か所） |
 | `export_too_large` | [宣言](../apps/worker/src/routes/booking-payment-admin.ts)（1か所） |
+| `external_request_interrupted` | [宣言](../apps/worker/src/lib/external-call/bounded-http.ts)（2か所） |
+| `external_response_too_large` | [宣言](../apps/worker/src/lib/external-call/bounded-http.ts)（1か所） |
 | `failure_mode_invalid` | [宣言](../apps/worker/src/services/common-actions-is-record.ts)（3か所） |
 | `FALLBACK_REQUIRED` | [宣言](../apps/worker/src/routes/friend-add-rules-drafts-handlers.ts)（1か所） |
 | `FEATURE_DEPENDENCY_DISABLED` | [宣言](../apps/worker/src/middleware/feature-enforcement.ts)（2か所） |
@@ -833,6 +835,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `invalid_late_minutes` | [宣言](../apps/worker/src/routes/booking/register-today.ts)（1か所） |
 | `INVALID_LIFF` | [宣言](../apps/worker/src/lib/rich-menu-publisher.ts)（1か所） |
 | `invalid_limit` | [宣言](../apps/worker/src/routes/instagram.ts)（1か所） |
+| `invalid_list_cursor` | [宣言](../apps/worker/src/routes/friend-list-cursor.ts)（3か所） |
 | `INVALID_LIST_FILTER` | [宣言](../apps/worker/src/routes/hq-templates.ts)（3か所） |
 | `INVALID_LOGO` | [宣言](../apps/worker/src/routes/company-settings.ts)（1か所） |
 | `invalid_makeup_rule` | [宣言](../apps/worker/src/services/booking-makeup.ts)（1か所） |
@@ -1267,6 +1270,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `purchase_not_found` | [宣言](../apps/worker/src/services/booking-pass-billing.ts)（1か所） |
 | `push_payload_too_large` | [宣言](../apps/worker/src/services/web-push.ts)（1か所） |
 | `push_test_rate_limit` | [宣言](../apps/worker/src/routes/operator-push.ts)（1か所） |
+| `QA_SCOPE_CHANGED` | [宣言](../apps/worker/src/routes/staging-qa.ts)（1か所） |
 | `quota_insufficient` | [宣言](../apps/worker/src/routes/line-notifications.ts)（6か所） |
 | `quota_limited` | [宣言](../packages/db/src/error-messages.ts)（1か所） |
 | `quota_timeout` | [宣言](../apps/worker/src/services/dashboard-quota.ts)（1か所） |
@@ -1332,6 +1336,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `reply_input_unavailable` | [宣言](../apps/worker/src/services/event-payload.ts)（1か所） |
 | `REPLY_LEASE_CONFLICT` | [宣言](../apps/worker/src/routes/chats-scheduled-handlers.ts)（3か所） |
 | `reply_too_long` | [宣言](../apps/worker/src/services/auto-reply-unmatched.ts)（1か所） |
+| `reply_unknown` | [宣言](../apps/worker/src/services/workflow-line-client.ts)（1か所） |
 | `request_conflict` | [宣言](../apps/worker/src/routes/restaurant-customer-booking.ts)（2か所） |
 | `request_in_progress` | [宣言](../apps/worker/src/routes/booking/register-create.ts)（6か所） |
 | `request_invalid` | [宣言](../apps/worker/src/services/nen-column-contract.ts)（7か所） |
@@ -1354,6 +1359,8 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `RETENTION_POLICY_INVALID` | [宣言](../apps/worker/src/routes/personal-data-retention.ts)（1か所） |
 | `RETROACTIVE_PREVIEW_REQUIRED` | [宣言](../apps/worker/src/routes/tags.ts)（2か所） |
 | `RETROACTIVE_PREVIEW_STALE` | [宣言](../apps/worker/src/routes/tags.ts)（2か所） |
+| `retry_after_exceeds_budget` | [宣言](../apps/worker/src/routes/reminders-lifecycle-handlers.ts)（1か所） |
+| `retry_after_pending` | [宣言](../apps/worker/src/routes/reminders-lifecycle-handlers.ts)（2か所） |
 | `retry_busy` | [宣言](../apps/worker/src/services/ad-conversion.ts)（2か所） |
 | `retry_conflict` | [宣言](../apps/worker/src/services/automation-engine.ts)（2か所） |
 | `retry_expired` | [宣言](../apps/worker/src/services/ad-conversion.ts)（1か所） |
@@ -1491,6 +1498,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `STAFF_POLICY_CONFLICT` | [宣言](../apps/worker/src/routes/staff.ts)（2か所） |
 | `staff_required` | [宣言](../apps/worker/src/routes/styles-routes-4.ts)（1か所） |
 | `staff_selection_required` | [宣言](../apps/worker/src/routes/booking/register-menus-write.ts)（1か所） |
+| `STAGING_QA_OUTBOUND_BLOCKED` | [宣言](../apps/worker/src/services/staging-qa-safety.ts)（3か所） |
 | `STALE_ORDER` | [宣言](../apps/worker/src/routes/restaurant-delivery-orders-actions.ts)（1か所） |
 | `stamp_queue_pending` | [宣言](../apps/worker/src/services/restaurant-events.ts)（1か所） |
 | `start_at_invalid` | [宣言](../apps/worker/src/routes/scenarios-steps-handlers.ts)（3か所） |

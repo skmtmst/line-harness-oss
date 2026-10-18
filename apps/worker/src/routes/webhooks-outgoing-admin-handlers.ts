@@ -507,6 +507,7 @@ export const post__api_webhooks_interactions_id_retry_10 = async (c: Context<Env
     if (code === 'already_delivered') {
       return c.json({ success: false, error: code }, 409);
     }
+    if(code==='retry_after_pending')return c.json({success:false,code,error:'連携先の待機期限を確認してください。期限前の再送はできません。'},409);
     if (code === 'auto_retry_scheduled') {
       return c.json({ success: false, error: code }, 409);
     }

@@ -1,4 +1,5 @@
 import { logger } from '@line-crm/shared/server';
+import { photoImageScanAllowed } from '../services/photo-image-gate.js';
 import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -158,11 +159,7 @@ images.get('/images/*', async (c) => {
     return c.json({ success: false, error: 'Image not found' }, 404);
   }
   if (key.startsWith('nen-photo-review/') || key.startsWith('nen-photo-public/')) {
-    const photo = await c.env.DB.prepare(`SELECT ps.id FROM nen_photo_submissions ps
-      JOIN media_file_scans scan ON scan.subject_kind='photo' AND scan.subject_id=ps.id
-        AND scan.line_account_id=ps.line_account_id AND scan.status='clean'
-      WHERE substr(ps.review_image_url,-length(?))=? OR substr(ps.public_image_url,-length(?))=?`).bind(`/images/${key}`, `/images/${key}`, `/images/${key}`, `/images/${key}`).first();
-    if (!photo) return c.json({ success: false, error: 'ファイルの安全性を確かめています' }, 409);
+    if (!await photoImageScanAllowed(c.env.DB,key)) return c.json({ success: false, error: 'ファイルの安全性を確かめています' }, 409);
   }
   // Webinar originals use the existing enrollment-gated playback API.
   // A webinar may refer to a media key, so namespace checks alone are insufficient.
@@ -194,7 +191,8 @@ images.get('/images/*', async (c) => {
   headers.set('Content-Type', contentType);
   headers.set('Cache-Control', isPrivate ? 'private, no-store' : 'public, max-age=300');
   headers.set('Referrer-Policy', 'no-referrer');
-  headers.set('ETag', object.etag);
+  const etag = object.httpEtag ?? `"${object.etag.replace(/^"|"$/g, '')}"`;
+  headers.set('ETag', etag);
   // 判別不能なまま開かせない。画像以外はそのまま表示せず添付で渡す。
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set(
@@ -202,6 +200,13 @@ images.get('/images/*', async (c) => {
     contentType.toLowerCase().startsWith('image/') ? 'inline' : 'attachment',
   );
 
+  // Authorization, publishing and scan gates above run before cache validation.
+  // Signed private content keeps no-store and is never represented by a cached 304.
+  const validators = c.req.header('If-None-Match')?.split(',').map(value => value.trim().replace(/^W\//, '')) ?? [];
+  if (!isPrivate && (validators.includes('*') || validators.includes(etag))) {
+    if (typeof object.body?.cancel === 'function') void object.body.cancel().catch(() => {});
+    return new Response(null, { status: 304, headers });
+  }
   return new Response(object.body, { headers });
 });
 

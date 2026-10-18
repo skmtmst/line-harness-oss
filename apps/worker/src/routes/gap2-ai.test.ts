@@ -33,3 +33,35 @@ test('AI-03 AI-29: 模擬OpenAIの返信案には使った根拠。LINE送信と
  const r=await makeAiDraft(d.db,{account:'a',friend:'f',chat:'chat',kind:'draft',apiKey:'fake-test-key',masked:false,providerEnabled:true}) as any;expect(r.sources).toEqual([{type:'qa',id:'qa',title:'営業時間'}]);expect(payload).not.toMatch(/090-1234|test@example|千代田/);expect(d.raw.prepare('SELECT count(*) n FROM messages_log').get()).toEqual({n:1});
  vi.stubGlobal('fetch',vi.fn(async()=>new Response('{}',{status:429})));await expect(makeAiDraft(d.db,{account:'a',friend:'f',chat:'chat',kind:'draft',apiKey:'fake-test-key',masked:false,providerEnabled:true})).rejects.toThrow('ai_rate_limit');
 });
+
+test.each([3999,4000,4500])('conversation content remains within 4000 characters with newest length %i',async length=>{
+ const {makeAiDraft}=await import('../services/ai-drafts.js');
+ await gapCall(app(),setting,'PUT',{mode:'draft_only',expectedVersion:0,confirmed:true});
+ d.raw.exec('DELETE FROM messages_log');
+ const insert=d.raw.prepare("INSERT INTO messages_log(id,friend_id,line_account_id,direction,message_type,content,created_at) VALUES(?,'f','a','incoming','text',?,?)");
+ insert.run('old','o'.repeat(10000),'2026-01-01');insert.run('new','n'.repeat(length),'2026-01-02');
+ let conversation:Array<{id:string;text:string}>=[];
+ vi.stubGlobal('fetch',vi.fn(async(_url:string,init:RequestInit)=>{
+   const request=JSON.parse(String(init.body));conversation=JSON.parse(request.messages[1].content).conversation;
+   return Response.json({choices:[{message:{content:JSON.stringify({text:'案',sourceIds:[]})}}]});
+ }));
+ await makeAiDraft(d.db,{account:'a',friend:'f',chat:'chat',kind:'draft',apiKey:'fake-test-key',masked:false,providerEnabled:true});
+ expect(conversation.reduce((n,row)=>n+row.text.length,0)).toBe(4000);
+ expect(conversation.at(-1)).toEqual({id:'new',role:'お客さま',text:'n'.repeat(Math.min(length,4000))});
+ if(length>=4000)expect(conversation).toHaveLength(1);
+});
+
+test('Q&A content has an independent character budget and output retains its token budget',async()=>{
+ const {makeAiDraft}=await import('../services/ai-drafts.js');
+ await gapCall(app(),setting,'PUT',{mode:'draft_only',expectedVersion:0,confirmed:true});
+ d.raw.prepare("INSERT INTO qa_entries(id,account_id,questions_json,answer_messages_json,status,created_by,updated_at,idempotency_key) VALUES('qa','a',?,?,'published','o',datetime('now'),'qa')")
+  .run(JSON.stringify(['q'.repeat(8000)]),JSON.stringify([{type:'text',text:'a'.repeat(8000)}]));
+ let references:Array<{questions:string;answer:string}>=[];
+ vi.stubGlobal('fetch',vi.fn(async(_url:string,init:RequestInit)=>{
+  const request=JSON.parse(String(init.body));references=JSON.parse(request.messages[1].content).qa;
+  expect(request.max_completion_tokens).toBe(1500);
+  return Response.json({choices:[{message:{content:JSON.stringify({text:'案',sourceIds:[]})}}]});
+ }));
+ await makeAiDraft(d.db,{account:'a',friend:'f',chat:'chat',kind:'draft',apiKey:'fake-test-key',masked:false,providerEnabled:true});
+ expect(references.reduce((n,q)=>n+q.questions.length+q.answer.length,0)).toBe(4000);
+});

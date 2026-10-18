@@ -5,13 +5,12 @@
  * 各画面が onCreate を権限の値で切り替えているかで見張る。
  */
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '../..')
-const read = (path: string) => (['v8/tag-edit/edit.tsx', 'app/reminders/new/new-v8.tsx'].includes(path) ? readUiSource : readFileSync)(join(SRC, path), 'utf8')
+const read = (path: string) => readUiSource(join(SRC, path), 'utf8')
 
 /** 画面 → onCreate を決める権限の値（その値が偽なら作らせない）。 */
 const SCREENS: Array<[string, RegExp]> = [

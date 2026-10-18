@@ -104,7 +104,7 @@ describe('シナリオの複製は通の中身を落とさない', () => {
   it('1通でも失敗したら中断し、理由を出す', () => {
     const body = duplicateScenario()
     expect(body).toContain('if (!copied.success)')
-    expect(body).toContain('e instanceof Error')
+    // エラーの言い方は detail.test.tsx の実操作で確認する。通の失敗で止まる守りは残す。
   })
 
   it('SCENARIO-09: 途中失敗で不完全なコピーを残したまま成功扱いにしない', () => {

@@ -23,6 +23,23 @@ export const bookingAdminPaths = {
     },
   },
   '/api/booking/admin/bookings/{id}': {
+    get: {
+      tags: ['Booking'], summary: '予約の詳細と確定LINEの見本を取得',
+      description: '既存の所属・閲覧権限で読む。confirmationPreviewTextは実送信と同じレンダラーの見本で、取得だけでは送信・予定・決済を作らない。本人用の履歴案内はLIFF設定と実際の変更・取消期限に従う。',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: {
+        '200': { description: '既存の予約詳細。見本はLINE連携したrequested/confirmedで返し、対象外はnull。',
+          content: { 'application/json': { schema: { type: 'object', properties: {
+            booking: { type: 'object', properties: { confirmationPreviewText: { type: ['string', 'null'] } } },
+          } } } } },
+        '400': { description: 'account_id未指定' },
+        '403': { description: '所属または閲覧権限なし' },
+        '404': { description: '指定した店の予約が見つからない' },
+      },
+    },
     patch: {
       tags: ['Booking'], summary: '予約内容を版付きで変更',
       description: 'requested/confirmed の予約だけ変更できる。lock_version 必須の楽観ロックで、日時・担当・メニュー・料金・メモ・通知方針を変える。変更対象の予約自身は重なり・席数・資源ガードから外す。LINE未連携の予約へ送信系方針をオンにはできない。',

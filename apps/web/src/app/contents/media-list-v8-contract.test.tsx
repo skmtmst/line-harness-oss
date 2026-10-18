@@ -206,6 +206,21 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     expect(host!.textContent).toContain('メニュー表.pdf')
   })
 
+  test('共通の表示件数から10・20・50件を選べる', async () => {
+    await renderPage()
+    const trigger = host!.querySelector<HTMLButtonElement>('button[aria-label="表示件数"]')!
+    expect(trigger).not.toBeNull()
+    await act(async () => { trigger.click() })
+    expect([...document.querySelectorAll('[role="listbox"] [role="option"]')].map(option => option.textContent?.trim())).toEqual(['10件表示', '20件表示', '50件表示'])
+    for (const size of [10, 50, 20]) {
+      if (size !== 10) await act(async () => { trigger.click() })
+      const option = [...document.querySelectorAll<HTMLElement>('[role="listbox"] [role="option"]')].find(row => row.textContent?.trim() === `${size}件表示`)!
+      await act(async () => { option.querySelector('button')!.click() })
+      expect(trigger.textContent).toContain(`${size}件表示`)
+    }
+    expect(host!.textContent).toContain('秋の新商品.jpg')
+  })
+
   test('v8 では新しい一覧（O7hUt7）が出て、v7 は出ない', async () => {
     document.documentElement.dataset.theme = 'v8'
     await renderPage()
@@ -268,8 +283,6 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     expect(LIST_V8).toContain('aria-label="並べ方"')
     expect(LIST_V8).toContain('...SORT_OPTIONS.map')
     expect(LIST_V8).toContain('aria-label="表示件数"')
-    expect(LIST_V8).toContain('10件表示')
-    expect(LIST_V8).toContain('50件表示')
     expect(LIST_V8).toContain('<ListRange')
     expect(LIST_V8).toContain('<Pagination')
     expect(LIST_V8).toContain('<BulkBar')

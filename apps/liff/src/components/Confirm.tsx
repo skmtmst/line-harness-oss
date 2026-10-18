@@ -1,3 +1,5 @@
+import PaymentPreparingNote from './PaymentPreparingNote.js';
+import { CUSTOMER_WORDS } from '../lib/customer-words.js';
 import { useEffect,useState } from 'react';
 import { api,type BookingEntitlement,type CreateBookingResponse,type MenuItem,type StaffItem } from '../lib/api.js';
 import { bookingPriceText } from '../lib/booking-price.js';
@@ -184,7 +186,7 @@ export default function Confirm({
       } else if (err.status === 409 && err.body?.error === 'card_not_registered') {
         setError('カードの登録が済んでいません。もう一度押して、カードを登録してください。');
       } else if (err.status === 409 && err.body?.error === 'payment_not_connected') {
-        setError('いまはこのお店でカードの登録ができません。お店にご連絡ください。');
+        setError('いまはカードの登録は準備中です。トークで担当者へご連絡ください。');
       } else if (err.status === 409 && err.body?.error === 'slot_conflict') {
 
         setError('この時間枠は他の方の予約と重なりました。日時を選び直してください。');
@@ -200,7 +202,7 @@ export default function Confirm({
     <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
       <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
-        {party ? totals(party, menu).rows.map((r) => <Row alignEnd={policy !== null} key={r.index} label={personShort(r.index)} value={`${menuLine(r.menu, r.member)}・${(r.index === 0 ? (r.member.staff ?? staff) : r.member.staff)?.display_name ?? '指名なし'}`} />) : <Row alignEnd={policy !== null} label="メニュー" value={menu.name} />}
+        {party ? totals(party, menu).rows.map((r) => <Row alignEnd={policy !== null} key={r.index} label={personShort(r.index)} value={`${menuLine(r.menu, r.member)}・${(r.index === 0 ? (r.member.staff ?? staff) : r.member.staff)?.display_name ?? '指名なし'}`} />) : <Row alignEnd={policy !== null} label={CUSTOMER_WORDS.bookingContent} value={menu.name} />}
         <Row
           alignEnd={policy !== null}
           label="日時"
@@ -210,12 +212,12 @@ export default function Confirm({
         <Row
           alignEnd={policy !== null}
           label="料金"
-          value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : party ? `${yen(totals(party, menu).price)}（目安・お店で払う）` : policy ? bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・お店で払う）`}
+          value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : party ? `${yen(totals(party, menu).price)}（目安・当日払う）` : policy ? bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・当日払う）`}
         />
         {policy?.deposit ? (
           <>
-            <Row alignEnd={policy !== null} label="今お支払い（デポジット）" value={yen(policy.deposit.amount)} wideLabel />
-            <Row alignEnd={policy !== null} label="お店で" value={yen(Math.max(0, policy.price - policy.deposit.amount))} />
+            <Row alignEnd={policy !== null} label="試験のお支払い（デポジット）" value={yen(policy.deposit.amount)} wideLabel />
+            <Row alignEnd={policy !== null} label={CUSTOMER_WORDS.payOnsite} value={yen(Math.max(0, policy.price - policy.deposit.amount))} />
           </>
         ) : null}
       </dl>
@@ -240,7 +242,7 @@ export default function Confirm({
                 </span>
                 {e && (
                   <span className={`shrink-0 text-xs whitespace-nowrap ${selected ? 'text-(--liff-on-primary)' : 'text-ink-secondary'}`}>
-                    {e.kind === 'monthly' ? `今月 あと ${e.monthRemaining ?? 0} 回` : `残り ${e.remaining ?? 0} 回`}
+                    {e.kind === 'monthly' ? `今月 あと ${e.monthRemaining ?? '—'} 回` : `残り ${e.remaining ?? '—'} 回`}
                   </span>
                 )}
               </Button>
@@ -267,18 +269,19 @@ export default function Confirm({
         <p>
           {autoConfirm
             ? '送るとその場で確定します。確定のお知らせをLINEで送ります。'
-            : 'まだ確定ではありません。お店が確かめたら、LINEでお知らせします。'}
+            : 'まだ確定ではありません。ご利用先が確かめたら、LINEでお知らせします。'}
           {deadline != null ? `キャンセルは開始の${deadline % 60 === 0 ? `${deadline / 60}時間` : `${deadline}分`}前まで。` : 'キャンセル期限は予約の履歴で確認してください。'}
         </p>
       </div>
       )}
+      {(policy && policy.cardRequired !== false) || menu.payment_mode === 'online' ? <PaymentPreparingNote /> : null}
       <PrivacyNote />
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || (policy !== null && !accepted)}>
           {submitting ? '送信中...'
-            : policy?.deposit ? `${yen(policy.deposit.amount)} を払って予約する`
-              : policy && policy.cardRequired !== false ? 'カードを登録して予約する'
+            : policy?.deposit ? `${yen(policy.deposit.amount)}の試験で予約する`
+              : policy && policy.cardRequired !== false ? '試験のカードを登録して予約する'
                 : recurrence ? `${recurrence.made} 回分を予約する` : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
         </Button>
       </BottomBar>

@@ -54,7 +54,7 @@ export default function StaffList({
   if (failed) return <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />;
   if (!list) return <LoadingView />;
   if (list.length === 0) {
-    return <p className="text-[13px] leading-6 text-liff-sub">このメニューを担当できるスタッフがいません。</p>;
+    return <p className="text-[13px] leading-6 text-liff-sub">この予約内容を担当できるスタッフがいません。</p>;
   }
 
   return (

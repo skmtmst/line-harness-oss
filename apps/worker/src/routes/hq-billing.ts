@@ -8,11 +8,10 @@ import {
   getStaffById,
   getTenantBilling,
   getTenantBillingByStripeCustomer,
-  recordBillingEvent,
+  prepareTenantBillingUpdate,
+  prepareBillingInvoice,
   toJstString,
-  updateBillingInvoiceRefund,
   updateTenantBilling,
-  upsertBillingInvoice,
   type TenantBilling,
   type TenantPlanStatus,
 } from '@line-crm/db';
@@ -73,24 +72,24 @@ function periodEndIso(subscription: Pick<StripeSubscription, 'current_period_end
   return periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
 }
 
-async function applySubscription(c: Context<Env>, tenant: TenantBilling, subscription: StripeSubscription): Promise<TenantBilling | null> {
+function subscriptionPatch(c: Context<Env>, tenant: TenantBilling, subscription: StripeSubscription) {
   if (subscription.status === 'incomplete') {
-    return updateTenantBilling(c.env.DB, tenant.id, {
+    return {
       stripe_subscription_id: subscription.id,
       stripe_customer_id: subscription.customer,
-    });
+    };
   }
   const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
   const planKey = planKeyForPrice(c.env, priceId)?.key ?? (subscription.metadata?.plan_key as PlanKey | undefined) ?? tenant.plan_key;
   const planStatus = mapStripeSubscriptionStatus(subscription.status);
-  return updateTenantBilling(c.env.DB, tenant.id, {
+  return {
     plan_key: planKey ?? null,
     plan_status: planStatus ?? tenant.plan_status,
     stripe_subscription_id: subscription.id,
     stripe_customer_id: subscription.customer,
     current_period_ends_at: periodEndIso(subscription),
     trial_ends_at: null,
-  });
+  };
 }
 
 // ================================================================ summary
@@ -346,6 +345,7 @@ hqBilling.get('/api/hq/billing/invoices', requireRole('owner', 'admin'), async (
 interface BillingWebhookEvent {
   id: string;
   type: string;
+  created?: number;
   data: { object: Record<string, unknown> };
 }
 
@@ -372,7 +372,8 @@ async function resolveRefundedInvoiceId(c: Context<Env>, object: Record<string, 
     return typeof paymentIntent.invoice === 'string' ? paymentIntent.invoice : null;
   } catch (error) {
     logger.warn("routes_hq_billing_warn");
-    return null;
+    // An unavailable lookup is not evidence that the charge has no invoice.
+    throw error;
   }
 }
 
@@ -415,13 +416,63 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
       ? await resolveRefundedInvoiceId(c, object)
       : undefined;
     const tenant = await findTenantForEvent(c, object);
-    const first = await recordBillingEvent(c.env.DB, { id: event.id, type: event.type, tenantId: tenant?.id ?? null, summary: event.type });
-    if (!first) return c.json({ success: true, data: { received: true, duplicate: true } });
+    // Existing rows are completed legacy receipts. New receipts remain pending until
+    // every domain write and the completion marker commit together.
+    await c.env.DB.prepare('INSERT OR IGNORE INTO billing_events (id,type,tenant_id,summary) VALUES (?,?,?,?)')
+      .bind(event.id,event.type,tenant?.id ?? null,'pending').run();
+    const receipt = await c.env.DB.prepare('SELECT summary FROM billing_events WHERE id=?').bind(event.id).first<{summary:string}>();
+    if (receipt?.summary !== 'pending') return c.json({ success:true,data:{received:true,duplicate:true} });
+    const statements: D1PreparedStatement[] = [];
+    let refundStatementIndex: number | undefined;
+    let hasTenantWrite=false;
+    const pending = {sql:"EXISTS (SELECT 1 FROM billing_events WHERE id=? AND summary='pending')",values:[event.id] as unknown[]};
+    const subscriptionId = event.type.startsWith('customer.subscription.') ? stripeExpandableId(object.id)
+      : stripeExpandableId(object.subscription);
+    const created = typeof event.created === 'number' && Number.isSafeInteger(event.created) && event.created > 0 ? event.created : 0;
+    const writeTenant = (patch: Parameters<typeof updateTenantBilling>[2], subscription = false) => {
+      const sql = [pending.sql]; const values = [...pending.values];
+      if (subscription) {
+        // Deletion/updates belong to the current subscription. A new checkout or
+        // creation may replace a canceled contract, never a different live one.
+        const canReplace = event.type === 'checkout.session.completed' || event.type === 'customer.subscription.created';
+        sql.push(`(stripe_subscription_id IS NULL OR stripe_subscription_id=?${canReplace ? " OR plan_status='canceled'" : ''})`);
+        values.push(subscriptionId);
+        if (event.type === 'customer.subscription.deleted') {
+          sql.push('stripe_subscription_id=?'); values.push(subscriptionId);
+        }
+        sql.push("(stripe_customer_id IS NULL OR stripe_customer_id=?)"); values.push(stripeExpandableId(object.customer));
+        // The completed receipt carries provider time, never local arrival time.
+        if (created) {
+          sql.push(`NOT EXISTS (SELECT 1 FROM billing_events e WHERE e.tenant_id=tenants.id
+            AND json_valid(e.summary) AND json_extract(e.summary,'$.applied')=1
+            AND (?=1 OR json_extract(e.summary,'$.subscriptionId')=?)
+            AND json_extract(e.summary,'$.created')>?)`); values.push(canReplace?1:0,subscriptionId,created);
+        }
+        // A deleted subscription cannot become active again; re-contracting has a new ID.
+        if (patch.plan_status && patch.plan_status !== 'canceled') {
+          sql.push("NOT (plan_status='canceled' AND stripe_subscription_id=?)"); values.push(subscriptionId);
+        }
+      } else if (event.type.startsWith('invoice.')) {
+        sql.push("plan_status=? AND (stripe_subscription_id IS NULL OR ? IS NULL OR stripe_subscription_id=?)");
+        values.push(event.type==='invoice.paid'?'past_due':'active',subscriptionId,subscriptionId);
+      }
+      const statement=prepareTenantBillingUpdate(c.env.DB,tenant!.id,patch,{sql:sql.join(' AND '),values});
+      if(statement){statements.push(statement);hasTenantWrite=true;}
+    };
+    const finish = async () => {
+      statements.push(c.env.DB.prepare(`UPDATE billing_events SET summary=json_object('state','completed','created',?,'subscriptionId',?,'applied',${hasTenantWrite?'changes()':'0'}) WHERE id=? AND summary='pending'`)
+        .bind(created,subscriptionId,event.id));
+      const results = await c.env.DB.batch(statements);
+      if (refundStatementIndex !== undefined && !results[refundStatementIndex]?.meta.changes) {
+        logger.warn('routes_hq_billing_warn');
+      }
+    };
     if (refundedInvoiceId === null) {
       logger.info("routes_hq_billing_info");
     }
     if (!tenant) {
       logger.warn("routes_hq_billing_warn");
+      await finish();
       return c.json({ success: true, data: { received: true, matched: false } });
     }
 
@@ -434,20 +485,20 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
         if (subscriptionId && stripeReady(c)) {
           try {
             const subscription = await stripeApi.retrieveSubscription(c.env, subscriptionId);
-            await applySubscription(c, tenant, subscription);
+            writeTenant(subscriptionPatch(c, tenant, subscription), true);
             applied = true;
           } catch (error) {
             logger.warn("routes_hq_billing_warn");
           }
         }
         if (!applied) {
-          await updateTenantBilling(c.env.DB, tenant.id, {
+          writeTenant({
             plan_key: findPlan(metadata.plan_key)?.key ?? tenant.plan_key,
             plan_status: 'active',
             stripe_subscription_id: subscriptionId,
             stripe_customer_id: customerId,
             trial_ends_at: null,
-          });
+          }, true);
         }
         break;
       }
@@ -462,51 +513,49 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
             logger.warn("routes_hq_billing_warn");
           }
         }
-        await applySubscription(c, tenant, subscription);
+        writeTenant(subscriptionPatch(c, tenant, subscription), true);
         break;
       }
       case 'customer.subscription.deleted': {
-        await applySubscription(c, tenant, { ...(object as unknown as StripeSubscription), status: 'canceled' });
+        writeTenant(subscriptionPatch(c, tenant, { ...(object as unknown as StripeSubscription), status: 'canceled' }), true);
         break;
       }
       case 'invoice.paid': {
-        await upsertBillingInvoice(c.env.DB, billingInvoiceInput(object as unknown as StripeInvoice, {
+        statements.push(prepareBillingInvoice(c.env.DB, billingInvoiceInput(object as unknown as StripeInvoice, {
           tenantId: tenant.id,
           fallbackPaidAt: toJstString(new Date()),
-        }));
-        if (tenant.plan_status === 'past_due') await updateTenantBilling(c.env.DB, tenant.id, { plan_status: 'active' });
+        }), pending));
+        writeTenant({ plan_status: 'active' });
         break;
       }
       case 'invoice.payment_failed': {
-        await upsertBillingInvoice(c.env.DB, billingInvoiceInput({
+        statements.push(prepareBillingInvoice(c.env.DB, billingInvoiceInput({
           ...(object as unknown as StripeInvoice),
           status: 'open',
-        }, { tenantId: tenant.id }));
-        if (tenant.plan_status === 'active') await updateTenantBilling(c.env.DB, tenant.id, { plan_status: 'past_due' });
+        }, { tenantId: tenant.id }), pending));
+        writeTenant({ plan_status: 'past_due' });
         break;
       }
       case 'invoice.voided': {
-        await upsertBillingInvoice(c.env.DB, billingInvoiceInput({
+        statements.push(prepareBillingInvoice(c.env.DB, billingInvoiceInput({
           ...(object as unknown as StripeInvoice),
           status: 'void',
-        }, { tenantId: tenant.id }));
+        }, { tenantId: tenant.id }), pending));
         break;
       }
       case 'charge.refunded': {
         if (refundedInvoiceId) {
-          const updated = await updateBillingInvoiceRefund(c.env.DB, {
-            invoiceId: refundedInvoiceId,
-            amountRefunded: typeof object.amount_refunded === 'number' ? object.amount_refunded : 0,
-          });
-          if (!updated) {
-            logger.warn("routes_hq_billing_warn");
-          }
+          refundStatementIndex = statements.length;
+          statements.push(c.env.DB.prepare(`UPDATE billing_invoices SET amount_refunded=?,synced_at=? WHERE id=? AND tenant_id=? AND ${pending.sql}`)
+            .bind(Math.max(0,Math.floor(typeof object.amount_refunded==='number'?object.amount_refunded:0)),
+              toJstString(new Date()),refundedInvoiceId,tenant.id,...pending.values));
         }
         break;
       }
       default:
         break;
     }
+    await finish();
     return c.json({ success: true, data: { received: true } });
   } catch (err) {
     logger.error("routes_hq_billing_failed");

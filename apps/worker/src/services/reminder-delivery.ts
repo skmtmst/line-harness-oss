@@ -46,6 +46,9 @@ import { resolveSendInterpolationExtra, resolveInterpolationExtra } from './inte
 import { resolveReminderSendAt } from '@line-crm/shared';
 import {
   classifyExternalDeliveryError,
+  externalDeliveryStatus,
+  externalDeliveryNotBefore,
+  EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES,
   externalDeliveryRetryAt,
   type SafeExternalDeliveryError,
 } from './external-delivery-retry.js';
@@ -547,6 +550,8 @@ export async function processReminderDeliveries(
         continue;
       }
 
+      let sendStarted=false,accepted=false;
+      let lineRequestId:string|null=null;
       try {
         const deliveryClient = await (options.resolveClient
           ? options.resolveClient(accountId, lineClient)
@@ -644,12 +649,18 @@ export async function processReminderDeliveries(
             continue enrollmentLoop;
           }
         }
+        const marker=await db.prepare(`UPDATE reminder_delivery_runs SET last_error_code='delivery_started',updated_at=?
+          WHERE id=? AND status='claimed' AND lease_expires_at IN (${ownedLeases.map(()=>'?').join(',')})`)
+          .bind(nowIso,run.id,...ownedLeases).run();
+        if(marker.meta.changes!==1)continue;
+        sendStarted=true;
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,
           [built.message],
           run.line_retry_key,
         );
 
+        accepted=true;lineRequestId=response.requestId;
         const deliveredId = crypto.randomUUID();
         const logId = crypto.randomUUID();
         const completed = await db.batch([
@@ -688,23 +699,35 @@ export async function processReminderDeliveries(
           logger.error("reminder_delivery_completed_after_cancel");
         }
       } catch (error) {
-        const safe = classifyReminderDeliveryError(error);
+        const status=externalDeliveryStatus(error);
+        const rejected=!accepted&&status>=400&&status<500&&status!==408;
+        const unknown=sendStarted&&!rejected;
+        const safe = unknown?{code:'delivery_unknown',message:'送信結果を確認できません。LINEの送信履歴を照合するまで再送しません。',retryable:false}:classifyReminderDeliveryError(error);
+        // The relative provider wait starts when its response arrives, rather
+        // than at the beginning of a potentially long cron sweep.
+        const failureNow = options.now ?? new Date();
         const retryAt = externalDeliveryRetryAt(
           error,
           run.retry_cycle_attempt_count,
-          now,
+          failureNow,
           safe.retryable,
         )?.toISOString() ?? null;
+        const notBefore=unknown?undefined:externalDeliveryNotBefore(error,failureNow);
+        const providerDate=new Date(notBefore ?? Number.NaN);
+        const notBeforeAt=Number.isFinite(providerDate.getTime())?providerDate.toISOString():null;
+        const overWait=notBefore!==undefined&&notBefore-failureNow.getTime()>EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES*60_000;
         const exhausted = safe.retryable && !retryAt;
         // R340: 持ち主が移っているときは書けず false になる。
         // 新しい持ち主が結果を記録するため、ここでは数えない。
         const recorded = await failReminderDeliveryRun(db, {
           id: run.id,
-          code: exhausted ? 'retry_exhausted' : safe.code,
-          message: exhausted
+          lineRequestId,
+          code: !sendStarted && safe.retryable ? 'delivery_not_started' : overWait ? 'retry_after_exceeds_budget' : exhausted && status===429 ? 'line_rate_limited_exhausted' : exhausted ? 'retry_exhausted' : safe.code,
+          message: overWait?'連携先の待機期限が再試行の予算を超えたため、自動・手動の再送を止めています。連携先の状態を確認してください。':exhausted
             ? '自動再試行の上限に達しました。LINE連携を確認し、必要なら手動で再試行してください。'
             : safe.message,
           retryAt,
+          notBeforeAt,
           now: nowIso,
           expectedLeaseExpiresAt: ownedLeases,
         });

@@ -6,7 +6,7 @@ import { activeRuleGateSql, bookingPolicyGateSql, ownerGateSql } from './reminde
  * 1通ぶんの実行行を作り、同時実行のうち1つだけが送信を担当する。
  *
  * LINEへ送る前に行と再送キーを固定する。通信後にWorkerが落ちても、次のcronは
- * 同じ X-Line-Retry-Key で再試行できるため、二重送信を避けられる。
+ * 送信開始済みなら結果照合まで止め、未実行と確認できた失敗だけ再試行する。
  */
 export async function claimReminderDeliveryRun(
   db: D1Database,
@@ -56,6 +56,14 @@ export async function claimReminderDeliveryRun(
   ).bind(input.friendReminderId, input.reminderStepId, input.scheduledAt)
     .first<ReminderDeliveryRunRow>();
   if (!row) return null;
+
+  // Reclaiming a lease cannot establish that a physical send never happened.
+  // Keep the original run/key and hold it for reconciliation instead of sending.
+  await db.prepare(`UPDATE reminder_delivery_runs SET status='permanent_failed',
+    last_error_code='delivery_unknown',last_error_message='送信結果の照合が必要です。自動では再送しません。',
+    lease_expires_at=NULL,next_retry_at=NULL,completed_at=?,updated_at=?
+    WHERE id=? AND status='claimed' AND lease_expires_at<=? AND (last_error_code='delivery_started' OR sent_message_content IS NOT NULL)`)
+    .bind(input.now,input.now,row.id,input.now).run();
 
   // 登録・基準日変更・再開より前に過ぎた通は、遡って送らず記録を残す。
   // cron の遅れや、すでに送信を試みた通の再試行とは区別する。

@@ -1,3 +1,4 @@
+import type { AccountStyle } from '@line-crm/shared';
 import { prepareEventReminders } from './event-reminder-plan.js';
 import { recoverEventBookingNotifications } from './event-notification-recovery.js';
 import { deliverBookingLine, BookingLineDeliveryIncomplete } from './booking-line-delivery.js';
@@ -116,6 +117,7 @@ interface DueEventReminderRow {
   channel_access_token_encrypted: string | null;
   line_user_id: string;
   reminder_hours_before: number | null;
+  notification_style: AccountStyle | null;
 }
 
 function startsAtJstFmt(utcIso: string): string {
@@ -159,13 +161,14 @@ export async function processDueEventReminders(
               s.starts_at,
               la.channel_access_token,
               la.channel_access_token_encrypted,
-              f.line_user_id
+              f.line_user_id, ast.style AS notification_style
          FROM event_booking_reminders r
          INNER JOIN event_bookings b ON b.id = r.booking_id
          INNER JOIN events e ON e.id = b.event_id
          INNER JOIN event_slots s ON s.id = b.slot_id
          INNER JOIN line_accounts la ON la.id = b.line_account_id
          INNER JOIN friends f ON f.id = b.friend_id AND f.line_account_id=b.line_account_id
+         LEFT JOIN account_styles ast ON ast.line_account_id=b.line_account_id AND ast.selection_mode='configured'
         WHERE r.status IN ('pending','failed')
           AND r.scheduled_at <= ?
           AND f.is_following=1
@@ -200,7 +203,7 @@ export async function processDueEventReminders(
       input: {
         toLineUserId: row.line_user_id,
         kind: notificationKindFor(row.kind),
-        ctx: { eventName: row.event_name, startsAtJst: startsAtJstFmt(row.starts_at),
+        ctx: { style:row.notification_style??'standard',eventName: row.event_name, startsAtJst: startsAtJstFmt(row.starts_at),
           venueName: row.venue_name, venueUrl: row.venue_url,
           hoursBefore: row.reminder_hours_before ?? 0, reminderExtra: row.reminder_message_extra },
       },

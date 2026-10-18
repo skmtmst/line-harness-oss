@@ -3,11 +3,11 @@
  * 今までの画面（app/form-submissions/edit）の処理を写したもの。src/v8 からは
  * 古い画面ファイルを import できないので、同じ中身をここに持つ（動きは同じ）。
  */
-import { FIXED_FRIEND_FIELDS, DEFAULT_ALLERGY_OPTIONS, fixedFieldForBlock } from '@line-crm/shared'
-import type { FormAction, FormBlock, FormInputBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { makeFormBlock } from '@/components/forms/form-definition-operations'
 import type { FormRefs } from '@/components/forms/form-refs'
 import { formatDateTime } from '@/lib/format'
+import type { FormAction,FormBlock,FormInputBlock,FormInputType,FormLayout } from '@line-crm/shared'
+import { DEFAULT_ALLERGY_OPTIONS,FIXED_FRIEND_FIELDS,fixedFieldForBlock } from '@line-crm/shared'
 
 /* ---------------- 競合（409）の言い方：form-conflict-message.ts と同じ ---------------- */
 
@@ -229,8 +229,6 @@ export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
     { key: 'time', label: '時刻', hint: '時計で選ぶ', make: input('text', { label: '時刻', limit: { format: 'time' } }) },
     { key: 'booking', label: '予約を入れる', hint: '空いている枠から選ぶ', fresh: true, make: input('booking', { booking: null }) },
     { key: 'file', label: 'ファイル', hint: '写真・書類を送る', make: input('file', { label: 'ファイル' }) },
-    // 絵 m1cWEy：本人確認書類は表と裏の2枚を受けるファイルの欄として足す。
-    { key: 'identity', label: '本人確認書類', hint: '免許証などの表と裏', make: input('file', { label: '本人確認書類', fileKinds: ['identity'], fileBothSides: true }) },
   ] },
   { title: '飾り', cards: [
     { key: 'image', label: '画像', hint: 'ロゴ・写真', make: () => makeFormBlock('image') },

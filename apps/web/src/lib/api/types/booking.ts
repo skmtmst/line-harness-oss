@@ -540,6 +540,8 @@ export interface BookingAdminDetail {
   calendarSync: 'synced' | 'not_configured' | 'failed' | 'pending';
   /** この予約へ送る通知の固定方針。アカウント設定の現行値ではない。 */
   notificationPolicy: BookingNotificationPolicy;
+  /** Workerの実送信と同じ文面。取得するだけでは送信・予定作成を行わない。 */
+  confirmationPreviewText?: string | null;
   menuName: string;
   staffName: string;
   /** T: 予約の写し。写しが無い予約（490 より前）は null。 */

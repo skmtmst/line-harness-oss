@@ -1,3 +1,4 @@
+import { CUSTOMER_WORDS } from '../lib/customer-words.js';
 import { useUrlStep } from '../lib/use-url-step.js';
 import WaitlistOfferSheet from '../components/WaitlistOfferSheet.js';
 import { useEffect, useRef, useState } from 'react';
@@ -20,7 +21,7 @@ import { initialParty, partyCapable, type PartyState } from '../lib/party.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
-const STEPS = ['メニュー', '担当', '日時', '確認'];
+const STEPS = [CUSTOMER_WORDS.bookingContent, '担当', '日時', '確認'];
 
 /**
  * ご予約 (★V8・IruGD→biNP5→M2p63S/k3aJKU→gLReL→VU6Xi)。手順は4つ。
@@ -48,7 +49,7 @@ export default function Booking() {
   const [cardStep, setCardStep] = useState(false);
   const [prepayNotice, setPrepayNotice] = useState<string | null>(null);
   const [doneStatus, setDoneStatus] = useState('requested');
-  // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
+  // 予約のルール「ご利用先が承認してから確定する」。読めなければ承認あり扱い。
   const [autoConfirm, setAutoConfirm] = useState(false);
   const [cancelDeadline, setCancelDeadline] = useState<number | null>(null);
   useEffect(() => {

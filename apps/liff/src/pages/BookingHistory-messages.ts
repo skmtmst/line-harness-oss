@@ -14,6 +14,7 @@ export type ChangeSlot = { date: string; start: string; startUtc?: string };
 /** 取消の失敗を、お客さまが次に何をすればよいかの1文にする。 */
 export function cancelFailureMessage(code: string | undefined): string {
   switch (code) {
+    case 'cancellation_fee_confirmation_required': return 'キャンセル料の確認が必要です。トークで担当者へご連絡ください。';
     case 'self_deadline_passed': return 'キャンセルの期限を過ぎています。トークでご連絡ください。';
     case 'version_conflict':
     case 'not_editable':

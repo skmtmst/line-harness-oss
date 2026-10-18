@@ -74,3 +74,22 @@ it('S11 refuses webinar originals even under a published media location', async 
  expect((await app().request('/images/media/webinar/frame.jpg')).status).toBe(404);
  expect(get).not.toHaveBeenCalled();
 });
+
+it.each(['"etag-conditional"','W/"etag-conditional"','"other", "etag-conditional"','*'])('public conditional request %s returns 304 without a body',async tag=>{
+ get.mockReset();get.mockResolvedValue({body:'synthetic-image',etag:'etag-conditional',httpEtag:'"etag-conditional"',httpMetadata:{contentType:'image/png'}});
+ const response=await app().request('/images/conditional.png',{headers:{'If-None-Match':tag}});
+ expect(response.status).toBe(304);expect(await response.text()).toBe('');
+ expect(response.headers.get('ETag')).toBe('"etag-conditional"');
+});
+it('nonmatching validators retain the image and return a quoted ETag',async()=>{
+ get.mockReset();get.mockResolvedValue({body:'synthetic-image',etag:'etag-current',httpMetadata:{contentType:'image/png'}});
+ const response=await app().request('/images/conditional.png',{headers:{'If-None-Match':'"other"'}});
+ expect(response.status).toBe(200);expect(await response.text()).toBe('synthetic-image');expect(response.headers.get('ETag')).toBe('"etag-current"');
+});
+it('private delivery rechecks signatures and retains no-store even with a matching validator',async()=>{
+ get.mockReset();get.mockResolvedValue({body:'private-image',etag:'etag-private',httpMetadata:{contentType:'image/png'}});
+ const url=await signPrivateImageUrl(new URL('http://localhost/images/form-uploads/form/friend/photo.jpg'),'synthetic-signing-key');
+ const response=await app().request(url,{headers:{'If-None-Match':'*'}});
+ expect(response.status).toBe(200);expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+ get.mockClear();expect((await app().request(url.replace('photo.jpg','other.jpg'),{headers:{'If-None-Match':'*'}})).status).toBe(404);expect(get).not.toHaveBeenCalled();
+});

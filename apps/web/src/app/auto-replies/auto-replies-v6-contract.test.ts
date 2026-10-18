@@ -1,15 +1,16 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const EDITOR = fs.readFileSync(
+const EDITOR = readUiSource(
   path.join(__dirname, '../../components/auto-replies/edit-dialog.tsx'),
   'utf8',
 )
-const PUBLISH = fs.readFileSync(new URL('edit/wizard-v8.tsx', import.meta.url), 'utf8')
-const LIST = fs.readFileSync(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
-const EDIT_PAGE = fs.readFileSync(new URL('edit/wizard-v8.tsx', import.meta.url), 'utf8')
+const PUBLISH = readUiSource(new URL('edit/wizard-v8.tsx', import.meta.url), 'utf8')
+const LIST = readUiSource(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
+const EDIT_PAGE = readUiSource(new URL('edit/wizard-v8.tsx', import.meta.url), 'utf8')
 
 describe('V6 自動応答一覧の契約', () => {
   it('共通の編集用変換と保存本文で所属フォルダを引き継ぐ', () => {

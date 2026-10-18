@@ -1,6 +1,6 @@
-import { liffErrorMessage } from '../lib/api-error.js';
-import { TextInput, FieldLabel } from '../components/forms/controls.js';
 import liff from '@line/liff';
+import { TextInput, FieldLabel } from '../components/forms/controls.js';
+import { fetchMe, postRegister, postAddLink, fetchOffers, fetchMileage, postEnrollOffer, type AffiliateData, type AffiliateLinkData, type OfferData, type MileageWalletData, type MileageOpportunity } from '../lib/affiliate-profile-api.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LOAD_FAILED_MESSAGE, SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
@@ -15,190 +15,12 @@ import Badge from '../components/ui/Badge.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import Icon from '../components/ui/Icon.js';
 import { copyText, CopyButton } from "../components/affiliate-parts.js"
-const BASE = import.meta.env.VITE_API_BASE ?? '';
-
-interface AffiliateData {
-  id: string;
-  name: string;
-  code: string;
-  commissionRate: number;
-  isActive: boolean;
-  friendId: string;
-}
-
-interface AffiliateLinkData {
-  refCode: string;
-  label: string | null;
-  url: string;
-  clickCount: number;
-  friendAdds: number;
-  conversions: number;
-  conversionsPending: number;
-  conversionsApproved: number;
-  offerId: string | null;
-  offerName: string | null;
-}
-
-interface OfferData {
-  id: string;
-  name: string;
-  description: string | null;
-  rewardAmount: number;
-  rewardMiles: number;
-  windowDays: number | null;
-  receptionFrom: string | null;
-  receptionTo: string | null;
-  /** 上限に達して受付が止まっているか。(PR823) */
-  halted: boolean;
-  totalRemaining: number | null;
-  monthlyRemaining: number | null;
-  enrolled: boolean;
-  refCode: string | null;
-  url: string | null;
-}
-
-interface MileageData {
-  programId: string;
-  programName: string;
-  available: number;
-  pending: number;
-  lifetimeEarned: number;
-  spent: number;
-}
-
-interface MileageHistoryItem {
-  id: string;
-  entryType: 'grant' | 'reversal' | 'spend' | 'expiration' | 'adjustment';
-  status: 'pending' | 'available' | 'void';
-  amount: number;
-  reason: string;
-  source: string;
-  sourceEventId: string | null;
-  occurredAt: string;
-}
-
-interface MileageInsights {
-  accountCount: number;
-  rewardedActions: number;
-  referralMiles: number;
-  qualityReferralCount: number;
-  lastEarnedAt: string | null;
-}
-
-interface MileageWalletData {
-  mileage: MileageData;
-  history: MileageHistoryItem[];
-  insights: MileageInsights;
-  opportunities: MileageOpportunity[];
-}
-
-interface MileageOpportunity {
-  id: string;
-  type: 'webinar' | 'friend_add';
-  title: string;
-  description: string;
-  rewardMiles: number;
-  nextRewardMiles: number;
-  progressPercent: number;
-  ctaLabel: string;
-  url: string;
-  targetAccountId?: string;
-  completed?: boolean;
-  mileageStatus?: 'credited' | 'pending' | 'waiting';
-  creditedMiles?: number;
-}
 
 type State =
   | { phase: 'loading' }
   | { phase: 'not_registered' }
   | { phase: 'registered'; affiliate: AffiliateData; links: AffiliateLinkData[]; offers: OfferData[] }
   | { phase: 'error'; message: string };
-
-async function getAccessToken(): Promise<string> {
-  const token = liff.getAccessToken();
-  if (!token) throw new Error('LINE アクセストークンを取得できませんでした');
-  return token;
-}
-
-async function fetchMe(): Promise<
-  | { registered: true; affiliate: AffiliateData; links: AffiliateLinkData[] }
-  | { registered: false }
-> {
-  const token = await getAccessToken();
-  const url = `${BASE}/api/liff/affiliate/me?lineAccessToken=${encodeURIComponent(token)}`;
-  const res = await fetch(url);
-  if (res.status === 404) return { registered: false };
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(liffErrorMessage(body));
-  }
-  const data = (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
-  return { registered: true, affiliate: data.affiliate, links: data.links };
-}
-
-async function postRegister(): Promise<{ affiliate: AffiliateData; links: AffiliateLinkData[] }> {
-  const token = await getAccessToken();
-  const res = await fetch(`${BASE}/api/liff/affiliate/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lineAccessToken: token }),
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(liffErrorMessage(body));
-  }
-  return (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
-}
-
-async function postAddLink(label: string | null, offerId: string | null): Promise<AffiliateLinkData> {
-  const token = await getAccessToken();
-  const res = await fetch(`${BASE}/api/liff/affiliate/links`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lineAccessToken: token, label: label || null, offerId: offerId || null }),
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(liffErrorMessage(body));
-  }
-  const data = (await res.json()) as { link: AffiliateLinkData };
-  return data.link;
-}
-
-async function fetchOffers(): Promise<OfferData[]> {
-  const token = await getAccessToken();
-  const url = `${BASE}/api/liff/affiliate/offers?lineAccessToken=${encodeURIComponent(token)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('案件を読み込めませんでした。');
-  const data = (await res.json()) as { offers: OfferData[] };
-  return data.offers;
-}
-
-async function fetchMileage(): Promise<MileageWalletData> {
-  const token = await getAccessToken();
-  const url = `${BASE}/api/liff/mileage/me?lineAccessToken=${encodeURIComponent(token)}&limit=20`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(liffErrorMessage(body));
-  }
-  return (await res.json()) as MileageWalletData;
-}
-
-async function postEnrollOffer(offerId: string): Promise<AffiliateLinkData> {
-  const token = await getAccessToken();
-  const res = await fetch(`${BASE}/api/liff/affiliate/offers/${encodeURIComponent(offerId)}/enroll`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ lineAccessToken: token }),
-  });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(liffErrorMessage(body));
-  }
-  const data = (await res.json()) as { link: AffiliateLinkData };
-  return data.link;
-}
 
 const rewardText = (amount: number) =>
   amount > 0 ? `1件 ¥${amount.toLocaleString()}` : '報酬未設定';

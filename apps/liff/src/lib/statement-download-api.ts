@@ -34,7 +34,7 @@ export async function issueStatement(id: string): Promise<IssuedStatement> {
   url.searchParams.set('issue', '1');
   let response: Response;
   try {
-    response = await fetch(url, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer' });
+    response = await fetch(url, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
   } catch (err) {
     if (err instanceof FileDownloadError) throw err;
     throw new FileDownloadError('retry');
@@ -54,7 +54,7 @@ export async function fetchStatementBlob(id: string, issued: IssuedStatement): P
   }
   let response: Response;
   try {
-    response = await fetch(signed, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer' });
+    response = await fetch(signed, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
   } catch (err) {
     if (err instanceof FileDownloadError) throw err;
     throw new FileDownloadError('retry');

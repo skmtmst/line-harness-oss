@@ -13,7 +13,6 @@ import {
   computeRemindersForBooking,
   insertRemindersForBooking,
 } from './event-booking-reminders.js';
-import { getEventOccurrenceUsedSeats } from './event-waitlist.js';
 import {
   reconcileV6ToStartsAt,
   rescheduleByTrigger,
@@ -215,35 +214,11 @@ interface SlotRow {
   is_active: number;
 }
 
-async function countPendingReminders(db: D1Database, slotId: string): Promise<number> {
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS c FROM event_booking_reminders
-        WHERE booking_id IN (
-          SELECT id FROM event_bookings
-           WHERE slot_id = ? AND status = 'confirmed'
-        ) AND sent_at IS NULL AND status = 'pending'`,
-    )
-    .bind(slotId)
-    .first<{ c: number }>();
-  return row?.c ?? 0;
-}
-
-async function countSeats(
-  db: D1Database,
-  slotId: string,
-): Promise<{ confirmed: number; waiting: number }> {
-  const row = await db
-    .prepare(
-      `SELECT
-         COALESCE((SELECT SUM(party_size) FROM event_bookings
-                    WHERE slot_id = ? AND status IN ('requested', 'confirmed')), 0) AS confirmed,
-         COALESCE((SELECT SUM(party_size) FROM event_waitlist
-                    WHERE slot_id = ? AND status IN ('waiting', 'offered', 'accepted')), 0) AS waiting`,
-    )
-    .bind(slotId, slotId)
-    .first<{ confirmed: number; waiting: number }>();
-  return { confirmed: row?.confirmed ?? 0, waiting: row?.waiting ?? 0 };
+interface SlotPreviewRow extends SlotRow {
+  confirmed_seats: number;
+  waiting_seats: number;
+  held_seats: number;
+  pending_reminders: number;
 }
 
 export async function previewEventChange(
@@ -268,15 +243,38 @@ export async function previewEventChange(
     .first<{ id: string }>();
   if (!event) return { kind: 'not_found' };
 
+  // Read slots and all impact counts in one statement, scoped to the already
+  // authorized event. JSON IDs keep the existing D1 binding budget unchanged.
+  const slots = new Map<string, SlotPreviewRow>();
+  if (params.slotChanges.length) {
+    const ids = sqlIdSet(params.slotChanges.map(change => change.slot_id));
+    const rows = await db.prepare(`WITH selected_slots AS (
+      SELECT id,starts_at,ends_at,capacity,is_active FROM event_slots
+      WHERE event_id=? AND deleted_at IS NULL AND id IN (${ids.sql})
+    ), booking_counts AS (
+      SELECT b.slot_id,SUM(b.party_size) confirmed_seats
+      FROM event_bookings b JOIN selected_slots s ON s.id=b.slot_id
+      WHERE b.status IN ('requested','confirmed') GROUP BY b.slot_id
+    ), waiting_counts AS (
+      SELECT w.slot_id,SUM(w.party_size) waiting_seats,
+        SUM(CASE WHEN w.status IN ('offered','accepted') THEN w.party_size ELSE 0 END) held_seats
+      FROM event_waitlist w JOIN selected_slots s ON s.id=w.slot_id
+      WHERE w.status IN ('waiting','offered','accepted') GROUP BY w.slot_id
+    ), reminder_counts AS (
+      SELECT b.slot_id,COUNT(*) pending_reminders
+      FROM event_booking_reminders r JOIN event_bookings b ON b.id=r.booking_id
+      JOIN selected_slots s ON s.id=b.slot_id
+      WHERE b.status='confirmed' AND r.sent_at IS NULL AND r.status='pending' GROUP BY b.slot_id
+    ) SELECT s.*,COALESCE(b.confirmed_seats,0) confirmed_seats,
+      COALESCE(w.waiting_seats,0) waiting_seats,COALESCE(w.held_seats,0) held_seats,
+      COALESCE(r.pending_reminders,0) pending_reminders FROM selected_slots s
+      LEFT JOIN booking_counts b ON b.slot_id=s.id LEFT JOIN waiting_counts w ON w.slot_id=s.id
+      LEFT JOIN reminder_counts r ON r.slot_id=s.id`).bind(params.eventId,...ids.binds).all<SlotPreviewRow>();
+    for (const row of rows.results ?? []) slots.set(row.id,row);
+  }
   const impacts: SlotChangeImpact[] = [];
   for (const change of params.slotChanges) {
-    const slot = await db
-      .prepare(
-        `SELECT id, starts_at, ends_at, capacity, is_active FROM event_slots
-          WHERE id = ? AND event_id = ? AND deleted_at IS NULL`,
-      )
-      .bind(change.slot_id, params.eventId)
-      .first<SlotRow>();
+    const slot = slots.get(change.slot_id);
     if (!slot) {
       impacts.push({
         slot_id: change.slot_id,
@@ -291,13 +289,13 @@ export async function previewEventChange(
       });
       continue;
     }
-    const seats = await countSeats(db, slot.id);
-    const pendingReminders = await countPendingReminders(db, slot.id);
+    const seats = { confirmed: slot.confirmed_seats, waiting: slot.waiting_seats };
+    const pendingReminders = slot.pending_reminders;
     const errors: string[] = [];
     const notices: string[] = [];
     const nextCapacity = change.capacity === undefined ? slot.capacity : change.capacity;
     if (nextCapacity != null) {
-      const used = await getEventOccurrenceUsedSeats(db, slot.id);
+      const used = slot.confirmed_seats + slot.held_seats;
       if (nextCapacity < used) errors.push('slot_capacity_below_bookings');
       else if (slot.capacity != null && nextCapacity < slot.capacity
         && seats.confirmed + seats.waiting > 0) {

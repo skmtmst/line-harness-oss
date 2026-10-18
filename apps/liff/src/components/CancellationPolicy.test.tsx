@@ -27,9 +27,11 @@ it('決まりがオンの店は、チェックを入れるまで押せず、入�
   renderConfirm();
   const box = await screen.findByRole('checkbox', { name: 'キャンセル料の決まりを確認しました' }) as HTMLInputElement;
   expect(box.checked).toBe(false);
-  const submit = screen.getByRole('button', { name: 'カードを登録して予約する' }) as HTMLButtonElement;
+  const submit = screen.getByRole('button', { name: '試験のカードを登録して予約する' }) as HTMLButtonElement;
   expect(submit.disabled).toBe(true);
   expect(screen.getByText('料金の 50%（¥4,200）')).toBeTruthy();
+  expect(screen.getByText(/チェックを入れると試験のカードを登録できます/)).toBeTruthy();
+  expect(screen.queryByText(/取り消したときだけ、お店が決まりのとおりに請求します/)).toBeNull();
   fireEvent.click(box);
   expect(submit.disabled).toBe(false);
   fireEvent.click(submit);
@@ -40,7 +42,7 @@ it('決まりがオンの店は、チェックを入れるまで押せず、入�
 it('デポジットがある店は今払う額とお店で払う額を出し、ボタンに今払う額を書く', async () => {
   vi.mocked(api.cancellationPreview).mockResolvedValue({ ...POLICY, deposit: { amount: 2520 } });
   renderConfirm();
-  expect(await screen.findByRole('button', { name: '¥2,520 を払って予約する' })).toBeTruthy();
+  expect(await screen.findByRole('button', { name: '¥2,520の試験で予約する' })).toBeTruthy();
   expect(screen.getByText('¥5,880')).toBeTruthy();
   expect(screen.getByText('キャンセル料とデポジット')).toBeTruthy();
 });

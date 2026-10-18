@@ -1,5 +1,7 @@
 import { logger, resumeInvocation, withInvocation } from '@line-crm/shared/server';
 import { setHolidayCoverageWarningHandler } from '@line-crm/shared';
+import { stagingQa } from './routes/staging-qa.js';
+import { qaEnabled, qaOutboundStopped, qaSafeBindings, withQaOutboundBoundary } from './services/staging-qa-safety.js';
 import { scheduled } from './cron/scheduled.js';
 import { apiContractMiddleware } from './middleware/api-contract.js';
 
@@ -251,6 +253,15 @@ export const ADMIN_REQUEST_HEADERS = [
 setHolidayCoverageWarningHandler(() => logger.warn('src_japanese_holidays_warn'));
 app.use('*', apiContractMiddleware);
 app.use('*', noindexHeaderMiddleware);
+// Establish an invocation-local outbound boundary before any auth or error reporting.
+app.use('*', async (c, next) => {
+  if ((c.req.path === '/api/ops/staging-qa' || c.req.path.startsWith('/api/ops/staging-qa/')) && !qaEnabled(c.env)) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const env = c.env;
+  c.env = qaSafeBindings(env);
+  return withQaOutboundBoundary(env, next);
+});
 app.get('/robots.txt', robotsTxtHandler);
 
 // 段ごとの経過時間を Server-Timing で返す（V6R-CX-a）。ログイン済みの職員への応答だけ。
@@ -302,6 +313,7 @@ app.use('/api/*', sensitiveOperationMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
+app.route('/', stagingQa);
 app.route('/', gettingStarted);
 app.route('/', recipes);
 app.route('/', hqTemplates);
@@ -1128,11 +1140,18 @@ app.notFound(notFoundHandler);
 
 export default {
   fetch: (...args: Parameters<typeof app.fetch>) => withInvocation('http', () => app.fetch(...args)),
-  scheduled: (...args: Parameters<typeof scheduled>) => withInvocation('cron', () => scheduled(...args)),
+  async scheduled(event: ScheduledEvent, env: Env['Bindings'], ctx: ExecutionContext): Promise<void> {
+    if (qaOutboundStopped(env)) return;
+    return withInvocation('cron', () => scheduled(event, env, ctx));
+  },
   async queue(
     batch: MessageBatch<CodexMentionQueueMessage>,
     env: Env['Bindings'],
   ): Promise<void> {
+    if (qaOutboundStopped(env)) {
+      for (const message of batch.messages) message.retry({ delaySeconds: 60 });
+      return;
+    }
     for (const message of batch.messages) {
       await withInvocation('queue', () => resumeInvocation(message.body?.requestId, async () => {
         try {
@@ -1166,6 +1185,10 @@ export default {
     env: Env['Bindings'],
     _ctx: ExecutionContext,
   ): Promise<void> {
+    if (qaOutboundStopped(env)) {
+      message.setReject('Staging QA outbound stop is active');
+      return;
+    }
     await withInvocation('email', () => routeInboundEmail(message, env));
   },
 };

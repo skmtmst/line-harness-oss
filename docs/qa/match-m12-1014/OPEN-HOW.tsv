@@ -1,7 +1,0 @@
-板ID	URL	開き方
-aZ8li	/friends	open-toolbar-optional → 表示項目を編集
-lwWLu	/friends	open-toolbar-optional → 表示項目を編集 → columns-to-limit
-pUT4L	/conversions	の操作 → 止める
-u8sKN	/auto-replies	の操作 → 削除する
-VsSyu	/reminders	の操作 → 削除
-qUdNh	/events/change-review?id=ev-1	開始日時 → fill:時刻=10:30 → 閉じる → 終了日時 → fill:時刻=12:30 → 閉じる → fill:変える理由=会場の都合で時間を30分遅らせます → 変えてお知らせする

@@ -1,74 +1,44 @@
 'use client'
 
-import { blockIcon, ADD_CARD_ICONS, AddGrid } from './content-add-grid'
+import { AddGrid,blockIcon } from './content-add-grid';
 
-import Card from '@/components/shared/card'
-import {japaneseDetailOf} from '@/components/shared/api-error-message'
-import Toggle from '@/components/shared/toggle';
+import { japaneseDetailOf } from '@/components/shared/api-error-message';
+import Card from '@/components/shared/card';
 
-import { Field } from '@/components/shared/form-controls'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { api } from '@/lib/api'
-import { useStaffRole } from '@/lib/staff-role'
+import BlockEditor from '@/components/forms/block-editor';
+import { formJumpsInto } from '@/components/forms/form-definition-operations';
+import type { FormRefs } from '@/components/forms/form-refs';
+import Button from '@/components/shared/button';
+import { SettingCheckbox } from '@/components/shared/checkbox';
+import Dialog from '@/components/shared/dialog';
+import { EntityKindField } from '@/components/shared/entity-picker-sources';
+import EntitySelect from '@/components/shared/entity-select';
+import { Field,FieldError } from '@/components/shared/form-controls';
+import FormFileSettings from '@/components/shared/form-file-settings';
+import ImageFrame from '@/components/shared/image-frame';
+import InlineSettings from '@/components/shared/inline-settings';
+import { uploadImageFile,uploadToMediaLibrary } from '@/components/shared/media-library-upload';
+import MediaPickerDialog from '@/components/shared/media-picker-dialog';
+import { DragHandle,RowActions } from '@/components/shared/row-actions';
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
+import Select from '@/components/shared/select';
+import { TextArea,TextField } from '@/components/shared/text-field';
+import TextLink from '@/components/shared/text-link';
+import UriTapActionField from '@/components/shared/uri-tap-action-field';
+import { api } from '@/lib/api';
+import { useStaffRole } from '@/lib/staff-role';
+import { FIXED_FRIEND_FIELDS,fixedFieldForBlock,newBlockId,type FormBlock,type FormInputBlock,type FormLayout } from '@line-crm/shared';
 import {
-  AlarmClock,
-  AlignLeft,
-  Armchair,
-  Cake,
-  Calendar,
-  CalendarCheck,
-  ChevronDown,
-  CircleDot,
-  Gift,
-  Heading,
-  HelpCircle,
-  Image as ImageIcon,
-  MousePointerClick,
-  Hash,
-  IdCard,
-  Languages,
-  Mail,
-  MapPin,
-  Minus,
-  Paperclip,
-  Phone,
-  Pilcrow,
-  ShieldAlert,
-  SquareCheck,
-  Star,
-  Type,
-  User,
-  ExternalLink,
-  Plus,
-  X,
-} from 'lucide-react'
-import { FIXED_FRIEND_FIELDS, fixedFieldForBlock, newBlockId, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
-import BlockEditor from '@/components/forms/block-editor'
-import FormFileSettings from '@/components/shared/form-file-settings'
-import type { FormRefs } from '@/components/forms/form-refs'
-import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
-import InlineSettings from '@/components/shared/inline-settings'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import { DragHandle, RowActions } from '@/components/shared/row-actions'
-import Select from '@/components/shared/select'
-import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import { SettingCheckbox } from '@/components/shared/checkbox'
-import { ADD_GROUPS, blockKindLine, blockTitleKind, blockTitleLine, inputTypeLabel, isChoiceType } from './model'
-import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import MediaSlot from '@/components/shared/media-slot'
-import { uploadImageFile, uploadToMediaLibrary } from '@/components/shared/media-library-upload'
-import UriTapActionField from '@/components/shared/uri-tap-action-field'
-import { FieldError } from '@/components/shared/form-controls'
-import { useFormEditAttempted } from './field-issues'
-import RoutingSection from './routing-section'
-import type { FormRouting } from './routing-model'
-import styles from './edit.module.css'
-import TextLink from '@/components/shared/text-link'
-import { SaveErrorScope, useSaveFormErrors, SaveErrorField } from '@/components/shared/save-form-errors'
-import { formJumpsInto } from '@/components/forms/form-definition-operations'
-import ImageFrame from '@/components/shared/image-frame'
-import EntitySelect from '@/components/shared/entity-select'
+CalendarCheck,
+Plus,
+X
+} from 'lucide-react';
+import { useEffect,useMemo,useRef,useState,type DragEvent,type KeyboardEvent,type ReactNode } from 'react';
+import styles from './edit.module.css';
+import { useFormEditAttempted } from './field-issues';
+import { blockKindLine,blockTitleKind,blockTitleLine,inputTypeLabel,isChoiceType } from './model';
+import type { FormRouting } from './routing-model';
+import RoutingSection from './routing-section';
 
 /*
  * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
@@ -180,7 +150,7 @@ export function ContentTab(props: Props) {
             ),
           )
         )}
-        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} note={props.portable ? '本人確認書類の保存日数は、配った先の各アカウントの設定で決まります' : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
+        {props.readOnly ? null : <AddGrid hide={props.portable ? PORTABLE_HIDDEN_CARDS : undefined} onAdd={(make) => props.onAddBlock(make(props.inputCount))} />}
       </Card>
 
       <RenameDialog

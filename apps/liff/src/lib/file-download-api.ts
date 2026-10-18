@@ -52,7 +52,7 @@ export async function issueFile(id: string): Promise<IssuedFile> {
   let response: Response;
   try {
     response = await fetch(new URL(`${BASE}${path}`, window.location.origin), {
-      headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer',
+      headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error',
     });
   } catch {
     throw new FileDownloadError('retry');
@@ -71,12 +71,12 @@ export async function issueFile(id: string): Promise<IssuedFile> {
 export async function fetchFileBlob(issued: IssuedFile): Promise<Blob> {
   const expected = new URL(`${BASE}/images/chat-attachments/${encodeURIComponent(issued.id)}`, window.location.origin);
   const signed = new URL(issued.url, window.location.origin);
-  if (signed.origin !== expected.origin || signed.pathname !== expected.pathname) {
+  if (signed.origin !== expected.origin || signed.pathname !== expected.pathname || signed.searchParams.has('lineAccessToken')) {
     throw new FileDownloadError('retry');
   }
   let response: Response;
   try {
-    response = await fetch(signed, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer' });
+    response = await fetch(signed, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
   } catch {
     throw new FileDownloadError('retry');
   }
