@@ -65,10 +65,10 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     expect(board.textContent).toContain('佐藤 S.')
     expect(board.textContent).toContain('下書きを作る')
     expect(board.textContent).toContain('返信を見る')
-    expect(screen.getByText(/^返信文は手で書くか/)).toBeTruthy()
+    // 説明は板の頭の「？」の中へ置く。表の下に説明の注記の箱は置かない。
+    expect(screen.queryByText(/^返信文は手で書くか/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Googleビジネスの説明' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '一覧の操作の説明' })).toBeNull()
-    const table = board.querySelector('[data-shared-part="list-table"]')!
-    expect(table.contains(screen.getByText(/^返信文は手で書くか/))).toBe(false)
   })
 
   it('状態で絞ると一覧の口へ条件が届く', async () => {
@@ -79,6 +79,21 @@ describe('j0Wcg GoogleビジネスのV8', () => {
     const option = await screen.findByRole('option', { name: '未返信' })
     fireEvent.click(option.querySelector('button')!)
     await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ filter: 'unreplied' })))
+  })
+
+  it('選択肢に「状態：」の頭は付けず、閉じた欄の頭で出し、表示件数（10・20・50）を切り替えられる', async () => {
+    render(<GoogleV8 />)
+    await screen.findByPlaceholderText('口コミを探す')
+    await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ perPage: 20 })))
+    expect(screen.getByRole('button', { name: '状態で絞り込み' }).textContent).toMatch(/^状態：/)
+    fireEvent.click(screen.getByRole('button', { name: '状態で絞り込み' }))
+    expect(screen.queryByRole('option', { name: '状態：未返信' })).toBeNull()
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+
+    fireEvent.click(screen.getByRole('button', { name: '表示件数' }))
+    const ten = await screen.findByRole('option', { name: '10件表示' })
+    fireEvent.click(ten.querySelector('button')!)
+    await waitFor(() => expect(fixture.listReviews).toHaveBeenCalledWith('account-1', expect.objectContaining({ perPage: 10, page: 1 })))
   })
 
   it('受信列は編集後の日時を表示する（投稿2023年・編集2026年9月の口コミで2023年と出さない）', async () => {

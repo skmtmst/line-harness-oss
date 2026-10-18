@@ -1,5 +1,6 @@
 import type { GoogleReview } from '@/lib/restaurant-google-api'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
+import { GOOGLE_REPLY_STATUS } from '@/lib/status-labels'
 import styles from './google.module.css'
 
 /** 星（★の文字）。評価2以下は赤、ほかは金。 */
@@ -13,9 +14,9 @@ export function Stars({ rating, small = false }: { rating: number; small?: boole
 }
 
 export function replyBadge(review: GoogleReview): { label: string; tone: StatusBadgeTone } {
-  if (review.replyStatus === 'published') return { label: '返信済み', tone: 'success' }
-  if (review.replyStatus === 'replied' || review.replyStatus === 'pending_confirm') return { label: '反映確認中', tone: 'warning' }
-  if (review.replyStatus === 'draft') return { label: review.replyDraftAiGenerated ? 'AI下書きあり' : '下書きあり', tone: 'info' }
-  if (review.needsAttention) return { label: '要確認', tone: 'danger' }
-  return { label: '未返信', tone: 'warning' }
+  if (review.replyStatus === 'published') return GOOGLE_REPLY_STATUS.published
+  if (review.replyStatus === 'replied' || review.replyStatus === 'pending_confirm') return GOOGLE_REPLY_STATUS.confirming
+  if (review.replyStatus === 'draft') return review.replyDraftAiGenerated ? GOOGLE_REPLY_STATUS.aiDraft : GOOGLE_REPLY_STATUS.draft
+  if (review.needsAttention) return GOOGLE_REPLY_STATUS.attention
+  return GOOGLE_REPLY_STATUS.unreplied
 }
