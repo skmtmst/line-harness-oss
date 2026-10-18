@@ -1,3 +1,4 @@
+import { parseRetryAfter } from '../lib/external-call/policy.js';
 /**
  * 送信Webhookの配送。
  *
@@ -163,17 +164,8 @@ export function webhookFetchTimeoutMs(value: unknown): number {
  * （リクエスト内で待つなら秒、台帳へ積む再送なら分まで許せる）。
  */
 function parseRetryAfterDelayMs(header: string | null, nowMs: number): number | null {
-  if (header == null) return null;
-  const text = header.trim();
-  if (!text) return null;
-  if (/^\d+(\.\d+)?$/.test(text)) {
-    const ms = Number(text) * 1000;
-    return Number.isFinite(ms) && ms >= 0 ? ms : null;
-  }
-  const at = Date.parse(text);
-  if (!Number.isFinite(at)) return null;
-  const ms = at - nowMs;
-  return ms < 0 ? null : ms;
+  const at = parseRetryAfter(header, nowMs);
+  return at === undefined ? null : at - nowMs;
 }
 
 /**
@@ -216,8 +208,6 @@ export interface WebhookRow {
   secret_encrypted?: string | null;
   max_retries: number | null;
 }
-
-
 
 /**
  * 送信直前の SSRF 再検査 (N-366)。
@@ -671,7 +661,7 @@ export interface DeliveryResult {
  *
  * | 応答 | 扱い | 次までの待ち |
  * | 2xx | 成功 | 待たない |
- * | 429 | 送り直す。Retry-After があれば上限8秒へクランプして待つ | Retry-After／指数待ち |
+ * | 429 | 送り直す。Retry-After があれば8秒以内なら待つ。超過は次回の台帳へ返す | Retry-After／指数待ち |
  * | 5xx | 送り直す | 指数待ち（0.5→1→2→4→8秒） |
  * | タイムアウト（既定10秒）・接続失敗 | 送り直す。lastStatus=null で失敗台帳に残る | 指数待ち |
  * | その他の 4xx | 恒久失敗。残りの回数を使わずに諦める | — |
@@ -760,6 +750,9 @@ export async function deliverWebhook(
     lastRetryAfterMs = retryAfterHeader === null
       ? null
       : parseRetryAfterDelayMs(retryAfterHeader, Date.now());
+    if (lastRetryAfterMs !== null && lastRetryAfterMs > WEBHOOK_RETRY_AFTER_MAX_MS) {
+      return { ok: false, attempts: attempt + 1, lastStatus, retryAfterMs: lastRetryAfterMs };
+    }
     waitMs = retryAfterHeader === null
       ? retryDelayMs(attempt)
       : retryAfterDelayMs(retryAfterHeader, retryDelayMs(attempt));
@@ -944,7 +937,7 @@ function deliveryJitterRatio(key: string): number {
  * 次の再送時刻を決める。上限・24時間の窓を超えるなら null（=諦める）。
  *
  * 429 で Retry-After をもらったときは、その指定を30分上限で尊重する。
- * 上限を超える指定は30分へ丸める（既定間隔へ戻すと混雑中に早めてしまう）。
+ * 上限を超える指定では自動再送を止め、相手の指定より早く送らない。
  * それ以外は指数バックオフ＋配送ID由来の jitter。
  */
 export function outgoingDeliveryNextRetryAt(input: {
@@ -961,7 +954,8 @@ export function outgoingDeliveryNextRetryAt(input: {
   const deadline = Date.parse(input.queuedAt) + OUTGOING_WEBHOOK_RETRY_WINDOW_MS;
   let waitMs: number;
   if (input.responseStatus === 429 && typeof input.retryAfterMs === 'number' && input.retryAfterMs >= 0) {
-    waitMs = Math.min(input.retryAfterMs, EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000);
+    if (input.retryAfterMs > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000) return null;
+    waitMs = input.retryAfterMs;
   } else {
     const index = Math.min(
       Math.max(0, input.attemptsDone - 1),
@@ -1097,6 +1091,7 @@ const OUTGOING_DELIVERY_FAILURE_TEXT: Record<string, string> = {
   secret_unavailable: '署名に使うsecretを確認できませんでした。設定を保存し直してください。',
   rejected_4xx: '送り先が内容を受け取りませんでした。URLと受け手の設定を確認してください。',
   retry_exhausted: '自動での送り直しが上限に達しました。連携先を確認して、必要なら管理画面から再送してください。',
+  retry_after_exceeds_budget: '連携先の待ち時間が自動再送の上限を超えました。連携先を確認して、必要なら管理画面から再送してください。',
   retry_window_expired: '24時間の再送期間を過ぎました。連携先を確認して、必要なら管理画面から再送してください。',
   webhook_not_found: '送信Webhookが削除されたため送りませんでした。',
   webhook_inactive: '送信Webhookが停止中のため送りませんでした。',
@@ -1183,7 +1178,10 @@ export async function finishOutgoingDelivery(
     responseStatus = attempt.responseStatus;
     if (retryAt === null) {
       status = 'failed';
-      errorCode = attemptsDone >= delivery.max_attempts ? 'retry_exhausted' : 'retry_window_expired';
+      errorCode = attemptsDone >= delivery.max_attempts ? 'retry_exhausted'
+        : attempt.responseStatus === 429 && typeof attempt.retryAfterMs === 'number'
+          && attempt.retryAfterMs > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000
+          ? 'retry_after_exceeds_budget' : 'retry_window_expired';
       errorMessage = outgoingDeliverySafeMessage(errorCode);
     } else {
       status = 'retry_wait';

@@ -85,7 +85,9 @@ describe('GB-9 パフォーマンス', () => {
     expect(text).toContain('前の28日より +12%')
     // 前期が未取得の指標は比較しない
     expect(text).toContain('前の28日より —')
-    expect(text).toContain('数字は Google ビジネス プロフィールの集計です')
+    // 説明の行は置かず、板の頭の「？」の中へ。期間は Google の集計が 28 日区切りなので 28 日を残して言う。
+    expect(text).not.toContain('数字は Google ビジネス プロフィールの集計です')
+    expect(text).toContain('過去28日（Google の集計）')
   })
 
   it('未対応の飲食店向け指標は「—」で出す', async () => {

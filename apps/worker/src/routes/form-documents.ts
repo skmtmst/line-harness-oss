@@ -13,6 +13,8 @@ import { documentAnswer, documentExpired, uploadedDocumentKind, purgeUnsafeFormD
 
 const TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' };
 export async function uploadFormDocument(c: Context<Env>, block: FormInputBlock, scope: { accountId: string; formId: string; friendId: string; versionId: string | null }) {
+  // B-374: reject legacy and mixed identity fields before reading or storing bytes.
+  if (formFileKinds(block).includes('identity')) return c.json({ success: false, code: 'IDENTITY_DOCUMENT_DISABLED', error: '本人確認書類は受け取れません。画像・PDFの質問を使ってください' }, 400);
   if (await customerDeletionPending(c.env.DB, scope.friendId)) return c.json({ success: false, error: 'この友だちのデータは削除中です' }, 409);
   const mime = (c.req.header('Content-Type') ?? '').split(';')[0].trim().toLowerCase();
   const kind = uploadedDocumentKind(block, mime);

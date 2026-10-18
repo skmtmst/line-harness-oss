@@ -1,3 +1,4 @@
+import { implementationFiles, readImplementationSource } from '../test-utils/implementation-source.js';
 /*
  * N-189 機械照合: LINE送信へ繋がる全経路が、共通情報を厳格resolver
  * （resolveSendInterpolationExtra / resolveSendCommonVars）経由で解決する
@@ -14,7 +15,8 @@ import { fileURLToPath } from 'node:url';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function read(rel: string): string {
-  return readFileSync(join(SRC, rel), 'utf8');
+  const entries = new Set([...SEND_PATHS, ...NON_TEMPLATE_PATHS, { file: 'routes/chats.ts' }, { file: 'services/scheduled-chat-sends.ts' }, { file: 'services/reminder-draft.ts' }].map(p => join(SRC, p.file)));
+  return readImplementationSource(join(SRC, rel), entries);
 }
 
 // LINE送信に繋がる経路と、そこで必須の厳格resolver呼び出し。
@@ -148,7 +150,20 @@ describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () =
     strict.add('services/reminder-draft.ts');
     const nonTemplate = new Set(NON_TEMPLATE_PATHS.map((p) => p.file));
 
-    for (const file of sendFiles) {
+    // Preserve the existing audited feature entries. Discover extracted modules
+    // only through their real imports; unmounted/new senders still fail below.
+    const audited = new Set([...strict, ...nonTemplate].map(file => join(SRC, file)));
+    const owner = new Map<string, string>();
+    for (const root of [...strict, ...nonTemplate]) {
+      for (const file of implementationFiles(join(SRC, root), audited)) {
+        const relative = file.slice(SRC.length + 1);
+        const previous = owner.get(relative);
+        if (previous && previous !== root) throw new Error(`Ambiguous sending module: ${relative}`);
+        owner.set(relative, root);
+      }
+    }
+    const logicalSendFiles = new Set([...sendFiles].map(file => owner.get(file) ?? file));
+    for (const file of logicalSendFiles) {
       expect(
         strict.has(file) || nonTemplate.has(file),
         `${file} はLINE送信を持ちますが、厳格resolver経路・固定文経路のどちらにも分類されていません`,
@@ -157,7 +172,7 @@ describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () =
     // 固定文経路の陳腐化も防ぐ: 宣言したが送信呼出しが消えたファイルは落とす
     for (const file of nonTemplate) {
       expect(
-        sendFiles.has(file),
+        logicalSendFiles.has(file),
         `${file} は固定文経路として宣言されていますが、LINE送信呼出しが見つかりません`,
       ).toBe(true);
     }

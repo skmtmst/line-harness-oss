@@ -2,36 +2,8 @@ import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affi
 import { customerDownloadEntry } from '../services/download-entrypoints.js';
 import { signDownload, validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { Hono } from 'hono';
-import {
-  getAffiliateByFriendId,
-  createAffiliate,
-  createAffiliateLink,
-  listAffiliateLinks,
-  countAffiliateLinks,
-  generateRefSlug,
-  getAffiliateLinkStats,
-  listAffiliateOffers,
-  getCurrentOfferVersion,
-  getOfferCapStatus,
-  enrollAffiliateInOffer,
-  getMileageSummaryForFriend,
-  getMileageHistoryForFriend,
-  getMileageSelfInsights,
-  getMileageEarningOpportunitiesForFriend,
-  listMileageRewards,
-  getMileageRewardRedemptionCounts,
-  reserveMileageRewardRedemption,
-  MileageRewardError,
-  encryptCredential,
-  getAffiliateBankProfile,
-  saveAffiliateBankProfile,
-  listAffiliateStatementsForSelf,
-  getAffiliateStatementDownload,
-  type Affiliate,
-  type AffiliateLink,
-  type AffiliateLinkStat,
-} from '@line-crm/db';
+import { Hono, type MiddlewareHandler } from 'hono';
+import { getAffiliateByFriendId, createAffiliate, createAffiliateLink, listAffiliateLinks, countAffiliateLinks, generateRefSlug, getAffiliateLinkStats, listAffiliateOffers, getCurrentOfferVersion, getOfferCapStatus, enrollAffiliateInOffer, getMileageSummaryForFriend, getMileageHistoryForFriend, getMileageSelfInsights, getMileageEarningOpportunitiesForFriend, listMileageRewards, getMileageRewardRedemptionCounts, reserveMileageRewardRedemption, MileageRewardError, encryptCredential, getAffiliateBankProfile, saveAffiliateBankProfile, listAffiliateStatementsForSelf, getAffiliateStatementDownload, type Affiliate, type AffiliateLink, type AffiliateLinkStat } from '@line-crm/db';
 import { affiliateBankFields } from '@line-crm/shared';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import { signCrossAccountToken } from '../lib/cross-account-token.js';
@@ -53,6 +25,20 @@ import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
  * authMiddleware skips `/api/liff/*` (staff auth), so verification lives here.
  */
 const affiliateSelfRoutes = new Hono<Env>();
+
+// URL credentials must never enter access logs, caches, or referrers.
+const privateSelfAccess: MiddlewareHandler<Env> = async (c, next) => {
+  c.header('Cache-Control', 'private, no-store');
+  c.header('Referrer-Policy', 'no-referrer');
+  if (new URL(c.req.url).searchParams.has('lineAccessToken')
+    && !(/^\/api\/liff\/affiliate\/statements\/[^/]+\/download$/.test(c.req.path)
+      && !c.req.header('Authorization') && !c.req.query('signature') && !c.req.query('expires') && c.req.query('issue') !== '1')) {
+    return c.json({ success: false, error: 'Use Authorization Bearer' }, 400);
+  }
+  await next();
+};
+affiliateSelfRoutes.use('/api/liff/mileage/*', privateSelfAccess);
+affiliateSelfRoutes.use('/api/liff/affiliate/*', privateSelfAccess);
 
 /** Max self-issued links per affiliate. The 21st issuance is a 400. */
 const MAX_SELF_LINKS = 20;
@@ -119,7 +105,7 @@ function serializeAffiliate(aff: Affiliate) {
  */
 affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) {
       return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     }
@@ -161,7 +147,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
 /** Published mileage uses for the verified friend. Unknown numbers stay null. */
 affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -348,12 +334,12 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', inputJsonBoundary(), as
 });
 
 /**
- * GET /api/liff/affiliate/me?lineAccessToken= — return the caller's affiliate
+ * GET /api/liff/affiliate/me — return the caller's affiliate
  * profile + links. 404 if the caller is a friend but not yet registered.
  */
 affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) {
       return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     }
@@ -392,7 +378,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
 /** 本人の振込先。口座番号は復号せず、末尾4桁だけを返す。 */
 affiliateSelfRoutes.get('/api/liff/affiliate/bank', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -632,7 +618,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async
 });
 
 /**
- * GET /api/liff/affiliate/offers?lineAccessToken= — list active offers with the
+ * GET /api/liff/affiliate/offers — list active offers with the
  * caller's participation state. For enrolled offers, the caller's offer-scoped
  * refCode + url are returned so the LIFF page can show "あなたの◯◯案件用リンク".
  *
@@ -641,7 +627,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async
  */
 affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) {
       return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     }

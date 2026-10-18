@@ -15,7 +15,8 @@ import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
-import StickyBar from '@/components/shared/sticky-bar'
+import { PageFooter } from '@/components/templates/page-footer'
+import { ProgressBar } from '@/components/shared/progress'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import Radio from '@/components/shared/radio'
@@ -450,7 +451,7 @@ export default function AccountRegisterV8() {
   const nextLabel = currentStep === 3 && sub === 1 ? '登録する' : currentStep === 2 ? '次のステップへ' : '次へ'
 
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame kind="wizard" boardId={shownStep.node}>
+    <SaveErrorScope errors={saveErrors}><PageFrame kind="wizard" boardId={shownStep.node} hasFooter>
       <PageHeading
         title="LINEアカウントを登録"
         help={shownStep.lead}
@@ -471,11 +472,11 @@ export default function AccountRegisterV8() {
           /></div>
         )}
       />
-      <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
+      <form id="account-register-form" data-template-region="body" className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
         <div ref={stepPanelRef} tabIndex={-1} className={styles.stepBody}>
           {currentStep === 1 && (
             <CreateStepColumns data-design-node="p6zMkA" previewTitle="この5段でやること" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="この5段でやること">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="この5段でやること">
                 <h2 className={styles.asideH2}>この5段でやること</h2>
                 <p className={styles.asideP}>① 事前確認：公式アカウントと2つのチャネルを用意</p>
                 <p className={styles.asideP}>② アカウント接続：チャネル ID とシークレット、LINE側の設定</p>
@@ -484,7 +485,7 @@ export default function AccountRegisterV8() {
                 <p className={styles.asideP}>⑤ 完了：いまの友だちの引き継ぎ</p>
               </Card>
               )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="アカウントの用意方法">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="アカウントの用意方法">
                 {draftRestored && (
                   <Notice tone="info" message="端末の下書きから続けます。チャネルシークレットだけ入れ直してください。" onClose={() => setDraftRestored(false)} />
                 )}
@@ -492,19 +493,19 @@ export default function AccountRegisterV8() {
                   <legend className={styles.panelTitle}>アカウントの用意方法</legend>
                   <div className={styles.radios}>
                     <SaveErrorField names={["account-method-v8","accountMethod"]}><Radio name="account-method-v8" value="existing" checked={accountMethod === 'existing'} onChange={() => setAccountMethod('existing')}>既存の公式アカウントを使う</Radio></SaveErrorField>
-                    <SaveErrorField names={["account-method-v8","accountMethod"]}><Radio name="account-method-v8" value="new" checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')}>新しく公式アカウントを作成</Radio></SaveErrorField>
+                    <SaveErrorField names={["account-method-v8","accountMethod"]}><Radio name="account-method-v8" value="new" checked={accountMethod === 'new'} onChange={() => setAccountMethod('new')}>新しく公式アカウントを作る</Radio></SaveErrorField>
                   </div>
                 </fieldset>
-                <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
-                  <p>{accountMethod === 'existing'
+                <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
+                  <p className={styles.noteText}>{accountMethod === 'existing'
                     ? 'LINE公式アカウントを作成してから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。'
                     : 'LINE公式アカウントを作成してから、同じプロバイダー内に Messaging API と LINE Login のチャネルを用意します。新しく作るときは、先に公式アカウントを作ります。'}</p>
-                  <p>・Messaging API と LINE Login は同じプロバイダーで作成してください<br />・Webhook の利用は LINE Developers でオンにしてください</p>
+                  <p className={styles.noteText}>・Messaging API と LINE Login は同じプロバイダーで作成してください<br />・Webhook の利用は LINE Developers でオンにしてください</p>
                 </Card>
                 <div className={styles.buttonRow}>
                   <Button external href="https://manager.line.biz/"  >LINE公式アカウントを作る</Button>
                   <Button external href="https://developers.line.biz/console/"  >LINE Developersを開く</Button>
-                  <Button external href={`${MANUAL}#m1`}  ><BookOpen size={15} aria-hidden="true" />全手順を見る</Button>
+                  <Button external href={`${MANUAL}#m1`}  ><BookOpen size={16} aria-hidden="true" />全手順を見る</Button>
                 </div>
               </Card>
             </CreateStepColumns>
@@ -512,7 +513,7 @@ export default function AccountRegisterV8() {
 
           {currentStep === 2 && (
             <CreateStepColumns data-design-node="Fqy29" previewTitle="どこにある？" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="どこにある？">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="どこにある？">
                 <h2 className={styles.asideH2}>どこにある？</h2>
                 <p className={styles.asideP}>チャネル ID とシークレットは、LINE Developers → プロバイダー → チャネル → 「チャネル基本設定」にあります。</p>
                 <p className={styles.asideP}>登録済みのチャネル ID を入れると「このチャネルIDは登録済みです」と出て先へ進めません。</p>
@@ -520,7 +521,7 @@ export default function AccountRegisterV8() {
               </Card>
               )}>
               {sub === 1 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Messaging API のチャネル">
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="Messaging API のチャネル">
                   <p className={styles.subBadge}>{badge}</p>
                   <h2 className={styles.panelTitle}>Messaging API のチャネル</h2>
                   <SettingsFormRow layout="columns">
@@ -533,12 +534,12 @@ export default function AccountRegisterV8() {
                   </SettingsFormRow>
                   <div className={styles.secretRow}>
                     <span className={styles.secretNote}><Lock size={14} aria-hidden="true" />秘密値は保存後に画面へ表示されません。</span>
-                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />取得方法を見る</Button>
+                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={16} aria-hidden="true" />取得方法を見る</Button>
                   </div>
                 </Card>
               )}
               {sub === 2 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook の設定">
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="Webhook の設定">
                   <p className={styles.subBadge}>{badge}</p>
                   <h2 className={styles.panelTitle}>Webhook の設定</h2>
                   <div className={styles.field}>
@@ -558,12 +559,12 @@ export default function AccountRegisterV8() {
                   </div>
                   <div className={styles.buttonRow}>
                     <Button external href={developerChannelUrl(form.channelId)}  >LINE Developersでこのチャネルを開く</Button>
-                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={15} aria-hidden="true" />設定の場所を見る</Button>
+                    <Button external href={`${MANUAL}#m1`}  ><CircleHelp size={16} aria-hidden="true" />設定の場所を見る</Button>
                   </div>
                 </Card>
               )}
               {sub === 3 && (
-                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINE Login のチャネル">
+                <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="LINE Login のチャネル">
                   <p className={styles.subBadge}>{badge}</p>
                   <h2 className={styles.panelTitle}>LINE Login のチャネル</h2>
                   <SettingsFormRow layout="columns">
@@ -600,13 +601,13 @@ export default function AccountRegisterV8() {
 
           {currentStep === 3 && sub === 1 && (
             <CreateStepColumns data-design-node="Lwxyh" previewTitle="ここで登録します" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ここで登録します">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ここで登録します">
                 <h2 className={styles.asideH2}>ここで登録します</h2>
                 <p className={styles.asideP}>5つの確認がすべて通るまで、アカウントは作られません。</p>
                 <p className={styles.asideP}>止まった項目を直して、もう一度「もう一度確かめる」を押します。</p>
               </Card>
               )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続確認">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="接続確認">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 className={styles.panelTitle}>接続確認</h2>
                 <ul className={styles.checkList}>
@@ -638,13 +639,13 @@ export default function AccountRegisterV8() {
 
           {currentStep === 3 && sub === 2 && connection && (
             <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
                 <h2 className={styles.asideH2}>ためしに友だち追加</h2>
                 <p className={styles.asideP}>自分のスマホの LINE で QR を読み取って、友だち追加してみてください。</p>
                 <p className={styles.asideP}>届かなくても先へ進めます。あとから友だち一覧で確かめられます。</p>
               </Card>
               )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="ためしに友だち追加">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 className={styles.panelTitle}>ためしに友だち追加してみましょう</h2>
                 <div className={styles.qrBlock}>
@@ -674,13 +675,13 @@ export default function AccountRegisterV8() {
 
           {currentStep === 4 && (
             <CreateStepColumns data-design-node="X0pGdw" previewTitle="あとから変えられます" preview={(
-                <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="あとから変えられます">
+                <Card layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="あとから変えられます">
                 <h2 className={styles.asideH2}>あとから変えられます</h2>
                 <p className={styles.asideP}>選んだ使い方でダッシュボードの並びが決まります。</p>
                 <p className={styles.asideP}>カードは、あとから自分で足し引きできます。</p>
               </Card>
               )}>
-              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="使い方を選ぶ">
+              <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label="使い方を選ぶ">
                 <h2 className={styles.panelTitle}>いちばん近い使い方を選んでください</h2>
                 <RadioCardGroup legend="いちばん近い使い方" columns={2}>
                   {templateOptions().map((option) => (
@@ -698,17 +699,15 @@ export default function AccountRegisterV8() {
           )}
 
           {currentStep === 5 && connection && (
-            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label={importRunning ? 'いまの友だちを引き継いでいます' : '登録完了'} data-design-node="Plmq1">
+            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" aria-label={importRunning ? 'いまの友だちを引き継いでいます' : '登録完了'} data-design-node="Plmq1">
               {importRunning && form.importFriends ? <>
                 <h2 className={styles.panelTitle}>いまの友だちを引き継いでいます</h2>
-                <Card className={styles.handoverBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
+                <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn6-hand-pad)" gap="var(--tpl-htn6-hand-gap)">
                   <div className={styles.handoverStats}>
                     <strong>{`${polishFormatNumber(handover.imported)} 人`}</strong>
                     <strong>{handover.total !== null ? `${polishFormatNumber(handover.total)} 人` : '確認中'}</strong>
                   </div>
-                  <div className={styles.progressTrack} role="progressbar" aria-valuenow={handover.rate} aria-valuemin={0} aria-valuemax={100} aria-label="友だちの引き継ぎ">
-                    <span className={styles.progressFill} style={{ width: `${handover.rate}%` }} />
-                  </div>
+                  <ProgressBar value={handover.rate} label="友だちの引き継ぎ" />
                   <p className={styles.progressNote}>{remainText}</p>
                   <p className={styles.progressWarn}>引き継ぎは画面を閉じても続きます。もう一度開くと進み具合を確認できます。</p>
                 </Card>
@@ -717,9 +716,11 @@ export default function AccountRegisterV8() {
                   <CircleCheck size={28} className={styles.doneIcon} aria-hidden="true" />
                   <p className={styles.doneTitle}>準備ができました</p>
                 </div>
-                <Card className={styles.accountBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
+                <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn6-acct-pad)" gap="var(--tpl-htn-gap-s)">
+                  <div className={styles.accountDetails}>
                   <span className={styles.accountName}>{(connection.displayName ?? form.name.trim()) || 'LINEアカウント'}</span>
                   <span className={styles.accountId}>{connection.basicId || String(emptyValue('none'))}</span>
+                  </div>
                 </Card>
                 <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
                   {form.importFriends
@@ -728,17 +729,17 @@ export default function AccountRegisterV8() {
                   <p className={styles.progressNote}>LINE の都合で引き継げないアカウントでは、友だちが話しかけた順に登録されます。</p>
                 </Card>
                 {connection.remainingActions.length > 0 && (
-                  <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
-                    <p><strong>残りの手作業</strong></p>
-                    <ul>{connection.remainingActions.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
+                    <p className={styles.noteText}><strong>残りの手作業</strong></p>
+                    <ul className={styles.noteText}>{connection.remainingActions.map((item) => <li key={item}>{item}</li>)}</ul>
                   </Card>
                 )}
                 <p className={styles.groupLabel}>次にすること</p>
                 <div className={styles.useRow}>
                   <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
-                  <Button href="/friends"><Users size={15} aria-hidden="true" />友だち一覧</Button>
-                  <Button href="/friend-add-settings"><QrCode size={15} aria-hidden="true" />友だち追加URL・QR</Button>
-                  <Button href="/emergency"><Activity size={15} aria-hidden="true" />運用状態の接続監視</Button>
+                  <Button href="/friends"><Users size={16} aria-hidden="true" />友だち一覧</Button>
+                  <Button href="/friend-add-settings"><QrCode size={16} aria-hidden="true" />友だち追加URL・QR</Button>
+                  <Button href="/emergency"><Activity size={16} aria-hidden="true" />運用状態の接続監視</Button>
                 </div>
               </>}
             </Card>
@@ -755,18 +756,18 @@ export default function AccountRegisterV8() {
             <Notice tone="danger" message={error} onClose={() => setError('')} />
           ) : null}
         </div>
-        <StickyBar presentation="account-registration" actions={currentStep === 5 ? (
-            <Button href="/hq" variant="primary"><ArrowLeft size={15} aria-hidden="true" />統括コンソールへ戻る</Button>
+      </form>
+      <PageFooter actions={currentStep === 5 ? (
+            <Button href="/hq" variant="primary"><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
           ) : currentStep === 3 && sub === 1 && !rowsOk ? <>
-            <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={15} aria-hidden="true" />{backLabel}</Button>
-            <Button type="button" variant="primary" disabled={busy || checkRunning} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={15} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
+            <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
+            <Button type="button" variant="primary" disabled={busy || checkRunning} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={16} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
           </> : <>
             {canBack
-              ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={15} aria-hidden="true" />{backLabel}</Button>
+              ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save'} busyLabel="登録しています…"><ArrowRight size={15} aria-hidden="true" />{nextLabel}</Button>
+            <Button type="submit" form="account-register-form" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save'} busyLabel="登録しています…"><ArrowRight size={16} aria-hidden="true" />{nextLabel}</Button>
           </>} />
-      </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
       {stepUp && <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} />}
     </PageFrame></SaveErrorScope>
@@ -774,6 +775,6 @@ export default function AccountRegisterV8() {
 }
 function CopyButton({ value }: { value: string }) {
   return (
-    <CopyTextButton value={value} label="コピーする" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="値をコピー" disabled={value === '—'} />
+    <CopyTextButton value={value} label="コピーする" variant="secondary" icon={<Copy size={16} aria-hidden="true" />} aria-label="値をコピーする" disabled={value === '—'} />
   )
 }

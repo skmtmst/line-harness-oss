@@ -114,9 +114,9 @@ export function DataTable({
   /** 列の幅の割合（1,2.2,…）。均等割りにせず、条件のような長い列に幅を取る。列の数と同じだけ渡す。 */
   columnWeights?: readonly number[]
   'data-design'?: string
-  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
+  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表。指定した表だけに適用する。 */
   cellPresentation?: 'friends'
-  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery' | 'template-list'
+  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'template-list'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
   /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */

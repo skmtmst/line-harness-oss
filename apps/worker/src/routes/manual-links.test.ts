@@ -264,3 +264,10 @@ describe('いま全部を確かめる', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 });
+
+// Resolve synthetic public DNS while keeping the real URL policy and HEAD call.
+vi.mock('../services/manual-link-check.js', async original => {
+  const actual = await original<typeof import('../services/manual-link-check.js')>();
+  return { ...actual, checkAllManualLinks: (...[db, options]: Parameters<typeof actual.checkAllManualLinks>) =>
+    actual.checkAllManualLinks(db, { ...options, lookupHost: async () => ['93.184.216.34'] }) };
+});

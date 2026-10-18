@@ -17,16 +17,8 @@ type CommonProps = {
    * `compact` は一覧の行内・絞り込み行など、32px級の操作と高さを
    * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
    * `standard` のままにする。
-   *
-   * `delivery-head` は★V8 デリバリー受注の板の頭の操作（絵 kDQHr・OzHLO）と
-   * 注文詳細の窓の足（絵 hjdqV）だけ。どの絵も余白 14・印 15・間 6 で同じ値。
-   * 高さ・角丸・字は既定と同じで、左右の余白と印の大きさだけ絵へ合わせる。
-   * 渡さないボタンは変わらない。
-   *
-   * `delivery-bulk` は★V8 デリバリー受注の「まとめて」の帯の中の操作（絵 h7OeT）だけ。
-   * 高さ28・左右10・角丸8・字12は `delivery-row` と同じで、印13角・印と字の間5が違う。
    */
-  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'inbox-tool' | 'booking' | 'delivery-row' | 'delivery-bulk' | 'delivery-head'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'inbox-tool' | 'booking'
   fullWidth?: boolean
   align?: 'start'
   /**
