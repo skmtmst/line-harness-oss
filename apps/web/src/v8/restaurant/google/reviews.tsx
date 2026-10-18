@@ -161,7 +161,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
       />
       {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
       {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認する</Link>}>この店舗を操作する権限がありません。</Notice> : null}
-      {syncError && canEdit ? <Notice tone="warn" action={<Button variant="text" onClick={() => sync()} busy={syncing} busyLabel="取得中…">もう一度</Button>}>{syncError}</Notice> : null}
+      {syncError ? <Notice tone="warn" action={canEdit ? <Button variant="text" onClick={() => sync()} busy={syncing} busyLabel="取得中…">もう一度</Button> : undefined}>{syncError}</Notice> : null}
       {syncing && (list?.total ?? 0) === 0 ? <Notice tone="info">口コミを取得中… すべてのページを取得してから表示します。</Notice> : null}
       {listLoading && !list ? <div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div> : null}
       {listError ? <div className={styles.stateBox}><ListState kind="error" title="口コミを表示できませんでした" description={listError} onRetry={() => void load()} /></div> : null}
@@ -370,9 +370,10 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
   return (
     <SaveErrorScope errors={saveErrors}><>
       {!canEdit ? <ReadOnlyNotice /> : null}
+      {!canEdit && actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       {done ? <Notice tone="success">Googleに返信を送信しました。反映を確認できるまで「反映確認中」と表示します。</Notice> : null}
       {conflict !== null ? <SaveConflictBand title="別の担当者がすでに返信しています。" description={`表示されている返信：「${conflict}」。重ねて送信せず、最新の内容を読み込んで確認してください。`} onReload={() => void load()} /> : null}
-      {pendingConfirm && !done ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
+      {pendingConfirm && !done ? <Notice tone="warn">{canEdit ? '前回の送信結果を確認できていません。「この内容で返信する」を押すと、先にGoogle側の状態を照合してから送信します。' : '前回の送信結果を確認できていません。オーナーか管理者にGoogle側の状態の確認を頼んでください。'}</Notice> : null}
       <div className={styles.split}>
         <div className={styles.mainColumn}>
           <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
@@ -388,7 +389,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
               <p className={styles.repliedBox}>{`公開済みの返信：${done?.comment ?? review.replyComment}`}</p>
             ) : null}
           </Card>
-          {!canEdit && !alreadyReplied ? <Card appearance="outlined" layout="vertical" padding="default" gap="normal"><SectionHeader size="small" title="返信の下書き" /><p className={styles.preText}>{review.replyDraft || '下書きはまだありません。'}</p></Card> : !alreadyReplied ? (
+          {!canEdit && !alreadyReplied ? <Card appearance="outlined" layout="vertical" padding="default" gap="normal"><SectionHeader size="small" title={review.replyDraftAiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'} /><p className={styles.preText}>{review.replyDraft || '下書きはまだありません。'}</p></Card> : !alreadyReplied ? (
             <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
               <SectionHeader size="small" title={<>{aiGenerated ? 'AIが作った返信の下書き' : '返信の下書き'}</>} />
               <SaveErrorField names={["text"]}><TextArea

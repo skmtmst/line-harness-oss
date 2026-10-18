@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({ review: vi.fn(), publishReply: vi.fn(), listReviews: vi.fn(), syncReviews: vi.fn(), generateDraft: vi.fn(), saveDraft: vi.fn(), createPost: vi.fn(), profile: vi.fn(), role: 'owner' as string | null }))
@@ -164,9 +164,11 @@ it.each(['viewer', null])('口コミは変更権限がない間（%s）も読め
 
 it.each(['viewer', null])('下書きのURLを直接開いても変更権限がない間（%s）は読むだけ', async (role) => {
   fixture.role = role
+  fixture.review.mockResolvedValue({ review: { ...review, replyDraftAiGenerated: true } })
   render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
   await screen.findByText('待ちました。')
   expect(screen.getByText('下書き', { exact: true })).toBeTruthy()
+  expect(screen.getByText('AIが作った返信の下書き', { exact: true })).toBeTruthy()
   expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
   expect(screen.queryByRole('textbox', { name: '返信文' })).toBeNull()
   for (const name of ['下書きを保存する', 'AIで下書きを作る', '返信内容を確認する']) expect(screen.queryByRole('button', { name })).toBeNull()
@@ -205,4 +207,39 @@ it('公開の確認中に閲覧のみに変わっても、送信へ進めない'
   expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'この内容で返信する' })).toBeNull()
   expect(fixture.publishReply).not.toHaveBeenCalled()
+})
+
+
+it('同期中に閲覧のみへ変わっても失敗の案内は残し、再試行の操作を隠す', async () => {
+  fixture.listReviews.mockResolvedValue({ reviews: [review], total: 1, page: 1, perPage: 20 })
+  let rejectSync!: (reason: Error) => void
+  fixture.syncReviews.mockImplementation(() => new Promise((_resolve, reject) => { rejectSync = reject }))
+  const props = { accountId: 'a', data: connection(true, true), go: vi.fn(), onSynced: vi.fn() }
+  const view = render(<ReviewsBoard {...props} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Googleから同期する' }))
+  fixture.role = 'viewer'
+  view.rerender(<ReviewsBoard {...props} />)
+  await act(async () => { rejectSync(new Error('模擬の同期失敗')) })
+  expect(await screen.findByText(/前回取得した内容を表示しています/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'もう一度', exact: true })).toBeNull()
+  expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+})
+
+
+it('送信中に閲覧のみへ変わっても結果不明の案内を残し、再送を誘わない', async () => {
+  let rejectPublish!: (reason: Error) => void
+  fixture.publishReply.mockImplementation(() => new Promise((_resolve, reject) => { rejectPublish = reject }))
+  const props = { accountId: 'a', reviewId: 'rv-2', data: connection(true, true), go: vi.fn(), onPublished: vi.fn() }
+  const view = render(<ReviewDraft {...props} />)
+  fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
+  fireEvent.click(screen.getByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で返信する' }))
+  fixture.role = 'viewer'
+  view.rerender(<ReviewDraft {...props} />)
+  await act(async () => { rejectPublish(new ApiError(502, '送信結果を確認できません', 'upstream_error')) })
+  expect(await screen.findByText(/Googleへの送信結果を確認できませんでした/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'この内容で返信する' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '返信内容を確認する' })).toBeNull()
+  expect(fixture.publishReply).toHaveBeenCalledTimes(1)
+  expect(props.onPublished).not.toHaveBeenCalled()
 })
