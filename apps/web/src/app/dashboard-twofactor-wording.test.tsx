@@ -11,7 +11,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import DashboardPage from './page'
+// 組織全体の集計は共通ダッシュボード本体で検査。業種の入口はhome.test.tsxへ。
+import DashboardPage from '@/v8/dashboard/dashboard'
 
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a>,

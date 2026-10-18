@@ -7,7 +7,7 @@ import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
 import { prepareEventNotification } from './event-notification-plan.js';
 import { prepareEventReminders } from './event-reminder-plan.js';
-import { computeRemindersForBooking } from './event-booking-reminders.js';
+import { computeRemindersForBooking } from './event-reminder-schedule.js';
 import { dispatchPendingEventWaitlistOffers, eventWaitlistDeliveryStatements } from './event-waitlist-delivery.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';

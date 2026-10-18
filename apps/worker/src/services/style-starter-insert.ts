@@ -50,7 +50,7 @@ export async function insertStyleStarterItems(
           old.is_sample &&
           old.source_snapshot &&
           ['template', 'rich_menu'].includes(item.kind) &&
-          (!answers.content || answers.content.mode === 'configured')
+          (!answers.content || (answers.content.mode === 'configured' && answers.content.value !== false))
         ) {
           const snapshot = await resourceSnapshot(
             db,
@@ -105,7 +105,7 @@ export async function insertStyleStarterItems(
     if (
       ['template', 'rich_menu'].includes(item.kind) &&
       answers.content &&
-      answers.content.mode !== 'configured'
+      (answers.content.mode !== 'configured' || answers.content.value === false)
     )
       continue;
     const intrinsicFeature =

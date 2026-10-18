@@ -1,11 +1,22 @@
 import Database from 'better-sqlite3';
 import { readFileSync, readdirSync } from 'node:fs';
 import { beforeAll, expect, it } from 'vitest';
-import refs from '../../../apps/worker/src/services/customer-data-protected-relations.json';
+import protectedRefs from '../../../apps/worker/src/services/customer-data-protected-relations.json';
 import { seedDeletionRecords } from './fixtures/customer-deletion.mjs';
 const root = new URL('../', import.meta.url);
 const sql = readFileSync(new URL('migrations/634_customer_deletion_retained_references.sql', root), 'utf8');
 const statements = sql.split(/;\s*(?:\r?\n|$)/).map(s => s.trim()).filter(Boolean);
+// This historical migration rebuilds these 13 tables. Later retained relations
+// (such as 733's class-pass history) do not exist in its pre-634 database.
+const rebuiltTables = [
+  'affiliate_payout_batch_lines', 'affiliate_payout_results', 'affiliate_settlement_lines',
+  'affiliate_settlements', 'affiliate_statements', 'booking_audit_logs', 'booking_payments',
+  'mileage_adjustment_approval_events', 'nen_photo_assessment_runs',
+  'nen_photo_original_download_audit', 'nen_photo_original_download_grants',
+  'nen_photo_review_events', 'nen_photo_risk_assessments',
+] as const satisfies readonly (keyof typeof protectedRefs)[];
+const refs = Object.fromEntries(rebuiltTables.map(table => [table, protectedRefs[table]])) as
+  Pick<typeof protectedRefs, typeof rebuiltTables[number]>;
 let baseline: Buffer;
 it('fits D1 SQL/file limits and contains only the approved rebuilt tables', () => {
   expect(Math.max(...statements.map(s=>Buffer.byteLength(s)))).toBeLessThan(100000);

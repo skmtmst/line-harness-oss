@@ -1,4 +1,5 @@
 'use client'
+import { dashboardCardForStyle } from './style-cards'
 
 import { jstDate, jstDayStartIso } from '@/lib/jst-datetime'
 
@@ -60,7 +61,7 @@ function monthKey(offset: number): string {
   return d.toISOString().slice(0, 7)
 }
 
-export function useDashboard() {
+export function useDashboard(usageStyle?: 'standard' | 'ec') {
   const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
@@ -152,9 +153,10 @@ export function useDashboard() {
     : null
   const supportMarksEnabled = useFeatureVisibility(selectedAccountId).enabled('support_marks')
   const visibleRight = preferences.right
+    .filter(item => dashboardCardForStyle(item.id, usageStyle, preferenceVersion > 0))
     .filter((item) => item.visible)
     .filter((item) => item.id !== 'support-mark-status' || supportMarksEnabled)
-  const visibleToday = preferences.today.filter((item) => item.visible)
+  const visibleToday = preferences.today.filter((item) => item.visible && dashboardCardForStyle(item.id, usageStyle, preferenceVersion > 0))
   const needsPhotos = visibleToday.some((item) => item.id === 'today-photo-review')
   const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
     || visibleRight.some((item) => item.id === 'upcoming')
@@ -555,6 +557,7 @@ export function useDashboard() {
     error,
     load,
     preferences,
+    preferenceVersion,
     preferenceSaving,
     preferenceSaveError,
     applyPreferences,

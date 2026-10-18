@@ -57,6 +57,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' }, status: 'ready', error: null, reload: vi.fn() }) }))
 import Sidebar, { isHqShellPath } from './sidebar'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 

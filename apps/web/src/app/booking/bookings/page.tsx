@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { api, bookingApi, ApiError, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
 
 import { SERIES_QUERY_KEYS } from '@/v8/booking-gap/series-host'
 
@@ -38,6 +39,7 @@ import { STATUS_TABS, SOURCE_FILTERS, PAGE_SIZE, jstDay, LEDGER_QUERY_KEYS, LEDG
 function useBookingLedger() {
   usePageTitle('予約管理')
   const { selectedAccountId, selectedAccount } = useAccount()
+  const styleProfile = useAccountStyle(selectedAccountId)
   const urlParams = useSearchParams()
   const router = useRouter()
   const [view, setView] = useState<'day' | 'week' | 'month' | 'list'>('day')
@@ -748,6 +750,7 @@ function useBookingLedger() {
   const weekCount = summary.weekTabTotal ?? summary.weekTotal
   const monthCount = summary.monthTabTotal ?? kpi.total
   return {
+    styleProfile,
     selectedAccountId,
     selectedAccount,
     urlParams,

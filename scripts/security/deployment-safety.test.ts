@@ -20,10 +20,22 @@ describe('deployment safety fails closed on unsafe candidate and deployed metada
     const fake=(async(url:any,init:any)=>{urls.push(String(url));expect(init.method??'GET').toBe('GET');return Response.json({success:true,result:String(url).endsWith('/settings')?{bindings}:String(url).endsWith('/managed')?{enabled:false}:{domains:[]}});}) as typeof fetch;
     expect(await inspectDeployment(path,'staging','fixture-token','fixture-account',fake)).toEqual([]);expect(urls).toHaveLength(5);
   });
-  it.each(['worker','staging','admin'])('runs the guard before deployment in %s workflow',name=>{
-    const source=readFileSync(`.github/workflows/deploy-cloudflare-${name}.yml`,'utf8');
-    expect(source.indexOf('scripts/security/run-deployment-safety.ts')).toBeGreaterThan(0);
-    expect(source.indexOf('scripts/security/run-deployment-safety.ts')).toBeLessThan(source.indexOf(name==='admin'?'npx wrangler pages deploy':name==='worker'?'command: deploy --config':'npx wrangler deploy'));
+  function assertGuardBeforePublish(source: string, name: 'worker' | 'staging' | 'admin') {
+    const publication = source.indexOf(name === 'staging' ? 'npx wrangler deploy' : `run: pnpm exec tsx scripts/deploy/production/run.ts deploy-${name}`);
+    const guards = [...source.matchAll(/^\s+run: pnpm exec tsx scripts\/security\/run-deployment-safety\.ts[^\n]*/gm)];
+    expect(publication).toBeGreaterThan(0);
+    // Worker must inspect both source and exact generated config, before publishing.
+    expect(guards).toHaveLength(name === 'worker' ? 2 : 1);
+    for (const guard of guards) expect(guard.index).toBeLessThan(publication);
+  }
+  it.each(['worker','staging','admin'] as const)('runs the guard before deployment in %s workflow', name => {
+    assertGuardBeforePublish(readFileSync(`.github/workflows/deploy-cloudflare-${name}.yml`, 'utf8'), name);
+  });
+  it.each(['worker','admin'] as const)('rejects a missing guard or a guard moved after %s publication', name => {
+    const source = readFileSync(`.github/workflows/deploy-cloudflare-${name}.yml`, 'utf8');
+    const guard = [...source.matchAll(/^\s+run: pnpm exec tsx scripts\/security\/run-deployment-safety\.ts[^\n]*/gm)].at(-1)![0];
+    expect(() => assertGuardBeforePublish(source.replace(guard, ''), name)).toThrow();
+    expect(() => assertGuardBeforePublish(source.replace(guard, '') + '\n' + guard, name)).toThrow();
   });
 });
 
