@@ -11,6 +11,7 @@ import { CreatePage } from '@/components/templates'
 import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import PageHeader from '@/components/shared/page-header'
@@ -139,7 +140,7 @@ type ReportSummaryInput = {
   savedName: (id: string) => string
 }
 
-function describeReportSummary(input: ReportSummaryInput): string {
+function describeReportSummary(input: ReportSummaryInput, oneTime = false): string {
   const sections = input.sections.map(sectionTitleOf)
   const saved = input.savedAnalysisIds.map(input.savedName)
   const recipients = [
@@ -159,7 +160,7 @@ function describeReportSummary(input: ReportSummaryInput): string {
     `入れるもの: ${sections.length > 0 ? sections.join('、') : '（なし）'}`,
     `保存した分析: ${saved.length > 0 ? saved.join('、') : 'なし'}`,
     `宛先: ${recipients.length > 0 ? recipients.join('、') : '（なし）'}`,
-    `送る間かく: ${schedule}`,
+    ...(oneTime ? [] : [`送る間かく: ${schedule}`]),
     `集計する期間: 前の${input.periodDays}日間`,
     `通知方法: ${channels.length > 0 ? channels.join('、') : '（なし）'}`,
     `知らせる条件: ${alerts.length > 0 ? alerts.join('、') : 'なし'}`,
@@ -643,7 +644,12 @@ function AnalyticsReportFormPage() {
     }
   }
 
+  const submitLock = useRef<{ target: string } | null>(null)
+  const [sendOnceOpen, setSendOnceOpen] = useState(false)
+  useEffect(() => { setSendOnceOpen(false) }, [selectedAccountId, editId, canManage])
   const submit = async (sendOnce: boolean) => {
+    const target = `${selectedAccountId}:${editId}:${switchSeqRef.current}`
+    if (submitLock.current?.target === target) return
     if (!selectedAccountId || !options || !canManage || !hasRecipient) return
     const built = buildReportPayload(options)
     if (!built.ok) {
@@ -651,6 +657,9 @@ function AnalyticsReportFormPage() {
       return
     }
     const { payload } = built
+    const lock = { target }
+    submitLock.current = lock
+    setSendOnceOpen(false)
     const submittedSignature = signature
     setSaving(true)
     setError('')
@@ -780,6 +789,7 @@ function AnalyticsReportFormPage() {
       if (!isFresh()) return
       setError(describeSaveFailure(caught))
     } finally {
+      if (submitLock.current === lock) submitLock.current = null
       if (isFresh()) setSaving(false)
     }
   }
@@ -965,7 +975,7 @@ function AnalyticsReportFormPage() {
     }
     return rules
   }
-  const draftSummary = describeReportSummary({
+  const draftSummaryInput: ReportSummaryInput = {
     name, sections, savedAnalysisIds, cadence, weekday, monthDay, sendTime, periodDays,
     staffIds, emails: emails.map((item) => item.trim()).filter(Boolean),
     channels: [
@@ -976,7 +986,9 @@ function AnalyticsReportFormPage() {
     alertRules: parsedDraftAlerts(),
     staffName: staffNameOf,
     savedName: savedNameOf,
-  })
+  }
+  const draftSummary = describeReportSummary(draftSummaryInput)
+  const oneTimeSummary = describeReportSummary(draftSummaryInput, true)
 
   /*
    * つくる・なおし途中の離脱確認。基準（初期値または読み直した値）から
@@ -1014,7 +1026,7 @@ function AnalyticsReportFormPage() {
   if (editLoadFailed) return <ListState kind="error" title="定期レポートを表示できませんでした" description="通信が切れたか、サーバーが応えませんでした。もう一度読み込んでください。" onRetry={() => setReloadSeq((n) => n + 1)} />
   if (editMissing || (editing === null && editId)) return <ListState kind="error" title="定期レポートが見つかりませんでした" description="一覧から選び直してください。" />
   if (editing?.isOneTime) return <ListState kind="empty" title="1回だけ送る依頼は変更できません" description="同じ内容が必要なときは、新しく作ってください。" />
-  if (!options || options.recipients.length === 0) return (
+  if (!options) return (
     <ListState
       kind="empty"
       title="受け取るログインユーザーがいません"
@@ -1054,7 +1066,7 @@ function AnalyticsReportFormPage() {
         footerActions={<>
         <Button href="/analytics">キャンセル</Button>
         {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
-        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
+        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; setSendOnceOpen(true) }}>今すぐ1回だけ送る</Button>}
         {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
       </>}
       >
@@ -1157,6 +1169,9 @@ function AnalyticsReportFormPage() {
       <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy || latestBusy}>
         <VersionCompare before={latestSummary} after={draftSummary} />
       </Dialog>
+      <ConfirmDialog open={sendOnceOpen && canManage} title="レポートを今すぐ1回だけ送りますか？" description="次の宛先と通知方法で送る依頼を作ります。" confirmLabel="この宛先へ1回だけ送る" busy={saving} onCancel={() => { if (!saving) setSendOnceOpen(false) }} onConfirm={() => void submit(true)}>
+        <p className="whitespace-pre-wrap break-words">{oneTimeSummary}</p>
+      </ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した定期レポート" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )
