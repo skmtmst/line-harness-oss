@@ -13,6 +13,8 @@ import SectionHeader from '@/components/shared/section-header'
 import TruncatedText from '@/components/shared/truncated-text'
 import Notice from '@/components/shared/notice'
 import { isSaveConflict } from '@/components/shared/save-conflict'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { readSaveFieldErrors } from '@/lib/api-field-errors'
 import { ListPageCards } from '@/components/templates/list-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useV8TabEdit } from './tabs/shared'
@@ -22,8 +24,8 @@ const LABELS = { exterior: '外観', interior: '店内', waiting: '待合' }
 type Target = { owner: BookingPhotoOwner; id: string; name: string }
 const keyOf = (target: Target) => `${target.owner}:${target.id}`
 
-function PhotoCard({ name, photo, accountId, editable, changed, busy, disabledReason, onPick, onRemove, onSave, orderActions }: {
-  name: string; photo: BookingPhoto | null; accountId: string; editable: boolean; changed: boolean; busy: boolean
+function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, disabledReason, onPick, onRemove, onSave, orderActions }: {
+  name: string; fieldKey: string; photo: BookingPhoto | null; accountId: string; editable: boolean; changed: boolean; busy: boolean
   onPick: () => void; onRemove: () => void; onSave?: () => void; orderActions?: React.ReactNode
   disabledReason?: string
 }) {
@@ -34,12 +36,12 @@ function PhotoCard({ name, photo, accountId, editable, changed, busy, disabledRe
     </div>
     <CardContent>
       <SectionHeader title={<TruncatedText value={name} />} />
-      {editable ? <div className={styles.actions}>
+      {editable ? <SaveErrorField names={[fieldKey]}><div className={styles.actions} role="group" aria-label={`${name}の写真を選ぶ操作`}>
         <Button onClick={onPick} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を選ぶ`}>{photo ? '替える' : '写真を選ぶ'}</Button>
         {photo ? <Button onClick={onRemove} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を外す`}>外す</Button> : null}
         {orderActions}
         {onSave && changed ? <Button variant="primary" onClick={onSave} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を保存する`}>保存する</Button> : null}
-      </div> : null}
+      </div></SaveErrorField> : null}
     </CardContent>
   </Card>
 }
@@ -47,6 +49,7 @@ function PhotoCard({ name, photo, accountId, editable, changed, busy, disabledRe
 export default function PhotosTab({ accountId, canEditMenus, canEditSettings, onSaved }: {
   accountId: string; canEditMenus: boolean; canEditSettings: boolean; onSaved?: () => void
 }) {
+  const saveErrors = useSaveFormErrors()
   const [catalog, setCatalog] = useState<BookingPhotoCatalog | null>(null)
   const [drafts, setDrafts] = useState<Record<string, BookingPhoto | null>>({})
   const [order, setOrder] = useState<BookingStorePhotoSlot[] | null>(null)
@@ -74,18 +77,23 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
   }, [accountId])
   useEffect(() => {
     setCatalog(null); setDrafts({}); setOrder(null); setPicker(null); setBusy(false); savingRef.current = false
+    saveErrors.reset()
     void load()
     return () => { generation.current += 1 }
-  }, [load])
+  }, [load, saveErrors])
 
   const store = catalog?.store
   const storeOrder = order ?? store?.order ?? []
   const dirty = Object.keys(drafts).length > 0 || order !== null
-  const reset = () => { setDrafts({}); setOrder(null); setConflict(false); setError('') }
+  const reset = () => { setDrafts({}); setOrder(null); setConflict(false); setError(''); saveErrors.reset() }
   useV8TabEdit({ dirty, saving: busy, subject: '写真の変更', showBar: false, onReset: reset, onSave: () => {} })
 
   const value = (target: Target, saved: BookingPhoto | null) => Object.hasOwn(drafts, keyOf(target)) ? drafts[keyOf(target)]! : saved
-  const change = (target: Target, next: BookingPhoto | null) => setDrafts(current => ({ ...current, [keyOf(target)]: next }))
+  const change = (target: Target, next: BookingPhoto | null) => {
+    saveErrors.clear(keyOf(target))
+    if (target.owner === 'store') saveErrors.clear('store:')
+    setDrafts(current => ({ ...current, [keyOf(target)]: next }))
+  }
   const selected = (item: MediaItem) => {
     if (!picker || busy) return
     if (picker.owner === 'menu' ? !canEditMenus : !canEditSettings) return
@@ -99,6 +107,8 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
   async function save(target: Target) {
     if (!catalog || savingRef.current || conflict || loading) return
     if (target.owner === 'menu' ? !canEditMenus : !canEditSettings) return
+    saveErrors.clear(keyOf(target))
+    if (target.owner === 'store') for (const slot of storeOrder) saveErrors.clear(`store:${slot}`)
     savingRef.current = true; setBusy(true); setError('')
     const request = generation.current
     try {
@@ -131,6 +141,15 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
       onSaved?.()
     } catch (caught) {
       if (request !== generation.current) return
+      const status = caught && typeof caught === 'object' && 'status' in caught ? caught.status : undefined
+      const problems = readSaveFieldErrors(caught)
+      const fields: Record<string, string> = Object.fromEntries(Object.entries(problems).map(([field, message]) => {
+        if (target.owner === 'store' && field.startsWith('photos.') && Object.hasOwn(LABELS, field.slice(7))) return [`store:${field.slice(7)}`, message]
+        if (field === 'expectedVersion' || field === 'mediaId' || (target.owner === 'store' && (field === 'order' || field === 'photos'))) return [keyOf(target), message]
+        return [field, message]
+      }))
+      if ((status === 400 || status === 422) && !Object.keys(fields).length) fields[keyOf(target)] = '写真の選び方を確かめて、もう一度保存してください。'
+      saveErrors.capture({ status, fields })
       if (isSaveConflict(caught)) {
         setConflict(true)
         setError('ほかの人が更新しました。入力を残して最新の写真を読み直し、確認してから保存してください。')
@@ -145,24 +164,24 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
   const disabled = busy || loading || conflict
   const disabledReason = conflict ? '最新の写真を読み直してから保存してください。' : busy ? '写真を保存しています。' : loading ? '写真を読み直しています。' : undefined
   const storeChanged = order !== null || Object.keys(drafts).some(key => key.startsWith('store:'))
-  return <div className={styles.root} aria-busy={busy}>
+  return <SaveErrorScope errors={saveErrors}><div className={styles.root} aria-busy={busy}>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {error ? <Button onClick={() => void load()} disabled={busy || loading} disabledReason={busy ? '写真を保存しています。' : '写真を読み直しています。'}>入力を残して読み直す</Button> : null}
-    <section className={styles.section} aria-label="お店の写真">
+    <SaveErrorField names={['store:']}><section className={styles.section} aria-label="お店の写真">
       <SectionHeader title="お店" description="外観・店内・待合を各1枚。矢印で表示順を変えられます。"
         actions={canEditSettings && storeChanged ? <Button variant="primary" onClick={() => void save({ owner: 'store', id: '', name: 'お店' })} disabled={disabled} disabledReason={disabledReason}>お店の写真を保存する</Button> : undefined} />
       <ListPageCards>
         {storeOrder.map((slot, index) => {
           const target = { owner: 'store' as const, id: slot, name: LABELS[slot] }
-          return <PhotoCard key={slot} name={target.name} photo={value(target, store?.photos[slot] ?? null)} accountId={accountId} editable={canEditSettings}
+          return <PhotoCard key={slot} name={target.name} fieldKey={keyOf(target)} photo={value(target, store?.photos[slot] ?? null)} accountId={accountId} editable={canEditSettings}
             changed={storeChanged} busy={disabled} disabledReason={disabledReason} onPick={() => setPicker(target)} onRemove={() => change(target, null)}
             orderActions={<>
-              <Button aria-label={`${target.name}を前へ`} disabled={disabled || index === 0} disabledReason={disabledReason ?? (index === 0 ? 'これが先頭の写真です。' : undefined)} onClick={() => { const next = [...storeOrder]; [next[index - 1], next[index]] = [next[index]!, next[index - 1]!]; setOrder(next) }}>前へ</Button>
-              <Button aria-label={`${target.name}を後へ`} disabled={disabled || index === storeOrder.length - 1} disabledReason={disabledReason ?? (index === storeOrder.length - 1 ? 'これが最後の写真です。' : undefined)} onClick={() => { const next = [...storeOrder]; [next[index + 1], next[index]] = [next[index]!, next[index + 1]!]; setOrder(next) }}>後へ</Button>
+              <Button aria-label={`${target.name}を前へ`} disabled={disabled || index === 0} disabledReason={disabledReason ?? (index === 0 ? 'これが先頭の写真です。' : undefined)} onClick={() => { saveErrors.clear('store:'); const next = [...storeOrder]; [next[index - 1], next[index]] = [next[index]!, next[index - 1]!]; setOrder(next) }}>前へ</Button>
+              <Button aria-label={`${target.name}を後へ`} disabled={disabled || index === storeOrder.length - 1} disabledReason={disabledReason ?? (index === storeOrder.length - 1 ? 'これが最後の写真です。' : undefined)} onClick={() => { saveErrors.clear('store:'); const next = [...storeOrder]; [next[index + 1], next[index]] = [next[index]!, next[index + 1]!]; setOrder(next) }}>後へ</Button>
             </>} />
         })}
       </ListPageCards>
-    </section>
+    </section></SaveErrorField>
     {(['menu', 'staff'] as const).map(owner => {
       const rows = owner === 'menu' ? catalog.menus : catalog.staff
       const label = owner === 'menu' ? 'メニュー' : 'スタッフ'
@@ -171,7 +190,7 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
         {rows.length ? <ListPageCards columns={owner === 'menu' ? 4 : 3}>
           {rows.map(item => {
             const target = { owner, id: item.id, name: item.name }
-            return <PhotoCard key={item.id} name={item.name} photo={value(target, item.photo)} accountId={accountId}
+            return <PhotoCard key={item.id} name={item.name} fieldKey={keyOf(target)} photo={value(target, item.photo)} accountId={accountId}
               editable={owner === 'menu' ? canEditMenus : canEditSettings} changed={Object.hasOwn(drafts, keyOf(target))} busy={disabled} disabledReason={disabledReason}
               onPick={() => setPicker(target)} onRemove={() => change(target, null)} onSave={() => void save(target)} />
           })}
@@ -181,5 +200,5 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
     <Notice tone="info">使っている写真は、先にここから外して保存するまで登録メディアから削除できません。</Notice>
     <MediaPickerDialog open={picker !== null && (picker.owner === 'menu' ? canEditMenus : canEditSettings)} accountId={accountId} kind="image" accountOnly
       title={`${picker?.name ?? ''}の写真を選ぶ`} onClose={() => setPicker(null)} onSelect={selected} />
-  </div>
+  </div></SaveErrorScope>
 }
