@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 // 描画は page.tsx、読み込みの入口（loadInitial）は use-manual-links.ts にある。
 const PAGE = [
   readFileSync(new URL('./manual-links-v8.tsx', import.meta.url), 'utf8'),
-  readFileSync(new URL('./use-manual-links.ts', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../../v8/settings/manual-links/use-manual-links.ts', import.meta.url), 'utf8'),
 ].join('\n')
 
 /** #975 U071: 初回の読み込み失敗にも再試行を付ける。 */

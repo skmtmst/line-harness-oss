@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = [
   'page.tsx',
-  'use-duplicates-data.ts',
+  '../../v8/friends/duplicates/use-duplicates-data.ts',
   'duplicates-v8.tsx',
 ].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 

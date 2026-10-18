@@ -6,7 +6,7 @@ import { createAccountRequestGuard } from './account-request-guard'
 
 const source = [
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'feature-settings-v8.tsx'), 'utf8'),
-  readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'use-feature-settings.ts'), 'utf8'),
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../v8/settings/features/use-feature-settings.ts'), 'utf8'),
 ].join('\n')
 const apiSource = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'lib', 'api.ts'), 'utf8')
 

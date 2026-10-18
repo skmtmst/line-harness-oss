@@ -8,7 +8,7 @@ import { parseUidCsv } from '../../accounts/migration'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CSV_PAGE = [
   'page.tsx',
-  'use-friend-migrations.ts',
+  '../../../v8/friends/migrations/use-friend-migrations.ts',
 ].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 const UID_PAGE = [
   'migration.tsx',

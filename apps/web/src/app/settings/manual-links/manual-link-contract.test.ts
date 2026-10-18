@@ -182,7 +182,7 @@ describe('失敗の表示', () => {
   const dir = dirname(fileURLToPath(import.meta.url))
   const page = [
     readFileSync(join(dir, 'manual-links-v8.tsx'), 'utf8'),
-    readFileSync(join(dir, 'use-manual-links.ts'), 'utf8'),
+    readFileSync(join(dir, '../../../v8/settings/manual-links/use-manual-links.ts'), 'utf8'),
   ].join('\n')
 
   it('「確かめる」と「保存」の失敗を無言にしない', () => {

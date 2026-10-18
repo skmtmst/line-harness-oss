@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 const dir = dirname(fileURLToPath(import.meta.url))
 const source = [
   readFileSync(join(dir, 'feature-settings-v8.tsx'), 'utf8'),
-  readFileSync(join(dir, 'use-feature-settings.ts'), 'utf8'),
+  readFileSync(join(dir, '../../v8/settings/features/use-feature-settings.ts'), 'utf8'),
 ].join('\n')
 
 describe('機能設定の添付デザイン', () => {

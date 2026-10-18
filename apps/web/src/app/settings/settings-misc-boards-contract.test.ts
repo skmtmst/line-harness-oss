@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const FEATURE = readFileSync(join(HERE, 'feature-settings-v8.tsx'), 'utf8')
 const MANUAL = readFileSync(join(HERE, 'manual-links', 'manual-links-v8.tsx'), 'utf8')
 const SCAN = readFileSync(join(HERE, 'file-scan', 'file-scan-v8.tsx'), 'utf8')
-const HOOK = readFileSync(join(HERE, 'use-feature-settings.ts'), 'utf8')
+const HOOK = readFileSync(join(HERE, '../../v8/settings/features/use-feature-settings.ts'), 'utf8')
 const CSS = readFileSync(join(HERE, '../../components/templates/page-templates.module.css'), 'utf8')
 const START = readFileSync(join(HERE, '..', 'getting-started', 'page.tsx'), 'utf8')
 
