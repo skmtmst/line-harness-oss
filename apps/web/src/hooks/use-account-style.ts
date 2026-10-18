@@ -29,7 +29,7 @@ function load(accountId: string): Promise<Data> {
 export function useAccountStyle(accountId: string | null | undefined) {
   const [snapshot, setSnapshot] = useState<{ accountId: string; data: Data | null; error: unknown } | null>(null)
   const [tick, setTick] = useState(0)
-  const reload = useCallback(() => setTick(n => n + 1), [])
+  const reload = useCallback(() => { if (accountId) accountStyleUpdated(accountId) }, [accountId])
   useEffect(() => {
     setSnapshot(null)
     if (!accountId) return
@@ -41,11 +41,11 @@ export function useAccountStyle(accountId: string | null | undefined) {
   }, [accountId, tick])
   useEffect(() => {
     const changed = (event: Event) => {
-      if ((event as CustomEvent<{ accountId: string }>).detail?.accountId === accountId) reload()
+      if ((event as CustomEvent<{ accountId: string }>).detail?.accountId === accountId) setTick(n => n + 1)
     }
     window.addEventListener(ACCOUNT_STYLE_UPDATED, changed)
     return () => window.removeEventListener(ACCOUNT_STYLE_UPDATED, changed)
-  }, [accountId, reload])
+  }, [accountId])
   const current = snapshot?.accountId === accountId ? snapshot : null
   return { data: current?.data ?? null, error: current?.error ?? null, reload,
     status: !accountId ? 'idle' as const : !current ? 'loading' as const : current.error ? 'error' as const : 'ready' as const }

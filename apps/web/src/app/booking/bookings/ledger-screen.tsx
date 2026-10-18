@@ -93,6 +93,10 @@ import type { BookingLedgerModel } from './page'
 import { bookingWords } from '@/v8/booking-bookings/words'
 
 export default function BookingLedgerScreen({ model }: { model: BookingLedgerModel }) {
+  if (model.selectedAccountId && model.styleProfile && !model.styleProfile.data) return <BookingLedgerFrame view={model.view}>
+    <PageHeading title="予約管理" />
+    <ListState kind={model.styleProfile.error ? 'error' : 'loading'} title={model.styleProfile.error ? '使い方のスタイルを読み込めませんでした' : '使い方のスタイルを確認しています'} error={model.styleProfile.error ?? undefined} onRetry={model.styleProfile.reload} />
+  </BookingLedgerFrame>
   const usageStyle = model.styleProfile?.data?.style
   const words = bookingWords(usageStyle)
   const {

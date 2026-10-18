@@ -236,7 +236,7 @@ export default function Sidebar({
   const [visibilityStatus, setVisibilityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [visibilityRetry, setVisibilityRetry] = useState(0)
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
-  const [explicitSettings, setExplicitSettings] = useState<{ accountId: string; value: boolean } | null>(null)
+  const [explicitSettings, setExplicitSettings] = useState<{ accountId: string; value: boolean | null } | null>(null)
   const [currentSearch, setCurrentSearch] = useState('')
 
   // 同じ画面の別タブをメニューへ出す項目（コンバージョン、データ移行）が
@@ -303,6 +303,7 @@ export default function Sidebar({
             setVisibilityAccountId(accountId)
             setVisibilityStatus('ready')
             setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
+            if (visibility.success && 'version' in visibility.data && typeof visibility.data.version === 'number') setExplicitSettings({ accountId, value: visibility.data.version > 0 })
           } else if (!cancelled) {
             setVisibilityStatus('error')
           }
@@ -314,9 +315,10 @@ export default function Sidebar({
               setExplicitSettings({ accountId, value: settings.data.version > 0 })
               setSectionOrder(settings.data.sidebarOrder)
               setItemOrder(settings.data.sidebarItemOrder)
-            }
+            } else if (!cancelled) { setExplicitSettings({ accountId, value: null }) }
           } catch {
             // 権限降格後など管理GETが拒否されても、最小read-modelの表示可否は残す。
+            if (!cancelled) setExplicitSettings({ accountId, value: null })
           }
         })
         .catch(() => {
@@ -361,7 +363,8 @@ export default function Sidebar({
          */
 
         if (isHq) return true
-        if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, explicitSettings?.accountId === selectedAccountId && explicitSettings.value)) return false
+        const savedSettings = explicitSettings?.accountId === selectedAccountId ? explicitSettings.value : staffRole === 'owner' || staffRole === 'admin' ? false : null
+        if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, savedSettings)) return false
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 

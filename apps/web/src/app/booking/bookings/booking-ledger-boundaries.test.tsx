@@ -7,6 +7,7 @@ import type { BookingLedgerModel } from './page'
 import Page from './page'
 
 const m = vi.hoisted(() => ({ latest: null as unknown as BookingLedgerModel, realView: false, account: 'A', liff: 'liff-a', query: 'view=list&status=confirmed', list: vi.fn(), summary: vi.fn(), menus: vi.fn(), staff: vi.fn(), me: vi.fn(), decide: vi.fn(), csv: vi.fn(), get: vi.fn(), replace: vi.fn() }))
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'standard' }, error: null, reload: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: m.account, selectedAccount: { id: m.account, name: m.account, liffId: m.liff } }) }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => new URLSearchParams(m.query), useRouter: () => ({ replace: m.replace, push: vi.fn() }) }))
 vi.mock('@/lib/api', async original => {

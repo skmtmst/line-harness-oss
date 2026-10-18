@@ -22,3 +22,9 @@ it('業種未取得なら専用機能を隠し、辞書のメニュー名を使�
   expect(styleMenuLabel(item('/'), 'consult')).toBe('ダッシュボード')
   expect(styleMenuLabel(item('/events'), 'lesson')).toBe('イベント予約')
 })
+
+it('保存版が無い旧staff読取では、許可済みの共通機能の履歴を隠さない', () => {
+  expect(styleMenuItemVisible(item('/events'), 'standard', null)).toBe(true)
+  expect(styleMenuItemVisible(item('/booking/bookings'), 'ec', null)).toBe(true)
+  expect(styleMenuItemVisible(item('/restaurant-test/reservations'), 'standard', null)).toBe(false)
+})

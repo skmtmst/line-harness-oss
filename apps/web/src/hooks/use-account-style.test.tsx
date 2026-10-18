@@ -32,3 +32,15 @@ it('失敗と不正な業種を標準へ読み替えず、再試行と同じ店�
   act(() => accountStyleUpdated('a'))
   await waitFor(() => expect(view.result.current.data?.style).toBe('salon'))
 })
+
+it('本文で読み直すと、同じアカウントの左メニューも一緒に復旧する', async () => {
+  net.get.mockReset().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(ok('lesson'))
+  const view = renderHook(() => ({ menu: useAccountStyle('shared'), body: useAccountStyle('shared') }))
+  await waitFor(() => expect(view.result.current.menu.status).toBe('error'))
+  expect(view.result.current.body.status).toBe('error')
+  expect(net.get).toHaveBeenCalledTimes(1)
+  act(view.result.current.body.reload)
+  await waitFor(() => expect(view.result.current.menu.data?.style).toBe('lesson'))
+  expect(view.result.current.body.data?.style).toBe('lesson')
+  expect(net.get).toHaveBeenCalledTimes(2)
+})
