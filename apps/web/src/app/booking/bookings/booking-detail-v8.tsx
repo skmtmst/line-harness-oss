@@ -133,7 +133,7 @@ export default function BookingDetailV8({
           </dd>
         </div>
         <div>
-          <dt className="text-ink-faint text-xs">お客様からのご希望</dt>
+          <dt className="text-ink-faint text-xs">{`${words.person}からのご希望`}</dt>
           <dd className="text-ink mt-0.5">{b.customer_note ?? '記入なし'}</dd>
         </div>
       </dl>
