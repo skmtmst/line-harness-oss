@@ -39,6 +39,7 @@ import { X } from 'lucide-react'
 import { formatDateTime, formatRelative, formatNumber } from '@/lib/format'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { asArray, isFriendDetailShape } from './friend-detail-shape'
 
 const DETAIL_SECTIONS = [
   { key: 'profile', label: 'プロフィール' },
@@ -95,19 +96,6 @@ const statusLabels: Record<NonNullable<ChatStatusInfo['status']>, { label: strin
   in_progress: { label: '対応中', className: 'bg-warning-bg text-warning' },
   on_hold: { label: '保留', className: 'bg-action-soft text-action' },
   resolved: { label: '対応済み', className: 'bg-success-bg text-success' },
-}
-
-/*
- * API の形が想定と違っても（一覧の形・null・項目の欠け）落ちないよう、
- * 配列として読む値はここを通す。配列でなければ空として扱う。
- */
-function asArray<T>(value: T[] | null | undefined): T[] {
-  return Array.isArray(value) ? value : []
-}
-
-function isFriendDetailShape(value: unknown): boolean {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    && typeof (value as { id?: unknown }).id === 'string'
 }
 
 /*
@@ -372,7 +360,6 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     setError(null)
     api.friends.get(friendId).then((res) => {
       if (cancelled) return
-      // 1人分の形（id を持つ1件）だけを受け取る。一覧の形などは取得失敗として扱う。
       if (res.success && isFriendDetailShape(res.data)) {
         setFriend(res.data as unknown as FriendDetail)
       } else {
