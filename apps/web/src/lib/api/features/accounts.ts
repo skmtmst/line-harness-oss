@@ -47,6 +47,7 @@ export const accountsMethods = {
     get: (id: string) =>
       fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`),
     create: (data: {
+      style?: import('@line-crm/shared').AccountStyle;
       channelId: string;
       name: string;
       channelAccessToken: string;

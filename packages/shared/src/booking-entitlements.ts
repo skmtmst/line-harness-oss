@@ -7,7 +7,7 @@ export interface BookingEntitlement {
 export interface BookingEntitlementGrant {
   planId?: string;
   friendId: string; menuId?: string | null; kind: 'ticket' | 'monthly'; name: string;
-  remaining?: number; monthlyLimit?: number; validFrom: string; expiresAt: string; reason: string;
+  remaining?: number; monthlyLimit?: number | null; validFrom: string; expiresAt: string; reason: string;
 }
 export type BookingEntitlementOperation = { expectedVersion: number; reason: string } & (
   { action: 'adjust'; remaining: number; periodAt?: string } | { action: 'extend'; expiresAt: string } | { action: 'revoke' }

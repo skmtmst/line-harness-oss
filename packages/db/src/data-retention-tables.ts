@@ -155,6 +155,8 @@ export const RETENTION_R2_KEY_COLUMNS: ReadonlyArray<{ table: string; column: st
   { table: 'nen_pet_profiles', column: 'image_r2_key' },
   { table: 'nen_photo_derivatives', column: 'r2_key' },
   { table: 'nen_photo_submissions', column: 'r2_key' },
+  { table: 'nen_photo_submissions', column: 'review_r2_key' },
+  { table: 'nen_photo_submissions', column: 'public_r2_key' },
   { table: 'rich_menu_pages', column: 'image_r2_key' },
   { table: 'rt_inbound_emails', column: 'r2_key' },
 ];

@@ -6,8 +6,7 @@ import ListState from '@/components/shared/list-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
-  Activity, ArrowLeft, ArrowRight, Check, CircleAlert, CircleCheck, CircleDashed,
-  Copy, Plug, QrCode, Users,
+  ArrowLeft, ArrowRight, Check, CircleAlert, CircleDashed, Copy, Plug,
 } from 'lucide-react'
 import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -32,9 +31,11 @@ import {
 import Step1Precheck from './step1-precheck'
 import Step2Connect from './step2-connect'
 import Step4Template from './step4-template'
+import Step5Completion from './step5-completion'
+import ResumeRegistrationStyle from './resume-style'
+import { REGISTRATION_STYLE_KEY, useRegistrationStyle } from './use-registration-style'
 import styles from './register.module.css'
 import { qrToDataURL } from '@/lib/qr-image'
-import { formatNumber as polishFormatNumber } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -67,14 +68,20 @@ const emptyForm: FormState = {
 
 export default function AccountRegisterV8() {
   const role = useStaffRole()
+  const [resumeId, setResumeId] = useState('')
+  useEffect(() => {
+    if (role !== 'owner') return
+    try { setResumeId(sessionStorage.getItem(REGISTRATION_STYLE_KEY) ?? '') } catch { /* 接続を新規作成する前に通常の重複検査も行う。 */ }
+  }, [role])
   usePageTitle('LINEアカウントを登録')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'アカウント', href: '/hq' }])
 
   // API の接続・登録と同じくオーナーだけ。権限確認前に下書きの復元や変更処理を起動しない。
   if (role !== 'owner') return <PageFrame kind="wizard" boardId="p6zMkA">
     <PageHeading title="LINEアカウントを登録" />
-    <PageContent>{role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>閲覧のみで見ています。LINEアカウントの登録はオーナーに頼んでください。</ReadOnlyNotice>}</PageContent>
+    <PageContent layout="stats">{role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>閲覧のみで見ています。LINEアカウントの登録はオーナーに頼んでください。</ReadOnlyNotice>}</PageContent>
   </PageFrame>
+  if (resumeId) return <ResumeRegistrationStyle accountId={resumeId} />
   return <AccountRegistrationForm />
 }
 
@@ -100,7 +107,6 @@ function AccountRegistrationForm() {
   const [checkAttempted, setCheckAttempted] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [testFollowed, setTestFollowed] = useState(false)
-  const [templateKey, setTemplateKey] = useState('')
   const [elapsed, setElapsed] = useState(0)
   const [insightTotal, setInsightTotal] = useState<number | null>(null)
   const [draftRestored, setDraftRestored] = useState(false)
@@ -125,6 +131,8 @@ function AccountRegistrationForm() {
   const createdId = connection?.id ?? ''
   /* Webhook URL も Callback URL も musubo が自動で登録するので画面に出さない
      （正本 v06 ②-2 の gcbIm、②-3 の CE8q1 には控えの欄が無い）。 */
+  const registrationStyle = useRegistrationStyle(createdId, currentStep === 4)
+  const templateKey = registrationStyle.choice
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
   const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
   const basicId = connection?.basicId ?? ''
@@ -377,6 +385,7 @@ function AccountRegistrationForm() {
       }
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
+      try { if (response.data.id) sessionStorage.setItem(REGISTRATION_STYLE_KEY, response.data.id) } catch (failure) { saveErrors.capture(failure) }
       // v06：登録できたら③の2つめ（友だち追加のためし）へ進む。
       setCurrentStep(3)
       setSub(2)
@@ -445,9 +454,9 @@ function AccountRegistrationForm() {
       return
     }
     if (currentStep === 4) {
-      if (!templateKey) return
-      setCurrentStep(5)
-      setSub(1)
+      void registrationStyle.save().then(saved => {
+        if (saved) { setCurrentStep(5); setSub(1) }
+      })
     }
   }
 
@@ -479,14 +488,14 @@ function AccountRegistrationForm() {
     running: importRunning,
   })
   const remainText = handover.remainingSeconds ? `残り およそ ${formatJaDuration(handover.remainingSeconds)}` : '残り時間を計算しています'
-  const busy = Boolean(busyAction)
+  const busy = Boolean(busyAction) || registrationStyle.busy
   // 登録したあとは戻らない（③の2つめから先）。
   const canBack = !createdId && (currentStep > 1 || sub > 1 || (currentStep === 1 && precheckBack(precheckAt, precheck) !== null))
   const nextBlocked = (currentStep === 1 && precheckBlocked(precheckAt, precheck, acks))
     || (currentStep === 2 && sub === 2 && !allAcked(WEBHOOK_ACKS, acks))
     || (currentStep === 2 && sub === 3 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && !rowsOk)
-    || (currentStep === 4 && !templateKey)
+    || (currentStep === 4 && (!templateKey || registrationStyle.version === null))
   // v06 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
   const backLabel = currentStep === 3 && sub === 1 ? 'LINEログインへ戻る'
     : currentStep !== 2 ? '戻る'
@@ -621,54 +630,11 @@ function AccountRegistrationForm() {
           )}
 
           {currentStep === 4 && (
-            <Step4Template templateKey={templateKey} onPick={(key) => { setTemplateKey(key); setError('') }} />
+            <>{registrationStyle.error ? <ListState kind="error" title="使い方を確認・保存できませんでした" error={registrationStyle.error} onRetry={registrationStyle.reload} /> : null}<Step4Template templateKey={templateKey} onPick={(key) => { registrationStyle.setChoice(key); setError('') }} /></>
           )}
 
           {currentStep === 5 && connection && (
-            <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label={importRunning ? 'いまの友だちを引き継いでいます' : '登録完了'} data-design-node="Plmq1">
-              {importRunning && form.importFriends ? <>
-                <h2 className={styles.panelTitle}>いまの友だちを引き継いでいます</h2>
-                <Card className={styles.handoverBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
-                  <div className={styles.handoverStats}>
-                    <strong>{`${polishFormatNumber(handover.imported)} 人`}</strong>
-                    <strong>{handover.total !== null ? `${polishFormatNumber(handover.total)} 人` : '確認中'}</strong>
-                  </div>
-                  <div className={styles.progressTrack} role="progressbar" aria-valuenow={handover.rate} aria-valuemin={0} aria-valuemax={100} aria-label="友だちの引き継ぎ">
-                    <span className={styles.progressFill} style={{ width: `${handover.rate}%` }} />
-                  </div>
-                  <p className={styles.progressNote}>{remainText}</p>
-                  <p className={styles.progressWarn}>引き継ぎは画面を閉じても続きます。もう一度開くと進み具合を確認できます。</p>
-                </Card>
-              </> : <>
-                <div className={styles.doneHero}>
-                  <CircleCheck size={28} className={styles.doneIcon} aria-hidden="true" />
-                  <p className={styles.doneTitle}>準備ができました</p>
-                </div>
-                <Card className={styles.accountBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
-                  <span className={styles.accountName}>{(connection.displayName ?? form.name.trim()) || 'LINEアカウント'}</span>
-                  <span className={styles.accountId}>{connection.basicId || String(emptyValue('none'))}</span>
-                </Card>
-                <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
-                  {form.importFriends
-                    ? <p className={styles.progressNote}>{`いまの友だちを ${polishFormatNumber(handover.imported)} 人 引き継ぎました。`}</p>
-                    : <p className={styles.progressNote}>いまの友だちの引き継ぎはオフになっています。引き継ぐときはアカウントの詳細から始めてください。</p>}
-                  <p className={styles.progressNote}>LINE の都合で引き継げないアカウントでは、友だちが話しかけた順に登録されます。</p>
-                </Card>
-                {connection.remainingActions.length > 0 && (
-                  <Card className={styles.noteBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-s)">
-                    <p><strong>残りの手作業</strong></p>
-                    <ul>{connection.remainingActions.map((item) => <li key={item}>{item}</li>)}</ul>
-                  </Card>
-                )}
-                <p className={styles.groupLabel}>次にすること</p>
-                <div className={styles.useRow}>
-                  <Button external href={`/accounts/detail?id=${encodeURIComponent(createdId)}`}>登録したアカウントを見る</Button>
-                  <Button href="/friends"><Users size={15} aria-hidden="true" />友だち一覧</Button>
-                  <Button href="/friend-add-settings"><QrCode size={15} aria-hidden="true" />友だち追加URL・QR</Button>
-                  <Button href="/emergency"><Activity size={15} aria-hidden="true" />運用状態の接続監視</Button>
-                </div>
-              </>}
-            </Card>
+            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} handover={handover} remainText={remainText} restaurant={templateKey === 'restaurant'} />
           )}
 
           {recoveredAccountId ? (
@@ -691,7 +657,7 @@ function AccountRegistrationForm() {
             {canBack
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={15} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save'} busyLabel="登録しています…"><ArrowRight size={15} aria-hidden="true" />{nextLabel}</Button>
+            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save' || registrationStyle.busy} busyLabel={currentStep === 4 ? '保存しています…' : '登録しています…'}><ArrowRight size={15} aria-hidden="true" />{nextLabel}</Button>
           </>} />
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />

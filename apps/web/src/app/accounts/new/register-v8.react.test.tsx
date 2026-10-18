@@ -25,6 +25,7 @@ vi.mock('@/lib/api', () => ({
     lineAccountTags: { list: calls.tagList, create: calls.tagCreate, setForAccount: calls.tagSet },
   },
 }))
+vi.mock('@/lib/api-styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })), save: vi.fn(async () => ({ success: true, data: { version: 1 } })) } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('@/components/step-up-prompt', () => ({
@@ -67,6 +68,7 @@ afterEach(() => {
   try { window.localStorage.clear() } catch { /* 下書きが残っても次の試験は上書きする。 */ }
 })
 beforeEach(() => {
+  sessionStorage.clear()
   vi.clearAllMocks()
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account' } })
@@ -158,9 +160,10 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(shownNode()).toBe('Lwxyh')
     next()
     expect(shownNode()).toBe('X0pGdw')
-    fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /飲食店/ }))
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
     next()
-    expect(shownNode()).toBe('Plmq1')
+    await waitFor(() => expect(shownNode()).toBe('Plmq1'))
     expect(await screen.findByText('準備ができました')).toBeTruthy()
   })
 
@@ -273,7 +276,8 @@ describe('V8 登録ウィザードの gated 進行', () => {
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
     next()
-    fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /飲食店/ }))
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
     next()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledWith('new-account'))
     expect(calls.followerImportState).not.toHaveBeenCalled()

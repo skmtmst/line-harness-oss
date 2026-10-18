@@ -258,10 +258,11 @@ events.post(
             (slotStarts.results ?? []).map((s) => [s.id, s.starts_at] as const),
           );
           for (const target of result.notifyTargets) {
+            if(target.bookingVersion===undefined)continue;
             try {
               await sendEventBookingNotification({
-                delivery: { db: c.env.DB, accountId: account_id, operationId: `event-change:${result.logId}:${target.lineUserId}` },
-                channelAccessToken: accessToken,
+                delivery: { db: c.env.DB, accountId:target.lineAccountId??account_id, operationId: `event-transition:${target.bookingId}:${target.bookingVersion}`,subject:{bookingId:target.bookingId,version:target.bookingVersion,slotId:target.slotId,status:'confirmed',startsAt:startsBySlot.get(target.slotId)} },
+                channelAccessToken:target.lineAccountId&&target.lineAccountId!==account_id?await (async()=>{const line=await c.env.DB.prepare('SELECT channel_access_token,channel_access_token_encrypted FROM line_accounts WHERE id=?').bind(target.lineAccountId).first<{channel_access_token:string;channel_access_token_encrypted:string|null}>();if(!line)throw new Error('sender_unavailable');return resolveLineCredential(line.channel_access_token_encrypted,line.channel_access_token,{lineAccountId:target.lineAccountId!,field:'channel_access_token'});})():accessToken,
                 toLineUserId: target.lineUserId,
                 kind: 'schedule_changed',
                 ctx: {

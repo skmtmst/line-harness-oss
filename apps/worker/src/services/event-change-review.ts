@@ -99,13 +99,13 @@ export interface EventChangeLogEntry {
   nowIso?: string;
 }
 
-export async function writeEventChangeLog(
+export function prepareEventChangeLog(
   db: D1Database,
   entry: EventChangeLogEntry,
-): Promise<{ id: string; createdAt: string }> {
+) {
   const id = crypto.randomUUID();
   const createdAt = entry.nowIso ?? new Date().toISOString();
-  await db
+  const statement=db
     .prepare(
       `INSERT INTO event_change_logs
          (id, line_account_id, event_id, slot_id, actor_id, actor_role,
@@ -133,8 +133,12 @@ export async function writeEventChangeLog(
       entry.idempotencyKey ?? null,
       createdAt,
     )
-    .run();
-  return { id, createdAt };
+;
+  return { id, createdAt,statement };
+}
+
+export async function writeEventChangeLog(db:D1Database,entry:EventChangeLogEntry):Promise<{id:string;createdAt:string}> {
+  const log=prepareEventChangeLog(db,entry);await log.statement.run();return {id:log.id,createdAt:log.createdAt};
 }
 
 export async function findChangeLogByIdempotency(
@@ -360,6 +364,7 @@ export type ApplyEventChangeResult =
     /** LINE 通知の送り先（route 側が best-effort で送る）。 */
     notifyTargets: Array<{
       bookingId: string;
+      bookingVersion?:number;lineAccountId?:string;
       friendId: string;
       lineUserId: string;
       slotId: string;
@@ -481,6 +486,7 @@ export async function applyEventChange(
   });
 
   let affectedReminders = 0;
+  const writes:D1PreparedStatement[]=[];
   const movedSlots: Array<{ slotId: string; oldStartsAt: string; newStartsAt: string }> = [];
   for (const change of params.slotChanges) {
     const slot = await db
@@ -490,36 +496,7 @@ export async function applyEventChange(
     if (!slot) return { kind: 'invalid', error: 'slot_not_found' };
     const nextStarts = (change.starts_at ?? slot.starts_at) as string;
     const nextEnds = (change.ends_at ?? slot.ends_at) as string;
-    // 日時が動く回は、V6 の未送信予定を旧起点へ戻してから新起点へ移す
-    // （枠更新より前。失敗時は枠 untouched のまま 500 にし、再送で回復する）。
-    if (nextStarts !== slot.starts_at) {
-      const confirmed = await db
-        .prepare(`SELECT id, friend_id, line_account_id FROM event_bookings
-                   WHERE slot_id = ? AND status = 'confirmed'`)
-        .bind(change.slot_id)
-        .all<{ id: string; friend_id: string; line_account_id: string }>();
-      for (const bookingRow of confirmed.results ?? []) {
-        const base = {
-          triggerType: 'event' as const,
-          sourceId: bookingRow.id,
-          sourceEventId: bookingRow.id,
-          friendId: bookingRow.friend_id,
-          lineAccountId: bookingRow.line_account_id,
-        };
-        await reconcileV6ToStartsAt(db, { ...base, startsAtIso: slot.starts_at as string });
-        await rescheduleByTrigger(db, {
-          ...base,
-          oldStartsAtIso: slot.starts_at as string,
-          newStartsAtIso: nextStarts,
-        });
-        await reconcileV6ToStartsAt(db, { ...base, startsAtIso: nextStarts });
-      }
-      movedSlots.push({
-        slotId: change.slot_id,
-        oldStartsAt: slot.starts_at as string,
-        newStartsAt: nextStarts,
-      });
-    }
+    if(nextStarts!==slot.starts_at)movedSlots.push({slotId:change.slot_id,oldStartsAt:slot.starts_at as string,newStartsAt:nextStarts});
     const sets: string[] = [];
     const values: unknown[] = [];
     if (change.starts_at !== undefined) { sets.push('starts_at = ?'); values.push(change.starts_at); }
@@ -529,14 +506,9 @@ export async function applyEventChange(
     if (sets.length > 0) {
       sets.push(`updated_at = ?`);
       values.push(nowIso, change.slot_id);
-      await db
-        .prepare(`UPDATE event_slots SET ${sets.join(', ')} WHERE id = ?`)
-        .bind(...values)
-        .run();
+      writes.push(db.prepare(`UPDATE event_slots SET ${sets.join(', ')} WHERE id = ?`).bind(...values));
     }
-    if (nextStarts !== slot.starts_at || nextEnds !== (slot.ends_at as string)) {
-      affectedReminders += await rebuildSlotReminders(db, change.slot_id, nextStarts);
-    }
+
   }
 
   // イベント本体の会場だけをここで変える（名前・条件は編集画面の PUT の役目）。
@@ -554,11 +526,8 @@ export async function applyEventChange(
   eventSets.push('version = version + 1');
   eventSets.push(`updated_at = ?`);
   eventValues.push(nowIso, params.eventId, event.version);
-  const updated = await db
-    .prepare(`UPDATE events SET ${eventSets.join(', ')} WHERE id = ? AND version = ?`)
-    .bind(...eventValues)
-    .run();
-  if ((updated.meta?.changes ?? 0) === 0) return { kind: 'conflict' };
+  writes.push(db.prepare(`UPDATE events SET ${eventSets.join(', ')} WHERE id = ? AND version = ?`).bind(...eventValues));
+  writes.push(db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'event_change_conflict' END)"));
 
   const afterJson = JSON.stringify({
     venue_name: params.eventChanges?.venue_name ?? event.venue_name,
@@ -579,6 +548,7 @@ export async function applyEventChange(
     || params.eventChanges?.venue_url !== undefined;
   let notifyTargets: Array<{
     bookingId: string;
+    bookingVersion?:number;lineAccountId?:string;
     friendId: string;
     lineUserId: string;
     slotId: string;
@@ -625,7 +595,7 @@ export async function applyEventChange(
   }
   const changeSummary = summaryParts.join(' / ');
 
-  const log = await writeEventChangeLog(db, {
+  const log = prepareEventChangeLog(db, {
     lineAccountId: params.lineAccountId,
     eventId: params.eventId,
     actorId: params.actorId ?? null,
@@ -643,6 +613,16 @@ export async function applyEventChange(
     nowIso,
   });
 
+  try {await db.batch([...writes,log.statement]);}
+  catch(error){if(error instanceof Error&&/event_change_conflict|malformed JSON/.test(error.message))return {kind:'conflict'};throw error;}
+  for(const moved of movedSlots){
+    // The committed transition is recoverable even if a reminder fence is busy or this process stops.
+    try{affectedReminders+=await rebuildSlotReminders(db,moved.slotId,moved.newStartsAt);}catch{}
+  }
+  for(const target of notifyTargets){
+    const row=await db.prepare('SELECT lock_version,line_account_id FROM event_bookings WHERE id=?').bind(target.bookingId).first<{lock_version:number;line_account_id:string}>();
+    target.bookingVersion=row?.lock_version;target.lineAccountId=row?.line_account_id;
+  }
   return {
     kind: 'applied',
     version: nextVersion,

@@ -4,7 +4,8 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import RegisterV8 from './register'
 import { DRAFT_KEY } from './logic'
 
-const calls = vi.hoisted(() => ({ me: vi.fn(), connect: vi.fn(), connectCheck: vi.fn(), stepFollowerImport: vi.fn() }))
+const calls = vi.hoisted(() => ({ me: vi.fn(), connect: vi.fn(), connectCheck: vi.fn(), stepFollowerImport: vi.fn(), getStyle: vi.fn(), saveStyle: vi.fn() }))
+vi.mock('@/lib/api-styles', () => ({ styleApi: { get: calls.getStyle, save: calls.saveStyle } }))
 vi.mock('@/lib/api', () => ({ api: { staff: { me: calls.me }, lineAccounts: { connect: calls.connect, connectCheck: calls.connectCheck, stepFollowerImport: calls.stepFollowerImport } } }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/step-up-prompt', () => ({ default: () => null, isStepUpRequired: () => false }))
@@ -32,6 +33,8 @@ it.each([
   expect(calls.connect).not.toHaveBeenCalled()
   expect(calls.connectCheck).not.toHaveBeenCalled()
   expect(calls.stepFollowerImport).not.toHaveBeenCalled()
+  expect(calls.getStyle).not.toHaveBeenCalled()
+  expect(calls.saveStyle).not.toHaveBeenCalled()
 })
 
 it('権限の取得失敗では登録フォームを起動しない', async () => {
