@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第3段：投稿（最新情報・イベント・特典）。

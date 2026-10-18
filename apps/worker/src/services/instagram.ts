@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { encryptCredential, decryptCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { detectImageMeta } from '../lib/image-validator.js';

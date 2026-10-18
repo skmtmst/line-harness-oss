@@ -1,6 +1,10 @@
+import { logger, resumeInvocation, withInvocation } from '@line-crm/shared/server';
+import { setHolidayCoverageWarningHandler } from '@line-crm/shared';
 import { stagingQa } from './routes/staging-qa.js';
 import { qaEnabled, qaOutboundStopped, qaSafeBindings, withQaOutboundBoundary } from './services/staging-qa-safety.js';
 import { scheduled } from './cron/scheduled.js';
+import { apiContractMiddleware } from './middleware/api-contract.js';
+
 import { accountAiFeatures } from './routes/account-ai-features.js';
 import { broadcastSimulation } from './routes/broadcast-simulation.js';
 import { bookingPassNotices } from './routes/booking-pass-notices.js';
@@ -246,6 +250,8 @@ export const ADMIN_REQUEST_HEADERS = [
 // else gets no Access-Control-Allow-Origin header (browser blocks it). Bearer
 // SDK/MCP callers send no Origin header and are unaffected.
 // 検索に出さない：本物の robots.txt と、全部の応答に X-Robots-Tag（リリース前点検 2026-10-07）。
+setHolidayCoverageWarningHandler(() => logger.warn('src_japanese_holidays_warn'));
+app.use('*', apiContractMiddleware);
 app.use('*', noindexHeaderMiddleware);
 // Establish an invocation-local outbound boundary before any auth or error reporting.
 app.use('*', async (c, next) => {
@@ -265,7 +271,7 @@ app.use('*', cors({
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: [...ADMIN_REQUEST_HEADERS],
-  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated'],
+  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated', 'X-Request-ID'],
   maxAge: 600,
 }));
 
@@ -1133,11 +1139,10 @@ app.onError(unhandledWorkerError);
 app.notFound(notFoundHandler);
 
 export default {
-  fetch: app.fetch,
+  fetch: (...args: Parameters<typeof app.fetch>) => withInvocation('http', () => app.fetch(...args)),
   async scheduled(event: ScheduledEvent, env: Env['Bindings'], ctx: ExecutionContext): Promise<void> {
-    // The QA runner calls only the public account/store-scoped operations.
     if (qaOutboundStopped(env)) return;
-    return scheduled(event, env, ctx);
+    return withInvocation('cron', () => scheduled(event, env, ctx));
   },
   async queue(
     batch: MessageBatch<CodexMentionQueueMessage>,
@@ -1148,29 +1153,31 @@ export default {
       return;
     }
     for (const message of batch.messages) {
-      try {
-        await processCodexMentionMessage(env, message.body);
-        message.ack();
-      } catch (error) {
-        const reason = classifyCodexMonitorError(error);
-        const stopped = shouldStopCodexQueueRetry(
-          message.attempts,
-          env.CODEX_QUEUE_MAX_ATTEMPTS,
-        );
-        console.error(JSON.stringify({"code":"src_index_failed"}));
-        if (stopped) {
-          try {
-            if (message.body.kind !== 'auto_merge') {
-              await markCodexMentionFailed(env.DB, message.body.slackEventId);
-            }
-          } catch {
-            console.error(JSON.stringify({"code":"codex_cloud_monitor_queue_ledger_failed"}));
-          }
+      await withInvocation('queue', () => resumeInvocation(message.body?.requestId, async () => {
+        try {
+          await processCodexMentionMessage(env, message.body);
           message.ack();
-        } else {
-          message.retry({ delaySeconds: 60 });
+        } catch (error) {
+          const reason = classifyCodexMonitorError(error);
+          const stopped = shouldStopCodexQueueRetry(
+            message.attempts,
+            env.CODEX_QUEUE_MAX_ATTEMPTS,
+          );
+          logger.error("src_index_failed");
+          if (stopped) {
+            try {
+              if (message.body.kind !== 'auto_merge') {
+                await markCodexMentionFailed(env.DB, message.body.slackEventId);
+              }
+            } catch {
+              logger.error("codex_cloud_monitor_queue_ledger_failed");
+            }
+            message.ack();
+          } else {
+            message.retry({ delaySeconds: 60 });
+          }
         }
-      }
+      }));
     }
   },
   async email(
@@ -1182,7 +1189,7 @@ export default {
       message.setReject('Staging QA outbound stop is active');
       return;
     }
-    await routeInboundEmail(message, env);
+    await withInvocation('email', () => routeInboundEmail(message, env));
   },
 };
 // redeploy trigger

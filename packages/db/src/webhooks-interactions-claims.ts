@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { jstNow, toJstString } from './utils.js';
 import { type WebhookInteractionRow } from './webhooks-types.js';
 
@@ -59,7 +60,7 @@ export async function claimWebhookInteractionRetryAndInsert(
     try {
       await deletePendingWebhookInteraction(db, retryId, original.line_account_id);
     } catch (error) {
-      console.error(JSON.stringify({"code":"src_webhooks_failed"}));
+      logger.error("src_webhooks_failed");
     }
   }
   return { claimed: claimChanged && insertChanged, retryId };

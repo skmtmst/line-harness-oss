@@ -1,3 +1,4 @@
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 
 import { accountCustomerLook } from '../services/customer-look.js';
@@ -105,7 +106,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
 
     if (!tokenRes.ok) {
       const errText = await tokenRes.text();
-      console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
+      logger.error("routes_liff_failed");
       return c.html(errorPage('Token exchange failed'));
     }
 
@@ -200,7 +201,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
           source: 'line_login',
         });
       } catch (err) {
-        console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
+        logger.error("routes_liff_failed");
         return c.html(errorPage('Internal error'), 500);
       }
     }
@@ -304,14 +305,14 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         const xhResult = await resolveXHarnessToken(xhToken, c.env);
         if (xhResult?.xUsername) {
           await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
-          console.log(JSON.stringify({"code":"routes_liff_log","route":"GET /auth/callback"}));
+          logger.log("routes_liff_log");
         }
         // Apply gate actions (tag + scenario) from X Harness
         if (xhResult) {
           await applyXHarnessActions(db, friend.id, xhResult);
         }
       } catch (err) {
-        console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
+        logger.error("routes_liff_failed");
       }
     }
 
@@ -378,11 +379,11 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
             );
           }
         } catch (err) {
-          console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
+          logger.error("routes_liff_failed");
         }
       }
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
+      logger.error("routes_liff_failed");
     }
 
     // Redirect or show completion. Guard against open-redirect abuse: only
@@ -453,7 +454,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
               const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
               await setFriendFirstTrackedLinkIfNull(db, friend.id, trackedLink.id);
             } catch (e) {
-              console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
+              logger.error("routes_liff_failed");
             }
             if (trackedLink.intro_template_id) {
               introTemplate = await getMessageTemplateById(db, trackedLink.intro_template_id);
@@ -478,7 +479,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         const lineClient = new LineClient(accessToken);
         await lineClient.pushMessage(friend.line_user_id, [introMessagePayload(introMessage)]);
       } catch (err) {
-        console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
+        logger.error("routes_liff_failed");
       }
     }
 
@@ -520,7 +521,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     return c.html(completionPage(displayName, pictureUrl, ref));
 
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /auth/callback"}));
+    logger.error("routes_liff_failed");
     return c.html(errorPage('Internal error'));
   }
 };
@@ -580,7 +581,7 @@ export const get__api_liff_config_3 = async (c: Context<Env, "/api/liff/config">
       data: { botBasicId, accountName, accountId, customerLook: account ? (await accountCustomerLook(c.env.DB,account.id)).look : DEFAULT_CUSTOMER_LOOK },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /api/liff/config"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -613,7 +614,7 @@ export const post__api_liff_profile_4 = async (c: Context<Env, "/api/liff/profil
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/profile"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -638,7 +639,7 @@ export const post__api_liff_entry_route_coupon_5 = async (c: Context<Env, "/api/
     if (!coupon) return c.json({ success: false, error: 'このクーポンは現在受け取れません', code: 'ENTRY_COUPON_UNAVAILABLE' }, 409);
     return c.json({ success: true, data: coupon });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/entry-route-coupon"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { HQ_SUPPORT_KIND_LABELS, serialize } from './hq-support-display.js';
 export { HQ_SUPPORT_KIND_LABELS } from './hq-support-display.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -134,7 +135,7 @@ hqSupport.get('/api/hq/support/requests', async (c) => {
     }));
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"GET /api/hq/support/requests"}));
+    logger.error("routes_hq_support_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -174,7 +175,7 @@ hqSupport.get('/api/hq/support/context', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"GET /api/hq/support/context"}));
+    logger.error("routes_hq_support_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -302,7 +303,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
         });
       }
     } catch (error) {
-      console.warn(JSON.stringify({"code":"routes_hq_support_warn","route":"POST /api/hq/support/requests"}));
+      logger.warn("routes_hq_support_warn");
     }
     if (notified) await markHqSupportRequestNotified(c.env.DB, request.id);
 
@@ -311,7 +312,7 @@ hqSupport.post('/api/hq/support/requests', requireRole('owner', 'admin', 'staff'
       data: { ...serialize({ ...request, notified_at: notified ? request.created_at : null }, base), notified },
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"POST /api/hq/support/requests"}));
+    logger.error("routes_hq_support_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -341,7 +342,7 @@ hqSupport.get('/api/hq/support/requests/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"GET /api/hq/support/requests/:id"}));
+    logger.error("routes_hq_support_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -413,7 +414,7 @@ hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'ad
         });
       }
     } catch (error) {
-      console.warn(JSON.stringify({"code":"routes_hq_support_warn","route":"POST /api/hq/support/requests/:id/messages"}));
+      logger.warn("routes_hq_support_warn");
     }
     return c.json({
       success: true,
@@ -429,7 +430,7 @@ hqSupport.post('/api/hq/support/requests/:id/messages', requireRole('owner', 'ad
       },
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_hq_support_failed","route":"POST /api/hq/support/requests/:id/messages"}));
+    logger.error("routes_hq_support_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { issueLineAccessToken, LineTokenIssueError } from './token-refresh.js';
 
 export type LineConnectStepState = 'passed' | 'failed' | 'skipped';

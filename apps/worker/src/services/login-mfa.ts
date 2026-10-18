@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
 import { getPlatformSetting, getStaffById, recordAuditEvent, type StaffMember } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -19,7 +20,7 @@ export async function loginMfaRequired(db: D1Database, tenantId?: string | null,
 export async function loginMfaChallenge(c: Context<Env>, staff: StaffMember, remember: boolean, force = false) {
   const registered = twoFactorRequired(staff);
   if (!mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) {
-    console.warn(JSON.stringify({"code":"mfa_key_unavailable"}));
+    logger.warn("mfa_key_unavailable");
     // Never bypass a person's existing enrollment or an operator's forced MFA.
     if (!registered && !force) return null;
   }

@@ -1,3 +1,6 @@
+import { createClientLogger } from '@line-crm/shared';
+
+const clientLogger = createClientLogger('liff');
 /**
  * お客さん向け画面 (LIFF) の失敗・読み込み中の文言。
  *
@@ -29,5 +32,5 @@ export const SUBMIT_FAILED_MESSAGE =
  * 失敗のくわしい中身を console にだけ残す。画面には出さない。
  */
 export function logFailure(scope: string, err: unknown): void {
-  console.error(JSON.stringify({"code":"lib_user_message_failed"}));
+  clientLogger.error("lib_user_message_failed", err);
 }

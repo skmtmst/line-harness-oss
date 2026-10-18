@@ -374,8 +374,8 @@ describe('POST /api/liff/affiliate/links — offer-scoped issuance', () => {
       body: JSON.stringify({ lineAccessToken: 'tok-alice', offerId: 'off-active' }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('先に案件に参加してください');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toBe('先に案件に参加してください');
     expect(dbMocks.createAffiliateLink).not.toHaveBeenCalled();
   });
 

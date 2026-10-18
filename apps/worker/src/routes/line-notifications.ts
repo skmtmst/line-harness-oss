@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';

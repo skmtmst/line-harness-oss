@@ -1,3 +1,4 @@
+import { liffErrorMessage } from '../lib/api-error.js';
 
 import { TextInput } from '../components/forms/controls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -72,8 +73,7 @@ export function cardState(card: VisitStampCard, balance: number) {
 /** 店のエラー文（サーバの日本語の理由）があればそれ、無ければ汎用の文。英語・コードは出さない。 */
 function reasonOf(err: unknown): string {
   const body = (err as { body?: { error?: unknown } })?.body;
-  const text = typeof body?.error === 'string' ? body.error : '';
-  return /[ぁ-んァ-ン一-龥]/.test(text) ? text : SUBMIT_FAILED_MESSAGE;
+  return liffErrorMessage(body, SUBMIT_FAILED_MESSAGE);
 }
 
 function Slots({ card, balance }: { card: VisitStampCard; balance: number }) {

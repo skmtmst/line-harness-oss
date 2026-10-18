@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { getAccountSetting, setAccountSetting, type FriendAddRuleDefinition } from '@line-crm/db';
 import { FRIEND_ADD_ROUTING_DEFAULT, toJstParts, type FriendAddRouting, type FriendAddAction, type FriendAddFirstTimeCriterion, type FriendAddReturningMode, type FriendAddRowActionType, type FriendAddStartPosition, type FriendAddTiming } from '@line-crm/shared';
 
@@ -136,7 +137,7 @@ export async function loadFriendAddRouting(
     return normalizeRouting(JSON.parse(raw));
   } catch {
     // 壊れた JSON が入っていても配信は止めない。設定していない扱いにする。
-    console.error(JSON.stringify({"code":"services_friend_add_routing_failed"}));
+    logger.error("services_friend_add_routing_failed");
     return null;
   }
 }

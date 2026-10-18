@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { notifyForBooking } from '../../services/booking-notification.js';
@@ -200,7 +201,7 @@ booking.post(
       await notifyForBooking(c.env.DB, bookingId, notificationKind, op.id);
     } catch (error) {
       outcome = 'failed';
-      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/bookings/:id/notifications/:runId/retry"}));
+      logger.error("routes_booking_failed");
     }
     const refreshed = await c.env.DB
       .prepare(`SELECT status, error_code FROM booking_operation_runs WHERE id = ?`)

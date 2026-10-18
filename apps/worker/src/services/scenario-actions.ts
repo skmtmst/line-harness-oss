@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 /*
  * シナリオのアクション。
  *
@@ -228,7 +229,7 @@ export async function runScenarioActions(
   try {
     actions = await loadScenarioActions(db, input)
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_scenario_actions_failed"}))
+    logger.error("services_scenario_actions_failed")
     return emptyActionsResult()
   }
   return runActionRows(db, actions, input.friendId, input)
@@ -347,12 +348,12 @@ export async function runActionRows(
       try {
         parsedConfig = JSON.parse(action.config_json)
       } catch {
-        console.error(JSON.stringify({"code":"services_scenario_actions_failed"}))
+        logger.error("services_scenario_actions_failed")
         result.failed++
         continue
       }
       if (!isScenarioActionComplete(action.action_type, parsedConfig)) {
-        console.warn(JSON.stringify({"code":"services_scenario_actions_warn"}))
+        logger.warn("services_scenario_actions_warn")
         result.skippedIncomplete++
         continue
       }
@@ -388,7 +389,7 @@ export async function runActionRows(
       if (action.condition_json && !condition) {
         // 保存されている条件が読めない。全員に実行するより、飛ばして
         // ログに残すほうが安全側。
-        console.error(JSON.stringify({"code":"services_scenario_actions_failed"}))
+        logger.error("services_scenario_actions_failed")
         result.failed++
         continue
       }
@@ -414,7 +415,7 @@ export async function runActionRows(
       }
     } catch (err) {
       // 1つ失敗しても残りは続ける。配信も止めない。
-      console.error(JSON.stringify({"code":"services_scenario_actions_failed"}))
+      logger.error("services_scenario_actions_failed")
       result.failed++
       if (action.action_type === 'event_booking' && err instanceof Error && 'code' in err &&
         (err.code === 'event_booking_unavailable' || err.code === 'event_booking_missing')) {
@@ -472,7 +473,7 @@ async function executeAction(
         c.scenarioId &&
         !(await isResourceInScenarioAccount(db, 'scenario', c.scenarioId, accountId))
       ) {
-        console.warn(JSON.stringify({"code":"services_scenario_actions_warn"}))
+        logger.warn("services_scenario_actions_warn")
         return false
       }
       await runScenarioOp(db, friendId, action.scenario_id, c, options.sourceEventId)
@@ -530,7 +531,7 @@ async function resolveTagIds(
       allowed.push(id)
       continue
     }
-    console.warn(JSON.stringify({"code":"services_scenario_actions_warn"}))
+    logger.warn("services_scenario_actions_warn")
   }
   return allowed
 }

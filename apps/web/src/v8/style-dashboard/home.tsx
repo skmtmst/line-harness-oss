@@ -1,5 +1,6 @@
 'use client'
 import dynamic from 'next/dynamic'
+import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import type { IndustryStyle, UsageStyle } from './model'
@@ -28,6 +29,7 @@ function remembered(accountId: string | null): UsageStyle {
 
 export default function HomeDashboard() {
   const { selectedAccountId } = useAccount()
+  const qrRequested = useSearchParams().has('qr')
   const [style, setStyle] = useState<UsageStyle>(() => remembered(selectedAccountId))
   useEffect(() => {
     if (!selectedAccountId) return
@@ -45,6 +47,8 @@ export default function HomeDashboard() {
       .catch(() => {})
     return () => { active = false }
   }, [selectedAccountId])
+  // 受信の確認から開くQRは、業種に関係なく既存のQR画面へつなぐ。
+  if (qrRequested) return <StandardDashboard />
   if (INDUSTRY.includes(style)) return <StyleDashboard key={style} style={style as IndustryStyle} />
   return <StandardDashboard />
 }

@@ -30,7 +30,7 @@ describe('S15 event callers must use the requested store login channel', () => {
         'Idempotency-Key': 'fixture-event-request', 'CF-Connecting-IP': 'fixture-event' }, body: '{}',
     }, { DB: db.db } as Env['Bindings']);
     expect(response.status).toBe(404);
-    expect((await response.json() as { error: string }).error).toBe('friend_not_found');
+    expect((await response.json() as { error: { code: string } }).error.code).toBe('friend_not_found');
     expect(verify).toHaveBeenCalledTimes(1);
   });
   for (const state of ['wrong-store', 'missing', 'expired'] as const) {

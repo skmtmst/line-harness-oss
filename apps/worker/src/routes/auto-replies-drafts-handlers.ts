@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 
@@ -60,14 +61,14 @@ export const get__api_auto_replies_1 = async (c: Context<Env, "/api/auto-replies
       );
       hitsById = new Map(counts.map((h) => [h.autoReplyId, { period: h.period, total: h.total }]));
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"GET /api/auto-replies"}));
+      logger.error("routes_auto_replies_failed");
     }
 
     let actionsById: Map<string, number> | null = null;
     try {
       actionsById = await actionExecutionCounts(c.env.DB, accountId || null);
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"GET /api/auto-replies"}));
+      logger.error("routes_auto_replies_failed");
     }
 
     const memos = await internalMemosOf(c.env.DB, items.map((item) => item.id));
@@ -105,7 +106,7 @@ export const get__api_auto_replies_1 = async (c: Context<Env, "/api/auto-replies
     }
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"GET /api/auto-replies"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -130,7 +131,7 @@ export const get__api_auto_replies_conflicts_2 = async (c: Context<Env, "/api/au
       receiveSourceCounts = summary.receiveSourceCounts;
       matchedLast28Days = summary.matchedLast28Days;
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"GET /api/auto-replies/conflicts"}));
+      logger.error("routes_auto_replies_failed");
     }
     return c.json({
       success: true,
@@ -142,7 +143,7 @@ export const get__api_auto_replies_conflicts_2 = async (c: Context<Env, "/api/au
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"GET /api/auto-replies/conflicts"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: '競合する自動応答を確認できませんでした' }, 500);
   }
 };
@@ -176,7 +177,7 @@ export const post__api_auto_replies_drafts_3 = async (c: Context<Env, "/api/auto
       throw err;
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"POST /api/auto-replies/drafts"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: '自動応答の下書きを作成できませんでした' }, 500);
   }
 };
@@ -193,7 +194,7 @@ export const get__api_auto_replies_id_4 = async (c: Context<Env, "/api/auto-repl
     await resolveStoppedByNames(c.env.DB, [data]);
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"GET /api/auto-replies/:id"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -209,14 +210,14 @@ export const get__api_auto_replies_id_draft_5 = async (c: Context<Env, "/api/aut
       const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1_000).toISOString();
       matchedLast28Days = await getAutoReplyHitCountSince(c.env.DB, version.auto_reply_id, since);
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"GET /api/auto-replies/:id/draft"}));
+      logger.error("routes_auto_replies_failed");
     }
     return c.json({
       success: true,
       data: { ...draftVersionResponse(version), matchedLast28Days },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"GET /api/auto-replies/:id/draft"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: '自動応答の下書きを読み込めませんでした' }, 500);
   }
 };
@@ -285,7 +286,7 @@ export const put__api_auto_replies_id_draft_6 = async (c: Context<Env, "/api/aut
         },
       }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"PUT /api/auto-replies/:id/draft"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: '自動応答の下書きを保存できませんでした' }, 500);
   }
 };
@@ -296,7 +297,7 @@ export const post__api_auto_replies_id_validate_7 = async (c: Context<Env, "/api
     if (!version) return c.json({ success: false, error: '公開する下書きがありません' }, 404);
     return c.json({ success: true, data: await validateDraft(c.env.DB, version) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"POST /api/auto-replies/:id/validate"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: '公開前チェックを実行できませんでした' }, 500);
   }
 };
@@ -318,7 +319,7 @@ export const get__api_auto_replies_id_conflicts_8 = async (c: Context<Env, "/api
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"GET /api/auto-replies/:id/conflicts"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: '競合する自動応答を確認できませんでした' }, 500);
   }
 };
@@ -423,7 +424,7 @@ export const post__api_auto_replies_id_test_9 = async (c: Context<Env, "/api/aut
         staffId: c.get('staff')?.id ?? null,
       });
     }
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"POST /api/auto-replies/:id/test"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: '自動応答を試せませんでした' }, 500);
   }
 };
@@ -519,7 +520,7 @@ export const post__api_auto_replies_id_publish_10 = async (c: Context<Env, "/api
     if (code === 'AUTO_REPLY_DRAFT_NOT_TESTED') {
       return inputError(c, { success: false, error: 'この下書きを実際の相手と文面で試してください' }, 422, []);
     }
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed","route":"POST /api/auto-replies/:id/publish"}));
+    logger.error("routes_auto_replies_failed");
     return c.json({ success: false, error: '自動応答を有効化できませんでした' }, 500);
   }
 };

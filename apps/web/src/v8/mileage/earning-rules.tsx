@@ -1,4 +1,5 @@
 'use client'
+import { responseApiError } from '@/lib/api'
 
 import StatusBadge from '@/components/shared/status-badge'
 import { mileageStatusTone } from './parts'
@@ -302,7 +303,7 @@ export default function EarningRulesTab() {
       )
       if (!res.ok) {
         exportStatus = res.status
-        throw new Error('export_failed')
+        throw responseApiError(res, await res.text())
       }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)

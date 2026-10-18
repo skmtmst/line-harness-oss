@@ -1,7 +1,24 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { boundedHttpRequest } from './bounded-http.js';
 import { stripeRequest } from '../../services/stripe-api.js';
+import { currentRequestId, withInvocation } from '@line-crm/shared/server';
 afterEach(()=>vi.useRealTimers());
+it('passes the server request ID through bounded Stripe and Google transports without changing wire safety', async () => {
+ await withInvocation('http', async () => {
+  const send = vi.fn<typeof fetch>(async () => Response.json({ id: 'synthetic' }));
+  await boundedHttpRequest('https://provider.test', { headers: { Authorization: 'synthetic', 'X-Request-ID': 'untrusted' } }, { timeoutMs: 100, maxResponseBytes: 100, fetch: send });
+  await stripeRequest({ STRIPE_SECRET_KEY: 'synthetic' }, 'POST', '/v1/customers', {}, { fetchImpl: send, idempotencyKey: 'same-operation' });
+  const { GoogleCalendarClient } = await import('../../services/google-calendar.js');
+  await new GoogleCalendarClient({ calendarId: 'synthetic', accessToken: 'synthetic', transport: send }).getEvent('synthetic-event');
+  expect(send).toHaveBeenCalledTimes(3);
+  for (const [, init] of send.mock.calls) {
+   expect(new Headers(init?.headers).get('X-Request-ID')).toBe(currentRequestId());
+   expect(init?.redirect).toBe('manual');
+   expect(init?.signal).toBeInstanceOf(AbortSignal);
+  }
+  expect(new Headers(send.mock.calls[1]?.[1]?.headers).get('Idempotency-Key')).toBe('same-operation');
+ });
+});
 it('bounds a stalled request even when the transport ignores abort',async()=>{
  vi.useFakeTimers();const send=vi.fn<typeof fetch>(()=>new Promise<Response>(()=>{}));
  const result=boundedHttpRequest('https://provider.test',{}, {timeoutMs:10,maxResponseBytes:10,fetch:send});

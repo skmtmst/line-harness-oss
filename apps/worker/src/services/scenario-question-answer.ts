@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
 import { applyTapExtras } from './tap-extras.js'
 /*
@@ -469,7 +470,7 @@ async function sendReply(
     await lineClient.pushMessage(friend.line_user_id, [{ type: 'text', text }])
     return false
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_scenario_question_answer_failed"}))
+    logger.error("services_scenario_question_answer_failed")
     return false
   }
 }

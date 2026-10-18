@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { getAccountSetting, recordAuditEvent } from '@line-crm/db';
 import { deleteCustomerData } from './customer-data-deletion.js';
 import { parseRetentionPolicy, RETENTION_POLICY_KEY, retentionCutoff, type RetentionPolicy } from './retention-policy.js';
@@ -68,7 +69,7 @@ export async function processPersonalDataRetention(env: RetentionEnvironment, no
       });
     } catch {
       failed++;
-      console.error(JSON.stringify({ code: 'personal_data_retention_failed' }));
+      logger.error("personal_data_retention_failed");
     }
   }
   return { deleted, failed, held };

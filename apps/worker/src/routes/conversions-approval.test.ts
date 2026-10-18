@@ -280,9 +280,9 @@ describe('PATCH /api/conversions/events/:id/approval', () => {
       expectedStatus: 'pending',
     });
     expect(res.status).toBe(422);
-    const body = (await res.json()) as { success: boolean; code: string; data: { currentStatus: string } };
+    const body = (await res.json()) as { success: boolean; error: { code: string }; data: { currentStatus: string } };
     expect(body.success).toBe(false);
-    expect(body.code).toBe('approval_unbillable');
+    expect(body.error.code).toBe('approval_unbillable');
     expect(body.data.currentStatus).toBe('pending');
     // 承認していないので台帳同期・通知・案件動作へ進まない。
     expect(dbMocks.syncAffiliateConversionMileage).not.toHaveBeenCalled();

@@ -626,7 +626,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
     line.includes('instagram_oauth_callback_failed'),
   );
   expect(record).toBeDefined();
-  expect(JSON.parse(record!)).toEqual({ code: 'instagram_oauth_callback_failed', route: 'GET /api/instagram/oauth/callback' });
+  expect(JSON.parse(record!)).toEqual({ code: 'instagram_oauth_callback_failed', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
   // 説明文（message）自体を記録に出さないため、どの表現も残らない。
   expect(record).not.toContain('message=');
   for (const secret of [

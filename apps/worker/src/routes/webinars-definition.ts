@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { type Context, type MiddlewareHandler } from 'hono';
 import { getWebinarById, archiveWebinar, getWebinarCtas, getWebinarVideoAsset, isWebinarVideoReady, getWebinarEditorSettings, getWebinarMonitoringSummary, getWebinarPublicAccount, getWebinarActions, countInvalidWebinarActionReferences, getFormById, type Webinar, type WebinarListRow, type WebinarActionInput, type WebinarActionType, type WebinarEditorSettings, type WebinarEditorSettingsInput, type WebinarParticipantClassification, getMediaIdByR2Key } from '@line-crm/db';
@@ -590,7 +591,7 @@ export async function archiveVisibleWebinar(c: Context<Env>) {
     auditLog(c, 'webinar.archive', { kind: 'webinar', id });
     return c.json({ success: true, data: serializeWebinar(archived!) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 }

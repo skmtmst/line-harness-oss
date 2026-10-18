@@ -49,20 +49,6 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/app/duplicates/use-duplicates-data.ts",
-    "fingerprint": "88fde07726bec066",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
-    "filename": "src/app/friends/migrations/use-friend-migrations.ts",
-    "fingerprint": "e302697ad92dbc79",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
     "filename": "src/app/health/page.tsx",
     "fingerprint": "021d0cfb20884819",
     "disposition": "error-visible",
@@ -89,13 +75,6 @@
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
-    "filename": "src/app/tags/fields/default-labels.ts",
-    "fingerprint": "b135da5aff5f52e7",
-    "disposition": "local-parser",
-    "count": 1,
-    "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
     "filename": "src/app/users/use-merged-users.ts",

@@ -1,3 +1,4 @@
+import { liffErrorMessage } from '../lib/api-error.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import SeatBookingBlock from '../components/SeatBookingBlock.js';
 import { restaurantBookingApi } from '../lib/api.js';
@@ -359,7 +360,7 @@ export default function Form() {
       return '送信を処理中です。少し待って送り直してください。';
     }
     // サーバが断った理由（期限切れ・1人1回・定員）はそのまま出す
-    return body?.error ?? '送信できませんでした。時間をおいて試してください。';
+    return liffErrorMessage(body, '送信できませんでした。時間をおいて試してください。');
   };
 
   /**

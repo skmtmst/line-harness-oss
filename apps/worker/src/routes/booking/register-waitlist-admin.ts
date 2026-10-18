@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
@@ -102,7 +103,7 @@ booking.delete('/api/booking/admin/waitlist/:id', requireRole('owner', 'admin', 
         startsAt: entry.starts_at,
       }, undefined, c.env.LIFF_URL ?? '',c.env);
     } catch {
-      console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"DELETE /api/booking/admin/waitlist/:id"}));
+      logger.error("booking_waitlist_promote_failed");
     }
   }
   return c.json({ status: 'cancelled' });

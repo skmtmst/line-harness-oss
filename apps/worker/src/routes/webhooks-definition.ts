@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { decryptCredential } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
@@ -383,7 +384,7 @@ export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 
             maskedPayloadShape(payload),
           );
         } catch {
-          console.error(JSON.stringify({"code":"incoming_webhook_masked_sample_update_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
+          logger.error("incoming_webhook_masked_sample_update_failed");
         }
       }
 
@@ -405,7 +406,7 @@ export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 
           })).id }));
         } catch (logError) {
           // 台帳の一時障害で、署名確認済みの受信処理まで止めない。
-          console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
+          logger.error("routes_webhooks_failed");
         }
       }
       let actionResult: { matchedFriendId: string | null; executed: number; failed: number;
@@ -469,7 +470,7 @@ export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 
               failureReason: 'processing_failed',
             });
           } catch (logError) {
-            console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
+            logger.error("routes_webhooks_failed");
           }
         }
         throw eventError;
@@ -484,7 +485,7 @@ export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 
           });
         } catch (logError) {
           // 受信処理は完了している。台帳の一時障害だけで送信元へ500を返さない。
-          console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/incoming/:id/receive"}));
+          logger.error("routes_webhooks_failed");
         }
       }
 

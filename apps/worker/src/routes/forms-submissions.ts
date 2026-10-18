@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { auditLog } from '../lib/audit-log.js';
 import { reportPeriod, type ReportPeriodInput } from '@line-crm/shared';
 import { callFormWebhook, publicFormWebhookData } from '../services/form-webhook.js';
@@ -75,7 +76,7 @@ export const post__api_forms_id_archive_1 = async (c: Context<Env, "/api/forms/:
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/archive"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
   }
 };
@@ -135,7 +136,7 @@ export const post__api_forms_id_unarchive_2 = async (c: Context<Env, "/api/forms
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/unarchive"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: '回答フォームを元に戻せませんでした' }, 503);
   }
 };
@@ -185,7 +186,7 @@ export const delete__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) 
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"DELETE /api/forms/:id"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 };
@@ -311,7 +312,7 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/submissions"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -330,7 +331,7 @@ export const get__api_forms_id_submissions_submissionId_7 = async (c: Context<En
     const actions = await describePostActionsForSubmissions(c.env.DB, [submission], form);
     return c.json({ success: true, data: { ...serializeSubmission(submission, actions.get(submission.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(submission.data), c.get('staff')?.role, submission.id) } });
   } catch {
-    console.error('フォーム回答の詳細を取得できませんでした');
+    logger.error("forms_submissions_ts_log_333");
     return c.json({ success: false, error: 'フォーム回答の詳細を取得できませんでした' }, 500);
   }
 };
@@ -437,7 +438,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
             await failFormSubmitClaim(c.env.DB, scope, owner, taken.version);
           }
         } catch (error) {
-          console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
+          logger.error("routes_forms_failed");
         }
         return missing;
       },
@@ -526,7 +527,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
           } catch (error) {
             if (error instanceof ClaimOwnershipLost) throw error;
             // 届かなくても残りの記録へ進む。未完のまま残して次の再実行に託す。
-            console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
+            logger.error("routes_forms_failed");
           }
         }
         // 回答行はある(この口は回答idから入る)。記録だけ揃える。
@@ -554,7 +555,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
             submission.destination_write_failed = 0;
             recorded = true;
           } catch (error) {
-            console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
+            logger.error("routes_forms_failed");
           }
           if (recorded) await claimHandle.checkpoint('destination_status');
         }
@@ -628,7 +629,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
       throw err;
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submissions/:submissionId/retry-effects"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

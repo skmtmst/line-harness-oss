@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { verifyNenWebhook } from '../lib/hmac.js';
 export { SUPPORT_EMAIL_RAW_MAX_CHARACTERS } from '../lib/webhook-body.js';
 

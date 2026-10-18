@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { readCookie } from '../middleware/auth-http.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -194,7 +195,7 @@ authEmail.post('/api/auth/register/request', inputJsonBoundary(), async (c) => {
     await sendSignupVerifyMail(c.env, { email, completeUrl: `${base}/register/complete?token=${encodeURIComponent(token)}` });
     return c.json({ success: true, data: { sent: true } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_auth_email_failed","route":"POST /api/auth/register/request"}));
+    logger.error("routes_auth_email_failed");
     return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });
@@ -420,7 +421,7 @@ authEmail.post('/api/auth/password/forgot', inputJsonBoundary(), async (c) => {
     }
     return c.json({ success: true, data: { sent: true } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_auth_email_failed","route":"POST /api/auth/password/forgot"}));
+    logger.error("routes_auth_email_failed");
     return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });

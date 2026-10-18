@@ -1,3 +1,5 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 /**
  * #838 第2段: Google Sheets への直接書き出し。
  *
@@ -715,7 +717,7 @@ export async function processDueGoogleSheetsSyncs(
     } catch (error) {
       failed += 1;
       // 詳細メッセージは応答内容を含み得るので、種別名だけを記録する。
-      console.error(JSON.stringify({"code":"google_sheets_sync_failed"}));
+      logger.error("google_sheets_sync_failed");
     }
   }
   return { synced, skipped, failed };

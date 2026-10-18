@@ -1,3 +1,4 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { inputError } from '../lib/input-errors.js';
 import { redeemCoupon } from '../services/coupon-redemption.js';
@@ -32,7 +33,7 @@ export const post__api_liff_entry_route_coupon_use_1 = async (c: Context<Env, "/
     if (!result.ok) return c.json({ success: false, error: result.message }, 409);
     return c.json({ success: true, data: { message: result.message, replayed: result.replayed ?? false } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/entry-route-coupon/use"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -104,7 +105,7 @@ export const post__api_liff_friend_add_intent_2 = async (c: Context<Env, "/api/l
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/friend-add-intent"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -269,13 +270,13 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
           const xhResult = await resolveXHarnessToken(xhToken, c.env);
           if (xhResult?.xUsername) {
             await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
-            console.log(JSON.stringify({"code":"routes_liff_log","route":"POST /api/liff/link"}));
+            logger.log("routes_liff_log");
           }
           if (xhResult) {
             await applyXHarnessActions(db, friend.id, xhResult);
           }
         } catch (err) {
-          console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/link"}));
+          logger.error("routes_liff_failed");
         }
       }
       return c.json({
@@ -350,13 +351,13 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
         const xhResult = await resolveXHarnessToken(xhToken, c.env);
         if (xhResult?.xUsername) {
           await patchFriendMetadata(db, friend.id, { x_username: xhResult.xUsername });
-          console.log(JSON.stringify({"code":"routes_liff_log","route":"POST /api/liff/link"}));
+          logger.log("routes_liff_log");
         }
         if (xhResult) {
           await applyXHarnessActions(db, friend.id, xhResult);
         }
       } catch (err) {
-        console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/link"}));
+        logger.error("routes_liff_failed");
       }
     }
 
@@ -365,7 +366,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
       data: { userId, alreadyLinked: false },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"POST /api/liff/link"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -502,7 +503,7 @@ export const get__api_analytics_ref_summary_4 = async (c: Context<Env, "/api/ana
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /api/analytics/ref-summary"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -568,7 +569,7 @@ export const get__api_analytics_ref_refCode_5 = async (c: Context<Env, "/api/ana
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /api/analytics/ref/:refCode"}));
+    logger.error("routes_liff_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

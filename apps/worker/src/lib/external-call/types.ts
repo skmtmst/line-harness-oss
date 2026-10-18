@@ -32,6 +32,8 @@ export interface CallIdentity {
   effect: 'read' | 'write';
 }
 export interface CallState {
+  /** 作成時の依頼を、保存済み台帳からcron再開後まで結ぶ（旧台帳は未指定）。 */
+  requestId?: string;
   identity: CallIdentity;
   policy: CallPolicy;
   createdAt: number;

@@ -1,5 +1,6 @@
 import { schemas } from './schemas.js';
 import { paths } from './paths.js';
+import { withApiErrorContract } from './error-contract.js';
 
 export const spec = {
   openapi: '3.1.0',
@@ -22,7 +23,7 @@ export const spec = {
     },
     schemas,
   },
-  paths,
+  paths: withApiErrorContract(paths),
   tags: [
     { name: 'Dashboard', description: 'ダッシュボードの予定・数字の出どころ・印刷' },
     { name: 'Friends', description: '友だち管理' },

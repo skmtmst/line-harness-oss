@@ -1,3 +1,4 @@
+import { liffErrorMessage } from '../lib/api-error.js';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useNavigate,useSearchParams} from 'react-router-dom';
 import liff from '@line/liff';
@@ -27,7 +28,7 @@ export default function VisitStampQr() {
      if(config.data.accountId!==account||!token) {setResult({status:'invalid',reason:'invalid'});return;}
      const response=await visitStampsApi.redeemQr(account,token,request.current.id,visitId);
      if(current===sequence.current)setResult(response.data);
-   }catch(e){if(current===sequence.current){const text=(e as {body?:{error?:string}})?.body?.error;setError(text&&/[ぁ-んァ-ン一-龥]/.test(text)?text:'押印を確認できませんでした。読み直してください。');}}
+   }catch(e){if(current===sequence.current){setError(liffErrorMessage((e as {body?:unknown})?.body,'押印を確認できませんでした。読み直してください。'));}}
    finally{if(current===sequence.current)setBusy(false);}
  },[account,token]);
  useEffect(()=>{void load();return()=>{sequence.current++}},[load]);

@@ -377,6 +377,8 @@ export {
   extractApiErrorMessage,
   extractApiFieldErrors,
   getApiFieldErrors,
+  getApiErrorCode,
+  responseApiError,
   extractApiErrorCode,
   extractApiErrorTrackingId,
   extractApiErrorData,

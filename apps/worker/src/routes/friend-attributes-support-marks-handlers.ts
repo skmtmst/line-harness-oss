@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { serializeMark } from '../services/support-mark-display.js';
 import { parseSupportMarkLocations } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
@@ -34,7 +35,7 @@ export const get__api_support_marks_1 = async (c: Context<Env, "/api/support-mar
       }));
     return c.json({ success: true, data: withCounts });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/support-marks"}));
+    logger.error("routes_friend_attributes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -51,7 +52,7 @@ export const post__api_support_marks_id_restore_2 = async (c: Context<Env, "/api
     return c.json({ success: true, data: await restoreSupportMark(c.env.DB, scope, { id: c.req.param('id'), expectedVersion, actorId: c.get('staff').id }) });
   } catch (error) {
     if (error instanceof ArchiveRestoreError) return c.json({ success: false, code: error.code, error: error.code === 'not_found' ? '対象が見つかりません' : '状態が変わりました。もう一度読み込んでください' }, error.code === 'not_found' ? 404 : 409);
-    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks/:id/restore"}));
+    logger.error("routes_friend_attributes_failed");
     return c.json({ success: false, error: '保管から戻せませんでした' }, 500);
   }
 };
@@ -115,7 +116,7 @@ export const post__api_support_marks_3 = async (c: Context<Env, "/api/support-ma
     try {
       createdRules = await listSupportMarkAutomationRules(c.env.DB, scope, mark.id) ?? [];
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks"}));
+      logger.error("routes_friend_attributes_failed");
     }
     // 再送で保存済みを返したときは200、新しく作ったときは201。
     return c.json({ success: true, data: serializeMark(mark, createdRules) }, replayed ? 200 : 201);
@@ -123,7 +124,7 @@ export const post__api_support_marks_3 = async (c: Context<Env, "/api/support-ma
     if (err instanceof SupportMarkCreateError) {
       return c.json({ success: false, code: err.code, error: err.message }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks"}));
+    logger.error("routes_friend_attributes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -145,7 +146,7 @@ export const patch__api_support_marks_reorder_4 = async (c: Context<Env, "/api/s
     await reorderSupportMarks(c.env.DB, scope, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/support-marks/reorder"}));
+    logger.error("routes_friend_attributes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -249,7 +250,7 @@ export const patch__api_support_marks_id_5 = async (c: Context<Env, "/api/suppor
     }
     return c.json({ success: true, data: serializeMark(mark!) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/support-marks/:id"}));
+    logger.error("routes_friend_attributes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -262,7 +263,7 @@ export const get__api_support_marks_id_automation_rules_6 = async (c: Context<En
       if (!rules) return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
       return c.json({ success: true, data: rules });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/support-marks/:id/automation-rules"}));
+      logger.error("routes_friend_attributes_failed");
       return c.json({ success: false, error: '自動変更ルールを読み込めませんでした' }, 500);
     }
   };
@@ -296,7 +297,7 @@ export const post__api_support_marks_id_automation_rules_7 = async (c: Context<E
       if (reason.startsWith('rule_') || reason === 'manual_protection_invalid') {
         return inputError(c, { success: false, error: '自動変更ルールの入力が正しくありません' }, 422, ["event","priority","manualProtectionMinutes","name","condition","isActive"]);
       }
-      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks/:id/automation-rules"}));
+      logger.error("routes_friend_attributes_failed");
       return c.json({ success: false, error: '自動変更ルールを保存できませんでした' }, 500);
     }
   };
@@ -326,7 +327,7 @@ export const patch__api_support_mark_rules_ruleId_8 = async (c: Context<Env, "/a
       if (reason.startsWith('rule_') || reason === 'manual_protection_invalid') {
         return inputError(c, { success: false, error: '自動変更ルールの入力が正しくありません' }, 422, ["event","priority","manualProtectionMinutes","name","condition","isActive"]);
       }
-      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/support-mark-rules/:ruleId"}));
+      logger.error("routes_friend_attributes_failed");
       return c.json({ success: false, error: '自動変更ルールを保存できませんでした' }, 500);
     }
   };
@@ -356,7 +357,7 @@ export const delete__api_support_mark_rules_ruleId_9 = async (c: Context<Env, "/
       }, 409);
       return c.json({ success: true, data: null });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"DELETE /api/support-mark-rules/:ruleId"}));
+      logger.error("routes_friend_attributes_failed");
       return c.json({ success: false, error: '自動変更ルールを停止できませんでした' }, 500);
     }
   };
@@ -388,7 +389,7 @@ export const get__api_support_marks_id_archive_impact_10 = async (c: Context<Env
         },
       });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"GET /api/support-marks/:id/archive-impact"}));
+      logger.error("routes_friend_attributes_failed");
       return c.json({ success: false, error: '保管の影響を確認できませんでした' }, 500);
     }
   };
@@ -442,7 +443,7 @@ export const post__api_support_marks_id_archive_11 = async (c: Context<Env, "/ap
         const status = err.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, code: err.code, error: err.message }, status, []);
       }
-      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"POST /api/support-marks/:id/archive"}));
+      logger.error("routes_friend_attributes_failed");
       return c.json({ success: false, error: '対応マークを保管できませんでした' }, 500);
     }
   };
@@ -550,7 +551,7 @@ export const delete__api_support_marks_id_12 = async (c: Context<Env, "/api/supp
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"DELETE /api/support-marks/:id"}));
+    logger.error("routes_friend_attributes_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -578,7 +579,7 @@ export const patch__api_friends_id_support_mark_13 = async (c: Context<Env, "/ap
       if (!updated) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
       return c.json({ success: true, data: null });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_friend_attributes_failed","route":"PATCH /api/friends/:id/support-mark"}));
+      logger.error("routes_friend_attributes_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   };

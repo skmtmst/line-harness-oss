@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { petCard } from './nen-pet-card.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
@@ -216,7 +217,7 @@ export async function mirrorReviewNotificationStatus(
       input.status, input.now ?? new Date().toISOString(), input.photoId, input.lineAccountId,
     ).run();
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_nen_members_failed"}));
+    logger.error("routes_nen_members_failed");
   }
 }
 
@@ -287,7 +288,7 @@ export async function deliverPhotoReviewNotification(
      * そのまま出ていた。他の送信失敗と同じ安全な理由へそろえる（2026-10-02）。
      * 原因を追うための生の本文はログにだけ残す。
      */
-    console.error(JSON.stringify({"code":"routes_nen_members_failed"}));
+    logger.error("routes_nen_members_failed");
     sendError = classifyExternalDeliveryError(error).message;
   }
   try {
@@ -303,7 +304,7 @@ export async function deliverPhotoReviewNotification(
       return { notificationStatus: finalStatus, notificationError: sendError, busy: false, relayed };
     }
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_nen_members_failed"}));
+    logger.error("routes_nen_members_failed");
   }
   const state = await getPhotoNotificationState(db, {
     decisionId: input.decisionId, lineAccountId: input.lineAccountId,
@@ -672,7 +673,7 @@ async function handlePhotoRewardAction(c: Context<Env>, action: 'retry' | 'recon
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_nen_members_failed"}));
+    logger.error("routes_nen_members_failed");
     return c.json({ success: false, error: 'ポイントの手続きに失敗しました' }, 500);
   }
 }

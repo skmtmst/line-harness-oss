@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { friendFieldReminderTargetStatements } from './reminders.js';
 import { jstNow } from './utils.js';
 import { ageFromBirthday, allergyValues, validateAllergyValues, DEFAULT_ALLERGY_OPTIONS } from '@line-crm/shared';
@@ -610,7 +611,7 @@ export async function getFriendFieldListSummary(
       formLinks: new Set(usages.filter((usage) => usage.kind === 'form').map((usage) => usage.id)).size,
     };
   } catch (error) {
-    console.error(JSON.stringify({"code":"src_friend_fields_failed"}));
+    logger.error("src_friend_fields_failed");
     return {
       ...base,
       formLinks: null,

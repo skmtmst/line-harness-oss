@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
@@ -62,7 +63,7 @@ booking.put('/api/booking/admin/staff/:id/google-calendar', requireOwnBookingSta
       access_token: null,
     }, googleCredentials(c.env), {db:c.env.DB,accountId});
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_booking_failed","route":"PUT /api/booking/admin/staff/:id/google-calendar"}));
+    logger.error("routes_booking_failed");
     const message = error instanceof Error ? error.message : String(error);
     const status = message === 'google_service_account_not_configured' ? 503 : 422;
     return inputError(c, { error: status === 503 ? 'service_account_not_configured' : 'calendar_not_accessible' }, status, []);

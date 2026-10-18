@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { outgoingEventTypes } from './webhook-event-types.js';
 import { exportWebhookInteractions } from './webhook-interactions-export.js';
 import { inputError } from '../lib/input-errors.js';
@@ -48,7 +49,7 @@ export const get__api_webhooks_outgoing_id_1 = async (c: Context<Env, "/api/webh
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/outgoing/:id"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -136,7 +137,7 @@ export const post__api_webhooks_outgoing_2 = async (c: Context<Env, "/api/webhoo
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/outgoing"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -285,7 +286,7 @@ export const put__api_webhooks_outgoing_id_3 = async (c: Context<Env, "/api/webh
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret を安全に保存できませんでした' }, 503);
     }
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"PUT /api/webhooks/outgoing/:id"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -354,7 +355,7 @@ export const post__api_webhooks_outgoing_id_test_4 = async (c: Context<Env, "/ap
     auditLog(c, 'webhook.outgoing.test', { kind: 'outgoing_webhook', id: webhook.id }, { lineAccountId });
     return c.json({ success: true, data: { delivered: result.ok, responseStatus: result.lastStatus ?? null } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/outgoing/:id/test"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: '試し送信に失敗しました' }, 502);
   }
 };
@@ -373,7 +374,7 @@ export const delete__api_webhooks_outgoing_id_5 = async (c: Context<Env, "/api/w
     auditLog(c, 'webhook.outgoing.delete', { kind: 'outgoing_webhook', id }, { lineAccountId });
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"DELETE /api/webhooks/outgoing/:id"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -407,7 +408,7 @@ export const post__api_webhooks_outgoing_id_restore_6 = async (c: Context<Env, "
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/outgoing/:id/restore"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -443,7 +444,7 @@ export const get__api_webhooks_interactions_8 = async (c: Context<Env, "/api/web
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/interactions"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -461,7 +462,7 @@ export const get__api_webhooks_interactions_id_payload_9 = async (c: Context<Env
       data: { id: original.id, body: masked.body, available: masked.available },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"GET /api/webhooks/interactions/:id/payload"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -520,7 +521,7 @@ export const post__api_webhooks_interactions_id_retry_10 = async (c: Context<Env
     if (code === 'webhook_inactive' || code === 'payload_unavailable') {
       return inputError(c, { success: false, error: code }, 400, []);
     }
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/interactions/:id/retry"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -567,7 +568,7 @@ export const post__api_webhooks_interactions_retry_failed_11 = async (c: Context
       data: { requested: failed.length, succeeded, failed: failedAgain, skipped, remaining, needsReview, excluded },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webhooks_failed","route":"POST /api/webhooks/interactions/retry-failed"}));
+    logger.error("routes_webhooks_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -606,7 +607,7 @@ export const post__api_webhooks_maintenance_secret_backfill_12 = async (c: Conte
     if (isEncryptionKeyError(err)) {
       return c.json({ success: false, error: 'secret の移行に必要な鍵がありません' }, 503);
     }
-    console.error(JSON.stringify({"code":"webhook_secret_backfill_failed","route":"POST /api/webhooks/maintenance/secret-backfill"}));
+    logger.error("webhook_secret_backfill_failed");
     return c.json({ success: false, error: 'secret の移行に失敗しました' }, 500);
   }
 };

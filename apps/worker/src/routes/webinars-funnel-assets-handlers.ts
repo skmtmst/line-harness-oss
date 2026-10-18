@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { applyVideoMediaSelection } from './webinar-video-selection.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -62,7 +63,7 @@ export const post__api_liff_webinars_slug_funnel_event_1 = async (c: Context<Env
     });
     return c.json({ ok: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/liff/webinars/:slug/funnel-event"}));
+    logger.error("routes_webinars_failed");
     return c.json({ error: 'internal_error' }, 500);
   }
 };
@@ -138,7 +139,7 @@ export const get__api_webinars_overview_3 = async (c: Context<Env, "/api/webinar
     const overview = await getWebinarOverview(c.env.DB, accountId);
     return c.json({ success: true, data: overview });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/overview"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -182,7 +183,7 @@ export const get__api_webinars_4 = async (c: Context<Env, "/api/webinars">) => {
       }),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -226,7 +227,7 @@ export const post__api_webinars_5 = async (c: Context<Env, "/api/webinars">) => 
     });
     return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, created) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -237,7 +238,7 @@ export const get__api_webinars_id_6 = async (c: Context<Env, "/api/webinars/:id"
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, row) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -248,7 +249,7 @@ export const get__api_webinars_id_editor_7 = async (c: Context<Env, "/api/webina
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: await getEditorPayload(c, row) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/editor"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -306,7 +307,7 @@ export const put__api_webinars_id_editor_8 = async (c: Context<Env, "/api/webina
     if (!saved) return c.json({ success: false, error: 'version_conflict' }, 409);
     return c.json({ success: true, data: await getEditorPayload(c, row) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/editor"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -335,7 +336,7 @@ export const post__api_webinars_id_public_page_test_9 = async (c: Context<Env, "
     if (!saved) return c.json({ success: false, error: 'version_conflict' }, 409);
     return c.json({ success: true, data: await getEditorPayload(c, row) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/public-page/test"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -346,7 +347,7 @@ export const get__api_webinars_id_publish_validation_10 = async (c: Context<Env,
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: await buildPublishValidation(c, row) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/publish-validation"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -370,7 +371,7 @@ export const post__api_webinars_id_publish_11 = async (c: Context<Env, "/api/web
     auditLog(c, 'webinar.publish', { kind: 'webinar', id });
     return c.json({ success: true, data: { webinar: serializeWebinar(updated!), validation } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/publish"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -382,7 +383,7 @@ export const get__api_webinars_id_video_asset_12 = async (c: Context<Env, "/api/
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: { asset: serializeVideoAsset(await getWebinarVideoAsset(c.env.DB, id)) } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/video-asset"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -416,7 +417,7 @@ export const post__api_webinars_id_video_asset_advance_13 = async (c: Context<En
     auditLog(c, 'webinar.video_stage', { kind: 'webinar', id });
     return c.json({ success: true, data: { asset: serializeVideoAsset(advanced) } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/video-asset/advance"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -444,7 +445,7 @@ export const get__api_webinars_id_sessions_startAt_14 = async (c: Context<Env, "
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/sessions/:startAt"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -475,7 +476,7 @@ export const put__api_webinars_id_sessions_startAt_15 = async (c: Context<Env, "
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/sessions/:startAt"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -494,7 +495,7 @@ export const post__api_webinars_id_pause_16 = async (c: Context<Env, "/api/webin
     auditLog(c, 'webinar.pause', { kind: 'webinar', id });
     return c.json({ success: true, data: serializeWebinar(updated!) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/pause"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -537,7 +538,7 @@ export const post__api_webinars_id_duplicate_17 = async (c: Context<Env, "/api/w
     auditLog(c, 'webinar.duplicate', { kind: 'webinar', id });
     return c.json({ success: true, data: serializeWebinar(duplicate) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/duplicate"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -551,7 +552,7 @@ export const get__api_webinars_id_notifications_18 = async (c: Context<Env, "/ap
     ]);
     return c.json({ success: true, data: { settings, overview } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/notifications"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -601,7 +602,7 @@ export const put__api_webinars_id_notifications_19 = async (c: Context<Env, "/ap
       if (code === 'invalid_time' || code === 'invalid_hour_before' || code === 'invalid_missed_window') {
         return inputError(c, { success: false, error: code }, 400, code === 'invalid_time' ? ['dayBeforeTime', 'missedTime'] : code === 'invalid_hour_before' ? ['hourBeforeMinutes'] : ['missedWindowDays']);
       }
-      console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/notifications"}));
+      logger.error("routes_webinars_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   };

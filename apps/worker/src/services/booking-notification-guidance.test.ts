@@ -104,6 +104,10 @@ it('keeps booking details readable when damaged legacy policy prevents a safe pr
   const detail=await getBookingAdminDetail(item.db,{id:'b',lineAccountId:'a'});
   expect(detail?.id).toBe('b');expect(detail?.confirmationPreviewText).toBeNull();
   expect(sendBookingNotification).not.toHaveBeenCalled();
-  expect(log).toHaveBeenCalledWith(JSON.stringify({code:'booking_confirmation_preview_failed'}));
+  expect(log).toHaveBeenCalledOnce();
+  expect(JSON.parse(String(log.mock.calls[0][0]))).toEqual({
+   timestamp: NOW.toISOString(), level: 'warn', code: 'booking_confirmation_preview_failed',
+   requestId: null, invocationId: null, source: 'background',
+  });
  }finally{log.mockRestore();}
 });

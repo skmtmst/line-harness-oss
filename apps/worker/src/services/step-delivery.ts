@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { resolveMetadata } from './step-metadata.js';
 export { resolveMetadata } from './step-metadata.js';
 import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
@@ -203,7 +204,7 @@ export async function processStepDeliveries(
   // an uncertain attempt older than 24 hours is held for operator review.
   const recovered = await recoverStuckDeliveries(db);
   if (recovered > 0) {
-    console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+    logger.warn("services_step_delivery_warn");
   }
 
   const now = jstNow();
@@ -241,7 +242,7 @@ export async function processStepDeliveries(
             title: `friend_scenario:${fs.scenario_id}`,
           });
         } catch (skipError) {
-          console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+          logger.error("services_step_delivery_failed");
         }
         await db.prepare(
           `UPDATE friend_scenarios
@@ -278,13 +279,13 @@ export async function processStepDeliveries(
       const sent = await processSingleDelivery(db, lineClient, fs, workerUrl, sendPermissions, credentialKey);
       if (sent) sendCount++;
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+      logger.error("services_step_delivery_failed");
       // A permanent LINE 4xx (invalid/unreachable recipient, invalid payload,
       // unauthorized channel, etc.) must not be recovered and retried forever.
       // 408/409/429 are transient and retain the existing 5-minute recovery.
       if (isPermanentLineDeliveryError(err)) {
         await pauseFriendScenarioDelivery(db, fs.id);
-        console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+        logger.warn("services_step_delivery_warn");
       }
       // Continue with next one.
     }
@@ -393,7 +394,7 @@ async function processSingleDelivery(
   );
   if (!friend) {
     await pauseFriendScenarioDelivery(db, fs.id);
-    console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+    logger.warn("services_step_delivery_warn");
     return false;
   }
   if (await isFriendDeliverySuppressed(db, friend.id)) {
@@ -417,7 +418,7 @@ async function processSingleDelivery(
   const source = await getStepsForDelivery(db, fs.scenario_id, fs.published_version_id ?? null);
   if (!source) {
     await pauseFriendScenarioDelivery(db, fs.id);
-    console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+    logger.warn("services_step_delivery_warn");
     return false;
   }
   const steps = source.steps.filter((s) => (s.is_draft ?? 0) === 0);
@@ -435,7 +436,7 @@ async function processSingleDelivery(
    */
   const audience = parseCondition(source.audienceConditionJson);
   if (source.audienceConditionJson && !audience) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
     await pauseFriendScenarioDelivery(db, fs.id);
     return false;
   }
@@ -508,7 +509,7 @@ async function processSingleDelivery(
    */
   const stepTarget = parseCondition(currentStep.target_condition_json);
   if (currentStep.target_condition_json && !stepTarget) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
   }
   const stepTargeted = currentStep.target_condition_json
     ? stepTarget
@@ -629,7 +630,7 @@ async function processSingleDelivery(
     const account = await getLineAccountById(db, deliveryAccountId, credentialKey);
     if (!account) {
       await pauseFriendScenarioDelivery(db, fs.id);
-      console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+      logger.warn("services_step_delivery_warn");
       return false;
     }
     const { LineClient: LC } = await import('@line-crm/line-sdk');
@@ -706,7 +707,7 @@ async function processSingleDelivery(
     try {
       await addTagToFriend(db, friend.id, currentStep.on_reach_tag_id);
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+      logger.error("services_step_delivery_failed");
     }
   }
 
@@ -766,7 +767,7 @@ export async function finishScenario(
       });
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
   }
 
   await runScenarioActions(db, {
@@ -812,12 +813,12 @@ export async function evaluateCondition(
   if (!step.condition_type) return true;
 
   if (!isSupportedConditionType(step.condition_type)) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
     return false;
   }
 
   if (!step.condition_value) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
     return false;
   }
 
@@ -864,7 +865,7 @@ export async function evaluateCondition(
       try {
         raw = JSON.parse(step.condition_value);
       } catch {
-        console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+        logger.error("services_step_delivery_failed");
         return false;
       }
       if (
@@ -877,7 +878,7 @@ export async function evaluateCondition(
         // 既存行や直接 INSERT された行で {"key":"x"} のように value が欠落しているケースは
         // friend.metadata[x] === undefined と比較されて「key 不在の全友だち」に一致する
         // (= 同じ OSS issue #120 の over-delivery を再現する) ので明示的にスキップする。
-        console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+        logger.error("services_step_delivery_failed");
         return false;
       }
       const parsed = raw as { key: string; value: unknown };

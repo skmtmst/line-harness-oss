@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sweepOperatorPush, retryOperatorPush } from '../services/operator-push.js';
 
 import { decideAbTests } from '../services/broadcast-ab.js';
@@ -45,7 +46,7 @@ export async function runFrequentHeavyJobs(
   env: Env['Bindings'],
 ): Promise<void> {
   try { await pruneSensitiveRateLimits(env.DB, new Date(event.scheduledTime)); }
-  catch { console.error('sensitive_rate_limit_cleanup_failed'); }
+  catch { logger.error("sensitive_rate_limit_cleanup_failed"); }
   const dbAccounts = await getLineAccounts(env.DB);
   const lineClients = new Map<string, LineClient>();
   for (const account of dbAccounts) {
@@ -54,7 +55,7 @@ export async function runFrequentHeavyJobs(
   try {
     const { processAutoReplyDeliveries } = await import('../services/auto-reply-delivery.js');
     await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
-  } catch (error) { console.error(JSON.stringify({"code":"src_index_failed"})); }
+  } catch (error) { logger.error("src_index_failed"); }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [
@@ -89,7 +90,7 @@ export async function runFrequentHeavyJobs(
           credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
         });
         if (result.processed + result.failed > 0) {
-          console.log(JSON.stringify({"code":"ec_event_retry"}));
+          logger.log("ec_event_retry");
         }
       },
     },
@@ -120,7 +121,7 @@ export async function runFrequentHeavyJobs(
           }, bookingId),
         });
         if (result.processed > 0) {
-          console.log(JSON.stringify({"code":"booking_calendar_delete_retry"}));
+          logger.log("booking_calendar_delete_retry");
         }
       },
     },
@@ -132,7 +133,7 @@ export async function runFrequentHeavyJobs(
         const { processDueFileScans } = await import('../routes/file-scan.js');
         const result = await processDueFileScans(env, 20);
         if (result.processed > 0) {
-          console.log(JSON.stringify({"code":"file_scan_retry"}));
+          logger.log("file_scan_retry");
         }
       },
     },
@@ -143,7 +144,7 @@ export async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
           executorDependencies: { credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY },
         });
-        if (result.items > 0) console.log(JSON.stringify({"code":"friend_bulk_runs_cron"}));
+        if (result.items > 0) logger.log("friend_bulk_runs_cron");
       },
     },
     {
@@ -156,7 +157,7 @@ export async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.claimed > 0) {
-          console.log(JSON.stringify({"code":"scheduled_chat_sends"}));
+          logger.log("scheduled_chat_sends");
         }
       },
     },
@@ -166,7 +167,7 @@ export async function runFrequentHeavyJobs(
       run: async () => {
         const { processDueAnnouncements } = await import('../services/platform-announcements.js');
         const result = await processDueAnnouncements(env, { now: new Date(event.scheduledTime + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00') });
-        if (result.sent > 0) console.log(JSON.stringify({"code":"platform_announcements_cron"}));
+        if (result.sent > 0) logger.log("platform_announcements_cron");
       },
     },
     {
@@ -185,7 +186,7 @@ export async function runFrequentHeavyJobs(
           limit: 50,
         });
         if (result.processed > 0) {
-          console.log(JSON.stringify({"code":"mileage_reward_delivery_retry"}));
+          logger.log("mileage_reward_delivery_retry");
         }
       },
     },
@@ -202,7 +203,7 @@ export async function runFrequentHeavyJobs(
         );
         const result = await processPendingAnalyticsCrossRuns(env.DB, 1);
         if (recovered + result.processed + result.failed > 0) {
-          console.log(JSON.stringify({"code":"analytics_cross_tick"}));
+          logger.log("analytics_cross_tick");
         }
       },
     },
@@ -211,7 +212,7 @@ export async function runFrequentHeavyJobs(
       run: async () => {
         const result = await processPendingMileageEvents(env.DB, { limit: 100 });
         if (result.claimed > 0) {
-          console.log(JSON.stringify({"code":"src_index_log"}));
+          logger.log("src_index_log");
         }
         // m22o: 付与ルールの「通知する」で予約された分だけ、付与の後に届ける。
         // OFF のルールは予約自体が無い。公開URLが無い環境では送らず残す。
@@ -229,7 +230,7 @@ export async function runFrequentHeavyJobs(
             { limit: 20 },
           );
           if (notified.delivered + notified.failed > 0) {
-            console.log(JSON.stringify({"code":"src_index_log"}));
+            logger.log("src_index_log");
           }
         }
       },
@@ -248,7 +249,7 @@ export async function runFrequentHeavyJobs(
         if (result.newlyBroken.length > 0) {
           await notifyBrokenManualLinks(env.DB, env, result.newlyBroken);
         }
-        console.log(JSON.stringify({"code":"manual_link_weekly_check"}));
+        logger.log("manual_link_weekly_check");
       },
     },
     {
@@ -259,7 +260,7 @@ export async function runFrequentHeavyJobs(
           limit: 50, credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
         });
         if (result.claimed > 0) {
-          console.log(JSON.stringify({"code":"ad_conversion_outbox_tick"}));
+          logger.log("ad_conversion_outbox_tick");
         }
       },
     },
@@ -272,7 +273,7 @@ export async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.claimed > 0) {
-          console.log(JSON.stringify({"code":"analytics_url_exposure_queue"}));
+          logger.log("analytics_url_exposure_queue");
         }
       },
     },
@@ -286,7 +287,7 @@ export async function runFrequentHeavyJobs(
           new Date(event.scheduledTime),
         );
         if (result.processed > 0) {
-          console.log(JSON.stringify({"code":"analytics_projection_tick"}));
+          logger.log("analytics_projection_tick");
         }
       },
     },
@@ -296,7 +297,7 @@ export async function runFrequentHeavyJobs(
         const { processDueAnalyticsReports } = await import('../services/analytics-reports.js');
         const result = await processDueAnalyticsReports(env, new Date(event.scheduledTime));
         if (result.processed + result.failed + result.purged + result.reclaimed + result.repaired > 0) {
-          console.log(JSON.stringify({"code":"analytics_report_tick"}));
+          logger.log("analytics_report_tick");
         }
       },
     },
@@ -310,7 +311,7 @@ export async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.generated + result.failed > 0) {
-          console.log(JSON.stringify({"code":"scheduled_exports_tick"}));
+          logger.log("scheduled_exports_tick");
         }
       },
     },
@@ -324,7 +325,7 @@ export async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.synced + result.failed > 0) {
-          console.log(JSON.stringify({"code":"google_sheets_sync_tick"}));
+          logger.log("google_sheets_sync_tick");
         }
       },
     },
@@ -340,7 +341,7 @@ export async function runFrequentHeavyJobs(
       run: async () => {
         const { processPendingNenRichMenuJobs } = await import('../services/nen-rich-menu.js');
         const result = await processPendingNenRichMenuJobs(env);
-        if (result.processed > 0) console.log(JSON.stringify({"code":"nen_rich_menu_job"}));
+        if (result.processed > 0) logger.log("nen_rich_menu_job");
       },
     },
     {
@@ -353,7 +354,7 @@ export async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime),
         });
         if (result.checked + result.failed > 0) {
-          console.log(JSON.stringify({"code":"rich_menu_daily_reconcile"}));
+          logger.log("rich_menu_daily_reconcile");
         }
       },
     },
@@ -365,7 +366,7 @@ export async function runFrequentHeavyJobs(
       run: async () => {
         const { syncXServerSupportMailbox } = await import('../services/xserver-mail.js');
         const result = await syncXServerSupportMailbox(env);
-        if (result.checked > 0) console.log(JSON.stringify({"code":"support_email_sync"}));
+        if (result.checked > 0) logger.log("support_email_sync");
       },
     });
   }
@@ -395,7 +396,7 @@ export async function runFrequentHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.reviewsSynced + result.postsSynced + result.failed > 0) {
-          console.log(JSON.stringify({"code":"google_business_resync_tick"}));
+          logger.log("google_business_resync_tick");
         }
       },
     });
@@ -410,7 +411,7 @@ export async function runFrequentHeavyJobs(
       run: async () => {
         const result = await processFriendFieldReminders(env.DB);
         if (result.enrolled > 0 || result.hasMore) {
-          console.log(JSON.stringify({"code":"src_index_log"}));
+          logger.log("src_index_log");
         }
       },
     });
@@ -433,7 +434,7 @@ export async function runFrequentHeavyJobs(
           });
         }
         if (result.candidates > 0) {
-          console.log(JSON.stringify({"code":"action_score_inactivity_tick"}));
+          logger.log("action_score_inactivity_tick");
         }
       },
     });

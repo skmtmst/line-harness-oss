@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { reconcileLateBookingPayment } from './booking-late-payment.js';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
@@ -63,7 +64,7 @@ export async function reconcilePaidBookingPayment(
       WHERE booking_id = ? AND line_account_id = ? AND idempotency_key = ? AND status IN ('queued','retry_wait')`)
       .bind(row.booking_id, row.line_account_id, `${row.booking_id}:confirmation-effects`).first()) {
     try { await runConfirmedBookingSideEffects(db, row.booking_id, { now, credentials }); }
-    catch { console.error(JSON.stringify({"code":"paid_booking_confirmation_incomplete"})); }
+    catch { logger.error("paid_booking_confirmation_incomplete"); }
   }
   return { duplicate: !applyPaid || (result[0]?.meta?.changes ?? 0) === 0 };
 }
@@ -112,7 +113,7 @@ export async function recoverPaidBookingPayments(db: D1Database, now: Date, cred
     ORDER BY p.id LIMIT 200`).all<{ id: string }>();
   for (const row of rows.results ?? []) {
     try { await reconcilePaidBookingPayment(db, row.id, now, false, credentials); }
-    catch { console.error(JSON.stringify({"code":"paid_booking_recovery_failed"})); }
+    catch { logger.error("paid_booking_recovery_failed"); }
   }
 }
 

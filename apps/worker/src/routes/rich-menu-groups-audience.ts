@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getRichMenuGroupById, getRichMenuGroupWithPages, getLineAccountById, getFollowingLineUserIdsByTag, recordRichMenuAssignmentsByLineUserIds, duplicateRichMenuGroupAtomic, createRichMenuTestApplyAtomic, getActiveRichMenuTestApply, getRichMenuTestApplyById, listRichMenuTestApplies, captureRichMenuTestApplyPrevious, recordRichMenuTestApplyShells, markRichMenuTestApplyApplied, markRichMenuTestApplyFailed, getStaffById, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
@@ -183,7 +184,7 @@ export const post__api_rich_menu_groups_groupId_duplicate_2 = async (c: Context<
         deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
       });
     } catch (auditError) {
-      console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/duplicate"}));
+      logger.error("routes_rich_menu_groups_failed");
     }
 
     return c.json(
@@ -285,7 +286,7 @@ export const get__api_rich_menu_groups_groupId_audience_summary_3 = async (c: Co
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups/:groupId/audience-summary"}));
+    logger.error("routes_rich_menu_groups_failed");
     return c.json({ success: false, error: '対象人数を確認できませんでした' }, 503);
   }
 };
@@ -509,7 +510,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_5 = async (c: Context
           deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
         });
       } catch (auditError) {
-        console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/test-apply"}));
+        logger.error("routes_rich_menu_groups_failed");
       }
 
       const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);

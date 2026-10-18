@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { inputError, readBoundedBytes } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
@@ -105,7 +106,7 @@ export const post__api_forms_id_opened_1 = async (c: Context<Env, "/api/forms/:i
 
     return c.json({ success: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/opened"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: true }); // non-blocking, always succeed
   }
 };
@@ -179,7 +180,7 @@ export const post__api_forms_id_partial_2 = async (c: Context<Env, "/api/forms/:
 
     return c.json({ success: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/partial"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -301,7 +302,7 @@ export const post__api_forms_id_files_3 = async (c: Context<Env, "/api/forms/:id
       mimeType,
       sizeBytes: formBytes.byteLength,
     }).then((scan) => markFileScanClean(c.env.DB, scan.id))
-      .catch((err) => console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/files"})));
+      .catch((err) => logger.error("routes_forms_failed"));
 
     const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
     return c.json(
@@ -309,7 +310,7 @@ export const post__api_forms_id_files_3 = async (c: Context<Env, "/api/forms/:id
       201,
     );
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/files"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -360,7 +361,7 @@ export const get__api_forms_id_my_latest_4 = async (c: Context<Env, "/api/forms/
     delete answers._webhookResult;
     return c.json({ success: true, data: { answers, createdAt: latest.created_at } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/my-latest"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

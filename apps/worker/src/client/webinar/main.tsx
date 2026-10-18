@@ -1,3 +1,6 @@
+import { responseLiffError } from '../../../../liff/src/lib/api-error.js';
+import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
+import { createClientLogger } from '@line-crm/shared';
 import { jstDate } from '@line-crm/shared';
 // main.tsx — Auto-webinar (疑似ライブ) LIFF entry. Loaded via dynamic import
 // from apps/worker/src/client/main.ts (?page=webinar&slug=<slug>).
@@ -27,6 +30,8 @@ import StatusView from '../../../../liff/src/components/ui/StatusView.js';
 import Button from '../../../../liff/src/components/ui/Button.js';
 import { TextInput, FieldCount } from '../../../../liff/src/components/forms/controls.js';
 import { setLiffContext } from '../../../../liff/src/lib/liff-auth.js';
+const clientLogger = createClientLogger('embedded');
+
 
 // LIFF SDK は index.html の script タグでグローバル注入される
 declare const liff: {
@@ -153,11 +158,7 @@ async function apiGet<T>(path: string, ctx: WebinarContext): Promise<T> {
   const url = new URL(path, ctx.apiBase || window.location.origin);
   url.searchParams.set('liffId', ctx.liffId);
   const r = await fetch(url.toString(), { headers: buildAuthHeaders(ctx) });
-  if (!r.ok) {
-    const err = new Error(`API ${r.status}`) as Error & { status: number };
-    err.status = r.status;
-    throw err;
-  }
+  if (!r.ok) throw await responseLiffError(r);
   return r.json() as Promise<T>;
 }
 
@@ -169,11 +170,7 @@ async function apiPost<T>(path: string, body: unknown, ctx: WebinarContext): Pro
     headers: buildAuthHeaders(ctx, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
   });
-  if (!r.ok) {
-    const err = new Error(`API ${r.status}`) as Error & { status: number };
-    err.status = r.status;
-    throw err;
-  }
+  if (!r.ok) throw await responseLiffError(r);
   return r.json() as Promise<T>;
 }
 
@@ -282,7 +279,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
       if (status === 403) setError('この配信は友だち追加後にご覧いただけます。');
       else if (status === 404) setError('この配信は見つかりませんでした。');
       else setError('読み込みに失敗しました。開き直してください。');
-      console.error(JSON.stringify({"code":"webinar_main_failed"}));
+      clientLogger.error("webinar_main_failed");
     } finally {
       loadingRef.current = false;
     }
@@ -575,7 +572,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
         body: text,
       }, ctx);
     } catch (err) {
-      console.warn(JSON.stringify({"code":"webinar_main_warn"}));
+      clientLogger.warn("webinar_main_warn");
       setChat(prev => prev.map(item => item.key === key ? { ...item, failed: true } : item));
       setInput(current => current === '' ? text : current);
     } finally {
@@ -673,7 +670,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
       // 再生画面へ切り替える。未来回なら予約済み表示／待機ルームへ更新される。
       await load();
     } catch (err) {
-      console.warn(JSON.stringify({"code":"webinar_main_warn"}));
+      clientLogger.warn("webinar_main_warn");
     } finally {
       setRegistering(false);
     }
@@ -1120,7 +1117,8 @@ export function FormSheet({
         headers: buildAuthHeaders(ctx, buildFormSubmitHeaders(key)),
         body: JSON.stringify({ data: values }),
       });
-      const json = (await r.json().catch(() => null)) as {
+      const payload: unknown = await r.json().catch(() => null);
+      const json = (r.ok || payload === null ? payload : { ...legacyApiErrorBody(payload) as object, error: readApiError(payload).message }) as {
         success: boolean;
         error?: string;
         code?: string;

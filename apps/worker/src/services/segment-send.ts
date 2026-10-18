@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   getBroadcastById,
   updateBroadcastStatus,
@@ -95,7 +96,7 @@ export async function processSegmentSend(
         );
         await db.batch(logStmts);
       } catch (err) {
-        console.error(JSON.stringify({"code":"services_segment_send_failed"}));
+        logger.error("services_segment_send_failed");
         // Continue with next batch; failed batch is not logged
       }
     }

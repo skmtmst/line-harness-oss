@@ -286,3 +286,29 @@ describe('IDEA-27: 長い変更履歴は追加取得する', () => {
     expect(screen.queryByText(/記録を読み込む/)).toBeNull()
   })
 })
+
+it('送達不明は通常の失敗と区別し、再送の入口を置かない', async () => {
+  m.get.mockResolvedValue({ booking: booking({ operations: [{ id: 'unknown-line', kind: 'confirmation_line', status: 'permanent_failed', scheduledAt: null, completedAt: null, openedAt: null, result: {}, errorCode: 'delivery_unknown' }] }) })
+  render(<Page />)
+  await flush()
+  expect(screen.getByText(/送達不明・要確認（自動では送り直しません）/)).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'もう一度送る' })).toBeNull()
+})
+
+describe('実送信と共通の通知本文を読む', () => {
+  it('詳細の取得結果をそのまま表示し、未取得は補わず読み直せる', async () => {
+    const text = '予約を承りました。\n店名: 確認用のお店\n変更期限: 前日18時まで\nhttps://example.test/history/booking-1'
+    m.get.mockResolvedValueOnce({ booking: booking({ confirmationPreviewText: null }) })
+      .mockResolvedValueOnce({ booking: booking({ confirmationPreviewText: text }) })
+    render(<Page />)
+    await flush()
+    expect(screen.getByText('送信内容を確認できませんでした。もう一度読み込んで確認してください。')).toBeTruthy()
+    expect(screen.queryByText('予約が確定しました。', { exact: false })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '通知文を読み直す' }))
+    await flush()
+    expect(m.get).toHaveBeenLastCalledWith('A', 'one')
+    expect(screen.getByText((_, node) => node?.tagName === 'P' && node.textContent === text)).toBeTruthy()
+    expect(screen.queryByText('送信内容を確認できませんでした。もう一度読み込んで確認してください。')).toBeNull()
+    expect(screen.getByText('現在の設定で送る場合の内容です。送信済みのお知らせとは異なる場合があります。')).toBeTruthy()
+  })
+})

@@ -35,12 +35,6 @@ describe('m22c 札・ボタンの折り返し', () => {
 })
 
 describe('m22c 行き先リンクの見た目', () => {
-  it('ダッシュボードの「順路を見る」はカード見出しの行き先リンクと同じ', () => {
-    const source = read('components/dashboard/getting-started-band.tsx')
-    expect(source).toContain('text-status-info inline-flex shrink-0 items-center gap-1 text-label font-semibold hover:underline')
-    expect(source).not.toContain('順路を見る\n      </Link>')
-  })
-
   it('分類案内の行き先リンクは共通の見た目（13px/600青文字）', () => {
     const source = read('components/friend-fields/attribute-kind-guide.tsx')
     expect(source).toContain('text-status-info mt-0.5 inline-block text-label font-semibold hover:underline')

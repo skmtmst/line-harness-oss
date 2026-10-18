@@ -11,14 +11,15 @@ import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope } from '@/components/shared/save-form-errors'
 import TextLink from '@/components/shared/text-link'
-import { gapDraftApi, type DepositRule } from '@/lib/api-gap-draft'
+import { bookingAdvancedApi } from '@/lib/api-booking-advanced'
+import type { DepositRule } from '@line-crm/shared'
 import type { MenuPaymentState } from './menu-payment'
 import { MODE_LABEL } from './labels'
 import styles from './payments.module.css'
 
 /*
  * 予約メニューの「お支払い」の段（B1・絵 CnV1I）：いつもの方法／先払い／お店で払う／デポジット（一部）の 4 つ。
- * 先払い・お店で払うは今ある口（saveMenuPayment）、デポジットは口の案（api-gap-draft のメニューのデポジット：口が要る）。
+ * 先払い・お店で払うは今ある口（saveMenuPayment）、デポジットも版付きの実APIで読み書きする。
  * デポジットを選ぶと支払い方法は先払い（残りはお店で）として送る。
  */
 
@@ -34,7 +35,7 @@ export function useMenuDeposit(accountId: string | null, menuId: string | null) 
     /* 作る画面（まだメニューが無い）：いつもの方法から始め、保存でメニューができてから同じ口へ送る（版 0）。 */
     if (!menuId) { setSaved(NEW_MENU_DEPOSIT); setDraft(NEW_MENU_DEPOSIT); setReady(true); return }
     let alive = true
-    void Promise.resolve().then(() => gapDraftApi.menuDeposit(accountId, menuId))
+    void Promise.resolve().then(() => bookingAdvancedApi.menuDeposit(accountId, menuId))
       .then((response) => { if (alive) { setSaved(response.data); setDraft(response.data); setReady(true) } })
       .catch(() => { if (alive) { setSaved(null); setDraft(null); setReady(false) } })
     return () => { alive = false }
@@ -44,7 +45,7 @@ export function useMenuDeposit(accountId: string | null, menuId: string | null) 
     const id = targetId ?? menuId
     if (!accountId || !id || !draft || !dirty) return
     const { version, ...body } = draft
-    const response = await gapDraftApi.saveMenuDeposit(accountId, id, { ...body, expectedVersion: version })
+    const response = await bookingAdvancedApi.saveMenuDeposit(accountId, id, { ...body, expectedVersion: version })
     setSaved(response.data); setDraft(response.data)
   }, [accountId, menuId, draft, dirty])
   return { ready, draft, setDraft, dirty, save }

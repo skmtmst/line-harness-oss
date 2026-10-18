@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
 import { getMediaById, archiveMedia, restoreMedia, getStaffNameMap, getMediaReplacementPlan, getMediaUploadSession, getCurrentMediaVersionNo, getLatestMediaVersion, evaluateMediaVersionCompat, backfillMediaVersionMetadata, type MediaMetadata, jstNow, normalizeCommonVarValidityAt, type Media, type MediaKind, type CommonVar, type CommonVarSchedule, type CommonVarExpiryBehavior, type CommonVarUsageImpact, type CommonVarUsageItem } from '@line-crm/db';
@@ -211,7 +212,7 @@ export async function measureStoredImageMetadata(
     const bytes = new Uint8Array(await object.arrayBuffer());
     return imageDimensions(bytes, media.mime_type);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed"}));
+    logger.error("routes_contents_failed");
     return null;
   }
 }
