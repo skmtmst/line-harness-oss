@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../../scripts/test-api-source.mjs'
 /*
  * IDEA-07: イベントの予約ごとの通知予定を、予約そのもののそばで見せる。
  *
@@ -13,7 +14,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '../../../v8/events/booking-records.tsx'), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 // 取得範囲・1回の取得・応答内容はWorker events.test.tsの実HTTP試験で確認する。
 
 /** 説明の文だけで通ってしまわないよう、判定の前にコメントを落とす。 */

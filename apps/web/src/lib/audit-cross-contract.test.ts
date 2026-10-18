@@ -1,9 +1,10 @@
+import { readApiSource } from '../../scripts/test-api-source.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-const API = read('./api.ts')
+const API = readApiSource(new URL('./api.ts', import.meta.url), 'utf8')
 const CONTENTS_ROUTE = read('../../../worker/src/routes/contents.ts')
 const AUTOMATIONS_PAGE = read('../v8/automations/list.tsx')
 const AUTOMATIONS_ROUTE = read('../../../worker/src/routes/automations.ts')

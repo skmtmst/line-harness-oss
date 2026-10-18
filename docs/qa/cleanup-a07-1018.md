@@ -53,3 +53,18 @@
 - Worker/DB型検査成功。Worker build成功（既存のchunkサイズ警告のみ）。追加のイベント回収186件、遮断33件、結果保存28件、Google関連35件/接続確認12件も成功（重複を含む個別実行）。最後の製品変更を含む全工程は、コミット済みHEADからci-localで検証する。最終結果は下記の外部記録を正本にする。正式PR番号が未確定のため#0000の通常照合は司令塔の採番後。
 
 外部記録：`~/lh-work/design/v8/review/CLEANUP-1017/A07-EVIDENCE/`、`DONE-A07.tsv`、`A07-HANDOFF.md`、`API-CONTRACT-A07.md`。ci-localの生ログ・再実行の対応・最終SHAは外部記録に保持する。新migration/DB適用/配備/push/PR/本番操作なし。
+
+## まとめ枝の取り込み（2026-10-18 12:18 JST 再開）
+
+開始SHAは `ab065b6fb56e5d4caa159fa6495ad8f13134cd26`、作業木clean。doctorは合格。
+指定のまとめ枝 `a4b078aa56d41583971fcd488a7b66b0c4664ce7` をmergeし、競合1件を解消した。
+検査前fetchの `origin/codex/development` は `e9b423eb7c798f7d5a530a05a6e86a0c26dd56f9` で、既に包含済み。
+
+`event-booking-reminders-contract.test.ts` は、A04の分割後のAPIをたどる `readApiSource` と、A07の実HTTP試験への移行を保持。
+Worker `events.test.ts` が通知内容・1要求1問・表示ページの予約IDだけの取得を検証するため、移行済みのWorkerソース文字列検査は戻さない。
+残るWebの4試験、API互換3試験、Workerの関連157試験はすべて成功。
+Node22.23.3でWorker・Web・DBの型検査も終了0。差分検査成功。
+共用heavy枠待ちの関連試験1回は自分の待機だけを中断し、ブラウザを起動しない関連6ファイル164件として実行した。全体検査・ビルド・実ブラウザはci-local内部のheavy経由で実行する。
+
+ci-localは未コミットの作業木を受け付けないため、ここでマージをコミットし、その版で全工程を再検証する。
+全体結果は完了後に追記する。新migration、既存の未完部分、上限・許可・保護条件は変更していない。

@@ -1,8 +1,9 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const apiSource = readFileSync(join(process.cwd(), 'src/lib/api.ts'), 'utf8')
+const apiSource = readApiSource(join(process.cwd(), 'src/lib/api.ts'), 'utf8')
 const pageSource = ['src/app/emergency/page.tsx', 'src/v8/settings/emergency/history-details.tsx', 'src/app/emergency/control-v8.tsx', 'src/v8/settings/emergency/health.tsx', 'src/v8/settings/emergency/screen.tsx'].map((file) => readFileSync(join(process.cwd(), file), 'utf8')).join('\n')
 const fixtureSource = readFileSync(join(process.cwd(), '../../scripts/visual-qa/fixtures.mjs'), 'utf8')
 const mockSource = readFileSync(join(process.cwd(), '../../scripts/visual-qa/mock-api.mjs'), 'utf8')

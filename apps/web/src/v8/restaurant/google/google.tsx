@@ -44,6 +44,19 @@ export type GoogleTab = keyof typeof TAB_LABELS
 export type GoogleNav = (params: Record<string, string | undefined>) => void
 
 /** 口コミの一覧の帯だけ、返信が実際に Google に届くことを知らせる（j0Wcg）。 */
+/**
+ * 板の頭の「？」に入れる説明。画面の中（タブの下・表の下）に説明の行や注記の箱は置かない。
+ * 口コミだけは「Googleへ送ると『反映確認中』になる」までを書く（j0Wcg）。
+ */
+const HELP_BASE = 'Google の口コミ・投稿・営業時間を、店舗ごとに管理します。'
+const TAB_HELP: Record<GoogleTab, string> = {
+  reviews: `${HELP_BASE}返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。`,
+  posts: `${HELP_BASE}投稿は Google に出す最新情報・イベント・特典・お知らせです。行の「…」から、中身を見る・Google から削除・Instagram へもう一度送るができます。削除は元に戻せません（確認の窓が出ます）。Instagram が失敗した投稿は再送でき、Google への公開はそのまま残ります。時刻はすべて日本時間（Asia/Tokyo）です。`,
+  performance: `${HELP_BASE}Google の検索・地図でどれだけ見られたかを出します。数字は Google ビジネス プロフィールの集計です（前日までの分。2〜3日遅れることがあります）。`,
+  profile: HELP_BASE,
+  settings: `${HELP_BASE}接続を解除すると、口コミ・投稿・パフォーマンスの取り込みが止まります。解除の前に確認の窓が出ます。`,
+}
+
 const REVIEWS_BANNER_NOTE = 'Google への返信は、つないだ設定で実際に Google に届きます。送れない設定のときは送信ボタンを出しません'
 
 /** Googleからの戻り（?google=connected など）の知らせ（今の画面と同じ文）。 */
@@ -51,12 +64,12 @@ const RETURN_MESSAGES: Record<string, { tone: 'info' | 'warn' | 'danger'; text: 
   connected: { tone: 'info', text: 'Googleアカウントを接続しました。口コミを取得します。' },
   reconnected: { tone: 'info', text: 'Googleアカウントを再接続しました。' },
   select_location: { tone: 'warn', text: 'このLINEアカウントに結びつける店舗を1つ選んでください。前につないでいた店舗とは別の店舗を選ぶと、切り替える前に確認します。' },
-  'error:invalid_state': { tone: 'danger', text: '認可の確認に失敗しました。もう一度「Googleアカウントを接続」からやり直してください。' },
+  'error:invalid_state': { tone: 'danger', text: '認可の確認に失敗しました。もう一度「接続する」からやり直してください。' },
   'error:denied': { tone: 'danger', text: 'Googleでの許可が取り消されました。接続は変更していません。' },
   'error:location_mismatch': { tone: 'danger', text: '選んだ店舗をGoogleで確認できなかったため保存しませんでした。店舗一覧をもう一度読み込んでから選び直してください。' },
   'error:no_locations': { tone: 'danger', text: 'このGoogleアカウントで管理できる店舗が見つかりませんでした。店舗を管理しているGoogleアカウントでログインしてください。' },
   'error:oauth_not_configured': { tone: 'danger', text: 'この環境にはGoogle接続の設定がありません。' },
-  'error:no_permission': { tone: 'danger', text: 'Googleの許可画面で「ビジネス情報の管理」の許可が外れていたため、接続していません。もう一度「Googleアカウントを接続」から進み、この許可を付けたままにしてください。' },
+  'error:no_permission': { tone: 'danger', text: 'Googleの許可画面で「ビジネス情報の管理」の許可が外れていたため、接続していません。もう一度「接続する」から進み、この許可を付けたままにしてください。' },
 }
 
 function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
@@ -209,10 +222,10 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     <SaveErrorScope errors={saveErrors}><RestaurantPage
       boardId={boardId}
       title="Googleビジネス"
-      description={boardId === 'j0Wcg' ? 'Google の口コミ・投稿・営業時間を、店舗ごとに管理します。返信文は手で書くか、AIで下書きを作れます。Googleへ送ると「反映確認中」になり、反映されると「返信済み」になります。' : 'Google の口コミ・投稿・営業時間を、店舗ごとに管理します。'}
+      description={draftOpen ? HELP_BASE : TAB_HELP[tab]}
       picker={picker}
     >
-      <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : undefined} />
+      <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : tab === 'settings' && data && !data.writeEnabled ? '外部への更新は止めています' : undefined} />
       {body}
     </RestaurantPage></SaveErrorScope>
   )

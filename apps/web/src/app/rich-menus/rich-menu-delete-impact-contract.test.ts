@@ -1,7 +1,8 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { describe, expect, test } from 'vitest'
 import { readFileSync } from 'node:fs'
 
-const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const FIXTURES = readFileSync(
   new URL('../../../../../scripts/visual-qa/fixtures.mjs', import.meta.url),
   'utf8',

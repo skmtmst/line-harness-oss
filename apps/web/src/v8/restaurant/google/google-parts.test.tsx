@@ -3,8 +3,8 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ review: vi.fn(), listReviews: vi.fn(), createPost: vi.fn(), profile: vi.fn(), role: 'owner' }))
-vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { review: fixture.review, listReviews: fixture.listReviews, createPost: fixture.createPost, profile: fixture.profile } }))
+const fixture = vi.hoisted(() => ({ review: vi.fn(), publishReply: vi.fn(), listReviews: vi.fn(), createPost: vi.fn(), profile: vi.fn(), role: 'owner' }))
+vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: { review: fixture.review, publishReply: fixture.publishReply, listReviews: fixture.listReviews, createPost: fixture.createPost, profile: fixture.profile } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string) => role === 'owner' || role === 'admin' }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/google', useSearchParams: () => new URLSearchParams() }))
 import { compareText } from './performance'
@@ -13,6 +13,7 @@ import { PostEditor } from './posts'
 import { ReviewDraft, ReviewsBoard } from './reviews'
 import ProfileBoard from './profile'
 import type { GoogleConnectionData } from '@/lib/restaurant-google-api'
+import { ApiError } from '@/lib/api'
 
 const review = {
   id: 'rv-2', reviewName: 'r', reviewerDisplayName: 'Kenji', starRating: 2, comment: '待ちました。', createTime: '2026-09-30T11:12:00Z', updateTime: null,
@@ -37,7 +38,7 @@ it('閲覧のみのプロフィールでは変更操作を隠し、営業時間�
   })
   render(<ProfileBoard accountId="a" go={vi.fn()} />)
   expect(await screen.findByText(/11:00.*20:00/)).toBeTruthy()
-  for (const name of ['営業時間を変更', '今日を休みにする', '今日は早く閉める', 'プロフィールを編集']) {
+  for (const name of ['営業時間を変える', '今日を休みにする', '今日は早く閉める', 'プロフィールを編集する']) {
     expect(screen.queryByRole('button', { name })).toBeNull()
   }
 })
@@ -57,15 +58,41 @@ describe('Googleビジネスの表示の道具', () => {
 })
 
 describe('返信を作る：送れない設定のときは送信へ進むボタンを出さない', () => {
-  it('検証環境（writeEnabled=false）では「返信内容を確認」を置かず、下書きの保存はできる', async () => {
+  it('検証環境（writeEnabled=false）では「返信内容を確認する」を置かず、下書きの保存はできる', async () => {
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(false, true)} go={vi.fn()} onPublished={vi.fn()} />)
     expect(await screen.findByRole('button', { name: '下書きを保存する' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '返信内容を確認' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '返信内容を確認する' })).toBeNull()
     expect(screen.getByText('検証環境では Google へは送りません。下書きと承認まで。')).toBeTruthy()
   })
-  it('送れる設定で公開の権限があれば「返信内容を確認」を出す', async () => {
+  it('送れる設定で公開の権限があれば「返信内容を確認する」を出す', async () => {
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
-    expect(await screen.findByRole('button', { name: '返信内容を確認' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '返信内容を確認する' })).toBeTruthy()
+  })
+  it.each([true, false])('返信済みの競合は再送せず、返信文の有無にかかわらず最新を確認できる（返信文あり=%s）', async (withExistingReply) => {
+    const existingReply = '別の担当者による返信です。'.repeat(15)
+    fixture.publishReply.mockRejectedValue(new ApiError(409, '返信済み', 'already_replied', withExistingReply ? { existingReply } : undefined))
+    const onPublished = vi.fn()
+    render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={onPublished} />)
+    fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: '返信先・内容・個人情報の有無を確認しました' }))
+    fireEvent.click(screen.getByRole('button', { name: 'この内容で返信する' }))
+    expect(await screen.findByText('別の担当者がすでに返信しています。')).toBeTruthy()
+    expect(screen.getByText(withExistingReply ? new RegExp(existingReply) : /返信文を読み込めませんでした/)).toBeTruthy()
+    const confirm = screen.getByRole('button', { name: '返信内容を確認する' }) as HTMLButtonElement
+    expect(confirm.disabled).toBe(true)
+    fireEvent.click(confirm)
+    expect(fixture.publishReply).toHaveBeenCalledTimes(1)
+
+    fixture.review.mockRejectedValueOnce(new Error('取得失敗'))
+    fireEvent.click(screen.getByRole('button', { name: '最新を読み込んで続ける' }))
+    expect(await screen.findByRole('button', { name: 'もう一度読み込む' })).toBeTruthy()
+    fixture.review.mockResolvedValue({ success: true, review: { ...review, replyStatus: 'replied', replyComment: existingReply }, store: { id: 's', name: '試験店' }, connection: {} })
+    fireEvent.click(screen.getByRole('button', { name: /もう一度/ }))
+    expect(await screen.findByText(`公開済みの返信：${existingReply}`)).toBeTruthy()
+    expect(screen.queryByText('別の担当者がすでに返信しています。')).toBeNull()
+    expect(screen.queryByRole('button', { name: '返信内容を確認する' })).toBeNull()
+    expect(fixture.publishReply).toHaveBeenCalledTimes(1)
+    expect(onPublished).not.toHaveBeenCalled()
   })
 })
 
@@ -84,7 +111,7 @@ describe('投稿フォームの入力と保存', () => {
   })
   it('特典の入力不足は最初のタイトル欄へ移し、期間の誤りも各欄に結び付ける', () => {
     render(<PostEditor accountId="a" kind="offer" postId={null} go={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: '公開内容を確認' }))
+    fireEvent.click(screen.getByRole('button', { name: '公開内容を確認する' }))
     expect(document.activeElement).toBe(screen.getByLabelText('タイトル（特典・イベントのとき）'))
     for (const label of ['期間 はじめ', '期間 おわり']) {
       const field = screen.getByLabelText(label)

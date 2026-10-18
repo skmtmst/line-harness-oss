@@ -1,4 +1,6 @@
-import { ApiError, fetchApi, fetchApiBlob } from './api';
+import type { SimulatedPaymentResult, PaymentLinkPreview } from './api-booking-payment-types'
+export type { SimulatedPaymentResult, PaymentLinkPreview } from './api-booking-payment-types'
+import { ApiError, fetchApi, fetchApiBlob } from './api'
 
 /*
  * 予約のお支払い（管理画面）の口（B-305・B-315）。作業役Dの形を保持する。
@@ -81,9 +83,9 @@ export interface PaymentEvent {
 }
 
 export interface RefundPaymentInput { amount?: number; reason: string; notifyLine?: boolean; idempotencyKey: string }
-export interface PaymentRefund {
+export interface PaymentRefund extends SimulatedPaymentResult {
   id: string; amount: number; reason: string; actorLabel: string; createdAt: string;
-  notifyLine: boolean; notificationStatus: 'not_requested' | 'simulated' | 'unavailable'; simulation: true; sent: false;
+  notifyLine: boolean; notificationStatus: 'not_requested' | 'simulated' | 'unavailable';
 }
 
 export const bookingPaymentAdminApi = {
@@ -101,7 +103,7 @@ export const bookingPaymentAdminApi = {
   staffTodayCounts: (accountId: string) =>
     fetchApi<Result<{ items: { staffId: string; todayCount: number }[]; date: string; timezone: string }>>(`/api/booking/admin/staff/today-counts?${q(accountId)}`),
   previewPaymentLink: (accountId: string, paymentId: string) =>
-    fetchApi<Result<{ paymentId: string; checkoutUrl: string | null; sent: false; simulation: true }>>(`/api/booking/admin/payments/${encodeURIComponent(paymentId)}/send-link?${q(accountId)}`, { method: 'POST', body: JSON.stringify({ dryRun: true }) }),
+    fetchApi<Result<PaymentLinkPreview>>(`/api/booking/admin/payments/${encodeURIComponent(paymentId)}/send-link?${q(accountId)}`, { method: 'POST', body: JSON.stringify({ dryRun: true }) }),
   connection: (accountId: string) =>
     fetchApi<Result<StripeConnection>>(`/api/booking/admin/payment-connection?${q(accountId)}`),
   menuOverrides: (accountId: string) =>
@@ -114,7 +116,7 @@ export const bookingPaymentAdminApi = {
     fetchApi<Result<PaymentEvent>>(`/api/booking/admin/payment-events/${encodeURIComponent(id)}/replay?${q(accountId)}`, { method: 'POST', body: '{}' }),
   /** 同じ操作の再送には同じidempotencyKey。amount省略は残額全部。実送金・実送信なし。 */
   refund: (paymentId: string, input: RefundPaymentInput) =>
-    fetchApi<Result<{ payment: unknown; refund: PaymentRefund; duplicate: boolean; simulation: true; sent: false }>>(`/api/booking/payments/${encodeURIComponent(paymentId)}/refund`, { method: 'POST', body: JSON.stringify(input) }),
+    fetchApi<Result<SimulatedPaymentResult & { payment: unknown; refund: PaymentRefund; duplicate: boolean }>>(`/api/booking/payments/${encodeURIComponent(paymentId)}/refund`, { method: 'POST', body: JSON.stringify(input) }),
   refunds: (paymentId: string) =>
     fetchApi<Result<{ items: PaymentRefund[] }>>(`/api/booking/payments/${encodeURIComponent(paymentId)}/refunds`),
   linkBooking: (paymentId: string, bookingId: string, reason: string) =>
