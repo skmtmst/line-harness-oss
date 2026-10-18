@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,7 +10,7 @@ const SCORE_TAB = readFileSync(join(HERE, '../../v8/mileage/score.tsx'), 'utf8')
 const SCORE_SOURCE = readFileSync(join(HERE, '../../v8/mileage/score.tsx'), 'utf8')
 const HISTORY_DIALOG = SCORE_SOURCE.slice(SCORE_SOURCE.indexOf('function ScoreHistoryDialog('))
 const DISPLAY = readFileSync(join(HERE, '../../v8/mileage/display.ts'), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const SCORING_ROUTE = readImplementationSource(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'scoring.ts'),
 )

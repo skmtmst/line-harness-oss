@@ -1,8 +1,9 @@
+import { readApiSource } from '../../../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const API = readFileSync(new URL('../../../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../../../lib/api.ts', import.meta.url), 'utf8')
 
 describe('V6 URqOA 定期レポート作成', () => {
   it('設計の入力・予告・関係先を持つ', () => {

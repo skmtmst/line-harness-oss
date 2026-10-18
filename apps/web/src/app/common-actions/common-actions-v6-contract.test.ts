@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -7,6 +8,7 @@ import { readImplementationSource } from '../../../../worker/src/test-utils/impl
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
+const readApi = (...parts: string[]) => readApiSource(join(HERE, ...parts), 'utf8')
 const LIST = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const CREATE = readUiSource(join(HERE, 'new', 'page.tsx'), 'utf8')
 const EDIT = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
@@ -15,7 +17,7 @@ const VERSIONS = readUiSource(join(HERE, 'versions', 'page.tsx'), 'utf8')
 const EDITOR = read('..', '..', 'components', 'automations', 'common-action-editor.tsx')
 // #580: 権限の実体は use-can-manage.ts へ1本化。旧2ファイルは互換の再送出。
 const PERMISSION = read('..', '..', 'components', 'automations', 'use-can-manage.ts')
-const API = read('..', '..', 'lib', 'api.ts')
+const API = readApi('..', '..', 'lib', 'api.ts')
 const WORKER = readImplementationSource(join(HERE, '..', '..', '..', '..', 'worker', 'src', 'services', 'common-actions.ts'))
 const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'services', 'automation-engine.ts')
 const FOUNDATION = read('..', '..', '..', '..', '..', 'packages', 'db', 'migrations', '181_automation_v6_foundation.sql')

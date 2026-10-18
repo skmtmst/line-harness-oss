@@ -1,10 +1,11 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const STAFF_DIR = dirname(fileURLToPath(import.meta.url))
-const apiSource = readFileSync(join(STAFF_DIR, '../../lib/api.ts'), 'utf8')
+const apiSource = readApiSource(join(STAFF_DIR, '../../lib/api.ts'), 'utf8')
 const auditSource = readFileSync(join(STAFF_DIR, '../../components/staff/login-audit.tsx'), 'utf8')
 
 describe('ログインユーザーの残りの画面契約', () => {
