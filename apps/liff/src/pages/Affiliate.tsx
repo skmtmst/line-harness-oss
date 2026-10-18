@@ -1,3 +1,4 @@
+import { liffErrorMessage } from '../lib/api-error.js';
 import { TextInput, FieldLabel } from '../components/forms/controls.js';
 import liff from '@line/liff';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -129,7 +130,7 @@ async function fetchMe(): Promise<
   if (res.status === 404) return { registered: false };
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
   return { registered: true, affiliate: data.affiliate, links: data.links };
@@ -144,7 +145,7 @@ async function postRegister(): Promise<{ affiliate: AffiliateData; links: Affili
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   return (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
 }
@@ -158,7 +159,7 @@ async function postAddLink(label: string | null, offerId: string | null): Promis
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;
@@ -179,7 +180,7 @@ async function fetchMileage(): Promise<MileageWalletData> {
   const res = await fetch(url);
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   return (await res.json()) as MileageWalletData;
 }
@@ -193,7 +194,7 @@ async function postEnrollOffer(offerId: string): Promise<AffiliateLinkData> {
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;

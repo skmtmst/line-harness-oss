@@ -174,7 +174,7 @@ describe('buildNenFlexMessage', () => {
       // 発動したら不具合が起きているということなので、黙って切らず記録する。
       expect(errorSpy).toHaveBeenCalledTimes(1);
       const logged = JSON.parse(errorSpy.mock.calls[0][0] as string);
-      expect(logged).toEqual({ code: 'nen_body_truncated_at_send' });
+      expect(logged).toEqual({ code: 'nen_body_truncated_at_send', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
     });
 
     it('差し込み後に上限内に収まる本文はそのまま切られず、記録も残さない', () => {
@@ -200,9 +200,8 @@ describe('buildNenFlexMessage', () => {
 
       expect(errorSpy).toHaveBeenCalledTimes(1);
       const logged = JSON.parse(errorSpy.mock.calls[0][0] as string);
-      expect(logged).toEqual({ code: 'nen_column_intro_truncated' });
+      expect(logged).toEqual({ code: 'nen_column_intro_truncated', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
       expect(JSON.stringify(logged)).not.toContain(title);
-      expect(Object.keys(logged)).toEqual(['code']);
     });
 
     it('1500字に収まる入力はそのまま切られず、記録も残さない', () => {

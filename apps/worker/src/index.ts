@@ -1,4 +1,8 @@
+import { logger, withInvocation } from '@line-crm/shared/server';
+import { setHolidayCoverageWarningHandler } from '@line-crm/shared';
 import { scheduled } from './cron/scheduled.js';
+import { apiContractMiddleware } from './middleware/api-contract.js';
+
 import { accountAiFeatures } from './routes/account-ai-features.js';
 import { broadcastSimulation } from './routes/broadcast-simulation.js';
 import { bookingPassNotices } from './routes/booking-pass-notices.js';
@@ -202,7 +206,7 @@ import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { operations } from './routes/operations.js';
 import { securityAlerts } from './routes/security-alerts.js';
 
-import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
+import { unhandledWorkerError } from './lib/unhandled-error.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 
 import { classifyCodexMonitorError, markCodexMentionFailed, processCodexMentionMessage, shouldStopCodexQueueRetry, type CodexMentionQueueMessage } from './services/codex-cloud-monitor.js';
@@ -244,6 +248,8 @@ export const ADMIN_REQUEST_HEADERS = [
 // else gets no Access-Control-Allow-Origin header (browser blocks it). Bearer
 // SDK/MCP callers send no Origin header and are unaffected.
 // 検索に出さない：本物の robots.txt と、全部の応答に X-Robots-Tag（リリース前点検 2026-10-07）。
+setHolidayCoverageWarningHandler(() => logger.warn('src_japanese_holidays_warn'));
+app.use('*', apiContractMiddleware);
 app.use('*', noindexHeaderMiddleware);
 app.get('/robots.txt', robotsTxtHandler);
 
@@ -254,7 +260,7 @@ app.use('*', cors({
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: [...ADMIN_REQUEST_HEADERS],
-  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated'],
+  exposeHeaders: ['Content-Disposition', 'X-Exported-By', 'X-Exported-At', 'X-Csv-Total-Count', 'X-Csv-Returned-Count', 'X-Csv-Truncated', 'X-Request-ID'],
   maxAge: 600,
 }));
 
@@ -1116,59 +1122,43 @@ export async function notFoundHandler(
   }
   return assetRes;
 }
-app.onError((error, c) => {
-  const incidentId = crypto.randomUUID();
-  const method = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/.test(c.req.method) ? c.req.method : 'OTHER';
-  const route = `${method} ${c.req.routePath || '(unmatched)'}`;
-  console.error(JSON.stringify({ code: 'unhandled_worker_error', route }));
-  const reportPromise = reportHarnessErrorToSlack(c.env, {
-    source: 'worker',
-    message: 'unhandled_worker_error',
-    path: route,
-  }).catch(() => {
-    console.error(JSON.stringify({"code":"unhandled_worker_error_slack_report_failed"}));
-  });
-  try {
-    c.executionCtx.waitUntil(reportPromise);
-  } catch {
-    void reportPromise;
-  }
-  return c.json({ success: false, error: 'Internal Server Error', incidentId }, 500);
-});
+app.onError(unhandledWorkerError);
 
 app.notFound(notFoundHandler);
 
 export default {
-  fetch: app.fetch,
-  scheduled,
+  fetch: (...args: Parameters<typeof app.fetch>) => withInvocation('http', () => app.fetch(...args)),
+  scheduled: (...args: Parameters<typeof scheduled>) => withInvocation('cron', () => scheduled(...args)),
   async queue(
     batch: MessageBatch<CodexMentionQueueMessage>,
     env: Env['Bindings'],
   ): Promise<void> {
     for (const message of batch.messages) {
-      try {
-        await processCodexMentionMessage(env, message.body);
-        message.ack();
-      } catch (error) {
-        const reason = classifyCodexMonitorError(error);
-        const stopped = shouldStopCodexQueueRetry(
-          message.attempts,
-          env.CODEX_QUEUE_MAX_ATTEMPTS,
-        );
-        console.error(JSON.stringify({"code":"src_index_failed"}));
-        if (stopped) {
-          try {
-            if (message.body.kind !== 'auto_merge') {
-              await markCodexMentionFailed(env.DB, message.body.slackEventId);
-            }
-          } catch {
-            console.error(JSON.stringify({"code":"codex_cloud_monitor_queue_ledger_failed"}));
-          }
+      await withInvocation('queue', async () => {
+        try {
+          await processCodexMentionMessage(env, message.body);
           message.ack();
-        } else {
-          message.retry({ delaySeconds: 60 });
+        } catch (error) {
+          const reason = classifyCodexMonitorError(error);
+          const stopped = shouldStopCodexQueueRetry(
+            message.attempts,
+            env.CODEX_QUEUE_MAX_ATTEMPTS,
+          );
+          logger.error("src_index_failed");
+          if (stopped) {
+            try {
+              if (message.body.kind !== 'auto_merge') {
+                await markCodexMentionFailed(env.DB, message.body.slackEventId);
+              }
+            } catch {
+              logger.error("codex_cloud_monitor_queue_ledger_failed");
+            }
+            message.ack();
+          } else {
+            message.retry({ delaySeconds: 60 });
+          }
         }
-      }
+      });
     }
   },
   async email(
@@ -1176,7 +1166,7 @@ export default {
     env: Env['Bindings'],
     _ctx: ExecutionContext,
   ): Promise<void> {
-    await routeInboundEmail(message, env);
+    await withInvocation('email', () => routeInboundEmail(message, env));
   },
 };
 // redeploy trigger

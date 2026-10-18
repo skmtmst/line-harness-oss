@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 const SEARCH_ANALYTICS_BASE = 'https://www.googleapis.com/webmasters/v3/sites';
 
 export const SEARCH_CONSOLE_READONLY_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';

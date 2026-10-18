@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { applyVideoMediaSelection } from './webinar-video-selection.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -64,7 +65,7 @@ export const post__api_webinars_id_notifications_test_1 = async (c: Context<Env,
       ].includes(code)) {
         return inputError(c, { success: false, error: code }, 400, []);
       }
-      console.error(JSON.stringify({"code":"routes_webinars_failed","route":"POST /api/webinars/:id/notifications/test"}));
+      logger.error("routes_webinars_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   };
@@ -110,7 +111,7 @@ export const put__api_webinars_id_2 = async (c: Context<Env, "/api/webinars/:id"
     if (!updated) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
     return c.json({ success: true, data: await serializeWebinarWithVideoMedia(c, updated!) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -120,7 +121,7 @@ export const get__api_webinars_id_actions_3 = async (c: Context<Env, "/api/webin
     const actions = await getWebinarActions(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: actions.map(serializeWebinarAction) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/actions"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -140,7 +141,7 @@ export const put__api_webinars_id_actions_4 = async (c: Context<Env, "/api/webin
     const saved = await replaceWebinarActions(c.env.DB, c.req.param('id'), actions);
     return c.json({ success: true, data: saved.map(serializeWebinarAction) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/actions"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -158,7 +159,7 @@ export const get__api_webinars_id_comments_5 = async (c: Context<Env, "/api/webi
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/comments"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -193,7 +194,7 @@ export const put__api_webinars_id_comments_6 = async (c: Context<Env, "/api/webi
     const count = await replaceWebinarComments(c.env.DB, id, cleaned);
     return c.json({ success: true, data: { count } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/comments"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -222,7 +223,7 @@ export const get__api_webinars_id_ctas_7 = async (c: Context<Env, "/api/webinars
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/ctas"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -302,7 +303,7 @@ export const put__api_webinars_id_ctas_8 = async (c: Context<Env, "/api/webinars
     if (count === null) return c.json({ success: false, error: 'version_conflict' }, 409);
     return c.json({ success: true, data: { count, version: expectedVersion + 1 } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"PUT /api/webinars/:id/ctas"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -416,7 +417,7 @@ export const get__api_webinars_id_analytics_9 = async (c: Context<Env, "/api/web
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/analytics"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -481,7 +482,7 @@ export const get__api_webinars_id_participants_10 = async (c: Context<Env, "/api
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/participants"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
   };
@@ -538,7 +539,7 @@ export const get__api_webinars_id_participants_csv_11 = async (c: Context<Env, "
         },
       });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/participants.csv"}));
+      logger.error("routes_webinars_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   };
@@ -563,7 +564,7 @@ export const get__api_webinars_id_user_comments_12 = async (c: Context<Env, "/ap
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_webinars_failed","route":"GET /api/webinars/:id/user-comments"}));
+    logger.error("routes_webinars_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

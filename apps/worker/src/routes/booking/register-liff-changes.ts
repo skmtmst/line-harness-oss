@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { bookingCancellationQuote } from '../../services/booking-cancellation.js';
@@ -248,7 +249,7 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
       startsAt: row.starts_at,
     }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch (error) {
-    console.error(JSON.stringify({"code":"booking_waitlist_promote_failed","route":"POST /api/liff/booking/:id/cancel"}));
+    logger.error("booking_waitlist_promote_failed");
   }
   return c.json({
     ...(await bookingCancellationQuote(c.env.DB,bookingId,accountId)),

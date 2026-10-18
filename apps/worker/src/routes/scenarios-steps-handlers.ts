@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { validateConditionForStorage } from './scenario-condition-validation.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -233,7 +234,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
 
     return c.json({ success: true, data: serializeStep(updated) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"PUT /api/scenarios/:id/steps/:stepId"}));
+    logger.error("routes_scenarios_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -244,7 +245,7 @@ export const delete__api_scenarios_id_steps_stepId_2 = async (c: Context<Env, "/
     await deleteScenarioStep(c.env.DB, stepId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"DELETE /api/scenarios/:id/steps/:stepId"}));
+    logger.error("routes_scenarios_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -318,7 +319,7 @@ export const post__api_scenarios_id_steps_reorder_3 = async (c: Context<Env, "/a
 
     return c.json({ success: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/steps/reorder"}));
+    logger.error("routes_scenarios_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -435,7 +436,7 @@ export const get__api_scenarios_id_preview_4 = async (c: Context<Env, "/api/scen
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/preview"}));
+    logger.error("routes_scenarios_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -453,7 +454,7 @@ export const get__api_scenarios_id_stats_5 = async (c: Context<Env, "/api/scenar
     const stats = await computeScenarioStats(c.env.DB, scenarioId);
     return c.json({ success: true, data: stats });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"GET /api/scenarios/:id/stats"}));
+    logger.error("routes_scenarios_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -611,7 +612,7 @@ export const post__api_scenarios_id_enroll_friendId_10 = async (c: Context<Env, 
     }
     return c.json({ success: true, data: serializeFriendScenario(enrollment) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scenarios_failed","route":"POST /api/scenarios/:id/enroll/:friendId"}));
+    logger.error("routes_scenarios_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

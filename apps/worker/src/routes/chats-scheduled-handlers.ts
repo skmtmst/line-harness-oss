@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { resolveLineSender } from '../services/line-senders.js';
 import { GapError } from '../services/gap-common.js';
 import { validateScheduledAt } from './chat-schedule-validation.js';
@@ -342,7 +343,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
         .bind(jstNow(), chat.id)
         .run();
     } catch (e) {
-      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send-combined"}));
+      logger.error("routes_chats_failed");
     }
 
     await fireEvent(c.env.DB, 'manual_reply_sent', {
@@ -352,7 +353,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
       friendId: friend.id,
       eventData: { staffId: c.get('staff').id },
     }, undefined, friend.line_account_id).catch((error) => {
-      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send-combined"}));
+      logger.error("routes_chats_failed");
     });
 
     await releaseInboxReplyLease(c.env.DB, {
@@ -376,7 +377,7 @@ export const post__api_chats_id_send_combined_1 = async (c: Context<Env, "/api/c
         channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
       }).catch(() => undefined);
     }
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send-combined"}));
+    logger.error("routes_chats_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -485,7 +486,7 @@ export const post__api_chats_id_schedule_2 = async (c: Context<Env, "/api/chats/
       data: { ...scheduledSendResponse(row), replayed: !created },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/schedule"}));
+    logger.error("routes_chats_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -502,7 +503,7 @@ export const get__api_chats_id_scheduled_3 = async (c: Context<Env, "/api/chats/
       data: { scheduled: rows.map(scheduledSendResponse) },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"GET /api/chats/:id/scheduled"}));
+    logger.error("routes_chats_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -587,7 +588,7 @@ export const patch__api_chats_id_scheduled_scheduleId_4 = async (c: Context<Env,
     }
     return c.json({ success: true, data: { updated: true } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"PATCH /api/chats/:id/scheduled/:scheduleId"}));
+    logger.error("routes_chats_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -625,7 +626,7 @@ export const delete__api_chats_id_scheduled_scheduleId_5 = async (c: Context<Env
     }
     return c.json({ success: true, data: { cancelled: true } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"DELETE /api/chats/:id/scheduled/:scheduleId"}));
+    logger.error("routes_chats_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

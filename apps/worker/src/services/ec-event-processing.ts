@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { getEcDispatchStatus, markEcDispatch } from './ec-dispatch-ledger.js';
 import { upsertEcEventReadModels } from '@line-crm/db';
 import { acquireWorkflow, runWorkflowStep, type WorkflowExecution } from './workflow-execution.js';
@@ -69,7 +70,7 @@ async function fireEcV6Event(
         idempotencyKey, now: input.now,
       });
     } catch (markError) {
-      console.error(JSON.stringify({"code":"services_ec_event_processing_failed"}));
+      logger.error("services_ec_event_processing_failed");
     }
     throw error;
   }
@@ -280,7 +281,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
           },
         });
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_ec_event_processing_failed"}));
+        logger.error("services_ec_event_processing_failed");
       }
     }
 
@@ -424,7 +425,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
             idempotencyKey: notificationKey, now,
           });
         } catch (markError) {
-          console.error(JSON.stringify({"code":"services_ec_event_processing_failed"}));
+          logger.error("services_ec_event_processing_failed");
         }
         // N-328: 送れなかった結果も共通送信台帳へ残す。秘密値を含まない
         // 安全な分類だけ書く。
@@ -516,5 +517,5 @@ export async function markEcEventFailed(
     errorMessageSafe: 'ECの処理を完了できませんでした',
     now: input.now,
   }).catch(() => undefined);
-  console.error(JSON.stringify({"code":"services_ec_event_processing_failed"}));
+  logger.error("services_ec_event_processing_failed");
 }

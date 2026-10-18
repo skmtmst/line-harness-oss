@@ -1,3 +1,5 @@
+import { responseApiError, extractApiErrorCode } from './api/transport/errors'
+import { readApiError } from '@line-crm/shared'
 import { fetchApi } from './api'
 import type { FormLayout } from '@line-crm/shared'
 
@@ -20,7 +22,13 @@ export async function readHqFormTest(apiOrigin:string,id:string,token:string,ans
     headers:{Authorization:`Bearer ${token}`,...(answers===undefined?{}:{'Content-Type':'application/json'})},
     ...(answers===undefined?{}:{body:JSON.stringify({answers})}),
   })
-  const result=await response.json() as {success:boolean;data:HqFormTest;error?:string}
-  if(!response.ok||!result.success)throw new Error(result.error??'試しのURLと有効期限を確認してください')
+  const raw = await response.text()
+  if (!response.ok) {
+    const failure = responseApiError(response, raw, extractApiErrorCode(raw))
+    if (/^API error: /.test(failure.message)) failure.message = '試しのURLと有効期限を確認してください'
+    throw failure
+  }
+  const result=JSON.parse(raw) as {success:boolean;data:HqFormTest;error?:string}
+  if(!result.success)throw new Error(readApiError(result).message??'試しのURLと有効期限を確認してください')
   return result.data
 }

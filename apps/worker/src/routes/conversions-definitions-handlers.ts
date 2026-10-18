@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { consumePublicIngressReceipt } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 
@@ -390,7 +391,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
     try {
       await recordConversionIngestionEvent(c.env.DB, { conversionPointId: pointId, ...entry });
     } catch (logError) {
-      console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/ingest/:id"}));
+      logger.error("routes_conversions_failed");
     }
   };
   try {
@@ -584,7 +585,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
       throw trackError;
     }
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/ingest/:id"}));
+    logger.error("routes_conversions_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

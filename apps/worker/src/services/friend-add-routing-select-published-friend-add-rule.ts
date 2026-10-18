@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { getScenarios, enrollFriendInScenario, resumeFriendScenario, type FriendScenario, ensureFriendAddFallbackRules } from '@line-crm/db';
 import { FRIEND_ADD_ROUTING_DEFAULT, type FriendAddRouting, type FriendAddBranch } from '@line-crm/shared';
 
@@ -276,7 +277,7 @@ export async function applyFriendAddRouting(
       };
     }
     if (classifiedKind === 'returning' && routing.returning.mode === 'other') {
-      console.warn(JSON.stringify({"code":"services_friend_add_routing_warn"}));
+      logger.warn("services_friend_add_routing_warn");
       const actionResult = await runActions(
         db, friend.id, routing.returning.actions, push, routingContext?.fence,
         routingContext?.eventId ? {

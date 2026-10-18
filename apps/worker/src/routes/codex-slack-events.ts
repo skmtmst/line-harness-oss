@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { verifySupportRelay } from '../services/support-relay.js';
@@ -160,7 +161,7 @@ codexSlackEvents.post('/api/integrations/codex-slack/events', async (c) => {
     const result = await relayCodexSlackEvent(c.env, event);
     return c.json({ success: true, ...result });
   } catch (error) {
-    console.error(JSON.stringify({"code":"codex_slack_relay_failed","route":"POST /api/integrations/codex-slack/events"}));
+    logger.error("codex_slack_relay_failed");
     return c.json({ success: false, error: 'Slack relay failed' }, 502);
   }
 });
@@ -201,7 +202,7 @@ codexSlackEvents.post('/api/integrations/slack/actions', async (c) => {
     if (message.includes('INVALID_')) {
       return c.json({ success: false, error: 'Invalid Slack task action' }, 400);
     }
-    console.error(JSON.stringify({"code":"slack_task_action_failed","route":"POST /api/integrations/slack/actions"}));
+    logger.error("slack_task_action_failed");
     return c.json({ success: false, error: 'Slack task action failed' }, 502);
   }
 });

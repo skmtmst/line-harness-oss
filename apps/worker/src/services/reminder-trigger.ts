@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 /**
  * リマインダを自動で登録する。
  *
@@ -79,7 +80,7 @@ export async function matchesReminderTargetCondition(
   try {
     return await matchesCondition(db, friendId, condition);
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_reminder_trigger_failed"}));
+    logger.error("services_reminder_trigger_failed");
     return false;
   }
 }

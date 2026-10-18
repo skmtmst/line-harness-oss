@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { BannerPreset } from './banner-prompt.js';
 
 /**
@@ -100,7 +101,7 @@ export async function resizeBannerToPreset(
     if (resizedBytes.byteLength === 0) return fallback();
     return { bytes: resizedBytes, width: preset.targetWidth, height: preset.targetHeight, resized: true };
   } catch (error) {
-    console.warn(JSON.stringify({"code":"services_banner_resize_warn"}));
+    logger.warn("services_banner_resize_warn");
     return fallback();
   }
 }

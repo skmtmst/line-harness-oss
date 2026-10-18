@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 // ウェビナー予約リマインド — 5分毎 cron から実行。
 // セッション選択メニュー (webinar_registrations) で予約した友だちに、開始
 // LEAD_SECONDS 前〜セッション中の間に視聴リンクを1回だけプッシュする。
@@ -133,7 +134,7 @@ export async function processWebinarReminders(
       await markWebinarRegistrationNotified(db, reg.id);
       sent++;
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_webinar_reminders_failed"}));
+      logger.error("services_webinar_reminders_failed");
       failed++;
     }
   }
@@ -176,6 +177,6 @@ export async function sendWebinarRegistrationConfirmation(
       },
     ], retryKey, options.proxyDispatch, 'reminder_dispatch');
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_webinar_reminders_failed"}));
+    logger.error("services_webinar_reminders_failed");
   }
 }

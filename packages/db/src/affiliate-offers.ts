@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from './id-queries.js';
 import { readFolderAssignment } from './folder-assignment.js';
 import { dbTableExists, jstNow } from './utils.js';
@@ -528,7 +529,7 @@ export async function freezeConversionApproval(
       inputs.fixedReward, inputs.rewardMiles, eventId,
     ).run();
   } catch (error) {
-    console.error(JSON.stringify({"code":"src_affiliate_offers_failed"}));
+    logger.error("src_affiliate_offers_failed");
   }
 }
 

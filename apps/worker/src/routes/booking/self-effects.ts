@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { bookingCancellationQuote } from '../../services/booking-cancellation.js';
 import { simulatePaymentRefund } from '../../services/booking-payment-refunds.js';
 import type { BookingPaymentRecord } from '@line-crm/db';
@@ -70,7 +71,7 @@ export async function runSelfBookingCancelSideEffects(
       startsAt: row.starts_at,
     }, undefined, c.env.LIFF_URL ?? '',c.env);
   } catch {
-    console.error(JSON.stringify({"code":"booking_waitlist_promote_failed"}));
+    logger.error("booking_waitlist_promote_failed");
   }
   return {
     calendar_sync: calResult === 'succeeded' ? 'synced' : calResult === 'retry_wait' ? 'failed' : 'not_applicable',

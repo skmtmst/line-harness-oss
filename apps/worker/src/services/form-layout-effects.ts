@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { FormGateInput, FormAnswers } from './form-gate-types.js';
 export type { FormAnswers, FormGateInput } from './form-gate-types.js';
 import { writeFormDestinationsOnce } from './form-destination-workflow.js';
@@ -376,13 +377,13 @@ async function runEffectStep(
     await run();
   } catch (err) {
     failed.push(effectId);
-    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
+    logger.error("services_form_layout_effects_failed");
     return;
   }
   if (failed.length > beforeInnerFailed || stats.failed > beforeFailed) {
     // 内側の動作が欠けたまま終わった。再開時に補完するため未完に残す。
     if (!failed.includes(effectId)) failed.push(effectId);
-    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
+    logger.error("services_form_layout_effects_failed");
     return;
   }
   await input.onEffectComplete?.(effectId, {
@@ -397,7 +398,7 @@ async function runTracked(failed: string[], label: string, run: () => Promise<un
     await run();
   } catch (err) {
     failed.push(label);
-    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
+    logger.error("services_form_layout_effects_failed");
   }
 }
 
@@ -539,7 +540,7 @@ async function trackDestinationWrite(
     else stats.failed += count;
   } catch (error) {
     stats.failed += count;
-    console.error(JSON.stringify({"code":"services_form_layout_effects_failed"}));
+    logger.error("services_form_layout_effects_failed");
   }
 }
 

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { countInboxSavedViewMatches } from './inbox-saved-view-matches.js';
 import { serializeInboxSavedView } from '../services/inbox-saved-view-response.js';
 import { inputError } from '../lib/input-errors.js';
@@ -143,7 +144,7 @@ export const post__api_chats_5 = async (c: Context<Env, "/api/chats">) => {
     }
     return c.json({ success: true, data: { id: item.id, friendId: item.friend_id, status: item.status } }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats"}));
+    logger.error("routes_chats_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -258,7 +259,7 @@ export const put__api_chats_id_6 = async (c: Context<Env, "/api/chats/:id">) => 
           friendId: resolved.friend_id,
           eventData: { staffId: body.operatorId },
         }, undefined, assignedFriend?.line_account_id).catch((error) => {
-          console.error(JSON.stringify({"code":"routes_chats_failed","route":"PUT /api/chats/:id"}));
+          logger.error("routes_chats_failed");
         });
       }
     }
@@ -277,7 +278,7 @@ export const put__api_chats_id_6 = async (c: Context<Env, "/api/chats/:id">) => 
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"PUT /api/chats/:id"}));
+    logger.error("routes_chats_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -313,7 +314,7 @@ export const post__api_chats_id_loading_7 = async (c: Context<Env, "/api/chats/:
 
     return c.json({ success: true, data: { started: true, loadingSeconds } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/loading"}));
+    logger.error("routes_chats_failed");
     const message = err instanceof Error ? err.message : 'Internal server error';
     return c.json({ success: false, error: message }, 500);
   }

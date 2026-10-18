@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { publicReminder } from './reminder-display.js';
 import type { ReminderListRow } from './reminder-display.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -39,7 +40,7 @@ export const patch__api_reminders_reorder_1 = async (c: Context<Env, "/api/remin
     await reorderReminders(c.env.DB, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"PATCH /api/reminders/reorder"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -214,7 +215,7 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
     /* 旧配列応答は、移行期限（2026-10-31）まで未移行の呼び出しだけに残す。 */
     return c.json({ success: true, data: publicItems });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -238,7 +239,7 @@ export const post__api_reminders_drafts_3 = async (c: Context<Env, "/api/reminde
       data: { id: created.reminder.id, ...versionResponse(created.version) },
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/drafts"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: '下書きを作成できませんでした' }, 500);
   }
 };
@@ -291,7 +292,7 @@ export const get__api_reminders_id_4 = async (c: Context<Env, "/api/reminders/:i
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders/:id"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -305,7 +306,7 @@ export const get__api_reminders_id_draft_5 = async (c: Context<Env, "/api/remind
     ).bind(c.req.param('id')).first<{ leap_year_policy: 'feb28' | 'mar1' | 'skip' }>();
     return c.json({ success: true, data: versionResponse(draft, reminderRow?.leap_year_policy) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders/:id/draft"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: '下書きを読み込めませんでした' }, 500);
   }
 };
@@ -356,7 +357,7 @@ export const put__api_reminders_id_draft_6 = async (c: Context<Env, "/api/remind
     if (err instanceof Error && err.message === 'REMINDER_DRAFT_CONFLICT') {
       return c.json({ success: false, error: 'この下書きは別の画面で先に更新されました。最新の内容を読み込み直してください' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"PUT /api/reminders/:id/draft"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: '下書きを保存できませんでした' }, 500);
   }
 };
@@ -370,7 +371,7 @@ export const post__api_reminders_id_validate_7 = async (c: Context<Env, "/api/re
     if (referenceError) return inputError(c, { success: false, error: referenceError }, 422, ["steps"]);
     return c.json({ success: true, data: await validateReminderDraft(c.env.DB, settings, draft) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/validate"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: '検証できませんでした' }, 500);
   }
 };
@@ -404,7 +405,7 @@ export const post__api_reminders_id_audience_8 = async (c: Context<Env, "/api/re
       data: { matched: audience.matched, excluded: audience.excluded, sample },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/audience"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: '対象者を数え直せませんでした' }, 500);
   }
 };
@@ -453,7 +454,7 @@ export const post__api_reminders_id_preview_10 = async (c: Context<Env, "/api/re
     const settings = parseReminderVersionSettings(draft);
     return c.json({ success: true, data: await previewReminderDraft(c.env.DB, settings, targetDate) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/preview"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: '配信予定を確認できませんでした' }, 500);
   }
 };
@@ -475,7 +476,7 @@ export const get__api_reminders_id_test_recipient_11 = async (c: Context<Env, "/
     });
     return c.json({ success: true, data: status });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"GET /api/reminders/:id/test-recipient"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: 'テスト送信先を読み込めませんでした' }, 500);
   }
 };
@@ -529,7 +530,7 @@ export const post__api_reminders_id_test_send_12 = async (c: Context<Env, "/api/
     if (code === 'REMINDER_TEST_KEY_CONFLICT') {
       return c.json({ success: false, error: '同じキーが別のテスト送信に使われています' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/test-send"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: 'テスト送信に失敗しました' }, 502);
   }
 };
@@ -549,7 +550,7 @@ export const post__api_reminders_id_publish_13 = async (c: Context<Env, "/api/re
     const published = await publishReminderDraftVersion(c.env.DB, reminderId, c.get('staff').id);
     return c.json({ success: true, data: versionResponse(published) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_reminders_failed","route":"POST /api/reminders/:id/publish"}));
+    logger.error("routes_reminders_failed");
     return c.json({ success: false, error: '公開できませんでした' }, 500);
   }
 };

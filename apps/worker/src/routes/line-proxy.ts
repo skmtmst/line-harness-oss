@@ -1,3 +1,4 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { getFriendsByLineUserIds, readProxyPushRecipient } from './line-proxy-recipients.js';
 import { hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
 import { Hono } from 'hono';
@@ -244,7 +245,7 @@ async function createFriendForRecipient(
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
+      logger.error("routes_line_proxy_failed");
     }
 
     const friend = await upsertFriend(db, {
@@ -265,7 +266,7 @@ async function createFriendForRecipient(
     }
     return friend;
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
+    logger.error("routes_line_proxy_failed");
     return null;
   }
 }
@@ -366,7 +367,7 @@ async function logProxySend(
 
     if (path === '/v2/bot/message/push' && typeof parsed.to === 'string') {
       if (!LINE_USER_ID_RE.test(parsed.to)) {
-        console.warn(JSON.stringify({"code":"routes_line_proxy_warn"}));
+        logger.warn("routes_line_proxy_warn");
         return;
       }
       const friend =
@@ -401,7 +402,7 @@ async function logProxySend(
         if (friend) rows.push(...rowsFor(friend.id, 'push'));
       }
       if (skipped > 0) {
-        console.warn(JSON.stringify({"code":"routes_line_proxy_warn"}));
+        logger.warn("routes_line_proxy_warn");
       }
       await insertLogRows(db, rows, source, logKey);
       return;
@@ -437,22 +438,20 @@ async function logProxySend(
         // Multi-account install + unregistered env token: the recipient set is
         // unknowable, and logging every friend would fabricate sends on other
         // accounts' timelines. Register the account to get broadcast logging.
-        console.warn(
-          '[line-proxy] broadcast not logged: env token is not registered in line_accounts and multiple accounts exist',
-        );
+        logger.warn("line_proxy_broadcast_not_logged_env_token_is_not_registered_in_line_accounts_and_multiple_accou");
         return;
       }
       const rows = friendIds.flatMap((friendId) => rowsFor(friendId, null));
       await insertLogRows(db, rows, source, logKey);
-      console.log(JSON.stringify({"code":"routes_line_proxy_log"}));
+      logger.log("routes_line_proxy_log");
       return;
     }
 
     if (path === '/v2/bot/message/reply' || path === '/v2/bot/message/narrowcast') {
-      console.warn(JSON.stringify({"code":"routes_line_proxy_warn"}));
+      logger.warn("routes_line_proxy_warn");
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
+    logger.error("routes_line_proxy_failed");
   }
 }
 
@@ -603,7 +602,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
         signal: AbortSignal.timeout(15_000),
       });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_line_proxy_failed"}));
+      logger.error("routes_line_proxy_failed");
       return c.json({ message: 'Upstream request failed' }, 502);
     }
 

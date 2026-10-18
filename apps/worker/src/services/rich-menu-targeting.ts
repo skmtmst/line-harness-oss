@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   getRichMenuTargetingCandidates,
   recordRichMenuAssignment,
@@ -45,7 +46,7 @@ export async function pickMenuForFriend(
   for (const candidate of candidates) {
     const condition = parseCondition(candidate.condition);
     if (!condition) {
-      console.warn(JSON.stringify({"code":"services_rich_menu_targeting_warn"}));
+      logger.warn("services_rich_menu_targeting_warn");
       continue;
     }
     if (await matchesCondition(db, friendId, condition)) return candidate;

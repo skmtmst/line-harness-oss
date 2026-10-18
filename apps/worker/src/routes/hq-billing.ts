@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { mapStripeSubscriptionStatus } from './hq-subscription-status.js';
 export { mapStripeSubscriptionStatus } from './hq-subscription-status.js';
 import { hqBillingMetrics } from '../services/hq-billing-metrics.js';
@@ -177,7 +178,7 @@ hqBilling.get('/api/hq/billing/summary', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_hq_billing_failed","route":"GET /api/hq/billing/summary"}));
+    logger.error("routes_hq_billing_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -230,7 +231,7 @@ hqBilling.get('/api/hq/billing/preview', requireRole('owner'), async (c) => {
     } });
   } catch (error) {
     // Stripe の応答本文や顧客情報を返さない。
-    if (error instanceof StripeApiError) console.warn(JSON.stringify({"code":"routes_hq_billing_warn","route":"GET /api/hq/billing/preview"}));
+    if (error instanceof StripeApiError) logger.warn("routes_hq_billing_warn");
     return c.json({ success: false, error: '決済サービスの見積りを取得できませんでした。時間をおいてもう一度お試しください' }, 502);
   }
 });
@@ -281,10 +282,10 @@ hqBilling.post('/api/hq/billing/checkout', requireRole('owner'), inputJsonBounda
     return c.json({ success: true, data: { url: session.url } });
   } catch (err) {
     if (err instanceof StripeApiError) {
-      console.warn(JSON.stringify({"code":"routes_hq_billing_warn","route":"POST /api/hq/billing/checkout"}));
+      logger.warn("routes_hq_billing_warn");
       return c.json({ success: false, error: '決済サービスに接続できませんでした。時間をおいてもう一度お試しください' }, 502);
     }
-    console.error(JSON.stringify({"code":"routes_hq_billing_failed","route":"POST /api/hq/billing/checkout"}));
+    logger.error("routes_hq_billing_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -305,7 +306,7 @@ hqBilling.post('/api/hq/billing/portal', requireRole('owner', 'admin'), inputJso
     if (err instanceof StripeApiError) {
       return c.json({ success: false, error: '決済サービスに接続できませんでした。時間をおいてもう一度お試しください' }, 502);
     }
-    console.error(JSON.stringify({"code":"routes_hq_billing_failed","route":"POST /api/hq/billing/portal"}));
+    logger.error("routes_hq_billing_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -335,7 +336,7 @@ hqBilling.get('/api/hq/billing/invoices', requireRole('owner', 'admin'), async (
     if (err instanceof StripeApiError) {
       return c.json({ success: false, error: '支払い履歴を取得できませんでした。時間をおいてもう一度お試しください' }, 502);
     }
-    console.error(JSON.stringify({"code":"routes_hq_billing_failed","route":"GET /api/hq/billing/invoices"}));
+    logger.error("routes_hq_billing_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -370,7 +371,7 @@ async function resolveRefundedInvoiceId(c: Context<Env>, object: Record<string, 
     const paymentIntent = await stripeApi.retrievePaymentIntent(c.env, paymentIntentId);
     return typeof paymentIntent.invoice === 'string' ? paymentIntent.invoice : null;
   } catch (error) {
-    console.warn(JSON.stringify({"code":"routes_hq_billing_warn"}));
+    logger.warn("routes_hq_billing_warn");
     return null;
   }
 }
@@ -417,10 +418,10 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     const first = await recordBillingEvent(c.env.DB, { id: event.id, type: event.type, tenantId: tenant?.id ?? null, summary: event.type });
     if (!first) return c.json({ success: true, data: { received: true, duplicate: true } });
     if (refundedInvoiceId === null) {
-      console.info(JSON.stringify({"code":"routes_hq_billing_info","route":"POST /api/hq/billing/webhook"}));
+      logger.info("routes_hq_billing_info");
     }
     if (!tenant) {
-      console.warn(JSON.stringify({"code":"routes_hq_billing_warn","route":"POST /api/hq/billing/webhook"}));
+      logger.warn("routes_hq_billing_warn");
       return c.json({ success: true, data: { received: true, matched: false } });
     }
 
@@ -436,7 +437,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
             await applySubscription(c, tenant, subscription);
             applied = true;
           } catch (error) {
-            console.warn(JSON.stringify({"code":"routes_hq_billing_warn","route":"POST /api/hq/billing/webhook"}));
+            logger.warn("routes_hq_billing_warn");
           }
         }
         if (!applied) {
@@ -458,7 +459,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
           try {
             subscription = await stripeApi.retrieveSubscription(c.env, payload.id);
           } catch (error) {
-            console.warn(JSON.stringify({"code":"routes_hq_billing_warn","route":"POST /api/hq/billing/webhook"}));
+            logger.warn("routes_hq_billing_warn");
           }
         }
         await applySubscription(c, tenant, subscription);
@@ -498,7 +499,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
             amountRefunded: typeof object.amount_refunded === 'number' ? object.amount_refunded : 0,
           });
           if (!updated) {
-            console.warn(JSON.stringify({"code":"routes_hq_billing_warn","route":"POST /api/hq/billing/webhook"}));
+            logger.warn("routes_hq_billing_warn");
           }
         }
         break;
@@ -508,7 +509,7 @@ hqBilling.post('/api/hq/billing/webhook', async (c) => {
     }
     return c.json({ success: true, data: { received: true } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_hq_billing_failed","route":"POST /api/hq/billing/webhook"}));
+    logger.error("routes_hq_billing_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

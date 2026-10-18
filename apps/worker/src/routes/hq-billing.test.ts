@@ -413,7 +413,7 @@ describe('課金 Webhook', () => {
     expect(res.status).toBe(200);
     expect(await res.json<{ data: { matched: boolean } }>()).toMatchObject({ data: { matched: false } });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM billing_invoices').get()).toMatchObject({ n: 0 });
-    expect(info).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_info', route: 'POST /api/hq/billing/webhook' }));
+    expect(info.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'routes_hq_billing_info', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
   });
 
   it('invoiceが無くpayment_intentのみのEC-CUBE返金でも、Billing請求書のPaymentIntentならStripeに問い合わせて反映する', async () => {
@@ -445,7 +445,7 @@ describe('課金 Webhook', () => {
 
     expect(res.status).toBe(200);
     expect(stripe.retrievePaymentIntent).not.toHaveBeenCalled();
-    expect(info).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_info', route: 'POST /api/hq/billing/webhook' }));
+    expect(info.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'routes_hq_billing_info', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
   });
 
   it('請求書IDがあっても更新対象がなければ警告する', async () => {
@@ -458,7 +458,7 @@ describe('課金 Webhook', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(warn).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_warn', route: 'POST /api/hq/billing/webhook' }));
+    expect(warn.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'routes_hq_billing_warn', timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background' });
   });
 
   it('知らない顧客の請求書はイベントだけ記録し、請求書行は作らない', async () => {

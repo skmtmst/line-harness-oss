@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -127,7 +128,7 @@ adCosts.get('/api/ad-costs', requireRole('owner', 'admin', 'staff'), async (c) =
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_costs_failed","route":"GET /api/ad-costs"}));
+    logger.error("routes_ad_costs_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -194,7 +195,7 @@ adCosts.post('/api/ad-costs', requireRole('owner', 'admin'), inputJsonBoundary()
     auditLog(c, 'ad_cost.manual_entry', { id: entry.id, kind: 'ad_cost' }, { lineAccountId: accountId });
     return c.json({ success: true, data: entry }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_costs_failed","route":"POST /api/ad-costs"}));
+    logger.error("routes_ad_costs_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -231,7 +232,7 @@ adCosts.post('/api/ad-costs/:id/cancel', requireRole('owner', 'admin'), inputJso
     auditLog(c, 'ad_cost.cancel', { id: entry.id, kind: 'ad_cost' }, { lineAccountId: entry.line_account_id });
     return c.json({ success: true, data: { id: entry.id } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_costs_failed","route":"POST /api/ad-costs/:id/cancel"}));
+    logger.error("routes_ad_costs_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -259,7 +260,7 @@ adCosts.post('/api/ad-platforms/:id/cost-import', requireRole('owner', 'admin'),
     }
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_costs_failed","route":"POST /api/ad-platforms/:id/cost-import"}));
+    logger.error("routes_ad_costs_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

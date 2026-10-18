@@ -1,3 +1,4 @@
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { serializeGroup } from './rich-menu-group-display.js';
 import { type ExternalLineArea } from './rich-menu-external-types.js';
@@ -622,7 +623,7 @@ export const get__api_rich_menu_groups_6 = async (c: Context<Env, "/api/rich-men
     }
     return c.json({ success: true, data: items });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"GET /api/rich-menu-groups"}));
+    logger.error("routes_rich_menu_groups_failed");
     return c.json({ success: false, error: 'リッチメニュー一覧を取得できませんでした' }, 503);
   }
 };

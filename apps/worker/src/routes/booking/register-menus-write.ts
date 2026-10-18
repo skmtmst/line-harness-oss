@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { readAddonSettings } from '../../services/booking-addons.js';
@@ -338,7 +339,7 @@ booking.patch('/api/booking/admin/menus/:id', requirePermission(BOOKING_MENUS_KE
     }
     return c.json({ success: true, data: { id: c.req.param('id'), version: result.version } });
   } catch {
-    console.error(JSON.stringify({"code":"booking_menu_settings_update_failed","route":"PATCH /api/booking/admin/menus/:id"}));
+    logger.error("booking_menu_settings_update_failed");
     return c.json({ success: false, error: 'booking_menu_save_failed' }, 503);
   }
 });

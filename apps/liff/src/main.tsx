@@ -1,3 +1,4 @@
+import { createClientLogger } from '@line-crm/shared';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -5,6 +6,8 @@ import App from './App.js';
 import LiffLookScope from './components/LiffLookScope.js';
 import { initLiff } from './lib/liff-auth.js';
 import './index.css';
+const clientLogger = createClientLogger('liff');
+
 
 (async () => {
   try {
@@ -17,7 +20,7 @@ import './index.css';
       </StrictMode>,
     );
   } catch (err) {
-    console.error(JSON.stringify({"code":"src_main_failed"}));
+    clientLogger.error("src_main_failed");
     document.getElementById('root')!.innerHTML = `
       <div style="padding: 2rem; font-family: sans-serif; color: #4b5563; text-align: center;">
         <h1 style="font-size: 1rem; margin-bottom: 0.5rem;">開けませんでした</h1>

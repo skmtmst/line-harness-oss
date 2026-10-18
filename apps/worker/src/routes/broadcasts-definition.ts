@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
 import type { Context } from 'hono';
 import { countBroadcastLedger, isTemporaryLedgerErrorCode, deriveBroadcastDisplayStatus, recordBroadcastLifecycleEvent, BROADCAST_DISPLAY_STATUS_LABELS, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
@@ -465,7 +466,7 @@ async function recordLifecycle(
       detail: detail ?? null,
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed"}));
+    logger.error("routes_broadcasts_failed");
   }
 }
 
@@ -506,11 +507,11 @@ function kickQueueProcessing(c: Context<Env>, label: string): void {
     const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
     ctx.waitUntil(
       processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-        console.error(JSON.stringify({"code":"routes_broadcasts_failed"}));
+        logger.error("routes_broadcasts_failed");
       }),
     );
   } catch (kickErr) {
-    console.warn(JSON.stringify({"code":"routes_broadcasts_warn"}));
+    logger.warn("routes_broadcasts_warn");
   }
 }
 
@@ -580,7 +581,7 @@ async function recordBroadcastControlAudit(
       deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed"}));
+    logger.error("routes_broadcasts_failed");
   }
 }
 

@@ -1,4 +1,5 @@
 'use client'
+import { responseApiError } from '@/lib/api'
 import { useEffect, useState } from 'react'
 import { LogIn } from 'lucide-react'
 import {
@@ -82,7 +83,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
         body: JSON.stringify({ challengeToken: challenge, code: recovery ? `${code.slice(0, 4)}-${code.slice(4)}` : code }),
       })
       const body = await response.json() as { success: boolean; error?: string; data?: { sessionToken?: string }; csrfToken?: string }
-      if (!response.ok || !body.success) throw new Error(body.error || '認証できませんでした')
+      if (!response.ok || !body.success) throw responseApiError(response, JSON.stringify(body), undefined, undefined, { preserveBodyMessage: true, fallbackMessage: '認証できませんでした' })
       if (body.data?.sessionToken) storeAdminSession(body.data.sessionToken, body.csrfToken)
       else if (body.csrfToken) {
         try { localStorage.setItem('lh_csrf', body.csrfToken) } catch (saveFailure) {

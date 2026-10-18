@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { cancelByTrigger } from '../../services/reminder-trigger.js';
 import { sendEventBookingNotification, type EventNotificationKind } from '../../services/event-booking-notifier.js';
 import { resolveLineCredential } from '@line-crm/db';
@@ -92,7 +93,7 @@ export async function notifyBookingFriend(
       },
     });
   } catch (e) {
-    console.error(JSON.stringify({"code":"routes_events_failed"}));
+    logger.error("routes_events_failed");
   }
 }
 

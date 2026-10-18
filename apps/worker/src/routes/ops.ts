@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { TenantStatus, TenantListRow } from './ops-tenant-types.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -523,7 +524,7 @@ ops.post('/api/ops/members', requirePlatformAdminWrite(), inputJsonBoundary(), a
       existingAccount: Boolean(inDefault),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_ops_failed","route":"POST /api/ops/members"}));
+    logger.error("routes_ops_failed");
     return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
   }
   await recordPlatformAudit(db, {
@@ -553,7 +554,7 @@ ops.post('/api/ops/members/:staffId/resend-invite', requirePlatformAdminWrite(),
       existingAccount: Boolean(target.password_hash),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_ops_failed","route":"POST /api/ops/members/:staffId/resend-invite"}));
+    logger.error("routes_ops_failed");
     return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
   }
   return c.json({ success: true, data: { staffId: targetId, activationState: 'invited' } });

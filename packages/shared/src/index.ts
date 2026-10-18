@@ -1,5 +1,7 @@
 export * from "./chat-attachments";
 export * from "./types";
+export * from './api-errors.js';
+export * from './client-logger.js';
 export * from "./sticker";
 export * from "./interpolation";
 export * from "./japanese-holidays";

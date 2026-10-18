@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import {
   WORKER_HASH,

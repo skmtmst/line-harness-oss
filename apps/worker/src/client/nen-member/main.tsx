@@ -1,3 +1,4 @@
+import { LiffApiError } from '../../../../liff/src/lib/api-error.js';
 import { jstCalendar, jstDate } from '@line-crm/shared';
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -53,7 +54,9 @@ const tabItems: Array<{ value: Tab; label: string }> = [
 async function call<T>(ctx: Ctx, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { ...init, headers: { Authorization: `Bearer ${ctx.idToken}`, ...(init?.body ? { 'Content-Type': 'application/json' } : {}), ...init?.headers } });
   const data = await res.json() as T & { error?: string };
-  if (!res.ok) throw new Error(data.error || '通信に失敗しました');
+  if (!res.ok) {
+    throw new LiffApiError(res.status, data, res.headers?.get('X-Request-ID') ?? undefined);
+  }
   return data;
 }
 const concernLabels: Record<string, string> = { tear_stain: '涙やけ', coat: '毛並み', allergy: 'アレルギー', appetite: '食いつき', stool: '便', weight: '体重', other: 'その他' };

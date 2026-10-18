@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { collectInputs, formFileKind, formFileKinds, type FormInputBlock, type FormLayout } from '@line-crm/shared';
 import { getAccountSetting } from '@line-crm/db';
 import type { FormFileAnswer } from '@line-crm/shared';
@@ -93,13 +94,13 @@ export async function attachDocumentAnswers(db: D1Database, data: Record<string,
 /** A flagged document is never retained for the one-day abandoned-upload period. */
 export async function purgeUnsafeFormDocuments(db: D1Database, store: Pick<R2Bucket, 'delete'>, scanId: string): Promise<boolean> {
   const rows = await db.prepare('SELECT * FROM form_submission_files WHERE scan_id = ? AND deleted_at IS NULL').bind(scanId).all<FormDocumentRow>().catch(() => null);
-  if (!rows) { console.error('unsafe form document lookup failed'); return false; }
+  if (!rows) { logger.error("unsafe_form_document_lookup_failed"); return false; }
   let complete = true;
   for (const row of rows.results) {
     try {
       await store.delete(row.r2_key);
       await db.prepare("UPDATE form_submission_files SET deleted_at = ?, deletion_reason = 'unsafe' WHERE id = ? AND deleted_at IS NULL").bind(new Date().toISOString(), row.id).run();
-    } catch { complete = false; console.error('unsafe form document deletion failed'); }
+    } catch { complete = false; logger.error("unsafe_form_document_deletion_failed"); }
   }
   return complete;
 }
@@ -114,7 +115,7 @@ export async function purgeExpiredFormDocuments(db: D1Database, store: Pick<R2Bu
       await store.delete(row.r2_key);
       await db.prepare('UPDATE form_submission_files SET deleted_at = ?, deletion_reason = ? WHERE id = ? AND deleted_at IS NULL').bind(now.toISOString(), scan?.status === 'quarantined' ? 'unsafe' : row.expires_at && Date.parse(row.expires_at) <= now.getTime() ? 'expired' : 'abandoned', row.id).run();
       deleted++;
-    } catch { console.error('form document retention failed'); }
+    } catch { logger.error("form_document_retention_failed"); }
   }
   return deleted;
 }

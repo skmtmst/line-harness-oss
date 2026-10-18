@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { parseJsonArray } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
@@ -83,7 +84,7 @@ export const get__api_broadcasts_id_insight_1 = async (c: Context<Env, "/api/bro
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"GET /api/broadcasts/:id/insight"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -182,7 +183,7 @@ export const post__api_broadcasts_id_fetch_insight_2 = async (c: Context<Env, "/
           aggMedia += (overview.uniqueMediaPlayed as number) ?? 0;
           if (messages && messages.length > 0) hasAnyData = true;
         } catch (err) {
-          console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/fetch-insight"}));
+          logger.error("routes_broadcasts_failed");
           responses.push({ accountId: aid, data: { error: String(err) } });
         }
       }
@@ -263,7 +264,7 @@ export const post__api_broadcasts_id_fetch_insight_2 = async (c: Context<Env, "/
       data: { delivered, uniqueImpression, uniqueClick, uniqueMediaPlayed, openRate, clickRate },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/fetch-insight"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -410,14 +411,14 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
            VALUES (?, ?, 'outgoing', ?, ?, NULL, 'test', 'broadcast', ?)`
         ).bind(crypto.randomUUID(), friend.id, part.messageType, part.messageContent, now)));
       } catch (err) {
-        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/test-send"}));
+        logger.error("routes_broadcasts_failed");
         failed++;
       }
     }
 
     return c.json({ success: true, sent, failed });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/test-send"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -550,7 +551,7 @@ export const post__api_segments_count_5 = async (c: Context<Env, "/api/segments/
 
     return c.json({ success: true, count: result?.count ?? 0 });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/segments/count"}));
+    logger.error("routes_broadcasts_failed");
     return inputError(c, { success: false, error: 'Invalid segment conditions' }, 400, ["conditions"]);
   }
 };

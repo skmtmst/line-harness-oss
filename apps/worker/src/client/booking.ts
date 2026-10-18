@@ -1,3 +1,5 @@
+import { responseLiffError } from '../../../liff/src/lib/api-error.js';
+import { createClientLogger } from '@line-crm/shared';
 import { jstCalendar, jstDate, jstTime } from '@line-crm/shared';
 /**
  * LIFF Booking Page — Calendar-based slot booking
@@ -10,6 +12,8 @@ import { jstCalendar, jstDate, jstTime } from '@line-crm/shared';
  */
 
 import { customerMessage } from './customer-message.js';
+const clientLogger = createClientLogger('embedded');
+
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -387,7 +391,7 @@ async function fetchSlots(date: string): Promise<void> {
     if (generation === slotsGeneration && date === state.selectedDate) state.slots = json.data;
   } catch (err) {
     if (generation === slotsGeneration && date === state.selectedDate) state.slotsFailed = true;
-    console.error(JSON.stringify({"code":"client_booking_failed"}));
+    clientLogger.error("client_booking_failed");
   } finally {
     if (generation === slotsGeneration && date === state.selectedDate) {
       state.loading = false;
@@ -422,8 +426,7 @@ async function submitBooking(): Promise<void> {
     });
 
     if (!res.ok) {
-      const errData = await res.json().catch(() => null) as { error?: string } | null;
-      throw new Error(errData?.error || '予約に失敗しました');
+      throw await responseLiffError(res);
     }
 
     renderSuccess(selectedDate, selectedSlot);

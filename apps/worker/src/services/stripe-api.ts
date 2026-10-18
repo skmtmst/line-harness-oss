@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * Stripe の API を呼ぶ小さな道具。SDK は使わず fetch で叩く（Workers で軽く保つ）。
  *

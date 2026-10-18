@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { idChunks } from '@line-crm/db/id-queries';
 
 import { getFriendListFieldValues, getFriendAddBreakdown, getFriendTagsByFriendIds, getSavedSearchById, recordSavedSearchUsage, validateSearchConditions } from '@line-crm/db';
@@ -541,7 +542,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
         });
       } catch (error) {
         // 集計台帳の一時失敗で、友だち一覧そのものを表示不能にしない。
-        console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends"}));
+        logger.error("routes_friends_failed");
       }
     }
 
@@ -557,7 +558,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends"}));
+    logger.error("routes_friends_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -579,7 +580,7 @@ export const get__api_friends_add_breakdown_2 = async (c: Context<Env, "/api/fri
     const data = await getFriendAddBreakdown(c.env.DB, safeDays, statsScope);
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/add-breakdown"}));
+    logger.error("routes_friends_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -603,7 +604,7 @@ export const get__api_friends_count_3 = async (c: Context<Env, "/api/friends/cou
     }
     return c.json({ success: true, data: { count } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/count"}));
+    logger.error("routes_friends_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -632,7 +633,7 @@ export const get__api_friends_ref_stats_4 = async (c: Context<Env, "/api/friends
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friends_failed","route":"GET /api/friends/ref-stats"}));
+    logger.error("routes_friends_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

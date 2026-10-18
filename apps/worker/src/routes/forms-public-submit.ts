@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { canonicalizeIdempotencyInput } from './form-idempotency.js';
 import { callFormWebhook, publicFormWebhookData } from '../services/form-webhook.js';
 import { inputError, validatedInputBody } from '../lib/input-errors.js';
@@ -374,7 +375,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
             ? await getFormSubmissionById(c.env.DB, existing.submission_id)
             : null;
           if (!saved) {
-            console.error('form submit claim is completed without an answer row');
+            logger.error("form_submit_claim_is_completed_without_an_answer_row");
             return c.json({ success: false, error: 'Internal server error' }, 500);
           }
           c.header('Idempotency-Replayed', 'true');
@@ -434,7 +435,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
           await failFormSubmitClaim(c.env.DB, claimCtx.scope, claimCtx.owner, claimCtx.version);
         }
       } catch (error) {
-        console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
+        logger.error("routes_forms_failed");
       }
       return missing;
     };
@@ -582,7 +583,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
         submission.destination_write_failed = result.failed;
       } catch (error) {
         // 回答自体は保存済み。記録失敗を回答失敗へ見せず、再開時に残す。
-        console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
+        logger.error("routes_forms_failed");
         return;
       }
       if (claimCtx) {
@@ -725,7 +726,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
             } catch (error) {
               if (error instanceof ClaimOwnershipLost) throw error;
               // 届かなくても回答の保存へ進む。再開時に送り直す。
-              console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
+              logger.error("routes_forms_failed");
             }
           }
           // Still save the submission for records
@@ -772,7 +773,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
       sourceEventId: submission.id,
       metadata: { formId, submissionId: submission.id },
     }).catch((error) => {
-      console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
+      logger.error("routes_forms_failed");
       return null;
     });
     if (executionCtx) executionCtx.waitUntil(recordFormConversion());
@@ -811,7 +812,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
         }),
       ]).then((results) => {
         for (const result of results) {
-          if (result.status === 'rejected') console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
+          if (result.status === 'rejected') logger.error("routes_forms_failed");
         }
       }),
     );
@@ -852,7 +853,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
     if (err instanceof Error && ['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'].includes(err.message)) {
       return c.json({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/submit"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

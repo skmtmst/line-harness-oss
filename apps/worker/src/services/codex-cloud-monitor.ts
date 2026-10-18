@@ -1,3 +1,4 @@
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 import type { Env } from '../index.js';
 import {
   githubFailureDetails,
@@ -643,7 +644,7 @@ async function processOfficialInspection(
       message.threadTs,
       '【中継失敗】Slack User OAuthによる公式Codexへの自動中継に失敗しました。重複防止のため再送せず停止しています。',
     );
-    console.error(JSON.stringify({"code":"codex_user_relay_failed"}));
+    logger.error("codex_user_relay_failed");
     return;
   }
 

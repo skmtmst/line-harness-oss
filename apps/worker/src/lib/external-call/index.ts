@@ -1,4 +1,5 @@
 import { retryTime, validateState } from './policy.js';
+import { resumeInvocation } from '@line-crm/shared/server';
 import type { CallRequest, CallResult, CallState, CircuitStore, Outcome } from './types.js';
 export * from './types.js';
 export * from './policy.js';
@@ -9,7 +10,10 @@ export { createHttpAttempt } from './http.js';
 export function createExternalCall(options: { circuits: CircuitStore; now?: () => number; random?: () => number }) {
   const now = options.now ?? Date.now;
   const random = options.random ?? Math.random;
-  return async function externalCall<T>(request: CallRequest<T>): Promise<CallResult<T>> {
+  return function externalCall<T>(request: CallRequest<T>): Promise<CallResult<T>> {
+    return resumeInvocation(request.state.requestId, () => execute(request));
+  };
+  async function execute<T>(request: CallRequest<T>): Promise<CallResult<T>> {
     // Isolate the immutable identity/budget from caller changes across awaits.
     const state = structuredClone(request.state);
     validateState(state);

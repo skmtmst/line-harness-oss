@@ -1,3 +1,5 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 import { parseRetryAfter } from '../lib/external-call/policy.js';
 /**
  * 送信Webhookの配送。
@@ -703,7 +705,7 @@ export async function deliverWebhook(
       sendSecret = null;
     }
     if (!sendSecret) {
-      console.error(JSON.stringify({"code":"outgoing_webhook_secret_unavailable"}));
+      logger.error("outgoing_webhook_secret_unavailable");
       return { ok: false, attempts: 0, lastStatus: null, secretUnavailable: true };
     }
   }
@@ -726,7 +728,7 @@ export async function deliverWebhook(
       // 接続そのものの失敗と、打ち切り（タイムアウト）は同じ扱い。
       // 相手が落ちている可能性が高いので送り直す。再試行可能な失敗として
       // lastStatus=null のまま残し、呼び出し側が失敗台帳へ記録する。
-      console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+      logger.error("services_outgoing_webhook_delivery_failed");
       lastStatus = null;
       waitMs = retryDelayMs(attempt);
       continue;
@@ -857,7 +859,7 @@ export async function recordDeliveryOutcome(
     });
   } catch (error) {
     // 通知の書き込みだけが落ちても、自動停止そのものは巻き戻さない。
-    console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+    logger.error("services_outgoing_webhook_delivery_failed");
   }
 }
 
@@ -1287,7 +1289,7 @@ async function logSweptDeliveryAttempt(
       failureReason: sendResult.ok ? null : failureReasonForDelivery(sendResult),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+    logger.error("services_outgoing_webhook_delivery_failed");
   }
 }
 
@@ -1411,7 +1413,7 @@ export async function sweepOutgoingWebhookDeliveries(
       try {
         await recordDeliveryOutcome(db, row.webhook_id, true);
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+        logger.error("services_outgoing_webhook_delivery_failed");
       }
       // d23b R412: 届いた通知と同じ失敗記録が残っていれば畳む。
       // 「やり直せる」のまま残すと届いた分をもう一度送らせてしまう。
@@ -1420,14 +1422,14 @@ export async function sweepOutgoingWebhookDeliveries(
           db, row.line_account_id, row.webhook_id, row.idempotency_key,
         );
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+        logger.error("services_outgoing_webhook_delivery_failed");
       }
     } else if (outcome === 'failed') {
       result.failed += 1;
       try {
         await recordDeliveryOutcome(db, row.webhook_id, false);
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+        logger.error("services_outgoing_webhook_delivery_failed");
       }
     } else if (outcome === 'retry_wait') {
       result.retryWait += 1;

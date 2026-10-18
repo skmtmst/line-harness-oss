@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { createMileageRuleIdempotent, serializeMileageRule } from './mileage-rule-create.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -106,7 +107,7 @@ export const get__api_mileage_rules_3 = async (c: Context<Env, "/api/mileage/rul
       : scope.allowedAccountIds.includes(rule.line_account_id));
     return c.json({ success: true, data: rules.map(serializeMileageRule) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/mileage/rules"}));
+    logger.error("routes_scoring_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -153,7 +154,7 @@ export const get__api_mileage_rules_export_4 = async (c: Context<Env, "/api/mile
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/mileage/rules/export"}));
+    logger.error("routes_scoring_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -200,7 +201,7 @@ export const post__api_mileage_events_5 = async (c: Context<Env, "/api/mileage/e
     if (err instanceof Error && err.message.startsWith('Mileage friend not found:')) {
       return c.json({ success: false, error: 'friend_not_found' }, 404);
     }
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"POST /api/mileage/events"}));
+    logger.error("routes_scoring_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -274,7 +275,7 @@ export const post__api_mileage_rules_6 = async (c: Context<Env, "/api/mileage/ru
     });
     return c.json({ success: true, data: serializeMileageRule(rule) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"POST /api/mileage/rules"}));
+    logger.error("routes_scoring_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -324,7 +325,7 @@ export const put__api_mileage_rules_id_7 = async (c: Context<Env, "/api/mileage/
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeMileageRule(updated) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"PUT /api/mileage/rules/:id"}));
+    logger.error("routes_scoring_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -349,7 +350,7 @@ export const delete__api_mileage_rules_id_8 = async (c: Context<Env, "/api/milea
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"DELETE /api/mileage/rules/:id"}));
+    logger.error("routes_scoring_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -385,7 +386,7 @@ export const get__api_action_scores_friends_9 = async (c: Context<Env, "/api/act
     });
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/action-scores/friends"}));
+    logger.error("routes_scoring_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -425,7 +426,7 @@ export const get__api_friends_id_score_10 = async (c: Context<Env, "/api/friends
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"GET /api/friends/:id/score"}));
+    logger.error("routes_scoring_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -459,7 +460,7 @@ export const post__api_friends_id_score_11 = async (c: Context<Env, "/api/friend
     if (err instanceof Error && err.message === 'score_idempotency_conflict') {
       return c.json({ success: false, error: '同じ操作番号で異なる加点はできません' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_scoring_failed","route":"POST /api/friends/:id/score"}));
+    logger.error("routes_scoring_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

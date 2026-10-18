@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
 import { Hono } from 'hono';
@@ -317,7 +318,7 @@ autoReplyRuns.get(
       };
       return c.json({ success: true, data });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_auto_reply_runs_failed","route":"GET /api/auto-reply-runs"}));
+      logger.error("routes_auto_reply_runs_failed");
       return c.json({ success: false, error: '自動応答の実行結果を表示できませんでした' }, 500);
     }
   },
@@ -346,7 +347,7 @@ autoReplyRuns.post(
         const status = error.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, error: error.message, code: error.code }, status);
       }
-      console.error(JSON.stringify({"code":"routes_auto_reply_runs_failed","route":"POST /api/auto-reply-runs/:id/retry"}));
+      logger.error("routes_auto_reply_runs_failed");
       return c.json({ success: false, error: '失敗した処理をもう一度実行できませんでした' }, 500);
     }
   },

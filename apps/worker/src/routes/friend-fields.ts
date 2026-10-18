@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -364,7 +365,7 @@ friendFields.get('/api/friend-fields', async (c) => {
     }
     return c.json({ success: true, data: items.map(serialize) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"GET /api/friend-fields"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -379,7 +380,7 @@ friendFields.get('/api/friend-fields-stats', async (c) => {
     if (scope instanceof Response) return scope;
     return c.json({ success: true, data: await getFriendFieldListSummary(c.env.DB, scope) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"GET /api/friend-fields-stats"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -450,7 +451,7 @@ friendFields.post('/api/friend-fields/:id/migration-preview', requireRole('owner
       previewExpiresAt,
     } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"POST /api/friend-fields/:id/migration-preview"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -514,7 +515,7 @@ friendFields.post('/api/friend-fields/:id/migrations', requireRole('owner', 'adm
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, code: 'IDEMPOTENCY_CONFLICT', error: '同じ操作はすでに受け付けています' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"POST /api/friend-fields/:id/migrations"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -529,7 +530,7 @@ friendFields.get('/api/field-migrations/:runId', async (c) => {
     const rows = await getFieldMigrationItems(c.env.DB, run.id);
     return c.json({ success: true, data: serializeMigrationRun(run, rows) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"GET /api/field-migrations/:runId"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -608,7 +609,7 @@ friendFields.post('/api/friend-fields', requireRole('owner', 'admin'), inputJson
     if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"POST /api/friend-fields"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -643,7 +644,7 @@ friendFields.patch('/api/friend-fields/reorder', requireRole('owner', 'admin'), 
     await reorderFriendFields(c.env.DB, scope, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"PATCH /api/friend-fields/reorder"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -746,7 +747,7 @@ friendFields.patch('/api/friend-fields/:id', requireRole('owner', 'admin'), inpu
     }
     return c.json({ success: true, data: serialize(field!) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"PATCH /api/friend-fields/:id"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -781,7 +782,7 @@ friendFields.delete('/api/friend-fields/:id', requireRole('owner', 'admin'), asy
     await deleteFriendField(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"DELETE /api/friend-fields/:id"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -845,7 +846,7 @@ friendFields.get(
         },
       });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"GET /api/friends/:id/fields"}));
+      logger.error("routes_friend_fields_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -927,7 +928,7 @@ friendFields.put('/api/friends/:id/fields', requireRole('owner', 'admin', 'staff
 
     return c.json({ success: true, data: { updated: pending.length }, warnings });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"PUT /api/friends/:id/fields"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1021,7 +1022,7 @@ friendFields.post('/api/friend-fields/bulk', requireRole('owner', 'admin', 'staf
     });
     return c.json({ success: true, data: { updated: friendIds.length } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_friend_fields_failed","route":"POST /api/friend-fields/bulk"}));
+    logger.error("routes_friend_fields_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

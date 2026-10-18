@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { SelfBookingChange } from '../booking-self-meet-sync.js';
 import { notifyForBooking } from '../../services/booking-notification.js';
 import { inputError } from '../../lib/input-errors.js';
@@ -480,7 +481,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
             lineAccountId: accountId,
           });
         } catch (error) {
-          console.error(JSON.stringify({"code":"routes_booking_failed"}));
+          logger.error("routes_booking_failed");
           v6Sync = 'failed';
         }
       }
@@ -498,7 +499,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
           cancelReason: `booking_updated_notifications_off:${bookingId}:by:${self ? `self:${self.lineUserId}` : (c.get('staff')?.id ?? 'admin')}`,
         });
       } catch (error) {
-        console.error(JSON.stringify({"code":"routes_booking_failed"}));
+        logger.error("routes_booking_failed");
         v6Sync = 'failed';
       }
     }
@@ -513,7 +514,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
         startsAtIso: newStartsAt.toISOString(),
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_booking_failed"}));
+      logger.error("routes_booking_failed");
       v6Sync = 'failed';
     }
   }
@@ -556,7 +557,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
     });
     c.executionCtx.waitUntil(
       notifyForBooking(c.env.DB, bookingId, 'changed', changeOperationId).catch((err) =>
-        console.error(JSON.stringify({"code":"routes_booking_failed"})),
+        logger.error("routes_booking_failed"),
       ),
     );
   }

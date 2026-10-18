@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { jstNow } from '@line-crm/db';
 import {
   createAutomationActionExecutors,
@@ -73,7 +74,7 @@ export async function sweepBroadcastAfterActions(
       total.done += result.done;
       total.failed += result.failed;
     } catch (error) {
-      console.error(JSON.stringify({"code":"services_broadcast_after_actions_failed"}));
+      logger.error("services_broadcast_after_actions_failed");
     }
   }
   return total;

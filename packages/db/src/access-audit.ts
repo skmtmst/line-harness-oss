@@ -1,3 +1,4 @@
+import { currentRequestId } from '@line-crm/shared/server';
 import { sqlIdSet } from './id-queries.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
@@ -352,7 +353,7 @@ export function auditEventStatement(
     safeAuditJson(input.before),
     safeAuditJson(input.after),
     input.reason ? redactAuditText(input.reason).slice(0, 300) : null,
-    safeText(input.requestTraceId, 160),
+    safeText(currentRequestId() ?? input.requestTraceId, 160),
     safeText(input.ipPrefix, 80),
     safeText(input.deviceFamily, 80),
     input.riskLevel ?? 'normal',

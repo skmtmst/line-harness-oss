@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -674,7 +675,7 @@ ecCommerce.get(
   const malformedSnapshots = Number(malformedRow?.count ?? 0);
   if (malformedSnapshots > 0) {
     // 運用者が「なぜ数が合わないのか」を後から追えるようにする。
-    console.warn(JSON.stringify({"code":"ec_subscriptions_malformed_snapshots_skipped","route":"GET /api/ec-commerce/subscriptions"}));
+    logger.warn("ec_subscriptions_malformed_snapshots_skipped");
   }
 
   const items = rows.results.map((row) => {

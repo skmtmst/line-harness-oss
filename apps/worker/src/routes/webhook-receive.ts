@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { workflowLineClient } from '../services/workflow-line-client.js';
 
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
@@ -36,7 +37,7 @@ export const post__webhook_1 = async (c: Context<Env, "/webhook">) => {
   // for junk traffic on a public endpoint.
   const LINE_SIGNATURE_LENGTH = 44;
   if (signature.length !== LINE_SIGNATURE_LENGTH) {
-    console.error('Missing or malformed LINE signature');
+    logger.error("Missing_or_malformed_LINE_signature");
     return c.json({ status: 'ok' }, 200);
   }
 
@@ -84,7 +85,7 @@ export const post__webhook_1 = async (c: Context<Env, "/webhook">) => {
   }
 
   if (!valid) {
-    console.error('Invalid LINE signature');
+    logger.error("Invalid_LINE_signature");
     return c.json({ status: 'ok' }, 200);
   }
 
@@ -99,7 +100,7 @@ export const post__webhook_1 = async (c: Context<Env, "/webhook">) => {
         .bind(new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, -1) + '+09:00', matchedAccountId)
         .run();
     } catch (stampError) {
-      console.error(JSON.stringify({"code":"routes_webhook_failed","route":"POST /webhook"}));
+      logger.error("routes_webhook_failed");
     }
   }
 
@@ -107,7 +108,7 @@ export const post__webhook_1 = async (c: Context<Env, "/webhook">) => {
   try {
     body = JSON.parse(rawBody) as WebhookRequestBody;
   } catch {
-    console.error('Failed to parse webhook body');
+    logger.error("Failed_to_parse_webhook_body");
     return c.json({ status: 'ok' }, 200);
   }
 

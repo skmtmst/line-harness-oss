@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {passUnusable} from '../services/booking-pass-plans.js';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
@@ -10,7 +11,7 @@ import { resolveAccountIdFromLiff, resolveFriendId, verifyCallerLineUserId } fro
 export const bookingEntitlements=new Hono<Env>();
 bookingEntitlements.onError((error,c)=>{
   if(error instanceof EntitlementError)return c.json({success:false,error:error.code},error.status);
-  console.error(JSON.stringify({code:'booking_entitlements_unavailable'}));
+  logger.error("booking_entitlements_unavailable");
   return c.json({success:false,error:'booking_entitlements_unavailable'},503);
 });
 bookingEntitlements.use('/api/booking/admin/entitlements/*', requireRole('owner','admin','staff'),requirePermission('/booking/bookings'),async(c,next)=>{

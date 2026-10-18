@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import type { Context } from 'hono';
 import { getChatById, getFriendById, getLineAccountById, type InboxSavedViewConditions, type SavedSearchAccess, type ScheduledChatSendRow, jstNow } from '@line-crm/db';

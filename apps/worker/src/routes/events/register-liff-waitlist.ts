@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -47,7 +48,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     reminder_hours_before: result.reminderHoursBefore,
   });
   await insertRemindersForBooking(c.env.DB, result.bookingId, reminders)
-    .catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
+    .catch((error) => logger.error("routes_events_failed"));
   await enrollByTrigger(c.env.DB, {
     triggerType: 'event',
     friendId: result.friendId,
@@ -56,7 +57,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     sourceEventId: result.bookingId,
     eventId: result.eventId,
     lineAccountId: result.lineAccountId,
-  }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
+  }).catch((error) => logger.error("routes_events_failed"));
   await awardActivityMileage(c.env.DB, {
     eventType: 'booking_created',
     source: 'event_booking',
@@ -67,7 +68,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
       eventId: result.eventId, slotId: result.occurrenceId,
     },
     occurredAt: new Date().toISOString(),
-  }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
+  }).catch((error) => logger.error("routes_events_failed"));
   await applyActionScoreEvent(c.env.DB, {
     lineAccountId: result.lineAccountId,
     friendId: result.friendId,
@@ -76,7 +77,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     sourceEventId: result.bookingId,
     subjectKey: result.eventId,
     occurredAt: new Date().toISOString(),
-  }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
+  }).catch((error) => logger.error("routes_events_failed"));
 
   if (result.newlyConverted) {
     const automation = dispatchAutomationEventWithLogging(c.env.DB, {
@@ -88,7 +89,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
         bookingType: 'event', bookingId: result.bookingId,
         eventId: result.eventId, slotId: result.occurrenceId,
       },
-    }).catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"})));
+    }).catch((error) => logger.error("routes_events_failed"));
     const executionCtx = optionalExecutionCtx(c);
     if (executionCtx) executionCtx.waitUntil(automation);
     else await automation;
@@ -122,7 +123,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
         });
       }
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/waitlist/:token/accept"}));
+      logger.error("routes_events_failed");
     }
   }
 

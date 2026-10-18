@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { BookingExternalCircuits } from './booking-external-circuits.js';
 import { API_RETRY_WAIT, type Outcome } from '../lib/external-call/index.js';
 import { runBookingExternalStep, reconcileBookingExternalStep } from './booking-external-step.js';
@@ -306,7 +307,7 @@ export async function runCalendarDeleteOperation(
         errorCode: error instanceof CalendarResultUnknownError ? 'delivery_unknown' : error instanceof CalendarConnectionMissingError ? 'calendar_connection_missing' : 'calendar_delete_failed',
         result: { direction: 'delete' },
       });
-      console.error(JSON.stringify({"code":"services_booking_calendar_sync_failed"}));
+      logger.error("services_booking_calendar_sync_failed");
       return 'retry_wait';
     }
     await finishBookingOperation(db, {
@@ -317,7 +318,7 @@ export async function runCalendarDeleteOperation(
     });
     return 'succeeded';
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_booking_calendar_sync_failed"}));
+    logger.error("services_booking_calendar_sync_failed");
     return 'retry_wait';
   }
 }
@@ -653,7 +654,7 @@ export async function runBookingGoogleSync(
       errorCode: error instanceof CalendarResultUnknownError ? 'delivery_unknown' : 'calendar_sync_failed',
       result: { direction: 'sync' },
     }).catch(() => undefined);
-    console.error(JSON.stringify({"code":"services_booking_calendar_sync_failed"}));
+    logger.error("services_booking_calendar_sync_failed");
     return 'retry_wait';
   }
 }

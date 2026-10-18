@@ -1,3 +1,4 @@
+import { tracedFetch as fetch, traceRequestInit } from '@line-crm/shared/server';
 import { parseRetryAfter } from './policy.js';
 import type { CallIdentity, Outcome } from './types.js';
 
@@ -35,8 +36,8 @@ export function createHttpAttempt<T>(options: HttpAttemptOptions<T>) {
   const rejected = options.rejectedWithoutEffect;
   return async (signal: AbortSignal, identity: Readonly<CallIdentity>): Promise<Outcome<T>> => {
     if (signal.aborted) return { kind: 'permanent', reason: 'cancelled' };
-    const response = await transport(target, { method, headers: new Headers(headers),
-      body: typeof body === 'string' ? body : body?.slice(0), signal, redirect: 'manual' });
+    const response = await transport(target, traceRequestInit(target, { method, headers: new Headers(headers),
+      body: typeof body === 'string' ? body : body?.slice(0), signal, redirect: 'manual' }));
     const retryAt = parseRetryAfter(response.headers.get('retry-after'), now());
     const transient = response.status === 408 || response.status === 429 || response.status >= 500;
     // A mutation's 5xx is not evidence that nothing happened. Even a key header

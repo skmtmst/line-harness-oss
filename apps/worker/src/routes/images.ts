@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -123,7 +124,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c, nex
       data: { id, key, url, mimeType, size: data.byteLength },
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_images_failed","route":"POST /api/images"}));
+    logger.error("routes_images_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -213,7 +214,7 @@ images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async 
     await c.env.IMAGES.delete(key);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_images_failed","route":"DELETE /api/images/:key"}));
+    logger.error("routes_images_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
