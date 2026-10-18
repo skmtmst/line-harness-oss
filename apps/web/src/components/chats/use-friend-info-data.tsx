@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { api } from '@/lib/api'
 import { useEffect,useState } from 'react'
 import { FriendFieldsState,MileageState,PurchaseState,RichMenuState,UpcomingState } from './friend-info-model'
@@ -49,11 +50,11 @@ export function useFriendInfoData({ friendId, accountId }: Options) {
         setFriend(res.data as unknown as FriendDetail)
       } else {
         // 内部の例外文字列はそのまま出さない。利用者向けの短い理由にする。
-        setError('友だち情報を取得できませんでした')
+        setError(describeApiFailure(undefined, '友だち情報の読み込み'))
       }
-    }).catch(() => {
+    }).catch((reason) => {
       if (cancelled) return
-      setError('友だち情報を取得できませんでした')
+      setError(describeApiFailure(reason, '友だち情報の読み込み'))
     }).finally(() => {
       if (!cancelled) setLoading(false)
     })

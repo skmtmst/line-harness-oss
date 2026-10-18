@@ -10,7 +10,6 @@ import StatusPill, { SUPPORT_STATUS_TONES, StatusDot } from '@/components/shared
 import TagOverflow from '@/components/shared/tag-overflow'
 import TagPill from '@/components/shared/tag-pill'
 import { TextArea } from '@/components/shared/text-field'
-import { api } from '@/lib/api'
 import { formAnswerText } from '@/lib/form-answer'
 import { formatNumber } from '@/lib/format'
 import v8 from '@/v8/inbox-chat/customer-panel.module.css'
@@ -66,13 +65,12 @@ type Options = {
   setFieldsRetry: Dispatch<SetStateAction<number>>
   metadataLabel: (key: string) => string | null
   targetKey: string
-  beginChange: (scope: string) => () => boolean
-  setFriend: Dispatch<SetStateAction<FriendDetail | null>>
+  saveMetadata: (entry: { key: string }, next: string) => Promise<void>
   purchase: PurchaseState
   setPurchaseRetry: Dispatch<SetStateAction<number>>
 }
 
-export function createFriendInfoSections({ sectionStyle, canEditChat, statusButtonRef, effectiveStatus, saveChatStatus, chatStatus, operators, effectiveOperatorId, saveAssignee, operatorName, memoSaving, memoAreaRef, chatId, effectiveNotes, queueMemoSave, upcoming, setUpcomingRetry, friendId, canEditFriend, tagPickerOpen, setTagPickerOpen, effectiveTags, setTagToRemove, tagOptions, tagFolders, loadTagFolders, createTagForPicker, tagSaving, applyTagSelection, tagSearchRef, tagQuery, setTagQuery, setTagActive, tagActive, addTagById, createAndAddTag, richMenu, setRichMenuRetry, accountId, canClearPrepay, friendFields, setFieldsRetry, metadataLabel, targetKey, beginChange, setFriend, purchase, setPurchaseRetry }: Options) {
+export function createFriendInfoSections({ sectionStyle, canEditChat, statusButtonRef, effectiveStatus, saveChatStatus, chatStatus, operators, effectiveOperatorId, saveAssignee, operatorName, memoSaving, memoAreaRef, chatId, effectiveNotes, queueMemoSave, upcoming, setUpcomingRetry, friendId, canEditFriend, tagPickerOpen, setTagPickerOpen, effectiveTags, setTagToRemove, tagOptions, tagFolders, loadTagFolders, createTagForPicker, tagSaving, applyTagSelection, tagSearchRef, tagQuery, setTagQuery, setTagActive, tagActive, addTagById, createAndAddTag, richMenu, setRichMenuRetry, accountId, canClearPrepay, friendFields, setFieldsRetry, metadataLabel, targetKey, saveMetadata, purchase, setPurchaseRetry }: Options) {
 
   /*
    * 顧客情報の節（基本情報・マイル・次の対応・タグ・★つき・リッチメニュー・友だち情報・フォーム回答）。
@@ -544,13 +542,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
                         key={`${targetKey}:${entry.key}`}
                         value={renderValue(entry.value)}
                         label={entry.label}
-                        onSave={async (next) => {
-                          const isCurrent = beginChange(`metadata:${entry.key}`)
-                          const res = await api.friends.updateMetadata(friendId, { [entry.key]: next || null })
-                          if (!isCurrent()) return
-                          if (!res.success) throw new Error('failed')
-                          setFriend((prev) => prev ? { ...prev, metadata: { ...prev.metadata, [entry.key]: next } } : prev)
-                        }}
+                        onSave={(next) => saveMetadata(entry, next)}
                       />
                     ) : (
                       <span className="whitespace-pre-wrap">{renderValue(entry.value)}</span>

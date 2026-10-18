@@ -1,6 +1,5 @@
 'use client'
 import { type ImageUploaderValue } from '@/components/shared/image-uploader';
-import { useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { api, type ChatDetailMessage, type ScheduledChatSend } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
@@ -30,10 +29,9 @@ type Options = {
   quotedMessage: ChatDetailMessage | null
   sendKeysRef: RefObject<IdempotencyKeyStore>
   setQuotedMessage: Dispatch<SetStateAction<ChatDetailMessage | null>>
-  saveErrors: ReturnType<typeof useSaveFormErrors>
 }
 
-export function useInboxSchedule({ detailAccountRef, selectedChatIdRef, selectedChatId, messageContent, pendingImage, pendingAttachment, setError, selectedAccountId, dropSentDraft, pendingImageRef, setPendingImage, setPendingImageMeta, attachDraftsRef, putAttachment, setMessageContent, quotedMessage, sendKeysRef, setQuotedMessage, saveErrors }: Options) {
+export function useInboxSchedule({ detailAccountRef, selectedChatIdRef, selectedChatId, messageContent, pendingImage, pendingAttachment, setError, selectedAccountId, dropSentDraft, pendingImageRef, setPendingImage, setPendingImageMeta, attachDraftsRef, putAttachment, setMessageContent, quotedMessage, sendKeysRef, setQuotedMessage }: Options) {
 
   // N-025: 送信予約。JSTの datetime-local 値をそのまま口へ渡し、
   // 保存はサーバー側でUTCへ正規化される。
@@ -222,17 +220,5 @@ export function useInboxSchedule({ detailAccountRef, selectedChatIdRef, selected
     }
   }
 
-  /** 予約時刻の変更。datetime-local の JST 値はオフセットを付けて口へ渡す(INBOX-21)。 */
-  const handleReschedule = async (scheduleId: string, nextAt: string) => {
-    if (!selectedChatId || !nextAt) return
-    try {
-      const res = await api.chats.updateScheduled(selectedChatId, scheduleId, { scheduledAt: jstDatetimeLocalToIso(nextAt) })
-      if (res.success) await loadScheduledSends(selectedChatId)
-    } catch (reason) {
-      saveErrors.capture(reason)
-      setError('予約時刻の変更に失敗しました。一覧を読み込み直してください。')
-      void loadScheduledSends(selectedChatId)
-    }
-  }
-  return { scheduledSends, scheduledSendsFailed, scheduleInput, setScheduleInput, showSchedulePanel, setShowSchedulePanel, scheduling, loadScheduledSends, handleScheduleSend, handleCancelScheduled, handleReschedule }
+  return { scheduledSends, scheduledSendsFailed, scheduleInput, setScheduleInput, showSchedulePanel, setShowSchedulePanel, scheduling, loadScheduledSends, handleScheduleSend, handleCancelScheduled, }
 }

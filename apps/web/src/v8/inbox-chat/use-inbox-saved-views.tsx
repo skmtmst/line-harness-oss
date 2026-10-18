@@ -1,13 +1,11 @@
 'use client'
-import { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
-import { useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { type SavedViewDraft } from '@/components/chats/saved-view-dialog';
 import { api } from '@/lib/api';
 import { clampSearchQuery } from '@/lib/search-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InboxSavedView, SAVED_VIEW_URL_KEY, StatusFilter, buildInboxUrl } from './inbox-model';
-import { savedViewFailureMessage } from './saved-view-failure';
 import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types';
 
 type Options = {
@@ -29,10 +27,9 @@ type Options = {
   statusFilter: StatusFilter
   assigneeFilter: string
   unreadOnly: boolean
-  saveErrors: ReturnType<typeof useSaveFormErrors>
 }
 
-export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, setAssigneeFilter, setQuickFilter, setUnreadOnly, params, router, selectedAccountId, savedViewParam, accountsLoading, setDebouncedNameQuery, channel, quickFilter, nameQuery, statusFilter, assigneeFilter, unreadOnly, saveErrors }: Options) {
+export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, setAssigneeFilter, setQuickFilter, setUnreadOnly, params, router, selectedAccountId, savedViewParam, accountsLoading, setDebouncedNameQuery, channel, quickFilter, nameQuery, statusFilter, assigneeFilter, unreadOnly }: Options) {
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
 
@@ -224,56 +221,6 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
     }
   }
 
-  const createSavedView = async (draft?: SavedViewDraft): Promise<SavedViewSaveResult> => {
-    if (savingView) return { success: false, error: '保存処理が終わるまでお待ちください' }
-    // モーダルから呼ぶときは、そこで打った名前をそのまま使う。
-    // 状態の更新を待つと、1回目の保存が空の名前で走る。
-    const name = (draft?.name ?? savedViewName).trim()
-    if (!name) {
-      const message = '名前を入力してください'
-      setSavedViewError(message)
-      return { success: false, error: message }
-    }
-    setSavingView(true)
-    setSavedViewError('')
-    try {
-      if (!selectedAccountId) {
-        const message = 'LINE公式アカウントを選んでください'
-        setSavedViewError(message)
-        return { success: false, error: message }
-      }
-      const response = await api.chats.savedViews.create(selectedAccountId, {
-        name,
-        conditions: currentSavedViewConditions(draft),
-        isFavorite: draft?.favorite ?? false,
-      })
-      if (!response.success) {
-        const message = '保存できませんでした。時間を置いてもう一度お試しください。'
-        setSavedViewError(message)
-        return { success: false, error: message }
-      }
-      setSavedViewName('')
-      await loadSavedViews()
-      setSaveDialogOpen(false)
-      setSavedViewsOpen(true)
-      setSavedViewSuccess(true)
-      return { success: true }
-    } catch (reason) {
-      saveErrors.capture(reason)
-      /*
-        **失敗の種類で言い分ける。** fetchApi は !ok を ApiError として投げる
-        ので、409(同名の競合)も403(権限)も通信障害もここへ来る。全部を
-        「時間を置いて」と言うと、名前を変えれば直る競合まで待たせてしまう
-        (N-027)。文言は運用者向けに作り、APIの内部文言は素通ししない。
-      */
-      const message = savedViewFailureMessage(reason)
-      setSavedViewError(message)
-      return { success: false, error: message }
-    } finally {
-      setSavingView(false)
-    }
-  }
-
   const applySavedView = (view: InboxSavedView) => {
     const nextChannel = applySavedViewConditions(view)
     setSavedViewNotice('')
@@ -282,5 +229,5 @@ export function useInboxSavedViews({ operators, setNameQuery, setStatusFilter, s
     router.push(buildInboxUrl(nextChannel, view.id))
     setSavedViewsOpen(false)
   }
-  return { saveDialogOpen, setSaveDialogOpen, savedViews, savedViewsOpen, setSavedViewsOpen, savedViewMenuId, setSavedViewMenuId, setSavedViewName, savedViewError, setSavedViewError, savingView, savedViewSuccess, setSavedViewSuccess, savedViewNotice, operatorNames, dropSavedViewParam, loadSavedViews, createSavedView, applySavedView }
+  return { saveDialogOpen, setSaveDialogOpen, savedViews, savedViewsOpen, setSavedViewsOpen, savedViewMenuId, setSavedViewMenuId, setSavedViewName, savedViewError, setSavedViewError, savingView, savedViewSuccess, setSavedViewSuccess, savedViewNotice, operatorNames, dropSavedViewParam, loadSavedViews, currentSavedViewConditions, savedViewName, setSavingView, applySavedView }
 }

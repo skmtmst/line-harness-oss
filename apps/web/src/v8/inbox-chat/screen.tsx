@@ -1,5 +1,8 @@
 'use client'
 
+import { japaneseDetailOf } from '@/components/shared/api-error-message';
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import type { SavedViewDraft, SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar';
 import Notice from '@/components/shared/notice';
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -12,11 +15,12 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { useInboxAi } from '@/v8/ai-reply/inbox-ai';
 import { useRouter,useSearchParams } from 'next/navigation';
 import { Suspense,useEffect,useRef,useState } from 'react';
-import { MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,statusFilters,statusFiltersV8 } from './inbox-model';
+import { jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,statusFilters,statusFiltersV8 } from './inbox-model';
 
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
 import InboxList from './inbox-list-view';
+import { savedViewFailureMessage } from './saved-view-failure';
 import { useInboxActions } from './use-inbox-actions';
 import { useInboxConversation } from './use-inbox-conversation';
 import { useInboxDraft } from './use-inbox-draft';
@@ -261,7 +265,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     loadScheduledSends,
     handleScheduleSend,
     handleCancelScheduled,
-    handleReschedule,
   } = useInboxSchedule({
     detailAccountRef,
     selectedChatIdRef,
@@ -281,9 +284,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     quotedMessage,
     sendKeysRef,
     setQuotedMessage,
-    saveErrors,
   })
 
+  /** 予約時刻の変更。datetime-local の JST 値はオフセットを付けて口へ渡す(INBOX-21)。 */
+  const handleReschedule = async (scheduleId: string, nextAt: string) => {
+    if (!selectedChatId || !nextAt) return
+    try {
+      const res = await api.chats.updateScheduled(selectedChatId, scheduleId, { scheduledAt: jstDatetimeLocalToIso(nextAt) })
+      if (res.success) await loadScheduledSends(selectedChatId)
+    } catch (reason) {
+      saveErrors.capture(reason)
+      setError('予約時刻の変更に失敗しました。一覧を読み込み直してください。')
+      void loadScheduledSends(selectedChatId)
+    }
+  }
   // 会話を切り替えたら引用中の選択と予約パネルは閉じる。
   // 前の会話のメッセージを引用したまま別の会話へ送ると、別friendの
   // メッセージ指定で口が404を返すため、ここで必ず外す。
@@ -327,7 +341,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     operatorNames,
     dropSavedViewParam,
     loadSavedViews,
-    createSavedView,
+    currentSavedViewConditions,
+    savedViewName,
+    setSavingView,
     applySavedView,
   } = useInboxSavedViews({
     operators,
@@ -348,8 +364,57 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     statusFilter,
     assigneeFilter,
     unreadOnly,
-    saveErrors,
   })
+
+  const createSavedView = async (draft?: SavedViewDraft): Promise<SavedViewSaveResult> => {
+    if (savingView) return { success: false, error: '保存処理が終わるまでお待ちください' }
+    // モーダルから呼ぶときは、そこで打った名前をそのまま使う。
+    // 状態の更新を待つと、1回目の保存が空の名前で走る。
+    const name = (draft?.name ?? savedViewName).trim()
+    if (!name) {
+      const message = '名前を入力してください'
+      setSavedViewError(message)
+      return { success: false, error: message }
+    }
+    setSavingView(true)
+    setSavedViewError('')
+    try {
+      if (!selectedAccountId) {
+        const message = 'LINE公式アカウントを選んでください'
+        setSavedViewError(message)
+        return { success: false, error: message }
+      }
+      const response = await api.chats.savedViews.create(selectedAccountId, {
+        name,
+        conditions: currentSavedViewConditions(draft),
+        isFavorite: draft?.favorite ?? false,
+      })
+      if (!response.success) {
+        const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+        setSavedViewError(message)
+        return { success: false, error: message }
+      }
+      setSavedViewName('')
+      await loadSavedViews()
+      setSaveDialogOpen(false)
+      setSavedViewsOpen(true)
+      setSavedViewSuccess(true)
+      return { success: true }
+    } catch (reason) {
+      saveErrors.capture(reason)
+      /*
+        **失敗の種類で言い分ける。** fetchApi は !ok を ApiError として投げる
+        ので、409(同名の競合)も403(権限)も通信障害もここへ来る。全部を
+        「時間を置いて」と言うと、名前を変えれば直る競合まで待たせてしまう
+        (N-027)。文言は運用者向けに作り、APIの内部文言は素通ししない。
+      */
+      const message = savedViewFailureMessage(reason)
+      setSavedViewError(message)
+      return { success: false, error: message }
+    } finally {
+      setSavingView(false)
+    }
+  }
 
   const handleStatusFilterKeyDown = (event: React.KeyboardEvent) => {
     const list = statusFiltersV8
@@ -528,30 +593,82 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     memoDraft,
     setMemoDraft,
     memoSaving,
+    setMemoSaving,
     memoError,
+    setMemoError,
     attentionSaving,
     setAttentionSaving,
-    handleOperatorUpdate,
     handleStatusUpdate,
     handleAttentionUpdate,
     closeMemoEditor,
     memoPopoverRef,
-    handleSaveMemo,
-    leaveTarget,
-    confirmLeave,
-    cancelLeave,
   } = useInboxActions({
     chatDetail,
     selectedChatId,
     loadChatDetail,
     loadChats,
-    saveErrors,
     setError,
     setChatDetail,
     setChats,
-    selectedAccountId,
-    selectedChatIdRef,
-    detailAccountRef,
+  })
+
+  /** 担当を付け替える（設計 `TalkPane` の「担当」）。 */
+  const handleOperatorUpdate = async (operatorId: string | null) => {
+    if (!selectedChatId || !chatDetail) return
+    try {
+      await api.chats.update(selectedChatId, { operatorId, revision: chatDetail.revision })
+      loadChatDetail(selectedChatId)
+      loadChats()
+    } catch (reason) {
+      saveErrors.capture(reason)
+      setError('担当の更新に失敗しました。')
+    }
+  }
+
+  const handleSaveMemo = async () => {
+    if (!selectedChatId || memoSaving) return
+    /*
+     * 保存を始めた会話と版を固定する(INBOX-25)。応答を待つ間に別の
+     * 会話・アカウントへ切り替わっても、その画面へ結果を書き込まない。
+     */
+    const savingChatId = selectedChatId
+    const savingAccountId = selectedAccountId
+    const savingRevision = chatDetail?.revision
+    const notes = memoDraft.trim() || null
+    setMemoSaving(true)
+    setMemoError('')
+    try {
+      const response = await api.chats.update(savingChatId, {
+        notes,
+        revision: savingRevision,
+      })
+      if (!response.success) throw new Error(response.error || '内部メモを保存できませんでした')
+      // 返ってきた版を採用する。古い版のまま次の保存を送ると409になる。
+      setChatDetail((current) => current && current.id === savingChatId
+        ? { ...current, notes: response.data?.notes ?? notes, revision: response.data.revision }
+        : current)
+      setChats((current) => current.map((chat) => chat.id === savingChatId
+        ? { ...chat, notes }
+        : chat))
+      // 開いている紙を閉じるのは、いまも同じ会話を見ているときだけ。
+      if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
+        setShowMemoEditor(false)
+      }
+    } catch (memoSaveError) {
+      if (selectedChatIdRef.current === savingChatId && detailAccountRef.current === savingAccountId) {
+        saveErrors.capture(memoSaveError)
+        setMemoError(japaneseDetailOf(memoSaveError) || '内部メモを保存できませんでした')
+      }
+    } finally {
+      setMemoSaving(false)
+    }
+  }
+
+  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
+    dirty: showMemoEditor && memoDraft !== (chatDetail?.notes ?? ''),
+    busy: memoSaving,
+    samePage: (destination) => destination.pathname === '/chats',
+    onDiscard: () => { setShowMemoEditor(false); setMemoDraft(chatDetail?.notes ?? '') },
   })
 
   // 同じ会話IDが別アカウントにも存在していても、切替前の遅い応答を表示しない。

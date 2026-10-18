@@ -24,10 +24,11 @@ type Options = {
   operators: { id: string; name: string; }[] | undefined
   friendId: string | null
   effectiveNotes: string | null | undefined
+  setFriend: Dispatch<SetStateAction<FriendDetail | null>>
   memoAreaRef: RefObject<HTMLTextAreaElement | null>
 }
 
-export function useFriendInfoEditing({ setLocalStatus, chatStatus, setLocalOperatorId, operatorId, setLocalNotes, setLocalTags, friend, revision, chatId, targetRef, onChatChanged, effectiveStatus, beginChange, effectiveOperatorId, operators, friendId, effectiveNotes, memoAreaRef }: Options) {
+export function useFriendInfoEditing({ setLocalStatus, chatStatus, setLocalOperatorId, operatorId, setLocalNotes, setLocalTags, friend, revision, chatId, targetRef, onChatChanged, effectiveStatus, beginChange, effectiveOperatorId, operators, friendId, effectiveNotes, setFriend, memoAreaRef }: Options) {
 
   /*
    * B-26（A-2 採用）：押した瞬間に変えて裏で保存し、白い知らせに［元に戻す］（5秒・乗せている間は止まる）。
@@ -183,5 +184,14 @@ export function useFriendInfoEditing({ setLocalStatus, chatStatus, setLocalOpera
   useEffect(() => () => {
     if (memoTimerRef.current) clearTimeout(memoTimerRef.current)
   }, [])
-  return { saveChatStatus, saveAssignee, memoSaving, setMemoSaving, queueMemoSave }
+  const saveMetadata = async (entry: { key: string }, next: string) => {
+    if (!friendId) return
+    const isCurrent = beginChange(`metadata:${entry.key}`)
+    const res = await api.friends.updateMetadata(friendId, { [entry.key]: next || null })
+    if (!isCurrent()) return
+    if (!res.success) throw new Error('failed')
+    setFriend((prev) => prev ? { ...prev, metadata: { ...prev.metadata, [entry.key]: next } } : prev)
+  }
+
+  return { saveMetadata, saveChatStatus, saveAssignee, memoSaving, setMemoSaving, queueMemoSave }
 }
