@@ -77,6 +77,7 @@ adminAuth.use('/api/auth/two-factor/*', async (c, next) => {
 });
 
 const OAUTH_STATE_COOKIE = 'lh_line_state';
+const OAUTH_HANDOFF_COOKIE = 'lh_line_handoff';
 const OAUTH_NONCE_COOKIE = 'lh_line_nonce';
 const OAUTH_VERIFIER_COOKIE = 'lh_line_verifier';
 const OAUTH_INVITE_COOKIE = 'lh_line_invite';
@@ -249,6 +250,8 @@ adminAuth.get('/api/auth/line', async (c) => {
     return c.json({ success: false, error: 'LINE Login is not configured' }, 500);
   }
 
+  const handoff = c.req.query('handoff');
+  if (handoff && /^[0-9a-f-]{36}$/.test(handoff)) c.header('Set-Cookie', oauthCookie(OAUTH_HANDOFF_COOKIE, handoff), { append: true });
   const state = randomToken();
   const nonce = randomToken();
   const verifier = randomToken(48);
@@ -292,10 +295,12 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
   const invite = readCookie(cookies, OAUTH_INVITE_COOKIE);
   const next = readCookie(cookies, OAUTH_NEXT_COOKIE);
   const remember = readCookie(cookies, OAUTH_REMEMBER_COOKIE) === '1';
+  const handoff = readCookie(cookies, OAUTH_HANDOFF_COOKIE) || '';
+  if (handoff) c.set('adminHandoffNonce', handoff);
   const state = c.req.query('state');
   const code = c.req.query('code');
 
-  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_INVITE_COOKIE, OAUTH_NEXT_COOKIE, OAUTH_REMEMBER_COOKIE]) {
+  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_INVITE_COOKIE, OAUTH_NEXT_COOKIE, OAUTH_REMEMBER_COOKIE, OAUTH_HANDOFF_COOKIE]) {
     c.header('Set-Cookie', oauthCookie(name, '', 0), { append: true });
   }
 
@@ -405,6 +410,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     if (config.crossSite) {
       adminUrl.hash = new URLSearchParams({
         lh_session: session.sessionToken,
+        lh_nonce: handoff,
         lh_csrf: session.csrfToken,
       }).toString();
     }

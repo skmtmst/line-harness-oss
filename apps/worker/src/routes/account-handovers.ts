@@ -277,6 +277,11 @@ accountHandovers.put('/api/account-handovers/:id/decisions', requireRole('owner'
     if (decisions.length === 0) {
       return inputError(c, { success: false, error: 'decisions が要ります' }, 400, ["decisions"]);
     }
+    for (const d of decisions) {
+      const source = await c.env.DB.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=?').bind(d.fromFriendId ?? '', handover.from_account_id).first();
+      const target = !d.toFriendId || await c.env.DB.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=?').bind(d.toFriendId, handover.to_account_id).first();
+      if (!source || !target) return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const staff = c.get('staff');
     for (const d of decisions) {
       if (!d.fromFriendId) {
@@ -366,10 +371,12 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
     let failed = 0;
     for (const d of moving) {
       try {
-        await c.env.DB.prepare(`UPDATE friends SET line_account_id = ? WHERE id = ?`)
-          .bind(handover.to_account_id, d.from_friend_id)
+        const result = await c.env.DB.prepare(`UPDATE friends SET line_account_id = ? WHERE id = ? AND line_account_id = ?
+          AND (? IS NULL OR EXISTS(SELECT 1 FROM friends target WHERE target.id=? AND target.line_account_id=?))`)
+          .bind(handover.to_account_id, d.from_friend_id, handover.from_account_id, d.to_friend_id, d.to_friend_id, handover.to_account_id)
           .run();
-        moved += 1;
+        if (result.meta.changes === 1) moved += 1;
+        else failed += 1;
       } catch (err) {
         console.error(JSON.stringify({"code":"routes_account_handovers_failed","route":"POST /api/account-handovers/:id/execute"}));
         failed += 1;

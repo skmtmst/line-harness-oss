@@ -153,11 +153,11 @@ describe('A-6 account tenant scope', () => {
     expect(mocks.getChatById).not.toHaveBeenCalled();
   });
 
-  test('auto-reply update permits null to clear scope but rejects an empty account id', async () => {
+  test('F1: tenant owner cannot clear scope to create a global rule or use an empty account id', async () => {
     expect((await app(autoReplies).request(
       '/api/auto-replies/auto-reply',
       request('PUT', { lineAccountId: null }),
-    )).status).not.toBe(403);
+    )).status).toBe(403);
 
     expect((await app(autoReplies).request(
       '/api/auto-replies/auto-reply',

@@ -8,6 +8,7 @@ export type Env = {
   Variables: {
     // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
     staff: AuthenticatedStaff;
+    adminHandoffNonce?: string;
     /** route固有の監査を残した場合、共通middlewareとの二重記録を防ぐ。 */
     auditRecorded?: boolean;
     mfaAuditRecorded?: boolean;

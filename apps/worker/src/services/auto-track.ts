@@ -189,6 +189,7 @@ export interface AutoTrackOptions {
   templateId?: string | null;
   /** 配信別に短縮URLとクリック数を分ける。 */
   broadcastId?: string | null;
+  sourceContent?: string;
 }
 
 /**
@@ -263,7 +264,9 @@ export async function autoTrackContent(
   // Extract first so URL-free messages (the common case in per-friend
   // delivery loops) skip the settings lookup entirely.
   const workerBase = workerUrl.replace(/\/$/, '');
-  let urls = extractUrls(content, [workerBase]);
+  const authored = options?.sourceContent === undefined ? null : extractUrls(options.sourceContent, [workerBase]);
+  const isAuthored = (url: string) => !authored || authored.has(url) && !/[{}]/.test(url);
+  let urls = new Set([...extractUrls(content, [workerBase])].filter(isAuthored));
   if (urls.size === 0) return { messageType, content };
 
   // Branded short domain (tracked_link_base_url) when configured, else workerUrl.
@@ -321,7 +324,7 @@ export async function autoTrackContent(
   // "https://" — createTrackingMap calls `new URL()`, so an invalid URI here
   // would throw and fail the whole delivery instead of one link).
   const trackableUris = new Set(
-    [...actionUris].filter((u) => isTrackableHttpUrl(u) && !shouldSkip(u, skipPrefixes)),
+    [...actionUris].filter((u) => isTrackableHttpUrl(u) && !shouldSkip(u, skipPrefixes) && isAuthored(u)),
   );
   if (trackableUris.size === 0) return { messageType, content };
   const uriMap = await createTrackingMap(db, trackableUris, linkBase, options?.lineAccountId, options?.templateId, options?.broadcastId);
@@ -396,11 +399,12 @@ export async function decorateForFriendPush(
   messageType: string,
   content: string,
   workerUrl: string | undefined,
-  opts: { lineAccountId: string | null; friendId: string },
+  opts: { lineAccountId: string | null; friendId: string; sourceContent?: string },
 ): Promise<AutoTrackResult> {
   if (!workerUrl) return { messageType, content };
   const tracked = await autoTrackContent(db, messageType, content, workerUrl, {
     lineAccountId: opts.lineAccountId,
+    sourceContent: opts.sourceContent ?? '',
   });
   const decorated = await appendFriendToTrackedLinks(db, tracked.content, workerUrl, opts.friendId);
   return { messageType: tracked.messageType, content: decorated };

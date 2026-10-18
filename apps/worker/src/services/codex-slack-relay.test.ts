@@ -1165,3 +1165,25 @@ test('Worker trace UUID reaches notification while free-form incident fields are
  await reportHarnessErrorToSlack(config,{source:'worker',message:'unhandled_worker_error',incidentId:'private-customer secret-token'},fetcher);
  expect(fetcher.mock.calls.map(([,init])=>String(init?.body)).join('\n')).not.toMatch(/private-customer|secret-token/);
 });
+
+
+test('F17: untrusted Slack text cannot mention channels or forge links', () => {
+  expect(sanitizeSlackContent('<!channel> <https://evil.test|trusted> & `escape`')).toBe('&lt;!channel&gt; &lt;https://evil.test|trusted&gt; &amp; ˋescapeˋ');
+});
+
+test('F18: a GitHub title TASK-ID cannot redirect completion to another task', async () => {
+  const target = { ts: '300.001', metadata: { event_type: 'line_harness_task', event_payload: {
+    work_key: 'pr:999', task_id: taskIdForKey('pr:999'), source_channel: 'CFOREIGN123', source_thread_ts: '1787326497.583159', session_id: 'foreign',
+  } } };
+  const writes: Array<Record<string, unknown>> = [];
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (url.includes('conversations.history')) return slackResponse({ messages: [target] });
+    if (url.includes('chat.')) writes.push(JSON.parse(String(init?.body)));
+    return slackResponse({ ts: '1787334034.300149', messages: [], permalink: 'https://slack.test/thread' });
+  });
+  await relayCodexSlackEvent({ SLACK_BOT_TOKEN: 'test', SLACK_DEFAULT_PR_CHANNEL_ID: 'COWN123', SLACK_TASK_CHANNEL_ID: 'CTASK123' }, event({ eventSource: 'github', eventType: 'turn_completed', prNumber: 220, content: `fix ${taskIdForKey('pr:999')}`, refreshCommandCenter: false }), fetcher);
+  expect(writes.length).toBeGreaterThan(0);
+  expect(writes.every(write => write.channel !== 'CFOREIGN123')).toBe(true);
+  expect(writes.filter(write => write.ts === '300.001')).toEqual([]);
+});

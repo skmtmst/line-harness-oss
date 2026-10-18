@@ -1,3 +1,5 @@
+import { navigationProof } from '../lib/navigation-proof.js';
+import { storedRedirectTarget } from '../lib/safe-redirect.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getFriendByLineUserIdForAccount, getLineAccountById, getLineAccounts, getTrackedLinkById, getMessageTemplateById } from '@line-crm/db';
@@ -127,7 +129,11 @@ export const post__api_links_wrap_2 = async (c: Context<Env, "/api/links/wrap">)
       return c.json({ success: false, error: 'LIFF_URL not configured' }, 500);
     }
 
-    const params = new URLSearchParams({ redirect: body.url });
+    const destination = storedRedirectTarget(body.url);
+    if (!destination) return inputError(c, { success: false, error: 'url is required' }, 400, ['url']);
+    const liffId = new URL(liffUrl).pathname.split('/').filter(Boolean)[0] || '';
+    const proof = await navigationProof(c.env.LINE_CHANNEL_SECRET, `redirect:${liffId}`, destination);
+    const params = new URLSearchParams({ redirect: destination, redirectProof: proof });
     if (body.ref) {
       params.set('ref', body.ref);
     }

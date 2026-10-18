@@ -64,7 +64,9 @@ function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
 
 /** 保存形式が壊れていても例外を出さず false を返す。 */
 export async function verifyPassword(password: string, stored: string | null | undefined): Promise<boolean> {
-  if (!stored || typeof password !== 'string') return false;
+  if (typeof password !== 'string') return false;
+  const missing = !stored;
+  stored ||= `${ALGORITHM}$${ITERATIONS}$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`;
   const [algorithm, iterationsText, saltText, hashText] = stored.split('$');
   if (algorithm !== ALGORITHM || !iterationsText || !saltText || !hashText) return false;
   const iterations = Number.parseInt(iterationsText, 10);
@@ -72,7 +74,7 @@ export async function verifyPassword(password: string, stored: string | null | u
   try {
     const expected = fromBase64(hashText);
     const actual = await derive(password, fromBase64(saltText), iterations);
-    return constantTimeEqual(actual, expected);
+    return constantTimeEqual(actual, expected) && !missing;
   } catch {
     return false;
   }

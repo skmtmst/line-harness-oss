@@ -1,3 +1,4 @@
+import { escapeHtml } from '../lib/html-escape.js';
 import '../../../liff/src/card-surface.css';
 import { choiceReceptionLabel } from '../../../liff/src/lib/form-reception.js';
 import {applyCustomerFormTheme} from './customer-look.js';
@@ -111,11 +112,7 @@ const state: FormState = {
 // Replier pool loading state (shared between renderFormPage and attachXAutocomplete)
 let _replierPoolReady = false;
 
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+
 
 function apiCall(path: string, options?: RequestInit): Promise<Response> {
   const idToken = liff.getIDToken();
@@ -153,7 +150,7 @@ function receptionOption(field: FormField, label: string): string {
   return escapeHtml(label + choiceReceptionLabel(choiceCapacity(field, label)));
 }
 
-function renderField(field: FormField): string {
+export function renderField(field: FormField): string {
   const required = field.required ? ' required' : '';
   const placeholder = field.placeholder ? ` placeholder="${escapeHtml(field.placeholder)}"` : '';
   const requiredMark = field.required ? '<span class="required-mark">*</span>' : '';

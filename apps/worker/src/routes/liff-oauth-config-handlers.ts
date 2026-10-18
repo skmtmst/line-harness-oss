@@ -1,16 +1,19 @@
+import { getCookie, deleteCookie } from 'hono/cookie';
+import { verifyNavigationProof } from '../lib/navigation-proof.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 
 import { accountCustomerLook } from '../services/customer-look.js';
 import { customerLookPublicSettings, DEFAULT_CUSTOMER_LOOK } from '@line-crm/shared';
 import { receiveEntryRouteCoupon } from '../services/entry-route-coupon.js';
 
-import { getFriendByLineUserIdForAccount, createUser, getUserByEmail, linkFriendToUser, upsertFriend, getEntryRouteByRefCode, recordRefTracking, getLineAccountByChannelId, getLineAccountById, getLineAccounts, getTrackedLinkById, getMessageTemplateById, getScenarios, enrollFriendInScenario, getFriendAddScenarioIds, resolveLineCredential } from '@line-crm/db';
+import { getFriendByLineUserIdForAccount, createUser, getUserByEmailForAccess, linkFriendToUser, upsertFriend, getEntryRouteByRefCode, recordRefTracking, getLineAccountByChannelId, getLineAccountById, getLineAccounts, getTrackedLinkById, getMessageTemplateById, getScenarios, enrollFriendInScenario, getFriendAddScenarioIds, resolveLineCredential } from '@line-crm/db';
 import { isStoppedEntryRouteRef, recordStopSuppressionSafe } from '../services/entry-route-stop.js';
 import { buildIntroMessage } from '../services/intro-message.js';
 import { introMessagePayload } from '../lib/intro-message-payload.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
-import { safeRedirectTarget } from '../lib/safe-redirect.js';
+import { safeRedirectTarget, storedRedirectTarget } from '../lib/safe-redirect.js';
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { decodeState, errorPage, stoppedLineAccountResponse, saveFriendAddCandidate, linkIgIgsid, saveIgAccountMeta, applyRefAttribution, resolveXHarnessToken, applyXHarnessActions, completionPage } from './liff-definition.js';
@@ -24,6 +27,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
   // Parse state (contains ref, redirect, and ad click IDs)
   let ref = '';
   let redirect = '';
+  let redirectProof = '';
   let formId = '';
   let gateParam = '';
   let xhParam = '';
@@ -40,9 +44,16 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
   let igaParam = '';
   let iganParam = '';
   try {
-    const parsed = JSON.parse(decodeState(stateParam));
+    const [payload, proof, extra] = stateParam.split('.');
+    if (extra || !await verifyNavigationProof(c.env.LINE_CHANNEL_SECRET, 'liff-oauth', payload, proof || '')) return c.html(errorPage('Authorization failed'), 400);
+    const envelope = JSON.parse(decodeState(payload));
+    const nonce = getCookie(c, 'lh_liff_oauth');
+    deleteCookie(c, 'lh_liff_oauth', { path: '/auth', secure: true, sameSite: 'Lax' });
+    if (!nonce || nonce !== envelope.nonce || !Number.isFinite(envelope.expires) || envelope.expires <= Date.now() || envelope.expires > Date.now() + 10 * 60_000) return c.html(errorPage('Authorization failed'), 400);
+    const parsed = JSON.parse(envelope.data);
     ref = parsed.ref || '';
     redirect = parsed.redirect || '';
+    redirectProof = parsed.redirectProof || '';
     formId = parsed.form || '';
     gateParam = parsed.gate || '';
     xhParam = parsed.xh || '';
@@ -54,12 +65,12 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     utmMedium = parsed.utmMedium || '';
     utmCampaign = parsed.utmCampaign || '';
     accountParam = parsed.account || '';
-    uidParam = parsed.uid || '';
+
     igParam = parsed.ig || '';
     igaParam = parsed.iga || '';
     iganParam = parsed.igan || '';
   } catch {
-    // ignore
+    return c.html(errorPage('Authorization failed'), 400);
   }
 
   if (error || !code) {
@@ -211,6 +222,10 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     const igLinkOk = await linkIgIgsid(c, friend.id, igParam);
     if (igLinkOk) await saveIgAccountMeta(db, friend.id, igaParam, iganParam);
 
+    const identityAccount = loginLineAccountId ? await getLineAccountById(db, loginLineAccountId) : null;
+    if (!identityAccount) return c.html(errorPage('Authorization failed'), 400);
+    const identityTenant = identityAccount.tenant_id ?? DEFAULT_TENANT_ID;
+    const identityAccounts = (await getLineAccounts(db)).filter(a => (a.tenant_id ?? DEFAULT_TENANT_ID) === identityTenant).map(a => a.id);
     // Create or find user → link
     let userId: string | null = null;
 
@@ -220,13 +235,11 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       userId = existingUserId;
     } else {
       // Cross-account linking: if uid is provided, use that existing UUID
-      if (uidParam) {
-        userId = uidParam;
-      }
+
 
       // Try to find by email
       if (!userId && verified.email) {
-        const existingUser = await getUserByEmail(db, verified.email);
+        const existingUser = await getUserByEmailForAccess(db, verified.email, { tenantId: identityTenant, allowedAccountIds: identityAccounts, includeUnlinked: true });
         if (existingUser) userId = existingUser.id;
       }
 
@@ -234,6 +247,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
       if (!userId) {
         const newUser = await createUser(db, {
           email: verified.email || null,
+          tenantId: identityTenant,
           displayName,
         });
         userId = newUser.id;
@@ -389,7 +403,8 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
     // http(s) destinations and root-relative paths are honored (external
     // marketing/LP redirects are an intentional feature; javascript:/data:/
     // protocol-relative targets are not).
-    const safeRedirect = safeRedirectTarget(redirect);
+    const safeRedirect = safeRedirectTarget(redirect, new URL(c.req.url).origin)
+      || (await verifyNavigationProof(c.env.LINE_CHANNEL_SECRET, `redirect:${identityAccount.liff_id ?? ''}`, redirect, redirectProof) ? storedRedirectTarget(redirect) : null);
     if (safeRedirect) {
       return c.redirect(safeRedirect);
     }
@@ -577,7 +592,7 @@ export const get__api_liff_config_3 = async (c: Context<Env, "/api/liff/config">
 
     return c.json({
       success: true,
-      data: { botBasicId, accountName, accountId, customerLook: account ? (await accountCustomerLook(c.env.DB,account.id)).look : DEFAULT_CUSTOMER_LOOK },
+      data: { botBasicId, accountName, accountId, redirectTarget: await verifyNavigationProof(c.env.LINE_CHANNEL_SECRET, `redirect:${liffId}`, c.req.query('redirect') || '', c.req.query('redirectProof') || '') ? storedRedirectTarget(c.req.query('redirect')) : null, customerLook: account ? (await accountCustomerLook(c.env.DB,account.id)).look : DEFAULT_CUSTOMER_LOOK },
     });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_liff_failed","route":"GET /api/liff/config"}));

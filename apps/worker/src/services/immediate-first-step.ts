@@ -447,7 +447,7 @@ export async function pushImmediateFirstStep(
         resolved.messageType,
         expanded,
         ctx.workerUrl,
-        { lineAccountId: friend.line_account_id ?? ctxAccount?.id ?? null, friendId },
+        { lineAccountId: friend.line_account_id ?? ctxAccount?.id ?? null, friendId, sourceContent: resolved.messageContent },
       );
       messages = [buildMessage(decorated.messageType, decorated.content)];
     }

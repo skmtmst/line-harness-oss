@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { vi, describe, expect, it } from 'vitest';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from './password-hash.js';
 
 describe('パスワードのハッシュ（36-4）', () => {
@@ -29,4 +29,14 @@ describe('パスワードのハッシュ（36-4）', () => {
     expect(validatePasswordPolicy('a'.repeat(128) + '1')).toContain('128文字');
     expect(validatePasswordPolicy('abcdefg1')).toBeNull();
   });
+});
+
+
+it('F20: missing credentials perform the same PBKDF2 work', async () => {
+  const spy = vi.spyOn(crypto.subtle, 'deriveBits');
+  try {
+    expect(await verifyPassword('wrong', null)).toBe(false);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0]).toMatchObject({ name: 'PBKDF2', iterations: 100000 });
+  } finally { spy.mockRestore(); }
 });

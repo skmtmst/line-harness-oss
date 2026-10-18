@@ -288,6 +288,20 @@ export async function linkFriendToUser(
   userId: string,
   actor: RelinkActor | null = null,
 ): Promise<boolean> {
+  // Identity and wallet operations must share a tenant even for legacy NULL users.
+  const boundary = await db.prepare(`SELECT f.id FROM friends f
+    LEFT JOIN line_accounts a ON a.id=f.line_account_id
+    JOIN users u ON u.id=?
+    WHERE f.id=? AND COALESCE(u.status,'active') <> 'archived'
+      AND COALESCE(u.tenant_id, COALESCE(a.tenant_id, ?)) = COALESCE(a.tenant_id, ?)
+      AND NOT EXISTS (SELECT 1 FROM friends other
+        LEFT JOIN line_accounts oa ON oa.id=other.line_account_id
+        WHERE other.user_id=u.id AND COALESCE(oa.tenant_id, ?) <> COALESCE(a.tenant_id, ?))
+      AND (u.tenant_id IS NOT NULL OR COALESCE(a.tenant_id, ?)=?
+        OR EXISTS (SELECT 1 FROM friends own JOIN line_accounts own_a ON own_a.id=own.line_account_id
+          WHERE own.user_id=u.id AND COALESCE(own_a.tenant_id,?)=COALESCE(a.tenant_id,?)))
+  `).bind(userId,friendId,...Array(8).fill(DEFAULT_TENANT_ID)).first();
+  if (!boundary) return false;
   const now = jstNow();
   const userKey = `user:${userId}`;
   const friendKey = `friend:${friendId}`;

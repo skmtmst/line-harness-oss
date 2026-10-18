@@ -22,6 +22,9 @@ export function formWebhookTarget(template: string, answers: Record<string, unkn
   if (!authority || /[{}\\]/.test(authority)) throw new Error('unsafe_destination');
   const origin = new URL(template).origin;
   const value = template.replace(/\{([^{}]+)\}/g, (_, key: string) => encodeURIComponent(String(answers[key] ?? '')));
+  const templatePath = template.slice(authority.length).split(/[?#]/)[0].split('/');
+  const renderedPath = value.slice(authority.length).split(/[?#]/)[0].split('/');
+  if (templatePath.some((segment, i) => /\{[^{}]+\}/.test(segment) && /^(?:\.|%2e){1,2}$/i.test(renderedPath[i] ?? ''))) throw new Error('unsafe_destination');
   if (new URL(value).origin !== origin) throw new Error('unsafe_destination');
   return value;
 }

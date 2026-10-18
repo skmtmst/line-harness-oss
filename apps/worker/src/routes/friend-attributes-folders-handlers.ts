@@ -17,13 +17,11 @@ export const post__api_folders_1 = async (c: Context<Env, "/api/folders">) => {
     if (!name) return inputError(c, { success: false, error: 'フォルダ名を入力してください' }, 400, ["name"]);
 
     const integrationKind = ['automation', 'common_action', 'webhook', 'conversion', 'affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule'].includes(body.kind);
-    const accountId = integrationKind || body.kind === 'webinar' || body.kind === 'tag' || body.kind === 'template' || body.kind === 'form'
-      ? (typeof body.accountId === 'string' ? body.accountId.trim() : '')
-      : '';
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
     // テンプレートのフォルダはアカウント単位（N-147）。accountId なしで作れるのは
     // 全アカウントを見られる人だけ（タグと同じ決まり）。画面は必ず選択中の
     // アカウントを送る。回答フォームの箱（R25）も同じく選択中のアカウントに付ける。
-    if ((body.kind === 'tag' || body.kind === 'template' || body.kind === 'form') && !accountId) {
+    if (!accountId) {
       const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
       if (!scope.canSeeUnassigned) return inputError(c, { success: false, error: 'account_id_required' }, 400, ["accountId"]);
     }

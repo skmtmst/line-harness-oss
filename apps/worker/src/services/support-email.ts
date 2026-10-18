@@ -83,8 +83,8 @@ async function findThreadId(
   const replyId = inReplyTo || lastReference(references);
   if (replyId) {
     const byReply = await db.prepare(
-      'SELECT thread_id FROM support_email_messages WHERE message_id = ? LIMIT 1',
-    ).bind(replyId).first<{ thread_id: string }>();
+      `SELECT m.thread_id, m.sender_email, m.direction, t.customer_email FROM support_email_messages m JOIN support_email_threads t ON t.id=m.thread_id WHERE m.message_id = ? AND lower(t.customer_email) = ? LIMIT 1`,
+    ).bind(replyId, customerEmail).first<{ thread_id: string }>();
     if (byReply?.thread_id) return byReply.thread_id;
   }
 
@@ -125,9 +125,10 @@ export async function storeSupportEmail(
 
   if (messageId) {
     const duplicate = await env.DB.prepare(
-      'SELECT thread_id FROM support_email_messages WHERE message_id = ? LIMIT 1',
-    ).bind(messageId).first<{ thread_id: string }>();
+      `SELECT m.thread_id, m.sender_email, m.direction, t.customer_email FROM support_email_messages m JOIN support_email_threads t ON t.id=m.thread_id WHERE m.message_id = ? LIMIT 1`,
+    ).bind(messageId).first<{ thread_id: string; sender_email: string; direction: string; customer_email: string }>();
     if (duplicate?.thread_id) {
+      if (duplicate.direction !== 'incoming' || duplicate.sender_email.trim().toLowerCase() !== customerEmail || duplicate.customer_email.trim().toLowerCase() !== customerEmail) throw new Error('SUPPORT_MESSAGE_ID_COLLISION');
       const correctedAt = new Date().toISOString();
       await env.DB.batch([
         env.DB.prepare(
@@ -137,11 +138,10 @@ export async function storeSupportEmail(
         ).bind(customerEmail, customerName, subject, body, messageId),
         env.DB.prepare(
           `UPDATE support_email_threads
-           SET customer_email = ?, customer_name = COALESCE(?, customer_name),
+           SET customer_name = COALESCE(?, customer_name),
                subject = ?, normalized_subject = ?, updated_at = ?
            WHERE id = ?`,
         ).bind(
-          customerEmail,
           customerName,
           subject,
           normalizedSubject,

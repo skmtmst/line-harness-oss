@@ -1,3 +1,4 @@
+import { bumpAuthThrottle } from './auth-email.js';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow, nextVersionToken } from './utils.js';
 
@@ -371,6 +372,9 @@ export async function consumeStaffLineLinkCode(
   db: D1Database,
   input: { code: string; friendId: string },
 ): Promise<{ staffId: string; staffName: string } | null> {
+  const senderAttempts = await bumpAuthThrottle(db, `notice-link:friend:${input.friendId}`, 15 * 60_000);
+  const globalAttempts = await bumpAuthThrottle(db, 'notice-link:global', 15 * 60_000);
+  if (senderAttempts > 5 || globalAttempts > 25) return null;
   const now = jstNow();
   const row = await db
     .prepare(`SELECT c.code, c.staff_id, sm.name FROM staff_line_link_codes c JOIN staff_members sm ON sm.id = c.staff_id
@@ -378,11 +382,11 @@ export async function consumeStaffLineLinkCode(
     .bind(input.code, now)
     .first<{ code: string; staff_id: string; name: string }>();
   if (!row) return null;
-  await db.batch([
-    db.prepare(`UPDATE staff_line_link_codes SET used_at = ? WHERE code = ?`).bind(now, row.code),
-    db.prepare(`UPDATE staff_members SET notice_friend_id = ?, notice_linked_at = ? WHERE id = ?`).bind(input.friendId, now, row.staff_id),
+  const results = await db.batch([
+    db.prepare(`UPDATE staff_line_link_codes SET used_at = ? WHERE code = ? AND used_at IS NULL AND expires_at > ?`).bind(now, row.code, now),
+    db.prepare(`UPDATE staff_members SET notice_friend_id = ?, notice_linked_at = ? WHERE id = ? AND changes() = 1`).bind(input.friendId, now, row.staff_id),
   ]);
-  return { staffId: row.staff_id, staffName: row.name };
+  return results[0].meta.changes === 1 ? { staffId: row.staff_id, staffName: row.name } : null;
 }
 
 export async function countNoticeLinkedStaff(db: D1Database, excludeTenantId: string): Promise<{ linked: number; total: number }> {

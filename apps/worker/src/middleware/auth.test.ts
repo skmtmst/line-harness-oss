@@ -533,7 +533,7 @@ describe('protected API access', () => {
 describe('staff feature permissions', () => {
   const bearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
 
-  test.each(['/api/support', '/api/operators', '/api/friends/friend-1/messages'])(
+  test.each(['/api/support', '/api/operators', '/api/friends/friend-1/messages', '/api/friends/friend-1/%6Dessages', '/api/friends/friend-1/me%73sages'])(
     'chat permission protects %s',
     async (path) => {
       expect((await app().request(path, bearer('chats-key'), crossSiteEnv())).status).toBe(200);

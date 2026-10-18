@@ -1,3 +1,4 @@
+import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import Database from 'better-sqlite3';
@@ -140,11 +141,12 @@ async function seedDb(dbs: SqliteD1) {
   });
 }
 
-function postCallback(app: Hono<Env>, env: Env['Bindings'], ref: string, extra: Record<string, string> = {}) {
-  const state = btoa(JSON.stringify({ ref, ...extra }));
+async function postCallback(app: Hono<Env>, env: Env['Bindings'], ref: string, extra: Record<string, string> = {}) {
+  const signed = await signedLiffState(env.LINE_CHANNEL_SECRET, { ref, ...extra });
+  const state = signed.state;
   return app.request(
     `/auth/callback?code=x&state=${encodeURIComponent(state)}`,
-    {},
+    { headers: { Cookie: signed.cookie } },
     env,
   );
 }

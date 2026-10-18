@@ -104,7 +104,7 @@ export async function authenticateApiToken(
 export async function authMiddleware(c: Context<Env>, next: Next): Promise<Response | void> {
   // Skip auth for the LINE webhook endpoint — it uses signature verification instead
   // Skip auth for OpenAPI docs — public documentation
-  const path = new URL(c.req.url).pathname;
+  const path = c.req.path;
   // LIFF / admin の SPA アセットは Authorization ヘッダなしで HTML を取りに
   // くる。Worker は API 以外のパスを ASSETS バインディングから配信するので、
   // /api/ で始まらないパスは認証 skip して static asset として返す。

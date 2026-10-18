@@ -364,7 +364,7 @@ describe('GET /api/liff/mileage/me — generic wallet', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { opportunities: Array<{ url: string }> };
     const missionUrl = new URL(body.opportunities[0].url);
-    expect(missionUrl.searchParams.get('crossAccountToken')).toMatch(/^v1\./u);
+    expect(missionUrl.searchParams.get('crossAccountToken')).toMatch(/^v2\./u);
   });
 });
 
