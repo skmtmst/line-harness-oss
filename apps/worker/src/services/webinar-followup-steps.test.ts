@@ -16,7 +16,7 @@ const options=(dispatch:(request:Request)=>Promise<Response>)=>({proxyBaseUrl:'h
 describe('W9 bounded automatic followup recovery',()=>{
  it('retries a transient failure later with the same number and immutable text',async()=>{
   const seen:Request[]=[];let fail=true;
-  const dispatch=vi.fn(async(request:Request)=>{seen.push(request.clone());return new Response('{}',{status:fail?503:200})});
+  const dispatch=vi.fn(async(request:Request)=>{seen.push(request.clone());return new Response('{}',{status:fail?429:200})});
   expect(await processWebinarFollowups(item.db,options(dispatch))).toEqual({sent:0,failed:1});
   await processWebinarFollowups(item.db,options(dispatch));expect(dispatch).toHaveBeenCalledOnce();
   item.raw.prepare("UPDATE webinars SET title='edited'").run();vi.advanceTimersByTime(60_000);fail=false;
@@ -27,13 +27,13 @@ describe('W9 bounded automatic followup recovery',()=>{
   await processWebinarFollowups(item.db,options(dispatch));expect(dispatch).toHaveBeenCalledTimes(2);
   expect(JSON.stringify(item.raw.prepare('SELECT input_json FROM workflow_steps').all())).not.toContain('private-token');
  });
- it('stopping does not mark sent and five failures exhaust automatic attempts',async()=>{
-  const dispatch=vi.fn(async()=>new Response('{}',{status:503}));stop.value=true;
+ it('stopping does not mark sent and four rejections exhaust automatic attempts',async()=>{
+  const dispatch=vi.fn(async()=>new Response('{}',{status:429}));stop.value=true;
   await processWebinarFollowups(item.db,options(dispatch));expect(item.raw.prepare('SELECT count(*) AS n FROM webinar_journey_followups').get()).toEqual({n:0});
   stop.value=false;
   for(let i=0;i<6;i++){await processWebinarFollowups(item.db,options(dispatch));vi.advanceTimersByTime(3600_000)}
-  expect(dispatch).toHaveBeenCalledTimes(5);
-  expect(item.raw.prepare('SELECT status,attempt_count FROM workflow_steps').get()).toEqual({status:'exhausted',attempt_count:5});
+  expect(dispatch).toHaveBeenCalledTimes(4);
+  expect(item.raw.prepare('SELECT status,attempt_count FROM workflow_steps').get()).toEqual({status:'exhausted',attempt_count:4});
  });
  it('can recover from missing LIFF configuration without creating an empty wire snapshot',async()=>{
   item.raw.prepare('UPDATE line_accounts SET liff_id=NULL').run();
@@ -42,4 +42,35 @@ describe('W9 bounded automatic followup recovery',()=>{
   item.raw.prepare("UPDATE line_accounts SET liff_id='restored'").run();vi.advanceTimersByTime(60_000);
   expect(await processWebinarFollowups(item.db,options(dispatch))).toEqual({sent:1,failed:0});
  });
+ it.each(['disconnect','accepted_storage_failure'])('does not send an unknown followup again: %s',async failure=>{
+  const dispatch=vi.fn(async()=>{if(failure==='disconnect')throw new Error('lost response');return new Response('{}',{headers:{'x-line-request-id':'accepted-webinar'}})});
+  if(failure==='accepted_storage_failure')item.raw.exec("CREATE TRIGGER fail_followup_completion BEFORE UPDATE ON workflow_steps WHEN NEW.status='succeeded' BEGIN SELECT RAISE(ABORT,'injected'); END");
+  await processWebinarFollowups(item.db,options(dispatch));
+  vi.advanceTimersByTime(3600_000);await processWebinarFollowups(item.db,options(dispatch));
+  expect(dispatch).toHaveBeenCalledOnce();
+  if(failure==='accepted_storage_failure') {
+    const row=item.raw.prepare('SELECT result_json FROM workflow_steps').get() as {result_json:string};
+    expect(JSON.parse(row.result_json)).toEqual({requestId:'accepted-webinar'});
+  }
+  expect(item.raw.prepare('SELECT status,error_code FROM workflow_steps').get()).toEqual({status:'unknown',error_code:'delivery_unknown'});
+ });
+
+ it('holds an ambiguous historical followup failure without resetting attempts or its key',async()=>{
+  const dispatch=vi.fn(async()=>new Response('{}',{status:429}));await processWebinarFollowups(item.db,options(dispatch));
+  item.raw.exec("UPDATE workflow_steps SET error_code='delivery_failed',max_attempts=5");
+  const before=item.raw.prepare('SELECT retry_key,attempt_count FROM workflow_steps').get();
+  vi.advanceTimersByTime(3600_000);await processWebinarFollowups(item.db,options(dispatch));
+  expect(dispatch).toHaveBeenCalledOnce();expect(item.raw.prepare('SELECT retry_key,attempt_count FROM workflow_steps').get()).toEqual(before);
+  expect(item.raw.prepare('SELECT status,error_code FROM workflow_steps').get()).toEqual({status:'unknown',error_code:'delivery_unknown'});
+ });
+
+});
+
+it('stores an over-budget Retry-After without shortening it or sending again',async()=>{
+ const now=Date.now();
+ const dispatch=vi.fn(async()=>new Response('{}',{status:429,headers:{'Retry-After':'7200'}}));
+ await processWebinarFollowups(item.db,options(dispatch));
+ expect(item.raw.prepare('SELECT status,error_code,next_attempt_at FROM workflow_steps').get()).toEqual({status:'exhausted',error_code:'retry_after_exceeds_budget',next_attempt_at:now+7200_000});
+ vi.advanceTimersByTime(3600_000);await processWebinarFollowups(item.db,options(dispatch));
+ expect(dispatch).toHaveBeenCalledOnce();
 });

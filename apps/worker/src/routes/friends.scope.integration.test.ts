@@ -89,6 +89,23 @@ describe('N-032 friend stats account scope integration (#664)', () => {
     }, target.env);
   }
 
+  it.each(['recent','oldest'])('cursor pagination keeps timestamp ties stable, ignores earlier insertions and retains tenant scope: %s',async sort=>{
+    const base=`/api/friends?includeTags=false&limit=1&pagination=cursor&sort=${sort}&lineAccountId=account-a`;
+    const seen:string[]=[];let cursor:string|null=null;
+    for(let page=0;page<4;page++){
+      const response=await get(base+(cursor?`&cursor=${cursor}`:''),'key-partial');expect(response.status).toBe(200);
+      const {data}=await response.json<{data:{items:Array<{id:string}>,nextCursor:string|null,total:number}}>();
+      expect(data.total).toBeGreaterThanOrEqual(2);seen.push(...data.items.map(item=>item.id));
+      if(page===0)insertFriend(testDb.raw,'insert-before',{line_account_id:'account-a',created_at:sort==='recent'?'2999-01-01':'2000-01-01'});
+      cursor=data.nextCursor;if(!cursor)break;
+    }
+    expect(seen).toEqual(sort==='recent'?['friend-a-2','friend-a-1']:['friend-a-1','friend-a-2']);
+    expect(new Set(seen).size).toBe(seen.length);
+    expect((await get(base+'&cursor=not-a-valid-cursor','key-partial')).status).toBe(400);
+    expect((await get(base+'&offset=1','key-partial')).status).toBe(400);
+    expect((await get(base+'&search=test','key-partial')).status).toBe(400);
+  });
+
   async function visibleCounts(apiKey: string, lineAccountId?: string) {
     const accountQuery = lineAccountId ? `&lineAccountId=${lineAccountId}` : '';
     const lineAccountQuery = lineAccountId ? `?lineAccountId=${lineAccountId}` : '';

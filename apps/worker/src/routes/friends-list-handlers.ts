@@ -1,3 +1,4 @@
+import { readFriendListCursor, friendListCursor, type FriendListCursor } from './friend-list-cursor.js';
 import { idChunks } from '@line-crm/db/id-queries';
 
 import { getFriendListFieldValues, getFriendAddBreakdown, getFriendTagsByFriendIds, getSavedSearchById, recordSavedSearchUsage, validateSearchConditions } from '@line-crm/db';
@@ -62,6 +63,15 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
     // match-quality ranking and only flip the secondary `created_at` tier.
     const requestedSort = c.req.query('sort') ?? directConditions?.list?.sort;
     const sort: 'recent' | 'oldest' = requestedSort === 'oldest' ? 'oldest' : 'recent';
+    const cursorMode=c.req.query('pagination')==='cursor'||c.req.query('cursor')!==undefined;
+    let cursor:FriendListCursor|undefined;
+    if(cursorMode){
+      if(search||offset>0)return c.json({success:false,error:'カーソルのページ送りでは検索とoffsetを同時に指定できません'},400);
+      try{const raw=c.req.query('cursor');if(raw)cursor=readFriendListCursor(raw);
+        if(cursor&&cursor.sort!==sort)throw new Error('invalid_list_cursor');
+      }catch{return c.json({success:false,error:'ページ送りの指定を確認してください'},400);}
+    }
+
     // ?handled=unhandled filters to friends whose latest activity is an
     // incoming message (mirroring the L-step "未対応" tab). Done in SQL so
     // pagination + total counts are correct; client-side filter would only
@@ -393,15 +403,17 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
                   ELSE 3
                 END AS match_score
          ${baseFrom} ${where}
-         ORDER BY match_score ASC, f.created_at ${createdOrder}
+         ORDER BY match_score ASC, f.created_at ${createdOrder}, f.id ${createdOrder}
          LIMIT ? OFFSET ?`,
       );
       listBinds = [exactPattern, prefixPattern, wordStartAscii, wordStartFullWidth, ...binds, limit, offset];
     } else {
+      const compare=sort==='oldest'?'>':'<';
+      const cursorWhere=cursor?`${where ? ' AND' : 'WHERE'} (f.created_at ${compare} ? OR (f.created_at=? AND f.id ${compare} ?))`:'';
       listStmt = db.prepare(
-        `SELECT ${baseSelect} ${baseFrom} ${where} ORDER BY f.created_at ${createdOrder} LIMIT ? OFFSET ?`,
+        `SELECT ${baseSelect} ${baseFrom} ${where} ${cursorWhere} ORDER BY f.created_at ${createdOrder}, f.id ${createdOrder} LIMIT ?${cursorMode?'':' OFFSET ?'}`,
       );
-      listBinds = [...binds, limit, offset];
+      listBinds = [...binds,...(cursor?[cursor.createdAt,cursor.createdAt,cursor.id]:[]),limit,...(cursorMode?[]:[offset])];
     }
     const listResult = await listStmt.bind(...listBinds).all<DbFriend>();
     const items = listResult.results;
@@ -550,6 +562,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       success: true,
       data: {
         items: itemsWithTags,
+        ...(cursorMode?{nextCursor:items.length===limit?friendListCursor({createdAt:items.at(-1)!.created_at,id:items.at(-1)!.id,sort}):null}:{}),
         total,
         page: Math.floor(offset / limit) + 1,
         limit,

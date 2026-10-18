@@ -1,3 +1,4 @@
+import { readNotificationStyle } from './notification-words.js';
 import { workflowBindings, workflowJson } from '@line-crm/db';
 import { bookingLinePlan } from './booking-line-delivery.js';
 import { renderEventNotificationText, type EventNotificationContext, type EventNotificationKind } from './event-booking-notifier.js';
@@ -9,8 +10,9 @@ import { prepareEventReminders } from './event-reminder-plan.js';
 export async function prepareEventNotification(db:D1Database,input:{accountId:string;operationId:string;to:string;
   kind:EventNotificationKind;ctx:EventNotificationContext;subject:EventNotificationSubject;now?:Date}) {
   const now=(input.now??new Date()).getTime();
-  const snapshot={to:input.to,kind:input.kind,ctx:input.ctx,
-    messages:[{type:'text' as const,text:renderEventNotificationText(input.kind,input.ctx)}],subject:input.subject};
+  const ctx={...input.ctx,style:input.ctx.style??await readNotificationStyle(db,input.accountId)};
+  const snapshot={to:input.to,kind:input.kind,ctx,
+    messages:[{type:'text' as const,text:renderEventNotificationText(input.kind,ctx)}],subject:input.subject};
   const plan=await bookingLinePlan({...input,snapshot,now:()=>now});
   return db.prepare(`INSERT OR IGNORE INTO workflow_steps
     (scope_id,process_kind,subject_id,step_key,retry_key,input_json,max_attempts,status,created_at,updated_at,attempt_count)

@@ -36,7 +36,7 @@ describe('リッチメニューの残り板', () => {
   })
 
   it('競合は409のときだけ帯にする（入力は残す）', () => {
-    expect(CREATE).toContain('e.status === 409')
+    expect(CREATE).toContain('isSaveConflict(e) && group')
     expect(CREATE).toContain('setConflict(true)')
   })
 

@@ -128,7 +128,6 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
     'v8/mileage/earning-rules.tsx',
     'v8/mileage/history.tsx',
     'v8/nen-health/summary.tsx',
-    'v8/nen-posts/review.tsx',
     'v8/restaurant/google/reviews.tsx',
     'v8/settings/ec-commerce/connector.tsx',
     'v8/settings/emergency/health.tsx',

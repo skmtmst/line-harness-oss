@@ -1,8 +1,9 @@
+import { workflowLineClient } from './workflow-line-client.js';
 import { getEcDispatchStatus, markEcDispatch } from './ec-dispatch-ledger.js';
 import { upsertEcEventReadModels } from '@line-crm/db';
-import { acquireWorkflow, runWorkflowStep, type WorkflowExecution } from './workflow-execution.js';
+import { acquireWorkflow, type WorkflowExecution } from './workflow-execution.js';
 import {
-  getWorkflowStep,failWorkflowStep,
+  getWorkflowStep,
   attachEcOrderFriend,
   getCustomerNotificationSource,
   getFriendByLineUserIdForAccount,
@@ -406,21 +407,23 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
         idempotencyKey: notificationKey, now,
       });
       let providerRequestId: string | null = null;
+      let attemptedSend=false;
       try {
-        const pushed = await runWorkflowStep(execution.db,{...execution.ref,stepKey:'customer_notification'},async lease=>{
-          if(lease.attempt_count>1 && Date.now()-lease.first_attempt_at!>=23*3600_000){
-            await failWorkflowStep(execution.db,{...execution.ref,stepKey:'customer_notification'},lease.lease_owner!,{unknown:true,code:'delivery_unknown'});
-            throw new Error('delivery_unknown');
-          }
-          const original=JSON.parse(lease.input_json!);
-          return lineClient.pushMessageWithRequestId(original.to,original.messages,lease.retry_key);
-        },{input:{to:event.line_user_id,messages:[message]},retryKey,maxAttempts:5});
+        // Retain the existing checkpoint/key when bringing this older sender
+        // through the same started/unknown/retry-budget rules as other LINE sends.
+        const pushed = await workflowLineClient(lineClient,execution,{
+          stepKey:'customer_notification',retryKeyValidityMs:23*3600_000,onAttempt:()=>{attemptedSend=true;},
+        })
+          .pushMessageWithRequestId(event.line_user_id,[message],retryKey);
         providerRequestId = pushed.requestId;
       } catch (pushError) {
+        const checkpoint=await getWorkflowStep(execution.db,{...execution.ref,stepKey:'customer_notification'});
+        const unknown=checkpoint?.status==='unknown'||checkpoint?.status==='running';
+        const classified=unknown?{code:'delivery_unknown',message:'送信結果を照合するまで再送しません。'}:classifyExternalDeliveryError(pushError);
         try {
           await markEcDispatch(db, {
             eventId: row.id, subscriber: 'notification', status: 'failed',
-            error: pushError instanceof Error ? pushError.message.slice(0, 500) : 'Unknown error',
+            error: classified.code,
             idempotencyKey: notificationKey, now,
           });
         } catch (markError) {
@@ -428,12 +431,11 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
         }
         // N-328: 送れなかった結果も共通送信台帳へ残す。秘密値を含まない
         // 安全な分類だけ書く。
-        const classified = classifyExternalDeliveryError(pushError);
         await recordCustomerEcDelivery(db, {
           ...ledgerBase,
           recipientId: friend.id,
           idempotencyKey: retryKey,
-          attemptedSend: true,
+          attemptedSend,
           finish: { kind: 'failed', errorCode: classified.code, errorMessage: classified.message },
         });
         throw pushError;
@@ -445,7 +447,7 @@ async function processClaimedEcEvent(db:D1Database,input:Parameters<typeof proce
         ...ledgerBase,
         recipientId: friend.id,
         idempotencyKey: retryKey,
-        attemptedSend: true,
+        attemptedSend,
         finish: { kind: 'accepted', providerRequestId },
       });
       await markEcDispatch(db, {

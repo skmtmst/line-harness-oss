@@ -1,5 +1,7 @@
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import path from 'node:path'
+import { readFileSync as readImplementation } from 'node:fs'
+import ts from 'typescript'
 
 import { describe, expect, it } from 'vitest'
 
@@ -15,6 +17,15 @@ import { describe, expect, it } from 'vitest'
 
 const SRC = path.join(__dirname, '..')
 const read = (...parts: string[]) => readFileSync(path.join(SRC, ...parts), 'utf8')
+
+// 委譲する入口ではなく、実際に保存・削除する関数の本体だけを見る。
+function implementationBody(file: string, name: string): string {
+  const source = readImplementation(path.join(SRC, file), 'utf8')
+  const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const declaration = tree.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name)
+  if (!declaration || !ts.isFunctionDeclaration(declaration) || !declaration.body) throw new Error(`${name} が見つかりません`)
+  return declaration.body.getText(tree)
+}
 
 /** 注意書きの中の字に当てないため、コメントを外す。 */
 function code(src: string): string {
@@ -65,10 +76,10 @@ describe('リッチメニュー編集の確認窓', () => {
   const detail = read('v8', 'rich-menu-edit', 'detail.tsx')
 
   it('ページ削除は窓を開くだけで、消せない理由があるときは押し口を出さない', () => {
-    const ask = fnBody(code(src), 'function requestTabCount')
+    const ask = implementationBody('app/rich-menus/new/create-tab-actions.tsx', 'requestMenuTabCount')
     expect(ask).toContain('setPendingTabCount(next)')
     expect(ask).toContain('removed.some(pageHasSettings)')
-    const remove = fnBody(code(src), 'function applyTabCount')
+    const remove = implementationBody('app/rich-menus/new/create-tab-actions.tsx', 'applyMenuTabCount')
     expect(remove).toContain('removePageBlockers(pages.slice(count), remaining).length > 0) return')
     const dialog = confirmDialogWith(src, 'blockers.length > 0')
     expect(dialog).toContain('onConfirm={blockers.length === 0 && next !== null')
@@ -80,12 +91,12 @@ describe('リッチメニュー編集の確認窓', () => {
   it('ページ削除の理由は窓の中に出す（alert に戻していない）', () => {
     const blockers = fnBody(code(src), 'function removePageBlockers')
     expect(blockers, 'alert へ戻っている').not.toContain('alert(')
-    expect(fnBody(code(src), 'function applyTabCount')).toContain('const count = next + 1')
+    expect(implementationBody('app/rich-menus/new/create-tab-actions.tsx', 'applyMenuTabCount')).toContain('const count = next + 1')
     expect(blockers, 'タブ切替の参照を見ていない').toContain('richmenuswitch')
   })
 
   it('LINE登録は二度押しを止め、失敗を握りつぶさない', () => {
-    const body = fnBody(code(src), 'async function handlePublish')
+    const body = implementationBody('app/rich-menus/new/create-publish-actions.tsx', 'publishMenuNow')
     expect(body, '二度押しを止めていない').toContain(
       'if (!group || publishing || saving) return',
     )

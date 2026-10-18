@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { cloneScenarioQuestion, isSelectableScenarioTemplate } from '../../v8/scenario-detail/question-template-model'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -6,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(join(HERE, '../../v8/templates/question-new.tsx'), 'utf8')
-const templates = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
+const templates = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 const css = readFileSync(join(HERE, '../../v8/templates/question-new.module.css'), 'utf8')
 const editor = readFileSync(join(HERE, '..', '..', 'components', 'scenarios', 'question-editor.tsx'), 'utf8')
 

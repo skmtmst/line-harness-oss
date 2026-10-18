@@ -1,4 +1,4 @@
-import { normalizedHarnessErrorPath, harnessErrorCode, harnessErrorIncidentKey, type HarnessErrorReport } from './slack-error-summary.js';
+import { safeWorkerIncidentId, normalizedHarnessErrorPath, harnessErrorCode, harnessErrorIncidentKey, type HarnessErrorReport } from './slack-error-summary.js';
 export type CodexSlackCategory = 'error' | 'idea' | 'fix' | 'decision';
 export type SlackTaskStatus = 'working' | 'review' | 'done';
 
@@ -1223,6 +1223,7 @@ export async function reportHarnessErrorToSlack(
     path ? `場所：${path}` : '',
     `内容：${message}`,
     `エラーID：ERR-${fingerprint}`,
+    safeWorkerIncidentId(report) ? `追跡番号：${safeWorkerIncidentId(report)}` : '',
     `TASK-ID：${taskId}`,
   ].filter(Boolean).join('\n');
   await relayCodexSlackEvent(config, {

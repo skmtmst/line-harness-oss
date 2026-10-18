@@ -1479,6 +1479,15 @@ describe('Webhookやり取り記録', () => {
     expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow, { current: undefined, previous: undefined });
   });
 
+  test('provider待機中の手動再送は409で理由を返す', async () => {
+    vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
+    vi.mocked(retryWebhookInteraction).mockRejectedValueOnce(new Error('retry_after_pending'));
+    const res=await receiveAndDrain(setupApp(),`/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'},baseEnv);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({error:expect.stringContaining('待機期限')});
+  });
+
   test('secretを読めない送り直しは503にし、秘密値を出さない(#650)', async () => {
     vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
     vi.mocked(retryWebhookInteraction).mockRejectedValueOnce(new Error('webhook_secret_unavailable'));

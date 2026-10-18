@@ -160,6 +160,12 @@ export async function holdExpiredLineRetryRuns(
   db: D1Database,
   input: { now: string },
 ): Promise<number> {
+  await db.prepare(`UPDATE reminder_delivery_runs SET status='permanent_failed',last_error_code='delivery_unknown',
+    last_error_message='以前の送信結果を照合するまで再送しません。',next_retry_at=NULL,lease_expires_at=NULL,completed_at=?,updated_at=?
+    WHERE status IN ('queued','retry_wait','permanent_failed')
+      AND (last_error_code IN ('line_temporary_failure','delivery_failed','retry_key_expired','retry_exhausted')
+        OR (last_error_code IS NULL AND (status IN ('retry_wait','permanent_failed') OR (status='queued' AND attempt_count>0))))
+      AND sent_message_content IS NOT NULL`).bind(input.now,input.now).run();
   const cutoff = new Date(new Date(input.now).getTime() - LINE_RETRY_KEY_VALIDITY_MS).toISOString();
   const held = await db.prepare(
     `UPDATE reminder_delivery_runs

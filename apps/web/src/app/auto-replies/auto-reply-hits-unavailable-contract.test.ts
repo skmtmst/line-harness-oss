@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { metricWord } from './auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
 
 /**
  * 自動応答一覧（設計 `cmDfJ` 8-1 ／ `q8wSqO` 8-1-J）で、

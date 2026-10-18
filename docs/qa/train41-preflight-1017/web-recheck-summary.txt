@@ -1,7 +1,0 @@
-v22.23.3
- ✓ src/app/automations/new/automation-create-draft-safety.test.tsx (10 tests) 5615ms
- ✓ src/app/mileage/earning-rules-order-react.test.tsx (3 tests) 1381ms
- ✓ src/v8/restaurant/google/profile-edit.test.tsx (8 tests) 309ms
- Test Files  2277 passed (2277)
-      Tests  13526 passed | 1 skipped | 1 todo (13528)
-   Duration  253.39s (transform 19.55s, setup 7.16s, collect 260.76s, tests 374.84s, environment 129.08s, prepare 62.93s)

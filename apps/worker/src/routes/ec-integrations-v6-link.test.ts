@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { ecNotificationRetryKey } from '../services/ec-event-publish.js';
 
@@ -17,7 +18,8 @@ const mocks = vi.hoisted(() => ({
   getCustomerSource: vi.fn(),
   recordEcDelivery: vi.fn(),
 }));
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async importOriginal => ({
+  ...await importOriginal<typeof import('@line-crm/db')>(),
   attachEcOrderFriend: mocks.attachOrderFriend,
   getCustomerNotificationSource: mocks.getCustomerSource,
   getLineAccountById: mocks.getAccount,
@@ -55,14 +57,20 @@ type EcRow = { id: string; status: string };
 
 type DispatchRow = { status: string; attempt_count: number; last_error: string | null; idempotency_key: string };
 
+const workflowStores:SqliteD1[]=[];
+afterEach(()=>{for(const item of workflowStores)item.raw.close();workflowStores.length=0;vi.useRealTimers()});
+
 function harness(opts: { notificationEnabled?: boolean; failDispatchWritesOn?: number[] } = {}) {
   const events = new Map<string, EcRow>();
   const dispatches = new Map<string, DispatchRow>();
   let dispatchWriteCount = 0;
   const app = new Hono<any>();
   app.route('/', ecIntegrations);
+  const workflow=createTestD1();workflowStores.push(workflow);
   const db = {
+    batch:workflow.db.batch.bind(workflow.db),
     prepare(query: string) {
+      if(query.includes('workflow_steps'))return workflow.db.prepare(query);
       const entry = { query, bindings: [] as unknown[] };
       const statement = {
         bind(...bindings: unknown[]) { entry.bindings = bindings; return statement; },
@@ -248,12 +256,14 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(mocks.fireEvent).not.toHaveBeenCalled();
   });
 
-  it('retries a failed receipt and publishes V6 only once', async () => {
+  it('retries a confirmed rejection after its wait and publishes V6 only once', async () => {
+    vi.useFakeTimers();
     const { app, db } = harness();
-    mocks.pushMessage.mockRejectedValueOnce(new Error('LINE temporarily unavailable'));
+    mocks.pushMessage.mockRejectedValueOnce(Object.assign(new Error('rejected'),{status:429}));
     const failed = await signedRequest(app, db, baseEvent);
     expect(failed.status).toBe(503);
     expect(mocks.fireEvent).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(60_000);
     const retried = await signedRequest(app, db, baseEvent);
     expect(retried.status).toBe(200);
     expect(await retried.json()).toMatchObject({ success: true, status: 'processed' });
@@ -329,7 +339,7 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(mocks.fireEvent).not.toHaveBeenCalled();
   });
 
-  it('resends with the same retry key when the sent-mark was lost', async () => {
+  it('recovers the sent-mark from the existing checkpoint without another push', async () => {
     // 2書込目(sent確定)を落とす。pending先行は残り、送達不明になる。
     const { app, db, dispatches, events } = harness({ failDispatchWritesOn: [2] });
     const failed = await signedRequest(app, db, baseEvent);
@@ -340,11 +350,11 @@ describe('EC receipt links one normalized event to V6', () => {
 
     const retried = await signedRequest(app, db, baseEvent);
     expect(retried.status).toBe(200);
-    expect(mocks.pushMessage).toHaveBeenCalledTimes(2);
+    expect(mocks.pushMessage).toHaveBeenCalledTimes(1);
     const expectedKey = await ecNotificationRetryKey('account-a', 'event-12345678');
-    const [firstCall, secondCall] = mocks.pushMessage.mock.calls as unknown as Array<[string, unknown, string]>;
+    const [firstCall] = mocks.pushMessage.mock.calls as unknown as Array<[string, unknown, string]>;
     expect(firstCall[2]).toBe(expectedKey);
-    expect(secondCall[2]).toBe(expectedKey);
+
     expect(dispatches.get(`${rowId}:notification`)).toMatchObject({ status: 'sent' });
   });
 
@@ -355,7 +365,7 @@ describe('EC receipt links one normalized event to V6', () => {
     expect(failed.status).toBe(503);
     const rowId = events.get('eccube:account-a:event-12345678')?.id;
     expect(dispatches.get(`${rowId}:notification`)).toMatchObject({
-      status: 'failed', attempt_count: 2, last_error: 'LINE is down',
+      status: 'failed', attempt_count: 2, last_error: 'delivery_unknown',
     });
     expect(dispatches.get(`${rowId}:v6`)).toBeUndefined();
   });
@@ -375,8 +385,9 @@ describe('EC receipt links one normalized event to V6', () => {
   });
 });
 
-vi.mock('../services/workflow-execution.js',async()=>{
+vi.mock('../services/workflow-execution.js',async importOriginal=>{
+ const actual=await importOriginal<typeof import('../services/workflow-execution.js')>();
  const {unitWorkflow}=await import('../test-utils/workflow-unit.js');
- return {acquireWorkflow:async(db:D1Database,ref:any)=>unitWorkflow(db,ref),
+ return {...actual,acquireWorkflow:async(db:D1Database,ref:any)=>unitWorkflow(db,ref),
   runWorkflowStep:async(_db:any,_ref:any,work:Function,options:any)=>work({input_json:JSON.stringify(options.input),retry_key:options.retryKey,attempt_count:1,first_attempt_at:Date.now()})};
 });

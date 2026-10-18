@@ -1,5 +1,0 @@
- FAIL  src/lib/design-debt.test.ts > 共通部品を通らない直書き > 増えていない
- FAIL  src/lib/design-impact.test.ts > 共通部品の影響範囲 > 共通Buttonの実利用先が一覧ファイルと一致する
- FAIL  src/app/restaurant-test/v8/line-followup-v8-contract.test.ts > LINE来店フォロー V8（板 xLpnS） > 外枠に板の印を付ける
- Test Files  3 failed | 2232 passed (2235)
-      Tests  3 failed | 13311 passed | 1 skipped | 1 todo (13316)

@@ -124,6 +124,8 @@ export async function retryWebhookInteraction(
   let deliveryLease: string | null = null;
   if (delivery) {
     if (delivery.status === 'delivered') throw new Error('already_delivered');
+    if(delivery.next_retry_at&&Date.parse(delivery.next_retry_at)>Date.now()
+      ||delivery.error_code==='retry_after_exceeds_budget'&&!delivery.next_retry_at)throw new Error('retry_after_pending');
     deliveryLease = await claimOutgoingDelivery(db, delivery);
     if (!deliveryLease) throw new Error('auto_retry_scheduled');
   }

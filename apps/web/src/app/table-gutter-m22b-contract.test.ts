@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -68,7 +69,7 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
   })
 
   it('/contents/vars：操作の中身は枠いっぱいで右へ寄せる', () => {
-    const body = read('v8', 'common-vars', 'list.tsx')
+    const body = readUiSource(path.join(SRC, 'v8', 'common-vars', 'list.tsx'), 'utf8')
     expect(body).toContain('className={styles.menuBox}')
     expect(read('v8', 'common-vars', 'list.module.css')).toMatch(/\.menuBox[^}]*justify-content: flex-end/)
   })

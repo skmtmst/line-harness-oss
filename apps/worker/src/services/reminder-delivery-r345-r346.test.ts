@@ -94,7 +94,7 @@ describe('R345 受理された本文の保存', () => {
       targetDate: '2026-08-28T10:00:00.000Z',
     })
     const { client, calls } = makeCaptureClient(async (n) => {
-      if (n === 0) throw new Error('fetch failed: network timeout')
+      if (n === 0) throw Object.assign(new Error('not accepted'),{status:429})
       return { requestId: 'line-request-after-retry' }
     })
 
@@ -130,7 +130,7 @@ describe('R345 受理された本文の保存', () => {
     })
   })
 
-  it('受理後に履歴保存まで届かなかった再試行は、保存した初回本文から履歴を回復する', async () => {
+  it.each(['retry_wait','queued'])('受理後に履歴保存まで届かなかった旧行は、初回本文とキーを照合用に保ち再送しない: %s', async status => {
     const { db, raw } = createTestD1()
     seedTemplateReminder(raw, '確定本文A')
     await enrollFriendInReminder(db, {
@@ -151,6 +151,7 @@ describe('R345 受理された本文の保存', () => {
           'text', '確定本文A', '2026-08-28T09:00:00.000Z', '2026-08-28T09:00:00.000Z')`,
     ).run()
     raw.prepare(`UPDATE friend_reminders SET id = 'enrollment-x' WHERE friend_id = 'friend-1'`).run()
+    if(status==='queued')raw.prepare("UPDATE reminder_delivery_runs SET status='queued',next_retry_at=NULL WHERE id='run-1'").run()
     raw.prepare(`UPDATE friends SET display_name = '佐藤はなこ' WHERE id = 'friend-1'`).run()
     publishTemplateV2(raw, TEMPLATE_B)
 
@@ -161,12 +162,11 @@ describe('R345 受理された本文の保存', () => {
       resolveClient: async () => client,
     })
 
-    expect(result.succeeded).toBe(1)
-    expect(calls).toHaveLength(1)
-    expect(calls[0].retryKey).toBe('retry-key-1')
-    expect(pushText(calls[0])).toBe('確定本文A')
-    expect(raw.prepare(`SELECT content FROM messages_log`).get()).toEqual({
-      content: '確定本文A',
+    expect(result.succeeded).toBe(0)
+    expect(calls).toHaveLength(0)
+    expect(raw.prepare(`SELECT content FROM messages_log`).get()).toBeUndefined()
+    expect(raw.prepare(`SELECT status,last_error_code,line_retry_key,sent_message_content,attempt_count FROM reminder_delivery_runs WHERE id='run-1'`).get()).toEqual({
+      status:'permanent_failed',last_error_code:'delivery_unknown',line_retry_key:'retry-key-1',sent_message_content:'確定本文A',attempt_count:1,
     })
   })
 })

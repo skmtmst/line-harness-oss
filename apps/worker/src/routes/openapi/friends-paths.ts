@@ -8,6 +8,8 @@ export const friendsPaths = {
       parameters: [
         { name: 'limit', in: 'query', schema: { type: 'integer', default: 50 } },
         { name: 'offset', in: 'query', schema: { type: 'integer', default: 0 } },
+        { name: 'pagination', in: 'query', schema: { type: 'string', enum: ['cursor'] }, description: '日時とIDで安定したページ送り。検索とoffsetとは併用不可。data.nextCursorを次のcursorへ渡す。' },
+        { name: 'cursor', in: 'query', schema: { type: 'string', maxLength: 1024 } },
         { name: 'tagId', in: 'query', schema: { type: 'string' } },
       ],
       responses: { '200': { description: 'Paginated friends list' } },

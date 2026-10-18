@@ -141,6 +141,22 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  // U05: state/ref と離脱確認は従来の親が保持する。分割先をその親へ結び直す（対象外の追加ではない）。
+  'app/auto-replies/edit/wizard-load.tsx': 'app/auto-replies/edit/wizard-v8.tsx',
+  'app/auto-replies/edit/wizard-model.tsx': 'app/auto-replies/edit/wizard-v8.tsx',
+  'app/auto-replies/edit/wizard-save.tsx': 'app/auto-replies/edit/wizard-v8.tsx',
+  'app/rich-menus/new/create-audience-step.tsx': 'app/rich-menus/new/create-v8.tsx',
+  'app/rich-menus/new/create-hydration.tsx': 'app/rich-menus/new/create-v8.tsx',
+  'app/rich-menus/new/create-image-slots.tsx': 'app/rich-menus/new/create-v8.tsx',
+  'app/rich-menus/new/create-preview-rail.tsx': 'app/rich-menus/new/create-v8.tsx',
+  'app/rich-menus/new/create-publish-step.tsx': 'app/rich-menus/new/create-v8.tsx',
+  'components/broadcasts/broadcast-confirm-dialogs.tsx': 'components/broadcasts/broadcast-form.tsx',
+  'components/broadcasts/broadcast-persist-draft.tsx': 'components/broadcasts/broadcast-form.tsx',
+  'v8/reminders/edit-basics.tsx': 'v8/reminders/edit.tsx',
+  'v8/reminders/edit-confirm.tsx': 'v8/reminders/edit.tsx',
+  'v8/reminders/edit-messages.tsx': 'v8/reminders/edit.tsx',
+  'v8/reminders/edit-schedule.tsx': 'v8/reminders/edit.tsx',
+  'v8/common-vars-edit/edit-value-fields.tsx': 'v8/common-vars-edit/edit.tsx',
   // U04: 入力状態と番兵は元の入口が持つ。分割先も親の番兵の検査対象にする（対象外にはしない）。
   'v8/automations/create/automation-dialogs.tsx': 'v8/automations/create/create.tsx',
   'v8/automations/create/use-automation-draft-resume.tsx': 'v8/automations/create/create.tsx',
@@ -471,15 +487,6 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
    * 画面の守りを共有フック（同じフォルダの use-*.ts）へ寄せた画面は、
    * フックの中身も合わせて1つの画面として見る。
    */
-  function screenSources(file: string): string {
-    const dir = dirname(join(SRC, file))
-    const hooks = readdirSync(dir)
-      .filter((name) => /^use-[^/]+\.ts$/.test(name) && !name.includes('.test.'))
-      .map((name) => readFileSync(join(dir, name), 'utf8'))
-    const own = readUiSource(join(SRC, file), 'utf8')
-    const commonGuard = own.includes('FormLeaveGuard') ? readFileSync(join(SRC, 'components/shared/form-leave-guard.tsx'), 'utf8') : ''
-    return [own, commonGuard, ...hooks].join('\n')
-  }
 
   it('番兵を持つ画面は共通フックと離脱確認ダイアログを配線している', () => {
     // 足りない画面の一覧が空であること（ソース文字を直接は比べない。点検は scripts/unsaved-guard-wiring.mjs）。
@@ -489,8 +496,7 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
   it('親へ dirty を報告する画面の親は、共通フックで番兵を持っている', () => {
     for (const [file, parents] of Object.entries(COVERED_BY_PARENT)) {
       for (const parent of typeof parents === 'string' ? [parents] : parents) {
-        const parentSource = screenSources(parent)
-        expect(parentSource, `${file} の番兵を持つ親 ${parent}`).toContain('useUnsavedGuard(')
+        expect(screensWithoutLeaveGuard(SRC, [parent]), `${file} の番兵を持つ親 ${parent}`).toEqual([])
       }
     }
   })
@@ -520,11 +526,11 @@ describe('未保存の編集がある画面は離脱の番兵を持つ契約（D
   })
 
   it('未判定の一覧は、まだ番兵が無く・まだ編集画面の印を持つものだけ（直したら一覧から消す）', () => {
-    const editors = new Set(editorFiles())
-    for (const file of Object.keys(UNTRIAGED)) {
-      const source = readFileSync(join(SRC, file), 'utf8')
-      expect(source.includes('useUnsavedGuard('), `${file} は番兵が付いたので GUARDED へ移す`).toBe(false)
-      expect(editors.has(file), `${file} はもう編集画面の印が無いので UNTRIAGED から消す`).toBe(true)
-    }
+    const stale = Object.keys(UNTRIAGED).filter(file => {
+      const source = readUiSource(join(SRC, file), 'utf8')
+      const stillEditor = !DIRTY_SIGNATURE.test(source) && EDITOR_SAVE_SIGNATURE.test(source) && (source.match(EDITOR_INPUT_SIGNATURE) ?? []).length >= EDITOR_MIN_INPUTS
+      return source.includes('useUnsavedGuard(') || !stillEditor
+    })
+    expect(stale, '番兵が付いた画面、編集の印が無くなった画面は未判定から外す').toEqual([])
   })
 })
