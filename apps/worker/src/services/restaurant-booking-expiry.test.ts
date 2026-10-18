@@ -4,7 +4,7 @@ import { expireRestaurantHolds } from './restaurant-booking.js';
 let sql: SqliteD1;
 const now = '2026-10-18T01:00:00.000Z';
 beforeEach(() => {
-  sql = createTestD1();
+  sql = createTestD1({ now: () => new Date(now) });
   sql.raw.exec(`INSERT INTO rt_organizations(id,account_id,name) VALUES('org','fixture','fixture'),('other','other','other');
     INSERT INTO rt_stores(id,organization_id,name,code) VALUES('a','org','A','A'),('b','other','B','B');`);
 });
@@ -23,14 +23,16 @@ it('失効した店/重なる時間だけを再計算し、終端同時刻・取
   reservation('cancelled','a','2026-10-18T02:00:00Z','2026-10-18T03:00:00Z',7,'cancelled',null);
   reservation('departed','a','2026-10-18T02:00:00Z','2026-10-18T03:00:00Z',9,'visited',null);
   sql.raw.exec("INSERT INTO rt_seat_visit_marks(id,reservation_id,store_id,kind,marked_at) VALUES('visit','departed','a','visited','2026-10-18T01:50:00Z'); UPDATE rt_reservations SET departed_at='2026-10-18T02:00:00Z' WHERE id='departed'");
-  reservation('other','b','2026-10-18T02:00:00Z','2026-10-18T03:00:00Z',4);
+  reservation('other','b','2026-10-18T02:00:00Z','2026-10-18T03:00:00Z',4,'pending','2026-10-19T01:00:00Z');
+  reservation('other-expired','b','2026-10-18T04:00:00Z','2026-10-18T05:00:00Z',6);
   slot('before','a','2026-10-18T01:30:00Z',88); slot('hit','a','2026-10-18T02:00:00Z',5);
   slot('after','a','2026-10-18T03:00:00Z',77); slot('other','b','2026-10-18T02:00:00Z',4);
   expect(await expireRestaurantHolds(sql.db,now,undefined,'org')).toBe(1);
   expect(sql.raw.prepare('SELECT id,reserved_count FROM rt_inventory_slots ORDER BY id').all()).toEqual([
     {id:'after',reserved_count:0},{id:'before',reserved_count:0},{id:'hit',reserved_count:2},{id:'other',reserved_count:4}]);
   expect(await expireRestaurantHolds(sql.db,now,undefined,'org')).toBe(0);
-  expect(sql.raw.prepare("SELECT status FROM rt_reservations WHERE id='other'").get()).toEqual({status:'pending'});
+  expect(sql.raw.prepare("SELECT id,status FROM rt_reservations WHERE store_id='b' ORDER BY id").all()).toEqual([
+    {id:'other',status:'pending'},{id:'other-expired',status:'pending'}]);
 });
 it('在庫保存の障害は失効も戻す。再開/並行でも人数を二重に引かない', async () => {
   reservation('expire','a','2026-10-18T02:00:00Z','2026-10-18T03:00:00Z',3); slot('hit','a','2026-10-18T02:00:00Z',3);
