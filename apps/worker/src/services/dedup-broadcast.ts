@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { parseProgress } from './dedup-broadcast-progress.js';
 import type { DedupPreviewPerAccount, DedupPreviewResult, DedupProgress } from './dedup-broadcast-progress.js';
 export type { DedupPreviewPerAccount, DedupPreviewResult } from './dedup-broadcast-progress.js';
@@ -329,7 +330,7 @@ export async function processMultiAccountDedupBroadcast(
     if (stopRequested) break; // 停止済み — 新しいアカウントの送信を始めない
     const account = await getLineAccountById(db, accountResult.accountId);
     if (!account || !account.is_active) {
-      console.log(JSON.stringify({"code":"services_dedup_broadcast_log"}));
+      logger.log("services_dedup_broadcast_log");
       continue;
     }
     // 緊急停止 (#1050): broadcast_dispatch が止まっているアカウントの束は
@@ -384,7 +385,7 @@ export async function processMultiAccountDedupBroadcast(
           continue;
         }
       } catch (err) {
-        console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
+        logger.error("services_dedup_broadcast_failed");
         failedAccountIds.push(account.id);
         continue;
       }
@@ -401,7 +402,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
       if (missing.size > 0) {
-        console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
+        logger.error("services_dedup_broadcast_failed");
         failedAccountIds.push(account.id);
         continue;
       }
@@ -574,7 +575,7 @@ export async function processMultiAccountDedupBroadcast(
         try {
           await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
         } catch (afterError) {
-          console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
+          logger.error("services_dedup_broadcast_failed");
         }
         sentAnyBatch = true; // 1 batch 以上 durable に記録した → 前進保証 & yield 可
         if (batchDeliveryError) {
@@ -592,7 +593,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
+      logger.error("services_dedup_broadcast_failed");
       failedAccountIds.push(account.id);
     }
   }

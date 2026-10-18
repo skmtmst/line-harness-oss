@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { CredentialEncryptionKeyError, decryptCredential } from './credential-crypto.js';
 import { type LineCredentialFailureReason, type LineCredentialContext, type LineAccount, type LineCredentialHealth, type LineAccountCredentialHealth } from './line-accounts-types.js';
@@ -54,7 +55,7 @@ export function warnPlaintextCredentialFallback(
   error: unknown,
 ): void {
   // Credential values and thrown error messages are deliberately excluded.
-  console.warn(JSON.stringify({"code":"line_credential_plaintext_fallback"}));
+  logger.warn("line_credential_plaintext_fallback");
 }
 
 /**

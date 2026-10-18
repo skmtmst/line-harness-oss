@@ -7,35 +7,8 @@ export { featureReadiness, styleWarnings } from './style-readiness.js';
 import { StyleError, checkStyle, readAnswers } from './style-setup-core.js';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
-export type StyleProfile = {
-  line_account_id: string;
-  style: AccountStyle;
-  answers_json: string;
-  cards_json: string | null;
-  metrics_json: string | null;
-  settings_json: string;
-  selected_at: string | null;
-  selection_mode: SetupAnswer['mode'];
-  version: number;
-  updated_at: string;
-};
-export function profileAnswers(
-  p: StyleProfile | null,
-): Record<string, SetupAnswer> {
-  return {
-    ...JSON.parse(p?.answers_json ?? '{}'),
-    style: {
-      mode: p?.selection_mode ?? 'later',
-      ...(p?.selection_mode === 'configured' ? { value: p.style } : {}),
-    },
-  };
-}
-export async function profile(db: D1Database, account: string) {
-  return db
-    .prepare('SELECT * FROM account_styles WHERE line_account_id=?')
-    .bind(account)
-    .first<StyleProfile>();
-}
+export {profile,profileAnswers,type StyleProfile} from './style-profile.js';
+import {profile,profileAnswers} from './style-profile.js';
 export async function starter(
   db: D1Database,
   tenant: string | null,
@@ -260,7 +233,11 @@ export async function initializeAccountStyle(
   account: string,
   tenant: string | null,
   actor: string,
+  selectedStyle?: AccountStyle,
 ) {
+  if (selectedStyle !== undefined) {
+    return saveProfile(db, account, tenant, actor, { expectedVersion: 0, style: checkStyle(selectedStyle) });
+  }
   const saved = await saveProfile(db, account, tenant, actor, {
     expectedVersion: 0,
     style: 'standard',

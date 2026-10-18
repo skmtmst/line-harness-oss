@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { simulationContext, scheduleSimulation, processBroadcastSimulation, simulationPreview } from '../services/broadcast-simulation.js';
 import { maybeStartAb, maybeReplayAbStart } from './broadcast-ab.js';
 import { GapError } from '../services/gap-common.js';
@@ -46,7 +47,7 @@ export const delete__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcas
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"DELETE /api/broadcasts/:id"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -115,7 +116,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     } catch (gateError) {
       if(gateError instanceof GapError)return c.json({success:false,error:gateError.code},gateError.status);
       // 数えられない（DB到達不能など）ときは送らない。誤送信より停止を選ぶ。
-      console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
+      logger.error("routes_broadcasts_failed");
       return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
     }
 
@@ -219,12 +220,12 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
         const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
         ctx.waitUntil(
           processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
+            logger.error("routes_broadcasts_failed");
           }),
         );
       } catch (kickErr) {
         // waitUntil が使えない環境では cron が拾う。送れないわけではない。
-        console.warn(JSON.stringify({"code":"routes_broadcasts_warn","route":"POST /api/broadcasts/:id/send"}));
+        logger.warn("routes_broadcasts_warn");
       }
 
       return c.json({
@@ -291,11 +292,11 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
         const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
         ctx.waitUntil(
           processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
+            logger.error("routes_broadcasts_failed");
           }),
         );
       } catch (kickErr) {
-        console.warn(JSON.stringify({"code":"routes_broadcasts_warn","route":"POST /api/broadcasts/:id/send"}));
+        logger.warn("routes_broadcasts_warn");
       }
 
       return c.json({
@@ -362,12 +363,12 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
         const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
         ctx.waitUntil(
           processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-            console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
+            logger.error("routes_broadcasts_failed");
           }),
         );
       } catch (kickErr) {
         // ExecutionContext 未利用環境 (test 等) — cron 経由にフォールバック
-        console.warn(JSON.stringify({"code":"routes_broadcasts_warn","route":"POST /api/broadcasts/:id/send"}));
+        logger.warn("routes_broadcasts_warn");
       }
 
       return c.json({
@@ -498,7 +499,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
         });
       } catch (notificationError) {
         // 配信本体は完了済み。通知の失敗で再配信させず、台帳の回収口に残す。
-        console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
+        logger.error("routes_broadcasts_failed");
       }
     }
     return c.json({ success: true, data: result ? serializeBroadcast(result) : null });
@@ -506,7 +507,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       if (sendAccountId) await releaseQuotaSlot(c.env.DB, sendAccountId, id);
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -554,7 +555,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
           }, segmentGate.status as 409, []);
       }
     } catch (gateError) {
-      console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send-segment"}));
+      logger.error("routes_broadcasts_failed");
       return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
     }
 
@@ -624,7 +625,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
     const result = await getBroadcastById(c.env.DB, id);
     return c.json({ success: true, data: result ? serializeBroadcast(result) : null, queued: true, message: 'Broadcast queued for batch processing by Cron' }, 202);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_broadcasts_failed","route":"POST /api/broadcasts/:id/send-segment"}));
+    logger.error("routes_broadcasts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

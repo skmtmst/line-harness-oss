@@ -147,6 +147,7 @@ export interface AccountMigration {
 }
 
 export interface LineAccountConnectInput {
+  style?: import('../style-api.js').AccountStyle;
  name?: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string
  tagIds?: string[]; parentLineAccountId?: string | null; staffIds?: string[]; liffId?: string
 }

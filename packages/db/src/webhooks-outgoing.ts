@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { WebhookCreateState } from '@line-crm/shared';
 import { readFolderAssignment } from './folder-assignment.js';
 import { jstNow } from './utils.js';
@@ -154,11 +155,11 @@ export async function getActiveOutgoingWebhooksByEvent(
     try {
       types = JSON.parse(w.event_types);
     } catch {
-      console.error(JSON.stringify({"code":"outgoing_webhook_event_types_broken"}));
+      logger.error("outgoing_webhook_event_types_broken");
       continue;
     }
     if (!Array.isArray(types)) {
-      console.error(JSON.stringify({"code":"outgoing_webhook_event_types_broken"}));
+      logger.error("outgoing_webhook_event_types_broken");
       continue;
     }
     if (types.includes(eventType) || types.includes('*')) matched.push(w);

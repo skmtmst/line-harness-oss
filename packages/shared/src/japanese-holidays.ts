@@ -1,3 +1,5 @@
+import { createClientLogger } from './client-logger.js';
+
 /**
  * 日本の祝日表。
  *
@@ -45,10 +47,11 @@ const HOLIDAYS: ReadonlySet<string> = new Set([
 /** 表の対象年から外れた日付を判定しようとしたときの通知先。 */
 export type HolidayCoverageWarning = (message: string, isoDate: string) => void;
 
-let warn: HolidayCoverageWarning = (message, isoDate) => {
-  // 既定は console.warn。呼び出し側（Worker など）が監視に載せたい場合は
+const holidayLogger = createClientLogger('shared');
+let warn: HolidayCoverageWarning = () => {
+  // 既定も自由文を含まない共通ログ。Workerは依頼番号付きのloggerへ
   // setHolidayCoverageWarningHandler で差し替える。
-  console.warn(JSON.stringify({"code":"src_japanese_holidays_warn"}));
+  holidayLogger.warn('src_japanese_holidays_warn');
 };
 
 /** 対象外の年を判定したときの通知方法を差し替える。 */

@@ -315,6 +315,8 @@ export interface FormSubmitResponse {
   retryable?: boolean;
   error?: string;
   code?: string;
+  requestId?: string;
+  fields?: Record<string, string>;
   idempotencyKey?: string;
 }
 

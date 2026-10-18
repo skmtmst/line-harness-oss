@@ -1,13 +1,6 @@
 'use client'
 
-/*
- * ★V8 の写し（app/duplicates/use-duplicates-data.ts から。src/v8 は @/app を読めない）。
- * API・絞り込み・再検出・古い応答の捨て方は同じ。
- *
- * 重複検出の読み込み・絞り込み・再検出（`duplicates/page.tsx` から移した
- * ロジックの正本）。v7 の画面と ★V8 の画面（`duplicates-v8.tsx`）が
- * 同じ口を使う。判定はここでだけ変える——2か所で計算がずれないため。
- */
+/** 重複候補の読み込み・絞り込み・再検出の正本。URLの条件と新しい応答だけを使う。 */
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
@@ -88,6 +81,11 @@ export function useDuplicatesData() {
   const candidatesReqRef = useRef(0)
   const candidatesKeyRef = useRef('')
   const statsReqRef = useRef(0)
+  useEffect(() => () => {
+    candidatesReqRef.current += 1
+    statsReqRef.current += 1
+    candidatesKeyRef.current = ''
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 250)

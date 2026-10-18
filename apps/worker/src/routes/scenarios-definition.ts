@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getScenarioById, getFriendScenarioById, getFriendById, jstNow } from '@line-crm/db';
@@ -24,7 +25,7 @@ export function scenarioContractError(c: Context<Env>, error: unknown): Response
       ...(error.field ? { field: error.field } : {}),
     }, error.status, []);
   }
-  console.error(JSON.stringify({"code":"scenario_v6_contract_failed"}));
+  logger.error("scenario_v6_contract_failed");
   return c.json({ success: false, error: 'シナリオの情報を処理できませんでした' }, 500);
 }
 
@@ -487,7 +488,7 @@ async function runTestSend(
     }
     return c.json({ success: true, data: { sent: result.sent } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_scenarios_failed"}));
+    logger.error("routes_scenarios_failed");
     return c.json(
       { success: false, error: `テスト送信に失敗しました: ${(err as Error).message}` },
       502,

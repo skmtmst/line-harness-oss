@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -193,7 +194,7 @@ opsSupport.get('/api/ops/support/tickets/:id', async (c) => {
   const base = workerUrl(c);
   // 閲覧の記録（統括には見せない）。失敗しても画面は出す。
   await audit(c, { action: 'ticket.view', ticket, visibleToTenant: false }).catch((error) => {
-    console.error(JSON.stringify({"code":"routes_ops_support_failed","route":"GET /api/ops/support/tickets/:id"}));
+    logger.error("routes_ops_support_failed");
   });
   return c.json({
     success: true,
@@ -293,7 +294,7 @@ opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(
       deliveredVia.push('email');
     } catch (error) {
       // メールが落ちても返信は記録する。画面には「メールは送れなかった」と返す。
-      console.error(JSON.stringify({"code":"routes_ops_support_failed","route":"POST /api/ops/support/tickets/:id/reply"}));
+      logger.error("routes_ops_support_failed");
     }
   }
   const message = await addSupportReply(db, {
@@ -474,7 +475,7 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
       if (timer) clearTimeout(timer);
     }
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_ops_support_failed","route":"POST /api/ops/support/tickets/:id/draft/ai"}));
+    logger.error("routes_ops_support_failed");
     if (error instanceof KnowledgeAiTimeout) {
       return c.json({ success: false, error: 'AI の応答が 45 秒以内に返りませんでした。手で書くか、少し待ってからもう一度お試しください' }, 504);
     }

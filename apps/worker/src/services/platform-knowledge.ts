@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   claimKnowledgeJob, failKnowledgeJob, finishKnowledgeJob, getSupportTicket,
   listSupportMessages, recordPlatformAiCall,
@@ -228,7 +229,7 @@ export async function processKnowledgeJob(env: Env['Bindings'], requestId?: stri
     await finishKnowledgeJob(db, job, parseKnowledgeSuggestion(raw, ticket, messages));
   } catch (error) {
     // Provider error messages may echo the prompt. Persist only this fixed code.
-    console.error(JSON.stringify({"code":"services_platform_knowledge_failed"}));
+    logger.error("services_platform_knowledge_failed");
     await failKnowledgeJob(db, job, 'generation_failed');
   } finally {
     if (attempted) await recordPlatformAiCall(db, { id: callId, purpose: 'article', requestId: job.request_id, model, ok, durationMs: Date.now() - started });

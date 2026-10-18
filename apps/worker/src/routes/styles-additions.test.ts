@@ -95,7 +95,7 @@ describe('B-311 template samples', () => {
         15 +
           {
             standard: 0,
-            ec: 0,
+            ec: 2,
             restaurant: 3,
             salon: 2,
             consult: 3,
@@ -113,11 +113,12 @@ describe('B-311 template samples', () => {
             },
           ]),
         );
-        expect(standardStarter(style).items).toContainEqual(item.starterItem);
+        if (!['standard', 'ec'].includes(style)) expect(standardStarter(style).items).toContainEqual(item.starterItem);
         expect(item.hqDefinition.template.messageContent).toBe(
           JSON.stringify({ text: item.text }),
         );
       }
+      for (const item of standardStarter(style).items.filter(i => i.key.startsWith('sample-'))) expect(result.body.data.items.map((s: {starterItem: unknown}) => s.starterItem)).toContainEqual(item);
       expect(
         result.body.data.items.every(
           (s: any) => s.category === 'common' || s.category === style,
@@ -184,7 +185,7 @@ describe('B-311 template samples', () => {
     expect(r.status).toBe(200);
     expect(
       r.body.data.inserted.filter((i: any) => i.kind === 'template'),
-    ).toHaveLength(3);
+    ).toHaveLength(13);
     expect(r.body.data.inserted.find((i: any) => i.key === key)).toMatchObject({
       id: existing.id,
       isSample: false,

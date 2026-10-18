@@ -1,3 +1,4 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { type Context } from 'hono';
@@ -89,7 +90,7 @@ export async function saveFriendAddCandidate(
     });
   } catch (err) {
     // 既存のLIFF連携を止めない。台帳だけ監視ログへ残して再調査できるようにする。
-    console.error(JSON.stringify({"code":"friend_add_candidate_record_failed"}));
+    logger.error("friend_add_candidate_record_failed");
   }
 }
 
@@ -129,12 +130,12 @@ async function linkIgIgsid(
       linked = row?.ig_igsid === igParam;
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed"}));
+    logger.error("routes_liff_failed");
     return false;
   }
 
   if (!linked) {
-    console.warn(JSON.stringify({"code":"routes_liff_warn"}));
+    logger.warn("routes_liff_warn");
     return false;
   }
 
@@ -161,11 +162,11 @@ async function linkIgIgsid(
       })
         .then(async (res) => {
           if (!res.ok) {
-            console.error(JSON.stringify({"code":"routes_liff_failed"}));
+            logger.error("routes_liff_failed");
           }
           await res.body?.cancel().catch(() => undefined);
         })
-        .catch((err) => console.error(JSON.stringify({"code":"routes_liff_failed"}))),
+        .catch((err) => logger.error("routes_liff_failed")),
     );
   }
   return true;
@@ -191,7 +192,7 @@ async function saveIgAccountMeta(
     if (igAccountUsername) patch.ig_account_username = igAccountUsername.replace(/^@/, '');
     await patchFriendMetadata(db, friendId, patch, { firstTouchKeys: ['ig_account_id','ig_account_username'] });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_liff_failed"}));
+    logger.error("routes_liff_failed");
   }
 }
 
@@ -263,7 +264,7 @@ async function applyRefAttribution(
             await notifyAffiliateFriendAdd(db, c.env, affiliate.id, offerName);
           }
         } catch (err) {
-          console.error(JSON.stringify({"code":"routes_liff_failed"}));
+          logger.error("routes_liff_failed");
         }
       }
 
@@ -315,7 +316,7 @@ async function applyRefAttribution(
         { mode: 'every-click', targetLineUserId: lineUserId },
       );
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_liff_failed"}));
+      logger.error("routes_liff_failed");
     }
   }
 }
@@ -478,10 +479,10 @@ async function applyXHarnessActions(
       if (tagRow) {
         const { addTagToFriend } = await import('@line-crm/db');
         await addTagToFriend(db, friendId, tagRow.id);
-        console.log(JSON.stringify({"code":"routes_liff_log"}));
+        logger.log("routes_liff_log");
       }
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_liff_failed"}));
+      logger.error("routes_liff_failed");
     }
   }
 
@@ -490,9 +491,9 @@ async function applyXHarnessActions(
     try {
       const { enrollFriendInScenario } = await import('@line-crm/db');
       await enrollFriendInScenario(db, friendId, result.scenarioId);
-      console.log(JSON.stringify({"code":"routes_liff_log"}));
+      logger.log("routes_liff_log");
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_liff_failed"}));
+      logger.error("routes_liff_failed");
     }
   }
 }

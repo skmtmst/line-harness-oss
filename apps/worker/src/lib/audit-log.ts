@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
 import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -189,6 +190,8 @@ export type AuditAction =
   // Uber Eats のログイン連携。店舗の代理で使えるトークンを得る操作なので必ず残す。
   | 'restaurant.delivery.ubereats.connect.start'
   | 'restaurant.delivery.ubereats.connect'
+  // つなぐお店の確定。Uber 側で連携が有効になる取り消しにくい操作なので必ず残す。
+  | 'restaurant.delivery.ubereats.store.select'
   // #818: 広告費の手入力と、管理画面からの取り直し
   | 'ad_cost.manual_entry'
   | 'ad_cost.import'
@@ -253,7 +256,7 @@ export function auditLog(
   // 認証前に呼ばれることはない想定だが、ログのために例外を投げたくない。
   const actorRole = staff?.role ?? 'unknown';
   c.set('auditRecorded', true);
-  console.log(JSON.stringify({ code: 'audit.recorded', route: c.req.routePath || '(unmatched)' }));
+  logger.log("audit.recorded");
 
   const db = c.env?.DB;
   const writer = commonAuditWriter();
@@ -274,7 +277,7 @@ export function auditLog(
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error(JSON.stringify({"code":"lib_audit_log_failed"}));
+    logger.error("lib_audit_log_failed");
   });
   try {
     c.executionCtx.waitUntil(task);

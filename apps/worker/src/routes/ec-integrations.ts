@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { validateNenWebhookHeaders, verifyNenWebhook } from '../lib/hmac.js';
 import { WEBHOOK_BODY_BYTES, isDeclaredWebhookBodyTooLarge, isWebhookBodyTooLarge } from '../lib/webhook-body.js';
 import { getConnectorSecret } from './ec-connector-secret.js';
@@ -499,7 +500,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     ? await getConnectorSecret(c.env.DB, requestedLineAccountId, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY)
     : null;
   if (!globalSecret && !headerConnectorSecret) {
-    console.error('[ec-event] no usable webhook secret (global or connector)');
+    logger.error("ec_event_no_usable_webhook_secret_global_or_connector");
     return c.json({ success: false, error: 'Integration is not configured' }, 503);
   }
 
@@ -602,7 +603,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       eventId: row.id, lineAccountId, status: 'retryable_failed',
       errorCode: 'read_model_failed', errorMessageSafe: '注文情報を取り込めませんでした', now,
     }).catch(() => undefined);
-    console.error(JSON.stringify({"code":"routes_ec_integrations_failed","route":"POST /api/integrations/eccube/events"}));
+    logger.error("routes_ec_integrations_failed");
     return c.json({ success: false, error: 'Event processing failed' }, 503);
   }
 
@@ -639,10 +640,10 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         reason: event.event_type === 'ec.order.cancelled' ? 'order_cancelled' : 'order_refunded',
       });
       if (cancelled > 0) {
-        console.log(JSON.stringify({"code":"nen_order_followups_stopped","route":"POST /api/integrations/eccube/events"}));
+        logger.log("nen_order_followups_stopped");
       }
     } catch (followUpError) {
-      console.error(JSON.stringify({"code":"routes_ec_integrations_failed","route":"POST /api/integrations/eccube/events"}));
+      logger.error("routes_ec_integrations_failed");
     }
   }
 
@@ -661,7 +662,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       });
     } catch (notificationError) {
       // 受注の取り込みは通知の失敗で止めない。送り残しは回収口から拾う。
-      console.error(JSON.stringify({"code":"routes_ec_integrations_failed","route":"POST /api/integrations/eccube/events"}));
+      logger.error("routes_ec_integrations_failed");
     }
   }
 
@@ -698,7 +699,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       return c.json({ success: true, status: 'view_counts_saved', ...result });
     } catch (viewError) {
       await c.env.DB.prepare(`UPDATE ec_events SET status = 'failed', error_message = 'publication_views_failed', updated_at = ? WHERE id = ?`).bind(now,row.id).run().catch(() => undefined);
-      console.error('[ec-event] publication views failed');
+      logger.error("ec_event_publication_views_failed");
       return c.json({ success: false, error: 'Event processing failed' }, 503);
     }
   }

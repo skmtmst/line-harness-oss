@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from './id-queries.js';
 import { queueMappedAdConversion } from './ad-event-mappings.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -610,7 +611,7 @@ export async function trackConversion(
     }
     const exclusion = readConversionExclusion(parsed);
     if (exclusion.invalid) {
-      console.error(JSON.stringify({"code":"src_conversions_failed"}));
+      logger.error("src_conversions_failed");
     } else if (await isFriendExcludedByConversion(db, input.friendId, exclusion.condition)) {
       throw new Error('conversion_excluded');
     }
@@ -835,7 +836,7 @@ export async function trackConversion(
   try {
     await recordAttributionDecision(db, id, input.friendId, input.conversionPointId, explanation);
   } catch (err) {
-    console.error(JSON.stringify({"code":"src_conversions_failed"}));
+    logger.error("src_conversions_failed");
   }
   await queueMappedAdConversion(db, created.id);
   return created;

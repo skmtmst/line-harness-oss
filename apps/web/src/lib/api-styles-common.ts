@@ -69,7 +69,7 @@ export type StarterSetItem = {
   text?: string;
   durationMinutes?: number;
   price?: number;
-  buttons?: Array<{ label: string; feature: string }>;
+  buttons?: Array<{ label: string; feature: string; actionType?: 'uri' | 'message'; actionData?: string }>;
   cards?: StyleCard[];
   offsetMinutes?: number;
   offsetDays?: number;

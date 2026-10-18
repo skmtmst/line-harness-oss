@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { runBookingPaymentStart } from '../services/booking-payment-start.js';
 import { safeReceiptUrl } from '../services/booking-payment-history.js';
 import { expireBookingPaymentIfHeld } from './booking-payment-expiration.js';
@@ -346,7 +347,7 @@ bookingPayments.onError((error,c) => {
   if (error instanceof PaymentActionError) return c.json({success:false,error:error.code,code:error.code},error.status);
   const missing = /no such (table|column).*?(booking_payment_refunds|booking_payment_booking_links|refunded_amount|actor_label)/.test(String(error));
   const code = missing ? 'payment_refund_storage_not_ready' : 'payment_action_unavailable';
-  console.error(JSON.stringify({code}));
+  logger.error(code);
   return c.json({success:false,error:code,code}, /\/(refund|refunds|booking)$/.test(c.req.path) ? 503 : 500);
 });
 bookingPayments.post('/api/booking/payments/:id/refund',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary(),async c => {

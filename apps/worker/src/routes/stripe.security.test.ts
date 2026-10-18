@@ -87,7 +87,7 @@ describe('POST /api/integrations/stripe/webhook security boundary', () => {
     }, env(null));
 
     expect(response.status).toBe(503);
-    expect(consoleError).toHaveBeenCalledWith('[stripe-webhook] STRIPE_WEBHOOK_SECRET is not configured');
+    expect(consoleError.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'stripe_webhook_STRIPE_WEBHOOK_SECRET_is_not_configured', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
     expect(mocks.getStripeEventByStripeId).not.toHaveBeenCalled();
     expect(mocks.createStripeEvent).not.toHaveBeenCalled();
     consoleError.mockRestore();

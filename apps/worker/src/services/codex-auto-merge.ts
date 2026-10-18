@@ -1,3 +1,5 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 import type { Env } from '../index.js';
 import { decodeSlackTextEntities } from './slack-text.js';
 
@@ -370,7 +372,7 @@ export async function processCodexAutoMerge(
   fetcher: typeof fetch = fetch,
 ): Promise<void> {
   if (!env.SLACK_BOT_TOKEN) {
-    console.error('Codex auto-merge stopped: SLACK_BOT_TOKEN is not configured');
+    logger.error("Codex_auto_merge_stopped_SLACK_BOT_TOKEN_is_not_configured");
     return;
   }
 
@@ -406,7 +408,7 @@ export async function processCodexAutoMerge(
   } catch (error) {
     const failure = githubFailureDetails(error);
     if (!failure) throw error;
-    console.error(JSON.stringify({"code":"codex_auto_merge_github_failed"}));
+    logger.error("codex_auto_merge_github_failed");
     const reason = failure.kind === 'ledger'
       ? `マージ済みですが台帳に記録できませんでした。二重マージ防止の記録がないため、人が確認してください (${failure.status} ${failure.path})`
       : `GitHub APIが失敗しました (${failure.status} ${failure.path})`;

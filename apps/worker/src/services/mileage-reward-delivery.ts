@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { stableUuid } from './mileage-delivery-key.js';
 import {
   accountFeatureOffExclusionSql,

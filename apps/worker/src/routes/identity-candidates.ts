@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -137,7 +138,7 @@ function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof IdentityCandidateError) {
     return inputError(c, { success: false, error: error.message, code: error.code }, error.status, []);
   }
-  console.error(JSON.stringify({"code":"routes_identity_candidates_failed"}));
+  logger.error("routes_identity_candidates_failed");
   return c.json(
     { success: false, error: '本人照合の記録を処理できませんでした', code: 'INTERNAL_ERROR' },
     500,

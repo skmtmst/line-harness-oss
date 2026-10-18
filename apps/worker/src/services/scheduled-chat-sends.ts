@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   claimDueScheduledChatSends,
   getFriendById,
@@ -106,7 +107,7 @@ async function dispatchOne(
         title: null,
       });
     } catch (skipError) {
-      console.error(JSON.stringify({"code":"services_scheduled_chat_sends_failed"}));
+      logger.error("services_scheduled_chat_sends_failed");
     }
     return;
   }
@@ -291,7 +292,7 @@ export async function processDueScheduledChatSends(
     try {
       await dispatchOne(env, row);
     } catch (error) {
-      console.error(JSON.stringify({"code":"services_scheduled_chat_sends_failed"}));
+      logger.error("services_scheduled_chat_sends_failed");
       failed += 1;
       continue;
     }

@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { checkWebhookUrlSafety, type WebhookSafetyOptions } from './outgoing-webhook-delivery.js';
 
 /** Same DNS policy as outgoing webhooks; no redirect or extra delivery attempt. */

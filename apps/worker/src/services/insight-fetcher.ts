@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { LineClient } from '@line-crm/line-sdk'
 import {
   getPendingInsights,
@@ -93,7 +94,7 @@ export async function processInsightFetch(
             aggMedia += (overview.uniqueMediaPlayed as number) ?? 0
             if (messages && messages.length > 0) hasAnyData = true
           } catch (err) {
-            console.error(JSON.stringify({"code":"services_insight_fetcher_failed"}))
+            logger.error("services_insight_fetcher_failed")
             perAccountResponses.push({ accountId: aid, data: { error: String(err) } })
           }
         }
@@ -144,7 +145,7 @@ export async function processInsightFetch(
         await markInsightFailed(db, item.insightId, item.retryCount)
       }
     } catch (error) {
-      console.error(JSON.stringify({"code":"services_insight_fetcher_failed"}))
+      logger.error("services_insight_fetcher_failed")
       await markInsightFailed(db, item.insightId, item.retryCount)
     }
   }

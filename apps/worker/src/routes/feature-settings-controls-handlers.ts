@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { auditDeviceFamily, auditEventStatement, getAccountSetting, getVersionedAccountSetting, maskAuditIp, setAccountSetting } from '@line-crm/db';
@@ -36,7 +37,7 @@ export const get__api_settings_features_visibility_1 = async (c: Context<Env, "/
       ),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"GET /api/settings/features/visibility"}));
+    logger.error("routes_feature_settings_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -88,7 +89,7 @@ export const get__api_settings_features_2 = async (c: Context<Env, "/api/setting
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"GET /api/settings/features"}));
+    logger.error("routes_feature_settings_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -178,7 +179,7 @@ export const post__api_settings_features_impact_3 = async (c: Context<Env, "/api
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"POST /api/settings/features/impact"}));
+    logger.error("routes_feature_settings_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -531,7 +532,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
           .map((_, index) => index)
           .filter((index) => index !== casIndex && changed(index) > 0);
         if (leaked.length > 0) {
-          console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"PUT /api/settings/features"}));
+          logger.error("routes_feature_settings_failed");
         }
         const reread = await loadFeatureSettings(
           c.env.DB,
@@ -599,7 +600,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
       data: savedVersion === null ? null : { version: savedVersion },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_feature_settings_failed","route":"PUT /api/settings/features"}));
+    logger.error("routes_feature_settings_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

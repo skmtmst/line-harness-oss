@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import type { CodexSlackRelayConfig } from './codex-slack-relay.js';
 import { securityRule } from './security-monitor-rules.js';
 import type { SecurityAlertRow } from './security-monitor-store.js';

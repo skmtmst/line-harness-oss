@@ -1,4 +1,5 @@
 'use client'
+import { getApiErrorCode } from '@/lib/api'
 
 /*
  * U-1 変更の確認（v6-29 §10）の処理の核。
@@ -264,7 +265,7 @@ export function useChangeReview(eventId: string) {
       const detail = await eventsApi.getEvent(selectedAccountId, eventId)
       setEvent(detail)
     } catch (error) {
-      const code = (error as { body?: { error?: string } }).body?.error ?? null
+      const code = getApiErrorCode(error) ?? null
       setApplyError(applyErrorMessage(code))
     } finally {
       setApplyBusy(false)

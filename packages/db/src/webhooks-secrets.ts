@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from './credential-crypto.js';
 import { jstNow } from './utils.js';
 import { type WebhookKeyInput, type WebhookKeySet, type WebhookSecretColumns, type WebhookSecretTable, type WebhookSecretBackfillOptions, type WebhookSecretBackfillReport, type WebhookSecretKeyStats } from './webhooks-types.js';
@@ -91,7 +92,7 @@ export async function resolveWebhookSecret(
   if (row.secret_encrypted) {
     const parsed = parseStoredSecret(row.secret_encrypted);
     if (!parsed) {
-      console.error(JSON.stringify({"code":"webhook_secret_unknown_format"}));
+      logger.error("webhook_secret_unknown_format");
       throw new Error('Unable to decrypt webhook secret');
     }
     const set = await readWebhookKeySet(keys);
@@ -101,7 +102,7 @@ export async function resolveWebhookSecret(
         : [set.current, ...set.previous])
       : [];
     if (candidates.length === 0) {
-      console.error(JSON.stringify({"code":"webhook_secret_key_unavailable"}));
+      logger.error("webhook_secret_key_unavailable");
       throw new Error('Unable to decrypt webhook secret');
     }
     for (const candidate of candidates) {
@@ -112,7 +113,7 @@ export async function resolveWebhookSecret(
         if (parsed.keyId) break;
       }
     }
-    console.error(JSON.stringify({"code":"webhook_secret_decrypt_failed"}));
+    logger.error("webhook_secret_decrypt_failed");
     throw new Error('Unable to decrypt webhook secret');
   }
   return row.secret;
@@ -137,7 +138,7 @@ export async function resolvePreviousWebhookSecret(
       keys,
     );
   } catch {
-    console.error(JSON.stringify({"code":"webhook_secret_previous_decrypt_failed"}));
+    logger.error("webhook_secret_previous_decrypt_failed");
     return null;
   }
 }

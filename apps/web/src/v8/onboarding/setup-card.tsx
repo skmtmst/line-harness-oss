@@ -56,13 +56,13 @@ export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOp
   return (
     <section className={styles.card} aria-labelledby="setup-card-title" data-design-node="Bdfxm">
       <div className={styles.head}>
-        <h2 id="setup-card-title" className={styles.title}>はじめにやること</h2>
-        <HelpTip label="はじめにやることの説明">はじめの質問で「あとで設定する」にした物と、動かす前に確かめる物が残ります。済むと消えます。</HelpTip>
+        <h2 id="setup-card-title" className={styles.title}>使い方の設定</h2>
+        <HelpTip label="使い方の設定の説明">選んだ機能だけの設定です。「はじめの設定」の完了条件とは別に、あとで設定する物や動かす前の確認を表示します。</HelpTip>
         <span className={styles.spacer} />
         <span className={styles.count}>{`${summary.done} / ${summary.total} 済み`}</span>
         <Button onClick={() => onOpenStep(summary.nextStep)}>質問の続きを開く</Button>
       </div>
-      <span className={styles.track} role="progressbar" aria-label="はじめにやることの進み" aria-valuemin={0} aria-valuemax={summary.total} aria-valuenow={summary.done}>
+      <span className={styles.track} role="progressbar" aria-label="使い方の設定の進み" aria-valuemin={0} aria-valuemax={summary.total} aria-valuenow={summary.done}>
         <span className={styles.fill} style={{ width: `${rate}%` }} />
       </span>
       <ul className={styles.rows}>

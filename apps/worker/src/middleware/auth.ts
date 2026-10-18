@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 /** Public auth facade. Internal auth.ts modules retain the existing manual-review gate. */
 import { bearerToken } from './auth-http.js';
 import { isPublicApiBoundary, isPublicFormDefinition } from './public-api-boundary.js';
@@ -94,7 +95,7 @@ export async function authenticateApiToken(
     token === c.env.LEGACY_API_KEY
   ) {
     if (mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${DEFAULT_TENANT_ID}`) !== 'false') return null;
-    console.log('[auth] accept_via=LEGACY_API_KEY');
+    logger.log("auth_accept_via_LEGACY_API_KEY");
     return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, tenantStatus: 'active', credential: 'api-key' };
   }
 

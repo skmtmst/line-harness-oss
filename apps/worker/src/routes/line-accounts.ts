@@ -1,4 +1,6 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { readOfficialProfileUrl } from './line-account-profile-url.js';
+import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
 import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -227,7 +229,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
     );
     return c.json({ success: true, data: results });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -251,7 +253,7 @@ lineAccounts.get('/api/line-accounts/summary', async (c) => {
     ).bind(...sqlIdSet(visibleActiveIds).binds).first<{ count: number }>();
     return c.json({ success: true, data: { uniqueFriendCount: row?.count ?? 0 } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/summary"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -599,7 +601,7 @@ lineAccounts.post(
       if (error instanceof LineAccountRevisionConflictError) {
         return c.json({ success: false, error: 'REVISION_CONFLICT' }, 409);
       }
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/connection-checks"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -634,7 +636,7 @@ lineAccounts.put('/api/line-accounts/default', requireRole('owner'), inputJsonBo
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PUT /api/line-accounts/default"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -686,7 +688,7 @@ lineAccounts.post('/api/line-accounts/:id/archive', requireRole('owner'), inputJ
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/archive"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -707,7 +709,7 @@ lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), inputJ
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/restore"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -752,7 +754,7 @@ lineAccounts.post('/api/line-accounts/:id/deactivate', requireRole('owner', 'adm
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/deactivate"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -802,7 +804,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
       });
     } catch (checkError) {
       // 台帳への記録が失敗しても再開判定は止めない（検査自体は済んでいる）。
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/activate"}));
+      logger.error("routes_line_accounts_failed");
     }
     if (!connectionOk) {
       return inputError(c, {
@@ -825,7 +827,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/activate"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -855,7 +857,7 @@ lineAccounts.get(
         })),
       });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/:id/skipped-deliveries"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -870,7 +872,7 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
     }
     return c.json({ success: true, data: serializeLineAccount(account) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/:id"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -896,7 +898,7 @@ lineAccounts.get(
     } catch {
       // Do not serialize the underlying error: crypto/runtime errors can contain
       // implementation details that are unnecessary for this diagnostic.
-      console.error(JSON.stringify({"code":"line_credential_health_check_failed","route":"GET /api/line-accounts/:id/credential-health"}));
+      logger.error("line_credential_health_check_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -929,7 +931,7 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
     });
   } catch (err) {
     const lineStatus = typeof (err as { status?: unknown } | null)?.status === 'number' ? (err as { status: number }).status : null; // LINEの状態番号(401失効/403権限不足/429上限)だけ残す。本文・トークンは出さない
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/:id/follower-insight"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Failed to fetch LINE follower insight', lineStatus }, 502);
   }
 });
@@ -966,7 +968,7 @@ lineAccounts.post(
       return c.json({ success: true, data: state });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/follower-import/detect"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: '利用可否の確認に失敗しました' }, 502);
     }
   },
@@ -1131,6 +1133,7 @@ function duplicateAccountError(
 }
 
 type ConnectBody = {
+  style?: unknown;
   tagIds?: unknown; staffIds?: unknown; parentLineAccountId?: unknown; liffId?: unknown;
   name?: unknown;
   channelId?: unknown;
@@ -1140,8 +1143,9 @@ type ConnectBody = {
 };
 
 function readConnectBody(body: ConnectBody):
-  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
+  | { ok: true; value: { style?: AccountStyle; name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
   | { ok: false; error: string } {
+  if (body.style !== undefined && !ACCOUNT_STYLES.includes(body.style as AccountStyle)) return { ok: false, error: 'invalid_style' };
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
   const channelSecret = typeof body.channelSecret === 'string' ? body.channelSecret.trim() : '';
@@ -1157,7 +1161,7 @@ function readConnectBody(body: ConnectBody):
   for(const value of [body.tagIds,body.staffIds]) if(value!==undefined && (!Array.isArray(value)||value.length>50||value.some(v=>!id(v))||new Set(value).size!==value.length)) return {ok:false,error:'タグ・担当者の指定を確認してください'};
   if(body.parentLineAccountId!==undefined && body.parentLineAccountId!==null && !id(body.parentLineAccountId)) return {ok:false,error:'親アカウントを確認してください'};
   if(body.liffId!==undefined && (typeof body.liffId!=='string'||!/^\d+-[A-Za-z0-9_-]+$/.test(body.liffId))) return {ok:false,error:'LIFF IDを確認してください'};
-  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:(body.tagIds ?? []) as string[],staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
+  return { ok: true, value: { style: body.style as AccountStyle | undefined, name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:(body.tagIds ?? []) as string[],staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
 }
 
 async function readConnectRequest(c: Context<Env>) {
@@ -1323,6 +1327,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
   if (duplicate) return c.json({ success: false, error: duplicate }, 409);
 
   let account: DbLineAccount | null = null;
+  let savingStyle = false;
   try {
     account = await createLineAccount(c.env.DB, {
       channelId: parsed.value.channelId,
@@ -1380,7 +1385,9 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
-    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
+    savingStyle = true;
+    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style);
+    savingStyle = false;
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
     return c.json({
       success: true,
@@ -1390,6 +1397,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
       }, account.id),
     }, 201);
   } catch (error) {
+    if (account && savingStyle) return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: parsed.value.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}` } }, 502);
     if (account) await deleteUncommittedLineAccount(c.env.DB, account.id);
     if (error instanceof RegistrationOptionsError) return inputError(c, {success:false,error:'登録中にタグ・親・担当範囲が変わりました。選び直してください',code:error.code}, error.status, []);
     if (error instanceof CredentialEncryptionKeyError) {
@@ -1423,6 +1431,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
   let attemptedLiffId: string | null = null;
   try {
     let body: {
+      style?: AccountStyle;
       channelId: string;
       name: string;
       channelAccessToken: string;
@@ -1447,6 +1456,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
       return inputError(c, { success: false, error: 'request body must be valid JSON' }, 422, []);
     }
 
+    if (body.style !== undefined && !ACCOUNT_STYLES.includes(body.style)) return inputError(c, { success: false, error: 'invalid_style' }, 422, ['style']);
     if (!body.channelId || !body.name || !body.channelAccessToken || !body.channelSecret) {
       return inputError(c, { success: false, error: 'channelId, name, channelAccessToken, and channelSecret are required' }, 400, ["channelId","name","channelAccessToken","channelSecret"]);
     }
@@ -1577,7 +1587,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
         await copyLineAccountSettings(c.env.DB, copyFromAccountId, account.id, copyItems);
       } catch (copyError) {
         await deleteUncommittedLineAccount(c.env.DB, account.id);
-        console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts"}));
+        logger.error("routes_line_accounts_failed");
         return c.json({ success: false, error: '設定のコピーに失敗したため、アカウントは追加していません' }, 500);
       }
     }
@@ -1592,10 +1602,14 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
         account.id,
       );
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts"}));
+      logger.error("routes_line_accounts_failed");
     }
 
-    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
+    try {
+      await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,body.style);
+    } catch {
+      return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: body.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}` } }, 502);
+    }
     return c.json({ success: true, data: serializeLineAccountFull(account) }, 201);
   } catch (err) {
     if (err instanceof CredentialEncryptionKeyError) {
@@ -1614,7 +1628,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
     if (duplicate) {
       return inputError(c, { success: false, error: duplicate.error }, duplicate.status, []);
     }
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1691,7 +1705,7 @@ lineAccounts.patch(
       );
       return c.json({ success: true, data: relationships });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PATCH /api/line-accounts/hierarchy"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1734,7 +1748,7 @@ lineAccounts.patch(
     } catch (err) {
       const conflict = lifecycleConflict(err);
       if (conflict) return c.json(conflict, 409);
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PATCH /api/line-accounts/order"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1911,7 +1925,7 @@ lineAccounts.patch(
     } catch (err) {
       const conflict = lifecycleConflict(err);
       if (conflict) return c.json(conflict, 409);
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PATCH /api/line-accounts/:id"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2065,7 +2079,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
     if (err instanceof CredentialEncryptionKeyError) {
       return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
     }
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PUT /api/line-accounts/:id"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2077,7 +2091,7 @@ lineAccounts.delete('/api/line-accounts/:id', requireRole('owner'), async (c) =>
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"DELETE /api/line-accounts/:id"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

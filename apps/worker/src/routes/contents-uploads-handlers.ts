@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { hasMediaSignature } from './media-signature.js';
 import { inputError } from '../lib/input-errors.js';
 import { mediaTabCounts } from '../services/tab-counts.js';
@@ -23,7 +24,7 @@ export const get__api_media_quota_1 = async (c: Context<Env, "/api/media/quota">
     }
     return c.json({ success: true, data: await getMediaStorageQuota(c.env.DB, accountId) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/quota"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: '容量を確認できませんでした' }, 503);
   }
 };
@@ -150,7 +151,7 @@ export const post__api_media_upload_sessions_2 = async (c: Context<Env, "/api/me
       }
       return c.json({ success: true, data: { sessions } }, 201);
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions"}));
+      logger.error("routes_contents_failed");
       return c.json({ success: false, error: 'アップロードを準備できませんでした' }, 500);
     }
   };
@@ -247,13 +248,13 @@ export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<E
           mimeType: session.expected_mime,
           sizeBytes: session.expected_size,
         }).catch((err) => {
-          console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"}));
+          logger.error("routes_contents_failed");
           return null;
         });
         if (versionScan) {
           await runScanForStoredObject(c.env.DB, c.env.IMAGES, versionScan, session.r2_key, {
             width: session.width, height: session.height,
-          }).catch((err) => console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"})));
+          }).catch((err) => logger.error("routes_contents_failed"));
         }
         return c.json({
           success: true,
@@ -273,20 +274,20 @@ export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<E
         mimeType: media.mime_type,
         sizeBytes: media.size_bytes,
       }).catch((err) => {
-        console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"}));
+        logger.error("routes_contents_failed");
         return null;
       });
       if (newScan) {
         await runScanForStoredObject(c.env.DB, c.env.IMAGES, newScan, session.r2_key, {
           width: media.width, height: media.height,
-        }).catch((err) => console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"})));
+        }).catch((err) => logger.error("routes_contents_failed"));
       }
       return c.json({
         success: true,
         data: { uploadSessionId: session.id, status: 'completed', mediaId: media.id },
       }, 201);
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/upload-sessions/:id/complete"}));
+      logger.error("routes_contents_failed");
       return c.json({ success: false, error: 'アップロードを確定できませんでした' }, 500);
     }
   };
@@ -391,7 +392,7 @@ export const post__api_media_id_versions_4 = async (c: Context<Env, "/api/media/
         error: '差し替え用ファイルの確認が完了していません',
       }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/:id/versions"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: '新しい版を追加できませんでした' }, 500);
   }
 };
@@ -426,7 +427,7 @@ export const post__api_media_id_replacement_preview_5 = async (c: Context<Env, "
         },
       });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/media/:id/replacement-preview"}));
+      logger.error("routes_contents_failed");
       return c.json({ success: false, error: '差し替え内容を確認できませんでした' }, 503);
     }
   };
@@ -440,7 +441,7 @@ export const get__api_media_counts_6 = async (c: Context<Env, "/api/media/counts
   try {
     return c.json({ success: true, data: await mediaTabCounts(c.env.DB, accountId) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/counts"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
   }
 };
@@ -485,7 +486,7 @@ export const get__api_media_7 = async (c: Context<Env, "/api/media">) => {
       data: { items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -512,7 +513,7 @@ export const get__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) => 
       data: { item: serializeMedia(media, workerUrl, names), folderName },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -521,7 +522,7 @@ export const get__api_media_id_download_9 = async (c: Context<Env, "/api/media/:
   try {
     return await serveMediaFile(c, { auditDownload: true, disposition: 'attachment' });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id/download"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -530,7 +531,7 @@ export const get__api_media_id_content_10 = async (c: Context<Env, "/api/media/:
   try {
     return await serveMediaFile(c, { auditDownload: false, disposition: 'inline' });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id/content"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -589,7 +590,7 @@ export const get__api_media_id_versions_versionNo_download_11 = async (c: Contex
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/media/:id/versions/:versionNo/download"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

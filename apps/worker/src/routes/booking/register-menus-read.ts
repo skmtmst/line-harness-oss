@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { menuAudience } from '../../services/booking-audience.js';
@@ -142,7 +143,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
       })),
     });
   } catch {
-    console.error(JSON.stringify({"code":"booking_menu_list_failed","route":"GET /api/booking/admin/menus"}));
+    logger.error("booking_menu_list_failed");
     return c.json({ error: 'booking_menu_data_unavailable' }, 503);
   }
 });
@@ -179,7 +180,7 @@ booking.put('/api/booking/admin/menus/:id/resources', requirePermission(BOOKING_
       data: { id: c.req.param('id'), version: result.version, resources: result.resources },
     });
   } catch {
-    console.error(JSON.stringify({"code":"booking_menu_resources_update_failed","route":"PUT /api/booking/admin/menus/:id/resources"}));
+    logger.error("booking_menu_resources_update_failed");
     return c.json({ success: false, error: 'booking_menu_resources_save_failed' }, 503);
   }
 });

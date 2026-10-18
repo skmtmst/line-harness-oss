@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import type { NenLifetimeMilestone, NenRankRules, NenRankSetting } from '@line-crm/db';
 
 /**

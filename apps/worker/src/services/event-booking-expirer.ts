@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 // Cron handler: expire 24h-old `requested` event bookings + purge
 // idempotency rows. Mirrors booking-expirer.ts but without a friend
 // notification — spec §7.1 lists no expired-kind notification for events.
@@ -80,7 +81,7 @@ export async function runEventBookingExpirer(
         cancelReason: `event_expired:${row.id}:by:system`,
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"services_event_booking_expirer_failed"}));
+      logger.error("services_event_booking_expirer_failed");
     }
     await enqueueEventWaitlistPromotion(db, {
       lineAccountId: row.line_account_id,
@@ -124,11 +125,11 @@ export async function runEventBookingExpirer(
           allowLegacyFallback: false,
         });
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_event_booking_expirer_failed"}));
+        logger.error("services_event_booking_expirer_failed");
       }
     }
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_event_booking_expirer_failed"}));
+    logger.error("services_event_booking_expirer_failed");
   }
 
   const idempotencyPurged = await purgeExpiredEventIdempotency(db, params.now);

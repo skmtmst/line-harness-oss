@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { BROADCAST_APPROVE_KEY } from '@line-crm/shared';
 import { createNotification, type Broadcast } from '@line-crm/db';
@@ -222,7 +223,7 @@ export async function notifyBroadcastApproval(
       metadata: JSON.stringify({ broadcastId: broadcast.id, action: eventType }),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_broadcast_approval_failed"}));
+    logger.error("services_broadcast_approval_failed");
   }
 }
 
@@ -279,7 +280,7 @@ export async function sweepBroadcastApprovalExpiry(db: D1Database, nowMs: number
   try {
     expired = await expireOverdueBroadcastApprovals(db, nowMs);
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_broadcast_approval_failed"}));
+    logger.error("services_broadcast_approval_failed");
     return;
   }
   const { getBroadcastById } = await import('@line-crm/db');
@@ -293,7 +294,7 @@ export async function sweepBroadcastApprovalExpiry(db: D1Database, nowMs: number
         '承認されないまま予約の時刻を過ぎたため、送らずに期限切れにしました。送るには作り直してください。',
       );
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_broadcast_approval_failed"}));
+      logger.error("services_broadcast_approval_failed");
     }
   }
 }

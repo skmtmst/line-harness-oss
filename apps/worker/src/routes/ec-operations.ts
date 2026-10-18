@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
@@ -83,7 +84,7 @@ ecOperations.get(
       });
       return c.json({ success: true, data, pagination: { total: data.total, ...page } });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_ec_operations_failed","route":"GET /api/ec-commerce/orders"}));
+      logger.error("routes_ec_operations_failed");
       return c.json({ success: false, error: '注文を確認できませんでした' }, 500);
     }
   },
@@ -110,7 +111,7 @@ ecOperations.get(
       if (!data) return c.json({ success: false, error: '注文が見つかりません' }, 404);
       return c.json({ success: true, data });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_ec_operations_failed","route":"GET /api/ec-commerce/orders/:id"}));
+      logger.error("routes_ec_operations_failed");
       return c.json({ success: false, error: '注文の処理状況を確認できませんでした' }, 500);
     }
   },
@@ -149,7 +150,7 @@ ecOperations.get(
       });
       return c.json({ success: true, data, pagination: { total: data.total, ...page } });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_ec_operations_failed","route":"GET /api/ec-commerce/action-executions"}));
+      logger.error("routes_ec_operations_failed");
       return c.json({ success: false, error: 'ECの処理履歴を確認できませんでした' }, 500);
     }
   },
@@ -195,7 +196,7 @@ ecOperations.post(
       auditLog(c, 'ec.action.retry', { kind: 'ec-action-execution', id: result.execution.id });
       return c.json({ success: true, data: result.execution }, result.kind === 'queued' ? 202 : 200);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_ec_operations_failed","route":"POST /api/ec-commerce/action-executions/:id/retry"}));
+      logger.error("routes_ec_operations_failed");
       return c.json({ success: false, error: 'ECの処理を再試行できませんでした' }, 500);
     }
   },
@@ -224,7 +225,7 @@ ecOperations.get(
       });
       return c.json({ success: true, data, pagination: { total: data.total, ...page } });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_ec_operations_failed","route":"GET /api/ec-commerce/identity-candidates"}));
+      logger.error("routes_ec_operations_failed");
       return c.json({ success: false, error: '会員のつき合わせを確認できませんでした' }, 500);
     }
   },

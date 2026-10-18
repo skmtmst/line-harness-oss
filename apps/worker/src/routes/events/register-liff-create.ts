@@ -1,3 +1,6 @@
+import { EntitlementError } from '../../services/booking-entitlements.js';
+import { discardUnacceptedEventBooking, assertEventPassRequirement, validateEventEntitlement, eventEntitlementUse } from '../../services/event-entitlements.js';
+import { logger } from '@line-crm/shared/server';
 import { prepareEventNotification } from '../../services/event-notification-plan.js';
 import { prepareEventReminders } from '../../services/event-reminder-plan.js';
 import type { Env } from '../../index.js';
@@ -77,7 +80,9 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   try {
     return await runBookingFlow();
   } catch (e) {
-    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
+    if(e instanceof EntitlementError)return finalize(e.status,{error:e.code});
+    if(e instanceof Error&&e.message.includes('entitlement_unavailable'))return finalize(409,{error:'entitlement_unavailable'});
+    logger.error("routes_events_failed");
     return finalize(500, { error: 'internal_error' });
   }
 
@@ -112,6 +117,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
 
   const body = (await c.req.json().catch(() => ({}))) as {
     slot_id?: string;
+    entitlement_id?: unknown;
     customer_note?: string | null;
     party_size?: unknown;
     participation_mode?: unknown;
@@ -129,7 +135,9 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   if (!Number.isInteger(requestedPartySize) || (requestedPartySize as number) < 1 || (requestedPartySize as number) > EVENT_PARTY_SIZE_MAX) {
     return finalize(422, { error: 'invalid_party_size' });
   }
+  await assertEventPassRequirement(c.env.DB,account_id,event.id,body.entitlement_id);
   const partySize = requestedPartySize as number;
+  if(body.entitlement_id!==undefined&&(typeof body.entitlement_id!=='string'||!body.entitlement_id||partySize!==1)) return finalize(422,{error:'invalid_entitlement'});
   const participationMode=body.participation_mode??'classroom';
   if(participationMode!=='classroom'&&participationMode!=='online')return finalize(422,{error:'invalid_participation_mode'});
   const answerSnapshot = serializeAnswerSnapshot(body.answers);
@@ -292,6 +300,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     }
   }
 
+  if(typeof body.entitlement_id==='string') await validateEventEntitlement(c.env.DB,account_id,friend.id,event.id,body.entitlement_id,slot.starts_at);
   const modeRemaining=await eventModeRemaining(c.env.DB,slot.id,participationMode);
   if(modeRemaining!==null&&partySize>modeRemaining){if(event.waitlist_enabled===1)return enterWaitlist();return finalize(409,{error:'slot_full'});}
 
@@ -384,7 +393,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       event.id, slot.id, identityKey,
       event.max_bookings_per_friend, event.id, identityKey,
       event.id, identityKey, event.max_bookings_per_friend,slot.id,partySize,
-    ),notificationPlan,...reminderPlans]);
+    ),...(typeof body.entitlement_id==='string'?[await eventEntitlementUse(c.env.DB,account_id,id,body.entitlement_id,slot.starts_at)]:[]),notificationPlan,...reminderPlans]);
   if ((bookingInserted.meta?.changes ?? 0) === 0) {
     const remaining=await eventModeRemaining(c.env.DB,slot.id,participationMode);
     if(remaining!==null&&remaining<partySize){if(event.waitlist_enabled===1)return enterWaitlist();return finalize(409,{error:'slot_full'});}
@@ -421,10 +430,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
         .all<{ id: string }>();
       const winners = new Set((winner.results ?? []).map((r) => r.id));
       if (!winners.has(id)) {
-        await c.env.DB
-          .prepare(`DELETE FROM event_bookings WHERE id = ?`)
-          .bind(id)
-          .run();
+        await discardUnacceptedEventBooking(c.env.DB,account_id,id);
         // 席を戻してから待ちへ入れる。順序が逆だと、自分の予約行が残った
         // まま待ちの行が増え、一瞬だけ定員を二重に押さえる。
         if (event.waitlist_enabled === 1) return enterWaitlist();
@@ -457,10 +463,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
         .all<{ id: string }>();
       const winners = new Set((winner.results ?? []).map((r) => r.id));
       if (!winners.has(id)) {
-        await c.env.DB
-          .prepare(`DELETE FROM event_bookings WHERE id = ?`)
-          .bind(id)
-          .run();
+        await discardUnacceptedEventBooking(c.env.DB,account_id,id);
         const code = effectiveMax === 1 ? 'duplicate_friend_booking' : 'over_friend_limit';
         return finalize(409, { error: code });
       }
@@ -485,7 +488,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     occurredAt: nowIso,
   }).catch((error) => {
     // 予約成立後の派生処理なので、スコア側の障害で予約を失敗扱いにしない。
-    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
+    logger.error("routes_events_failed");
   });
   const actionScoreExecutionCtx = optionalExecutionCtx(c);
   if (actionScoreExecutionCtx) actionScoreExecutionCtx.waitUntil(actionScorePromise);
@@ -511,7 +514,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       sourceEventId: id,
       eventId: event.id,
       lineAccountId: account_id,
-    }).catch((err) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"})));
+    }).catch((err) => logger.error("routes_events_failed"));
     optionalExecutionCtx(c)?.waitUntil(
       dispatchAutomationEventWithLogging(c.env.DB, {
         lineAccountId: account_id,
@@ -522,7 +525,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
           bookingType: 'event', bookingId: id, eventId: event.id, slotId: slot.id,
         },
       })
-        .catch((error) => console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}))),
+        .catch((error) => logger.error("routes_events_failed")),
     );
   }
 
@@ -564,7 +567,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       });
     }
   } catch (e) {
-    console.error(JSON.stringify({"code":"routes_events_failed","route":"POST /api/liff/events/:id/bookings"}));
+    logger.error("routes_events_failed");
   }
 
   return finalize(201, { id, status });

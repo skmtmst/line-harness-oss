@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../../services/booking-confirmed-effects.js';
@@ -312,7 +313,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       adminPrepayOnly = decision.prepayOnly;
       adminPrepayNotice = await prepayNoticeFor(c.env.DB, accountId, decision);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/bookings"}));
+      logger.error("routes_booking_failed");
     }
   }
   const initialStatus = (adminPrepayOnly ? 'requested' : 'confirmed') satisfies BookingStatus;
@@ -472,7 +473,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       c.executionCtx.waitUntil(enrollByTrigger(c.env.DB, {
         triggerType: 'booking', friendId, startsAtIso: startsAt.toISOString(), sourceId: bookingId,
         sourceEventId: bookingId, lineAccountId: accountId,
-      }).catch(() => console.error('proxy reminder enrollment failed')));
+      }).catch(() => logger.error("proxy_reminder_enrollment_failed")));
     }
   }
   if (friendId) {
@@ -490,7 +491,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
           staffId: body.staff_id,
           startsAt: startsAt.toISOString(),
         },
-      }, accountId).catch((err) => console.error(JSON.stringify({"code":"routes_booking_failed","route":"POST /api/booking/admin/bookings"}))),
+      }, accountId).catch((err) => logger.error("routes_booking_failed")),
     );
   }
   const [reminderRows, operationRows, customerContext] = await Promise.all([

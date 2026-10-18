@@ -18,11 +18,11 @@ export function entitlementMonth(at: string, timezone: string) {
 }
 export async function entitlementViews(db: D1Database, accountId: string, friendId: string, at: string): Promise<BookingEntitlementView[]> {
   const period=entitlementMonth(at,await getAccountTimeZone(db,accountId));
-  const rows=await db.prepare(`SELECT e.*, COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=?),e.monthly_limit) AS monthAllowance, (SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id
-    WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(b.starts_at)>=julianday(?) AND julianday(b.starts_at)<julianday(?)) AS monthUsed
+  const rows=await db.prepare(`SELECT e.*, COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=?),e.monthly_limit) AS monthAllowance, ((SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id
+    WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(b.starts_at)>=julianday(?) AND julianday(b.starts_at)<julianday(?)) + (SELECT COUNT(*) FROM event_booking_entitlement_uses u WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(u.starts_at)>=julianday(?) AND julianday(u.starts_at)<julianday(?))) AS monthUsed
     FROM booking_entitlements e WHERE e.line_account_id=? AND e.friend_id=? ORDER BY e.expires_at,e.id`)
-    .bind(period.periodStart,period.periodStart,period.periodEnd,accountId,friendId).all<BookingEntitlement & {monthUsed:number;monthAllowance:number|null}>();
-  return rows.results.map(e=>({...e,...period,monthRemaining:e.kind==='monthly'?Math.max(0,e.monthAllowance!-e.monthUsed):null}));
+    .bind(period.periodStart,period.periodStart,period.periodEnd,period.periodStart,period.periodEnd,accountId,friendId).all<BookingEntitlement & {monthUsed:number;monthAllowance:number|null}>();
+  return rows.results.map(e=>({...e,...period,monthRemaining:e.kind==='monthly'&&e.monthAllowance!==null?Math.max(0,e.monthAllowance-e.monthUsed):null}));
 }
 async function replay(db: D1Database, account: string, key: string, request: string) {
   const row=await db.prepare('SELECT entitlement_id,request_json,after_json FROM booking_entitlement_events WHERE line_account_id=? AND request_key=?')
@@ -43,7 +43,7 @@ export async function grantEntitlement(db:D1Database, account:string, actor:stri
   if(planRequest){const existing=await replay(db,account,key,planRequest);if(existing)return {data:existing,replayed:true};b=await expandPlanGrant(db,account,b as unknown as Record<string,unknown>) as unknown as BookingEntitlementGrant;}
 
   if(!b || !text(b.friendId,128)||!text(b.name,100)||!text(b.reason,1000)||!instant(b.validFrom)||!instant(b.expiresAt)||Date.parse(b.expiresAt)<=Date.parse(b.validFrom)
-    ||!['ticket','monthly'].includes(b.kind)|| (b.kind==='ticket'? !integer(b.remaining,0)||b.monthlyLimit!==undefined : !integer(b.monthlyLimit,1)||b.remaining!==undefined)
+    ||!['ticket','monthly'].includes(b.kind)|| (b.kind==='ticket'? !integer(b.remaining,0)||b.monthlyLimit!==undefined : b.monthlyLimit!==null&&!integer(b.monthlyLimit,1)||b.remaining!==undefined)
     ||!(b.menuId==null||text(b.menuId,128))) invalid();
   const request=planRequest??JSON.stringify({action:'grant',friendId:b.friendId,menuId:b.menuId??null,kind:b.kind,name:b.name.trim(),remaining:b.remaining??null,monthlyLimit:b.monthlyLimit??null,validFrom:new Date(b.validFrom).toISOString(),expiresAt:new Date(b.expiresAt).toISOString(),reason:b.reason.trim()});
   const existing=await replay(db,account,key,request); if(existing) return {data:existing,replayed:true};
@@ -94,7 +94,7 @@ export async function validateEntitlementSelection(db:D1Database,accountId:strin
   const rows=await entitlementViews(db,accountId,friendId,at);
   const e=rows.find(r=>r.id===id);
   if(!e||e.status!=='active'||e.menu_id&&e.menu_id!==menuId||Date.parse(at)<Date.parse(e.valid_from)||Date.parse(at)>=Date.parse(e.expires_at)
-    ||(e.kind==='ticket'?e.remaining!<=0:e.monthRemaining!<=0))throw new EntitlementError('entitlement_unavailable',409);
+    ||(e.kind==='ticket'?e.remaining!<=0:e.monthRemaining!==null&&e.monthRemaining<=0))throw new EntitlementError('entitlement_unavailable',409);
   if(await passUnusable(db,e,accountId,menuId,at))throw new EntitlementError('entitlement_unavailable',409);
   return e;
 }

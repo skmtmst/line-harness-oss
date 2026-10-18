@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { resolveLineSender } from '../services/line-senders.js';
 import { GapError } from '../services/gap-common.js';
 import { inputError } from '../lib/input-errors.js';
@@ -331,7 +332,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
         .bind(jstNow(), chat.id)
         .run();
     } catch (e) {
-      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send"}));
+      logger.error("routes_chats_failed");
     }
 
     await fireEvent(c.env.DB, 'manual_reply_sent', {
@@ -341,7 +342,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
       friendId: friend.id,
       eventData: { staffId: c.get('staff').id },
     }, undefined, friend.line_account_id).catch((error) => {
-      console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send"}));
+      logger.error("routes_chats_failed");
     });
 
     await releaseInboxReplyLease(c.env.DB, {
@@ -364,7 +365,7 @@ export const post__api_chats_id_send_1 = async (c: Context<Env, "/api/chats/:id/
         channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
       }).catch(() => undefined);
     }
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/send"}));
+    logger.error("routes_chats_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -403,7 +404,7 @@ export const post__api_chats_id_render_preview_2 = async (c: Context<Env, "/api/
       data: { content: rendered.content, unresolved: rendered.unresolved },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_chats_failed","route":"POST /api/chats/:id/render-preview"}));
+    logger.error("routes_chats_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

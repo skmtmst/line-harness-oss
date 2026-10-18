@@ -35,7 +35,7 @@ describe('はじめの質問の決まり（B-313・組4の質問キー）', () =
     expect(recommendedValue(approval, 'consult')).toBe('require_approval')
     expect(answerOf('require_approval', approval)).toEqual({ mode: 'configured', value: 'manual' })
     expect(answerOf('manual', approval)).toEqual({ mode: 'manual' })
-    expect(choiceLabel(approval, approval.choices[1], 'consult')).toBe('お店が承認してから確定する（おすすめ）')
+    expect(choiceLabel(approval, approval.choices[1], 'consult')).toBe('担当が承認してから確定する（おすすめ）')
   })
 })
 

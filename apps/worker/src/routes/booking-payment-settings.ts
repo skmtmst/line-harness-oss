@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
 import { inputError } from '../lib/input-errors.js';
@@ -47,7 +48,7 @@ export async function paymentSettingResponse(
     const code = missing
       ? target.kind === 'course' ? 'course_payment_storage_not_ready' : 'event_payment_storage_not_ready'
       : 'payment_admin_unavailable';
-    console.error(JSON.stringify({ code }));
+    logger.error(code);
     return c.json({ success: false, error: code, code }, 503);
   }
 }

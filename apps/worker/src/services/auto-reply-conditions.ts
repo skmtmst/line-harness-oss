@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { toJstParts, type HolidayRule } from '@line-crm/shared';
 import { hasAutoReplyHitForFriend } from '@line-crm/db';
 import { holidaysOfYear } from './jp-holidays.js';
@@ -18,7 +19,7 @@ const HOLIDAY_YEAR_MAX = 2099;
 function isHolidayOn(isoDate: string): boolean {
   const year = Number(isoDate.slice(0, 4));
   if (!Number.isInteger(year) || year < HOLIDAY_YEAR_MIN || year > HOLIDAY_YEAR_MAX) {
-    console.warn(JSON.stringify({"code":"services_auto_reply_conditions_warn"}));
+    logger.warn("services_auto_reply_conditions_warn");
     return false;
   }
   return holidaysOfYear(year).some((holiday) => holiday.date === isoDate);
@@ -233,7 +234,7 @@ export async function matchesFriendConditions(
   if (!raw) return true;
   const condition = parseCondition(raw);
   if (!condition) {
-    console.error('[auto-reply] unreadable friend_conditions_json — skipped the rule');
+    logger.error("auto_reply_unreadable_friend_conditions_json_skipped_the_rule");
     return false;
   }
   return matchesCondition(db, friendId, condition);

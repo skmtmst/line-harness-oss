@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 /**
  * #838 第1段: 定期CSV書き出しの実行役。
  *
@@ -58,7 +59,7 @@ export async function processDueScheduledExports(
       generated += 1;
     } catch (error) {
       failed += 1;
-      console.error(JSON.stringify({"code":"scheduled_export_failed"}));
+      logger.error("scheduled_export_failed");
     }
   }
   return { generated, skipped, failed };

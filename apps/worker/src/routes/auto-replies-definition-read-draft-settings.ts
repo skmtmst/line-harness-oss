@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { readPriority } from '../services/auto-reply-priority.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import type { Context } from 'hono';
@@ -461,7 +462,7 @@ async function internalMemosOf(
   try {
     return await getAutoReplyInternalMemos(db, autoReplyIds);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed"}));
+    logger.error("routes_auto_replies_failed");
     return new Map();
   }
 }
@@ -487,7 +488,7 @@ async function resolveStoppedByNames(
     }
   } catch (err) {
     // 名前が引けなくても一覧は出す。ID そのものは画面に出さず null のままにする。
-    console.error(JSON.stringify({"code":"routes_auto_replies_failed"}));
+    logger.error("routes_auto_replies_failed");
   }
 }
 

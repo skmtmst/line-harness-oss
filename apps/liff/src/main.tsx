@@ -1,3 +1,4 @@
+import { createClientLogger } from '@line-crm/shared';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, useLocation } from 'react-router-dom';
@@ -7,6 +8,8 @@ import LiffLookScope from './components/LiffLookScope.js';
 import CustomerStyleScope from './components/CustomerStyleScope.js';
 import { initLiff } from './lib/liff-auth.js';
 import './index.css';
+const clientLogger = createClientLogger('liff');
+
 
 /** 業種を必要としない既存のファイル・フォーム等は、業種未設定だけで止めない。 */
 function CustomerContext() {
@@ -33,7 +36,7 @@ function CustomerContext() {
       </StrictMode>,
     );
   } catch (err) {
-    console.error(JSON.stringify({"code":"src_main_failed"}));
+    clientLogger.error("src_main_failed");
     document.getElementById('root')!.innerHTML = `
       <div style="padding: 2rem; font-family: sans-serif; color: #4b5563; text-align: center;">
         <h1 style="font-size: 1rem; margin-bottom: 0.5rem;">開けませんでした</h1>

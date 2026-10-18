@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { parseReservationFilter } from './restaurant-reservation-filter.js';
 import { deriveStoreLineStatuses, isValidTimezone, uniqueStoreConflict } from './restaurant-store-status.js';
 import type { RestaurantStoreRow, SelectedRestaurantStore } from './restaurant-context-types.js';
@@ -29,11 +30,11 @@ export const use__api_restaurant_test__1 = async (c: Context<Env, "/api/restaura
  await next();
  if(!['POST','PUT','PATCH','DELETE'].includes(c.req.method)||!c.res.ok||c.req.path.endsWith('/closures/preview'))return;
  await processVisitStampQueue(c.env);
- try{await processRestaurantEvents(c.env);await processScenarioSourceJobs(c.env);}catch{console.error(JSON.stringify({"code":"restaurant_event_dispatch_deferred"}));}
+ try{await processRestaurantEvents(c.env);await processScenarioSourceJobs(c.env);}catch{logger.error("restaurant_event_dispatch_deferred");}
  const organization=await organizationFor(c);if(!organization)return;
  const dirty=await dbFor(c.env).prepare(`SELECT q.store_id FROM rt_inventory_rule_queue q JOIN rt_stores s ON s.id=q.store_id
  WHERE s.organization_id=? AND (? IS NULL OR s.id=?) LIMIT 100`).bind(organization.id,organization.scopedStoreId,organization.scopedStoreId).all<{store_id:string}>();
- for(const row of dirty.results)try {await reconcileRestaurantInventory(c.env,row.store_id);}catch {console.error('飲食店の枠通知は次の定期処理で再試行します');}
+ for(const row of dirty.results)try {await reconcileRestaurantInventory(c.env,row.store_id);}catch {logger.error("restaurant_test_organization_handlers_ts_log_36");}
 };
 
 export const onError_route_2 = (error: Error, c: Context<Env>) => {
@@ -44,7 +45,7 @@ export const onError_route_2 = (error: Error, c: Context<Env>) => {
   throw error;
 };
 
-export const use___3 = async (c: Context<Env, "*">, next: Next) => {await next();if(!c.req.path.startsWith('/api/restaurant-test/google/')&&!['GET','HEAD','OPTIONS'].includes(c.req.method)&&!c.req.path.endsWith('/closures/preview')&&c.res.status<400&&!(c.req.path.endsWith('/seat-waitlist')&&c.req.method==='POST')){try{const org=await organizationFor(c);if(org){const stores=await dbFor(c.env).prepare('SELECT id,line_account_id FROM rt_stores WHERE organization_id=? AND (? IS NULL OR id=?)').bind(org.id,org.scopedStoreId,org.scopedStoreId).all<{id:string;line_account_id:string|null}>();for(const store of stores.results)await processBookingWaitlists(c.env,store.line_account_id??undefined,store.id);}}catch{console.error(JSON.stringify({"code":"seat_waitlist_reconcile_failed"}));}}};
+export const use___3 = async (c: Context<Env, "*">, next: Next) => {await next();if(!c.req.path.startsWith('/api/restaurant-test/google/')&&!['GET','HEAD','OPTIONS'].includes(c.req.method)&&!c.req.path.endsWith('/closures/preview')&&c.res.status<400&&!(c.req.path.endsWith('/seat-waitlist')&&c.req.method==='POST')){try{const org=await organizationFor(c);if(org){const stores=await dbFor(c.env).prepare('SELECT id,line_account_id FROM rt_stores WHERE organization_id=? AND (? IS NULL OR id=?)').bind(org.id,org.scopedStoreId,org.scopedStoreId).all<{id:string;line_account_id:string|null}>();for(const store of stores.results)await processBookingWaitlists(c.env,store.line_account_id??undefined,store.id);}}catch{logger.error("seat_waitlist_reconcile_failed");}}};
 
 export const use__api_restaurant_test__4 = async (c: Context<Env, "/api/restaurant-test/*">, next: Next) => {
   // Google の各ルートは専用の旗・ログイン・統括・アカウントの guard で守る。
@@ -390,7 +391,7 @@ export const post__api_restaurant_test_stores_connect_14 = async (c: Context<Env
       try {
         await deleteUncommittedLineAccount(dbFor(c.env), createdLineAccountId);
       } catch {
-        console.error(JSON.stringify({"code":"restaurant_store_wizard_rollback_failed","route":"POST /api/restaurant-test/stores/connect"}));
+        logger.error("restaurant_store_wizard_rollback_failed");
       }
     }
     if (error instanceof LineTokenIssueError) {
@@ -410,7 +411,7 @@ export const post__api_restaurant_test_stores_connect_14 = async (c: Context<Env
     if (/UNIQUE constraint failed.*line_accounts\.channel_id/i.test(message)) {
       return c.json({ success: false, error: 'このLINE公式アカウントは既に登録されています' }, 409);
     }
-    console.error(JSON.stringify({"code":"restaurant_store_wizard_failed","route":"POST /api/restaurant-test/stores/connect"}));
+    logger.error("restaurant_store_wizard_failed");
     return c.json({ success: false, error: '店舗を追加できませんでした。時間を置いてもう一度お試しください。' }, 500);
   }
 };

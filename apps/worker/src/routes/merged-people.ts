@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -162,7 +163,7 @@ function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof MergedPersonError) {
     return inputError(c, { success: false, error: error.message, code: error.code }, error.status, mergedPersonErrorFields(c, error.code));
   }
-  console.error(JSON.stringify({"code":"routes_merged_people_failed"}));
+  logger.error("routes_merged_people_failed");
   return c.json(
     { success: false, error: '統合ユーザーを処理できませんでした', code: 'INTERNAL_ERROR' },
     500,

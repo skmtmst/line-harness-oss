@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   BILLING_INVOICES_LAST_SYNCED_KEY,
   getPlatformSetting,
@@ -121,7 +122,7 @@ export async function syncBillingInvoices(
       } while (startingAfter);
     } catch (error) {
       failed += 1;
-      console.warn(JSON.stringify({"code":"billing_invoice_sync_failed"}));
+      logger.warn("billing_invoice_sync_failed");
     }
   }
 
