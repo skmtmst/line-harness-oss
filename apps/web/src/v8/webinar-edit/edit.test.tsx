@@ -79,11 +79,14 @@ const conflictState = vi.hoisted(() => ({ ctas: false, actions: false }))
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
+const analyticsNet = { hold: false, pending: [] as Array<(value: Response) => void> }
 let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
   clearToastsForTest()
+  analyticsNet.hold = false
+  analyticsNet.pending.length = 0
   routerPush.mockReset()
   document.documentElement.dataset.theme = 'v8'
   roleState.role = 'owner'
@@ -114,8 +117,12 @@ beforeEach(() => {
       return json({ data: { count: 0 } })
     }
     if (path === '/api/webinars/webinar-1') return json({ data: webinar })
+    if (path === '/api/webinars/webinar-2') return json({ data: { ...webinar, id: 'webinar-2', title: '次のウェビナー' } })
     if (path.endsWith('/editor')) return json({ data: editor })
-    if (path.endsWith('/analytics')) return json({ data: analytics })
+    if (path.endsWith('/analytics')) {
+      if (analyticsNet.hold) return new Promise<Response>(done => analyticsNet.pending.push(done))
+      return json({ data: analytics })
+    }
     if (path.endsWith('/participants')) return json({ data: participants })
     if (path.endsWith('/user-comments')) return json({ data: [] })
     if (path.endsWith('/comments')) return json({ data: comments })
@@ -415,3 +422,21 @@ it('編集の複製は保存済みの版を送り、一覧で下書きを光ら�
   expect(routerPush).toHaveBeenCalledWith('/webinars?status=draft&highlight=copied-webinar')
   expect(document.querySelector('[role="dialog"]')).toBeNull()
 });
+
+it('集計の通信中に段を移っても重複せず、相手切替前の遅い応答を捨てる', async () => {
+  analyticsNet.hold = true
+  nav.search = 'id=webinar-1&pane=participants'
+  await render(<WebinarEditV8 />)
+  expect(analyticsNet.pending).toHaveLength(1)
+  nav.search = 'id=webinar-1&pane=analytics'
+  await render(<WebinarEditV8 />)
+  expect(analyticsNet.pending).toHaveLength(1)
+  nav.search = 'id=webinar-2&pane=analytics'
+  await render(<WebinarEditV8 />)
+  expect(analyticsNet.pending).toHaveLength(2)
+  await act(async () => { analyticsNet.pending[1](json({ data: { ...analytics, summary: { ...analytics.summary, reservations: 222 } } })) })
+  expect(host.textContent).toContain('222')
+  await act(async () => { analyticsNet.pending[0](json({ data: { ...analytics, summary: { ...analytics.summary, reservations: 111 } } })) })
+  expect(host.textContent).toContain('222')
+  expect(host.textContent).not.toContain('111')
+})
