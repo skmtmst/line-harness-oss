@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import type { Env } from '../worker-env.js';
 
 import { enqueueFollowingMileageMilestones } from '@line-crm/db';
@@ -27,7 +28,7 @@ export async function runSixHourlyHeavyJobs(
       run: async () => {
         const { refreshAllNenTags } = await import('../services/nen-tag-sync.js');
         const result = await refreshAllNenTags(env.DB, { allTenants: true }, 500, new Date());
-        if (result.added + result.removed > 0) console.log(JSON.stringify({"code":"nen_tag_refresh"}));
+        if (result.added + result.removed > 0) logger.log("nen_tag_refresh");
       },
     },
     {
@@ -47,7 +48,7 @@ export async function runSixHourlyHeavyJobs(
           purged.events + purged.dailyMetrics + purged.reconciliationRuns
           + purged.funnelRuns + purged.crossRuns + purged.savedSnapshots + purged.audiences > 0
         ) {
-          console.log(JSON.stringify({"code":"analytics_retention_purged"}));
+          logger.log("analytics_retention_purged");
         }
       },
     },
@@ -58,7 +59,7 @@ export async function runSixHourlyHeavyJobs(
         const { purgeExpiredAutomationRuns } = await import('@line-crm/db');
         const purged = await purgeExpiredAutomationRuns(env.DB, new Date(event.scheduledTime));
         if (purged.runs + purged.dailyExpired > 0) {
-          console.log(JSON.stringify({"code":"automation_retention_purged"}));
+          logger.log("automation_retention_purged");
         }
       },
     },
@@ -77,7 +78,7 @@ export async function runSixHourlyHeavyJobs(
         const scanStartedAt = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
         const result = await scanMediaUsage(env.DB, scanStartedAt);
         if (result.matched > 0 || result.pruned > 0) {
-          console.log(JSON.stringify({"code":"media_usage_scan"}));
+          logger.log("media_usage_scan");
         }
       },
     },
@@ -86,7 +87,7 @@ export async function runSixHourlyHeavyJobs(
       run: async () => {
         const result = await enqueueFollowingMileageMilestones(env.DB, { limitPerMilestone: 1000 });
         if (result.eventsCreated + result.queued > 0) {
-          console.log(JSON.stringify({"code":"src_index_log"}));
+          logger.log("src_index_log");
         }
       },
     },
@@ -95,14 +96,14 @@ export async function runSixHourlyHeavyJobs(
       run: async () => {
         const result = await runExpirer(env.DB, { now: new Date(), sender: sendBookingNotification,
           credentials: { email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL, privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY } });
-        console.log(JSON.stringify({"code":"src_index_log"}));
+        logger.log("src_index_log");
       },
     },
     {
       name: 'event booking expirer',
       run: async () => {
         const result = await runEventBookingExpirer(env.DB, { now: new Date() });
-        console.log(JSON.stringify({"code":"src_index_log"}));
+        logger.log("src_index_log");
       },
     },
     {
@@ -112,7 +113,7 @@ export async function runSixHourlyHeavyJobs(
         const { sweepCommonVarExpiryNotices } = await import('../services/common-var-expiry-sweep.js');
         const result = await sweepCommonVarExpiryNotices(env.DB, env, new Date());
         if (result.notified > 0 || result.errors > 0) {
-          console.log(JSON.stringify({"code":"common_var_expiry_sweep"}));
+          logger.log("common_var_expiry_sweep");
         }
       },
     },
@@ -122,7 +123,7 @@ export async function runSixHourlyHeavyJobs(
         const { syncBillingInvoicesDaily } = await import('../services/billing-invoices-sync.js');
         const result = await syncBillingInvoicesDaily(env, new Date(event.scheduledTime));
         if (result && (result.imported > 0 || result.failed > 0)) {
-          console.log(JSON.stringify({"code":"billing_invoice_sync"}));
+          logger.log("billing_invoice_sync");
         }
       },
     },
@@ -140,7 +141,7 @@ export async function runSixHourlyHeavyJobs(
           credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
         });
         if (result.imported + result.failed > 0) {
-          console.log(JSON.stringify({"code":"ad_cost_import"}));
+          logger.log("ad_cost_import");
         }
       },
     },
@@ -154,7 +155,7 @@ export async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.createdSheets + result.importedOrders + result.wroteRows + result.failed > 0) {
-          console.log(JSON.stringify({"code":"tiktok_pnl_tick"}));
+          logger.log("tiktok_pnl_tick");
         }
       },
     },
@@ -168,7 +169,7 @@ export async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.anchoredTrials + result.tenants + result.deletedRows > 0) {
-          console.log(JSON.stringify({"code":"tenant_data_retention_purge"}));
+          logger.log("tenant_data_retention_purge");
         }
       },
     },
@@ -185,7 +186,7 @@ export async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (totalRetentionActions(result) > 0) {
-          console.log(JSON.stringify({"code":"google_business_content_retention"}));
+          logger.log("google_business_content_retention");
         }
       },
     },
@@ -197,7 +198,7 @@ export async function runSixHourlyHeavyJobs(
       run: async () => {
         const result = await deleteExpiredRestaurantRawEmails(env);
         if (result.deleted + result.failed > 0) {
-          console.log(JSON.stringify({"code":"restaurant_raw_mail_retention"}));
+          logger.log("restaurant_raw_mail_retention");
         }
       },
     });
@@ -213,7 +214,7 @@ export async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.synced + result.failed > 0) {
-          console.log(JSON.stringify({"code":"google_business_metrics_tick"}));
+          logger.log("google_business_metrics_tick");
         }
       },
     });
@@ -227,7 +228,7 @@ export async function runSixHourlyHeavyJobs(
           now: new Date(event.scheduledTime).toISOString(),
         });
         if (result.refreshed + result.failed > 0) {
-          console.log(JSON.stringify({"code":"google_business_token_keepalive_tick"}));
+          logger.log("google_business_token_keepalive_tick");
         }
       },
     });

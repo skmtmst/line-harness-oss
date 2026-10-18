@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import type { SelfBookingChange } from '../booking-self-meet-sync.js';
 import { inputError } from '../../lib/input-errors.js';
 import { type Context, type MiddlewareHandler } from 'hono';

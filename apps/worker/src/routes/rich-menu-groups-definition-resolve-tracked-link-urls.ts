@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
 import { type Context } from 'hono';

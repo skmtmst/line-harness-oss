@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { accountScopeWhere, accountScopeBindings, adminAccountScope, visibleAccountNames } from '../services/profile-refresh-scope.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -122,7 +123,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), inputJs
           notFound += 1;
         } else {
           otherErrors += 1;
-          console.error(JSON.stringify({"code":"routes_profile_refresh_failed","route":"POST /api/admin/refresh-profiles"}));
+          logger.error("routes_profile_refresh_failed");
         }
       } finally {
         processed += 1;

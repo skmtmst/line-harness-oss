@@ -1,3 +1,5 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 import { toJstString } from '@line-crm/db';
 
 /**
@@ -205,7 +207,7 @@ async function deliverClaimedReward(
       ? { kind: 'retry_later', reason: classified.reason, nextAttemptAt: backoffNextAttempt(now, attemptCount, classified.reason) }
       : classified;
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_photo_reward_sync_failed"}));
+    logger.error("services_photo_reward_sync_failed");
     outcome = {
       kind: 'retry_later',
       reason: 'ec_unavailable',

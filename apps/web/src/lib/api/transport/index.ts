@@ -8,6 +8,8 @@ export {
   extractApiErrorTrackingId,
   extractApiFieldErrors,
   getApiFieldErrors,
+  getApiErrorCode,
+  responseApiError,
   describeSaveFailure,
   parseRetryAfterSeconds,
   NETWORK_FAILURE_MESSAGE,

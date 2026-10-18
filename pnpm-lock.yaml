@@ -361,6 +361,10 @@ importers:
         version: 4.1.11(@types/node@25.5.0)(happy-dom@20.14.0)(vite@6.4.3(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.23.0)(yaml@2.9.0))
 
   packages/line-sdk:
+    dependencies:
+      '@line-crm/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: ^5.9.3

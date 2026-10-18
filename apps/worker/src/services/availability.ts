@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {toMin,fromMin,overlaps,intInRange,isHhmm} from './availability-time-values.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 // Booking availability calculation.
@@ -156,7 +157,7 @@ export function normalizeTimeZone(raw: unknown): string {
     new Intl.DateTimeFormat('en-US', { timeZone: candidate });
     return candidate;
   } catch {
-    console.error('booking availability: invalid timezone, falling back to Asia/Tokyo');
+    logger.error("booking_availability_invalid_timezone_falling_back_to_Asia_Tokyo");
     return FALLBACK_TIME_ZONE;
   }
 }
@@ -822,7 +823,7 @@ async function loadAvailabilityData(
     } catch (error) {
       // Configured calendar must fail closed. Showing slots while Google is
       // unreachable can create double bookings.
-      console.error(JSON.stringify({"code":"services_availability_failed"}));
+      logger.error("services_availability_failed");
       googleBusyByStaff.set(staff.id, []);
       calendarSync.push({ staff_id: staff.id, configured: true, ok: false, error: 'unavailable' });
     }

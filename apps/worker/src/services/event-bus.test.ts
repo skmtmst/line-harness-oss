@@ -461,7 +461,7 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
     expect(deliveryModule.recordDeliveryOutcome).toHaveBeenCalledWith(db, 'legacy-webhook', true);
     expect(log).toHaveBeenCalledOnce();
     const record = log.mock.calls[0]?.[0] as string;
-    expect(JSON.parse(record)).toEqual({ code: 'outgoing_webhook_line_account_unknown' });
+    expect(JSON.parse(record)).toEqual({ code: 'outgoing_webhook_line_account_unknown', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
     expect(record).not.toContain('webhook-1');
   });
 });

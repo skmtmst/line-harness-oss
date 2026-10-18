@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { hasStaffAccess } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
@@ -62,7 +63,7 @@ export function conversionContractError(c: Context<Env>, error: unknown): Respon
   if (error instanceof ConversionDefinitionError) {
     return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
   }
-  console.error(JSON.stringify({"code":"conversion_definition_contract_failed"}));
+  logger.error("conversion_definition_contract_failed");
   return c.json({ success: false, error: '成果地点の情報を処理できませんでした' }, 500);
 }
 
@@ -442,7 +443,7 @@ async function notifyOfferActionFailure(
       }),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_conversions_failed"}));
+    logger.error("routes_conversions_failed");
   }
 }
 
@@ -490,7 +491,7 @@ async function runApprovedConversionOfferActions(
       try {
         await attachTagAndFireSideEffects(db, plan.friendId, plan.tagId);
       } catch (error) {
-        console.error(JSON.stringify({"code":"routes_conversions_failed"}));
+        logger.error("routes_conversions_failed");
         attachError = error;
       }
       // 例外を投げない失敗（マイル工程・走り直し経路の失敗）も未完として拾う。
@@ -559,7 +560,7 @@ async function runApprovedConversionOfferActions(
             }
           }
         } catch (error) {
-          console.error(JSON.stringify({"code":"routes_conversions_failed"}));
+          logger.error("routes_conversions_failed");
           failures.push({
             action: 'scenario',
             refId: plan.scenarioId,
@@ -660,6 +661,6 @@ async function notifyApprovalOnce(
       throw err;
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_conversions_failed"}));
+    logger.error("routes_conversions_failed");
   }
 }

@@ -1,8 +1,7 @@
+import { recoverEventTransitions } from './event-transition-recovery.js';
 import type { AccountStyle } from '@line-crm/shared';
-import { prepareEventReminders } from './event-reminder-plan.js';
 import { recoverEventBookingNotifications } from './event-notification-recovery.js';
 import { deliverBookingLine, BookingLineDeliveryIncomplete } from './booking-line-delivery.js';
-import { reverseSourceConversions } from '@line-crm/db';
 // Event booking reminders: schedule + cron processor.
 // Phase 1 mirrors booking-reminders.ts pattern but on event_booking_reminders.
 
@@ -23,88 +22,14 @@ import {
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 
-export interface ComputedReminder {
-  kind: EventReminderKind;
-  scheduled_at: string; // UTC ISO8601 (Z)
-}
-
-export interface ComputeRemindersInput {
-  starts_at_utc: string; // UTC ISO8601
-  reminder_day_before_enabled: boolean;
-  reminder_hours_before: number | null;
-  now?: Date;
-}
-
-const JST_OFFSET_MS = 9 * 3600_000;
-
-// Reminders that fall in the past are dropped. Pure function, no DB.
-export function computeRemindersForBooking(input: ComputeRemindersInput): ComputedReminder[] {
-  const out: ComputedReminder[] = [];
-  const startMs = new Date(input.starts_at_utc).getTime();
-  const nowMs = (input.now ?? new Date()).getTime();
-
-  if (input.reminder_day_before_enabled) {
-    // 前日 18:00 JST = 09:00 UTC of the day before starts_at(JST)
-    const startJst = new Date(startMs + JST_OFFSET_MS);
-    const dayBeforeUtc = new Date(
-      Date.UTC(
-        startJst.getUTCFullYear(),
-        startJst.getUTCMonth(),
-        startJst.getUTCDate() - 1,
-        9, // 09:00 UTC == 18:00 JST
-        0,
-        0,
-      ),
-    );
-    if (dayBeforeUtc.getTime() > nowMs) {
-      out.push({ kind: 'day_before', scheduled_at: dayBeforeUtc.toISOString() });
-    }
-  }
-
-  if (input.reminder_hours_before != null && input.reminder_hours_before > 0) {
-    const hoursBeforeMs = startMs - input.reminder_hours_before * 3600_000;
-    if (hoursBeforeMs > nowMs) {
-      out.push({ kind: 'hours_before', scheduled_at: new Date(hoursBeforeMs).toISOString() });
-    }
-  }
-
-  return out;
-}
-
-// Persist reminders for a single booking. Caller decides when to invoke
-// (e.g. after status -> 'confirmed').
-export async function insertRemindersForBooking(
-  db: D1Database,
-  booking_id: string,
-  reminders: ComputedReminder[],
-): Promise<void> {
-  for (const statement of prepareEventReminders(db,booking_id,reminders)) await statement.run();
-}
-
-// Cancel pending and retryable failed reminders linked to a booking
-// (cancel/reject/expire flows). The cron retries `failed` rows, so a stale
-// failed row left here would still notify after the booking is gone.
-export async function cancelPendingRemindersFor(
-  db: D1Database,
-  booking_id: string,
-): Promise<void> {
-  await db
-    .prepare(
-      `UPDATE event_booking_reminders
-          SET status = 'cancelled'
-        WHERE booking_id = ? AND status IN ('pending','failed')`,
-    )
-    .bind(booking_id)
-    .run();
-  const cancelled = await db.prepare(`SELECT line_account_id, friend_id FROM event_bookings WHERE id = ? AND status = 'cancelled'`)
-    .bind(booking_id).first<{ line_account_id: string; friend_id: string }>();
-  if (cancelled) await reverseSourceConversions(db, { lineAccountId: cancelled.line_account_id, sourceType: 'reservation_confirmed', bookingId: booking_id, friendId: cancelled.friend_id });
-
-}
+export {computeRemindersForBooking,insertRemindersForBooking,type ComputedReminder,type ComputeRemindersInput} from './event-reminder-schedule.js';
+export {cancelPendingRemindersFor} from './event-reminder-cleanup.js';
+const JST_OFFSET_MS=9*3600_000;
 
 interface DueEventReminderRow {
   id: string;
   booking_id: string;
+  booking_version:number;
   line_account_id: string;
   kind: EventReminderKind;
   retry_count: number;
@@ -154,7 +79,7 @@ export async function processDueEventReminders(
   // start in the future at processing time.
   const due = await db
     .prepare(
-      `SELECT r.id, r.booking_id, r.kind, r.retry_count,
+      `SELECT r.id, r.booking_id, r.kind, r.retry_count,r.booking_version,
               b.line_account_id,
               e.name AS event_name, e.venue_name, e.venue_url,
               e.reminder_message_extra, e.reminder_hours_before,
@@ -172,7 +97,7 @@ export async function processDueEventReminders(
         WHERE r.status IN ('pending','failed')
           AND r.scheduled_at <= ?
           AND f.is_following=1
-          AND b.status = 'confirmed'
+          AND b.status = 'confirmed' AND b.lock_version=r.booking_version
           AND s.starts_at > ?
           AND ${activeTenantLineAccountSql('b.line_account_id')}
           AND NOT EXISTS(SELECT 1 FROM workflow_steps ws WHERE ws.scope_id='line:' || b.line_account_id
@@ -222,7 +147,7 @@ export async function processDueEventReminders(
         { lineAccountId: row.line_account_id, field: 'channel_access_token' });
       const eligible = await db.prepare(`SELECT 1 ok FROM event_booking_reminders r
         JOIN event_bookings b ON b.id=r.booking_id WHERE r.id=? AND r.status IN ('pending','failed')
-        AND b.status='confirmed' AND ${activeTenantLineAccountSql('b.line_account_id')}`).bind(row.id).first();
+        AND b.status='confirmed' AND b.lock_version=r.booking_version AND ${activeTenantLineAccountSql('b.line_account_id')}`).bind(row.id).first();
       if (!eligible || await isOperationCapabilityStopped(db,row.line_account_id,'reminder_dispatch')) {
         await releaseWorkflowStep(db,ref,owner,now);
         continue;
@@ -243,13 +168,13 @@ export async function processDueEventReminders(
         authorize: async saved => !await isOperationCapabilityStopped(db,row.line_account_id,'reminder_dispatch')
           && !!await db.prepare(`SELECT 1 ok FROM event_booking_reminders r JOIN event_bookings b ON b.id=r.booking_id
             JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
-            WHERE r.id=? AND r.status IN ('pending','failed') AND b.status='confirmed'
+            WHERE r.id=? AND r.status IN ('pending','failed') AND b.status='confirmed' AND b.lock_version=r.booking_version
               AND f.is_following=1 AND f.line_user_id=? AND b.line_account_id=?
               AND ${activeTenantLineAccountSql('b.line_account_id')}`).bind(row.id,saved.toLineUserId,row.line_account_id).first(),
         statements: next => next.phase==='started'?[db.prepare(`SELECT json(CASE WHEN EXISTS(
           SELECT 1 FROM event_booking_reminders r JOIN event_bookings b ON b.id=r.booking_id
           JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id
-          WHERE r.id=? AND r.status IN ('pending','failed') AND b.status='confirmed' AND b.line_account_id=?
+          WHERE r.id=? AND r.status IN ('pending','failed') AND b.status='confirmed' AND b.lock_version=r.booking_version AND b.line_account_id=?
             AND f.is_following=1 AND f.line_user_id=? AND ${activeTenantLineAccountSql('b.line_account_id')})
           THEN 'true' ELSE 'event_reminder_obsolete' END)`).bind(row.id,row.line_account_id,input.toLineUserId)]
           : next.phase==='succeeded' ? [db.prepare(`UPDATE event_booking_reminders
@@ -280,7 +205,9 @@ export async function processDueEventReminders(
       failed++;
     }
   }
-  const recovered=await recoverEventBookingNotifications(db,params.now,Math.max(0,100-(due.results??[]).length));
+  const remaining=Math.max(0,100-(due.results??[]).length);
+  const transitions=await recoverEventTransitions(db,params.now,remaining);
+  const recovered=await recoverEventBookingNotifications(db,params.now,Math.max(0,remaining-transitions));
   return { sent:sent+recovered.sent, failed:failed+recovered.failed };
 }
 

@@ -1,3 +1,4 @@
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 /**
  * TikTok利益計算の自動化（第2段＝API連携）。
  *
@@ -909,7 +910,7 @@ export async function processTiktokPnlTick(
       if (one.status === 'error') result.failed += 1;
     } catch (error) {
       result.failed += 1;
-      console.error(JSON.stringify({"code":"tiktok_pnl_sync_failed"}));
+      logger.error("tiktok_pnl_sync_failed");
     }
   }
   return result;

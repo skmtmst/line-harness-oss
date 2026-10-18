@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { withDisplayReadCache } from './display-read-cache.js';
 import { type DashboardPeriod, type AccountStatsScope, type DashboardOverview, type DashboardSectionStatus, type DashboardMetricState, type DashboardMetricReason } from './dashboard-types.js';
 import { periodStart, monthStart, oldestDashboardTime, dashboardFreshness, summarizeDashboardFreshness } from './dashboard-freshness.js';
@@ -43,7 +44,7 @@ async function dashboardOverview(
       return value;
     } catch (error) {
       partialFailures.push(name);
-      console.error(JSON.stringify({"code":"src_dashboard_failed"}));
+      logger.error("src_dashboard_failed");
       return fallback;
     }
   };

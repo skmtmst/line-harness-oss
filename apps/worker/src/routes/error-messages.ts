@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import { listErrorMessages } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -29,7 +30,7 @@ errorMessages.get('/api/error-messages', requireRole('owner', 'admin', 'staff'),
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_error_messages_failed","route":"GET /api/error-messages"}));
+    logger.error("routes_error_messages_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

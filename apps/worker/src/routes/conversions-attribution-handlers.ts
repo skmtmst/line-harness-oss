@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { decideConversionApproval, syncAffiliateConversionMileage, getAttributionDecisionView } from '@line-crm/db';
@@ -37,7 +38,7 @@ export const get__api_conversions_events_id_attribution_1 = async (c: Context<En
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"GET /api/conversions/events/:id/attribution"}));
+    logger.error("routes_conversions_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -145,7 +146,7 @@ export const patch__api_conversions_events_id_approval_2 = async (c: Context<Env
 
     return c.json({ success: true, data: { id: c.req.param('id'), approvalStatus: parsed.status } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"PATCH /api/conversions/events/:id/approval"}));
+    logger.error("routes_conversions_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -218,7 +219,7 @@ export const post__api_conversions_approvals_bulk_3 = async (c: Context<Env, "/a
               continue;
             }
           } catch (err) {
-            console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/approvals/bulk"}));
+            logger.error("routes_conversions_failed");
             result.failed.push({ id: itemId, error: '案件の動作を実行できませんでした' });
             continue;
           }
@@ -227,13 +228,13 @@ export const post__api_conversions_approvals_bulk_3 = async (c: Context<Env, "/a
       } catch (err) {
         // m22u R353: 途中の失敗で全体を500にしない。処理済み・失敗の一覧を
         // 必ず返し、一部だけ承認済みのまま黙って止まらないようにする。
-        console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/approvals/bulk"}));
+        logger.error("routes_conversions_failed");
         result.failed.push({ id: itemId, error: '処理できませんでした。もう一度お試しください' });
       }
     }
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_conversions_failed","route":"POST /api/conversions/approvals/bulk"}));
+    logger.error("routes_conversions_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };

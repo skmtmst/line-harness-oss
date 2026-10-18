@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -75,7 +76,7 @@ async function readDisplayConfig(
     const secrets = JSON.parse(await decryptCredential(p.config_encrypted, encryptionKey));
     return { values: parsed, secretKeys: Object.keys(secrets) };
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_platforms_failed"}));
+    logger.error("routes_ad_platforms_failed");
     return { values: parsed, secretKeys: [] };
   }
 }
@@ -118,7 +119,7 @@ adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), asy
       data: await Promise.all(visible.map((item) => serializePlatform(item, key))),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_platforms_failed","route":"GET /api/ad-platforms"}));
+    logger.error("routes_ad_platforms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -181,7 +182,7 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), inputJsonBoundary({"
       throw err;
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_platforms_failed","route":"POST /api/ad-platforms"}));
+    logger.error("routes_ad_platforms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -298,7 +299,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), inputJsonBoundary
       throw err;
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_platforms_failed","route":"PUT /api/ad-platforms/:id"}));
+    logger.error("routes_ad_platforms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -394,7 +395,7 @@ adPlatforms.post('/api/ad-platforms/test', requireRole('owner'), inputJsonBounda
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_platforms_failed","route":"POST /api/ad-platforms/test"}));
+    logger.error("routes_ad_platforms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -421,7 +422,7 @@ adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_platforms_failed","route":"DELETE /api/ad-platforms/:id"}));
+    logger.error("routes_ad_platforms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -519,7 +520,7 @@ adPlatforms.get('/api/ad-platforms/logs', requireRole('owner', 'admin', 'staff')
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_platforms_failed","route":"GET /api/ad-platforms/logs"}));
+    logger.error("routes_ad_platforms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -543,7 +544,7 @@ adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'sta
       data: logs.map(serializeLog),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_ad_platforms_failed","route":"GET /api/ad-platforms/:id/logs"}));
+    logger.error("routes_ad_platforms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

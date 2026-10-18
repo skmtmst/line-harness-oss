@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import type { WorkerBindings } from '../worker-bindings.js';
 import { collectSecurityCounts } from './security-monitor-counts.js';
 import { securityThresholds } from './security-monitor-rules.js';

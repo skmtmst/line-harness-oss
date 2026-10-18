@@ -85,7 +85,9 @@ describe('support relay transport safety (F05)', () => {
     await expect(sendViaXServerRelay(relayUrl, secret, message)).rejects.toThrow('connection lost');
     expect(transport).toHaveBeenCalledTimes(1);
     expect(log).not.toHaveBeenCalled();
-    expect(warn).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(warn.mock.calls[0][0]))).toEqual({ code: 'external.request.failed', timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background', durationMs: expect.any(Number) });
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/mail|signature|connection lost/);
     expect(error).not.toHaveBeenCalled();
   });
 });

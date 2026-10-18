@@ -5,8 +5,9 @@ import type { ApiFieldErrors } from '../api-field-errors.js';
 // =============================================================================
 
 /**
- * 汎用 API レスポンス型
- * 成功時は data を持ち、失敗時は error メッセージを持つ
+ * 既存の呼出元用の互換表示。fetchApiはHTTP失敗をApiErrorとして投げる。
+ * 通信上の4xx/5xxはapi-errors.tsのApiErrorResponseを使う。
+ * 2xxの業務状態と、既存の内部ハンドラの組立て用の型を保つ。
  */
 export type ApiResponse<T> =
   | {

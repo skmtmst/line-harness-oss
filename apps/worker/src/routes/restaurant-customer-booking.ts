@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { identity } from './restaurant-customer-identity.js';
 import { assignRestaurantTable } from '../services/booking-assignment.js';
 import { referralCandidates } from '../services/restaurant-referrals.js';
@@ -67,7 +68,7 @@ async function finish(c: Context<Env>, store: CustomerStore) {
     await processScenarioSourceJobs(c.env);
     await processRestaurantCustomerNotices(c.env, store.id);
   } catch {
-    console.error(JSON.stringify({"code":"restaurant_customer_notice_pending"}));
+    logger.error("restaurant_customer_notice_pending");
   }
 }
 restaurantCustomerBooking.get('/api/liff/restaurant/link/:token', async (c) => {

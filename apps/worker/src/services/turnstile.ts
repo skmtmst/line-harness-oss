@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * Cloudflare Turnstile（ロボット対策）の検証。★V6 36-4 会員登録・パスワード再設定。
  *

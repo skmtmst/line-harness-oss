@@ -82,7 +82,7 @@ export function validatedInputBody(c: Context): Record<string, unknown> | undefi
 }
 
 /** 宣言値でも実バイト数でも止める。超過時は残りを読まず、本文を保持しない。 */
-export async function readBoundedText(request: Request, maxBytes: number): Promise<string | null> {
+export async function readBoundedText(request: Pick<Request, 'headers' | 'body'>, maxBytes: number): Promise<string | null> {
   const bytes = await readBoundedBytes(request, maxBytes);
   return bytes === null ? null : new TextDecoder().decode(bytes);
 }
@@ -144,7 +144,7 @@ export function inputShapeErrors(body: Record<string, unknown>, shape: InputShap
 }
 
 /** 旧来の error に入っていた機械コードは code に残し、本文は人向けの文にする。 */
-function inputErrorMessage(code: string): string {
+export function inputErrorMessage(code: string, fallback = '入力内容を確認してください'): string {
   const messages: Record<string, string> = {
     INVALID_INPUT: '入力内容の形式を確認してください',
     INVALID_FOLDER_KIND: 'フォルダの種類を確認してください',
@@ -189,7 +189,7 @@ function inputErrorMessage(code: string): string {
     ambiguous_video_source: '動画の指定方法は1つにしてください',
     dst_gap: '夏時間への切り替えで存在しない時刻です。別の時刻を選んでください',
   };
-  return messages[code] ?? '入力内容を確認してください';
+  return messages[code] ?? fallback;
 }
 
 /** フォルダの口で使うJSONの鍵を、DB側の共通エラーへ対応させる。 */

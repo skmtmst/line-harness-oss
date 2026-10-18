@@ -779,6 +779,36 @@ function seedLiffCancelTarget(raw: Database.Database) {
   `);
 }
 
+function confirmLegacyEventReminder(raw: Database.Database) {
+  // Approval schedules its reminders against the resulting booking generation.
+  raw.exec(`UPDATE event_bookings SET status='confirmed' WHERE id='eb-l1';
+    UPDATE event_booking_reminders SET booking_version=(SELECT lock_version FROM event_bookings WHERE id='eb-l1')
+      WHERE id='LEG-l1' AND status='pending';`);
+}
+
+it('イベント: 確定ずみでも旧版の通知は送らず、現行版の予定を回収して一度だけ送る', async () => {
+  const dual = openDualDb();
+  try {
+    seedLiffCancelTarget(dual.raw1);
+    dual.raw1.exec(`UPDATE events SET reminder_day_before_enabled=1,reminder_hours_before=NULL WHERE id='ev-9';
+      UPDATE event_booking_reminders SET scheduled_at='2099-05-31T07:00:00.000Z' WHERE id='LEG-l1';
+      UPDATE event_bookings SET status='confirmed' WHERE id='eb-l1'`);
+    const sender=vi.fn(async()=>{});
+    const params={now:new Date('2099-05-31T08:00:00.000Z'),sender};
+    expect(await processDueEventReminders(dual.db1,params)).toEqual({sent:0,failed:0});
+    expect(sender).not.toHaveBeenCalled();
+    expect(dual.raw1.prepare("SELECT booking_version,status FROM event_booking_reminders WHERE id='LEG-l1'").get())
+      .toEqual({booking_version:1,status:'pending'});
+    expect(dual.raw1.prepare("SELECT booking_version,status FROM event_booking_reminders WHERE booking_id='eb-l1' AND booking_version=2").all())
+      .toEqual([{booking_version:2,status:'pending'}]);
+    params.now=new Date('2099-05-31T12:00:00.000Z');
+    expect(await processDueEventReminders(dual.db1,params)).toEqual({sent:1,failed:0});
+    expect(sender).toHaveBeenCalledTimes(1);
+    expect(await processDueEventReminders(dual.db1,params)).toEqual({sent:0,failed:0});
+    expect(sender).toHaveBeenCalledTimes(1);
+  } finally { dual.cleanup(); }
+});
+
 describe('管理者イベント取消の待機者再登録 (再審査-3)', () => {
   it('初回のenqueue失敗を同じ取消要求の再送で復旧する', async () => {
     const dual = openDualDb();
@@ -1528,9 +1558,7 @@ describe('旧表の取消後送信 (自主検証)', () => {
     try {
       seedLiffCancelTarget(dual.raw1);
       // 旧表 cron の対象は確定ずみの予約。
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
       const sentTo: string[] = [];
       let cancelStatus = 0;
       const cancelEvent = (db: D1Database) => {
@@ -1571,9 +1599,7 @@ describe('旧表の取消後送信 (自主検証)', () => {
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
       const sentTo: string[] = [];
       const result = await processDueEventReminders(dual.db1, {
         now: new Date('2099-05-31T12:00:00.000Z'),
@@ -1595,9 +1621,7 @@ describe('旧表の取消後送信 (自主検証)', () => {
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
       const sender = vi.fn(async () => { throw new Error('line down'); });
       const result = await processDueEventReminders(dual.db1, {
         now: new Date('2099-05-31T12:00:00.000Z'),
@@ -1689,9 +1713,7 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
       let failOnce = true;
       const faultyRoute = dual.faultyDb2((sql) =>
         sql.includes('UPDATE event_booking_reminders') && failOnce
@@ -1708,6 +1730,9 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
           { method: 'POST' },
           env,
         )).status;
+        expect(dual.raw1.prepare(
+          `SELECT status, sent_at, retry_count FROM event_booking_reminders WHERE id='LEG-l1'`,
+        ).get()).toEqual({ status:'pending',sent_at:null,retry_count:0 });
       });
 
       const result = await processDueEventReminders(hooked, {
@@ -1722,12 +1747,12 @@ describe('旧表の送信直前に予約状態そのものを見る (自主検�
         .toEqual({ status: 'cancelled' });
       expect(dual.raw1.prepare(
         `SELECT status FROM event_booking_reminders WHERE id = 'LEG-l1'`,
-      ).get()).toEqual({ status: 'pending' });
+      ).get()).toEqual({ status: 'cancelled' });
       expect(sentTo).toEqual([]);
       expect(result).toEqual({ sent: 0, failed: 0 });
       expect(dual.raw1.prepare(
         `SELECT status, sent_at, retry_count FROM event_booking_reminders WHERE id = 'LEG-l1'`,
-      ).get()).toEqual({ status: 'pending', sent_at: null, retry_count: 0 });
+      ).get()).toEqual({ status: 'cancelled', sent_at: null, retry_count: 0 });
     } finally {
       dual.cleanup();
     }
@@ -1791,9 +1816,7 @@ describe('旧表の恒久失敗を上限で打ち切る (自主検証)', () => {
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      dual.raw1.prepare(
-        `UPDATE event_bookings SET status = 'confirmed' WHERE id = 'eb-l1'`,
-      ).run();
+      confirmLegacyEventReminder(dual.raw1);
       breakAccountCredential(dual.raw1, 'account-9');
       const sentTo: string[] = [];
       let attemptTime=Date.parse('2099-05-31T12:00:00.000Z');

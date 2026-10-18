@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { recordAuditEvent, type AuditRiskLevel } from './access-audit.js';
@@ -68,7 +69,7 @@ export async function recordLoginAudit(
       )
       .run();
   } catch (error) {
-    console.error(JSON.stringify({"code":"src_login_audit_failed"}));
+    logger.error("src_login_audit_failed");
   }
   try {
     const actor = input.adminUserId
@@ -104,7 +105,7 @@ export async function recordLoginAudit(
     });
   } catch (error) {
     // 認証自体は成功させ、保存失敗は安全な固定文言だけを運用ログへ残す。
-    console.error(JSON.stringify({"code":"src_login_audit_failed"}));
+    logger.error("src_login_audit_failed");
   }
 }
 

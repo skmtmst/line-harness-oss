@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getRichMenuGroupWithPages, getLineAccountById, getActiveRichMenuTestApply, getRichMenuTestApplyById, beginRichMenuTestApplyRevert, markRichMenuTestApplyReverted, markRichMenuTestApplyRevertFailed, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
@@ -125,7 +126,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_revert_1 = async (c: 
             }
           }
         } catch (aliasError) {
-          console.warn(JSON.stringify({"code":"routes_rich_menu_groups_warn","route":"POST /api/rich-menu-groups/:groupId/test-apply/revert"}));
+          logger.warn("routes_rich_menu_groups_warn");
         }
       }
       await deleteRichMenuShells(line, testShellIds);
@@ -155,7 +156,7 @@ export const post__api_rich_menu_groups_groupId_test_apply_revert_1 = async (c: 
           deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
         });
       } catch (auditError) {
-        console.error(JSON.stringify({"code":"routes_rich_menu_groups_failed","route":"POST /api/rich-menu-groups/:groupId/test-apply/revert"}));
+        logger.error("routes_rich_menu_groups_failed");
       }
 
       const updated = await getRichMenuTestApplyById(c.env.DB, apply.id);

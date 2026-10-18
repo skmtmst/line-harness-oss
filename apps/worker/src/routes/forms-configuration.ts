@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { formWebhookTarget } from '../services/public-https-request.js';
 import { webhookUrlBlockReason } from '../services/outgoing-webhook-delivery.js';
 import { validateLayoutRouting } from '../services/form-routing.js';
@@ -100,7 +101,7 @@ export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
     }
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -132,7 +133,7 @@ export const get__api_forms_unassigned_2 = async (c: Context<Env, "/api/forms/un
     );
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/unassigned"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -202,7 +203,7 @@ export const get__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) => 
       }) };
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -262,7 +263,7 @@ export const post__api_forms_id_publish_4 = async (c: Context<Env, "/api/forms/:
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/publish"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -301,7 +302,7 @@ export const post__api_forms_id_test_token_5 = async (c: Context<Env, "/api/form
     // 生の合言葉はこの応答でしか返さない。台帳からは読み出せない。
     return c.json({ success: true, data: { token, expiresAt } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/test-token"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -378,7 +379,7 @@ export const post__api_forms_6 = async (c: Context<Env, "/api/forms">) => {
 
     return c.json({ success: true, data: serializeForm(form) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -404,7 +405,7 @@ export const post__api_forms_drafts_7 = async (c: Context<Env, "/api/forms/draft
     });
     return c.json({ success: true, data: serializeForm(form) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/drafts"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -460,7 +461,7 @@ export const post__api_forms_id_duplicate_8 = async (c: Context<Env, "/api/forms
     const withFolder = source.folder_id ? await getFormById(c.env.DB, copy.id) : copy;
     return c.json({ success: true, data: serializeForm(withFolder ?? copy) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"POST /api/forms/:id/duplicate"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -622,7 +623,7 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
 
     return c.json({ success: true, data: {...serializeForm(updated.form),latestEdit:await getFormLatestEdit(c.env.DB,id,updated.form.content_revision)} });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"PUT /api/forms/:id"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -640,7 +641,7 @@ export const get__api_forms_id_delete_impact_10 = async (c: Context<Env, "/api/f
     }
     return c.json({ success: true, data: authorized.impact });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_forms_failed","route":"GET /api/forms/:id/delete-impact"}));
+    logger.error("routes_forms_failed");
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 };

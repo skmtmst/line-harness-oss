@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { LineClient } from '@line-crm/line-sdk';
 import {
   consumeStaffLineLinkCode,
@@ -148,7 +149,7 @@ export async function processDueAnnouncements(env: Env['Bindings'], input: { now
       await deliverAnnouncement(env, a);
       sent += 1;
     } catch (error) {
-      console.error(JSON.stringify({"code":"services_platform_announcements_failed"}));
+      logger.error("services_platform_announcements_failed");
       await finishAnnouncement(env.DB, a.id, { recipientsTotal: 0, lineSent: 0, lineFailed: 0, mailSent: 0, mailFailed: 0, lastError: error instanceof Error ? error.message.slice(0, 200) : 'failed', failed: true });
     }
   }

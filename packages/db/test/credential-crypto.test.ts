@@ -106,7 +106,8 @@ describe('LINE credential AES-GCM encryption', () => {
     expect(resolved.channel_access_token_last4).toBeNull();
     expect(resolved.channel_secret_last4).toBeNull();
     expect(warn).toHaveBeenCalledTimes(2);
-    expect(warn.mock.calls[0]).toEqual([JSON.stringify({ code: 'line_credential_plaintext_fallback' })]);
+    expect(warn.mock.calls[0]).toHaveLength(1);
+    expect(JSON.parse(String(warn.mock.calls[0][0]))).toEqual({ code: 'line_credential_plaintext_fallback', timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background' });
     const output = JSON.stringify(warn.mock.calls);
     for (const value of [
       KEY,
@@ -164,7 +165,7 @@ describe('LINE credential AES-GCM encryption', () => {
         undefined,
       ),
     ).resolves.toBe('legacy-token');
-    expect(warn).toHaveBeenCalledWith(JSON.stringify({ code: 'line_credential_plaintext_fallback' }));
+    expect(warn.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'line_credential_plaintext_fallback', timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background' });
     expect(JSON.stringify(warn.mock.calls)).not.toContain('acc-joined');
     expect(JSON.stringify(warn.mock.calls)).not.toContain('legacy-token');
     warn.mockRestore();

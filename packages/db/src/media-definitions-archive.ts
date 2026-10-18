@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { jstNow } from './utils.js';
 import { type Media, type MediaArchiveResult } from './media-primitives.js';
 import { getMediaById } from './media-definitions-reads.js';
@@ -82,7 +83,7 @@ export async function setMediaArchiveState(
         ).bind(existing.archived_at ?? null, existing.archived_by ?? null,
           existing.archive_reason ?? null, input.id).run();
     if ((reverted.meta?.changes ?? 0) === 0) {
-      console.error(JSON.stringify({"code":"src_media_failed"}));
+      logger.error("src_media_failed");
     }
     throw error;
   }

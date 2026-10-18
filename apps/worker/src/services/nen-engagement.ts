@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { currentOrderState, orderNumberFromPayload } from './nen-order-state.js';
 import { EXTERNAL_DELIVERY_MAX_ATTEMPTS as MAX_DELIVERY_ATTEMPTS } from './external-delivery-retry.js';
 import {
@@ -227,7 +228,7 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
  */
 function truncateForSend(value: string, maxLength: number, context: { campaignKey: string; field: string }): string {
   if (value.length <= maxLength) return value;
-  console.error(JSON.stringify({"code":"nen_body_truncated_at_send"}));
+  logger.error("nen_body_truncated_at_send");
   return value.slice(0, maxLength);
 }
 
@@ -487,7 +488,7 @@ const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
  */
 function truncateColumnIntro(value: string, maxLength: number, context: { title: string }): string {
   if (value.length <= maxLength) return value;
-  console.error(JSON.stringify({"code":"nen_column_intro_truncated"}));
+  logger.error("nen_column_intro_truncated");
   return value.slice(0, maxLength);
 }
 
@@ -886,11 +887,11 @@ export async function enqueueBirthdayCoupons(
   let queued = 0;
   let failed = 0;
   const report = async (failure: NenCouponIssueFailure) => {
-    console.error(JSON.stringify({"code":"nen_birthday_coupon_issue_failed"}));
+    logger.error("nen_birthday_coupon_issue_failed");
     try {
       await onIssueFailed?.(failure);
     } catch (notifyError) {
-      console.error(JSON.stringify({"code":"services_nen_engagement_failed"}));
+      logger.error("services_nen_engagement_failed");
     }
   };
   for (const pet of pets.results) {
@@ -1244,7 +1245,7 @@ export async function processNenDeliveries(
       await db.prepare(
         `UPDATE nen_delivery_jobs SET status = 'failed', last_error = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
       ).bind(message, new Date(now.getTime() + RETRY_DELAYS_MS[Math.min(Number(job.attempts ?? 0), 2)]).toISOString(), now.toISOString(), job.id, claimToken).run();
-      console.error(JSON.stringify({"code":"nen_delivery_failed"}));
+      logger.error("nen_delivery_failed");
       failed++;
     }
   }

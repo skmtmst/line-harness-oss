@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { jstNow, getCommonVarById, createCommonVar, updateCommonVar, CommonVarFolderError, CommonVarKeyConflictError, deleteCommonVar, getCommonVarUsageImpact, getCommonVarReplacementCandidates, getCommonVarReplacementPlan, applyCommonVarReplacementPlan, CommonVarVersionConflictError, getCommonVarSchedules, createCommonVarSchedule, deleteCommonVarSchedule, validateFieldKey, COMMON_VAR_TYPES, normalizeCommonVarValue, isSecretLikeValue, setCommonVarStatus, CommonVarReasonRequiredError, CommonVarStatusTransitionError, type CommonVarType } from '@line-crm/db';
@@ -99,7 +100,7 @@ export const post__api_common_vars_1 = async (c: Context<Env, "/api/common-vars"
     if (err instanceof CommonVarKeyConflictError) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -250,7 +251,7 @@ export const patch__api_common_vars_id_2 = async (c: Context<Env, "/api/common-v
         currentVersion: err.currentVersion,
       }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"PATCH /api/common-vars/:id"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -306,7 +307,7 @@ export const post__api_common_vars_id_status_3 = async (c: Context<Env, "/api/co
         currentVersion: err.currentVersion,
       }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars/:id/status"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -323,7 +324,7 @@ export const get__api_common_vars_id_delete_impact_4 = async (c: Context<Env, "/
     const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key, accountId);
     return c.json({ success: true, data: serializeCommonVarDeleteImpact(existing, impact) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/common-vars/:id/delete-impact"}));
+    logger.error("routes_contents_failed");
     return c.json(
       { success: false, error: '使用先を確認できないため削除できません' },
       503,
@@ -383,7 +384,7 @@ export const post__api_common_vars_id_impact_preview_5 = async (c: Context<Env, 
     if (err instanceof RequestBodyError) {
       return inputError(c, { success: false, error: err.message }, err.status, []);
     }
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars/:id/impact-preview"}));
+    logger.error("routes_contents_failed");
     return c.json(
       { success: false, error: '影響する場所を確認できませんでした' },
       503,
@@ -495,7 +496,7 @@ export const post__api_common_vars_id_replace_6 = async (c: Context<Env, "/api/c
         currentVersion: err.currentVersion,
       }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars/:id/replace"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: '差し替えの影響を確認できませんでした' }, 503);
   }
 };
@@ -533,7 +534,7 @@ export const delete__api_common_vars_id_7 = async (c: Context<Env, "/api/common-
     await deleteCommonVar(c.env.DB, existing.id, accountId, c.get('staff').id, deleteReason);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"DELETE /api/common-vars/:id"}));
+    logger.error("routes_contents_failed");
     return c.json(
       { success: false, error: '使用先を確認できないため削除できません' },
       503,
@@ -553,7 +554,7 @@ export const get__api_common_vars_id_schedules_8 = async (c: Context<Env, "/api/
     const items = await getCommonVarSchedules(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: items.map(serializeSchedule) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"GET /api/common-vars/:id/schedules"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -612,7 +613,7 @@ export const post__api_common_vars_id_schedules_9 = async (c: Context<Env, "/api
     if (err instanceof RequestBodyError) {
       return inputError(c, { success: false, error: err.message }, err.status, []);
     }
-    console.error(JSON.stringify({"code":"routes_contents_failed","route":"POST /api/common-vars/:id/schedules"}));
+    logger.error("routes_contents_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
@@ -629,7 +630,7 @@ export const delete__api_common_vars_id_schedules_scheduleId_10 = async (c: Cont
       await deleteCommonVarSchedule(c.env.DB, c.req.param('scheduleId'), existing.id);
       return c.json({ success: true, data: null });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_contents_failed","route":"DELETE /api/common-vars/:id/schedules/:scheduleId"}));
+      logger.error("routes_contents_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   };

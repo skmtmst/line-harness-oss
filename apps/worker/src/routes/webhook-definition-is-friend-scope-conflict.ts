@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { logWebhookStepFailure, recordWebhookAnalyticsEvent } from './webhook-analytics.js';
 import { assignInbox } from '../services/inbox-assignment.js';
 import { LineClient } from '@line-crm/line-sdk';
@@ -57,10 +58,10 @@ export async function ensureFriendFromWebhookUser(
       if (!isFriendScopeConflict(err)) throw err;
       // 同一 line_user_id が別アカウント所有。C-2b まではこのアカウント用の
       // friend 行を作れないので、相手の行に触れずイベントを諦める。
-      console.warn(JSON.stringify({"code":"line_webhook_friend_scope_conflict"}));
+      logger.warn("line_webhook_friend_scope_conflict");
       return null;
     }
-    console.log(JSON.stringify({"code":"line_webhook_friend_registered"}));
+    logger.log("line_webhook_friend_registered");
   }
 
   if (lineAccountId && friend.line_account_id !== lineAccountId) {

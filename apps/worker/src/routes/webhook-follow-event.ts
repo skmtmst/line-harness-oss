@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { logWebhookStepFailure } from './webhook-analytics.js';
 
 import { sendEntryRouteCoupon } from '../services/entry-route-coupon.js';
@@ -45,7 +46,7 @@ export async function handleFollowEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    console.log(JSON.stringify({"code":"line_webhook_follow_received"}));
+    logger.log("line_webhook_follow_received");
 
     // プロフィール取得 & 友だち登録/更新
     let profile: Awaited<ReturnType<LineClient['getProfile']>> | undefined;
@@ -69,7 +70,7 @@ export async function handleFollowEvent(
       if (!isFriendScopeConflict(err)) throw err;
       // 同一 line_user_id が別アカウント所有。friend 行なしではフォロー処理を
       // 進められないので、相手の行に触れずこのイベントを諦める (Issue #961)。
-      console.warn(JSON.stringify({"code":"line_webhook_friend_scope_conflict"}));
+      logger.warn("line_webhook_friend_scope_conflict");
       return;
     }
     if (friend.is_following === 0 || (friend.last_followed_at && Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(friend.last_followed_at)?friend.last_followed_at:`${friend.last_followed_at}${friend.last_followed_at.length===10?'T00:00:00':''}+09:00`) > event.timestamp)) return;
@@ -443,14 +444,14 @@ export async function handleFollowEvent(
           if (sent) {
             friendAddDeliveryCount += 1;
             await noteDelivered();
-            console.log(JSON.stringify({"code":"routes_webhook_log"}));
+            logger.log("routes_webhook_log");
           }
         } catch (err) {
           logWebhookStepFailure('routed_scenario_delivery', err, lineAccountId, event);
         }
       }
       if (routing.suppressed) {
-        console.log(JSON.stringify({"code":"routes_webhook_log"}));
+        logger.log("routes_webhook_log");
       }
     }
 
@@ -505,7 +506,7 @@ export async function handleFollowEvent(
           if (sent) {
             friendAddDeliveryCount += 1;
             await noteDelivered();
-            console.log(JSON.stringify({"code":"routes_webhook_log"}));
+            logger.log("routes_webhook_log");
           }
         } catch (err) {
           logWebhookStepFailure('scenario_enrollment', err, lineAccountId, event);
@@ -549,7 +550,7 @@ export async function handleFollowEvent(
               throw pushErr;
             }
             noteSendOutcome('delivered');
-            console.log(JSON.stringify({"code":"routes_webhook_log"}));
+            logger.log("routes_webhook_log");
           }
         } catch (err) {
           logWebhookStepFailure('referral_intro_push', err, lineAccountId, event);
@@ -565,7 +566,7 @@ export async function handleFollowEvent(
       if (referralRoute.scenario_id && await holdSendRight()) {
         try {
           const enrollment = await enrollFriendInScenario(db, friend.id, referralRoute.scenario_id);
-          console.log(JSON.stringify({"code":"routes_webhook_log"}));
+          logger.log("routes_webhook_log");
           if (enrollment && await holdSendRight({ external: true })) {
             await pushImmediateFirstStep(
               db,
@@ -711,7 +712,7 @@ export async function handleFollowEvent(
         if (!ledgerFinalized) {
           // 回収されていた。勝った側が確定するのでここでは何も書かない。
           fencedOut = true;
-          console.warn('[friend-add] ledger finalize fenced out (send right revoked)');
+          logger.warn("friend_add_ledger_finalize_fenced_out_send_right_revoked");
         }
       } catch (err) {
         logWebhookStepFailure('friend_add_event_mark_complete', err, lineAccountId, event);

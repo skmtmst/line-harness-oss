@@ -1,3 +1,5 @@
+import { readApiError } from '@line-crm/shared';
+import { responseLiffError, liffErrorMessage } from './api-error.js';
 import liff from '@line/liff';
 import { fetchAffiliateSelf } from './affiliate-self-fetch.js';
 
@@ -29,7 +31,7 @@ function token() {
   return value;
 }
 export class SelfApiError extends Error {
-  constructor(public status: number, public fields: Record<string, string>, message: string) { super(message); }
+  constructor(public status: number, public fields: Record<string, string>, message: string, public code?: string, public requestId?: string) { super(message); }
 }
 async function request<T>(path: string, method = 'GET', body?: object, key?: string): Promise<T> {
   const accessToken = token();
@@ -39,8 +41,10 @@ async function request<T>(path: string, method = 'GET', body?: object, key?: str
     ...(body ? { body: JSON.stringify({ ...body, lineAccessToken: accessToken }) } : {}),
   });
   const result = await response.json();
-  if (!response.ok) throw new SelfApiError(response.status, result.fields ?? {},
-    /[ぁ-んァ-ン一-龥]/.test(result.error ?? '') ? result.error : '処理できませんでした。もう一度お試しください。');
+  if (!response.ok) {
+    const detail = readApiError(result);
+    throw new SelfApiError(response.status, detail.fields, liffErrorMessage(result), detail.code, detail.requestId ?? response.headers.get('X-Request-ID') ?? undefined);
+  }
   return result as T;
 }
 export const affiliateSelfApi = {
@@ -55,12 +59,12 @@ export const affiliateSelfApi = {
     url.searchParams.set('issue', '1');
     const headers = { Authorization: `Bearer ${token()}` };
     const issued = await fetch(url, { headers, cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
-    if (!issued.ok) throw new Error('支払明細を取得できませんでした。もう一度お試しください。');
+    if (!issued.ok) throw await responseLiffError(issued);
     const result = await issued.json() as { data: { url: string } };
     const signed = new URL(result.data.url);
     if (signed.origin !== url.origin || signed.pathname !== url.pathname || signed.searchParams.has('lineAccessToken')) throw new Error('取得用URLが無効です');
     const response = await fetch(signed, { headers, cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
-    if (!response.ok) throw new Error('支払明細を取得できませんでした。もう一度お試しください。');
+    if (!response.ok) throw await responseLiffError(response);
     const blobUrl = URL.createObjectURL(await response.blob());
     const link = document.createElement('a');
     link.href = blobUrl; link.download = `statement-${id}.pdf`;

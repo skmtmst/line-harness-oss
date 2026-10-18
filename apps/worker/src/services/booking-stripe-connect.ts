@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { getWorkflowStep } from '@line-crm/db';
 import { runBookingExternalStep } from './booking-external-step.js';
 import { API_RETRY_WAIT } from '../lib/external-call/index.js';

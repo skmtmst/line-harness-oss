@@ -1,3 +1,4 @@
+import { createClientLogger } from '@line-crm/shared';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, type EventBookingMine, type EventDetail, type EventSlot } from '../lib/api.js';
@@ -16,6 +17,8 @@ import Button from '../components/ui/Button.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import LiffHeader from '../components/ui/LiffHeader.js';
 import LiffLookScope from '../components/LiffLookScope.js';
+const clientLogger = createClientLogger('liff');
+
 
 /**
  * 表示してよいURLか。保存時に弾き切れない古い行もあるため、表示側でも
@@ -88,7 +91,7 @@ export default function Event() {
           );
         } catch (authErr) {
           // 認証なし → 上限の数えだけ弱くなり、通常表示で続行。
-          console.warn(JSON.stringify({"code":"pages_Event_warn"}));
+          clientLogger.warn("pages_Event_warn");
         }
       } catch (err) {
         if (!cancelled) {

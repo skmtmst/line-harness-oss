@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { jstNow } from './utils.js';
 import { enqueueMileageEvent } from './mileage.js';
 import { recordConversionSourceEvent } from './conversion-event-sources.js';
@@ -66,7 +67,7 @@ export async function addTagToFriend(
         occurredAt: now,
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"src_tags_failed"}));
+      logger.error("src_tags_failed");
       if (options?.strictSideEffects) throw error;
     }
     // 「タグが付いた」を成果として数える(#648)。
@@ -93,7 +94,7 @@ export async function addTagToFriend(
         throw new Error(`tag conversion record failed: ${conversion.failed}`);
       }
     } catch (error) {
-      console.error(JSON.stringify({"code":"src_tags_failed"}));
+      logger.error("src_tags_failed");
       if (options?.strictSideEffects) throw error;
     }
   }

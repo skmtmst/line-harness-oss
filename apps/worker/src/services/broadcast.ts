@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {processBroadcastSimulation} from './broadcast-simulation.js';
 import { broadcastWideContext } from './broadcast-wide-context.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL, recordSuppressedBroadcastRecipients, suppressedFriendIds, hasSuppressedDeliveryRecipients } from '@line-crm/db/src/friend-delivery-consents.js';
@@ -362,7 +363,7 @@ export async function processBroadcastSend(
             });
           }
         } catch (error) {
-          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+          logger.error("services_broadcast_failed");
         }
       }
       // We don't have exact count for broadcast API, set as 0 (unknown)
@@ -481,7 +482,7 @@ export async function processBroadcastSend(
           ]);
           for (const id of sendableIds) blocked.add(id);
         } catch (err) {
-          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+          logger.error("services_broadcast_failed");
           // Continue with next batch; failed batch is not logged.
           // 誰が落ちたかは台帳に残す。断定できた失敗だけが再送の対象になる。
           const outcome = classifyDeliveryFailure(err);
@@ -635,7 +636,7 @@ export async function processScheduledBroadcasts(
     const { sweepBroadcastApprovalExpiry } = await import('./broadcast-approval.js');
     await sweepBroadcastApprovalExpiry(db, nowMs);
   } catch (sweepError) {
-    console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+    logger.error("services_broadcast_failed");
   }
 
   for (const broadcast of scheduled) {
@@ -664,7 +665,7 @@ export async function processScheduledBroadcasts(
             title: broadcast.title ?? null,
           });
         } catch (skipError) {
-          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+          logger.error("services_broadcast_failed");
         }
         await db.prepare(
           `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'scheduled'`,
@@ -690,7 +691,7 @@ export async function processScheduledBroadcasts(
         const approvalCheck = await checkScheduledBroadcastApproval(db, broadcast);
         if (!approvalCheck.sendable) continue;
       } catch (approvalError) {
-        console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+        logger.error("services_broadcast_failed");
         continue;
       }
       // Optimistic lock: claim this broadcast (scheduled → sending)
@@ -708,7 +709,7 @@ export async function processScheduledBroadcasts(
           detail: { fromStatus: 'scheduled', trigger: 'schedule' },
         });
       } catch (lifecycleError) {
-        console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+        logger.error("services_broadcast_failed");
       }
 
       // Resolve correct lineClient for this broadcast's account
@@ -739,7 +740,7 @@ export async function processScheduledBroadcasts(
       // 下書きへ戻し、予約は消す。プランを選べば送り直せる。
       const permission = await getSendPermissionForAccount(db, accountId, sendPermissions);
       if (!permission.allowed) {
-        console.warn(JSON.stringify({"code":"services_broadcast_warn"}));
+        logger.warn("services_broadcast_warn");
         await db.prepare(
           `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending'`,
         ).bind(broadcast.id).run();
@@ -760,23 +761,23 @@ export async function processScheduledBroadcasts(
       // 分析の一時対象者が期限切れ・消滅している予約は毎tick再試行しても
       // 届かない。下書きへ戻して予約を消す（内容は残るので作り直せる）。
       if (err instanceof BroadcastAudienceError) {
-        console.warn(JSON.stringify({"code":"services_broadcast_warn"}));
+        logger.warn("services_broadcast_warn");
         try {
           await db.prepare(
             `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending'`,
           ).bind(broadcast.id).run();
         } catch (demoteErr) {
-          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+          logger.error("services_broadcast_failed");
         }
         continue;
       }
-      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+      logger.error("services_broadcast_failed");
       // Reset to scheduled so it can be retried next cron
       try {
         await db.prepare(`UPDATE broadcasts SET status = 'scheduled' WHERE id = ? AND status = 'sending'`)
           .bind(broadcast.id).run();
       } catch (resetErr) {
-        console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+        logger.error("services_broadcast_failed");
       }
     }
   }
@@ -853,7 +854,7 @@ export async function processQueuedBroadcasts(
     // 送っている途中でトライアルが終わった統括は、残りを送らずに待つ（プランを選べば続きから送れる）。
     const permission = await getSendPermissionForAccount(db, accountId, sendPermissions);
     if (!permission.allowed) {
-      console.warn(JSON.stringify({"code":"services_broadcast_warn"}));
+      logger.warn("services_broadcast_warn");
       continue;
     }
     /*
@@ -870,7 +871,7 @@ export async function processQueuedBroadcasts(
           await assertAnalyticsAudiencesUsable(db, storedConditions, accountId);
         } catch (audienceError) {
           if (!(audienceError instanceof BroadcastAudienceError)) throw audienceError;
-          console.warn(JSON.stringify({"code":"services_broadcast_warn"}));
+          logger.warn("services_broadcast_warn");
           await db.prepare(
             `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending' AND batch_offset = 0`,
           ).bind(broadcast.id).run();
@@ -891,7 +892,7 @@ export async function processQueuedBroadcasts(
     try {
       await processQueuedBroadcastBatches(db, client, broadcast, workerUrl);
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+      logger.error("services_broadcast_failed");
     }
   }
 }
@@ -1220,10 +1221,10 @@ async function processQueuedBroadcastBatches(
           try {
             await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 5 });
           } catch (afterError) {
-            console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+            logger.error("services_broadcast_failed");
           }
         } catch (err) {
-          console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+          logger.error("services_broadcast_failed");
           // 届いていないと断定できたものだけ再送の対象にする。分からない
           // ものは送達不明のまま置き、この tick の残りも飛ばす。
           const outcome = classifyDeliveryFailure(err);
@@ -1310,7 +1311,7 @@ async function processQueuedBroadcastBatches(
       );
       ({ requestId: queuedRequestId } = await lineClient.multicast(lineUserIds, batchMessages, aggregationUnits(unit), retryKey));
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+      logger.error("services_broadcast_failed");
       const outcome = classifyDeliveryFailure(err);
       await settleBroadcastRecipients(db, {
         broadcastId: broadcast.id,
@@ -1348,13 +1349,13 @@ async function processQueuedBroadcastBatches(
       ];
       await db.batch(stmts);
     } catch (logErr) {
-      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+      logger.error("services_broadcast_failed");
       // 記録に失敗しても、外の口は受け取っている。台帳だけは必ず閉じる。
       // 閉じ損ねると次の試行がこの相手を送り直して2通目が出る。
       try {
         await db.batch(settleSent());
       } catch (settleErr) {
-        console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+        logger.error("services_broadcast_failed");
       }
     }
     for (const friend of sendable) blocked.add(friend.id);
@@ -1363,7 +1364,7 @@ async function processQueuedBroadcastBatches(
     try {
       await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
     } catch (afterError) {
-      console.error(JSON.stringify({"code":"services_broadcast_failed"}));
+      logger.error("services_broadcast_failed");
     }
 
     currentOffset += batch.length;

@@ -1,4 +1,5 @@
 'use client'
+import { getApiErrorCode } from '@/lib/api'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -117,7 +118,7 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
     } catch (failure) {
       if (!request.isCurrent()) return
       saveErrors.capture(failure)
-      const code = (failure as { body?: { error?: string } }).body?.error
+      const code = getApiErrorCode(failure)
       setError(code === 'lifecycle_transition_invalid'
         ? 'いまの状態からは変えられません。開き直して最新の状態で、もう一度お試しください。'
         : '変えられませんでした。時間をおいて、もう一度お試しください。')

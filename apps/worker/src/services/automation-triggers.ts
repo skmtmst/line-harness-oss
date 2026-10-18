@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { accountFeatureOffExclusionSql } from '@line-crm/db';
 import type { SegmentCondition } from './segment-query.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
@@ -329,7 +330,7 @@ export async function dispatchAutomationEventWithLogging(
   const results = await dispatchAutomationEvent(db, input, options);
   for (const result of results) {
     if (result.kind === 'configuration_error') {
-      console.error(JSON.stringify({"code":"automation_v6_trigger_failed"}));
+      logger.error("automation_v6_trigger_failed");
     }
   }
   return results;
