@@ -301,6 +301,11 @@
   },
   {
     "file": "v8/account-new/register.module.css",
+    "selector": ".precheckResultMark",
+    "reason": "札・印・画像・端末の見本。カードの影を付けない。"
+  },
+  {
+    "file": "v8/account-new/register.module.css",
     "selector": ".errorBox",
     "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
   },
