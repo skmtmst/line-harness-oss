@@ -317,6 +317,16 @@ export function newSourceAssertions(before, after, moves = new Map()) {
     if (remap) {
       parts[0] = moves.get(parts[0]) ?? parts[0]
       parts[1] = moves.get(parts[1]) ?? parts[1]
+      parts[3] = parts[3].map(read => {
+        const [path, helper] = read.split('|helper:')
+        for (const [from, to] of moves) {
+          const styles = [[from, to], [posix.relative(posix.dirname(hit.file), from), posix.relative(posix.dirname(parts[1]), to)]]
+          if (from.startsWith('apps/web/') && to.startsWith('apps/web/')) styles.push([from.slice(9), to.slice(9)])
+          const match = styles.find(([old]) => path === old || path === './' + old)
+          if (match) return (path.startsWith('./') ? './' : '') + match[1] + (helper ? '|helper:' + helper : '')
+        }
+        return read
+      })
     }
     if (plainReader) parts[3] = parts[3].map(path => path.replace(/\|helper:[a-f0-9]+$/, ''))
     return JSON.stringify(parts)

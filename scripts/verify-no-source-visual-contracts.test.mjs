@@ -218,3 +218,14 @@ test('repository git rename detection preserves a moved test but fails a deliber
     assert.equal(checkRepository(root, base).findings.length, 1)
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
+
+
+test('renaming the read source keeps an unchanged assertion while unrelated read roots stay new', () => {
+  const run = path => analyzeSourceTests(new Map([[entry, `import{readFileSync}from'node:fs';import{it,expect}from'vitest';const src=readFileSync('${path}');it('case',()=>expect(src).toContain('styles.row'))`]]))
+  const moves = new Map([['apps/web/src/view.tsx', 'apps/web/src/moved/view.tsx']])
+  for (const [from, to] of [['apps/web/src/view.tsx', 'apps/web/src/moved/view.tsx'], ['src/view.tsx', 'src/moved/view.tsx'], ['view.tsx', 'moved/view.tsx']]) {
+    assert.equal(newSourceAssertions(run(from), run(to), moves).length, 0)
+    assert.equal(newSourceAssertions(run(from), run('unrelated.tsx'), moves).length, 1)
+    assert.equal(newSourceAssertions(run(from), [...run(to), ...run(to)], moves).length, 1)
+  }
+})
