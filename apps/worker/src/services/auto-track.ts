@@ -250,6 +250,9 @@ export async function autoTrackContent(
   options?: AutoTrackOptions,
 ): Promise<AutoTrackResult> {
   if (messageType === 'image') return { messageType, content };
+  const workerBase = workerUrl.replace(/\/$/, '');
+  const authored = options?.sourceContent === undefined ? null : extractUrls(options.sourceContent, [workerBase]);
+  const isAuthored = (url: string) => !authored || authored.has(url) && !/[{}]/.test(url);
   if (messageType !== 'text' && content.includes('\"tapExtras\"')) {
     let tree = JSON.parse(content);
     if (isBroadcastAssetKind(messageType)) {
@@ -258,14 +261,12 @@ export async function autoTrackContent(
       messageType = converted.message.messageType;
       tree = JSON.parse(converted.message.messageContent);
     }
-    content = JSON.stringify(await decorateTapExtras(db, tree, workerUrl, options?.lineAccountId ?? null, options?.templateId, options?.broadcastId));
+    content = JSON.stringify(await decorateTapExtras(db, tree, workerUrl, options?.lineAccountId ?? null, options?.templateId, options?.broadcastId, isAuthored));
   }
 
   // Extract first so URL-free messages (the common case in per-friend
   // delivery loops) skip the settings lookup entirely.
-  const workerBase = workerUrl.replace(/\/$/, '');
-  const authored = options?.sourceContent === undefined ? null : extractUrls(options.sourceContent, [workerBase]);
-  const isAuthored = (url: string) => !authored || authored.has(url) && !/[{}]/.test(url);
+
   let urls = new Set([...extractUrls(content, [workerBase])].filter(isAuthored));
   if (urls.size === 0) return { messageType, content };
 

@@ -1,5 +1,6 @@
-import { safeNavigationPath } from '@/lib/safe-navigation'
 'use client'
+
+import { safeNavigationPath } from '@/lib/safe-navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
