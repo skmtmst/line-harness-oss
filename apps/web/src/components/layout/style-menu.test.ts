@@ -28,3 +28,12 @@ it('保存版が無い旧staff読取では、許可済みの共通機能の履�
   expect(styleMenuItemVisible(item('/booking/bookings'), 'ec', null)).toBe(true)
   expect(styleMenuItemVisible(item('/restaurant-test/reservations'), 'standard', null)).toBe(false)
 })
+
+it('ECの共通機能を保存しただけでは、専用の契約を推測しない', () => {
+  const specialized = items.filter(item => item.href.startsWith('/nen') || item.featureKey === 'photo_review' || item.featureKey === 'nen_campaigns')
+  expect(specialized.length).toBeGreaterThan(0)
+  for (const item of specialized) {
+    expect(styleMenuItemVisible(item, 'ec', true)).toBe(false)
+    expect(styleMenuItemVisible(item, 'restaurant', true)).toBe(true)
+  }
+})

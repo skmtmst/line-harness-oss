@@ -8,7 +8,8 @@ export function styleMenuItemVisible(item: MenuItem, style: AccountStyle | null,
   if (style === 'restaurant') return true
   if (item.href.startsWith('/restaurant-test') || item.featureKey === 'restaurant_test') return false
   if (!style) return !item.featureKey
-  if (item.href.startsWith('/nen') || item.featureKey === 'photo_review' || item.featureKey === 'nen_campaigns') return style === 'ec' && explicitlyConfigured === true
+  // 旧応答はNENの契約と「未設定=全提供」の既定を区別できない。保存版だけで契約を推測しない。
+  if (item.href.startsWith('/nen') || item.featureKey === 'photo_review' || item.featureKey === 'nen_campaigns') return false
   if (item.featureKey === 'ec_commerce' || item.featureKey === 'line_notifications') return style === 'ec'
   // 旧staff読取は保存版を返さない。既存の共通機能を消さず、サーバーが返す可視性で絞る。
   if (explicitlyConfigured !== false) return true
