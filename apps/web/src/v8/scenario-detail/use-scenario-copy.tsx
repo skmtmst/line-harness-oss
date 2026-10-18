@@ -1,5 +1,7 @@
 'use client'
 
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+
 import { type ScenarioQuestion } from '@/components/scenarios/question-editor'
 import { type SegmentCondition } from '@/components/shared/condition-builder'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -120,7 +122,7 @@ export function useScenarioCopy({
           targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
           question: (step.question as ScenarioQuestion | null) ?? null,
           isDraft: step.isDraft === true,
-        }).catch((cause) => ({ success: false as const, error: cause instanceof Error && cause.message ? cause.message : '通をコピーできませんでした' }))
+        }).catch((cause) => ({ success: false as const, error: japaneseDetailOf(cause) || '通をコピーできませんでした' }))
         // 途中で止める。続けると通が欠けた別物の流れが残る。
         if (!copied.success) throw new DuplicateAborted(copy, `${step.stepOrder} 通目のコピー`, new Error(copied.error))
         stepIdMap.set(step.id, copied.data.id)
@@ -216,7 +218,7 @@ export function useScenarioCopy({
       }
       } else {
         { if (!fieldFailure)
-        setError(e instanceof Error && e.message ? e.message : '複製に失敗しました。通信を確かめて、もう一度お試しください。') }
+        setError(japaneseDetailOf(e) || '複製に失敗しました。通信を確かめて、もう一度お試しください。') }
       }
     } finally {
       setDuplicating(false)
@@ -265,5 +267,5 @@ export function useScenarioCopy({
     }
   }
 
-  return { handleDuplicate, handleDeleteScenario, handleDiscardDuplicate }
+  return { saveErrors, handleDuplicate, handleDeleteScenario, handleDiscardDuplicate }
 }

@@ -276,7 +276,7 @@ const { loadScenario, reloadStats, simulationRefreshing, simulation, reloadActio
    * 中身だけ写して、名前に「のコピー」を付け、止めた状態で作る。
    * 作った直後に配信が始まると、確かめる前に届いてしまう。
    */
-const { handleDuplicate, handleDeleteScenario, handleDiscardDuplicate } = useScenarioCopy({
+const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handleDiscardDuplicate } = useScenarioCopy({
     scenario, duplicating, setDuplicating,
     setError, duplicateRemainder, saveErrors,
     sortedSteps, deliveryMode, id,
@@ -286,13 +286,13 @@ const { handleDuplicate, handleDeleteScenario, handleDiscardDuplicate } = useSce
     setDeleteScenarioOpen, router,
   })
   const {
-  editDirty, openRenameDialog, openDuplicateDialog, acceptLatestAndContinue,
+  saveErrors: settingsSaveErrors, editDirty, openRenameDialog, openDuplicateDialog, acceptLatestAndContinue,
   handleSaveScenario, latestSummary, currentSummary, handleStart,
   handleStop,
 } = useScenarioSettings({
     editForm, setSaving, id,
     setEditing, setRenameOpen, setSaveDone,
-    loadScenario, setError, saveErrors,
+    loadScenario, setError, saveErrors: copySaveErrors,
     setConflict, setConflictLatest, setCompareOpen,
     scenario, conflictLatest, startBusy,
     startConfirmed, setStartBusy, setStartError,
@@ -351,7 +351,7 @@ const { handleDuplicate, handleDeleteScenario, handleDiscardDuplicate } = useSce
     active: canEdit,
   })
   const {
-  handleSaveStep, closeStepForm, openInsertStep, openEditStep,
+  saveErrors: stepSaveErrors, handleSaveStep, closeStepForm, openInsertStep, openEditStep,
   handleMoveStep, handleDuplicateStep, openAddStep, openAddTemplateStep,
   openAddQuestionStep, handleDeleteStep,
 } = useScenarioStepActions({
@@ -359,7 +359,7 @@ const { handleDuplicate, handleDeleteScenario, handleDiscardDuplicate } = useSce
     setShowStepForm, setInsertAfter, setStepError,
     setStepFormNonce, setKindState, id,
     stepForm, failStep, kindState,
-    saveErrors, deliveryMode, stepFields,
+    saveErrors: settingsSaveErrors, deliveryMode, stepFields,
     setStepSaving, templates, editingStepId,
     loadScenario, insertAfter, sortedSteps,
     stepDraft, reloadStats, duplicatingStepId,
@@ -414,7 +414,7 @@ const { handleDuplicate, handleDeleteScenario, handleDiscardDuplicate } = useSce
 
   if (loading) {
     return (
-      <SaveErrorScope errors={saveErrors}><div className={styles.board}>
+      <SaveErrorScope errors={stepSaveErrors}><div className={styles.board}>
         <DetailLoading />
       </div></SaveErrorScope>
     )
@@ -422,7 +422,7 @@ const { handleDuplicate, handleDeleteScenario, handleDiscardDuplicate } = useSce
 
   if (!scenario && (scenarioMissing || !error)) {
     return (
-      <SaveErrorScope errors={saveErrors}><TargetMissing
+      <SaveErrorScope errors={stepSaveErrors}><TargetMissing
         kind="not-found"
         title="このシナリオは見つかりません"
         description="削除されたか、別の LINE アカウントのものです。一覧から選び直してください。"
@@ -434,7 +434,7 @@ const { handleDuplicate, handleDeleteScenario, handleDiscardDuplicate } = useSce
 
   if (!scenario) {
     return (
-      <SaveErrorScope errors={saveErrors}><TargetMissing
+      <SaveErrorScope errors={stepSaveErrors}><TargetMissing
         kind="error"
         title="シナリオを読み込めませんでした"
         description="通信が切れたか、サーバが応えませんでした。しばらくしてから、もう一度読み込んでください。"
@@ -556,7 +556,7 @@ const { handleDuplicate, handleDeleteScenario, handleDiscardDuplicate } = useSce
   const startedAt = formatSavedAt(runs?.subscriptions?.[0]?.startedAt)
 
   return (
-    <SaveErrorScope errors={saveErrors}><PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
+    <SaveErrorScope errors={stepSaveErrors}><PageFrame kind="detail" boardId={conflict ? 'kz2B6' : scenario.isActive ? 'PMLkX' : 'ARuZ4'} hasFooter>
       {/* 板の頭：題＋状態の札＋鉛筆・説明の1行。右に操作（配信結果・下見・まとめてテスト・その他）。 */}
       <PageHeading title={scenario.name}
         crumbs={<><p className={styles.meta}>

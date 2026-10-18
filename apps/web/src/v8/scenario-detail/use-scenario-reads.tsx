@@ -1,5 +1,7 @@
 'use client'
 
+import { isSelectableScenarioTemplate } from './question-template-model'
+
 import { type ScenarioQuestion } from '@/components/scenarios/question-editor'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -136,7 +138,7 @@ export function useScenarioReads({
       if (statsRes && statsRes.success) setStats(statsRes.data)
       if (tplRes && tplRes.success) {
         setTemplates(tplRes.data
-          .filter((t) => !t.question || t.questionStatus === 'published')
+          .filter(isSelectableScenarioTemplate)
           .map((t) => ({
           id: t.id,
           name: t.name,

@@ -26,6 +26,7 @@ import { useScenarioDraft } from '@/v8/autosave/use-scenario-draft'
 import type { DeliveryMode, MessageType, ScenarioStep } from '@line-crm/shared'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 import { formatScheduleLabel, FormSection, isStructuredKind, messageTypeOptions, ScenarioWithSteps, StepFormState, TagOpt, TemplateOpt } from './detail-model'
+import { cloneScenarioQuestion } from './question-template-model'
 import { describeAfterSend, describeStepAudience } from './scenario-step-audience'
 
 export function ScenarioStepForm({
@@ -201,7 +202,7 @@ export function ScenarioStepForm({
                   ...stepForm,
                   templateId,
                   question: template?.question
-                    ? withChoiceKeys(structuredClone(template.question) as ScenarioQuestion)
+                    ? withChoiceKeys(cloneScenarioQuestion(template.question))
                     : null,
                   messageType: (template?.messageType as MessageType | undefined) ?? stepForm.messageType,
                   messageContent: template?.messageContent ?? stepForm.messageContent,

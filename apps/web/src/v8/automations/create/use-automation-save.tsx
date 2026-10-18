@@ -452,5 +452,5 @@ export function useAutomationSave({
     }
   }
 
-  return { reloadServerDraft, save }
+  return { saveErrors, reloadServerDraft, save }
 }

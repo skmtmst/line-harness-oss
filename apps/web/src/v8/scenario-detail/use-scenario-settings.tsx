@@ -219,5 +219,5 @@ export function useScenarioSettings({
    * 同時配信）は、左メニューなどで画面を離れる前に確かめる。保存すると印が消えて番兵も外れる。
    */
 
-  return { editDirty, openRenameDialog, openDuplicateDialog, acceptLatestAndContinue, handleSaveScenario, latestSummary, currentSummary, handleStart, handleStop }
+  return { saveErrors, editDirty, openRenameDialog, openDuplicateDialog, acceptLatestAndContinue, handleSaveScenario, latestSummary, currentSummary, handleStart, handleStop }
 }

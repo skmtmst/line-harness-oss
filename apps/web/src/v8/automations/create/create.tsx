@@ -562,7 +562,7 @@ const { refreshAudiencePreview } = useAutomationAudience({ formStashRef, selecte
    * 公開の応答が失われたあとの再試行で、新しい下書きを作る前に呼ぶ。
    * 公開済み（動いている・止めている）が見つかれば true。
    */
-const { reloadServerDraft, save } = useAutomationSave({
+const { saveErrors: saveScopeErrors, reloadServerDraft, save } = useAutomationSave({
     saveErrors, selectedAccountRef, setConflict,
     conflict, selectedAccountId, eventType,
     suppressTriggerResetRef, setName, setEventType,
@@ -756,7 +756,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
   ) : null
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage
+    <SaveErrorScope errors={saveScopeErrors}><CreatePage
       boardId={conflict ? 'tJqST' : isDraft ? 'J1VA8' : 'M4torY'}
       title={isDraft ? '下書きを仕上げる' : 'ルールを作る'}
       /* 見本の帯（J1VA8）は頭の中、説明のすぐ下（絵では頭の線より上）。 */

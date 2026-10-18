@@ -1,5 +1,7 @@
 'use client'
 
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+
 import { type ScenarioQuestion } from '@/components/scenarios/question-editor';
 import { type OnCompleteMode } from '@/components/scenarios/scenario-dialogs';
 import { emptySchedule, type ScheduleValue } from '@/components/scenarios/schedule-input';
@@ -168,7 +170,7 @@ export class DuplicateAborted extends Error {
     readonly stage: string,
     cause?: unknown,
   ) {
-    super(cause instanceof Error && cause.message ? cause.message : '複製できませんでした')
+    super(japaneseDetailOf(cause) || '複製できませんでした')
   }
 }
 

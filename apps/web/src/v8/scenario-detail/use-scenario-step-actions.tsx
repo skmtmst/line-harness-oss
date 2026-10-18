@@ -422,5 +422,5 @@ export function useScenarioStepActions({
    * 設定内容は「1分後」なのにプレビューが「すぐに」のまま残る（#616 SC-02b）。
    */
 
-  return { handleSaveStep, closeStepForm, openInsertStep, openEditStep, handleMoveStep, handleDuplicateStep, openAddStep, openAddTemplateStep, openAddQuestionStep, handleDeleteStep }
+  return { saveErrors, handleSaveStep, closeStepForm, openInsertStep, openEditStep, handleMoveStep, handleDuplicateStep, openAddStep, openAddTemplateStep, openAddQuestionStep, handleDeleteStep }
 }

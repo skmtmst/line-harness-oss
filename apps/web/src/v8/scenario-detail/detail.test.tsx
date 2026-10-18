@@ -18,6 +18,7 @@ vi.hoisted(() => {
 
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const updateScenario = vi.hoisted(() => vi.fn())
+const createScenario = vi.hoisted(() => vi.fn())
 const triggerList = vi.hoisted(() => vi.fn(async () => ({ success: true, data: [{ id: 't1', kind: 'friend_add', tagId: null }] })))
 const getScenario = vi.hoisted(() => vi.fn())
 
@@ -60,6 +61,7 @@ vi.mock('@/lib/api', () => ({
   },
   api: {
     scenarios: {
+      create: createScenario,
       get: getScenario,
       update: updateScenario,
       simulate: vi.fn(async () => ({ success: true, data: { audience: { newStartPlanned: 116 }, steps: [] } })),
@@ -157,6 +159,7 @@ beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   role.value = 'owner'
   updateScenario.mockReset()
+  createScenario.mockReset()
   updateScenario.mockResolvedValue({ success: true, data: { id: 'sc-1' } })
   getScenario.mockReset()
   getScenario.mockResolvedValue({ success: true, data: { ...scenario, updatedAt: '2026-10-01T05:10:00.000Z' } })
@@ -293,6 +296,48 @@ it('WEB229：開始のきっかけを保存したら、見出しのきっかけ�
 })
 
 describe('整理後も保存・開始・停止と通の状態を保つ', () => {
+  it('複製の開始に失敗したら英語の番号を出さず、名前と再試行を残す', async () => {
+    const { ApiError } = await import('@/lib/api')
+    createScenario.mockRejectedValueOnce(new ApiError(500, 'API error: 500'))
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: '複製する', exact: true }))
+    const dialog = screen.getByRole('dialog', { name: 'このシナリオを複製する' })
+    fireEvent.change(within(dialog).getByLabelText('新しい名前'), { target: { value: '入力したコピー名' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '複製する', exact: true }))
+    await waitFor(() => expect(createScenario).toHaveBeenCalledOnce())
+    await waitFor(() => expect(screen.getByText('複製に失敗しました。通信を確かめて、もう一度お試しください。')).toBeTruthy())
+    expect(screen.queryByText('API error: 500')).toBeNull()
+    expect((within(dialog).getByLabelText('新しい名前') as HTMLInputElement).value).toBe('入力したコピー名')
+    expect(within(dialog).getByRole('button', { name: '複製する', exact: true }).hasAttribute('disabled')).toBe(false)
+  })
+
+  it('複製失敗の番号をそのまま出さず、途中のコピーと段階を保持する', async () => {
+    const { ApiError } = await import('@/lib/api')
+    const { DuplicateAborted } = await import('./detail-model')
+    const failure = new DuplicateAborted('copy-1', '2通目', new ApiError(500, 'API error: 500'))
+    expect(failure.message).toBe('複製できませんでした')
+    expect([failure.copyId, failure.stage]).toEqual(['copy-1', '2通目'])
+    expect(new DuplicateAborted('copy-1', '名前', new ApiError(422, '名前が重複しています')).message).toBe('名前が重複しています')
+  })
+
+  it('名前の保存で欄の検査に失敗したら、入力と窓を残して理由と焦点を欄へ返す', async () => {
+    const { ApiError } = await import('@/lib/api')
+    updateScenario.mockRejectedValueOnce(Object.assign(new ApiError(422, '名前を直してください'), {
+      fields: { name: '同じ名前があります' },
+    }))
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: '名前・説明・置き場を変える' }))
+    const dialog = screen.getByRole('dialog', { name: '名前・説明・置き場を変える' })
+    const name = within(dialog).getByLabelText('シナリオ名') as HTMLInputElement
+    fireEvent.change(name, { target: { value: '入力した名前' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'この内容で保存する' }))
+    await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))
+    expect(within(dialog).getByText('同じ名前があります')).toBeTruthy()
+    expect(name.value).toBe('入力した名前')
+    await waitFor(() => expect(document.activeElement).toBe(name))
+    expect(screen.getByRole('dialog', { name: '名前・説明・置き場を変える' })).toBeTruthy()
+  })
+
   it('下書きの通は行の中で区別でき、選んだ本文も保持する', async () => {
     const { scenarioReferenceData } = await import('@/components/scenarios/scenario-reference-data')
     vi.mocked(scenarioReferenceData.scenario).mockResolvedValue({ success: true, data: {
