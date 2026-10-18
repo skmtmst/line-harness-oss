@@ -1,10 +1,11 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 /* 種類の呼び方は `./template-message-type` に一本化した（#497 軽2）。 */
 const MESSAGE_TYPE = readFileSync(join(HERE, '../../v8/templates/words.ts'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, '../../v8/template-edit/message.tsx'), 'utf8')

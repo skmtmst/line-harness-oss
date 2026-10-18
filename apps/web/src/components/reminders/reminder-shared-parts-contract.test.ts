@@ -1,8 +1,9 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const SOURCE = readFileSync(new URL('../../v8/reminders/ui.tsx', import.meta.url), 'utf8')
-const EDIT = readFileSync(new URL('../../v8/reminders/edit.tsx', import.meta.url), 'utf8')
+const EDIT = readUiSource(new URL('../../v8/reminders/edit.tsx', import.meta.url), 'utf8')
 
 describe('リマインダ表示部品の共通部品とのすみ分け', () => {
   it('ボタンと手順の動作は現役の共通部品へ寄せる', () => {

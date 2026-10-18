@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
 
 // B-169: 足す・行を直す・並べ替える・消すの形は共通部品が持つ。
@@ -19,7 +19,7 @@ const owners = [
   'v8/webhooks/incoming-actions.tsx',
   'v8/webinar-edit/notifications.tsx',
 ]
-const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8')
+const read = (path: string) => readUiSource(new URL(`../../${path}`, import.meta.url), 'utf8')
 describe('B-169 行うことの形を戻さない', () => {
   for (const path of owners) it(`${path} は共通の行を使う`, () => {
     expect(read(path)).toMatch(/import .*action-list['"]/)

@@ -1,10 +1,11 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 const LIST_PAGE = fs.readFileSync(new URL('../../v8/friend-add/list.tsx', import.meta.url), 'utf8')
-const EDITOR = fs.readFileSync(path.join(__dirname, '../../v8/friend-add/editor.tsx'), 'utf8')
+const EDITOR = readUiSource(path.join(__dirname, '../../v8/friend-add/editor.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 
 const ENTRY = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')

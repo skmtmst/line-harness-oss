@@ -1,3 +1,4 @@
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
-const TEMPLATES = read('../v8/templates/list.tsx')
+const TEMPLATES = readUiSource(join(HERE, '../v8/templates/list.tsx'), 'utf8')
 const TEMPLATES_CSS = read('../v8/templates/list.module.css')
 const CONVERSIONS = read('../v8/conversions/list.tsx')
 const HEALTH_TAB = read('../v8/nen-health/health.tsx')
