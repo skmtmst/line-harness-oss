@@ -108,7 +108,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
           { lineAccountId: result.lineAccountId, field: 'channel_access_token' },
         );
         await sendEventBookingNotification({
-          delivery: { db: c.env.DB, accountId: result.lineAccountId, operationId: `event-waitlist-accept:${result.bookingId}`,subject:{bookingId:result.bookingId,slotId:result.occurrenceId,status:'confirmed'} },
+          delivery: { db: c.env.DB, accountId: result.lineAccountId, operationId: `event-waitlist-accept:${result.bookingId}`,subject:{bookingId:result.bookingId,slotId:result.occurrenceId,status:'confirmed',startsAt:result.startsAt} },
           channelAccessToken: accessToken,
           toLineUserId: result.lineUserId,
           kind: 'received_confirmed',

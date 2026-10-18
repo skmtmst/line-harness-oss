@@ -10,6 +10,7 @@ export interface EventDbRow {
   venue_address: string | null;
   venue_name: string | null;
   venue_url: string | null;
+  confirmation_message_extra: string | null;
   requires_approval: number;
   approval_deadline_hours: number;
   current_published_version_id: string | null;

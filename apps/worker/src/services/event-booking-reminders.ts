@@ -1,3 +1,4 @@
+import { prepareEventReminders } from './event-reminder-plan.js';
 import { recoverEventBookingNotifications } from './event-notification-recovery.js';
 import { deliverBookingLine, BookingLineDeliveryIncomplete } from './booking-line-delivery.js';
 import { reverseSourceConversions } from '@line-crm/db';
@@ -76,23 +77,7 @@ export async function insertRemindersForBooking(
   booking_id: string,
   reminders: ComputedReminder[],
 ): Promise<void> {
-  for (const r of reminders) {
-    await db
-      .prepare(
-        `INSERT INTO event_booking_reminders
-           (id, booking_id, kind, scheduled_at, status, retry_count)
-         SELECT ?, ?, ?, ?, 'pending', 0
-          WHERE NOT EXISTS (
-            SELECT 1 FROM event_booking_reminders
-             WHERE booking_id = ? AND kind = ? AND scheduled_at = ?
-          )`,
-      )
-      .bind(
-        crypto.randomUUID(), booking_id, r.kind, r.scheduled_at,
-        booking_id, r.kind, r.scheduled_at,
-      )
-      .run();
-  }
+  for (const statement of prepareEventReminders(db,booking_id,reminders)) await statement.run();
 }
 
 // Cancel pending and retryable failed reminders linked to a booking

@@ -12,6 +12,20 @@ export async function bookingRetryKey(operationId: string): Promise<string> {
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
 
+/** 予約の保存取引へ予定を積む側と、送信側で同じ不変の入力を使う。 */
+export async function bookingLinePlan<S>(input:{accountId:string;operationId:string;snapshot:S;retryKey?:string;
+  deadlineAt?:number;maxAttempts?:number;now?:()=>number}) {
+  const now=input.now??Date.now;
+  return {
+    ref:{scopeId:`line:${input.accountId}`,processKind:'booking_line_delivery',subjectId:input.operationId,stepKey:'send'},
+    identity:{scope:{accountId:input.accountId,storeId:input.accountId,destination:'line',connectionId:input.accountId},
+      operationId:input.operationId,snapshotId:input.operationId,idempotencyKey:input.retryKey??await bookingRetryKey(input.operationId),effect:'write' as const},
+    policy:{category:'api' as const,maxAttempts:input.maxAttempts??1,timeoutMs:10_000,
+      deadlineAt:input.deadlineAt??now()+86_400_000,wait:API_RETRY_WAIT},
+    snapshot:input.snapshot,
+  };
+}
+
 export async function deliverBookingLine<S>(db: D1Database, input: {
   accountId: string; operationId: string; snapshot: S; retryKey?: string;
   deadlineAt?: number; maxAttempts?: number; initialAttempts?: number; legacyUnknown?: boolean; now?: () => number;
@@ -20,13 +34,9 @@ export async function deliverBookingLine<S>(db: D1Database, input: {
   statements?(next: Readonly<CallState>): D1PreparedStatement[];
 }): Promise<void> {
   const now = input.now ?? Date.now;
+  const plan=await bookingLinePlan(input);
   const result = await runBookingExternalStep(db, {
-    ref: { scopeId: `line:${input.accountId}`, processKind: 'booking_line_delivery', subjectId: input.operationId, stepKey: 'send' },
-    identity: { scope: { accountId: input.accountId, storeId: input.accountId, destination: 'line', connectionId: input.accountId },
-      operationId: input.operationId, snapshotId: input.operationId,
-      idempotencyKey: input.retryKey ?? await bookingRetryKey(input.operationId), effect: 'write' },
-    policy: { category: 'api', maxAttempts: input.maxAttempts ?? 1, timeoutMs: 10_000,
-      deadlineAt: input.deadlineAt ?? now() + 86_400_000, wait: API_RETRY_WAIT },
+    ...plan,
     initialAttempts: input.initialAttempts, legacyUnknown: input.legacyUnknown,
     snapshot: input.snapshot, now, authorize: input.authorize,
     execute: async (signal, saved, identity) => {

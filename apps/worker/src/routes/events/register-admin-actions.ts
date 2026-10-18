@@ -1,5 +1,6 @@
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
+import { prepareConfirmedEventBooking } from '../../services/event-notification-plan.js';
 import { bad } from '../../services/event-input-error.js';
 import { inputJsonBoundary } from '../../lib/input-errors.js';
 import { requireRole } from '../../middleware/role-guard.js';
@@ -77,14 +78,14 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
   // Conditional UPDATE so two concurrent admins can't both transition the
   // same `requested` row. The losing request gets changes=0 and treats the
   // booking as already decided.
-  const upd = await c.env.DB
+  const plans=action==='confirm'?await prepareConfirmedEventBooking(c.env.DB,booking.id,new Date(nowIso)):[];
+  const [upd] = await c.env.DB.batch([c.env.DB
     .prepare(
       `UPDATE event_bookings
           SET status = ?, decided_at = ?, decided_by_staff_id = ?, updated_at = ?
         WHERE id = ? AND status = ? AND decided_at IS NULL`,
     )
-    .bind(next, nowIso, staff?.id ?? null, nowIso, booking.id, booking.status)
-    .run();
+    .bind(next, nowIso, staff?.id ?? null, nowIso, booking.id, booking.status),...plans]);
   if ((upd.meta?.changes ?? 0) === 0) {
     // 同時確定との競合敗北は成功にしない。落選ずみへの承認は 409。
     // 落選ずみへの却下の再送だけ V6 修復を受け付けて 200 にする。

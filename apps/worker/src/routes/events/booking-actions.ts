@@ -77,7 +77,7 @@ export async function notifyBookingFriend(
     );
     await sendEventBookingNotification({
       delivery: { db, accountId: row.line_account_id, operationId: `event-booking:${booking_id}:${kind}:${row.slot_id}`,
-        subject:{bookingId:booking_id,slotId:row.slot_id,status:row.status},
+        subject:{bookingId:booking_id,slotId:row.slot_id,status:row.status,startsAt:row.slot_starts_at},
         authorize: async () => !!await db.prepare('SELECT 1 ok FROM event_bookings WHERE id=? AND line_account_id=? AND status=? AND slot_id=?')
           .bind(booking_id,row.line_account_id,row.status,row.slot_id).first() },
       channelAccessToken: accessToken,

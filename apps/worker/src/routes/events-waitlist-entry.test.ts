@@ -131,8 +131,17 @@ function pauseBefore(db: D1Database, matches: (sql: string) => boolean, method: 
   const released = new Promise<void>(resolve => { resume = resolve; });
   let intercepted = false;
   const prepare = db.prepare.bind(db);
+  const originals=new WeakMap<D1PreparedStatement,D1PreparedStatement>();
+  const targets=new WeakSet<D1PreparedStatement>();
+  const pause=async()=>{if(!intercepted){intercepted=true;reached();await released;}};
   const wrapped = {
     ...db,
+    async batch(statements:D1PreparedStatement[]) {
+      // 実D1の取引途中では別の取引を割り込ませられない。
+      // 先頭の書込みの直前、取引を開く前に順番を固定する。
+      if(method==='run'&&statements.some(statement=>targets.has(statement)))await pause();
+      return db.batch(statements.map(statement=>originals.get(statement)??statement));
+    },
     prepare(sql: string) {
       const statement = prepare(sql);
       if (!matches(sql)) return statement;
@@ -141,17 +150,15 @@ function pauseBefore(db: D1Database, matches: (sql: string) => boolean, method: 
         ...statement,
         bind(...args: unknown[]) {
           const bound = bind(...args);
-          return {
+          const proxy = {
             ...bound,
             async [method]() {
-              if (!intercepted) {
-                intercepted = true;
-                reached();
-                await released;
-              }
+              await pause();
               return bound[method]();
             },
           };
+          originals.set(proxy,bound);targets.add(proxy);
+          return proxy;
         },
       };
     },

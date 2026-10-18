@@ -1,3 +1,5 @@
+import { prepareEventNotification } from '../../services/event-notification-plan.js';
+import { prepareEventReminders } from '../../services/event-reminder-plan.js';
 import type { Env } from '../../index.js';
 import type { Hono } from 'hono';
 import { eventModeRemaining } from '../../services/event-mode-capacity.js';
@@ -338,8 +340,17 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   const approvalExpiresAt = status === 'requested'
     ? new Date(Date.parse(nowIso) + event.approval_deadline_hours * 3600_000).toISOString()
     : null;
-  const bookingInserted = await c.env.DB
-    .prepare(
+  const notificationKind:EventNotificationKind=status==='requested'?'received_pending':'received_confirmed';
+  const notificationPlan=await prepareEventNotification(c.env.DB,{
+    accountId:account_id,operationId:`event-booking:${id}:${notificationKind}:${slot.id}`,to:callerLineUserId,
+    kind:notificationKind,ctx:{eventName:event.name,startsAtJst:startsAtJst(slot.starts_at),venueName:event.venue_name,
+      venueUrl:event.venue_url,confirmationExtra:event.confirmation_message_extra},subject:{bookingId:id,slotId:slot.id,status,startsAt:slot.starts_at},now:new Date(nowIso),
+  });
+  const reminderPlans=status==='confirmed'?prepareEventReminders(c.env.DB,id,computeRemindersForBooking({
+    starts_at_utc:slot.starts_at,reminder_day_before_enabled:event.reminder_day_before_enabled===1,
+    reminder_hours_before:event.reminder_hours_before,now:new Date(nowIso),
+  }),true):[];
+  const [bookingInserted] = await c.env.DB.batch([c.env.DB.prepare(
       `INSERT INTO event_bookings
          (id, line_account_id, event_id, slot_id, friend_id, status, customer_note,
           requested_at, identity_key, party_size, answer_snapshot_json,
@@ -357,7 +368,12 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
               WHERE event_id = ? AND identity_key = ? AND status IN ('requested','confirmed'))
             + (SELECT COUNT(*) FROM event_waitlist
                 WHERE event_id = ? AND identity_key = ? AND status IN ('offered','accepted'))
-          ) < ?)`,
+          ) < ?)
+          AND EXISTS(SELECT 1 FROM event_slots live_slot WHERE live_slot.id=?
+            AND (live_slot.capacity IS NULL OR COALESCE((SELECT SUM(party_size) FROM event_bookings
+              WHERE slot_id=live_slot.id AND status IN ('requested','confirmed')),0)
+              + COALESCE((SELECT SUM(party_size) FROM event_waitlist
+                WHERE slot_id=live_slot.id AND status IN ('offered','accepted')),0)+?<=live_slot.capacity))`,
     )
     .bind(
       id, account_id, event.id, slot.id, friend.id, status,
@@ -367,9 +383,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
       event.current_published_version_id, bookingSnapshotJson, approvalExpiresAt, participationMode,
       event.id, slot.id, identityKey,
       event.max_bookings_per_friend, event.id, identityKey,
-      event.id, identityKey, event.max_bookings_per_friend,
-    )
-    .run();
+      event.id, identityKey, event.max_bookings_per_friend,slot.id,partySize,
+    ),notificationPlan,...reminderPlans]);
   if ((bookingInserted.meta?.changes ?? 0) === 0) {
     const remaining=await eventModeRemaining(c.env.DB,slot.id,participationMode);
     if(remaining!==null&&remaining<partySize){if(event.waitlist_enabled===1)return enterWaitlist();return finalize(409,{error:'slot_full'});}
@@ -533,7 +548,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
         status === 'requested' ? 'received_pending' : 'received_confirmed';
       await sendEventBookingNotification({
         delivery: { db: c.env.DB, accountId: account_id, operationId: `event-booking:${id}:${kind}:${slot.id}`,
-          subject:{bookingId:id,slotId:slot.id,status},
+          subject:{bookingId:id,slotId:slot.id,status,startsAt:slot.starts_at},
           authorize: async () => !!await c.env.DB.prepare('SELECT 1 ok FROM event_bookings WHERE id=? AND line_account_id=? AND status=? AND slot_id=?')
             .bind(id,account_id,status,slot.id).first() },
         channelAccessToken: accessToken,
