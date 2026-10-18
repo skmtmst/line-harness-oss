@@ -1,3 +1,4 @@
+import { getRun, getStep } from './automation-run-state.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 /**
  * V6オートメーションの実行状態機械。
@@ -47,7 +48,7 @@ export interface ActionDefinition {
   branchConditions?: Array<{ condition: SegmentCondition; expected: boolean; branchStepKey?: string }>;
 }
 
-interface RunRow {
+export interface RunRow {
   id: string;
   line_account_id: string;
   automation_id: string;
@@ -63,7 +64,7 @@ interface RunRow {
   execution_plan_json: string | null;
 }
 
-interface StepRow {
+export interface StepRow {
   id: string;
   automation_run_id: string;
   step_key: string;
@@ -136,6 +137,9 @@ export class AutomationActionError extends Error {
     this.name = 'AutomationActionError';
   }
 }
+
+/** The delivery outbox owns retries; polling must not spend this action's retry budget. */
+export class AutomationActionDeferred extends Error {}
 
 export class AutomationRunRetryError extends Error {
   constructor(
@@ -254,28 +258,6 @@ async function recordedBranchSelected(
     if (output.matched !== item.expected) return false;
   }
   return true;
-}
-
-async function getRun(db: D1Database, runId: string): Promise<RunRow | null> {
-  return db.prepare(
-    `SELECT r.id, r.line_account_id, r.automation_id, r.automation_version_id,
-            r.friend_id, r.source_event_id, r.idempotency_key, r.status,
-            r.current_step, r.input_event_json, r.is_test, v.action_config,
-            r.execution_plan_json
-       FROM automation_runs r
-       JOIN automation_versions v
-         ON v.id = r.automation_version_id AND v.automation_id = r.automation_id
-      WHERE r.id = ?`,
-  ).bind(runId).first<RunRow>();
-}
-
-async function getStep(db: D1Database, runId: string, stepKey: string): Promise<StepRow | null> {
-  return db.prepare(
-    `SELECT id, automation_run_id, step_key, action_type, common_action_version_id,
-            attempt_number, idempotency_key, status, retry_at, lease_expires_at
-       FROM automation_run_steps
-      WHERE automation_run_id = ? AND step_key = ?`,
-  ).bind(runId, stepKey).first<StepRow>();
 }
 
 export async function resolveCommonActionVersion(
@@ -620,7 +602,8 @@ async function claimStep(
   const result = await db.prepare(
     `UPDATE automation_run_steps
         SET status = 'running',
-            attempt_number = CASE WHEN status = 'queued' THEN attempt_number ELSE attempt_number + 1 END,
+            attempt_number = CASE WHEN status = 'queued' OR error_code = 'webhook_delivery_pending'
+              THEN attempt_number ELSE attempt_number + 1 END,
             started_at = COALESCE(started_at, ?), retry_at = NULL, lease_expires_at = ?
       WHERE id = ? AND (
         status = 'queued'
@@ -937,6 +920,17 @@ export async function processAutomationRun(
       await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
         .bind(index + 1, run.id).run();
     } catch (error) {
+      if (error instanceof AutomationActionDeferred) {
+        const retryAt = addMinutes(now, 5);
+        await db.batch([
+          db.prepare(`UPDATE automation_run_steps SET status = 'waiting',
+            error_code = 'webhook_delivery_pending', error_message = NULL, retry_at = ?, lease_expires_at = NULL
+            WHERE id = ? AND status = 'running'`).bind(retryAt, step.id),
+          db.prepare(`UPDATE automation_runs SET status = 'waiting', resume_at = ?, lease_expires_at = NULL
+            WHERE id = ? AND status = 'running'`).bind(retryAt, run.id),
+        ]);
+        return 'waiting';
+      }
       const failure = normalizeError(error);
       const outcome = await markStepFailure(db, step, failure, now);
       if (outcome === 'retry') return 'waiting';

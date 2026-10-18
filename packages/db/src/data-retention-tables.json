@@ -469,6 +469,15 @@
       "column": "tenant_id"
     }
   },
+  "auth_known_devices": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
   "auth_email_tokens": {
     "category": "global"
   },
@@ -1891,6 +1900,31 @@
       "column": "webhook_id",
       "parent": "incoming_webhooks",
       "parentColumn": "id"
+    }
+  },
+  "incoming_webhook_queue": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "webhook_id",
+      "parent": "incoming_webhooks",
+      "parentColumn": "id"
+    }
+  },
+  "operator_notification_occurrences": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "instance_id",
+      "parent": "notification_instances",
+      "parentColumn": "id"
+    }
+  },
+  "public_ingress_receipts": {
+    "category": "purge",
+    "scope": {
+      "by": "publicIngress",
+      "column": "scope_id"
     }
   },
   "incoming_webhook_steps": {
@@ -4527,6 +4561,16 @@
       "parentColumn": "id"
     }
   },
+  "security_alerts": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
+  "security_monitor_state": {
+    "category": "global"
+  },
   "rt_reservation_referrals": {
     "category": "purge",
     "scope": {
@@ -4675,5 +4719,399 @@
       "by": "tenant",
       "column": "tenant_id"
     }
+  },
+  "line_senders": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "inbox_routing_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "account_id",
+      "parent": "line_accounts",
+      "parentColumn": "id"
+    }
+  },
+  "booking_calendar_switches": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_calendar_busy_cache": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_calendar_read_health": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_calendar_switch_jobs": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "booking_id",
+      "parent": "bookings",
+      "parentColumn": "id"
+    }
+  },
+  "booking_calendar_switch_audit": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_cancellation_policies": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_payment_methods": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "friend_id",
+      "parent": "friends",
+      "parentColumn": "id"
+    }
+  },
+  "booking_charges": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_cancellation_events": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "charge_id",
+      "parent": "booking_charges",
+      "parentColumn": "id"
+    }
+  },
+  "ai_request_claims": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "chat_id",
+      "parent": "chats",
+      "parentColumn": "id"
+    }
+  },
+  "ai_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ai_usage_counters": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "booking_addons": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "booking_id",
+      "parent": "bookings",
+      "parentColumn": "id"
+    }
+  },
+  "booking_batch_assertions": {
+    "category": "global"
+  },
+  "booking_makeup_credits": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_routing_staff_groups": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_series": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "broadcast_ab_recipients": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_ab_tests": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "broadcast_variants": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "broadcast_id",
+      "parent": "broadcasts",
+      "parentColumn": "id"
+    }
+  },
+  "operator_push_deliveries": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "subscription_id",
+      "parent": "operator_push_subscriptions",
+      "parentColumn": "id"
+    }
+  },
+  "operator_push_preferences": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
+  "operator_push_subscriptions": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
+  "qa_entries": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "booking_payment_refunds": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_payment_booking_links": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "ai_answer_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "booking_cancellation_options": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "booking_deposit_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "booking_groups": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "booking_pass_plans": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
+  "customer_activity_daily": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "customer_activity_runs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ec_auto_line_rule_events": {
+    "category": "retain",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ec_auto_line_rules": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ec_auto_line_sends": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "ec_behavior_events": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "hq_store_daily_metrics": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "inbox_assignment_logs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "inbox_assignment_settings": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "mcp_call_logs": {
+    "category": "retain",
+    "scope": {
+      "by": "parent",
+      "column": "connection_id",
+      "parent": "mcp_connections",
+      "parentColumn": "id"
+    }
+  },
+  "mcp_connections": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "organization_id"
+    }
+  },
+  "member_rank_history": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "member_rank_mutations": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "member_rank_programs": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "member_rank_tiers": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "member_ranks": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "rfm_segment_names": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "account_id"
+    }
+  },
+  "staff_presence": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
   }
+,
+  "hq_store_response_samples": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "member_rank_notices": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "ec_auto_line_attribution_events": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "booking_entitlement_notices": {"category":"purge","scope":{"by":"lineAccount","column":"line_account_id"}},
+  "booking_pass_purchases": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "broadcast_execution_contexts": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "hq_store_comparison_export_jobs": {"category":"purge","scope":{"by":"tenant","column":"tenant_id"}},
+  "booking_pass_billing_events": {"category":"purge","scope":{"by":"parent","column":"purchase_id","parent":"booking_pass_purchases","parentColumn":"id"}}
+,
+  "account_ai_features":{"category":"purge","scope":{"by":"lineAccount","column":"account_id"}}
 }

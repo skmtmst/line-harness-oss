@@ -1,3 +1,4 @@
+import {buildSegmentWhere} from '@line-crm/db/src/segment-conditions.js';
 import type { SavedSearchCondition, SavedSearchConditions } from '@line-crm/shared';
 
 export interface CompiledSavedSearch {
@@ -63,6 +64,12 @@ export function friendFieldValueSql(): string {
 function compileCondition(condition: SavedSearchCondition): CompiledCondition | string {
   const value = text(condition.value);
   switch (condition.kind) {
+    case 'visit_count': case 'purchase_amount': case 'last_activity_at': case 'member_tier': {
+      const expected=condition.kind==='member_tier'?'eq':'between';
+      if(condition.op!==expected)return 'この比較方法は使えません';
+      try{const clause=buildSegmentWhere({operator:'AND',rules:[{type:condition.kind,value:condition.value}]});return {sql:clause.sql,binds:clause.bindings};}
+      catch{return '来店・購入・会員ランクの条件を確認してください';}
+    }
     case 'name':
       if (!value) return '名前の条件に値がありません';
       if (condition.op === 'eq') return { sql: 'f.display_name = ?', binds: [value] };

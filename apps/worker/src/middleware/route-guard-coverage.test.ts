@@ -1,25 +1,38 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { registrations, hasPriorGuard, importedRouters, exportedRouters } from '../test-utils/route-guards.js';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Hono } from 'hono';
+import {requireRole} from './role-guard.js';
+import { isOutputRequest } from './output-audit.js';
 
-const authState = vi.hoisted(() => ({ readOnly: false }));
+const authState = vi.hoisted(() => ({ readOnly: false, role: 'staff' as 'owner' | 'admin' | 'staff', permissionKeys: [] as string[], viewKeys: [] as string[] }));
 vi.mock('@line-crm/db', async (original) => ({
   ...await original<typeof import('@line-crm/db')>(),
   getStaffByAdminSession: async () => null,
   getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
-  getStaffByApiKey: async () => ({ id: 'coverage-staff', name: 'Coverage', role: 'staff',
-    access_level: authState.readOnly ? 'read_only' : 'full', permission_keys: '[]', tenant_status: 'active' }),
+  getStaffByApiKey: async (_db: unknown, token: string) => ({ id: `coverage-${token}`, name: 'Coverage', role: authState.role, tenant_id: 'coverage-tenant',
+    access_level: authState.readOnly ? 'read_only' : 'full', permission_keys: JSON.stringify(authState.permissionKeys), view_permission_keys: JSON.stringify(authState.viewKeys), tenant_status: 'active' }),
   getActiveImpersonation: async () => null,
   getPlatformAdminByStaffId: async () => null,
   getStaffById: async () => null,
+  // The matrix tests authorization, with rate limiting tested separately in
+  // rate-limit-shared.test.ts. A fake DB must not stop requests at the throttle.
+  bumpAuthThrottle: async () => 1,
+  getLineAccountScopeEntries: async () => [{ id: 'coverage-account', tenant_id: 'coverage-tenant', is_active: 1 }],
   recordAuditEvent: async () => undefined,
 }));
 import { app } from '../index.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
+import { collectSecurityRoutes } from '../test-utils/route-security-inventory.js';
+import { isLegacyGlobalApi } from './tenant-scope.js';
+
+beforeEach(() => { authState.role = 'staff'; authState.readOnly = false; authState.permissionKeys = []; authState.viewKeys = []; });
 
 
 import {
+  authMiddleware,
   isPublicApiBoundary,
   isStaffExplicitAllow,
   isStaffSelfRouteTemplate,
@@ -68,6 +81,123 @@ function collectUnguarded(fixtures?: Record<string, string>): Finding[] {
 }
 
 describe('更新系の権限ガードの網羅', () => {
+  it('S07 read-only exports are denied except the aggregate comparison CSV for owner/admin', async () => {
+    const aggregate=new Hono();aggregate.use('*',authMiddleware as never);
+    aggregate.get('/api/hq/store-comparison/exports/:id/download',requireRole('owner','admin') as never,c=>c.json({success:true}));
+    const routes = [...new Map(app.routes.filter(route => route.method === 'GET'
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path))
+      .map(route => [route.path, route])).values()];
+    expect(routes.length).toBeGreaterThan(100);
+    authState.readOnly = true;
+    let index = 80_000;
+    for (const role of ['owner', 'admin', 'staff'] as const) {
+      authState.role = role;
+      for (const route of routes) {
+        const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
+        const aggregateCsv=route.path==='/api/hq/store-comparison/exports/:id/download';
+        const response = await (aggregateCsv?aggregate:app).request(`${path}?format=csv`, { headers: {
+          Authorization: `Bearer ${String(++index).padStart(16, '0')}`,
+          'CF-Connecting-IP': `s07-output-${index}`,
+        } }, { DB: {} } as never);
+        expect(response.status, `${role} GET ${route.path}: read-only export`).toBe(aggregateCsv&&role!=='staff'?200:403);
+      }
+    }
+  }, 120_000);
+
+  it('S07 feature view permission permits reading but requires edit permission for exports', async () => {
+    const router = new Hono();
+    router.use('*', authMiddleware as never);
+    router.get('/api/friends', c => c.json({ success: true }));
+    router.get('/api/friends/export', c => c.json({ success: true }));
+    const request = (path: string) => router.request(path, { headers: {
+      Authorization: 'Bearer coverage-view-0001', 'CF-Connecting-IP': 's07-output-view',
+    } }, { DB: {} });
+    authState.viewKeys = ['/friends'];
+    expect((await request('/api/friends')).status).toBe(200);
+    expect((await request('/api/friends/export')).status).toBe(403);
+    expect((await request('/api/friends?format=csv')).status).toBe(403);
+    authState.permissionKeys = ['/friends'];
+    expect((await request('/api/friends/export')).status).toBe(200);
+    expect((await request('/api/friends?format=csv')).status).toBe(200);
+  });
+
+  it('S07/S15 lists every mounted API/LIFF route with its authentication, scope evidence, permissions and read-only boundary', () => {
+    const candidates = collectSecurityRoutes(join(ROUTES_DIR, '..'));
+    const sourceKeys = new Set(candidates.map(route => `${route.method} ${route.path}`));
+    const runtimeKeys = new Set(app.routes.filter(route =>
+      ['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS'].includes(route.method)
+    ).map(route => `${route.method} ${route.path}`));
+    expect([...runtimeKeys].filter(key => !sourceKeys.has(key))).toEqual([]);
+    // Conditional route factories can yield several possible method/path pairs.
+    // Intersect those with the actual Hono registrations, never guess a route
+    // into existence from the syntax alone. ALL endpoints are retained too.
+    const sources = candidates.filter(route => runtimeKeys.has(`${route.method} ${route.path}`) || route.method === 'ALL');
+    if (process.env.SECURITY_INVENTORY_REPORT) {
+      const lines = sources.map(route => {
+        const admin = route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path);
+        const readonly = admin && (!['GET','HEAD','OPTIONS'].includes(route.method) || isOutputRequest(route.path, undefined, route.method)) ? 'authMiddleware:403' : admin ? 'read_allowed;format=csv:403' : 'read_or_dedicated_auth';
+        const scope = isLegacyGlobalApi(route.path) ? 'tenantScopeMiddleware:legacy_unassigned'
+          : route.evidence.join(',') || 'REVIEW:see_called_helpers_or_direct_SQL';
+        const permission = admin ? permissionForApiPath(route.path)
+          || (isStaffSelfRouteTemplate(route.method, route.path) ? 'self'
+            : isStaffExplicitAllow(route.method, route.path) ? 'explicit_allow' : 'staff_fail_closed_or_platform_guard') : 'dedicated_or_public';
+        return [route.method, route.path, `${route.file}:${route.line}`, admin ? 'admin_session_or_api_key' : 'dedicated_or_public',
+          scope, permission, readonly, route.calls.filter(name => /require|verify|identity|authority|visible|scope|tenant|access/i.test(name)).join(',') || '-'].join('\t');
+      });
+      writeFileSync(process.env.SECURITY_INVENTORY_REPORT,
+        'method\tpath\tsource\tlogin\tstore_hq_scope_evidence\tstaff_permission\tread_only\tcalled_authorization_helpers\n' + lines.join('\n') + '\n');
+    }
+  }, 120_000);
+
+  it('S07 all reads and exports reject a staff member with no feature permission', async () => {
+    const routes = [...new Map(app.routes.filter(route =>
+      route.method === 'GET' && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
+      && !isStaffSelfRouteTemplate(route.method, route.path) && !isStaffExplicitAllow(route.method, route.path)
+      && !route.path.startsWith('/api/ops/') && route.path !== '/api/auth/two-factor/policy'
+    ).map(route => [`${route.method} ${route.path}`, route])).values()];
+    expect(routes.length).toBeGreaterThan(100);
+    for (const [index, route] of routes.entries()) {
+      const path = route.path.replace(/:[^/]+/g, 'coverage-target');
+      const response = await app.request(path, { headers: {
+        Authorization: `Bearer ${String(index + 50_000).padStart(16, '0')}`,
+        'CF-Connecting-IP': `s07-read-permission-${index}`,
+      } }, { DB: {} } as never);
+      expect(response.status, `${route.method} ${route.path}: no read permission`).toBe(403);
+    }
+  });
+
+  it('S07 全管理APIの読取・書出し・更新で未ログインと別アカウント指定を拒否する', async () => {
+    const routes = [...new Map(app.routes.filter(route =>
+      ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method)
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
+    ).map(route => [`${route.method} ${route.path}`, route])).values()];
+    expect(routes.length).toBeGreaterThan(100);
+    let index = 10_000;
+    const matrixDb = createTestD1({ foreignKeys: false });
+    try {
+    for (const route of routes) {
+      const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
+      const env = { DB: matrixDb.db };
+      const unauthenticated = await app.request(path, { method: route.method,
+        headers: { 'CF-Connecting-IP': `s07-unauth-${++index}` } }, env as never);
+      expect(unauthenticated.status, `${route.method} ${route.path}: unauthenticated`).toBe(401);
+      for (const role of ['owner', 'admin', 'staff'] as const) {
+        authState.role = role;
+        authState.readOnly = false;
+        const denied = await app.request(`${path}?accountId=foreign-account`, { method: route.method,
+          headers: { Authorization: `Bearer ${String(++index).padStart(16, '0')}`,
+            'CF-Connecting-IP': `s07-${index}` } }, env as never);
+        expect(denied.status, `${route.method} ${route.path}: ${role} outside account`).toBe(403);
+      }
+    }
+    if (process.env.SECURITY_MATRIX_REPORT) {
+      writeFileSync(process.env.SECURITY_MATRIX_REPORT,
+        'method\tpath\tunauthenticated\towner_foreign_account_query\tadmin_foreign_account_query\tstaff_foreign_account_query\n'
+        + routes.map(route => `${route.method}\t${route.path}\t401\t403\t403\t403`).join('\n') + '\n');
+    }
+    } finally { matrixDb.raw.close(); authState.role = 'staff'; }
+  }, 120_000);
+
   it('同じファイルの保護済みルートが未保護ルートを隠さない', () => {
     const source = `import { requireRole } from '../middleware/role-guard.js';
       router.post('/api/mixed/protected', requireRole('owner'), async c => c.json({ok:true}));
@@ -267,6 +397,10 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/hq/billing/preview',
     'GET /api/hq/billing/summary',
     'GET /api/hq/operator-history',
+    'GET /api/hq/store-comparison',
+    'GET /api/hq/store-comparison/:accountId',
+    'GET /api/hq/store-comparison/exports/:id',
+    'GET /api/hq/store-comparison/exports/:id/download',
     'GET /api/hq/style-attention',
     'GET /api/hq/style-starter-sets',
     'GET /api/hq/style-template-samples',
@@ -313,6 +447,9 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/login-audit',
     'GET /api/manual-links',
     'GET /api/manual-links/lookup',
+    // Store comparison and MCP management remain owner/admin only.
+    'GET /api/mcp-connections',
+    'GET /api/mcp-connections/logs',
     'GET /api/notifications',
     'GET /api/notifications/center',
     'GET /api/notifications/operator-deliveries.csv',
@@ -327,6 +464,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/operations/health',
     'GET /api/operations/history',
     'GET /api/operations/incidents/:id',
+    'GET /api/operations/security-alerts',
     'GET /api/operations/send-paths',
     'GET /api/ops/announcements',
     'GET /api/ops/audit',
@@ -338,6 +476,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/ops/me',
     'GET /api/ops/members',
     'GET /api/ops/notice-line-account',
+    'GET /api/ops/security-alerts',
     'GET /api/ops/support/summary',
     'GET /api/ops/support/tickets',
     'GET /api/ops/support/tickets/:id',
@@ -439,6 +578,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/hq/banners/projects/:id/uploads',
     'POST /api/hq/billing/checkout',
     'POST /api/hq/billing/portal',
+    'POST /api/hq/store-comparison/export',
     'POST /api/hq/support/requests',
     'POST /api/hq/support/requests/:id/messages',
     'POST /api/hq/templates',
@@ -483,6 +623,7 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/line-webhook-events/:id/retry',
     'POST /api/links/wrap',
     'POST /api/manual-links/check',
+    'POST /api/mcp-connections',
     'POST /api/notifications/center/:id/read',
     'POST /api/notifications/center/read-all',
     'POST /api/notifications/operator-events',
@@ -497,6 +638,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/operations/incidents',
     'POST /api/operations/incidents/:id/restore',
     'POST /api/operations/incidents/:id/restore-preview',
+    'POST /api/operations/security-alerts/:id/acknowledge',
+    'POST /api/operations/security-alerts/:id/resolve',
     'POST /api/ops/announcements',
     'POST /api/ops/announcements/preview',
     'POST /api/ops/billing/sync',
@@ -511,6 +654,9 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/knowledge/tickets/:id/retry',
     'POST /api/ops/members',
     'POST /api/ops/members/:staffId/resend-invite',
+    'POST /api/ops/security-alerts/:id/acknowledge',
+    'POST /api/ops/security-alerts/:id/resolve',
+    'POST /api/ops/security-alerts/run-once',
     'POST /api/ops/support/tickets',
     'POST /api/ops/support/tickets/:id/draft/ai',
     'POST /api/ops/support/tickets/:id/reply',

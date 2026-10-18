@@ -165,13 +165,13 @@ export default function ListToolbar({
 }
 
 /** 検索の送信・保存条件などを持つ一覧でも、段の見た目を画面に持たせない。 */
-export function ListToolbarFrame({ children, layout = 'band', ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked' }) {
+export function ListToolbarFrame({ children, layout = 'band', singleRow = false, ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked'; /** 狭い板でも道具を 1 行に並べる（検索は縮み、折り返さない）。既定は狭い板で 2 段。 */ singleRow?: boolean }) {
   const ref = useToolbarFit()
   const { leading, persistent } = useContext(LeadingContext)
   const containsToolbar = (nodes: ReactNode): boolean => Children.toArray(nodes).some(node => isValidElement<{ children?: ReactNode }>(node)
     && (node.type === ListToolbar || node.props.children && containsToolbar(node.props.children)))
   const ownsLeading = !containsToolbar(children)
-  return <FrameContext.Provider value><div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'}>
+  return <FrameContext.Provider value><div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'} data-toolbar-single-row={singleRow || undefined}>
     {ownsLeading && leading ? <span className={styles.leading} data-toolbar-leading data-toolbar-persistent={persistent || undefined}>{leading}</span> : null}
     {ownsLeading ? <span className={styles.rowBreak} aria-hidden="true" /> : null}{children}
   </div></FrameContext.Provider>

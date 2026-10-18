@@ -183,6 +183,7 @@ async function request(path: string, init?: { method?: string; apiKey?: string; 
     headers: {
       ...(init?.apiKey ? { Authorization: `Bearer ${init.apiKey}` } : {}),
       ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.method === 'PATCH' ? { 'If-Match': '1' } : {}),
     },
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   }, environment());

@@ -1,3 +1,4 @@
+import { stableUuid } from './mileage-delivery-key.js';
 import {
   accountFeatureOffExclusionSql,
   claimRedemptionStep,
@@ -60,16 +61,6 @@ function parseActions(raw: string | null): ActionDefinition[] {
       onFailure: action.onFailure === 'continue' ? 'continue' : 'stop',
     };
   });
-}
-
-async function stableUuid(value: string): Promise<string> {
-  const digest = new Uint8Array(
-    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)),
-  ).slice(0, 16);
-  digest[6] = (digest[6] & 0x0f) | 0x40;
-  digest[8] = (digest[8] & 0x3f) | 0x80;
-  const hex = [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function publicFailure(error: unknown): { code: string; message: string; retryable: boolean } {
@@ -294,6 +285,7 @@ export async function deliverMileageReward(
       const actions = parseActions(plan.actionConfig);
       if (!actions.length) throw new Error('交換後の動きがありません');
       const executors = createAutomationActionExecutors({
+        webhookDeliveryMode: 'immediate',
         credentialEncryptionKey: options.credentialEncryptionKey,
         fetch: options.fetch,
         now: options.now,

@@ -127,6 +127,7 @@ else
   NEXT_PUBLIC_API_URL="$STAGING_API_URL" \
     NEXT_PUBLIC_TURNSTILE_SITE_KEY="${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}" \
     NEXT_PUBLIC_RESTAURANT_TEST_ENABLED="true" \
+    NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED="true" \
     pnpm --filter web build
   if [ "$APPLY" -eq 1 ]; then
     # `pages deploy` は wrangler.staging.toml を読まないため、Worker と違って

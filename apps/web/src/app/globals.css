@@ -1089,7 +1089,7 @@
   --tpl-htn-radius-m: var(--polish-radius-control); --tpl-htn-radius-l: var(--polish-radius-card); --tpl-htn-radius-pill: var(--polish-radius-pill); --tpl-htn-line-2: 2px; --tpl-htn-soft-bg: #fafafc;
   --tpl-htn-text-11: 11px; --tpl-htn-text-12: 12px; --tpl-htn-text-13: 13px; --tpl-htn-text-14: 14px; --tpl-htn-lh-16: 16px; --tpl-htn-lh-17: 17px; --tpl-htn-lh-18: 18px; --tpl-htn-lh-19: 19px; --tpl-htn-lh-20: 20px; --tpl-htn-lh-21: 21px;
   --tpl-htn-panel-pad: var(--polish-space-section); --tpl-htn-panel-gap: 12px; --tpl-htn-aside-w: 340px; --tpl-htn-aside-pad: var(--polish-space-card); --tpl-htn-aside-gap: 10px; --tpl-htn-note-pad: 14px;
-  --tpl-htn-radio-gap: 24px; --tpl-htn-ring: inset 0 0 0 1px var(--color-hairline); --tpl-htn-ring-control: inset 0 0 0 1px var(--color-control-border); --tpl-htn-ring-accent: inset 0 0 0 2px var(--color-accent-deep); --tpl-htn-ring-focus: inset 0 0 0 2px var(--color-focus-ring); --tpl-htn-line-top: inset 0 1px 0 var(--color-hairline); --tpl-htn-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-htn-input-h: 36px; --tpl-htn-input-pad: 0 12px;
+  --tpl-htn-radio-gap: 24px; --tpl-htn-ring: inset 0 0 0 1px var(--color-hairline); --tpl-htn-ring-control: inset 0 0 0 1px var(--color-control-border); --tpl-htn-ring-accent: inset 0 0 0 2px var(--color-accent-deep); --tpl-htn-ring-focus: inset 0 0 0 2px var(--color-focus-ring); --tpl-htn-ring-danger: inset 0 0 0 1px var(--color-danger); --tpl-htn-ring-info: inset 0 0 0 1px var(--color-accent-deep); --tpl-htn-line-top: inset 0 1px 0 var(--color-hairline); --tpl-htn-line-bottom: inset 0 -1px 0 var(--color-hairline); --tpl-htn-input-h: 36px; --tpl-htn-input-pad: 0 12px;
   --tpl-htn-chip-pad: 0 10px; --tpl-htn-chip-gap: 6px; --tpl-htn-tag-input-w: 320px; --tpl-htn-info-pad: 10px 12px; --tpl-htn-endpoint-pad: 8px 10px; --tpl-htn-basic-pad-bottom: 44px;
   --tpl-htn-check-row-h: var(--polish-table-row); --tpl-htn-check-pad: 0 16px; --tpl-htn-import-pad: 16px 16px 12px; --tpl-htn-import-gap: 2px; --tpl-htn-done-gap: 14px; --tpl-htn-progress-h: 6px;
   --tpl-htn-footer-pad: 14px 0 0; --tpl-htn-result-gap: 12px; --tpl-htn-result-row-h: var(--polish-table-row); --tpl-htn-result-label-w: 168px; --tpl-htn-result-badge-w: 120px; --tpl-htn-ack-pad: 4px 0 0; --tpl-htn-result-pull-top: -14px; --tpl-htn-result-pull-bottom: -15px; --tpl-htn-dialog-footer-pad: 14px 24px;
@@ -1102,7 +1102,15 @@
   --tpl-htn-edit-gap: 20px; --tpl-htn-textarea-h: 72px; --tpl-htn-textarea-pad: 8px 10px; --tpl-htn-seg-gap: 2px; --tpl-htn-seg-pad: 3px; --tpl-htn-seg-item-pad: 5px 14px 6px;
   --tpl-htn-image-gap: 10px; --tpl-htn-image-pad: 10px; --tpl-htn-thumb: 64px; --tpl-htn-thumb-bg: #c8a47a; --tpl-htn-preview-w: 360px; --tpl-htn-preview-card-w: 186px; --tpl-htn-preview-image-h: 100px;
   --tpl-htn-preview-copy-pad: 10px 12px 33px; --tpl-htn-preview-action-pad: 8px 12px; --tpl-htn-line-green: #06c755; --tpl-htn-progress-pad: 18px 16px 12px; --tpl-htn-seg-h: 34px; --tpl-htn-preview-gap: 4px; --tpl-htn-preview-avatar: 28px; --tpl-htn-preview-avatar-gap: 7px; --tpl-htn-rail-pad: 12px; --tpl-htn-list-gap: 14px; --tpl-htn-list-pad: 0 23px 24px 16px; --tpl-htn-list-pad-narrow: 24px; --tpl-htn-top-cell-pad: 10px; --tpl-htn-result-name-w: 200px; --tpl-htn-result-row-pad: 8px 0; --tpl-htn-result-summary-pull: -10px; --tpl-htn-folder-block-gap: 16px; --tpl-htn-dist-progress-h: 8px; --tpl-htn-toolbar-pull: -8px; --tpl-htn-dot-pull: -14px;
-  --tpl-an-notes-pad: 12px 14px; --tpl-an-notes-gap: 6px; --tpl-an-notes-radius: var(--polish-radius-control); --tpl-an-note-dot-gap: 8px; --tpl-an-route-bar-gap: 4px; --tpl-an-track-h: 6px;
+  /* LINE新規追加 v06（p6zMkA・Fqy29・Lwxyh・X0pGdw・Plmq1）。確認の行の回るリング、引き継ぎ中の箱。ひな型の札は共通の StatusBadge が持つ。 */
+  --tpl-htn6-ring: 16px; --tpl-htn6-ring-w: 2px; --tpl-htn6-spin: 0.8s; --tpl-htn6-err-pad: 12px 14px; --tpl-htn6-err-gap: 4px; --tpl-htn6-ack-gap: 12px; --tpl-htn6-ack-note-pad: 26px;
+  --tpl-htn6-qr: 180px; --tpl-htn6-qr-pad: 16px; --tpl-htn6-qr-gap: 12px;
+  --tpl-htn6-text-20: 20px; --tpl-htn6-lh-28: 28px; --tpl-htn6-hero: 48px; --tpl-htn6-done-pad: 24px 0 8px; --tpl-htn6-acct-pad: 14px 16px; --tpl-htn6-hand-pad: 16px; --tpl-htn6-hand-gap: 10px; --tpl-htn6-stat-gap: 16px;
+  /* ①事前確認（p6zMkA）。カードの頭・答えの一覧・いまの質問・このあとの質問・チェック結果。 */
+  --tpl-htn6-pre-head-gap: 8px; --tpl-htn6-pre-group-gap: 12px; --tpl-htn6-pre-row-gap: 6px; --tpl-htn6-pre-row-pad: 8px 12px; --tpl-htn6-pre-mark: 20px; --tpl-htn6-pre-mark-gap: 10px; --tpl-htn6-pre-link-gap: 6px;
+  /* 選択肢の下の案内。白地の案内（SwjOv）と注意（Z0v3c）で地・枠・間が違う。 */
+  --tpl-htn6-pre-note-gap: 10px; --tpl-htn6-pre-note-pad: 12px 14px;
+--tpl-an-notes-pad: 12px 14px; --tpl-an-notes-gap: 6px; --tpl-an-notes-radius: var(--polish-radius-control); --tpl-an-note-dot-gap: 8px; --tpl-an-route-bar-gap: 4px; --tpl-an-track-h: 6px;
   --tpl-an-tab-gap: 14px; --tpl-an-tab-pad: 14px 24px 24px; --tpl-an-toolbar-gap: 8px; --tpl-an-col-gap: 16px; --tpl-an-thead-pad: 9px 16px; --tpl-an-row-pad: 10px 16px; --tpl-an-row-two-h: 55px; --tpl-an-row-one-h: 37px; --tpl-an-cell-gap: 2px; --tpl-an-num-pad-end: 12px; --tpl-an-col-type: 150px;
   --tpl-an-col-58: 58px; --tpl-an-col-70: 70px; --tpl-an-col-80: 80px; --tpl-an-col-88: 88px; --tpl-an-col-100: 100px; --tpl-an-col-116: 116px;
   /* 予約設定・予約台帳の残り（bk2）。板 x1OZS6 ほか：中身が短くても下の帯を板の下に置く（上の帯 60・板の下 12・枠 2）。 */
@@ -3173,3 +3181,8 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 :root { --tpl-rm-review-thumb-w: 165px; --tpl-rm-face-row-h: 38px; --tpl-rm-face-label-lh: 18px; --tpl-rm-face-name-lh: 19px; --tpl-rm-face-summary-lh: 16px; --tpl-ledger-month-lh: normal; --tpl-cv-delete-reason-w: 92px; --tpl-fr-name-content-min: 160px; --tpl-rt-flow-timing-w: 132px; --tpl-rt-flow-row-h: 58px; --tpl-rt-flow-name-lh: 20px; --tpl-rt-flow-note-lh: 18px; --tpl-rm-review-label-lh: 17px; --tpl-rm-review-action-h: 38px; --tpl-rm-review-letter: 22px; }
 
 :root { --tpl-rm-state-pad: 32px 20px; --tpl-rm-head-pad: 20px 24px 16px; }
+
+/* 配置の共通値。画面ごとのリセット・伸縮も同じ値を使う。 */
+:root { --tpl-layout-zero: 0; --tpl-layout-auto: auto; --tpl-layout-full: 100%; --tpl-layout-relaxed: 1.6; }
+
+:root { --tpl-sender-icon: 32px; --tpl-sender-row: 48px; --tpl-sender-tile: 88px; --tpl-sender-icon-text: 13px; --tpl-sender-note-lh: 18px; --tpl-sender-outline: 2px; }

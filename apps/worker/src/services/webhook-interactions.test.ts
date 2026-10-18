@@ -25,8 +25,9 @@ vi.mock('./outgoing-webhook-delivery.js', async (importOriginal) => {
     // 純粋な変換(failureReasonForDelivery / outgoingAttemptOf)は本物を使い、
     // 外部通信・DBだけモックへ差し替える。
     claimOutgoingDelivery: vi.fn(),
-    deliverWebhook: vi.fn(),
+    deliverOnce: vi.fn(),
     findOutgoingDeliveryByKey: vi.fn(),
+    enqueueOutgoingWebhookDelivery: vi.fn(),
     finishOutgoingDelivery: vi.fn(),
     recordDeliveryOutcome: vi.fn(),
     releaseOutgoingDelivery: vi.fn(),
@@ -47,8 +48,9 @@ import {
 } from '@line-crm/db';
 import {
   claimOutgoingDelivery,
-  deliverWebhook,
+  deliverOnce,
   findOutgoingDeliveryByKey,
+  enqueueOutgoingWebhookDelivery,
   finishOutgoingDelivery,
   recordDeliveryOutcome,
   releaseOutgoingDelivery,
@@ -98,6 +100,8 @@ describe('Webhookの安全な送り直し', () => {
     });
     vi.mocked(isOperationCapabilityStopped).mockResolvedValue(false);
     vi.mocked(findOutgoingDeliveryByKey).mockResolvedValue(null);
+    vi.mocked(enqueueOutgoingWebhookDelivery).mockResolvedValue(deliveryRow({status:'pending'}));
+    vi.mocked(claimOutgoingDelivery).mockResolvedValue('lease:test');
     vi.mocked(claimWebhookInteractionRetryAndInsert).mockResolvedValue({ claimed: true, retryId: 'run-2' });
     vi.mocked(getWebhookInteractionById).mockResolvedValue({ ...retryRow, status: 'succeeded', response_status: 200 });
     vi.mocked(finishWebhookInteraction).mockResolvedValue(undefined);
@@ -110,7 +114,7 @@ describe('Webhookの安全な送り直し', () => {
   });
 
   it('初回と同じ配送IDを使い、成功を新しい記録へ残す', async () => {
-    vi.mocked(deliverWebhook).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 });
+    vi.mocked(deliverOnce).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 });
     const db = {} as D1Database;
 
     const result = await retryWebhookInteraction(db, original);
@@ -119,10 +123,10 @@ describe('Webhookの安全な送り直し', () => {
     expect(claimWebhookInteractionRetryAndInsert).toHaveBeenCalledWith(db, original, expect.objectContaining({
       webhookId: 'wh-1', idempotencyKey: 'delivery-1', requestBodyJson: original.request_body_json,
     }));
-    expect(deliverWebhook).toHaveBeenCalledWith(
+    expect(deliverOnce).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'wh-1' }),
       original.request_body_json,
-      { idempotencyKey: 'delivery-1' },
+      { idempotencyKey: 'delivery-1',credentialKeys:undefined },
     );
     expect(finishWebhookInteraction).toHaveBeenCalledWith(db, 'run-2', 'account-a', expect.objectContaining({
       status: 'succeeded', responseStatus: 200,
@@ -136,18 +140,18 @@ describe('Webhookの安全な送り直し', () => {
   it('別アカウントのWebhook IDを使っても見つからなければ送らない', async () => {
     vi.mocked(getOutgoingWebhookById).mockResolvedValue(null);
     await expect(retryWebhookInteraction({} as D1Database, original)).rejects.toThrow('webhook_not_found');
-    expect(deliverWebhook).not.toHaveBeenCalled();
+    expect(deliverOnce).not.toHaveBeenCalled();
     expect(claimWebhookInteractionRetryAndInsert).not.toHaveBeenCalled();
   });
 
   it('同じ失敗を二重に確保できなければ送らない', async () => {
     vi.mocked(claimWebhookInteractionRetryAndInsert).mockResolvedValue({ claimed: false, retryId: 'run-2' });
     await expect(retryWebhookInteraction({} as D1Database, original)).rejects.toThrow('already_retried');
-    expect(deliverWebhook).not.toHaveBeenCalled();
+    expect(deliverOnce).not.toHaveBeenCalled();
   });
 
   it('再送記録が残らなかった場合だけ元の失敗を再試行可能へ戻す', async () => {
-    vi.mocked(deliverWebhook).mockRejectedValue(new Error('database unavailable'));
+    vi.mocked(deliverOnce).mockRejectedValue(new Error('database unavailable'));
     vi.mocked(getWebhookInteractionById).mockResolvedValue(null);
     await expect(retryWebhookInteraction({} as D1Database, original)).rejects.toThrow('database unavailable');
     expect(restoreWebhookInteractionFailure).toHaveBeenCalledWith(expect.anything(), 'run-1', 'account-a');
@@ -160,13 +164,13 @@ describe('Webhookの安全な送り直し', () => {
       consecutive_failures: 0, last_failed_at: null, line_account_id: 'account-a',
       created_at: '2026-08-29', updated_at: '2026-08-29',
     });
-    vi.mocked(deliverWebhook).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 });
+    vi.mocked(deliverOnce).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 });
     const db = {} as D1Database;
 
     await retryWebhookInteraction(db, original, 'test-key');
     expect(resolveWebhookSecret).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1' }), 'test-key');
-    // 署名用の復号は deliverWebhook が行う。鍵がそのまま渡ることを固定する。
-    expect(deliverWebhook).toHaveBeenCalledWith(
+    // 署名用の復号は deliverOnce が行う。鍵がそのまま渡ることを固定する。
+    expect(deliverOnce).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'wh-1' }),
       original.request_body_json,
       { idempotencyKey: 'delivery-1', credentialKeys: 'test-key' },
@@ -182,7 +186,7 @@ describe('Webhookの安全な送り直し', () => {
     });
     await expect(retryWebhookInteraction({} as D1Database, original, 'test-key'))
       .rejects.toThrow('webhook_secret_unavailable');
-    expect(deliverWebhook).not.toHaveBeenCalled();
+    expect(deliverOnce).not.toHaveBeenCalled();
     expect(claimWebhookInteractionRetryAndInsert).not.toHaveBeenCalled();
   });
 
@@ -192,7 +196,7 @@ describe('Webhookの安全な送り直し', () => {
     vi.mocked(findOutgoingDeliveryByKey).mockResolvedValue(deliveryRow({ status: 'delivered' }));
     await expect(retryWebhookInteraction({} as D1Database, original)).rejects.toThrow('already_delivered');
     expect(claimOutgoingDelivery).not.toHaveBeenCalled();
-    expect(deliverWebhook).not.toHaveBeenCalled();
+    expect(deliverOnce).not.toHaveBeenCalled();
     expect(claimWebhookInteractionRetryAndInsert).not.toHaveBeenCalled();
   });
 
@@ -200,7 +204,7 @@ describe('Webhookの安全な送り直し', () => {
     vi.mocked(findOutgoingDeliveryByKey).mockResolvedValue(deliveryRow());
     vi.mocked(claimOutgoingDelivery).mockResolvedValue(null);
     await expect(retryWebhookInteraction({} as D1Database, original)).rejects.toThrow('auto_retry_scheduled');
-    expect(deliverWebhook).not.toHaveBeenCalled();
+    expect(deliverOnce).not.toHaveBeenCalled();
     expect(claimWebhookInteractionRetryAndInsert).not.toHaveBeenCalled();
   });
 
@@ -208,7 +212,7 @@ describe('Webhookの安全な送り直し', () => {
     const delivery = deliveryRow();
     vi.mocked(findOutgoingDeliveryByKey).mockResolvedValue(delivery);
     vi.mocked(claimOutgoingDelivery).mockResolvedValue('lease-1');
-    vi.mocked(deliverWebhook).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 });
+    vi.mocked(deliverOnce).mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 });
 
     await retryWebhookInteraction({} as D1Database, original);
 
@@ -223,7 +227,7 @@ describe('Webhookの安全な送り直し', () => {
     const delivery = deliveryRow();
     vi.mocked(findOutgoingDeliveryByKey).mockResolvedValue(delivery);
     vi.mocked(claimOutgoingDelivery).mockResolvedValue('lease-1');
-    vi.mocked(deliverWebhook).mockResolvedValue({ ok: false, attempts: 1, lastStatus: 503 });
+    vi.mocked(deliverOnce).mockResolvedValue({ ok: false, attempts: 1, lastStatus: 503 });
 
     await retryWebhookInteraction({} as D1Database, original);
 
@@ -245,7 +249,7 @@ describe('Webhookの安全な送り直し', () => {
 
     await expect(retryWebhookInteraction({} as D1Database, original)).rejects.toThrow('emergency_stopped');
 
-    expect(deliverWebhook).not.toHaveBeenCalled();
+    expect(deliverOnce).not.toHaveBeenCalled();
     // 作ったばかりの再送記録を消し、元の記録を失敗へ戻し、台帳のleaseも外す。
     expect(deletePendingWebhookInteraction).toHaveBeenCalledWith(expect.anything(), 'run-2', 'account-a');
     expect(restoreWebhookInteractionFailure).toHaveBeenCalledWith(expect.anything(), 'run-1', 'account-a');

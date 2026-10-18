@@ -181,17 +181,19 @@ export async function evaluateApprovalGate(
   db: D1Database,
   broadcast: Broadcast,
 ): Promise<ApprovalGate> {
+  const context=await db.prepare('SELECT execution_mode,created_via FROM broadcast_execution_contexts WHERE broadcast_id=?').bind(broadcast.id).first<{execution_mode:string;created_via:string}>();
+  const simulation=context?.execution_mode==='simulation';
   const [recipientCount, threshold, operatorCount] = await Promise.all([
-    countApprovalRecipients(db, broadcast),
+    simulation?import('./broadcast-simulation.js').then(m=>m.simulationPreview(db,broadcast.id)).then(p=>p.recipients):countApprovalRecipients(db, broadcast),
     getBroadcastApprovalThreshold(db, broadcast),
     countActiveOperators(db),
   ]);
   return {
     recipientCount,
     threshold,
-    required: recipientCount >= threshold,
+    required: simulation&&context.created_via==='mcp'||recipientCount >= threshold,
     // 数えられなかったとき（0人）は1人運用扱いにしない。二者承認も要らない。
-    singleOperator: operatorCount <= 1,
+    singleOperator: !(simulation&&context.created_via==='mcp')&&operatorCount <= 1,
     operatorCount,
   };
 }

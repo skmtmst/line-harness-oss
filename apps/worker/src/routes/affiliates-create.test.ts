@@ -340,14 +340,21 @@ describe('GET /api/affiliates/:id/links — offer_name enrichment', () => {
 });
 
 describe('紹介者APIの所属境界', () => {
-  it('一覧取得へテナントとLINEアカウントの範囲を渡す', async () => {
+  it('複数の店を見られても選んだ店だけを取得し、未割当も含めない', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([{ id: ACCOUNT_ID, tenant_id: TENANT_ID }, { id: 'account-2', tenant_id: TENANT_ID }]);
     dbMocks.getAffiliates.mockResolvedValue([]);
     expect((await get('/api/affiliates')).status).toBe(200);
     expect(dbMocks.getAffiliates).toHaveBeenCalledWith(env.DB, {
       tenantId: TENANT_ID,
       allowedLineAccountIds: [ACCOUNT_ID],
-      includeUnassigned: true,
+      includeUnassigned: false,
     });
+  });
+
+  it('選択なしでは一覧を読み出さない', async () => {
+    const response = await worker.fetch(new Request('https://worker.example.com/api/affiliates', { headers: { Authorization: `Bearer ${API_KEY}` } }), env, { waitUntil() {} } as unknown as ExecutionContext);
+    expect(response.status).toBe(400);
+    expect(dbMocks.getAffiliates).not.toHaveBeenCalled();
   });
 
   it('所属外IDは詳細・更新・停止・関連情報の全てで404にする', async () => {

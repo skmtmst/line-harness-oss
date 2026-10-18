@@ -41,6 +41,13 @@ export async function evaluateBookingSyncNotices(env:Env['Bindings'],accountId:s
   if(rules.notifyConflicts)for(const conflict of await listBookingConflicts(db,accountId))desired.push({key:`conflict:${conflict.bookingId}:${conflict.otherBookingId}`,staffId:conflict.staffId,
     date:tzDateStr(timeZone,new Date(conflict.startsAt)),kind:'conflict',bookingId:conflict.bookingId,count:2,limit:null,
     message:`${conflict.staffName}さんの予約が重なっています。予約管理で別のスタッフへの変更を確認してください。`});
+  const health=(await db.prepare(`SELECT h.staff_id,h.error_code,s.display_name FROM booking_calendar_read_health h
+    JOIN staff s ON s.id=h.staff_id AND s.line_account_id=h.line_account_id
+    JOIN booking_calendar_switches p ON p.line_account_id=h.line_account_id AND p.scope_id=h.staff_id AND p.read_enabled=1
+    JOIN booking_calendar_switches a ON a.line_account_id=h.line_account_id AND a.scope_id='' AND a.read_enabled=1
+    WHERE h.line_account_id=? AND (h.error_code='calendar_disconnected' OR (h.error_code IS NOT NULL AND julianday(h.failed_since)<=julianday(?)-30.0/1440))`)
+    .bind(accountId,now.toISOString()).all<{staff_id:string;error_code:string;display_name:string}>()).results;
+  for(const h of health)desired.push({key:`calendar-read:${h.staff_id}`,staffId:h.staff_id,date:tzDateStr(timeZone,now),kind:'calendar_disconnected',bookingId:null,count:1,limit:null,message:`${h.display_name}さんのカレンダーを読めません。この人の新しい予約の枠を確認してください。`});
   for(const n of desired) {
     await db.prepare(`INSERT INTO booking_sync_notices(id,line_account_id,notice_key,staff_id,target_date,kind,status,booking_id,booking_count,daily_limit,message)
       VALUES(?,?,?,?,?,?,'open',?,?,?,?) ON CONFLICT(line_account_id,notice_key) DO UPDATE SET

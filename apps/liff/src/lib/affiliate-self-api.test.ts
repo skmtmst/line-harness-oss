@@ -18,6 +18,16 @@ it('GETの本人トークンと欄エラーを失わず渡す', async () => {
     .mockResolvedValueOnce(new Response('{"error":"口座番号を確認してください","fields":{"accountNumber":"数字で入力してください"}}', { status: 400 }));
   vi.stubGlobal('fetch', fetcher);
   expect(await affiliateSelfApi.statements()).toEqual([]);
-  expect(new URL(String(fetcher.mock.calls[0][0])).searchParams.get('lineAccessToken')).toBe('self-token');
+  expect(new URL(String(fetcher.mock.calls[0][0])).search).toBe('');
+  expect(fetcher.mock.calls[0][1].headers.Authorization).toBe('Bearer self-token');
   await expect(affiliateSelfApi.redeem('r1', 'op')).rejects.toMatchObject({ status: 400, fields: { accountNumber: '数字で入力してください' } });
+});
+it('明細URLに認証情報を載せず、別originへの署名URLへ認証情報を送らない', async () => {
+  const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { url: 'https://foreign.example/fixture' } })));
+  vi.stubGlobal('fetch', fetcher);
+  await expect(affiliateSelfApi.download('statement-1')).rejects.toThrow('取得用URLが無効');
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  const [url, init] = fetcher.mock.calls[0];
+  expect(new URL(String(url)).searchParams.has('lineAccessToken')).toBe(false);
+  expect(init.headers.Authorization).toBe('Bearer self-token');
 });

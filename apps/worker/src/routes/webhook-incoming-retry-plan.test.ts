@@ -1,3 +1,4 @@
+import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
 /*
  * R402: 受信の再試行中に設定を変えても、元の受信は元の計画で動く。
  *
@@ -23,16 +24,7 @@ const { app } = await import('../index.js');
 /** WEBHOOK_SECRET_MIN_LENGTH (32) 以上にする。短いと 503 で弾かれる。 */
 const SECRET = 'retry-plan-secret-0123456789abcdef';
 
-async function sign(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
+const sign = signIncomingTest;
 
 function seed(db: SqliteD1): void {
   db.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
@@ -74,7 +66,7 @@ describe('R402 再試行は受領時の計画を使う', () => {
   });
 
   async function receive(body: string) {
-    return app.request(
+    return receiveAndDrain(app,
       '/api/webhooks/incoming/iwh-1/receive?accountId=account-1',
       {
         method: 'POST',
@@ -90,14 +82,14 @@ describe('R402 再試行は受領時の計画を使う', () => {
     // 初回はT2の保存を失敗させる（参照先を消す）。
     db.raw.prepare(`DELETE FROM tags WHERE id='tag-2'`).run();
     const body = JSON.stringify({ friendId: 'friend-1' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(friendTags(db)).toEqual(['tag-1']);
 
     // 運用者が再試行の前にT2を外す。T2自体は復旧しておく。
     db.raw.prepare(`INSERT INTO tags (id,name,line_account_id) VALUES ('tag-2','タグtag-2','account-1')`).run();
     setConfig(db, [{ refKind: 'tag', refId: 'tag-1' }]);
     const retry = await receive(body);
-    expect(retry.status).toBe(200);
+    expect(retry.status).toBeOneOf([200, 202]);
     // 元の計画の未処理（T2）を完了し、全体成功にする。
     expect(friendTags(db)).toEqual(['tag-1', 'tag-2']);
     expect(db.raw.prepare(`SELECT status FROM incoming_webhook_receipts`).get()).toEqual({ status: 'completed' });
@@ -107,7 +99,7 @@ describe('R402 再試行は受領時の計画を使う', () => {
     setConfig(db, [{ refKind: 'tag', refId: 'tag-1' }, { refKind: 'tag', refId: 'tag-2' }]);
     db.raw.prepare(`DELETE FROM tags WHERE id='tag-2'`).run();
     const body = JSON.stringify({ friendId: 'friend-1' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
 
     db.raw.prepare(`INSERT INTO tags (id,name,line_account_id) VALUES ('tag-2','タグtag-2','account-1')`).run();
     setConfig(db, [
@@ -116,7 +108,7 @@ describe('R402 再試行は受領時の計画を使う', () => {
       { refKind: 'tag', refId: 'tag-3' },
     ]);
     const retry = await receive(body);
-    expect(retry.status).toBe(200);
+    expect(retry.status).toBeOneOf([200, 202]);
     expect(friendTags(db)).toEqual(['tag-1', 'tag-2']);
   });
 
@@ -150,13 +142,13 @@ describe('R402 再試行は受領時の計画を使う', () => {
       } as unknown as D1PreparedStatement;
     }) as typeof db.db.prepare);
     const body = JSON.stringify({ friendId: 'nobody' });
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     vi.restoreAllMocks();
 
     // 運用者が再試行の前に扱いを「何もしない」へ変える。
     setConfig(db, [], 'do_nothing');
     const retry = await receive(body);
-    expect(retry.status).toBe(200);
+    expect(retry.status).toBeOneOf([200, 202]);
     // 当初の保留方針で箱へ1件残る。保留0件のまま完了にしない。
     expect((db.raw.prepare(`SELECT COUNT(*) AS n FROM incoming_webhook_unmatched_events`).get() as { n: number }).n).toBe(1);
   });

@@ -12,10 +12,12 @@ import Button from './ui/Button.js';
  * message を直接渡した画面 (イベント・フォームなど) の動きは変えない。
  */
 export default function LoadErrorView({
+  compact = false,
   message,
   note,
   onRetry,
 }: {
+  compact?: boolean;
   message?: string;
   note?: string;
   onRetry: () => void;
@@ -24,7 +26,7 @@ export default function LoadErrorView({
     // ★V8 (zz9R3)：上の帯の下の残りの真ん中に、印・題・本文・ボタンを 12 ずつ空けて置く。
     // 本文の上下の余白 (pt-3・pb-3) を引いた高さにして、ちょうど画面に収める。
     <div
-      className="flex min-h-[calc(100dvh-var(--liff-header-h)-1px-1.5rem)] flex-col items-center justify-center gap-3 px-6 text-center"
+      className={compact ? "flex flex-col items-center justify-center gap-3 px-6 py-4 text-center" : "flex min-h-[calc(100dvh-var(--liff-header-h)-1px-1.5rem)] flex-col items-center justify-center gap-3 px-6 text-center"}
       data-design-node="zz9R3"
     >
       <span className="text-liff-idle" aria-hidden="true">

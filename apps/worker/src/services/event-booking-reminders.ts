@@ -1,3 +1,4 @@
+import { reverseSourceConversions } from '@line-crm/db';
 // Event booking reminders: schedule + cron processor.
 // Phase 1 mirrors booking-reminders.ts pattern but on event_booking_reminders.
 
@@ -107,6 +108,10 @@ export async function cancelPendingRemindersFor(
     )
     .bind(booking_id)
     .run();
+  const cancelled = await db.prepare(`SELECT line_account_id, friend_id FROM event_bookings WHERE id = ? AND status = 'cancelled'`)
+    .bind(booking_id).first<{ line_account_id: string; friend_id: string }>();
+  if (cancelled) await reverseSourceConversions(db, { lineAccountId: cancelled.line_account_id, sourceType: 'reservation_confirmed', bookingId: booking_id, friendId: cancelled.friend_id });
+
 }
 
 interface DueEventReminderRow {

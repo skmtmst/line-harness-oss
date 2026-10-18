@@ -52,7 +52,7 @@ async function createAs(req: any, J: any, key: string, accountId: string, name =
   return r;
 }
 
-test('N-170 鍵持ちstaffは作成・下書き・更新・公開ができる', async () => {
+test('N-170 鍵持ちstaffは作成・下書き・更新まででき、公開は管理者が行う', async () => {
   const { t, req, J } = setup();
   const created = await createAs(req, J, 'key-staff', 'acc-a');
   expect(created.status).toBe(201);
@@ -68,7 +68,11 @@ test('N-170 鍵持ちstaffは作成・下書き・更新・公開ができる', 
   const pub = await req(`/api/forms/${id}/publish?account_id=acc-a`, 'key-staff', {
     method: 'POST', headers: J, body: JSON.stringify({ expectedContentRevision: 2 }),
   });
-  expect(pub.status).toBe(200);
+  expect(pub.status).toBe(403);
+  const published = await req(`/api/forms/${id}/publish?account_id=acc-a`, 'key-owner', {
+    method: 'POST', headers: J, body: JSON.stringify({ expectedContentRevision: 2 }),
+  });
+  expect(published.status).toBe(200);
   t.raw.close();
 });
 

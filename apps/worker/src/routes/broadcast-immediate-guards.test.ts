@@ -233,3 +233,22 @@ describe('N-062 即時送信の直前再確認', () => {
     expect(rowOf(testDb.raw).status).toBe('sent');
   });
 });
+
+
+describe('B-333 過去日時からの確認なし送信を防ぐ', () => {
+  test.each(['2000-01-01T00:00:00Z', 'not-a-date', ''])('作成・更新は不正な予約日時 %s を保存しない', async (scheduledAt) => {
+    const db = createTestD1(); seedBase(db.raw);
+    const app = setupApp(db);
+    for (const method of ['POST', 'PUT']) {
+      const response = await app.request(method === 'POST' ? '/api/broadcasts' : '/api/broadcasts/bc-1', {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '予約', messageType: 'text', messageContent: '本文', targetType: 'all', lineAccountId: 'acc-1', expectedVersion: 1, scheduledAt }),
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'SCHEDULE_MUST_BE_FUTURE' });
+    }
+    expect(db.raw.prepare('SELECT COUNT(*) AS n FROM broadcasts').get()).toEqual({ n: 1 });
+    expect(rowOf(db.raw)).toEqual({ status: 'draft' });
+    db.raw.close();
+  });
+});

@@ -10,6 +10,7 @@ import { awardActivityMileage } from '../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { listLimit } from './list-pagination.js';
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const stripe = new Hono<Env>();
 
@@ -35,7 +36,9 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
     const friendId = c.req.query('friendId') ?? undefined;
     const eventType = c.req.query('eventType') ?? undefined;
     const limit = listLimit(c.req.query('limit'), 100);
-    const items = await getStripeEvents(c.env.DB, { friendId, eventType, limit });
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const items = await getStripeEvents(c.env.DB, { friendId, eventType, limit,
+      lineAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned });
     return c.json({
       success: true,
       data: items.map((e) => ({

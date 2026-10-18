@@ -1,3 +1,4 @@
+import { safeReceiptUrl } from '../services/booking-payment-history.js';
 import { expireBookingPaymentIfHeld } from './booking-payment-expiration.js';
 export { expireBookingPaymentIfHeld } from './booking-payment-expiration.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -6,16 +7,17 @@ import {
   createBookingPayment,
   getBookingPaymentByBooking,
   getBookingPaymentConfig,
-  markBookingPayment,
   resolveBookingPaymentConfig,
   resolveBookingPaymentForBooking,
   saveBookingPaymentConfig,
   saveBookingPaymentMenuSetting,
+  type BookingPaymentRecord,
   type BookingPaymentMode,
   type BookingPaymentProviderName,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { requireRole } from '../middleware/role-guard.js';
+import { PaymentActionError, linkPaymentBooking, parseRefundInput, refundHistory, simulatePaymentRefund } from '../services/booking-payment-refunds.js';
+import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
   resolveAccountIdFromLiff,
@@ -246,7 +248,12 @@ async function bookingPaymentStatusPayload(
   bookingId: string,
 ) {
   const record = await expireBookingPaymentIfHeld(db, lineAccountId, bookingId);
-  return { payment: record };
+  return { payment: customerPaymentRecord(record) };
+}
+
+function customerPaymentRecord(record: BookingPaymentRecord | null) {
+  return record ? {id:record.id,status:record.status,amount:record.amount,currency:record.currency,
+    hold_until:record.hold_until,refunded_amount:record.refunded_amount ?? 0,receipt_url:safeReceiptUrl(record.receipt_url)} : null;
 }
 
 // POST /api/booking/payments/start — 支払いを始める（担当者用）
@@ -298,7 +305,7 @@ bookingPayments.post('/api/liff/booking/payments/start', inputJsonBoundary(), as
   if (!result.ok) return inputError(c, { error: result.error }, result.status, []);
   const current = await getBookingPaymentByBooking(c.env.DB, accountId, bookingId);
   return c.json(
-    { payment: current, checkoutUrl: result.checkoutUrl },
+    { payment: customerPaymentRecord(current), checkoutUrl: result.checkoutUrl },
     result.created ? 201 : 200,
   );
 });
@@ -341,37 +348,44 @@ bookingPayments.get(
   },
 );
 
-// POST /api/booking/payments/:id/refund — 返金する
-bookingPayments.post(
-  '/api/booking/payments/:id/refund',
-  requireRole('owner', 'admin'),
-  inputJsonBoundary(), async (c) => {
-    const paymentId = c.req.param('id');
-    const record = await c.env.DB.prepare(
-      `SELECT * FROM booking_payments WHERE id = ?`,
-    ).bind(paymentId).first<{
-      id: string; line_account_id: string; status: string;
-      provider: string; provider_payment_id: string | null;
-    }>();
-    if (!record
-      || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [record.line_account_id])) {
-      return c.json({ success: false, error: '対象が見つかりません' }, 404);
-    }
-    if (record.status !== 'paid') {
-      return c.json({ success: false, error: '支払い済みだけ返金できます' }, 409);
-    }
-    const provider = providerFor(c.env, record.provider);
-    if (!provider || !record.provider_payment_id) {
-      return c.json({ success: false, error: 'この支払いは返金できません' }, 409);
-    }
-    const ok = await provider.refund(record.provider_payment_id);
-    if (!ok) return c.json({ success: false, error: '返金できませんでした' }, 502);
-    const updated = await markBookingPayment(c.env.DB, {
-      lineAccountId: record.line_account_id, paymentId: record.id, status: 'refunded',
-    });
-    return c.json({ success: true, data: { payment: updated } });
-  },
-);
+// 支払いを扱う操作は所属と閲覧のみを個別にも確認する。
+async function accessiblePayment(c: import('hono').Context<Env>) {
+  const record = await c.env.DB.prepare('SELECT * FROM booking_payments WHERE id=?')
+    .bind(c.req.param('id')).first<BookingPaymentRecord>();
+  return record && await canAccessAllLineAccounts(c.env.DB,c.get('staff'),[record.line_account_id]) ? record : null;
+}
+bookingPayments.onError((error,c) => {
+  if (error instanceof PaymentActionError) return c.json({success:false,error:error.code,code:error.code},error.status);
+  const missing = /no such (table|column).*?(booking_payment_refunds|booking_payment_booking_links|refunded_amount|actor_label)/.test(String(error));
+  const code = missing ? 'payment_refund_storage_not_ready' : 'payment_action_unavailable';
+  console.error(JSON.stringify({code}));
+  return c.json({success:false,error:code,code}, /\/(refund|refunds|booking)$/.test(c.req.path) ? 503 : 500);
+});
+bookingPayments.post('/api/booking/payments/:id/refund',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary(),async c => {
+  c.header('Cache-Control','no-store');
+  const payment = await accessiblePayment(c);
+  if (!payment) return c.json({success:false,error:'not_found'},404);
+  const input = parseRefundInput(await c.req.json().catch(()=>null));
+  if (!input) return inputError(c,{success:false,error:'invalid_refund'},400,['amount','reason','notifyLine','idempotencyKey']);
+  return c.json({success:true,data:await simulatePaymentRefund(c.env.DB,payment,input,c.get('staff'))});
+});
+bookingPayments.get('/api/booking/payments/:id/refunds',requireRole('owner','admin','staff'),async c => {
+  c.header('Cache-Control','no-store');
+  const payment = await accessiblePayment(c);
+  if (!payment) return c.json({success:false,error:'not_found'},404);
+  return c.json({success:true,data:{items:await refundHistory(c.env.DB,payment.line_account_id,payment.id)}});
+});
+bookingPayments.post('/api/booking/payments/:id/booking',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary(),async c => {
+  c.header('Cache-Control','no-store');
+  const payment = await accessiblePayment(c);
+  if (!payment) return c.json({success:false,error:'not_found'},404);
+  const body = await c.req.json<{bookingId?:unknown;reason?:unknown}>().catch(()=>null);
+  if (typeof body?.bookingId!=='string' || !body.bookingId || body.bookingId.length>200
+    || typeof body?.reason!=='string' || !body.reason.trim() || body.reason.trim().length>500) {
+    return inputError(c,{success:false,error:'invalid_payment_link'},400,['bookingId','reason']);
+  }
+  return c.json({success:true,data:await linkPaymentBooking(c.env.DB,payment,body.bookingId,body.reason.trim(),c.get('staff'))});
+});
 
 // POST /api/booking/payments/webhook/:provider — 支払い済みの知らせ
 bookingPayments.post(

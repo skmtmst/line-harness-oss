@@ -1,3 +1,4 @@
+import { seedCleanPhotoScans } from '../test-utils/photo-scans.js';
 /*
  * #666 N-004: 写真一覧の口を実D1（bootstrap.sql を流した SQLite）で固定する。
  *
@@ -64,6 +65,7 @@ function seed(raw: Database.Database): void {
   // 別アカウントの写真。ページングで混ざってはいけない。
   insert.run('photo-other', 'friend-b', 'pet-b', 'k/other', 'legacy-other',
     '2026-12-31T00:00:00.000', '2026-12-31T00:00:00.000', 'account-b', 'https://cdn.test/other.jpg');
+  seedCleanPhotoScans(raw);
 }
 
 function harness(database: D1Database) {

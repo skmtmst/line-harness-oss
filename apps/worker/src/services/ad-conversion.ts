@@ -1,3 +1,8 @@
+import { refFromOutboxSnapshot } from './ad-conversion-snapshot.js';
+class AdConversionHttpError extends Error {
+  constructor(public readonly status: number, message: string) { super(message); }
+}
+
 /**
  * 広告CV送信サービス
  *
@@ -81,38 +86,6 @@ async function clickSnapshotForPlatform(
     consentAt: selection.consentAt,
     context: { ipAddress: selection.ipAddress, userAgent: selection.userAgent },
     reason: selection.status,
-  };
-}
-
-function refFromOutboxSnapshot(row: AdConversionOutboxRow): RefTracking | null {
-  if (row.selection_reason !== 'eligible'
-    || !row.ref_tracking_id || !row.click_id || !row.click_id_type
-    || !row.click_recorded_at || !row.click_expires_at || !row.click_consent_at) return null;
-  let context: { ipAddress?: string | null; userAgent?: string | null } = {};
-  try {
-    context = row.click_context_json ? JSON.parse(row.click_context_json) as typeof context : {};
-  } catch {
-    return null;
-  }
-  const clicks = {
-    fbclid: null, gclid: null, twclid: null, ttclid: null,
-    [row.click_id_type]: row.click_id,
-  } as Pick<RefTracking, 'fbclid' | 'gclid' | 'twclid' | 'ttclid'>;
-  return {
-    id: row.ref_tracking_id,
-    ref_code: '',
-    friend_id: row.friend_id,
-    entry_route_id: null,
-    source_url: null,
-    ...clicks,
-    utm_source: null,
-    utm_medium: null,
-    utm_campaign: null,
-    user_agent: context.userAgent ?? null,
-    ip_address: context.ipAddress ?? null,
-    line_account_id: row.line_account_id,
-    ad_conversion_consent_at: row.click_consent_at,
-    created_at: row.click_recorded_at,
   };
 }
 
@@ -204,6 +177,13 @@ export async function sendAdConversions(
     // 旧行の平文は鍵なしでそのまま送る。
     const fullConfig = await resolveAdPlatformConfig(platform, opts?.credentialKey);
     if (!fullConfig) continue;
+    const priorOutbox = await getAdConversionOutboxById(db, outboxId);
+    if (priorOutbox && priorOutbox.currency !== toCurrencyCode(opts?.currency)) {
+      await db.prepare(`UPDATE ad_conversion_logs SET status = 'needs-review', error_message = 'idempotency key content mismatch'
+        WHERE ad_platform_id = ? AND friend_id = ? AND event_name = ? AND idempotency_key = ?`)
+        .bind(platform.id, friendId, eventName, idempotencyKey).run();
+      continue;
+    }
     const outboxLease = await takeAdConversionOutboxRow(db, outboxId);
     if (!outboxLease) continue; // 他が送り中・送り済み
     const outboxRow = await getAdConversionOutboxById(db, outboxId);
@@ -295,9 +275,9 @@ async function attemptPlatformSend(
       if (!(settleError instanceof AdConversionLeaseError)) throw settleError;
     }
   };
-  const markDone = async (status: 'sent' | 'failed', errorMessage?: string): Promise<void> => {
+  const markDone = async (status: 'sent' | 'failed', errorMessage?: string, retryable = true): Promise<void> => {
     await settle(status, errorMessage);
-    await finishOutbox(status, errorMessage);
+    await finishOutbox(status, errorMessage, retryable);
   };
 
   try {
@@ -321,7 +301,7 @@ async function attemptPlatformSend(
     await markDone('sent');
     return 'sent';
   } catch (error) {
-    await markDone('failed', String(error));
+    await markDone('failed', String(error), error instanceof AdConversionHttpError ? error.status === 429 || error.status >= 500 : error instanceof TypeError || (error instanceof Error && (['AbortError', 'TimeoutError'].includes(error.name) || /fetch failed|network|connection|timed? ?out|timeout/i.test(error.message))));
     return 'failed';
   }
 }
@@ -418,13 +398,14 @@ async function sendMetaConversion(
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Meta CAPI error: ${response.status} ${errorBody}`);
+    throw new AdConversionHttpError(response.status, `Meta CAPI error: ${response.status} ${errorBody}`);
   }
 }
 
@@ -521,6 +502,7 @@ async function sendXConversion(
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
       'Authorization': authorization,
@@ -530,7 +512,7 @@ async function sendXConversion(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`X Conversion API error: ${response.status} ${errorBody}`);
+    throw new AdConversionHttpError(response.status, `X Conversion API error: ${response.status} ${errorBody}`);
   }
 }
 
@@ -569,6 +551,7 @@ async function sendGoogleConversion(
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${config.oauth_token}`,
@@ -579,7 +562,7 @@ async function sendGoogleConversion(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`Google Ads API error: ${response.status} ${errorBody}`);
+    throw new AdConversionHttpError(response.status, `Google Ads API error: ${response.status} ${errorBody}`);
   }
   // HTTP 200 でも conversions 単位の失敗が partialFailureError に入る。見落とさない。
   let payload: unknown = null;
@@ -624,6 +607,7 @@ async function sendTikTokConversion(
 
   const response = await fetch(url, {
     method: 'POST',
+    signal: AbortSignal.timeout(15_000),
     headers: {
       'Content-Type': 'application/json',
       'Access-Token': config.access_token || '',
@@ -633,7 +617,7 @@ async function sendTikTokConversion(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    throw new Error(`TikTok Events API error: ${response.status} ${errorBody}`);
+    throw new AdConversionHttpError(response.status, `TikTok Events API error: ${response.status} ${errorBody}`);
   }
 }
 

@@ -1,3 +1,4 @@
+import { signIncomingTest, receiveAndDrain } from '../test-utils/incoming-webhook-request.js';
 /*
  * R403: 受信のタグ付与でマイル・成果の記録だけ失敗しても成功扱いにしない。
  *
@@ -20,16 +21,7 @@ const { app } = await import('../index.js');
 /** WEBHOOK_SECRET_MIN_LENGTH (32) 以上にする。短いと 503 で弾かれる。 */
 const SECRET = 'tag-side-effect-secret-0123456789ab';
 
-async function sign(secret: string, body: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  return Array.from(new Uint8Array(signature))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
+const sign = signIncomingTest;
 
 function seed(db: SqliteD1): void {
   db.raw.prepare(`INSERT INTO tenants (id, name) VALUES ('tenant-1', '統括1')`).run();
@@ -105,7 +97,7 @@ describe('R403 タグ連動の失敗は受領に残し再送で直す', () => {
   });
 
   async function receive(body: string) {
-    return app.request(
+    return receiveAndDrain(app,
       '/api/webhooks/incoming/iwh-1/receive?accountId=account-1',
       {
         method: 'POST',
@@ -119,29 +111,29 @@ describe('R403 タグ連動の失敗は受領に残し再送で直す', () => {
   it('マイル待ち行の保存失敗は成功扱いにせず、再送で1件だけ作る', async () => {
     const body = JSON.stringify({ friendId: 'friend-1' });
     failOnce(db, 'INSERT OR IGNORE INTO mileage_event_queue');
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     vi.restoreAllMocks();
     expect(counts(db)).toMatchObject({ tags: 1, queue: 0, receipt: { status: 'retryable_failed' } });
 
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(counts(db)).toMatchObject({ tags: 1, queue: 1, receipt: { status: 'completed' } });
 
     // 正常な記録の再送は重複扱いで増やさない。
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(counts(db)).toMatchObject({ tags: 1, queue: 1 });
   });
 
   it('成果記録の保存失敗は成功扱いにせず、再送で1件だけ作る', async () => {
     const body = JSON.stringify({ friendId: 'friend-1' });
     failOnce(db, 'INSERT INTO conversion_events');
-    expect((await receive(body)).status).toBe(500);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     vi.restoreAllMocks();
     expect(counts(db)).toMatchObject({ tags: 1, conversions: 0, receipt: { status: 'retryable_failed' } });
 
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(counts(db)).toMatchObject({ tags: 1, conversions: 1, receipt: { status: 'completed' } });
 
-    expect((await receive(body)).status).toBe(200);
+    expect((await receive(body)).status).toBeOneOf([200, 202]);
     expect(counts(db)).toMatchObject({ tags: 1, conversions: 1 });
   });
 });

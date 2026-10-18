@@ -114,7 +114,7 @@ describe('V8 の形', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'トリミング' }));
     fireEvent.click(screen.getByRole('button', { name: '次へ' }));
     expect(await screen.findByText('2 / 2 ページ')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '← 前のページへ' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '戻る' })).toBeTruthy();
   });
 });
 

@@ -978,7 +978,7 @@ export async function getAffiliateStatementDownload(
   const row = await db.prepare(
     `SELECT * FROM affiliate_statements
       WHERE id = ? AND organization_id = ? AND line_account_id = ? AND affiliate_id = ?
-        AND status = 'generated' AND (expires_at IS NULL OR expires_at > ?)`,
+        AND status = 'generated' AND expires_at IS NOT NULL AND expires_at > ?`,
   ).bind(
     input.statementId, input.tenantId, input.lineAccountId, input.affiliateId,
     input.now ?? new Date().toISOString(),

@@ -55,7 +55,7 @@ describe('友だちV8の画面契約', () => {
     expect(PAGE).toContain("{ value: '', label: 'すべて' }")
     expect(PAGE).toContain('注目のみ')
     expect(PAGE).toContain('boardId="x6QsVz"')
-    expect(ADVANCED).toContain('z-[100]')
+    // overlayの役割・Escape・入れ子の順序は advanced-search-dialog-focus.test.tsx で実際に操作して確認する。
     expect(ADVANCED).toContain('現在の条件に一致')
     expect(ADVANCED).toContain('いずれか1つ以上満たす条件')
     expect(ADVANCED).toContain('条件を保存')

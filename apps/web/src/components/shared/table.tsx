@@ -35,6 +35,7 @@ export function Th({
   showActionLabel = false,
   collapseAt,
   grow,
+  weight,
   inset,
   columnKind,
   ...cellProps
@@ -51,7 +52,7 @@ export function Th({
   const actionHeading = children === '操作' && !showActionLabel
   const heading = helpLabel ?? (typeof children === 'string' ? children : 'この項目')
   return (
-    <th className={classes} data-align={align} data-column-kind={columnKind} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset ? { paddingInlineStart: inset } : undefined} {...cellProps}>
+    <th className={classes} data-align={align} data-column-kind={columnKind} scope={scope} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} style={inset || weight ? { ...(inset ? { paddingInlineStart: inset } : {}), ...(weight ? { '--cell-weight': weight } : {}) } as CSSProperties : undefined} data-cell-weight={weight} {...cellProps}>
       {actionHeading ? <span className="sr-only">操作</span> : truncate ? typeof children === 'string' ? <TruncatedText className={styles.truncated} value={children} /> : <span className={styles.truncated}>{children}</span> : children}
       {hasHelp ? (
         <HelpTip label={`${heading}の説明`}>
@@ -106,9 +107,12 @@ export function DataTable({
   'aria-label': ariaLabel,
   grid,
   columnSizing,
+  columnWeights,
 }: {
   children: ReactNode
   className?: string
+  /** 列の幅の割合（1,2.2,…）。均等割りにせず、条件のような長い列に幅を取る。列の数と同じだけ渡す。 */
+  columnWeights?: readonly number[]
   'data-design'?: string
   /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
   cellPresentation?: 'friends'
@@ -154,7 +158,7 @@ export function DataTable({
         '--table-head-padding': grid.headPadding,
         '--table-head-text-size': grid.headTextSize ?? 'var(--tpl-sb-tbl-head)',
         '--table-body-text-size': grid.bodyTextSize ?? 'var(--tpl-sb-tbl-head)',
-      } as CSSProperties : undefined}>{children}</table>
+      } as CSSProperties : undefined}>{columnWeights?.length ? <colgroup>{columnWeights.map((weight, index) => <col key={index} style={{ width: `${(weight / columnWeights.reduce((sum, value) => sum + value, 0)) * 100}%` }} />)}</colgroup> : null}{children}</table>
     </div>
   )
 }
@@ -240,12 +244,14 @@ export type TdProps = Omit<TdHTMLAttributes<HTMLTableCellElement>, 'align' | 'ch
   className?: string
   collapseAt?: 'narrow'
   grow?: boolean
+  /** 余った幅の割合（grow の列どうしの比）。 */
   presentation?: 'friend-list' | 'template-plain'
   columnKind?: 'check' | 'star' | 'menu'
+  weight?: number
 }
 
 /** 標準一覧の本文セル。 */
-export function Td({ children, align = 'left', className, collapseAt, grow, presentation, columnKind, ...cellProps }: TdProps) {
+export function Td({ children, align = 'left', className, collapseAt, grow, presentation, columnKind, weight, style, ...cellProps }: TdProps) {
   const classes = [
     shell.bodyCell,
     presentation === 'friend-list' && cellPresentations.friendListCell,
@@ -254,7 +260,7 @@ export function Td({ children, align = 'left', className, collapseAt, grow, pres
     align === 'center' && styles.center,
     className,
   ].filter(Boolean).join(' ')
-  return <td className={classes} data-column-kind={columnKind} data-align={align} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} {...cellProps}>{children}</td>
+  return <td className={classes} data-align={align} data-column-kind={columnKind} data-cell-collapse={collapseAt} data-cell-grow={grow || undefined} data-cell-align={align} data-cell-weight={weight} style={weight ? { ...style, '--cell-weight': weight } as CSSProperties : style} {...cellProps}>{children}</td>
 }
 
 /** 日時の本文セル。数字の桁と補足色は共通部品が持つ。 */

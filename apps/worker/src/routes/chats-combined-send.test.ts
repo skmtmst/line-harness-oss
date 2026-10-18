@@ -16,7 +16,7 @@ import type { AuthenticatedStaff } from '../middleware/auth.js';
 
 const pushMessage = vi.fn().mockResolvedValue({ sentMessages: [{}, {}] });
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage }); }),
 }));
 
 const { chats } = await import('./chats.js');
@@ -189,4 +189,13 @@ describe('結合送信(N-022)', () => {
     expect(pushMessage).not.toHaveBeenCalled();
     expect(rows()).toEqual([]);
   });
+});
+
+
+test('B-333 ブロック後のまとめて送信は送信0回', async () => {
+  sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
+  const response = await postCombined({ text: '送らない' }, KEY1);
+  expect(response.status).toBe(409);
+  expect(await response.json()).toMatchObject({ code: 'FRIEND_NOT_FOLLOWING' });
+  expect(pushMessage).not.toHaveBeenCalled();
 });

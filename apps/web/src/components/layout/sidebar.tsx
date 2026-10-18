@@ -11,7 +11,7 @@ import Notice from '@/components/shared/notice'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { restaurantTestUiEnabled } from '@/lib/environment-features'
+import { allowFeatureNavigation, featureGateVisibility, usePreparingDialog } from './sidebar-feature-gate'
 import { SIDEBAR_TOGGLE_EVENT,UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import {
 FEATURE_SETTINGS_UPDATED_EVENT,
@@ -102,6 +102,7 @@ export default function Sidebar({
   const { title: chromeTitle } = usePageChrome()
   const mobileTitle = chromeTitle ?? defaultTitleForPath(pathname ?? '')
   const [isOpen, setIsOpen] = useState(false)
+  const preparing = usePreparingDialog()
   /*
    * ★V8（夕44-A・部品 T7XSI6）：組の開閉と V2 モードの扱いにテーマが要る。
    * SSR・最初の描画は v7 の形（hydration を一致させるため）で、
@@ -342,7 +343,6 @@ export default function Sidebar({
   const sections = isHq ? HQ_MENU_SECTIONS : orderedStoreSections
 
   const visibleSections = sections
-    .filter((section) => section.id !== 'restaurant-test' || restaurantTestUiEnabled())
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
@@ -366,6 +366,7 @@ export default function Sidebar({
         // 変えられる権限でも見えるだけ権限でも、メニューには出す（N-424）。
         const permissionKey = item.permissionKey ?? item.href
         if (staffReadRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
+        const gated = featureGateVisibility(item); if (gated !== undefined) return gated
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (!featureKey) return true
         if (!currentVisibility || currentVisibility[featureKey] !== true) return false
@@ -786,7 +787,7 @@ export default function Sidebar({
                   href={item.href}
                   // V8は多数の別画面を先読みせず、選んだ画面だけ読み込む。
                   prefetch={false}
-                  onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
+                  onClick={(event) => allowFeatureNavigation(event, item.href, item.label, preparing) && setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={visibleLabel}
                   aria-current={active ? 'page' : undefined}
                   data-nav-active={active ? '' : undefined}
@@ -951,7 +952,7 @@ export default function Sidebar({
       </div>
 
       {/* オーバーレイ。ドロワーが開くのは xl 未満 */}
-      {isOpen && <div className={`${styles.scrim} ${styles.mobileOnly}`} onClick={() => setIsOpen(false)} />}
+      {preparing.dialog}{isOpen && <div className={`${styles.scrim} ${styles.mobileOnly}`} onClick={() => setIsOpen(false)} />}
 
       {/*
         スライドインするメニュー。

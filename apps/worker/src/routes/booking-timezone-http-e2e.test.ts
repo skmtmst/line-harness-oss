@@ -210,7 +210,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
         return new Response(JSON.stringify({ calendars: { 'cal-ny': { busy } } }), { status: 200 });
       }
       if (url.includes('googleapis.com/calendar/v3/calendars/')) {
-        return new Response(JSON.stringify({ id: 'gcal-event-1' }), { status: 200 });
+        return new Response(JSON.stringify(url.includes('/events?')?{items:busy.map((b,i)=>({id:`busy-${i}`,start:{dateTime:b.start},end:{dateTime:b.end}}))}:{id:'gcal-event-1'}),{status:200});
       }
       throw new Error(`想定外の外部呼び出し: ${url}`);
     }));
@@ -229,6 +229,7 @@ describe('非JST店舗の予約作成 HTTP E2E（実DB・America/New_York）', (
       INSERT INTO google_calendar_connections
         (id, calendar_id, line_account_id, staff_id, access_token, auth_type, is_active)
       VALUES ('gcal-ny', 'cal-ny', 'account-ny', 'staff-ny', 'token-gcal', 'oauth', 1);
+      INSERT INTO booking_calendar_switches(line_account_id,scope_id,read_enabled,updated_by,updated_at) VALUES('account-ny','',1,'test',datetime('now')),('account-ny','staff-ny',1,'test',datetime('now'));
     `);
   }
 

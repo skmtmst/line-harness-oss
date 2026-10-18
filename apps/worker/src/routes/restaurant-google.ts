@@ -1,3 +1,5 @@
+import {requireAccountAi} from '../services/account-ai-features.js';
+import {GapError} from '../services/gap-common.js';
 import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 export { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -17,7 +19,7 @@ import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } fr
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
-import { restaurantTestEnabled } from '../lib/environment-features.js';
+import { googleBusinessEnabled } from '../lib/environment-features.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
@@ -482,7 +484,7 @@ async function reviewFor(c: Context<Env>, storeId: string, id: string): Promise<
 // ---------- access guard（restaurant-test.ts と同じ3点検査） ----------
 
 export const googleAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
-  if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
+  if (!googleBusinessEnabled(c.env)) return fail(c, 404, 'Not found');
   // 長期間使えるAPIキーでは通さない。管理画面に人がログインした状態だけを受ける。
   //
   // Google Business Profile APIのポリシー
@@ -547,10 +549,17 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
             .all<{ location_name: string; location_title: string; address_text: string | null }>()
         ).results.map((row) => ({ locationName: row.location_name, locationTitle: row.location_title, addressText: row.address_text }))
       : [];
+  const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
+  const rows = await dbFor(c.env).prepare(`SELECT s.id, s.name, s.line_account_id
+    FROM rt_stores s JOIN rt_organizations o ON o.id = s.organization_id
+    WHERE o.tenant_id = ? AND s.status = 'active' ORDER BY s.name, s.id`)
+    .bind(staffTenantId(c)).all<{ id: string; name: string; line_account_id: string | null }>();
+  const stores = rows.results.filter(row => row.line_account_id && scope.ids.includes(row.line_account_id));
   const lastSyncedMs = connection?.last_synced_at ? Date.parse(connection.last_synced_at) : 0;
   return c.json({
     success: true,
     store: { id: store.id, name: store.name, lineAccountId: store.lineAccountId },
+    stores,
     connection: publicConnection(connection),
     candidates,
     summary: {
@@ -1048,6 +1057,7 @@ export async function runReplyDraftAi(c: Context<Env>, prompt: { system: string;
 }
 
 restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', requireRole('owner','admin','staff'), inputJsonBoundary(), async (c) => {
+  if(c.get('staff')?.readOnly||c.get('impersonation'))return fail(c,403,'この操作はできません',{code:'forbidden'});
   const store = await storeFor(c);
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const row = await reviewFor(c, store.id, c.req.param('id'));
@@ -1060,6 +1070,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
   if (!body || Array.isArray(body) || !['generate','shorten','polite'].includes(String(body.mode ?? 'generate'))) {
     return fail(c,400,'下書きの作り方を確認してください',{code:'invalid_mode'},['mode']);
   }
+  try{await requireAccountAi(dbFor(c.env, store.id),store.lineAccountId,'google_review');}catch(e){if(e instanceof GapError)return fail(c,409,'AIを使っていません',{code:e.code,enabled:false,feature:'google_review'});throw e;}
   const mode = body.mode ?? 'generate';
   const original = mode === 'generate' ? null : validateReplyText(typeof body.replyDraft === 'string' ? body.replyDraft : row.reply_draft ?? '');
   if (mode !== 'generate' && (body.replyDraft !== undefined && typeof body.replyDraft !== 'string' || !original?.ok)) {

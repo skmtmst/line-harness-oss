@@ -15,6 +15,7 @@ import type { Env } from '../index.js';
  */
 
 export type AuditAction =
+  | 'form.submission.export'
   | 'ad_conversion.retry'
   | 'line_account_folder.create'
   | 'line_account_folder.update'
@@ -95,6 +96,14 @@ export type AuditAction =
   | 'analytics.export'
   | 'nen.column.duplicate'
   | 'nen.column.import'
+  | 'nen.campaign.save'
+  | 'nen.campaign.enable'
+  | 'nen.campaign.stop'
+  | 'nen.birthday_coupon.save'
+  | 'nen.column.create'
+  | 'nen.column.save'
+  | 'nen.pet.archive'
+  | 'nen.column.schedule'
   | 'nen.delivery.pending_now'
   | 'operator_notification.rule.publish'
   | 'operator_notification.rule.stop'

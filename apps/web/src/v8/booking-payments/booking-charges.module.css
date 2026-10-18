@@ -1,0 +1,25 @@
+/* 予約の詳細のお支払い・組（★V8 Ae1W1・fom2A・Nx1kq）。値は変数だけ。 */
+.section { display: flex; flex-direction: column; gap: var(--tpl-bm-8); padding: var(--tpl-bm-16); border-radius: var(--radius-card); outline: 1px solid var(--card-edge); outline-offset: calc(var(--tpl-bm-1) * -1); box-shadow: var(--card-shadow); background: var(--color-canvas); }
+.headRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-bm-12); }
+.title { margin: var(--tpl-layout-zero); color: var(--color-ink); font-size: var(--tpl-bm-14); font-weight: 700; }
+.minor { margin: var(--tpl-layout-zero); color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); line-height: var(--tpl-bm-18); }
+.line { display: flex; align-items: center; gap: var(--tpl-bm-6); margin: var(--tpl-layout-zero); color: var(--color-ink); font-size: var(--tpl-bm-13); }
+.amount { margin: var(--tpl-layout-zero); color: var(--color-ink); font-size: var(--tpl-bm-14); font-weight: 700; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--tpl-bm-8); }
+.facts { display: flex; flex-direction: column; margin: var(--tpl-layout-zero); width: 100%; }
+.facts > div { display: grid; grid-template-columns: var(--tpl-bm-96) minmax(0, 1fr); align-items: center; gap: var(--tpl-bm-12); min-height: var(--tpl-bm-44); box-shadow: var(--shadow-row-line); font-size: var(--tpl-bm-13); }
+.facts dt { color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); }
+.facts dd { margin: var(--tpl-layout-zero); color: var(--color-ink); }
+.big { font-size: var(--tpl-bm-20); font-weight: 700; }
+.info, .warn { display: flex; align-items: flex-start; gap: var(--tpl-bm-8); margin: var(--tpl-layout-zero); padding: var(--tpl-bm-12) var(--tpl-bm-16); border-radius: var(--tpl-bm-8); font-size: var(--tpl-bm-13); line-height: var(--tpl-bm-20); color: var(--color-ink); }
+.info { background: var(--color-info-bg); }
+.warn { background: var(--color-warning-bg, var(--color-table-head)); }
+.info svg, .warn svg { flex: none; margin-top: var(--tpl-bm-2); }
+.groupTable { display: flex; flex-direction: column; border-radius: var(--tpl-bm-8); overflow: hidden; }
+.groupRow { display: grid; grid-template-columns: var(--tpl-bm-40) minmax(0, 1fr) var(--tpl-bm-48) var(--tpl-bm-84); align-items: center; gap: var(--tpl-bm-6); min-height: var(--tpl-bm-48); padding: var(--tpl-bm-6) var(--tpl-bm-8); box-shadow: var(--shadow-row-line); font-size: var(--tpl-bm-13); color: var(--color-ink); }
+.groupRow > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* メニューは切らない：詳細パネルの幅（決まりの 360）でも、言葉の切れ目（「（」の前など）で 2 行にする（絵 Nx1kq）。 */
+.groupRow > span.groupWrap { white-space: normal; word-break: keep-all; text-overflow: clip; }
+/* 組の囲みは緑の枠（絵 Nx1kq）。 */
+.groupSection { outline: var(--tpl-bm-2) solid var(--color-accent); outline-offset: calc(var(--tpl-bm-2) * -1); }
+.groupHead { min-height: var(--tpl-bm-40); background: var(--color-table-head); color: var(--color-ink-secondary); font-size: var(--tpl-bm-12); }

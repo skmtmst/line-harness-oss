@@ -1,6 +1,6 @@
 'use client'
 
-import type { InputHTMLAttributes, ReactNode } from 'react'
+import type { InputHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
 import styles from './radio.module.css'
 
 /** V8 の行内ラジオ（y4YQSB / gzxYf）。カード形式は RadioCardGroup を使う。 */
@@ -34,4 +34,9 @@ export default function Radio({
       <span className={styles.label}>{children}</span>
     </label>
   )
+}
+
+/** 行内ラジオを1つの読み上げられる選択群にする。配置は呼び出し側から渡す。 */
+export function RadioGroup({ label, children, ...props }: HTMLAttributes<HTMLDivElement> & { label: string; children: ReactNode }) {
+  return <div {...props} role="radiogroup" aria-label={label}>{children}</div>
 }

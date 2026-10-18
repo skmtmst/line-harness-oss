@@ -179,11 +179,11 @@ describe('style setup', () => {
     });
     expect(r.status).toBe(200);
     expect(
-      raw.prepare('SELECT status FROM automation_definitions').get(),
-    ).toEqual({ status: 'draft' });
+      raw.prepare("SELECT COUNT(*) n FROM reminders WHERE is_active=0 AND lifecycle_status='draft'").get(),
+    ).toEqual({ n: 3 });
     expect(
       raw.prepare('SELECT approval_mode FROM booking_settings').get(),
-    ).toEqual({ approval_mode: 'manual' });
+    ).toBeUndefined();
     const count = (
       raw
         .prepare(
@@ -1055,6 +1055,7 @@ describe('style additions contract', () => {
     ).toBe(400);
   });
   test('activation uses canonical draft versions and never publishes a rich menu or sends LINE', async () => {
+    raw.prepare(`INSERT INTO style_starter_sets(id,tenant_id,style,name,definition_json,updated_at) VALUES('thankyou','tenant','salon','お礼',?,'now')`).run(JSON.stringify({items:[{key:'thanks',kind:'automation',feature:'reminders',name:'来店のお礼',text:'ありがとうございました。',triggerType:'restaurant.departed'}]}));
     await write('', {
       expectedVersion: 1,
       style: 'salon',
@@ -1125,7 +1126,7 @@ test('restaurant counts include guests, staff assignment and real closure-aware 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ expectedVersion: 1, staffId: null }),
     },
-    { DB: db, RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings'],
+    { DB: db, RESTAURANT_TEST_ENABLED: 'true', DEPLOY_ENV:'test' } as Env['Bindings'],
   );
   expect(r.status).toBe(200);
   expect((await styleSnapshot(db, 'a', 'restaurant', {}, 's')).items).toEqual(

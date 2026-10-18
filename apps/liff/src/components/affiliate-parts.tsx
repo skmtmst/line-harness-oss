@@ -1,0 +1,104 @@
+import { TextInput } from '../components/forms/controls.js';
+import { useState, type RefObject } from 'react';
+import Button from '../components/ui/Button.js';
+import Icon from '../components/ui/Icon.js';
+
+
+/**
+ * Copy `text` with graceful degradation for LIFF WebViews:
+ *   1. navigator.clipboard.writeText  — modern, needs secure context + permission
+ *   2. document.execCommand('copy')   — legacy textarea-select fallback
+ *   3. neither worked → caller shows the URL selected for manual copy
+ * Returns true only when the browser confirms the copy succeeded.
+ */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // fall through to execCommand
+  }
+
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    ta.style.left = '-9999px';
+    ta.setAttribute('readonly', '');
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (ok) return true;
+  } catch {
+    // fall through to manual-copy fallback
+  }
+
+  return false;
+}
+
+
+function CopyButton({
+  url,
+  urlRef,
+  compact = false,
+}: {
+  url: string;
+  urlRef: RefObject<HTMLInputElement | null>;
+  /** 箱の中の1行 (S3uBl) では小さな四角のボタンにする。 */
+  compact?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [manualCopy, setManualCopy] = useState(false);
+
+  async function handleCopy() {
+    const ok = await copyText(url);
+    if (ok) {
+      setManualCopy(false);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      return;
+    }
+    setManualCopy(true);
+    setTimeout(() => {
+      const el = urlRef.current;
+      if (el) {
+        el.focus();
+        el.select();
+        el.setSelectionRange(0, el.value.length);
+      }
+    }, 0);
+  }
+
+  return (
+    <>
+      <Button variant={compact ? 'inline-action' : 'secondary'} className="w-auto shrink-0"
+        type="button"
+        onClick={handleCopy}
+      >
+        {!compact && <Icon name="copy" className="h-3.5 w-3.5" />}
+        {copied ? 'コピーしました' : 'コピーする'}
+      </Button>
+      {manualCopy && (
+        <div className="w-full space-y-1">
+          <p className="text-xs text-ink-secondary">
+            自動コピーできませんでした。下のURLを選択してコピーしてください。
+          </p>
+          <TextInput
+            ref={urlRef}
+            type="text"
+            aria-label="紹介のURL"
+            readOnly
+            value={url}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+export { copyText, CopyButton }

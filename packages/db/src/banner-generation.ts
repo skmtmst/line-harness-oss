@@ -1,3 +1,5 @@
+import {getBannerUsageToday,getBannerUsageThisMonth,countRecentFailedBannerGenerations,recordBannerUsage} from './banner-generation-usage.js';
+export {getBannerUsageToday,countRecentFailedBannerGenerations,getBannerUsageThisMonth,recordBannerUsage} from './banner-generation-usage.js';
 import { sqlIdSet } from './id-queries.js';
 import { readHqBannerFolderAssignment } from './hq-folders.js';
 import { jstNow } from './utils.js';
@@ -101,6 +103,7 @@ export interface BannerProject {
 }
 
 export interface BannerGeneration {
+  ai_account_id?: string | null;
   crop_gravity?: 'center' | 'top' | 'bottom';
   stop_requested_at?: string | null;
   id: string;
@@ -279,6 +282,7 @@ export async function createBannerGeneration(
   input: {
     /** Deterministic operation ID supplied only by the authenticated API. */
     operationId?: string;
+    aiAccountId?: string;
     tenantId: string;
     projectId: string;
     mode: BannerMode;
@@ -316,8 +320,8 @@ export async function createBannerGeneration(
           text_lines, emphasis_lines, base_color, main_color, sub_color, accent_color,
           person_option, custom_prompt, free_prompt, final_prompt,
           engine, model_name, requested_count, done_count, failed_count, units_per_image,
-          error_message, reference_image_id, reference_mode, reference_images, created_by, created_at, crop_gravity)
-       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
+          error_message, reference_image_id, reference_mode, reference_images, created_by, created_at, crop_gravity, ai_account_id)
+       VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, NULL, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING`,
     )
     .bind(
       id,
@@ -350,6 +354,7 @@ export async function createBannerGeneration(
       input.createdBy ?? null,
       jstNow(),
       input.cropGravity ?? 'center',
+      input.aiAccountId ?? null,
     )
     .run();
   return (await getBannerGeneration(db, id, input.tenantId))!;
@@ -736,66 +741,4 @@ export async function getBannerStats(db: D1Database, tenantId: string): Promise<
     deliveredImages: Number(deliveries?.images ?? 0),
     deliveredAccounts: Number(deliveries?.accounts ?? 0),
   };
-}
-
-// -------------------------------------------------------------------- usage
-
-/** 当日（日本時間）の生成枚数。1日の上限判定に使う。 */
-export async function getBannerUsageToday(db: D1Database, tenantId: string): Promise<number> {
-  const dayPrefix = jstNow().slice(0, 10); // YYYY-MM-DD
-  const row = await db
-    .prepare(
-      `SELECT COALESCE(SUM(units), 0) AS units
-         FROM banner_usage_ledger
-        WHERE tenant_id = ? AND substr(created_at, 1, 10) = ?`,
-    )
-    .bind(tenantId, dayPrefix)
-    .first<{ units: number }>();
-  return Number(row?.units ?? 0);
-}
-
-/**
- * 直近の失敗した生成の数。短時間に失敗が続いたら自動で一時停止するために使う
- * （鍵の失効や上流の障害で、無駄な呼び出しが積み上がるのを防ぐ）。
- */
-export async function countRecentFailedBannerGenerations(
-  db: D1Database,
-  tenantId: string,
-  sinceJst: string,
-): Promise<number> {
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS n FROM banner_generations
-        WHERE tenant_id = ? AND status = 'failed' AND done_count = 0 AND finished_at >= ?`,
-    )
-    .bind(tenantId, sinceJst)
-    .first<{ n: number }>();
-  return Number(row?.n ?? 0);
-}
-
-/** 当月（日本時間）の生成枚数の合計（units は1枚＝1）。 */
-export async function getBannerUsageThisMonth(db: D1Database, tenantId: string): Promise<number> {
-  const monthPrefix = jstNow().slice(0, 7); // YYYY-MM
-  const row = await db
-    .prepare(
-      `SELECT COALESCE(SUM(units), 0) AS units
-         FROM banner_usage_ledger
-        WHERE tenant_id = ? AND substr(created_at, 1, 7) = ?`,
-    )
-    .bind(tenantId, monthPrefix)
-    .first<{ units: number }>();
-  return Number(row?.units ?? 0);
-}
-
-export async function recordBannerUsage(
-  db: D1Database,
-  input: { tenantId: string; generationId: string | null; units: number; reason: 'generate' | 'refund' | 'edit' },
-): Promise<void> {
-  await db
-    .prepare(
-      `INSERT INTO banner_usage_ledger (id, tenant_id, generation_id, units, reason, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(crypto.randomUUID(), input.tenantId, input.generationId, input.units, input.reason, jstNow())
-    .run();
 }

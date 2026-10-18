@@ -68,11 +68,12 @@ export async function processDueEcRetries(
   db: D1Database,
   input: { now: string; limit?: number; credentialKey?: string },
 ): Promise<EcRetrySweepResult> {
+  await (await import('./ec-identity-recovery.js')).recoverEcIdentityPending(db,input.now);
   const result: EcRetrySweepResult = { processed: 0, failed: 0, dead: 0, skipped: 0 };
   const limit = input.limit ?? 50;
   const staleBefore = new Date(new Date(input.now).getTime() - STALE_PROCESSING_MINUTES * 60 * 1000).toISOString();
   const due = await db.prepare(
-    `SELECT e.id AS event_row_id, e.payload AS payload, e.line_account_id AS line_account_id,
+    `SELECT e.id AS event_row_id, e.payload AS payload, e.line_account_id AS line_account_id, e.identity_recovery_mode AS recovery_mode,
             a.id AS execution_id, a.status AS execution_status, a.version AS version
        FROM ec_action_executions a
        JOIN ec_events e ON e.id = a.event_id AND e.line_account_id = a.line_account_id
@@ -83,7 +84,7 @@ export async function processDueEcRetries(
       ORDER BY a.updated_at
       LIMIT ?`,
   ).bind(input.now, staleBefore, limit).all<{
-    event_row_id: string; payload: string; line_account_id: string;
+    event_row_id: string; payload: string; line_account_id: string; recovery_mode: string|null;
     execution_id: string; execution_status: string; version: number;
   }>();
 
@@ -139,6 +140,7 @@ export async function processDueEcRetries(
         eventRowId: row.event_row_id,
         now: input.now,
         credentialKey: input.credentialKey,
+        identityRecovery: row.recovery_mode==='analytics_snapshot'?'analytics_snapshot':row.recovery_mode==='non_delivery_actions'?'non_delivery_actions':undefined,
       });
       if (outcome === 'duplicate') {
         // 誰かが処理中。待ちに戻す。

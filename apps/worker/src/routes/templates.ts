@@ -1,3 +1,4 @@
+import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { readCarouselOptions } from './template-carousel-input.js';
 import { publishedInfoOf, versionInfoOf } from './../services/template-display.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -298,6 +299,7 @@ templates.get('/api/templates', async (c) => {
       createdAt: t.created_at,
       updatedAt: t.updated_at,
     }));
+    const withSamples=await withStyleSampleMetadata(c.env.DB,serialized,'template');
     if (wantsPaging && paging) {
       // フォルダ欄の件数を、一覧を全件読まなくても出せるように添える。
       const folderCounts = c.req.query('folder_counts') === '1'
@@ -310,7 +312,7 @@ templates.get('/api/templates', async (c) => {
         success: true,
         data: {
           ...buildOffsetListResponse({
-            items: serialized,
+            items: withSamples,
             total,
             paging,
             sort: [
@@ -322,7 +324,7 @@ templates.get('/api/templates', async (c) => {
         },
       });
     }
-    return c.json({ success: true, data: serialized });
+    return c.json({ success: true, data: withSamples });
   } catch (err) {
     console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates"}));
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -385,6 +387,7 @@ templates.get('/api/templates/:id', async (c) => {
     return c.json({
       success: true,
       data: {
+        ...(await withStyleSampleMetadata(c.env.DB,[{id:item.id}],'template'))[0],
         id: item.id,
         accountId: item.line_account_id,
         name: item.name,

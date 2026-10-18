@@ -156,7 +156,7 @@ beforeEach(() => {
   authMocks.getStaffByAdminSession.mockResolvedValue(null);
   authMocks.lineAccounts = [
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
-    { id: 'account-9', name: 'S店', is_active: 1, channel_access_token: 'token-s' },
+    { id: 'account-9', login_channel_id: 'login-seat', name: 'S店', is_active: 1, channel_access_token: 'token-s' },
   ];
   testDb = createTestD1({ loginPolicy: 'off' });
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
@@ -170,7 +170,7 @@ beforeEach(() => {
     RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     RESTAURANT_INTAKE_DOMAIN: 'intake.example.test',
-    RESTAURANT_TEST_ENABLED: 'true',
+    DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://liff.line.me/test123', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
@@ -278,7 +278,7 @@ describe('日付で席予約を閉じる',()=>{
 });
 
 async function seatLiffRequest(path:string,body?:unknown,token='test-id-token') {
- testDb.raw.exec(`UPDATE line_accounts SET liff_id='liff-seat' WHERE id='account-9'; INSERT OR IGNORE INTO friends(id,line_user_id,display_name,line_account_id,is_following) VALUES('liff-friend','liff-user','本人','account-9',1);`);
+ testDb.raw.exec(`UPDATE line_accounts SET liff_id='liff-seat',login_channel_id='login-seat' WHERE id='account-9'; INSERT OR IGNORE INTO friends(id,line_user_id,display_name,line_account_id,is_following) VALUES('liff-friend','liff-user','本人','account-9',1);`);
  vi.stubGlobal('fetch',vi.fn(async(url:unknown)=>String(url).includes('oauth2/v2.1/verify')?new Response(JSON.stringify({sub:'liff-user'}),{status:200}):new Response('{}',{status:404})));
  const {default:booking}=await import('./booking.js');const app=new Hono<Env>();app.route('/',booking);
  return app.request(path+(path.includes('?')?'&':'?')+'liffId=liff-seat',{method:body===undefined?'GET':'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json', 'Idempotency-Key':'test-key'},body:body===undefined?undefined:JSON.stringify(body)},env);

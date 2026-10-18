@@ -1,3 +1,4 @@
+import {accountClause} from './friend-bulk-scope.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
   canRecordConversion,
@@ -220,15 +221,6 @@ function parseOperation(value: unknown): FriendBulkOperation {
   }
 }
 
-function accountClause(scope: VisibleLineAccountScope): { sql: string; binds: unknown[] } {
-  if (scope.allowedAccountIds.length > 0) {
-    return {
-      sql: `(f.line_account_id IN (${sqlIdSet(scope.allowedAccountIds).sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`,
-      binds: scope.allowedAccountIds.length ? sqlIdSet(scope.allowedAccountIds).binds : [],
-    };
-  }
-  return { sql: scope.canSeeUnassigned ? 'f.line_account_id IS NULL' : '1 = 0', binds: [] };
-}
 
 async function querySelected(
   db: D1Database,
@@ -379,6 +371,7 @@ async function prepareOperation(db: D1Database, operation: FriendBulkOperation):
   switch (operation.kind) {
     case 'add_tag':
     case 'remove_tag':
+      if(await db.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(operation.tagId).first())throw new FriendBulkRunError('rank_tag_managed','会員ランクのタグは自動で管理します',403);
       return { operation, resourceAccountId: await requireAccountResource(db, 'tags', operation.tagId, 'タグ'), reversible: true };
     case 'start_scenario':
     case 'stop_scenario':
@@ -647,6 +640,7 @@ async function executeOperation(
   switch (operation.kind) {
     case 'add_tag':
     case 'remove_tag': {
+      if(await db.prepare('SELECT id FROM member_rank_tiers WHERE tag_id=?').bind(operation.tagId).first())throw new FriendBulkRunError('rank_tag_managed','会員ランクのタグは自動で管理します',403);
       const exists = Boolean(await db.prepare(`SELECT 1 AS ok FROM friend_tags WHERE friend_id = ? AND tag_id = ?`)
         .bind(friend.id, operation.tagId).first<{ ok: number }>());
       const add = operation.kind === 'add_tag';

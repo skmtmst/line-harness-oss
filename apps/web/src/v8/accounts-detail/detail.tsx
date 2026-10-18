@@ -9,52 +9,30 @@
  * 編集 n9Z2P）は dialogs.tsx。データの口は今の画面（app/accounts/detail）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { ArchiveRestore, ArrowLeftRight, Pause, Pencil, Play, QrCode } from 'lucide-react'
-import type { LineAccount } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
-import { formatDateTime } from '@/lib/format'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { SettingsPage } from '@/components/templates'
-import SettingsInnerNav from '@/components/layout/settings-inner-nav'
-import Button from '@/components/shared/button'
-import Card, { CardHeader } from '@/components/shared/card'
-import TruncatedText from '@/components/shared/truncated-text'
-import TextLink from '@/components/shared/text-link'
-
-
-import StatusBadge from '@/components/shared/status-badge'
-import TargetMissing from '@/components/shared/target-missing'
-import {
-  ArchiveDialog,
-  CredentialsDialog,
-  EditDialog,
-  RestoreDialog,
-  StopDialog,
-  TestRecipientsDialog,
-  type CredentialKind,
-} from './dialogs'
-import {
-  archiveBlockedReason,
-  capacityDetails,
-  credentialLine,
-  friendsLine,
-  shortDateTime,
-  skippedKindLabel,
-  stateBadge,
-  summaryLine,
-  webhookMatch,
-  webhookUse,
-  type AccountDetailView,
-} from './view'
-import styles from './detail.module.css'
-
-import { emptyValue } from '@/components/shared/empty-value'
-import { DetailLoading } from '@/components/templates/detail-page'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
-
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ArchiveRestore, ArrowLeftRight, Pause, Pencil, Play, QrCode } from 'lucide-react';
+import type { LineAccount } from '@line-crm/shared';
+import { api, ApiError } from '@/lib/api';
+import { formatDateTime } from '@/lib/format';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { SettingsPage } from '@/components/templates';
+import SettingsInnerNav from '@/components/layout/settings-inner-nav';
+import Button from '@/components/shared/button';
+import SendersCard from './senders-card';
+import Card, { CardHeader } from '@/components/shared/card';
+import TruncatedText from '@/components/shared/truncated-text';
+import TextLink from '@/components/shared/text-link';
+import StatusBadge from '@/components/shared/status-badge';
+import TargetMissing from '@/components/shared/target-missing';
+import { ArchiveDialog, CredentialsDialog, EditDialog, RestoreDialog, StopDialog, TestRecipientsDialog, type CredentialKind } from './dialogs';
+import { archiveBlockedReason, capacityDetails, credentialLine, friendsLine, shortDateTime, skippedKindLabel, stateBadge, summaryLine, webhookMatch, webhookUse, type AccountDetailView } from './view';
+import styles from './detail.module.css';
+import { emptyValue } from '@/components/shared/empty-value';
+import { DetailLoading } from '@/components/templates/detail-page';
+import ReadOnlyNotice from '@/components/shared/read-only-notice';
+import { Row, Pair, ActionValue } from "./detail-gap-parts"
 type Skipped = Array<{ id: string; kind: string; title: string | null; skippedAt: string }>
 
 const CAN_DO = ['・友だち追加URLとQRはここに出ます', '・人ごとの既定のアカウントはここで決めます', '・接続の異常や停止は、ここで見張ります'].join('\n')
@@ -291,6 +269,7 @@ export default function AccountDetailV8() {
               </Row>
             </Card>
 
+            <SendersCard accountId={account.id} accountName={account.name} />
             <Card variant="form" aria-labelledby="acd-credentials">
               <Card surface="inset" layout="vertical" padding="compact" gap="var(--polish-space-row)">
                 <CardHeader size="stacked" headingLevel={3} title="登録の内容（つづき）" />
@@ -416,36 +395,5 @@ export default function AccountDetailV8() {
       <CredentialsDialog account={credentials ? account : null} kind={credentials ?? 'messaging'} onClose={() => setCredentials(null)} onSaved={() => void load()} />
       <TestRecipientsDialog accountId={account.id} open={recipientsOpen} onClose={() => { setRecipientsOpen(false); void loadRecipients() }} />
     </div>
-  )
-}
-
-/** 札（幅150）と値の1行。上に線。 */
-function Row({ label, id, children }: { label: string; id?: string; children: ReactNode }) {
-  return (
-    <div className={styles.row} id={id}>
-      <span className={styles.rowLabel}>{label}</span>
-      <span className={styles.rowValue}>{children}</span>
-    </div>
-  )
-}
-
-/** つづきの段の1行。札と値を半分ずつ。下に線。 */
-function Pair({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className={styles.pair}>
-      <span className={styles.pairLabel}>{label}</span>
-      <span className={styles.pairValue}>{children}</span>
-    </div>
-  )
-}
-
-/** 値と、右端の操作。 */
-function ActionValue({ value, action }: { value: string; action: ReactNode }) {
-  return (
-    <span className={styles.actionValue}>
-      <span className={styles.muted} title={value}>{value}</span>
-      <span className={styles.spacer} />
-      {action}
-    </span>
   )
 }

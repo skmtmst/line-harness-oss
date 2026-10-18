@@ -1,3 +1,4 @@
+import { styleStarterDistribution } from './style-starter-distribution.js';
 import { Hono } from 'hono';
 
 
@@ -24,6 +25,7 @@ styles.onError((e, c) => {
     return c.json({ success: false, code: 'mode_capacity_full' }, 409);
   if (
     String(e).includes('STYLE_VERSION_CONFLICT') ||
+    String(e).includes('UNIQUE constraint failed: style_starter_items.') ||
     String(e).includes('malformed JSON')
   )
     return c.json({ success: false, code: 'version_conflict' }, 409);
@@ -59,3 +61,5 @@ styles.route('/', group2);
 styles.route('/', group3);
 styles.route('/', group4);
 styles.route('/', group5);
+
+styles.route('/',styleStarterDistribution);

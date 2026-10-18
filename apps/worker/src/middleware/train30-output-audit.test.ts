@@ -49,3 +49,17 @@ describe('train30 export audit', () => {
     expect(res.status).toBe(500); expect(await res.text()).not.toContain('fixture-file-content');
   });
 });
+
+it('B351 stamps actor/time metadata while preserving CSV bytes for reimport',async()=>{
+  const res=await app('/api/booking/admin/bookings.csv','csv').request('/api/booking/admin/bookings.csv',{}, {DB:db.db} as Env['Bindings']);
+  const csv=await res.text();expect(csv).toBe('Name,Note\r\n"Fixture","a\nb"\r\n"Other","safe"\r\n');
+  expect(csvRecordCount(csv)).toBe(2);expect(csv).not.toContain('# exported_by=Fixture');
+  expect(res.headers.get('X-Exported-By')).toBe('fixture-operator');expect(res.headers.get('X-Exported-At')).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+});
+
+it('stamps both ASCII and UTF-8 binary filenames while preserving original bytes',async()=>{
+ const a=new Hono<Env>();a.use('*',async(c,next)=>{c.set('staff',{id:'fixture-actor',name:'Private Name',role:'owner',readOnly:false});await next();});
+ a.use('*',outputAuditMiddleware);a.get('/api/media/item/download',c=>c.body(new Uint8Array([1,2,3]),200,{'Content-Type':'application/octet-stream','Content-Disposition':`attachment; filename="download.pdf"; filename*=UTF-8''${encodeURIComponent('添付.pdf')}`}));
+ const res=await a.request('/api/media/item/download',{}, {DB:db.db} as Env['Bindings']);expect([...new Uint8Array(await res.arrayBuffer())]).toEqual([1,2,3]);
+ expect(res.headers.get('Content-Disposition')).toContain('download-by-fixture-actor-');expect(decodeURIComponent(res.headers.get('Content-Disposition')!)).toContain('添付-by-fixture-actor-');expect(res.headers.get('Content-Disposition')).not.toContain('Private Name');
+});

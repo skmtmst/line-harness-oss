@@ -44,7 +44,8 @@ export function fitListColumns(frame) {
     return content + number(css.paddingLeft) + number(css.paddingRight) + number(css.borderLeftWidth) + number(css.borderRightWidth)
   }
   const widths = [...body.children].map((cell, index) => {
-    if (index === nameIndex || !cell.getBoundingClientRect().width) return null
+    // 割合を指定した列は、残りを割合で分け合う列。中身で測らない。
+    if (index === nameIndex || cell.hasAttribute('data-cell-weight') || !cell.getBoundingClientRect().width) return null
     const cells = rows.map(row => row.children[index]).filter(Boolean).filter(cell => cell.getBoundingClientRect().width)
     if (controlsOnly && !cells.some(cell => cell.querySelector('button, input, [role="button"], [data-design-node="xRvDB"]'))) return null
     // A genuinely long secondary value keeps its existing truncation budget.
@@ -52,6 +53,14 @@ export function fitListColumns(frame) {
     const unbroken = cells.some(cell => cell.matches('[data-list-number]') || cell.querySelector('button, a, input, [data-design-node="xRvDB"], [data-list-date-time]'))
     return Math.ceil(controlsOnly ? Math.max(frame.listColumnCeilings[index], required) : unbroken ? required : Math.min(frame.listColumnCeilings[index], required))
   })
+  // 割合（weight）を指定した列：測った列を除いた残りの幅を、割合で分ける（実寸の px にして、ほかの測った列と同じ道で渡す）。
+  const weights = [...body.children].map(cell => Number(cell.dataset.cellWeight) || 0)
+  const weightTotal = weights.reduce((sum, weight) => sum + weight, 0)
+  if (weightTotal > 0) {
+    const fixed = widths.reduce((sum, width, index) => sum + (width && !weights[index] ? width : 0), 0)
+    const room = Math.max(0, table.getBoundingClientRect().width - fixed)
+    weights.forEach((weight, index) => { if (weight > 0 && body.children[index].getBoundingClientRect().width) widths[index] = Math.floor(room * weight / weightTotal) })
+  }
   if (frame.hasAttribute('data-grid-table') || frame.hasAttribute('data-table-density')) {
     const columns = widths.map(width => width == null ? 'minmax(0, 1fr)' : `${width}px`).join(' ')
     frame.style.setProperty('--table-content-columns', columns)

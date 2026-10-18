@@ -1,3 +1,4 @@
+import {asString,asStringArray,asRecord,buildDateRange} from './segment-condition-values.js';
 import { sqlIdSet } from './id-queries.js';
 /*
  * 友だちの絞り込み条件を SQL に組み立てる。
@@ -49,55 +50,9 @@ export type ReactionState = (typeof REACTION_STATES)[number]
 const CHAT_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const
 export type ChatStatus = (typeof CHAT_STATUSES)[number]
 
-function asString(value: unknown, ruleType: string): string {
-  if (typeof value !== 'string') {
-    throw new Error(`${ruleType} rule requires a string value`)
-  }
-  return value
-}
 
-function asStringArray(value: unknown, ruleType: string): string[] {
-  if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
-    throw new Error(`${ruleType} rule requires an array of string IDs`)
-  }
-  if (value.length === 0) {
-    throw new Error(`${ruleType} rule requires at least one ID`)
-  }
-  return value as string[]
-}
 
-function asRecord(value: unknown, ruleType: string): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new Error(`${ruleType} rule requires an object value`)
-  }
-  return value as Record<string, unknown>
-}
 
-/**
- * 期間の条件。from / to はどちらも省略できるが、両方省略は受け付けない。
- * 「期間を指定したつもりで全員に一致する」事故を防ぐため。
- */
-function buildDateRange(column: string, value: unknown, ruleType: string): { sql: string; bindings: unknown[] } {
-  const v = asRecord(value, ruleType)
-  const from = typeof v.from === 'string' && v.from !== '' ? v.from : null
-  const to = typeof v.to === 'string' && v.to !== '' ? v.to : null
-  if (!from && !to) {
-    throw new Error(`${ruleType} rule requires at least one of from / to`)
-  }
-  const parts: string[] = []
-  const bindings: unknown[] = []
-  if (from) {
-    parts.push(`${column} >= ?`)
-    bindings.push(from)
-  }
-  if (to) {
-    // 「〜まで」は、その日の終わりまでを含める。日付だけを渡されたときに
-    // 当日ぶんが落ちると、指定した本人の期待とずれる。
-    parts.push(`${column} <= ?`)
-    bindings.push(to.length === 10 ? `${to}T23:59:59.999` : to)
-  }
-  return { sql: `(${parts.join(' AND ')})`, bindings }
-}
 
 /**
  * 値の比較。友だち情報欄で使う。
@@ -143,6 +98,23 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
   const bindings: unknown[] = []
 
   switch (rule.type) {
+    case 'customer_segment': {
+      const v=asRecord(rule.value,rule.type),r=Number(v.r),f=Number(v.f),basis=v.basis??'both',measure=v.measure??'count';
+      if(![r,f].every(n=>Number.isInteger(n)&&n>=1&&n<=5)||!['visit','purchase','both'].includes(String(basis))||!['count','amount'].includes(String(measure)))throw new Error('invalid customer segment');
+      return {sql:`EXISTS(SELECT 1 FROM customer_activity_daily c WHERE c.account_id=f.line_account_id AND c.friend_id=f.id AND c.basis=? AND c.r_bucket=? AND c.${measure==='amount'?'m_bucket':'f_bucket'}=?)`,bindings:[basis,r,f]};
+    }
+    case 'visit_count': case 'purchase_amount': {
+      const v=asRecord(rule.value,rule.type),min=Number(v.min??0),max=v.max===undefined?Number.MAX_SAFE_INTEGER:Number(v.max);
+      if(!Number.isFinite(min)||!Number.isFinite(max)||min<0||max<min)throw new Error('invalid customer activity range');
+      const column=rule.type==='visit_count'?'activity_count':'amount',basis=rule.type==='visit_count'?'visit':'purchase';
+      return {sql:`EXISTS(SELECT 1 FROM customer_activity_daily c WHERE c.account_id=f.line_account_id AND c.friend_id=f.id AND c.basis=? AND c.${column} BETWEEN ? AND ?)`,bindings:[basis,min,max]};
+    }
+    case 'last_activity_at': {
+      const range=buildDateRange('c.last_activity_at',rule.value,rule.type);
+      return {sql:`EXISTS(SELECT 1 FROM customer_activity_daily c WHERE c.account_id=f.line_account_id AND c.friend_id=f.id AND c.basis='both' AND ${range.sql})`,bindings:range.bindings};
+    }
+    case 'member_tier': return {sql:'EXISTS(SELECT 1 FROM member_ranks r WHERE r.account_id=f.line_account_id AND r.friend_id=f.id AND r.tier_id=?)',bindings:[asString(rule.value,rule.type)]};
+
     case 'friend_id_in': {
       const ids = [...new Set(asStringArray(rule.value, 'friend_id_in'))];
       // IDごとの ? を並べるとD1のbind上限へ当たる。JSONは1 bindで展開する。

@@ -25,7 +25,10 @@ describe('作業役Dと同じ支払い管理APIの形',()=>{
     expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/payment-events?account_id=a&result=failed&period=7d&limit=20');
   });
   it('既存の返金・通知再読込のパスとメソッドを保持する',async()=>{
-    await api.refund('p /');expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/payments/p%20%2F/refund',{method:'POST',body:'{}'});
+    const input={amount:300,reason:'取消',notifyLine:true,idempotencyKey:'request'};
+    await api.refund('p /',input);expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/payments/p%20%2F/refund',{method:'POST',body:JSON.stringify(input)});
+    await api.refunds('p /');expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/payments/p%20%2F/refunds');
+    await api.linkBooking('p /','b','照合');expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/payments/p%20%2F/booking',{method:'POST',body:JSON.stringify({bookingId:'b',reason:'照合'})});
     await api.replayEvent('a','ev /');expect(fetchApi).toHaveBeenLastCalledWith('/api/booking/admin/payment-events/ev%20%2F/replay?account_id=a',{method:'POST',body:'{}'});
   });
   it('設定の読取で返された版を保存に渡せる',async()=>{

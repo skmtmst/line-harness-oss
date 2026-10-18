@@ -7,7 +7,7 @@ let mf: Miniflare;
 let native: Awaited<ReturnType<Miniflare['getD1Database']>>;
 let sequence = 0;
 let friendId: string, submissionId: string, scanId: string, fileId: string;
-let remove: ReturnType<typeof vi.fn>;
+let remove: ReturnType<typeof vi.fn<(keys: string | string[]) => Promise<void>>>;
 const db = () => native as unknown as D1Database;
 const target = (kind: 'friend_data' | 'form_response') => ({ kind, id: kind === 'friend_data' ? friendId : submissionId,
   friendId, accountId: 'account', formId: 'form', lineUserId: `LINE-${friendId}` });

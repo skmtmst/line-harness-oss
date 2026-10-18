@@ -13,6 +13,8 @@ import { fetchQuota } from './broadcast-quota-guard.js';
 import { findPlan } from './billing-plans.js';
 import { collectOperationDispatchHealth } from './operation-dispatch-health.js';
 import { externalIntegrationsSummary } from './operations-health-delivery.js';
+import { runSecurityMonitor } from './security-monitor.js';
+import type { WorkerBindings } from '../worker-bindings.js';
 
 type AccountRow = {
   id: string;
@@ -24,6 +26,7 @@ type AccountRow = {
 
 /** R2・Queue の束縛は環境次第で無いので、持っているものだけ渡す。 */
 export type OperationInfraDeps = {
+  security?: WorkerBindings;
   r2?: R2Bucket;
   queue?: Queue<unknown>;
 };
@@ -526,6 +529,10 @@ export async function runScheduledOperationHealthChecks(
   db: D1Database,
   deps: OperationInfraDeps = {},
 ): Promise<void> {
+  if (deps.security) {
+    try { await runSecurityMonitor(deps.security); }
+    catch { console.error(JSON.stringify({ code: 'security_monitor_failed' })); }
+  }
   const rows = await db.prepare('SELECT id FROM line_accounts WHERE is_active = 1 ORDER BY id')
     .all<{ id: string }>();
   await Promise.allSettled((rows.results ?? []).map((account) =>

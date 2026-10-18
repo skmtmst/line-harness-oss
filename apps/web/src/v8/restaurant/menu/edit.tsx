@@ -1,35 +1,37 @@
 'use client'
 
+import { storedStringList } from '@/lib/stored-json'
+
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Check } from 'lucide-react'
+import { CreatePage } from '@/components/templates/create-page'
+import PreviewLauncher from '@/components/templates/preview-launcher'
+import { CreateSummaryCard } from '@/components/templates/create-parts'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
-import Card,{ CardHeader } from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
-import { emptyValue } from '@/components/shared/empty-value'
-import { Field } from '@/components/shared/form-controls'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
-import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import TargetMissing from '@/components/shared/target-missing'
+import { Field } from '@/components/shared/form-controls'
+import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { TextField } from '@/components/shared/text-field'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifySaved } from '@/components/shared/toast'
-import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates/create-page'
-import { CreateSummaryCard } from '@/components/templates/create-parts'
-import PreviewLauncher from '@/components/templates/preview-launcher'
+import { emptyValue } from '@/components/shared/empty-value'
 import { useAccount } from '@/contexts/account-context'
 import { fetchApi } from '@/lib/api'
-import { formatYen,formatDateTime as polishFormatDateTime } from '@/lib/format'
+import { formatDateTime as polishFormatDateTime, formatYen } from '@/lib/format'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
-import { restaurantTestApi,type RestaurantMenuItem } from '@/lib/restaurant-test-api'
-import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { Check } from 'lucide-react'
-import { useRouter,useSearchParams } from 'next/navigation'
-import { Suspense,useCallback,useEffect,useMemo,useState } from 'react'
-import { MenuPaymentFields,PaymentConflictError,PaymentSideCard,useMenuPayment } from '../../booking-payments/menu-payment'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
+import { MenuPaymentFields, PaymentConflictError, PaymentSideCard, useMenuPayment } from '../../booking-payments/menu-payment'
 import styles from './edit.module.css'
 
 /*
@@ -44,22 +46,17 @@ type Period = 'lunch' | 'dinner' | 'both'
 type Draft = { kind: 'course' | 'a_la_carte'; name: string; price: string; period: Period; effectiveAt: string; allergens: string }
 const LIST_HREF = '/restaurant-test/menu'
 
-function safeArray(value: string): string[] {
-  const parsed: unknown = JSON.parse(value)
-  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== 'string')) throw new Error('保存済みのメニュー設定を読み込めませんでした。')
-  return parsed
-}
 
 function periodLabel(periods: string[]): string {
   return periods.map((period) => (period === 'lunch' ? 'ランチ' : 'ディナー')).join('・') || emptyValue('unknown')
 }
 function draftOf(item: RestaurantMenuItem | null): Draft {
   if (!item) return { kind: 'course', name: '', price: '', period: 'dinner', effectiveAt: '', allergens: '' }
-  const periods = safeArray(item.service_periods_json)
+  const periods = storedStringList(item.service_periods_json)
   return {
     kind: item.kind, name: item.name, price: String(item.price),
     period: periods.length > 1 ? 'both' : periods[0] === 'lunch' ? 'lunch' : 'dinner',
-    effectiveAt: '', allergens: safeArray(item.allergens_json).join(', '),
+    effectiveAt: '', allergens: storedStringList(item.allergens_json).join(', '),
   }
 }
 
@@ -225,7 +222,7 @@ function MenuEditBody() {
             { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },
             { label: '価格（税込）', value: editing ? formatYen(editing.price) : emptyValue('unconfigured') },
             ...(editing?.pendingPrice != null ? [{ label: '変更予定の価格', value: formatYen(editing.pendingPrice) }] : []),
-            { label: '提供時間', value: editing ? periodLabel(safeArray(editing.service_periods_json)) : emptyValue('unknown') },
+            { label: '提供時間', value: editing ? periodLabel(storedStringList(editing.service_periods_json)) : emptyValue('unknown') },
             { label: '所要時間', value: editing?.duration_minutes ? `${editing.duration_minutes}分` : emptyValue('unknown') },
             { label: 'アレルギー', value: draft.allergens || emptyValue('none') },
             { label: '変更後の価格の開始日時', value: editing?.pendingEffectiveAt ? polishFormatDateTime(new Date(editing.pendingEffectiveAt)) : emptyValue('unconfigured') },

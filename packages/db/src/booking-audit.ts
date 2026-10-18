@@ -1,3 +1,4 @@
+import { reverseSourceConversions } from './conversion-event-sources.js';
 /**
  * 予約の変更履歴（booking_audit_logs）。
  *
@@ -112,6 +113,7 @@ export async function recordBookingAudit(
   input: Parameters<typeof bookingAuditInsert>[1],
 ): Promise<void> {
   await bookingAuditInsert(db, input).run();
+  if (input.after?.status === 'cancelled') await reverseSourceConversions(db, { lineAccountId: input.lineAccountId, sourceType: 'reservation_confirmed', bookingId: input.bookingId });
 }
 
 export async function listBookingAuditLogs(

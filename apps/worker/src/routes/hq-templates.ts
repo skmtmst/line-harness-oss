@@ -26,6 +26,7 @@ import { templateVersions, compareTemplateVersions, restoreTemplateVersion, temp
 export const hqTemplates = new Hono<Env>();
 async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   const staff = c.get('staff');
+  if(c.get('impersonation')&&!['GET','HEAD'].includes(c.req.method))throw new HqTemplateError('FORBIDDEN',403);
   if (!staff || !staff.tenantId) throw new HqTemplateError('FORBIDDEN', 403);
   const member = await getStaffById(dbFor(c.env), staff.id);
   // A missing database identity does not turn into a tenant-wide administrator.

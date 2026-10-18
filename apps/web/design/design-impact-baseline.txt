@@ -189,6 +189,7 @@ shared-button-importer lib/unsaved-leave-dialog.tsx
 shared-button-importer test-utils/webinar-notifications.tsx
 shared-button-importer test-utils/webinar-video.tsx
 shared-button-importer v8/account-new/register.tsx
+shared-button-importer v8/account-new/step1-precheck.tsx
 shared-button-importer v8/accounts-detail/detail.tsx
 shared-button-importer v8/accounts-detail/dialogs.tsx
 shared-button-importer v8/accounts-detail/handover.tsx
@@ -347,6 +348,12 @@ shared-button-importer v8/inbox-chat/attach-menu.tsx
 shared-button-importer v8/inbox-chat/rules-popover.tsx
 shared-button-importer v8/inbox-chat/screen.tsx
 shared-button-importer v8/inbox-chat/template-picker-view.tsx
+shared-button-importer v8/ai-reply/ai-mode-band.tsx
+shared-button-importer v8/ai-reply/answer-log.tsx
+shared-button-importer v8/ai-reply/inbox-ai.tsx
+shared-button-importer v8/ai-reply/qa-list.tsx
+shared-button-importer v8/nen-campaigns/list.tsx
+shared-button-importer v8/nen-campaigns/edit.tsx
 shared-button-importer v8/inflow-links/ad-connection-dialog.tsx
 shared-button-importer v8/inflow-links/ad-connections.tsx
 shared-button-importer v8/inflow-links/ad-history.tsx
@@ -376,8 +383,6 @@ shared-button-importer v8/mileage/score-rules.tsx
 shared-button-importer v8/mileage/score.tsx
 shared-button-importer v8/nen-campaigns/column-intros.tsx
 shared-button-importer v8/nen-campaigns/column-new.tsx
-shared-button-importer v8/nen-campaigns/edit.tsx
-shared-button-importer v8/nen-campaigns/list.tsx
 shared-button-importer v8/nen-health/health.tsx
 shared-button-importer v8/nen-health/summary.tsx
 shared-button-importer v8/nen-members/lifetime.tsx
@@ -405,6 +410,9 @@ shared-button-importer v8/ops/knowledge-article.tsx
 shared-button-importer v8/ops/login.tsx
 shared-button-importer v8/ops/members.tsx
 shared-button-importer v8/ops/support.tsx
+shared-button-importer v8/broadcast-ab/result.tsx
+shared-button-importer v8/broadcast-ab/settings.tsx
+shared-button-importer v8/broadcast-ab/tabs.tsx
 shared-button-importer v8/ops/tenant-detail.tsx
 shared-button-importer v8/ops/tenants.tsx
 shared-button-importer v8/ops/two-factor.tsx
@@ -567,6 +575,34 @@ shared-button-importer v8/webinars/list.tsx
 
 
 # B-234〜238：アレルギー・統括本文・お客さまデザインの共通操作。
+shared-button-importer v8/mcp-connect/log.tsx
+shared-button-importer v8/mcp-connect/section.tsx
+
+# B-244〜B-247: 新しい共通の知らせの持ち主
+# ③-2 第3波の画面（共通Button）。
+shared-button-importer v8/analytics/segments.tsx
+shared-button-importer v8/booking-passes/create.tsx
+shared-button-importer v8/booking-passes/passes-tab.tsx
+shared-button-importer v8/ec-auto-line/auto-line.tsx
+shared-button-importer v8/ec-auto-line/edit-drawer.tsx
+shared-button-importer v8/friend-detail/delivery-consent.tsx
+shared-button-importer v8/hq-store-compare/list.tsx
+shared-button-importer v8/mileage/ranks.tsx
+shared-button-importer app/booking/bookings/page-gap-parts.tsx
+shared-button-importer components/broadcasts/broadcast-form-gap-parts.tsx
+shared-button-importer components/shared/condition-builder-gap-parts.tsx
+shared-button-importer components/shared/send-confirm-dialog.tsx
+shared-button-importer components/templates/steps.tsx
+shared-button-importer v8/accounts-detail/senders-card.tsx
+shared-button-importer v8/booking-gap/party-section.tsx
+shared-button-importer v8/booking-gap/series-drawer.tsx
+shared-button-importer v8/booking-gap/series-panel-section.tsx
+shared-button-importer v8/booking-menus/staff-calendar.tsx
+shared-button-importer v8/booking-payments/booking-charges.tsx
+shared-button-importer v8/booking-payments/booking-group.tsx
+shared-button-importer v8/booking-payments/cancellation.tsx
+shared-button-importer v8/form-edit/routing-section.tsx
+shared-button-importer v8/inbox-chat/routing-drawer.tsx
 
 # B-244〜B-247: 新しい共通の知らせの持ち主
 shared-button-importer components/shared/image-multi-upload.tsx

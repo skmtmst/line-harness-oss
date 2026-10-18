@@ -79,7 +79,7 @@ export async function countBroadcastLedger(
   const rows = await db
     .prepare(
       `SELECT state, COUNT(*) AS cnt FROM broadcast_send_claims
-        WHERE broadcast_id = ? GROUP BY state`,
+        WHERE broadcast_id = ? AND COALESCE(error_code,'') NOT LIKE 'simulation_%' GROUP BY state`,
     )
     .bind(broadcastId)
     .all<{ state: BroadcastSendClaimState; cnt: number }>();

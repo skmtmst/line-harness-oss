@@ -4,6 +4,13 @@ import styles from './Icon.module.css';
 // 見た目は 24x24・線・角丸 (lucide の決まり) でそろえる。絵文字は使わない。
 
 const PATHS = {
+  /** 振替・繰り返し */
+  repeat: [
+    <path key="a" d="m17 2 4 4-4 4" />,
+    <path key="b" d="M3 11v-1a4 4 0 0 1 4-4h14" />,
+    <path key="c" d="m7 22-4-4 4-4" />,
+    <path key="d" d="M21 13v1a4 4 0 0 1-4 4H3" />,
+  ],
   'qr-code': [
     <rect key="a" width="5" height="5" x="3" y="3" rx="1" />,
     <rect key="b" width="5" height="5" x="16" y="3" rx="1" />,
@@ -77,6 +84,11 @@ const PATHS = {
     <path key="p" d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />,
   ],
   /** 場所 (イベント詳細) */
+  /** オンラインの会議 */
+  video: [
+    <path key="a" d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5" />,
+    <rect key="r" x="2" y="6" width="14" height="12" rx="2" />,
+  ],
   'map-pin': [
     <path key="p" d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />,
     <circle key="c" cx="12" cy="10" r="3" />,

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MenuList from '../components/MenuList.js';
 import RepeatCard from '../components/RepeatCard.js';
-import StaffList from '../components/StaffList.js';
+import StaffList, { nominationFee } from '../components/StaffList.js';
 import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
 import BookingPayment from '../components/BookingPayment.js';
@@ -15,6 +15,8 @@ import Stepper from '../components/ui/Stepper.js';
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
+import PartyMenuStep, { PartyStaffStep, PartySummary } from '../components/PartyStep.js';
+import { initialParty, partyCapable, type PartyState } from '../lib/party.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
@@ -35,9 +37,15 @@ export default function Booking() {
   const [step, setStep] = useUrlStep<Step>('menu', { search: params.toString(), write: (query, replace) => setParams(query, { replace }) });
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
+  /* 同伴・追加メニュー（B5）。メニューが許したときだけ使う。1 人で追加なしなら今までどおり。 */
+  const [party, setParty] = useState<PartyState>(initialParty);
+  const [changingMenu, setChangingMenu] = useState(false);
+  const confirmBack = useRef<(() => void) | null>(null);
   const [slot, setSlot] = useState<SlotPick | null>(null);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [paymentDue, setPaymentDue] = useState(false);
+  /* キャンセル料の決まりがオンの店は、確認の段から手順の帯に「お支払い」（カードの登録）を出す（kwC8E）。 */
+  const [cardStep, setCardStep] = useState(false);
   const [prepayNotice, setPrepayNotice] = useState<string | null>(null);
   const [doneStatus, setDoneStatus] = useState('requested');
   // 予約のルール「お店が承認してから確定する」。読めなければ承認あり扱い。
@@ -49,7 +57,7 @@ export default function Booking() {
     api.menus().then(({ menus }) => {
       if (!alive || menuTouched.current) return;
       const selected = menus.find(item => item.id === initialMenuId);
-      if (selected) { setMenu(selected); setStep('staff'); }
+      if (selected) { setMenu(selected); loadAddons(selected); setStep('staff'); }
     }).catch(() => { /* 非公開・削除済み・取得失敗は通常の選択へ戻す。 */ });
     return () => { alive = false; };
   }, [initialMenuId]);
@@ -83,14 +91,22 @@ export default function Booking() {
     navigate({ pathname: '/booking', search: next.toString() }, { replace: true });
   }
 
+  /** 追加メニュー（B5）：メニューを選んだあとに読み足す。読めなければ追加なしのまま進める。 */
+  function loadAddons(m: MenuItem) {
+    Promise.resolve().then(() => api.addons(m.id)).then((addons) => setMenu((cur) => (cur && cur.id === m.id ? { ...cur, addons } : cur))).catch(() => undefined);
+  }
+
   function pickMenu(m: MenuItem) {
     menuTouched.current = true;
     // 選び直したら後の選択は捨てる (古い担当・日時のまま送らない)。
     if (m.id !== menu?.id) {
       setStaff(null);
       setSlot(null);
+      setParty(initialParty());
     }
+    setChangingMenu(false);
     setMenu(m);
+    loadAddons(m);
   }
 
   function pickStaff(s: StaffItem) {
@@ -98,7 +114,10 @@ export default function Booking() {
     setStaff(s);
   }
 
-  const steps = paymentDue ? [...STEPS, 'お支払い'] : STEPS;
+  /* 2 人以上・追加メニューあり。確認と送信を組の形にする。 */
+  const partyActive = party.size > 1 || party.members[0]?.addonIds.length > 0;
+  const partyMode = step === 'menu' && !changingMenu && partyCapable(menu);
+  const steps = paymentDue || cardStep ? [...STEPS, 'お支払い'] : STEPS;
   const stepIndex =
     step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : step === 'payment' ? 4 : 3;
   /**
@@ -109,13 +128,16 @@ export default function Booking() {
 
   return (
     <LiffLookScope className="min-h-screen bg-canvas">
-      <LiffHeader title="ご予約" />
+      <LiffHeader title="ご予約" backLabel={step === 'confirm' ? '確かめを閉じて日時に戻る' : '戻る'} onBack={step === 'staff' ? () => setStep('menu') : step === 'datetime' ? () => setStep('staff') : step === 'confirm' ? () => (confirmBack.current ? confirmBack.current() : setStep('datetime')) : undefined} />
       {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}} />}
       {step !== 'done' && !waiting && !(step === 'datetime' && emptyDatetime) && <Stepper steps={steps} current={stepIndex} />}
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>
         {/* ★A: ページを移らず、段が替わるたび中身だけ右から移り変わる。 */}
         <div key={step} className="liff-step">
-        {step === 'menu' && (
+        {step === 'menu' && partyMode && (
+          <PartyMenuStep menu={menu!} party={party} onParty={setParty} onChangeMenu={() => setChangingMenu(true)} />
+        )}
+        {step === 'menu' && !partyMode && (
           <div data-design-node="IruGD" className="space-y-3.5">
             <RepeatCard
               onRepeat={(m, s) => {
@@ -127,7 +149,10 @@ export default function Booking() {
             <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
           </div>
         )}
-        {step === 'staff' && menu && (
+        {step === 'staff' && menu && party.size > 1 && (
+          <PartyStaffStep menu={menu} party={party} onParty={setParty} onLoadState={setStepReady} />
+        )}
+        {step === 'staff' && menu && party.size === 1 && (
           <div data-design-node="biNP5">
             <StaffList
               key={menu.id}
@@ -159,7 +184,10 @@ export default function Booking() {
             slot={slot}
             autoConfirm={autoConfirm}
             cancelDeadlineMinutesBefore={cancelDeadline}
+            onPolicyChange={setCardStep}
             onBack={() => setStep('datetime')}
+            onRegisterBack={(fn) => { confirmBack.current = fn; }}
+            party={partyActive ? party : undefined}
             onSubmitted={(result) => {
               setBookingId(result.bookingId);
               setDoneStatus(result.status);
@@ -184,6 +212,7 @@ export default function Booking() {
           <Done
             menuName={menu.name}
             slot={slot}
+            durationMinutes={staff.duration_minutes}
             status={doneStatus}
             bookingId={bookingId}
             prepayNotice={prepayNotice}
@@ -191,23 +220,35 @@ export default function Booking() {
         )}
         </div>
       </div>
-      {step === 'menu' && stepReady && (
+      {step === 'menu' && !partyMode && stepReady && (
         <BottomBar>
           <Button variant="primary" disabled={!menu} onClick={() => setStep('staff')}>
             担当を選ぶ
           </Button>
         </BottomBar>
       )}
+      {step === 'menu' && partyMode && menu && (
+        <BottomBar>
+          <PartySummary party={party} first={menu} />
+          <Button variant="primary" onClick={() => setStep('staff')}>
+            担当を選ぶ
+          </Button>
+        </BottomBar>
+      )}
       {step === 'staff' && stepReady && (
         <BottomBar>
-          <Button variant="primary" disabled={!staff} onClick={() => setStep('datetime')}>
+          {party.size === 1 && menu && staff && menu.price_mode !== 'inquiry' && menu.base_price > 0 ? (
+            <p className="mb-2.5 flex items-baseline gap-2 text-[13px] text-liff-sub" data-booking-total="">
+              <span>合計</span>
+              <span className="text-[17px] font-bold text-ink">{`¥${(menu.base_price + nominationFee(menu, staff)).toLocaleString()}`}</span>
+              <span className="text-xs">{nominationFee(menu, staff) > 0
+                ? `（料金 ¥${menu.base_price.toLocaleString()}・指名料 ¥${nominationFee(menu, staff).toLocaleString()}）`
+                : `（料金 ¥${menu.base_price.toLocaleString()}・指名料なし）`}</span>
+            </p>
+          ) : null}
+          {party.size > 1 && menu ? <PartySummary party={party} first={menu} withFee /> : null}
+          <Button variant="primary" disabled={party.size > 1 ? !party.members[0].staff : !staff} onClick={() => { if (party.size > 1) { const lead = party.members[0].staff; if (lead && lead.id !== staff?.id) { setSlot(null); setStaff(lead); } } setStep('datetime'); }}>
             日時を選ぶ
-          </Button>
-          <Button variant="text"
-            type="button"
-            onClick={() => setStep('menu')}
-          >
-            ← メニューを選び直す
           </Button>
         </BottomBar>
       )}

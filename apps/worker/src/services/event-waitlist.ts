@@ -2,6 +2,7 @@ import type { EventOccurrenceApplicants } from './event-waitlist-types.js';
 export type { EventOccurrenceApplicants } from './event-waitlist-types.js';
 import { eventModeRemaining } from './event-mode-capacity.js';
 import { activeTenantLineAccountSql, resolveLineCredential, isOperationCapabilityStopped } from '@line-crm/db';
+import { sha256 } from './event-waitlist-owner.js';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
 import { dispatchPendingEventWaitlistOffers, eventWaitlistDeliveryStatements } from './event-waitlist-delivery.js';
@@ -439,12 +440,6 @@ async function expireEventWaitlistOffer(
   return (expired.meta?.changes ?? 0) === 1;
 }
 
-async function sha256(value: string): Promise<string> {
-  const bytes = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
 /** 順番は管理者の並べ替えを含む、実際の繰上げ順と同じ。 */
 export async function getMyEventWaitlist(
   db: D1Database,
@@ -516,6 +511,8 @@ export async function cancelMyEventWaitlist(
   ]);
   return (results[0].meta?.changes ?? 0) > 0 ? 'cancelled' : 'conflict';
 }
+
+export { getEventWaitlistOfferAccountId } from './event-waitlist-owner.js';
 
 /** 案内の読み出しでは失効・予約化をしない。URLの所持と本人を両方照合する。 */
 export async function getEventWaitlistOffer(

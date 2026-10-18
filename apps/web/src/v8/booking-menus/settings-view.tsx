@@ -12,6 +12,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { V8TabEditContext, AccountIcon, StateCard } from './tabs/shared'
 import styles from './settings.module.css'
 import ChannelsTabV8 from './channels-tab'
+import PassesTabV8 from '../booking-passes/passes-tab'
 import type { useBookingSettings } from './settings'
 import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, PaymentsTabV8, PaymentsSideV8, V8_TABS } from './settings-parts'
 import { useSearchParams } from 'next/navigation'
@@ -24,7 +25,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
   /* つなぐ前（UteeA）も右の欄を出さない。 */
   const paymentsWide = tab === 'payments' && (paymentsView === 'records' || paymentsView === 'events')
   /* 担当スタッフは割り当て方（QJMoY）が入って横いっぱいの表になった。スマホの見本は出さない。 */
-  const withoutPreview = tab === 'channels' || tab === 'payments' || tab === 'staff'
+  const withoutPreview = tab === 'channels' || tab === 'payments' || tab === 'staff' || tab === 'passes'
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
@@ -54,6 +55,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
             /></>}
 
 
+        actions={tab === 'passes' && canEditSettings ? <Button variant="primary" href="/booking/passes/new">回数券・月謝を作る</Button> : undefined}
         preview={tab === 'payments' && accountId && !paymentsWide ? <PaymentsSideV8 accountId={accountId} menus={menus} connected={paymentsConnected} /> : withoutPreview ? undefined : previewContent}
         previewToggle={tab === 'payments' && accountId && !paymentsWide ? (
           /* 狭い幅（1152）：右の欄を畳み、「メニューごとの支払い方法」を窓で開く。 */
@@ -159,6 +161,8 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                 canEdit={canEditSettings}
                 onReload={reloadCore}
               />
+            ) : tab === 'passes' ? (
+              <PassesTabV8 accountId={accountId} canEdit={canEditSettings} />
             ) : tab === 'payments' ? (
               <PaymentsTabV8 accountId={accountId} canEdit={canEditSettings} onConnectedChange={setPaymentsConnected} />
             ) : (

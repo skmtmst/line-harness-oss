@@ -64,3 +64,17 @@ test('shared NAT retains independent verified staff allowances',async()=>{
  for(const [id,n] of [['a',600],['b',1000]] as const)for(let i=0;i<n;i++)expect((await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.203','x-test-staff':id}},env)).status).toBe(200);
  expect((await a.request('/api/protected',{headers:{'cf-connecting-ip':'192.0.2.203','x-test-staff':'b'}},env)).status).toBe(429);
 });
+
+test('本人用ファイルとLIFF入口はID・未検証Bearerを変えても100回のIP枠を共有する', async () => {
+  const a = new Hono<Env>();
+  a.use('*', rateLimitMiddleware);
+  a.get('*', c => c.text('fixture'));
+  const paths = ['/liff/files/', '/liff/statements/', '/api/liff/files/'];
+  for (let i = 0; i < 100; i++) {
+    expect((await a.request(`${paths[i % 3]}${i}/download`, { headers: {
+      'cf-connecting-ip': '192.0.2.220', Authorization: `Bearer unverified-${i}`,
+    } }, env)).status).toBe(200);
+  }
+  const blocked = await a.request('/api/liff/files/next/download', { headers: { 'cf-connecting-ip': '192.0.2.220' } }, env);
+  expect(blocked.status).toBe(429); expect(blocked.headers.get('retry-after')).toBeTruthy();
+});

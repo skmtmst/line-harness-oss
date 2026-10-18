@@ -16,7 +16,8 @@ const UNAVAILABLE = {
  */
 export const tenantPublicBoundaryMiddleware: MiddlewareHandler<Env> = async (c, next) => {
   const path = new URL(c.req.url).pathname;
-  if (!path.startsWith('/api/liff/')) return next();
+  if (!path.startsWith('/api/liff/')
+    && !(c.req.method === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(path))) return next();
   const url = new URL(c.req.url);
   let liffId = (url.searchParams.get('liffId') ?? url.searchParams.get('liff_id'))?.trim() || '';
   let accountId = (url.searchParams.get('accountId') ?? url.searchParams.get('account_id'))?.trim() || '';
@@ -39,10 +40,11 @@ export const tenantPublicBoundaryMiddleware: MiddlewareHandler<Env> = async (c, 
      END AS tenant_status
        FROM line_accounts account
        LEFT JOIN tenants tenant ON tenant.id = COALESCE(account.tenant_id, ?)
-      WHERE ${accountId ? 'account.id = ?' : 'account.liff_id = ?'} AND account.is_active = 1
+      WHERE ${accountId && liffId ? 'account.id = ? AND account.liff_id = ?' : accountId ? 'account.id = ?' : 'account.liff_id = ?'} AND account.is_active = 1
       LIMIT 1`,
-  ).bind(DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, accountId || liffId)
+  ).bind(DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, ...(accountId && liffId ? [accountId, liffId] : [accountId || liffId]))
     .first<{ tenant_status: 'active' | 'suspended' | 'archived' }>();
+  if (!row && accountId && liffId) return c.json({ success: false, error: 'LINEアカウントの指定が一致しません' }, 403);
   if (row && row.tenant_status !== 'active') return c.json(UNAVAILABLE, 503);
   return next();
 };

@@ -21,6 +21,8 @@ export type ThProps = Omit<
   /** 列の余った幅をこのセルに割り当てる。 */
   columnKind?: 'check' | 'name' | 'menu'
   grow?: boolean
+  /** 余った幅の割合（grow の列どうしの比。省略は従来どおり）。見出しと本文に同じ値を渡す。 */
+  weight?: number
   /** 文字の先頭を名前のフォルダ印に揃える。 */
   inset?: string
   /**

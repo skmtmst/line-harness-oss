@@ -205,9 +205,9 @@ function isoFromMs(ms: number | null | undefined): string | null {
 // ---------- 入口の検査（restaurant-google.ts と同じ3点検査） ----------
 
 export const deliveryAccessGuard: MiddlewareHandler<Env> = async (c, next) => {
+  if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
   // 署名検証で守る外部受信は管理画面の認証を通さない。
   if (c.req.path.startsWith(WEBHOOK_PREFIX)) return next();
-  if (!restaurantTestEnabled(c.env)) return fail(c, 404, 'Not found');
   // 統括ゲート。パック無しは環境無効と同じ404。
   if (!(await tenantHasFeaturePack(dbFor(c.env), staffTenantId(c), 'restaurant'))) {
     return fail(c, 404, 'Not found');

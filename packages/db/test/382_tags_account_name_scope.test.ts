@@ -50,6 +50,8 @@ function setup() {
   // 移行前の姿を再現するこの器には含めない。残すと 382 自身の番兵
   // （参照数=14・未知の参照があれば中止）が正しく止めてしまう。
   db.exec('DROP TABLE IF EXISTS tag_update_requests');
+  // 717/721 are later than 382; their rank-to-tag reference must not enter the historical 14-reference fixture.
+  db.exec('DROP TABLE member_rank_notices; DROP TABLE member_ranks; DROP TABLE member_rank_tiers');
   for (let i = 1; i <= 3; i++) insert(db, 'line_accounts', {
     id: `account-${i}`, channel_id: `fixture-channel-${i}`, name: `店舗${i}`,
     channel_access_token: 'fixture', channel_secret: 'fixture',

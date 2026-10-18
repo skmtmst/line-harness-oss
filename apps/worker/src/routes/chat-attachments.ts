@@ -1,3 +1,6 @@
+import { customerDownloadEntry, privateDownloadHeaders } from '../services/download-entrypoints.js';
+import { isCustomerFileOwner } from '../services/customer-file-access.js';
+import { validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { getChatById, getFriendById, jstNow } from '@line-crm/db';
@@ -8,7 +11,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
 import {
   attachmentFromObject, attachmentUrl, CHAT_ATTACHMENT_ID, CHAT_ATTACHMENT_PREFIX,
-  CHAT_UPLOAD_PREFIX, ChatAttachmentError, metadataFor, ownedAttachment, uploadKind, validateChatUpload,
+  CHAT_UPLOAD_PREFIX, ChatAttachmentError, metadataFor, ownedAttachment, signedAttachment, uploadKind, validateChatUpload,
   type AttachmentOwner,
 } from '../services/chat-attachments.js';
 
@@ -50,6 +53,7 @@ async function readBounded(body: ReadableStream<Uint8Array>, max: number): Promi
 chatAttachments.post('/api/chats/:id/attachments/upload', ...guards, async c => {
   const owner = await target(c);
   if (!owner) return c.notFound();
+  if (!c.env.API_KEY) return c.json({ success: false, error: '取得用の鍵が未設定です' }, 503);
   try {
     const mimeType = (c.req.header('Content-Type') ?? '').split(';')[0];
     const filename = decodeURIComponent(c.req.header('X-Filename') ?? '');
@@ -64,7 +68,7 @@ chatAttachments.post('/api/chats/:id/attachments/upload', ...guards, async c => 
     await c.env.IMAGES.put(attachment.key, bytes, {
       httpMetadata: { contentType: mimeType }, customMetadata: metadataFor(attachment, owner),
     });
-    return c.json({ success: true, data: attachment }, 201);
+    return c.json({ success: true, data: await signedAttachment(attachment, owner, c.env.API_KEY) }, 201);
   } catch (error) {
     if (error instanceof ChatAttachmentError || error instanceof URIError) return inputError(c, { success: false, error: error.message }, 400, []);
     return c.json({ success: false, error: '添付を保存できませんでした。もう一度選び直してください' }, 502);
@@ -80,6 +84,7 @@ interface Session {
 chatAttachments.post('/api/chats/:id/attachments/upload-sessions', ...guards, inputJsonBoundary(), async c => {
   const owner = await target(c);
   if (!owner) return c.notFound();
+  if (!c.env.API_KEY) return c.json({ success: false, error: '取得用の鍵が未設定です' }, 503);
   let body: { filename: string; mimeType: string; sizeBytes: number };
   try {
     body = await c.req.json();
@@ -104,6 +109,7 @@ chatAttachments.post('/api/chats/:id/attachments/upload-sessions', ...guards, in
 chatAttachments.post('/api/chats/:id/attachments/upload-sessions/:sessionId/complete', ...guards, inputJsonBoundary(), async c => {
   const owner = await target(c);
   if (!owner) return c.notFound();
+  if (!c.env.API_KEY) return c.json({ success: false, error: '取得用の鍵が未設定です' }, 503);
   const id = c.req.param('sessionId');
   if (!CHAT_ATTACHMENT_ID.test(id)) return c.notFound();
   const session = await c.env.DB.prepare('SELECT * FROM broadcast_media_upload_sessions WHERE id = ? AND created_by = ?')
@@ -112,7 +118,7 @@ chatAttachments.post('/api/chats/:id/attachments/upload-sessions/:sessionId/comp
   const storedOwner = context ? await context.json<AttachmentOwner>() : null;
   if (!session || !session.r2_key.startsWith(CHAT_UPLOAD_PREFIX) || session.line_account_id !== owner.lineAccountId
     || storedOwner?.friendId !== owner.friendId || storedOwner?.lineAccountId !== owner.lineAccountId) return c.notFound();
-  const replay = async (key: string) => ownedAttachment(c.env.IMAGES, key.slice(CHAT_ATTACHMENT_PREFIX.length), owner, originOf(c));
+  const replay = async (key: string) => signedAttachment(await ownedAttachment(c.env.IMAGES, key.slice(CHAT_ATTACHMENT_PREFIX.length), owner, originOf(c)), owner, c.env.API_KEY);
   if (session.completed_at && session.public_key) return c.json({ success: true, data: await replay(session.public_key) });
   if (Date.parse(session.expires_at) <= Date.now()) return c.json({ success: false, error: 'アップロード期限が切れました' }, 409);
   let body: { etag?: string };
@@ -153,7 +159,7 @@ chatAttachments.post('/api/chats/:id/attachments/upload-sessions/:sessionId/comp
     if (!winner?.public_key) return c.json({ success: false, error: '完了を確認できませんでした' }, 409);
     return c.json({ success: true, data: await replay(winner.public_key) });
   }
-  return c.json({ success: true, data: attachment }, 201);
+  return c.json({ success: true, data: await signedAttachment(attachment, owner, c.env.API_KEY) }, 201);
 });
 
 // 決まったPNG（先頭のコマを作れないときのプレビュー）。R2への設定作業は不要。
@@ -164,8 +170,20 @@ chatAttachments.get('/images/chat-attachments/video-preview.png', c => {
 chatAttachments.get('/images/chat-attachments/:attachmentId', async c => {
   const id = c.req.param('attachmentId');
   if (!CHAT_ATTACHMENT_ID.test(id)) return c.notFound();
+  for (const [key, value] of Object.entries(privateDownloadHeaders)) c.header(key, value);
+  const requestUrl = new URL(c.req.url);
+  if (!requestUrl.searchParams.has('expires') && !requestUrl.searchParams.has('signature')) {
+    return c.redirect(customerDownloadEntry(originOf(c), 'files', id), 303);
+  }
   const head = await c.env.IMAGES.head(`${CHAT_ATTACHMENT_PREFIX}${id}`);
   if (!head) return c.notFound();
+  const binding = JSON.stringify([head.customMetadata?.lineAccountId ?? '', head.customMetadata?.friendId ?? '']);
+  const staffOrLineDelivery = await validDownload(requestUrl, c.env.API_KEY, 'chat-attachment', id, binding);
+  const customer = !staffOrLineDelivery && await validDownload(requestUrl, c.env.API_KEY, 'chat-attachment-self', id, binding)
+    && await isCustomerFileOwner(c, head);
+  if (!staffOrLineDelivery && !customer) {
+    return c.json({ success: false, error: '取得用URLが無効か期限切れです' }, 403, { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' });
+  }
   const attachment = attachmentFromObject(id, head, originOf(c));
   // no-storeをすべてのファイル応答に付け、期限後にキャッシュから返さない。
   const privateHeaders = { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' };

@@ -10,7 +10,7 @@ import type { AuthenticatedStaff } from '../middleware/auth.js';
 
 const mocks = vi.hoisted(() => ({ pushMessage: vi.fn() }));
 vi.mock('@line-crm/line-sdk', () => ({
-  LineClient: vi.fn().mockImplementation(() => ({ pushMessage: mocks.pushMessage })),
+  LineClient: vi.fn().mockImplementation(function () { return ({ pushMessage: mocks.pushMessage }); }),
 }));
 
 const { chats } = await import('./chats.js');

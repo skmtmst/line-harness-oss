@@ -19,7 +19,7 @@ vi.mock('../services/account-access.js', () => ({
 
 const { featureSettings } = await import('./feature-settings.js');
 
-const ENV = { RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
+const ENV = { DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Record<string, string>;
 const CATALOG_KEY = 'feature.specialized.catalog';
 const CONFIRM_KEY = 'feature.off_confirm';
 

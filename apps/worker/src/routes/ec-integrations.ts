@@ -1,3 +1,4 @@
+import { getConnectorSecret } from './ec-connector-secret.js';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { savePublicationDailyViews } from '@line-crm/db';
 import type { PublicationViewSample } from '@line-crm/shared';
@@ -32,6 +33,7 @@ type EcItem = {
   line_amount?: number | null;
 };
 export type EcEvent = {
+  customer_identity?: {email?:string;email_verified?:boolean;phone?:string;phone_verified?:boolean;name?:string;postal_code?:string};
   event_id: string;
   event_type: string;
   occurred_at: string;
@@ -444,28 +446,6 @@ function usableGlobalSecret(value: string | undefined): string | null {
 }
 
 /**
- * つなぎ先ごとの受信鍵。ec_connectors の暗号化された鍵を復号する。
- * 鍵の用意がない・復号できないときは null（全体の鍵へ倒す）。
- */
-async function getConnectorSecret(
-  db: D1Database,
-  lineAccountId: string,
-  encryptionKey: string | undefined,
-): Promise<string | null> {
-  try {
-    const row = await db.prepare(
-      `SELECT inbound_secret_encrypted FROM ec_connectors WHERE line_account_id = ? LIMIT 1`,
-    ).bind(lineAccountId).first<{ inbound_secret_encrypted: string | null }>();
-    const encrypted = row?.inbound_secret_encrypted;
-    if (!encrypted) return null;
-    const secret = await decryptCredential(encrypted, encryptionKey);
-    return secret && secret.length >= 32 ? secret : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * 公式サイトの掲載閲覧数を保存する（F-20）。
  *
  * ECが数えた累計を、今ある数と比べて大きい方だけ残す。足し算しないので、
@@ -628,6 +608,11 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     return c.json({ success: true, duplicate: true, status: row.status });
   }
 
+  const subscription = await c.env.DB.prepare('SELECT status,event_types_json FROM ec_connectors WHERE line_account_id=?').bind(lineAccountId).first<{status:string;event_types_json:string}>();
+  if(subscription && subscription.status !== 'paused' && !(JSON.parse(subscription.event_types_json) as string[]).includes(event.event_type)) {
+    await c.env.DB.prepare("UPDATE ec_events SET status='skipped',error_message='event_not_subscribed',updated_at=? WHERE id=?").bind(now,row.id).run();
+    return c.json({success:true,status:'not_subscribed'},202);
+  }
   try {
     await upsertEcEventReadModels(c.env.DB, {
       eventId: row.id,

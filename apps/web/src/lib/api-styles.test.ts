@@ -124,3 +124,57 @@ describe('style client scope and consent', () => {
     });
   });
 });
+
+it('preflights a distribution and sends the reviewed token, copy policy and shop consent', async () => {
+  await hqStyleApi.preflight('salon', {
+    expectedVersion: 4,
+    target: { style: 'salon' },
+  });
+  await hqStyleApi.distribute('salon', {
+    expectedVersion: 4,
+    target: { accountIds: ['a'] },
+    token: 'reviewed-token',
+    confirmed: true,
+    editedAction: 'notify',
+  });
+  await styleApi.acceptStarterUpdate('a', 'welcome', {
+    confirmed: true,
+    expectedSetVersion: 4,
+    expectedSnapshot: 'snapshot',
+  });
+  expect(mocks.fetchApi.mock.calls.map((c) => c[0])).toEqual([
+    '/api/hq/style-starter-sets/salon/preflight',
+    '/api/hq/style-starter-sets/salon/distribute',
+    '/api/dashboard/style/starter-items/welcome/accept-update?account_id=a',
+  ]);
+  expect(
+    JSON.parse(mocks.fetchApi.mock.calls[1][1]!.body as string),
+  ).toMatchObject({
+    token: 'reviewed-token',
+    confirmed: true,
+    editedAction: 'notify',
+    target: { accountIds: ['a'] },
+  });
+});
+it('saves KPI choices and reminder draft revision without losing account/version scoping', async () => {
+  await styleApi.saveCards(
+    'a',
+    7,
+    [{ id: 'analytics', visible: false }],
+    ['bookings', 'paidAmount'],
+  );
+  await styleApi.activate('a', [
+    { id: 'reminder', kind: 'reminder', expectedDraftVersionId: 'draft' },
+  ]);
+  expect(JSON.parse(mocks.fetchApi.mock.calls[0][1]!.body as string)).toEqual({
+    expectedVersion: 7,
+    cards: [{ id: 'analytics', visible: false }],
+    metricIds: ['bookings', 'paidAmount'],
+  });
+  expect(JSON.parse(mocks.fetchApi.mock.calls[1][1]!.body as string)).toEqual({
+    confirmed: true,
+    items: [
+      { id: 'reminder', kind: 'reminder', expectedDraftVersionId: 'draft' },
+    ],
+  });
+});

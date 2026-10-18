@@ -200,7 +200,7 @@
 .head,
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-amount) var(--tpl-hq-col-actions);
+  grid-template-columns: minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-amount) calc(var(--space-32) + var(--space-8));
   align-items: center;
   column-gap: var(--tpl-hq-col-gap);
 }
@@ -251,3 +251,5 @@
 
 .dialogFields { display: flex; flex-direction: column; gap: var(--tpl-hq-field-gap); }
 .dialogLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 500; }
+
+.rowEnd { display: inline-flex; justify-content: flex-end; }

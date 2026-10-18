@@ -17,6 +17,12 @@ export interface MenuItem {
   /** キャンセル期限 (開始の何時間前まで)。null は店の既定を使う。 */
   cancel_deadline_hours_before?: number | null;
   intake_question?: string | null;
+  /** 同時に予約できる人数（B5。口は今 1 だけ。2 以上になったら「何人で予約しますか」を出す）。 */
+  max_party_size?: number;
+  /** 追加メニュー（オプション）。メニューを選んだあと addons の口で読み足す。 */
+  addons?: MenuAddon[];
+  /** お客さまの繰り返し予約（B4。初期オフ）。オンのメニューだけ確認に「毎週この時間で続ける」を出す。口が出来るまでの形（B-314）。 */
+  recurring?: { enabled: boolean; max_count: number };
 }
 
 
@@ -210,6 +216,7 @@ export type CreateEventBookingResponse =
 
 
 export interface EventBookingMine {
+  makeup?: EventBookingMakeup;
   /** 従来の予約行は未指定。待ちの行は source: 'waitlist'。 */
   source?: 'booking' | 'waitlist';
   queue_position?: number | null;
@@ -308,3 +315,33 @@ export interface FormSubmitResponse {
   code?: string;
   idempotencyKey?: string;
 }
+
+export interface MenuAddon { id: string; name: string; duration_minutes: number; price: number }
+
+/** 答えで決まった予約の行き先（B6）。 */
+export interface RoutedTarget { menuId: string; menuName: string; durationMinutes: number; price: number; staffId: string | null; staffName: string | null; meetingMode: 'in_person' | 'online' | null }
+
+export interface MakeupCredit { id: string; expires_at: string; status: 'open' | 'used' | 'expired' | 'revoked'; source_event_booking_id?: string | null; source_event_id?: string; /** 口はまだ返さない（欠席した回の日時・名前）。返すようになったら帯の 1 行目に出す。 */ source_starts_at?: string | null; source_name?: string | null }
+export interface MakeupOption { slot_id: string; event_id: string; starts_at: string; ends_at: string; name: string; remaining: number | null; full: boolean }
+
+
+
+/** 予約前の費用見積もりから読み替えたキャンセル料・デポジット。金額は円。 */
+export interface BookingCancellationPreview {
+  enabled: boolean;
+  version: number;
+  /** この時刻までは無料（ISO）。 */
+  freeUntil: string | null;
+  /** カード登録が必要な相手だけ登録へ進む。 */
+  cardRequired?: boolean;
+  /** 実際の決まりの全段。複数段を省かず表示する。 */
+  tiers?: Array<{ beforeHours: number; percent: number }>;
+  afterPercent: number;
+  noShowPercent: number;
+  price: number;
+  /** デポジット（今払う額）。無ければ null。 */
+  deposit: { amount: number } | null;
+}
+
+
+export interface EventBookingMakeup { enabled: boolean; /** 振替がもらえるときの期限（この欠席なら）。 */ valid_until?: string | null; /** 欠席の連絡の締め（これを過ぎると振替の対象外）。 */ cutoff_at: string | null; plan_label?: string | null }

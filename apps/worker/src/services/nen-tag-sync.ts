@@ -1,3 +1,4 @@
+import { daysUntil } from './nen-date-window.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import * as dbPackage from '@line-crm/db';
 import type { NenRankSetting } from '@line-crm/db';
@@ -174,15 +175,6 @@ function daysSince(value: string | null | undefined, now: Date): number | null {
   if (!value) return null;
   const time = Date.parse(value);
   return Number.isFinite(time) ? Math.floor((now.getTime() - time) / 86_400_000) : null;
-}
-
-function daysUntil(value: unknown, now: Date): number | null {
-  if (typeof value !== 'string') return null;
-  const time = Date.parse(`${value.slice(0, 10)}T00:00:00+09:00`);
-  if (!Number.isFinite(time)) return null;
-  const todayJst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-  todayJst.setHours(0, 0, 0, 0);
-  return Math.ceil((time - todayJst.getTime()) / 86_400_000);
 }
 
 function productTags(nameValue: unknown): string[] {
@@ -389,6 +381,7 @@ async function syncManagedTags(
   managed: readonly string[],
   desired: Set<string>,
   prefetchedCurrentIds?: Set<string>,
+  historySourceId?: string,
 ): Promise<{ added: number; removed: number }> {
   const uniqueManaged = [...new Set(managed)];
   let currentIds = prefetchedCurrentIds;
@@ -403,15 +396,18 @@ async function syncManagedTags(
   let removed = 0;
   for (const tagId of uniqueManaged) {
     if (desired.has(tagId) && !currentIds.has(tagId)) {
-      if ((await attachTagAndFireSideEffects(db, friendId, tagId)).added) added += 1;
+      if (historySourceId) {
+        if(await dbPackage.addTagToFriend(db,friendId,tagId,{sourceEventId:`${historySourceId}:${tagId}`,strictSideEffects:true})) added++;
+      } else if ((await attachTagAndFireSideEffects(db, friendId, tagId)).added) added += 1;
     } else if (!desired.has(tagId) && currentIds.has(tagId)) {
-      if ((await detachTagAndFireSideEffects(db, friendId, tagId)).removed) removed += 1;
+      if(historySourceId) {await dbPackage.removeTagFromFriend(db,friendId,tagId);removed++;}
+      else if ((await detachTagAndFireSideEffects(db, friendId, tagId)).removed) removed += 1;
     }
   }
   return { added, removed };
 }
 
-export async function syncNenEcTags(db: D1Database, friendId: string, now = new Date()): Promise<{ added: number; removed: number }> {
+export async function syncNenEcTags(db: D1Database, friendId: string, now = new Date(), historySourceId?: string): Promise<{ added: number; removed: number }> {
   const [snapshot, friend] = await Promise.all([
     db.prepare(
       `SELECT customer_id, orders_json, subscription_json, purchase_count, purchase_amount, member_rank,
@@ -426,12 +422,12 @@ export async function syncNenEcTags(db: D1Database, friendId: string, now = new 
   const rankTag = await resolver.desiredTagId(friend?.line_account_id ?? null, snapshot);
   if (rankTag) desired.add(rankTag);
   const managed = [...EC_STATE_TAGS, ...await resolver.managedTagIds(friend?.line_account_id ?? null)];
-  return syncManagedTags(db, friendId, managed, desired);
+  return syncManagedTags(db, friendId, managed, desired, undefined, historySourceId);
 }
 
 export async function syncNenPetTags(db: D1Database, friendId: string, now = new Date()): Promise<{ added: number; removed: number }> {
   const rows = await db.prepare(
-    `SELECT animal_type, birthday, weight_kg, concerns, image_url FROM nen_pet_profiles WHERE friend_id = ?`,
+    `SELECT animal_type, birthday, weight_kg, concerns, image_url FROM nen_pet_profiles WHERE archived_at IS NULL AND friend_id = ?`,
   ).bind(friendId).all<Pet>();
   return syncManagedTags(db, friendId, PET_STATE_TAGS, derivePetTagIds(rows.results, now));
 }
@@ -629,7 +625,7 @@ async function refreshScheduledNenTags(
     ).bind(...friendIds).all<SnapshotRow>(),
     db.prepare(
       `SELECT friend_id, animal_type, birthday, weight_kg, concerns, image_url
-         FROM nen_pet_profiles WHERE friend_id IN (${placeholders})`,
+         FROM nen_pet_profiles WHERE archived_at IS NULL AND friend_id IN (${placeholders})`,
     ).bind(...friendIds).all<PetRow>(),
     db.prepare(healthQuery).bind(...friendIds).all<HealthLogRow>(),
     db.prepare(

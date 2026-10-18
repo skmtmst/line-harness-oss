@@ -35,6 +35,32 @@ function Form({ error = new ApiError(422, '入力を確認してください', u
   </SaveErrorScope>
 }
 
+function BusyForm() {
+  const fields = useSaveFormErrors()
+  const [busy, setBusy] = useState(false)
+  async function save() {
+    setBusy(true)
+    try { await Promise.reject(new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, { name: '名前を直してください' })) }
+    catch (error) { fields.capture(error) }
+    finally { setBusy(false) }
+  }
+  return <SaveErrorScope errors={fields}>
+    <SaveErrorField names={['name']}><TextField aria-label="保存中の名前" disabled={busy} /></SaveErrorField>
+    <button onClick={() => void save()}>描画前に失敗</button>
+  </SaveErrorScope>
+}
+
+it('APIの失敗が描画の確定より先に返っても、入力を有効に戻してから該当欄へ移る', async () => {
+  vi.stubGlobal('requestAnimationFrame', (run: FrameRequestCallback) => { run(0); return 0 })
+  render(<BusyForm />)
+  const input = screen.getByRole('textbox', { name: '保存中の名前' })
+  fireEvent.click(screen.getByRole('button', { name: '描画前に失敗' }))
+  await act(async () => { await Promise.resolve() })
+  expect(screen.getByText('名前を直してください')).toBeTruthy()
+  expect(input).toHaveProperty('disabled', false)
+  expect(document.activeElement).toBe(input)
+})
+
 describe('保存の失敗を欄に返す共通部品（B-154）', () => {
   it('欄下の理由・赤い印・読み上げのつなぎを付け、最初の欄へ移る。直した欄だけ消す', async () => {
     render(<Form />)

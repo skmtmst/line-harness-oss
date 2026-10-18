@@ -1,3 +1,4 @@
+import { getFriendByLineUserIdForAccount } from './friend-account-identity.js';
 import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
 export interface Friend {
@@ -99,42 +100,7 @@ export async function getFollowingLineUserIdsByTag(
   return (result.results ?? []).map((r) => r.line_user_id);
 }
 
-/**
- * アカウントスコープの friend 解決。同一プロバイダー配下の複数アカウントでは
- * line_user_id が同一になるため、無指定の先頭一致だと別アカウントの friend 行に
- * 吸われて「friend=別アカウント・送信元=受信アカウント」の履歴が作られる
- * (Issue #961)。
- *
- * - lineAccountId 指定時: そのアカウントの行か、まだどのアカウントにも
- *   紐づいていない未割当 (NULL) の行だけを返す。**別アカウント所有の行は
- *   絶対に返さない**（跨ぎフォールバックは廃止）。
- * - lineAccountId が null の場合: アカウント文脈を持たないレガシー呼出として
- *   未割当の行だけを返す。他店の所属を推測しない。
- *
- * 未割当行を受信アカウントへ引き当てるかは各呼出側の明示的な判断に委ねる
- * （例: webhook は受信時に NULL 行を自アカウントへ引き当てる）。
- */
-export async function getFriendByLineUserIdForAccount(
-  db: D1Database,
-  lineUserId: string,
-  lineAccountId: string | null,
-): Promise<Friend | null> {
-  if (lineAccountId) {
-    // C-2b で UNIQUE(line_account_id, line_user_id) へ移行すると同一スコープと
-    // 未割当の行が並存し得るため、厳密一致の行を優先して返す。
-    return db
-      .prepare(
-        `SELECT * FROM friends
-          WHERE line_user_id = ?
-            AND (line_account_id = ? OR line_account_id IS NULL)
-          ORDER BY (line_account_id = ?) DESC
-          LIMIT 1`,
-      )
-      .bind(lineUserId, lineAccountId, lineAccountId)
-      .first<Friend>();
-  }
-  return db.prepare('SELECT * FROM friends WHERE line_user_id = ? AND line_account_id IS NULL LIMIT 1').bind(lineUserId).first<Friend>();
-}
+export { getFriendByLineUserIdForAccount } from './friend-account-identity.js';
 
 export async function getFriendByLineUserId(
   db: D1Database,

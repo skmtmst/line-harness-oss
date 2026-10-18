@@ -1,61 +1,58 @@
 'use client'
 
-import ReservationBoard,{ ReservationLegend } from '@/components/shared/reservation-board'
-import { allBoardPages,reservationBoardApi } from '@/lib/api-reservation-board'
-import PeopleDayFrame from '@/v8/booking-bookings/day-frame'
-import PeopleDayList from '@/v8/booking-bookings/day-list'
-import { usePeopleVisitMarks } from '@/v8/booking-bookings/use-visit-marks'
-import { peopleBoardEntry } from '@line-crm/shared'
-import { statusTone } from './booking-status-tone'
-
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
-import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-menu'
-import DetailPanel,{ useDetailPanelUrl } from '@/components/shared/detail-panel'
-import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
-import FilterChip from '@/components/shared/filter-chip'
-import FolderPanel from '@/components/shared/folder-panel'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
-import ListToolbar,{ ListToolbarEnd,ListToolbarRow,ListToolbarSearchSlot,ResponsiveFilterChips } from '@/components/shared/list-toolbar'
-import Notice from '@/components/shared/notice'
-import Pagination from '@/components/shared/pagination'
-import { RowMenu } from '@/components/shared/row-actions'
-import SegmentedControl from '@/components/shared/segmented'
-import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import { ActionCell,DataTable,DateCell,StatusCell,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
-import { withViewTransition } from '@/components/shared/view-transition'
-import { usePageTitle } from '@/components/shell/page-chrome'
-import { PageHeading } from '@/components/templates/page-frame'
-import ListRange from '@/components/ui/list-range'
-import { useAccount } from '@/contexts/account-context'
-import { api,ApiError,bookingApi,type BookingAdminDetail,type BookingMenu,type BookingRequest,type BookingStaff } from '@/lib/api'
-import { formatDate,formatDateTime,formatDay,formatNumber,formatTime } from '@/lib/format'
-import BookingLedgerBody from '@/v8/booking-bookings/ledger-body'
-import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
-import { BookingChipsLabel,BookingMonthBar,BookingUrlCopy } from '@/v8/booking-bookings/month-bar'
-import ledgerStyles from '@/v8/booking-bookings/month-bar.module.css'
-import LedgerMonthNavigation,{ monthDifference,monthKey,monthLabel } from '@/v8/booking-bookings/month-navigation'
-import { Calendar,CalendarPlus,CalendarX,CircleAlert,Download,Phone,X } from 'lucide-react'
-import Link from 'next/link'
-import { useRouter,useSearchParams } from 'next/navigation'
-import { useCallback,useEffect,useRef,useState,type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { canOperateBookings } from '../lib/booking-permissions'
-import {
-isLineBooking,
-moveDay,
-startOfWeek,
-type CalendarAvailability,
-type CalendarSlot,
-} from './booking-calendar'
-import BookingDetailV8 from './booking-detail-v8'
-import { DetailRow } from './detail-row'
-import { fetchAllPages } from './fetch-all-pages'
-
-
+import { statusTone } from './booking-status-tone';
+import ReservationBoard, { ReservationLegend } from '@/components/shared/reservation-board';
+import PeopleDayList from '@/v8/booking-bookings/day-list';
+import PeopleDayFrame from '@/v8/booking-bookings/day-frame';
+import { usePeopleVisitMarks } from '@/v8/booking-bookings/use-visit-marks';
+import { peopleBoardEntry } from '@line-crm/shared';
+import { reservationBoardApi, allBoardPages } from '@/lib/api-reservation-board';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import KpiBand from '@/components/shared/kpi-band';
+import KpiCard from '@/components/shared/kpi-card';
+import { PageHeading } from '@/components/templates/page-frame';
+import SegmentedControl from '@/components/shared/segmented';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Calendar, CalendarPlus, CalendarX, CircleAlert, Download, Phone, X } from 'lucide-react';
+import { api, bookingApi, ApiError, type BookingAdminDetail, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api';
+import { useAccount } from '@/contexts/account-context';
+import ConfirmDialog from '@/components/shared/confirm-dialog';
+import BookingGapSections from '@/v8/booking-gap/booking-gap-sections';
+import SeriesHost, { SERIES_QUERY_KEYS } from '@/v8/booking-gap/series-host';
+import Button from '@/components/shared/button';
+import ListToolbar from '@/components/shared/list-toolbar';
+import ListState from '@/components/shared/list-state';
+import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message';
+import Notice from '@/components/shared/notice';
+import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame';
+import BookingLedgerBody from '@/v8/booking-bookings/ledger-body';
+import LedgerMonthNavigation, { monthKey, monthLabel, monthDifference } from '@/v8/booking-bookings/month-navigation';
+import FilterChip from '@/components/shared/filter-chip';
+import { ListToolbarEnd, ListToolbarRow, ListToolbarSearchSlot, ResponsiveFilterChips } from '@/components/shared/list-toolbar';
+import StatusBadge from '@/components/shared/status-badge';
+import { RowMenu } from '@/components/shared/row-actions';
+import { BookingChipsLabel, BookingMonthBar, BookingUrlCopy } from '@/v8/booking-bookings/month-bar';
+import ledgerStyles from '@/v8/booking-bookings/month-bar.module.css';
+import Select from '@/components/shared/select';
+import { ActionCell, DataTable, DateCell, StatusCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
+import Pagination from '@/components/shared/pagination';
+import ListRange from '@/components/ui/list-range';
+import FolderPanel from '@/components/shared/folder-panel';
+import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
+import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
+import { withViewTransition } from '@/components/shared/view-transition';
+import { usePageTitle } from '@/components/shell/page-chrome';
+import BookingDetailV8 from './booking-detail-v8';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { BookingChargesSection } from '@/v8/booking-payments/booking-charges';
+import { BookingGroupSection } from '@/v8/booking-payments/booking-group';
+import { canOperateBookings } from '../lib/booking-permissions';
+import { fetchAllPages } from './fetch-all-pages';
+import { isLineBooking, moveDay, startOfWeek, type CalendarAvailability, type CalendarSlot } from './booking-calendar';
+import { formatDate, formatDateTime, formatDay, formatNumber, formatTime } from '@/lib/format';
+import { DetailRow, ActionButtons } from "./page-gap-parts"
 /**
  * 予約管理（設計 V2 8-1 / node EAYvf）。
  *
@@ -367,6 +364,8 @@ export default function BookingsPage() {
    * v7 は今のまま（引き出し・小窓）で、1画素も変えない。
    */
   const [activeBookingId, setActiveBookingId] = useDetailPanelUrl('booking')
+  /* 返金はオーナー・管理者だけ（B1：スタッフは請求・請求しないまで）。 */
+  const canRefundCharges = canManageRole(useStaffRole())
   const openBookingDetail = (id: string) => withViewTransition(() => setActiveBookingId(id))
   const closeBookingDetail = () => setActiveBookingId(null)
 
@@ -810,6 +809,8 @@ export default function BookingsPage() {
     ...(page <= 1 ? [] : [`page=${page}`]),
     // V8 C①：開いている詳細パネルの行を残す。無いとURLの写しが ?booking= を消す。
     ...(activeBookingId ? [`booking=${encodeURIComponent(activeBookingId)}`] : []),
+    // 「繰り返して入れる」の引き出し（B4）：開いている間の指定も残す。
+    ...SERIES_QUERY_KEYS.flatMap((key) => (urlParams.get(key) ? [`${key}=${encodeURIComponent(urlParams.get(key) ?? '')}`] : [])),
   ].join('&')
   useEffect(() => {
     if (!urlInitRef.current || !ledgerRestored) return
@@ -931,6 +932,7 @@ export default function BookingsPage() {
           detailHref={`/booking/bookings/detail?id=${encodeURIComponent(detail.id)}`}
         />
       ))}
+      {selectedAccountId && canOperate ? <SeriesHost params={new URLSearchParams(urlParams.toString())} accountId={selectedAccountId} menus={menus} staffList={staffList} basePath="/booking/bookings" /> : null}
       <ConfirmDialog
         open={decideTarget !== null}
         designNode={decideTarget?.action === 'cancel' ? 'iJdAi' : undefined}
@@ -1345,9 +1347,16 @@ export default function BookingsPage() {
           }
           footer={activeBooking ? (
             <>
+              {/* 絵 Nx1kq の言葉（日時を変える）。来店にするを並べても 360 の帯で 1 行に収める。 */}
               <Button href={`/booking/bookings/detail?id=${encodeURIComponent(activeBooking.id)}`} variant="secondary">
-                時間や担当を変える
+                日時を変える
               </Button>
+              {/* 来店にする（Nx1kq・司令塔の判断）：確定の予約だけ。今ある「完了」の確かめの窓を通す。閲覧のみには出さない。 */}
+              {canOperate && activeBooking.status === 'confirmed' ? (
+                <Button variant={activeBooking.friend_id ? 'secondary' : 'primary'} onClick={() => handleDecide(activeBooking.id, 'complete')}>
+                  来店にする
+                </Button>
+              ) : null}
               {activeBooking.friend_id ? (
                 <Button href={`/chats?friend=${activeBooking.friend_id}`} variant="primary">
                   この人と話す
@@ -1358,6 +1367,7 @@ export default function BookingsPage() {
         >
           {activeBooking ? (
             <div>
+              {selectedAccountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={selectedAccountId} bookingId={activeBooking.id} seriesId={(activeBooking as { series_id?: string | null }).series_id ?? null} customerName={activeBooking.friend_name ?? 'お客様'} menuName={activeBooking.menu_name} startsAt={activeBooking.starts_at} canOperate={canOperate} onChanged={() => void load()} /></div> : null}
               <DetailRow label="日時">
                 {formatJpDateTime(activeBooking.starts_at)} 〜 {formatJpTime(activeBooking.ends_at)}
               </DetailRow>
@@ -1373,6 +1383,13 @@ export default function BookingsPage() {
               <DetailRow label="お客様からのご希望">
                 {activeBooking.customer_note ?? <span className="text-ink-faint">記入なし</span>}
               </DetailRow>
+              {/* この組（B5・Nx1kq）と お支払い（B1・Ae1W1・fom2A）。口が無い・対象でない予約は出さない。 */}
+              {selectedAccountId ? <div className="mt-3 flex flex-col gap-3">
+                <BookingGroupSection accountId={selectedAccountId} bookingId={activeBooking.id} canOperate={canOperate} />
+                <BookingChargesSection accountId={selectedAccountId} bookingId={activeBooking.id} customerName={activeBooking.friend_name ?? 'お客'}
+                  bookingLabel={`${formatJpDateTime(activeBooking.starts_at)} ${activeBooking.menu_name}`} price={activeBooking.price_at_booking ?? null}
+                  canCharge={canOperate} canRefund={canOperate && canRefundCharges} />
+              </div> : null}
               <p className="mt-3 text-xs">
                 <Link
                   href={`/booking/bookings/detail?id=${encodeURIComponent(activeBooking.id)}`}
@@ -1543,53 +1560,4 @@ function BookingDetailPanel({
       </aside>
     </div>
   )
-}
-
-function ActionButtons({
-  status,
-  onAction,
-}: {
-  status: string
-  onAction: (a: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete') => void
-}) {
-  if (status === 'requested') {
-    return (
-      <div className="inline-flex gap-1">
-        <Button variant="primary" className="px-3 py-1 text-xs font-medium border-0 h-auto whitespace-normal" onClick={() => onAction('approve')}>
-          承認
-        </Button>
-        <button
-          onClick={() => onAction('reject')}
-          className="text-danger bg-danger-bg rounded-mini px-3 py-1 text-xs font-medium hover:bg-status-danger-selected"
-        >
-          拒否
-        </button>
-      </div>
-    )
-  }
-  if (status === 'confirmed') {
-    return (
-      <div className="inline-flex gap-1">
-        <button
-          onClick={() => onAction('complete')}
-          className="bg-info-bg text-info rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-        >
-          閉じる
-        </button>
-        <button
-          onClick={() => onAction('no_show')}
-          className="bg-warning-bg text-warning rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-        >
-          無断
-        </button>
-        <button
-          onClick={() => onAction('cancel')}
-          className="text-ink-secondary bg-canvas-sunken rounded-mini px-3 py-1 text-xs font-medium hover:bg-hairline"
-        >
-          取消
-        </button>
-      </div>
-    )
-  }
-  return <span className="text-ink-faint text-xs">-</span>
 }

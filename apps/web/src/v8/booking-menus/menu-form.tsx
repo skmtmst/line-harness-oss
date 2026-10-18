@@ -1,4 +1,6 @@
 'use client'
+
+import { storedStringList } from '@/lib/stored-json'
 import Toggle from '@/components/shared/toggle'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
@@ -14,7 +16,9 @@ import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import CheckCard from '@/components/shared/check-card'
-import { MenuPaymentFields, useMenuPayment } from '../booking-payments/menu-payment'
+import { useMenuPayment } from '../booking-payments/menu-payment'
+import { BookingMenuPaymentCard, useMenuDeposit } from '../booking-payments/menu-deposit'
+import { MeetingModeCard, useMenuMeeting, type MeetingMode } from './meeting-mode'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -45,6 +49,9 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { EntityPickerField } from '@/components/shared/entity-picker'
 import Notice from '@/components/shared/notice'
+import { AudienceSection, audienceVisibility, type AudienceMode } from './audience-section'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import type { FriendListItem } from '@/lib/api'
 import HelpTip from '@/components/shared/help-tip'
 import { isSaveConflict } from '@/components/shared/api-error-message'
 
@@ -187,6 +194,12 @@ export default function MenuFormV8() {
   const [askQuestion, setAskQuestion] = useState(false)
   const [intakeQuestion, setIntakeQuestion] = useState('')
   const [autoTagId, setAutoTagId] = useState<string | null>(null)
+  /* 見せる相手（B9）。保存の口はメニューの audienceMode・audienceTagIds（Codex の次の段）。 */
+  const [audienceMode, setAudienceMode] = useState<AudienceMode>('all')
+  const [audienceTagIds, setAudienceTagIds] = useState<string[]>([])
+  const [previewFriendId, setPreviewFriendId] = useState('')
+  const [previewFriends, setPreviewFriends] = useState<FriendListItem[]>([])
+  const canEditAudience = canManageRole(useStaffRole())
   const [resourceIds, setResourceIds] = useState<Set<string>>(new Set())
   const [resourceQuantities, setResourceQuantities] = useState<Record<string, string>>({})
   const [resourceSaving, setResourceSaving] = useState(false)
@@ -241,6 +254,11 @@ export default function MenuFormV8() {
     setAskQuestion(Boolean(menu.intake_question))
     setIntakeQuestion(menu.intake_question ?? '')
     setAutoTagId(menu.auto_tag_id)
+    {
+      const wide = menu as BookingMenu & { audience_mode?: AudienceMode; audience_tag_ids_json?: string | null }
+      setAudienceMode(wide.audience_mode ?? 'all')
+      setAudienceTagIds(storedStringList(wide.audience_tag_ids_json))
+    }
     setResourceIds(new Set((menu.assigned_resources ?? []).map((item) => item.resourceId)))
     setResourceQuantities(Object.fromEntries((menu.assigned_resources ?? []).map((item) => [item.resourceId, String(item.quantity)])))
     const ids = new Set<string>()
@@ -390,6 +408,7 @@ export default function MenuFormV8() {
     setResourceSaving(false)
     setResourceMessage(null)
     setAutoTagId(null)
+    setAudienceMode('all'); setAudienceTagIds([]); setPreviewFriendId('')
     setNoAssign(false)
   }, [selectedAccountId])
 
@@ -431,6 +450,14 @@ export default function MenuFormV8() {
     auto_tag_id: autoTagId,
   }
 
+  /* 「この人で見る」：選んだ友だちに、作りかけのメニューが見えるか（タグで限定したとき）。 */
+  const hiddenMenuFields = (() => {
+    const friend = previewFriends.find((item) => item.id === previewFriendId)
+    if (!friend) return null
+    const verdict = audienceVisibility(audienceMode, audienceTagIds, friend.tags.map((tag) => tag.id), (id) => tags.find((tag) => tag.id === id)?.name ?? '選んだタグ')
+    return verdict.visible ? null : { name: friend.displayName, reason: verdict.reason }
+  })()
+
   /*
    * 直しかけ判定：読み込んだ時点（作成なら初期値）と違ったら確認を挟む。
    * baseline は fillFrom で版ごと取り直す。
@@ -443,7 +470,10 @@ export default function MenuFormV8() {
   ])
   /* お支払い（いつもの方法／このメニューだけ変える）。メニューを保存したあとに口へ書く。 */
   const payment = useMenuPayment('booking', selectedAccountId, editTarget?.id ?? null)
-  const dirty = payment.dirty || baselineRef.current !== '' && baselineRef.current !== currentSignature ||
+  /* デポジット（B1・CnV1I）と会い方・会議の URL（B7・ELruS）。どちらもメニューを保存したあとに口へ書く。 */
+  const deposit = useMenuDeposit(selectedAccountId, editTarget?.id ?? null)
+  const meeting = useMenuMeeting(selectedAccountId, editTarget?.id ?? null, ((editTarget as (BookingMenu & { meeting_mode?: MeetingMode | null }) | null)?.meeting_mode) ?? null)
+  const dirty = payment.dirty || deposit.dirty || meeting.dirty || baselineRef.current !== '' && baselineRef.current !== currentSignature ||
     (baselineRef.current === '' && Boolean(
       name || effectiveCategory || description || durationMinutes !== '60' ||
       bufferAfterMinutes !== '0' || basePrice || concurrentCapacity !== '1' ||
@@ -661,6 +691,7 @@ export default function MenuFormV8() {
       intake_question: askQuestion ? intakeQuestion.trim() || null : null,
       auto_tag_id: autoTagId,
       is_active: publish ? 1 : 0,
+      ...({ audience_mode: audienceMode, audience_tag_ids: audienceMode === 'all' ? [] : audienceTagIds } as Partial<BookingMenu>),
     }
   }
 
@@ -794,9 +825,11 @@ export default function MenuFormV8() {
       }
       try {
         await payment.save(menuId)
+        await deposit.save(menuId)
+        version = await meeting.save(menuId, version)
       } catch (paymentFailure) {
         saveErrors.capture(paymentFailure)
-        throw new Error('メニューは保存されましたが、お支払いの方法を保存できませんでした。もう一度押してください。')
+        throw new Error('メニューは保存されましたが、お支払いの方法・会い方を保存できませんでした。もう一度押してください。')
       }
       setCreatedMenuNeedingFollowUp(null)
       notifySaved(editTarget ? 'メニューを保存しました' : publish ? 'メニューを公開しました' : '下書きを保存しました')
@@ -902,10 +935,11 @@ export default function MenuFormV8() {
             {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
           </div>
           <p className={shell.sideTitle}>お客さまの予約画面</p>
+          {hiddenMenuFields ? <Notice tone="warn">{`${hiddenMenuFields.name}さんには「${draftMenu.name}」は見えません（${hiddenMenuFields.reason}）`}</Notice> : null}
           <>
             <LiffPhoneMenuStep categoryTone="customer"
               menus={menus.filter((menu) => menu.id !== editTarget?.id)}
-              draft={draftMenu}
+              draft={hiddenMenuFields ? null : draftMenu}
               status={menusStatus}
             />
           </>
@@ -959,7 +993,7 @@ export default function MenuFormV8() {
           {/* ① メニューの中身 */}
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="メニューの中身" />
-            <SettingsFormRow layout="name-folder">
+            <SettingsFormRow layout="name-folder" keepColumns>
               <Field label="メニュー名" requirement={menuNameRequirement}><SaveErrorField names={["name"]}><TextField
                   type="text"
                   value={name}
@@ -1011,7 +1045,7 @@ export default function MenuFormV8() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="例：シャンプー・カット・爪切り"
               /></SaveErrorField></Field>
-            <SettingsFormRow layout="columns" columns={3}>
+            <SettingsFormRow layout="columns" columns={3} keepColumns>
               <Field label="かかる時間" requirement={menuDurationRequirement}>
                 <SaveErrorField names={["durationMinutes","duration_minutes"]}><NumberInput unit="分"
                   type="number"
@@ -1086,7 +1120,7 @@ export default function MenuFormV8() {
               </p>
             ) : (
               <>
-                <SettingsFormRow layout="columns" columns={3} role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
+                <SettingsFormRow layout="columns" columns={3} keepColumns role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
                   {staff.filter((person) => person.is_active).map((person) => {
                     const on = assigned.has(person.id)
                     // 絵 QqER7：トリマーは名前だけ、それ以外は（役割）を付ける。
@@ -1100,23 +1134,23 @@ export default function MenuFormV8() {
                   })}
                 </SettingsFormRow>
                 {fieldErrors.staff && assigned.size === 0 ? <p className={styles.fieldError} role="alert">{fieldErrors.staff}</p> : null}
+                {/* 保存する設定はチェック（決まり14・絵どおり：言葉は左、チェックは右）。 */}
                 <div className={styles.toggleLine}>
                   <span className={styles.toggleLineLabel}>「指名なし」でも受ける</span>
-                  <SaveErrorField names={["noAssign","no_assign"]}><Toggle
-                    label="「指名なし」でも受ける"
-                    checked={noAssign}
-                    onChange={toggleNoAssign}
-                  /></SaveErrorField>
+                  <SaveErrorField names={["noAssign","no_assign"]}><SettingCheckbox label="「指名なし」でも受ける" checked={noAssign} onChange={toggleNoAssign} /></SaveErrorField>
                 </div>
               </>
             )}
           </Card>
 
+          {/* 会い方（B7・ELruS）：担当スタッフと予約のきまりの間。 */}
+          <MeetingModeCard state={meeting} readOnly={Boolean(editTarget && !canEdit)} />
+
           {/* ③ 予約のきまり */}
           <Card variant="form" gap="normal">
             <CardHeader size="stacked" title="予約のきまり" meta="空ならお店全体のきまり（予約のルール）を使います" />
             {ownRules ? (
-              <SettingsFormRow layout="columns" columns={3}>
+              <SettingsFormRow layout="columns" columns={3} keepColumns>
                 <Field label="先の予約が取れる範囲">
                   <SaveErrorField names={["windowDays","window_days"]}><NumberInput unit="日先まで" type="number" min={1} value={windowDays} onChange={(e) => setWindowDays(e.target.value)} aria-label="先の予約が取れる範囲（日）" /></SaveErrorField>
                 </Field>
@@ -1151,6 +1185,12 @@ export default function MenuFormV8() {
               </Button>
             </div>
           </Card>
+
+          {/* 見せる相手（B9・絵 L6ifay）。 */}
+          <AudienceSection accountId={selectedAccountId ?? null} mode={audienceMode} tagIds={audienceTagIds} onMode={setAudienceMode} onTagIds={setAudienceTagIds} canEdit={canEditAudience}
+            friendId={previewFriendId} onFriendId={setPreviewFriendId} onFriends={setPreviewFriends} />
+          {/* お支払い（B1・CnV1I）：予約のきまりのすぐ下に、独立した段で。 */}
+          <BookingMenuPaymentCard payment={payment} deposit={deposit} price={basePrice.trim() === '' ? null : Number(basePrice) || 0} readOnly={Boolean(editTarget && !canEdit)} />
 
           {/* ④ そのほか（受け方・予約を受けたとき・設備）と お支払い。絵 QqER7・v5L19Z は白い段に白い小段を積む。 */}
           <Card variant="form" gap="normal">
@@ -1271,9 +1311,6 @@ export default function MenuFormV8() {
               {resourceMessage && <p role="status" className="text-ink-secondary text-sm">{resourceMessage}</p>}
             </Card>
 
-            {/* 絵 QqER7・mauOC：いつもの方法を使う／このメニューだけ変える（B-305）。決済をつないでいない店は 1 行の案内。 */}
-            <CardHeader size="stacked" title="お支払い" />
-            <MenuPaymentFields state={payment} name="menu" price={basePrice.trim() === '' ? null : Number(basePrice) || 0} readOnly={Boolean(editTarget && !canEdit)} />
           </Card>
 
           {saveError && (

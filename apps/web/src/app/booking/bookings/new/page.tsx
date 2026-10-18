@@ -1,36 +1,22 @@
 'use client'
 
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { PageHeading } from '@/components/templates/page-frame'
-
-import DateField from '@/components/shared/date-field'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { useAccount } from '@/contexts/account-context'
-import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
-import MenuPortal from '@/components/shared/menu-portal'
-import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
-import StickyBar from '@/components/shared/sticky-bar'
-import LinePreview from '@/components/shared/line-preview'
-import {
-  api,
-  ApiError,
-  bookingApi,
-  type BookingAvailabilitySlot,
-  type BookingConflictAlternatives,
-  type BookingCustomerContext,
-  type BookingMenu,
-  type BookingMenuStaff,
-  type BookingCustomerSummary,
-  type FriendListItem,
-  type ProxyBookingResult,
-} from '@/lib/api'
-import { canOperateBookings } from '../../lib/booking-permissions'
-import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
-import { formatDateTime, formatDay, formatTime } from '@/lib/format'
-
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import { PageHeading } from '@/components/templates/page-frame';
+import DateField from '@/components/shared/date-field';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useAccount } from '@/contexts/account-context';
+import Button from '@/components/shared/button';
+import MenuPortal from '@/components/shared/menu-portal';
+import Notice from '@/components/shared/notice';
+import Select from '@/components/shared/select';
+import StickyBar from '@/components/shared/sticky-bar';
+import LinePreview from '@/components/shared/line-preview';
+import { api, ApiError, bookingApi, type BookingAvailabilitySlot, type BookingConflictAlternatives, type BookingCustomerContext, type BookingMenu, type BookingMenuStaff, type BookingCustomerSummary, type FriendListItem, type ProxyBookingResult } from '@/lib/api';
+import { canOperateBookings } from '../../lib/booking-permissions';
+import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message';
+import { formatDateTime, formatDay, formatTime } from '@/lib/format';
+import { Card, NotificationToggle, RelatedLinks } from "./page-gap-parts"
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
 /**
@@ -1143,6 +1129,7 @@ export default function NewProxyBookingPage() {
           actions={(
             <>
               {(step === 'confirm' || step === 'conflict') && <Button onClick={() => { setStep('input'); setError('') }}>入力に戻る</Button>}
+              {step === 'confirm' && friend && confirmedSlot ? <Button href={`/booking/bookings?${new URLSearchParams({ series: 'new', seriesAt: slotInstant(confirmedSlot) ?? '', seriesMenu: menuId, seriesStaff: staffId, seriesFriend: friend.id, seriesName: friend.displayName ?? '' })}`}>繰り返して入れる</Button> : null}
               {step === 'input' ? (
                 <Button variant="primary" disabled={loading} data-qa-open="GFDqW" onClick={() => void review()} busy={loading} busyLabel="空きを再確認しています">予約内容を確認する
                 </Button>
@@ -1156,10 +1143,6 @@ export default function NewProxyBookingPage() {
       )}
     </div>
   )
-}
-
-function Card({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
-  return <section className="border-hairline bg-canvas rounded-card border p-5"><h2 className="text-ink text-sm font-semibold">{title}</h2>{note ? <p className="text-ink-faint mt-1 text-xs">{note}</p> : null}<div className="mt-4">{children}</div></section>
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -1176,22 +1159,6 @@ function NoticeRow({ title, detail }: { title: string; detail: string }) {
       <span className="text-success font-bold">✓</span>
       <div><p className="text-ink text-sm font-medium">{title}</p><p className="text-ink-faint mt-0.5 text-xs">{detail}</p></div>
     </div>
-  )
-}
-
-/** N-391: 通知の送る／送らないを予約ごとに選ぶトグル。 */
-function NotificationToggle({ checked, onChange, title, detail }: {
-  checked: boolean
-  onChange: (checked: boolean) => void
-  title: string
-  detail: string
-}) {
-  return (
-    <Checkbox
-      checked={checked}
-      onCheckedChange={onChange}
-      description={detail}
-    >{title}</Checkbox>
   )
 }
 
@@ -1231,19 +1198,5 @@ function WarningCard({ title, lines }: { title: string; lines: string[] }) {
       <h2 className="text-warning text-sm font-semibold">{title}</h2>
       <ul className="text-warning mt-3 space-y-2 text-xs">{lines.map((line) => <li key={line}>・{line}</li>)}</ul>
     </section>
-  )
-}
-
-function RelatedLinks({ includeConversion }: { includeConversion: boolean }) {
-  return (
-    <Card title="つながる先">
-      <div className="text-ink-secondary space-y-2 text-xs">
-        <p><Link href="/booking/bookings" className="text-action font-semibold underline">→ 予約管理</Link>　今日の台帳</p>
-        <p><Link href="/booking/menus" className="text-action font-semibold underline">→ 予約設定</Link>　メニューと空き枠</p>
-        <p><Link href="/reminders" className="text-action font-semibold underline">→ リマインダ</Link>　前日・開始前のお知らせ</p>
-        <p><Link href="/friends" className="text-action font-semibold underline">→ 友だち</Link>　顧客カルテに残ります</p>
-        {includeConversion ? <p><Link href="/conversions" className="text-action font-semibold underline">→ コンバージョン</Link>　予約の成果を確認</p> : null}
-      </div>
-    </Card>
   )
 }

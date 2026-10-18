@@ -1,22 +1,28 @@
-import liff from '@line/liff';
-import { useEffect,useState } from 'react';
-import { useLocation,useNavigate } from 'react-router-dom';
-import HistoryCard from '../components/HistoryCard.js';
-import LiffLookScope from '../components/LiffLookScope.js';
+import BookingHistoryCancelDialog from '../components/BookingHistoryCancelDialog.js';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { api, type BookingHistoryItem } from '../lib/api.js';
+import { addDays, slotStartsAtIso, jstToday, formatMd, formatWeekday } from '../lib/datetime.js';
+import ConfirmDialog from '../components/ui/ConfirmDialog.js';
+import { logFailure } from '../lib/user-message.js';
 import LoadErrorView from '../components/LoadErrorView.js';
 import LoadingView from '../components/LoadingView.js';
+import HistoryCard from '../components/HistoryCard.js';
+import WaitlistSection from '../components/WaitlistSection.js';
+import LessonHistorySection from '../components/LessonHistorySection.js';
+import LiffHeader from '../components/ui/LiffHeader.js';
+import LiffLookScope from '../components/LiffLookScope.js';
+import StatusView from '../components/ui/StatusView.js';
+import liff from '@line/liff';
+
 import BottomBar from '../components/ui/BottomBar.js';
 import Button from '../components/ui/Button.js';
-import ConfirmDialog from '../components/ui/ConfirmDialog.js';
-import Icon from '../components/ui/Icon.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import StatusView from '../components/ui/StatusView.js';
-import { api,type BookingHistoryItem } from '../lib/api.js';
-import { loadPaymentViews,type PaymentView } from '../lib/booking-payment-view.js';
-import { addDays,formatMd,formatWeekday,jstToday,slotStartsAtIso,utcToJstHm,utcToJstMd } from '../lib/datetime.js';
-import { logFailure } from '../lib/user-message.js';
-import { CHANGE_RANGE_DAYS,CHANGE_SLOT_LIMIT,cancelFailureMessage,changeFailureMessage,errorCode,type ChangeSlot } from './BookingHistory-messages';
 
+import Icon from '../components/ui/Icon.js';
+
+import { loadPaymentViews,type PaymentView } from '../lib/booking-payment-view.js';
+
+import { CHANGE_RANGE_DAYS,CHANGE_SLOT_LIMIT,cancelFailureMessage,changeFailureMessage,errorCode,type ChangeSlot } from './BookingHistory-messages';
 
 /** 予約履歴と本人の変更・取消。版が返る予約に操作を出し、支払いの状態と領収書も表示する。 */
 export default function BookingHistory() {
@@ -37,6 +43,8 @@ export default function BookingHistory() {
     selected: ChangeSlot | null;
     error: string | null;
   } | null>(null);
+  /* 振替先を選ぶ間は、その帯が下の操作を担う（下の帯を重ねない）。 */
+  const [picking, setPicking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   /* 予約ごとの支払いの札（nWby5）。読めない予約は札なし＝予約の状態の札を出す。 */
@@ -237,6 +245,8 @@ export default function BookingHistory() {
             {actionError && (
               <p role="alert" className="text-[13px] leading-5 text-danger">{actionError}</p>
             )}
+            {tab === 'upcoming' ? <LessonHistorySection onPicking={setPicking} /> : null}
+            {tab === 'upcoming' ? <WaitlistSection upcomingHeading={list.length > 0} onChanged={() => setReloadKey((k) => k + 1)} /> : null}
             {notice && (
               <p role="status" className="text-[13px] leading-5 text-ink-secondary">{notice}</p>
             )}
@@ -280,7 +290,7 @@ export default function BookingHistory() {
           </>
         )}
       </div>
-      {data && !failed && (
+      {data && !failed && !picking && (
         <BottomBar>
           <Button
             variant="primary"
@@ -290,44 +300,8 @@ export default function BookingHistory() {
           </Button>
         </BottomBar>
       )}
-      <ConfirmDialog
-        open={pendingCancel !== null}
-        surface={paidCancel ? 'sheet' : 'dialog'}
-        title={
-          paidCancel
-            ? 'この予約をキャンセルしますか？'
-            : pendingCancel
-              ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)} の${pendingCancel.menu_name}をキャンセルしますか`
-              : ''
-        }
-        description={paidCancel && pendingCancel
-          ? `${utcToJstMd(pendingCancel.starts_at)} ${utcToJstHm(pendingCancel.starts_at)}・${pendingCancel.menu_name}・${pendingCancel.staff_name}`
-          : 'キャンセルすると元に戻せません。キャンセルの期限を過ぎると、ここからは変えられません（トークでご連絡ください）。'}
-        error={actionError ?? undefined}
-        confirmLabel="キャンセルする"
-        cancelLabel="閉じる"
-        destructive
-        busy={busy}
-        footer={paidCancel ? (
-          <div className="flex flex-col gap-2.5">
-            <Button variant="danger" disabled={busy} onClick={() => void runCancel()}>キャンセルして返金を受ける</Button>
-            <Button variant="secondary" disabled={busy} onClick={() => setPendingCancel(null)}>やめる</Button>
-          </div>
-        ) : undefined}
-        onCancel={() => {
-          if (!busy) setPendingCancel(null);
-        }}
-        onConfirm={() => void runCancel()}
-      >
-        {/* 払い済みの予約のキャンセル（hOILq・B-338）：期限内は全額返金を先に知らせる。 */}
-        {paidCancel ? (
-          <div className="flex flex-col gap-1 rounded-(--liff-radius) bg-liff-ok-bg px-3.5 py-3" data-refund-note>
-            <p className="text-[14px] leading-[20px] font-bold text-liff-ok-ink">{`お支払い済みの ¥${Math.round(paidCancel.amount ?? 0).toLocaleString('ja-JP')} は全額返金します`}</p>
-            <p className="text-[12px] leading-[18px] text-ink">カードへの反映まで 5〜10 日かかることがあります。</p>
-          </div>
-        ) : null}
-        {paidCancel ? <p className="text-[12px] leading-[18px] text-liff-sub">{pendingCancel?.cancel_deadline_at ? `キャンセルの期限：${utcToJstMd(pendingCancel.cancel_deadline_at)} ${utcToJstHm(pendingCancel.cancel_deadline_at)} まで。過ぎると返金はありません。` : 'キャンセルの期限を過ぎると返金はありません。'}</p> : null}
-      </ConfirmDialog>
+      <BookingHistoryCancelDialog booking={pendingCancel} payment={paidCancel || null} busy={busy} error={actionError}
+        onConfirm={() => void runCancel()} onCancel={() => { if (!busy) setPendingCancel(null) }} />
       <ConfirmDialog
         open={pendingChange !== null}
         title={pendingChange ? `「${pendingChange.booking.menu_name}」の日時を変えますか` : ''}

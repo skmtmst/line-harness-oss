@@ -1,3 +1,4 @@
+import {appendFeatureScopeMeta} from './feature-scope-response.js';
 import { ACCOUNT_KEYS, bodyAccountIds } from './feature-body-accounts.js';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { FeatureId } from '@line-crm/shared';
@@ -74,6 +75,12 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/friend-reminders', 'reminders'),
   feature('/api/reminder-runs', 'reminders'),
   feature('/api/auto-replies', 'auto_replies'),
+  feature('/api/qa-entries', 'auto_replies'),
+  feature('/api/ai-settings', 'auto_replies'),
+  exempt('/api/ai-features','core','Account AI opt-in; explicit account scope, admin role, consent and step-up are checked in the route'),
+  feature('/api/ai-answer-logs','auto_replies'),
+  feature('/api/delivery-purposes','broadcasts'),
+  feature('/api/mcp-connections','external_integrations'),
   feature('/api/auto-reply-runs', 'auto_replies'),
   feature('/api/rich-menus', 'rich_menus'),
   feature('/api/rich-menu', 'rich_menus'),
@@ -117,6 +124,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/site', 'site_tracking'),
   feature('/api/webinars', 'webinars'),
   feature('/api/events', 'events'),
+  exempt('/api/booking/pass-payments/webhook','public','Stripeの試験署名を確認する券の支払通知'),
   feature('/api/booking', 'booking'),
   feature('/api/meet-consultations', 'booking'),
   feature('/api/conversions', 'affiliates'),
@@ -125,9 +133,12 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/affiliates', 'affiliates'),
   feature('/api/affiliate-', 'affiliates'),
   feature('/api/affiliates-report', 'affiliates'),
+  feature('/api/member-ranks', 'mileage'),
   feature('/api/mileage', 'mileage'),
   feature('/api/action-scores', 'mileage'),
   feature('/api/scoring-rules', 'mileage'),
+  exempt('/api/ec/events','public','署名で店とEC本人を確認する行動の受信口'),
+  feature('/api/ec/auto-line','ec_commerce'),
   feature('/api/ec-commerce', 'ec_commerce'),
   feature('/api/ec-operations', 'ec_commerce'),
   feature('/api/line-notifications', 'line_notifications'),
@@ -155,6 +166,8 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
 
   exempt('/api/settings', 'core', '機能を再度オンにするため停止対象外'),
   exempt('/api/auth', 'core', 'ログインとセッション管理'),
+  exempt('/api/me/presence','core','認証済み本人の在席設定。代理と閲覧専用の変更を拒否する'),
+  exempt('/api/me/push', 'core', '認証済み本人の端末通知。各操作で本人と代理禁止を検証'),
   exempt('/api/staff', 'core', 'ログインユーザーと権限管理'),
   exempt('/api/access', 'core', '権限と監査の共通基盤'),
   exempt('/api/capabilities', 'core', '権限判定の共通基盤'),
@@ -174,12 +187,15 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/health', 'system', '稼働確認'),
   exempt('/api/qr', 'public', '公開QR生成'),
   exempt('/api/liff', 'public', 'LIFF内で個別認証する公開経路'),
+  exempt('/liff', 'public', '本人確認するLIFFへ案内する入口。ファイル本文は返さない'),
   exempt('/api/public', 'public', '公開表示専用経路'),
   exempt('/api/integrations', 'system', '署名検証する外部受信経路'),
   exempt('/api/internal', 'system', '内部サービス間経路'),
   exempt('/api/operations', 'system', '運用状態と監視'),
   exempt('/api/tenants', 'core', '統括管理'),
   exempt('/api/ops', 'core', '運営コンソール（★V6 37）。ルート内で platform_admins を検証し、統括をまたいで読む'),
+  exempt('/api/hq/style-starter-sets','core','統括の初期セット配布。各口で統括の役割と可視店を検証'),
+  exempt('/api/hq/store-comparison','core','統括の現在の可視店だけの集計とCSV。各口で統括の役割・代理・取得時の店権限を確認'),
   exempt('/api/hq/operator-history', 'core', '契約先から見える運営の操作履歴。ルート内で staff.tenantId に絞る'),
   exempt('/api/setup', 'core', '初期設定'),
   exempt('/api/getting-started', 'core', '初期設定'),
@@ -216,6 +232,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/admin', 'system', '保守診断と復旧'),
   exempt('/api/meet-callback', 'system', '署名済み外部完了通知'),
 
+  exempt('/mcp','system','接続ごとの鍵と店・操作の段を検証するMCP口'),
   exempt('/webhook', 'public', 'LINE署名で検証する受信経路'),
   exempt('/webhooks', 'public', '外部署名で検証する受信経路'),
   exempt('/openapi.json', 'public', '公開API仕様'),
@@ -343,11 +360,12 @@ function prefixMatches(path: string, prefix: string): boolean {
 }
 
 export function routeClassification(path: string, method = 'GET'): RouteClassification | null {
+  const prefixPath=path.replace(/\*$/, '').replace(/\/$/, '');
   const pattern = FEATURE_ROUTE_PATTERN_MANIFEST.find(
     (item) => item.methods.includes(method.toUpperCase()) && item.pattern.test(path),
   );
   if (pattern) return pattern.classification;
-  return FEATURE_ROUTE_MANIFEST.find((item) => prefixMatches(path, item.prefix))?.classification ?? null;
+  return FEATURE_ROUTE_MANIFEST.find((item) => prefixMatches(prefixPath, item.prefix))?.classification ?? null;
 }
 
 /**
@@ -495,6 +513,16 @@ async function resourceOwnerAccountId(c: Context<Env>): Promise<string | null> {
 }
 
 async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; accountMismatch: boolean }> {
+  // Customer booking changes use a compatibility URL outside /api/liff. Keep
+  // the normal event feature gate, but resolve its owner from the stored LIFF
+  // mapping rather than an untrusted account parameter or an admin session.
+  if (c.req.method === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(c.req.path)) {
+    const liffId = c.req.query('liffId');
+    const account = liffId ? await dbFor(c.env).prepare(
+      'SELECT id FROM line_accounts WHERE liff_id = ? AND is_active = 1',
+    ).bind(liffId).first<{ id: string }>() : null;
+    return { ids: account ? [account.id] : [], accountMismatch: false };
+  }
   /*
    * R423/R426/R428: 公開受信口は受信口IDから所属を確定する。
    * 画面のコピーURL（queryなし）でも通り、外部指定の account は使わない。
@@ -595,24 +623,6 @@ async function requestAccountIds(c: Context<Env>): Promise<{ ids: string[]; acco
   return { ids: [], accountMismatch: false };
 }
 
-async function appendFeatureScopeMeta(c: Context<Env>, excluded: number): Promise<void> {
-  if (excluded < 1 || !c.res.headers.get('content-type')?.includes('application/json')) return;
-  try {
-    const body = await c.res.clone().json() as Record<string, unknown>;
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return;
-    const meta = body.meta && typeof body.meta === 'object' && !Array.isArray(body.meta)
-      ? body.meta as Record<string, unknown>
-      : {};
-    const headers = new Headers(c.res.headers);
-    headers.delete('content-length');
-    c.res = new Response(JSON.stringify({
-      ...body,
-      meta: { ...meta, featureDisabledAccounts: excluded },
-    }), { status: c.res.status, headers });
-  } catch {
-    // JSONでない特殊応答は元のまま返す。
-  }
-}
 
 const BULK_APPROVAL_PATH = '/api/conversions/approvals/bulk';
 const BULK_APPROVAL_MAX_ITEMS = 100;

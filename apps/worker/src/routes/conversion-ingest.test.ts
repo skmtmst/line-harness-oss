@@ -12,6 +12,7 @@ const dbMocks = vi.hoisted(() => ({
   resolveConversionIngestSecret: vi.fn(),
   recordConversionIngestionEvent: vi.fn(),
   trackConversion: vi.fn(),
+  consumePublicIngressReceipt: vi.fn().mockResolvedValue(true),
 }));
 const contractMocks = vi.hoisted(() => ({
   ConversionDefinitionError: class ConversionDefinitionError extends Error {
@@ -70,7 +71,7 @@ async function signedRequest(
   body: Record<string, unknown>,
   { eventId, secret = SECRET }: { eventId?: string; secret?: string } = {},
 ) {
-  const raw = JSON.stringify(body);
+  const raw = JSON.stringify({ timestamp: Math.floor(Date.now() / 1000), nonce: crypto.randomUUID(), ...body });
   const signature = await computeHmacSha256Hex(secret, raw);
   const headers: Record<string, string> = {
     'content-type': 'application/json',
@@ -87,8 +88,7 @@ function lastLog() {
   return calls[calls.length - 1]?.[1] as Record<string, unknown> | undefined;
 }
 
-describe('POST /api/conversions/ingest/:id (N-270)', () => {
-  beforeEach(() => {
+beforeEach(() => {
     vi.clearAllMocks();
     dbMocks.getConversionPointForIngest.mockResolvedValue(activePoint());
     dbMocks.resolveConversionIngestSecret.mockResolvedValue(SECRET);
@@ -101,6 +101,7 @@ describe('POST /api/conversions/ingest/:id (N-270)', () => {
     );
   });
 
+describe('POST /api/conversions/ingest/:id (N-270)', () => {
   it('存在しない地点は404で、point_not_found を台帳へ残す', async () => {
     dbMocks.getConversionPointForIngest.mockResolvedValue(null);
     const response = await signedRequest({ friendId: 'f1' }, { eventId: 'e1' });
@@ -229,7 +230,7 @@ describe('POST /api/conversions/ingest/:id (N-270)', () => {
       await next();
     });
     hono.route('/', conversions);
-    const raw = JSON.stringify({ lineUserId: 'U123', sourceEventId: 'e-line' });
+    const raw = JSON.stringify({ lineUserId: 'U123', sourceEventId: 'e-line', timestamp: Math.floor(Date.now() / 1000), nonce: crypto.randomUUID() });
     const signature = await computeHmacSha256Hex(SECRET, raw);
     const response = await hono.request('/api/conversions/ingest/point-a', {
       method: 'POST',
@@ -318,5 +319,21 @@ describe('POST /api/conversions/ingest/:id (N-270)', () => {
       expect(dbMocks.trackConversion).toHaveBeenCalled();
       expect(lastLog()?.isTest).not.toBe(true);
     });
+  });
+});
+
+
+describe('B-333 署名済み外部受信の新鮮さ', () => {
+  it.each([0, Math.floor(Date.now() / 1000) + 600])('古い・未来すぎる時刻 %s は記録しない', async timestamp => {
+    const response = await signedRequest({ timestamp, friendId: 'f1', sourceEventId: 'e1' });
+    expect(response.status).toBe(401);
+    expect(dbMocks.trackConversion).not.toHaveBeenCalled();
+  });
+  it('nonceを使い回すと別イベントIDでも記録しない', async () => {
+    dbMocks.consumePublicIngressReceipt.mockResolvedValueOnce(false);
+    const response = await signedRequest({ friendId: 'f1', sourceEventId: 'e2' });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'NONCE_REUSED' });
+    expect(dbMocks.trackConversion).not.toHaveBeenCalled();
   });
 });
