@@ -46,4 +46,3 @@ export async function runBroadcastPreflight({ preflightRequestBody, preflightSeq
  setError('確認できませんでした') }
     }
   }
-

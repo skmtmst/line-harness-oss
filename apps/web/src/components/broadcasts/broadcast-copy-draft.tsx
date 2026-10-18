@@ -37,4 +37,3 @@ export function copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMeth
     setBubbles(copy.bubbles)
     setDeliveryMethod('duplicate')
   }
-

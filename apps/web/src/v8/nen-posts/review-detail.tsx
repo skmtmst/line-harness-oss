@@ -269,4 +269,3 @@ export function DetailV8({
     /></SaveErrorScope>
   )
 }
-

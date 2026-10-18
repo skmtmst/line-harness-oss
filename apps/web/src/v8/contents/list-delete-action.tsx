@@ -81,4 +81,3 @@ export async function deleteMediaItem({ deleteBusy, deleteRequestRef, deleting, 
       if (isCurrentDelete()) setDeleteBusy(false)
     }
   }
-

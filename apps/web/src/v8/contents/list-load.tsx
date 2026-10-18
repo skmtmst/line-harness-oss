@@ -148,4 +148,3 @@ export async function loadMediaFolders({ latestAccountRef, saveErrors, selectedA
       if (accountAtRequest === latestAccountRef.current) setFolderReloading(false)
     }
   }
-

@@ -101,4 +101,3 @@ export async function loadCommonVar({ accountLoading, applyDetail, id, latestAcc
       if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
   }
-

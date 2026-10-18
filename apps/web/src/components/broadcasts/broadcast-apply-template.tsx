@@ -42,4 +42,3 @@ export async function applyBroadcastTemplate({ placeTemplateBubble, saveErrors, 
     placeTemplateBubble(bubble)
     setShowTemplatePicker(false)
   }
-

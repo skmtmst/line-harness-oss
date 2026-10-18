@@ -117,4 +117,3 @@ export function buildWizardInput({ accounts, form, matchedAccountId, selectedAcc
     }
     return body
   }
-

@@ -78,4 +78,3 @@ export type MediaKpis = {
   unusedTotal: number | null
   archivedTotal: number | null
 }
-

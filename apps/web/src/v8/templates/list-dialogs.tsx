@@ -436,4 +436,3 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
     </>
   ))
 }
-

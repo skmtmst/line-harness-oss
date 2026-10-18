@@ -137,4 +137,3 @@ export function renderButtonsStep({ activePage, addArea, areaActionSummary, dele
       />
     )
   }
-

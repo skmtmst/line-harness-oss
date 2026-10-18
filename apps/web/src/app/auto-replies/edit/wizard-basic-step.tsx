@@ -78,4 +78,3 @@ export function WizardBasicStep({ canManage, folders, form, goToStep, patch, set
               </Card>
             </>)
 }
-

@@ -222,4 +222,3 @@ export async function saveMenuDraft({ createDraft, group, host, persistDraft, re
       setSaving(false)
     }
   }
-

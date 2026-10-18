@@ -387,4 +387,3 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
               </Card>
             </>)
 }
-

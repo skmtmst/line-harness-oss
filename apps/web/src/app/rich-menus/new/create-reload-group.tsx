@@ -15,4 +15,3 @@ export async function reloadMenuGroup({ hydrate }: reloadMenuGroupContext, group
     if (!res.success) throw new Error(res.error ?? '取得失敗')
     hydrate(res.data as Group)
   }
-

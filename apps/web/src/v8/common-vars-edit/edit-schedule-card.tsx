@@ -92,4 +92,3 @@ export function renderScheduleCard({ canWrite, item, loadSchedules, removeSchedu
     </section>
   ) : null)
 }
-

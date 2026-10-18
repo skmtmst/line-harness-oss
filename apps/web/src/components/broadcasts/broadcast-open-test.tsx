@@ -36,4 +36,3 @@ export async function openBroadcastTest({ rejectValidation, saveErrors, selected
       if (generation === testRecipientsGeneration.current) { if (!fieldFailure) setTestRecipientState('error') }
     }
   }
-

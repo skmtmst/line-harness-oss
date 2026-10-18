@@ -128,4 +128,3 @@ export function ReadOnlyValue({ id, label, value }: { id: string; label?: string
     /></SaveErrorField>
   )
 }
-

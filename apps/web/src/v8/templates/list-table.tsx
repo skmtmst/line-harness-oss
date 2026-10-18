@@ -267,4 +267,3 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
     </>
   ))
 }
-

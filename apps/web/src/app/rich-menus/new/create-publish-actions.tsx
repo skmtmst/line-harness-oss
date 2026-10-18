@@ -83,4 +83,3 @@ export async function publishMenuNow({ audience, group, loadChecks, persistDraft
       publishAttempt.current.finish()
     }
   }
-

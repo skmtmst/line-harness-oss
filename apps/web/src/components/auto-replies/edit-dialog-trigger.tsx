@@ -483,4 +483,3 @@ export function AutoReplyTriggerFields({ activeFrom, activeUntil, changeMatchTyp
           </div>
           </section>)
 }
-

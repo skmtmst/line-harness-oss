@@ -139,4 +139,3 @@ export function BroadcastScheduleStep({ ab, approvalConfig, audienceCount, concu
           <BroadcastAbSettings ab={ab} total={audienceCount} targetAll={targetMode === 'all'} start={new Date(scheduledAtIso() ?? Date.now())} approvalThreshold={approvalConfig?.threshold ?? null} ecConnected canEdit onNarrow={() => goToStep('audience')} />
         </section>)
 }
-

@@ -63,4 +63,3 @@ export function BroadcastMessageStep({ ab, assets, bubbles, composerBusy, fields
           </div>
         </section>)
 }
-

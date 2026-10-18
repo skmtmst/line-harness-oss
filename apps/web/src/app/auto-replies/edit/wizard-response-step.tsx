@@ -246,4 +246,3 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
               </Card>
             </>)
 }
-

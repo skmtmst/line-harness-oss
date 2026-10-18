@@ -105,4 +105,3 @@ export function toggleAutoReply({ listContextKey, load, pendingToggle, rules, sa
     setToggleError('')
     sendToggle(kind, () => reason)
   }
-

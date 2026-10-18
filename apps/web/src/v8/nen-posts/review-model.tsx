@@ -46,4 +46,3 @@ export function boardNode(view: PhotoView, status: PhotoStatus, canEdit: boolean
   if (!canEdit) return 'Jn95h'
   return 'TkA4D'
 }
-

@@ -142,4 +142,3 @@ export function AutoReplyBasicFields({ draft, folderId, folders, foldersLoadStat
             </div>
           </section>)
 }
-

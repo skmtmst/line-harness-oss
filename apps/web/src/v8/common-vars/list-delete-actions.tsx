@@ -231,4 +231,3 @@ export async function removeCommonVars({ batchReason, batchRequestRef, deleteTar
       if (isCurrentRequest()) setDeleting(false)
     }
   }
-

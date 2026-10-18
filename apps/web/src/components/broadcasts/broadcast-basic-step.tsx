@@ -92,4 +92,3 @@ export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMeth
           </div>
         </section>)
 }
-

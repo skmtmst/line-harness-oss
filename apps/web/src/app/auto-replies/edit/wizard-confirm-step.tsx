@@ -138,4 +138,3 @@ export function WizardConfirmStep({ actionOptions, autoReplyId, confirmState, ef
               </Card>
             </>)
 }
-

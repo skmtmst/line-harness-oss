@@ -185,4 +185,3 @@ export function renderShapeStep({ busy, canOperate, chatBarText, defaultTabName,
       </>
     )
   }
-

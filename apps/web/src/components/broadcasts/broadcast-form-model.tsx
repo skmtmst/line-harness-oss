@@ -271,4 +271,3 @@ export const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
   audio: '音声', carousel: 'カルーセル', video: '動画', rich_message: 'リッチメッセージ',
   rich_video: 'リッチビデオ', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
 }
-

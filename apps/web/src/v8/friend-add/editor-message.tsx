@@ -314,4 +314,3 @@ export function ReturningMessage({ definition, setDefinition, scenarios, canEdit
     </>
   )
 }
-

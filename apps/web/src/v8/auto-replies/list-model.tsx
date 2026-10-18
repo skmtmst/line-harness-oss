@@ -115,4 +115,3 @@ export function displayName(r: AutoReply): string {
 
 /** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */
 export const VIEW_ONLY_MENU_IDS = new Set(['runs'])
-

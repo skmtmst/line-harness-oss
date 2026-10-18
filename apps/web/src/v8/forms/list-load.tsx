@@ -125,4 +125,3 @@ export async function loadFormsPage({ activeFolderId, clearList, fetchQuery, for
       if (request === formRequest.current) setLoading(false)
     }
   }
-

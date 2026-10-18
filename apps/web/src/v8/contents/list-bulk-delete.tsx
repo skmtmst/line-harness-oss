@@ -68,4 +68,3 @@ export async function deleteMediaSelection({ items, latestAccountRef, load, load
     void load()
     void loadKpis()
   }
-

@@ -481,4 +481,3 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
       </>
     )
   }
-

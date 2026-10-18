@@ -67,4 +67,3 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
         <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
       </aside>)
 }
-

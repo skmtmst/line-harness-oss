@@ -9,4 +9,3 @@
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 export const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
-

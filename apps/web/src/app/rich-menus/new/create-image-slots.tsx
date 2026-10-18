@@ -164,4 +164,3 @@ export function renderTabSlot({ accountId, busy, clearPendingImage, group, handl
       </div>
     )
   }
-

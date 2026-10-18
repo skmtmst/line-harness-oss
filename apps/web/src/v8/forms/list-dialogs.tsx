@@ -350,4 +350,3 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
     </>
   ))
 }
-

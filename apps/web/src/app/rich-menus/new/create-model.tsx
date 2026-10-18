@@ -39,4 +39,3 @@ export function groupFromSeed(seed: HqRichMenuSeed): Group {
     })),
   }
 }
-

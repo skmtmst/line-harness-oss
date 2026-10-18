@@ -171,4 +171,3 @@ export function PreviewStep({ rule, definition, routeNames, runTest, onTestCondi
     </>
   )
 }
-

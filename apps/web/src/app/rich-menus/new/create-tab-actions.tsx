@@ -92,4 +92,3 @@ export function applyMenuTabCount({ activePageId, group, host, pages, removePage
     })
     setPages([...pages, ...added])
   }
-

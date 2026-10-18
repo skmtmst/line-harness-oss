@@ -372,4 +372,3 @@ export function RejectDialogV8({
     </Dialog>
   )
 }
-

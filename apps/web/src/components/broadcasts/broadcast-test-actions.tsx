@@ -61,4 +61,3 @@ export async function testBroadcast({ onDraftSaved, persistDraft, rejectValidati
       setTestSending(false)
     }
   }
-

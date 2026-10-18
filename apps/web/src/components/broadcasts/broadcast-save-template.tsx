@@ -53,4 +53,3 @@ export async function saveBroadcastTemplate({ bubbles, composerBusy, saveErrors,
  if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。もう一度お試しください。') } }
     finally { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(false) }
   }
-

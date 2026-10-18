@@ -199,4 +199,3 @@ export function renderBroadcastConfirmDialogs({ approvalCandidates, approvalCand
       error={error || undefined}
     /></>)
 }
-
