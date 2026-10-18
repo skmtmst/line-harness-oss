@@ -315,6 +315,16 @@
     "reason": "未取得・未選択・空の状態・警告。線とメッセージで区別する。"
   },
   {
+    "file": "v8/account-new/register.module.css",
+    "selector": ".outlineCard",
+    "reason": "絞り込み・段の切り替え・選択の枠。中身のカードではない。"
+  },
+  {
+    "file": "v8/account-new/register.module.css",
+    "selector": ".outlineCurrent",
+    "reason": "カード内の小箱・入れ子・階層の行。影を重ねない。"
+  },
+  {
     "file": "v8/inflow-links/qr-dialog.module.css",
     "selector": ".qr",
     "reason": "札・印・画像・端末の見本。カードの影を付けない。"

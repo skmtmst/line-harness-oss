@@ -1110,6 +1110,8 @@
   --tpl-htn6-pre-head-gap: 8px; --tpl-htn6-pre-group-gap: 12px; --tpl-htn6-pre-row-gap: 6px; --tpl-htn6-pre-row-pad: 8px 12px; --tpl-htn6-pre-mark: 20px; --tpl-htn6-pre-mark-gap: 10px; --tpl-htn6-pre-link-gap: 6px;
   /* 選択肢の下の案内。白地の案内（SwjOv）と注意（Z0v3c）で地・枠・間が違う。 */
   --tpl-htn6-pre-note-gap: 10px; --tpl-htn6-pre-note-pad: 12px 14px;
+  /* ②アカウント接続（Fqy29）。左の細い列「AC左 操作ステップ」（g48QV）と、中のカードの入力の積み方。 */
+  --tpl-htn-outline-w: 240px; --tpl-htn6-ac-outline-radius: 12px; --tpl-htn6-ac-radius: 10px; --tpl-htn6-ac-row-pad: 10px 12px; --tpl-htn6-ac-row-gap: 10px; --tpl-htn6-ac-num: 22px; --tpl-htn6-ac-text-gap: 2px; --tpl-htn6-ac-auto-pad: 12px; --tpl-htn6-ac-auto-gap: 6px; --tpl-htn6-ac-input-gap: 12px; --tpl-htn6-ac-field-gap: 4px;
 --tpl-an-notes-pad: 12px 14px; --tpl-an-notes-gap: 6px; --tpl-an-notes-radius: var(--polish-radius-control); --tpl-an-note-dot-gap: 8px; --tpl-an-route-bar-gap: 4px; --tpl-an-track-h: 6px;
   --tpl-an-tab-gap: 14px; --tpl-an-tab-pad: 14px 24px 24px; --tpl-an-toolbar-gap: 8px; --tpl-an-col-gap: 16px; --tpl-an-thead-pad: 9px 16px; --tpl-an-row-pad: 10px 16px; --tpl-an-row-two-h: 55px; --tpl-an-row-one-h: 37px; --tpl-an-cell-gap: 2px; --tpl-an-num-pad-end: 12px; --tpl-an-col-type: 150px;
   --tpl-an-col-58: 58px; --tpl-an-col-70: 70px; --tpl-an-col-80: 80px; --tpl-an-col-88: 88px; --tpl-an-col-100: 100px; --tpl-an-col-116: 116px;
