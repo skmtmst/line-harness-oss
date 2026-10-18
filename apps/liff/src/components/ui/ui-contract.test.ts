@@ -126,14 +126,15 @@ describe('予約の履歴の操作（F-6）', () => {
     expect(page).toContain("typeof b.lock_version === 'number'");
     expect(page).toContain('api.cancelMyBooking');
     expect(page).toContain('api.rescheduleMyBooking');
-    expect(page).toContain('お店に LINE でご連絡ください');
+    expect(page).toContain('ご利用先に LINE でご連絡ください');
     expect(card).toContain('日時を変える');
     expect(card).toContain('{onCancel && (');
   });
 
   it('札は確認待ち・確定の文字を出す', () => {
     const card = src('components', 'HistoryCard.tsx');
-    expect(card).toContain('確認待ち');
+    expect(card).toContain('CUSTOMER_WORDS.approvalPending');
+    expect(src('lib', 'customer-words.ts')).toContain('担当者の確認待ち');
     expect(card).toContain('確定');
   });
 

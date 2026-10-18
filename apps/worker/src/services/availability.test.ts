@@ -1,4 +1,8 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+
+const circuitFixtures = new Set<SqliteD1>();
+afterEach(() => { for (const fixture of circuitFixtures) fixture.raw.close(); circuitFixtures.clear(); });
 import { computeSlots, explainBookingSlot, getAvailability, type Interval } from './availability.js';
 
 const MENU_60 = { duration_minutes: 60, buffer_after_minutes: 0 };
@@ -180,8 +184,12 @@ interface StubData {
 }
 
 function stubDB(data: StubData, seen?: Array<{ sql: string; args: unknown[] }>): D1Database {
+  // Exercise the real persisted circuit SQL while retaining the focused availability fixture.
+  const circuit = data.calendarConnection ? createTestD1() : undefined;
+  if (circuit) circuitFixtures.add(circuit);
   return {
     prepare(sql: string) {
+      if (circuit && sql.includes('workflow_steps')) return circuit.db.prepare(sql);
       return {
         bind(...args: unknown[]) {
           seen?.push({ sql, args });

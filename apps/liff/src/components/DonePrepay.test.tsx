@@ -83,7 +83,7 @@ describe('Done の事前のお支払い', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'お支払いへ進む' }));
     expect(
-      await screen.findByText('このお店ではアプリでのお支払いができません。お手数ですが、お店に電話で確認してください。'),
+      await screen.findByText('アプリでのお支払いは準備中です。支払い方法はご利用先に電話で確認してください。'),
     ).toBeTruthy();
   });
 });

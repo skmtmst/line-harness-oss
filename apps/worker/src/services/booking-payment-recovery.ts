@@ -1,3 +1,4 @@
+import { reconcileLateBookingPayment } from './booking-late-payment.js';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
 
@@ -51,12 +52,13 @@ export async function reconcilePaidBookingPayment(
       id: string; line_account_id: string; booking_id: string | null; status: string;
     }>();
   if (!row) return null;
-  if (row.status !== 'paid' && (!applyPaid || !['unpaid', 'pending'].includes(row.status))) {
+  if (row.status !== 'paid' && (!applyPaid || !['unpaid', 'pending', 'expired'].includes(row.status))) {
     return { duplicate: true };
   }
   const nowIso = now.toISOString();
   const statements = paidBookingPaymentStatements(db, row, nowIso, applyPaid);
   const result = statements.length ? await db.batch(statements) : [];
+  await reconcileLateBookingPayment(db,paymentId,now,credentials);
   if (row.booking_id && await db.prepare(`SELECT id FROM booking_operation_runs
       WHERE booking_id = ? AND line_account_id = ? AND idempotency_key = ? AND status IN ('queued','retry_wait')`)
       .bind(row.booking_id, row.line_account_id, `${row.booking_id}:confirmation-effects`).first()) {
@@ -79,7 +81,7 @@ export function paidBookingPaymentStatements(
   if (applyPaid) {
     statements.push(db.prepare(`UPDATE booking_payments
       SET status = 'paid', paid_at = COALESCE(paid_at, ?), updated_at = ?
-      WHERE id = ? AND status IN ('unpaid', 'pending') AND (${gate.sql})`).bind(nowIso, nowIso, row.id, ...gate.args));
+      WHERE id = ? AND status IN ('unpaid', 'pending', 'expired') AND (${gate.sql})`).bind(nowIso, nowIso, row.id, ...gate.args));
   }
   if (row.booking_id !== null) {
     statements.push(db.prepare(`UPDATE bookings
@@ -104,9 +106,9 @@ export function paidBookingPaymentStatements(
 export async function recoverPaidBookingPayments(db: D1Database, now: Date, credentials: GoogleServiceAccountCredentials = {}): Promise<void> {
   const rows = await db.prepare(`SELECT p.id FROM booking_payments p
     JOIN bookings b ON b.id = p.booking_id AND b.line_account_id = p.line_account_id
-    WHERE p.status = 'paid' AND b.status = 'requested'
+    WHERE p.status = 'paid' AND (b.status IN ('expired','cancelled') OR b.status = 'requested'
       AND COALESCE((SELECT approval_mode FROM booking_settings
-        WHERE line_account_id = b.line_account_id), 'automatic') = 'automatic'
+        WHERE line_account_id = b.line_account_id), 'automatic') = 'automatic')
     ORDER BY p.id LIMIT 200`).all<{ id: string }>();
   for (const row of rows.results ?? []) {
     try { await reconcilePaidBookingPayment(db, row.id, now, false, credentials); }

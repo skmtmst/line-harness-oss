@@ -83,7 +83,8 @@ export function registerStripeConnectRoutes(app: Hono<Env>, guard: (write?: bool
       // codeはStripeで再利用すると接続が失効する。外部通信より先に一度だけ獲得する。
       const claimed = await c.env.DB.prepare("UPDATE booking_stripe_connect_states SET status='exchanging',updated_at=datetime('now') WHERE state_hash=? AND status='pending' RETURNING line_account_id").bind(hash).first();
       if (!claimed) return fail(c, 'stripe_connect_invalid_state', 400);
-      const providerAccount = await exchangeStripeConnectCode(config, body.code);
+      const providerAccount = await exchangeStripeConnectCode(config, body.code,{db:c.env.DB,accountId:account,operationId:hash,
+        authorize:()=>canAccessAllLineAccounts(c.env.DB,staff,[account])});
       const at = new Date().toISOString();
       // 別店で有効な同じStripeアカウントを上書きしない。選択と保存は1つのSQLで行う。
       const results = await c.env.DB.batch([
@@ -119,13 +120,14 @@ export function registerStripeConnectRoutes(app: Hono<Env>, guard: (write?: bool
       const lock = await connectHash(opaqueState());
       if (!await begin(c.env.DB, account, staff.id, session, lock, 'disconnecting')) return fail(c, 'stripe_connect_busy', 409);
       try {
-        const row = await c.env.DB.prepare('SELECT provider_account_id,test_mode FROM booking_payment_connections WHERE line_account_id=? AND disconnected_at IS NULL')
-          .bind(account).first<{provider_account_id:string;test_mode:number}>();
+        const row = await c.env.DB.prepare('SELECT provider_account_id,test_mode,connected_at FROM booking_payment_connections WHERE line_account_id=? AND disconnected_at IS NULL')
+          .bind(account).first<{provider_account_id:string;test_mode:number;connected_at:string}>();
         if (row && row.test_mode !== 1) throw new StripeConnectError('stripe_connect_test_only');
         if (row) {
           const shared = await c.env.DB.prepare('SELECT 1 FROM booking_payment_connections WHERE provider_account_id=? AND line_account_id<>? AND disconnected_at IS NULL').bind(row.provider_account_id, account).first();
           if (shared) throw new StripeConnectError('stripe_connect_account_in_use');
-          await revokeStripeConnect(config, row.provider_account_id);
+          await revokeStripeConnect(config, row.provider_account_id,{db:c.env.DB,accountId:account,
+            operationId:`disconnect:${row.provider_account_id}:${row.connected_at}`,authorize:()=>canAccessAllLineAccounts(c.env.DB,staff,[account])});
           await c.env.DB.batch([
             c.env.DB.prepare("UPDATE booking_payment_connections SET disconnected_at=?,updated_at=datetime('now') WHERE line_account_id=? AND provider_account_id=?")
               .bind(new Date().toISOString(), account, row.provider_account_id),

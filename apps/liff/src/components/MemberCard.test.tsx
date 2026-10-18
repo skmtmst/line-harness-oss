@@ -12,7 +12,7 @@ describe('会員証の段（G5-3）', () => {
     expect(screen.getByRole('progressbar', { name: 'ゴールドまで' }).getAttribute('aria-valuenow')).toBe('60');
     expect(screen.getByText('No. 0012-3456')).toBeTruthy();
     expect(screen.getByText('特典：マイル 1.2 倍')).toBeTruthy();
-    expect(screen.getByText('ゴールドまで あと 2 回の来店')).toBeTruthy();
+    expect(screen.getByText('ゴールドまで あと 2 回の利用')).toBeTruthy();
     expect(screen.queryByText(/下がる前/)).toBeNull();
   });
   it('下がる予定のある人には、その日までに条件を満たすと今のランクのままと伝える', () => {

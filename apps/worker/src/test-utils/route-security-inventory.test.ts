@@ -5,6 +5,33 @@ import { join } from 'node:path';
 import { collectSecurityRoutes, inspectRouteSource } from './route-security-inventory.js';
 
 describe('security route inventory', () => {
+  it('follows nested imported registrars with only prior, matching guards on the same router', () => {
+    const root = mkdtempSync(join(tmpdir(), 'security-nested-registrar-'));
+    try {
+      mkdirSync(join(root, 'routes/feature'), { recursive: true });
+      writeFileSync(join(root, 'index.ts'), `import router from './routes/feature.js';
+        const app = new Hono(); app.route('/api', router);`);
+      const entry = `import { install } from './feature/register.js';
+        const router = new Hono(); const other = new Hono();
+        other.use('*', requireRole('owner'));
+        router.use('/safe/*', authMiddleware);
+        install(router);
+        router.use('*', authMiddleware);
+        export default router;`;
+      writeFileSync(join(root, 'routes/feature.ts'), entry);
+      writeFileSync(join(root, 'routes/feature/register.ts'), `import { leaf } from './leaf.js';
+        export function install(target: Hono<Env>) { leaf(target); }
+        export function unused(target: Hono<Env>) { target.post('/unused', c => c.json({})); }`);
+      writeFileSync(join(root, 'routes/feature/leaf.ts'), `export function leaf(target: Hono<Env>) {
+        target.post('/safe/write', c => c.json({}));
+        target.post('/unsafe/write', c => c.json({}));
+        target.post('/explicit/write', requireRole('owner'), c => c.json({})); }`);
+      const scan = () => collectSecurityRoutes(root).map(route => [route.path, route.guarded]);
+      expect(scan()).toEqual([['/api/explicit/write', true], ['/api/safe/write', true], ['/api/unsafe/write', false]]);
+      writeFileSync(join(root, 'routes/feature.ts'), entry.replace("router.use('/safe/*', authMiddleware);", ''));
+      expect(scan()).toEqual([['/api/explicit/write', true], ['/api/safe/write', false], ['/api/unsafe/write', false]]);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
   it('retains every mount of a shared router factory and rereads changed source', () => {
     const root = mkdtempSync(join(tmpdir(), 'security-shared-mount-'));
     try {

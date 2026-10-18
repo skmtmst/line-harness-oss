@@ -5,6 +5,9 @@ import { activeTenantLineAccountSql, resolveLineCredential, isOperationCapabilit
 import { sha256 } from './event-waitlist-owner.js';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
+import { prepareEventNotification } from './event-notification-plan.js';
+import { prepareEventReminders } from './event-reminder-plan.js';
+import { computeRemindersForBooking } from './event-booking-reminders.js';
 import { dispatchPendingEventWaitlistOffers, eventWaitlistDeliveryStatements } from './event-waitlist-delivery.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
@@ -627,6 +630,13 @@ export async function acceptEventWaitlistOffer(
     return { kind: 'unavailable' };
   }
 
+  const notificationPlan=await prepareEventNotification(db,{accountId:offer.line_account_id,
+    operationId:`event-waitlist-accept:${bookingId}`,to:offer.line_user_id,kind:'received_confirmed',
+    ctx:{eventName:offer.event_name,startsAtJst:formatJst(offer.starts_at),venueName:offer.venue_name,
+      venueUrl:offer.venue_url,confirmationExtra:offer.confirmation_message_extra},
+    subject:{bookingId,slotId:offer.slot_id,status:'confirmed',startsAt:offer.starts_at},now});
+  const reminderPlans=prepareEventReminders(db,bookingId,computeRemindersForBooking({starts_at_utc:offer.starts_at,
+    reminder_day_before_enabled:offer.reminder_day_before_enabled===1,reminder_hours_before:offer.reminder_hours_before,now}),true);
   const results = await db.batch([
     db.prepare(
       `UPDATE event_waitlist
@@ -710,6 +720,7 @@ export async function acceptEventWaitlistOffer(
         WHERE id = ? AND status = 'accepted' AND offer_token_hash = ?
           AND EXISTS (SELECT 1 FROM event_bookings b WHERE b.id = ?)`,
     ).bind(nowIso, offer.id, tokenHash, bookingId),
+    notificationPlan,...reminderPlans,
   ]);
 
   const converted = await db
@@ -1303,6 +1314,8 @@ export function createEventWaitlistOfferSender(
       ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}eventWaitlistToken=${encodeURIComponent(offer.token)}`
       : null;
     await sendEventBookingNotification({
+      delivery: { db, accountId: offer.lineAccountId, operationId: `event-offer:${offer.waitlistId}:${offer.retryKey}`,
+        deadlineAt: Date.parse(offer.expiresAt) },
       channelAccessToken: accessToken,
       toLineUserId: row.line_user_id,
       kind: 'waitlist_offer',

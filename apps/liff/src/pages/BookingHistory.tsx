@@ -1,3 +1,5 @@
+import { CUSTOMER_WORDS, PAYMENT_UNKNOWN } from '../lib/customer-words.js';
+import PaymentPreparingNote from '../components/PaymentPreparingNote.js';
 import BookingHistoryCancelDialog from '../components/BookingHistoryCancelDialog.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -81,13 +83,14 @@ export default function BookingHistory() {
   /** 未払いの先払いを Stripe の支払いページで払う（予約の 5 段目と同じ口。同じ申込は同じページが返る）。 */
   async function runPay(booking: BookingHistoryItem) {
     if (busy) return;
+    if (payments[booking.id]?.actionRequired) { setNotice(PAYMENT_UNKNOWN); return; }
     setBusy(true);
     setActionError(null);
     setNotice(null);
     try {
       const res = await api.startBookingPayment(booking.id);
       if (!res.checkoutUrl) {
-        setActionError('お支払いを始められませんでした。時間をおいて再度お試しください。');
+        setActionError(PAYMENT_UNKNOWN);
         return;
       }
       // 決済画面は外のブラウザで開く (店内の WebView では 3D セキュア等が動かないことがある)。
@@ -95,7 +98,8 @@ export default function BookingHistory() {
       setNotice('お支払いのページを開きました。終わったらこの画面に戻ると、状態が変わります。');
     } catch (err) {
       logFailure('booking-history-pay', err);
-      setActionError('お支払いを始められませんでした。時間をおいて再度お試しください。');
+      setPayments((prev) => ({ ...prev, [booking.id]: prev[booking.id] ? { ...prev[booking.id]!, actionRequired: true } : null }));
+      setActionError(PAYMENT_UNKNOWN);
     } finally {
       setBusy(false);
     }
@@ -105,7 +109,7 @@ export default function BookingHistory() {
     setActionError(null);
     if (!view.receiptUrl) {
       // 領収書の URL を返す口は組1 に依頼中（B-314：入口は置き、押すと準備中の案内）。
-      setNotice('領収書は現在準備中です。必要なときはトークでお店にご連絡ください。');
+      setNotice('領収書は現在準備中です。必要なときはトークでご利用先にご連絡ください。');
       return;
     }
     setNotice(null);
@@ -114,8 +118,9 @@ export default function BookingHistory() {
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
-  const withinDeadline = (b: BookingHistoryItem, at: number) => !b.cancel_deadline_at || at <= Date.parse(b.cancel_deadline_at);
-  const canCancel = (b: BookingHistoryItem) => tab === 'upcoming' && typeof b.lock_version === 'number'
+  const withinDeadline = (b: BookingHistoryItem, at: number) => at < Date.parse(b.starts_at)
+    && (!b.cancel_deadline_at || at <= Date.parse(b.cancel_deadline_at));
+  const canCancel = (b: BookingHistoryItem) => tab === 'upcoming' && (b.status === 'requested' || b.status === 'confirmed') && typeof b.lock_version === 'number' && Number.isInteger(b.lock_version) && b.lock_version >= 0
     && withinDeadline(b, now);
   const canChange = (b: BookingHistoryItem) =>
     canCancel(b) && typeof b.menu_id === 'string' && typeof b.staff_id === 'string';
@@ -242,11 +247,12 @@ export default function BookingHistory() {
                 </Button>
               ))}
             </div>
-            {actionError && (
+            {actionError && !pendingCancel && !pendingChange && (
               <p role="alert" className="text-[13px] leading-5 text-danger">{actionError}</p>
             )}
             {tab === 'upcoming' ? <LessonHistorySection onPicking={setPicking} /> : null}
             {tab === 'upcoming' ? <WaitlistSection upcomingHeading={list.length > 0} onChanged={() => setReloadKey((k) => k + 1)} /> : null}
+            {Object.values(payments).some((view) => view && view.kind !== 'onsite') ? <PaymentPreparingNote /> : null}
             {notice && (
               <p role="status" className="text-[13px] leading-5 text-ink-secondary">{notice}</p>
             )}
@@ -269,8 +275,8 @@ export default function BookingHistory() {
                     key={b.id}
                     booking={b}
                     payment={pay}
-                    onPay={pay?.kind === 'unpaid' && tab === 'upcoming' ? () => void runPay(b) : undefined}
-                    onReceipt={pay && (pay.kind === 'paid' || pay.kind === 'refunded') ? () => openReceipt(pay) : undefined}
+                    onPay={pay?.kind === 'unpaid' && !pay.actionRequired && tab === 'upcoming' ? () => void runPay(b) : undefined}
+                    onReceipt={pay && !pay.actionRequired && (pay.kind === 'paid' || pay.kind === 'refunded') ? () => openReceipt(pay) : undefined}
                     disabled={busy}
                     onChange={canChange(b) ? () => void openChange(b) : undefined}
                     onCancel={canCancel(b) ? () => { setActionError(null); setPendingCancel(b); } : undefined}
@@ -283,8 +289,8 @@ export default function BookingHistory() {
               <Icon name="message-circle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 {anySelfChange
-                  ? '期限を過ぎた予約の変更は、トークでご連絡ください。'
-                  : '予定の変更・キャンセルは、お店に LINE でご連絡ください。'}
+                  ? CUSTOMER_WORDS.selfService
+                  : '予定の変更・キャンセルは、ご利用先に LINE でご連絡ください。'}
               </span>
             </p>
           </>

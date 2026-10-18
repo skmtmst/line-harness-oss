@@ -20,7 +20,7 @@ export interface MemberCardData {
   benefits?: string[];
 }
 
-const UNIT = { visits: '回の来店', amount: '円の購入', miles: 'マイル' } as const;
+const UNIT = { visits: '回の利用', amount: '円の購入', miles: 'マイル' } as const;
 const md = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
 
 export async function fetchMemberCard(): Promise<MemberCardData | null> {
@@ -28,7 +28,7 @@ export async function fetchMemberCard(): Promise<MemberCardData | null> {
   if (!idToken) throw new Error('LINEで開き直してください');
   const url = new URL(`${BASE}/api/liff/member-card`, window.location.origin);
   url.searchParams.set('liffId', liff.id ?? '');
-  const response = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` } });
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${idToken}` }, cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
   if (!response.ok) throw new Error('member-card');
   const body = (await response.json()) as { success: boolean; data: MemberCardData | null };
   return body.success ? body.data : null;

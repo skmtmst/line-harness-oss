@@ -215,12 +215,13 @@ describe('test限定・障害時・切断', () => {
     expect((await callback(state)).status).toBe(400);
     expect((await request(`${base}?account_id=a`, 'DELETE')).status).toBe(200); expect(fetchMock).toHaveBeenCalledTimes(1);
   });
-  it('切断の通信失敗では接続中を保ち、再切断できる', async () => {
+  it('切断の結果不明では接続中を保ち、別のlockでも自動再切断しない', async () => {
     connection();
     expect((await request(`${base}?account_id=a`, 'DELETE')).status).toBe(503);
     expect(f.raw.prepare('SELECT disconnected_at FROM booking_payment_connections').get()).toEqual({ disconnected_at: null });
     fetchMock.mockResolvedValueOnce(Response.json({ stripe_user_id: 'acct_old1234' }));
-    expect((await request(`${base}?account_id=a`, 'DELETE')).status).toBe(200);
+    expect((await request(`${base}?account_id=a`, 'DELETE')).status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
   it('本番の接続・閲覧のみ・API鍵は切断させない', async () => {
     connection('acct_live', 0);
