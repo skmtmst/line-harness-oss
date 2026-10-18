@@ -9,6 +9,7 @@ import { getAvailability } from '../../services/availability.js';
 import { DEFAULT_ACCOUNT_SETTINGS } from '../../services/booking-types.js';
 import { resolveSelfBookingCaller, resolveAccountIdFromLiff, verifyCallerLineUserId, resolveFriendId } from './identity.js';
 import { googleCredentials } from './availability.js';
+import { bookingPhoto } from '../../services/booking-photos.js';
 
 export function registerLiffCatalog(booking: Hono<Env>): void {
 // ================================================================
@@ -38,7 +39,7 @@ booking.get('/api/liff/booking/menus', async (c) => {
       `SELECT id, name, category_label, description,
               duration_minutes, buffer_after_minutes,
               base_price, price_mode, sort_order,audience_mode,audience_tag_ids_json,addon_menu_ids_json,max_party_size,addon_only,customer_recurring_enabled,recurring_freqs_json,recurring_max_count,
-              cancel_deadline_hours_before, intake_question,
+              cancel_deadline_hours_before, intake_question, photo_media_id,
               COALESCE((SELECT mode FROM booking_payment_menu_settings WHERE menu_id = menus.id AND line_account_id = menus.line_account_id),
                 (SELECT mode FROM booking_payment_configs WHERE line_account_id = menus.line_account_id),'none') AS payment_mode
          FROM menus
@@ -51,7 +52,9 @@ booking.get('/api/liff/booking/menus', async (c) => {
   const friend=user?await resolveFriendId(c,user,accountId):null;
   const visible=[];
   for(const row of rows.results as Array<{id:string;addon_only:number}>)if(!row.addon_only&&(await menuAudience(c.env.DB,accountId,row.id,friend)).visible)visible.push(row);
-  return c.json({ menus: visible });
+  return c.json({ menus: visible.map(row => ({ ...row,
+    photo_url: bookingPhoto(c.env.WORKER_URL || new URL(c.req.url).origin, (row as { photo_media_id?: string }).photo_media_id)?.url ?? null,
+  })) });
 });
 
 booking.get('/api/liff/booking/menus/:id/addons',async(c)=>{
@@ -70,7 +73,7 @@ booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
   const rows = await c.env.DB
     .prepare(
       `SELECT s.id, s.display_name, s.role, s.profile_image_url, s.bio,
-              s.is_designation_optional,s.nomination_fee,
+              s.is_designation_optional,s.nomination_fee,s.photo_media_id,
               COALESCE(sm.override_price, m.base_price) AS price,
               m.price_mode,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS duration_minutes
@@ -82,7 +85,9 @@ booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
     )
     .bind(accountId, menuId)
     .all();
-  return c.json({ staff: rows.results });
+  return c.json({ staff: rows.results.map(row => ({ ...(row as Record<string, unknown>),
+    photo_url: bookingPhoto(c.env.WORKER_URL || new URL(c.req.url).origin, (row as { photo_media_id?: string }).photo_media_id)?.url ?? null,
+  })) });
 });
 
 booking.get('/api/liff/booking/availability', async (c) => {
