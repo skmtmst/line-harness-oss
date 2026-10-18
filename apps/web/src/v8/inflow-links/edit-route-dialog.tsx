@@ -9,7 +9,7 @@ const b244Requirements = {
 import { useEffect, useState } from 'react'
 import Combobox from '@/components/shared/combobox'
 import Select from '@/components/shared/select'
-import { api, ApiError, describeSaveFailure } from '@/lib/api'
+import { api, describeSaveFailure } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Dialog from '@/components/shared/dialog'
@@ -29,7 +29,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict, isConflictResponse } from '@/components/shared/save-conflict'
 import EditorSurface from '@/components/shared/editor-surface'
 
 /*
@@ -204,7 +204,7 @@ export default function EditRouteModal({
       else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
       // 新規の識別子重複と、更新時の版の競合は別の409。新規は入力を直して再試行できるままにする。
-      if (!isNew && err instanceof ApiError && err.status === 409 && err.code === 'VERSION_CONFLICT') { conflict.mark(); return }
+      if (!isNew && isConflictResponse(err) && err.code === 'VERSION_CONFLICT') { conflict.mark(); return }
       const fieldFailure = saveErrors.capture(err)
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
       { if (!fieldFailure)
