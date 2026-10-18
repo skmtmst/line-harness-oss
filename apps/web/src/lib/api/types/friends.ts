@@ -67,6 +67,9 @@ export type FriendSavedView = {
 }
 
 export type FriendListParams = {
+  /** Cursor mode preserves stable timestamp/ID order; omit search and offset. */
+  pagination?: 'cursor'
+  cursor?: string
   offset?: string
   limit?: string | number
   tagId?: string
