@@ -1,5 +1,6 @@
+import { useCustomerWords, useCustomerStyle } from '../components/CustomerStyleScope.js';
 import PaymentPreparingNote from '../components/PaymentPreparingNote.js';
-import { CUSTOMER_WORDS, PAYMENT_UNKNOWN } from '../lib/customer-words.js';
+import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import PageHeading from '../components/ui/PageHeading.js';
 import FieldError from '../components/ui/FieldError.js';
 import { useEffect, useState } from 'react';
@@ -79,6 +80,8 @@ export function entitlementDetail(e: BookingEntitlement): string {
  * 口が無い物（回数券＝組3、お知らせの受け取り＝組1・組2 の 637、クーポン）は「現在準備中です」で出す。
  */
 export default function MyPage() {
+  const words = useCustomerWords();
+  const style = useCustomerStyle();
   const navigate = useNavigate();
   const { search } = useLocation();
   const go = (pathname: string) => navigate({ pathname, search });
@@ -252,12 +255,13 @@ export default function MyPage() {
             ) : (
               <Card className="flex items-center justify-between gap-3 p-3.5">
                 <p className="text-sm text-ink-secondary">次の予約はありません</p>
-                <Button variant="compact-secondary" className="w-auto shrink-0" onClick={() => go('/booking')}>予約する</Button>
+                {style !== 'ec' && style !== 'lesson' ? <Button variant="compact-secondary" className="w-auto shrink-0" onClick={() => go('/booking')}>予約する</Button> : null}
               </Card>
             )}
 
             <Card className="py-0.5">
               <ul>
+                {style === 'lesson' ? <MenuRow icon="calendar" label="予約の確認・振替" state={{ kind: 'value', text: '' }} onPress={() => go('/events/me')} /> : null}
                 <MenuRow icon="hourglass" label="キャンセル待ち" state={waitlist}
                   onPress={() => waitlist.kind === 'error' ? setReloadKey((k) => k + 1) : go('/booking/history')} />
                 <MenuRow icon="ticket" label="回数券" state={tickets} expanded={tickets.kind === 'value' ? ticketsOpen : undefined}
@@ -311,11 +315,12 @@ function paymentInk(tone: PaymentView['tone']): string {
 
 /** 未払いの予約（琥珀の箱・L5g75）。札・日時とメニュー・払う期限・［お支払いへ進む］。 */
 function UnpaidCard({ booking, payment, busy, onPay }: { booking: BookingHistoryItem; payment: PaymentView; busy: boolean; onPay: () => void }) {
+  const words = useCustomerWords();
   const title = `${utcToJstMd(booking.starts_at)}（${utcToJstWeekday(booking.starts_at)}）${utcToJstHm(booking.starts_at)} ${booking.menu_name}`;
   return (
     <section aria-label="お支払いが済んでいない予約" className="space-y-3 rounded-(--liff-radius-lg) border border-liff-wait-bg bg-liff-wait-bg p-3.5">
       <div className="flex min-w-0 items-center gap-2">
-        <Badge tone={payment.tone}>{paymentText(payment)}</Badge>
+        <Badge tone={payment.tone}>{paymentText(payment, words.payOnsite)}</Badge>
         <p className="min-w-0 truncate text-[14px] font-bold text-ink" title={title}>{title}</p>
       </div>
       {payment.holdUntil ? <p className="text-[12.5px] leading-[19px] text-ink-secondary">{`${holdDeadlineText(payment.holdUntil)}。過ぎると予約は取り消されます。`}</p> : null}
@@ -331,6 +336,7 @@ function NextBookingCard({ booking, payment, onChange, onDetail }: {
   onChange: () => void;
   onDetail: () => void;
 }) {
+  const words = useCustomerWords();
   const title = booking.staff_name ? `${booking.menu_name}・${booking.staff_name}` : booking.menu_name;
   const canChange = (booking.status === 'requested' || booking.status === 'confirmed')
     && typeof booking.lock_version === 'number' && Number.isInteger(booking.lock_version) && booking.lock_version >= 0
@@ -348,9 +354,9 @@ function NextBookingCard({ booking, payment, onChange, onDetail }: {
           <p className="liff-num text-xs text-liff-sub">{`次の予約 ${utcToJstHm(booking.starts_at)}`}</p>
           <p className="truncate text-[15px] font-bold text-ink" title={title}>{title}</p>
           {payment?.actionRequired ? <p role="status" className="text-xs text-liff-sub">{PAYMENT_UNKNOWN}</p> : payment ? (
-            <p className={`liff-num text-xs font-bold ${paymentInk(payment.tone)}`}>{paymentText(payment)}</p>
+            <p className={`liff-num text-xs font-bold ${paymentInk(payment.tone)}`}>{paymentText(payment, words.payOnsite)}</p>
           ) : booking.status === 'requested' ? (
-            <p className="text-xs font-bold text-liff-wait-ink">{CUSTOMER_WORDS.approvalPending}</p>
+            <p className="text-xs font-bold text-liff-wait-ink">{words.approvalPending}</p>
           ) : null}
         </div>
       </div>

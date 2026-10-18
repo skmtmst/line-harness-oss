@@ -1,3 +1,4 @@
+import { useCustomerWords } from '../components/CustomerStyleScope.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import { TextInput, TextArea, ChoiceInput, FieldLabel, FieldCount, FormChoiceRow } from '../components/forms/controls.js';
 import { useEffect, useMemo, useState } from 'react';
@@ -28,6 +29,7 @@ function nanoid(): string {
  * そのときは 2-d (キャンセル待ちに入りました) へ進む。
  */
 export default function EventConfirm() {
+  const words = useCustomerWords();
   const { id } = useParams<{ id: string }>();
   const [search] = useSearchParams();
   const slotId = search.get('slotId') ?? '';
@@ -135,12 +137,12 @@ export default function EventConfirm() {
       const msg = (() => {
         switch (code) {
           case 'slot_full': return 'すでに満員になりました。別の日時をお選びください。';
-          case 'over_friend_limit': return 'このイベントへの予約上限に達しています。';
-          case 'duplicate_friend_booking': return 'この時間はすでに申し込み済みです。自分のイベントで確認してください。';
-          case 'entry_closed': return '申込期限を過ぎています。別のイベントをお探しください。';
+          case 'over_friend_limit': return `この${words.event}への予約上限に達しています。`;
+          case 'duplicate_friend_booking': return `この時間はすでに申し込み済みです。${words.myEvents}で確認してください。`;
+          case 'entry_closed': return `申込期限を過ぎています。別の${words.event}をお探しください。`;
           case 'slot_started': return 'この枠は既に開始されています。';
           case 'slot_inactive': return 'この枠は受付を締め切りました。';
-          case 'event_unpublished': return 'このイベントは現在受付を停止しています。';
+          case 'event_unpublished': return `この${words.event}は現在受付を停止しています。`;
           case 'unauthorized':
           case 'friend_not_found':
             return 'LINE 認証に失敗しました。一度 LINE のトークルームに戻り、友だち追加が完了していることを確認してから再度お試しください。';
@@ -174,7 +176,7 @@ export default function EventConfirm() {
                 選択した枠は受付終了しました。別の日時をお選びください。
               </p>
               <Button variant="primary" onClick={() => navigate({ pathname: `/events/${id}`, search: locationSearch })}>
-                イベントページに戻る
+                {`${words.event}ページに戻る`}
               </Button>
             </div>
           ) : (
@@ -188,9 +190,9 @@ export default function EventConfirm() {
   // 期限があれば日時で出す（板 EscPA「キャンセルは 10月10日 18:00 まで。」）。無ければ「自分のイベント」へ案内する。
   const cancelText = event.cancel_deadline_hours_before != null
     ? `キャンセルは ${formatJstDeadline(slot.starts_at, event.cancel_deadline_hours_before)} まで。`
-    : 'キャンセルは期限まで「自分のイベント」からできます（期限はイベントごとに違います）。';
+    : `キャンセルは期限まで「${words.myEvents}」からできます（期限は${words.event}ごとに違います）。`;
   const infoText = event.requires_approval === 1
-    ? `このイベントは承認制です。受付後、運営が承認するまでお待ちください。${cancelText}`
+    ? `受付後、${words.contact}の確認をお待ちください。${cancelText}`
     : cancelText;
 
   return (
@@ -200,7 +202,7 @@ export default function EventConfirm() {
       <div className="mx-auto w-full max-w-md space-y-3.5 px-4 pt-4 pb-28">
         <h1 className="text-xl font-bold text-ink">内容を確かめてください</h1>
         <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
-          <Row label="イベント" value={event.name} />
+          <Row label={words.event} value={event.name} />
           <Row label="日時" value={formatJstEventSpan(slot.starts_at, slot.ends_at)} />
           {event.venue_name && <Row label="場所" value={event.venue_name} />}
           {event.venue_address && <Row label="住所" value={event.venue_address} />}

@@ -1,3 +1,4 @@
+import { useCustomerWords } from '../components/CustomerStyleScope.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
@@ -28,6 +29,7 @@ type State = 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 
  * 見た目だけ ★V7 (主ボタン1つ・札の代わりに印＋文)。
  */
 export default function EventWaitlistOffer({ token }: { token: string }) {
+  const words = useCustomerWords();
   const [state, setState] = useState<State>('ready');
   const navigate = useNavigate();
   // ?liffId=... を引き継ぐ (再読み込みで失わない)。
@@ -71,7 +73,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
 
   return (
     <LiffLookScope className="min-h-screen bg-canvas" designNode="BjcuB">
-      <LiffHeader title="イベント" />
+      <LiffHeader title={words.event} />
       <main className="mx-auto flex min-h-[calc(100dvh-44px)] w-full max-w-md flex-col justify-center gap-4 px-6 pb-[142px]">
         {state === 'confirmed' ? (
           <div className="space-y-4">
@@ -83,7 +85,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
             />
             <Button variant="secondary" onClick={goMine}>
               <Icon name="list" className="h-4 w-4" />
-              自分のイベントを見る
+              {`${words.myEvents}を見る`}
             </Button>
           </div>
         ) : state === 'expired' ? (
@@ -96,7 +98,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
             />
             <Button variant="secondary" onClick={goMine}>
               <Icon name="list" className="h-4 w-4" />
-              自分のイベントを見る
+              {`${words.myEvents}を見る`}
             </Button>
           </div>
         ) : state === 'unavailable' ? (
@@ -108,7 +110,7 @@ export default function EventWaitlistOffer({ token }: { token: string }) {
             />
             <Button variant="secondary" onClick={goMine}>
               <Icon name="list" className="h-4 w-4" />
-              自分のイベントを見る
+              {`${words.myEvents}を見る`}
             </Button>
           </div>
         ) : state === 'error' ? (

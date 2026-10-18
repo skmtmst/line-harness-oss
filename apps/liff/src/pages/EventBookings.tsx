@@ -1,3 +1,4 @@
+import { useCustomerWords, useCustomerStyle } from '../components/CustomerStyleScope.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type EventBookingMine, type EventSlot } from '../lib/api.js';
@@ -15,6 +16,8 @@ import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
 import { statusMeta, canLeaveWaitlist } from './event-bookings-policy.js';
+import LessonHistorySection from '../components/LessonHistorySection.js';
+import AbsenceSheet from '../components/AbsenceSheet.js';
 
 function canCancel(b: EventBookingMine): boolean {
   if (b.status !== 'requested' && b.status !== 'confirmed') return false;
@@ -43,6 +46,10 @@ const DECIDED_CHANGE_ERRORS = new Set([
 ]);
 
 export default function EventBookings() {
+  const words = useCustomerWords();
+  const style = useCustomerStyle();
+  const [absence, setAbsence] = useState<EventBookingMine | null>(null);
+  const [lessonRevision, setLessonRevision] = useState(0);
   const navigate = useNavigate();
   // ?liffId=... を引き継ぐ (再読み込みで失わない)。
   const { search } = useLocation();
@@ -210,9 +217,9 @@ export default function EventBookings() {
 
   return (
     <LiffLookScope className="min-h-screen bg-canvas" designNode="y1bs9A">
-      <LiffHeader title="自分のイベント" />
+      <LiffHeader title={words.myEvents} />
       <div className="mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 pb-10">
-        <h1 className="text-xl font-bold text-ink">自分のイベント</h1>
+        <h1 className="text-xl font-bold text-ink">{words.myEvents}</h1>
         {loading ? (
           <LoadingView />
         ) : loadFailed ? (
@@ -246,16 +253,23 @@ export default function EventBookings() {
                 {actionError}
               </p>
             )}
+            {style === 'lesson' && tab === 'upcoming' ? <>
+              <Button variant="secondary" onClick={() => navigate({ pathname: '/mypage', search })}>回数券と月謝を見る</Button>
+              <LessonHistorySection key={lessonRevision} creditsOnly />
+            </> : null}
             {items.length === 0 ? (
               tab === 'upcoming' ? (
-                <StatusView icon="calendar" title="これからのイベントはありません" />
+                <StatusView icon="calendar" title={`これからの${words.event}はありません`} />
               ) : (
-                <StatusView icon="calendar" title="これまでのイベントはありません" />
+                <StatusView icon="calendar" title={`これまでの${words.event}はありません`} />
               )
             ) : (
               <ul className="space-y-3.5">
                 {items.map((b) => {
-                  const meta = canLeaveWaitlist(b) ? { text: 'キャンセル待ち', tone: 'pending' as const } : statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
+                  const baseMeta = statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
+                  const lessonStatus: Record<string, string> = { requested: words.approvalPending, confirmed: '確定', attended: '出席', no_show: '欠席', rejected: 'お受けできませんでした' };
+                  const meta = canLeaveWaitlist(b) ? { text: 'キャンセル待ち', tone: 'pending' as const }
+                    : style === 'lesson' ? { ...baseMeta, text: lessonStatus[b.status] ?? baseMeta.text } : baseMeta;
                   return (
                     <li key={b.id}>
                       <Card className="p-3.5">
@@ -317,10 +331,13 @@ export default function EventBookings() {
                                 </Button>
                               </div>
                             )}
+                            {style === 'lesson' && tab === 'upcoming' && b.makeup?.enabled
+                              && (b.status === 'requested' || b.status === 'confirmed') && Date.parse(b.slot_starts_at) > Date.now()
+                              ? <Button variant="inline-action" disabled={busy} onClick={() => setAbsence(b)}>欠席する</Button> : null}
                           </div>
                           <Button variant="arrow"
                             type="button"
-                            aria-label={`${b.event_name}のイベントを見る`}
+                            aria-label={`${b.event_name}の${words.event}を見る`}
                             onClick={() =>
                               navigate({ pathname: `/events/${b.event_id}`, search })
                             }
@@ -337,6 +354,9 @@ export default function EventBookings() {
           </>
         )}
       </div>
+      {absence ? <AbsenceSheet booking={absence} onClose={() => setAbsence(null)} onDone={({ reason }) => {
+        setAbsence(null); setLessonRevision((n) => n + 1); void refresh().then(() => { if (reason) setActionError(reason); });
+      }} /> : null}
       <ConfirmDialog
         open={pendingCancel !== null}
         designNode="nUYyb"
@@ -345,7 +365,7 @@ export default function EventBookings() {
             ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)} の${pendingCancel.event_name}${canLeaveWaitlist(pendingCancel) ? 'のキャンセル待ちをやめますか' : 'をキャンセルしますか'}`
             : ''
         }
-        description={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめると、空きが出てもLINEのお知らせは届かなくなります。' : 'キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（お店へご連絡ください）。'}
+        description={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめると、空きが出てもLINEのお知らせは届かなくなります。' : `キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（${words.contact}へご連絡ください）。`}
         confirmLabel={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめる' : 'キャンセルする'}
         cancelLabel="閉じる"
         destructive

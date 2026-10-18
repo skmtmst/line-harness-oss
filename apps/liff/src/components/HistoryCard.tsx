@@ -1,4 +1,5 @@
-import { CUSTOMER_WORDS, PAYMENT_UNKNOWN } from '../lib/customer-words.js';
+import { useCustomerWords } from './CustomerStyleScope.js';
+import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import BookingCancelDeadline from './BookingCancelDeadline.js';
 import type { BookingHistoryItem } from '../lib/api.js';
 import { paymentText, type PaymentView } from '../lib/booking-payment-view.js';
@@ -8,6 +9,7 @@ import Badge from './ui/Badge.js';
 import Button from './ui/Button.js';
 import Icon from './ui/Icon.js';
 import UnpaidPaymentNote from './UnpaidPaymentNote.js';
+import OnlineMeetingCard from './OnlineMeetingCard.js';
 
 /**
  * 予約の履歴の札 (★V8・nWby5)。日付の四角＋メニュー名＋支払いの札（無いときは予約の状態の札）。
@@ -34,7 +36,10 @@ export default function HistoryCard({
   onReceipt?: () => void;
   disabled?: boolean;
 }) {
-  const meta = STATUS_META[booking.status] ?? { label: booking.status, tone: 'neutral' as const };
+  const words = useCustomerWords();
+  const statusWords: Record<string, string> = { requested: words.approvalPending, completed: words.completed, no_show: words.noShow, rejected: 'お受けできませんでした' };
+  const base = STATUS_META[booking.status];
+  const meta = (base ? { ...base, label: statusWords[booking.status] ?? base.label } : null) ?? { label: booking.status, tone: 'neutral' as const };
   const hasActions = Boolean(onChange || onCancel || onPay);
   // 支払いの札があるときは、予約の状態は「確定」以外だけを札の右に文字で添える（絵の「返金済み キャンセル」）。
   const statusAside = payment && booking.status !== 'confirmed' && booking.status !== 'completed' && meta.label !== payment.label ? meta.label : null;
@@ -53,12 +58,13 @@ export default function HistoryCard({
               {booking.menu_name}
             </div>
             <div className="flex min-w-0 items-center gap-2">
-              {payment ? <Badge size="md" tone={payment.tone}>{paymentText(payment)}</Badge> : <Badge size="md" tone={meta.tone}>{meta.label}</Badge>}
+              {payment ? <Badge size="md" tone={payment.tone}>{paymentText(payment, words.payOnsite)}</Badge> : <Badge size="md" tone={meta.tone}>{meta.label}</Badge>}
               {statusAside && <span className="truncate text-xs text-liff-sub">{statusAside}</span>}
             </div>
           </div>
         </div>
         {payment?.actionRequired ? <p role="status" className="text-xs leading-5 text-liff-sub">{PAYMENT_UNKNOWN}</p> : null}
+        <OnlineMeetingCard bookingId={booking.id} status={booking.status} booking={booking} />
         {onReceipt && (
           <div className="flex items-center justify-between gap-2">
             <Button variant="link" onClick={onReceipt} disabled={disabled}>
@@ -95,7 +101,7 @@ export default function HistoryCard({
 }
 
 const STATUS_META: Record<string, { label: string; tone: 'confirmed' | 'pending' | 'neutral' }> = {
-  requested: { label: CUSTOMER_WORDS.approvalPending, tone: 'pending' },
+  requested: { label: '確認待ち', tone: 'pending' },
   confirmed: { label: '確定', tone: 'confirmed' },
   rejected: { label: '不可', tone: 'neutral' },
   expired: { label: '期限切れ', tone: 'neutral' },

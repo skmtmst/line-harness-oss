@@ -1,5 +1,5 @@
+import { useCustomerWords, useCustomerStyle } from './CustomerStyleScope.js';
 import PaymentPreparingNote from './PaymentPreparingNote.js';
-import { CUSTOMER_WORDS } from '../lib/customer-words.js';
 import { useEffect,useState } from 'react';
 import { api,type BookingEntitlement,type CreateBookingResponse,type MenuItem,type StaffItem } from '../lib/api.js';
 import { bookingPriceText } from '../lib/booking-price.js';
@@ -22,6 +22,7 @@ import BottomBar from './ui/BottomBar.js';
 import Button from './ui/Button.js';
 import Icon from './ui/Icon.js';
 import PrivacyNote from './ui/PrivacyNote.js';
+import { FormChoiceRow, ChoiceInput } from './forms/controls.js';
 
 /**
  * 1-d 内容の確認 (★V8・gLReL)。送った中身のカード＋ご要望＋案内の帯。
@@ -62,6 +63,12 @@ export default function Confirm({
     prepayNotice: string | null;
   }) => void;
 }) {
+  const words = useCustomerWords();
+  const style = useCustomerStyle();
+  const [chosenMode, setChosenMode] = useState<'online' | 'in_person' | null>(null);
+  const meetingMode = menu.meeting_mode === 'customer_choice' ? chosenMode
+    : menu.meeting_mode === 'online' || menu.meeting_mode === 'in_person' ? menu.meeting_mode : null;
+  const missingMeetingMode = (style === 'consult' || menu.meeting_mode === 'customer_choice') && !meetingMode;
   // 414 幅の板（`uZqMA`）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
   const deadline = menu.cancel_deadline_hours_before == null ? cancelDeadlineMinutesBefore : menu.cancel_deadline_hours_before * 60;
@@ -117,7 +124,7 @@ export default function Confirm({
   }, [menu.id, slot]);
   const chosenEntitlement = Array.isArray(entitlements) ? entitlements.find((e) => e.id === entitlementId) ?? null : null;
 
-  const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start]));
+  const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start, meetingMode]));
   /* 戻る（頭の「‹」から呼ぶ）：送りかけの返事は受け取らず、日時の段へ戻る。 */
   function back() {
     request.invalidate();
@@ -129,7 +136,7 @@ export default function Confirm({
   useEffect(() => { onRegisterBack?.(() => backRef.current()); return () => onRegisterBack?.(null); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (submitting || !policyReady || (policy !== null && !accepted)) return;
+    if (submitting || !policyReady || missingMeetingMode || (policy !== null && !accepted)) return;
     if (party && party.size > 1) { setPreparing('2 人以上でのご予約'); return; }
     if (recurrence) { setPreparing('毎週の続けての予約'); return; }
     const generation = request.begin();
@@ -157,6 +164,7 @@ export default function Confirm({
           // 空き枠が返した開始の瞬間を送る（店が日本時間以外でもずれない）。
           starts_at: startsAt,
           customer_note: note || undefined,
+          ...(meetingMode ? { meeting_mode: meetingMode } : {}),
           ...(consent ?? {}),
           ...(party && party.members[0].addonIds.length ? { addonIds: party.members[0].addonIds } : {}),
           ...(chosenEntitlement ? { entitlement_id: chosenEntitlement.id } : {}),
@@ -201,14 +209,22 @@ export default function Confirm({
   return (
     <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
+      {menu.meeting_mode === 'customer_choice' ? <fieldset className="space-y-2">
+        <legend className="mb-2 text-sm font-bold text-ink">会い方を選んでください</legend>
+        {(['online', 'in_person'] as const).map((mode) => <FormChoiceRow key={mode} selected={meetingMode === mode}>
+          <ChoiceInput type="radio" name="meeting-mode" value={mode} checked={meetingMode === mode} disabled={submitting} onChange={() => setChosenMode(mode)} />
+          {mode === 'online' ? 'オンライン' : '対面'}
+        </FormChoiceRow>)}
+      </fieldset> : style === 'consult' && !meetingMode ? <p role="alert" className="text-[13px] leading-6 text-danger">会い方を読み込めませんでした。前の画面へ戻り、もう一度お試しください。</p> : null}
       <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
-        {party ? totals(party, menu).rows.map((r) => <Row alignEnd={policy !== null} key={r.index} label={personShort(r.index)} value={`${menuLine(r.menu, r.member)}・${(r.index === 0 ? (r.member.staff ?? staff) : r.member.staff)?.display_name ?? '指名なし'}`} />) : <Row alignEnd={policy !== null} label={CUSTOMER_WORDS.bookingContent} value={menu.name} />}
+        {party ? totals(party, menu).rows.map((r) => <Row alignEnd={policy !== null} key={r.index} label={personShort(r.index)} value={`${menuLine(r.menu, r.member)}・${(r.index === 0 ? (r.member.staff ?? staff) : r.member.staff)?.display_name ?? '指名なし'}`} />) : <Row alignEnd={policy !== null} label={words.bookingContent} value={menu.name} />}
         <Row
           alignEnd={policy !== null}
           label="日時"
           value={`${formatJpLong(slot.date)}${slot.start}〜${addMinutesHm(slot.start, party ? totals(party, menu).minutes : staff.duration_minutes)}`}
         />
-        {party ? null : <Row alignEnd={policy !== null} label="担当" value={staff.display_name} />}
+        {party ? null : <Row alignEnd={policy !== null} label={words.staff} value={staff.display_name} />}
+        {meetingMode ? <Row alignEnd={policy !== null} label="会い方" value={meetingMode === 'online' ? 'オンライン' : '対面'} /> : null}
         <Row
           alignEnd={policy !== null}
           label="料金"
@@ -217,7 +233,7 @@ export default function Confirm({
         {policy?.deposit ? (
           <>
             <Row alignEnd={policy !== null} label="試験のお支払い（デポジット）" value={yen(policy.deposit.amount)} wideLabel />
-            <Row alignEnd={policy !== null} label={CUSTOMER_WORDS.payOnsite} value={yen(Math.max(0, policy.price - policy.deposit.amount))} />
+            <Row alignEnd={policy !== null} label={words.payOnsite} value={yen(Math.max(0, policy.price - policy.deposit.amount))} />
           </>
         ) : null}
       </dl>
@@ -269,7 +285,7 @@ export default function Confirm({
         <p>
           {autoConfirm
             ? '送るとその場で確定します。確定のお知らせをLINEで送ります。'
-            : 'まだ確定ではありません。ご利用先が確かめたら、LINEでお知らせします。'}
+            : `まだ確定ではありません。${words.contact}が確かめたら、LINEでお知らせします。`}
           {deadline != null ? `キャンセルは開始の${deadline % 60 === 0 ? `${deadline / 60}時間` : `${deadline}分`}前まで。` : 'キャンセル期限は予約の履歴で確認してください。'}
         </p>
       </div>
@@ -278,7 +294,7 @@ export default function Confirm({
       <PrivacyNote />
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
-        <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || (policy !== null && !accepted)}>
+        <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || missingMeetingMode || (policy !== null && !accepted)}>
           {submitting ? '送信中...'
             : policy?.deposit ? `${yen(policy.deposit.amount)}の試験で予約する`
               : policy && policy.cardRequired !== false ? '試験のカードを登録して予約する'

@@ -11,7 +11,7 @@ import LoadErrorView from './LoadErrorView.js';
  * 予約の履歴に並ぶ教室の予約（B3・rx3FL・kzE16）。振替を使うクラスの行に［欠席する］、
  * 残っている振替があれば「振替先を選ぶ」。欠席の確定と振替先の選択は別の操作。
  */
-export default function LessonHistorySection({ onPicking }: { onPicking?: (picking: boolean) => void }) {
+export default function LessonHistorySection({ onPicking, creditsOnly = false }: { onPicking?: (picking: boolean) => void; creditsOnly?: boolean }) {
   const [items, setItems] = useState<EventBookingMine[]>([]);
   const [credits, setCredits] = useState<MakeupCredit[]>([]);
   const [target, setTarget] = useState<EventBookingMine | null>(null);
@@ -30,13 +30,13 @@ export default function LessonHistorySection({ onPicking }: { onPicking?: (picki
   useEffect(() => { onPicking?.(credits.length > 0); return () => onPicking?.(false); }, [credits.length, onPicking]);
   const sourceOf = (c: MakeupCredit) => { if (justAbsent) return justAbsent; const b = known.find((k) => k.id === c.source_event_booking_id); return b ? { startsAt: b.slot_starts_at, name: b.event_name } : null; };
   if (loadFailed) return <LoadErrorView compact note="教室の予約・振替の履歴はなくなっていません。" onRetry={load} />;
-  if (items.length === 0 && credits.length === 0 && !target) return null;
+  if ((creditsOnly || items.length === 0) && credits.length === 0 && !target) return null;
   return (
     <section className="space-y-3.5" aria-label="教室の予約">
       {credits[0] ? <MakeupPicker key={credits[0].id} credit={credits[0]} source={sourceOf(credits[0])} onUsed={() => { setJustAbsent(null); load(); }} onLater={() => setJustAbsent(null)} /> : null}
       {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
       <ul className="space-y-3.5">
-        {items.map((b) => (
+        {(creditsOnly ? [] : items).map((b) => (
           <li key={b.id}>
             <Card className="space-y-2.5 p-3.5">
               <h3 className="text-[15px] font-bold text-ink">{mdHm(b.slot_starts_at)}</h3>

@@ -91,10 +91,10 @@ describe('進む操作は下の操作の帯に1つだけ', () => {
   it('確定・待ちは下の帯に「LINEに戻る」と、待ちなら「キャンセル待ちを取り消す」・それ以外は「自分のイベントを見る」(★V8 qVdiX)', () => {
     expect(done).toContain('<BottomBar>');
     expect(done).toContain('LINEに戻る');
-    expect(done).toContain('自分のイベントを見る');
+    expect(done).toContain('words.myEvents');
     expect(done).toContain('キャンセル待ちを取り消す');
     // 2つ目のボタンはどちらか一方だけ (自分の待ちが見つかったときだけ「やめる」)。
-    expect(done).toMatch(/\{waitEntry \? \([\s\S]*キャンセル待ちを取り消す[\s\S]*\) : \([\s\S]*自分のイベントを見る[\s\S]*\)\}/);
+    expect(done).toMatch(/\{waitEntry \? \([\s\S]*キャンセル待ちを取り消す[\s\S]*\) : \([\s\S]*words.myEvents[\s\S]*\)\}/);
     expect(done.match(/<Button/g)?.length ?? 0).toBe(3);
   });
 
@@ -137,7 +137,7 @@ describe('承認待ちと確定は別の印と文', () => {
   it('確定は暦・承認待ちと待ちは砂時計', () => {
     expect(done).toContain("status === 'requested'");
     expect(done).toContain('受付しました');
-    expect(done).toContain('運営の承認をお待ちください');
+    expect(done).toContain('${words.contact}の確認をお待ちください');
   });
 });
 
@@ -225,7 +225,7 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
   });
 
   it('上限のお知らせは赤を使わず info の帯 (主ボタンと紐づく)', () => {
-    expect(event).toContain('このイベントへの予約上限');
+    expect(event).toContain('この{words.event}への予約上限');
     expect(event).toContain('bg-info-bg');
     expect(event).toContain('text-ink-secondary');
     expect(event).toContain('name="info"');

@@ -6,6 +6,7 @@ import Button from './ui/Button.js';
 import BottomBar from './ui/BottomBar.js';
 import Icon from './ui/Icon.js';
 import { mdHm } from './AbsenceSheet.js';
+import StatusView from './ui/StatusView.js';
 
 const jstDate = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3_600_000).toISOString().slice(0, 10);
 const mondayOf = (date: string) => { const d = new Date(`${date}T00:00:00Z`); return addDays(date, -((d.getUTCDay() + 6) % 7)); };
@@ -22,6 +23,14 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   onUsed: () => void;
   onLater?: () => void;
 }) {
+  const [clock, setClock] = useState(Date.now);
+  const expires = Date.parse(credit.expires_at);
+  const usable = credit.status === 'open' && Number.isFinite(expires) && clock < expires;
+  useEffect(() => {
+    if (!usable) return;
+    const timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [usable]);
   /* 欠席した回の次の週（今日より前は選べない）から始める。 */
   const firstLoad = useRef(true);
   const [week, setWeek] = useState(() => { const next = credit.source_starts_at ? addDays(mondayOf(jstDate(credit.source_starts_at)), 7) : jstToday(); const today = jstToday(); return mondayOf(next > today ? next : today); });
@@ -32,31 +41,36 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const key = useRef(crypto.randomUUID());
+  const generation = useRef(0);
 
   const load = useCallback(() => {
+    const version = ++generation.current;
     setOptions(null); setFailed(false);
+    if (!usable) { setOptions([]); return; }
     api.makeupOptions(credit.id, week).then((r) => {
+      if (generation.current !== version) return;
+      const options = r.options.filter((o) => Date.parse(o.starts_at) > Date.now() && Date.parse(o.starts_at) <= expires);
       const inWeek = (o: MakeupOption) => { const d = jstDate(o.starts_at); return d >= week && d <= addDays(week, 6); };
-      const earliest = r.options.find((o) => !o.full);
+      const earliest = options.find((o) => !o.full);
       /* 初めて開いたときだけ、振替できる一番早い日の週へ移る（見えている週と選んだ日を食い違わせない）。 */
       if (firstLoad.current) {
         firstLoad.current = false;
         if (earliest && !inWeek(earliest)) { setWeek(mondayOf(jstDate(earliest.starts_at))); return; }
       }
-      setOptions(r.options);
-      const first = r.options.find((o) => !o.full && inWeek(o));
-      setDay((cur) => (cur && r.options.some((o) => jstDate(o.starts_at) === cur && inWeek(o)) ? cur : first ? jstDate(first.starts_at) : null));
-      setPicked((cur) => (cur && r.options.some((o) => o.slot_id === cur && !o.full && inWeek(o)) ? cur : first?.slot_id ?? null));
-    }).catch((e) => { logFailure('makeup-options', e); setFailed(true); });
-  }, [credit.id, week]);
-  useEffect(() => { load(); }, [load]);
+      setOptions(options);
+      const first = options.find((o) => !o.full && inWeek(o));
+      setDay((cur) => (cur && options.some((o) => jstDate(o.starts_at) === cur && inWeek(o)) ? cur : first ? jstDate(first.starts_at) : null));
+      setPicked((cur) => (cur && options.some((o) => o.slot_id === cur && !o.full && inWeek(o)) ? cur : first?.slot_id ?? null));
+    }).catch((e) => { if (generation.current === version) { logFailure('makeup-options', e); setFailed(true); } });
+  }, [credit.id, week, usable, expires]);
+  useEffect(() => { load(); return () => { generation.current++; }; }, [load]);
 
   const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
   const rows = (options ?? []).filter((o) => !day || jstDate(o.starts_at) === day);
   const chosen = (options ?? []).find((o) => o.slot_id === picked) ?? null;
 
   async function use() {
-    if (!chosen || busy) return;
+    if (!chosen || chosen.full || busy || credit.status !== 'open' || !Number.isFinite(expires) || Date.now() >= expires || Date.parse(chosen.starts_at) > expires || Date.parse(chosen.starts_at) <= Date.now()) return;
     setBusy(true); setError(null);
     try { await api.useMakeup(credit.id, chosen.slot_id, key.current); onUsed(); }
     catch (e) {
@@ -66,6 +80,8 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
       else setError('振替を予約できませんでした。振替は残っています。もう一度お試しください。');
     } finally { setBusy(false); }
   }
+
+  if (!usable) return <StatusView icon="calendar-x" title={credit.status !== 'open' ? 'この振替は使えません' : Number.isFinite(expires) ? '振替の期限を過ぎています' : '振替の期限を読み込めませんでした'} body="教室にLINEでご連絡ください。" />;
 
   return (
     <section className="space-y-3.5" aria-label="振替">
@@ -95,7 +111,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
         </div>
         {failed ? <p role="alert" className="text-[13px] text-danger">空いている回を読み込めませんでした。<Button variant="link" onClick={load}>もう一度</Button></p> : null}
         {options !== null && options.length === 0 ? (
-          <p className="text-[13px] leading-5 text-liff-sub">期限内に空いている回がありません。お店にご相談ください。</p>
+          <p className="text-[13px] leading-5 text-liff-sub">期限内に空いている回がありません。教室にご相談ください。</p>
         ) : (
           <ul className="space-y-2">
             {rows.map((o) => {

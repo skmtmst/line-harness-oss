@@ -1,3 +1,4 @@
+import { useCustomerWords } from '../components/CustomerStyleScope.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, type EventBookingMine, type EventDetail, type EventSlot } from '../lib/api.js';
@@ -39,6 +40,7 @@ function seatLabel(s: EventSlot): string {
  * API・上限の数え方・失敗の扱いはそのまま。見た目だけ ★V7。
  */
 export default function Event() {
+  const words = useCustomerWords();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   // initLiff() は ?liffId=... をクエリから読むので、内部遷移でも保持する。
@@ -108,7 +110,7 @@ export default function Event() {
   if (loading || failed || !event) {
     return (
       <LiffLookScope className="min-h-screen bg-ground">
-        <LiffHeader title="イベント" />
+        <LiffHeader title={words.event} />
         <div className="mx-auto w-full max-w-md space-y-4 px-4 pt-2 pb-10">
           {failed ? (
             <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />
@@ -159,7 +161,7 @@ export default function Event() {
 
   return (
     <LiffLookScope className="min-h-screen bg-ground" designNode="gVjiC">
-      <LiffHeader title="イベント" />
+      <LiffHeader title={words.event} />
       {/* 板 gVjiC：中身は余白 16・まとまりの間は 14。 */}
       <div className="mx-auto w-full max-w-md space-y-3.5 px-4 pt-4 pb-28">
         {isHttpsUrl(event.image_url) ? (
@@ -275,7 +277,7 @@ export default function Event() {
               className="mt-2 flex gap-2 rounded-lg bg-info-bg p-3 text-xs leading-5 text-ink-secondary"
             >
               <Icon name="info" className="h-4 w-4 shrink-0" />
-              <p>このイベントへの予約上限（{max}）に達しています。</p>
+              <p>この{words.event}への予約上限（{max}）に達しています。</p>
             </div>
           )}
         </div>
