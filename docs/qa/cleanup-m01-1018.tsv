@@ -1,0 +1,20 @@
+category	target	before	after	reason_or_evidence	owner
+b389-5-1	入力エラー	U01の共通Field	保持（#1772も同じField）	aria-invalid・エラー文と入力の関連付けは実際の入力支援。v06と競合なし	M01
+b389-5-2	Cardの画面class	U01で削除	#1772へ譲る	v06の配置・文字・案内の形を優先。共通Card自体とU02は変更しない	M01
+b389-5-3	下の操作帯	U01のPageFooter	#1772のStickyBarへ戻す	v06は本文直下・長い時だけ追従。フォーム内送信を保持	M01
+b389-5-4	ボタンとコピーの読み上げ名	U01の語尾統一	#1772の表示と読み上げ名を採用	実際の操作を失う不具合ではないためv06を優先	M01
+b389-5-5	友だち取り込みの進捗	U01の共通ProgressBar	#1772の進捗表示へ戻す	v06の高さ6・色・形を保持。aria-valuenow/min/maxと取り込み処理は保持	M01
+b389-5-6	アイコン	U01の16px統一	#1772の15pxを採用	見た目の統一を理由に承認済みv06を変えない	M01
+scope	ほかの4画面61項目	23a72a6772	変更0	git diff 23a72a6772 -- settings/delivery settings/sns restaurant/delivery restaurant/google = empty	U01
+guards	共通radio-card・globals.css	U02 + #1772	両方保持	radio-cardは本線と同じ。globalsはU02の既存値に本線の事前確認用変数を追加済み	M01/U02
+counts	account-new（試験・説明を含む）	5 files / 1616 lines / max780 / logic18 tests	10 files / 2232 lines / max770 / logic27 tests	M01-EVIDENCE/b389-metrics.json; primaryBundle M01=0; LONG-FILES M01=0	M01
+files_and_tests	本線の登録用4試験	upstream #1772	byte一致・移動/改名/削除0	b389-metrics.json; 画面本体/CSSも本線byte一致	M01
+files_and_tests	接続判定の移動	logic.ts <-> check-rows.ts runtime cycle	connection-check.tsへ移動、公開名はlogicから保持	b389-graph.json; AST本文一致・循環0	M01
+guards	固定一覧・旧例外	G01で廃止	固定JSON2つ/importer地図を復活させない。b244の常設案内ソース固定1試験だけ撤去を維持	conflict-resolutions.tsv; Field定義・権限/別店/送信/崩れの動作は保持; B172新規0/許可0・B273新規0	M01/G01
+validation	全体CI（Node22.23.3）	未完走	完走exit1: 実検査80成功/31省略/集約1失敗	b389-ci-final/results.json; PR題名が不明なrelease-log1工程が未実施で集約未合格。全体合格とはしない	M01
+validation	試験・型・ビルド	未確認	関連92 / Web13679（既存skip/todo各1）/Worker13304/DB2327/LIFF572/更新161/scripts1048/共有387×2TZ成功	対象と各全体の型・lint・Web208ページ/Worker/MCP build・実ブラウザ操作成功。source tests変更0	M01
+validation	V8の実画面・故障対照	未確認	基本36/状態201:崩れ0、一覧132/骨格93:失敗0、故障対照79成功	b389-ci-final/guard; virtual table/Train17/PERF01/stress成功	M01
+screenshots	LINE追加1152/1440	未確認	44状態・54PNG・目視代表11枚、崩れ0/横はみ出し0/実行時例外0	b389-shots-v2/results.json; b389-capture-v2.log exit0; b389-visual-review.tsv	M01
+deferred	正式PR番号・題名の履歴/集約ゲート	PR未作成	採番後に通常ゲートで再照合。#0000指定の書式確認だけは成功	push/PR禁止を守り、実在しないPR情報・skipで合格にしない	司令塔
+deferred	dashboard JS量	budget 3710688B	3759538B / +48850B 未達	55測定完了・時間の絶対目標は全合格。報告モードexit0を予算内と扱わない。原因は未切分け、上限/許可を変えず所有者へ	A04/司令塔
+deferred	新migration・実送信/決済・外部書込み	対象外	不要・番号案なし・作成/適用0、push/PR/DB更新/配備0	M01は既存の登録手順の取り込みと検証のみ	M01/司令塔
