@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import EcSummary from './ec-summary'
+import EcPeriodSummary from './ec-period'
 import { dashboardCardForStyle } from './style-cards'
 const net = vi.hoisted(() => ({ overview: vi.fn(), orders: vi.fn(), connector: vi.fn(), period: vi.fn() }))
 vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { ecCommerce: net }, fetchApi: net.period }))
@@ -35,4 +36,23 @@ it('未接続・失敗を0にせず、読み直しと別店の切替で古い数
   expect(screen.queryByText('21')).toBeNull()
   await waitFor(() => expect(net.connector).toHaveBeenCalledWith('b'))
   expect(screen.queryByText('0')).toBeNull()
+})
+
+it('T01の接続済み・注文未取得を、未設定や0件と区別する', async () => {
+  const response = await net.period()
+  net.period.mockClear().mockResolvedValue({ ...response, data: { ...response.data, status: 'unavailable' } })
+  render(<EcPeriodSummary accountId="ec-account" period="today" />)
+  await screen.findByText('ECは接続済みですが、注文をまだ取り込めていません。数字を0件としては表示していません。')
+  expect(screen.queryByText('0')).toBeNull()
+  expect(screen.getAllByText('まだ取り込めていません')).toHaveLength(2)
+})
+
+it('T01の割合0〜1を%で表示し、選んだ期間と分母を渡して示す', async () => {
+  const response = await net.period()
+  net.period.mockClear().mockResolvedValue({ ...response, data: { ...response.data, status: 'available', orders: { value: 12, status: 'available', formula: '注文日' }, repeatCustomers: { value: .25, numerator: 3, denominator: 12, status: 'available', formula: '再購入' } } })
+  render(<EcPeriodSummary accountId="ec-account" period="last7" />)
+  await screen.findByText('25')
+  const query = new URL(net.period.mock.calls[0][0], 'https://fixture.test').searchParams
+  expect(query.get('account_id')).toBe('ec-account')
+  expect(new Date(query.get('to')!).getTime() - new Date(query.get('from')!).getTime()).toBe(7 * 86400000)
 })
