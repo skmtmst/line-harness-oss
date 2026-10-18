@@ -5,7 +5,7 @@ import { preflight } from './preflight.js';
 const sha = 'a'.repeat(40), main = 'b'.repeat(40), repository = 'owner/repository';
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 function fixture(failure = '') {
-  for (const [name, value] of Object.entries({ PAGES_PROJECT_NAME: unstable_readConfig({config: 'apps/worker/wrangler.toml'}).vars.ADMIN_PAGES_PROJECT, NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'synthetic-site-key', OPERATIONS_PAUSED: 'true', GITHUB_REPOSITORY: repository, GITHUB_SHA: main, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main`, GH_TOKEN: 'synthetic-token' })) vi.stubEnv(name, value);
+  for (const [name, value] of Object.entries({ SECURITY_WORKER_NAME: unstable_readConfig({config: 'apps/worker/wrangler.toml'}).name, PAGES_PROJECT_NAME: unstable_readConfig({config: 'apps/worker/wrangler.toml'}).vars.ADMIN_PAGES_PROJECT, NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'synthetic-site-key', OPERATIONS_PAUSED: 'true', GITHUB_REPOSITORY: repository, GITHUB_SHA: main, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main`, GH_TOKEN: 'synthetic-token' })) vi.stubEnv(name, value);
   vi.spyOn(common, 'command').mockImplementation((_binary, args) => {
     if (args.includes('FETCH_HEAD')) return main;
     if (args.includes('HEAD')) return sha;
@@ -41,6 +41,11 @@ describe('release preflight uses real orchestration with synthetic metadata', ()
     await expect(preflight(sha, '123', fetcher)).rejects.toThrow(); expect(fetcher).not.toHaveBeenCalled();
     vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'synthetic-site-key'); vi.stubEnv('PAGES_PROJECT_NAME', 'wrong');
     await expect(preflight(sha, '123', fetcher)).rejects.toThrow(); expect(fetcher).not.toHaveBeenCalled();
+  });
+  it.each(['', 'wrong-worker'])('rejects missing/mismatched Worker identity %s before DB work or provider requests', async worker => {
+    const fetcher = fixture(); vi.stubEnv('SECURITY_WORKER_NAME', worker);
+    await expect(preflight(sha, '123', fetcher)).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
   });
   it('requires the operator pause confirmation without changing operational flags', async () => {
     const fetcher = fixture(); vi.stubEnv('OPERATIONS_PAUSED', 'false');

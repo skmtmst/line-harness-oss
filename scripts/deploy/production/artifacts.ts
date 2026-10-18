@@ -43,13 +43,14 @@ export function verifyHeaders(kind: 'admin' | 'worker'): void {
     walk(root);
   }
 }
-export function assertAdminInputs(): void {
+export function assertReleaseInputs(): void {
   const source = unstable_readConfig({ config: 'apps/worker/wrangler.toml' });
+  if (requireValue(process.env.SECURITY_WORKER_NAME) !== source.name) throw new Error('production_identity');
   if (requireValue(process.env.PAGES_PROJECT_NAME) !== source.vars.ADMIN_PAGES_PROJECT) throw new Error('pages_project');
   requireValue(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 }
 export function prepareAdmin(): void {
-  assertAdminInputs();
+  assertReleaseInputs();
   verifyHeaders('admin');
 }
 export function assertBootstrap(html: string, exists: (file: string) => boolean): void {

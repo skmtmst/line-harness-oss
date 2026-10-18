@@ -88,3 +88,13 @@ Worker・管理画面の実ビルドと生成設定/見出し検査が成功（�
 中止時のMac用ci-local cleanupで既知のPermissionErrorが出た。自分の残存processが0、
 自分の一時worktreeがcleanであることを確認し、そのworktreeだけ通常のremoveで片付けた。
 他束のprocess・worktree・共用ツールは変更していない。
+
+## 本番の名前もDB更新より先に照合
+
+Worker名が未設定/別名でも、以前の入口はソース名へのfallbackで通り、生成物の確認で
+DB更新後に止まる余地があった。新しい失敗対照2件で、修正前は2失敗/8成功を確認した。
+公開の入口でWorker名・Pagesの本番project・公開キーを確認し、親WorkflowもWorker名を
+明示して渡すようにした。修正後は関連102件・scripts型・構造/故障対照・actionlintが成功。
+本番/検証の設定変更はしていない。変更は配備補助とその試験・親のenvだけで、
+apps/・packages/の製品入力と既存のアプリ検査ジョブ定義はcecbから変更0。
+cecbの全体CIを継続し、変更した補助のRoot検査と両ビルドの検査は追加コミットで再確認する。

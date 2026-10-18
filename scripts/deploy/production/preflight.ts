@@ -1,4 +1,4 @@
-import { assertAdminInputs } from './artifacts.js';
+import { assertReleaseInputs } from './artifacts.js';
 import { assertSha, command, requireValue } from './common.js';
 // @ts-expect-error Existing read-only JS CLI
 import { verifyPublicBuild } from '../verify-public-build.mjs';
@@ -29,7 +29,7 @@ export function assertProductionApproval(environment: any): void {
 }
 export async function preflight(sha: string, runId: string, fetcher: typeof fetch = fetch): Promise<void> {
   if (process.env.OPERATIONS_PAUSED !== 'true') throw new Error('operations_pause_confirmation');
-  assertAdminInputs();
+  assertReleaseInputs();
   const repository = requireValue(process.env.GITHUB_REPOSITORY);
   verifyReleaseCheckout(sha);
   if (!/^\d+$/.test(runId)) throw new Error('staging_run_id');
