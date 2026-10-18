@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { buildSupportEmailInboxQuery } from '../../app/chats/support-email-query'
+import { readImplementationSource } from '../../../../worker/src/test-utils/implementation-source'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
@@ -12,9 +13,8 @@ const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
 // 受信箱の指標カード（inbox-kpis.tsx）はどの画面からも描かれないので 2026-10-07 に消した。それを見ていた行も外した。
 const EMAIL_THREAD = readFileSync(join(HERE, '..', 'support', 'email-thread.tsx'), 'utf8')
-const WORKER_CHATS = readFileSync(
+const WORKER_CHATS = readImplementationSource(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'chats.ts'),
-  'utf8',
 )
 const WORKER_EMAIL = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'support-inbox.ts'),

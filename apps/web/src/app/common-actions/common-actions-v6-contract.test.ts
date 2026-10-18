@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { readImplementationSource } from '../../../../worker/src/test-utils/implementation-source'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
@@ -15,7 +16,7 @@ const EDITOR = read('..', '..', 'components', 'automations', 'common-action-edit
 // #580: 権限の実体は use-can-manage.ts へ1本化。旧2ファイルは互換の再送出。
 const PERMISSION = read('..', '..', 'components', 'automations', 'use-can-manage.ts')
 const API = read('..', '..', 'lib', 'api.ts')
-const WORKER = read('..', '..', '..', '..', 'worker', 'src', 'services', 'common-actions.ts')
+const WORKER = readImplementationSource(join(HERE, '..', '..', '..', '..', 'worker', 'src', 'services', 'common-actions.ts'))
 const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'services', 'automation-engine.ts')
 const FOUNDATION = read('..', '..', '..', '..', '..', 'packages', 'db', 'migrations', '181_automation_v6_foundation.sql')
 

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('../../v8/events/list.tsx', import.meta.url), 'utf8')
-const WORKER = readFileSync(new URL('../../../../worker/src/index.ts', import.meta.url), 'utf8')
+const WORKER = readFileSync(new URL('../../../../worker/src/cron/scheduled.ts', import.meta.url), 'utf8')
 const WAITLIST = readFileSync(new URL('../../../../worker/src/services/event-waitlist.ts', import.meta.url), 'utf8')
 
 describe('V8 イベント予約の件数状態', () => {
