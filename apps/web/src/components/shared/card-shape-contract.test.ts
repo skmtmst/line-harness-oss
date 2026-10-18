@@ -41,6 +41,7 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/tap-area-editor.module.css", ".frame", "押したら行うことの入れ子の編集欄。影を重ねない。"],
   ["components/shared/time-field-v8.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/toast.module.css", ":root .toast", "一時的な知らせ。知らせ専用の影を保つ。"],
+  ["v8/account-new/register.module.css", ".outlineCard", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["v8/analytics/analytics.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/analytics/analytics.module.css", ".reportTable", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/analytics/analytics.module.css", ".waitBox", "警告・閲覧のみ・状態・待機の帯。線で区別する。"],
