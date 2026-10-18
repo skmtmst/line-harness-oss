@@ -59,7 +59,7 @@ describe('はじめにやること（Bdfxm）', () => {
     )
     expect(summary.rows.map((row) => row.title)).toEqual(['来店スタンプの決まりを入れる', 'Stripe をつなぐ', '入った予約メニュー・お知らせを動かす', 'お店の写真とロゴを入れる'])
     expect(summary.rows[0].action.href).toBe('/visit-stamps')
-    expect(summary.rows[1].action.preparing).toBe('お支払い')
+    expect(summary.rows[1].action.href).toBe('/booking/menus?tab=payments')
     expect(summary.done).toBe(3)
     expect(summary.total).toBe(11)
   })

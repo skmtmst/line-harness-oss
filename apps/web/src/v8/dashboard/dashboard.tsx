@@ -35,11 +35,14 @@ import { InboxSection } from './inbox'
 import { ConnectionStatus,DeliveryFailures,FriendStatus,Loading,Metric,MonthlyDelivery,OperationalAlerts,RecentActivity,RecentResults,SendQuota,SupportStatus,Tag,Unavailable,Upcoming } from './sections'
 import { FriendTrend,trendRangeNote } from './trend'
 import { PERIODS,jstDay,useDashboard } from './use-dashboard'
+import { dashboardCardForStyle } from './style-cards'
 export { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 
 
 /* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
 /* はじめの質問の窓（xxpM9 ほか）も開くまで読まない。 */
+const EcSummary = dynamic(() => import('./ec-summary'))
+
 const StyleSetupWizard = dynamic(() => import('@/v8/onboarding/wizard').then((module) => module.default))
 
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
@@ -58,9 +61,9 @@ const ROW_VARIANT: Partial<Record<DashboardCardId, 'trend' | 'inbox' | 'link'>> 
   'friend-add': 'link',
 }
 
-export default function DashboardV8() {
+export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 'ec' } = {}) {
   const router = useRouter()
-  const d = useDashboard()
+  const d = useDashboard(usageStyle)
   const role = useStaffRole()
   const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
@@ -249,7 +252,9 @@ export default function DashboardV8() {
   const rows: ReactNode[] = []
   const looseMain: DashboardCardId[] = []
   for (const item of d.preferences.main) {
+    if (!dashboardCardForStyle(item.id, usageStyle, d.preferenceVersion > 0)) continue
     if (item.id === 'shipment') {
+      if (usageStyle === 'standard') continue
       /* 件数は隠していても取り続ける（v7 と同じ）。出荷があるときだけ段として出す。 */
       const show = item.visible && (d.shipmentSummary?.soon ?? 0) > 0
       rows.push(
@@ -362,7 +367,7 @@ export default function DashboardV8() {
     <DashboardPage
       boardId="WQmep"
       headingSize="compact"
-      title={greeting(d.staffName)}
+      title={usageStyle ? 'ダッシュボード' : greeting(d.staffName)}
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
         <PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 30} supportedDays={[1,7,30]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 30, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last30')} />
@@ -373,6 +378,7 @@ export default function DashboardV8() {
       overlays={d.editorOpen && canEditLayout ? <DashboardEditor
         open={d.editorOpen}
         preferences={d.preferences}
+        usageStyle={usageStyle}
         saving={d.preferenceSaving}
         saveError={d.preferenceSaveError?.message ?? null}
         saveConflict={d.preferenceSaveError?.conflict ?? false}
@@ -395,6 +401,7 @@ export default function DashboardV8() {
       ) : null}
       {/* 本文の段が見えたら補足の口を叩く（速さ対応）。 */}
       <div ref={d.bodyRef} className={styles.body}>
+        {usageStyle === 'ec' && d.selectedAccountId ? <EcSummary key={d.selectedAccountId} accountId={d.selectedAccountId} period={d.period} /> : null}
         {rows}
         <RecentActivity items={d.notifications} failed={d.notificationFailed} />
       </div>

@@ -1186,7 +1186,7 @@ describe('Meet個別相談のV6送信の最終関係フェンス', () => {
     ).run()
     // 新版へ再利用される前の子IDを先に固定する (旧senderが触らないことの対照)。
     raw.prepare(
-      `INSERT INTO meet_consultation_reminders
+      `INSERT INTO meet_consultation_notification_runs
          (id, consultation_id, kind, scheduled_at, status, retry_count)
        VALUES ('mcr-day-seed', 'consult-1', 'day_before', '2026-11-01T10:00:00.000Z', 'pending', 0),
               ('mcr-hour-seed', 'consult-1', 'hour_before', '2026-11-02T09:00:00.000Z', 'pending', 0)`,
@@ -1271,11 +1271,13 @@ describe('Meet個別相談のV6送信の最終関係フェンス', () => {
     ).get()).toEqual({ lock_version: 1, starts_at: targetB })
     // 新版の子はpending・新予定日時・子ID不変。旧senderは作りも壊しもしない。
     expect(raw.prepare(
-      `SELECT id, kind, status, scheduled_at FROM meet_consultation_reminders
-        WHERE consultation_id = 'consult-1' ORDER BY kind`,
+      `SELECT id, kind, status, scheduled_at FROM meet_consultation_notification_runs
+        WHERE consultation_id = 'consult-1' ORDER BY kind,schedule_revision`,
     ).all()).toEqual([
-      { id: 'mcr-day-seed', kind: 'day_before', status: 'pending', scheduled_at: '2026-11-02T10:00:00.000Z' },
-      { id: 'mcr-hour-seed', kind: 'hour_before', status: 'pending', scheduled_at: '2026-11-03T09:00:00.000Z' },
+      {id:'mcr-day-seed',kind:'day_before',status:'cancelled',scheduled_at:'2026-11-01T10:00:00.000Z'},
+      { id: expect.any(String), kind: 'day_before', status: 'pending', scheduled_at: '2026-11-02T10:00:00.000Z' },
+      {id:'mcr-hour-seed',kind:'hour_before',status:'cancelled',scheduled_at:'2026-11-02T09:00:00.000Z'},
+      { id: expect.any(String), kind: 'hour_before', status: 'pending', scheduled_at: '2026-11-03T09:00:00.000Z' },
     ])
     expect(raw.prepare(
       `SELECT COUNT(*) AS c FROM friend_reminder_deliveries WHERE friend_reminder_id = 'enrollment-1'`,

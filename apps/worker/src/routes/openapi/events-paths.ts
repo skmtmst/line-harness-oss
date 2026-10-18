@@ -227,7 +227,7 @@ export const eventsPaths = {
     post: {
       tags: ['Events'],
       summary: '本人が予約を別の開催回へ移す',
-      description: '新しい席を確保できた時だけ元の申込を取り消す、まとめて1つの操作。確保に失敗したら旧予約を維持する。',
+      description: '新しい席を確保できた時だけ元の申込を取り消す、まとめて1つの操作。確保に失敗したら旧予約を維持する。券の利用記録は移し、再消費しない。予約の版と各段の記録を残す。',
       parameters: [
         { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
         { name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } },
