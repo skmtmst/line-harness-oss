@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readImplementationSource } from '../test-utils/implementation-source.js';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const route = readFileSync(join(here, 'reminders.ts'), 'utf8');
+const route = readImplementationSource(join(here, 'reminders.ts'));
 
 describe('プレビューは目標日なしでも予定を返す', () => {
   it('目標日が無いときは仮の基準日で予定を作る', () => {

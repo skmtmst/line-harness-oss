@@ -102,11 +102,11 @@ describe('重なった予約', () => {
     await notifyBookingConflicts(db.db,'a');
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  it('送信失敗は次回の確認で再試行できる', async () => {
+  it('送信開始後の切断は結果不明を残し、次回の確認でも送り直さない', async () => {
     const fetchMock = vi.fn().mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(new Response('',{ status:200 })); vi.stubGlobal('fetch',fetchMock);
     await expect(notifyBookingConflicts(db.db,'a')).rejects.toThrow('booking_conflict_notification_failed');
     await notifyBookingConflicts(db.db,'a');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0][1].headers['X-Line-Retry-Key']).toBe(fetchMock.mock.calls[1][1].headers['X-Line-Retry-Key']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(db.raw.prepare("SELECT value FROM account_settings WHERE key LIKE 'booking_conflict:%'").all())).toContain('unknown');
   });
 });

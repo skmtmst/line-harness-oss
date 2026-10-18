@@ -661,3 +661,11 @@ describe('N-042 型検証の接続(#702) F1旧項目対応表', () => {
     expect(fieldValue('ff-multi')).toBe(JSON.stringify(['犬', '猫']));
   });
 });
+
+// Keep the real URL/private-IP policy and webhook fetch. Only DNS is synthetic,
+// so concurrency/event-id assertions still count actual webhook attempts.
+vi.mock('../services/form-webhook.js', async original => {
+  const actual = await original<typeof import('../services/form-webhook.js')>();
+  return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
+    actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
+});

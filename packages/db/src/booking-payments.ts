@@ -160,15 +160,17 @@ export async function createBookingPayment(
        (id, line_account_id, booking_id, amount, currency, status,
         provider, provider_payment_id, idempotency_key, hold_until, paid_at,
         created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'unpaid', ?, NULL, ?, ?, NULL, ?, ?)`,
+     SELECT ?, ?, ?, ?, ?, 'unpaid', ?, NULL, ?, ?, NULL, ?, ?
+     WHERE NOT EXISTS (SELECT 1 FROM booking_payments WHERE line_account_id=? AND booking_id=?)`,
   ).bind(
     id, input.lineAccountId, input.bookingId, Math.max(0, Math.trunc(input.amount)),
     input.currency ?? 'JPY', input.provider, input.idempotencyKey,
-    input.holdUntil ?? null, now, now,
+    input.holdUntil ?? null, now, now, input.lineAccountId, input.bookingId,
   ).run();
   const saved = await db.prepare(
-    `SELECT * FROM booking_payments WHERE line_account_id = ? AND idempotency_key = ?`,
-  ).bind(input.lineAccountId, input.idempotencyKey).first<BookingPaymentRecord>();
+    `SELECT * FROM booking_payments WHERE line_account_id = ? AND (idempotency_key = ? OR booking_id = ?)
+      ORDER BY CASE WHEN idempotency_key = ? THEN 0 ELSE 1 END,created_at DESC,id LIMIT 1`,
+  ).bind(input.lineAccountId, input.idempotencyKey, input.bookingId, input.idempotencyKey).first<BookingPaymentRecord>();
   if (!saved) throw new Error('booking payment could not be created');
   return saved;
 }

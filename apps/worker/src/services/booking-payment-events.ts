@@ -95,7 +95,7 @@ export async function processPaymentEvent(db: D1Database, account: string, id: s
         AND p.provider=e.provider AND p.provider_payment_id=e.provider_payment_id
         AND p.amount=e.amount AND upper(p.currency)=e.currency) THEN 'failed'
       WHEN EXISTS(SELECT 1 FROM booking_payments p WHERE p.id=e.payment_id AND
-        ((e.outcome='refunded' AND p.status='paid' AND COALESCE(e.refunded_amount,e.amount)>p.refunded_amount) OR (e.outcome IN ('paid','failed','expired') AND p.status IN ('unpaid','pending')))) THEN 'applied'
+        ((e.outcome='refunded' AND p.status='paid' AND COALESCE(e.refunded_amount,e.amount)>p.refunded_amount) OR (e.outcome IN ('paid','failed','expired') AND p.status IN ('unpaid','pending')) OR (e.outcome='paid' AND p.status='expired'))) THEN 'applied'
       WHEN e.outcome='refunded' AND EXISTS(SELECT 1 FROM booking_payments p WHERE p.id=e.payment_id AND p.status NOT IN ('paid','refunded')) THEN 'failed'
       ELSE 'duplicate' END,error_code=NULL WHERE id=? AND lease_token=?`).bind(id, token)];
     if (payment && event.outcome === 'paid') writes.push(...paidBookingPaymentStatements(db, payment, at, true, fence));

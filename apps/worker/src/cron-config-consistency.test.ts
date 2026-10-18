@@ -6,12 +6,12 @@ import { SCHEDULED_CRONS } from './services/scheduled-job-isolation.js';
 
 const workerSource = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
 
-function sourceBetween(start: string, end: string): string {
-  const startIndex = workerSource.indexOf(start);
-  const endIndex = workerSource.indexOf(end, startIndex);
-  expect(startIndex).toBeGreaterThanOrEqual(0);
-  expect(endIndex).toBeGreaterThan(startIndex);
-  return workerSource.slice(startIndex, endIndex);
+const cronSource = readFileSync(new URL('./cron/scheduled.ts', import.meta.url), 'utf8');
+function functionBody(file: string, name: string): string {
+  const source = readFileSync(new URL(file, import.meta.url), 'utf8');
+  const at = source.indexOf(`async function ${name}(`);
+  expect(at).toBeGreaterThanOrEqual(0);
+  return source.slice(at);
 }
 
 describe('Cron Trigger設定', () => {
@@ -22,20 +22,15 @@ describe('Cron Trigger設定', () => {
     expect(configuredCronList).toBeDefined();
 
     const configuredCrons = new Set<string>(JSON.parse(configuredCronList ?? '[]'));
-    expect(workerSource).toContain('scheduledLane(event.cron)');
+    expect(workerSource).toContain("from './cron/scheduled.js'");
+    expect(cronSource).toContain('scheduledLane(event.cron)');
     expect(configuredCrons).toEqual(new Set(Object.values(SCHEDULED_CRONS)));
   });
 
   it('通知と重い処理を、それぞれ決めたCronレーンに残す', () => {
-    const frequentHeavy = sourceBetween(
-      'async function runFrequentHeavyJobs(',
-      'async function runSixHourlyHeavyJobs(',
-    );
-    const sixHourlyHeavy = sourceBetween(
-      'async function runSixHourlyHeavyJobs(',
-      '// Scheduled handler for cron triggers',
-    );
-    const delivery = sourceBetween('async function scheduled(', '\nexport default');
+    const frequentHeavy = functionBody('./cron/frequent.ts', 'runFrequentHeavyJobs');
+    const sixHourlyHeavy = functionBody('./cron/six-hourly.ts', 'runSixHourlyHeavyJobs');
+    const delivery = functionBody('./cron/scheduled.ts', 'scheduled');
 
     const frequentHeavyCalls = [
       'processDueFriendBulkRuns',

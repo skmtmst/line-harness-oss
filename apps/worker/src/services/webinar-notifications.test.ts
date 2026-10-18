@@ -146,6 +146,19 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
     };
   }
 
+  test.each([0, 20, 21])('通知%s件を20件以内ずつ処理し、続きと履歴を残す', async count => {
+    const real = await proxyFixture(count);
+    const upstream = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      expect((await real.tick()).result.sent).toBe(Math.min(count, 20));
+      expect((await real.tick()).result.sent).toBe(Math.max(0, count - 20));
+      expect((await real.tick()).result.sent).toBe(0);
+      expect(upstream).toHaveBeenCalledTimes(count);
+      expect(real.store.raw.prepare("SELECT COUNT(*) AS n FROM messages_log").get()).toEqual({ n: count });
+    } finally { vi.unstubAllGlobals(); real.store.raw.close(); }
+  });
+
   test('実Proxy込み100件をD1上限内の複数tickに分け、送信と履歴を各1回にする', async () => {
     const real = await proxyFixture(100);
     const upstream = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response('{}', { status: 200 }));
@@ -163,7 +176,7 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
       // +1 query/件は #960 の緊急停止判定 (broadcast_dispatch) — 自動pushも
       // 送信直前に operation_control_sets を読む分。
       // tenant suspension is consumed in one batch query before each tick.
-      expect(queries).toEqual([322, 322, 322, 322, 322]);
+      expect(queries).toEqual([302, 302, 302, 302, 302]);
       expect((await real.tick()).result.sent).toBe(0);
       expect(upstream).toHaveBeenCalledTimes(100);
       expect(new Set(upstream.mock.calls.map(([, init]) => new Headers(init?.headers).get('X-Line-Retry-Key'))).size).toBe(100);
@@ -400,9 +413,12 @@ describe('緊急停止と通知取得・送信の競合 (#745)', () => {
 
   test('claim後の設定取得中に停止しても外部送信直前に止まり、解除後一度だけ届く', async () => {
     const store = await fixture();
+    let stopReads = 0;
     const racedDb = intercept(store.db, async (sql, method, run) => {
       const result = await run();
-      if (method === 'first' && sql === 'SELECT liff_id FROM line_accounts WHERE id=?') stop(store);
+      // Flip the switch after the post-claim check has read 'running'. The
+      // last check must still re-read it even though LIFF is now preloaded.
+      if (method === 'all' && sql.includes('SELECT states_json, active_incident_id') && ++stopReads === 2) stop(store);
       return result;
     });
     const dispatch = vi.fn(async () => new Response('{}', { status: 200 }));
@@ -913,7 +929,6 @@ describe('webinar session capacity and missed window (N)', () => {
     await expect(registerWebinarSession(db, 'webinar-1', 'friend-2', SESSION, NOW))
       .rejects.toThrow('session_full');
   });
-
 
   test('W10: 同じ申込が並行しても登録・席・通知は1件ずつになる', async () => {
     const { db, raw } = createTestD1(); seedBase(raw);

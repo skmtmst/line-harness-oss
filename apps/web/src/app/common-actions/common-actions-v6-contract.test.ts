@@ -17,7 +17,7 @@ const EDITOR = read('..', '..', 'components', 'automations', 'common-action-edit
 // #580: 権限の実体は use-can-manage.ts へ1本化。旧2ファイルは互換の再送出。
 const PERMISSION = read('..', '..', 'components', 'automations', 'use-can-manage.ts')
 const API = readApi('..', '..', 'lib', 'api.ts')
-const WORKER = read('..', '..', '..', '..', 'worker', 'src', 'services', 'common-actions.ts')
+// Workerの分岐・参照版・保管の動きは services/common-actions.test.ts の実DB試験で守る。
 const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'services', 'automation-engine.ts')
 const FOUNDATION = read('..', '..', '..', '..', '..', 'packages', 'db', 'migrations', '181_automation_v6_foundation.sql')
 
@@ -49,8 +49,6 @@ describe('V6共通アクションの画面契約', () => {
     expect(BRANCH_EDITOR).toContain('条件の組み合わせ')
     expect(BRANCH_EDITOR).toContain('当てはまるとき')
     expect(BRANCH_EDITOR).toContain('当てはまらないとき')
-    expect(WORKER).toContain("'branch'")
-    expect(WORKER).toContain('branch_too_deep')
     expect(ENGINE).toContain("type: 'branch_marker'")
     expect(ENGINE).toContain('branch_not_selected')
   })
@@ -115,8 +113,6 @@ describe('V6共通アクションの画面契約', () => {
   })
 
   it('利用先ごとの件数と旧版の残りを分けて出す（監査 R471・R472）', () => {
-    expect(WORKER).toContain('older_running_count')
-    expect(WORKER).toContain('consumer_path')
     expect(API).toContain('olderRunningCount')
     expect(VERSIONS).toContain('olderRunningCount')
     expect(VERSIONS).toContain('binding.olderRunningCount')
@@ -135,9 +131,6 @@ describe('V6共通アクションの画面契約', () => {
   })
 
   it('確認後の参照先更新は再確認なしで公開しない（監査 R479）', () => {
-    expect(WORKER).toContain('reference_updated')
-    expect(WORKER).toContain('新しい版があります')
-    expect(WORKER).toContain('keepPins')
   })
 
   it('未使用は保管でき利用中は理由を示して止まる（監査 R480）', () => {
@@ -146,7 +139,6 @@ describe('V6共通アクションの画面契約', () => {
     expect(LIST).toContain('api.commonActions.archive')
     expect(LIST).toContain('api.commonActions.unarchive')
     expect(LIST).toContain("chip('archived', '保管'")
-    expect(WORKER).toContain('binding_exists')
     expect(API).toContain('archive:')
   })
 
@@ -197,7 +189,6 @@ describe('V6共通アクションの機能契約', () => {
 
   it('公開版を直接変更せず、実行開始時の計画へ展開する', () => {
     expect(FOUNDATION).toContain('trg_common_action_published_version_immutable')
-    expect(WORKER).toContain('common_action_cycle')
     expect(ENGINE).toContain('buildExecutionPlan')
     expect(ENGINE).toContain('execution_plan_json')
     expect(ENGINE).toContain('common_action_marker')
