@@ -291,3 +291,40 @@ it('WEB229：開始のきっかけを保存したら、見出しのきっかけ�
   fireEvent.click(await screen.findByRole('button', { name: 'きっかけを保存（試験）' }))
   await waitFor(() => expect(host.textContent).toContain('フォームに答えたとき'))
 })
+
+describe('整理後も保存・開始・停止と通の状態を保つ', () => {
+  it('下書きの通は行の中で区別でき、選んだ本文も保持する', async () => {
+    const { scenarioReferenceData } = await import('@/components/scenarios/scenario-reference-data')
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValue({ success: true, data: {
+      ...scenario, steps: [{ ...scenario.steps[0], isDraft: true }],
+    } } as never)
+    await render()
+    expect(within(host.querySelector('ol')!).getByText('下書き')).toBeTruthy()
+    expect(screen.getAllByText('ご登録ありがとうございます。').length).toBeGreaterThan(1)
+  })
+
+  it('停止前は送らず、確認した時だけ停止を保存し、窓を閉じる', async () => {
+    const { scenarioReferenceData } = await import('@/components/scenarios/scenario-reference-data')
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValue({ success: true, data: scenario } as never)
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: '一時停止する', exact: true }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(updateScenario).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する', exact: true }))
+    await waitFor(() => expect(updateScenario).toHaveBeenCalledWith('sc-1', { isActive: false }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  })
+
+  it('停止に失敗したら確認窓と再試行を残し、成功したように見せない', async () => {
+    const { scenarioReferenceData } = await import('@/components/scenarios/scenario-reference-data')
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValue({ success: true, data: scenario } as never)
+    updateScenario.mockRejectedValueOnce(new Error('手元の故障対照'))
+    await render()
+    fireEvent.click(screen.getByRole('button', { name: '一時停止する', exact: true }))
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '一時停止する', exact: true }))
+    await waitFor(() => expect(within(dialog).getByRole('alert')).toBeTruthy())
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    expect(within(dialog).getByRole('button', { name: '一時停止する', exact: true }).hasAttribute('disabled')).toBe(false)
+  })
+})
