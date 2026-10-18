@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 // @ts-expect-error Node のソース検査を同じ故障注入で確認する。
 import { inspectB244Source, inspectB244Tree } from '../../scripts/verify-b244.mjs'
 
@@ -38,6 +39,7 @@ describe('B-244/245 ソースの見張り', () => {
     } finally { rmSync(root, { recursive: true, force: true }) }
   })
   it('対象の全V8ファイルに違反がない', () => {
-    expect(inspectB244Tree(new URL('../..', import.meta.url).pathname).errors).toEqual([])
+    // pathname は百分率符号化されるので、作業場所の名前に日本語や空白があると読めない。
+    expect(inspectB244Tree(fileURLToPath(new URL('../..', import.meta.url))).errors).toEqual([])
   })
 })
