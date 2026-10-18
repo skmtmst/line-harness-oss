@@ -1,5 +1,8 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import ListState from '@/components/shared/list-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
@@ -66,9 +69,20 @@ const emptyForm: FormState = {
 }
 
 export default function AccountRegisterV8() {
-  const saveErrors = useSaveFormErrors()
+  const role = useStaffRole()
   usePageTitle('LINEアカウントを登録')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'アカウント', href: '/hq' }])
+
+  // API の接続・登録と同じくオーナーだけ。権限確認前に下書きの復元や変更処理を起動しない。
+  if (role !== 'owner') return <PageFrame kind="wizard" boardId="p6zMkA">
+    <PageHeading title="LINEアカウントを登録" />
+    {role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>閲覧のみで見ています。LINEアカウントの登録はオーナーに頼んでください。</ReadOnlyNotice>}
+  </PageFrame>
+  return <AccountRegistrationForm />
+}
+
+function AccountRegistrationForm() {
+  const saveErrors = useSaveFormErrors()
 
   // ①事前確認（v06 p6zMkA）。答えと、いま出している面。
   const [precheck, setPrecheck] = useState<PrecheckAnswers>({})
