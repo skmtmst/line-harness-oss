@@ -157,26 +157,10 @@ export function bookingNumber(id: string): string {
   return `#R-${id.replace(/[^0-9a-zA-Z]/g, '').slice(-6).toUpperCase()}`
 }
 
-/**
- * 承認したときにお客様へ届く文面。
- *
- * 実際に送っているのは apps/worker/src/services/booking-notifier.ts の
- * renderNotificationText('approved', ...)。ここは同じ形をなぞっている。
- * 向こうを変えたらここも直すこと。
- */
-export function approvedText(b: { menu_name: string; staff_name: string; starts_at: string }): string {
-  const jst = new Date(new Date(b.starts_at).getTime() + 9 * 3600_000)
-    .toISOString()
-    .slice(0, 16)
-    .replace('T', ' ')
-  return [
-    '予約が確定しました。',
-    `メニュー: ${b.menu_name}`,
-    `担当: ${b.staff_name}`,
-    `日時: ${jst}`,
-    '',
-    '変更・キャンセルはお店に直接ご連絡ください。',
-  ].join('\n')
+/** 実送信と共通のサーバー本文だけを表示する。取得できない本文は推測しない。 */
+export function approvedText(booking: Pick<BookingAdminDetail, 'confirmationPreviewText'>): string | null {
+  const text = booking.confirmationPreviewText
+  return typeof text === 'string' && text.trim() ? text : null
 }
 
 export const AUDIT_FIELD_LABELS: Record<string, string> = {
