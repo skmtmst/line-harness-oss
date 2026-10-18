@@ -1,4 +1,4 @@
-import { logger, withInvocation } from '@line-crm/shared/server';
+import { logger, resumeInvocation, withInvocation } from '@line-crm/shared/server';
 import { setHolidayCoverageWarningHandler } from '@line-crm/shared';
 import { scheduled } from './cron/scheduled.js';
 import { apiContractMiddleware } from './middleware/api-contract.js';
@@ -1134,7 +1134,7 @@ export default {
     env: Env['Bindings'],
   ): Promise<void> {
     for (const message of batch.messages) {
-      await withInvocation('queue', async () => {
+      await withInvocation('queue', () => resumeInvocation(message.body?.requestId, async () => {
         try {
           await processCodexMentionMessage(env, message.body);
           message.ack();
@@ -1158,7 +1158,7 @@ export default {
             message.retry({ delaySeconds: 60 });
           }
         }
-      });
+      }));
     }
   },
   async email(

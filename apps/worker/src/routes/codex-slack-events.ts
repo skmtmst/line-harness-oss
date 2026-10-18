@@ -1,4 +1,4 @@
-import { logger } from '@line-crm/shared/server';
+import { logger, traceQueueMessage } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { verifySupportRelay } from '../services/support-relay.js';
@@ -255,13 +255,13 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
   if (event.user === c.env.CODEX_SLACK_USER_ID && event.thread_ts) {
     const observed = await observeOfficialCodexReply(c.env, event.channel, threadTs, event.text);
     if (observed.duplicateRisk) {
-      await c.env.CODEX_MENTION_QUEUE.send({
+      await c.env.CODEX_MENTION_QUEUE.send(traceQueueMessage({
         kind: 'notify_duplicate',
         slackEventId: envelope.event_id,
         channelId: event.channel,
         threadTs,
         officialTaskUrl: observed.taskUrl,
-      });
+      }));
     }
     return c.json({ success: true, observed: observed.tracked });
   }
@@ -278,7 +278,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     autoMergeApproval !== null &&
     isAllowedRelaySource(c.env.CODEX_RELAY_SOURCE_USER_IDS, event.user)
   ) {
-    await c.env.CODEX_MENTION_QUEUE.send({
+    await c.env.CODEX_MENTION_QUEUE.send(traceQueueMessage({
       kind: 'auto_merge',
       slackEventId: envelope.event_id,
       channelId: event.channel,
@@ -286,7 +286,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
       requesterUserId: event.user,
       prNumber: autoMergeApproval.prNumber,
       approvedHeadSha: autoMergeApproval.headSha,
-    });
+    }));
     autoMergeQueued = true;
   }
 
@@ -317,7 +317,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     const delaySeconds = Number.isFinite(configuredGrace)
       ? Math.min(300, Math.max(10, configuredGrace))
       : 30;
-    await c.env.CODEX_MENTION_QUEUE.send(message, { delaySeconds });
+    await c.env.CODEX_MENTION_QUEUE.send(traceQueueMessage(message), { delaySeconds });
   }
   return c.json({ success: true, queued: inserted, autoMergeQueued });
 });

@@ -1,4 +1,4 @@
-import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
+import { tracedFetch as fetch, logger, traceQueueMessage } from '@line-crm/shared/server';
 import type { Env } from '../index.js';
 import {
   githubFailureDetails,
@@ -21,7 +21,7 @@ export type CodexMonitorStatus =
   | 'completed'
   | 'failed';
 
-export type CodexMentionQueueMessage =
+export type CodexMentionQueueMessage = (
   | CodexAutoMergeMessage
   | {
       kind: 'inspect_official';
@@ -45,7 +45,8 @@ export type CodexMentionQueueMessage =
       channelId: string;
       threadTs: string;
       officialTaskUrl?: string;
-    };
+    }
+) & { requestId?: string };
 
 export type SlackEventEnvelope = {
   type?: string;
@@ -519,12 +520,12 @@ async function processOfficialInspection(
     // If the producer response was lost after the user relay succeeded, the
     // original message may be retried. Recreate only the idempotent receipt
     // inspection; never post the user relay a second time.
-    await env.CODEX_MENTION_QUEUE?.send({
+    await env.CODEX_MENTION_QUEUE?.send(traceQueueMessage({
       kind: 'inspect_relay',
       slackEventId: message.slackEventId,
       channelId: message.channelId,
       threadTs: message.threadTs,
-    }, { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
+    }), { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
     return;
   }
   if (
@@ -648,12 +649,12 @@ async function processOfficialInspection(
     return;
   }
 
-  await env.CODEX_MENTION_QUEUE?.send({
+  await env.CODEX_MENTION_QUEUE?.send(traceQueueMessage({
     kind: 'inspect_relay',
     slackEventId: message.slackEventId,
     channelId: message.channelId,
     threadTs: message.threadTs,
-  }, { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
+  }), { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
 }
 
 async function processRelayInspection(

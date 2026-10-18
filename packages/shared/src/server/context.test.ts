@@ -1,11 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { currentRequestId, createInvocationContext, runWithInvocation, withInvocation } from './context.js';
+import { currentRequestId, createInvocationContext, resumeInvocation, runWithInvocation, traceQueueMessage, withInvocation } from './context.js';
 import { tracedFetch } from './fetch.js';
 import { logger } from './logger.js';
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('invocation context', () => {
+  it('キューの内部メタデータだけを足し、業務キー・本文と旧メッセージを保つ', () => {
+    const message = { kind: 'inspect_relay', slackEventId: 'event', threadTs: 'thread' };
+    expect(traceQueueMessage(message)).toBe(message);
+    withInvocation('http', () => {
+      const traced = traceQueueMessage({ ...message, requestId: 'untrusted-customer' });
+      expect(traced).toEqual({ ...message, requestId: currentRequestId() });
+      expect(JSON.parse(JSON.stringify(traced))).toEqual(traced);
+      expect(traced.requestId).not.toBe('untrusted-customer');
+      let restored: string | undefined;
+      expect(() => { restored = resumeInvocation({ toString: 'untrusted-customer' }, () => currentRequestId()); }).not.toThrow();
+      expect(restored).toBe(currentRequestId());
+    });
+  });
   it('並列の依頼とwaitUntil相当の継続でIDを混ぜない', async () => {
     const rows: Array<[string, string | undefined]> = [];
     const log = vi.spyOn(console, 'info').mockImplementation(() => {});
