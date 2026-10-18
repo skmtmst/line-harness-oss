@@ -1,5 +1,6 @@
 import type { StarterSetItem } from '@/lib/api-styles'
 import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
+import { bookingHost, styleTerm } from '@/lib/terms'
 import { Q } from './setup-questions'
 
 
@@ -22,12 +23,12 @@ export type IconKey =
   | 'stamp' | 'ticket' | 'ban' | 'users' | 'user' | 'file'
 
 export const STYLE_CHOICES: ReadonlyArray<{ value: AccountStyle; icon: IconKey; label: string; note: string }> = [
-  { value: 'restaurant', icon: 'utensils', label: '飲食店向け', note: '席・コースの予約、前日のお知らせ、来店スタンプ' },
-  { value: 'salon', icon: 'scissors', label: 'サロン', note: '担当者の指名・空き枠、回数券、次回予約' },
-  { value: 'consult', icon: 'messages', label: '面談・相談', note: '担当を自動で割り当て、オンライン／対面、資料' },
-  { value: 'lesson', icon: 'graduation', label: '教室・レッスン', note: 'クラスの定員、回数券・月謝、振替' },
-  { value: 'ec', icon: 'bag', label: 'ECサイト', note: '商品のお知らせ、カゴ落ち、再入荷' },
-  { value: 'standard', icon: 'grid', label: '標準', note: '配信と受信箱だけで始める（あとで足せます）' },
+  { value: 'restaurant', icon: 'utensils', label: styleTerm('restaurant', 'V01'), note: '席・コースの予約、前日のお知らせ、来店スタンプ' },
+  { value: 'salon', icon: 'scissors', label: styleTerm('salon', 'V01'), note: '担当者の指名・空き枠、回数券、次回予約' },
+  { value: 'consult', icon: 'messages', label: styleTerm('consult', 'V01'), note: '担当を自動で割り当て、オンライン／対面、資料' },
+  { value: 'lesson', icon: 'graduation', label: styleTerm('lesson', 'V01'), note: 'クラスの定員、回数券・月謝、振替' },
+  { value: 'ec', icon: 'bag', label: styleTerm('ec', 'V01'), note: '商品のお知らせ、カゴ落ち、再入荷' },
+  { value: 'standard', icon: 'grid', label: styleTerm('standard', 'V01'), note: '配信と受信箱だけで始める（あとで足せます）' },
 ]
 
 export function styleLabel(style: AccountStyle): string {
@@ -106,7 +107,12 @@ export const LOOK_CHOICES: ReadonlyArray<{ value: 'keep' | 'change' | 'existing'
 ]
 
 export function questionsFor(style: AccountStyle): Question[] {
-  return BY_STYLE[style].map((key) => Q[key])
+  const host = bookingHost(style)
+  const words = (value: string) => value.replaceAll('お店', host).replaceAll('お客さま', styleTerm(style, 'V12').split('（')[0])
+  return BY_STYLE[style].map((key) => {
+    const question = Q[key]
+    return { ...question, title: words(question.title), description: words(question.description), info: question.info ? words(question.info) : undefined, manualNote: words(question.manualNote), todo: { ...question.todo, title: words(question.todo.title), note: words(question.todo.note) }, choices: question.choices.map((choice) => ({ ...choice, label: words(choice.label), note: words(choice.note) })) }
+  })
 }
 
 /** 左の一覧の並び（スタイル・見た目・質問…）。 */

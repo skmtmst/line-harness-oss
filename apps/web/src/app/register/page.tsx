@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { PRODUCT_SCOPE } from '@/lib/product-scope'
 import { useRouter } from 'next/navigation'
 import { useCallback, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
@@ -12,7 +13,7 @@ import { TextField } from '@/components/shared/text-field'
 import { authRequest, CONTACT_URL, emailError, LEGAL_LINKS, readDeviceMarker, rememberSignupEmail, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 
 /**
- * 会員登録の 1 歩目。★V6 36-4（`JBd7P`、カード `NIOtl`）。
+ * 会員登録の 1 歩目。V8（`JBd7P`、カード `NIOtl`）。
  *
  * メールアドレスだけを入れ、本登録の URL をメールで受け取る（決定 2026-09-13）。
  * 誤ったメールでは先に進めない。返事は登録済みでも同じ「送りました」。
@@ -64,8 +65,9 @@ export default function RegisterPage() {
       node="JBd7P"
       cardNode="NIOtl"
       title="無料で始める"
-      description="登録から30日はすべての機能を無料で使えます。クレジットカードは不要です。まずメールアドレスを入れてください。本登録の URL をお送りします。"
+      description={`${PRODUCT_SCOPE.trial} まずメールアドレスを入れてください。本登録の URL をお送りします。`}
     >
+      <p className="text-caption text-ink-secondary">{PRODUCT_SCOPE.boundaries}</p>
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
           <Notice tone="danger" message={error} />

@@ -16,6 +16,7 @@ import { PageContent } from '@/components/templates/page-frame'
  * お金が動く操作は新しく作らない：変えるときは確認の窓から、今ある口（支払いの管理＝Stripe の画面）
  * へ渡す。課金の対象外・支払いの管理画面が無いときは、運営へのお問い合わせへ渡す。
  */
+import { PRODUCT_SCOPE, planFeatureLabel } from '@/lib/product-scope'
 import { Check, CreditCard, Download } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -69,7 +70,7 @@ export function currentPlanKey(summary: BillingSummary): BillingSummary['planKey
 const INVOICE_WORDS: Record<string, string> = { ...INVOICE_STATUS_LABELS, open: '請求中' }
 
 const TITLE = '請求'
-const DESCRIPTION = 'プランと支払いの記録です。プランの申込はオーナーだけ、支払い方法の管理はオーナーか管理者ができます。'
+const DESCRIPTION = `プランと支払いの記録です。プランの申込はオーナーだけ、支払い方法の管理はオーナーか管理者ができます。${PRODUCT_SCOPE.estimates} ${PRODUCT_SCOPE.boundaries}`
 
 export default function HqBillingV8() {
   return (
@@ -270,7 +271,7 @@ function BillingInner() {
                 {plan.features.map((feature) => (
                   <li key={feature} className={styles.feature}>
                     <Check aria-hidden="true" className={styles.check} />
-                    {feature}
+                    {planFeatureLabel(feature)}
                   </li>
                 ))}
               </ul>

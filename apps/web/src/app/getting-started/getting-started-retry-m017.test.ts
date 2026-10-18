@@ -1,21 +1,26 @@
-import { describe, expect, it } from 'vitest'
-import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
+// @vitest-environment happy-dom
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import { afterEach, expect, it, vi } from 'vitest'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+const get = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get } } }))
+import { useFirstRun } from '@/v8/onboarding/use-first-run'
+afterEach(cleanup)
 
-const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+it('M017: 取得失敗を未設定にせず、読み直すと保存済み状態に復旧する', async () => {
+  get.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ success: true, data: { steps: [{ key: 'featureSet', state: 'done', href: '/settings', reason: null }] } })
+  const { result } = renderHook(() => useFirstRun('account-1'))
+  await waitFor(() => expect(result.current.status).toBe('error'))
+  expect(result.current.steps).toEqual([])
+  expect(result.current.error).toBeInstanceOf(Error)
+  await act(async () => result.current.reload())
+  await waitFor(() => expect(result.current.status).toBe('ready'))
+  expect(result.current.steps.find((step) => step.key === 'featureSet')?.state).toBe('done')
+})
 
-/**
- * M017：順路の読み込み失敗時に再試行口がない。
- * 捕まえた失敗を共通部品へ渡し、読み直し口を出す。
- * 403 は共通部品が権限の案内にし、再試行口を出さない。
- */
-describe('M017 はじめの設定の読み込み失敗の再試行口', () => {
-  it('読み込み失敗面に再試行口があり、押すと読み直す', () => {
-    expect(PAGE).toContain('error={status === \'error\' ? loadError : undefined}')
-    expect(PAGE).toContain('onRetry={() => void load()}')
-  })
-
-  it('読み直しは読み込み処理に結ばれている', () => {
-    expect(PAGE).toContain('const load = useCallback(async ()')
-    expect(PAGE).toContain('setLoadError(')
-  })
+it('M017: 実画面は同じhookの再取得と捕まえた失敗を共通のエラー表示へ渡す', () => {
+  const page = readUiSource(`${process.cwd()}/src/app/getting-started/page.tsx`, 'utf8')
+  expect(page).toContain("error={status === 'error' ? loadError : undefined}")
+  expect(page).toContain('onRetry={reload}')
+  expect(page).toContain('useFirstRun(selectedAccountId, !accountLoading)')
 })
