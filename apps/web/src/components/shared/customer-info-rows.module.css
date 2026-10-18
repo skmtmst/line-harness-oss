@@ -1,0 +1,9 @@
+/* 項目の最長の幅を全行で共有する。顧客パネルの基本欄の幅は変えない。 */
+.rows {
+  display: grid;
+  grid-template-columns: minmax(var(--tpl-customer-label), max-content) minmax(0, 1fr);
+}
+.rows > .row {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
