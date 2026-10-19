@@ -54,8 +54,8 @@ import ListToolbar from '@/components/shared/list-toolbar';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 友だち追加時の配信の一覧（Pencil：一覧 ``・閲覧のみ ``・1152 ``・
- * 受け皿の「…」``・受け皿は止められない ``・状態 ``）。
+ * ★V8 友だち追加時の配信の一覧（Pencil：一覧 ・閲覧のみ ・1152 ・
+ * 受け皿の「…」・受け皿は止められない ・状態 ）。
  *
  * 型（ListPage）に、閲覧のみの帯＋区分のタブ・数の帯・左のフォルダの列（上に「初回案内を作る」）・
  * 案内の帯・道具の段・表（順・設定・最初に送るもの・状態・直近7日・…）を渡す。

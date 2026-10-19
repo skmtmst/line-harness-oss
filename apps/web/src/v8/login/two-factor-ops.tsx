@@ -25,7 +25,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8-B 運営 ログイン 2段目（板 ``「6桁の確認」）。
+ * ★V8-B 運営 ログイン 2段目（板 「6桁の確認」）。
  *
  * 運営のログイン（/ops/login）でパスワードを確かめたあと、`/login/two-factor?next=ops#lh_2fa=…`
  * で来たときだけ出す。動き（合言葉の受け取り・確認の口・運営権限の確かめ・失敗の文）は

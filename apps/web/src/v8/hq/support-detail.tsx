@@ -30,7 +30,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 お問い合わせのやり取り（Pencil ``）。
+ * ★V8 お問い合わせのやり取り（Pencil ）。
  *
  * 管理画面 の画面（app/hq/support/detail/page.tsx）と読み書きの口・失敗時の扱いは同じ。
  * 見た目だけを絵どおりに一から組んだ：頭（題＝件名・説明＝受付番号・種類・店舗・送った日時）・
@@ -181,7 +181,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const ready = !idMissing && !detailLoading && id !== undefined && !detailMissing && !loadError && detail
   const accountName = detail?.lineAccountId ? accounts.find((a) => a.id === detail.lineAccountId)?.name ?? null : null
   const title = ready ? detail.subject : 'お問い合わせのやり取り'
-  // ★V8 パンくずは「ホーム › 統括の設定 › お問い合わせ › 番号」（絵 `V8-B/`）。番号が無い・読み込み中は「お問い合わせ」。
+  // ★V8 パンくずは「ホーム › 統括の設定 › お問い合わせ › 番号」。番号が無い・読み込み中は「お問い合わせ」。
   const ticketLabel = ready ? detail.ticketLabel ?? '' : ''
   usePageTitle(ticketLabel || 'お問い合わせ')
   usePageCrumbs(ticketLabel ? [{ label: '統括の設定', href: '/hq/settings' }, { label: 'お問い合わせ', href: '/hq/support' }] : [{ label: '統括の設定', href: '/hq/settings' }])

@@ -11,12 +11,12 @@ import MileagePage from './page'
 
 /*
  * ★V8-B マイル（Pencil「★V8-B 画面の地図」の行：
- * たまる決めごと ``・使い道 ``・友だちの残高 ``・
- * 履歴 ``・行動スコア ``・状態 ``・1152 ``・
- * 閲覧のみ ``）の契約。
+ * たまる決めごと ・使い道 ・友だちの残高 ・
+ * 履歴 ・行動スコア ・状態 ・1152 ・
+ * 閲覧のみ ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい器に切り替わり、
  * タブごとの板 ID・数の帯・表・操作が出ることを実DOMで固定する。
- * 管理画面 では従来の器が出ることも固定する。
+ * 互換経路では従来の器が出ることも固定する。
  */
 let query = ''
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),

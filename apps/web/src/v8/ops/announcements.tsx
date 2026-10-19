@@ -36,7 +36,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import Notice from '@/components/shared/notice'
 
 /**
- * 運営のお知らせ配信 V8（絵 ``・送る前の確認 ``）。
+ * 運営のお知らせ配信 V8（絵の送る前の確認 ）。
  *
  * 動きは 管理画面（app/ops/announcements）と同じ口：一覧・宛先の見込み（preview）・作る・直す・消す。
  * 左で作り、右に配信済み・予約・下書き。送る（今すぐ・予約）ときは必ず「送る前の確認」を挟む。

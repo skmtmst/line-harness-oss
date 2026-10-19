@@ -179,7 +179,7 @@
   white-space: nowrap;
 }
 
-.nameLink { color: var(--color-action); } /* 保存した検索の条件名は青い文字（絵 ）。 */
+.nameLink { color: var(--color-action); } /* 保存した検索の条件名は青い文字。 */
 
 .name:hover {
   color: var(--color-action);

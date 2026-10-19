@@ -45,7 +45,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import IncomingActions from './incoming-actions'
 
 /*
- * ★V8 外部連携「こちらで受け取る」タブ（Pencil ``、作る窓 ``）。
+ * ★V8 外部連携「こちらで受け取る」タブ（Pencil 、作る窓 ）。
  *
  * 左に受け取り口の列（上に「受け取り口を作る」）、右に選んだ口の設定カード
  * （どこから受け取るか・だれの出来事か・届いたらすること・人が見つからなかった

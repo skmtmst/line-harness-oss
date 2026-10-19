@@ -150,7 +150,7 @@ export function richMenuCreateValueToHqDefinition(value: RichMenuCreateValue, pr
   }
 }
 
-/* ───── 統括のリッチメニューを、店のリッチメニューの作る画面（app/rich-menus/new/create-v8.tsx）で作る口（・gobhu〜gQabc） ───── */
+/* ───── 統括のリッチメニューを、店のリッチメニューの作る画面（v8/rich-menus/new/create.tsx）で作る口（・gobhu〜gQabc） ───── */
 
 /**
  * 作る画面が手順①〜④の間に画面の中で持つ統括のひな形。店は手順ごとにサーバーへ下書きを保存するが、

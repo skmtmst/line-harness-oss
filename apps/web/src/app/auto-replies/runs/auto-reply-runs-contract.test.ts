@@ -8,7 +8,7 @@ const page = readFileSync(new URL('../../../v8/auto-replies/runs.tsx', import.me
 const worker = readFileSync(join(here, '../../../../../worker/src/routes/auto-reply-runs.ts'), 'utf8')
 const service = readFileSync(join(here, '../../../../../worker/src/services/auto-reply.ts'), 'utf8')
 
-describe('管理画面 自動応答・実行結果 t7UtYQ', () => {
+describe('V6 自動応答・実行結果 t7UtYQ', () => {
   it('未取得と実値0を同じ表示にしない', () => {
     expect(page).toContain("value={data ? data.summary.monthHits : null}")
     expect(page).toContain("const failedCount = data?.summary.errors")

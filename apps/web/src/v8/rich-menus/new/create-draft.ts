@@ -25,7 +25,7 @@ export function isGroupResponse(value: unknown): value is Group {
 /* ---------- 補助（edit/page.tsx と同じ写し。page.tsx は部品を export できないため） ---------- */
 
 /*
- * ★V8 ``「違いを比べる」の比べる文。版の本文ではなく設定の要約。
+ * ★V8 「違いを比べる」の比べる文。版の本文ではなく設定の要約。
  * 最新と入力中の2つを作り、VersionCompare（行ごとの比べる）へ渡す。
  */
 export function describeMenuSummary(input: {

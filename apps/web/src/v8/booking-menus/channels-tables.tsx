@@ -20,7 +20,7 @@ const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> 
   epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む' },
 }
 /*
- * 外の予約サイト（Hot Pepper・EPARK）の行末の「…」（絵 ・行末の決まり ）。
+ * 外の予約サイト（Hot Pepper・EPARK）の行末の「…」（絵の行末の決まり ）。
  * 連携を始める・止める口はまだ無い（Codex 待ち）ので、今ある行き先だけを出す：
  * 入った予約を見る（予約管理）と、Google カレンダー経由の媒体はスタッフのカレンダーの段へ。
  */

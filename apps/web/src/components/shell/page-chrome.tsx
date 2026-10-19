@@ -21,7 +21,7 @@ import { setDocumentTitle } from '@/lib/document-title'
  * `ホーム › 一斉配信`・`一斉配信 › 新商品発売のお知らせ` のように、
  * 画面名の前に「どこから来たか」を1段だけ置く。先頭の「ホーム」は
  * 帯が自分で出すので渡さない。渡さない画面はアカウント名を出さず
- * 題だけにする（絵の指示）。管理画面 では描かない。
+ * 題だけにする（指示）。互換経路では描かない。
  */
 export interface PageCrumb {
   label: string
@@ -123,12 +123,12 @@ export function useFullWidthPage(enabled = true) {
 /**
  * ページがパンくずの手前の段を渡す（★V8）。
  *
- * ```tsx
+ * `tsx
  * usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
- * ```
+ * `
  *
  * 一覧からの詳細画面で「一斉配信 › 配信名」と出すためのもの。
- * 管理画面 では描かれないので、渡しても 管理画面 の見た目は変わらない。
+ * 互換経路では描かれないので、渡しても 管理画面 の見た目は変わらない。
  * 画面を離れたら既定（アカウント名）へ戻す。
  */
 export function usePageCrumbs(crumbs: PageCrumb[] | null, enabled = true) {

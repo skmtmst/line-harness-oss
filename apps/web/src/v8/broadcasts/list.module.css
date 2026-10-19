@@ -1,5 +1,5 @@
 /*
- * ★V8 一斉配信の一覧（Pencil ``・1152 ``・閲覧のみ ``）。
+ * ★V8 一斉配信の一覧（Pencil ・1152 ・閲覧のみ ）。
  * 枠・見出し・数の帯・フォルダの列・道具の段の外側は型（ListPage）が持つ。
  * 値は globals.css の `:root` の `--tpl-bc-*`。
  */
@@ -312,5 +312,5 @@
 
 .note, .noteNoticePlacement { margin: 0; }
 
-/* 行を選ぶ欄（絵  の左の四角）。 */
+/* 行を選ぶ欄（左の四角）。 */
 .selectCell { width: var(--tpl-bc-col-select); text-align: center; }

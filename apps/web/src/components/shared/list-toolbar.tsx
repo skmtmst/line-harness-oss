@@ -220,7 +220,7 @@ function orderedTrailingTools(nodes: ReactNode, accessory?: ReactNode): ReactNod
   return at < 0 ? [...tools, keyed] : [...tools.slice(0, at), keyed, ...tools.slice(at)]
 }
 
-/** /266: retain named tools; an overflow group keeps its explicit name. */
+/** : retain named tools; an overflow group keeps its explicit name. */
 export function ListToolbarOptional({ children, label = 'ほかの絞り込み', collapse }: { children: ReactNode; label?: string; compact?: boolean; collapse?: 'overflow' }) {
   return collapse === 'overflow' ? <OverflowTools label={label}>{children}</OverflowTools> : <InlineOptional>{children}</InlineOptional>
 }

@@ -41,7 +41,7 @@ function percentTotal(source: string): number {
 }
 
 describe('表は器の幅にぴったり収める', () => {
-  it('booking/menus: 共通の行末操作から長い名前のメニューの中身を開ける', () => {
+  it('/booking/menus: 共通の行末操作から長い名前のメニューの中身を開ける', () => {
     const menu: BookingMenu = {
       id: 'menu-long', name: '小型犬のトリミングとシャンプーを一緒に受けるメニュー',
       category_label: null, description: null, duration_minutes: 60, buffer_after_minutes: 10,
@@ -62,7 +62,7 @@ describe('表は器の幅にぴったり収める', () => {
     expect(navigation.push).toHaveBeenCalledWith('/booking/menus/new?menu=menu-long')
   })
 
-  it('events: 操作列は固定幅で、中身が器からはみ出さない', () => {
+  it('/events: 操作列は固定幅で、中身が器からはみ出さない', () => {
     const page = read('../v8/events/list.tsx')
     const css = read('../v8/events/list.module.css')
     expect(page).toContain('<DataTable')
@@ -74,7 +74,7 @@ describe('表は器の幅にぴったり収める', () => {
     expect(percentTotal(page)).toBeLessThan(100)
   })
 
-  it('events: 申込条件は1行で省略し、全文は title で確認する', () => {
+  it('/events: 申込条件は1行で省略し、全文は title で確認する', () => {
     const page = read('../v8/events/list.tsx')
     // 申込条件は状態の札の下へ畳む。独立した列に戻すと、狭い器で見出しが
     // 重なり「全員」が縦に折れる（m19d の撮影指摘）。
@@ -86,7 +86,7 @@ describe('表は器の幅にぴったり収める', () => {
     expect(read('../components/shared/truncated-text.module.css')).toContain('white-space: nowrap; text-overflow: ellipsis;')
   })
 
-  it('（対応が必要な受信）: 状態列は札に合わせた固定幅で、右に空けない', () => {
+  it('/（対応が必要な受信）: 状態列は札に合わせた固定幅で、右に空けない', () => {
     const card = read('../components/support/pending-inbox-card.tsx')
     expect(card).toContain('<DataTable')
     // 状態の札（約52px＋余白）に合わせた 80px。96px に戻さない。

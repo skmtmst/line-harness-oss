@@ -64,7 +64,7 @@ export default function ScenarioDetailV8({
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [scenarioMissing, setScenarioMissing] = useState(false)
   /*
-   * ★V8 ``：ほかの人が先に保存したら帯で知らせる。
+   * ★V8 ：ほかの人が先に保存したら帯で知らせる。
    * この画面は書き換えない（読み直すまで古い内容のまま）。
    * 名前・時刻は API に無いので出さない。
    */
@@ -105,7 +105,7 @@ export default function ScenarioDetailV8({
   const [previewLabels, setPreviewLabels] = useState<Record<number, string>>({})
   /** 開始のきっかけの一覧（件数だけだと箱に名前を出せない）。 */
   const [triggerItems, setTriggerItems] = useState<ScenarioTriggerItem[] | null>(null)
-  /* 配信を始める前の確認（★V8 ``）・止める確認（``）。 */
+  /* 配信を始める前の確認（★V8 ）・止める確認（）。 */
   const [startOpen, setStartOpen] = useState(false)
   const [startBusy, setStartBusy] = useState(false)
   const [startError, setStartError] = useState('')
@@ -113,12 +113,12 @@ export default function ScenarioDetailV8({
   const [stopOpen, setStopOpen] = useState(false)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopError, setStopError] = useState('')
-  /* 複製の窓（★V8 ``：新しい名前を本人が決める）。 */
+  /* 複製の窓（★V8 ：新しい名前を本人が決める）。 */
   const [duplicateOpen, setDuplicateOpen] = useState(false)
   const [duplicateName, setDuplicateName] = useState('')
   /* 名前・説明・フォルダを変える窓（題の横の鉛筆）。 */
   const [renameOpen, setRenameOpen] = useState(false)
-  /* 始めた直後の知らせ（``）。URL の started=1 か、この画面で始めたとき。 */
+  /* 始めた直後の知らせ（）。URL の started=1 か、この画面で始めたとき。 */
   const [justStarted, setJustStarted] = useState(showStarted)
   useEffect(() => {
     if (showStarted) setJustStarted(true)

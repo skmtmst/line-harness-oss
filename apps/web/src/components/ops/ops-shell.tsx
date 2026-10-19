@@ -45,7 +45,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const [loadError, setLoadError] = useState('')
   // ★管理画面：担当者の取得だけ落ちても外枠は落とさない。本文は普通に出す。
   const [meError, setMeError] = useState('')
-  // ★V8：外枠は src/v8/ops/shell.tsx（統括・店舗と同じ外側に運営のメニュー）。管理画面 は下のまま。
+  // ★V8：外枠は src/v8/ops/shell.tsx（統括・店舗と同じ外側に運営のメニュー）。互換経路は下のまま。
 
 
   /*

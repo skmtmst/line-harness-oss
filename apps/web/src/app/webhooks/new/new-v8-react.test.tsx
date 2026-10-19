@@ -10,9 +10,9 @@ vi.hoisted(() => {
 import NewWebhookPage from './page'
 
 /*
- * ★V8-B 外部連携の送り先を作る（板 ``）の契約。
+ * ★V8-B 外部連携の送り先を作る（板 ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい作る画面に切り替わることを
- * 実DOMで固定する。管理画面 では従来の作る画面が出ることも固定する。
+ * 実DOMで固定する。互換経路では従来の作る画面が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),

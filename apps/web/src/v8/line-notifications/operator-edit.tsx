@@ -41,7 +41,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 運用者へのお知らせを作る・なおす（板 `` 作る・`` なおす、公開前の確認 ``）。
+ * ★V8 運用者へのお知らせを作る・なおす（板  作る・ なおす、公開前の確認 ）。
  *
  * 絵の形：板の頭（題・説明）→ 左に設定の中のメニュー、右に本文。
  * 本文は左に3枚のカード（どんなときに知らせるか・だれが受け取るか・いつ送るか）、
@@ -163,7 +163,7 @@ function OperatorEditInner() {
   const [baseline, setBaseline] = useState<string | null>(null)
   const autoIdsRef = useRef<string[] | null>(null)
   const sawLoadingRef = useRef(false)
-  /* 公開前の確認の窓（板 ``）。 */
+  /* 公開前の確認の窓（板 ）。 */
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [publishing, setPublishing] = useState(false)
   /* 確認の窓の「役割」の列。宛先の口は役割を返さないので、ログインユーザーの一覧から引く。読めなければ空のまま。 */
@@ -382,7 +382,7 @@ function OperatorEditInner() {
     }
   }
 
-  /* 公開の前に `` の確認の窓を出す。保存後に直した分も出すので、古い内容のまま出さない。 */
+  /* 公開の前に  の確認の窓を出す。保存後に直した分も出すので、古い内容のまま出さない。 */
   const openPublishConfirm = async () => {
     if (!selectedAccountId || saving || ruleLoading || publishing) return
     /* 押した「公開」のボタンに手応え（押せない形＋輪）を出す。先に下書きを保存している間も。 */

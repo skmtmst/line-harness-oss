@@ -59,7 +59,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8-B 流入と計測の一覧（Pencil「★V8-B 画面の地図」：
- * 一覧 ``、1152 ``、閲覧のみ ``、QR コードの小窓 ``）。
+ * 一覧 、1152 、閲覧のみ 、QR コードの小窓 ）。
  *
  * 型（ListPage）に、数の帯・左のフォルダの列（上に「流入リンクを作る」）・
  * 案内の帯・道具の段・表を置く。行は「コピー」「…」「編集」。

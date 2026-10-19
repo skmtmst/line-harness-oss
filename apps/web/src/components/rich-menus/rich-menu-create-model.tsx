@@ -74,7 +74,7 @@ export function RichMenuTemplatePreview({ template }: { template: RichMenuTempla
    * （200px超）書くと、計算上の大きな文字として読まれる。
    */
   /*
-   * 板 `` の見本どおり、面は塗らず薄い線だけにする。箱の地と枠は
+   * 板  の見本どおり、面は塗らず薄い線だけにする。箱の地と枠は
    * 呼び出し側の見本の箱が持つ。面の記号は契約試験が位置を守るため残す。
    */
   return (

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 通知と視聴後のこと（``）の描画。
+ * ★V8 通知と視聴後のこと（）の描画。
  * 差し替えるのは通信だけ。入り切りの段・実績・視聴後の段が実在する。
  */
 import React, { act } from 'react'

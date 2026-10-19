@@ -25,7 +25,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 承認ワークフロー（Pencil ``、閲覧のみ ``、差し戻す理由の小窓 ``）。
+ * ★V8 承認ワークフロー（Pencil 、閲覧のみ 、差し戻す理由の小窓 ）。
  *
  * 数4 → 承認カード（種類・状態・店舗・申請者・変更内容・差戻しコメント・差戻し／承認する）→ 公開境界。
  * 閲覧のみ（変える権限が無い人）には案内の帯を出し、差戻し・承認するのボタンは置かない

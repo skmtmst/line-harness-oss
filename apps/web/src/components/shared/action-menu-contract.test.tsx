@@ -45,7 +45,7 @@ function openMenu(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[role="menu"]')
 }
 
-describe('ActionMenu  の項目', () => {
+describe('ActionMenu B-244 の項目', () => {
   it('補足・別画面・見出し・区切り・危ない操作を出せる', async () => {
     const onSelect = vi.fn()
     const onClose = vi.fn()
@@ -130,7 +130,7 @@ describe('ActionMenu  の項目', () => {
   })
 })
 
-describe('ActionMenu ★管理画面 のキーボード', () => {
+describe('ActionMenu ★V7 のキーボード', () => {
   it('開いたら最初の項目にいて、矢印で動ける', async () => {
     await act(async () => {
       root.render(

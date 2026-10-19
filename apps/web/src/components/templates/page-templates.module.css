@@ -64,14 +64,14 @@
 :global(:root) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global(:root) .folders { box-sizing: content-box; width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-row); }
 /*
- * 統括（/hq）の列（絵 ・ ほか）：中身の幅 200 に左24・右12の余白と線を足した外寸（content-box）。
+ * 統括（/hq）の列（絵の ほか）：中身の幅 200 に左24・右12の余白と線を足した外寸（content-box）。
  * border-box のままだと中身が 164 に縮み、右の中身が 36px 左へずれていた（2026-10-08）。
  * 設定の列は中身200に左右12の余白と線を足す。通常の一覧は下の  で余白込み200。
  * 外寸指定（folderWidth）は渡された幅を守る。
  */
 :global(:root) .folders[data-folder-inset] { box-sizing: content-box; padding-left: var(--tpl-folder-inset-pad-start); }
 :global(:root) .collapsedFolders { display: none; }
-/* 中身の高さで止まる列（統括の設定の中のメニュー・絵 ・・）。縦の仕切り線も中身まで。 */
+/* 中身の高さで止まる列（統括の設定の中のメニュー・絵の）。縦の仕切り線も中身まで。 */
 :global(:root) .folders:has(> [data-folder-fit]) { align-self: flex-start; }
 /* 型が組む畳んだ段（folderNav）。作るボタンは列の幅いっぱいにせず中身の幅。選ぶ欄は 1152 の板（・）の幅。 */
 :global(:root) .collapsedCreate { display: flex; flex-shrink: 0; }

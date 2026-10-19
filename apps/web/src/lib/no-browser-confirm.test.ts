@@ -93,7 +93,7 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
    *
    * `app/form-submissions/edit` の「ページの名前」は、そもそも入力欄を持つ窓に
    * するのが正しい。
-   * 手本は `app/rich-menus/new/create-v8.tsx`——`Dialog` の `children` に
+   * 手本は `v8/rich-menus/new/create.tsx`——`Dialog` の `children` に
    * 入力欄を置いている。
    *
    * **増やせない。0 になったら行ごと消す**（消し忘れるとここで落ちる）。

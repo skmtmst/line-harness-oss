@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /*
- * 名寄せパネル（``）の数字の契約。
+ * 名寄せパネル（）の数字の契約。
  * 見本 `lint/V8-B/.html` との突き合わせ（2026-10-03）。
  * 主体カードは内側16・間隔12、比較の段は内側16。
  * 件数・日付は API の実値を出す（見本の数は書かない）。

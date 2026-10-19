@@ -213,7 +213,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   /*
-   * ★V8 ``：なおし中にほかの人が先に保存した（409）。
+   * ★V8 ：なおし中にほかの人が先に保存した（409）。
    * 入力は残したまま、帯で知らせる。名前・時刻は API に無いので出さない。
    */
   const [conflict, setConflict] = useState(false)
@@ -570,7 +570,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setError(null)
   }
 
-  /** ★V8 ``「最新を読み込んで続ける」。最新で入力を置き換える。 */
+  /** ★V8 「最新を読み込んで続ける」。最新で入力を置き換える。 */
   function acceptLatestAndContinue() {
     if (!conflictLatest) return
     hydrate(conflictLatest)
@@ -1181,7 +1181,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
       } headingSize="large" title={<>リッチメニューを作る</>} help={<>{headNote}{conditionHelp ? <p>{conditionHelp}</p> : null}</>} notice={conflict ? (
-          /* 板 ``：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
+          /* 板 ：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
           <div className={styles.conflictSlot}>
             <SaveConflictBand reloadVariant="primary"
               title="ほかの人がこのメニューを更新しました"
@@ -1407,7 +1407,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   function renderButtons() { return renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }) }
 
   /*
-   * ======== 統括の手順③：配る先（絵 ）========
+   * ======== 統括の手順③：配る先========
    * 配るアカウント（統括が渡す1行の欄）→ 各アカウントで誰に出すか。
    * 統括のひな形が持てるのは「全員（配った先の既定）」か「決めない（各アカウントで決める）」の2つ。
    * 「タグが付いた人」（displayTagName）と「トークを開いたとき」（defaultOpen）は組1の口（保存・配布）で持つ。
@@ -1418,7 +1418,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   function renderAudience() { return renderAudienceStep({ aggregateOnly, audience, canOperate, conditionCount, conditionEmpty, conditionUnsaved, currentDefaultMenu, defaultOpen, editGroupId, host, orderRows, renderHqAudience, setAudience, setDefaultOpen, setPriorityInput, setPriorityOpen, setTargetingCondition, setTargetingPriority, targetedMenus, targetingCondition, targetingPriority }) }
 
   /*
-   * ======== 統括の手順④：確かめて配る（絵 ）========
+   * ======== 統括の手順④：確かめて配る========
    * 確かめる（形と面ごとの動き）→ 足りないもの（画面の中で分かる所だけ）→ 配ったときの扱い（同じ名前があるとき）。
    * アカウントごとの足りないもの（そのアカウントに無いタグなど）と同じ名前のメニューの数は、
    * 保存したあとの「配る前の確認」で口（preflight）が返すので、ここでは数を作らない（機能待ち）。

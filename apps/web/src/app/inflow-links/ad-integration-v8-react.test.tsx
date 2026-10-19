@@ -11,10 +11,10 @@ vi.hoisted(() => {
 import InflowLinksPage from './page'
 
 /*
- * ★V8-B 広告連携（``）・広告とのつなぎ（``）・
- * 広告への送信履歴（``）の契約。
+ * ★V8-B 広告連携（）・広告とのつなぎ（）・
+ * 広告への送信履歴（）の契約。
  * `<html data-theme="v8">` の下でだけ新しい画面に切り替わることを
- * 実DOMで固定する。管理画面 では従来のタブが出ることも固定する。
+ * 実DOMで固定する。互換経路では従来のタブが出ることも固定する。
  */
 let search = 'tab=ads'
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),

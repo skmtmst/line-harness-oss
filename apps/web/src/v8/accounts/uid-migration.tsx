@@ -31,7 +31,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 UID移行（Pencil `` 要確認の判断・`` 本移行の完了・
+ * ★V8 UID移行（Pencil  要確認の判断・ 本移行の完了・
  * `sdbsQ` 板5）。
  *
  * 管理画面 と同じ判断・実行・切り戻しの仕組み（use-uid-migration.ts）を使い、

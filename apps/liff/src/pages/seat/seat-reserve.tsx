@@ -9,7 +9,7 @@ import liff from '../../lib/liff-runtime.js';
 import type { RestaurantCustomerBooking, RestaurantLateArrivalPolicy, RestaurantUnavailableReason } from '@line-crm/shared';
 import LiffHeader from '../../components/ui/liff-header.js';
 import LiffLookScope from '../../components/liff-look-scope.js';
-import Stepper from '../../components/ui/stepper/index.js';
+import Stepper from '../../components/ui/Stepper.js';
 import BottomBar from '../../components/ui/bottom-bar.js';
 import Button from '../../components/ui/button/index.js';
 import Icon from '../../components/ui/icon.js';

@@ -219,7 +219,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           const isRegularOff = settings.businessHoursConfigured && closedDow.has(d.getUTCDay())
           const isToday = date === today
           const mark = exception ? '臨時休業' : isRegularOff ? '定休' : null
-          // 前後の月の日は空けておく（絵 ）。
+          // 前後の月の日は空けておく。
           if (!inMonth) return <span key={date} className={`${styles.calDay} ${styles.calDayOutside}`} aria-hidden="true" />
           const dayLabel = `${jpDate(date)}${mark ? `（${mark}）` : ''}`
           const dayClass = [

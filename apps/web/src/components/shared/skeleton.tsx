@@ -140,7 +140,7 @@ export function DelayedSkeleton({
 
 /**
  * 表の骨組み。見出しは画面の表に残し、tbody の場所へ置く。
- * 行の高さは出来上がりと同じ（V8 56・管理画面 は 58 を渡す）。
+ * 行の高さは出来上がりと同じ（V8 56・互換経路は 58 を渡す）。
  * 列の骨の幅は出来上がりの列幅と同じ値を渡す。
  */
 export function TableSkeleton({

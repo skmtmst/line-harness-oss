@@ -48,7 +48,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 成果地点を作る（Pencil：作る ``・競合 ``）。
+ * ★V8 成果地点を作る（Pencil：作る ・競合 ）。
  *
  * 型（CreatePage）に、4つの段（何が起きたら・何回まで・金額・数えない条件）と
  * 下書き・詳細設定の段、右の列（この30日にあてはめると・使う場所）、下の帯を渡す。

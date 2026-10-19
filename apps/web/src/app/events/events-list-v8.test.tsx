@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B イベント予約の一覧（板 ``）。
+ * ★V8-B イベント予約の一覧（板 ）。
  * 現役の src/v8/events/list が、取得・絞り込み・ページ送り・削除を守ること。
  */
 import React, { act } from 'react'

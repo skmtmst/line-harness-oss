@@ -41,7 +41,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 広告連携（Pencil：画面 ``・広告費を手で入れる ``）。
+ * ★V8 広告連携（Pencil：画面 ・広告費を手で入れる ）。
  *
  * 頭（戻る・題・説明・右下に「費用を手で入れる」）→ 数の4枚 → 媒体の4枚 → 流入元ごとの費用 → 注 → 手で入れた費用。
  *

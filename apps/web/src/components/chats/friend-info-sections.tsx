@@ -75,7 +75,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
 
   /*
    * 顧客情報の節（基本情報・マイル・次の対応・タグ・★つき・リッチメニュー・友だち情報・フォーム回答）。
-   * 管理画面 は今までどおり右の欄に線で並べ、★V8 は角丸の枠（顧客情報）の中に並べる。中身は同じ。
+   * 互換経路は今までどおり右の欄に線で並べ、★V8 は角丸の枠（顧客情報）の中に並べる。中身は同じ。
    */
   const renderSupport = (friend: FriendDetail) => (
     <div data-customer-section="support" style={sectionStyle('support')} className={`space-y-3 px-5 py-4`}>

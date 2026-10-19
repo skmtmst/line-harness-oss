@@ -50,8 +50,8 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { ListToolbarRow, ListToolbarSort } from '@/components/shared/list-toolbar'
 /*
- * ★V8 統括のバナー生成（Pencil `` プロジェクト一覧・`` 画像ライブラリ）。
- * 窓：`` プロジェクトを作る・`` 画像を取り込む・画像の詳細（`` と同じ窓）。
+ * ★V8 統括のバナー生成（Pencil  プロジェクト一覧・ 画像ライブラリ）。
+ * 窓： プロジェクトを作る・ 画像を取り込む・画像の詳細（ と同じ窓）。
  *
  * 管理画面 の画面（app/hq/banners/page.tsx と components/hq/banners/*）と、読み書きの口・
  * 失敗時の扱い・`?tab=` は同じ。見た目だけを絵どおりに一から組んだ：
@@ -71,7 +71,7 @@ const PROJECT_SORTS: Array<{ value: ProjectSort; label: string }> = [
   { value: 'name', label: '並び：名前順' },
 ]
 
-/** 画像ライブラリは 12 枚ずつ（絵  の「1–12 件 / 23 件」「次の 12 件」）。 */
+/** 画像ライブラリは 12 枚ずつ（「1–12 件 / 23 件」「次の 12 件」）。 */
 const LIBRARY_PAGE = 12
 
 function isCursorHistory(value: unknown): value is Array<string | null> {

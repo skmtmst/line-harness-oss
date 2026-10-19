@@ -17,8 +17,8 @@ function page(name: string): string {
   return readFileSync(join(ROOT, name), 'utf8');
 }
 
-const form = () => page('Form.tsx');
-const affiliate = () => page('Affiliate.tsx');
+const form = () => page('form.tsx');
+const affiliate = () => page('affiliate.tsx');
 const webinar = () => readFileSync(join(ROOT, '../../../worker/src/client/webinar/main.tsx'), 'utf8');
 
 /**
@@ -201,7 +201,7 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
 
 describe('ウェビナーは申込もできる本体を共用する', () => {
   it('旧URLの入口からWorkerと同じ画面へ認証情報とslugを渡す', () => {
-    const src = page('Webinar.tsx');
+    const src = page('webinar.tsx');
     expect(src).toContain("worker/src/client/webinar/main");
     expect(src).toContain('<WebinarApp ctx={ctx} slug={slug} />');
     const shared = webinar();

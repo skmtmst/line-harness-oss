@@ -20,7 +20,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 統括の情報（Pencil ``）。
+ * ★V8 統括の情報（Pencil ）。
  *
  * 管理画面 の画面（app/hq/settings/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
@@ -32,7 +32,7 @@ const TITLE = '統括の情報'
 const DESCRIPTION = '統括の名前です。各アカウントの画面の上と、メンバーへの招待メールに出ます。'
 
 export default function HqSettingsV8() {
-  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/`）。
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」。
   usePageTitle(TITLE)
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const settingsNav = useHqSettingsFolderNav('info')

@@ -29,7 +29,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 外部連携「送り先を作る」（Pencil ``、競合 ``）。
+ * ★V8 外部連携「送り先を作る」（Pencil 、競合 ）。
  *
  * 型（CreatePage）に、どちら向き・どこへ・いつ・送れなかったときのカードと、
  * 右の列（届く中身の見本・試しに送る・気をつけること）、下の帯
@@ -144,7 +144,7 @@ function WebhooksCreateV8Inner() {
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [secret, setSecret] = useState(generateSecret)
-  /* 既定は「選んだものだけ送る」（絵 ）。すべて送ると要らない個人情報まで出るので、選んでもらう。 */
+  /* 既定は「選んだものだけ送る」。すべて送ると要らない個人情報まで出るので、選んでもらう。 */
   const [sendAll, setSendAll] = useState(false)
   const [selectedEvents, setSelectedEvents] = useState<string[]>(presetValid && presetEvent ? [presetEvent] : [])
   const [incomingSources, setIncomingSources] = useState('')

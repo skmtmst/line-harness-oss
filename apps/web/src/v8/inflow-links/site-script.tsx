@@ -38,7 +38,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 サイトスクリプト（Pencil ``）。
+ * ★V8 サイトスクリプト（Pencil ）。
  *
  * 頭（戻る・題・説明・右下に「貼りかたが分からないときは」）→ 成果を数えるサイトの表（板いっぱい）→
  * 左の列（サイトに貼るコード・計測を許可するドメイン・閲覧の記録への同意）と右の列（いま届いているか・

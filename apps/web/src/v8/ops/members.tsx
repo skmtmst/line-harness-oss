@@ -31,7 +31,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { RowActions } from '@/components/shared/row-actions'
 
 /**
- * 運営のメンバー管理 V8（絵 ``・停止の窓 ``）。
+ * 運営のメンバー管理 V8（絵の停止の窓 ）。
  *
  * 動きは 管理画面（app/ops/members）と同じ口：一覧（/api/ops/members）・招待・再送・
  * 停止／再開。自分自身の行には操作を置かない。閲覧のみの運営メンバー

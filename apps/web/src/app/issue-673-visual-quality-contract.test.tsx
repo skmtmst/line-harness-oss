@@ -49,7 +49,7 @@ describe('#673 A. カード・パネルの立体感', () => {
       ['components/dashboard/qr-dialog.tsx', 'shadow-float'],
       ['v8/dashboard/dashboard-editor.module.css', 'var(--shadow-card)'],
       ['app/chats/page.tsx', 'shadow-card'],
-      ['app/friends/friends-v8.module.css', 'var(--card-shadow)'],
+      ['v8/friends/friends.module.css', 'var(--card-shadow)'],
     ] as const
     for (const [file, token] of migrated) {
       const source = readFileSync(join(SRC, file), 'utf8')
@@ -65,7 +65,7 @@ describe('#673 A. カード・パネルの立体感', () => {
 })
 
 describe('#673 B. 触った感触', () => {
-  it('ボタンは motion-instant(80ms) で 0.98倍に沈む（★管理画面 仕上げ §2）', () => {
+  it('ボタンは motion-instant(80ms) で 0.98倍に沈む（★V7 仕上げ §2）', () => {
     // 0.98 は変数（--press-scale）に置いた（動きの点検 6 番）。
     expect(GLOBALS_CODE).toMatch(/--press-scale:\s*0\.98;/)
     expect(GLOBALS_CODE).toMatch(/:active[\s\S]*?scale:\s*var\(--press-scale\)/)

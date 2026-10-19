@@ -3,7 +3,7 @@
 import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
 
 /*
- * ★V8 Googleビジネス パフォーマンス（``）。
+ * ★V8 Googleビジネス パフォーマンス（）。
  * 数4（共通の KpiCard）→ 飲食店向け指標 → 注。期間は 7／28／90 日（今の画面と同じ口・既定28日）。
  * 表示数の推移は、飲食店向け指標の題の右の操作から開閉する。
  */

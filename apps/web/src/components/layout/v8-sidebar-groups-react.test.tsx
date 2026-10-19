@@ -9,7 +9,7 @@ import type { StaffMember } from '@line-crm/shared'
  *   - 押すと開き、開いた状態はブラウザが覚える（lh-sidebar-groups）
  *   - いまいる画面の組は常に開く
  *   - 左メニューのいちばん下に「設定」（オーナー・管理者だけ）
- *   - 管理画面 では開閉も歯車も出さず、V2 モードの組隠しも v8 では効かない
+ *   - 互換経路では開閉も歯車も出さず、V2 モードの組隠しも v8 では効かない
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -296,7 +296,7 @@ describe('★V8 統括の左メニュー（絵 V8-B/JKjsE・オーナー 2026-10
 })
 
 describe('統括の左メニューを出す住所', () => {
-  it('hq の下と LINEアカウントの登録は統括、ほかの /accounts は店舗', () => {
+  it('/hq の下と LINEアカウントの登録は統括、ほかの /accounts は店舗', () => {
     expect(isHqShellPath('/hq')).toBe(true)
     expect(isHqShellPath('/hq/templates')).toBe(true)
     expect(isHqShellPath('/accounts/new')).toBe(true)
@@ -310,7 +310,7 @@ describe('統括の左メニューを出す住所', () => {
 })
 
 
-describe('本番の入口', () => {
+describe('B-368 本番の入口', () => {
   afterEach(() => vi.unstubAllEnvs())
   it('Google と飲食店の入口を残し、飲食店を押すと共通の窓を出す', async () => {
     vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')

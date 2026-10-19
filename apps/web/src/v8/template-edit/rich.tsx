@@ -42,7 +42,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8「リッチメッセージを作る」（絵 ・機能追加 F-4）。
+ * ★V8「リッチメッセージを作る」（絵の機能追加 F-4）。
  *
  * 1枚の画像を面に分けて、押した面ごとに動く。形（面の分け方）・画像・面ごとの動きを決める。
  * 保存は今の画面（app/templates/asset-editor-v8.tsx・template-asset-editor.tsx）と同じ口

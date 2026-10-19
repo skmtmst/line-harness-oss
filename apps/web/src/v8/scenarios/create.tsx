@@ -35,7 +35,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil ``）。
+ * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil ）。
  *
  * 型（CreatePage）に、戻る・題・手順の輪と、左の段（シナリオ情報・配信方式）、
  * 下の帯（キャンセル・あとで決める・この方式で保存する）を渡す。右の列は無い。

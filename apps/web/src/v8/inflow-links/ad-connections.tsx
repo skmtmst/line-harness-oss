@@ -24,7 +24,7 @@ import Notice from '@/components/shared/notice'
 import AdMappingDialog from './ad-mapping-dialog'
 
 /*
- * ★V8 広告とのつなぎ（Pencil ``・`/inflow-links?tab=connections`）。
+ * ★V8 広告とのつなぎ（Pencil ・`/inflow-links?tab=connections`）。
  *
  * 2026-10-07 src/v8 に一から書いた（今の V8 は 13%）。頭は広告連携と同じ形。
  * 本文（間14）：返すしくみの3枚 → 数の4枚（共通の数の帯）→ 成果地点と広告に返す名前の対応（F-21）→ 注。

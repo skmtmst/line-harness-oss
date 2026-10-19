@@ -22,7 +22,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 type Check = { email: string; name: string; needsPassword: boolean }
 
 /**
- * 運営メンバーの招待を受ける V8（絵 ``）。
+ * 運営メンバーの招待を受ける V8。
  *
  * 動きは 管理画面（app/ops/invite）と同じ。メールの URL の `#invite=…` を読み、
  * パスワードが無い人は名前とパスワードを決める。進んだ先は 2要素認証の設定。

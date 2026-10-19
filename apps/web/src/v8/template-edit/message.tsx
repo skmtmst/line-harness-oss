@@ -46,7 +46,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8「メッセージを作る／編集」（絵 ・1152 は ・競合は ）。
+ * ★V8「メッセージを作る／編集」（絵の1152 は ・競合は ）。
  *
  * 左：名前とフォルダ／中身（本文・差し込む）／本文の中のURL。
  * 右：送るときの名前／届き方（本物のスマホ）。1152 ではスマホを窓で開く。

@@ -709,9 +709,9 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
 }
 
 /*
- * 板 `` 右の欄「役割でできること」。運用の目安の書き付け。
+ * 板  右の欄「役割でできること」。運用の目安の書き付け。
  */
-/** 役割の札（絵  の色：オーナー墨・管理者緑・運用青・受付琥珀・見るだけ灰）。 */
+/** 役割の札（色：オーナー墨・管理者緑・運用青・受付琥珀・見るだけ灰）。 */
 type RoleKey = 'owner' | AccessRoleBundle
 const V8_ROLE_LABEL: Record<RoleKey, string> = {
   owner: 'オーナー', administrator: '管理者', operations: '運用', reception: '受付', view_only: '見るだけ', custom: '個別設定',
@@ -748,7 +748,7 @@ function twoFactorState(user: AccessUserItem): { label: string; tone: 'success' 
   return { label: '確認が必要', tone: 'warning' }
 }
 
-/** 右の「役割でできること」（絵 ）。 */
+/** 右の「役割でできること」。 */
 function StaffRoleGuide() {
   const rows: Array<{ role: RoleKey; body: string }> = [
     { role: 'owner', body: 'すべて。お金・会社とロゴ・ほかの人の役割も変えられる' },

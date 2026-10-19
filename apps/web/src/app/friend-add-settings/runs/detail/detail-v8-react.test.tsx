@@ -10,7 +10,7 @@ vi.hoisted(() => {
 import FriendAddRunDetailPage from './page'
 
 /*
- * ★V8 友だち追加時の配信の実行の詳細（板 ``）の契約。
+ * ★V8 友だち追加時の配信の実行の詳細（板 ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい詳細に切り替わり、
  * 失敗の帯・行ったこと・右の「この追加について」が出ることを
  */

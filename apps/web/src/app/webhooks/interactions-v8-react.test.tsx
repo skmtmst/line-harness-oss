@@ -12,10 +12,10 @@ import WebhooksPage from './page'
 import type { WebhookInteraction } from '@line-crm/shared'
 
 /*
- * ★V8-B 外部連携のやり取りの記録（板 ``・中身 ``）の契約。
+ * ★V8-B 外部連携のやり取りの記録（板 ・中身 ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい記録タブに切り替わり、
  * 見本が決めた帯・札・表が出ることを実DOMで固定する。
- * 管理画面 では従来の記録タブが出ることも固定する。
+ * 互換経路では従来の記録タブが出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -119,7 +119,7 @@ test('v8 では Uv9AA の記録（帯・札・表）が出る', async () => {
   expect(board?.querySelector('button[aria-label="「予約台帳」の操作"]')).not.toBeNull()
 })
 
-/** 行の「…」を開いて「中身を見る」を押す（絵  の行の右端は「…」だけ）。 */
+/** 行の「…」を開いて「中身を見る」を押す（行の右端は「…」だけ）。 */
 async function openContents(board: Element, name?: string) {
   const trigger = (name
     ? board.querySelector(`button[aria-label="「${name}」の操作"]`)
@@ -144,7 +144,7 @@ test('旧テーマ属性でも現役の記録タブが出て Uv9AA が出る', a
 })
 
 /*
- * 中身は絵 `` どおり真ん中の窓（2026-10-07 右の詳細パネルから変えた）。
+ * 中身は絵  どおり真ん中の窓（2026-10-07 右の詳細パネルから変えた）。
  * 絵の窓に前後の行へ移る操作は無いので、前後送りの確かめは外した（BEHAVIOR.md）。
  */
 test('v8 で中身を見ると中身の窓（DA0Ag）が出て、伏せ字の本文と送り直しが出る', async () => {

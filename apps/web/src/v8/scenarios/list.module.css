@@ -1,5 +1,5 @@
 /*
- * ★V8 シナリオ配信の一覧（Pencil ``・狭い板 ``・閲覧のみ ``・複製の窓 ``、状態は ``）。
+ * ★V8 シナリオ配信の一覧（Pencil ・狭い板 ・閲覧のみ ・複製の窓 、状態は ）。
  * 枠・見出し・帯・フォルダ列・道具の段の並びは型（ListPage・ListToolbar）が持つ。
  * 値は globals.css の `:root` の `--tpl-scn-*` と共通の `--tpl-*` だけを使う。
  */
@@ -39,7 +39,7 @@
   cursor: pointer;
 }
 
-/* 表。見出しと行の区切り線だけ（``）。外側の枠は作らない。 */
+/* 表。見出しと行の区切り線だけ（）。外側の枠は作らない。 */
 .tableWrap {
   min-width: 0;
 }
@@ -103,7 +103,7 @@
   display: block;
   margin-top: calc(var(--tpl-scn-sub-gap) - var(--tpl-row-sub-gap));
   overflow: hidden;
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵  の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
   padding-inline-start: var(--tpl-folder-dot-indent);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -305,7 +305,7 @@
   font-size: var(--text-micro);
 }
 
-/* 複製の窓（``）：名前の欄 → 引き継ぐもの → 引き継がないもの → 案内の帯。 */
+/* 複製の窓（）：名前の欄 → 引き継ぐもの → 引き継がないもの → 案内の帯。 */
 .dupBody {
   display: flex;
   flex-direction: column;

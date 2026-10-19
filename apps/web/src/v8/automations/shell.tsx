@@ -2,7 +2,7 @@
 
 /*
  * ★V8 オートメーションの外枠（Pencil「★V8 画面の地図」のオートメーションの行）。
- * 板：ルール ``・1152 ``・閲覧のみ ``・共通アクション ``・動いた記録 ``。
+ * 板：ルール ・1152 ・閲覧のみ ・共通アクション ・動いた記録 。
  *
  * どのタブも「題・説明・右上の操作 → タブ（件数つき）→ 数の帯」が同じ。
  * 枠と見出しは型（ListPage）が持つ。ここはタブ・閲覧のみの帯・タブの件数を読む口だけ。
@@ -100,7 +100,7 @@ export function AutomationTabs({ active, counts }: { active: AutomationTabKey; c
   )
 }
 
-/** 閲覧のみの帯（``：タブの下・数の帯の上。薄い青の地・目の印）。 */
+/** 閲覧のみの帯（：タブの下・数の帯の上。薄い青の地・目の印）。 */
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>

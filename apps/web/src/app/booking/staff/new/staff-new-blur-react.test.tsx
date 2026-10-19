@@ -4,7 +4,7 @@ import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約スタッフの登録（V8）の「その場で確かめる入力」。
  * 名前欄を離れたとき（blur）に直し方を欄の下へ出す。文は保存時と同じ。
- * 管理画面 は触らない。
+ * 互換経路は触らない。
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'

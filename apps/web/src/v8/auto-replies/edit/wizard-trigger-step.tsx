@@ -251,7 +251,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                           key={label}
                           type="button"
                           className={styles.weekday}
-                          /* つなげた7つ（絵 ）。選んだ日は地の色だけで示し、共通の選択の枠は付けない。 */
+                          /* つなげた7つ。選んだ日は地の色だけで示し、共通の選択の枠は付けない。 */
                           data-part="joined-segment"
                           aria-pressed={on}
                           onClick={() => {

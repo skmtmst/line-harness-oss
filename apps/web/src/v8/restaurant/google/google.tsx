@@ -31,8 +31,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 Googleビジネス（Pencil：口コミ ``・返信を作る ``・投稿 ``・投稿を作る ``・
- * パフォーマンス ``・プロフィール ``・設定 ``）。
+ * ★V8 Googleビジネス（Pencil：口コミ ・返信を作る ・投稿 ・投稿を作る ・
+ * パフォーマンス ・プロフィール ・設定 ）。
  *
  * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール・設定）
  * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。

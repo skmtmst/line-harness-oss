@@ -15,7 +15,7 @@
 .hit:hover .tooltip, .hit:focus-visible .tooltip { display: block; }
 .axis { position: absolute; top: calc(100% + 8px); left: 0; right: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--color-ink-faint); }
 .funnel { display: flex; flex-direction: column; gap: 12px; }
-/* 段の行は枠の無い行（絵 ・）。棒は LINE の緑、選んだ段は薄い緑の地と濃い緑の棒。 */
+/* 段の行は枠の無い行。棒は LINE の緑、選んだ段は薄い緑の地と濃い緑の棒。 */
 .funnelRow { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; border: 0; background: transparent; border-radius: var(--radius-control); padding: 12px; color: var(--color-ink); font-size: 12px; }
 .funnelRow[aria-pressed='true'] { background: var(--color-accent-soft); }
 .funnelBar { background: var(--color-accent); }

@@ -112,7 +112,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
 
   /*
-   * 数の帯（絵 ・）：ひな形（下書き N件＝まだ配っていない）・配ったアカウント・今月送った数（テンプレートだけ。
+   * 数の帯：ひな形（下書き N件＝まだ配っていない）・配ったアカウント・今月送った数（テンプレートだけ。
    * ほかの種類は配ったひな形）・新しい版を未配布（API-18。直したあと配っていない先があるひな形の数）。
    */
   const distributed = rows.filter((row) => (row.distributed_account_count ?? 0) > 0).length

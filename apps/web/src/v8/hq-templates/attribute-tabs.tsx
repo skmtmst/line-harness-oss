@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 統括のタグの上のタブ（絵 ・・。店のタグ src/v8/tags/list.tsx と同じ4つ）。
+ * ★V8 統括のタグの上のタブ（絵の。店のタグ src/v8/tags/list.tsx と同じ4つ）。
  *   タグ（統括のタグのひな形の一覧）・友だち情報欄・対応マーク・保存した検索。
  * 受け付ける URL は店と同じ `?tab=fields|marks|searches`（無い・違う値はタグ）。切り替えは履歴を積まない（replace）。
  *

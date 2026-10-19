@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 の写し（app/users/use-merged-users.ts から。src/v8 は @/app を読めない）。
+ * ★V8 の写し（v8/users/use-merged-users.ts から。src/v8 は @/app を読めない）。
  * 違いは1ページの人数を選べることだけ。API・CSV・再計算は同じ。
  *
  * 統合ユーザー一覧（`users/page.tsx` から移したロジックの正本）。

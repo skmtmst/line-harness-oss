@@ -31,7 +31,7 @@ import nav from '@/components/layout/sidebar.module.css'
 import styles from './shell.module.css'
 
 /**
- * 運営コンソールの V8 の外枠（絵 `` ほか運営の板一式）。
+ * 運営コンソールの V8 の外枠（絵  ほか運営の板一式）。
  *
  * 統括・店舗と同じ外側（左メニュー 240・上の帯 60・白い板1枚）に、
  * 運営のメニューだけを載せる。見た目は共通の左メニュー・外枠の class を

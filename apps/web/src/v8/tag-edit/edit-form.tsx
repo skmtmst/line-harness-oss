@@ -156,7 +156,7 @@ export function TagEditForm({
   const usageRows = buildUsageRows(dependencies, tag.usedIn)
   /* このタグが付く物（絵 zOc7f）：自動応答・回答フォーム・オートメーションなど、付ける側。 */
   const grantAttachers = usageRows.filter((row) => ['自動応答', '回答フォーム', 'オートメーション', '友だち追加時の配信', '流入リンク', '友だち追加の経路'].includes(row.label) && row.count > 0)
-  /* 競合の帯は共通部品（save-conflict）。絵は ``（頭の説明の下・横いっぱい）。 */
+  /* 競合の帯は共通部品（save-conflict）。絵は （頭の説明の下・横いっぱい）。 */
   const conflictBand = conflict ? (
     <div className={styles.conflictSlot}>
       <SaveConflictBand

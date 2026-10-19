@@ -56,8 +56,8 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 タグ「タグ」タブ（Pencil ``・1152 ``・閲覧のみ ``、
- * フォルダ窓 ``、状態の板 ``）。
+ * ★V8 タグ「タグ」タブ（Pencil ・1152 ・閲覧のみ 、
+ * フォルダ窓 、状態の板 ）。
  *
  * 動き（読み込み・数の帯・絞り込み・並べ替え・フォルダへ移す・フォルダの
  * 追加/直す/並べ替え/削除・保管・CSV・行の詳細パネル・右クリック）は
@@ -65,7 +65,7 @@ import Notice from '@/components/shared/notice'
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
  */
 
-/** 付け方の呼び名（絵  の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。 */
+/** 付け方の呼び名（「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   ec: 'EC 連携',
   line_login: 'LINE ログイン',
@@ -113,7 +113,7 @@ export function tagLinkText(tag: Tag): string {
 }
 
 /**
- * タグのフォルダ追加・編集（Pencil ``）。タグの分類は `tag_groups` 表なので
+ * タグのフォルダ追加・編集（Pencil ）。タグの分類は `tag_groups` 表なので
  * 共通の FolderAddDialog（folders 表）ではなく、この画面の形を持つ。右のパネルで出す。
  */
 function TagFolderDialog({

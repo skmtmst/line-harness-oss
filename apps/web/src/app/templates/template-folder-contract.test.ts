@@ -25,7 +25,7 @@ const ROW_ACTIONS = read('../../components/shared/folder-row-actions.tsx')
  * **空のフォルダを作れず、名前を直すと中身が散らばった。**
  * 本物のフォルダ（`folders.kind = 'template'`）へ寄せる。
  */
-describe('管理画面 テンプレートのフォルダ操作（CzndJ）', () => {
+describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
   it('文字列ではなく、本物のフォルダを読む', () => {
     expect(PAGE).toContain("api.folders.list('template', accountId)")
     // `category` から帯を組み立てる作りへ戻さない。
@@ -76,7 +76,7 @@ describe('管理画面 テンプレートのフォルダ操作（CzndJ）', () =
     // ★管理画面（m13g）：独自の見た目から共通 ActionMenu へ移した。描く項目は同じ。
     expect(PANEL).toContain('if (row.onMoveUp)')
     expect(PANEL).toContain('if (row.onDelete)')
-    // V8（nH0fZ）は吹き出しを出さず確認の窓で読ませる。管理画面 は今までどおり但し書きを出す。
+    // V8（nH0fZ）は吹き出しを出さず確認の窓で読ませる。互換経路は今までどおり但し書きを出す。
     expect(PANEL_CODE).not.toContain('note={row.deleteNote}')
     expect(ROW_ACTIONS).toContain('description={deleteFolderDescription(itemLabel, deletingCount)}')
   })

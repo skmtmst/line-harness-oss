@@ -43,7 +43,7 @@ export function useBookingDetail() {
     ? detailState.booking
     : null
   usePageTitle(detail ? `${detail.customer.displayName} ／ ${detail.menuName}` : '予約の詳細')
-  /* ★V8 は本文の「予約管理 / 予約の詳細」を置かない（オーナー 2026-10-08）。一覧へは上の帯のパンくずで戻る。管理画面 は今までどおり。 */
+  /* ★V8 は本文の「予約管理 / 予約の詳細」を置かない（オーナー 2026-10-08）。一覧へは上の帯のパンくずで戻る。互換経路は今までどおり。 */
   /**
    * R322: 保存・再試行・承認を始めた対象を覚える。今見ている対象と
    * 違う操作の完了では、現在の表示・編集中の内容を変えない。

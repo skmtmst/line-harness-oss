@@ -1,7 +1,7 @@
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
- * ★V8 CTA・フォーム（``）の描画。
+ * ★V8 CTA・フォーム（）の描画。
  * 差し替えるのは通信だけ。カードの一覧・選んだカードの欄・申込フォームが実在する。
  */
 import { fireEvent, screen, within } from '@testing-library/react'

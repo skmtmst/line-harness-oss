@@ -5,7 +5,7 @@ import type { AccountStyle } from '@line-crm/shared'
 /*
  * はじめの質問と初期セットの決まりを画面から切り離した表。
  * 絵：修正案 DIHFx の列 VHp7p（xxpM9・RZW83・lS1Gh・rJ36f・oKSsG・Bdfxm）。
- * 口：組4（`lib/api-styles.ts` の styleApi）。質問のキーは口の `questionKeys`
+ * 口：組4（`lib/api/helpers/styles.ts` の styleApi）。質問のキーは口の `questionKeys`
  * （image/booking/approval/payment/reminders/stamps/coupons/tickets/outcome/content）だけ。口に無い質問は置かない（未定は入れない）。
  *
  * - どの質問にも「あとで設定する」「手動で設定する」がある（ 追記）。あとで＝何も入れない・

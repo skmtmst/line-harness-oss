@@ -1,10 +1,10 @@
 'use client'
 
 /*
- * ★V8 分析（Pencil：友だちの増減 ``・1152 ``・閲覧のみ ``・
- * 配信の反応 ``・経路と成果 ``・URLクリック ``・成果地点ごとの
- * レポート ``・ファネル ``・クロス分析 ``・使われ方 ``・
- * 保存した分析 ``）。
+ * ★V8 分析（Pencil：友だちの増減 ・1152 ・閲覧のみ ・
+ * 配信の反応 ・経路と成果 ・URLクリック ・成果地点ごとの
+ * レポート ・ファネル ・クロス分析 ・使われ方 ・
+ * 保存した分析 ）。
  *
  * 型（ListPage）に、板の頭・二段の切り替え（組／見かた）・閲覧のみの帯・
  * 見かたごとの数の帯と本文を渡す。ファネルの作る・編集フォームと結果の保存欄だけは、
@@ -74,7 +74,7 @@ function readTab(params: URLSearchParams): AnalyticsTabV8 {
 function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount: number | null }) {
   const owner = tabOwner(active)
   const group = GROUPS.find((item) => item.tabs.some((tab) => tab.key === owner)) ?? GROUPS[0]
-  /* 上の段（組）も下の段（その組の見かた）も共通の下線のタブ（司令塔の判断・絵 ・・・）。 */
+  /* 上の段（組）も下の段（その組の見かた）も共通の下線のタブ（司令塔の判断・絵の）。 */
   return <div className={styles.navigation}>
     <Tabs label="分析の組" items={GROUPS.map((item) => ({ label: item.label, href: hrefOf(item.tabs[0].key), current: item.label === group.label }))} />
     <Tabs label="分析の見かた" items={group.tabs.map(item => ({label:item.label,href:hrefOf(item.key),current:item.key===owner,count:item.key==='saved' ? savedCount ?? undefined : undefined}))} />

@@ -88,7 +88,7 @@ export const ACTIONS: ReadonlyArray<{ value: string; label: string }> = [...AUTO
  */
 export const EDITABLE_ACTIONS = ACTIONS.filter((action) => action.value !== 'notify_staff')
 
-/* 代表3件のカードの短い説明（絵 ）。ほかは EVENT_NOTES をそのまま出す。 */
+/* 代表3件のカードの短い説明。ほかは EVENT_NOTES をそのまま出す。 */
 export const TRIGGER_SHORT_NOTES: Record<string, string> = {
   friend_add: '友だち追加で動きます',
   message_received: '届いたトークの言葉で絞れます',

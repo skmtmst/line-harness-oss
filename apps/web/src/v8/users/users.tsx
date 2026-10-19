@@ -24,7 +24,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 統合ユーザー（Pencil ``、採用版の流れは `sdbsQ` 板3、状態 ``）。
+ * ★V8 統合ユーザー（Pencil 、採用版の流れは `sdbsQ` 板3、状態 ）。
  *
  * データの口は 管理画面 と同じ `useMergedUsers`。違いは見せ方——タブの段は
  * 「← 友だち一覧 › データ管理 › 統合ユーザー」＋「データ管理 ▾」に替える。

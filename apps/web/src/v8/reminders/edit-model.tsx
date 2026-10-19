@@ -104,7 +104,7 @@ export function stepShortTiming(step: ReminderDraftStep, mode: ReminderDraftSett
   return describeReminderTiming(step, mode)
 }
 
-/** 板が 1100px を切ったら（画面幅で約 1352px 未満）、通知の中身は 1152 の板 `` の形。 */
+/** 板が 1100px を切ったら（画面幅で約 1352px 未満）、通知の中身は 1152 の板  の形。 */
 export function useNarrowBoard() {
   const [narrow, setNarrow] = useState(false)
   useEffect(() => {

@@ -357,7 +357,7 @@ html:root .card:is(.compact, .form) > .radio:checked { background: radial-gradie
 html:root .card:not(.row) .body { padding-right: calc(var(--choice-size) + var(--space-8)); }
 /* 印の行がある標準カードは、本文が右上の丸より下に来る。横の余白を重ねない。 */
 html:root .card:not(.compact):not(.form):has(> .topIcon) .body { padding-right: 0; }
-/* /229：図と本文が丸より下にある箱は、丸の場所を上で確保する。 */
+/* ：図と本文が丸より下にある箱は、丸の場所を上で確保する。 */
 html:root .card:not(.row)[data-content-placement='below-indicator'] { padding-top: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
 html:root .card:not(.row)[data-content-placement='below-indicator'] .body { padding-right: 0; }
 html:root .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -367,7 +367,7 @@ html:root .card:not(.row) { position: relative; display: flex; flex-direction: c
 html:root .card:not(.row) > .radio { position: absolute; top: var(--space-16); right: var(--space-16); margin: 0; opacity: 1; pointer-events: auto; }
 /* 行型の選択は丸だけで示す。カードの選択枠を引き継がない。 */
 html:root .card.row { outline-color: transparent; box-shadow: none; background: transparent; }
-/* 行型の部品は .card を持たないので、選んだ行にも同じく枠を出さない（絵 ・：選んだ文の周りに細い緑の四角が出ていた）。 */
+/* 行型の部品は .card を持たないので、選んだ行にも同じく枠を出さない（絵の：選んだ文の周りに細い緑の四角が出ていた）。 */
 html:root .row.checked, html:root .row.checked:hover { outline-color: transparent; box-shadow: none; background: transparent; }
 html:root .row, html:root .row.checked, html:root .row.checked:hover { outline-color: transparent; box-shadow: none; background: transparent; }
 

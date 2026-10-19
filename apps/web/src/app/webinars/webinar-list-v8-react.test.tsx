@@ -12,7 +12,7 @@ import WebinarsPage from './page'
 import type { WebinarListItem } from '@/lib/api'
 
 /*
- * ★V8-B ウェビナー一覧（板 ``・状態 ``・閲覧のみ ``）の契約。
+ * ★V8-B ウェビナー一覧（板 ・状態 ・閲覧のみ ）の契約。
  * V8だけの一覧で、
  * 見本が決めた帯・表・札・押せない形が出ることを実DOMで固定する。
  */

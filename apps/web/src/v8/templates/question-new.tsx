@@ -48,7 +48,7 @@ import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveErrorReveal, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 テンプレート「質問を作る・編集」（Pencil ``）。
+ * ★V8 テンプレート「質問を作る・編集」（Pencil ）。
  *
  * 外枠はテンプレートの作る画面と同じ（src/v8/template-edit/frame）。左に段「名前とフォルダ」「質問」「選択肢」、
  * 右の列に「この質問を使う場所」と「届き方」（本物のスマホ）。下の帯はキャンセル・下書きを保存・保存して公開。

@@ -24,7 +24,7 @@ import Notice from '@/components/shared/notice'
 import AggregationStatus from '@/components/shared/aggregation-status'
 
 /*
- * ★V8 分析「クロス分析」（Pencil ``）。
+ * ★V8 分析「クロス分析」（Pencil ）。
  * 数の帯 → 選ぶ段（数えるもの・たての軸・よこの軸・期間・集計する・この分析を保存）
  * → 左に掛け合わせの表（濃さはその表の最大が基準・マスを押して選ぶ・凡例）、
  *   右に選んだマス（対象者を開く・この対象者へ配信を作成）とこの表から読めること → 見かたの注意。

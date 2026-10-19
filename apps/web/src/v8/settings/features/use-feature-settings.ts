@@ -116,7 +116,7 @@ export function useFeatureSettings() {
   /** GET で受けた版。保存時に送り返し、競合(409)を検出する。 */
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
-  /** ★V8 ``：ほかの管理者が先に保存した。編集中身は残して帯で知らせる。 */
+  /** ★V8 ：ほかの管理者が先に保存した。編集中身は残して帯で知らせる。 */
   const [conflict, setConflict] = useState(false)
   /*
    * 監査 D019: 読み込みに失敗したら初期値のスイッチ一覧を本物の設定の

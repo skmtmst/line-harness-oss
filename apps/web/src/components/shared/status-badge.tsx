@@ -46,7 +46,7 @@ export default function StatusBadge({
   helpHref?: string
   /**
    * ★V8 の色の点。既定は出す。「変わる」のように状態ではなく変化の印として使う札は false
-   * （絵 `` の「変わる」は点なしの札）。
+   * （「変わる」は点なしの札）。
    */
   dot?: boolean
 }) {

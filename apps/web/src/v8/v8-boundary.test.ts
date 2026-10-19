@@ -34,7 +34,7 @@ describe('V8 の画面（src/v8）の決まり', () => {
     expect(bad).toEqual([])
   })
 
-  it('管理画面 と v8 を画面の中で分けない（分けるのは入口の page.tsx）', () => {
+  it('v7 と v8 を画面の中で分けない（分けるのは入口の page.tsx）', () => {
     const bad = code.filter((f) => /useAdminTheme|data-theme=|theme\s*===?\s*['"]v7['"]/.test(readFileSync(f, 'utf8'))).map((f) => relative(ROOT, f))
     expect(bad).toEqual([])
   })

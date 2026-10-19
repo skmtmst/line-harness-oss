@@ -28,7 +28,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
- * 運営の契約先アカウント V8（絵 ``・作る窓 ``）。
+ * 運営の契約先アカウント V8（絵の作る窓 ）。
  *
  * 動きは 管理画面（app/ops/tenants）と同じ口：/api/ops/tenants を検索語で読み、状態の札で絞る。
  * `?status=` で絞り込みを受け取る（ダッシュボードの要対応から来る）。

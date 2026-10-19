@@ -592,7 +592,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                       aria-describedby={(`${chat.isUnread ? `chat-row-unread-${chat.id} ` : ''}chat-row-preview-${chat.id}`)}
                       className={`w-full px-3 py-3 text-left transition-colors ${isSelected
                           ? 'bg-shell'
-                          /* 板 ``：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
+                          /* 板 ：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
                           : 'hover:bg-shell'
                         } ${styles.row}`}
                     >

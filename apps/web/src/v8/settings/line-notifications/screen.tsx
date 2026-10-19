@@ -43,7 +43,7 @@ import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 /*
- * ★V8 LINE通知（Pencil ``。運用者へのお知らせ ``・送れなかったもの ``・記録 ``）。
+ * ★V8 LINE通知（Pencil 。運用者へのお知らせ ・送れなかったもの ・記録 ）。
  *
  * app/line-notifications/page.tsx を写して、見た目（外側の型・中のメニュー・タブ・数のカード・帯・札・表）だけを
  * 絵に合わせた（src/v8 は @/app を読めない）。動き（読み込み・下書き・保存・公開・止める・テスト送信・

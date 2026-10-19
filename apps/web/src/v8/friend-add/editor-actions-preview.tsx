@@ -20,7 +20,7 @@ import styles from './editor.module.css';
 import { MESSAGE_TYPE_LABEL,friendAddFlowSteps,friendAddReaddLines } from './flow';
 import { resendSuppressionText } from './text';
 
-/* ===== 作る④ あわせて行うこと（板 ``） ===== */
+/* ===== 作る④ あわせて行うこと（板 ） ===== */
 export const ACTION_KINDS: Array<{ type: FriendAddRuleAction['type']; label: string; source: 'tag' | 'scenario' }> = [
   { type: 'add_tag', label: 'タグを付ける', source: 'tag' },
   { type: 'remove_tag', label: 'タグを外す', source: 'tag' },
@@ -53,7 +53,7 @@ export function ActionsStep({ definition, setDefinition, options, canEdit }: {
           </Card>
 }
 
-/* ===== 作る⑤ 確認（板 ``） ===== */
+/* ===== 作る⑤ 確認（板 ） ===== */
 export function PreviewStep({ rule, definition, routeNames, runTest, onTestConditions, testing, testOk, overlapNotes, slackConnected, canEdit, hrefFor, accountId, ruleId, scenarios }: {
   rule: EditorRule
   definition: FriendAddRuleDefinition

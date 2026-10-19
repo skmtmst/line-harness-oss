@@ -222,7 +222,7 @@
   /*
    * **カードは12px。** ★管理画面「見た目の物差し」§1 で丸みは 6 / 8 / 12 / 999
    * の4段だけになり、カード・ダイアログ・知らせはすべて 12px。
-   * 管理画面 では 10px（`$radius-md`）と窓の 12px を分けていたが、管理画面 では
+   * 互換経路では 10px（`$radius-md`）と窓の 12px を分けていたが、互換経路では
    * 同じ段に畳まれた。`--radius-card` は `--radius-panel` と同値で残し、
    * 画面側の `rounded-card` はそのまま読み替わる。
    *
@@ -701,7 +701,7 @@
  *   control 8→10  ボタン・入力・選ぶ欄・探す欄の角丸（板「角丸 10」）
  *   panel  12→16  白い板・ダイアログの角丸（板「角丸 16」、ダイアログ 16〜20）
  *   text-lh  1.4→1.5  部品の文字の行の高さ（Pencil の部品は全部 1.5。
- *     部品側は `line-height: var(--text-lh, 1.4)` と書き、管理画面 は
+ *     部品側は `line-height: var(--text-lh, 1.4)` と書き、互換経路は
  *     既定値 1.4 が効いて1画素も変わらない）
  *   control-border   案1：入力・選ぶ・検索・副ボタン・絞り込みの札の黒12%の枠。
  *     control-shadow は黒6%の薄い影。チェック・ラジオ・トグルは別変数で保つ。
@@ -814,7 +814,7 @@
    * 夕15 一斉配信の右欄のスマホ（app/broadcasts/phone-mock-v8.module.css）。
    * 画面の中の飾りなので管理画面のテーマ色とは別物として `bphone` で分ける。
    * 共有の LINE 見本（components/shared/line-preview）とは別の絵で、
-   * 角丸・地の色も違う。値は Pencil `` / `` / `` の実測。
+   * 角丸・地の色も違う。値は Pencil  /  /  の実測。
    */
   --v8-bphone-ink: #171a1f;          /* 器の地・島・帯の中の字・ホームの線 */
   --v8-bphone-talk: #7f93c4;         /* トークの地 */
@@ -973,7 +973,7 @@
   --tpl-rm-row-gap-sm: 8px; --tpl-rm-row-gap: 10px; --tpl-rm-row-gap-lg: 12px; --tpl-rm-side-row-gap: var(--polish-space-row); --tpl-rm-choice-gap: 12px; --tpl-rm-field-grid: minmax(0, 1fr) 220px; --tpl-rm-tpl-card-h: 150px;
   --tpl-rm-band-gap: 12px; --tpl-rm-band-pad: 12px 16px; --tpl-rm-band-radius: var(--polish-radius-control); --tpl-rm-band-lh: 20px;
   --tpl-rm-count-gap: 24px; --tpl-rm-count-pad: 14px; --tpl-rm-count-size: 20px; --tpl-rm-count-lh: 29px; --tpl-rm-stop-pad: 10px 0;
-  --tpl-rm-narrow-pull: 8px; --tpl-rm-narrow-margin: -8px -8px 0; --tpl-rm-open-outline: 1.5px; --tpl-rm-open-offset: -0.75px; --tpl-rm-num-size: 24px; --tpl-rm-days-w: 64px; --tpl-rm-time-w: 140px; --tpl-sfs-time-w: 140px; /* 時刻の欄の幅（絵 ・・・）*/
+  --tpl-rm-narrow-pull: 8px; --tpl-rm-narrow-margin: -8px -8px 0; --tpl-rm-open-outline: 1.5px; --tpl-rm-open-offset: -0.75px; --tpl-rm-num-size: 24px; --tpl-rm-days-w: 64px; --tpl-rm-time-w: 140px; --tpl-sfs-time-w: 140px; /* 時刻の欄の幅*/
   --tpl-rm-body-pad: 14px; --tpl-rm-body-lh: 22px; --tpl-rm-body-min-h: 88px; --tpl-rm-insert-gap: 4px; --tpl-rm-bubble-pad: 10px 12px; --tpl-rm-bubble-lh: 1.6; --tpl-rm-list-indent: 18px;
   --tpl-rm-plan-head-pad: 8px 0; --tpl-rm-plan-row-pad: 11px 0; --tpl-rm-col-when: 130px; --tpl-rm-col-step: 80px; --tpl-rm-col-state: 180px; --tpl-rm-info-pad: 10px 14px; --tpl-rm-confirm-key-w: 140px; --tpl-rm-value-lh: 21px; --tpl-rm-dest-pad: 8px 12px;
   --tpl-rm-done-pad: 48px 0; --tpl-rm-done-w: 560px; --tpl-rm-done-card-pad: var(--polish-space-card); --tpl-rm-done-icon: 48px; --tpl-rm-done-title-size: var(--polish-text-section); --tpl-rm-done-title-lh: 26px; --tpl-rm-done-note-lh: 22px;
@@ -1009,7 +1009,7 @@
   /* 統括の新しい板（作業役 hq）。他機能の既定値は変更しない。 */
   --tpl-hql-actions-w: 136px;
   --tpl-hql-home-card-h: 234px;
-  /* 統括のカードの帯の段の最低の高さ。警告の無いカードにも帯の分の空きを残し、どの段のカードも同じ高さ（絵  の 234）にする。 */
+  /* 統括のカードの帯の段の最低の高さ。警告の無いカードにも帯の分の空きを残し、どの段のカードも同じ高さ（ 234）にする。 */
   --tpl-hq-home-reason-min: 32px;
   --tpl-hql-form-storage-w: 136px; --tpl-hql-form-state-w: 96px; --tpl-hql-form-dest-w: 290px; --tpl-hql-form-actions-w: 148px;
   /* 統括のメンバー・アカウントの残り（作業役 hq） */ --tpl-hq-mem-radio-gap: 20px; --tpl-hq-mem-check-pad: 12px; --tpl-hq-mem-check-gap: 6px; --tpl-hq-mem-confirm-row-h: 35.5px; --tpl-hq-mem-confirm-label-w: 200px; --tpl-hq-home-account-h: 240px; --tpl-hq-home-warn-pad-end: 0px; --tpl-hq-home-warn-pull: -10px;
@@ -1317,7 +1317,7 @@
   --tpl-bd-rs-card-pad: var(--polish-space-card); --tpl-bd-rs-card-gap: var(--polish-space-row); --tpl-bd-rs-done-gap: 12px; --tpl-bd-rs-done-icon: 40px; --tpl-bd-rs-done-title-size: var(--polish-text-section); --tpl-bd-rs-done-title-lh: 25px; --tpl-bd-rs-row-pad: 10px 0; --tpl-bd-rs-row-label: 120px; --tpl-bd-rs-row-size: var(--polish-text-body); --tpl-bd-rs-row-lh: 18px; --tpl-bd-rs-band-pad: 10px 14px; --tpl-bd-rs-band-gap: 10px; --tpl-bd-rs-band-lh: 20px; --tpl-bd-rs-band-bg: #e9f1ff; --tpl-bd-rs-icon: 16px; --tpl-bd-rs-warn-title-lh: 19px;
   --tpl-bd-dialog-pad: 12px 24px 24px; --tpl-bd-mark-stroke: 2px; --tpl-bd-focus: 2px; --tpl-bd-line-b: inset 0 -1px 0 var(--color-hairline); --tpl-bd-line-l: inset 1px 0 0 var(--color-hairline); --tpl-bd-line-t: inset 0 1px 0 var(--color-hairline); --tpl-bd-ring: inset 0 0 0 1px var(--color-hairline); --tpl-bd-ring-accent: inset 0 0 0 1px var(--color-accent); --tpl-bd-ring-warning: inset 0 0 0 1px var(--color-warning); --tpl-bd-soft-bg: #fafafc; --tpl-bd-green: #087a3e;
   --tpl-page-pad-block: 10px; --tpl-page-pad-side: 24px;
-  /* タグ タグの一覧（絵 ・・）。 */
+  /* タグ タグの一覧。 */
   --tpl-tag-search-w: 240px; --tpl-tag-search-w-narrow: 200px;
   --tpl-tag-col-star: 56px; --tpl-tag-col-folder: 86px; --tpl-tag-col-count: 76px; --tpl-tag-col-source: 106px;
   --tpl-tag-col-link: 126px; --tpl-tag-col-usage: 136px; --tpl-tag-col-menu: 60px;
@@ -1426,7 +1426,7 @@
   --tpl-wh-mini-when: 120px; --tpl-wh-mini-value: 200px; --tpl-wh-mini-candidate: 160px; --tpl-wh-mini-ops: 120px; --tpl-wh-sample-lh: 16px; --tpl-wh-textarea-h: 144px; --tpl-wh-textarea-pad: 8px 12px;
   --tpl-wh-dialog-pull-top: 14px; --tpl-wh-dialog-pull-bottom: 10px; --tpl-wh-sheets-gap: 16px; --tpl-wh-small-select-w: 104px; --tpl-wh-log-row-h: var(--polish-table-row); --tpl-wh-log-body-w: 180px; --tpl-wh-log-reply-w: 100px; --tpl-wh-log-time-w: 84px; --tpl-wh-log-ops-w: 130px; --tpl-wh-detail-row-pad: 8px 0; --tpl-wh-pager-margin: 12px 24px; --tpl-wh-pager-lead-pad: 20px; --tpl-wh-new-card-gap: var(--polish-space-row); --tpl-wh-check-gap: 16px; --tpl-wh-event-pad: 12px 14px; --tpl-wh-sample-line-gap: 1px; --tpl-wh-sheets-side-w: 320px; --tpl-wh-care-lh: 19px; --tpl-wh-run-row-h: var(--polish-table-row); --tpl-wh-run-when: 140px; --tpl-wh-run-kind: 80px; --tpl-wh-run-what: 220px; --tpl-wh-skel-dot: 32px; --tpl-wh-skel-bar: 10px;
   --tpl-band-cell-pad-block: 16px; --tpl-band-cell-pad-side: 24px; --tpl-band-cell-gap: 8px;
-  /* シナリオ配信の編集（src/v8/scenario-detail・絵 ・・・・） */
+  /* シナリオ配信の編集（src/v8/scenario-detail・絵の） */
   --tpl-sd-head-pad: 20px 24px 16px; --tpl-sd-head-gap: 12px; --tpl-sd-head-text-gap: 6px; --tpl-sd-title-gap: 10px; --tpl-sd-back-size: 13px; --tpl-sd-back-lh: 19px; --tpl-sd-title-size: var(--polish-text-section); --tpl-sd-title-lh: 32px; --tpl-sd-meta-size: 12px; --tpl-sd-meta-lh: 17px; --tpl-sd-icon-btn: 28px; --tpl-sd-icon-btn-radius: var(--polish-radius-small); --tpl-sd-icon: 16px;
   --tpl-sd-conflict-wrap-pad: 0 24px 8px; --tpl-sd-conflict-pad: 12px 16px; --tpl-sd-conflict-gap: 12px; --tpl-sd-conflict-icon: 18px; --tpl-sd-conflict-bg: #fdf3e1; --tpl-sd-conflict-text-gap: 2px; --tpl-sd-conflict-title-size: var(--polish-text-section); --tpl-sd-conflict-title-lh: 20px; --tpl-sd-conflict-body-size: var(--polish-text-body); --tpl-sd-conflict-body-lh: 19px;
   --tpl-sd-left-pad: 20px 28px; --tpl-sd-left-gap: 18px; --tpl-sd-right-w: 379.5px; --tpl-sd-right-pad: 20px 24px; --tpl-sd-right-gap: 14px; --tpl-sd-right-title-size: var(--polish-text-section); --tpl-sd-right-title-lh: 23px;
@@ -1464,7 +1464,7 @@
   --tpl-il-qr-gap: 14px; --tpl-il-qr-wrap-pad: 12px 0; --tpl-il-qr-size: 220px; --tpl-il-qr-pad: 12px; --tpl-il-qr-radius: var(--polish-radius-card);
   --tpl-il-qr-url-pad: 8px 12px; --tpl-il-qr-url-radius: var(--polish-radius-control); --tpl-il-qr-note-lh: 19px; --tpl-il-qr-actions-top: 6px;
   --tpl-create-desc-size: var(--polish-text-body); --tpl-create-desc-lh: 17px;
-  /* 予約設定（src/v8/booking-menus）の寸法。絵 ・・・・・ の書き出しの値。 */ --tpl-bm-1: 1px; --tpl-bm-2: 2px; --tpl-bm-3: 3px; --tpl-bm-4: 4px; --tpl-bm-5: 5px; --tpl-bm-6: 6px; --tpl-bm-7: 7px; --tpl-bm-8: 8px; --tpl-bm-9: 9px; --tpl-bm-10: 10px; --tpl-bm-11: 11px; --tpl-bm-11-5: 11.5px; --tpl-bm-12: 12px; --tpl-bm-13: 13px; --tpl-bm-14: 14px; --tpl-bm-15: 15px; --tpl-bm-16: 16px; --tpl-bm-17: 17px; --tpl-bm-18: 18px; --tpl-bm-19: 19px; --tpl-bm-20: 20px; --tpl-bm-21: 21px; --tpl-bm-22: 22px; --tpl-bm-24: 24px; --tpl-bm-26: 26px; --tpl-bm-28: 28px; --tpl-bm-29: 29px; --tpl-bm-30: 30px; --tpl-bm-32: 32px; --tpl-bm-35: 35px; --tpl-bm-36: 36px; --tpl-bm-40: 40px; --tpl-bm-44: 44px; --tpl-bm-46: 46px; --tpl-bm-48: 48px; --tpl-bm-49: 49px; --tpl-bm-56: 56px; --tpl-bm-64: 64px; --tpl-bm-70: 70px; --tpl-bm-72: 72px; --tpl-bm-84: 84px; --tpl-bm-88: 88px; --tpl-bm-96: 96px; --tpl-bm-100: 100px; --tpl-bm-110: 110px; --tpl-bm-120: 120px; --tpl-bm-140: 140px; --tpl-bm-150: 150px; --tpl-bm-160: 160px; --tpl-bm-200: 200px; --tpl-bm-220: 220px; --tpl-bm-280: 280px; --tpl-bm-330: 330px; --tpl-bm-380: 380px; --tpl-bm-714: 714px;
+  /* 予約設定（src/v8/booking-menus）の寸法。絵の の書き出しの値。 */ --tpl-bm-1: 1px; --tpl-bm-2: 2px; --tpl-bm-3: 3px; --tpl-bm-4: 4px; --tpl-bm-5: 5px; --tpl-bm-6: 6px; --tpl-bm-7: 7px; --tpl-bm-8: 8px; --tpl-bm-9: 9px; --tpl-bm-10: 10px; --tpl-bm-11: 11px; --tpl-bm-11-5: 11.5px; --tpl-bm-12: 12px; --tpl-bm-13: 13px; --tpl-bm-14: 14px; --tpl-bm-15: 15px; --tpl-bm-16: 16px; --tpl-bm-17: 17px; --tpl-bm-18: 18px; --tpl-bm-19: 19px; --tpl-bm-20: 20px; --tpl-bm-21: 21px; --tpl-bm-22: 22px; --tpl-bm-24: 24px; --tpl-bm-26: 26px; --tpl-bm-28: 28px; --tpl-bm-29: 29px; --tpl-bm-30: 30px; --tpl-bm-32: 32px; --tpl-bm-35: 35px; --tpl-bm-36: 36px; --tpl-bm-40: 40px; --tpl-bm-44: 44px; --tpl-bm-46: 46px; --tpl-bm-48: 48px; --tpl-bm-49: 49px; --tpl-bm-56: 56px; --tpl-bm-64: 64px; --tpl-bm-70: 70px; --tpl-bm-72: 72px; --tpl-bm-84: 84px; --tpl-bm-88: 88px; --tpl-bm-96: 96px; --tpl-bm-100: 100px; --tpl-bm-110: 110px; --tpl-bm-120: 120px; --tpl-bm-140: 140px; --tpl-bm-150: 150px; --tpl-bm-160: 160px; --tpl-bm-200: 200px; --tpl-bm-220: 220px; --tpl-bm-280: 280px; --tpl-bm-330: 330px; --tpl-bm-380: 380px; --tpl-bm-714: 714px;
   /* 作る画面の右の列の箱（「右の箱 設定内容」）と、本文の小さい文字の行の高さ */
   /* タブ（画面の板 72 枚が 高さ28・文字の下10。部品見本 clV5c の 35 は少数） */
   --tpl-preview-title-size: var(--polish-text-section); --tpl-preview-title-lh: 23px; --tpl-tabs-pad-bottom: 10px; --tpl-tabs-text-lh: 18px; --tpl-tabs-compact-lh: 18.5px; --tpl-tabs-compact-line-overlap: -2px;
@@ -1520,7 +1520,7 @@
   /* 作成の型の口 contentSpacing='flush-top'（板の頭のすぐ下から。E-9 p17Qku：上 4・左右 24・下 24、段の間 28）。 */
   --tpl-create-flush-pad: var(--polish-space-row) var(--polish-space-section) var(--polish-space-section); --tpl-create-flush-gap: var(--polish-space-section);
   --tpl-section-pad: var(--polish-space-section); --tpl-section-gap: var(--polish-space-field);
-  /* 行の「…」のメニューの項目（絵 ・・）。 */ --tpl-menu-divider-margin: 0; --tpl-create-notice-pad: 12px 24px;
+  /* 行の「…」のメニューの項目。 */ --tpl-menu-divider-margin: 0; --tpl-create-notice-pad: 12px 24px;
   --tpl-menu-item-h: 34px; --tpl-menu-item-gap: 8px;
   /* フォルダの色の丸（一覧の行の名前の前）。説明の行は丸と間の分 16 を下げて名前にそろえる。 */
   --tpl-folder-dot-size: 8px; --tpl-folder-dot-gap: 8px; --tpl-folder-dot-indent: 16px;
@@ -2094,7 +2094,7 @@
 }
 
 /*
- * ★V8 LIFFプレビューのスマホ（予約設定 `` の右欄）：お客さまの
+ * ★V8 LIFFプレビューのスマホ（予約設定  の右欄）：お客さまの
  * LIFF 予約画面の写しの値。管理画面のテーマ色とは別物なので
  * `--v8-liff-*` で分ける（LINEプレビューの `--v8-line-*` と同じ考え）。
  * 値は Pencil の実寸の写しで、直値はここだけに置く。
@@ -2125,7 +2125,7 @@
  * 各部品の CSS Module が `:root` で上書きする。
  *
  * `.v8-only` / `.管理画面-only` は「そのテーマのときだけ出る要素」の印。
- * v8 の新しい操作（検索・通知・メニュー畳み）は 管理画面 では描かない。
+ * v8 の新しい操作（検索・通知・メニュー畳み）は 互換経路では描かない。
  */
 
 /* v8 の地は全体が shell の灰。板の白が浮くのはこの差で作る。 */
@@ -2159,7 +2159,7 @@
 /*
  * ★V8 流入と計測 一覧：1152幅で「最新追加」の日付（8月25日（火）・
  * 約96px）が 8% 列（約85px）からはみ出す。1列目（流入元名）は伸び縮み・
- * 日付は中身に合わせた幅にする。管理画面 は変えない。
+ * 日付は中身に合わせた幅にする。互換経路は変えない。
  */
 :root col.inflow-name-col {
   width: auto;
@@ -2169,7 +2169,7 @@
   width: 7rem;
 }
 
-/* v8 では上の帯を 1024px から出す（管理画面 は 1280px から）。畳んだ左
+/* v8 では上の帯を 1024px から出す（互換経路は 1280px から）。畳んだ左
    メニューと組むので、狭い PC 幅でも帯を畳まない。 */
 @media (min-width: 1024px) {
   :root .v8-topbar-wrap {
@@ -2239,7 +2239,7 @@
  * ★V8「ページ送り」（jX2Uw）：帯そのものが「件数＋ボタン」を持つ。
  * 帯を包む行（data-pagebar）は高さ固定・余白をやめ、外に出していた
  * 件数の文（data-pagebar-out）は帯の中の summary へ移すので隠す。
- * 管理画面 は今までどおり。
+ * 互換経路は今までどおり。
  */
 :root [data-pagebar] {
   height: auto;
@@ -3045,7 +3045,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-list-cell-side: 16px;
 }
 
-/* 画像の枠：中に印・題・説明2行・上限が入る大きさ（絵 ・・ の 180×160）。 */
+/* 画像の枠：中に印・題・説明2行・上限が入る大きさ（絵の の 180×160）。 */
 :root { --tpl-image-frame-w: 180px; --tpl-image-frame-h: 160px; --tpl-image-frame-ratio: 9 / 8; --tpl-slot-links-gap-below: 2px; --tpl-slot-links-pad-below: 8px; }
 :root { --tpl-floor-map-inset: 32px; --tpl-floor-aside-w: 400px; --tpl-floor-detail-row-h: 59px; --tpl-board-tabs-top: 18px; --tpl-board-body-top: 10px; --tpl-board-section-gap: 13px; --tpl-board-detail-w: 330px; --tpl-board-side-w: 304px; --tpl-board-resource-w: 86px; --tpl-board-row-h: 52px; --tpl-board-block-top: 4px; }
 /* 印刷の内容は body 直下へ置き、画面のスクロール枠・高さ制限から外す。 */

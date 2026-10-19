@@ -51,17 +51,17 @@
   font-weight: 600;
 }
 
-.badge_neutral {
+.badgeNeutral {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
 }
 
-.badge_warning {
+.badgeWarning {
   background: var(--color-status-warn-soft);
   color: var(--color-status-warn-deep);
 }
 
-.badge_danger {
+.badgeDanger {
   background: var(--color-danger-bg);
   color: var(--color-danger);
 }

@@ -89,7 +89,7 @@ export function useScenarioReads({
   }, [loadScenario])
 
   /*
-   * ★V8 ``：別のタブから戻ってきたら更新日時だけ確かめる。
+   * ★V8 ：別のタブから戻ってきたら更新日時だけ確かめる。
    * ずれていたら帯を出すだけで、画面は書き換えない。
    */
   useEffect(() => {

@@ -24,7 +24,7 @@ import Notice from '@/components/shared/notice'
 import Card from '@/components/shared/card'
 
 /**
- * 運営の監査ログ V8（絵 ``）。
+ * 運営の監査ログ V8。
  *
  * 動きは 管理画面（app/ops/audit）と同じ口：種類（代理ログイン・個人情報の表示・
  * 契約先の停止・運営メンバー）と期間で /api/ops/audit を読み、50件ずつ送る。

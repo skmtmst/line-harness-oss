@@ -13,7 +13,7 @@ import BookingPayment from '../components/booking-payment.js';
 import Done from '../components/done.js';
 import LiffHeader from '../components/ui/liff-header.js';
 import LiffLookScope from '../components/liff-look-scope.js';
-import Stepper from '../components/ui/stepper/index.js';
+import Stepper from '../components/ui/Stepper.js';
 import BottomBar from '../components/ui/bottom-bar.js';
 import Button from '../components/ui/button/index.js';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';

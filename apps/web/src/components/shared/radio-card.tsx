@@ -92,7 +92,7 @@ export interface RadioCardProps {
    */
   onClick?: () => void
   className?: string
-  /** V8 の上段に出す印。省略すると印は出さない（既定）。管理画面 では非表示。 */
+  /** V8 の上段に出す印。省略すると印は出さない（既定）。互換経路では非表示。 */
   icon?: ReactNode
   /**
    * 選ぶカードの形。既定は箱（fNPdg/r3xz1W）。

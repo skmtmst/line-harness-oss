@@ -60,7 +60,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 一斉配信の一覧（Pencil ``・1152 は ``・閲覧のみは ``）。
+ * ★V8 一斉配信の一覧（Pencil ・1152 は ・閲覧のみは ）。
  *
  * 今までの V8 一覧（app/broadcasts/list-v8.tsx）の動きを写し、見た目は
  * 型（ListPage）と共通部品で一から組み直した。データの口・保存先は今と同じ。
@@ -178,7 +178,7 @@ export default function BroadcastListV8() {
   usePageTitle('一斉配信')
   const router = useRouter()
   const { selectedAccountId } = useAccount()
-  /* かんたんに送る（板 ``）の窓。 */
+  /* かんたんに送る（板 ）の窓。 */
   const [quickSendOpen, setQuickSendOpen] = useState(false)
   const staffRole = useStaffRole()
   const narrow = useNarrowViewport()
@@ -227,7 +227,7 @@ export default function BroadcastListV8() {
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
   const [folderError, setFolderError] = useState('')
-  /* 行を選んでまとめてフォルダへ移す（絵  の左の選ぶ欄）。選ぶのはこのページの行だけ。 */
+  /* 行を選んでまとめてフォルダへ移す（左の選ぶ欄）。選ぶのはこのページの行だけ。 */
   const bulkAnchorRef = useRef<HTMLButtonElement | null>(null)
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
@@ -1175,7 +1175,7 @@ export default function BroadcastListV8() {
           anchorRef={createAnchorRef}
           ariaLabel="配信の作り方"
           items={[
-            /* 絵 `` の分け方：かんたんに送る（1画面・板 ``）と詳しく作る（5つの手順 `/broadcasts/new`）。
+            /* 絵  の分け方：かんたんに送る（1画面・板 ）と詳しく作る（5つの手順 `/broadcasts/new`）。
                テンプレートから作るは絵に無いが今ある機能なので、その下に残す。 */
             { id: 'create-quick', label: 'かんたんに送る', description: '文字1通を、全員かタグで。1画面で送れる', onSelect: () => { setCreateMenuOpen(false); setQuickSendOpen(true) } },
             { id: 'create-new', label: '詳しく作る', description: '画像・カード・細かい絞り込み・承認（5つの手順）', onSelect: () => { setCreateMenuOpen(false); router.push('/broadcasts/new') } },

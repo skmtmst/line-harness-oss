@@ -501,7 +501,7 @@ export default function HqBroadcastDetail() {
       <PageFrame kind="detail" boardId="M2tJM xOXuY">
         <PageHeading title={run?.title ?? '一括配信'}
         steps={<>{run ? <HqDeliveryRail run={run} approvalPending={approval.state?.approval.status === 'pending'} /> : null}</>}
-        /* 店の詳細と同じ形：題の右に状態の札、題の下に1行の要約（絵 ）。 */
+        /* 店の詳細と同じ形：題の右に状態の札、題の下に1行の要約。 */
         titleAccessory={badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : undefined}
         crumbs={run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : undefined}
         actions={<>{run ? (

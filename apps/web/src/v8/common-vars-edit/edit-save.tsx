@@ -136,7 +136,7 @@ export async function saveCommonVar({ changeReason, expiryBehavior, fallbackValu
         const fresh = await refreshBaseline(item.id, accountAtRequest, e)
         /*
          * 409は誰かが先に保存した。入力は残したまま、帯で誰の保存かを見せる
-         * （板 ``）。428（確認切れ）は文だけで、帯は出さない。
+         * （板 ）。428（確認切れ）は文だけで、帯は出さない。
          */
         if (e.status === 409) {
           const latest = fresh?.history[0]

@@ -14,7 +14,7 @@ import { ListFolderContext } from '@/components/shared/list-folder-context'
 
 /**
  * 左の列（フォルダ・タグ・設定のメニュー）を、白い板が狭いとき（1100 未満）に
- * 道具の段の先頭へ畳んで出すための中身。絵 ・ の1段目「作る・フォルダ：すべて」。
+ * 道具の段の先頭へ畳んで出すための中身。絵の の1段目「作る・フォルダ：すべて」。
  * 画面は FolderPanel に渡しているのと同じ rows・activeId・onSelect・作るボタンを渡すだけ。
  * 閲覧のみの画面は createAction を渡さない（押せない作るボタンは出さない）。
  */
@@ -42,7 +42,7 @@ export interface ListPageBodyProps {
    * 左の列に選ぶものが2つある画面（統括のテンプレートの種類と分類など）は配列で渡す。
    */
   folderNav?: ListFolderNav | ListFolderNav[]
-  /** 左の列の左の余白を 24 にする（統括の画面。絵 ・ ほか）。ふつうの一覧は 12。 */
+  /** 左の列の左の余白を 24 にする（統括の画面。絵の ほか）。ふつうの一覧は 12。 */
   folderInset?: boolean
   /** 指定した板だけ、余白を含めた外寸にする。既定の列幅は変えない。 */
   folderWidth?: number

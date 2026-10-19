@@ -18,7 +18,7 @@ function Harness({ initial = false }: { initial?: boolean }) {
   return <Checkbox checked={checked} onCheckedChange={setChecked}>すべての友だちに送る</Checkbox>
 }
 
-describe('チェックボックス（★管理画面 gvjpx）', () => {
+describe('チェックボックス（★V7 gvjpx）', () => {
   it('文字を押しても切り替わり、読み上げ名は文字になる', () => {
     render(<Harness />)
     const box = screen.getByRole('checkbox', { name: 'すべての友だちに送る' }) as HTMLInputElement

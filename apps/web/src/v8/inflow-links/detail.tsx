@@ -47,7 +47,7 @@ import { Field } from '@/components/shared/form-controls'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 流入と計測の詳細（Pencil ``）。
+ * ★V8 流入と計測の詳細（Pencil ）。
  *
  * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→ その後（この経路から来た人）→
  * 友だちになったときの帯 → この経路から来た友だちの表（道具の段・表・ページ送り）→ 下の2つの箱。

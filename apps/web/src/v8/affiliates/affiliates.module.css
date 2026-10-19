@@ -1,5 +1,5 @@
 /*
- * ★V8 成果とアフィリエイト（Pencil ``・``・``・``・``・``・``・``）。
+ * ★V8 成果とアフィリエイト（Pencil ・・・・・・・）。
  * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  * 寸法は globals.css の --tpl-af-*。
  */
@@ -96,7 +96,7 @@
   min-width: 0;
 }
 .dotStack > * + * {
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 ・ の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵の の説明の行）。 */
   margin-inline-start: var(--tpl-folder-dot-indent);
 }
 .stackEnd {
@@ -408,7 +408,7 @@
 .colPayBank { width: var(--tpl-af-col-pay-bank); min-width: 0; }
 .colPayState { width: var(--tpl-af-col-pay-state); min-width: 0; }
 .colPayOps { width: var(--tpl-af-col-pay-ops); }
-/* 「…」1つだけの操作の列は右端に寄せる（絵 ）。 */
+/* 「…」1つだけの操作の列は右端に寄せる。 */
 .colPayOps .menuBox { justify-content: flex-end; }
 
 /* 今回の締め（案内の帯のすぐ下・枠の中に 期間・対象・合計・締める）。 */

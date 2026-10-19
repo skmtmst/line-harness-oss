@@ -78,12 +78,12 @@ export default function FormsListV8() {
   /*
    * 箱の作成・名前変更・削除・並び替えは `/api/folders` が owner/admin で閉じている。
    * 役割と鍵は本人APIで確かめ、答えが来るまでは変更操作を隠す。
-   * 変えられない人には操作を出さず、閲覧のみの帯（``）を出す。
+   * 変えられない人には操作を出さず、閲覧のみの帯（）を出す。
    */
   const staffRole = useStaffRole()
   const canManageFolders = canManageRole(staffRole)
   const canEditForms = useFeatureAccess('forms')
-  /* 1152 の板（``）。フォルダの列は型が畳み、道具の段を2段にする。 */
+  /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
   const [forms, setForms] = useState<Form[]>([])
@@ -125,7 +125,7 @@ export default function FormsListV8() {
   const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const [duplicating, setDuplicating] = useState(false)
   const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
-  /* アーカイブ・削除の窓（``）。開いたら影響を読んでから2つの道を出す。 */
+  /* アーカイブ・削除の窓（）。開いたら影響を読んでから2つの道を出す。 */
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
   const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
@@ -1168,7 +1168,7 @@ export default function FormsListV8() {
     />
   )
 
-  /* 閲覧のみの帯（``）。見出しの下・数の帯の上。 */
+  /* 閲覧のみの帯（）。見出しの下・数の帯の上。 */
   const viewerBand = !canEditForms ? (
     <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null

@@ -93,7 +93,7 @@ export function useScenarioSettings({
   }
 
   /*
-   * ★V8 ``「最新を読み込んで続ける」。最新で入力を置き換える。
+   * ★V8 「最新を読み込んで続ける」。最新で入力を置き換える。
    * 比べる文は設定の要約（名前・状態・通の数）で作る。
    */
   const acceptLatestAndContinue = async () => {
@@ -118,7 +118,7 @@ export function useScenarioSettings({
     : ''
 
   /*
-   * ★V8: 3 の箱の「配信を再開する」。開始前の確認（``）で
+   * ★V8: 3 の箱の「配信を再開する」。開始前の確認（）で
    * 対象人数・送信枠を確かめてから動かす。試算は画面が常に持っている
    * simulation / runs をそのまま使う（確認窓で取り直さない）。
    */
@@ -148,7 +148,7 @@ export function useScenarioSettings({
   }
 
   /*
-   * ★V8: 3 の箱の「一時停止する」（`` 止める確認）。
+   * ★V8: 3 の箱の「一時停止する」（ 止める確認）。
    * 止めても途中の人の記録は残る。板にある「止める理由」の欄は、
    * 受け口（保存先）が API に無いので置いていない
    * （design/v8/DEVIN-QUESTIONS.md 参照）。
@@ -177,7 +177,7 @@ export function useScenarioSettings({
     }
   }
 
-  /* ★V8 ``：複製の窓を開く。名前は「のコピー」を下書きに持つ。 */
+  /* ★V8 ：複製の窓を開く。名前は「のコピー」を下書きに持つ。 */
   const openDuplicateDialog = () => {
     if (!scenario) return
     setDuplicateName(`${scenario.name} のコピー`)

@@ -33,7 +33,7 @@ export default function CustomerInfoPanel({
   extraSections?: CustomerInfoSection[]
   actionWording?: boolean
   hiddenPersonalCount?: number
-  /** 見出しの幅。'wide'（84）は受信箱の右の列（絵 ）。「次の自動配信」まで1行で値と離して置く。 */
+  /** 見出しの幅。'wide'（84）は受信箱の右の列。「次の自動配信」まで1行で値と離して置く。 */
   labelWidth?: 'standard' | 'wide'
 }) {
   const [expanded, setExpanded] = useState(false)

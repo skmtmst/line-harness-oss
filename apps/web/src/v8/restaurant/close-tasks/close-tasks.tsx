@@ -30,7 +30,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 ``。ダッシュボードの「すべて見る」から）。
+ * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 。ダッシュボードの「すべて見る」から）。
  *
  * 未対応／閉じた で切り替え。1行＝1つの枠（時刻）。閉じる媒体は札で並べ、閉じた媒体には ✓。
  * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
@@ -151,7 +151,7 @@ export default function CloseTasksPage() {
             const remaining = openItems(group)
             const target = remaining[0] ?? null
             /*
-             * 「もう開けてよい」の行は、閉じた媒体の管理画面で枠を開け直す（絵 ）。
+             * 「もう開けてよい」の行は、閉じた媒体の管理画面で枠を開け直す。
              * 開け直した印を付ける口（［開けた］）はまだ無い（BEHAVIOR.md の「今の口で出せないもの」）。
              */
             const linkItem = target ?? (group.state === 'reopen' ? group.items[0] ?? null : null)

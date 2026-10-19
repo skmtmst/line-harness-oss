@@ -65,7 +65,7 @@ export default function TemplatesListV8() {
   const staffRole = useStaffRole()
   const featureAccess = useFeatureAccess('templates')
   const canMutateTemplates = featureAccess
-  /* 1152 の板（``）。フォルダの列は型が畳み、道具の段を2段にする。 */
+  /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
   const [activeSection, setActiveSection] = useState<Section>('message')
@@ -134,7 +134,7 @@ export default function TemplatesListV8() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  /** 使っている所があるので削除できない窓（``）。中身は usage 口で取る。 */
+  /** 使っている所があるので削除できない窓（）。中身は usage 口で取る。 */
   const [blockedDelete, setBlockedDelete] = useState<PendingDelete | null>(null)
   const [blockedUsage, setBlockedUsage] = useState<UsageDetail | null>(null)
   const [blockedLoading, setBlockedLoading] = useState(false)
@@ -883,7 +883,7 @@ export default function TemplatesListV8() {
     </ListToolbarFrame>
   )
 
-  /* ===== 一覧の中身（``：読込中・読み込めない・空・0件を分ける） ===== */
+  /* ===== 一覧の中身（：読込中・読み込めない・空・0件を分ける） ===== */
   const sectionWord = activeSection === 'rich_video' ? 'リッチビデオのテンプレート' : activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
   const listBody = renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, openPicker, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view })
 
@@ -900,7 +900,7 @@ export default function TemplatesListV8() {
     setSelectedIds(new Set())
   }
 
-  /* 種類のタブ（件数つき）。閲覧のみの帯（``）はタブの上。 */
+  /* 種類のタブ（件数つき）。閲覧のみの帯（）はタブの上。 */
   const tabs = (
     <>
       {!canMutateTemplates ? (

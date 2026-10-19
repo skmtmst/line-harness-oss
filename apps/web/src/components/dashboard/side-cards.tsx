@@ -262,7 +262,7 @@ export function UpcomingCard({
   updatedAt?: Date | null
   /*
    * V8 速さ対応：右の列が見えるまで取得を待つとき false。
-   * 省略時は今までどおりすぐ取る（管理画面 は変えない）。
+   * 省略時は今までどおりすぐ取る（互換経路は変えない）。
    */
   startLoad?: boolean
 }) {
@@ -388,7 +388,7 @@ export function DeliveryFailuresCard({ accountId, startLoad = true }: {
   accountId?: string | null
   /*
    * V8 速さ対応：右の列が見えるまで取得を待つとき false。
-   * 省略時は今までどおりすぐ取る（管理画面 は変えない）。
+   * 省略時は今までどおりすぐ取る（互換経路は変えない）。
    */
   startLoad?: boolean
 }) {

@@ -259,7 +259,7 @@ describe('画面', () => {
     const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '返信する')
     await act(async () => { send!.click() })
     await flush()
-    // 板 ``「この返事を送りますか？」を見てから送る。
+    // 板 「この返事を送りますか？」を見てから送る。
     const confirm = document.body.querySelector('[data-design-node="GgP2d"]')
     expect(confirm, '返事の確認の窓が出ない').not.toBeNull()
     for (const row of ['この返事を送りますか？', '宛先', '状態', '優先度', '下書きを削除', '戻って直す', '送信する']) {

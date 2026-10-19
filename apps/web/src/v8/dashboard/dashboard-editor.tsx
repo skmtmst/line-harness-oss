@@ -51,7 +51,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 ダッシュボード編集（Pencil ``）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
+ * ★V8 ダッシュボード編集（Pencil ）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
  *
  * 動き（並べ替え・表示の ON/OFF・「今日やること」は4枠まで・初期状態に戻す・
  * 保存の失敗と 409・読み上げ）は 管理画面 と共有の `components/dashboard/dashboard-editor.tsx`

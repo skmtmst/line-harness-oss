@@ -25,7 +25,7 @@ const account = (over: Partial<LineAccount> = {}): LineAccount => ({
 })
 
 /**
- * LINEアカウントの一覧（設計板 ``）。
+ * LINEアカウントの一覧（設計板 ）。
  *
  * 板の言葉が正本。接続は「正常／確認停止中／アーカイブ」、
  * Webhook は「正常／未確認」の2択で出す。

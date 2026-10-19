@@ -13,7 +13,7 @@ const token = (name: string) => GLOBALS.match(new RegExp(`${name}:\\s*([^;]+);`)
 /*
  * V8 一斉配信の数字合わせ。見本 `.html` の寸法に合わせる。
  * 10-11固定版と：名前は黒・700。件数・金額は実データを出す。
- * 件数・金額などの中身は API の実データを出す（絵の数は写さない）。
+ * 件数・金額などの中身は API の実データを出す（数は写さない）。
  */
 describe('一斉配信の数字合わせ', () => {
   it('見出しは12px・500・余白13px 20px', () => {
@@ -31,7 +31,7 @@ describe('一斉配信の数字合わせ', () => {
     expect(CSS).toMatch(/\.table th:last-child,\s*\.table td:last-child \{ padding-right: var\(--tpl-bc-edge-pad\)/)
   })
 
-  it('名前は12px・黒・700', () => {
+  it('名前は12px・黒・700（B-207）', () => {
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-size: var\(--text-label\)/)
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-weight: 700/)
     expect(CSS).toMatch(/\.cellTitle \{[^}]*color: var\(--color-ink\)/)

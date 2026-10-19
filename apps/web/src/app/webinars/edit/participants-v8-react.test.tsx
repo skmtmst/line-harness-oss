@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 参加者管理（``）の描画。
+ * ★V8 参加者管理（）の描画。
  * 差し替えるのは通信だけ。集計の札・分類の札・一覧・友だち詳細への導線が実在する。
  */
 import React, { act } from 'react'

@@ -11,9 +11,9 @@ import type { FormFieldProblem } from '@/lib/use-form-errors'
  * 「1つ目へ」で最初の欄へフォーカスを移す。欄が直るとまとめからも消える。
  *
  * `useFormErrors` と組み合わせて使う:
- * ```tsx
+ * `tsx
  * <ValidationSummary problems={fields.listProblems} onFocusFirst={fields.focusFirst} />
- * ```
+ * `
  */
 export default function ValidationSummary({
   problems,

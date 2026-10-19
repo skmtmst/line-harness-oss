@@ -53,7 +53,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 シナリオを作る②：1通目を設定（Pencil ``・1152 ``）。
+ * ★V8 シナリオを作る②：1通目を設定（Pencil ・1152 ）。
  *
  * 型（CreatePage）に、戻る・題・手順の輪・説明・左の段（だれに送るか・1通目の内容）と、
  * 右の列（LINEでの見え方）・下の帯（キャンセル・1通目はあとで書く・作って編集へ）を渡す。

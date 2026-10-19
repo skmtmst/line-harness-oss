@@ -7,7 +7,7 @@ import {seatBoardEntry,type RestaurantFloor} from '@line-crm/shared'
 import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 
 /*
- * ★V8 座席・卓管理（板 `BERxg`・卓を止める ``・卓を追加・変更 ``）。
+ * ★V8 座席・卓管理（板 `BERxg`・卓を止める ・卓を追加・変更 ）。
  *
  * 数4（卓数・総席数・結合可能・個室）→ 右上に「卓を追加する」→
  * 左にフロアマップ（結合グループは緑の地と札・停止中は薄く）、右に卓の詳細
@@ -43,7 +43,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 座席・卓管理（板 `BERxg`・卓を止める ``・卓を追加・変更 ``）。
+ * ★V8 座席・卓管理（板 `BERxg`・卓を止める ・卓を追加・変更 ）。
  *
  * 数4（卓数・総席数・結合可能・個室）→ 右上に「卓を追加する」→
  * 左にフロアマップ（結合グループは緑の地と札・停止中は薄く）、右に卓の詳細

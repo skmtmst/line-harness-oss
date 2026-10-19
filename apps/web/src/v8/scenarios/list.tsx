@@ -76,7 +76,7 @@ import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
- * 一覧 ``・狭い板 ``・閲覧のみ ``・複製の窓 ``、状態の板は ``）。
+ * 一覧 ・狭い板 ・閲覧のみ ・複製の窓 、状態の板は ）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・保存・権限・
  * 失敗時の扱いは今までの一覧（app/scenarios/list-v8.tsx）と同じ。違いは見せ方だけ——
@@ -103,14 +103,14 @@ type ScenarioRow = Scenario & {
   completedCount?: number
 }
 
-/* 板 `` の行の補足に出る送り方の言い方。relative は 028 以前の作り方で、いまは新しく作れない。 */
+/* 板  の行の補足に出る送り方の言い方。relative は 028 以前の作り方で、いまは新しく作れない。 */
 const deliveryModeLabels: Record<DeliveryMode, string> = {
   relative: 'Legacy',
   elapsed: '経過時間で指定',
   absolute_time: '時刻で指定',
 }
 
-/** 読み終えた人の補足行（板 ``：「登録した 1,756 人の 41%」）。 */
+/** 読み終えた人の補足行（板 ：「登録した 1,756 人の 41%」）。 */
 function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
   if (enrolled === 0) return '—'
@@ -136,7 +136,7 @@ export default function ScenariosListV8() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const router = useRouter()
-  // 1152 の板（``）。板IDと道具の段の並びだけを切り替える。
+  // 1152 の板（）。板IDと道具の段の並びだけを切り替える。
   const narrow = useNarrowViewport()
 
   /*
@@ -179,7 +179,7 @@ export default function ScenariosListV8() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  /* 複製の窓（★V8 ``）。 */
+  /* 複製の窓（★V8 ）。 */
   const duplicateLock = useRef(false)
   const [duplicating, setDuplicating] = useState(false)
   const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
@@ -297,7 +297,7 @@ export default function ScenariosListV8() {
     return res.data
   }, [accountLoading, activeParam, createdThisMonthOnly, folderFilter, selectedAccountId, serverQuery])
 
-  /* 板 ``：右端は「20件表示」。 */
+  /* 板 ：右端は「20件表示」。 */
   const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const scenarioList = useOffsetServerList<ScenarioRow>({
     requestKey: JSON.stringify({
@@ -550,7 +550,7 @@ export default function ScenariosListV8() {
     }
   }
 
-  /* ===== 複製（★V8 ``） ===== */
+  /* ===== 複製（★V8 ） ===== */
 
   const openDuplicate = (s: ScenarioRow) => { void runDuplicate(s)
   }
@@ -687,7 +687,7 @@ export default function ScenariosListV8() {
 
   /* ===== 数の帯（4つ） ===== */
 
-  /* 板 ``：1つ目の補足は「有効 3・停止中 2」。止めた数は合計から出す。 */
+  /* 板 ：1つ目の補足は「有効 3・停止中 2」。止めた数は合計から出す。 */
   const scenarioStopped = stats ? Math.max(0, stats.scenarios.total - stats.scenarios.active) : null
   const kpis = [
     {
@@ -844,7 +844,7 @@ export default function ScenariosListV8() {
         <DelayedSkeleton loading skeleton={loadingSkeleton} />
       </div>
     ) : scenarioList.error ? (
-      /* 板 ``「読み込めなかった」。数の帯は「—」のまま。 */
+      /* 板 「読み込めなかった」。数の帯は「—」のまま。 */
       <ListState kind="error" title="シナリオを読み込めませんでした" description="作ったシナリオは消えていません。通信を確かめて、もう一度試してください。" data-design-node="BxGhV" action={<><Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button></>} />
     ) : scenarios.length === 0 ? (
       /* 修正案 D-2（2026-10-07 採用）：空の一覧は次の一歩へ導く。 */
@@ -1113,7 +1113,7 @@ export default function ScenariosListV8() {
     </>
   )
 
-  /* 板 ``：一覧の口が 403（この役割では開けない）なら、画面ごと権限なしの板にする。 */
+  /* 板 ：一覧の口が 403（この役割では開けない）なら、画面ごと権限なしの板にする。 */
   if (scenarioList.error && isForbidden(scenarioList.error)) {
     return (
       <SaveErrorScope errors={saveErrors}><NoPermissionBoard

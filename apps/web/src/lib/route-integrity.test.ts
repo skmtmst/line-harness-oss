@@ -234,7 +234,7 @@ describe('旧ルートのリダイレクト', () => {
     expect(line).toContain('308');
   });
 
-  it('affiliates は _redirects に戻さず、画面側が ?tab= を保って /conversions へ送る', () => {
+  it('/affiliates は _redirects に戻さず、画面側が ?tab= を保って /conversions へ送る', () => {
     // Pages の _redirects はクエリを条件にできない。静的 308 で
     // /conversions?tab=affiliates へ固定すると、/affiliates?tab=offers の
     // tab が落ちる。受け皿は /affiliates の page.tsx（クライアント側で
@@ -258,7 +258,7 @@ describe('旧ルートのリダイレクト', () => {
     }
   });
 
-  it('pools はリダイレクトせず、プール管理の画面がそのまま開く (監査R127)', () => {
+  it('/pools はリダイレクトせず、プール管理の画面がそのまま開く (監査R127)', () => {
     // /pools → /accounts?tab=pools の旧リダイレクトは、統合時代の残り。
     // accounts 画面は pools の札を処理しないため、直接URL・再読み込みで
     // アカウント一覧に落ちていた。専用画面が /pools にあるので、

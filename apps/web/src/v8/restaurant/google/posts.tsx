@@ -56,7 +56,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 Googleビジネス 投稿（一覧 ``・投稿を作る ``）と公開前の確認。
+ * ★V8 Googleビジネス 投稿（一覧 ・投稿を作る ）と公開前の確認。
  * 口（一覧・状態の確認・下書きの保存・取消・削除・公開）は今の画面と同じ。
  * 端末からの画像のアップロードは、入口の page.tsx が渡す道具（mediaUpload）で行う
  * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。

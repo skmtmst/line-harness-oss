@@ -19,7 +19,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 Googleビジネス プロフィール（``）。
+ * ★V8 Googleビジネス プロフィール（）。
  * 本日の営業時間（変更・今日を休みにする・祝日の確認・早く閉める）→ 店舗情報 → Google側の変更を確認。
  * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
  * ?tab=profile&view=hours|confirm|history|edit へ移り、共通の V8 部品で出す。

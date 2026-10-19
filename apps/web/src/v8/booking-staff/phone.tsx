@@ -31,7 +31,7 @@ export function formatJpDay(date: string): string {
   return polishFormatDate(date, { style: 'day' })
 }
 
-/** LINE の予約画面の時刻は先頭の0を落とす（09:00 → 9:00。絵 ・）。 */
+/** LINE の予約画面の時刻は先頭の0を落とす（09:00 → 9:00。絵の）。 */
 export function phoneTime(time: string): string {
   return time.replace(/^0(\d:)/, '$1')
 }

@@ -73,7 +73,7 @@ import { lastContactOf,messageWord,monthDay,monthDayTime,splitTags,statusOf } fr
 
 
 /*
- * ★V8 友だち一覧（Pencil ``：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
+ * ★V8 友だち一覧（Pencil ：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
  *
  * 管理画面 の一覧（app/friends/page.tsx の FriendsPageInner）とは別の部品として持つ。
  * 呼ぶ API・送る形・保存先（sessionStorage・localStorage）は今と同じ。
@@ -753,7 +753,7 @@ export default function FriendsListV8() {
     </>
   )
 
-  // 閲覧のみは選んでできる操作が無いので、選ぶチェックの列を出さない（絵 ）。
+  // 閲覧のみは選んでできる操作が無いので、選ぶチェックの列を出さない。
   const selectable = !readOnly
   const colCount = (selectable ? 4 : 3) + displayColumns.length
   const table = (

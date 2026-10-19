@@ -42,7 +42,7 @@ describe('統括コンソール', () => {
   })
 
   it('各アカウントの設定から既存編集モーダルを開き、保存後に一覧を再読込する', () => {
-    // 板 ``：カードの「設定」は設定の窓を開き、「詳しい数値を見る」から
+    // 板 ：カードの「設定」は設定の窓を開き、「詳しい数値を見る」から
     // 既存編集モーダルへ進む。保存後の再読込は変えない。
     expect(page).toContain('AccountSettingsDialog')
     expect(page).toContain('setSettingsAccount(account)')

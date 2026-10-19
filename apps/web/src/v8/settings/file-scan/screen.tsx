@@ -26,7 +26,7 @@ import { FILE_SCAN_PAGE_SIZE,useFileScan } from './use-file-scan'
 
 
 /*
- * ★V8 ファイルの検査（Pencil ``、状態は ``）。
+ * ★V8 ファイルの検査（Pencil 、状態は ）。
  *
  * 動き（権限・一覧・札の絞り込み・探す・ページ送り・使えるように戻す・消す・外の検査の設定）は
  * 今までの V8（app/settings/file-scan/file-scan-v8.tsx）と同じ。処理は同じ場所の use-file-scan.ts（写し）。

@@ -56,7 +56,7 @@ export function Tabs({
   label?: string
   /**
    * 段の詰め方。省くと今までどおり（v8 は文字20＋下12）。
-   * 'compact' は文字の行を詰めた段（E-1 hKRRF の店のタブ：高さ 30.5）。管理画面 では効かない。
+   * 'compact' は文字の行を詰めた段（E-1 hKRRF の店のタブ：高さ 30.5）。互換経路では効かない。
    */
   size?: 'compact' | 'settings' | 'short' | 'notification'
   /** 'settings' は設定の板のタブ間・下余白。指定した板だけに適用する。 */

@@ -11,7 +11,7 @@ vi.mock('@/lib/api', async (original) => ({ ...await original<typeof import('@/l
 import type { WebinarAnalytics } from '@/lib/api'
 
 /*
- * ウェビナー分析の数の帯と棒（V8-B ``）の契約。
+ * ウェビナー分析の数の帯と棒（V8-B ）の契約。
  * 数は集計の口の実データで、段ごとの減りといちばん減っている段が出る。
  */
 

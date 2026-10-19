@@ -26,7 +26,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
 
 /**
- * ナレッジの記事 V8（絵 ``）。一覧の「開く」から出す。
+ * ナレッジの記事 V8。一覧の「開く」から出す。
  *
  * 動きは 管理画面（components/ops/knowledge-editor の全画面）と同じ：
  * - 承認待ち・要確認：見送る・下書きを保存・保存して承認（承認の前に「記事を承認する前に」で確かめる）

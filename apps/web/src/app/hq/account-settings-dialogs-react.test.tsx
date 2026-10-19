@@ -13,7 +13,7 @@ import { AccountArchiveDialogV8 as AccountArchiveDialog, AccountRestoreDialogV8 
 import type { AccountWithStats } from '@/contexts/account-context'
 
 /*
- * ★V8-B 統括のアカウントの3つの窓（板 ``・``・``）の契約。
+ * ★V8-B 統括のアカウントの3つの窓（板 ・・）の契約。
  * 設定・保存・復帰の窓が出て、理由と6桁コードで口へ送ることを固定する。
  */
 const account = {

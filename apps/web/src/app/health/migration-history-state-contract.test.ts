@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
-describe('health のUID移行履歴状態契約', () => {
+describe('/health のUID移行履歴状態契約', () => {
   it('成功0件だけを「移行履歴はありません」と表示する', () => {
     expect(PAGE).toContain("type MigrationLoadState = 'loading' | 'ready' | 'error'")
     expect(PAGE).toContain("setMigrationLoadState('ready')")

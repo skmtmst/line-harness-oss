@@ -28,7 +28,7 @@ import Notice from '@/components/shared/notice'
 import AggregationStatus from '@/components/shared/aggregation-status'
 
 /*
- * ★V8 分析「ファネル」（Pencil ``）。
+ * ★V8 分析「ファネル」（Pencil ）。
  * 数の帯 → 選ぶ段（ファネル・何日以内・比較する条件・作る・読み直す）→ 左に全体の流れ、
  * 右に選んだ段（到達・止まった・進行中 → 対象者を開く／この対象者へ配信を作成）と比較 → 注。
  * その下に、定義の操作（期間・再集計・編集・停止・保管）・結果の保存・停止中のファネル。

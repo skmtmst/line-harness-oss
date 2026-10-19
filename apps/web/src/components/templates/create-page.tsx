@@ -25,7 +25,7 @@ export interface CreatePageProps extends PageHeadingProps {
   previewTitle?: string
   /** 狭い板でプレビューを開くボタン・パネルは画面が持つ。 */
   previewToggle?: ReactNode
-  /** ★V8：狭い板（白い板 1100 未満）で右の列の余白を 16 に詰める（絵 ）。渡さなければ今までどおり 24。 */
+  /** ★V8：狭い板（白い板 1100 未満）で右の列の余白を 16 に詰める。渡さなければ今までどおり 24。 */
   previewCompactWhenNarrow?: boolean
   /** 白い板が1100未満のとき右欄を畳む。見本は既存のボタンで開く。 */
   hidePreviewWhenNarrow?: boolean

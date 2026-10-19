@@ -131,7 +131,7 @@
   padding: var(--tpl-bm-24);
 }
 
-/* 予約経路の連携（絵 ）は右の列が無い全幅。帯が頭の線のすぐ下から始まり、左右は 24。 */
+/* 予約経路の連携は右の列が無い全幅。帯が頭の線のすぐ下から始まり、左右は 24。 */
 .mainChannels {
   padding: 0 var(--tpl-bm-24) var(--tpl-bm-24);
 }
@@ -909,7 +909,7 @@
   box-shadow: var(--shadow-row-line);
 }
 
-/* 行の中の文字ボタンは全体のボタンの最低の高さ（32）を受けない（絵  の行は 17 の文字1行）。 */
+/* 行の中の文字ボタンは全体のボタンの最低の高さ（32）を受けない（行は 17 の文字1行）。 */
 .exceptionRow > button {
   min-height: var(--tpl-bm-17);
   line-height: var(--tpl-bm-17);
@@ -1257,7 +1257,7 @@
   font-weight: 600;
 }
 
-/* 行：63。中身の高さ32の中心が行の上から37（絵 ）なので上21・下9。線は行の下。字14。 */
+/* 行：63。中身の高さ32の中心が行の上から37なので上21・下9。線は行の下。字14。 */
 .equipRow {
   display: flex;
   flex-wrap: wrap;
@@ -1700,7 +1700,7 @@
   line-height: var(--tpl-bm-13);
 }
 
-/* 休み＝地も数字も薄く。満＝地は白のまま、札だけ薄く（絵 ）。 */
+/* 休み＝地も数字も薄く。満＝地は白のまま、札だけ薄く。 */
 .phoneDayOff .phoneDayState,
 .phoneDayFull .phoneDayState {
   color: var(--v8-liff-idle);

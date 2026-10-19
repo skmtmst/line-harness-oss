@@ -133,7 +133,7 @@ export function FriendsListHeadV8({
 }: {
   onExportCurrentPage?: (() => void) | null
 }) {
-  /* 板 ``：閲覧のみは「取り込む」を押せない形にする（隠さない）。
+  /* 板 ：閲覧のみは「取り込む」を押せない形にする（隠さない）。
      役割が読めるまでは今までどおり出す（このファイルの CSV と同じ守り）。 */
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)

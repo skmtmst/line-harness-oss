@@ -73,8 +73,8 @@ import type { FriendDetail } from '@/lib/api'
 
 /*
  * ★V8 リマインダの一覧（Pencil「★V8 画面の地図」のリマインダの行：
- * 一覧 ``、行の「…」は ``、一時停止は ``、削除は ``、
- * 状態の板は ``）。
+ * 一覧 、行の「…」は 、一時停止は 、削除は 、
+ * 状態の板は ）。
  *
  * 管理画面 の一覧（app/reminders/page.tsx 内の RemindersPageV7）とは別の部品
  * として持つ。データの口（取得・絞り込み・並び・ページ送り）は同じ。
@@ -96,7 +96,7 @@ const SORT_OPTIONS = [
   { value: 'name', label: '名前順' },
 ]
 const STATUS_CHIPS = ['有効', '下書き', '停止中', '失敗あり'] as const
-/* 板 ``：札には状態の図柄を付ける（有効=丸チェック・下書き=鉛筆・停止中=一時停止・失敗あり=三角注意）。 */
+/* 板 ：札には状態の図柄を付ける（有効=丸チェック・下書き=鉛筆・停止中=一時停止・失敗あり=三角注意）。 */
 const STATUS_CHIP_ICONS = {
   '有効': <CircleCheck size={14} aria-hidden="true" />,
   '下書き': <FilePen size={14} aria-hidden="true" />,
@@ -147,7 +147,7 @@ const BASE_LABELS: Record<string, string> = {
 
 /** 行ごとに作ると件数分だけ重いため、外で1回作って使い回す。 */
 function rowView(reminder: ReminderRow) {
-  // 板 ``：副題は「基準日・1日前 18:00・テキスト1通」の形で「・」でつなぐ。
+  // 板 ：副題は「基準日・1日前 18:00・テキスト1通」の形で「・」でつなぐ。
   const timing = reminder.timingSummary
     ? reminder.timingSummary.replace(' ／ テキスト ', '・テキスト')
     : `${formatTriggerOffset(reminder.triggerOffsetMinutes)}${reminder.sendAtTime ? ` ${reminder.sendAtTime}` : ''}・テキスト${reminder.stepCount ?? 0}通`
@@ -174,7 +174,7 @@ export default function RemindersListV8() {
   const role = useStaffRole()
   const canEdit = useFeatureAccess('reminders')
   const readonlyReason = 'この操作にはオーナーか管理者の権限が要ります'
-  // 1152の板（``）。折り畳みはCSSのコンテナ問い合わせが担い、
+  // 1152の板（）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
 
@@ -332,7 +332,7 @@ export default function RemindersListV8() {
 
   /*
    * 1件の「一時停止／再開」は押した瞬間に描き換え、裏で保存する
-   * （・決まり3）。失敗したら元に戻して知らせる。一時停止の窓（``）は残し、確定で即反映する。
+   * （・決まり3）。失敗したら元に戻して知らせる。一時停止の窓（）は残し、確定で即反映する。
    */
   const runToggle = (row: ReminderRow, next: boolean) => {
     setActionError('')
@@ -680,7 +680,7 @@ export default function RemindersListV8() {
     },
   ]
 
-  /* ===== 行の「…」の中身（★V8 ``） ===== */
+  /* ===== 行の「…」の中身（★V8 ） ===== */
 
   /** 一覧の行→詳細はつながる移り変わりで開く。 */
   const goDetail = (href: string) => {
@@ -805,7 +805,7 @@ export default function RemindersListV8() {
     </>
   )
 
-  /* 板 ``「読み込み中」：見出しなしの骨4行。 */
+  /* 板 「読み込み中」：見出しなしの骨4行。 */
   const loadingSkeleton = (
     <div className={styles.skeletonRows} aria-label="読み込み中">
       {[0, 1, 2, 3].map((n) => (

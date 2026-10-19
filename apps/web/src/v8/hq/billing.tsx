@@ -3,7 +3,7 @@
 import { PageContent } from '@/components/templates/page-frame'
 
 /*
- * ★V8 統括の請求（Pencil ``）。
+ * ★V8 統括の請求（Pencil ）。
  *
  * 管理画面 の画面（app/hq/billing/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
@@ -86,7 +86,7 @@ function invoiceDate(iso: string): string {
 }
 
 function BillingInner() {
-  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/`）。
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」。
   usePageTitle('請求')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const settingsNav = useHqSettingsFolderNav('billing')

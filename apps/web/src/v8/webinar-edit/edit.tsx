@@ -323,7 +323,7 @@ function EditInner() {
   const stepPane: StepKey = (STEP_KEYS.includes(pane) ? pane : 'basic') as StepKey
   const stateOf = (key: StepKey) => {
     const state = stepStateOf(key, stepPane, webinar, ctaCount)
-    /* 通知は、後ろの段（確認）にいるときは通った印にする（絵 ）。 */
+    /* 通知は、後ろの段（確認）にいるときは通った印にする。 */
     if (state === 'todo' && key === 'notifications' && stepPane === 'review') return 'done' as const
     return state
   }

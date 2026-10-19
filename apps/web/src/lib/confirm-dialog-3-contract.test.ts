@@ -76,10 +76,10 @@ describe('リッチメニュー編集の確認窓', () => {
   const detail = read('v8', 'rich-menu-edit', 'detail.tsx')
 
   it('ページ削除は窓を開くだけで、消せない理由があるときは押し口を出さない', () => {
-    const ask = implementationBody('app/rich-menus/new/create-tab-actions.tsx', 'requestMenuTabCount')
+    const ask = implementationBody('v8/rich-menus/new/create-tab-actions.tsx', 'requestMenuTabCount')
     expect(ask).toContain('setPendingTabCount(next)')
     expect(ask).toContain('removed.some(pageHasSettings)')
-    const remove = implementationBody('app/rich-menus/new/create-tab-actions.tsx', 'applyMenuTabCount')
+    const remove = implementationBody('v8/rich-menus/new/create-tab-actions.tsx', 'applyMenuTabCount')
     expect(remove).toContain('removePageBlockers(pages.slice(count), remaining).length > 0) return')
     const dialog = confirmDialogWith(src, 'blockers.length > 0')
     expect(dialog).toContain('onConfirm={blockers.length === 0 && next !== null')
@@ -91,12 +91,12 @@ describe('リッチメニュー編集の確認窓', () => {
   it('ページ削除の理由は窓の中に出す（alert に戻していない）', () => {
     const blockers = fnBody(code(src), 'function removePageBlockers')
     expect(blockers, 'alert へ戻っている').not.toContain('alert(')
-    expect(implementationBody('app/rich-menus/new/create-tab-actions.tsx', 'applyMenuTabCount')).toContain('const count = next + 1')
+    expect(implementationBody('v8/rich-menus/new/create-tab-actions.tsx', 'applyMenuTabCount')).toContain('const count = next + 1')
     expect(blockers, 'タブ切替の参照を見ていない').toContain('richmenuswitch')
   })
 
   it('LINE登録は二度押しを止め、失敗を握りつぶさない', () => {
-    const body = implementationBody('app/rich-menus/new/create-publish-actions.tsx', 'publishMenuNow')
+    const body = implementationBody('v8/rich-menus/new/create-publish-actions.tsx', 'publishMenuNow')
     expect(body, '二度押しを止めていない').toContain(
       'if (!group || publishing || saving) return',
     )

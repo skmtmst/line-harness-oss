@@ -122,7 +122,7 @@
 
 :root .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
 :root .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
-/* 切り替え（SegmentedControl）の項目は器の地で区切る。1つずつ枠で囲まない（絵  の期間）。 */
+/* 切り替え（SegmentedControl）の項目は器の地で区切る。1つずつ枠で囲まない（期間）。 */
 :root .trailing [data-appearance] > button:not(:focus-visible) { outline: 0; }
   /*
    * ★V8「道具の1段」（c4n9Kr）：探す欄は幅 280px・縮まない
@@ -194,7 +194,7 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
 .filterNarrow { display: none; }
 
 
-/* /205：札とほかの道具が入りきらない時だけ、共通の実寸判定で畳む。 */
+/* ：札とほかの道具が入りきらない時だけ、共通の実寸判定で畳む。 */
 .toolbar, .slots { container-type: inline-size; container-name: v8-list-toolbar; }
 .filterChoices[data-filter-collapsed] .filterWide { display: none; }
 .filterChoices[data-filter-collapsed] .filterNarrow { display: flex; }
@@ -309,7 +309,7 @@ html:root .leading[data-toolbar-persistent] { display: inline-flex; align-items:
 html:root .leading > :is(button, a) { width: max-content; flex: none; }
 
 /*
- * 設定の板の本文の中の道具の段は、上の知らせ・下の表と左端をそろえる（絵 ・。
+ * 設定の板の本文の中の道具の段は、上の知らせ・下の表と左端をそろえる（絵の。
  * 2026-10-15 判定役：約16px 右へずれていた）。本文の段が左右の余白を持つので、部品は二重に持たない。
  */
 :root :global([data-page-template='settings'] [data-template-region='content']) .toolbar { padding-inline: 0; }

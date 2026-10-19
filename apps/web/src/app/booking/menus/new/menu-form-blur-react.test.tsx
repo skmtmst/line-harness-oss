@@ -4,7 +4,7 @@ import type { StaffMember } from '@line-crm/shared'
 /*
  * 予約メニューの作成・編集（V8）の「その場で確かめる入力」。
  * 名前・かかる時間・後の空き時間の欄を離れたとき（blur）に直し方を
- * 欄の下へ出す。文は保存時と同じ。管理画面 は触らない。
+ * 欄の下へ出す。文は保存時と同じ。互換経路は触らない。
  */
 import React from 'react'
 import { act } from 'react'

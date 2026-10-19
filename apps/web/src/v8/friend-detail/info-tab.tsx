@@ -36,7 +36,7 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
   value: string
   onChange: (v: string) => void
   disabled: boolean
-  /** ほかの値から計算した値（年齢＝生年月日から）。灰色の読むだけの欄で見せる（絵 ）。 */
+  /** ほかの値から計算した値（年齢＝生年月日から）。灰色の読むだけの欄で見せる。 */
   computed?: boolean
   id: string
 }) {
@@ -60,7 +60,7 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
     const ymd = field.type === 'date' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null
     // 日付はほかの日付の欄と同じ「2026年9月15日（火）」の書き方で見せる。
     const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : ymd ? formatDateLabel(new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))) : (value || emptyValue('unconfigured'))
-    // EC が正本の値は、年齢と同じ灰色の読むだけの欄にする（絵 ）。
+    // EC が正本の値は、年齢と同じ灰色の読むだけの欄にする。
     return <SaveErrorField names={["shown"]}><TextField id={id} value={shown} readOnly disabled={!!field.ecIsMaster} aria-readonly="true" aria-label={`${field.name}の値`} title={shown} /></SaveErrorField>
   }
   if (field.type === 'select') {

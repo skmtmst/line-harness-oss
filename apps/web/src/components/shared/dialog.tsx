@@ -21,7 +21,7 @@ export type DialogProps = {
   size?: 'small' | 'medium' | 'large' | 'wide'
   /**
    * ★V8：480・560・720・960の4段。旧指定は共通部品で段へそろえる。
-   * 渡さなければ size の幅のまま。管理画面 では効かない。
+   * 渡さなければ size の幅のまま。互換経路では効かない。
    */
   /** 頭・説明・本文・操作を同じ余白で積む小窓（ 等）。 */
   designLayout?: 'stacked'
@@ -30,19 +30,19 @@ export type DialogProps = {
   designWidth?: number
   /** の共通選択窓だけ640pxの幅を使う。 */
   widthPreset?: 'picker'
-  /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。管理画面 では効かない。 */
+  /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。互換経路では効かない。 */
   designTop?: number
   /** 指定した上位置を含めて窓を画面内に収め、本文だけをスクロールする。 */
   fitViewport?: boolean
   /**
    * ★V8：絵の窓の頭（題と×の行）の余白。CSS の padding と同じ書き方（例 `'20px 20px 0'`）。
    * 小窓だけの絵（・・ など）は頭が今の共通の値（上20・左右24・下8）より
-   * 詰まっているので、絵の値を画面から渡す。渡さなければ今までどおり。管理画面 では効かない。
+   * 詰まっているので、絵の値を画面から渡す。渡さなければ今までどおり。互換経路では効かない。
    * 読み方：~/lh-work/design/v8/html/<板>.html の窓（角丸16px の箱）の padding が上と左右、
    * 窓の gap が頭と次の段の間。
    */
   designHeaderPadding?: string
-  /** ★V8：絵の窓の頭の高さ（px）。渡すと頭の行をこの高さに固定する。渡さなければ中身なり。管理画面 では効かない。 */
+  /** ★V8：絵の窓の頭の高さ（px）。渡すと頭の行をこの高さに固定する。渡さなければ中身なり。互換経路では効かない。 */
   designHeaderHeight?: number
   /** 頭の×の左に置く操作（選ぶ窓の「＋タグを作る」など）。 */
   headerAction?: ReactNode
@@ -122,7 +122,7 @@ export type DialogProps = {
    * `'cancel'` を渡す。×と背景は取消と同じ動きのまま変えない。
    */
   primaryAction?: 'confirm' | 'cancel'
-  /** ★V8：下のボタンの並び。省くと今までどおり右寄せ。'center' は中央（E-3 ウォークイン ）。管理画面 では効かない。 */
+  /** ★V8：下のボタンの並び。省くと今までどおり右寄せ。'center' は中央（E-3 ウォークイン ）。互換経路では効かない。 */
   footerAlign?: 'center' | 'start'
   /** 絵で操作の間隔が指定されている窓だけに使う。 */
   designFooterGap?: number

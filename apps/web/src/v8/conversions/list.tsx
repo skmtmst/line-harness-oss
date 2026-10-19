@@ -68,11 +68,11 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 コンバージョンの一覧（Pencil：一覧 ``・1152 ``・閲覧のみ ``・
- * 状態の見本帳 ``）。
+ * ★V8 コンバージョンの一覧（Pencil：一覧 ・1152 ・閲覧のみ ・
+ * 状態の見本帳 ）。
  *
  * 型（ListPage）に、数の帯・左のフォルダの列（上に「成果地点を作る」）・
- * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「…」（使う場所を足す操作も中に残す）。
+ * 案内の帯・道具の段・表（列の並び）を渡す。行の右端は「…」（使う場所を足す操作も中に残す）。
  * 行はURLに残る右の詳細パネル、「止める」は3択と理由を持つ確認画面。
  *
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
@@ -98,7 +98,7 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
   name: 'name_asc',
 }
 
-/* 状態の札（絵  の並び）。件数は口の stateCounts。 */
+/* 状態の札（並び）。件数は口の stateCounts。 */
 const CHIPS: Array<{ value: ConversionDefinitionFilter; label: string; icon: ReactNode }> = [
   { value: 'active', label: '有効', icon: <Play size={13} aria-hidden="true" /> },
   { value: 'stopped', label: '停止中', icon: <Pause size={13} aria-hidden="true" /> },

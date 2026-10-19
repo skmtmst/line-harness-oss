@@ -29,7 +29,7 @@ import { useEffect, useState } from 'react'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   /*
-   * LINEアカウントを登録（/accounts/new）。管理画面 は外枠の無い専用の全画面。
+   * LINEアカウントを登録（/accounts/new）。互換経路は外枠の無い専用の全画面。
    * ★V8 は絵（〜）どおり、ほかの画面と同じ外枠（左メニュー・上の帯）で出す（2026-10-07 司令塔）。
    */
 
@@ -173,7 +173,7 @@ export function Workspace({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   /*
    * ★V8（夕41）：設定の画面は、白い板の中の左に「設定の中のメニュー」
-   * （幅208）を付ける。管理画面 では部品も枠組みも出さない（1画素も変えない）。
+   * （幅208）を付ける。互換経路では部品も枠組みも出さない（1画素も変えない）。
    * SSR・最初の描画は 管理画面 の形で、レイアウト効果の中で v8 に揃える。
    */
 

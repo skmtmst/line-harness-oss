@@ -44,7 +44,7 @@ import TextLink from '@/components/shared/text-link'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 Googleビジネス 口コミ（一覧 ``・返信を作る ``・公開の確認 `xSudF`）。
+ * ★V8 Googleビジネス 口コミ（一覧 ・返信を作る ・公開の確認 `xSudF`）。
  * 口（一覧・絞り込み・並び・同期・下書き作成・保存・公開）は今の画面と同じ。
  */
 

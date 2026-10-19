@@ -40,7 +40,7 @@
 
 /*
  * ★V8 仕上げ（M10）：行に乗せたときの薄い背景の変化は 120ms。
- * 管理画面 は今までどおり即時に変わる。
+ * 互換経路は今までどおり即時に変わる。
  */
 :root .rowInteractive {
   transition: background-color var(--motion-fast) var(--motion-ease-out);

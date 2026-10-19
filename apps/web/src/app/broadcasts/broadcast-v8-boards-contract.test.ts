@@ -7,8 +7,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (relative: string) => readFileSync(join(HERE, relative), 'utf8')
 
 /*
- * V8 再撮の9板（`EML2F` `` `rfdmA` `` `` `` ``
- * `` ``）。画面はどれも作り済みなので、同じ画面の外枠か
+ * V8 再撮の9板（`EML2F`  `rfdmA`
+ *  ）。画面はどれも作り済みなので、同じ画面の外枠か
  * 該当の場所に `data-design-node` を付けるだけ——付けないと進み具合に
  * 数えられない。管理画面・見せ方・API は何も変えない。
  */

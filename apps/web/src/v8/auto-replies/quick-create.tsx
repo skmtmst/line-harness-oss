@@ -17,7 +17,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 自動応答 かんたんに作る（板 ``、小窓 560）。
+ * ★V8 自動応答 かんたんに作る（板 、小窓 560）。
  *
  * 言葉（どれか1つを含む）と返す文だけ聞いて、その場で有効にする。
  * 重なりは作った下書きで確かめ、あるときは相手の名前を帯に出してから

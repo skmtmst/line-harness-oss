@@ -39,7 +39,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers() })
 
 /*
- * ★V8-B メニュー管理（板 ``）の契約。
+ * ★V8-B メニュー管理（板 ）の契約。
  * 数5・決まりの帯・一覧の表（行末は「…」・アーカイブだけ再開）が出て、
  * 操作が今の口へ届くことを固定する。
  */

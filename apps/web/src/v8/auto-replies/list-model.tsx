@@ -7,8 +7,8 @@ import { actionShortWord } from './words'
 
 /*
  * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
- * 一覧 ``、行の「…」は ``、止めるは ``、削除は ``、
- * 状態の板は ``）。
+ * 一覧 、行の「…」は 、止めるは 、削除は 、
+ * 状態の板は ）。
  *
  * 管理画面 の一覧（app/auto-replies/page.tsx 内の AutoRepliesPageV7）とは
  * 別の部品として持つ。データの口は同じ。違いは置き場と見せ方だけ——

@@ -26,7 +26,7 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
 ])
 
 /**
- * 運営コンソールのログイン V8（絵 ``）。
+ * 運営コンソールのログイン V8。
  *
  * 動きは 管理画面（app/ops/login）と同じ：メール＋パスワードが主、LINE が副。
  * 入れた後に /api/auth/session で運営メンバーかを確かめてから /ops へ進む。

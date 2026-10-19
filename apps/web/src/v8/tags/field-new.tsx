@@ -17,7 +17,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8「友だち情報欄を作る」（Pencil ``）の入口。
+ * ★V8「友だち情報欄を作る」（Pencil ）の入口。
  *
  * 読み込み・重複確認・冪等キー・保存の動きは今の入口（src/v8/tags/field-new.tsx）と同じ。
  * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/new`・`?back=<戻り先>`。

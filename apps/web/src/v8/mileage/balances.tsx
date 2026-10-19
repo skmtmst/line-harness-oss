@@ -48,7 +48,7 @@ import { formatMileageDate } from './display'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 マイル「友だちの残高」（板 ``、状態は見本帳 ``）。
+ * ★V8 マイル「友だちの残高」（板 、状態は見本帳 ）。
  *
  * app/mileage/v8-balances-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
  * フォルダの列は無い（絵どおり）。表は「友だち・ランク・いまの残高・今月の増減・

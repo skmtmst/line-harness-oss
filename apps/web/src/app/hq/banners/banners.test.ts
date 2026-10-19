@@ -172,7 +172,7 @@ describe('統括 バナー生成', () => {
 
   it('参照画像を選ぶ（★BG-C `cOgWE`）: 複数選択して使い方つきで返す', () => {
     const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
-    // 板IDは承認時に ★V8 `` から ★BG-C `cOgWE` へ改名した（同じダイアログ）
+    // 板IDは承認時に ★V8  から ★BG-C `cOgWE` へ改名した（同じダイアログ）
     expect(picker).toContain('designNode="cOgWE"')
     // 複数選択・選択順・使い方の受渡しはreference-picker-v8.test.tsxが実DOMで検証する。
     expect(picker).toContain('data-design-node="JOi8G"')

@@ -11,7 +11,7 @@ import liff from '../lib/liff-runtime.js';
 import { PREFECTURES, collectInputs, isOtherFreeText, formChoiceIsSelected, nextSectionIndex, normalizeBookingValue, normalizeFormTheme, normalizeRatingValue, validateAnswer, type FormAvailability, type FormBlock, type FormBookingValue, type FormInputBlock, type FormLayout } from '@line-crm/shared';
 import { submitButtonText } from '../lib/form-button-text.js';
 import { api, type MenuItem, type PublicForm, type RoutedTarget, type StaffItem } from '../lib/api.js';
-import Stepper from '../components/ui/stepper/index.js';
+import Stepper from '../components/ui/Stepper.js';
 import { NoRoutedSlots, RoutedBanner, RoutedConfirm } from '../components/routed-booking.js';
 import { addDays, formatWeekday, slotStartsAtIso, formatJstEventAt, jstToday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import { conflictMessage, decideFormSubmitStep, FORM_SUBMIT_INCOMPLETE_MESSAGE } from '../lib/form-submit-flow.js';
@@ -114,7 +114,7 @@ export default function Form() {
    */
   const testToken = search.get('test_token');
 
-  // 414 幅の板（``）は板 ID だけを替える。中身は同じ。
+  // 414 幅の板（）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
   const [form, setForm] = useState<PublicForm | null>(null);
   const [answers, setAnswers] = useState<Answers>({});

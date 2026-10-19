@@ -40,7 +40,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import FriendMatchRow from '@/components/shared/friend-match-row'
 
 /*
- * ★V8 電話の予約を入れる（板 ``）。作る型（CreatePage）で、左に入れる中身、右に確かめる物。
+ * ★V8 電話の予約を入れる（板 ）。作る型（CreatePage）で、左に入れる中身、右に確かめる物。
  *
  * 何を入れますか（お客さまの予約／枠だけ押さえる）→ だれの予約ですか（LINE の友だちを探す／
  * LINE 未連携の電話番号）→ いつ・何人・どの卓（空いている時間・卓・コース）→ 要望・アレルギー →

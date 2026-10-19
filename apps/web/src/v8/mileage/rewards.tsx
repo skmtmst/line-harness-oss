@@ -50,7 +50,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 マイル「使い道」（板 ``、状態は見本帳 ``）。
+ * ★V8 マイル「使い道」（板 、状態は見本帳 ）。
  *
  * app/mileage/v8-rewards-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
  * 表は「使い道・必要なマイル・交換すると渡るもの・今月交換された・状態・

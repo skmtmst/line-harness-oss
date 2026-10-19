@@ -14,7 +14,7 @@ export function bannerFailureMessage(caught: unknown, action: string): string {
   return japaneseDetailOf(caught) || describeApiFailure(caught, action, { forbidden: BANNER_FORBIDDEN })
 }
 
-/** 「9/30」。カードの「更新」に使う（絵  の「8 枚 ・ 9/30 更新」）。 */
+/** 「9/30」。カードの「更新」に使う（「8 枚 ・ 9/30 更新」）。 */
 export function monthDay(iso: string): string {
   return polishFormatDate(iso, { style: 'list-day', fallback: '—' })
 }
@@ -39,7 +39,7 @@ export function shortPresetLabel(preset: BannerPreset | null | undefined, image?
   return preset.label
 }
 
-/** プロジェクトの中の画像の札（絵  の「リッチメッセージ・1:1」「カード・3:2」）。 */
+/** プロジェクトの中の画像の札（「リッチメッセージ・1:1」「カード・3:2」）。 */
 export function tileLabel(preset: BannerPreset | null | undefined, image: Pick<BannerImage, 'generation' | 'source'>): string {
   if (image.source === 'upload') return '取り込み'
   const ratio = image.generation?.aspectRatio ?? preset?.aspectRatio ?? ''

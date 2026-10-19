@@ -59,7 +59,7 @@ const BASELINE: Record<string, number> = {
   'app/hq/banners/project/page.tsx': 6,
   'app/hq/templates/template-definition-editor.tsx': 3,
   'app/login/two-factor/setup/page.tsx': 1,
-  'app/login/two-factor/two-factor-error.ts': 1,
+  'v8/login/two-factor/two-factor-error.ts': 1,
   'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx': 1,
   'app/mileage/page.tsx': 2,
   'v8/nen-campaigns/column-intros.tsx': 1,
@@ -170,7 +170,7 @@ describe('「API error: 500」を画面に出さない', () => {
     for (const file of [
       'v8/restaurant/google/format.ts',
       'v8/friends/migrations/use-uid-migration.ts',
-      'app/accounts/use-uid-migration.ts',
+      'v8/accounts/use-uid-migration.ts',
       'v8/hq-broadcasts/create.tsx',
       'v8/hq-broadcasts/detail.tsx',
     ]) {

@@ -20,11 +20,11 @@ function src(...parts: string[]): string {
   return readFileSync(join(ROOT, ...parts), 'utf8');
 }
 
-const event = src('pages', 'Event.tsx');
-const confirm = src('pages', 'EventConfirm.tsx');
-const done = src('pages', 'EventDone.tsx');
-const bookings = src('pages', 'EventBookings.tsx');
-const offer = src('pages', 'EventWaitlistOffer.tsx');
+const event = src('pages', 'event.tsx');
+const confirm = src('pages', 'event-confirm.tsx');
+const done = src('pages', 'event-done.tsx');
+const bookings = src('pages', 'event-bookings.tsx');
+const offer = src('pages', 'event-waitlist-offer.tsx');
 const api = src('lib', 'api.ts') + src('lib', 'api-types.ts');
 const EVENT_FILES = [event, confirm, done, bookings, offer];
 

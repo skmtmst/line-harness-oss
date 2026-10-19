@@ -50,7 +50,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 /*
  * ★V8 リマインダの詳細（src/v8 に一から書いた版）。
  * 板：（概要）/ （登録者）/ （一時停止の窓）。
- * 枠は型（PageFrame）。頭の中にタブを持つ形（絵の「板の頭」）は型の頭に無いので、ここで組む。
+ * 枠は型（PageFrame）。頭の中にタブを持つ形（「板の頭」）は型の頭に無いので、ここで組む。
  * 読む口・操作は今の画面（app/reminders/detail/detail-v8.tsx）と同じ。BEHAVIOR.md に一覧がある。
  */
 

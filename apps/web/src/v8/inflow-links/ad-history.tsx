@@ -27,7 +27,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 広告への送信履歴（Pencil ``・`/inflow-links?tab=connections&view=history`）。
+ * ★V8 広告への送信履歴（Pencil ・`/inflow-links?tab=connections&view=history`）。
  *
  * 2026-10-07 src/v8 に一から書いた（今の V8 は 18%）。頭は広告連携と同じ形。
  * 本文（間14）：道具の段（探す・状態・媒体・件数）→ 表（いつ・何の成果／媒体／流入元／状態／次の予定／操作）→ 注。

@@ -32,7 +32,7 @@ describe('LIFF の決まり (sxNO5)', () => {
   });
 
   it('上の帯は ×・題・店名で、主ボタンは下の帯に固定する', () => {
-    const header = src('components', 'ui', 'LiffHeader.tsx');
+    const header = src('components', 'ui', 'liff-header.tsx');
     expect(header).toContain('aria-label="閉じる"');
     expect(header).toContain('shopName');
     // 主ボタンは高さ 48 (min-h-12)。
@@ -48,16 +48,16 @@ describe('LIFF の決まり (sxNO5)', () => {
   });
 
   it('読み込み中は骨格、失敗は「もう一度読み込む」、空きがないときは次の手', () => {
-    const loading = src('components', 'LoadingView.tsx');
+    const loading = src('components', 'loading-view.tsx');
     // ★A (オーナー決定)：明滅ではなく左から右へ流れる光。0.3秒以内なら出さない。
     expect(loading).toContain('liff-shimmer-bone');
     expect(loading).toContain('300');
     expect(loading).not.toContain('animate-pulse');
-    const error = src('components', 'LoadErrorView.tsx');
+    const error = src('components', 'load-error-view.tsx');
     expect(error).toContain('data-design-node="zz9R3"');
     expect(error).toContain('RETRY_LABEL');
     // 空きがないときは次の週・指名なしへの手を出す 。
-    const picker = src('components', 'DateTimePicker.tsx');
+    const picker = src('components', 'date-time-picker.tsx');
     expect(picker).toContain('次の週');
     expect(picker).toContain('指名なし');
   });

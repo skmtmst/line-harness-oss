@@ -10,7 +10,7 @@ export const gridFourUpClassName = 'grid grid-cols-2 gap-3 xl:grid-cols-4'
  * KpiCard を子に並べるだけで、v8 では1本の帯になる（隙間0・
  * 黒7%の右線・帯の上下線だけ）。1枚ずつ KpiCard を置いて
  * いる所は、並べる div をこの部品へ置き換えるだけで帯になる
- * （並べ方 gridClassName はそのまま渡すので 管理画面 は不変）。
+ * （並べ方 gridClassName はそのまま渡すので 互換経路は不変）。
  */
 export default function KpiBand({
   children,

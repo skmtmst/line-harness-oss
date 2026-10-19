@@ -37,7 +37,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /**
- * 運営のお問い合わせ V8（絵 ``・代わりに起票 ``）。
+ * 運営のお問い合わせ V8（絵の代わりに起票 ）。
  *
  * 動きは 管理画面（app/ops/support）と同じ口：一覧（段階・優先度・並び・検索）、内容と返信、
  * AI の下書き（作る・作り直す・消す・待たずに手で書く）、下書きの保存、返信の前の確認、

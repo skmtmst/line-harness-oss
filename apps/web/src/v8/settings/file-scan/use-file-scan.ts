@@ -26,7 +26,7 @@ export function useFileScan() {
   const [items, setItems] = useState<FileScanItem[]>([])
   const [total, setTotal] = useState(0)
   const [statusFilter, setStatusFilter] = useListUrlValue('statusFilter', 'quarantined')
-  /** 板 `` の札の件数。検索語を含めた今の条件での総数。 */
+  /** 板  の札の件数。検索語を含めた今の条件での総数。 */
   const [counts, setCounts] = useState({ quarantined: 0, pending: 0, released: 0 })
   const [query, setQuery] = useListUrlValue('q', '')
   const deferredQuery = useDeferredValue(query)

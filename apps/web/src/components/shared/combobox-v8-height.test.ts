@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 /*
  * ★V8 の「探して選ぶ欄」（友だちを選ぶ欄など）は、ほかの入れる欄・選ぶ欄と同じ高さ 36（絵 w4SBbv・）。
- * 管理画面 は 40、指で触る画面は 44 のまま。
+ * 互換経路は 40、指で触る画面は 44 のまま。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'combobox.module.css'), 'utf8')
@@ -17,7 +17,7 @@ describe('探して選ぶ欄の高さ', () => {
     expect(globals).toMatch(/:root \{[^}]*--tpl-ux5-combobox-h: 36px;/)
   })
 
-  it('管理画面 の 40・指の 44 は残す', () => {
+  it('v7 の 40・指の 44 は残す', () => {
     expect(css).toMatch(/\.field \{[^}]*height: 40px;/)
     expect(css).toMatch(/@media \(pointer: coarse\) \{\s*\.field \{\s*height: 44px;/)
   })

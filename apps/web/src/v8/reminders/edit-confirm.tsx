@@ -286,7 +286,7 @@ export function DoneStageV8({
   const next7 = preview?.summary.next7Days ?? published?.plannedDeliveries ?? null
   const { boardId, ...heading } = frame
 
-  // 完了には下の帯が無い（絵 ）。型の枠と頭はそのまま使い、本文だけ真ん中のカードにする。
+  // 完了には下の帯が無い。型の枠と頭はそのまま使い、本文だけ真ん中のカードにする。
   return (
     <PageFrame kind="create" boardId={boardId}>
       <PageHeading {...heading} />

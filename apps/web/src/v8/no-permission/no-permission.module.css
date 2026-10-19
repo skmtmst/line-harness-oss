@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* 白い板いっぱいの高さにして、札を板の真ん中へ置く（絵 ）。 */
+  /* 白い板いっぱいの高さにして、札を板の真ん中へ置く。 */
   min-height: var(--tpl-hb2-np-min-h);
   margin: var(--tpl-hb2-board-bleed);
 }

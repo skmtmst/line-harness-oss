@@ -272,7 +272,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         ? chrome.footerWithDraft(<Button disabled={busy} busy={reading} onClick={() => void readLatest()}>比べてから保存</Button>)
         : chrome.footerActions}
       status={chrome.status}
-      /* 競合の帯は左右の列の上に横いっぱい（絵 ）。 */
+      /* 競合の帯は左右の列の上に横いっぱい。 */
       notice={conflict ? (
         <SaveConflictBand designNode="pvimJ"
           title={latest?.editor.updatedAt ? `ほかの人が ${polishFormatTime(new Date(latest.editor.updatedAt))} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}

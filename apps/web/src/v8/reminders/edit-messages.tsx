@@ -305,7 +305,7 @@ export function FieldInsert({ fields, onInsert }: { fields: FriendField[]; onIns
 export type TimingUnit = 'day' | 'hour' | 'min'
 
 /**
- * 「基準日の [1] [日] [前] の [18:00]」の入力行（絵 ・）。
+ * 「基準日の [1] [日] [前] の [18:00]」の入力行。
  * 日で書く通（○日前の●時）と、時間・分で書く通（1時間前など）を単位で切り替える。
  * 日 → 時間・分にすると時刻は外れ、分の数で持つ。逆は 9:00 を入れる。
  */

@@ -66,7 +66,7 @@
   color: var(--color-ink-faint);
 }
 
-/* Pencil の文字は行の高さ 1.5（--text-lh）。管理画面 は書かない（既定のまま）。 */
+/* Pencil の文字は行の高さ 1.5（--text-lh）。互換経路は書かない（既定のまま）。 */
 :root .title,
 :root .note,
 :root .time {

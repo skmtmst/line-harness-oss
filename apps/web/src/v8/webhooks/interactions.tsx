@@ -34,7 +34,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 外部連携「やり取りの記録」タブ（Pencil ``、中身は ``）。
+ * ★V8 外部連携「やり取りの記録」タブ（Pencil 、中身は ）。
  *
  * 型（ListPage）に、タブ・やり取りの帯・案内の帯・道具の段（探す・札4つ・
  * まとめてやり直す）・表・ページ送りをはめる。データの口は 管理画面 と同じ
@@ -290,7 +290,7 @@ export default function WebhooksInteractionsV8() {
   const known = loaded ? summary : null
   const bandCells: BandCell[] = [
     {
-      // 数の帯の題はタブをまたいで「直近30日 送った」にそろえる（絵 ）。期間を変えたらその日数で出す。
+      // 数の帯の題はタブをまたいで「直近30日 送った」にそろえる。期間を変えたらその日数で出す。
       key: 'sent', title: `直近${periodDays}日 送った`, icon: <History size={13} aria-hidden="true" />,
       value: known ? known.outgoing : null, unit: '回',
       detail: known ? `成功 ${formatNumber(Math.max(0, known.outgoing - known.outgoingFailed))}` : '集計を読み込めませんでした',
@@ -523,7 +523,7 @@ function payloadText(body: unknown): string {
 }
 
 /*
- * やり取りの中身の窓（絵 ``：幅680・上から110・題 18/700 と状態の札・1行の説明・
+ * やり取りの中身の窓（絵 ：幅680・上から110・題 18/700 と状態の札・1行の説明・
  * 8行の項目・送った・届いた中身・伏せている旨・下の段 技術的な記録／閉じる／送り直す）。
  * 本文は F-18 の口（伏せ字にした本文）から読む。URL・鍵は出さない。
  */

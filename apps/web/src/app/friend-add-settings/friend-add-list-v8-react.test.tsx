@@ -11,7 +11,7 @@ vi.hoisted(() => {
 import FriendAddSettingsPage from './page'
 
 /*
- * ★V8 友だち追加時の配信の一覧（Pencil ``）の契約。
+ * ★V8 友だち追加時の配信の一覧（Pencil ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
  * 見本が決めた帯・受け皿の守り（消せない・動かせない・止められない確かめ）
  */

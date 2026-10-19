@@ -36,7 +36,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8-B ``：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
+ * ★V8-B ：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
  *
  * 外側は取り込みの記録と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
  * 数の帯（自動で結びついた・候補が見つかった・結びついていない・結びついていない注文の金額）→

@@ -56,7 +56,7 @@ import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8「クーポンを作る」（絵 ）・「リサーチを作る」（絵 ）。
+ * ★V8「クーポンを作る」・「リサーチを作る」。
  *
  * 保存は今の画面（app/templates/asset-editor-v8.tsx・template-asset-editor.tsx）と
  * 同じ口（POST /api/broadcast-message-assets）・同じ形の payload。違いは置き場と
@@ -357,7 +357,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     </section>
   )
 
-  /* リサーチはお客さまが答える画面（LIFF）で見せる。回答フォームの LIFF と同じ形（絵 ・）。 */
+  /* リサーチはお客さまが答える画面（LIFF）で見せる。回答フォームの LIFF と同じ形。 */
   const researchLayout: FormLayout = {
     version: 2,
     header: [],

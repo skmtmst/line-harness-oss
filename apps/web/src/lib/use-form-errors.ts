@@ -66,7 +66,7 @@ export function focusFieldById(id: string) {
  * 欄の検証を「離れた時点で1回・直せばすぐ消える・送るとき全部」に揃える
  * （★管理画面 sTJsh §6・ 欄で知らせて移る）。
  *
- * ```tsx
+ * `tsx
  * const fields = useFormErrors
  * fields.define('name', '送信者の名前',  => name.trim ? null : '入力してください')
  * // 別のカード・タブにある欄は開き方と束を渡す
@@ -80,7 +80,7 @@ export function focusFieldById(id: string) {
  * if (fields.submit.length > 0) return  // 欄が赤くなり、1つ目の欄を開いてそこへ移る
  * // サーバーが欄の誤りを返したら:
  * fields.setServerErrors({ name: 'この名前はもう使われています' })
- * ```
+ * `
  *
  * - `define` は描画のたびに呼ぶ。チェックはその時点の値を見る関数なので、
  *   直すと描画が走り、エラーはその場で消える。

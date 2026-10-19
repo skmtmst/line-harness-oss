@@ -8,7 +8,7 @@ const CSS = readFileSync(new URL('../../../v8/rich-menus/new/create.module.css',
 const TSX = readFileSync(new URL('../../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 
 /**
- * 板 ``（リッチメニュー 作る③ 誰に出すか）「出す順番」の行の形。
+ * 板 （リッチメニュー 作る③ 誰に出すか）「出す順番」の行の形。
  * 絵の HTML の数値どおり：行の間 6、順番の数字は丸い札にせず裸の 13px
  * 太字（灰色・自分は濃い緑）、自分の行の枠は濃い緑。
  */

@@ -5,7 +5,7 @@ export interface SelectOption {
   value: string
   label: string
   disabled?: boolean
-  /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。管理画面 では出さない。 */
+  /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。互換経路では出さない。 */
   leading?: ReactNode
   /** ★V8 の開いた中身で名前の下に出す1行の説明（「押したら」YPzmo）。候補が多く間引く一覧では出さない。 */
   description?: string

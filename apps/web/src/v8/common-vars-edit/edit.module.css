@@ -55,7 +55,7 @@
 .selectBox :global(button) { width: 100%; }
 
 
-/* いまの中身・新しい中身は題の行をそろえる（絵 ）。新しい中身だけ文字数の行があるので下ぞろえにしない。 */
+/* いまの中身・新しい中身は題の行をそろえる。新しい中身だけ文字数の行があるので下ぞろえにしない。 */
 .valueRow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: var(--tpl-rule-row-gap); }
 /* 矢印は欄の高さの中央：共通の欄の題の行20＋間6だけ下げる。 */
 .valueArrow { display: inline-flex; align-items: center; height: var(--tpl-chip-h); margin-top: var(--tpl-field-control-offset); color: var(--color-ink-faint); }

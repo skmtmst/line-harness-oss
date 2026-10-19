@@ -59,7 +59,7 @@ function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | n
 function ReservedBroadcastContent() {
   /*
    * ★V8：上の帯のパンくずは「一斉配信 › 予約しました」。
-   * 管理画面 ではパンくずが描かれないので、渡しても見た目は変わらない。
+   * 互換経路ではパンくずが描かれないので、渡しても見た目は変わらない。
    */
   usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
   usePageTitle('予約しました')

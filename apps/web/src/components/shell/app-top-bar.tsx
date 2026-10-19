@@ -128,7 +128,7 @@ export function finishPageCrumbs<T extends { label: string; href?: string }>(pat
  *
  * 管理画面 の設計（Pencil `cBSCb`）が「統括」だったが、2026-10-01 のオーナー決定で
  * 「オーナー」にそろえた。「統括」は組織と統括コンソールの名前だけに使う。
- * ただし V8 の統括の画面では、名前の下に「統括」と出す（絵 `V8-B/`・オーナー 2026-10-07）。
+ * ただし V8 の統括の画面では、名前の下に「統括」と出す（絵のオーナー 2026-10-07）。
  */
 const ROLE_LABELS: Record<string, string> = {
   owner: 'オーナー',
@@ -145,7 +145,7 @@ export default function AppTopBar() {
   const [staffName, setStaffName] = useState('')
   const staffRole = useStaffRole()
   /*
-   * ★V8 外側：ベルの未読の数。取るのは v8 のときだけ（管理画面 では描かない
+   * ★V8 外側：ベルの未読の数。取るのは v8 のときだけ（互換経路では描かない
    * ので余計な要求を出さない）。取れなくても帯は壊さない。
    * 設定画面でその場で v8 へ切り替えたときにも取れるよう、テーマ
    * 変更の合図を受ける。
@@ -192,8 +192,8 @@ export default function AppTopBar() {
   useEffect(() => { setDocumentTitle(documentTitleForPath(pathname, shownTitle)) }, [pathname, shownTitle])
   const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
   /*
-   * ★V8 統括の外側（絵 `V8-B/`・オーナー 2026-10-07）：統括の画面（LINEアカウントの登録も含む）では、
-   * 切替の札に「統括」と統括名、名前の下に「統括」を出す。管理画面 は今までどおり。
+   * ★V8 統括の外側（絵のオーナー 2026-10-07）：統括の画面（LINEアカウントの登録も含む）では、
+   * 切替の札に「統括」と統括名、名前の下に「統括」を出す。互換経路は今までどおり。
    */
 
   /*
@@ -203,7 +203,7 @@ export default function AppTopBar() {
    */
   const onlyHome = pageCrumbs === null || pageCrumbs.every((crumb) => crumb.label === 'ホーム')
   const parentCrumb = onlyHome ? parentCrumbForPath(pathname) : null
-  // LINEアカウントの登録（/accounts/new）も統括の外側なので「設定」の段を足さない（絵 ）。
+  // LINEアカウントの登録（/accounts/new）も統括の外側なので「設定」の段を足さない。
   const crumbs = finishPageCrumbs(pathname, parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs, shownTitle, isHqShellPath(pathname))
   const titleHref = parentCrumb && parentCrumb.label === shownTitle ? parentCrumb.href : undefined
   const hqShell = isHqShellPath(pathname)
@@ -316,7 +316,7 @@ export default function AppTopBar() {
       hqReturn={hqReturn}
       /*
         ★V8：自分の名前・役割・ログアウトは左下の自分のメニューへ移した
-        （オーナー 2026-10-07・絵 zUg8S の zyFtB・l0VY4 を隠した）。管理画面 は今までどおり。
+        （オーナー 2026-10-07・絵 zUg8S の zyFtB・l0VY4 を隠した）。互換経路は今までどおり。
       */
       showIdentity={false}
     />

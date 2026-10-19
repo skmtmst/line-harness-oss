@@ -4,7 +4,7 @@ import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
  * ★V8 リッチメニューを作る（作る①〜④のウィザード）。
  *
  * Pencil の正本：
- *   ① 形と画像 `` / ② ボタンの動き `` / ③ 誰に出すか `` / ④ 公開 ``
+ *   ① 形と画像  / ② ボタンの動き  / ③ 誰に出すか  / ④ 公開
  *
  * 立て付け：
  * - 「次へ：ボタンの動き」で下書き（rich_menu_groups）を作る。手順②以降は
@@ -34,7 +34,7 @@ export const NEXT_LABEL: Record<Exclude<StepKey, 'publish'>, string> = {
   audience: '次へ：公開',
 }
 
-/** 統括のひな形（host）の手順の名前（絵 ・・）。複数のアカウントへ配る画面なので③④が店と違う。 */
+/** 統括のひな形（host）の手順の名前。複数のアカウントへ配る画面なので③④が店と違う。 */
 export const HQ_STEP_LABEL: Record<StepKey, string> = {
   shape: '形と画像',
   buttons: 'ボタンの動き',
@@ -83,7 +83,7 @@ export const SIZE_OPTIONS: Array<{
   label: string
   dims: string
   hint: string
-  /* 板 ``：絵の印は形の印（大＝縦長・小＝横長）。札の印にしない。 */
+  /* 板 ：絵の印は形の印（大＝縦長・小＝横長）。札の印にしない。 */
   icon: typeof RectangleVertical
 }> = [
   {

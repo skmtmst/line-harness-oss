@@ -32,7 +32,7 @@ import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/g
 import TruncatedText from '@/components/shared/truncated-text'
 
 /*
- * ★V8 統括のお問い合わせ（Pencil ``。運営の LINE を登録する窓を開いた状態が ``）。
+ * ★V8 統括のお問い合わせ（Pencil 。運営の LINE を登録する窓を開いた状態が ）。
  *
  * 管理画面 の画面（app/hq/support/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
@@ -43,7 +43,7 @@ type Attachment = { name: string; mimeType: string; data: string; size: number; 
 
 export default function HqSupportV8() {
   const saveErrors = useSaveFormErrors()
-  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/`）。
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」。
   usePageTitle('お問い合わせ')
   const settingsNav = useHqSettingsFolderNav('contact')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])

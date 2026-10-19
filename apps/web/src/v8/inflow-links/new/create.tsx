@@ -48,7 +48,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 流入リンクを作る（Pencil：作る ``・競合 ``・競合の比べ ``）。
+ * ★V8 流入リンクを作る（Pencil：作る ・競合 ・競合の比べ ）。
  *
  * 型（CreatePage）に、4つの段（どこに置くか・どのアカウントか・友だちになったとき・発行される URL）と、
  * 右の列（お客さまの進む順・スマホの見え方）、下の帯を渡す。

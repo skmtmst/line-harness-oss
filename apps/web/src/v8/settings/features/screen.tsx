@@ -26,7 +26,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 機能設定（Pencil ``・1152 ``・競合 ``・状態の見本帳 ``）。
+ * ★V8 機能設定（Pencil ・1152 ・競合 ・状態の見本帳 ）。
  *
  * 動き（読み込み・保存・競合・オフ前の影響確認・離脱の番兵・初期値に戻す・並びを変える）は
  * 今までの V8（app/settings/feature-settings-v8.tsx）と同じ。処理は同じ場所の
@@ -320,7 +320,7 @@ export default function FeatureSettingsScreen() {
   const ready = Boolean(selectedAccountId) && !loading && !loadFailed
 
   /*
-   * ★V8 ``：ほかの人が先に保存した。題の下に帯を出し、編集中身は残す。
+   * ★V8 ：ほかの人が先に保存した。題の下に帯を出し、編集中身は残す。
    * 保存は下の帯から押すので、そのままだと帯が画面の外に出る。帯が出たら板のいちばん上へ戻して見せる。
    */
   const conflictRef = useRef<HTMLDivElement>(null)

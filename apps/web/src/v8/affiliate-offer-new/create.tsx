@@ -29,7 +29,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8-B 案件を作る（絵 ・機能追加 F-23）。
+ * ★V8-B 案件を作る（絵の機能追加 F-23）。
  *
  * 型（CreatePage）に4つの段（どんな案件か・何を成果として数えるか・いくら払うか・成果を認めたときにすること）と、
  * 右の列（アフィリエイターの画面での見え方・気をつけること）、下の帯を渡す。

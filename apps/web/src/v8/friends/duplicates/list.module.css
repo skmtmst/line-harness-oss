@@ -80,9 +80,9 @@
   white-space: nowrap;
 }
 
-.pill_ok { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.pill_warn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.pill_muted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
+.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pillWarn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.pillMuted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 
 .rateHigh { color: var(--color-status-warn-deep); font-weight: 700; }
 .faint { color: var(--color-ink-disabled); }

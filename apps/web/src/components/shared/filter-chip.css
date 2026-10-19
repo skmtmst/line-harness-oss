@@ -80,7 +80,7 @@
   opacity: 0.85;
 }
 
-/* ★V8 仕上げ3回目（M10）②：切替の速さ・感じを --motion-* にそろえる（120ms）。管理画面 は今までどおり。 */
+/* ★V8 仕上げ3回目（M10）②：切替の速さ・感じを --motion-* にそろえる（120ms）。互換経路は今までどおり。 */
 :root .v6-filter-chip {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),

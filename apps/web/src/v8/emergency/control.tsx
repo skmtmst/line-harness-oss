@@ -377,7 +377,7 @@ const EmergencyControlV8 = (
     setConfirmWord('')
   }
 
-  /** 板 ``（1枚の確認窓）で止められる条件。理由・言葉・番号の1つでも欠けたら止まる。 */
+  /** 板 （1枚の確認窓）で止められる条件。理由・言葉・番号の1つでも欠けたら止まる。 */
   const stopCodeOk = stepUpMethod === 'none'
     ? true
     : stepUpMethod === 'password'

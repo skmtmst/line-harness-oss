@@ -67,8 +67,8 @@ import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/
 
 
 /*
- * ★V8 成果とアフィリエイト「アフィリエイター」（板 ``・1152 ``・
- * 閲覧のみ ``、状態は見本帳 ``、行を押すと引き出し ``）。
+ * ★V8 成果とアフィリエイト「アフィリエイター」（板 ・1152 ・
+ * 閲覧のみ 、状態は見本帳 、行を押すと引き出し ）。
  *
  * app/affiliates/v8-affiliates-tab.tsx から動きを写し、見た目を一覧の型
  * （ListPage）で組み直した。データの口・操作は今と同じ（一覧・集計・承認待ち・

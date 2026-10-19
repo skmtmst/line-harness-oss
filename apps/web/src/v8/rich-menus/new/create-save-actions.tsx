@@ -194,7 +194,7 @@ export async function saveMenuDraft({ createDraft, group, host, persistDraft, re
       return true
     } catch (e) {
       const fieldFailure = saveErrors.capture(e)
-      // ★V8 ``：ほかの人が先に保存した（409）。入力は残したまま、
+      // ★V8 ：ほかの人が先に保存した（409）。入力は残したまま、
       // 帯を出して最新を取り直す。比べる文に使う。
       if (isSaveConflict(e) && group) {
         setConflict(true)

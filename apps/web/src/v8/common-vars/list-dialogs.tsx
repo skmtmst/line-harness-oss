@@ -179,7 +179,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
           <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
             {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
-              /* 必須は欄の中の文（理由（必須…））と aria-required で伝え、下の帯を1行に保つ（絵  の帯の高さ）。 */
+              /* 必須は欄の中の文（理由（必須…））と aria-required で伝え、下の帯を1行に保つ（帯の高さ）。 */
               <span><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                 aria-required={reasonRequirement.required}
                 value={deleteReason}

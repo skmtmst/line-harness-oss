@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
- * V8 一覧の閲覧のみの帯（``）。staff（変えられない人）には
+ * V8 一覧の閲覧のみの帯（）。staff（変えられない人）には
  * 見出しの下に青い帯「閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。」
  * が出る。owner/admin には出ない。
  */

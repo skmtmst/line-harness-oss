@@ -170,5 +170,5 @@ export interface FriendMigrationJob {
   expires_at?: string | null
 }
 
-/** LINEアカウントのタグ（板 ``・``）。 */
+/** LINEアカウントのタグ（板 ・）。 */
 export type LineAccountTag = { id: string; name: string; color: string | null; displayOrder: number }

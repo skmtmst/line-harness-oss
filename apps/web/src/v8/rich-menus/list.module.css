@@ -1,5 +1,5 @@
 /*
- * ★V8 リッチメニューの一覧（Pencil ``・1152 ``・閲覧のみ ``・窓 ``）。
+ * ★V8 リッチメニューの一覧（Pencil ・1152 ・閲覧のみ ・窓 ）。
  * 枠・見出し・数の帯・フォルダの列・道具の段の余白は型（ListPage）が持つ。
  * 寸法は globals.css の `--tpl-rml-*`。
  */
@@ -97,7 +97,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵  の説明の行）。 */
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
 .nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
 .audienceMain {
   display: block;

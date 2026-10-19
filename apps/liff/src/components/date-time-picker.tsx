@@ -294,7 +294,7 @@ export default function DateTimePicker({
   onEmptyState?: (empty: boolean) => void;
 }) {
   const today = jstToday();
-  // 414 幅の板（``）は板 ID だけを替える。中身は同じ。
+  // 414 幅の板（）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
   // 予約の設定（最初の形・受付期間・カレンダーの出し方・空きの点）。
   // 読めるまで切り替えは出さない。

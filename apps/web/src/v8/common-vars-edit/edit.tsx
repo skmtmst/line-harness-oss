@@ -114,7 +114,7 @@ function EditCommonVarV8Inner() {
 
   const [impact, setImpact] = useState<CommonVarDeleteImpact | CommonVarChangeImpact | null>(null)
   const [impactState, setImpactState] = useState<ChangeImpactState>('loading')
-  /** 狭い板ではスマホの見え方を窓で見る（板 ``）。 */
+  /** 狭い板ではスマホの見え方を窓で見る（板 ）。 */
   const [previewOpen, setPreviewOpen] = useState(false)
 
   const loadImpact = useCallback(async (
@@ -218,7 +218,7 @@ function EditCommonVarV8Inner() {
   }, [load])
 
   /*
-   * 競合の帯（板 ``）。保存が409で止まったとき、入力を残したまま
+   * 競合の帯（板 ）。保存が409で止まったとき、入力を残したまま
    * いま保存されている版へ合わせ、誰がいつ保存したかを見せる。
    */
   const [conflict, setConflict] = useState<{

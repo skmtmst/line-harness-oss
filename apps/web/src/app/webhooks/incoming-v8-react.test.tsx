@@ -10,10 +10,10 @@ vi.hoisted(() => {
 import WebhooksPage from './page'
 
 /*
- * ★V8-B 外部連携のこちらで受け取る（板 ``）の契約。
+ * ★V8-B 外部連携のこちらで受け取る（板 ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい受け取るタブに切り替わり、
  * 見本が決めた受け取り口の列・設定カードが出ることを実DOMで固定する。
- * 管理画面 では従来の受け取るタブが出ることも固定する。
+ * 互換経路では従来の受け取るタブが出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),

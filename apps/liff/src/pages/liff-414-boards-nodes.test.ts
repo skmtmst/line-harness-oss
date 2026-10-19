@@ -9,7 +9,7 @@ const CONFIRM = readFileSync(new URL('../components/confirm.tsx', import.meta.ur
 const FORM = readFileSync(new URL('./form.tsx', import.meta.url), 'utf8');
 
 /*
- * 414 幅の板（``・``・``）は `data-design-node` が無いと
+ * 414 幅の板（・・）は `data-design-node` が無いと
  * 進み具合に数えられない。中身は 375 幅と同じで、板 ID だけを替える。
  * ここでは板IDの結び付けだけを見る。
  */

@@ -197,7 +197,7 @@ export function useBookingLedger() {
   /*
    * V8「サクサク感」C①：一覧（表）の行の詳細パネル。URL に ?booking=<id> を残す。
    * 行を押すとつながる移り変わり（E）で右から出て、↑↓で前・次へ。
-   * 管理画面 は今のまま（引き出し・小窓）で、1画素も変えない。
+   * 互換経路は今のまま（引き出し・小窓）で、1画素も変えない。
    */
   const [activeBookingId, setActiveBookingId] = useDetailPanelUrl('booking')
   /* 返金はオーナー・管理者だけ（B1：スタッフは請求・請求しないまで）。 */
@@ -516,7 +516,7 @@ export function useBookingLedger() {
     })()
     return () => { alive = false }
   }, [selectedAccountId, view, calendarFrom, calendarTo, candidatesStatus, menus, staffList])
-  // 人（スタッフ）ごとの毎週の休憩。1日表示の盤に「休憩」の枠として出す（絵 ）。読めなければ空き枠の失敗として示す。
+  // 人（スタッフ）ごとの毎週の休憩。1日表示の盤に「休憩」の枠として出す。読めなければ空き枠の失敗として示す。
   useEffect(() => {
     if (!selectedAccountId || view !== 'day' || staffList.length === 0) return
     let alive = true

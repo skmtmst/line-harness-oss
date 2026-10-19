@@ -245,7 +245,7 @@ export default function KpiCard({
         </p>
         {menu && !menuDescription ? <span className={styles.menu}>{menu}</span> : null}
         {badge ? (
-          <span className={[styles.badge, styles[`badge_${badgeTone}`]].filter(Boolean).join(' ')}>{badge}</span>
+          <span className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[badgeTone]].filter(Boolean).join(' ')}>{badge}</span>
         ) : null}
       </div>
 

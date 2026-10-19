@@ -11,7 +11,7 @@ vi.hoisted(() => {
 import RemindersPage from './page'
 
 /*
- * ★V8 一覧（Pencil ``）の契約。V8 だけを出す。
+ * ★V8 一覧（Pencil ）の契約。V8 だけを出す。
  * 見本が決めた文言・帯・行の操作が出ることを実DOMで固定する。
  */
 const navigation = vi.hoisted(() => ({ push: vi.fn() }))

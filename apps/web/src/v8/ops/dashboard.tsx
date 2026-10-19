@@ -31,7 +31,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
 
 /**
- * 運営ダッシュボード V8（絵 ``）。
+ * 運営ダッシュボード V8。
  *
  * 動きは 管理画面（app/ops/dashboard）と同じ口を使う：期間（今月・先月・今年）で
  * /api/ops/dashboard を読み直す。要対応の4行は契約先一覧・お問い合わせへの入口。

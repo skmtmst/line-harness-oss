@@ -12,11 +12,11 @@ vi.hoisted(() => {
 import CommonVarsPage from './page'
 
 /*
- * ★V8 共通情報の一覧（板 ``、閲覧のみ ``）の契約。
+ * ★V8 共通情報の一覧（板 、閲覧のみ ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
  * 数の帯・黄色の帯・行末の「…」が出ること、staff では閲覧のみの帯が
  * 出て作る操作が押せない形になることを実DOMで固定する。
- * 管理画面 では従来の一覧が出ることも固定する。
+ * 互換経路では従来の一覧が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),

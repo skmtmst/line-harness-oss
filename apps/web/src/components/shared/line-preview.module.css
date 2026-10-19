@@ -3,7 +3,7 @@
 /*
  * LINE プレビューの枠（Pencil ★V8 `cfVyj`）。
  *
- * 管理画面 はトーク背景色のパネルだけ。V8 は白い板の中に置かれるので、
+ * 互換経路はトーク背景色のパネルだけ。V8 は白い板の中に置かれるので、
  * 板の決まり（細い枠・radius-panel・board の薄い影）にそろえる。
  * 吹き出し・カードなど中身の改修は各画面側で別途行う。
  */
@@ -25,7 +25,7 @@
  * ★V8（夕15・cfVyj / specs/line-preview-real-phone.md）：本物のスマホ。
  * LINE アプリの画面なのでテーマトークンではなく globals.css の
  * `[data-theme="v8"]` に置いた `--v8-line-*` を読む（直値は globals に
- * だけ書き、ここでは var で読む）。管理画面 では部品がこの枠を描かない。
+ * だけ書き、ここでは var で読む）。互換経路では部品がこの枠を描かない。
  * ------------------------------------------------------------------ */
 
 .phoneRoot {
@@ -266,7 +266,7 @@
 :root .messageRow { min-width: 0; }
 :root .senderBody { flex: 0 1 auto; min-width: 0; }
 :root .bubbleRow { max-width: 100%; }
-/* 吹き出しは文の幅 186＋左右の余白 12（絵  の吹き出し 210）。 */
+/* 吹き出しは文の幅 186＋左右の余白 12（吹き出し 210）。 */
 :root .bubble { width: auto; min-height: 0; max-width: 210px; flex-shrink: 1; }
 :root .tail { display: none; }
 :root .bubbleBody { display: block; width: auto; min-height: 0; padding: 8px 12px; border-radius: var(--radius-mini) var(--radius-large) var(--radius-large) var(--radius-large); color: var(--color-ink); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }

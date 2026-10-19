@@ -427,7 +427,7 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
 /** 答えを保存する先（友だち情報の項目）。本名・表示名・メモへの保存は「詳しい設定」。 */
 function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void }) {
   const fixedKey = block.fixedField ?? (block.destinations?.realName ? undefined : fixedFieldForBlock(block))
-  // 決まった欄は変えられない。ほかの保存先と同じ欄の形で、読むだけで出す（絵 ）。
+  // 決まった欄は変えられない。ほかの保存先と同じ欄の形で、読むだけで出す。
   if (fixedKey) {
     const fixedLabel = `${FIXED_FRIEND_FIELDS.find(f => f.key === fixedKey)?.label ?? ''}（決まった欄）`
     return <div className={styles.saveTo}>

@@ -29,7 +29,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 友だち追加時の配信 作る⑤ 確認（Pencil ``）と、有効にしたあとの完了（``）。
+ * ★V8 友だち追加時の配信 作る⑤ 確認（Pencil ）と、有効にしたあとの完了（）。
  *
  * 入口は /friend-add-settings/publish?id=<設定>。管理画面（app/friend-add-settings/publish）と
  * 同じ口を同じ順に呼ぶ：設定を読む → 確認（validate）と重なり（conflicts）を読む →

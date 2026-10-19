@@ -283,7 +283,7 @@ describe('日時の欄の時刻の部分も同じ部品', () => {
     expect(within(dialog).queryByRole('button', { name: '時' })).toBeNull()
     const time = within(dialog).getByRole('combobox', { name: '時刻' }) as HTMLInputElement
     expect(time.value).toBe('10 : 00')
-    // 日付の欄（36）と並ぶので高さは field（絵 ・・ZU4Ae）。
+    // 日付の欄（36）と並ぶので高さは field（絵のZU4Ae）。
     expect((time.parentElement as HTMLElement).dataset.size).toBe('field')
     fireEvent.focus(time)
     fireEvent.change(time, { target: { value: '1430' } })

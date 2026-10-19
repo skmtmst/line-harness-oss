@@ -19,7 +19,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 マイル「マイルを手で増やす・減らす」（板 ``）。
+ * ★V8 マイル「マイルを手で増やす・減らす」（板 ）。
  * app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx から写し、直書きの style を外した。
  *
  * 口と約束（理由必須・追記だけ・再送しても二重反映しない・

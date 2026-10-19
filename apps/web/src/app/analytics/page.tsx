@@ -37,7 +37,7 @@ const FUNNEL_STEP_KIND_OPTIONS = [
 ]
 
 const ANALYTICS_V8_SLOTS: AnalyticsSlotsV8 = {
-  // ★V8 のファネルを作る・直すは src/v8 の窓（板 ``）。
+  // ★V8 のファネルを作る・直すは src/v8 の窓（板 ）。
   renderFunnelForm: ({ accountId, edit, presetConversion, onCancel, onCreated }) => <FunnelFormV8 accountId={accountId} edit={edit} presetConversion={presetConversion} onCancel={onCancel} onCreated={onCreated} />,
   renderSave: ({ accountId, sourceKind, sourceResultId, defaultName }) => <SaveAnalysisAction accountId={accountId} sourceKind={sourceKind} sourceResultId={sourceResultId} defaultName={defaultName} compact={sourceKind === 'cross'} />,
   funnelStepKindsLabel: FUNNEL_STEP_KIND_OPTIONS.map((item) => item.label).join('・'),

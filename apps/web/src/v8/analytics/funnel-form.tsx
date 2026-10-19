@@ -27,7 +27,7 @@ import EntityRemoteField, { type RemoteEntityKind } from '@/components/shared/en
 
 
 /*
- * ★V8-B 分析「ファネルを作る」（板 ``）と「ファネルを直す」（同じ形）。
+ * ★V8-B 分析「ファネルを作る」（板 ）と「ファネルを直す」（同じ形）。
  *
  * 今の作る・直すフォーム（app/analytics/page.tsx の FunnelForm）の動きを写して一から書いた。
  * 絵は「段Nの名前 ｜ 何をしたら」の2列。何をしたらは、種類と相手（成果地点・タグ・フォーム）を

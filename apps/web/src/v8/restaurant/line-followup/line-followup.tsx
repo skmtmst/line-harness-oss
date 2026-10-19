@@ -23,7 +23,7 @@ import { FlowEditor, FlowPreview, type FlowDraft } from './flow-editor'
 
 type FlowKind = { name: string; note: string; icon: ComponentType<{ size?: number; 'aria-hidden'?: boolean }> }
 
-/** 本物の flow_type ごとの名前・説明・印（絵  の行）。 */
+/** 本物の flow_type ごとの名前・説明・印（行）。 */
 const FLOW_KINDS: Record<string, FlowKind> = {
   reservation_24h: { name: '予約 24時間前', note: '前日の確かめ・変更と取り消しの案内', icon: Bell },
   reservation_2h: { name: '予約 2時間前', note: '当日のご案内', icon: Bell },

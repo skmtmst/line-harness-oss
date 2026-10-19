@@ -37,7 +37,7 @@ export function StaffEditModal({
   const saveErrors = useSaveFormErrors()
   const [form, setForm] = useState<Partial<BookingStaff>>(staff)
   const [saving, setSaving] = useState(false)
-  /* V8 のときだけボタンの内側の保存中表示へ。管理画面 は従来の文字のまま。 */
+  /* V8 のときだけボタンの内側の保存中表示へ。互換経路は従来の文字のまま。 */
   const busySave = saving
   const [err, setErr] = useState<string | null>(null)
   // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。

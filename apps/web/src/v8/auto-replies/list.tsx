@@ -63,7 +63,7 @@ import styles from './list.module.css'
 import { compareEvaluationOrder,movePriorityUpdates } from './order'
 import QuickCreateV8 from './quick-create'
 
-/* 作るボタン（板 `` の ▾）。窓は1つだけ置き、押したボタンの位置に出す。 */
+/* 作るボタン（板  の ▾）。窓は1つだけ置き、押したボタンの位置に出す。 */
 function CreateRuleButton({ full, compact, disabled, disabledTitle, menuOpen, onOpenMenu }: {
   full?: boolean
   /** 1152 の板：▾ なし・＋は印（絵どおり）。押すと同じ窓が開く。 */
@@ -98,7 +98,7 @@ export default function AutoRepliesListV8() {
   const staffRole = useStaffRole()
   const featureAccess = useFeatureAccess('autoReplies')
   const canEdit = featureAccess
-  // 1152の板（``）。折り畳みはCSSのコンテナ問い合わせが担い、
+  // 1152の板（）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
 
@@ -127,10 +127,10 @@ export default function AutoRepliesListV8() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  /* 板 ``：作るボタンは ▾ で作り方を選ぶ。 */
+  /* 板 ：作るボタンは ▾ で作り方を選ぶ。 */
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const createMenuAnchorRef = useRef<HTMLButtonElement | null>(null)
-  /* ★V8 かんたんに作る（板 ``）。詳しい分け方は  待ち。 */
+  /* ★V8 かんたんに作る（板 ）。詳しい分け方は  待ち。 */
   const [quickOpen, setQuickOpen] = useState(false)
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
   const [panelId, setPanelId] = useDetailPanelUrl('reply')
@@ -551,7 +551,7 @@ export default function AutoRepliesListV8() {
     )
   }
 
-  /* ===== 行の「…」（Pencil ``） ===== */
+  /* ===== 行の「…」（Pencil ） ===== */
   const rowMenuItems = (r: AutoReply): ActionMenuItem[] => {
     const name = displayName(r)
     const readonly = !canEdit
@@ -785,7 +785,7 @@ export default function AutoRepliesListV8() {
     </>
   )
 
-  /* 板 ``「読み込み中」：見出しなしの骨4行。 */
+  /* 板 「読み込み中」：見出しなしの骨4行。 */
   const loadingSkeleton = (
     <div className={styles.skeletonRows} aria-label="読み込み中">
       {[0, 1, 2, 3].map((n) => (

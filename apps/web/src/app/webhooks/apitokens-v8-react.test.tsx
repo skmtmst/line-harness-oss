@@ -11,10 +11,10 @@ import WebhooksPage from './page'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 
 /*
- * ★V8-B 外部連携の API 接続（板 ``）の契約。
+ * ★V8-B 外部連携の API 接続（板 ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい鍵タブに切り替わり、
  * 見本が決めた表・札・操作が出ることを実DOMで固定する。
- * 管理画面 では従来の鍵タブが出ることも固定する。
+ * 互換経路では従来の鍵タブが出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -105,7 +105,7 @@ test('v8 では ralAc の鍵の表（札・行の右端の「…」）が出る'
   expect(board?.textContent).toContain('有効')
   // 行の右端は「…」1つ。入れ替えるはその中。
   expect(board?.querySelector('button[aria-label="「予約システム連携」の操作"]')).not.toBeNull()
-  // 板 `` の作るボタンの文言（本人確認の用途名ではなく表のボタンの文言で見る）。
+  // 板  の作るボタンの文言（本人確認の用途名ではなく表のボタンの文言で見る）。
   expect(board?.textContent).toContain('鍵を発行する')
   expect(board?.textContent).toContain('外の仕組みに書き写してから閉じてください')
 })

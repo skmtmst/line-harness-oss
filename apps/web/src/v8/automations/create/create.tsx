@@ -37,7 +37,7 @@ import { useAutomationTest } from './use-automation-test'
 export { actionDraftToPayload,draftDetailToForm } from './draft-model'
 
 /*
- * ★V8-B ルールを作る（板 ``・競合 ``）。src/v8 に一から書いた画面。
+ * ★V8-B ルールを作る（板 ・競合 ）。src/v8 に一から書いた画面。
  *
  * 型（CreatePage）に、戻る・題・説明・左の段（名前・どんなときに・だれに・何をするか）、
  * 右の列（文章にすると・人数・1人で試す・気をつけること・つながる先）、
@@ -138,7 +138,7 @@ export function NewAutomationV8({
   /* R491: 公開済みで戻ったとき、元のルールへ案内するための番号。 */
   const [publishedRuleId, setPublishedRuleId] = useState<string | null>(null)
   /*
-   * 競合（板 ``）：保存しようとしたら、ほかの人が先に同じ下書きを
+   * 競合（板 ）：保存しようとしたら、ほかの人が先に同じ下書きを
    * 保存していた。自分の入力は残したまま、帯で知らせる。
    * 誰が・いつ保存したかは口が返さないため、帯の文言は相手を名指ししない。
    * 比べる窓は、自分のいまの入力と、取り直した保存済みの内容を並べる。
@@ -538,7 +538,7 @@ const { syncResumeUrl, bindAccountDraft, captureFormSnapshot, resumeBase } = use
             ? [
                 dirtySinceSave
                   ? '保存したあとに内容を変更しています'
-                  /* 読み込んだだけ（この画面でまだ保存していない）なら、下の帯に保存の知らせを出さない（絵 ）。 */
+                  /* 読み込んだだけ（この画面でまだ保存していない）なら、下の帯に保存の知らせを出さない。 */
                   : savedAt === null ? null : `下書きに保存しました（${formatClock(savedAt)}）`,
                 // AUTOMATION-03: 人数の確認の失敗は、保存の結果とは別に添える。
                 previewFailed ? '人数の確認に失敗しました。通信を確かめて、もう一度お試しください。' : null,

@@ -4,7 +4,7 @@ import type { LineAccountTag, LineAccountConnectData, FollowerImportState } from
 import type { FetchApiOptions } from '../types/transport'
 
 export const accountsMethods = {
-/** 統括のアカウントフォルダ（板 ``）。店のFolder型を共用する。 */
+/** 統括のアカウントフォルダ（板 ）。店のFolder型を共用する。 */
   lineAccountFolders: {
     list: () => fetchApi<ApiResponse<import('@line-crm/shared').LineAccountFolderList>>('/api/line-account-folders'),
     create: (input: import('@line-crm/shared').LineAccountFolderInput) => fetchApi<ApiResponse<import('@line-crm/shared').Folder>>('/api/line-account-folders', {method:'POST',body:JSON.stringify(input)}),

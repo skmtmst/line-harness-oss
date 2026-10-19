@@ -238,7 +238,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
       )
     }
     /*
-     * 板 ``：公開の前に「確かめる」（見本と面ごとの動き）と「足りないもの」を上に置く。
+     * 板 ：公開の前に「確かめる」（見本と面ごとの動き）と「足りないもの」を上に置く。
      * 面の動きは②、画像は①で決めるので、足りないときはその手順へ戻る口を出す。
      */
     const reviewSize = group?.size ?? size

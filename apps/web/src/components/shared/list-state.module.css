@@ -14,7 +14,7 @@
  *   `BDOJu` データがありません
  *   `sZE9Q` 読み込んでいます
  * どちらも 高さ132・$surface-pearl・$radius-md(10)・padding 24・gap 8・中央寄せ で、
- * 変わるのは **絵・文言だけ**。数字を変えるときは Pencil を先に直す。
+ * 変わるのは **絵の文言だけ**。数字を変えるときは Pencil を先に直す。
  *
  * 失敗（`error`）はここで描かない。★管理画面 `x63W5x` の決まりで TargetMissing の
  * error と同じ中立の見た目にするため、`list-state.tsx` から

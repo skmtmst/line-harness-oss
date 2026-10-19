@@ -66,7 +66,7 @@ function StaffTableSkeleton() {
 export default function BookingStaffPage() {
   usePageTitle('予約設定')
   const { selectedAccountId } = useAccount()
-  /* V8 のときだけ骨組み・保存中表示へ。管理画面 は従来の見た目のまま。 */
+  /* V8 のときだけ骨組み・保存中表示へ。互換経路は従来の見た目のまま。 */
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')

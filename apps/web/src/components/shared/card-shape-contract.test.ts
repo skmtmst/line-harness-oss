@@ -18,8 +18,8 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/date-time-field.module.css", ".popover", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/multi-select.module.css", ".popup", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
   ["app/mileage/earning-rules/new/v8-create-form.module.css", ".choice", "獲得方法を選ぶ入力。選択枠で区別する。"],
-  ["app/reminders/wizard-v8.module.css", ".choice", "入力欄・補助操作・選択肢。中身のカードではない。"],
-  ["app/reminders/wizard-v8.module.css", ".addStep", "入力欄・補助操作・選択肢。中身のカードではない。"],
+  ["v8/reminders/wizard.module.css", ".choice", "入力欄・補助操作・選択肢。中身のカードではない。"],
+  ["v8/reminders/wizard.module.css", ".addStep", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["components/friend-fields/tag-csv-import-dialog.module.css", ".panel", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
   ["components/friend-fields/tag-csv-import-dialog.module.css", ".summary", "取り込む件数の数の帯。影を重ねない。"],
   ["components/friend-fields/tag-csv-import-dialog.module.css", ".tableFrame", "取り込み内容の表の枠。影を重ねない。"],
@@ -65,7 +65,7 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/scenarios/results.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/settings/accounts/accounts.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/templates/question-new.module.css", ".choice", "入力欄・補助操作・選択肢。中身のカードではない。"],
-  ["app/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
+  ["v8/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-approval.tsx", "className=\"bg-warning-bg rounded-card border-hairline border p-5\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-form-model.tsx", "className=\"border-hairline mt-4 rounded-card border bg-canvas p-5\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["components/broadcasts/broadcast-form.tsx", "className=\"rounded-card border border-hairline bg-canvas p-8 text-center\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
@@ -110,7 +110,7 @@ function candidates(): Candidate[] {
 
 const all = candidates()
 
-describe('カードの角丸・枠・影', () => {
+describe('B-168 カードの角丸・枠・影', () => {
   it('カードの角丸と枠を持つ規則には共通の影がある（理由つきの非カードだけ除外）', () => {
     const permitted = new Set(EXCEPTIONS.map(([file, selector]) => key({ file, selector })))
     const missing = all.filter(candidate => !permitted.has(key(candidate)))

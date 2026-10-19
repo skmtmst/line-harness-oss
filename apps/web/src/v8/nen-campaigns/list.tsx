@@ -59,7 +59,7 @@ import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size
 
 /*
  * ★V8-B NEN配信の一覧（Pencil「★V8-B 画面の地図」専用機能の組）。
- * 自動配信 ``・コラム ``・送った履歴 ``・誕生日クーポンの決めごと（引き出し）``。
+ * 自動配信 ・コラム ・送った履歴 ・誕生日クーポンの決めごと（引き出し）。
  *
  * 取得・保存は今の入口（app/nen-campaigns/page.tsx）が持ったまま。ここは見せ方だけ。
  * 外側（見出し・タブ・数の帯・案内・道具の段）は4つのタブで同じ形にし、

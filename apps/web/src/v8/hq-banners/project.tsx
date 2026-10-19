@@ -57,8 +57,8 @@ import { bannerFailureMessage,tileLabel } from './words'
 
 
 /*
- * ★V8 バナー生成・プロジェクトの中（Pencil ``・生成中 ``・上限 ``）。
- * 窓：画像の詳細 ``・一覧から外す ``・アーカイブ ``・名前と説明を変える。
+ * ★V8 バナー生成・プロジェクトの中（Pencil ・生成中 ・上限 ）。
+ * 窓：画像の詳細 ・一覧から外す ・アーカイブ ・名前と説明を変える。
  *
  * 管理画面 の画面（app/hq/banners/project/page.tsx）と、読み書きの口・1枚ずつ作る繰り返し・
  * 戻ったら続きから動く・失敗時の扱い・`?id=` `?from=` は同じ。見た目だけを絵どおりに一から組んだ：
@@ -141,7 +141,7 @@ function ProjectInner() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   usePageTitle(project?.name ?? null)
-  // ★V8 パンくずは「ホーム › バナー生成 › プロジェクト名」（絵 `V8-B/`）。
+  // ★V8 パンくずは「ホーム › バナー生成 › プロジェクト名」。
   usePageCrumbs([{ label: 'バナー生成', href: '/hq/banners' }])
 
   const loadUsage = useCallback(async () => {

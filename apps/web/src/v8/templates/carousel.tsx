@@ -56,7 +56,7 @@ import CarouselButtons from './carousel-buttons'
 export { inlineActionsText } from './carousel-button-options'
 
 /*
- * ★V8 テンプレート「カルーセルを作る・編集」（Pencil ``）。
+ * ★V8 テンプレート「カルーセルを作る・編集」（Pencil ）。
  *
  * 外枠はテンプレートの作る画面と同じ（src/v8/template-edit/frame）。左に段「名前とフォルダ」「カード」（札で選ぶ・つまんで並べ替え）
  * 「カード N の中身」（画像・タイトル・本文・ボタン最大3つ）と案内の帯、絵に無い「押せる回数」は下に。

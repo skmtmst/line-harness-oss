@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /*
- * ★V8 共通情報 編集（板 ``）の言葉の確認。
+ * ★V8 共通情報 編集（板 ）の言葉の確認。
  * 社内メモの説明は板どおり「出ません」にそろえる。
  */
 describe('共通情報編集の言葉（AYc6O）', () => {

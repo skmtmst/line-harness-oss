@@ -55,8 +55,8 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 外部連携「こちらから送る」の一覧（Pencil ``・1152 ``・
- * 閲覧のみ ``・状態 ``）。
+ * ★V8 外部連携「こちらから送る」の一覧（Pencil ・1152 ・
+ * 閲覧のみ ・状態 ）。
  *
  * 型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「送り先を作る」）・
  * 案内の帯・道具の段・表をはめる。データの口は 管理画面 と同じ（一覧・集計・

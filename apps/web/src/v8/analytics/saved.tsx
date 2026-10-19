@@ -27,7 +27,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { ActionCell, DataTable, RowNameButton, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 /*
- * ★V8 分析「保存した分析」（Pencil ``）。
+ * ★V8 分析「保存した分析」（Pencil ）。
  * 数の帯 → 道具の段（探す・説明）→ 左に保存した分析の表、右に選んだ分析の履歴（結果を見る・CSV・内容を変える）
  * → 定期レポート（作る・止める・また送る・しまう）→ 1回だけ送った結果。
  * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。

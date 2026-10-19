@@ -39,7 +39,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 アフィリエイターを作る（板 ``、競合の絵 `` は同時編集APIが必要）。
+ * ★V8 アフィリエイターを作る（板 、競合の絵  は同時編集APIが必要）。
  *
  * app/affiliates/new-affiliate-v8.tsx から動きを写し、作る型（CreatePage）で組み直した。
  * データの口・動きは今と同じ：登録（合言葉 operationId つき）→ 追加情報の保存。追加情報だけ

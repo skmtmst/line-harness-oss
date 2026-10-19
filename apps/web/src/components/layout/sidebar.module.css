@@ -176,7 +176,7 @@
   white-space: nowrap;
 }
 
-/* V8 でメニューを畳んだときに隠す塊の印。管理画面 では何もしない。 */
+/* V8 でメニューを畳んだときに隠す塊の印。互換経路では何もしない。 */
 .collapseHide {
   display: block;
 }
@@ -378,7 +378,7 @@
   display: none;
 }
 
-/* zUg8S / Yw24X の実寸。管理画面 は既存値を保持。 */
+/* zUg8S / Yw24X の実寸。互換経路は既存値を保持。 */
 :root .item { gap: 10px; padding-inline: 10px; border-radius: var(--radius-button-primary); color: var(--color-ink-secondary); }
 :root .active { color: var(--color-ink); }
 :root .section { gap: 1px; }

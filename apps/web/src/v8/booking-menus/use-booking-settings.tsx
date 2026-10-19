@@ -19,7 +19,7 @@ import { V8TabKey, V8_TAB_KEYS, V8_TAB_NODE, previewRange } from './settings-par
 
 export function useBookingSettings(accountId: string | null) {
   usePageTitle('予約設定')
-  // 左メニューの項目そのものの画面なので、上の帯は「ホーム › 予約設定」だけ（絵 ・）。
+  // 左メニューの項目そのものの画面なので、上の帯は「ホーム › 予約設定」だけ。
   usePageCrumbs(null)
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B イベント予約の「変更の確認」（板 ``）。
+ * ★V8-B イベント予約の「変更の確認」（板 ）。
  * 現役の入力・自動の影響確認・人数付きの確認窓を通して変更する。
  */
 import React, { act } from 'react'

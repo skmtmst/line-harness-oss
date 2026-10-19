@@ -40,10 +40,10 @@ interface UnsavedLeaveDialogProps {
  * 文言と向きはここで1つに固定する（★管理画面：残る方が主の緑、離れる方は枠線、
  * 印は付けない）。画面ごとの違いは `subject` の名詞だけにする。
  *
- * ```tsx
+ * `tsx
  * const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
  * <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した共通情報" onConfirm={confirmLeave} onCancel={cancelLeave} />
- * ```
+ * `
  *
  * キャンセル・戻るリンクは素の `<a href>` のまま置く（止める役は
  * `useUnsavedGuard` が受け持つ）。`onClick`＋`router.push` にすると

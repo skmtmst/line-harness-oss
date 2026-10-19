@@ -69,7 +69,7 @@ export default function Confirm({
   const meetingMode = menu.meeting_mode === 'customer_choice' ? chosenMode
     : menu.meeting_mode === 'online' || menu.meeting_mode === 'in_person' ? menu.meeting_mode : null;
   const missingMeetingMode = (style === 'consult' || menu.meeting_mode === 'customer_choice') && !meetingMode;
-  // 414 幅の板（``）は板 ID だけを替える。中身は同じ。
+  // 414 幅の板（）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
   const deadline = menu.cancel_deadline_hours_before == null ? cancelDeadlineMinutesBefore : menu.cancel_deadline_hours_before * 60;
   const [note, setNote] = useState('');

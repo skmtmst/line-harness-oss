@@ -52,7 +52,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 成果とアフィリエイト「成果承認」（板 ``、まとめて操作は ``）。
+ * ★V8 成果とアフィリエイト「成果承認」（板 、まとめて操作は ）。
  *
  * app/affiliates/v8-approvals-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
  * 組み直した。データの口・操作は今と同じ（承認の全件読み・続きの読み込み・認める・

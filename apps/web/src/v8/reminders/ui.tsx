@@ -14,7 +14,7 @@ import styles from './edit.module.css'
 
 /*
  * ★V8 リマインダの作る・確かめる・詳細で使う小さな部品（src/v8 の決まりで、
- * 古い app/reminders/wizard-v8-ui.tsx を写して書き直した）。
+ * 古い v8/reminders/wizard-v8-ui.tsx を写して書き直した）。
  * 板： /  /  /  /  /  / 。
  */
 

@@ -48,7 +48,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 /*
- * ★V8-B Googleビジネス（板 ``）の契約。
+ * ★V8-B Googleビジネス（板 ）の契約。
  * 口コミタブの頭・数4・道具の段・表・足元の帯が出て、
  * 下書き画面への行き先が保たれることを固定する。
  */

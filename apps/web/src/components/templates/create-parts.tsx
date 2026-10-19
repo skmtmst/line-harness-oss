@@ -58,7 +58,7 @@ export function CreatePreviewNote({ children }: { children: ReactNode }) {
 
 export type StarterItem = { key: string; name: string; lines: string[]; onUse: () => void; useLabel?: string }
 
-/** 「ひな形から作る（任意）」のカード列（絵 ・）。カードの中は1行ずつ、入りきらないときだけ「…」＋title。 */
+/** 「ひな形から作る（任意）」のカード列。カードの中は1行ずつ、入りきらないときだけ「…」＋title。 */
 export function CreateStarterCards({
   title,
   description,

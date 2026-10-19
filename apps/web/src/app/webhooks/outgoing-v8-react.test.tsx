@@ -11,11 +11,11 @@ import WebhooksPage from './page'
 import type { OutgoingWebhookOverview } from '@/lib/api'
 
 /*
- * ★V8 外部連携の一覧（板 ``・状態 ``・閲覧のみ ``）の契約。
+ * ★V8 外部連携の一覧（板 ・状態 ・閲覧のみ ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい一覧（src/v8/webhooks/outgoing）に
  * 切り替わり、見本が決めた帯・表・札が出ることを実DOMで固定する。
  * 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
- * 管理画面 では従来の一覧が出ることも固定する。
+ * 互換経路では従来の一覧が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -125,7 +125,7 @@ test('v8 では ZSbFY の一覧（帯・表・動いているの札）が出る'
   // 表の行：いつ送るか・送るもの・ようすの札。
   expect(board?.textContent).toContain('友だちになった')
   expect(board?.textContent).toContain('動いている')
-  // 板 `` 行の右端は「…」だけ。中身を見る・やり直すはその中。
+  // 板  行の右端は「…」だけ。中身を見る・やり直すはその中。
   expect(board?.querySelector('[aria-label="「顧客台帳（CRM）」の操作"]')).not.toBeNull()
   expect([...board!.querySelectorAll('a, button')].some((element) => element.textContent === '中身を見る')).toBe(false)
 })
@@ -144,7 +144,7 @@ test('v8 で失敗がある行は失敗ありの札と失敗の内訳が出る',
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board?.textContent).toContain('失敗あり')
   expect(board?.textContent).toContain('失敗 2 回')
-  // 板 `` 行3の「…」の中に「失敗をやり直す」が入る。
+  // 板  行3の「…」の中に「失敗をやり直す」が入る。
   await act(async () => { (board!.querySelector('[aria-label="「予約台帳」の操作"]') as HTMLButtonElement).click() })
   expect([...document.querySelectorAll('[role="menuitem"]')].some((node) => node.textContent?.includes('失敗をやり直す'))).toBe(true)
 })

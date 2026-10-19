@@ -34,7 +34,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 成果とアフィリエイト「支払い」（板 ``、期間を締めるの確かめは ``）。
+ * ★V8 成果とアフィリエイト「支払い」（板 、期間を締めるの確かめは ）。
  *
  * app/affiliates/v8-payment-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
  * 決まりは今と同じ：

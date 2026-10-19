@@ -44,8 +44,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 /*
- * ★V8 マイル「たまる決めごと」（板 ``・1152 ``・閲覧のみ ``、
- * 状態は見本帳 ``）。
+ * ★V8 マイル「たまる決めごと」（板 ・1152 ・閲覧のみ 、
+ * 状態は見本帳 ）。
  *
  * app/mileage/v8-earning-rules-tab.tsx から動きを写し、見た目を一覧の型
  * （ListPage）で組み直した。データの口・操作は今と同じ（編集・テスト・

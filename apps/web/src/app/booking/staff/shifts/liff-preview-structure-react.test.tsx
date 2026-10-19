@@ -13,7 +13,7 @@ import type { BookingAvailabilitySlot } from '@/lib/api'
 
 /**
  * Issue #643: 予約設定の右パネルプレビューが、実際のLIFF
- * （apps/liff/src/components/DateTimePicker.tsx）と同じ構造かを
+ * （apps/liff/src/components/date-time-picker.tsx）と同じ構造かを
  * 実Reactで確かめる。
  *
  * 実LIFF（★V8・//）: 「日時を選んでください」の下に

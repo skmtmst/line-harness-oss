@@ -1,6 +1,6 @@
 /*
- * ★V8 自動応答の作成・編集・有効化（Pencil `` `` ``
- * `` ``、完了 ``）。
+ * ★V8 自動応答の作成・編集・有効化（Pencil
+ *  、完了 ）。
  *
  * 組版は「作る・確かめる板（左）」と「いまの状態・LINEの見え方（右）」の
  * 2列。板が狭い画面では右の列を下へ畳む。
@@ -33,7 +33,7 @@
   flex-direction: column;
   gap: 4px;
 }
-/* 板の頭の題は `` どおり 22px。 */
+/* 板の頭の題は  どおり 22px。 */
 .headTitle {
   margin: 0;
   color: var(--color-ink);
@@ -104,7 +104,7 @@
   font-size: var(--text-label);
   font-weight: 600;
 }
-/* 手順②（絵 ）だけ：欄の題と中身の間 8・題の行 20。①は 6 のまま。 */
+/* 手順②だけ：欄の題と中身の間 8・題の行 20。①は 6 のまま。 */
 .stepTrigger .label { font-size: var(--text-label); line-height: var(--tpl-chip-label-lh); }
 .stepTrigger .kwField .label { font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 /* 言葉の欄：題のすぐ下に札と足す欄（絵の行は高さ36で中央そろえ）。 */
@@ -187,7 +187,7 @@
   line-height: var(--tpl-tabs-text-lh);
   cursor: pointer;
 }
-/* 絵 ・：選んでいる札は墨の地に白い字。 */
+/* 絵の：選んでいる札は墨の地に白い字。 */
 .pickChip[aria-pressed='true'] {
   outline-color: var(--color-ink);
   background: var(--color-ink);
@@ -659,7 +659,7 @@
   font-size: var(--text-micro);
 }
 
-/* 編集の競合の帯（``）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
+/* 編集の競合の帯（）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
 
 
 /* 右の列の箱（絵 「右の箱 設定内容」）：余白16・題13太字・行の間4・行は上下9＋下線。 */

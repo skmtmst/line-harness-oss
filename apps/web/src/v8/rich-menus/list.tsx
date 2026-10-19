@@ -67,7 +67,7 @@ import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 リッチメニューの一覧（Pencil「★V8 画面の地図」のリッチメニューの行：
- * 一覧 ``、1152 ``、閲覧のみ ``、削除できない理由の窓 ``）。
+ * 一覧 、1152 、閲覧のみ 、削除できない理由の窓 ）。
  *
  * 2026-10-06 オーナー決定により、古い V8 一覧（app/rich-menus/list-v8.tsx）を
  * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
@@ -88,7 +88,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 
 const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
-/* 道具の段の札（絵 ``：公開中・予約・下書き・出し分け）。もう一度押すと外れる（排他）。 */
+/* 道具の段の札（絵 ：公開中・予約・下書き・出し分け）。もう一度押すと外れる（排他）。 */
 const FILTER_CHIPS = [
   { key: 'published', label: '公開中', note: 'いまLINEで公開しているメニュー', icon: CircleCheck },
   { key: 'scheduled', label: '予約', note: '公開日時を予約したメニュー', icon: CalendarClock },
@@ -264,7 +264,7 @@ export default function RichMenusListV8() {
   const deferredQuery = useDeferredValue(query.trim())
 
   /*
-   * 消せない理由があるとき（板 ``）。見出しを「まだ消せません」にし、
+   * 消せない理由があるとき（板 ）。見出しを「まだ消せません」にし、
    * 理由を外す順に並べ、実行は「LINEから取り下げる」（公開中のとき）だけにする。
    */
   const blockedDelete = deleteTarget?.kind === 'managed'

@@ -23,7 +23,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
 /**
- * 運営のナレッジ V8（絵 ``・記事 ``）。
+ * 運営のナレッジ V8（絵の記事 ）。
  *
  * 動きは 管理画面（components/ops/knowledge-list）と同じ口：検索・種類・状態・記事の種類で
  * /api/ops/knowledge を読み、50件ずつ送る。「開く」で記事の画面（下書きの確認・承認）。

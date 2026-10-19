@@ -87,7 +87,7 @@ export default function ImpersonationBar({
 
 
   /*
-   * V8-B ``「代理ログイン中（閲覧のみ）」。閲覧のみの帯だけ V8 の形にし、
+   * V8-B 「代理ログイン中（閲覧のみ）」。閲覧のみの帯だけ V8 の形にし、
    * 書き込み中・理由の窓・止め方は今のまま。押す先・API は変えない。
    */
   const v8ReadBanner = !writing ? (

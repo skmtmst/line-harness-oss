@@ -1,5 +1,5 @@
 /*
- * ★V8 マイル（Pencil ``・``・``・``・``・``・``）。
+ * ★V8 マイル（Pencil ・・・・・・）。
  * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  * 寸法は globals.css の --tpl-ml-*。
  */
@@ -54,13 +54,13 @@
 .colOps { width: calc(var(--tpl-ml-col-ops) + var(--tpl-ml-col-gap)); }
 
 .rowNameLine {
-  /* 名前の前のフォルダの丸と名前を1行に（絵  の「名の行」：丸 8・間 8）。 */
+  /* 名前の前のフォルダの丸と名前を1行に（「名の行」：丸 8・間 8）。 */
   display: flex;
   min-width: 0;
   align-items: center;
 }
 .dotIndent {
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵  の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
   padding-inline-start: var(--tpl-folder-dot-indent);
 }
 .rowSub,
@@ -279,7 +279,7 @@
   justify-content: space-between;
   gap: var(--tpl-toolbar-gap);
 }
-/* ページ送りの段と、その下の案内を縦に積む（絵 ）。 */
+/* ページ送りの段と、その下の案内を縦に積む。 */
 .pagerStack {
   display: flex;
   flex: 1;

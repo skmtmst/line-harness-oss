@@ -30,7 +30,7 @@ import { emptyValue } from '@/components/shared/empty-value';
 import Card from '@/components/shared/card'
 
 /*
- * ★V8 重複検出（Pencil ``、1152 は ``、状態の見本帳は ``）。/friends?tab=duplicates。
+ * ★V8 重複検出（Pencil 、1152 は 、状態の見本帳は ）。/friends?tab=duplicates。
  *
  * データの口は今と同じ（/api/duplicates/stats・/api/identity-candidates・再検出）。
  * 見せ方：頭（← 友だちへ・タブ・表示中をCSVで書き出す）→ 案内の帯 → 数4つ →
@@ -227,7 +227,7 @@ export default function DuplicatesListV8() {
                       </RowNameLink>
                     </Td>
                     <Td>
-                      <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : `${styles.pill} ${styles.pill_muted}`}>
+                      <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>
                         {CONFIDENCE_WORD[candidate.confidence.label] ?? candidate.confidence.label}
                       </span>
                     </Td>

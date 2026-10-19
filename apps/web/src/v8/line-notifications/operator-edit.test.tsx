@@ -18,7 +18,7 @@ vi.hoisted(() => {
  * ★V8 運用者へのお知らせを なおす（板 ）・作るの動き。
  * - ?id= で開くと、保存ずみの名前で題が「「〇〇」を編集する」になり、選んでいない人も並ぶ
  * - 受け取るスタッフは、選ぶ・外すで「選択 N人」が変わる
- * - きっかけの写しは正本（app/line-notifications/operator-event-options.ts）と同じ
+ * - きっかけの写しは正本（v8/line-notifications/operator-event-options.ts）と同じ
  */
 const search = { value: 'id=rule-9' }
 vi.mock('next/navigation', () => ({
