@@ -47,15 +47,16 @@ export async function reserveLineWebhookEvent(
 export async function markLineWebhookEventSucceeded(
   db: D1Database,
   webhookEventId: string,
+  lineAccountId?: string | null,
 ): Promise<void> {
   await db
     .prepare(
       `UPDATE line_webhook_events
           SET status = 'succeeded', last_error = NULL,
               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE webhook_event_id = ?`,
+        WHERE webhook_event_id = ? ${lineAccountId === undefined ? '' : 'AND line_account_id IS ?'}`,
     )
-    .bind(webhookEventId)
+    .bind(webhookEventId, ...(lineAccountId === undefined ? [] : [lineAccountId]))
     .run();
 }
 
@@ -63,15 +64,16 @@ export async function markLineWebhookEventFailed(
   db: D1Database,
   webhookEventId: string,
   classification: LineWebhookErrorClassification,
+  lineAccountId?: string | null,
 ): Promise<void> {
   await db
     .prepare(
       `UPDATE line_webhook_events
           SET status = 'failed', attempts = attempts + 1, last_error = ?,
               updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-        WHERE webhook_event_id = ?`,
+        WHERE webhook_event_id = ? ${lineAccountId === undefined ? '' : 'AND line_account_id IS ?'}`,
     )
-    .bind(classification, webhookEventId)
+    .bind(classification, webhookEventId, ...(lineAccountId === undefined ? [] : [lineAccountId]))
     .run();
 }
 

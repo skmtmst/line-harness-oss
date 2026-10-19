@@ -1162,7 +1162,7 @@ export async function notFoundHandler(
 ): Promise<Response> {
   const url = new URL(c.req.url);
   const path = url.pathname;
-  if (path.startsWith('/api/') || path === '/webhook' || path === '/docs' || path === '/openapi.json') {
+  if (path.startsWith('/api/') || path === '/webhook' || path.startsWith('/webhook/') || path === '/docs' || path === '/openapi.json') {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
 

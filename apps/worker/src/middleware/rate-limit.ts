@@ -66,6 +66,7 @@ function check(key: string, max: number, windowMs: number): { ok: boolean; remai
 
 const UNAUTHENTICATED_PATTERNS: Array<string | RegExp> = [
   '/webhook',
+  /^\/webhook\/\d+$/,
   /^\/api\/forms\/[^/]+\/submit$/,
   // サイトスクリプトの受け口。認証が無く、外のサイトから直接叩かれる。
   '/api/site/collect',

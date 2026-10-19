@@ -22,6 +22,7 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
   }
   return (
     path === '/webhook' ||
+    (normalizedMethod === 'POST' && /^\/webhook\/\d+$/.test(path)) ||
     path === '/docs' ||
     path === '/openapi.json' ||
     path === '/api/affiliates/click' ||

@@ -1,3 +1,5 @@
+import { verifyLineMessagingIdentity } from '../services/line-messaging-identity.js';
+import { expectedWebhookUrl as accountWebhookUrl } from '../lib/webhook-endpoint.js';
 import { readOfficialProfileUrl } from './line-account-profile-url.js';
 import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -201,7 +203,6 @@ lineAccounts.get('/api/line-accounts', async (c) => {
       });
     }
     const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
-    const expectedWebhookUrl = `${base}/webhook`;
 
     // 1アカウントにつき最大3接続を同時に開くため、2アカウントずつに抑える。
     // Workersの同時外向き接続上限6を越えない。
@@ -211,7 +212,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
       async (item) => {
         const [profile, webhook, plan] = await Promise.all([
           fetchBotProfile(item.channel_access_token),
-          fetchWebhookEndpointState(item.channel_access_token, expectedWebhookUrl),
+          fetchWebhookEndpointState(item.channel_access_token, accountWebhookUrl(base, item.channel_id), [...acceptedWebhookUrls(c.env, accountWebhookUrl(base, item.channel_id)), ...acceptedWebhookUrls(c.env, `${base}/webhook`)]),
           fetchLineMonthlyPlan(item.channel_access_token),
         ]);
 
@@ -295,7 +296,8 @@ export function acceptedWebhookUrls(
   ]
     .map((value) => (value ? trimTrailingSlash(value) : ''))
     .filter((value) => /^https:\/\/[^/]+$/.test(value));
-  const urls = [trimTrailingSlash(canonicalWebhookUrl), ...origins.map((origin) => `${origin}/webhook`)];
+  const path = new URL(canonicalWebhookUrl).pathname.replace(/\/+$/, '');
+  const urls = [trimTrailingSlash(canonicalWebhookUrl), ...origins.map((origin) => `${origin}${path}`)];
   return [...new Set(urls)];
 }
 
@@ -304,11 +306,11 @@ function isAcceptedWebhookUrl(registeredUrl: string | null | undefined, accepted
   return accepted.includes(trimTrailingSlash(registeredUrl));
 }
 
-function publicAccountUrls(c: Context<Env>, liffId: string | null) {
+function publicAccountUrls(c: Context<Env>, liffId: string | null, channelId: string) {
   const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
   return {
-    webhook: `${base}/webhook`,
-    webhookAccepted: acceptedWebhookUrls(c.env, `${base}/webhook`),
+    webhook: accountWebhookUrl(base, channelId),
+    webhookAccepted: [...acceptedWebhookUrls(c.env, accountWebhookUrl(base, channelId)), ...acceptedWebhookUrls(c.env, `${base}/webhook`)],
     callback: `${base}/auth/callback`,
     liffEndpoint: liffId ? `${base}?liffId=${encodeURIComponent(liffId)}` : null,
   };
@@ -566,7 +568,7 @@ lineAccounts.post(
         return inputError(c, { success: false, error: 'expectedRevision must be a positive integer' }, 422, ["expectedRevision"]);
       }
 
-      const urls = publicAccountUrls(c, account.liff_id);
+      const urls = publicAccountUrls(c, account.liff_id, account.channel_id);
       const existing = await getLineAccountConnectionChecksByIdempotencyKey(c.env.DB, id, idempotencyKey);
       if (existing.length > 0) {
         return c.json({ success: true, data: connectionCheckResponse(account, existing, urls) });
@@ -786,7 +788,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
     }
 
     // 再開の前に接続を確かめる。bot_info が通らなければ再開しない。
-    const urls = publicAccountUrls(c, account.liff_id);
+    const urls = publicAccountUrls(c, account.liff_id, account.channel_id);
     const collected = await collectConnectionChecks(account, urls.webhook, urls.liffEndpoint, urls.webhookAccepted);
     const botInfo = collected.checks.find((check) => check.kind === 'bot_info');
     const connectionOk = botInfo?.result === 'ok';
@@ -1270,8 +1272,11 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), inpu
   let registration;
   try { registration=await validateRegistrationOptions(c.env.DB,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,parsed.value,c.get('staff').id); }
   catch(error) { if(error instanceof RegistrationOptionsError) return inputError(c, {success:false,error:'タグ・親・担当者の指定を確認してください',code:error.code}, error.status, []); throw error; }
+  const alreadyRegistered = await c.env.DB.prepare('SELECT id FROM line_accounts WHERE channel_id = ?')
+    .bind(parsed.value.channelId).first();
+  if (alreadyRegistered) return c.json({ success: false, error: 'このLINEチャネルは登録済みです' }, 409);
   const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
-  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl, acceptedWebhookUrls: acceptedWebhookUrls(c.env, `${baseUrl}/webhook`) });
+  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl, acceptedWebhookUrls: acceptedWebhookUrls(c.env, accountWebhookUrl(baseUrl, parsed.value.channelId)) });
   if (!prepared.success || !prepared.channelAccessToken) {
     return c.json({
       success: true,
@@ -1306,8 +1311,11 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
   let registration;
   try { registration=await validateRegistrationOptions(c.env.DB,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,parsed.value,c.get('staff').id); }
   catch(error) { if(error instanceof RegistrationOptionsError) return inputError(c, {success:false,error:'タグ・親・担当者の指定を確認してください',code:error.code}, error.status, []); throw error; }
+  const alreadyRegistered = await c.env.DB.prepare('SELECT id FROM line_accounts WHERE channel_id = ?')
+    .bind(parsed.value.channelId).first();
+  if (alreadyRegistered) return c.json({ success: false, error: 'このLINEチャネルは登録済みです' }, 409);
   const baseUrl = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
-  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl, acceptedWebhookUrls: acceptedWebhookUrls(c.env, `${baseUrl}/webhook`) });
+  const prepared = await prepareLineConnection({ ...parsed.value, baseUrl, acceptedWebhookUrls: acceptedWebhookUrls(c.env, accountWebhookUrl(baseUrl, parsed.value.channelId)) });
   if (!prepared.success || !prepared.channelAccessToken || !prepared.bot || !prepared.liffId) {
     return inputError(c, {
       success: false,
@@ -1542,11 +1550,15 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(
       loginChannelId,
       loginChannelSecret,
       liffId,
-      expectedWebhookUrl: `${base}/webhook`,
-      acceptedWebhookUrls: acceptedWebhookUrls(c.env, `${base}/webhook`),
+      expectedWebhookUrl: accountWebhookUrl(base, body.channelId.trim()),
+      acceptedWebhookUrls: [...acceptedWebhookUrls(c.env, accountWebhookUrl(base, body.channelId.trim())), ...acceptedWebhookUrls(c.env, `${base}/webhook`)],
     });
     if (!verification.messagingApi || !verification.webhook || !verification.lineLogin || !verification.liff) {
       return inputError(c, { success: false, error: 'すべての接続確認を完了してください', details: { connection: verification.errors } }, 400, ["channelAccessToken"]);
+    }
+
+    if (!await verifyLineMessagingIdentity({ channelId: body.channelId.trim(), channelSecret: body.channelSecret.trim(), channelAccessToken: body.channelAccessToken.trim() })) {
+      return inputError(c, { success: false, error: '同じMessaging APIチャネルのID・シークレット・アクセストークンを指定してください' }, 422, ['channelId', 'channelSecret', 'channelAccessToken']);
     }
 
     const account = await createLineAccount(c.env.DB, {
@@ -2017,6 +2029,14 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
     // 鍵・トークンの書き換え（接続情報・有効/無効の切替）は大事な操作（V）。
     if (credentialsTouched && !await sensitiveStepUpSatisfied(c, 'line_account.credentials')) {
       return stepUpRequiredResponse(c, '接続情報の変更には本人確認が必要です');
+    }
+
+    if ((body.channelAccessToken !== undefined || body.channelSecret !== undefined) && !await verifyLineMessagingIdentity({
+      channelId: currentAccount.channel_id,
+      channelSecret: body.channelSecret ?? currentAccount.channel_secret,
+      channelAccessToken: body.channelAccessToken ?? currentAccount.channel_access_token,
+    })) {
+      return inputError(c, { success: false, error: '同じMessaging APIチャネルのシークレット・アクセストークンを指定してください' }, 422, ['channelSecret', 'channelAccessToken']);
     }
 
     let updated = credentialsTouched

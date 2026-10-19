@@ -180,7 +180,7 @@ const ACCOUNT = {
   id: 'account-main',
   channel_secret: 'env-default-secret',
   channel_access_token: 'account-token',
-  is_active: 1,
+  is_active: 1, tenant_status: 'active',
 } as never;
 
 const FRIEND = {
@@ -237,7 +237,7 @@ async function postWebhook(db: D1Database, events: unknown[]) {
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
-      body: JSON.stringify({ events }),
+      body: JSON.stringify({ destination: 'bot', events }),
     },
     { ...baseEnv, DB: db },
     executionCtx,
