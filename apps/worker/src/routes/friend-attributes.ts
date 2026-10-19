@@ -1,7 +1,7 @@
 import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 
 import { get__api_support_marks_1, post__api_support_marks_id_restore_2, post__api_support_marks_3, patch__api_support_marks_reorder_4, patch__api_support_marks_id_5, get__api_support_marks_id_automation_rules_6, post__api_support_marks_id_automation_rules_7, patch__api_support_mark_rules_ruleId_8, delete__api_support_mark_rules_ruleId_9, get__api_support_marks_id_archive_impact_10, post__api_support_marks_id_archive_11, delete__api_support_marks_id_12, patch__api_friends_id_support_mark_13 } from './friend-attributes-support-marks-handlers.js';

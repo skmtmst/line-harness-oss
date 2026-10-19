@@ -6,7 +6,7 @@ import {
   getBroadcastById,
   updateBroadcast,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 /**
@@ -301,7 +301,7 @@ describe('参照表と削除の止め', () => {
 });
 
 
-describe('UTbi1: 版を作った人', () => {
+describe(': 版を作った人', () => {
   it('公開時の担当者IDから同じ組織の名前を返す。再公開と名簿の変更も区別する', async () => {
     store.raw.exec(`INSERT INTO tenants(id,name) VALUES('tenant-api5','組5');
       INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id)

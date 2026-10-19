@@ -1,6 +1,6 @@
 import {createSavedSearch} from '@line-crm/db';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {GapError,gapAccount,gapBody,gapWrite} from '../services/gap-common.js';
 import {segmentName} from '../services/customer-segments.js';

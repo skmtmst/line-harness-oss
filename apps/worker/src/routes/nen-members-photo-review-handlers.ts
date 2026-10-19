@@ -3,7 +3,7 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 
 import { findRewardedAdoptedDuplicate, getEffectivePhotoRewardPolicy, jstNow } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { getFileScanBySubject, runScanForStoredObject } from '../services/file-scan.js';
 import { ensureFileScanForUpload } from './file-scan.js';
@@ -77,7 +77,7 @@ export const put__api_nen_members_photos_id_review_1 = async (c: Context<Env, "/
     return c.json({ success: false, error: 'Already reviewed', code: 'VERSION_CONFLICT' }, 409);
   }
   if (status === 'adopted') {
-    // 検査が終わるまで採用しない。失敗時は審査へ流さない（v6-22 §4）。
+    // 検査が終わるまで採用しない。失敗時は審査へ流さない（-22 §4）。
     const targetPhotoId = c.req.param('id');
     let photoScan = await getFileScanBySubject(c.env.DB, 'photo', targetPhotoId);
     if (!photoScan) {

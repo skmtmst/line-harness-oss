@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dashboard } from './dashboard.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 let db: SqliteD1;

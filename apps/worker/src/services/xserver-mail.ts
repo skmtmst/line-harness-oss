@@ -2,7 +2,7 @@ import { connect } from 'cloudflare:sockets';
 import { assertQaOutboundAllowed } from './staging-qa-safety.js';
 import PostalMime, { type Address } from 'postal-mime';
 import { NEN_FROM_NAME } from './mail-from-name.js';
-import { storeSupportEmail } from './support-email.js';
+import { storeSupportEmail } from './support-email-store.js';
 
 const CONNECTION_TIMEOUT_MS = 15_000;
 const MAX_EMAIL_BYTES = 10 * 1024 * 1024;

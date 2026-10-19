@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 export async function appendFeatureScopeMeta(c: Context<Env>, excluded: number): Promise<void> {
   if (excluded < 1 || !c.res.headers.get('content-type')?.includes('application/json')) return;

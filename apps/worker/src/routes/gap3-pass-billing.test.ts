@@ -1,8 +1,8 @@
 import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
-import {passCheckout,passBillingEvent,expirePassGrace,type PassBillingEvent} from '../services/booking-pass-billing.js';
+import {passCheckout,passBillingEvent,expirePassGrace,type PassBillingEvent} from '../features/booking/booking-pass-billing.js';
 import {bookingPassBilling} from './booking-pass-billing.js';
-import {passUnusable} from '../services/booking-pass-plans.js';
+import {passUnusable} from '../features/booking/booking-pass-plans.js';
 import {isPublicApiBoundary} from '../middleware/public-api-boundary.js';
 vi.mock('./booking.js',async importOriginal=>({...await importOriginal<any>(),resolveAccountIdFromLiff:async(c:any)=>c.req.query('liffId')==='liff-a'?'a':null,verifyCallerLineUserId:async(c:any)=>c.req.header('authorization')==='Bearer customer'?'Uf':null,resolveFriendId:async()=> 'f'}));
 let d:ReturnType<typeof gapFixture>;const now=new Date('2026-10-16T03:00:00Z');

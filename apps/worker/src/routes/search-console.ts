@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getGoogleServiceAccountToken } from '../services/google-service-account.js';
 import {
   getSearchConsolePerformance,

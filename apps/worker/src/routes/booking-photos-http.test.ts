@@ -4,8 +4,8 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { asD1 } from '@line-crm/db/test/d1-test-helper.js';
 import { getMediaDeleteImpactSnapshot, getMediaReplacementPlan } from '@line-crm/db';
-import { scanMediaUsage, scanSingleMediaUsage } from '../services/media-usage-scan.js';
-import type { Env } from '../index.js';
+import { scanMediaUsage, scanSingleMediaUsage } from '../features/media/media-usage-scan.js';
+import type { Env } from '../worker-env.js';
 import { permissionForApiPath } from '../middleware/auth.js';
 
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: async (_db: unknown, _staff: unknown, ids: string[]) => ids.every(id => id === 'a') }));

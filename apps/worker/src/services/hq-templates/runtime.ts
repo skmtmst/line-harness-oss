@@ -1,5 +1,6 @@
 import { captureDistributionName } from './distribution-display.js';
 import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, normalizeScopedTagName, type HqTemplateDistributionResult, type HqTemplatePreflight, type HqTemplatePreflightResolution, type HqTemplateStatement } from '@line-crm/db';
+
 import { requireHqTemplateAuthority, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAdapterResult, type HqTemplateAuthority, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { createFormHqTemplateAdapter, type FormReference, type FormTemplateDependencies } from './form.js';
 import { bindScenarioGraphRevision, loadScenarioReferenceGraph, readScenarioGraphRevision, remapScenarioJson, scenarioGraphSnapshotToken, scenarioGraphSourceGuardStatements, ScenarioGraphError, type ScenarioGraphReference, type ScenarioGraphRow } from './scenario-graph.js';

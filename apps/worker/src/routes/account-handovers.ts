@@ -22,14 +22,15 @@ import {
   type HandoverRow,
   type MatchBucket,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 
 /**
- * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
+ * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。台帳 #133。
  *
  * 5段の流れ。
  *   1 引き継ぎコードを出す   POST /api/account-handovers
@@ -344,7 +345,7 @@ accountHandovers.post('/api/account-handovers/:id/execute', requireRole('owner',
       return inputError(c, { success: false, error: '先に事前確認をしてください' }, 422, []);
     }
     /*
-      件数照合（X-3、v6-33 §12-6）。移し元システム側の申告件数が
+      件数照合（X-3、-33 §12-6）。移し元システム側の申告件数が
       事前確認の合計と違うままでは本実行しない。
     */
     if (
@@ -423,7 +424,7 @@ accountHandovers.post('/api/account-handovers/:id/cancel', requireRole('owner', 
 });
 
 /**
- * 段6。切り戻し（X-3、v6-33 §12-2）。
+ * 段6。切り戻し（X-3、-33 §12-2）。
  * 本実行から7日間だけ。動かした友だちを元のアカウントへ戻す。
  */
 accountHandovers.post('/api/account-handovers/:id/rollback', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {

@@ -849,7 +849,7 @@ describe('Googleビジネス：口コミ', () => {
   });
 });
 
-describe('B-368 実際の本番・検証設定を組み合わせたルート', () => {
+describe('実際の本番・検証設定を組み合わせたルート', () => {
   it.each(['production', 'staging'] as const)('%s のGoogle接続は開き、飲食店だけ独立して閉じる', async environment => {
     const { unstable_readConfig } = await import('wrangler');
     const config = unstable_readConfig({ config: new URL(environment === 'production' ? '../../wrangler.toml' : '../../wrangler.staging.toml', import.meta.url).pathname });
@@ -881,7 +881,7 @@ describe('B-368 実際の本番・検証設定を組み合わせたルート', (
 });
 
 
-it('B-368 Googleの店舗選択は同じ統括かつ担当範囲だけを返す', async () => {
+it('Googleの店舗選択は同じ統括かつ担当範囲だけを返す', async () => {
   seedStore();
   testDb.raw.prepare("INSERT INTO rt_stores (id,organization_id,name,code,line_account_id) VALUES ('sibling','org-1','同じ統括の店','SIBLING','account-1')").run();
   testDb.raw.prepare("INSERT INTO tenants (id,name) VALUES ('b368-other','別の統括')").run();

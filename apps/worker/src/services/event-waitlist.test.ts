@@ -14,7 +14,7 @@ import {
   promoteEventWaitlist,
   reorderEventWaitlist,
 } from './event-waitlist.js';
-import type { EventWaitlistOfferSender } from './event-waitlist.js';
+import type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
 
 function asD1(sqlite: Database.Database, beforeRun?: (query: string) => Promise<void>): D1Database {
   function prepare(query: string): D1PreparedStatement {
@@ -46,7 +46,7 @@ function asD1(sqlite: Database.Database, beforeRun?: (query: string) => Promise<
   } as unknown as D1Database;
 }
 
-describe('V6 event waitlist and applicants', () => {
+describe('event waitlist and applicants', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

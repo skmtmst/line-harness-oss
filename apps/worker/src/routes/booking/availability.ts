@@ -1,4 +1,4 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import { getAccountTimeZone, getAvailability, tzDateStr, tzHHMM } from '../../services/availability.js';
 
 export const BOOKING_CONFIRMED_AUTOMATION_EVENT = 'calendar_booked' as const;

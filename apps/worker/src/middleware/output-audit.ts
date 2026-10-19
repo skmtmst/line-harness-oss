@@ -3,7 +3,7 @@ import { isOutputRequest } from './output-request.js';
 export { isOutputRequest } from './output-request.js';
 import type { MiddlewareHandler } from 'hono';
 import { auditEventStatement } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /** Records CSV records correctly even when a quoted cell contains a newline. */
 export function csvRecordCount(csv: string): number {

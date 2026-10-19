@@ -1,14 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
-import type { Env } from '../index.js';
-import {
-  commitStatusesBlockReason,
-  isCodexAutoMergeEnabled,
-  parseCodexAuditApproval,
-  prohibitedPullRequestChange,
-  processCodexAutoMerge,
-  requiredChecksBlockReason,
-  type CodexAutoMergeMessage,
-} from './codex-auto-merge.js';
+import type { Env } from '../worker-env.js';
+import { commitStatusesBlockReason, isCodexAutoMergeEnabled, parseCodexAuditApproval, prohibitedPullRequestChange, processCodexAutoMerge, requiredChecksBlockReason } from './codex-auto-merge.js';
+import { type CodexAutoMergeMessage } from './codex-auto-merge-types.js';
 
 const message: CodexAutoMergeMessage = {
   kind: 'auto_merge',

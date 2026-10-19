@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getFolderById, createFolder, updateFolder, swapFolderOrder, FolderConflictError, deleteFolder, isFolderKind } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { COLOR_PATTERN, serializeFolder, folderBoundary } from './friend-attributes-definition.js';

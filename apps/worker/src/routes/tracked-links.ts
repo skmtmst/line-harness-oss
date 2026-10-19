@@ -17,7 +17,7 @@ import {
 } from '@line-crm/db';
 import { getUrlReachConversionPoints } from '@line-crm/db';
 import type { TrackedLink } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { isLinkPreviewBot } from '../lib/og-bot.js';
 import { buildOgHtml } from '../lib/og-html.js';

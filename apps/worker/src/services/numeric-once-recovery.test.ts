@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { runActionRows, type ScenarioActionRow } from './scenario-actions.js';
+import { runActionRows, type ScenarioActionRow } from '../features/scenarios/scenario-actions.js';
 
 let f: SqliteD1;
 beforeEach(() => {

@@ -3,19 +3,19 @@ import { isWebinarMissedInWindow, getWebinarWatchedSeconds } from '@line-crm/db'
 import { inputError } from '../lib/input-errors.js';
 
 import type { WebinarAudience } from '@line-crm/shared';
-import { countRecentWebinarViewers, WEBINAR_AUDIENCE_WINDOW_SECONDS } from '../services/webinar-audience.js';
+import { countRecentWebinarViewers, WEBINAR_AUDIENCE_WINDOW_SECONDS } from '../features/webinars/webinar-audience/index.js';
 import { getWebinarComments, getWebinarCtas, upsertWebinarViewer, recordWebinarHeartbeat, parseWebinarHeartbeatPlayerState, recordWebinarCtaClick, recordWebinarFunnelEvent, insertWebinarUserComment, countSessionUserComments, getUpcomingWebinarRegistration, getWebinarRegistration, recordWebinarPickerOpen } from '@line-crm/db';
-import { resolveWebinarCaller } from '../services/webinar-caller.js';
-import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
-import { runWebinarTriggerActions } from '../services/webinar-action-runner.js';
+import { resolveWebinarCaller } from '../features/webinars/webinar-caller/index.js';
+import { attachTagAndFireSideEffects } from '../features/friends/friend-tag-attach/index.js';
+import { runWebinarTriggerActions } from '../features/webinars/webinar-action-runner/index.js';
 import { recordConversionSourceEvent } from '@line-crm/db';
-import { resolveSession, parseScheduleRules, upcomingSessions } from '../services/webinar-schedule.js';
-import { sendWebinarRegistrationConfirmation } from '../services/webinar-reminders.js';
-import { enqueueWebinarCompletedNotification, getWebinarNotificationSettings, registerWebinarSession } from '../services/webinar-notifications.js';
+import { resolveSession, parseScheduleRules, upcomingSessions } from '../features/webinars/webinar-schedule/index.js';
+import { sendWebinarRegistrationConfirmation } from '../features/webinars/webinar-reminders/index.js';
+import { enqueueWebinarCompletedNotification, getWebinarNotificationSettings, registerWebinarSession } from '../features/webinars/webinar-notifications/index.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { signWebinarToken } from '../lib/webinar-token.js';
-import { awardWebinarCtaMileage, awardWebinarPositionMileage } from '../services/webinar-mileage.js';
-import type { Env } from '../index.js';
+import { awardWebinarCtaMileage, awardWebinarPositionMileage } from '../features/webinars/webinar-mileage/index.js';
+import type { Env } from '../worker-env.js';
 import { nowEpoch, publicationWindowBlockReason, resolveWebinarDeliveryKind, onDemandSessionStartAt, TOKEN_GRACE_SECONDS, WAITING_ROOM_SECONDS, CURRENT_SESSION_JOIN_GRACE_SECONDS, COMMENT_MIN_AT_SECONDS, COMMENT_MAX, SESSION_COMMENT_LIMIT } from './webinars-definition.js';
 import type { Context } from 'hono';
 

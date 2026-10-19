@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, test } from 'vitest';
 import { emptyLayout } from '@line-crm/shared';
-import { applyFormLayoutEffects } from '../form-layout-effects';
+import { applyFormLayoutEffects } from '../../features/forms/form-layout-effects';
 import { publishFormVersion, updateForm } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { createFormHqTemplateAdapter, inspectFormTemplate, formTemplatePublicUrl, formTemplateSnapshot, formTemplateSnapshotToken, parseFormTemplateDefinition, type FormTemplateDependencies } from './form.js';

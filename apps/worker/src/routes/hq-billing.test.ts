@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const stripe = vi.hoisted(() => ({
@@ -608,7 +608,7 @@ describe('即時変更の日割り見積り', () => {
   });
 });
 
-type StoredBillingMetrics = NonNullable<Awaited<ReturnType<typeof import('../services/hq-billing-metrics.js').hqBillingMetrics>>>;
+type StoredBillingMetrics = NonNullable<Awaited<ReturnType<typeof import('../features/hq-billing/hq-billing-metrics.js').hqBillingMetrics>>>;
 describe('統括の請求の数の帯（保存済み請求のみ）',()=>{
   it('今月の額・未払いと組織単位の契約を、他組織と分けて返す',async()=>{
     vi.useFakeTimers();vi.setSystemTime(new Date('2026-09-30T15:00:00Z'));

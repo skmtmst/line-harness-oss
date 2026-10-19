@@ -2,11 +2,12 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { archiveFriendAddRule, restoreFriendAddRule, createFriendAddRuleDraft, ensureFriendAddFallbackRules, getFriendAddRule, getFriendByLineUserIdForAccount, getLineAccountById, jstNow, listFriendAddRules, publishFriendAddRule, saveFriendAddRuleDraft, stopFriendAddRule, type FriendAddRuleKind, type FriendAddRuleRow } from '@line-crm/db';
+
 import { LineClient } from '@line-crm/line-sdk';
 import { CommonVarResolutionFailedError, expandSendCommonVars } from '../services/interpolation-context.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-import { areFriendAddConditionsOverlapping, doFriendAddTimeWindowsOverlap, doFriendAddWeekdaySetsOverlap } from '../services/friend-add-routing.js';
+import { areFriendAddConditionsOverlapping, doFriendAddTimeWindowsOverlap, doFriendAddWeekdaySetsOverlap } from '../features/friends/friend-add-routing/index.js';
 import { accountIdFrom, KINDS, canUseAccount, parseSnapshot, RuleTestInput, ruleTestResponse, RuleInput, validateInput, normalizeDefinition, validateReferences, loadOptions, toRule } from './friend-add-rules-definition.js';
 import type { Context } from 'hono';
 

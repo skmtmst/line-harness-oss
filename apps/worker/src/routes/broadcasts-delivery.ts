@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import { simulationContext, scheduleSimulation, processBroadcastSimulation, simulationPreview } from '../services/broadcast-simulation.js';
+import { simulationContext, scheduleSimulation, processBroadcastSimulation, simulationPreview } from '../features/broadcasts/broadcast-simulation/index.js';
 import { maybeStartAb, maybeReplayAbStart } from './broadcast-ab.js';
 import { GapError } from '../services/gap-common.js';
 import { broadcastSendPreview, broadcastQuietHoursShift } from '../services/gap-send-preview.js';
@@ -10,18 +10,18 @@ import { inputError } from '../lib/input-errors.js';
 import { getBroadcastById, deleteBroadcast } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { getSendPermissionForAccount } from '../services/send-entitlements.js';
-import { processBroadcastSend, processQueuedBroadcasts, guardScheduledBroadcastQuota } from '../services/broadcast.js';
-import { parseBroadcastMessageParts, unsupportedMessageVariables } from '../services/broadcast-message-set.js';
+import { processBroadcastSend, processQueuedBroadcasts, guardScheduledBroadcastQuota } from '../features/broadcasts/broadcast/index.js';
+import { parseBroadcastMessageParts, unsupportedMessageVariables } from '../features/broadcasts/broadcast-message-set/index.js';
 import { computeDedupBroadcastPreview } from '../services/dedup-broadcast.js';
-import type { SegmentCondition } from '../services/segment-query.js';
+import type { SegmentCondition } from '@line-crm/shared';
 import { getLineAccountById } from '@line-crm/db';
 import { isOperationCapabilityStopped } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 
 import { BROADCAST_DEFINITION_PUBLISH_KEY } from '@line-crm/shared';
 import { hasRecipientVariables } from '../services/render-message.js';
-import { releaseQuotaSlot } from '../services/broadcast-quota-guard.js';
+import { releaseQuotaSlot } from '../features/broadcasts/broadcast-quota-guard/index.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
 import { canAccessBroadcast, broadcastDeleteConflictMessage, broadcastWriteBoundary, broadcastAccountIds, rejectIfAudienceUnusable, serializeBroadcast, checkSendableAfterActionVersion, recordLifecycle, kickQueueProcessing } from './broadcasts-definition.js';
 import type { Context } from 'hono';
@@ -74,12 +74,12 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     }
 
     /*
-     * 二者承認のゲート（m12a / v6-06 §6）。送信時点の宛先数で判定する。
+     * 二者承認のゲート（m12a / -06 §6）。送信時点の宛先数で判定する。
      * 承認が要る人数なのに承認済みでなければ送らない。1人運用の組織では
      * 人数の手入力との一致を見る。既存の原子ロック（下の claim）は変えない。
      */
     try {
-      const { enforceBroadcastSendApproval } = await import('../services/broadcast-approval.js');
+      const { enforceBroadcastSendApproval } = await import('../features/broadcasts/broadcast-approval.js');
       const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown;testMode?:unknown }>().catch(() => null);
       if(await simulationContext(c.env.DB,id)){const result=await scheduleSimulation(c.env.DB,id,sendBody??{},c.req.header('Idempotency-Key')??'');await processBroadcastSimulation(c.env.DB,id);return c.json({success:true,data:{...result,...await simulationPreview(c.env.DB,id)}});}
       const abReplay=await maybeReplayAbStart(c,id,sendBody);if(abReplay)return abReplay;
@@ -408,7 +408,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     // 即時送信パスには recoverStalledBroadcasts がない)
     let accountToken: string | null = null;
     const broadcastAccountId = (existing as unknown as Record<string, unknown>).line_account_id;
-    // 課金の状態（トライアル終了・解約）で配信が止まっている統括は送らない（★V6 36-2）。
+    // 課金の状態（トライアル終了・解約）で配信が止まっている統括は送らない（★36-2）。
     const sendPermission = await getSendPermissionForAccount(c.env.DB, (broadcastAccountId as string | null) ?? null);
     if (!sendPermission.allowed) {
       return c.json({ success: false, error: sendPermission.reason ?? '配信が止まっています' }, 409);
@@ -536,7 +536,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
      * 送る条件は行に無いので、今回の条件を重ねた行で数える。
      */
     try {
-      const { enforceBroadcastSendApproval } = await import('../services/broadcast-approval.js');
+      const { enforceBroadcastSendApproval } = await import('../features/broadcasts/broadcast-approval.js');
       const mergedForGate = {
         ...existing,
         target_type: 'segment',

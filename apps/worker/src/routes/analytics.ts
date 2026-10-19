@@ -6,7 +6,10 @@ import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { getDailyMessageCounts, getLinkClickSummary, getTrackedLinkStats, getBroadcastSummary, buildFunnelResult, getFunnelsWithCurrentVersions, getLegacyFunnels, getFunnelById, getFunnelSteps, createFunnel, deleteFunnel, countFunnelStep, createVersionedFunnel, createFunnelVersion, getFunnelWithCurrentVersion, setFunnelStatus, runChronologicalFunnel, getLatestFunnelRun, createFunnelResultAudience, createAnalyticsCrossRun, getAnalyticsCrossRun, addConversionDefinitionUsage, createAnalyticsCrossAudience, getCurrentFunnelVersion, getAnalyticsFriendsOverview, getAnalyticsReactionsOverview, getAnalyticsRoutesOverview, getAnalyticsUrlClicksOverview, getAnalyticsUsageOverview, createSavedAnalyticsFromResult, getSavedAnalytics, getSavedAnalyticsSnapshots, ANALYTICS_REPORT_SECTIONS, createAnalyticsReportSchedule, getAnalyticsReportRuns, getAnalyticsReportSchedule, getRecentOneTimeAnalyticsReportRuns, getAnalyticsReportScheduleIncludingArchived, getAnalyticsReportSchedules, requeueOneTimeAnalyticsReportSchedule, setAnalyticsReportScheduleStatus, updateAnalyticsReportSchedule, getStaffMembers, getStaffAccountScopeIds, getLineAccountById, DEFAULT_TENANT_ID, FUNNEL_STEP_KINDS, type FunnelStepKind, type AnalyticsOverviewContext, type AnalyticsReportAlertRule, type AnalyticsReportChannel, type AnalyticsReportRecipient, type AnalyticsReportSection } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
@@ -431,7 +434,7 @@ analytics.get('/api/analytics/broadcasts', async (c) => {
   }
 });
 
-// V6: クロス分析はCronで非同期実行し、HTTPの処理時間とD1負荷を固定する。
+// クロス分析はCronで非同期実行し、HTTPの処理時間とD1負荷を固定する。
 analytics.post('/api/analytics/cross/query', inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
@@ -917,7 +920,7 @@ analytics.get('/api/funnels', async (c) => {
   }
 });
 
-// V6: 作成時点の段・期間・比較条件を第1版として固定する。
+// 作成時点の段・期間・比較条件を第1版として固定する。
 /**
  * N-256/N-258: 段に「成果」が入ったファネルを保存したら、成果地点側の
  * 「使う場所」台帳へこのファネルを実IDで記す。
@@ -1363,8 +1366,8 @@ analytics.get('/api/funnels/:id/result', async (c) => {
     if (!range.ok) return c.json({ success: false, error: range.error }, 400);
 
     // 現行画面は過去の業務台帳を読む互換APIを維持する。
-    // V6の時系列結果は POST /api/analytics/funnels/:id/run で作り、
-    // 取得不可・部分データを表示できるV6画面と同時に切り替える。
+    // の時系列結果は POST /api/analytics/funnels/:id/run で作り、
+    // 取得不可・部分データを表示できる画面と同時に切り替える。
     const steps = await getFunnelSteps(c.env.DB, funnel.id);
     const reachedPerStep: string[][] = [];
     let scope: string[] | undefined;

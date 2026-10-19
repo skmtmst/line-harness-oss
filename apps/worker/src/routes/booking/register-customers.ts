@@ -1,11 +1,11 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { createBookingCustomer, getBookingCustomer, searchBookingCustomers } from '@line-crm/db';
 import { requireRole } from '../../middleware/role-guard.js';
-import { completeIdempotencyResponse, findIdempotencyResponse, reserveIdempotencyResponse } from '../../services/booking-idempotency.js';
-import { BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES } from '../../services/booking-types.js';
+import { completeIdempotencyResponse, findIdempotencyResponse, reserveIdempotencyResponse } from '../../features/booking/booking-idempotency/index.js';
+import { BOOKING_CUSTOMER_IDEMPOTENCY_TTL_MINUTES } from '../../features/booking/booking-types/index.js';
 import { resolveAccountIdAdmin } from './identity.js';
 
 export function registerCustomers(booking: Hono<Env>): void {

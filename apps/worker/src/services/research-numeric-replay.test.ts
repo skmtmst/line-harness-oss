@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { emptyLayout, type FormAction } from '@line-crm/shared';
+
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { applyFormLayoutEffects } from './form-layout-effects.js';
+import { applyFormLayoutEffects } from '../features/forms/form-layout-effects.js';
 vi.mock('./event-bus.js', () => ({ fireEvent: vi.fn() }));
 let fixture: SqliteD1;
 beforeEach(() => {

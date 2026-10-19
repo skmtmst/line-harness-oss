@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { promoteEventWaitlist } from '../services/event-waitlist.js';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 vi.mock('../services/liff-auth.js', () => ({

@@ -3,11 +3,12 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { emptyLayout, validateAnswer, type FormInputBlock } from '@line-crm/shared';
+
 import { insertFormSubmissionRecord } from '@line-crm/db';
 import { formDocuments, uploadFormDocument } from './form-documents.js';
-import { documentAnswer, hydrateDocumentAnswers, validateDocumentAnswers, purgeExpiredFormDocuments, identityRetentionDays } from '../services/form-documents.js';
+import { documentAnswer, hydrateDocumentAnswers, validateDocumentAnswers, purgeExpiredFormDocuments, identityRetentionDays } from '../features/forms/form-documents.js';
 import { fileScan, processDueFileScans } from './file-scan.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 vi.mock('../services/account-access.js', () => ({ getVisibleLineAccountScope: vi.fn(async () => ({ ids: ['a'] })), canAccessAllLineAccounts: vi.fn(async () => true) }));
 let sql: Database.Database;
@@ -172,7 +173,7 @@ describe('private form documents', () => {
   });
 });
 
-describe('B-213 document corrections', () => {
+describe('document corrections', () => {
   it('records PDF in an image/PDF field and validates its actual kind', async () => {
     const result = await upload('single', new TextEncoder().encode('%PDF-1.7\n%%EOF'), 'application/pdf', 'image-pdf');
     expect(result.response.status).toBe(201);

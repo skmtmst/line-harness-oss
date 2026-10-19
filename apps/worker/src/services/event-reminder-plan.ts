@@ -1,4 +1,4 @@
-import type { ComputedReminder } from './event-reminder-schedule.js';
+import type { ComputedReminder } from './event-reminder-types.js';
 
 /** 作成/CASの取引へ通知予定を含める。従来の単独呼出しも同じSQLを使う。 */
 export function prepareEventReminders(db:D1Database,bookingId:string,reminders:ComputedReminder[],onlyConfirmed=false):D1PreparedStatement[] {

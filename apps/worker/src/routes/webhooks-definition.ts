@@ -1,9 +1,12 @@
 import { logger } from '@line-crm/shared/server';
 import { decryptCredential } from '@line-crm/db';
+import { getIncomingWebhookById, createWebhookInteraction, finishWebhookInteraction, updateIncomingWebhookMaskedSample, WEBHOOK_SECRET_PREVIOUS_GRACE_MS, isKnownOutgoingEventType, KNOWN_OUTGOING_EVENT_TYPES, WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH, type IntegrationApiTokenRow, type WebhookInteractionRow, type WebhookInteractionListRow, type IncomingWebhookIdentityMatch, type IncomingWebhookActionRef } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
-import { getIncomingWebhookById, createWebhookInteraction, finishWebhookInteraction, updateIncomingWebhookMaskedSample, WEBHOOK_SECRET_PREVIOUS_GRACE_MS, isKnownOutgoingEventType, KNOWN_OUTGOING_EVENT_TYPES, WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH, type IntegrationApiTokenRow, type WebhookInteractionRow, type WebhookInteractionListRow, type IncomingWebhookIdentityMatch, type IncomingWebhookActionRef } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+
+import type { Env } from '../worker-env.js';
 import { stoppedTenantLineAccountSql } from '../services/tenant-runtime-status.js';
 import { reserveIncomingWebhook, readIncomingWebhookReceiptPlan, saveIncomingWebhookReceiptPlan, type IncomingWebhookReceiptPlan } from '../services/incoming-webhook-receipts.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -164,7 +167,7 @@ const MAX_INCOMING_BODY_BYTES = 256 * 1024;
 export const RECEIVE_RATE_LIMIT = 60;
 export const RECEIVE_RATE_WINDOW_MS = 60_000;
 export /*
- * R430 (v6-26 §7-1): 署名時刻の受付窓。過去15分・未来5分（時計ずれ分）。
+ * R430 (-26 §7-1): 署名時刻の受付窓。過去15分・未来5分（時計ずれ分）。
  * 時刻を送ってきた受信だけを検査し、送らない古い送信元は壊さない。
  */
 const RECEIVE_TIMESTAMP_PAST_MS = 15 * 60_000;

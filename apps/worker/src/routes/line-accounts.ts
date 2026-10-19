@@ -1,6 +1,7 @@
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { readOfficialProfileUrl } from './line-account-profile-url.js';
 import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
+
 import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -16,14 +17,14 @@ import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up
 import { auditLog } from '../lib/audit-log.js';
 import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
 import { detectFollowerImportCapability, getFollowerImportState, processFollowerImportStep, startFollowerImport } from '../services/follower-import.js';
-import type { FollowerImportClient } from '../services/follower-import.js';
+import type { FollowerImportClient } from '../services/follower-import-state.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope, validateAccountHierarchy } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const lineAccounts = new Hono<Env>();
@@ -81,7 +82,7 @@ function serializeLineAccount(row: DbLineAccount) {
     isActive: Boolean(row.is_active),
     isDefault: Boolean(row.is_default),
     archivedAt: row.archived_at ?? null,
-    // 止めた理由。動いていれば null（v6-33 §10-1）。
+    // 止めた理由。動いていれば null（-33 §10-1）。
     inactiveReason: row.inactive_reason ?? null,
     inactiveReasonDetail: row.inactive_reason_detail ?? null,
     inactivatedAt: row.inactivated_at ?? null,
@@ -715,7 +716,7 @@ lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), inputJ
 });
 
 /**
- * 送受信を止める（v6-33 §10-1、X-1）。
+ * 送受信を止める（-33 §10-1、X-1）。
  * 理由は必須。止めている間の受信は署名検証から外れ、予約配信は
  * 「止めていたので送らなかった」として一覧に残る。
  */
@@ -760,7 +761,7 @@ lineAccounts.post('/api/line-accounts/:id/deactivate', requireRole('owner', 'adm
 });
 
 /**
- * 送受信を再開する（v6-33 §10-2、X-1）。
+ * 送受信を再開する（-33 §10-2、X-1）。
  * 理由は必須。再開の前に接続を確かめ、LINE との接続（bot_info）が
  * 通らないときは再開しない。確かめた結果は台帳にも残す。
  */
@@ -833,7 +834,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
 });
 
 /**
- * 「止めていたので送らなかった」の一覧（v6-33 §10-2）。
+ * 「止めていたので送らなかった」の一覧（-33 §10-2）。
  * 再開の画面で運用者が確認し、再実行は別途選ぶ。
  */
 lineAccounts.get(
@@ -1071,7 +1072,7 @@ function validateLoginChannelPair(
 }
 
 // Reject duplicate login_channel_id / liff_id across accounts.
-// /auth/callback and /api/liff/config both resolve the row with `.first()`
+// /auth/callback and /api/liff/config both resolve the row with `.first`
 // after a `WHERE col = ?` lookup, so duplicates would silently bind events
 // to whichever row D1 happens to return first. Two layers:
 //   1. this app-level pre-check for the sequential path (409 with the value),
@@ -1188,7 +1189,7 @@ async function probeFollowerCapability(channelAccessToken: string): Promise<'ava
 }
 
 /*
- * V8 登録 ④接続確認（`v2KMj`）用の検証の内訳。`steps` の5段とは切り口が
+ * V8 登録 ④接続確認（``）用の検証の内訳。`steps` の5段とは切り口が
  * 違い、画面の5行（チャネル・同じプロバイダー・Webhook・LINE ID・友だち
  * 追加URL）にそのまま載る。LINEにプロバイダ照合の口は無いため、
  * 同じプロバイダーは「Messaging APIとLINE Loginの両方の認証が通ったこと」
@@ -1221,7 +1222,7 @@ export function insightDateJst(now: Date = new Date()): string {
 }
 
 /*
- * 登録前の友だち総数。V8 ④の結果窓（`qw80E`）のボット情報に出す。
+ * 登録前の友だち総数。V8 ④の結果窓（``）のボット情報に出す。
  * 取れなければ null（表示は名前だけにする）。検査の合否には使わない。
  */
 export async function fetchPreConnectFollowerTotal(channelAccessToken: string): Promise<number | null> {
@@ -1806,7 +1807,7 @@ lineAccounts.patch(
 
       // Normalize: trim non-empty strings; treat empty/whitespace-only as null.
       // Empty-string-from-UI represents "user cleared the field" — store as NULL,
-      // not as empty string, so countryFlag() lookup degrades gracefully.
+      // not as empty string, so countryFlag lookup degrades gracefully.
       const country = normalizeOptionalString(body.country);
       const role = normalizeOptionalString(body.role);
       const loginChannelId = normalizeOptionalString(body.loginChannelId);

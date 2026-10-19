@@ -1,6 +1,10 @@
 import { logger } from '@line-crm/shared/server';
 import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import { effectiveStaffEditKeys, SCOPE_OPERATION_KEYS } from '@line-crm/shared';
+import {
+  ACCESS_ROLE_BUNDLE_IDS, SCOPE_ITEMS, BUNDLE_PRESETS, scopeLevelsToKeys, keysToScopeLevels,
+  type AccessRoleBundleId, type FeatureAccessLevel, type EmailMaskLevel, type ScopeLevels,
+} from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -20,20 +24,18 @@ import {
   sendStaffEmailChangeConfirmEmail, sendStaffEmailChangeNoticeEmail, sendStaffEmailChangeCompletedEmail,
 } from '../services/staff-invite.js';
 import { createTotpEnrollment, buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getLineAccounts } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import {
-  ACCESS_ROLE_BUNDLE_IDS, SCOPE_ITEMS, BUNDLE_PRESETS, scopeLevelsToKeys, keysToScopeLevels,
-  type AccessRoleBundleId, type FeatureAccessLevel, type EmailMaskLevel, type ScopeLevels,
-} from '@line-crm/shared';
+
+
 import {
   getStaffPermissionReceipt, saveStaffPermissionReceipt,
 } from '@line-crm/db';
 
 const staff = new Hono<Env>();
-// 招待の有効期限は7日。要件 v6-30 §9-2・§17(既存の48時間招待はその期限のまま守り、新規・再送から7日)。
+// 招待の有効期限は7日。要件 -30 §9-2・§17(既存の48時間招待はその期限のまま守り、新規・再送から7日)。
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /* 本人のメール変更の確認リンクは24時間。招待より短く、放置された変更申し込みが残らないようにする(N-433)。 */
 const EMAIL_CHANGE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -71,7 +73,7 @@ function safeJson<T>(value: string | null | undefined, fallback: T): T {
 }
 
 /**
- * N-424: 役割バンドル（v6-30 §7 のカタログ）。
+ * N-424: 役割バンドル（-30 §7 のカタログ）。
  * role_bundle 列が正本。未保存の行は role/access_level から従来どおり推定する。
  */
 function parseRoleBundle(value: string | null | undefined): AccessRoleBundleId | null {
@@ -508,7 +510,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
     if (accountScope.accountScope !== undefined && !await mayAssignAccountScopes(c.env.DB, current, accountScope.accountScope, accountScope.scopedLineAccountIds)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
     }
-    // 同じメールの行があるときの扱い。要件 v6-30 §9-2(既存メールは管理者へ安全な案内)。
+    // 同じメールの行があるときの扱い。要件 -30 §9-2(既存メールは管理者へ安全な案内)。
     // M957: 招待中・期限切れの行は作り直す（上書き・掃除）。送信されなかった
     // 幽霊行が残っていても、同じメールの招待し直しで古い行を消して作り直す
     // ので、409で永久に塞がらない。利用開始済みは従来どおり登録済みで断る。
@@ -608,7 +610,7 @@ staff.post('/api/staff/invitations/confirm/verify', inputJsonBoundary({"token":[
  * 同じ行を使い回す(新規行を作らず、作成日時などの履歴を残す)。旧トークンは
  * 上書きで失効し、新トークンの期限は7日(N-432)。二重押し・同時再送は後勝ちで、
  * 生き残るのは最後に発行した1つだけ。旧リンクの受諾は410で再発行を案内する。
- * 自動再送はしない(要件 v6-30 §9-2)。管理者が対象を確かめて押す運用にする。
+ * 自動再送はしない(要件 -30 §9-2)。管理者が対象を確かめて押す運用にする。
  */
 staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
   const id = c.req.param('id');
@@ -1139,7 +1141,7 @@ staff.post('/api/staff/:id/two-factor/confirm', inputJsonBoundary({"code":["stri
   const updated = await getStaffById(c.env.DB, id);
   if (updated) {
     await clearTwoFactorSetupAttempts(c.env.DB, id);
-    // 運営メンバーの招待（★V6 37-10）: 2要素認証の登録が終わった時点で登録完了にする
+    // 運営メンバーの招待（★37-10）: 2要素認証の登録が終わった時点で登録完了にする
     await activatePlatformAdminIfAwaitingTotp(c.env.DB, id);
     await revokeStaffAuthentication(c.env.DB, id);
   }

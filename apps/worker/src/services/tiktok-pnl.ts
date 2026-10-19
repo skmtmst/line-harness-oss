@@ -13,7 +13,7 @@ import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
  * worker が書くのは A〜L 列の生データだけ（M列以降は数式なので触らない）。
  * 秘密値（トークン・署名鍵）は応答・ログに出さない。
  */
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import {
   GoogleBusinessError,
   authorizedJson,

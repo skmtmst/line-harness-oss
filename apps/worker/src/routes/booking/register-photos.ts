@@ -1,6 +1,6 @@
 import type { Context, Hono } from 'hono';
 import { BOOKING_MENUS_KEY, BOOKING_SETTINGS_KEY } from '@line-crm/shared';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import { requirePermission } from '../../middleware/role-guard.js';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { logger } from '@line-crm/shared/server';

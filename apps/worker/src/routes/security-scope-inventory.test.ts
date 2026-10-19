@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { tenantScopeMiddleware } from '../middleware/tenant-scope.js';
 import { profileRefresh } from './profile-refresh.js';

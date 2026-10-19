@@ -89,7 +89,7 @@ vi.mock('./outgoing-webhook-delivery.js', async () => {
   };
 });
 
-vi.mock('./automation-triggers.js', () => ({
+vi.mock('../features/automations/automation-triggers.js', () => ({
   dispatchAutomationEventWithLogging: vi.fn().mockResolvedValue([]),
 }));
 
@@ -253,7 +253,7 @@ describe('fireEvent — send_message action logging', () => {
   });
 });
 
-describe('fireEvent — V6分析イベント', () => {
+describe('fireEvent — 分析イベント', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     actionScoreMocks.applyActionScoreEvent.mockResolvedValue({
@@ -308,7 +308,7 @@ describe('fireEvent — V6分析イベント', () => {
   });
 });
 
-describe('fireEvent — V6行動スコア', () => {
+describe('fireEvent — 行動スコア', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const dbModule = await import('@line-crm/db');
@@ -352,12 +352,12 @@ describe('fireEvent — V6行動スコア', () => {
   });
 
   /*
-   * IDEA-17: V6ルール未設定で旧ルールへ落ちるときも、発生元の不変IDを
+   * IDEA-17: ルール未設定で旧ルールへ落ちるときも、発生元の不変IDを
    * 渡して決定的な履歴IDで受け付ける。実行台帳(execution)が無い呼び出し
    * でも payload.sourceEventId があれば、同じイベントの走り直しで
    * スコアと履歴は二重に増えない。
    */
-  it('V6未設定でも発生元IDが分かる旧ルール適用は冪等キー付きで呼ぶ', async () => {
+  it('未設定でも発生元IDが分かる旧ルール適用は冪等キー付きで呼ぶ', async () => {
     const dbModule = await import('@line-crm/db');
     actionScoreMocks.applyActionScoreEvent.mockResolvedValue({
       configured: false,
@@ -557,7 +557,7 @@ describe('fireEvent — 広告成果の配線(#638)', () => {
   });
 });
 
-describe('fireEvent — EC正規化イベントのV6連携', () => {
+describe('fireEvent — EC正規化イベントの連携', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const dbModule = await import('@line-crm/db');
@@ -582,7 +582,7 @@ describe('fireEvent — EC正規化イベントのV6連携', () => {
 
   it('自動化・分析・スコアへ同一イベントIDで渡す', async () => {
     const dbModule = await import('@line-crm/db');
-    const triggers = await import('./automation-triggers.js');
+    const triggers = await import('../features/automations/automation-triggers.js');
     const db = fakeDb({ capturedInserts: [] });
 
     await fireEvent(db, 'ec.order.confirmed', ecPayload(), 'account-token', 'account-a');
@@ -612,7 +612,7 @@ describe('fireEvent — EC正規化イベントのV6連携', () => {
 
   it('分析の記録に失敗しても自動化への連携は止めない', async () => {
     const dbModule = await import('@line-crm/db');
-    const triggers = await import('./automation-triggers.js');
+    const triggers = await import('../features/automations/automation-triggers.js');
     (dbModule.recordAnalyticsEvent as unknown as { mockRejectedValueOnce: (e: unknown) => void })
       .mockRejectedValueOnce(new Error('analytics_event_type_unknown:ec.order.cancelled'));
     const db = fakeDb({ capturedInserts: [] });
@@ -631,8 +631,8 @@ describe('fireEvent — EC正規化イベントのV6連携', () => {
     errorLog.mockRestore();
   });
 
-  it('アカウントが分からないイベントはV6自動化へ渡さない', async () => {
-    const triggers = await import('./automation-triggers.js');
+  it('アカウントが分からないイベントは自動化へ渡さない', async () => {
+    const triggers = await import('../features/automations/automation-triggers.js');
     const db = fakeDb({ capturedInserts: [] });
 
     await fireEvent(db, 'ec.order.confirmed', {

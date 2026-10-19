@@ -1,6 +1,7 @@
 import { restaurantCivilTime, validRestaurantDate } from './restaurant-booking.js';
 import { closuresForRange, closureAffectsTable } from './restaurant-closures.js';
 import { reservationInstant, type RestaurantOpeningDay } from '@line-crm/shared';
+
 type Interval=[number,number];
 function union(intervals:Interval[]):Interval[] {const out:Interval[]=[];for(const range of intervals.sort((a,b)=>a[0]-b[0])){const last=out.at(-1);if(last&&range[0]<=last[1])last[1]=Math.max(last[1],range[1]);else if(range[1]>range[0])out.push([...range]);}return out;}
 function subtract(open:Interval[],closed:Interval[]):Interval[] {let remaining=union(open);for(const [from,to] of union(closed))remaining=remaining.flatMap(([a,b])=>to<=a||from>=b?[[a,b]] as Interval[]:[[a,Math.min(b,from)],[Math.max(a,to),b]].filter(([x,y])=>y>x) as Interval[]);return remaining;}

@@ -1,13 +1,10 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
-import {
-  cancelMeetConsultation,
-  registerMeetConsultation,
-  type RegisterMeetConsultationInput,
-} from '../services/meet-consultation-reminders.js';
+import { cancelMeetConsultation, registerMeetConsultation } from '../services/meet-consultation-reminders.js';
+import { type RegisterMeetConsultationInput } from '../services/meet-reminder-types.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const meetConsultations = new Hono<Env>();

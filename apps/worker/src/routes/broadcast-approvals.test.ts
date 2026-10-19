@@ -1,5 +1,5 @@
 /*
- * m12a 一斉配信の二者承認（v6-06 §6）。
+ * m12a 一斉配信の二者承認（-06 §6）。
  *
  * 見張るのは「人数の境目」と「送る人と承認する人は別人」と
  * 「期限切れは送らない」の3つ。承認済みになってから既存の送信の
@@ -7,8 +7,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index';
-import type { AuthenticatedStaff } from '../middleware/auth';
+import type { Env } from '../worker-env';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { broadcasts } from './broadcasts';
 import { broadcastApprovals } from './broadcast-approvals';
@@ -16,7 +16,7 @@ import {
   checkScheduledBroadcastApproval,
   enforceBroadcastSendApproval,
   sweepBroadcastApprovalExpiry,
-} from '../services/broadcast-approval';
+} from '../features/broadcasts/broadcast-approval';
 import { getBroadcastById } from '@line-crm/db';
 
 const owner: AuthenticatedStaff = {

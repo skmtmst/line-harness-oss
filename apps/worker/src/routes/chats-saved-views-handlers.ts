@@ -4,7 +4,7 @@ import { serializeInboxSavedView } from '../services/inbox-saved-view-response.j
 import { inputError } from '../lib/input-errors.js';
 
 import { getOperatorById, getChatById, createChat, getFriendById, getSavedSearches, getSavedSearchById, createSavedSearch, updateSavedSearch, deleteSavedSearch, validateInboxSavedViewConditions, jstNow } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { inboxEventStatement, inboxNoteStatement, isInboxStatus } from '../services/inbox-events.js';

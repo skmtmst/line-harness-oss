@@ -6,7 +6,7 @@ import {
   createStripeEvent,
   addTagToFriend,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { listLimit } from './list-pagination.js';

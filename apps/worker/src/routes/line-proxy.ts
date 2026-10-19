@@ -18,11 +18,14 @@ import {
   OPERATION_CAPABILITIES,
 } from '@line-crm/db';
 import type { Friend, LineAccount, OperationCapability } from '@line-crm/db';
+
+
+
 import { OPERATION_PROXY_CAPABILITY_HEADER } from '../services/operation-send-paths.js';
 import { authenticateApiToken } from '../middleware/auth.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { messageToLogPayload } from '../services/step-delivery.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * LINE Messaging API 互換プロキシ。

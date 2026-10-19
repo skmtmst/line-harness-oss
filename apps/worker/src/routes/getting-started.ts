@@ -3,18 +3,18 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration, resolveLineCredential } from '@line-crm/db';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { expectedWebhookUrl, fetchWebhookEndpoint } from '../lib/webhook-endpoint.js';
 
 /**
- * はじめの設定の順路。設計 ★V6 34-1（`RAW35`）。台帳 #134。
+ * はじめの設定の順路。設計 ★34-1（`RAW35`）。台帳 #134。
  *
  * **画面を開いたかではなく、実際に作られたもので判定する。**
  * 訪問の記録は持たない。毎回いまの中身を数え、キャッシュもしない
- * （要件 v6-34 §6-1）。
+ * （要件 -34 §6-1）。
  */
 const gettingStarted = new Hono<Env>();
 

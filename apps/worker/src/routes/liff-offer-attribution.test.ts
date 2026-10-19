@@ -41,7 +41,7 @@ vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateFriendAdd }
 // Ref-attribution tag attach now goes through the guarded helper (fires
 // tag_added side effects only on first-time attach) — assert on this mock.
 const attachTagAndFireSideEffects = vi.fn().mockResolvedValue({ added: true });
-vi.mock('../services/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects }));
+vi.mock('../features/friends/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects }));
 
 // Import after the mock so index.ts binds the mocked helpers.
 const worker = (await import('../index.js')).default;

@@ -3,10 +3,11 @@ import { applyVideoMediaSelection } from './webinar-video-selection.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getWebinarById, getWebinarBySlug, updateWebinar, getWebinarComments, getWebinarCtas, replaceWebinarCtas, replaceWebinarComments, getWebinarRetention, countWebinarStartedViewers, countWebinarHeartbeatRejects, getWebinarUserComments, getWebinarSessionStats, getWebinarDropoff, getWebinarParticipantStats, getWebinarAnalyticsSummary, getWebinarDailyStats, getWebinarFormFunnelStats, getWebinarEditorSettings, saveWebinarEditorSettings, getWebinarViewSegmentCoverage, getWebinarParticipantOperations, classifyWebinarParticipant, getWebinarActions, replaceWebinarActions, countInvalidWebinarActionReferences, getFormById, formBelongsToLineAccount, getFolderById, type WebinarParticipantClassification, type WebinarParticipantStat } from '@line-crm/db';
-import { parseScheduleRules, upcomingSessions } from '../services/webinar-schedule.js';
-import { sendWebinarNotificationTest } from '../services/webinar-notifications.js';
+
+import { parseScheduleRules, upcomingSessions } from '../features/webinars/webinar-schedule/index.js';
+import { sendWebinarNotificationTest } from '../features/webinars/webinar-notifications/index.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';

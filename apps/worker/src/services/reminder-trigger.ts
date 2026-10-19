@@ -21,6 +21,7 @@ import {
   type RescheduleV6RemindersResult,
   type V6WriteGuard,
 } from '@line-crm/db';
+
 import { matchesCondition, parseCondition } from './segment-query.js';
 
 export type ReminderTriggerType = 'manual' | 'booking' | 'event';
@@ -282,7 +283,7 @@ export interface CancelByTriggerInput {
 }
 
 /**
- * 取消を V6 へ連動する。未送信だけを止め、送信済み履歴は残す。
+ * 取消を へ連動する。未送信だけを止め、送信済み履歴は残す。
  *
  * 同じ取消通知の再送は active が無いため 0 件で返す。
  * 失敗は呼び出し側へ投げる。黙って握ると取消漏れ (N-065 そのもの) になる。
@@ -322,7 +323,7 @@ export interface RescheduleByTriggerInput {
 }
 
 /**
- * 日程変更を V6 へ連動する。送信済みを残し、未来予定だけ新基準日へ移す。
+ * 日程変更を へ連動する。送信済みを残し、未来予定だけ新基準日へ移す。
  *
  * 同じ変更通知の再送は from の起点が既に無いため 0 件で返す。
  *

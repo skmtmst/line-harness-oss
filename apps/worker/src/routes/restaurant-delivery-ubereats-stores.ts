@@ -9,9 +9,8 @@
  */
 import { logger } from '@line-crm/shared/server';
 import type { Context, Hono } from 'hono';
-import { logger } from '@line-crm/shared/server';
 import { decryptCredential } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';

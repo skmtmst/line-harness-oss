@@ -1,5 +1,5 @@
 /*
- * P0-8 一斉配信の staff 個別権限キー（v6-06 §6 の6キー）を効かせる。
+ * P0-8 一斉配信の staff 個別権限キー（-06 §6 の6キー）を効かせる。
  *
  * 要件の表：下書き作成・編集=definition.edit／テスト送信=test.send／
  * 予約・即時送信=definition.publish／緊急停止=job.stop／失敗再送=job.retry／
@@ -7,8 +7,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const mocks = vi.hoisted(() => ({
   getBroadcastById: vi.fn(),
@@ -47,8 +47,8 @@ vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: vi.fn(async () => true),
 }));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: vi.fn() }));
-vi.mock('../services/broadcast-preflight.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/broadcast-preflight.js')>()),
+vi.mock('../features/broadcasts/broadcast-preflight.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/broadcasts/broadcast-preflight.js')>()),
   previewAudience: mocks.previewAudience,
   hasRecentSimilarBroadcast: mocks.hasRecentSimilar,
 }));

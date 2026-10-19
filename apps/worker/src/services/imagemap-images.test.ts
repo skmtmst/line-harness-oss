@@ -1,8 +1,8 @@
 import {describe,it,expect,vi} from 'vitest';
 import {prepareImagemapImages,IMAGEMAP_WIDTHS} from './imagemap-images.js';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 vi.mock('./file-scan.js',()=>({checkMediaGate:vi.fn(async()=>({allowed:true})),checkKeyGate:vi.fn(async()=>({allowed:true}))}));
-vi.mock('./media-metadata.js',()=>({imageDimensions:()=>({width:1040,height:520})}));
+vi.mock('../features/media/media-metadata.js',()=>({imageDimensions:()=>({width:1040,height:520})}));
 describe('イメージマップのR2画像',()=>{
  it('5種類の幅を実際に変換し、拡張子のないURLで保存する',async()=>{
   const transform=vi.fn();const put=vi.fn();const run=vi.fn();

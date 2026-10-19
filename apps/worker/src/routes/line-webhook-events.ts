@@ -6,7 +6,7 @@ import {
   listLineWebhookEvents,
 } from '@line-crm/db';
 import type { LineWebhookEventStatus } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';

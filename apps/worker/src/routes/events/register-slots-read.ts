@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
 import { requireRole } from '../../middleware/role-guard.js';
@@ -46,7 +46,7 @@ events.get('/api/events/admin/events/:id/occurrence-selector', async (c) => {
 // GET /api/events/admin/events/:id/waitlist — キャンセル待ちの一覧
 //
 // 空きが出たときに誰へ案内したかも含めて見るための互換一覧。
-// V6の開催回別画面は /occurrences/:id/applicants を使う。
+// の開催回別画面は /occurrences/:id/applicants を使う。
 events.get('/api/events/admin/events/:id/waitlist', async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
@@ -68,7 +68,7 @@ events.get('/api/events/admin/events/:id/waitlist', async (c) => {
   return c.json({ waitlist: results });
 });
 
-// V6では event_slots を「開催回(occurrence)」として扱う。
+// では event_slots を「開催回(occurrence)」として扱う。
 events.get(
   '/api/events/admin/occurrences/:id/applicants',
   requireRole('owner', 'admin', 'staff'),

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // N-316(#626): events / subscriptions / connector / settings の4 GET が
 // overview / orders 等と同じ requireEcPermission('ec.event.view') で守られること。
@@ -21,7 +21,7 @@ const accessMocks = vi.hoisted(() => ({
 vi.mock('@line-crm/db', () => dbMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
 vi.mock('../services/event-bus.js', () => ({ logOutgoingMessage: vi.fn() }));
-vi.mock('../services/ec-notification-message.js', () => ({ ecFlexMessage: vi.fn() }));
+vi.mock('../features/ec-commerce/ec-notification-message.js', () => ({ ecFlexMessage: vi.fn() }));
 vi.mock('./line-notifications.js', () => ({ notificationDeliveriesResponse: vi.fn() }));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: vi.fn() }));
 

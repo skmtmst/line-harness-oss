@@ -187,16 +187,37 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
         .filter(node => node.name).map(node => [node.name!.text, node])),
     }] as const;
   }));
-  const routes = new Map([...sources].map(([file]) => [file, inspectScopedRouteSource(file, metadata.get(file)!.ast, (module, name) => {
-    const importedSource = readFileSync(resolve(dirname(file), module.replace(/\.js$/, '.ts')), 'utf8');
-    const ast = ts.createSourceFile(module, importedSource, ts.ScriptTarget.Latest, true);
+  const constantSources = new Map<string, ts.SourceFile>();
+  function importedStringConstant(file: string, name: string, seen = new Set<string>()): string[] {
+    const key = `${file}:${name}`;
+    if (seen.has(key)) return [];
+    const nextSeen = new Set(seen).add(key);
+    let ast = constantSources.get(file);
+    if (!ast) {
+      ast = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+      constantSources.set(file, ast);
+    }
     for (const statement of ast.statements) {
-      if (!ts.isVariableStatement(statement)) continue;
-      for (const declaration of statement.declarationList.declarations) {
-        if (ts.isIdentifier(declaration.name) && declaration.name.text === name && declaration.initializer && ts.isStringLiteral(declaration.initializer)) return [declaration.initializer.text];
+      if (ts.isVariableStatement(statement)) {
+        for (const declaration of statement.declarationList.declarations) {
+          if (ts.isIdentifier(declaration.name) && declaration.name.text === name && declaration.initializer && ts.isStringLiteral(declaration.initializer)) return [declaration.initializer.text];
+        }
+      }
+      if (ts.isExportDeclaration(statement) && !statement.isTypeOnly
+        && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+        const binding = statement.exportClause.elements.find(entry => !entry.isTypeOnly && entry.name.text === name);
+        if (!binding) continue;
+        const target = statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)
+          ? resolve(dirname(file), statement.moduleSpecifier.text.replace(/\.js$/, '.ts')) : file;
+        return importedStringConstant(target, (binding.propertyName ?? binding.name).text, nextSeen);
       }
     }
+    const imported = importedRouters(ast).get(name);
+    if (imported) return importedStringConstant(resolve(dirname(file), imported.module.replace(/\.js$/, '.ts')), imported.exported, nextSeen);
     return [];
+  }
+  const routes = new Map([...sources].map(([file]) => [file, inspectScopedRouteSource(file, metadata.get(file)!.ast, (module, name) => {
+    return importedStringConstant(resolve(dirname(file), module.replace(/\.js$/, '.ts')), name);
   })]));
   function mounted(file: string, router: string, prefix = '', ancestors = new Set<string>(), inherited: SecurityRoute[] = []): SecurityRoute[] {
     const key = `${file}:${router}`;

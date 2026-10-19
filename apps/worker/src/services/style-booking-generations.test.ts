@@ -1,19 +1,19 @@
 import { deleteCustomerData } from './customer-data-deletion.js';
 import { prepareEventNotification } from './event-notification-plan.js';
 import { bookingPassPlans } from '../routes/booking-pass-plans.js';
-import { absence,useMakeup } from './booking-makeup.js';
+import { absence,useMakeup } from '../features/booking/booking-makeup.js';
 import { cancelByTrigger } from './reminder-trigger.js';
 import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import events from '../routes/events.js';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { entitlementUseStatement, entitlementViews, grantEntitlement } from './booking-entitlements.js';
+import { entitlementUseStatement, entitlementViews, grantEntitlement } from '../features/booking/booking-entitlements.js';
 import { discardUnacceptedEventBooking, eventEntitlementUse, returnEventEntitlement, transferEventEntitlement, validateEventEntitlement } from './event-entitlements.js';
 import { registerMeetConsultation, cancelMeetConsultation, processDueMeetConsultationReminders } from './meet-consultation-reminders.js';
 import { recoverEventTransitions } from './event-transition-recovery.js';
-import { passPlanInput } from './booking-pass-plans.js';
+import { passPlanInput } from '../features/booking/booking-pass-plans.js';
 
 vi.mock('./account-access.js',()=>({canAccessAllLineAccounts:async(_db:unknown,_staff:unknown,ids:string[])=>ids.every(id=>id==='a')}));
 vi.mock('./liff-auth.js',()=>({verifyCallerLineUserId:vi.fn(async()=> 'Uf')}));

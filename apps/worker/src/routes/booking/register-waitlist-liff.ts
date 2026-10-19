@@ -1,10 +1,10 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { openSeatTables, closuresForRange, closureAffectsTable } from '../../services/restaurant-closures.js';
 import { explainBookingSlot, getAccountTimeZone, tzDateStr, tzHHMM } from '../../services/availability.js';
-import { finishExpiredWaitlists, promoteBookingWaitlist } from '../../services/booking-waitlist.js';
+import { finishExpiredWaitlists, promoteBookingWaitlist } from '../../features/booking/booking-waitlist/index.js';
 import { insertSeatWaitlistEntry } from '../restaurant-test.js';
 import { restaurantTestEnabled } from '../../lib/environment-features.js';
 import { validateInboundReservation } from '../../services/restaurant-test.js';

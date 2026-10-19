@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = vi.hoisted(() => ({
   recordSiteEvent: vi.fn(),
@@ -412,7 +412,7 @@ it('API-02 rejects impossible date in page-view aggregation',async()=>{
 });
 
 
-describe('B-333 サイト計測の出どころと再送', () => {
+describe('サイト計測の出どころと再送', () => {
   const body = { visitorId: VALID_ID, trackingKey: 'hk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', consent: 'granted' };
   it('許可していない送信元・送信元なしを記録しない', async () => {
     mocks.siteAllowsHost.mockResolvedValueOnce(false);

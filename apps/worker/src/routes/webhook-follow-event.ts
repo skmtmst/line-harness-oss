@@ -11,17 +11,19 @@ import type { WebhookEvent } from '@line-crm/line-sdk';
 
 import { upsertFriend, getScenarios, enrollFriendInScenario, jstNow, getEntryRouteByRefCode, getMessageTemplateById, getFriendAddScenarioIds, recordFriendAddEvent, captureFriendAddEventAttribution, markFriendAddEventRouting, claimFriendAddSendRight, touchFriendAddSendClaim, recordFriendAddDelivery, releaseFriendAddSendRight, toJstString } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
+
+
 import { isStoppedEntryRouteRef, getActiveStopSuppressionSafe } from '../services/entry-route-stop.js';
-import { applyFriendAddRouting } from '../services/friend-add-routing.js';
+import { applyFriendAddRouting } from '../features/friends/friend-add-routing/index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 
 import { buildMessage } from '../services/step-delivery.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { createEccubeCoupon } from '../services/eccube-coupon.js';
-import { issueFriendAddCoupon } from '../services/friend-add-coupon.js';
+import { issueFriendAddCoupon } from '../features/friends/friend-add-coupon/index.js';
 
 import { isFriendScopeConflict, type FollowSendOutcome, stableRetryKey, classifyFollowSendFailure } from './webhook-definition-is-friend-scope-conflict.js';
 
@@ -76,7 +78,7 @@ export async function handleFollowEvent(
     if (friend.is_following === 0 || (friend.last_followed_at && Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(friend.last_followed_at)?friend.last_followed_at:`${friend.last_followed_at}${friend.last_followed_at.length===10?'T00:00:00':''}+09:00`) > event.timestamp)) return;
     const friendKind = (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time';
 
-    // V6台帳はWebhookイベント単位。初回流入 friends.ref_code とは分離し、
+    // 台帳はWebhookイベント単位。初回流入 friends.ref_code とは分離し、
     // 再追加でも「今回開いたリンク」が取れた場合だけ候補を結び付ける。
     let friendAddEventId: string | null = null;
     /** 台帳の行を作れなかった。送信権を持てないので外部送信はしない。 */

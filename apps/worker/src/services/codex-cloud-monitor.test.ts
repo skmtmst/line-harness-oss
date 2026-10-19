@@ -1,6 +1,6 @@
 import { currentRequestId, resumeInvocation, withInvocation } from '@line-crm/shared/server';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import {
   classifyCodexMonitorError,
   createCodexQueueFailureLog,

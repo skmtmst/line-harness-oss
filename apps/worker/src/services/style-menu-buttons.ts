@@ -1,5 +1,6 @@
 import { restaurantMenuButtons } from './style-restaurant-buttons.js';
 import { liffActionUrl, type AccountStyle, type SetupAnswer } from '@line-crm/shared';
+
 import { isCustomerUri, type StarterItem } from './style-starter-definition.js';
 import { featureReadiness } from './style-readiness.js';
 

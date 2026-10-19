@@ -5,9 +5,11 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 import { buildReminderStepMessage } from '../services/reminder-delivery.js';
 import { getTemplateById } from '@line-crm/db';
-
 import { getFriendById, getReminders, getRemindersByIds, reorderReminders, getReminderById, getReminderSteps, getReminderVersionSteps, createReminderWithDraftVersion, getReminderDraftVersion, getReminderPublishedVersion, parseReminderVersionSettings, publishReminderDraftVersion, recordReminderDraftTest, saveReminderDraftVersion, type ReminderDraftSettings } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
@@ -154,7 +156,7 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
         return c.json({ success: false, error: 'Reminder not found' }, 404);
       }
       /*
-       * 並びは getReminders() と同じにする（161）。
+       * 並びは getReminders と同じにする（161）。
        *
        * ここだけ created_at DESC のままだと、**画面から並べ替えても効かない。**
        * アカウントを選んでいるのが通常の状態（選択は既定で先頭のアカウントに

@@ -4,10 +4,10 @@ import {
   listManualLinks,
   recordCheck,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * マニュアル導線の週1回の点検（要件 v6-34 §8-4）。台帳 #134。
+ * マニュアル導線の週1回の点検（要件 -34 §8-4）。台帳 #134。
  *
  * **開けたかどうかを、確かめて初めて言う。** URL が入っているだけでは
  * 「開けます」と書かない。読めなかったものは `broken` にして、

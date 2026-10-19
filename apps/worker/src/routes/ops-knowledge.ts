@@ -5,7 +5,8 @@ import {
   knowledgeFeedback, knowledgeForTicket, listKnowledgeArticles, listSupportMessages, recordPlatformAudit,
   retryKnowledgeJob, reviewKnowledgeArticle, type KnowledgeArticle, type KnowledgeArticleInput,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { dbFor } from '../services/db-router.js';
 import { knowledgeNames, knowledgeSources, processKnowledgeJob, redactKnowledgeText,

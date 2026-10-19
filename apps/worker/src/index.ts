@@ -212,7 +212,8 @@ import { securityAlerts } from './routes/security-alerts.js';
 import { unhandledWorkerError } from './lib/unhandled-error.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 
-import { classifyCodexMonitorError, markCodexMentionFailed, processCodexMentionMessage, shouldStopCodexQueueRetry, type CodexMentionQueueMessage } from './services/codex-cloud-monitor.js';
+import { classifyCodexMonitorError, markCodexMentionFailed, processCodexMentionMessage, shouldStopCodexQueueRetry } from './services/codex-cloud-monitor.js';
+import { type CodexMentionQueueMessage } from './services/codex-cloud-types.js';
 import { createQrImage, isQrDataAllowed, normalizeQrFormat, normalizeQrSize, qrResponseHeaders, QrInputError, QR_MAX_RESPONSE_BYTES } from './lib/qr-response.js';
 import { storedRedirectTarget } from './lib/safe-redirect.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';

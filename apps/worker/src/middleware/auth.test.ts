@@ -13,11 +13,11 @@ import { resolveCorsOrigin } from './admin-auth-config.js';
 import { requirePlatformAdmin } from './platform-admin.js';
 import { adminAuth } from '../routes/admin-auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 vi.mock('@line-crm/db', async original => ({
   ...await original<typeof import('@line-crm/db')>(),
-  // 代理ログイン（★V6 37-5）。ここでは常に「無し」。
+  // 代理ログイン（★37-5）。ここでは常に「無し」。
   getActiveImpersonation: vi.fn(async () => null),
   getPlatformAdminByStaffId: vi.fn(async (_db: unknown, staffId: string) => staffId === 'ops-staff-1'
     ? { staff_id: staffId, is_active: 1, activation_state: 'active' }

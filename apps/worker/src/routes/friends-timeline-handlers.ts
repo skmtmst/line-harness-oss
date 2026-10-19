@@ -3,7 +3,7 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getFriendById, jstNow } from '@line-crm/db';
 import { buildMessage } from '../services/step-delivery.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 
 import { classifyLineOutboundFailure, completeOutboundSendStatement, failOutboundSend, hashOutboundPayload, isValidIdempotencyKey, reserveOutboundSend } from '../services/outbound-idempotency.js';

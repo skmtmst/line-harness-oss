@@ -128,7 +128,7 @@ export function createTestD1(
   let batchTail:Promise<unknown>=Promise.resolve();
   const db = {
     prepare: (sql: string) => ({
-      // batch が SELECT へ .all() を振り分けられるよう、元の SQL を残しておく。
+      // batch が SELECT へ .all を振り分けられるよう、元の SQL を残しておく。
       bind: (...args: unknown[]) => {
         if (args.length > 100) throw new Error(`D1 bind limit exceeded: ${args.length} > 100`)
         return { ...wrap(raw, sql, args), sql }
@@ -144,7 +144,7 @@ export function createTestD1(
         for (const statement of statements) {
           /*
            * 実 D1 の batch は SELECT 文でも .results を返す。ここで一律
-           * .run() すると .results が無く、batch 内で SELECT を投げる
+           * .run すると .results が無く、batch 内で SELECT を投げる
            * 呼び出し側（使用先のまとめ集計など）が黙って壊れる。
            */
           const sql = (statement as unknown as { sql?: string }).sql ?? '';
@@ -161,7 +161,7 @@ export function createTestD1(
           } catch (error) {
             if(!String((error as {message?:unknown})?.message).includes('does not return data'))throw error;
             // WITH x AS (...) INSERT ... のように WITH で始まる書き込みもある。
-            // returnsData が無い文に .all() すると実行前に失敗するので .run() へ倒す。
+            // returnsData が無い文に .all すると実行前に失敗するので .run へ倒す。
             const result=invoke('run');results.push(result && typeof (result as Promise<unknown>).then==='function'?await result:result);
           }
         }

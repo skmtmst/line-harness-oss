@@ -2,8 +2,8 @@
  * 状態の写像が JS と SQL で一致すること(#731)。
  *
  * 契約の状態は、いま2か所で判定している。
- *   - JS: `subscriptionState()`   … 1件を整形するとき
- *   - SQL: `subscriptionStateSql()` … 数えるとき・絞り込むとき・並べるとき
+ *   - JS: `subscriptionState`   … 1件を整形するとき
+ *   - SQL: `subscriptionStateSql` … 数えるとき・絞り込むとき・並べるとき
  *
  * **表(`SUBSCRIPTION_STATE_RULES`)は1か所だけ**にしてあるが、表を共有しても
  * **順序までは揃わない**。「解約」と「休止」の両方を含む文字列がどちらに倒れるかは、

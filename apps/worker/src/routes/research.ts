@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import { getLineAccounts, getFriendByLineUserIdForAccount, isLineAccountTenantActive } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { ensureResearchForm } from '../services/research-forms.js';
 

@@ -1,10 +1,10 @@
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
-import { purgeUnsafeFormDocuments } from '../services/form-documents.js';
+import { purgeUnsafeFormDocuments } from '../features/forms/form-documents/index.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditEventStatement, recordAuditEvent } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -180,7 +180,7 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   const allowed: FileScanStatus[] = ['pending', 'clean', 'rejected', 'quarantined'];
-  // 板 `PfA4o` の「戻した」札。戻したものだけを見る口。`clean` には一度も
+  // 板 `` の「戻した」札。戻したものだけを見る口。`clean` には一度も
   // 止められていないものも混ざるため、`released_at` で絞る。
   const releasedOnly = status === 'released';
   const conditions = releasedOnly
@@ -274,7 +274,7 @@ fileScan.get('/api/file-scans/for-media', requireRole('owner', 'admin', 'staff')
   return c.json({ success: true, data: { scan: serializeScan(scan) } });
 });
 
-/** 止まっている時の表示（B-3）。staff も見られる。赤は使わない。 */
+/** 止まっている時の表示。staff も見られる。赤は使わない。 */
 fileScan.get('/api/file-scans/health', requireRole('owner', 'admin', 'staff'), async (c) => {
   const accountId = (c.req.query('accountId') ?? '').trim();
   if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
@@ -482,7 +482,7 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
   // 共通監査は長い文字列を秘密値として伏せる。ホストだけを短い断片で
   // 保存すれば、その保護を緩めず長い正式ホストも正確に復元できる。
   // 3文字の断片は電話番号の伏せ字にも該当しない。1配列50項目の上限を
-  // 守って二段に分け、最大253文字をすべて保存する。flat().join('')で復元。
+  // 守って二段に分け、最大253文字をすべて保存する。flat.join('')で復元。
   const auditHost = endpointHost && (endpointHost.length > 200 || /[A-Za-z0-9_-]{32,}|[0-9-]{6,}/.test(endpointHost))
     ? { endpointHostParts: [endpointHost.slice(0, 150).match(/.{1,3}/g)!, ...(endpointHost.length > 150 ? [endpointHost.slice(150).match(/.{1,3}/g)!] : [])] }
     : { endpointHost };

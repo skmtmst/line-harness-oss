@@ -2,7 +2,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess } from '../middleware/role-guard.js';
 
 import { get__api_rich_menu_groups_external_richMenuId_image_1, post__api_rich_menu_groups_import_2, get__api_rich_menu_groups_external_3, delete__api_rich_menu_groups_external_richMenuId_4, get__api_rich_menu_groups_tap_stats_5, get__api_rich_menu_groups_6 } from './rich-menu-groups-external.js';

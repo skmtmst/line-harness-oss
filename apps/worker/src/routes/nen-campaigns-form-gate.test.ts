@@ -6,7 +6,7 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type Database from 'better-sqlite3';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 const accessMocks = vi.hoisted(() => ({ canAccess: vi.fn(async () => true) }));

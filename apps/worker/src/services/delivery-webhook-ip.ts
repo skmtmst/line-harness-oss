@@ -5,7 +5,7 @@
  * - DBも fetch も触らない。設定（env）と文字列だけを見る。
  * - 受け口（routes/restaurant-delivery.ts）はここを本文を読む前に通す。
  */
-import type { DeliveryService } from './restaurant-delivery.js';
+import type { DeliveryService } from './delivery-service-types.js';
 
 /** 受け口の関門に必要な設定だけ。DeliveryEnv がこれを引き継ぐ。 */
 export interface DeliveryWebhookEnv {

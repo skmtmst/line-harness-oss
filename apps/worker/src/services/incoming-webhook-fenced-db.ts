@@ -24,7 +24,7 @@ export function classifySingleStatement(
       i = end + 2;
       continue;
     }
-    // D1's all() can execute a SELECT followed by a mutation. No token (including
+    // D1's all can execute a SELECT followed by a mutation. No token (including
     // another semicolon) may follow the one optional terminal semicolon.
     if (terminated) unsupported();
     if (!keyword) {

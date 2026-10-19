@@ -5,10 +5,10 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getBroadcastById, countBroadcastLedger, deriveBroadcastDisplayStatus, BROADCAST_DISPLAY_STATUS_LABELS } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
-import { addTestLabel, assertMessagePartsResolved, autoTrackMessageParts, buildMessages, combinedMessageContent, parseBroadcastMessageParts, renderMessageParts } from '../services/broadcast-message-set.js';
-import type { SegmentCondition } from '../services/segment-query.js';
+import { addTestLabel, assertMessagePartsResolved, autoTrackMessageParts, buildMessages, combinedMessageContent, parseBroadcastMessageParts, renderMessageParts } from '../features/broadcasts/broadcast-message-set/index.js';
+import type { SegmentCondition } from '@line-crm/shared';
 import { getLineAccountById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';

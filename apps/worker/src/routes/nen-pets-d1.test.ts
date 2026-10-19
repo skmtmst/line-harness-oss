@@ -1,5 +1,5 @@
 /*
- * 管理画面 マイペット（★V6 37-3）／健康日記（★V6 37-4）の API を実D1で固定する。
+ * 管理画面 マイペット（★37-3）／健康日記（★37-4）の API を実D1で固定する。
  *  1. /api/nen/pets：一覧・KPI・今日の目安・体重の更新日（90日）・絞り込み・並び
  *  2. /api/nen/health：記録のあるペットだけ。8週の週平均体重・気になる変化・KPI・絞り込み
  *  3. /api/nen/health/:petId/summary：30日のまとめ。別アカウントのペットは 404
@@ -88,7 +88,7 @@ beforeEach(() => {
   seed(sql);
 });
 
-describe('GET /api/nen/pets（★V6 37-3 マイペット）', () => {
+describe('GET /api/nen/pets（★37-3 マイペット）', () => {
   it('一覧・KPI・今日の目安・体重の更新日を返し、別アカウントのペットは含めない', async () => {
     const { status, body } = await get(`/api/nen/pets?accountId=${ACCOUNT}`);
     expect(status).toBe(200);
@@ -202,7 +202,7 @@ describe('GET /api/nen/pets（★V6 37-3 マイペット）', () => {
   });
 });
 
-describe('GET /api/nen/health（★V6 37-4 健康日記）', () => {
+describe('GET /api/nen/health（★37-4 健康日記）', () => {
   beforeEach(() => seedHealth(sql));
 
   it('記録のあるペットだけを、気になる変化の順に返す。KPI と 8週の体重も付く', async () => {

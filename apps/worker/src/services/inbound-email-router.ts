@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { isRestaurantIntakeRecipient, receiveRestaurantIntakeEmail } from './restaurant-email-intake.js';
 import { receiveSupportEmail } from './support-email.js';

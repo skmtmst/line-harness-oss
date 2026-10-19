@@ -39,7 +39,7 @@ test.each([
  ['purchase_amount',{min:6000},{min:5000,max:5000}],
  ['last_activity_at',{from:'2026-10-16'},{from:'2026-10-15',to:'2026-10-15'}],
  ['member_tier','gold','base'],
-] as const)('B349-fmToi-%s: 1条件だけでも一致と不一致を分け、anyでも同じ値を使う',async(kind,miss,hit)=>{
+] as const)('B349--%s: 1条件だけでも一致と不一致を分け、anyでも同じ値を使う',async(kind,miss,hit)=>{
  await setup();await refreshCustomerSegments(d.db,'a',new Date());
  d.raw.exec("UPDATE customer_activity_daily SET amount=5000 WHERE friend_id='f' AND basis='purchase'");
  const app=gapApp(d,[friends]);

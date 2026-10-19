@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { afterEach,beforeEach,expect,test,vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { hqBroadcasts } from './hq-broadcasts.js';
 
 let sql:ReturnType<typeof createTestD1>,app:Hono<Env>,staff:Env['Variables']['staff'];

@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {gapFixture} from '../test-utils/gap1.js';
 import {deleteCustomerData} from '../services/customer-data-deletion.js';
-import {passCheckout,passBillingEvent} from '../services/booking-pass-billing.js';
+import {passCheckout,passBillingEvent} from '../features/booking/booking-pass-billing.js';
 let d:ReturnType<typeof gapFixture>;
 beforeEach(()=>{d=gapFixture();d.raw.pragma("foreign_keys=ON");vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
 afterEach(()=>{expect(fetch).not.toHaveBeenCalled();d.raw.close();vi.unstubAllGlobals();});

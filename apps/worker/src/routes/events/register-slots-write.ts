@@ -1,11 +1,12 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
 import { inputJsonBoundary } from '../../lib/input-errors.js';
 import { requireRole } from '../../middleware/role-guard.js';
 import { reconcileV6ToStartsAt, rescheduleByTrigger } from '../../services/reminder-trigger.js';
 import { createBroadcast, getBroadcastById, type Broadcast } from '@line-crm/db';
+
 import { createEventWaitlistOfferSender, getEventOccurrenceUsedSeats, promoteEventWaitlist } from '../../services/event-waitlist.js';
 import { writeEventChangeLog } from '../../services/event-change-review.js';
 import { getEventApplicantSnapshot } from '../../services/event-applicant-snapshot.js';
@@ -276,7 +277,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
     expected_version?: unknown;
     expectedVersion?: unknown;
   };
-  // m26g R577: 枠の並行編集・有効切替の競合検出（v6-29 §13「変更系は
+  // m26g R577: 枠の並行編集・有効切替の競合検出（-29 §13「変更系は
   // 期待版を必須にし、版競合は 409 で最新内容と差分を返す」）。
   // 版なしの更新は受けず、古い版は 409 + 最新の枠を返す。画面は
   // 読み直して差分を見せる。イベント本体 PUT と同じ決め。
@@ -323,9 +324,9 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
   }
   // If the slot time moved, reminders for the slot's confirmed bookings are
   // now stale (they still point at the old starts_at).
-  // N-065: V6 の未来予定だけを先に新基準日へ移す (枠更新より前)。
-  // 枠を先に更新すると、V6 の途中失敗後の再送で旧起点が分からなくなり、
-  // 移行前の行が旧日のまま残る。V6 を先にすると失敗時は枠が untouched の
+  // N-065: の未来予定だけを先に新基準日へ移す (枠更新より前)。
+  // 枠を先に更新すると、の途中失敗後の再送で旧起点が分からなくなり、
+  // 移行前の行が旧日のまま残る。を先にすると失敗時は枠が untouched の
   // まま 500 になるため、同じリクエストの再送がそのまま回復になる。
   // 送信済みは残し、現在の枠時刻へ直すため再送は冪等。
   const slotStartsAtChanging = Object.prototype.hasOwnProperty.call(body, 'starts_at');

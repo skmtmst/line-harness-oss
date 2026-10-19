@@ -2,9 +2,10 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { deleteFriendAddRuleFolder, ensureFriendAddFallbackRules, listFriendAddRuleOrderIds, listFriendAddRulesPage, reorderFriendAddRulePriorities, reorderFriendAddRulePrioritiesCAS, type FriendAddRuleKind, type FriendAddRuleRow } from '@line-crm/db';
-import type { Env } from '../index.js';
 
-import { retryFailedFriendAddActions } from '../services/friend-add-routing.js';
+import type { Env } from '../worker-env.js';
+
+import { retryFailedFriendAddActions } from '../features/friends/friend-add-routing/index.js';
 import { isFolderSelectColor } from '@line-crm/shared';
 import { accountIdFrom, runPeriod, parseRunCursor, RUN_STATUSES, KINDS, RUN_ATTRIBUTIONS, canUseAccount, runFailureKind, runFriendReadModel, makeRunCursor, parseSnapshot, safeActionErrorCode, RULE_STATUSES, loadOptions, getFriendAddOrderVersion, toRule } from './friend-add-rules-definition.js';
 import type { Context } from 'hono';

@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 const attachTag = vi.hoisted(() => vi.fn().mockResolvedValue({ added: true }));
 
-vi.mock('./friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: attachTag,
   detachTagAndFireSideEffects: vi.fn().mockResolvedValue({ removed: true }),
 }));

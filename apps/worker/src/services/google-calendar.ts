@@ -1,5 +1,6 @@
 import { tracedFetch as fetch } from '@line-crm/shared/server';
-import { API_RETRY_WAIT, createCallState, createExternalCall, type CallScope, type CircuitStore } from '../lib/external-call/index.js';
+import { API_RETRY_WAIT, createCallState, createExternalCall } from '../lib/external-call/index.js';
+import { type CallScope, type CircuitStore } from '../lib/external-call/types.js';
 import { boundedHttpRequest } from '../lib/external-call/bounded-http.js';
 // Google Calendar API client
 

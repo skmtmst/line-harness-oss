@@ -9,12 +9,12 @@ import { Hono } from 'hono';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
 import { getTemplatesWithUsageCount, getTemplateSendCounts, getTemplateFolderCounts, getTemplateById, getTemplateUsage, createTemplate, updateTemplate, saveTemplateDraft, publishTemplate, hasTemplateDraft, deleteTemplate, getCarouselTapTotals, getFolderById, listTemplateVersions, revertTemplateToVersion, listBroadcastReferences, listTemplateReferences, getBroadcastDeleteBlockers, getPinnedReminderDeleteBlockers, MediaReferenceAccountError } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess } from '../middleware/role-guard.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { validateCarousel } from '../services/carousel-validation.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { parseQuestion, type ScenarioQuestion } from '../services/scenario-question.js';
+import { parseQuestion, type ScenarioQuestion } from '../features/scenarios/scenario-question/index.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { validateFlexContent } from '@line-crm/shared';
 

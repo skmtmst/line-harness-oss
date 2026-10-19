@@ -5,7 +5,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { staffApiKey } from './staff-api-key.js';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import {
   ADMIN_AUTH_COOKIE,
   ADMIN_SESSION_BEARER_PREFIX,
@@ -82,7 +82,7 @@ const OAUTH_HANDOFF_COOKIE = 'lh_line_handoff';
 const OAUTH_NONCE_COOKIE = 'lh_line_nonce';
 const OAUTH_VERIFIER_COOKIE = 'lh_line_verifier';
 const OAUTH_INVITE_COOKIE = 'lh_line_invite';
-/** ログイン後の戻り先。'ops' のときだけ運営コンソールへ（★V6 37-1）。 */
+/** ログイン後の戻り先。'ops' のときだけ運営コンソールへ（★37-1）。 */
 const OAUTH_NEXT_COOKIE = 'lh_line_next';
 /** 「7日間ログインを保持」の選択をOAuth往復のあいだ保持するための印。 */
 const OAUTH_REMEMBER_COOKIE = 'lh_line_remember';
@@ -369,7 +369,7 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     }
     if (!staff) return lineLoginFailure(c, 'not_authorized', next);
 
-    // 運営コンソールへの LINE ログイン（★V6 37-1）。platform_admins に登録された
+    // 運営コンソールへの LINE ログイン（★37-1）。platform_admins に登録された
     // LINE ユーザーだけを通す。契約先の権限者や、契約者専用 LINE の友だちでは入れない。
     // platform_admins が空の間だけ、既定の統括のオーナーを互換で通す（初期登録のため）。
     if (next === 'ops') {
@@ -867,7 +867,7 @@ adminAuth.get('/api/auth/session', async (c) => {
   // 運営マスターかどうか。platform_admins が空の間は既定の統括のオーナーも真になる
   // （初期登録のため。API 側の requirePlatformAdmin と同じ判定）。
   const platformAdmin = await isPlatformAdmin(c);
-  // 招待の進み具合（★V6 37-10）。awaiting_totp なら画面は 2要素認証の設定へ案内する。
+  // 招待の進み具合（★37-10）。awaiting_totp なら画面は 2要素認証の設定へ案内する。
   const platformAdminRecord = staff.id === 'env-owner' ? null : await getPlatformAdminRecord(c.env.DB, staff.id);
   const platformAdminState = platformAdminRecord?.is_active === 1 ? platformAdminRecord.activation_state : null;
   // /api/auth/* は代理ログインの差し替え対象外なので、ここで直接引く。

@@ -1,9 +1,9 @@
 import { type Context } from 'hono';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import { getAccountTimeZone, getAvailability, tzDateStr } from '../../services/availability.js';
-import { DEFAULT_ACCOUNT_SETTINGS } from '../../services/booking-types.js';
-import { getBookingAutoAssign } from '../../services/booking-channels.js';
-import { assignBookingStaff } from '../../services/booking-assignment.js';
+import { DEFAULT_ACCOUNT_SETTINGS } from '../../features/booking/booking-types/index.js';
+import { getBookingAutoAssign } from '../../features/booking/booking-channels/index.js';
+import { assignBookingStaff } from '../../features/booking/booking-assignment/index.js';
 import { googleCredentials, findLatestSlotForInstant } from './availability.js';
 
 export async function needsAutoAssignment(c: Context<Env>, accountId: string, staffId: string): Promise<boolean> {

@@ -1,9 +1,9 @@
-import { EntitlementError } from '../../services/booking-entitlements.js';
+import { EntitlementError } from '../../features/booking/booking-entitlements/index.js';
 import { discardUnacceptedEventBooking, assertEventPassRequirement, validateEventEntitlement, eventEntitlementUse } from '../../services/event-entitlements.js';
 import { logger } from '@line-crm/shared/server';
 import { prepareEventNotification } from '../../services/event-notification-plan.js';
 import { prepareEventReminders } from '../../services/event-reminder-plan.js';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { eventModeRemaining } from '../../services/event-mode-capacity.js';
 import { bad } from '../../services/event-input-error.js';
@@ -16,7 +16,7 @@ import { reserveEventIdempotency, finalizeEventIdempotencyResponse } from '../..
 import { computeRemindersForBooking, insertRemindersForBooking } from '../../services/event-booking-reminders.js';
 import { sendEventBookingNotification, type EventNotificationKind } from '../../services/event-booking-notifier.js';
 import { awardActivityMileage } from '../../services/activity-mileage.js';
-import { dispatchAutomationEventWithLogging } from '../../services/automation-triggers.js';
+import { dispatchAutomationEventWithLogging } from '../../features/automations/automation-triggers/index.js';
 import { applyActionScoreEvent } from '../../services/action-score-events.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { getEventOccurrenceUsedSeats } from '../../services/event-waitlist.js';

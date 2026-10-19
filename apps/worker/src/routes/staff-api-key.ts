@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getStaffById, getPlatformSetting, getActiveImpersonation, auditEventStatement } from '@line-crm/db';
 import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
 import { consumeStepUpToken, stepUpRequiredResponse } from '../lib/step-up.js';

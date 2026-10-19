@@ -146,7 +146,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { fireEvent } from '../services/event-bus.js';
 import { executeIncomingWebhookActions, previewIncomingWebhook } from '../services/incoming-webhook-actions.js';
 import { deliverWebhook, deliverOnce } from '../services/outgoing-webhook-delivery.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { webhooks } from './webhooks.js';
 
 const VALID_SECRET = 'a'.repeat(32);
@@ -1261,7 +1261,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
     expect(json.data.actions[0]!.ok).toBe(true);
     // 試しは実行しない。行動の実行と受領の予約は呼ばれない。
     expect(executeIncomingWebhookActions).not.toHaveBeenCalled();
-    // 結果はやり取り台帳へ test 種別で分けて残る(v6-26 §9)。
+    // 結果はやり取り台帳へ test 種別で分けて残る(-26 §9)。
     // d23d R407: 試算の結果（照合できた）を記録へ残す。試しなので
     // 相手への応答番号は残さない（実際の受信とは分ける）。
     expect(createWebhookInteraction).toHaveBeenCalledWith(

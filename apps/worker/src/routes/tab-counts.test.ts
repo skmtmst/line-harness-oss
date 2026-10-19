@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { listAutomationTemplates } from '../services/automation-drafts.js';
+import { listAutomationTemplates } from '../features/automations/automation-drafts.js';
 
 const scope = vi.hoisted(() => ({ allowedAccountIds: ['a'], canSeeUnassigned: false }));
 vi.mock('../services/account-access.js', async original => ({

@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import { simulationContext } from '../services/broadcast-simulation.js';
+import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { validateAfterActionVersion } from './broadcast-after-action-validation.js';
 import { parseJsonArray, sameJsonMeaning } from './broadcast-json.js';
@@ -7,9 +7,9 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getBroadcastById, updateBroadcast, requestBroadcastStop, resumeBroadcastSending, beginBroadcastRetryAttempt, closeClaimsForStop, reopenFailedClaims, getRetryableRecipientIds } from '@line-crm/db';
 import type { BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
-import { MAX_BROADCAST_MESSAGES, parseBroadcastMessageParts } from '../services/broadcast-message-set.js';
-import type { SegmentCondition } from '../services/segment-query.js';
-import type { Env } from '../index.js';
+import { MAX_BROADCAST_MESSAGES, parseBroadcastMessageParts } from '../features/broadcasts/broadcast-message-set/index.js';
+import type { SegmentCondition } from '@line-crm/shared';
+import type { Env } from '../worker-env.js';
 
 import { BROADCAST_DEFINITION_EDIT_KEY } from '@line-crm/shared';
 import { canAccessBroadcast, BROADCAST_DRAFT_STEPS, validateMessageOptions, broadcastWriteBoundary, ACCOUNT_ACCESS_ERROR, unsupportedVariablesError, parseStoredSegmentConditions, rejectIfAudienceUnusable, recordLifecycle, serializeBroadcast, broadcastLedgerSummary, parseExpectedVersion, recordBroadcastControlAudit, queueMarkerFor, kickQueueProcessing } from './broadcasts-definition.js';
@@ -209,7 +209,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     const makesNewReservation = statusUpdate === 'scheduled' && existing.status !== 'scheduled';
     if (makesNewReservation) {
       try {
-        const approval = await import('../services/broadcast-approval.js');
+        const approval = await import('../features/broadcasts/broadcast-approval.js');
         const mergedForGate = {
           ...existing,
           target_type: body.targetType ?? existing.target_type,
@@ -294,7 +294,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
      */
     if (snapshotSemanticsChanged) {
       try {
-        const approval = await import('../services/broadcast-approval.js');
+        const approval = await import('../features/broadcasts/broadcast-approval.js');
         if (approval.readApprovalStatus(existing) === 'pending'
           || approval.readApprovalStatus(existing) === 'approved') {
           await c.env.DB.prepare(

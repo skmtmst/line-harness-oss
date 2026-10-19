@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
-import { paymentRecords, paymentSummary } from '../services/booking-payment-admin.js';
-import { customerBookingPayments } from '../services/booking-payment-history.js';
-import { receivePaymentEvent, processPaymentEvent } from '../services/booking-payment-events.js';
+import { paymentRecords, paymentSummary } from '../features/booking/booking-payment-admin.js';
+import { customerBookingPayments } from '../features/booking/booking-payment-history.js';
+import { receivePaymentEvent, processPaymentEvent } from '../features/booking/booking-payment-events.js';
 const scope=vi.hoisted(()=>({allowed:true}));
 vi.mock('../services/account-access.js',()=>({canAccessAllLineAccounts:vi.fn(async()=>scope.allowed)}));
 import { bookingPayments } from './booking-payments.js';

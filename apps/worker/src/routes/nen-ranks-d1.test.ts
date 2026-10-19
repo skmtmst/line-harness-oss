@@ -1,5 +1,5 @@
 /*
- * 会員ランク（★V6 37-1-A / 37-1-B）の設定API。実D1（bootstrap.sql を流した SQLite）で、
+ * 会員ランク（★37-1-A / 37-1-B）の設定API。実D1（bootstrap.sql を流した SQLite）で、
  *  1. 初期値（4ランク・4節目）が最初の GET で入る
  *  2. 保存は owner/admin だけ。検証に落ちると 400 で理由を返し、何も変えない
  *  3. 保存で新しいランクのタグが作られ、ECへ署名付きで送られ、同期状態が synced になる
@@ -18,7 +18,7 @@ const tagSide = vi.hoisted(() => ({
   attach: vi.fn(async (_db: D1Database, _friendId: string, _tagId: string) => ({ added: true })),
   detach: vi.fn(async (_db: D1Database, _friendId: string, _tagId: string) => ({ removed: true })),
 }));
-vi.mock('../services/friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: tagSide.attach,
   detachTagAndFireSideEffects: tagSide.detach,
 }));

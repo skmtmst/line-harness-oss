@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 
 // 分類は純粋関数なので実物を差す。ロジックを試験側へ複写すると
@@ -96,7 +96,7 @@ const authMock = { verifyCallerLineUserId: vi.fn() };
 vi.mock('../services/liff-auth.js', () => authMock);
 
 const tagMock = { attachTagAndFireSideEffects: vi.fn(), detachTagAndFireSideEffects: vi.fn() };
-vi.mock('../services/friend-tag-attach.js', () => tagMock);
+vi.mock('../features/friends/friend-tag-attach.js', () => tagMock);
 
 const localProxyMock = { dispatchLineProxyLocally: vi.fn() };
 vi.mock('../services/local-line-proxy.js', () => localProxyMock);
@@ -109,7 +109,7 @@ const webinarNotificationMocks = {
   saveWebinarNotificationSettings: vi.fn(),
   sendWebinarNotificationTest: vi.fn(),
 };
-vi.mock('../services/webinar-notifications.js', () => webinarNotificationMocks);
+vi.mock('../features/webinars/webinar-notifications.js', () => webinarNotificationMocks);
 
 const accountAccessMock = {
   canAccessAllLineAccounts: vi.fn(async (
@@ -122,7 +122,7 @@ const accountAccessMock = {
 vi.mock('../services/account-access.js', () => accountAccessMock);
 
 const audienceMock = vi.hoisted(() => ({ countRecentWebinarViewers: vi.fn(async () => 0) }));
-vi.mock('../services/webinar-audience.js', () => ({
+vi.mock('../features/webinars/webinar-audience.js', () => ({
   ...audienceMock, WEBINAR_AUDIENCE_WINDOW_SECONDS: 60,
 }));
 
@@ -2528,7 +2528,7 @@ describe('GET /api/liff/webinars/:slug/audience', () => {
 });
 
 
-describe('B-333 ウェビナーの見逃し・完了・保存', () => {
+describe('ウェビナーの見逃し・完了・保存', () => {
   test('期限の切れた見逃しは専用リンクでも開けない', async () => {
     vi.setSystemTime(new Date((SESSION_START + 9 * 86400) * 1000));
     dbMocks.isWebinarMissedInWindow.mockResolvedValueOnce(false);

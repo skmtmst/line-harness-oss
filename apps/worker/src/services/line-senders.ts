@@ -1,4 +1,4 @@
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { GapError } from './gap-common.js';
 export interface SenderSnapshot {name:string;iconUrl?:string}
 export interface SenderRow {id:string;account_id:string;name:string;icon_media_id:string|null;icon_url:string|null;visibility:'all'|'owner_only';owner_staff_id:string|null;status:string;version:number;request_json:string}

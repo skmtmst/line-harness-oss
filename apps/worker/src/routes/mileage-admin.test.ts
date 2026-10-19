@@ -81,13 +81,13 @@ const dbMocks = {
 vi.mock('@line-crm/db', () => dbMocks);
 
 const deliveryMocks = { deliverMileageReward: vi.fn() };
-vi.mock('../services/mileage-reward-delivery.js', () => deliveryMocks);
+vi.mock('../features/mileage/mileage-reward-delivery.js', () => deliveryMocks);
 
 const adjustmentNotificationMocks = {
   mileageAdjustmentMessage: vi.fn().mockReturnValue('通知本文'),
   sendMileageAdjustmentNotification: vi.fn(),
 };
-vi.mock('../services/mileage-adjustment-notification.js', () => adjustmentNotificationMocks);
+vi.mock('../features/mileage/mileage-adjustment-notification.js', () => adjustmentNotificationMocks);
 
 const accountAccessMocks = {
   getVisibleLineAccountScope: vi.fn(),

@@ -5,7 +5,7 @@ import { inputError } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
 
 import { getOutgoingWebhookById, createOutgoingWebhook, updateOutgoingWebhook, deleteOutgoingWebhook, restoreOutgoingWebhook, createWebhookInteraction, finishWebhookInteraction, getWebhookInteractionById, listFailedWebhookInteractionsForRetry, countFailedWebhookInteractionsForRetry, countExcludedFailedWebhookInteractions, countUnverifiedWebhookInteractions, listWebhookInteractions, backfillWebhookSecrets, hasWebhookSecret, resolveWebhookSecret, WEBHOOK_SECRET_MIN_LENGTH as MIN_SECRET_LENGTH, isOperationCapabilityStopped } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';

@@ -24,6 +24,8 @@ import {
   type AnalyticsReportAlertRule,
   type AnalyticsReportSchedule,
 } from '@line-crm/db';
+
+
 import { sendXServerMail } from './xserver-mail.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { zonedWallTime } from './zoned-time.js';
@@ -131,7 +133,7 @@ function reportState(value: unknown): 'available' | 'partial' | 'unavailable' {
 /**
  * 変化通知の1条件の判定結果（R77）。
  *
- * 要件 v6-20 §4-5: 同じ長さの直前期間と比べ、最低母数を満たすときだけ
+ * 要件 -20 §4-5: 同じ長さの直前期間と比べ、最低母数を満たすときだけ
  * 判定する。取得待ち・部分データの期間は判定しない。
  */
 export type AlertRuleOutcome = 'triggered' | 'ok' | 'skipped';
@@ -517,7 +519,7 @@ export function reportText(
   ];
   const alerts = alertLines(report.result.alertEvaluation as { state: string; results?: AlertRuleEvaluation[] });
   if (alerts.length > 0) lines.push('▼すぐの知らせ', ...alerts);
-  // 要件 v6-20 §4-5: 通知に顧客本文・秘密値・URLクエリは入れない。
+  // 要件 -20 §4-5: 通知に顧客本文・秘密値・URLクエリは入れない。
   // ここで付けるのは運用者自身の管理画面への固定の行き先だけで、
   // 顧客の値や追跡用のクエリは付けない。
   if (adminOrigin) lines.push(`くわしく見る: ${adminOrigin.replace(/\/+$/, '')}/analytics?tab=saved`);

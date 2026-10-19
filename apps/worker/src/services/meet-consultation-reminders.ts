@@ -1,6 +1,8 @@
+export type { MeetReminderKind, RegisterMeetConsultationInput, MeetReminderSchedule } from './meet-reminder-types.js';
+import type { MeetReminderKind, RegisterMeetConsultationInput, MeetReminderSchedule } from './meet-reminder-types.js';
 import { persistMeetGeneration } from './meet-notification-generations.js';
 import { logger } from '@line-crm/shared/server';
-import { deliverBookingLine, BookingLineDeliveryIncomplete } from './booking-line-delivery.js';
+import { deliverBookingLine, BookingLineDeliveryIncomplete } from '../features/booking/booking-line-delivery/index.js';
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
 import {
@@ -9,34 +11,16 @@ import {
   resolveLineCredential,
   type V6WriteGuard,
 } from '@line-crm/db';
+
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { cancelByTrigger, enrollByTrigger, reconcileV6ToStartsAt } from './reminder-trigger.js';
-
-export type MeetReminderKind = 'day_before' | 'hour_before';
-
-export interface RegisterMeetConsultationInput {
-  externalEventId: string;
-  friendId: string;
-  title: string;
-  startsAt: string;
-  endsAt: string;
-  meetUrl: string;
-  /** 結び付く予約。版と組で後発の勝者を古い操作から守る。無いときは従来どおり無条件。 */
-  bookingId?: string | null;
-  bookingVersion?: number | null;
-}
 
 export interface CancelMeetConsultationOptions {
   failOnSendInFlight?: boolean;
   /** 行が見た版と違うときは何も変えず false (古い補償が勝者を消さない)。無いときは従来どおり無条件。 */
   expectedBookingId?: string | null;
   expectedBookingVersion?: number | null;
-}
-
-export interface MeetReminderSchedule {
-  kind: MeetReminderKind;
-  scheduledAt: string;
 }
 
 export interface MeetReminderDeliveryOptions {
@@ -212,7 +196,7 @@ export async function registerMeetConsultation(
     .bind(input.friendId)
     .first<{ id: string; line_account_id: string | null;line_user_id:string }>();
   if (!friend) throw new Error('friend not found or not following');
-  // V6 登録は店舗境界の中でだけ行う。所属不明では書かずに落とす。
+  // 登録は店舗境界の中でだけ行う。所属不明では書かずに落とす。
   if (!friend.line_account_id) throw new Error('friend line account unknown');
 
   const existing = await db
@@ -228,7 +212,7 @@ export async function registerMeetConsultation(
     {line_account_id:friend.line_account_id,line_user_id:friend.line_user_id},existing,schedules,now.toISOString());
   const consultationId=generation.id,writtenBookingId=input.bookingId??null;
   if(!generation.updated)return {id:consultationId,reminders:schedules,updated:false};
-  // 共有 V6 操作の直前の版の再確認。子の書込み後・各共有呼出しの前に
+  // 共有 操作の直前の版の再確認。子の書込み後・各共有呼出しの前に
   // 勝者が上書きしていたら、その共有呼出しを出さず stale で終える。
   // 行と子は勝者の full pass がそろえるため、敗者は何も直さない。
   // 共有層に版条件を持てないため、確認→呼出しの窓は残差として記録する。
@@ -245,7 +229,7 @@ export async function registerMeetConsultation(
   };
   const staleResult = { id: consultationId, reminders: schedules, updated: false };
 
-  // N-065: 個別相談の日程変更・再送を V6 へ連動する。
+  // N-065: 個別相談の日程変更・再送を へ連動する。
   // 予約ルール (booking) を個別相談にも使い、sourceKind='meet' で追跡する。
   // 旧起点ではなく現在の開始時刻へ直す。途中失敗後の再送でも回復でき、
   // 友だち変更で旧友だちへ残った行もここで止める (新 friend だけ active)。
@@ -262,7 +246,7 @@ export async function registerMeetConsultation(
   const oldFriendId = existing?.friend_id ?? null;
   const friendChanged = oldFriendId !== null && oldFriendId !== input.friendId;
   // 新 friend 側にこの相談の active 行があるか。再送の判定に使う。
-  // 初回も再送も V6 登録に失敗した再送では、相談行だけ新 friend へ進み
+  // 初回も再送も 登録に失敗した再送では、相談行だけ新 friend へ進み
   // (friendChanged=false)、旧取消を先にすると新旧どちらの通知も消える。
   const newActive = await db.prepare(
     `SELECT COUNT(*) AS c FROM friend_reminders
@@ -271,7 +255,7 @@ export async function registerMeetConsultation(
   ).bind(input.friendId, consultationId, input.externalEventId).first<{ c: number }>();
   // 新規成功後に旧取消: 新 friend 側の行が無いときは登録を先に行い、
   // 失敗は投げる (旧行に触る前に終えるため旧通知が残り、再送で回復できる)。
-  // 共有 V6 書込みにも版ガードを付ける。確認→呼出しの間に勝者が動いても
+  // 共有 書込みにも版ガードを付ける。確認→呼出しの間に勝者が動いても
   // 共有側の各文が 0 件になり、新版の通知予定を変えない。ガードで止まった
   // 書込みは後の stillMine で stale にまとめる。
   const v6Guard = meetWriteGuard(
@@ -329,14 +313,14 @@ export async function registerMeetConsultation(
       logger.error("services_meet_consultation_reminders_failed");
     });
   }
-  // V6 phase の後の最終確認。共有呼出しの間に勝者が動いていたら stale。
+  // phase の後の最終確認。共有呼出しの間に勝者が動いていたら stale。
   if (!(await stillMine())) return staleResult;
 
   return { id: consultationId, reminders: schedules, updated: true };
 }
 
 /**
- * 共有 V6 書込みへ渡す版ガードを組み立てる。親の版 (と登録なら confirmed、
+ * 共有 書込みへ渡す版ガードを組み立てる。親の版 (と登録なら confirmed、
  * 取消なら操作 uuid) が動いていたら共有側の各文は 0 件になる。
  */
 function meetWriteGuard(
@@ -366,7 +350,7 @@ function meetWriteGuard(
 }
 
 /**
- * Meet相談の送信可否。V6共有送信路（reminder-delivery）から使う。
+ * Meet相談の送信可否。共有送信路（reminder-delivery）から使う。
  * 版なし旧相談は従来どおり通す。結び付き予約の本人・状態・版・日時が
  * 一致しない古い版は送らない。相談行自体が confirmed でないときも送らない。
  */
@@ -384,7 +368,7 @@ export async function isMeetConsultationSendable(
   return !!row;
 }
 
-/** V6送信の最終権利と結び付ける送信候補の写し。本文解決の前に読む。 */
+/** 送信の最終権利と結び付ける送信候補の写し。本文解決の前に読む。 */
 export interface MeetSendCandidate {
   scheduleRevision?: number;
   bookingId: string | null;
@@ -425,7 +409,7 @@ export async function readMeetSendCandidate(
  * 写し一致を同一文で確かめる。新版が勝てば false になり、勝者の通知を残す。
  */
 /**
- * V6最終送信権の確定。認証・本文解決・beforePush・停止確認の待機を全て
+ * 最終送信権の確定。認証・本文解決・beforePush・停止確認の待機を全て
  * 終えた後、送信権の行と候補の版を同じUPDATE文で結び直す。この後は
  * push呼出しまでawaitを置かない (呼出し自体の間の取消は残差)。
  * 戻り値: 'ok' 送ってよい / 'stale' 旧候補 (呼出し側が実行行を取り消す) /
@@ -574,7 +558,7 @@ export async function cancelMeetConsultation(
   }
   const nowIso = now.toISOString();
   // 行の確定と操作所有権の主張を同じ文で勝ち取る。SELECT 後に勝者が
-  // 上書きしていたら 0 件になり、V6・通知には触らず false (敗者は何も壊さない)。
+  // 上書きしていたら 0 件になり、・通知には触らず false (敗者は何も壊さない)。
   // 同版の別操作も uuid が違うため、後で戻すときに区別できる。
   const claimId = crypto.randomUUID();
   const claimed = await db
@@ -595,8 +579,8 @@ export async function cancelMeetConsultation(
     )
     .run();
   if ((claimed.meta?.changes ?? 0) === 0) return false;
-  // V6 の前の版＋操作の再確認。claim から V6 の間に勝者が上書きしていたら、
-  // V6・子には触らず false (敗者は何も壊さない)。行は勝者のものが残る。
+  // の前の版＋操作の再確認。claim から の間に勝者が上書きしていたら、
+  // ・子には触らず false (敗者は何も壊さない)。行は勝者のものが残る。
   // 同版の別操作の claim 上書きも uuid で検出する。
   const beforeV6 = await db
     .prepare(
@@ -612,7 +596,7 @@ export async function cancelMeetConsultation(
   ) {
     return false;
   }
-  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
+  // N-065: の未送信予定だけを止める。送信済み履歴は残す。
   // 再送は active が無いため 0 件で返す。移行前の行は探さない。
   // 共有取消にも版＋操作ガードを付け、前確認→呼出しの間に勝者が動いても
   // 共有側の各文が 0 件になり、新版の通知予定を変えない。
@@ -652,7 +636,7 @@ export async function cancelMeetConsultation(
     }
     throw error;
   }
-  // V6 の後の最終確認。共有呼出しの間に勝者が動いていたら false。
+  // の後の最終確認。共有呼出しの間に勝者が動いていたら false。
   // 書けた分は正当な接頭辞 (版が自分の間に通った文だけ) として残す。
   const afterV6 = await db
     .prepare(
@@ -668,7 +652,7 @@ export async function cancelMeetConsultation(
   ) {
     return false;
   }
-  // 子の取消も親の版＋操作と結び付ける。V6 の間に勝者が来ていたら 0 件になり、
+  // 子の取消も親の版＋操作と結び付ける。の間に勝者が来ていたら 0 件になり、
   // 勝者の未来通知を残す。同版の別操作の claim 上書きもここで止まる。
   await db
     .prepare(

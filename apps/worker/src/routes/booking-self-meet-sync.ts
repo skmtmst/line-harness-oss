@@ -1,7 +1,7 @@
 import { type Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { cancelMeetConsultation, registerMeetConsultation } from '../services/meet-consultation-reminders.js';
-import { type BookingStatus } from '../services/booking-types.js';
+import { type BookingStatus } from '../features/booking/booking-types/index.js';
 import { recordBookingAudit } from '@line-crm/db';
 
 // ---- F6 本人日時変更・取消 (core)。待ち列は含まない ----

@@ -5,8 +5,8 @@
  * `inbound_only` を型と実行時の両方で固定し、誤って双方向化できないようにする。
  */
 
-import { selectAssignment } from './booking-assignment-selector.js';
-import { defaultAssignmentResource } from './booking-assignment-settings.js';
+import { selectAssignment } from '../features/booking/booking-assignment-selector/index.js';
+import { defaultAssignmentResource } from '../features/booking/booking-assignment-settings/index.js';
 
 export const RESTAURANT_RESERVATION_SOURCES = [
   'restaurant_board',

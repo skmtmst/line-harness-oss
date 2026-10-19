@@ -5,7 +5,7 @@ import { isPublicApiBoundary, isPublicFormDefinition } from './public-api-bounda
 import { mfaEncryptionConfigured } from '../lib/mfa-config.js';
 import type { Context, Next } from 'hono';
 import { deleteAdminSession, getPlatformSetting, getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { isForbiddenWhileImpersonating, resolveImpersonation } from './impersonation.js';
 import { isOutputRequest } from './output-request.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -157,7 +157,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
-  // 代理ログイン（★V6 37-5）。運営マスターが契約先の画面に入っている間だけ、
+  // 代理ログイン（★37-5）。運営マスターが契約先の画面に入っている間だけ、
   // 見ている統括を差し替える。既定は閲覧のみなので、この直後の readOnly 判定に乗る。
   const impersonated = await resolveImpersonation(c, staff, path);
   if (impersonated) {
@@ -188,7 +188,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   // N-423 (#670): staff は deny-by-default。権限表に無い管理 API は
   // 本人・自組織と明示許可の口以外すべて 403。owner/admin は従来どおり通す。
   // 運営メンバーは、運営会社の統括に属する通常の staff として作る。
-  // /api/ops/* は直後の route 側で requirePlatformAdmin() が全件を守るため、
+  // /api/ops/* は直後の route 側で requirePlatformAdmin が全件を守るため、
   // ここで通常スタッフ向けの画面権限へ落とすと、登録済みの運営メンバーまで
   // 専用判定へ到達する前に 403 になる。運営 API だけは専用の門番へ委ねる。
   const usesPlatformAdminAuthorization = path.startsWith('/api/ops/') || path === '/api/auth/two-factor/policy';

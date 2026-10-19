@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
 const access = vi.hoisted(() => ({ allow: true }));
@@ -9,7 +9,7 @@ vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: vi.fn(async () => ({ ids: access.allow ? ['a'] : [], isAccountScoped: true })),
   canAccessLineAccount: vi.fn(async () => access.allow),
 }));
-vi.mock('../services/booking-automatic-line.js', () => ({ sendAutomaticBookingLine: vi.fn(async () => false) }));
+vi.mock('../features/booking/booking-automatic-line.js', () => ({ sendAutomaticBookingLine: vi.fn(async () => false) }));
 import booking from './booking.js';
 import { restaurantTest } from './restaurant-test.js';
 let f: SqliteD1;

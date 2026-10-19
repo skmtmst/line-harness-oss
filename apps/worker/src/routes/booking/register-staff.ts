@@ -1,4 +1,4 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { gapWrite, GapError } from '../../services/gap-common.js';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';

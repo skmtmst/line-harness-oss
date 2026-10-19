@@ -2,14 +2,14 @@ import { getCookie } from 'hono/cookie';
 import { bumpAuthThrottle } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
-import { patchFriendMetadata } from '../services/friend-metadata.js';
+import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { inputError } from '../lib/input-errors.js';
 import { redeemCoupon } from '../services/coupon-redemption.js';
 
 import { getFriendByLineUserIdForAccount, createUser, getUserByEmailForAccess, linkFriendToUser, getEntryRouteByRefCode, recordRefTracking, recordFriendAddAttributionCandidate, getLineAccounts } from '@line-crm/db';
 import { isStoppedEntryRouteRef, recordStopSuppressionSafe } from '../services/entry-route-stop.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { verifyCrossAccountToken } from '../lib/cross-account-token.js';
 import { stoppedLineAccountResponse, linkIgIgsid, saveIgAccountMeta, saveFriendAddCandidate, applyRefAttribution, resolveXHarnessToken, applyXHarnessActions, analyticsAccountScope } from './liff-definition.js';

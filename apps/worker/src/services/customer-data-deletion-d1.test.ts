@@ -13,7 +13,7 @@ const target = (kind: 'friend_data' | 'form_response') => ({ kind, id: kind === 
   friendId, accountId: 'account', formId: 'form', lineUserId: `LINE-${friendId}` });
 const env = () => ({ DB: db(), IMAGES: { delete: remove } });
 
-describe('B-215 local workerd D1 binding', () => {
+describe('local workerd D1 binding', () => {
   beforeAll(async () => {
     mf = new Miniflare({ modules: true, script: 'export default { fetch() { return new Response("ok") } }', d1Databases: ['DB'] });
     native = await mf.getD1Database('DB');

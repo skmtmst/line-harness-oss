@@ -1,10 +1,10 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { consumeStepUpGrant, getAdminSessionByTokenHash } from '@line-crm/db';
 import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth/credentials/auth.js';
 
 /**
- * 大事な操作の直前再確認（V：v6-26 §16・v6-30 §14・v6-33 §16）。
+ * 大事な操作の直前再確認（V：-26 §16・-30 §14・-33 §16）。
  *
  * 対象：鍵・トークンの操作、権限の変更、LINE の接続の変更、一斉配信の承認、
  * アカウントの停止・削除。二者承認など後続の高危険操作もここへ乗せる。

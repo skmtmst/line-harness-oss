@@ -24,7 +24,7 @@ vi.mock('@line-crm/db', () => ({
   jstNow: () => '2026-08-15T00:00:00+09:00',
 }));
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { lineAccounts } from './line-accounts.js';
 
 /**

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { asD1 } from '../test-utils/d1-atomic.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { ecIntegrations } from './ec-integrations.js';
 import { ecCommerce } from './ec-commerce.js';
-import { claimEcRetryExecution, processDueEcRetries } from '../services/ec-retry.js';
+import { claimEcRetryExecution, processDueEcRetries } from '../features/ec-commerce/ec-retry.js';
 
 /*
  * EC の「止める」を本当に効かせ、落ちた受信は上限つきで回す。
@@ -181,7 +181,7 @@ describe('ECの停止と再試行 (P1-23)', () => {
     expect(event.status).toBe('processed');
   });
 
-  it('回収した受信のV6連携へ復号鍵を渡す', async () => {
+  it('回収した受信の連携へ復号鍵を渡す', async () => {
     const payload = JSON.stringify(orderEvent('evt-retry-key-1')).replace(/'/g, "''");
     db.raw.exec(`
       INSERT INTO ec_events (id, source, external_event_id, event_type, line_account_id, customer_id,
@@ -282,7 +282,7 @@ describe('W11 A interrupted processing recovery', () => {
 });
 
 describe('W11 B resumes the remaining integration stages on A version recovery',()=>{
- it('does not repeat member-tag mutations or customer notifications after V6 fails',async()=>{
+ it('does not repeat member-tag mutations or customer notifications after fails',async()=>{
   const {syncNenEcTags}=await import('../services/nen-tag-sync.js');
   const {fireEvent}=await import('../services/event-bus.js');
   const {__pushMessage:push}=await import('@line-crm/line-sdk') as unknown as {__pushMessage:ReturnType<typeof vi.fn>};

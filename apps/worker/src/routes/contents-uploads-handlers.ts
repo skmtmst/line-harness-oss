@@ -4,11 +4,13 @@ import { inputError } from '../lib/input-errors.js';
 import { mediaTabCounts } from '../services/tab-counts.js';
 
 import { getMedia, countMedia, getMediaById, getFolderById, getMediaStorageQuota, getMediaVersionByNo, createMediaUploadSession, getMediaUploadSession, failMediaUploadSession, verifyMediaUploadSession, completeNewMediaUpload, createMediaVersionFromUpload, MediaVersionConflictError, MediaVersionIncompatibleError, type MediaMetadata, type MediaKind } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../services/media-metadata.js';
+import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../features/media/media-metadata/index.js';
 import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
 import { checkMediaGate, runScanForStoredObject } from '../services/file-scan.js';
 import { ensureFileScanForUpload } from './file-scan.js';

@@ -6,7 +6,7 @@ import {
   processNenDeliveries,
 } from './nen-engagement.js';
 
-// v6-21 §8: 深夜に送らない・1アカウントが1回の実行で送りすぎない。
+// -21 §8: 深夜に送らない・1アカウントが1回の実行で送りすぎない。
 
 const DAYTIME = new Date('2026-09-25T12:00:00+09:00');
 const NIGHT = new Date('2026-09-25T23:00:00+09:00');

@@ -3,9 +3,10 @@ import {staffName} from './broadcast-approval-actor.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { getBroadcastById, createNotification, type Broadcast } from '@line-crm/db';
+
 import { BROADCAST_APPROVE_KEY, BROADCAST_DEFINITION_PUBLISH_KEY } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
@@ -19,10 +20,10 @@ import {
   readApprovalStatus,
   recordBroadcastApprovalEvent,
   setBroadcastApprovalThreshold,
-} from '../services/broadcast-approval.js';
+} from '../features/broadcasts/broadcast-approval/index.js';
 
 /**
- * 一斉配信の二者承認の口（m12a / v6-06 §6）。
+ * 一斉配信の二者承認の口（m12a / -06 §6）。
  *
  * 送る人（依頼）と承認する人は別人。自分の依頼は承認できない。
  * 承認済みになってから既存の送信の流れ（POST /:id/send・cron）に渡す。

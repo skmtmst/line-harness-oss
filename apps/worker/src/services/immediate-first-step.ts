@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import { decorateTapExtras } from './tap-extras.js';
+import { decorateTapExtras } from './tap-extra-links.js';
 import {
   getScenarioById,
   getScenarioPublishedVersion,
@@ -19,15 +19,14 @@ import {
 } from '@line-crm/db';
 import type { PinnedScenarioStep, ScenarioDeliverySource } from '@line-crm/db';
 import { LineClient, type Message } from '@line-crm/line-sdk';
-import {
-  buildMessage,
-  expandVariables,
-  resolveMetadata,
-  messageToLogPayload,
-} from './step-delivery.js';
+
+import { buildMessage } from './line-message.js';
+import { expandVariables } from './message-interpolation.js';
+import { resolveMetadata } from './step-metadata.js';
+import { messageToLogPayload } from './message-log-payload.js';
 import { decorateForFriendPush } from './auto-track.js';
 import { resolveSendInterpolationExtra } from './interpolation-context.js';
-import { buildQuestionMessages, parseQuestion } from './scenario-question.js';
+import { buildQuestionMessages, parseQuestion } from '../features/scenarios/scenario-question/index.js';
 
 export interface ImmediatePushContext {
   defaultAccessToken: string;
@@ -259,7 +258,7 @@ export async function pushImmediateFirstStep(
           { enrolledAt: enrolledAtJst, previousDeliveredAt: enrolledAtJst, now: enrolledAtJst },
         );
         // `next` is already in the shifted-JST frame (its inputs were
-        // Date.now()+9h), so serialize by relabeling — NOT toJstString(),
+        // Date.now+9h), so serialize by relabeling — NOT toJstString,
         // which would add the offset a second time and schedule step 2
         // nine hours late. Matches enrollFriendInScenario / the cron.
         await advanceFriendScenario(

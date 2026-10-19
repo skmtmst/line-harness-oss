@@ -1,13 +1,15 @@
 import { logger } from '@line-crm/shared/server';
-import { readPriority } from '../services/auto-reply-priority.js';
+import { readPriority } from '../features/auto-replies/auto-reply-priority/index.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import type { Context } from 'hono';
 import { getAutoReplyById, getTemplateById, autoReplyRowFromDraftSettings, getAutoReplyInternalMemos, parseAutoReplyVersionSettings, jstNow } from '@line-crm/db';
 import type { AutoReply as DbAutoReply, AutoReplyDraftSettings, AutoReplyVersionRow } from '@line-crm/db';
-import type { Env } from '../index.js';
-import { compareAutoReplyCandidates, keywordMatches, parseAutoReplyActions, resolveKeywordRules } from '../services/auto-reply.js';
-import { validateAutoReplyOperatorAction } from '../services/auto-reply-operator-action.js';
-import { isScenarioActionComplete } from '../services/scenario-actions.js';
+
+
+import type { Env } from '../worker-env.js';
+import { compareAutoReplyCandidates, keywordMatches, parseAutoReplyActions, resolveKeywordRules } from '../features/auto-replies/auto-reply/index.js';
+import { validateAutoReplyOperatorAction } from '../features/auto-replies/auto-reply-operator-action/index.js';
+import { isScenarioActionComplete } from '../features/scenarios/scenario-actions/index.js';
 import { validateFlexContent } from '@line-crm/shared';
 import { type DraftReadResult, AUTO_REPLY_KEYWORD_MAX, parseHhmm, parseCooldown, COOLDOWN_RANGE_ERROR, readMessageKinds, readExtras, validateAutoReplyFolder, AUTO_REPLY_RESPONSE_MAX, jsonText, readJson, type AutoReplyConflict, type AutoReplyConflictPair, type AutoReplyValidationResult, type SerializedAutoReply, type EffectiveAccount } from './auto-replies-definition-validate-auto-reply-folder.js';
 

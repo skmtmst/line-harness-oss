@@ -24,7 +24,7 @@ export const opsSupportPaths = {
       responses: { '201': { description: 'Recorded; notification result is included' }, '400': { description: 'Invalid request' }, '403': { description: 'Read-only staff cannot submit' }, '404': { description: 'Line account not found in tenant scope' } },
     },
   },
-  // ── Ops Console（★V6 37 運営コンソール）─────────────────────────────
+  // ── Ops Console（★37 運営コンソール）─────────────────────────────
   '/api/hq/support/requests/{id}': {
     get: { tags: ['HQ Support'], summary: 'お問い合わせ 1 件のやり取り（★V6 36-3-A）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Request with messages' }, '404': { description: 'Not found' } } },
   },
@@ -77,7 +77,7 @@ export const opsSupportPaths = {
   '/api/ops/members/{staffId}': {
     patch: { tags: ['Ops Console'], summary: '運営メンバーの停止・再開', parameters: [{ name: 'staffId', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['isActive'], properties: { isActive: { type: 'boolean' } } } } } }, responses: { '200': { description: 'Updated' }, '400': { description: 'Self or last member' }, '404': { description: 'Staff not found' } } },
   },
-  // ── HQ Notices / Ops Announcements（★V6 37-7） ────────────────────────
+  // ── HQ Notices / Ops Announcements（★37-7） ────────────────────────
   '/api/hq/notices': {
     get: { tags: ['HQ Support'], summary: '運営からの未読のお知らせ（画面のお知らせ）', responses: { '200': { description: 'Unread notices for the caller' } } },
   },
@@ -126,7 +126,7 @@ export const opsSupportPaths = {
     put: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを変える（今すぐ送るも可）', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { expectedUpdatedAt: { type: 'string', description: '一覧で見た版。違う版からの保存は最新の内容つきで409。' } } } } } }, responses: { '200': { description: 'Updated' }, '404': { description: 'Not found' }, '409': { description: 'Already sent or version conflict with the latest content' } } },
     delete: { tags: ['Ops Console'], summary: '下書き・予約のお知らせを消す', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' }, '404': { description: 'Not found' }, '409': { description: 'Already sent' } } },
   },
-  // ── Ops Console: ダッシュボード（★V6 37-2） ────────────────────────────
+  // ── Ops Console: ダッシュボード（★37-2） ────────────────────────────
   '/api/ops/dashboard': {
     get: { tags: ['Ops Console'], summary: '運営ダッシュボード（Stripe入金実績・契約中の月額合計・要対応・チケット・LINE登録・使用量）', parameters: [
       { name: 'period', in: 'query', required: false, schema: { type: 'string', enum: ['month', 'prev_month', 'year'] } },
@@ -138,7 +138,7 @@ export const opsSupportPaths = {
   '/api/ops/dashboard/line-unregistered': {
     get: { tags: ['Ops Console'], summary: 'LINE 未登録の権限者（名前と契約先だけ）', responses: { '200': { description: 'Unregistered staff' } } },
   },
-  // ── Ops Console: お問い合わせ（★V6 37-6） ────────────────────────────
+  // ── Ops Console: お問い合わせ（★37-6） ────────────────────────────
   '/api/ops/support/summary': {
     get: { tags: ['Ops Console'], summary: 'お問い合わせの状態別件数と数値カード（未対応・初回返信・解決率・解決時間）', responses: { '200': { description: 'Counts by stage and KPIs' } } },
   },

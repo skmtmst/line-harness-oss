@@ -11,8 +11,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const pushMessage = vi.fn().mockResolvedValue({ sentMessages: [{}] });
 vi.mock('@line-crm/line-sdk', () => ({
@@ -376,7 +376,7 @@ describe('送信予約(N-025)', () => {
 });
 
 
-describe('B-333 ブロック・解除済み相手の送信禁止', () => {
+describe('ブロック・解除済み相手の送信禁止', () => {
   test('手動送信も予約作成も拒否し、送信と予約が残らない', async () => {
     sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
     for (const response of [

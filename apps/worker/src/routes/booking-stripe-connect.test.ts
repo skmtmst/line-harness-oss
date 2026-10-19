@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
-import { connectHash, STRIPE_CONNECT_CALLBACK } from '../services/booking-stripe-connect.js';
+import { connectHash, STRIPE_CONNECT_CALLBACK } from '../features/booking/booking-stripe-connect.js';
 const access = vi.hoisted(() => ({ allow: true }));
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: vi.fn(async () => access.allow) }));
 import { bookingPaymentAdmin } from './booking-payment-admin.js';

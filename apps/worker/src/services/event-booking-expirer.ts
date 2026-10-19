@@ -68,7 +68,7 @@ export async function runEventBookingExpirer(
       )
       .bind(row.id)
       .run();
-    // N-065: 期限切れも取消と同じく V6 の未送信予定だけを止める。送信済み履歴は残す。
+    // N-065: 期限切れも取消と同じく の未送信予定だけを止める。送信済み履歴は残す。
     // 1件の失敗で残りを止めないよう行単位で握る。失敗行は末尾の修復走査で拾い直す。
     try {
       await cancelByTrigger(db, {
@@ -93,8 +93,8 @@ export async function runEventBookingExpirer(
     expired++;
   }
 
-  // 部分失敗の回復: 業務は終わっているのに V6 が active のまま残った行を止める。
-  // V6 取消が投げた行は次回 cron で拾い直す。手動取消・落選の取りこぼしも
+  // 部分失敗の回復: 業務は終わっているのに が active のまま残った行を止める。
+  // 取消が投げた行は次回 cron で拾い直す。手動取消・落選の取りこぼしも
   // source 連動に限って拾う。legacy・手動登録には触れない。
   // 修復自体の失敗で期限切れを壊さないよう外側でも握る。
   try {

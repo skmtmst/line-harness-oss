@@ -1,6 +1,7 @@
 import { richMessageActions, type AssetPayloadInput } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import { imageDimensions } from './media-metadata.js';
+
+import type { Env } from '../worker-env.js';
+import { imageDimensions } from '../features/media/media-metadata/index.js';
 import { checkKeyGate, checkMediaGate } from './file-scan.js';
 
 export const IMAGEMAP_WIDTHS = [240,300,460,700,1040] as const;

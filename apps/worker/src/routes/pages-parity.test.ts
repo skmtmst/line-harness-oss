@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { createFriendAddRuleDraft, getFriendAddRule, archiveFriendAddRule, listFriendAddRulesPage } from '@line-crm/db';
 import { createCommonAction, listCommonActions } from '../services/common-actions.js';

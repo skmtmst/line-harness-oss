@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import { simulationContext } from '../services/broadcast-simulation.js';
+import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
 import { broadcastSendPreview } from '../services/gap-send-preview.js';
 import { parseJsonArray, parseJsonObject } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -12,7 +12,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import { listResponse } from '../lib/list-etag.js';
 import { computeDedupBroadcastPreview } from '../services/dedup-broadcast.js';
 import { getLineAccountById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { ACCOUNT_ACCESS_ERROR, ledgerCountsForBroadcasts, serializeBroadcast, BroadcastNotificationSettings, BROADCAST_NOTIFICATION_KEY, DEFAULT_BROADCAST_NOTIFICATIONS, notificationSentence, canAccessBroadcast, broadcastStatusView, recipientResultFilter, failedBreakdown } from './broadcasts-definition.js';

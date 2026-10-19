@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { relayAiLoopReport, type AiLoopReport } from '../services/ai-loop-slack-report.js';
 import { verifySupportRelay } from '../services/support-relay.js';
 

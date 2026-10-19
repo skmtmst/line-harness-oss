@@ -1,20 +1,23 @@
 import { logger } from '@line-crm/shared/server';
 import { auditLog } from '../lib/audit-log.js';
 import { reportPeriod, type ReportPeriodInput } from '@line-crm/shared';
-import { callFormWebhook, publicFormWebhookData } from '../services/form-webhook.js';
+import { parseLayout } from '@line-crm/shared';
+
+import { callFormWebhook, publicFormWebhookData } from '../features/forms/form-webhook/index.js';
 import { customerDeletionPending, deleteCustomerData, deletionJournal, DeletionFailure } from '../services/customer-data-deletion.js';
 import { inputError } from '../lib/input-errors.js';
-import { hydrateDocumentAnswers } from '../services/form-documents.js';
+import { hydrateDocumentAnswers } from '../features/forms/form-documents/index.js';
 
 import { getFormById, type FormSubmitClaimScope, getFormAccountIds, getFormDeleteImpact, archiveFormAtRevision, unarchiveFormAtRevision, deleteFormAtRevision, getFormSubmissions, getFormSubmissionsPage, getFormSubmissionAnalytics, getFormSubmissionById, resyncFormSubmitCount, getFormSubmitClaim, takeoverFormSubmitClaim, readFormSubmitClaimSteps, appendFormSubmitClaimStep, saveFormSubmitClaimWebhook, completeFormSubmitClaim, failFormSubmitClaim, ensureFormSubmitOutboxEvent, getFormSubmitOutbox, markFormSubmitOutboxDelivered, readFormSubmitOutboxPayload, readFormSubmitClaimEffectStats, saveFormSubmitClaimEffectStats, getFormSubmitClaimBySubmissionId, getFormVersionContent, updateFormSubmissionDestinationWriteResult, getFriendById, toJstString } from '@line-crm/db';
+
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { listLimit, listPage } from './list-pagination.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
-import { parseLayout } from '@line-crm/shared';
+import { createBroadcastRetryKey } from '../features/broadcasts/broadcast-retry-key/index.js';
+
 import { authorizedDeleteImpact, requireFormManage, canUseFormFromAccount, NON_PAGINATED_SUBMISSIONS_MAX, describePostActionsForSubmissions, serializeSubmission, dateFieldsOfForm, ratingFieldsOfForm, describeSubmissionPostActions, formSubmitClaimExpired, formSubmitClaimStaleBefore, FormSubmitClaimHandle, ClaimOwnershipLost, resolveFriendAccessToken, optionalExecutionCtx, runFormPostEffects } from './forms-definition.js';
 import type { Context } from 'hono';
 
@@ -260,7 +263,7 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
     catch { return c.json({success:false,error:'期間は正しい日付（YYYY-MM-DD）、または this_month・last_month・all で指定してください'},400); }
     const hasPagination = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
     if (!hasPagination) {
-      // SDKなど既存利用先との互換性を保つ。V6管理画面だけが明示的にページ分けを要求する。
+      // SDKなど既存利用先との互換性を保つ。管理画面だけが明示的にページ分けを要求する。
       // 大きいフォームで重い応答になるため上限を置く。page/limit 付きへ移行すること。
       /*
        * **切るのは `getFormSubmissions` の SQL ひとつだけ。**ここで重ねて

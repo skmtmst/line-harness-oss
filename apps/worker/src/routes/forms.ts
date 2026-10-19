@@ -2,7 +2,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { denyReadOnly, requireIrreversibleConfirmation, requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 
@@ -80,7 +80,7 @@ forms.post('/api/forms/:id/unarchive', requireArchiveManage, inputJsonBoundary({
 // DELETE /api/forms/:id — 影響0件・非公開・同じ版のときだけ物理削除する。
 forms.delete('/api/forms/:id', requireDeliveryAccess('forms', 'archive'), delete__api_forms_id_3);
 
-// B-215: one answer and its private attachments; never the whole form.
+// one answer and its private attachments; never the whole form.
 forms.delete('/api/forms/:id/submissions/:submissionId', requireRole('owner', 'admin'), denyReadOnly(), requireIrreversibleConfirmation('delete-form-response'), delete__api_forms_id_submissions_submissionId_4);
 
 // CSV は回答閲覧と分離し、明示的な書き出し権限で確認する。

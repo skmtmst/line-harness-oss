@@ -1,10 +1,10 @@
 import type { Context } from 'hono';
 import { getAutoReplyById, parseAutoReplyVersionSettings, getFolderById } from '@line-crm/db';
 import type { AutoReplyDraftSettings, AutoReplyVersionRow } from '@line-crm/db';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { type AutoReplyCandidateReasonCode } from '../services/auto-reply.js';
+import { type AutoReplyCandidateReasonCode } from '../features/auto-replies/auto-reply/index.js';
 
 export /*
  * R200: 「連投を防ぐ」の範囲外は、対象欄の名前と許容範囲が分かる日本語で断る。
@@ -27,7 +27,7 @@ export async function validateAutoReplyFolder(
 
 export /*
  * m26c R562: 全アカウント共通（lineAccountId が null）の作成・共通化は
- * owner だけ。要件 v6-08 §7「全アカウント共通ルールはownerだけが作成・変更」。
+ * owner だけ。要件 -08 §7「全アカウント共通ルールはownerだけが作成・変更」。
  * m26c R563: テンプレートは所属アカウントが見える人だけが使える。
  * 所属なし（共通）のテンプレートは共有物として扱う。
  */

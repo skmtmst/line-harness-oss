@@ -1,5 +1,5 @@
 import { API_RETRY_WAIT, parseRetryAfter } from '../lib/external-call/policy.js';
-// V6 共通基盤 §6-2: 外部APIは初回後に1分・5分・30分の最大3回だけ再試行する。
+// 共通基盤 §6-2: 外部APIは初回後に1分・5分・30分の最大3回だけ再試行する。
 export const EXTERNAL_DELIVERY_MAX_ATTEMPTS = 4;
 const EXTERNAL_DELIVERY_RETRY_DELAYS_MINUTES = API_RETRY_WAIT.kind === 'fixed' ? API_RETRY_WAIT.delaysMs.map(ms => ms / 60_000) : [];
 /**

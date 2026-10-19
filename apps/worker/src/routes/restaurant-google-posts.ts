@@ -18,7 +18,7 @@ import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-er
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getMediaById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';

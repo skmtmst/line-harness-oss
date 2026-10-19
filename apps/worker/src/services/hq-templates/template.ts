@@ -2,8 +2,10 @@ import type {MessageTemplateSourceMediaBinding} from './message-media-binding.js
 export type {MessageTemplateSourceMediaBinding} from './message-media-binding.js';
 import type { MessageTemplateTargetSnapshot } from './message-target-snapshot.js';
 export type { MessageTemplateTargetSnapshot } from './message-target-snapshot.js';
-import { parseBroadcastMessageParts } from '../broadcast-message-set.js';
+import { parseBroadcastMessageParts } from '../../features/broadcasts/broadcast-message-set/index.js';
 import { parseHqMessageCard, composeHqMessageCard, validateImagemapMessage, type HqMessageCard, isLiffActionKind, collectLiffActionLocators, replaceLiffActionLocators } from '@line-crm/shared';
+import { type MessageTemplateDefinition, type MessageTemplateMediaDefinition, validateAssetPayload, validateTapExtrasTree, tapExtrasError, isBroadcastAssetKind, convertBroadcastAsset, templateKind } from '@line-crm/shared';
+
 import { HQ_MEDIA_MAX_BYTES, type HqMediaStreamSource } from '../hq-media-stream.js';
 import type { HqTemplateBinding, HqTemplateStatement } from '@line-crm/db';
 import {
@@ -30,8 +32,9 @@ export class TemplateHqTemplateError extends Error {
 }
 
 export type { MessageTemplateDefinition, MessageTemplateMediaDefinition } from '@line-crm/shared';
-import { type MessageTemplateDefinition, type MessageTemplateMediaDefinition, validateAssetPayload, validateTapExtrasTree, tapExtrasError, isBroadcastAssetKind, convertBroadcastAsset, templateKind } from '@line-crm/shared';
-import { parseQuestion } from '../scenario-question.js';
+
+
+import { parseQuestion } from '../../features/scenarios/scenario-question/index.js';
 
 /**
  * The factory is bound to this authority before it receives an adapter input.
@@ -87,7 +90,7 @@ export interface MessageTemplateAdapterDependencies {
    * Must perform a conditional R2 read when binding.etag is present. Returning null means that
    * the object no longer matches the version recorded by resolveSourceVersion.
    * Check the R2 reported size and consume body with readMessageTemplateSourceBytes
-   * (or an equivalent bounded reader). Do not call unbounded arrayBuffer() first.
+   * (or an equivalent bounded reader). Do not call unbounded arrayBuffer first.
    */
   readSourceObjectIfUnchanged(input: Readonly<{
     authority: MessageTemplateSourceAuthority;
@@ -611,7 +614,7 @@ function nameInventoryGuard(kind: 'template' | 'media', accountId: string, names
   const table = kind === 'template' ? (asset ? 'broadcast_message_assets' : 'templates') : 'media';
   const column = kind === 'template' ? 'name' : 'filename';
   const expected = JSON.stringify(names);
-  // SQLite lower() cannot reproduce JavaScript NFKC/case folding. Prove the entire
+  // SQLite lower cannot reproduce JavaScript NFKC/case folding. Prove the entire
   // account name inventory is unchanged instead, then use the JS decision above.
   // Compare sets, not JSON row ordering; Unicode ids and query ordering are immaterial.
   return conflictGuard(`SELECT 1 WHERE

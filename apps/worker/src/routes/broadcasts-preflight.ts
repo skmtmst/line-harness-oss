@@ -5,15 +5,15 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getBroadcastById, createBroadcast } from '@line-crm/db';
 import type { Broadcast as DbBroadcast } from '@line-crm/db';
-import { MAX_BROADCAST_MESSAGES, parseBroadcastMessageParts, unsupportedMessageVariables } from '../services/broadcast-message-set.js';
-import type { SegmentCondition } from '../services/segment-query.js';
+import { MAX_BROADCAST_MESSAGES, parseBroadcastMessageParts, unsupportedMessageVariables } from '../features/broadcasts/broadcast-message-set/index.js';
+import type { SegmentCondition } from '@line-crm/shared';
 import { getLineAccountById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { BROADCAST_DEFINITION_EDIT_KEY } from '@line-crm/shared';
-import { buildWarnings, hasRecentSimilarBroadcast, previewAudience } from '../services/broadcast-preflight.js';
+import { buildWarnings, hasRecentSimilarBroadcast, previewAudience } from '../features/broadcasts/broadcast-preflight/index.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { fetchQuota } from '../services/broadcast-quota-guard.js';
+import { fetchQuota } from '../features/broadcasts/broadcast-quota-guard/index.js';
 import { ACCOUNT_ACCESS_ERROR, STANDARD_CONDITION_AXES, BROADCAST_ONLY_CONDITION_AXES, CreateBroadcastBody, UUID_PATTERN, BROADCAST_DRAFT_STEPS, validateMessageOptions, broadcastWriteBoundary, rejectIfAudienceUnusable, sameCreateRequest, serializeBroadcast, recordLifecycle } from './broadcasts-definition.js';
 import type { Context } from 'hono';
 

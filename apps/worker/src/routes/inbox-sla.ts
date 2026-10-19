@@ -1,6 +1,6 @@
 import { routingSettings,routingInput,assignInbox } from '../services/inbox-assignment.js';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {gapAccount,gapBody,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
 import {inboxSlaSettings} from '../services/inbox-sla.js';
 export const inboxSla=new Hono<Env>();

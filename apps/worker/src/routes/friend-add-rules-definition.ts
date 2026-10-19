@@ -2,9 +2,11 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 import type { Context } from 'hono';
 import { getFriendAddRule, listFriendAddRules, recordFriendAddRuleTest, type FriendAddRuleDefinition, type FriendAddRuleKind, type FriendAddRuleRow } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import { collectFriendAddReferences, evaluateFriendAddRuleConditions, evaluateFriendAddSchedule, type FriendAddSuppressReason, findFriendAddUnusableReferences, friendAddJstHhmm, hasInvalidFriendAddTimeWindows, isValidFriendAddHhmm, parseFriendAddConditionAst } from '../services/friend-add-routing.js';
+import { collectFriendAddReferences, evaluateFriendAddRuleConditions, evaluateFriendAddSchedule, findFriendAddUnusableReferences, friendAddJstHhmm, hasInvalidFriendAddTimeWindows, isValidFriendAddHhmm, parseFriendAddConditionAst } from '../features/friends/friend-add-routing/index.js';
+import { type FriendAddSuppressReason } from '../features/friends/friend-add-routing-pick-string/index.js';
 import { toJstParts } from '@line-crm/shared';
 
 export const KINDS = new Set<FriendAddRuleKind>(['first_time', 'returning']);
@@ -448,7 +450,7 @@ export async function validateReferences(
   }
   /*
    * 再追加で「何も配信しない」(returningMode none) ときはシナリオを使わない。
-   * 要件 v6-09 §4-3 の正規の選択肢であり、受け皿ルール自身も scenarioId なしで
+   * 要件 -09 §4-3 の正規の選択肢であり、受け皿ルール自身も scenarioId なしで
    * 作られる (ensureFriendAddFallbackRules)。下書きの保存では未完成を許す
    * (R30)。それ以外（テスト・公開前確認・公開）は従来どおり必須とし、
    * 公開はテスト成功が鍵のため未完成のまま公開できない。

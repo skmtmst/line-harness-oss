@@ -3,7 +3,7 @@ import {
   getVisibleLineAccountScope,
   type VisibleLineAccountScope,
 } from './account-access.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 /**
  * 権限・tenant・LINEアカウント境界の共通土台(board #800)。

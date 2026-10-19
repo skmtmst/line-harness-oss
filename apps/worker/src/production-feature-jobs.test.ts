@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from './test-utils/d1-sqlite.js';
-import type { Env } from './index.js';
+import type { Env } from './worker-env.js';
 
 const fixture = vi.hoisted(() => ({ jobs: [] as string[] }));
 vi.mock('./services/scheduled-job-isolation.js', async importOriginal => ({
@@ -15,7 +15,7 @@ const { default: worker } = await import('./index.js');
 const { SCHEDULED_CRONS } = await import('./services/scheduled-job-isolation.js');
 afterEach(() => { fixture.jobs = []; });
 
-describe('B-368 Googleの定期読み取りも飲食店の試験旗から独立', () => {
+describe('Googleの定期読み取りも飲食店の試験旗から独立', () => {
   it.each(['production', 'staging'] as const)('%s の実設定で必要な処理だけを登録する', async environment => {
     const { unstable_readConfig } = await import('wrangler');
     const config = unstable_readConfig({ config: new URL(environment === 'production' ? '../wrangler.toml' : '../wrangler.staging.toml', import.meta.url).pathname });

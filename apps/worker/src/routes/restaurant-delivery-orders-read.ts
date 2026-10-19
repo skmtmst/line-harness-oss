@@ -2,14 +2,15 @@ import { orderFor } from './restaurant-delivery-common.js';
 import type { DeliveryOrderRow } from './restaurant-delivery-types.js';
 import type { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 
 import { dbFor } from '../services/db-router.js';
 import { fail } from './restaurant-google.js';
 
 import { DELIVERY_SERVICE_LABELS, isDeliveryService, judgeUrgency, nowSec, summarizeOrderItems, tokyoDateText, tokyoDayRange } from '../services/restaurant-delivery.js';
-import type { DeliveryOrderStatus, DeliveryService } from '../services/restaurant-delivery.js';
+import type { DeliveryOrderStatus } from '../services/restaurant-delivery.js';
+import type { DeliveryService } from '../services/delivery-service-types.js';
 import { ORDER_STATUS_LABELS, isoOrNull, deliveryStore, serviceStates, resumeExpiredIntake, cookingCountFor, itemsForOrders } from './restaurant-delivery-common.js';
 
 export function registerDeliveryOrderReads(restaurantDelivery: Hono<Env>): void {

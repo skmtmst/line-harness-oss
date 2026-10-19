@@ -1,5 +1,5 @@
 /*
- * 健康日記の管理画面（★V6 37-4）：記録から「気になる変化」を出す計算を固定する。
+ * 健康日記の管理画面（★37-4）：記録から「気になる変化」を出す計算を固定する。
  */
 import { describe, expect, it } from 'vitest';
 import { lastLoggedLabel, summarizePetHealth, thirtyDaySummary, type HealthLogRow } from './nen-health-admin.js';

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { signOperationsEvent } from '../services/operations-signature.js';
 import { DELIVERY_DISPATCH_JOB_NAMES } from '../services/feature-enforcement.js';
@@ -1149,7 +1149,7 @@ describe('停止不可理由の機械コード(N-453/N-455)', () => {
   });
 });
 
-describe('W: 運用状態の確認項目の追加（v6-32）', () => {
+describe('W: 運用状態の確認項目の追加（-32）', () => {
   it('月間配信数はLINEとHarnessの小さい方を送れる数にし、予定分と翌月1日(JST)のresetを返す', async () => {
     const now = '2026-09-15T05:00:00.000Z';
     testDb.raw.prepare(
@@ -1361,7 +1361,7 @@ describe('繰り返し通知の止め方（同じ知らせが5分ごとに鳴ら
     unlimitedQuota();
 
     // 本番の received_at は strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') の JST。
-    // 判定時刻(observedAt)は UTC なので、そのまま datetime() で引き算すると
+    // 判定時刻(observedAt)は UTC なので、そのまま datetime で引き算すると
     // 9時間ぶん受信が新しく見え、26時間前の受信が24時間以内に入ってしまっていた。
     // UTC 2026-09-15T12:00:00Z = JST 21:00 の26時間前 = JST 2026-09-14T19:00。
     testDb.raw.prepare(

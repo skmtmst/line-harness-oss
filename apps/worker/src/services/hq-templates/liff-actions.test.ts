@@ -4,6 +4,7 @@ import { resolveHqLiffActions } from './liff-actions.js';
 import { listMessageReferences } from './message-card-references.js';
 import { hqLiffActionLocator, liffActionFromUrl, type LiffAction } from '@line-crm/shared';
 
+
 const resources: ReturnType<typeof createTestD1>[] = [];
 afterEach(() => { for (const r of resources.splice(0)) r.raw.close(); });
 const authority = { tenantId: 'tenant', actorId: 'owner', role: 'owner', readOnly: false, accountScoped: false } as const;

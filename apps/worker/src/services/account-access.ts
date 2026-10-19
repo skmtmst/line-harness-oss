@@ -4,8 +4,9 @@ import {
   getStaffById,
   type LineAccountScopeEntry,
 } from '@line-crm/db';
+
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 /**
  * 認証済みユーザーが閲覧できるLINE公式アカウントを返す。

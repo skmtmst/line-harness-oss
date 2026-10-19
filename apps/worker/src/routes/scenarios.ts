@@ -1,7 +1,7 @@
 import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess, requirePermission } from '../middleware/role-guard.js';
 
 import { get__api_scenarios_id_question_answers_1, post__api_scenarios_id_question_answers_executionId_resume_2, patch__api_scenarios_reorder_3, get__api_scenarios_4, get__api_scenarios_id_5, post__api_scenarios_6, put__api_scenarios_id_7, get__api_scenarios_id_move_referrers_8, delete__api_scenarios_id_9, post__api_scenarios_id_steps_10 } from './scenarios-drafts-handlers.js';

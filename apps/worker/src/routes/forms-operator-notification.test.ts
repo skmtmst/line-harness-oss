@@ -26,7 +26,7 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const dispatchOperatorEvent = vi.hoisted(() => vi.fn());
 vi.mock('../services/operator-notification-dispatch.js', () => ({ dispatchOperatorEvent }));
@@ -95,7 +95,7 @@ function asD1(sqlite: Database.Database): D1Database {
 /**
  * waitUntil に渡された Promise を集めて、明示的に待てるようにする。
  *
- * 拒否は握り潰さず `settle()` の戻りで返す。allSettled で飲み込むと
+ * 拒否は握り潰さず `settle` の戻りで返す。allSettled で飲み込むと
  * 「副作用が自分で後始末しているか」を見張れなくなり、後始末を外しても
  * 緑のままになる。
  */

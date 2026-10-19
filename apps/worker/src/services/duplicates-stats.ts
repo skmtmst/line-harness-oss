@@ -131,7 +131,7 @@ const PAIRWISE_RAW_SQL = `
  * 可視アカウントへの絞り (#496-14)。
  *
  * 絞り無し(undefined)は従来どおり全アカウント。空配列は「見られる
- * アカウントが無い」= 0件の集計になる（`IN ()` は不正SQLなので
+ * アカウントが無い」= 0件の集計になる（`IN ` は不正SQLなので
  * `1 = 0` に倒す）。
  */
 function accountFilterClause(column: string, accountIds: string[] | undefined): string {

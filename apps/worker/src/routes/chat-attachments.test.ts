@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { CHAT_FILE_MAX_BYTES, CHAT_FILE_TYPES, CHAT_VIDEO_MAX_BYTES, type ChatAttachment } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { attachmentBucket, MP4_BYTES, PDF_BYTES, PNG_BYTES, zipBytes } from '../test-utils/chat-attachment-bucket.js';
 import { chatAttachments } from './chat-attachments.js';
@@ -225,7 +226,7 @@ describe('受信箱の送信・期限付きリンク', () => {
   });
 });
 
-describe('B-351 短命の添付URL', () => {
+describe('短命の添付URL', () => {
   it.each(['image', 'video', 'file'])('%sは署名なし・改ざん・期限切れで本文を渡さない', async kind => {
     const file = kind === 'video' ? (await video()).attachment
       : kind === 'image' ? (await (await upload(PNG_BYTES, 'a.png', 'image/png')).json<TestReply>()).data : await uploadedFile();

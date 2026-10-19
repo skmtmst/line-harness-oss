@@ -8,7 +8,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
  * - 「未取得」と「0件」を区別する。期間内が全部未取得の指標は null（画面は「—」）。
  */
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from '../services/db-router.js';
 import { processGoogleBusinessDailyMetrics } from '../services/google-business-resync.js';
 import { requireRole } from '../middleware/role-guard.js';

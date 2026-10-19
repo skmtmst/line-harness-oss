@@ -1,12 +1,12 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { issueStaffLineLinkCode, listUnreadScreenNotices, markScreenNoticeRead } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { loadNoticeLineAccount } from '../services/platform-announcements.js';
 
 /**
- * 統括の管理画面に出す運営からのお知らせ（★V6 37-7 の「画面のお知らせ」）と、
+ * 統括の管理画面に出す運営からのお知らせ（★37-7 の「画面のお知らせ」）と、
  * 契約者専用LINEの登録案内（LINE アカウント登録完了時のポップアップ。決定 2026-09-18）。
  * 本人（ログイン中の権限者）の分だけを扱う。
  */

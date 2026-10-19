@@ -2,8 +2,9 @@ import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { type Context, type MiddlewareHandler } from 'hono';
 import { getWebinarById, archiveWebinar, getWebinarCtas, getWebinarVideoAsset, isWebinarVideoReady, getWebinarEditorSettings, getWebinarMonitoringSummary, getWebinarPublicAccount, getWebinarActions, countInvalidWebinarActionReferences, getFormById, type Webinar, type WebinarListRow, type WebinarActionInput, type WebinarActionType, type WebinarEditorSettings, type WebinarEditorSettingsInput, type WebinarParticipantClassification, getMediaIdByR2Key } from '@line-crm/db';
-import { parseScheduleRules } from '../services/webinar-schedule.js';
-import type { Env } from '../index.js';
+
+import { parseScheduleRules } from '../features/webinars/webinar-schedule/index.js';
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 
@@ -222,7 +223,7 @@ export async function getEditorPayload(c: Context<Env>, row: Webinar) {
     : null;
   return {
     version: settings.version,
-    /* 同時編集の帯（pvimJ）が読んだ版を見分ける更新日時。 */
+    /* 同時編集の帯が読んだ版を見分ける更新日時。 */
     updatedAt: settings.updated_at ?? null,
     deliveryKind: settings.delivery_kind,
     viewingCondition: parseJson(settings.viewing_condition_json, { kind: 'registered', label: '申込者向け' }),

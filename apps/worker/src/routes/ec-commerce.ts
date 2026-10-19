@@ -5,12 +5,12 @@ import { Hono } from 'hono';
 import { classifyEcErrorCode, encryptCredential, getLineAccountById, jstDateString, jstNow, nextDateString } from '@line-crm/db';
 import { EC_EVENT_TYPES, ecEventLabel, addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requireEcPermission } from './ec-operations.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
-import type { EcEvent } from './ec-integrations.js';
-import { ecFlexMessage } from '../services/ec-notification-message.js';
+import type { EcEvent } from '../features/ec-commerce/member-snapshot/index.js';
+import { ecFlexMessage } from '../features/ec-commerce/ec-notification-message/index.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import { notificationDeliveriesResponse } from './line-notifications.js';
@@ -67,7 +67,7 @@ export type SubscriptionState = 'active' | 'paused' | 'at_risk' | 'cancelled';
  *
  * 判定語はすべて小文字・記号なしにすること。SQL 側は `lower(...) LIKE '%語%'`
  * へ展開するので、`%` や `_` を含む語を足すと LIKE のワイルドカードとして
- * 解釈される。日本語は `lower()` で変わらないのでそのまま比べられる。
+ * 解釈される。日本語は `lower` で変わらないのでそのまま比べられる。
  */
 export const SUBSCRIPTION_STATE_RULES: ReadonlyArray<{
   readonly state: SubscriptionState;
@@ -92,8 +92,8 @@ export function subscriptionState(value: unknown): SubscriptionState {
 /**
  * 上の表から SQL の `CASE` を組み立てる。`expr` は状態の文字列を返す SQL 式。
  *
- * `LIKE` は SQLite では ASCII の大小を区別しないが、JS 側が `toLowerCase()`
- * してから比べているので、ここでも `lower()` を掛けて条件を揃える。
+ * `LIKE` は SQLite では ASCII の大小を区別しないが、JS 側が `toLowerCase`
+ * してから比べているので、ここでも `lower` を掛けて条件を揃える。
  */
 export function subscriptionStateSql(expr: string): string {
   const whens = SUBSCRIPTION_STATE_RULES.map((rule) => {
@@ -534,7 +534,7 @@ const SUBSCRIPTIONS_NON_PAGINATED_MAX = 100;
 const SUBSCRIPTION_STATUS_EXPR = `coalesce(nullif(json_extract(c.value, '$.status_code'), ''), nullif(json_extract(c.value, '$.status'), ''), '')`;
 
 /**
- * `monthKey()` と同じ月キーを SQL で作る。`2026-9-01` のような1桁月も
+ * `monthKey` と同じ月キーを SQL で作る。`2026-9-01` のような1桁月も
  * `2026-09` に揃える。文字列でない値は NULL(集計から外れる)。
  */
 function monthKeySql(expr: string): string {
@@ -945,7 +945,7 @@ ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), inpu
   return c.json({ success: true, data: { version: nextVersion } });
 });
 
-/** V6の共通送信台帳を、既存画面の互換URLでも返す。 */
+/** の共通送信台帳を、既存画面の互換URLでも返す。 */
 ecCommerce.get(
   '/api/ec-commerce/notification-runs',
   requireRole('owner', 'admin', 'staff'),

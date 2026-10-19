@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import type { EventPayload } from './event-payload.js';
 export type { EventPayload } from './event-payload.js';
-import { patchFriendMetadata } from './friend-metadata.js';
+import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
 
@@ -53,13 +53,13 @@ import {
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
-import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
+import { dispatchAutomationEventWithLogging } from '../features/automations/automation-triggers/index.js';
 import { applyActionScoreEvent } from './action-score-events.js';
 
 import {
   applyRichMenuTargeting,
   isTargetingTrigger,
-} from './rich-menu-targeting.js';
+} from '../features/rich-menus/rich-menu-targeting/index.js';
 
 function toAdConversionAmount(value: unknown): number | undefined {
   const amount = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
@@ -198,7 +198,7 @@ export async function fireEvent(
   // Phase 2: evaluate automations.
   await replayStep(execution, 'event:legacy-automations', () => processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId, execution));
 
-  // V6は発生元の不変IDとアカウントが分かるイベントだけを受け付ける。
+  // は発生元の不変IDとアカウントが分かるイベントだけを受け付ける。
   // 旧イベントの時刻などからIDを推測すると再配達で二重実行になるため、
   // 接続元が明示していないイベントは移行PRで接続するまで実行しない。
   if (lineAccountId && enrichedPayload.sourceEventId) {

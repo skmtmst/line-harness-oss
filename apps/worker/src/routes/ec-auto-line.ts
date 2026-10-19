@@ -1,12 +1,12 @@
 import { validateNenWebhookHeaders, verifyNenWebhook } from '../lib/hmac.js';
 import { WEBHOOK_BODY_BYTES, isWebhookBodyTooLarge } from '../lib/webhook-body.js';
-import {simulateAttribution,simulationResults} from '../services/ec-auto-line-attribution.js';
-import {assertChanged,clearAssertions} from '../services/booking-series.js';
+import {simulateAttribution,simulationResults} from '../features/ec-commerce/ec-auto-line-attribution/index.js';
+import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite,gapKey} from '../services/gap-common.js';
-import {autoKinds,autoLineRules,ingestBehavior,processAutoLineMock} from '../services/ec-auto-line.js';
+import {autoKinds,autoLineRules,ingestBehavior,processAutoLineMock} from '../features/ec-commerce/ec-auto-line/index.js';
 import {getConnectorSecret} from './ec-connector-secret.js';
 export const ecAutoLine=new Hono<Env>();
 ecAutoLine.use('/api/ec/auto-line/*',requirePermission('/ec-commerce'));

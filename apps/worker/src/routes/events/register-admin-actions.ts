@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { prepareConfirmedEventBooking } from '../../services/event-notification-plan.js';
 import { bad } from '../../services/event-input-error.js';
@@ -8,7 +8,7 @@ import { requireRole } from '../../middleware/role-guard.js';
 import { cancelByTrigger, enrollByTrigger } from '../../services/reminder-trigger.js';
 import { computeRemindersForBooking, insertRemindersForBooking, cancelPendingRemindersFor } from '../../services/event-booking-reminders.js';
 import { canTransition, nextStatus, type EventBookingAction } from '../../services/event-booking-state.js';
-import { dispatchAutomationEventWithLogging } from '../../services/automation-triggers.js';
+import { dispatchAutomationEventWithLogging } from '../../features/automations/automation-triggers/index.js';
 import { enqueueEventWaitlistPromotion, getEventOccurrenceUsedSeats } from '../../services/event-waitlist.js';
 import { getAccountId, optionalExecutionCtx } from './input.js';
 import { ownsEvent } from './slot-input.js';
@@ -29,7 +29,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
   }
   const action: EventBookingAction = body.action;
   if (booking.decided_at != null) {
-    // 落選ずみへの却下の再送は V6 修復を受け付ける (状態更新後の V6 失敗を
+    // 落選ずみへの却下の再送は 修復を受け付ける (状態更新後の 失敗を
     // 回復するため。修復不能な 409 にしない)。承認の再送・競合敗北は 409。
     if (action === 'reject' && booking.status === 'rejected') {
       try {
@@ -41,7 +41,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         throw error;
       }
       // 初回の待機者ジョブ登録が失敗したままのとき、同じ却下要求の再送で
-      // 再登録する (V6修復だけの早期returnでは待機者が進まない)。
+      // 再登録する (修復だけの早期returnでは待機者が進まない)。
       // source_key が同じため二重登録にならない。
       await enqueueEventWaitlistPromotion(c.env.DB, {
         lineAccountId: booking.line_account_id,
@@ -91,7 +91,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
   const [upd]=decision;
   if ((upd.meta?.changes ?? 0) === 0) {
     // 同時確定との競合敗北は成功にしない。落選ずみへの承認は 409。
-    // 落選ずみへの却下の再送だけ V6 修復を受け付けて 200 にする。
+    // 落選ずみへの却下の再送だけ 修復を受け付けて 200 にする。
     const current = await c.env.DB
       .prepare(`SELECT status FROM event_bookings WHERE id = ?`)
       .bind(booking.id)
@@ -152,7 +152,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
         reminder_hours_before: evRow.reminder_hours_before,
       });
       await insertRemindersForBooking(c.env.DB, booking.id, reminders);
-      // N-065: 承認で確定した予約も V6 へ登録する (source 連動つき)。
+      // N-065: 承認で確定した予約も へ登録する (source 連動つき)。
       // 登録失敗で承認自体を壊さない。二重登録は enroll 側で吸収する。
       await enrollByTrigger(c.env.DB, {
         triggerType: 'event',
@@ -179,7 +179,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
     );
   }
   if (action === 'reject') {
-    // N-065: 落選した予約の V6 未送信予定だけを止める。
+    // N-065: 落選した予約の 未送信予定だけを止める。
     // 送信権の貸出中は状態更新を巻き戻して 409 にする。貸出中の送信は
     // 確定ずみの予約への送信になるため正当で、再試行は巻き戻し後の状態から
     // 再開する (再送の修復受付も残す)。
@@ -223,7 +223,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
   if (!(await ownsEvent(c.env.DB, event_id, account_id))) return bad(c, 'not_found', 404);
   const booking = await loadBookingForAction(c.env.DB, account_id, event_id, c.req.param('bookingId'));
   if (!booking) return bad(c, 'not_found', 404);
-  // 再試行の受付: V6 取消が投げた直後の再送は V6 だけ直す (409 にしない)。
+  // 再試行の受付: 取消が投げた直後の再送は だけ直す (409 にしない)。
   // 送信権の貸出中は 409 で再試行させる。
   if (booking.status === 'cancelled') {
     const slot = await c.env.DB
@@ -248,7 +248,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
       throw error;
     }
     // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
-    // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+    // 再送でそろえる (fence 成功後なので 409 で巻き戻す物は無い)。
     await cancelPendingRemindersFor(c.env.DB, booking.id);
     // 初回の取消確定後に待機者ジョブ登録だけ失敗しても、
     // 同じ取消要求の再送で復旧する。source_key が重複登録を吸収する。
@@ -278,8 +278,8 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     .prepare(`SELECT starts_at FROM event_slots WHERE id = ?`)
     .bind(booking.slot_id)
     .first<{ starts_at: string }>();
-  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-  // 旧表の取消は V6 fence 成功の後に回す (409 の完全 rollback のため)。
+  // N-065: の未送信予定だけを止める。送信済み履歴は残す。
+  // 旧表の取消は fence 成功の後に回す (409 の完全 rollback のため)。
   // 送信権の貸出中は状態更新を巻き戻して 409 にする (取消確定後の送信を起こさない)。
   try {
     await cancelByTrigger(c.env.DB, {
@@ -306,7 +306,7 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/cancel', requireRo
     }
     throw error;
   }
-  // 旧表の取消は V6 fence 成功の後 (409 では触らない)。
+  // 旧表の取消は fence 成功の後 (409 では触らない)。
   await cancelPendingRemindersFor(c.env.DB, booking.id);
   await enqueueEventWaitlistPromotion(c.env.DB, {
     lineAccountId: booking.line_account_id,

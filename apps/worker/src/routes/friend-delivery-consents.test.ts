@@ -1,8 +1,8 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {Hono} from 'hono';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
-import type {Env} from '../index.js';
-import type {AuthenticatedStaff} from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import {createUidMigrationRun} from '@line-crm/db';
 import {consentRollbackConflicts,hasSuppressedDeliveryRecipients,isFriendDeliverySuppressed,listFriendDeliveryConsents,suppressionReconciliation} from '@line-crm/db/src/friend-delivery-consents.js';
 const scope=vi.hoisted(()=>({allowed:true}));

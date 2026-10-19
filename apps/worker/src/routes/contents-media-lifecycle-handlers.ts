@@ -1,14 +1,16 @@
 import { logger } from '@line-crm/shared/server';
 import { getMediaVersionKeys } from '@line-crm/db';
+import { getMediaById, getFolderById, updateMedia, deleteMedia, getMediaUsages, getMediaDeleteImpactSnapshot, isMissingTableError, applyMediaReplacementPlan, getMediaVersionList, getMediaLiveTarget, getMediaUsageReferenceStates, retargetMediaUsageReference, MediaUsageReferenceError, MEDIA_REF_KINDS, jstNow, getCommonVars, countCommonVars, COMMON_VARS_LIST_LIMIT, getCommonVarUsageSummaries, getCommonVarByIdIncludingArchived, getCommonVarUsageImpact, getCommonVarVersions, type CommonVar } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 import { isWebinarSource, privateImageKey, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
 
-import { getMediaById, getFolderById, updateMedia, deleteMedia, getMediaUsages, getMediaDeleteImpactSnapshot, isMissingTableError, applyMediaReplacementPlan, getMediaVersionList, getMediaLiveTarget, getMediaUsageReferenceStates, retargetMediaUsageReference, MediaUsageReferenceError, MEDIA_REF_KINDS, jstNow, getCommonVars, countCommonVars, COMMON_VARS_LIST_LIMIT, getCommonVarUsageSummaries, getCommonVarByIdIncludingArchived, getCommonVarUsageImpact, getCommonVarVersions, type CommonVar } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
+import { scanSingleMediaUsage } from '../features/media/media-usage-scan/index.js';
 import { checkMediaGate, getMediaGateInfo } from '../services/file-scan.js';
 import { isValidUsageExpiryDate, uploaderNameMap, serializeMedia, mediaArchiveRoute, replacementImpact, RequestBodyError, COMMON_VAR_USAGE_KIND_LABELS, serializeVar, emptyCommonVarUsageImpact, serializeCommonVarDeleteImpact } from './contents-definition.js';
 import type { Context } from 'hono';

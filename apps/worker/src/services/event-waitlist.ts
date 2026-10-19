@@ -1,3 +1,5 @@
+export type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
+import type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
 import type { EventOccurrenceApplicants } from './event-waitlist-types.js';
 export type { EventOccurrenceApplicants } from './event-waitlist-types.js';
 import { eventModeRemaining } from './event-mode-capacity.js';
@@ -14,19 +16,6 @@ import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shar
 
 const DEFAULT_OFFER_HOURS = 24;
 const JOB_RETRY_MAX_MINUTES = 60;
-
-export type EventWaitlistOfferSender = (offer: {
-  waitlistId: string;
-  retryKey?: string;
-  lineAccountId: string;
-  friendId: string;
-  eventName: string;
-  startsAt: string;
-  venueName: string | null;
-  venueUrl: string | null;
-  token: string;
-  expiresAt: string;
-}) => Promise<void>;
 
 interface OccurrenceRow {
   classroom_capacity:number|null;online_capacity:number|null;

@@ -3,8 +3,8 @@ import {appendFeatureScopeMeta} from './feature-scope-response.js';
 import { ACCOUNT_KEYS, bodyAccountIds } from './feature-body-accounts.js';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { FeatureId } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from './auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from './auth/principal/auth.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import { accountFeatureAvailability, createFeatureAvailabilityRequestContext, type FeatureAvailability } from '../services/feature-enforcement.js';
@@ -278,7 +278,7 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'public', reason: 'ログイン中の合言葉で本人確認する二段階認証の入口' },
   },
   {
-    // 運営メンバーの招待を受ける口（★V6 37-10-A）。メールの URL のトークンだけで守る
+    // 運営メンバーの招待を受ける口（★37-10-A）。メールの URL のトークンだけで守る
     pattern: /^\/api\/auth\/ops-invite\//,
     methods: ['GET', 'POST'],
     accountResolver: 'none',
@@ -408,8 +408,8 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/media\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM media WHERE id = ?' },
   { pattern: /^\/api\/common-vars\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_vars WHERE id = ?' },
   { pattern: /^\/api\/common-actions\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_actions WHERE id = ?' },
-  // #942: 一覧が返すidは V6 の automation_definitions。旧 automations 表だけを
-  // 見ると V6 ルールの稼働切替・改訂下書きが全部 LINE_ACCOUNT_REQUIRED で止まる。
+  // #942: 一覧が返すidは の automation_definitions。旧 automations 表だけを
+  // 見ると ルールの稼働切替・改訂下書きが全部 LINE_ACCOUNT_REQUIRED で止まる。
   { pattern: /^\/api\/automations\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM automation_definitions WHERE id = ?', fallbackSql: 'SELECT line_account_id AS account_id FROM automations WHERE id = ?' },
   { pattern: /^\/api\/tracked-links\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM tracked_links WHERE id = ?' },
   { pattern: /^\/api\/entry-routes\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM entry_routes WHERE id = ?' },

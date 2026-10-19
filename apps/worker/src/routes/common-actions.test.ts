@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
-import type { Env } from '../index';
-import type { AuthenticatedStaff } from '../middleware/auth';
+import type { Env } from '../worker-env';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth';
 import { commonActions } from './common-actions';
 import {
   createCommonAction,
@@ -26,7 +26,7 @@ const action = [{
   id: 'wait', type: 'wait', params: { minutes: 5 }, onFailure: 'stop',
 }];
 
-describe('V6共通アクションAPI', () => {
+describe('共通アクションAPI', () => {
   let testDb: SqliteD1;
   const admin: AuthenticatedStaff = {
     id: 'admin-1', name: '管理者', role: 'admin', readOnly: false, tenantId: 'tenant-1',

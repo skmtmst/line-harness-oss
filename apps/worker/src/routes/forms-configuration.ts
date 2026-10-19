@@ -1,20 +1,21 @@
 import { logger } from '@line-crm/shared/server';
 import { formWebhookTarget } from '../services/public-https-request.js';
 import { webhookUrlBlockReason } from '../services/outgoing-webhook-delivery.js';
-import { validateLayoutRouting } from '../services/form-routing.js';
+import { validateLayoutRouting } from '../features/forms/form-routing/index.js';
 import { GapError } from '../services/gap-common.js';
 import { normalizeLayoutInput } from './form-layout-input.js';
 import { hasDeliveryAccess } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
-import { formAvailability } from '../services/form-availability.js';
+import { formAvailability } from '../features/forms/form-availability/index.js';
 import { applyAccountAllergyOptions } from '../services/allergy-options.js';
 import { accountCustomerLook } from '../services/customer-look.js';
 import { resolveCustomerFormTheme } from '@line-crm/shared';
 
 import { getFormsWithStats, getFormById, getFormLatestEdit, getFormAccountIds, getFolderById, formBelongsToLineAccount, createForm, updateForm, setFormFolder, publishFormVersion, type UpdateFormInput, countActiveFormTestTokens, insertFormTestToken, deleteExpiredFormTestTokens, getFriendByLineUserIdForAccount, jstNow, toJstString } from '@line-crm/db';
+
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { listLimit, listPage } from './list-pagination.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { legacyFormFieldTypeError, parseLayout, validateFormForPublish, DEFAULT_TENANT_ID } from '@line-crm/shared';

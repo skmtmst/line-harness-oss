@@ -1,15 +1,15 @@
 import { logger } from '@line-crm/shared/server';
-import { patchFriendMetadata } from '../services/friend-metadata.js';
+import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { inputError, readBoundedBytes } from '../lib/input-errors.js';
 import { uploadFormDocument } from './form-documents.js';
 
 import { getFormById, formBelongsToLineAccount, getLatestFormSubmission, getFriendByLineUserIdForAccount, jstNow } from '@line-crm/db';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { builtinFileScan, markFileScanClean } from '../services/file-scan.js';
-import { imageDimensions } from '../services/media-metadata.js';
+import { imageDimensions } from '../features/media/media-metadata/index.js';
 import { ensureFileScanForUpload } from './file-scan.js';
 import type { Form as DbForm } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { collectInputs, formFileKind, parseLayout } from '@line-crm/shared';
 import { stoppedPublicFormResponse, readFormTestToken, verifyFormTestToken, PARTIAL_MERGED_MAX_BYTES, FORM_UPLOAD_TYPES, FORM_UPLOAD_MAX_BYTES } from './forms-definition.js';
 import type { Context } from 'hono';

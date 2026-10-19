@@ -10,7 +10,7 @@
  *      予約成立時にそのまま付与し、後続副作用(シナリオ enrollment・
  *      tag_change イベント・マイル)まで動かす。
  *   4. auto_tag_id に文字列以外(数値・配列・オブジェクト・真偽値)が来ると
- *      `.trim()` が TypeError になり、入力不備が 500 として返る。
+ *      `.trim` が TypeError になり、入力不備が 500 として返る。
  *
  * 3 は「設定 → archive → 予約」を1本の実 DB で通して確かめる。waitUntil の
  * 中で付与するため、この試験の ExecutionContext は渡された Promise を集めて
@@ -23,11 +23,11 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // 送る側(LINE 通知)は対象外。予約の成否とタグ付与だけを見る。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({

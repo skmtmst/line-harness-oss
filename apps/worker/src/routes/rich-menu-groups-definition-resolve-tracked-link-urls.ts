@@ -1,9 +1,10 @@
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
-import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../services/rich-menu-group-input.js';
+import { assembleRichMenuGroupInput, richMenuLiveToSnapshot } from '../features/rich-menus/rich-menu-group-input/index.js';
 import { type Context } from 'hono';
 import { getRichMenuGroupWithPages, acquirePublishLease, releasePublishLease, renewPublishLease, isPublishLeaseHeld, setPageRichMenuId, markRichMenuGroupPublished, getLineAccountById, getTrackedLinkById, createRichMenuManualPublishRequestAtomic, getRichMenuManualPublishRequest, getRichMenuManualPublishShells, claimRichMenuManualPublishRequest, markRichMenuManualPublishFailed, markRichMenuManualPublishSucceeded, recordRichMenuManualPublishShells, restartRichMenuManualPublishRequest, ensureRichMenuVersion, markRichMenuVersionPublished, findRichMenuDeviceConfirmation, ensureRichMenuPublishRun, markRichMenuPublishRun, ensureRichMenuPublishRunPages, markRichMenuPublishRunPageStep, jstNow, type RichMenuGroupWithPages } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { createRichMenuShells, switchRichMenuLive, deleteRichMenuShells, resolveSwitcherActions, validateRichMenuGroupForPublish, validateRichMenuPagesWithLine, PublishLeaseLostError, RichMenuValidationError, buildAliasId, type LineRichMenuClient, type R2Like, type GroupInput } from '../lib/rich-menu-publisher.js';
 import { manualPublishFingerprint, serializeGroupWithPages, recoverManualPublishShellsFromLine, manualPublishShellName } from './rich-menu-groups-definition-serialize-group-with-pages.js';

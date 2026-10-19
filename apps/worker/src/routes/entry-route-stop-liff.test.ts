@@ -45,7 +45,7 @@ const dbMocks = {
 vi.mock('@line-crm/db', () => dbMocks);
 
 const attachTagAndFireSideEffects = vi.fn().mockResolvedValue({ added: true });
-vi.mock('../services/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects }));
+vi.mock('../features/friends/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects }));
 
 const notifyAffiliateFriendAdd = vi.fn().mockResolvedValue(undefined);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateFriendAdd }));

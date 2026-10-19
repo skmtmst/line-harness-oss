@@ -4,9 +4,9 @@ import type { SeatWaitlistEntryLike } from './restaurant-context-types.js';
 import { inputError } from '../lib/input-errors.js';
 import { publicClosure, closuresForRange, closureAffectsTable, openSeatTables } from '../services/restaurant-closures.js';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-import { assignRestaurantTable } from '../services/booking-assignment.js';
+import { assignRestaurantTable } from '../features/booking/booking-assignment/index.js';
 import { sendRestaurantLineConfirmation, type RestaurantLineNotice } from '../services/restaurant-line-confirmation.js';
 import { promoteSeatWaitlist } from '../services/restaurant-seat-waitlist.js';
 import { dbFor } from '../services/db-router.js';

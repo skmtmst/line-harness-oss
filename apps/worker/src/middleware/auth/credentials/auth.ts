@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Env } from '../../../index.js';
+import type { Env } from '../../../worker-env.js';
 import type { AdminSameSite } from '../../admin-auth-config.js';
 import { bearerToken, parseCookieHeader } from '../../auth-http.js';
 
@@ -8,7 +8,7 @@ export const ADMIN_SESSION_BEARER_PREFIX = 'lh_session:';
 export const CSRF_COOKIE = 'lh_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
-// 既定は 8 時間（要件 v6-30 §10）。利用者が明示して「記憶する」を選んだ
+// 既定は 8 時間（要件 -30 §10）。利用者が明示して「記憶する」を選んだ
 // ときだけ 7 日にする。cookie の Max-Age と admin_sessions.expires_at は
 // 必ずこの同じ秒数から作り、ブラウザ側とサーバー側の期限を一致させる。
 export const SESSION_DEFAULT_MAX_AGE = 8 * 60 * 60;

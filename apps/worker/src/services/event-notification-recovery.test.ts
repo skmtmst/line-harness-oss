@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { deliverBookingLine } from './booking-line-delivery.js';
+import { deliverBookingLine } from '../features/booking/booking-line-delivery.js';
 import { recoverEventBookingNotifications } from './event-notification-recovery.js';
 import { prepareEventNotification, prepareConfirmedEventBooking } from './event-notification-plan.js';
 import { prepareEventReminders } from './event-reminder-plan.js';

@@ -3,7 +3,8 @@ import { createTestD1, type SqliteD1 } from './test-utils/d1-sqlite.js';
 import { FOLDER_KINDS, getFolders, createUser, getUserByEmailForAccess, linkFriendToUser, getMergedMetadataByUserId, consumeStaffLineLinkCode, createTrackedLink } from '@line-crm/db';
 import { storeSupportEmail } from './services/support-email.js';
 import { buildOgForLiffPath } from './liff-open-graph.js';
-import { app, type Env } from './index.js';
+import { app } from './index.js';
+import { type Env } from './worker-env.js';
 
 let f: SqliteD1;
 beforeEach(() => {

@@ -1,7 +1,7 @@
 import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 
 import { get__api_settings_features_visibility_1, get__api_settings_features_2, post__api_settings_features_impact_3, put__api_settings_features_4 } from './feature-settings-controls-handlers.js';

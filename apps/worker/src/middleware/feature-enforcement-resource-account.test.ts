@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from './auth/principal/auth.js';
 import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -103,13 +103,13 @@ function seedResources(testDb: SqliteD1): void {
       (id, conversion_point_id, friend_id, created_at)
     VALUES ('ce-a', 'cv-1', 'friend-a', ?)
   `).run(now);
-  // V6オートメーション。一覧が返すidはこちら（旧 automations 表には無い）。
+  // オートメーション。一覧が返すidはこちら（旧 automations 表には無い）。
   testDb.raw.prepare(`
     INSERT INTO automation_definitions
       (id, line_account_id, name, status, created_at, updated_at)
     VALUES ('auto-def-1', 'account-1', '監査用ルール', 'active', ?, ?)
   `).run(now, now);
-  // 旧 automations 表の行（V6定義を持たないレガシー）。
+  // 旧 automations 表の行（定義を持たないレガシー）。
   testDb.raw.prepare(`
     INSERT INTO automations
       (id, name, event_type, line_account_id, created_at, updated_at)
@@ -307,9 +307,9 @@ describe('WRITE-01: 対象IDからの所属account解決', () => {
     expect(await response.json()).toMatchObject({ code: 'LINE_ACCOUNT_REQUIRED' });
   });
 
-  it('V6オートメーション定義の稼働切替も対象の所属accountで通る', async () => {
+  it('オートメーション定義の稼働切替も対象の所属accountで通る', async () => {
     // #1063: automation_definitions の行は旧 automations 表に無い。
-    // 旧表だけを見る所有解決だと V6 ルールへの操作が全部 LINE_ACCOUNT_REQUIRED で止まる。
+    // 旧表だけを見る所有解決だと ルールへの操作が全部 LINE_ACCOUNT_REQUIRED で止まる。
     setFeature(testDb, 'account-1', 'automations', true);
     const app = routeApp(staff('env-owner'));
     const response = await app.request('/api/automations/auto-def-1/status', {
@@ -321,7 +321,7 @@ describe('WRITE-01: 対象IDからの所属account解決', () => {
     expect(await response.json()).toEqual({ success: true });
   });
 
-  it('V6オートメーション定義の改訂下書きも対象の所属accountで通る', async () => {
+  it('オートメーション定義の改訂下書きも対象の所属accountで通る', async () => {
     // 一覧の「編集する」が「編集用の下書きを作れませんでした」になる原因と同根。
     setFeature(testDb, 'account-1', 'automations', true);
     const app = routeApp(staff('env-owner'));

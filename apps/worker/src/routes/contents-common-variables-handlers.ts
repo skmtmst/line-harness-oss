@@ -2,7 +2,8 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { jstNow, getCommonVarById, createCommonVar, updateCommonVar, CommonVarFolderError, CommonVarKeyConflictError, deleteCommonVar, getCommonVarUsageImpact, getCommonVarReplacementCandidates, getCommonVarReplacementPlan, applyCommonVarReplacementPlan, CommonVarVersionConflictError, getCommonVarSchedules, createCommonVarSchedule, deleteCommonVarSchedule, validateFieldKey, COMMON_VAR_TYPES, normalizeCommonVarValue, isSecretLikeValue, setCommonVarStatus, CommonVarReasonRequiredError, CommonVarStatusTransitionError, type CommonVarType } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { parseCommonVarValidity, serializeVar, RequestBodyError, parseCommonVarImpactProof, commonVarUsageRevision, serializeCommonVarDeleteImpact, serializeCommonVarChangeImpact, buildCommonVarImpactProof, commonVarReplacementRevision, serializeCommonVarReplacementPlan, serializeSchedule, isValidScheduleDateTime } from './contents-definition.js';

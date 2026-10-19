@@ -24,10 +24,10 @@ import {
   verifyClaimedRunBeforeSend,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
-import type { Env } from '../index.js';
-import { processPendingCalendarDeleteOperations } from '../services/booking-calendar-sync.js';
+import type { Env } from '../worker-env.js';
+import { processPendingCalendarDeleteOperations } from '../features/booking/booking-calendar-sync.js';
 import { processReminderDeliveries } from '../services/reminder-delivery.js';
-import { processDueReminders } from '../services/booking-reminders.js';
+import { processDueReminders } from '../features/booking/booking-reminders.js';
 import { processDueEventReminders } from '../services/event-booking-reminders.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
@@ -54,8 +54,8 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
 
 const notifierMocks = vi.hoisted(() => ({ sendBookingNotification: vi.fn() }));
 // 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -616,7 +616,7 @@ describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
       ).get()).toEqual({ c: 0 });
       // 残留した古い queued 行があっても、確定ずみの予定は消さない。
       const { enqueueCalendarDeleteOperation } = await import(
-        '../services/booking-calendar-sync.js'
+        '../features/booking/booking-calendar-sync.js'
       );
       await enqueueCalendarDeleteOperation(dual.db1, { bookingId: 'RB9', lineAccountId: 'acc1' });
       const removed: string[] = [];
@@ -642,9 +642,9 @@ describe('Calendar台帳の初期DB失敗の永続回復 (#654-2)', () => {
       seedBookingCancelTarget(dual.raw1);
       // fence成功後の取消ずみ予約を想定する (実行側は取消ずみだけ消す)。
       dual.raw1.prepare(`UPDATE bookings SET status = 'cancelled' WHERE id = 'RB10'`).run();
-      // route側の接続で登録 (V6 fence成功後に残る想定)。
+      // route側の接続で登録 (fence成功後に残る想定)。
       const { enqueueCalendarDeleteOperation } = await import(
-        '../services/booking-calendar-sync.js'
+        '../features/booking/booking-calendar-sync.js'
       );
       await enqueueCalendarDeleteOperation(dual.db1, { bookingId: 'RB10', lineAccountId: 'acc1' });
       // cron側の別接続が回収する。外部削除は1回だけ。
@@ -723,7 +723,7 @@ describe('event却下再送の待機者再登録 (#654-3)', () => {
           env,
         );
       };
-      // 初回の待機者ジョブ登録だけ落とすDB失敗。V6修復は通る。
+      // 初回の待機者ジョブ登録だけ落とすDB失敗。修復は通る。
       let failOnce = true;
       const faulty = dual.faultyDb1((sql) =>
         sql.includes('INSERT OR IGNORE INTO event_waitlist_promotion_jobs') && failOnce
@@ -908,7 +908,7 @@ describe('LIFF本人取消の両分岐strict fence (再審査-2)', () => {
       expect(dual.raw1.prepare(
         `SELECT COUNT(*) AS c FROM event_waitlist_promotion_jobs WHERE source_key = 'booking:eb-l1:cancelled'`,
       ).get()).toEqual({ c: 1 });
-      // 再送: V6も待機者も冪等 (二重登録なし)。
+      // 再送: も待機者も冪等 (二重登録なし)。
       const again = await cancel(dual.db1);
       expect(again.status).toBe(200);
       expect(dual.raw1.prepare(
@@ -923,7 +923,7 @@ describe('LIFF本人取消の両分岐strict fence (再審査-2)', () => {
     const dual = openDualDb();
     try {
       seedLiffCancelTarget(dual.raw1);
-      // 取消ずみ・V6未処理の残り (初回の V6 失敗相当) + 新しい貸出。
+      // 取消ずみ・未処理の残り (初回の 失敗相当) + 新しい貸出。
       dual.raw1.prepare(`UPDATE event_bookings SET status = 'cancelled', cancelled_at = ?, cancelled_by = 'friend' WHERE id = 'eb-l1'`)
         .run('2026-09-02T00:00:00.000Z');
       seedDeliveryRun(dual.raw1, {
@@ -988,7 +988,7 @@ function makePushRecorder(
 
 const noPause = async () => undefined;
 
-/** V6 登録 + 旧表の未送信を1件ずつ足す (予約 RB9 きっかけ)。 */
+/** 登録 + 旧表の未送信を1件ずつ足す (予約 RB9 きっかけ)。 */
 function seedBookingReminderPair(raw: Database.Database) {
   raw.exec(`
     INSERT INTO friend_reminders (id, friend_id, reminder_id, target_date, status, source_kind, source_id, source_event_id, created_at, updated_at) VALUES ('FR-d1','f1','rb-rule','2026-09-20T01:00:00.000Z','active','booking','RB9','RB9','2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
@@ -1224,7 +1224,7 @@ describe('途中失敗の後の再実行で全通知が取消へそろう (自�
     try {
       seedBookingCancelTarget(dual.raw1);
       seedBookingReminderPair(dual.raw1);
-      // 旧表の取消だけ1回落とす。V6 fence は通り、予約は取消ずみになる。
+      // 旧表の取消だけ1回落とす。fence は通り、予約は取消ずみになる。
       let failOnce = true;
       const faulty = dual.faultyDb1((sql) =>
         sql.includes('UPDATE booking_reminders') && failOnce ? (failOnce = false, true) : false,
@@ -1426,7 +1426,7 @@ describe('取消チェックの各層を個別に見張る (自主検証)', () =
       // RB10 は confirmed かつ外部予定つき。409 で巻き戻した後の残留台帳や、
       // 再確定した予約に古い行が残った状況を表す。
       const { enqueueCalendarDeleteOperation } = await import(
-        '../services/booking-calendar-sync.js'
+        '../features/booking/booking-calendar-sync.js'
       );
       await enqueueCalendarDeleteOperation(dual.db1, { bookingId: 'RB10', lineAccountId: 'acc1' });
       const removed: string[] = [];
@@ -1457,7 +1457,7 @@ describe('取消チェックの各層を個別に見張る (自主検証)', () =
 // 旧表の cron は対象行を `b.status = 'confirmed'` 付きで一括読み出しするが、
 // この条件は読み出し時にしか効かない。読み出しから各行の送信までの間
 // (最大100件ループの全区間) に取消が確定しても止まらず、取消成功後に
-// 外部送信が起きていた。V6 の verifyClaimedRunBeforeSend と同じ形で、
+// 外部送信が起きていた。の verifyClaimedRunBeforeSend と同じ形で、
 // 送る直前に1文で予約 / イベント予約の状態を確かめる。
 // =============================================================================
 
@@ -1661,7 +1661,7 @@ describe('旧表の取消後送信 (自主検証)', () => {
   });
 });
 
-// 取消 route は「予約の状態を先に倒し、旧表の取消は V6 fence 成功の後」に
+// 取消 route は「予約の状態を先に倒し、旧表の取消は fence 成功の後」に
 // 置いている (409 で完全 rollback するため)。その間に旧表 cron の送信が
 // 挟まると、旧表の行はまだ pending のままなので、行の状態だけでは止まらない。
 // 送信直前に予約そのものの状態を見ていることを、この2件が見張る。

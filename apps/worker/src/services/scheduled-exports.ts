@@ -13,7 +13,7 @@ import { logger } from '@line-crm/shared/server';
  * 手動分と区別して出る。
  */
 import { getLineAccounts } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 function jstDate(iso: string): string {
   return new Date(Date.parse(iso) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);

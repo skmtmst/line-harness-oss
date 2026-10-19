@@ -1,4 +1,4 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { normalizeEventQuestions, validateEventInput } from '../event-input.js';
 import type { EventQuestion } from '../event-input.js';
@@ -187,7 +187,7 @@ events.get('/api/events/admin/events', async (c) => {
   else if (folderId) { conditions.push('e.folder_id = ?'); params.push(folderId); }
   if (q) {
     /*
-     * #625: LIKE ではなく instr() で部分一致する。
+     * #625: LIKE ではなく instr で部分一致する。
      * D1 の LIKE/GLOB パターンは最大50バイト。`%<検索語>%` を束縛すると
      * 48バイト超の検索語で SQLite エラー(500)になっていた。
      */

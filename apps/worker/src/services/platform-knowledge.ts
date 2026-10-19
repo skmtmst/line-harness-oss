@@ -4,7 +4,9 @@ import {
   listSupportMessages, recordPlatformAiCall,
   type KnowledgeArticleInput, type KnowledgeEvidence, type SupportMessage, type SupportTicketRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
 
 export const KNOWLEDGE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
