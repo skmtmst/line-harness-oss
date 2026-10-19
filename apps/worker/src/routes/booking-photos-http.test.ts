@@ -60,7 +60,7 @@ function request(path: string, body?: unknown, account = 'a') {
   }, { DB: db, WORKER_URL: 'https://worker.test' } as Env['Bindings']);
 }
 const menuSave = (mediaId: unknown, expectedVersion = 1, id = 'm') => request(`/api/booking/admin/menus/${id}/photo`, { mediaId, expectedVersion });
-const storeSave = (photos: unknown, expectedVersion = 0, photoOrder: unknown = order) => request('/api/booking/admin/store-photos', { photos, order: photoOrder, expectedVersion });
+const storeSave = (photos: unknown, expectedVersion = 0, photoOrder: unknown = order, visibility: unknown = { exterior: true, interior: true, waiting: true }) => request('/api/booking/admin/store-photos', { photos, order: photoOrder, expectedVersion, visibility });
 const photos = (exterior: string | null = 'p', interior: string | null = null, waiting: string | null = null) => ({ exterior, interior, waiting });
 
 describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
@@ -189,4 +189,61 @@ describe('予約写真：実HTTP・実SQLite・使用台帳', () => {
   it.each([[], ['exterior', 'exterior', 'waiting'], ['exterior', 'interior', 'waiting', 'extra'], [null, 'interior', 'waiting']].map(input => ({ input })))('店の写真の数・順の形を増やせない: $input', async ({ input }) => {
     expect((await storeSave(photos(), 0, input)).status).toBe(400);
   });
+  it('公開を選ぶまでは既存の写真も公開しない。選択だけ保存し、管理と公開の読み直しを分ける', async () => {
+    const env = { DB: db, WORKER_URL: 'https://worker.test' } as Env['Bindings'];
+    const publicPhotos = async () => (await app.request('/api/liff/booking/store-photos?liffId=la', {}, env)).json();
+    expect((await request('/api/booking/admin/store-photos', { photos: photos('p', 'p-more', 'p'), order, expectedVersion: 0 })).status).toBe(200);
+    expect(await publicPhotos()).toEqual({ success: true, data: [] });
+    expect((await storeSave(photos('p', 'p-more', 'p'), 1, ['waiting', 'interior', 'exterior'], { exterior: false, interior: true, waiting: true })).status).toBe(200);
+    expect(await publicPhotos()).toEqual({ success: true, data: [
+      { slot: 'waiting', url: 'https://worker.test/media/p/content' },
+      { slot: 'interior', url: 'https://worker.test/media/p-more/content' },
+    ] });
+    const admin = await (await request('/api/booking/admin/menus/photos')).json() as { data: { store: { version: number; photos: unknown; visibility: unknown } } };
+    expect(admin.data.store).toMatchObject({ version: 2, photos: { exterior: { mediaId: 'p' } }, visibility: { exterior: false, interior: true, waiting: true } });
+    // An old writer cannot silently republish the hidden slot.
+    expect((await request('/api/booking/admin/store-photos', { photos: photos('p', 'p-more', 'p'), order, expectedVersion: 2 })).status).toBe(200);
+    expect((await publicPhotos() as { data: Array<{ slot: string }> }).data.map(p => p.slot)).toEqual(['interior', 'waiting']);
+    expect((await storeSave(photos('p', 'p-more', 'p'), 3, order, { exterior: false, interior: false, waiting: false })).status).toBe(200);
+    expect(await publicPhotos()).toEqual({ success: true, data: [] });
+    expect(raw.prepare('SELECT COUNT(*) AS count FROM media_usages').get()).toEqual({ count: 2 });
+  });
+  it('公開の保存失敗は写真・順・版・使用台帳も戻し、片側だけ保存しない', async () => {
+    await storeSave(photos(), 0, order, { exterior: true, interior: false, waiting: false });
+    raw.exec("CREATE TRIGGER visibility_test_failure BEFORE UPDATE ON account_settings BEGIN SELECT RAISE(ABORT,'forced_failure'); END;");
+    expect((await storeSave(photos('p-more'), 1, ['waiting', 'interior', 'exterior'], { exterior: false, interior: true, waiting: false })).status).toBe(503);
+    expect(raw.prepare('SELECT version,store_photo_media_id,store_photo_order_json FROM booking_settings').get()).toEqual({ version: 1, store_photo_media_id: 'p', store_photo_order_json: JSON.stringify(order) });
+    expect(raw.prepare('SELECT media_id FROM media_usages').all()).toEqual([{ media_id: 'p' }]);
+    const admin = await (await request('/api/booking/admin/menus/photos')).json() as { data: { store: { visibility: unknown } } };
+    expect(admin.data.store.visibility).toEqual({ exterior: true, interior: false, waiting: false });
+  });
+  it('同時保存と古い版は公開の選択も上書きしない', async () => {
+    const visible = { exterior: true, interior: false, waiting: false };
+    const hidden = { exterior: false, interior: false, waiting: false };
+    const results = await Promise.all([storeSave(photos(), 0, order, visible), storeSave(photos('p-more'), 0, order, hidden)]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 409]);
+    const admin = await (await request('/api/booking/admin/menus/photos')).json() as { data: { store: { visibility: unknown; photos: { exterior: { mediaId: string } } } } };
+    expect(admin.data.store.visibility).toEqual(results[0]!.status === 200 ? visible : hidden);
+    expect(admin.data.store.photos.exterior.mediaId).toBe(results[0]!.status === 200 ? 'p' : 'p-more');
+    const before = raw.prepare('SELECT value FROM account_settings').get();
+    expect((await storeSave(photos('p-more'), 0, order, hidden)).status).toBe(409);
+    expect(raw.prepare('SELECT value FROM account_settings').get()).toEqual(before);
+    staff = { ...staff, readOnly: true };
+    expect((await storeSave(photos('p-more'), 1, order, hidden)).status).toBe(403);
+    expect(raw.prepare('SELECT value FROM account_settings').get()).toEqual(before);
+  });
+  it.each([null, [], {}, { exterior: 'true', interior: false, waiting: false }, { exterior: true, interior: false, waiting: false, extra: true }])('公開の選択の不正な形は保存しない: %j', async visibility => {
+    expect((await storeSave(photos(), 0, order, visibility)).status).toBe(400);
+    expect(raw.prepare('SELECT * FROM booking_settings').all()).toEqual([]);
+    expect(raw.prepare('SELECT * FROM account_settings').all()).toEqual([]);
+  });
+  it('公開設定が壊れていたら写真を公開せず、別店の選択も参照しない', async () => {
+    await storeSave(photos());
+    raw.prepare("UPDATE account_settings SET value='invalid-json'").run();
+    const env = { DB: db } as Env['Bindings'];
+    expect(await (await app.request('/api/liff/booking/store-photos?liffId=la', {}, env)).json()).toEqual({ success: true, data: [] });
+    raw.prepare("UPDATE account_settings SET line_account_id='b',value=?").run(JSON.stringify({ exterior: true, interior: true, waiting: true }));
+    expect(await (await app.request('/api/liff/booking/store-photos?liffId=la', {}, env)).json()).toEqual({ success: true, data: [] });
+  });
+
 });
