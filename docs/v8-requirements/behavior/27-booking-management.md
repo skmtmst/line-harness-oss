@@ -1,3 +1,5 @@
+> 文書：27 予約管理 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 27 予約管理 操作と挙動（受け入れ）
 
 要件の正本：[27 予約管理](../../v6-requirements/v6-27-booking-management-requirements-draft.md)・[v8-booking-additions.md](../v8-booking-additions.md) §1・[飲食の融合1](../restaurant-fusion-contract.md)（予約盤）・[共通基盤 §6-2](../../v6-requirements/v6-shared-platform-requirements.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。

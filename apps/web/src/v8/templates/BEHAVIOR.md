@@ -1,3 +1,5 @@
+> 文書：テンプレート一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # テンプレート一覧の動き（BEHAVIOR.md）
 
 対象：現役の `src/v8/templates/list.tsx`。見た目は型（ListPage）と部品で組む。

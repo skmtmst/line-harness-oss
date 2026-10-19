@@ -52,3 +52,27 @@ it('店の写真の読込失敗を空にせず、予約メニューの選択を�
   await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   expect(document.querySelector('img')?.getAttribute('src')).toBe('/media/i/content');
 });
+
+it('公開写真0枚ならお店の案内ごと出さない', async () => {
+  net.storePhotos.mockResolvedValue([]);
+  render(<StorePhotos />);
+  await waitFor(() => expect(net.storePhotos).toHaveBeenCalledOnce());
+  expect(screen.queryByRole('region', { name: 'お店の案内' })).toBeNull();
+  expect(screen.queryByText('お店の案内')).toBeNull();
+});
+it('小さい写真から拡大し、閉じると選んだ写真へ焦点を戻す', async () => {
+  net.storePhotos.mockResolvedValue([{ slot: 'waiting', url: '/media/w/content' }, { slot: 'exterior', url: '/media/e/content' }]);
+  render(<StorePhotos />);
+  const opener = await screen.findByRole('button', { name: '外観の写真を大きく見る' });
+  opener.focus(); fireEvent.click(opener);
+  const dialog = screen.getByRole('dialog', { name: 'お店の外観' });
+  expect(dialog.querySelector('img')?.getAttribute('src')).toBe('/media/e/content');
+  expect(screen.getByRole('img', { name: 'お店の外観（拡大）' })).toBeTruthy();
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect(document.activeElement).toBe(opener);
+  fireEvent.click(screen.getByRole('button', { name: '待合の写真を大きく見る' }));
+  expect(screen.getByRole('dialog', { name: 'お店の待合' }).querySelector('img')?.getAttribute('src')).toBe('/media/w/content');
+  fireEvent.click(screen.getByRole('button', { name: '閉じる' }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+});

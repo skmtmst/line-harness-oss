@@ -1,3 +1,5 @@
+> 文書：OpenAPI definitions｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # OpenAPI definitions
 
 `../openapi.ts` keeps the public `openapi` export and serves `/openapi.json` and

@@ -1,3 +1,5 @@
+> 文書：自動応答一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 自動応答一覧の動き（BEHAVIOR.md）
 
 対象：`app/auto-replies/list-v8.tsx`（V8一覧、`uE9gf`）。このファイルから写して `list.tsx` を一から書く。

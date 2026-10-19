@@ -1,3 +1,5 @@
+> 文書：流入と計測の一覧（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 流入と計測の一覧（V8）の動き
 
 入口：`app/inflow-links/page.tsx`（`?tab` なし／`?tab=links` は `src/v8/inflow-links/list.tsx`。全経路をV8に固定）。
@@ -59,7 +61,7 @@
 
 # サイトスクリプト（V8・site-script.tsx・板 XjOte）
 
-入口：`app/inflow-links/page.tsx` の `?tab=script`（V8 のときだけ）。写し元：`components/inflow-links/site-script-v8.tsx`（import はしない）。
+入口：`app/inflow-links/page.tsx` の `?tab=script`（V8専用で）。写し元：`components/inflow-links/site-script-v8.tsx`（import はしない）。
 
 ## 呼ぶ口（今と同じ）
 - `api.siteTracking.pages`・`api.siteTracking.summary`・`api.measurementSites.list`（アカウントで絞る）、鍵は `api.siteTracking.trackingKey`（取れないときはコードを出さない）
@@ -74,7 +76,7 @@
 
 # 広告連携（V8・ads.tsx・板 qSTVR・広告費を手で入れる ZxKL5）
 
-入口：`app/inflow-links/page.tsx` の `?tab=ads`（V8 のときだけ）。写し元：`app/inflow-links/ad-integration-v8.tsx` の `AdMetricsV8`（import はしない）。
+入口：`app/inflow-links/page.tsx` の `?tab=ads`（V8専用で）。写し元：`app/inflow-links/ad-integration-v8.tsx` の `AdMetricsV8`（import はしない）。
 
 ## 呼ぶ口
 - `api.adPlatforms.list(accountId)`・`api.adCosts.list({ accountId })`・`api.entryRoutes.list(accountId)`・`api.staff.me()`

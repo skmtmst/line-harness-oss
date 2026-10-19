@@ -1,7 +1,0 @@
-v26.0.0
-.../node_modules/better-sqlite3 install$ prebuild-install || node-gyp rebuild --release
-.../node_modules/better-sqlite3 install: Done
-{"node":"v26.0.0","abi":"147","sqlite":{"version":"3.53.2"}}
- Test Files  2 passed (2)
-      Tests  13 passed (13)
-   Duration  5.62s (transform 1.67s, setup 35ms, collect 1.78s, tests 6.40s, environment 438ms, prepare 121ms)

@@ -1,3 +1,5 @@
+> 文書：たまる決めごとを作る（V8・create.tsx・板 ctLwT・競合 BnrQp）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # たまる決めごとを作る（V8・create.tsx・板 ctLwT・競合 BnrQp）
 
 入口：`app/mileage/earning-rules/new/page.tsx`（`src/v8/mileage/earning-rule-new/create.tsx` へ固定）。

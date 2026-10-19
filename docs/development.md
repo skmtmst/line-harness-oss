@@ -1,3 +1,5 @@
+> 文書：開発ガイド｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 開発ガイド
 
 作業前に [AGENTS.md](../AGENTS.md) と、そこで指定された必読文書を順に読みます。機能の動きは [要件の索引](v6-requirements/v6-requirements-master-index.md) と [追加機能](v8-requirements/README.md) で確認します。

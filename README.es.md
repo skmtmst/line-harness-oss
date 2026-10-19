@@ -1,3 +1,5 @@
+> 文書：LINE Harness｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 > **Congelado en v0.13.2 (2026-09-03).** El `README.md` en japonés es la fuente de verdad y la única versión que se mantiene actualizada.
 
 🌐 [日本語](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | [한국어](README.ko.md) | **Español**

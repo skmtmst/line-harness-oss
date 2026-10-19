@@ -1,3 +1,5 @@
+> 文書：オートメーション（V8）の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # オートメーション（V8）の動き（BEHAVIOR.md）
 
 対象：src/v8/automations の画面。今までの V8（`app/automations/list-v8.tsx`・`runs-v8.tsx`・

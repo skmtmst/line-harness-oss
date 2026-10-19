@@ -1,3 +1,5 @@
+> 文書：共通情報の一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 共通情報の一覧の動き（BEHAVIOR.md）
 
 対象：`src/v8/common-vars/list.tsx`（現役V8一覧）。

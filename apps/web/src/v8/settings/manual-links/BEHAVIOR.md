@@ -1,3 +1,5 @@
+> 文書：マニュアルの正本表の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # マニュアルの正本表の動き（BEHAVIOR.md）
 
 対象：`screen.tsx`（★V8 `cIdA2`）。写し元：`app/settings/manual-links/manual-links-v8.tsx`・`use-manual-links.ts`・`manual-link-view.ts`。

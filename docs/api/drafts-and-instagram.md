@@ -1,3 +1,5 @@
+> 文書：下書き・会話検索・InstagramのAPI｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 下書き・会話検索・InstagramのAPI
 
 管理APIはログイン・可視アカウント・機能権限を確認します。口の一覧はWorkerのOpenAPI、呼び出しと型は `apps/web/src/lib/api.ts`・`packages/shared` を確認します。
