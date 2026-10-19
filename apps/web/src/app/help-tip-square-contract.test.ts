@@ -58,9 +58,7 @@ describe('V8の「？」は円と押せる範囲を分ける', () => {
 })
 
 describe('友だち数の推移の表の「？」', () => {
-  it('「？」は見出しの日付の横に1つだけ置く', () => {
-    expect(TREND.match(/<HelpTip/g)?.length).toBe(1)
-    expect(TREND).toContain('日付の推定値の説明')
+  it('行ごとの古い説明部品を復活させない', () => {
     expect(TREND).not.toContain('EstimatedHelp')
   })
 

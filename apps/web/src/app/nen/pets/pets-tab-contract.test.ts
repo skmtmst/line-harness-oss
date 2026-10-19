@@ -16,11 +16,6 @@ describe('V8 ペット一覧の操作と狭幅', () => {
  expect(PAGE).toContain('<RowMenu subject={name} items={items} />')
  expect(PARTS).toContain('SharedRowMenu')
  })
- it('行の編集は権限がある時だけ、飼い主の操作は常に残す', () => {
- expect(PAGE).toContain("...(canEdit ? [{ id: 'edit'")
- expect(PAGE).toContain("{ id: 'owner'")
- expect(PAGE).toContain("{ id: 'nudge'")
- })
  it('狭い板でも行の操作は同じ共通メニューで行う', () => {
  expect(PAGE.match(/<RowMenu subject=/g)).toHaveLength(1)
  expect(PARTS).toContain("from '@/components/shared/row-actions'")

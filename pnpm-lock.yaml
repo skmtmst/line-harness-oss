@@ -243,9 +243,6 @@ importers:
       '@line-crm/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@line-harness/update-engine':
-        specifier: workspace:*
-        version: link:../../packages/update-engine
       hls.js:
         specifier: ^1.6.16
         version: 1.6.16
