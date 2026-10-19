@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import type { Dispatch, SetStateAction } from 'react'
 import Button from '@/components/shared/button'
 import ConditionBuilder from '@/components/shared/condition-builder'
@@ -67,7 +68,7 @@ function exclusionLine(sourceConfig: Record<string, unknown>): string {
 /** R41: 詳細の「金額」行の1行。起点の対応表と同じ言葉を使う。 */
 function valueModeLine(item: Pick<ConversionDefinitionListItem, 'sourceType' | 'valueMode' | 'value'>): string {
   if (item.valueMode === 'fixed') {
-    return item.value == null ? '決まった額（金額なし）' : `決まった額（1件 ¥${formatNumber(item.value)}）`
+    return item.value == null ? '決まった額（金額なし）' : `決まった額（1件 ${formatYen(item.value)}）`
   }
   if (item.valueMode === 'source') return `起点の金額を使う（${originInfoOf(item.sourceType).amount}）`
   return '金額を集計しない'
@@ -275,7 +276,7 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
             <div><dt className="text-ink-faint">数え方</dt><dd className="text-ink mt-1 font-semibold">{deduplicationLabel(detailTarget.deduplicationMode, detailTarget.deduplicationWindowDays)}</dd></div>
             <div><dt className="text-ink-faint">この30日</dt><dd className="text-ink mt-1 font-semibold">{formatNumber(detailTarget.metrics.netCount)} 件</dd></div>
             <div><dt className="text-ink-faint">利用先</dt><dd className="text-ink mt-1 font-semibold">{usageLabel(detailTarget)}</dd></div>
-            <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.reversedCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.reversedCount} 件・¥${formatNumber((detailTarget.metrics.reversedValue ?? 0))}`}</dd></div>
+            <div><dt className="text-ink-faint">取消内訳</dt><dd className="text-ink mt-1 font-semibold">{detailTarget.metrics.reversedCount == null ? '取消台帳は未接続' : `${detailTarget.metrics.reversedCount} 件・${formatYen((detailTarget.metrics.reversedValue ?? 0))}`}</dd></div>
           </dl>
           {detailTarget.stateReason ? (
             <Notice tone="warn" message={detailTarget.stateReason} />
@@ -316,7 +317,7 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
                       </span>
                       {/* R42: 金額なしは0円と区別して出す。 */}
                       {event.value !== null ? (
-                        <span className="text-ink-faint ml-2 tabular-nums">¥{formatNumber(event.value)}</span>
+                        <span className="text-ink-faint ml-2 tabular-nums">{formatYen(event.value)}</span>
                       ) : (
                         <span className="text-ink-faint ml-2">金額なし</span>
                       )}

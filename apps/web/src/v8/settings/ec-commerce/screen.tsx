@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { ACTION_STATUS, FAILURE_KIND_LABEL } from './execution-status'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { notifySaved } from '@/components/shared/toast'
@@ -415,10 +416,10 @@ function EventsPanel({ accountId, canEdit }: { accountId: string | null; canEdit
                 ? order.orderLines.map((line) => `${line.productName} × ${line.quantity}`).join('・')
                 : '商品明細は未取得'
               const amount = order?.status === 'refunded' && order.refundedAmount !== null
-                ? `−¥${formatNumber(order.refundedAmount)}`
+                ? `−${formatYen(order.refundedAmount)}`
                 : order?.totalAmount === null || order?.totalAmount === undefined
                   ? null
-                  : `¥${formatNumber(order.totalAmount)}`
+                  : `${formatYen(order.totalAmount)}`
               const statusInfo = ACTION_STATUS[action.status]
               const linked = Boolean(action.friendId ?? order?.friendId)
               const label = action.eventLabel || ecEventLabel(action.eventType, action.eventType)

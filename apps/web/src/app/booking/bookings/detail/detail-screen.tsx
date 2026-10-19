@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 import { notificationResultUnknown } from './detail-model'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -177,7 +178,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
               <Row label="担当">{detail.staffName}</Row>
               <Row label="料金">
                 <span className="tabular-nums">
-                  ¥{formatNumber(detail.price)}（税込）
+                  {formatYen(detail.price)}（税込）
                 </span>
               </Row>
               <Row label="申込日時">{jpStamp(detail.requestedAt)}</Row>
@@ -230,7 +231,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                         ? '無料'
                         : snapshot.priceMode === 'inquiry'
                           ? 'お問い合わせ'
-                          : `¥${formatNumber(snapshot.basePrice)}（税込）`}
+                          : `${formatYen(snapshot.basePrice)}（税込）`}
                     </span>
                   </Row>
                 </section>

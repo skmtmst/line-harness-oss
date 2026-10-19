@@ -66,7 +66,7 @@ export function CancelReservationDialog({ open, title, subtitle, facts, fullAmou
           <Field label="お支払いの扱い" optional={false}>
             <div className={styles.choices} role="radiogroup" aria-label="お支払いの扱い">
               <Radio name="cancel-refund" checked={refund === 'none'} onChange={() => setRefund('none')}>決まりどおり返金しない</Radio>
-              <Radio name="cancel-refund" checked={refund === 'full'} onChange={() => setRefund('full')}>{`全額を返金する（¥${fullAmount.toLocaleString('ja-JP')}）`}</Radio>
+              <Radio name="cancel-refund" checked={refund === 'full'} onChange={() => setRefund('full')}>{`全額を返金する（${yen(fullAmount)}）`}</Radio>
               <Radio name="cancel-refund" checked={refund === 'partial'} onChange={() => setRefund('partial')}>一部を返金する（次で金額を入れる）</Radio>
             </div>
           </Field>
@@ -176,7 +176,7 @@ export function CancelClassDialog({ open, subtitle, facts, counts, testMode, bus
         <Facts facts={facts} testMode={testMode} testText="本当の返金は起きません" />
         {counts.paid || counts.tickets || counts.unpaid ? <Field label="お金と回数券の扱い" optional={false}>
           <div className={styles.choices}>
-            {counts.paid ? <Checkbox checked={refundPaid} onCheckedChange={setRefundPaid}>{`支払い済みの ${counts.paid}人に全額を返金する（¥${counts.paidAmount.toLocaleString('ja-JP')}）`}</Checkbox> : null}
+            {counts.paid ? <Checkbox checked={refundPaid} onCheckedChange={setRefundPaid}>{`支払い済みの ${counts.paid}人に全額を返金する（${yen(counts.paidAmount)}）`}</Checkbox> : null}
             {counts.tickets ? <Checkbox checked={restoreTickets} onCheckedChange={setRestoreTickets}>{`回数券の ${counts.tickets}人に 1回分を戻す`}</Checkbox> : null}
             {counts.unpaid ? <Checkbox checked={stopPaymentLinks} onCheckedChange={setStopPaymentLinks}>{`未払いの ${counts.unpaid}人の支払いのリンクを止める`}</Checkbox> : null}
           </div>

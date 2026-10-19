@@ -1,9 +1,10 @@
+import { formatYen } from '@line-crm/shared';
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingAdminDetail, type BookingRequest } from '@/lib/api'
-import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
+import { formatDateTime, formatTime } from '@/lib/format'
 import type { AccountStyle } from '@line-crm/shared'
 import { bookingWords } from '@/v8/booking-bookings/public/words/index'
 import { BookingGapSections } from '@/v8/booking-gap/public/booking-gap-sections/index'
@@ -111,7 +112,7 @@ export default function BookingDetailV8({
         <div>
           <dt className="text-ink-faint text-xs">{words.menu}</dt>
           <dd className="text-ink mt-0.5">
-            {b.menu_name} <span className="tabular-nums">¥{formatNumber(b.price_at_booking)}</span> ・
+            {b.menu_name} <span className="tabular-nums">{formatYen(b.price_at_booking)}</span> ・
             {SOURCE_LABEL[b.source] ?? b.source}から
           </dd>
         </div>

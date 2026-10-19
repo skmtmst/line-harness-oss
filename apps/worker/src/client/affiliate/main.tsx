@@ -1,3 +1,4 @@
+import { formatYen } from '@line-crm/shared';
 import { liffErrorMessage } from '../../../../liff/src/lib/api-error.js';
 // main.tsx — Affiliate self-serve React entry. Loaded via dynamic import from
 // the LIFF orchestrator (apps/worker/src/client/main.ts) on ?page=affiliate.
@@ -299,7 +300,7 @@ function CopyButton({ url, urlRef }: { url: string; urlRef: React.RefObject<HTML
 }
 
 const rewardText = (amount: number) =>
-  amount > 0 ? `1件 ¥${amount.toLocaleString()}` : '報酬未設定';
+  amount > 0 ? `1件 ${formatYen(amount)}` : '報酬未設定';
 
 function formatMileageDate(value: string): string {
   const parsed = new Date(value.includes('T') ? value : value.replace(' ', 'T'));

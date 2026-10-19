@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 import { DAY_MS, definitionRange } from './list-export'
 
@@ -150,7 +151,7 @@ function shortDate(iso: string): string {
 function rowSub(point: ConversionDefinitionListItem): string {
   const parts = [deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays).replace(/だけ$/, '').replace('何回でも数える', '1回ごと')]
   if (point.status === 'stopped' && point.stoppedAt) parts.push(`止めた日 ${shortDate(point.stoppedAt)}`)
-  else if (point.valueMode === 'fixed') parts.push(point.value == null ? '金額なし' : `決まった金額 ¥${formatNumber(point.value)}`)
+  else if (point.valueMode === 'fixed') parts.push(point.value == null ? '金額なし' : `決まった金額 ${formatYen(point.value)}`)
   else if (point.valueMode === 'none') parts.push('金額なし')
   else if (point.reversalPolicy === 'source_cancelled') parts.push('取り消しは引く')
   return parts.join('・')
@@ -914,7 +915,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       </div>
       <div className={styles.panelFact}>
         <p className={styles.panelLabel}>今月の成果</p>
-        <p className={styles.panelText}>{`${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・¥${formatNumber(panelPoint.metrics.netValue)}`}`}</p>
+        <p className={styles.panelText}>{`${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・${formatYen(panelPoint.metrics.netValue)}`}`}</p>
       </div>
       <div className={styles.panelFact}>
         <p className={styles.panelLabel}>使われている場所</p>
@@ -1102,7 +1103,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                     </Td>
                     <Td className={styles.colCount} align="right"><span className={styles.num}>{`${formatNumber(point.metrics.netCount)} 件`}</span></Td>
                     <Td className={styles.colValue} align="right">
-                      <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : emptyValue('unknown')}</span>
+                      <span className={styles.num}>{point.metrics.netValue > 0 ? `${formatYen(point.metrics.netValue)}` : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colUsage} collapseAt="narrow">
                       <span className={styles.usageMain} title={usageLabel(point)}><TruncatedText value={usage.main} /></span>
@@ -1222,7 +1223,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             icon={<Banknote size={13} aria-hidden="true" />}
             help="この30日に数えた成果の金額の合計です。"
             value={reportUnavailable ? null : kpi.currentValue}
-            valueText={reportUnavailable ? undefined : `¥${formatNumber(kpi.currentValue)}`}
+            valueText={reportUnavailable ? undefined : `${formatYen(kpi.currentValue)}`}
             unit=""
             detail={<span title={listUnavailable ? '金額の内訳を読み込めませんでした' : `${formatNumber(points.filter(point => point.value != null).length)}個の成果地点で金額を記録`}>{listTruncated ? '直近5000件までの合計です' : '注文の金額で数えるもの'}</span>}
           />

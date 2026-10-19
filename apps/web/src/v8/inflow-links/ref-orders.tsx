@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 /*
  * IDEA-18: 流入経路と注文の連結ブロック（★V8 の詳細  用に app/inflow-links/_components/ref-orders.tsx から写した。import はしない）。
@@ -72,7 +73,7 @@ type LoadState = 'loading' | 'ready' | 'error'
 
 function formatMoney(currency: string, amount: number | null): string {
   if (amount === null) return '—'
-  return `${currency === 'JPY' ? '¥' : ''}${formatNumber(amount)}`
+  return currency === 'JPY' ? formatYen(amount) : formatNumber(amount)
 }
 
 function formatDate(iso: string): string {

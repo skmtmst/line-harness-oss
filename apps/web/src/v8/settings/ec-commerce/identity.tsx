@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -187,7 +188,7 @@ export default function EcIdentityCandidatesScreen() {
             title="結びついていない注文の金額"
             value={null}
             unit=""
-            valueText={operationsReady && operations?.summary.potentialRevenue != null ? `¥${formatNumber(operations.summary.potentialRevenue)}` : undefined}
+            valueText={operationsReady && operations?.summary.potentialRevenue != null ? `${formatYen(operations.summary.potentialRevenue)}` : undefined}
             detail={operationsReady ? `候補 ${formatNumber(candidateCount)} 人の注文` : operationsDetail('分析にも入ります')}
             loading={operationsState === 'loading'}
           />
