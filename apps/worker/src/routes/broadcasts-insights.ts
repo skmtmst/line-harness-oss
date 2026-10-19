@@ -26,15 +26,15 @@ export const get__api_broadcasts_id_insight_1 = async (c: Context<Env, "/api/bro
   ).bind(id).first<Record<string, unknown>>();
   const linkRows = await c.env.DB.prepare(
     `SELECT tl.id, btl.label, tl.original_url,
-            COUNT(lc.id) AS click_count,
-            COUNT(DISTINCT lc.friend_id) AS unique_click_count,
-            MAX(lc.clicked_at) AS last_clicked_at
-       FROM broadcast_tracked_links btl
-       JOIN tracked_links tl ON tl.id = btl.tracked_link_id
-       LEFT JOIN link_clicks lc ON lc.tracked_link_id = tl.id
-      WHERE btl.broadcast_id = ?
-      GROUP BY tl.id, btl.label, tl.original_url
-      ORDER BY click_count DESC, tl.id`,
+              COUNT(lc.id) AS click_count,
+              COUNT(DISTINCT lc.friend_id) AS unique_click_count,
+              MAX(lc.clicked_at) AS last_clicked_at
+         FROM broadcast_tracked_links btl
+         JOIN tracked_links tl ON tl.id = btl.tracked_link_id
+         LEFT JOIN link_clicks lc ON lc.tracked_link_id = tl.id
+        WHERE btl.broadcast_id = ?
+        GROUP BY tl.id, btl.label, tl.original_url
+        ORDER BY click_count DESC, tl.id`,
   ).bind(id).all<{
     id: string;
     label: string;
@@ -241,15 +241,15 @@ export const post__api_broadcasts_id_fetch_insight_2 = async (c: Context<Env, "/
   if (existing) {
     await c.env.DB.prepare(
       `UPDATE broadcast_insights SET
-         delivered = ?, unique_impression = ?, unique_click = ?, unique_media_played = ?,
-         open_rate = ?, click_rate = ?, raw_response = ?, status = 'ready', fetched_at = ?
-       WHERE id = ?`,
+           delivered = ?, unique_impression = ?, unique_click = ?, unique_media_played = ?,
+           open_rate = ?, click_rate = ?, raw_response = ?, status = 'ready', fetched_at = ?
+         WHERE id = ?`,
     ).bind(delivered, uniqueImpression, uniqueClick, uniqueMediaPlayed, openRate, clickRate, rawResponse, now, existing.id).run();
   } else {
     const insightId = crypto.randomUUID();
     await c.env.DB.prepare(
       `INSERT INTO broadcast_insights (id, broadcast_id, delivered, unique_impression, unique_click, unique_media_played, open_rate, click_rate, raw_response, status, fetched_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', ?, ?)`,
     ).bind(insightId, id, delivered, uniqueImpression, uniqueClick, uniqueMediaPlayed, openRate, clickRate, rawResponse, now, now).run();
   }
 
@@ -295,13 +295,13 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
   // 二度押しも早い段階で止める点は変えない。
   const claim = await c.env.DB.prepare(
     `INSERT INTO operation_audit (id, target_kind, target_id, action, actor_id, detail_json)
-     SELECT ?, 'broadcast', ?, 'test_send', ?, ?
-     WHERE NOT EXISTS (
-       SELECT 1 FROM operation_audit
-        WHERE target_kind = 'broadcast' AND target_id = ?
-          AND action = 'test_send' AND actor_id = ?
-          AND datetime(created_at) >= datetime('now', '+9 hours', '-10 seconds')
-     )`,
+       SELECT ?, 'broadcast', ?, 'test_send', ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM operation_audit
+          WHERE target_kind = 'broadcast' AND target_id = ?
+            AND action = 'test_send' AND actor_id = ?
+            AND datetime(created_at) >= datetime('now', '+9 hours', '-10 seconds')
+       )`,
   ).bind(
     crypto.randomUUID(),
     id,
@@ -397,7 +397,7 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
       sent++;
       await c.env.DB.batch(rendered.map((part) => c.env.DB.prepare(
         `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, delivery_type, source, created_at)
-         VALUES (?, ?, 'outgoing', ?, ?, NULL, 'test', 'broadcast', ?)`
+           VALUES (?, ?, 'outgoing', ?, ?, NULL, 'test', 'broadcast', ?)`
       ).bind(crypto.randomUUID(), friend.id, part.messageType, part.messageContent, now)));
     } catch (err) {
       logger.error("routes_broadcasts_failed");

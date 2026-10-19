@@ -298,12 +298,12 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
         || approval.readApprovalStatus(existing) === 'approved') {
         await c.env.DB.prepare(
           `UPDATE broadcasts
-              SET approval_status = 'none',
-                  approval_decided_by_staff_id = NULL,
-                  approval_decided_at = NULL,
-                  approval_reject_reason = NULL,
-                  approval_confirmed_count = NULL
-            WHERE id = ? AND approval_status IN ('pending', 'approved')`,
+                SET approval_status = 'none',
+                    approval_decided_by_staff_id = NULL,
+                    approval_decided_at = NULL,
+                    approval_reject_reason = NULL,
+                    approval_confirmed_count = NULL
+              WHERE id = ? AND approval_status IN ('pending', 'approved')`,
         ).bind(id).run();
         await approval.recordBroadcastApprovalEvent(c.env.DB, id, c.get('staff')?.id ?? '', 'cancelled', '内容の変更');
       }
@@ -325,14 +325,14 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   // - aggregation_unit / line_request_id: 過去送信の insight 集計参照を残さない
   await c.env.DB.prepare(
     `UPDATE broadcasts SET
-       dedup_progress = NULL,
-       batch_lock_at = NULL,
-       success_count = 0,
-       failed_account_ids = NULL,
-       sent_at = NULL,
-       aggregation_unit = NULL,
-       line_request_id = NULL
-     WHERE id = ?`,
+         dedup_progress = NULL,
+         batch_lock_at = NULL,
+         success_count = 0,
+         failed_account_ids = NULL,
+         sent_at = NULL,
+         aggregation_unit = NULL,
+         line_request_id = NULL
+       WHERE id = ?`,
   ).bind(id).run();
 
   // 過去 send の insight 行を削除する。createBroadcastInsight は idempotent で
@@ -361,9 +361,9 @@ export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/bro
 
   const result = await c.env.DB.prepare(
     `UPDATE broadcasts
-     SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL,
-         common_var_snapshot = NULL, common_var_snapshot_at = NULL
-     WHERE id = ? AND status = 'scheduled' AND scheduled_at IS NOT NULL`,
+       SET status = 'draft', scheduled_at = NULL, batch_lock_at = NULL,
+           common_var_snapshot = NULL, common_var_snapshot_at = NULL
+       WHERE id = ? AND status = 'scheduled' AND scheduled_at IS NOT NULL`,
   ).bind(id).run();
   if ((result.meta.changes ?? 0) !== 1) {
     return c.json({ success: false, error: 'Broadcast is no longer scheduled' }, 409);

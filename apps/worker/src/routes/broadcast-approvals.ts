@@ -101,7 +101,7 @@ broadcastApprovals.get('/api/broadcasts/approvals/candidates', async (c) => {
   }
   const rows = await c.env.DB.prepare(
     `SELECT id, name, role, permission_keys FROM staff_members
-      WHERE is_active = 1 AND invite_status = 'active' ORDER BY name`,
+        WHERE is_active = 1 AND invite_status = 'active' ORDER BY name`,
   ).all<{ id: string; name: string; role: string; permission_keys: string }>();
   const items = (rows.results ?? [])
     .filter((row) => row.id !== staff?.id)
@@ -246,17 +246,17 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', inputJsonBoundar
   // pending のまま二重に頼めない。差し戻し・取消・期限切れのあとは頼み直せる。
   const claimed = await c.env.DB.prepare(
     `UPDATE broadcasts
-        SET approval_status = 'pending',
-            approval_requested_by_staff_id = ?,
-            approval_requested_at = ?,
-            approval_approver_staff_id = ?,
-            approval_note = ?,
-            approval_decided_by_staff_id = NULL,
-            approval_decided_at = NULL,
-            approval_reject_reason = NULL,
-            approval_confirmed_count = NULL
-      WHERE id = ? AND approval_status IN ('none', 'rejected', 'cancelled', 'expired')
-        AND status IN ('draft', 'scheduled')`,
+          SET approval_status = 'pending',
+              approval_requested_by_staff_id = ?,
+              approval_requested_at = ?,
+              approval_approver_staff_id = ?,
+              approval_note = ?,
+              approval_decided_by_staff_id = NULL,
+              approval_decided_at = NULL,
+              approval_reject_reason = NULL,
+              approval_confirmed_count = NULL
+        WHERE id = ? AND approval_status IN ('none', 'rejected', 'cancelled', 'expired')
+          AND status IN ('draft', 'scheduled')`,
   ).bind(staff?.id ?? '', now, approverStaffId, note || null, broadcast.id).run();
   if (!claimed.meta.changes) {
     return c.json({ success: false, error: 'すでに承認の依頼中です。状態を読み直してください。', code: 'ALREADY_REQUESTED' }, 409);
@@ -295,10 +295,10 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-approve', inputJsonBoundar
   // pending のときだけ承認済みにする。二重押し・取り消し後の承認を防ぐ。
   const claimed = await c.env.DB.prepare(
     `UPDATE broadcasts
-        SET approval_status = 'approved',
-            approval_decided_by_staff_id = ?,
-            approval_decided_at = ?
-      WHERE id = ? AND approval_status = 'pending' AND status IN ('draft', 'scheduled')`,
+          SET approval_status = 'approved',
+              approval_decided_by_staff_id = ?,
+              approval_decided_at = ?
+        WHERE id = ? AND approval_status = 'pending' AND status IN ('draft', 'scheduled')`,
   ).bind(staff?.id ?? '', now, broadcast.id).run();
   if (!claimed.meta.changes) {
     return c.json({ success: false, error: '承認できる依頼がありません。状態を読み直してください。', code: 'NOT_PENDING' }, 409);
@@ -342,11 +342,11 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-reject', inputJsonBoundary
   const now = new Date().toISOString();
   const claimed = await c.env.DB.prepare(
     `UPDATE broadcasts
-        SET approval_status = 'rejected',
-            approval_decided_by_staff_id = ?,
-            approval_decided_at = ?,
-            approval_reject_reason = ?
-      WHERE id = ? AND approval_status = 'pending' AND status IN ('draft', 'scheduled')`,
+          SET approval_status = 'rejected',
+              approval_decided_by_staff_id = ?,
+              approval_decided_at = ?,
+              approval_reject_reason = ?
+        WHERE id = ? AND approval_status = 'pending' AND status IN ('draft', 'scheduled')`,
   ).bind(staff?.id ?? '', now, reason.slice(0, 1000), broadcast.id).run();
   if (!claimed.meta.changes) {
     return c.json({ success: false, error: '差し戻せる依頼がありません。状態を読み直してください。', code: 'NOT_PENDING' }, 409);
@@ -378,7 +378,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-cancel', inputJsonBoundary
   }
   const claimed = await c.env.DB.prepare(
     `UPDATE broadcasts SET approval_status = 'cancelled'
-      WHERE id = ? AND approval_status = 'pending' AND status IN ('draft', 'scheduled')`,
+        WHERE id = ? AND approval_status = 'pending' AND status IN ('draft', 'scheduled')`,
   ).bind(broadcast.id).run();
   if (!claimed.meta.changes) {
     return c.json({ success: false, error: '取り消せる依頼がありません。状態を読み直してください。', code: 'NOT_PENDING' }, 409);

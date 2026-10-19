@@ -90,11 +90,11 @@ export const post__api_broadcasts_preflight_1 = async (c: Context<Env, "/api/bro
     const placeholders = sqlIdSet(accountIds).sql;
     const rows = await c.env.DB.prepare(
       `SELECT id, title, scheduled_at
-         FROM broadcasts
-        WHERE status = 'scheduled' AND scheduled_at IS NOT NULL
-          AND line_account_id IN (${placeholders})
-          AND ABS(strftime('%s', scheduled_at) - strftime('%s', ?)) <= 3600
-        ORDER BY scheduled_at, id LIMIT 10`,
+           FROM broadcasts
+          WHERE status = 'scheduled' AND scheduled_at IS NOT NULL
+            AND line_account_id IN (${placeholders})
+            AND ABS(strftime('%s', scheduled_at) - strftime('%s', ?)) <= 3600
+          ORDER BY scheduled_at, id LIMIT 10`,
     ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : []), scheduledAt).all<{ id: string; title: string; scheduled_at: string }>();
     concurrentBroadcasts = rows.results.map((row) => ({ id: row.id, title: row.title, scheduledAt: row.scheduled_at }));
   }

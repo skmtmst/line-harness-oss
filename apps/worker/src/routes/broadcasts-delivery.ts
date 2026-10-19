@@ -178,13 +178,13 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
 
     const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
     let audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-                         FROM (${sql}) q`;
+                                SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
+                           FROM (${sql}) q`;
     const audienceBindings = [...bindings];
     if (accountId) {
       audienceSql = `SELECT COUNT(*) AS total,
-                            SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-                       FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
+                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
+                         FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
       audienceBindings.unshift(accountId);
     }
     const audience = await c.env.DB.prepare(audienceSql)
@@ -202,8 +202,8 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     const total = Number(audience?.total ?? 0);
     const lockResult = await c.env.DB.prepare(
       `UPDATE broadcasts
-          SET status = 'sending', batch_offset = 0, total_count = ?
-        WHERE id = ? AND status IN ('draft','scheduled')`,
+            SET status = 'sending', batch_offset = 0, total_count = ?
+          WHERE id = ? AND status IN ('draft','scheduled')`,
     ).bind(total, id).run();
     if (!lockResult.meta.changes) {
       return c.json({ success: false, error: 'Broadcast is already sent or sending' }, 409);
@@ -253,9 +253,9 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
 
     const audience = await c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN f.display_name IS NULL OR trim(f.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
-         FROM friends f
-        WHERE ${where.join(' AND ')}`,
+                SUM(CASE WHEN f.display_name IS NULL OR trim(f.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+           FROM friends f
+          WHERE ${where.join(' AND ')}`,
     ).bind(...binds).first<{ total: number; missing_name: number | null }>();
     const total = Number(audience?.total ?? 0);
     const missingName = Number(audience?.missing_name ?? 0);
@@ -274,8 +274,8 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       : { operator: 'AND', rules: [{ type: 'is_following', value: true }] };
     const lockResult = await c.env.DB.prepare(
       `UPDATE broadcasts
-          SET status = 'sending', batch_offset = 0, total_count = ?, segment_conditions = ?
-        WHERE id = ? AND status IN ('draft','scheduled')`,
+            SET status = 'sending', batch_offset = 0, total_count = ?, segment_conditions = ?
+          WHERE id = ? AND status IN ('draft','scheduled')`,
     ).bind(total, JSON.stringify(conditions), id).run();
     if (!lockResult.meta.changes) {
       return c.json({ success: false, error: 'Broadcast is already sent or sending' }, 409);
@@ -583,13 +583,13 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
     const { sql, bindings } = buildPublicSegmentQuery(body.conditions);
     const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
     let audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-                         FROM (${sql}) q`;
+                                SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
+                           FROM (${sql}) q`;
     const audienceBindings = [...bindings];
     if (accountId) {
       audienceSql = `SELECT COUNT(*) AS total,
-                            SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-                       FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
+                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
+                         FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
       audienceBindings.unshift(accountId);
     }
     const audience = await c.env.DB.prepare(audienceSql)

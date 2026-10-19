@@ -144,8 +144,8 @@ export const get__api_broadcasts_saved_views_6 = async (c: Context<Env, "/api/br
   }
   const rows = await c.env.DB.prepare(
     `SELECT id, name, filters_json, sort_key, page_size, created_by, created_at, updated_at, version
-       FROM broadcast_saved_views WHERE line_account_id = ?
-      ORDER BY updated_at DESC, id`,
+         FROM broadcast_saved_views WHERE line_account_id = ?
+        ORDER BY updated_at DESC, id`,
   ).bind(lineAccountId).all<Record<string, unknown>>();
   return c.json({
     success: true,
@@ -191,8 +191,8 @@ export const post__api_broadcasts_saved_views_7 = async (c: Context<Env, "/api/b
   const now = new Date().toISOString();
   await c.env.DB.prepare(
     `INSERT INTO broadcast_saved_views
-       (id, line_account_id, name, filters_json, sort_key, page_size, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, line_account_id, name, filters_json, sort_key, page_size, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, lineAccountId, name, JSON.stringify(body.filters), sortKey, pageSize, c.get('staff')!.id, now, now).run();
   return c.json({
     success: true,
@@ -256,13 +256,13 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
     ? { results: [] as RecipientRow[] }
     : await c.env.DB.prepare(
       `SELECT c.friend_id, c.line_account_id, c.state, c.error_code,
-              c.line_request_id, c.dispatched_at, c.settled_at,
-              f.display_name
-         FROM broadcast_send_claims c
-         LEFT JOIN friends f ON f.id = c.friend_id
-        WHERE c.broadcast_id = ?${filter}
-        ORDER BY COALESCE(f.display_name, ''), c.friend_id
-        LIMIT ? OFFSET ?`,
+                c.line_request_id, c.dispatched_at, c.settled_at,
+                f.display_name
+           FROM broadcast_send_claims c
+           LEFT JOIN friends f ON f.id = c.friend_id
+          WHERE c.broadcast_id = ?${filter}
+          ORDER BY COALESCE(f.display_name, ''), c.friend_id
+          LIMIT ? OFFSET ?`,
     ).bind(id, limit + 1, cursor).all<RecipientRow>();
   const allRows = queryResult.results ?? [];
   const page = allRows.slice(0, limit);
@@ -385,11 +385,11 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
     const tagAccountId = (raw.line_account_id as string | null) || null;
     const tagSql = tagAccountId
       ? `SELECT COUNT(*) AS cnt FROM friends f
-         INNER JOIN friend_tags ft ON ft.friend_id = f.id
-         WHERE ft.tag_id = ? AND f.is_following = 1 AND f.line_account_id = ?`
+           INNER JOIN friend_tags ft ON ft.friend_id = f.id
+           WHERE ft.tag_id = ? AND f.is_following = 1 AND f.line_account_id = ?`
       : `SELECT COUNT(*) AS cnt FROM friends f
-         INNER JOIN friend_tags ft ON ft.friend_id = f.id
-         WHERE ft.tag_id = ? AND f.is_following = 1`;
+           INNER JOIN friend_tags ft ON ft.friend_id = f.id
+           WHERE ft.tag_id = ? AND f.is_following = 1`;
     const tagBinds: unknown[] = tagAccountId
       ? [broadcast.target_tag_id, tagAccountId]
       : [broadcast.target_tag_id];
@@ -462,11 +462,11 @@ export const get__api_broadcasts_id_per_account_stats_13 = async (c: Context<Env
   const placeholders = sqlIdSet(accountIds).sql;
   const sentRes = await c.env.DB.prepare(
     `SELECT COALESCE(ml.line_account_id, f.line_account_id) AS account_id, COUNT(*) AS sent
-     FROM messages_log ml
-     INNER JOIN friends f ON f.id = ml.friend_id
-     WHERE ml.broadcast_id = ? AND ml.direction = 'outgoing'
-       AND COALESCE(ml.line_account_id, f.line_account_id) IN (${placeholders})
-     GROUP BY COALESCE(ml.line_account_id, f.line_account_id)`,
+       FROM messages_log ml
+       INNER JOIN friends f ON f.id = ml.friend_id
+       WHERE ml.broadcast_id = ? AND ml.direction = 'outgoing'
+         AND COALESCE(ml.line_account_id, f.line_account_id) IN (${placeholders})
+       GROUP BY COALESCE(ml.line_account_id, f.line_account_id)`,
   ).bind(id, ...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<{ account_id: string; sent: number }>();
   const sentMap = new Map<string, number>();
   for (const r of sentRes.results ?? []) sentMap.set(r.account_id, r.sent);
