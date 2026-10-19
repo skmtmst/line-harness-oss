@@ -114,4 +114,43 @@ describe('feature entry verification', () => {
     } finally { rmSync(root, { recursive: true, force: true }) }
   })
 
+  it('checks an adapter that renders a V8 component through its public import', () => {
+    const root = mkdtempSync(join(tmpdir(), 'v8-render-adapter-'))
+    try {
+      mkdirSync(join(root, 'app'), { recursive: true })
+      mkdirSync(join(root, 'v8'), { recursive: true })
+      const adapter = join(root, 'app/entry.tsx')
+      writeFileSync(join(root, 'app/widget.tsx'), 'export default function Widget(){return <div/>}')
+      writeFileSync(adapter, "import WidgetV8 from './widget'; export default function Entry(){return <><section className='rounded-card border-hairline'/><WidgetV8/></>}")
+      expect(v8Sources(root)).toContain(adapter)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('checks an adapter that republishes the V8 editor', () => {
+    const root = mkdtempSync(join(tmpdir(), 'v8-export-adapter-'))
+    try {
+      mkdirSync(join(root, 'app'), { recursive: true })
+      mkdirSync(join(root, 'v8'), { recursive: true })
+      const adapter = join(root, 'app/editor.tsx')
+      writeFileSync(join(root, 'v8/editor.tsx'), 'export default function Editor(){return <div/>}')
+      writeFileSync(adapter, "export {default} from '../v8/editor'")
+      expect(v8Sources(root)).toContain(adapter)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('keeps a legacy screen separate from the V8 dialog it opens', () => {
+    const root = mkdtempSync(join(tmpdir(), 'v8-dialog-in-legacy-'))
+    try {
+      mkdirSync(join(root, 'app'), { recursive: true })
+      mkdirSync(join(root, 'v8'), { recursive: true })
+      const legacy = join(root, 'app/legacy.tsx')
+      const dialog = join(root, 'app/dialog.tsx')
+      writeFileSync(dialog, 'export default function DialogV8(){return <div/>}')
+      writeFileSync(legacy, "import DialogV8 from './dialog'; export default function Legacy(){const dialogs=open&&<DialogV8/>;return <section>{dialogs}</section>}")
+      const sources = v8Sources(root)
+      expect(sources).toContain(dialog)
+      expect(sources).not.toContain(legacy)
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
 })
