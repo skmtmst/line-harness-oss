@@ -32,7 +32,7 @@ function rules(css: string) {
 afterEach(() => cleanup())
 
 describe('③ 「…」のメニューの開き方', () => {
-  it('層の外の旧い開く動き（lh-surface-in）は v7 の「…」だけに当たる（V8 には当てない）', () => {
+  it("層の外の旧い開く動き（lh-surface-in）は 既存の見た目の「…」だけに当たる（V8 には当てない）", () => {
     const hits = rules(globals).filter((r) => /animation:\s*lh-surface-in/.test(r.body))
     const menuSelectors = hits
       .flatMap((r) => r.selector.split(','))

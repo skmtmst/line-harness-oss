@@ -17,7 +17,7 @@ describe('探して選ぶ欄の高さ', () => {
     expect(globals).toMatch(/:root \{[^}]*--tpl-ux5-combobox-h: 36px;/)
   })
 
-  it('v7 の 40・指の 44 は残す', () => {
+  it("既存の見た目の 40・指の 44 は残す", () => {
     expect(css).toMatch(/\.field \{[^}]*height: 40px;/)
     expect(css).toMatch(/@media \(pointer: coarse\) \{\s*\.field \{\s*height: 44px;/)
   })

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { analyzeSourceTests, newSourceAssertions, checkRepository } from './verify-no-source-visual-contracts.mjs'
+import { analyzeSourceTests, newSourceAssertions, checkRepository, splitModuleMoves } from './verify-no-source-visual-contracts.mjs'
 
 const entry = 'apps/web/src/example.test.tsx'
 const analyze = (body, extras = new Map(), file = entry) => analyzeSourceTests(new Map([
@@ -234,4 +234,76 @@ test('renaming the read source keeps an unchanged assertion while unrelated read
     assert.equal(newSourceAssertions(run(from), run('unrelated.tsx'), moves).length, 1)
     assert.equal(newSourceAssertions(run(from), [...run(to), ...run(to)], moves).length, 1)
   }
+})
+
+test('a named default implementation retains lineage when split; ambiguous or unrelated defaults do not', () => {
+  const old = 'apps/web/src/old.tsx', next = 'apps/web/src/feature/main.tsx'
+  const before = new Map([[old, 'export default function Orders(){ return <Old/> }']])
+  const after = new Map([[next, "import { Body } from './body';export default function Orders(){return <Body/>}"]])
+  const moves = splitModuleMoves(before, after)
+  assert.equal(moves.get(old), next)
+  assert.equal(splitModuleMoves(before, new Map([...after, ['apps/web/src/another.tsx', after.get(next)]])).has(old), false)
+  assert.equal(splitModuleMoves(before, new Map([[next, 'export default function Other(){return null}']])).has(old), false)
+  assert.equal(splitModuleMoves(new Map([[old, 'export default () => null']]), after).has(old), false)
+  const run = path => analyzeSourceTests(new Map([[entry, `import {readFileSync}from'node:fs';import{it,expect}from'vitest';it('case',()=>expect(readFileSync('${path}')).toContain('label'))`]]))
+  assert.equal(newSourceAssertions(run(old), run(next), moves).length, 0)
+  assert.equal(newSourceAssertions(run(old), [...run(next), ...run(next)], moves).length, 1)
+  assert.equal(newSourceAssertions(run(old), run('unrelated.tsx'), moves).length, 1)
+})
+
+test('aliased path functions and array reads retain separate roots, and a new root or copied assertion fails', () => {
+  const run = (parts, file = entry) => analyzeSourceTests(new Map([[file, `import{readFileSync}from'node:fs';import{join as sourceJoin}from'node:path';import{it,expect}from'vitest';const text=${JSON.stringify(parts)}.map(name=>readFileSync(sourceJoin(__dirname,name))).join('');it('case',()=>expect(text).toContain('label'))`]]))
+  const old = run(['view.tsx', 'model.ts'])
+  assert.deepEqual(old[0].reads, ['apps/web/src/model.ts', 'apps/web/src/view.tsx'])
+  const moved = 'apps/web/src/moved.test.tsx', moves = new Map([[entry, moved]])
+  assert.equal(newSourceAssertions(old, run(['view.tsx', 'model.ts'], moved), moves).length, 0)
+  assert.equal(newSourceAssertions(old, run(['view.tsx', 'new.tsx'], moved), moves).length, 1)
+  assert.equal(newSourceAssertions(old, [...run(['view.tsx', 'model.ts'], moved), ...run(['view.tsx', 'model.ts'], moved)], moves).length, 1)
+})
+
+test('a renamed opaque reader keeps its identity without approving a changed read root', () => {
+  const run = (file, path) => analyzeSourceTests(new Map([[file, `import{readFileSync}from'node:fs';import{it,expect}from'vitest';const text=readFileSync(sourceJoin(__dirname,'${path}'));it('case',()=>expect(text).toContain('label'))`]]))
+  const moved = 'apps/web/src/moved.test.tsx', moves = new Map([[entry, moved]])
+  assert.equal(newSourceAssertions(run(entry, 'view.tsx'), run(moved, 'view.tsx'), moves).length, 0)
+  assert.equal(newSourceAssertions(run(entry, 'view.tsx'), run(moved, 'other.tsx'), moves).length, 1)
+})
+
+test('AST node predicates inspect syntax, while raw root text and getFullText remain source assertions', () => {
+  const run = body => analyzeSourceTests(new Map([[entry, `import ts from 'typescript';import{readFileSync}from'node:fs';import{it,expect}from'vitest';it('case',()=>{const ast=ts.createSourceFile('view.tsx',readFileSync('view.tsx'));${body}})`]]))
+  assert.deepEqual(run('expect(ts.isFunctionDeclaration(ast.statements[0])).toBe(true)'), [])
+  assert.ok(run("expect(ast.text).toContain('className')").length)
+  assert.ok(run("expect(ast.getFullText()).toContain('className')").length)
+})
+
+test('temporary fixture results are executable test data; copying product source there retains its origin', () => {
+  const run = content => analyzeSourceTests(new Map([[entry, `import{mkdtempSync,readFileSync,writeFileSync}from'node:fs';import{join}from'node:path';import{it,expect}from'vitest';it('case',()=>{const root=mkdtempSync('/tmp/fixture-');const path=join(root,'view.tsx');writeFileSync(path,${content});expect(readFileSync(path)).toContain('className')})`]]))
+  assert.deepEqual(run(`'<div className="fixture"/>'`), [])
+  assert.ok(run(`readFileSync('apps/web/src/example.tsx')`).length)
+})
+
+test('an extracted dependency can accompany its retained read root; unrelated roots, new strings and copies fail', () => {
+  const source = 'apps/web/src/view.tsx', extracted = 'apps/web/src/model.ts', other = 'apps/web/src/other.ts'
+  const modules = new Map([[source, "import { model } from './model'; export default model"], [extracted, 'export const model = 1'], [other, 'export const other = 1']])
+  const run = (roots, text = 'label') => analyzeSourceTests(new Map([[entry, `import{readFileSync}from'node:fs';import{it,expect}from'vitest';const value=${JSON.stringify(roots)}.map(path=>readFileSync(path)).join('');it('case',()=>expect(value).toContain('${text}'))`]]))
+  const before = run([source]), after = run([source, extracted])
+  assert.equal(newSourceAssertions(before, after, new Map(), modules).length, 0)
+  assert.equal(newSourceAssertions(before, run([source, other]), new Map(), modules).length, 1)
+  assert.equal(newSourceAssertions(before, run([source, extracted], 'new-label'), new Map(), modules).length, 1)
+  assert.equal(newSourceAssertions(before, [...after, ...after], new Map(), modules).length, 1)
+  assert.equal(newSourceAssertions(before, run([other]), new Map(), modules).length, 1)
+})
+
+test('changing a reader argument from segments to one path preserves the assertion but not a changed target', () => {
+  const run = args => analyzeSourceTests(new Map([[entry, `import{readFileSync}from'node:fs';import{join}from'node:path';import{it,expect}from'vitest';function read(...parts){return readFileSync(join(__dirname,...parts))}it('case',()=>expect(read(${args})).toContain('label'))`]]))
+  assert.equal(newSourceAssertions(run("'feature','view.tsx'"), run("'feature/view.tsx'")).length, 0)
+  assert.equal(newSourceAssertions(run("'feature','view.tsx'"), run("'other/view.tsx'")).length, 1)
+})
+
+test('renaming a case title preserves its assertion; a new case copying it still increases the count', () => {
+  const run = (title, text = 'label', path = 'view.tsx') => analyzeSourceTests(new Map([[entry, `import{readFileSync}from'node:fs';import{it,expect}from'vitest';const source=readFileSync('${path}');it('${title}',()=>expect(source).toContain('${text}'))`]]))
+  const before = run('historical title'), after = run('describes behavior')
+  assert.equal(newSourceAssertions(before, after).length, 0)
+  assert.equal(newSourceAssertions(before, [...before, ...after]).length, 1)
+  assert.equal(newSourceAssertions(before, run('describes behavior', 'new-label')).length, 1)
+  assert.equal(newSourceAssertions(before, run('describes behavior', 'label', 'other.tsx')).length, 1)
 })

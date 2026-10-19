@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
 
-describe('V6 リッチメニュー削除確認 szXsT', () => {
+describe("管理画面 リッチメニュー削除確認 szXsT", () => {
   it('管理画面とLINE上の削除を共通確認窓へ寄せる', () => {
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
     expect(PAGE).toContain('canDeleteImpact({ impact, busy: deleteBusy })')

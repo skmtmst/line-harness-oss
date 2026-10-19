@@ -7,7 +7,7 @@ import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { MediaSort } from './list-model'
 
 
-type loadMediaListContext = {
+type LoadMediaListContext = {
   folderFilter: string
   kinds: Set<"image" | "video" | "audio" | "file">
   latestAccountRef: RefObject<string | null>
@@ -29,7 +29,7 @@ type loadMediaListContext = {
   sort: MediaSort
 }
 
-export async function loadMediaList({ folderFilter, kinds, latestAccountRef, listSeqRef, page, pageSize, query, saveErrors, selectedAccountId, setError, setItems, setListKnown, setLoadFailed, setLoading, setTotal, showArchivedOnly, showNearLimitOnly, showUnusedOnly, sort }: loadMediaListContext) {
+export async function loadMediaList({ folderFilter, kinds, latestAccountRef, listSeqRef, page, pageSize, query, saveErrors, selectedAccountId, setError, setItems, setListKnown, setLoadFailed, setLoading, setTotal, showArchivedOnly, showNearLimitOnly, showUnusedOnly, sort }: LoadMediaListContext) {
     const accountAtRequest = selectedAccountId
     const seq = ++listSeqRef.current
     const isLatest = () => seq === listSeqRef.current && accountAtRequest === latestAccountRef.current
@@ -74,7 +74,7 @@ export async function loadMediaList({ folderFilter, kinds, latestAccountRef, lis
     }
   }
 
-type loadMediaSummaryContext = {
+type LoadMediaSummaryContext = {
   latestAccountRef: RefObject<string | null>
   selectedAccountId: string | null
   setOverallTotal: Dispatch<SetStateAction<number | null>>
@@ -84,7 +84,7 @@ type loadMediaSummaryContext = {
   summarySeqRef: RefObject<number>
 }
 
-export async function loadMediaSummary({ latestAccountRef, selectedAccountId, setOverallTotal, setQuota, setQuotaFailed, showArchivedOnly, summarySeqRef }: loadMediaSummaryContext) {
+export async function loadMediaSummary({ latestAccountRef, selectedAccountId, setOverallTotal, setQuota, setQuotaFailed, showArchivedOnly, summarySeqRef }: LoadMediaSummaryContext) {
     const accountAtRequest = selectedAccountId
     const seq = ++summarySeqRef.current
     if (!accountAtRequest) {
@@ -110,7 +110,7 @@ export async function loadMediaSummary({ latestAccountRef, selectedAccountId, se
     }
   }
 
-type loadMediaFoldersContext = {
+type LoadMediaFoldersContext = {
   latestAccountRef: RefObject<string | null>
   saveErrors: ReturnType<typeof useSaveFormErrors>
   selectedAccountId: string | null
@@ -120,7 +120,7 @@ type loadMediaFoldersContext = {
   setUnfiledCount: Dispatch<SetStateAction<number | null>>
 }
 
-export async function loadMediaFolders({ latestAccountRef, saveErrors, selectedAccountId, setFolderFailure, setFolderReloading, setFolders, setUnfiledCount }: loadMediaFoldersContext) {
+export async function loadMediaFolders({ latestAccountRef, saveErrors, selectedAccountId, setFolderFailure, setFolderReloading, setFolders, setUnfiledCount }: LoadMediaFoldersContext) {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) {
       setFolders([])

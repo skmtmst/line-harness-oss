@@ -12,7 +12,7 @@ function fixture() {
   roots.push(root);
   mkdirSync(join(root, 'apps/worker/src'), { recursive: true });
   writeFileSync(join(root, 'package.json'), '{"version":"0.24.0"}');
-  writeFileSync(join(root, 'apps/worker/src/_version.ts'), readFileSync(new URL('../src/_version.ts', import.meta.url)));
+  writeFileSync(join(root, 'apps/worker/src/release-version.ts'), readFileSync(new URL('../src/release-version.ts', import.meta.url)));
   execFileSync('git', ['init', '-q', root]);
   execFileSync('git', ['-C', root, 'add', '.']);
   execFileSync('git', ['-C', root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', 'fixture']);
@@ -22,9 +22,9 @@ it('config replayはworkflowのSHAでなく配備元のHEADを埋め、実在し
   const root = fixture();
   const sha = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   vi.stubEnv('GITHUB_SHA', 'f'.repeat(40));
-  const original = readFileSync(join(root, 'apps/worker/src/_version.ts'), 'utf8');
+  const original = readFileSync(join(root, 'apps/worker/src/release-version.ts'), 'utf8');
   expect(stampStagingVersion(root, '2026-10-10T00:00:00Z')).toEqual({ version: '0.24.0', commit: sha, releasedAt: '2026-10-10T00:00:00Z' });
-  const source = readFileSync(join(root, 'apps/worker/src/_version.ts'), 'utf8');
+  const source = readFileSync(join(root, 'apps/worker/src/release-version.ts'), 'utf8');
   expect(source).toContain(`GIT_COMMIT = "${sha}";`);
   expect(source).toContain('BUNDLE_VERSION = "0.24.0";');
   expect(source).toContain('RELEASED_AT = "2026-10-10T00:00:00Z";');
@@ -37,7 +37,7 @@ it('SHAを確認できない場合は埋め込みを止める', () => {
 });
 it('版の値が不正なら元の定数を変更しない', () => {
   const root = fixture();
-  const path = join(root, 'apps/worker/src/_version.ts');
+  const path = join(root, 'apps/worker/src/release-version.ts');
   const original = readFileSync(path, 'utf8');
   writeFileSync(join(root, 'package.json'), '{"version":"unknown"}');
   expect(() => stampStagingVersion(root)).toThrow('版を確認できません');

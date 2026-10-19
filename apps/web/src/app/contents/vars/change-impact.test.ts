@@ -330,7 +330,7 @@ describe('共通情報編集（V8）の画面', () => {
     expect(EDIT).not.toContain('配信中の設定にも反映されます')
   })
 
-  it('競合で入力を消さない。load()ではなく版だけ取り直す（IDEA-14）', () => {
+  it("競合で入力を消さない。loadではなく版だけ取り直す", () => {
     // load は名前・値・メモまで初期化する。409/428で呼ぶと入力が消える。
     const CATCH = sliceBetween(SAVE_FN, '} catch (e) {', '} finally {')
     expect(CATCH).toContain('await refreshBaseline(item.id, accountAtRequest, e)')

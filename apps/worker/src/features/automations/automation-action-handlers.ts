@@ -1,3 +1,4 @@
+import type { EventDispatcher } from '../../services/event-payload.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { classifyLinePushError } from './automation-line-errors.js';
 import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
@@ -44,6 +45,7 @@ interface AutomationLineClient {
 }
 
 export interface AutomationActionExecutorDependencies {
+  emitEvent?: EventDispatcher;
   credentialEncryptionKey?: string;
   /** Immediate callers own their delivery ledger and require the external acknowledgement. */
   webhookDeliveryMode?: 'queued' | 'immediate';
@@ -229,7 +231,7 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-async function tagExecutor(context: AutomationActionContext, operation: 'add' | 'remove'): Promise<void> {
+async function tagExecutor(context: AutomationActionContext, operation: 'add' | 'remove', dependencies: AutomationActionExecutorDependencies): Promise<void> {
   const friend = await requireFriend(context);
   const tagId = requiredString(context.action.params.tagId, 'tag_id_missing', 'タグ');
   await requireScopedResource(context, { table: 'tags', id: tagId, code: 'tag_not_found', label: 'タグ' });
@@ -249,7 +251,8 @@ async function tagExecutor(context: AutomationActionContext, operation: 'add' | 
   }
   const depth=Number(context.inputEvent?.automationDepth??0);
   if(depth<3) {
-    const {fireEvent}=await import('../../services/event-bus.js');
+    const fireEvent = dependencies.emitEvent;
+    if (!fireEvent) throw new Error('automation_event_dispatcher_missing');
     await fireEvent(context.db,'tag_change',{friendId:friend.id,sourceEventId:`automation-tag:${context.idempotencyKey}`,sourceKind:'automation',occurredAt:new Date().toISOString(),eventData:{tagId,action:operation,automationDepth:depth+1}},undefined,context.lineAccountId);
   }
 }
@@ -688,8 +691,8 @@ export function createAutomationActionExecutors(
   dependencies: AutomationActionExecutorDependencies = {},
 ): Record<string, AutomationActionExecutor> {
   return {
-    add_tag: (context) => tagExecutor(context, 'add'),
-    remove_tag: (context) => tagExecutor(context, 'remove'),
+    add_tag: (context) => tagExecutor(context, 'add', dependencies),
+    remove_tag: (context) => tagExecutor(context, 'remove', dependencies),
     notify_staff: (context) => notifyStaffExecutor(context, dependencies),
     set_metadata: metadataExecutor,
     set_support_mark: (context) => supportMarkExecutor(context, dependencies),

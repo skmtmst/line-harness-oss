@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const ROW = fs.readFileSync(path.join(__dirname, 'friend-list-row.tsx'), 'utf8')
 const TABLE = fs.readFileSync(path.join(__dirname, 'friend-list-table.tsx'), 'utf8')
 
-describe('友だち一覧のV6表示契約', () => {
+describe("友だち一覧の管理画面表示契約", () => {
   it('日時を日付欄と同じスラッシュ区切りにする', () => {
     expect(ROW).toContain("slice(0, 16).replace(/-/g, '/')")
   })

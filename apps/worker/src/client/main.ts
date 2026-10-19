@@ -765,7 +765,7 @@ async function openPage(): Promise<void> {
     } else if (page === 'nen-member') {
       await initNenMember();
     } else if (page === 'form') {
-      await initForm(new URLSearchParams(window.location.search).get('id'));
+      await initForm(new URLSearchParams(window.location.search).get('id'), initRestaurantForm);
     } else if (!page) {
       await linkAndAddFlow();
     } else {

@@ -909,4 +909,4 @@ export async function getConversionEvents(
  * reportRows(新レポートと同じ集計)へ集約した。暦日解釈とスナップショット
  * 固定は新レポートと一致する。呼び出し互換のため再公開する。
  */
-export { getConversionReport, type ConversionReport } from '../conversion-definitions/reports.js';
+export { getConversionReport, type ConversionReport } from '../conversion-definitions/reports/index.js';

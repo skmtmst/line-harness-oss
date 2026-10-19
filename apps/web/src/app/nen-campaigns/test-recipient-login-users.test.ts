@@ -43,7 +43,7 @@ describe('NEN配信のテスト送信先', () => {
     expect(overview).not.toContain('>{job.status}</span>');
   });
 
-  test('誕生日クーポンはV6どおり3日前10時と案内する', () => {
+  test("誕生日クーポンは管理画面どおり3日前10時と案内する", () => {
     expect(overview).toContain('誕生日は3日前の10:00に送ります');
     expect(overview).not.toContain('誕生日月の1日に自動送信');
     expect(overview).toContain('formatCampaignTiming(setting)');

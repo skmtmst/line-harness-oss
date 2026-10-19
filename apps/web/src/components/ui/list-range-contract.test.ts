@@ -115,7 +115,7 @@ describe('ListRange 統一（監査6 #667）', () => {
 
   // 実行結果の総数・表示範囲・カーソル移動は runs-v8.react.test.tsx で実描画する。
 
-  it('B-231：単一ページもカーソル式の共通ページ送りを使う', () => {
+  it("単一ページもカーソル式の共通ページ送りを使う", () => {
     const source = read('../../v8/friend-add/list.tsx')
     expect(source).toContain('<CursorPagination')
     expect(source).toContain('hasNext={Boolean(data.nextCursor)}')

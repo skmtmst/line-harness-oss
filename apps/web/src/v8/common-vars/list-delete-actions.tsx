@@ -7,7 +7,7 @@ import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { MAX_BATCH_DELETE_COUNT } from './list-model'
 import { reasonRequirement } from './model'
 
-type openCommonVarDeleteContext = {
+type OpenCommonVarDeleteContext = {
   deleteRequestRef: RefObject<{ accountId: string | null; itemId: string | null; generation: number; }>
   saveErrors: ReturnType<typeof useSaveFormErrors>
   selectedAccountId: string | null
@@ -25,7 +25,7 @@ type openCommonVarDeleteContext = {
   setUsageExpanded: Dispatch<SetStateAction<boolean>>
 }
 
-export async function openCommonVarDelete({ deleteRequestRef, saveErrors, selectedAccountId, setDeleteChoice, setDeleteError, setDeleteImpact, setDeletePhase, setDeleteReason, setDeleteTarget, setReplacementCandidates, setReplacementId, setReplacementImpact, setReplacementPhase, setTypedKey, setUsageExpanded }: openCommonVarDeleteContext, item: CommonVar) {
+export async function openCommonVarDelete({ deleteRequestRef, saveErrors, selectedAccountId, setDeleteChoice, setDeleteError, setDeleteImpact, setDeletePhase, setDeleteReason, setDeleteTarget, setReplacementCandidates, setReplacementId, setReplacementImpact, setReplacementPhase, setTypedKey, setUsageExpanded }: OpenCommonVarDeleteContext, item: CommonVar) {
     setDeleteTarget(item)
     setTypedKey('')
     setDeleteReason('')
@@ -93,7 +93,7 @@ export async function openCommonVarDelete({ deleteRequestRef, saveErrors, select
     }
   }
 
-type prepareCommonVarRemovalContext = {
+type PrepareCommonVarRemovalContext = {
   batchRequestRef: RefObject<{ accountId: string | null; generation: number; }>
   items: CommonVar[]
   saveErrors: ReturnType<typeof useSaveFormErrors>
@@ -105,7 +105,7 @@ type prepareCommonVarRemovalContext = {
   setError: Dispatch<SetStateAction<string>>
 }
 
-export async function prepareCommonVarRemoval({ batchRequestRef, items, saveErrors, selected, selectedAccountId, setBatchReason, setDeleteBatchError, setDeleteTargets, setError }: prepareCommonVarRemovalContext) {
+export async function prepareCommonVarRemoval({ batchRequestRef, items, saveErrors, selected, selectedAccountId, setBatchReason, setDeleteBatchError, setDeleteTargets, setError }: PrepareCommonVarRemovalContext) {
     if (selected.size === 0 || !selectedAccountId) return
     if (selected.size > MAX_BATCH_DELETE_COUNT) {
       setError(`一度に削除できるのは${MAX_BATCH_DELETE_COUNT} 件までです。フォルダや検索で絞り込んで分けて削除してください。`)
@@ -159,7 +159,7 @@ export async function prepareCommonVarRemoval({ batchRequestRef, items, saveErro
     setDeleteTargets(targets)
   }
 
-type removeCommonVarsContext = {
+type RemoveCommonVarsContext = {
   batchReason: string
   batchRequestRef: RefObject<{ accountId: string | null; generation: number; }>
   deleteTargets: CommonVar[]
@@ -174,7 +174,7 @@ type removeCommonVarsContext = {
   setSelected: Dispatch<SetStateAction<Set<string>>>
 }
 
-export async function removeCommonVars({ batchReason, batchRequestRef, deleteTargets, deleting, load, saveErrors, selectedAccountId, setBatchReason, setDeleteBatchError, setDeleteTargets, setDeleting, setSelected }: removeCommonVarsContext) {
+export async function removeCommonVars({ batchReason, batchRequestRef, deleteTargets, deleting, load, saveErrors, selectedAccountId, setBatchReason, setDeleteBatchError, setDeleteTargets, setDeleting, setSelected }: RemoveCommonVarsContext) {
     if (deleteTargets.length === 0 || !selectedAccountId || deleting) return
     if (reasonRequirement.check(batchReason)) {
       setDeleteBatchError('消した理由を入力してください。')

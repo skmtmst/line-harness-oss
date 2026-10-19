@@ -8,7 +8,7 @@ const source = readFileSync(join(here, 'top-bar.tsx'), 'utf8')
 const css = readFileSync(join(here, 'top-bar.module.css'), 'utf8')
 const appTopBar = readFileSync(join(here, '..', 'shell', 'app-top-bar.tsx'), 'utf8')
 
-describe('V6共通トップバー', () => {
+describe("管理画面共通トップバー", () => {
   it('押せる要素のキーボードフォーカスを消さない', () => {
     expect(css).toContain(':focus-visible')
     expect(css).not.toMatch(/outline:\s*(?:0|none)/)
@@ -48,7 +48,7 @@ describe('V8 の帯は絵どおり（殻合わせ）', () => {
     expect(source).toContain('HomeGridIcon')
   })
 
-  it('切替の札に役割を添える（v8-only・v7 の1行札は不変）', () => {
+  it("切替の札に役割を添える（v8-only・既存の見た目の1行札は不変）", () => {
     expect(source).toContain('pillText')
     expect(source).toContain('pillRole')
     expect(css).toMatch(/:root \.pillText \{[^}]*flex-direction:\s*column/s)

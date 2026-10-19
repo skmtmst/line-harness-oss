@@ -139,7 +139,7 @@ describe('TextInput・TextArea（form-controls）は正本の包み', () => {
     expect(areaRef.current?.tagName).toBe('TEXTAREA')
   })
 
-  it('form-controls は入力欄の見た目を自分で持たない（v7 の差は v7 のときだけ）', () => {
+  it("form-controls は入力欄の見た目を自分で持たない（既存の見た目の差は 既存の見た目のときだけ）", () => {
     const css = withoutComments(read('./form-controls.module.css'))
     expect(css).not.toMatch(/\.(control|input|textarea)\s*\{/)
     // 管理画面 の差（読み取り専用の地・押せないときの薄さ・大きさ固定）は 管理画面 に閉じる。

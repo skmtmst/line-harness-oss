@@ -18,3 +18,6 @@ export interface EventPayload {
   recoveryWithoutReply?: boolean;
   onRecoveryReview?: (code: 'reply_input_unavailable' | 'delivery_unknown') => void;
 }
+
+/** Event dispatch supplied by the composition root, including nested tag changes. */
+export type EventDispatcher = (db: D1Database, eventType: string, payload: EventPayload, lineAccessToken?: string, lineAccountId?: string | null) => Promise<void>;

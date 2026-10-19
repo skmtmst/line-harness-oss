@@ -9,7 +9,7 @@ import { formatTime } from '@/lib/format'
 import type { Dispatch,SetStateAction } from 'react'
 import { testSendFailure,testSendResult,type TestSendView } from './test-send-view'
 
-type testBroadcastContext = {
+type TestBroadcastContext = {
   onDraftSaved: ((broadcast: ApiBroadcast) => void) | undefined
   persistDraft: (scheduledAt: string | null, saveAsDraft?: boolean, confirmedCount?: number, autosaveStep?: BroadcastStepKey | null) => Promise<ApiBroadcast | null>
   rejectValidation: (validationError: string) => void
@@ -21,7 +21,7 @@ type testBroadcastContext = {
   validate: () => string
 }
 
-export async function testBroadcast({ onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, validate }: testBroadcastContext) {
+export async function testBroadcast({ onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, validate }: TestBroadcastContext) {
     const validationError = validate()
     if (validationError) {
       rejectValidation(validationError)

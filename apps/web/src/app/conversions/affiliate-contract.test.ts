@@ -6,7 +6,7 @@ const TABS = readFileSync(new URL('../../v8/affiliates/affiliators.tsx', import.
 const LEGACY_PAGE = readFileSync(new URL('../affiliates/page.tsx', import.meta.url), 'utf8')
 const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
-describe('V6 成果・アフィリエイトの契約', () => {
+describe("管理画面 成果・アフィリエイトの契約", () => {
 
   it('本文に画面タイトル・説明・準備中マニュアルを重ねない', () => {
     expect(PAGE).not.toContain("import Header from")

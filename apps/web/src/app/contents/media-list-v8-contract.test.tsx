@@ -221,7 +221,7 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     expect(host!.textContent).toContain('秋の新商品.jpg')
   })
 
-  test('v8 では新しい一覧（O7hUt7）が出て、v7 は出ない', async () => {
+  test("v8 では新しい一覧が出て、既存の見た目は出ない", async () => {
     document.documentElement.dataset.theme = 'v8'
     await renderPage()
     expect(host?.querySelector('[data-design-node="O7hUt7"]')).not.toBeNull()
@@ -300,7 +300,7 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     expect(LIST_V8).not.toContain('186')
   })
 
-  test('v6 の列・絞り込み・操作を残す', () => {
+  test("管理画面 の列・絞り込み・操作を残す", () => {
     // 列（札の中身）。
     expect(LIST_V8).toContain('formatMediaDetails(item)')
     expect(LIST_V8).toContain('どこでも使っていない')

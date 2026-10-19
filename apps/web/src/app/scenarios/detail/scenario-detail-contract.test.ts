@@ -17,7 +17,7 @@ const DIALOGS = fs.readFileSync(
   'utf8',
 )
 
-describe('V6 シナリオ編集の契約', () => {
+describe("管理画面 シナリオ編集の契約", () => {
   it('上部の一括テスト送信を既存の全通テスト送信へ接続する', () => {
     expect(PAGE).toContain(
       "onClick={() => setTestSend({ stepId: null, label: 'すべての通' })}",

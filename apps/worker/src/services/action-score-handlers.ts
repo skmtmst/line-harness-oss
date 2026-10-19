@@ -1,6 +1,7 @@
+import type { EventDispatcher } from './event-payload.js';
 import { applyPublishedActionScoreRules } from '@line-crm/db';
 import type { ActionScoreApplication } from '@line-crm/db';
-import { dispatchAutomationEventWithLogging } from '../features/automations/automation-triggers/index.js';
+import { dispatchAutomationEventWithLogging } from '../features/automations/automation-trigger-handlers/index.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 
 const BAND_RANK = { low: 0, normal: 1, high: 2 } as const;
@@ -34,6 +35,7 @@ export async function applyActionScoreEvent(
     occurredAt: string;
     lineAccessToken?: string;
   },
+  emitEvent: EventDispatcher,
 ) {
   // 機能オフ中は適用(状態更新)も自動化への受け渡しもしない。
   // dispatch側のgateだけでは適用が先に進むため、ここで止める。
@@ -47,7 +49,7 @@ export async function applyActionScoreEvent(
     friendId: input.friendId,
     applications: result.applications,
     lineAccessToken: input.lineAccessToken,
-  });
+  }, emitEvent);
   return result;
 }
 
@@ -59,6 +61,7 @@ export async function dispatchActionScoreApplications(
     applications: ActionScoreApplication[];
     lineAccessToken?: string;
   },
+  emitEvent: EventDispatcher,
 ): Promise<void> {
   // 機能オフ中は適用も自動化への受け渡しもしない。
   if (!await featureJobCanRun(db, { accountId: input.lineAccountId, featureId: 'mileage', job: 'action score applications' })) {
@@ -81,7 +84,7 @@ export async function dispatchActionScoreApplications(
       friendId: input.friendId,
       eventData,
       lineAccessToken: input.lineAccessToken,
-    });
+    }, { emitEvent });
     for (const band of crossedBands(application)) {
       await dispatchAutomationEventWithLogging(db, {
         lineAccountId: input.lineAccountId,
@@ -90,7 +93,7 @@ export async function dispatchActionScoreApplications(
         friendId: input.friendId,
         eventData: { ...eventData, thresholdBand: band },
         lineAccessToken: input.lineAccessToken,
-      });
+      }, { emitEvent });
     }
   }
 }

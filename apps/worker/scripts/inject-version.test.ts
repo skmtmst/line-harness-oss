@@ -293,8 +293,8 @@ describe('injectVersion.write', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('writes a _version.ts file with all 5 exports', () => {
-    const outPath = join(dir, '_version.ts');
+  it('writes a release-version.ts file with all 5 exports', () => {
+    const outPath = join(dir, 'release-version.ts');
     injectVersion.write(outPath, {
       version: '0.8.0',
       workerHash: 'sha256:aaaa',

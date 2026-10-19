@@ -68,7 +68,7 @@ describe('一覧の状態とページ送り', () => {
     expect(html).not.toContain('作る')
   })
 
-  it('B-231：1ページでも現在地と枠を出し、0件のページ送りは出さない', () => {
+  it("1ページでも現在地と枠を出し、0件のページ送りは出さない", () => {
     const html = renderToStaticMarkup(<Pagination page={1} pageCount={1} onPageChange={vi.fn()} />)
     expect(html).toContain('aria-current="page"')
     expect(html).toContain('aria-label="前のページ"')

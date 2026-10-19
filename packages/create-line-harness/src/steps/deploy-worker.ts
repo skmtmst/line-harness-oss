@@ -246,7 +246,7 @@ export async function deployWorker(
 
   // Write .env for Vite build (LIFF client env vars)
   const envPath = join(workerDir, ".env");
-  const envContent = `VITE_LIFF_ID=${options.liffId}\nVITE_BOT_BASIC_ID=${options.botBasicId}\n`;
+  const envContent = `VITE_LIFF_ID=${options.liffId}\n`;
   writeFileSync(envPath, envContent);
 
   const buildSpinner = p.spinner();
@@ -274,7 +274,7 @@ export async function deployWorker(
 
     if (options.bundleWorkerJs) {
       // Deploy the OFFICIAL release Worker bytes (not the local build).
-      // Their baked-in _version.ts stamp matches the release manifest, so
+      // Their baked-in release-version.ts stamp matches the release manifest, so
       // `update`'s fork detection sees a vanilla install. The local vite
       // build above still provides dist/client (the LIFF SPA assets).
       writeReleaseArtifact(workerDir, options.bundleWorkerJs);

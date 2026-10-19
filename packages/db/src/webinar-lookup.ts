@@ -1,4 +1,4 @@
-import type { Webinar } from './webinars/types.js';
+import type { Webinar } from './webinars/types/index.js';
 import { activeTenantLineAccountSql } from './line-accounts.js';
 
 export async function getWebinarBySlug(db: D1Database, slug: string, options: { activeAccountOnly?: boolean } = {}): Promise<Webinar | null> {

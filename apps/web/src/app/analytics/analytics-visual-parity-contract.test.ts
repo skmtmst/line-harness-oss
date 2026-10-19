@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 
-describe('V6 機能20の画面比較で直した契約', () => {
+describe("管理画面 機能20の画面比較で直した契約", () => {
   it('概要4画面に設計の判断材料を残す', () => {
     for (const text of [
       '日ごとの増減（この${days}日）',

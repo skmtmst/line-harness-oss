@@ -1,0 +1,1 @@
+export { FormPhone } from '../phone';

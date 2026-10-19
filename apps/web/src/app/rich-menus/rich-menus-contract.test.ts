@@ -14,7 +14,7 @@ const PUBLISHER = readFileSync(
   'utf8',
 )
 
-describe('V6リッチメニューの画面契約', () => {
+describe("管理画面リッチメニューの画面契約", () => {
   it('LINEアカウント切替前の応答を捨て、全件をページ送りでたどれる', () => {
     expect(PAGE).toContain('activeAccountRef.current !== accountId')
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
@@ -76,7 +76,7 @@ describe('V6リッチメニューの画面契約', () => {
   })
 })
 
-describe('V6リッチメニューの公開安全契約', () => {
+describe("管理画面リッチメニューの公開安全契約", () => {
   it('全画像の準備後にaliasを切り替え、旧メニューは最後に削除する', () => {
     expect(PUBLISHER).toContain('全ページを作成し、全画像を upload する')
     expect(PUBLISHER).toContain('ここが完走するまで alias は触らない')

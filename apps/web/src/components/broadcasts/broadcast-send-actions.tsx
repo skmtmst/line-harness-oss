@@ -10,7 +10,7 @@ import { broadcastAbApi } from '@/v8/broadcast-ab/public/api/index'
 import { useBroadcastAb } from '@/v8/broadcast-ab/public/use-ab/index'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
-type saveBroadcastContext = {
+type SaveBroadcastContext = {
   ab: ReturnType<typeof useBroadcastAb>
   approvalConfigState: "error" | "idle" | "loading" | "ready"
   approvalCountInput: string
@@ -37,7 +37,7 @@ type saveBroadcastContext = {
   validate: () => string
 }
 
-export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, setConfirmOpen, setError, setSaving, submittingRef, validate }: saveBroadcastContext) {
+export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, setConfirmOpen, setError, setSaving, submittingRef, validate }: SaveBroadcastContext) {
     if (saving || submittingRef.current) return
     if (currentStep && approvalConfigState !== 'ready') { setError('承認の設定を確認できません。確認画面を開き直してください'); return }
     const validationError = validate(); if (validationError) { rejectValidation(validationError); return }

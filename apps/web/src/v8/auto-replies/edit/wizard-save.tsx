@@ -11,7 +11,7 @@ AutoReplyValidationResult
 import type { Dispatch,RefObject,SetStateAction } from 'react';
 import { InputIssue,WizardForm,WizardStep } from './wizard-model';
 
-type saveWizardDraftContext = {
+type SaveWizardDraftContext = {
   autoReplyId: string | null
   buildInput: () => AutoReplyDraftInput | InputIssue
   createKeyRef: RefObject<string>
@@ -39,7 +39,7 @@ type saveWizardDraftContext = {
   versionNumber: number | null
 }
 
-export async function saveWizardDraft({ autoReplyId, buildInput, createKeyRef, form, router, savedSnapshotRef, savedVersionRef, saveErrors, setAutoReplyId, setConfirmState, setDryRun, setError, setInputIssue, setLifecycleStatus, setMatchedAccountId, setSaveConflict, setSaveNotice, setSaving, setValidation, setVersionNumber, setWeekdayNotice, showInputIssue, step, stepDataRequested, versionNumber }: saveWizardDraftContext): Promise<{ id: string; accountId: string | null } | null> {
+export async function saveWizardDraft({ autoReplyId, buildInput, createKeyRef, form, router, savedSnapshotRef, savedVersionRef, saveErrors, setAutoReplyId, setConfirmState, setDryRun, setError, setInputIssue, setLifecycleStatus, setMatchedAccountId, setSaveConflict, setSaveNotice, setSaving, setValidation, setVersionNumber, setWeekdayNotice, showInputIssue, step, stepDataRequested, versionNumber }: SaveWizardDraftContext): Promise<{ id: string; accountId: string | null } | null> {
     if (form.weekdays.length === 0) { setWeekdayNotice('反応する曜日を1つ以上選んでください。'); return null }
     const body = buildInput()
     if ('error' in body) {

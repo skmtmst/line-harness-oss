@@ -278,7 +278,7 @@ export async function runActions(
     }
     try {
       if (action.kind === 'row') {
-        const { runActionRows } = await import('../scenarios/scenario-actions.js');
+        const { runActionRows } = await import('../scenarios/scenario-actions/index.js');
         const result = await runActionRows(db, [{
           id: actionRunId ?? `friend-add-${index}`,
           scenario_id: '',
@@ -347,7 +347,7 @@ export async function executeStoredFriendAddAction(
   const [action] = normalizeActions([parsed]);
   if (!action) throw new Error('friend_add_action_snapshot_invalid');
   if (action.kind === 'row') {
-    const { runActionRows } = await import('../scenarios/scenario-actions.js');
+    const { runActionRows } = await import('../scenarios/scenario-actions/index.js');
     const result = await runActionRows(db, [{
       id: input.run.id,
       scenario_id: '',

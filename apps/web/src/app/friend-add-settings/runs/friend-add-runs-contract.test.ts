@@ -8,7 +8,7 @@ const PAGE = fs.readFileSync(new URL('../../../v8/friend-add-runs/runs.tsx', imp
 const DETAIL = fs.readFileSync(new URL('../../../v8/friend-add-runs/detail.tsx', import.meta.url), 'utf8')
 const SETTINGS = fs.readFileSync(new URL('../../../v8/friend-add/list.tsx', import.meta.url), 'utf8')
 
-describe('V6 友だち追加時配信・実行結果の契約', () => {
+describe("管理画面 友だち追加時配信・実行結果の契約", () => {
   it('実ノードと実行結果への往復導線を持つ', () => {
     expect(PAGE).toContain("usePageTitle('実行結果：友だち追加時の配信')")
     expect(PAGE).not.toContain('<Header')

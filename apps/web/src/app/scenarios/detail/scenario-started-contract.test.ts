@@ -6,7 +6,7 @@ const LIST_PAGE = readFileSync(new URL('../../../v8/scenarios/list.tsx', import.
 const DETAIL_PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('./scenario-detail-client.tsx', import.meta.url), 'utf8')
 
-describe('V6 シナリオ開始完了', () => {
+describe("管理画面 シナリオ開始完了", () => {
   it('開始成功時だけV8の開始完了の帯へ進む', () => {
     // 一覧からの開始は詳細画面で行う（V8 の一覧に開始の口は無い）。
     expect(DETAIL_PAGE).toContain("searchParams.get('started') === '1'")

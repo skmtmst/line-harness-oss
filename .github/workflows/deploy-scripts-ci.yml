@@ -48,6 +48,9 @@ jobs:
       - name: TypeScript typecheck (scripts)
         run: pnpm typecheck:scripts
 
+      - name: Check names and public dependency boundaries
+        run: pnpm exec tsx scripts/structure/check.ts
+
       - name: Shell syntax check
         run: |
           failed=0

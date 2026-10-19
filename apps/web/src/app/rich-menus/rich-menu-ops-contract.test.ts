@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { api } from '@/lib/api'
+import ts from 'typescript'
 import { areaDraftsWithSwitchTargets, mediaToFile } from '../../v8/rich-menus/new/create-draft'
 import { describe,expect,it,vi } from 'vitest'
 
@@ -29,7 +30,13 @@ describe('一覧の検索はボタン名にも当たる', () => {
 /** #899 / N-164: 登録メディアの選択が作成フォームへ戻る */
 describe('作成画面の登録メディア選択', () => {
   it('メディア選択ダイアログを今のアカウントで開き、選択がフォームへ戻る', () => {
-    expect(NEW_PAGE).toContain("import { MediaPickerDialog } from '@/v8/contents/public/media-picker-dialog/index'")
+    const parsedModule = ts.createSourceFile('create.tsx', NEW_PAGE, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const picker = parsedModule.statements.filter(ts.isImportDeclaration).filter(statement => {
+      const bindings = statement.importClause?.namedBindings
+      return bindings && ts.isNamedImports(bindings) && bindings.elements.some(binding => binding.name.text === 'MediaPickerDialog')
+    })
+    expect(picker).toHaveLength(1)
+    expect((picker[0].moduleSpecifier as ts.StringLiteral).text).toBe('@/v8/contents/public/media-picker-dialog/index')
     expect(NEW_PAGE).toContain('accountId={accountId}')
     expect(NEW_PAGE).toContain('onSelect={handlePickedMedia}')
     expect(NEW_PAGE).toContain('setPendingImageAt(imagePickTarget, { file: null, url: null, dims: null, media: item })')

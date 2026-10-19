@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const here = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(new URL('../../../v8/scenarios/create.tsx', import.meta.url), 'utf8')
 
-describe('V6 シナリオ作成・配信方式 cCB7r', () => {
+describe("管理画面 シナリオ作成・配信方式 cCB7r", () => {
   it('既存のシナリオ用フォルダを読み、名前と分類を同じ受け口へ保存する', () => {
     /*
      * SCENARIO-20: フォルダはシナリオ所属（共通なら選択中）のアカウントで

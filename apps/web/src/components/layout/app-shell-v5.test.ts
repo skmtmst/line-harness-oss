@@ -24,7 +24,7 @@ const ALL_ESTIMATED_SAMPLE = [
   { date: '2026-09-20', added: 3, blocked: 0, active: 95, estimated: true },
 ]
 
-describe('Pen.dev V6を共通レイアウトの正本にする', () => {
+describe("Pen.dev 管理画面を共通レイアウトの正本にする", () => {
   const pendingInbox = readFileSync(PENDING_INBOX, 'utf8')
   const friendTrend = readFileSync(FRIEND_TREND, 'utf8')
   const chats = readFileSync(CHATS, 'utf8')

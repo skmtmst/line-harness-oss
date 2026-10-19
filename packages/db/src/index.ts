@@ -634,17 +634,17 @@ export {
   MileageV6Error, getActionScoreBandOverview, getMileageAdjustmentNotificationRecord, getMileageEarningRulesV6, getMileageFriendsV6, getMileageHistoryPeriodSummary,
   getMileageRewardReachMetrics, listPendingMileageGrantNotifications, markMileageAdjustmentNotification, publishMileageEarningRule, reorderMileageEarningRules, reserveMileageAdjustmentNotification,
   saveMileageEarningRuleDraft, validateMileageEarningRuleDraft,
-} from './mileage/admin-operations';
+} from './mileage/admin-operations/index.js';
 export type {
   MileageAdjustmentNotification, MileageAdjustmentNotificationStatus, MileageEarningRuleDraft, MileageEarningRulePublishResult, MileageTargetCondition, PendingMileageGrantNotification,
-} from './mileage/admin-operations';
+} from './mileage/admin-operations/index.js';
 export {
   approveMileageAdjustmentRequest, cancelMileageAdjustmentRequest, confirmPendingMileageEntry, createMileageAdjustmentApprovalRequest, getMileageAdjustmentApprovalRequest, listMileageAdjustmentApprovalRequests,
   rejectMileageAdjustmentRequest, testMileageEarningRuleDraft, voidMileageLedgerEntry,
-} from './mileage/approvals';
+} from './mileage/approvals/index.js';
 export type {
   MileageAdjustmentRequestRow, MileageRuleTestResult,
-} from './mileage/approvals';
+} from './mileage/approvals/index.js';
 export {
   MILEAGE_REWARD_RETRY_KEY_VALIDITY_MS, MileageRedemptionConfirmError, MileageRewardError, claimRedemptionStep, claimRedemptionStepForRecovery, clearRedemptionStepIntent,
   collectBeneficiaryKeysForLimit, createMileageRewardDraft, createMileageRewardDraftFromPublished, findIncompleteMileageRefunds, getMileageRedemption, getMileageReward,
@@ -652,12 +652,12 @@ export {
   isMileageRefundComplete, listMileageRedemptions, listMileageRewards, markRedemptionStepSent, publishMileageReward, recordMileageRedemptionAttempt,
   recoverIncompleteMileageRefunds, refundMileageRewardRedemption, reorderMileageRewards, reserveMileageRewardRedemption, setMileageRewardStatus, updateMileageRewardDraft,
   validateMileageRewardDraft,
-} from './mileage/rewards';
+} from './mileage/rewards/index.js';
 export type {
   MileageRedemptionListItem, MileageRedemptionListStatus, MileageRedemptionStatus, MileageRedemptionStepDelivery, MileageRedemptionStepStatus, MileageRewardAdminOverview,
   MileageRewardDraftInput, MileageRewardFailurePolicy, MileageRewardKind, MileageRewardRedemption, MileageRewardStatus, MileageRewardSummary,
   MileageRewardTargetCondition, MileageRewardVersion, RedemptionStepClaim, RedemptionStepLease,
-} from './mileage/rewards';
+} from './mileage/rewards/index.js';
 export {
   ATTRIBUTION_WINDOW_DAYS, explainAffiliateAttribution, getAttributionDecision, getAttributionDecisionView, recordAttributionDecision, resolveAffiliateAttribution,
 } from './affiliate-attribution';
@@ -861,10 +861,10 @@ export {
   MediaVersionConflictError, MediaVersionIncompatibleError, backfillMediaVersionMetadata, completeNewMediaUpload, createMediaUploadSession, createMediaVersionFromUpload,
   evaluateMediaVersionCompat, failMediaUploadSession, getCurrentMediaVersionNo, getLatestMediaVersion, getMediaStorageQuota, getMediaUploadSession,
   getMediaVersionByNo, getMediaVersionList, verifyMediaUploadSession,
-} from './media/uploads';
+} from './media/uploads/index.js';
 export type {
   MediaMetadata, MediaQuotaState, MediaStorageQuota, MediaUploadSession, MediaVersion, MediaVersionBlocker,
-} from './media/uploads';
+} from './media/uploads/index.js';
 export {
   COMMON_VARS_LIST_LIMIT, COMMON_VAR_TYPES, CommonVarFolderError, CommonVarKeyConflictError, CommonVarReasonRequiredError, CommonVarStatusTransitionError,
   CommonVarVersionConflictError, applyCommonVarReplacementPlan, applyDueCommonVarSchedules, countCommonVars, createCommonVar, createCommonVarSchedule,
@@ -1270,10 +1270,10 @@ export {
 
 export {
   createMileageRewardFolder, listMileageRewardFolders, moveMileageRewardToFolder, reorderMileageRewardFolders,
-} from './mileage/reward-folders';
+} from './mileage/reward-folders/index.js';
 export type {
   MileageRewardFolder,
-} from './mileage/reward-folders';
+} from './mileage/reward-folders/index.js';
 
 export {
   reorderBookingMenus,

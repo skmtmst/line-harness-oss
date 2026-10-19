@@ -87,7 +87,7 @@ describe('ダイアログの桃箱', () => {
     expect(html.indexOf('書き出しが止まります。')).toBeGreaterThan(html.indexOf('data-qa-dialog-callout'))
   })
 
-  it('桃箱は v8 だけで桃色（v7 は変えない）', () => {
+  it("桃箱は v8 だけで桃色（既存の見た目は変えない）", () => {
     expect(css).toMatch(/:root \.calloutDanger\s*\{[^}]*background:\s*var\(--color-danger-bg\)/s)
     expect(css).toMatch(/:root \.calloutDanger \.description\s*\{[^}]*color:\s*var\(--color-danger\)/s)
   })

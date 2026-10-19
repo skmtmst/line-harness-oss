@@ -7,7 +7,7 @@ import { api,ApiError } from '@/lib/api'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { AutoReply,PendingToggle } from './list-model'
 
-type toggleAutoReplyContext = {
+type ToggleAutoReplyContext = {
   listContextKey: string
   load: () => Promise<void>
   pendingToggle: PendingToggle | null
@@ -23,7 +23,7 @@ type toggleAutoReplyContext = {
   toggleReason: string
 }
 
-export function toggleAutoReply({ listContextKey, load, pendingToggle, rules, saveErrors, selectedAccountId, selectedAccountIdRef, setOptimisticRows, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, toggleReason }: toggleAutoReplyContext, target = pendingToggle) {
+export function toggleAutoReply({ listContextKey, load, pendingToggle, rules, saveErrors, selectedAccountId, selectedAccountIdRef, setOptimisticRows, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, toggleReason }: ToggleAutoReplyContext, target = pendingToggle) {
     if (!target) return
     if (target.accountId !== selectedAccountId) {
       setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')

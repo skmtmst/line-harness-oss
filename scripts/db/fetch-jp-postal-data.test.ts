@@ -15,7 +15,7 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const script = join(here, 'fetch-jp-postal-data.mjs');
-const fixture = join(here, 'test-data', 'jp-postal-sample.csv');
+const fixture = join(here, '..', 'test-data', 'jp-postal-sample.csv');
 
 describe('日本郵便の取込手順（外部通信なし・fixtureで検証）', () => {
   it('無関係文字の除去で有効化しない', () => {

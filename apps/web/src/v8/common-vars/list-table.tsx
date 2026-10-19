@@ -26,7 +26,7 @@ import type { Dispatch,SetStateAction } from 'react'
 import { formatListDate,formatVarValue } from './list-model'
 import styles from './list.module.css'
 
-type renderCommonVarListContext = {
+type RenderCommonVarListContext = {
   accountLoading: boolean
   activeId: string | null
   allOnPageSelected: boolean
@@ -57,7 +57,7 @@ type renderCommonVarListContext = {
   toggle: (id: string) => void
 }
 
-export function renderCommonVarList({ accountLoading, activeId, allOnPageSelected, canWrite, clearVarFilters, contextItem, contextMenuItems, current, error, filtered, folderDotOf, items, listFailed, listFailure, load, loading, narrow, openMenuId, prepareRemoveSelected, rowMenuItems, selected, selectedAccountId, setActiveId, setContextId, setOpenMenuId, setSelected, someOnPageSelected, toggle }: renderCommonVarListContext) {
+export function renderCommonVarList({ accountLoading, activeId, allOnPageSelected, canWrite, clearVarFilters, contextItem, contextMenuItems, current, error, filtered, folderDotOf, items, listFailed, listFailure, load, loading, narrow, openMenuId, prepareRemoveSelected, rowMenuItems, selected, selectedAccountId, setActiveId, setContextId, setOpenMenuId, setSelected, someOnPageSelected, toggle }: RenderCommonVarListContext) {
   return (accountLoading || (loading && items.length === 0 && !listFailed) ? (
     <div className={styles.skeletonRows} aria-label="読み込み中">
         {[0, 1, 2, 3].map((n) => (

@@ -43,7 +43,7 @@ export { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 /* はじめの質問の窓（xxpM9 ほか）も開くまで読まない。 */
 const EcSummary = dynamic(() => import('./ec-summary'))
 
-const StyleSetupWizard = dynamic(() => import('@/v8/onboarding/wizard').then((module) => module.default))
+const StyleSetupWizard = dynamic(() => import('../onboarding/wizard/index').then((module) => module.default))
 
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,

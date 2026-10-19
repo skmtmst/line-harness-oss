@@ -5,7 +5,7 @@ import { api,ApiError } from '@/lib/api'
 import type { MediaDeleteImpact,MediaItem } from '@line-crm/shared'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
-type deleteMediaItemContext = {
+type DeleteMediaItemContext = {
   deleteBusy: boolean
   deleteRequestRef: RefObject<number>
   deleting: MediaItem | null
@@ -22,7 +22,7 @@ type deleteMediaItemContext = {
   setImpactPhase: Dispatch<SetStateAction<"error" | "idle" | "loading" | "ready">>
 }
 
-export async function deleteMediaItem({ deleteBusy, deleteRequestRef, deleting, impactRequestRef, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, setDeleteBusy, setDeleteError, setDeleting, setImpact, setImpactPhase }: deleteMediaItemContext) {
+export async function deleteMediaItem({ deleteBusy, deleteRequestRef, deleting, impactRequestRef, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, setDeleteBusy, setDeleteError, setDeleting, setImpact, setImpactPhase }: DeleteMediaItemContext) {
     if (!deleting || !selectedAccountId || deleteBusy) return
     const accountAtRequest = selectedAccountId
     const mediaIdAtRequest = deleting.id

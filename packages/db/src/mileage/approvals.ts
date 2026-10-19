@@ -1,4 +1,4 @@
-import { postMileageAdjustment } from './index.js';
+import { postMileageAdjustment } from './adjustments-post.js';
 import type { MileageLedgerEntry, MileageRuleRow } from './types.js';
 import { matchesCondition, parseCondition } from '../segment-conditions.js';
 import { dbTableExists, jstNow } from '../utils.js';

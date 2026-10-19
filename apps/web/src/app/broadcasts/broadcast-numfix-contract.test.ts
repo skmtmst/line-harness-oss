@@ -31,7 +31,7 @@ describe('一斉配信の数字合わせ', () => {
     expect(CSS).toMatch(/\.table th:last-child,\s*\.table td:last-child \{ padding-right: var\(--tpl-bc-edge-pad\)/)
   })
 
-  it('名前は12px・黒・700（B-207）', () => {
+  it("名前は12px・黒・700", () => {
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-size: var\(--text-label\)/)
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-weight: 700/)
     expect(CSS).toMatch(/\.cellTitle \{[^}]*color: var\(--color-ink\)/)

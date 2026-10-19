@@ -20,7 +20,7 @@ import { ChevronDown, Database, Upload } from 'lucide-react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { FRIENDS_MERGED_TABS } from '../../v8/friends/friends-tabs'
+import { FRIENDS_MERGED_TABS } from '../../v8/friends/friends-tabs/index'
 import styles from './friends-v8.module.css'
 
 /** メニューの組に出す短い説明（Pencil `XWrGf` の文言）。 */

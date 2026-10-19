@@ -24,7 +24,7 @@ Users
 import type { Dispatch,JSX,SetStateAction } from 'react'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
-type renderHqAudienceStepContext = {
+type RenderHqAudienceStepContext = {
   audience: "all" | "tag" | "none" | "targeted"
   defaultOpen: boolean
   host: RichMenuCreateHost | undefined
@@ -34,7 +34,7 @@ type renderHqAudienceStepContext = {
   setHqTagName: Dispatch<SetStateAction<string>>
 }
 
-export function renderHqAudienceStep({ audience, defaultOpen, host, hqTagName, setAudience, setDefaultOpen, setHqTagName }: renderHqAudienceStepContext) {
+export function renderHqAudienceStep({ audience, defaultOpen, host, hqTagName, setAudience, setDefaultOpen, setHqTagName }: RenderHqAudienceStepContext) {
     if (!host) return null
     return (
       <>
@@ -109,7 +109,7 @@ export function renderHqAudienceStep({ audience, defaultOpen, host, hqTagName, s
     )
   }
 
-type renderAudienceStepContext = {
+type RenderAudienceStepContext = {
   aggregateOnly: boolean
   audience: "all" | "tag" | "none" | "targeted"
   canOperate: boolean
@@ -133,7 +133,7 @@ type renderAudienceStepContext = {
   targetingPriority: number
 }
 
-export function renderAudienceStep({ aggregateOnly, audience, canOperate, conditionCount, conditionEmpty, conditionUnsaved, currentDefaultMenu, defaultOpen, editGroupId, host, orderRows, renderHqAudience, setAudience, setDefaultOpen, setPriorityInput, setPriorityOpen, setTargetingCondition, setTargetingPriority, targetedMenus, targetingCondition, targetingPriority }: renderAudienceStepContext) {
+export function renderAudienceStep({ aggregateOnly, audience, canOperate, conditionCount, conditionEmpty, conditionUnsaved, currentDefaultMenu, defaultOpen, editGroupId, host, orderRows, renderHqAudience, setAudience, setDefaultOpen, setPriorityInput, setPriorityOpen, setTargetingCondition, setTargetingPriority, targetedMenus, targetingCondition, targetingPriority }: RenderAudienceStepContext) {
     if (host) return renderHqAudience()
     return (
       <>

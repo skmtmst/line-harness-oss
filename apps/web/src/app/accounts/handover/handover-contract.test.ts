@@ -18,7 +18,7 @@ const PAGE = readFileSync(join(HERE, '../../../v8/accounts-detail/handover.tsx')
  *
  * 実 API の事前確認結果を読み、合計が一致した値だけを表示する。
  */
-describe('V6 33-4 乗り換え・引き継ぎ', () => {
+describe("管理画面 33-4 乗り換え・引き継ぎ", () => {
   it('設計の5段を持つ', () => {
     expect(HANDOVER_PILLS).toEqual([
       '引き継ぎコード', '事前確認', '要確認を決める', '本実行',

@@ -13,7 +13,7 @@ const EDIT_PAGE = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
 const API = readApiSource(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const WORKER = readImplementationSource(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'contents.ts'))
 
-describe('V6共通情報一覧', () => {
+describe("管理画面共通情報一覧", () => {
   it('次回予約は一覧APIで受け取り、行ごとのAPI呼出をしない', () => {
     expect(PAGE).toContain('item.nextSchedule')
     expect(PAGE).not.toContain('api.commonVars.schedules(item.id)')

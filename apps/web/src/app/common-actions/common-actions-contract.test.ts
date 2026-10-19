@@ -21,7 +21,7 @@ const API = readApi('..', '..', 'lib', 'api.ts')
 const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'features', 'automations', 'automation-engine.ts')
 const FOUNDATION = read('..', '..', '..', '..', '..', 'packages', 'db', 'migrations', '181_automation_v6_foundation.sql')
 
-describe('V6共通アクションの画面契約', () => {
+describe("管理画面共通アクションの画面契約", () => {
   it('一覧・空・読込・失敗と、名前で分かる遷移を持つ', () => {
     expect(LIST).toContain('共通アクションを読み込んでいます')
     expect(LIST).toContain('まだ、共通アクションはありません')
@@ -173,7 +173,7 @@ describe('V6共通アクションの画面契約', () => {
   })
 })
 
-describe('V6共通アクションの機能契約', () => {
+describe("管理画面共通アクションの機能契約", () => {
   it('画面操作を読み書きAPIへ接続する', () => {
     for (const method of ['resources:', 'list:', 'get:', 'create:', 'duplicate:', 'updateDraft:', 'createDraft:', 'publish:', 'updateBinding:']) {
       expect(API).toContain(method)

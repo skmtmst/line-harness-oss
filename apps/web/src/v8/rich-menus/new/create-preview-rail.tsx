@@ -21,7 +21,7 @@ import { MenuContent,MetricValue } from './create-preview'
 import { type Group,type Page } from './create-types'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
-type renderMenuLinePreviewContext = {
+type RenderMenuLinePreviewContext = {
   activePage: Page
   chatBarText: string
   group: Group | null
@@ -34,7 +34,7 @@ type renderMenuLinePreviewContext = {
   size: "large" | "compact"
 }
 
-export function renderMenuLinePreview({ activePage, chatBarText, group, host, previewAreas, previewImageUrl, previewPage, previewPages, selectedAccount, size }: renderMenuLinePreviewContext) {
+export function renderMenuLinePreview({ activePage, chatBarText, group, host, previewAreas, previewImageUrl, previewPage, previewPages, selectedAccount, size }: RenderMenuLinePreviewContext) {
     return (
       <LinePreview
         accountName={host ? '公式アカウント' : selectedAccount?.name}
@@ -53,7 +53,7 @@ export function renderMenuLinePreview({ activePage, chatBarText, group, host, pr
     )
   }
 
-type renderPreviewRailContext = {
+type RenderPreviewRailContext = {
   activePage: Page
   audience: "all" | "tag" | "none" | "targeted"
   conditionEmpty: boolean
@@ -75,7 +75,7 @@ type renderPreviewRailContext = {
   totalAreaCount: number
 }
 
-export function renderPreviewRail({ activePage, audience, conditionEmpty, conditionUnsaved, configuredCount, currentDefaultMenu, group, host, hqPreview, pages, previewImageUrl, renderLinePreview, selectedArea, step, tabCount, targetPreview, targetPreviewError, targetPreviewLoading, totalAreaCount }: renderPreviewRailContext, inDialog = false) {
+export function renderPreviewRail({ activePage, audience, conditionEmpty, conditionUnsaved, configuredCount, currentDefaultMenu, group, host, hqPreview, pages, previewImageUrl, renderLinePreview, selectedArea, step, tabCount, targetPreview, targetPreviewError, targetPreviewLoading, totalAreaCount }: RenderPreviewRailContext, inDialog = false) {
     return (
       <>
         {step === 'shape' ? (

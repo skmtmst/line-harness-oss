@@ -4,7 +4,7 @@ import type { Env } from '../../worker-env.js';
 import { requirePermission } from '../../middleware/role-guard.js';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { logger } from '@line-crm/shared/server';
-import { BookingPhotoError, bookingPhoto, getBookingPhotos, readPhotoId, readStorePhotos, saveBookingPhoto, saveBookingStorePhotos, storePhotoVisibility } from '../../services/booking-photos.js';
+import { BookingPhotoError, bookingPhoto, getBookingPhotos, readPhotoId, readStorePhotos, saveBookingPhoto, saveBookingStorePhotos, storePhotoVisibility } from '../../features/booking/booking-photos/index.js';
 import { resolveAccountIdAdmin, resolveAccountIdFromLiff } from './identity.js';
 
 function origin(c: Context<Env>): string {

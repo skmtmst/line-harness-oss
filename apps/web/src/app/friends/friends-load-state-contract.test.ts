@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const TABLE = readFileSync(new URL('../../components/friends/friend-list-table.tsx', import.meta.url), 'utf8')
 
-describe('V6 友だち一覧の読込状態', () => {
+describe("管理画面 友だち一覧の読込状態", () => {
   it('読込・成功・失敗を別の状態として持つ', () => {
     expect(PAGE).toContain("type LoadStatus = 'loading' | 'ready' | 'error'")
     expect(PAGE).toContain("setLoadStatus('loading')")

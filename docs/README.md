@@ -595,3 +595,5 @@
 - [コードの構成と名前](code-structure.md)
 
 - [構成と接続の整理の更新履歴](release-log/unreleased/0000-kenta-cleanup-s02z.md)
+
+- [構成と接続の整理の検査記録](qa/cleanup-s02z-1020.md)

@@ -29,7 +29,7 @@ import scanVisualState from './visual-state-browser.mjs'
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8')
 const css = name => read(`../../src/components/shared/${name}.module.css`).replace(/:global\(([^)]+)\)/g, '$1')
 
-test('B-191: list placeholders remain readable at both widths; fixed-width regression is detected', async () => {
+test("list placeholders remain readable at both widths; fixed-width regression is detected", async () => {
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()

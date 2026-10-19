@@ -13,7 +13,7 @@ const BULK = readFileSync(new URL('../../v8/inflow-links/bulk-dialog.tsx', impor
  * 素の前後ボタン・素のTailwind色を共通部品とトークンへ寄せたことも、
  * ここで止める。
  */
-describe('V6 流入経路一覧の契約', () => {
+describe("管理画面 流入経路一覧の契約", () => {
   it('共通フォルダ欄の統一幅を使い、追加ボタンを欄内だけに置く', () => {
     expect(PAGE).toContain('folders={<>')
     expect(PAGE).toContain('<ListPage')

@@ -33,11 +33,11 @@ export const RulesTabV8 = memo(dynamic(() => import('./tabs/rules-tab').then((mo
   loading: () => <SkeletonRows rows={7} />,
   ssr: false,
 }))
-export const PaymentsTabV8 = memo(dynamic(() => import('../booking-payments/payments-tab').then((module) => module.PaymentsTabV8), {
+export const PaymentsTabV8 = memo(dynamic(() => import('../booking-payments/payments-tab/index').then((module) => module.PaymentsTabV8), {
   loading: () => <SkeletonRows rows={7} />,
   ssr: false,
 }))
-export const PaymentsSideV8 = memo(dynamic(() => import('../booking-payments/payments-side'), {
+export const PaymentsSideV8 = memo(dynamic(() => import('../booking-payments/payments-side/index'), {
   loading: () => <SkeletonRows rows={5} />,
   ssr: false,
 }))

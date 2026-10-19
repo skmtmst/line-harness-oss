@@ -18,7 +18,7 @@ const brightnessOf = (token: string) => Number(globals.match(new RegExp(`${token
  * 管理画面 の沈み（0.98・80ms）は変えない。
  */
 describe('押した感じ（V8 のボタン・絵ボタン）', () => {
-  it('B-151：主ボタンは高さ36を保ち、墨色の影・濃緑の縁・角丸8を使う', () => {
+  it("主ボタンは高さ36を保ち、墨色の影・濃緑の縁・角丸8を使う", () => {
     expect(globals).toContain('--shadow-primary-action: var(--card-shadow)')
     expect(globals).toContain('--card-shadow: 0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)')
     expect(globals).toContain('--color-primary-border: #06612f')

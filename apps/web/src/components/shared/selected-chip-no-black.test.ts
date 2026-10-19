@@ -45,7 +45,7 @@ describe('選んだ札6か所は白＋緑（黒をなくす #4）', () => {
     expect(rule).toMatch(/color:\s*var\(--color-canvas\)/)
   })
 
-  it('共通のV8札は10-11固定版とB-211の薄い緑・緑の枠と文字に合わせる', () => {
+  it("共通のV8札は10-11固定版との薄い緑・緑の枠と文字に合わせる", () => {
     const css = readFileSync(join(HERE, 'filter-chip.css'), 'utf8')
     const rule = selectedRule(css, /:root \.v6-filter-chip\[aria-pressed='true'\] \{[^}]*\}/s, 'shared')
     expect(rule).toMatch(/background:\s*var\(--color-selection-bg\)/)

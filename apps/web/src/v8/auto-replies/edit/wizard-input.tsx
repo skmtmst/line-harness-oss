@@ -18,7 +18,7 @@ AutoReplyDraftInput
 import { validateFlexContent } from '@line-crm/shared';
 import { InputIssue,WizardForm,readLineImageContent } from './wizard-model';
 
-type buildWizardInputContext = {
+type BuildWizardInputContext = {
   accounts: AccountWithStats[]
   form: WizardForm
   matchedAccountId: string | null
@@ -26,7 +26,7 @@ type buildWizardInputContext = {
   templates: { id: string; name: string; messageType: string; messageContent: string; folderId?: string | null; updatedAt?: string; }[]
 }
 
-export function buildWizardInput({ accounts, form, matchedAccountId, selectedAccountId, templates }: buildWizardInputContext): AutoReplyDraftInput | InputIssue {
+export function buildWizardInput({ accounts, form, matchedAccountId, selectedAccountId, templates }: BuildWizardInputContext): AutoReplyDraftInput | InputIssue {
     const effectiveRules = form.keywordRules.filter((rule) => rule.keyword.trim() !== '')
     const firstKeyword = effectiveRules[0]?.keyword.trim() ?? ''
     if (!form.respondToAll && !firstKeyword) {

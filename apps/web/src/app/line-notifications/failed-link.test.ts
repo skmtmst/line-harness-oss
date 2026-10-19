@@ -6,7 +6,7 @@ import { canOpenCustomerNotificationKpi, customerNotificationKpis } from '@/v8/s
 const PAGE = readFileSync(join(__dirname, '../../v8/settings/line-notifications/screen.tsx'), 'utf8')
 
 /** 「送れなかった」から対応一覧へ渡す（設計 `festr`）。 */
-describe('V6 LINE通知（festr）', () => {
+describe("管理画面 LINE通知（festr）", () => {
   it('送れなかった帯から、対応一覧へ渡す', () => {
     /*
       数を出すだけで終わらせない。「要確認 2件」と言われても、

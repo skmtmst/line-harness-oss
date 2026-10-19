@@ -1,4 +1,4 @@
-import { BUNDLE_VERSION, GIT_COMMIT, RELEASED_AT } from '../_version.js';
+import { BUNDLE_VERSION, GIT_COMMIT, RELEASED_AT } from '../release-version.js';
 
 /** 配備で渡す公開情報だけを選ぶ。環境変数の一覧は返さない。 */
 export type BuildBindings = {

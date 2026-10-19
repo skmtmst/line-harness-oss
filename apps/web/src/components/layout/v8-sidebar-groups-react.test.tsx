@@ -310,7 +310,7 @@ describe('統括の左メニューを出す住所', () => {
 })
 
 
-describe('B-368 本番の入口', () => {
+describe("本番の入口", () => {
   afterEach(() => vi.unstubAllEnvs())
   it('Google と飲食店の入口を残し、飲食店を押すと共通の窓を出す', async () => {
     vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')

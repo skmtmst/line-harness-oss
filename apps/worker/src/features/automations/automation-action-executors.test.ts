@@ -129,6 +129,28 @@ describe('オートメーションの既存処理接続', () => {
     ).get(result.runId)).toEqual({ error_code: 'tag_not_found' });
   });
 
+  it('タグを保存した後、同じ店舗と安定キーでイベントを渡し、深さ3では再発火しない', async () => {
+    testDb.raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`).run();
+    const emitEvent = vi.fn(async () => undefined);
+    const executors = createAutomationActionExecutors({ emitEvent });
+    const action = { id: 'tag', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' as const };
+    const result = await execute(testDb, { accountId: 'account-1', friendId: 'friend-1', action, executors });
+    expect(result.status).toBe('success');
+    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(emitEvent).toHaveBeenCalledWith(testDb.db, 'tag_change', expect.objectContaining({
+      friendId: 'friend-1', sourceEventId: expect.stringMatching(/^automation-tag:/), sourceKind: 'automation',
+      eventData: { tagId: 'tag-1', action: 'add', automationDepth: 1 },
+    }), undefined, 'account-1');
+    const context = {
+      db: testDb.db, runId: 'run', lineAccountId: 'account-1', automationId: 'automation', automationVersionId: 'version',
+      friendId: 'friend-1', sourceEventId: 'source', inputEvent: { automationDepth: 3 }, action,
+      stepExecutionId: 'step', idempotencyKey: 'stable-key', attemptNumber: 1, commonActionVersionId: null, isTest: false,
+    };
+    await executors.add_tag(context);
+    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare('SELECT friend_id, tag_id FROM friend_tags').all()).toEqual([{ friend_id: 'friend-1', tag_id: 'tag-1' }]);
+  });
+
   it('対応マークを変更し、変更前後と自動変更の根拠を監査へ残す', async () => {
     testDb.raw.prepare(
       `INSERT INTO support_marks (id, name, color) VALUES ('mark-working', '対応中', '#3B82F6')`,

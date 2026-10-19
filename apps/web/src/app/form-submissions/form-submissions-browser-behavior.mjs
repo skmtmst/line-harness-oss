@@ -15,7 +15,7 @@ import { createServer } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { chromium } from '@playwright/test'
-import { waitForOverlayLayout } from '../../../../../scripts/codex/overlay-ready.mjs'
+import { waitForOverlayLayout } from '../../../../../scripts/browser/overlay-ready.mjs'
 
 /*
  * #1060: 一覧の絞り込み・並び替えは Worker が済ませて1ページ分だけ返す。

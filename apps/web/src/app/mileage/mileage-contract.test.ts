@@ -18,7 +18,7 @@ const SEGMENT = readFileSync(join(HERE, '..', '..', 'lib', 'segment-condition.ts
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const MENU = readFileSync(join(HERE, '..', '..', 'lib', 'menu.ts'), 'utf8')
 
-describe('V6 マイルの正本URLと概念分離', () => {
+describe("管理画面 マイルの正本URLと概念分離", () => {
   it('マイルの正本を /mileage にし、旧URLを恒久転送する', () => {
     expect(MENU).toContain("{ href: '/mileage', label: 'マイル'")
     expect(LEGACY).toContain("permanentRedirect('/mileage')")
@@ -71,7 +71,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(PAGE).not.toContain('<option value="all">全アカウント横断</option>')
   })
 
-  it('一覧の読込・空・失敗を言い分け、失効値をV6の口から表示する', () => {
+  it("一覧の読込・空・失敗を言い分け、失効値を管理画面の口から表示する", () => {
     expect(PAGE).toContain('kind="loading"')
     expect(PAGE).toContain('kind="empty"')
     expect(PAGE).toContain('kind="error"')
@@ -99,7 +99,7 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(FRIEND_DETAIL).toContain('setAdjustmentOpen(true)')
   })
 
-  it('V6の一覧契約を読み、既存の更新APIから停止と再開を操作できる', () => {
+  it("管理画面の一覧契約を読み、既存の更新APIから停止と再開を操作できる", () => {
     expect(PAGE).toContain('api.mileage.earningRulesV6')
     expect(PAGE).toContain("updateRule(rule.id, { isActive: next === 'published' })")
     expect(PAGE).toContain("active ? '止める' : '再開する'")

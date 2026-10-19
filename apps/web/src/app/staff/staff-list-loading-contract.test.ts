@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const directory = dirname(fileURLToPath(import.meta.url))
 const staffSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
 
-describe('V6 30 一覧の読み方(#572 #515中2)', () => {
+describe("管理画面 30 一覧の読み方", () => {
   it('入った記録は「入った記録」タブでだけ読む', () => {
     // 親の先読みと表の再取得の二重取りをやめる。
     expect(staffSource).toContain("if (tab !== 'audit') return")

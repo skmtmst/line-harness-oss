@@ -1018,7 +1018,7 @@ export async function processFriendBulkRun(
   const approval = await getBulkMessageApproval(db, runId);
   if (approval && !['approved', 'confirmed'].includes(approval.status)) return { processed: 0, status: run.status };
   if (approval?.status === 'confirmed') {
-    const { countActiveOperators } = await import('../broadcasts/broadcast-approval.js');
+    const { countActiveOperators } = await import('../broadcasts/broadcast-approval/index.js');
     if (await countActiveOperators(db) > 1) {
       await db.prepare(`UPDATE friend_bulk_message_approvals SET status = 'pending', decided_by = NULL,
         decided_at = NULL, confirmed_count = NULL WHERE run_id = ? AND status = 'confirmed'`).bind(runId).run();

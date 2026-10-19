@@ -18,11 +18,11 @@ import type { Dispatch,SetStateAction } from 'react'
 import { TYPE_LABELS,formatScheduleTime } from './broadcast-form-model'
 import styles from './broadcast-form-v8.module.css'
 import { type TestSendView } from './test-send-view'
-const TemplateRichEditor = dynamic(() => import('@/v8/template-edit/rich'))
-const TemplateRichVideoEditor = dynamic(() => import('@/v8/template-edit/rich-video'))
-const CarouselV8 = dynamic(() => import('@/v8/templates/carousel'))
+const TemplateRichEditor = dynamic(() => import('../../v8/template-edit/rich/index'))
+const TemplateRichVideoEditor = dynamic(() => import('../../v8/template-edit/rich-video/index'))
+const CarouselV8 = dynamic(() => import('../../v8/templates/carousel/index'))
 
-type renderBroadcastEditorDialogsContext = {
+type RenderBroadcastEditorDialogsContext = {
   ab: ReturnType<typeof useBroadcastAb>
   approvalConfigState: "loading" | "error" | "ready" | "idle"
   approvalCountInput: string
@@ -73,7 +73,7 @@ type renderBroadcastEditorDialogsContext = {
   unconfirmedCount: number | null
 }
 
-export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, preflight, previewConfirmed, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, title, trackLinks, unconfirmedCount }: renderBroadcastEditorDialogsContext) {
+export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, preflight, previewConfirmed, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, title, trackLinks, unconfirmedCount }: RenderBroadcastEditorDialogsContext) {
   return (<><div data-design-node="FpgxH">
       <ConfirmDialog
         open={confirmOpen && needsApprovalSingle}

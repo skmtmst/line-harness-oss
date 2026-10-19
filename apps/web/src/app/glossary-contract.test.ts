@@ -42,7 +42,7 @@ const BANNED: Array<{ use: string; avoid: RegExp; why: string }> = [
   { use: 'アカウント', avoid: /アカ(?![ウ])/, why: '省略語を開く' },
 ]
 
-describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
+describe("用語表（管理画面 §7 48番の表記ゆれ潰し）", () => {
   for (const { use, avoid, why } of BANNED) {
     it(`画面には「${use}」を出す（${why}）`, () => {
       const hits = FILES.filter((f) => avoid.test(f.s)).map((f) => f.p)

@@ -12,7 +12,7 @@ const CSS = readFileSync(resolve(__dirname, "../../v8/conversions/list.module.cs
 const TOKENS = readFileSync(resolve(__dirname, "../globals.css"), "utf-8");
 
 describe("conversions 一覧の板の数字", () => {
-  it("B-217 の平らな表は共通部品に寸法を渡し、画面からセルを上書きしない", () => {
+  it("共通部品の平らな表は共通部品に寸法を渡し、画面からセルを上書きしない", () => {
     const listCells = PAGE.split("<tbody").at(-1)!.split("</tbody>")[0];
     expect(listCells).toContain('<Td');
     expect(PAGE).toContain("padding: '0 var(--tpl-list-inset)'");

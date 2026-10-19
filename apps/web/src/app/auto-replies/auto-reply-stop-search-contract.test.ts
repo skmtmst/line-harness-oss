@@ -110,7 +110,7 @@ describe('機能08 点検: 一覧検索（N-087）', () => {
 })
 
 describe('機能08 点検: どんなときに動くか列（N-088）', () => {
-  it('B-194：名前は1行にし、実情報の要約と全条件は詳細パネルに残す', () => {
+  it("名前は1行にし、実情報の要約と全条件は詳細パネルに残す", () => {
     expect(PAGE).toContain('triggerSummary(panelRow)')
     expect(PAGE).toContain('conditionChips(panelRow)')
   })

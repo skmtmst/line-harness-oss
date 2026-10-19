@@ -40,7 +40,7 @@ test('同じ結果の2000件判定は、読む端末のCI環境変数で50/65ms�
  } finally {rmSync(dir,{recursive:true,force:true})}
 })
 
-test('列車17と共通入口が超過と測定不正を区別し、CLIの超過は表を出して終了0にする',()=>{
+test("速度の判定と共通入口が超過と測定不正を区別し、CLIの超過は表を出して終了0にする",()=>{
  const dir=mkdtempSync(join(tmpdir(),'speed-train17-report-'))
  try {
   const path=join(dir,'speed.json'),summary=join(dir,'summary.md')

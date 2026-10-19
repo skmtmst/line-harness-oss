@@ -11,7 +11,7 @@ import { parseStoredCondition,projectAreaForDraft } from './create-draft'
 import { V8_LAYOUT_KEYS } from './create-options'
 import { type Group,type Page } from './create-types'
 
-type hydrateMenuDraftContext = {
+type HydrateMenuDraftContext = {
   host: RichMenuCreateHost | undefined
   setActivePageId: Dispatch<SetStateAction<string | null>>
   setAudience: Dispatch<SetStateAction<"all" | "tag" | "none" | "targeted">>
@@ -30,7 +30,7 @@ type hydrateMenuDraftContext = {
   setTemplateKey: Dispatch<SetStateAction<string>>
 }
 
-export function hydrateMenuDraft({ host, setActivePageId, setAudience, setBaselineSignature, setChatBarText, setDefaultOpen, setFolderId, setGroup, setName, setPages, setSelectedAreaId, setSize, setTabCount, setTargetingCondition, setTargetingPriority, setTemplateKey }: hydrateMenuDraftContext, g: Group) {
+export function hydrateMenuDraft({ host, setActivePageId, setAudience, setBaselineSignature, setChatBarText, setDefaultOpen, setFolderId, setGroup, setName, setPages, setSelectedAreaId, setSize, setTabCount, setTargetingCondition, setTargetingPriority, setTemplateKey }: HydrateMenuDraftContext, g: Group) {
     setGroup(g)
     setSize(g.size)
     setTabCount(Math.max(0, g.pages.length - 1))

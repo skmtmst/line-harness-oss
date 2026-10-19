@@ -35,7 +35,7 @@ function violations(path: string, source: string): string[] {
   return errors
 }
 
-describe('B-177: 全V8画面の行き先の見張り', () => {
+describe("全V8画面の行き先の見張り", () => {
   it('↗はhrefで開き、複製の窓を再導入しない', () => {
     expect(targets.flatMap(path => violations(path, readFileSync(path, 'utf8')))).toEqual([])
   })

@@ -88,7 +88,7 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
     expect(PAGE).toContain("if (outcome.kind === 'stale' || generation !== loadGeneration.current) return")
   })
 
-  it('load()の再開点も、世代だけでなく選択中accountを見る（4経路で形をそろえる）', () => {
+  it("loadの再開点も、世代だけでなく選択中accountを見る（4経路で形をそろえる）", () => {
     // 保存・公開・テスト送信と同じ形。世代だけでは、切替の描画コミット後・
     // 次のload発火前の隙間で前アカウントの一覧応答を見分けられない。
     expect(PAGE).toContain('const stale = () => generation !== loadGeneration.current || selectedAccountId !== selectedAccountRef.current')

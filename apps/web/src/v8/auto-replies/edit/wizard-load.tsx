@@ -5,7 +5,7 @@ import { ApiError,api } from '@/lib/api';
 import type { Dispatch,RefObject,SetStateAction } from 'react';
 import { EMPTY_FORM,InputIssue,LoadState,WizardForm,formFromSettings } from './wizard-model';
 
-type loadWizardDraftContext = {
+type LoadWizardDraftContext = {
   autoReplyId: string | null
   creationAccountId: string | null
   savedSnapshotRef: RefObject<string>
@@ -25,7 +25,7 @@ type loadWizardDraftContext = {
   setWasPublished: Dispatch<SetStateAction<boolean>>
 }
 
-export async function loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setFolders, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setVersionNumber, setWasPublished }: loadWizardDraftContext) {
+export async function loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setFolders, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setVersionNumber, setWasPublished }: LoadWizardDraftContext) {
     setLoadState('loading')
     setLoadError(null)
     setInputIssue(null)

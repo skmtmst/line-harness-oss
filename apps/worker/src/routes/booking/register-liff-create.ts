@@ -64,7 +64,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   if((body as Record<string,unknown>).routing_token!==undefined){if(body.routingToken!==undefined&&body.routingToken!==(body as Record<string,unknown>).routing_token)return c.json({error:'routing_token_invalid'},400);body.routingToken=String((body as Record<string,unknown>).routing_token);}
   if(body.recurrence!==undefined||body.members!==undefined){
     const friend=await resolveFriendId(c,callerLineUserId,accountId);if(!friend)return c.json({error:'friend_not_found'},404);
-    const {createBulkBooking}=await import('../../features/booking/booking-bulk.js');return createBulkBooking(c,accountId,friend,body as Record<string,unknown>);
+    const {createBulkBooking}=await import('../../features/booking/booking-bulk/index.js');return createBulkBooking(c,accountId,friend,body as Record<string,unknown>);
   }
   try { await assertPassRequirement(c.env.DB,accountId,body.menu_id,body.entitlement_id); } catch(e) { if(e instanceof EntitlementError)return c.json({error:e.code},e.status);throw e; }
   if (body.entitlement_id !== undefined && (typeof body.entitlement_id !== 'string' || !body.entitlement_id)) return inputError(c,{error:'invalid_entitlement_id'},400,['entitlement_id']);

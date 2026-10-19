@@ -16,7 +16,7 @@ import { insertedLabels } from './insert-chips';
 import { RuleRow,WizardForm,WizardStep } from './wizard-model';
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
-type renderWizardPreviewContext = {
+type RenderWizardPreviewContext = {
   acknowledged: Set<string>
   autoReplyId: string | null
   conflicts: AutoReplyConflict[]
@@ -37,7 +37,7 @@ type renderWizardPreviewContext = {
   triggerSamples: { text: string; hit: boolean; }[]
 }
 
-export function renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged, step, testMessage, triggerSamples }: renderWizardPreviewContext, withPhone: boolean) { return (<>
+export function renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged, step, testMessage, triggerSamples }: RenderWizardPreviewContext, withPhone: boolean) { return (<>
           {step === 'basic' && (
             <CreateSummaryCard rows={[
               { label: '状態', value: '停止中' },

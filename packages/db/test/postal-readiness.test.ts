@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { getPostalReadiness, searchPostalCodes } from '../src/postal-codes.js';
-import { buildImportSql } from '../../../scripts/fetch-jp-postal-data.mjs';
+import { buildImportSql } from '../../../scripts/db/fetch-jp-postal-data.mjs';
 
 function asD1(sqlite: Database.Database): D1Database {
   return {

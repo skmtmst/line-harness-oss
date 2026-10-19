@@ -110,7 +110,7 @@ function candidates(): Candidate[] {
 
 const all = candidates()
 
-describe('B-168 カードの角丸・枠・影', () => {
+describe("カードの角丸・枠・影", () => {
   it('カードの角丸と枠を持つ規則には共通の影がある（理由つきの非カードだけ除外）', () => {
     const permitted = new Set(EXCEPTIONS.map(([file, selector]) => key({ file, selector })))
     const missing = all.filter(candidate => !permitted.has(key(candidate)))

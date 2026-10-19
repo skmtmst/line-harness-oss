@@ -11,7 +11,7 @@ const API = readApiSource(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 
 const ENTRY = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
-describe('V6 友だち追加時配信 7画面の契約', () => {
+describe("管理画面 友だち追加時配信 7画面の契約", () => {
   it('一覧から新規作成と編集へ遷移できる', () => {
     expect(LIST_PAGE).toContain('href="/friend-add-settings?view=new"')
     expect(LIST_PAGE).toContain("href={editHref(rule.id)}")
@@ -49,7 +49,7 @@ describe('V6 友だち追加時配信 7画面の契約', () => {
   })
 })
 
-describe('V6 友だち追加時配信の運用者向け表示', () => {
+describe("管理画面 友だち追加時配信の運用者向け表示", () => {
 
   it('画面にDB名やマイグレーション番号を出さない', () => {
     const screens = `${LIST_PAGE}\n${EDITOR}`
@@ -77,7 +77,7 @@ describe('V6 友だち追加時配信の運用者向け表示', () => {
   })
 })
 
-describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () => {
+describe("管理画面 友だち追加時配信の点検・中の再発防止", () => {
   it('一覧の検索とフォルダ絞りをサーバ側へ送り、件数は全ページの合計で出す', () => {
     expect(LIST_PAGE).toContain('q: appliedSearch.trim() || undefined')
     expect(LIST_PAGE).toContain('folder: folder ?? undefined')
@@ -143,7 +143,7 @@ describe('V6 友だち追加時配信の点検・中の再発防止(#501)', () =
   })
 })
 
-describe('V6 友だち追加時配信の保存の取りこぼし防止(#501 重大)', () => {
+describe("管理画面 友だち追加時配信の保存の取りこぼし防止", () => {
   it('保存が通るたびに冪等キーを回す', () => {
     expect(EDITOR).toContain('saveIdempotencyKey.current = crypto.randomUUID()')
   })
@@ -154,7 +154,7 @@ describe('V6 友だち追加時配信の保存の取りこぼし防止(#501 重�
   })
 })
 
-describe('V6 友だち追加時配信の監査修正(#946)', () => {
+describe("管理画面 友だち追加時配信の監査修正", () => {
   it('N-107: 「その他操作」は実画面へつなぐメニューを開く', () => {
     // 押しても何も起きないボタンにしない。テスト・有効化・実行結果は実在する画面。
     // ★管理画面 `Xn1Mz`（行の「…」統一）：手書きの開閉（setOpenMenuId＋ActionMenu直置き）

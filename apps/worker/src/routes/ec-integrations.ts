@@ -1,7 +1,7 @@
 import type { EcItem } from '../features/ec-commerce/member-snapshot/index.js';
-export { syncMemberSnapshot } from '../features/ec-commerce/member-snapshot.js';
+export { syncMemberSnapshot } from '../features/ec-commerce/member-snapshot/index.js';
 import { syncMemberSnapshot } from '../features/ec-commerce/member-snapshot/index.js';
-export type { EcEvent } from '../features/ec-commerce/member-snapshot.js';
+export type { EcEvent } from '../features/ec-commerce/member-snapshot/index.js';
 import type { EcEvent } from '../features/ec-commerce/member-snapshot/index.js';
 import { logger } from '@line-crm/shared/server';
 import { validateNenWebhookHeaders, verifyNenWebhook } from '../lib/hmac.js';

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '../../v8/scenarios/list.tsx'), 'utf8')
 
-describe('V6 シナリオの読了率の母数', () => {
+describe("管理画面 シナリオの読了率の母数", () => {
   it('現在配信中と読了済みの合計を母数にする', () => {
     expect(PAGE).toContain('const enrolled = active + completed')
     expect(PAGE).toContain('Math.round((completed / enrolled) * 100)')

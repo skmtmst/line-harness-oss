@@ -15,7 +15,7 @@ const EDITOR = readFileSync(join(__dirname, '../../v8/tags/mark-editor.tsx'), 'u
  * 画面側の配線。**考え方が正しくても、繋いでいなければ効かない。**
  * 純粋関数の試験（`support-mark-rules-view.test.ts`）と対で見る。
  */
-describe('V6 対応マークの自動変更ルール（GMvBd）の配線', () => {
+describe("管理画面 対応マークの自動変更ルール（GMvBd）の配線", () => {
   it('編集画面から現役の窓で開き、作成前は保存先を持つパネルを出さない', () => {
     expect(EDITOR).toContain('<SupportMarkRulesPanel')
     expect(EDITOR).toContain('markId={markId ?? null}')

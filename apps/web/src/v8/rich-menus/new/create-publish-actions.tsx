@@ -13,7 +13,7 @@ import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { type Group } from './create-types'
 
 
-type publishMenuNowContext = {
+type PublishMenuNowContext = {
   audience: "all" | "tag" | "none" | "targeted"
   group: Group | null
   loadChecks: () => Promise<void>
@@ -29,7 +29,7 @@ type publishMenuNowContext = {
   setPublishing: Dispatch<SetStateAction<boolean>>
 }
 
-export async function publishMenuNow({ audience, group, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing }: publishMenuNowContext) {
+export async function publishMenuNow({ audience, group, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing }: PublishMenuNowContext) {
     if (!group || publishing || saving) return
     const idempotencyKey = publishAttempt.current.begin()
     if (!idempotencyKey) return

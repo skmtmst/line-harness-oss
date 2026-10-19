@@ -18,7 +18,7 @@ import { type StepKey } from './create-options'
 import { type Group,type Page } from './create-types'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
-type renderButtonsStepContext = {
+type RenderButtonsStepContext = {
   activePage: Page
   addArea: (pageId: string, area: Area) => void
   areaActionSummary: (area: Area) => string
@@ -41,7 +41,7 @@ type renderButtonsStepContext = {
   updateArea: (pageId: string, areaId: string, patch: Partial<Area>) => void
 }
 
-export function renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }: renderButtonsStepContext) {
+export function renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }: RenderButtonsStepContext) {
     if (!activePage) return <div className={styles.stateCard}>ページがありません</div>
     const activeIndex = activePage.areas.findIndex((a) => a.id === selectedAreaId)
     const areaPages = pages

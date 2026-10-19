@@ -1,10 +1,11 @@
+import type { EventDispatcher } from '../../services/event-payload.js';
 import { logger } from '@line-crm/shared/server';
 import { accountFeatureOffExclusionSql } from '@line-crm/db';
 import type { SegmentCondition } from '@line-crm/shared';
 import { matchesCondition, parseCondition } from '../../services/segment-query.js';
 import { processAutomationRun, startAutomationRun, type AutomationActionExecutor } from './automation-engine.js';
 import { type RunStatus } from './run-types.js';
-import { createAutomationActionExecutors } from './automation-action-executors.js';
+import { createAutomationActionExecutors } from './automation-action-handlers.js';
 import { featureJobCanRun } from '../../services/feature-enforcement.js';
 
 /**
@@ -127,6 +128,7 @@ export interface AutomationDispatchItem {
 }
 
 export interface AutomationTriggerOptions {
+  emitEvent?: EventDispatcher;
   now?: string;
   executors?: Record<string, AutomationActionExecutor>;
   limit?: number;
@@ -206,6 +208,7 @@ function defaultExecutors(
 ): Record<string, AutomationActionExecutor> {
   if (options.executors) return options.executors;
   return createAutomationActionExecutors({
+    emitEvent: options.emitEvent,
     credentialEncryptionKey: options.credentialEncryptionKey,
     ...(input.lineAccessToken
       ? { resolveLineAccessToken: async () => input.lineAccessToken! }

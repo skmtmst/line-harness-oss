@@ -9,7 +9,7 @@ import { jstNowLocalInput } from './edit-model'
 import { scheduleStamp } from './edit-text'
 import styles from './edit.module.css'
 
-type renderScheduleCardContext = {
+type RenderScheduleCardContext = {
   canWrite: boolean
   item: CommonVarDetail | null
   loadSchedules: (varId: string, accountId: string) => Promise<void>
@@ -23,7 +23,7 @@ type renderScheduleCardContext = {
   value: string
 }
 
-export function renderScheduleCard({ canWrite, item, loadSchedules, removeSchedule, schedules, schedulesError, selectedAccountId, setClearSchedulesError, setClearSchedulesOpen, setDraft, value }: renderScheduleCardContext) {
+export function renderScheduleCard({ canWrite, item, loadSchedules, removeSchedule, schedules, schedulesError, selectedAccountId, setClearSchedulesError, setClearSchedulesOpen, setDraft, value }: RenderScheduleCardContext) {
   return (item ? (
     <section className={styles.schedCard} aria-labelledby="cv-edit-schedule-heading">
       <h2 id="cv-edit-schedule-heading" className={styles.schedTitle}>決めた日に変える</h2>

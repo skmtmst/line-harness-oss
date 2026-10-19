@@ -9,7 +9,7 @@ import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { b244Requirements } from './edit-model'
 import { saveErrorText } from './impact'
 
-type saveCommonVarContext = {
+type SaveCommonVarContext = {
   changeReason: string
   expiryBehavior: "stop" | "fallback"
   fallbackValue: string
@@ -39,7 +39,7 @@ type saveCommonVarContext = {
   value: string
 }
 
-export async function saveCommonVar({ changeReason, expiryBehavior, fallbackValue, folderId, item, latestAccountRef, load, memo, name, refreshBaseline, saveErrors, saving, selectedAccountId, setChangeReason, setCompareOpen, setConflict, setError, setFallbackFieldError, setNameFieldError, setPeriodFieldError, setReasonFieldError, setSaved, setSaving, setValueFieldError, validFrom, validUntil, value }: saveCommonVarContext) {
+export async function saveCommonVar({ changeReason, expiryBehavior, fallbackValue, folderId, item, latestAccountRef, load, memo, name, refreshBaseline, saveErrors, saving, selectedAccountId, setChangeReason, setCompareOpen, setConflict, setError, setFallbackFieldError, setNameFieldError, setPeriodFieldError, setReasonFieldError, setSaved, setSaving, setValueFieldError, validFrom, validUntil, value }: SaveCommonVarContext) {
     if (!item || saving || !selectedAccountId)
  return
     const accountAtRequest = selectedAccountId

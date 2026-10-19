@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { waitForOverlayLayout } from '../../../../../scripts/codex/overlay-ready.mjs'
+import { waitForOverlayLayout } from '../../../../../scripts/browser/overlay-ready.mjs'
 const mockPort = Number(process.env.TRAIN30_MOCK_PORT ?? 8788)
 async function openPrimaryAuthenticatedChallenge(page, path, token, method) {
   const nonce = crypto.randomUUID()

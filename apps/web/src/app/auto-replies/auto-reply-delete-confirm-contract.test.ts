@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
 
-describe('V6 自動応答の削除確認 Gy9OK', () => {
+describe("管理画面 自動応答の削除確認 Gy9OK", () => {
   it('ブラウザ標準confirmではなく共通の確認ダイアログを使う', () => {
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
     expect(PAGE).not.toContain("confirm('このルールを削除しますか？')")

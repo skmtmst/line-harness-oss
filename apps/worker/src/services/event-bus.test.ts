@@ -89,11 +89,11 @@ vi.mock('./outgoing-webhook-delivery.js', async () => {
   };
 });
 
-vi.mock('../features/automations/automation-triggers.js', () => ({
+vi.mock('../features/automations/automation-trigger-handlers.js', () => ({
   dispatchAutomationEventWithLogging: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('./action-score-events.js', () => actionScoreMocks);
+vi.mock('./action-score-handlers.js', () => actionScoreMocks);
 
 describe('fireEvent — send_message action logging', () => {
   let captured: CapturedInsert[];
@@ -339,7 +339,7 @@ describe('fireEvent — 行動スコア', () => {
       eventType: 'message_received',
       source: 'line_webhook',
       sourceEventId: 'webhook-1',
-    }));
+    }), fireEvent);
     expect(dbModule.applyScoring).not.toHaveBeenCalled();
   });
 
@@ -582,7 +582,7 @@ describe('fireEvent — EC正規化イベントの連携', () => {
 
   it('自動化・分析・スコアへ同一イベントIDで渡す', async () => {
     const dbModule = await import('@line-crm/db');
-    const triggers = await import('../features/automations/automation-triggers.js');
+    const triggers = await import('../features/automations/automation-trigger-handlers.js');
     const db = fakeDb({ capturedInserts: [] });
 
     await fireEvent(db, 'ec.order.confirmed', ecPayload(), 'account-token', 'account-a');
@@ -601,18 +601,18 @@ describe('fireEvent — EC正規化イベントの連携', () => {
       eventType: 'ec.order.confirmed',
       source: 'eccube',
       sourceEventId: 'event-12345678',
-    }));
+    }), fireEvent);
     expect(triggers.dispatchAutomationEventWithLogging).toHaveBeenCalledWith(db, expect.objectContaining({
       lineAccountId: 'account-a',
       eventType: 'ec.order.confirmed',
       sourceEventId: 'event-12345678',
       friendId: 'friend-1',
-    }));
+    }), { emitEvent: fireEvent });
   });
 
   it('分析の記録に失敗しても自動化への連携は止めない', async () => {
     const dbModule = await import('@line-crm/db');
-    const triggers = await import('../features/automations/automation-triggers.js');
+    const triggers = await import('../features/automations/automation-trigger-handlers.js');
     (dbModule.recordAnalyticsEvent as unknown as { mockRejectedValueOnce: (e: unknown) => void })
       .mockRejectedValueOnce(new Error('analytics_event_type_unknown:ec.order.cancelled'));
     const db = fakeDb({ capturedInserts: [] });
@@ -627,12 +627,12 @@ describe('fireEvent — EC正規化イベントの連携', () => {
       lineAccountId: 'account-a',
       eventType: 'ec.order.cancelled',
       sourceEventId: 'event-cancel-1',
-    }));
+    }), { emitEvent: fireEvent });
     errorLog.mockRestore();
   });
 
   it('アカウントが分からないイベントは自動化へ渡さない', async () => {
-    const triggers = await import('../features/automations/automation-triggers.js');
+    const triggers = await import('../features/automations/automation-trigger-handlers.js');
     const db = fakeDb({ capturedInserts: [] });
 
     await fireEvent(db, 'ec.order.confirmed', {

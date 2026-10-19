@@ -208,7 +208,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   const makesNewReservation = statusUpdate === 'scheduled' && existing.status !== 'scheduled';
   if (makesNewReservation) {
     try {
-      const approval = await import('../features/broadcasts/broadcast-approval.js');
+      const approval = await import('../features/broadcasts/broadcast-approval/index.js');
       const mergedForGate = {
         ...existing,
         target_type: body.targetType ?? existing.target_type,
@@ -293,7 +293,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
    */
   if (snapshotSemanticsChanged) {
     try {
-      const approval = await import('../features/broadcasts/broadcast-approval.js');
+      const approval = await import('../features/broadcasts/broadcast-approval/index.js');
       if (approval.readApprovalStatus(existing) === 'pending'
         || approval.readApprovalStatus(existing) === 'approved') {
         await c.env.DB.prepare(

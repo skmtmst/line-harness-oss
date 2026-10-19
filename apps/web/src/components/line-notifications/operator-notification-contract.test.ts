@@ -9,7 +9,7 @@ const db = readFileSync(new URL('../../../../../packages/db/src/notifications.ts
 const route = readFileSync(new URL('../../../../worker/src/routes/notifications.ts', import.meta.url), 'utf8')
 const dispatch = readFileSync(new URL('../../../../worker/src/services/operator-notification-dispatch.ts', import.meta.url), 'utf8')
 
-describe('V6 運用者へのお知らせ — 宛先・送信・実行記録の接続', () => {
+describe("管理画面 運用者へのお知らせ — 宛先・送信・実行記録の接続", () => {
   it('4タブの2番目に運用者向けを置き、顧客向けと混ぜない', () => {
     expect(page).toMatch(/customer[\s\S]*operator[\s\S]*failures[\s\S]*history/)
     expect(page).toContain('<OperatorTab lineAccountId={selectedAccountId}')

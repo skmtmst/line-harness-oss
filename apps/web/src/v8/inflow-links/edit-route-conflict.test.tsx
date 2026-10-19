@@ -23,6 +23,20 @@ beforeEach(() => {
   net.get.mockResolvedValue({ success: true, data: { ...route, couponEnabled: undefined, couponAssetId: undefined, couponAudience: undefined, tagId: 'tag-missing', name: 'ほかの人の名前', updatedAt: '2026-10-19T00:00:00Z' } })
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove() })
+it('流入元の名前は必須で、フォルダを選ばなくても名前を直せば保存できる', async () => {
+  net.update.mockReset()
+  net.update.mockResolvedValue({ success: true, data: route })
+  await act(async () => { root.render(<EditRouteModal surface="inline" route={route} pools={[]} scenarios={[]} templates={[]} tags={[]} existingGenres={[]} poolMemberNames={{}} onClose={() => {}} onSaved={net.saved} />) })
+  const name = document.getElementById('route-name') as HTMLInputElement
+  await act(async () => { fireEvent.change(name, { target: { value: '   ' } }) })
+  await act(async () => { screen.getByRole('button', { name: '保存する' }).click() })
+  expect(name.getAttribute('aria-invalid')).toBe('true')
+  expect(net.update).not.toHaveBeenCalled()
+  await act(async () => { fireEvent.change(name, { target: { value: '新しい流入元' } }) })
+  await act(async () => { screen.getByRole('button', { name: '保存する' }).click() })
+  expect(net.update).toHaveBeenCalledWith('route-1', expect.objectContaining({ name: '新しい流入元', genre: '', expectedUpdatedAt: route.updatedAt }))
+  expect(net.saved).toHaveBeenCalledTimes(1)
+})
 it('開いた版を送信し、409では入力を残して最新と比較・読込した後に新しい版を送る', async () => {
   await act(async () => { root.render(<EditRouteModal surface="inline" route={route} pools={[]} scenarios={[]} templates={[]} tags={[]} existingGenres={[]} poolMemberNames={{}} onClose={() => {}} onSaved={net.saved} />) })
   const name = document.getElementById('route-name') as HTMLInputElement

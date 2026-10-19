@@ -154,7 +154,7 @@ describe('RowMenu：行の右端の「…」', () => {
     expect(changes).toEqual([true, false])
   })
 
-  it('B-199：項目なしでも入口をそろえ、開くと理由を示す', async () => {
+  it("項目なしでも入口をそろえ、開くと理由を示す", async () => {
     render(<RowMenu label="春のセールの操作" items={[]} />)
     fireEvent.click(screen.getByRole('button', { name: '春のセールの操作' }))
     expect(await screen.findByText('この行に使える操作はありません')).toBeTruthy()

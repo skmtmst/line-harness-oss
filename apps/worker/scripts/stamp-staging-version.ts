@@ -10,7 +10,7 @@ export function stampStagingVersion(root: string, releasedAt = new Date().toISOS
   if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error('配備するソースのSHAを確認できません');
   const version = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).version;
   if (typeof version !== 'string' || !/^\d+\.\d+\.\d+(?:[-+][\w.-]+)?$/.test(version)) throw new Error('版を確認できません');
-  const path = resolve(root, 'apps/worker/src/_version.ts');
+  const path = resolve(root, 'apps/worker/src/release-version.ts');
   let source = readFileSync(path, 'utf8');
   for (const [key, value] of Object.entries({ BUNDLE_VERSION: version, RELEASED_AT: releasedAt, GIT_COMMIT: commit })) {
     const pattern = new RegExp(`export const ${key} = [^;]+;`);

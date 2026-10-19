@@ -11,7 +11,7 @@ vi.mock('@line-crm/db', () => ({
 
 vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
 
-vi.mock('../features/automations/automation-triggers.js', () => ({
+vi.mock('../features/automations/automation-trigger-handlers.js', () => ({
   dispatchAutomationEventWithLogging: mocks.dispatchAutomationEventWithLogging,
 }));
 
@@ -70,18 +70,18 @@ describe('行動スコアの帯変更イベント', () => {
         eventType: 'score_band_changed',
         sourceEventId: 'score:history-crossing:band',
         lineAccessToken: 'line-token',
-      }));
+      }), { emitEvent: expect.any(Function) });
     expect(mocks.dispatchAutomationEventWithLogging).toHaveBeenNthCalledWith(2, {},
       expect.objectContaining({
         eventType: 'score_threshold_crossed',
         sourceEventId: 'score:history-crossing:threshold:normal',
         eventData: expect.objectContaining({ thresholdBand: 'normal' }),
-      }));
+      }), { emitEvent: expect.any(Function) });
     expect(mocks.dispatchAutomationEventWithLogging).toHaveBeenNthCalledWith(3, {},
       expect.objectContaining({
         eventType: 'score_threshold_crossed',
         sourceEventId: 'score:history-crossing:threshold:high',
         eventData: expect.objectContaining({ thresholdBand: 'high' }),
-      }));
+      }), { emitEvent: expect.any(Function) });
   });
 });

@@ -4,7 +4,7 @@ import {
   WORKER_HASH,
   ADMIN_HASH,
   LIFF_HASH,
-} from '../_version.js';
+} from '../release-version.js';
 import { buildMetadata, type BuildBindings } from '../lib/build-metadata.js';
 
 const DEFAULT_MANIFEST_URL =

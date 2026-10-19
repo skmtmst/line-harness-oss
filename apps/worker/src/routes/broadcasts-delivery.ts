@@ -73,7 +73,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
    * 人数の手入力との一致を見る。既存の原子ロック（下の claim）は変えない。
    */
   try {
-    const { enforceBroadcastSendApproval } = await import('../features/broadcasts/broadcast-approval.js');
+    const { enforceBroadcastSendApproval } = await import('../features/broadcasts/broadcast-approval/index.js');
     const sendBody = await c.req.json<{ confirmedRecipientCount?: unknown; expectedVersion?:unknown; scheduledAt?:unknown;testMode?:unknown }>().catch(() => null);
     if(await simulationContext(c.env.DB,id)){const result=await scheduleSimulation(c.env.DB,id,sendBody??{},c.req.header('Idempotency-Key')??'');await processBroadcastSimulation(c.env.DB,id);return c.json({success:true,data:{...result,...await simulationPreview(c.env.DB,id)}});}
     const abReplay=await maybeReplayAbStart(c,id,sendBody);if(abReplay)return abReplay;
@@ -525,7 +525,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
    * 送る条件は行に無いので、今回の条件を重ねた行で数える。
    */
   try {
-    const { enforceBroadcastSendApproval } = await import('../features/broadcasts/broadcast-approval.js');
+    const { enforceBroadcastSendApproval } = await import('../features/broadcasts/broadcast-approval/index.js');
     const mergedForGate = {
       ...existing,
       target_type: 'segment',

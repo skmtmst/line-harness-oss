@@ -8,7 +8,7 @@ import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { summarizeBulkDeleteResult } from './media-delete-impact'
 
 
-type deleteMediaSelectionContext = {
+type DeleteMediaSelectionContext = {
   items: MediaItem[]
   latestAccountRef: RefObject<string | null>
   load: () => Promise<void>
@@ -23,7 +23,7 @@ type deleteMediaSelectionContext = {
   setSelected: Dispatch<SetStateAction<Set<string>>>
 }
 
-export async function deleteMediaSelection({ items, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, selectionItems, setBulkBusy, setBulkConfirm, setBulkProgress, setError, setSelected }: deleteMediaSelectionContext, ids: string[]) {
+export async function deleteMediaSelection({ items, latestAccountRef, load, loadKpis, saveErrors, selectedAccountId, selectionItems, setBulkBusy, setBulkConfirm, setBulkProgress, setError, setSelected }: DeleteMediaSelectionContext, ids: string[]) {
     const accountAtRequest = selectedAccountId
     if (!accountAtRequest) return
     setBulkBusy(true)

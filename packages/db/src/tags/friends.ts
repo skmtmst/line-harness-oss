@@ -1,4 +1,4 @@
-import type { Friend } from '../friends/types';
+import type { Friend } from '../friends/types/index.js';
 import { type Tag } from './types.js';
 
 

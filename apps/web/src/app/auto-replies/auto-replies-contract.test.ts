@@ -12,7 +12,7 @@ const PUBLISH = readUiSource(new URL('../../v8/auto-replies/edit/wizard.tsx', im
 const LIST = readUiSource(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
 const EDIT_PAGE = readUiSource(new URL('../../v8/auto-replies/edit/wizard.tsx', import.meta.url), 'utf8')
 
-describe('V6 自動応答一覧の契約', () => {
+describe("管理画面 自動応答一覧の契約", () => {
   it('共通の編集用変換と保存本文で所属フォルダを引き継ぐ', () => {
     expect(EDITOR).toContain('folderId: rule.folderId ?? null')
     expect(EDITOR).toContain("useState(draft.folderId ?? '')")

@@ -1,4 +1,4 @@
-export { getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight.js';
+export { getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight/index.js';
 import { getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight/index.js';
 import type { RunRow, Target } from '../features/hq-broadcasts/preflight/index.js';
 import { validateHqAfterActionSelection, hqAfterAction } from '../features/hq-broadcasts/hq-broadcast-after-actions/index.js';
