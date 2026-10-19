@@ -61,7 +61,7 @@ describe('配備の仕組みから呼ぶ入口（run-deployment-safety.ts）', (
 });
 
 
-describe('B-368 本番の実設定と管理画面buildの整合', () => {
+describe('本番の実設定と管理画面buildの整合', () => {
   afterEach(() => vi.unstubAllEnvs());
   async function realConfig(environment: 'production' | 'staging') {
     const { unstable_readConfig } = await import('wrangler');

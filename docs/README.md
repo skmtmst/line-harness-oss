@@ -588,3 +588,9 @@
 - [cleanup-q02a1-source-tests.tsv](qa/cleanup-q02a1-source-tests.tsv)
 
 - [0000-kenta-cleanup-q02a1.md](release-log/unreleased/0000-kenta-cleanup-q02a1.md)
+
+## 台本整理で加わった文書
+
+- [台本とCIの入口](../scripts/README.md)
+- [S02Cの検査記録](qa/cleanup-s02c-1019.md)
+- [S02Cの変更履歴](release-log/unreleased/0000-kenta-cleanup-s02c.md)
