@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { describeFriendAddFailure } from './friend-add-failure'
+import { describeFriendAddFailure } from '@/v8/friend-add/failure'
 
 /**
  * M006・M009〜M011: 失敗の理由を区別する。「通信を確認して」は通信断だけ。

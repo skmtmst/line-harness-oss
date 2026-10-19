@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createLatestPreviewRequestGate } from './latest-preview-request'
+import { createLatestPreviewRequestGate } from '@/v8/conversions/latest-preview-request'
 
 describe('成果地点の試算要求', () => {
   it('新しい入力を送ると古い要求を中断し、古い応答を採用しない', () => {

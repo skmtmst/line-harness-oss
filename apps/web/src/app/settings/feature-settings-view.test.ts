@@ -12,7 +12,7 @@ import {
   featureSettingsSaveConflictMessage,
   normalizeFeatureSettings,
   splitFeatureGroups,
-} from './feature-settings-view'
+} from '@/v8/settings/features/feature-settings-view'
 
 const groups: FeatureGroup[] = [
   { id: 'a', label: 'A', items: [{ id: 'a1', label: 'A1', note: '', keys: ['scenarios'] }] },

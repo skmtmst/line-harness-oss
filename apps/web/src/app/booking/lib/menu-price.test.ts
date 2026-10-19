@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { menuPriceLabel } from './menu-price'
+import { menuPriceLabel } from '@/v8/booking-menus/lib/menu-price'
 
 describe('R309 予約メニューの料金表示', () => {
   it('お問い合わせは金額を出さず「お問い合わせ」', () => {

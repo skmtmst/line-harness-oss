@@ -30,9 +30,7 @@ import { registerManageMessageTemplates } from '../src/tools/manage-message-temp
 import { registerListConversations } from '../src/tools/list-conversations.js'
 import { registerGetConversation } from '../src/tools/get-conversation.js'
 
-// NOTE: auto-track-urls.ts is a helper (no server.tool call) and is
-// intentionally not registered. The count below is the contract: adding,
-// removing, or renaming a tool must update this list on purpose.
+// Adding, removing, or renaming a registered tool must update this list on purpose.
 
 export const EXPECTED_TOOL_NAMES = [
   'account_summary',

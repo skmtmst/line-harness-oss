@@ -1,7 +1,7 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { emptyMessageOf, hasAnyFilter, type EmptyFilters } from './friend-list-empty'
+import { emptyMessageOf, hasAnyFilter, type EmptyFilters } from '@/v8/friends/list/empty'
 
 const none: EmptyFilters = { search: '', tagId: '', advanced: false, others: false }
 
