@@ -31,7 +31,7 @@
 - `?tab=funnel&conversionPointId=…&conversionPointName=…` はファネル作成へ成果地点を渡す
 
 ## 呼ぶ口（今の画面と同じ）
-- 役割：`api.staff.me()`（owner・admin だけ変える操作を出す）
+- 役割：`本人情報の共通読取（useStaffRole / loadStaffIdentity）`（owner・admin だけ変える操作を出す）
 - 友だちの増減：`api.analytics.friendsOverview(account, {from,to})`、右の列は `routesOverview`（概要の後に読む）
 - 配信の反応：`reactionsOverview`、経路と成果：`routesOverview`、URLクリック：`urlClicksOverview(account, {from,to,limit:200,query})`（検索語は300ms待って API へ）
 - 成果地点ごとのレポート：`api.conversions.definitionReport({from,to,lineAccountId})`、CSV は `api.conversions.exportDefinitions`

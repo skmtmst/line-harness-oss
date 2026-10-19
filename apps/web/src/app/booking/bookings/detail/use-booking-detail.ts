@@ -1,11 +1,12 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
+import { loadStaffIdentity } from '@/lib/staff-role'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { api, ApiError, bookingApi, type BookingAdminDetail, type BookingAvailabilitySlot, type BookingAuditLog, type BookingMenu, type BookingMenuStaff, type BookingNotificationPolicy } from '@/lib/api'
+import { ApiError, bookingApi, type BookingAdminDetail, type BookingAvailabilitySlot, type BookingAuditLog, type BookingMenu, type BookingMenuStaff, type BookingNotificationPolicy } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { canOperateBookings } from '../../lib/booking-permissions'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageTitle } from '../../../../components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -112,14 +113,13 @@ export function useBookingDetail() {
   const loadGeneration = useRef(0)
   // N-401: 閲覧のみの人には承認・変更・再試行のボタンを見せない。
   // 読み込めるまでは隠す。最終の可否はサーバ側の403が決める。
-  const [canOperate, setCanOperate] = useState(false)
+  const canOperate = usePermissionAccess('/booking/bookings')
   // 権限を読み終わるまで「閲覧のみ」の案内も出さない（操作できる人へ一瞬見せない）。
   const [staffResolved, setStaffResolved] = useState(false)
   useEffect(() => {
     let active = true
-    void api.staff.me()
-      .then((response) => { if (active) setCanOperate(response.success && canOperateBookings(response.data)) })
-      .catch(() => { if (active) setCanOperate(false) })
+    void loadStaffIdentity()
+      .catch(() => {})
       .finally(() => { if (active) setStaffResolved(true) })
     return () => { active = false }
   }, [])

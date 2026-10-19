@@ -11,7 +11,7 @@ import { ArrowLeft, Info, Pause, Pencil, QrCode, UserPlus, Gift, Check, Calendar
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole, loadStaffIdentity } from '@/lib/staff-role'
 import { canEditFeature } from '@/lib/staff-capability'
 import { formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'
@@ -137,7 +137,7 @@ function InflowDetailContent() {
   const [deleteError, setDeleteError] = useState('')
   const [deleteConfirmationName, setDeleteConfirmationName] = useState('')
   const [deleteChoice, setDeleteChoice] = useState<DeleteChoice>('stop')
-  const [canPermanentlyDelete, setCanPermanentlyDelete] = useState(false)
+  const canPermanentlyDelete = canManageRole(useStaffRole())
   // 「別の流入リンクへ送る」の転送先。先頭を自動採用しない（#514 重大4）。
   const [redirectTargetId, setRedirectTargetId] = useState('')
   const [qrOpen, setQrOpen] = useState(false)
@@ -165,13 +165,10 @@ function InflowDetailContent() {
         ? api.pools.list({ suppressFeatureDisabledEvent: true })
         : { success: false as const, error: 'feature_disabled' },
     )
-    void Promise.allSettled([api.entryRoutes.list(), poolsRequest, api.staff.me()]).then(([r, p, me]) => {
+    void Promise.allSettled([api.entryRoutes.list(), poolsRequest]).then(([r, p]) => {
       if (cancelled) return
       if (r.status === 'fulfilled' && r.value.success) setRoutes(r.value.data)
       if (p.status === 'fulfilled' && p.value.success) setPools(p.value.data)
-      if (me.status === 'fulfilled' && me.value.success) {
-        setCanPermanentlyDelete(me.value.data.role === 'owner' || me.value.data.role === 'admin')
-      }
       setLoading(false)
     })
     return () => {

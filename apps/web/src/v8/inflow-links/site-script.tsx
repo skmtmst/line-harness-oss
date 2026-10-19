@@ -92,7 +92,7 @@ export default function SiteScriptV8() {
   const [keyAttempt, setKeyAttempt] = useState(0)
   const [sites, setSites] = useState<MeasurementSite[]>([])
   const [sitesFailed, setSitesFailed] = useState(false)
-  const [canManage, setCanManage] = useState(false)
+  const canManage = canManageRole(useStaffRole())
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null)
   const [siteDialog, setSiteDialog] = useState<SiteDialogState | null>(null)
   const [siteBusy, setSiteBusy] = useState(false)
@@ -149,16 +149,7 @@ export default function SiteScriptV8() {
     setLoading(false)
   }, [selectedAccountId, gate])
 
-  useEffect(() => {
-    let active = true
-    void api.staff.me().then((response) => {
-      if (!active) return
-      setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
-    }).catch(() => undefined)
-    return () => {
-      active = false
-    }
-  }, [])
+
 
   useEffect(() => {
     void load()

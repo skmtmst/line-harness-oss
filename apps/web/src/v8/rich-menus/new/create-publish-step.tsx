@@ -1,5 +1,6 @@
 'use client'
 
+import { canManageRole } from '@/lib/staff-role'
 import {
 type PublishPlanInput
 } from '@/v8/rich-menus/edit/publish-plan-draft'
@@ -450,7 +451,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
                     {checks.device.state === 'ok'
                       ? `スマホの実機で確認済みです${checks.device.at ? `（${formatDateTime(checks.device.at)}）` : ''}。`
                       : '管理画面の見本だけでは公開できません。スマホで見た担当者が押します'}
-                    {!host && group && (staffRole === 'owner' || staffRole === 'admin')
+                    {!host && group && (canManageRole(staffRole))
                       ? <RichMenuTestApply key={`${accountId}:${group.id}`} groupId={group.id} /> : null}
                   </p>
                 </div>

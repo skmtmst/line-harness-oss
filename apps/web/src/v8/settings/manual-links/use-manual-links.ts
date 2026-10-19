@@ -2,6 +2,8 @@
 
 /* app/settings/manual-links/use-manual-links.ts から写した（src/v8 は @/app を読めない）。動きは同じ。 */
 
+import { loadStaffIdentity, useStaffIdentity } from '@/lib/staff-role'
+import { canViewManualLinks } from '@/lib/manual-link-access'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -21,7 +23,7 @@ import {
  * 権限の判定・確かめる・直す・保存はここに1つだけ置く。
  */
 export function useManualLinks() {
-  const [staff, setStaff] = useState<{ id: string; role: string | null; permissionKeys: string[] } | null>(null)
+  const staff = useStaffIdentity()
   const [links, setLinks] = useState<ManualLink[]>([])
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -41,17 +43,12 @@ export function useManualLinks() {
   const loadInitial = useCallback(async (alive: () => boolean) => {
     setStatus('loading')
     try {
-      const [staffResponse, manualLinks] = await Promise.all([api.staff.me(), api.manualLinks.list()])
+      const [staffResponse, manualLinks] = await Promise.all([loadStaffIdentity(), api.manualLinks.list()])
       if (!alive()) return
       if (!staffResponse.success || !manualLinks.success) {
         setStatus('error')
         return
       }
-      setStaff({
-        id: staffResponse.data?.id ?? '',
-        role: staffResponse.data?.role ?? null,
-        permissionKeys: staffResponse.data?.permissionKeys ?? [],
-      })
       setLinks(manualLinks.data.items)
       setTotal(manualLinks.data.total)
       setStatus('ready')
@@ -73,7 +70,7 @@ export function useManualLinks() {
   const notice = brokenNotice(rows)
 
   const checkAll = async () => {
-    if (checking) return
+    if (!canEditTable(staff) || checking) return
     setChecking(true)
     setActionError('')
     try {
@@ -98,6 +95,7 @@ export function useManualLinks() {
 
   const guard = useUnsavedGuard({ dirty: editingKey !== null && editingUrl !== (links.find((item) => item.key === editingKey)?.url ?? ''), busy: saving })
   const startEdit = (key: string) => guard.guarded(() => {
+    if (!canEditTable(staff)) return
     const link = links.find((item) => item.key === key)
     if (!link) return
     setEditingKey(key)
@@ -105,7 +103,7 @@ export function useManualLinks() {
   })
 
   const saveEdit = async () => {
-    if (!editingKey || saving) return
+    if (!canEditTable(staff) || !editingKey || saving) return
     const current = links.find((item) => item.key === editingKey)
     if (!current) return
     setSaving(true)
@@ -165,6 +163,7 @@ export function useManualLinks() {
     actionError,
     notice,
     canEdit: canEditTable(staff),
+    canView: canViewManualLinks(staff),
     loadInitial,
     checkAll,
     startEdit,

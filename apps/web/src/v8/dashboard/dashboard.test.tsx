@@ -60,11 +60,11 @@ describe('V8 ダッシュボードの言葉', () => {
  * 読み取り専用でサーバーが保存を断る人）だけ。書き込みできるスタッフは自分の並びを編集できる。
  */
 describe('ダッシュボード編集の入口', () => {
-  it('スタッフ・管理者・オーナーには出す。閲覧のみには出さない。役割を読む前は出す', () => {
+  it('スタッフ・管理者・オーナーには出す。閲覧のみには出さない。役割を読む前は隠す', () => {
     expect(canEditDashboardLayout('staff')).toBe(true)
     expect(canEditDashboardLayout('admin')).toBe(true)
     expect(canEditDashboardLayout('owner')).toBe(true)
-    expect(canEditDashboardLayout(null)).toBe(true)
+    expect(canEditDashboardLayout(null)).toBe(false)
     expect(canEditDashboardLayout('viewer')).toBe(false)
   })
 

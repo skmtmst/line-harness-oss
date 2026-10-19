@@ -32,7 +32,7 @@ import { api, bookingApi, fetchApi } from '@/lib/api';
 import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared';
 import { resolveStoreReturnPath } from '@/lib/hq-navigation';
 import { formatNumber } from '@/lib/format';
-import { useStaffRole } from '@/lib/staff-role';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { readSessionSnapshot } from '@/lib/session-snapshot';
 import { useAccount, type AccountWithStats } from '@/contexts/account-context';
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs';
@@ -57,7 +57,7 @@ export default function HqHomeV8() {
    * サーバも書き込みを断る。決まり：閲覧のみには押せないボタンを置かず隠す（2026-10-06）。
    */
   const readOnlyImpersonation = readSessionSnapshot()?.impersonation?.mode === 'read'
-  const canManage = !readOnlyImpersonation && (role === 'owner' || role === 'admin')
+  const canManage = !readOnlyImpersonation && (canManageRole(role))
   const isOwner = !readOnlyImpersonation && role === 'owner'
   const { setSelectedAccountId, refreshAccounts } = useAccount()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])

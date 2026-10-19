@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
 import { useFriendMigrations } from './use-friend-migrations'
 const m = vi.hoisted(() => ({ role: 'owner', jobs: vi.fn(), createExport: vi.fn(), previewImport: vi.fn(), executeImport: vi.fn() }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => m.role }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => m.role }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, lineAccounts: { list: async () => ({ success: true, data: [{ id: 'A' }] }) }, friendMigrations: m } }

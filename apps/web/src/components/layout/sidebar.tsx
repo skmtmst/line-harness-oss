@@ -21,7 +21,7 @@ SIDEBAR_FEATURE_BY_HREF,
 SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import { HQ_MENU_SECTIONS,isHqShellPath,menuOwnerForScreen,orderedMenuSections,type MenuItem,type MenuSection } from '@/lib/menu'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useBrand } from '@/lib/use-brand'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -280,7 +280,7 @@ export default function Sidebar({
     }
     let cancelled = false
     const accountId = selectedAccountId
-    const canManageFeatureSettings = staffRole === 'owner' || staffRole === 'admin'
+    const canManageFeatureSettings = canManageRole(staffRole)
     setFeatureVisibility(null)
     setExplicitSettings(null)
     setVisibilityAccountId(null)
@@ -358,12 +358,12 @@ export default function Sidebar({
          */
 
         if (isHq) return true
-        const savedSettings = explicitSettings?.accountId === selectedAccountId ? explicitSettings.value : staffRole === 'owner' || staffRole === 'admin' ? false : null
+        const savedSettings = explicitSettings?.accountId === selectedAccountId ? explicitSettings.value : canManageRole(staffRole) ? false : null
         if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, savedSettings)) return false
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 
-        if (item.href === '/staff' && staffReadRole !== 'owner' && staffReadRole !== 'admin') return false
+        if (item.href === '/staff' && !canManageRole(staffReadRole)) return false
         if (item.href === '/accounts' && staffReadRole === 'staff') return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
         if (item.staffOnly && staffReadRole !== 'staff') return false
@@ -855,7 +855,7 @@ export default function Sidebar({
         設定の画面ではここが選ばれた形にする。
         nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
       */}
-      {!isHq && !preview && (staffReadRole === 'owner' || staffReadRole === 'admin') && (
+      {!isHq && !preview && (canManageRole(staffReadRole)) && (
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"

@@ -1,5 +1,7 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
+import { loadStaffIdentity } from '@/lib/staff-role'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import { PageHeading } from '@/components/templates/page-frame';
 import DateField from '@/components/shared/date-field';
@@ -13,7 +15,6 @@ import Select from '@/components/shared/select';
 import StickyBar from '@/components/shared/sticky-bar';
 import LinePreview from '@/components/shared/line-preview';
 import { api, ApiError, bookingApi, type BookingAvailabilitySlot, type BookingConflictAlternatives, type BookingCustomerContext, type BookingMenu, type BookingMenuStaff, type BookingCustomerSummary, type FriendListItem, type ProxyBookingResult } from '@/lib/api';
-import { canOperateBookings } from '../../lib/booking-permissions';
 import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message';
 import { formatDateTime, formatDay, formatTime } from '@/lib/format';
 import { Card, NotificationToggle, RelatedLinks } from "./page-gap-parts"
@@ -177,14 +178,13 @@ export default function NewProxyBookingPage() {
   const [error, setError] = useState('')
   const slotRequest = useRef(0)
   // N-401: 閲覧のみの人には予約を入れる操作を出さない。読み込めるまでは隠す。
-  const [canOperate, setCanOperate] = useState(false)
+  const canOperate = usePermissionAccess('/booking/bookings')
   // 権限を読み終わるまで案内バナーも出さない（操作できる人へ一瞬見せない）。
   const [staffResolved, setStaffResolved] = useState(false)
   useEffect(() => {
     let active = true
-    void api.staff.me()
-      .then((response) => { if (active) setCanOperate(response.success && canOperateBookings(response.data)) })
-      .catch(() => { if (active) setCanOperate(false) })
+    void loadStaffIdentity()
+      .catch(() => {})
       .finally(() => { if (active) setStaffResolved(true) })
     return () => { active = false }
   }, [])

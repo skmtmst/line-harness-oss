@@ -1,5 +1,6 @@
 'use client'
 
+import { canManageRole, isOwnerRole, useStaffRole } from '@/lib/staff-role'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { UserX, CircleX, Mail, RotateCcw, RotateCw } from 'lucide-react'
@@ -101,8 +102,9 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   const [notice, setNotice] = useState<ScopedNotice>({ generation: -1, notice: null })
   const [detailId, setDetailId] = useState<string | null>(null)
   /* 再試行は店長だけ、対応済みは店長・管理者だけ。押せない人には出さない。 */
-  const [canRetry, setCanRetry] = useState(false)
-  const [canResolve, setCanResolve] = useState(false)
+  const staffRole = useStaffRole()
+  const canRetry = isOwnerRole(staffRole)
+  const canResolve = canManageRole(staffRole)
   const requestRef = useRef(0)
   const mutationRef = useRef<{ generation: number; id: string } | null>(null)
   const env = useMemo<NotificationRunEnv>(() => ({
@@ -123,16 +125,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
     setRetrying,
   }), [])
 
-  useEffect(() => {
-    let active = true
-    void api.staff.me().then((response) => {
-      if (active && response.success) {
-        setCanRetry(response.data.role === 'owner')
-        setCanResolve(response.data.role === 'owner' || response.data.role === 'admin')
-      }
-    }).catch(() => {})
-    return () => { active = false }
-  }, [])
+
 
   useEffect(() => {
     setPage(1); setQuery(''); setFilter('all'); setRecipientFilter('all'); setPeriodFilter('all'); setDetailId(null)

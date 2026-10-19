@@ -1,5 +1,6 @@
 'use client'
 
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { DetailV8 } from './review-detail'
 import { RejectDialogV8,ReviewListV8 } from './review-list'
 import { PHOTO_PAGE_SIZE,PhotoPageResponse,PhotoStatus,PhotoView,REVIEW_REASONS,ReviewReasonCode,boardNode,photoPagePath } from './review-model'
@@ -79,7 +80,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   const [allPhotosLoading, setAllPhotosLoading] = useState(false)
   const [reviewing, setReviewing] = useState<string | null>(null)
   // 審査・見送りの口は owner/admin だけ。staff は見るだけ。
-  const [canEdit, setCanEdit] = useState(false)
+  const canEdit = canManageRole(useStaffRole())
   const [historyOpen, setHistoryOpen] = useState(false)
   const loadSequence = useRef(0)
   const accountGeneration = useRef(0)
@@ -87,14 +88,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   const retryKeys = useRef(new Map<string, string>())
   const [bulkFailed, setBulkFailed] = useState<Array<{ photoId: string; petName: string; error: string }>>([])
 
-  useEffect(() => {
-    let active = true
-    void api.staff.me().then((response) => {
-      if (!active) return
-      setCanEdit(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
-    }).catch(() => undefined)
-    return () => { active = false }
-  }, [])
+
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current

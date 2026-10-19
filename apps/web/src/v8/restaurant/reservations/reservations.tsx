@@ -16,7 +16,7 @@ import TextLink from '@/components/shared/text-link'
 import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi,type ReservationQuery,type RestaurantClosure,type RestaurantReservation } from '@/lib/restaurant-test-api'
-import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { Lock,Phone } from 'lucide-react'
 import { useCallback,useEffect,useMemo,useState,type ReactNode } from 'react'
 import { ReservationDetailDialog } from '@/v8/restaurant-reservations/index'
@@ -33,7 +33,7 @@ import SeatWaitlistDialog from './waitlist'
 
 /** 予約を変えられる役割か（口は owner・admin・staff。閲覧のみは 403）。読めるまでは出す（最後の守りは口の 403）。 */
 function canWriteRole(role: string | null | undefined): boolean {
-  return role === 'owner' || role === 'admin' || role === 'staff'
+  return canManageRole(role) || role === 'staff'
 }
 
 /* 頭の右：見方の切り替え（数はその月を取り直して今日・今週・今月で数える。遅い応答は捨てる）と主ボタン。 */

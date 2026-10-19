@@ -1,5 +1,6 @@
 'use client'
 
+import { useStaffRole } from '@/lib/staff-role'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
@@ -43,17 +44,8 @@ function EditWebhookPageInner() {
    * 送り先の変更は統括だけ（R32）。口側が `requireRole('owner')` で守っている。
    * 直接URLで開いた管理者には作らず、統括への依頼を案内する。
    */
-  const [staffRole, setStaffRole] = useState<string | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    void api.staff.me()
-      .then((response) => {
-        if (cancelled || !response.success) return
-        setStaffRole(response.data.role)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
+  const staffRole = useStaffRole()
+
 
   useEffect(() => {
     let cancelled = false

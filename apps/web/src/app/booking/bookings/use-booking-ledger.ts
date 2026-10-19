@@ -1,10 +1,11 @@
 'use client'
 
+import { usePermissionAccess } from '@/lib/use-feature-access'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { usePeopleVisitMarks } from '@/v8/booking-bookings/public/use-visit-marks/index'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { api, bookingApi, ApiError, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
+import { bookingApi, ApiError, type BookingMenu, type BookingRequest, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import { SERIES_QUERY_KEYS } from '@/v8/booking-gap/public/series-host/index'
@@ -14,7 +15,6 @@ import { type ContextMenuItem } from '@/components/shared/context-menu'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { usePageTitle } from '../../../components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { canOperateBookings } from '../lib/booking-permissions'
 import { fetchAllPages } from './fetch-all-pages'
 import { moveDay, startOfWeek, type CalendarAvailability, type CalendarSlot } from './booking-calendar'
 import { STATUS_TABS, SOURCE_FILTERS, PAGE_SIZE, jstDay, LEDGER_QUERY_KEYS, LEDGER_STORAGE_KEY, LedgerSavedState, readLedgerState } from './ledger-model'
@@ -183,14 +183,8 @@ export function useBookingLedger() {
   listAccountRef.current = selectedAccountId
   // N-401: 閲覧のみの人には操作ボタンを見せない。読み込めるまでは隠す
   // （権限のある人に一瞬見せて消すより、静かに出すほうが誤操作を防ぐ）。
-  const [canOperate, setCanOperate] = useState(false)
-  useEffect(() => {
-    let active = true
-    void api.staff.me()
-      .then((response) => { if (active) setCanOperate(response.success && canOperateBookings(response.data)) })
-      .catch(() => { if (active) setCanOperate(false) })
-    return () => { active = false }
-  }, [])
+  const canOperate = usePermissionAccess('/booking/bookings')
+
   // 詳細パネルは行の実体ではなく id を保持する。承認などで再読み込みしたあとも
   // 最新の行を引き直せるので、パネルに古い状態が残らない。
   const [detailId, setDetailId] = useState<string | null>(null)

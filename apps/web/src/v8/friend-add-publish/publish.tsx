@@ -18,7 +18,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError, type FriendAddRule } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, loadStaffIdentity } from '@/lib/staff-role'
 import { resendSuppressionText } from '@/v8/friend-add/public/text/index'
 import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
 import FriendAddDoneV8 from './done'
@@ -94,7 +94,7 @@ function FriendAddPublish() {
 
   useEffect(() => {
     let alive = true
-    void api.staff.me().then((res) => { if (alive && res.success) setMe(res.data.name ?? null) }).catch(() => {})
+    void loadStaffIdentity().then((res) => { if (alive && res.success) setMe(res.data.name ?? null) }).catch(() => {})
     return () => { alive = false }
   }, [])
 

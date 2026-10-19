@@ -1,9 +1,10 @@
 'use client'
 
+import { loadStaffIdentity } from '@/lib/staff-role'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import Link from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, api, fetchApi } from '@/lib/api'
+import { ApiError, fetchApi } from '@/lib/api'
 import { inboxItemHref, type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import Pagination from '@/components/shared/pagination'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -58,7 +59,7 @@ export function InboxSection({ onSummaryChange }: {
 
   useEffect(() => {
     let cancelled = false
-    void api.staff.me()
+    void loadStaffIdentity()
       .then((response) => {
         if (cancelled || !response.success) return
         try {

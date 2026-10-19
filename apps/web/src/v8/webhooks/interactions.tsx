@@ -7,7 +7,7 @@ import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/share
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -164,7 +164,7 @@ export default function WebhooksInteractionsV8() {
   const generationRef = useRef(0)
   const staffRole = useStaffRole()
   /* 送り直しは統括と管理者（管理画面 と同じ）。確認が終わるまでは出す。 */
-  const canRetry = staffRole === 'owner' || staffRole === 'admin'
+  const canRetry = canManageRole(staffRole)
   const isOwner = staffRole === 'owner'
   const overview = useWebhookOverview()
 

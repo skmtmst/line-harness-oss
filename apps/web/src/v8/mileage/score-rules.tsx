@@ -1,5 +1,6 @@
 'use client'
 
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { CreatePage } from '@/components/templates/create-page'
 import Card from '@/components/shared/card'
 
@@ -152,7 +153,7 @@ export default function ActionScoreRulesPage() {
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [canEdit, setCanEdit] = useState(false)
+  const canEdit = canManageRole(useStaffRole())
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [editRuleIndex, setEditRuleIndex] = useState<number | null>(null)
   // ほかの一覧と同じく、削除は「…」の中へ入れ、押した先で確認を出す。
@@ -191,16 +192,7 @@ export default function ActionScoreRulesPage() {
   const [bandPreview, setBandPreview] = useState<ActionScoreBandPreview | null>(null)
   const [bandPreviewBusy, setBandPreviewBusy] = useState(false)
 
-  useEffect(() => {
-    let current = true
-    void api.staff.me().then((response) => {
-      if (!current || !response.success) return
-      setCanEdit(response.data.role === 'owner' || response.data.role === 'admin')
-    }).catch(() => {
-      if (current) setCanEdit(false)
-    })
-    return () => { current = false }
-  }, [])
+
 
   const load = useCallback(async () => {
     const accountAtRequest = selectedAccountId

@@ -36,7 +36,7 @@ const net = vi.hoisted(() => ({
   /** run id ごとの対応表応答を差し替える。 */
   detailResponders: new Map<string, () => Promise<Response>>(),
   /** 自分自身（実行権限の案内に使う）。 */
-  me: { id: 'owner-2', role: 'owner' } as { id: string; role: string } | null,
+  me: { id: 'owner-2', role: 'owner' } as { id: string; role: string; readOnly?: boolean; roleBundle?: string } | null,
   /** TECH-07: 通信断・応答喪失を再現する。'network' で fetch が投げる。 */
   failItemPatch: null as null | 'network' | { status: number; error: string },
   failExecute: null as null | 'network' | { status: number; error: string },
@@ -563,5 +563,21 @@ describe('R398 一部反映の500で「未変更」と残さない', () => {
     fireEvent.click(buttonByText('本移行を実行', openDialog()))
     await flush()
     expect(openDialog().textContent).toContain('実行結果を確認できませんでした')
+  })
+})
+
+describe('UID移行の閲覧のみ', () => {
+  it.each([
+    { id: 'owner-2', role: 'owner', readOnly: true },
+    { id: 'owner-2', role: 'owner', roleBundle: 'view_only' },
+  ])('履歴は読めるが登録・判断・本移行・切り戻しを出さない: %j', async identity => {
+    net.me = identity
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    expect(host.querySelector('[aria-labelledby="uid-history"]')).toBeTruthy()
+    expect(host.textContent).toContain('閲覧のみで見ています')
+    const labels = [...host.querySelectorAll('button')].map(button => button.textContent?.trim())
+    for (const label of ['テスト移行を実行', '新しい移行を登録', '本移行へ進む', '切り戻す']) expect(labels).not.toContain(label)
+    expect(net.calls.filter(call => call.method !== 'GET')).toHaveLength(0)
   })
 })

@@ -1,3 +1,4 @@
+import { canManageRole } from '@/lib/staff-role'
 import { formatDashboardAsOf } from '@/components/dashboard/freshness'
 
 
@@ -5,10 +6,10 @@ import { formatDashboardAsOf } from '@/components/dashboard/freshness'
 /**
  * ダッシュボード編集（自分の並び）を出してよい役割か。隠すのは閲覧のみ（読み取り専用。
  * `/api/staff/me` の role が 'viewer'＝サーバーが保存を断る人）だけ。書き込みできる
- * スタッフは押せるので出す（決まりは「押せないボタンを隠す」）。読めるまで（null）は出す。
+ * スタッフは押せるので出す（決まりは「押せないボタンを隠す」）。読めるまで（null）は隠す。
  */
 export function canEditDashboardLayout(role: string | null): boolean {
-  return role !== 'viewer'
+  return canManageRole(role) || role === 'staff'
 }
 
 

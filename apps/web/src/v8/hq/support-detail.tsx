@@ -1,5 +1,7 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { loadStaffIdentity, useStaffRole, canManageRole } from '@/lib/staff-role'
 import { PageContent } from '@/components/templates/page-frame'
 import StatusBadge from '@/components/shared/status-badge'
 import { Paperclip, Send, X } from 'lucide-react'
@@ -83,6 +85,8 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const [loadError, setLoadError] = useState('')
   const [detailMissing, setDetailMissing] = useState(false)
   const [detailLoading, setDetailLoading] = useState(true)
+  const role = useStaffRole()
+  const canReply = canManageRole(role) || role === 'staff'
   const [me, setMe] = useState<StaffMember | null>(null)
   const [tenantName, setTenantName] = useState('')
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
@@ -126,7 +130,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
     if (id === undefined) return
     if (id) void load(id)
     // 送信者と履歴は id が無くても読む（U099：右の一覧から正しい件へ戻れるように）。
-    void Promise.allSettled([api.staff.me(), api.tenants.me(), api.hqSupport.list(), api.hqSupport.context()]).then(([meRes, tenantRes, listRes, contextRes]) => {
+    void Promise.allSettled([loadStaffIdentity(), api.tenants.me(), api.hqSupport.list(), api.hqSupport.context()]).then(([meRes, tenantRes, listRes, contextRes]) => {
       if (meRes.status === 'fulfilled' && meRes.value.success) setMe(meRes.value.data)
       if (tenantRes.status === 'fulfilled' && tenantRes.value.success) setTenantName(tenantRes.value.data.name)
       if (listRes.status === 'fulfilled' && listRes.value.success) setHistory(listRes.value.data)
@@ -159,6 +163,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const blocked = !body.trim() ? '本文を入力してください' : body.length > SUPPORT_BODY_MAX ? `本文は${SUPPORT_BODY_MAX}文字以内で入力してください` : ''
 
   const send = async () => {
+    if (!canReply) return
     if (!id || blocked || sending) return
     setSending(true)
     setError('')
@@ -215,7 +220,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                 ))}
               </ol>
 
-              <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><SaveErrorField names={["body"]}><TextArea
+              {canReply ? <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><SaveErrorField names={["body"]}><TextArea
                   id={`${uid}-body`}
                   value={body}
                   onChange={(event) => { setBody(event.target.value); setNotice('') }}
@@ -257,7 +262,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   </Button>
                 </div>
 {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-{error ? <Notice tone="danger" >{error}</Notice> : null}</Field></div>
+{error ? <Notice tone="danger" >{error}</Notice> : null}</Field></div> : <ReadOnlyNotice />}
             </>
           )}
         </div>

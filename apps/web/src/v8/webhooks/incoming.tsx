@@ -14,7 +14,7 @@ import { api, ApiError, type IncomingWebhookDetail as DetailType, type IncomingW
 import { useAccount } from '@/contexts/account-context'
 import { useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
@@ -126,7 +126,7 @@ export default function WebhooksIncomingV8() {
   const staffRole = useStaffRole()
   /* 受け取り口の変更は統括だけ（R32）。届物の結び付けは管理者も使える。 */
   const canManage = staffRole === 'owner'
-  const canResolveUnmatched = staffRole === 'owner' || staffRole === 'admin'
+  const canResolveUnmatched = canManageRole(staffRole)
   const searchParams = useSearchParams()
 
   const overview = useWebhookOverview()

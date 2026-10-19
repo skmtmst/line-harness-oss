@@ -8,7 +8,7 @@
 - `app/settings/manual-links/page.tsx`。`/settings/manual-links`（指定なし）。
 
 ## 読み込み（API）
-- `api.staff.me()` と `GET /api/manual-links` を一緒に読む。失敗は「正本表を読み込めませんでした」＋読み直し（U071）。
+- `本人情報の共通読取（useStaffRole / loadStaffIdentity）` と `GET /api/manual-links` を一緒に読む。失敗は「正本表を読み込めませんでした」＋読み直し（U071）。
 - 見られる人：運営の代表（env-owner）・`manual.link.edit` を持つ人・オーナー。ほかは「この表は運営だけが見られます」。
 
 ## 操作

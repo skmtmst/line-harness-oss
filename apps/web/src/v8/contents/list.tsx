@@ -1,5 +1,7 @@
 'use client'
 
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { loadStaffIdentity, useStaffRole, canManageRole } from '@/lib/staff-role'
 import { deleteMediaSelection } from './list-bulk-delete'
 import { loadMediaDeleteImpact } from './list-delete-impact'
 import { loadMediaFolders,loadMediaList,loadMediaSummary } from './list-load'
@@ -197,7 +199,9 @@ export default function MediaLibraryListV8() {
     一覧・ダウンロード・登録・版追加は staff も使えるので混同しない。
   */
   const [mediaManagementPermission, setMediaManagementPermission] = useState<MediaManagementPermission>('loading')
-  const [canRegisterMedia, setCanRegisterMedia] = useState(false)
+  const staffRole = useStaffRole()
+  const canRegisterMedia = canManageRole(staffRole) || staffRole === 'staff'
+  const mediaEditAccess = useFeatureAccess('contents')
 
   const setDetailUrl = useCallback((id: string | null, mode: 'push' | 'replace' = 'push') => {
     const url = new URL(window.location.href)
@@ -219,7 +223,7 @@ export default function MediaLibraryListV8() {
 
   useEffect(() => {
     let active = true
-    void api.staff.me().then((response) => {
+    void loadStaffIdentity().then((response) => {
       if (!active) return
       if (!response.success) {
         setMediaManagementPermission('error')
@@ -230,7 +234,6 @@ export default function MediaLibraryListV8() {
       )
       // Registration is available to staff, while a view-only session cannot
       // write. Use the same verified identity as the management controls.
-      setCanRegisterMedia(!response.data.readOnly && response.data.roleBundle !== 'view_only')
     }).catch(() => {
       if (active) setMediaManagementPermission('error')
     })
@@ -304,7 +307,7 @@ export default function MediaLibraryListV8() {
     setDetailRetry((count) => count + 1)
   }, [detailId])
 
-  const canManageMedia = mediaManagementPermission === 'allowed'
+  const canManageMedia = mediaManagementPermission === 'allowed' && mediaEditAccess
   const managementPermissionReason = mediaManagementPermission === 'loading'
     ? '操作権限を確認しています'
     : mediaManagementPermission === 'error'

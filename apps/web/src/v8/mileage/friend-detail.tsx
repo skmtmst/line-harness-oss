@@ -1,4 +1,5 @@
 'use client'
+import { canManageRole, useStaffRole, isOwnerRole } from '@/lib/staff-role'
 import { mileageAssignee as assignee } from './display'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
@@ -106,8 +107,8 @@ function FriendDetailInner() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [missing, setMissing] = useState(false)
-  const [canAdjust, setCanAdjust] = useState(false)
-  const [canConfigureAdjustmentPolicy, setCanConfigureAdjustmentPolicy] = useState(false)
+  const canAdjust = canManageRole(useStaffRole())
+  const canConfigureAdjustmentPolicy = isOwnerRole(useStaffRole())
   const [adjustmentOpen, setAdjustmentOpen] = useState(false)
   const [adjustMode, setAdjustMode] = useState<'increase' | 'decrease'>('increase')
   const [pendingAction, setPendingAction] = useState<{ entryId: string; kind: 'confirm' | 'void'; label: string } | null>(null)
@@ -142,9 +143,8 @@ function FriendDetailInner() {
     try {
       const friendResponse = await api.friends.get(friendId)
       if (!friendResponse.success) throw new Error('load_failed')
-      const [mileageResponse, staffResponse, v6Response, historyResponse] = await Promise.all([
+      const [mileageResponse, v6Response, historyResponse] = await Promise.all([
         api.friends.mileage(friendId, { limit: 100, accountId: selectedAccountId }),
-        api.staff.me().catch(() => null),
         api.mileage.friendsV6({ accountId: selectedAccountId, friendId, limit: 1, offset: 0 }).catch(() => null),
         api.mileage.history({ accountId: selectedAccountId, friendId, limit: 100, offset: 0 }).catch(() => null),
       ])
@@ -159,16 +159,14 @@ function FriendDetailInner() {
         ? historyResponse.data.items.map(friendHistoryItem)
         : null)
       setHistoryTotal(historyResponse?.success ? mileagePaginationTotal(historyResponse.data) : null)
-      setCanAdjust(Boolean(staffResponse?.success && (staffResponse.data.role === 'owner' || staffResponse.data.role === 'admin')))
-      setCanConfigureAdjustmentPolicy(Boolean(staffResponse?.success && staffResponse.data.role === 'owner'))
+
     } catch (caught) {
       if (request !== requestRef.current) return
       setFriend(null)
       setMileage(null)
       setV6Friend(null)
       setV6History(null)
-      setCanAdjust(false)
-      setCanConfigureAdjustmentPolicy(false)
+
       if (caught instanceof ApiError && caught.status === 404) setMissing(true)
       else setError(true)
     } finally {

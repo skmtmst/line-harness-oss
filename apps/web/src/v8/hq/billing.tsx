@@ -32,7 +32,7 @@ import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import {
   INVOICE_STATUS_LABELS,
   billingBanner,
@@ -192,7 +192,7 @@ function BillingInner() {
 
   const banner = billingBanner(summary)
   const isOwner = role === 'owner'
-  const canManagePayment = role === 'owner' || role === 'admin'
+  const canManagePayment = canManageRole(role)
   const canChoose = isOwner && summary.state !== 'exempt' && summary.state !== 'active' && summary.state !== 'past_due'
   const currentKey = currentPlanKey(summary)
   /* 契約中の変更は支払いの管理（Stripe の画面）で。管理画面が無い・課金の対象外は運営へ頼む。 */

@@ -30,10 +30,12 @@ function buildDetail() {
 let host: HTMLDivElement
 let root: Root
 let staffEmail: string | null
+let staffReadOnly = false
 let posted: Record<string, unknown> | null
 
 beforeEach(() => {
   staffEmail = 'yamada@example.com'
+  staffReadOnly = false
   posted = null
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   window.history.replaceState(null, '', '/hq/support/detail?id=r1')
@@ -46,7 +48,7 @@ beforeEach(() => {
     }
     if (url.endsWith('/api/hq/support/requests/r1')) return json({ success: true, data: buildDetail() })
     if (url.endsWith('/api/hq/support/requests')) return json({ success: true, data: [buildDetail()] })
-    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', email: staffEmail } })
+    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', email: staffEmail, role: 'staff', readOnly: staffReadOnly } })
     if (url.endsWith('/api/tenants/me')) return json({ success: true, data: { name: '株式会社サンプル' } })
     return json({ success: false, error: `unexpected ${url}` }, 404)
   }))
@@ -78,6 +80,7 @@ async function typeBody(text: string) {
 describe('返信先の案内（R609）', () => {
   it('メールがあるときはメール到着を案内する', async () => {
     staffEmail = 'yamada@example.com'
+  staffReadOnly = false
     await act(async () => { root.render(<HqSupportDetailPage />) })
     await flush()
     const text = host.textContent ?? ''
@@ -113,4 +116,15 @@ describe('返信先の案内（R609）', () => {
     expect(after).toContain('続きを送りました。運営に届きました。返信はこの画面のやり取りに届きます。')
     expect(after).not.toContain('登録メールアドレス')
   })
+})
+
+it('閲覧のみはやり取りを読めるが返信欄・送信・添付操作がない', async () => {
+  staffReadOnly = true
+  await act(async () => { root.render(<HqSupportDetailPage />) })
+  await act(async () => { for (let i = 0; i < 12; i++) await Promise.resolve() })
+  expect(host.textContent).toContain('再現を確認しました。')
+  expect(host.textContent).toContain('閲覧のみで見ています')
+  expect(host.querySelector('textarea')).toBeNull()
+  expect([...host.querySelectorAll('button')].some(b => b.textContent?.trim() === '送る')).toBe(false)
+  expect(posted).toBeNull()
 })

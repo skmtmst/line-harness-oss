@@ -1,4 +1,5 @@
 'use client'
+import { loadStaffIdentity } from '@/lib/staff-role'
 import { dashboardCardForStyle } from './style-cards'
 
 import { jstDate, jstDayStartIso } from '@/lib/jst-datetime'
@@ -170,7 +171,7 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
   /* 本人の名前（あいさつ）。取れなくても画面は止めない。 */
   useEffect(() => {
     let cancelled = false
-    void api.staff.me()
+    void loadStaffIdentity()
       .then((response) => { if (!cancelled && response.success) setStaffName(response.data.name) })
       .catch(() => undefined)
     return () => { cancelled = true }

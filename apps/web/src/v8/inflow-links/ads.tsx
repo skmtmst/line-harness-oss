@@ -149,7 +149,7 @@ export default function AdsV8() {
   const [costFailed, setCostFailed] = useState(false)
   const [manualEntries, setManualEntries] = useState<ManualCostEntry[]>([])
   const [entryRoutes, setEntryRoutes] = useState<EntryRoute[]>([])
-  const [canManage, setCanManage] = useState(false)
+  const canManage = canManageRole(role)
   const [importingId, setImportingId] = useState<string | null>(null)
   const [importError, setImportError] = useState('')
   const [connectionTarget, setConnectionTarget] = useState<{ key: string; label: string } | null>(null)
@@ -225,19 +225,7 @@ export default function AdsV8() {
     }
   }, [load])
 
-  useEffect(() => {
-    if (!selectedAccountId) {
-      setCanManage(false)
-      return
-    }
-    let active = true
-    void api.staff.me().then((response) => {
-      if (active) setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
-    }).catch(() => undefined)
-    return () => {
-      active = false
-    }
-  }, [selectedAccountId])
+
 
   const [manualFieldErrors, setManualFieldErrors] = useState<Record<string, string>>({})
 

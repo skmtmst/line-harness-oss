@@ -16,7 +16,7 @@ afterEach(async () => {
 const fixture = vi.hoisted(() => ({ dryRun: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
-  return { ...actual, api: { ...actual.api, friendMigrations: { ...actual.api.friendMigrations, dryRun: fixture.dryRun } } }
+  return { ...actual, api: { ...actual.api, staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 'owner', role: 'owner' } }) }, friendMigrations: { ...actual.api.friendMigrations, dryRun: fixture.dryRun } } }
 })
 
 const { useUidMigration } = await import('./use-uid-migration')

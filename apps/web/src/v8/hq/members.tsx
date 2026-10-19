@@ -1,5 +1,6 @@
 'use client'
 
+import { loadStaffIdentity, useTenantWideAccess } from '@/lib/staff-role'
 import { PageContent } from '@/components/templates/page-frame'
 import { Plus, Users, UserPlus, Eye, Building2 } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
@@ -101,7 +102,7 @@ function MembersInner() {
     try {
       // M025: 範囲限定の担当者に一覧は出さない（口も403で断る）。
       // 先に自分を読んで理由の分かる面を出し、通らない一覧は呼ばない。
-      const meRes = await api.staff.me()
+      const meRes = await loadStaffIdentity()
       if (!meRes.success) throw new Error(meRes.error)
       setMe(meRes.data)
       if (meRes.data.accountScope === 'accounts') {
@@ -134,7 +135,7 @@ function MembersInner() {
   /* 絵  の並び：状態→役割（オーナー→管理者→担当者→閲覧のみ）→名前。 */
   const rows = sortMembersByRole(members)
   const kpis = useMemo(() => memberKpis(members), [members])
-  const canManage = !me?.readOnly && me?.accountScope !== 'accounts' && (me?.role === 'owner' || me?.role === 'admin')
+  const canManage = useTenantWideAccess()
   const restricted = me?.accountScope === 'accounts'
 
   const submitDialog = async (value: MemberDialogValue, stepUpToken?: string) => {

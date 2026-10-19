@@ -1,4 +1,5 @@
 'use client'
+import { loadStaffIdentity, canManageRole, useStaffRole } from '@/lib/staff-role'
 import SelfMfa from './self-mfa'
 import MfaPolicy from './mfa-policy'
 import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
@@ -809,7 +810,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const resendingRef = useRef(false)
   const removingRef = useRef(false)
   // 閲覧専用（代理ログインの見るだけ等）のオーナー・管理者は、変える操作を出さず閲覧のみの形にする。
-  const administrator = (me?.role === 'admin' || me?.role === 'owner') && !me?.readOnly
+  const administrator = canManageRole(useStaffRole())
   usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
   const load = useCallback(async () => {
     setLoading(true)
@@ -819,7 +820,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       const scope = selectedAccountId ?? undefined
       const [staffResult, meResult, accountsResult, usersResult, rolesResult] = await Promise.all([
         api.staff.list(),
-        api.staff.me(),
+        loadStaffIdentity(),
         api.lineAccounts.list(),
         api.access.users({ lineAccountId: scope, limit: 200 }),
         api.access.roles(scope),

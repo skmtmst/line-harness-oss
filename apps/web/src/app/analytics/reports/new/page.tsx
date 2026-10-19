@@ -1,4 +1,5 @@
 'use client'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import EntitySelect from '@/components/shared/entity-select'
@@ -275,7 +276,7 @@ function AnalyticsReportFormPage() {
   const [editMissing, setEditMissing] = useState(false)
   /* WEB308：履歴の口が読めなかったことを「見つかりません」と分ける。 */
   const [editLoadFailed, setEditLoadFailed] = useState(false)
-  const [canManage, setCanManage] = useState(false)
+  const canManage = canManageRole(useStaffRole())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -320,13 +321,7 @@ function AnalyticsReportFormPage() {
     setBaseline(editId ? null : NEW_BASELINE)
   }, [selectedAccountId, editId])
 
-  useEffect(() => {
-    let active = true
-    void api.staff.me().then((response) => {
-      if (active && response.success) setCanManage(response.data.role === 'owner' || response.data.role === 'admin')
-    })
-    return () => { active = false }
-  }, [])
+
 
   // 読み直し用の数え直し。入力の状態には触らない(点検#508軽8)。
   const [reloadSeq, setReloadSeq] = useState(0)

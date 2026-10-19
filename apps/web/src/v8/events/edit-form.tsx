@@ -84,7 +84,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   /* クラスのお支払い（ 追記 3・絵 XFRyO）。保存は「概要を保存する」と一緒。 */
   const eventPayment = useMenuPayment('event', accountId, eventId)
   /* 下の帯の左端に［削除する］（絵 XFRyO）。権限と断りの文は一覧の削除と同じ。 */
-  const canDelete = role === 'owner' || role === 'admin'
+  const canDelete = canManageRole(role)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
