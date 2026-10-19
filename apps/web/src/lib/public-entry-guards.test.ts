@@ -6,6 +6,10 @@ import { describe, expect, it } from 'vitest'
 import { readUiSource } from '../../scripts/test-ui-source.mjs'
 // @ts-expect-error The inspector is a Node module.
 import { inspectB244Tree } from '../../scripts/verify.mjs'
+// @ts-expect-error The save inspector is a Node module.
+import { auditSavedScreens } from '../../scripts/form-save-errors-audit.mjs'
+// @ts-expect-error The card source selector is a Node module.
+import { v8Sources } from '../../scripts/card-shape-contract.mjs'
 
 describe('feature entry verification', () => {
   it('follows an explicit public index to its declared implementation', () => {
@@ -62,6 +66,51 @@ describe('feature entry verification', () => {
       expect(inspectB244Tree(root).errors.map((row: { kind: string }) => row.kind)).toEqual(['requirement-without-definition'])
       writeFileSync(current, "fields.define('name','名前',check,{required:true}); <Field requirement={fields.requirement('name')}/>")
       expect(inspectB244Tree(root).errors).toEqual([])
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('keeps save error checks on an exported hook after it moves out of the screen', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exported-save-hook-'))
+    try {
+      mkdirSync(join(root, 'src/v8/settings'), { recursive: true })
+      mkdirSync(join(root, 'src/app'), { recursive: true })
+      writeFileSync(join(root, 'src/v8/settings/screen.tsx'), "export {useSettings} from './use-settings'")
+      const hook = join(root, 'src/v8/settings/use-settings.ts')
+      writeFileSync(hook, "export function useSettings(){const saveErrors=useSaveFormErrors(); async function save(){try{await api.settings.update({})}catch(error){setError('failed')}} return {saveErrors}}")
+      expect(auditSavedScreens(root)).toHaveLength(1)
+      writeFileSync(hook, "export function useSettings(){const saveErrors=useSaveFormErrors(); async function save(){try{await api.settings.update({})}catch(error){saveErrors.capture(error)}} return {saveErrors}}")
+      expect(auditSavedScreens(root)).toEqual([])
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('keeps save error checks when a public V8 screen receives a purpose name', () => {
+    const root = mkdtempSync(join(tmpdir(), 'renamed-save-screen-'))
+    try {
+      mkdirSync(join(root, 'src/v8'), { recursive: true })
+      mkdirSync(join(root, 'src/app/reservations'), { recursive: true })
+      const previous = join(root, 'src/app/reservations/editor-v8.tsx')
+      const current = join(root, 'src/app/reservations/editor.tsx')
+      const source = "export default function ReservationEditorV8(){const saveErrors=useSaveFormErrors(); async function save(){try{await api.reservations.update({})}catch(error){setError('failed')}} return <SaveErrorScope fields={saveErrors}/> }"
+      writeFileSync(previous, source)
+      expect(auditSavedScreens(root)).toHaveLength(1)
+      renameSync(previous, current)
+      expect(auditSavedScreens(root)).toHaveLength(1)
+      writeFileSync(current, source.replace("setError('failed')", 'saveErrors.capture(error)'))
+      expect(auditSavedScreens(root)).toEqual([])
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
+  it('keeps a public V8 component in the card guard after its file is renamed', () => {
+    const root = mkdtempSync(join(tmpdir(), 'renamed-card-screen-'))
+    try {
+      mkdirSync(join(root, 'v8'), { recursive: true })
+      mkdirSync(join(root, 'app'), { recursive: true })
+      const previous = join(root, 'app/editor-v8.tsx')
+      const current = join(root, 'app/editor.tsx')
+      writeFileSync(previous, 'export default function EditorV8(){return <div/>}')
+      expect(v8Sources(root)).toContain(previous)
+      renameSync(previous, current)
+      expect(v8Sources(root)).toContain(current)
     } finally { rmSync(root, { recursive: true, force: true }) }
   })
 

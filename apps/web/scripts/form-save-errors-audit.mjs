@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import ts from 'typescript'
+import { hasExportedV8Component } from './v8-component-source.mjs'
 
 const mutationMethod = /^(?:(?:create|update|save|register|upsert|replace|publish|connect|set|patch|edit)(?:$|[A-Z_])|(?:bulk|batch)(?:Create|Update|Save))/
 function hasMutation(node) {
@@ -26,7 +27,7 @@ function hasScope(component, root) {
 
 /** 保存するcatch自身を見る。importだけ・別のcatchで受けるだけでは合格しない。 */
 export function auditFormSaveErrors(source, filename = 'screen.tsx') {
-  const root = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const root = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, filename.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
   const findings = []
   visit(root, (node) => {
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'catch'
@@ -55,9 +56,27 @@ export function auditFormSaveErrors(source, filename = 'screen.tsx') {
 }
 
 export function savedScreenFiles(root) {
-  return ['src/v8', 'src/app'].flatMap((dir) => fs.readdirSync(path.join(root, dir), { recursive: true }).map((file) => path.join(dir, file)))
-    .filter((file) => file.endsWith('.tsx') && !/\.(?:test|spec)\.tsx$|fixture/.test(file) && (file.startsWith('src/v8/') || file.endsWith('-v8.tsx') || file.includes('/v8/')))
-    .sort()
+  const sourceFiles = ['src/v8', 'src/app'].flatMap(dir => fs.readdirSync(path.join(root, dir), { recursive: true }).map(file => path.join(dir, file)))
+    .filter(file => file.endsWith('.tsx') && !/\.(?:test|spec)\.tsx$|fixture/.test(file))
+  const selected = new Set()
+  const parse = file => ts.createSourceFile(file, fs.readFileSync(path.join(root, file), 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+  const pending = sourceFiles.filter(file => {
+    if (file.startsWith('src/v8/') || file.endsWith('-v8.tsx') || file.includes('/v8/')) return true
+    return hasExportedV8Component(parse(file))
+  })
+  while (pending.length) {
+    const file = pending.pop()
+    if (selected.has(file)) continue
+    selected.add(file)
+    for (const statement of parse(file).statements) {
+      const runtimeExport = ts.isExportDeclaration(statement) && !statement.isTypeOnly && (!statement.exportClause || !ts.isNamedExports(statement.exportClause) || statement.exportClause.elements.some(binding => !binding.isTypeOnly))
+      if (!runtimeExport || !statement.moduleSpecifier || !ts.isStringLiteral(statement.moduleSpecifier) || !statement.moduleSpecifier.text.startsWith('.')) continue
+      const stem = path.resolve(root, path.dirname(file), statement.moduleSpecifier.text)
+      const target = [stem, `${stem}.ts`, `${stem}.tsx`, path.join(stem, 'index.ts')].find(file => /\.tsx?$/.test(file) && fs.existsSync(file) && fs.statSync(file).isFile())
+      if (target && !/\.(?:test|spec)\.|fixture/.test(target) && !path.relative(path.join(root, 'src'), target).startsWith('..')) pending.push(path.relative(root, target))
+    }
+  }
+  return [...selected].sort()
 }
 
 export function auditSavedScreens(root) {

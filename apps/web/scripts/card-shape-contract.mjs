@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import postcss from 'postcss'
 import ts from 'typescript'
+import { hasExportedV8Component } from './v8-component-source.mjs'
 
 export function sourceFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -141,6 +142,9 @@ export function v8Sources(src, files = sourceFiles(src)) {
       if (next) scan(next)
     }
   }
-  for (const file of files.filter(f => !f.includes('.test.') && (f.includes('/v8/') || /v8[^/]*\.tsx$/.test(f)))) scan(file)
+  for (const file of files.filter(f => !f.includes('.test.') && /\.tsx?$/.test(f))) {
+    const namedV8 = file.endsWith('.tsx') && hasExportedV8Component(ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX))
+    if (file.includes('/v8/') || /v8[^/]*\.tsx$/.test(file) || namedV8) scan(file)
+  }
   return [...active].filter(file => /\.tsx?$/.test(file) && !file.includes('.test.')).sort()
 }
