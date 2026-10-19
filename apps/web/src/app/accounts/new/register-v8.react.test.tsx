@@ -26,7 +26,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 vi.mock('@/lib/api-styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })), save: vi.fn(async () => ({ success: true, data: { version: 1 } })) } }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('@/components/step-up-prompt', () => ({
   default: () => null,

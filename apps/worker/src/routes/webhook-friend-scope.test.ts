@@ -131,7 +131,7 @@ async function postWebhook(events: unknown[]) {
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
-      body: JSON.stringify({ events }),
+      body: JSON.stringify({ destination: 'bot', events }),
     },
     baseEnv,
     {
@@ -154,7 +154,7 @@ beforeEach(() => {
       id: 'account-a',
       channel_secret: 'env-default-secret',
       channel_access_token: 'account-a-token',
-      is_active: 1,
+      is_active: 1, tenant_status: 'active',
     } as never,
   ]);
 });

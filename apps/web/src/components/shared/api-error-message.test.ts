@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
+import { describeActionFailure } from '@/lib/use-action-error'
 import { classifyApiFailure, describeApiFailure, isForbiddenOrRateLimited, japaneseDetailOf, loadFailureCopy, loadFailureNotice, retryAfterSecondsOf } from './api-error-message'
 
 describe('APIの失敗を原因どおりに言い分ける（R32）', () => {
@@ -14,6 +15,19 @@ describe('APIの失敗を原因どおりに言い分ける（R32）', () => {
     const err = new ApiError(403, 'API error: 403')
     expect(describeApiFailure(err, '作成', { scope: 'hq', forbidden: '受け取り口の作成は統括だけができます。' }))
       .toBe('この操作の権限がありません。統括の管理者に頼んでください。')
+  })
+
+  /*
+   * 管理者にも渡していない口（要件 v6-33 §15 `account.line.register`「登録、接続確認」）は
+   * owner。ここで既定の store のままにすると、管理者が「オーナーか管理者に頼んでください」と
+   * 言われ、自分自身に頼む行き止まりになる（2026-10-18 利用者報告）。
+   */
+  it('オーナーだけの口は、管理者ではなくオーナーへ頼むよう案内する', () => {
+    const err = new ApiError(403, 'API error: 403')
+    expect(describeApiFailure(err, '接続の確認', { scope: 'owner' }))
+      .toBe('この操作の権限がありません。オーナーに頼んでください。')
+    expect(describeActionFailure(err, '接続の確認', 'owner'))
+      .toBe('この操作の権限がありません。オーナーに頼んでください。')
   })
 
   it('400/422は入力の直しに分け、欄の下と組み合わせられる', () => {

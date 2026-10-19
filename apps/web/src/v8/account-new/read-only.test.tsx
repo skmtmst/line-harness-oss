@@ -24,7 +24,7 @@ it.each([
   localStorage.setItem('lh_staff_role', 'owner')
   calls.me.mockResolvedValue({ success: true, data: { id: 'reader', name: '閲覧者', ...identity } })
   const view = render(<RegisterV8 />)
-  await screen.findByText(/登録はオーナーに頼んでください/)
+  await screen.findByText('LINEアカウントの登録はオーナーだけができます。オーナーに頼んでください。')
   expect(view.container.querySelector('form')).toBeNull()
   expect(screen.queryByRole('radio')).toBeNull()
   expect(screen.queryByRole('textbox')).toBeNull()

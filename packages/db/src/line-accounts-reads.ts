@@ -40,6 +40,7 @@ export async function getLineAccounts(
 export async function listLineAccountsWithTenantStatus(
   db: D1Database,
   credentialEncryptionKey?: string,
+  channelId?: string,
 ): Promise<LineAccountWithTenantStatus[]> {
   const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
   const result = await db
@@ -48,9 +49,10 @@ export async function listLineAccountsWithTenantStatus(
          FROM line_accounts account
          LEFT JOIN tenants tenant
            ON tenant.id = COALESCE(account.tenant_id, ?)
+        ${channelId === undefined ? '' : 'WHERE account.channel_id = ?'}
         ORDER BY account.display_order ASC, account.created_at ASC`,
     )
-    .bind(DEFAULT_TENANT_ID)
+    .bind(DEFAULT_TENANT_ID, ...(channelId === undefined ? [] : [channelId]))
     .all<LineAccountWithTenantStatus>();
   const rows = await Promise.all(
     result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),

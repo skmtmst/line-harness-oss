@@ -44,11 +44,13 @@ export async function handleEvent(
   ecommerce?: { baseUrl: string; secret: string },
   operatorMailEnv?: Env['Bindings'],
   execution?: WorkflowExecution,
+  legacyLineMessageAccountKey?: string,
 ): Promise<void> {
   const replay=<T>(key:string,work:()=>Promise<T>):Promise<T>=>execution?execution.step(key,work):work();
   if (event.type === 'unsend') {
     await recordLineMessageUnsend(db, {
       lineMessageAccountKey,
+      lineAccountId,
       lineMessageId: event.unsend.messageId,
       sourceUserId: event.source.type === 'user' ? event.source.userId : null,
       unsentAt: toJstString(new Date(event.timestamp)),
@@ -346,6 +348,7 @@ export async function handleEvent(
       content: finalContent,
       lineAccountId,
       lineMessageAccountKey,
+      legacyLineMessageAccountKey,
       lineMessageId: msg.id,
       createdAt: jstNow(),
       lineEventAt: toJstString(new Date(event.timestamp)),
@@ -430,6 +433,7 @@ export async function handleEvent(
       content: incomingText,
       lineAccountId,
       lineMessageAccountKey,
+      legacyLineMessageAccountKey,
       lineMessageId: textMessage.id,
       createdAt: now,
       lineEventAt: toJstString(new Date(event.timestamp)),

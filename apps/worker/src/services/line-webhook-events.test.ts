@@ -43,3 +43,13 @@ describe('LINE durable event receipts',()=>{
   expect(classifyLineWebhookError(new Error('LINE API error: 500 private body'))).toBe('line_api_error');
  });
 });
+
+// Event IDs are globally unique in the legacy receipt table. A foreign owner
+// must never change that receipt, even when its own workflow checkpoint exists.
+test('foreign event IDs never run handlers or overwrite another customer receipt', async () => {
+  item.raw.prepare("INSERT INTO line_webhook_events(webhook_event_id,line_account_id,event_type,status) VALUES('shared','account-a','message','failed')").run();
+  const handle=vi.fn();
+  await processLineWebhookEvents({db:item.db,events:[event('shared')],lineAccountId:'account-b',handle});
+  expect(handle).not.toHaveBeenCalled();
+  expect(item.raw.prepare("SELECT line_account_id,status FROM line_webhook_events WHERE webhook_event_id='shared'").get()).toEqual({line_account_id:'account-a',status:'failed'});
+});

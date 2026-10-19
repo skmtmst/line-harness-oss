@@ -142,6 +142,7 @@ async function sendFollow(userId: string, webhookEventId: string) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
     body: JSON.stringify({
+      destination: 'bot',
       events: [{
         type: 'follow', webhookEventId, timestamp: 1787530800000,
         source: { type: 'user', userId }, replyToken: 'reply-1',
@@ -160,7 +161,7 @@ beforeEach(() => {
   vi.mocked(verifySignature).mockResolvedValue(true);
   vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
     id: 'account-main', channel_secret: 'env-default-secret',
-    channel_access_token: 'account-token', is_active: 1,
+    channel_access_token: 'account-token', is_active: 1, tenant_status: 'active',
   } as never]);
   vi.mocked(getEntryRouteByRefCode).mockResolvedValue(null);
   vi.mocked(getEntryRouteByRefCodeAny).mockResolvedValue(null);
