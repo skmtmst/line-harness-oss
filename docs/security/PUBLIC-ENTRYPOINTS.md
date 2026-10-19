@@ -4,7 +4,7 @@
 
 ## 数え方と限界
 
-WorkerのHono実登録にある管理認証の外の入口は **201経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。
+WorkerのHono実登録にある管理認証の外の入口は **202経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。10-19にチャネル別LINE Webhookを追加（201＋1）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。
 
 「全経路を列挙」と「すべての入力で安全を確認」は別。表の本人確認・期限はコードの方式で、実配備の設定や全資源ID×本人の組合せはS07/S15の未完を維持する。URLの実値・query・顧客情報は記録しない。
 
@@ -198,6 +198,7 @@ WorkerのHono実登録にある管理認証の外の入口は **201経路**（�
 | `GET /setup` | 固定パス、IDは秘密にしない | IP 3,000/分（単一実行環境） | 公開の版/稼働/ブランド/静的手引き・スクリプト/転送 | 期限なし。公開メタデータ | `apps/worker/src/routes/setup.ts` |
 | `GET /t/:linkId` | rは利用者指定ref、poolは指定slugで推測可能。tはランダム短縮コード/UUID。認証の代用にしない | rはIP 100/分（今回追加、ref/help/query共通）。t/poolはIP 3,000/分 | 公開の店/案内/転送先。個人プロフィールを返さない用途 | URL自体の期限なし。有効状態で停止 | `apps/worker/src/routes/tracked-links.ts` |
 | `POST /webhook` | 入口IDは秘密ではない。サービス別の署名/専用鍵で確認 | IP 100/分＋サービス固有の重複/署名検証 | 署名/専用鍵を検査後に通知処理。GETの登録確認は専用確認値。顧客本文・鍵を応答/Slackへ出さない | サービス別の署名時刻/受信済み記録（全方式の期限の統一はしていない） | `apps/worker/src/routes/webhook.ts` |
+| `POST /webhook/:channelId` | 数字のチャネルIDは公開識別子。対象アカウントのLINE署名を検証 | IP 100/分＋受信済み記録 | 署名で確定したアカウント内だけに保存・取消。本文のdestinationは他顧客の識別に使用しない | 受信済みイベントとメッセージの重複を抑止 | `apps/worker/src/routes/webhook.ts` |
 | `POST /webhooks/xserver/support-email` | 入口IDは秘密ではない。サービス別の署名/専用鍵で確認 | IP 3,000/分（単一実行環境） | 署名/専用鍵を検査後に通知処理。GETの登録確認は専用確認値。顧客本文・鍵を応答/Slackへ出さない | サービス別の署名時刻/受信済み記録（全方式の期限の統一はしていない） | `apps/worker/src/routes/support-inbox.ts` |
 | `GET /webinar-assets/:token/:slug/*` | 期限＋HMACを含むtoken、slug/パスも署名照合 | IP 3,000/分（単一実行環境） | 申込者へ配る動画。URLの再配布は防ぎ切れない | 署名時のexpまで。期限と動画公開状態を確認 | `apps/worker/src/routes/webinars.ts` |
 | `POST /api/booking/pass-payments/webhook` | Stripe試験用の専用署名。管理ログインとは別 | IP 3,000/分（単一実行環境） | 署名を検査した試験イベントだけ。livemodeと支払状態を確認し、本番決済や外部Stripe書込は行わない | 署名時刻は前後5分。イベントIDで二重適用を抑止 | `apps/worker/src/routes/booking-pass-billing.ts` |
