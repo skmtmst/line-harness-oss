@@ -30,7 +30,7 @@ describe('V6 成果地点一覧の契約', () => {
   it('V6一覧APIの集計・状態・利用先をそのまま使う', () => {
     expect(PAGE).toContain('api.conversions.definitions({')
     expect(PAGE).toContain('formatNumber(point.metrics.netCount')
-    expect(PAGE).toContain('formatNumber(point.metrics.netValue')
+    // 金額セルはconversion-points-v8-react.test.tsxで実表示を検査する。
     expect(PAGE).toContain('point.usageCount === 0')
     expect(PAGE).toContain('stateCounts.active')
     expect(PAGE).not.toContain('利用先の取得は未接続')
