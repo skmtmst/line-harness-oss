@@ -71,7 +71,8 @@
 3. 資格情報の差し替え（§6-2「差し替え前に接続確認を通し、失敗したら保存しない」）：今の保存の口は LINE への確認をせずに保存する。根拠：apps/worker/src/routes/line-accounts.ts:1994-2140（fetch・接続確認の呼び出しが無い）。
 4. 画面は管理者にも「編集する・差し替える」を出すが、保存の口はオーナーだけ（管理者が押すと 403）。根拠：apps/web/src/v8/accounts-detail/BEHAVIOR.md「オーナーと管理者だけ」、apps/worker/src/routes/line-accounts.ts:1994（requireRole('owner')）。
 5. アーカイブの理由：画面は「任意」、空ならサーバーが既定の文を入れる。要件 §10-3 は理由を記録（§24 で止める・再開は必須）。アーカイブの理由を必須にするかは書いていない。根拠：apps/web/src/v8/accounts-detail/dialogs.tsx:272、apps/worker/src/routes/line-accounts.ts:725。
-6. アーカイブの本人確認：本人確認の方法が無い人は「そのままアーカイブします」と案内し、パスワードでも通る。30 §22 は TOTP だけ。根拠：apps/web/src/v8/accounts-detail/dialogs.tsx:282-292、apps/worker/src/routes/admin-auth.ts:684-695。
+6. 【2026-10-18 解消】登録・接続確認の権限：要件 §15 は `account.line.register`（登録、接続確認）をオーナーだけ。画面は一覧の「LINEアカウントを登録」と `/accounts/new` を管理者にも出していたため、管理者が③接続確認で 403（しかも「オーナーか管理者に頼んでください」＝自分自身に頼む文）に当たっていた。要件が勝つので**サーバは広げず画面を合わせた**：登録の入口はオーナーだけに出し、管理者には頼む先の一文と一覧へ戻る道を出す。403 の文は `scope: 'owner'`。並び順と親子・スタイルは `account.metadata.edit`（owner、admin）なので管理者に残す。根拠：apps/worker/src/routes/line-accounts.ts（requireRole('owner')）、apps/web/src/v8/settings/accounts/accounts.tsx、apps/web/src/v8/account-new/register.tsx。
+7. アーカイブの本人確認：本人確認の方法が無い人は「そのままアーカイブします」と案内し、パスワードでも通る。30 §22 は TOTP だけ。根拠：apps/web/src/v8/accounts-detail/dialogs.tsx:282-292、apps/worker/src/routes/admin-auth.ts:684-695。
 
 ### 仕様が無い
 
