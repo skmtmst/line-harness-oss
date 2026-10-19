@@ -254,7 +254,7 @@ export const FEATURE_JOB_MANIFEST: readonly FeatureJobMetadata[] = [
       mode: 'gated',
       sources: [
         'packages/db/src/action-score-rules.ts',
-        'apps/worker/src/services/action-score-events.ts',
+        'apps/worker/src/services/action-score-handlers.ts',
       ],
       markers: [
         "isAccountFeatureEnabled(db, row.line_account_id, 'mileage')",
