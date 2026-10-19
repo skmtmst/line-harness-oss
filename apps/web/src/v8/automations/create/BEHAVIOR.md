@@ -1,3 +1,5 @@
+> 文書：オートメーション ルールを作る（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # オートメーション ルールを作る（V8）の動き
 
 入口：`app/automations/new/page.tsx`（V8 のときだけ `src/v8/automations/create/create.tsx`、それ以外は今の v7 の画面）。

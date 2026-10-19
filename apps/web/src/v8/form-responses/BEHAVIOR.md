@@ -1,3 +1,5 @@
+> 文書：集まった回答（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 集まった回答（V8）の動き
 
 入口：`app/form-submissions/responses/page.tsx`（V8 のときだけ `src/v8/form-responses/responses.tsx`）。v7 の画面・試験は触らない。

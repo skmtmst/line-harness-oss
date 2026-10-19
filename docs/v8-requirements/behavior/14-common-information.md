@@ -1,3 +1,5 @@
+> 文書：14 共通情報 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 14 共通情報 操作と挙動（受け入れ）
 
 - 正本の要件：[v6-14 共通情報](../../v6-requirements/v6-14-common-information-requirements-draft.md)（§24 の確定条件を含む）。共通の動き・権限は [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限・§6-2 再試行・§11 応答・§15 進みとトースト）と [30 ログインユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。

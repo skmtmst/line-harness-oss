@@ -1,3 +1,5 @@
+> 文書：シナリオを作る②：1通目を設定（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # シナリオを作る②：1通目を設定（V8）の動き
 
 入口：`app/scenarios/first-step/page.tsx`（V8 のときだけ `src/v8/scenario-first-step/first-step.tsx`、それ以外は今の v7 の画面）。

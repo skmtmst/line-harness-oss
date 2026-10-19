@@ -1,3 +1,5 @@
+> 文書：友だち追加時の配信の実行結果（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 友だち追加時の配信の実行結果（V8）の動き
 
 入口：`app/friend-add-settings/runs/page.tsx`（V8 のときだけ `src/v8/friend-add-runs/runs.tsx`、それ以外は今の v7 の画面）。

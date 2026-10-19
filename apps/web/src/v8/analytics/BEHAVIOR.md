@@ -1,3 +1,5 @@
+> 文書：分析（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 分析（V8）の動き
 
 入口：`app/analytics/page.tsx`（V8 のときだけ `src/v8/analytics/analytics.tsx`、それ以外は今の画面 `AnalyticsInner`）。

@@ -1,3 +1,5 @@
+> 文書：統括API｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 統括API
 
 型は `packages/shared`、呼び出しは `apps/web/src/lib/hq-templates-api.ts`・`hq-broadcasts-api.ts`・`api-hq-deliveries.ts` にあります。口の一覧はWorkerのOpenAPIで確認します。

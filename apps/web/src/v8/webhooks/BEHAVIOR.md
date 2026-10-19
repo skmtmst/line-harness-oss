@@ -1,3 +1,5 @@
+> 文書：外部連携（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 外部連携（V8）の動き
 
 入口：`app/webhooks/page.tsx`（V8 のときだけ、タブごとに `src/v8/webhooks/*.tsx`）と `app/webhooks/new/page.tsx`（V8 のときだけ `src/v8/webhooks/create.tsx`）。

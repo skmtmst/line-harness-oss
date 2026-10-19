@@ -1,3 +1,5 @@
+> 文書：統括（/hq）の画面の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 統括（/hq）の画面の動き（BEHAVIOR.md）
 
 対象：`home.tsx`・`account-dialogs.tsx`・`settings.tsx`・`members.tsx`・`billing.tsx`・`support.tsx`・`support-detail.tsx`。

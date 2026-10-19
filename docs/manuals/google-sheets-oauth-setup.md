@@ -1,3 +1,5 @@
+> 文書：手順書：Googleスプレッドシート連携のためのGoogle Cloud設定（検証環境用）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 手順書：Googleスプレッドシート連携のためのGoogle Cloud設定（検証環境用）
 
 対象：運営（Google Cloud管理画面の操作）。Googleビジネス連携と同じGoogle Cloudプロジェクトを使う。

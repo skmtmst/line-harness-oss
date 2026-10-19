@@ -1,3 +1,5 @@
+> 文書：26 外部連携 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 26 外部連携 操作と挙動（受け入れ）
 
 要件の正本：[26 外部連携](../../v6-requirements/v6-26-external-integrations-requirements-draft.md)・[25 共通アクション接続契約 §6・§7](../../v6-requirements/v6-25-automation-action-contract.md)・[共通基盤 §3・§6-2（送信 Webhook は最大 8 回・24 時間）・§9・§11・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[30 §7〜§8 権限・§22 大事な操作の再確認](../../v6-requirements/v6-30-login-users-requirements-draft.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。

@@ -1,3 +1,5 @@
+> 文書：10 ウェビナー 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 10 ウェビナー 操作と挙動（受け入れ）
 
 要件の正本：[10 ウェビナー](../../v6-requirements/v6-10-webinar-requirements-draft.md)（§18 の確定条件を含む）・[共通基盤 §4・§6-2・§9・§11](../../v6-requirements/v6-shared-platform-requirements.md)・[索引 §5 横断契約](../../v6-requirements/v6-requirements-master-index.md)。オーナーの決定は `~/lh-work/design/v8/V8-INTRO-CHECKLIST.md` の B-158・B-160（状態の言葉）・B-232（行の「…」）・B-129（CTA の押したとき）。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。

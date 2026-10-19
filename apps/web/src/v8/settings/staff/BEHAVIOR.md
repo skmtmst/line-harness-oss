@@ -1,3 +1,5 @@
+> 文書：ログインユーザーの動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # ログインユーザーの動き（BEHAVIOR.md）
 
 対象：`app/staff/page.tsx` は `staff.tsx` を常に出す。板 `nku0f`（管理者）・`A35Gh`（閲覧のみ）・`wbDHy`（1152）・`bMpC5`（止める）。

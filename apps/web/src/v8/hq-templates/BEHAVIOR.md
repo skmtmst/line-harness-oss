@@ -1,3 +1,5 @@
+> 文書：統括のテンプレートの動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 統括のテンプレートの動き（BEHAVIOR.md）
 
 対象：`console.tsx`（★V8-B 一覧 `LRc93`・メッセージのひな形を作る `X4JcOf`・アカウントへ配る `meBRB`）と `message-form.tsx`（`X4JcOf` の中身）。

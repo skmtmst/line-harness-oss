@@ -1,3 +1,5 @@
+> 文書：LINE Harness Plugin Template｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # LINE Harness Plugin Template
 
 A template for building integrations that connect external services to LINE Harness.

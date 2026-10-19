@@ -1,3 +1,5 @@
+> 文書：外のサービスごとの起きうる失敗と復旧（全機能の横断）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 外のサービスごとの起きうる失敗と復旧（全機能の横断）
 
 正本：[共通基盤 §6-2](../../v6-requirements/v6-shared-platform-requirements.md)（再試行の既定）・[26 外部連携](../../v6-requirements/v6-26-external-integrations-requirements-draft.md)・[32 運用状態](../../v6-requirements/v6-32-operations-status-requirements-draft.md)・各機能の要件。この文書は、外のサービスとつながる所で何が起きうるか・今の作りがどう扱うか・画面にどう出すか・どう戻すかを 1 つにまとめたもの（2026-10-16 B-333）。コードは `~/lh-work/lh-claude-f`（2026-10-16 時点）を読んだ。

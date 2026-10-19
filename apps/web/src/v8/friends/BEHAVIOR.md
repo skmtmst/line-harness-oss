@@ -1,3 +1,5 @@
+> 文書：友だち（V8）の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 友だち（V8）の動き（BEHAVIOR.md）
 
 対象：src/v8/friends の画面一式。v7 の画面（app/friends・app/duplicates・app/users・app/friends/migrations・app/accounts の UID移行）から動きを写し、見た目だけを Pencil ★V8 の絵どおりに一から書いた。

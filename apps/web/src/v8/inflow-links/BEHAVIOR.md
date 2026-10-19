@@ -1,3 +1,5 @@
+> 文書：流入と計測の一覧（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 流入と計測の一覧（V8）の動き
 
 入口：`app/inflow-links/page.tsx`（`?tab` なし／`?tab=links` は `src/v8/inflow-links/list.tsx`。全経路をV8に固定）。

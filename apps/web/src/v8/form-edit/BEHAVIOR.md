@@ -1,3 +1,5 @@
+> 文書：回答フォームの編集の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 回答フォームの編集の動き（BEHAVIOR.md）
 
 対象：今までの画面 `app/form-submissions/edit/page.tsx`（v7 と、その中の `renderV8Edit`）。ここから動きを写して `edit.tsx` を一から書いた。見た目は作る型（CreatePage）と共通部品で組んだ。

@@ -1,3 +1,5 @@
+> 文書：LINEアカウントの詳細・乗り換え（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # LINEアカウントの詳細・乗り換え（V8）の動き
 
 入口：`app/accounts/detail/page.tsx`（V8 のときだけ `src/v8/accounts-detail/detail.tsx`）と `app/accounts/handover/page.tsx`（V8 のときだけ `src/v8/accounts-detail/handover.tsx`）。

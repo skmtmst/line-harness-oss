@@ -1,3 +1,5 @@
+> 文書：健康日記（専用機能）の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 健康日記（専用機能）の動き（BEHAVIOR.md）
 
 対象：今までの V8 の健康日記（`app/nen/health/health-v8.tsx`）と v7（`page.tsx` の HealthInner・`health-tab.tsx`・`items-tab.tsx`・`summary-drawer.tsx`）。動きを写して、`health.tsx`（外枠と一覧）・`summary.tsx`（30日のまとめと印刷面）・`items.tsx`（記録の項目）を一から書いた。見た目は型（ListPage）と部品で組み直した。板は 一覧 `mIwA4`・30日のまとめ（引き出し）`BVuYh`・記録の項目 `z2tvtX`。
