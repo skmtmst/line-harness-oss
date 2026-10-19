@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { readNotificationStyle } from './notification-words.js';
 import { workflowBindings, workflowJson } from '@line-crm/db';
 import { bookingLinePlan } from '../features/booking/booking-line-delivery/index.js';
@@ -34,7 +35,7 @@ export async function prepareConfirmedEventBooking(db:D1Database,bookingId:strin
       reminder_day_before_enabled:number;reminder_hours_before:number|null;slot_starts_at:string;
       line_account_id:string;slot_id:string;lock_version:number;line_user_id:string|null}>();
   if(!row?.line_user_id)return [];
-  const starts=new Date(Date.parse(row.slot_starts_at)+9*3600000).toISOString();
+  const starts=japanCalendar(new Date(Date.parse(row.slot_starts_at))).toISOString();
   const notification=await prepareEventNotification(db,{accountId:row.line_account_id,
     operationId:`event-transition:${bookingId}:${row.lock_version+1}`,to:row.line_user_id,kind:'confirmed',
     ctx:{eventName:row.event_name,startsAtJst:`${starts.slice(0,10)} ${starts.slice(11,16)}`,

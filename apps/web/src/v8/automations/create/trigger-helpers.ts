@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /**
  * 毎週の曜日と対象の友だちの持ち方（R21・R22）。
  *
@@ -87,7 +88,7 @@ export const nextWeeklyRunText = (days: ReadonlyArray<number>, time: string): st
   const minute = Number(matched[2])
   const now = Date.now()
   // 日本時間の今日の0時（UTCの軸で計算する）。
-  const jstNow = new Date(now + 9 * 60 * 60 * 1000)
+  const jstNow = japanCalendar(new Date(now))
   const jstMidnight = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate())
   for (let offset = 0; offset < 8; offset += 1) {
     const candidate = new Date(jstMidnight + offset * 24 * 60 * 60 * 1000 + (hour * 60 + minute) * 60 * 1000)

@@ -1,3 +1,4 @@
+import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { verifyLineMessagingIdentity } from '../services/line-messaging-identity.js';
 import { expectedWebhookUrl as accountWebhookUrl } from '../lib/webhook-endpoint.js';
@@ -1216,11 +1217,7 @@ function stepPassed(steps: LineConnectStep[], order: LineConnectStep['order']): 
 
 /* 友だち数の統計は前日分しか無い。日本時間の昨日を yyyyMMdd で返す。 */
 export function insightDateJst(now: Date = new Date()): string {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000);
-  const year = jst.getUTCFullYear();
-  const month = String(jst.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(jst.getUTCDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
+  return japanDateOffset(-1, now).replaceAll('-', '');
 }
 
 /*

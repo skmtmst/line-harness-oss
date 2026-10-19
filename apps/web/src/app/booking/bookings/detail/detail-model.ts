@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { jstDate as japanDate } from '@/lib/jst-datetime'
 import { type BookingAdminDetail, type BookingAuditLog, type BookingNotificationPolicy, type BookingOperationResult } from '@/lib/api'
 
 import { formatDateTime, formatTime } from '@/lib/format'
@@ -143,12 +145,11 @@ export function jpStamp(iso: string): string {
 }
 
 export function jstDate(iso: string): string {
-  const jst = new Date(new Date(iso).getTime() + 9 * 3600_000)
-  return jst.toISOString().slice(0, 10)
+  return japanDate(new Date(iso))
 }
 
 export function jstHHMM(iso: string): string {
-  const jst = new Date(new Date(iso).getTime() + 9 * 3600_000)
+  const jst = japanCalendar(new Date(iso))
   return jst.toISOString().slice(11, 16)
 }
 

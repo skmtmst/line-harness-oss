@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 /*
  * 日付の差し込み。
  *
@@ -43,7 +44,7 @@ function isDateFormat(value: string): value is DateFormat {
 
 /** JST での年月日を取り出す。 */
 function jstParts(date: Date): { y: number; m: number; d: number; w: number } {
-  const jst = new Date(date.getTime() + 9 * 60 * 60_000)
+  const jst = japanCalendar(date)
   return {
     y: jst.getUTCFullYear(),
     m: jst.getUTCMonth() + 1,

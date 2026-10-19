@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 /**
  * 然-NEN- 健康日記の管理画面（★37-4）：記録から「変化」に気づくための計算。
  *
@@ -71,7 +72,7 @@ export function summarizePetHealth(logs: HealthLogRow[], today: Date): PetHealth
   const sorted = [...logs]
     .filter((log) => /^\d{4}-\d{2}-\d{2}$/.test(log.logged_on))
     .sort((a, b) => (a.logged_on < b.logged_on ? -1 : a.logged_on > b.logged_on ? 1 : 0));
-  const todayIdx = Math.floor(today.getTime() / 86_400_000);
+  const todayIdx = dayIndex(japanDate(today));
   const last = sorted[sorted.length - 1] ?? null;
   const daysSinceLast = last ? todayIdx - dayIndex(last.logged_on) : null;
   const count30d = sorted.filter((log) => todayIdx - dayIndex(log.logged_on) < 30).length;
@@ -130,7 +131,7 @@ export function lastLoggedLabel(summary: PetHealthSummary): string {
 
 /** 診察時に見せる「30 日のまとめ」。医療判断はしない。 */
 export function thirtyDaySummary(logs: HealthLogRow[], today: Date) {
-  const todayIdx = Math.floor(today.getTime() / 86_400_000);
+  const todayIdx = dayIndex(japanDate(today));
   const recent = logs
     .filter((log) => /^\d{4}-\d{2}-\d{2}$/.test(log.logged_on) && todayIdx - dayIndex(log.logged_on) < 30)
     .sort((a, b) => (a.logged_on < b.logged_on ? 1 : -1));

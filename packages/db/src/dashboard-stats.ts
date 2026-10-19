@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { sqlIdSet } from './id-queries.js';
 import type { FriendActiveMonthComparison as importFriendActiveMonthComparison } from '@line-crm/shared';
 import { type AccountStatsScope, type InboxStats, type FriendStats, type BroadcastStatsScope, type BroadcastStats } from './dashboard-types.js';
@@ -91,7 +92,7 @@ export async function getInboxStats(
 
 /** 前月末の記録が可視対象すべてに揃う場合だけ合計する。 */
 export async function getFriendActiveMonthComparison(db: D1Database, scope: AccountStatsScope, active: number, nowMs = Date.now()): Promise<importFriendActiveMonthComparison> {
-  const now = new Date(nowMs + 9 * 3600_000);
+  const now = japanCalendar(new Date(nowMs));
   const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0)).toISOString().slice(0, 10);
   const filter = snapshotScopeSql(scope);
   const row = await db.prepare(`SELECT COUNT(*) AS recorded, SUM(active) AS active FROM friend_daily_snapshots WHERE date = ? AND ${filter.sql}`)
@@ -119,7 +120,7 @@ export async function getFriendStats(
   const inbox = await inboxState(db, scope);
 
   // JST の月の頭。月をまたぐ集計は UTC のままだと9時間ずれる。
-  const now = new Date(Date.now() + 9 * 3600_000);
+  const now = japanCalendar();
   const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
   const lastMonth = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;

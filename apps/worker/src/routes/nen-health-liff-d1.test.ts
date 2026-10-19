@@ -5,7 +5,7 @@
  */
 import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 const liffAuth = vi.hoisted(() => ({ verifyCallerLineIdentity: vi.fn(), verifyCallerLineUserId: vi.fn() }));
@@ -17,9 +17,11 @@ const { nenMembers } = await import('./nen-members.js');
 
 let sql: Database.Database;
 let db: D1Database;
-const day = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
+const day = (daysAgo: number) => new Date(Date.parse('2026-10-20T00:00:00Z') - daysAgo * 86_400_000).toISOString().slice(0, 10);
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-19T15:09:00Z')); // 日本の10月20日00:09。見本の日付もこの暦日。
   const created = createTestD1();
   sql = created.raw;
   db = created.db;
@@ -109,4 +111,17 @@ describe('POST /api/liff/nen/health-logs（監査 R59/R61）', () => {
 it('API-02 health log rejects impossible dates instead of normalizing or using today',async()=>{
  const res=await liff('U-a').request('/api/liff/nen/health-logs',{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json'},body:JSON.stringify({petId:'pet-momo',loggedOn:'2026-02-30',stoolStatus:'normal',appetite:'good'})});
  expect(res.status).toBe(400);
+});
+
+
+afterEach(() => vi.useRealTimers());
+it.each(['2026-09-30T15:00:00Z', '2026-09-30T23:59:59Z', '2026-10-01T00:00:00Z'])('日本時間の朝も健康日記を当日で保存する: %s', async (at) => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(at));
+  const res = await liff('U-a').request('/api/liff/nen/health-logs', {
+    method: 'POST', headers: { Authorization: 'Bearer token', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ petId: 'pet-momo', stoolStatus: 'normal', appetite: 'normal', note: 'clock-fixture' }),
+  });
+  expect(res.status).toBe(201);
+  expect(sql.prepare("SELECT logged_on FROM nen_health_logs WHERE pet_id='pet-momo' AND note='clock-fixture'").get()).toEqual({ logged_on: '2026-10-01' });
 });

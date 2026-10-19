@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import {
   completeOperationHealthRun,
@@ -33,7 +34,6 @@ export type OperationInfraDeps = {
   queue?: Queue<unknown>;
 };
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const CREDENTIAL_WARNING_DAYS = 14;
 const INFRA_SLOW_MS = 3_000;
 const INFRA_ALERT_AFTER = 3;
@@ -51,12 +51,12 @@ const FRIEND_DECREASE_MIN_ABSOLUTE = 10;
  * 26時間前の受信を「直近24時間にあった」と数えてしまう。
  */
 function jstCutoff(nowIso: string, backMs: number): string {
-  return new Date(Date.parse(nowIso) + JST_OFFSET_MS - backMs).toISOString().replace('Z', '');
+  return japanCalendar(new Date(Date.parse(nowIso) - backMs)).toISOString().replace('Z', '');
 }
 
 /** JST の月初・翌月初を、台帳の JST 壁時計（オフセット無し）と同じ形で返す。 */
 function jstMonthBounds(nowIso: string): { monthStart: string; monthEnd: string; resetAt: string } {
-  const jst = new Date(Date.parse(nowIso) + JST_OFFSET_MS);
+  const jst = japanCalendar(new Date(Date.parse(nowIso)));
   const y = jst.getUTCFullYear();
   const m = jst.getUTCMonth();
   const pad = (n: number) => String(n).padStart(2, '0');

@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from './jst-datetime.js';
 import type {
   FormInputType, FormInputFormat, FormInputBlock, FormBlock, FormOptions,
   FormTheme, FormLayout, FormFieldCompat, FormAddressValue, FormDecorationBlock,
@@ -668,7 +669,7 @@ export function normalizeBookingValue(value: unknown): FormBookingValue | null {
 export function formatBookingStartsAt(startsAt: string): string {
   const time = Date.parse(startsAt);
   if (Number.isNaN(time)) return startsAt;
-  const jst = new Date(time + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(new Date(time));
   const month = jst.getUTCMonth() + 1;
   const day = jst.getUTCDate();
   const hour = String(jst.getUTCHours()).padStart(2, "0");

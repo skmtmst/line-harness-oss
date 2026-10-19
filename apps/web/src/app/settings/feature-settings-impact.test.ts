@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createAccountRequestGuard } from './account-request-guard'
+import { createAccountRequestGuard } from '@/v8/settings/features/account-request-guard'
 
 describe('機能設定のアカウント境界', () => {
   it('Aで取った応答をBへ混ぜず、Aの版でBへ保存しない', async () => {
