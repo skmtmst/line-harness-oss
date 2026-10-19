@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { BookingPhoto, BookingPhotoCatalog, BookingPhotoOwner, BookingStorePhotoSlot, MediaItem } from '@line-crm/shared'
+import type { BookingPhoto, BookingPhotoCatalog, BookingPhotoOwner, BookingStorePhotoSlot, BookingStorePhotoVisibility, MediaItem } from '@line-crm/shared'
 import { bookingPhotosApi } from '@/lib/api-booking-photos'
 import { api } from '@/lib/api'
+import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
 import Card, { CardContent } from '@/components/shared/card'
 import ListState, { ListEmptyMessage } from '@/components/shared/list-state'
@@ -24,10 +25,10 @@ const LABELS = { exterior: '外観', interior: '店内', waiting: '待合' }
 type Target = { owner: BookingPhotoOwner; id: string; name: string }
 const keyOf = (target: Target) => `${target.owner}:${target.id}`
 
-function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, disabledReason, onPick, onRemove, onSave, orderActions }: {
+function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, disabledReason, onPick, onRemove, onSave, orderActions, visibilityControl }: {
   name: string; fieldKey: string; photo: BookingPhoto | null; accountId: string; editable: boolean; changed: boolean; busy: boolean
   onPick: () => void; onRemove: () => void; onSave?: () => void; orderActions?: React.ReactNode
-  disabledReason?: string
+  disabledReason?: string; visibilityControl?: React.ReactNode
 }) {
   return <Card layout="vertical" overflow="hidden" aria-label={`${name}の写真`}>
     <div className={styles.photo}>
@@ -36,9 +37,10 @@ function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, 
     </div>
     <CardContent>
       <SectionHeader title={<TruncatedText value={name} />} />
-      {editable ? <SaveErrorField names={[fieldKey]}><div className={styles.actions} role="group" aria-label={`${name}の写真を選ぶ操作`}>
+      {visibilityControl}
+      {editable ? <SaveErrorField names={[fieldKey]}><div className={orderActions ? styles.storeActions : styles.actions} role="group" aria-label={`${name}の写真を選ぶ操作`}>
         <Button onClick={onPick} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を選ぶ`}>{photo ? '替える' : '写真を選ぶ'}</Button>
-        {photo ? <Button onClick={onRemove} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を外す`}>外す</Button> : null}
+        {photo || orderActions ? <Button onClick={onRemove} disabled={busy || !photo} disabledReason={disabledReason ?? (!photo ? '写真はありません。' : undefined)} aria-label={`${name}の写真を外す`}>外す</Button> : null}
         {orderActions}
         {onSave && changed ? <Button variant="primary" onClick={onSave} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を保存する`}>保存する</Button> : null}
       </div></SaveErrorField> : null}
@@ -53,6 +55,7 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
   const [catalog, setCatalog] = useState<BookingPhotoCatalog | null>(null)
   const [drafts, setDrafts] = useState<Record<string, BookingPhoto | null>>({})
   const [order, setOrder] = useState<BookingStorePhotoSlot[] | null>(null)
+  const [visibilityDraft, setVisibilityDraft] = useState<Partial<BookingStorePhotoVisibility>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
@@ -76,7 +79,7 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
     }
   }, [accountId])
   useEffect(() => {
-    setCatalog(null); setDrafts({}); setOrder(null); setPicker(null); setBusy(false); savingRef.current = false
+    setCatalog(null); setDrafts({}); setOrder(null); setVisibilityDraft({}); setPicker(null); setBusy(false); savingRef.current = false
     saveErrors.reset()
     void load()
     return () => { generation.current += 1 }
@@ -84,8 +87,9 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
 
   const store = catalog?.store
   const storeOrder = order ?? store?.order ?? []
-  const dirty = Object.keys(drafts).length > 0 || order !== null
-  const reset = () => { setDrafts({}); setOrder(null); setConflict(false); setError(''); saveErrors.reset() }
+  const visibility: BookingStorePhotoVisibility = { exterior: false, interior: false, waiting: false, ...store?.visibility, ...visibilityDraft }
+  const dirty = Object.keys(drafts).length > 0 || order !== null || Object.keys(visibilityDraft).length > 0
+  const reset = () => { setDrafts({}); setOrder(null); setVisibilityDraft({}); setConflict(false); setError(''); saveErrors.reset() }
   useV8TabEdit({ dirty, saving: busy, subject: '写真の変更', showBar: false, onReset: reset, onSave: () => {} })
 
   const value = (target: Target, saved: BookingPhoto | null) => Object.hasOwn(drafts, keyOf(target)) ? drafts[keyOf(target)]! : saved
@@ -108,7 +112,7 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
     if (!catalog || savingRef.current || conflict || loading) return
     if (target.owner === 'menu' ? !canEditMenus : !canEditSettings) return
     saveErrors.clear(keyOf(target))
-    if (target.owner === 'store') for (const slot of storeOrder) saveErrors.clear(`store:${slot}`)
+    if (target.owner === 'store') for (const slot of storeOrder) { saveErrors.clear(`store:${slot}`); saveErrors.clear(`store:visibility:${slot}`) }
     savingRef.current = true; setBusy(true); setError('')
     const request = generation.current
     try {
@@ -119,13 +123,13 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
           waiting: value({ owner: 'store', id: 'waiting', name: LABELS.waiting }, store.photos.waiting),
         }
         const result = await bookingPhotosApi.saveStore(accountId, {
-          expectedVersion: store.version, order: storeOrder,
+          expectedVersion: store.version, order: storeOrder, visibility,
           photos: { exterior: photos.exterior?.mediaId ?? null, interior: photos.interior?.mediaId ?? null, waiting: photos.waiting?.mediaId ?? null },
         })
         if (request !== generation.current) return
-        setCatalog(current => current ? { ...current, store: { ...store, photos, order: storeOrder, version: result.data.version } } : current)
+        setCatalog(current => current ? { ...current, store: { ...store, photos, order: storeOrder, visibility, version: result.data.version } } : current)
         setDrafts(current => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith('store:'))))
-        setOrder(null)
+        setOrder(null); setVisibilityDraft({})
       } else if (target.owner !== 'store') {
         const owner = target.owner === 'menu' ? 'menus' : 'staff'
         const item = catalog[owner].find(row => row.id === target.id)
@@ -144,8 +148,9 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
       const status = caught && typeof caught === 'object' && 'status' in caught ? caught.status : undefined
       const problems = readSaveFieldErrors(caught)
       const fields: Record<string, string> = Object.fromEntries(Object.entries(problems).map(([field, message]) => {
+        if (target.owner === 'store' && field.startsWith('visibility.') && Object.hasOwn(LABELS, field.slice(11))) return [`store:visibility:${field.slice(11)}`, message]
         if (target.owner === 'store' && field.startsWith('photos.') && Object.hasOwn(LABELS, field.slice(7))) return [`store:${field.slice(7)}`, message]
-        if (field === 'expectedVersion' || field === 'mediaId' || (target.owner === 'store' && (field === 'order' || field === 'photos'))) return [keyOf(target), message]
+        if (field === 'expectedVersion' || field === 'mediaId' || (target.owner === 'store' && (field === 'order' || field === 'photos' || field === 'visibility'))) return [keyOf(target), message]
         return [field, message]
       }))
       if ((status === 400 || status === 422) && !Object.keys(fields).length) fields[keyOf(target)] = '写真の選び方を確かめて、もう一度保存してください。'
@@ -163,7 +168,7 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
   if (!catalog) return <ListState kind="error" title="写真を読み込めませんでした" onRetry={() => void load()} />
   const disabled = busy || loading || conflict
   const disabledReason = conflict ? '最新の写真を読み直してから保存してください。' : busy ? '写真を保存しています。' : loading ? '写真を読み直しています。' : undefined
-  const storeChanged = order !== null || Object.keys(drafts).some(key => key.startsWith('store:'))
+  const storeChanged = Object.keys(visibilityDraft).length > 0 || order !== null || Object.keys(drafts).some(key => key.startsWith('store:'))
   return <SaveErrorScope errors={saveErrors}><div className={styles.root} aria-busy={busy}>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {error ? <Button onClick={() => void load()} disabled={busy || loading} disabledReason={busy ? '写真を保存しています。' : '写真を読み直しています。'}>入力を残して読み直す</Button> : null}
@@ -175,6 +180,10 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
           const target = { owner: 'store' as const, id: slot, name: LABELS[slot] }
           return <PhotoCard key={slot} name={target.name} fieldKey={keyOf(target)} photo={value(target, store?.photos[slot] ?? null)} accountId={accountId} editable={canEditSettings}
             changed={storeChanged} busy={disabled} disabledReason={disabledReason} onPick={() => setPicker(target)} onRemove={() => change(target, null)}
+            visibilityControl={canEditSettings ? <SaveErrorField names={[`store:visibility:${slot}`]}><Checkbox
+              aria-label={`${target.name}をお客さまの予約画面に出す`} checked={visibility[slot]} disabled={disabled}
+              onCheckedChange={next => { saveErrors.clear('store:'); saveErrors.clear(`store:visibility:${slot}`); setVisibilityDraft(current => ({ ...current, [slot]: next })) }}
+            >お客さまの予約画面に出す</Checkbox></SaveErrorField> : null}
             orderActions={<>
               <Button aria-label={`${target.name}を前へ`} disabled={disabled || index === 0} disabledReason={disabledReason ?? (index === 0 ? 'これが先頭の写真です。' : undefined)} onClick={() => { saveErrors.clear('store:'); const next = [...storeOrder]; [next[index - 1], next[index]] = [next[index]!, next[index - 1]!]; setOrder(next) }}>前へ</Button>
               <Button aria-label={`${target.name}を後へ`} disabled={disabled || index === storeOrder.length - 1} disabledReason={disabledReason ?? (index === storeOrder.length - 1 ? 'これが最後の写真です。' : undefined)} onClick={() => { saveErrors.clear('store:'); const next = [...storeOrder]; [next[index + 1], next[index]] = [next[index]!, next[index + 1]!]; setOrder(next) }}>後へ</Button>

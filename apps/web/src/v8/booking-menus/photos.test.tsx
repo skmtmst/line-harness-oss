@@ -57,7 +57,7 @@ describe('BA-19 予約写真の編集', () => {
     expect(within(section).getAllByRole('region').map(el => el.getAttribute('aria-label'))).toEqual(['店内の写真', '外観の写真', '待合の写真'])
     fireEvent.click(screen.getByRole('button', { name: '外観の写真を外す' }))
     fireEvent.click(screen.getByRole('button', { name: 'お店の写真を保存する' }))
-    await waitFor(() => expect(net.saveStore).toHaveBeenCalledWith('a', { expectedVersion: 3, order: ['interior', 'exterior', 'waiting'], photos: { exterior: null, interior: 'inside', waiting: null } }))
+    await waitFor(() => expect(net.saveStore).toHaveBeenCalledWith('a', { expectedVersion: 3, order: ['interior', 'exterior', 'waiting'], visibility: { exterior: false, interior: false, waiting: false }, photos: { exterior: null, interior: 'inside', waiting: null } }))
   })
   it('スタッフの写真も専用の版で保存する', async () => {
     show()
@@ -179,4 +179,48 @@ describe('BA-19 予約写真の編集', () => {
     expect(screen.getByRole('region', { name: 'B店の相談の写真' }).querySelector('img')?.getAttribute('src')).toContain('/old/')
     expect(net.saved).not.toHaveBeenCalled()
   })
+  it('公開の選択だけでも書きかけになり、写真・順・版と一緒に保存して読み直せる', async () => {
+    const register = vi.fn()
+    const view = show(undefined, 'a', register)
+    const exterior = await screen.findByRole('checkbox', { name: '外観をお客さまの予約画面に出す' })
+    expect((exterior as HTMLInputElement).checked).toBe(false)
+    fireEvent.click(exterior)
+    await waitFor(() => expect(register).toHaveBeenLastCalledWith(expect.objectContaining({ dirty: true })))
+    fireEvent.click(screen.getByRole('button', { name: 'お店の写真を保存する' }))
+    const visibility = { exterior: true, interior: false, waiting: false }
+    await waitFor(() => expect(net.saveStore).toHaveBeenCalledWith('a', { expectedVersion: 3, order: ['exterior', 'interior', 'waiting'], photos: { exterior: 'old', interior: 'inside', waiting: null }, visibility }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'お店の写真を保存する' })).toBeNull())
+    expect((exterior as HTMLInputElement).checked).toBe(true)
+    view.unmount()
+    const latest = catalog(); latest.store!.visibility = visibility; latest.store!.version = 5
+    net.list.mockResolvedValue({ success: true, data: latest })
+    show()
+    expect((await screen.findByRole('checkbox', { name: '外観をお客さまの予約画面に出す' }) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByRole('checkbox', { name: '店内をお客さまの予約画面に出す' }) as HTMLInputElement).checked).toBe(false)
+  })
+  it.each([503, 409])('公開設定の保存が%sでも選択を残し、読み直しで他人の変更を保って再保存する', async status => {
+    net.saveStore.mockRejectedValueOnce({ status })
+    const latest = catalog(); latest.store!.version = 8; latest.store!.visibility = { exterior: false, interior: true, waiting: false }
+    net.list.mockResolvedValueOnce({ success: true, data: catalog() }).mockResolvedValueOnce({ success: true, data: latest })
+    show()
+    fireEvent.click(await screen.findByRole('checkbox', { name: '外観をお客さまの予約画面に出す' }))
+    fireEvent.click(screen.getByRole('button', { name: 'お店の写真を保存する' }))
+    await screen.findByRole('alert')
+    expect((screen.getByRole('checkbox', { name: '外観をお客さまの予約画面に出す' }) as HTMLInputElement).checked).toBe(true)
+    expect(net.saved).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '入力を残して読み直す' }))
+    await waitFor(() => expect((screen.getByRole('checkbox', { name: '店内をお客さまの予約画面に出す' }) as HTMLInputElement).checked).toBe(true))
+    fireEvent.click(screen.getByRole('button', { name: 'お店の写真を保存する' }))
+    await waitFor(() => expect(net.saveStore).toHaveBeenLastCalledWith('a', expect.objectContaining({ expectedVersion: 8, visibility: { exterior: true, interior: true, waiting: false } })))
+  })
+  it('閲覧のみは公開の切り替えも隠し、空の写真の操作枠はほかのカードとそろえる', async () => {
+    const view = show({ canEditMenus: false, canEditSettings: false })
+    await screen.findByRole('region', { name: 'お店の写真' })
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    view.unmount()
+    show()
+    const waiting = await screen.findByRole('region', { name: '待合の写真' })
+    expect((within(waiting).getByRole('button', { name: '待合の写真を外す' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
 });
