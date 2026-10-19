@@ -1,3 +1,4 @@
+import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { RESERVATION_FILTER_STATUSES } from './restaurant-reservation-filter.js';
 import type { SeatWaitlistEntryLike } from './restaurant-context-types.js';
@@ -278,8 +279,9 @@ export const patch__api_restaurant_test_reservations_id_5 = async (c: Context<En
     next.customer_name = value;
   }
   if (has('customerPhone')) {
+    if (body.customerPhone != null && (typeof body.customerPhone !== 'string' || phoneProblem(body.customerPhone))) return inputError(c, { success: false, error: '電話番号は0から始まる10〜11桁の数字で入れてください。' }, 400, ['customerPhone']);
     next.customer_phone = typeof body.customerPhone === 'string' && body.customerPhone.trim()
-      ? body.customerPhone.trim()
+      ? normalizePhone(body.customerPhone)
       : null;
   }
   if (has('guestCount')) {
@@ -394,13 +396,14 @@ export const post__api_restaurant_test_seat_waitlist_6 = async (c: Context<Env, 
   if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) {
     return inputError(c, { success: false, error: '店舗が正しくありません' }, 400, ["storeId"]);
   }
+  if (body.customerPhone != null && (typeof body.customerPhone !== 'string' || phoneProblem(body.customerPhone))) return inputError(c, { success: false, error: '電話番号は0から始まる10〜11桁の数字で入れてください。' }, 400, ['customerPhone']);
   const result = await insertSeatWaitlistEntry(dbFor(c.env, storeId), {
     storeId,
     startsAt: typeof body.startsAt === 'string' ? body.startsAt : '',
     guestCount: Number(body.guestCount),
     customerName: typeof body.customerName === 'string' ? body.customerName : '',
     customerPhone: typeof body.customerPhone === 'string' && body.customerPhone.trim()
-      ? body.customerPhone.trim() : null,
+      ? normalizePhone(body.customerPhone) : null,
     lineUid: typeof body.lineUid === 'string' && body.lineUid.trim() ? body.lineUid.trim() : null,
   });
   if (!result.ok) {
@@ -510,7 +513,7 @@ export const post__api_restaurant_test_seat_waitlist_id_convert_9 = async (c: Co
     || reservation.starts_at !== entry.starts_at
     || reservation.guest_count !== entry.guest_count
     || reservation.table_id!==entry.table_id
-    || (entry.line_uid?reservation.line_uid!==entry.line_uid:reservation.customer_phone!==entry.customer_phone)) {
+    || (entry.line_uid?reservation.line_uid!==entry.line_uid:normalizePhone(reservation.customer_phone??'')!==normalizePhone(entry.customer_phone??''))) {
     return c.json({ success: false, error: '予約が待ちと合いません' }, 409);
   }
   const updated=await dbFor(c.env, entry.store_id).prepare(

@@ -19,7 +19,7 @@ export const tenantCompanyContactPaths = {
     },
     patch: {
       tags: ['Tenants'], summary: '所属する統括の会社と連絡先を保存する（オーナー・管理者）',
-      description: '郵便番号は7桁（ハイフン許可・保存時除去）。電話番号は国内10〜11桁または+付き国際番号10〜15桁。必須6項目、任意2項目。同じ内容の再送は版と監査を増やさず成功。異なる内容で版が古いと409。閲覧のみは保存不可。',
+      description: '郵便番号は7桁（ハイフン許可・保存時除去）。電話番号は0始まりの国内10〜11桁。全角・空白・括弧・ハイフンを受け付け、半角数字だけ保存。必須6項目、任意2項目。同じ内容の再送は版と監査を増やさず成功。異なる内容で版が古いと409。閲覧のみは保存不可。',
       requestBody: { required: true, content: { 'application/json': { schema: {
         type: 'object', required: [...COMPANY_CONTACT_FIELDS.filter(field => field.required).map(field => field.key), 'expectedRevision'],
         properties: { ...properties, expectedRevision: { type: 'integer', minimum: 0 } },

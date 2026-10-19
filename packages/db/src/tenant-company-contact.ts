@@ -1,4 +1,5 @@
 import type { TenantCompanyContact, TenantCompanyContactInfo } from '@line-crm/shared';
+import { normalizePhone } from '@line-crm/shared';
 
 const COLUMNS = `legal_company_name AS legalCompanyName, company_postal_code AS postalCode,
   company_address AS address, company_building AS building, company_phone AS phone,
@@ -6,8 +7,9 @@ const COLUMNS = `legal_company_name AS legalCompanyName, company_postal_code AS 
   company_settings_version AS revision`;
 const SELECT = `SELECT ${COLUMNS} FROM tenants WHERE id=?`;
 
-export function getTenantCompanyContact(db: D1Database, tenantId: string) {
-  return db.prepare(SELECT).bind(tenantId).first<TenantCompanyContactInfo>();
+export async function getTenantCompanyContact(db: D1Database, tenantId: string) {
+  const row = await db.prepare(SELECT).bind(tenantId).first<TenantCompanyContactInfo>();
+  return row ? { ...row, phone: row.phone ? normalizePhone(row.phone) : null } : null;
 }
 
 function sameContact(a: TenantCompanyContact, b: TenantCompanyContact): boolean {

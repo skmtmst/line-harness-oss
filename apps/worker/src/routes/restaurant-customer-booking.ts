@@ -1,3 +1,4 @@
+import { normalizePhone } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { identity } from './restaurant-customer-identity.js';
 import { assignRestaurantTable } from '../features/booking/booking-assignment/index.js';
@@ -140,7 +141,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
   if (old) {
     if (
       old.note !== customerDetailValue(body.note) ||
-      old.customer_phone !== customerDetailValue(body.customerPhone) ||
+      (normalizePhone(old.customer_phone ?? '') || null) !== (normalizePhone(body.customerPhone ?? '') || null) ||
       old.starts_at !== startsAt ||
       old.guest_count !== body.guestCount ||
       (old.course_id ?? null) !== (body.courseId || null) ||
@@ -201,7 +202,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       expires,
       body.requestId,
       customerDetailValue(body.note),
-      customerDetailValue(body.customerPhone),
+      (normalizePhone(body.customerPhone ?? '') || null),
       body.courseId || null,
       store.id,
       result.hoursVersion,
@@ -268,7 +269,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         (action === 'confirm' && row.status === 'confirmed') ||
         (action === 'cancel' && row.status === 'cancelled')
       ) {
-        if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && customerDetailValue(b.customerPhone)!==row.customer_phone))) return c.json({success:false,error:'request_conflict'},409);
+        if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && (normalizePhone(b.customerPhone ?? '') || null)!==(normalizePhone(row.customer_phone ?? '') || null)))) return c.json({success:false,error:'request_conflict'},409);
         if(action==='confirm' && typeof b.referralId==='string') await acceptReferral(db,b.referralId,store.id,row.id,self.uid,row.customer_version).run();
         await finish(c, store);
         return c.json({ success: true, data: customerBooking(row) });
@@ -357,7 +358,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       const next = {
         ...row,
         note: action === 'confirm' && b.note !== undefined ? customerDetailValue(b.note) : row.note,
-        customer_phone: action === 'confirm' && b.customerPhone !== undefined ? customerDetailValue(b.customerPhone) : row.customer_phone,
+        customer_phone: action === 'confirm' && b.customerPhone !== undefined ? (normalizePhone(b.customerPhone ?? '') || null) : row.customer_phone,
         status: action === 'cancel' ? 'cancelled' : 'confirmed',
         starts_at: starts,
         ends_at: ends,

@@ -173,18 +173,7 @@ export function noteProblem(note: string): string {
   return [...note.trim()].length > 200 ? 'ご要望は200字までで書いてください。' : '';
 }
 
-/** 電話の書き方をそろえる (全角のハイフン・長音・＋を半角へ)。 */
-export function normalizePhone(phone: string): string {
-  return phone.trim().replace(/[－‐ー―−]/g, '-').replace(/＋/g, '+');
-}
-
-/** 電話の確かめ (口と同じ：50字まで・数字・空白・括弧・ハイフン・+)。空は送らない。 */
-export function phoneProblem(phone: string): string {
-  const t = normalizePhone(phone);
-  if (!t) return '';
-  if (t.length > 50 || !/^[+0-9０-９()（）\s-]+$/.test(t)) return '電話番号は数字とハイフンで入れてください。';
-  return '';
-}
+export { normalizePhone, phoneProblem } from '@line-crm/shared';
 
 /**
  * 取り消し・変更の締め切り。「前日 21:00」「当日 17:00」「10月5日（月）21:00」。
