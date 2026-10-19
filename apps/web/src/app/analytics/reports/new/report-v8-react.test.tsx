@@ -60,6 +60,8 @@ const net = vi.hoisted(() => ({
   latestVersion: '2026-09-01T00:00:00.000Z',
   latestName: null as string | null,
   role: 'owner' as 'owner' | 'staff',
+  noStaff: false,
+  posts: [] as Record<string, unknown>[],
 }))
 
 function installFetch() {
@@ -86,6 +88,10 @@ function installFetch() {
       net.puts.push(1)
       return new Response(JSON.stringify({ success: true, data: { ...SCHEDULE, updatedAt: '2026-09-03T00:00:00.000Z' } }), { status: 200 })
     }
+    if (url.pathname.startsWith('/api/analytics/report-schedules') && init?.method === 'POST') {
+      net.posts.push(JSON.parse((init as RequestInit).body as string))
+      return new Promise<Response>(() => {})
+    }
     if (url.pathname.startsWith('/api/analytics/report-schedules')) {
       // 初回の読み込みは保存済みの名前、取り直しはほかの人が変えた名前。
       net.gets += 1
@@ -94,7 +100,7 @@ function installFetch() {
       const name = net.latestName ?? (net.gets === 1 ? SCHEDULE.name : 'ほかの人が変えた名前')
       return new Response(JSON.stringify({
         success: true,
-        data: { items: [{ ...SCHEDULE, name, updatedAt: net.latestVersion }], options: OPTIONS },
+        data: { items: [{ ...SCHEDULE, name, updatedAt: net.latestVersion }], options: net.noStaff ? { ...OPTIONS, recipients: [] } : OPTIONS },
       }), { status: 200 })
     }
     return new Response(JSON.stringify({ success: false, error: '未設定' }), { status: 500 })
@@ -155,6 +161,8 @@ beforeEach(() => {
   fixture.accountId = 'account-a'
   fixture.pushes.length = 0
   net.puts.length = 0
+  net.noStaff = false
+  net.posts.length = 0
   net.putMode = 'ok'
   net.deferred.length = 0
   net.gets = 0
@@ -483,4 +491,43 @@ describe('V8 作成時の競合小窓（G83vi）', () => {
     await settle()
     expect(container.textContent).toContain('定期レポートを更新しました')
   })
+})
+
+it('担当者候補0人でもメール宛先だけで作成でき、1回送信は確認してから1要求だけ送る', async () => {
+  net.noStaff = true
+  await mount()
+  await settle()
+  expect(container.textContent).toContain('だれに送りますか')
+  await act(async () => { fireEvent.change(container.querySelector('input[placeholder="例：週次まとめ"]')!, { target: { value: 'メールだけの集計' } }) })
+  await click(buttonByText('＋ 宛先を足す'))
+  await click(buttonByText('メールだけの宛先を足す'))
+  await act(async () => { fireEvent.change(container.querySelector('input[aria-label="宛先のメールアドレス 1行目"]')!, { target: { value: 'report@example.com' } }) })
+  await click(buttonByText('通知方法：管理画面'))
+  await act(async () => {
+    fireEvent.click(container.querySelector('#report-channels')!)
+    fireEvent.click([...container.querySelectorAll('input[type="checkbox"]')].find(el => el.closest('label')?.textContent?.includes('メールでも送る'))!)
+  })
+  await click(buttonByText('今すぐ1回だけ送る'))
+  expect(net.posts).toHaveLength(0)
+  const dialog = document.querySelector('[role="dialog"]')!
+  expect(dialog.textContent).toContain('report@example.com')
+  expect(dialog.textContent).toContain('通知方法: メール')
+  expect(dialog.textContent).not.toContain('送る間かく')
+  const confirm = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === 'この宛先へ1回だけ送る')!
+  await act(async () => { confirm.click(); confirm.click() })
+  await settle()
+  expect(net.posts).toHaveLength(1)
+  expect(net.posts[0]).toMatchObject({ sendOnce: true, channels: ['email'], recipients: [{ kind: 'email', email: 'report@example.com' }] })
+})
+
+it('定期レポート作成の同じイベント内の連打も同期して1要求に止める', async () => {
+  await mount()
+  await settle()
+  await act(async () => { fireEvent.change(container.querySelector('input[placeholder="例：週次まとめ"]')!, { target: { value: '連打しても一つ' } }) })
+  await pickEntities('レポートを受け取る人', ['担当1'])
+  const create = buttonByText('つくって動かす')
+  await act(async () => { create.click(); create.click() })
+  await settle()
+  expect(net.posts).toHaveLength(1)
+  expect(net.posts[0]).toMatchObject({ sendOnce: false })
 })

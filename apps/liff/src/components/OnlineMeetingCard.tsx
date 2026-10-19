@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, type BookingHistoryItem } from '../lib/api.js';
 import Icon from './ui/Icon.js';
 import Button from './ui/Button.js';
+import { useCustomerStyle } from './CustomerStyleScope.js';
 
 /**
  * 予約が済んだあとのオンラインの会議（B7・★V8 sjkwK・I5hxa）。
@@ -29,23 +30,41 @@ function hm(ms: number): string {
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 
-export default function OnlineMeetingCard({ bookingId, status, now = () => Date.now() }: { bookingId: string | null | undefined; status: string; now?: () => number }) {
+export function safeMeetingUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password ? url.href : null; }
+  catch { return null; }
+}
+
+export default function OnlineMeetingCard({ bookingId, status, booking, now = () => Date.now() }: { bookingId: string | null | undefined; status: string; booking?: BookingHistoryItem; now?: () => number }) {
   const [item, setItem] = useState<BookingHistoryItem | null>(null);
+  const style = useCustomerStyle();
+  const current = booking ?? item;
+  const [, tick] = useState(0);
   useEffect(() => {
-    if (!bookingId) return;
+    if (current?.meeting_mode !== 'online' || current.status !== 'confirmed' || status !== 'confirmed') return;
+    const timer = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, [current?.meeting_mode, current?.status, status]);
+  useEffect(() => {
+    setItem(null);
+    if (!bookingId || booking) return;
     let alive = true;
     void Promise.resolve().then(() => api.me()).then((res) => {
       if (alive) setItem([...res.upcoming, ...res.past].find((entry) => entry.id === bookingId) ?? null);
     }).catch(() => undefined);
     return () => { alive = false; };
-  }, [bookingId]);
-  if (!item || item.meeting_mode !== 'online') return null;
-  const confirmed = status === 'confirmed' && item.status === 'confirmed';
-  const provider = confirmed ? meetingProvider(item.meeting_url) : null;
-  const start = new Date(item.starts_at).getTime();
-  const end = item.ends_at ? new Date(item.ends_at).getTime() : start + 60 * 60 * 1000;
+  }, [bookingId, booking]);
+  if (!current || current.id !== bookingId) return null;
+  if (current.meeting_mode === 'in_person') return style === 'consult' ? <p className="text-[13px] leading-5 text-ink">対面で行います。場所はトークのご案内をご確認ください。</p> : null;
+  if (current.meeting_mode !== 'online') return null;
+  const confirmed = status === 'confirmed' && current.status === 'confirmed';
+  const url = safeMeetingUrl(current.meeting_url);
+  const provider = confirmed ? meetingProvider(url) : null;
+  const start = new Date(current.starts_at).getTime();
+  const end = current.ends_at ? new Date(current.ends_at).getTime() : start + 60 * 60 * 1000;
   const t = now();
-  const open = confirmed && item.meeting_url && t >= start - JOIN_BEFORE_MS && t <= end;
+  const open = confirmed && url && t >= start - JOIN_BEFORE_MS && t <= end;
   return (
     <section aria-label="オンラインの会議" className="space-y-2.5 rounded-(--liff-radius-lg) bg-canvas p-3.5 outline outline-2 -outline-offset-2 outline-liff-primary">
       <p className="flex items-center gap-2 text-[15px] font-bold text-ink">
@@ -54,16 +73,16 @@ export default function OnlineMeetingCard({ bookingId, status, now = () => Date.
       </p>
       {!confirmed ? (
         <p className="text-[13px] leading-5 text-ink">会議の自動発行は準備中です。確定後の参加用URLは、トークで担当者へご確認ください。</p>
-      ) : !item.meeting_url ? (
+      ) : !url ? (
         <p className="text-[13px] leading-5 text-ink">会議の自動発行は準備中です。参加用URLは、トークで担当者へご確認ください。</p>
       ) : (
         <>
-          <p className="text-[13px] leading-5 text-ink">{`担当：${item.staff_name}`}</p>
+          <p className="text-[13px] leading-5 text-ink">{`担当：${current.staff_name}`}</p>
           {open ? (
-            <Button variant="primary" onClick={() => window.open(item.meeting_url ?? '', '_blank', 'noopener')}>会議に参加する</Button>
+            <Button variant="primary" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>会議に参加する</Button>
           ) : null}
           <p className="text-xs leading-[18px] text-liff-sub">
-            {open ? '会議の画面が開きます。' : `開始 10 分前（${hm(start - JOIN_BEFORE_MS)}）から参加のボタンが出ます。`}
+            {open ? '会議の画面が開きます。' : t > end ? '面談の終了時刻を過ぎています。' : `開始 10 分前（${hm(start - JOIN_BEFORE_MS)}）から参加のボタンが出ます。`}
           </p>
         </>
       )}

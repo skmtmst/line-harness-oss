@@ -1,5 +1,6 @@
+import { useCustomerWords } from './CustomerStyleScope.js';
 import PaymentPreparingNote from './PaymentPreparingNote.js';
-import { PAYMENT_UNKNOWN, CUSTOMER_WORDS } from '../lib/customer-words.js';
+import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
@@ -36,6 +37,7 @@ export default function Done({
   /** 無断キャンセルが続いている人への前払いのみの案内。無いときは出さない。 */
   prepayNotice?: string | null;
 }) {
+  const words = useCustomerWords();
   // initLiff() は ?liffId=... をクエリから読むので、内部遷移でも保持する。
   // search を維持しないと「予約の履歴を見る」→ WebView 再読み込みで liffId が失われる。
   const { search } = useLocation();
@@ -82,7 +84,7 @@ export default function Done({
             </>
           ) : (
             <>
-              ご利用先が確かめたら、LINE でお知らせします。
+              {`${words.contact}が確かめたら、LINE でお知らせします。`}
               <br />
               この画面は閉じてかまいません。
             </>
@@ -98,7 +100,7 @@ export default function Done({
           </dd>
         </div>
         <div className="flex h-10 items-start gap-2 py-2.5">
-          <dt className="w-18 shrink-0 text-xs text-liff-sub">{CUSTOMER_WORDS.bookingContent}</dt>
+          <dt className="w-18 shrink-0 text-xs text-liff-sub">{words.bookingContent}</dt>
           <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={menuName}>
             {menuName}
           </dd>
@@ -106,7 +108,7 @@ export default function Done({
         <div className="flex h-10 items-start gap-2 py-2.5">
           <dt className="w-18 shrink-0 text-xs text-liff-sub">状態</dt>
           <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">
-            {status === 'confirmed' ? '確定' : CUSTOMER_WORDS.approvalPending}
+            {status === 'confirmed' ? '確定' : words.approvalPending}
           </dd>
         </div>
       </dl>
@@ -121,7 +123,7 @@ export default function Done({
           <p className="mt-1 text-[13px] leading-6 text-liff-sub">{prepayNotice}</p>
           {payState === 'phone' || payState === 'failed' ? (
             <p className="mt-2 text-[13px] leading-6 text-ink" role="status">
-              {payState === 'failed' ? PAYMENT_UNKNOWN : 'アプリでのお支払いは準備中です。支払い方法はご利用先に電話で確認してください。'}
+              {payState === 'failed' ? PAYMENT_UNKNOWN : `アプリでのお支払いは準備中です。支払い方法は${words.contact}に${words.contact === '担当' ? 'LINEで' : '電話で'}確認してください。`}
             </p>
           ) : (
             <Button

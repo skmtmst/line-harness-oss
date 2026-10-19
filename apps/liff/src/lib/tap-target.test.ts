@@ -23,7 +23,7 @@ describe('押せる所の大きさ', () => {
       ['../components/DateTimePicker.tsx', 'aria-label="前の月"'],
       ['../components/HelpTip.tsx', 'aria-label={label}'],
       ['../pages/seat/SeatPick.tsx', 'aria-label="人数を増やす"'],
-      ['../pages/EventBookings.tsx', 'のイベントを見る`}'],
+      ['../pages/EventBookings.tsx', 'の${words.event}を見る`}'],
     ];
     for (const [file, marker] of cases) {
       const src = read(file);

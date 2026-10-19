@@ -3,6 +3,7 @@
 import { japaneseDetailOf } from '@/components/shared/api-error-message';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import type { SavedViewDraft, SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
+import FriendInfoSidebarBoundary from '@/components/chats/friend-info-sidebar-boundary';
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar';
 import Notice from '@/components/shared/notice';
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -694,7 +695,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     messageContent,
   })
 
-  const lineContent = (<FriendInfoSidebar
+  const lineContent = (<FriendInfoSidebarBoundary resetKey={`${selectedAccountId ?? ''}:${activeFriendId ?? ''}`}><FriendInfoSidebar
             lastContactAt={chatDetail && chatDetail.id === selectedChatId ? chatDetail.lastMessageAt : null}
             friendId={activeFriendId}
             accountId={selectedAccountId ?? undefined}
@@ -716,7 +717,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 ? { status: chatDetail.status, notes: chatDetail.notes }
                 : undefined
             }
-          />)
+          /></FriendInfoSidebarBoundary>)
 
   return (
     <SaveErrorScope errors={saveErrors}><div className="space-y-3">

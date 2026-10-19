@@ -1,4 +1,4 @@
-import { CUSTOMER_WORDS } from '../lib/customer-words.js';
+import { useCustomerWords } from '../components/CustomerStyleScope.js';
 import { useUrlStep } from '../lib/use-url-step.js';
 import WaitlistOfferSheet from '../components/WaitlistOfferSheet.js';
 import { useEffect, useRef, useState } from 'react';
@@ -21,7 +21,6 @@ import { initialParty, partyCapable, type PartyState } from '../lib/party.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
-const STEPS = [CUSTOMER_WORDS.bookingContent, '担当', '日時', '確認'];
 
 /**
  * ご予約 (★V8・IruGD→biNP5→M2p63S/k3aJKU→gLReL→VU6Xi)。手順は4つ。
@@ -29,6 +28,7 @@ const STEPS = [CUSTOMER_WORDS.bookingContent, '担当', '日時', '確認'];
  * 上の帯は ×・題・店名 (LiffHeader)。手順の印は短い緑の棒 (Stepper)。
  */
 export default function Booking() {
+  const words = useCustomerWords();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const isPeek = params.get('mode') === 'peek';
@@ -118,6 +118,7 @@ export default function Booking() {
   /* 2 人以上・追加メニューあり。確認と送信を組の形にする。 */
   const partyActive = party.size > 1 || party.members[0]?.addonIds.length > 0;
   const partyMode = step === 'menu' && !changingMenu && partyCapable(menu);
+  const STEPS = [words.bookingContent, words.staff, '日時', '確認'];
   const steps = paymentDue || cardStep ? [...STEPS, 'お支払い'] : STEPS;
   const stepIndex =
     step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : step === 'payment' ? 4 : 3;
@@ -129,7 +130,7 @@ export default function Booking() {
 
   return (
     <LiffLookScope className="min-h-screen bg-canvas">
-      <LiffHeader title="ご予約" backLabel={step === 'confirm' ? '確かめを閉じて日時に戻る' : '戻る'} onBack={step === 'staff' ? () => setStep('menu') : step === 'datetime' ? () => setStep('staff') : step === 'confirm' ? () => (confirmBack.current ? confirmBack.current() : setStep('datetime')) : undefined} />
+      <LiffHeader title={words.bookingTitle} backLabel={step === 'confirm' ? '確かめを閉じて日時に戻る' : '戻る'} onBack={step === 'staff' ? () => setStep('menu') : step === 'datetime' ? () => setStep('staff') : step === 'confirm' ? () => (confirmBack.current ? confirmBack.current() : setStep('datetime')) : undefined} />
       {(params.get('waitlist')||params.get('seat_waitlist'))&&<WaitlistOfferSheet id={params.get('waitlist')||params.get('seat_waitlist')!} seat={!!params.get('seat_waitlist')} decline={params.get('action')==='decline'} onClose={()=>{const next=new URLSearchParams(params);next.delete('waitlist');next.delete('seat_waitlist');next.delete('action');navigate({pathname:'/booking',search:next.toString()},{replace:true});}} />}
       {step !== 'done' && !waiting && !(step === 'datetime' && emptyDatetime) && <Stepper steps={steps} current={stepIndex} />}
       <div className={`mx-auto w-full max-w-md px-4 pt-3 ${waiting ? 'pb-3' : 'pb-40'}`}>

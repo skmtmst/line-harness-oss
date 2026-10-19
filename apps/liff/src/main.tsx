@@ -1,13 +1,29 @@
 import { createClientLogger } from '@line-crm/shared';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, useLocation } from 'react-router-dom';
+import { liffActionFromUrl } from '@line-crm/shared';
 import App from './App.js';
 import LiffLookScope from './components/LiffLookScope.js';
+import CustomerStyleScope from './components/CustomerStyleScope.js';
 import { initLiff } from './lib/liff-auth.js';
 import './index.css';
 const clientLogger = createClientLogger('liff');
 
+
+/** 業種を必要としない既存のファイル・フォーム等は、業種未設定だけで止めない。 */
+function CustomerContext() {
+  const location = useLocation();
+  const search = new URLSearchParams(location.search);
+  const page = search.get('page');
+  const action = liffActionFromUrl(`https://liff.line.me/entry/${location.search}`);
+  const independentEntry = search.has('couponRef') || search.has('eventWaitlistToken')
+    || (page === 'webinar' && search.has('slug')) || (page === 'research' && search.has('researchId'))
+    || (page === 'restaurant' && search.has('token')) || action?.kind === 'form' || action?.kind === 'visit_stamp';
+  const required = /^\/(?:booking|events|mypage)(?:\/|$)/.test(location.pathname)
+    || (location.pathname === '/' && !independentEntry);
+  return <CustomerStyleScope required={required}><App /></CustomerStyleScope>;
+}
 
 (async () => {
   try {
@@ -15,7 +31,7 @@ const clientLogger = createClientLogger('liff');
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <BrowserRouter>
-          <LiffLookScope><App /></LiffLookScope>
+          <LiffLookScope><CustomerContext /></LiffLookScope>
         </BrowserRouter>
       </StrictMode>,
     );

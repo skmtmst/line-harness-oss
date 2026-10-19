@@ -52,15 +52,15 @@ export default function LiffLookScope({
   children: ReactNode;
 }) {
   const key = currentLiffId();
-  const [look, setLook] = useState<LiffLook | null>(cachedLooks.get(key) ?? null);
+  const [loaded, setLoaded] = useState<{ key: string; look: LiffLook } | null>(null);
+  const look = loaded?.key === key ? loaded.look : cachedLooks.get(key) ?? null;
 
   useEffect(() => {
     const cached = cachedLooks.get(key);
-    setLook(cached ?? null);
     if (cached) return;
     let alive = true;
     void loadLook(key).then((next) => {
-      if (alive) setLook(next);
+      if (alive) setLoaded({ key, look: next });
     });
     return () => {
       alive = false;

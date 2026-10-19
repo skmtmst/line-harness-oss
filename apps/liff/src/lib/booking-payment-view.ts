@@ -39,8 +39,9 @@ export function yen(amount: number): string {
 }
 
 /** 札の文字（「お支払い済み ¥8,800」）。金額が分からないときは名前だけ。 */
-export function paymentText(view: PaymentView): string {
-  return view.amount != null && view.amount > 0 ? `${view.label} ${yen(view.amount)}` : view.label;
+export function paymentText(view: PaymentView, onsiteLabel = CUSTOMER_WORDS.payOnsite): string {
+  const label = view.kind === 'onsite' ? onsiteLabel : view.label;
+  return view.amount != null && view.amount > 0 ? `${label} ${yen(view.amount)}` : label;
 }
 
 export function paymentView(payment: BookingPayment | null, menu: MenuItem | undefined): PaymentView | null {

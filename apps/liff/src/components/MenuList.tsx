@@ -1,4 +1,4 @@
-import { CUSTOMER_WORDS } from '../lib/customer-words.js';
+import { useCustomerWords } from './CustomerStyleScope.js';
 import { bookingPriceText } from '../lib/booking-price.js';
 import Button from './ui/Button.js';
 import { useEffect, useMemo, useState } from 'react';
@@ -25,6 +25,7 @@ export default function MenuList({
   /** 読み込み中・失敗・選ぶものが無い間は、下の帯を出さないための合図。 */
   onLoadState?: (ready: boolean) => void;
 }) {
+  const words = useCustomerWords();
   const [menus, setMenus] = useState<MenuItem[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -64,7 +65,7 @@ export default function MenuList({
 
   return (
     <div className="space-y-3.5">
-      <h2 className="text-xl font-bold text-ink">{`${CUSTOMER_WORDS.bookingContent}を選んでください`}</h2>
+      <h2 className="text-xl font-bold text-ink">{`${words.bookingContent}を選んでください`}</h2>
       {categories.length > 1 && (
         <div
           className="-mx-4 flex gap-1.5 overflow-x-auto px-4"
