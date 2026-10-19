@@ -16,7 +16,7 @@ beforeEach(()=>{item=createTestD1();insertFriend(item.raw,'f');send=vi.fn().mock
 });
 afterEach(()=>item.raw.close());
 const root=()=>item.raw.prepare("SELECT * FROM workflow_steps WHERE process_kind='question_answer' AND step_key='__run'").get() as {scope_id:string;subject_id:string;status:string};
-describe('W45 administrator recovery',()=>{
+describe('administrator recovery',()=>{
  it('reopens only unfinished choice effects, audits who/when/why, and never replies again',async()=>{
   item.raw.exec("CREATE TRIGGER fail_second BEFORE INSERT ON friend_tags WHEN NEW.tag_id='two' BEGIN SELECT RAISE(ABORT,'temporary storage failure');END");
   await handleQuestionAnswer(item.db,client,friend,{stepId:'step',choiceIndex:0},'private-reply');

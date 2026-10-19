@@ -652,7 +652,7 @@ describe('Googleビジネス：口コミ', () => {
 
   beforeEach(()=>{testDb.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('account-2','test-2','店','','',?)").run(TENANT);testDb.raw.exec("INSERT INTO account_ai_features(account_id,feature,enabled,consent_by,consent_at,disclosure_version) VALUES('account-2','google_review',1,'owner-1','2026-10-16','2026-10-16')");});
 
-  it('B354-GOOGLE-01: 既定off・別店の同意では呼ばず、自店の停止後もAIを呼ばない',async()=>{
+  it('既定off・別店の同意では呼ばず、自店の停止後もAIを呼ばない',async()=>{
     await seedReviews();const run=vi.fn(async()=>({response:'文'}));env.AI={run} as unknown as Ai;
     testDb.raw.exec("DELETE FROM account_ai_features");googleCalls=[];
     const response=await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`,{body:{}});

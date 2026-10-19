@@ -396,7 +396,7 @@ describe('パスワード再設定（36-6）', () => {
   });
 });
 
-describe('B351 password login robot boundary',()=>{
+describe('password login robot boundary',()=>{
   it.each(['missing_token','rejected','unavailable','not_configured'] as const)('rejects %s before password lookup or session creation',async reason=>{
     turnstile.result={ok:false,reason};
     const response=await call('POST','/api/auth/password/login',{email:'fixture@example.invalid',password:'fixture-password',turnstileToken:'fixture-token'});

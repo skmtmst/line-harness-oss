@@ -9,7 +9,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { sha256Hex } from './auth.js';
 const opened: ReturnType<typeof createTestD1>[] = [];
 afterEach(() => opened.splice(0).forEach(d => d.raw.close()));
-describe('B351 dangerous operations require reauthentication before releasing data or mutating', () => {
+describe('dangerous operations require reauthentication before releasing data or mutating', () => {
   it.each([
     ['GET','/api/friends/exports/job/download'], ['POST','/api/common-vars/exports/job/regenerate'], ['GET','/api/events/e/applicants.csv'],
     ['POST','/api/broadcasts/b/send'], ['POST','/api/broadcasts/b/send-segment'],
