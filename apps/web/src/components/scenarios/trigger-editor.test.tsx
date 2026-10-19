@@ -205,7 +205,7 @@ describe('U006: 開始回数は固定仕様の説明にする', () => {
     expect(screen.queryByText('同じ友だちは初回のみ開始')).toBeNull()
     expect(screen.queryByText('条件を満たすたびに開始')).toBeNull()
     // 実挙動: status != 'completed' の重複だけを弾くので、読了後は再開する。
-    expect(SOURCE).toContain('最後まで読み終えた人が条件を満たすと、もう一度最初から始まります')
+    expect(screen.getByText('最後まで読み終えた人が条件を満たすと、もう一度最初から始まります。', { exact: false })).toBeTruthy()
   })
 })
 
