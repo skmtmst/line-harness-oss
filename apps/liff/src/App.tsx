@@ -2,6 +2,8 @@ import { liffActionFromUrl } from '@line-crm/shared';
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import LoadingView from './components/LoadingView.js';
+import { useCustomerStyle } from './components/CustomerStyleScope.js';
+import CustomerBookingEntry from './components/CustomerBookingEntry.js';
 
 // 画面ごとに束を分ける。開いた画面のぶんだけ読む。
 const Booking = lazy(() => import('./pages/Booking.js'));
@@ -31,6 +33,7 @@ function Loading() {
 export default function App() {
   const [search] = useSearchParams();
   const location = useLocation();
+  const style = useCustomerStyle();
   if (search.get('couponRef')) return <Suspense fallback={<Loading />}><EntryRouteCoupon /></Suspense>;
   const waitlistToken = search.get('eventWaitlistToken');
   if (waitlistToken) {
@@ -53,6 +56,13 @@ export default function App() {
     return <Navigate to={{ pathname: '/mypage', search: location.search }} replace />;
   }
 
+  if (location.pathname === '/' && search.get('page') === 'event') {
+    const id = search.get('eventId');
+    return id
+      ? <Navigate to={{ pathname: `/events/${encodeURIComponent(id)}`, search: location.search }} replace />
+      : <CustomerBookingEntry><Suspense fallback={<Loading />}><NotFound /></Suspense></CustomerBookingEntry>;
+  }
+
   if (location.pathname === '/' && search.get('page') === 'restaurant' && search.get('token')) {
     return <Navigate to={{ pathname: `/restaurant/reserve/${encodeURIComponent(search.get('token')!)}`, search: location.search }} replace />;
   }
@@ -68,7 +78,7 @@ export default function App() {
   return (
     <Suspense fallback={<Loading />}>
       <Routes>
-        <Route path="/booking" element={<Booking />} />
+        <Route path="/booking" element={<CustomerBookingEntry><Booking /></CustomerBookingEntry>} />
         <Route path="/booking/history" element={<BookingHistory />} />
         <Route path="/mypage" element={<MyPage />} />
         <Route path="/events/me" element={<EventBookings />} />
@@ -86,7 +96,7 @@ export default function App() {
         <Route path="/statements" element={<StatementOpen />} />
         <Route path="/forms/:id" element={<Form />} />
         <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
-        <Route path="/" element={<Navigate to={{ pathname: '/booking', search: location.search }} replace />} />
+        <Route path="/" element={<Navigate to={{ pathname: style === 'ec' ? '/mypage' : style === 'lesson' ? '/events/me' : '/booking', search: location.search }} replace />} />
         {/* どの住所にも当たらないとき（板 aLU3r）。 */}
         <Route path="*" element={<NotFound />} />
       </Routes>

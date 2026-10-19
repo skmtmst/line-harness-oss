@@ -14,6 +14,8 @@ export interface MenuItem {
   base_price: number;
   price_mode?: 'fixed' | 'free' | 'inquiry';
   payment_mode?: 'none' | 'onsite' | 'online';
+  /** 同じメニューの公開設定。未取得を対面と推測しない。 */
+  meeting_mode?: 'online' | 'in_person' | 'customer_choice';
   sort_order: number;
   /** キャンセル期限 (開始の何時間前まで)。null は店の既定を使う。 */
   cancel_deadline_hours_before?: number | null;

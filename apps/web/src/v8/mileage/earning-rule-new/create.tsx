@@ -93,6 +93,13 @@ export default function EarningRuleCreateV8() {
 }
 
 function EarningRuleCreateBody() {
+  const [formNumber, setFormNumber] = useState(0)
+  return <EarningRuleForm key={formNumber} focusName={formNumber > 0} onContinue={() => setFormNumber((number) => number + 1)} />
+}
+
+function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onContinue: () => void }) {
+  const nameRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (focusName) nameRef.current?.focus() }, [focusName])
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -238,7 +245,8 @@ function EarningRuleCreateBody() {
         }
         throw new Error(draftResponse.error)
       }
-      router.push(continueAfter ? '/mileage/earning-rules/new' : createPageReturnHref(LIST_HREF, res.data.id))
+      if (continueAfter) onContinue()
+      else router.push(createPageReturnHref(LIST_HREF, res.data.id))
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
       /* BnrQp：同時に作られた・版がずれたときは競合の帯で知らせる。 */
@@ -353,7 +361,7 @@ function EarningRuleCreateBody() {
       <Card variant="form" aria-labelledby="er-new-rule">
         <CardHeader size="stacked" titleId="er-new-rule" title="どのルールか" meta="きっかけになる行動を選びます" />
         <Field requirement={b244Requirements.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
-          <SaveErrorField names={["name"]}><TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
+          <SaveErrorField names={["name"]}><TextField ref={nameRef} id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
         <SettingsFormRow layout="columns">
           <div className={styles.field}>

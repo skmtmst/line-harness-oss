@@ -1,4 +1,5 @@
 'use client'
+import { asArray } from './friend-detail-shape'
 import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
 import Button from '@/components/shared/button'
 import { EntityPickerField, type EntityPickerFolder } from '@/components/shared/entity-picker'
@@ -606,19 +607,19 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
                   INBOX-17: 取得するのは最新10件まで。続きがあるか、全部で
                   何件あるかを黙らせない。10件を超える分は友だち詳細へ誘導する。
                 */}
-          {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && (
+          {typeof friend.formSubmissionTotal === 'number' && friend.formSubmissionTotal > 0 && asArray(friend.formSubmissions).length > 0 && (
             <span className="text-nano text-ink-faint">
-              {formatNumber(friend.formSubmissionTotal)}件中 1〜{formatNumber(friend.formSubmissions.length)}件を表示
+              {formatNumber(friend.formSubmissionTotal)}件中 1〜{formatNumber(asArray(friend.formSubmissions).length)}件を表示
             </span>
           )}
         </div>
-        {!friend.formSubmissions || friend.formSubmissions.length === 0 ? (
+        {!friend.formSubmissions || asArray(friend.formSubmissions).length === 0 ? (
           <p className="text-micro text-ink-faint italic">回答はまだありません</p>
         ) : (
           <div>
             <div className="space-y-3">
-              {friend.formSubmissions.map((submission) => {
-                const labels = new Map(submission.fields.map((field) => [field.name, field.label]))
+              {asArray(friend.formSubmissions).map((submission) => {
+                const labels = new Map(asArray(submission.fields).map((field) => [field.name, field.label]))
                 const answers = Object.entries(submission.data).filter(([key]) => !key.startsWith('_'))
                 return (
                   <div key={submission.id} className="rounded-control border border-divider-soft bg-surface-pearl p-3">
@@ -647,12 +648,12 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
                   友だち詳細の回答一覧へ進む口を出す。
                 */}
             {typeof friend.formSubmissionTotal === 'number'
-              && friend.formSubmissions.length < friend.formSubmissionTotal && (
+              && asArray(friend.formSubmissions).length < friend.formSubmissionTotal && (
                 <a
                   href={`/friends/detail?id=${friend.id}`}
                   className="text-action mt-3 inline-flex text-micro font-semibold hover:underline"
                 >
-                  残り{friend.formSubmissionTotal - friend.formSubmissions.length}件は友だち詳細で見る
+                  残り{friend.formSubmissionTotal - asArray(friend.formSubmissions).length}件は友だち詳細で見る
                 </a>
               )}
           </div>

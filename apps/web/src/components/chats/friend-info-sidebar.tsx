@@ -1,4 +1,5 @@
 'use client'
+import { asArray } from './friend-detail-shape'
 
 import { STATUS_WORD } from './friend-info-status'
 
@@ -155,7 +156,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
     accountId,
   })
 
-  const effectiveTags = localTags ?? friend?.tags
+  const effectiveTags = localTags ?? asArray(friend?.tags)
 
   /*
    * 友だち情報（metadata）のキーを、画面に出す項目名へ写す対応表。
@@ -168,8 +169,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
       ? friendFields.items.find((field) => field.fieldKey === key)?.name
       : undefined
     if (fromField) return fromField
-    const fromForm = (friend?.formSubmissions ?? [])
-      .flatMap((submission) => submission.fields)
+    const fromForm = asArray(friend?.formSubmissions)
+      .flatMap((submission) => asArray(submission.fields))
       .find((field) => field.name === key)?.label
     return fromForm ?? key
   }

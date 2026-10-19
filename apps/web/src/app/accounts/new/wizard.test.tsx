@@ -121,18 +121,18 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByText('ご利用環境の確認', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('質問 1')).toBeTruthy()
     passPrecheck()
-    expect(screen.getByText('Messaging API のチャネル', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Messaging API の情報を入れる', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 1 / 3')).toBeTruthy()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
     nextStep()
-    expect(screen.getByText('Webhook の設定', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 2 / 3')).toBeTruthy()
     ack('Webhookの利用をONにした')
     ack('Webhookの再送をONにした')
     ack('エラーの統計情報をONにした')
     nextStep()
-    expect(screen.getByText('LINE Login のチャネル', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('LINEログインの情報を入れる', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 3 / 3')).toBeTruthy()
   })
 
@@ -198,8 +198,14 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
     expect(document.getElementById('channel-access-token')).toBeNull()
     expect(document.getElementById('liff-id')).toBeNull()
-    expect(screen.getAllByRole('link', { name: '取得方法を見る' }).map((node) => node.getAttribute('href')))
-      .toEqual(['/manuals/line-connect/index.html#m1'])
+    /* 承認済み v06 の ②-1（A2cEg1）では、取りに行く先は青い囲みの「LINE Developers を開く」1つ。
+       マニュアルは右の列からいつでも開ける。どちらも別タブ。 */
+    const developers = screen.getByRole('link', { name: /LINE Developers を開く/ })
+    expect(developers.getAttribute('href')).toBe('https://developers.line.biz/console/')
+    expect(developers.getAttribute('target')).toBe('_blank')
+    const manual = screen.getByRole('link', { name: /マニュアルを開く/ })
+    expect(manual.getAttribute('href')).toBe('/manuals/line-connect/index.html')
+    expect(manual.getAttribute('target')).toBe('_blank')
   })
 
   it('5行で止まった箇所を示し、失敗時は登録できない', async () => {
