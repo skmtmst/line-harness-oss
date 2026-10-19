@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { groupTagsByFolder } from './tag-options'
+import { groupTagsByFolder } from '@/v8/inflow-links/new/tag-options'
 
 const tag = (id: string, name: string, groupId: string | null): Tag =>
   ({ id, name, groupId, color: null }) as unknown as Tag

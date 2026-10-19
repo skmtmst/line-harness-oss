@@ -306,23 +306,23 @@ jobs:
         run: pnpm tsx scripts/check-migrations.ts
       - name: Test database package
         if: needs.changes.outputs.db_tests == 'true'
-        run: pnpm --filter @line-crm/db test
+        run: pnpm --config.enable-pre-post-scripts=false --filter @line-crm/db test
       # 自己更新まわりの2つは release.yml のタグ push でしか動いていなかった。
       # 取り込んだ後、リリースを打つ段になって初めて失敗が分かる位置にあったので、
       # PRの必須ゲートへ引き上げる(#704)。この工程はすでに update-engine を
       # build しているので、依存の追加も待ち時間の追加もほぼない。
       - name: Test the self-update engine
         run: pnpm --filter @line-harness/update-engine test
-      # `pretest` が update-engine を build し直す。上の build と同じ内容。
+      # Dependencies were built above; standalone package hooks remain enabled locally.
       - name: Test the setup CLI
-        run: pnpm --filter create-line-harness test
+        run: pnpm --config.enable-pre-post-scripts=false --filter create-line-harness test
       - run: pnpm test:scripts
       - name: Typecheck repository scripts
         run: pnpm typecheck:scripts
       - name: Test shared
         run: |
           pnpm --filter @line-crm/shared typecheck
-          pnpm --filter @line-crm/shared test
+          TZ=UTC pnpm --filter @line-crm/shared test
           TZ=Asia/Bangkok pnpm --filter @line-crm/shared test
       - run: pnpm --filter liff typecheck
       - run: pnpm --filter liff test
@@ -343,13 +343,13 @@ jobs:
       - name: Build Worker dependencies
         run: >-
           pnpm
+          --filter @line-harness/sdk
           --filter @line-crm/shared
           --filter @line-crm/line-sdk
           --filter @line-crm/db
-          --filter @line-harness/update-engine
           build
-      - run: pnpm --filter worker typecheck
-      - run: pnpm --filter worker test
+      - run: pnpm --config.enable-pre-post-scripts=false --filter worker typecheck
+      - run: pnpm --config.enable-pre-post-scripts=false --filter worker test
 
   worker-build:
     name: Worker build
@@ -370,13 +370,12 @@ jobs:
           --filter @line-crm/shared
           --filter @line-crm/line-sdk
           --filter @line-crm/db
-          --filter @line-harness/update-engine
           build
       - name: Build Worker
         env:
           VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
-        run: pnpm --filter worker build
+        run: pnpm --config.enable-pre-post-scripts=false --filter worker build
       - name: Verify built production Worker config and security headers (offline)
         run: pnpm exec tsx scripts/deploy/production/check-build.ts worker
       - name: Install browser for deployed LIFF entry guard
@@ -402,17 +401,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build Admin dependencies
-        run: >-
-          pnpm
-          --filter @line-crm/shared
-          --filter @line-harness/update-engine
-          build
+        run: |
+          pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build
+          pnpm --filter web release-log
       - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
       - run: node apps/web/scripts/verify-entity-pickers.mjs
       - name: Reject restored legacy admin appearance
         run: node apps/web/scripts/verify-v8-only.mjs
-      - run: pnpm --filter web typecheck
-      - run: pnpm --filter web test
+      - run: pnpm --config.enable-pre-post-scripts=false --filter web typecheck
+      - run: pnpm --config.enable-pre-post-scripts=false --filter web test
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
       # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
       # #704 で繋いだところ2試験が落ち、原因が画面側の不具合だと分かったので
@@ -475,8 +472,8 @@ jobs:
       # ここで続けて動かすのが一番安い。
       - name: Test the SDK
         run: pnpm --filter @line-harness/sdk test
-      - run: pnpm --filter @line-harness/mcp-server typecheck
-      - run: pnpm --filter @line-harness/mcp-server test
+      - run: pnpm --config.enable-pre-post-scripts=false --filter @line-harness/mcp-server typecheck
+      - run: pnpm --config.enable-pre-post-scripts=false --filter @line-harness/mcp-server test
       - run: pnpm --filter @line-harness/mcp-server build
 
   # apps/docs の2ファイル6試験は、`deploy-cloudflare-docs.yml` が呼ぶのが
@@ -528,11 +525,8 @@ jobs:
           key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**/*.[jt]s', 'apps/web/**/*.[jt]sx') }}
       - run: pnpm install --frozen-lockfile
       - name: Build Admin dependencies
-        run: >-
-          pnpm
-          --filter @line-crm/shared
-          --filter @line-harness/update-engine
-          build
+        # web prebuild builds shared and line-sdk and prepares the release log.
+        run: pnpm --filter @line-harness/update-engine build
       - run: pnpm --filter web build
       - name: Verify exported Admin headers and all external bootstrap scripts (offline)
         run: pnpm exec tsx scripts/deploy/production/check-build.ts admin
@@ -585,8 +579,6 @@ jobs:
       - run: pnpm --filter web verify:design
       # 画面の実挙動は、書き出した本番と同じ中身をブラウザで押して見る。
       # 型と文字列の検査だけでは、押せない口や取り違えた導線が残る。
-      - name: Install Chromium for browser checks
-        run: pnpm exec playwright install --with-deps chromium
       - name: Admin browser behavior checks
         run: |
           node apps/web/src/app/form-submissions/form-submissions-browser-behavior.mjs
@@ -636,7 +628,7 @@ jobs:
       - name: Build the PR admin against the visual-qa mock API
         if: steps.scope.outputs.run == 'true'
         run: |
-          pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
+          pnpm --filter @line-harness/update-engine build
           pnpm --filter web build
           cp -a apps/web/out /tmp/head-out
       - name: Build the base admin against the same mock API
@@ -647,7 +639,7 @@ jobs:
           git worktree add /tmp/base "$BASE_SHA"
           cd /tmp/base
           pnpm install --frozen-lockfile
-          pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
+          pnpm --filter @line-harness/update-engine build
           pnpm --filter web build
       - name: Install Chromium for the V8 screen guard
         if: steps.scope.outputs.run == 'true'
