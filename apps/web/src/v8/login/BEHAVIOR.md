@@ -1,3 +1,5 @@
+> 文書：運営 ログイン 2段目の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 運営 ログイン 2段目の動き（BEHAVIOR.md）
 
 対象：`app/login/two-factor/page.tsx`（v7 の2段目）。運営から来たときの動きを写して `two-factor-ops.tsx` を一から書いた。絵は `tOPeY`「6桁の確認」。

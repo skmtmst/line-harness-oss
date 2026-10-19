@@ -1,3 +1,5 @@
+> 文書：見本のリッチメニュー（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 見本のリッチメニュー（BEHAVIOR.md）
 
 絵：VHp7p `cAaGY`（B-311・B-313 追記）。入口 `app/rich-menus/sample/page.tsx`。

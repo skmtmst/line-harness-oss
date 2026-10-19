@@ -1,3 +1,5 @@
+> 文書：郵便番号データの出どころ（F11）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 郵便番号データの出どころ（F11）
 
 - 取得元（公式）: https://www.post.japanpost.jp/service/search/zipcode/download/utf-zip.html

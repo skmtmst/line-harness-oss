@@ -1,3 +1,5 @@
+> 文書：休業日・貸切（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 休業日・貸切（V8）の動き
 
 入口：予約枠・在庫（`app/restaurant-test/inventory/page.tsx` → `v8/restaurant/inventory/inventory.tsx`）のタブ「休業日・貸切」。`?tab=closures` で開く（押したタブも URL に残す）。絵：提案 E-10 `UVnvR`（タブ）・`nVvXy`（足す窓）。新しいタブなので V8 だけ。

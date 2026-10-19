@@ -1,3 +1,5 @@
+> 文書：ログイン不要の入口（B-351/4）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # ログイン不要の入口（B-351/4）
 
 2026-10-16 / kenta・Codex。本線 `af8e504d75` を通常mergeして点検。ここで「ログイン不要」は**管理画面のログインを通らない**意味。LINEの本人確認、Webhook署名、専用鍵が必要な入口も含める。公開URLを知っているだけで、その人の本人確認を済ませたとは考えない。
@@ -229,7 +231,7 @@ WorkerのHono実登録にある管理認証の外の入口は **202経路**（�
 
 | 面 | ID/回数制限 | 個人情報・期限・残る条件 |
 | --- | --- | --- |
-| 管理画面の `apps/web/out` のHTML・JS・CSS・公開画像・version.json | 固定パスとビルドのhash。静的配信の回数制限はCloudflare側、未確認 | ログイン画面の骨組みは公開。顧客データは管理APIの本人確認後。CSPは[CSP記録](CSP-REVIEW-1016.md)。ビルドへ秘密を埋めない |
+| 管理画面の `apps/web/out` のHTML・JS・CSS・公開画像・version.json | 固定パスとビルドのhash。静的配信の回数制限はCloudflare側、未確認 | ログイン画面の骨組みは公開。顧客データは管理APIの本人確認後。CSPは[CSP記録](csp.md)。ビルドへ秘密を埋めない |
 | LIFFの `apps/liff/dist` とWorkerの `dist/client`、未知の非APIパスのSPA fallback | 画面のパス、ID/slugは秘密ではない。Worker経由は共通IP枠、Pages直配信は別確認 | 予約確認/フォーム/本人履歴の骨組みは公開。個人情報の取得は表のAPIで検証。外部ログインの実試験は今回は行わない |
 | 管理専用の添付 `/api/form-files/:id/content` | 管理認証の外ではないため201に含めない。本人確認書類はowner/admin、所属と期限・検査状態を照合 | `routes/form-documents.ts`。`private/form-documents/` のR2原本は公開画像口では404。期限付きURLへ切り替えたという意味ではない |
 

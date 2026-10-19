@@ -1,3 +1,5 @@
+> 文書：マイペット（専用機能）の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # マイペット（専用機能）の動き（BEHAVIOR.md）
 
 対象：今までの V8 のマイペット（`app/nen/pets/pets-v8.tsx`）と v7（`pets-tab.tsx`・`feeding-tab.tsx`・`pet-editor.tsx`）。動きを写して、`pets.tsx`（外枠）・`list.tsx`（登録ペット）・`editor.tsx`（ペットの情報を直す）・`feeding.tsx`（ごはんの目安）を一から書いた。見た目は型（ListPage）と部品で組み直した。板は 一覧 `wTIej`・一覧 1152 `t2SMXX`・ペットの情報を直す `eLjeQ`・ごはんの目安 `h7A2F`。

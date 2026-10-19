@@ -1,6 +1,8 @@
+> 文書：分析（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 分析（V8）の動き
 
-入口：`app/analytics/page.tsx`（V8 のときだけ `src/v8/analytics/analytics.tsx`、それ以外は今の画面 `AnalyticsInner`）。
+入口：`app/analytics/page.tsx`（V8専用で `src/v8/analytics/analytics.tsx`）。
 ファネルの作る・直すの窓は `funnel-form.tsx`（絵 `VDPz5`。今の `FunnelForm` の動きを写して一から書いた。入口の page.tsx が `slots.renderFunnelForm` で渡す）。結果の保存欄（`SaveAnalysisAction`）だけは、入口が今の部品を `slots` で渡す（src/v8 から @/app を読めないため）。
 
 ### ファネルを作る・直す（`funnel-form.tsx`）

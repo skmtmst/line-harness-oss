@@ -1,3 +1,5 @@
+> 文書：EC連携の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # EC連携の動き（BEHAVIOR.md）
 
 対象：`screen.tsx`（★V8 `GmVR5`、定期便 `wqC8x` は `subscriptions.tsx`・つなぎ先 `iLJmw` は `connector.tsx`）。
