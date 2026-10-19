@@ -150,7 +150,7 @@ describe('席の予約の流れ', () => {
     expect(screen.getByText('13/50文字')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
     await screen.findByText('ご予約を受け付けました');
-    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: '記念日です', customerPhone: '090-1111-2222' });
+    expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: '記念日です', customerPhone: '09011112222' });
     expect(screen.getByText('記念日のコース')).toBeTruthy();
     expect(screen.queryByText('お席')).toBeNull();
   });
@@ -163,7 +163,7 @@ describe('席の予約の流れ', () => {
     await screen.findByText('ご予約の内容');
     fireEvent.change(screen.getByLabelText('電話'), { target: { value: 'でんわ' } });
     fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
-    expect(await screen.findByText('電話番号は数字とハイフンで入れてください。')).toBeTruthy();
+    expect(await screen.findByText('電話番号は0から始まる10〜11桁の数字で入れてください。')).toBeTruthy();
     expect(seat.confirm).not.toHaveBeenCalled();
   });
 
