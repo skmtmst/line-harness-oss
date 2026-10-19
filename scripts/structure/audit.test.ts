@@ -62,6 +62,14 @@ describe('構成の境界を実際の依存から守る', () => {
     files.set('packages/shared/src/b.ts', 'export const b = 1; export type B = string');
     expect(rules(files)).toEqual([]);
   });
+  test('実行設定同士は設定を直接読み、製品からの内部読込は引き続き検出する', () => {
+    const files = fixture();
+    files.set(root + '/browser.config.mjs', 'export default {}');
+    files.set('scripts/browser/isolated.config.mjs', "import config from '../../apps/web/src/v8/orders/browser.config.mjs'; export default config");
+    expect(rules(files)).toEqual([]);
+    files.set('scripts/browser/isolated.config.mjs', "import { OrderList } from '../../apps/web/src/v8/orders/list'; export default OrderList");
+    expect(rules(files)).toContain('public-entry');
+  });
   test('workspace package入口の循環も同じグラフで見つける', () => {
     const files = new Map([
       ['packages/a/src/index.ts', "import { b } from '@example/b'; export const a = b"],
