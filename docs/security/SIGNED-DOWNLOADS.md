@@ -14,7 +14,7 @@ LINEで受け取る**本文中のリンクは、期限のない本人確認の�
 - Workerの入口は、保存物の所属する店の `liff_id` だけを使って `https://liff.line.me/<LIFF ID>/files/?id=<UUID>&liffId=<LIFF ID>` または `/statements/?id=<明細ID>&liffId=<LIFF ID>` へ303で案内する。外から渡された遷移先・認証情報・署名・URLのクエリは引き継がない。停止した店/統括・削除済み・LIFF未設定は、中身を返さず410の問い合わせ案内。
 - 入口は取得権限ではない。他の人へ転送しても新しいURLを作れない。
 
-LIFFの取得画面は `apps/liff/src/pages/FileOpen.tsx` と `StatementOpen.tsx` に接続されている。本人用の認証付きfetchとBlob表示を使い、期限切れ・別人・削除済みは取得成功にしない。実際のLINE内での操作、配備先の鍵・保存物・期限の確認は[点検表](SECURITY-CHECKLIST.md)に残す。
+LIFFの取得画面は `apps/liff/src/pages/file-open.tsx` と `StatementOpen.tsx` に接続されている。本人用の認証付きfetchとBlob表示を使い、期限切れ・別人・削除済みは取得成功にしない。実際のLINE内での操作、配備先の鍵・保存物・期限の確認は[点検表](SECURITY-CHECKLIST.md)に残す。
 
 ## 画面に渡すAPI
 

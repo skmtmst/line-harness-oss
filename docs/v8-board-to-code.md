@@ -60,14 +60,14 @@
 | V8 | u8sKN | 自動応答 削除ダイアログ V8 | /auto-replies | `app/auto-replies/page.tsx` | `v8/auto-replies/list.tsx` |
 | V8 | uE9gf | 自動応答 一覧 V8 | /auto-replies | `app/auto-replies/page.tsx` | `v8/auto-replies/list.tsx` |
 | V8 | WPrd5 | 自動応答 一覧（1152）V8 | /auto-replies | `app/auto-replies/page.tsx` | `v8/auto-replies/list.tsx` |
-| V8 | A0pDt | 自動応答 作る② どんなときに動くか V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `app/auto-replies/edit/wizard-v8.tsx` |
-| V8 | Guoye | 自動応答 作る④ 優先順位 V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `app/auto-replies/edit/wizard-v8.tsx` |
-| V8 | K7HWG | 自動応答 作る① 基本設定 V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `app/auto-replies/edit/wizard-v8.tsx` |
-| V8 | rfhIf | 自動応答 作る③ 何を返すか V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `app/auto-replies/edit/wizard-v8.tsx` |
-| V8 | UGrd2 | 自動応答 編集（競合）V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `app/auto-replies/edit/wizard-v8.tsx` |
-| V8 | V4LjH | 自動応答 作る 完了（有効にした） V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `app/auto-replies/edit/wizard-v8.tsx` |
-| V8 | XJUqs | 自動応答 作る⑤ 確認 V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `app/auto-replies/edit/wizard-v8.tsx` |
-| V8 | Z2LIUx | 自動応答 作る②（1152）V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `app/auto-replies/edit/wizard-v8.tsx` |
+| V8 | A0pDt | 自動応答 作る② どんなときに動くか V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `v8/auto-replies/edit/wizard.tsx` |
+| V8 | Guoye | 自動応答 作る④ 優先順位 V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `v8/auto-replies/edit/wizard.tsx` |
+| V8 | K7HWG | 自動応答 作る① 基本設定 V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `v8/auto-replies/edit/wizard.tsx` |
+| V8 | rfhIf | 自動応答 作る③ 何を返すか V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `v8/auto-replies/edit/wizard.tsx` |
+| V8 | UGrd2 | 自動応答 編集（競合）V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `v8/auto-replies/edit/wizard.tsx` |
+| V8 | V4LjH | 自動応答 作る 完了（有効にした） V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `v8/auto-replies/edit/wizard.tsx` |
+| V8 | XJUqs | 自動応答 作る⑤ 確認 V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `v8/auto-replies/edit/wizard.tsx` |
+| V8 | Z2LIUx | 自動応答 作る②（1152）V8 | /auto-replies/edit | `app/auto-replies/edit/page.tsx` | `v8/auto-replies/edit/wizard.tsx` |
 | V8 | nWmLg | 自動応答 実行結果 V8 | /auto-replies/runs | `app/auto-replies/runs/page.tsx` | `v8/auto-replies/runs.tsx` |
 | V8-B | c7dxp | オートメーション 見本 V8（機能追加 F-16・API待ち） | /automations | `app/automations/page.tsx` | `v8/automations/list.tsx`<br>`v8/automations/templates.tsx` |
 | V8-B | En14p | オートメーション 一覧 1152 V8 | /automations | `app/automations/page.tsx` | `v8/automations/list.tsx`<br>`v8/automations/templates.tsx` |
@@ -78,8 +78,8 @@
 | V8-B | M4torY | オートメーション ルールを作る V8 | /automations/new | `app/automations/new/page.tsx` | `v8/automations/create/create.tsx` |
 | V8-B | tJqST | オートメーション ルールを作る（競合）V8 | /automations/new | `app/automations/new/page.tsx` | `v8/automations/create/create.tsx` |
 | V8-B | g98F9 | オートメーション 動いた記録 V8 | /automations/runs | `app/automations/runs/page.tsx` | `v8/automations/runs.tsx` |
-| V8 | acRIl | ★P2 予約 /booking/bookings（今日・今週・今月・一覧）2026-10-01 | /booking/bookings | `app/booking/bookings/page.tsx` | `app/booking/bookings/booking-detail-v8.tsx` |
-| V8-B | AjZhH | 予約台帳 予約の詳細 V8 | /booking/bookings | `app/booking/bookings/page.tsx` | `app/booking/bookings/booking-detail-v8.tsx` |
+| V8 | acRIl | ★P2 予約 /booking/bookings（今日・今週・今月・一覧）2026-10-01 | /booking/bookings | `app/booking/bookings/page.tsx` | `app/booking/bookings/booking-detail.tsx` |
+| V8-B | AjZhH | 予約台帳 予約の詳細 V8 | /booking/bookings | `app/booking/bookings/page.tsx` | `app/booking/bookings/booking-detail.tsx` |
 | V8 | If9Mh | ★P2-2 予約：電話の予約・予約の詳細 2026-10-01 | /booking/bookings/new | `app/booking/bookings/new/page.tsx` | （別ファイルなし：page.tsx の中で分けている・または V8 なし） |
 | V8 | C9fv7A | 予約設定 メニュー（閲覧のみ）V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
 | V8 | owaS3 | 予約設定 メニュー V8 | /booking/menus | `app/booking/menus/page.tsx` | `v8/booking-menus/settings.tsx` |
@@ -144,9 +144,9 @@
 | V8-B | iLJmw | EC連携 つなぎ先 V8 | /ec-commerce?tab=connector | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx` |
 | V8-B | wqC8x | EC連携 定期便 V8 | /ec-commerce?tab=subscriptions | `app/ec-commerce/page.tsx` | `v8/settings/ec-commerce/screen.tsx` |
 | V8-B | w1W8h | EC連携 会員のつき合わせ V8 | /ec-commerce/identity-candidates | `app/ec-commerce/identity-candidates/page.tsx` | `v8/settings/ec-commerce/identity.tsx` |
-| V8-B | OHwbU | 運用状態 緊急コントロール V8 | /emergency?tab=control | `app/emergency/page.tsx` | `v8/settings/emergency/screen.tsx`<br>`app/emergency/control-v8.tsx` |
-| V8-B | Y4LkX1 | 設定 運用状態 V8 | /emergency?tab=health | `app/emergency/page.tsx` | `v8/settings/emergency/screen.tsx`<br>`app/emergency/control-v8.tsx` |
-| V8-B | I2V65v | 運用状態 更新履歴 V8 | /emergency?tab=history | `app/emergency/page.tsx` | `v8/settings/emergency/screen.tsx`<br>`app/emergency/control-v8.tsx` |
+| V8-B | OHwbU | 運用状態 緊急コントロール V8 | /emergency?tab=control | `app/emergency/page.tsx` | `v8/settings/emergency/screen.tsx`<br>`v8/emergency/control.tsx` |
+| V8-B | Y4LkX1 | 設定 運用状態 V8 | /emergency?tab=health | `app/emergency/page.tsx` | `v8/settings/emergency/screen.tsx`<br>`v8/emergency/control.tsx` |
+| V8-B | I2V65v | 運用状態 更新履歴 V8 | /emergency?tab=history | `app/emergency/page.tsx` | `v8/settings/emergency/screen.tsx`<br>`v8/emergency/control.tsx` |
 | V8-B | e2ekFu | イベント予約 一覧 V8 | /events | `app/events/page.tsx` | `v8/events/list.tsx` |
 | V8-B | Mu8qW | イベント予約 申込者 V8 | /events/bookings?id=ev-1 | `app/events/bookings/page.tsx` | `v8/events/bookings.tsx` |
 | V8-B | hmr2P | イベント予約 変更の確認 V8 | /events/change-review?id=ev-1 | `app/events/change-review/page.tsx` | `v8/events/change-review.tsx` |
@@ -308,23 +308,23 @@
 | V8-B | qod6X | 運営 2要素認証を設定 V8 | /ops/two-factor | `app/ops/two-factor/page.tsx` | `v8/ops/two-factor.tsx` |
 | V8-B | u3iab3 | 設定 プール管理 V8 | /pools | `app/pools/page.tsx` | `v8/settings/pools/pools.tsx`<br>`components/layout/settings-inner-nav.tsx` |
 | V8-B | D0AOyx | プール管理 プールを作る V8 | /pools/new | `app/pools/new/page.tsx` | `v8/settings/pools/create.tsx` |
-| V8 | a5C1p | リマインダ 一覧（閲覧のみ）V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
-| V8 | apLqS | リマインダ 一覧 V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
-| V8 | Iffil | リマインダ 一覧（1152）V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
-| V8 | RrYYJ | ★V8 リマインダ 状態 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
-| V8 | RwVo5 | リマインダ 一時停止ダイアログ V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
-| V8 | SkY9V | リマインダ 行の「…」を開いた V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
-| V8 | VsSyu | リマインダ 削除ダイアログ V8 | /reminders | `app/reminders/page.tsx` | `app/reminders/list-v8.tsx` |
+| V8 | a5C1p | リマインダ 一覧（閲覧のみ）V8 | /reminders | `app/reminders/page.tsx` | `v8/reminders/list.tsx` |
+| V8 | apLqS | リマインダ 一覧 V8 | /reminders | `app/reminders/page.tsx` | `v8/reminders/list.tsx` |
+| V8 | Iffil | リマインダ 一覧（1152）V8 | /reminders | `app/reminders/page.tsx` | `v8/reminders/list.tsx` |
+| V8 | RrYYJ | ★V8 リマインダ 状態 | /reminders | `app/reminders/page.tsx` | `v8/reminders/list.tsx` |
+| V8 | RwVo5 | リマインダ 一時停止ダイアログ V8 | /reminders | `app/reminders/page.tsx` | `v8/reminders/list.tsx` |
+| V8 | SkY9V | リマインダ 行の「…」を開いた V8 | /reminders | `app/reminders/page.tsx` | `v8/reminders/list.tsx` |
+| V8 | VsSyu | リマインダ 削除ダイアログ V8 | /reminders | `app/reminders/page.tsx` | `v8/reminders/list.tsx` |
 | V8 | loVfW | リマインダ 登録者を管理 V8 | /reminders/detail | `app/reminders/detail/page.tsx` | `v8/reminders/detail.tsx` |
 | V8 | rbAig | リマインダ 詳細（概要） V8 | /reminders/detail | `app/reminders/detail/page.tsx` | `v8/reminders/detail.tsx` |
 | V8 | k32cn | リマインダ 編集（競合）V8 | /reminders/edit | `app/reminders/edit/page.tsx` | `v8/reminders/edit.tsx` |
-| V8 | hjNpJ | リマインダ 作る 完了（有効にした） V8 | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
-| V8 | ltAaq | リマインダ 作る⑤ 確認 V8（機能追加 F-10・API待ち） | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
-| V8 | p5YuP | リマインダ 作る③ 通知の中身 V8（機能追加 F-10・API待ち） | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
-| V8 | r1l0bT | リマインダ 作る③（1152）V8 | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
+| V8 | hjNpJ | リマインダ 作る 完了（有効にした） V8 | /reminders/new | `app/reminders/new/page.tsx` | `v8/reminders/new/new.tsx` |
+| V8 | ltAaq | リマインダ 作る⑤ 確認 V8（機能追加 F-10・API待ち） | /reminders/new | `app/reminders/new/page.tsx` | `v8/reminders/new/new.tsx` |
+| V8 | p5YuP | リマインダ 作る③ 通知の中身 V8（機能追加 F-10・API待ち） | /reminders/new | `app/reminders/new/page.tsx` | `v8/reminders/new/new.tsx` |
+| V8 | r1l0bT | リマインダ 作る③（1152）V8 | /reminders/new | `app/reminders/new/page.tsx` | `v8/reminders/new/new.tsx` |
 | V8 | T0nis | リマインダ 作る④ 配信予定 V8｜状態は型の見本 CS のとおり | /reminders/edit?id=reminder-new&stage=schedule | `app/reminders/edit/page.tsx` | `v8/reminders/edit.tsx` |
-| V8 | VE1u5 | リマインダ 作る① 基本設定 V8 | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
-| V8 | YChR6 | リマインダ 作る② 対象者と止める条件 V8 | /reminders/new | `app/reminders/new/page.tsx` | `app/reminders/new/new-v8.tsx` |
+| V8 | VE1u5 | リマインダ 作る① 基本設定 V8 | /reminders/new | `app/reminders/new/page.tsx` | `v8/reminders/new/new.tsx` |
+| V8 | YChR6 | リマインダ 作る② 対象者と止める条件 V8 | /reminders/new | `app/reminders/new/page.tsx` | `v8/reminders/new/new.tsx` |
 | V8-B | n4DT7 | 承認ワークフロー（閲覧のみ）V8 | /restaurant-test/approvals | `app/restaurant-test/approvals/page.tsx` | `v8/restaurant/approvals/approvals.tsx` |
 | V8-B | t8WgD8 | 承認ワークフロー V8 | /restaurant-test/approvals | `app/restaurant-test/approvals/page.tsx` | `v8/restaurant/approvals/approvals.tsx` |
 | V8-B | ao15G | 飲食店向け 店舗を追加 ①利用規約への同意 V8 | /restaurant-test/dashboard | `app/restaurant-test/dashboard/page.tsx` | `v8/restaurant/dashboard/entry.tsx` |
@@ -360,13 +360,13 @@
 | V8 | yOyCg | リッチメニュー 削除できない理由 V8 | /rich-menus | `app/rich-menus/page.tsx` | `v8/rich-menus/list.tsx` |
 | V8 | ZoKow | リッチメニュー 一覧（閲覧のみ）V8 | /rich-menus | `app/rich-menus/page.tsx` | `v8/rich-menus/list.tsx` |
 | V8 | wxIQ7 | リッチメニュー 切替のつながり V8 | /rich-menus/connections | `app/rich-menus/connections/page.tsx` | `v8/rich-menus/connections.tsx` |
-| V8 | hKr8f | リッチメニュー 公開した（公開の進み） V8 | /rich-menus/edit | `app/rich-menus/edit/page.tsx` | `v8/rich-menu-edit/detail.tsx`<br>`app/rich-menus/new/create-v8.tsx` |
-| V8 | r8dGXT | リッチメニュー 編集（競合）V8 | /rich-menus/edit | `app/rich-menus/edit/page.tsx` | `v8/rich-menu-edit/detail.tsx`<br>`app/rich-menus/new/create-v8.tsx` |
-| V8 | F4gELj | リッチメニュー 作る④ 公開 V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `app/rich-menus/new/create-v8.tsx` |
-| V8 | JeINq | リッチメニュー 作る① 形と画像 V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `app/rich-menus/new/create-v8.tsx` |
-| V8 | kmTab | リッチメニュー 作る②（1152）V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `app/rich-menus/new/create-v8.tsx` |
-| V8 | OxEMM | リッチメニュー 作る③ 誰に出すか V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `app/rich-menus/new/create-v8.tsx` |
-| V8 | Z0uO6 | リッチメニュー 作る② ボタンの動き V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `app/rich-menus/new/create-v8.tsx` |
+| V8 | hKr8f | リッチメニュー 公開した（公開の進み） V8 | /rich-menus/edit | `app/rich-menus/edit/page.tsx` | `v8/rich-menu-edit/detail.tsx`<br>`v8/rich-menus/new/create.tsx` |
+| V8 | r8dGXT | リッチメニュー 編集（競合）V8 | /rich-menus/edit | `app/rich-menus/edit/page.tsx` | `v8/rich-menu-edit/detail.tsx`<br>`v8/rich-menus/new/create.tsx` |
+| V8 | F4gELj | リッチメニュー 作る④ 公開 V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `v8/rich-menus/new/create.tsx` |
+| V8 | JeINq | リッチメニュー 作る① 形と画像 V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `v8/rich-menus/new/create.tsx` |
+| V8 | kmTab | リッチメニュー 作る②（1152）V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `v8/rich-menus/new/create.tsx` |
+| V8 | OxEMM | リッチメニュー 作る③ 誰に出すか V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `v8/rich-menus/new/create.tsx` |
+| V8 | Z0uO6 | リッチメニュー 作る② ボタンの動き V8 | /rich-menus/new | `app/rich-menus/new/page.tsx` | `v8/rich-menus/new/create.tsx` |
 | V8 | axFrW | シナリオ配信 一覧 V8 | /scenarios | `app/scenarios/page.tsx` | `v8/scenarios/list.tsx` |
 | V8 | BxGhV | ★V8 シナリオ配信 一覧の状態 | /scenarios | `app/scenarios/page.tsx` | `v8/scenarios/list.tsx` |
 | V8 | wjfLe | シナリオ 一覧（1152）V8 | /scenarios | `app/scenarios/page.tsx` | `v8/scenarios/list.tsx` |

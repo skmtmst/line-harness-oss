@@ -8,7 +8,7 @@
 - 画面：`apps/web/src/v8/mileage/`（`BEHAVIOR.md` を含む）・`apps/web/src/app/mileage/`・`apps/web/src/app/scoring/`
 - Worker：`apps/worker/src/routes/scoring.ts`・`apps/worker/src/routes/action-score-rules.ts`・`apps/worker/src/services/`（`mileage-*`・`action-score-events.ts`・`event-bus.ts`）・`apps/worker/src/index.ts`（定期処理）
 - DB：`packages/db/src/`（`mileage*.ts`・`action-score-rules.ts`・`scoring.ts`）
-- お客さまの画面：`apps/liff/src/components/MileageRewards.tsx`・`apps/liff/src/pages/MyPage.tsx`
+- お客さまの画面：`apps/liff/src/components/mileage-rewards.tsx`・`apps/liff/src/pages/my-page.tsx`
 
 言葉：マイル＝お客さまの資産（見せる・使える・失効する）。行動スコア＝運用者だけが見る反応の目安（お客さまに見せない・使えない）。この2つを同じ「ポイント」として扱わない（要件 §2）。
 
@@ -109,7 +109,7 @@
 | # | 要件 | 今の作り | 確かめ方（場所） |
 |---|---|---|---|
 | 1 | タブの順は「友だちの残高→たまる決めごと→使い道→履歴→行動スコア」、残高は `/mileage?tab=balances`（§3） | 順は「たまる決めごと→使い道→友だちの残高→履歴→行動スコア」、`/mileage` はたまる決めごと | `apps/web/src/v8/mileage/frame.tsx` 30〜41 行。★V8 の絵の順なら要件 §3 を直す側 |
-| 2 | 失効は付与ロットごとに毎日、期限の来た未使用分を失効の行として足す。再実行で二重に減らさない。失効前に設定日数で知らせる（§8-3） | 失効の行を書く定期処理が無い。期限切れの分は読むときに残高から外すだけ。種類「expiration」は型にあるが書く所が無い。失効前のお知らせも無い | `packages/db/src/mileage.ts` 42 行・823〜835 行（`expiredLotHoldbackSql`）。`apps/worker/src/index.ts` の定期処理に失効が無い |
+| 2 | 失効は付与ロットごとに毎日、期限の来た未使用分を失効の行として足す。再実行で二重に減らさない。失効前に設定日数で知らせる（§8-3） | 失効の行を書く定期処理が無い。期限切れの分は読むときに残高から外すだけ。種類「expiration」は型にあるが書く所が無い。失効前のお知らせも無い | `packages/db/src/mileage/index.ts` 42 行・823〜835 行（`expiredLotHoldbackSql`）。`apps/worker/src/index.ts` の定期処理に失効が無い |
 | 3 | CSV は役割・範囲・理由・監査が要る。担当者は ×、admin は明示の権限時だけ（§7-3・§10） | 残高・履歴・使い道・行動スコアの CSV は画面の中で作り、役割で隠さず記録も残さない（閲覧のみでも出せる） | `apps/web/src/v8/mileage/balances.tsx` 542 行・`history.tsx` 171・331 行・`rewards.tsx` 897 行・`score.tsx` 733 行・`BEHAVIOR.md`「CSV…は使える」 |
 | 4 | 公開・手動調整は重要操作の権限（`mileage.rule.publish` など）で個別に許す。admin は「許可時のみ」（§10） | 権限の名前は記録のラベルだけ。口は owner/admin なら誰でも公開・調整できる | `apps/worker/src/lib/audit-log.ts` 31〜54 行・`apps/worker/src/routes/scoring.ts` 768・961 行（`requireRole('owner','admin')`） |
 | 5 | アカウントを確かめない全件取得を作らない。手動のスコア変更は理由つき（§7-3・§4-10） | 古い口が残る：GET `/api/scoring-rules` は全アカウントのルールを返す（役割の指定も無い）。POST `/api/friends/:id/score` は理由も操作番号も任意 | `apps/worker/src/routes/scoring.ts` 1940・2056 行、`packages/db/src/scoring.ts` 249 行 |

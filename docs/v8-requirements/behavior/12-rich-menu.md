@@ -82,12 +82,12 @@
 
 1. **スタッフが公開・取り下げ・削除・外部取り込みをできる**。要件 §9 は作成・公開・取り下げ・削除・外部取り込み・照合修復を owner/admin に限り、スタッフは閲覧とテストだけ。今の作りはどの書き込み口も `requireDeliveryAccess('richMenus')`（`apps/worker/src/routes/rich-menu-groups.ts:1890`・`:2237`・`:3024`・`:754` ほか）で、`/rich-menus` の edit を持つスタッフ（運用の束は配信 edit）を通す（`packages/shared/src/staff-permissions.ts:75`・`:100-113`・`:265-270`）。画面も `useFeatureAccess('richMenus')` で同じ判定（`apps/web/src/v8/rich-menus/list.tsx:196-198`。直前のコメントは「requireRole('owner','admin') で閉じている」と書くが実際と違う）。
 2. **公開中のメニューを直すには取り下げが要る**。要件 §6 は公開版と編集用の下書きを別の版で持つ（`current_published_version_id`・`current_draft_version_id`）。今の作りは公開中にページ・文言・既定を変えると 409 で「取り下げて下書きに戻して」と返す（`rich-menu-groups.ts:1785-1803`）。版の表（`packages/db/migrations/480_rich_menu_versions.sql`）はあるが、グループに下書き版・公開版の指し先は無い。取り下げている間、友だちはメニューを失う。
-3. **切替タブは3つ（3ページ）まで**。要件 §5-2・§17-2 は最大10ページ。作る①の選択肢が「なし・2つ・3つ」だけ（`apps/web/src/app/rich-menus/new/create-v8.tsx:222-229`）。
+3. **切替タブは3つ（3ページ）まで**。要件 §5-2・§17-2 は最大10ページ。作る①の選択肢が「なし・2つ・3つ」だけ（`apps/web/src/v8/rich-menus/new/create.tsx:222-229`）。
 4. **公開の実行の状態が3つだけ**。要件 §5-8 は queued〜reconciliation_required など11の状態。台帳は running・succeeded・failed（`packages/db/migrations/509_rich_menu_publish_runs.sql:13-14`）。ページごとの段（作成・画像・alias・片付け）は別の表にある（`510_rich_menu_publish_run_pages.sql`）。
-5. **押したときの動き（タグ・スコア・テンプレート）の実行台帳が無い**。要件 §6 の `rich_menu_action_runs`（冪等キー・試行回数・失敗符号）に当たる表がどの migration にも無い。押したときの処理は「ひとつ失敗しても残りは続ける」で、失敗を後から再実行する口が無い（`apps/worker/src/services/rich-menu-tap.ts:14-24`）。
+5. **押したときの動き（タグ・スコア・テンプレート）の実行台帳が無い**。要件 §6 の `rich_menu_action_runs`（冪等キー・試行回数・失敗符号）に当たる表がどの migration にも無い。押したときの処理は「ひとつ失敗しても残りは続ける」で、失敗を後から再実行する口が無い（`apps/worker/src/features/rich-menus/rich-menu-tap.ts:14-24`）。
 6. **画面の入口が要件の URL と違う**。要件 §4 は `/rich-menus/{id}/edit`・`/targeting`・`/publish`・`/runs`・`/external`・`/delete` と旧 URL からの転送。今は `/rich-menus/edit?id=&step=`・`/rich-menus/connections?id=` だけで、誰に出す・公開・結果・外部・削除は同じ画面の手順・窓（`apps/web/src/app/rich-menus/edit/page.tsx:10-23`、`apps/web/src/app/rich-menus/` の下は connections・edit・new だけ）。
-7. **B-313 の「中身が未設定のボタン」の注意が無い**。リッチメニューの一覧・作る画面に、ポイントカードなどが未設定のボタンへの注意と設定への入口が見当たらない（`apps/web/src/v8/rich-menus/list.tsx`・`apps/web/src/app/rich-menus/new/create-v8.tsx` に該当の処理なし）。決定は 10-15 で、順番は B-314 の②以降。
-8. **毎日の照合は見つけるだけで直さない**。要件 §7-2 は「切り替え後の失敗は照合・修復へ送り、自動で旧か新にそろえる」。毎日の照合は「ずれは直さず台帳に残す。直すのは運用者」（`apps/worker/src/services/rich-menu-daily-reconcile.ts:14-16`、`apps/worker/src/index.ts:1776-1778`）。公開の途中の失敗は自動で前へ戻している（`apps/worker/src/lib/rich-menu-publisher.ts:898-`）ので、ずれが残るのは公開の外で起きたずれだけ。
+7. **B-313 の「中身が未設定のボタン」の注意が無い**。リッチメニューの一覧・作る画面に、ポイントカードなどが未設定のボタンへの注意と設定への入口が見当たらない（`apps/web/src/v8/rich-menus/list.tsx`・`apps/web/src/v8/rich-menus/new/create.tsx` に該当の処理なし）。決定は 10-15 で、順番は B-314 の②以降。
+8. **毎日の照合は見つけるだけで直さない**。要件 §7-2 は「切り替え後の失敗は照合・修復へ送り、自動で旧か新にそろえる」。毎日の照合は「ずれは直さず台帳に残す。直すのは運用者」（`apps/worker/src/features/rich-menus/rich-menu-daily-reconcile.ts:14-16`、`apps/worker/src/index.ts:1776-1778`）。公開の途中の失敗は自動で前へ戻している（`apps/worker/src/lib/rich-menu-publisher.ts:898-`）ので、ずれが残るのは公開の外で起きたずれだけ。
 
 ### 仕様が無い
 > 2026-10-16 オーナー「おすすめで」（B-337）で下の項目は全部決まった。各行の → が決定。問いは design/v8/review/SPEC-QUESTIONS-1016.md。

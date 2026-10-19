@@ -74,7 +74,7 @@
 
 | # | 要件 | 今の作り | 根拠 |
 |---|---|---|---|
-| 1 | シナリオ未選択で「有効な友だち追加シナリオを全部流す」動きは除外（§4-3・§11） | 設定に当たらず旧設定（アカウントごとの JSON）でシナリオ未選択だと、有効な友だち追加シナリオを全部登録して1通目を送る経路が残っている | apps/worker/src/services/friend-add-routing.ts:1877・1939-1999、apps/worker/src/routes/webhook.ts:900-956 |
+| 1 | シナリオ未選択で「有効な友だち追加シナリオを全部流す」動きは除外（§4-3・§11） | 設定に当たらず旧設定（アカウントごとの JSON）でシナリオ未選択だと、有効な友だち追加シナリオを全部登録して1通目を送る経路が残っている | apps/worker/src/features/friends/friend-add-routing.ts:1877・1939-1999、apps/worker/src/routes/webhook.ts:900-956 |
 | 2 | 受け皿は「停止はできても削除はできない。停止時は代替先が必要」（§4-1） | 画面は受け皿を「止められません」として止める操作を出さない | apps/web/src/v8/friend-add/list.tsx:886 |
 | 3 | 作成・公開・停止・優先順位・再実行は owner/admin（§8） | 「友だち追加の編集」権限を持つ staff でも作成・公開・停止・並べ替え・再実行が通る | apps/worker/src/routes/friend-add-rules.ts:1010・1256・1453・1740・1779、packages/shared/src/staff-permissions.ts:108-113 |
 | 4 | 再実行は冪等キー必須（§7） | 失敗したアクションの再実行は冪等キーを読まない（予約の取り合いで二重だけは防ぐ） | apps/worker/src/routes/friend-add-rules.ts:1010-1033 |

@@ -6,7 +6,7 @@
 
 書いた日：2026-10-16（B-333）。この文書は「操作したらどう動くか」を、自動の試験と検証環境での手の確かめがすぐ書ける形にしたもの。本当の送信はしない（検証環境の試しチャネル・試しの友だちだけに送る）。
 
-読んだ主なコード：`apps/web/src/v8/broadcasts/`（一覧・かんたんに送る）・`apps/web/src/v8/broadcast-detail/`（詳細・予約したあと）・`apps/web/src/components/broadcasts/broadcast-form.tsx`（作る5手順）・`apps/web/src/app/broadcasts/detail/`・`apps/web/src/lib/api.ts`・`apps/worker/src/routes/broadcasts.ts`・`apps/worker/src/routes/broadcast-approvals.ts`・`apps/worker/src/services/broadcast.ts`・`broadcast-approval.ts`・`broadcast-quota-guard.ts`・`broadcast-preflight.ts`・`apps/worker/src/middleware/impersonation.ts`。
+読んだ主なコード：`apps/web/src/v8/broadcasts/`（一覧・かんたんに送る）・`apps/web/src/v8/broadcast-detail/`（詳細・予約したあと）・`apps/web/src/components/broadcasts/broadcast-form.tsx`（作る5手順）・`apps/web/src/app/broadcasts/detail/`・`apps/web/src/lib/api.ts`・`apps/worker/src/routes/broadcasts.ts`・`apps/worker/src/routes/broadcast-approvals.ts`・`apps/worker/src/features/broadcasts/broadcast.ts`・`broadcast-approval.ts`・`broadcast-quota-guard.ts`・`broadcast-preflight.ts`・`apps/worker/src/middleware/impersonation.ts`。
 
 ## 操作と挙動
 
@@ -119,11 +119,11 @@
 
 | # | 要件の節 | 今の作り | 違い | 影響 |
 |---|---|---|---|---|
-| 1 | §3-4「過去日時を保存しない」 | `apps/worker/src/routes/broadcasts.ts:1673-1677`（PUT は `scheduledAt` があれば状態を予約にするだけ）・POST も過去の判定なし。画面 `apps/web/src/components/broadcasts/broadcast-form.tsx:1428-1431`（`scheduledAtIso` は日本時間を直すだけ） | 過去の日時を入れても保存でき、`apps/worker/src/services/broadcast.ts:645-648` の見回り（予定 ≦ 今）が次の 1 分で送る | 「予約したつもり」が確認の取り消しの機会なく即送信になる。今すぐ送るの不可逆の確認（`requireIrreversibleConfirmation`）を通らない |
+| 1 | §3-4「過去日時を保存しない」 | `apps/worker/src/routes/broadcasts.ts:1673-1677`（PUT は `scheduledAt` があれば状態を予約にするだけ）・POST も過去の判定なし。画面 `apps/web/src/components/broadcasts/broadcast-form.tsx:1428-1431`（`scheduledAtIso` は日本時間を直すだけ） | 過去の日時を入れても保存でき、`apps/worker/src/features/broadcasts/broadcast.ts:645-648` の見回り（予定 ≦ 今）が次の 1 分で送る | 「予約したつもり」が確認の取り消しの機会なく即送信になる。今すぐ送るの不可逆の確認（`requireIrreversibleConfirmation`）を通らない |
 | 2 | §3-1 操作「未送信分を緊急停止」・§3-8 | API は在る（`routes/broadcasts.ts:1993` /stop・`:2108` /resume、`apps/web/src/lib/api.ts:8738-8748`）が、画面から呼んでいる所が無い（`apps/web/src` で `broadcasts.stop`・`broadcasts.resume` の呼び出し 0 件） | 送信中に止める・続きを送るボタンが無い | 誤配信に気づいても運用者は止められない。合格条件「未送信分だけ停止でき」を画面で満たさない |
 | 3 | §3-3「変数の値がない人がいる場合、既定値・対象除外・明示確認のいずれか」 | `routes/broadcasts.ts:2426-2430`・`:2493-2497` は送信を丸ごと拒む。文は英語 `Cannot personalize broadcast: N recipient(s) have no display name` で、`apps/web/src/lib/api.ts:2686-2691`（英文を落とさない）→ `describeSaveFailure` でそのまま画面に出る | 選ばせずに止め、英語で出る | 名前が空の友だちが 1 人でもいると {名前} 入りの配信が送れず、理由も読めない |
 | 4 | §3-8・§13-3「送信の途中で止めると…」 | `routes/broadcasts.ts:2009-2015`（全員への配信は 409 BROADCAST_NOT_STOPPABLE）・`:2177-2182`（全員は再送不可） | 要件は配信の種類を分けていないが、全員への配信は止める・送り直す・宛先ごとの結果を持たない | 全員への配信では §13-2 の「宛先ごとに結果を残す」が満たせない（LINE の口の制約。仕様の書き分けが要る） |
-| 5 | §3-4「LINE 送信枠の見込み」・予約直前の再確認 | `apps/worker/src/services/broadcast.ts:611-624`（`countScheduledRecipients` はタグ以外を全員として数える） | 絞り込み（条件）の配信でも、全フォロワーの数で送信枠を見る | 枠に余裕があるのに「足りない」と止めることがある（安全側だが誤った知らせ） |
+| 5 | §3-4「LINE 送信枠の見込み」・予約直前の再確認 | `apps/worker/src/features/broadcasts/broadcast.ts:611-624`（`countScheduledRecipients` はタグ以外を全員として数える） | 絞り込み（条件）の配信でも、全フォロワーの数で送信枠を見る | 枠に余裕があるのに「足りない」と止めることがある（安全側だが誤った知らせ） |
 | 6 | §5「送信・予約・停止・失敗再送は Idempotency-Key 必須」 | Idempotency-Key を見るのは作成だけ（`routes/broadcasts.ts:1326`）。送信は状態の原子ロック、停止・再送は `expectedVersion` | 方式が違う | 二重送信は状態のロックで防げているので影響は小さい。要件の書き方を今の方式に合わせるか決める |
 | 7 | §5 API `POST /api/broadcasts/{id}/schedule`・`/duplicate` | 予約は `PUT /api/broadcasts/:id` の `scheduledAt`、複製は画面の `?duplicateFrom=` で作り直す（一覧の BEHAVIOR.md） | 口の名前・形が違う | 動きは同じ。要件の API 一覧が古い |
 

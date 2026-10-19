@@ -109,7 +109,7 @@
 | 2 | 数の帯は 5 つ（有効・LINE でブロック中・管理画面で非表示・未対応・今月の追加）（§5-1） | 4 つ（ブロックと非表示が 1 つ） | apps/web/src/v8/friends/list/list.tsx:575-604 |
 | 3 | プロフィール画像の URL を同一人物の確定・重複配信除外に使わない（§9-1・§18） | 同一人物の鍵の 1 番目がまだ画像 URL のトークン。統合ユーザーの一覧・重複の数え方・イベント予約などが使っている | apps/worker/src/lib/identity-key.ts:10-16、apps/worker/src/services/users-grouped.ts:15-21、apps/worker/src/services/duplicates-stats.ts:62 |
 | 4 | 一括操作に「友だち情報を変更」「表示・非表示」「コンバージョンの追加・解除」「リマインダの解除」（§7） | サーバーは 14 種を受けるが、画面の選択肢は 9 種だけ（上の 5 種が無い） | apps/web/src/components/friends/bulk-run-view.ts:31-41、packages/shared/src/friend-bulk-runs.ts:10-23 |
-| 5 | 管理画面で非表示にできる（§8-1・§11-1） | 非表示を書く口は一括操作のサーバーだけで、画面にその操作が無い（4 と同じ理由）。個別の非表示の操作も見当たらない | apps/worker/src/services/friend-bulk-runs.ts:212（set_visibility）、apps/web/src 全体に set_visibility の呼び出しなし |
+| 5 | 管理画面で非表示にできる（§8-1・§11-1） | 非表示を書く口は一括操作のサーバーだけで、画面にその操作が無い（4 と同じ理由）。個別の非表示の操作も見当たらない | apps/worker/src/features/friends/friend-bulk-runs.ts:212（set_visibility）、apps/web/src 全体に set_visibility の呼び出しなし |
 | 6 | CSV 出力は検索対象全件・項目を選ぶ・Shift_JIS も（§13-1） | 一覧の書き出しは表示中のページだけ。書き出しの仕事は「アカウントの全員」で検索条件を持たない。タグ・対応情報の列と Shift_JIS は 422 で断る | apps/web/src/v8/friends/list/list.tsx:513-531、apps/worker/src/routes/friend-migrations.ts:822-828・841 |
 | 7 | 並び順は追加・最終反応・待ち時間・名前（§5-4） | 「新しい順・古い順」の 2 つだけ | apps/web/src/v8/friends/list/list.tsx:85 |
 | 8 | 保存検索は `/api/friends/saved-views` の作成・変更・削除（§14）。条件の項目が消えたら要修正 | 友だちの口は一覧と作成だけで、変更・削除の口が無い。V8 の一覧は旧い口 `/api/saved-searches` を使う。消えた項目の「要修正」は今回確かめていない | apps/worker/src/routes/friends.ts:252・274（PATCH/DELETE なし）、apps/web/src/lib/api.ts:7049-7075 |
