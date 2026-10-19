@@ -10,8 +10,8 @@ export function canManageRole(role: string | null | undefined): boolean {
 }
 
 /**
- * オーナーだけの操作。要件 v6-33 §15 で `account.line.register`（登録・接続確認）や
- * 資格情報の差し替えなど、管理者にも渡していない鍵がある。
+ * オーナーだけの操作。資格情報の差し替えなど、管理者にも渡していない鍵がある。
+ * LINEアカウントの新規登録・接続確認は canManageRole を使う。
  * 管理者に入口を出すとサーバの403で行き止まりになるので、出す側でここを使って分ける。
  */
 export function isOwnerRole(role: string | null | undefined): boolean {

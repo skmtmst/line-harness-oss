@@ -96,6 +96,17 @@ describe('useStaffRole', () => {
     expect(canManageRole(seen[seen.length - 1])).toBe(true)
   })
 
+  it.each([
+    { role: 'admin', readOnly: true },
+    { role: 'admin', roleBundle: 'view_only' },
+  ])('閲覧専用の管理者 $roleBundle $readOnly は変更できない', async (identity) => {
+    staffMe.mockResolvedValue({ success: true, data: identity })
+    await act(async () => { root.render(<Probe />) })
+    await flush()
+    expect(seen[seen.length - 1]).toBe('viewer')
+    expect(canManageRole(seen[seen.length - 1])).toBe(false)
+  })
+
   it('読めなかったときは null のまま（呼び出し側は操作を隠す）', async () => {
     staffMe.mockImplementation(async () => ({ success: false, error: 'ng' }))
     await act(async () => {
