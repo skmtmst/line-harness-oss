@@ -124,6 +124,23 @@ const fakeAccount = {
   updated_at: '2026-05-08T00:00:00.000',
 };
 
+describe('GET /api/line-accounts/:id/registration-receipt', () => {
+  test('only exposes a receipt in the current account scope', async () => {
+    const app = setupApp('owner', makeDbStub(), {
+      assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,
+    });
+    const allowed = await app.request('/api/line-accounts/acc-1/registration-receipt');
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get('Cache-Control')).toBe('no-store');
+    expect(await allowed.json()).toEqual({
+      success: true, data: { status: 'waiting', receivedAt: null },
+    });
+    const denied = await app.request('/api/line-accounts/acc-other/registration-receipt');
+    expect(denied.status).toBe(404);
+    expect(await denied.json()).toEqual({ success: false, error: 'LINE account not found' });
+  });
+});
+
 beforeEach(() => {
   styleMocks.initializeAccountStyle.mockClear();
   for (const fn of Object.values(dbMocks)) {
