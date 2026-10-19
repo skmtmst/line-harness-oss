@@ -28,9 +28,9 @@ export default function BookingStorePhotos() {
     <h2 className="text-sm font-bold text-ink">お店の案内</h2>
     <div className="grid grid-cols-3 gap-3">
       {photos.map(photo => <figure key={photo.slot} className="min-w-0 space-y-1.5">
-        <button type="button" aria-label={`${labels[photo.slot]}の写真を大きく見る`} onClick={() => setSelected(photo)} className="block w-full rounded-[10px] focus-visible:outline-2 focus-visible:outline-accent">
+        <Button variant="plain" aria-label={`${labels[photo.slot]}の写真を大きく見る`} onClick={() => setSelected(photo)} className="block w-full rounded-[10px] focus-visible:outline-2 focus-visible:outline-accent">
           <img src={photo.url} alt={`お店の${labels[photo.slot]}`} loading="lazy" className="aspect-video w-full rounded-[10px] object-cover" />
-        </button>
+        </Button>
         <figcaption className="text-xs text-liff-sub">{labels[photo.slot]}</figcaption>
       </figure>)}
     </div>
