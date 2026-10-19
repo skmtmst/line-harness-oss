@@ -582,3 +582,9 @@
 - [1777-masato-owner-only-line-register.md](release-log/unreleased/1777-masato-owner-only-line-register.md)
 
 - [LINE接続の分離](release-log/unreleased/1778-masato-line-webhook-isolation.md)
+
+- [cleanup-q02a1-1019.md](qa/cleanup-q02a1-1019.md)
+
+- [cleanup-q02a1-source-tests.tsv](qa/cleanup-q02a1-source-tests.tsv)
+
+- [0000-kenta-cleanup-q02a1.md](release-log/unreleased/0000-kenta-cleanup-q02a1.md)
