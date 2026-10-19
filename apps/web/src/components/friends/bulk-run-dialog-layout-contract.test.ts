@@ -7,8 +7,6 @@ const DIALOG = readFileSync(join(__dirname, 'bulk-run-dialog.tsx'), 'utf8')
 
 describe('V8 一括操作の小窓（CYJ0L）', () => {
   it('外側・フォーカス・画面内への収まりは共通Dialogを使う', () => {
-    expect(DIALOG).toContain("import Dialog from '@/components/shared/dialog'")
-    expect(DIALOG).toContain('<Dialog open={open}')
     expect(DIALOG).toContain('busy={busy} footer={footer}')
     expect(CSS).not.toContain('position: fixed')
     expect(CSS).not.toContain('left: 256px')

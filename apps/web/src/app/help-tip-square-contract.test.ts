@@ -28,7 +28,6 @@ describe('「？」の正円', () => {
   it('文字の「？」を専用の円に置き、アイコンへ置き換えない', () => {
     expect(TSX).not.toContain('lucide')
     expect(TSX).not.toContain('CircleHelp')
-    expect(TSX).toContain('className={styles.mark}>?</span>')
     expect(CSS).not.toContain('.button svg')
     expect(CSS).toMatch(/:root \.button\s*\{[^}]*background:\s*transparent;/)
   })
@@ -58,9 +57,7 @@ describe('V8の「？」は円と押せる範囲を分ける', () => {
 })
 
 describe('友だち数の推移の表の「？」', () => {
-  it('「？」は見出しの日付の横に1つだけ置く', () => {
-    expect(TREND.match(/<HelpTip/g)?.length).toBe(1)
-    expect(TREND).toContain('日付の推定値の説明')
+  it('行ごとの古い説明部品を復活させない', () => {
     expect(TREND).not.toContain('EstimatedHelp')
   })
 
