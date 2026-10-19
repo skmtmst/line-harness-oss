@@ -1,6 +1,8 @@
+> 文書：オートメーション ルールを作る（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # オートメーション ルールを作る（V8）の動き
 
-入口：`app/automations/new/page.tsx`（V8 のときだけ `src/v8/automations/create/create.tsx`、それ以外は今の v7 の画面）。
+入口：`app/automations/new/page.tsx`（V8専用で `src/v8/automations/create/create.tsx`）。
 絵：`M4torY`（ルールを作る）・`tJqST`（保存が先にされていた＝競合）。
 下書きを仕上げる（`J1VA8`・`/automations/drafts?id=<下書き>`）も同じ画面（`chrome="draft"`）。入口は `app/automations/drafts/page.tsx`（V8へ固定済み。番号が無いときは今までどおり理由を出す）。旧の共通下書き編集器は動作5+6件/契約4件を現役へ移して削除した。
 

@@ -1,3 +1,5 @@
+> 文書：Instagram同時投稿のためのMetaアプリ準備手順｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # Instagram同時投稿のためのMetaアプリ準備手順
 
 Googleビジネスの投稿をInstagramにも同時に出すには、Meta（Facebook）側に「アプリ」を1つ作る必要があります。

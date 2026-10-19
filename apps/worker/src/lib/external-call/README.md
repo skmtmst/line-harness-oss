@@ -1,3 +1,5 @@
+> 文書：External call executor (A06 / B-365①)｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # External call executor (A06 / B-365①)
 
 仕様の正本は [段2の契約 §3・§4](../../../../../docs/v8-requirements/cleanup-stage2-contract.md#retry)。

@@ -1,3 +1,5 @@
+> 文書：LINE API 互換プロキシ (/line-api)｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # LINE API 互換プロキシ (`/line-api`)
 
 外部エージェント (Codex / Claude Code / 各種スクリプト) が LINE Messaging API を直接叩くと、送信メッセージが `messages_log` に残らず admin UI のチャット履歴から欠落する。このプロキシは **ベースURLを差し替えるだけ** で送信を `messages_log` に記録する drop-in 経路を提供する。通常の自動送信は `source='external'`、人間が個別に返信する場合は下記ヘッダーを付けて `source='manual'` として記録する。

@@ -23,7 +23,7 @@ const single = (permission: string) => ({
 export const bookingPhotosPaths = {
   '/api/booking/admin/menus/photos': { get: {
     tags: ['Booking'], summary: '予約設定のメニュー・スタッフ・店の写真を取得',
-    parameters: [account], responses: { '200': { description: 'menus/staffのid,name,version,photo。storeのversion,photos,order。photoは{mediaId,url}またはnull。未設定の店はversion=0。' }, '403': responses['403'], '503': { description: '写真を読み込めない' } },
+    parameters: [account], responses: { '200': { description: 'menus/staffのid,name,version,photo。storeのversion,photos,order,visibility（3枠の公開可否）。photoは{mediaId,url}またはnull。未設定の店はversion=0。' }, '403': responses['403'], '503': { description: '写真を読み込めない' } },
   } },
   '/api/booking/admin/menus/{id}/photo': { put: single('/booking/menus') },
   '/api/booking/admin/staff/{id}/photo': { put: single('booking.settings') },
@@ -34,6 +34,7 @@ export const bookingPhotosPaths = {
       type: 'object', required: ['expectedVersion', 'photos', 'order'], properties: {
         expectedVersion: { type: 'integer', minimum: 0 },
         photos: { type: 'object', additionalProperties: false, required: slots, properties: { exterior: mediaId, interior: mediaId, waiting: mediaId } },
+        visibility: { type: 'object', additionalProperties: false, required: slots, properties: { exterior: { type: 'boolean' }, interior: { type: 'boolean' }, waiting: { type: 'boolean' } }, description: '省略時は選択済みの公開設定を保持。未設定は全て非公開。写真と同じ版で保存。' },
         order: { type: 'array', minItems: 3, maxItems: 3, uniqueItems: true, items: { type: 'string', enum: slots } },
       },
     } } } }, responses,
@@ -41,6 +42,6 @@ export const bookingPhotosPaths = {
   '/api/liff/booking/store-photos': { get: {
     tags: ['Booking'], summary: 'LIFFのお店の案内に表示する写真を保存順で取得',
     security: [], parameters: [{ name: 'liffId', in: 'query', required: true, schema: { type: 'string' } }],
-    responses: { '200': { description: 'success:true,data:[{slot,url}]。登録した写真だけ。管理用メディアID・版を返さない。' }, '404': { description: '未登録・無効なLIFF' }, '503': { description: '写真を読み込めない' } },
+    responses: { '200': { description: 'success:true,data:[{slot,url}]。公開を選んだ写真だけ。0枚なら空配列。管理用メディアID・版を返さない。' }, '404': { description: '未登録・無効なLIFF' }, '503': { description: '写真を読み込めない' } },
   } },
 };

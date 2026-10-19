@@ -1,3 +1,5 @@
+> 文書：SNS 連携（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # SNS 連携（V8）の動き
 
 入口：`app/settings/sns/page.tsx`（新しい画面なので V8 だけ）。絵：★V8-B `YINmJ`（未接続）・`DFnll`（Instagram 接続済み）／2026-10-07 利用者承認。板は `y3GGTs`。Googleビジネスと Instagram の2つだけ（X は入れない）。

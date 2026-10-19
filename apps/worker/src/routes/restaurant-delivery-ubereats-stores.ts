@@ -7,7 +7,6 @@
  * 親（`restaurant-delivery.ts`）からは読み込まない。店舗の引き当て・接続の読み取り・
  * 時刻の整え方だけを引数（`deps`）で受け取る。親と行き違いにならないようにするため。
  */
-import { logger } from '@line-crm/shared/server';
 import type { Context, Hono } from 'hono';
 import { decryptCredential } from '@line-crm/db';
 import type { Env } from '../worker-env.js';

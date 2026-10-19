@@ -1,3 +1,5 @@
+> 文書：座席・卓管理の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 座席・卓管理の動き（BEHAVIOR.md）
 
 対象：`app/restaurant-test/v8/tables.tsx`（今の V8）から写して `tables.tsx` を一から書いた。板 BERxg・卓を止める eY9F3・卓を追加・変更 gBrCz。

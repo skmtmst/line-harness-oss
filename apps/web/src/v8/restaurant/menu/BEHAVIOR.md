@@ -1,3 +1,5 @@
+> 文書：メニュー管理の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # メニュー管理の動き（BEHAVIOR.md）
 
 対象：`app/restaurant-test/v8/menu.tsx`（今の V8）から写して `menu.tsx` を一から書いた。板 MJoJR・停止 MV5Os・追加と変更 NkmwU。

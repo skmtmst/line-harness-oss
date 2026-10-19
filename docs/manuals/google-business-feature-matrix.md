@@ -1,3 +1,5 @@
+> 文書：Googleビジネスプロフィール連携 機能対応表（申請用・根拠付き）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # Googleビジネスプロフィール連携 機能対応表（申請用・根拠付き）
 
 この表は、Google Business Profile API の利用審査とOAuthアプリ審査に出す申請文（`docs/manuals/google-business-verification-application.md`）が、実際の本番実装と一致していることを示すための一覧である。**審査のために事実と異なる説明は書かない。** 表に書いていないGoogle APIは本番コードから呼び出していない。
