@@ -12,7 +12,7 @@ import { useListUrlJsonValue } from '@/components/shared/list-url-state'
 
 import { useEffect, useState } from 'react'
 import { Download, History, MinusCircle, PlusCircle, Undo2 } from 'lucide-react'
-import { ListPage } from '@/components/templates/index'
+import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'

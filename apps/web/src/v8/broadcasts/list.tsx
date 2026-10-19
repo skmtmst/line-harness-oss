@@ -25,7 +25,7 @@ import { loadFailureNotice, permissionDeniedMessage } from '@/components/shared/
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { ListPage, ListPagePagination } from '@/components/templates/index';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';

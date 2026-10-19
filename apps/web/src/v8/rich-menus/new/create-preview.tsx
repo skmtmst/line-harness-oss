@@ -5,7 +5,7 @@ import { formatNumber } from '@/lib/format'
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
 import { Circle,CircleAlert,CircleCheck } from 'lucide-react'
 import type { CheckState } from './create-types'
-import styles from './create.module.css'
+import styles from '../../../app/rich-menus/new/create-v8.module.css'
 /* ---------- 小部品 ---------- */
 
 export function MetricValue({ metric }: { metric: RichMenuTargetPreview['matched'] | undefined }) {

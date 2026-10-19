@@ -9,7 +9,7 @@ import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } fr
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, FlaskConical, Plus } from 'lucide-react'
-import { CreatePage } from '@/components/templates/index'
+import { CreatePage } from '@/components/templates'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConditionBuilder, { pruneCondition } from '@/components/shared/condition-builder'

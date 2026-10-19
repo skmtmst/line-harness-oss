@@ -1,8 +1,8 @@
 import { formatDate } from '@/lib/format'
 import type { StyleAlert, StyleKpi, StyleRow, StyleToday } from './model'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { isWalkIn } from '@/v8/restaurant/front-desk'
-import { sourceName } from '@/v8/restaurant/reservations'
+import { isWalkIn } from '@/v8/restaurant/front-desk/public/walk-in'
+import { sourceName } from '@/v8/restaurant/reservations/public/format'
 import { canMarkVisited, groupCloseTasks, openItems, reasonText, slotTitle, summarizeToday, visitState } from '@/v8/restaurant/dashboard/public/summarize'
 import type { StoreToday } from '@/v8/restaurant/dashboard/public/use-store-today'
 

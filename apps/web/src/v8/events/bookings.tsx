@@ -7,7 +7,7 @@ import { api, eventsApi, type EventBookingItem, type EventDetail, type EventOccu
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
-import { DetailPage } from '@/components/templates/index'
+import { DetailPage } from '@/components/templates'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import Button from '@/components/shared/button'

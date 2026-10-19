@@ -45,10 +45,10 @@ function slice(source: string, start: string, end: string): string {
 
 const detail = withoutComments(fs.readFileSync(DETAIL, 'utf8'))
 const triggerEditor = withoutComments(
-  fs.readFileSync(new URL('../../../components/scenarios/trigger-editor.tsx', import.meta.url), 'utf8'),
+  fs.readFileSync(path.join(SCENARIOS, 'trigger-editor.tsx'), 'utf8'),
 )
 const dialogs = withoutComments(
-  fs.readFileSync(new URL('../../../components/scenarios/scenario-dialogs.tsx', import.meta.url), 'utf8'),
+  fs.readFileSync(path.join(SCENARIOS, 'scenario-dialogs.tsx'), 'utf8'),
 )
 
 /** 見出しの `<Header ... />` だけ。説明文はここに書かれる。 */
@@ -125,7 +125,7 @@ describe('bV5Vs シナリオ編集', () => {
   })
 
   it('SCENARIO-23: 操作名は単語の途中で折らず、操作列の必要幅を確保する', () => {
-    const css = fs.readFileSync(new URL('../../../v8/scenario-detail/detail.module.css', import.meta.url), 'utf8')
+    const css = fs.readFileSync(path.join(__dirname, '../../../v8/scenario-detail/detail.module.css'), 'utf8')
     expect(css).toMatch(/\.stepOps\s*\{[^}]*flex-shrink: 0;/)
     expect(detail).toContain('<RowMenu')
     expect(detail).toContain('className={styles.stepOps}')

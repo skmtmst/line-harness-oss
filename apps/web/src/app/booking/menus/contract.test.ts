@@ -13,12 +13,12 @@ vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const ROOT = join(process.cwd(), 'src', 'app', 'booking', 'menus')
-const LIST = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const CREATE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8')
+const LIST = readFileSync(join(ROOT, 'page.tsx'), 'utf8')
+const CREATE = readFileSync(join(ROOT, 'new', 'page.tsx'), 'utf8')
 const SETTINGS_V8 = readFileSync(join(ROOT, 'settings-v8.tsx'), 'utf8')
 // タブの中身は settings-tabs/ に分かれている（見た目・動きは同じ）。
-const SETTINGS_MENUS_TAB = readFileSync(new URL('../../../v8/booking-menus/tabs/menus-tab.tsx', import.meta.url), 'utf8')
-const SETTINGS_CSS = readFileSync(new URL('../../../v8/booking-menus/settings.module.css', import.meta.url), 'utf8')
+const SETTINGS_MENUS_TAB = readFileSync(join(ROOT, '../../../v8/booking-menus/tabs/menus-tab.tsx'), 'utf8')
+const SETTINGS_CSS = readFileSync(join(ROOT, '../../../v8/booking-menus/settings.module.css'), 'utf8')
 
 describe('V8 予約設定', () => {
   it('R91: メニューがあるときも見出しに作成の入口を常設する', () => {
@@ -129,7 +129,7 @@ describe('V8 予約設定', () => {
 
   it('日時の表示は予約設定内の共通整形を使う', () => {
     // readUiSource は共通整形の定義まで読むので、入口だけを検査する。
-    const entry = readRawSource(new URL('../../../v8/booking-menus/tabs/rules-tab.tsx', import.meta.url), 'utf8')
+    const entry = readRawSource(join(ROOT, '../../../v8/booking-menus/tabs/rules-tab.tsx'), 'utf8')
     expect(entry).toContain("from '../lib/format-time'")
     expect(entry).not.toContain('function bookingWindowEnd(')
     expect(entry).not.toContain('function businessHourSummary(')

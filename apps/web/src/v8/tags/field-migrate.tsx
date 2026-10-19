@@ -8,7 +8,7 @@ import { ArrowRight } from 'lucide-react';
 import type { FriendField, FriendFieldType } from '@line-crm/shared';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { CreatePage } from '@/components/templates/index';
+import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { canManageRole, useStaffRole } from '@/lib/staff-role';

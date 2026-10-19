@@ -5,7 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const EDITOR = readUiSource(
-  new URL('../../components/auto-replies/edit-dialog.tsx', import.meta.url),
+  path.join(__dirname, '../../components/auto-replies/edit-dialog.tsx'),
   'utf8',
 )
 const PUBLISH = readUiSource(new URL('../../v8/auto-replies/edit/wizard.tsx', import.meta.url), 'utf8')

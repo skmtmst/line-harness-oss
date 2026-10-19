@@ -17,7 +17,7 @@ import { api, ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { SettingsPage } from '@/components/templates/index';
+import { SettingsPage } from '@/components/templates';
 import SettingsInnerNav from '@/components/layout/settings-inner-nav';
 import Button from '@/components/shared/button';
 import SendersCard from './senders-card';

@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   button_label: requiredText("ボタンの文字を入力してください"),
 }
 
@@ -89,7 +89,7 @@ export interface MessageFormProps {
 function cardButtonProblem(button: HqMessageCard['buttons'][number]): string | null {
   const extrasError = tapExtrasError(button.tapExtras)
   if (extrasError) return extrasError
-  if ((b244Requirements.button_label.check(button.label) !== null)) return 'ボタンの文字を入力してください'
+  if ((FIELD_REQUIREMENTS.button_label.check(button.label) !== null)) return 'ボタンの文字を入力してください'
   if (!button.value.trim()) return button.action === 'form' ? '回答フォームを選んでください' : button.action === 'scenario' ? 'シナリオを選んでください' : button.action === 'message' ? '送る文を入力してください' : 'URLを入力してください'
   if (button.action === 'url') {
     try {
@@ -175,7 +175,7 @@ export default function MessageForm({
               {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => loadReferences()} busyLabel="処理中…">参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
                 <div key={button.id} className={styles.buttonEdit} {...(fields ? fields.bind(`button-${button.id}`) : {})} aria-describedby={fields?.invalid(`button-${button.id}`) ? `hq-msg-button-${button.id}-error` : undefined}>
-                  <Field label="ボタンの文字" requirement={b244Requirements.button_label}><SaveErrorField names={[`buttons.${index}.label`,"label","button.label"]}><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></SaveErrorField></Field>
+                  <Field label="ボタンの文字" requirement={FIELD_REQUIREMENTS.button_label}><SaveErrorField names={[`buttons.${index}.label`,"label","button.label"]}><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></SaveErrorField></Field>
                   <div className={styles.field}>
                     <span className={styles.smallLabel}>押したとき</span>
                     <SaveErrorField names={["button"]}><TapActionField allowExtras accountId={null} extrasError={fields?.error(`button-${button.id}`)}

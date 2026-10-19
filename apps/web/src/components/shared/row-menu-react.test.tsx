@@ -39,8 +39,8 @@ describe('RowMenu：行の右端の「…」', () => {
   it('28角の CSS は v8 だけで効き、押せる所は 36 まで広げる', async () => {
     const { readFileSync } = await import('node:fs')
     const { join } = await import('node:path')
-    const css = readFileSync(new URL('./icon-button.module.css', import.meta.url), 'utf8')
-    const globals = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8')
+    const css = readFileSync(join(process.cwd(), 'src/components/shared/icon-button.module.css'), 'utf8')
+    const globals = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8')
     expect(css).toMatch(/:root \.button\[data-size='row'\] \{[^}]*width: var\(--tpl-icon-btn-row\)/)
     expect(css).toMatch(/\[data-size='row'\]::before \{[^}]*--tpl-icon-btn-row-hit/)
     expect(globals).toContain('--tpl-icon-btn-row: 28px;')

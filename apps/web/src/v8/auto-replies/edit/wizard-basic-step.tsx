@@ -12,7 +12,7 @@ import { CreateStarterCards } from '@/components/templates/create-parts';
 import { api } from '@/lib/api';
 import type { Dispatch,SetStateAction } from 'react';
 import { STARTER_TEMPLATES,WizardForm,WizardStep } from './wizard-model';
-import styles from './wizard.module.css';
+import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardBasicStepContext = {
   accountId: string | null

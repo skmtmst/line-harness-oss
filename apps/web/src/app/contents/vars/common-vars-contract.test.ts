@@ -7,10 +7,10 @@ import { describe, expect, it } from 'vitest'
 import { readImplementationSource } from '../../../../../worker/src/test-utils/implementation-source'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-const NEW_PAGE = readUiSource(new URL('./new/page.tsx', import.meta.url), 'utf8')
-const EDIT_PAGE = readUiSource(new URL('./edit/page.tsx', import.meta.url), 'utf8')
-const API = readApiSource(new URL('../../../lib/api.ts', import.meta.url), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
+const NEW_PAGE = readUiSource(join(HERE, 'new', 'page.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const WORKER = readImplementationSource(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'contents.ts'))
 
 describe('V6共通情報一覧', () => {
@@ -113,7 +113,7 @@ describe('V6共通情報一覧', () => {
       expect(src, name).toContain('feature="common_vars"')
     }
     // 登録メディア一覧はメディアキーで閉じる（共通情報とは別キー）。
-    const mediaPage = readUiSource(new URL('../page.tsx', import.meta.url), 'utf8')
+    const mediaPage = readUiSource(join(HERE, '..', 'page.tsx'), 'utf8')
     expect(mediaPage).toContain('FeatureGate')
     expect(mediaPage).toContain('feature="media"')
   })

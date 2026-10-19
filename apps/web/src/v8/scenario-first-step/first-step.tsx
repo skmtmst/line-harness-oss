@@ -24,7 +24,7 @@ import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import { LINE_TEXT_LIMIT, isOverCharLimit } from '@/components/scenarios/char-counter';
 import type { SegmentCondition } from '@/components/shared/condition-builder';
 import { pruneCondition } from '@/lib/segment-condition';
-import { CreatePage } from '@/components/templates/index';
+import { CreatePage } from '@/components/templates';
 import { Steps } from '@/components/templates/steps';
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
@@ -43,9 +43,9 @@ import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { restoreFirstStep, scheduleToPayload } from './first-step-form';
 import styles from './first-step.module.css'
-import { browserDraftKey } from '@/v8/autosave'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave'
-import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave'
+import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice'
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 import { permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';

@@ -35,7 +35,7 @@ import { formatNumber } from '@/lib/format'
 
 import { ACTION_LABELS, STATUS_LABELS, STATUS_BADGE, OPERATION_STATUS_LABELS, POLICY_FIELD_LABELS, notificationOpLine, decideDescription, jpDateTime, jpTime, jpStamp, jstDate, jstHHMM, bookingNumber, approvedText, auditLine } from './detail-model'
 
-import type { BookingDetailModel } from '@/v8/booking'
+import type { BookingDetailModel } from '@/app/booking/bookings'
 
 export default function BookingDetailScreen({ model }: { model: BookingDetailModel }) {
   const {

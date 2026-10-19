@@ -13,8 +13,8 @@ import { notifyToast } from '@/components/shared/toast'
 import { ApiError, describeSaveFailure } from '@/lib/api'
 import { restaurantGoogleApi, type GoogleSpecialDay } from '@/lib/restaurant-google-api'
 import { restaurantTestApi, type RestaurantReservation } from '@/lib/restaurant-test-api'
-import type { RestaurantV8Context } from '@/v8/restaurant/booking-kit'
-import { RowMore } from '@/v8/restaurant/booking-kit'
+import type { RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell'
+import { RowMore } from '@/v8/restaurant/booking-kit/public/parts'
 import ClosureDialog, { type ClosureDialogTarget, type ClosureSaved } from './closure-dialog'
 import {
   KIND_LABEL, addDays, covers, dayShort, dayTitle, kindTone, monthTitle, monthWeeks, overlapping, rangeTitle, regularHolidays,

@@ -1,6 +1,6 @@
 import { Children, Fragment, cloneElement, isValidElement, type ComponentProps, type ReactNode } from 'react'
 import { ShieldCheck } from 'lucide-react'
-import { ListPage, type ListPageProps } from '@/components/templates/index'
+import { ListPage, type ListPageProps } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
 import parts from './parts.module.css'
 import Notice from '@/components/shared/notice'

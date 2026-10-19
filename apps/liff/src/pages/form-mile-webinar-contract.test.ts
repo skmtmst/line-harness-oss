@@ -82,7 +82,7 @@ describe('マイル・紹介は中身を全部残し、★V8 S3uBl の順に並�
   it('並びは「貯まった → お友だちを紹介する → マイルの履歴 → 増やす → 案件」', () => {
     // 紹介者に登録済みの画面  の並びを見る。
     const all = affiliate();
-    const src = all.slice(all.indexOf('並びは ★V8 S3uBl'));
+    const src = all.slice(all.indexOf('// 並びは ★V8'));
     const order = [
       '<MileageSummaryCard',
       '<ReferralCard',

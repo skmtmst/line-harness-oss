@@ -24,7 +24,7 @@ PenLine
 } from 'lucide-react';
 import AutoReplyInsertChips from './insert-chips';
 import { REPLY_DELAY_OPTIONS,ResponseMode,WizardForm } from './wizard-model';
-import styles from './wizard.module.css';
+import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardResponseStepContext = {
   actionOptions: ReturnType<typeof useActionOptions>

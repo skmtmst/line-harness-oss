@@ -29,12 +29,12 @@ function expectWhiteGreen(rule: string, file: string) {
 
 describe('選んだ札6か所は白＋緑（黒をなくす #4）', () => {
   it('リマインダの札', () => {
-    const css = readFileSync(new URL('../../v8/reminders/wizard.module.css', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../../app/reminders/wizard-v8.module.css', import.meta.url), 'utf8')
     expectWhiteGreen(selectedRule(css, /\.filterChipOn \{[^}]*\}/s, 'reminders'), 'reminders')
   })
 
   it('リッチメニューの札', () => {
-    const css = readFileSync(new URL('../../v8/rich-menus/new/create.module.css', import.meta.url), 'utf8')
+    const css = readFileSync(new URL('../../app/rich-menus/new/create-v8.module.css', import.meta.url), 'utf8')
     expectWhiteGreen(selectedRule(css, /\.pageChipOn \{[^}]*\}/s, 'rich-menus'), 'rich-menus')
   })
 

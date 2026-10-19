@@ -49,7 +49,7 @@ describe('#673 A. カード・パネルの立体感', () => {
       ['components/dashboard/qr-dialog.tsx', 'shadow-float'],
       ['v8/dashboard/dashboard-editor.module.css', 'var(--shadow-card)'],
       ['app/chats/page.tsx', 'shadow-card'],
-      ['v8/friends/friends.module.css', 'var(--card-shadow)'],
+      ['app/friends/friends-v8.module.css', 'var(--card-shadow)'],
     ] as const
     for (const [file, token] of migrated) {
       const source = readFileSync(join(SRC, file), 'utf8')

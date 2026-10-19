@@ -95,7 +95,7 @@ describe('R527 編集URLの出し分け（役割×操作）', () => {
  * こちらは分岐の削除・無条件表示への戻しを見張る。
  */
 const HERE = __dirname
-const PAGE = readFileSync(sourceJoin(__dirname, 'wizard-v8.tsx'), 'utf8')
+const PAGE = readFileSync(sourceJoin(__dirname, '../../../v8/auto-replies/edit/wizard.tsx'), 'utf8')
 
 describe('R527 編集URLの出し分け契約', () => {
   it('変更の可否は共通の出し分けで決める', () => {

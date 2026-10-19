@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const css = readFileSync(new URL('./identity-review.module.css', import.meta.url), "utf8");
+const css = readFileSync(join(here, "identity-review.module.css"), "utf8");
 
 function block(selector: string): string {
   const m = css.match(new RegExp(`${selector}\\s*{([^}]*)}`));

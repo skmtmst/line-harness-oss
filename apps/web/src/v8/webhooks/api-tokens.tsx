@@ -19,7 +19,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { ActionCell,DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt from '@/components/step-up-prompt'
-import { ListPage } from '@/components/templates/index'
+import { ListPage } from '@/components/templates'
 import { Check,Coins,Gift,Wallet,KeyRound,LayoutTemplate,Plus } from 'lucide-react'
 import { SCOPES } from './api-token-words'
 import { formatDate as polishFormatDate } from '@/lib/format'
@@ -32,7 +32,7 @@ WebhookTabs,
 overviewBandCells
 } from './shell'
 import { useApiTokens } from './use-api-tokens'
-import { McpConnectionsSection } from '@/v8/mcp-connect'
+import { McpConnectionsSection } from '@/v8/mcp-connect/public/section'
 
 
 function SkeletonCells({ height, width }: { height: number; width: string }) {

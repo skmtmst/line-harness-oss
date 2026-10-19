@@ -3,7 +3,7 @@
 import { StageFrame } from './edit-model'
 
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { CreatePage } from '@/components/templates/index'
+import { CreatePage } from '@/components/templates'
 import { type EventListItem } from '@/lib/api'
 import {
 type FriendField

@@ -15,7 +15,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { TemplateDeleteDialog } from '@/v8/templates'
+import { TemplateDeleteDialog } from '@/v8/templates/public/delete-dialog'
 import Dialog from '@/components/shared/dialog'
 import DialogUsageTable from '@/components/shared/dialog-usage-table'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent, LinePreviewMessage } from '@/components/shared/line-preview';

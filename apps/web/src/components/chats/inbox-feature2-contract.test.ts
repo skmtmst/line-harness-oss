@@ -12,10 +12,10 @@ import { describe, expect, it } from 'vitest'
 import { formatRelative } from '@/lib/format'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(new URL('../../app/chats/page.tsx', import.meta.url), 'utf8')
-const HEAD = readFileSync(new URL('../shared/inbox-conversation-head.tsx', import.meta.url), 'utf8')
-const SIDEBAR = readFileSync(new URL('./friend-info-sidebar.tsx', import.meta.url), 'utf8')
-const INBOX_FILTER = readFileSync(new URL('./inbox-filter-panel.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8')
+const HEAD = readFileSync(join(HERE, '../shared/inbox-conversation-head.tsx'), 'utf8')
+const SIDEBAR = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
+const INBOX_FILTER = readFileSync(join(HERE, 'inbox-filter-panel.tsx'), 'utf8')
 
 /**
  * `start` から `end` までを切り出す。**印が無ければ落とす。**
@@ -119,7 +119,7 @@ describe('LAY-01/LAY-02 顧客情報の列とドロワー', () => {
     // 狭い幅では fixed のドロワー（背景の暗幕付き）として出す。
     expect(panel).toContain('wide={wideInfoPanel}')
     expect(PAGE).toContain('<InboxInfoBackdrop wide={wideInfoPanel}')
-    const backdrop = readFileSync(new URL('../shared/inbox-content.tsx', import.meta.url), 'utf8')
+    const backdrop = readFileSync(join(HERE, '../shared/inbox-content.tsx'), 'utf8')
     expect(backdrop).toContain('return wide ? null : <div')
     // 広い幅では従来どおり列として並ぶ。
     expect(panel).toContain('wide={wideInfoPanel}')

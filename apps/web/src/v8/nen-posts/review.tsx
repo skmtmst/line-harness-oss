@@ -20,7 +20,7 @@ import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/sh
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea } from '@/components/shared/text-field'
 import { notifySaved, notifyToast } from '@/components/shared/toast';
-import { ListPage } from '@/components/templates/index'
+import { ListPage } from '@/components/templates'
 import { ApiError,api,fetchApi,type PhotoBulkReviewResult,type PhotoReviewMetrics } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { formatMinutesRough,formatWaitRough } from '@/lib/format-duration'

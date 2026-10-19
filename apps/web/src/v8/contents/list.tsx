@@ -33,7 +33,7 @@ import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/sh
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import { notifyToast } from '@/components/shared/toast'
-import { ListPage } from '@/components/templates/index'
+import { ListPage } from '@/components/templates'
 import { ListPageCards,ListPager } from '@/components/templates/list-page'
 import ListRange from '@/components/ui/list-range'
 import { useAccount } from '@/contexts/account-context'

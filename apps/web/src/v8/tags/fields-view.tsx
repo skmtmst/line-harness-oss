@@ -2,7 +2,7 @@
 
 import type { FriendFieldType } from '@line-crm/shared';
 import { api } from '@/lib/api';
-import { ListPageBody } from '@/components/templates/index';
+import { ListPageBody } from '@/components/templates';
 import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel';
 import FolderAddDialog from '@/components/shared/folder-add-dialog';
 import DetailPanel from '@/components/shared/detail-panel';

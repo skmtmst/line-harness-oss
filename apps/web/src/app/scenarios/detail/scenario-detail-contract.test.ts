@@ -10,10 +10,10 @@ const PAGE = fs.readFileSync(
   'utf8',
 )
 /* 一覧の入口は src/v8/scenarios/list.tsx（2026-10-06〜。古い list-v8.tsx はもう描かれない）。 */
-const LIST = fs.readFileSync(new URL('../../../v8/scenarios/list.tsx', import.meta.url), 'utf8')
+const LIST = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'v8', 'scenarios', 'list.tsx'), 'utf8')
 const LIST_TABLE = LIST
 const DIALOGS = fs.readFileSync(
-  new URL('../../../components/scenarios/scenario-dialogs.tsx', import.meta.url),
+  path.join(__dirname, '..', '..', '..', 'components', 'scenarios', 'scenario-dialogs.tsx'),
   'utf8',
 )
 

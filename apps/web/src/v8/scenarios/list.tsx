@@ -36,7 +36,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';
 import { runUndoable, runOptimistic } from '@/lib/undoable';
 import { useLiveReorder } from '@/lib/use-live-reorder';
-import { ListPage, ListPagePagination } from '@/components/templates/index';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
 import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
 import Button from '@/components/shared/button'

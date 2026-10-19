@@ -1,2 +1,3 @@
-// この機能が外へ公開する名前。機能内では宣言元を直接読む。
+// この操作の公開名。ほかの画面の初期化を読み込まない。
 export type { TemplateEditHost } from '../../host'
+export type { TemplateHostContent } from '../../host'

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, fetchApi } from '../../api'
-import { ApiError as TransportError, fetchApi as transportRequest } from '../transport/index'
+import { ApiError as TransportError, fetchApi as transportRequest } from '../transport'
 import { bookingAdvancedApi } from './booking-advanced'
 import { gap3BookingApi } from './gap3'
 import { gapDraftApi } from './gap-draft'

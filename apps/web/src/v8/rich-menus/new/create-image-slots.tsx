@@ -14,7 +14,7 @@ BookOpen
 } from 'lucide-react'
 import type { Dispatch,SetStateAction } from 'react'
 import { type Group,type Page,type PendingImage } from './create-types'
-import styles from './create.module.css'
+import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 type getSlotImageContext = {
   accountId: string | null

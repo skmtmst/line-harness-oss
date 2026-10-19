@@ -72,7 +72,7 @@ function confirmDialogWith(src: string, anchor: string): string {
 }
 
 describe('リッチメニュー編集の確認窓', () => {
-  const src = read('app', 'rich-menus', 'new', 'create-v8.tsx')
+  const src = read("v8/rich-menus/new/create.tsx")
   const detail = read('v8', 'rich-menu-edit', 'detail.tsx')
 
   it('ページ削除は窓を開くだけで、消せない理由があるときは押し口を出さない', () => {

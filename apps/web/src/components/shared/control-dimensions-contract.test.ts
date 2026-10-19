@@ -70,7 +70,7 @@ describe('V8 の入力・選択・押し口規定', () => {
 
   it('代表的な画面側上書きも規定値に戻す', () => {
     const folderSelect = read('../chats/template-folder-select.tsx')
-    const users = read('../../v8/users/users.tsx')
+    const users = read('../../app/users/users-screen.tsx')
     const tags = read('../../v8/tags/tags-tab.tsx')
     const broadcasts = read('../../v8/broadcasts/list.tsx')
 

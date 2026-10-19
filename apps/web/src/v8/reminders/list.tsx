@@ -19,7 +19,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
 import { collectListRows } from '@/components/shared/collect-list-rows';
-import { ListPageBody } from '@/components/templates/index';
+import { ListPageBody } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame';
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
@@ -58,7 +58,7 @@ import PageSizeSelect from '@/components/shared/page-size-select'
 import { completeReorder } from '@/lib/complete-reorder';
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle';
 import { formatTriggerOffset } from './reminder-timing';
-import styles from './list.module.css'
+import styles from '../../app/reminders/list-v8.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value';
 import { Field } from '@/components/shared/form-controls';
@@ -719,7 +719,6 @@ export default function RemindersListV8() {
         label: '編集する',
         icon: <Pencil size={15} aria-hidden="true" />,
         dividerBefore: true,
-        disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => goDetail(`/reminders/edit?id=${encodeURIComponent(row.id)}`),
       },
@@ -727,7 +726,6 @@ export default function RemindersListV8() {
         id: 'duplicate',
         label: '複製する',
         icon: <Copy size={15} aria-hidden="true" />,
-        disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => {
           setDuplicateError('')
@@ -739,7 +737,6 @@ export default function RemindersListV8() {
             id: 'pause',
             label: '一時停止する',
             icon: <Pause size={15} aria-hidden="true" />,
-            disabled: !canEdit,
             disabledReason: canEdit ? undefined : readonlyReason,
             onSelect: () => {
                         setPauseTarget(row)
@@ -750,8 +747,7 @@ export default function RemindersListV8() {
               id: 'resume',
               label: '再開する',
               icon: <Play size={15} aria-hidden="true" />,
-              disabled: !canEdit,
-              disabledReason: canEdit ? undefined : readonlyReason,
+                disabledReason: canEdit ? undefined : readonlyReason,
               onSelect: () => void runResume(row),
             }
           : {
@@ -766,7 +762,6 @@ export default function RemindersListV8() {
         id: 'move',
         label: 'フォルダへ移す',
         icon: <FolderInput size={15} aria-hidden="true" />,
-        disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => openMove([row.id]),
       },
@@ -778,7 +773,6 @@ export default function RemindersListV8() {
         icon: <Trash2 size={15} aria-hidden="true" />,
         tone: 'danger',
         dividerBefore: true,
-        disabled: !canEdit,
         disabledReason: canEdit ? undefined : readonlyReason,
         onSelect: () => requestDelete(row),
       },

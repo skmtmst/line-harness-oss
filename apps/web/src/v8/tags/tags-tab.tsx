@@ -14,7 +14,7 @@ import type { Tag, TagGroup } from '@line-crm/shared';
 import { api, ApiError, type ListStats } from '@/lib/api';
 import { useRowLeaving } from '@/lib/use-row-leaving';
 import { RovingTbody } from '@/components/shared/row-roving';
-import { ListPageBody } from '@/components/templates/index';
+import { ListPageBody } from '@/components/templates';
 import { TAG_FOLDER_COLORS, DEFAULT_TAG_FOLDER_COLOR } from './folder-colors';
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { FolderManagementDialog } from '@/components/shared/managed-folder-panel'

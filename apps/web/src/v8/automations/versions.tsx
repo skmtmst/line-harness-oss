@@ -17,7 +17,7 @@ import { api, ApiError, type CommonActionDetail, type CommonActionStep, type Com
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
-import { DetailPage } from '@/components/templates/index'
+import { DetailPage } from '@/components/templates'
 import { PageContent } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'

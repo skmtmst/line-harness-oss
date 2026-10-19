@@ -5,16 +5,16 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-const EDIT = readUiSource(new URL('./edit/page.tsx', import.meta.url), 'utf8')
-const PARTICIPANTS = fs.readFileSync(new URL('../../v8/webinar-edit/participants.tsx', import.meta.url), 'utf8')
-const REVIEW = fs.readFileSync(new URL('../../v8/webinar-edit/review.tsx', import.meta.url), 'utf8')
-const ANALYTICS = fs.readFileSync(new URL('../../v8/webinar-edit/analytics.tsx', import.meta.url), 'utf8')
-const PUBLISHED = fs.readFileSync(new URL('./published/page.tsx', import.meta.url), 'utf8')
-const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
-const FORM = fs.readFileSync(new URL('../../components/webinars/webinar-form.tsx', import.meta.url), 'utf8')
+const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
+const EDIT = readUiSource(path.join(__dirname, 'edit/page.tsx'), 'utf8')
+const PARTICIPANTS = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/participants.tsx'), 'utf8')
+const REVIEW = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/review.tsx'), 'utf8')
+const ANALYTICS = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/analytics.tsx'), 'utf8')
+const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
+const API = readApiSource(path.join(__dirname, '../../lib/api.ts'), 'utf8')
+const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
 /** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
-const FAILURE = fs.readFileSync(new URL('../../v8/webinars/helpers.ts', import.meta.url), 'utf8')
+const FAILURE = fs.readFileSync(path.join(__dirname, '../../v8/webinars/helpers.ts'), 'utf8')
 
 describe('V8 ウェビナー一覧の契約', () => {
   it('既存データで判定できる並び順と表示件数だけを選べる', () => {

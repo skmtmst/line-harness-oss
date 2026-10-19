@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const NEW = fs.readFileSync(new URL('../../../v8/reminders/new/new.tsx', import.meta.url), 'utf8')
-const BASICS = fs.readFileSync(new URL('../../../v8/reminders/basics-form.tsx', import.meta.url), 'utf8')
+const BASICS = fs.readFileSync(path.join(__dirname, '../../../v8/reminders/basics-form.tsx'), 'utf8')
 
 describe('V8 リマインダ作成の契約', () => {
   it('既存のリマインダ用フォルダを読み、作成時に選択を保存する', () => {

@@ -3,7 +3,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { BookingRequest } from '@/lib/api'
-import type { BookingLedgerModel } from '../../../v8/booking/bookings/use-booking-ledger'
+import type { BookingLedgerModel } from './use-booking-ledger'
 import Page from './page'
 
 const m = vi.hoisted(() => ({ latest: null as unknown as BookingLedgerModel, realView: false, style: 'standard' as 'standard' | 'consult' | 'lesson', account: 'A', liff: 'liff-a', query: 'view=list&status=confirmed', list: vi.fn(), summary: vi.fn(), menus: vi.fn(), staff: vi.fn(), me: vi.fn(), decide: vi.fn(), csv: vi.fn(), get: vi.fn(), replace: vi.fn() }))
@@ -16,8 +16,8 @@ vi.mock('@/lib/api', async original => {
 })
 vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { card: async () => ({ success: true, data: null }), group: async () => ({ success: true, data: null }) } }))
 vi.mock('@/lib/api/helpers/gap1', () => ({ bookingCancellationApi: { charges: async () => ({ success: true, data: { charges: [], quote: { eligible: false }, testMode: true } }) } }))
-vi.mock('../../../v8/booking/bookings/ledger-screen', async original => {
-  const Actual = (await original<typeof import('../../../v8/booking/bookings/ledger-screen')>()).default
+vi.mock('./ledger-screen', async original => {
+  const Actual = (await original<typeof import('./ledger-screen')>()).default
   return { default: ({ model }: { model: BookingLedgerModel }) => { m.latest = model; return m.realView ? <Actual model={model} /> : null } }
 })
 function mountController() {

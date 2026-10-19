@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
-const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
+const API = readApiSource(join(HERE, '../../lib/api.ts'), 'utf8')
+const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 
 describe('V8 外部連携の接続別集計と受信口詳細', () => {
@@ -54,7 +54,7 @@ describe('V8 外部連携の接続別集計と受信口詳細', () => {
     expect(OVERVIEWS).toContain('{action.displayName}')
     expect(OVERVIEWS).toContain('maskedSampleText(detail.latestSample.fields)')
     expect(OVERVIEWS).toContain('detail.templateFields.map((field) => field.token)')
-    expect(readFileSync(new URL('../../v8/webhooks/incoming.tsx', import.meta.url), 'utf8')).not.toContain('{action.refId}')
+    expect(readFileSync(join(HERE, '../../v8/webhooks/incoming.tsx'), 'utf8')).not.toContain('{action.refId}')
     expect(OVERVIEWS).not.toContain('照合方法のAPI待ち')
     expect(OVERVIEWS).not.toContain('最近届いた本文を安全にマスクして返すAPIがまだありません')
   })

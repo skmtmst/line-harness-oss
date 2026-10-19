@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const root = join(import.meta.dirname, '..');
 const app = readFileSync(new URL('../app.tsx', import.meta.url), 'utf8');
 const page = readFileSync(new URL('./event-waitlist-offer.tsx', import.meta.url), 'utf8');
-const api = readFileSync(new URL('../lib/api.ts', import.meta.url), 'utf8');
+const api = readFileSync(join(root, 'lib/api.ts'), 'utf8');
 
 describe('キャンセル待ちの繰上げ承諾導線', () => {
   it('LINE案内のquery tokenを承諾画面へ渡し、公開LIFF APIへ送る', () => {

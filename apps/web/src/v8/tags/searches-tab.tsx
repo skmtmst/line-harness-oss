@@ -15,7 +15,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { AlertCircle } from 'lucide-react';
 import type { SavedSearch, Tag } from '@line-crm/shared';
 import { api, ApiError, type SavedSearchSummary } from '@/lib/api';
-import { ListPageBody } from '@/components/templates/index';
+import { ListPageBody } from '@/components/templates';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';

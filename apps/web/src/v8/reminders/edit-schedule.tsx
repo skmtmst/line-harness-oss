@@ -8,7 +8,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import ListState from '@/components/shared/list-state'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import SegmentedControl from '@/components/shared/segmented'
-import { CreatePage } from '@/components/templates/index'
+import { CreatePage } from '@/components/templates'
 import { useAccount } from '@/contexts/account-context'
 import { formatNumber } from '@/lib/format'
 import {

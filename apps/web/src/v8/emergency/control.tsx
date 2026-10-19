@@ -27,7 +27,7 @@ import { CAPABILITY_LABEL, describeRestoreBlockers, describeRestoreDrift, descri
 import { SendPathCoveragePanel } from './send-path-coverage-panel'
 import releaseLog from '@/generated/release-log-summary.json'
 import type { UpdateRelease } from '@/lib/operation-updates'
-import styles from './control.module.css'
+import styles from '../../app/emergency/control-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'

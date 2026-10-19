@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(new URL('../../../v8/scenario-first-step/first-step.tsx', import.meta.url), 'utf8')
 const COMPONENTS = path.join(__dirname, '..', '..', '..', 'components', 'scenarios')
-const PREVIEW = fs.readFileSync(new URL('../../../components/scenarios/step-preview.tsx', import.meta.url), 'utf8')
+const PREVIEW = fs.readFileSync(path.join(COMPONENTS, 'step-preview.tsx'), 'utf8')
 
 describe('1通目設定の動きの契約', () => {
   it('作成の現在地と保存前の要点を同時に確認できる', () => {

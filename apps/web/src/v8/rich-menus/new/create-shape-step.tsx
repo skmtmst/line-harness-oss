@@ -23,7 +23,7 @@ import type { Dispatch,JSX,SetStateAction } from 'react'
 import { MAX_TAB_PAGES } from './create-model'
 import { SIZE_OPTIONS,TAB_COUNT_OPTIONS,V8_LAYOUT_KEYS,V8_LAYOUT_LABEL } from './create-options'
 import { type Group,type Page } from './create-types'
-import styles from './create.module.css'
+import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 type renderShapeStepContext = {
   accountId: string | null

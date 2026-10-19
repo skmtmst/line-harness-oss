@@ -12,10 +12,10 @@ import { describe, expect, it } from "vitest";
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const list = readFileSync(new URL('../../v8/settings/line-notifications/runs-tab.tsx', import.meta.url), "utf8");
-const css = readFileSync(new URL('../../v8/settings/line-notifications/screen.module.css', import.meta.url), "utf8");
+const list = readFileSync(join(here, "../../v8/settings/line-notifications/runs-tab.tsx"), "utf8");
+const css = readFileSync(join(here, "../../v8/settings/line-notifications/screen.module.css"), "utf8");
 const operator = readFileSync(
-  new URL('../../v8/settings/line-notifications/operator-tab.tsx', import.meta.url),
+  join(here, "..", "..", "v8", "settings", "line-notifications", "operator-tab.tsx"),
   "utf8",
 );
 

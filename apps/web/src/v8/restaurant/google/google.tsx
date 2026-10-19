@@ -14,7 +14,7 @@ import Notice from '@/components/shared/notice'
 
 import { Tabs } from '@/components/shared/tabs'
 import { restaurantGoogleApi, type GoogleConnectionData, type GoogleBusinessStore, type GooglePostKind } from '@/lib/restaurant-google-api'
-import { BoundaryBanner, RestaurantPage } from '@/v8/restaurant/common-a'
+import { BoundaryBanner, RestaurantPage } from '@/v8/restaurant/common-a/public/frame'
 import { errorMessage } from './format'
 import { ReviewDraft, ReviewsBoard } from './reviews'
 import { PostEditor, PostConfirm, PostsBoard, type MediaUploadHelpers } from './posts'

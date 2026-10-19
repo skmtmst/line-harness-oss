@@ -10,10 +10,10 @@
  */
 import { Check } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
-import { useFirstRun } from '@/v8/onboarding'
+import { useFirstRun } from '@/v8/onboarding/public/use-first-run'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { SettingsPage } from '@/components/templates/index'
+import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'

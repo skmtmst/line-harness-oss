@@ -2,7 +2,7 @@ import React from 'react'
 import { PageExplanationProvider } from '@/components/shared/page-explanation'
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
-import { FieldsTab } from '@/v8/tags'
+import { FieldsTab } from '@/v8/tags/public/fields-tab'
 
 const fixture = vi.hoisted(() => ({ load: vi.fn() }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())

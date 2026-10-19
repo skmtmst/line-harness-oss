@@ -2,7 +2,7 @@
 import { notifySaved } from '@/components/shared/toast'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { useEffect, useId, useState, type FormEvent } from 'react'
-import { ListPage } from '@/components/templates/index'
+import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'

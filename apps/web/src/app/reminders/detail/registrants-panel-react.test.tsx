@@ -59,7 +59,7 @@ const registrant = {
 }
 const detailSource = fs.readFileSync(sourceJoin(__dirname, '../../../v8/reminders/detail.tsx'), 'utf8')
 /* 完全切り替え：管理画面 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
-const listSource = fs.readFileSync(new URL('../../../v8/reminders/list.tsx', import.meta.url), 'utf8')
+const listSource = fs.readFileSync(path.resolve(__dirname, '../../../v8/reminders/list.tsx'), 'utf8')
 
 let host: HTMLDivElement
 let root: Root

@@ -12,7 +12,7 @@ const nativeHeaderExceptions = new Set(baseline.nativeTableHeaderExceptions)
 // V8で作り直した画面のローカル部品にある表見出し。
 // 旧管理画面のTh移行対象へ戻さず、確認済みの件数を上限として見張る。
 const v8NativeHeaders: Record<string, number> = {
-  'v8/accounts/migration.tsx': 8,
+  'app/accounts/migration.tsx': 8,
   'app/duplicates/page.tsx': 12,
   // 'app/templates/page.tsx' は 2026-10-06 に新しい一覧（src/v8/templates）へ移り、直書き th が 0 になったので外した。
 }

@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = import.meta.dirname
 /** リポジトリの根。`apps/web/src/app/line-notifications` から5つ上。 */
 const REPO = join(HERE, '..', '..', '..', '..', '..')
-const PAGE = readFileSync(new URL('../../v8/settings/line-notifications/screen.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../v8/settings/line-notifications/screen.tsx'), 'utf8')
 
 /**
  * 注釈を落とした page.tsx。「なぜ消したか」を書いた文が、消したはずの
@@ -47,7 +47,7 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
     expect(PAGE).toContain("import { Tabs } from '@/components/shared/tabs'")
     expect(PAGE).toContain("<Tabs")
     const tabs = readFileSync(
-      new URL('../../components/shared/tabs.module.css', import.meta.url),
+      join(REPO, 'apps', 'web', 'src', 'components', 'shared', 'tabs.module.css'),
       'utf8',
     )
     expect(tabs).toMatch(/:root \.list \.tab\.tab\s*\{[^}]*height: var\(--tpl-tabs-h\)/s)

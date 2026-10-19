@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Link from '@/components/shared/list-navigation'
 import { ArrowRight, ChevronLeft } from 'lucide-react'
-import { CreatePage } from '@/components/templates/index'
+import { CreatePage } from '@/components/templates'
 import type { FriendField, ReminderDraftSettings, ReminderDraftStep, ReminderDraftVersion } from '@line-crm/shared'
 import { ApiError, api, type EventListItem } from '@/lib/api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -19,7 +19,7 @@ import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSave
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useDraftAutosave } from '@/v8/autosave'
+import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave'
 import {
   EMPTY_BASICS,
   basicsBaseSummary,
@@ -30,8 +30,8 @@ import {
   type BasicsValue,
   type ReminderTemplateV8,
 } from '@/v8/reminders/basics-form'
-import { SummaryCardV8, WizardFooterV8, ReminderV8Stepper } from '../wizard-v8-ui'
-import styles from '../wizard.module.css'
+import { SummaryCardV8, WizardFooterV8, ReminderV8Stepper } from '../wizard-ui'
+import styles from '../../../app/reminders/wizard-v8.module.css'
 import { humanizeErrorText } from '@/components/shared/human-error-text'
 import { describeReminderDiff } from '../edit/reminder-conflict-diff'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'

@@ -9,7 +9,7 @@ import { decodeImageSize } from './image-size'
 import { freshDefinition, withUploadedImage, withMessageCard } from '@/lib/hq-template-authoring'
 import RichMenuCreateForm from '@/components/rich-menus/rich-menu-create-form'
 import { freshRichMenuCreateValue, type RichMenuOption } from '../../../components/rich-menus/rich-menu-create-model'
-import { HqTagEditorV8 } from '@/v8/hq-templates'
+import { HqTagEditorV8 } from '@/v8/hq-templates/public/tag-editor'
 import HqFormDefinitionEditor from '@/components/forms/hq-form-definition-editor'
 import type { FormRefs } from '@/components/forms/form-refs'
 import {

@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("成果地点の名前を入力してください"),
   targetUrl: requiredText("指定ページへの到達で数えるときは、対象のURLが要ります"),
 }
@@ -14,7 +14,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { Check, Plus } from 'lucide-react'
 import { api, ApiError, type ConversionDeduplicationMode, type ConversionDefinitionPreview, type ConversionDefinitionUsageKind, type ConversionReversalPolicy, type ConversionValueMode } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
-import { CreatePage } from '@/components/templates/index'
+import { CreatePage } from '@/components/templates'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
@@ -337,8 +337,8 @@ function ConversionCreate() {
 
   /* 入力の点検（今の作る画面と同じ）。 */
   const validate = (): ConversionFieldIssue | null => {
-    if ((b244Requirements.name.check(name) !== null)) return { field: 'cv-name', message: '成果地点の名前を入力してください' }
-    if (measureMethod === 'url_reach' && (b244Requirements.targetUrl.check(targetUrl) !== null)) return { field: 'cv-url', message: '指定ページへの到達で数えるときは、対象のURLが要ります' }
+    if ((FIELD_REQUIREMENTS.name.check(name) !== null)) return { field: 'cv-name', message: '成果地点の名前を入力してください' }
+    if (measureMethod === 'url_reach' && (FIELD_REQUIREMENTS.targetUrl.check(targetUrl) !== null)) return { field: 'cv-url', message: '指定ページへの到達で数えるときは、対象のURLが要ります' }
     if (exclusionMemo.trim().length > 500) return { field: 'cv-memo', message: '数えない条件のメモは500文字以内で入力してください' }
     const exclusionIssue = findConditionDraftIssue(exclusion)
     if (exclusionIssue) return { field: 'cv-exclusion-fields', message: exclusionIssue }
@@ -574,7 +574,7 @@ function ConversionCreate() {
 
       <Card variant="form" aria-labelledby="cv-new-what">
         <CardHeader size="stacked" titleId="cv-new-what" title="何が起きたら数えますか" meta="名前は一覧で見分けるため。お客さまには見えません" />
-        <Field requirement={b244Requirements.name} density="input" label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
+        <Field requirement={FIELD_REQUIREMENTS.name} density="input" label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
           <SaveErrorField names={["name","fieldIssue","field_issue"]}><TextField
             aria-label="成果地点の名前"
             value={name}
@@ -602,7 +602,7 @@ function ConversionCreate() {
           </div>
         </div>
         {measureMethod === 'url_reach' ? (
-          <Field density="input" label="数えてよいページ" htmlFor="cv-url" error={fieldIssue?.field === 'cv-url' ? fieldIssue.message : undefined} requirement={b244Requirements.targetUrl}>
+          <Field density="input" label="数えてよいページ" htmlFor="cv-url" error={fieldIssue?.field === 'cv-url' ? fieldIssue.message : undefined} requirement={FIELD_REQUIREMENTS.targetUrl}>
             <SaveErrorField names={["targetUrl","fieldIssue","target_url","field_issue"]}><TextField
               aria-label="数えてよいページ"
               inputMode="url"

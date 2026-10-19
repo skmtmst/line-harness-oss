@@ -1,8 +1,8 @@
 import { type ImageUploaderValue } from '@/components/shared/image-uploader';
 import { type ChatDetail as ApiChatDetail, type ChatDetailMessage, type ScheduledChatSend } from '@/lib/api';
-import { useInboxAi } from '@/v8/ai-reply'
+import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai'
 import { type AttachSlot } from '@/v8/inbox-chat/attachments';
-import { useChatSearch } from '@/v8/inbox-search'
+import { useChatSearch } from '@/v8/inbox-search/public/use-chat-search'
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { PendingAttachment } from './inbox-model';
 import { Chat } from './inbox-model';

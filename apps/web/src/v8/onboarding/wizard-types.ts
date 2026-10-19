@@ -1,6 +1,6 @@
 'use client'
 
-import { type StarterSetItem } from '../../lib/api/helpers/styles'
+import { type StarterSetItem } from '@/lib/api/helpers/styles'
 
 import { type StarterItemState, type StyleState } from './model'
 

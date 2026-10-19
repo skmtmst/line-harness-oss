@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const page = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const page = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 
 describe('R534 booking new メニュー取得失敗', () => {
   it('メニュー取得失敗は再試行でき、403は権限案内で分ける', () => {

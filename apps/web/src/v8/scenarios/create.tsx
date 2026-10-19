@@ -8,7 +8,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { CalendarClock, Check, Timer } from 'lucide-react';
 import type { DeliveryMode, Folder, Scenario } from '@line-crm/shared';
 import { ApiError, api } from '@/lib/api';
-import { CreatePage } from '@/components/templates/index';
+import { CreatePage } from '@/components/templates';
 import { Steps } from '@/components/templates/steps';
 import { notifyToast } from '@/components/shared/toast';
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
@@ -16,9 +16,9 @@ import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
-import { browserDraftKey } from '@/v8/autosave'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave'
-import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave'
+import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice'
+import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import { TextField } from '@/components/shared/text-field';
 import { Field } from '@/components/shared/form-controls';

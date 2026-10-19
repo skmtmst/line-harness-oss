@@ -14,7 +14,7 @@ AutoReplyDryRunResult
 import type { Dispatch,SetStateAction } from 'react';
 import { insertedLabels } from './insert-chips';
 import { RuleRow,WizardForm,WizardStep } from './wizard-model';
-import styles from './wizard.module.css';
+import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type renderWizardPreviewContext = {
   acknowledged: Set<string>

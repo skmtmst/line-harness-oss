@@ -40,7 +40,7 @@ import type { Dispatch,JSX,SetStateAction } from 'react'
 import { SIZE_OPTIONS,type StepKey } from './create-options'
 import { CheckIcon,MenuContent } from './create-preview'
 import { type Group,type Page,type PrepublishState } from './create-types'
-import styles from './create.module.css'
+import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 type renderHqPublishStepContext = {
   areaActionSummary: (area: Area) => string

@@ -3,7 +3,9 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const DIALOG = readFileSync(join(__dirname, 'bulk-run-dialog.tsx'), 'utf8')
+// 役割の読込は共通フックが持つ。画面の押し口と、その読込口を両方確かめる。
 const PAGE = readFileSync(join(__dirname, '..', '..', 'app', 'friends', 'page.tsx'), 'utf8')
+  + readFileSync(join(__dirname, '..', '..', 'lib', 'staff-role.ts'), 'utf8')
 
 /** 画面側の配線。**考え方が正しくても、繋いでいなければ効かない。** */
 describe('V6 友だち一括操作（IAf7j）の配線', () => {

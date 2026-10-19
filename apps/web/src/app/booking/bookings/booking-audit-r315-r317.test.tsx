@@ -11,7 +11,7 @@
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import BookingCalendar, { slotAriaLabel, startOfWeek, type CalendarSlot } from '../../../v8/booking/bookings/booking-calendar'
+import BookingCalendar, { slotAriaLabel, startOfWeek, type CalendarSlot } from './booking-calendar'
 import type { BookingRequest } from '@/lib/api'
 
 const nav = vi.hoisted(() => ({

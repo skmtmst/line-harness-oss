@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Webinar, WebinarEditor } from '@/lib/api'
-import { VideoPane } from '@/v8/webinar-edit'
+import { VideoPane } from '@/v8/webinar-edit/public/video'
 import Button from '@/components/shared/button'
 import { webinarEditContext, webinarWizardChrome } from './webinar-edit'
 

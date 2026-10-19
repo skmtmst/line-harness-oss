@@ -16,7 +16,7 @@ import { useFormErrors } from '@/lib/use-form-errors'
 import type { Dispatch,SetStateAction } from 'react'
 import { type StepKey } from './create-options'
 import { type Group,type Page } from './create-types'
-import styles from './create.module.css'
+import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 type renderButtonsStepContext = {
   activePage: Page

@@ -11,7 +11,7 @@ import { describe,expect,it } from 'vitest';
  */
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FORM = readFileSync(new URL('./form.tsx', import.meta.url), 'utf8');
-const API = readFileSync(new URL('../lib/api.ts', import.meta.url), 'utf8') + readFileSync(new URL('../lib/api-types.ts', import.meta.url), 'utf8');
+const API = readFileSync(join(HERE, '..', 'lib', 'api.ts'), 'utf8') + readFileSync(new URL('../lib/api-types.ts', import.meta.url), 'utf8');
 
 describe('試し合言葉の動線', () => {
   it('取得・送信・添付に合言葉を添えられる', () => {

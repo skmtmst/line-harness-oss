@@ -42,7 +42,7 @@ describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
   })
 
   it('重複検出の数の帯に G9C4Uw（1152）を付ける', () => {
-    const duplicates = read('../duplicates/duplicates-v8.tsx')
+    const duplicates = read("../duplicates/list-screen.tsx")
     expect(duplicates, '重複検出1152 の板が無い').toMatch(/(?:data-design-node|boardId)="G9C4Uw"/)
   })
 

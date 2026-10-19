@@ -75,14 +75,14 @@ describe('LINEでの見え方共通部品', () => {
   it('旧テーマの指定でも現在の枠1つだけを描く', () => {
     // 管理画面（未設定）ではパネルだけ。スマホの帯（9:41・メニュー）は出ない。
     document.documentElement.dataset.theme = 'v7'
-    const v7 = render(
+    const legacyPreview = render(
       <LinePreview>
         <p>こんにちは</p>
       </LinePreview>,
     )
-    expect(v7.container.querySelectorAll('section[aria-label="LINEでの見え方"]')).toHaveLength(1)
+    expect(legacyPreview.container.querySelectorAll('section[aria-label="LINEでの見え方"]')).toHaveLength(1)
     expect(screen.getByText('9:41')).toBeTruthy()
-    v7.unmount()
+    legacyPreview.unmount()
 
     // v8 ではスマホの枠だけ。中身はトークの中へ入る。
     document.documentElement.dataset.theme = 'v8'

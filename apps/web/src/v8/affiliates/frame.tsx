@@ -10,7 +10,7 @@
  */
 import { createContext, useContext, type ReactNode } from 'react'
 
-import { ListPage, type ListFolderNav } from '@/components/templates/index'
+import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import styles from './affiliates.module.css'

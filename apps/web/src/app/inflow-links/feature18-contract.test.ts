@@ -4,12 +4,12 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const ROOT = import.meta.dirname
-const PAGE = readFileSync(new URL('../../v8/inflow-links/list.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(ROOT, '../../v8/inflow-links/list.tsx'), 'utf8')
 const ADS = ['ads.tsx', 'ad-connections.tsx', 'ad-history.tsx', 'ad-shared.ts'].map(file => readFileSync(join(ROOT, '../../v8/inflow-links', file), 'utf8')).join('\n')
-const CREATE = readFileSync(new URL('../../v8/inflow-links/new/create.tsx', import.meta.url), 'utf8')
-const DETAIL = readFileSync(new URL('../../v8/inflow-links/detail.tsx', import.meta.url), 'utf8')
-const SITE = readFileSync(new URL('../../v8/inflow-links/site-script.tsx', import.meta.url), 'utf8')
-const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
+const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
+const SITE = readFileSync(join(ROOT, '../../v8/inflow-links/site-script.tsx'), 'utf8')
+const API = readApiSource(join(ROOT, '..', '..', 'lib', 'api.ts'), 'utf8')
 const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 
 describe('V6 機能18の画面契約', () => {
@@ -97,4 +97,4 @@ describe('V6 機能18の計測鍵の契約(#514-2)', () => {
   })
 })
 
-const HOST = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const HOST = readFileSync(join(ROOT, 'page.tsx'), 'utf8')

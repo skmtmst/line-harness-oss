@@ -28,7 +28,7 @@ import { HQ_NEXT_LABEL,HQ_STEP_LABEL,NEXT_LABEL,STEP_KEYS,STEP_LABEL,V8_LAYOUT_K
 
 import ListState from '@/components/shared/list-state'
 
-import { MediaPickerDialog } from '@/v8/contents'
+import { MediaPickerDialog } from '@/v8/contents/public/media-picker-dialog'
 import { ManualPublishAttempt } from '@/v8/rich-menus/edit/manual-publish-attempt'
 import {
 DEFAULT_PUBLISH_PLAN,
@@ -60,7 +60,7 @@ import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-
 import TargetMissing from '@/components/shared/target-missing'
 import VersionCompare from '@/components/shared/version-compare'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates/index'
+import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
 import { useAccount } from '@/contexts/account-context'
 import {
@@ -99,7 +99,7 @@ Upload
 } from 'lucide-react'
 import { useCallback,useEffect,useRef,useState } from 'react'
 import { describeMenuSummary,isGroupResponse,mediaToFile,parseStoredCondition,projectAreaForDraft } from './create-draft'
-import styles from './create.module.css'
+import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 /* ---------- 本体 ---------- */
 

@@ -9,7 +9,7 @@ const DIALOG = readFileSync(
   'utf8',
 )
 /* #984 LAY-14: 主タブの定義は friends-tabs.ts が正本（UID移行側も同じ一覧を使う）。 */
-const NAV = readFileSync(new URL('../../v8/friends/friends-nav.tsx', import.meta.url), 'utf8')
+const NAV = readFileSync(new URL('./friends-nav.tsx', import.meta.url), 'utf8')
 const TABS = readFileSync(new URL('../../v8/friends/friends-tabs.ts', import.meta.url), 'utf8')
 
 /*

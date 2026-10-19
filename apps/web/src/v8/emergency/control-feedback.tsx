@@ -1,7 +1,7 @@
 'use client'
 import Button from '@/components/shared/button'
 import SaveConflictBar from '@/components/shared/save-conflict-bar'
-import styles from './control.module.css'
+import styles from '../../app/emergency/control-v8.module.css'
 
 type StopBlocker = 'unavailable' | 'forbidden' | 'scope' | 'empty' | 'stopped'
 const blockerText: Record<StopBlocker, string> = {

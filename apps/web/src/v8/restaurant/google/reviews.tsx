@@ -33,7 +33,7 @@ import {
   type GoogleReviewListData,
   type GoogleReviewOrder,
 } from '@/lib/restaurant-google-api'
-import { StatRow } from '@/v8/restaurant/common-a'
+import { StatRow } from '@/v8/restaurant/common-a/public/parts'
 import { errorMessage, formatShortStamp, reviewReceivedAt } from './format'
 import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'

@@ -1,7 +1,7 @@
 'use client'
-import type { BookingDetailModel } from '../../../../v8/booking/bookings/detail/use-booking-detail'
-import { useBookingDetail } from '../../../../v8/booking/bookings/detail/use-booking-detail'
-export type { BookingDetailModel } from '../../../../v8/booking/bookings/detail/use-booking-detail'
+import type { BookingDetailModel } from './use-booking-detail'
+import { useBookingDetail } from './use-booking-detail'
+export type { BookingDetailModel } from './use-booking-detail'
 
 import BookingDetailScreen from './detail-screen'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'

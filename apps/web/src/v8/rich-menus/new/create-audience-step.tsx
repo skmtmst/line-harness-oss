@@ -22,7 +22,7 @@ Tag,
 Users
 } from 'lucide-react'
 import type { Dispatch,JSX,SetStateAction } from 'react'
-import styles from './create.module.css'
+import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 type renderHqAudienceStepContext = {
   audience: "all" | "tag" | "none" | "targeted"

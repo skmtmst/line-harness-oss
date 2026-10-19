@@ -9,7 +9,7 @@ const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 
 /* 完全切り替え：管理画面 page は捨て、V8 を見る。シナリオの入口は src/v8/scenarios/list.tsx（古い list-v8 はもう描かれない）。 */
 const SCENARIOS = read('..', 'v8', 'scenarios', 'list.tsx')
-const REMINDERS = read('reminders', 'list-v8.tsx')
+const REMINDERS = read("../v8/reminders/list.tsx")
 const BROADCASTS = read('broadcasts', 'page.tsx')
 const AUTO_REPLIES = read('auto-replies', 'page.tsx')
 const TEMPLATES = read('templates', 'page.tsx')

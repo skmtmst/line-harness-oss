@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   form_name: requiredText("流入元の名前を入力してください"),
 }
 
@@ -166,7 +166,7 @@ export default function EditRouteModal({
 
   const validateFields = () => {
     const errors: Record<string, string> = {}
-    if ((b244Requirements.form_name.check(form.name) !== null)) errors['route-name'] = '流入元の名前を入力してください'
+    if ((FIELD_REQUIREMENTS.form_name.check(form.name) !== null)) errors['route-name'] = '流入元の名前を入力してください'
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(form.refCode)) errors['route-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
     if (form.couponEnabled && !form.couponAssetId) errors['route-coupon'] = '渡すクーポンを選んでください'
     setFieldErrors(errors)
@@ -277,7 +277,7 @@ export default function EditRouteModal({
 
         </Field>
 
-        <Field label="流入元の名前" htmlFor="route-name" error={fieldErrors['route-name']} requirement={b244Requirements.form_name}>
+        <Field label="流入元の名前" htmlFor="route-name" error={fieldErrors['route-name']} requirement={FIELD_REQUIREMENTS.form_name}>
           <SaveErrorField names={["name","form.name"]}><TextField
             value={form.name}
             onChange={(e) => { setForm({ ...form, name: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-name': '' })) }}

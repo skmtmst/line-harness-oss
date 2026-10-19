@@ -209,7 +209,7 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
     expect(event).toContain('満席');
     // 押せない時の地は1つだけ (bg-shell-gray)。白と重ねると白く見える。
     expect(event).toContain('unavailable={disabled}');
-    const button = readFileSync(new URL('../components/ui/button/index', import.meta.url), 'utf8');
+    const button = readFileSync(new URL('../components/ui/Button.tsx', import.meta.url), 'utf8');
     const disabledTone = button.match(/unavailable\s*\?\s*'[^']*'/g)?.find((tone) => tone.includes('border-hairline')) ?? '';
     expect(disabledTone).toContain('bg-liff-off-bg');
     expect(disabledTone).not.toContain('bg-canvas');
@@ -220,7 +220,7 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
 
   it('選んだ時間は濃い緑の地＋白文字 (gVjiC・予約の日時選びと同じ形)', () => {
     expect(event).toContain('variant="optionRow" selected={selected}');
-    expect(readFileSync(new URL('../components/ui/button/index', import.meta.url), 'utf8')).toContain('border-liff-primary bg-liff-primary');
+    expect(readFileSync(new URL('../components/ui/Button.tsx', import.meta.url), 'utf8')).toContain('border-liff-primary bg-liff-primary');
     expect(event).toContain('setSelectedId(s.id)');
   });
 

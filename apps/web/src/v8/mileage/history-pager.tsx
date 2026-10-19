@@ -1,5 +1,5 @@
 import Pagination from '@/components/shared/pagination'
-import { ListPagePagination } from '@/components/templates/index'
+import { ListPagePagination } from '@/components/templates'
 import { formatNumber } from '@/lib/format'
 
 export default function HistoryPager({ spentOnly, total, page, pageSize, items, pageCount, loading, setPage }: {

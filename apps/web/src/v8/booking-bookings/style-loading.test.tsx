@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import BookingLedgerScreen from '@/v8/booking/bookings/ledger-screen'
-import type { BookingLedgerModel } from '../booking/bookings/use-booking-ledger'
+import BookingLedgerScreen from '@/app/booking/bookings/ledger-screen'
+import type { BookingLedgerModel } from '../../app/booking/bookings/use-booking-ledger'
 afterEach(cleanup)
 
 it('業種を未取得・取得失敗の間は、前の来店語や操作を出さず読み直す', () => {

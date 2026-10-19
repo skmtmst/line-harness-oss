@@ -3,7 +3,7 @@
 import { statusBadge } from './post-status'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   form_title: requiredText("タイトルを入力してください。"),
   form_start: requiredText("期間のはじめの日時を入力してください。"),
   form_end: requiredText("期間のおわりの日時を入力してください。"),
@@ -428,12 +428,12 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
 
   const validate = () => {
     const errors: Partial<Record<keyof PostForm, string>> = {}
-    if ((b244Requirements.form_summary.check(form.summary) !== null)) errors.summary = '本文を入力してください。'
+    if ((FIELD_REQUIREMENTS.form_summary.check(form.summary) !== null)) errors.summary = '本文を入力してください。'
     else if (form.summary.length > 1500) errors.summary = '本文は1,500文字までです。'
     if (form.kind !== 'standard') {
-      if ((b244Requirements.form_title.check(form.title) !== null)) errors.title = `${form.kind === 'event' ? 'イベントタイトル' : '特典タイトル'}を入力してください。`
-      if ((b244Requirements.form_start.check(form.start) !== null)) errors.start = '期間のはじめの日時を入力してください。'
-      if ((b244Requirements.form_end.check(form.end) !== null)) errors.end = '期間のおわりの日時を入力してください。'
+      if ((FIELD_REQUIREMENTS.form_title.check(form.title) !== null)) errors.title = `${form.kind === 'event' ? 'イベントタイトル' : '特典タイトル'}を入力してください。`
+      if ((FIELD_REQUIREMENTS.form_start.check(form.start) !== null)) errors.start = '期間のはじめの日時を入力してください。'
+      if ((FIELD_REQUIREMENTS.form_end.check(form.end) !== null)) errors.end = '期間のおわりの日時を入力してください。'
       else if (form.start && form.end < form.start) errors.end = '期間のおわりは、はじめより後にしてください。'
     }
     setFieldErrors(errors)
@@ -518,21 +518,21 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         </Field>
         {withPeriod ? (
           <div className={styles.fieldGroup}>
-            <Field density="input" label="タイトル（特典・イベントのとき）" htmlFor="gb-post-title" error={fieldErrors.title} requirement={b244Requirements.form_title}>
+            <Field density="input" label="タイトル（特典・イベントのとき）" htmlFor="gb-post-title" error={fieldErrors.title} requirement={FIELD_REQUIREMENTS.form_title}>
               <SaveErrorField names={["title","form.title"]}><TextField id="gb-post-title" value={form.title} onChange={(e) => set({ title: e.target.value })} disabled={!editable} maxLength={100} /></SaveErrorField>
             </Field>
             <div className={styles.fieldPair}>
-              <Field density="input" label="期間 はじめ" htmlFor="gb-post-start" error={fieldErrors.start} grow requirement={b244Requirements.form_start}>
+              <Field density="input" label="期間 はじめ" htmlFor="gb-post-start" error={fieldErrors.start} grow requirement={FIELD_REQUIREMENTS.form_start}>
                 <SaveErrorField names={["start","form.start"]}><DateTimeField size="compact" id="gb-post-start" invalid={Boolean(fieldErrors.start)} value={form.start} onChange={(next) => set({ start: next })} disabled={!editable} /></SaveErrorField>
               </Field>
-              <Field density="input" label="期間 おわり" htmlFor="gb-post-end" error={fieldErrors.end} grow requirement={b244Requirements.form_end}>
+              <Field density="input" label="期間 おわり" htmlFor="gb-post-end" error={fieldErrors.end} grow requirement={FIELD_REQUIREMENTS.form_end}>
                 <SaveErrorField names={["end","form.end"]}><DateTimeField size="compact" id="gb-post-end" invalid={Boolean(fieldErrors.end)} value={form.end} onChange={(next) => set({ end: next })} disabled={!editable} /></SaveErrorField>
               </Field>
             </div>
           </div>
         ) : null}
         <div className={styles.postCompose}>
-        <Field density="compact" label="本文" htmlFor="gb-post-summary" error={fieldErrors.summary} requirement={b244Requirements.form_summary}>
+        <Field density="compact" label="本文" htmlFor="gb-post-summary" error={fieldErrors.summary} requirement={FIELD_REQUIREMENTS.form_summary}>
           <SaveErrorField names={["summary","form.summary"]}><TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" /></SaveErrorField>
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>

@@ -29,7 +29,7 @@ const PAGE = readImplementation('../../v8/auto-replies/list.tsx')
 const PAGE_WITHOUT_COMMENTS = ts.createPrinter({ removeComments: true }).printFile(
   ts.createSourceFile('list.tsx', PAGE, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX),
 )
-const WORDS = read('auto-reply-words.ts')
+const WORDS = read("../../v8/auto-replies/auto-reply-words.ts")
 const DIALOG = read('..', '..', 'components', 'shared', 'dialog.tsx')
 const CONFIRM = read('..', '..', 'components', 'shared', 'confirm-dialog.tsx')
 

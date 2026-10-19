@@ -1,6 +1,6 @@
 'use client'
 
-import { MESSAGE_KIND_WORDS, messageKindWord } from '@/v8/auto-replies'
+import { MESSAGE_KIND_WORDS, messageKindWord } from '@/v8/auto-replies/public/auto-reply-words'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConditionBuilder from '@/components/shared/condition-builder'

@@ -9,7 +9,7 @@ import { RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/s
 import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { api, ApiError, type ListStats, type SupportMarkArchiveImpact, type SupportMarkListItem } from '@/lib/api';
 import { createResponseGate } from '@/lib/latest-request';
-import { ListPageBody } from '@/components/templates/index';
+import { ListPageBody } from '@/components/templates';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';

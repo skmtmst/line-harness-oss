@@ -19,7 +19,7 @@ vi.mock('next/link', () => ({
     React.createElement('a', { href, className }, children),
 }))
 
-import { CreatePage, DetailPage } from '@/components/templates/index'
+import { CreatePage, DetailPage } from '@/components/templates'
 import TopBar from '@/components/shared/top-bar'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { parentCrumbForPath } from './app-top-bar'

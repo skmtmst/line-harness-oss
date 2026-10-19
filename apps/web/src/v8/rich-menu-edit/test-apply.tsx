@@ -7,7 +7,7 @@ import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import { formatDateTime } from '@/lib/format'
-import styles from '@/v8/rich-menus/new/create.module.css'
+import styles from '@/app/rich-menus/new/create-v8.module.css'
 
 type TestApplyState = {
   linked: boolean

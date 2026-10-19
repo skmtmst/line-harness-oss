@@ -3,11 +3,11 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const OVERVIEW = fs.readFileSync(new URL('../../v8/nen-campaigns/list.tsx', import.meta.url), 'utf8')
-const PAGE = fs.readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const PREVIEW = fs.readFileSync(new URL('../../v8/nen-campaigns/preview.tsx', import.meta.url), 'utf8')
-const NEW_COLUMN = fs.readFileSync(new URL('../../v8/nen-campaigns/column-new.tsx', import.meta.url), 'utf8')
-const EDIT = fs.readFileSync(new URL('../../v8/nen-campaigns/column-intros.tsx', import.meta.url), 'utf8')
+const OVERVIEW = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/list.tsx'), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const PREVIEW = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/preview.tsx'), 'utf8')
+const NEW_COLUMN = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/column-new.tsx'), 'utf8')
+const EDIT = fs.readFileSync(path.join(__dirname, '../../v8/nen-campaigns/column-intros.tsx'), 'utf8')
 
 /*
  * ★管理画面 37-6（`z4q1K`）自動配信／37-6-A（`u66A0`）コラム の画面契約。

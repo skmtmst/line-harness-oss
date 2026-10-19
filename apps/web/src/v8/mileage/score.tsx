@@ -4,7 +4,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import ScoreValue from './score-value'
 import { mileageStatusTone } from './parts'
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   reason: requiredText("理由を入力してください。"),
 }
 
@@ -897,7 +897,7 @@ export function ScoreAdjustDialog({
   /* 確定で落ちた欄は、その欄の真下に理由を出して移る。 */
   const fields = useFormErrors()
   fields.define('amount', '点数', () => (validAmount ? null : '1以上1000000以下の整数で点数を入力してください'), { required: true })
-  fields.define('reason', '理由', () => ((b244Requirements.reason.check(reason) !== null) ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null), { required: true })
+  fields.define('reason', '理由', () => ((FIELD_REQUIREMENTS.reason.check(reason) !== null) ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null), { required: true })
 
   const submit = async () => {
     if (fields.submit().length > 0) {
@@ -987,7 +987,7 @@ export function ScoreAdjustDialog({
           /></SaveErrorField>
 <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></DialogFormRow>
 
-        <DialogFormRow><Field label="理由" htmlFor="ml-score-reason" requirement={b244Requirements.reason}><SaveErrorField names={["reason"]}><textarea
+        <DialogFormRow><Field label="理由" htmlFor="ml-score-reason" requirement={FIELD_REQUIREMENTS.reason}><SaveErrorField names={["reason"]}><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}

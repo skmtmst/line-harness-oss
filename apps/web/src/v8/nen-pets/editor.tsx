@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("ペットの名前を入れてください。"),
 }
 
@@ -61,7 +61,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
   const weightText = weight.replace(/kg/i, '').trim()
   const weightKg = weightText === '' ? null : Number(weightText)
   const fields = useFieldValidation([
-    ...((b244Requirements.name.check(name) !== null) ? [{ id: 'pet-edit-name', message: 'ペットの名前を入れてください。' }] : []),
+    ...((FIELD_REQUIREMENTS.name.check(name) !== null) ? [{ id: 'pet-edit-name', message: 'ペットの名前を入れてください。' }] : []),
     ...(normalized === 'invalid' ? [{ id: 'pet-edit-birthday', message: '誕生日は「2020-03-15」か「03-15」（月日だけ）で入力してください。' }] : []),
     ...(weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.01 || weightKg > 200)
       ? [{ id: 'pet-edit-weight', message: '体重は 0.01〜200kg で入力してください。' }] : []),
@@ -140,7 +140,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           </span>
         </div>
         <div className={styles.editorPair}>
-          <Field label="ペットの名前" requirement={b244Requirements.name}><SaveErrorField names={["name"]}><TextField {...fields.bind('pet-edit-name')} aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
+          <Field label="ペットの名前" requirement={FIELD_REQUIREMENTS.name}><SaveErrorField names={["name"]}><TextField {...fields.bind('pet-edit-name')} aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
 <FieldError id="pet-edit-name-error">{fields.error('pet-edit-name')}</FieldError></Field>
           <Field label="品種"><SaveErrorField names={["breed"]}><TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} /></SaveErrorField></Field>
         </div>

@@ -19,7 +19,7 @@ import type { JSX } from 'react'
 import { HQ_REFERENCE_LABEL } from './create-model'
 import { MenuContent,MetricValue } from './create-preview'
 import { type Group,type Page } from './create-types'
-import styles from './create.module.css'
+import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 type renderMenuLinePreviewContext = {
   activePage: Page

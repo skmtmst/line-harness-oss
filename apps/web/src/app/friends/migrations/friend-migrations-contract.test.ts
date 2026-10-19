@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseFriendCsv } from '../../../v8/friends/migrations/friend-csv'
-import { parseUidCsv } from '../../../v8/accounts/migration'
+import { parseUidCsv } from '../../accounts/migration'
 
 describe('管理画面 機能3 UID・CSV移行', () => {
   it('UID対応表の必須列を読み取る', () => {

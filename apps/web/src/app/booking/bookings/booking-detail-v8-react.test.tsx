@@ -34,7 +34,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-import BookingDetailV8 from '../../../v8/booking/bookings/booking-detail'
+import BookingDetailV8 from './booking-detail'
 
 const BOOKING = {
   id: 'booking-1',

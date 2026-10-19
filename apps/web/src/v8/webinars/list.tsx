@@ -16,7 +16,7 @@ import { useSearchParams } from 'next/navigation';
 import { Archive, Bookmark, Download, FilePen, Inbox, Plus, Radio, Video } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye } from 'lucide-react';
-import { ListPage, ListPagePagination } from '@/components/templates/index';
+import { ListPage, ListPagePagination } from '@/components/templates';
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'

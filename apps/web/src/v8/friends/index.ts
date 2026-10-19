@@ -2,6 +2,5 @@
 export { default as CompareV8 } from './compare/compare'
 export { default as FriendMigrationsV8 } from './migrations/page'
 export { default as FriendsHostV8 } from './host'
-export { FriendsManageNavV8 } from './friends-nav'
 export { splitCsvRecords } from './migrations/friend-csv'
 export { CANDIDATE_PAGE_SIZE, formatRelative, useDuplicatesData } from './duplicates/use-duplicates-data'

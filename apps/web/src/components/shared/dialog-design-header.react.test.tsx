@@ -13,7 +13,7 @@ import ConfirmDialog from './confirm-dialog'
  * 約 33px 低い。絵の頭の余白・高さを画面から渡せる口（渡さなければ今までどおり）。
  */
 afterEach(() => cleanup())
-const css = readFileSync(new URL('./dialog.module.css', import.meta.url), 'utf8')
+const css = readFileSync(join(process.cwd(), 'src/components/shared/dialog.module.css'), 'utf8')
 
 describe('窓の頭の余白・高さを絵から渡す', () => {
   it('渡さなければ印も変数も付けない（今までどおり）', () => {

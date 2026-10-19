@@ -6,10 +6,10 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const LIST_PAGE = fs.readFileSync(new URL('../../v8/friend-add/list.tsx', import.meta.url), 'utf8')
-const EDITOR = readUiSource(new URL('../../v8/friend-add/editor.tsx', import.meta.url), 'utf8')
-const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const EDITOR = readUiSource(path.join(__dirname, '../../v8/friend-add/editor.tsx'), 'utf8')
+const API = readApiSource(path.join(__dirname, '../../lib/api.ts'), 'utf8')
 
-const ENTRY = fs.readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const ENTRY = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('V6 友だち追加時配信 7画面の契約', () => {
   it('一覧から新規作成と編集へ遷移できる', () => {

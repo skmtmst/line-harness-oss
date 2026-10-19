@@ -3,13 +3,13 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const page = readFileSync(new URL('../../v8/settings/ec-commerce/screen.tsx', import.meta.url), 'utf8')
-const tabs = readFileSync(new URL('./ec-tabs.ts', import.meta.url), 'utf8')
-const tabsView = readFileSync(new URL('../../v8/settings/ec-commerce/screen.tsx', import.meta.url), 'utf8')
-const identity = readFileSync(new URL('../../v8/settings/ec-commerce/identity.tsx', import.meta.url), 'utf8')
-const subscriptions = readFileSync(new URL('../../v8/settings/ec-commerce/subscriptions.tsx', import.meta.url), 'utf8')
-const connector = readFileSync(new URL('../../v8/settings/ec-commerce/connector.tsx', import.meta.url), 'utf8')
-const api = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const page = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
+const tabs = readFileSync(join(import.meta.dirname, 'ec-tabs.ts'), 'utf8')
+const tabsView = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
+const identity = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/identity.tsx'), 'utf8')
+const subscriptions = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/subscriptions.tsx'), 'utf8')
+const connector = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/connector.tsx'), 'utf8')
+const api = readApiSource(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V8 EC integration screens', () => {
   it('connects all four EC tabs to real routes', () => {

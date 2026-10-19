@@ -7,7 +7,7 @@ import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { formatDateTime } from '@/lib/format'
-import styles from '@/v8/rich-menus/new/create.module.css'
+import styles from '@/app/rich-menus/new/create-v8.module.css'
 
 type Schedule = {
   id: string; mode: 'scheduled' | 'period'; startsAt: string; endsAt: string | null

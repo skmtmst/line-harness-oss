@@ -3,7 +3,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("ルール名を入力してください"),
 }
 
@@ -20,7 +20,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { formatNumber } from '@/lib/format'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates/index'
+import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
@@ -162,7 +162,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const fieldErrors: Record<string, string> = {}
-  if ((b244Requirements.name.check(name) !== null)) fieldErrors['er-name'] = 'ルール名を入力してください'
+  if ((FIELD_REQUIREMENTS.name.check(name) !== null)) fieldErrors['er-name'] = 'ルール名を入力してください'
   if (!validAmount) fieldErrors['er-amount'] = '付与マイルは1以上の整数で入力してください'
   if (validFrom && validUntil && validFrom > validUntil) fieldErrors['er-until'] = '終了日は開始日より後にしてください'
   if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
@@ -360,7 +360,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
 
       <Card variant="form" aria-labelledby="er-new-rule">
         <CardHeader size="stacked" titleId="er-new-rule" title="どのルールか" meta="きっかけになる行動を選びます" />
-        <Field requirement={b244Requirements.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
+        <Field requirement={FIELD_REQUIREMENTS.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
           <SaveErrorField names={["name"]}><TextField ref={nameRef} id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
         <SettingsFormRow layout="columns">

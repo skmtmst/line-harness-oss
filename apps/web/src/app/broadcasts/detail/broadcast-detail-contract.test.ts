@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const PAGE = fs.readFileSync(new URL('./page.tsx', import.meta.url), 'utf8') + fs.readFileSync(new URL('../../../v8/broadcast-detail/detail.tsx', import.meta.url), 'utf8')
+const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8') + fs.readFileSync(path.join(__dirname, '../../../v8/broadcast-detail/detail.tsx'), 'utf8')
 
 describe('V6 一斉配信詳細の契約', () => {
   it('概要・宛先・記録を押せるタブとして示す', () => {

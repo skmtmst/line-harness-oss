@@ -8,7 +8,7 @@ const GRID_PAGES = [
 ]
 /* 完全切り替え：管理画面 page は捨て、V8 の list-v8 を見る（幅は CSS の `.split` で付ける）。 */
 const V8_FOLDER_PAGES = [
-  'reminders/list-v8.tsx',
+  '../v8/reminders/list.tsx',
 ]
 /*
  * シナリオ・回答フォームの入口は src/v8 の新しい一覧（2026-10-06〜。古い list-v8.tsx はもう描かれない）。

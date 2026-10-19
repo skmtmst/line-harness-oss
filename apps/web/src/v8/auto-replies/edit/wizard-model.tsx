@@ -27,7 +27,7 @@ Type,
 Video
 } from 'lucide-react';
 import type * as React from 'react';
-import styles from './wizard.module.css';
+import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 
 /*

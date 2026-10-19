@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   createName: requiredText("名前を入力してください"),
 }
 
@@ -15,7 +15,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useOnAccountSwitch } from '@/components/shared/list-url-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
-import { ListPage } from '@/components/templates/index'
+import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
@@ -436,7 +436,7 @@ export default function WebhooksIncomingV8() {
       return
     }
     const sourceValue = createSource === SOURCE_OTHER ? createSourceFree.trim() : createSource
-    if ((b244Requirements.createName.check(createName) !== null)) {
+    if ((FIELD_REQUIREMENTS.createName.check(createName) !== null)) {
       setCreateFieldError({ name: '名前を入力してください' })
       requestAnimationFrame(() => { const field = document.getElementById('wh-incoming-name'); field?.focus(); field?.scrollIntoView?.({ block: 'center' }) })
       return
@@ -883,7 +883,7 @@ export default function WebhooksIncomingV8() {
           confirmIcon={<Plus size={15} aria-hidden="true" />}
         >
           <div className={`${styles.form} ${styles.formTight}`}>
-            <Field label="名前" htmlFor="wh-incoming-name" error={createFieldError.name} requirement={b244Requirements.createName}>
+            <Field label="名前" htmlFor="wh-incoming-name" error={createFieldError.name} requirement={FIELD_REQUIREMENTS.createName}>
               <SaveErrorField names={["createName","name","create_name"]}><TextField
                 value={createName}
                 onChange={(event) => setCreateName(event.target.value)}

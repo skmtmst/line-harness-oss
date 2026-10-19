@@ -7,7 +7,7 @@ import { CircleDot, Folder, Gauge, Plus, Send, Sparkles, Star, Upload } from 'lu
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ListPage } from '@/components/templates/index'
+import { ListPage } from '@/components/templates'
 import { ListPageCards } from '@/components/templates/list-page'
 import { PageContent } from '@/components/templates/page-frame'
 import Card, { CardContent, CardHeader } from '@/components/shared/card'

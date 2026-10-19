@@ -22,7 +22,7 @@ function ui(name: string): string {
 }
 
 /** ★V8 の見た目で読む文面。Event 系は別 PR なので外す。 */
-const V7_FILES = [
+const RESERVATION_UI_SOURCES = [
   ui('icon.tsx'),
   ui('Button.tsx'),
   ui('card.tsx'),
@@ -54,7 +54,7 @@ const V7_FILES = [
 
 describe('★V8 の色はトークンだけ', () => {
   it('素の Tailwind 色・16進数・青ボタン・LINE の明るい緑のボタン地が無い', () => {
-    for (const text of V7_FILES) {
+    for (const text of RESERVATION_UI_SOURCES) {
       expect(text).not.toMatch(/#[0-9a-fA-F]{3,8}/);
       for (const banned of [
         'bg-green-',
@@ -192,7 +192,7 @@ describe('撮り直しの3点', () => {
   });
 
   it('中央寄せの本文は行末の1〜2文字落ちを防ぐ (説明文は pretty)', () => {
-    expect(src('components', 'ui/StatusView.tsx')).toContain('text-pretty');
+    expect(src("components/ui/status-view.tsx")).toContain('text-pretty');
     expect(src('components', 'load-error-view.tsx')).toContain('text-pretty');
   });
 });

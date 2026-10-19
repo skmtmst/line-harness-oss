@@ -1,9 +1,10 @@
-// この機能が外へ公開する名前。機能内では宣言元を直接読む。
+// この操作の公開名。ほかの画面の初期化を読み込まない。
+export type { CloseGroup } from '../../summarize'
 export { canMarkVisited } from '../../summarize'
+export { canWriteRole } from '../../summarize'
 export { groupCloseTasks } from '../../summarize'
 export { openItems } from '../../summarize'
 export { reasonText } from '../../summarize'
 export { slotTitle } from '../../summarize'
 export { summarizeToday } from '../../summarize'
 export { visitState } from '../../summarize'
-export { canWriteRole } from '../../summarize'

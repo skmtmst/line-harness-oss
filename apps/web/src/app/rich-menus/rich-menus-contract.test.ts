@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 // 「LINE上にあるメニュー」の取り込み画面は external-import.tsx（★管理画面・★V8 で共有）。
-const PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
-  + readFileSync(new URL('../../v8/rich-menus/external-import.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
+  + readFileSync(join(HERE, '../../v8/rich-menus/external-import.tsx'), 'utf8')
 const EDIT_PAGE = readUiSource(new URL('../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 const PUBLISHER = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'lib', 'rich-menu-publisher.ts'),

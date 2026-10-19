@@ -25,7 +25,7 @@ import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { StatRow } from '@/v8/restaurant/booking-kit'
+import { StatRow } from '@/v8/restaurant/booking-kit/public/shell'
 import {
   INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, floorOrder, hm, isHold, mdWeek, minutesOf,
   addDays, sameDay, shortCourse, slotLabel, sourceKind, sourceName, dayRange, toYmd,

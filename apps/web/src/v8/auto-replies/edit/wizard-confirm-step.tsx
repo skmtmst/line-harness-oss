@@ -17,7 +17,7 @@ Check,
 CircleAlert
 } from 'lucide-react';
 import { SummaryRow,WizardForm,WizardStep,weekdaySummary } from './wizard-model';
-import styles from './wizard.module.css';
+import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardConfirmStepContext = {
   actionOptions: ReturnType<typeof useActionOptions>

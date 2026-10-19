@@ -21,7 +21,7 @@ import { formatDateTime } from '@/lib/format'
 import MergedDeliveryDialog from './merged-delivery-dialog'
 import MergedProfileDialog from './merged-profile-dialog'
 import { useMergedPerson } from './use-merged-person'
-import styles from '@/v8/friends/friends.module.css'
+import styles from '@/app/friends/friends-v8.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 

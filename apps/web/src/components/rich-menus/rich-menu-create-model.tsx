@@ -1,7 +1,7 @@
 'use client'
 import type { Area } from './area-types'
-import { SIZE_DIMENSIONS, TEMPLATES, type RichMenuTemplate } from '../../lib/rich-menu-templates'
-import type { SegmentCondition } from '../../lib/segment-condition'
+import { SIZE_DIMENSIONS, TEMPLATES, type RichMenuTemplate } from '@/lib/rich-menu-templates'
+import type { SegmentCondition } from '@/lib/segment-condition'
 import type { RichMenuAreaIntent } from '@line-crm/shared'
 
 export type RichMenuOption = { id: string; name: string }

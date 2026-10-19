@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest'
 import { element } from './design-fit-slice'
 
 const ROOT = path.resolve(__dirname)
-const LIST = fs.readFileSync(new URL('../../v8/tags/marks-tab.tsx', import.meta.url), 'utf8') + fs.readFileSync(new URL('./mark-list.tsx', import.meta.url), 'utf8')
-const EDITOR = fs.readFileSync(new URL('../../v8/tags/mark-editor.tsx', import.meta.url), 'utf8')
-const TABS = fs.readFileSync(new URL('../../v8/tags/list.tsx', import.meta.url), 'utf8')
+const LIST = fs.readFileSync(path.join(ROOT, '../../v8/tags/marks-tab.tsx'), 'utf8') + fs.readFileSync(path.join(ROOT, 'mark-list.tsx'), 'utf8')
+const EDITOR = fs.readFileSync(path.join(ROOT, '../../v8/tags/mark-editor.tsx'), 'utf8')
+const TABS = fs.readFileSync(path.join(ROOT, '../../v8/tags/list.tsx'), 'utf8')
 
 describe('V8 対応マーク', () => {
   it('一覧は実Node、KPI、絞り込み、設計の列を持つ', () => {
@@ -32,7 +32,7 @@ describe('V8 対応マーク', () => {
     // R510: 一覧の取得は再試行できる形（load 関数）に切り出した。
     // 取得時のアカウントを退避し、その口を呼ぶ約束は変えない。
     expect(EDITOR).toContain('api.supportMarks.list(account)')
-    const basic = fs.readFileSync(new URL('../../v8/tags/mark-basic-fields.tsx', import.meta.url), 'utf8')
+    const basic = fs.readFileSync(path.join(ROOT, '../../v8/tags/mark-basic-fields.tsx'), 'utf8')
     for (const label of ['マーク名', '色']) expect(basic).toContain(label)
     expect(EDITOR).toContain('新しい友だちに最初から付ける')
     expect(EDITOR).toContain('name: name.trim(), color, displayOrder, isDefault')
@@ -63,7 +63,7 @@ describe('V8 対応マーク', () => {
     expect(LIST).toContain('<Dialog open confirmation role="alertdialog" designNode="fy5dz"')
     // ★V8 ：窓 560。置き換え先は選んだマークの1行（変える）で示し、人数は説明の文に出す。
     expect(LIST).toContain('そのまま保管できます')
-    const css = fs.readFileSync(new URL('../shared/dialog.module.css', import.meta.url), 'utf8')
+    const css = fs.readFileSync(path.join(ROOT, '../shared/dialog.module.css'), 'utf8')
     expect(css).toContain('max-height: calc(100dvh - 32px)')
     expect(css).toContain('overflow-y: auto')
     expect(LIST).not.toContain('margin-top: 310px')

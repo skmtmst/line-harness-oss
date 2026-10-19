@@ -35,7 +35,7 @@ import {
   type DeliveryService,
   type DeliveryServiceState,
 } from '@/lib/restaurant-delivery-api'
-import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit'
+import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts'
 import { DASH, INTAKE_STOP_PRESET_OPTIONS, SERVICE_TONES, formatYen } from './format'
 import styles from './delivery.module.css'
 

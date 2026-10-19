@@ -32,7 +32,7 @@ import type { StepperStep } from '@/components/shared/stepper'
 import TargetMissing from '@/components/shared/target-missing'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates/index'
+import { CreatePage } from '@/components/templates'
 import { PageFrame,PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
 import { useAccount } from '@/contexts/account-context'
@@ -59,7 +59,7 @@ Power
 import { useSearchParams } from 'next/navigation'
 import { Suspense,useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
-import styles from './wizard.module.css'
+import styles from '../../../app/auto-replies/edit/wizard-v8.module.css'
 
 function readStep(raw: string | null): WizardStep {
   return raw === 'trigger' || raw === 'response' || raw === 'priority' || raw === 'confirm' ? raw : 'basic'

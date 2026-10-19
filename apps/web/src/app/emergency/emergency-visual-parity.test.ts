@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const source = ['../../v8/settings/emergency/screen.tsx', '../../v8/settings/emergency/health.tsx', 'control-v8.tsx', '../../v8/settings/emergency/history.tsx'].map((file) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), file), 'utf8')).join('\n')
+const source = ['../../v8/settings/emergency/screen.tsx', '../../v8/settings/emergency/health.tsx', '../../v8/emergency/control.tsx', '../../v8/settings/emergency/history.tsx'].map((file) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), file), 'utf8')).join('\n')
 
 /** 注釈を落とす。**「なぜ h1 をやめたか」を書いた注釈が見張りに当たらないように。** */
 const visible = source

@@ -4,12 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(new URL('../../v8/users/users.tsx', import.meta.url), 'utf8')
+const PAGE = readFileSync(new URL('../../app/users/users-screen.tsx', import.meta.url), 'utf8')
 const ROW = PAGE
 const TABLE = PAGE
 const SUMMARY = PAGE
 const FILTERS = PAGE
-const HOOK = readFileSync(new URL('./use-users-summary.ts', import.meta.url), 'utf8')
+const HOOK = readFileSync(join(HERE, 'use-users-summary.ts'), 'utf8')
 
 describe('統合ユーザーV8の画面契約', () => {
   it('内部の統合キーを画面へ出さない', () => {

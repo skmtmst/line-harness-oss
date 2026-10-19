@@ -20,7 +20,7 @@ import { useSearchParams } from 'next/navigation';
 import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug, Eye } from 'lucide-react'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ListPage } from '@/components/templates/index';
+import { ListPage } from '@/components/templates';
 import { ListPager } from '@/components/templates/list-page';
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'

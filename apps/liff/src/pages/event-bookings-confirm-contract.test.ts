@@ -1,3 +1,4 @@
+import path from 'node:path'
 // @vitest-environment happy-dom
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,8 +24,8 @@ afterEach(() => { cleanup(); vi.resetAllMocks(); });
  */
 
 const root = join(import.meta.dirname, '..');
-const page = readFileSync(new URL('./event-bookings.tsx', import.meta.url), 'utf8');
-const dialog = readFileSync(new URL('../components/ui/confirm-dialog.tsx', import.meta.url), 'utf8');
+const page = readFileSync(path.resolve(__dirname, './event-bookings.tsx'), 'utf8');
+const dialog = readFileSync(path.resolve(__dirname, '../components/ui/confirm-dialog.tsx'), 'utf8');
 
 /** 注意書きの中の字に当てないため、コメントを外す。 */
 function code(src: string): string {
@@ -71,7 +72,7 @@ describe('LIFF にブラウザの確認窓を残さない', () => {
 
 describe('イベント予約の取り消し確認', () => {
   it('共通の確認窓を開くだけで、ブラウザの confirm を呼ばない', () => {
-    expect(page).toContain("import ConfirmDialog from '../components/ui/ConfirmDialog.js'");
+    expect(page).toContain("import ConfirmDialog from '../components/ui/confirm-dialog.js'");
     expect(code(page), 'ブラウザのconfirmへ戻っている').not.toMatch(BROWSER_DIALOG);
     expect(page).toContain('setPendingCancel(b)');
   });

@@ -81,7 +81,7 @@ const DESIGN_WORDS: Record<string, number> = {}
  * 決まった1つの共通部品で出す。言葉はこの部品の中の1か所（`PREPARING_WORD`）にだけ置き、画面はそれを使う。
  * ここに無いファイルで「準備中」を書いたら、今までどおり落ちる。
  */
-const B314_PREPARING: Record<string, number> = {
+const PREPARING_COMPONENTS: Record<string, number> = {
   'components/shared/preparing-dialog.tsx': 1,
 }
 
@@ -121,14 +121,14 @@ describe('画面に「準備中」を置かない', () => {
   })
 
   it('共通部品に「準備中」が1つも無い', () => {
-    for (const f of FILES.filter((f) => f.p.startsWith('components/shared/') && !(f.p in B314_PREPARING))) {
+    for (const f of FILES.filter((f) => f.p.startsWith('components/shared/') && !(f.p in PREPARING_COMPONENTS))) {
       expect(count(f.s, ANY), `${f.p} に「準備中」がある`).toBe(0)
     }
   })
 
   it('表に無いファイルは「準備中」を1つも持たない', () => {
     for (const f of FILES) {
-      if (f.p in REMAINING || f.p in DESIGN_WORDS || f.p in B314_PREPARING) continue
+      if (f.p in REMAINING || f.p in DESIGN_WORDS || f.p in PREPARING_COMPONENTS) continue
       expect(count(f.s, ANY), `${f.p} に新しい「準備中」が入った`).toBe(0)
     }
   })
@@ -151,7 +151,7 @@ describe('画面に「準備中」を置かない', () => {
 
   it('言い回しを変えて言い訳を逃がさない', () => {
     for (const f of FILES) {
-      if (f.p in B314_PREPARING) continue
+      if (f.p in PREPARING_COMPONENTS) continue
       const design = DESIGN_WORDS[f.p] ?? 0
       expect(count(f.s, ANY), `${f.p} に、言い訳でも設計の状態名でもない「準備中」がある`).toBe(
         count(f.s, EXCUSE) + design,
@@ -160,7 +160,7 @@ describe('画面に「準備中」を置かない', () => {
   })
 
   it('B-314 の準備中は共通部品の1か所だけ（数を増やさない）', () => {
-    for (const [p, allowed] of Object.entries(B314_PREPARING)) {
+    for (const [p, allowed] of Object.entries(PREPARING_COMPONENTS)) {
       const f = FILES.find((x) => x.p === p)
       expect(f, `${p} が無い。表から消す`).toBeDefined()
       expect(count(f!.s, ANY), `${p} の「準備中」が ${allowed} 件と違う`).toBe(allowed)

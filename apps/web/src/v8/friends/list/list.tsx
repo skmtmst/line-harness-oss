@@ -50,7 +50,7 @@ import { TableBody } from '@/components/shared/table-body';
 import TagPill from '@/components/shared/tag-pill';
 import { notifyToast } from '@/components/shared/toast';
 import { usePageTitle } from '@/components/shell/page-chrome';
-import { ListPage } from '@/components/templates/index';
+import { ListPage } from '@/components/templates';
 import { ListPager } from '@/components/templates/list-page';
 import { useAccount } from '@/contexts/account-context';
 import { api,ApiError,fetchApi,type FriendListItem,type FriendStats,type SupportMarkListItem } from '@/lib/api';

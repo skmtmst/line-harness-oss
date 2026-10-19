@@ -28,7 +28,7 @@ X
 } from 'lucide-react';
 import type { Dispatch,JSX,SetStateAction } from 'react';
 import { KIND_ICONS,MAIN_KINDS,WEEKDAY_PRESETS,WizardForm,kindOrder,weekdaySummary } from './wizard-model';
-import styles from './wizard.module.css';
+import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardTriggerStepContext = {
   effectiveKeywords: KeywordRuleDraft[]

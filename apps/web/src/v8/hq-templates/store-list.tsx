@@ -36,7 +36,7 @@ import { DataTable,NameCell,RowNameLink,TableHeadRow,Td,Th,Tr } from '@/componen
 import { Tabs,type TabItem } from '@/components/shared/tabs'
 import TagPill from '@/components/shared/tag-pill'
 import { notifyToast } from '@/components/shared/toast'
-import { ListPage } from '@/components/templates/index'
+import { ListPage } from '@/components/templates'
 import { formatNumber } from '@/lib/format'
 import type { HqTemplate } from '@/lib/hq-templates-api'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'

@@ -1,5 +1,5 @@
 import { api } from '@/lib/api'
-import { extractMediaMetadata, putMediaFile, validateMediaFile } from '@/v8/contents'
+import { extractMediaMetadata, putMediaFile, validateMediaFile } from '@/v8/contents/public/media-direct-upload'
 
 export function validateCarouselImage(file: File, maxMB = 10): string {
   if (!['image/jpeg', 'image/png'].includes(file.type)) return 'JPEG・PNGの画像を選んでください。'

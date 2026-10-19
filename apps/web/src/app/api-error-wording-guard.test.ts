@@ -143,7 +143,7 @@ const BASELINE: Record<string, number> = {
   'v8/tags/create.tsx': 1,
   'v8/tags/field-edit.tsx': 2,
   'v8/tags/field-migrate.tsx': 3,
-  'v8/tags/fields-tab.tsx': 1,
+  'v8/tags/use-fields-tab.tsx': 1,
   'v8/tags/searches-tab.tsx': 2,
   'v8/tags/tags-tab.tsx': 4,
   'v8/templates/carousel-core.ts': 1,
@@ -170,7 +170,7 @@ describe('「API error: 500」を画面に出さない', () => {
     for (const file of [
       'v8/restaurant/google/format.ts',
       'v8/friends/migrations/use-uid-migration.ts',
-      'v8/accounts/use-uid-migration.ts',
+      'app/accounts/use-uid-migration.ts',
       'v8/hq-broadcasts/create.tsx',
       'v8/hq-broadcasts/detail.tsx',
     ]) {

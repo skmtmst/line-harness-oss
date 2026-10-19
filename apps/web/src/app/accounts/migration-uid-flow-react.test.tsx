@@ -3,7 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import AccountMigration from '../../v8/accounts/migration'
+import AccountMigration from './migration'
 import UidMigrationV8 from '@/v8/friends/migrations/uid'
 
 /**

@@ -7,7 +7,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useSearchParams } from 'next/navigation';
 import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react';
 import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
-import { CreatePage } from '@/components/templates/index';
+import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button';
 import Dialog from '@/components/shared/dialog';
 import Notice from '@/components/shared/notice';
@@ -27,7 +27,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { useStaffRole } from '@/lib/staff-role';
-import { useDraftAutosave } from '@/v8/autosave'
+import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave'
 import { requestUnsavedAction } from '@/lib/unsaved-action';
 import { hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter';
 import type { FormEditHost } from './host';

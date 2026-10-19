@@ -6,7 +6,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const EDITOR = fs.readFileSync(new URL('./action-editor.tsx', import.meta.url), 'utf8')
+const EDITOR = fs.readFileSync(path.join(__dirname, 'action-editor.tsx'), 'utf8')
 
 describe('V6 送信後アクションの契約', () => {
   /*

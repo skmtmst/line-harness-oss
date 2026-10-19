@@ -7,7 +7,7 @@ import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye } from 'lucide-react';
 import type { Tag } from '@line-crm/shared';
-import { CreatePage } from '@/components/templates/index';
+import { CreatePage } from '@/components/templates';
 import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'

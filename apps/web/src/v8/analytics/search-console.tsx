@@ -2,7 +2,7 @@
 import { ValueBarChart } from '@/components/shared/charts'
 import { useEffect, useState } from 'react'
 import { Download, Eye, ListOrdered, MousePointerClick, Percent, SlidersHorizontal } from 'lucide-react'
-import { DashboardColumns, ListPage } from '@/components/templates/index'
+import { DashboardColumns, ListPage } from '@/components/templates'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'

@@ -24,7 +24,7 @@ Play
 } from 'lucide-react';
 import type { Dispatch,SetStateAction } from 'react';
 import { REASON_WORDS,RuleRow,displayName,ruleTriggerSummary } from './wizard-model';
-import styles from './wizard.module.css';
+import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardPriorityStepContext = {
   autoReplyId: string | null

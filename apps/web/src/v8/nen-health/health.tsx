@@ -6,7 +6,7 @@ import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-u
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react';
-import { ListPage } from '@/components/templates/index';
+import { ListPage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import FilterChip from '@/components/shared/filter-chip'

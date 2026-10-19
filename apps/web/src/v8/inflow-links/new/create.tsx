@@ -2,7 +2,7 @@
 import FolderSelect from '@/components/shared/folder-select'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("リンク名を入力してください"),
 }
 
@@ -22,7 +22,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates/index'
+import { CreatePage } from '@/components/templates'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
@@ -193,7 +193,7 @@ function InflowCreate() {
     if(candidatesError || candidatesLoading)return
     setSaveError(null)
     const errors: Record<string, string> = {}
-    if ((b244Requirements.name.check(name) !== null)) errors['ir-name'] = 'リンク名を入力してください'
+    if ((FIELD_REQUIREMENTS.name.check(name) !== null)) errors['ir-name'] = 'リンク名を入力してください'
     if (!validRef) errors['ir-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
     if (redirectUrl.trim()) {
       try {
@@ -409,7 +409,7 @@ function InflowCreate() {
       <Card variant="form" gap="normal" aria-labelledby="ir-new-where">
         <CardHeader size="stacked" titleId="ir-new-where" title={<>どこに置くリンクですか</>} meta={<>名前は一覧で見分けるため。お客さまには見えません</>} />
         <SettingsFormRow layout="name-folder">
-          <div className={styles.field}><Field label="名前" requirement={b244Requirements.name}><SaveErrorField names={["name","mine"]}><TextField
+          <div className={styles.field}><Field label="名前" requirement={FIELD_REQUIREMENTS.name}><SaveErrorField names={["name","mine"]}><TextField
               id="ir-name"
               type="text"
               value={name}

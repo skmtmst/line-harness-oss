@@ -13,7 +13,7 @@ const FILES: Array<[string, string]> = [
   ['components/shared/bulk-bar.module.css', '.bar'],
   ['v8/scenarios/list.module.css', '.bulkRow'],
   ['v8/auto-replies/list.module.css', '.bulkRow'],
-  ['v8/reminders/list.module.css', '.bulkRow'],
+  ['app/reminders/list-v8.module.css', '.bulkRow'],
   ['v8/templates/list.tsx', 'BulkBar'],
 ]
 
