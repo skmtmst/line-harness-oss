@@ -54,6 +54,8 @@ tags: [memory, core]
 
 ## 進行中（2026-10-17）
 
+- 整理の段2・Q02A1（lh-cl-q02a1 / codex/kenta-train-cleanup-q02a1-1018）：S02Aの追加926fa0b7bc0c（S02C包含）を7ecbc4bfc48fへmerge。共通部品の文字固定54候補を監査し、同じ故障で既存ブラウザ検査が赤になる本文スクロールの1断定だけ削除。327ケースを維持し、残る文字確認は54候補とも理由つきでBへ。更新後の対象327・Web13777/Worker13666/LIFF655、型/lint・全build208ページ、V8基本36/構造201/一覧132/読込93と故障対照/仮想表は成功。全体ci-local115工程79成功4失敗32省略で未合格：S02Zの文書3指摘/Worker旧参照1suite/Web33旧パス1件＋集約、正式PR情報1件未判定。速度11画面×5回と必須目標は成功、dashboard JS参考超過4,049,152B > 3,710,688Bを保持。詳細docs/qa/cleanup-q02a1-1019.md・対応TSV、外部Q02A1-EVIDENCE/DONE4区分。新migration/番号案・push/PR/DB/配備/実送信/実決済/外部書込なし。記録をコミットして止め、次は司令塔のB担当割当・S02Z接続と統合後の同SHA検査。
+
 - 整理の段2・P03（lh-cl-p03 / codex/kenta-train-cleanup-p03-1018、10-19）：指定まとめ30ae4d4870から予約写真の公開選択・LIFFの小写真/拡大・カード操作位置を実装。既存店舗設定と写真CASを原子保存し、未設定も含め未選択は公開APIから除外。重点53・故障対照8種、修正版3幅の基本7条件/18測定は崩れ0。製品99a520097a4で全体ci-localと未設定varsを確認した補完runを完了し、LIFF655/Worker13619/Web13748・型/lint・全build・V8の実行工程は失敗0。正式PR情報のない履歴検査だけ未対応で、全体CI合格とはしない。共通dashboardのJS量の参考超過1件（4065888B > 3710688B）を司令塔へ。上限/許可変更0。新規migration/SQL/bootstrap差分・番号案・DB適用/配備/push/PR/実送信/外部投稿なし。コミット止め。詳細docs/qa/cleanup-p03-1019.mdと外部P03-EVIDENCE。
 
 - 整理の段2・P02（lh-cl-p02 / codex/kenta-train-cleanup-p02-1018、10-19再開）：まとめb24ce2a16fを39d046f478へ取り込み、MemoryのP02/M03記録を双方保持、重複logger importを解消。業種別予約の写真GET模擬応答を512a777e3dで補修し、親の写真接続の故障4件→復元21件成功。DB2341/Worker13532/Web13717/LIFF653・型・両build成功（39dと512aの製品同一）。写真設定1152/1440の20場面とLIFF3幅9場面は崩れ等0・全画像目視済み。V8基本/比較/一覧/仮想表も成功。全体CIは77成功7失敗31省略、補修後repositoryは20成功0失敗5省略でLIFFを解消。全体未合格：速度5工程は取り込み元と同じmock GET500 req.on不足でF01へ、正式PR/Pencilは司令塔。詳細docs/qa/cleanup-p02-merge2-1019.md・外部P02-EVIDENCE/merge2-1019/、DONE4行/API/引継ぎを更新。735/全migration/bootstrap差分0、新規番号案・DB適用・配備・push・PR・実送信・外部書込0。記録をコミットして止め、司令塔がF01等とまとめて同SHA全体CI/正式PR/Pencil確認からS02へ渡す。
