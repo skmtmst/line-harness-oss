@@ -23,6 +23,7 @@
 - 見るだけの人には、頭の2つ・引き継ぎ・アーカイブ（戻す）を出さない。詳細と確かめ直しは出す。
 - **「LINEアカウントを登録」はオーナーだけに出す**（要件 v6-33 §15 `account.line.register`「登録、接続確認」＝owner）。管理者には入口の代わりに「LINEアカウントの登録はオーナーだけができます。オーナーに頼んでください。」の一文を出す（1件も無いときの案内文も同じ）。管理者に入口を出すと `/accounts/new` の③接続確認でサーバの403に当たって行き止まりになるため（2026-10-18 利用者報告）。
 - 一方で**「並び順と親子を変える」とスタイルの入口は管理者にも残す**（`account.metadata.edit`＝owner、admin）。登録と一緒に隠さない。見張りは `owner-only-register.test.tsx`。
+- この食い違い解消の記録は、いまはこの BEHAVIOR.md が持つ。正本 `docs/v8-requirements/behavior/33-account-settings.md` の食い違い一覧への反映は**司令塔の所有パス**なので lane の PR からは入れられない（PR #1777 が `required-pr-gate` の `Protect command-center owned documents` で落ちたため該当差分を戻した）。正本への反映は司令塔の枝で行う別タスクとして残す。
 
 ## 失敗
 - 一覧の失敗は `ListState` の error（再読み込み）。アーカイブできない理由（blockers）は運用者の言葉で窓の中に。428 は本人確認の窓を立ててやり直す。
