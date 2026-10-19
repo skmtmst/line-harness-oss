@@ -38,6 +38,8 @@ export interface SlotDbRow {
 }
 
 
+export const JST_OFFSET_MS = 9 * 3600_000;
+
 export function startsAtJst(utcIso: string): string {
   const jst = japanCalendar(new Date(utcIso)).toISOString();
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
