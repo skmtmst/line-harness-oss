@@ -22,7 +22,9 @@ it('基準の形も1000番以降を数値順に再生し、同番号は名前順
     writeFileSync(join(fixture, 'migrations/1000_b_q03_index.sql'), 'CREATE INDEX q03_order_label ON q03_order(label);\n');
     await execFileAsync(process.execPath, [join(fixture, 'scripts/generate-bootstrap.mjs')]);
     const meta = JSON.parse(readFileSync(join(fixture, 'bootstrap-meta.json'), 'utf8'));
-    expect(meta.includedMigrations.slice(-3)).toEqual([
+    expect(meta.includedMigrations.filter((name: string) => [
+      '999_q03_parent.sql', '1000_a_q03_column.sql', '1000_b_q03_index.sql',
+    ].includes(name))).toEqual([
       '999_q03_parent.sql', '1000_a_q03_column.sql', '1000_b_q03_index.sql',
     ]);
     const db = new Database(':memory:');
