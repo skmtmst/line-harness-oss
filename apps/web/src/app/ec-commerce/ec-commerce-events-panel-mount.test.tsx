@@ -235,6 +235,27 @@ function nextPageButton(el: HTMLDivElement): HTMLButtonElement {
   return button as HTMLButtonElement
 }
 
+describe('EC注文の実際の金額表示', () => {
+  it.each([
+    { status: 'current', totalAmount: 1234.9, refundedAmount: null, expected: '商品amount × 1・¥1,234' },
+    { status: 'refunded', totalAmount: 1234.9, refundedAmount: 50.9, expected: '商品amount × 1・−¥50' },
+    { status: 'current', totalAmount: null, refundedAmount: null, expected: '商品amount × 1' },
+  ])('注文$status/$totalAmount/$refundedAmountを$expectedと表示する', async ({ expected, ...amounts }) => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    const row = action('amount')
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(1)))
+      eventsDeferreds[0].resolve(ok(recordsList([action('amount', { order: { ...row.order, ...amounts } })])))
+      await drainMicrotasks()
+    })
+    const renderedRow = el.querySelector('[data-row-id="action-amount"]')
+    expect(renderedRow).toBeTruthy()
+    expect(renderedRow!.querySelector('span[title^="商品amount"]')?.textContent).toBe(expected)
+  })
+})
+
 describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
   it('M3: アカウント切替の直後(commit直後・useEffect未実行)は前アカウントの一覧を表示し続けない', async () => {
     const { container: el, root: r } = mount()

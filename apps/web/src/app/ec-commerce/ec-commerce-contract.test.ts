@@ -47,7 +47,7 @@ describe('V8 EC integration screens', () => {
       expect(identity).toContain(wording)
     }
     expect(page).toContain('order.orderLines.map')
-    expect(page).toContain('formatNumber(order.totalAmount')
+    // 注文金額はec-commerce-events-panel-mount.test.tsxで実表示を検査する。
     expect(identity).toContain('operations?.summary.linked')
     expect(identity).toContain('operations?.summary.potentialRevenue')
     expect(identity).toContain('過去の LINE 送信は再送しません')
