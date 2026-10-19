@@ -90,8 +90,15 @@ import { DetailRow, ActionButtons } from "./page-gap-parts"
 import { STATUS_TABS, SOURCE_FILTERS, statusBadgeColor, sourceLabel, formatLedgerDateTime, statusLabel, actionLabel, PAGE_SIZE, formatJpDateTime, formatJpTime, formatJpDay, jstDay } from './ledger-model'
 
 import type { BookingLedgerModel } from './page'
+import { bookingWords } from '@/v8/booking-bookings/words'
 
 export default function BookingLedgerScreen({ model }: { model: BookingLedgerModel }) {
+  if (model.selectedAccountId && model.styleProfile && !model.styleProfile.data) return <BookingLedgerFrame view={model.view}>
+    <PageHeading title="予約管理" />
+    <ListState kind={model.styleProfile.error ? 'error' : 'loading'} title={model.styleProfile.error ? '使い方のスタイルを読み込めませんでした' : '使い方のスタイルを確認しています'} error={model.styleProfile.error ?? undefined} onRetry={model.styleProfile.reload} />
+  </BookingLedgerFrame>
+  const usageStyle = model.styleProfile?.data?.style
+  const words = bookingWords(usageStyle)
   const {
     selectedAccountId,
     selectedAccount,
@@ -205,6 +212,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
          * `data-theme="v8"` のときだけ小窓にする。
          */
         <BookingDetailV8
+          usageStyle={usageStyle}
           booking={detail}
           accountId={selectedAccountId}
           canOperate={canOperate}
@@ -222,7 +230,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
           // N-390: LINE未連携の予約へ「届きます」と出すと事実と違う。
           decideTarget && (calendarItems.find((b) => b.id === decideTarget.id) ?? items.find((b) => b.id === decideTarget.id))?.friend_id
             ? '予約した人へ、この結果がLINEで届きます。取り消すには、もう一度状態を変える必要があります。'
-            : 'LINEと結びついていないため、お客様への自動連絡はありません。取り消すには、もう一度状態を変える必要があります。'
+            : `LINEと結びついていないため、${words.person}への自動連絡はありません。取り消すには、もう一度状態を変える必要があります。`
         }
         confirmLabel={decideTarget ? actionLabel[decideTarget.action] : '実行する'}
         destructive={decideTarget?.action === 'reject' || decideTarget?.action === 'cancel' || decideTarget?.action === 'no_show'}
@@ -237,7 +245,8 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
   {/* 帯同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
   if (view === 'day' || view === 'week') {
     return (
-      <PeopleDayFrame view={view} date={calendarFrom} rows={calendarItems} ready={calendarStatus === 'ready'} availability={availability} actions={headingActions} canWrite={canOperate} onOpen={setDetailId}>
+      <PeopleDayFrame usageStyle={usageStyle} view={view} date={calendarFrom} rows={calendarItems} ready={calendarStatus === 'ready'} availability={availability} actions={headingActions} canWrite={canOperate} onOpen={setDetailId}>
+        {model.styleProfile?.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={model.styleProfile.error} onRetry={model.styleProfile.reload} /> : null}
         {/*
           ★V7 `x63W5x`：同じ失敗を1画面に1つへ。失敗の1枚はカレンダーの場所に
           出す（#634 の読み直す口は保つ）。一覧が読めている間はカレンダーを出す。
@@ -258,10 +267,10 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<p>担当者か予約メニューが未設定です</p>:null}
             slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
-            trailingToolbar={view==='day'?<><ReservationLegend label="予約元の色" items={[{label:'LINE',tone:'success'},{label:'電話',tone:'neutral'}]}/><EntitySelect aria-label="担当者で絞り込む" value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'担当者：すべて'},...staffList.map(r=>({value:r.id,label:`担当者：${r.display_name}`}))]}/></>:undefined}
+            trailingToolbar={view==='day'?<><ReservationLegend label="予約元の色" items={[{label:'LINE',tone:'success'},{label:'電話',tone:'neutral'}]}/><EntitySelect aria-label={`${words.staff}で絞り込む`} value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'担当者：すべて'},...staffList.map(r=>({value:r.id,label:`担当者：${r.display_name}`}))]}/></>:undefined}
             resources={staffList.filter(r=>view!=='day'||boardStaff==='all'||r.id===boardStaff).map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
-            renderList={view === 'day' ? () => <PeopleDayList rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
+            renderList={view === 'day' ? () => <PeopleDayList usageStyle={usageStyle} rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
             onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);setCalendarSeq(n=>n+1);await load()}}
           />
         )}
@@ -273,6 +282,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
   return (
     <BookingLedgerFrame view={view}>
       {pageHead}
+      {model.styleProfile?.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={model.styleProfile.error} onRetry={model.styleProfile.reload} /> : null}
       <BookingLedgerBody view={view} readOnly={!canOperate}
         stats={<>
           {summaryError && (
@@ -291,7 +301,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               unit="件"
               detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : `前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
             />
-            <KpiCard icon={view === 'month' ? <CalendarPlus size={16} aria-hidden="true" /> : null} presentation="band" title="確定" help={view === 'month' ? '今月の予約のうち、確定して来店を予定している件数です。' : undefined} helpDisplay="question" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : '来店予定'} />
+            <KpiCard icon={view === 'month' ? <CalendarPlus size={16} aria-hidden="true" /> : null} presentation="band" title="確定" help={view === 'month' ? (usageStyle === 'consult' || usageStyle === 'lesson' ? `今月の予約のうち、確定した${words.planned}の件数です。` : '今月の予約のうち、確定して来店を予定している件数です。') : undefined} helpDisplay="question" value={summaryReady ? kpi.confirmed : null} unit="件" detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : words.planned} />
             {/* 設計は「変更依頼 / 要対応」。bookings の状態に「変更依頼」が無いので
                 承認待ちを出す。要対応であることは変わらない。 */}
             <KpiCard icon={view === 'month' ? <CircleAlert size={16} aria-hidden="true" /> : null} presentation="band"
@@ -300,7 +310,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               unit="件"
               badge={view === 'month' && summaryReady && summary.requested > 0 ? '要対応' : undefined}
               badgeTone="warning"
-              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : view === 'month' ? `お客さまから ${summary.requested}件` : '要対応'}
+              detail={summaryError ? '読み込めませんでした' : !summaryReady ? '読み込んでいます' : view === 'month' ? `${words.person}から ${summary.requested}件` : '要対応'}
             />
             <KpiCard icon={view === 'month' ? <CalendarX size={16} aria-hidden="true" /> : null} presentation="band"
               title="キャンセル"
@@ -337,7 +347,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             total={`${summary.total} 件`}
           />}
         folderNav={{
-          label: 'メニュー',
+          label: words.menu,
           activeId: menuFilter,
           onSelect: setMenuFilter,
           rows: [{ id: 'all', label: 'すべて', count: summary.total }, ...menus.map(menu => ({ id: menu.name, label: menu.name, count: menuCounts.get(menu.name) ?? 0 }))],
@@ -345,10 +355,10 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
         toolbar={view === 'month' ? <>
           {/* R8tlbw：1段目＝探す・担当・経路 … CSV、2段目＝「よく使う」と状態の札。 */}
           <ListToolbarRow>
-            <ListToolbarSearchSlot search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }} />
+            <ListToolbarSearchSlot search={{ placeholder: `${words.person}名で検索`, value: query, onChange: setQuery }} />
             <EntitySelect
-              aria-label="担当者で絞り込む"
-              valuePrefix="担当: "
+              aria-label={`${words.staff}で絞り込む`}
+              valuePrefix={`${words.staff}: `}
               value={staffFilter}
               onChange={setStaffFilter}
               options={[
@@ -372,7 +382,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
           </ListToolbarRow>
         </> : <>
             <ListToolbar
-            search={{ placeholder: 'お客さま名で検索', value: query, onChange: setQuery }}
+            search={{ placeholder: `${words.person}名で検索`, value: query, onChange: setQuery }}
             filters={
               <>
                 <>
@@ -405,7 +415,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                 </>
                 {/* 担当者と予約経路は一覧と件数の両方を絞り込む。 */}
                 <EntitySelect
-                  aria-label="担当者で絞り込む"
+                  aria-label={`${words.staff}で絞り込む`}
                   value={staffFilter}
                   onChange={setStaffFilter}
                   options={[
@@ -475,7 +485,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                 <ListState
                   kind="empty"
                   title="まだ予約はありません"
-                  description="予約が入ると、ここに日時とお客さまが並びます。"
+                  description={`予約が入ると、ここに日時と${words.person}が並びます。`}
                   action={canOperate ? <Button variant="primary" size="booking" href="/booking/bookings/new">電話の予約を入れる</Button> : undefined}
                 />
               )}
@@ -487,9 +497,9 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                   <thead>
                     <TableHeadRow>
                       <Th style={{ width: '15%' }}>日時</Th>
-                      <Th style={{ width: '13%' }}>お客さま</Th>
-                      <Th style={{ width: '17%' }}>メニュー</Th>
-                      <Th style={{ width: '10%' }} className="cq-hide-below-830">担当</Th>
+                      <Th style={{ width: '13%' }}>{words.person}</Th>
+                      <Th style={{ width: '17%' }}>{words.menu}</Th>
+                      <Th style={{ width: '10%' }} className="cq-hide-below-830">{words.staff}</Th>
                       <Th style={{ width: '9%' }}>予約経路</Th>
                       <Th style={{ width: '9%' }} align="right">料金</Th>
                       <Th style={{ width: '11%' }}>状態</Th>
@@ -517,9 +527,9 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                         <DateCell>{formatLedgerDateTime(b.starts_at)}</DateCell>
                         <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
-                          <ContextMenu label={`予約「${b.friend_name ?? 'お客様'}」の操作`} items={bookingContextItems(b)}>
-                            <span className={ledgerStyles.name} title={b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}>
-                              {b.friend_name ?? (b.friend_id ? '-' : 'LINE未連携のお客さま')}
+                          <ContextMenu label={`予約「${b.friend_name ?? words.person}」の操作`} items={bookingContextItems(b)}>
+                            <span className={ledgerStyles.name} title={b.friend_name ?? (b.friend_id ? '-' : `LINE未連携の${words.person}`)}>
+                              {b.friend_name ?? (b.friend_id ? '-' : `LINE未連携の${words.person}`)}
                             </span>
                           </ContextMenu>
                         </Td>
@@ -536,7 +546,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                               行の右端は「…」1つ（B-253）。詳細・会話・承認などは中へ。承認待ちは状態の札で分かる。 */}
                           <span className={ledgerStyles.actions} onClick={(event) => event.stopPropagation()}>
                             <RowMenu
-                              label={`予約「${b.friend_name ?? 'お客様'}」の操作`}
+                              label={`予約「${b.friend_name ?? words.person}」の操作`}
                               items={bookingContextItems(b).map((item) => ({ id: item.id, label: item.label, tone: item.danger ? 'danger' as const : undefined, onSelect: () => item.onSelect?.(item.id) }))}
                             />
                           </span>
@@ -565,7 +575,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                   <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" type="button" onClick={() => copyUrl(shareUrl)}>
                     {isCopied(shareUrl) ? 'コピー済' : 'コピー'}
                   </Button>
-                  <span className="text-ink-faint text-xs">お客さまが新しく予約を入れるURL</span>
+                  <span className="text-ink-faint text-xs">{`${words.person}が新しく予約を入れるURL`}</span>
                 </div>
                 {/* N-396: 履歴URLは別画面を開く。両方発行できることを注記と揃える。 */}
                 {historyUrl ? (
@@ -580,7 +590,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                     <Button variant="primary" className="px-4 py-2 font-medium border-0 h-auto whitespace-normal" type="button" onClick={() => copyUrl(historyUrl)}>
                       {isCopied(historyUrl) ? 'コピー済' : 'コピー'}
                     </Button>
-                    <span className="text-ink-faint text-xs">お客さまが自分の予約履歴を見るURL</span>
+                    <span className="text-ink-faint text-xs">{`${words.person}が自分の予約履歴を見るURL`}</span>
                   </div>
                 ) : null}
                 {copyFailedUrl && (copyFailedUrl === shareUrl || copyFailedUrl === historyUrl) ? (
@@ -610,7 +620,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
       {(
         <DetailPanel
           open={activeBooking !== null}
-          title={activeBooking ? `${activeBooking.friend_name ?? 'お客様'} ／ ${activeBooking.menu_name}` : ''}
+          title={activeBooking ? `${activeBooking.friend_name ?? words.person} ／ ${activeBooking.menu_name}` : ''}
           description={
             activeBooking
               ? `${formatJpDateTime(activeBooking.starts_at)}〜${formatJpTime(activeBooking.ends_at)}・${statusLabel[activeBooking.status] ?? activeBooking.status}`
@@ -634,7 +644,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               {/* 来店にする（Nx1kq・司令塔の判断）：確定の予約だけ。今ある「完了」の確かめの窓を通す。閲覧のみには出さない。 */}
               {canOperate && activeBooking.status === 'confirmed' ? (
                 <Button variant={activeBooking.friend_id ? 'secondary' : 'primary'} onClick={() => handleDecide(activeBooking.id, 'complete')}>
-                  来店にする
+                  {usageStyle === 'consult' || usageStyle === 'lesson' ? words.completeAction : '来店にする'}
                 </Button>
               ) : null}
               {activeBooking.friend_id ? (
@@ -647,11 +657,11 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
         >
           {activeBooking ? (
             <div>
-              {selectedAccountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={selectedAccountId} bookingId={activeBooking.id} seriesId={(activeBooking as { series_id?: string | null }).series_id ?? null} customerName={activeBooking.friend_name ?? 'お客様'} menuName={activeBooking.menu_name} startsAt={activeBooking.starts_at} canOperate={canOperate} onChanged={() => void load()} /></div> : null}
+              {selectedAccountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={selectedAccountId} bookingId={activeBooking.id} seriesId={(activeBooking as { series_id?: string | null }).series_id ?? null} customerName={activeBooking.friend_name ?? words.person} menuName={activeBooking.menu_name} startsAt={activeBooking.starts_at} canOperate={canOperate} onChanged={() => void load()} /></div> : null}
               <DetailRow label="日時">
                 {formatJpDateTime(activeBooking.starts_at)} 〜 {formatJpTime(activeBooking.ends_at)}
               </DetailRow>
-              <DetailRow label="担当">{activeBooking.staff_name}</DetailRow>
+              <DetailRow label={words.staff}>{activeBooking.staff_name}</DetailRow>
               <DetailRow label="料金">
                 <span className="tabular-nums">¥{formatNumber(activeBooking.price_at_booking)}</span>
               </DetailRow>
@@ -660,12 +670,12 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               <DetailRow label="予約番号">
                 <span className="text-ink-secondary font-mono text-xs">{activeBooking.id}</span>
               </DetailRow>
-              <DetailRow label="お客様からのご希望">
+              <DetailRow label={`${words.person}からのご希望`}>
                 {activeBooking.customer_note ?? <span className="text-ink-faint">記入なし</span>}
               </DetailRow>
               {/* この組（B5・Nx1kq）と お支払い（B1・Ae1W1・fom2A）。口が無い・対象でない予約は出さない。 */}
               {selectedAccountId ? <div className="mt-3 flex flex-col gap-3">
-                <BookingChargesSection accountId={selectedAccountId} bookingId={activeBooking.id} customerName={activeBooking.friend_name ?? 'お客'}
+                <BookingChargesSection accountId={selectedAccountId} bookingId={activeBooking.id} customerName={activeBooking.friend_name ?? words.person}
                   bookingLabel={`${formatJpDateTime(activeBooking.starts_at)} ${activeBooking.menu_name}`} price={activeBooking.price_at_booking ?? null}
                   canCharge={canOperate} canRefund={canOperate && canRefundCharges} />
               </div> : null}

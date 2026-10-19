@@ -13,11 +13,6 @@ const listStyles = readFileSync(
   resolve(root, 'apps/web/src/v8/inflow-links/list.module.css'),
   'utf8',
 );
-const modal = readFileSync(
-  resolve(root, 'apps/web/src/v8/inflow-links/edit-route-dialog.tsx'),
-  'utf8',
-);
-
 describe('inflow link tag auto-assignment UI wiring', () => {
   test('inflow-links page loads tags and shows the assigned auto-tag in the route list', () => {
     expect(page).toContain("import type { ApiResponse, EntryRoute, EntryRouteGenre, Scenario, Tag, TrafficPool }");
@@ -52,22 +47,6 @@ describe('inflow link tag auto-assignment UI wiring', () => {
     expect(page).not.toContain('font-mono text-blue-600 break-all');
   });
 
-  test('edit route modal lets operators select a tagId that is sent with create/update payloads', () => {
-    expect(modal).toContain("Tag,");
-    expect(modal).toContain('tags: Tag[]');
-    expect(modal).toContain('tagId: route?.tagId ?? null');
-    expect(modal).toContain('自動付与タグ（任意）');
-    // V8の共通選択欄: 現在値・候補・「なし」表示を保つ
-    expect(modal).toContain('value={form.tagId ?? \'\'}');
-    expect(modal).toContain('EntitySelect');
-    expect(modal).toContain('options={tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}');
-    expect(modal).toContain('placeholder="— 設定なし —"');
-    // 選んだ id が form に入り、「なし」は null になる。form ごと作成・更新で送る
-    // （R39: 新規は選択中アカウントの所属を付けて作る）
-    expect(modal).toContain('tagId: next || null');
-    expect(modal).toContain('api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })');
-    expect(modal).toContain('api.entryRoutes.update(route!.id, form)');
-    expect(modal).toContain('友だち追加時にこのタグを自動付与します');
-    expect(modal).toContain('clearable size="full" kind="tag"');
-  });
+  // 作成/更新でのタグ選択・解除の実操作は
+  // apps/web/src/app/inflow-links/edit-route-modal-submit-contract.test.ts へ移した。
 });

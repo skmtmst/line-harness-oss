@@ -36,7 +36,7 @@ export function SetupWarningBands({ data }: { data: StyleSetupData }) {
       {warnings.map((warning) => {
         const button = tiles.find((tile) => tile.feature === warning.feature)?.label ?? featureName(warning.feature)
         return (
-          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button onClick={() => preparing.open(FEATURES[warning.feature]!.preparing!)}>決まりを入れる</Button> : <Button href={featureHref(warning.feature, warning.href)}>決まりを入れる</Button>}>
+          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button onClick={() => preparing.open(FEATURES[warning.feature]!.preparing!)}>決まりを入れる</Button> : <Button href={featureHref(warning.feature, warning.href, data.state.style)}>決まりを入れる</Button>}>
             {`リッチメニューに「${button}」のボタンがありますが、${featureName(warning.feature)}の決まりがまだです。お客さまには「${PREPARING_WORD}」と出ています。`}
           </Notice>
         )

@@ -1,10 +1,12 @@
 .standalone { container: v8-page / inline-size; width: 100%; min-width: 0; }
 .columns { display: flex; align-items: stretch; gap: var(--polish-space-card); min-width: 0; }
+.outline { width: var(--tpl-htn-outline-w); flex-shrink: 0; min-width: 0; display: flex; flex-direction: column; }
 .content { flex: 1; min-width: 0; }
 .preview { width: var(--tpl-htn-aside-w); flex-shrink: 0; min-width: 0; }
 .toggle { display: none; }
 @container v8-page (max-width: 1099px) {
   .columns { flex-direction: column; }
+  .outline { width: 100%; }
   .preview { display: none; }
   .toggle { display: flex; }
 }

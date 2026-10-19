@@ -17,6 +17,7 @@ const friends = vi.hoisted(() => ({ list: vi.fn() }))
 // 登録完了直後の契約者専用LINEの登録案内（★V6 37-7）。既定は「運営側で未設定」なので何も出ない
 const accountTags = vi.hoisted(() => ({ list: vi.fn(async () => ({success:true,data:[{id:'tag-own',name:'店舗',color:null}]})) }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
+vi.mock('@/lib/api-styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })), save: vi.fn(async () => ({ success: true, data: { version: 1 } })) } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
 vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, lineAccountTags: accountTags, hqNotices: notices, friends, staff: { list: async () => ({ success: true, data: [] }) } } }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
@@ -45,6 +46,7 @@ const checked = {
 
 afterEach(() => { cleanup(); window.localStorage?.clear(); delete document.documentElement.dataset.theme })
 beforeEach(() => {
+  sessionStorage.clear()
   vi.clearAllMocks(); document.documentElement.dataset.theme='v8'
   calls.list.mockResolvedValue({success:true,data:[]}); calls.followerInsight.mockResolvedValue({success:true,data:{total:null}});
   calls.connectCheck.mockResolvedValue(checked)
@@ -108,7 +110,8 @@ async function saveAndFinish() {
   fireEvent.click(screen.getByRole('button', { name: '登録する' }))
   await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
   next()
-  fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
+  fireEvent.click(screen.getByRole('radio', { name: /飲食店/ }))
+  await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
   next()
 }
 
@@ -118,18 +121,18 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByText('ご利用環境の確認', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('質問 1')).toBeTruthy()
     passPrecheck()
-    expect(screen.getByText('Messaging API のチャネル', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Messaging API の情報を入れる', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 1 / 3')).toBeTruthy()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
     nextStep()
-    expect(screen.getByText('Webhook の設定', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 2 / 3')).toBeTruthy()
     ack('Webhookの利用をONにした')
     ack('Webhookの再送をONにした')
     ack('エラーの統計情報をONにした')
     nextStep()
-    expect(screen.getByText('LINE Login のチャネル', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('LINEログインの情報を入れる', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 3 / 3')).toBeTruthy()
   })
 
@@ -195,8 +198,14 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
     expect(document.getElementById('channel-access-token')).toBeNull()
     expect(document.getElementById('liff-id')).toBeNull()
-    expect(screen.getAllByRole('link', { name: '取得方法を見る' }).map((node) => node.getAttribute('href')))
-      .toEqual(['/manuals/line-connect/index.html#m1'])
+    /* 承認済み v06 の ②-1（A2cEg1）では、取りに行く先は青い囲みの「LINE Developers を開く」1つ。
+       マニュアルは右の列からいつでも開ける。どちらも別タブ。 */
+    const developers = screen.getByRole('link', { name: /LINE Developers を開く/ })
+    expect(developers.getAttribute('href')).toBe('https://developers.line.biz/console/')
+    expect(developers.getAttribute('target')).toBe('_blank')
+    const manual = screen.getByRole('link', { name: /マニュアルを開く/ })
+    expect(manual.getAttribute('href')).toBe('/manuals/line-connect/index.html')
+    expect(manual.getAttribute('target')).toBe('_blank')
   })
 
   it('5行で止まった箇所を示し、失敗時は登録できない', async () => {
@@ -246,7 +255,7 @@ describe('LINEアカウント作成ウィザード', () => {
     await saveAndFinish()
     await screen.findByText('準備ができました')
     await screen.findByText('musubo 運営（契約者専用）の LINE を登録してください')
-    expect(document.body.textContent).toContain('123456')
+    await screen.findByText('123456')
     fireEvent.click(screen.getByRole('button', { name: 'あとで確認する' }))
     await waitFor(() => expect(screen.queryByText('musubo 運営（契約者専用）の LINE を登録してください')).toBeNull())
     expect(notices.lineRegistration).toHaveBeenCalledTimes(1)
