@@ -9,7 +9,6 @@
  */
 import { logger } from '@line-crm/shared/server';
 import type { Context, Hono } from 'hono';
-import { logger } from '@line-crm/shared/server';
 import { decryptCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
