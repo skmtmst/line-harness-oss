@@ -2,6 +2,9 @@ import { emptyLayout } from '@line-crm/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import { Hono } from 'hono';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 import type { Env } from '../worker-env.js';
 
 const mocks = vi.hoisted(() => ({
@@ -181,6 +184,7 @@ function app(asAdmin = false, role: 'owner' | 'staff' = 'owner') {
     });
   }
   a.route('/', forms);
+  a.onError(unhandledWorkerError);
   return a;
 }
 
@@ -561,7 +565,10 @@ describe('submission pagination compatibility', () => {
     );
 
     expect(res.status).toBe(500);
-    expect(JSON.stringify(await res.json())).not.toContain('startedUnique');
+    const body = await res.json<{ incidentId: string }>();
+    expect(JSON.stringify(body)).not.toContain('startedUnique');
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
   });
 
   test('別アカウントの権限では集計を読まない', async () => {

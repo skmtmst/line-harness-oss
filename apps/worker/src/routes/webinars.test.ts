@@ -1,4 +1,7 @@
 import { Hono } from 'hono';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 import type { Env } from '../worker-env.js';
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 
@@ -177,6 +180,7 @@ adminApp.use('*', async (c, next) => {
   return next();
 });
 adminApp.route('/', webinarRoutes);
+adminApp.onError(unhandledWorkerError);
 
 function adminReq(path: string, init?: RequestInit) {
   if (init?.method === 'PUT' && /^\/api\/webinars\/[^/]+$/.test(path) && typeof init.body === 'string') {
@@ -1332,7 +1336,14 @@ describe('webinar notification settings', () => {
     const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
 
     expect(res.status).toBe(expectedStatus);
-    expect(await res.json()).toMatchObject({ success: false });
+    const body = await res.json<{ incidentId?: string }>();
+    expect(body).toMatchObject({ success: false });
+    if (expectedStatus === 500) {
+      expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
+    } else {
+      expect(report).not.toHaveBeenCalled();
+    }
   });
 });
 
