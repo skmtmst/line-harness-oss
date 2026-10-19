@@ -97,10 +97,15 @@ export function linksIn(text: string): Link[] {
 }
 
 export function localTarget(root: string, source: string, target: string): string | null {
-  if (!target || /^(?:[a-z][a-z\d+.-]*:|\/|#|\{)/i.test(target)) return null;
+  if (!target || /^(?:[a-z][a-z\d+.-]*:|#|\{)/i.test(target)) return null;
   let path: string;
   try { path = decodeURIComponent(target.split(/[?#]/, 1)[0]); }
   catch { return resolve(root, '__invalid_url_encoding__'); }
+  if (path.startsWith('/')) {
+    // /docs names repository documents; other root paths name app routes or sites.
+    if (path !== '/docs' && !path.startsWith('/docs/')) return null;
+    return resolve(root, `.${path}`);
+  }
   return resolve(dirname(source), path);
 }
 

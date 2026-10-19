@@ -52,6 +52,21 @@ describe('文書の入口と参照の見張り', () => {
     put(root, 'docs/guide.md', '[過去の記録](removed.md)');
     expect(auditCatalog(root)).toEqual([expect.objectContaining({ source: 'docs/guide.md:1', target: 'removed.md' })]);
   });
+  test.each(['/docs/removed.md', '/docs%2Fremoved.md'])('外した文書へのルート相対リンク %s を検出する', (target) => {
+    const root = fixture();
+    put(root, 'docs/guide.md', `[過去の記録](${target})`);
+    expect(auditCatalog(root)).toEqual([expect.objectContaining({ source: 'docs/guide.md:1', target })]);
+  });
+  test('入口のルート相対リンクも同じ文書として数える', () => {
+    const root = fixture();
+    put(root, 'docs/README.md', '[入口](/docs/README.md)\n[使い方](/docs/guide.md)\n[図](/docs/images/図.png)\n[機能](../apps/README)');
+    expect(auditCatalog(root)).toEqual([]);
+  });
+  test('アプリの画面URLや外部URLを文書ファイルと取り違えない', () => {
+    const root = fixture();
+    put(root, 'docs/guide.md', '[友だち](/friends?view=list)\n[外部](https://example.invalid/docs/missing.md)\n[外部2](//example.invalid/docs/missing.md)');
+    expect(auditCatalog(root)).toEqual([]);
+  });
   test('リポジトリの外の実在ファイルへ抜けるリンクを検出する', () => {
     const root = fixture();
     put(root, 'docs/guide.md', '[外部](../../outside.md)');
