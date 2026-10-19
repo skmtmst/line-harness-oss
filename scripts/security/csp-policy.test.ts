@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 // @ts-expect-error The browser runner shares this native JavaScript module.
 import { assertEnforcedPolicy, securityHeaders } from './csp-policy.mjs';
 
-describe('B-351 production static policies', () => {
+describe('production static policies', () => {
   for (const target of ['web', 'liff']) it(`${target}: enforces the script boundary without unsafe script sources`, () => {
     const source = readFileSync(`apps/${target}/public/_headers`, 'utf8');
     const headers = securityHeaders(source);
