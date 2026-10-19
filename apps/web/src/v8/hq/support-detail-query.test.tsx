@@ -33,7 +33,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
         list: async () => ({ success: true, data: [] }),
         context: async () => ({ success: true, data: { accounts: [] } }),
       },
-      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 's', email: 'a@example.com', name: '担当' } }) },
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 's', email: 'a@example.com', name: '担当', role: 'staff' } }) },
       tenants: { ...actual.api.tenants, me: async () => ({ success: true, data: { name: '本部' } }) },
     },
   }

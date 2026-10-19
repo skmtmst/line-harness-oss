@@ -6,8 +6,8 @@ const net=vi.hoisted(()=>({role:'owner' as string | null,account:'a',query:'id=r
 vi.mock('next/navigation',()=>({useRouter:()=>({replace:vi.fn(),push:vi.fn()}),useSearchParams:()=>new URLSearchParams(net.query)}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:net.account,accounts:[]})}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{}}))
-vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> net.role,canManageRole:(role:string|null)=>role==='owner'||role==='admin'}))
-vi.mock('@/lib/api',async importOriginal=> {const actual=await importOriginal<typeof import('@/lib/api')>();return {...actual,api:{staff:{me:async()=>({success:true,data:{name:'担当'}})},friendAddRules:{get:async()=>({success:true,data:{rule:{id:'r',name:'案内',status:'stopped',friendKind:'first_time',priority:1,routeNames:[],definition:{routeIds:[],actions:[],messageType:'text',messageText:'案内'}},options:{routes:[],scenarios:[],tags:[]}}}),validate:net.validate,conflicts:net.conflicts,test:net.test}}}})
+vi.mock('@/lib/staff-role',async importOriginal=>({...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole:()=> net.role,canManageRole:(role:string|null)=>role==='owner'||role==='admin'}))
+vi.mock('@/lib/api',async importOriginal=> {const actual=await importOriginal<typeof import('@/lib/api')>();return {...actual,api:{staff:{me:async()=>({success:true,data:{id:'self',role:net.role??'viewer',name:'担当'}})},friendAddRules:{get:async()=>({success:true,data:{rule:{id:'r',name:'案内',status:'stopped',friendKind:'first_time',priority:1,routeNames:[],definition:{routeIds:[],actions:[],messageType:'text',messageText:'案内'}},options:{routes:[],scenarios:[],tags:[]}}}),validate:net.validate,conflicts:net.conflicts,test:net.test}}}})
 import Page from './publish'
 beforeEach(()=>{net.role='owner';net.account='a';net.query='id=r&done=1';net.test.mockReset();net.validate.mockReset().mockResolvedValue({success:true,data:{canPublish:true,checks:[],estimatedAudienceCount:1}});net.conflicts.mockReset().mockResolvedValue({success:true,data:{rules:[],conflicts:[]}})})
 afterEach(cleanup)

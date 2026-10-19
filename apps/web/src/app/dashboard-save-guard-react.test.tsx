@@ -39,6 +39,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(json({ success: true, data: { id: 'test-owner', role: 'owner' } }))
     if (path.includes('/api/dashboard/preferences?')) {
       if (init?.method === 'PUT') {
         return new Promise<Response>(resolve => pending.push({ body: JSON.parse(String(init.body)), resolve }))

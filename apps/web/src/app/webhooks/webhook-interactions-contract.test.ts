@@ -94,7 +94,7 @@ describe('V8 外部連携・やり取りの記録 Uv9AA', () => {
   })
 
   it('送り直しは管理者だけに見せ、単体と一括の両方を持つ', () => {
-    expect(PAGE).toContain("staffRole === 'owner' || staffRole === 'admin'")
+    // 役割の出し分けは interactions-v8-react.test.tsx の実DOMと故障対照で確かめる。
     expect(PAGE).toContain('失敗したものをまとめてやり直す')
     expect(PAGE).toContain('return allowed && item.canRetry &&')
   })

@@ -16,6 +16,9 @@ import type { StaffMember } from '@line-crm/shared'
 
 const fixture = vi.hoisted(() => ({
   tab: 'members',
+  meRole: 'admin' as StaffMember['role'],
+  meId: 'me-1',
+  meReadOnly: false,
   updated: [] as Array<{ id: string; data: unknown }>,
 }))
 
@@ -67,7 +70,7 @@ vi.mock('@/lib/api', () => {
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
-        me: async () => ({ success: true, data: member({ id: 'me-1', name: '管理者', email: 'me@example.test', role: 'admin', isActive: true }) }),
+        me: async () => ({ success: true, data: member({ id: fixture.meId, name: '管理者', email: 'me@example.test', role: fixture.meRole, readOnly: fixture.meReadOnly, isActive: true }) }),
         update: async (id: string, data: unknown) => {
           fixture.updated.push({ id, data })
           return { success: true, data: member({}) }
@@ -131,6 +134,9 @@ async function saveEditFull() {
 
 beforeEach(() => {
   fixture.tab = 'members'
+  fixture.meRole = 'admin'
+  fixture.meId = 'me-1'
+  fixture.meReadOnly = false
   fixture.updated = []
   state.members = [member({})]
   state.users = [accessUser({})]
@@ -178,3 +184,25 @@ describe('既存スタッフの成果承認権限', () => {
 
 // Self-security loading is covered separately; retain this suite’s original operation assertions.
 vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))
+
+test('本人確認が失効したら、古い本人データが残っていても自己編集と2段階の変更を隠す', async () => {
+  fixture.meRole = 'staff'; fixture.meId = 'staff-1'
+  await act(async () => { render(<StaffPage />) })
+  const menu = await screen.findByRole('button', { name: /の操作$/ })
+  fireEvent.click(menu)
+  expect(screen.getByRole('menuitem', { name: '役割を変える' })).toBeTruthy()
+  const { forgetStaffIdentity } = await import('@/lib/staff-identity-state')
+  await act(async () => { forgetStaffIdentity() })
+  expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: /2段階の確認を設定する/ })).toBeNull()
+  expect(fixture.updated).toHaveLength(0)
+})
+
+test('閲覧のみのスタッフは自分の行でも編集と2段階の変更を出さない', async () => {
+  fixture.meRole = 'staff'; fixture.meId = 'staff-1'; fixture.meReadOnly = true
+  await act(async () => { render(<StaffPage />) })
+  fireEvent.click(await screen.findByRole('button', { name: /の操作$/ }))
+  expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: /2段階の確認を設定する/ })).toBeNull()
+  expect(fixture.updated).toHaveLength(0)
+})

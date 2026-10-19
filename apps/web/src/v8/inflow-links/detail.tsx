@@ -11,7 +11,7 @@ import { ArrowLeft, Info, Pause, Pencil, QrCode, UserPlus, Gift, Check, Calendar
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
-import { canManageRole, useStaffRole, loadStaffIdentity } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { canEditFeature } from '@/lib/staff-capability'
 import { formatNumber } from '@/lib/format'
 import { useAccount } from '@/contexts/account-context'

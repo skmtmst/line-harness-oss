@@ -17,7 +17,7 @@ import RichMenuDetailV8 from '@/v8/rich-menu-edit/detail'
 const net = vi.hoisted(() => ({
   /** 次の publishRuns 応答。 */
   publishRunsResult: undefined as unknown,
-  role: 'owner',
+  role: 'owner', readOnly: false, roleBundle: undefined as string | undefined,
   preview: vi.fn(), summary: vi.fn(), reconcile: vi.fn(), retry: vi.fn(),
 }))
 
@@ -30,7 +30,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 'owner-1', role: net.role } }) },
+      staff: { ...actual.api.staff, me: async () => ({ success: true, data: { id: 'owner-1', role: net.role, readOnly: net.readOnly, roleBundle: net.roleBundle } }) },
       richMenuGroups: {
         ...actual.api.richMenuGroups,
         publishRuns: async () => net.publishRunsResult,
@@ -61,7 +61,7 @@ async function flush() {
 }
 
 beforeEach(async () => {
-  net.role = 'owner'
+  net.role = 'owner'; net.readOnly = false; net.roleBundle = undefined
   net.preview.mockReset().mockResolvedValue({ success: true, data: null })
   net.summary.mockReset().mockResolvedValue({ success: true, data: { effective: { value: 12, state: 'available', reason: null } } })
   net.reconcile.mockReset().mockResolvedValue({ success: true, data: { dryRun: true, diffs: [] } })
@@ -171,8 +171,10 @@ describe('公開履歴の読み込み（応答の形ずれ）', () => {
     expect(net.reconcile.mock.calls.filter(call => call[1] === false)).toHaveLength(1)
   })
 
-  it.each(['staff', 'viewer'])('管理者以外（%s）は合計だけを読み、公開履歴の操作を出さない', async role => {
-    net.role = role
+  it.each([
+    { role: 'staff' }, { role: 'viewer' }, { role: 'admin', readOnly: true }, { role: 'owner', roleBundle: 'view_only' },
+  ])('操作できない担当者は合計だけを読み、公開履歴の操作を出さない: %j', async identity => {
+    Object.assign(net, identity)
     net.publishRunsResult = { success: true, data: { runs: [run('failed')] } }
     await renderDetail()
     await waitFor(() => expect(net.summary).toHaveBeenCalledExactlyOnceWith('menu-1'))
