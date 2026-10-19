@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 /*
  * ★V8 分析「経路と成果」（Pencil ）と、その中の「成果地点ごとのレポート」（）の共通部分。
@@ -29,7 +30,7 @@ function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
   const values = metrics.map(shownValue)
   return values.some((value) => value === null) ? null : values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
 }
-const yen = (value: number | null, signed = false) => value === null ? undefined : `${signed && value > 0 ? '+' : ''}¥${formatNumber(value)}`
+const yen = (value: number | null, signed = false) => value === null ? undefined : `${signed && value > 0 ? '+' : ''}${formatYen(value)}`
 
 /** 経路と成果の数の帯と道具の段を読み込み、本文は呼び出し側（経路の表／成果地点のレポート）が描く。 */
 export function useRoutesOverview(accountId: string, controlled?: { days: number; setDays: (days: number) => void; customRange?: PeriodRange | null; setRange?: (range: PeriodRange) => void }) {

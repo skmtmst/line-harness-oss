@@ -77,6 +77,12 @@ describe('★管理画面 日付と数の書き方（板 ZzBqa §2）', () => {
     expect(formatYen(0)).toBe('¥0')
   })
 
+  it('請求と同じく1円未満を切り捨て、取消料の端数を上乗せしない', () => {
+    expect(formatYen(1001 * 33 / 100)).toBe('¥330')
+    expect(formatYen(1001 * 50 / 100)).toBe('¥500')
+    expect(formatYen(12400.99)).toBe('¥12,400')
+  })
+
   it('読めない値はフォールバック、numberは有限だけ', () => {
     expect(formatDateTime(null)).toBe('—')
     expect(formatDateTime('not-a-date', '?')).toBe('?')

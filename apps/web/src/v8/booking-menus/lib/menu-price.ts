@@ -1,5 +1,5 @@
+import { formatYen } from '@line-crm/shared';
 import type { BookingMenu } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
 
 /**
  * 予約メニューの料金表示（R309）。
@@ -10,5 +10,5 @@ import { formatNumber } from '@/lib/format'
  */
 export function menuPriceLabel(menu: Pick<BookingMenu, 'price_mode' | 'base_price'>): string {
   if (menu.price_mode === 'inquiry') return 'お問い合わせ'
-  return menu.base_price === 0 ? '無料' : `¥${formatNumber(menu.base_price)}`
+  return menu.base_price === 0 ? '無料' : formatYen(menu.base_price)
 }

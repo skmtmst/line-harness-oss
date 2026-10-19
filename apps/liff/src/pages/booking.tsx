@@ -1,3 +1,4 @@
+import { formatYen } from '@line-crm/shared';
 import { useCustomerWords } from '../components/customer-style-scope.js';
 import { useUrlStep } from '../lib/use-url-step.js';
 import WaitlistOfferSheet from '../components/waitlist-offer-sheet.js';
@@ -244,10 +245,10 @@ export default function Booking() {
           {party.size === 1 && menu && staff && menu.price_mode !== 'inquiry' && menu.base_price > 0 ? (
             <p className="mb-2.5 flex items-baseline gap-2 text-[13px] text-liff-sub" data-booking-total="">
               <span>合計</span>
-              <span className="text-[17px] font-bold text-ink">{`¥${(menu.base_price + nominationFee(menu, staff)).toLocaleString()}`}</span>
+              <span className="text-[17px] font-bold text-ink">{formatYen(menu.base_price + nominationFee(menu, staff))}</span>
               <span className="text-xs">{nominationFee(menu, staff) > 0
-                ? `（料金 ¥${menu.base_price.toLocaleString()}・指名料 ¥${nominationFee(menu, staff).toLocaleString()}）`
-                : `（料金 ¥${menu.base_price.toLocaleString()}・指名料なし）`}</span>
+                ? `（料金 ${formatYen(menu.base_price)}・指名料 ${formatYen(nominationFee(menu, staff))}）`
+                : `（料金 ${formatYen(menu.base_price)}・指名料なし）`}</span>
             </p>
           ) : null}
           {party.size > 1 && menu ? <PartySummary party={party} first={menu} withFee /> : null}

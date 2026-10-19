@@ -1,4 +1,5 @@
 import {GapError} from '../../services/gap-common.js';
+import { formatYen, yenPercent } from '@line-crm/shared';
 export interface CancellationPolicy {enabled:boolean;tiers:Array<{beforeHours:number;percent:number}>;noShowPercent:number;version:number}
 export const defaultCancellationPolicy:CancellationPolicy={enabled:false,tiers:[{beforeHours:24,percent:0},{beforeHours:0,percent:50}],noShowPercent:100,version:0};
 export function validCancellationPolicy(b:unknown):b is CancellationPolicy {
@@ -14,8 +15,8 @@ export function cancellationQuote(policy:CancellationPolicy,startsAt:string,pric
  const enabled=policy.enabled&&!ticket,remaining=(Date.parse(startsAt)-now.getTime())/3600000;
  const sorted=[...policy.tiers].sort((a,b)=>b.beforeHours-a.beforeHours),tier=sorted.find(t=>remaining>=t.beforeHours)??sorted.at(-1)!;
  const free=sorted.find(t=>t.percent===0),freeUntil=enabled&&free?new Date(Date.parse(startsAt)-free.beforeHours*3600000).toISOString():null;
- const feeNow=enabled?Math.floor(price*tier.percent/100):0,feeNoShow=enabled?Math.floor(price*policy.noShowPercent/100):0;
- const text=!enabled?'キャンセル料は掛かりません':`${freeUntil} まで無料／${sorted.filter(t=>t.percent>0).map(t=>`${t.beforeHours===0?'それ以降':`開始${t.beforeHours}時間前まで`} 料金の ${t.percent}%（¥${Math.floor(price*t.percent/100).toLocaleString('ja-JP')}）`).join('／')}／連絡なしの欠席 ${policy.noShowPercent}%（¥${feeNoShow.toLocaleString('ja-JP')}）`;
+ const feeNow=enabled?yenPercent(price,tier.percent):0,feeNoShow=enabled?yenPercent(price,policy.noShowPercent):0;
+ const text=!enabled?'キャンセル料は掛かりません':`${freeUntil} まで無料／${sorted.filter(t=>t.percent>0).map(t=>`${t.beforeHours===0?'それ以降':`開始${t.beforeHours}時間前まで`} 料金の ${t.percent}%（${formatYen(yenPercent(price,t.percent))}）`).join('／')}／連絡なしの欠席 ${policy.noShowPercent}%（${formatYen(feeNoShow)}）`;
  return {freeUntil,feeNow,feeNoShow,text,policyAcceptedRequired:enabled};
 }
 export async function requireCancellationTestConnection(db:D1Database,account:string) {

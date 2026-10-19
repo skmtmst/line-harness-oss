@@ -1,3 +1,4 @@
+import { formatYen } from '@line-crm/shared';
 import { bookingPriceText } from '../lib/booking-price.js';
 import Button from './ui/button/index.js';
 import { useEffect, useState } from 'react';
@@ -114,7 +115,7 @@ export default function StaffList({
                 {selected ? (
                   <Icon name="circle-check" className="h-[22px] w-[22px] shrink-0 text-liff-primary" />
                 ) : fee > 0 ? (
-                  <span className="shrink-0 rounded-[5px] border border-liff-primary px-2 py-0.5 text-[11.5px] font-bold text-liff-primary">{`指名料 +¥${fee.toLocaleString()}`}</span>
+                  <span className="shrink-0 rounded-[5px] border border-liff-primary px-2 py-0.5 text-[11.5px] font-bold text-liff-primary">{`指名料 +${formatYen(fee)}`}</span>
                 ) : null}
               </Button>
             </li>

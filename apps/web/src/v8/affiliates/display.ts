@@ -1,3 +1,4 @@
+import { formatYen } from '@line-crm/shared';
 /*
  * ★V8 成果とアフィリエイトの表示の言い換えと、読み込みの小さな手助け。
  *
@@ -106,9 +107,7 @@ export function asReportV2(raw: unknown): ReportV2 | null {
   return value as ReportV2
 }
 
-export function formatYen(n: number): string {
-  return `¥${formatNumber(Math.round(n))}`
-}
+export { formatYen };
 
 export function formatYenNullable(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'

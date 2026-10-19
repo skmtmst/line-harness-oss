@@ -1,4 +1,5 @@
 'use client'
+import { formatYen as yen } from '@line-crm/shared';
 
 import Notice from '@/components/shared/notice'
 
@@ -29,7 +30,6 @@ export type SeriesTarget = {
   startsAt: string
 }
 
-const yen = (n: number) => `¥${n.toLocaleString('ja-JP')}`
 
 /*
  * 繰り返しの予約を変える・取り消す確かめの窓（B4-2・i1NoP と YoXiY）。

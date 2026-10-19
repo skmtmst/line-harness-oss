@@ -1,3 +1,4 @@
+import { formatYen } from '@line-crm/shared';
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import type { DeliveryService, DeliveryUrgency } from '@/lib/restaurant-delivery-api'
@@ -97,10 +98,7 @@ export function storeToday(nowMs?: number): string {
 }
 
 /** 「¥3,480」。金額は円の整数で届く。 */
-export function formatYen(value: number | null | undefined): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return DASH
-  return `¥${Math.round(value).toLocaleString('ja-JP')}`
-}
+export { formatYen };
 
 /**
  * 受信からの経過。D-1の「経過」列（「2分」「18分」）。

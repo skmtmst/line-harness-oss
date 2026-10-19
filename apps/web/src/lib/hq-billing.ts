@@ -1,5 +1,5 @@
+import { formatYen as yen } from '@line-crm/shared';
 import { PRODUCT_SCOPE } from '@/lib/product-scope'
-import { formatNumber } from '@/lib/format'
 /**
  * 統括の課金（★管理画面 36-2）の型と小さな計算。API の形は `apps/worker/src/routes/hq-billing.ts` が正本。
  */
@@ -117,9 +117,7 @@ export function billingBanner(summary: BillingSummary): { tone: 'info' | 'warn' 
   }
 }
 
-export function yen(amount: number): string {
-  return `¥${formatNumber(amount)}`
-}
+export { yen };
 
 /** 表示も申込み可否も、選んだ周期だけを見る。月払いへの暗黙の代替はしない。 */
 export function billingPlanPrice(plan: BillingPlanView, interval: BillingInterval) {

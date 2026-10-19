@@ -1,3 +1,4 @@
+import { formatYen } from '@line-crm/shared';
 import liff from '@line/liff';
 import { TextInput, FieldLabel } from '../components/forms/controls.js';
 import { fetchMe, postRegister, postAddLink, fetchOffers, fetchMileage, postEnrollOffer, type AffiliateData, type AffiliateLinkData, type OfferData, type MileageWalletData, type MileageOpportunity } from '../lib/affiliate-profile-api.js';
@@ -23,7 +24,7 @@ type State =
   | { phase: 'error'; message: string };
 
 const rewardText = (amount: number) =>
-  amount > 0 ? `1件 ¥${amount.toLocaleString()}` : '報酬未設定';
+  amount > 0 ? `1件 ${formatYen(amount)}` : '報酬未設定';
 
 function formatMileageDate(value: string): string {
   const parsed = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
@@ -229,7 +230,7 @@ function MileageHistory({ wallet }: { wallet: MileageWalletData }) {
                 <p
                   className={`shrink-0 text-sm font-bold whitespace-nowrap tabular-nums ${item.amount < 0 ? 'text-ink' : 'text-ok-ink'}`}
                 >
-                  {item.amount > 0 ? `+${item.amount.toLocaleString()}` : item.amount.toLocaleString()}
+                  {item.amount > 0 ? `+${formatYen(item.amount).replace(/^¥/, '')}` : formatYen(item.amount).replace(/^¥/, '')}
                 </p>
               </li>
             ))}

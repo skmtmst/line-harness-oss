@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { formatNumber } from '@/lib/format'
 
 /**
@@ -10,11 +11,7 @@ import { formatNumber } from '@/lib/format'
  * プランの分類色に緑は使わない（緑は「正常」の意味だけ）。
  */
 
-export function formatYen(yen: number): string {
-  // 数字でない値が来ても「¥NaN」を出さない。未取得は「—」が決まり。
-  if (typeof yen !== 'number' || !Number.isFinite(yen)) return '—'
-  return `¥${formatNumber(Math.round(yen))}`
-}
+export { formatYen };
 
 /** 軸の目盛り。¥450万 のように「万」で丸める。 */
 export function formatYenShort(yen: number): string {

@@ -1,4 +1,5 @@
 'use client'
+import { formatYen as yen } from '@line-crm/shared';
 
 import ListDateTime from '@/components/shared/list-date-time'
 
@@ -36,7 +37,6 @@ const STATUS: Record<BookingCancellationCharge['status'], { label: string; tone:
   waived: { label: '請求しない', tone: 'neutral' },
   refunded: { label: '返金済み', tone: 'neutral' },
 }
-const yen = (value: number) => `¥${Math.floor(value).toLocaleString('ja-JP')}`
 const uuid = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`)
 
 type Load = { state: 'loading' } | { state: 'ready'; charges: BookingCancellationCharge[]; quote: BookingCancellationQuote; testMode: boolean } | { state: 'error' }

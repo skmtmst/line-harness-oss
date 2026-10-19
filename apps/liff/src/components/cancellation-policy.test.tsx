@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import Confirm from './confirm.js';
 import { api } from '../lib/api.js';
+import CancellationPolicy from './cancellation-policy.js';
 
 /* キャンセル料の決まり（B1・kwC8E・Q8HLq）：チェックは初めは空で、入れるまで予約のボタンは押せない。押すとカードを登録し、確かめた決まりの版と登録の印を一緒に送る。 */
 vi.mock('../lib/api.js', () => ({
@@ -17,6 +18,12 @@ const staff = { id: 's1', display_name: '指名なし', role: null, profile_imag
 const POLICY = { enabled: true, version: 2, freeUntil: '2099-01-01T01:00:00.000Z', afterPercent: 50, noShowPercent: 100, price: 8400, deposit: null };
 beforeEach(() => { vi.mocked(api.createRequest).mockClear(); vi.mocked(api.cancellationSetup).mockClear(); });
 afterEach(cleanup);
+
+it('端数のある割合の取消料を請求と同じ切り捨てで表示する', () => {
+  render(<CancellationPolicy preview={{ ...POLICY, price: 1001, noShowPercent: 33 }} accepted={false} onAcceptedChange={() => {}} />);
+  expect(screen.getByText('料金の 50%（¥500）')).toBeTruthy();
+  expect(screen.getByText('料金の 33%（¥330）')).toBeTruthy();
+});
 
 function renderConfirm() {
   render(<Confirm menu={menu} staff={staff} slot={{ date: '2099-01-02', start: '10:00' }} autoConfirm onSubmitted={() => {}} />);
