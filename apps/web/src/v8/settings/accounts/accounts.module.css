@@ -10,6 +10,16 @@
   gap: var(--tpl-sa-head-actions-gap);
 }
 
+/*
+ * 登録の口が無い人（管理者）へ出す一文。mcp-connect の .ownerOnly と同じ見た目。
+ * span に出すので余白は書かない（画面CSSの余白の基準を増やさない。
+ * 見張りは src/lib/screen-css-budget.test.ts）。
+ */
+.ownerOnly {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-micro);
+}
+
 /* 探す欄（幅 260）と絞り込みの札。 */
 .toolbar {
   display: flex;
