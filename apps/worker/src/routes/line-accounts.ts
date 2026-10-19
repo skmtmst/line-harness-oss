@@ -866,7 +866,7 @@ lineAccounts.get(
 );
 
 // Only the registered account's signed inbound receipt can unlock the wizard.
-lineAccounts.get('/api/line-accounts/:id/registration-receipt', async (c) => {
+lineAccounts.get('/api/line-accounts/:id/registration-receipt', requireRole('owner', 'admin'), async (c) => {
   c.header('Cache-Control', 'no-store');
   try {
     const account = await getAuthorizedLineAccount(c, c.req.param('id'));

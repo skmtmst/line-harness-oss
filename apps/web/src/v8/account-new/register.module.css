@@ -260,7 +260,7 @@
 .receiptInstructions p, .receiptHelp { margin: 0; }
 .receiptHelp { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); }
 .receiptHelp a { color: var(--color-accent-deep); font-weight: 700; }
-.receiptHelp a:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+.receiptHelp a:focus-visible { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 .qrWait { display: inline-flex; align-items: center; gap: var(--tpl-htn-gap-s); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 
 /* ④ 使い方のひな型は共通の RadioCardGroup／RadioCard・StatusBadge が持つ（★V8 §24）。

@@ -6,7 +6,7 @@ import { allV8RowsPassed, toV8CheckRows } from '@/v8/account-new/logic'
 import type { LineAccountConnectData } from '@/lib/api'
 
 const calls = vi.hoisted(() => ({
-  connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(),
+  connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(), registrationReceipt: vi.fn(),
   followerImportState: vi.fn(), stepFollowerImport: vi.fn(), followerInsight: vi.fn(),
   staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(), friendsList: vi.fn(),
 }))
@@ -16,6 +16,7 @@ vi.mock('@/lib/api', () => ({
       connectCheck: calls.connectCheck,
       connect: calls.connect,
       list: calls.list,
+      registrationReceipt: calls.registrationReceipt,
       followerImportState: calls.followerImportState,
       stepFollowerImport: calls.stepFollowerImport,
       followerInsight: calls.followerInsight,
@@ -70,6 +71,7 @@ beforeEach(() => {
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...baseData, id: 'new-account' } })
   calls.list.mockResolvedValue({ success: true, data: [] })
+  calls.registrationReceipt.mockResolvedValue({ success: true, data: { status: 'confirmed', receivedAt: '2026-10-20T10:00:02.000+09:00' } })
   calls.staffList.mockResolvedValue({ success: true, data: [] })
   calls.tagList.mockResolvedValue({ success: true, data: [] })
   calls.followerInsight.mockResolvedValue({ success: true, data: { followers: null } })
@@ -154,10 +156,12 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(shownNode()).toBe('Lwxyh')
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
-    await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
+    await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
     expect(shownNode()).toBe('Lwxyh')
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
     next()
-    expect(shownNode()).toBe('X0pGdw')
+    await waitFor(() => expect(shownNode()).toBe('X0pGdw'))
+    expect(calls.registrationReceipt.mock.calls.length).toBeGreaterThanOrEqual(2)
     fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
     next()
     expect(shownNode()).toBe('Plmq1')
@@ -172,10 +176,36 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(current()).toContain('接続確認')
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
-    await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
+    await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
     expect(current()).toContain('接続確認')
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
     next()
-    expect(current()).toContain('使い方を選ぶ')
+    await waitFor(() => expect(current()).toContain('使い方を選ぶ'))
+  })
+
+  it('友だち人数があっても今回の受信が未確認なら次へ進めない', async () => {
+    calls.registrationReceipt.mockResolvedValue({ success: true, data: { status: 'waiting', receivedAt: null } })
+    enterCheckStep()
+    await runCheck()
+    fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+    await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
+    await waitFor(() => expect(calls.registrationReceipt).toHaveBeenCalledWith('new-account'))
+    expect(screen.getByText('接続を待っています…')).toBeTruthy()
+    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(shownNode()).toBe('Lwxyh')
+  })
+
+  it('受信表示の後でも押した時の再確認が未受信なら進めない', async () => {
+    calls.registrationReceipt
+      .mockResolvedValueOnce({ success: true, data: { status: 'confirmed', receivedAt: '2026-10-20T10:00:02.000+09:00' } })
+      .mockResolvedValue({ success: true, data: { status: 'waiting', receivedAt: null } })
+    enterCheckStep()
+    await runCheck()
+    fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
+    next()
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true))
+    expect(shownNode()).toBe('Lwxyh')
   })
 
   it('①と②も絵の正本ノードを描く', () => {
@@ -263,7 +293,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(document.querySelectorAll('[data-phase="ok"]').length).toBe(5)
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await waitFor(() => expect(calls.connect).toHaveBeenCalledOnce())
-    expect(await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })).toBeTruthy()
+    expect(await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })).toBeTruthy()
   })
 
   it('登録後は画面から取り込みの続きを進め、完了を画面へ反映する', async () => {
@@ -273,9 +303,10 @@ describe('V8 登録ウィザードの gated 進行', () => {
     enterCheckStep()
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
-    await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
+    await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
     next()
-    fireEvent.click(screen.getByRole('radio', { name: /飲食店向け/ }))
+    fireEvent.click(await screen.findByRole('radio', { name: /飲食店向け/ }))
     next()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledWith('new-account'))
     expect(calls.followerImportState).not.toHaveBeenCalled()
