@@ -86,6 +86,7 @@ export async function processLineWebhookEvents(input: {
     const ref={scopeId:`line:${input.lineAccountId ?? 'default'}`,processKind:'line_event',subjectId:webhookEvent.webhookEventId};
     try {
       const prior=await getLineWebhookEvent(input.db,webhookEvent.webhookEventId);
+      if (prior && prior.line_account_id !== input.lineAccountId) continue;
       const checkpoint=await getWorkflowStep(input.db,{...ref,stepKey:'__run'});
       if(prior && !checkpoint) {
         if(prior.status!=='succeeded') await ensureWorkflowStep(input.db,{...ref,stepKey:'__run'},
@@ -98,16 +99,23 @@ export async function processLineWebhookEvents(input: {
       try {
         let reserved=false;
         for(let attempt=0;attempt<2;attempt++){
-          try{await reserveLineWebhookEvent(execution.db,reservation);reserved=true;break}
+          try{
+            const inserted = await reserveLineWebhookEvent(execution.db,reservation);
+            if (!inserted) {
+              const owner = await getLineWebhookEvent(input.db, webhookEvent.webhookEventId);
+              if (!owner || owner.line_account_id !== input.lineAccountId) break;
+            }
+            reserved=true;break;
+          }
           catch(error){if(attempt===1)throw error}
         }
-        if(!reserved)throw new Error('line_event_reservation_failed');
+        if (!reserved) { await execution.fail(); continue; }
         await input.handle(webhookEvent,execution);
-        await markLineWebhookEventSucceeded(execution.db,webhookEvent.webhookEventId);
+        await markLineWebhookEventSucceeded(execution.db,webhookEvent.webhookEventId,input.lineAccountId);
         await execution.complete();
       }catch(error){
         const reason=classifyLineWebhookError(error);
-        await markLineWebhookEventFailed(execution.db,webhookEvent.webhookEventId,reason).catch(()=>undefined);
+        await markLineWebhookEventFailed(execution.db,webhookEvent.webhookEventId,reason,input.lineAccountId).catch(()=>undefined);
         await execution.fail();
         safeLog('error',{...logBase,event:'line_webhook_event_failed',reason});
       }

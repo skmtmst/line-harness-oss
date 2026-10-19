@@ -10,7 +10,7 @@ import {stableWebhookStepId} from '../services/incoming-webhook-receipts.js';
 import { workflowLineClient } from '../services/workflow-line-client.js';
 import type { WorkflowExecution } from '../services/workflow-execution.js';
 import { redeemCoupon } from '../services/coupon-redemption.js';
-import { Hono } from 'hono';
+import { Hono, type Handler } from 'hono';
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
 import { parseTapPostbackData } from '../lib/rich-menu-tap.js';
 import { parseCarouselPostbackData } from '../lib/carousel-tap.js';
@@ -140,7 +140,7 @@ async function ensureFriendFromWebhookUser(
   return friend;
 }
 
-webhook.post('/webhook', async (c) => {
+const receiveWebhook: Handler<Env> = async (c) => {
   // Pre-read size guard: reject before reading the body if Content-Length is oversized.
   const contentLengthHeader = c.req.header('Content-Length');
   if (contentLengthHeader) {
@@ -172,56 +172,36 @@ webhook.post('/webhook', async (c) => {
     return c.json({ status: 'ok' }, 200);
   }
 
-  // Verify signature BEFORE JSON.parse so attacker-controlled bodies never reach the parser.
-  // Fast path: try env default secret first so malformed/unauthenticated traffic
-  //   fails fast without a D1 lookup. The main account is typically also registered
-  //   in line_accounts; on env match we still look it up so matchedAccountId binds
-  //   correctly for downstream account-scoped filters.
-  // Slow path: iterate DB-registered accounts for genuinely multi-account installs.
-  let channelAccessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
-  let matchedAccountId: string | null = null;
-  let matchedTenantStatus: 'active' | 'suspended' | 'archived' = 'active';
-  let valid = false;
-
-  const envSecret = c.env.LINE_CHANNEL_SECRET;
-  if (envSecret) {
-    valid = await verifySignature(envSecret, rawBody, signature);
-    if (valid) {
-      const accounts = await listLineAccountsWithTenantStatus(db);
-      const main = accounts.find(
-        (a) => a.is_active && !a.archived_at && a.channel_secret === envSecret,
-      );
-      if (main) {
-        channelAccessToken = main.channel_access_token;
-        matchedAccountId = main.id;
-        matchedTenantStatus = main.tenant_status ?? 'active';
-      }
+  // A URL selects a candidate, never authorizes it. Legacy URLs must have
+  // exactly one signature match; never pick the first of ambiguous credentials.
+  const channelId = c.req.param('channelId');
+  if (channelId !== undefined && !/^\d+$/.test(channelId)) return c.json({ status: 'ok' }, 200);
+  const accounts = await listLineAccountsWithTenantStatus(db, undefined, channelId);
+  let matched: (typeof accounts)[number] | undefined;
+  for (const account of accounts) {
+    if (channelId !== undefined && account.channel_id !== channelId) continue;
+    if (!account.channel_secret || !await verifySignature(account.channel_secret, rawBody, signature)) continue;
+    if (matched) {
+      console.error(JSON.stringify({ code: 'line_webhook_ambiguous_account' }));
+      return c.json({ status: 'ok' }, 200);
     }
+    matched = account;
   }
+  if (!matched || !matched.is_active || matched.archived_at) return c.json({ status: 'ok' }, 200);
+  const matchedAccountId = matched.id;
+  const channelAccessToken = matched.channel_access_token;
+  const matchedTenantStatus = matched.tenant_status;
+  if (!channelAccessToken) return c.json({ status: 'ok' }, 200);
 
-  if (!valid) {
-    const accounts = await listLineAccountsWithTenantStatus(db);
-    for (const account of accounts) {
-      if (!account.is_active || account.archived_at) continue;
-      if (envSecret && account.channel_secret === envSecret) continue; // already tried via fast path
-      const isValid = await verifySignature(account.channel_secret, rawBody, signature);
-      if (isValid) {
-        channelAccessToken = account.channel_access_token;
-        matchedAccountId = account.id;
-        matchedTenantStatus = account.tenant_status ?? 'active';
-        valid = true;
-        break;
-      }
-    }
-  }
-
-  if (!valid) {
-    console.error('Invalid LINE signature');
+  let body: WebhookRequestBody;
+  try {
+    body = JSON.parse(rawBody) as WebhookRequestBody;
+  } catch {
     return c.json({ status: 'ok' }, 200);
   }
-
-  // 署名だけでは店の所属を証明できない。解決不能な受信は副作用を起こさない。
-  if (!matchedAccountId) return c.json({ status: 'ok' }, 200);
+  if (!body || typeof body.destination !== 'string' || !body.destination || !Array.isArray(body.events)) {
+    return c.json({ status: 'ok' }, 200);
+  }
 
   // 届いた時刻を覚える。届かない警告（X-2）の判定に使う。
   if (matchedAccountId) {
@@ -235,18 +215,11 @@ webhook.post('/webhook', async (c) => {
     }
   }
 
-  let body: WebhookRequestBody;
-  try {
-    body = JSON.parse(rawBody) as WebhookRequestBody;
-  } catch {
-    console.error('Failed to parse webhook body');
-    return c.json({ status: 'ok' }, 200);
-  }
-
   const lineClient = new LineClient(channelAccessToken);
-  // LINEのdestinationは公式アカウントごとに安定している。DBアカウントの
-  // 解決前後でキーを変えると、先着した取消墓標と後着messageが分断される。
-  const lineMessageAccountKey = `destination:${body.destination}`;
+  // The sender knows its own secret and can sign arbitrary destination values.
+  // Persistence must therefore use the authenticated DB identity, not payload data.
+  const lineMessageAccountKey = `account:${matchedAccountId}`;
+  const legacyLineMessageAccountKey = `destination:${body.destination}`;
 
   // 非同期処理 — LINE は ~1s 以内のレスポンスを要求
   const processingPromise = processLineWebhookEvents({
@@ -262,6 +235,7 @@ webhook.post('/webhook', async (c) => {
           event,
           matchedAccountId,
           lineMessageAccountKey,
+          legacyLineMessageAccountKey,
         );
       }
       // 契約者専用LINE（★V6 37-7）: 6 桁の確認コードなら権限者の紐づけとして受ける。
@@ -282,6 +256,7 @@ webhook.post('/webhook', async (c) => {
         : undefined,
       c.env,
       execution,
+      legacyLineMessageAccountKey,
       );
     },
   });
@@ -289,7 +264,10 @@ webhook.post('/webhook', async (c) => {
   c.executionCtx.waitUntil(processingPromise);
 
   return c.json({ status: 'ok' }, 200);
-});
+};
+
+webhook.post('/webhook', receiveWebhook);
+webhook.post('/webhook/:channelId', receiveWebhook);
 
 /**
  * Stopped tenants still own their inbound data, but no webhook-triggered
@@ -303,10 +281,12 @@ async function handleStoppedTenantEvent(
   event: WebhookEvent,
   lineAccountId: string | null,
   lineMessageAccountKey: string,
+  legacyLineMessageAccountKey?: string,
 ): Promise<void> {
   if (event.type === 'unsend') {
     await recordLineMessageUnsend(db, {
       lineMessageAccountKey,
+      lineAccountId,
       lineMessageId: event.unsend.messageId,
       sourceUserId: event.source.type === 'user' ? event.source.userId : null,
       unsentAt: toJstString(new Date(event.timestamp)),
@@ -387,6 +367,7 @@ async function handleStoppedTenantEvent(
     content,
     lineAccountId,
     lineMessageAccountKey,
+    legacyLineMessageAccountKey,
     lineMessageId: message.id,
     createdAt: jstNow(),
     lineEventAt: toJstString(new Date(event.timestamp)),
@@ -441,11 +422,13 @@ async function handleEvent(
   ecommerce?: { baseUrl: string; secret: string },
   operatorMailEnv?: Env['Bindings'],
   execution?: WorkflowExecution,
+  legacyLineMessageAccountKey?: string,
 ): Promise<void> {
   const replay=<T>(key:string,work:()=>Promise<T>):Promise<T>=>execution?execution.step(key,work):work();
   if (event.type === 'unsend') {
     await recordLineMessageUnsend(db, {
       lineMessageAccountKey,
+      lineAccountId,
       lineMessageId: event.unsend.messageId,
       sourceUserId: event.source.type === 'user' ? event.source.userId : null,
       unsentAt: toJstString(new Date(event.timestamp)),
@@ -1459,6 +1442,7 @@ async function handleEvent(
       content: finalContent,
       lineAccountId,
       lineMessageAccountKey,
+      legacyLineMessageAccountKey,
       lineMessageId: msg.id,
       createdAt: jstNow(),
       lineEventAt: toJstString(new Date(event.timestamp)),
@@ -1543,6 +1527,7 @@ async function handleEvent(
       content: incomingText,
       lineAccountId,
       lineMessageAccountKey,
+      legacyLineMessageAccountKey,
       lineMessageId: textMessage.id,
       createdAt: now,
       lineEventAt: toJstString(new Date(event.timestamp)),

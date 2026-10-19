@@ -108,6 +108,7 @@ async function postFollow(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
     body: JSON.stringify({
+      destination: 'bot',
       events: [{
         type: 'follow', webhookEventId, timestamp,
         source: { type: 'user', userId: 'U-1' }, replyToken: `reply-${webhookEventId}`,

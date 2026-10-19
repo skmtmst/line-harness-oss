@@ -1,3 +1,4 @@
+vi.mock('../services/line-messaging-identity.js', () => ({ verifyLineMessagingIdentity: vi.fn().mockResolvedValue(true) }));
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 
@@ -636,7 +637,7 @@ function installAutoConnectFetch() {
     }
     if (url.endsWith('/v2/bot/channel/webhook/endpoint') && method === 'PUT') return Response.json({});
     if (url.endsWith('/v2/bot/channel/webhook/endpoint')) {
-      return Response.json({ endpoint: 'http://localhost/webhook', active: true });
+      return Response.json({ endpoint: 'http://localhost/webhook/123456789', active: true });
     }
     if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
     if (url.endsWith('/liff/v1/apps') && method === 'GET') return Response.json({ apps: [] });
@@ -694,7 +695,7 @@ describe('POST /api/line-accounts/connect', () => {
       tokenOk: true,
       loginOk: true,
       sameProvider: true,
-      webhook: { registeredUrl: 'http://localhost/webhook', active: true, testPassed: true },
+      webhook: { registeredUrl: 'http://localhost/webhook/123456789', active: true, testPassed: true },
       followerTotal: 1284,
     });
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
@@ -1076,7 +1077,7 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
         accountId: 'acc-1',
         revision: 2,
         expectedUrls: {
-          webhook: 'http://localhost/webhook',
+          webhook: 'http://localhost/webhook/123456789',
           callback: 'http://localhost/auth/callback',
           liffEndpoint: 'http://localhost?liffId=2009624792-XXXX',
         },
@@ -1117,7 +1118,7 @@ describe('POST /api/line-accounts/:id/connection-checks', () => {
       .find((check: { kind: string }) => check.kind === 'webhook_endpoint');
     expect(webhook).toMatchObject({
       result: expected,
-      expectedUrl: 'https://stg.example.test/webhook',
+      expectedUrl: 'https://stg.example.test/webhook/123456789',
       registeredUrl: registered,
     });
   });
@@ -1382,7 +1383,7 @@ describe('GET /api/line-accounts', () => {
     };
     expect(body.data[0].webhook).toMatchObject({
       status: 'matched',
-      expectedUrl: 'http://localhost/webhook',
+      expectedUrl: 'http://localhost/webhook/123456789',
     });
     expect(body.data[0].channelAccessToken).toBeUndefined();
     expect(body.data[0].plan).toMatchObject({
@@ -1816,4 +1817,23 @@ test('登録に選んだタグを保存し、秘密と分けてLINE取得項目�
  expect(insertTags).toHaveBeenCalledExactlyOnceWith('created-account','tag-own', expect.any(String));
  expect(db.batch).toHaveBeenCalledOnce();
  expect(await response.json()).toMatchObject({data:{basicId:'@line',pictureUrl:'https://example.com/icon.png'}});
+});
+
+test.each(['/api/line-accounts/connect/check', '/api/line-accounts/connect'])('registered channels are rejected before LINE changes: %s', async (path) => {
+  const response = await setupApp('owner', makeDbStub({ id: 'other-customer' })).request(path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(autoConnectBody),
+  });
+  expect(response.status).toBe(409);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+});
+
+test('a mismatched Messaging credential cannot be saved by the owner', async () => {
+  const { verifyLineMessagingIdentity } = await import('../services/line-messaging-identity.js');
+  vi.mocked(verifyLineMessagingIdentity).mockResolvedValueOnce(false);
+  const response = await setupApp('owner').request('/api/line-accounts/acc-1', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelAccessToken: 'other-shop-token' }),
+  });
+  expect(response.status).toBe(422);
+  expect(dbMocks.updateLineAccount).not.toHaveBeenCalled();
 });
