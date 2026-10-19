@@ -84,3 +84,17 @@ describe('thirtyDaySummary', () => {
     expect(s.logs).toHaveLength(3);
   });
 });
+
+
+it.each(['2026-09-30T15:00:00Z', '2026-09-30T23:59:59Z', '2026-10-01T00:00:00Z'])('日本時間の同じ朝は日数・8週・30日の境界が変わらない: %s', (at) => {
+  const rows = [
+    { ...log(0, 4), logged_on: '2026-10-01' },
+    { ...log(0, 3), logged_on: '2026-09-02' },
+    { ...log(0, 2), logged_on: '2026-09-01' },
+  ];
+  const summary = summarizePetHealth(rows, new Date(at));
+  expect(summary.daysSinceLast).toBe(0);
+  expect(summary.weightSeries[7]).toBe(4);
+  expect(summary.count30d).toBe(2);
+  expect(thirtyDaySummary(rows, new Date(at)).logs.map(row => row.loggedOn)).toEqual(['2026-10-01', '2026-09-02']);
+});

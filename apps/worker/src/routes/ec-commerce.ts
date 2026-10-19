@@ -1,3 +1,4 @@
+import { jstDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -540,10 +541,10 @@ const SUBSCRIPTION_STATUS_EXPR = `coalesce(nullif(json_extract(c.value, '$.statu
 function monthKeySql(expr: string): string {
   return `CASE
     WHEN json_type(${expr}) != 'text' THEN NULL
-    WHEN json_extract(${expr}, '$') GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]*'
-      THEN substr(json_extract(${expr}, '$'), 1, 7)
-    WHEN json_extract(${expr}, '$') GLOB '[0-9][0-9][0-9][0-9]-[0-9]*'
-      THEN substr(json_extract(${expr}, '$'), 1, 5) || '0' || substr(json_extract(${expr}, '$'), 6, 1)
+    WHEN json_extract(${expr}) GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]*'
+      THEN substr(json_extract(${expr}), 1, 7)
+    WHEN json_extract(${expr}) GLOB '[0-9][0-9][0-9][0-9]-[0-9]*'
+      THEN substr(json_extract(${expr}), 1, 5) || '0' || substr(json_extract(${expr}), 6, 1)
     ELSE NULL END`;
 }
 
@@ -590,6 +591,7 @@ ecCommerce.get(
    * `try/catch` と `Array.isArray` で守っていたので、SQL へ移すとその守りが
    * 消える。弾いた行の数は下で別に数えて、応答と記録に残す。
    */
+  const currentMonth = jstDate().slice(0, 7);
   const contractsCte = `
     WITH contracts AS (
       SELECT s.friend_id AS friend_id,
@@ -651,7 +653,7 @@ ecCommerce.get(
     ).bind(lineAccountId).all<{ month: string; count: number; amount: number }>(),
     c.env.DB.prepare(
       `${contractsCte} SELECT COUNT(*) AS count FROM contracts WHERE cancelled_month = ?`,
-    ).bind(lineAccountId, new Date().toISOString().slice(0, 7)).first<{ count: number }>(),
+    ).bind(lineAccountId, currentMonth).first<{ count: number }>(),
     c.env.DB.prepare(
       `${contractsCte}
        SELECT cancellation_reason AS reason, COUNT(*) AS count FROM contracts
@@ -736,7 +738,7 @@ ecCommerce.get(
         // 元の実装と同じく、**全件に金額があるときだけ**合計を出す。
         monthlyAmount: total > 0 && withAmount === total ? Number(amountRow?.sum_amount ?? 0) : null,
         startedThisMonth: Number(
-          monthRows.results.find((row) => row.month === new Date().toISOString().slice(0, 7))?.count ?? 0,
+          monthRows.results.find((row) => row.month === currentMonth)?.count ?? 0,
         ),
         cancelledThisMonth: Number(cancelRow?.count ?? 0),
         cancellationTopReason: reasonRow?.reason ?? null,

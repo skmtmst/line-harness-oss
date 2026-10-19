@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -88,7 +89,7 @@ const listOperatorRules = async (c: Context<Env>) => {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
     const rules = await getNotificationRules(c.env.DB, lineAccountId);
-    const today = new Date(Date.now() + 9 * 60 * 60_000).toISOString().slice(0, 10);
+    const today = japanDate();
     const activity = await c.env.DB.prepare(`
       SELECT i.definition_id AS rule_id,
              COUNT(DISTINCT i.id) AS occurred_today,
@@ -487,7 +488,7 @@ const exportOperatorDeliveriesCsv = async (c: Context<Env>) => {
     return new Response(`\uFEFF${lines.join('\r\n')}\r\n`, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="operator-notifications-${new Date().toISOString().slice(0, 10)}.csv"`,
+        'Content-Disposition': `attachment; filename="operator-notifications-${japanDate()}.csv"`,
       },
     });
   } catch (err) {

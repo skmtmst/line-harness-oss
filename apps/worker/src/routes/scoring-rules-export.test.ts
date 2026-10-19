@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
@@ -90,4 +90,15 @@ describe('N-237 決めごとCSVのサーバー化', () => {
     ).get() as { action: string; target_kind: string } | undefined;
     expect(row?.action).toBe('mileage.rule.export');
   });
+});
+
+
+afterEach(() => vi.useRealTimers());
+it('日本時間の朝もマイルの書出し名は今日の日付', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-09-30T15:09:00Z'));
+  const testDb = createTestD1(); seed(testDb);
+  const res = await app(testDb, owner(DEFAULT_TENANT_ID)).request('/api/mileage/rules/export?accountId=acc-1');
+  expect(res.status).toBe(200);
+  expect(res.headers.get('content-disposition')).toBe('attachment; filename="mileage-earning-rules-2026-10-01.csv"');
+  testDb.raw.close();
 });

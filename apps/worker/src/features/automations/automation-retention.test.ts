@@ -79,6 +79,17 @@ describe('オートメーション履歴の保持期間', () => {
     expect(buckets.find((row) => row.status === 'failed')).toMatchObject({ run_count: 1, step_count: 0 });
   });
 
+  it('日本時間の月初の朝も13か月の日別保持境界を変えない', async () => {
+    for (const day of ['2025-08-31', '2025-09-01']) {
+      testDb.raw.prepare(`INSERT INTO automation_run_daily_counts
+        (line_account_id,automation_id,day,status,run_count,step_count,created_at,updated_at)
+        VALUES ('account-1','auto-1',?,'success',1,0,?,?)`).run(day, day, day);
+    }
+    const purged = await purgeExpiredAutomationRuns(testDb.db, new Date('2026-09-30T15:09:00Z'));
+    expect(purged.dailyExpired).toBe(1);
+    expect(testDb.raw.prepare('SELECT day FROM automation_run_daily_counts').all()).toEqual([{ day: '2025-09-01' }]);
+  });
+
   it('13か月を超えた日別集計を消す', async () => {
     const oldDay = '2025-01-01';
     testDb.raw.prepare(`

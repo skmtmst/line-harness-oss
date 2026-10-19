@@ -1,3 +1,4 @@
+import { jstDate as japanDate, jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
@@ -345,7 +346,7 @@ export const post__api_liff_nen_health_logs_7 = async (c: Context<Env, "/api/lif
   if (body?.loggedOn != null && body.loggedOn !== '' && !dateOnly(body.loggedOn)) {
     return inputError(c, { success: false, error: '日付が正しくありません' }, 400, ['loggedOn']);
   }
-  const loggedOn = dateOnly(body?.loggedOn) || new Date().toISOString().slice(0, 10);
+  const loggedOn = dateOnly(body?.loggedOn) || japanDate();
   const stool = ['normal', 'soft', 'hard', 'diarrhea', 'bloody', 'other'].includes(String(body?.stoolStatus)) ? String(body?.stoolStatus) : '';
   const appetite = ['good', 'normal', 'poor'].includes(String(body?.appetite)) ? String(body?.appetite) : '';
   const skin = ['normal', 'itchy', 'red', 'other'].includes(String(body?.skinStatus)) ? String(body?.skinStatus) : 'normal';
@@ -431,7 +432,7 @@ export const get__api_liff_nen_health_logs_summary_9 = async (c: Context<Env, "/
     .bind(petId, friend.id).first<{ id: string; name: string; gender: string | null; animal_type: string; breed: string | null; birthday: string | null; weight_kg: number | null }>();
   if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
   const today = new Date();
-  const since = new Date(today.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const since = japanDateOffset(-30, today);
   const logs = await c.env.DB.prepare(
     `SELECT pet_id, logged_on, weight_kg, stool_status, appetite, skin_status, tear_stain_status, heart_rate_bpm, respiratory_rate_bpm, note
        FROM nen_health_logs WHERE pet_id = ? AND logged_on >= ? ORDER BY logged_on DESC`,

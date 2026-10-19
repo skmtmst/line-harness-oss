@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -194,6 +194,13 @@ describe('運用者へのお知らせの送信と実行記録', () => {
     expect(testDb.raw.prepare(`SELECT status, grouped_count FROM notification_instances`).get()).toEqual({
       status: 'completed', grouped_count: 2,
     });
+  });
+
+  it('日本時間の朝も通知履歴の書出し名は今日の日付', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-09-30T15:09:00Z'));
+    const csv = await app(testDb.db).request('/api/notifications/operator-deliveries.csv?lineAccountId=account-1&reason=日付確認');
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get('content-disposition')).toBe('attachment; filename="operator-notifications-2026-10-01.csv"');
   });
 
   it('本人テスト送信を台帳へ分け、理由付きCSV出力を監査する', async () => {
@@ -519,3 +526,5 @@ describe('N-342 (#943): 正本名 /api/line-notifications 配下の運用者通�
     await expect(stopped.json()).resolves.toMatchObject({ data: { isActive: false } });
   });
 });
+
+afterEach(() => vi.useRealTimers());

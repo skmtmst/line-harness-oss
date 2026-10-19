@@ -246,6 +246,16 @@ describe('GET /api/booking/admin/bookings.csv (N-397)', () => {
 
   afterEach(() => sqlite.close());
 
+  test('日本時間の朝も台帳の書出し名は今日の日付', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-09-30T15:09:00Z'));
+    try {
+      const { app, env } = makeApp(db);
+      const res = await app.request('/api/booking/admin/bookings.csv?account_id=acc1&status=all', {}, env);
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-disposition')).toBe('attachment; filename="booking-ledger-20261001-by-owner-1-20260930T150900000Z.csv"');
+    } finally { vi.useRealTimers(); }
+  });
+
   test('BOM付きCSV・注記行に絞り込みと上限を書く', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1', status: 'confirmed', source: 'liff' });
     insertBooking(sqlite, { id: 'B2', customer: 'customer-1', staff: 's2', menu: 'm2', status: 'completed', source: 'phone' });
