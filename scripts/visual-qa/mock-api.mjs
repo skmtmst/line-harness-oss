@@ -2259,8 +2259,8 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
   { const ab = broadcastAbWrite(method, pathname); if (ab) return ab }
   { const style = styleSetupWrite(method, pathname); if (style) return style }
   /*
-   * B-6 受信箱の添付（API-15・M0393「7. 添付」）：画像以外の準備（アップロード）は保存しないで同じ形を返す。
-   * B-26 右の欄でその場で直す：対応状況・担当・メモの更新は、送った値を当てた会話を返す（保存はしない）。
+   * 受信箱の添付（API-15・M0393「7. 添付」）：画像以外の準備（アップロード）は保存しないで同じ形を返す。
+   * 右の欄でその場で直す：対応状況・担当・メモの更新は、送った値を当てた会話を返す（保存はしない）。
    */
   if (method === 'POST' && /^\/api\/chats\/[^/]+\/attachments\/upload$/.test(pathname)) {
     return {
@@ -2349,7 +2349,7 @@ function visualQaWriteBody(method, pathname, query = new URLSearchParams()) {
     return { ...SCENARIO_SIMULATION, scenarioId: scenarioSimulation[1] }
   }
   if (method === 'PUT' && /^\/api\/scenarios\/[^/]+\/draft$/.test(pathname)) return SCENARIO_DRAFT
-  /* Al4Ek（B-177 ③）：シナリオの複製。止めたコピーを作って返す（保存はしない）。通・きっかけは取得の口が同じ形を返すので足さずに済む。 */
+  /* Al4Ek（③）：シナリオの複製。止めたコピーを作って返す（保存はしない）。通・きっかけは取得の口が同じ形を返すので足さずに済む。 */
   if ((method === 'POST' && pathname === '/api/scenarios') || (method === 'PUT' && pathname === '/api/scenarios/scenario-copy')) {
     return { ...FRIEND_SCENARIOS[0], id: 'scenario-copy', name: `${FRIEND_SCENARIOS[0].name} のコピー`, isActive: false }
   }
@@ -4157,7 +4157,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
       ['email', 'メール', 'email', 'sample@example.test'],
       ['tel', '電話', 'tel', '09012345678'],
       ['address', '住所', 'textarea', '東京都新宿区1-2'],
-      // B-235：基本の8つ目。値の中身は絵へ合わせず、複数の状態を見せる。
+      // 基本の8つ目。値の中身は絵へ合わせず、複数の状態を見せる。
       ['allergy', 'アレルギー', 'checkbox', JSON.stringify(['小麦', 'えび', 'くるみ'])],
     ]
     const basics = specs.map(([fixedKey, name, type, value], index) => ({
@@ -6706,7 +6706,7 @@ const server = createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader(
     'Access-Control-Allow-Headers',
-    // X-Filename は本物の口（ADMIN_REQUEST_HEADERS）と同じ。受信箱の添付（B-6）が送る。
+    // X-Filename は本物の口（ADMIN_REQUEST_HEADERS）と同じ。受信箱の添付が送る。
     'Content-Type, X-CSRF-Token, X-Admin-Session, Idempotency-Key, X-Confirm-Irreversible, X-Filename',
   )
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')

@@ -19,7 +19,7 @@ function diagnostics(samples: Sample[]) {
   const options: ts.CompilerOptions = {
     strict: true, noEmit: true, skipLibCheck: true, target: ts.ScriptTarget.ES2022,
     module: ts.ModuleKind.ESNext, moduleResolution: ts.ModuleResolutionKind.Bundler,
-    baseUrl: fileURLToPath(new URL('../../apps/web/', import.meta.url)), paths: { '@/*': ['./src/*'] },
+    baseUrl: fileURLToPath(new URL('../../apps/web', import.meta.url)), paths: { '@/*': ['./src/*'] },
   }
   const host = ts.createCompilerHost(options)
   const originalRead = host.readFile
