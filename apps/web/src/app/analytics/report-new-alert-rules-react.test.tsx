@@ -327,6 +327,7 @@ describe('定期レポートの作成後(R76)', () => {
     await render()
     await selectRecipient()
     await act(async () => { button('今すぐ1回だけ送る').click(); await Promise.resolve(); await Promise.resolve() })
+    await act(async () => { [...document.querySelectorAll<HTMLButtonElement>('[role=dialog] button')].find(el => el.textContent?.trim() === 'この宛先へ1回だけ送る')!.click(); await Promise.resolve(); await Promise.resolve() })
 
     expect(writeCalls('POST')).toHaveLength(1)
     expect((writeCalls('POST').at(-1)?.body as { sendOnce: boolean }).sendOnce).toBe(true)
