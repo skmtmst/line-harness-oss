@@ -151,7 +151,12 @@ export default function Step2Connect({
             <p className={styles.webhookUrlTitle}><LinkIcon size={14} aria-hidden="true" />musubo の Webhook URL</p>
             <p className={styles.precheckLead}>下のURLをコピーし、「Messaging API設定」のWebhook URLに貼り付けて「更新」を押します。</p>
             <div className={styles.webhookUrlRow}>
-              <Card surface="bordered" corner="control" contentPadding="var(--tpl-htn-endpoint-pad)">
+              {/* 承認済み v07 の枠 E01lkh（高さ36・左右12・角10）。余白は1語にまとめた変数では
+                  渡さない。Card は文字列を見て左右別々の余白かを決める（card.tsx の hasSides）ので、
+                  var() 1つだと共通の下限 16 と突き合わされて `max(16px, 8px 10px)` になり、
+                  CSS として成り立たず余白が 0 に落ちる（枠が1行ぶんに潰れて字が線に付く）。
+                  ⑤の同じ形の枠（register.tsx）と同じく、値を空白で分けて渡す。 */}
+              <Card layout="horizontal" surface="bordered" corner="control" contentPadding="var(--space-8) var(--space-12)">
                 <span className={styles.endpointValue}><TruncatedText value={WEBHOOK_URL || String(emptyValue('unknown'))} url /></span>
               </Card>
               <CopyTextButton value={WEBHOOK_URL} label="コピー" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="Webhook URL をコピー" disabled={!WEBHOOK_URL} />
