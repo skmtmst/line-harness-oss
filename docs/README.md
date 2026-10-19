@@ -584,3 +584,4 @@
 - [LINE接続の分離](release-log/unreleased/1778-masato-line-webhook-isolation.md)
 - [金額と電話番号の共通化](release-log/unreleased/0000-kenta-cleanup-q01f1.md)
 - [画面コードの置き場と名前の整理](release-log/unreleased/0000-kenta-cleanup-s02a.md)
+- [画面コード整理の検査記録](qa/cleanup-s02a-1019.md)
