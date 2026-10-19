@@ -53,7 +53,7 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
 
   it.each(V8_FOLDER_PAGES)('%s は共通の FolderPanel（ManagedFolderPanel）と追加操作を使う', (relativePath) => {
     const page = readFileSync(resolve(APP, relativePath), 'utf8')
-    const css = readFileSync(resolve(APP, relativePath.replace(/\.tsx$/, '.module.css')), 'utf8')
+    const css = readFileSync(resolve(APP, 'reminders/list-v8.module.css'), 'utf8')
     expect(page).toMatch(/<FolderPanel[\s\S]*?(onAddFolder|addFolderDisabled)|<ManagedFolderPanel[\s\S]*?canManage=/)
     expect(css).toMatch(/grid-template-columns:\s*200px minmax\(0, 1fr\)/)
     expect(css).toMatch(/@container[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/s)
