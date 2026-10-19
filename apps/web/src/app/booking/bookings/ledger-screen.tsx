@@ -779,7 +779,7 @@ function BookingDetailPanel({
             </DetailRow>
             <DetailRow label="担当">{b.staff_name}</DetailRow>
             <DetailRow label="料金">
-              <span className="tabular-nums">{formatYen(b.price_at_booking)}</span>
+              <span className="tabular-nums">¥{formatNumber(b.price_at_booking)}</span>
             </DetailRow>
             <DetailRow label="予約番号">
               <span className="text-ink-secondary font-mono text-xs">{b.id}</span>
@@ -793,7 +793,7 @@ function BookingDetailPanel({
             <p className="text-ink-faint mt-1 text-xs">顧客カルテの履歴は、友だち詳細で確認できます。前回のことを覚えていると、話が早くなります。</p>
             <div className="border-hairline mt-4 grid grid-cols-4 gap-3 border-b pb-2 text-xs text-ink-faint"><span>いつ・何を</span><span>担当</span><span>金額</span><span>メモ</span></div>
             {(detail?.history.length ? detail.history : [{ id: b.id, startsAt: b.starts_at, menuName: b.menu_name, staffName: b.staff_name, price: b.price_at_booking, customerNote: b.customer_note, handoverNote: null, status: b.status }]).slice(0, 3).map((item) => (
-              <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>{formatYen(item.price)}</span><span>{item.customerNote ?? '記入なし'}</span></div>
+              <div key={item.id} className="grid grid-cols-4 gap-3 py-3 text-sm"><span>{formatJpDateTime(item.startsAt)} {item.menuName}</span><span>{item.staffName}</span><span>¥{formatNumber(item.price)}</span><span>{item.customerNote ?? '記入なし'}</span></div>
             ))}
             {b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-action text-xs font-semibold hover:underline focus-visible:underline">顧客カルテで以前の予約を見る →</Link> : null}
           </section>
