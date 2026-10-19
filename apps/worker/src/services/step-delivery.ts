@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 export { messageToLogPayload } from './message-log-payload.js';
 import { messageToLogPayload } from './message-log-payload.js';
 export { expandVariables } from './message-interpolation.js';
@@ -329,8 +330,8 @@ async function processSingleDelivery(
   // (setHours/getDate が JST clock 通りに動くようにオフセット済みの Date)。
   // fs.started_at は "+09:00" 付き ISO で本物の UTC instant として parse されるため、
   // +9h ずらして JST clock-time 表現に揃える必要がある。
-  const enrolledAtDate = new Date(new Date(fs.started_at).getTime() + 9 * 60 * 60_000);
-  const nowJstDate = new Date(Date.now() + 9 * 60 * 60_000);
+  const enrolledAtDate = japanCalendar(new Date(new Date(fs.started_at).getTime()));
+  const nowJstDate = japanCalendar();
   const nextDeliveryFor = (step: { delay_minutes: number; offset_days: number | null; offset_minutes: number | null; delivery_time: string | null }): Date =>
     computeNextDeliveryAt(
       { delivery_mode: source.deliveryMode },

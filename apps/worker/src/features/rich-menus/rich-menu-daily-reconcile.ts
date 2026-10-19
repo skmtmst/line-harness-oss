@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import {
   countScheduledReconcileSince,
@@ -24,8 +25,7 @@ export type DailyReconcileDeps = {
 
 /** 日本日の始まり（台帳の started_at と同じ形）。その日の照合済み判定に使う。 */
 export function jstDayStart(now: Date): string {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const day = jst.toISOString().slice(0, 10);
+  const day = japanDate(now);
   return `${day}T00:00:00.000`;
 }
 

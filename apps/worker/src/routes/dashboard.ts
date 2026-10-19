@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { fetchQuota } from '../services/dashboard-quota.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -449,7 +450,7 @@ dashboard.get('/api/dashboard/upcoming', async (c) => {
 
 /** 日本時間の今日 0:00。失敗の「今日ぶん」の既定の境目。 */
 function jstDayStart(now: Date): string {
-  return `${new Date(now.getTime() + 9 * 3_600_000).toISOString().slice(0, 10)}T00:00:00+09:00`;
+  return `${japanDate(now)}T00:00:00+09:00`;
 }
 
 /**

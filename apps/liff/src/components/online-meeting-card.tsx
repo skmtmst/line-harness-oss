@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { useEffect, useState } from 'react';
 import { api, type BookingHistoryItem } from '../lib/api.js';
 import Icon from './ui/icon.js';
@@ -26,7 +27,7 @@ export function meetingProvider(url: string | null | undefined): string | null {
 }
 
 function hm(ms: number): string {
-  const d = new Date(ms + 9 * 60 * 60 * 1000);
+  const d = japanCalendar(new Date(ms));
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }
 

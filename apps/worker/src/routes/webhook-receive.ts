@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { workflowLineClient } from '../services/workflow-line-client.js';
 
@@ -77,7 +78,7 @@ export const post__webhook_1 = async (c: Context<Env>) => {
     try {
       await db
         .prepare(`UPDATE line_accounts SET last_webhook_received_at = ? WHERE id = ?`)
-        .bind(new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, -1) + '+09:00', matchedAccountId)
+        .bind(japanCalendar().toISOString().slice(0, -1) + '+09:00', matchedAccountId)
         .run();
     } catch (stampError) {
       logger.error("routes_webhook_failed");

@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import type { MileageAdminHistoryItem, MileageHistoryItem } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
 
@@ -185,7 +186,7 @@ export function formatMileageMonthDay(value: string | null): string {
   if (!value) return '—'
   const time = new Date(value).getTime()
   if (Number.isNaN(time)) return '—'
-  const jst = new Date(time + 9 * 60 * 60 * 1000)
+  const jst = japanCalendar(new Date(time))
   return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`
 }
 
@@ -193,7 +194,7 @@ export function formatMileageShortDateTime(value: string | null): string {
   if (!value) return '—'
   const time = new Date(value).getTime()
   if (Number.isNaN(time)) return '—'
-  const jst = new Date(time + 9 * 60 * 60 * 1000)
+  const jst = japanCalendar(new Date(time))
   const minutes = String(jst.getUTCMinutes()).padStart(2, '0')
   return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${jst.getUTCHours()}:${minutes}`
 }

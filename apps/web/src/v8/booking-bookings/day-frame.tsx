@@ -1,5 +1,6 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import type { ReactNode } from 'react'
 import { CalendarDays, CalendarPlus, CalendarX, CircleAlert, Clock, Info, MessageSquare, User } from 'lucide-react'
 import { BookingPage, BookingSidebarLinks, BookingSidebarNotes, BookingSidebarSection } from '@/components/templates/booking-page'
@@ -43,7 +44,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
   const value = (count: number) => ready ? count : null
   const next = ready ? summary.next : undefined
   const day = formatDay(`${date}T00:00:00+09:00`)
-  const formatMonthDay = (iso: string) => { const d = new Date(Date.parse(iso) + 9 * 3600000); return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}` }
+  const formatMonthDay = (iso: string) => { const d = japanCalendar(new Date(Date.parse(iso))); return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}` }
   const period = date === jstDate() ? '今日' : day
   const stats = <KpiBand layout="booking">
     <KpiCard presentation="band" icon={<CalendarDays size={16} aria-hidden />} title={`${period}の${words.noun}`} value={value(summary.active)} unit="件" detail={ready ? `LINE ${summary.line}・電話 ${summary.phone}${summary.other ? `・その他 ${summary.other}` : ''}` : '読み込んでいます'} />

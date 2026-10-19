@@ -1,3 +1,4 @@
+import { jstDate as japanDate, jstCalendar as japanCalendar } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 import type { Context } from 'hono';
@@ -692,8 +693,8 @@ export function runPeriod(period: string | undefined, from: string | undefined, 
     return { from: from ? `${from}T00:00:00+09:00` : null, to: to ? new Date(Date.parse(`${to}T00:00:00+09:00`) + 86400000).toISOString() : null };
   }
   const now = new Date();
-  const jst = new Date(now.getTime() + 9 * 3600000);
-  const day = jst.toISOString().slice(0, 10);
+  const jst = japanCalendar(now);
+  const day = japanDate(now);
   const month = day.slice(0, 7);
   if (!period || period === 'all') return { from: null, to: null };
   if (period === 'last28days') return { from: new Date(now.getTime() - 28 * 86400000).toISOString(), to: null };

@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { validateConditionForStorage } from './scenario-condition-validation.js';
 import { inputError } from '../lib/input-errors.js';
@@ -384,8 +385,8 @@ export const get__api_scenarios_id_preview_4 = async (c: Context<Env, "/api/scen
     // +9h ずらして JST clock-time 表現に揃える。default の now も同様にずらして表現する。
     // （正しさは入口で見ているので、ここでは読むだけ。）
     const startAt = startParam
-      ? new Date(new Date(startParam).getTime() + 9 * 60 * 60_000)
-      : new Date(Date.now() + 9 * 60 * 60_000);
+      ? japanCalendar(new Date(startParam))
+      : japanCalendar();
 
     // Day N はカレンダー日数差で算出。経過 24h 単位だと、enrolledAt 14:32 →
     // 翌日 09:00 (18.5h 後) が Day 0 と表示されてしまう (本来 Day 1)。

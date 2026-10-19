@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import {
   computeNextDeliveryAt,
   DEFAULT_TENANT_ID,
@@ -801,7 +802,7 @@ function jstClockLabel(date: Date): string {
 
 /** "+09:00" 付き ISO（実 instant）を JST clock-time 表現の Date へ戻す。 */
 function toJstClockDate(value: string): Date {
-  return new Date(new Date(value).getTime() + 9 * 60 * 60_000);
+  return japanCalendar(new Date(value));
 }
 
 /** 分岐条件を読む人向けの文にする。タグIDは名前へ解決する。 */
@@ -1011,7 +1012,7 @@ export async function simulateFriendPlan(
 
   const planSteps: ScenarioFriendPlanStep[] = [];
   if (deliverableSteps.length > 0) {
-    const nowJst = new Date(Date.now() + 9 * 60 * 60_000);
+    const nowJst = japanCalendar();
     const startAt = input.startAt ? new Date(input.startAt) : null;
     if (input.startAt && (!startAt || !Number.isFinite(startAt.getTime()))) {
       throw new ScenarioContractError('start_at_invalid', '開始日時が正しくありません', 400, 'startAt');

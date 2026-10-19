@@ -1,4 +1,5 @@
 'use client'
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { type CustomerMileageState } from '@/components/shared/customer-info-mileage'
 import { type FriendUpcoming } from '@/lib/api'
 import { formAnswerText } from '@/lib/form-answer'
@@ -46,7 +47,7 @@ export const DEFAULT_SECTION_ORDER = DETAIL_SETTING_GROUPS.flatMap((group) => gr
 /** ★V8 顔の下の「2025年8月14日に友だち追加」。日本時間の暦で書く。 */
 export function formatAddedDate(iso: string | null): string {
   if (!iso) return '友だち追加日は未登録'
-  const d = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000)
+  const d = japanCalendar(new Date(iso))
   if (Number.isNaN(d.getTime())) return '友だち追加日は未登録'
   return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日に友だち追加`
 }

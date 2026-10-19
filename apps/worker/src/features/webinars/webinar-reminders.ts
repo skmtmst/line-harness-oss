@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 // ウェビナー予約リマインド — 5分毎 cron から実行。
 // セッション選択メニュー (webinar_registrations) で予約した友だちに、開始
@@ -46,7 +47,7 @@ export function buildWebinarUrl(
 }
 
 function fmtJstDateTime(epochSeconds: number): string {
-  const d = new Date((epochSeconds + 9 * 3600) * 1000);
+  const d = japanCalendar(new Date((epochSeconds) * 1000));
   const days = ['日', '月', '火', '水', '木', '金', '土'];
   return (
     `${d.getUTCMonth() + 1}月${d.getUTCDate()}日(${days[d.getUTCDay()]}) ` +

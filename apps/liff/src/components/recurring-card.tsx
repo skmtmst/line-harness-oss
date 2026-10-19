@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
@@ -10,7 +11,7 @@ export type RecurrenceChoice = { index: number; action: 'keep' | 'skip' | 'alter
 export type RecurrenceValue = { count: number; choices: RecurrenceChoice[]; made: number } | null;
 
 type Occurrence = { index: number; starts_at: string; available: boolean; reason?: string; alternatives: string[] };
-const jstDay = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3_600_000).toISOString().slice(0, 10);
+const jstDay = (iso: string) => japanDate(new Date(iso));
 const label = (iso: string) => `${utcToJstMd(iso)}（${formatWeekday(jstDay(iso))}）${utcToJstHm(iso)}`;
 
 /**

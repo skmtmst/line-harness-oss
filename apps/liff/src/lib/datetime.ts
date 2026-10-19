@@ -1,7 +1,6 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 // All helpers operate in JST. The Worker accepts UTC ISO8601 — we convert
 // at the boundary (jstStartsAtIso) before posting.
-
-const JST_OFFSET_MS = 9 * 3600_000;
 
 export { jstDate as jstToday } from '@line-crm/shared';
 
@@ -42,7 +41,7 @@ export function addMinutesHm(hhmm: string, minutes: number): string {
 }
 
 function jstParts(utcIso: string): string {
-  return new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
+  return japanCalendar(new Date(utcIso)).toISOString();
 }
 
 /** UTC ISO → '10/1' (JST)。履歴の日付の四角で使う。 */
@@ -111,6 +110,6 @@ export function jstStartsAtIso(date: string, hhmm: string): string {
 }
 
 export function utcToJstDisplay(utcIso: string): string {
-  const d = new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
+  const d = japanCalendar(new Date(utcIso)).toISOString();
   return `${d.slice(0, 10)} ${d.slice(11, 16)}`;
 }

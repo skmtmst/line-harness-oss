@@ -1,4 +1,6 @@
 'use client'
+
+import { jstDate as japanDate } from '@/lib/jst-datetime'
 import { localJst, toJstIso } from './video-time'
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
@@ -508,7 +510,7 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
       const cursor = new Date(`${from}T00:00:00+09:00`)
       const end = new Date(`${to}T00:00:00+09:00`)
       while (cursor <= end && rules.length < 31) {
-        const day = new Date(cursor.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        const day = japanDate(cursor)
         rules.push({ type: 'once', at: toJstIso(`${day}T${time}`) })
         cursor.setTime(cursor.getTime() + 24 * 60 * 60 * 1000)
       }

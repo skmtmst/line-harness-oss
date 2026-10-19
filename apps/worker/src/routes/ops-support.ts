@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -79,7 +80,7 @@ function safeKeys(raw: string): string[] {
 }
 
 function jstMonthStarts(): { monthStart: string; prevMonthStart: string } {
-  const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const now = japanCalendar();
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   const fmt = (yy: number, mm: number) => `${yy}-${String(mm + 1).padStart(2, '0')}-01T00:00:00.000+09:00`;

@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import type { Context } from 'hono';
 import { listWebhookInteractions } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -36,7 +37,7 @@ export async function exportWebhookInteractions(c: Context<Env>, lineAccountId: 
     accountIds: [lineAccountId],
     accountCounts: { [lineAccountId]: result.items.length },
   });
-  const date = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const date = japanDate();
   return new Response('\uFEFF' + lines.map(row => row.map(cell).join(',')).join('\r\n'), {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',

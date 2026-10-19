@@ -1,5 +1,6 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { scheduledJstIso } from '@/lib/jst-datetime';
 import type { HqBroadcastInput, HqBroadcastRun, SegmentCondition } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message';
@@ -47,7 +48,7 @@ function jstIso(date: string, time: string): string | null {
 function splitJst(iso: string): { date: string; time: string } | null {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
-  const j = new Date(d.getTime() + 9 * 60 * 60 * 1000)
+  const j = japanCalendar(d)
   return { date: `${j.getUTCFullYear()}-${String(j.getUTCMonth() + 1).padStart(2, '0')}-${String(j.getUTCDate()).padStart(2, '0')}`, time: `${String(j.getUTCHours()).padStart(2, '0')}:${String(j.getUTCMinutes()).padStart(2, '0')}` }
 }
 

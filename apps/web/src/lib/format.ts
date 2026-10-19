@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * （2026-10-09）：管理画面の日付と数は、この共通書式を使う。
  * 一覧は MM/DD HH:mm、過去の別年は YYYY/MM/DD。
@@ -22,7 +23,7 @@ interface JstParts {
 }
 
 function jstParts(epoch: number): JstParts {
-  const j = new Date(epoch + JST_OFFSET_MS)
+  const j = japanCalendar(new Date(epoch))
   return {
     y: j.getUTCFullYear(),
     m: j.getUTCMonth() + 1,

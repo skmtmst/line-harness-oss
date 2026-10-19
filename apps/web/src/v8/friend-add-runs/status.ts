@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * 友だち追加時の配信の実行結果で使う、状態の言葉・CSV の1マス・時刻の書き方。
  * 写し元：`app/friend-add-settings/runs/run-status.ts`・`csv.ts`（src/v8 からは import できないので写した）。
@@ -77,7 +78,7 @@ export function jstParts(value: string | null): { month: number; day: number; hh
   }
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return null
-  const jst = new Date(parsed.getTime() + 9 * 60 * 60 * 1000)
+  const jst = japanCalendar(parsed)
   const pad = (n: number) => String(n).padStart(2, '0')
   return {
     month: jst.getUTCMonth() + 1, day: jst.getUTCDate(),

@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate as japanDate } from '@/lib/jst-datetime'
+
 import Card from '@/components/shared/card'
 
 import { useState } from 'react'
@@ -35,7 +37,7 @@ export default function SeriesPanelSection({ series, bookings, accountId, custom
   const rule = (() => { try { return JSON.parse(series.rule_json) as { freq: 'weekly' | 'biweekly' | 'monthly_nth' } } catch { return { freq: 'weekly' as const } } })()
   const here = sorted.find((b) => b.id === bookingId)
   const target = { seriesId: series.id, customerName, ruleText: ruleLabel(rule.freq, startsAt), menuName, index: (here?.series_index ?? 0) + 1, bookingId, startsAt }
-  const jstDay = new Date(new Date(startsAt).getTime() + 9 * 3_600_000).toISOString().slice(0, 10)
+  const jstDay = japanDate(new Date(startsAt))
   const newStartsAt = `${jstDay}T${time}:00+09:00`
 
   return (

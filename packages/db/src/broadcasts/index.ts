@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import {markInsightFailed} from '../broadcast-insight-retry.js';
 export {markInsightFailed} from '../broadcast-insight-retry.js';
 import { sqlIdSet } from '../id-queries.js';
@@ -598,7 +599,7 @@ export async function updateInsightResult(
     result.delivered && result.uniqueClick
       ? result.uniqueClick / result.delivered
       : null;
-  const now = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString();
+  const now = japanCalendar().toISOString();
   await db
     .prepare(
       `UPDATE broadcast_insights

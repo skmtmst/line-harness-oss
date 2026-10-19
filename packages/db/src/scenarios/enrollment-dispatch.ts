@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import type { FriendScenario } from '../friend-scenario-types.js';
 import { accountFeatureOffExclusionSql } from '../account-settings.js';
 import { jstNow } from '../utils.js';
@@ -49,7 +50,7 @@ export async function claimFriendScenarioForDelivery(
  * Crash recovery: reset friend_scenarios stuck in 'delivering' for over 5 minutes back to 'active'.
  */
 export async function recoverStuckDeliveries(db: D1Database): Promise<number> {
-  const fiveMinAgo = new Date(Date.now() + 9 * 60 * 60_000 - 5 * 60_000);
+  const fiveMinAgo = japanCalendar(new Date(Date.now() - 5 * 60_000));
   const threshold = fiveMinAgo.toISOString().slice(0, -1) + '+09:00';
   // 機能オフ中のアカウントの行は回収しない。OFF中は status も updated_at も
   // 動かさず delivering のまま残し、再オンの tick で回収する。

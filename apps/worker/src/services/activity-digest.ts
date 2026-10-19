@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
   computeUnansweredInbox,
@@ -94,7 +95,7 @@ export function parseActivityDigestHours(value: string | undefined): number | nu
 }
 
 function formatJstSqlTimestamp(date: Date): string {
-  const jst = new Date(date.getTime() + 9 * 60 * 60_000).toISOString();
+  const jst = japanCalendar(date).toISOString();
   return jst.slice(0, -1);
 }
 

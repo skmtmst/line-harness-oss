@@ -1,5 +1,8 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { jstDate as japanDate } from '@/lib/jst-datetime'
+
 import KpiBand from '@/components/shared/kpi-band'
 import { BookingPageStats, BookingPageContent } from '@/components/templates/booking-page'
 import { CalendarDays, CalendarPlus, CircleAlert, CalendarX } from 'lucide-react'
@@ -44,7 +47,7 @@ export interface CalendarAvailability {
 }
 
 function jstDay(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3_600_000).toISOString().slice(0, 10)
+  return japanDate(new Date(iso))
 }
 
 function todayKey(): string {
@@ -69,7 +72,7 @@ function dateLabel(day: string): string {
 const sep = '\u0000'
 
 function bookingHour(booking: BookingRequest): number {
-  return new Date(new Date(booking.starts_at).getTime() + 9 * 3_600_000).getUTCHours()
+  return japanCalendar(new Date(new Date(booking.starts_at).getTime())).getUTCHours()
 }
 
 function bookingTime(booking: BookingRequest): string {

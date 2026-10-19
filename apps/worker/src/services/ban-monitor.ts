@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * BAN検知モニター — cronトリガーで定期実行
@@ -210,7 +211,7 @@ async function returnRecoveredAccountsToPools(db: D1Database): Promise<void> {
   const switchedOut = await listAutoSwitchedOutPoolAccounts(db);
   // account_health_logs.created_at は JST(+09:00) 表記。同じ形で比べる。
   const since =
-    new Date(Date.now() - POOL_RETURN_NORMAL_MS + 9 * 60 * 60 * 1000)
+    japanCalendar(new Date(Date.now() - POOL_RETURN_NORMAL_MS))
       .toISOString()
       .slice(0, -1) + '+09:00';
 

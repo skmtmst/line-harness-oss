@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import type { TodaySeatRow } from '../booking-today-seat-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 
@@ -125,8 +126,7 @@ export async function getTodaySeatReservations(
 }
 
 export function jstDateString(now: Date): string {
-  const jst = new Date(now.getTime() + 9 * 3600_000);
-  return jst.toISOString().slice(0, 10);
+  return japanDate(now);
 }
 
 export const VISIT_KINDS = ['visited', 'late', 'no_show'] as const;

@@ -1,8 +1,9 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 export type ReportPeriod = 'this_month' | 'last_month' | 'all'
 
 /** 集計と表示の月境界を日本時間にそろえる。 */
 export function reportMonthKey(shift: number, now = Date.now()): string {
-  const jst = new Date(now + 9 * 3600_000)
+  const jst = japanCalendar(new Date(now))
   return new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + shift, 1)).toISOString().slice(0, 7)
 }
 

@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
@@ -409,7 +410,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
             : sidebarItemOrder,
         },
       });
-      const now = new Date(Date.now() + 9 * 60 * 60_000)
+      const now = japanCalendar()
         .toISOString()
         .replace('Z', '+09:00');
       const bundleExists = await getVersionedAccountSetting(
@@ -554,7 +555,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
        * どちらも起こさない（N-444）。
        */
       const staff = c.get('staff');
-      const now = new Date(Date.now() + 9 * 60 * 60_000)
+      const now = japanCalendar()
         .toISOString()
         .replace('Z', '+09:00');
       const catalogValue = JSON.stringify(catalog);

@@ -1,5 +1,6 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -43,7 +44,7 @@ export function contentSourceLabel(step: PreviewStep): string | null {
 
 function nowJstAsLocalInput(): string {
   // JST clock-time as YYYY-MM-DDTHH:MM for DateTimeField
-  const d = new Date(Date.now() + 9 * 60 * 60_000)
+  const d = japanCalendar()
   return d.toISOString().slice(0, 16)
 }
 

@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import {g2OpenAiAvailable} from '../services/account-ai-features.js';
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
@@ -11,7 +12,7 @@ aiDrafts.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code
 async function settings(c:Context<Env>,a:string){
  const counts=await c.env.DB.prepare("SELECT count(CASE WHEN status='published' THEN 1 END) publishedQaCount,count(CASE WHEN status='draft' THEN 1 END) draftQaCount FROM qa_entries WHERE account_id=?").bind(a).first();
  const configured=await aiSettings(c.env.DB,a);
- const start=new Date(`${new Date(Date.now()+9*3600000).toISOString().slice(0,7)}-01T00:00:00+09:00`).toISOString();
+ const start=new Date(`${japanCalendar().toISOString().slice(0,7)}-01T00:00:00+09:00`).toISOString();
  const usage=await c.env.DB.prepare("SELECT count(*) n FROM ai_answer_logs WHERE account_id=? AND id LIKE 'ai-sim:%' AND action='answered' AND julianday(created_at)>=julianday(?)").bind(a,start).first<{n:number}>();
  const limit=(await c.env.DB.prepare('SELECT monthly_limit_answers FROM ai_settings WHERE account_id=?').bind(a).first<{monthly_limit_answers:number}>())?.monthly_limit_answers??3000;
  const used=usage?.n??0;

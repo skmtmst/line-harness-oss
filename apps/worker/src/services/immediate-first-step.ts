@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { decorateTapExtras } from './tap-extra-links.js';
 import {
@@ -285,7 +286,7 @@ export async function pushImmediateFirstStep(
     // elapsed/absolute_time modes have offset/clock-time semantics — cron
     // owns those. Checked BEFORE claiming/enrolling so non-immediate
     // enrollments are left untouched.
-    const enrolledAtJst = new Date(Date.now() + 9 * 60 * 60_000);
+    const enrolledAtJst = japanCalendar();
     const isImmediate = (source: ScenarioDeliverySource, firstStep: PinnedScenarioStep) => {
       const firstScheduledAt = computeNextDeliveryAt(
         { delivery_mode: source.deliveryMode },

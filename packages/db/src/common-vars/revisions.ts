@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { jstNow } from '../utils.js';
 import { type CommonVarExpiryBehavior, type CommonVar } from './record-types.js';
 import { getCommonVarById, CommonVarVersionConflictError, CommonVarReasonRequiredError, assertCommonVarFolder, CommonVarStatusTransitionError, getCommonVarByIdIncludingArchived } from './definitions.js';
@@ -14,7 +15,7 @@ export function formatVarStampJst(value: string | null): string {
   if (!value) return '制限なし';
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) return value;
-  const jst = new Date(ms + 9 * 60 * 60_000);
+  const jst = japanCalendar(new Date(ms));
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${pad(jst.getUTCHours())}:${pad(jst.getUTCMinutes())}`;
 }

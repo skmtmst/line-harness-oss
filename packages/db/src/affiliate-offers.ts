@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from './id-queries.js';
 import { readFolderAssignment } from './folder-assignment.js';
@@ -1030,7 +1031,7 @@ export async function createOfferVersion(
  */
 export function jstMonthRange(at?: string): { start: string; end: string } {
   const base = at ? new Date(at) : new Date();
-  const jst = new Date(base.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(base);
   const year = jst.getUTCFullYear();
   const month = jst.getUTCMonth();
   const pad = (n: number) => String(n).padStart(2, '0');

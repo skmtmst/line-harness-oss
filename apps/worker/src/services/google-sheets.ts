@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
 /**
@@ -448,7 +449,7 @@ export interface SyncOneResult {
 }
 
 function jstDate(iso: string): string {
-  return new Date(Date.parse(iso) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate(new Date(iso));
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));

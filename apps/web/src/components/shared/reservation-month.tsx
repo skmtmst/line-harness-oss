@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDate as japanDate } from '@/lib/jst-datetime'
+
 import type { ReservationBoardEntry } from '@line-crm/shared'
 import { formatDate } from '@/lib/format'
 import Button from './button'
@@ -21,7 +23,7 @@ export default function ReservationMonth({ month, entries, onOpen, readableNames
     {Array.from({ length: count }, (_, index) => {
       const date = `${month}-${String(index + 1).padStart(2, '0')}`
       return <div key={date}><strong>{index + 1}日</strong>{entries.filter(entry =>
-        new Date(Date.parse(entry.startsAt) + 9 * 3600000).toISOString().slice(0, 10) === date,
+        japanDate(new Date(entry.startsAt)) === date,
       ).map(entry => {
         const label = `${formatDate(entry.startsAt, { style: 'time' })} ${entry.customerName}`
         if (!readableNames) return <Button presentation="restaurant" key={entry.id} onClick={() => onOpen(entry.id)}>{label}</Button>

@@ -1,4 +1,5 @@
 'use client'
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -11,14 +12,14 @@ import Notice from '@/components/shared/notice'
 function jstMonthDay(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  const jst = new Date(date.getTime() + 9 * 3600_000)
+  const jst = japanCalendar(date)
   return `${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`
 }
 
 function jstDateTime(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return ''
-  const jst = new Date(date.getTime() + 9 * 3600_000)
+  const jst = japanCalendar(date)
   const pad = (value: number) => String(value).padStart(2, '0')
   return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()} ${pad(jst.getUTCHours())}:${pad(jst.getUTCMinutes())}`
 }

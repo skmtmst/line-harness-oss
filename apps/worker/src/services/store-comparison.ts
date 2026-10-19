@@ -1,3 +1,4 @@
+import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import {GapError} from './gap-common.js';
 export const comparisonKeys=['friendChange','blockRate','clickRate','bookings','visits','noShowRate','responseMinutes']as const;
 export type ComparisonKey=typeof comparisonKeys[number];
@@ -14,7 +15,7 @@ export async function snapshotStoreMetrics(db:D1Database,a:string,day:string,now
  await db.prepare(`INSERT INTO hq_store_daily_metrics(account_id,date,bookings,visits,no_shows,first_response_median_minutes,first_response_count,state,computed_at) VALUES(?,?,?,?,?,?,?,'partial',?) ON CONFLICT(account_id,date) DO UPDATE SET bookings=excluded.bookings,visits=excluded.visits,no_shows=excluded.no_shows,first_response_median_minutes=excluded.first_response_median_minutes,first_response_count=excluded.first_response_count,state='partial',computed_at=excluded.computed_at`).bind(a,day,bookingEnabled?count?.bookings??0:null,bookingEnabled?count?.visits??0:null,bookingEnabled?count?.no_shows??0:null,median,response.length,now.toISOString()).run();
 }
 export function comparisonPeriod(from?:string,to?:string){
- const end=to??new Date(Date.now()+9*3600000-86400000).toISOString().slice(0,10),start=from??new Date(Date.parse(end)-29*86400000).toISOString().slice(0,10);
+ const end=to??japanDateOffset(-1),start=from??new Date(Date.parse(end)-29*86400000).toISOString().slice(0,10);
  if(![start,end].every(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s)||start>end||Date.parse(end)-Date.parse(start)>366*86400000)throw new GapError('invalid_period');return {from:start,to:end,days:1+(Date.parse(end)-Date.parse(start))/86400000};
 }
 export async function storeNumbers(db:D1Database,a:string,period:ReturnType<typeof comparisonPeriod>){
@@ -32,7 +33,7 @@ export async function storeNumbers(db:D1Database,a:string,period:ReturnType<type
 
 /** Work through stores independently, retrying a failed store after one hour. */
 export async function processStoreComparison(db:D1Database,now=new Date()){
- const day=new Date(now.getTime()+9*3600000-86400000).toISOString().slice(0,10);
+ const day=japanDateOffset(-1, now);
  const account=await db.prepare(`SELECT a.id FROM line_accounts a WHERE a.is_active=1 AND a.archived_at IS NULL AND NOT EXISTS(SELECT 1 FROM hq_store_daily_metrics m WHERE m.account_id=a.id AND m.date=? AND (m.state!='failed' OR julianday(m.computed_at)>julianday(?,'-1 hour'))) ORDER BY a.id LIMIT 1`).bind(day,now.toISOString()).first<{id:string}>();
  if(!account)return;
  try{await snapshotStoreMetrics(db,account.id,day,now);}catch(error){

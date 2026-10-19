@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { serialize } from './entry-route-display.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -418,7 +419,7 @@ entryRoutes.post('/api/entry-routes/:id/qr-pdf', requireEntryRouteManagement(), 
       ? await getLineAccountById(c.env.DB, existing.line_account_id)
       : null;
     const accountName = account?.name?.trim() || existing.name;
-    const jst = new Date(Date.now() + 9 * 3_600_000).toISOString();
+    const jst = japanCalendar().toISOString();
     const issuedAt = `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
     const coupon = existing.coupon_enabled === 1 && existing.coupon_asset_id && existing.line_account_id
       ? await availableEntryCoupon(c.env.DB, existing.coupon_asset_id, existing.line_account_id) : null;

@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { LineClient } from '@line-crm/line-sdk';
 import {
@@ -136,7 +137,7 @@ export async function deliverAnnouncement(env: Env['Bindings'], a: PlatformAnnou
 }
 
 function nowJst(): string {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+  return japanCalendar().toISOString().replace('Z', '+09:00');
 }
 
 /** cron: 公開日時を過ぎた予約を 1 回の実行で 1 件ずつ送る。 */

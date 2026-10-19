@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@/lib/jst-datetime'
 import { type BookingRequest } from '@/lib/api'
 
 import { formatDate, formatDateTime, formatDay, formatTime } from '@/lib/format'
@@ -99,7 +100,7 @@ export function formatJpDay(iso: string): string {
 }
 
 export function jstDay(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+  return japanDate(new Date(iso))
 }
 
 /**

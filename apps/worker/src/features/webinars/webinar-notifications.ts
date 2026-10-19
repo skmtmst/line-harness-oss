@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import {
   activeTenantLineAccountSql,
@@ -137,7 +138,7 @@ function formatTime(minutes: number): string {
 }
 
 function jstDayAt(sessionStartAt: number, dayOffset: number, minutes: number): number {
-  const local = new Date((sessionStartAt + JST_SECONDS) * 1000);
+  const local = japanCalendar(new Date((sessionStartAt) * 1000));
   return Math.floor(Date.UTC(
     local.getUTCFullYear(),
     local.getUTCMonth(),
@@ -440,7 +441,7 @@ export async function enqueueWebinarCompletedNotification(
 }
 
 function formatJstDateTime(epochSeconds: number): string {
-  const d = new Date((epochSeconds + JST_SECONDS) * 1000);
+  const d = japanCalendar(new Date((epochSeconds) * 1000));
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${weekdays[d.getUTCDay()]}）${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
 }

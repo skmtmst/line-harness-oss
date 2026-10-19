@@ -1,5 +1,6 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { requiredText } from '@/lib/form-requirement'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { jstDate } from '@/lib/jst-datetime'
@@ -18,7 +19,7 @@ export function historyStamp(value: string): string {
 /** 「いま」より前は予約できない。入れた瞬間に当たって、予約に見えない。 */
 export function jstNowLocalInput(): { date: string; time: string } {
   const now = new Date()
-  const jst = new Date(now.getTime() + 9 * 3600_000).toISOString()
+  const jst = japanCalendar(now).toISOString()
   return { date: jstDate(now), time: jst.slice(11, 16) }
 }
 
@@ -26,14 +27,14 @@ export function utcToJstLocalInput(value: string | null): string {
   if (!value) return ''
   const parsed = new Date(value)
   if (!Number.isFinite(parsed.getTime())) return ''
-  return new Date(parsed.getTime() + 9 * 3600_000).toISOString().slice(0, 16)
+  return japanCalendar(parsed).toISOString().slice(0, 16)
 }
 
 /** 競合の帯の時刻。「14:02」の形（板 ）。 */
 export function formatHourMinute(value: string): string | null {
   const parsed = new Date(value)
   if (!Number.isFinite(parsed.getTime())) return null
-  const jst = new Date(parsed.getTime() + 9 * 3600_000)
+  const jst = japanCalendar(parsed)
   return `${String(jst.getUTCHours()).padStart(2, '0')}:${String(jst.getUTCMinutes()).padStart(2, '0')}`
 }
 

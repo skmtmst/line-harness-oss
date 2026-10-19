@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { parseJsonArray } from './broadcast-json.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -377,7 +378,7 @@ export const post__api_broadcasts_id_test_send_3 = async (c: Context<Env, "/api/
 
   let sent = 0;
   let failed = 0;
-  const now = new Date(Date.now() + 9 * 60 * 60_000).toISOString().replace('Z', '+09:00');
+  const now = japanCalendar().toISOString().replace('Z', '+09:00');
 
   for (const friend of friends.results) {
     try {

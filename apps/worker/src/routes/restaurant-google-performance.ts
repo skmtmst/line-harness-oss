@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第4段：パフォーマンス表示（GB-9 Zq8DN）。
@@ -34,7 +35,7 @@ interface MetricsRow {
 }
 
 function jstToday(): string {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate();
 }
 
 function daysBefore(isoDate: string, days: number): string {

@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { sqlIdSet } from './id-queries.js';
 /**
  * account_settings table helpers.
@@ -63,7 +64,7 @@ export async function setAccountSetting(
   value: string,
 ): Promise<void> {
   const id = crypto.randomUUID();
-  const now = new Date(Date.now() + 9 * 60 * 60_000)
+  const now = japanCalendar()
     .toISOString()
     .replace('Z', '+09:00');
 
@@ -111,7 +112,7 @@ export async function saveVersionedAccountSetting<T>(
     data: input.data,
   };
   const value = JSON.stringify(next);
-  const now = new Date(Date.now() + 9 * 60 * 60_000)
+  const now = japanCalendar()
     .toISOString()
     .replace('Z', '+09:00');
 

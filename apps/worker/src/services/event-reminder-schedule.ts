@@ -1,9 +1,9 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 export type { ComputedReminder, ComputeRemindersInput } from './event-reminder-types.js';
 import type { ComputedReminder, ComputeRemindersInput } from './event-reminder-types.js';
 import { prepareEventReminders } from './event-reminder-plan.js';
 import type { EventReminderKind } from './event-booking-types.js';
 
-const JST_OFFSET_MS = 9 * 3600_000;
 
 // Reminders that fall in the past are dropped. Pure function, no DB.
 export function computeRemindersForBooking(input: ComputeRemindersInput): ComputedReminder[] {
@@ -13,7 +13,7 @@ export function computeRemindersForBooking(input: ComputeRemindersInput): Comput
 
   if (input.reminder_day_before_enabled) {
     // 前日 18:00 JST = 09:00 UTC of the day before starts_at(JST)
-    const startJst = new Date(startMs + JST_OFFSET_MS);
+    const startJst = japanCalendar(new Date(startMs));
     const dayBeforeUtc = new Date(
       Date.UTC(
         startJst.getUTCFullYear(),

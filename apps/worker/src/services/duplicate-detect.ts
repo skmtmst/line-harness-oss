@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 /**
  * Cross-account duplicate friend detection via LINE profile picture URL tokens.
@@ -51,7 +52,7 @@ async function ensureTags(
   tagNames: Record<string, { name: string; color: string }>
 ): Promise<void> {
   if (Object.keys(tagNames).length === 0) return;
-  const now = new Date(Date.now() + 9 * 60 * 60_000).toISOString().replace('Z', '+09:00');
+  const now = japanCalendar().toISOString().replace('Z', '+09:00');
   for (const [id, { name, color }] of Object.entries(tagNames)) {
     const existing = await findTagByNormalizedName(db, name, null);
     if (existing && existing.id !== id) {
@@ -153,7 +154,7 @@ export async function processDuplicateDetection(db: D1Database): Promise<void> {
   }
 
   // Update last run timestamp
-  const now = new Date(Date.now() + 9 * 60 * 60_000).toISOString().replace('Z', '+09:00');
+  const now = japanCalendar().toISOString().replace('Z', '+09:00');
   await db.prepare(
     `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
      VALUES (?, 'system', 'duplicate_detect_last_run', ?, ?, ?)

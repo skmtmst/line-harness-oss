@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
@@ -216,7 +217,7 @@ async function normalizedSearchHash(value: string): Promise<string> {
 
 /** UTCで保存した受信時刻を、日本の月境界に合わせて集計する。 */
 function currentJstMonthUtcRange(now: Date): { from: string; to: string } {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(now);
   const year = jst.getUTCFullYear();
   const month = jst.getUTCMonth();
   const from = new Date(Date.UTC(year, month, 1) - 9 * 60 * 60 * 1000).toISOString();

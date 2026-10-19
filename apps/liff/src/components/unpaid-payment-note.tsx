@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import Icon from './ui/icon.js';
 import { formatWeekday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 
@@ -10,7 +11,7 @@ export function holdDeadlineText(holdUntil: string): string {
 }
 
 function utcToJstDateKey(iso: string): string {
-  return new Date(Date.parse(iso) + 9 * 3600_000).toISOString().slice(0, 10);
+  return japanDate(new Date(iso));
 }
 
 export default function UnpaidPaymentNote({ holdUntil, after = '過ぎると予約は取り消され、枠はほかの方に回ります' }: { holdUntil: string | null; after?: string }) {

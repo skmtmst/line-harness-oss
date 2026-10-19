@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 /**
  * リマインダを自動で登録する。
@@ -111,7 +112,7 @@ export function resolveAnchor(rule: ReminderTriggerRow, startsAtIso: string): st
   // リマインダそのものが黙って消える。
   if (!match) return shifted.toISOString();
 
-  const jst = new Date(shifted.getTime() + JST_OFFSET_MS);
+  const jst = japanCalendar(shifted);
   jst.setUTCHours(Number(match[1]), Number(match[2]), 0, 0);
   return new Date(jst.getTime() - JST_OFFSET_MS).toISOString();
 }

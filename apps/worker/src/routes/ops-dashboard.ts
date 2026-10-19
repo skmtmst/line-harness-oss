@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { Hono } from 'hono';
 import {
   billingRevenueTotals,
@@ -35,10 +36,8 @@ opsDashboard.use('/api/ops/dashboard', requirePlatformAdmin());
 
 export type DashboardPeriod = 'month' | 'prev_month' | 'year';
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-
 function jstParts(at = Date.now()): { y: number; m: number; d: number } {
-  const t = new Date(at + JST_OFFSET_MS);
+  const t = japanCalendar(new Date(at));
   return { y: t.getUTCFullYear(), m: t.getUTCMonth(), d: t.getUTCDate() };
 }
 
@@ -50,7 +49,7 @@ export function jstMonthStart(y: number, m: number): string {
 }
 
 export function jstIso(at: number): string {
-  const t = new Date(at + JST_OFFSET_MS);
+  const t = japanCalendar(new Date(at));
   const pad = (n: number, w = 2) => String(n).padStart(w, '0');
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}T${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:${pad(t.getUTCSeconds())}.${pad(t.getUTCMilliseconds(), 3)}+09:00`;
 }

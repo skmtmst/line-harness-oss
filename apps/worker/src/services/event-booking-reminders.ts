@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { recoverEventTransitions } from './event-transition-recovery.js';
 import type { AccountStyle } from '@line-crm/shared';
 import { recoverEventBookingNotifications } from './event-notification-recovery.js';
@@ -46,7 +47,7 @@ interface DueEventReminderRow {
 }
 
 function startsAtJstFmt(utcIso: string): string {
-  const jst = new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
+  const jst = japanCalendar(new Date(utcIso)).toISOString();
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
 }
 

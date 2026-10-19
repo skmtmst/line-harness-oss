@@ -1,5 +1,7 @@
 'use client'
 
+import { jstCalendar as japanCalendar, jstDate as japanDate } from '@/lib/jst-datetime'
+
 import { copyBroadcastDraft,copyRecentBroadcast } from './broadcast-copy-draft'
 
 import { applyBroadcastTemplate } from './broadcast-apply-template'
@@ -471,9 +473,9 @@ export default function BroadcastForm({
 
       // 予約日時。保存値はUTC、入力は一覧と同じ日本時間（EVENT-05と同じ決めごと）。
       if (draft.scheduledAt) {
-        const jst = new Date(new Date(draft.scheduledAt).getTime() + 9 * 60 * 60 * 1000)
+        const jst = japanCalendar(new Date(draft.scheduledAt))
         setSendMode('scheduled')
-        setScheduledDate(jst.toISOString().slice(0, 10))
+        setScheduledDate(japanDate(new Date(draft.scheduledAt)))
         setScheduledTime(jst.toISOString().slice(11, 16))
       }
 

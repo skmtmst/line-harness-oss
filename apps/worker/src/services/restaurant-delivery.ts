@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { jstDate as japanDate } from '@line-crm/shared';
 export type { DeliveryService } from './delivery-service-types.js';
 export { DELIVERY_SERVICES } from './delivery-service-types.js';
 import { DELIVERY_SERVICES } from './delivery-service-types.js';
@@ -185,7 +187,7 @@ export function intakeStopUntil(preset: IntakeStopPreset, now: number): number {
   if (preset === '60m') return now + 60 * 60;
   if (preset === '90m') return now + 90 * 60;
   // 「本日中」= 日本時間のその日の 23:59:59 まで。
-  const jst = new Date((now + 9 * 3600) * 1000);
+  const jst = japanCalendar(new Date((now) * 1000));
   const endOfDayJst = Date.UTC(
     jst.getUTCFullYear(),
     jst.getUTCMonth(),
@@ -206,7 +208,7 @@ const DATE_TEXT_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /** エポック秒を日本時間の `YYYY-MM-DD` にする。 */
 export function tokyoDateText(now: number): string {
-  return new Date((now + JST_OFFSET_SECONDS) * 1000).toISOString().slice(0, 10);
+  return japanDate(new Date(now * 1000));
 }
 
 export interface TokyoDayRange {

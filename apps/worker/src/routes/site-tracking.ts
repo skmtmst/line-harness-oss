@@ -1,3 +1,4 @@
+import { jstDate as japanDate, jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { visibleAccountId } from './site-tracking-scope.js';
 import { consumePublicIngressReceipt, getMeasurementSite, siteAllowsHost, normalizeSiteHost } from '@line-crm/db';
@@ -361,11 +362,11 @@ siteTracking.get('/api/site/pages', requireRole('owner', 'admin', 'staff'), asyn
   const accountId = await visibleAccountId(c);
   if (typeof accountId !== 'string') return accountId;
   try {
-    const jstNow = new Date(Date.now() + 9 * 3600_000);
-    const to = c.req.query('to') ?? jstNow.toISOString().slice(0, 10);
+    const now = new Date();
+    const to = c.req.query('to') ?? japanDate(now);
     const from =
       c.req.query('from') ??
-      new Date(jstNow.getTime() - 30 * 24 * 3600_000).toISOString().slice(0, 10);
+      japanDateOffset(-30, now);
     if (!isExistingCalendarDate(from) || !isExistingCalendarDate(to)) {
       return c.json({ success: false, error: '期間は 2026-08-01 の形で指定してください' }, 400);
     }

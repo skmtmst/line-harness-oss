@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * 来店スタンプ（V8 w4SBbv）の見せ方の決まり。画面から切り離した純粋な関数だけを置く（試験は display.test.ts）。
  * 設定の形は @line-crm/shared の VisitStampSettings（サーバと同じ）。ここで形を変えない。
@@ -65,7 +66,7 @@ export function expiryLabel(months: number | null, basis: VisitStampSettings['ex
 }
 export function previewExpiry(months: number | null, basis: VisitStampSettings['expiryBasis'], at = new Date()): string {
   if(months === null || basis === 'none') return '期限なし'
-  const date = new Date(at.getTime() + 9 * 3_600_000), day = date.getUTCDate()
+  const date = japanCalendar(at), day = date.getUTCDate()
   date.setUTCDate(1); date.setUTCMonth(date.getUTCMonth() + months)
   date.setUTCDate(Math.min(day, new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate()))
   const label = polishFormatDate(new Date(date.getTime() - 9 * 3_600_000), { style: 'list-day' })

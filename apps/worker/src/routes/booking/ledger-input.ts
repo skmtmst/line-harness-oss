@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { type Context } from 'hono';
 import type { Env } from '../../worker-env.js';
 
@@ -88,7 +89,7 @@ export function csvTimestamp(iso: string | null): string {
   const time = new Date(iso).getTime();
   if (Number.isNaN(time)) return '';
   // 台帳をExcel等で開いたときに読みやすいよう JST 表記で出す。
-  return new Date(time + 9 * 3600_000).toISOString().slice(0, 16).replace('T', ' ');
+  return japanCalendar(new Date(time)).toISOString().slice(0, 16).replace('T', ' ');
 }
 
 /**

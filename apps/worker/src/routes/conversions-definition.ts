@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { hasStaffAccess } from '@line-crm/shared';
@@ -71,7 +72,7 @@ export function conversionContractError(c: Context<Env>, error: unknown): Respon
 }
 
 export function jstDate(date: Date): string {
-  return new Date(date.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate(date);
 }
 
 export function parseDate(value: string | undefined): Date | null {
