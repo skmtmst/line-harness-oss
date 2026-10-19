@@ -1,8 +1,10 @@
+> 文書：コンバージョン（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # コンバージョン（V8）の動き
 
 入口：
-- 一覧 `app/conversions/page.tsx`（V8 のときだけ `src/v8/conversions/list.tsx`。成果とアフィリエイトのタブ `?tab=affiliates|offers|approvals|payment|report` は今までどおり `/affiliates` へ移す）
-- 作る `app/conversions/new/page.tsx`（V8 のときだけ `src/v8/conversions/create.tsx`。先に分けるので、V8 では v7 の画面の読み込みは走らない）
+- 一覧 `app/conversions/page.tsx`（V8専用で `src/v8/conversions/list.tsx`。成果とアフィリエイトのタブ `?tab=affiliates|offers|approvals|payment|report` は今までどおり `/affiliates` へ移す）
+- 作る `app/conversions/new/page.tsx`（V8専用で `src/v8/conversions/create.tsx`。入口はV8の画面を直接読み込む）
 
 絵：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・状態の見本帳 `E2l8cw`、作る `j8p3yj`・競合 `cXqlS`。
 

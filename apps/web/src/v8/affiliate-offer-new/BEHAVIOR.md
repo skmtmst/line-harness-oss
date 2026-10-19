@@ -1,3 +1,5 @@
+> 文書：案件を作るの動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 案件を作るの動き（BEHAVIOR.md）
 
 対象：今までの画面 `app/affiliate-offers/new-offer-v8.tsx`。ここから動きを写して `create.tsx` を一から書いた。見た目は作る型（CreatePage）で組んだ。

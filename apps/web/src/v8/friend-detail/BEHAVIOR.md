@@ -1,3 +1,5 @@
+> 文書：友だち詳細の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 友だち詳細の動き（BEHAVIOR.md）
 
 対象：`app/friends/detail/page.tsx` の `FriendDetailInner`（約1,840行の1部品）。その動きを写して、`src/v8/friend-detail/` にタブごとのファイルで一から書いた。見た目は Pencil「★P1-4 友だち詳細」`Q5F2QE`（概要は `JCDRm`）。

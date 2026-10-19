@@ -1,3 +1,5 @@
+> 文書：23 EC連携 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 23 EC連携 操作と挙動（受け入れ）
 
 要件の正本：[V6 23 EC連携 要件定義](../../v6-requirements/v6-23-ec-integration-requirements-draft.md)。共通の動き・権限は [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限、§6-2 再試行、§9 未取得の表示、§11 応答コード、§15 進み・トースト）と [30 ログインユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。

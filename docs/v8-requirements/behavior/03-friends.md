@@ -1,3 +1,5 @@
+> 文書：03 友だち 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 03 友だち 操作と挙動（受け入れ）
 
 要件：[V6 3 友だち 要件定義](../../v6-requirements/v6-03-friends-requirements-draft.md)・[友だちの決まった欄と表示項目](../friend-fixed-fields.md)・共通の動き [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限・§6-2 再試行・§9 未取得・§11 応答コード・§15 進み・トースト）・権限モデル [30 ログインユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。見た目は [V8 の決まり](../../v8-design-rules.md)。
