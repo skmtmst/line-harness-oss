@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * 予約台帳（l9NlC0・Z3FoM・・xzCK6）の表示の形。今の画面
  * （app/restaurant-test/v8/reservations.tsx・reservation-phone.tsx）から写し、絵の書き方に合わせた。
@@ -126,7 +127,7 @@ export function floorOrder(a: RestaurantTable, b: RestaurantTable): number {
 
 export function minutesOf(value: string): number {
   const date = new Date(value)
-  const jst=new Date(date.getTime()+9*3600000)
+  const jst=japanCalendar(date)
   return jst.getUTCHours() * 60 + jst.getUTCMinutes()
 }
 

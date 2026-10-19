@@ -1,4 +1,5 @@
 'use client'
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { getApiErrorCode } from '@/lib/api'
 
 /*
@@ -20,13 +21,12 @@ import {
 } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 
-const JST_OFFSET_MS = 9 * 3600_000
 
 /** UTC ISO → datetime-local（日本時間の壁時計）。 */
 export function isoToLocalInput(iso: string): string {
   const time = Date.parse(iso)
   if (!Number.isFinite(time)) return ''
-  const jst = new Date(time + JST_OFFSET_MS).toISOString()
+  const jst = japanCalendar(new Date(time)).toISOString()
   return jst.slice(0, 16)
 }
 

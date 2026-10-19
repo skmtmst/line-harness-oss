@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../worker-env.js';
 
@@ -75,7 +77,7 @@ export async function runSixHourlyHeavyJobs(
       name: 'media usage scan',
       run: async () => {
         const { scanMediaUsage } = await import('../features/media/media-usage-scan/index.js');
-        const scanStartedAt = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
+        const scanStartedAt = japanCalendar().toISOString().replace('Z', '');
         const result = await scanMediaUsage(env.DB, scanStartedAt);
         if (result.matched > 0 || result.pruned > 0) {
           logger.log("media_usage_scan");
@@ -134,8 +136,7 @@ export async function runSixHourlyHeavyJobs(
       name: 'ad cost import',
       run: async () => {
         const { importAdCosts } = await import('../services/ad-cost-import.js');
-        const day = new Date(Date.now() + 9 * 3600_000 - 24 * 3600_000)
-          .toISOString().slice(0, 10);
+        const day = japanDateOffset(-1);
         const result = await importAdCosts(env.DB, {
           day,
           credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,

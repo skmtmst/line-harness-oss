@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { parseExecutionDateRange } from '@line-crm/shared';
 import { getHqBroadcastRun, readHqBroadcastResult } from '../../services/hq-broadcasts.js';
 import { StampError } from '../../services/visit-stamps.js';
@@ -45,7 +46,7 @@ export async function hqBroadcastQuota(db:D1Database,tenantId:string) {
     let v:{line?:{remaining?:number;used?:number;limit?:number}}={};try{v=JSON.parse(a.value_json??'{}')??{};}catch{ /* Unreadable measurements are unknown. */ }
     const observed=a.observed_at?Date.parse(a.observed_at):NaN;
     const fresh=Number.isFinite(observed)&&observed<=Date.now()&&Date.now()-observed<=15*60*1000
-      &&new Date(observed+9*3600000).toISOString().slice(0,7)===new Date(Date.now()+9*3600000).toISOString().slice(0,7);
+      &&japanCalendar(new Date(observed)).toISOString().slice(0,7)===japanCalendar().toISOString().slice(0,7);
     const value=(n:unknown)=>fresh&&typeof n==='number'&&Number.isFinite(n)&&n>=0?n:null;
     return {accountId:a.id,accountName:a.name,remaining:value(v.line?.remaining),used:value(v.line?.used),limit:value(v.line?.limit),observedAt:a.observed_at,fresh};
   });

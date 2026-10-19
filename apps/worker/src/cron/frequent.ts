@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sweepOperatorPush, retryOperatorPush } from '../services/operator-push.js';
 
@@ -166,7 +167,7 @@ export async function runFrequentHeavyJobs(
       name: 'platform announcements',
       run: async () => {
         const { processDueAnnouncements } = await import('../services/platform-announcements.js');
-        const result = await processDueAnnouncements(env, { now: new Date(event.scheduledTime + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00') });
+        const result = await processDueAnnouncements(env, { now: japanCalendar(new Date(event.scheduledTime)).toISOString().replace('Z', '+09:00') });
         if (result.sent > 0) logger.log("platform_announcements_cron");
       },
     },

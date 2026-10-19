@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import type { Env } from '../worker-env.js';
 
@@ -57,12 +58,12 @@ export async function scheduled(
       {name:'restaurant events',run:()=>processRestaurantEvents(env)},
       {name:'customer segments and ranks',run:async()=>{
         const now=new Date(event.scheduledTime);
-        if(new Date(now.getTime()+9*3600000).getUTCHours()<4)return;
+        if(japanCalendar(now).getUTCHours()<4)return;
         const {processCustomerSegments}=await import('../services/customer-segments.js');
         await processCustomerSegments(env.DB,now);
       }},
       {name:'store comparison snapshots',run:async()=>{
-        const now=new Date(event.scheduledTime),jst=new Date(now.getTime()+9*3600000);
+        const now=new Date(event.scheduledTime),jst=japanCalendar(now);
         if(jst.getUTCHours()*60+jst.getUTCMinutes()<270)return;
         const {processStoreComparison}=await import('../services/store-comparison.js');
         await processStoreComparison(env.DB,now);
@@ -405,7 +406,7 @@ export async function scheduled(
   try {
     await observeDispatch('common variable schedules', async () => {
       const { applyDueCommonVarSchedules } = await import('@line-crm/db');
-      const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
+      const jstNowIso = japanCalendar().toISOString().replace('Z', '');
       const applied = await applyDueCommonVarSchedules(env.DB, jstNowIso);
       if (applied > 0) logger.log("common_var_schedule_applied");
     });

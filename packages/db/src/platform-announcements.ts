@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { bumpAuthThrottle } from './auth-email.js';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow, nextVersionToken } from './utils.js';
@@ -351,7 +352,7 @@ export async function issueStaffLineLinkCode(db: D1Database, staffId: string, tt
     .bind(staffId, now)
     .first<{ code: string; expires_at: string }>();
   if (existing) return { code: existing.code, expiresAt: existing.expires_at };
-  const expiresAt = new Date(Date.now() + ttlMs + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+  const expiresAt = japanCalendar(new Date(Date.now() + ttlMs)).toISOString().replace('Z', '+09:00');
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = randomCode();
     try {

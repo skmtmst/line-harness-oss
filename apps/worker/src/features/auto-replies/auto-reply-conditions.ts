@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { toJstParts, type HolidayRule } from '@line-crm/shared';
 
@@ -58,7 +59,7 @@ export interface AutoReplyConditionRow {
 
 /** JSTの現在時刻を "HH:MM" で返す。 */
 export function jstHhmm(now: Date): string {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(now);
   const h = String(jst.getUTCHours()).padStart(2, '0');
   const m = String(jst.getUTCMinutes()).padStart(2, '0');
   return `${h}:${m}`;
@@ -184,7 +185,7 @@ export async function isCoolingDown(
 ): Promise<boolean> {
   if (!cooldownMinutes || cooldownMinutes <= 0) return false;
   // messages_log.created_at は JST の文字列。比較する境界も同じ形にする。
-  const since = new Date(now.getTime() + 9 * 60 * 60 * 1000 - cooldownMinutes * 60 * 1000)
+  const since = japanCalendar(new Date(now.getTime() - cooldownMinutes * 60 * 1000))
     .toISOString()
     .replace('Z', '');
   // idx_messages_log_friend_source があるので friend_id + source は索引で引ける。

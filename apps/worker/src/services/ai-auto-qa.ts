@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import {maskAiText} from './ai-drafts.js';
 import {GapError} from './gap-common.js';
 
@@ -54,7 +55,7 @@ export async function simulateQa(db:D1Database,input:{account:string;chatId:stri
   if(human)reason='customer_requested';else if(settings.mode==='suspended')reason='suspended';else if(typing)reason='typing';
   if(reason)decision={action:'handed_off',handoffReason:reason,qa:null};
  }
- const monthStart=new Date(`${new Date(now.getTime()+9*3600000).toISOString().slice(0,7)}-01T00:00:00+09:00`).toISOString();
+ const monthStart=new Date(`${japanCalendar(now).toISOString().slice(0,7)}-01T00:00:00+09:00`).toISOString();
  // The event row, monthly cap and per-person cap share one transaction. No check-then-insert race.
  const countSql="SELECT count(*) FROM ai_answer_logs WHERE account_id=? AND action='answered' AND id LIKE 'ai-sim:%' AND julianday(created_at)>=julianday(?)";
  const guard=decision.action==='answered'?` AND (${countSql})<(SELECT monthly_limit_answers FROM ai_settings WHERE account_id=?) AND (SELECT count(*) FROM ai_answer_logs WHERE account_id=? AND friend_id=? AND action='answered' AND id LIKE 'ai-sim:%' AND julianday(created_at)>julianday(?,'-30 minutes'))<3 AND EXISTS(SELECT 1 FROM qa_entries WHERE id=? AND account_id=? AND status='published' AND version=?) AND EXISTS(SELECT 1 FROM ai_settings WHERE account_id=? AND mode='auto_qa' AND confidence_threshold<=1) AND NOT EXISTS(SELECT 1 FROM ai_answer_logs WHERE account_id=? AND friend_id=? AND action='customer_asked_human' AND julianday(created_at)>julianday(?,'-24 hours')) AND NOT EXISTS(SELECT 1 FROM inbox_reply_leases WHERE channel='line' AND conversation_id=? AND julianday(expires_at)>julianday(?))`:'';

@@ -8,7 +8,7 @@
  */
 import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 const { nenPets } = await import('./nen-pets.js');
@@ -17,8 +17,8 @@ const ACCOUNT = 'account-nen';
 let sql: Database.Database;
 let db: D1Database;
 
-const day = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
-const stamp = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 19).replace('T', ' ');
+const day = (daysAgo: number) => new Date(Date.parse('2026-10-20T00:00:00Z') - daysAgo * 86_400_000).toISOString().slice(0, 10);
+const stamp = (daysAgo: number) => new Date(Date.parse('2026-10-20T00:09:00Z') - daysAgo * 86_400_000).toISOString().slice(0, 19).replace('T', ' ');
 const birthdayYearsAgo = (years: number) => {
   const d = new Date(); d.setUTCFullYear(d.getUTCFullYear() - years); d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
@@ -82,6 +82,8 @@ async function get(path: string, role: 'owner' | 'admin' | 'staff' = 'owner', te
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-19T15:09:00Z')); // 日本の10月20日00:09。見本の日付もこの暦日。
   const created = createTestD1();
   sql = created.raw;
   db = created.db;
@@ -295,4 +297,23 @@ describe('GET /api/nen/health（★37-4 健康日記）', () => {
     expect(summary.status).toBe(200);
     expect(summary.body.data.pet.animalType).toBe('other');
   });
+});
+
+
+afterEach(() => vi.useRealTimers());
+it.each(['2026-09-30T15:00:00Z', '2026-09-30T23:59:59Z'])('日本の月初の朝に前月のペットや7日前より古い日記を混ぜない: %s', async (at) => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(at));
+  sql.prepare("UPDATE nen_pet_profiles SET created_at='2026-09-15T00:00:00+09:00'").run();
+  sql.prepare("UPDATE nen_pet_profiles SET created_at='2026-10-01T00:01:00+09:00' WHERE id='pet-momo'").run();
+  const pets = await get(`/api/nen/pets?accountId=${ACCOUNT}`);
+  expect(pets.status).toBe(200);
+  expect(pets.body.data.kpis.newThisMonth).toBe(1);
+  for (const [id, day] of [['old', '2026-09-23'], ['edge', '2026-09-24'], ['today', '2026-10-01']]) {
+    sql.prepare("INSERT INTO nen_health_logs(id,pet_id,friend_id,logged_on,weight_kg,stool_status,appetite,created_at) VALUES(?,'pet-momo','friend-a',?,10,'normal','normal','2026-10-01T00:00:00+09:00')").run(id, day);
+  }
+  const health = await get(`/api/nen/health?accountId=${ACCOUNT}`);
+  expect(health.status).toBe(200);
+  expect(health.body.data.kpis.recordsThisWeek).toBe(2);
+  expect(health.body.data.items.find((row: any) => row.pet.id === 'pet-momo').daysSinceLast).toBe(0);
 });

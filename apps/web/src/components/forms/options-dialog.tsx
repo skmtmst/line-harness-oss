@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset as japanDateOffset } from '@/lib/jst-datetime'
+
 /**
  * オプション設定。
  *
@@ -26,8 +28,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
  * そのまま保存されてしまうため、ONにした時点で実値を入れる。
  */
 function defaultDeadlineEndsAt(): string {
-  const jst = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 9 * 60 * 60 * 1000)
-  return `${jst.toISOString().slice(0, 10)}T23:59`
+  return `${japanDateOffset(7)}T23:59`
 }
 
 export default function OptionsDialog({

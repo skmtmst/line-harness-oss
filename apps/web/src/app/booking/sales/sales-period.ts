@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /**
  * 予約からの売上の期間と差分の言葉（ X26oo）。
  * 今日は JST。to は含まない（明日の日付を渡す）。
@@ -6,7 +7,7 @@
 export type SalesPeriodKey = 'week' | 'month' | 'quarter'
 
 function jstToday(): { year: number; month: number; date: number } {
-  const now = new Date(Date.now() + 9 * 3600_000)
+  const now = japanCalendar()
   return { year: now.getUTCFullYear(), month: now.getUTCMonth(), date: now.getUTCDate() }
 }
 

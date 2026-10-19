@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from './jst-datetime.js';
 import { isJapaneseHoliday } from './japanese-holidays';
 
 /**
@@ -59,7 +60,7 @@ function pad2(n: number): string {
 /** UTC の Date を、日本時間の暦日・曜日・その日の何分目かに分解する。 */
 export function toJstParts(at: Date): { date: string; weekday: number; minutes: number } {
   // getUTC* を使うのが肝。ローカルの getDay を使うと実行環境の時計に引きずられる。
-  const jst = new Date(at.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(at);
   return {
     date: `${jst.getUTCFullYear()}-${pad2(jst.getUTCMonth() + 1)}-${pad2(jst.getUTCDate())}`,
     weekday: jst.getUTCDay(),

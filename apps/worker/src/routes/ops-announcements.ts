@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -112,7 +113,7 @@ function parseInput(body: Record<string, unknown>): { input: AnnouncementInput }
   if (typeof body.publishAt === 'string' && body.publishAt.trim()) {
     const parsed = Date.parse(body.publishAt);
     if (Number.isNaN(parsed)) return { error: '公開日時の形式が正しくありません' };
-    publishAt = new Date(parsed + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+    publishAt = japanCalendar(new Date(parsed)).toISOString().replace('Z', '+09:00');
   }
   return { input: { subject, body: text, audienceKind, audiencePlans, audienceTenantIds, channels, publishAt } };
 }

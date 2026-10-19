@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import type { VisitStampSettings, VisitStampQr, VisitStampQrInput, VisitStampQrResult, VisitStampQrStatus } from '@line-crm/shared';
 import { calculateVisitStamps, canonicalStampFriend, readStampCard, readStampWallet, stampCard, stampFriend, stampId, stampIntervalCondition, storefrontStampIntervalCondition, stampExpiryExpression, stampWallet, getStampVisit, StampError } from './visit-stamps.js';
 
@@ -103,7 +104,7 @@ async function limitedResult(db:D1Database,row:QrRow,friendId:string,at:string,s
   const entries=boundVisit?"e.kind IN ('visit','manual') AND e.idempotency_key<>'@receipt-bonus'":"e.kind='visit' AND e.visit_key LIKE 'storefront:%'";
   const last=await db.prepare(`SELECT MAX(e.occurred_at) AS at FROM visit_stamp_entries e WHERE e.card_id=? AND e.friend_id=? AND ${entries}
     AND e.delta>0 AND NOT EXISTS(SELECT 1 FROM visit_stamp_entries r WHERE r.original_id=e.id AND r.kind='reverse')`).bind(row.card_id,friendId).first<{at:string|null}>();
-  const lastMs=Date.parse(last?.at??at),jst=new Date(lastMs+9*3600000);
+  const lastMs=Date.parse(last?.at??at),jst=japanCalendar(new Date(lastMs));
   const midnight=Date.UTC(jst.getUTCFullYear(),jst.getUTCMonth(),jst.getUTCDate()+1)-9*3600000;
   const hours=settings.stampInterval?.mode==='hours'?settings.stampInterval.hours!:0;
   const dailyLimit=!boundVisit||settings.stampInterval?.mode==='same_day';

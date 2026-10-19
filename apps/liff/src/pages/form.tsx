@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
 import { liffErrorMessage } from '../lib/api-error.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
@@ -698,7 +699,7 @@ export default function Form() {
           )}
 
           {firstPage && <FormReception availability={form.availability} />}
-          {routedPage && routedConfirm && routed?.status === 'ready' && routedPicked ? <RoutedConfirm target={routed.target} whenText={`${utcToJstMd(routedPicked)}（${formatWeekday(new Date(new Date(routedPicked).getTime() + 9 * 3_600_000).toISOString().slice(0, 10))}）${utcToJstHm(routedPicked)}`} /> : null}
+          {routedPage && routedConfirm && routed?.status === 'ready' && routedPicked ? <RoutedConfirm target={routed.target} whenText={`${utcToJstMd(routedPicked)}（${formatWeekday(japanDate(new Date(routedPicked)))}）${utcToJstHm(routedPicked)}`} /> : null}
           <div className={routedPage && routedConfirm ? 'hidden' : 'contents'}>{bodyBlocks.map((block) => blockView(block))}</div>
 
           {error && (
@@ -732,7 +733,7 @@ export default function Form() {
           disabled={sending || Object.values(uploading).some(Boolean) || (routedPage && routedNeedsPick)}
           style={{ backgroundColor: theme.main, color: submitButtonText(theme, hasCustomTheme), borderRadius: radius }}
         >
-          {sending ? '送信中...' : routedPage && routedEmpty ? `${words.contact}に問い合わせる` : routedPage && routedNeedsPick ? '日時を選んでください' : routedPage && routedPicked && routedConfirm ? 'この内容で送る' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(new Date(new Date(routedPicked).getTime() + 9 * 3_600_000).toISOString().slice(0, 10))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
+          {sending ? '送信中...' : routedPage && routedEmpty ? `${words.contact}に問い合わせる` : routedPage && routedNeedsPick ? '日時を選んでください' : routedPage && routedPicked && routedConfirm ? 'この内容で送る' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(japanDate(new Date(routedPicked)))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
         </Button>
 
       </BottomBar>

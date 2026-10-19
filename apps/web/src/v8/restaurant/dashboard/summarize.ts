@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * 「今日のお店」（E-1）と「枠を閉じる知らせ」（E-5）の数え方。画面から切り離して試験する。
  */
@@ -48,7 +49,7 @@ export function summarizeToday(rows: RestaurantReservation[], tables: Restaurant
   for (const r of live) {
     // 表の時刻（lib/format）と同じく、時差の無い文字は UTC として読む。ブラウザの時計で読むと日本では 9 時間ずれる。
     const iso = /Z$|[+-]\d{2}:?\d{2}$/i.test(r.starts_at) ? r.starts_at : `${r.starts_at.replace(' ', 'T')}Z`
-    const hour = new Date(Date.parse(iso) + 9 * 3600000).getUTCHours()
+    const hour = japanCalendar(new Date(Date.parse(iso))).getUTCHours()
     byHour.set(hour, (byHour.get(hour) ?? 0) + r.guest_count)
   }
   let peak: TodaySummary['peak'] = null
@@ -141,7 +142,7 @@ export function openItems(group: CloseGroup): CloseGroup['items'] {
 
 /** 枠の日時「1/13（火）19:00」。 */
 export function slotTitle(iso: string): string {
-  const day = new Date(Date.parse(iso)+9*3600000)
+  const day = japanCalendar(new Date(Date.parse(iso)))
   const week = '日月火水木金土'[day.getUTCDay()]
   return `${day.getUTCMonth() + 1}/${day.getUTCDate()}（${week}）${pad2(day.getUTCHours())}:${pad2(day.getUTCMinutes())}`
 }

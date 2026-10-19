@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import type { FriendScenario } from '../friend-scenario-types.js';
 import { jstNow } from '../utils.js';
 import { computeNextDeliveryAt } from '../scenario-schedule.js';
@@ -86,7 +87,7 @@ export async function resumeExistingFriendScenario(
   const nextStep = source.steps.find(s => s.step_order > existing.current_step_order);
   if (!nextStep) return null;
 
-  const nowDate = new Date(Date.now() + 9 * 60 * 60_000);
+  const nowDate = japanCalendar();
   const nextDeliveryDate = computeNextDeliveryAt(
     { delivery_mode: source.deliveryMode },
     nextStep,

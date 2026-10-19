@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 export type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
 import type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
 import type { EventOccurrenceApplicants } from './event-waitlist-types.js';
@@ -1108,7 +1109,7 @@ export async function processEventWaitlistPromotionJobs(
 }
 
 function formatJst(utcIso: string): string {
-  const jst = new Date(new Date(utcIso).getTime() + 9 * 3600_000).toISOString();
+  const jst = japanCalendar(new Date(utcIso)).toISOString();
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
 }
 
