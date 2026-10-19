@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { trustedChallengeUrl } from '@/test-utils/trusted-auth-handoff'
 import React, { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -43,6 +44,8 @@ async function settle() {
 }
 
 async function render() {
+  const url = trustedChallengeUrl('/login/two-factor' + window.location.search + window.location.hash)
+  window.history.replaceState(null, '', url)
   await act(async () => { root.render(<TwoFactorLoginPage />) })
   await settle()
 }

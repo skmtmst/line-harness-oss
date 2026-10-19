@@ -1812,6 +1812,7 @@ lineAccounts.patch(
       const loginChannelId = normalizeOptionalString(body.loginChannelId);
       const loginChannelSecret = normalizeOptionalString(body.loginChannelSecret);
       const liffId = normalizeOptionalString(body.liffId);
+    if (liffId && !/^\d+-[A-Za-z0-9]+$/.test(liffId)) return inputError(c, { success: false, error: 'LIFF IDを確認してください' }, 400, ['liffId']);
       const ogSiteName = normalizeOptionalString(body.ogSiteName);
       const ogDefaultImageUrl = normalizeOptionalString(body.ogDefaultImageUrl);
       const ogDefaultDescription = normalizeOptionalString(body.ogDefaultDescription);
@@ -1988,6 +1989,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
     const loginChannelId = normalizeOptionalString(body.loginChannelId);
     const loginChannelSecret = normalizeOptionalString(body.loginChannelSecret);
     const liffId = normalizeOptionalString(body.liffId);
+    if (liffId && !/^\d+-[A-Za-z0-9]+$/.test(liffId)) return inputError(c, { success: false, error: 'LIFF IDを確認してください' }, 400, ['liffId']);
     const ogSiteName = normalizeOptionalString(body.ogSiteName);
     const ogDefaultImageUrl = normalizeOptionalString(body.ogDefaultImageUrl);
     const ogDefaultDescription = normalizeOptionalString(body.ogDefaultDescription);

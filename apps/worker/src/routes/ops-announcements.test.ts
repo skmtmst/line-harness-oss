@@ -167,7 +167,8 @@ describe('契約者専用LINEの登録案内と紐づけ', () => {
     expect(await tryLinkStaffByCode(env(), { lineAccountId: 'ops-oa', friendId: 'f-a', text: '000000', reply })).toBe(true);
     expect(replies[0]).toContain('見つからない');
     expect(await tryLinkStaffByCode(env(), { lineAccountId: 'ops-oa', friendId: 'f-a', text: info.data.code, reply })).toBe(true);
-    expect(replies[1]).toContain('山田 太郎');
+    expect(replies[1]).toContain('紐づきました');
+    expect(replies[1]).not.toContain(ownerA.name);
     const row = testDb.raw.prepare(`SELECT notice_friend_id FROM staff_members WHERE id = 'owner-a'`).get() as { notice_friend_id: string };
     expect(row.notice_friend_id).toBe('f-a');
     const linked = await (await app(ownerA).request('/api/hq/notices/line-registration')).json() as { data: { linked: boolean; code: string | null } };

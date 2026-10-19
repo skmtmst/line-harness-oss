@@ -1,5 +1,7 @@
 'use client'
 
+import { csvCell } from '@/lib/presentation'
+
 import { useCallback, useEffect, useState } from 'react'
 import { useResponseGate } from '@/lib/use-response-gate'
 import { api, type BroadcastRecipientRow, type BroadcastRecipientsSummary } from '@/lib/api'
@@ -27,18 +29,14 @@ const GROUP_TONE: Record<BroadcastRecipientRow['group'], ChipTone> = {
   inflight: 'info',
 }
 
-function recipientCsv(rows: BroadcastRecipientRow[]): string {
-  const cell = (value: string | number | null) => {
-    const text = value == null ? '—' : String(value)
-    return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-  }
+export function recipientCsv(rows: BroadcastRecipientRow[]): string {
   const lines = [
     ['名前', '結果', '理由', 'LINEの要求ID', '送った時刻', '結果が決まった時刻'],
     ...rows.map((row) => [
       row.displayName, row.label, row.detail, row.lineRequestId, row.dispatchedAt, row.settledAt,
     ]),
   ]
-  return `\uFEFF${lines.map((line) => line.map(cell).join(',')).join('\r\n')}\r\n`
+  return `\uFEFF${lines.map((line) => line.map(value => csvCell(value ?? '—')).join(',')).join('\r\n')}\r\n`
 }
 
 /** CSV は 100件ずつ読む。これを超えて続きが残るときは、書き出さずに知らせる（ROOT29）。 */

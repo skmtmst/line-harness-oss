@@ -164,7 +164,7 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
                 const scanned = part.messageContent.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g, (m, key: string) => key in vars ? '' : m);
                 const extra = await resolveSendInterpolationExtra(db, friend.id, scanned, { kind: 'scenario', id: j.id });
                 const content = expandVariables(part.messageContent, { ...friend, metadata } as never, env.WORKER_PUBLIC_URL, part.messageType, { ...extra, vars: { ...extra.vars, ...vars }, deliveredAt: new Date() });
-                const tracked = await decorateForFriendPush(db, part.messageType, content, env.WORKER_PUBLIC_URL, { lineAccountId: j.line_account_id, friendId: j.friend_id });
+                const tracked = await decorateForFriendPush(db, part.messageType, content, env.WORKER_PUBLIC_URL, { lineAccountId: j.line_account_id, friendId: j.friend_id, sourceContent: part.messageContent });
                 messages.push(buildMessage(tracked.messageType, tracked.content));
             }
             // 返事の依頼はこの予約版で固定し、再試行は同じID・押し口を使う。

@@ -457,7 +457,7 @@ async function runFormPostEffects(input: {
       const { buildMessage, expandVariables } = await import('../services/step-delivery.js');
       const apiOrigin = input.origin;
       const { resolveMetadata } = await import('../services/step-delivery.js');
-      const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
+      const resolvedMeta = await resolveMetadata(db, friend);
       const friendData = {
         id: friend.id,
         display_name: friend.display_name,

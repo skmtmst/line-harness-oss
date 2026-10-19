@@ -174,7 +174,7 @@ export async function tryLinkStaffByCode(
     await input.reply('確認コードが見つからないか、期限が切れています。管理画面でもう一度コードを表示して、その 6 桁を送ってください。').catch(() => {});
     return true;
   }
-  await input.reply(`${linked.staffName} さんの管理画面と紐づきました。今後の大事なお知らせはここに届きます。`).catch(() => {});
+  await input.reply(`管理画面と紐づきました。今後の大事なお知らせはここに届きます。`).catch(() => {});
   return true;
 }
 

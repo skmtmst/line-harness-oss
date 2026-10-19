@@ -492,7 +492,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       'text',
       'welcome!',
       ctx.workerUrl,
-      { lineAccountId: null, friendId: 'friend-1' },
+      { lineAccountId: null, friendId: 'friend-1', sourceContent: 'welcome!' },
     );
     // What LINE receives AND what messages_log records is the decorated
     // message, mirroring the cron.
@@ -521,7 +521,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       'text',
       'welcome!',
       ctx.workerUrl,
-      { lineAccountId: 'acct-7', friendId: 'friend-1' },
+      { lineAccountId: 'acct-7', friendId: 'friend-1', sourceContent: 'welcome!' },
     );
   });
 
@@ -544,7 +544,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       'text',
       'welcome!',
       ctx.workerUrl,
-      { lineAccountId: 'acct-9', friendId: 'friend-1' },
+      { lineAccountId: 'acct-9', friendId: 'friend-1', sourceContent: 'welcome!' },
     );
   });
 
@@ -563,7 +563,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       'text',
       'welcome!',
       undefined,
-      { lineAccountId: null, friendId: 'friend-1' },
+      { lineAccountId: null, friendId: 'friend-1', sourceContent: 'welcome!' },
     );
     expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [{ type: 'text', text: 'welcome!' }], undefined);
   });

@@ -14,6 +14,19 @@ const base = { showMs: 1000, lcpMs: 300, pressMs: 67, longTaskMs: 50, jsBytes: 1
 const sample = { name: 'inbox', ...base }
 const stress = { name: 'friends-2000', rows: 2000, renderedRows: 25, showMs: 540, longTaskMs: 63 }
 
+for (const path of ['/api/dashboard/style', '/api/dashboard/style/warnings', '/api/dashboard/style/starter-items']) {
+  test(`local API fixture supports an empty HTTP request stream: ${path}`, async () => {
+    const { mockFetch } = await import('./mock-local.mjs')
+    const response = await mockFetch('GET', `${path}?account_id=visual-qa-account`)
+    assert.equal(response.status, 200, response.body)
+    const body = JSON.parse(response.body)
+    assert.equal(body.success, true)
+    assert.ok(body.data)
+    if (path !== '/api/dashboard/style') assert.ok(Array.isArray(body.data.items))
+    else assert.equal(typeof body.data.styleSelected, 'boolean')
+  })
+}
+
 test('5回を順に測り、2回の外れ値を除いた中央値と全測定値を保存する', async () => {
   const values = [67, 900, 66, 800, 68]
   let calls = 0

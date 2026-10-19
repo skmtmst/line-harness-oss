@@ -1,4 +1,6 @@
 'use client'
+
+import { twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 import { ArrowRight } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import PasswordField from '@/components/auth/password-field'
@@ -92,7 +94,7 @@ export default function OpsInviteV8() {
     resetAuthSelectionCleared(localStorage, sessionStorage)
     if (res.data.challengeToken) {
       const path = res.data.twoFactorSetup ? '/login/two-factor/setup' : '/login/two-factor';
-      window.location.assign(`${path}?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      window.location.assign(twoFactorChallengeHandoffPath(`${path}?next=ops`, res.data.challengeToken))
       return
     }
 

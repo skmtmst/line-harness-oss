@@ -1,9 +1,12 @@
+import { getCookie } from 'hono/cookie';
+import { bumpAuthThrottle } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { patchFriendMetadata } from '../services/friend-metadata.js';
 import { inputError } from '../lib/input-errors.js';
 import { redeemCoupon } from '../services/coupon-redemption.js';
 
-import { getFriendByLineUserIdForAccount, createUser, getUserByEmail, linkFriendToUser, getEntryRouteByRefCode, recordRefTracking, recordFriendAddAttributionCandidate, getLineAccounts } from '@line-crm/db';
+import { getFriendByLineUserIdForAccount, createUser, getUserByEmailForAccess, linkFriendToUser, getEntryRouteByRefCode, recordRefTracking, recordFriendAddAttributionCandidate, getLineAccounts } from '@line-crm/db';
 import { isStoppedEntryRouteRef, recordStopSuppressionSafe } from '../services/entry-route-stop.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import type { Env } from '../index.js';
@@ -118,6 +121,7 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
       ref?: string;
       existingUuid?: string;
       crossAccountToken?: string;
+      confirmCrossAccountLink?: boolean;
       ig?: string;
       iga?: string;
       igan?: string;
@@ -195,7 +199,9 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
         c.env.LINE_CHANNEL_SECRET,
         body.crossAccountToken,
       );
-      if (!crossAccount || !matchedAccount || crossAccount.targetAccountId !== matchedAccount.id) {
+      if (!crossAccount || !matchedAccount || crossAccount.targetAccountId !== matchedAccount.id
+        || !crossAccount.browserNonce || getCookie(c, '__Host-lh_cross_account') !== crossAccount.browserNonce
+        || body.confirmCrossAccountLink !== true || (linkedUserId && linkedUserId !== crossAccount.userId)) {
         return inputError(c, { success: false, error: 'Invalid cross-account token' }, 400, ["crossAccountToken"]);
       }
       const targetUser = await db
@@ -205,7 +211,8 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
       if (!targetUser) {
         return inputError(c, { success: false, error: 'Cross-account user not found' }, 400, ["crossAccountToken"]);
       }
-      await linkFriendToUser(db, friend.id, crossAccount.userId);
+      const consumed = await bumpAuthThrottle(db, `cross-account-used:${await tokenDigest(body.crossAccountToken)}`, 15 * 60_000);
+      if (consumed !== 1 || !await linkFriendToUser(db, friend.id, crossAccount.userId)) return inputError(c, { success: false, error: 'Invalid cross-account token' }, 400, ['crossAccountToken']);
       linkedUserId = crossAccount.userId;
     }
 
@@ -285,15 +292,18 @@ export const post__api_liff_link_3 = async (c: Context<Env, "/api/liff/link">) =
       });
     }
 
+    const identityTenant = matchedAccount?.tenant_id ?? DEFAULT_TENANT_ID;
+    const identityAccounts = dbAccounts.filter(a => (a.tenant_id ?? DEFAULT_TENANT_ID) === identityTenant).map(a => a.id);
     let userId: string | null = null;
     if (email) {
-      const existingUser = await getUserByEmail(db, email);
+      const existingUser = await getUserByEmailForAccess(db, email, { tenantId: identityTenant, allowedAccountIds: identityAccounts, includeUnlinked: true });
       if (existingUser) userId = existingUser.id;
     }
 
     if (!userId) {
       const newUser = await createUser(db, {
         email,
+        tenantId: identityTenant,
         displayName: body.displayName || verified.name,
       });
       userId = newUser.id;
@@ -573,3 +583,8 @@ export const get__api_analytics_ref_refCode_5 = async (c: Context<Env, "/api/ana
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 };
+
+async function tokenDigest(token: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)));
+  return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}

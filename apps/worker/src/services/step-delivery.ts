@@ -551,7 +551,7 @@ async function processSingleDelivery(
   };
 
   // Expand template variables ({{name}}, {{uid}}, {{auth_url:CHANNEL_ID}}, {{metadata.KEY}}, etc.)
-  const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
+  const resolvedMeta = await resolveMetadata(db, friend);
   const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
   // 質問の前文・選択肢文にも expandVariables が効くので、共通情報の
   // 厳格スキャンは本文と質問JSONを合わせた全体で行う。
@@ -581,6 +581,7 @@ async function processSingleDelivery(
   const tracked = await decorateForFriendPush(db, resolved.messageType, expandedContent, workerUrl, {
     lineAccountId: deliveryAccountId ?? null,
     friendId: friend.id,
+    sourceContent: resolved.messageContent,
   });
   /*
    * 質問メッセージなら、本文の代わりに選択肢つきのメッセージを組み立てる。
@@ -883,12 +884,13 @@ export async function evaluateCondition(
       }
       const parsed = raw as { key: string; value: unknown };
       const friend = await db
-        .prepare('SELECT user_id, metadata FROM friends WHERE id = ?')
+        .prepare('SELECT user_id, metadata, line_account_id FROM friends WHERE id = ?')
         .bind(friendId)
-        .first<{ user_id: string | null; metadata: string | null }>();
+        .first<{ user_id: string | null; metadata: string | null; line_account_id: string | null }>();
       const metadata = await resolveMetadata(db, {
         user_id: friend?.user_id ?? null,
         metadata: friend?.metadata ?? null,
+        line_account_id: friend?.line_account_id ?? null,
       });
       const actual = metadata[parsed.key];
       return step.condition_type === 'metadata_equals'

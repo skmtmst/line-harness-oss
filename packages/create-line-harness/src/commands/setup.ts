@@ -1,3 +1,4 @@
+import { writePrivateState } from '../lib/private-state.js';
 import * as p from "@clack/prompts";
 import pc from "picocolors";
 import { readFileSync, writeFileSync, existsSync, rmSync, unlinkSync } from "node:fs";
@@ -97,7 +98,7 @@ function loadState(repoDir: string): SetupState {
 }
 
 function saveState(repoDir: string, state: SetupState): void {
-  writeFileSync(getStatePath(repoDir), JSON.stringify(state, null, 2) + "\n");
+  writePrivateState(repoDir, getStatePath(repoDir), JSON.stringify(state, null, 2) + "\n");
 }
 
 function removeStateFile(repoDir: string): void {

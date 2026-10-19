@@ -399,7 +399,7 @@ export async function pushImmediateFirstStep(
       questionJson: firstStep.question_json ?? null,
     };
     const [resolvedMeta, ctxAccount] = await Promise.all([
-      resolveMetadata(db, { user_id: friend.user_id, metadata: friend.metadata }),
+      resolveMetadata(db, friend),
       ctx.accountChannelId ? getLineAccountByChannelId(db, ctx.accountChannelId) : null,
     ]);
     const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
@@ -448,7 +448,7 @@ export async function pushImmediateFirstStep(
         resolved.messageType,
         expanded,
         ctx.workerUrl,
-        { lineAccountId: friend.line_account_id ?? ctxAccount?.id ?? null, friendId },
+        { lineAccountId: friend.line_account_id ?? ctxAccount?.id ?? null, friendId, sourceContent: resolved.messageContent },
       );
       messages = [buildMessage(decorated.messageType, decorated.content)];
     }

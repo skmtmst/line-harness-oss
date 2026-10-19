@@ -45,8 +45,8 @@ async function imagemapTextDestination(db: D1Database, accountId: string | null,
   return `https://line.me/R/oaMessage/${encodeURIComponent(account.line_basic_id)}/?${encodeURIComponent(text)}`;
 }
 /** LINEへは独自項目を渡さず、URLとイメージマップのテキストは既存の転送、ほかのテキストはpostbackにする。 */
-export async function decorateTapExtras(db: D1Database, tree: unknown, workerUrl: string, accountId: string | null, templateId?: string | null, broadcastId?: string | null): Promise<unknown> {
-  if (Array.isArray(tree)) return Promise.all(tree.map(child => decorateTapExtras(db, child, workerUrl, accountId, templateId, broadcastId)));
+export async function decorateTapExtras(db: D1Database, tree: unknown, workerUrl: string, accountId: string | null, templateId?: string | null, broadcastId?: string | null, canTrackDestination?: (url: string) => boolean): Promise<unknown> {
+  if (Array.isArray(tree)) return Promise.all(tree.map(child => decorateTapExtras(db, child, workerUrl, accountId, templateId, broadcastId, canTrackDestination)));
   if (!tree || typeof tree !== 'object') return tree;
   const node = tree as Record<string, unknown>;
   const { tapExtras, ...rest } = node;
@@ -62,6 +62,7 @@ export async function decorateTapExtras(db: D1Database, tree: unknown, workerUrl
     const imagemapMessage = node.type === 'message' && Boolean(node.area);
     const destination = imagemapMessage ? await imagemapTextDestination(db, accountId, node.text)
       : node.type === 'uri' ? String(node.uri ?? node.linkUri ?? '') : `${workerUrl.replace(/\/$/, '')}/`;
+    if (node.type === 'uri' && canTrackDestination && !canTrackDestination(destination)) return rest;
     if (!/^https?:\/\//.test(destination)) throw new Error('tap_extra_url_unsupported');
     const scope = PREFIX + encodeURIComponent(JSON.stringify({ extras: { tagIds: [...new Set(extras?.tagIds ?? [])].sort(), scoreChange: extras?.scoreChange ?? null }, broadcastId: broadcastId ?? null, inner: node.type === 'uri' || imagemapMessage ? null : node.type === 'message' ? String(node.text ?? '') : originalData }));
     const link = await getOrCreateAutoTrackedLink(db, { originalUrl: destination, lineAccountId: accountId, templateId, dedupScope: scope });
@@ -84,7 +85,7 @@ export async function decorateTapExtras(db: D1Database, tree: unknown, workerUrl
     const { text: _text, ...action } = rest;
     return { ...action, type: 'postback', data, ...(node.type === 'message' ? { displayText: node.text } : {}) };
   }
-  return Object.fromEntries(await Promise.all(Object.entries(rest).map(async ([key, child]) => [key, await decorateTapExtras(db, child, workerUrl, accountId, templateId, broadcastId)])));
+  return Object.fromEntries(await Promise.all(Object.entries(rest).map(async ([key, child]) => [key, await decorateTapExtras(db, child, workerUrl, accountId, templateId, broadcastId, canTrackDestination)])));
 }
 export async function handleExtraPostback(db: D1Database, friendId: string, accountId: string | null, data: string, eventId: string): Promise<string | null> {
   const match = /^tx=([A-Za-z0-9_-]+)$/.exec(data);

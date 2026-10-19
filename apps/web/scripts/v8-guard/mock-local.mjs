@@ -9,6 +9,7 @@
 import { register } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { Readable } from 'node:stream'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 register(pathToFileURL(join(HERE, 'mock-local-hooks.mjs')).href)
@@ -28,7 +29,9 @@ export function mockFetch(method, path) {
         resolve(value)
       }
     }
-    const req = { url: path, method, headers: {} }
+    // IncomingMessage is a stream even when a GET request has no body.
+    // The shared mock reads data/end before routing setup requests.
+    const req = Object.assign(Readable.from([]), { url: path, method, headers: {} })
     const res = {
       statusCode: 200,
       headers: {},

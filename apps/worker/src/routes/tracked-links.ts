@@ -1,3 +1,4 @@
+import { escapeHtml, scriptString } from '../lib/html-escape.js';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -299,13 +300,16 @@ function getAndroidPackage(url: string): string | null {
 }
 
 function buildAppRedirectHtml(destinationUrl: string): string {
-  const escaped = destinationUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  destinationUrl = new URL(destinationUrl).href;
+  if (!/^https?:$/.test(new URL(destinationUrl).protocol)) throw new Error('unsafe_destination');
+  const escaped = escapeHtml(destinationUrl);
   const androidPackage = getAndroidPackage(destinationUrl);
   // intent://path#Intent;scheme=https;package=com.xxx;S.browser_fallback_url=https://...;end
   const intentUrl = androidPackage
     ? `intent://${destinationUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=${androidPackage};S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end`
     : null;
-  const intentEscaped = intentUrl ? intentUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;') : '';
+  const destinationScript = scriptString(destinationUrl);
+  const intentScript = scriptString(intentUrl ?? '');
 
   return `<!DOCTYPE html>
 <html><head>
@@ -318,10 +322,10 @@ function buildAppRedirectHtml(destinationUrl: string): string {
 <script>
 (function(){
   var isAndroid = /Android/i.test(navigator.userAgent);
-  if(isAndroid && "${intentEscaped}"){
-    window.location.href="${intentEscaped}";
+  if(isAndroid && ${intentScript}){
+    window.location.href=${intentScript};
   } else {
-    window.location.href="${escaped}";
+    window.location.href=${destinationScript};
   }
 })();
 </script>

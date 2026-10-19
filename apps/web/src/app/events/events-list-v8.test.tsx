@@ -48,6 +48,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1' }),
+  useOptionalAccount: () => ({ selectedAccountId: 'acc-1' }),
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({

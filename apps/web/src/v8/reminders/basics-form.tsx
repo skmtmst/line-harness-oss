@@ -290,7 +290,7 @@ export function ReminderBasicsFormV8({
                 folders={folders.map(folderById)}
                 // 一覧の左の列の「フォルダを追加」と同じ口（リマインダのフォルダは共有）。
                 onCreate={canCreateFolder
-                  ? folderCreator((name, color) => api.folders.create({ kind: 'reminder', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+                  ? folderCreator((name, color) => api.folders.create({ kind: 'reminder', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                   : undefined}
               /></SaveErrorField>
               {foldersLoadState === 'error' ? (

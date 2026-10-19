@@ -10,6 +10,7 @@
  * 違うのは `kind` だけ。フォルダは `folders.kind` で画面ごとに分かれている。
  */
 
+import { useOptionalAccount } from '@/contexts/account-context'
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import { FOLDER_SELECT_COLORS, type Folder } from '@line-crm/shared'
@@ -47,8 +48,8 @@ export interface FolderAddDialogProps {
    */
   folder?: Folder
   /**
-   * フォルダの持ち主のLINE公式アカウント。アカウント単位の kind
-   * （template など）では必ず渡す。渡さないと共有（未所属）のフォルダになる。
+   * フォルダの持ち主のLINE公式アカウント。明示指定を優先する。
+   * 作成時の未指定は現在の選択アカウントを使い、共通操作の権限はAPIで確認する。
    */
   accountId?: string | null
   /** 窓の下に出す一言。「消しても中身は未分類に残る」など。 */
@@ -76,6 +77,8 @@ export default function FolderAddDialog({
   onReload,
 }: FolderAddDialogProps) {
 
+  const selectedAccount = useOptionalAccount()
+  const targetAccountId = accountId === undefined ? selectedAccount?.selectedAccountId : accountId
   const [name, setName] = useState(folder?.name ?? '')
   const [color, setColor] = useState<string | null>((folder ? folderDisplayColor(folder) : FOLDER_SELECT_COLORS[0].value))
   const [saving, setSaving] = useState(false)
@@ -94,7 +97,7 @@ export default function FolderAddDialog({
       const folderUpdates = { name: trimmed, color }
       const res = folder
         ? await api.folders.update(folder.id, folderUpdates, accountId ?? undefined)
-        : await api.folders.create({ kind, name: trimmed, color, accountId })
+        : await api.folders.create({ kind, name: trimmed, color, accountId: targetAccountId })
       if (!res.success) {
         setError(res.error)
         return

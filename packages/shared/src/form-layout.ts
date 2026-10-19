@@ -534,7 +534,7 @@ const FORMAT_RULES: Record<
     message: "全角カタカナで入力してください",
   },
   email: {
-    test: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+    test: (v) => v.length <= 254 && /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(v),
     message: "メールアドレスの形になっていません",
   },
   // ハイフンあり・なしの両方を通す
@@ -633,7 +633,11 @@ export function isAddressValueEmpty(value: unknown): boolean {
  * ASCII空白だけを許す（「　3　」・タブ付きは受け入れない）。
  */
 export function trimAsciiSpaces(value: string): string {
-  return value.replace(/^ +| +$/g, "");
+  let start = 0;
+  let end = value.length;
+  while (start < end && value.charCodeAt(start) === 32) start++;
+  while (end > start && value.charCodeAt(end - 1) === 32) end--;
+  return value.slice(start, end);
 }
 
 /** ASCII空白だけからなる文字列か（ratingの未入力判定用）。 */

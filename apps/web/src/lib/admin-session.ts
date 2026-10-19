@@ -3,6 +3,43 @@ export const TWO_FACTOR_CHALLENGE_STORAGE_KEY = 'lh_two_factor_challenge'
 const TWO_FACTOR_NEXT_STORAGE_KEY = 'lh_2fa_next'
 const TWO_FACTOR_METHOD_STORAGE_KEY = 'lh_2fa_method'
 let runtimeAdminSessionToken = ''
+const HANDOFF_STORAGE_KEY = 'lh_login_handoff'
+type PendingHandoff = { nonce: string; expires: number; kind: 'line' | 'session' | 'challenge'; path?: string }
+
+function startHandoff(kind: PendingHandoff['kind'], path?: string): string {
+  const nonce = crypto.randomUUID()
+  writeSessionStorage(HANDOFF_STORAGE_KEY, JSON.stringify({ nonce, expires: Date.now() + 10 * 60_000, kind, path }))
+  return nonce
+}
+
+/** Called only by a browser login action before leaving for LINE OAuth. */
+export function beginAdminLoginHandoff(): string {
+  clearAdminSession()
+  return startHandoff('line')
+}
+
+function matchesHandoff(params: URLSearchParams, kind: 'session' | 'challenge', consume = false): boolean {
+  try {
+    const pending = JSON.parse(readSessionStorage(HANDOFF_STORAGE_KEY) || 'null') as PendingHandoff | null
+    const pathname = window.location.pathname
+    const lineLanding = kind === 'session' ? ['/', '/ops'] : ['/login/two-factor', '/login/two-factor/setup']
+    const accepted = !!pending && pending.nonce === params.get('lh_nonce') && pending.expires > Date.now()
+      && (pending.kind === kind && pending.path === pathname || pending.kind === 'line' && lineLanding.includes(pathname))
+    if (consume) removeSessionStorage(HANDOFF_STORAGE_KEY)
+    return accepted
+  } catch { return false }
+}
+
+function clearHandoffHash(): void {
+  try { window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`) } catch { /* cosmetic only */ }
+}
+
+export function twoFactorChallengeHandoffPath(path: string, challengeToken: string, method: TwoFactorMethod = 'password'): string {
+  const pathname = path.split('?')[0]
+  const nonce = startHandoff('challenge', pathname)
+  return `${path}#${new URLSearchParams({ lh_2fa: challengeToken, lh_method: method, lh_nonce: nonce })}`
+}
+
 
 function readSessionStorage(key: string): string | null {
   try { return sessionStorage.getItem(key) } catch { return null }
@@ -50,6 +87,7 @@ export function adminSessionHandoffPath(path: string, sessionToken?: string, csr
   if (!sessionToken) return path
   const hash = new URLSearchParams({ lh_session: sessionToken })
   if (csrfToken) hash.set('lh_csrf', csrfToken)
+  hash.set('lh_nonce', startHandoff('session', path.split('?')[0]))
   return `${path}#${hash.toString()}`
 }
 
@@ -61,8 +99,11 @@ export function captureAdminSessionHandoff(): string {
   const csrfToken = params.get('lh_csrf') || ''
   if (!sessionToken) return getAdminSessionToken()
 
+  const accepted = matchesHandoff(params, 'session', true)
+  clearHandoffHash()
+  const current = getAdminSessionToken()
+  if (!accepted || current && current !== sessionToken) return current
   storeAdminSession(sessionToken, csrfToken)
-  try { window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`) } catch { /* cosmetic only */ }
   return sessionToken
 }
 
@@ -70,14 +111,14 @@ export function captureTwoFactorChallenge(): string {
   if (typeof window === 'undefined') return ''
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
   const token = params.get('lh_2fa') || ''
-  // 運営コンソール（/ops）から来たときは、認証のあと /ops へ戻す（★V6 37-1）。
-  if (isOpsTwoFactorReturn(window.location.search, window.location.hash, null)) {
-    writeSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY, 'ops')
-  }
   if (token) {
+    const accepted = matchesHandoff(params, 'challenge', true)
+    clearHandoffHash()
+    if (!accepted) return readSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY) || ''
+    if (isOpsTwoFactorReturn(window.location.search, '', null)) writeSessionStorage(TWO_FACTOR_NEXT_STORAGE_KEY, 'ops')
     writeSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY, token)
-    try { window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`) } catch { /* cosmetic only */ }
   }
+
   return token || readSessionStorage(TWO_FACTOR_CHALLENGE_STORAGE_KEY) || ''
 }
 
@@ -109,7 +150,7 @@ export type TwoFactorMethod = 'password' | 'line'
 export function captureTwoFactorMethod(): TwoFactorMethod {
   if (typeof window === 'undefined') return 'line'
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  if (params.get('lh_2fa')) {
+  if (params.get('lh_2fa') && matchesHandoff(params, 'challenge')) {
     const method: TwoFactorMethod = params.get('lh_method') === 'password' ? 'password' : 'line'
     try { sessionStorage.setItem(TWO_FACTOR_METHOD_STORAGE_KEY, method) } catch { /* 合言葉と同じ扱い */ }
     return method
