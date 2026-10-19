@@ -357,7 +357,7 @@ jobs:
       - name: Verify D1, delivery batches, and notification rules
         run: |
           set -o pipefail
-          pnpm tsx scripts/verify-staging-operational-path.ts \
+          pnpm tsx scripts/verification/verify-staging-operational-path.ts \
             | tee "$RUNNER_TEMP/staging-verification.json"
 
       - name: Publish aggregate-only result
@@ -410,7 +410,7 @@ jobs:
       - name: Verify the Instagram cross-post state, posts, and reviews
         run: |
           set -o pipefail
-          pnpm tsx scripts/verify-staging-instagram-cross-post.ts \
+          pnpm tsx scripts/verification/verify-staging-instagram-cross-post.ts \
             | tee "$RUNNER_TEMP/instagram-verification.json"
 
       - name: Publish aggregate-only result
@@ -467,7 +467,7 @@ jobs:
       - name: Verify the delivery reads and the three screens
         run: |
           set -o pipefail
-          pnpm tsx scripts/verify-staging-restaurant-delivery.ts \
+          pnpm tsx scripts/verification/verify-staging-restaurant-delivery.ts \
             | tee "$RUNNER_TEMP/delivery-verification.json"
 
       - name: Publish aggregate-only result

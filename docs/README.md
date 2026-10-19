@@ -586,3 +586,8 @@
 - [Q02A2の整理・検証記録](qa/cleanup-q02a2-1019.md)
 - [0000-kenta-cleanup-q02a2.md](release-log/unreleased/0000-kenta-cleanup-q02a2.md)
 - [0000-kenta-cleanup-s02a.md](release-log/unreleased/0000-kenta-cleanup-s02a.md)
+## 台本整理で加わった文書
+
+- [台本とCIの入口](../scripts/README.md)
+- [S02Cの検査記録](qa/cleanup-s02c-1019.md)
+- [S02Cの変更履歴](release-log/unreleased/0000-kenta-cleanup-s02c.md)
