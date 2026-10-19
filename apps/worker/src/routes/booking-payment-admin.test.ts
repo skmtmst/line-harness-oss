@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
-import { paymentPeriod, paymentSummary } from '../services/booking-payment-admin.js';
+import { paymentPeriod, paymentSummary } from '../features/booking/booking-payment-admin.js';
 const access=vi.hoisted(()=>({allow:true}));
 vi.mock('../services/account-access.js',()=>({
   canAccessAllLineAccounts:vi.fn(async()=>access.allow),canAccessLineAccount:vi.fn(async()=>access.allow),

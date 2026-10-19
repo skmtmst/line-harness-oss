@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { FEATURE_IDS } from '@line-crm/shared';
 import { saveVersionedAccountSetting } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { processPendingCalendarDeleteOperations } from './booking-calendar-sync.js';
+import { processPendingCalendarDeleteOperations } from '../features/booking/booking-calendar-sync.js';
 
 const BUNDLE_KEY = 'feature.settings_bundle_v1';
 const NOW = new Date('2026-09-09T00:00:00.000Z');

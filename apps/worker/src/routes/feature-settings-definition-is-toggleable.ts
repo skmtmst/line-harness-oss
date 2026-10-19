@@ -1,5 +1,6 @@
 import { FEATURE_CATALOG, FEATURE_IDS, type FeatureId } from '@line-crm/shared';
 
+
 /** 受け付けるIDは共有カタログそのもの。画面・Workerで別の配列を持たない。 */
 export const TOGGLEABLE_FEATURES: readonly FeatureId[] = FEATURE_IDS;
 

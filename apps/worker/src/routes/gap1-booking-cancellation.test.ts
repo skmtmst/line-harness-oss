@@ -2,7 +2,7 @@ import {beforeEach,afterEach,expect,test,vi} from 'vitest';
 import {bookingCancellation} from './booking-cancellation.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
-import {cancellationQuote,cancellationPolicy} from '../services/booking-cancellation.js';
+import {cancellationQuote,cancellationPolicy} from '../features/booking/booking-cancellation.js';
 let d:SqliteD1;
 const policy={enabled:true,tiers:[{beforeHours:24,percent:0},{beforeHours:0,percent:50}],noShowPercent:100,expectedVersion:0};
 const app=()=>gapApp(d,[bookingCancellation]);
@@ -107,7 +107,7 @@ test('B1-13 B7-24 GAP3-INTEGRATION-02: 本人の予約履歴に取消前の額�
  }finally{vi.useRealTimers();}
 });
 test('B7-14 B7-15: カレンダーが切れた知らせは1回、つなぎ直すと解決にする',async()=>{
- const {evaluateBookingSyncNotices}=await import('../services/booking-sync-rules.js');
+ const {evaluateBookingSyncNotices}=await import('../features/booking/booking-sync-rules.js');
  d.raw.exec("INSERT INTO booking_calendar_switches(line_account_id,scope_id,read_enabled,updated_by,updated_at) VALUES('a','',1,'o',datetime('now')),('a','bs',1,'o',datetime('now'));INSERT INTO booking_calendar_read_health(line_account_id,staff_id,failed_since,error_code) VALUES('a','bs',datetime('now'),'calendar_disconnected')");
  const env={DB:d.db} as import('../index.js').Env['Bindings'];await evaluateBookingSyncNotices(env,'a');await evaluateBookingSyncNotices(env,'a');
  expect(d.raw.prepare("SELECT status,generation FROM booking_sync_notices WHERE notice_key='calendar-read:bs'").get()).toEqual({status:'open',generation:1});expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_sync_notice_outbox').get()).toEqual({n:1});

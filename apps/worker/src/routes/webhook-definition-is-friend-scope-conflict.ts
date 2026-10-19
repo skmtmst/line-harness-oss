@@ -6,7 +6,7 @@ import type { WebhookEvent, TextEventMessage } from '@line-crm/line-sdk';
 import { createStickerMessageContent } from '@line-crm/shared';
 import { upsertFriend, updateFriendFollowStatus, getFriendByLineUserIdForAccount, upsertChatOnMessage, jstNow, toJstString, recordIncomingLineMessage, recordLineMessageUnsend } from '@line-crm/db';
 import type { Friend } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 export // LINE webhook bodies are small (events array). Cap defends against unauthenticated
 // large-payload DoS before signature verification (#104). 1 MiB leaves room for

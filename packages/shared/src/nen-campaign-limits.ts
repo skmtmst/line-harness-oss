@@ -2,7 +2,7 @@
  * NEN配信の本文の上限。画面・保存・送信が同じ値・同じ単位で数える。
  *
  * 根拠（#659 差し戻し3点目: 単位の混同を修正）。`body_text` は素のテキスト
- * メッセージではなく、`nen-engagement.ts` の `flexMessage()` でFlexの
+ * メッセージではなく、`nen-engagement.ts` の `flexMessage` でFlexの
  * bubble内textコンポーネントに入る。LINEはFlexの個々のtextコンポーネント
  * には文字数上限を公開しておらず、公開されているのはFlexメッセージ全体の
  * JSONサイズ上限（50,000バイト）だけ。画像URL・ボタンなど可変要素が多く

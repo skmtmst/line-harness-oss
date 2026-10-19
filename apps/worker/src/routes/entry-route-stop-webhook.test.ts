@@ -51,7 +51,7 @@ vi.mock('../services/event-bus.js', () => ({
   logOutgoingMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../services/friend-add-routing.js', () => ({
+vi.mock('../features/friends/friend-add-routing.js', () => ({
   applyFriendAddRouting: vi.fn().mockResolvedValue({ routed: false, suppressed: false, enrollments: [] }),
 }));
 
@@ -76,7 +76,7 @@ import {
   captureFriendAddEventAttribution,
   listLineAccountsWithTenantStatus,
 } from '@line-crm/db';
-import { applyFriendAddRouting } from '../services/friend-add-routing.js';
+import { applyFriendAddRouting } from '../features/friends/friend-add-routing.js';
 import {
   enrollFriendInScenario,
   getScenarios,

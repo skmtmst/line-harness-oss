@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import { getLineAccounts } from '@line-crm/db';
 import { fetchBotProfile } from '../lib/bot-profile.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 export const brand = new Hono<Env>();
 

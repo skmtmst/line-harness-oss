@@ -13,7 +13,7 @@ import {
   MENU_SECTION_LABELS,
   expectedMenuItemOrder,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { featureSettings, NEN_SPECIALIZED_FEATURES } from './feature-settings.js';
 

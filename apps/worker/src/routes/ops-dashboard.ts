@@ -15,14 +15,15 @@ import {
   knowledgeMetrics,
   type TenantPlanRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requirePlatformAdmin } from '../middleware/platform-admin.js';
 import { BILLING_PLANS, findPlan, type PlanKey } from '../services/billing-plans.js';
 import { dbFor } from '../services/db-router.js';
 
 /**
- * 運営ダッシュボード（★V6 37-2 `Xvofy`）。
+ * 運営ダッシュボード（★37-2 `Xvofy`）。
  *
  * 売上は Stripe の入金済み請求書から数え、返金を差し引く。
  * Stripe 未設定または請求書がまだ無い環境だけ、契約中プランの定価へ戻す。
@@ -249,7 +250,7 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
   });
 });
 
-/** 「未登録の N 人へ案内」の一覧（★V6 37-2）。名前と契約先だけ返す。メールアドレスは返さない。 */
+/** 「未登録の N 人へ案内」の一覧（★37-2）。名前と契約先だけ返す。メールアドレスは返さない。 */
 opsDashboard.get('/api/ops/dashboard/line-unregistered', async (c) => {
   const db = dbFor(c.env);
   const line = await dashboardLineRegistration(db, DEFAULT_TENANT_ID);

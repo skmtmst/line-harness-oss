@@ -12,7 +12,7 @@ export function validEventBookingAction(value: unknown): value is EventBookingAc
 }
 type Receipt = { reason: string | null; bookingIds: string[] };
 const SOURCE = 'event_booking_action';
-/** B-179: 空き無しも終わった工程として記録する。再送で別の回を予約しない。 */
+/** 空き無しも終わった工程として記録する。再送で別の回を予約しない。 */
 export async function runEventBookingAction(db: D1Database, config: EventBookingActionConfig, friendId: string, effectKey: string): Promise<Receipt> {
   if (!validEventBookingAction(config)) throw new Error('イベントに行うことの設定を確認してください');
   const friend = await db.prepare(`SELECT f.id,f.user_id,f.picture_url,f.line_account_id FROM friends f

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { emptyLayout, newBlockId } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * 回答に添付する画像の預かり口。
@@ -48,7 +48,7 @@ vi.mock('../services/liff-auth.js', () => ({
   verifyCallerLineIdentity: mocks.verifyCallerLineIdentity,
 }));
 
-vi.mock('../services/friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: vi.fn(),
 }));
 

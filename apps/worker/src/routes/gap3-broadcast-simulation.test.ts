@@ -2,8 +2,8 @@ import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import {broadcastSimulation} from './broadcast-simulation.js';
 import {broadcasts} from './broadcasts.js';
-import {scheduleSimulation,processBroadcastSimulation,simulationPreview,saveSimulationDraft} from '../services/broadcast-simulation.js';
-import {processBroadcastSend,processScheduledBroadcasts,processQueuedBroadcasts} from '../services/broadcast.js';
+import {scheduleSimulation,processBroadcastSimulation,simulationPreview,saveSimulationDraft} from '../features/broadcasts/broadcast-simulation.js';
+import {processBroadcastSend,processScheduledBroadcasts,processQueuedBroadcasts} from '../features/broadcasts/broadcast.js';
 import {countBroadcastLedger,getRetryableRecipientIds} from '@line-crm/db/src/broadcast-send-claims.js';
 let d:ReturnType<typeof gapFixture>;const now=new Date('2026-10-16T03:00:00Z');
 beforeEach(()=>{d=gapFixture();vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
@@ -27,7 +27,7 @@ test('PURPOSE-02: 既存の即時・予約・キュー・再試行からも実�
  const id=await create();await schedule(id);await processBroadcastSend(d.db,client,id);await processScheduledBroadcasts(d.db,client);await processQueuedBroadcasts(d.db,client);expect(client.broadcast).not.toHaveBeenCalled();expect(client.multicast).not.toHaveBeenCalled();expect(client.pushMessage).not.toHaveBeenCalled();
  const app=gapApp(d,[broadcasts]);for(const action of ['test-send','send-segment','resume','retry-failed'])expect((await gapCall(app,`/api/broadcasts/${id}/${action}`,'POST',{})).status).toBe(409);
 });
-test('PURPOSE-03/B-337: 版と人数が変われば拒否、閲覧・代理不可、別店不可、模擬指定必須',async()=>{
+test('PURPOSE-03/版と人数が変われば拒否、閲覧・代理不可、別店不可、模擬指定必須',async()=>{
  const id=await create();await expect(scheduleSimulation(d.db,id,{expectedVersion:0,confirmedRecipientCount:2,testMode:true},'s',now)).rejects.toMatchObject({code:'SEND_PREVIEW_CHANGED'});
  const api=()=>gapApp(d,[broadcastSimulation]);const path='/api/broadcasts/simulation-drafts?account_id=a';
  for(const [staff,im] of [[{...gapOwner,readOnly:true},false],[gapOwner,true]] as const)expect((await gapCall(gapApp(d,[broadcastSimulation],staff,im),path,'POST',draft)).status).toBe(403);

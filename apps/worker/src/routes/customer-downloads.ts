@@ -1,6 +1,6 @@
 import { Hono, type MiddlewareHandler } from 'hono';
 import { activeTenantLineAccountSql } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { CHAT_ATTACHMENT_ID, CHAT_ATTACHMENT_PREFIX, ChatAttachmentError, ownedAttachment } from '../services/chat-attachments.js';
 import { customerFileOwner } from '../services/customer-file-access.js';
 import { customerLiffDownload, privateDownloadHeaders } from '../services/download-entrypoints.js';

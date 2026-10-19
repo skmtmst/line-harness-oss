@@ -18,12 +18,12 @@ import {
   parsePublishedSnapshot,
   processPendingMileageEvents,
   updateMileageRule,
-} from '../src/mileage.js';
+} from '../src/mileage/index.js';
 import {
   MileageV6Error,
   publishMileageEarningRule,
   saveMileageEarningRuleDraft,
-} from '../src/mileage-admin-v6.js';
+} from '../src/mileage/admin-operations.js';
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BENIGN = /duplicate column name|already exists/i;

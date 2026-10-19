@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { tags } from './tags.js';
 import { lineAccountTags } from './line-account-tags.js';
@@ -25,7 +25,7 @@ afterEach(() => fixture.raw.close());
 const create = (path: string, body: unknown) => app.request(path, {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
 }, { DB: fixture.db } as Env['Bindings']);
-describe('B-156 新しいタグの既定色', () => {
+describe('新しいタグの既定色', () => {
   it.each([{ name: '旧口' }, { name: '新口', lineAccountId: 'shop' }])('店のタグを色なしで作ると灰色を返し、保存する: $name', async body => {
     const response = await create('/api/tags', body);
     expect(response.status).toBe(201);

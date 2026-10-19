@@ -4,7 +4,7 @@ import { parseSupportMarkLocations } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 
 import { restoreSupportMark, ArchiveRestoreError, getSupportMarksWithUsage, getSupportMarkArchiveImpact, getSupportMarkById, createSupportMarkIdempotent, SupportMarkCreateError, updateSupportMark, reorderSupportMarks, replaceAndArchiveSupportMark, archiveSupportMarkWithReplacement, SupportMarkArchiveError, getDefaultSupportMark, setFriendSupportMark } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { archiveSupportMarkAutomationRule, createSupportMarkAutomationRuleIdempotent, listSupportMarkAutomationRules, listSupportMarkAutomationRulesForAccount, SupportMarkRuleCreateError, updateSupportMarkAutomationRule, validateSupportMarkAutomationRuleInput, type SaveSupportMarkAutomationRule } from '../services/support-mark-automation.js';
 import { supportMarkAccess, SUPPORT_MARK_NAME_MAX, COLOR_PATTERN, supportMarkRuleInput, markReferenceCount, serializeMarkImpact, sameMarkImpact } from './friend-attributes-definition.js';

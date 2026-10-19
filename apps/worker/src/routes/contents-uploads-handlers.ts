@@ -4,11 +4,13 @@ import { inputError } from '../lib/input-errors.js';
 import { mediaTabCounts } from '../services/tab-counts.js';
 
 import { getMedia, countMedia, getMediaById, getFolderById, getMediaStorageQuota, getMediaVersionByNo, createMediaUploadSession, getMediaUploadSession, failMediaUploadSession, verifyMediaUploadSession, completeNewMediaUpload, createMediaVersionFromUpload, MediaVersionConflictError, MediaVersionIncompatibleError, type MediaMetadata, type MediaKind } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../services/media-metadata.js';
+import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../features/media/media-metadata/index.js';
 import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
 import { checkMediaGate, runScanForStoredObject } from '../services/file-scan.js';
 import { ensureFileScanForUpload } from './file-scan.js';
@@ -30,266 +32,256 @@ export const get__api_media_quota_1 = async (c: Context<Env, "/api/media/quota">
 };
 
 export const post__api_media_upload_sessions_2 = async (c: Context<Env, "/api/media/upload-sessions">) => {
-    try {
-      const body = await c.req.json<{
-        accountId?: unknown;
-        files?: Array<{
-          filename?: unknown;
-          mimeType?: unknown;
-          sizeBytes?: unknown;
-          folderId?: unknown;
-          targetMediaId?: unknown;
-          metadata?: unknown;
-        }>;
-      }>().catch(() => null);
-      const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
-      if (!accountId || !Array.isArray(body?.files) || body.files.length < 1 || body.files.length > 20) {
-        return inputError(c, { success: false, error: 'accountId と1〜20件のfilesが必要です' }, 400, ["accountId","files"]);
+    const body = await c.req.json<{
+      accountId?: unknown;
+      files?: Array<{
+        filename?: unknown;
+        mimeType?: unknown;
+        sizeBytes?: unknown;
+        folderId?: unknown;
+        targetMediaId?: unknown;
+        metadata?: unknown;
+      }>;
+    }>().catch(() => null);
+    const accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+    if (!accountId || !Array.isArray(body?.files) || body.files.length < 1 || body.files.length > 20) {
+      return inputError(c, { success: false, error: 'accountId と1〜20件のfilesが必要です' }, 400, ["accountId","files"]);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const config = directUploadConfig(c.env);
+    if (!config) {
+      return c.json({
+        success: false,
+        code: 'media_direct_upload_unavailable',
+        error: '直接アップロードの設定が完了していません',
+      }, 503);
+    }
+    const validated: Array<{
+      filename: string;
+      mimeType: string;
+      sizeBytes: number;
+      folderId: string | null;
+      targetMediaId: string | null;
+      metadata: MediaMetadata | null;
+      spec: { kind: MediaKind; ext: string[]; maxBytes: number };
+    }> = [];
+    for (const file of body.files) {
+      const filename = typeof file?.filename === 'string' ? file.filename.trim() : '';
+      const mimeType = typeof file?.mimeType === 'string' ? file.mimeType.trim().toLowerCase() : '';
+      const sizeBytes = Number(file?.sizeBytes);
+      const folderId = typeof file?.folderId === 'string' && file.folderId.trim()
+        ? file.folderId.trim()
+        : null;
+      const targetMediaId = typeof file?.targetMediaId === 'string' && file.targetMediaId.trim()
+        ? file.targetMediaId.trim()
+        : null;
+      const spec = DIRECT_ALLOWED[mimeType];
+      const ext = extensionOf(filename);
+      if (!filename || filename.length > 255 || /[\u0000-\u001f]/.test(filename)
+        || !spec || !spec.ext.includes(ext)
+        || !Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > spec.maxBytes) {
+        return inputError(c, {
+          success: false,
+          code: 'media_file_invalid',
+          error: `${filename || 'ファイル'}の形式、拡張子、容量を確認してください`,
+        }, 400, []);
       }
-      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      const metadata = parseUploadMetadata(file?.metadata);
+      if (metadata === undefined) {
+        return inputError(c, {
+          success: false,
+          code: 'media_file_invalid',
+          error: `${filename}の内容情報が正しくありません`,
+        }, 400, []);
+      }
+      if (targetMediaId && !await getMediaById(c.env.DB, targetMediaId, accountId)) {
         return c.json({ success: false, error: 'Not found' }, 404);
       }
-      const config = directUploadConfig(c.env);
-      if (!config) {
-        return c.json({
-          success: false,
-          code: 'media_direct_upload_unavailable',
-          error: '直接アップロードの設定が完了していません',
-        }, 503);
-      }
-      const validated: Array<{
-        filename: string;
-        mimeType: string;
-        sizeBytes: number;
-        folderId: string | null;
-        targetMediaId: string | null;
-        metadata: MediaMetadata | null;
-        spec: { kind: MediaKind; ext: string[]; maxBytes: number };
-      }> = [];
-      for (const file of body.files) {
-        const filename = typeof file?.filename === 'string' ? file.filename.trim() : '';
-        const mimeType = typeof file?.mimeType === 'string' ? file.mimeType.trim().toLowerCase() : '';
-        const sizeBytes = Number(file?.sizeBytes);
-        const folderId = typeof file?.folderId === 'string' && file.folderId.trim()
-          ? file.folderId.trim()
-          : null;
-        const targetMediaId = typeof file?.targetMediaId === 'string' && file.targetMediaId.trim()
-          ? file.targetMediaId.trim()
-          : null;
-        const spec = DIRECT_ALLOWED[mimeType];
-        const ext = extensionOf(filename);
-        if (!filename || filename.length > 255 || /[\u0000-\u001f]/.test(filename)
-          || !spec || !spec.ext.includes(ext)
-          || !Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > spec.maxBytes) {
-          return inputError(c, {
-            success: false,
-            code: 'media_file_invalid',
-            error: `${filename || 'ファイル'}の形式、拡張子、容量を確認してください`,
-          }, 400, []);
-        }
-        const metadata = parseUploadMetadata(file?.metadata);
-        if (metadata === undefined) {
-          return inputError(c, {
-            success: false,
-            code: 'media_file_invalid',
-            error: `${filename}の内容情報が正しくありません`,
-          }, 400, []);
-        }
-        if (targetMediaId && !await getMediaById(c.env.DB, targetMediaId, accountId)) {
-          return c.json({ success: false, error: 'Not found' }, 404);
-        }
-        validated.push({ filename, mimeType, sizeBytes, folderId, targetMediaId, metadata, spec });
-      }
-      const quota = await getMediaStorageQuota(c.env.DB, accountId);
-      const requestedBytes = validated.reduce((total, file) => total + file.sizeBytes, 0);
-      if (requestedBytes > quota.remainingBytes) {
-        return c.json({
-          success: false,
-          code: 'media_quota_exceeded',
-          error: '保存容量が不足しています',
-          data: quota,
-        }, 409);
-      }
-      const now = new Date();
-      const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
-      const sessions = [];
-      for (const file of validated) {
-        const id = crypto.randomUUID();
-        const r2Key = `media/${accountId}/${crypto.randomUUID()}.${extensionOf(file.filename)}`;
-        await createMediaUploadSession(c.env.DB, {
-          id,
-          lineAccountId: accountId,
-          targetMediaId: file.targetMediaId,
-          folderId: file.folderId,
-          filename: file.filename,
-          kind: file.spec.kind,
-          mimeType: file.mimeType,
-          sizeBytes: file.sizeBytes,
-          metadata: file.metadata,
-          r2Key,
-          expiresAt,
-          createdBy: c.get('staff')?.id ?? null,
-        });
-        const signed = await createR2PresignedPutUrl(config, {
-          key: r2Key,
-          contentType: file.mimeType,
-          lineAccountId: accountId,
-          uploadSessionId: id,
-          expiresInSeconds: 900,
-          now,
-        });
-        sessions.push({
-          id,
-          filename: file.filename,
-          sizeBytes: file.sizeBytes,
-          targetMediaId: file.targetMediaId,
-          method: 'PUT',
-          uploadUrl: signed.url,
-          requiredHeaders: signed.headers,
-          expiresAt: signed.expiresAt,
-        });
-      }
-      return c.json({ success: true, data: { sessions } }, 201);
-    } catch (err) {
-      logger.error("routes_contents_failed");
-      return c.json({ success: false, error: 'アップロードを準備できませんでした' }, 500);
+      validated.push({ filename, mimeType, sizeBytes, folderId, targetMediaId, metadata, spec });
     }
+    const quota = await getMediaStorageQuota(c.env.DB, accountId);
+    const requestedBytes = validated.reduce((total, file) => total + file.sizeBytes, 0);
+    if (requestedBytes > quota.remainingBytes) {
+      return c.json({
+        success: false,
+        code: 'media_quota_exceeded',
+        error: '保存容量が不足しています',
+        data: quota,
+      }, 409);
+    }
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+    const sessions = [];
+    for (const file of validated) {
+      const id = crypto.randomUUID();
+      const r2Key = `media/${accountId}/${crypto.randomUUID()}.${extensionOf(file.filename)}`;
+      await createMediaUploadSession(c.env.DB, {
+        id,
+        lineAccountId: accountId,
+        targetMediaId: file.targetMediaId,
+        folderId: file.folderId,
+        filename: file.filename,
+        kind: file.spec.kind,
+        mimeType: file.mimeType,
+        sizeBytes: file.sizeBytes,
+        metadata: file.metadata,
+        r2Key,
+        expiresAt,
+        createdBy: c.get('staff')?.id ?? null,
+      });
+      const signed = await createR2PresignedPutUrl(config, {
+        key: r2Key,
+        contentType: file.mimeType,
+        lineAccountId: accountId,
+        uploadSessionId: id,
+        expiresInSeconds: 900,
+        now,
+      });
+      sessions.push({
+        id,
+        filename: file.filename,
+        sizeBytes: file.sizeBytes,
+        targetMediaId: file.targetMediaId,
+        method: 'PUT',
+        uploadUrl: signed.url,
+        requiredHeaders: signed.headers,
+        expiresAt: signed.expiresAt,
+      });
+    }
+    return c.json({ success: true, data: { sessions } }, 201);
   };
 
 export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<Env, "/api/media/upload-sessions/:id/complete">) => {
     const accountIdFromBody = async () => c.req.json<{ accountId?: unknown; etag?: unknown }>()
       .catch(() => null);
     let accountId = '';
-    try {
-      const body = await accountIdFromBody();
-      accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
-      const suppliedEtag = typeof body?.etag === 'string' ? normalizedEtag(body.etag) : '';
-      if (!accountId || !suppliedEtag) {
-        return inputError(c, { success: false, error: 'accountId と etag が必要です' }, 400, ["etag"]);
-      }
-      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-        return c.json({ success: false, error: 'Not found' }, 404);
-      }
-      let session = await getMediaUploadSession(c.env.DB, c.req.param('id'), accountId);
-      if (!session) return c.json({ success: false, error: 'Not found' }, 404);
-      if (session.status === 'completed') {
-        return c.json({
-          success: true,
-          data: { uploadSessionId: session.id, status: 'completed', mediaId: session.result_media_id },
-        });
-      }
-      if (session.status === 'verified') {
-        return c.json({
-          success: true,
-          data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
-        });
-      }
-      if (session.status !== 'pending') {
-        return c.json({ success: false, code: 'media_upload_not_pending', error: 'このアップロードは確定できません' }, 409);
-      }
-      if (Date.parse(session.expires_at) <= Date.now()) {
-        await failMediaUploadSession(c.env.DB, session.id, accountId, 'expired');
-        return c.json({ success: false, code: 'media_upload_expired', error: 'アップロード期限が切れました' }, 409);
-      }
-      const object = await c.env.IMAGES.head(session.r2_key);
-      const objectEtag = object?.etag ? normalizedEtag(object.etag) : '';
-      const contentType = object?.httpMetadata?.contentType ?? '';
-      const metadata = object?.customMetadata ?? {};
-      const metadataAccountId = metadata['line-account-id'] ?? metadata.lineAccountId;
-      const metadataSessionId = metadata['upload-session-id'] ?? metadata.uploadSessionId;
-      if (!object || Number(object.size) !== Number(session.expected_size)
-        || contentType !== session.expected_mime || objectEtag !== suppliedEtag
-        || metadataAccountId !== accountId || metadataSessionId !== session.id) {
-        await failMediaUploadSession(c.env.DB, session.id, accountId, 'object_mismatch');
-        await c.env.IMAGES.delete(session.r2_key);
-        return c.json({
-          success: false,
-          code: 'media_upload_mismatch',
-          error: 'アップロードしたファイルを確認できませんでした',
-        }, 409);
-      }
-      const headBytes = session.kind === 'image' ? IMAGE_METADATA_PREFIX_BYTES : 16;
-      const bodyObject = await c.env.IMAGES.get(session.r2_key, { range: { offset: 0, length: headBytes } });
-      const signatureBytes = bodyObject
-        ? new Uint8Array(await bodyObject.arrayBuffer())
-        : new Uint8Array();
-      if (!hasMediaSignature(signatureBytes, session.expected_mime)) {
-        await failMediaUploadSession(c.env.DB, session.id, accountId, 'signature_mismatch');
-        await c.env.IMAGES.delete(session.r2_key);
-        return c.json({
-          success: false,
-          code: 'media_signature_mismatch',
-          error: 'ファイルの実際の形式が申告と一致しません',
-        }, 409);
-      }
-      // 画像は実体の先頭から寸法を測り、申告値ではなく実測値を正本として残す。
-      // 測れなかった場合は寸法を null に戻し、版追加は「判定材料不足」で拒否する。
-      const measured = session.kind === 'image'
-        ? imageDimensions(signatureBytes, session.expected_mime)
-        : null;
-      session = await verifyMediaUploadSession(
-        c.env.DB, session.id, accountId, objectEtag,
-        session.kind === 'image'
-          ? { width: measured?.width ?? null, height: measured?.height ?? null }
-          : undefined,
-        session.kind === 'image',
-      );
-      if (!session) throw new Error('verified upload session is unavailable');
-      if (session.target_media_id) {
-        // 版の差し替えも検査の対象にする。検査が終わるまで版は出さない。
-        // 記録に失敗しても確定自体は返す（門番は出す前にその場で回す）。
-        const versionScan = await ensureFileScanForUpload({
-          db: c.env.DB,
-          lineAccountId: accountId,
-          subjectKind: 'upload_session',
-          subjectId: session.id,
-          mediaId: session.target_media_id,
-          filename: session.filename,
-          mimeType: session.expected_mime,
-          sizeBytes: session.expected_size,
-        }).catch((err) => {
-          logger.error("routes_contents_failed");
-          return null;
-        });
-        if (versionScan) {
-          await runScanForStoredObject(c.env.DB, c.env.IMAGES, versionScan, session.r2_key, {
-            width: session.width, height: session.height,
-          }).catch((err) => logger.error("routes_contents_failed"));
-        }
-        return c.json({
-          success: true,
-          data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
-        });
-      }
-      const media = await completeNewMediaUpload(c.env.DB, session);
-      // 保存の直後に検査の段を入れる。clean になるまで中身は出さない。
+    const body = await accountIdFromBody();
+    accountId = typeof body?.accountId === 'string' ? body.accountId.trim() : '';
+    const suppliedEtag = typeof body?.etag === 'string' ? normalizedEtag(body.etag) : '';
+    if (!accountId || !suppliedEtag) {
+      return inputError(c, { success: false, error: 'accountId と etag が必要です' }, 400, ["etag"]);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    let session = await getMediaUploadSession(c.env.DB, c.req.param('id'), accountId);
+    if (!session) return c.json({ success: false, error: 'Not found' }, 404);
+    if (session.status === 'completed') {
+      return c.json({
+        success: true,
+        data: { uploadSessionId: session.id, status: 'completed', mediaId: session.result_media_id },
+      });
+    }
+    if (session.status === 'verified') {
+      return c.json({
+        success: true,
+        data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
+      });
+    }
+    if (session.status !== 'pending') {
+      return c.json({ success: false, code: 'media_upload_not_pending', error: 'このアップロードは確定できません' }, 409);
+    }
+    if (Date.parse(session.expires_at) <= Date.now()) {
+      await failMediaUploadSession(c.env.DB, session.id, accountId, 'expired');
+      return c.json({ success: false, code: 'media_upload_expired', error: 'アップロード期限が切れました' }, 409);
+    }
+    const object = await c.env.IMAGES.head(session.r2_key);
+    const objectEtag = object?.etag ? normalizedEtag(object.etag) : '';
+    const contentType = object?.httpMetadata?.contentType ?? '';
+    const metadata = object?.customMetadata ?? {};
+    const metadataAccountId = metadata['line-account-id'] ?? metadata.lineAccountId;
+    const metadataSessionId = metadata['upload-session-id'] ?? metadata.uploadSessionId;
+    if (!object || Number(object.size) !== Number(session.expected_size)
+      || contentType !== session.expected_mime || objectEtag !== suppliedEtag
+      || metadataAccountId !== accountId || metadataSessionId !== session.id) {
+      await failMediaUploadSession(c.env.DB, session.id, accountId, 'object_mismatch');
+      await c.env.IMAGES.delete(session.r2_key);
+      return c.json({
+        success: false,
+        code: 'media_upload_mismatch',
+        error: 'アップロードしたファイルを確認できませんでした',
+      }, 409);
+    }
+    const headBytes = session.kind === 'image' ? IMAGE_METADATA_PREFIX_BYTES : 16;
+    const bodyObject = await c.env.IMAGES.get(session.r2_key, { range: { offset: 0, length: headBytes } });
+    const signatureBytes = bodyObject
+      ? new Uint8Array(await bodyObject.arrayBuffer())
+      : new Uint8Array();
+    if (!hasMediaSignature(signatureBytes, session.expected_mime)) {
+      await failMediaUploadSession(c.env.DB, session.id, accountId, 'signature_mismatch');
+      await c.env.IMAGES.delete(session.r2_key);
+      return c.json({
+        success: false,
+        code: 'media_signature_mismatch',
+        error: 'ファイルの実際の形式が申告と一致しません',
+      }, 409);
+    }
+    // 画像は実体の先頭から寸法を測り、申告値ではなく実測値を正本として残す。
+    // 測れなかった場合は寸法を null に戻し、版追加は「判定材料不足」で拒否する。
+    const measured = session.kind === 'image'
+      ? imageDimensions(signatureBytes, session.expected_mime)
+      : null;
+    session = await verifyMediaUploadSession(
+      c.env.DB, session.id, accountId, objectEtag,
+      session.kind === 'image'
+        ? { width: measured?.width ?? null, height: measured?.height ?? null }
+        : undefined,
+      session.kind === 'image',
+    );
+    if (!session) throw new Error('verified upload session is unavailable');
+    if (session.target_media_id) {
+      // 版の差し替えも検査の対象にする。検査が終わるまで版は出さない。
       // 記録に失敗しても確定自体は返す（門番は出す前にその場で回す）。
-      const newScan = await ensureFileScanForUpload({
+      const versionScan = await ensureFileScanForUpload({
         db: c.env.DB,
         lineAccountId: accountId,
-        subjectKind: 'media',
-        subjectId: media.id,
-        mediaId: media.id,
-        filename: media.filename,
-        mimeType: media.mime_type,
-        sizeBytes: media.size_bytes,
+        subjectKind: 'upload_session',
+        subjectId: session.id,
+        mediaId: session.target_media_id,
+        filename: session.filename,
+        mimeType: session.expected_mime,
+        sizeBytes: session.expected_size,
       }).catch((err) => {
         logger.error("routes_contents_failed");
         return null;
       });
-      if (newScan) {
-        await runScanForStoredObject(c.env.DB, c.env.IMAGES, newScan, session.r2_key, {
-          width: media.width, height: media.height,
+      if (versionScan) {
+        await runScanForStoredObject(c.env.DB, c.env.IMAGES, versionScan, session.r2_key, {
+          width: session.width, height: session.height,
         }).catch((err) => logger.error("routes_contents_failed"));
       }
       return c.json({
         success: true,
-        data: { uploadSessionId: session.id, status: 'completed', mediaId: media.id },
-      }, 201);
-    } catch (err) {
-      logger.error("routes_contents_failed");
-      return c.json({ success: false, error: 'アップロードを確定できませんでした' }, 500);
+        data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
+      });
     }
+    const media = await completeNewMediaUpload(c.env.DB, session);
+    // 保存の直後に検査の段を入れる。clean になるまで中身は出さない。
+    // 記録に失敗しても確定自体は返す（門番は出す前にその場で回す）。
+    const newScan = await ensureFileScanForUpload({
+      db: c.env.DB,
+      lineAccountId: accountId,
+      subjectKind: 'media',
+      subjectId: media.id,
+      mediaId: media.id,
+      filename: media.filename,
+      mimeType: media.mime_type,
+      sizeBytes: media.size_bytes,
+    }).catch((err) => {
+      logger.error("routes_contents_failed");
+      return null;
+    });
+    if (newScan) {
+      await runScanForStoredObject(c.env.DB, c.env.IMAGES, newScan, session.r2_key, {
+        width: media.width, height: media.height,
+      }).catch((err) => logger.error("routes_contents_failed"));
+    }
+    return c.json({
+      success: true,
+      data: { uploadSessionId: session.id, status: 'completed', mediaId: media.id },
+    }, 201);
   };
 
 export const post__api_media_id_versions_4 = async (c: Context<Env, "/api/media/:id/versions">) => {
@@ -392,8 +384,7 @@ export const post__api_media_id_versions_4 = async (c: Context<Env, "/api/media/
         error: '差し替え用ファイルの確認が完了していません',
       }, 409);
     }
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: '新しい版を追加できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -438,159 +429,129 @@ export const get__api_media_counts_6 = async (c: Context<Env, "/api/media/counts
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
-  try {
-    return c.json({ success: true, data: await mediaTabCounts(c.env.DB, accountId) });
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
-  }
+  return c.json({ success: true, data: await mediaTabCounts(c.env.DB, accountId) });
 };
 
 export const get__api_media_7 = async (c: Context<Env, "/api/media">) => {
-  try {
-    const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const kindRaw = c.req.query('kind');
-    const kind = kindRaw && ['image', 'video', 'audio', 'file'].includes(kindRaw)
-      ? (kindRaw as MediaKind)
-      : undefined;
-    const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '20', 10) || 20));
-    const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
-    const sortRaw = c.req.query('sort');
-    const sort = sortRaw && ['newest', 'oldest', 'name', 'size', 'usage'].includes(sortRaw)
-      ? sortRaw as 'newest' | 'oldest' | 'name' | 'size' | 'usage'
-      : 'newest';
-    const filters = {
-      lineAccountId: accountId,
-      kind,
-      folderId: c.req.query('folderId') || undefined,
-      excludeId: c.req.query('excludeId') || undefined,
-      query: c.req.query('query')?.trim() || undefined,
-      unusedOnly: c.req.query('unusedOnly') === '1',
-      nearLimitOnly: c.req.query('nearLimitOnly') === '1',
-      archived: c.req.query('archived') === 'only' || c.req.query('archived') === 'all'
-        ? c.req.query('archived') as 'only' | 'all'
-        : undefined,
-    };
-    const [items, total] = await Promise.all([
-      getMedia(c.env.DB, { ...filters, sort, limit, offset }),
-      countMedia(c.env.DB, filters),
-    ]);
-    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    const names = await uploaderNameMap(c.env.DB, items);
-    return c.json({
-      success: true,
-      data: { items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset },
-    });
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Not found' }, 404);
   }
+  const kindRaw = c.req.query('kind');
+  const kind = kindRaw && ['image', 'video', 'audio', 'file'].includes(kindRaw)
+    ? (kindRaw as MediaKind)
+    : undefined;
+  const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') || '20', 10) || 20));
+  const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+  const sortRaw = c.req.query('sort');
+  const sort = sortRaw && ['newest', 'oldest', 'name', 'size', 'usage'].includes(sortRaw)
+    ? sortRaw as 'newest' | 'oldest' | 'name' | 'size' | 'usage'
+    : 'newest';
+  const filters = {
+    lineAccountId: accountId,
+    kind,
+    folderId: c.req.query('folderId') || undefined,
+    excludeId: c.req.query('excludeId') || undefined,
+    query: c.req.query('query')?.trim() || undefined,
+    unusedOnly: c.req.query('unusedOnly') === '1',
+    nearLimitOnly: c.req.query('nearLimitOnly') === '1',
+    archived: c.req.query('archived') === 'only' || c.req.query('archived') === 'all'
+      ? c.req.query('archived') as 'only' | 'all'
+      : undefined,
+  };
+  const [items, total] = await Promise.all([
+    getMedia(c.env.DB, { ...filters, sort, limit, offset }),
+    countMedia(c.env.DB, filters),
+  ]);
+  const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+  const names = await uploaderNameMap(c.env.DB, items);
+  return c.json({
+    success: true,
+    data: { items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset },
+  });
 };
 
 export const get__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) => {
-  try {
-    const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const media = await getMediaById(c.env.DB, c.req.param('id'), accountId);
-    if (!media) return c.json({ success: false, error: 'Not found' }, 404);
-    const folder = media.folder_id ? await getFolderById(c.env.DB, media.folder_id) : null;
-    const folderName = folder
-      && folder.kind === 'media'
-      && (folder.account_id === null || folder.account_id === accountId)
-      ? folder.name
-      : null;
-    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    const names = await uploaderNameMap(c.env.DB, [media]);
-    return c.json({
-      success: true,
-      data: { item: serializeMedia(media, workerUrl, names), folderName },
-    });
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Not found' }, 404);
   }
+  const media = await getMediaById(c.env.DB, c.req.param('id'), accountId);
+  if (!media) return c.json({ success: false, error: 'Not found' }, 404);
+  const folder = media.folder_id ? await getFolderById(c.env.DB, media.folder_id) : null;
+  const folderName = folder
+    && folder.kind === 'media'
+    && (folder.account_id === null || folder.account_id === accountId)
+    ? folder.name
+    : null;
+  const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+  const names = await uploaderNameMap(c.env.DB, [media]);
+  return c.json({
+    success: true,
+    data: { item: serializeMedia(media, workerUrl, names), folderName },
+  });
 };
 
 export const get__api_media_id_download_9 = async (c: Context<Env, "/api/media/:id/download">) => {
-  try {
-    return await serveMediaFile(c, { auditDownload: true, disposition: 'attachment' });
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
+  return await serveMediaFile(c, { auditDownload: true, disposition: 'attachment' });
 };
 
 export const get__api_media_id_content_10 = async (c: Context<Env, "/api/media/:id/content">) => {
-  try {
-    return await serveMediaFile(c, { auditDownload: false, disposition: 'inline' });
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
+  return await serveMediaFile(c, { auditDownload: false, disposition: 'inline' });
 };
 
 export const get__api_media_id_versions_versionNo_download_11 = async (c: Context<Env, "/api/media/:id/versions/:versionNo/download">) => {
-  try {
-    const id = c.req.param('id');
-    const accountId = c.req.query('accountId')?.trim();
-    const versionNo = Number(c.req.param('versionNo'));
-    if (!id || !Number.isInteger(versionNo) || versionNo < 1) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const media = await getMediaById(c.env.DB, id, accountId);
-    if (!media) {
-      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const version = await getMediaVersionByNo(c.env.DB, id, accountId, versionNo);
-    if (!version) {
-      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const versionGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
-      id: media.id,
-      lineAccountId: media.line_account_id,
-      r2Key: media.r2_key,
-      filename: media.filename,
-      mimeType: media.mime_type,
-      sizeBytes: media.size_bytes,
-      width: media.width,
-      height: media.height,
-    });
-    if (!versionGate.allowed) {
-      auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
-      return c.json({ success: false, code: versionGate.code, error: versionGate.message }, 409);
-    }
-    const object = await c.env.IMAGES.get(version.r2_key);
-    if (!object) return c.json({ success: false, error: 'Not found' }, 404);
-    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
-    // どの版か分かる名前で保存する（例: a.png → a-v1.png）。
-    const dot = media.filename.lastIndexOf('.');
-    const downloadName = dot > 0
-      ? `${media.filename.slice(0, dot)}-v${versionNo}${media.filename.slice(dot)}`
-      : `${media.filename}-v${versionNo}`;
-    return new Response(object.body, {
-      headers: {
-        'Content-Type': version.mime_type,
-        'Content-Disposition': `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
-        'Cache-Control': 'private, no-store',
-        'X-Content-Type-Options': 'nosniff',
-      },
-    });
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+  const id = c.req.param('id');
+  const accountId = c.req.query('accountId')?.trim();
+  const versionNo = Number(c.req.param('versionNo'));
+  if (!id || !Number.isInteger(versionNo) || versionNo < 1) {
+    return c.json({ success: false, error: 'Not found' }, 404);
   }
+  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const media = await getMediaById(c.env.DB, id, accountId);
+  if (!media) {
+    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const version = await getMediaVersionByNo(c.env.DB, id, accountId, versionNo);
+  if (!version) {
+    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const versionGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+    id: media.id,
+    lineAccountId: media.line_account_id,
+    r2Key: media.r2_key,
+    filename: media.filename,
+    mimeType: media.mime_type,
+    sizeBytes: media.size_bytes,
+    width: media.width,
+    height: media.height,
+  });
+  if (!versionGate.allowed) {
+    auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
+    return c.json({ success: false, code: versionGate.code, error: versionGate.message }, 409);
+  }
+  const object = await c.env.IMAGES.get(version.r2_key);
+  if (!object) return c.json({ success: false, error: 'Not found' }, 404);
+  auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
+  // どの版か分かる名前で保存する（例: a.png → a-v1.png）。
+  const dot = media.filename.lastIndexOf('.');
+  const downloadName = dot > 0
+    ? `${media.filename.slice(0, dot)}-v${versionNo}${media.filename.slice(dot)}`
+    : `${media.filename}-v${versionNo}`;
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': version.mime_type,
+      'Content-Disposition': `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 };

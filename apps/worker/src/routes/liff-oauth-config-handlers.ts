@@ -3,7 +3,7 @@ import { verifyNavigationProof } from '../lib/navigation-proof.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { accountCustomerStyle } from '../services/customer-style.js';
 import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
-import { patchFriendMetadata } from '../services/friend-metadata.js';
+import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 
 import { accountCustomerLook } from '../services/customer-look.js';
 import { customerLookPublicSettings, DEFAULT_CUSTOMER_LOOK } from '@line-crm/shared';
@@ -16,7 +16,7 @@ import { introMessagePayload } from '../lib/intro-message-payload.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { safeRedirectTarget, storedRedirectTarget } from '../lib/safe-redirect.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { decodeState, errorPage, stoppedLineAccountResponse, saveFriendAddCandidate, linkIgIgsid, saveIgAccountMeta, applyRefAttribution, resolveXHarnessToken, applyXHarnessActions, completionPage } from './liff-definition.js';
 import type { Context } from 'hono';

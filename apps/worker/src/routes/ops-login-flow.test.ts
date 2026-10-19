@@ -4,7 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import { hashPassword } from '../services/password-hash.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authEmail } from './auth-email.js';
 import { adminAuth } from './admin-auth.js';
 import { ops } from './ops.js';

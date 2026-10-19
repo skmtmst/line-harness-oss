@@ -9,7 +9,7 @@
  */
 
 import type { Context, Next } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authenticatedSensitiveLimit, preAuthSensitiveLimit } from './sensitive-rate-limit.js';
 
 // ---------------------------------------------------------------------------

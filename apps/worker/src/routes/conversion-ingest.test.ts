@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeHmacSha256Hex } from '../lib/hmac.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // N-270: 公開受信口 /api/conversions/ingest/:id の回帰テスト。
 // 管理認証を通さず、地点ごとの受信鍵で HMAC-SHA256 を照合し、
@@ -323,7 +323,7 @@ describe('POST /api/conversions/ingest/:id (N-270)', () => {
 });
 
 
-describe('B-333 署名済み外部受信の新鮮さ', () => {
+describe('署名済み外部受信の新鮮さ', () => {
   it.each([0, Math.floor(Date.now() / 1000) + 600])('古い・未来すぎる時刻 %s は記録しない', async timestamp => {
     const response = await signedRequest({ timestamp, friendId: 'f1', sourceEventId: 'e1' });
     expect(response.status).toBe(401);

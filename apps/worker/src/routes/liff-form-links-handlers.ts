@@ -7,7 +7,7 @@ import { getFriendByLineUserIdForAccount, getLineAccountById, getLineAccounts, g
 import { isStoppedEntryRouteRef } from '../services/entry-route-stop.js';
 import { buildIntroMessage } from '../services/intro-message.js';
 import { introMessagePayload } from '../lib/intro-message-payload.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 
 import { analyticsAccountScope, stoppedLineAccountResponse, linkIgIgsid, saveIgAccountMeta } from './liff-definition.js';

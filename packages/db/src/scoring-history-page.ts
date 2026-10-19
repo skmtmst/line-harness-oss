@@ -1,4 +1,4 @@
-import type { FriendScoreRow } from './scoring.js';
+import type { FriendScoreRow } from './scoring-types.js';
 import { boundedListLimit } from './utils.js';
 
 /** Bound to the same authorized friend and account as the next request. */

@@ -2,7 +2,7 @@ import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import type { Hono } from 'hono';
 import type { Context } from 'hono';
 import { CredentialEncryptionKeyError, encryptCredential } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';

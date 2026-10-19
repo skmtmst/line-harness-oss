@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
-import { claimFormCapacitySlot, releaseFormCapacityClaims } from '../src/forms.js';
+import { claimFormCapacitySlot, releaseFormCapacityClaims } from '../src/forms/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const opened: Database.Database[] = [];

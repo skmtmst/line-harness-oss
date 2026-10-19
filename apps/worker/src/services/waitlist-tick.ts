@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
-import { dispatchWaitlistInvites, finishExpiredWaitlists, promoteBookingWaitlist } from './booking-waitlist.js';
+import { dispatchWaitlistInvites, finishExpiredWaitlists, promoteBookingWaitlist } from '../features/booking/booking-waitlist/index.js';
 import { promoteSeatWaitlist } from './restaurant-seat-waitlist.js';
 /** 時間切れ・取り消し・変更・卓の追加を同じ判定へ送る。処理時刻で回し順を変える。 */
 export async function processBookingWaitlists(env: Env['Bindings'], accountId?: string,storeId?:string): Promise<void> {

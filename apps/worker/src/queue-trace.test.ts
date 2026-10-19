@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { currentInvocation, currentRequestId, logger, traceQueueMessage, tracedFetch, withInvocation } from '@line-crm/shared/server';
-import type { CodexMentionQueueMessage } from './services/codex-cloud-monitor.js';
+import type { CodexMentionQueueMessage } from './services/codex-cloud-types.js';
 import type { Env } from './worker-env.js';
 
 const processor = vi.hoisted(() => vi.fn());

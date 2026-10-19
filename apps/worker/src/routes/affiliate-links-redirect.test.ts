@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock @line-crm/db. index.ts pulls several helpers eagerly at module load, so
 // every referenced export must exist as a stub. The /r/:ref handler is the only
-// thing exercised here; unrelated helpers stay as bare vi.fn().
+// thing exercised here; unrelated helpers stay as bare vi.fn.
 const dbMocks = {
   // eager module-load deps (mirror not-found.test.ts)
   getLineAccounts: vi.fn().mockResolvedValue([]),

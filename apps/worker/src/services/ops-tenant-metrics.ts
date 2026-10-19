@@ -1,5 +1,5 @@
 import { findPlan } from './billing-plans.js';
-import { hqBillingMetrics } from './hq-billing-metrics.js';
+import { hqBillingMetrics } from '../features/hq-billing/hq-billing-metrics/index.js';
 
 /** Stored counters only. A plan's list price is explicitly separate from the invoiced amount. */
 export async function opsTenantMetrics(db:D1Database,tenantId:string) {

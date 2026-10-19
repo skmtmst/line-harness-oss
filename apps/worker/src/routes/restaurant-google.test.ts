@@ -652,7 +652,7 @@ describe('Googleビジネス：口コミ', () => {
 
   beforeEach(()=>{testDb.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('account-2','test-2','店','','',?)").run(TENANT);testDb.raw.exec("INSERT INTO account_ai_features(account_id,feature,enabled,consent_by,consent_at,disclosure_version) VALUES('account-2','google_review',1,'owner-1','2026-10-16','2026-10-16')");});
 
-  it('B354-GOOGLE-01: 既定off・別店の同意では呼ばず、自店の停止後もAIを呼ばない',async()=>{
+  it('既定off・別店の同意では呼ばず、自店の停止後もAIを呼ばない',async()=>{
     await seedReviews();const run=vi.fn(async()=>({response:'文'}));env.AI={run} as unknown as Ai;
     testDb.raw.exec("DELETE FROM account_ai_features");googleCalls=[];
     const response=await call(`/api/restaurant-test/google/reviews/${reviewIdOf('r1')}/draft/generate?account_id=account-2`,{body:{}});
@@ -849,7 +849,7 @@ describe('Googleビジネス：口コミ', () => {
   });
 });
 
-describe('B-368 実際の本番・検証設定を組み合わせたルート', () => {
+describe('実際の本番・検証設定を組み合わせたルート', () => {
   it.each(['production', 'staging'] as const)('%s のGoogle接続は開き、飲食店だけ独立して閉じる', async environment => {
     const { unstable_readConfig } = await import('wrangler');
     const config = unstable_readConfig({ config: new URL(environment === 'production' ? '../../wrangler.toml' : '../../wrangler.staging.toml', import.meta.url).pathname });
@@ -881,7 +881,7 @@ describe('B-368 実際の本番・検証設定を組み合わせたルート', (
 });
 
 
-it('B-368 Googleの店舗選択は同じ統括かつ担当範囲だけを返す', async () => {
+it('Googleの店舗選択は同じ統括かつ担当範囲だけを返す', async () => {
   seedStore();
   testDb.raw.prepare("INSERT INTO rt_stores (id,organization_id,name,code,line_account_id) VALUES ('sibling','org-1','同じ統括の店','SIBLING','account-1')").run();
   testDb.raw.prepare("INSERT INTO tenants (id,name) VALUES ('b368-other','別の統括')").run();

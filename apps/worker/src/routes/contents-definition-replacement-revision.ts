@@ -2,12 +2,16 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
 import { getMediaById, archiveMedia, restoreMedia, getStaffNameMap, getMediaReplacementPlan, getMediaUploadSession, getCurrentMediaVersionNo, getLatestMediaVersion, evaluateMediaVersionCompat, backfillMediaVersionMetadata, type MediaMetadata, jstNow, normalizeCommonVarValidityAt, type Media, type MediaKind, type CommonVar, type CommonVarSchedule, type CommonVarExpiryBehavior, type CommonVarUsageImpact, type CommonVarUsageItem } from '@line-crm/db';
+
+
+
+
 import type { CommonVarUsageKind } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../services/media-metadata.js';
-import { scanSingleMediaUsage } from '../services/media-usage-scan.js';
+import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../features/media/media-metadata/index.js';
+import { scanSingleMediaUsage } from '../features/media/media-usage-scan/index.js';
 import { checkMediaGate } from '../services/file-scan.js';
 import type { MediaReplacementImpact } from '@line-crm/shared';
 

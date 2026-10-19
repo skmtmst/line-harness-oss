@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { expect,it,vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 vi.mock('../services/account-access.js',()=>({canAccessAllLineAccounts:vi.fn(async(_db,_staff,ids)=>ids.every((id:string)=>id==='a'))}));
 import { notificationTeams } from './notification-teams.js';
 import { operatorRecipients } from '../services/operator-notification-dispatch.js';

@@ -15,7 +15,7 @@ async function setup(){
  const r=await gapCall(app,'/api/member-ranks/activate?account_id=a','POST',{expectedVersion:2});expect(r.status).toBe(200);
  return app;
 }
-test('RANK-15/B349-CARD-01: 本人の会員番号・短い特典・next.progress。再読込でも同番号',async()=>{
+test('RANK-15: 本人の会員番号・短い特典・next.progress。再読込でも同番号',async()=>{
  const app=await setup();const read=()=>app.request('/api/liff/member-card?liffId=liff-a&friendId=f2',{headers:{Authorization:'Bearer customer'}});
  const r=await read();expect(r.status).toBe(200);const card=(await r.json() as any).data;
  expect(card).toMatchObject({memberNumber:expect.stringMatching(/^[A-F0-9]{16}$/),name:'一般',benefits:['会員の特典'],next:{name:'金',remaining:2,progress:0.5}});
@@ -23,7 +23,7 @@ test('RANK-15/B349-CARD-01: 本人の会員番号・短い特典・next.progress
  expect((await app.request('/api/liff/member-card?liffId=liff-a')).status).toBe(401);
  expect((await app.request('/api/liff/member-card?liffId=other',{headers:{Authorization:'Bearer customer'}})).status).toBe(401);
 });
-test('RFM-11/B349-FILTER-01: 既存の検索形式で4条件をANDし、配信の同じ控えと一致する',async()=>{
+test('RFM-11: 既存の検索形式で4条件をANDし、配信の同じ控えと一致する',async()=>{
  await setup();await refreshCustomerSegments(d.db,'a',new Date());
  d.raw.exec("UPDATE customer_activity_daily SET amount=5000 WHERE friend_id='f' AND basis='purchase'");
  const rules=[{type:'visit_count',value:{min:2,max:3}},{type:'purchase_amount',value:{min:5000}},{type:'last_activity_at',value:{from:'2026-10-15',to:'2026-10-15'}},{type:'member_tier',value:'base'}] as const;
@@ -39,7 +39,7 @@ test.each([
  ['purchase_amount',{min:6000},{min:5000,max:5000}],
  ['last_activity_at',{from:'2026-10-16'},{from:'2026-10-15',to:'2026-10-15'}],
  ['member_tier','gold','base'],
-] as const)('B349-fmToi-%s: 1条件だけでも一致と不一致を分け、anyでも同じ値を使う',async(kind,miss,hit)=>{
+] as const)('%s: 1条件だけでも一致と不一致を分け、anyでも同じ値を使う',async(kind,miss,hit)=>{
  await setup();await refreshCustomerSegments(d.db,'a',new Date());
  d.raw.exec("UPDATE customer_activity_daily SET amount=5000 WHERE friend_id='f' AND basis='purchase'");
  const app=gapApp(d,[friends]);

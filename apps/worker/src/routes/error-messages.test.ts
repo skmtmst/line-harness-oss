@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * エラー文面の対応表（要件 v6-34 §9）。台帳 #134。
+ * エラー文面の対応表（要件 -34 §9）。台帳 #134。
  *
  * **表をそのまま返すだけ。** 文面の選び方は画面側が持つ。
  */

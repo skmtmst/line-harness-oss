@@ -2,7 +2,7 @@ import type { TemplateRow } from './template-row-types.js';
 export type { TemplateRow } from './template-row-types.js';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
-import { applyMediaUsageMutation } from './media.js';
+import { applyMediaUsageMutation } from './media/index.js';
 import { publishedVersionStatement } from './template-publish-statement.js';
 export { publishedVersionStatement } from './template-publish-statement.js';
 
@@ -832,7 +832,7 @@ function likeEscape(text: string): string {
 }
 
 function quickClause(keywords: string[]): string {
-  // instr() は大文字小文字を区別するので、従来の正規表現と同じ一致方になる。
+  // instr は大文字小文字を区別するので、従来の正規表現と同じ一致方になる。
   return `(${keywords.map(() => '(instr(name, ?) > 0 OR instr(message_content, ?) > 0)').join(' OR ')})`;
 }
 

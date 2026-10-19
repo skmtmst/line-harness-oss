@@ -5,15 +5,15 @@ import { countBroadcastLedger, isTemporaryLedgerErrorCode, deriveBroadcastDispla
 import type { BroadcastDisplayStatus } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
-import { processQueuedBroadcasts } from '../services/broadcast.js';
-import type { SegmentCondition } from '../services/segment-query.js';
+import { processQueuedBroadcasts } from '../features/broadcasts/broadcast/index.js';
+import type { SegmentCondition } from '@line-crm/shared';
 import { assertAnalyticsAudiencesUsable, BroadcastAudienceError } from '../services/segment-audience-guard.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { hasStaffPermission } from '../middleware/role-guard.js';
 import { getUnsupportedBroadcastVariables } from '../services/render-message.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
@@ -46,7 +46,7 @@ export async function canAccessBroadcast(
 }
 
 export /**
- * 配信の作成・更新・送信の共通境界(N-061＋v6-06 §6)。
+ * 配信の作成・更新・送信の共通境界(N-061＋-06 §6)。
  *
  * owner/adminは従来の範囲確認だけ通す(動作・状態を変えない)。一般staffは
  * /broadcasts に加え、操作ごとの個別キー（下書き・送信など）も要る。

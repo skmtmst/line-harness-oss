@@ -9,14 +9,14 @@ import type {
   UpdateMergedPersonDeliveryPrioritiesRequest,
   UpdateMergedPersonRequest,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   getFriendProfileCandidates,
   resolveProfileCandidateSelections,
   type ProfileCandidateSelectionReference,
-} from '../services/friend-profile-candidates.js';
+} from '../features/friends/friend-profile-candidates/index.js';
 import {
   getMergedPerson,
   hasMergedPersonHistory,

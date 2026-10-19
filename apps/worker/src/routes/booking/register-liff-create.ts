@@ -1,29 +1,29 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
-import { depositEstimate, cancellationCardRequired } from '../../services/booking-deposit.js';
-import { assertPassRequirement } from '../../services/booking-pass-plans.js';
-import { verifyRoutingToken } from '../../services/form-routing.js';
-import { bookingAddons } from '../../services/booking-addons.js';
-import { menuAudience } from '../../services/booking-audience.js';
-import { cancellationPolicy, requireCancellationTestConnection } from '../../services/booking-cancellation.js';
-import { EntitlementError, entitlementUseStatement, validateEntitlementSelection } from '../../services/booking-entitlements.js';
-import { defaultBookingPaymentSelection } from '../../services/booking-payment-selection.js';
-import { resolveFormBookingAnswer, FormBookingAnswerError } from '../../services/form-booking-answer.js';
-import { notifyForBooking } from '../../services/booking-notification.js';
-import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../../services/booking-confirmed-effects.js';
+import { depositEstimate, cancellationCardRequired } from '../../features/booking/booking-deposit/index.js';
+import { assertPassRequirement } from '../../features/booking/booking-pass-plans/index.js';
+import { verifyRoutingToken } from '../../features/forms/form-routing/index.js';
+import { bookingAddons } from '../../features/booking/booking-addons/index.js';
+import { menuAudience } from '../../features/booking/booking-audience/index.js';
+import { cancellationPolicy, requireCancellationTestConnection } from '../../features/booking/booking-cancellation/index.js';
+import { EntitlementError, entitlementUseStatement, validateEntitlementSelection } from '../../features/booking/booking-entitlements/index.js';
+import { defaultBookingPaymentSelection } from '../../features/booking/booking-payment-selection/index.js';
+import { resolveFormBookingAnswer, FormBookingAnswerError } from '../../features/forms/form-booking-answer/index.js';
+import { notifyForBooking } from '../../features/booking/booking-notification/index.js';
+import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../../features/booking/booking-confirmed-effects/index.js';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
-import { BOOKING_PERSON_LIMIT_GUARD_SQL, bookingPersonLimitBindings, bookingPersonLimitError } from '../../services/booking-person-limit.js';
+import { BOOKING_PERSON_LIMIT_GUARD_SQL, bookingPersonLimitBindings, bookingPersonLimitError } from '../../features/booking/booking-person-limit/index.js';
 import { getBookingAdminSettings, bookingPaymentInsertStatement, getBookingPaymentByBooking, decidePrepayOnly, prepayNoticeFor, resolveBookingPaymentConfig, resolveBookingPaymentForBooking } from '@line-crm/db';
 import { enrollByTrigger } from '../../services/reminder-trigger.js';
 import { getAccountTimeZone, getStoreCapacitySnapshot } from '../../services/availability.js';
-import { STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../../services/booking-store-capacity.js';
-import { BOOKING_RESOURCE_CAPACITY_GUARD_SQL, bookingResourceGuardBindings, insertBookingWithResourceSnapshot } from '../../services/booking-resource-capacity.js';
-import { completeIdempotencyResponse, findIdempotencyResponse, releaseReservedIdempotencyResponse, reserveIdempotencyResponse } from '../../services/booking-idempotency.js';
+import { STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../../features/booking/booking-store-capacity/index.js';
+import { BOOKING_RESOURCE_CAPACITY_GUARD_SQL, bookingResourceGuardBindings, insertBookingWithResourceSnapshot } from '../../features/booking/booking-resource-capacity/index.js';
+import { completeIdempotencyResponse, findIdempotencyResponse, releaseReservedIdempotencyResponse, reserveIdempotencyResponse } from '../../features/booking/booking-idempotency/index.js';
 import { dispatchOperatorEvent } from '../../services/operator-notification-dispatch.js';
 import { fireOutgoingWebhooks } from '../../services/event-bus.js';
-import { attachTagAndFireSideEffects } from '../../services/friend-tag-attach.js';
-import { DEFAULT_ACCOUNT_SETTINGS, IDEMPOTENCY_TTL_MINUTES, type BookingStatus } from '../../services/booking-types.js';
+import { attachTagAndFireSideEffects } from '../../features/friends/friend-tag-attach/index.js';
+import { DEFAULT_ACCOUNT_SETTINGS, IDEMPOTENCY_TTL_MINUTES, type BookingStatus } from '../../features/booking/booking-types/index.js';
 import { awardActivityMileage } from '../../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../../services/action-score-events.js';
 import { recordBookingAudit } from '@line-crm/db';
@@ -64,7 +64,7 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   if((body as Record<string,unknown>).routing_token!==undefined){if(body.routingToken!==undefined&&body.routingToken!==(body as Record<string,unknown>).routing_token)return c.json({error:'routing_token_invalid'},400);body.routingToken=String((body as Record<string,unknown>).routing_token);}
   if(body.recurrence!==undefined||body.members!==undefined){
     const friend=await resolveFriendId(c,callerLineUserId,accountId);if(!friend)return c.json({error:'friend_not_found'},404);
-    const {createBulkBooking}=await import('../../services/booking-bulk.js');return createBulkBooking(c,accountId,friend,body as Record<string,unknown>);
+    const {createBulkBooking}=await import('../../features/booking/booking-bulk.js');return createBulkBooking(c,accountId,friend,body as Record<string,unknown>);
   }
   try { await assertPassRequirement(c.env.DB,accountId,body.menu_id,body.entitlement_id); } catch(e) { if(e instanceof EntitlementError)return c.json({error:e.code},e.status);throw e; }
   if (body.entitlement_id !== undefined && (typeof body.entitlement_id !== 'string' || !body.entitlement_id)) return inputError(c,{error:'invalid_entitlement_id'},400,['entitlement_id']);

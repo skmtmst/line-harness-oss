@@ -17,10 +17,11 @@ import {
   toJstString,
   decryptCredential,
 } from '@line-crm/db';
+
 import { GoogleCalendarClient } from '../services/google-calendar.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const calendar = new Hono<Env>();
 

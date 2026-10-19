@@ -3,7 +3,7 @@ import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import {storeComparison} from './store-comparison.js';
 import {processComparisonExports} from '../services/store-comparison-export.js';
 import {authMiddleware} from '../middleware/auth.js';
-import {Hono} from 'hono';import type {Env} from '../index.js';
+import {Hono} from 'hono';import type { Env } from '../worker-env.js';
 let d:ReturnType<typeof gapFixture>;const filters={from:'2026-10-15',to:'2026-10-15',compare:'average',order:'desc'};
 beforeEach(()=>{d=gapFixture();vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));for(let i=0;i<24;i++){const id='store'+i;d.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,tenant_id,channel_access_token,channel_secret) VALUES(?,?,?,'t','token','secret')").run(id,id,i===0?' =FORMULA':'店'+i);d.raw.prepare("INSERT INTO hq_store_daily_metrics(account_id,date,bookings,state,computed_at) VALUES(?,'2026-10-15',?,'partial','2026-10-16T00:00:00Z')").run(id,i);}});
 afterEach(()=>{expect(fetch).not.toHaveBeenCalled();d.raw.close();vi.unstubAllGlobals();});

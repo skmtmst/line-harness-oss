@@ -7,7 +7,7 @@ import {
   deleteUnusedConversionDefinition,
   replaceConversionDefinitionUsages,
   stopConversionDefinition,
-} from '../src/conversion-definitions.js';
+} from '../src/conversion-definitions/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 /** Cloudflare D1 batchの「1文失敗で全体rollback」を再現し、指定文を故障注入する。 */

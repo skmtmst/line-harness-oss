@@ -5,7 +5,7 @@ import { inputError } from '../lib/input-errors.js';
 
 import type { Message } from '@line-crm/line-sdk';
 import { getChatById, updateChat, jstNow } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { classifyLineOutboundFailure, completeOutboundSendStatement, failOutboundSend, hashOutboundPayload, isValidIdempotencyKey, reserveOutboundSend } from '../services/outbound-idempotency.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';

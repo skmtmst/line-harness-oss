@@ -1,7 +1,8 @@
 import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
 import { getPlatformSetting, getStaffById, recordAuditEvent, type StaffMember } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { startTwoFactorChallenge, twoFactorRequired } from './admin-session.js';
 

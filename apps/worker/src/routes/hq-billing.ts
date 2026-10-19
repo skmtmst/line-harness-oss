@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { mapStripeSubscriptionStatus } from './hq-subscription-status.js';
 export { mapStripeSubscriptionStatus } from './hq-subscription-status.js';
-import { hqBillingMetrics } from '../services/hq-billing-metrics.js';
+import { hqBillingMetrics } from '../features/hq-billing/hq-billing-metrics/index.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono'
 import {
@@ -15,7 +15,8 @@ import {
   type TenantBilling,
   type TenantPlanStatus,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
@@ -35,7 +36,7 @@ import { StripeApiError, stripeApi, type StripeInvoice, type StripeSubscription 
 import { MAX_STRIPE_WEBHOOK_BODY_BYTES, readBodyWithinLimit, verifyStripeSignature } from '../services/stripe-signature.js';
 
 /**
- * 統括の課金（★V6 36-2）。Stripe のサブスクリプション。
+ * 統括の課金（★36-2）。Stripe のサブスクリプション。
  *
  * - `summary`: いまの契約状態とプラン一覧（金額は Stripe の価格が取れればそちら）
  * - `checkout`: Stripe Checkout（申込画面）の URL を作る。オーナーだけ

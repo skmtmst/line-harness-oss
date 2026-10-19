@@ -9,7 +9,7 @@ import {
   publishConversionDefinition,
   reviseConversionDefinition,
   stopConversionDefinition,
-} from '../src/conversion-definitions.js';
+} from '../src/conversion-definitions/index.js';
 
 /*
  * CONVERSION-07: 下書きの成果地点の正常編集が常に409で失敗していた回帰。

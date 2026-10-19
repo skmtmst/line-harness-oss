@@ -1,5 +1,7 @@
 import type {AccountStyle} from '@line-crm/shared';
-import {profile,starter,StyleError} from './style-setup.js';
+import { profile } from './style-profile.js';
+import { starter } from './style-starter-set.js';
+import { StyleError } from './style-setup-core.js';
 
 export async function prepareStarterInsert(db:D1Database,account:string,tenant:string|null,style:AccountStyle,input:Record<string,unknown>,options:{set?:Awaited<ReturnType<typeof starter>>;skipExisting?:boolean}) {
   const set = options.set ?? (await starter(db, tenant, style));

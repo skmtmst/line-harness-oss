@@ -2,12 +2,12 @@ import { applyTapExtras } from './tap-extras.js';
 import type { TapExtras } from '@line-crm/shared';
 import {featureJobCanRun} from './feature-enforcement.js';
 import { ensureWorkflowStep,prepareWorkflowStep,getWorkflowStep,recordLinkClick,jstNow,enrollFriendInScenario,trackConversion } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { acquireWorkflow } from './workflow-execution.js';
 import { awardActivityMileage } from './activity-mileage.js';
 import { applyActionScoreEvent } from './action-score-events.js';
-import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
-import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { dispatchAutomationEventWithLogging } from '../features/automations/automation-triggers/index.js';
+import { attachTagAndFireSideEffects } from '../features/friends/friend-tag-attach/index.js';
 
 export interface TrackedClickPlan {
   linkId:string;friendId:string|null;accountId:string|null;tagId:string|null;scenarioId:string|null;

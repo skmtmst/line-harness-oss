@@ -1,5 +1,5 @@
 import { type Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { inputError } from '../lib/input-errors.js';
 

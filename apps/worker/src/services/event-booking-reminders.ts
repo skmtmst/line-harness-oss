@@ -1,7 +1,7 @@
 import { recoverEventTransitions } from './event-transition-recovery.js';
 import type { AccountStyle } from '@line-crm/shared';
 import { recoverEventBookingNotifications } from './event-notification-recovery.js';
-import { deliverBookingLine, BookingLineDeliveryIncomplete } from './booking-line-delivery.js';
+import { deliverBookingLine, BookingLineDeliveryIncomplete } from '../features/booking/booking-line-delivery/index.js';
 // Event booking reminders: schedule + cron processor.
 // Phase 1 mirrors booking-reminders.ts pattern but on event_booking_reminders.
 

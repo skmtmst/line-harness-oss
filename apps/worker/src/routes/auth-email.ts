@@ -3,7 +3,7 @@ import { readCookie } from '../middleware/auth-http.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import {
@@ -28,6 +28,7 @@ import {
   updateStaffMember,
   type AuthEmailToken,
 } from '@line-crm/db';
+
 import { clientIp, issueSession, randomToken, recordSuccessfulLoginAudit } from '../services/admin-session.js';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from '../services/password-hash.js';
 import { turnstileErrorMessage, verifyTurnstile } from '../services/turnstile.js';
@@ -42,7 +43,7 @@ import {
 import { TRIAL_DAYS } from '../services/billing-plans.js';
 
 /**
- * 会員登録（★V6 36-4）・メール＋パスワードのログイン・パスワード再設定（36-6）。
+ * 会員登録（★36-4）・メール＋パスワードのログイン・パスワード再設定（36-6）。
  *
  * 流れ（決定 2026-09-13）:
  *   1. メールアドレスだけ入れる → 本登録 URL をメールで送る（誤入力のメールでは進まない）

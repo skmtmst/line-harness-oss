@@ -34,7 +34,7 @@ test.each(['success', 'error'] as const)('OPSSET-02: 遅れた旧タブの%sは�
   expect(document.body.textContent).not.toContain('API 503');
 });
 
-test('B-241: イベント履歴の失敗は空履歴を出さず、もう一度から回復する', async () => {
+test('イベント履歴の失敗は空履歴を出さず、もう一度から回復する', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   document.body.innerHTML = '<div id="app"></div>';
   let fail = true;

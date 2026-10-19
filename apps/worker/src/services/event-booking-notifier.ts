@@ -3,9 +3,10 @@ import { notificationWords, readNotificationStyle } from './notification-words.j
 import { currentEventNotificationSubject,type EventNotificationSubject } from './event-notification-subject.js';
 import { activeTenantLineAccountSql, isOperationCapabilityStopped } from '@line-crm/db';
 import { lineTransport } from '../lib/external-call/line.js';
-import { deliverBookingLine } from './booking-line-delivery.js';
+import { deliverBookingLine } from '../features/booking/booking-line-delivery/index.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { LineClient, type Message } from '@line-crm/line-sdk';
+
 
 export type EventNotificationKind =
   | 'received_pending'

@@ -1,7 +1,7 @@
 import {sendRecordedNotification,NotificationDeliveryIncomplete} from './recorded-notification-send.js';
 import { LineClient } from '@line-crm/line-sdk';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 type OutboxRow = {
   id: string;

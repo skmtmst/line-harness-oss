@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dangerousOperationPurpose } from './sensitive-operation-purpose.js';
 export { dangerousOperationPurpose } from './sensitive-operation-purpose.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';

@@ -46,7 +46,7 @@ export function inputJsonBoundary(shape: InputShape = {}, options: { maxBytes?: 
       && (options.maxBytes !== undefined || /^application\/(?:[\w.+-]+\+)?json(?:\s*;|$)/i.test(c.req.header('content-type') ?? ''))) {
       try {
         // 上限のある口では clone へ全文を貯めず、元のストリームを上限まで読む。
-        // 上限内の本文だけを後続の Hono json()/text() に渡す。
+        // 上限内の本文だけを後続の Hono json/text に渡す。
         let body: unknown;
         if (options.maxBytes !== undefined) {
           const text = await readBoundedText(c.req.raw, options.maxBytes);
@@ -73,7 +73,7 @@ export function inputJsonBoundary(shape: InputShape = {}, options: { maxBytes?: 
 /**
  * inputJsonBoundary が読んで検査し終えた本文。
  * この口を通ったルートが本文を使うときは、自分で読み直さずこれを使う。
- * 読み直すと clone() で分けた同じ本文を二度読むことになり、
+ * 読み直すと clone で分けた同じ本文を二度読むことになり、
  * 中身は正しいのに読み取りの失敗で 400 になる余地が残る。
  * この口を通らない（本文が無い・JSON以外・除外パス）場合は undefined。
  */
@@ -131,7 +131,7 @@ export function boundedUploadBody(maxBinaryBytes: number): MiddlewareHandler {
 }
 export type InputShape = Record<string, readonly InputKind[]>;
 
-/** 型の違う値を .trim() 等へ渡して500にしない。必須・範囲・相関の検証は各ルートで行う。 */
+/** 型の違う値を .trim 等へ渡して500にしない。必須・範囲・相関の検証は各ルートで行う。 */
 export function inputShapeErrors(body: Record<string, unknown>, shape: InputShape): ApiFieldErrors {
   const fields: ApiFieldErrors = {};
   for (const [key, kinds] of Object.entries(shape)) {

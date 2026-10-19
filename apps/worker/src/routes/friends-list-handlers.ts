@@ -4,8 +4,11 @@ import { idChunks } from '@line-crm/db/id-queries';
 
 import { getFriendListFieldValues, getFriendAddBreakdown, getFriendTagsByFriendIds, getSavedSearchById, recordSavedSearchUsage, validateSearchConditions } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
+
+
 import { BASIC_FRIEND_FIELDS, DEFAULT_TENANT_ID, type SavedSearchConditions } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { hasStaffPermission } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listResponse } from '../lib/list-etag.js';
@@ -435,7 +438,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
 
     // Optional: hydrate chat status (latest in/out message, active scenario,
     // derived "handled" flag). Three batched queries instead of N×3 to keep
-    // the request cheap even at limit=50. ROW_NUMBER() picks the freshest
+    // the request cheap even at limit=50. ROW_NUMBER picks the freshest
     // row per friend; SQLite supports window functions on D1.
     if (includeChatStatus && items.length > 0) {
       const ids = items.map((f) => f.id);

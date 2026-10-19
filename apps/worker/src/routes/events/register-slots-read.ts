@@ -1,5 +1,4 @@
-import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
 import { requireRole } from '../../middleware/role-guard.js';
@@ -46,7 +45,7 @@ events.get('/api/events/admin/events/:id/occurrence-selector', async (c) => {
 // GET /api/events/admin/events/:id/waitlist — キャンセル待ちの一覧
 //
 // 空きが出たときに誰へ案内したかも含めて見るための互換一覧。
-// V6の開催回別画面は /occurrences/:id/applicants を使う。
+// の開催回別画面は /occurrences/:id/applicants を使う。
 events.get('/api/events/admin/events/:id/waitlist', async (c) => {
   const account_id = getAccountId(c);
   if (!account_id) return bad(c, 'account_id_required', 400);
@@ -68,7 +67,7 @@ events.get('/api/events/admin/events/:id/waitlist', async (c) => {
   return c.json({ waitlist: results });
 });
 
-// V6では event_slots を「開催回(occurrence)」として扱う。
+// では event_slots を「開催回(occurrence)」として扱う。
 events.get(
   '/api/events/admin/occurrences/:id/applicants',
   requireRole('owner', 'admin', 'staff'),
@@ -96,48 +95,43 @@ events.get(
   '/api/events/admin/occurrences/:id/applicants.csv',
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
-    try {
-      const accountId = getAccountId(c);
-      if (!accountId) return bad(c, 'account_id_required', 400);
-      const occurrenceId = c.req.param('id');
-      const snapshotId = c.req.query('snapshot_id');
-      if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
-      const loaded = await getEventApplicantSnapshot(c.env.DB, {
-        id: snapshotId,
-        lineAccountId: accountId,
-        occurrenceId,
-        staffId: c.get('staff')!.id,
-      });
-      if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
-      if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
-      if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
-      c.set('outputAudit', { count: loaded.snapshot.data.applicants.length, accountId, targetId: occurrenceId });
-      const rows = loaded.snapshot.data.applicants.map((applicant) => [
-        applicant.displayName,
-        applicant.source === 'waitlist' ? 'キャンセル待ち' : '申込',
-        applicant.status,
-        applicant.partySize,
-        applicant.appliedAt,
-        applicant.offerExpiresAt,
-      ].map(csvCell).join(','));
-      const safeId = occurrenceId.replace(/[^A-Za-z0-9_-]/g, '') || 'occurrence';
-      auditLog(c, 'event.applicant.export', { kind: 'event_occurrence', id: occurrenceId }, {
-        lineAccountId: accountId,
-      });
-      return new Response(`\uFEFF${[
-        ['申込者', '区分', '状態', '人数', '申込日時', '案内期限'].map(csvCell).join(','),
-        ...rows,
-      ].join('\r\n')}\r\n`, {
-        headers: {
-          'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="event-${safeId}-applicants.csv"`,
-          'Cache-Control': 'no-store',
-        },
-      });
-    } catch (error) {
-      logger.error("routes_events_failed");
-      return c.json({ error: 'applicants_export_failed' }, 500);
-    }
+    const accountId = getAccountId(c);
+    if (!accountId) return bad(c, 'account_id_required', 400);
+    const occurrenceId = c.req.param('id');
+    const snapshotId = c.req.query('snapshot_id');
+    if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
+    const loaded = await getEventApplicantSnapshot(c.env.DB, {
+      id: snapshotId,
+      lineAccountId: accountId,
+      occurrenceId,
+      staffId: c.get('staff')!.id,
+    });
+    if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
+    if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
+    if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
+    c.set('outputAudit', { count: loaded.snapshot.data.applicants.length, accountId, targetId: occurrenceId });
+    const rows = loaded.snapshot.data.applicants.map((applicant) => [
+      applicant.displayName,
+      applicant.source === 'waitlist' ? 'キャンセル待ち' : '申込',
+      applicant.status,
+      applicant.partySize,
+      applicant.appliedAt,
+      applicant.offerExpiresAt,
+    ].map(csvCell).join(','));
+    const safeId = occurrenceId.replace(/[^A-Za-z0-9_-]/g, '') || 'occurrence';
+    auditLog(c, 'event.applicant.export', { kind: 'event_occurrence', id: occurrenceId }, {
+      lineAccountId: accountId,
+    });
+    return new Response(`\uFEFF${[
+      ['申込者', '区分', '状態', '人数', '申込日時', '案内期限'].map(csvCell).join(','),
+      ...rows,
+    ].join('\r\n')}\r\n`, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="event-${safeId}-applicants.csv"`,
+        'Cache-Control': 'no-store',
+      },
+    });
   },
 );
 }

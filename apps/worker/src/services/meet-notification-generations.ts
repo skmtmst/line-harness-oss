@@ -1,4 +1,4 @@
-import type { MeetReminderSchedule, RegisterMeetConsultationInput } from './meet-consultation-reminders.js';
+import type { MeetReminderSchedule, RegisterMeetConsultationInput } from './meet-reminder-types.js';
 
 export interface StoredConsultation {
   id: string; friend_id: string; starts_at: string; ends_at: string; meet_url: string;

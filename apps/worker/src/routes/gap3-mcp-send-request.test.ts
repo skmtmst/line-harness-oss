@@ -5,7 +5,7 @@ import {broadcastApprovals} from './broadcast-approvals.js';
 import {mcpConnections} from './mcp-connections.js';
 import {mcpRpc} from './mcp-rpc.js';
 import {sha256Hex} from '../middleware/auth.js';
-import {scheduleSimulation,simulationPreview,processBroadcastSimulation,saveSimulationDraft} from '../services/broadcast-simulation.js';
+import {scheduleSimulation,simulationPreview,processBroadcastSimulation,saveSimulationDraft} from '../features/broadcasts/broadcast-simulation.js';
 let d:ReturnType<typeof gapFixture>;
 const app=()=>gapApp(d,[mcpConnections,mcpRpc]);
 beforeEach(async()=>{d=gapFixture();vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));d.raw.exec("INSERT INTO staff_members(id,name,role,tenant_id,api_key) VALUES('approver','承認者','admin','t','approve-key')");d.raw.prepare('INSERT INTO admin_sessions(token_hash,staff_id,expires_at,step_up_at) VALUES(?,?,?,?)').run(await sha256Hex('session'),'o',new Date(Date.now()+3600000).toISOString(),new Date().toISOString());});

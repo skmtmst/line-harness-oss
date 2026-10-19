@@ -11,7 +11,7 @@ import {
 } from './affiliate-settlements.js';
 import { createAffiliateLink } from './affiliate-links.js';
 import type { AffiliateLink } from './affiliate-links.js';
-import { ensureDefaultMileageProgram } from './mileage.js';
+import { ensureDefaultMileageProgram } from './mileage/index.js';
 // =============================================================================
 // Affiliate Offers (案件) — ASP Phase 2
 // =============================================================================
@@ -1025,7 +1025,7 @@ export async function createOfferVersion(
 // ── 上限の使用状況 ─────────────────────────────────────────────────────────
 
 /**
- * 日本時間の月の区切りを ISO 文字列で返す。SQLite 側は julianday() で
+ * 日本時間の月の区切りを ISO 文字列で返す。SQLite 側は julianday で
  * 時刻として比べる(文字列の形に依存しないため。affiliate-attribution 参照)。
  */
 export function jstMonthRange(at?: string): { start: string; end: string } {

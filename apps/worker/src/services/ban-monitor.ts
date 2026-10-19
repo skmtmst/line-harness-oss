@@ -18,7 +18,8 @@ import {
   type LineAccount,
 } from '@line-crm/db';
 
-/** Webhook が無いまま警告を出すまでの時間（v6-33 §11-1 の既定24時間）。 */
+
+/** Webhook が無いまま警告を出すまでの時間（-33 §11-1 の既定24時間）。 */
 const WEBHOOK_SILENCE_WARNING_MS = 24 * 60 * 60 * 1000;
 /** 「正常」が続いたらプールへ自動で戻すまでの時間（X の確定値・24時間）。 */
 const POOL_RETURN_NORMAL_MS = 24 * 60 * 60 * 1000;
@@ -151,7 +152,7 @@ async function checkSingleAccount(
   if (riskLevel === 'danger') {
     logger.error("services_ban_monitor_failed");
     /*
-     * 自動切替（v6-33 §11-2、X-2）。トラフィックプールに入っている
+     * 自動切替（-33 §11-2、X-2）。トラフィックプールに入っている
      * アカウントが danger になったら、プールの中だけで止めて、
      * 友だち追加先を同じ組の予備へ切り替える。
      * アカウント自体の is_active は触らない（配信・受信の停止は別の決まり）。

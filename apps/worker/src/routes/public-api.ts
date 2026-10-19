@@ -13,7 +13,8 @@ import {
   type IntegrationApiScope,
   type IntegrationApiTokenRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { fireEvent } from '../services/event-bus.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
@@ -206,7 +207,7 @@ async function readTagAssignedAt(db: D1Database, friendId: string, tagId: string
 /**
  * タグ変化を業務の受け口へ渡す（R436）。
  *
- * V6公開版は発生元の不変IDと所属が分かる出来事だけを受け付ける。
+ * 公開版は発生元の不変IDと所属が分かる出来事だけを受け付ける。
  * IDは「公開の付与:友だち:タグ:確定時刻」で、再送でも同じになる。
  * 旧自動化・加点も同じ1回に乗るので、呼び出し側は重複して呼ばない。
  */

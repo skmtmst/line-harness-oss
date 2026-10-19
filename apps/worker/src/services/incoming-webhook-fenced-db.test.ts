@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyScoring, publishScenarioVersion } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { incomingWebhookFencedDb } from './incoming-webhook-fenced-db.js';
-import { createAutomationActionExecutors } from './automation-action-executors.js';
-import type { ActionDefinition, AutomationActionContext } from './automation-engine.js';
+import { createAutomationActionExecutors } from '../features/automations/automation-action-executors.js';
+import type { ActionDefinition, AutomationActionContext } from '../features/automations/automation-engine.js';
 
 describe('受信所有権と副作用を同じSQL transactionで検査する', () => {
   let testDb: SqliteD1;

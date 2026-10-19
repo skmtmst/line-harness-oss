@@ -8,17 +8,20 @@ import { messageTemplateSearchIds, listTemplateViews, saveTemplateView, archiveT
 import { markListStats } from '../services/hq-templates/mark-list-stats.js';
 import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { swapHqFolderOrder, HqFolderError } from '@line-crm/db';
+import { HQ_TEMPLATE_TYPES, getStaffById, getHqTemplate, type HqTemplateType } from '@line-crm/db';
 import { isFriendAttributeType, preflightFriendAttribute, distributeFriendAttribute, friendAttributeResult } from '../services/hq-templates/friend-attribute-distribution.js';
 import { TEMPLATE_KINDS, type TemplateKindCounts, type TemplateKind } from '@line-crm/shared';
+
 import { listTemplateFolders, saveTemplateFolder, deleteTemplateFolder, duplicateTemplate } from '../services/hq-templates/folders.js';
 import { listMessageReferences } from '../services/hq-templates/message-card-references.js';
 import { deleteHqImage, uploadHqImage, uploadHqImagemap } from '../services/hq-templates/authoring-media.js';
 import { TemplateHqTemplateError } from '../services/hq-templates/template.js';
 import { createHqMediaSession, completeHqMediaSession, cancelHqMediaSession, listHqRegisteredMedia } from '../services/hq-media.js';
 import { Hono, type Context } from 'hono';
-import { HQ_TEMPLATE_TYPES, getStaffById, getHqTemplate, type HqTemplateType } from '@line-crm/db';
+
+
 import { dbFor } from '../services/db-router.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireHqTemplateAuthority, type HqTemplateAuthority } from '../services/hq-templates/contract.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { templateVersions, compareTemplateVersions, restoreTemplateVersion, templateReceivedVersions, HqTemplateError, templateCreationRequestId, listTemplates, listTemplateAccounts, templateDetail, saveTemplate, deleteTemplate, preflightDistribution, distributeTemplate, distributionResult, type DistributionSelection } from '../services/hq-templates/distribution.js';

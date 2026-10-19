@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import { friendFieldReminderTargetStatements } from './reminders.js';
+import { friendFieldReminderTargetStatements } from './reminders/index.js';
 import { jstNow } from './utils.js';
 import { ageFromBirthday, allergyValues, validateAllergyValues, DEFAULT_ALLERGY_OPTIONS } from '@line-crm/shared';
 
@@ -575,7 +575,7 @@ export async function getFriendFieldValuesForMigration(
   return result.results;
 }
 
-/** V6 4-2 上部の4枚に使う、選択中アカウントだけの集計。 */
+/** 4-2 上部の4枚に使う、選択中アカウントだけの集計。 */
 export async function getFriendFieldListSummary(
   db: D1Database,
   scope: FriendFieldScope,

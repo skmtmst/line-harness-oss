@@ -10,7 +10,7 @@
 
 import { LineHarness } from '@line-harness/sdk'
 import { MyServiceClient } from './external-api.js'
-import type { Env } from './index.js'
+import type { Env } from './env.js';
 
 /**
  * Check conditions in MyService and send relevant notifications.

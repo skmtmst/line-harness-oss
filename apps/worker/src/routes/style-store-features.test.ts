@@ -4,7 +4,7 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { storeFeatureInitialization } from '@line-crm/db/src/store-feature-initialization.js';
 import { initializeAccountStyle, saveProfile } from '../services/style-setup.js';
 import { styles } from './styles.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: async (_db: unknown, _staff: unknown, ids: string[]) =>

@@ -17,7 +17,8 @@ import {
   isAccountFeatureEnabled,
   type LineAccount,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import {
   GoogleBusinessError,
   authorizedJson,

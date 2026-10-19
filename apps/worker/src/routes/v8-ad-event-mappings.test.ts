@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { expect,it,vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 vi.mock('../services/account-access.js',()=>({canAccessAllLineAccounts:vi.fn(async(_db,_staff,ids)=>ids.every((id:string)=>id==='a'))}));
 import { adEventMappings } from './ad-event-mappings.js';
 it('validates manual override, scope, role and concurrent versions',async()=>{

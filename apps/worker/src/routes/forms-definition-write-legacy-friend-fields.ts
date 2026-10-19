@@ -1,22 +1,28 @@
 import { logger } from '@line-crm/shared/server';
 import { hasDeliveryAccess } from '@line-crm/shared';
+import { formatAddressValue, type FormLayout } from '@line-crm/shared';
 import { parseFormFields } from './form-field-definition.js';
-import { patchFriendMetadata } from '../services/friend-metadata.js';
-import { writeFormDestinationsOnce } from '../services/form-destination-workflow.js';
+import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
+import { writeFormDestinationsOnce } from '../features/forms/form-destination-workflow/index.js';
 import { inputError } from '../lib/input-errors.js';
 import { type MiddlewareHandler } from 'hono';
 import { getFormAccountIds, getFormSubmissionById, updateFormSubmissionDestinationWriteResult, getFriendById, jstNow } from '@line-crm/db';
 import { enrollFriendInScenario } from '@line-crm/db';
-import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
+import type { Form as DbForm, FormSubmission as DbFormSubmission, FormDestinationWriteResult } from '@line-crm/db';
+import { applyMileageRulesForEvent } from '@line-crm/db';
+
+import { attachTagAndFireSideEffects } from '../features/friends/friend-tag-attach/index.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
-import type { Form as DbForm, FormSubmission as DbFormSubmission, FormDestinationWriteResult } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { applyMileageRulesForEvent } from '@line-crm/db';
-import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
-import { applyFormLayoutEffects } from '../services/form-layout-effects.js';
-import { formatAddressValue, type FormLayout } from '@line-crm/shared';
+
+import { dispatchAutomationEventWithLogging } from '../features/automations/automation-triggers/index.js';
+import { applyFormLayoutEffects } from '../features/forms/form-layout-effects/index.js';
+
+
 import { requireFormManage, resolveFriendAccessToken, displayAnswerValue, ClaimOwnershipLost } from './forms-definition-stopped-public-form-response.js';
 
 export async function writeLegacyFriendFields(
@@ -352,7 +358,7 @@ async function runFormPostEffects(input: {
     });
   }
 
-  // B-249: evaluate conditions only after every customer registration succeeded.
+  // evaluate conditions only after every customer registration succeeded.
   // This checkpoint also gives both resubmission and staff retry the same recovery path.
   effectRuns.push({
     step: 'automation',

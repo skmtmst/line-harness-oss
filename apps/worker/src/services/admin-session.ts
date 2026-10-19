@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { parseCookieHeader } from '../middleware/auth-http.js';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { adminSessionCookie, csrfCookie, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, sha256Hex } from '../middleware/auth/credentials/auth.js';
 import {
   adminSessionFamiliarity,
@@ -15,6 +15,7 @@ import {
   type StaffMember,
   type TwoFactorChallengePurpose,
 } from '@line-crm/db';
+
 import { sendPlainMail } from './plain-mail.js';
 
 /**
@@ -81,7 +82,7 @@ export function deviceHashFromUserAgent(userAgent: string | null): Promise<strin
 }
 
 /**
- * いつもと違う端末・場所からのログインを本人へ知らせる（v6-30 §14、V-2）。
+ * いつもと違う端末・場所からのログインを本人へ知らせる（-30 §14、V-2）。
  *
  * 管理画面の帯は session の unfamiliar_at が担う。ここでは監査（要確認の行）と
  * メールを出す。通知の失敗でログイン自体を止めない。

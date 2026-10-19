@@ -1,6 +1,7 @@
 import { reservationInstant } from '@line-crm/shared';
 import { parseScenarioVersionSteps, type ScenarioVersion } from '@line-crm/db';
-import type { RestaurantEvent } from './restaurant-events.js';
+
+import type { RestaurantEvent } from './restaurant-event-types.js';
 export interface FollowupTemplate {
     store_id: string;
     scenario_id: string;

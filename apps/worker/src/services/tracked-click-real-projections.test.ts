@@ -3,7 +3,7 @@ vi.mock('./feature-enforcement.js',()=>({featureJobCanRun:async()=>true}));
 import {processPendingMileageEvents,toJstString} from '@line-crm/db';
 import {createTestD1,insertFriend,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import {recordTrackedClick,processTrackedClick,processDueTrackedClicks} from './tracked-click-steps.js';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 let item:SqliteD1;
 beforeEach(()=>{
  item=createTestD1();

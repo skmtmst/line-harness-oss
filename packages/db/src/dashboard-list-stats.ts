@@ -7,7 +7,7 @@ import { sqlIdSet } from './id-queries.js';
  * 「有効友だちは今朝の値、未対応は今の値」のような画面は読み違えのもとなので、
  * 1回のリクエストでまとめて返す。
  */
-import { FORM_SUBMIT_CLAIM_STALE_MS } from './forms.js';
+import { FORM_SUBMIT_CLAIM_STALE_MS } from './forms/index.js';
 import { toJstString } from './utils.js';
 import { type AccountStatsScope, type ListStats } from './dashboard-types.js';
 import { jstDate, nextMonth } from './dashboard-freshness.js';

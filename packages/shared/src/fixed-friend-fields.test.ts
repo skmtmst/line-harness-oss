@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { ageFromBirthday, FIXED_FRIEND_FIELDS } from './fixed-friend-fields'
-import { emptyLayout, normalizeLayout, validateAnswer, validateFormDefinition, type FormInputBlock } from './form-layout'
+import { emptyLayout, normalizeLayout, validateAnswer, validateFormDefinition } from './form-layout';
+import { type FormInputBlock } from './types/form-layout';
 
 describe('fixed form fields', () => {
   test('JST birthday, future and invalid dates', () => {

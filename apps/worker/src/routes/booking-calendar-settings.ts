@@ -1,8 +1,8 @@
 import {Hono,type Context} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {gapAccount,gapBody,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
-import {calendarSwitch,validMeetingUrl} from '../services/booking-calendar-settings.js';
-import {bookingChannelBounds} from '../services/booking-channels.js';
+import {calendarSwitch,validMeetingUrl} from '../features/booking/booking-calendar-settings/index.js';
+import {bookingChannelBounds} from '../features/booking/booking-channels/index.js';
 import {getAccountTimeZone} from '../services/availability.js';
 import {BOOKING_STAFF_OWN_KEY} from '@line-crm/shared';
 export const bookingCalendarSettings=new Hono<Env>();

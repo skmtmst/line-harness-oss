@@ -383,9 +383,9 @@ describe('GET /api/rich-menu-groups/:groupId', () => {
   });
 });
 
-// ----- POST preview-targets / schedule / GET usages (V6 12-1-B/D/F) -----
+// ----- POST preview-targets / schedule / GET usages (12-1-B/D/F) -----
 
-describe('V6 targeting preview and publish schedule', () => {
+describe('targeting preview and publish schedule', () => {
   test('削除確認へ割当台帳の現在表示人数を返す', async () => {
     dbMocks.getRichMenuDeleteImpact.mockResolvedValue({
       group: { id: 'g1', accountId: 'acc-1', name: 'メニュー', status: 'published' },

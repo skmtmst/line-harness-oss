@@ -17,10 +17,12 @@ import {
   createEntryRouteGenre,
   updateEntryRouteGenre,
 } from '@line-crm/db';
+import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
 import { QrCapacityError, encodeQr } from '../lib/qr-matrix.js';
 import { QrPdfError, buildQrPrintPdf } from '../lib/qr-print-pdf.js';
-import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';

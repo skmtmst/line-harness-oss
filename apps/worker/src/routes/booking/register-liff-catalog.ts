@@ -1,12 +1,12 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
-import { bookingAddons } from '../../services/booking-addons.js';
-import { menuAudience } from '../../services/booking-audience.js';
+import { bookingAddons } from '../../features/booking/booking-addons/index.js';
+import { menuAudience } from '../../features/booking/booking-audience/index.js';
 import { featureReadiness, StyleError } from '../../services/style-setup.js';
 import { inputJsonBoundary } from '../../lib/input-errors.js';
 import { normalizeLiffDateView } from '@line-crm/db';
 import { getAvailability } from '../../services/availability.js';
-import { DEFAULT_ACCOUNT_SETTINGS } from '../../services/booking-types.js';
+import { DEFAULT_ACCOUNT_SETTINGS } from '../../features/booking/booking-types/index.js';
 import { resolveSelfBookingCaller, resolveAccountIdFromLiff, verifyCallerLineUserId, resolveFriendId } from './identity.js';
 import { googleCredentials } from './availability.js';
 import { bookingPhoto } from '../../services/booking-photos.js';

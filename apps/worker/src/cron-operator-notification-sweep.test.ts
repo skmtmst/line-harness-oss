@@ -10,7 +10,7 @@
  *   4. 1回の取り分の上限が効かず、1 tick が無限に伸びる／古い行が後回しに
  *      され続ける。
  *
- * source 文字列ではなく `worker.scheduled()` を本当に呼ぶ。cron-config-
+ * source 文字列ではなく `worker.scheduled` を本当に呼ぶ。cron-config-
  * consistency.test.ts は「どのレーンに書いてあるか」を見張る係で、ここは
  * 「呼んだら本当に捌けるか」を見張る係。
  */

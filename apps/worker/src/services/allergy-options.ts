@@ -1,5 +1,6 @@
 import { getVersionedAccountSetting } from '@line-crm/db';
 import { DEFAULT_ALLERGY_OPTIONS, validateAllergyValues, collectInputs, type FormLayout } from '@line-crm/shared';
+
 export const ALLERGY_OPTIONS_KEY = 'friend.allergy_options_v1';
 export async function accountAllergyOptions(db: D1Database, accountId: string) {
   const setting = await getVersionedAccountSetting<string[]>(db, accountId, ALLERGY_OPTIONS_KEY);

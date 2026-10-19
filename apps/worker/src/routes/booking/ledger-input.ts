@@ -1,5 +1,5 @@
 import { type Context } from 'hono';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 
 // ---- Bookings (requests) ----
 
@@ -97,7 +97,7 @@ export function csvTimestamp(iso: string | null): string {
  * 再送でも同じ結果になるよう1文にまとめ、本線と再送枝の両方から呼ぶ。
  * 一時失敗の 'failed' も止める: 取消ずみの予約は送らないため、'pending' だけ
  * 止めると管理画面に未取消の予定が残り続ける (expirer も両方止めている)。
- * V6 fence の成功後にだけ呼ぶ (409 では旧表も含めて巻き戻す)。
+ * fence の成功後にだけ呼ぶ (409 では旧表も含めて巻き戻す)。
  */
 export async function cancelLegacyBookingReminders(db: D1Database, bookingId: string): Promise<void> {
   await db

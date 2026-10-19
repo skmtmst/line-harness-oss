@@ -10,7 +10,7 @@ import {
   updateConversionPoint,
   getUrlReachConversionPoints,
   trackConversion,
-} from '../src/conversions.js';
+} from '../src/conversions/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

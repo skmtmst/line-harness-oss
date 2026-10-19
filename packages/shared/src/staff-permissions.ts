@@ -1,5 +1,5 @@
 /**
- * ログインユーザーの権限モデル正本（N-424 / v6-30 §6-7）。
+ * ログインユーザーの権限モデル正本（N-424 / -30 §6-7）。
  *
  * 画面の「項目ごとに決める」3択（変えられる=edit / 見えるだけ=view /
  * 出さない=none）と、役割bundleの初期値をここに置く。
@@ -36,7 +36,7 @@ export const ACCESS_USER_VIEW_KEY = 'access.user.view';
 export const ACCESS_AUDIT_VIEW_KEY = 'access.audit.view';
 
 /**
- * 一斉配信の操作キー（v6-06 §6 が正本）。
+ * 一斉配信の操作キー（-06 §6 が正本）。
  * 下書き作成・編集／テスト送信／予約・即時送信／緊急停止／失敗再送／CSV。
  */
 export const BROADCAST_DEFINITION_EDIT_KEY = 'broadcast.definition.edit';
@@ -46,7 +46,7 @@ export const BROADCAST_JOB_STOP_KEY = 'broadcast.job.stop';
 export const BROADCAST_JOB_RETRY_KEY = 'broadcast.job.retry';
 export const BROADCAST_RESULT_EXPORT_KEY = 'broadcast.result.export';
 /**
- * 一斉配信の承認キー（v6-06 §6 の二者承認）。
+ * 一斉配信の承認キー（-06 §6 の二者承認）。
  * 1,000通以上の送信を、送る人とは別の人が確かめるための鍵。
  * owner・admin は常に通る（role-guard の hasStaffPermission）。
  * 止める・送り直すと同じく束には入れず、管理者が個別に付ける。
@@ -118,7 +118,7 @@ export const DELIVERY_API_PERMISSIONS: Array<[string, string]> = Object.values(D
   .flatMap((policy) => policy.api.map((prefix): [string, string] => [prefix, policy.key]));
 
 /**
- * 予約の細かい権限（N-411 / v6-30 §7-2「予約管理editでも予約設定は別permission」）。
+ * 予約の細かい権限（N-411 / -30 §7-2「予約管理editでも予約設定は別permission」）。
  * - `/booking/menus`: メニューと担当割当の編集・閲覧
  * - `booking.settings`: 予約設定（受付枠・資源・例外・予約スタッフ登録）の変更
  * - `booking.staff.own`: 本人に紐づく予約スタッフの勤務（シフト・休憩・連携）
@@ -251,7 +251,7 @@ export interface BundlePreset {
 }
 
 /**
- * bundle の初期権限（v6-30 §6 が正本）。
+ * bundle の初期権限（-30 §6 が正本）。
  *
  * - 管理者: 全機能 edit（実際の判定は role=owner/admin が全通過）
  * - 運用: 配信・予約・コンテンツ・受信箱・友だちを edit、分析・運用状態は view

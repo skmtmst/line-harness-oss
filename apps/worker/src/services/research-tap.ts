@@ -1,6 +1,7 @@
 import { getBroadcastMessageAsset, jstNow } from '@line-crm/db';
 import { applyTapExtras } from './tap-extras.js';
 import { couponDate, type TapExtras } from '@line-crm/shared';
+
 import { acquireWorkflow } from './workflow-execution.js';
 
 /** 既存の回答ログと継続処理を使う。追加処理のための表は作らない。 */

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // スタッフ一覧の担当範囲 N+1 解消(#515 中1)。
 // 一覧では IN で一括取得し、1人ずつの getStaffAccountScopeIds を叩かない。

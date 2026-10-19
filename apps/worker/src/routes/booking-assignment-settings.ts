@@ -1,8 +1,8 @@
 import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { inputError } from '../lib/input-errors.js';
-import { assignmentResourceIds, assignmentSettingsWithResources, d1AssignmentSettingsStore, validAssignmentWrite, type AssignmentScope } from '../services/booking-assignment-settings.js';
+import { assignmentResourceIds, assignmentSettingsWithResources, d1AssignmentSettingsStore, validAssignmentWrite, type AssignmentScope } from '../features/booking/booking-assignment-settings/index.js';
 
 /** 所属・店舗・予約設定権限は既存の各ルートで確認する。 */
 export async function assignmentSettingsResponse(c: Context<Env>, db: D1Database, scope: AssignmentScope) {

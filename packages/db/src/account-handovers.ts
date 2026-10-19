@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 
 /**
- * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
+ * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。台帳 #133。
  *
  * **`account_migrations` とは別物。** あちらは友だちを別のアカウントへ移す表。
  * こちらは「2つのアカウントをコードでつなぎ、突合してから本実行する」5段の流れ。
@@ -217,7 +217,7 @@ export async function savePreview(
   return { ok: true };
 }
 
-/** 切り戻しできるのは本実行から7日間だけ（v6-33 §12-2、X の確定値）。 */
+/** 切り戻しできるのは本実行から7日間だけ（-33 §12-2、X の確定値）。 */
 export const HANDOVER_ROLLBACK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function rollbackDeadlineOf(handover: HandoverRow): string | null {

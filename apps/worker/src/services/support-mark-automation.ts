@@ -1,5 +1,7 @@
 import { getSupportMarkById, jstNow, type SupportMarkScope } from '@line-crm/db';
-import { buildSegmentWhere, type SegmentCondition } from './segment-query.js';
+
+import { buildSegmentWhere } from './segment-query.js';
+import { type SegmentCondition } from '@line-crm/shared';
 
 export const SUPPORT_MARK_RULE_EVENTS = [
   'message_received',

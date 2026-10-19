@@ -1,4 +1,6 @@
 import { activeTenantLineAccountSql, type V6WriteGuard } from '@line-crm/db';
+import { isOperationCapabilityStopped } from '@line-crm/db';
+
 import { cancelByTrigger, reconcileV6ToStartsAt, enrollByTrigger } from './reminder-trigger.js';
 import { cancelPendingRemindersFor } from './event-reminder-cleanup.js';
 import { computeRemindersForBooking,insertRemindersForBooking } from './event-reminder-schedule.js';
@@ -7,7 +9,7 @@ import { returnEventEntitlement } from './event-entitlements.js';
 import { prepareEventNotification } from './event-notification-plan.js';
 import type { EventNotificationKind } from './event-booking-notifier.js';
 import { featureJobCanRun } from './feature-enforcement.js';
-import { isOperationCapabilityStopped } from '@line-crm/db';
+
 
 type Transition = {id:string;line_account_id:string;event_id:string;booking_id:string;booking_version:number;
   operation_key:string;action:string;input_snapshot:string;steps_json:string};

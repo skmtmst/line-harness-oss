@@ -43,7 +43,7 @@ vi.mock('../services/account-access.js', () => ({
   },
 }));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: mocks.lineClient }));
-vi.mock('../services/broadcast.js', () => ({
+vi.mock('../features/broadcasts/broadcast.js', () => ({
   processBroadcastSend: mocks.processBroadcastSend,
   processQueuedBroadcasts: mocks.processQueuedBroadcasts,
   buildMessage: vi.fn(),

@@ -22,11 +22,11 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const notifierMocks = { sendBookingNotification: vi.fn() };
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 vi.mock('../services/account-access.js', () => ({
@@ -41,8 +41,8 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
 
 const calendarState: { real?: (...args: never[]) => Promise<unknown> } = {};
 const calendarSyncMocks = { runBookingGoogleSync: vi.fn() };
-vi.mock('../services/booking-calendar-sync.js', async (importOriginal) => {
-  const orig = await importOriginal<typeof import('../services/booking-calendar-sync.js')>();
+vi.mock('../features/booking/booking-calendar-sync.js', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('../features/booking/booking-calendar-sync.js')>();
   calendarState.real = orig.runBookingGoogleSync as unknown as typeof calendarState.real;
   return {
     ...orig,
@@ -106,8 +106,8 @@ vi.mock('../services/meet-consultation-reminders.js', async (importOriginal) => 
   };
 });
 
-vi.mock('../services/booking-channels.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-channels.js')>()),
+vi.mock('../features/booking/booking-channels.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-channels.js')>()),
   bookingAutomaticNotificationAllowed: vi.fn(async () => true),
 }));
 vi.mock('../services/feature-enforcement.js', async (importOriginal) => ({
@@ -1133,7 +1133,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       bookingId: 'bk-race',
       bookingVersion: 1,
     });
-    // upsert 0 件で敗者確定。子も V6 も書かない。
+    // upsert 0 件で敗者確定。子も も書かない。
     expect(r.updated).toBe(false);
     const kept = sqlite.prepare(
       'SELECT starts_at, booking_version, status FROM meet_consultations WHERE external_event_id = ?',
@@ -1289,7 +1289,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       'mr-ab-day', 'consult-ab', 'day_before', '2026-11-01T14:00:00.000Z',
       'mr-ab-hour', 'consult-ab', 'hour_before', '2026-11-02T14:00:00.000Z',
     );
-    // A を V6 の直前で止める有限barrier。時刻は Frozen のまま進めない。
+    // A を の直前で止める有限barrier。時刻は Frozen のまま進めない。
     let entered = false;
     let gateResolve: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => { gateResolve = resolve; });
@@ -1327,7 +1327,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       sqlite.prepare('SELECT cancel_claim_id FROM meet_consultations WHERE id = ?').get('consult-ab') as { cancel_claim_id: string }
     ).cancel_claim_id;
     expect(typeof uuidB).toBe('string');
-    // A の V6 で貸出が来たら A は 409。復元は uuid_B に阻まれる。
+    // A の で貸出が来たら A は 409。復元は uuid_B に阻まれる。
     // (rule を先に置く。FK のため)
     sqlite.prepare(
       `INSERT INTO reminders
@@ -1380,7 +1380,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       T1, '2026-11-02T16:00:00.000Z', 'https://meet.google.com/aaa-bbbb-ccc',
       'bk-ab', 5,
     );
-    // B (先行claim側) を V6 直前で止める。
+    // B (先行claim側) を 直前で止める。
     let entered = false;
     let gateResolve: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => { gateResolve = resolve; });
@@ -1418,8 +1418,8 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       sqlite.prepare('SELECT cancel_claim_id FROM meet_consultations WHERE id = ?').get('consult-ab-rev') as { cancel_claim_id: string }
     ).cancel_claim_id;
     gateResolve();
-    // B は前確認ずみの V6 が空振りし、復元も uuid_A に阻まれて false。
-    // (V6 に貸出なし・行は A のもののため、投げずに戻す)
+    // B は前確認ずみの が空振りし、復元も uuid_A に阻まれて false。
+    // (に貸出なし・行は A のもののため、投げずに戻す)
     const bOk = await Promise.race([bPromise, timeout]);
     expect(bOk).toBe(false);
     const finalRow = sqlite.prepare(
@@ -1650,7 +1650,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       '../services/meet-consultation-reminders.js'
     );
     const evt = 'evt-guard-v6';
-    // V6 rule を置く (enroll がwinnerの行を1件作る。offsetなし→target=開始時刻)。
+    // rule を置く (enroll がwinnerの行を1件作る。offsetなし→target=開始時刻)。
     sqlite.exec(`
       INSERT INTO reminders
         (id, name, line_account_id, is_active, trigger_type, delivery_mode, lifecycle_status)
@@ -1672,7 +1672,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       meetUrl: 'https://meet.google.com/aaa-bbbb-ccc',
       bookingId: 'bk-g', bookingVersion: 1,
     });
-    // 旧操作は共有呼出しを出さず stale。勝者の行・子・V6 が残る。
+    // 旧操作は共有呼出しを出さず stale。勝者の行・子・が残る。
     expect(old.updated).toBe(false);
     const row = sqlite.prepare(
       'SELECT starts_at, booking_version, status FROM meet_consultations WHERE external_event_id = ?',
@@ -1693,7 +1693,7 @@ describe('F6 本人日時変更・取消（mock局所）', () => {
       `SELECT target_date, status FROM friend_reminders
         WHERE source_kind = 'meet' AND source_id = ? AND status = 'active'`,
     ).all(cid) as Array<{ target_date: string; status: string }>;
-    // 旧操作は何も残さず、勝者の V6 行だけが新日時に向く。
+    // 旧操作は何も残さず、勝者の 行だけが新日時に向く。
     expect(v6rows).toEqual([{ target_date: T2, status: 'active' }]);
   });
 

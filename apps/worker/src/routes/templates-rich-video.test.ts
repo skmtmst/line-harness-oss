@@ -1,16 +1,16 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { getTemplateById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { resolveAutoReplyContent } from '../services/auto-reply.js';
-import { buildStepMessages } from '../services/scenario-test-send.js';
+import { resolveAutoReplyContent } from '../features/auto-replies/auto-reply.js';
+import { buildStepMessages } from '../features/scenarios/scenario-test-send.js';
 import { buildMessage } from '../services/line-message.js';
-import { parseBroadcastMessageParts } from '../services/broadcast-message-set.js';
+import { parseBroadcastMessageParts } from '../features/broadcasts/broadcast-message-set.js';
 
 const gates = vi.hoisted(() => ({allowed:true}));
 vi.mock('../services/file-scan.js', () => ({checkKeyGate: async()=>gates,checkMediaGate:async()=>gates}));
-vi.mock('../services/media-metadata.js', () => ({imageDimensions:()=>({width:1040,height:520})}));
+vi.mock('../features/media/media-metadata.js', () => ({imageDimensions:()=>({width:1040,height:520})}));
 vi.mock('../services/account-access.js', () => ({canAccessAllLineAccounts:async()=>true,getVisibleLineAccountScope:async()=>({allowedAccountIds:['a'],canSeeUnassigned:false})}));
 import { templates } from './templates.js';
 

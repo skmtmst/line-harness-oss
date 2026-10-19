@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getEntryRouteById, getEntryRouteFunnel, deleteEntryRoute, type Friend } from '@line-crm/db';
+
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { receiveEntryRouteCoupon, sendEntryRouteCoupon } from './entry-route-coupon.js';
 import type { Message } from '@line-crm/line-sdk';

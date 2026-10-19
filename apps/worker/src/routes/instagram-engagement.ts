@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { applyMileageRulesForEvent } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const ALLOWED_EVENTS = new Set([
   'instagram_dm_received',

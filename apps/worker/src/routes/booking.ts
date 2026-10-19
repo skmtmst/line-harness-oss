@@ -1,14 +1,14 @@
 import { logger } from '@line-crm/shared/server';
 import { GapError } from '../services/gap-common.js';
-import { EntitlementError } from '../services/booking-entitlements.js';
+import { EntitlementError } from '../features/booking/booking-entitlements/index.js';
 import { outputAuditMiddleware } from '../middleware/output-audit.js';
-import { evaluateBookingSyncNotices } from '../services/booking-sync-rules.js';
+import { evaluateBookingSyncNotices } from '../features/booking/booking-sync-rules/index.js';
 import { processVisitStampQueue } from '../services/visit-stamps.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { processBookingWaitlists } from '../services/waitlist-tick.js';
-import { notifyBookingConflicts } from '../services/booking-channels.js';
+import { notifyBookingConflicts } from '../features/booking/booking-channels/index.js';
 import { resolveAccountIdFromLiff, resolveAccountIdAdmin } from './booking/identity.js';
 import { registerLiffCatalog } from './booking/register-liff-catalog.js';
 import { registerLiffCreate } from './booking/register-liff-create.js';

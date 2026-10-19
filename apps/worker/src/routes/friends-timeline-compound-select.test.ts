@@ -22,7 +22,7 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const TIMELINE_SOURCE_TS = join(process.cwd(), 'src/routes/friends-timeline-handlers.ts');
 

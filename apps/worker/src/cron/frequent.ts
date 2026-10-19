@@ -1,15 +1,15 @@
 import { logger } from '@line-crm/shared/server';
 import { sweepOperatorPush, retryOperatorPush } from '../services/operator-push.js';
 
-import { decideAbTests } from '../services/broadcast-ab.js';
+import { decideAbTests } from '../features/broadcasts/broadcast-ab/index.js';
 
-import { expireMakeup } from '../services/booking-makeup.js';
+import { expireMakeup } from '../features/booking/booking-makeup/index.js';
 
 import type { Env } from '../worker-env.js';
 
-import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
+import { processScenarioSourceJobs } from '../features/scenarios/scenario-source-jobs/index.js';
 
-import { purgeExpiredFormDocuments } from '../services/form-documents.js';
+import { purgeExpiredFormDocuments } from '../features/forms/form-documents/index.js';
 
 import { purgeInstagramTransientData } from '../services/instagram.js';
 
@@ -22,16 +22,16 @@ import { processVisitStampQueue } from '../services/visit-stamps.js';
 import { LineClient } from '@line-crm/line-sdk';
 import { getLineAccounts, processPendingMileageEvents, processActionScoreInactivity } from '@line-crm/db';
 
-import { processFriendFieldReminders } from '../services/friend-field-reminders.js';
+import { processFriendFieldReminders } from '../features/friends/friend-field-reminders/index.js';
 import { toJstParts } from '@line-crm/shared';
 import { checkAccountHealth } from '../services/ban-monitor.js';
 
 import { processInsightFetch } from '../services/insight-fetcher.js';
 
-import { processDueFriendBulkRuns } from '../services/friend-bulk-runs.js';
+import { processDueFriendBulkRuns } from '../features/friends/friend-bulk-runs/index.js';
 
 import { dispatchActionScoreApplications } from '../services/action-score-events.js';
-import { processDueMileageRewardDeliveries } from '../services/mileage-reward-delivery.js';
+import { processDueMileageRewardDeliveries } from '../features/mileage/mileage-reward-delivery/index.js';
 
 import { pruneSensitiveRateLimits } from '../middleware/sensitive-rate-limit.js';
 
@@ -53,7 +53,7 @@ export async function runFrequentHeavyJobs(
     if (account.is_active) lineClients.set(account.id, new LineClient(account.channel_access_token));
   }
   try {
-    const { processAutoReplyDeliveries } = await import('../services/auto-reply-delivery.js');
+    const { processAutoReplyDeliveries } = await import('../features/auto-replies/auto-reply-delivery.js');
     await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
   } catch (error) { logger.error("src_index_failed"); }
 
@@ -84,7 +84,7 @@ export async function runFrequentHeavyJobs(
       // claim で二重実行なし。停止中は回さない。
       name: 'ec event retry',
       run: async () => {
-        const { processDueEcRetries } = await import('../services/ec-retry.js');
+        const { processDueEcRetries } = await import('../features/ec-commerce/ec-retry.js');
         const result = await processDueEcRetries(env.DB, {
           now: new Date(event.scheduledTime).toISOString(),
           credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
@@ -96,12 +96,12 @@ export async function runFrequentHeavyJobs(
     },
     {
       name: 'calendar busy cache and switch jobs',
-      run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('../services/booking-calendar-settings.js');const credentials={email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY};await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime));},
+      run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('../features/booking/booking-calendar-settings.js');const credentials={email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY};await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime));},
     },
     {
       name: 'booking sync notices',
       run: async () => {
-        const { processBookingSyncNoticeQueue } = await import('../services/booking-sync-rules.js');
+        const { processBookingSyncNoticeQueue } = await import('../features/booking/booking-sync-rules.js');
         await processBookingSyncNoticeQueue(env);
       },
     },
@@ -111,7 +111,7 @@ export async function runFrequentHeavyJobs(
       name: 'booking calendar delete retry',
       run: async () => {
         const { processPendingCalendarDeleteOperations, removeBookingFromGoogle } = await import(
-          '../services/booking-calendar-sync.js'
+          '../features/booking/booking-calendar-sync.js'
         );
         const result = await processPendingCalendarDeleteOperations(env.DB, {
           now: new Date(event.scheduledTime),
@@ -162,7 +162,7 @@ export async function runFrequentHeavyJobs(
       },
     },
     {
-      // 運営からのお知らせの予約配信（★V6 37-7）。claim で 1 件ずつ sending にしてから送る。
+      // 運営からのお知らせの予約配信（★37-7）。claim で 1 件ずつ sending にしてから送る。
       name: 'platform announcements',
       run: async () => {
         const { processDueAnnouncements } = await import('../services/platform-announcements.js');
@@ -218,7 +218,7 @@ export async function runFrequentHeavyJobs(
         // OFF のルールは予約自体が無い。公開URLが無い環境では送らず残す。
         if (env.WORKER_PUBLIC_URL) {
           const { deliverDueMileageGrantNotifications } = await import(
-            '../services/mileage-grant-notification.js'
+            '../features/mileage/mileage-grant-notification.js'
           );
           const { dispatchLineProxyLocally } = await import('../services/local-line-proxy.js');
           const notified = await deliverDueMileageGrantNotifications(
@@ -236,7 +236,7 @@ export async function runFrequentHeavyJobs(
       },
     },
     {
-      // マニュアル導線の週1回の点検（要件 v6-34 §8-4）。cron自体は
+      // マニュアル導線の週1回の点検（要件 -34 §8-4）。cron自体は
       // 短い間隔で回るので、最終確認から7日を経るまで関数側で何もしない。
       // 新たに broken になったリンクだけ、運営へ1回だけ知らせる。
       name: 'manual link weekly check',
@@ -349,7 +349,7 @@ export async function runFrequentHeavyJobs(
       // 見つけたずれは直さず台帳に残す。直すのは運用者が K-2 画面で行う。
       name: 'rich menu daily reconcile',
       run: async () => {
-        const { processDailyRichMenuReconcile } = await import('../services/rich-menu-daily-reconcile.js');
+        const { processDailyRichMenuReconcile } = await import('../features/rich-menus/rich-menu-daily-reconcile.js');
         const result = await processDailyRichMenuReconcile(env.DB, {
           now: new Date(event.scheduledTime),
         });

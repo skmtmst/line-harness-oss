@@ -1,14 +1,14 @@
 import { logger } from '@line-crm/shared/server';
 import { identity } from './restaurant-customer-identity.js';
-import { assignRestaurantTable } from '../services/booking-assignment.js';
+import { assignRestaurantTable } from '../features/booking/booking-assignment/index.js';
 import { referralCandidates } from '../services/restaurant-referrals.js';
 import { collectInputs, parseLayout, normalizeBookingValue } from '@line-crm/shared';
 import { respondToRestaurantConfirmation, type RestaurantConfirmationResponse } from '../services/restaurant-confirmations.js';
 import { processRestaurantEvents } from '../services/restaurant-events.js';
-import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
+import { processScenarioSourceJobs } from '../features/scenarios/scenario-source-jobs/index.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import {
   DEFAULT_TENANT_ID,
   activeTenantLineAccountSql,

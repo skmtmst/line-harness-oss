@@ -11,7 +11,7 @@ vi.mock('@line-crm/db', () => ({
 
 vi.mock('./feature-enforcement.js', () => ({ featureJobCanRun: async () => true }));
 
-vi.mock('./automation-triggers.js', () => ({
+vi.mock('../features/automations/automation-triggers.js', () => ({
   dispatchAutomationEventWithLogging: mocks.dispatchAutomationEventWithLogging,
 }));
 

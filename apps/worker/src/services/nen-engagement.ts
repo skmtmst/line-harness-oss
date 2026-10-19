@@ -11,8 +11,9 @@ import {
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
+
 import type { Message } from '@line-crm/line-sdk';
-import type { EcEvent } from '../routes/ec-integrations.js';
+import type { EcEvent } from '../features/ec-commerce/member-snapshot/index.js';
 import { createFeatureJobGate, featureJobCanRun } from './feature-enforcement.js';
 import { createEccubeCoupon } from './eccube-coupon.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
@@ -28,10 +29,10 @@ const MAX_JOBS_PER_TICK = 30;
 // status='failed' のまま残る（last_error に理由が入る）。
 const DELIVERY_LEASE_MS = 5 * 60_000;
 const RETRY_DELAYS_MS = [60_000, 300_000, 1_800_000];
-// 要件 v6-21 §8: 1アカウントが1回の実行で送る上限。一斉配信の batch と同じく、
+// 要件 -21 §8: 1アカウントが1回の実行で送る上限。一斉配信の batch と同じく、
 // 1つのアカウントが上限ぶん先頭を占めて他のアカウントを止めないようにする。
 const MAX_JOBS_PER_ACCOUNT_PER_TICK = 10;
-// 要件 v6-21 §5・§8: 深夜に送らない時間帯（JST）。この時間帯の予約は claim せず
+// 要件 -21 §5・§8: 深夜に送らない時間帯（JST）。この時間帯の予約は claim せず
 // pending のまま残し、朝8時を過ぎた tick が送る。時刻の既定は司令塔の確認待ち。
 export const NEN_QUIET_HOURS_START_JST = 21;
 export const NEN_QUIET_HOURS_END_JST = 8;

@@ -46,7 +46,7 @@ const dbMocks = {
 vi.mock('@line-crm/db', () => dbMocks);
 
 const deliveryMocks = { deliverMileageReward: vi.fn() };
-vi.mock('../services/mileage-reward-delivery.js', () => deliveryMocks);
+vi.mock('../features/mileage/mileage-reward-delivery.js', () => deliveryMocks);
 
 // Import after the mock so index.ts binds the mocked helpers.
 const worker = (await import('../index.js')).default;

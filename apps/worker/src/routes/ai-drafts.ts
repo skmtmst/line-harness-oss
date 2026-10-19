@@ -1,6 +1,6 @@
 import {g2OpenAiAvailable} from '../services/account-ai-features.js';
 import {Hono,type Context} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapVersion,gapWrite} from '../services/gap-common.js';
 import {aiSettings,makeAiDraft} from '../services/ai-drafts.js';
 import {acquireInboxReplyLease,releaseInboxReplyLease} from '../services/inbox-events.js';

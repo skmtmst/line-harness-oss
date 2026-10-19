@@ -5,7 +5,9 @@ import {
   countRecentFailedBannerGenerations,toJstString,releaseWorkflowStep,workflowFence,getWorkflowStep,
   type BannerGeneration,type WorkflowStepRef,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { resolveEntitlements } from './billing-plans.js';
 import { findBannerPreset } from './banner-prompt.js';
 import { resizeBannerToPreset,type BannerCropPosition } from './banner-resize.js';

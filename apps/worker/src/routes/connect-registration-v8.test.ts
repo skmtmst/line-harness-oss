@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {Hono} from 'hono';
 import type Database from 'better-sqlite3';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {createTestD1} from '../test-utils/d1-sqlite.js';
 const prepared=vi.hoisted(()=>vi.fn());
 vi.mock('../services/line-account-connect.js',async importOriginal=>({...await importOriginal<typeof import('../services/line-account-connect.js')>(),prepareLineConnection:prepared}));

@@ -1,15 +1,15 @@
 import { logger } from '@line-crm/shared/server';
 import { serializeFriend } from './friend-display.js';
-import { patchFriendMetadata } from '../services/friend-metadata.js';
+import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { inputError } from '../lib/input-errors.js';
-import { hydrateDocumentAnswers } from '../services/form-documents.js';
+import { hydrateDocumentAnswers } from '../features/forms/form-documents/index.js';
 import { getFriendSummary } from '@line-crm/db';
-import { getFriendUpcomingItems } from '../services/friend-upcoming-items.js';
+import { getFriendUpcomingItems } from '../features/friends/friend-upcoming-items/index.js';
 
 import { getFriendById, getFriendWithFirstTrackedLinkName, addTagToFriend, getFriendTags, getFormSubmissionsByFriend, getFormSubmissionsByFriendCursor, countFriendFormSubmissions, enrollFriendInScenario, getMileageSummaryForFriend, getMileageHistoryForFriend, getMileageSelfInsights, getMileageConnectedAccountsForFriend, jstNow, getTagAddedScenarioIdsForAccount } from '@line-crm/db';
 import type { Tag as DbTag } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
@@ -428,7 +428,7 @@ export const post__api_friends_id_tags_7 = async (c: Context<Env, "/api/friends/
 
     // イベントバス発火: tag_change（R436）。
     // 手動操作は毎クリックで発火する合図なので、重複付与でも発火は保つ。
-    // V6公開版が受け取れるよう、発生元の不変IDと所属を付ける。
+    // 公開版が受け取れるよう、発生元の不変IDと所属を付ける。
     // IDは「手動の付与:友だち:タグ:確定時刻」で、台帳の値なので安定する。
     const assignedRow = await db
       .prepare(`SELECT assigned_at FROM friend_tags WHERE friend_id = ? AND tag_id = ?`)

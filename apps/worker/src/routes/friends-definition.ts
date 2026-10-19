@@ -4,7 +4,11 @@ import { inputError } from '../lib/input-errors.js';
 import { type Context, type MiddlewareHandler } from 'hono';
 import { getFriendById, jstNow, validateSearchConditions } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag, SavedSearch, SavedSearchAccess, FriendFormSubmission } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+
+
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { getSavedSearchMatchPreview } from '../services/saved-search-insights.js';

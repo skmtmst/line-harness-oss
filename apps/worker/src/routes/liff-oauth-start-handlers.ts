@@ -2,7 +2,7 @@ import { setCookie } from 'hono/cookie';
 import { navigationProof } from '../lib/navigation-proof.js';
 import { getEntryRouteByRefCode, getLineAccountByChannelId, getTrafficPoolBySlug, getTrafficPoolById, getRandomPoolAccount, getPoolAccounts } from '@line-crm/db';
 import { isStoppedEntryRouteRef, ENTRY_ROUTE_STOPPED_HTML } from '../services/entry-route-stop.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { stoppedLineAccountResponse, encodeState } from './liff-definition.js';
 import type { Context } from 'hono';
 

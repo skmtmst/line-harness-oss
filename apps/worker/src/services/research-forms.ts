@@ -1,9 +1,11 @@
 import { getBroadcastMessageAsset, getFriendFieldByIdForScope, getSupportMarkById, getFormById, jstNow, publishFormVersion } from '@line-crm/db';
 import { DEFAULT_TENANT_ID, layoutToFields, researchFormLayout, type FormAction, type ResearchGate } from '@line-crm/shared';
-import { isScenarioActionComplete, runActionRows, type ScenarioActionRow } from './scenario-actions.js';
-import { runAutoReplyAction, validateAutoReplyOperatorAction, type AutoReplyExecutionAction } from './auto-reply-operator-action.js';
+
+
+import { isScenarioActionComplete, runActionRows, type ScenarioActionRow } from '../features/scenarios/scenario-actions/index.js';
+import { runAutoReplyAction, validateAutoReplyOperatorAction, type AutoReplyExecutionAction } from '../features/auto-replies/auto-reply-operator-action/index.js';
 import { runEventBookingAction } from './event-booking-action.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 async function researchBelongsToAccount(db: D1Database, ownerId: string | null, accountId: string | null): Promise<boolean> {
   if (!accountId) return false;

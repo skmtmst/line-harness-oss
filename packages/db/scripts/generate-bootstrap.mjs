@@ -16,7 +16,7 @@ const BENIGN_SQLITE_ERROR = /duplicate column name|already exists/i;
 function listMigrationFiles() {
   return readdirSync(MIGRATIONS_DIR)
     .filter((file) => file.endsWith(".sql"))
-    .sort();
+    .sort((a, b) => Number(a.split('_')[0]) - Number(b.split('_')[0]) || a.localeCompare(b));
 }
 
 function isBenignSqliteError(error) {

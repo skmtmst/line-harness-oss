@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 class MockCommonVarVersionConflictError extends Error {
   constructor(readonly currentVersion: number) {
@@ -147,7 +147,7 @@ vi.mock('@line-crm/db', async () => {
 const accessMocks = { canAccessAllLineAccounts: vi.fn(async () => true) };
 vi.mock('../services/account-access.js', () => accessMocks);
 const scanMocks = { scanSingleMediaUsage: vi.fn() };
-vi.mock('../services/media-usage-scan.js', () => scanMocks);
+vi.mock('../features/media/media-usage-scan.js', () => scanMocks);
 const signingMocks = { createR2PresignedPutUrl: vi.fn() };
 vi.mock('../services/r2-presigned-upload.js', () => signingMocks);
 // 検査の門番は別ファイル（file-scan-gate.test.ts）で本物を見る。
@@ -167,7 +167,7 @@ const { contents } = await import('./contents.js');
 const { MediaVersionIncompatibleError } = await import('@line-crm/db');
 
 // R2 の put/delete は Promise を返す。undefined を返すモックにすると、
-// 実装の .catch() が落ちて本物と違う結果になる。
+// 実装の .catch が落ちて本物と違う結果になる。
 const put = vi.fn().mockResolvedValue(undefined);
 const del = vi.fn().mockResolvedValue(undefined);
 const head = vi.fn();
@@ -1955,7 +1955,7 @@ describe('共通情報', () => {
     expect(await conflict.json()).toMatchObject({ code: 'common_var_version_conflict', currentVersion: 4 });
   });
 
-  it('B-333 版番号なしの上書きを断る', async () => {
+  it('版番号なしの上書きを断る', async () => {
     // 影響の確認値があっても、読み込んだ版を欠く保存は通さない。
     const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
       accountId: 'account-1', nextValue: '11-20',
@@ -2632,14 +2632,14 @@ describe('公開配信の安全ヘッダ', () => {
 });
 
 
-it('B-333 メディアは版の指定なし・古い版で保存しない', async () => {
+it('メディアは版の指定なし・古い版で保存しない', async () => {
   const missing = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' }, 'owner', null);
   expect(missing.status).toBe(400);
   const stale = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' }, 'owner', '999');
   expect(stale.status).toBe(409);
   expect(mocks.updateMedia).not.toHaveBeenCalled();
 });
-it('B-333 保管庫の削除に失敗したら記録を消さず再試行できる', async () => {
+it('保管庫の削除に失敗したら記録を消さず再試行できる', async () => {
   vi.mocked(env.IMAGES.delete).mockRejectedValueOnce(new Error('R2 unavailable'));
   const response = await req('/api/media/md-1?accountId=account-1', 'DELETE');
   expect(response.status).toBe(503);

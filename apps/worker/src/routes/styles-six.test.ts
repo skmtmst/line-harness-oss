@@ -2,7 +2,8 @@ import { apiContractMiddleware } from '../middleware/api-contract.js';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { ACCOUNT_STYLES, DEFAULT_TENANT_ID, type SetupAnswer } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { initializeAccountStyle, profile, saveProfile, standardStarter, readDefinition } from '../services/style-setup.js';
 import { styleMenuButtons } from '../services/style-menu-buttons.js';

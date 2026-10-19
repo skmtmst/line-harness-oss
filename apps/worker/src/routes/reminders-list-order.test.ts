@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * 一覧の並びが、アカウントを選んでいるときも display_order を見ることを確かめる。
@@ -105,7 +105,7 @@ describe('リマインダ一覧の並び', () => {
     ).toContain('deleted_at IS NULL');
   });
 
-  it('アカウントを選んでいないときは getReminders() に任せる', async () => {
+  it('アカウントを選んでいないときは getReminders に任せる', async () => {
     const seen: string[] = [];
     const app = makeApp();
     const res = await app.request('/api/reminders', {}, { DB: makeDb(seen) });

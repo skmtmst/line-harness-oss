@@ -1,11 +1,11 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { requireRole } from '../../middleware/role-guard.js';
-import { canTransition, nextStatus } from '../../services/booking-state.js';
-import { type BookingStatus } from '../../services/booking-types.js';
+import { canTransition, nextStatus } from '../../features/booking/booking-state/index.js';
+import { type BookingStatus } from '../../features/booking/booking-types/index.js';
 import { recordBookingAudit } from '@line-crm/db';
 import { resolveAccountIdAdmin } from './identity.js';
 import { jstDateString, getTodaySeatReservations, VISIT_KINDS, VisitKind } from './today-data.js';

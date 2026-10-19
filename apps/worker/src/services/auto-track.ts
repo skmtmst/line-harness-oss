@@ -1,5 +1,5 @@
 import { convertBroadcastAsset, isBroadcastAssetKind } from '@line-crm/shared';
-import { decorateTapExtras } from './tap-extras.js';
+import { decorateTapExtras } from './tap-extra-links.js';
 import { getOrCreateAutoTrackedLink } from '@line-crm/db';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 
@@ -322,7 +322,7 @@ export async function autoTrackContent(
   collectActionUris(tree, actionUris);
   // Only valid http(s) URIs are trackable (uri actions also allow tel:,
   // line://, etc., and hand-written JSON can hold malformed URLs like a bare
-  // "https://" — createTrackingMap calls `new URL()`, so an invalid URI here
+  // "https://" — createTrackingMap calls `new URL`, so an invalid URI here
   // would throw and fail the whole delivery instead of one link).
   const trackableUris = new Set(
     [...actionUris].filter((u) => isTrackableHttpUrl(u) && !shouldSkip(u, skipPrefixes) && isAuthored(u)),
@@ -339,7 +339,7 @@ export async function autoTrackContent(
   return { messageType, content: JSON.stringify(tree) };
 }
 
-/** Valid, parseable http(s) URL — safe to hand to `new URL()` downstream */
+/** Valid, parseable http(s) URL — safe to hand to `new URL` downstream */
 function isTrackableHttpUrl(u: string): boolean {
   try {
     const parsed = new URL(u);

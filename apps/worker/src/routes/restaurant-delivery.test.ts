@@ -1243,7 +1243,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
 
   /**
    * 戻り先の受け口は統括の指定を付けずに呼ぶ。
-   * call() は必ず account_id を足してしまうので、ここでは直接組み立てる。
+   * call は必ず account_id を足してしまうので、ここでは直接組み立てる。
    */
   async function callback(
     query: Record<string, string>,

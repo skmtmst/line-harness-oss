@@ -5,7 +5,7 @@ import {
   knowledgeForTicket, searchKnowledge,
 } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { processKnowledgeJob } from '../services/platform-knowledge.js';
 import { opsKnowledge } from './ops-knowledge.js';
 

@@ -1,4 +1,4 @@
-// B-349: 第3弾の実装済みAPI。模擬・未提供の境界も契約に残す。
+// 第3弾の実装済みAPI。模擬・未提供の境界も契約に残す。
 const responses={'200':{description:'成功。dataはdescriptionを参照'},'201':{description:'作成済み'},'400':{description:'入力不正'},'401':{description:'本人確認・署名不正'},'403':{description:'権限不足・閲覧のみ・代理で禁止'},'404':{description:'対象なし・担当外'},'409':{description:'版競合・未提供・実送信/決済禁止'},'503':{description:'取得・保存できない'}};
 const entries:readonly (readonly [string,string,string,string])[]=[
  ["GET", "/api/ai-answer-logs", "自動応答の記録", "店の担当範囲でのみ利用可能。取得失敗は503。閲覧のみは読み取り可。query:action,offset。data:{items,total,summary}、詳細はqa/afterNoteを含む。会話の閲覧権限。"],

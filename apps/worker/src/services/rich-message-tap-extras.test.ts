@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTrackedLinkByIdOrShortCode } from '@line-crm/db';
 import { stripTapExtras, validateImagemapMessage } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { trackedLinks } from '../routes/tracked-links.js';
 import { autoTrackContent, decorateForFriendPush } from './auto-track.js';
 import { processTrackedClick } from './tracked-click-steps.js';

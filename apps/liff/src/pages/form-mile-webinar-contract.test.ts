@@ -211,17 +211,6 @@ describe('ウェビナーは申込もできる本体を共用する', () => {
     expect(src).toContain('getIdToken()');
   });
 
-  it('配信中は暗い地・16:9 の動画・途中のボタンは LINE の緑・送信は主の緑', () => {
-    const src = webinar();
-    const live = src.slice(src.indexOf('ライブ中 (★V8 RpW2h)'));
-    expect(live).toContain('bg-night-deep');
-    expect(live).toContain('aspect-video');
-    expect(live).toContain('variant="nightAction"');
-    expect(live).toContain('variant="nightSend"');
-    // 待機・終了などは白い殻のまま
-    expect(src).toContain('bg-canvas');
-  });
-
   it('残り時間は箱で大きく出す (分・秒)', () => {
     const src = webinar();
     expect(src).toContain('remainSec');

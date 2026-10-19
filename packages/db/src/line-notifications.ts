@@ -784,7 +784,7 @@ export interface NotificationMetricRow {
 }
 
 /**
- * 送信台帳の1件取得。要件 v6-24 §6 `GET deliveries/:id`。
+ * 送信台帳の1件取得。要件 -24 §6 `GET deliveries/:id`。
  * 一覧と同じ射影・同じ結合で返し、アカウント境界の外側は null（404 隠蔽）にする。
  */
 export async function getNotificationDelivery(
@@ -834,7 +834,7 @@ export async function getNotificationDelivery(
 
 /**
  * 手動の新規再送（resend）の送達行を、元の通知インスタンス配下に積む。
- * retry と違い元の行は触らず、新しい冪等キーで送る。要件 v6-24 §6。
+ * retry と違い元の行は触らず、新しい冪等キーで送る。要件 -24 §6。
  */
 export async function insertNotificationResendDelivery(
   db: D1Database,

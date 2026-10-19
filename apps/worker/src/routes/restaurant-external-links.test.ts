@@ -4,13 +4,14 @@ import { readFileSync } from 'node:fs';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { DEFAULT_TENANT_ID, type RestaurantExternalLink } from '@line-crm/shared';
 
+
 const auth = vi.hoisted(() => ({ member: null as Record<string, unknown> | null }));
 vi.mock('@line-crm/db', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
   return { ...actual, getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.
   getStaffByApiKey: vi.fn(async () => auth.member), getStaffByAdminSession: vi.fn(async () => auth.member) };
 });
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware, sha256Hex } from '../middleware/auth.js';
 import { restaurantExternalLinks } from './restaurant-external-links.js';
 import { restaurantTest } from './restaurant-test.js';

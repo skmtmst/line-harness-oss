@@ -9,7 +9,7 @@ import {
   updateScenarioStep,
 } from '@line-crm/db';
 import { processStepDeliveries } from './step-delivery';
-import { parseQuestionPostback } from './scenario-question';
+import { parseQuestionPostback } from '../features/scenarios/scenario-question';
 
 // 文面パリティ装飾だけモック（中身の同一性は既存の decoration テストが
 // 保証）。LINE 送信は偽クライアントで受け、DB は本物を使う。

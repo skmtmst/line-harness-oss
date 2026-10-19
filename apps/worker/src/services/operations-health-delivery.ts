@@ -9,7 +9,7 @@ import { logger } from '@line-crm/shared/server';
 
 /**
  * `rt_delivery_*` の台帳と比べるための境界を秒で返す。
- * これらの受信・依頼の時刻は `nowSec()` の通算秒（INTEGER）で入るため、
+ * これらの受信・依頼の時刻は `nowSec` の通算秒（INTEGER）で入るため、
  * JST 文字列を返す jstCutoff とは混ぜられない。
  */
 function epochCutoff(nowIso: string, backMs: number): number {
@@ -33,7 +33,7 @@ export type IntegrationFailureTotals = {
  * 出前館QA#3「各APIでエラーの発生を監視する仕組み」をこの確認で受け持つ。
  * 板の9行を増やさないため、外部連携の確認へ畳んで数える。
  *
- * `rt_delivery_*` の時刻は `nowSec()` の通算秒なので epochCutoff で境界を作る。
+ * `rt_delivery_*` の時刻は `nowSec` の通算秒なので epochCutoff で境界を作る。
  * 台帳がまだ無い配備では 0 件として返す。ここで投げると isolate が
  * 外部連携の確認ごと「確認できず」に落とし、Webhook や Sheets の失敗も見えなくなる。
  */

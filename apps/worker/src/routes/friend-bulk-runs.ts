@@ -3,7 +3,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { DEFAULT_TENANT_ID, getFriendBulkRunDetail } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import {
@@ -14,9 +14,9 @@ import {
   requireFriendBulkRunAccess,
   retryFriendBulkRun,
   startFriendBulkRun,
-} from '../services/friend-bulk-runs.js';
+} from '../features/friends/friend-bulk-runs/index.js';
 
-import { approveBulkMessage, getBulkMessageApproval } from '../services/friend-bulk-message-approval.js';
+import { approveBulkMessage, getBulkMessageApproval } from '../features/friends/friend-bulk-message-approval/index.js';
 
 export const friendBulkRuns = new Hono<Env>();
 

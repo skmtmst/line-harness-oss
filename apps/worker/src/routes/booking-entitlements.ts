@@ -1,12 +1,12 @@
 import { validateEventEntitlement } from '../services/event-entitlements.js';
 import { logger } from '@line-crm/shared/server';
-import {passUnusable} from '../services/booking-pass-plans.js';
+import {passUnusable} from '../features/booking/booking-pass-plans/index.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { requirePermission, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { EntitlementError, entitlementViews, grantEntitlement, operateEntitlement } from '../services/booking-entitlements.js';
+import { EntitlementError, entitlementViews, grantEntitlement, operateEntitlement } from '../features/booking/booking-entitlements/index.js';
 import { resolveAccountIdFromLiff, resolveFriendId, verifyCallerLineUserId } from './booking.js';
 
 export const bookingEntitlements=new Hono<Env>();

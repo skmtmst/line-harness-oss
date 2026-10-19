@@ -22,9 +22,9 @@ import {
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { styles } from './styles.js';
 import { hqTemplates } from './hq-templates.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { permissionForApiPath } from '../middleware/auth.js';
-import * as googleCalendar from '../services/booking-calendar-sync.js';
+import * as googleCalendar from '../features/booking/booking-calendar-sync.js';
 import { readWindow, instant } from '../services/style-analytics.js';
 import {
   initializeAccountStyle,
@@ -156,7 +156,7 @@ function restaurant() {
  INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,allergy_note) VALUES('r','store','line','花子','Uf',2,'2026-10-15T04:00:00Z','2026-10-15T06:00:00Z','table','卵');`);
 }
 
-describe('B-335 safety regressions', () => {
+describe('safety regressions', () => {
   test('unchanged answers never overwrite booking settings; only changed answers are proposed', async () => {
     const first = await setup({
       expectedVersion: 1,

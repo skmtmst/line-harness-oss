@@ -6,6 +6,7 @@ import {
   resolveCommonVarValuesAt,
   type CommonVarResolutionFailureReason,
 } from '@line-crm/db';
+
 import { commonVarKeysInContent } from './common-var-snapshot.js';
 
 /**

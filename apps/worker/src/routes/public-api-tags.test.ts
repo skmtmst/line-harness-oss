@@ -7,7 +7,7 @@ import {
   rotateIntegrationApiToken,
 } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /*
  * 公開APIトークンとタグ付与の後続（監査 R431〜R436）。
@@ -276,7 +276,7 @@ describe('R436 タグ付与から公開版オートメーションへ安定IDで
     const call = fireEventMock.mock.calls[0] as unknown[];
     const payload = call[2] as Record<string, unknown>;
     expect(payload.friendId).toBe('friend-a');
-    // V6公開版の受け口が求める3点（発生元ID・所属・時刻）がそろう。
+    // 公開版の受け口が求める3点（発生元ID・所属・時刻）がそろう。
     expect(typeof payload.sourceEventId).toBe('string');
     expect((payload.sourceEventId as string).length).toBeGreaterThan(0);
     expect(call[4]).toBe('acc-a');

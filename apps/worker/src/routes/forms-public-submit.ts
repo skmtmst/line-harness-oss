@@ -1,23 +1,28 @@
 import { logger } from '@line-crm/shared/server';
 import { canonicalizeIdempotencyInput } from './form-idempotency.js';
-import { callFormWebhook, publicFormWebhookData } from '../services/form-webhook.js';
+import { callFormWebhook, publicFormWebhookData } from '../features/forms/form-webhook/index.js';
 import { inputError, validatedInputBody } from '../lib/input-errors.js';
-import { validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../services/form-documents.js';
+import { validateDocumentAnswers, attachDocumentAnswers, documentIds } from '../features/forms/form-documents/index.js';
 import { applyAccountAllergyOptions } from '../services/allergy-options.js';
 
 import { getFormById, type FormSubmitClaimScope, formBelongsToLineAccount, getFormSubmissionById, insertFormSubmissionRecord, resyncFormSubmitCount, claimFormCapacitySlot, releaseFormCapacityClaims, createFormSubmitClaim, getFormSubmitClaim, takeoverFormSubmitClaim, readFormSubmitClaimSteps, appendFormSubmitClaimStep, saveFormSubmitClaimWebhook, completeFormSubmitClaim, failFormSubmitClaim, ensureFormSubmitOutboxEvent, getFormSubmitOutbox, markFormSubmitOutboxDelivered, readFormSubmitOutboxPayload, readFormSubmitClaimEffectStats, saveFormSubmitClaimEffectStats, findUnfinishedFormSubmitClaimByHash, getFormVersionContent, updateFormSubmissionDestinationWriteResult, getFriendByLineUserIdForAccount, getLineAccountById, toJstString } from '@line-crm/db';
+import type { Form as DbForm, FormSubmission as DbFormSubmission, FormDestinationWriteResult } from '@line-crm/db';
+import { recordConversionSourceEvent } from '@line-crm/db';
+
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
-import type { Form as DbForm, FormSubmission as DbFormSubmission, FormDestinationWriteResult } from '@line-crm/db';
-import type { Env } from '../index.js';
-import { createBroadcastRetryKey } from '../services/broadcast-retry-key.js';
+
+
+import type { Env } from '../worker-env.js';
+import { createBroadcastRetryKey } from '../features/broadcasts/broadcast-retry-key/index.js';
 import { fireOutgoingWebhooks } from '../services/event-bus.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { dispatchOperatorEvent } from '../services/operator-notification-dispatch.js';
-import { recordConversionSourceEvent } from '@line-crm/db';
-import { checkFormGates, collectCapacitySlots } from '../services/form-layout-effects.js';
+
+import { checkFormGates, collectCapacitySlots } from '../features/forms/form-layout-effects/index.js';
 import { collectInputs, parseLayout, type FormLayout } from '@line-crm/shared';
+
 import { stoppedPublicFormResponse, FORM_IDEMPOTENCY_KEY_PATTERN, readFormTestToken, verifyFormTestToken, FORM_SUBMIT_DATA_MAX_FIELDS, FORM_SUBMIT_DATA_MAX_BYTES, FORM_SUBMIT_TRACKED_LINK_MAX_LENGTH, serializeSubmission, hashIdempotentSubmission, formSubmitClaimExpired, serializeIdempotentReplay, FORM_IDEMPOTENCY_TTL_MS, formSubmitClaimStaleBefore, FormSubmitClaimHandle, ClaimOwnershipLost, resolveFriendAccessToken, optionalExecutionCtx, runFormPostEffects } from './forms-definition.js';
 import type { Context } from 'hono';
 
@@ -375,8 +380,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
             ? await getFormSubmissionById(c.env.DB, existing.submission_id)
             : null;
           if (!saved) {
-            logger.error("form_submit_claim_is_completed_without_an_answer_row");
-            return c.json({ success: false, error: 'Internal server error' }, 500);
+            throw new Error('form_submit_claim_is_completed_without_an_answer_row');
           }
           c.header('Idempotency-Replayed', 'true');
           return c.json({ success: true, data: serializeIdempotentReplay(saved) }, 200);
@@ -853,7 +857,6 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
     if (err instanceof Error && ['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'].includes(err.message)) {
       return c.json({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' }, 409);
     }
-    logger.error("routes_forms_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

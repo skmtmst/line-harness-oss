@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { listLimit } from './list-pagination.js';
 
@@ -232,7 +232,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       .all<{ name: string }>();
     const tags = tagRows.results.map((r) => r.name);
 
-    // Normalize the `before` cursor via julianday() so sub-second precision
+    // Normalize the `before` cursor via julianday so sub-second precision
     // is preserved and cursors in any ISO 8601 timezone form (Z, +09:00) sort
     // correctly against stored `+09:00` timestamps. strftime('%s', ...) would
     // truncate to whole seconds and drop messages that share a second.

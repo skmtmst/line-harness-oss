@@ -1,4 +1,4 @@
-import { COMMON_ACTION_MAX_BRANCH_DEPTH, COMMON_ACTION_MAX_DEPTH, COMMON_ACTION_MAX_STEPS, type ActionDefinition } from './automation-engine.js';
+import { COMMON_ACTION_MAX_BRANCH_DEPTH, COMMON_ACTION_MAX_DEPTH, COMMON_ACTION_MAX_STEPS, type ActionDefinition } from '../features/automations/automation-engine/index.js';
 import { requireResource, requiredString, isRecord, CommonActionValidationError, resolveLatestPublishedReference, assertNoCycle, parseStoredActions, type CommonActionSummary, type CommonActionResources } from './common-actions-is-record.js';
 
 export async function pinAndValidateReferences(

@@ -1,11 +1,11 @@
 import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 const mocks=vi.hoisted(()=>({access:vi.fn(),signed:vi.fn(),stored:vi.fn(),scan:vi.fn()}));
 vi.mock('../services/account-access.js',()=>({canAccessAllLineAccounts:mocks.access}));
 vi.mock('../services/r2-presigned-upload.js',()=>({createR2PresignedPutUrl:mocks.signed}));
-vi.mock('../services/broadcast-media-storage.js',()=>({storeBroadcastMedia:mocks.stored}));
+vi.mock('../features/broadcasts/broadcast-media-storage.js',()=>({storeBroadcastMedia:mocks.stored}));
 vi.mock('./file-scan.js',()=>({ensureFileScanForUpload:mocks.scan}));
 import {broadcastMediaDirect} from './broadcast-media-direct.js';
 let test:SqliteD1;let app:Hono<Env>;let env:Env['Bindings'];

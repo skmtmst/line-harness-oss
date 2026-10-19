@@ -44,7 +44,7 @@ interface ScenarioRow {
   line_account_id: string | null;
 }
 
-/** Minimal D1 mock covering the raw queries in resolveLinkAccount(). */
+/** Minimal D1 mock covering the raw queries in resolveLinkAccount. */
 function makeDb(state: { accounts?: AccountRow[]; scenarios?: ScenarioRow[] }): D1Database {
   return {
     prepare(sql: string) {

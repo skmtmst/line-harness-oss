@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
 import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * お金が動く操作の記録。

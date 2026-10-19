@@ -5,7 +5,7 @@ import { getFriendListFieldValues } from '@line-crm/db';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { authMiddleware } from '../middleware/auth';
 import { friends } from './friends';
-import type { Env } from '../index';
+import type { Env } from '../worker-env';
 let f: SqliteD1, app: Hono<Env>;
 beforeEach(()=>{
   f=createTestD1({ loginPolicy: 'off',foreignKeys:true});

@@ -17,7 +17,7 @@ it('R-MEET01: 結果保存の失敗は未完として残し、同じ受信で補
  expect(push).toHaveBeenCalledTimes(1);
  expect((await post()).status).toBe(200);expect(push).toHaveBeenCalledTimes(1);
 });
-it('R-MEET01/B-248: 送信結果が不明なら失敗を見せ、自動で二度送らない',async()=>{
+it('R-MEET01/送信結果が不明なら失敗を見せ、自動で二度送らない',async()=>{
  push.mockRejectedValueOnce(new Error('fixture transport interrupted'));
  const failed=await post();expect(failed.status).toBe(202);
  expect(await failed.json()).toMatchObject({code:'MEET_DELIVERY_REVIEW_REQUIRED'});

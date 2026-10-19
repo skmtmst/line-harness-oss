@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { tenantPublicBoundaryMiddleware } from './tenant-public-boundary.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 

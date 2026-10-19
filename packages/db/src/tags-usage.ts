@@ -1,3 +1,2 @@
-// Public entry point. Implementation is organized by responsibility.
-export { getTagsWithUsage } from './tags-usage-references.js';
-export { getTagDeleteImpact } from './tags-usage-delete-impact.js';
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { getTagDeleteImpact, getTagsWithUsage } from './tags/usage.js';

@@ -5,8 +5,9 @@ import { type ExternalLineArea } from './rich-menu-external-types.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getRichMenuGroups, createRichMenuGroup, setRichMenuPageImage, acquirePublishLease, releasePublishLease, renewPublishLease, setPageRichMenuId, markRichMenuGroupPublished, getLineAccountById, getRichMenuTapStats, getRichMenuAudienceStats, listRichMenuGroupIdsByAreaLabel, normalizeRichMenuSearchText, jstNow, type RichMenuAreaInput } from '@line-crm/db';
+
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { currentMonthRange } from '../lib/jst-range.js';

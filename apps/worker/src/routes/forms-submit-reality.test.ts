@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test as vitestTest, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { AsyncTestScope } from '../test-utils/async-test-scope.js';
 
 /**
@@ -460,7 +460,7 @@ describe('フォーム回答の冪等化(実DB)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'form-2conn-'));
     const file = join(dir, 'test.sqlite');
     const primary = new Database(file);
-    // #743: 起動SQLの素の再生は文ごとに確定・fsyncし、列車274では並行
+    // #743: 起動SQLの素の再生は文ごとに確定・fsyncし、では並行
     // 480ファイルの確定待ちで行列して準備だけで15秒を超えた。1つの確定に
     // まとめる(判定内容・待ち時間は変えない。WAL化は確定の後)。
     primary.exec('BEGIN;');
@@ -664,8 +664,8 @@ describe('N-042 型検証の接続(#702) F1旧項目対応表', () => {
 
 // Keep the real URL/private-IP policy and webhook fetch. Only DNS is synthetic,
 // so concurrency/event-id assertions still count actual webhook attempts.
-vi.mock('../services/form-webhook.js', async original => {
-  const actual = await original<typeof import('../services/form-webhook.js')>();
+vi.mock('../features/forms/form-webhook.js', async original => {
+  const actual = await original<typeof import('../features/forms/form-webhook.js')>();
   return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
     actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
 });

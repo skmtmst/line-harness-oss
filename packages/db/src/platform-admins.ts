@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 
 /**
- * 運営（musubo 提供元）の階層。★V6 37 マスター（運営）コンソール。
+ * 運営（musubo 提供元）の階層。★37 マスター（運営）コンソール。
  *
  * 運営マスターは staff_members の行を持ち、ログイン・2要素認証・LINE ログインは
  * 既存の仕組みをそのまま使う。「運営マスターかどうか」だけを platform_admins で判定する。
@@ -14,7 +14,7 @@ export interface PlatformAdmin {
   staff_id: string;
   is_active: number;
   approved_by: string | null;
-  /** 招待の進み具合（★V6 37-10）。active だけが運営マスターとして扱われる。 */
+  /** 招待の進み具合（★37-10）。active だけが運営マスターとして扱われる。 */
   activation_state: PlatformAdminActivationState;
   invited_by: string | null;
   invited_at: string | null;
@@ -105,7 +105,7 @@ export async function createPlatformAdmin(
 }
 
 /**
- * 招待の行を作る（★V6 37-10）。既に招待中・2要素認証待ちの行があれば招待し直し。
+ * 招待の行を作る（★37-10）。既に招待中・2要素認証待ちの行があれば招待し直し。
  * 登録完了（active）の行は触らない（呼び出し側で先に断る）。
  */
 export async function upsertPlatformAdminInvite(

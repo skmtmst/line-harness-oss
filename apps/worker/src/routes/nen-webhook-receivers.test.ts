@@ -2,14 +2,14 @@
 import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = vi.hoisted(() => ({
   ingest: vi.fn(), storeEmail: vi.fn(), getSecret: vi.fn(), prepare: vi.fn(),
 }));
 vi.mock('./ec-connector-secret.js', () => ({ getConnectorSecret: mocks.getSecret }));
-vi.mock('../services/ec-auto-line.js', async (load) => ({
-  ...await load<typeof import('../services/ec-auto-line.js')>(), ingestBehavior: mocks.ingest,
+vi.mock('../features/ec-commerce/ec-auto-line.js', async (load) => ({
+  ...await load<typeof import('../features/ec-commerce/ec-auto-line.js')>(), ingestBehavior: mocks.ingest,
 }));
 vi.mock('../services/support-email.js', async (load) => ({
   ...await load<typeof import('../services/support-email.js')>(), storeSupportEmail: mocks.storeEmail,

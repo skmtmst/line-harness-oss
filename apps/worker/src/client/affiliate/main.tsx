@@ -5,7 +5,7 @@ import { liffErrorMessage } from '../../../../liff/src/lib/api-error.js';
 // authenticates every /api/liff/affiliate/* call server-side.
 //
 // NOTE: this mirrors apps/liff/src/pages/Affiliate.tsx, but that page imports
-// `@line/liff` and calls liff.getAccessToken() itself. The worker client never
+// `@line/liff` and calls liff.getAccessToken itself. The worker client never
 // bundles @line/liff (the orchestrator uses a `declare const liff` global), so
 // we re-home the same UI here and take the access token via ctx instead.
 
@@ -25,7 +25,7 @@ export interface AffiliateContext {
   liffId: string;
   idToken?: string;
   lineUserId: string;
-  /** LINE access token (liff.getAccessToken()); auth for the affiliate API. */
+  /** LINE access token (liff.getAccessToken); auth for the affiliate API. */
   lineAccessToken: string;
 }
 

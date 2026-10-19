@@ -1,15 +1,14 @@
+export { WorkflowDeferred } from './workflow-error.js';
+import { WorkflowDeferred } from './workflow-error.js';
 import {
   claimWorkflowStep, ensureWorkflowStep, failWorkflowStep, finishWorkflowStep,
   getWorkflowStep, releaseWorkflowStep, renewWorkflowStep, workflowJson,
   type WorkflowStepRef, type WorkflowStepRow,
 } from '@line-crm/db';
+
 import { workflowFencedDb } from './workflow-fenced-db.js';
 import { workflowMutationDb, normalizeWorkflowResult } from './workflow-db.js';
 import type { IncomingWebhookExecution } from './incoming-webhook-receipts.js';
-
-export class WorkflowDeferred extends Error {
-  constructor(public readonly state: string) { super(`workflow_${state}`); }
-}
 export interface WorkflowExecution extends IncomingWebhookExecution {
   ref: WorkflowStepRef;
   owner: string;

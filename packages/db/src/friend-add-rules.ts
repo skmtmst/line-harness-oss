@@ -272,7 +272,7 @@ export async function listFriendAddRulesPage(
   }
   if (input.search) {
     /*
-     * 「設定名・流入リンクで探す」（★V8 MRhef）。設定名に加えて、一覧が
+     * 「設定名・流入リンクで探す」（★V8 ）。設定名に加えて、一覧が
      * 参照する版（下書きがあれば下書き、なければ公開版）に選ばれている
      * 流入リンクの名前でも当たるようにする。版の取り方は RULE_SELECT と同じ。
      */
@@ -667,7 +667,7 @@ export async function listFriendAddRuleOrderIds(
 }
 
 /**
- * 優先順位の書き換え（★V8 MRhef のつまみ並び替え）。priority は版ではなく
+ * 優先順位の書き換え（★V8  のつまみ並び替え）。priority は版ではなく
  * 行の値なので、公開中でも下書きを経ずにその場で効く（実行側は
  * `ORDER BY is_unknown_route_fallback, priority` で読む）。同時編集への
  * 印として lock_version を上げ、ほかの画面の下書き保存が古い順を

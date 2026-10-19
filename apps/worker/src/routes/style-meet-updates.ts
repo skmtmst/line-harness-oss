@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { StyleError } from '../services/style-setup.js';
 import { base, account, json, edit, text, oneOf } from './styles-common.js';
 

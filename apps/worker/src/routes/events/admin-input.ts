@@ -1,5 +1,5 @@
 import { type Context } from 'hono';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import { computeRemindersForBooking, insertRemindersForBooking, cancelPendingRemindersFor } from '../../services/event-booking-reminders.js';
 
 // Cancel all pending reminders for an event's confirmed bookings, then
@@ -67,7 +67,7 @@ export async function rebuildRemindersForSlot(db: D1Database, slot_id: string): 
 
 // ============================================================
 // U: イベントの状態・変更確認・待ちの手動操作
-// v6-29 §10・§11-2。状態を変える操作は event_change_logs に残す。
+// -29 §10・§11-2。状態を変える操作は event_change_logs に残す。
 // ============================================================
 
 /** 変更の記録に残す操作者。staff ミドルウェアが無い口では null。 */

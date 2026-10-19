@@ -3,11 +3,11 @@ import type { Env } from '../worker-env.js';
 
 import { enqueueFollowingMileageMilestones } from '@line-crm/db';
 
-import { runExpirer } from '../services/booking-expirer.js';
+import { runExpirer } from '../features/booking/booking-expirer/index.js';
 
 import { runEventBookingExpirer } from '../services/event-booking-expirer.js';
 
-import { sendBookingNotification } from '../services/booking-notifier.js';
+import { sendBookingNotification } from '../features/booking/booking-notifier/index.js';
 
 import events from '../routes/events.js';
 
@@ -53,7 +53,7 @@ export async function runSixHourlyHeavyJobs(
       },
     },
     {
-      // v6-25 §15: 明細90日・日別13か月。確定済みだけ畳んで消す。
+      // -25 §15: 明細90日・日別13か月。確定済みだけ畳んで消す。
       name: 'automation retention purge',
       run: async () => {
         const { purgeExpiredAutomationRuns } = await import('@line-crm/db');
@@ -74,7 +74,7 @@ export async function runSixHourlyHeavyJobs(
       // 日常更新は各保存経路で原子的に行う。ここは欠損補修だけの経路。
       name: 'media usage scan',
       run: async () => {
-        const { scanMediaUsage } = await import('../services/media-usage-scan.js');
+        const { scanMediaUsage } = await import('../features/media/media-usage-scan.js');
         const scanStartedAt = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
         const result = await scanMediaUsage(env.DB, scanStartedAt);
         if (result.matched > 0 || result.pruned > 0) {
@@ -160,7 +160,7 @@ export async function runSixHourlyHeavyJobs(
       },
     },
     {
-      // ★V6 36-2: 退会・無料体験切れから保存期限が過ぎた統括の顧客データを消す。
+      // ★36-2: 退会・無料体験切れから保存期限が過ぎた統括の顧客データを消す。
       // 1回の行数に上限があり、途中で止まっても次の回が続きから消す。
       name: 'tenant data retention purge',
       run: async () => {

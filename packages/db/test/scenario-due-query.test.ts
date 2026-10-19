@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   advanceFriendScenario,
   getFriendScenariosDueForDelivery,
-} from '../src/scenarios.js';
+} from '../src/scenarios/index.js';
 
 const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 

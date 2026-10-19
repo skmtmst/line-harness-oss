@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { resolveRewardTemplate } from './reward-resolver.js';
 import type { MessageTemplate, TrackedLink, Friend } from '@line-crm/db';
 
+
+
 const tplA: MessageTemplate = {
   id: 'tpl-a',
   name: 'reward A',

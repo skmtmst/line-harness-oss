@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const roleBundles = [
   { id: 'administrator', name: '管理者', description: '全機能', featureAccess: 'edit', requiresMfa: true },

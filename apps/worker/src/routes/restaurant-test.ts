@@ -5,7 +5,7 @@ import { readCloseNotificationSettings, saveCloseNotificationSettings } from '..
 import { StampError } from '../services/visit-stamps.js';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { requireRole, requirePermission } from '../middleware/role-guard.js';
 import { BOOKING_SETTINGS_KEY } from '@line-crm/shared';

@@ -415,6 +415,11 @@
 - [文書の入口とリンクの検査](../scripts/docs/README.md)
 - [画面確認の道具](../scripts/visual-qa/README.md)
 
+- [cleanup-f01-1019.md](qa/cleanup-f01-1019.md)
+- [cleanup-q01w1-1019.md](qa/cleanup-q01w1-1019.md)
+- [cleanup-q01w4-1019.md](qa/cleanup-q01w4-1019.md)
+- [README.md](../packages/db/README.md)
+
 ## セキュリティ
 
 - [Security Policy](../SECURITY.md)
@@ -564,11 +569,11 @@
 - [pending-kenta-one-f2x-j7-1015.md](release-log/unreleased/pending-kenta-one-f2x-j7-1015.md)
 - [pending-kenta-testfix-1015.md](release-log/unreleased/pending-kenta-testfix-1015.md)
 - [pending-kenta-train40-evening.md](release-log/unreleased/pending-kenta-train40-evening.md)
-
-## まとめ枝の取り込みで加わった文書
-
-- [F01の検査記録](qa/cleanup-f01-1019.md)
-- [F01の変更履歴](release-log/unreleased/0000-kenta-cleanup-f01.md)
-- [X01Cの変更履歴](release-log/unreleased/0000-kenta-cleanup-x01c.md)
-- [LINE接続の変更履歴](release-log/unreleased/1775-masato-line-webhook-v07.md)
-- [LINE接続URL枠の変更履歴](release-log/unreleased/1776-masato-line-webhook-padding.md)
+- [0000-kenta-cleanup-f01.md](release-log/unreleased/0000-kenta-cleanup-f01.md)
+- [0000-kenta-cleanup-x01c.md](release-log/unreleased/0000-kenta-cleanup-x01c.md)
+- [1775-masato-line-webhook-v07.md](release-log/unreleased/1775-masato-line-webhook-v07.md)
+- [1776-masato-line-webhook-padding.md](release-log/unreleased/1776-masato-line-webhook-padding.md)
+- [0000-kenta-cleanup-q01w1.md](release-log/unreleased/0000-kenta-cleanup-q01w1.md)
+- [0000-kenta-cleanup-q01w4.md](release-log/unreleased/0000-kenta-cleanup-q01w4.md)
+- [0000-kenta-cleanup-q03.md](release-log/unreleased/0000-kenta-cleanup-q03.md)
+- [0000-kenta-cleanup-s02b.md](release-log/unreleased/0000-kenta-cleanup-s02b.md)

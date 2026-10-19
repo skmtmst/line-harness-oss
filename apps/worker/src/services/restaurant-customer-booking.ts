@@ -1,5 +1,5 @@
 import { getBookingAdminSettings } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type {
   RestaurantCustomerAvailability,
   RestaurantCustomerBooking,
@@ -10,7 +10,7 @@ import {
   validRestaurantDate,
 } from './restaurant-booking.js';
 import { tzDateStr } from './availability.js';
-import { sendAutomaticBookingLine } from './booking-automatic-line.js';
+import { sendAutomaticBookingLine } from '../features/booking/booking-automatic-line/index.js';
 export type CustomerReservationRow = {
   id: string;
   store_id: string;

@@ -102,7 +102,7 @@ describe('NENコラム一覧の上限(点検 #512 の中6)', () => {
   });
 });
 
-describe('未割り当てのECコラムを取り込む（★V6 37-6-A「ECのコラムを取り込む」）', () => {
+describe('未割り当てのECコラムを取り込む（★37-6-A「ECのコラムを取り込む」）', () => {
   test('line_account_id が NULL のコラムを選択中のアカウントへ割り当て、件数を返す', async () => {
     dbMocks.getLineAccountById.mockResolvedValue({ id: 'account-a' });
     const res = await app().request('/api/nen-campaigns/columns/import?lineAccountId=account-a', { method: 'POST' });

@@ -22,7 +22,8 @@ import {
   listSupportMessages,
   SUPPORT_STAGE_LABELS,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { sendPlainMail } from '../services/plain-mail.js';
@@ -30,7 +31,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { findPlan, formatJstMonthDay } from '../services/billing-plans.js';
 
 /**
- * 統括から運営へのお問い合わせ（★V6 36-3）。
+ * 統括から運営へのお問い合わせ（★36-3）。
  *
  * - 送るとこの統括の記録に残り、運営の連絡先へメールで知らせ、送信者に控えを送る
  * - メールが送れなくても記録は残す（`notified` が false で返る）

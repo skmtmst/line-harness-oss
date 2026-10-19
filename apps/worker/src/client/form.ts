@@ -1,6 +1,16 @@
 import { escapeHtml } from '../lib/html-escape.js';
 import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
 import { createClientLogger } from '@line-crm/shared';
+import {
+  buildFormSubmitHeaders,
+  newFormIdempotencyKey,
+  toFormIdempotencyKey,
+  type FormIdempotencyKey,
+  type FormAvailability,
+  type FormLayout,
+  collectInputs,
+} from '@line-crm/shared';
+
 import '../../../liff/src/card-surface.css';
 import { choiceReceptionLabel } from '../../../liff/src/lib/form-reception.js';
 import {applyCustomerFormTheme} from './customer-look.js';
@@ -20,15 +30,10 @@ import {applyCustomerFormTheme} from './customer-look.js';
  * 送信ヘッダの組み立ては共有部品に寄せる(#729)。Idempotency-Key の
  * 付け忘れは型で落ちる形にする。fetch・認証取得・再送フローはここに残す。
  */
-import {
-  buildFormSubmitHeaders,
-  newFormIdempotencyKey,
-  toFormIdempotencyKey,
-  type FormIdempotencyKey,
-  type FormAvailability,
-  type FormLayout,
-  collectInputs,
-} from '@line-crm/shared';
+
+
+
+
 import { customerMessage } from './customer-message.js';
 const clientLogger = createClientLogger('embedded');
 

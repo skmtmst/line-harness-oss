@@ -6,7 +6,7 @@ import { scenarios } from './scenarios.js';
 import { friendAddRules } from './friend-add-rules.js';
 import { richMenuGroups } from './rich-menu-groups.js';
 import { forms } from './forms.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 let t: SqliteD1;
 beforeEach(() => { t = createTestD1(); t.raw.prepare("INSERT INTO scenarios (id,name,trigger_type) VALUES ('s','試験','manual')").run(); });
@@ -19,7 +19,7 @@ function app(role: 'staff' | 'owner', readOnly = false) {
   return app;
 }
 
-describe('B-333 編集と公開・停止の権限を分ける', () => {
+describe('編集と公開・停止の権限を分ける', () => {
   test.each([
     ['POST', '/api/scenarios/s/publish'],
     ['POST', '/api/friend-add-rules/r/publish'], ['POST', '/api/friend-add-rules/r/stop'],

@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { decideConversionApproval, syncAffiliateConversionMileage, getAttributionDecisionView } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { readApprovalDecision, notifyApprovalOnce, runApprovedConversionOfferActions, offerActionFailureMessage, BULK_APPROVAL_MAX_ITEMS, BulkApprovalItemResult, isEventVisibleToStaff, bulkItemAccountId } from './conversions-definition.js';
 import type { Context } from 'hono';

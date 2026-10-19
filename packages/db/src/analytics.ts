@@ -34,7 +34,7 @@ export interface DailyMessageCount {
  * 日ごとの送受信数。
  *
  * created_at は JST の文字列なので、先頭10文字を取れば日付になる。
- * date() 関数を通すと UTC として解釈され、日本の朝9時より前が前日に寄る。
+ * date 関数を通すと UTC として解釈され、日本の朝9時より前が前日に寄る。
  *
  * reply と push は `delivery_type` から数える。**この2つを足しても outgoing に
  * ならないことがある。** delivery_type が入る前に記録された行と、テスト送信

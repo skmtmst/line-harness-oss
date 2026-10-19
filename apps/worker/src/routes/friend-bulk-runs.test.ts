@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { friendBulkRuns } from './friend-bulk-runs.js';
 
-vi.mock('../services/friend-bulk-runs.js', () => ({
+vi.mock('../features/friends/friend-bulk-runs.js', () => ({
   createFriendBulkUndoRun: vi.fn(),
   FriendBulkRunError: class FriendBulkRunError extends Error {
     constructor(

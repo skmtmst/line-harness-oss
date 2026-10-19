@@ -4,13 +4,13 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getAutoReplies, getAutoReplyById, getAutoReplyHitCounts, getAutoReplyHitCountSince, getFriendById, createAutoReplyWithDraftVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, publishAutoReplyDraftVersion, recordAutoReplyDraftTest, saveAutoReplyDraftVersion, jstNow } from '@line-crm/db';
 import type { AutoReplyVersionRow } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { currentMonthRange } from '../lib/jst-range.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { evaluateAutoReplyCandidates, parseAutoReplyActions, previewAutoReplyContent } from '../services/auto-reply.js';
-import { isOperatorHandling } from '../services/auto-reply-conditions.js';
+import { evaluateAutoReplyCandidates, parseAutoReplyActions, previewAutoReplyContent } from '../features/auto-replies/auto-reply/index.js';
+import { isOperatorHandling } from '../features/auto-replies/auto-reply-conditions/index.js';
 import { conflictCounts, conflictPairs, buildAutomationKeywordIndex, actionExecutionCounts, internalMemosOf, SerializedAutoReply, serializeAutoReply, computeEffectiveAccounts, resolveStoppedByNames, autoReplyReceiveSummary, readDraftSettings, assertTemplateVisible, readIdempotencyKey, draftVersionResponse, idempotencyErrorResponse, validateDraft, conflictsForDraft, MESSAGE_KINDS, activeRulesWithDraft, AutoReplyDryRunResult, validIdempotencyKey } from './auto-replies-definition.js';
 import type { Context } from 'hono';
 

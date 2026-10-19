@@ -6,7 +6,7 @@ import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
 import { claimPhotoNotificationDelivery, completePhotoNotificationDelivery, getPhotoNotificationState, resolveLineCredential } from '@line-crm/db';
 import * as dbPackage from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { type FriendRow } from '../services/nen-member-identity.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { classifyExternalDeliveryError } from '../services/external-delivery-retry.js';
@@ -322,7 +322,7 @@ export async function deliverPhotoReviewNotification(
 }
 
 export /**
- * LIFF マイページ（★V6 37-2）に出す会員ランク・マイル。
+ * LIFF マイページ（★37-2）に出す会員ランク・マイル。
  * 設定（nen_rank_settings）とECから届いた値（nen_ec_member_snapshots）から組み立てる。
  * ECの値が無い友だちは、これまでの足し算（purchase_amount）を通年の代わりに使う（暫定）。
  * お客様に見せる呼び名は「マイル」。ここに「ポイント」は出さない。
@@ -391,7 +391,7 @@ export async function buildMembership(db: D1Database, lineAccountId: string | nu
 }
 
 export /**
- * LIFF に返すペット。`feeding` は NRC／FEDIAF の式で毎回計算し直す（★V6 37-2「今日の目安」）。
+ * LIFF に返すペット。`feeding` は NRC／FEDIAF の式で毎回計算し直す（★37-2「今日の目安」）。
  * 主食（nen_feeding_products）が無いアカウントでは kcal だけ返し、グラムは null。
  */
 function mapPet(row: Record<string, unknown>, products: FeedingProductRow[] = [], treatLimitPercent = DEFAULT_TREAT_LIMIT_PERCENT) {

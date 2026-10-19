@@ -1,7 +1,7 @@
-import { BookingLineDeliveryIncomplete } from './booking-line-delivery.js';
+import { BookingLineDeliveryIncomplete } from '../features/booking/booking-line-delivery/index.js';
 import { activeTenantLineAccountSql, isOperationCapabilityStopped } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
-import type { EventWaitlistOfferSender } from './event-waitlist.js';
+import type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
 
 type Offer = Parameters<EventWaitlistOfferSender>[0];
 const SOURCE = 'event_waitlist_offer';

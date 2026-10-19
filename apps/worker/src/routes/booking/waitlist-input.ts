@@ -1,4 +1,4 @@
-import { finishExpiredWaitlists } from '../../services/booking-waitlist.js';
+import { finishExpiredWaitlists } from '../../features/booking/booking-waitlist/index.js';
 
 /**
  * キャンセル待ちの登録の共通処理（管理画面・LIFF）。

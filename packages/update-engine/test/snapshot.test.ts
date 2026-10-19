@@ -153,7 +153,7 @@ describe('snapshot CRUD', () => {
   });
 
   describe('updateStatus', () => {
-    it("sets completed_at to Date.now() when status='success'", async () => {
+    it("sets completed_at to Date.now when status='success'", async () => {
       const id = await createSnapshot(d1, { from: '0.5.0', to: '0.6.0' });
       const before = Date.now();
       await updateStatus(d1, id, 'success');

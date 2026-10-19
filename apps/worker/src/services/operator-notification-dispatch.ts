@@ -1,3 +1,5 @@
+export type { OperatorRuleConditions } from './operator-rule-types.js';
+import type { OperatorRuleConditions } from './operator-rule-types.js';
 import {deliverOperatorPush} from './operator-push.js';
 import { ensureOperatorInstance } from './operator-notification-instance.js';
 // N-327 (#663): 公開済み運用者通知ルールの自動実行と回復。
@@ -14,6 +16,7 @@ import {
   eligibleTeamStaffIds,
   type NotificationRuleRow,
 } from '@line-crm/db';
+
 import { sendOperationEmail } from './operation-notifications.js';
 import { isKnownOperatorEventType } from './operator-notification-registry.js';
 import {
@@ -76,19 +79,6 @@ export type OperatorRecipient = {
   email_verified_at: string | null;
   line_user_id: string | null;
   notification_preferences: string;
-};
-
-export type OperatorRuleConditions = {
-  teamId?: string;
-  schedule?: 'anytime'|'business_hours'|'morning_digest';
-  threshold?: 'one'|'three'|'ten';
-  onlyAvailable?: boolean;
-  importance?: string;
-  recipientIds?: string[];
-  recipientLabel?: string;
-  message?: string;
-  actionUrl?: string;
-  dedupeMinutes?: number;
 };
 
 export type OperatorDispatchPerRule = {

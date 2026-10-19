@@ -60,7 +60,7 @@ export interface LineAccount {
   parent_line_account_id: string | null;
   /** 所属する統括。指示Cで認可境界として有効化するまでは表示範囲を変えない。 */
   tenant_id: string | null;
-  /** V6の日時指定と日別分析で使うIANAタイムゾーン。 */
+  /** の日時指定と日別分析で使うIANAタイムゾーン。 */
   timezone?: string;
   /** 楽観ロックに使う版番号。変更の保存ごとに1増える。 */
   revision?: number;

@@ -1,7 +1,7 @@
 import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 
@@ -19,10 +19,10 @@ export { readDraftSettings } from './auto-replies-definition.js';
 // GET /api/auto-replies — list all auto-replies (optional ?accountId filter)
 autoReplies.get('/api/auto-replies', requireRole('owner', 'admin', 'staff'), get__api_auto_replies_1);
 
-/** V6一覧・競合画面用。公開中ルール同士と、直近28日の実測だけを返す。 */
+/** 一覧・競合画面用。公開中ルール同士と、直近28日の実測だけを返す。 */
 autoReplies.get('/api/auto-replies/conflicts', get__api_auto_replies_conflicts_2);
 
-/** V6: 新規設定は下書きだけを作り、この時点では返信を始めない。 */
+/** 新規設定は下書きだけを作り、この時点では返信を始めない。 */
 autoReplies.post('/api/auto-replies/drafts', requireDeliveryAccess('autoReplies'), inputJsonBoundary(), post__api_auto_replies_drafts_3);
 
 // GET /api/auto-replies/:id — get by ID
