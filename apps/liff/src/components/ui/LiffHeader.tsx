@@ -4,9 +4,11 @@ import liff from '../../lib/liff-runtime.js';
 import { api } from '../../lib/api.js';
 import { logFailure } from '../../lib/user-message.js';
 import Icon from './Icon.js';
+import { getLiffId } from '../../lib/liff-auth.js';
 
 // 店名は画面ごとに読み直さない。最初に取れた値をモジュールに持つ。
-let cachedShopName: string | null = null;
+const cachedShopNames = new Map<string, string>();
+function accountKey() { try { return getLiffId(); } catch { return ''; } }
 
 /**
  * ★V8 の上の帯。×・題・店名・… の1行 (高さ48)。全画面で同じ形。
@@ -23,7 +25,9 @@ export function liffDocumentTitle(title: string): string {
  * ページの中に戻るリンクは置かない。backLabel は読み上げの名前。
  */
 export default function LiffHeader({ title, onBack, backLabel = '戻る' }: { title: string; onBack?: () => void; backLabel?: string }) {
-  const [shopName, setShopName] = useState(cachedShopName);
+  const key = accountKey();
+  const [loadedName, setLoadedName] = useState<{ key: string; name: string } | null>(null);
+  const shopName = loadedName?.key === key ? loadedName.name : cachedShopNames.get(key) ?? null;
 
   // ブラウザ・LINE の上に出る題も、帯の題と同じ画面名にする（「<画面名> | musubo」）。
   useEffect(() => {
@@ -31,18 +35,19 @@ export default function LiffHeader({ title, onBack, backLabel = '戻る' }: { ti
   }, [title]);
 
   useEffect(() => {
-    if (cachedShopName !== null) return;
+    if (cachedShopNames.has(key)) return;
+    let alive = true;
     api
       .liffConfig()
       .then((r) => {
-        cachedShopName = r.data?.accountName ?? '';
-        setShopName(cachedShopName);
+        const name = r.data?.accountName ?? '';
+        if (alive) { cachedShopNames.set(key, name); setLoadedName({ key, name }); }
       })
       .catch((e) => {
         logFailure('liff-config', e);
-        cachedShopName = '';
       });
-  }, []);
+    return () => { alive = false; };
+  }, [key]);
 
   return (
     <header className="sticky top-0 z-10 border-b border-liff-line bg-canvas">

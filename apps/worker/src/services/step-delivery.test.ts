@@ -48,12 +48,13 @@ function mockDb(tables: FakeTables): D1Database {
             return {
               user_id: tables.friendUserIds?.[friendId] ?? null,
               metadata: JSON.stringify(meta),
+              line_account_id: 'account-same-tenant',
             } as unknown as T;
           }
           return null;
         },
         all: async () => {
-          if (sql.includes('SELECT metadata FROM friends') && sql.includes('WHERE user_id')) {
+          if (sql.includes('SELECT f.metadata FROM friends f') && sql.includes('WHERE f.user_id')) {
             const [userId] = args as [string];
             return {
               results: Object.entries(tables.friendMetadata ?? {})

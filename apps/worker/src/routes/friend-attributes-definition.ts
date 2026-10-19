@@ -301,7 +301,7 @@ export async function folderBoundary(c: Context<Env>, folder: { account_id: stri
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const owner = folder.account_id ?? null;
   if (owner ? !scope.allowedAccountIds.includes(owner) || Boolean(requested && requested !== owner)
-    : (folder.kind === 'tag' || folder.kind === 'template') && !scope.canSeeUnassigned) {
+    : !scope.canSeeUnassigned) {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   return null;

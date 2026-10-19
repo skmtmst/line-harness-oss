@@ -221,7 +221,7 @@ export function ScenarioDetailDialogs({
               folders={folders.map(folderById)}
               // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
               onCreate={canEdit
-                ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+                ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color, accountId: scenario?.lineAccountId ?? null }), folderById, (created) => setFolders((current) => [...current, created]))
                 : undefined}
             /></SaveErrorField>
             {folderState === 'error' && (

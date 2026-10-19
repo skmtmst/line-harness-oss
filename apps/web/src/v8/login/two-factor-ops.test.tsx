@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { trustedChallengeUrl } from '@/test-utils/trusted-auth-handoff'
 import React, { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,7 +26,7 @@ let host: HTMLDivElement
 let root: Root
 
 async function open(url: string, theme: 'v7' | 'v8') {
-  window.history.replaceState(null, '', url)
+  window.history.replaceState(null, '', trustedChallengeUrl(url))
   document.documentElement.dataset.theme = theme
   await act(async () => { root.render(<TwoFactorLoginPage />) })
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })

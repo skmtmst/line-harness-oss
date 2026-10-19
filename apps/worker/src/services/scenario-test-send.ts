@@ -79,10 +79,7 @@ export async function buildStepMessages(
   if (!friend) throw new Error('friend not found')
 
   const resolved = await resolveStepContent(db, step, lineAccountId)
-  const meta = await resolveMetadata(db, {
-    user_id: (friend as unknown as Record<string, string | null>).user_id,
-    metadata: (friend as unknown as Record<string, string | null>).metadata,
-  })
+  const meta = await resolveMetadata(db, friend)
   const friendWithMeta = { ...friend, metadata: meta } as Parameters<typeof expandVariables>[1]
   // 質問の前文・選択肢文にも差し込みが効くので、スキャンは本文と
   // 質問JSONを合わせた全体で行う。

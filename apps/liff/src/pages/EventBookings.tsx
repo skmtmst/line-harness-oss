@@ -1,3 +1,4 @@
+import { useCustomerWords, useCustomerStyle } from '../components/CustomerStyleScope.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type EventBookingMine, type EventSlot } from '../lib/api.js';
@@ -15,6 +16,8 @@ import LiffLookScope from '../components/LiffLookScope.js';
 import StatusView from '../components/ui/StatusView.js';
 
 import { statusMeta, canLeaveWaitlist } from './event-bookings-policy.js';
+import LessonHistorySection from '../components/LessonHistorySection.js';
+import AbsenceSheet from '../components/AbsenceSheet.js';
 
 function canCancel(b: EventBookingMine): boolean {
   if (b.status !== 'requested' && b.status !== 'confirmed') return false;
@@ -43,6 +46,11 @@ const DECIDED_CHANGE_ERRORS = new Set([
 ]);
 
 export default function EventBookings() {
+  const words = useCustomerWords();
+  const style = useCustomerStyle();
+  const [absence, setAbsence] = useState<EventBookingMine | null>(null);
+  const [lessonRevision, setLessonRevision] = useState(0);
+  const [pickingMakeup, setPickingMakeup] = useState(false);
   const navigate = useNavigate();
   // ?liffId=... を引き継ぐ (再読み込みで失わない)。
   const { search } = useLocation();
@@ -150,14 +158,14 @@ export default function EventBookings() {
       const msg = (() => {
         switch (e.body?.error) {
           case 'slot_full': return '選んだ時間は満席になりました。別の時間を選んでください。';
-          case 'change_deadline_passed': return '変更期限を過ぎています。LINE で運営にご連絡ください。';
-          case 'change_not_allowed': return 'このイベントは LIFF からの変更に対応していません。LINE で運営にご連絡ください。';
+          case 'change_deadline_passed': return `変更期限を過ぎています。LINE で${words.contact}にご連絡ください。`;
+          case 'change_not_allowed': return `この${words.event}は LIFF からの変更に対応していません。LINE で${words.contact}にご連絡ください。`;
           case 'slot_inactive':
           case 'slot_started':
           case 'entry_closed': return '選んだ時間は受付を終えています。別の時間を選んでください。';
           case 'same_slot': return '今と同じ時間です。別の時間を選んでください。';
           case 'over_friend_limit':
-          case 'duplicate_friend_booking': return '申込の上限に達しているため変えられません。LINE で運営にご連絡ください。';
+          case 'duplicate_friend_booking': return `申込の上限に達しているため変えられません。LINE で${words.contact}にご連絡ください。`;
           case 'invalid_state': return 'この予約は既に変更・キャンセル済みのため変えられません。一覧を開き直してください。';
           case 'send_in_flight_retry': return '送信の直前でした。少し待ってから、もう一度お試しください。';
           default: return '変えられませんでした。時間をおいて、もう一度お試しください。';
@@ -197,7 +205,7 @@ export default function EventBookings() {
       const msg = (() => {
         switch (e.body?.error) {
           case 'cancel_deadline_passed': return 'キャンセル期限を過ぎています。';
-          case 'cancel_not_allowed': return 'このイベントは LIFF からのキャンセルに対応していません。LINE で運営にご連絡ください。';
+          case 'cancel_not_allowed': return `この${words.event}は LIFF からのキャンセルに対応していません。LINE で${words.contact}にご連絡ください。`;
           case 'invalid_state': return 'この予約は既にキャンセル済 / 確定外のためキャンセルできません。';
           default: return canLeaveWaitlist(b) ? 'キャンセル待ちをやめられませんでした。時間をおいて、もう一度お試しください。' : 'キャンセルできませんでした。時間をおいて、もう一度お試しください。';
         }
@@ -210,9 +218,9 @@ export default function EventBookings() {
 
   return (
     <LiffLookScope className="min-h-screen bg-canvas" designNode="y1bs9A">
-      <LiffHeader title="自分のイベント" />
-      <div className="mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 pb-10">
-        <h1 className="text-xl font-bold text-ink">自分のイベント</h1>
+      <LiffHeader title={words.myEvents} />
+      <div className={`mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 ${pickingMakeup ? 'pb-40' : 'pb-10'}`}>
+        <h1 className="text-xl font-bold text-ink">{words.myEvents}</h1>
         {loading ? (
           <LoadingView />
         ) : loadFailed ? (
@@ -222,7 +230,7 @@ export default function EventBookings() {
             <div
               className="flex rounded-(--liff-radius) bg-liff-chip p-[3px]"
               role="tablist"
-              aria-label="イベントの期間"
+              aria-label={`${words.event}の期間`}
             >
               {(
                 [
@@ -246,16 +254,23 @@ export default function EventBookings() {
                 {actionError}
               </p>
             )}
+            {style === 'lesson' && tab === 'upcoming' ? <>
+              <Button variant="secondary" onClick={() => navigate({ pathname: '/mypage', search })}>回数券と月謝を見る</Button>
+              <LessonHistorySection key={lessonRevision} creditsOnly onPicking={setPickingMakeup} onBookingChanged={() => void refresh()} onLater={() => navigate({ pathname: '/mypage', search })} />
+            </> : null}
             {items.length === 0 ? (
-              tab === 'upcoming' ? (
-                <StatusView icon="calendar" title="これからのイベントはありません" />
+              tab === 'upcoming' && pickingMakeup ? null : tab === 'upcoming' ? (
+                <StatusView icon="calendar" title={`これからの${words.event}はありません`} />
               ) : (
-                <StatusView icon="calendar" title="これまでのイベントはありません" />
+                <StatusView icon="calendar" title={`これまでの${words.event}はありません`} />
               )
             ) : (
               <ul className="space-y-3.5">
                 {items.map((b) => {
-                  const meta = canLeaveWaitlist(b) ? { text: 'キャンセル待ち', tone: 'pending' as const } : statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
+                  const baseMeta = statusMeta[b.status] ?? { text: b.status, tone: 'neutral' as const };
+                  const lessonStatus: Record<string, string> = { requested: words.approvalPending, confirmed: '確定', attended: '出席', no_show: '欠席', rejected: 'お受けできませんでした' };
+                  const meta = canLeaveWaitlist(b) ? { text: 'キャンセル待ち', tone: 'pending' as const }
+                    : style === 'lesson' ? { ...baseMeta, text: lessonStatus[b.status] ?? baseMeta.text } : baseMeta;
                   return (
                     <li key={b.id}>
                       <Card className="p-3.5">
@@ -317,10 +332,13 @@ export default function EventBookings() {
                                 </Button>
                               </div>
                             )}
+                            {style === 'lesson' && tab === 'upcoming' && b.makeup?.enabled
+                              && (b.status === 'requested' || b.status === 'confirmed') && Date.parse(b.slot_starts_at) > Date.now()
+                              ? <Button variant="inline-action" disabled={busy} onClick={() => setAbsence(b)}>欠席する</Button> : null}
                           </div>
                           <Button variant="arrow"
                             type="button"
-                            aria-label={`${b.event_name}のイベントを見る`}
+                            aria-label={`${b.event_name}の${words.event}を見る`}
                             onClick={() =>
                               navigate({ pathname: `/events/${b.event_id}`, search })
                             }
@@ -337,6 +355,9 @@ export default function EventBookings() {
           </>
         )}
       </div>
+      {absence ? <AbsenceSheet booking={absence} onClose={() => setAbsence(null)} onDone={({ reason }) => {
+        setAbsence(null); setLessonRevision((n) => n + 1); void refresh().then(() => { if (reason) setActionError(reason); });
+      }} /> : null}
       <ConfirmDialog
         open={pendingCancel !== null}
         designNode="nUYyb"
@@ -345,7 +366,7 @@ export default function EventBookings() {
             ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)} の${pendingCancel.event_name}${canLeaveWaitlist(pendingCancel) ? 'のキャンセル待ちをやめますか' : 'をキャンセルしますか'}`
             : ''
         }
-        description={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめると、空きが出てもLINEのお知らせは届かなくなります。' : 'キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（お店へご連絡ください）。'}
+        description={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめると、空きが出てもLINEのお知らせは届かなくなります。' : `キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（${words.contact}へご連絡ください）。`}
         confirmLabel={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめる' : 'キャンセルする'}
         cancelLabel="閉じる"
         destructive

@@ -28,3 +28,14 @@ describe('fixed-origin public requests', () => {
     expect(send).toHaveBeenCalledExactlyOnceWith('https://example.com', { method: 'HEAD', redirect: 'manual' });
   });
 });
+
+
+it.each(['.', '..'])('F28: cannot normalize answer %s into a parent path', answer => {
+  expect(() => formWebhookTarget('https://partner.test/members/{member}/eligibility', { member: answer })).toThrow('unsafe_destination');
+  expect(new URL(formWebhookTarget('https://partner.test/check?q={member}', { member: answer })).searchParams.get('q')).toBe(answer);
+  expect(formWebhookTarget('https://partner.test/files/{member}.json', { member: answer })).toContain('.json');
+});
+it('F28: adjacent template characters cannot turn answers into a dot segment', () => {
+  expect(() => formWebhookTarget('https://partner.test/members/{member}./check', { member: '.' })).toThrow();
+  expect(() => formWebhookTarget('https://partner.test/members/{member}.%2e/check', { member: '' })).toThrow();
+});

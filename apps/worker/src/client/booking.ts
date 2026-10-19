@@ -1,3 +1,4 @@
+import { escapeHtml } from '../lib/html-escape.js';
 import { responseLiffError } from '../../../liff/src/lib/api-error.js';
 import { createClientLogger } from '@line-crm/shared';
 import { jstCalendar, jstDate, jstTime } from '@line-crm/shared';
@@ -61,11 +62,7 @@ const state: BookingState = {
 };
 let slotsGeneration = 0;
 
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+
 
 function apiCall(path: string, options?: RequestInit): Promise<Response> {
   return fetch(path, {

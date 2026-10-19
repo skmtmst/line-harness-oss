@@ -15,6 +15,7 @@ import { STARTER_TEMPLATES,WizardForm,WizardStep } from './wizard-model';
 import styles from './wizard-v8.module.css';
 
 type WizardBasicStepContext = {
+  accountId: string | null
   canManage: boolean
   folders: { id: string; name: string; color?: string | null; }[]
   form: WizardForm
@@ -24,7 +25,7 @@ type WizardBasicStepContext = {
   setForm: Dispatch<SetStateAction<WizardForm>>
 }
 
-export function WizardBasicStep({ canManage, folders, form, goToStep, patch, setFolders, setForm }: WizardBasicStepContext) {
+export function WizardBasicStep({ accountId, canManage, folders, form, goToStep, patch, setFolders, setForm }: WizardBasicStepContext) {
   return (<>
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
@@ -43,9 +44,9 @@ export function WizardBasicStep({ canManage, folders, form, goToStep, patch, set
                       onChange={(value) => patch({ folderId: value })}
                       unfiled={{ value: '', label: '分けない' }}
                       folders={folders.map(folderById)}
-                      // 一覧の左の列の「フォルダを追加」と同じ口（自動応答のフォルダは共有）。
+                      // 一覧の左の列の「フォルダを追加」と同じ口（自動応答と同じアカウントのフォルダ）。
                       onCreate={canManage
-                        ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
+                        ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color, accountId }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
                         : undefined}
                     /></SaveErrorField></Field></div>
                 </SettingsFormRow>

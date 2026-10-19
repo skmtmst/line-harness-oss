@@ -1,5 +1,7 @@
 'use client'
 
+import { beginAdminLoginHandoff, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
+
 import { MessageCircle } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useState, type FormEvent } from 'react'
@@ -82,12 +84,12 @@ export default function LoginPage() {
     // 前回の店舗選択を捨てる（NEXT-07）。
     resetAuthSelectionCleared(localStorage, sessionStorage)
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor/setup#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup', res.data.challengeToken))
       return
     }
     if (res.data.twoFactor && res.data.challengeToken) {
       // R507: 二段階認証の画面で実際のログイン方法を出せるよう、経路の印を付ける。
-      window.location.assign(`/login/two-factor#${new URLSearchParams({ lh_2fa: res.data.challengeToken, lh_method: 'password' }).toString()}`)
+      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor', res.data.challengeToken))
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
@@ -101,7 +103,7 @@ export default function LoginPage() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     if (!apiUrl) return setBusy(null)
     // 「7日間ログインを保持」の選択をOAuth往復へ持ち越す印（N-434）
-    window.location.assign(`${apiUrl}/api/auth/line${remember ? '?remember=1' : ''}`)
+    window.location.assign(`${apiUrl}/api/auth/line?${new URLSearchParams({ handoff: beginAdminLoginHandoff(), ...(remember ? { remember: '1' } : {}) })}`)
   }
 
   return (

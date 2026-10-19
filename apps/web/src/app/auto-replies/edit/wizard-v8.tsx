@@ -846,7 +846,7 @@ function AutoReplyWizardV8Inner() {
       ) : null}
 
           {step === 'basic' && (
-            <WizardBasicStep {...{ canManage, folders, form, goToStep, patch, setFolders, setForm }} />
+            <WizardBasicStep accountId={matchedAccountId ?? selectedAccountId ?? null} {...{ canManage, folders, form, goToStep, patch, setFolders, setForm }} />
           )}
 
           {step === 'trigger' && (

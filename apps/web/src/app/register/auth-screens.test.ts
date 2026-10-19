@@ -28,8 +28,7 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
     expect(login).toContain('href="/register"')
     expect(login).toContain('href="/password/forgot"')
     expect(login).toContain('autoComplete="current-password"')
-    // 二段階認証の人は既存の 6 桁コードの画面へ
-    expect(login).toContain('/login/two-factor#')
+    // 認証後の画面とnonceの受け渡しは login-remember-setup-react.test.tsx で実操作する。
   })
 
   it('登録の 1 歩目はメールだけ。Turnstile と同意があり、印（deviceMarker）を送る', () => {

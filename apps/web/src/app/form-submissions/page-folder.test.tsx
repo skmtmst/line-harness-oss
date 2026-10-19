@@ -47,6 +47,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useOptionalAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
 }))
 
 /* 新しい一覧（src/v8/forms/list.tsx）を描く。2026-10-06 に `./list-v8` から向け直した。 */

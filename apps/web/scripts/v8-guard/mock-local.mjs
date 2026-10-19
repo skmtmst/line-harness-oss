@@ -29,6 +29,8 @@ export function mockFetch(method, path) {
         resolve(value)
       }
     }
+    // IncomingMessage is a stream even when a GET request has no body.
+    // The shared mock reads data/end before routing setup requests.
     const req = Object.assign(Readable.from([]), { url: path, method, headers: {} })
     const res = {
       statusCode: 200,

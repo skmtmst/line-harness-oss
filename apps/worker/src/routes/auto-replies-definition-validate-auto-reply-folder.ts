@@ -3,7 +3,7 @@ import { getAutoReplyById, parseAutoReplyVersionSettings, getFolderById } from '
 import type { AutoReplyDraftSettings, AutoReplyVersionRow } from '@line-crm/db';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { type AutoReplyCandidateReasonCode } from '../services/auto-reply.js';
 
 export /*
@@ -31,10 +31,11 @@ export /*
  * m26c R563: テンプレートは所属アカウントが見える人だけが使える。
  * 所属なし（共通）のテンプレートは共有物として扱う。
  */
-function requireCommonRuleOwner(
+async function requireCommonRuleOwner(
+  db: D1Database,
   staff: AuthenticatedStaff | undefined,
-): { ok: true } | { ok: false; error: string; field?: string } {
-  if (staff?.role === 'owner') return { ok: true };
+): Promise<{ ok: true } | { ok: false; error: string; field?: string }> {
+  if (staff?.role === 'owner' && (await getVisibleLineAccountScope(db, staff)).canSeeUnassigned) return { ok: true };
   return { ok: false, error: '全アカウント共通の自動応答は統括だけが作成・変更できます' };
 }
 

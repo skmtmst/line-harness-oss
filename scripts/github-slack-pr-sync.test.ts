@@ -20,7 +20,7 @@ function pull(overrides: Partial<GitHubPullRequest> = {}): GitHubPullRequest {
     merged_at: null,
     updated_at: '2026-08-23T02:00:00.000Z',
     user: { login: 'skmtmst' },
-    head: { ref: 'codex/masato-github-slack-pr-sync', sha: 'abc123' },
+    head: { ref: 'codex/masato-github-slack-pr-sync', sha: 'abc123', repo: { full_name: 'skmtmst/line-harness-oss' } },
     base: { ref: 'codex/development' },
     mergeable_state: 'clean',
     ...overrides,
@@ -85,7 +85,7 @@ describe('GitHub PR Slack sync', () => {
       merged: true,
       merged_at: '2026-08-23T03:00:00.000Z',
       updated_at: '2026-08-23T03:00:00.000Z',
-      head: { ref: 'codex/kenta-followup', sha: 'def456' },
+      head: { ref: 'codex/kenta-followup', sha: 'def456', repo: { full_name: 'skmtmst/line-harness-oss' } },
       user: { login: 'kentavndng' },
     });
     const relayed: RelayPayload[] = [];
@@ -168,7 +168,7 @@ describe('GitHub PR Slack sync', () => {
     const second = pull({
       number: 277,
       html_url: 'https://github.com/skmtmst/line-harness-oss/pull/277',
-      head: { ref: 'codex/kenta-followup', sha: 'def456' },
+      head: { ref: 'codex/kenta-followup', sha: 'def456', repo: { full_name: 'skmtmst/line-harness-oss' } },
       user: { login: 'kentavndng' },
     });
     const relayed: RelayPayload[] = [];
@@ -216,7 +216,7 @@ describe('GitHub PR Slack sync', () => {
     const second = pull({
       number: 277,
       html_url: 'https://github.com/skmtmst/line-harness-oss/pull/277',
-      head: { ref: 'codex/kenta-followup', sha: 'def456' },
+      head: { ref: 'codex/kenta-followup', sha: 'def456', repo: { full_name: 'skmtmst/line-harness-oss' } },
     });
     const relayed: RelayPayload[] = [];
     const fetcher = vi.fn<typeof fetch>(async (input, init) => {
@@ -288,4 +288,21 @@ describe('GitHub PR Slack sync', () => {
 
     expect(relayAttempts).toBe(1);
   });
+});
+
+
+test.each(['schedule', 'push', 'workflow_dispatch', 'pull_request'])('F17/F18: %s never signs or relays fork PRs', async eventName => {
+  const fork = pull({ title: '<!channel> TASK-AAAAAAAAAAAAAAAA', head: { ref: 'codex/kenta-`inject`', sha: 'fork', repo: { full_name: 'outsider/fork' } } });
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async input => {
+    const url = String(input);
+    if (url.includes('/pulls?state=open')) return jsonResponse([fork]);
+    if (url.includes('/pulls?state=closed')) return jsonResponse([{ ...fork, state: 'closed' }]);
+    if (url.includes('/files?')) return jsonResponse([]);
+    if (url.includes('/check-runs?')) return jsonResponse({ check_runs: [] });
+    if (url.includes('/pulls/276')) return jsonResponse(fork);
+    if (url === 'https://relay.test') return jsonResponse({ success: true });
+    throw new Error('UNEXPECTED_REQUEST: ' + url);
+  });
+  expect(await syncGitHubPullRequests({ repository: 'skmtmst/line-harness-oss', githubToken: 'test', relayUrl: 'https://relay.test', relaySecret: 'test', eventName, event: { pull_request: fork }, minPrNumber: 1, closedLookbackHours: 72, now: new Date('2026-08-23T03:00:00Z'), fetcher })).toEqual({ sent: 0, reconciled: 0 });
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });

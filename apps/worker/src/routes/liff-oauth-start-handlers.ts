@@ -1,3 +1,5 @@
+import { setCookie } from 'hono/cookie';
+import { navigationProof } from '../lib/navigation-proof.js';
 import { getEntryRouteByRefCode, getLineAccountByChannelId, getTrafficPoolBySlug, getTrafficPoolById, getRandomPoolAccount, getPoolAccounts } from '@line-crm/db';
 import { isStoppedEntryRouteRef, ENTRY_ROUTE_STOPPED_HTML } from '../services/entry-route-stop.js';
 import type { Env } from '../index.js';
@@ -129,8 +131,11 @@ export const get__auth_line_1 = async (c: Context<Env, "/auth/line">) => {
   // can verify against the correct gate via the correct X Harness instance.
   // Without these, the form falls back to the gateId baked into the form's
   // onSubmitWebhookUrl (which is stale when a form is reused across campaigns).
-  const state = JSON.stringify({ ref, redirect, form: formId, gate: gateParam, xh: xhParam2, gclid, fbclid, twclid, ttclid, utmSource, utmMedium, utmCampaign, account: accountParam || poolAccount, uid: uidParam, ig: igParam, iga: igaParam, igan: iganParam });
-  const encodedState = encodeState(state);
+  const state = JSON.stringify({ ref, redirect, redirectProof: c.req.query('redirectProof') || '', form: formId, gate: gateParam, xh: xhParam2, gclid, fbclid, twclid, ttclid, utmSource, utmMedium, utmCampaign, account: accountParam || poolAccount, uid: uidParam, ig: igParam, iga: igaParam, igan: iganParam });
+  const oauthNonce = crypto.randomUUID();
+  const payload = encodeState(JSON.stringify({ data: state, nonce: oauthNonce, expires: Date.now() + 10 * 60_000 }));
+  const encodedState = `${payload}.${await navigationProof(c.env.LINE_CHANNEL_SECRET, 'liff-oauth', payload)}`;
+  setCookie(c, 'lh_liff_oauth', oauthNonce, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/auth', maxAge: 600 });
   const loginUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
   loginUrl.searchParams.set('response_type', 'code');
   loginUrl.searchParams.set('client_id', channelId);
@@ -289,13 +294,16 @@ export const get__auth_oauth_2 = async (c: Context<Env, "/auth/oauth">) => {
   // Build OAuth URL with full state
   const callbackUrl = `${baseUrl}/auth/callback`;
   const state = JSON.stringify({
-    ref, redirect, form: formId, gate: gateParam, xh: xhParam,
+    ref, redirect, redirectProof: c.req.query('redirectProof') || '', form: formId, gate: gateParam, xh: xhParam,
     gclid, fbclid, twclid, ttclid,
     utmSource, utmMedium, utmCampaign,
     account: accountParam || poolAccount, uid: uidParam, ig: igParam,
     iga: igaParam, igan: iganParam,
   });
-  const encodedState = encodeState(state);
+  const oauthNonce = crypto.randomUUID();
+  const payload = encodeState(JSON.stringify({ data: state, nonce: oauthNonce, expires: Date.now() + 10 * 60_000 }));
+  const encodedState = `${payload}.${await navigationProof(c.env.LINE_CHANNEL_SECRET, 'liff-oauth', payload)}`;
+  setCookie(c, 'lh_liff_oauth', oauthNonce, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/auth', maxAge: 600 });
   const loginUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
   loginUrl.searchParams.set('response_type', 'code');
   loginUrl.searchParams.set('client_id', channelId);

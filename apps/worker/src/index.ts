@@ -1,3 +1,4 @@
+import { escapeHtml as escapeHtmlAttribute } from './lib/html-escape.js';
 import { logger, resumeInvocation, withInvocation } from '@line-crm/shared/server';
 import { setHolidayCoverageWarningHandler } from '@line-crm/shared';
 import { stagingQa } from './routes/staging-qa.js';
@@ -213,7 +214,7 @@ import { routeInboundEmail } from './services/inbound-email-router.js';
 
 import { classifyCodexMonitorError, markCodexMentionFailed, processCodexMentionMessage, shouldStopCodexQueueRetry, type CodexMentionQueueMessage } from './services/codex-cloud-monitor.js';
 import { createQrImage, isQrDataAllowed, normalizeQrFormat, normalizeQrSize, qrResponseHeaders, QrInputError, QR_MAX_RESPONSE_BYTES } from './lib/qr-response.js';
-import { safeRedirectTarget } from './lib/safe-redirect.js';
+import { storedRedirectTarget } from './lib/safe-redirect.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 
 export const app = new Hono<Env>();
@@ -585,14 +586,14 @@ app.get('/r/:ref', async (c) => {
   const couponRoute = route?.coupon_enabled === 1 && Boolean(route.coupon_asset_id);
   if (couponRoute) {
     const account = route?.line_account_id ? await getLineAccountById(c.env.DB, route.line_account_id) : null;
-    if (!account?.liff_id) return c.html('<!doctype html><html lang="ja"><meta charset="utf-8"><title>このリンクは現在利用できません</title><p>お店へお問い合わせください。</p></html>', 503);
+    if (!account?.liff_id || !/^\d+-[A-Za-z0-9]+$/.test(account.liff_id)) return c.html('<!doctype html><html lang="ja"><meta charset="utf-8"><title>このリンクは現在利用できません</title><p>お店へお問い合わせください。</p></html>', 503);
     liffUrl = `https://liff.line.me/${account.liff_id}`;
   }
   // 転送先が設定された経路はそちらへ送る（#514 重大4）。保存はするのに
   // 読まないままだった。危険な形式は safe-redirect が弾き、そのときは
   // 従来どおり友だち追加の着地画面へ進む。
   if (!couponRoute && route?.redirect_url) {
-    const target = safeRedirectTarget(route.redirect_url);
+    const target = storedRedirectTarget(route.redirect_url);
     if (target) return c.redirect(target, 302);
   }
   if (!couponRoute && route?.pool_id) {
@@ -624,7 +625,7 @@ app.get('/r/:ref', async (c) => {
       affiliateResolved = true;
       if (affiliateLink.line_account_id) {
         const account = await getLineAccountById(c.env.DB, affiliateLink.line_account_id);
-        if (account?.liff_id) liffUrl = `https://liff.line.me/${account.liff_id}`;
+        if (account?.liff_id && /^\d+-[A-Za-z0-9]+$/.test(account.liff_id)) liffUrl = `https://liff.line.me/${account.liff_id}`;
       }
       // line_account_id === null → keep the default LIFF_URL (既定アカウント).
     }
@@ -641,11 +642,11 @@ app.get('/r/:ref', async (c) => {
   if (pool) {
     const account = await getRandomPoolAccount(c.env.DB, pool.id);
     if (account) {
-      if (account.liff_id) liffUrl = `https://liff.line.me/${account.liff_id}`;
+      if (account.liff_id && /^\d+-[A-Za-z0-9]+$/.test(account.liff_id)) liffUrl = `https://liff.line.me/${account.liff_id}`;
     } else {
       const allAccounts = await getPoolAccounts(c.env.DB, pool.id);
       if (allAccounts.length === 0) {
-        if (pool.liff_id) liffUrl = `https://liff.line.me/${pool.liff_id}`;
+        if (pool.liff_id && /^\d+-[A-Za-z0-9]+$/.test(pool.liff_id)) liffUrl = `https://liff.line.me/${pool.liff_id}`;
       }
     }
   }
@@ -766,7 +767,7 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 <svg viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="#06C755"/><path d="M24 12C17.37 12 12 16.58 12 22.2c0 3.54 2.35 6.65 5.86 8.47-.2.74-.76 2.75-.87 3.17-.14.55.2.54.42.39.18-.12 2.84-1.88 4-2.65.84.13 1.7.22 2.59.22 6.63 0 12-4.58 12-10.2S30.63 12 24 12z" fill="#fff"/></svg>
 </div>
 <p class="msg">友達追加して始める</p>
-<a href="${buttonHref}" class="btn">LINEで開く</a>
+<a href="${escapeHtmlAttribute(buttonHref)}" class="btn">LINEで開く</a>
 ${longPressHint}
 <p class="help">うまく開けない方は <a href="${helpUrl}">こちら</a></p>
 </div>
@@ -1051,7 +1052,7 @@ body{font-family:'Hiragino Sans','Helvetica Neue',system-ui,sans-serif;backgroun
 <svg viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="#06C755"/><path d="M24 12C17.37 12 12 16.58 12 22.2c0 3.54 2.35 6.65 5.86 8.47-.2.74-.76 2.75-.87 3.17-.14.55.2.54.42.39.18-.12 2.84-1.88 4-2.65.84.13 1.7.22 2.59.22 6.63 0 12-4.58 12-10.2S30.63 12 24 12z" fill="#fff"/></svg>
 </div>
 <p class="msg">LINE で開く</p>
-<a href="${buttonHref}" class="btn">LINEで開く</a>
+<a href="${escapeHtmlAttribute(buttonHref)}" class="btn">LINEで開く</a>
 ${longPressHint}
 </div>
 </body>

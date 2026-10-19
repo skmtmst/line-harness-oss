@@ -1,3 +1,4 @@
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { getFriendByLineUserIdForAccount } from './friend-account-identity.js';
 import { sqlIdSet } from './id-queries.js';
 import { boundedListLimit, jstNow, nonNegativeListOffset } from './utils.js';
@@ -384,14 +385,17 @@ export async function updateFriendFollowStatus(
 export async function getMergedMetadataByUserId(
   db: D1Database,
   userId: string,
+  lineAccountId?: string | null,
 ): Promise<Record<string, unknown>> {
+  if (!lineAccountId) return {};
   const result = await db
     .prepare(
-      `SELECT metadata FROM friends
-       WHERE user_id = ? AND metadata IS NOT NULL AND metadata != '{}'
-       ORDER BY updated_at DESC`,
+      `SELECT f.metadata FROM friends f JOIN line_accounts a ON a.id=f.line_account_id
+       WHERE f.user_id = ? AND COALESCE(a.tenant_id, ?) = (SELECT COALESCE(tenant_id, ?) FROM line_accounts WHERE id=?)
+         AND f.metadata IS NOT NULL AND f.metadata != '{}'
+       ORDER BY f.updated_at DESC`,
     )
-    .bind(userId)
+    .bind(userId, DEFAULT_TENANT_ID, DEFAULT_TENANT_ID, lineAccountId)
     .all<{ metadata: string }>();
   const merged: Record<string, unknown> = {};
   for (const row of result.results) {

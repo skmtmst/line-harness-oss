@@ -73,7 +73,7 @@ export async function getFolders(
     // the unassigned policy; other existing folder kinds keep their old list.
     const ids = accountId ? scope.allowedAccountIds.filter((id) => id === accountId) : scope.allowedAccountIds;
     const own = ids.length ? `account_id IN (${sqlIdSet(ids).sql})` : "0";
-    const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "(account_id IS NULL AND kind NOT IN ('tag', 'webinar', 'template', 'automation', 'common_action', 'webhook', 'conversion', 'affiliate', 'affiliate_offer', 'mileage_reward', 'friend_add_rule'))";
+    const legacy = scope.canSeeUnassigned ? "account_id IS NULL" : "0";
     const result = await db.prepare(`SELECT * FROM folders WHERE (${own} OR ${legacy})${kind ? " AND kind = ?" : ""}
       ORDER BY kind ASC, display_order ASC, name ASC`).bind(...(ids.length ? sqlIdSet(ids).binds : []), ...(kind ? [kind] : [])).all<Folder>();
     return result.results;

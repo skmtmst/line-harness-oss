@@ -106,7 +106,11 @@ try {
     await page.goto(`${base}/login`);
     await page.getByRole('button', { name: 'パスワードを表示する' }).click();
     await expect(page.locator('#login-password')).toHaveAttribute('type', 'text');
-    await page.goto(`${base}/login/two-factor#lh_2fa=synthetic-challenge&lh_method=password`);
+    const handoffNonce = crypto.randomUUID();
+    await page.evaluate(nonce => sessionStorage.setItem('lh_login_handoff', JSON.stringify({
+      nonce, expires: Date.now() + 600000, kind: 'challenge', path: '/login/two-factor',
+    })), handoffNonce);
+    await page.goto(`${base}/login/two-factor#${new URLSearchParams({ lh_2fa: 'synthetic-challenge', lh_method: 'password', lh_nonce: handoffNonce })}`);
     await expect(page.getByRole('textbox')).toHaveCount(6);
     await page.getByRole('button', { name: '回復コードを使う' }).click();
     await expect(page.getByRole('textbox')).toHaveCount(8);

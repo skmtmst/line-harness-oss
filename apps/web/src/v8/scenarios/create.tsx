@@ -481,7 +481,7 @@ export default function ScenarioCreateV8() {
                 ]}
                 // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
                 onCreate={canEdit && !locked
-                  ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+                  ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                   : undefined}
               /></SaveErrorField>
             </span>

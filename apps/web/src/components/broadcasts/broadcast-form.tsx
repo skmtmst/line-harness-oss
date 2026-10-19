@@ -236,7 +236,7 @@ export default function BroadcastForm({
   const staffRoleForFolders = useStaffRole()
   const canCreateFolder = canEditFeature('broadcast.definition.edit', staffRoleForFolders)
   const createFolder = folderCreator(
-    (name, color) => api.folders.create({ kind: 'broadcast', name, color }),
+    (name, color) => api.folders.create({ kind: 'broadcast', name, color, accountId: selectedAccountId }),
     folderById,
     (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]),
   )

@@ -1289,7 +1289,7 @@ export default function MediaLibraryListV8() {
         initialFolderId={folderFilter}
         // 左の列の「フォルダを追加」と同じ口・同じ権限。作ったフォルダは左の列にも足す。
         onCreateFolder={canManageMedia
-          ? folderCreator((name, color) => api.folders.create({ kind: 'media', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+          ? folderCreator((name, color) => api.folders.create({ kind: 'media', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
           : undefined}
         onClose={() => setUploadOpen(false)}
         onComplete={() => {

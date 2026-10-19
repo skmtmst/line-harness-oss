@@ -1,4 +1,6 @@
 'use client'
+
+import { safeNavigationPath } from '@/lib/safe-navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -25,7 +27,7 @@ export default function FieldNew() {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const params = useSearchParams()
-  const back = params.get('back')
+  const back = safeNavigationPath(params.get('back'))
   const { selectedAccountId } = useAccount()
 
   const [folders, setFolders] = useState<Folder[]>([])
@@ -127,7 +129,7 @@ export default function FieldNew() {
       foldersReloading={reloading}
       onRetryFolders={() => void loadFolders()}
       onCreateFolder={canCreateFolder
-        ? folderCreator((name, color) => api.folders.create({ kind: 'friend_field', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+        ? folderCreator((name, color) => api.folders.create({ kind: 'friend_field', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
         : undefined}
       siblings={existing}
       siblingsReady={existingState === 'ready'}

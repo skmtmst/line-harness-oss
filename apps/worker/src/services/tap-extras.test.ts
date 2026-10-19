@@ -126,3 +126,16 @@ describe('追加処理付きURLの配信別集計', () => {
     expect(sql.raw.prepare('SELECT broadcast_id FROM broadcast_tracked_links ORDER BY broadcast_id').all()).toEqual([{broadcast_id:'b1'},{broadcast_id:'b2'}]);
   });
 });
+
+
+it('F27: tap extras cannot wrap a customer-inserted URL; authored destinations still track', async () => {
+  const target = 'https://evil.example/customer';
+  const body = (uri: string) => JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'button', action: { type: 'uri', label: 'Open', uri, tapExtras: extras } }] } });
+  const result = await autoTrackContent(sql.db, 'flex', body(target), 'https://worker.test', { lineAccountId: 'account', sourceContent: body('{{metadata.url}}') });
+  expect(JSON.parse(result.content).body.contents[0].action).toEqual({ type: 'uri', label: 'Open', uri: target });
+  expect(sql.raw.prepare('SELECT count(*) n FROM tracked_links').get()).toEqual({ n: 0 });
+  const authored = body('https://business.example/offer');
+  const normal = await autoTrackContent(sql.db, 'flex', authored, 'https://worker.test', { lineAccountId: 'account', sourceContent: authored });
+  expect(JSON.parse(normal.content).body.contents[0].action.uri).toMatch(/^https:\/\/worker.test\/t\//);
+  expect(sql.raw.prepare('SELECT count(*) n FROM tracked_links').get()).toEqual({ n: 1 });
+});

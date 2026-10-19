@@ -14,7 +14,7 @@ export type GitHubPullRequest = {
   merged_at?: string | null;
   updated_at: string;
   user?: GitHubUser | null;
-  head: { ref: string; sha: string };
+  head: { ref: string; sha: string; repo?: { full_name?: string } | null };
   base: { ref: string };
   mergeable_state?: string;
   labels?: Array<{ name?: string | null }>;
@@ -138,7 +138,7 @@ async function openPrSnapshot(
   const detailed: Array<{ snapshot: PrSnapshot; paths: string[] }> = [];
   // Keep GitHub API concurrency bounded. Each PR uses three parallel reads,
   // while PRs themselves are processed in order to avoid secondary limits.
-  for (const pull of pulls.slice(0, MAX_OPEN_PRS)) {
+  for (const pull of pulls.filter(pull => isInternalPull(pull, repository)).slice(0, MAX_OPEN_PRS)) {
     const [detail, files, checkRuns] = await Promise.all([
       githubJson<GitHubPullRequest>(repository, `/pulls/${pull.number}`, token, fetcher),
       githubJson<GitHubFile[]>(repository, `/pulls/${pull.number}/files?per_page=100`, token, fetcher),
@@ -193,6 +193,10 @@ function prState(pull: GitHubPullRequest): 'open' | 'merged' | 'closed' {
 export function isPullExcluded(pull: GitHubPullRequest, excludedLabels: string[]): boolean {
   const excluded = new Set(excludedLabels.map((label) => label.trim().toLowerCase()).filter(Boolean));
   return (pull.labels || []).some((label) => excluded.has(String(label.name || '').trim().toLowerCase()));
+}
+
+export function isInternalPull(pull: GitHubPullRequest, repository: string): boolean {
+  return pull.head.repo?.full_name === repository;
 }
 
 function contentForPull(pull: GitHubPullRequest, action: string, mode: RelayPayload['syncMode']): string {
@@ -308,7 +312,7 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
     options.githubToken,
     fetcher,
   );
-  const openPulls = allOpenPulls.filter((pull) => !isPullExcluded(pull, excludedLabels));
+  const openPulls = allOpenPulls.filter((pull) => isInternalPull(pull, options.repository) && !isPullExcluded(pull, excludedLabels));
   const openPrs = await openPrSnapshot(options.repository, openPulls, options.githubToken, fetcher);
   let sent = 0;
   const failures: string[] = [];
@@ -324,7 +328,7 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
   };
 
   const rawEventPull = options.eventName === 'pull_request' ? options.event?.pull_request : undefined;
-  const eventPull = rawEventPull && !isPullExcluded(rawEventPull, excludedLabels) ? rawEventPull : undefined;
+  const eventPull = rawEventPull && isInternalPull(rawEventPull, options.repository) && !isPullExcluded(rawEventPull, excludedLabels) ? rawEventPull : undefined;
   const eventAction = options.event?.action || 'updated';
   const dedicatedCommandCenter = options.dedicatedCommandCenter === true;
   const closedPulls = await githubJson<GitHubPullRequest[]>(
@@ -340,7 +344,7 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
       pull.number >= options.minPrNumber && Date.parse(pull.updated_at) >= cutoff
     )),
   ]
-    .filter((pull) => !isPullExcluded(pull, excludedLabels))
+    .filter((pull) => isInternalPull(pull, options.repository) && !isPullExcluded(pull, excludedLabels))
     .filter((pull) => options.onlyPrNumber === undefined || pull.number === options.onlyPrNumber);
   if (
     eventPull

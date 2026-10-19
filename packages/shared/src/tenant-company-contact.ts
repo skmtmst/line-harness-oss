@@ -52,6 +52,6 @@ export function parseTenantCompanyContact(value: unknown):
     || (!data.phone!.startsWith('+') && !/^0\d{9,10}$/.test(digits))) {
     return { error: '電話番号を確認してください。例：03-1234-5678' };
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contactEmail!)) return { error: '担当者のメールをメールアドレスの形で入力してください。' };
+  if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(data.contactEmail!)) return { error: '担当者のメールをメールアドレスの形で入力してください。' };
   return { data };
 }

@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { FormLayout } from '@line-crm/shared';
 import Form from './Form.js';
+import type { MenuItem } from '../lib/api.js';
+import { CustomerStyleContext } from '../components/CustomerStyleScope.js';
 
 /**
  * 「予約を入れる」ブロック（g9osGN）。
@@ -68,7 +70,7 @@ function layout(): FormLayout {
   };
 }
 
-function setup() {
+function setup(options: { style?: 'consult'; mode?: MenuItem['meeting_mode'] } = {}) {
   getForm.mockResolvedValue({
     id: 'f1',
     name: '来店アンケート',
@@ -80,6 +82,7 @@ function setup() {
     menus: [{
       id: 'm1', name: 'トリミング（小型犬）', category_label: null, description: null,
       duration_minutes: 105, buffer_after_minutes: 0, base_price: 0, sort_order: 0,
+      meeting_mode: options.mode,
     }],
   });
   // 枠の日は「今日の3日後」にする（選べる期間14日の内側で固定）。
@@ -97,11 +100,11 @@ function setup() {
     ],
   });
   render(
-    <MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
+    <CustomerStyleContext.Provider value={options.style ?? null}><MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
       <Routes>
         <Route path="/forms/:id" element={<Form />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter></CustomerStyleContext.Provider>,
   );
 }
 
@@ -160,7 +163,7 @@ describe('予約を入れる', () => {
     expect(frame?.textContent).toContain('トリミング（小型犬）');
   });
 
-  it('★V8 g9osGN：満席の日も灰色で並べて押せなくし、送った後は予約の日時と確認待ちを出す', async () => {
+  it.each([['standard', 'お店の確認待ち'], ['ec', 'お店の確認待ち'], ['restaurant', 'お店の確認待ち'], ['salon', 'お店の確認待ち'], ['consult', '確認待ち'], ['lesson', '確認待ち']] as const)('%s: 満席の日は押せず、回答後に本人の予約日時と業種の確認待ちを出す', async (style, pending) => {
     getForm.mockResolvedValue({
       id: 'f1', name: '来店アンケート', description: '', layout: layout(), isActive: true,
     });
@@ -168,6 +171,7 @@ describe('予約を入れる', () => {
       menus: [{
         id: 'm1', name: 'トリミング（小型犬）', category_label: null, description: null,
         duration_minutes: 105, buffer_after_minutes: 0, base_price: 0, sort_order: 0,
+        meeting_mode: style === 'consult' ? 'in_person' : undefined,
       }],
     });
     const at = (n: number) => new Date(Date.now() + 9 * 3600_000 + n * 86400_000).toISOString().slice(0, 10);
@@ -183,11 +187,11 @@ describe('予約を入れる', () => {
       }],
     });
     render(
-      <MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
+      <CustomerStyleContext.Provider value={style}><MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
         <Routes>
           <Route path="/forms/:id" element={<Form />} />
         </Routes>
-      </MemoryRouter>,
+      </MemoryRouter></CustomerStyleContext.Provider>,
     );
     const fullLabel = `${Number(full.slice(5, 7))}月${Number(full.slice(8, 10))}日 空きなし`;
     const fullDay = (await screen.findByRole('button', { name: fullLabel })) as HTMLButtonElement;
@@ -198,8 +202,68 @@ describe('予約を入れる', () => {
     fireEvent.click(screen.getByRole('button', { name: '送信する' }));
     const md = `${Number(open.slice(5, 7))}月${Number(open.slice(8, 10))}日 13:00`;
     expect(
-      await screen.findByText(`次回のご予約（${md}）はお店の確認待ちです。決まったらLINEでお知らせします。`),
+      await screen.findByText(`次回のご予約（${md}）は${pending}です。決まったらLINEでお知らせします。`),
     ).toBeTruthy();
+  });
+});
+
+describe('フォームの面談予約', () => {
+  it.each(['online', 'in_person'] as const)('会い方 %s を選ぶまで日時を確定せず、回答と同じ予約へ送る', async mode => {
+    setup({ style: 'consult', mode: 'customer_choice' });
+    const time = await screen.findByRole('button', { name: '13:00' });
+    expect((time as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }));
+    expect(submitForm).not.toHaveBeenCalled();
+    expect(createRequest).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('radio', { name: mode === 'online' ? 'オンライン' : '対面' }));
+    fireEvent.click(time);
+    submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
+    createRequest.mockResolvedValue({ booking_id: 'bk1', status: 'requested' });
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }));
+    await screen.findByText('ご回答ありがとうございました');
+    expect(submitForm).toHaveBeenCalledOnce();
+    expect(createRequest).toHaveBeenCalledOnce();
+    expect(createRequest.mock.calls[0][0]).toMatchObject({ menu_id: 'm1', staff_id: 's1', meeting_mode: mode });
+    expect(submitForm.mock.calls[0][1].data['来店予約']).toMatchObject({ menuId: 'm1', staffId: 's1', meetingMode: mode });
+  });
+
+  it.each(['online', 'in_person'] as const)('固定の %s は選び直させず、その値で同じ予約を作る', async mode => {
+    setup({ style: 'consult', mode });
+    await screen.findByText(`会い方：${mode === 'online' ? 'オンライン' : '対面'}`);
+    expect(screen.queryByRole('radio')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: '13:00' }));
+    submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
+    createRequest.mockResolvedValue({ booking_id: 'bk1', status: 'requested' });
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }));
+    await screen.findByText('ご回答ありがとうございました');
+    expect(createRequest.mock.calls[0][0].meeting_mode).toBe(mode);
+  });
+
+  it('会い方が未取得なら対面で代用せず、回答も予約も送らない', async () => {
+    setup({ style: 'consult' });
+    await screen.findByText(/会い方を読み込めませんでした/);
+    const time = await screen.findByRole('button', { name: '13:00' });
+    expect((time as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(time);
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }));
+    expect(submitForm).not.toHaveBeenCalled();
+    expect(createRequest).not.toHaveBeenCalled();
+  });
+
+  it('予約だけ失敗した後も、会い方と同じ冪等キーを保って取り直す', async () => {
+    setup({ style: 'consult', mode: 'customer_choice' });
+    fireEvent.click(await screen.findByRole('radio', { name: 'オンライン' }));
+    fireEvent.click(await screen.findByRole('button', { name: '13:00' }));
+    submitForm.mockResolvedValue({ status: 200, body: { success: true, data: {} } });
+    createRequest.mockRejectedValueOnce({ status: 409, body: { error: 'slot_not_available' } });
+    fireEvent.click(screen.getByRole('button', { name: '送信する' }));
+    await screen.findByText('選んだ枠が埋まりました。日時を選び直してください。');
+    createRequest.mockResolvedValue({ booking_id: 'bk1', status: 'requested' });
+    fireEvent.click(screen.getByRole('button', { name: '予約を取り直す' }));
+    await waitFor(() => expect(createRequest).toHaveBeenCalledTimes(2));
+    expect(submitForm).toHaveBeenCalledOnce();
+    expect(createRequest.mock.calls[0][0].meeting_mode).toBe('online');
+    expect(createRequest.mock.calls[1]).toEqual(createRequest.mock.calls[0]);
   });
 });
 

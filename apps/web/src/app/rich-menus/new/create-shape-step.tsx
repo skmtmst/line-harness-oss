@@ -26,6 +26,7 @@ import { type Group,type Page } from './create-types'
 import styles from './create-v8.module.css'
 
 type renderShapeStepContext = {
+  accountId: string | null
   busy: boolean
   canOperate: boolean
   chatBarText: string
@@ -56,7 +57,7 @@ type renderShapeStepContext = {
   updatePage: (pageId: string, patch: Partial<Page>) => void
 }
 
-export function renderShapeStep({ busy, canOperate, chatBarText, defaultTabName, fields, folderId, folders, group, host, locked, name, pages, renderSingleImage, renderTabImageSlot, requestTabCount, setChatBarText, setFolderId, setFolders, setName, setSize, setTabNames, setTemplateKey, shownLayouts, size, tabCount, tabNames, templateKey, updatePage }: renderShapeStepContext) {
+export function renderShapeStep({ accountId, busy, canOperate, chatBarText, defaultTabName, fields, folderId, folders, group, host, locked, name, pages, renderSingleImage, renderTabImageSlot, requestTabCount, setChatBarText, setFolderId, setFolders, setName, setSize, setTabNames, setTemplateKey, shownLayouts, size, tabCount, tabNames, templateKey, updatePage }: renderShapeStepContext) {
     const dims = RICH_MENU_DIMENSIONS[size]
     /* タブの数（ページの数）。作った後はページの数、作る前は①で選んだ数。 */
     const slotCount = group ? pages.length : tabCount + 1
@@ -81,7 +82,7 @@ export function renderShapeStep({ busy, canOperate, chatBarText, defaultTabName,
                       ? folderCreator(async (name, color) => ({ success: true as const, data: await host.createFolder!(name, color) }), folderById, (created) => setFolders((current) => [...current, created as Folder]))
                       : undefined)
                     // 一覧の左の列の「フォルダを追加」と同じ口（リッチメニューのフォルダは共有）。
-                    : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color }), folderById, (created) => setFolders((current) => [...current, created]))} /></SaveErrorField>
+                    : folderCreator((name, color) => api.folders.create({ kind: 'rich_menu', name, color, accountId }), folderById, (created) => setFolders((current) => [...current, created]))} /></SaveErrorField>
             </Field>
           </SettingsFormRow>
           <Field label="トーク画面の下の文言（14文字まで）" htmlFor="rm-chatbar" requirement={fields.requirement('chatbar')} error={fields.error('chatbar')}>

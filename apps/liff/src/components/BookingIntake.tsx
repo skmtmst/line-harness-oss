@@ -7,6 +7,6 @@ export default function BookingIntake({ question, value, onChange }: {
   return <div className="space-y-1.5">
     <FieldLabel htmlFor="booking-note">{question?.trim() || 'ご要望'}</FieldLabel>
     <TextArea appearance="booking" id="booking-note" value={value} onChange={e => onChange(e.target.value)} rows={3}
-      placeholder={question?.trim() ? undefined : '例：前髪は短めにしたい'} />
+      placeholder={question?.trim() ? undefined : '質問や伝えたいことがあれば'} />
   </div>;
 }

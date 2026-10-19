@@ -1,3 +1,4 @@
+import { getCookie, setCookie } from 'hono/cookie';
 import { logger } from '@line-crm/shared/server';
 import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affiliate-self-auth.js';
 import { customerDownloadEntry } from '../services/download-entrypoints.js';
@@ -124,6 +125,8 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       getMileageSelfInsights(c.env.DB, resolved.friend.id),
       getMileageEarningOpportunitiesForFriend(c.env.DB, resolved.friend.id),
     ]);
+    const browserNonce = getCookie(c, '__Host-lh_cross_account') || crypto.randomUUID();
+    setCookie(c, '__Host-lh_cross_account', browserNonce, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 15 * 60 });
     const opportunities = await Promise.all(rawOpportunities.map(async (opportunity) => {
       if (opportunity.type !== 'friend_add'
           || opportunity.completed
@@ -134,6 +137,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       const token = await signCrossAccountToken(c.env.LINE_CHANNEL_SECRET, {
         userId: resolved.friend.user_id,
         targetAccountId: opportunity.targetAccountId,
+        browserNonce,
       });
       const separator = opportunity.url.includes('?') ? '&' : '?';
       return { ...opportunity, url: `${opportunity.url}${separator}crossAccountToken=${encodeURIComponent(token)}` };

@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test'
 import { waitForOverlayLayout } from '../../../../../scripts/codex/overlay-ready.mjs'
 const mockPort = Number(process.env.TRAIN30_MOCK_PORT ?? 8788)
+async function openPrimaryAuthenticatedChallenge(page, path, token, method) {
+  const nonce = crypto.randomUUID()
+  await page.evaluate(({ nonce, path }) => sessionStorage.setItem('lh_login_handoff', JSON.stringify({ nonce, expires: Date.now() + 600000, kind: 'challenge', path })), { nonce, path })
+  const fragment = new URLSearchParams({ lh_2fa: token, lh_method: method, lh_nonce: nonce })
+  await page.goto(`${path}#${fragment}`)
+}
 const codes = ['7K2Q-9FXM','B4TN-6WJP','H8RD-3CVY','M5ZL-2QKA','P9XE-7NHU','T3GW-8BSC','Y6JA-4DRV','C2FN-5MXT']
 async function centered(button) {
   await expect(button).toBeVisible()
@@ -40,7 +46,7 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   const brandStyle = await page.locator('[aria-hidden="true"]').filter({ hasText: 'm' }).first().evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })
   await page.goto('/password/reset?token=fixture-reset')
   await centered(page.getByRole('button', { name: 'パスワードを設定してログインへ' }))
-  await page.goto('/login/two-factor#lh_2fa=fixture-challenge&lh_method=password')
+  await openPrimaryAuthenticatedChallenge(page, '/login/two-factor', 'fixture-challenge', 'password')
   await expect(page.getByRole('textbox')).toHaveCount(6)
   expect(await page.getByRole('group', { name: '認証コード（6桁）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await centered(page.getByRole('button', { name: '確認してログイン', exact: true }))
@@ -64,7 +70,7 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`recovery-input-${width}.png`) })
   await page.getByRole('button', { name: '確認してログイン', exact: true }).click()
   await expect.poll(() => submitted?.code).toBe('7K2Q-9FXM')
-  await page.goto('/login/two-factor/setup#lh_2fa=fixture-setup')
+  await openPrimaryAuthenticatedChallenge(page, '/login/two-factor/setup', 'fixture-setup', 'line')
   await expect(page.getByAltText('認証アプリ登録用のQRコード')).toBeVisible()
   await centered(page.getByRole('button', { name: '登録してログイン' }))
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`setup-${width}.png`) })

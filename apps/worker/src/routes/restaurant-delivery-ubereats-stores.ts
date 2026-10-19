@@ -8,6 +8,7 @@
  * 時刻の整え方だけを引数（`deps`）で受け取る。親と行き違いにならないようにするため。
  */
 import type { Context, Hono } from 'hono';
+import { logger } from '@line-crm/shared/server';
 import { decryptCredential } from '@line-crm/db';
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../index.js';

@@ -1388,7 +1388,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   )
 
   /* ======== 手順①：形と画像 ======== */
-  function renderShape() { return renderShapeStep({ busy, canOperate, chatBarText, defaultTabName, fields, folderId, folders, group, host, locked, name, pages, renderSingleImage, renderTabImageSlot, requestTabCount, setChatBarText, setFolderId, setFolders, setName, setSize, setTabNames, setTemplateKey, shownLayouts, size, tabCount, tabNames, templateKey, updatePage }) }
+  function renderShape() { return renderShapeStep({ accountId, busy, canOperate, chatBarText, defaultTabName, fields, folderId, folders, group, host, locked, name, pages, renderSingleImage, renderTabImageSlot, requestTabCount, setChatBarText, setFolderId, setFolders, setName, setSize, setTabNames, setTemplateKey, shownLayouts, size, tabCount, tabNames, templateKey, updatePage }) }
 
   /** ①の画像の枠（タブの順）に入っている画像。作る前は選んだもの、作った後はページの画像。 */
   function slotImage(index: number): { src: string; name: string; dims: { w: number; h: number } | null; kb: number | null; removable: boolean } | null { return getSlotImage({ accountId, group, host, imageVersion, pages, pendingImages }, index) }

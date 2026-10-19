@@ -1,4 +1,5 @@
-import { CUSTOMER_WORDS, PAYMENT_UNKNOWN } from '../lib/customer-words.js';
+import { useCustomerWords, useCustomerStyle } from '../components/CustomerStyleScope.js';
+import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import PaymentPreparingNote from '../components/PaymentPreparingNote.js';
 import BookingHistoryCancelDialog from '../components/BookingHistoryCancelDialog.js';
 import { useEffect, useState } from 'react';
@@ -28,6 +29,8 @@ import { CHANGE_RANGE_DAYS,CHANGE_SLOT_LIMIT,cancelFailureMessage,changeFailureM
 
 /** 予約履歴と本人の変更・取消。版が返る予約に操作を出し、支払いの状態と領収書も表示する。 */
 export default function BookingHistory() {
+  const words = useCustomerWords();
+  const style = useCustomerStyle();
   const [data, setData] = useState<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] } | null>(
     null,
   );
@@ -250,7 +253,7 @@ export default function BookingHistory() {
             {actionError && !pendingCancel && !pendingChange && (
               <p role="alert" className="text-[13px] leading-5 text-danger">{actionError}</p>
             )}
-            {tab === 'upcoming' ? <LessonHistorySection onPicking={setPicking} /> : null}
+            {tab === 'upcoming' ? <LessonHistorySection onPicking={setPicking} onLater={() => navigate({ pathname: '/mypage', search })} /> : null}
             {tab === 'upcoming' ? <WaitlistSection upcomingHeading={list.length > 0} onChanged={() => setReloadKey((k) => k + 1)} /> : null}
             {Object.values(payments).some((view) => view && view.kind !== 'onsite') ? <PaymentPreparingNote /> : null}
             {notice && (
@@ -261,7 +264,7 @@ export default function BookingHistory() {
                 <StatusView
                   icon="calendar"
                   title="これからの予約はありません"
-                  body="空いている日時から、そのまま予約できます。"
+                  body={style === 'ec' ? undefined : '空いている日時から、そのまま予約できます。'}
                 />
               ) : (
                 <StatusView icon="calendar" title="これまでの予約はありません" />
@@ -289,14 +292,14 @@ export default function BookingHistory() {
               <Icon name="message-circle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 {anySelfChange
-                  ? CUSTOMER_WORDS.selfService
-                  : '予定の変更・キャンセルは、ご利用先に LINE でご連絡ください。'}
+                  ? words.selfService
+                  : `予定の変更・キャンセルは、${words.contact}に LINE でご連絡ください。`}
               </span>
             </p>
           </>
         )}
       </div>
-      {data && !failed && !picking && (
+      {data && !failed && !picking && style !== 'ec' && (
         <BottomBar>
           <Button
             variant="primary"

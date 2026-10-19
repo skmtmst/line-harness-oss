@@ -218,7 +218,7 @@ export function twoFactorLoginUrl(c: Context<Env>, challengeToken: string, next?
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
   const url = new URL(`${base}/login/two-factor`);
   if (next === 'ops') url.searchParams.set('next', 'ops');
-  url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
+  url.hash = new URLSearchParams({ lh_2fa: challengeToken, lh_nonce: c.get('adminHandoffNonce') || '' }).toString();
   return url.toString();
 }
 
@@ -228,7 +228,7 @@ export function twoFactorSetupUrl(c: Context<Env>, challengeToken: string, next?
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
   const url = new URL(`${base}/login/two-factor/setup`);
   if (next === 'ops') url.searchParams.set('next', 'ops');
-  url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
+  url.hash = new URLSearchParams({ lh_2fa: challengeToken, lh_nonce: c.get('adminHandoffNonce') || '' }).toString();
   return url.toString();
 }
 
