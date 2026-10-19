@@ -130,6 +130,7 @@ export const api = {
       '/api/liff/config',
     ),
   menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus'),
+  storePhotos: () => getData<Array<{ slot: 'exterior' | 'interior' | 'waiting'; url: string }>>('/api/liff/booking/store-photos'),
   staffOf: (menuId: string) =>
     get<{ staff: StaffItem[] }>(`/api/liff/booking/menus/${menuId}/staff`),
   availability: (menuId: string, staffId: string | undefined, from: string, to: string) => {

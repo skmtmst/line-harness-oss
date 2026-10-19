@@ -137,6 +137,18 @@ export async function loadUsageContent(
       ).bind(usage.ref_id, lineAccountId).first<Record<string, unknown>>();
       return row ? { shared: false, columns: usageTextColumns(row, ['video_prefix']) } : null;
     }
+    case 'booking_menu':
+    case 'booking_staff':
+    case 'booking_settings': {
+      const table = usage.ref_kind === 'booking_menu' ? 'menus' : usage.ref_kind === 'booking_staff' ? 'staff' : 'booking_settings';
+      const columns = usage.ref_kind === 'booking_settings'
+        ? ['store_photo_media_id', 'store_photo_interior_media_id', 'store_photo_waiting_media_id'] : ['photo_media_id'];
+      const row = await db.prepare(`SELECT ${columns.join(',')} FROM ${table} WHERE id=? AND line_account_id=?${table === 'booking_settings' ? '' : ' AND deleted_at IS NULL'}`)
+        .bind(usage.ref_id, lineAccountId).first<Record<string, unknown>>();
+      if (!row) return null;
+      return { shared: false, columns: Object.fromEntries(columns.flatMap(column =>
+        typeof row[column] === 'string' && row[column] ? [[column, mediaLiveContentPath(row[column])]] : [])) };
+    }
     default:
       return null;
   }
@@ -217,7 +229,7 @@ export async function retargetMediaUsageReference(
     mediaUpdate?: { expectedRevision?: number; filename?: string; folderId?: string | null };
   },
 ): Promise<{ changed: boolean; state: MediaUsageReferenceState }> {
-  if (input.refKind === 'webinar') {
+  if (input.refKind === 'webinar' || input.refKind === 'booking_menu' || input.refKind === 'booking_staff' || input.refKind === 'booking_settings') {
     throw new MediaUsageReferenceError('media_reference_unsupported');
   }
   if (input.target.mode === 'live' && input.refKind === 'rich_menu') {

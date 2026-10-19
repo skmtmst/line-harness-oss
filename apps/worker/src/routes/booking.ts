@@ -33,6 +33,7 @@ import { registerLedger } from './booking/register-ledger.js';
 import { registerDecisions } from './booking/register-decisions.js';
 import { registerSeatAvailability } from './booking/register-seat-availability.js';
 import { registerBoard } from './booking/register-board.js';
+import { registerPhotos } from './booking/register-photos.js';
 
 const booking = new Hono<Env>();
 
@@ -71,6 +72,7 @@ booking.use('/api/booking/admin/*', async (c, next) => {
 });
 
 registerLiffCatalog(booking);
+registerPhotos(booking);
 
 registerLiffCreate(booking);
 

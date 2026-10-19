@@ -97,10 +97,10 @@ export default function MenuList({
                 onClick={() => onSelect(m)}
                 aria-pressed={selected}
               >
-                <span
+                {m.photo_url ? <img src={m.photo_url} alt="" className="h-14 w-14 shrink-0 rounded-[10px] object-cover" /> : <span
                   className="h-14 w-14 shrink-0 rounded-[10px] bg-liff-photo"
                   aria-hidden="true"
-                />
+                />}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] leading-[22px] font-bold text-ink" title={m.name}>
                     {m.name}

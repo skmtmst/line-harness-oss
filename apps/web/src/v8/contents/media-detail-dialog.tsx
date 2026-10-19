@@ -631,6 +631,9 @@ export default function MediaDetailDialog({
                     && usage.refKind !== null
                     && usage.refId !== null
                     && usage.refKind !== 'webinar'
+                    && usage.refKind !== 'booking_menu'
+                    && usage.refKind !== 'booking_staff'
+                    && usage.refKind !== 'booking_settings'
                     && selectValue !== null
                   const options = [
                     ...(usage.refKind === 'rich_menu' ? [] : [{ value: 'live', label: '常に最新版（ライブ参照）' }]),

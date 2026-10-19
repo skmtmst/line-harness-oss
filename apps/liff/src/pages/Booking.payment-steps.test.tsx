@@ -6,7 +6,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import Booking from './Booking.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
 const fixture = vi.hoisted(() => ({ payment: true }));
-vi.mock('../lib/api.js', () => ({ api: { menus: async () => ({ menus: [{ id: 'm', name: 'メニュー' }] }), bookingSettings: async () => ({}) } }));
+vi.mock('../lib/api.js', () => ({ api: { menus: async () => ({ menus: [{ id: 'm', name: 'メニュー' }] }), bookingSettings: async () => ({}), storePhotos: async () => [] } }));
 vi.mock('../components/LiffLookScope.js', () => ({ default: ({ children }: { children: ReactNode }) => children }));
 vi.mock('../components/ui/LiffHeader.js', () => ({ default: () => null }));
 vi.mock('../components/RepeatCard.js', () => ({ default: () => null }));

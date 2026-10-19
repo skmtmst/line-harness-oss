@@ -128,7 +128,7 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
     ).get()).toEqual({ count: 205 });
   });
 
-  it('定期走査は7回へ分け、1周が終わるまで古い記録を消さない', async () => {
+  it('定期走査は予約写真を含む10回へ分け、1周が終わるまで古い記録を消さない', async () => {
     sqlite.prepare(
       `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
        VALUES ('template-1', '案内', 'image', 'https://example.com/media/guide.png', 'account-1')`,
@@ -152,7 +152,12 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
       `SELECT COUNT(*) AS count FROM media_usages WHERE ref_id = 'deleted-event'`,
     ).get()).toEqual({ count: 1 });
 
-    const completed = await scanMediaUsage(db, '2026-09-08T00:00:00.000');
+    for (const [index, source] of ['booking_menu', 'booking_staff', 'booking_settings'].entries()) {
+      const result = await scanMediaUsage(db, `2026-09-${String(index + 8).padStart(2, '0')}T00:00:00.000`);
+      expect(result).toMatchObject({ source, cycleCompleted: false, pruned: 0 });
+      expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM media_usages WHERE ref_id='deleted-event'`).get()).toEqual({ count: 1 });
+    }
+    const completed = await scanMediaUsage(db, '2026-09-11T00:00:00.000');
 
     expect(completed).toMatchObject({ cycleCompleted: true, pruned: 1 });
     expect(sqlite.prepare(
@@ -163,7 +168,7 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
     ).get()).toEqual({
       source_index: 0,
       last_ref_id: '',
-      cycle_started_at: '2026-09-08T00:00:00.000',
+      cycle_started_at: '2026-09-11T00:00:00.000',
     });
   });
 });

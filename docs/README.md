@@ -441,6 +441,8 @@
 
 ## 反映履歴
 
+- [予約写真の登録・参照保護の更新](release-log/unreleased/0000-kenta-cleanup-p02.md)
+- [予約写真の公開選択の更新](release-log/unreleased/0000-kenta-cleanup-p03.md)
 - [反映履歴（アップデート履歴）の設計](change-log-design.md)
 - [0.24.0.md](release-log/0.24.0.md)
 - [リマインダ](release-log/0.25.0.md)

@@ -4,6 +4,7 @@ import WaitlistOfferSheet from '../components/WaitlistOfferSheet.js';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import MenuList from '../components/MenuList.js';
+import BookingStorePhotos from '../components/BookingStorePhotos.js';
 import RepeatCard from '../components/RepeatCard.js';
 import StaffList, { nominationFee } from '../components/StaffList.js';
 import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
@@ -149,6 +150,7 @@ export default function Booking() {
               }}
             />
             <MenuList selectedId={menu?.id ?? null} onSelect={pickMenu} onLoadState={setStepReady} />
+            <BookingStorePhotos />
           </div>
         )}
         {step === 'staff' && menu && party.size > 1 && (

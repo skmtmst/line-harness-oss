@@ -42,6 +42,7 @@ try {
       else if (url.pathname === '/api/uuid') data = { success: true, data: { uuid: 'fixture-uuid' } };
       else if (url.pathname === '/api/liff/link') data = { success: true };
       else if (url.pathname.endsWith('/settings')) data = { liff_calendar_mode: 'week-first', booking_window_days: 60 };
+      else if (req.method() === 'GET' && url.pathname === '/api/liff/booking/store-photos') data = { success: true, data: [] };
       else if (url.pathname.endsWith('/menus')) data = { menus: [{ id: 'm', name: '人工メニュー', duration_minutes: 30, base_price: 1000 }] };
       else if (url.pathname.endsWith('/staff')) data = { staff: [{ id: 's', display_name: '人工担当', price: 1000, duration_minutes: 30 }] };
       else if (url.pathname.endsWith('/last-booking')) data = { available: false };

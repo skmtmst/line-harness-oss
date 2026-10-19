@@ -152,6 +152,21 @@ export async function describeMediaUsageInner(
         href = `/webinars/edit?id=${encodeURIComponent(usage.ref_id)}`;
       }
       break;
+    case 'booking_menu':
+      row = await db.prepare('SELECT name,line_account_id AS account_id FROM menus WHERE id=? AND deleted_at IS NULL')
+        .bind(usage.ref_id).first<NamedReference>();
+      href = '/booking/menus?tab=photos';
+      break;
+    case 'booking_staff':
+      row = await db.prepare('SELECT display_name AS name,line_account_id AS account_id FROM staff WHERE id=? AND deleted_at IS NULL')
+        .bind(usage.ref_id).first<NamedReference>();
+      href = '/booking/menus?tab=photos';
+      break;
+    case 'booking_settings':
+      row = await db.prepare(`SELECT la.name,bs.line_account_id AS account_id FROM booking_settings bs
+        JOIN line_accounts la ON la.id=bs.line_account_id WHERE bs.id=?`).bind(usage.ref_id).first<NamedReference>();
+      href = '/booking/menus?tab=photos';
+      break;
     default:
       // DBのCHECKに無い値も、詳細不明の参照として削除を止める。
       break;
@@ -249,6 +264,9 @@ export async function describeMediaReplacementUsage(
       blocker: 'unsupported_reference',
       reason: 'この種類のテンプレートは編集画面で画像を変更してください。',
     };
+  }
+  if (usage.ref_kind === 'booking_menu' || usage.ref_kind === 'booking_staff' || usage.ref_kind === 'booking_settings') {
+    return { ...described, replaceable: false, blocker: 'unsupported_reference', reason: '予約の写真は予約設定の「写真」から替えてください。' };
   }
   if (usage.ref_kind === 'webinar') {
     return {

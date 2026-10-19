@@ -103,6 +103,9 @@ export const REPLACEMENT_TARGET_KINDS: Record<MediaRefKind, {
   // ウェビナー動画は配信用の一式を持つため対象外（describeMediaReplacementUsage
   // が必ず unsupported_reference を付けるので、ここへは到達しない）。
   webinar: null,
+  booking_menu: null,
+  booking_staff: null,
+  booking_settings: null,
 };
 
 /**
