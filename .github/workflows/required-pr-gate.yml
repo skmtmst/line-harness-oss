@@ -273,7 +273,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Guard shared pattern ownership (B-172)
+      - name: Guard shared pattern ownership
         env:
           PATTERN_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -284,7 +284,7 @@ jobs:
             node scripts/visual-qa/v8-pattern-audit.mjs \
               --code . --out "$RUNNER_TEMP/pattern-ownership"
           fi
-      - name: Guard newly added source visual contracts (B-273)
+      - name: Guard newly added source visual contracts
         env:
           SOURCE_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -318,10 +318,7 @@ jobs:
         run: pnpm --filter create-line-harness test
       - run: pnpm test:scripts
       - name: Typecheck repository scripts
-        run: |
-          npm install --no-save --prefix "$RUNNER_TEMP/typedeps" @types/node@22
-          pnpm exec tsc -p scripts/tsconfig.json \
-            --typeRoots "$RUNNER_TEMP/typedeps/node_modules/@types"
+        run: pnpm typecheck:scripts
       - name: Test shared
         run: |
           pnpm --filter @line-crm/shared typecheck
@@ -378,17 +375,16 @@ jobs:
       - name: Build Worker
         env:
           VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
-          VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
         run: pnpm --filter worker build
       - name: Verify built production Worker config and security headers (offline)
         run: pnpm exec tsx scripts/deploy/production/check-build.ts worker
       - name: Install browser for deployed LIFF entry guard
         run: pnpm exec playwright install --with-deps chromium
-      - name: Guard customer waitlist entry, theme and short actions (B-247 E3)
-        run: node scripts/codex/revfix-c-liff-browser.mjs
+      - name: Guard customer waitlist entry, theme and short actions
+        run: node scripts/browser/liff-recovery.mjs
       - name: Verify LIFF security headers and public SDK compatibility
-        run: node scripts/codex/train32-security-browser.mjs worker
+        run: node scripts/security/browser-headers.mjs worker
 
   web-checks:
     name: Admin lint, typecheck and tests
@@ -555,7 +551,7 @@ jobs:
       - name: Verify EC import list account-switch behavior on the built admin
         run: >-
           pnpm exec playwright test
-          --config scripts/codex/ec-commerce-isolated.config.mjs
+          --config scripts/browser/ec-commerce-isolated.config.mjs
       # 間欠的な失敗(#685)の原因切り分け用。失敗時のDOM(error-context.md)を
       # artifactとして残し、CIでしか再現しない症状を後から読めるようにする。
       - name: Upload EC import list failure context
@@ -576,9 +572,9 @@ jobs:
           pnpm exec playwright test
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
       - name: MFA auth input and button behavior at three widths
-        run: pnpm exec playwright test --config scripts/codex/train30-auth-isolated.config.mjs
+        run: pnpm exec playwright test --config scripts/browser/auth-isolated.config.mjs
       - name: Verify admin security headers and auth interactions
-        run: node scripts/codex/train32-security-browser.mjs web
+        run: node scripts/security/browser-headers.mjs web
       - name: Upload MFA browser failure context
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -698,10 +694,10 @@ jobs:
       - name: Booking preview date agrees through settings and preview tabs
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview
-      - name: No new V8 layout or owner-rule defects (B-191 through B-218)
+      - name: No new V8 layout or owner-rule defects
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
-      - name: List row rules (B-190/193/194/195/198, with negative controls)
+      - name: List row rules
         if: steps.scope.outputs.run == 'true'
         run: |
           node apps/web/scripts/list-row-audit.mjs

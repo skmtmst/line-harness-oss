@@ -70,7 +70,6 @@ jobs:
         run: pnpm --filter worker build
         env:
           VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
-          VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
       - name: Verify worker build artifact and static security headers
         # Resolve dist/<environment>/wrangler.json from the canonical TOML name.

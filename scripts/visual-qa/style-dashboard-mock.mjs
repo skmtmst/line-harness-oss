@@ -1,5 +1,5 @@
 /*
- * 業種ダッシュボード（B-294・B-304・B-309・B-318。絵 XBkC2）の撮影の見本。
+ * 業種ダッシュボード（。絵 XBkC2）の撮影の見本。
  * 口は API 組4（/api/dashboard/style、apps/web/src/lib/api-styles.ts の styleApi・API-CONTRACT-4）。
  * 下の TODAY は絵の中身の控え。ここから口の生の形（summary・schedule・analytics・cards）を組み立てて返す。
  * 使い方のスタイルは PUT /api/dashboard/style { style } で変えられる（撮影で 4 業種を順に撮るため）。
