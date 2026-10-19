@@ -2,7 +2,7 @@
 
 # データベース構造一覧
 
-基準: `080dd531316be57c7e0110e4a18798e7382312af`（2026-10-19）。`schema.sql` と `migrations/*.sql` 全648本を空の手元SQLiteへ数値順に適用した結果。稼働DBを読み取った記録ではない。適用済みSQL・DB・番号は変更していない。
+基準: `2cb99bbe5c319d1a76d89a873f61b2c808816d9a`（2026-10-19）。`schema.sql` と `migrations/*.sql` 全649本を空の手元SQLiteへ数値順に適用した結果。稼働DBを読み取った記録ではない。適用済みSQL・DB・番号は変更していない。
 
 ## 作り方と読み方
 
@@ -17,13 +17,13 @@
 
 | 対象 | 数 |
 |---|---:|
-| migrations | 648 |
+| migrations | 649 |
 | tables | 710 |
-| columns | 7741 |
+| columns | 7748 |
 | explicitIndexes | 840 |
 | implicitIndexes | 1030 |
 | foreignKeys | 1102 |
-| triggers | 390 |
+| triggers | 405 |
 | views | 3 |
 
 ## 表の索引
@@ -206,7 +206,7 @@
 - [booking_resources](#table-booking-resources)（9列）
 - [booking_routing_staff_groups](#table-booking-routing-staff-groups)（5列）
 - [booking_series](#table-booking-series)（12列）
-- [booking_settings](#table-booking-settings)（18列）
+- [booking_settings](#table-booking-settings)（22列）
 - [booking_stripe_connect_states](#table-booking-stripe-connect-states)（7列）
 - [booking_sync_notice_outbox](#table-booking-sync-notice-outbox)（7列）
 - [booking_sync_notice_queue](#table-booking-sync-notice-queue)（3列）
@@ -427,7 +427,7 @@
 - [member_rank_tiers](#table-member-rank-tiers)（11列）
 - [member_ranks](#table-member-ranks)（5列）
 - [menu_versions](#table-menu-versions)（15列）
-- [menus](#table-menus)（36列）
+- [menus](#table-menus)（37列）
 - [message_templates](#table-message-templates)（6列）
 - [messages_log](#table-messages-log)（26列）
 - [mileage_adjustment_approval_events](#table-mileage-adjustment-approval-events)（7列）
@@ -655,7 +655,7 @@
 - [site_events](#table-site-events)（11列）
 - [site_tracking_keys](#table-site-tracking-keys)（4列）
 - [site_visitors](#table-site-visitors)（9列）
-- [staff](#table-staff)（17列）
+- [staff](#table-staff)（19列）
 - [staff_account_scopes](#table-staff-account-scopes)（3列）
 - [staff_availability_rules](#table-staff-availability-rules)（8列）
 - [staff_break_dates](#table-staff-break-dates)（10列）
@@ -5892,7 +5892,16 @@ CREATE TABLE booking_settings (
   CHECK (reminder_hours_before IS NULL
          OR reminder_hours_before BETWEEN 1 AND 72), liff_date_view TEXT NOT NULL DEFAULT 'list'
   CHECK (liff_date_view IN ('list', 'calendar')), waitlist_hold_minutes INTEGER NOT NULL DEFAULT 30
-  CHECK (waitlist_hold_minutes BETWEEN 1 AND 1440));
+  CHECK (waitlist_hold_minutes BETWEEN 1 AND 1440), store_photo_media_id TEXT, store_photo_interior_media_id TEXT, store_photo_waiting_media_id TEXT, store_photo_order_json TEXT NOT NULL
+  DEFAULT '["exterior","interior","waiting"]'
+  CHECK (COALESCE(json_valid(store_photo_order_json) AND json_type(store_photo_order_json) = 'array'
+    AND json_array_length(store_photo_order_json) = 3
+    AND json_extract(store_photo_order_json,'$[0]') IN ('exterior','interior','waiting')
+    AND json_extract(store_photo_order_json,'$[1]') IN ('exterior','interior','waiting')
+    AND json_extract(store_photo_order_json,'$[2]') IN ('exterior','interior','waiting')
+    AND json_extract(store_photo_order_json,'$[0]') <> json_extract(store_photo_order_json,'$[1]')
+    AND json_extract(store_photo_order_json,'$[0]') <> json_extract(store_photo_order_json,'$[2]')
+    AND json_extract(store_photo_order_json,'$[1]') <> json_extract(store_photo_order_json,'$[2]'),0)));
 ```
 
 索引:
@@ -13236,12 +13245,12 @@ CREATE TABLE media_usage_scan_state (
 ### media_usages
 
 ```sql
-CREATE TABLE media_usages (
-  media_id   TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,
-  ref_kind   TEXT NOT NULL CHECK (ref_kind IN (
-               'template','broadcast','rich_menu','scenario_step',
-               'nen_column','event','webinar')),
-  ref_id     TEXT NOT NULL,
+CREATE TABLE "media_usages" (
+  media_id TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+  ref_kind TEXT NOT NULL CHECK (ref_kind IN (
+    'template','broadcast','rich_menu','scenario_step','nen_column','event','webinar',
+    'booking_menu','booking_staff','booking_settings')),
+  ref_id TEXT NOT NULL,
   scanned_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   PRIMARY KEY (media_id, ref_kind, ref_id)
 );
@@ -13250,8 +13259,7 @@ CREATE TABLE media_usages (
 索引:
 
 ```sql
-CREATE INDEX idx_media_usages_media_scanned
-  ON media_usages (media_id, scanned_at);
+CREATE INDEX idx_media_usages_media_scanned ON media_usages(media_id, scanned_at);
 ```
 
 - `sqlite_autoindex_media_usages_1`: 自動生成、主キー、列 `media_id` COLLATE BINARY, `ref_kind` COLLATE BINARY, `ref_id` COLLATE BINARY
@@ -13626,7 +13634,7 @@ CREATE TABLE menus (
   auto_tag_id           TEXT,                  -- 予約申込時に friend に自動付与するタグ
   created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), concurrent_capacity INTEGER NOT NULL DEFAULT 1, booking_window_days INTEGER, cutoff_hours_before INTEGER, cancel_deadline_hours_before INTEGER, intake_question TEXT, price_mode TEXT NOT NULL DEFAULT 'fixed'
-  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), meeting_mode TEXT NOT NULL DEFAULT 'in_person' CHECK(meeting_mode IN('online','in_person','customer_choice')), meeting_location TEXT, fixed_meeting_url TEXT, audience_mode TEXT NOT NULL DEFAULT 'all' CHECK(audience_mode IN('all','include_tags','exclude_tags')), audience_tag_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(audience_tag_ids_json)), customer_recurring_enabled INTEGER NOT NULL DEFAULT 0 CHECK(customer_recurring_enabled IN(0,1)), recurring_freqs_json TEXT NOT NULL DEFAULT '["weekly"]' CHECK(json_valid(recurring_freqs_json)), recurring_max_count INTEGER NOT NULL DEFAULT 12 CHECK(recurring_max_count BETWEEN 2 AND 12), max_party_size INTEGER NOT NULL DEFAULT 1 CHECK(max_party_size BETWEEN 1 AND 6), addon_menu_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(addon_menu_ids_json)), addon_only INTEGER NOT NULL DEFAULT 0 CHECK(addon_only IN(0,1)), hq_template_id TEXT, hq_template_version_id TEXT, hq_customized INTEGER NOT NULL DEFAULT 0 CHECK(hq_customized IN(0,1)), image_url TEXT,
+  CHECK (price_mode IN ('fixed', 'free', 'inquiry') AND (price_mode = 'fixed' OR base_price = 0)), version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0), meeting_mode TEXT NOT NULL DEFAULT 'in_person' CHECK(meeting_mode IN('online','in_person','customer_choice')), meeting_location TEXT, fixed_meeting_url TEXT, audience_mode TEXT NOT NULL DEFAULT 'all' CHECK(audience_mode IN('all','include_tags','exclude_tags')), audience_tag_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(audience_tag_ids_json)), customer_recurring_enabled INTEGER NOT NULL DEFAULT 0 CHECK(customer_recurring_enabled IN(0,1)), recurring_freqs_json TEXT NOT NULL DEFAULT '["weekly"]' CHECK(json_valid(recurring_freqs_json)), recurring_max_count INTEGER NOT NULL DEFAULT 12 CHECK(recurring_max_count BETWEEN 2 AND 12), max_party_size INTEGER NOT NULL DEFAULT 1 CHECK(max_party_size BETWEEN 1 AND 6), addon_menu_ids_json TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(addon_menu_ids_json)), addon_only INTEGER NOT NULL DEFAULT 0 CHECK(addon_only IN(0,1)), hq_template_id TEXT, hq_template_version_id TEXT, hq_customized INTEGER NOT NULL DEFAULT 0 CHECK(hq_customized IN(0,1)), image_url TEXT, photo_media_id TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (auto_tag_id) REFERENCES tags(id) ON DELETE SET NULL
 );
@@ -21441,7 +21449,7 @@ CREATE TABLE staff (
   is_active                INTEGER NOT NULL DEFAULT 1,
   deleted_at               TEXT,
   created_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), staff_member_id TEXT, fixed_meeting_url TEXT, meeting_url_version INTEGER NOT NULL DEFAULT 0, nomination_fee INTEGER NOT NULL DEFAULT 0 CHECK(nomination_fee >= 0),
+  updated_at               TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), staff_member_id TEXT, fixed_meeting_url TEXT, meeting_url_version INTEGER NOT NULL DEFAULT 0, nomination_fee INTEGER NOT NULL DEFAULT 0 CHECK(nomination_fee >= 0), photo_media_id TEXT, photo_version INTEGER NOT NULL DEFAULT 1 CHECK(photo_version > 0),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 ```
@@ -24572,6 +24580,36 @@ AND NOT EXISTS(SELECT 1 FROM hq_templates t JOIN hq_template_versions v ON v.tem
 BEGIN SELECT RAISE(ABORT,'hq_origin_account_mismatch'); END;
 ```
 
+### booking_menu_photo_guard_insert
+
+```sql
+CREATE TRIGGER booking_menu_photo_guard_insert BEFORE INSERT ON menus BEGIN SELECT CASE WHEN NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.photo_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.photo_media_id IS NULL)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; END;
+```
+
+### booking_menu_photo_guard_update
+
+```sql
+CREATE TRIGGER booking_menu_photo_guard_update BEFORE UPDATE ON menus BEGIN SELECT CASE WHEN NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.photo_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.photo_media_id IS OLD.photo_media_id)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; END;
+```
+
+### booking_menu_photo_usage_delete
+
+```sql
+CREATE TRIGGER booking_menu_photo_usage_delete AFTER DELETE ON menus BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_menu' AND ref_id = OLD.id; END;
+```
+
+### booking_menu_photo_usage_insert
+
+```sql
+CREATE TRIGGER booking_menu_photo_usage_insert AFTER INSERT ON menus BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_menu' AND ref_id = NEW.id; INSERT INTO media_usages(media_id,ref_kind,ref_id) SELECT NEW.photo_media_id, 'booking_menu', NEW.id WHERE NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL; END;
+```
+
+### booking_menu_photo_usage_update
+
+```sql
+CREATE TRIGGER booking_menu_photo_usage_update AFTER UPDATE ON menus BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_menu' AND ref_id = NEW.id; INSERT INTO media_usages(media_id,ref_kind,ref_id) SELECT NEW.photo_media_id, 'booking_menu', NEW.id WHERE NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL; END;
+```
+
 ### booking_nomination_reassign
 
 ```sql
@@ -24643,6 +24681,66 @@ BEFORE UPDATE ON booking_resource_consumptions
 FOR EACH ROW
 BEGIN
   SELECT RAISE(ABORT, 'booking_resource_consumption_immutable'); END;
+```
+
+### booking_settings_photo_guard_insert
+
+```sql
+CREATE TRIGGER booking_settings_photo_guard_insert BEFORE INSERT ON booking_settings BEGIN SELECT CASE WHEN NEW.store_photo_media_id IS NOT NULL AND 1 AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.store_photo_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.store_photo_media_id IS NULL)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; SELECT CASE WHEN NEW.store_photo_interior_media_id IS NOT NULL AND 1 AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.store_photo_interior_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.store_photo_interior_media_id IS NULL)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; SELECT CASE WHEN NEW.store_photo_waiting_media_id IS NOT NULL AND 1 AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.store_photo_waiting_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.store_photo_waiting_media_id IS NULL)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; END;
+```
+
+### booking_settings_photo_guard_update
+
+```sql
+CREATE TRIGGER booking_settings_photo_guard_update BEFORE UPDATE ON booking_settings BEGIN SELECT CASE WHEN NEW.store_photo_media_id IS NOT NULL AND 1 AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.store_photo_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.store_photo_media_id IS OLD.store_photo_media_id)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; SELECT CASE WHEN NEW.store_photo_interior_media_id IS NOT NULL AND 1 AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.store_photo_interior_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.store_photo_interior_media_id IS OLD.store_photo_interior_media_id)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; SELECT CASE WHEN NEW.store_photo_waiting_media_id IS NOT NULL AND 1 AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.store_photo_waiting_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.store_photo_waiting_media_id IS OLD.store_photo_waiting_media_id)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; END;
+```
+
+### booking_settings_photo_usage_delete
+
+```sql
+CREATE TRIGGER booking_settings_photo_usage_delete AFTER DELETE ON booking_settings BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_settings' AND ref_id = OLD.id; END;
+```
+
+### booking_settings_photo_usage_insert
+
+```sql
+CREATE TRIGGER booking_settings_photo_usage_insert AFTER INSERT ON booking_settings BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_settings' AND ref_id = NEW.id; INSERT INTO media_usages(media_id,ref_kind,ref_id) SELECT NEW.store_photo_media_id, 'booking_settings', NEW.id WHERE NEW.store_photo_media_id IS NOT NULL AND 1 UNION SELECT NEW.store_photo_interior_media_id, 'booking_settings', NEW.id WHERE NEW.store_photo_interior_media_id IS NOT NULL AND 1 UNION SELECT NEW.store_photo_waiting_media_id, 'booking_settings', NEW.id WHERE NEW.store_photo_waiting_media_id IS NOT NULL AND 1; END;
+```
+
+### booking_settings_photo_usage_update
+
+```sql
+CREATE TRIGGER booking_settings_photo_usage_update AFTER UPDATE ON booking_settings BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_settings' AND ref_id = NEW.id; INSERT INTO media_usages(media_id,ref_kind,ref_id) SELECT NEW.store_photo_media_id, 'booking_settings', NEW.id WHERE NEW.store_photo_media_id IS NOT NULL AND 1 UNION SELECT NEW.store_photo_interior_media_id, 'booking_settings', NEW.id WHERE NEW.store_photo_interior_media_id IS NOT NULL AND 1 UNION SELECT NEW.store_photo_waiting_media_id, 'booking_settings', NEW.id WHERE NEW.store_photo_waiting_media_id IS NOT NULL AND 1; END;
+```
+
+### booking_staff_photo_guard_insert
+
+```sql
+CREATE TRIGGER booking_staff_photo_guard_insert BEFORE INSERT ON staff BEGIN SELECT CASE WHEN NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.photo_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.photo_media_id IS NULL)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; END;
+```
+
+### booking_staff_photo_guard_update
+
+```sql
+CREATE TRIGGER booking_staff_photo_guard_update BEFORE UPDATE ON staff BEGIN SELECT CASE WHEN NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM media WHERE id = NEW.photo_media_id AND line_account_id = NEW.line_account_id AND kind = 'image' AND (archived_at IS NULL OR NEW.photo_media_id IS OLD.photo_media_id)) THEN RAISE(ABORT, 'booking_photo_media_unavailable') END; END;
+```
+
+### booking_staff_photo_usage_delete
+
+```sql
+CREATE TRIGGER booking_staff_photo_usage_delete AFTER DELETE ON staff BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_staff' AND ref_id = OLD.id; END;
+```
+
+### booking_staff_photo_usage_insert
+
+```sql
+CREATE TRIGGER booking_staff_photo_usage_insert AFTER INSERT ON staff BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_staff' AND ref_id = NEW.id; INSERT INTO media_usages(media_id,ref_kind,ref_id) SELECT NEW.photo_media_id, 'booking_staff', NEW.id WHERE NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL; END;
+```
+
+### booking_staff_photo_usage_update
+
+```sql
+CREATE TRIGGER booking_staff_photo_usage_update AFTER UPDATE ON staff BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_staff' AND ref_id = NEW.id; INSERT INTO media_usages(media_id,ref_kind,ref_id) SELECT NEW.photo_media_id, 'booking_staff', NEW.id WHERE NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL; END;
 ```
 
 ### booking_sync_notice_booking_delete
