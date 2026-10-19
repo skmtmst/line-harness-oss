@@ -7,7 +7,7 @@ import { readImplementationSource } from '../../../../worker/src/test-utils/impl
 
 const ROOT = process.cwd()
 const FLOW = readUiSource(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(ROOT, 'src/app/reminders/new/new-v8.tsx'), 'utf8')
+const NEW_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/new/new.tsx'), 'utf8')
 const STEP_EDITOR = readUiSource(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
 const EDIT_PAGE = readUiSource(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
 const DETAIL_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/detail.tsx'), 'utf8')

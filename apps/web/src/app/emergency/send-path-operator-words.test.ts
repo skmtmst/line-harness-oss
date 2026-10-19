@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { operatorPathLabel, operatorPathNote } from './send-path-coverage-panel'
+import { operatorPathLabel, operatorPathNote } from '../../v8/emergency/send-path-coverage-panel'
 
 /* 停止が届く送信経路（OHwbU）：台帳の作り手向けの語を運用者の画面に出さない。 */
 describe('送信経路の言葉', () => {

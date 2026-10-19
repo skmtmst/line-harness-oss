@@ -1,5 +1,5 @@
-import type { Area } from '@/components/rich-menus/canvas-editor'
-import type { RichMenuCreateValue } from '@/components/rich-menus/rich-menu-create-form'
+import type { Area } from '../components/rich-menus/area-types'
+import type { RichMenuCreateValue } from '../components/rich-menus/rich-menu-create-model'
 import type { RichMenuDefinition } from './hq-templates-api'
 import { TEMPLATES } from './rich-menu-templates'
 import { tapActionFromUri, tapActionLiffUrl } from './tap-actions'

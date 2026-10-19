@@ -13,7 +13,7 @@ import { api, ApiError, describeSaveFailure, type SaveSupportMarkAutomationRule,
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { StickyBarAction } from '@/components/shared/sticky-bar'
-import { CreatePage } from '@/components/templates';
+import { CreatePage } from '@/components/templates/index';
 import Button from '@/components/shared/button'
 import { Field } from '@/components/shared/form-controls';
 import Checkbox from '@/components/shared/checkbox'

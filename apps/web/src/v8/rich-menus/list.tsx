@@ -30,7 +30,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { useRowLeaving } from '@/lib/use-row-leaving';
 import { runOptimistic } from '@/lib/undoable';
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message';
-import { ListPage } from '@/components/templates';
+import { ListPage } from '@/components/templates/index';
 import SearchField from '@/components/shared/search-field'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import Button from '@/components/shared/button'

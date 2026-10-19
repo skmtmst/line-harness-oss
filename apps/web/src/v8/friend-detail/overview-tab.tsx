@@ -34,7 +34,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
-import { memberRanksApi } from '@/lib/api-gap3'
+import { memberRanksApi } from '@/lib/api/helpers/gap3'
 import DeliveryConsentDrawer, { DeliveryConsentSummary, useDeliveryConsents } from './delivery-consent'
 
 

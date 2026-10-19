@@ -28,7 +28,7 @@ const replace = vi.hoisted(() => vi.fn())
 const params = vi.hoisted(() => ({ value: new URLSearchParams() }))
 
 vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
-vi.mock('@/lib/api-gap1', () => ({ chatSafetyApi: { hqSendPreview: async () => ({ success: true, data: { recipients: 6120, excluded: { blocked: 0, optedOut: 0, duplicate: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2, perAccount: [] } }) } }))
+vi.mock('@/lib/api/helpers/gap1', () => ({ chatSafetyApi: { hqSendPreview: async () => ({ success: true, data: { recipients: 6120, excluded: { blocked: 0, optedOut: 0, duplicate: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2, perAccount: [] } }) } }))
 vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), hqTemplatesApi: tpl }))
 /*
  * その場で作る：店のカルーセル・リッチメッセージの作る部品（host の口）は、ここでは口だけの代わりにする。

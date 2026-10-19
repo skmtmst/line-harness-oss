@@ -19,7 +19,7 @@ import { api, describeSaveFailure, type CommonActionResources, type CommonAction
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
+import { CreatePage } from '@/components/templates/index'
 import Button from '@/components/shared/button'
 
 import ListState from '@/components/shared/list-state'

@@ -14,7 +14,7 @@ import { commonVarValueError, isSecretLikeVarValue, COMMON_VAR_VALUE_REQUIRED } 
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { CreatePage } from '@/components/templates';
+import { CreatePage } from '@/components/templates/index';
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import DateTimeField from '@/components/shared/date-time-field'

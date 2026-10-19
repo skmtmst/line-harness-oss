@@ -10,7 +10,7 @@ import { api, ApiError, downloadApiFile, fetchApi, type AutomationRunDetail } fr
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { formatNumber } from '@/lib/format'
-import { ListPage } from '@/components/templates'
+import { ListPage } from '@/components/templates/index'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'

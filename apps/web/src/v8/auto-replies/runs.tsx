@@ -19,7 +19,7 @@ import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { TriangleAlert } from 'lucide-react';
 import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared';
-import { DetailPage } from '@/components/templates';
+import { DetailPage } from '@/components/templates/index';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'

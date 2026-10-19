@@ -33,9 +33,9 @@ import {
   type GoogleReviewListData,
   type GoogleReviewOrder,
 } from '@/lib/restaurant-google-api'
-import { StatRow } from '../common-a/parts'
+import { StatRow } from '@/v8/restaurant/common-a'
 import { errorMessage, formatShortStamp, reviewReceivedAt } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import { Stars, replyBadge } from './review-presentation'
 export { Stars, replyBadge } from './review-presentation'

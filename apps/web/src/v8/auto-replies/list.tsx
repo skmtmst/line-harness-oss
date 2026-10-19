@@ -19,7 +19,7 @@ import { autoReplyMatchesQuery,isCurrentAutoReplyLoad,LOAD_STATE_WORDS,NO_WRITE_
 
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
 import { useListScrollMemory,useListUrlFlag,useListUrlParam,useListUrlValue } from '@/components/shared/list-url-state'
-import { ListPage,ListPagePagination } from '@/components/templates'
+import { ListPage,ListPagePagination } from '@/components/templates/index'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 
@@ -57,7 +57,7 @@ import { clampSearchQuery } from '@/lib/search-query'
 import { runUndoable } from '@/lib/undoable'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
-import { AutoReplyTabs } from '@/v8/ai-reply/auto-reply-tabs'
+import { AutoReplyTabs } from '@/v8/ai-reply'
 import type { Folder } from '@line-crm/shared'
 import styles from './list.module.css'
 import { compareEvaluationOrder,movePriorityUpdates } from './order'

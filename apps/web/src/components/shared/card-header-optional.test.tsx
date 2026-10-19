@@ -17,7 +17,7 @@ it('指定のない題は札を足さない', () => {
   expect(screen.queryByText('任意')).toBeNull()
 })
 it('作成の題に括弧付きの任意を戻さない（共通Fieldの欄名は別に検証）', () => {
-  for (const file of ['src/app/auto-replies/edit/wizard-v8.tsx', 'src/v8/reminders/basics-form.tsx', 'src/v8/friend-add/editor.tsx', 'src/app/rich-menus/new/create-v8.tsx']) {
+  for (const file of ['src/v8/auto-replies/edit/wizard.tsx', 'src/v8/reminders/basics-form.tsx', 'src/v8/friend-add/editor.tsx', 'src/v8/rich-menus/new/create.tsx']) {
     const source = readFileSync(file, 'utf8')
     expect(source).not.toMatch(/(?:title=["'][^"']*|>[^<>\n]*)[（(]任意[）)]/)
   }

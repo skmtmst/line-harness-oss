@@ -38,7 +38,7 @@ import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/sh
 import Select from '@/components/shared/select'
 import { withViewTransition } from '@/components/shared/view-transition'
 import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage } from '@/components/templates'
+import { ListPage } from '@/components/templates/index'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError,api,type CommonVarReplacementCandidate,type CommonVarReplacementImpact } from '@/lib/api'
 import { formatNumber } from '@/lib/format'

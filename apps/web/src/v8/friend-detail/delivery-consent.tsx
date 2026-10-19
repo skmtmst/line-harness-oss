@@ -16,7 +16,7 @@ import Radio from '@/components/shared/radio'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { TextField } from '@/components/shared/text-field'
 import { notifySaved } from '@/components/shared/toast'
-import { friendDeliveryConsentHistoryApi, friendDeliveryConsentsApi, type FriendDeliveryConsent, type FriendDeliveryConsentEvent } from '@/lib/api-friend-delivery-consents'
+import { friendDeliveryConsentHistoryApi, friendDeliveryConsentsApi, type FriendDeliveryConsent, type FriendDeliveryConsentEvent } from '@/lib/api/helpers/friend-delivery-consents'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './delivery-consent.module.css'
 

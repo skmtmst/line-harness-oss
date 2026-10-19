@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const WIZARD = readFileSync(join(HERE, 'edit', 'wizard-v8.tsx'), 'utf8')
+const WIZARD = readFileSync(new URL('../../v8/auto-replies/edit/wizard.tsx', import.meta.url), 'utf8')
 
 /*
  * 状態・1152・閲覧のみ・競合の板は `data-design-node` が無いと

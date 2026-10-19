@@ -4,8 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ records: vi.fn(), refund: vi.fn(), saved: vi.fn() }))
-vi.mock('@/lib/api-booking-payment-admin', async (load) => {
-  const actual = await load<typeof import('@/lib/api-booking-payment-admin')>()
+vi.mock('@/lib/api/helpers/booking-payment-admin', async (load) => {
+  const actual = await load<typeof import('@/lib/api/helpers/booking-payment-admin')>()
   return { ...actual, bookingPaymentAdminApi: { ...actual.bookingPaymentAdminApi, ...net,
     connection: async () => ({ data: { connected: true, testMode: true } }),
   } }

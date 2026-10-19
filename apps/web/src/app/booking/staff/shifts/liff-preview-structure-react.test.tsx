@@ -28,7 +28,7 @@ const DIR = dirname(fileURLToPath(import.meta.url))
 // shifts → staff → booking → app → src → web → apps → リポジトリ根
 const REPO_ROOT = join(DIR, '../../../../../../..')
 const LIFF_SOURCE = readFileSync(
-  join(REPO_ROOT, 'apps/liff/src/components/DateTimePicker.tsx'),
+  join(REPO_ROOT, 'apps/liff/src/components/date-time-picker.tsx'),
   'utf8',
 )
 const LIFF_USER_MESSAGE_SOURCE = readFileSync(

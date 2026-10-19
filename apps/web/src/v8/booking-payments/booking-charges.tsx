@@ -15,8 +15,8 @@ import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { notifySaved } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
-import { bookingCancellationApi } from '@/lib/api-gap1'
-import { bookingAdvancedApi } from '@/lib/api-booking-advanced'
+import { bookingCancellationApi } from '@/lib/api/helpers/gap1'
+import { bookingAdvancedApi } from '@/lib/api/helpers/booking-advanced'
 type BookingCard = NonNullable<Awaited<ReturnType<typeof bookingAdvancedApi.card>>['data']>
 import styles from './booking-charges.module.css'
 

@@ -9,7 +9,7 @@ import { ApiError, api, type FileScanConfig, type FileScanItem } from '@/lib/api
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useFormErrors } from '@/lib/use-form-errors'
-import { readSaveFieldErrors } from '@/lib/api-field-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 
 /** 一覧の1ページの件数。先頭50件固定だった監査 R132 の名残を残さない。 */
 export const FILE_SCAN_PAGE_SIZE = 50

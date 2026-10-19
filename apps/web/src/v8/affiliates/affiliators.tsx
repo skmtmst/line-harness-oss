@@ -27,7 +27,7 @@ import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
-import { ListPagePagination } from '@/components/templates'
+import { ListPagePagination } from '@/components/templates/index'
 import { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import {
   calculateAffiliateReward,

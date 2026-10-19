@@ -11,7 +11,7 @@ import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { actionIncompleteReason } from '@/components/auto-replies/action-completeness'
 import { newActionKey, type InlineAction } from '@/components/auto-replies/draft-fields'
-import type { ActionOptions } from '@/components/auto-replies/inline-action-list'
+import type { ActionOptions } from '../auto-replies/action-options'
 import styles from './action-rows.module.css'
 
 /*

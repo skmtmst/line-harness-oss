@@ -15,12 +15,12 @@ import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import TemplateDeleteDialog from '@/v8/templates/delete-dialog'
+import { TemplateDeleteDialog } from '@/v8/templates'
 import Dialog from '@/components/shared/dialog'
 import DialogUsageTable from '@/components/shared/dialog-usage-table'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent, LinePreviewMessage } from '@/components/shared/line-preview';
 import { InsertText } from '@/components/shared/insert-text-field';
-import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor';
+import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '../../components/templates/template-preview-model'
 import TargetMissing from '@/components/shared/target-missing'
 import { buildUsageRows, insertionNames, isTemplateDetailData, lineChanges, messageTypeText, publishRowState, shortStamp, templateDeleteDescription, type TemplateDetailData, type TemplateVersionItem, type UsageRow } from './model';
 import styles from './detail.module.css'

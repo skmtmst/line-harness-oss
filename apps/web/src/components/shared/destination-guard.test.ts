@@ -58,6 +58,6 @@ describe('B-177: 全V8画面の行き先の見張り', () => {
     for (const feature of ['broadcasts', 'auto-replies', 'scenarios', 'webinars', 'forms']) {
       expect(readFileSync(join(root, 'v8', feature, 'list.tsx'), 'utf8')).toContain('useDetailPanelUrl(')
     }
-    expect(readFileSync(join(root, 'app/reminders/list-v8.tsx'), 'utf8')).toContain('useDetailPanelUrl(')
+    expect(readFileSync(new URL('../../v8/reminders/list.tsx', import.meta.url), 'utf8')).toContain('useDetailPanelUrl(')
   })
 })

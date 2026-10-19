@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const LIST = readUiSource(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
 const RUNS = fs.readFileSync(new URL('../../v8/auto-replies/runs.tsx', import.meta.url), 'utf8')
-const PUBLISH = readUiSource(new URL('edit/wizard-v8.tsx', import.meta.url), 'utf8')
+const PUBLISH = readUiSource(new URL('../../v8/auto-replies/edit/wizard.tsx', import.meta.url), 'utf8')
 const EDITOR = readUiSource(
   path.join(__dirname, '../../components/auto-replies/edit-dialog.tsx'),
   'utf8',

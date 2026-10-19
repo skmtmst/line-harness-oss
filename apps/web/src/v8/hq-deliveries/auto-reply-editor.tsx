@@ -8,7 +8,7 @@
  */
 import { useState, type ReactNode } from 'react'
 import { ArrowRight, PenLine, CircleSlash } from 'lucide-react'
-import { CreatePage } from '@/components/templates'
+import { CreatePage } from '@/components/templates/index'
 import { Steps } from '@/components/templates/steps'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import Button from '@/components/shared/button'

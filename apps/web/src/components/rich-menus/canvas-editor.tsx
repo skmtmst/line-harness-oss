@@ -1,39 +1,14 @@
 'use client'
+import type { Area } from './area-types'
+export type { Area } from './area-types'
 
 import { intentLabelOf } from '@/components/rich-menus/area-properties'
 import Notice from '@/components/shared/notice'
-import { RICH_MENU_DIMENSIONS,type RichMenuAreaIntent } from '@line-crm/shared'
-import { useEffect,useMemo,useRef,useState } from 'react'
+import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AreaIcon } from './area-icon'
 import styles from './canvas-v8.module.css'
 export { AreaIcon } from './area-icon'
-
-
-export type Area = {
-  id: string
-  boundsX: number
-  boundsY: number
-  boundsWidth: number
-  boundsHeight: number
-  /**
-   * LINE に登録するときの動きの種類。intent から決まる。
-   * datetimepicker・clipboard は新しい2種。DB へは postback に載るが、
-   * 画面が送る段階では intent から決めた本来の種類を載せる。
-   */
-  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch' | 'datetimepicker' | 'clipboard'
-  actionData: Record<string, unknown>
-  /** 運用者から見た「何をするボタンか」。 */
-  intent?: RichMenuAreaIntent | null
-  /** 管理用のボタン名。 */
-  label?: string | null
-  /** 押されたときに付けるタグ。 */
-  tagIds?: string[]
-  /** 押されたときに足すスコア。 */
-  scoreChange?: number | null
-  templateId?: string | null
-  formId?: string | null
-  trackedLinkId?: string | null
-}
 
 const SNAP_PX = 4
 const MIN_AREA = 20

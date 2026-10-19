@@ -112,7 +112,7 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
 
   it('リマインダの削除が共通の確認窓を使う', () => {
     /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
-    const src = fs.readFileSync(path.join(SRC, 'app', 'reminders', 'list-v8.tsx'), 'utf8')
+    const src = fs.readFileSync(new URL('../v8/reminders/list.tsx', import.meta.url), 'utf8')
     /*
      * 2026-10-06：V8 の削除の窓（絵 VsSyu：幅600・危ない操作は左端・「代わりに一時停止」）は
      * 共通の ConfirmDialog の形に無いため、src/v8/reminders/sheet-dialog（useOverlayFocus の面）で組む。

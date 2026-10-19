@@ -13,7 +13,7 @@ import { api,type ChatDetailMessage } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useStaffRole } from '@/lib/staff-role';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
-import { useInboxAi } from '@/v8/ai-reply/inbox-ai';
+import { useInboxAi } from '@/v8/ai-reply'
 import { useRouter,useSearchParams } from 'next/navigation';
 import { Suspense,useEffect,useRef,useState } from 'react';
 import { jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,statusFilters,statusFiltersV8 } from './inbox-model';

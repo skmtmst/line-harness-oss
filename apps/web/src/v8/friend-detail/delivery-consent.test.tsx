@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), save: vi.fn(), history: vi.fn() }))
-vi.mock('@/lib/api-friend-delivery-consents', () => ({ friendDeliveryConsentsApi: api, friendDeliveryConsentHistoryApi: { list: api.history } }))
+vi.mock('@/lib/api/helpers/friend-delivery-consents', () => ({ friendDeliveryConsentsApi: api, friendDeliveryConsentHistoryApi: { list: api.history } }))
 
 const { default: Drawer } = await import('./delivery-consent')
 

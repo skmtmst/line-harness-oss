@@ -15,7 +15,7 @@ import {
 } from '@/lib/tap-actions'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { FieldError } from '@/components/shared/form-controls'
-import type { Area } from './canvas-editor'
+import type { Area } from './area-types'
 import { RICH_MENU_ACTION_TYPE_BY_INTENT, richMenuUriError, type RichMenuAreaIntent } from '@line-crm/shared'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import TapSideEffects from '@/components/shared/tap-side-effects'

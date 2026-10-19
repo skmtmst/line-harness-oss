@@ -1,5 +1,5 @@
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
-import type { BookingPaymentMode, PaymentEvent } from '@/lib/api-booking-payment-admin'
+import type { BookingPaymentMode, PaymentEvent } from '@/lib/api/helpers/booking-payment-admin'
 
 /* お支払いの言葉と札の色（B-305・絵 T91bV・FY8HC・UteeA）。画面ごとに言い換えない。 */
 

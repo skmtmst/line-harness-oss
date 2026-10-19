@@ -49,7 +49,7 @@ import {
   type GooglePostListData,
 } from '@/lib/restaurant-google-api'
 import { errorMessage, formatShortDay, formatShortStamp } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'

@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import type { AccountStyle } from '@line-crm/shared'
-import { styleApi } from '@/lib/api-styles'
+import { styleApi } from '@/lib/api/helpers/styles'
 
 export type StarterButton = { label: string; feature: string; actionType?: 'uri' | 'message'; actionData?: string }
 type ResolvedPreview = { key: string; buttons: StarterButton[] }

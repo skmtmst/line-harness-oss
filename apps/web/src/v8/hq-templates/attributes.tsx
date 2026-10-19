@@ -1,5 +1,5 @@
 'use client'
-import { markNameRequirement } from '@/v8/tags/mark-requirement'
+import { markNameRequirement } from '@/v8/tags'
 
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
@@ -12,7 +12,7 @@ import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage, CreatePage } from '@/components/templates'
+import { ListPage, CreatePage } from '@/components/templates/index'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -22,11 +22,11 @@ import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import Checkbox from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import FieldsTab from '@/v8/tags/fields-tab'
-import MarksTab from '@/v8/tags/marks-tab'
-import FieldEditor, { type FieldEditorValues } from '@/v8/tags/field-editor'
-import MarkBasicFields from '@/v8/tags/mark-basic-fields'
-import type { AttributeListHost } from '@/v8/tags/attribute-host'
+import { FieldsTab } from '@/v8/tags'
+import { MarksTab } from '@/v8/tags'
+import { FieldEditor, type FieldEditorValues } from '@/v8/tags'
+import { MarkBasicFields } from '@/v8/tags'
+import type { AttributeListHost } from '@/v8/tags'
 import { AttributeTabs, type AttributeTabKey } from './attribute-tabs'
 import AttributeDistribution from './attribute-distribution'
 import { fieldOf, fieldDefinition, markOf } from './attribute-model'
@@ -183,7 +183,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
   const fieldRows = entries.filter((entry): entry is Entry & { detail: Extract<HqFriendAttributeDetail, { template: { template_type: 'friend_field' } }> } => entry.detail.template.template_type === 'friend_field').map((entry) => fieldOf(entry.detail, entry.row.friend_count))
   const markRows = type === 'mark' ? entries.map((entry) => markOf(entry.detail, entry.row.friend_count)) : []
   /* 対応マーク：受信箱の対応状況（友だち人数）と、記録に残ったマーク変更は別の数（API 組5 の stats）。取れなければ「—」。 */
-  const markStats = stats as unknown as { supportStatus?: import('@/lib/api-feature-wait').HqMarkListStats['supportStatus']; markChanges?: import('@/lib/api-feature-wait').HqMarkListStats['markChanges'] } | null
+  const markStats = stats as unknown as { supportStatus?: import('@/lib/api/helpers/feature-wait').HqMarkListStats['supportStatus']; markChanges?: import('@/lib/api/helpers/feature-wait').HqMarkListStats['markChanges'] } | null
   const kpis = type === 'friend_field' ? [
     { title: '項目', icon: List, value: status === 'ready' ? stats?.totalTemplates ?? entries.length : null, unit: '件', detail: '使っている —' },
     { title: '入力済みの友だち', icon: Users, value: null, unit: '人', detail: '1つ以上入っている' },

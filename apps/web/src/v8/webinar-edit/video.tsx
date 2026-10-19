@@ -15,7 +15,7 @@ const b244Requirements = {
 import DateField from '@/components/shared/date-field'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { CalendarPlus, Check, Monitor, Play, Plus, Smartphone, Upload } from 'lucide-react'
-import { CreatePage } from '@/components/templates'
+import { CreatePage } from '@/components/templates/index'
 import { RowMenu } from '@/components/shared/row-actions'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'

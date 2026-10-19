@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { api, bookingApi } from '@/lib/api'
 import { visitStampsApi } from '@/lib/visit-stamps-api'
 import * as accountContext from '@/contexts/account-context'
-import type { TapActionSources } from './tap-action-field'
+import type { TapActionSources } from './tap-action-source-types'
 
 export function useTapActionSources(accountId: string | null | undefined, want: { form?: boolean; booking?: boolean; visit_stamp?: boolean } = { form: true, booking: true, visit_stamp: true }): TapActionSources {
   const [sources, setSources] = useState<TapActionSources>({})

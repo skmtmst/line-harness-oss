@@ -1,6 +1,6 @@
 'use client'
 import { api, type ChatDetail as ApiChatDetail, type ChatDetailMessage } from '@/lib/api';
-import { useChatSearch } from '@/v8/inbox-search/use-chat-search';
+import { useChatSearch } from '@/v8/inbox-search'
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CHAT_SEARCH_FILL_MAX_ROUNDS, CHAT_SEARCH_FILL_PAGE } from './inbox-model';

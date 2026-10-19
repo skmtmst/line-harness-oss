@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import type { SeriesOccurrence } from '@/lib/api-gap2'
+import type { SeriesOccurrence } from '@/lib/api/helpers/gap2'
 import { createdCount, dayWithWeekday, hm, initialPick, ruleLabel } from './series-model'
 
 const occ = (index: number, available: boolean, alternatives: string[] = []): SeriesOccurrence => ({ index, startsAt: '2026-11-20T05:00:00.000Z', available, alternatives })

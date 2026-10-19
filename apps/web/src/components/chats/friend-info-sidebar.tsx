@@ -5,7 +5,7 @@ import { STATUS_WORD } from './friend-info-status'
 
 import { type ChatStatusInfo,type Props } from './friend-info-types'
 
-import PrepayBadgeV8 from '@/app/booking/prepay-badge-v8'
+import { PrepayBadgeV8 } from '@/v8/booking'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'

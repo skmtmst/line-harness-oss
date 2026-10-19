@@ -4,9 +4,7 @@ import { readLineImageContent } from './edit-dialog-model'
 
 
 
-import {
-MESSAGE_KIND_WORDS
-} from '@/app/auto-replies/auto-reply-words'
+import { MESSAGE_KIND_WORDS } from '@/v8/auto-replies'
 import { api,ApiError,describeSaveFailure } from '@/lib/api'
 import { findConditionDraftIssue,type SegmentCondition } from '@/lib/segment-condition'
 import type { AutoReplyDraftInput } from '@line-crm/shared'

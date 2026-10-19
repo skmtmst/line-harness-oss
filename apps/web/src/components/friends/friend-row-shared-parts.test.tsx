@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { FriendListItem } from '@/lib/api'
 import FriendListRow from './friend-list-row'
-import type { FriendListColumn } from './friend-list-table'
+import type { FriendListColumn } from './friend-list-types'
 
 /* 画面のコードは行を押すと詳細へ飛ぶ。描くだけなので遷移先は使わない。 */
 vi.mock('next/navigation', () => ({

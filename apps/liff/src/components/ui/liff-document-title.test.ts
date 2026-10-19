@@ -21,7 +21,7 @@ describe('LIFF のタブの題', () => {
   });
 
   it('上の帯が題を付ける', () => {
-    const header = readFileSync(fileURLToPath(new URL('./LiffHeader.tsx', import.meta.url)), 'utf8');
+    const header = readFileSync(fileURLToPath(new URL('./liff-header.tsx', import.meta.url)), 'utf8');
     expect(header).toMatch(/document\.title = liffDocumentTitle\(title\)/);
   });
 

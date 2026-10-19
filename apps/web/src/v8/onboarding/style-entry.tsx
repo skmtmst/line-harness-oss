@@ -6,7 +6,7 @@ import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context'
-import { styleApi } from '@/lib/api-styles'
+import { styleApi } from '@/lib/api/helpers/styles'
 import { styleLabel } from './model'
 import styles from './style-entry.module.css'
 

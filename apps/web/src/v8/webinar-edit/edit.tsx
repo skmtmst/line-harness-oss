@@ -37,7 +37,7 @@ import {
   type WebinarCtaCard,
   type WebinarEditor,
 } from '@/lib/api'
-import { webinarLoadFailure, type WebinarLoadFailure } from '@/v8/webinars/helpers'
+import { webinarLoadFailure, type WebinarLoadFailure } from '@/v8/webinars'
 import { BackLink, WizardSteps } from './chrome'
 import {
   PANE_KEYS,

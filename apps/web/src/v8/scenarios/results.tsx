@@ -8,7 +8,7 @@ import { api, ApiError, type ScenarioRuns } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { DetailPage } from '@/components/templates';
+import { DetailPage } from '@/components/templates/index';
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import type { ActionMenuItem } from '@/components/shared/action-menu';

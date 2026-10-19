@@ -1,4 +1,4 @@
-import type { Area } from './canvas-editor'
+import type { Area } from './area-types'
 import type { RichMenuTemplate } from '@/lib/rich-menu-templates'
 import { templateToAreas } from '@/lib/rich-menu-templates'
 import { richMenuUriError } from '@line-crm/shared'

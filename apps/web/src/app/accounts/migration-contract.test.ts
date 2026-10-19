@@ -9,7 +9,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import { parseUidCsv, splitUidCsvLine } from './migration'
+import { parseUidCsv, splitUidCsvLine } from '../../v8/accounts/migration'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = [
@@ -18,9 +18,9 @@ const PAGE = [
   'uid-migration-v8.tsx',
 ].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 /* #984 LAY-14: 友だち配下の主タブの正本。 */
-const TABS = readFileSync(join(HERE, '..', 'friends', 'friends-tabs.ts'), 'utf8')
+const TABS = readFileSync(new URL('../../v8/friends/friends-tabs.ts', import.meta.url), 'utf8')
 const NAV = readOwnFile(join(HERE, '../friends/friends-nav-v8.tsx'), 'utf8')
-const CSS = readFileSync(join(HERE, '../friends/friends-v8.module.css'), 'utf8')
+const CSS = readFileSync(new URL('../../v8/friends/friends.module.css', import.meta.url), 'utf8')
 
 /**
  * UID移行の対応表（設計 ★V6 機能3 `vtBCu`）。点検 #496 の項目2・6・9。

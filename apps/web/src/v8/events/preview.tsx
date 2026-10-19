@@ -1,6 +1,6 @@
 'use client'
 
-import { DetailPage } from '@/components/templates'
+import { DetailPage } from '@/components/templates/index'
 
 /*
  * U お客様表示確認（v6-29 §5）。

@@ -2,7 +2,8 @@
 
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
 import { isAreaActionConfigured } from '@/components/rich-menus/action-drafts'
-import { areaDisplayName, type Area } from '@/components/rich-menus/canvas-editor'
+import { areaDisplayName } from '@/components/rich-menus/canvas-editor'
+import { type Area } from '../../components/rich-menus/area-types'
 import { intentLabelOf } from '@/components/rich-menus/area-properties'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'

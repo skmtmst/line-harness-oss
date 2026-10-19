@@ -1,4 +1,4 @@
-import { messageTypeText } from '../templates/words'
+import { messageTypeText } from '@/v8/templates'
 import { emptyValue } from '@/components/shared/empty-value'
 import type { HqTemplate } from '@/lib/hq-templates-api'
 

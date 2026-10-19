@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ReminderDraftSettings } from '@line-crm/shared'
-import { describeReminderDiff } from './reminder-conflict-diff'
+import { describeReminderDiff } from '../../../v8/reminders/edit/reminder-conflict-diff'
 
 function settings(overrides: Partial<ReminderDraftSettings> = {}): ReminderDraftSettings {
   return {

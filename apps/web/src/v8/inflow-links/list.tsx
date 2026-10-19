@@ -21,10 +21,10 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { canEditFeature } from '@/lib/staff-capability';
 import { useFeatureVisibility } from '@/lib/use-feature-visibility';
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability';
-import type { FeatureKey } from '@/lib/feature-settings';
+import type { FeatureKey } from '../../lib/feature-key'
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { ListPage, ListPagePagination } from '@/components/templates';
+import { ListPage, ListPagePagination } from '@/components/templates/index';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'

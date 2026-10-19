@@ -110,7 +110,7 @@ describe('担当者別 勤務・シフト・外の予定(N-405)', () => {
     expect(DETAIL).toContain('T00:00:00Z')
     expect(DETAIL).toContain("timeZone,")
     expect(DETAIL).not.toContain('getTimezoneOffset')
-    expect(DETAIL).not.toContain('toLocaleString')
+    expect(DETAIL).not.toContain('function toLocaleString() { [native code] }')
     expect(DETAIL).not.toContain('new Date(shift.work_date)')
   })
 

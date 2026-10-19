@@ -17,7 +17,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import Link from '@/components/shared/list-navigation'
 import { Eye } from 'lucide-react';
 
-import { ListPage, ListPagePagination } from '@/components/templates';
+import { ListPage, ListPagePagination } from '@/components/templates/index';
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';

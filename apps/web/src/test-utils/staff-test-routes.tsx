@@ -1,4 +1,4 @@
-import StaffV8, { StaffEditV8 } from '@/v8/settings/staff/staff'
+import { StaffV8, StaffEditV8 } from '@/v8/settings'
 import { useListLocation } from '@/components/shared/list-url-state'
 /** 実物の一覧の行から、実物の編集入口へ移る。 */
 export default function StaffTestRoutes() {

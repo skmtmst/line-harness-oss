@@ -22,7 +22,7 @@ import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 
 import { TriangleAlert } from 'lucide-react';
-import { DetailPage } from '@/components/templates';
+import { DetailPage } from '@/components/templates/index';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -39,8 +39,8 @@ import { DataTable, TableHeadRow, Th, Tr, Td, PersonCell, ActionCell } from '@/c
 import { useAccount } from '@/contexts/account-context';
 import { api, type FriendAddRunList } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
-import { describeFriendAddFailure } from '@/v8/friend-add/failure';
-import { useCursorStack } from '@/v8/friend-add/use-cursor-stack';
+import { describeFriendAddFailure } from '@/v8/friend-add'
+import { useCursorStack } from '@/v8/friend-add'
 import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status';
 import styles from './runs.module.css'
 import { csvFileName } from '@/lib/csv-file-name';

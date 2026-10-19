@@ -1,6 +1,6 @@
 'use client'
 
-import { CreatePage } from '@/components/templates'
+import { CreatePage } from '@/components/templates/index'
 import Card from './card'
 import Button from './button'
 import Dialog, { type DialogProps } from './dialog'

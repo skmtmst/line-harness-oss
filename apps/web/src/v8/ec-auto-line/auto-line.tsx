@@ -13,7 +13,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import Toggle from '@/components/shared/toggle'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
-import { ecAutoLineApi } from '@/lib/api-gap3'
+import { ecAutoLineApi } from '@/lib/api/helpers/gap3'
 import { formatNumber } from '@/lib/format'
 import EditDrawer from './edit-drawer'
 import { KIND_LABEL, KIND_ORDER, KIND_WHEN, KIND_WHO, failureText, waitLabel } from './words'

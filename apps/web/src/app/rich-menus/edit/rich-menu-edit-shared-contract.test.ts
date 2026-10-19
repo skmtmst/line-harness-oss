@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest'
  * 戻すと赤。
  */
 const here = dirname(fileURLToPath(import.meta.url))
-const page = readUiSource(join(here, '..', 'new', 'create-v8.tsx'), 'utf8')
+const page = readUiSource(new URL('../../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 const form = readFileSync(
   join(here, '../../../v8/rich-menu-edit/compatibility-form.tsx'),
   'utf8',

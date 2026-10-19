@@ -4,7 +4,7 @@
  * 形は要件 §3「データと API の形（案）」どおり。Worker ができたら lib へ移す。
  */
 import { fetchApi, type StepUpPurpose } from '@/lib/api'
-import { aiDraftApi as gap2 } from '@/lib/api-gap2'
+import { aiDraftApi as gap2 } from '@/lib/api/helpers/gap2'
 import type { QaEntry as Gap2QaEntry } from '@line-crm/shared'
 
 type Result<T> = { success: true; data: T }

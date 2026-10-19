@@ -5,7 +5,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Inbox, LayoutGrid, List, LogIn, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { ListPage } from '@/components/templates';
+import { ListPage } from '@/components/templates/index';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/shared/list-toolbar';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
@@ -38,7 +38,7 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context';
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs';
 import { connectionReasonLine } from './connection-reasons';
 import styles from './home.module.css';
-import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/folder-colors';
+import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags'
 import StatusBadge from '@/components/shared/status-badge';
 import TagPill from '@/components/shared/tag-pill';
 import TagOverflow from '@/components/shared/tag-overflow';

@@ -2,7 +2,7 @@ import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const WIZARD = readFileSync(join(__dirname, 'wizard-v8.tsx'), 'utf8')
+const WIZARD = readFileSync(new URL('../../../v8/auto-replies/edit/wizard.tsx', import.meta.url), 'utf8')
 
 describe('自動応答を作る（V8）の「下書きとして保存」', () => {
   it('保存できなかったとき（競合 UGrd2 など）は「下書きを保存しました」を出さない', () => {

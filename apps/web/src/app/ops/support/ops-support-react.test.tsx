@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsSupportPage from './page'
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
-import { compareLabel, durationLabel, elapsedLabel } from './format'
+import { compareLabel, durationLabel, elapsedLabel } from '../../../v8/ops/support/format'
 import type { OpsKnowledgeReference, OpsSupportDetail } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true

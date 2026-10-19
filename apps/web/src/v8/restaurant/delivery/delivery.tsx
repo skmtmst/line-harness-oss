@@ -43,7 +43,7 @@ import {
   type DeliveryOrdersData,
   type DeliveryService,
 } from '@/lib/restaurant-delivery-api'
-import { BoundaryBanner, RestaurantPage } from '../common-a/frame'
+import { BoundaryBanner, RestaurantPage } from '@/v8/restaurant/common-a'
 import OrdersBoard from './orders'
 import { CancelOrderDialog, OrderDetailDialog } from './order-detail'
 import HistoryBoard from './history'

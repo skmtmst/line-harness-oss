@@ -6,7 +6,7 @@ import Link from '@/components/shared/list-navigation'
 import { AlignLeft, Calendar, Check, CircleDot, Hash, ListChecks, Star, Type } from 'lucide-react';
 import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { CreatePage } from '@/components/templates';
+import { CreatePage } from '@/components/templates/index';
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'

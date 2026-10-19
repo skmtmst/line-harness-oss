@@ -237,7 +237,7 @@ describe('ウェビナーは申込もできる本体を共用する', () => {
     expect(src).toContain('友だち追加すると見られます');
     expect(src).toContain('この端末では再生できません');
     expect(src).toContain('<LoadErrorView');
-    expect(readFileSync(join(ROOT, '..', 'components', 'LoadErrorView.tsx'), 'utf8')).toContain('読み込めませんでした');
+    expect(readFileSync(new URL('../components/load-error-view.tsx', import.meta.url), 'utf8')).toContain('読み込めませんでした');
   });
 
   it('会話は「名前　本文」の1行。自分の名前だけ色を変える', () => {

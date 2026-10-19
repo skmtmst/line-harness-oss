@@ -19,7 +19,7 @@ import Notice from '@/components/shared/notice'
 import ListPagination from '@/components/shared/list-pagination'
 import TruncatedText from '@/components/shared/truncated-text'
 import { RowNameButton, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { ListPagePagination } from '@/components/templates'
+import { ListPagePagination } from '@/components/templates/index'
 import {
   approvalReviewReasons,
   downloadCsv,

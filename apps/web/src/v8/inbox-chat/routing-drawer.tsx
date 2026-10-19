@@ -28,7 +28,7 @@ import Toggle from '@/components/shared/toggle'
 import NumberInput from '@/components/shared/number-field'
 import { Field } from '@/components/shared/form-controls'
 import { ApiError, api } from '@/lib/api'
-import { inboxRoutingApi } from '@/lib/api-gap1'
+import { inboxRoutingApi } from '@/lib/api/helpers/gap1'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import styles from './routing-drawer.module.css'
 

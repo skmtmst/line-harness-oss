@@ -2,7 +2,7 @@
 
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import Pagination from '@/components/shared/pagination'
-import { ListPagePagination } from '@/components/templates'
+import { ListPagePagination } from '@/components/templates/index'
 
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'

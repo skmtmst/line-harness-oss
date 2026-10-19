@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { styleApi } from '@/lib/api-styles'
+import { styleApi } from '@/lib/api/helpers/styles'
 import type { StarterItemState, StyleState, StyleWarning } from './model'
 import { canManageRole } from '@/lib/staff-role'
 

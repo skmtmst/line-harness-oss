@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 const get = vi.fn(); const change = vi.fn(); const cancel = vi.fn()
-vi.mock('@/lib/api-gap2', () => ({ bookingSeriesApi: { get: (...a: unknown[]) => get(...a), change: (...a: unknown[]) => change(...a), cancel: (...a: unknown[]) => cancel(...a) } }))
+vi.mock('@/lib/api/helpers/gap2', () => ({ bookingSeriesApi: { get: (...a: unknown[]) => get(...a), change: (...a: unknown[]) => change(...a), cancel: (...a: unknown[]) => cancel(...a) } }))
 const impact = vi.fn()
-vi.mock('@/lib/api-booking-advanced', () => ({ bookingAdvancedApi: { impact: (...a: unknown[]) => impact(...a) } }))
+vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { impact: (...a: unknown[]) => impact(...a) } }))
 const notifySaved = vi.fn()
 vi.mock('@/components/shared/toast', () => ({ notifySaved: (...a: unknown[]) => notifySaved(...a), notifyToast: vi.fn() }))
 const { default: SeriesScopeDialog } = await import('./series-scope-dialog')

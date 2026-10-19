@@ -12,8 +12,8 @@ vi.mock('@/lib/api', async (load) => {
   const actual = await load<typeof import('@/lib/api')>()
   return { ...actual, bookingApi: { ...actual.bookingApi, getPaymentConfig: async () => ({ success: true, data: { mode: 'onsite', provider: 'onsite', holdMinutes: 10, keyConfigured: true, testMode: true } }) } }
 })
-vi.mock('@/lib/api-booking-payment-admin', async (load) => {
-  const actual = await load<typeof import('@/lib/api-booking-payment-admin')>()
+vi.mock('@/lib/api/helpers/booking-payment-admin', async (load) => {
+  const actual = await load<typeof import('@/lib/api/helpers/booking-payment-admin')>()
   return {
     ...actual,
     bookingPaymentAdminApi: {

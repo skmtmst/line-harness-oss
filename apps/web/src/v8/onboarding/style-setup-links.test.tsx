@@ -5,7 +5,7 @@ import { featureHref, questionsFor, summarizeSetup } from './model'
 import { setupLinksFor } from './setup-links'
 import { useStarterMenu } from './use-starter-menu'
 const net = vi.hoisted(() => ({ starterSet: vi.fn() }))
-vi.mock('@/lib/api-styles', () => ({ styleApi: net }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: net }))
 afterEach(cleanup)
 
 it('実装済みの回数券・支払い・面談・振替・ECの設定先へ案内する', () => {

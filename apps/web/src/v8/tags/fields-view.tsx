@@ -2,7 +2,7 @@
 
 import type { FriendFieldType } from '@line-crm/shared';
 import { api } from '@/lib/api';
-import { ListPageBody } from '@/components/templates';
+import { ListPageBody } from '@/components/templates/index';
 import FolderPanel, { FolderPanelNote } from '@/components/shared/folder-panel';
 import FolderAddDialog from '@/components/shared/folder-add-dialog';
 import DetailPanel from '@/components/shared/detail-panel';
@@ -21,7 +21,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import Notice from '@/components/shared/notice';
 import { EXTENDED_PAGE_SIZES as PAGE_SIZES } from '@/components/shared/page-size-options';
-import type { useFieldsTab } from './fields-tab'
+import type { useFieldsTab } from './use-fields-tab'
 import { fieldTypeWord } from './fields-list-model'
 import FieldsTable from './fields-table'
 

@@ -16,7 +16,7 @@ import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'reac
 import { Tabs } from '@/components/shared/tabs'
 import { useSearchParams } from 'next/navigation'
 import { Download, Plus } from 'lucide-react'
-import { ListPage } from '@/components/templates'
+import { ListPage } from '@/components/templates/index'
 import Button from '@/components/shared/button'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'

@@ -12,7 +12,7 @@ import TemplatePicker from '@/components/chats/template-picker'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Select from '@/components/shared/select'
 
-import ConversationHead from '@/v8/inbox-chat/conversation-head'
+import { ConversationHead } from '@/v8/inbox-chat'
 import { formatDateTime } from '@/lib/format'
 import Button from '@/components/shared/button'
 

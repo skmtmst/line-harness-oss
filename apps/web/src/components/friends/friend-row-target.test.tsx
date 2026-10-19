@@ -3,7 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FriendListItem } from '@/lib/api'
-import type { FriendListColumn } from './friend-list-table'
+import type { FriendListColumn } from './friend-list-types'
 
 /*
  * 行を押した先は友だちの詳細（/friends/detail?id=…）。

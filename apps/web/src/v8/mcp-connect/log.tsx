@@ -25,7 +25,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import TruncatedText from '@/components/shared/truncated-text'
 import { describeApiFailure, loadFailureCopy } from '@/components/shared/api-error-message'
 import { notifyToast } from '@/components/shared/toast'
-import { ListPage } from '@/components/templates'
+import { ListPage } from '@/components/templates/index'
 import { formatDate } from '@/lib/format'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { mcpApi, type McpCallLog, type McpConnection } from './api'

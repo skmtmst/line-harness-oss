@@ -1,4 +1,4 @@
-import type { FeatureKey } from '@/lib/feature-settings'
+import type { FeatureKey } from '../../lib/feature-key'
 import type { Recipe as ApiRecipe } from '@/lib/api'
 
 /**

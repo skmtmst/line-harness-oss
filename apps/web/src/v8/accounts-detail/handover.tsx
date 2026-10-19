@@ -9,7 +9,7 @@ import { api, ApiError, type AccountHandover, type AccountHandoverDecision } fro
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { SettingsPage } from '@/components/templates'
+import { SettingsPage } from '@/components/templates/index'
 import { Steps } from '@/components/templates/steps'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'

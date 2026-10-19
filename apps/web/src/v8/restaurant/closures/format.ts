@@ -7,7 +7,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import type { RestaurantClosure, RestaurantClosureInput, RestaurantClosureKind } from '@line-crm/shared'
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { joinTableCodes } from '../inventory/format'
+import { joinTableCodes } from '@/v8/restaurant/inventory/public/format'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 

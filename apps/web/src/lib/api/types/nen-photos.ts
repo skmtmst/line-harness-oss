@@ -1,4 +1,4 @@
-import type { PhotoAssetRun } from '../../api-publication-types'
+import type { PhotoAssetRun } from './publication-types'
 
 export type PhotoReviewMetrics = {
   pendingCount: number

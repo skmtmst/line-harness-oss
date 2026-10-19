@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ACCOUNT_STYLES } from '@line-crm/shared'
-import type { styleApi } from '@/lib/api-styles'
+import type { styleApi } from '@/lib/api/helpers/styles'
 
 export const ACCOUNT_STYLE_UPDATED = 'musubo:account-style-updated'
 export function accountStyleUpdated(accountId: string) {
@@ -16,7 +16,7 @@ const pending = new Map<string, Promise<Data>>()
 function load(accountId: string): Promise<Data> {
   const hit = pending.get(accountId)
   if (hit) return hit
-  const promise = import('@/lib/api-styles').then(module => module.styleApi.get(accountId)).then(res => {
+  const promise = import('@/lib/api/helpers/styles').then(module => module.styleApi.get(accountId)).then(res => {
     if (!res.success || !ACCOUNT_STYLES.includes(res.data?.style)) throw new Error('使い方のスタイルを読み込めませんでした')
     return res.data
   })

@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest'
 import type { BookingGroupView as BookingParty } from '@line-crm/shared'
 
 const cancelGroup = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/api-booking-advanced', () => ({ bookingAdvancedApi: { cancelGroup } }))
+vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { cancelGroup } }))
 const { default: PartySection } = await import('./party-section')
 
 const party: BookingParty = { groupId: 'g1', ownerName: '山田 花子', version: 2, members: [

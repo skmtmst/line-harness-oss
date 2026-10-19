@@ -17,7 +17,7 @@ import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData, FriendAdd
 import { api } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { ListPage } from '@/components/templates';
+import { ListPage } from '@/components/templates/index';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';

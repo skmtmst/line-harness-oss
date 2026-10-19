@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
  */
 const here = dirname(fileURLToPath(import.meta.url))
 /* 作るの v7 本体は 2026-10-05 に撤去。候補の取得は `create-v8` が担う。 */
-const newPage = readFileSync(join(here, 'create-v8.tsx'), 'utf8')
+const newPage = readFileSync(new URL('../../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 const editPage = readFileSync(join(here, '..', 'edit', 'page.tsx'), 'utf8')
 
 describe('m18r テンプレート候補は選択accountで絞る', () => {

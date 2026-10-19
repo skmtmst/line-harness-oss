@@ -1,6 +1,6 @@
 'use client'
 
-import { memberRanksApi } from '@/lib/api-gap3';
+import { memberRanksApi } from '@/lib/api/helpers/gap3';
 import { useOverlayLayer } from '@/components/shared/overlay-utils';
 import TagOverflow from '@/components/shared/tag-overflow';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';

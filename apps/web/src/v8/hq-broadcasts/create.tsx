@@ -24,7 +24,7 @@ import Button from '@/components/shared/button';
 import Checkbox from '@/components/shared/checkbox';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
 import SendConfirmDialog, { describeExclusion } from '@/components/shared/send-confirm-dialog';
-import { chatSafetyApi } from '@/lib/api-gap1';
+import { chatSafetyApi } from '@/lib/api/helpers/gap1';
 import type { SendConfirmationPreview } from '@line-crm/shared';
 import DateField from '@/components/shared/date-field';
 import { TimeField } from '@/components/shared/date-time-field';
@@ -59,10 +59,10 @@ import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbl
 import HqTemplatePicker from './template-picker';
 import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker';
 import { SourcePickerSelection, type SourcePickerItem, type SourcePickerFolder } from '@/components/shared/source-picker-dialog';
-import CarouselV8 from '@/v8/templates/carousel';
-import TemplateRichEditor from '@/v8/template-edit/rich';
-import type { TemplateEditHost } from '@/v8/template-edit/host';
-import { hostDefinition } from '@/v8/hq-templates/console';
+import { CarouselV8 } from '@/v8/templates'
+import { TemplateRichEditor } from '@/v8/template-edit'
+import type { TemplateEditHost } from '@/v8/template-edit'
+import { hostDefinition } from '@/v8/hq-templates'
 import { freshDefinition } from '@/lib/hq-template-authoring';
 import styles from './create.module.css';
 import MessageComposer from '@/components/shared/message-composer';

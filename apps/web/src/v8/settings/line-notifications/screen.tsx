@@ -39,7 +39,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import FilterChip from '@/components/shared/filter-chip'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
-import { readSaveFieldErrors } from '@/lib/api-field-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 /*

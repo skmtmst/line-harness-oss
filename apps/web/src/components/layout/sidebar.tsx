@@ -412,7 +412,7 @@ export default function Sidebar({
     let cancelled = false
     const load = async () => {
       try {
-        const { hqStyleApi } = await import('@/lib/api-styles')
+        const { hqStyleApi } = await import('@/lib/api/helpers/styles')
         const res = await hqStyleApi.attention()
         if (cancelled || !res.success) return
         setHqAttentionCount(res.data.items.reduce((sum, item) => sum + Object.values(item.counts as Record<string, number>).reduce<number>((a, b) => a + (b ?? 0), 0), 0))

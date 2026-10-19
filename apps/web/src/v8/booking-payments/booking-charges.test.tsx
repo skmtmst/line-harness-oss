@@ -2,8 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const requests = vi.hoisted(() => ({ charges: vi.fn(), card: vi.fn(), charge: vi.fn() }))
-vi.mock('@/lib/api-gap1', () => ({ bookingCancellationApi: requests }))
-vi.mock('@/lib/api-booking-advanced', () => ({ bookingAdvancedApi: { card: requests.card } }))
+vi.mock('@/lib/api/helpers/gap1', () => ({ bookingCancellationApi: requests }))
+vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { card: requests.card } }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import { BookingChargesSection } from './booking-charges'
 const props = { accountId: 'a', bookingId: 'b', customerName: '確認用', bookingLabel: '予約', price: 1000, canCharge: true, canRefund: true }

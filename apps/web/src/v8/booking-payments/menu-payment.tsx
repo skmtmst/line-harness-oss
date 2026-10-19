@@ -13,7 +13,7 @@ import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConfli
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { formatYen } from '@/lib/format'
 import { bookingApi } from '@/lib/api'
-import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode } from '@/lib/api-booking-payment-admin'
+import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode } from '@/lib/api/helpers/booking-payment-admin'
 import { MODE_LABEL, providerFor } from './labels'
 import styles from './payments.module.css'
 

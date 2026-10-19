@@ -1,4 +1,6 @@
 'use client'
+import type { GoogleNav } from './navigation-types'
+export type { GoogleNav } from './navigation-types'
 
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
@@ -9,10 +11,10 @@ import { ApiError } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import Select from '@/components/shared/select'
+
 import { Tabs } from '@/components/shared/tabs'
 import { restaurantGoogleApi, type GoogleConnectionData, type GoogleBusinessStore, type GooglePostKind } from '@/lib/restaurant-google-api'
-import { BoundaryBanner, RestaurantPage, STORE_PICKER_WIDTH } from '../common-a/frame'
+import { BoundaryBanner, RestaurantPage } from '@/v8/restaurant/common-a'
 import { errorMessage } from './format'
 import { ReviewDraft, ReviewsBoard } from './reviews'
 import { PostEditor, PostConfirm, PostsBoard, type MediaUploadHelpers } from './posts'
@@ -26,7 +28,7 @@ import SettingsBoard from './settings'
 import styles from './google.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 Googleビジネス（Pencil：口コミ `j0Wcg`・返信を作る `x9HIR`・投稿 `Cfed0`・投稿を作る `T1j2Sw`・
@@ -41,7 +43,6 @@ export type { MediaUploadHelpers } from './posts'
 
 export const TAB_LABELS = { reviews: '口コミ', posts: '投稿', performance: 'パフォーマンス', profile: 'プロフィール', settings: '設定' } as const
 export type GoogleTab = keyof typeof TAB_LABELS
-export type GoogleNav = (params: Record<string, string | undefined>) => void
 
 /** 口コミの一覧の帯だけ、返信が実際に Google に届くことを知らせる（j0Wcg）。 */
 /**
@@ -98,7 +99,6 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       setData(null)
       { if (!fieldFailure)
 
-
       setError(err instanceof ApiError && err.status === 404
         ? 'このLINEアカウントには店舗が紐付いていません。先に店舗管理でLINEアカウントを割り当ててください。'
         : errorMessage(err, 'Googleビジネスの状態を読み込めませんでした。'))
@@ -149,7 +149,6 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
 
   const picker = stores.length > 0 ? (
     <SaveErrorField names={["currentStoreId","selectedAccountId"]}><StoreFilterTabs
-
 
       value={currentStoreId}
       onChange={(value) => {

@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { Star } from 'lucide-react'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
-import { memberRanksApi } from '@/lib/api-gap3'
+import { memberRanksApi } from '@/lib/api/helpers/gap3'
 import EmptyTab from './empty-tab'
 import styles from './delivery-consent.module.css'
 

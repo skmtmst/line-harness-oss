@@ -2,7 +2,7 @@
 
 import { tableRequirements as b244Requirements } from './requirements'
 
-import {reservationBoardApi} from '@/lib/api-reservation-board'
+import {reservationBoardApi} from '@/lib/api/helpers/reservation-board'
 import {seatBoardEntry,type RestaurantFloor} from '@line-crm/shared'
 import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 
@@ -30,8 +30,8 @@ import { TextField } from '@/components/shared/text-field'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
-import RestaurantShell, { Panel, QuietError, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
-import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
+import { RestaurantShell, Panel, QuietError, StatRow, Status, type RestaurantV8Context } from '@/v8/restaurant/booking-kit'
+import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit'
 import { pickMoveTarget, reservationLine } from './move'
 import styles from './tables.module.css'
 import TableRowActions from './table-row-actions'

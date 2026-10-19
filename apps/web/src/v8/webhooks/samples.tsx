@@ -10,7 +10,7 @@
 import { CalendarDays, ClipboardList, CreditCard, LayoutTemplate, MessageCircle, ShoppingCart } from 'lucide-react'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
-import { ListPage } from '@/components/templates'
+import { ListPage } from '@/components/templates/index'
 import Button from '@/components/shared/button'
 import {
   ViewerBand,

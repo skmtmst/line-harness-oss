@@ -19,7 +19,7 @@ import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/s
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { ListPage } from '@/components/templates'
+import { ListPage } from '@/components/templates/index'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import ListState from '@/components/shared/list-state'

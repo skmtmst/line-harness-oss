@@ -50,8 +50,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
     },
   }
 })
-vi.mock('@/lib/api-booking-payment-admin', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/api-booking-payment-admin')>()
+vi.mock('@/lib/api/helpers/booking-payment-admin', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api/helpers/booking-payment-admin')>()
   return {
     ...actual,
     bookingPaymentAdminApi: {

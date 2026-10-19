@@ -18,7 +18,7 @@ it('名前とフォルダは共通の2列。通常の横並びと郵便番号の
   expect(css).toContain('.postalRow > :first-child')
 })
 it('同じ並びの3つの画面は共通の行へ、フォルダは行の全幅へ渡す', () => {
-  for (const file of ['src/app/auto-replies/edit/wizard-v8.tsx', 'src/v8/friend-add/editor.tsx', 'src/v8/reminders/basics-form.tsx']) {
+  for (const file of ['src/v8/auto-replies/edit/wizard.tsx', 'src/v8/friend-add/editor.tsx', 'src/v8/reminders/basics-form.tsx']) {
     const source = readUiSource(file, 'utf8')
     expect(source).toContain('<SettingsFormRow layout="name-folder">')
     expect(source).not.toContain('className={styles.fieldPair}')

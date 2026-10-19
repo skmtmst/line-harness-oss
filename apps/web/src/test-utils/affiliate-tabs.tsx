@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import AffiliatorsV8 from '@/v8/affiliates/affiliators'
-import ApprovalsV8 from '@/v8/affiliates/approvals'
-import OffersV8 from '@/v8/affiliates/offers'
-import { AffiliateShell, type AffiliateTabKey } from '@/v8/affiliates/frame'
+import { AffiliatorsTab as AffiliatorsV8 } from '@/v8/affiliates'
+import { ApprovalsTab as ApprovalsV8 } from '@/v8/affiliates'
+import { OffersTab as OffersV8 } from '@/v8/affiliates'
+import { AffiliateShell, type AffiliateTabKey } from '@/v8/affiliates'
 
 export { distributionUrl } from '@/v8/affiliates/display'
 

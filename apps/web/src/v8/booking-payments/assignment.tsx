@@ -21,8 +21,8 @@ import { Field } from '@/components/shared/form-controls'
 
 import { notifySaved } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
-import { bookingAssignmentApi } from '@/lib/api-booking-assignment'
-import { isNotReadyError } from '@/lib/api-booking-payment-admin'
+import { bookingAssignmentApi } from '@/lib/api/helpers/booking-assignment'
+import { isNotReadyError } from '@/lib/api/helpers/booking-payment-admin'
 import settings from '../booking-menus/settings.module.css'
 import styles from './assignment.module.css'
 

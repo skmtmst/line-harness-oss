@@ -6,8 +6,8 @@ import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifyToast } from '@/components/shared/toast'
 import { api,describeSaveFailure,type ApiBroadcast,type BroadcastBubble } from '@/lib/api'
-import { broadcastAbApi } from '@/v8/broadcast-ab/api'
-import { useBroadcastAb } from '@/v8/broadcast-ab/use-ab'
+import { broadcastAbApi } from '@/v8/broadcast-ab'
+import { useBroadcastAb } from '@/v8/broadcast-ab'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
 type saveBroadcastContext = {

@@ -1,4 +1,4 @@
-import type { FeatureKey } from './feature-settings'
+import type { FeatureKey } from './feature-key'
 
 /**
  * サイドメニューの項目。**ここが正本。**

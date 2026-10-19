@@ -13,7 +13,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { LogIn } from 'lucide-react'
 import type { HqTemplate } from '@/lib/hq-templates-api'
 import { hqOpenHref } from '@/lib/hq-navigation'
-import { ListPage } from '@/components/templates'
+import { ListPage } from '@/components/templates/index'
 import Button from '@/components/shared/button'
 import { Tabs } from '@/components/shared/tabs'
 import styles from '../templates/list.module.css'

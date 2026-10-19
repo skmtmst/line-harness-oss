@@ -14,7 +14,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { Check, Plus } from 'lucide-react'
 import { api, ApiError, type ConversionDeduplicationMode, type ConversionDefinitionPreview, type ConversionDefinitionUsageKind, type ConversionReversalPolicy, type ConversionValueMode } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
-import { CreatePage } from '@/components/templates'
+import { CreatePage } from '@/components/templates/index'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'

@@ -17,7 +17,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     accountSettings: { getTestRecipients: empty },
   } }
 })
-vi.mock('@/lib/api-gap1', () => ({ chatSafetyApi: { sendPreview: mocks.preview, confirmBroadcast: mocks.confirm } }))
+vi.mock('@/lib/api/helpers/gap1', () => ({ chatSafetyApi: { sendPreview: mocks.preview, confirmBroadcast: mocks.confirm } }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => '/broadcasts/new', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }) }))

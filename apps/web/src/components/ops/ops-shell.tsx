@@ -16,7 +16,7 @@ import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-ses
 import { logoutAndGoToLogin } from '@/lib/logout'
 import ImpersonationBar from './impersonation-bar'
 import RecoveryCodeNotice from '@/components/recovery-code-notice'
-import OpsShellV8 from '@/v8/ops/shell'
+import { OpsShellV8 } from '@/v8/ops/public/shell'
 import { setDocumentTitle } from '@/lib/document-title'
 
 /**

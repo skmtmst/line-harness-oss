@@ -9,7 +9,7 @@ import {
   keywordRules,
   stopNote,
   triggerSummary,
-} from './auto-reply-words'
+} from '../../v8/auto-replies/auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readUiSource(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')

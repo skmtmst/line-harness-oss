@@ -2,7 +2,7 @@
 
 import { useSearchParams } from 'next/navigation'
 import AccountsV8 from '@/v8/settings/accounts/accounts'
-import AccountMigration from './migration'
+import AccountMigration from '../../v8/accounts/migration'
 
 export default function AccountsPage() {
   const searchParams = useSearchParams()

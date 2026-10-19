@@ -112,7 +112,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-import NewRichMenuPage from './new/create-v8'
+import NewRichMenuPage from '../../v8/rich-menus/new/create'
 import RichMenuDetailV8 from '@/v8/rich-menu-edit/detail'
 
 function CurrentRichMenuEdit() {

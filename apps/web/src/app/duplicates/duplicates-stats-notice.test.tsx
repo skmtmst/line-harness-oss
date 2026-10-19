@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
-import DuplicatesStatsNotice from './duplicates-stats-notice'
+import DuplicatesStatsNotice from '../../v8/duplicates/duplicates-stats-notice'
 
 /**
  * R598: 集計だけ失敗しても候補一覧は残り、集計欄に取得失敗と再試行が出る。

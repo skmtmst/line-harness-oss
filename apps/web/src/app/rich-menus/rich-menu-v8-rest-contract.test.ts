@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 /* 一覧の入口は V8 のとき src/v8/rich-menus/list.tsx（2026-10-06〜。古い list-v8.tsx・list-v8.module.css はもう描かれない）。 */
 const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'rich-menus', 'list.tsx'), 'utf8')
-const CREATE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
-const CREATE_CSS = readFileSync(join(HERE, 'new', 'create-v8.module.css'), 'utf8')
+const CREATE = readFileSync(new URL('../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
+const CREATE_CSS = readFileSync(new URL('../../v8/rich-menus/new/create.module.css', import.meta.url), 'utf8')
 
 /*
  * V8 リッチメニューの残り（rZEGN・ZoKow・作る①〜④・r8dGXT）。

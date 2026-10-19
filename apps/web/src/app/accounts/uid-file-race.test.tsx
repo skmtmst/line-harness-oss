@@ -19,7 +19,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   return { ...actual, api: { ...actual.api, friendMigrations: { ...actual.api.friendMigrations, dryRun: fixture.dryRun } } }
 })
 
-const { useUidMigration } = await import('./use-uid-migration')
+const { useUidMigration } = await import('../../v8/accounts/use-uid-migration')
 
 beforeEach(() => {
   stubFetchNotFound()

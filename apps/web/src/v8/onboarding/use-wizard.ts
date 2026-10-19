@@ -4,18 +4,12 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { notifySaved } from '@/components/shared/toast'
 import { accountStyleUpdated } from '@/hooks/use-account-style'
-import { styleApi } from '@/lib/api-styles'
+import { styleApi } from '@/lib/api/helpers/styles'
 import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
 import { useEffect,useMemo,useState } from 'react'
-import {
-LOOK_CHOICES,SETTINGS_KEYS,
-answerOf,answersForApi,changedAnswers,isBookingConfirmSample,
-needsActivation,pairStarterItems,questionsFor,recommendedValue,selectedValue,
-settingsChanges,
-stepNames,
-type Question
-} from './model'
-import type { Props,SummaryData,WizardStep } from './wizard'
+import { LOOK_CHOICES, SETTINGS_KEYS, answerOf, answersForApi, changedAnswers, isBookingConfirmSample, needsActivation, pairStarterItems, questionsFor, recommendedValue, selectedValue, settingsChanges, stepNames } from './model'
+import { type Question } from './question-types'
+import type { Props, SummaryData, WizardStep } from './wizard-types'
 export function useWizard({ accountId, state, initialStep = 0, onClose }: Props) {
   const [style, setStyle] = useState<AccountStyle>(state.style)
   const [answers, setAnswers] = useState<Record<string, SetupAnswer>>(state.answers ?? {})

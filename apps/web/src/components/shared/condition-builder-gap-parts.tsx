@@ -8,7 +8,7 @@ import Select from './select';
 import { type SegmentRule } from '@/lib/segment-condition';
 import Button from '@/components/shared/button';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
-import { memberRanksApi } from '@/lib/api-gap3';
+import { memberRanksApi } from '@/lib/api/helpers/gap3';
 
 
 /**

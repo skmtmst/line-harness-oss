@@ -1,6 +1,6 @@
 'use client'
 import { api,fetchApi } from '@/lib/api';
-import { inboxRoutingApi } from '@/lib/api-gap1';
+import { inboxRoutingApi } from '@/lib/api/helpers/gap1';
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events';
 import { withRequestTimeout } from '@/lib/request-timeout';
 import { clampSearchQuery } from '@/lib/search-query';

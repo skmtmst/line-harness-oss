@@ -1,4 +1,6 @@
 'use client'
+import type { FriendListColumn } from './friend-list-types'
+export type { FriendListColumn } from './friend-list-types'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Star } from 'lucide-react'
@@ -16,8 +18,6 @@ import FriendListRow, { FriendListCard } from './friend-list-row'
 import type { FriendAction } from './single-friend-actions'
 import { formatNumber } from '@/lib/format'
 import './friend-list-table.css'
-
-export type FriendListColumn = 'support' | 'scenario' | 'latest' | 'tags' | 'source' | 'last'
 
 interface Props {
   toolbarFilters?: ReactNode

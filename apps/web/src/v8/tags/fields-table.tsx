@@ -16,7 +16,7 @@ import { destinationLabel, knownUsageCount } from '@/components/friend-fields/fi
 import styles from './list.module.css';
 import TruncatedText from '@/components/shared/truncated-text';
 import { emptyValue } from '@/components/shared/empty-value';
-import type { useFieldsTab } from './fields-tab'
+import type { useFieldsTab } from './use-fields-tab'
 import { fieldTypeWord } from './fields-list-model'
 
 export default function FieldsTable({ canEdit, host, items, status, error, setQuery, type, setType, setFolderFilter, pageSize, page, setPage, dragId, setDragId, leavingId, openMenuId, setOpenMenuId, openFieldDetail, load, visible, pages, currentPage, liveOrder, bodyRef, move, keyboardMove, rowMenuItems, fieldContextItems, folderDotOf, filterActive, createButton }: ReturnType<typeof useFieldsTab>) {

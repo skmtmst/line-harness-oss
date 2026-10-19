@@ -8,7 +8,7 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { TEMPLATES } from '@/lib/rich-menu-templates'
-import { RichMenuTemplatePreview } from './rich-menu-create-form'
+import { RichMenuTemplatePreview } from './rich-menu-create-model'
 
 // globals: false のため Testing Library の自動 cleanup は登録されない。
 afterEach(async () => {

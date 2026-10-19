@@ -1,4 +1,4 @@
-import { broadcastAbApi as gap2 } from '@/lib/api-gap2'
+import { broadcastAbApi as gap2 } from '@/lib/api/helpers/gap2'
 import type { BroadcastBubble } from '@line-crm/shared'
 
 /* G1 A/B テストの口：組2（gap2）の lib/api-gap2 に合わせる画面側の形（契約 API-CONTRACT-GAP2 §G1）。 */

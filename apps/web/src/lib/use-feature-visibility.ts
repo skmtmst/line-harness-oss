@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { loadFeatureVisibility } from './feature-visibility-cache'
-import type { FeatureKey } from './feature-settings'
+import type { FeatureKey } from './feature-key'
 
 export type FeatureVisibilityStatus = 'idle' | 'loading' | 'ready' | 'error'
 

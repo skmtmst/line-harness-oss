@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { drawFields, stats } from './field-list.test.harness'
+import { drawFields, stats } from './field-list-test-harness'
 import { expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'

@@ -5,7 +5,7 @@ import { forgetStaffIdentity,rememberStaffIdentity } from '@/lib/staff-identity-
 import type { StaffMember } from '@line-crm/shared'
 import { cleanup,fireEvent,render,screen,waitFor,within } from '@testing-library/react'
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
-import RichMenuCreateV8 from '../../rich-menus/new/create-v8'
+import RichMenuCreateV8 from '../../../v8/rich-menus/new/create'
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccount: null, loading: false }) }))
 vi.mock('next/navigation', () => ({

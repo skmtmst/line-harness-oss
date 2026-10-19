@@ -1,5 +1,5 @@
 import { type MessageTemplateDefinition } from '@/lib/hq-templates-api'
-import type { TemplateHostContent } from '@/v8/template-edit/host'
+import type { TemplateHostContent } from '@/v8/template-edit'
 import { type TemplateKind } from '@line-crm/shared'
 
 

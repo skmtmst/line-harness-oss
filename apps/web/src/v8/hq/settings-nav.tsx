@@ -2,7 +2,7 @@
 
 import { SettingsMenu } from '@/components/layout/settings-inner-nav'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import type { ListFolderNav } from '@/components/templates'
+import type { ListFolderNav } from '@/components/templates/index'
 import { Building2, CreditCard, LifeBuoy, Users } from 'lucide-react'
 
 export type HqSettingsNavKey = 'members' | 'info' | 'billing' | 'contact'

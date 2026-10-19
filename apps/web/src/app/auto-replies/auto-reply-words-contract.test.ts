@@ -19,7 +19,7 @@ import {
   responseTypeWord,
   templateWord,
   visibleAutoReplyLoadState,
-} from '@/app/auto-replies/auto-reply-words'
+} from '@/v8/auto-replies/auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')

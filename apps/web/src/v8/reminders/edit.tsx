@@ -28,7 +28,7 @@ import { ApiError,api } from '@/lib/api'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
+import { useDraftAutosave } from '@/v8/autosave'
 import {
 type ReminderDraftSettings,
 type ReminderDraftVersion,
@@ -49,7 +49,7 @@ import { reminderTriggerLabel, renderReminderBodySample } from '@/components/rem
 import { SettingCheckbox } from '@/components/shared/checkbox';
 import Dialog from '@/components/shared/dialog';
 import { emptyValue } from '@/components/shared/empty-value';
-import { CreatePage } from '@/components/templates';
+import { CreatePage } from '@/components/templates/index';
 import { useAccount } from '@/contexts/account-context';
 import { formatNumber } from '@/lib/format';
 import { ArrowRight, Filter, RefreshCw, Users } from 'lucide-react';

@@ -8,7 +8,7 @@ import { ArrowLeftRight, ArrowRight, Pencil, Plus } from 'lucide-react';
 import { api, ApiError, type RichMenuAreaResponse } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { DetailPage } from '@/components/templates';
+import { DetailPage } from '@/components/templates/index';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'

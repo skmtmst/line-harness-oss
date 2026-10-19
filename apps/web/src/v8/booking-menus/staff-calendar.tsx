@@ -27,7 +27,7 @@ import { Field } from '@/components/shared/form-controls'
 import { notifySaved } from '@/components/shared/toast'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { ApiError, type BookingStaff } from '@/lib/api'
-import { bookingCalendarApi } from '@/lib/api-gap1'
+import { bookingCalendarApi } from '@/lib/api/helpers/gap1'
 import type { BookingCalendarSwitch } from '@line-crm/shared'
 import styles from './staff-calendar.module.css'
 

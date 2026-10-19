@@ -6,7 +6,7 @@
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 
-import { readSaveFieldErrors } from '@/lib/api-field-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
 

@@ -7,7 +7,7 @@ import { useResponseGate } from '@/lib/use-response-gate'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { DetailPage } from '@/components/templates'
+import { DetailPage } from '@/components/templates/index'
 import Button from '@/components/shared/button'
 import FormSection from '@/components/shared/form-section'
 import { Field } from '@/components/shared/form-controls'
@@ -17,7 +17,7 @@ import Notice from '@/components/shared/notice'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDay } from '@/lib/format'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { readSaveFieldErrors } from '@/lib/api-field-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 
 
 type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'publishedAt' | 'updatedAt'>

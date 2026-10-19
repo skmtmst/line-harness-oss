@@ -49,7 +49,7 @@ vi.mock('@/lib/api', async () => {
     },
   }
 })
-vi.mock('@/app/booking/prepay-badge-v8', () => ({ default: () => null }))
+vi.mock('@/v8/booking/prepay-badge', () => ({ default: () => null }))
 /* 選ぶ欄は共通 Select（listbox）。ここで見たいのは選んだ後の保存なので、素の select にする。 */
 vi.mock('@/components/shared/select', () => ({
   default: ({ 'aria-label': label, id, value, onChange, options }: {

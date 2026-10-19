@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AreaProperties } from './area-properties'
-import type { Area } from './canvas-editor'
+import type { Area } from './area-types'
 // @vitest-environment happy-dom
 // B-169: メニュー→選ぶ窓→確定。取消では保存値を変えない。
 

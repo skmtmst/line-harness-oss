@@ -17,7 +17,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
 import { restaurantGoogleApi, type GoogleChangeStatus, type GoogleHistoryData, type GoogleHistoryKind, type GoogleHistoryResult } from '@/lib/restaurant-google-api'
 import { errorMessage, formatStampFull } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 
 const STATUS_LABEL: Record<GoogleChangeStatus, { label: string; tone: StatusBadgeTone }> = {

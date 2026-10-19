@@ -2,7 +2,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderPublishStep } from './create-publish-step'
+import { renderPublishStep } from '../../../v8/rich-menus/new/create-publish-step'
 
 type Context = Parameters<typeof renderPublishStep>[0]
 let host: HTMLDivElement

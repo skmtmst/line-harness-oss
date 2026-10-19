@@ -6,7 +6,7 @@ import type { NotificationCenterData, NotificationCenterItem } from '@line-crm/s
 import BellPopover, { type BellFilter, type BellItem, type BellPopoverState } from '@/components/shared/bell-popover'
 import type { TopBarNotificationsPopover } from '@/components/shared/top-bar'
 import { isDashboardNotificationData } from '@/components/dashboard/notification-summary'
-import { notificationDestination, notificationLinkLabel } from '@/v8/notifications/destination'
+import { notificationDestination, notificationLinkLabel } from '@/v8/notifications'
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import { formatRelative } from '@/lib/format'
 import { runOptimistic } from '@/lib/undoable'

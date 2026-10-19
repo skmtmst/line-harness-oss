@@ -14,7 +14,7 @@ import type { Tag, TagGroup } from '@line-crm/shared';
 import { api, type TagDependencies, type TagRetroactivePreview } from '@/lib/api';
 import { formatDay } from '@/lib/format';
 import { StickyBarAction } from '@/components/shared/sticky-bar';
-import { CreatePage } from '@/components/templates';
+import { CreatePage } from '@/components/templates/index';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
 import Button from '@/components/shared/button';
 import Card, { CardHeader } from '@/components/shared/card';
@@ -23,7 +23,7 @@ import HelpTip from '@/components/shared/help-tip';
 import Notice from '@/components/shared/notice';
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
-import { tagNameProblem } from '@/v8/tags/tag-name';
+import { tagNameProblem } from '@/v8/tags'
 import Select from '@/components/shared/select';
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select';
 import { SettingCheckbox } from '@/components/shared/checkbox';

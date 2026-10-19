@@ -1,3 +1,3 @@
 'use client'
 
-export { default } from './users-v8'
+export { default } from '../../v8/users/users'

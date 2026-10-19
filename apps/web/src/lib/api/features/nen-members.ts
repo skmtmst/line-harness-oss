@@ -11,7 +11,7 @@ import type {
   NenPhotoPublicationList,
   PhotoRewardPolicyVersion,
 } from '../types/nen-photos'
-import type { PhotoAssetRun } from '../../api-publication-types'
+import type { PhotoAssetRun } from '../types/publication-types'
 import { fetchApiBlob } from '../transport/download'
 import type { NenFriendOverview } from '../types/nen-campaigns'
 

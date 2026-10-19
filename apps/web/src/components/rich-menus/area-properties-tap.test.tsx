@@ -9,7 +9,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AreaProperties, intentLabelOf } from './area-properties'
 import { isAreaActionConfigured } from './action-drafts'
-import type { Area } from './canvas-editor'
+import type { Area } from './area-types'
 import { HQ_RICH_MENU_INTENTS } from '@/lib/hq-rich-menu-create'
 
 afterEach(cleanup)

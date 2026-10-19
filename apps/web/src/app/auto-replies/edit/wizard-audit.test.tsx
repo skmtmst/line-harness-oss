@@ -11,7 +11,7 @@ vi.mock('@/lib/staff-role', () => ({useStaffRole: () => 'owner', canManageRole: 
 vi.mock('@/components/auto-replies/inline-action-list', () => ({default: () => null, useActionOptions: () => ({tags:[],fields:[],marks:[],scenarios:[],vars:[]})}))
 vi.mock('@/components/shared/select', () => ({ default: ({value,onChange,options,...props}: {value: string; onChange: (value: string) => void; options: Array<{value: string; label: string}>; 'aria-label'?: string}) => <select aria-label={props['aria-label']} value={value} onChange={e=>onChange(e.target.value)}>{options.map((o)=><option key={o.value} value={o.value}>{o.label}</option>)}</select> }))
 vi.mock('@/lib/api', async importOriginal => {const actual = await importOriginal<typeof import('@/lib/api')>(); return {...actual,api:{autoReplies:{getDraft:net.getDraft,get:async()=>({success:true,data:{isActive:net.liveStatus==='published',lifecycleStatus:net.liveStatus}}),list:net.list,conflicts:async()=>({success:true,data:{conflicts:[]}}),validateDraft:net.validateDraft,saveDraft:net.saveDraft,testDraft:net.testDraft,publishDraft:net.publishDraft},templates:{list:async()=>({success:true,data:[]})},folders:{list:async()=>({success:true,data:[]})},friends:{list:async()=>({success:true,data:{items:[{id:'synthetic-friend',displayName:'試験の友だち'}],total:1}})}}}})
-import Page from './wizard-v8'
+import Page from '../../../v8/auto-replies/edit/wizard'
 const DRAFT = {
   autoReplyId: 'synthetic-rule',
   versionId: 'synthetic-version',

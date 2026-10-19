@@ -1,57 +1,31 @@
 'use client'
+import type { WizardStep, Props, Pair, SummaryData } from './wizard-types'
+export type { WizardStep, Props, Pair, SummaryData } from './wizard-types'
 
 import { Steps } from '@/components/templates/steps'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog,{ DialogActions } from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Link from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
-import RadioCard,{ RadioCardGroup } from '@/components/shared/radio-card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import EntitySelect from '@/components/shared/entity-select'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
-import { type StarterSetItem } from '@/lib/api-styles'
-import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
-import { ArrowRight,Hourglass,Info,Play } from 'lucide-react'
+
+import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
+import { ArrowRight, Hourglass, Info, Play } from 'lucide-react'
 import { SetupIcon } from './icons'
-import {
-LOOK_CHOICES,
-STYLE_CHOICES,
-choiceLabel,
-styleLabel,
-type StarterItemState,type StyleState
-} from './model'
+import { LOOK_CHOICES, STYLE_CHOICES, choiceLabel, styleLabel } from './model'
 import { SampleMenuTiles } from './sample-menu'
 import { useWizard } from './use-wizard'
 import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
 import { useStarterMenu } from './use-starter-menu'
 import SetupLinks from './setup-links'
-
-
-
-/*
- * はじめの質問（★V8 修正案の列 VHp7p：xxpM9 スタイル選び・RZW83 見た目・lS1Gh/rJ36f 1問の画面・
- * oKSsG 最後の［まとめて動かす］。決まり B-311・B-313）。動きは BEHAVIOR.md。
- *
- * 窓の幅は V8 の 4 段の 960（xxpM9 の絵は 880 → 絵を直す）。
- */
-
-export type WizardStep = number | 'summary'
-
-export type Props = {
-  accountId: string
-  state: StyleState
-  /** 開く手順（0＝スタイル、1＝見た目、2〜＝質問、'summary'＝最後の一覧）。 */
-  initialStep?: WizardStep
-  onClose: (changed: boolean) => void
-}
-
-export type Pair = { item: StarterSetItem; state: StarterItemState }
-export type SummaryData = { inserted: Pair[]; activation: Pair[] }
 
 /*
  * B-335 (1)：スタイルを変えると、ダッシュボードが数える予約が変わる（前の予約は消えないが、出なくなる）。
@@ -60,7 +34,6 @@ export type SummaryData = { inserted: Pair[]; activation: Pair[] }
 const BOOKING_PLACE: Record<AccountStyle, string> = {
   restaurant: '予約台帳', salon: '予約管理', consult: '予約管理', lesson: 'イベント予約', ec: '予約管理', standard: '予約管理',
 }
-
 
 export default function StyleSetupWizard({ accountId, state, initialStep = 0, onClose }: Props) {
   const { style, answers, step, setStep, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, close, activate } = useWizard({ accountId, state, initialStep, onClose })

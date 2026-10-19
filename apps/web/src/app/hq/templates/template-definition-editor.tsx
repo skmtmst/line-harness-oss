@@ -7,8 +7,9 @@ import { parseHqMessageCard, type HqMessageCard, type HqMessageReference } from 
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import { decodeImageSize } from './image-size'
 import { freshDefinition, withUploadedImage, withMessageCard } from '@/lib/hq-template-authoring'
-import RichMenuCreateForm, { freshRichMenuCreateValue, type RichMenuOption } from '@/components/rich-menus/rich-menu-create-form'
-import HqTagEditorV8 from '@/v8/hq-templates/tag-editor'
+import RichMenuCreateForm from '@/components/rich-menus/rich-menu-create-form'
+import { freshRichMenuCreateValue, type RichMenuOption } from '../../../components/rich-menus/rich-menu-create-model'
+import { HqTagEditorV8 } from '@/v8/hq-templates'
 import HqFormDefinitionEditor from '@/components/forms/hq-form-definition-editor'
 import type { FormRefs } from '@/components/forms/form-refs'
 import {
@@ -17,10 +18,8 @@ import {
   richMenuCreateValueToHqDefinition,
 } from '@/lib/hq-rich-menu-create'
 export { freshDefinition } from '@/lib/hq-template-authoring'
-import {
-  EMPTY_TEMPLATE_REFERENCES,
-  MessageTemplateEditor,
-} from '@/components/templates/message-template-editor'
+import { MessageTemplateEditor } from '@/components/templates/message-template-editor'
+import { EMPTY_TEMPLATE_REFERENCES } from '../../../components/templates/template-preview-model'
 import type {
   FormDefinition,
   MessageTemplateDefinition,

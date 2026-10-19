@@ -6,8 +6,8 @@ import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { canManageRole } from '@/lib/staff-role'
 import styles from './first-steps.module.css'
 
-import { useFirstRun } from '@/v8/onboarding/use-first-run'
-import { doneCount, type StepResult } from '@/v8/settings/getting-started/steps'
+import { useFirstRun } from '@/v8/onboarding'
+import { doneCount, type StepResult } from '@/v8/settings'
 
 export type FirstStepsSummary = {
   steps: Array<{ key: string; label: string; href: string | null; link: string; done: boolean; state: StepResult['state'] }>

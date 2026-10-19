@@ -9,7 +9,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen } from '@testing-library/react'
-import WizardV8 from './wizard-v8'
+import WizardV8 from '../../../v8/auto-replies/edit/wizard'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AutoReplyEditPage from './page'
 

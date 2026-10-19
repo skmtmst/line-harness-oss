@@ -124,7 +124,7 @@ const type = async (el: HTMLInputElement, value: string) => {
   })
 }
 
-vi.mock('@/lib/api-gap1', () => ({ lineSenderApi: { list: async () => ({ success: true, data: [] }), create: vi.fn(), update: vi.fn(), deactivate: vi.fn() } }))
+vi.mock('@/lib/api/helpers/gap1', () => ({ lineSenderApi: { list: async () => ({ success: true, data: [] }), create: vi.fn(), update: vi.fn(), deactivate: vi.fn() } }))
 
 describe('LINEアカウントの詳細（V8 ihjfd）', () => {
   it.each([

@@ -18,7 +18,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { restaurantGoogleApi, type GooglePhoto, type GoogleProfileData, type GoogleProfileProposal } from '@/lib/restaurant-google-api'
 import { errorMessage } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 

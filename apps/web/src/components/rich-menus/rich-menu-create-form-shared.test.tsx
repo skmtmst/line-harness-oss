@@ -10,9 +10,8 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import RichMenuCreateForm, { freshRichMenuCreateValue } from './rich-menu-create-form'
-
-;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+import RichMenuCreateForm from './rich-menu-create-form'
+import { freshRichMenuCreateValue } from './rich-menu-create-model'(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 let host: HTMLDivElement
 let root: Root

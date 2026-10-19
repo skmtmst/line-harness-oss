@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isTwoFactorChallengeGone, twoFactorFailureMessage } from './two-factor-error'
+import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '../../../v8/login/two-factor/two-factor-error'
 
 /**
  * R506: 二段階認証の失敗文。通信断の技術文言や予期しない本文を

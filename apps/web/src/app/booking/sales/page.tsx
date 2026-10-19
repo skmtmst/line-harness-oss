@@ -12,7 +12,7 @@ import {
   type BookingSalesSummaryMenu,
 } from '@/lib/api'
 import { formatNumber, formatYen } from '@/lib/format'
-import styles from './sales-v8.module.css'
+import styles from '../../../v8/booking/sales/sales.module.css'
 import {
   formatCountDelta,
   formatPointDelta,

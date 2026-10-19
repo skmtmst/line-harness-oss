@@ -18,7 +18,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { CircleDot, Clock3, Inbox, MessageCircle, Minus, Plus, Undo2 } from 'lucide-react'
-import { DetailPage } from '@/components/templates'
+import { DetailPage } from '@/components/templates/index'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
