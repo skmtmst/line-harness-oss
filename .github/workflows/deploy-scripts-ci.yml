@@ -35,18 +35,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # `@line-crm/shared` の入口 (package.json の main / exports) は dist を
-      # 指している。`test:scripts` が読む scripts/verify-staging-operational-path.ts
-      # は packages/db/src 経由で shared を読むので、dist が無いと vite が入口を
-      # 解決できず、**試験を1件も走らせないまま**読み込みの段階で落ちる。
-      #
-      # PR は required-pr-gate.yml の `repository-checks` が install の直後に
-      # 同じ build を置いているため緑になる。本流に入ってから走るこの workflow
-      # だけが落ちていた (#714。2026-09-10 に6回連続で failure)。
-      #
-      # build するのは shared だけでよい。db や line-sdk まで足さなくても
-      # `test:scripts` が緑になること、後段の typecheck は dist 無しでも通ることを、
-      # dist を消した状態で実際に走らせて確かめている。
+      # scriptsの運用経路検査はDB経由でsharedのdistを読む。
+      # 空の作業ツリーでも試験を収集できるよう、先にsharedだけをbuildする。
       - name: Build the shared package
         run: pnpm --filter @line-crm/shared build
 
@@ -56,14 +46,7 @@ jobs:
         run: pnpm test:scripts
 
       - name: TypeScript typecheck (scripts)
-        # The root workspace intentionally has no @types/node: adding one
-        # rewrites unrelated pnpm-lock entries, because the committed lockfile
-        # was produced by a newer pnpm than `packageManager` pins. Installing
-        # the types into a throwaway prefix keeps the repository untouched.
-        run: |
-          npm install --no-save --prefix "$RUNNER_TEMP/typedeps" @types/node@22
-          pnpm exec tsc -p scripts/tsconfig.json \
-            --typeRoots "$RUNNER_TEMP/typedeps/node_modules/@types"
+        run: pnpm typecheck:scripts
 
       - name: Shell syntax check
         run: |
