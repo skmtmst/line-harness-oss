@@ -7,7 +7,7 @@
 配る結果の板 `dEvJM` は API 待ち（Codex）。今は同じ画面の進み具合の段で結果を出す。
 
 ## 入口
-- `app/hq/templates/page.tsx` が V8 のときだけこの画面を出す（v7 は今までの `HqTemplatePage`）。
+- `app/hq/templates/page.tsx` が V8専用でこの画面を出す。
 - タグ・リッチメニュー・回答フォーム・シナリオのひな形の中身は、入口が今の編集部品（`TemplateDefinitionEditor`）を `DefinitionEditor` として渡す（src/v8 は @/app を読まない）。
 
 ## 受け付ける URL と指定

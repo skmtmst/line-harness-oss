@@ -2,7 +2,7 @@
 
 # 承認ワークフロー（V8）の動き
 
-入口：`app/restaurant-test/approvals/page.tsx`（`data-theme="v8"` のとき V8、それ以外は今の画面）。絵：`t8WgD8`、閲覧のみ `n4DT7`、差し戻す理由の小窓 `n4j0Rm`。
+入口：`app/restaurant-test/approvals/page.tsx`（`data-theme="v8"` のとき V8）。絵：`t8WgD8`、閲覧のみ `n4DT7`、差し戻す理由の小窓 `n4j0Rm`。
 
 ## 受け付ける URL と指定
 - `/restaurant-test/approvals`：指定なし。店舗は上の「店舗を選ぶ」（既定はすべての店舗）。

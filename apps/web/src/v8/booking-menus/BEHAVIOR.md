@@ -2,7 +2,7 @@
 
 # 予約設定（V8）の動き
 
-入口（V8 のときだけ新しい画面。v7 はそのまま）：
+入口（V8専用）：
 - `app/booking/menus/page.tsx` → `src/v8/booking-menus/settings.tsx`（5タブ＋予約経路、右にお客さまの予約画面の写し）
 - `app/booking/menus/new/page.tsx` → `src/v8/booking-menus/menu-form.tsx`（作る・直す・競合）
 - `app/booking/menus/staff/page.tsx` → `src/v8/booking-menus/assign.tsx`（担当メニューをまとめて決める）
