@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { withDisplayReadCache } from './display-read-cache.js';
 import { type DashboardPeriod, type AccountStatsScope, type DashboardOverview, type DashboardSectionStatus, type DashboardMetricState, type DashboardMetricReason } from './dashboard-types.js';
@@ -163,7 +164,7 @@ async function dashboardOverview(
     safe('operations', operationsPromise, emptyOperations),
   ]);
 
-  const generatedAt = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+  const generatedAt = japanCalendar().toISOString().replace('Z', '+09:00');
   const trend = trendResult.points;
   if (trendResult.asOf) sourceAsOf.set('trend', trendResult.asOf);
   const status = (

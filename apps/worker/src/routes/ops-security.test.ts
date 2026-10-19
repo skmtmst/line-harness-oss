@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { activatePlatformAdminIfAwaitingTotp } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
@@ -382,4 +382,17 @@ describe('一覧の集計（監査 R153）', () => {
     // 請求解約・課金対象外・トライアルは含めない。
     expect(body.summary).toEqual({ active: 2, trialing: 1, suspended: 0, pastDue: 1 });
   });
+});
+
+
+afterEach(() => vi.useRealTimers());
+it.each(['2026-09-30T15:00:00Z', '2026-09-30T23:59:59Z'])('日本時間の月初に前月の代理ログインを今月へ含めない: %s', async (at) => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(at));
+  for (const [id, started] of [['prev', '2026-09-30T23:59:59.000+09:00'], ['current', '2026-10-01T00:00:00.000+09:00']]) {
+    testDb.raw.prepare("INSERT INTO impersonation_sessions(id,staff_id,tenant_id,mode,started_at,ended_at) VALUES(?,'master-1','tenant-a','read',?,?)").run(id, started, started);
+  }
+  const res = await app(master).request('/api/ops/members', {}, environment());
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ summary: { impersonationsThisMonth: 1 } });
 });

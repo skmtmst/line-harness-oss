@@ -1,3 +1,4 @@
+import { jstMonthStart as japanMonthStart } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import type { TenantStatus, TenantListRow } from './ops-tenant-types.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
@@ -407,10 +408,7 @@ ops.get('/api/ops/audit', async (c) => {
 ops.get('/api/ops/members', async (c) => {
   const db = dbFor(c.env);
   const members = await listPlatformAdminMembers(db);
-  const since = new Date();
-  since.setDate(1);
-  since.setHours(0, 0, 0, 0);
-  const monthly = await countImpersonationsSince(db, since.toISOString().slice(0, 10));
+  const monthly = await countImpersonationsSince(db, japanMonthStart());
   return c.json({
     success: true,
     data: members.map((m) => ({

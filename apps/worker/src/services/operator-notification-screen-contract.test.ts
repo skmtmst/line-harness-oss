@@ -33,7 +33,7 @@ import { listOperatorEventTypes } from './operator-notification-registry.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCREEN_OPTIONS_FILE = join(
   HERE, '..', '..', '..', '..',
-  'apps', 'web', 'src', 'app', 'line-notifications', 'operator-event-options.ts',
+  'apps', 'web', 'src', 'v8', 'line-notifications', 'operator-event-options.ts',
 );
 
 /**

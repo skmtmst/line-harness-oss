@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
 import PaymentPreparingNote from '../components/payment-preparing-note.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
@@ -60,7 +61,7 @@ function ymd(iso: string | null): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  const jst = new Date(d.getTime() + 9 * 3600_000);
+  const jst = japanCalendar(d);
   return `${jst.getUTCFullYear()}/${jst.getUTCMonth() + 1}/${jst.getUTCDate()}`;
 }
 

@@ -1,3 +1,4 @@
+import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { type DashboardFreshness, type DashboardOverview, type DashboardPeriod } from './dashboard-types.js';
 
 
@@ -79,8 +80,7 @@ export function summarizeDashboardFreshness(
 
 /** JST の「いまの日付」。D1 は UTC なので、日付の境目を跨ぐ集計は必ずずれる。 */
 export function jstDate(offsetDays = 0): string {
-  const now = new Date(Date.now() + 9 * 60 * 60 * 1000 + offsetDays * 24 * 60 * 60 * 1000);
-  return now.toISOString().slice(0, 10);
+  return japanDateOffset(offsetDays);
 }
 
 export function nextDate(day: string): string {

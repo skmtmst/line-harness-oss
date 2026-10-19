@@ -1,4 +1,4 @@
-import { formatYen } from '@line-crm/shared';
+import { formatYen, jstCalendar as japanCalendar } from '@line-crm/shared';
 import PaymentPreparingNote from './payment-preparing-note.js';
 import { useVisiblePolling } from '../lib/use-visible-polling.js';
 import { CUSTOMER_WORDS, PAYMENT_UNKNOWN } from '../lib/customer-words.js';
@@ -293,6 +293,6 @@ function PaymentCard({
 function formatHoldUntil(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  const jst = new Date(date.getTime() + 9 * 3600_000);
+  const jst = japanCalendar(date);
   return `${jst.getUTCMonth() + 1}月${jst.getUTCDate()}日 ${String(jst.getUTCHours()).padStart(2, '0')}:${String(jst.getUTCMinutes()).padStart(2, '0')}`;
 }

@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type MakeupCredit, type MakeupOption } from '../lib/api.js';
 import { addDays, formatMd, formatWeekday, jstToday, utcToJstHm } from '../lib/datetime.js';
@@ -9,7 +10,7 @@ import Icon from './ui/icon.js';
 import { mdHm } from './absence-sheet.js';
 import StatusView from './ui/status-view.js';
 
-const jstDate = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3_600_000).toISOString().slice(0, 10);
+const jstDate = (iso: string) => japanDate(new Date(iso));
 const mondayOf = (date: string) => { const d = new Date(`${date}T00:00:00Z`); return addDays(date, -((d.getUTCDay() + 6) % 7)); };
 
 /**

@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -31,7 +32,7 @@ const adCosts = new Hono<Env>();
 const DEFAULT_RANGE_DAYS = 30;
 
 function jstDay(date: Date): string {
-  return new Date(date.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
+  return japanDate(date);
 }
 
 /** accountId 省略時は可視アカウントが1つのときだけ補う。 */

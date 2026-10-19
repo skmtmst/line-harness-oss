@@ -1,3 +1,4 @@
+import { jstCalendar } from '@line-crm/shared';
 import { accountFeatureOffExclusionSql } from './account-settings.js';
 
 /**
@@ -19,7 +20,8 @@ const TERMINAL_RUN_STATUSES = ['success', 'partial', 'failed', 'cancelled', 'ski
 const PURGE_BATCH_SIZE = 1000;
 
 function monthCutoffDay(now: Date, months: number): string {
-  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, now.getUTCDate()));
+  const calendar = jstCalendar(now);
+  const date = new Date(Date.UTC(calendar.getUTCFullYear(), calendar.getUTCMonth() - months, calendar.getUTCDate()));
   return date.toISOString().slice(0, 10);
 }
 

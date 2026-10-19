@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import type { ConversionApprovalItem } from '@/lib/api'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 
@@ -27,7 +28,7 @@ export type ConfirmedState = 'loading' | 'ready' | 'error'
 export function jstMonthKey(at: string | number = Date.now()): string {
   const ms = typeof at === 'number' ? at : new Date(at).getTime()
   if (!Number.isFinite(ms)) return ''
-  return new Date(ms + 9 * 3600_000).toISOString().slice(0, 7)
+  return japanCalendar(new Date(ms)).toISOString().slice(0, 7)
 }
 
 /** 今月に発生し、承認まで済んだ成果だけを残す。 */

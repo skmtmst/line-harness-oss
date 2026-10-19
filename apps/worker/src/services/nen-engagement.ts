@@ -1,4 +1,4 @@
-import { formatYen } from '@line-crm/shared';
+import { formatYen, jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { currentOrderState, orderNumberFromPayload } from './nen-order-state.js';
 import { EXTERNAL_DELIVERY_MAX_ATTEMPTS as MAX_DELIVERY_ATTEMPTS } from './external-delivery-retry.js';
@@ -198,7 +198,7 @@ function sqliteDate(date: Date): string {
 
 function scheduledAfter(occurredAt: string, days: number, deliveryTime: string): string {
   const base = new Date(occurredAt);
-  const jst = new Date(base.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(base);
   const [hour, minute] = deliveryTime.split(':').map(Number);
   jst.setUTCDate(jst.getUTCDate() + days);
   jst.setUTCHours(Number.isFinite(hour) ? hour : 10, Number.isFinite(minute) ? minute : 0, 0, 0);
@@ -828,7 +828,7 @@ export function birthdayDeliveryTarget(now: Date): {
   monthDay: string;
   deliveryAt: Date;
 } {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(now);
   const targetBirthday = new Date(Date.UTC(
     jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() + 3,
   ));

@@ -1,5 +1,6 @@
 'use client'
 import { formatYen } from '@line-crm/shared';
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import PageSizeSelect, { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -98,7 +99,7 @@ export function monthKeyOf(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
-  return new Date(d.getTime() + 9 * 60 * 60_000).toISOString().slice(0, 7)
+  return japanCalendar(d).toISOString().slice(0, 7)
 }
 
 function InflowDetailContent() {
@@ -328,7 +329,7 @@ function InflowDetailContent() {
     return Math.round((funnel.friend_add_count / funnel.click_count) * 1000) / 10
   }, [funnel])
 
-  const nowDate = new Date(Date.now() + 9 * 60 * 60_000)
+  const nowDate = japanCalendar()
   const thisMonthKey = nowDate.toISOString().slice(0, 7)
   const lastMonthKey = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth() - 1, 1)).toISOString().slice(0, 7)
   const isBlockedFriend = (friend: AttributedFriend) => (friend.currentStatus ?? '').includes('ブロック')

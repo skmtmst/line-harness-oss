@@ -1,4 +1,4 @@
-import { formatYen as yen, yenPercent } from '@line-crm/shared';
+import { formatYen as yen, yenPercent, jstCalendar as japanCalendar } from '@line-crm/shared';
 import type { BookingCancellationPreview } from '../lib/api.js';
 import { ChoiceInput } from './forms/controls.js';
 
@@ -12,7 +12,7 @@ const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土'];
 
 /** 「11/19（木）14:00」。日本時間で出す。 */
 export function jpDeadline(iso: string): string {
-  const d = new Date(new Date(iso).getTime() + 9 * 60 * 60 * 1000);
+  const d = japanCalendar(new Date(iso));
   const hh = String(d.getUTCHours()).padStart(2, '0');
   const mm = String(d.getUTCMinutes()).padStart(2, '0');
   return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEKDAY[d.getUTCDay()]}）${hh}:${mm}`;
