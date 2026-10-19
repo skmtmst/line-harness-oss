@@ -3,7 +3,7 @@
 import { BarChart, BarChartEventMark, BarChartLegend, toBarChartItems } from '@/components/shared/bar-chart'
 
 /*
- * ★V8 分析「友だちの増減」（Pencil `ws9wt`・1152 `eEhYU`・閲覧のみ `L4Uov`）。
+ * ★V8 分析「友だちの増減」（Pencil ・1152 ・閲覧のみ ）。
  * 数の帯（4つ）→ 左に日ごとの増減の棒、右に「どこから増えたか」「減った友だち」。
  * 1152 では棒が全幅になり、右の2枚はその下に横並び。
  * 呼ぶ口・数の出し方は今の画面（app/analytics/page.tsx の FriendsOverviewTab）と同じ。

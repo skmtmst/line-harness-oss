@@ -15,7 +15,7 @@ const apiFolders = vi.hoisted(() => ({
   delete: vi.fn(),
   swapOrder: vi.fn(),
 }))
-// V8 の名前変更は型付き口 `api.forms.update` を使う（V7 の生 PUT と違う）。
+// V8 の名前変更は型付き口 `api.forms.update` を使う（管理画面 の生 PUT と違う）。
 const formsUpdate = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {

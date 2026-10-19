@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /**
- * ★V8 のフォルダの列：「…」の場所を取るのは選んでいる行だけ（絵 uE9gf・apLqS・I1E7Bt・v19Ivv）。
+ * ★V8 のフォルダの列：「…」の場所を取るのは選んでいる行だけ。
  * 全部の行が 14px＋間 8px を取ると、選んでいない行の件数が 22〜26px 左にずれる。
  * 選んでいない行でも、乗せたとき・キーボードで中へ入ったときは場所を取って出す（押せなくはしない）。
  */

@@ -17,7 +17,7 @@ describe('V6 LINE通知（festr）', () => {
     }).find((kpi) => kpi.label === '送れなかった')!
     expect(failed.href).toBe('/line-notifications?tab=failures')
     expect(canOpenCustomerNotificationKpi(failed)).toBe(true)
-    // 板 g3iDs：共通の数カードの行き先として付ける。
+    // 板 ：共通の数カードの行き先として付ける。
     expect(PAGE).toContain('見る')
     expect(PAGE).toContain("action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '見る', href: kpi.href } : undefined}")
   })
@@ -43,7 +43,7 @@ describe('V6 LINE通知（festr）', () => {
     })
     expect(unavailable.every((kpi) => kpi.value === null)).toBe(true)
     expect(unavailable.some(canOpenCustomerNotificationKpi)).toBe(false)
-    // 板 g3iDs：数カードは共通部品（取れないときは「—」）を使う。
+    // 板 ：数カードは共通部品（取れないときは「—」）を使う。
     expect(PAGE).toContain('<KpiCard')
   })
 
@@ -52,7 +52,7 @@ describe('V6 LINE通知（festr）', () => {
       ready: true, sentToday: 0, sentLast30d: 0, sentBreakdown: '', failed: 0,
       quota: { state: 'available', total: 500, used: 0, remaining: 500, asOf: '2026-09-15T00:00:00Z' },
     })
-    // 板 g3iDs：送信枠は「使った / 全体」の1枚。
+    // 板 ：送信枠は「使った / 全体」の1枚。
     expect(ready.find((kpi) => kpi.label === '今月の送信枠')?.valueText).toBe('0 / 500')
   })
 

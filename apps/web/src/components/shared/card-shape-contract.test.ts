@@ -10,7 +10,7 @@ const tokens = globalTokens(read(resolve(SRC, 'app/globals.css')))
 type Candidate = { file: string; selector: string }
 const key = ({ file, selector }: Candidate) => `${file} ${selector}`
 
-// B-168: ファイル全体・名前のパターンでは免除しない。該当する規則だけ。
+// : ファイル全体・名前のパターンでは免除しない。該当する規則だけ。
 // 新しい箱はここを足さず、共通の Card / content-card の形を使う。
 const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/combobox.module.css", ".popup", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
@@ -65,7 +65,7 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/scenarios/results.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/settings/accounts/accounts.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/templates/question-new.module.css", ".choice", "入力欄・補助操作・選択肢。中身のカードではない。"],
-  ["app/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
+  ["v8/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-approval.tsx", "className=\"bg-warning-bg rounded-card border-hairline border p-5\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-form-model.tsx", "className=\"border-hairline mt-4 rounded-card border bg-canvas p-5\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["components/broadcasts/broadcast-form.tsx", "className=\"rounded-card border border-hairline bg-canvas p-8 text-center\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],

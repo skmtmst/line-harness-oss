@@ -21,7 +21,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import EventForm from '@/v8/events/edit-form'
 import { useBookingRequests } from './booking-requests'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { PaymentSideCard } from '../booking-payments/menu-payment'
+import { PaymentSideCard } from '@/v8/booking-payments/public/menu-payment/index'
 import styles from './edit.module.css'
 
 

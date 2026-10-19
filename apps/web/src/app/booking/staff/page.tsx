@@ -66,7 +66,7 @@ function StaffTableSkeleton() {
 export default function BookingStaffPage() {
   usePageTitle('予約設定')
   const { selectedAccountId } = useAccount()
-  /* V8 のときだけ骨組み・保存中表示へ。v7 は従来の見た目のまま。 */
+  /* V8 のときだけ骨組み・保存中表示へ。互換経路は従来の見た目のまま。 */
   const [items, setItems] = useState<BookingStaff[]>([])
   const [editing, setEditing] = useState<Partial<BookingStaff> | null>(null)
   const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
@@ -129,7 +129,7 @@ export default function BookingStaffPage() {
 
   /**
    * 消す前に、**何が消えて何が残るかを本文で読ませる。**
-   * ブラウザの `confirm()` は見た目がブラウザ任せで、設計の確認窓と違ううえ、
+   * ブラウザの `confirm` は見た目がブラウザ任せで、設計の確認窓と違ううえ、
    * 画像比較にも写らない（確認の絵をそもそも撮れない）。
    */
   async function remove(id: string) {

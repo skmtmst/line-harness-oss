@@ -3,13 +3,13 @@ import { statusTone } from './booking-status-tone'
 
 import ReservationBoard, { ReservationLegend } from '@/components/shared/reservation-board'
 
-import PeopleDayList from '@/v8/booking-bookings/day-list'
+import { PeopleDayList } from '@/v8/booking-bookings/public/day-list/index'
 
-import PeopleDayFrame from '@/v8/booking-bookings/day-frame'
+import { PeopleDayFrame } from '@/v8/booking-bookings/public/day-frame/index'
 
 import { peopleBoardEntry } from '@line-crm/shared'
 
-import { reservationBoardApi, allBoardPages } from '@/lib/api-reservation-board'
+import { reservationBoardApi, allBoardPages } from '@/lib/api/helpers/reservation-board'
 
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
@@ -31,9 +31,9 @@ import { bookingApi, type BookingAdminDetail, type BookingRequest } from '@/lib/
 
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 
-import BookingGapSections from '@/v8/booking-gap/booking-gap-sections'
+import { BookingGapSections } from '@/v8/booking-gap/public/booking-gap-sections/index'
 
-import SeriesHost from '@/v8/booking-gap/series-host'
+import { SeriesHost } from '@/v8/booking-gap/public/series-host/index'
 
 import Button from '@/components/shared/button'
 
@@ -45,11 +45,11 @@ import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 
 import Notice from '@/components/shared/notice'
 
-import BookingLedgerFrame from '@/v8/booking-bookings/ledger-frame'
+import { BookingLedgerFrame } from '@/v8/booking-bookings/public/ledger-frame/index'
 
-import BookingLedgerBody from '@/v8/booking-bookings/ledger-body'
+import { BookingLedgerBody } from '@/v8/booking-bookings/public/ledger-body/index'
 
-import { monthKey, monthLabel } from '@/v8/booking-bookings/month-navigation'
+import { monthKey, monthLabel } from '@/v8/booking-bookings/public/month-navigation/index'
 
 import FilterChip from '@/components/shared/filter-chip'
 
@@ -59,7 +59,7 @@ import StatusBadge from '@/components/shared/status-badge'
 
 import { RowMenu } from '@/components/shared/row-actions'
 
-import { BookingChipsLabel, BookingMonthBar, BookingUrlCopy } from '@/v8/booking-bookings/month-bar'
+import { BookingChipsLabel, BookingMonthBar, BookingUrlCopy } from '@/v8/booking-bookings/public/month-bar/index'
 
 import ledgerStyles from '@/v8/booking-bookings/month-bar.module.css'
 
@@ -77,9 +77,9 @@ import DetailPanel from '@/components/shared/detail-panel'
 
 import ContextMenu from '@/components/shared/context-menu'
 
-import BookingDetailV8 from './booking-detail-v8'
+import BookingDetailV8 from './booking-detail'
 
-import { BookingChargesSection } from '@/v8/booking-payments/booking-charges'
+import { BookingChargesSection } from '@/v8/booking-payments/public/booking-charges/index'
 
 import { isLineBooking, moveDay } from './booking-calendar'
 
@@ -89,8 +89,8 @@ import { DetailRow, ActionButtons } from "./page-gap-parts"
 
 import { STATUS_TABS, SOURCE_FILTERS, statusBadgeColor, sourceLabel, formatLedgerDateTime, statusLabel, actionLabel, PAGE_SIZE, formatJpDateTime, formatJpTime, formatJpDay, jstDay } from './ledger-model'
 
-import type { BookingLedgerModel } from './page'
-import { bookingWords } from '@/v8/booking-bookings/words'
+import type { BookingLedgerModel } from './use-booking-ledger'
+import { bookingWords } from '@/v8/booking-bookings/public/words/index'
 
 export default function BookingLedgerScreen({ model }: { model: BookingLedgerModel }) {
   if (model.selectedAccountId && model.styleProfile && !model.styleProfile.data) return <BookingLedgerFrame view={model.view}>
@@ -208,8 +208,8 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
     <>
       {detail && ((
         /*
-         * ★V8-B 予約の詳細（`AjZhH`）。v7 の引き出しは残し、
-         * `data-theme="v8"` のときだけ小窓にする。
+         * ★V8-B 予約の詳細（`AjZhH`）。管理画面 の引き出しは残し、
+         * V8 の表示 のときだけ小窓にする。
          */
         <BookingDetailV8
           usageStyle={usageStyle}
@@ -459,7 +459,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               <ListState kind="loading" title="予約を読み込んでいます" />
             </div>
           ) : error ? (
-            // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+            // ★管理画面 `x63W5x`：失敗を「まだありません」と言わない。
             // 空の案内と作成ボタンは出さない。
             <div className="bg-canvas rounded-card border-hairline border">
               <ListState

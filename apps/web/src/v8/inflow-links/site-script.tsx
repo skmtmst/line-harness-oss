@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   siteDialog_label: requiredText("サイトの名前を入力してください"),
 }
 
@@ -38,7 +38,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 サイトスクリプト（Pencil `XjOte`）。
+ * ★V8 サイトスクリプト（Pencil ）。
  *
  * 頭（戻る・題・説明・右下に「貼りかたが分からないときは」）→ 成果を数えるサイトの表（板いっぱい）→
  * 左の列（サイトに貼るコード・計測を許可するドメイン・閲覧の記録への同意）と右の列（いま届いているか・
@@ -46,7 +46,7 @@ import Notice from '@/components/shared/notice'
  *
  * 呼ぶ口・権限・失敗の扱いは今のサイトスクリプト（components/inflow-links/site-script-v8.tsx）と同じ
  * （BEHAVIOR.md の「サイトスクリプト」）。違うのは見せ方だけ：
- * - 行の「…」を押すと、そのサイトの「編集・止める・再開する」を共通メニューで開く（B-202）
+ * - 行の「…」を押すと、そのサイトの「編集・止める・再開する」を共通メニューで開く
  * - 「貼りかたが分からないときは」は窓で開く（今は右の列のいちばん下の段）
  * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」を出さない
  */
@@ -189,7 +189,7 @@ export default function SiteScriptV8() {
   const saveSite = async () => {
     if (!siteDialog) return
     const errors: Record<string, string> = {}
-    if ((b244Requirements.siteDialog_label.check(siteDialog.label) !== null)) errors['site-name'] = 'サイトの名前を入力してください'
+    if ((FIELD_REQUIREMENTS.siteDialog_label.check(siteDialog.label) !== null)) errors['site-name'] = 'サイトの名前を入力してください'
     if (!parseDomains(siteDialog.domainsText).length) errors['site-domains'] = '計測を許可するドメインを入力してください'
     setSiteFieldErrors(errors)
     setSiteDialog({ ...siteDialog, error: null })
@@ -503,7 +503,7 @@ export default function SiteScriptV8() {
       >
         {siteDialog ? (
           <div className={styles.dialogFields}>
-            <Field label="サイトの名前" requirement={b244Requirements.siteDialog_label}><SaveErrorField names={["label","siteDialog.label","site_dialog.label","site_dialog"]}><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例：公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} /></SaveErrorField>
+            <Field label="サイトの名前" requirement={FIELD_REQUIREMENTS.siteDialog_label}><SaveErrorField names={["label","siteDialog.label","site_dialog.label","site_dialog"]}><TextField id="site-name" aria-invalid={Boolean(siteFieldErrors['site-name'])} aria-describedby={siteFieldErrors['site-name'] ? 'site-name-error' : undefined} value={siteDialog.label} maxLength={100} placeholder="例：公式ショップ" onChange={(e) => { setSiteDialog({ ...siteDialog, label: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-name': '' })) }} /></SaveErrorField>
 {siteFieldErrors['site-name'] ? <span id="site-name-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-name']}</span> : null}</Field>
             <Field label="計測を許可するドメイン"><SaveErrorField names={["domainsText","siteDialog.domainsText","domains_text","site_dialog.domains_text","site_dialog"]}><TextArea id="site-domains" aria-invalid={Boolean(siteFieldErrors['site-domains'])} aria-describedby={siteFieldErrors['site-domains'] ? 'site-domains-error' : undefined} rows={4} value={siteDialog.domainsText} placeholder={'example.com\nshop.example.com'} onChange={(e) => { setSiteDialog({ ...siteDialog, domainsText: e.target.value }); setSiteFieldErrors((old) => ({ ...old, 'site-domains': '' })) }} /></SaveErrorField>
 {siteFieldErrors['site-domains'] ? <span id="site-domains-error" className={styles.fieldError} role="alert">{siteFieldErrors['site-domains']}</span> : null}</Field>

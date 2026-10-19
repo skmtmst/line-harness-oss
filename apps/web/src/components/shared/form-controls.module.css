@@ -32,7 +32,7 @@
   line-height: 1.4;
 }
 
-/* 「任意」の札（Td4TN：11px・行17・薄い灰・左に6。丸い地なし）。 */
+/* 「任意」の札（：11px・行17・薄い灰・左に6。丸い地なし）。 */
 .optional {
   display: inline-flex;
   flex-shrink: 0;
@@ -43,8 +43,8 @@
 
 /*
  * 入力欄そのものの見た目は text-field.module.css（正本）が持つ。
- * ここの TextInput・TextArea は正本の包みで、v7 のときだけ元の見た目の差を足す
- * （v7 は本番で動いているので変えない）。v8 では正本と同じ物になる。
+ * ここの TextInput・TextArea は正本の包みで、互換経路のときだけ元の見た目の差を足す
+ * （互換経路は本番で動いているので変えない）。v8 では正本と同じ物になる。
  */
 
 /* 「？」の中の「くわしく」。キーボードで来たときに輪郭を出す。 */
@@ -91,7 +91,7 @@
   font-size: var(--text-label);
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .field { display: flex; flex-direction: column; gap: 6px; }
 :root .field > :is(.required, .optional) { align-self: flex-start; }
 :root .labelRow { margin-bottom: 0; gap: 6px; }
@@ -111,7 +111,7 @@
 
 :root .field[data-label-size='compact'] .label { font-size: var(--text-caption); font-weight: 600; line-height: 17px; }
 
-/* v7 の複数行（TextArea の包み）は元どおり大きさ固定。正本の層の外の resize: vertical より強くするため層の外に置く。 */
+/* 管理画面 の複数行（TextArea の包み）は元どおり大きさ固定。正本の層の外の resize: vertical より強くするため層の外に置く。 */
 
 :root .field[data-density] { display: flex; flex-direction: column; gap: var(--tpl-rt-payload-gap); }
 :root .field[data-density] .labelRow { margin: 0; }
@@ -125,14 +125,14 @@
 :root .field[data-field-size='compact'] .label { font-size: var(--tpl-rest3-ec-small); line-height: var(--tpl-rest3-ec-label-lh); }
 :root .field[data-field-size='compact'] :is(.note, .error) { margin-top: 0; font-size: var(--tpl-rest3-ec-xs); line-height: var(--tpl-rest3-ec-note-lh); }
 
-/* B-152・仕上げ1：ラベルと欄 */
+/* ・仕上げ1：ラベルと欄 */
 :root .field { gap: var(--polish-space-row); }
 :root .labelRow { margin-bottom: 0; }
 
-/* B-152・仕上げ2 */
+/* ・仕上げ2 */
 :root .field .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
 :root .field:is([data-field-size], [data-label-size], [data-density]) .label { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
-/* B-158：任意も札で示す。 */
+/* ：任意も札で示す。 */
 :root .optional {
   padding: 2px 6px;
   border-radius: var(--radius-pill);
@@ -142,7 +142,7 @@
   line-height: 1.4;
 }
 
-/* B-180：欄の上の小見出しは形・密度にかかわらず12/500。 */
+/* ：欄の上の小見出しは形・密度にかかわらず12/500。 */
 :root .label,
 :root .field[data-field-size] .label,
 :root .field[data-label-size] .label,
@@ -151,7 +151,7 @@
   font-weight: var(--tpl-field-label-weight);
 }
 
-/* B-152：ふつうの欄は親の間とラベルの下の余白を二重に足さない。 */
+/* ：ふつうの欄は親の間とラベルの下の余白を二重に足さない。 */
 html:root .field:not([data-density]):not([data-spacing]) { gap: var(--polish-space-row); }
 html:root .field:not([data-density]):not([data-spacing]) > .labelRow { margin-bottom: 0; }
 /*
@@ -169,7 +169,7 @@ html:root .field:not([data-density]):not([data-spacing]) > .labelRow { margin-bo
   margin-bottom: 0;
 }
 
-/* 固定絵のラベル行18。B-244の11px札も行の高さを押し広げない。 */
+/* 固定絵のラベル行18。の11px札も行の高さを押し広げない。 */
 html:root .field .label { line-height: var(--tpl-field-label-lh); }
 /* input の密度は20のラベル行を持つ。ふつうの18の行で押しつぶさない。 */
 html:root .field[data-density='input'] { gap: var(--polish-space-row); }
@@ -179,7 +179,7 @@ html:root :is(.required, .optional) {
   line-height: var(--tpl-field-badge-lh);
 }
 
-/* B-191：欄の名前は1行で省略し、全文は label の title と読み上げ名に残す。 */
+/* ：欄の名前は1行で省略し、全文は label の title と読み上げ名に残す。 */
 html:root .labelRow { min-width: 0; }
 html:root .labelRow > .label {
   min-width: 0;

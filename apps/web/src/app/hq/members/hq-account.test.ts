@@ -11,8 +11,8 @@ const topBar = read('../../../components/shell/app-top-bar.tsx')
 
 /**
  * 統括のアカウントメニュー・お問い合わせ・メンバー管理の見張り（番号 36-1・36-3・36-5 は当時の下書きの節）。
- * 見た目の正本は Pencil ★V8（メンバーは V8-B.pen `K7HYu`、`docs/v8-design-rules.md`）、請求の動きは `docs/hq-billing.md`。
- * 当時の下書き v6-36 は本線に入らなかった（原本なし。`docs/hq-signup-and-password-login.md` の冒頭）。
+ * 見た目の正本は Pencil ★V8（メンバーは V8-B.pen 、`docs/v8-design-rules.md`）、請求の動きは `docs/hq-billing.md`。
+ * 当時の下書き 管理画面-36 は本線に入らなかった（原本なし。`docs/hq-signup-and-password-login.md` の冒頭）。
  */
 describe('統括の左下アカウントメニュー', () => {
 

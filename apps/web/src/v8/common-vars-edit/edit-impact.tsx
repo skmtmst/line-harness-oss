@@ -16,7 +16,7 @@ import { blockingErrors,characterCountText,checkedAtText,hiddenText,historicalTe
 
 /*
  * 変える前に影響を見る、の行。いまの文と保存したあとの文を
- * 赤・緑の箱で並べる（板 `AYc6O`）。3件まで出し、残りは畳む。
+ * 赤・緑の箱で並べる（板 ）。3件まで出し、残りは畳む。
  */
 export function ImpactRows({
   impact,

@@ -4,7 +4,7 @@ import styles from './create-parts.module.css'
 
 /*
  * 作る画面（CreatePage）の中でくり返し出る形。合格した2画面
- * （自動応答の作る① K7HWG・リマインダを作る① VE1u5）の作りをそのまま部品にした。
+ * （自動応答の作る① ・リマインダを作る① ）の作りをそのまま部品にした。
  * 寸法は globals.css の --tpl-side-* / --tpl-text-sm-lh だけを読む（画面の CSS に数字を書かない）。
  */
 
@@ -20,7 +20,7 @@ export function CreateCompletionHeading({ icon, title, children }: { icon: React
   </div>
 }
 
-/** 右の列の「設定内容」の箱（絵 K7HWG「右の箱 設定内容」）：余白16・題13/700/19・行は上下9＋下線・字12/17。 */
+/** 右の列の「設定内容」の箱（絵 「右の箱 設定内容」）：余白16・題13/700/19・行は上下9＋下線・字12/17。 */
 export function CreateSummaryCard({ title = '設定内容', rows, children, leading, beforeRows, description, descriptionItems, variant, completionIcon }: {
   title?: ReactNode; rows: SummaryRow[]; children?: ReactNode; leading?: ReactNode; beforeRows?: ReactNode
   description?: ReactNode; descriptionItems?: readonly ReactNode[]; completionIcon?: ReactNode
@@ -51,14 +51,14 @@ export function CreateSummaryCard({ title = '設定内容', rows, children, lead
   )
 }
 
-/** 右の列の箱の外に出す淡い案内（絵 K7HWG「見え方は次の手順で」）。 */
+/** 右の列の箱の外に出す淡い案内（絵 「見え方は次の手順で」）。 */
 export function CreatePreviewNote({ children }: { children: ReactNode }) {
   return <p className={styles.note} data-part="create-preview-note">{children}</p>
 }
 
 export type StarterItem = { key: string; name: string; lines: string[]; onUse: () => void; useLabel?: string }
 
-/** 「ひな形から作る（任意）」のカード列（絵 K7HWG・VE1u5）。カードの中は1行ずつ、入りきらないときだけ「…」＋title。 */
+/** 「ひな形から作る（任意）」のカード列。カードの中は1行ずつ、入りきらないときだけ「…」＋title。 */
 export function CreateStarterCards({
   title,
   description,

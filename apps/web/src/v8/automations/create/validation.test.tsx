@@ -64,7 +64,7 @@ it('WEB-120: 何も変えていないキャンセルは未保存の確認を出�
   expect(screen.queryByRole('alertdialog')).toBeNull()
 })
 
-it('B-241：既存ルールの取得失敗を重複なしとして隠さず、再取得する',async()=>{
+it('既存ルールの取得失敗を重複なしとして隠さず、再取得する',async()=>{
  listExisting.mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({success:true,data:[{id:'existing',eventType:'friend_added'}]})
  render(<NewAutomationV8/>)
  const error=await screen.findByText('既存のルールを読み込めませんでした')

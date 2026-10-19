@@ -1,5 +1,5 @@
 /*
- * ★V8 シナリオ配信の編集（絵 PMLkX・nMSiE・ARuZ4・kz2B6・Al4Ek）。
+ * ★V8 シナリオ配信の編集。
  * 寸法はすべて app/globals.css の [data-theme="v8"] の --tpl-sd-*。
  * 外側（白い板・高さ・下の帯の居場所）は型の PageFrame が持つ。
  */
@@ -114,7 +114,7 @@
   align-items: center;
 }
 
-/* ── 競合の帯（kz2B6） ─────────────────────── */
+/* ── 競合の帯 ─────────────────────── */
 .conflictWrap {
   flex-shrink: 0;
   padding: var(--tpl-sd-conflict-wrap-pad);
@@ -758,7 +758,7 @@ button.stepTitle:hover {
   color: var(--color-action);
 }
 
-/* 止める確認（OPGU2）：説明・数の行・ボタンを間 12 で縦に並べる。 */
+/* 止める確認：説明・数の行・ボタンを間 12 で縦に並べる。 */
 .stopBody {
   display: flex;
   width: 100%;
@@ -803,7 +803,7 @@ button.stepTitle:hover {
   color: var(--color-ink);
 }
 
-/* 開始前の確認（F1LK4e）の行。 */
+/* 開始前の確認の行。 */
 .checkRow {
   display: flex;
   align-items: flex-start;

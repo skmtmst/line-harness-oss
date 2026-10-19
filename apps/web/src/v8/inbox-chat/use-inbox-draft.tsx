@@ -105,7 +105,7 @@ export function useInboxDraft({ selectedAccountId, selectedChatId }: Options) {
   }
 
   /*
-   * ★V8 B-6（M0393「7. 添付」I7Skn）：クリップ・ドラッグで選んだもの。
+   * ★V8 （「7. 添付」I7Skn）：クリップ・ドラッグで選んだもの。
    * 画像は今までの画像の準備へ渡す（1MB・送り方も同じ）。動画・ファイルは受信箱の添付の口
    * （API-15）へ先にアップロードし、書く欄の上の札で 準備中・済み・失敗（理由＋もう一度試す）を見せる。
    * 画像と同じく「アカウント＋会話」ごとに預かり、切り替えても前の会話の結果を今の欄へ書かない。
@@ -235,7 +235,7 @@ export function useInboxDraft({ selectedAccountId, selectedChatId }: Options) {
     else imageErrorDraftsRef.current.delete(prevKey)
     setImageError(imageErrorDraftsRef.current.get(nextKey) ?? '')
     setImagePreviewOpen(false)
-    // B-6：動画・ファイルの添付は預かりの表に常に書いているので、開いた会話の分を戻すだけ。
+    // ：動画・ファイルの添付は預かりの表に常に書いているので、開いた会話の分を戻すだけ。
     setPendingAttachment(attachDraftsRef.current.get(nextKey) ?? null)
   }, [selectedAccountId, selectedChatId])
 

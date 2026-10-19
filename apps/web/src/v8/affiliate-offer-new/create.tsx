@@ -29,7 +29,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8-B 案件を作る（絵 Td4TN・機能追加 F-23）。
+ * ★V8-B 案件を作る（絵の機能追加 F-23）。
  *
  * 型（CreatePage）に4つの段（どんな案件か・何を成果として数えるか・いくら払うか・成果を認めたときにすること）と、
  * 右の列（アフィリエイターの画面での見え方・気をつけること）、下の帯を渡す。
@@ -133,7 +133,7 @@ export default function AffiliateOfferCreateV8() {
   const yen = rewardAmount ? Number(rewardAmount) : 0
   const miles = rewardMiles ? Number(rewardMiles) : 0
 
-  /* 欄に結び付く誤りは欄で知らせて1つ目へ移る（B-139）。上の帯はアカウントと候補の読み込みだけ。 */
+  /* 欄に結び付く誤りは欄で知らせて1つ目へ移る。上の帯はアカウントと候補の読み込みだけ。 */
   const fields = useFormErrors()
   fields.define('name', '案件名', () => (name.trim() ? null : '案件名を入力してください'), { required: true })
   fields.define('amount', '報酬額（円）', () => (!rewardAmount && !rewardMiles ? '報酬（円かマイル）のどちらかを入れてください' : rewardIntegerError(rewardAmount, 'amount')), { required: !rewardMiles })

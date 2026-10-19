@@ -1,6 +1,6 @@
 /*
- * ★V8 自動応答の作成・編集・有効化（Pencil `K7HWG` `A0pDt` `rfhIf`
- * `Guoye` `XJUqs`、完了 `V4LjH`）。
+ * ★V8 自動応答の作成・編集・有効化（Pencil
+ *  、完了 ）。
  *
  * 組版は「作る・確かめる板（左）」と「いまの状態・LINEの見え方（右）」の
  * 2列。板が狭い画面では右の列を下へ畳む。
@@ -33,7 +33,7 @@
   flex-direction: column;
   gap: 4px;
 }
-/* 板の頭の題は `A0pDt` どおり 22px。 */
+/* 板の頭の題は  どおり 22px。 */
 .headTitle {
   margin: 0;
   color: var(--color-ink);
@@ -104,7 +104,7 @@
   font-size: var(--text-label);
   font-weight: 600;
 }
-/* 手順②（絵 A0pDt）だけ：欄の題と中身の間 8・題の行 20。①（K7HWG）は 6 のまま。 */
+/* 手順②だけ：欄の題と中身の間 8・題の行 20。①は 6 のまま。 */
 .stepTrigger .label { font-size: var(--text-label); line-height: var(--tpl-chip-label-lh); }
 .stepTrigger .kwField .label { font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 /* 言葉の欄：題のすぐ下に札と足す欄（絵の行は高さ36で中央そろえ）。 */
@@ -141,7 +141,7 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-/* 絵 A0pDt「言葉」：緑の地の小さい札。 */
+/* 絵 「言葉」：緑の地の小さい札。 */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -187,7 +187,7 @@
   line-height: var(--tpl-tabs-text-lh);
   cursor: pointer;
 }
-/* 絵 rfhIf・A0pDt：選んでいる札は墨の地に白い字。 */
+/* 絵の：選んでいる札は墨の地に白い字。 */
 .pickChip[aria-pressed='true'] {
   outline-color: var(--color-ink);
   background: var(--color-ink);
@@ -196,10 +196,10 @@
 }
 
 /* 「部分一致／完全一致」などのつながった選択。 */
-/* 絵 A0pDt「切り替え」：灰の地に、選んだ所だけ白。 */
+/* 絵 「切り替え」：灰の地に、選んだ所だけ白。 */
 .seg {
   display: inline-flex;
-  /* 縦に並べる欄の中でも、選ぶ部品は中身の幅（絵 A0pDt：言葉の合い方・言葉が2つ以上のとき）。 */
+  /* 縦に並べる欄の中でも、選ぶ部品は中身の幅（絵 ：言葉の合い方・言葉が2つ以上のとき）。 */
   align-self: flex-start;
   gap: var(--tpl-compact-gap);
   padding: var(--tpl-compact-gap);
@@ -287,7 +287,7 @@
   margin: 0;
   padding: 0;
 }
-/* 絵 Guoye「順番」：角10・上下10・左右12・間10。 */
+/* 絵 「順番」：角10・上下10・左右12・間10。 */
 .orderRow {
   display: flex;
   align-items: center;
@@ -428,7 +428,7 @@
 }
 
 /* 手順5「有効にする前の確認」の行。 */
-/* 絵 XJUqs「確認」：中央そろえ・上下10・右に「見直す」。 */
+/* 絵 「確認」：中央そろえ・上下10・右に「見直す」。 */
 .checkRow {
   display: flex;
   align-items: center;
@@ -477,7 +477,7 @@
 }
 
 /* 確認の「設定の確認」表。各行の右に「変える」。 */
-/* 絵 XJUqs「設定の確認」：行は 上下10・題140・字13/21・右に「変える」。行と行の間14。 */
+/* 絵 「設定の確認」：行は 上下10・題140・字13/21・右に「変える」。行と行の間14。 */
 .summaryList {
   display: flex;
   flex-direction: column;
@@ -549,7 +549,7 @@
   margin: 0;
 }
 
-/* 完了（V4LjH）：作る型の頭の下に、中央の完了カード（幅560・余白32・間12）。 */
+/* 完了：作る型の頭の下に、中央の完了カード（幅560・余白32・間12）。 */
 .doneBody { display: flex; justify-content: center; padding: var(--tpl-section-pad); }
 .done {
   display: flex; flex-direction: column; align-items: center; gap: var(--tpl-rule-row-gap);
@@ -575,7 +575,7 @@
 .doneActions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--tpl-body-gap); padding-top: var(--tpl-compact-gap); }
 
 /* トグルの行（細かい決まり）。 */
-/* 絵 rfhIf「細かい決まり」：行は線なし・間12・右に操作。 */
+/* 絵 「細かい決まり」：行は線なし・間12・右に操作。 */
 .ruleRows {
   display: flex;
   flex-direction: column;
@@ -610,7 +610,7 @@
   gap: 8px;
 }
 
-/* 絵 rfhIf「本文」：箱の中に 文 → 間24 → 差し込む・札・字数。 */
+/* 絵 「本文」：箱の中に 文 → 間24 → 差し込む・札・字数。 */
 .bodyBox {
   display: flex;
   flex-direction: column;
@@ -659,12 +659,12 @@
   font-size: var(--text-micro);
 }
 
-/* 編集の競合の帯（`UGrd2`）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
+/* 編集の競合の帯（）は本文で文字どおりに書く。部品CSS参照は負債に数えられる。 */
 
 
-/* 右の列の箱（絵 K7HWG「右の箱 設定内容」）：余白16・題13太字・行の間4・行は上下9＋下線。 */
+/* 右の列の箱（絵 「右の箱 設定内容」）：余白16・題13太字・行の間4・行は上下9＋下線。 */
 
-/* 絵 A0pDt：題の下の説明・言葉の並びと足す欄・2つの欄を横に・種類の札と注意を1行に・曜日とまとめてを1行に。 */
+/* 絵 ：題の下の説明・言葉の並びと足す欄・2つの欄を横に・種類の札と注意を1行に・曜日とまとめてを1行に。 */
 .cardDesc { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .kwRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-body-gap); }
 .kwSpacer { flex: 1 1 0; }
@@ -699,7 +699,7 @@
 .weekdaySummary { margin-left: auto; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 .stepTrigger { padding-bottom: var(--tpl-section-pad); }
 
-/* 絵 Guoye「重なりを1件ずつ確かめる」：クリームの地・角12・余白16。 */
+/* 絵 「重なりを1件ずつ確かめる」：クリームの地・角12・余白16。 */
 .conflictCard { display: flex; flex-direction: column; align-self: stretch; gap: var(--tpl-body-gap); padding: var(--tpl-side-card-pad); border-radius: var(--radius-card); background: var(--color-warning-bg); }
 .conflictDesc { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-conflict-desc-lh); }
 .conflictItem { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-body-gap); padding: var(--tpl-section-gap) 0; border-top: 1px solid var(--color-hairline); }
@@ -712,7 +712,7 @@
 .testGrow { flex: 1 1 0; min-width: 0; }
 
 /*
- * 1152 の板（Z2LIUx）。右の列は幅280・余白16で、スマホは置かず上のボタンから窓で開く。
+ * 1152 の板。右の列は幅280・余白16で、スマホは置かず上のボタンから窓で開く。
  * 左の段は「言葉の合い方」「言葉が2つ以上のとき」を縦に積み、まとめて・月〜金の行を分ける。
  */
 :global([data-page-template='create']):has(.narrowPhoneOpen) {
@@ -738,8 +738,8 @@
 :global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .inlineSelect > :last-child { width: var(--tpl-ar-ed-holiday-w); }
 :global([data-page-template='create']):has(.narrowPhoneOpen) .stepTrigger .inlineSelect :global(*) { max-width: 100%; }
 
-/* 編集の競合（UGrd2）：頭の「ルール名」の行の下に横いっぱいの帯（琥珀の地・枠）。 */
-/* 競合の帯（UGrd2）の置き場。帯そのものの見た目は共通部品（save-conflict）が持つ。 */
+/* 編集の競合：頭の「ルール名」の行の下に横いっぱいの帯（琥珀の地・枠）。 */
+/* 競合の帯の置き場。帯そのものの見た目は共通部品（save-conflict）が持つ。 */
 .conflictBandSlot {
   margin: var(--tpl-ar-ed-band-mt) 0 var(--tpl-ar-ed-band-mb);
 }

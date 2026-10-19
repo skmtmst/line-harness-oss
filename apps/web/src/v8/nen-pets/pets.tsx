@@ -2,7 +2,7 @@
 
 /*
  * ★V8-B マイペット（Pencil「★V8-B 画面の地図」専用機能の組：
- * 一覧 `wTIej`・一覧 1152 `t2SMXX`・ペットの情報を直す `eLjeQ`・ごはんの目安 `h7A2F`）。
+ * 一覧 ・一覧 1152 ・ペットの情報を直す ・ごはんの目安 ）。
  *
  * 外枠（見出し・CSV・タブ・数の帯）は2つのタブで同じ。型は ListPage。
  * データの口（pets・feeding・saveFeeding・updatePet・CSV）は今の画面と同じ。

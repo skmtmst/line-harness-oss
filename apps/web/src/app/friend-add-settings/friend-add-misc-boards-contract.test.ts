@@ -9,9 +9,9 @@ const CONFLICT = readFileSync(join(HERE, '../../components/shared/save-conflict.
 const CONFLICT_CSS = readFileSync(join(HERE, '../../components/shared/save-conflict.module.css'), 'utf8')
 
 /*
- * V8 友だち追加時の配信の細かい板（sFwWf・h5rm8t）。
+ * V8 友だち追加時の配信の細かい板（・）。
  * テスト段の確認は同じ画面の状態として板IDを付け、
- * 編集の競合は帯で知らせて書き換えない。v7 は変えない。
+ * 編集の競合は帯で知らせて書き換えない。互換経路は変えない。
  */
 describe('友だち追加時の配信の細かい板', () => {
   it('テスト条件を指定でき、実際の友だちへ送らないと説明する', () => {

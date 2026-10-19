@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
  *
  * CSS は後に書いた値が勝つ。`:root` の中で予約スタッフ用の
  * `--tpl-bks-title-size: 22px` を書いたあと、予約からの売上の行で同じ名前を
- * `20px` と書き直していたため、予約スタッフの4枚（CcA4k・d5fmnM・E3YDK・wvGke）の
+ * `20px` と書き直していたため、予約スタッフの4枚（・・・）の
  * 題が絵の 22px ではなく 20px になっていた（監査 W152）。
  *
  * 画面ごとに値が違うときは、用途の分かる別の名前にする。
@@ -66,13 +66,13 @@ describe('globals.css の変数の書き直し', () => {
     expect(css).toMatch(/--tpl-title-size:\s*var\(--polish-text-page\)/)
     expect(css).toMatch(/--tpl-bks-title-size:\s*var\(--tpl-title-size\)/)
     expect(css).toMatch(/--tpl-bks-sales-title-size:\s*var\(--tpl-title-size\)/)
-    const sales = fs.readFileSync(path.join(__dirname, 'booking/sales/sales-v8.module.css'), 'utf8')
+    const sales = fs.readFileSync(new URL('./booking/sales/sales-v8.module.css', import.meta.url), 'utf8')
     expect(sales).toContain('var(--tpl-bks-sales-title-size)')
   })
 
   it('売上用の題だけを変更してもスタッフ画面の題へ伝わらない', () => {
     const staff = fs.readFileSync(path.join(__dirname, '../v8/booking-staff/layout.module.css'), 'utf8')
-    const sales = fs.readFileSync(path.join(__dirname, 'booking/sales/sales-v8.module.css'), 'utf8')
+    const sales = fs.readFileSync(new URL('./booking/sales/sales-v8.module.css', import.meta.url), 'utf8')
     const staffTitle = staff.match(/\.title\s*\{([^}]+)\}/)![1]
     const salesTitle = sales.match(/\.title\s*\{([^}]+)\}/)![1]
     expect(staffTitle).toContain('font-size: var(--tpl-title-size)')

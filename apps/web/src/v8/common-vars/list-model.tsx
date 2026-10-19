@@ -9,8 +9,8 @@ import { type CommonVarFilter,type CommonVarOrder } from './model'
 
 /*
  * ★V8 共通情報の一覧（Pencil「★V8 画面の地図」の共通情報の行：
- * 一覧 `FM94M`、一覧（1152）`XIzkJ`、一覧（閲覧のみ）`OxSw8`、
- * 止める窓 `Hhl9M`、削除の窓 `xxKtW`、状態 `RqO7O`）。
+ * 一覧 、一覧（1152）、一覧（閲覧のみ）、
+ * 止める窓 、削除の窓 、状態 ）。
  *
  * 一覧の型（ListPage）に載せて一から書いた。動き（読む API・権限・失敗時・
  * 止める／削除の確かめ方・まとめて削除・フォルダ）は今の V8 一覧
@@ -34,7 +34,7 @@ export const MAX_BATCH_DELETE_COUNT = 20
 export const EXPIRING_SOON_MS = 7 * 24 * 3600_000
 
 /*
- * 道具の段の絞り込み（板 `FM94M`：空のまま・期限つき・使われていない・
+ * 道具の段の絞り込み（板 ：空のまま・期限つき・使われていない・
  * 下書き・止めた）。1つだけ選べる。選んだ札をもう一度押すと「すべて」に戻る。
  * 期限切れは絵に無いが今の機能なので、期限切れがあるとき（選んでいるとき）だけ出す。
  */
@@ -81,7 +81,7 @@ export function formatVarValue(type: CommonVar['type'], value: string): string {
 
 
 import { COMMON_VAR_STATE_LABELS } from '@/lib/common-vars'
-/** 札の文言と色。期限つきの使用中は「M/dまで」を青で出す（板 `FM94M`）。 */
+/** 札の文言と色。期限つきの使用中は「M/dまで」を青で出す（板 ）。 */
 export function stateBadge(item: CommonVar): { label: string; tone: 'success' | 'info' | 'warning' | 'neutral' } {
   const state = item.state ?? 'active'
   if (state === 'active' && item.validUntil) {

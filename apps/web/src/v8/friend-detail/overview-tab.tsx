@@ -34,12 +34,12 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
-import { memberRanksApi } from '@/lib/api-gap3'
+import { memberRanksApi } from '@/lib/api/helpers/gap3'
 import DeliveryConsentDrawer, { DeliveryConsentSummary, useDeliveryConsents } from './delivery-consent'
 
 
 /*
- * 概要タブ（JCDRm・Q5F2QE の 1.）。左に要点 320px、右に数の帯・進行中・同じ人・最近の履歴・行う操作。
+ * 概要タブ（・ の 1.）。左に要点 320px、右に数の帯・進行中・同じ人・最近の履歴・行う操作。
  */
 
 function GroupHead({ title, action }: { title: string; action?: React.ReactNode }) {
@@ -78,7 +78,7 @@ export function lastContactText(items: FriendTimelineItem[]) {
 
 /**
  * 友だち詳細の左の要点（顧客情報・対応・タグ・マイル・リッチメニュー・メモ）。
- * 概要タブと情報欄タブ（vX3wQ）で同じ物を出す。
+ * 概要タブと情報欄タブで同じ物を出す。
  */
 export function FriendSummaryRail({ friend, friendId, data, perms, fields, values, realName, onEditSupport }: {
   friend: FriendDetail

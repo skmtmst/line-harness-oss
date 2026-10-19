@@ -3,7 +3,7 @@
  *
  *   node apps/web/scripts/v8-guard/layout-overflow.mjs <baseUrl> [out.json]
  *
- * 数えるもの（V6 で崩れたのは 1152 付近。絵の幅の数字をそのまま写したため）
+ * 数えるもの（管理画面 で崩れたのは 1152 付近。絵の幅の数字をそのまま写したため）
  *   page-x     : ページ全体が横に送れる（AGENTS.md：PC は原則横スクロールなし）
  *   overflow   : 中身が枠からはみ出している（… でも横送りでもない）
  *   out-of-main: 白い板（main）の右端より外へ出た部品

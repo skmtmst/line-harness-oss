@@ -1,6 +1,6 @@
 /*
- * ★V8 共通情報の一覧（Pencil `FM94M`・1152 `XIzkJ`・閲覧のみ `OxSw8`、
- * 止める `Hhl9M`・削除 `xxKtW`、状態は `RqO7O`）。
+ * ★V8 共通情報の一覧（Pencil ・1152 ・閲覧のみ 、
+ * 止める ・削除 、状態は ）。
  * 枠・見出し・数の帯・フォルダの列・道具の段の外枠は型（ListPage）が持つ。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-cv-*`。
  */
@@ -31,7 +31,7 @@
   margin-top: var(--tpl-cv-gap-s);
 }
 
-/* 閲覧のみの帯（OxSw8）。数の帯の上。薄い青の地・目の印・枠なし。 */
+/* 閲覧のみの帯。数の帯の上。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin-bottom: var(--tpl-cv-band-after); }
 
 /* フォルダの列の注。 */
@@ -120,7 +120,7 @@
   flex-shrink: 0;
 }
 
-/* 1152 の板（XIzkJ）：1段目と2段目。 */
+/* 1152 の板：1段目と2段目。 */
 .narrowTools {
   display: flex;
   flex-basis: 100%;
@@ -206,14 +206,14 @@
 }
 
 .dotLine {
-  /* 丸と名前の行。ブロックの flex にして、行の箱が字の高さより伸びないようにする（絵 FM94M の名の行）。 */
+  /* 丸と名前の行。ブロックの flex にして、行の箱が字の高さより伸びないようにする（名の行）。 */
   display: flex;
   min-width: 0;
   align-items: center;
 }
 
 .dotIndent {
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 FM94M の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
   padding-inline-start: var(--tpl-folder-dot-indent);
 }
 
@@ -449,7 +449,7 @@
   font-size: var(--text-label);
 }
 
-/* 窓の中身（Hhl9M・xxKtW）。横いっぱい。下の帯は線なし（絵どおり）。 */
+/* 窓の中身（・）。横いっぱい。下の帯は線なし（絵どおり）。 */
 .dialogBody {
   display: flex;
   align-self: stretch;
@@ -467,7 +467,7 @@
   padding: var(--tpl-cv-dialog-actions-pad);
 }
 
-/* 削除の窓（xxKtW）：理由・キャンセル・空き・実行の4列。本文と下の帯の間は絵の 14。 */
+/* 削除の窓：理由・キャンセル・空き・実行の4列。本文と下の帯の間は絵の 14。 */
 .deleteFooter {
   grid-template-columns: 1fr auto 1fr auto;
   padding-top: 0;
@@ -605,7 +605,7 @@
   line-height: var(--tpl-cv-alert-lh);
 }
 
-/* 削除できない窓（xxKtW）の「使っている所」。 */
+/* 削除できない窓の「使っている所」。 */
 .usageList ul {
   margin: 0;
   padding: 0;
@@ -729,5 +729,5 @@
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
 .viewerCreateSpace { display: block; height: var(--tpl-viewer-create-space-col-h); }
 
-/* 削除の窓（xxKtW）：理由の欄は左の空き（1fr）に収まる幅にし、キャンセルを絵の位置に残す。全文は title。 */
+/* 削除の窓：理由の欄は左の空き（1fr）に収まる幅にし、キャンセルを絵の位置に残す。全文は title。 */
 .deleteFooter .footerReason { width: var(--tpl-cv-delete-reason-w); min-width: 0; }

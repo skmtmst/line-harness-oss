@@ -200,7 +200,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
     expect(host.querySelector('[role="status"]')?.textContent ?? '').not.toContain('節目を保存しました。')
   })
 
-  it('B-139 ランク：名前を消して保存すると、口を呼ばずその行の名前の欄が赤くなり、そこへ移る', async () => {
+  it('ランク：名前を消して保存すると、口を呼ばずその行の名前の欄が赤くなり、そこへ移る', async () => {
     await render('ranks')
     const name = host.querySelector('input[aria-label="ランク名 1"]') as HTMLInputElement
     await act(async () => { fireEvent.change(name, { target: { value: '' } }) })
@@ -213,7 +213,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
     expect(document.activeElement).toBe(name)
   })
 
-  it('B-139 ライフタイム：称号を消して決めると、窓は閉じず称号の欄が赤くなり、そこへ移る', async () => {
+  it('ライフタイム：称号を消して決めると、窓は閉じず称号の欄が赤くなり、そこへ移る', async () => {
     await render('lifetime')
     await click(byLabel('節目「なかよし」のその他操作'))
     await click(byText('編集する'))

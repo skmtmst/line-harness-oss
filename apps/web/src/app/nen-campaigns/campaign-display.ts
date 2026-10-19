@@ -52,7 +52,7 @@ export function formatNenJobDateTime(value: string): string {
 }
 
 /*
- * ★V6 37-6（`z4q1K`）「対象」列。だれに届く配信かを、実キーごとに運用の言葉で示す。
+ * ★管理画面 37-6（`z4q1K`）「対象」列。だれに届く配信かを、実キーごとに運用の言葉で示す。
  * 実キーは上と同じ5つ。増えたらここも手で揃える。
  */
 const audienceByCampaign: Record<string, string> = {
@@ -67,7 +67,7 @@ export function formatCampaignAudience(setting: Pick<NenCampaignSetting, 'campai
   return audienceByCampaign[setting.campaignKey] ?? (setting.category === 'birthday' ? 'ペットを登録した会員' : '注文した会員')
 }
 
-/** ★V6 37-6 「きっかけ」の絞り込み。実キーの category を運用の言葉にする。 */
+/** ★管理画面 37-6 「きっかけ」の絞り込み。実キーの category を運用の言葉にする。 */
 export const campaignTriggerLabel: Record<NenCampaignSetting['category'], string> = {
   transactional: '注文・発送',
   follow_up: '注文のあと',

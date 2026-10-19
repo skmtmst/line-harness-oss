@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { FriendListItem } from '@/lib/api'
 import FriendListRow from './friend-list-row'
-import type { FriendListColumn } from './friend-list-table'
+import type { FriendListColumn } from './friend-list-types'
 
 /* 画面のコードは行を押すと詳細へ飛ぶ。描くだけなので遷移先は使わない。 */
 vi.mock('next/navigation', () => ({
@@ -63,7 +63,7 @@ describe('友だち行の担当者とアバター（描画）', () => {
     expect(unknown).toContain('>不明</p>')
   })
 
-  // ★V7「友だちの顔」（KXDhj）：画像があれば画像、無ければ頭文字。どちらも共通 Avatar。
+  // ★管理画面「友だちの顔」（KXDhj）：画像があれば画像、無ければ頭文字。どちらも共通 Avatar。
   it('顔は共通 Avatar で、画像の有無どちらでも描く', () => {
     const withPicture = render({ ...BASE, pictureUrl: 'https://example.test/a.png' })
     expect(withPicture).toContain('data-avatar="image"')

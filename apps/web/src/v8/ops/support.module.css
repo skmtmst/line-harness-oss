@@ -1,4 +1,4 @@
-/* 運営のお問い合わせ V8（P0jhqO・代わりに起票 Izau1）。値は --tpl-op-*。 */
+/* 運営のお問い合わせ V8（・代わりに起票 ）。値は --tpl-op-*。 */
 
 .notice {
   margin-bottom: var(--tpl-op-section-gap);
@@ -24,7 +24,7 @@
   gap: var(--tpl-op-auth-field-gap);
 }
 
-/* 絵（P0jhqO）は残りの札を縦に積み、その下に優先度の選ぶ欄。 */
+/* 絵は残りの札を縦に積み、その下に優先度の選ぶ欄。 */
 .chipColumn {
   display: flex;
   flex-direction: column;
@@ -332,7 +332,7 @@
   }
 }
 
-/* 絵 P0jhqO：返信の操作は1行。返信するは行の右端。間の空きは左寄せの2つと右寄せの3つの境目だけ。 */
+/* 絵 ：返信の操作は1行。返信するは行の右端。間の空きは左寄せの2つと右寄せの3つの境目だけ。 */
 .actions {
   flex-wrap: nowrap;
 }
@@ -341,7 +341,7 @@
   margin-inline-end: var(--tpl-op-support-negative-gap);
 }
 
-/* 絵 P0jhqO：数の帯は白い板の端から端まで。下の注意帯とは間 4。 */
+/* 絵 ：数の帯は白い板の端から端まで。下の注意帯とは間 4。 */
 .band {
   margin-inline: var(--tpl-op-support-band-bleed);
   margin-bottom: var(--tpl-op-support-negative-gap);

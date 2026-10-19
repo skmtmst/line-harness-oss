@@ -1,9 +1,9 @@
 'use client'
 
 /*
- * ★V8 分析「使われ方」（Pencil `N8ZrUl`）。
+ * ★V8 分析「使われ方」（Pencil ）。
  * 数の帯 → 注の箱 → 左に機能ごとの表（行の右端は「…」1つ。中身を見る・片づける）、右に気づいたこと。
- * 集計期間は表の下で変えられる（絵の上には出さない）。
+ * 集計期間は表の下で変えられる（上には出さない）。
  * 呼ぶ口・判定・CSV は今の画面（UsageOverviewTab・app/analytics/analytics-usage.ts）と同じ。
  */
 import { useEffect, useMemo, useState } from 'react'

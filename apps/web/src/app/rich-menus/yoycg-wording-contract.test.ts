@@ -8,7 +8,7 @@ const V8_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'v8', '
 const LIST_V8 = readFileSync(join(V8_DIR, 'list.tsx'), 'utf8')
 const BLOCKED = readFileSync(join(V8_DIR, 'blocked-dialog.tsx'), 'utf8')
 
-/** リッチメニューの削除できない理由の窓（板 `yOyCg`）の言葉を絵に合わせる歯止め。 */
+/** リッチメニューの削除できない理由の窓（板 ）の言葉を絵に合わせる歯止め。 */
 describe('yOyCg 消せない理由の窓', () => {
   it('理由があるときは見出しを「まだ消せません」にし取消を「閉じる」にする', () => {
     expect(LIST_V8).toContain('はまだ消せません')

@@ -25,7 +25,7 @@ import { countLabel,formatMd } from './edit-model'
 import styles from './edit.module.css'
 import { PhoneV8,SummaryCardV8,WizardFooterV8 } from './ui'
 
-/* ---------------- 手順4：配信予定（T0nis） ---------------- */
+/* ---------------- 手順4：配信予定 ---------------- */
 export function ScheduleStageV8({
   frame,
   notice,

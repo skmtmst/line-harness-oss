@@ -52,7 +52,7 @@ export default function FriendTrendTable({
   }
   /*
    * 「推定」の「？」は7行に繰り返さず、見出しの日付の横に1つだけ置く
-   * （★V7・2026-09-27）。行には小さく「推定」の文字だけ残す。
+   * （★管理画面・2026-09-27）。行には小さく「推定」の文字だけ残す。
    * 全行が推定のときは、行からは消して見出しの「？」の中で言う。
    */
   const allEstimated = rows.every((row) => row.estimated)

@@ -30,7 +30,7 @@ export default function UploadTargetDialog({
   const [projectId, setProjectId] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  /** 選んだファイル（AnwtH）。選んでから「取り込む」を押すまで送らない。 */
+  /** 選んだファイル。選んでから「取り込む」を押すまで送らない。 */
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [dragging, setDragging] = useState(false)

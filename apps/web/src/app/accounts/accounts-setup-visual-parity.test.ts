@@ -17,7 +17,7 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     /*
       2026-09-04: 転送を2つともやめた。**統括の店舗管理と、LINE公式アカウントの
       設定は別のもの**。**店舗を作ることと、アカウントを登録することも別**
-      （要件 `v6-33-account-settings` §5-3）。
+      （要件 `管理画面-33-account-settings` §5-3）。
       `/hq` は統括向けの店舗管理として、店舗ウィザードは飲食店向けの入口として残す。
     */
     expect(accountsSource).not.toContain("redirect('/hq')")
@@ -29,7 +29,7 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
   it('新設計の4項目入力・自動接続と5つの正本ノードを使う', () => {
     /*
       2026-10-16: ⑤の進捗を「読むだけ（followerImportState）」から step の自己連鎖へ替えた。
-      ソース文字で呼ぶ口と正本ノードを数えていた並びは、B-273（新しいソース契約を増やさない）
+      ソース文字で呼ぶ口と正本ノードを数えていた並びは、（新しいソース契約を増やさない）
       に合わせてやめ、ソースの字面ではなく実際の描画・呼び出しで確かめる試験へ移した。
         - 4項目入力・自動接続と呼ぶ口: `new/register-v8.react.test.tsx`
           （「②の4項目が空では③へ進めない」「登録後は画面から取り込みの続きを進め…」）
@@ -64,7 +64,7 @@ describe('D-3 店舗追加・一覧の統括集約', () => {
     }
     expect(orderingSource).toContain('api.lineAccounts.updateHierarchy')
     /*
-      板 V7vn3 に並び順の操作は無いので、v7 の一覧（page.tsx 自身）からは外した。
+      板  に並び順の操作は無いので、管理画面 の一覧（page.tsx 自身）からは外した。
       部品自体は残し、絵に無い塊を一覧に出さない。
     */
     expect(readOwnFile(join(directory, 'page.tsx'), 'utf8')).not.toContain('AccountOrdering')

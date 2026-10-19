@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /*
- * ★V8 テンプレート 一覧（1152）（板 `L7zA7C`）の印の確認。
+ * ★V8 テンプレート 一覧（1152）（板 ）の印の確認。
  * 幅を測って狭いときだけ1152の板を付ける。常時付く文字列には固定しない。
  */
 describe('テンプレート一覧の板の印（L7zA7C）', () => {

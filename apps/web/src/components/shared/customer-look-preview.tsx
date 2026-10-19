@@ -4,7 +4,7 @@ import {customerPalette,DEFAULT_CUSTOMER_LOOK,emptyLayout,type CustomerLook} fro
 import LiffPhoneFrame from './liff-phone-frame'
 import {Tabs} from './tabs'
 import bookingPhone from '@/v8/booking-menus/settings.module.css'
-import {FormPhone} from '@/v8/form-edit/phone'
+import { FormPhone } from '@/v8/form-edit/public/phone/index'
 import styles from './customer-look-preview.module.css'
 // 固定の見本。選択の色と確認文を別々に書かない（実予約の状態ではない）。
 const bookingSample={month:10,days:[{day:'日',date:1},{day:'月',date:2},{day:'火',date:3},{day:'水',date:4},{day:'木',date:5},{day:'金',date:6},{day:'土',date:7}],selectedDate:6,time:'13:00'}

@@ -1,5 +1,5 @@
 /*
- * ★V8 ダッシュボード（Pencil WQmep）。
+ * ★V8 ダッシュボード（Pencil ）。
  * 枠・板の頭・段の線と右の列の幅は型（DashboardPage・DashboardRow）が持つ。
  * ここは段の中身だけ。寸法は app/globals.css の --tpl-db-* に1か所。
  */
@@ -23,9 +23,9 @@
   padding: var(--tpl-db-tag-pad); border-radius: var(--tpl-db-tag-radius);
   font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-db-caption-lh); white-space: nowrap;
 }
-.tag_warning { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.tag_success { background: var(--color-accent-soft); color: var(--color-success); }
-.tag_danger { background: var(--color-danger-bg); color: var(--color-danger); }
+.tagWarning { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.tagSuccess { background: var(--color-accent-soft); color: var(--color-success); }
+.tagDanger { background: var(--color-danger-bg); color: var(--color-danger); }
 
 /* ── 段の中の共通の文字 ── */
 .note, .noteBody {
@@ -66,13 +66,13 @@
 a.kv:hover .kvKey { text-decoration: underline; }
 .kvKey { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); font-size: var(--polish-text-body); line-height: var(--tpl-db-text-lh); }
 .kvValue { flex-shrink: 0; white-space: nowrap; color: var(--color-ink); font-size: var(--polish-text-body); font-weight: 600; line-height: var(--tpl-db-text-lh); font-variant-numeric: tabular-nums;  font-family: var(--font-inter), Inter, sans-serif; }
-.kv_danger .kvKey, .kv_danger .kvValue { color: var(--color-danger); font-weight: 600; }
-.kv_faint .kvValue { color: var(--color-ink-faint); }
+.kvDanger .kvKey, .kvDanger .kvValue { color: var(--color-danger); font-weight: 600; }
+.kvFaint .kvValue { color: var(--color-ink-faint); }
 .dot { width: var(--tpl-db-dot); height: var(--tpl-db-dot); flex-shrink: 0; border-radius: var(--radius-pill); background: var(--color-ink-faint); }
-.dot_success { background: var(--color-success); }
-.dot_danger { background: var(--color-danger); }
+.dotSuccess { background: var(--color-success); }
+.dotDanger { background: var(--color-danger); }
 /* 状態の色の丸（受信箱の状態の札と同じ色：未対応 赤・対応中 橙・保留 灰・対応済み 緑）。 */
-.dot_warning { background: var(--color-warning); }
+.dotWarning { background: var(--color-warning); }
 /* 行の右に小さな操作（接続状態の「確かめる」）。 */
 .kvWithAction { display: flex; align-items: center; gap: var(--tpl-db-kv-gap); min-width: 0; }
 .kvWithAction > .kv { flex: 1; min-width: 0; }

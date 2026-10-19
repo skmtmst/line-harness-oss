@@ -4,7 +4,7 @@ import React, { act } from 'react'
 import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { OPERATOR_EVENT_OPTIONS } from '@/app/line-notifications/operator-event-options'
+import { OPERATOR_EVENT_OPTIONS } from '@/v8/line-notifications/operator-event-options'
 import { EVENT_OPTIONS, eventPlaceLabel } from './operator-words'
 import OperatorEditV8 from './operator-edit'
 import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
@@ -15,10 +15,10 @@ vi.hoisted(() => {
 })
 
 /*
- * ★V8 運用者へのお知らせを なおす（板 hiBO8）・作る（gjUz3）の動き。
+ * ★V8 運用者へのお知らせを なおす（板 ）・作るの動き。
  * - ?id= で開くと、保存ずみの名前で題が「「〇〇」を編集する」になり、選んでいない人も並ぶ
  * - 受け取るスタッフは、選ぶ・外すで「選択 N人」が変わる
- * - きっかけの写しは正本（app/line-notifications/operator-event-options.ts）と同じ
+ * - きっかけの写しは正本（v8/line-notifications/operator-event-options.ts）と同じ
  */
 const search = { value: 'id=rule-9' }
 vi.mock('next/navigation', () => ({
@@ -127,7 +127,7 @@ test('狭い板の案内は開閉しても入力内容を保つ', async () => {
   expect(host?.querySelector<HTMLInputElement>('#operator-name')?.value).toBe(rule.name)
 })
 
-describe('B-139 欄で知らせて移る', () => {
+describe('欄で知らせて移る', () => {
   test('名前を消して下書きを保存すると、口を呼ばず名前の欄が赤くなり理由が出て、そこへ移る', async () => {
     await render()
     const name = host!.querySelector('#operator-name') as HTMLInputElement

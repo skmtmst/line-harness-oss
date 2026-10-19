@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { AccountStyle } from '@line-crm/shared'
-import { styleApi } from '@/lib/api-styles'
+import { styleApi } from '@/lib/api/helpers/styles'
 import { accountStyleUpdated } from '@/hooks/use-account-style'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 

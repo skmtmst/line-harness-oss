@@ -1,5 +1,5 @@
 /*
- * ★V8 一斉配信の詳細（絵 `cgiGB`・`pNiUk`・`F3X1Mo`・`Q28Gb`）。
+ * ★V8 一斉配信の詳細。
  * 白い板いっぱいに 頭 → 競合の帯 → タブ → 左の本文／右の欄（380）。カードで囲まず線で分ける。
  * 値は app/globals.css の `--tpl-bd-*`（[data-theme="v8"]）。線は内側の影で描き、高さを足さない。
  */
@@ -217,7 +217,7 @@ a.railStep:hover .railLabel {
   outline-offset: var(--tpl-bd-focus);
 }
 
-/* ほかの人が更新した（Q28Gb）：頭とタブの間の琥珀の帯。 */
+/* ほかの人が更新した：頭とタブの間の琥珀の帯。 */
 .conflictWrap {
   padding: var(--tpl-bd-conflict-wrap-pad);
 }
@@ -554,7 +554,7 @@ a.railStep:hover .railLabel {
   font-weight: 600;
 }
 
-/* 承認待ち（pNiUk）：緑の箱。 */
+/* 承認待ち：緑の箱。 */
 .approval {
   display: flex;
   flex-direction: column;
@@ -642,7 +642,7 @@ a.railStep:hover .railLabel {
   margin: 0;
 }
 
-/* 予約を取り消す窓（BeNtj）：ボタンは左から 取り消す・やめる・残す。 */
+/* 予約を取り消す窓：ボタンは左から 取り消す・やめる・残す。 */
 .dialogButtons {
   display: flex;
   flex-wrap: wrap;
@@ -671,7 +671,7 @@ a.railStep:hover .railLabel {
   }
 }
 
-/* 予約を取り消す窓（BeNtj）：赤の取り消しと、残す側の2つの間を少し空ける。 */
+/* 予約を取り消す窓：赤の取り消しと、残す側の2つの間を少し空ける。 */
 .dialogButtons.cancelButtons {
   padding: var(--tpl-sc2-cancel-foot-pad);
 }
@@ -681,7 +681,7 @@ a.railStep:hover .railLabel {
 }
 
 /*
- * 予約を取り消す窓（BeNtj）の頭：題は 16/700 の1行（幅432）、説明は題の12下・行21。
+ * 予約を取り消す窓の頭：題は 16/700 の1行（幅432）、説明は題の12下・行21。
  * 共通の窓は右上の×が頭の行で幅を取り、題が2行に折れていた。×は消さず（閉じ方は×・UI-25）、
  * この窓だけ右上の角（窓の余白の中・24角）へ浮かせて題の幅を空ける。共通部品は変えない（下のボタンの段を持つ窓だけに効かせる）。
  */
@@ -716,7 +716,7 @@ a.railStep:hover .railLabel {
 
 .head:has(.rail) ~ .split .side { padding-top: var(--tpl-section-pad); }
 
-/* 丸・線の色は型の共通部品 Steps（Fa8ED・B-211）とそろえる：済み＝緑の丸＋レ、今＝緑の面、まだ＝白に枠、済んだ線＝緑 1.5。 */
+/* 丸・線の色は型の共通部品 Steps（Fa8ED・）とそろえる：済み＝緑の丸＋レ、今＝緑の面、まだ＝白に枠、済んだ線＝緑 1.5。 */
 .railLine { height: var(--tpl-steps-line-h); background: var(--color-divider); }
 .railLine[data-done] { background: var(--color-accent-deep); }
 .railItem[data-finished] .railMark { background: var(--color-selection-border); }

@@ -143,7 +143,7 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
     const note = notes[notes.length - 1]
     expect(note).toMatch(/font-size:\s*var\(--polish-text-support\)/)
     expect(note).toMatch(/line-height:\s*var\(--text-lh\)/)
-    // 印は選択中も文字の色を継ぐ（B-152⑤）。
+    // 印は選択中も文字の色を継ぐ（⑤）。
     expect(c).toMatch(/:root\s*\.checked \.topIcon\s*\{[^}]*color:\s*inherit/s)
   })
 

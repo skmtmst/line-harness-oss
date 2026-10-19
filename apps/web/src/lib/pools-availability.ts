@@ -7,7 +7,7 @@ import { loadFeatureVisibility } from './feature-visibility-cache'
  * 口は、見えるLINEアカウントのどこにも multi_store_hierarchy が
  * 有効でないと 403（FEATURE_DISABLED）を返す。403 の応答自体が
  * ブラウザの console error（Failed to load resource）になるため、
- * .catch() で握りつぶしても監査のノイズは消えない。発行しないことが
+ * .catch で握りつぶしても監査のノイズは消えない。発行しないことが
  * 唯一の対策なので、ここで「有効な場所が1つでもあるか」だけを先に見る。
  *
  * 使うのは 403 にならない口だけ（/api/line-accounts は core、

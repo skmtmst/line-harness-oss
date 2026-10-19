@@ -1,0 +1,101 @@
+import type { ReactNode } from 'react';
+import Icon, { type IconName } from './icon.js';
+import Button from './button/index.js';
+
+/**
+ * ★V8 の中央寄せの状態 (完了・待ち・空・開けない)。
+ * 印＋題＋本文＋ボタン1つ。ボタンは action があるときだけ1つ出す。
+ * 印は success だけ緑の丸。それ以外は灰色の線の印をそのまま置く
+ * (・ と同じ形)。ウェビナーの暗い地では dark を渡す。
+ * 待ち (キャンセル待ち・承認待ち) は tone="wait" で黄土色の丸にする。
+ * 見つからない・開けない (板 ) は tone="muted" で薄い灰の丸に灰の印。
+ * large は ★V8 の終わり・お知らせの板 (・・) の形：
+ * 丸・題 (20)・本文 (13/21) の間をすべて 16 空け、children を本文の下に足す。
+ */
+export default function StatusView({
+  icon,
+  tone = 'neutral',
+  dark = false,
+  title,
+  body,
+  action,
+  large = false,
+  children,
+}: {
+  icon: IconName;
+  tone?: 'neutral' | 'success' | 'wait' | 'muted';
+  dark?: boolean;
+  title: string;
+  body?: string;
+  action?: { label: string; onClick: () => void };
+  large?: boolean;
+  children?: ReactNode;
+}) {
+  const mark =
+    tone === 'success' ? (
+      <span
+        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-soft text-liff-primary"
+        aria-hidden="true"
+      >
+        <Icon name={icon} className={large && icon !== 'check' ? 'h-[34px] w-[34px]' : 'h-9 w-9'} />
+      </span>
+    ) : tone === 'wait' ? (
+      <span
+        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-wait-bg text-liff-wait-ink"
+        aria-hidden="true"
+      >
+        <Icon name={icon} className={large ? 'h-[34px] w-[34px]' : 'h-8 w-8'} />
+      </span>
+    ) : tone === 'muted' ? (
+      <span
+        className="flex h-18 w-18 items-center justify-center rounded-full bg-liff-chip text-ink-secondary"
+        aria-hidden="true"
+      >
+        <Icon name={icon} className="h-9 w-9" />
+      </span>
+    ) : (
+      <span className={dark ? 'text-night-faint' : 'text-liff-idle'} aria-hidden="true">
+        <Icon name={icon} className="h-10 w-10" />
+      </span>
+    );
+  if (large) {
+    return (
+      <div className="flex w-full flex-col items-center gap-4 text-center">
+        {mark}
+        <p className={`w-full text-xl font-bold ${dark ? 'text-canvas' : 'text-ink'}`}>{title}</p>
+        {body && <BodyText text={body} dark={dark} large />}
+        {children}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center px-6 py-10 text-center">
+      {mark}
+      <p className={`mt-4 text-[17px] font-bold ${dark ? 'text-canvas' : 'text-ink'}`}>{title}</p>
+      {body && <BodyText text={body} dark={dark} />}
+      {action && (
+        <div className="mt-6 w-full max-w-55">
+          <Button variant="primary" onClick={action.onClick}>
+            {action.label}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BodyText({ text, dark = false, large = false }: { text: string; dark?: boolean; large?: boolean }) {
+  const lines = text.split('\n');
+  return (
+    <p
+      className={`text-[13px] text-pretty ${large ? 'w-full leading-[21px]' : 'mt-2 leading-6'} ${dark ? 'text-night-faint' : 'text-liff-sub'}`}
+    >
+      {lines.map((line, i) => (
+        <span key={i}>
+          {i > 0 && <br />}
+          {line}
+        </span>
+      ))}
+    </p>
+  );
+}

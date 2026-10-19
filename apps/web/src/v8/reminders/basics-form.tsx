@@ -21,7 +21,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 リマインダ手順1「基本設定」の入力部分（板 VE1u5・競合 k32cn）。
+ * ★V8 リマインダ手順1「基本設定」の入力部分（板 ・競合 ）。
  * /reminders/edit?stage=basics（保存済みの基本設定を直す）で使う。
  * 合格した /reminders/new（app/reminders/basics-form-v8.tsx）を写した。
  * src/v8 からは @/app を読めないため、同じ動き・同じ値で持つ。

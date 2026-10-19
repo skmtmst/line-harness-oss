@@ -2,7 +2,7 @@
 import { getApiErrorCode } from '@/lib/api'
 
 /*
- * U-1 変更の確認（v6-29 §10）の処理の核。
+ * U-1 変更の確認（管理画面-29 §10）の処理の核。
  * 入力を変えたら少し待って影響を自動で確かめる（autoPreview）。
  *
  * 公開後の名前・会場・日時・定員・条件の変更は、影響する申込・待ち・
@@ -273,7 +273,7 @@ export function useChangeReview(eventId: string) {
   }, [selectedAccountId, applyBusy, preview, buildChanges, eventId, event, reason])
 
   /*
-   * ★V8：絵（hmr2P）は「影響を確かめる」ボタンを持たず、変えたらすぐ右に影響が出る。
+   * ★V8：絵は「影響を確かめる」ボタンを持たず、変えたらすぐ右に影響が出る。
    * 入力が止まって 600ms たったら確かめる。変える内容が無ければ何も出さない。
    */
   const changeKey = JSON.stringify(buildChanges())

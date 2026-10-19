@@ -9,7 +9,7 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EditDialog, { type AutoReplyDraft } from './edit-dialog'
-import { MESSAGE_KIND_WORDS } from '@/app/auto-replies/auto-reply-words'
+import { MESSAGE_KIND_WORDS } from '@/v8/auto-replies/auto-reply-words'
 
 vi.mock('@/lib/api', () => ({
   api: {

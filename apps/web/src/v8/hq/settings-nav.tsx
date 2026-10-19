@@ -15,7 +15,7 @@ const ITEMS: { key: HqSettingsNavKey; label: string; href: string; Icon: typeof 
 ]
 
 /**
- * ★V8 統括の設定の中のメニュー（絵 `r4ARpV`・`JB8V1`・`b8xBtZ` の左の列）。
+ * ★V8 統括の設定の中のメニュー（絵の の左の列）。
  * 形は店の設定と同じ共通の「設定の中のメニュー」（components/layout/settings-inner-nav の SettingsMenu）。
  * 型（ListPage）のフォルダの列に入れて使う（placement="folder"）。列の幅・余白・仕切り線は型が持つ。
  * 印は絵どおり（メンバー users・統括の情報 building-2・請求 credit-card・お問い合わせ life-buoy）。

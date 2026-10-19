@@ -1,5 +1,5 @@
 import type { TemplateType } from '@/lib/hq-templates-api'
-import HqTemplatesV8 from '@/v8/hq-templates/console'
+import { HqTemplatesV8 } from '@/v8/hq-templates/public/console/index'
 import TemplateDefinitionEditor from '@/app/hq/templates/template-definition-editor'
 
 export { resolvedItems } from '@/v8/hq-templates/definition'

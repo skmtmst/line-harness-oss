@@ -27,11 +27,11 @@ import styles from './settings-inner-nav.module.css'
  */
 
 /**
- * ★V8 設定の板（ihjfd・u3iab3・V7vn3 ほか 8 枚）の並び。左のメニュー（menu.ts）の並びとは違うので、ここで明示する。
+ * ★V8 設定の板（・・ ほか 8 枚）の並び。左のメニュー（menu.ts）の並びとは違うので、ここで明示する。
  * 2026-10-06：夕41 の並び（専用の小見出し・プール管理なし）から、今の絵の並びへ。
  */
 const SETTINGS_ORDER = [
-  '/settings/customer-look', // お客さまのデザイン（B-237・絵 ewM7i では会社とロゴの次＝今は先頭）
+  '/settings/customer-look', // お客さまのデザイン（・絵  では会社とロゴの次＝今は先頭）
   '/getting-started', // はじめの設定
   '/accounts', // LINEアカウント
   '/pools', // プール管理

@@ -8,7 +8,7 @@ import type {
 import type { GettingStartedStep } from '@/lib/api'
 
 /*
- * ★V8 はじめの設定（xuJ7D）の6段の判定。
+ * ★V8 はじめの設定の6段の判定。
  * V8 の両入口が使う表示モデル。完了の判定はAPIの実際の状態を優先する。
  * 画面に出す2段目の言葉だけ絵どおり（「チャネル ID」「自分の LINE」の空き）。
  */

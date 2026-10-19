@@ -37,7 +37,7 @@ describe('V6 リッチメニュー削除確認 szXsT', () => {
 
   it('公開中のメニューもブラウザ標準alertを使わず、取り下げの順番を窓で案内する', () => {
     expect(PAGE).toContain("setDeleteTarget({ kind: 'managed', group })")
-    // ★V7 `Xn1Mz`（行の「…」統一）：削除口は共通 RowActions のメニューへそろえた。
+    // ★管理画面 `Xn1Mz`（行の「…」統一）：削除口は共通 RowActions のメニューへそろえた。
     // 公開中→szXsT・下書き→szXsT-draft の分け方は menuButtonProps で残す。
     expect(PAGE).toContain('<RowMenu')
     expect(PAGE).toContain("onSelect: () => handleDelete(g)")

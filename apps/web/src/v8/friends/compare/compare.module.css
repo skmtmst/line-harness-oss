@@ -1,4 +1,4 @@
-/* ★V8 重複候補を比べて決める（Pencil fcg2D・1152 は p15At）。値は globals.css の --tpl-fr-*。 */
+/* ★V8 重複候補を比べて決める（Pencil ・1152 は ）。値は globals.css の --tpl-fr-*。 */
 .head {
   display: flex;
   flex-direction: column;
@@ -41,7 +41,7 @@
   min-width: 0;
 }
 
-/* B-168: 中身のカードと、その中の判定・履歴の小箱を分ける。 */
+/* : 中身のカードと、その中の判定・履歴の小箱を分ける。 */
 .subject,
 .card {
   border-radius: var(--radius-card);
@@ -151,7 +151,7 @@
 .faint { color: var(--color-ink-faint); }
 
 /* 下の帯：左に「別の人だった」、中央に保留・結び付ける（画面の下に追従）。 */
-/* 1152 の板（p15At）：確認済みの札は値のすぐ後ろ。 */
+/* 1152 の板：確認済みの札は値のすぐ後ろ。 */
 @container v8-page (max-width: 1000px) {
   .attr { gap: var(--tpl-fr-area-gap); }
   .attr dt { width: var(--tpl-fr-cmp-attr-label-n); }

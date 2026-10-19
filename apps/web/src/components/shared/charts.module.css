@@ -8,14 +8,14 @@
 .column { flex: 1 1 0; min-width: 0; height: 100%; position: relative; }
 .hit { position: relative; display: flex; align-items: end; justify-content: center; height: 100%; width: 100%; border: 0; background: transparent; padding: 0 3px; }
 .bar { width: 100%; border-radius: var(--radius-icon) var(--radius-icon) 0 0; }
-/* 30日などの細かい棒（15本以上）は間と内側の余白を詰める。8px の間のままだと棒が 1px の線になる（健康日記 BVuYh）。 */
+/* 30日などの細かい棒（15本以上）は間と内側の余白を詰める。8px の間のままだと棒が 1px の線になる（健康日記 ）。 */
 .columns[data-dense] { gap: 2px; }
 .columns[data-dense] .hit { padding: 0 1px; }
 .tooltip { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); z-index: 2; background: var(--color-ink); color: var(--color-canvas); padding: 6px 8px; border-radius: var(--radius-mini); font-size: 11px; white-space: nowrap; }
 .hit:hover .tooltip, .hit:focus-visible .tooltip { display: block; }
 .axis { position: absolute; top: calc(100% + 8px); left: 0; right: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--color-ink-faint); }
 .funnel { display: flex; flex-direction: column; gap: 12px; }
-/* 段の行は枠の無い行（絵 DkRDE・z2dgw）。棒は LINE の緑、選んだ段は薄い緑の地と濃い緑の棒。 */
+/* 段の行は枠の無い行。棒は LINE の緑、選んだ段は薄い緑の地と濃い緑の棒。 */
 .funnelRow { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; border: 0; background: transparent; border-radius: var(--radius-control); padding: 12px; color: var(--color-ink); font-size: 12px; }
 .funnelRow[aria-pressed='true'] { background: var(--color-accent-soft); }
 .funnelBar { background: var(--color-accent); }
@@ -33,7 +33,7 @@
 
 html:root .tooltip { background: var(--color-canvas); color: var(--color-ink); border: 1px solid var(--color-code-border); box-shadow: var(--shadow-float); padding: var(--space-8) var(--space-12); }
 
-/* まとめの小さい棒（運営 CyW0E）：棒100＋月の名前20。数は焦点・乗せた時にも読める。 */
+/* まとめの小さい棒（運営 ）：棒100＋月の名前20。数は焦点・乗せた時にも読める。 */
 html:root .plot[data-presentation='summary'] { height: var(--tpl-chart-summary-plot-h); margin: 0 0 calc(var(--space-16) + var(--space-4)); }
 html:root .plot[data-presentation='summary'] .axis { top: calc(100% + var(--space-4)); }
 
@@ -43,7 +43,7 @@ html:root .axis[hidden] { display: none; }
 html:root .axis[data-axis-edge='first'] { left: 0; transform: none; }
 html:root .axis[data-axis-edge='last'] { left: auto; right: 0; transform: none; }
 
-/* 横棒（HorizontalBarChart・絵 v0SbYR）。 */
+/* 横棒（HorizontalBarChart・絵 ）。 */
 .hbar { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .hbarRow { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--color-ink); font-size: 12px; }
 .hbarLabel { flex: 0 0 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

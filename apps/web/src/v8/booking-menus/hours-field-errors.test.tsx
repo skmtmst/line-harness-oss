@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-/* B-139：開ける時間。保存で落ちた区間の時刻の欄が赤くなり、その欄へ移る（理由は表の下）。 */
+/* ：開ける時間。保存で落ちた区間の時刻の欄が赤くなり、その欄へ移る（理由は表の下）。 */
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -29,7 +29,7 @@ it('7曜日を継続設定のスイッチで切り替え、休みと開ける時
   const { rerender } = render(<HoursTabV8 {...props} />)
   expect(screen.queryByText('1〜1000')).toBeNull()
   expect(screen.getByLabelText('月曜日の開始時刻（1区間目）').parentElement?.querySelector('button')).toBeNull()
-  // 曜日の入り切りは保存してから効くのでチェック（決まり14・絵 yRPxl）。スイッチは置かない。
+  // 曜日の入り切りは保存してから効くのでチェック（決まり14・絵 ）。スイッチは置かない。
   expect(screen.queryAllByRole('switch')).toHaveLength(0)
   expect(screen.getAllByRole('checkbox', { name: /曜日を開ける/ })).toHaveLength(7)
   fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を開ける' }))

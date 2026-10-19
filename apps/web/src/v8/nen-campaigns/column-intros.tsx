@@ -17,7 +17,7 @@ import Notice from '@/components/shared/notice'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDay } from '@/lib/format'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { readSaveFieldErrors } from '@/lib/api-field-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 
 
 type Column = Pick<NenColumn, 'id' | 'slug' | 'title' | 'introText' | 'publishedAt' | 'updatedAt'>

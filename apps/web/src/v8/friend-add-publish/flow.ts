@@ -1,6 +1,6 @@
 /*
  * 友だち追加時の配信の公開（確認）で使う小さな決まり。
- * v7（app/friend-add-settings/publish/publish-flow.ts）と同じ中身を写した（src/v8 は @/app を読めない）。
+ * 管理画面（app/friend-add-settings/publish/publish-flow.ts）と同じ中身を写した（src/v8 は @/app を読めない）。
  */
 import type { FriendAddRoutingValidation, FriendAddRoutingVersion } from '@line-crm/shared'
 import type { FriendAddRule } from '@/lib/api'
@@ -38,7 +38,7 @@ export function blockedReason(validation: FriendAddRoutingValidation | null): st
   return null
 }
 
-/** 同じ下書きを2回公開しないための鍵。v7 と同じ作り。 */
+/** 同じ下書きを2回公開しないための鍵。管理画面 と同じ作り。 */
 export function idempotencyKeyFor(version: Pick<FriendAddRoutingVersion, 'accountId' | 'versionId'>): string {
   const key = `friend-add-publish-${version.accountId}-${version.versionId}`
   return key.length >= 16 ? key : key.padEnd(16, '0')

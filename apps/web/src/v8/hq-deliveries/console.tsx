@@ -18,7 +18,7 @@ import Checkbox from '@/components/shared/checkbox'
 import { Tabs } from '@/components/shared/tabs'
 import { Plus, Send } from 'lucide-react'
 import type { HqTemplateFolder } from '@line-crm/shared'
-import { useDistributionFolders, accountsInFolder, distributionFolderRows } from '../hq-templates/distribution-accounts'
+import { useDistributionFolders, accountsInFolder, distributionFolderRows } from '@/v8/hq-templates/public/distribution-accounts/index'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -28,7 +28,7 @@ import Select from '@/components/shared/select'
 import { OptionalBadge, RequiredBadge } from '@/components/shared/form-controls'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
-import { hqDeliveriesApi, type HqDeliveryTemplate, type HqDeliveryTemplateDetail } from '@/lib/api-hq-deliveries'
+import { hqDeliveriesApi, type HqDeliveryTemplate, type HqDeliveryTemplateDetail } from '@/lib/api/helpers/hq-deliveries'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import type { HqDeliveryTemplateType } from '@line-crm/shared'
 import styles from './console.module.css'
@@ -74,7 +74,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   const accountFolders = useDistributionFolders(view==='accounts' || view==='preflight' || view==='result')
   const dirty = view === 'edit' && JSON.stringify(selected) !== savedSnapshot.current
   const guard = useUnsavedGuard({ dirty, busy, onDiscard: () => setSelected(null) })
-  /* 作る・直す画面のパンくずは画面の題の種類名（絵 T5ljMA「自動応答」）。一覧は今までどおり「〜を配る」。 */
+  /* 作る・直す画面のパンくずは画面の題の種類名（絵 「自動応答」）。一覧は今までどおり「〜を配る」。 */
   usePageTitle(view === 'edit' ? titleOf(type) : `${titleOf(type)}を配る`)
 
   const load = useCallback(async () => {
@@ -101,7 +101,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     if (!selected) return
     setSelected({ ...selected, definition: { ...selected.definition, settings: { ...selected.definition.settings, [key]: value } } })
   }
-  /* 必須・任意の札（T5ljMA）。ほかの作る画面と同じく、題の右に置く。 */
+  /* 必須・任意の札。ほかの作る画面と同じく、題の右に置く。 */
   const req = (label: string, required: boolean) => <span className={styles.fieldLabel}>{label}{canEdit ? (required ? <RequiredBadge /> : <OptionalBadge />) : null}</span>
   const OPTIONAL_KEYS = new Set(['description'])
   const field = (key: string, label: string, multiline = false) => {
@@ -175,7 +175,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
       {loading ? <p role="status">読み込み中…</p> : shown.length ? <ResourceTable updatedLabel="版" canEdit={canEdit} rows={shown.map(row=>({id:row.id,name:<Button variant="text" onClick={()=>void edit(row)}>{row.name}</Button>,summary:row.content_summary || titleOf(type),folder:folders.find(folder=>folder.id===row.folder_id),references:'—',updated:`版 ${row.revision}`,destinations:row.distributed_account_count == null ? '—' : row.distributed_account_count ? `${row.distributed_account_count} アカウント` : 'まだ配っていない',actions:<RowMenu label={`「${row.name}」の操作`} items={[{id:'distribute',label:'アカウントへ配る',icon:<Send size={14} aria-hidden="true" />,emphasis:true,disabled:busy || accountsFailed,onSelect:()=>{void (async()=>{if (await edit(row)) setView('accounts')})()}}]} />}))} /> : <p>ひな形がありません。検索・フォルダを確認するか、新しく作ってください。</p>}
     </ListPage></SaveErrorScope>
   }
-  /* 自動応答は店と同じ手順の段で作る（T5ljMA）。ほかの種類は今の1枚の画面。 */
+  /* 自動応答は店と同じ手順の段で作る。ほかの種類は今の1枚の画面。 */
   if (view === 'edit' && selected && type === 'auto_reply') return <SaveErrorScope errors={saveErrors}><HqAutoReplyEditor
     title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
     canEdit={canEdit} busy={busy} name={selected.template.name} description={selected.template.description ?? ''} settings={settings}

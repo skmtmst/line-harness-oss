@@ -16,6 +16,6 @@
 .sample { display:flex; flex-direction:column; gap:var(--tpl-fdt-info-gap); }
 }
 
-/* 週・月の切り替え：店の色の地を少し濃くした器に、選んでいる方を店の地の色で浮かせる（絵 VsZ25）。 */
+/* 週・月の切り替え：店の色の地を少し濃くした器に、選んでいる方を店の地の色で浮かせる。 */
 .viewSwitch { background:color-mix(in srgb, var(--color-ink) 8%, var(--customer-background)); }
 .viewNow { background:var(--customer-background); }

@@ -14,7 +14,7 @@ import styles from './save-conflict.module.css'
  * ほかの人が先に保存していたら、入力は捨てずに帯を出し、
  * 「違いを比べる」（最新を取って比べるだけ・画面は書き換えない）と
  * 「最新を読み込んで続ける」（自分の直しを捨てて最新から続ける）を選んでもらう。
- * 回答フォームの編集（J1pdB）の作りを共通にしたもの。リマインダの作る・編集（k32cn）でも使う。
+ * 回答フォームの編集の作りを共通にしたもの。リマインダの作る・編集でも使う。
  *
  * 使い方：
  *   const conflict = useSaveConflict({ fetchLatest, reload })
@@ -162,7 +162,7 @@ export function SaveConflictBand({
   /** 比べる先が別の画面のときは、ボタンをその画面へのリンクにする（新しいタブでも開ける）。 */
   compareHref?: string
   onReload?: () => void
-  /** 絵の板の印（J1pdB・k32cn など）。 */
+  /** 絵の板の印（・ など）。 */
   designNode?: string
 }) {
   return (

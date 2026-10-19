@@ -69,7 +69,7 @@ export type BannerGenerationStatus = 'queued' | 'running' | 'done' | 'failed' | 
 export type BannerMode = 'banner' | 'free'
 export type BannerPersonOption = 'with' | 'without'
 /**
- * 参照画像の使い方（★V6 35-2・承認済み ★BG-C `cOgWE`）。
+ * 参照画像の使い方（★管理画面 35-2・承認済み ★BG-C `cOgWE`）。
  * edit=土台にする、parts=素材を一部使う、inspire=雰囲気を参考にする。
  */
 export type BannerReferenceMode = 'edit' | 'parts' | 'inspire'
@@ -390,7 +390,7 @@ function gcd(a: number, b: number): number {
  * DB の日時を Date にする。
  *
  * この機能の表は `strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')` で
- * **日本時間の壁時計を、時差なしで**保存している。そのまま `new Date()` に
+ * **日本時間の壁時計を、時差なしで**保存している。そのまま `new Date` に
  * 渡すとブラウザの時間帯で読まれてずれるので、`+09:00` を足して読む。
  * すでに時差（Z / +09:00）が付いているものはそのまま。
  */

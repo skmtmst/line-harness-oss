@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * たまる決めごとの表（板 `OC0gy`）。器からはみ出して行末の操作が
+ * たまる決めごとの表（板 ）。器からはみ出して行末の操作が
  * 見切れないよう、固定割付＋列幅の合計 100 をここで留める。
  * happy-dom に配置計算は無いので、構造（`colgroup` の7列と幅の合計）を見る。
  */
@@ -211,7 +211,7 @@ describe('たまる決めごとの表の器収め', () => {
       root.render(<AccountProvider><MileagePage /></AccountProvider>)
     })
     const table = await waitForTable()
-    /* ★V8（OC0gy）は共通の表の「列の並び」。表の幅は器に任せ、列の幅は CSS の変数で決める。 */
+    /* ★V8は共通の表の「列の並び」。表の幅は器に任せ、列の幅は CSS の変数で決める。 */
     const head = table.querySelector('thead tr')
     expect(head?.getAttribute('data-table-layout')).toBe('columns')
     const cells = [...(head?.querySelectorAll('th') ?? [])]
@@ -225,7 +225,7 @@ describe('たまる決めごとの表の器収め', () => {
 })
 
 /*
- * タブの名の横の件数（板 `OC0gy`：たまる決めごと・使い道・
+ * タブの名の横の件数（板 ：たまる決めごと・使い道・
  * 友だちの残高）。数は各タブの読み物から来る。読み直し中・失敗時は出さない。
  */
 async function waitForTabCount(calls: Array<{ key: string; text: string | null }>, key: string, text: string) {

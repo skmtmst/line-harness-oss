@@ -12,9 +12,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'dialog.module.css'), 'utf8')
 
 /**
- * 解除窓の説明文の桃箱（YZ57z Google Sheets の接続を解除）。
+ * 解除窓の説明文の桃箱（ Google Sheets の接続を解除）。
  * 板どおり「題は箱の外・説明だけ箱の中」。
- * 渡さなければ帯なし（今までどおり）。VsSyu 式（箱なし）の既定の
+ * 渡さなければ帯なし（今までどおり）。 式（箱なし）の既定の
  * 破壊的トーンは変えない。
  */
 describe('ダイアログの桃箱', () => {

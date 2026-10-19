@@ -55,11 +55,11 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 外部連携「こちらから送る」の一覧（Pencil `ZSbFY`・1152 `AsfFB`・
- * 閲覧のみ `l5SRfT`・状態 `wWrpY`）。
+ * ★V8 外部連携「こちらから送る」の一覧（Pencil ・1152 ・
+ * 閲覧のみ ・状態 ）。
  *
  * 型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「送り先を作る」）・
- * 案内の帯・道具の段・表をはめる。データの口は v7 と同じ（一覧・集計・
+ * 案内の帯・道具の段・表をはめる。データの口は 管理画面 と同じ（一覧・集計・
  * 動かす/止める・試し送信・合言葉の作り直し・削除）。
  *
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた
@@ -73,7 +73,7 @@ type SortKey = 'volume' | 'name'
 const UNFILED = '__unfiled__'
 
 function matchesQuery(item: OutgoingWebhookOverview, query: string): boolean {
-  // v7 と同じ探し方：名前・URL・出来事の種類（大文字小文字を区別しない）。
+  // 管理画面 と同じ探し方：名前・URL・出来事の種類（大文字小文字を区別しない）。
   const q = query.trim().toLocaleLowerCase('ja-JP')
   if (!q) return true
   return [item.name, item.url, ...item.eventTypes].some((value) => value.toLocaleLowerCase('ja-JP').includes(q))
@@ -99,7 +99,7 @@ export default function WebhooksOutgoingV8() {
   const staffRole = useStaffRole()
   /*
    * 送り先の変更（作る・動かす/止める・直す・合言葉・削除）は統括だけ（R32）。
-   * 試し送信は管理者も使える。見るだけの担当者は中身の確認と検索だけ（l5SRfT）。
+   * 試し送信は管理者も使える。見るだけの担当者は中身の確認と検索だけ。
    */
   const canManage = staffRole === 'owner'
   const canTest = canManage || staffRole === 'admin'
@@ -485,7 +485,7 @@ export default function WebhooksOutgoingV8() {
       aria-label="つなぎ先で探す"
     />
   )
-  /* 1152 の板（AsfFB）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
+  /* 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
 
   const wideToolbar = (
     <>
@@ -572,7 +572,7 @@ export default function WebhooksOutgoingV8() {
           <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--tpl-wh-head-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--tpl-wh-col-gap)', padding: '0 var(--tpl-list-inset)', numberInset: 'var(--tpl-wh-num-pad-end)' }}>
             <thead>
               {narrow ? (
-                /* 1152 の絵 AsfFB：送り先・今月送った・状態・操作の4列。 */
+                /* 1152 の絵 ：送り先・今月送った・状態・操作の4列。 */
                 <TableHeadRow data-table-layout="columns">
                   <Th grow inset="var(--tpl-folder-dot-indent)" className={styles.colName}>{folderMove.pageCheckbox}送り先（送るタイミング → URL）</Th>
                   <Th className={styles.colMonth}>今月送った</Th>

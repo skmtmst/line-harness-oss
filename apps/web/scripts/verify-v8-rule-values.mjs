@@ -1,4 +1,4 @@
-/** B-159/161/180 の採用済みの値を、CSS の上書き・変数参照まで解いて照合する。 */
+/** /161/180 の採用済みの値を、CSS の上書き・変数参照まで解いて照合する。 */
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import postcss from 'postcss'

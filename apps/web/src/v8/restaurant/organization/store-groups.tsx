@@ -17,7 +17,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { restaurantTestApi, type RestaurantStore, type RestaurantStoreGroup } from '@/lib/restaurant-test-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { Panel, Status } from '../common-a/parts'
+import { Panel, Status } from '@/v8/restaurant/common-a/public/parts/index'
 import styles from './organization.module.css'
 
 type Member = RestaurantStoreGroup['members'][number]

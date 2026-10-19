@@ -1,7 +1,7 @@
 /*
- * ★V8 友だちの段のタブ（Pencil x6QsVz・ADjK8・hn6Y8・T9gblG・L48eY）。
+ * ★V8 友だちの段のタブ（Pencil ・・・・）。
  *
- * 行き先は今の画面と同じ URL（app/friends/friends-tabs.ts と同じ名前・同じ順）。
+ * 行き先は今の画面と同じ URL（v8/friends/friends-tabs.ts と同じ名前・同じ順）。
  * 絵のタブは4つ。「CSVで書き出す・取り込む」（/friends/migrations）はタブに置かず、
  * 友だち一覧の「友だちを取り込む」から行く（画面の頭の説明の文だけ残す）。
  */
@@ -24,7 +24,7 @@ export const FRIENDS_TAB_NOTES: Record<FriendsTabKey, string> = {
 }
 
 /**
- * 変えられるかの判定。役割はサーバ（`api.staff.me()`）の答えを使い、
+ * 変えられるかの判定。役割はサーバ（`api.staff.me`）の答えを使い、
  * 手元の保存値の役割（`lh_staff_role`）は見ない（古い値が残ることがある）。
  * 担当者（staff）でも、項目キーで友だち・受信箱の変更を任されていれば変えられる。
  */

@@ -31,7 +31,7 @@
   max-height: calc(100dvh - 32px);
   flex-direction: column;
   background: var(--color-canvas);
-  /* ★V7 の影は3段。画面の真ん中に開く窓は最前面（段3）。 */
+  /* ★管理画面 の影は3段。画面の真ん中に開く窓は最前面（段3）。 */
   color: var(--color-ink);
 }
 
@@ -155,8 +155,8 @@
 }
 
 /*
- * 琥珀の呼びかけ（CFAyf 送受信を止める・YZ57z 解除：説明文を帯で囲む）。
- * v7 は変えない。地はトークン表の warn-soft（#fdf3e1。板 CFAyf #fff4e0
+ * 琥珀の呼びかけ（ 送受信を止める・ 解除：説明文を帯で囲む）。
+ * 互換経路は変えない。地はトークン表の warn-soft（#fdf3e1。板  #fff4e0
  * とほぼ同じ。--color-warning-bg #faf0dc は濃すぎるため使わない）。
  * 板どおり角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
  */
@@ -178,10 +178,10 @@
 }
 
 /*
- * 桃の呼びかけ（YZ57z 解除：説明文だけを桃箱で囲む。題は箱の外）。
+ * 桃の呼びかけ（ 解除：説明文だけを桃箱で囲む。題は箱の外）。
  * 板どおり地 #fdecea≒--color-danger-bg（#fce9e7）・文 #b42318≒--color-danger
  * （#b3261e）・角丸 8・内側 10/12・文 11px/17px。枠は地と同色で見せない。
- * v7 は変えない。VsSyu 式（箱なし）の既定の破壊的トーンはそのまま。
+ * 互換経路は変えない。 式（箱なし）の既定の破壊的トーンはそのまま。
  */
 :root .calloutDanger {
   border-color: var(--color-danger-bg);
@@ -268,7 +268,7 @@
  * ★V8 仕上げ（M10）「窓」：開くとき背景が薄く出て、窓は少し下から
  * ふわっと（opacity＋translateY 4px→0、scale 0.98→1、200ms ease-out）。
  * 閉じるときは逆（150ms）。閉じの印 `data-closing` は dialog.tsx が
- * V8 のときだけ付ける（v7・試験は今までどおり即時に消える）。
+ * V8 のときだけ付ける（管理画面・試験は今までどおり即時に消える）。
  */
 /*
  * 開く・閉じるは「移り変わり（transition）」で動かす（フルード・インタラクション ①）。
@@ -398,7 +398,7 @@
 :root .footer { display: block; width: 100%; flex-shrink: 0; }
 :root .footer:empty { display: none; }
 /* 画面がボタンを直に渡した下の段（footer）も、並びの間 8・高さの中心をそろえる。
-   直に並べると行の中の inline のボタンになり、間 0・上下がずれていた（yOyCg）。包みを渡す画面は変わらない。 */
+   直に並べると行の中の inline のボタンになり、間 0・上下がずれていた。包みを渡す画面は変わらない。 */
 :root .footer:has(> :is(button, a)) { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* 左寄せのまま（これまでの見え方）。真ん中に寄せたい画面は包み（actions）を渡す。 */
 :root .actions { width: 100%; padding: 14px 24px; gap: 8px; align-items: center; border-top: 1px solid var(--color-hairline); }
@@ -431,7 +431,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .content > * { flex-shrink: 0; }
 :root .designButton[data-dialog-action='primary'] { box-shadow: var(--v8-parts-primary-shadow); }
 
-/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 :root .panel { -webkit-font-smoothing: auto; }
 
 /* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
@@ -447,7 +447,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 
 :root .panel[data-footer-align='start'] .actions { justify-content: flex-start; }
 :root .panel[data-design-footer-gap] .actions { gap: var(--dialog-footer-gap); }
-/* hadfk の続いた窓。呼び出し側が選んだときだけ、既定の段の帯を外す。 */
+/*  の続いた窓。呼び出し側が選んだときだけ、既定の段の帯を外す。 */
 :root .panel[data-layout='continuous'] { padding: 22px 24px; gap: 14px; }
 :root .panel[data-layout='continuous'] > .headerRow { padding: 0; align-items: center; }
 :root .panel[data-layout='continuous'] .title { font-size: 16px; font-weight: 700; line-height: 23px; }

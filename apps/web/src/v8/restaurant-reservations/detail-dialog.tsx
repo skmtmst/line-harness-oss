@@ -23,8 +23,8 @@ import {
   type RestaurantReservation,
   type RestaurantTable,
 } from '@/lib/restaurant-test-api'
-import { RsDialog } from '../restaurant/booking-kit/parts'
-import { INACTIVE_STATUSES, hm, mdWeek, sourceName,maskPhone } from '../restaurant/reservations/format'
+import { RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
+import { INACTIVE_STATUSES, hm, mdWeek, sourceName, maskPhone } from '@/v8/restaurant/reservations/public/format/index'
 import styles from './detail-dialog.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { formatYen as polishFormatYen } from '@/lib/format'

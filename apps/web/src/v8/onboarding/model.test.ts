@@ -11,8 +11,8 @@ const state = {
   },
 }
 
-describe('はじめの質問の決まり（B-313・組4の質問キー）', () => {
-  it('飲食は 11 問（B-313 が正）。質問のキーはどれも口が受け付ける', () => {
+describe('はじめの質問の決まり（・組4の質問キー）', () => {
+  it('飲食は 11 問（ が正）。質問のキーはどれも口が受け付ける', () => {
     const keys = ['image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'tickets', 'outcome', 'content']
     expect(stepNames('restaurant').map((step) => step.short)).toEqual(['使い方のスタイル', '見た目', '予約の確定の仕方', 'お支払い', 'キャンセルの期限', '前日のお知らせ', '来店スタンプ', 'クーポン', '席・卓', '営業時間', '受け付ける人数'])
     for (const style of ['restaurant', 'salon', 'consult', 'lesson', 'ec', 'standard'] as const) {
@@ -71,7 +71,7 @@ describe('はじめにやること（Bdfxm）', () => {
   })
 })
 
-describe('開き直したときの保存（B-335）', () => {
+describe('開き直したときの保存', () => {
   it('変えた答えだけを送り、予約設定が変わる答えは確かめの文を作る', async () => {
     const { changedAnswers, settingsChanges, isBookingConfirmSample } = await import('./model')
     const saved = { approval: { mode: 'configured' as const, value: 'automatic' }, reminders: { mode: 'configured' as const, value: true } }

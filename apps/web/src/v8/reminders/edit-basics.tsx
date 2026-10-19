@@ -23,7 +23,7 @@ type ReminderTemplateV8
 import styles from './edit.module.css'
 import { SummaryCardV8,WizardFooterV8 } from './ui'
 
-/* ---------------- 手順1の直し（基本設定・競合 k32cn） ---------------- */
+/* ---------------- 手順1の直し（基本設定・競合 ） ---------------- */
 export function BasicsStageV8({
   frame,
   notice,

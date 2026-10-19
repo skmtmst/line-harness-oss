@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({ role: { value: 'owner' as string | null } }))
 const styleCalls = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn() }))
-vi.mock('@/lib/api-styles', () => ({ styleApi: styleCalls }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: styleCalls }))
 
 vi.mock('@/lib/staff-role', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/staff-role')>()),

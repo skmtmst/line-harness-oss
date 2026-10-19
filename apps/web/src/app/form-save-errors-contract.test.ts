@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { auditFormSaveErrors, auditSavedScreens } from '../../scripts/form-save-errors-audit.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
-describe('全V8画面の保存失敗を欄へ返す見張り（B-154）', () => {
+describe('全V8画面の保存失敗を欄へ返す見張り', () => {
   it('作成・更新・公開のcatchに、欄の理由を受ける口とスコープがある', () => {
     expect(auditSavedScreens(root)).toEqual([])
   }, 60_000)

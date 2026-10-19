@@ -28,15 +28,15 @@ describe('V6共通トップバー', () => {
     expect(css).toMatch(/:root \.accountName \{\s*max-width:\s*128px/s)
     expect(css).toMatch(/:root \.crumbCurrent/s)
     expect(css).toMatch(/min-width:\s*0/)
-    // v7 の札（縮む側）は変えない。
+    // 管理画面 の札（縮む側）は変えない。
     expect(css).not.toMatch(/^\.accountPill \{[^}]*flex-shrink/m)
   })
 })
 
 /*
- * V8 殻合わせ（絵 `V8-B/JKjsE`）。統括もふだんの画面も同じ帯：
+ * V8 殻合わせ。統括もふだんの画面も同じ帯：
  * ホーム › 画面名・切替札（役割＋名前）・鈴・名前と役割・ログアウト。
- * v7 の土台クラスは触らない（V8 の上書きだけ）。
+ * 管理画面 の土台クラスは触らない（V8 の上書きだけ）。
  */
 describe('V8 の帯は絵どおり（殻合わせ）', () => {
   it('パンくずの手前はホーム（格子印＋リンク。統括の画面は統括のホームへ）', () => {

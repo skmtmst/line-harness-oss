@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 切替のつながり V8（板 wxIQ7）。
+ * 切替のつながり V8（板 ）。
  * V8 の見出し・板ID・右の「いまの状態」を出し、旧設定でも旧画面へ戻さない。
  */
 import React, { act } from 'react'

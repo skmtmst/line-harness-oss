@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   draft_customerName: requiredText("お客さまのお名前を入れてください。"),
 }
 
@@ -22,8 +22,8 @@ import DateTimeField from '@/components/shared/date-time-field'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantIntakeAddress } from '@/lib/restaurant-test-api'
-import { Status } from '../booking-kit/shell'
-import { DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
+import { Status } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { DialogNote, RowMore, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { dayLabelParen, formatAt } from './format'
 import styles from './inventory.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -142,7 +142,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
   const manualImport = () => {
     if (!importing || busy) return
     const errors: typeof fieldErrors = {}
-    if ((b244Requirements.draft_customerName.check(draft.customerName) !== null)) errors.customerName = 'お客さまのお名前を入れてください。'
+    if ((FIELD_REQUIREMENTS.draft_customerName.check(draft.customerName) !== null)) errors.customerName = 'お客さまのお名前を入れてください。'
     const guests = Number(draft.guestCount)
     if (!Number.isInteger(guests) || guests < 1 || guests > 100) errors.guestCount = '人数は1〜100の整数で入れてください。'
     let startsAt = ''
@@ -320,7 +320,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
       >
         <div ref={importRef} className={styles.manualFields}>
         {importError ? <Notice tone="danger" message={importError} /> : null}
-        <Field label="お客さまのお名前" htmlFor="rs-import-name" error={fieldErrors.customerName} requirement={b244Requirements.draft_customerName}>
+        <Field label="お客さまのお名前" htmlFor="rs-import-name" error={fieldErrors.customerName} requirement={FIELD_REQUIREMENTS.draft_customerName}>
           <SaveErrorField names={["customerName","draft.customerName","customer_name","draft.customer_name"]}><TextField id="rs-import-name" required value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} /></SaveErrorField>
         </Field>
         <div className={styles.pair}>

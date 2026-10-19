@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const net = vi.hoisted(() => ({ get: vi.fn(), warnings: vi.fn(), starterItems: vi.fn(), progress: vi.fn() }))
-vi.mock('@/lib/api-styles', () => ({ styleApi: net }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: net }))
 vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get: net.progress } } }))
 import { useStyleSetup } from './use-style-setup'
 import { useFirstRun } from './use-first-run'

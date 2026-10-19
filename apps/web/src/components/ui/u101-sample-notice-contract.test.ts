@@ -17,7 +17,7 @@ describe('見本画面の明示（#975 U101）', () => {
 
   it('比較・検証画面がこの帯を持つ', () => {
     for (const path of [
-      // 2026-10-08 に V2〜V7 の見本（friend-attributes・-v2・-v3・v7-*）を撤去。残る見本は V8 の部品だけ。
+      // 2026-10-08 に V2〜管理画面 の見本（friend-attributes・-v2・-v3・管理画面-*）を撤去。残る見本は V8 の部品だけ。
       'app/visual-qa/v8-parts/page.tsx',
     ]) {
       const source = readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8')

@@ -202,7 +202,7 @@ describe('カラーの4つの役割（★BG-B KkTNS）', () => {
   })
 })
 
-/* 板 zOpMG: 上限のときはパネルに黄色の帯とプランの誘導を出す。空きがあるときは出さない。 */
+/* 板 : 上限のときはパネルに黄色の帯とプランの誘導を出す。空きがあるときは出さない。 */
 describe('zOpMG パネル内の上限の帯', () => {
   const limited: BannerUsage = {
     month: { used: 150, limit: 150, remaining: 0 },

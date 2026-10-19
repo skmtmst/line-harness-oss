@@ -27,8 +27,8 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { ApiError, fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantInventory, type RestaurantTable } from '@/lib/restaurant-test-api'
-import { QuietError, type RestaurantV8Context } from '../booking-kit/shell'
-import { DialogNote, RsDialog } from '../booking-kit/parts'
+import { QuietError, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { dayLabel, formatTime, joinTableCodes, sanName, slotTimeLabel, tableOrder, WEEK_ORDER, WEEKDAY_LABEL } from './format'
 import type { RestaurantChannel } from './channels'
 import styles from './inventory.module.css'
@@ -39,7 +39,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 予約枠・在庫「時間帯ごとの在庫」タブ（板 `Y8SjT2`・競合 `qf3ky`・媒体を閉じる知らせ `Yyw6i`）。
+ * ★V8 予約枠・在庫「時間帯ごとの在庫」タブ（板 `Y8SjT2`・競合 ・媒体を閉じる知らせ ）。
  *
  * 案内の帯 → 左：席と枠の配分（卓とつながる）→ 時間帯ごとの在庫の表 → 開ける時間
  * （先頭に「行を押したとき：その時間帯の配分だけ直す」の箱）、右：選んだ時間帯の卓 → 下の帯
@@ -182,7 +182,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   const [slotVersion, setSlotVersion] = useState<number | undefined>(undefined)
   const [conflict, setConflict] = useState<Conflict | null>(null)
   const [diffOpen, setDiffOpen] = useState(false)
-  // 板 `Yyw6i`：残りが少ない時間帯の「媒体を閉じる知らせ」。記録はこの画面だけで持ち、媒体へは書き戻さない。
+  // 板 ：残りが少ない時間帯の「媒体を閉じる知らせ」。記録はこの画面だけで持ち、媒体へは書き戻さない。
   const [closeNoteOpen, setCloseNoteOpen] = useState(false)
   const [closedSlots, setClosedSlots] = useState<string[]>([])
   const [closedChannels, setClosedChannels] = useState<string[]>([])

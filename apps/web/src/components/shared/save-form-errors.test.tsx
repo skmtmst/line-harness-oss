@@ -61,7 +61,7 @@ it('APIの失敗が描画の確定より先に返っても、入力を有効に�
   expect(document.activeElement).toBe(input)
 })
 
-describe('保存の失敗を欄に返す共通部品（B-154）', () => {
+describe('保存の失敗を欄に返す共通部品', () => {
   it('欄下の理由・赤い印・読み上げのつなぎを付け、最初の欄へ移る。直した欄だけ消す', async () => {
     render(<Form />)
     const input = screen.getByRole('textbox', { name: '名前' })

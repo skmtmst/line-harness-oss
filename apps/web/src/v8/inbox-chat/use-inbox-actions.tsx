@@ -37,7 +37,7 @@ export function useInboxActions({ chatDetail, selectedChatId, loadChatDetail, lo
 
   /*
    * 対応状況の切替は取り消せる軽い操作。押した瞬間に画面へ反映して
-   * 裏で保存する（★V7 sTJsh §1）。失敗したら元の状況へ戻す。
+   * 裏で保存する（★管理画面 sTJsh §1）。失敗したら元の状況へ戻す。
    */
   const handleStatusUpdate = (newStatus: Chat['status']) => {
     if (!selectedChatId || !chatDetail) return

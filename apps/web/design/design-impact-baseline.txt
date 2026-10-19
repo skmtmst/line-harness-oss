@@ -23,7 +23,7 @@ table-header-migration-target app/templates/page.tsx
 # ★V8-B 運用者へのお知らせを作る（gjUz3）。届き方の見本・公開前の確認の操作に共通Buttonを使う。
 # ★V8 共通情報の一覧（FM94M）。表の下にページ送りは共通Pagination、操作は共通Button。
 # ★V8 登録メディア一覧（O7hUt7）。札の操作・窓の確定・ページ送りの操作に共通Button。
-button-migration-target app/reminders/list-v8.tsx
+button-migration-target v8/reminders/list.tsx
 
 # ★V8 予約設定（owaS3 ほか）を src/v8/booking-menus に書き直した。
 # ★V8 飲食店向け（担当 a：CHz31・t8WgD8・bSp4h・xLpnS・Googleビジネス j0Wcg ほか・店舗を追加 ao15G/faGn4・利用規約 VdKOK）。src/v8/restaurant に一から書いた。

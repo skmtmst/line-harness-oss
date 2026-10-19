@@ -14,7 +14,7 @@ import scanOwnerRules from './owner-rules-browser.mjs'
 import scanControlOverlap from './control-overlap-browser.mjs'
 import scanFormRules from './form-rules-browser.mjs'
 import { collectReservationReading, assessReservationReading } from './reservation-reading-browser.mjs'
-import scanB244Rules from './b244-rules-browser.mjs'
+import scanB244Rules from './rules-browser.mjs'
 const GAP_ROUTES = JSON.parse(readFileSync(new URL('./layout-defects-routes.json',import.meta.url),'utf8'))
 
 export const DEFECT_ROUTES = { ...ROUTES, tags: '/tags', affiliates: '/affiliates', 'inflow-links': '/inflow-links', conversions: '/conversions', ...Object.fromEntries(GAP_ROUTES.map(route=>[route,route])) }

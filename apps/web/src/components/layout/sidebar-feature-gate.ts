@@ -3,7 +3,7 @@ export { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { environmentFeatureUiEnabled, googleBusinessUiEnabled, restaurantTestUiEnabled } from '@/lib/environment-features'
 
 /**
- * 環境の旗（B-368）による左メニューの出し入れ。
+ * 環境の旗による左メニューの出し入れ。
  * Google ビジネスは独立の旗で出し入れする。飲食店の試験の機能は旗が閉じていても入口を残す（押すと準備中）。
  * 判定しない項目は undefined を返し、呼び手のふだんの判定に任せる。
  */

@@ -18,7 +18,7 @@ describe('V6 外部連携の運用者向け文言', () => {
   })
 
   it('作成画面と空状態から同じ操作名へ進める', () => {
-    // 板 `H031gC`：作る操作は小窓（Dialog）で出す。操作名は変えない。
+    // 板 ：作る操作は小窓（Dialog）で出す。操作名は変えない。
     expect(PAGE).toContain('title="受け取る設定を追加"')
     expect(PAGE).toContain('受け取り口を作る')
     expect(PAGE).toContain('href="/webhooks/new"')

@@ -62,7 +62,7 @@ export function ArchiveMarkDialog({ mark, impact, replacementMarkId, loading, sa
   onCancel: () => void
   onConfirm: () => void
 }) {
-  /* ★V8 の小窓 `fy5dz` の題・実行ボタン・案内を使う。 */
+  /* ★V8 の小窓  の題・実行ボタン・案内を使う。 */
 
   /* R138横展開: 確認窓の名前として見出しを読ませる。 */
   /*

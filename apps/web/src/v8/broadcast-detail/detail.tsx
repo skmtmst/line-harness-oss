@@ -1,6 +1,6 @@
 'use client'
 
-import BroadcastAbResult, { abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/result'
+import { BroadcastAbResult, abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/public/result/index'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useState, type ReactNode, type RefObject } from 'react'
@@ -110,7 +110,7 @@ export interface BroadcastDetailProps {
   /** 集計の取り直し・状態の読み直し（reloadToken を進める）。 */
   onReload: () => void
   /**
-   * `Q28Gb`：ほかの人が更新したときだけ true。この画面は書き換えず、
+   * ：ほかの人が更新したときだけ true。この画面は書き換えず、
    * 帯で知らせて読み直しだけ受け付ける。
    */
   conflict?: boolean
@@ -425,7 +425,7 @@ export default function BroadcastDetail({
 }
 
 /**
- * 予約を取り消す（確かめ）の窓（絵 `BeNtj`：幅480・題16/700・説明13/21・
+ * 予約を取り消す（確かめ）の窓（絵 ：幅480・題16/700・説明13/21・
  * ボタンは 取り消す（赤）・やめる・← 予約のまま残す（主）の順に左から）。
  */
 export function CancelReservationDialog({
@@ -537,7 +537,7 @@ function DraftStepRail({ broadcastId, draftStep, canEdit }: { broadcastId: strin
 }
 
 /**
- * 送るまでの6段階（絵 `F3X1Mo`・`pNiUk`）。承認が絡まない・予約しない
+ * 送るまでの6段階。承認が絡まない・予約しない
  * 配信はその段を省く。分かれ道（失敗・停止・期限切れ）は札で添える。
  */
 /* abWaiting：A/B で残りの人への送信がまだ（選んでください・試し中）。段は「送信中」にとどめ、送信済みへ進めない。 */
@@ -794,7 +794,7 @@ function Overview({
 }
 
 /**
- * 承認の箱（絵 `pNiUk`）。承認待ちは緑の箱に 依頼・要点・差し戻す理由・操作。
+ * 承認の箱。承認待ちは緑の箱に 依頼・要点・差し戻す理由・操作。
  * 頼まれた人だけが 差し戻す／承認して送る を押せる。頼んだ人には 取り消す／もう一度知らせる。
  * 差し戻し・期限切れは理由だけを出す。承認済みは右の欄の「承認」に出す（箱は出さない）。
  */

@@ -5,7 +5,7 @@ import FormResponsesV8 from '@/v8/form-responses/responses'
 
 
 /*
- * ★V8（板 `v0SbYR`・`MKQyJ`）：現役の回答画面に固定する。
+ * ★V8（板 ・）：現役の回答画面に固定する。
  */
 export default function FormResponsesPage() {
   usePageTitle('集まった回答')

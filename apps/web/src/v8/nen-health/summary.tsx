@@ -6,7 +6,7 @@ import { jstDateOffset } from '@/lib/jst-datetime'
 import { TrendLineChart } from '@/components/shared/charts'
 
 /*
- * ★V8-B 健康日記 30日のまとめ（BVuYh）。一覧の上に右から出る引き出し（幅 600）。
+ * ★V8-B 健康日記 30日のまとめ。一覧の上に右から出る引き出し（幅 600）。
  * 注意書き → 数（記録・体重・呼吸数・心拍数）→ 体重の30日の棒 → 記録の表 → 印刷・PDF に保存する。
  * 引き出しの枠は共通の Drawer。診察時に獣医師へ見せる前提なので、記録の事実だけを並べ、判断は書かない。
  * 印刷面（SummarySheet）は画面に出ず、印刷のときだけ紙になる（今の画面と同じ data-print-sheet）。
@@ -30,9 +30,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 
 type Logs = NenHealthSummaryData['summary']['logs']
 
-/** 記録の表の涙やけは列が狭いので短い言葉（絵 BVuYh）。印刷面は今までどおり長い言葉。 */
+/** 記録の表の涙やけは列が狭いので短い言葉。印刷面は今までどおり長い言葉。 */
 const TEAR_SHORT: Record<string, string> = { normal: 'なし', mild: '少し', concern: '気になる' }
-/** 「気になる変化」の便・食いつきに数える値以外（問題なし・良い・ふつう）は注意の色で出す（絵 BVuYh）。 */
+/** 「気になる変化」の便・食いつきに数える値以外（問題なし・良い・ふつう）は注意の色で出す。 */
 const STOOL_OK = new Set(['normal'])
 const APPETITE_OK = new Set(['normal', 'good'])
 
@@ -62,7 +62,7 @@ export default function SummaryDrawerV8({
 }: {
   status: 'loading' | 'ready' | 'error'
   summary: NenHealthSummaryData | null
-  /** 一覧の「気になる変化」で体重が当たっているとき、30日の増減を注意の色にする（絵 BVuYh）。 */
+  /** 一覧の「気になる変化」で体重が当たっているとき、30日の増減を注意の色にする。 */
   weightWarn?: boolean
   error?: unknown
   onClose: () => void
@@ -148,7 +148,7 @@ export default function SummaryDrawerV8({
 }
 
 /**
- * 体重の30日の線（絵 BVuYh）。記録のある日の体重を線でつなぎ、縦は 0kg から 5kg 刻み。
+ * 体重の30日の線。記録のある日の体重を線でつなぎ、縦は 0kg から 5kg 刻み。
  * 横は30日の位置（記録の無い日は点を置かない）。
  */
 function WeightChart30d({ logs, generatedAt }: { logs: Logs; generatedAt: string }) {

@@ -1,7 +1,7 @@
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
- * ★V8-B プール管理の「プールを作る」（板 `D0AOyx`）。
+ * ★V8-B プール管理の「プールを作る」（板 ）。
  * 番号つきの節・複数の受け入れ先・部分失敗の伝え方が動くこと。
  */
 import React, { act } from 'react'

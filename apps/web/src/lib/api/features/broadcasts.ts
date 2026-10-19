@@ -15,7 +15,7 @@ import type {
 } from '../types/broadcasts'
 import type { BroadcastListKpis } from '../types/statistics'
 import type { SegmentCondition } from '../../segment-condition'
-import type { BroadcastPreflight } from '../../api-broadcast-preflight-types'
+import type { BroadcastPreflight } from '../types/broadcast-preflight-types'
 import { IRREVERSIBLE_BROADCAST_HEADERS } from '../transport/confirmation'
 
 export const broadcastsMethods = {

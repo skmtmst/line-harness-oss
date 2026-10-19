@@ -15,7 +15,7 @@ const PANEL_CODE = withoutComments(PANEL)
 const ROW_ACTIONS = read('../../components/shared/folder-row-actions.tsx')
 
 /**
- * テンプレートのフォルダ操作（設計 `CzndJ` ★V6 11-1-H）。
+ * テンプレートのフォルダ操作（設計 `CzndJ` ★管理画面 11-1-H）。
  *
  * 設計は行の操作を 5 つ持つ——**名前を変更 / 色を変える / 並び順を上へ /
  * 並び順を下へ / フォルダを削除**——と、削除の下に
@@ -73,10 +73,10 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
 
   it('部品が操作を実際に描く', () => {
     // **型に生えているだけでは描かれない。** 描く行を見る。
-    // ★V7（m13g）：独自の見た目から共通 ActionMenu へ移した。描く項目は同じ。
+    // ★管理画面（m13g）：独自の見た目から共通 ActionMenu へ移した。描く項目は同じ。
     expect(PANEL).toContain('if (row.onMoveUp)')
     expect(PANEL).toContain('if (row.onDelete)')
-    // V8（nH0fZ）は吹き出しを出さず確認の窓で読ませる。v7 は今までどおり但し書きを出す。
+    // V8（nH0fZ）は吹き出しを出さず確認の窓で読ませる。互換経路は今までどおり但し書きを出す。
     expect(PANEL_CODE).not.toContain('note={row.deleteNote}')
     expect(ROW_ACTIONS).toContain('description={deleteFolderDescription(itemLabel, deletingCount)}')
   })

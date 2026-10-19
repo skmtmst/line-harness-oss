@@ -11,11 +11,11 @@ import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { actionIncompleteReason } from '@/components/auto-replies/action-completeness'
 import { newActionKey, type InlineAction } from '@/components/auto-replies/draft-fields'
-import type { ActionOptions } from '@/components/auto-replies/inline-action-list'
+import type { ActionOptions } from '../auto-replies/action-options'
 import styles from './action-rows.module.css'
 
 /*
- * ★V8 自動応答の作る③「返したあとに行うこと」（絵 rfhIf「処理」の行）。
+ * ★V8 自動応答の作る③「返したあとに行うこと」（絵 「処理」の行）。
  * 1つの処理を1行で見せる：並べ替えの印・番号・何をするか「だれに・どれを」・失敗したら・…。
  * 中身の編集は「…」→「設定を変える」で行の下に開く（いつも開いておかない）。
  * 動き（足す・消す・並べ替え・失敗したときの動き・中身の編集）は InlineActionList と同じ。

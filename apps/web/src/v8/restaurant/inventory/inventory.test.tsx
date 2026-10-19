@@ -170,7 +170,7 @@ it('OP-R04 未保存の配分があるタブの移動は確認し、取り消す
  delete document.documentElement.dataset.theme
 })
 
-it('B-241 inventory channel read failure does not become no channels',async()=>{
+it('inventory channel read failure does not become no channels',async()=>{
  fetchApi.mockRejectedValueOnce(new Error('人工取得失敗'))
  render(<InventoryPage />)
  const error=await screen.findByText('予約媒体を読み込めませんでした')

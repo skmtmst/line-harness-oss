@@ -210,7 +210,7 @@ describe('R434 API接続パネル', () => {
       return { status: 500, body: { success: false, error: 'unhandled' } }
     }
     await render()
-    // 行の右端は「…」1つ（B-253）。入れ替えるはその中。
+    // 行の右端は「…」1つ。入れ替えるはその中。
     await act(async () => { (host.querySelector('button[aria-label="「予約連携」の操作"]') as HTMLButtonElement).click() })
     await settle()
     await act(async () => { button('入れ替え')!.click() })

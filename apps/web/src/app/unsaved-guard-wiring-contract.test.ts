@@ -22,7 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
-  // 友だち詳細の情報欄（vX3wQ）。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
+  // 友だち詳細の情報欄。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
   'v8/friend-detail/info-tab.tsx',
   'v8/restaurant/organization/store-groups.tsx',
   'v8/inbox-chat/screen.tsx',
@@ -39,7 +39,7 @@ const GUARDED = [
   'v8/affiliate-offer-new/create.tsx',
   'v8/affiliates/create.tsx',
   'app/analytics/reports/new/page.tsx',
-  'app/auto-replies/edit/wizard-v8.tsx',
+  'v8/auto-replies/edit/wizard.tsx',
   'app/booking/menus/new/page.tsx',
   'app/booking/menus/staff/page.tsx',
   'app/booking/staff/new/page.tsx',
@@ -55,15 +55,15 @@ const GUARDED = [
   'v8/mileage/earning-rules.tsx',
   'v8/nen-campaigns/column-intros.tsx',
   'app/nen-campaigns/page.tsx',
-  // ★V8 マイペットのごはんの目安（h7A2F）。下の帯の保存まで画面に残る変更を useUnsavedGuard で守る。
+  // ★V8 マイペットのごはんの目安。下の帯の保存まで画面に残る変更を useUnsavedGuard で守る。
   'v8/nen-pets/feeding.tsx',
-  'app/reminders/new/new-v8.tsx',
+  'v8/reminders/new/new.tsx',
   'app/reminders/new/page.tsx',
   'v8/restaurant/google/profile-edit.tsx',
   // 卓の割り当て方（jmVYJ）。下の帯で保存する変更を、離れる前に確認する。
   'v8/restaurant/tables/assign.tsx',
   'v8/restaurant/google/profile-hours.tsx',
-  'app/rich-menus/new/create-v8.tsx',
+  'v8/rich-menus/new/create.tsx',
   'app/rich-menus/new/page.tsx',
   // ★V8：入口（app/settings/file-scan/page.tsx）は src/v8 の画面を出すだけ。番兵は画面と同じ場所のフックが持つ。
   'v8/settings/file-scan/screen.tsx',
@@ -142,14 +142,14 @@ const GUARDED = [
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   // U05: state/ref と離脱確認は従来の親が保持する。分割先をその親へ結び直す（対象外の追加ではない）。
-  'app/auto-replies/edit/wizard-load.tsx': 'app/auto-replies/edit/wizard-v8.tsx',
-  'app/auto-replies/edit/wizard-model.tsx': 'app/auto-replies/edit/wizard-v8.tsx',
-  'app/auto-replies/edit/wizard-save.tsx': 'app/auto-replies/edit/wizard-v8.tsx',
-  'app/rich-menus/new/create-audience-step.tsx': 'app/rich-menus/new/create-v8.tsx',
-  'app/rich-menus/new/create-hydration.tsx': 'app/rich-menus/new/create-v8.tsx',
-  'app/rich-menus/new/create-image-slots.tsx': 'app/rich-menus/new/create-v8.tsx',
-  'app/rich-menus/new/create-preview-rail.tsx': 'app/rich-menus/new/create-v8.tsx',
-  'app/rich-menus/new/create-publish-step.tsx': 'app/rich-menus/new/create-v8.tsx',
+  'v8/auto-replies/edit/wizard-load.tsx': 'v8/auto-replies/edit/wizard.tsx',
+  'v8/auto-replies/edit/wizard-model.tsx': 'v8/auto-replies/edit/wizard.tsx',
+  'v8/auto-replies/edit/wizard-save.tsx': 'v8/auto-replies/edit/wizard.tsx',
+  'v8/rich-menus/new/create-audience-step.tsx': 'v8/rich-menus/new/create.tsx',
+  'v8/rich-menus/new/create-hydration.tsx': 'v8/rich-menus/new/create.tsx',
+  'v8/rich-menus/new/create-image-slots.tsx': 'v8/rich-menus/new/create.tsx',
+  'v8/rich-menus/new/create-preview-rail.tsx': 'v8/rich-menus/new/create.tsx',
+  'v8/rich-menus/new/create-publish-step.tsx': 'v8/rich-menus/new/create.tsx',
   'components/broadcasts/broadcast-confirm-dialogs.tsx': 'components/broadcasts/broadcast-form.tsx',
   'components/broadcasts/broadcast-persist-draft.tsx': 'components/broadcasts/broadcast-form.tsx',
   'v8/reminders/edit-basics.tsx': 'v8/reminders/edit.tsx',
@@ -182,7 +182,7 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   'v8/booking-passes/create.tsx': 'components/templates/create-page.tsx',
   'v8/form-edit/content-tab.tsx': 'v8/form-edit/edit.tsx',
   // 動き1：画面のdirtyは型／共通の番兵が守る。
-  'app/emergency/control-v8.tsx': 'components/shared/form-leave-guard.tsx',
+  'v8/emergency/control.tsx': 'components/shared/form-leave-guard.tsx',
   'components/templates/create-page.tsx': 'components/shared/form-leave-guard.tsx',
   'v8/dashboard/dashboard-editor.tsx': 'components/templates/create-page.tsx',
   'v8/hq/settings.tsx': 'components/shared/form-leave-guard.tsx',
@@ -404,7 +404,7 @@ const EDITOR_MIN_INPUTS = 3
  */
 const UNTRIAGED: Record<string, string> = {
   /* 予約設定V8化でスタッフ編集窓を staff-edit-dialog.tsx へ切り出し、page.tsx から編集画面の印が無くなったので行を消した。 */
-  /* ★V7: 書き出し項目を共通 Checkbox へ寄せたら入力の印が3未満になり、編集画面の印が無くなったので行を消した。 */
+  /* ★管理画面: 書き出し項目を共通 Checkbox へ寄せたら入力の印が3未満になり、編集画面の印が無くなったので行を消した。 */
   // 統括の入口はV8の再exportだけ。v8/hq/support.tsx の番兵を上の契約で点検する。
   'v8/inflow-links/edit-route-dialog.tsx':
     's3: 上の edit-route-modal.tsx の ★V8 の写し（src/v8/inflow-links/list.tsx から開く）。元と一緒に決める',

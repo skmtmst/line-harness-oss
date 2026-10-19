@@ -89,7 +89,7 @@ export function useScenarioReads({
   }, [loadScenario])
 
   /*
-   * ★V8 `kz2B6`：別のタブから戻ってきたら更新日時だけ確かめる。
+   * ★V8 ：別のタブから戻ってきたら更新日時だけ確かめる。
    * ずれていたら帯を出すだけで、画面は書き換えない。
    */
   useEffect(() => {
@@ -195,7 +195,7 @@ export function useScenarioReads({
     simulationResult?.key !== simulationKey
 
   /**
-   * 機能5 V6の開始前試算と運用記録。互いに独立した読取なので並列で取得する。
+   * 機能5 管理画面の開始前試算と運用記録。互いに独立した読取なので並列で取得する。
    * 失敗時は旧集計を残し、0件とは表示しない。
    *
    * SCENARIO-15: 依存に simulationKey を含める。設定を保存し直すと

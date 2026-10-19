@@ -21,7 +21,7 @@ import { restaurantTestApi,type RestaurantIntakeAddress,type RestaurantMembershi
 import type { RestaurantLoginMember } from '@line-crm/shared'
 import { Check,MailPlus,MessageCircle,Plus,type LucideIcon } from 'lucide-react'
 import { useCallback,useEffect,useState,type FormEvent,type ReactNode } from 'react'
-import { formatStamp,Panel,Status } from '../common-a/parts'
+import { formatStamp, Panel, Status } from '@/v8/restaurant/common-a/public/parts/index'
 import styles from './organization.module.css'
 
 export const roleLabel: Record<RestaurantMembership['role'], string> = {
@@ -72,7 +72,7 @@ export function DefaultSelect({ name, ariaLabel, defaultValue, options }: {
   return <SaveErrorField names={["value"]}><Select name={name} aria-label={ariaLabel} value={value} onChange={setValue} size="full" options={options} /></SaveErrorField>
 }
 
-/** 作ってある物を選ぶ欄（選ぶ窓・B-163）。フォームへは隠し欄で送る。 */
+/** 作ってある物を選ぶ欄（選ぶ窓・）。フォームへは隠し欄で送る。 */
 function PickerInput({ name, label, noun, items, defaultValue, placeholder, icon, required = false, clearable = false }: {
   name: string
   label: string
@@ -118,7 +118,7 @@ export function StoreLineAccountSelect({ accounts, stores, currentStore }: {
   )
 }
 
-/** 店舗の追加・編集（窓 vCEKM）。 */
+/** 店舗の追加・編集（窓 ）。 */
 export function StoreForm({ store, accounts, stores, busy, onSubmit, onCancel }: {
   store?: RestaurantStore
   accounts: AccountWithStats[]
@@ -252,7 +252,7 @@ export function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: 
   )
 }
 
-/** ログインとの連携（窓 ou60i の中。今の画面では表の中にあった）。 */
+/** ログインとの連携（窓  の中。今の画面では表の中にあった）。 */
 export function LoginConnection({ member, logins, busy, save }: { member: RestaurantMembership; logins: RestaurantLoginMember[]; busy: boolean; save: (id: string | null) => void }) {
   const [selected, setSelected] = useState(member.staff_id || '')
   useEffect(() => setSelected(member.staff_id || ''), [member.staff_id])
@@ -270,7 +270,7 @@ export function LoginConnection({ member, logins, busy, save }: { member: Restau
   )
 }
 
-/** ユーザーの追加・変更（窓 ou60i）。 */
+/** ユーザーの追加・変更（窓 ）。 */
 export function MemberForm({ member, stores, busy, onSubmit, onCancel, login }: {
   member?: RestaurantMembership
   stores: RestaurantStore[]

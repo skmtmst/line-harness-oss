@@ -1,7 +1,7 @@
 'use client'
 import { useLayoutEffect, useRef } from 'react'
 
-/** B-192：横の箱は自然な高さの差48以内だけそろえる（段に data-card-height="equal" があれば差に関係なくそろえる）。縦並びでは解除する。 */
+/** ：横の箱は自然な高さの差48以内だけそろえる（段に data-card-height="equal" があれば差に関係なくそろえる）。縦並びでは解除する。 */
 const groups = new WeakMap<HTMLElement, { users: number; release: () => void }>()
 export function useCardHeights() {
   const ref = useRef<HTMLElement>(null)

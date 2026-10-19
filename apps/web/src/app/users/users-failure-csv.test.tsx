@@ -31,8 +31,8 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
 })
 
-const { useMergedUsers } = await import('./use-merged-users')
-const { default: UsersV8 } = await import('./users-v8')
+const { useMergedUsers } = await import('../../v8/users/use-merged-users')
+const { default: UsersV8 } = await import('./users-screen')
 const { useUsersSummary } = await import('@/components/users/use-users-summary')
 const { default: MergedUsersV8 } = await import('@/v8/friends/merged/merged')
 

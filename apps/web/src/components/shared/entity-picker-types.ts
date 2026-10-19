@@ -2,7 +2,7 @@ import type { ReactNode, Ref } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import type { StatusBadgeTone } from './status-badge'
 /*
- * 受信箱の幅640の器を、作ってあるものを選ぶ窓へ共通化（B-155・163・164・165・175）。
+ * 受信箱の幅640の器を、作ってあるものを選ぶ窓へ共通化（・163・164・165・175）。
  * 行の選択は下書きで、確定したときだけ呼び出し元へ返す。
  * 欄全体で開き、複数選択の札は窓を開かず外せる。作成先は下の文字リンク。
  */
@@ -114,7 +114,7 @@ export type MultiBodyProps = {
   initialFolder?: string
   /** ほかの窓の中に埋め込むとき。高さを決めて一覧だけを送る。 */
   embedded?: boolean
-  /** 行を2段にする（名前の下に補足と状態）。名前を補足に押されて切らない（WjFWW 送るアカウント）。 */
+  /** 行を2段にする（名前の下に補足と状態）。名前を補足に押されて切らない（ 送るアカウント）。 */
   stacked?: boolean
 }
 

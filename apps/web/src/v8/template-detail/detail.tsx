@@ -15,12 +15,12 @@ import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import TemplateDeleteDialog from '@/v8/templates/delete-dialog'
+import { TemplateDeleteDialog } from '@/v8/templates/public/delete-dialog/index'
 import Dialog from '@/components/shared/dialog'
 import DialogUsageTable from '@/components/shared/dialog-usage-table'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent, LinePreviewMessage } from '@/components/shared/line-preview';
 import { InsertText } from '@/components/shared/insert-text-field';
-import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor';
+import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '../../components/templates/template-preview-model'
 import TargetMissing from '@/components/shared/target-missing'
 import { buildUsageRows, insertionNames, isTemplateDetailData, lineChanges, messageTypeText, publishRowState, shortStamp, templateDeleteDescription, type TemplateDetailData, type TemplateVersionItem, type UsageRow } from './model';
 import styles from './detail.module.css'
@@ -38,8 +38,8 @@ import { ListEmptyMessage } from '@/components/shared/list-state'
 
 /*
  * ★V8 テンプレートの詳細（一から書いた画面・2026-10-07）。
- * Pencil：詳細（未公開の変更あり）`UTbi1`、削除できない窓 `Z0g3si`、公開の確かめ `cuR8I`、
- * 使っていないときの削除の確認 `V6JFnd`。
+ * Pencil：詳細（未公開の変更あり）、削除できない窓 、公開の確かめ 、
+ * 使っていないときの削除の確認 。
  *
  * 型は「作る」と同じ頭（戻る・名前・種類とフォルダ）＋左右の列。下の帯は無い（詳細なので）。
  * 動き（読み込み・公開・この版に戻す・削除の安全・権限）は今の画面（app/templates/detail）と同じ。

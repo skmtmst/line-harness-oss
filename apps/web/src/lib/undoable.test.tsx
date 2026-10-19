@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 sTJsh §1・§4 の共有部品。
+ * ★管理画面 sTJsh §1・§4 の共有部品。
  * 先に画面を変える軽い操作と、「元に戻す」で止められる遅延送信の約束を固定する。
  */
 import { act, cleanup, render } from '@testing-library/react'

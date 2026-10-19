@@ -13,8 +13,8 @@ import { notifyToast } from '@/components/shared/toast'
 import { ApiError, describeSaveFailure } from '@/lib/api'
 import { restaurantGoogleApi, type GoogleSpecialDay } from '@/lib/restaurant-google-api'
 import { restaurantTestApi, type RestaurantReservation } from '@/lib/restaurant-test-api'
-import type { RestaurantV8Context } from '../booking-kit/shell'
-import { RowMore } from '../booking-kit/parts'
+import type { RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { RowMore } from '@/v8/restaurant/booking-kit/public/parts/index'
 import ClosureDialog, { type ClosureDialogTarget, type ClosureSaved } from './closure-dialog'
 import {
   KIND_LABEL, addDays, covers, dayShort, dayTitle, kindTone, monthTitle, monthWeeks, overlapping, rangeTitle, regularHolidays,
@@ -27,11 +27,11 @@ import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form
 
 
 /*
- * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 `UVnvR`。採用 2026-10-07）。
+ * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 。採用 2026-10-07）。
  *
  * 上：他の予約サイトの枠を閉じる知らせ（休業・貸切の分）→ 左：月のカレンダー（臨時休業・貸切・定休）
  * ｜右：これからの休業・貸切（「…」から変える・消す）と Google の営業時間。
- * 足す・変える窓（`nVvXy`）は closure-dialog.tsx。動きは BEHAVIOR.md。
+ * 足す・変える窓（）は closure-dialog.tsx。動きは BEHAVIOR.md。
  */
 
 type MediaLink = { code: string; name: string; loginUrl: string | null; closeOnBooking: boolean }

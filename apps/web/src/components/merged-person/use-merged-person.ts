@@ -1,8 +1,8 @@
 'use client'
 
 /*
- * 統合ユーザー詳細（w8W4Eh / ★V8 `Hn9eE`）の読み込み・保存・解除の正本。
- * v7 の詳細（merged-person-detail.tsx）と ★V8 の詳細（merged-person-detail-v8.tsx）
+ * 統合ユーザー詳細（w8W4Eh / ★V8 ）の読み込み・保存・解除の正本。
+ * 管理画面 の詳細（merged-person-detail.tsx）と ★V8 の詳細（merged-person-detail-v8.tsx）
  * が同じ口を使う——版の扱い（expectedRevision）や 409 の読み直しは2か所で
  * ずれないようにここにだけ置く。
  */
@@ -106,7 +106,7 @@ export function useMergedPerson(personId: string) {
   )
 
   /*
-   * ★V8 `Hn9eE`：「配信に使う」の切替は行ごとのスイッチ。目的（用途）ごとの
+   * ★V8 ：「配信に使う」の切替は行ごとのスイッチ。目的（用途）ごとの
    * 行をまとめて、その友だち分だけ isActive を反転して保存する。
    * 「全部『使わない』にすると、どこからも送れなくなります」は画面側の注意書き。
    */

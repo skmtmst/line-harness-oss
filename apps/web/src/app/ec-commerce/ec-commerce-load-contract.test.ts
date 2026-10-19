@@ -75,7 +75,7 @@ describe('V6 23-1 EC連携のアカウント切替', () => {
 
 /*
  * 起きたこと(2026-09-09, #685再差し戻し): アカウントAで再試行を始め、応答が
- * 返る前にBへ切り替えると、retry()が抱えたA向けのloadRecords(false)が
+ * 返る前にBへ切り替えると、retryが抱えたA向けのloadRecords(false)が
  * 共有listLoadSeqを進め、Bの正常な一覧応答をseq不一致で捨てていた。
  * Bは読み込み中のまま固まる。retryingIdもアカウントに結び付いていなかった。
  * accountIdRefで最新アカウントと突き合わせ、古いクロージャの呼び出しを
@@ -100,7 +100,7 @@ describe('V6 23-1 EC連携の再試行とアカウント切替の順序', () => 
 
   it('setNoticeとloadOverview/loadRecordsは、それぞれ呼び出し先でaccountId不一致を検知して戻る', () => {
     expect(source).toContain('const setNotice = useCallback')
-    /* フェンスは呼び出し先1箇所に一本化していて、retry()自身は持たない。 */
+    /* フェンスは呼び出し先1箇所に一本化していて、retry自身は持たない。 */
     const retryIdx = source.indexOf('const retry = async (action: EcActionExecution)')
     const retryOwnGuards = source.slice(retryIdx).match(/if \(retryAccountId !== currentAccountIdRef\.current\) return/g) ?? []
     expect(retryOwnGuards.length).toBe(0)

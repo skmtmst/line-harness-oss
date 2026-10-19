@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /**
  * ★V8 タグ タグの一覧（src/v8/tags）の動きの試験。
- * 絵（I1E7Bt・aPeD8・fkGUR）の置き場に移した操作が、押せる形で残っているかを見る。
+ * 絵（・・）の置き場に移した操作が、押せる形で残っているかを見る。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -100,7 +100,7 @@ describe('V8 タグ タグの一覧', () => {
     narrow.value = true
     await render(<TagsList fixture={fixture} />)
     expect(container.querySelector('[data-design-node="aPeD8"]')).not.toBeNull()
-    // B-217：1152でも名前の色の丸でフォルダを伝え、重複の列を置かない。
+    // ：1152でも名前の色の丸でフォルダを伝え、重複の列を置かない。
     expect([...container.querySelectorAll('thead th')].map((th) => th.textContent?.trim())).not.toContain('フォルダ')
     expect(container.querySelectorAll('tbody [data-list-name]').length).toBe(FRIEND_ATTRIBUTES_QA_TAGS.length)
     await act(async () => root.unmount())

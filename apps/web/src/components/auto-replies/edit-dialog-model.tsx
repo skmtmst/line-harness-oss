@@ -182,7 +182,7 @@ export interface Props {
   onSaved: () => void
   /** URLから開く編集画面では、設計どおりページ内に広く表示する。 */
   page?: boolean
-  /** V6ページ表示では、1画面に1段だけ出す。一覧内の編集ダイアログは全項目を出す。 */
+  /** 管理画面ページ表示では、1画面に1段だけ出す。一覧内の編集ダイアログは全項目を出す。 */
   step?: 'basic' | 'trigger' | 'response'
   onStepChange?: (step: 'basic' | 'trigger' | 'response') => void
   /** 一覧から開いたときに渡す順番の手がかり。URL編集では未指定。 */

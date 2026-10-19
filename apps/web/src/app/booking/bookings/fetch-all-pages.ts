@@ -6,7 +6,7 @@
  * 5往復を順番に待っていた。
  *
  * - 並びはページの順（offset の小さい順）に戻して返す
- * - 1ページ目のあと `stillWanted()` が false なら、残りを頼まずに null を返す
+ * - 1ページ目のあと `stillWanted` が false なら、残りを頼まずに null を返す
  *   （アカウントを切り替えたあとに前のアカウントの行を集め続けない。#963）
  */
 export async function fetchAllPages<T>(

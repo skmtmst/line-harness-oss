@@ -1,4 +1,4 @@
-import type { Area } from '@/components/rich-menus/canvas-editor'
+import type { Area } from '../../../components/rich-menus/area-types'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
 import { emptyValue } from '@/components/shared/empty-value'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'

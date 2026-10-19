@@ -1,6 +1,6 @@
 'use client'
 
-/** B-201：流入・クーポンも正本のQR窓を使う。停止経路は保存を止める。 */
+/** ：流入・クーポンも正本のQR窓を使う。停止経路は保存を止める。 */
 import DashboardQrDialog from '@/components/dashboard/qr-dialog'
 import { api } from '@/lib/api'
 import { useState } from 'react'

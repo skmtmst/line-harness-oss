@@ -58,7 +58,7 @@ describe('タグの入口は試験でも実行環境でもV8だけ', () => {
     document.documentElement.dataset.theme = 'v8'
     await assertV8Hydration()
   })
-  it('古い環境指定とDOMのV7値でもV8を保つ', async () => {
+  it('古い環境指定とDOMの管理画面値でもV8を保つ', async () => {
     vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', 'v7')
     document.documentElement.dataset.theme = 'v7'
     await assertV8Hydration()

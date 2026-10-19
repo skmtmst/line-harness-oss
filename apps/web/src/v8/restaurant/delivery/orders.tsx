@@ -102,7 +102,7 @@ const URGENCY_ICONS: Record<DeliveryUrgency, LucideIcon | null> = {
  * 札そのものは共通の `StatusBadge` が描く。ここは急ぎ度ごとの色と印を
  * 決めて渡すだけの差し込みで、札を自作しているわけではない。2つの画面で
  * 同じ形にするため置き場所は1つに保ち、見張りの「状態の札を自作」と
- * 読み違えない名前にしている（B-172）。
+ * 読み違えない名前にしている。
  */
 export function UrgencyMark({ urgency }: { urgency: DeliveryUrgency }) {
   const Icon = URGENCY_ICONS[urgency]
@@ -264,7 +264,7 @@ function OrderRow({
   onReady: (order: DeliveryOrderSummary) => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  /* 行の右端：主な操作は1つだけボタン、残りは「…」（共通の ActionCell。オーナー決定 B-360）。 */
+  /* 行の右端：主な操作は1つだけボタン、残りは「…」（共通の ActionCell。オーナー決定 ）。 */
   const openItem = { id: 'open', label: '詳細を見る', onSelect: () => onOpen(order.id) }
   return (
     <Tr data-table-layout="columns">

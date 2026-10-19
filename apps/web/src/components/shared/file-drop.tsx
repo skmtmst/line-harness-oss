@@ -133,7 +133,7 @@ export default function FileDropzone({
       tabIndex={wholeZonePicker && interactive ? 0 : undefined}
       onKeyDown={(event) => { if (wholeZonePicker && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openPicker() } }}
       onClick={(event) => {
-        // input 自身の click はここへ泡立ってくる。拾うと input.click() が再帰する。
+        // input 自身の click はここへ泡立ってくる。拾うと input.click が再帰する。
         if ((event.target as HTMLElement | null)?.closest('input[type="file"]')) return
         openPicker()
       }}

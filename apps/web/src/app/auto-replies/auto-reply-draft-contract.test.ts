@@ -9,7 +9,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const readApi = (...parts: string[]) => readApiSource(join(HERE, ...parts), 'utf8')
 const readImplementation = (...parts: string[]) => readUiSource(join(HERE, ...parts), 'utf8')
 const LIST = readImplementation('../../v8/auto-replies/list.tsx')
-const EDIT = readImplementation('edit/wizard-v8.tsx')
+const EDIT = readImplementation("../../v8/auto-replies/edit/wizard.tsx")
 const DIALOG = readImplementation('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
 
 /**

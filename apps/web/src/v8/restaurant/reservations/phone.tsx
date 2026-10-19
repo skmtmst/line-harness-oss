@@ -26,7 +26,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi, type RestaurantMenuItem, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
-import StoreTabs from '../store-tabs/store-tabs'
+import { StoreTabs } from '@/v8/restaurant/store-tabs/index'
 import type { PhonePreset } from './today'
 import { INACTIVE_STATUSES, dayTitle, floorOrder, slotLabel, toYmd } from './format'
 import styles from './reservations.module.css'
@@ -40,7 +40,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import FriendMatchRow from '@/components/shared/friend-match-row'
 
 /*
- * ★V8 電話の予約を入れる（板 `rm92Y`）。作る型（CreatePage）で、左に入れる中身、右に確かめる物。
+ * ★V8 電話の予約を入れる（板 ）。作る型（CreatePage）で、左に入れる中身、右に確かめる物。
  *
  * 何を入れますか（お客さまの予約／枠だけ押さえる）→ だれの予約ですか（LINE の友だちを探す／
  * LINE 未連携の電話番号）→ いつ・何人・どの卓（空いている時間・卓・コース）→ 要望・アレルギー →

@@ -47,7 +47,7 @@ export function csvLine(values: Array<string | null | undefined>): string {
   return values.map((value) => csvCell(value)).join(',')
 }
 
-/** ランクは状態ではないので、共通の灰色の札で文字だけ示す（B-202・B-240）。 */
+/** ランクは状態ではないので、共通の灰色の札で文字だけ示す（・）。 */
 export function RankChip({ name }: { name: string }) {
   return <StatusBadge tone="neutral" dot={false}>{name}</StatusBadge>
 }

@@ -35,7 +35,7 @@ export default function SegmentedControl<T extends string>({
   'aria-label': string
   className?: string
   /**
-   * 'timing' は連動タイミング（gSsPR）の高さ40・幅360の2択。
+   * 'timing' は連動タイミングの高さ40・幅360の2択。
    * 大きさ。既定 'medium' は箱型（dtJVi：項目 6/12・文 13）。
    * 'small' は小型（d8X09 グラフ／表：器 r8・項目 3/10・文 12・
    * つまみ r6・全体の高さ 28）。'compact' は詰めた形（ベルの小窓 mV28V：
@@ -47,7 +47,7 @@ export default function SegmentedControl<T extends string>({
   /** 操作を止める（生成中など）。項目すべてを押せなくする。 */
   disabled?: boolean
   /**
-   * 電話予約の探し方（rm92Y）：各項目が独立した丸い選択肢。
+   * 電話予約の探し方：各項目が独立した丸い選択肢。
    * 'intake-stop' はデリバリー受注の受付一括停止（XCVGd `To5Y0`）：
    * 高さ32・左右14・間8の離れた札4つで、選んだ札だけ薄い緑の面と緑の枠。
    */

@@ -44,7 +44,7 @@ export interface BroadcastStepInput {
 }
 
 /*
- * 段の名前は ★V8 板 `FU2aU` どおり（2026-10-04 の絵合わせで変更。
+ * 段の名前は ★V8 板  どおり（2026-10-04 の絵合わせで変更。
  * 旧名「対象者・メッセージ・確認」を指す契約テストも同日に書き換え）。
  */
 const DEFINITIONS: ReadonlyArray<{ key: BroadcastStepKey; label: string; anchor: string }> = [

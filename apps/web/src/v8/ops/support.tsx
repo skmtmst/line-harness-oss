@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from '@/lib/api'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
 import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL, ROLE_LABEL } from '@/components/ops/ops-ui'
-import { compareLabel, durationLabel, elapsedLabel } from '@/app/ops/support/format'
+import { compareLabel, durationLabel, elapsedLabel } from '@/v8/ops/support/format'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -37,10 +37,10 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /**
- * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。
+ * 運営のお問い合わせ V8（絵の代わりに起票 ）。
  *
- * 動きは v7（app/ops/support）と同じ口：一覧（段階・優先度・並び・検索）、内容と返信、
- * AI の下書き（作る・作り直す・消す・待たずに手で書く）、下書きの保存、返信の前の確認（GgP2d）、
+ * 動きは 管理画面（app/ops/support）と同じ口：一覧（段階・優先度・並び・検索）、内容と返信、
+ * AI の下書き（作る・作り直す・消す・待たずに手で書く）、下書きの保存、返信の前の確認、
  * 解決済み・クローズ・対応中に戻す、代わりに起票、`?id=` で1件を開く。
  * 閲覧のみの運営メンバーには、起票・返信・段階の変更を出さない（読むだけ）。
  */
@@ -324,7 +324,7 @@ export default function OpsSupportV8() {
     await refreshAll()
   }
 
-  /* 起票の窓で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  /* 起票の窓で落ちた欄は、その欄の真下に理由を出して移る。 */
   const createFields = useFormErrors()
   createFields.define('tenant', '契約先', () => (form.tenantId ? null : '契約先を選んでください'), { required: true })
   createFields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入れてください'), { required: true })
@@ -552,7 +552,7 @@ export default function OpsSupportV8() {
           busy={busy}
           error={error || undefined}
           designNode="GgP2d"
-          /* 絵 GgP2d：幅 600・窓の上 202（本文の長さで上下しない）。 */
+          /* 絵 ：幅 600・窓の上 202（本文の長さで上下しない）。 */
           designWidth={600}
           designTop={202}
           onCancel={() => { if (!busy) setConfirmReply(false) }}

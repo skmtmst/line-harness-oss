@@ -10,10 +10,10 @@ const DETAIL = readFileSync(join(HERE, 'detail', 'detail-v8.tsx'), 'utf8')
 const FIRST_CSS = readFileSync(join(HERE, '../../v8/scenario-first-step/first-step.module.css'), 'utf8')
 
 /*
- * V8 シナリオ配信の細かい板（X0QrW0・kz2B6・wjfLe・U5rxyH）。
+ * V8 シナリオ配信の細かい板（・・・）。
  * 一覧の閲覧のみは同じ画面の状態として板IDを付け、
  * 編集の競合は帯で知らせて書き換えない。
- * 1152は板1100px未満で畳む（同一画面の幅違い）。v7 は変えない。
+ * 1152は板1100px未満で畳む（同一画面の幅違い）。互換経路は変えない。
  */
 describe('シナリオ配信の細かい板', () => {
   it('一覧の閲覧のみに板IDを付ける（X0QrW0）', () => {
@@ -22,7 +22,7 @@ describe('シナリオ配信の細かい板', () => {
   })
 
   it('一覧1152（wjfLe）は狭い板でフォルダの列を道具の段の選ぶ欄へ畳む', () => {
-    // B-244：フォルダと作成の口を型へ渡し、並べ方は共通部品が持つ。
+    // ：フォルダと作成の口を型へ渡し、並べ方は共通部品が持つ。
     expect(LIST).toContain('useNarrowViewport()')
     expect(LIST).toContain('collapsedFolders={<>{createButton(false)}{folderSelect}</>}')
   })

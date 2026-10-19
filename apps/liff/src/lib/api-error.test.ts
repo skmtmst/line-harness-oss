@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { responseLiffError } from './api-error.js';
 import { decideFormSubmitStep } from './form-submit-flow.js';
 import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
-import { errorCode } from '../pages/BookingHistory-messages.js';
+import { errorCode } from '../pages/booking-history-messages.js';
 
 vi.mock('./liff-auth.js', () => ({ getIdToken: () => 'fixture-token', getLiffId: () => 'fixture-liff' }));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });

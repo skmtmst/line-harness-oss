@@ -51,12 +51,12 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 ダッシュボード編集（Pencil `mcOqK`）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
+ * ★V8 ダッシュボード編集（Pencil ）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
  *
  * 動き（並べ替え・表示の ON/OFF・「今日やること」は4枠まで・初期状態に戻す・
- * 保存の失敗と 409・読み上げ）は v7 と共有の `components/dashboard/dashboard-editor.tsx`
+ * 保存の失敗と 409・読み上げ）は 管理画面 と共有の `components/dashboard/dashboard-editor.tsx`
  * と同じ計算（reorder / move / toggle）をそのまま使い、見た目だけを絵どおりに組む。
- * v7 の部品は変えない。
+ * 管理画面 の部品は変えない。
  *
  * - 引き出し 540（共通の Drawer width="editor"）。頭に「カードと配置／プレビュー」の切り替えと説明1行。
  * - 行：持ち手・名前と置き場所・上下（24 の枠つき）・スイッチ。OFF の行は薄い地。

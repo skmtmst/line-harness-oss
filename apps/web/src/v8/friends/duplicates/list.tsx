@@ -30,7 +30,7 @@ import { emptyValue } from '@/components/shared/empty-value';
 import Card from '@/components/shared/card'
 
 /*
- * ★V8 重複検出（Pencil `hn6Y8`、1152 は `G9C4Uw`、状態の見本帳は `SXCb3`）。/friends?tab=duplicates。
+ * ★V8 重複検出（Pencil 、1152 は 、状態の見本帳は ）。/friends?tab=duplicates。
  *
  * データの口は今と同じ（/api/duplicates/stats・/api/identity-candidates・再検出）。
  * 見せ方：頭（← 友だちへ・タブ・表示中をCSVで書き出す）→ 案内の帯 → 数4つ →
@@ -40,7 +40,7 @@ import Card from '@/components/shared/card'
 export default function DuplicatesListV8() {
   usePageTitle('友だち')
   const d = useDuplicatesData()
-  /* 1152 の板（G9C4Uw）は探す欄が狭いので、案内の文を短くする（メールでも探せるのは同じ）。 */
+  /* 1152 の板は探す欄が狭いので、案内の文を短くする（メールでも探せるのは同じ）。 */
   const narrow = useNarrowViewport()
 
   const pageCount = Math.max(1, Math.ceil(d.candidateTotal / CANDIDATE_PAGE_SIZE))
@@ -129,7 +129,7 @@ export default function DuplicatesListV8() {
               value={null}
               valueText={kpi.valueText}
               unit={kpi.unit}
-              /* 絵 hn6Y8：数のあとに単位（18 組）。 */
+              /* 絵 ：数のあとに単位（18 組）。 */
               valueTextWithUnit={Boolean(kpi.unit)}
               detail={kpi.detail}
               help={kpi.help}
@@ -227,7 +227,7 @@ export default function DuplicatesListV8() {
                       </RowNameLink>
                     </Td>
                     <Td>
-                      <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pill_ok}` : `${styles.pill} ${styles.pill_muted}`}>
+                      <span className={confidenceTone(candidate.confidence.label) === 'ok' ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>
                         {CONFIDENCE_WORD[candidate.confidence.label] ?? candidate.confidence.label}
                       </span>
                     </Td>

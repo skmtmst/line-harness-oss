@@ -5,7 +5,7 @@ import Card from './card'
 import Button from './button'
 import styles from './inline-settings.module.css'
 
-/** B-177: 項目の設定はその項目の中で開く。窓や別のフォーカス面を増やさない。 */
+/** : 項目の設定はその項目の中で開く。窓や別のフォーカス面を増やさない。 */
 export default function InlineSettings({ open, title, children, onClose, footer, flow = 'row' }: {
   open: boolean; title: string; children: ReactNode; onClose: () => void; footer?: ReactNode
   flow?: 'row' | 'column'

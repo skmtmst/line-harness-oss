@@ -41,7 +41,7 @@ import type { FormRouting } from './routing-model';
 import RoutingSection from './routing-section';
 
 /*
- * 「中身」のタブ（m1cWEy・ITBAB・ijxur・J1pdB・Z9wXm の左の列）。
+ * 「中身」のタブ（・・・・ の左の列）。
  * ページの札、ページのブロック（畳んだ行と開いた設定）、ブロックを足す欄。
  */
 
@@ -306,7 +306,7 @@ function Labeled({ label, htmlFor, required, children }: { label: string; htmlFo
 function InputFields({ block, refs, patch, accountId, portable = false }: { block: FormInputBlock; refs: FormRefs; patch: (next: Partial<FormBlock>) => void; accountId: string | null; portable?: boolean }) {
   const set = (next: Partial<FormInputBlock>) => patch(next as Partial<FormBlock>)
   const labelId = `fe-q-${block.id}`
-  /* 保存を押したあと、質問文が空なら欄を赤くして真下に理由を出す（B-139）。 */
+  /* 保存を押したあと、質問文が空なら欄を赤くして真下に理由を出す。 */
   const labelError = useFormEditAttempted() && !block.label.trim() ? '質問文を入れてください' : null
   return (
     <>
@@ -427,7 +427,7 @@ function ChoiceFields({ block, set }: { block: FormInputBlock; set: (next: Parti
 /** 答えを保存する先（友だち情報の項目）。本名・表示名・メモへの保存は「詳しい設定」。 */
 function SaveTo({ block, refs, set }: { block: FormInputBlock; refs: FormRefs; set: (next: Partial<FormInputBlock>) => void }) {
   const fixedKey = block.fixedField ?? (block.destinations?.realName ? undefined : fixedFieldForBlock(block))
-  // 決まった欄は変えられない。ほかの保存先と同じ欄の形で、読むだけで出す（絵 SwGrd）。
+  // 決まった欄は変えられない。ほかの保存先と同じ欄の形で、読むだけで出す。
   if (fixedKey) {
     const fixedLabel = `${FIXED_FRIEND_FIELDS.find(f => f.key === fixedKey)?.label ?? ''}（決まった欄）`
     return <div className={styles.saveTo}>
@@ -482,7 +482,7 @@ function BookingFields({ block, refs, set, portable = false }: { block: FormInpu
           <SaveErrorField names={["menuId","booking?.menuId","booking"]}><EntityKindField
             kind="booking_menu"
             label="メニュー"
-            /* 絵 ijxur：欄は「名前・かかる時間」の1つの札（横の補足は出さず、狭い列でも名前を残す）。 */
+            /* 絵 ：欄は「名前・かかる時間」の1つの札（横の補足は出さず、狭い列でも名前を残す）。 */
             options={menuOptions}
             value={booking?.menuId ?? ''}
             onChange={(menuId) => setBooking({ menuId, staffId: null })}
@@ -533,7 +533,7 @@ function BookingFields({ block, refs, set, portable = false }: { block: FormInpu
   )
 }
 
-/* リンクのボタンの押したら（共通の欄・YPzmo・B-129）。保存は今のまま開く URL の文字だけ。 */
+/* リンクのボタンの押したら（共通の欄・YPzmo・）。保存は今のまま開く URL の文字だけ。 */
 function ButtonTapField({ id, url, accountId, onChange, name = 'このボタン' }: { id: string; url: string; accountId: string | null; onChange: (url: string) => void; name?: string }) {
   return (
     <div className={`${styles.field} ${styles.decoTap}`} id={`${id}-url`}>

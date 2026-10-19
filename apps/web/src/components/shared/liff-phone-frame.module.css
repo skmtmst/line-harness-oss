@@ -156,7 +156,7 @@
 
 .content { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
 .root { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; }
-/* 見出しは LINE の見え方（共通の見本の題）と同じ大きさ（絵 XXFT4：15・行23）。 */
+/* 見出しは LINE の見え方（共通の見本の題）と同じ大きさ（絵 ：15・行23）。 */
 .caption { align-self: stretch; margin: 0; font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
 /* 下端の印は下の余白に重ねる。中身や保存の段を20px持ち上げない。 */
 .home { position: absolute; inset-inline: 0; bottom: 0; height: 20px; display: grid; place-items: center; pointer-events: none; }

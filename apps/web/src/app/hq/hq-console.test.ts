@@ -42,7 +42,7 @@ describe('統括コンソール', () => {
   })
 
   it('各アカウントの設定から既存編集モーダルを開き、保存後に一覧を再読込する', () => {
-    // 板 `HMpVx`：カードの「設定」は設定の窓を開き、「詳しい数値を見る」から
+    // 板 ：カードの「設定」は設定の窓を開き、「詳しい数値を見る」から
     // 既存編集モーダルへ進む。保存後の再読込は変えない。
     expect(page).toContain('AccountSettingsDialog')
     expect(page).toContain('setSettingsAccount(account)')
@@ -77,7 +77,7 @@ describe('統括コンソール', () => {
   it('統括とアカウントのサイドバーを分け、採用フローを作らない', () => {
     expect(sidebar).toContain('HQ_MENU_SECTIONS')
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).map((item) => item.label)).toEqual([
-      // 提案 E-9（2026-10-07 オーナー採用）：統括の一括配信を末尾に足した。B-322（2026-10-16）：一番上に「対応が要るもの」。
+      // 提案 E-9（2026-10-07 オーナー採用）：統括の一括配信を末尾に足した。（2026-10-16）：一番上に「対応が要るもの」。
       '対応が要るもの', 'アカウント', '店の比較', 'タグ', 'テンプレート', 'リッチメニュー', '回答フォーム', 'バナー生成', '一括配信',
     ])
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.label === '採用フロー管理')).toBe(false)
@@ -92,7 +92,7 @@ describe('統括コンソール', () => {
       '/hq/banners',
       '/hq/broadcasts',
     ])
-    // 「設定」は左下のアカウントメニュー（メンバー管理）へ移した。★V6 36-1。
+    // 「設定」は左下のアカウントメニュー（メンバー管理）へ移した。★管理画面 36-1。
     expect(HQ_MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.href === '/hq/settings')).toBe(false)
     expect(sidebar).toContain('href="/hq/settings"')
     expect(sidebar).toContain('<SidebarAccountMenu hq={isHq}')

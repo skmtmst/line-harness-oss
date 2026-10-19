@@ -32,7 +32,7 @@ function visible(src: string): string {
 
 const FILES = sources(SRC).map((p) => ({ p: path.relative(SRC, p), s: visible(fs.readFileSync(p, 'utf8')) }))
 
-/** `docs/v6-requirements/v6-00-glossary.md` の1〜2節。使うほうを左に書く。 */
+/** `docs/管理画面-requirements/管理画面-00-glossary.md` の1〜2節。使うほうを左に書く。 */
 const BANNED: Array<{ use: string; avoid: RegExp; why: string }> = [
   { use: 'すべて', avoid: /全て/, why: '要件書が93対5で「すべて」' },
   { use: '対応済み', avoid: /対応済(?!み)/, why: '未対応・対応中・保留と語尾をそろえる' },
@@ -53,8 +53,8 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
   /**
    * **固定の4状態と、自由分類のマークは別物。**
    *
-   * 要件書 `v6-02-inbox-requirements-draft.md:77`
-   *   「V6画面の『対応マーク』は、実装時に『対応状況』へ変更する。
+   * 要件書 `管理画面-02-inbox-requirements-draft.md:77`
+   *   「管理画面画面の『対応マーク』は、実装時に『対応状況』へ変更する。
    *     タグの対応マークは右パネル内の別項目として表示する。」
    *
    * 見分け方は API の形。`chatStatus` / `status` が
@@ -90,8 +90,8 @@ describe('用語表（V6 §7 48番の表記ゆれ潰し）', () => {
    * **期間の言い方を1つにする。**
    *
    * 同じ30日を「直近30日」「過去30日」「この30日」の3通りで書いていた。
-   * 2026-10-09 オーナー決定（B-158 の 5・B-160 の ⑦）で「過去30日」に1つ
-   * （用語表 `docs/v6-requirements/v6-00-glossary.md` §3-3）。前の「この30日に寄せる」と
+   * 2026-10-09 オーナー決定（ の 5・ の ⑦）で「過去30日」に1つ
+   * （用語表 `docs/管理画面-requirements/管理画面-00-glossary.md` §3-3）。前の「この30日に寄せる」と
    * Webhook・マイルの「直近30日」（WEB-025・WEB-073）はこの決定で置き換え。
    *
    * 2026-10-09 時点で古い言い方が残っているファイルは、下の「直す途中」に入れてある。

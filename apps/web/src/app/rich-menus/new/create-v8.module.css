@@ -1,6 +1,6 @@
 /*
- * ★V8 リッチメニューを作る（作る① 形と画像 `JeINq`、② ボタンの動き `Z0uO6`、
- * ③ 誰に出すか `OxEMM`、④ 公開 `F4gELj`）。
+ * ★V8 リッチメニューを作る（作る① 形と画像 、② ボタンの動き 、
+ * ③ 誰に出すか 、④ 公開 ）。
  * 左に積んだ白カード＋右に説明カードと本物のスマホ（LINEでの見え方）。
  * 畳みの基準は板の幅（board の幅）。1100px 未満で右の列を下へ畳む。
  */
@@ -28,7 +28,7 @@
 
 /* 画面名＋手順の段は型に任せる。画面側に見出しの箱・文字の大きさを書かない。 */
 
-/* 板 `r8dGXT` の競合の帯の置き場（頭の説明の下・横いっぱい）。帯の見た目は共通部品（save-conflict）が持つ。 */
+/* 板  の競合の帯の置き場（頭の説明の下・横いっぱい）。帯の見た目は共通部品（save-conflict）が持つ。 */
 .conflictSlot {
   display: block;
   margin: var(--tpl-eds-band-mt) 0 var(--tpl-eds-band-mb);
@@ -135,7 +135,7 @@
   font-weight: 600;
 }
 
-/* 板 `OxEMM`「トークを開いたとき」：前の短い字は太字にしない。 */
+/* 板 「トークを開いたとき」：前の短い字は太字にしない。 */
 .segLabelPlain {
   font-weight: 400;
 }
@@ -146,7 +146,7 @@
   font-size: 12px;
 }
 
-/* 板 `JeINq`「画像」：文の列の間は 8。絵の置き場は上そろえ。 */
+/* 板 「画像」：文の列の間は 8。絵の置き場は上そろえ。 */
 .imageRow {
   display: flex;
   align-items: flex-start;
@@ -166,12 +166,12 @@
   color: var(--color-ink-secondary);
 }
 
-/* 板 `JeINq`：大きさが合っているときの文は濃い緑。 */
+/* 板 ：大きさが合っているときの文は濃い緑。 */
 .imageMetaOk {
   color: var(--color-accent-deep);
 }
 
-/* 板 `JeINq`「画像の作り方」：箱にせず文字だけの押しボタン。 */
+/* 板 「画像の作り方」：箱にせず文字だけの押しボタン。 */
 .guideLink {
   display: inline-flex;
   align-items: center;
@@ -343,7 +343,7 @@
 }
 
 /* 出す順番（番号つきの並び）。 */
-/* 板 `OxEMM`「出す順番」：行の間 6、順番の数字は裸の 13px 太字。 */
+/* 板 「出す順番」：行の間 6、順番の数字は裸の 13px 太字。 */
 .orderList {
   display: flex;
   flex-direction: column;
@@ -396,7 +396,7 @@
 /* 使っていない補助の余白・文字は置かない（予算のため。使うときに足す）。 */
 
 /* 青い案内帯（既定が入れ替わる注意など）。 */
-/* 板 `F4gELj` の注意の帯：絵の青い地・13px・印は青。段の中に置く。 */
+/* 板  の注意の帯：絵の青い地・13px・印は青。段の中に置く。 */
 .infoBand {
   display: flex;
   gap: 10px;
@@ -432,7 +432,7 @@
   list-style: none;
 }
 
-/* 板 `F4gELj`「公開の前の確認」：行は下の線で区切る。印は 18。 */
+/* 板 「公開の前の確認」：行は下の線で区切る。印は 18。 */
 .checkRow {
   display: flex;
   align-items: center;
@@ -472,7 +472,7 @@
   flex: 1;
 }
 
-/* 板 `F4gELj`：1・2行目の「見直す」は枠の無い押しボタン（高さ36・左右14）。 */
+/* 板 ：1・2行目の「見直す」は枠の無い押しボタン（高さ36・左右14）。 */
 .checkRetry {
   flex: none;
   height: var(--tpl-eds-ghost-h);
@@ -559,7 +559,7 @@
 .stackSection { gap: var(--tpl-section-gap); }
 .stackCompact { gap: var(--tpl-compact-gap); }
 
-/* 右の列の「LINEでの見え方を見る」は狭い板（kmTab・白い板 1100 未満）だけ。そのときスマホの見本は畳む。 */
+/* 右の列の「LINEでの見え方を見る」は狭い板（・白い板 1100 未満）だけ。そのときスマホの見本は畳む。 */
 .railPhoneButton { display: none; width: 100%; }
 .railPhoneButton > * { width: 100%; }
 @container v8-page (max-width: 1099px) {
@@ -595,7 +595,7 @@
 /* 段の題は 15/700・行の高さ 22（共通の見出しは 23）。 */
 .flatCard h3 { line-height: var(--tpl-eds-card-title-lh); }
 
-/* 統括の④「確かめる」（BVSbe）：左に形（幅 240）、右に面ごとの動きの一覧（行の間は線）。 */
+/* 統括の④「確かめる」：左に形（幅 240）、右に面ごとの動きの一覧（行の間は線）。 */
 .hqReview { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: var(--space-24); align-items: start; }
 .hqReviewShape { display: flex; flex-direction: column; gap: var(--space-8); min-width: 0; }
 .hqReviewActions { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
@@ -610,7 +610,7 @@
 .hqActionName { flex: 1; min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-body); font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
 .hqActionValue { flex: none; color: var(--color-ink-secondary); font-size: var(--text-caption); white-space: nowrap; }
 
-/* 板 `F4gELj`「確かめる」：左に小さな見本（幅 165）、右に面ごとの動き。 */
+/* 板 「確かめる」：左に小さな見本（幅 165）、右に面ごとの動き。 */
 .reviewRow { display: flex; align-items: flex-start; gap: var(--polish-space-card); min-width: 0; }
 .reviewThumb { flex: none; width: var(--tpl-rm-review-thumb-w); display: flex; flex-direction: column; gap: var(--space-8); }
 .reviewCaption { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-rm-face-label-lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

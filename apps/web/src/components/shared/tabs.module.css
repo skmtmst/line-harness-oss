@@ -98,7 +98,7 @@
  */
 :root .list {
   gap: 24px;
-  height: var(--tpl-tabs-h); /* 画面の板（AzrZq ほか72枚）：高さ28。部品見本 clV5c の35は少数なので板に合わせる */
+  height: var(--tpl-tabs-h); /* 画面の板（ ほか72枚）：高さ28。部品見本 clV5c の35は少数なので板に合わせる */
 }
 
 :root .items {
@@ -109,7 +109,7 @@
   height: var(--tpl-tabs-h);
   align-items: flex-end; /* 文字は下付き（文字の下10） */
   padding-bottom: var(--tpl-tabs-pad-bottom);
-  font-size: var(--text-body); /* B-180：13px */
+  font-size: var(--text-body); /* ：13px */
   line-height: var(--tpl-tabs-text-lh);
   transition:
     color var(--motion-fast) var(--motion-ease-out),
@@ -158,7 +158,7 @@
   }
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .list { height: auto; align-items: flex-start; }
 :root .items { align-items: flex-start; }
 :root .tab { height: auto; padding: 0 0 12px; border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
@@ -205,7 +205,7 @@
 .list[data-wrap='true'] { min-width: 0; max-width: 100%; }
 .list[data-wrap='true'] .items { flex-wrap: wrap; min-width: 0; max-width: 100%; }
 
-/* B-180：形の指定にかかわらず36px。滑る下線の動きは保つ。 */
+/* ：形の指定にかかわらず36px。滑る下線の動きは保つ。 */
 :root .list .tab.tab {
   box-sizing: border-box;
   height: var(--tpl-tabs-h);

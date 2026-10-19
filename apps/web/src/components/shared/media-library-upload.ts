@@ -1,6 +1,6 @@
 import type { MediaItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { extractMediaMetadata, putMediaFile, validateMediaFile } from '@/v8/contents/media-direct-upload'
+import { extractMediaMetadata, putMediaFile, validateMediaFile } from '@/v8/contents/public/media-direct-upload/index'
 
 /**
  * 登録メディアへ入れて、その URL を返す（画像を入れる所 MediaSlot の送り先の1つ）。

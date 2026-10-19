@@ -7,7 +7,7 @@
  * 質問・紹介は統括の口がまだ受けないので、タブは出して「まだ統括からは送れません」の1行だけにし、保存させない。
  */
 import { composeHqMessageCard, type BroadcastBubble, type MessageTemplateDefinition, type TemplateImagemapUpload } from '@line-crm/shared'
-import type { TemplateHostContent } from '@/v8/template-edit/host'
+import type { TemplateHostContent } from '@/v8/template-edit/public/host/index'
 import { videoPreviewProblem } from '@/components/broadcasts/broadcast-form'
 import { carouselColumnsProblem, flexContentProblem } from '@/components/broadcasts/bubble-content-check'
 import { emptyMessageKindState, messageKindProblem, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'

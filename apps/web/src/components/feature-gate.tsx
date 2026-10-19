@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import type { FeatureKey } from '@/lib/feature-settings'
+import type { FeatureKey } from '../lib/feature-key'
 import { FeatureDisabledScreen } from './feature-disabled-gate'
 
 /**

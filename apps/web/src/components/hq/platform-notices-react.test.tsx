@@ -11,7 +11,7 @@ import NoticeLineRegisterDialog from './notice-line-register-dialog'
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 
 /**
- * ★V6 37-7 統括側。運営からのお知らせは「読みました」で消え、
+ * ★管理画面 37-7 統括側。運営からのお知らせは「読みました」で消え、
  * 契約者専用LINEの登録案内は QR・確認コード・友だち追加リンクを出す（決定 2026-09-18: 案内だけ、ログインは止めない）。
  */
 

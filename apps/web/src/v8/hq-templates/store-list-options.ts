@@ -3,8 +3,8 @@ import { MessageSquare, GalleryHorizontalEnd, Image as ImageIcon, HelpCircle, Ti
 import type { TemplateKind } from '@line-crm/shared'
 import type { TemplateType } from '@/lib/hq-templates-api'
 /*
- * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・B-27〜B-29・B-34・B-36）。
- * 絵：テンプレート i0Ao0R（V8.pen の行「統括」）・LRc93（V8-B 版）、回答フォーム wZPua、タグ DzdC3、リッチメニュー noVq4。
+ * ★V8 統括のひな形の一覧を「店の同じ機能の一覧と同じ形」で出す（オーナー 2026-10-08・〜・・）。
+ * 絵：テンプレート （V8.pen の行「統括」）・（V8-B 版）、回答フォーム 、タグ 、リッチメニュー 。
  *
  * 店の一覧（src/v8/templates/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・種類のタブ・フォルダの列・表・ページ送り）・
  * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「配る」口だけ：

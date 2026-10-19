@@ -23,7 +23,7 @@ function detailText(node: ReactNode): string {
 
 /**
  * 題の終わりの「（…）」（添え書き）は、マスに入らないときだけ行ごと隠す。本体の言葉は切らない。
- * 「始まる見込み（試算）」が狭いマスで「始まる見込み（…」と切れていた（ARuZ4・PMLkX・Al4Ek・nMSiE・kz2B6）。
+ * 「始まる見込み（試算）」が狭いマスで「始まる見込み（…」と切れていた（・・・・）。
  * 全文は title と読み上げで残る。添え書きの無い題は今までどおり。
  */
 function titleParts(title: string) {
@@ -32,7 +32,7 @@ function titleParts(title: string) {
   return <><span className={styles.labelMain}>{m[1]}</span><span className={styles.labelQualifier}>{m[2]}</span></>
 }
 
-/** B-145・B-158：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
+/** ・：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
 function staticMenuDescription(menu: ReactNode): string | undefined {
   if (!React.isValidElement<React.ButtonHTMLAttributes<HTMLButtonElement>>(menu) || menu.type !== 'button') return
   const props = menu.props
@@ -59,7 +59,7 @@ export type KpiCardProps = {
    * null だけでなく undefined・NaN も「—」にする。呼び出し側が
    * `x?.y` をそのまま渡しても画面ごと落ちない。**0 は 0 のまま出す。**
    */
-  /** B-145：数の帯に『…』を置かず、数から既存の内訳を開く。 */
+  /** ：数の帯に『…』を置かず、数から既存の内訳を開く。 */
   valueMenu?: { label: string; open: boolean; items: ActionMenuItem[]; onOpenChange: (open: boolean) => void }
   valueAction?: { label: string; expanded: boolean; onClick: () => void }
   value: number | null | undefined
@@ -70,7 +70,7 @@ export type KpiCardProps = {
   signed?: boolean
   /**
    * 数では表せない値（「1時間24分」「96.7%」など）をそのまま出す。
-   * 渡したときは value と unit を使わない（★V6 37-6 の数値カード帯）。
+   * 渡したときは value と unit を使わない（★管理画面 37-6 の数値カード帯）。
    */
   valueText?: string
   /** 数字の範囲を数と単位で読む。片方を取得できないときは範囲全体が不明。 */
@@ -99,7 +99,7 @@ export type KpiCardProps = {
   descriptionLabel?: string
   /**
    * 定義・分母・計算のしかた・単位・いつ時点の数か・言葉の意味。
-   * 見出しのすぐ右の「？」へ入れる（★V7・§2-1b）。
+   * 見出しのすぐ右の「？」へ入れる（★管理画面・§2-1b）。
    * `description` と両方渡したときは `help` を使う。
    */
   help?: ReactNode
@@ -139,7 +139,7 @@ export type SummaryCardProps = KpiCardProps
 /**
  * 現在のV8の数のカード。画面ごとの形はpresentationとdensityで指定する。
  *
- * 取れないときの出し方（★V7 `x63W5x`）。**0 とは別物。**
+ * 取れないときの出し方（★管理画面 `x63W5x`）。**0 とは別物。**
  * - 読み込み中：`loading` を渡す。数値は骨組み、3段目（`detail`）に
  *   「読み込んでいます」と書く。
  * - 取得失敗：`value`（または `valueText`）を `null` にして「—」を出し、
@@ -245,7 +245,7 @@ export default function KpiCard({
         </p>
         {menu && !menuDescription ? <span className={styles.menu}>{menu}</span> : null}
         {badge ? (
-          <span className={[styles.badge, styles[`badge_${badgeTone}`]].filter(Boolean).join(' ')}>{badge}</span>
+          <span className={[styles.badge, ({ neutral: styles.badgeNeutral, warning: styles.badgeWarning, danger: styles.badgeDanger, accent: undefined })[badgeTone]].filter(Boolean).join(' ')}>{badge}</span>
         ) : null}
       </div>
 

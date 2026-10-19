@@ -23,7 +23,7 @@ const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土'] as const
 
 /**
  * 日付列(YYYY-MM-DD)の曜日。日付そのものの曜日は地域に依らないので、
- * UTCの暦日として読む。getDay() は端末の地域を使い、日本より遅い地域では
+ * UTCの暦日として読む。getDay は端末の地域を使い、日本より遅い地域では
  * 前日の曜日を返してしまう。
  */
 export function analyticsWeekday(date: string): string {

@@ -7,7 +7,7 @@ vi.hoisted(() => { process.env.NEXT_PUBLIC_API_URL = 'http://worker.test' })
 const calls = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), update: vi.fn(), create: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), accounts: vi.fn(), folders: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 vi.mock('@/components/shared/hq-account-picker', () => ({ useHqAccountFolders: () => ({ folders:[], membership:new Map([['account-1',{folderId:null,folder:null}]]), failed:false }) }))
-vi.mock('@/lib/api-hq-deliveries', () => ({ hqDeliveriesApi: calls }))
+vi.mock('@/lib/api/helpers/hq-deliveries', () => ({ hqDeliveriesApi: calls }))
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { accounts: calls.accounts, folders: { list: calls.folders } } }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (value: string) => value === 'owner' || value === 'admin' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
@@ -60,7 +60,7 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
   it('読込に失敗したひな形では配布先へ進まない', async () => {
     calls.detail.mockRejectedValue(new Error('offline'))
     render(<HqDeliveryConsole type="friend_add_rule" />)
-    // 行の右端は「…」1つ（B-253）。配るはその中。
+    // 行の右端は「…」1つ。配るはその中。
     fireEvent.click(await screen.findByRole('button', { name: '「追加のお礼」の操作' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /アカウントへ配る/ }))
     expect(await screen.findByText('ひな形を開けませんでした。一覧を読み直してください。')).toBeTruthy()
@@ -82,7 +82,7 @@ describe('統括の配信設定を共通の一覧と配布画面で扱う', () =
 
   it('選んだアカウントと確認番号を使って配り、成功を表示する', async () => {
     render(<HqDeliveryConsole type="friend_add_rule" />)
-    // 行の右端は「…」1つ（B-253）。配るはその中。
+    // 行の右端は「…」1つ。配るはその中。
     fireEvent.click(await screen.findByRole('button', { name: '「追加のお礼」の操作' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: /アカウントへ配る/ }))
     fireEvent.click(await screen.findByRole('checkbox', { name: '本店', exact: true }))

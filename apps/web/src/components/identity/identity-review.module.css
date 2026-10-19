@@ -171,7 +171,7 @@
 }
 
 /* ★V8（夕21・STATES-ALL）：長い名前が枠からはみ出すので1行で … に
-   （全文は title）。v7 は従来どおり折り返す。 */
+   （全文は title）。互換経路は従来どおり折り返す。 */
 :root .subjectLabel {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -14,7 +14,7 @@ export type TemplateFolderOption = {
 
 export type TemplateFolderStatus = 'loading' | 'ready' | 'error'
 
-/** V6受信箱のテンプレート用フォルダ選択（`NWbuF` / `TUveA`）。 */
+/** 管理画面受信箱のテンプレート用フォルダ選択（`NWbuF` / `TUveA`）。 */
 export default function TemplateFolderSelect({
   value,
   options,

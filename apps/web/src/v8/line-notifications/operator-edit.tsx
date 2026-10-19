@@ -41,7 +41,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 運用者へのお知らせを作る・なおす（板 `gjUz3` 作る・`hiBO8` なおす、公開前の確認 `sDXNy`）。
+ * ★V8 運用者へのお知らせを作る・なおす（板  作る・ なおす、公開前の確認 ）。
  *
  * 絵の形：板の頭（題・説明）→ 左に設定の中のメニュー、右に本文。
  * 本文は左に3枚のカード（どんなときに知らせるか・だれが受け取るか・いつ送るか）、
@@ -88,7 +88,7 @@ function OperatorEditInner() {
   const [previewExpanded, setPreviewExpanded] = useState(false)
   const teamGeneration = useRef(0)
   /*
-   * 作るときはチームがあれば最初のチームを選んでおく（絵 gjUz3：送り先「チーム」・チーム「〇〇（3人）」）。
+   * 作るときはチームがあれば最初のチームを選んでおく（絵 ：送り先「チーム」・チーム「〇〇（3人）」）。
    * 人が宛先・チームを触ったあとや、なおすとき（保存ずみの宛先がある）は選び直さない。
    */
   const teamTouchedRef = useRef(false)
@@ -163,7 +163,7 @@ function OperatorEditInner() {
   const [baseline, setBaseline] = useState<string | null>(null)
   const autoIdsRef = useRef<string[] | null>(null)
   const sawLoadingRef = useRef(false)
-  /* 公開前の確認の窓（板 `sDXNy`）。 */
+  /* 公開前の確認の窓（板 ）。 */
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [publishing, setPublishing] = useState(false)
   /* 確認の窓の「役割」の列。宛先の口は役割を返さないので、ログインユーザーの一覧から引く。読めなければ空のまま。 */
@@ -285,10 +285,10 @@ function OperatorEditInner() {
     busy: saving || publishing,
   })
 
-  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。受け取る人の読み込みの失敗は帯のまま。 */
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る。受け取る人の読み込みの失敗は帯のまま。 */
   const fields = useFormErrors()
   fields.define('name', 'お知らせの名前', () => (name.trim() ? null : 'お知らせの名前を入力してください。'), { required: true })
-  /* 受け取るスタッフは、宛先のチームの欄（operator-recipient-team）が赤くなって理由を出す（列車9 の形のまま）。 */
+  /* 受け取るスタッフは、宛先のチームの欄（operator-recipient-team）が赤くなって理由を出す（作業 の形のまま）。 */
 
   const saveDraft = async (quiet = false): Promise<string | null> => {
     // 読み込み中に保存すると、未復元の項目が初期値で上書きされる。
@@ -382,7 +382,7 @@ function OperatorEditInner() {
     }
   }
 
-  /* 公開の前に `sDXNy` の確認の窓を出す。保存後に直した分も出すので、古い内容のまま出さない。 */
+  /* 公開の前に  の確認の窓を出す。保存後に直した分も出すので、古い内容のまま出さない。 */
   const openPublishConfirm = async () => {
     if (!selectedAccountId || saving || ruleLoading || publishing) return
     /* 押した「公開」のボタンに手応え（押せない形＋輪）を出す。先に下書きを保存している間も。 */
@@ -664,7 +664,7 @@ function OperatorEditInner() {
         open={confirmOpen}
         busy={publishing}
         designNode="sDXNy"
-        // 絵 sDXNy：窓の余白24・題の行36・本文までの間14
+        // 絵 ：窓の余白24・題の行36・本文までの間14
         designWidth={580}
         designTop={220}
         designHeaderPadding="24px 24px 0"

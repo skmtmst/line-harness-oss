@@ -284,7 +284,7 @@ describe('画面のつなぎ', () => {
     'components/merged-person/use-merged-person.ts',
     'components/merged-person/merged-person-detail-v8.tsx',
   ].map(read).join('\n')
-  const row = read('app/users/users-v8.tsx')
+  const row = read('app/users/users-screen.tsx')
   const page = read('app/users/page.tsx')
 
   it('撮影の押し口と対象面に印を付ける', () => {

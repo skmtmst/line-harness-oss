@@ -21,7 +21,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { canEditFeature } from '@/lib/staff-capability';
 import { useFeatureVisibility } from '@/lib/use-feature-visibility';
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability';
-import type { FeatureKey } from '@/lib/feature-settings';
+import type { FeatureKey } from '../../lib/feature-key'
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { ListPage, ListPagePagination } from '@/components/templates';
@@ -59,7 +59,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
  * ★V8-B 流入と計測の一覧（Pencil「★V8-B 画面の地図」：
- * 一覧 `xbHxg`、1152 `y1ztx`、閲覧のみ `EMUl9`、QR コードの小窓 `GtI4Y`）。
+ * 一覧 、1152 、閲覧のみ 、QR コードの小窓 ）。
  *
  * 型（ListPage）に、数の帯・左のフォルダの列（上に「流入リンクを作る」）・
  * 案内の帯・道具の段・表を置く。行は「コピー」「…」「編集」。
@@ -499,7 +499,7 @@ export default function InflowListV8({
       // entry_route_genres に color 欄がない。追加はオーナーの migration 承認待ち。
       colorEditable: false,
       count: accountRows.filter((row) => row.genre === genre.name).length,
-      // 名前の変更は各フォルダの「…」から（ほかの一覧と同じ・B-136）。
+      // 名前の変更は各フォルダの「…」から（ほかの一覧と同じ・）。
       // 消す・並べ替え・色はフォルダの口（entry-route-genres）に無いので出さない（押せない口を置かない）。
       ...(canManageFolders && !genre.id.startsWith('legacy-')
         ? { onEdit: () => setEditingGenre(genre) }
@@ -606,7 +606,7 @@ export default function InflowListV8({
   ) : null
   const searchLabel = '経路の名前・URLで探す'
   const onSearch = (value: string) => { setSearch(value); setPage(1) }
-  // 1152 の板（y1ztx）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。
+  // 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。
   const toolbar = (
     <ListToolbarFrame>
       {notice}
@@ -626,7 +626,7 @@ export default function InflowListV8({
     listBody = (
       <ListState
         kind="error"
-        /* URzvC：分からない失敗のときだけ「流入リンクを読み込めませんでした」と言う（権限・混雑は言い分けたまま）。 */
+        /* ：分からない失敗のときだけ「流入リンクを読み込めませんでした」と言う（権限・混雑は言い分けたまま）。 */
         title={loadFailure && loadFailure.title !== '表示できませんでした' ? loadFailure.title : '流入リンクを読み込めませんでした'}
         description={loadFailure?.description}
         error={loadError ?? undefined}

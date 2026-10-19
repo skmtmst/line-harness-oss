@@ -5,7 +5,7 @@ import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 import { CircleCheck, Users } from 'lucide-react'
 
 /**
- * 予約設定の右欄に出す「お客さまの予約画面」の写し（★V8 `owaS3` 右のスマホ）。
+ * 予約設定の右欄に出す「お客さまの予約画面」の写し（★V8  右のスマホ）。
  *
  * 実LIFF（apps/liff）の並びにそろえた、押せない見本。予約は
  * 「①メニュー → ②担当 → ③日時 → ④確認」の順なので、タブごとに
@@ -107,7 +107,7 @@ export function LiffPhoneMenuStep({
   categoryTone,
 }: {
   menus: BookingMenu[]
-  /** 作りかけ・直しかけのメニュー。先頭に選ばれた状態で出す（QqER7 の写し）。 */
+  /** 作りかけ・直しかけのメニュー。先頭に選ばれた状態で出す（ の写し）。 */
   draft?: Pick<BookingMenu, 'id' | 'name' | 'category_label' | 'description' | 'duration_minutes' | 'base_price' | 'price_mode' | 'sort_order' | 'is_active' | 'auto_tag_id'> | null
   status?: 'loading' | 'ready' | 'error'
   categoryTone?: 'customer'

@@ -1,7 +1,7 @@
 /**
- * コンバージョン一覧 (板 r6dJFy) と実装の数字突き合わせ契約。
+ * コンバージョン一覧 (板 ) と実装の数字突き合わせ契約。
  * 板: 行 padding 上下9・左右20・gap16・区切り #eceef1 / 見出し 13/20 (見出し行は共通部品 TableHeadRow のため M10へ)。
- * 一覧の td だけを直す。詳細ダイアログの表 (cXqlS)・警告箱は別板のため対象外。
+ * 一覧の td だけを直す。詳細ダイアログの表 ・警告箱は別板のため対象外。
  */
 import { readUiSource, readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs';
 import { resolve } from "node:path";

@@ -2,7 +2,7 @@
 
 import { CircleAlert, CircleCheck } from 'lucide-react'
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
-import type { Area } from './canvas-editor'
+import type { Area } from './area-types'
 import { areaDisplayName } from './canvas-editor'
 import { isAreaActionConfigured } from './action-drafts'
 import { intentLabelOf } from './area-properties'

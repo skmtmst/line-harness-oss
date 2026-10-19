@@ -3,7 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FriendListItem } from '@/lib/api'
-import type { FriendListColumn } from './friend-list-table'
+import type { FriendListColumn } from './friend-list-types'
 
 /*
  * 行を押した先は友だちの詳細（/friends/detail?id=…）。
@@ -157,7 +157,7 @@ describe('友だち行の行き先', () => {
     expect(buttons.find((button) => button.textContent === 'トークを開く')?.disabled).toBe(false)
     expect(buttons.find((button) => button.textContent === '友だちの詳細を見る')?.disabled).toBe(false)
     const changes = buttons.filter((button) => !['トークを開く', '友だちの詳細を見る'].includes(button.textContent ?? ''))
-    // 2026-10-07：「予約して送る」（★V8 MyJP7）を足して9項目。
+    // 2026-10-07：「予約して送る」（V8）を足して9項目。
     expect(changes.length).toBe(9)
     expect(changes.find((button) => button.textContent?.startsWith('予約して送る'))?.disabled).toBe(true)
     expect(changes.every((button) => button.disabled)).toBe(true)

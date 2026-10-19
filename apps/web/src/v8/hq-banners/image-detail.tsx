@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 画像の詳細（Pencil `rI5uh`）と、そこから開く「一覧から外す」の確かめ（`B24oNg`）。
+ * ★V8 画像の詳細（Pencil ）と、そこから開く「一覧から外す」の確かめ（）。
  * 共通の窓に絵の幅 860・上からの位置を渡し、中身を絵どおりに組む：
  * 左に画像とダウンロード・お気に入り、右に「アカウントへ配る」（探す・タグの札・アカウントの一覧・渡す）、
  * 下に「生成時の条件」（2列）、いちばん下に 一覧から外す（左）・参照画像にする・同じ設定でもう一度生成（右）。
@@ -76,7 +76,7 @@ export function BannerImageDetailV8({
   const rows = conditionRows(image, presets)
 
   if (confirmRemove) {
-    // 絵 B24oNg：詳細の窓は閉じ、確かめる窓だけを出す。やめると詳細へ戻る。
+    // 絵 ：詳細の窓は閉じ、確かめる窓だけを出す。やめると詳細へ戻る。
     return (
       <BannerConfirmDialogV8
         open

@@ -3,7 +3,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import NewRichMenuPage from './create-v8'
+import NewRichMenuPage from '../../../v8/rich-menus/new/create'
 
 ;
 import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
@@ -36,7 +36,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useSearchParams: () => new URLSearchParams(''),
 }));
 
-vi.mock('@/app/contents/media-picker-dialog', () => ({
+vi.mock('@/v8/contents/media-picker-dialog', () => ({
   default: ({ open, accountId, onSelect }: { open: boolean; accountId: string | null; onSelect: (item: object) => void }) => open
     ? React.createElement('button', { 'data-media-account': accountId, onClick: () => onSelect({ id: 'media-a', filename: '店Aの画像.png', width: 2500, height: 1686, sizeBytes: 1024 }) }, '登録画像を選ぶ（試験）')
     : null,

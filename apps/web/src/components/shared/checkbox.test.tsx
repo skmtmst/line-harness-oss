@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 共通 チェックボックス（gvjpx）。
+ * ★管理画面 共通 チェックボックス（gvjpx）。
  * 本物の input を使うので、押す・Space・読み上げはブラウザの標準のまま。
  */
 import React, { useState } from 'react'

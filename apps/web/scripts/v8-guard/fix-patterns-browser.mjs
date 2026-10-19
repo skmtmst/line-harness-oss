@@ -1,4 +1,4 @@
-/** B-267/268: rendered evidence. Presence is separate from defects; API/rights
+/** : rendered evidence. Presence is separate from defects; API/rights
  * differences require a stated reason, never an allowance or a guessed zero. */
 export default function scanFixPatterns({ cssOwners = [] } = {}) {
   const counts = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`F${i + 1}`, 0]))

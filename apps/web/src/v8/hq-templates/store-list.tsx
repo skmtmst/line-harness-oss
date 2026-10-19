@@ -62,14 +62,14 @@ export default function HqStoreList(props: HqStoreListProps) {
   const words = WORDS[type]
   const [query, setQuery] = useListUrlValue('q', '')
   const [undistributedOnly, setUndistributedOnly] = useListUrlValue('undistributedOnly', false)
-  /* タグ（DzdC3）だけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
+  /* タグだけ：上のタブ（タグ・友だち情報欄・対応マーク・保存した検索）と、使用状態・付け方の絞り込み。 */
   const attribute = useAttributeTab('/hq/friend-attributes')
   const [tagUsage, setTagUsage] = useState<TagUsageFilter>('all')
   const [tagMethod, setTagMethod] = useState('all')
-  /* タグ（DzdC3）の「よく使う絞り込み」：数の帯と同じ2つ（新しい版を未配布・整理の候補）を重ねて絞る。 */
+  /* タグの「よく使う絞り込み」：数の帯と同じ2つ（新しい版を未配布・整理の候補）を重ねて絞る。 */
   const [tagQuick, setTagQuick] = useState<TagQuickFilter[]>([])
   const [tagQuickOpen, setTagQuickOpen] = useState(false)
-  /* テンプレート（Upx1c）：1通のみ・複数通・差し込みありの札（保存版の通数・差し込みの有無。API 組5）と、行のまとめて選ぶ印。 */
+  /* テンプレート：1通のみ・複数通・差し込みありの札（保存版の通数・差し込みの有無。API 組5）と、行のまとめて選ぶ印。 */
   const [tplCount, setTplCount] = useState<'single' | 'multiple' | null>(null)
   const [tplVars, setTplVars] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -112,7 +112,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
 
   /*
-   * 数の帯（絵 i0Ao0R・wZPua）：ひな形（下書き N件＝まだ配っていない）・配ったアカウント・今月送った数（テンプレートだけ。
+   * 数の帯：ひな形（下書き N件＝まだ配っていない）・配ったアカウント・今月送った数（テンプレートだけ。
    * ほかの種類は配ったひな形）・新しい版を未配布（API-18。直したあと配っていない先があるひな形の数）。
    */
   const distributed = rows.filter((row) => (row.distributed_account_count ?? 0) > 0).length
@@ -133,7 +133,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   ]
 
   /*
-   * タグ（DzdC3）の数の帯：未使用・付けている友だち・（今月付けた回数の代わりに）新しい版を未配布・整理の候補。
+   * タグの数の帯：未使用・付けている友だち・（今月付けた回数の代わりに）新しい版を未配布・整理の候補。
    * 今月付けた回数は統括の一覧の受け口に無いので出さない（見た目だけ置かない）。
    */
   const tagKpis = [
@@ -265,7 +265,7 @@ export default function HqStoreList(props: HqStoreListProps) {
     { id: 'remove', label: '削除する', icon: <Trash2 size={14} aria-hidden="true" />, tone: 'danger', dividerBefore: true, onSelect: () => onRemove(row) },
   ]
 
-  /* タグ（DzdC3）の名前の札。フォルダの色は札の中の丸。 */
+  /* タグの名前の札。フォルダの色は札の中の丸。 */
 
   const toolbar = (
     <div className={type === 'tag' ? `${storeStyles.wideTools} ${attributeStyles.tagTools}` : storeStyles.wideTools}>
@@ -367,11 +367,11 @@ export default function HqStoreList(props: HqStoreListProps) {
 
   /*
    * 種類ごとの列（店の同じ機能の一覧と同じ並び）。違いは「配布先」の列だけ。
-   *   テンプレート i0Ao0R：種類・公開・配布先・今月送った数・更新・「…」
-   *   タグ DzdC3：人数・付け方・配布先・「…」（人数は API-18 の配った先で付いている友だちの合計）
-   *   リッチメニュー noVq4：順・誰に出すか・状態・配布先・今月押された・「…」（API-18 の順・誰に出すか・配った先の押された数）
-   *   回答フォーム wZPua：状態・配布先・更新・「…」
-   * ［配る］は「…」の中（B-253）。閲覧のみ（配れない人）には「…」ごと出さない。
+   *   テンプレート ：種類・公開・配布先・今月送った数・更新・「…」
+   *   タグ ：人数・付け方・配布先・「…」（人数は API-18 の配った先で付いている友だちの合計）
+   *   リッチメニュー ：順・誰に出すか・状態・配布先・今月押された・「…」（API-18 の順・誰に出すか・配った先の押された数）
+   *   回答フォーム ：状態・配布先・更新・「…」
+   * ［配る］は「…」の中。閲覧のみ（配れない人）には「…」ごと出さない。
    */
   const rankOf = new Map(type === 'rich_menu'
     ? [...rows].sort((a, b) => (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'ja')).map((row, index) => [row.id, index + 1] as const)
@@ -471,7 +471,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                 {type === 'rich_menu' ? <Td presentation="template-plain">{rankOf.get(row.id) ?? emptyValue('unknown')}</Td> : null}
                 {type === 'template' ? <Td presentation="template-plain"><Checkbox aria-label={`「${row.name}」を選ぶ`} checked={selectedIds.includes(row.id)} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...current, row.id] : current.filter((id) => id !== row.id))} /></Td> : null}
                 {type === 'tag' ? (
-                  /* タグ（DzdC3）は名前をタグの札で出す。フォルダの色は札の中の丸（名前の前の丸を二重に置かない）。 */
+                  /* タグは名前をタグの札で出す。フォルダの色は札の中の丸（名前の前の丸を二重に置かない）。 */
                   <NameCell name={(
                     <div className={storeStyles.dotLine}>
                       {itemHref ? <RowNameLink href={itemHref(row)} className={hqStyles.hqTagLink} aria-label={row.name} title={row.name}><TagPill name={row.name} color={folder ? folderDisplayColor(folder) : null} folderName={folder?.name ?? '未分類'} /></RowNameLink> : canEdit ? (

@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("名前を入力してください"),
   step_label: requiredText("この段に名前を付けてください"),
 }
@@ -27,7 +27,7 @@ import EntityRemoteField, { type RemoteEntityKind } from '@/components/shared/en
 
 
 /*
- * ★V8-B 分析「ファネルを作る」（板 `VDPz5`）と「ファネルを直す」（同じ形）。
+ * ★V8-B 分析「ファネルを作る」（板 ）と「ファネルを直す」（同じ形）。
  *
  * 今の作る・直すフォーム（app/analytics/page.tsx の FunnelForm）の動きを写して一から書いた。
  * 絵は「段Nの名前 ｜ 何をしたら」の2列。何をしたらは、種類と相手（成果地点・タグ・フォーム）を
@@ -256,9 +256,9 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
 
   const save = async () => {
     const errors: Record<string, string> = {}
-    if ((b244Requirements.name.check(name) !== null)) errors['fn-v8-name'] = '名前を入力してください'
+    if ((FIELD_REQUIREMENTS.name.check(name) !== null)) errors['fn-v8-name'] = '名前を入力してください'
     steps.forEach((step, index) => {
-      if ((b244Requirements.step_label.check(step.label) !== null)) errors[`fn-v8-step-${index}`] = 'この段に名前を付けてください'
+      if ((FIELD_REQUIREMENTS.step_label.check(step.label) !== null)) errors[`fn-v8-step-${index}`] = 'この段に名前を付けてください'
       if (kindNeedsValue(step.kind) && !step.value.trim()) errors[`fn-v8-${step.other ? 'value' : 'choice'}-${index}`] = step.kind === 'site_event' ? 'パスのまとまりを入力してください' : '何をしたら進むかを選んでください'
     })
     focusTarget.current = Object.keys(errors)[0] ?? null
@@ -342,7 +342,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
             成果地点「{presetConversion.name}」を2段目に入れています。このまま段を組んで作成すると、その成果地点を使う分析として登録されます。
           </Notice>
         ) : null}
-        <Field label="名前" htmlFor="fn-v8-name" error={fieldErrors['fn-v8-name']} requirement={b244Requirements.name}>
+        <Field label="名前" htmlFor="fn-v8-name" error={fieldErrors['fn-v8-name']} requirement={FIELD_REQUIREMENTS.name}>
           <SaveErrorField names={["name"]}><TextField id="fn-v8-name" value={name} onChange={(e) => { setName(e.target.value); clearFieldError('fn-v8-name') }} placeholder="例：広告から購入まで" /></SaveErrorField>
         </Field>
         <div className={styles.field}>
@@ -368,7 +368,7 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
               <div key={i} className={styles.stepBlock}>
                 <div className={styles.stepRow}>
                   <div className={styles.stepCol}>
-                    <Field label={`段${i + 1}の名前`} htmlFor={`fn-v8-step-${i}`} error={fieldErrors[`fn-v8-step-${i}`]} requirement={b244Requirements.step_label}>
+                    <Field label={`段${i + 1}の名前`} htmlFor={`fn-v8-step-${i}`} error={fieldErrors[`fn-v8-step-${i}`]} requirement={FIELD_REQUIREMENTS.step_label}>
                       <SaveErrorField names={[`steps.${i}.label`,"label","step.label"]}><TextField id={`fn-v8-step-${i}`} value={step.label} onChange={(e) => update(i, { label: e.target.value })} placeholder="例：友だち追加" /></SaveErrorField>
                     </Field>
                       {steps.length > MIN_STEPS ? (

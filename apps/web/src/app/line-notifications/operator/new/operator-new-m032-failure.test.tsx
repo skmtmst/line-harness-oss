@@ -107,7 +107,7 @@ describe('M032 公開・テスト送信の失敗は生文を出さない', () =>
     await waitFor(() => expect(screen.getByText('花子')).toBeTruthy())
 
     fireEvent.click(screen.getByRole('button', { name: /運用者へのお知らせを公開/ }))
-    // 板 `sDXNy`「このお知らせを公開しますか？」を見てから送る。
+    // 板 「このお知らせを公開しますか？」を見てから送る。
     const confirm = await screen.findByText('このお知らせを公開しますか？')
     expect(confirm).toBeTruthy()
     const dialog = document.body.querySelector('[data-design-node="sDXNy"]')

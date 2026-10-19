@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 成果地点を作る（src/v8/conversions/create.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
- * 同じ名前の成果地点があると競合の帯（cXqlS）と「比べてから保存」・保存が 409 で返ったときも帯・
+ * 同じ名前の成果地点があると競合の帯と「比べてから保存」・保存が 409 で返ったときも帯・
  * 送る形（使う場所は種類の行のチェックで全部）・閲覧のみは保存ボタンを置かない。
  */
 import React, { act } from 'react'

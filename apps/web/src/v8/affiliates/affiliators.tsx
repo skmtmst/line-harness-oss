@@ -67,8 +67,8 @@ import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/
 
 
 /*
- * ★V8 成果とアフィリエイト「アフィリエイター」（板 `nJlxX`・1152 `KdFRI`・
- * 閲覧のみ `v9JWQ`、状態は見本帳 `rRk0C`、行を押すと引き出し `tnTn9`）。
+ * ★V8 成果とアフィリエイト「アフィリエイター」（板 ・1152 ・
+ * 閲覧のみ 、状態は見本帳 、行を押すと引き出し ）。
  *
  * app/affiliates/v8-affiliates-tab.tsx から動きを写し、見た目を一覧の型
  * （ListPage）で組み直した。データの口・操作は今と同じ（一覧・集計・承認待ち・
@@ -95,7 +95,7 @@ const SAVED_VIEWS: Array<{ value: string; label: string; filters: FilterKey[]; s
 
 /*
  * 報酬の決め方で分けた見え方（保存しない）。作ったフォルダではないので、左のフォルダの列ではなく
- * 上の絞り込み（「報酬の決め方」の選ぶ欄）に置く（B-136 2026-10-09）。
+ * 上の絞り込み（「報酬の決め方」の選ぶ欄）に置く（ 2026-10-09）。
  */
 const GROUPS: Array<{ key: GroupKey; label: string; match: (row: AffiliateListRow) => boolean }> = [
   { key: 'all', label: '報酬の決め方：すべて', match: () => true },

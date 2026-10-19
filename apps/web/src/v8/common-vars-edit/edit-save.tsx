@@ -131,12 +131,12 @@ export async function saveCommonVar({ changeReason, expiryBehavior, fallbackValu
       if (e instanceof ApiError && (e.status === 428 || e.status === 409)) {
         if (accountAtRequest !== latestAccountRef.current)
  return
-        // 409 は頭の下の帯（piWhz）が知らせるので、本文の上に同じ知らせを重ねない。
+        // 409 は頭の下の帯が知らせるので、本文の上に同じ知らせを重ねない。
         if (e.status === 428) { if (!fieldFailure) setError(saveErrorText(e)) }
         const fresh = await refreshBaseline(item.id, accountAtRequest, e)
         /*
          * 409は誰かが先に保存した。入力は残したまま、帯で誰の保存かを見せる
-         * （板 `piWhz`）。428（確認切れ）は文だけで、帯は出さない。
+         * （板 ）。428（確認切れ）は文だけで、帯は出さない。
          */
         if (e.status === 409) {
           const latest = fresh?.history[0]

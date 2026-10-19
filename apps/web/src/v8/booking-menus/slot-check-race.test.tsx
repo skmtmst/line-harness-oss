@@ -59,7 +59,7 @@ describe('空きを確かめる（WEB054）', () => {
   })
 })
 
-it('B-241 availability staff list failure is distinct from no designation and retryable',async()=>{
+it('availability staff list failure is distinct from no designation and retryable',async()=>{
  net.list.mockRejectedValueOnce(new Error('人工取得失敗'))
  render(<SlotCheckV8 accountId="a" menus={menus}/>)
  const error=await screen.findByText('担当を読み込めませんでした')

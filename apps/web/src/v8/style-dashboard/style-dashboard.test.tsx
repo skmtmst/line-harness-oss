@@ -8,7 +8,7 @@ import type { RestaurantReservation } from '@/lib/restaurant-test-api'
 const noop = { open: () => {}, visit: () => {}, line: () => {}, pay: () => {}, copy: () => {}, roster: () => {} }
 
 describe('業種ダッシュボード（XBkC2）', () => {
-  it('題は業種の名前、1枚目のタブは業種ごとの名前（B-318）', () => {
+  it('題は業種の名前、1枚目のタブは業種ごとの名前', () => {
     expect(STYLE_CONFIG.restaurant.title).toBe('お店')
     expect(STYLE_CONFIG.salon.title).toBe('サロン')
     expect(Object.values(STYLE_CONFIG.restaurant.tabs)).toEqual(['席', '予約', 'お客さま', '分析'])

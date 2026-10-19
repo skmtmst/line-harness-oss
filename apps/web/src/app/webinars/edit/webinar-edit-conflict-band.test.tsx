@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 同時編集の帯（板 `pvimJ`）。409 の見分けと帯の表示だけを確かめる。
+ * 同時編集の帯（板 ）。409 の見分けと帯の表示だけを確かめる。
  */
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'

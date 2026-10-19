@@ -43,7 +43,7 @@ import { EVENT_NAME_MAX_LENGTH, EVENT_DESCRIPTION_MAX_LENGTH, resolveEventMultiA
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 イベント予約「イベントを作る」（Pencil `d4adD4`）。
+ * ★V8 イベント予約「イベントを作る」（Pencil ）。
  *
  * 型（CreatePage）に、中身・公開対象・最初の予約枠・申し込みのきまり・聞くこと・
  * 申し込んだ人にすること のカードと、右の列（お客さまの申込ページ・保存すると起きること）、

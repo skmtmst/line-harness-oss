@@ -58,7 +58,7 @@ describe('NEN配信のテスト送信先', () => {
 
   test('一覧の読込失敗を0件や空状態として表示しない', () => {
     // 1件の失敗で画面全体をエラーにしない(点検 #512 の中3)。
-    // ★V7 `x63W5x`：失敗はそのタブの一覧の場所の1枚で示す（帯は出さない）。
+    // ★管理画面 `x63W5x`：失敗はそのタブの一覧の場所の1枚で示す（帯は出さない）。
     expect(page).toContain('tabErrors');
     expect(page).toContain('tabError');
     expect(overview).toContain('tabError');

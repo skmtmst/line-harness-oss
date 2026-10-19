@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CreatePage, DetailColumns, ListPage, SettingsPage } from './index'
+import { CreatePage, DetailColumns, ListPage, SettingsPage } from '.'
 import { useState } from 'react'
 import { PageFrame } from './page-frame'
 

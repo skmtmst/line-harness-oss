@@ -2,7 +2,7 @@
 /*
  * 差し込みを札で見せる本文の欄（絵 OVCot ①）の動き。
  * 保存の値は今までどおり {{name}} などの文字・札は Backspace 1回で消える・
- * 変換中の Enter は改行にしない・貼り付けた {{name}} は札になる・上限で切る・v7 は今の textarea。
+ * 変換中の Enter は改行にしない・貼り付けた {{name}} は札になる・上限で切る・互換経路は今の textarea。
  */
 import React, { act, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'

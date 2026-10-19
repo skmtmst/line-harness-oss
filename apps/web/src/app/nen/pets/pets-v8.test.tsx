@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B マイペット（wTIej・h7A2F・eLjeQ）の骨格。
- * データの口は v7 と同じ（nenPetsApi.pets・nenRanksApi.feeding）。
+ * ★V8-B マイペット（・・）の骨格。
+ * データの口は 管理画面 と同じ（nenPetsApi.pets・nenRanksApi.feeding）。
  * 板の印・10列・節のカード・計算のカード・小窓の見出しを見る。
  */
 import React from 'react'

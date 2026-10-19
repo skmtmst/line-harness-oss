@@ -75,7 +75,7 @@ afterEach(() => {
 })
 
 test('一覧口の403は権限なしの板（★V8 O5tUeE）になり、生の文は出さない', async () => {
-  // 2026-10-07：403 は読み直しても開けないので、読み直しの口ではなく権限なしの板にする（絵 O5tUeE）。
+  // 2026-10-07：403 は読み直しても開けないので、読み直しの口ではなく権限なしの板にする。
   handler = (url) => {
     if (url.pathname === '/api/scenarios') {
       return response({ success: false, error: 'forbidden' }, 403)

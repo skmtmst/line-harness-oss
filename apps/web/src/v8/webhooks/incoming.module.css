@@ -1,5 +1,5 @@
 /*
- * ★V8 外部連携「こちらで受け取る」（gW0F2・作る窓 H031gC）。
+ * ★V8 外部連携「こちらで受け取る」（・作る窓 ）。
  * 枠・見出し・タブ・数の帯は型（ListPage）が持つ。ここは本文の2列（左 240 の受け取り口の列・右の設定カード）。
  */
 .body {
@@ -290,7 +290,7 @@
   flex-direction: column;
   gap: var(--tpl-body-pad);
 }
-/* 作る窓（H031gC）：題の行のすぐ下（間14）から欄を並べ、操作の段まで間14。共通の窓の中の余白24を詰める。 */
+/* 作る窓：題の行のすぐ下（間14）から欄を並べ、操作の段まで間14。共通の窓の中の余白24を詰める。 */
 .formTight {
   margin-block: calc(var(--tpl-wh-dialog-pull-top) * -1) calc(var(--tpl-wh-dialog-pull-bottom) * -1);
 }

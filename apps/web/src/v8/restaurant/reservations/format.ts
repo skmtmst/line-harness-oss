@@ -1,5 +1,5 @@
 /*
- * 予約台帳（l9NlC0・Z3FoM・rm92Y・xzCK6）の表示の形。今の画面
+ * 予約台帳（l9NlC0・Z3FoM・・xzCK6）の表示の形。今の画面
  * （app/restaurant-test/v8/reservations.tsx・reservation-phone.tsx）から写し、絵の書き方に合わせた。
  */
 import { formatDate, formatYmd } from '@/lib/format'

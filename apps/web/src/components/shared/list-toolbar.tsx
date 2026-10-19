@@ -81,7 +81,7 @@ export type ListToolbarSearch = {
   label?: string
   /** 入力の上限（貼り付けの制限）。渡さないときは付けない。 */
   maxLength?: number
-  /** ★V8 探す欄の幅（板ごとの絵の幅。例：リマインダ apLqS は 200）。渡さないときは部品の 280。 */
+  /** ★V8 探す欄の幅（板ごとの絵の幅。例：リマインダ  は 200）。渡さないときは部品の 280。 */
   width?: number
   /** 検索中。渡すと虫眼鏡の代わりに回る印が出る。 */
   loading?: boolean
@@ -90,7 +90,7 @@ export type ListToolbarSearch = {
 }
 
 /**
- * 一覧の上の道具の並び。★V7 `Xn1Mz`。
+ * 一覧の上の道具の並び。★管理画面 `Xn1Mz`。
  *
  * どの一覧も同じ2行にする。画面ごとに手で並べない。
  *
@@ -131,7 +131,7 @@ export default function ListToolbar({
   secondary?: ReactNode
   /**
    * 並べ方。既定 'band' は1本の帯（c4n9Kr）。
-   * 'stacked' は2段（acRIl 予約管理：1段目＝探す・担当・経路・CSV、
+   * 'stacked' は2段（ 予約管理：1段目＝探す・担当・経路・CSV、
    * 2段目＝札）。段の間10・段の中の間6。
    */
   layout?: 'band' | 'stacked'
@@ -208,19 +208,19 @@ export function ListToolbarEnd({ children, ...props }: HTMLAttributes<HTMLSpanEl
   return <span {...props} className={styles.slotsEnd} data-toolbar-trailing data-toolbar-end>{orderedTrailingTools(children, trailingAccessory)}</span>
 }
 
-/** B-244: the shared end owns order; keep each control and its handler intact. */
+/** : the shared end owns order; keep each control and its handler intact. */
 function orderedTrailingTools(nodes: ReactNode, accessory?: ReactNode): ReactNode[] {
   const flatten = (items: ReactNode): ReactNode[] => Children.toArray(items).flatMap(node => isValidElement<{ children?: ReactNode }>(node) && node.type === Fragment ? flatten(node.props.children) : [node])
   const rank = (node: ReactNode) => ({ search: 0, filter: 0, sort: 1, count: 2 })[toolbarRole(node)]
   const tools = flatten(nodes).sort((a, b) => rank(a) - rank(b))
   if (!accessory) return tools
-  // 一覧の操作の説明（？）は、絞り込み・並びのあと、件数の直前（OylSV・uNsEy）。
+  // 一覧の操作の説明（？）は、絞り込み・並びのあと、件数の直前（・）。
   const at = tools.findIndex(node => rank(node) === 2)
   const keyed = isValidElement(accessory) && accessory.key == null ? cloneElement(accessory, { key: 'list-help' }) : accessory
   return at < 0 ? [...tools, keyed] : [...tools.slice(0, at), keyed, ...tools.slice(at)]
 }
 
-/** B-244/266: retain named tools; an overflow group keeps its explicit name. */
+/** : retain named tools; an overflow group keeps its explicit name. */
 export function ListToolbarOptional({ children, label = 'ほかの絞り込み', collapse }: { children: ReactNode; label?: string; compact?: boolean; collapse?: 'overflow' }) {
   return collapse === 'overflow' ? <OverflowTools label={label}>{children}</OverflowTools> : <InlineOptional>{children}</InlineOptional>
 }
@@ -275,7 +275,7 @@ export function ListToolbarSort(props: ListToolbarSortProps) {
   return <span data-list-sort><Select {...props} options={options} size="content" width={undefined} label="並び" aria-label="並び" /></span>
 }
 
-/** B-191/192/205：入らない札と狭い列だけを選ぶ欄へ畳む。 */
+/** /192/205：入らない札と狭い列だけを選ぶ欄へ畳む。 */
 function contentSizedSelect(child: React.ReactElement<SelectProps>) {
   return cloneElement(child, { size: 'content', width: undefined, pageSizeControl: child.props.pageSizeControl || toolbarRole(child) === 'count' })
 }

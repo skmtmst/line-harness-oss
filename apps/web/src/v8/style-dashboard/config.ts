@@ -2,7 +2,7 @@ import { styleTerm } from '@/lib/terms'
 import type { DashboardRange, IndustryStyle } from './model'
 
 /*
- * 4 業種のダッシュボードの違い（B-309・B-318。絵 XBkC2：NqAvL 飲食・mOAX5 サロン・R0FFqz 面談・k2MBw 教室）。
+ * 4 業種のダッシュボードの違い（・。絵 XBkC2：NqAvL 飲食・mOAX5 サロン・R0FFqz 面談・k2MBw 教室）。
  * 骨組みは同じ。違うのは題・タブ・表示の切り替え・担当の呼び方・主ボタン・表の列・行の「…」だけ。
  */
 

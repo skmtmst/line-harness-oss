@@ -20,12 +20,12 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import type { AccountStyle } from '@line-crm/shared'
-import { hqStyleApi } from '@/lib/api-styles'
-import { styleLabel } from '@/v8/onboarding/model'
+import { hqStyleApi } from '@/lib/api/helpers/styles'
+import { styleLabel } from '@/v8/onboarding/public/model/index'
 import styles from './attention.module.css'
 
 /*
- * 統括の「対応が要るもの」（★V8 修正案の列 VHp7p `Kyf8U`。決まり B-312）。
+ * 統括の「対応が要るもの」（★V8 修正案の列 VHp7p `Kyf8U`。決まり ）。
  *
  * 見る権限のあるアカウントごとに、未対応のトーク・承認待ちの予約・未払い・接続の異常・止まった配信の件数を出す。
  * 件数を押すと、そのアカウントに切り替えて受信箱・予約・配信の画面を開く。権限の無いアカウントは口が返さない（出さない）。
@@ -90,7 +90,7 @@ export default function HqAttentionV8() {
     .sort((a, b) => (kind === 'all' ? total(b) - total(a) : count(b, kind) - count(a, kind))),
   [items, kind, folder, accounts]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* そのアカウントに切り替えてから開く（B-312）。 */
+  /* そのアカウントに切り替えてから開く。 */
   const open = (accountId: string, href: string) => {
     setSelectedAccountId(accountId)
     router.push(href)

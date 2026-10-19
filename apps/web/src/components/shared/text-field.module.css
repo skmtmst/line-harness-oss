@@ -27,7 +27,7 @@
   background: var(--color-canvas-sunken);
 }
 
-/* 計算で決まる読むだけの欄（年齢など）。絵 vX3wQ：灰色の地・薄い文字。 */
+/* 計算で決まる読むだけの欄（年齢など）。絵 ：灰色の地・薄い文字。 */
 .field[data-look='derived'] {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
@@ -109,8 +109,8 @@
  * 複数行の入力欄の決まり（2026-10-08 共通部品の1本化）。
  * 縦にだけ手で広げられる・横は広げられない。層の外に置くのは、画面が
  * className で resize-none などを渡しても、この決まりを上書きさせないため。
- * v7 の TextArea（form-controls の包み）は form-controls.module.css が
- * v7 のときだけ元の resize: none に戻す（v7 の見た目は変えない）。
+ * 管理画面 の TextArea（form-controls の包み）は form-controls.module.css が
+ * 互換経路のときだけ元の resize: none に戻す（管理画面 の見た目は変えない）。
  */
 .multi {
   resize: vertical;
@@ -128,14 +128,14 @@
 :root .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
 :root .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }
 
-/* 見送りの補足2行（ujcar）。指定した欄だけを56pxにする。 */
+/* 見送りの補足2行。指定した欄だけを56pxにする。 */
 :root .multiShort { min-height: var(--tpl-nm-textarea-h); height: var(--tpl-nm-textarea-h); padding: var(--tpl-nm-textarea-pad); font-size: var(--tpl-nm-row-size); line-height: var(--tpl-nm-textarea-lh); }
 
 /* コラムの紹介文。改行を保ち、最初は1行分の高さで表示する。 */
 :root .multiSingleRow { min-height: var(--tpl-field-h); height: var(--tpl-field-h); border: 0; padding: var(--tpl-field-pad-y) var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: var(--tpl-field-lh); box-shadow: var(--control-shadow); }
 :root .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }
 
-/* B-152・仕上げ7 */
+/* ・仕上げ7 */
 :root .field:disabled { opacity: var(--polish-disabled-opacity); }
 html:root .field:is(.single, .multi)[aria-invalid='true']:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); box-shadow: var(--polish-error-ring); }
 

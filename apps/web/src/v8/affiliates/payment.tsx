@@ -34,7 +34,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 成果とアフィリエイト「支払い」（板 `aINnz`、期間を締めるの確かめは `usDpO`）。
+ * ★V8 成果とアフィリエイト「支払い」（板 、期間を締めるの確かめは ）。
  *
  * app/affiliates/v8-payment-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で組み直した。
  * 決まりは今と同じ：
@@ -400,7 +400,7 @@ export default function PaymentTab() {
                       <span className={styles.rowPlan}>口座番号は本人だけに表示</span>
                     </span>
                   ) : (
-                    /* 絵 aINnz：赤い「未登録」の下に、だれの手待ちかを添える。 */
+                    /* 絵 ：赤い「未登録」の下に、だれの手待ちかを添える。 */
                     <span className={styles.stack}>
                       <span className={`${styles.cellNum} ${styles.cellDanger}`}>未登録</span>
                       <span className={styles.rowPlan}>本人の登録待ち</span>

@@ -15,7 +15,7 @@ const LIST_V8 = readFileSync('src/app/contents/list-v8.tsx', 'utf8')
 const PAGE = readFileSync('src/app/contents/page.tsx', 'utf8')
 
 /*
- * ★V8 登録メディア一覧（板 `O7hUt7`）の契約。
+ * ★V8 登録メディア一覧（板 ）の契約。
  * テーマの古い属性が残っていてもV8一覧に固定し、
  * 数の帯・フォルダの列・道具の段・札の格子・表示範囲とページ送りが出ること、
  * staff では閲覧のみの帯が出て管理操作が押せない形になることを実DOMで固定する。
@@ -311,7 +311,7 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     expect(LIST_V8).toContain("{ value: 'near-limit', label: '上限に近いものだけ' }")
     expect(LIST_V8).toContain("showArchivedOnly ? 'archived'")
     expect(LIST_V8).toContain('使われている順')
-    // フォルダの列は共通の ManagedFolderPanel（名前・色・並べ替え・消すまで・B-136）。
+    // フォルダの列は共通の ManagedFolderPanel（名前・色・並べ替え・消すまで・）。
     expect(LIST_V8).toMatch(/<ManagedFolderPanel[\s\S]*?kind="media"/)
     // 操作。
     expect(LIST_V8).toContain('使用箇所を見る')

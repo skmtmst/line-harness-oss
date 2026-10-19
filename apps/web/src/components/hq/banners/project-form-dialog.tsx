@@ -54,7 +54,7 @@ export default function ProjectFormDialog({
     onSubmit({ name: trimmed, description: description.trim() })
   }
 
-  // W7Z57: 名前が空のまま作らせない。変えるときは名前が入っている。
+  // : 名前が空のまま作らせない。変えるときは名前が入っている。
   const canSubmit = !busy && (Boolean(project) || name.trim() !== '')
   return (
     <Dialog

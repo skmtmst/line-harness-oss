@@ -422,7 +422,7 @@
  * ★V8 1152 の帯（parity 1003-2106：1152 の 29/31 板で札が 20px に
  * 潰れて見えなくなっていた）。札は縮めない（長い名前は 128px の
  * 「…」で受ける）。代わりにパンくずと自分の名前が縮む（どちらも
- * 「…」持ち）。v7 は今までどおり。
+ * 「…」持ち）。互換経路は今までどおり。
  */
 :root .accountPill {
   flex-shrink: 0;
@@ -443,7 +443,7 @@
  * ★V8 1152 の帯（M3 報告・parity 1003-2106：1152 の 29/31 板で札が
  * 20px に潰れて見えなくなっていた）。札は縮めない（長い名前は
  * 128px の「…」で受ける）。代わりにパンくずと自分の名前が縮む
- * （どちらも「…」持ち）。v7 は今までどおり。
+ * （どちらも「…」持ち）。互換経路は今までどおり。
  */
 :root .accountPill {
   flex-shrink: 0;
@@ -471,11 +471,11 @@
 }
 
 /* ---------------------------------------------------------------------
- * ★V8 殻合わせ（絵 `V8-B/JKjsE`・統括もふだんの画面も同じ殻）。
- * v7 の土台クラスは触らない。ここは V8 の上書きだけ。
+ * ★V8 殻合わせ（絵の統括もふだんの画面も同じ殻）。
+ * 管理画面 の土台クラスは触らない。ここは V8 の上書きだけ。
  * ------------------------------------------------------------------- */
 
-/* v7 の中箱（名前＋役割）は素通しにする。V8 でだけ積む。 */
+/* 管理画面 の中箱（名前＋役割）は素通しにする。V8 でだけ積む。 */
 
 /* ホームの格子印＋文字。手前の段の頭。 */
 .crumbHome {
@@ -559,7 +559,7 @@
 :root .iconButton:not(:focus-visible) { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
 
 /* zUg8S / Yw24X: 統括の別の絵は既存の default variant に残す。 */
-/* 帯の右端は白い板の右端にそろえる（絵 JKjsE・ziYCN のログアウトの右端 1420）。 */
+/* 帯の右端は白い板の右端にそろえる（絵の のログアウトの右端 1420）。 */
 :root .root[data-v8-chrome='shell'] { padding-right: var(--tpl-hq2-topbar-pad-end); }
 :root .root[data-v8-chrome='shell'] .actions { gap: 10px; }
 :root .root[data-v8-chrome='shell'] .crumbs { gap: 6px; }
@@ -569,7 +569,7 @@
 :root .root[data-v8-chrome='shell'] .v8Left > .iconButton { width: 32px; height: 32px; border-radius: var(--polish-radius-control); background: transparent; }
 /* 切替の札は箱の中に小さい字＋名前の2行（絵の指示）。外の見出しは畳む。 */
 :root .accountField > span:first-child { display: none; }
-/* 1439 以下の v7 の決まり（見出しの span を画面外へ）が V8 では札そのものに当たり、幅 0 に潰れていた。札は戻す（1152 の絵にも札がある）。 */
+/* 1439 以下の 管理画面 の決まり（見出しの span を画面外へ）が V8 では札そのものに当たり、幅 0 に潰れていた。札は戻す（1152 の絵にも札がある）。 */
 :root .accountField > .accountPill { position: relative; width: auto; height: 36px; overflow: visible; clip: auto; white-space: nowrap; }
 :root .accountPill { height: 36px; min-height: 36px; padding: 0 10px 0 6px; gap: 8px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
 :root .accountMark { width: 24px; height: 24px; border-radius: 7px; font-size: 11px; font-weight: 700; line-height: 17px; }
@@ -582,7 +582,7 @@
 :root .root[data-v8-chrome='shell'] .user { font-size: 13px; font-weight: 600; line-height: 17px; }
 :root .root[data-v8-chrome='shell'] .role,
 :root .root[data-v8-chrome='shell'] .roleButton { font-size: 11px; font-weight: 400; line-height: 13px; }
-/* 押せる役割（統括へ戻る）は文字の高さのまま。ボタンの最低の高さで名前が上へ押し出されていた（絵 ziYCN の名前と役割の2行）。指で触る端末は今までどおり。 */
+/* 押せる役割（統括へ戻る）は文字の高さのまま。ボタンの最低の高さで名前が上へ押し出されていた（名前と役割の2行）。指で触る端末は今までどおり。 */
 @media (pointer: fine) { :root .root[data-v8-chrome='shell'] .identityText .roleButton { min-height: 0; } }
 :root .root[data-v8-chrome='shell'] .logout { gap: 6px; padding: 0 14px; border: 0; border-radius: var(--polish-radius-control); outline: 1px solid var(--color-hairline); outline-offset: -.5px; box-shadow: var(--shadow-board); font-size: 13px; font-weight: 600; line-height: 20px; }
 :root .root[data-v8-chrome='shell'] .logout svg { width: 15px; height: 15px; }

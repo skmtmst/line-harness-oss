@@ -1,6 +1,6 @@
 /*
- * ★V8 テンプレートの一覧（Pencil `v19Ivv`・1152 `L7zA7C`・閲覧のみ `hEDTK`、
- * 削除 `V6JFnd`・削除できない `Z0g3si`、状態は `susGP`）。
+ * ★V8 テンプレートの一覧（Pencil ・1152 ・閲覧のみ 、
+ * 削除 ・削除できない 、状態は ）。
  * 枠・見出し・タブ・数の帯・フォルダの列・道具の段の外枠は型（ListPage）が持つ。
  * 値は globals.css の `:root` の `--tpl-tl-*`。
  */
@@ -11,10 +11,10 @@
   line-height: var(--tpl-tl-note-lh);
 }
 
-/* 閲覧のみの帯（hEDTK）。タブの上。薄い青の地・目の印・枠なし。 */
+/* 閲覧のみの帯。タブの上。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin-bottom: var(--tpl-tl-band-after); }
 
-/* 数の帯の説明：狭い板（L7zA7C）では2行に折る（絵どおり）。 */
+/* 数の帯の説明：狭い板では2行に折る（絵どおり）。 */
 .kpiDetailWrap {
   display: block;
   white-space: normal;
@@ -46,7 +46,7 @@
   flex-shrink: 0;
 }
 
-/* 1152 の板（L7zA7C）：1段目と2段目。 */
+/* 1152 の板：1段目と2段目。 */
 .narrowTools {
   display: flex;
   flex-basis: 100%;
@@ -138,9 +138,9 @@
   white-space: nowrap;
 }
 
-/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 v19Ivv の説明の行）。 */
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
 .dotLine {
-  /* 丸と名前の行。ブロックの flex にして、行の箱が字の高さより伸びないようにする（絵 v19Ivv の名の行）。 */
+  /* 丸と名前の行。ブロックの flex にして、行の箱が字の高さより伸びないようにする（名の行）。 */
   display: flex;
   min-width: 0;
   align-items: center;
@@ -349,7 +349,7 @@
   padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side);
 }
 
-/* 窓の下の帯。危ないボタンは左端・キャンセルは真ん中（V6JFnd）。 */
+/* 窓の下の帯。危ないボタンは左端・キャンセルは真ん中。 */
 .dangerFooter {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -360,7 +360,7 @@
   border-top: 1px solid var(--color-hairline);
 }
 
-/* 窓の中の注意の帯は横いっぱい（絵 V6JFnd）。 */
+/* 窓の中の注意の帯は横いっぱい。 */
 .fullWidth {
   align-self: stretch;
 }
@@ -391,7 +391,7 @@
   align-self: stretch;
 }
 
-/* 削除できない窓（Z0g3si）の「使っている所」。 */
+/* 削除できない窓の「使っている所」。 */
 .usageList ul {
   margin: 0;
   padding: 0;
@@ -461,7 +461,7 @@
   font-weight: 600;
 }
 
-/* 種類を選ぶ窓（R9XUMr）：段の間 20・カードの間 12・カードは高さ 184・余白 16・中の間 6。 */
+/* 種類を選ぶ窓：段の間 20・カードの間 12・カードは高さ 184・余白 16・中の間 6。 */
 .picker {
   display: flex;
   flex-direction: column;
@@ -556,7 +556,7 @@
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
 
-/* ===== 統括のひな形（src/v8/hq-templates/store-list.tsx）：店と同じ一覧に「配布先」を足す（［配る］は「…」の中・B-253）。B-34：行の左右 24 ===== */
+/* ===== 統括のひな形（src/v8/hq-templates/store-list.tsx）：店と同じ一覧に「配布先」を足す（［配る］は「…」の中・）。：行の左右 24 ===== */
 .colHqDest { width: var(--tpl-tl-col-hq-dest); }
 .hqTable tr > :first-child { padding-left: var(--tpl-tl-hq-row-pad-x); }
 .hqTable tr > :last-child { padding-right: var(--tpl-tl-hq-row-pad-x); }

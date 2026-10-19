@@ -1,6 +1,6 @@
 .progress { display: flex; align-items: center; gap: var(--polish-space-field); padding: var(--polish-space-card); border-radius: var(--radius-card); background: var(--color-accent-soft); }
 .progressText { color: var(--color-accent-deep); font-size: var(--tpl-bm-18); font-weight: 700; white-space: nowrap; }
-/* 段の頭の丸（絵 xuJ7D）：済みは緑の地に白の印、まだは白の地に番号。 */
+/* 段の頭の丸：済みは緑の地に白の印、まだは白の地に番号。 */
 .mark { display: inline-flex; align-items: center; justify-content: center; width: var(--tpl-bm-28); height: var(--tpl-bm-28); border-radius: var(--radius-pill); box-shadow: var(--tpl-onboarding-step-ring); color: var(--color-ink-faint); font-size: var(--text-label); font-weight: 700; font-variant-numeric: tabular-nums; }
 .markDone { background: var(--color-accent-deep); box-shadow: none; color: var(--color-canvas); }
 .stepDoneTitle { color: var(--color-ink-secondary); }

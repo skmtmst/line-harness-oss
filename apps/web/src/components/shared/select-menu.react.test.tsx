@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 プルダウンの開いた中身（共通部品 select-menu・StFE7「選ぶ欄/開いた」・確認表 B-45）。
+ * ★V8 プルダウンの開いた中身（共通部品 select-menu・StFE7「選ぶ欄/開いた」・確認表 ）。
  * オーナーの悪い例（統括のアカウント画面）：開くと「並び：／友だち順」と2行に折れる・
  * 選択肢にも「並び：」が付く・緑の枠・✓ が左・選んだ行が緑の地。
  * ここは「頭を外して見出しにする」「✓ は右端」「選んだ値・キーボード・変換中」の動きを見張る。
- * v7（data-theme なし）は今までの中身のまま。
+ * 管理画面（data-theme なし）は今までの中身のまま。
  */
 import { act } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'

@@ -8,7 +8,7 @@
 
 .compact {
   padding: var(--polish-status-pad);
-  /* ★V7：10px は表の中で読みにくかった（better-typography：12px を大きく下回らない）。 */
+  /* ★管理画面：10px は表の中で読みにくかった（better-typography：12px を大きく下回らない）。 */
   font-size: var(--text-caption);
 }
 
@@ -55,7 +55,7 @@
   content: '';
 }
 
-/* Exported V8 states: exact geometry and palette; v7 stays above. */
+/* Exported V8 states: exact geometry and palette; 管理画面 stays above. */
 :root .badge {
   flex-shrink: 0;
   justify-content: flex-start;
@@ -81,7 +81,7 @@
 :root .annotation { padding: 0 var(--tpl-tag-name-gap); background: var(--color-canvas-sunken); color: var(--color-ink-faint); font-size: var(--tpl-tag-note-size); font-weight: 500; line-height: var(--tpl-row-sub-lh); }
 :root .annotation.warning { color: var(--color-warning); }
 
-/* B-152・仕上げ4 */
+/* ・仕上げ4 */
 :root .badge:not(.annotation) {
   gap: var(--polish-status-gap); padding: var(--badge-padding, var(--polish-status-pad));
   border: 0; border-radius: var(--radius-pill);
@@ -101,7 +101,7 @@
 :root .badge:not(.annotation)[data-tone='neutral']::before { background: var(--polish-status-neutral-dot); }
 :root .badge:not(.annotation)::before { background: var(--polish-status-neutral-dot); width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); }
 
-/* B-159 / B-180：小さい注記も状態なら同じ22px・12/600。 */
+/*  / ：小さい注記も状態なら同じ22px・12/600。 */
 :root .badge {
   box-sizing: border-box;
   width: fit-content;

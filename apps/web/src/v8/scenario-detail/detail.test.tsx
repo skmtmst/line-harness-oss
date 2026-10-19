@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 /*
  * V8 シナリオ配信の編集（src/v8/scenario-detail）の動きの試験。BEHAVIOR.md の「今までと変えたところ」を守る。
- * - V8 のテーマで、絵（PMLkX）の操作がそろって出る
+ * - V8 のテーマで、絵の操作がそろって出る
  * - 閲覧のみ：帯が出て、変える操作のボタンは置かない（押せないボタンを残さない）
- * - 保存が 409（ほかの人が先に保存）なら競合の帯（kz2B6）と「比べてから保存」
- * - 下の帯の「複製する」で複製の窓（Al4Ek）が「〇〇 のコピー」で開く
+ * - 保存が 409（ほかの人が先に保存）なら競合の帯と「比べてから保存」
+ * - 下の帯の「複製する」で複製の窓が「〇〇 のコピー」で開く
  * - 選んだ通の中身がスマホに出る（空の箱にしない）
  */
 import React, { act } from 'react'
@@ -193,7 +193,7 @@ describe('V8 シナリオ配信の編集', () => {
     expect(screen.getAllByText('ご登録ありがとうございます。').length).toBeGreaterThan(1)
   })
 
-  it('B-139：新しい通の本文が空のまま追加すると、本文の欄が赤くなり真下に理由が出て、その欄へ移る', async () => {
+  it('新しい通の本文が空のまま追加すると、本文の欄が赤くなり真下に理由が出て、その欄へ移る', async () => {
     await render()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'メッセージを追加する' })) })
     await act(async () => { await Promise.resolve() })

@@ -18,7 +18,7 @@ import { formatWaitRough } from '@/lib/format-duration'
 import { formatDateTime, formatNumber, formatTime, formatRelative } from '@/lib/format'
 import type { HealthRisk } from './use-dashboard'
 import type { AccountWithStats } from '@/contexts/account-context'
-import { connectionReasonLine } from '@/v8/hq/connection-reasons'
+import { connectionReasonLine } from '@/v8/hq/index'
 import { RetryLabel } from '@/components/shared/retry-label'
 import styles from './dashboard.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -37,9 +37,9 @@ export function sectionUpdated(section: Section | undefined): string | null {
   return dashboardFreshnessText(section.freshness, section.asOf, section.reason)
 }
 
-/** 札（WQmep の黄色い札）。tone で緑・赤も出す。 */
+/** 札（ の黄色い札）。tone で緑・赤も出す。 */
 export function Tag({ children, tone = 'warning' }: { children: ReactNode; tone?: 'warning' | 'success' | 'danger' }) {
-  return <span className={tone === 'success' ? `${styles.tag} ${styles.tag_success}` : tone === 'danger' ? `${styles.tag} ${styles.tag_danger}` : `${styles.tag} ${styles.tag_warning}`}>{children}</span>
+  return <span className={tone === 'success' ? `${styles.tag} ${styles.tagSuccess}` : tone === 'danger' ? `${styles.tag} ${styles.tagDanger}` : `${styles.tag} ${styles.tagWarning}`}>{children}</span>
 }
 
 /** 鍵と値の1行。`href` があれば行ごと押せる（その状態で絞った一覧へ）。 */
@@ -53,14 +53,14 @@ export function KeyValue({ label, value, tone = 'default', dot, href, title }: {
 }) {
   const body = (
     <>
-      {dot ? <span className={dot === 'success' ? `${styles.dot} ${styles.dot_success}` : dot === 'danger' ? `${styles.dot} ${styles.dot_danger}` : dot === 'warning' ? `${styles.dot} ${styles.dot_warning}` : styles.dot} aria-hidden="true" /> : null}
+      {dot ? <span className={dot === 'success' ? `${styles.dot} ${styles.dotSuccess}` : dot === 'danger' ? `${styles.dot} ${styles.dotDanger}` : dot === 'warning' ? `${styles.dot} ${styles.dotWarning}` : styles.dot} aria-hidden="true" /> : null}
       <span className={styles.kvKey} title={typeof label === 'string' ? label : undefined}>{label}</span>
       <span className={styles.kvValue}>{value}</span>
     </>
   )
   return href
-    ? <Link href={href} className={tone === 'danger' ? `${styles.kv} ${styles.kv_danger}` : tone === 'faint' ? `${styles.kv} ${styles.kv_faint}` : styles.kv} title={title}>{body}</Link>
-    : <div className={tone === 'danger' ? `${styles.kv} ${styles.kv_danger}` : tone === 'faint' ? `${styles.kv} ${styles.kv_faint}` : styles.kv}>{body}</div>
+    ? <Link href={href} className={tone === 'danger' ? `${styles.kv} ${styles.kvDanger}` : tone === 'faint' ? `${styles.kv} ${styles.kvFaint}` : styles.kv} title={title}>{body}</Link>
+    : <div className={tone === 'danger' ? `${styles.kv} ${styles.kvDanger}` : tone === 'faint' ? `${styles.kv} ${styles.kvFaint}` : styles.kv}>{body}</div>
 }
 
 export function Unavailable({ section, onRetry }: { section?: Section; onRetry: () => void }) {
@@ -363,7 +363,7 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
       </>
     )
   }
-  /* 旧Worker（upcoming 未返却）・取得失敗のときは予約だけに戻る（v7 と同じ）。 */
+  /* 旧Worker（upcoming 未返却）・取得失敗のときは予約だけに戻る（管理画面 と同じ）。 */
   const legacy = bookings ? activeUpcomingBookings(bookings) : []
   const legacyLoading = accountId ? (!failed || loading) && bookings === null : loading
   return (

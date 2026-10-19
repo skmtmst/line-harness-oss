@@ -3,7 +3,7 @@
 import { statusBadge } from './post-status'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   form_title: requiredText("タイトルを入力してください。"),
   form_start: requiredText("期間のはじめの日時を入力してください。"),
   form_end: requiredText("期間のおわりの日時を入力してください。"),
@@ -49,14 +49,14 @@ import {
   type GooglePostListData,
 } from '@/lib/restaurant-google-api'
 import { errorMessage, formatShortDay, formatShortStamp } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 Googleビジネス 投稿（一覧 `Cfed0`・投稿を作る `T1j2Sw`）と公開前の確認。
+ * ★V8 Googleビジネス 投稿（一覧 ・投稿を作る ）と公開前の確認。
  * 口（一覧・状態の確認・下書きの保存・取消・削除・公開）は今の画面と同じ。
  * 端末からの画像のアップロードは、入口の page.tsx が渡す道具（mediaUpload）で行う
  * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。
@@ -340,7 +340,7 @@ function draftInputFrom(form: PostForm, igAvailable: boolean): GooglePostDraftIn
   }
 }
 
-/** 投稿を作る・直す（T1j2Sw）。 */
+/** 投稿を作る・直す。 */
 export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUpload }: { accountId: string; kind: GooglePostKind; postId: string | null; go: GoogleNav; mediaUpload?: MediaUploadHelpers }) {
   const saveErrors = useSaveFormErrors()
 
@@ -428,12 +428,12 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
 
   const validate = () => {
     const errors: Partial<Record<keyof PostForm, string>> = {}
-    if ((b244Requirements.form_summary.check(form.summary) !== null)) errors.summary = '本文を入力してください。'
+    if ((FIELD_REQUIREMENTS.form_summary.check(form.summary) !== null)) errors.summary = '本文を入力してください。'
     else if (form.summary.length > 1500) errors.summary = '本文は1,500文字までです。'
     if (form.kind !== 'standard') {
-      if ((b244Requirements.form_title.check(form.title) !== null)) errors.title = `${form.kind === 'event' ? 'イベントタイトル' : '特典タイトル'}を入力してください。`
-      if ((b244Requirements.form_start.check(form.start) !== null)) errors.start = '期間のはじめの日時を入力してください。'
-      if ((b244Requirements.form_end.check(form.end) !== null)) errors.end = '期間のおわりの日時を入力してください。'
+      if ((FIELD_REQUIREMENTS.form_title.check(form.title) !== null)) errors.title = `${form.kind === 'event' ? 'イベントタイトル' : '特典タイトル'}を入力してください。`
+      if ((FIELD_REQUIREMENTS.form_start.check(form.start) !== null)) errors.start = '期間のはじめの日時を入力してください。'
+      if ((FIELD_REQUIREMENTS.form_end.check(form.end) !== null)) errors.end = '期間のおわりの日時を入力してください。'
       else if (form.start && form.end < form.start) errors.end = '期間のおわりは、はじめより後にしてください。'
     }
     setFieldErrors(errors)
@@ -518,28 +518,28 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         </Field>
         {withPeriod ? (
           <div className={styles.fieldGroup}>
-            <Field density="input" label="タイトル（特典・イベントのとき）" htmlFor="gb-post-title" error={fieldErrors.title} requirement={b244Requirements.form_title}>
+            <Field density="input" label="タイトル（特典・イベントのとき）" htmlFor="gb-post-title" error={fieldErrors.title} requirement={FIELD_REQUIREMENTS.form_title}>
               <SaveErrorField names={["title","form.title"]}><TextField id="gb-post-title" value={form.title} onChange={(e) => set({ title: e.target.value })} disabled={!editable} maxLength={100} /></SaveErrorField>
             </Field>
             <div className={styles.fieldPair}>
-              <Field density="input" label="期間 はじめ" htmlFor="gb-post-start" error={fieldErrors.start} grow requirement={b244Requirements.form_start}>
+              <Field density="input" label="期間 はじめ" htmlFor="gb-post-start" error={fieldErrors.start} grow requirement={FIELD_REQUIREMENTS.form_start}>
                 <SaveErrorField names={["start","form.start"]}><DateTimeField size="compact" id="gb-post-start" invalid={Boolean(fieldErrors.start)} value={form.start} onChange={(next) => set({ start: next })} disabled={!editable} /></SaveErrorField>
               </Field>
-              <Field density="input" label="期間 おわり" htmlFor="gb-post-end" error={fieldErrors.end} grow requirement={b244Requirements.form_end}>
+              <Field density="input" label="期間 おわり" htmlFor="gb-post-end" error={fieldErrors.end} grow requirement={FIELD_REQUIREMENTS.form_end}>
                 <SaveErrorField names={["end","form.end"]}><DateTimeField size="compact" id="gb-post-end" invalid={Boolean(fieldErrors.end)} value={form.end} onChange={(next) => set({ end: next })} disabled={!editable} /></SaveErrorField>
               </Field>
             </div>
           </div>
         ) : null}
         <div className={styles.postCompose}>
-        <Field density="compact" label="本文" htmlFor="gb-post-summary" error={fieldErrors.summary} requirement={b244Requirements.form_summary}>
+        <Field density="compact" label="本文" htmlFor="gb-post-summary" error={fieldErrors.summary} requirement={FIELD_REQUIREMENTS.form_summary}>
           <SaveErrorField names={["summary","form.summary"]}><TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" /></SaveErrorField>
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
         <div className={styles.postImageSlot}>
           <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><MediaSlot
             kind="image"
-            /* 絵 T1j2Sw：画像は本文の下、幅320・4:3。 */
+            /* 絵 ：画像は本文の下、幅320・4:3。 */
             aspectRatio="4 / 3"
             title="画像を追加"
             previewAlt={form.mediaFilename ?? '投稿の画像'}

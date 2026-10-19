@@ -43,7 +43,7 @@ function isTab(value: string | null): value is NenTab {
 }
 
 /**
- * NEN配信。★V6 37-6（`z4q1K`）／37-6-A（`u66A0`）。
+ * NEN配信。★管理画面 37-6（`z4q1K`）／37-6-A（`u66A0`）。
  *
  * 数値カード（今月・先月・開封・注文・届かなかった）は月の範囲で実口から取る。
  * タブごとに必要なものだけ取り、失敗はそのタブの帯で示す（点検 #512 の中3）。
@@ -95,7 +95,7 @@ export default function NenCampaignsPage() {
   tabRef.current = tab
 
   /*
-    数値カード帯はどのタブでも同じ4枚（★V6 37-6）。今月と先月を月の範囲で取る。
+    数値カード帯はどのタブでも同じ4枚（★管理画面 37-6）。今月と先月を月の範囲で取る。
     自動配信・停止中・コラムは同じ取得で足りる。送った履歴だけ別に取る。
   */
   const loadTab = useCallback(async (next: NenTab) => {
@@ -166,7 +166,7 @@ export default function NenCampaignsPage() {
       if (next === 'history') {
         /*
           URLで送った履歴を直接開いたときは、共通の数の帯がまだ無い。履歴と一緒に読む
-          （★V8-B Tj7n4 は履歴でも帯に数が出る）。帯が読めなくても履歴は出す。
+          （★V8-B  は履歴でも帯に数が出る）。帯が読めなくても履歴は出す。
         */
         const [deliveryRes] = await Promise.all([
           api.nenCampaigns.deliveries(selectedAccountId, { limit: 20 }),
@@ -328,7 +328,7 @@ export default function NenCampaignsPage() {
     } finally { setSavingColumnId(null) }
   }
   /*
-    ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届く。
+    ★管理画面 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届く。
     ここでは、宛先（LINEアカウント）が決まらずに未割り当てのまま残っている分を、
     選択中のアカウントへ割り当てて一覧に出す。
   */
@@ -449,8 +449,8 @@ export default function NenCampaignsPage() {
   if (loading && loadedTabs.current.size === 0) return <ListState kind="loading" />
 
   /*
-    ヘッダー操作。★V6 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
-    ため置かない。コラムは ★V6 37-6-A どおり「ECのコラムを取り込む」（未割り当て分の割り当て）。
+    ヘッダー操作。★管理画面 37-6 の「配信を追加」は、自動配信の種類が実キー固定（追加口が無い）
+    ため置かない。コラムは ★管理画面 37-6-A どおり「ECのコラムを取り込む」（未割り当て分の割り当て）。
     #618: 一覧に件数があっても未選択でも届くよう、新規作成入口「コラムを書く」
     （/nen-campaigns/columns/new・日時あり下書き保存）をヘッダーに置く。
   */
@@ -465,7 +465,7 @@ export default function NenCampaignsPage() {
 
   /*
    * #935 N-301: 紹介文の入力途中で画面を離れる／別コラムへ移るときの確認。
-   * v7・v8 のどちらの見た目でも同じ確認を出す（v8 にだけ無く、移動が黙って止まっていた：監査 WEB-315）。
+   * 管理画面・v8 のどちらの見た目でも同じ確認を出す（v8 にだけ無く、移動が黙って止まっていた：監査 WEB-315）。
    */
   const leaveDialogs = (
     <>

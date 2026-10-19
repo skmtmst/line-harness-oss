@@ -8,7 +8,7 @@
  */
 import type { BroadcastMessageButton } from '@/lib/api'
 import { LinePreviewMessage } from '@/components/shared/line-preview'
-import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
+import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '../templates/template-preview-model'
 
 export default function BroadcastTextBubble({ text, buttons, accountName }: {
   text: string

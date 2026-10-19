@@ -210,7 +210,7 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await render()
     await flush()
 
-    // V8-B `z2dgw`：見出しは数の帯・減りの棒に変わった。集計の数が見えることを確かめる。
+    // V8-B ：見出しは数の帯・減りの棒に変わった。集計の数が見えることを確かめる。
     expect(host.textContent).toContain('どこで人数が減っているか')
     expect(host.textContent).toContain('申込')
     expect(csvLinks()).toEqual([])
@@ -253,7 +253,7 @@ describe('ウェビナー編集の参加者導線と権限 (N-118)', () => {
     await render()
     await flush()
 
-    // V8-B `z2dgw`：見出しは数の帯・減りの棒に変わった。
+    // V8-B ``：見出しは数の帯・減りの棒に変わった。
     expect(host.textContent).toContain('どこで人数が減っているか')
     expect(csvLinks()).toEqual([])
     const callsBefore = net.calls.length

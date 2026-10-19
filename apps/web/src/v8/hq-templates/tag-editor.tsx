@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import type { HqTemplateFolder, Tag, TagGroup } from '@line-crm/shared'
 import type { TagDefinition } from '@/lib/hq-templates-api'
-import { TagEditForm } from '@/v8/tag-edit/edit'
+import { TagEditForm } from '@/v8/tag-edit/public/edit/index'
 import { hqTagDefinitionToEditor, hqTagEditorToDefinition } from '@/components/friend-fields/hq-tag-definition-editor'
 import { type TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 import Notice from '@/components/shared/notice'

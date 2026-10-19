@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * vWJEm（作る・競合）: 発行が 409 で返り、同じ文字の発行済みリンクが
+ * （作る・競合）: 発行が 409 で返り、同じ文字の発行済みリンクが
  * あるときは、帯で知らせて比べ・取り込みができる。本物のReactで動かす。
  */
 import React, { act } from 'react'

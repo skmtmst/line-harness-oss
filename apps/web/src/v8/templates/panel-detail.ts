@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '@/lib/api'
-import { isTemplateDetailData, type TemplateDetailData } from '../template-detail/model'
+import { isTemplateDetailData, type TemplateDetailData } from '@/v8/template-detail/public/model/index'
 
 /** 一覧のパネルでも使用先と公開前の版を読む。行・アカウントが替わった応答は捨てる。 */
 export function useTemplatePanelDetail(id: string | null, accountId: string | null, canPublish: boolean, onChanged: () => Promise<void>) {

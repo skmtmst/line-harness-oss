@@ -2,7 +2,7 @@
 @layer components {
 /*
  * ★V8 リマインダの作る・確かめる・詳細の共有組版。
- * 板：VE1u5 / YChR6 / p5YuP / T0nis / ltAaq / hjNpJ / rbAig / loVfW。
+ * 板： /  /  /  /  /  /  / 。
  *
  * 組版は「作る・確かめる板（左）」と「いまの状態・LINEの見え方（右）」の
  * 2列。板が狭い画面では右の列を下へ畳む。auto-replies の wizard-v8 と
@@ -68,7 +68,7 @@
 }
 
 /*
- * 手順③（通知の中身）の 1152 幅（見本 `r1l0bT`）：右の欄を細くして横に残す。
+ * 手順③（通知の中身）の 1152 幅（見本 ）：右の欄を細くして横に残す。
  * 720px を切ったら下へ畳む（ほかの手順は今までどおり）。
  */
 @container (min-width: 720px) and (max-width: 1099px) {
@@ -263,7 +263,7 @@
   line-height: 1.5;
 }
 
-/* ひな形カード（VE1u5）。 */
+/* ひな形カード。 */
 .tplGrid {
   display: grid;
   gap: 10px;
@@ -315,7 +315,7 @@
   margin-top: auto;
 }
 
-/* 対象者の人数の帯（YChR6）。 */
+/* 対象者の人数の帯。 */
 .countRow {
   display: flex;
   flex-wrap: wrap;
@@ -357,7 +357,7 @@
   font-size: 12px;
 }
 
-/* 止める条件（YChR6）：左に文、右にスイッチ。 */
+/* 止める条件：左に文、右にスイッチ。 */
 .stopList {
   display: flex;
   flex-direction: column;
@@ -408,7 +408,7 @@
   color: var(--color-ink-faint);
 }
 
-/* 通知ステップのカード（p5YuP）。 */
+/* 通知ステップのカード。 */
 .stepCard {
   display: flex;
   flex-direction: column;
@@ -565,7 +565,7 @@
   cursor: not-allowed;
 }
 
-/* 届く日時の例（p5YuP 右欄）。 */
+/* 届く日時の例（ 右欄）。 */
 .exampleRows {
   display: flex;
   flex-direction: column;
@@ -590,7 +590,7 @@
   font-weight: 500;
 }
 
-/* 配信予定の表（T0nis）。 */
+/* 配信予定の表。 */
 .previewHead {
   display: flex;
   align-items: center;
@@ -658,7 +658,7 @@
   line-height: var(--tpl-text-sm-lh);
 }
 
-/* 設定の確認（ltAaq）：名前と値と「変える」。 */
+/* 設定の確認：名前と値と「変える」。 */
 .confirmRows {
   display: flex;
   flex-direction: column;
@@ -695,7 +695,7 @@
   text-decoration: underline;
 }
 
-/* 有効にする前の確認（ltAaq）。 */
+/* 有効にする前の確認。 */
 .checkRow {
   display: flex;
   align-items: flex-start;
@@ -752,7 +752,7 @@
   color: var(--color-warning);
 }
 
-/* 完了（hjNpJ）。 */
+/* 完了。 */
 .done {
   display: flex;
   flex-direction: column;
@@ -851,7 +851,7 @@
 }
 
 /*
- * 右の欄の「本物のスマホ」（rbAig / YChR6 / p5YuP / T0nis / ltAaq）。
+ * 右の欄の「本物のスマホ」（ /  /  /  / ）。
  * broadcasts の phone-mock-v8 と同じく globals の --v8-bphone-* を読む。
  * 中身はテキストの吹き出しのみ（リマインダの本文はテキスト）。
  */
@@ -994,7 +994,7 @@
   background: var(--v8-bphone-ink);
 }
 
-/* 詳細のタブの上の小見出し・バナー（rbAig / loVfW）。 */
+/* 詳細のタブの上の小見出し・バナー（ / ）。 */
 .bannerWarn {
   display: flex;
   align-items: center;
@@ -1040,7 +1040,7 @@
   flex: 1;
 }
 
-/* 登録者の検索行（loVfW）。 */
+/* 登録者の検索行。 */
 .filterRow {
   display: flex;
   flex-wrap: wrap;

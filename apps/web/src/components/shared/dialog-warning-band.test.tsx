@@ -10,7 +10,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'dialog.module.css'), 'utf8')
 
 /**
- * 確認窓の説明文の琥珀帯（CFAyf 送受信を止める）。
+ * 確認窓の説明文の琥珀帯（ 送受信を止める）。
  * 渡さなければ帯なし（今までどおり）。
  */
 describe('ダイアログの琥珀帯', () => {

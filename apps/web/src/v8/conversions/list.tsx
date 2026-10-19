@@ -68,11 +68,11 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 コンバージョンの一覧（Pencil：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・
- * 状態の見本帳 `E2l8cw`）。
+ * ★V8 コンバージョンの一覧（Pencil：一覧 ・1152 ・閲覧のみ ・
+ * 状態の見本帳 ）。
  *
  * 型（ListPage）に、数の帯・左のフォルダの列（上に「成果地点を作る」）・
- * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「…」（使う場所を足す操作も中に残す）。
+ * 案内の帯・道具の段・表（列の並び）を渡す。行の右端は「…」（使う場所を足す操作も中に残す）。
  * 行はURLに残る右の詳細パネル、「止める」は3択と理由を持つ確認画面。
  *
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
@@ -98,7 +98,7 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
   name: 'name_asc',
 }
 
-/* 状態の札（絵 r6dJFy の並び）。件数は口の stateCounts。 */
+/* 状態の札（並び）。件数は口の stateCounts。 */
 const CHIPS: Array<{ value: ConversionDefinitionFilter; label: string; icon: ReactNode }> = [
   { value: 'active', label: '有効', icon: <Play size={13} aria-hidden="true" /> },
   { value: 'stopped', label: '停止中', icon: <Pause size={13} aria-hidden="true" /> },
@@ -819,7 +819,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   const createInRow = canEdit ? createLink : <span className={styles.createSpaceRow} aria-hidden="true" />
 
   /* ===== 道具の段 ===== */
-  /* 1152 の板（BygrU）は札を2つ（動いている・止めている）だけ。ほかの状態は「よく使う絞り込み」から選ぶ。 */
+  /* 1152 の板は札を2つ（動いている・止めている）だけ。ほかの状態は「よく使う絞り込み」から選ぶ。 */
   const chipList = narrow || (role !== null && !canEdit) ? CHIPS.slice(0, 2) : CHIPS
   const filterChips = (
     <div role="group" aria-label="状態で絞り込む">
@@ -868,7 +868,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   const searchBox = (
     <SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="成果地点の名前で探す" aria-label="成果地点の名前で探す" />
   )
-  /* 1152 の板（BygrU）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
+  /* 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
 
   const wideToolbar = (
     <div className={styles.wideTools} data-viewer={role !== null && !canEdit || undefined}>

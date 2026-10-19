@@ -24,7 +24,7 @@ import Notice from '@/components/shared/notice'
 import TruncatedText from '@/components/shared/truncated-text'
 
 /*
- * ★V8 統合ユーザーの詳細（Pencil `Hn9eE`）。/friends?tab=merged&person=<id>（一覧の名前からも開く）。
+ * ★V8 統合ユーザーの詳細（Pencil ）。/friends?tab=merged&person=<id>（一覧の名前からも開く）。
  *
  * 読み込み・「配信に使う」の保存・解除・使う値の保存は今と同じ口（components/merged-person の useMergedPerson：
  * 版の照合・409 の読み直し）。窓（目的ごとの順位・使う値・解除の理由）も今のものを使う。

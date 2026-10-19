@@ -13,7 +13,7 @@ async function prepareSession(page: Page) {
 }
 
 /*
-  `route.fetch()` はテスト側からモックAPIへ別途TCPを張る。稀に ECONNRESET の
+  `route.fetch` はテスト側からモックAPIへ別途TCPを張る。稀に ECONNRESET の
   ような一時切断で、画面とは無関係に契約試験が落ちる（#826）。
 
   HTTP応答（4xx/5xx）やJSONの形は従来どおり失敗させたまま、**接続が張れ
@@ -221,7 +221,7 @@ for (const role of ['admin', 'staff'] as const) {
         await expect(menu.getByRole('menuitem', { name: action, exact: true })).toHaveCount(0)
       }
     } else {
-      // B-244：狭い幅では、行き先を明示した閲覧項目がメニューに入る。
+      // ：狭い幅では、行き先を明示した閲覧項目がメニューに入る。
       const row = page.getByRole('row').filter({ hasText: name })
       const trigger = row.getByRole('button', { name: `「${name}」の操作`, exact: true })
       if (await trigger.count()) {

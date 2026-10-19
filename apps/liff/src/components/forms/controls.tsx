@@ -1,8 +1,8 @@
 /** LIFF と管理画面の見本で共有する入力の形。通信・送信は呼ぶ側が持つ。 */
 import { useEffect, useState, useRef, forwardRef, type InputHTMLAttributes, type ReactNode, type LabelHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes, type Ref } from 'react'
 import { PREFECTURES, type FormInputBlock, type FormFileAnswer } from '@line-crm/shared'
-import Button from '../ui/Button'
-import Icon from '../ui/Icon'
+import Button from '../ui/button/index'
+import Icon from '../ui/icon'
 import styles from './controls.module.css'
 
 /** 欄名と必要度の表示。札を読み上げ名へ混ぜず、欄との結び付きを保つ。 */

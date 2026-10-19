@@ -1,5 +1,5 @@
 /**
- * 予約からの売上の期間と差分の言葉（B-1 X26oo）。
+ * 予約からの売上の期間と差分の言葉（ X26oo）。
  * 今日は JST。to は含まない（明日の日付を渡す）。
  */
 
@@ -35,7 +35,7 @@ export function salesPeriodRange(key: SalesPeriodKey): { from: string; to: strin
   return { from: isoDay(today.year, today.month - 3, today.date), to }
 }
 
-/** 直前と比べる言葉（B-1 の「先月より」の段）。 */
+/** 直前と比べる言葉（ の「先月より」の段）。 */
 export const SALES_PERIOD_COMPARE_LABEL: Record<SalesPeriodKey, string> = {
   week: '前の週より',
   month: '先月より',

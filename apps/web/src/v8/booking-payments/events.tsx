@@ -17,7 +17,7 @@ import { ActionCell, DataTable, RowNameLink, TableHeadRow, Td, Th, Tr } from '@/
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { emptyValue } from '@/components/shared/empty-value'
 import { formatListTimestamp, formatYen } from '@/lib/format'
-import { bookingPaymentAdminApi, isNotReadyError, type PaymentEvent } from '@/lib/api-booking-payment-admin'
+import { bookingPaymentAdminApi, isNotReadyError, type PaymentEvent } from '@/lib/api/helpers/booking-payment-admin'
 import { EVENT_KIND, EVENT_RESULT } from './labels'
 import styles from './payments.module.css'
 

@@ -27,7 +27,7 @@ import { hqBroadcastsApi } from '@/lib/hq-broadcasts-api'
 import { type ResultTarget, canRetry, failedCount, failureLines, fromApiContent, jpDateTime, preflightBadge, previewText, resultBadge, runBadge, sendTotals } from './model'
 import styles from './detail.module.css'
 import detailStyles from '../broadcast-detail/detail.module.css'
-import BroadcastPhone from '../broadcast-detail/phone'
+import { BroadcastPhone } from '@/v8/broadcast-detail/public/phone/index'
 import { japaneseDetailOf, permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { csvFileName } from '@/lib/csv-file-name'
@@ -303,7 +303,7 @@ function ActivityTab({ run, names }: { run: HqBroadcastRun; names: Map<string, s
 }
 
 /**
- * 送るまでの段（店の配信の詳細と同じ帯・絵 M2tJM）。下書き →（承認待ち）→（予約中）→ 送信中 → 送信済み。
+ * 送るまでの段（店の配信の詳細と同じ帯・絵 ）。下書き →（承認待ち）→（予約中）→ 送信中 → 送信済み。
  * 承認が絡まない・予約しない一括配信はその段を省く。分かれ道（一部失敗・失敗あり・止めた・取り消した）は札で添える。
  * 承認の状態は下書きのあいだだけ読める（送ったあとは口に無い）ので、送ったあとは承認の段を出さない。
  */
@@ -393,7 +393,7 @@ export default function HqBroadcastDetail() {
   }, [id])
   useEffect(() => { void load() }, [load])
   const approval = useHqApproval(run)
-  /* 上の帯は「一括配信 › 配信名」、画面名は配信名だけ（店の配信の詳細と同じ・絵 M2tJM）。 */
+  /* 上の帯は「一括配信 › 配信名」、画面名は配信名だけ（店の配信の詳細と同じ・絵 ）。 */
   usePageTitle(run ? run.title : '一括配信の詳細')
   const gate = approvalGate(approval.state)
   const names = new Map(approval.candidates.map((person) => [person.id, person.name]))
@@ -477,7 +477,7 @@ export default function HqBroadcastDetail() {
     'retry-all': { title: '失敗した店にやり直します', description: '一時的に失敗した人と、止める前に送れなかった人にだけ送ります。届いた人には二重に送りません。', label: 'やり直す' },
   }
 
-  /* 店の配信の詳細（M2tJM）と同じ頭・数の帯・右の「配信した設定」とスマホ。統括だけの口はアカウント別の内訳（表）とやり直し。 */
+  /* 店の配信の詳細と同じ頭・数の帯・右の「配信した設定」とスマホ。統括だけの口はアカウント別の内訳（表）とやり直し。 */
   const sentTo = run ? run.targets.filter((t) => !t.excluded) : []
   const delivered = sentTo.reduce((sum, t) => sum + (t.successCount ?? 0), 0)
   const failedPeople = sentTo.reduce((sum, t) => sum + failedCount(t), 0)
@@ -501,7 +501,7 @@ export default function HqBroadcastDetail() {
       <PageFrame kind="detail" boardId="M2tJM xOXuY">
         <PageHeading title={run?.title ?? '一括配信'}
         steps={<>{run ? <HqDeliveryRail run={run} approvalPending={approval.state?.approval.status === 'pending'} /> : null}</>}
-        /* 店の詳細（tPm3e）と同じ形：題の右に状態の札、題の下に1行の要約（絵 M2tJM）。 */
+        /* 店の詳細と同じ形：題の右に状態の札、題の下に1行の要約。 */
         titleAccessory={badge ? <span className={detailStyles.badge} data-tone={tone}><span className={detailStyles.dot} aria-hidden="true" />{badge.label}</span> : undefined}
         crumbs={run ? <p className={detailStyles.meta}>{`${messageText.replace(' 1通', '')}・${audience}・${run.scheduledAt ? `${jpDateTime(run.scheduledAt)} に${run.status === 'prepared' ? '送る予定' : '送信'}` : 'すぐ送る'}・${n(sentTo.length)}アカウント`}</p> : undefined}
         actions={<>{run ? (

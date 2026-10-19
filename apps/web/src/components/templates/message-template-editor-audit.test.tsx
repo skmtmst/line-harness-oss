@@ -2,7 +2,8 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { TemplateInsertControls, buildTemplatePreview } from './message-template-editor'
+import { TemplateInsertControls } from './message-template-editor'
+import { buildTemplatePreview } from './template-preview-model'
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false }) }))
 afterEach(cleanup)
 it('WEB260: 日数のボタンが閉じ括弧2つの送信用トークンを入れ、見本も置き換える', () => {

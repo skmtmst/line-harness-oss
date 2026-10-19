@@ -6,10 +6,10 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 /* 一覧の入口は V8 のとき src/v8/rich-menus/list.tsx（2026-10-06〜。古い list-v8.module.css はもう描かれない）。 */
 const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'rich-menus', 'list.tsx'), 'utf8')
-const CREATE_CSS = readFileSync(join(HERE, 'new', 'create-v8.module.css'), 'utf8')
+const CREATE_CSS = readFileSync(new URL('./new/create-v8.module.css', import.meta.url), 'utf8')
 
 /*
- * V8 リッチメニューの数字合わせ（Y9ASp・Z0uO6・F4gELj・OxEMM・JeINq）。
+ * V8 リッチメニューの数字合わせ（・・・・）。
  * 数の帯は区切り線で並べる1本の帯。作る画面の右の列は見本どおり380。
  * 件数・金額などの中身は API の実データを出す。
  */

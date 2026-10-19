@@ -2,8 +2,8 @@
 import { act, renderHook, cleanup } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { useMenuMediaScope } from './use-menu-media-scope'
-import type { PendingImage } from './create-types'
+import { useMenuMediaScope } from '../../../v8/rich-menus/new/use-menu-media-scope'
+import type { PendingImage } from '../../../v8/rich-menus/new/create-types'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 

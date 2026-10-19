@@ -11,7 +11,7 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { restaurantGoogleApi, type GoogleHoursProposal, type GoogleProfileAddress, type GoogleProfileData } from '@/lib/restaurant-google-api'
 import { errorMessage, formatPeriods, formatStampFull, formatYmdShort, summarizeWeekly, TIME_OPTIONS } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -19,7 +19,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 Googleビジネス プロフィール（`JUTGz`）。
+ * ★V8 Googleビジネス プロフィール（）。
  * 本日の営業時間（変更・今日を休みにする・祝日の確認・早く閉める）→ 店舗情報 → Google側の変更を確認。
  * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
  * ?tab=profile&view=hours|confirm|history|edit へ移り、共通の V8 部品で出す。

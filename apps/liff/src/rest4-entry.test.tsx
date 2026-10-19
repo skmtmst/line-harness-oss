@@ -63,7 +63,7 @@ async function open(entry: 'apps' | 'worker', query: string) {
   if (entry === 'worker') await act(async () => { await import('../../worker/src/client/main.js'); });
   else {
     const { initLiff } = await import('./lib/liff-auth.js'); await initLiff();
-    const { default: App } = await import('./App.js'); render(<BrowserRouter><App /></BrowserRouter>);
+    const { default: App } = await import('./app.js'); render(<BrowserRouter><App /></BrowserRouter>);
   }
 }
 for (const entry of ['apps', 'worker'] as const) {

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 共通情報の一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
- * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 Hhl9M・xxKtW）・
+ * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 ・）・
  * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「編集する」で絞れる。
  */
 import styles from './list.module.css'

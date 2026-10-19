@@ -59,11 +59,11 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { kpiCells } from './overview'
 
 /*
- * ★V8 ウェビナーの一覧（Pencil：一覧 `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`・
- * アーカイブの確認 `VXZ6T`）。
+ * ★V8 ウェビナーの一覧（Pencil：一覧 ・1152 ・閲覧のみ ・
+ * アーカイブの確認 ）。
  *
  * 型（ListPage）に、数の帯・左のフォルダの列（上に「ウェビナーを作る」）・
- * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「編集」と「…」。
+ * 案内の帯・道具の段・表（列の並び）を渡す。行の右端は「編集」と「…」。
  * 「…」と右クリックは同じ操作（参加者・分析・コメント演出・アーカイブ）。
  * 行を押すと右に詳細が出る（↑↓で次の行へ・名前はその場で直せる）。
  *
@@ -157,7 +157,7 @@ function StatusPill({ webinar }: { webinar: WebinarListItem }) {
 }
 
 /*
- * アーカイブの確かめ（`VXZ6T`）。対象とアーカイブしたあとの3点を言う。
+ * アーカイブの確かめ（）。対象とアーカイブしたあとの3点を言う。
  * 公開中はこのままではアーカイブできない（先に公開を止める）。
  */
 function ArchiveConfirm({
@@ -317,7 +317,7 @@ function WebinarList() {
   const router = useRouter()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
-  // jiNg0「閲覧のみ」：押せない形にする（隠さない）。
+  // 「閲覧のみ」：押せない形にする（隠さない）。
   const role = useStaffRole()
   const featureAccess = useFeatureAccess('webinars')
   const canEdit = featureAccess
@@ -468,7 +468,7 @@ function WebinarList() {
       saveErrors.capture(saveFailure)
       /* 欄の件数だけの補助取得。失敗時は前の値を残す。 */
     }
-    /* 札の件数（絵 UyUMw「公開中 3」「下書き 1」）。札で絞ったときと同じ口・同じ条件で数える。取れなければ数を出さない。 */
+    /* 札の件数（絵 「公開中 3」「下書き 1」）。札で絞ったときと同じ口・同じ条件で数える。取れなければ数を出さない。 */
     try {
       const [activeRes, draftRes] = await Promise.all([
         webinarApi.list(accountId, { limit: 1, status: 'active' }),
@@ -725,7 +725,7 @@ function WebinarList() {
   const folderRows: FolderPanelRow[] = [
     { kind: 'all' as const, id: '', label: 'すべて', count: panelGrand, icon: <Inbox size={15} aria-hidden="true" /> },
     /*
-     * 絵（UyUMw）どおり「…」は選んだ行だけに出す。選んでいない行に操作を渡すと、
+     * 絵どおり「…」は選んだ行だけに出す。選んでいない行に操作を渡すと、
      * 共通のフォルダの列では「…」の箱が場所を取り、件数が左へずれる。
      * 名前の変更・並べ替え・削除は、フォルダを選ぶとその行の「…」から開ける。
      */
@@ -808,7 +808,7 @@ function WebinarList() {
       aria-label="ウェビナー名で探す"
     />
   )
-  /* 1152 の板（uBMuB）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … 並び・よく使う絞り込み・件数」。 */
+  /* 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … 並び・よく使う絞り込み・件数」。 */
 
   const wideToolbar = (
     <>

@@ -6,7 +6,7 @@ import { styleTerm } from '@/lib/terms'
 import ResumeRegistrationStyle from './resume-style'
 import { REGISTRATION_STYLE_KEY } from './use-registration-style'
 const net = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn() }))
-vi.mock('@/lib/api-styles', () => ({ styleApi: net }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: net }))
 beforeEach(() => {
   sessionStorage.clear()
   net.get.mockReset().mockResolvedValue({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })

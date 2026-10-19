@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 一括バー。★V7 仕上げ §2 の決まり:
+ * 一括バー。★管理画面 仕上げ §2 の決まり：
  *   - 黒地にしない。surface-pearl の地、上に 1px の細い線、段2（浮く）の影
  *   - 1件でも選ぶと表の下端から 8px 上がって出る（motion-base・ease-out）
  *   - 0件で下がって消える（motion-fast）
@@ -68,5 +68,5 @@
 }
 }
 
-/* B-161：浮く面の影と薄い縁を共通化。 */
+/* ：浮く面の影と薄い縁を共通化。 */
 :root .bar { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }

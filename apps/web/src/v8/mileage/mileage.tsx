@@ -30,13 +30,13 @@ function MileageInner() {
     ? (rawTab as MileageTabKey)
     : 'earning-rules'
   const role = useStaffRole()
-  /* E2Any：変える操作は押せない形。CSV・検索・絞り込みは使える。 */
+  /* ：変える操作は押せない形。CSV・検索・絞り込みは使える。 */
   const readonly = !canManageRole(role)
   const narrow = useNarrowViewport()
   const { selectedAccountId, loading: accountLoading } = useAccount()
 
   /*
-   * タブの名の横の件数。開いていないタブの数も出す（絵 OC0gy）。
+   * タブの名の横の件数。開いていないタブの数も出す。
    * 開いているタブが読み直したら、そのタブの数で上書きする。
    */
   const [counts, setCounts] = useState<MileageTabCounts>({})

@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * ★V8 の「探して選ぶ欄」（友だちを選ぶ欄など）は、ほかの入れる欄・選ぶ欄と同じ高さ 36（絵 w4SBbv・EsYo4）。
- * v7 は 40、指で触る画面は 44 のまま。
+ * ★V8 の「探して選ぶ欄」（友だちを選ぶ欄など）は、ほかの入れる欄・選ぶ欄と同じ高さ 36（絵 w4SBbv・）。
+ * 互換経路は 40、指で触る画面は 44 のまま。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'combobox.module.css'), 'utf8')

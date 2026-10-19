@@ -16,7 +16,7 @@ describe('V8 ウェビナー編集の集計の遅延読み込みの契約', () =
   })
 
   it('参加者・分析の段に親の集計を渡す', () => {
-    // 参加者（uNsEy）・分析の2か所。子は集計を取らず、親から受ける。
+    // 参加者・分析の2か所。子は集計を取らず、親から受ける。
     expect(PAGE).toContain('analytics,\n    analyticsState,')
     expect(PAGE).toContain('<ParticipantsPane ctx={ctx}')
     expect(PAGE).toContain('<AnalyticsPane ctx={ctx}')

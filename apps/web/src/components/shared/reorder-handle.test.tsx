@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * 並び替えの共通部品（ReorderHandle・useReorder）と、旧名（DragHandle・ReorderGrip）。
- * V8：動かせない時はつまみを出さず理由を言う。v7（ReorderGrip）：薄いつまみのまま。
+ * V8：動かせない時はつまみを出さず理由を言う。管理画面（ReorderGrip）：薄いつまみのまま。
  */
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'

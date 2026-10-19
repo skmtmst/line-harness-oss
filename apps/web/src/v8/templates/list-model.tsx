@@ -9,8 +9,8 @@ import { ClipboardList,GalleryHorizontalEnd,HelpCircle,LayoutGrid,MessageSquare,
 
 /*
  * ★V8 テンプレートの一覧（Pencil「★V8 画面の地図」のテンプレートの行）。
- * 一覧 `v19Ivv`・1152 `L7zA7C`・閲覧のみ `hEDTK`・削除の確認 `V6JFnd`・
- * 削除できない `Z0g3si`・作る種類を選ぶ `R9XUMr`・状態の板 `susGP`。
+ * 一覧 ・1152 ・閲覧のみ ・削除の確認 ・
+ * 削除できない ・作る種類を選ぶ ・状態の板 。
  *
  * 動き（呼ぶ API・権限・失敗の扱い・URL の指定）は今までの V8 一覧
  * を型（ListPage）と部品で組む。
@@ -102,14 +102,14 @@ export function excerptOf(t: Template): string {
   return contentExcerpt(t.messageType, latestContentOf(t), 60)
 }
 
-/** 今月送った数。数えられていないもの・一度も公開していない（送れない）ものは「—」（絵 v19Ivv の下書きだけの行）。 */
+/** 今月送った数。数えられていないもの・一度も公開していない（送れない）ものは「—」（下書きだけの行）。 */
 export function sendCountText(t: Template): string {
   if (typeof t.monthlySendCount !== 'number') return '—'
   if (t.publishedAt == null && t.monthlySendCount === 0) return '—'
   return `${formatNumber(t.monthlySendCount)} 通`
 }
 
-/** 公開の札（`v19Ivv`：公開中／未公開の変更／下書きだけ）。 */
+/** 公開の札（：公開中／未公開の変更／下書きだけ）。 */
 export function publishStateOf(t: Template): { label: string; tone: 'live' | 'changes' | 'draft' } {
   if (t.publishedAt == null) return { label: '下書きだけ', tone: 'draft' }
   if (t.hasDraft) return { label: '未公開の変更', tone: 'changes' }

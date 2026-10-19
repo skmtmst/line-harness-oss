@@ -5,7 +5,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(path.join(__dirname, 'page.tsx'), 'utf8')
-/* 止める窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
+/* 止める窓は 管理画面 共用の `_components/conversion-dialogs.tsx` にある。 */
 const DIALOGS = fs.readFileSync(path.join(__dirname, '../../v8/conversions', 'dialogs.tsx'), 'utf8')
 
 /** 注意書きの中の `confirm(` に当てないため、コメントを外す。 */

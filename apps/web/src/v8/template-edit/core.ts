@@ -2,11 +2,11 @@
  * ★V8 テンプレートの作る・編集の決まり（読み込み・断り方・保存・利用先）。
  *
  * 現役の画面と動作試験が同じ決まりを使う。保存の409は「競合」として
- * 返し、絵NCbYnの帯で入力を残したまま比較と読み直しを選べる。
+ * 返し、絵の帯で入力を残したまま比較と読み直しを選べる。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 
-import { readSaveFieldErrors } from '@/lib/api-field-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
 

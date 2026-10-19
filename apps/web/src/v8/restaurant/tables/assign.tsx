@@ -16,12 +16,12 @@ import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { jstDate } from '@/lib/jst-datetime'
 import type { RestaurantTable } from '@/lib/restaurant-test-api'
-import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '../../booking-payments/assignment'
-import type { RestaurantV8Context } from '../booking-kit/shell'
+import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '@/v8/booking-payments/public/assignment/index'
+import type { RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import styles from './tables.module.css'
 
 /*
- * 座席・卓管理 › 卓の割り当て方（B-306・絵 jmVYJ）。受け付ける指定：?view=assign。
+ * 座席・卓管理 › 卓の割り当て方（・絵 jmVYJ）。受け付ける指定：?view=assign。
  * 人数に合う一番小さい卓から（固定）＋同じ大きさの卓の中の選び方。卓ごとに優先度と 1 日の上限。
  * 口は組3 の bookingAssignmentApi.getTables／saveTables（店舗ごと）。口が無い間は準備中の帯。
  */

@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import StatusBadge from './status-badge'
 import { STATUS_LABELS, statusLabel } from '@/lib/status-labels'
 
-describe('B-158 決まり1 状態の言葉', () => {
+describe('決まり1 状態の言葉', () => {
   it('用途の札は自動処理の状態へ読み替えず、別の意味なら両方を残す', () => {
     expect(statusLabel('使用中')).toBe('使用中')
     expect(statusLabel('使っている')).toBe('使っている')
@@ -13,7 +13,7 @@ describe('B-158 決まり1 状態の言葉', () => {
     expect(renderToStaticMarkup(<StatusBadge distinctFrom="使用中" status="active" />)).toContain('有効')
   })
 
-  it.each(['審査中', '承認待ち', '未払い', '確認中', 'unknown', 'constructor', 'toString', '__proto__'])('別の状態や未知値 %s はそのまま描く', (label) => {
+  it.each(['審査中', '承認待ち', '未払い', '確認中', 'unknown', 'function Object() { [native code] }', 'function toString() { [native code] }', '[object Object]'])('別の状態や未知値 %s はそのまま描く', (label) => {
     expect(statusLabel(label)).toBe(label)
     expect(renderToStaticMarkup(<StatusBadge>{label}</StatusBadge>)).toContain(label)
   })

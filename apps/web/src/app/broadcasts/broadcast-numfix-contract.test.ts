@@ -11,9 +11,9 @@ const GLOBALS = readFileSync(join(HERE, '../globals.css'), 'utf8')
 const token = (name: string) => GLOBALS.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1]?.trim()
 
 /*
- * V8 一斉配信の数字合わせ（NtCE3）。見本 `NtCE3.html` の寸法に合わせる。
- * 10-11固定版とB-207：名前は黒・700。件数・金額は実データを出す。
- * 件数・金額などの中身は API の実データを出す（絵の数は写さない）。
+ * V8 一斉配信の数字合わせ。見本 `.html` の寸法に合わせる。
+ * 10-11固定版と：名前は黒・700。件数・金額は実データを出す。
+ * 件数・金額などの中身は API の実データを出す（数は写さない）。
  */
 describe('一斉配信の数字合わせ', () => {
   it('見出しは12px・500・余白13px 20px', () => {

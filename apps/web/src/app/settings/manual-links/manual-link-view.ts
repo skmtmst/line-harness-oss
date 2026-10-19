@@ -3,12 +3,12 @@ import type { ManualLink } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 
 /**
- * 設計 ★V6 34-4「マニュアルの正本表」（`f9oUm`）。
+ * 設計 ★管理画面 34-4「マニュアルの正本表」（`f9oUm`）。
  *
  * トップバーの「マニュアル」がどこを開くかを、運営だけが決める表。
  *
  * **表の正本はサーバにある。** 一覧は `GET /api/manual-links` を読む
- * （`page.tsx` が `api.manualLinks.list()` で取得）。
+ * （`page.tsx` が `api.manualLinks.list` で取得）。
  * 下の 4 つの作業 ID は、サーバにまだ無い分の手元の行。
  * 出せない分を 0 件として描かず、何が足りないかを言う。
  */

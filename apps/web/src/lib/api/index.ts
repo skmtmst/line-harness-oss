@@ -1,6 +1,6 @@
-export type { BroadcastPreflight } from '../api-broadcast-preflight-types';
-export type { AccountHealthSummary, PhotoAssetRun } from '../api-publication-types';
-export { type RichMenuPublishRun } from '../api-rich-menu-publish-types'
+export type { BroadcastPreflight } from './types/broadcast-preflight-types';
+export type { AccountHealthSummary, PhotoAssetRun } from './types/publication-types';
+export { type RichMenuPublishRun } from './types/rich-menu-publish-types'
 export type { RichMenuAreaIntent } from '@line-crm/shared'
 /*
  * #838 第2段: Google Sheets 連携。型の正本は packages/shared

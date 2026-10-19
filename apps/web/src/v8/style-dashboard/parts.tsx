@@ -69,7 +69,7 @@ type MenuHandlers = {
 export const PAY_NOTE = 'お支払い（Stripe）をつなぐと使えます。設定の「お支払い」からつなげます。'
 
 /**
- * 行の「…」（B-309・B-305）。業種ごとに絵の並び。
+ * 行の「…」（・）。業種ごとに絵の並び。
  * 決済の口（支払いのリンク・返金）は Stripe をつなぐまで押せない形で置く（理由つき）。
  */
 export function rowMenuItems(style: IndustryStyle, row: StyleRow, canWrite: boolean, h: MenuHandlers): ActionMenuItem[] {
@@ -78,7 +78,7 @@ export function rowMenuItems(style: IndustryStyle, row: StyleRow, canWrite: bool
   const payLink: ActionMenuItem = { id: 'pay-link', label: '支払いのリンクを送る', icon: <CreditCard size={16} />, dividerBefore: true, onSelect: () => h.pay(row) }
   const refund: ActionMenuItem = { id: 'refund', label: '返金する', icon: <Undo2 size={16} />, onSelect: () => h.refund(row) }
   const line: ActionMenuItem = { id: 'line', label: 'LINE を送る', icon: <MessageCircle size={16} />, dividerBefore: true, onSelect: () => h.line(row) }
-  // 無断・欠席の印は開始の時刻を過ぎた予約にだけ出す（B-338）。あとで戻せるので赤にしない。
+  // 無断・欠席の印は開始の時刻を過ぎた予約にだけ出す。あとで戻せるので赤にしない。
   const noShowItems: ActionMenuItem[] = row.past && row.live !== false ? [{ id: 'no-show', label: style === 'consult' ? '欠席にする（あとで戻せる）' : '無断にする（あとで戻せる）', icon: <UserRoundX size={16} />, group: 'destructive', onSelect: () => h.noShow(row) }] : []
   const cancelItem: ActionMenuItem = { id: 'cancel', label: '取り消す', icon: <CircleX size={16} />, tone: 'danger', dividerBefore: true, onSelect: () => h.cancel(row) }
   const cancel = row.live === false ? [] : [cancelItem]

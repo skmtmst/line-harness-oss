@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 成果をまとめて操作（★V8-B `hadfk`：手順1/3「操作を選ぶ」）。
+ * 成果をまとめて操作（★V8-B ：手順1/3「操作を選ぶ」）。
  * 対象の確認と操作の選択だけを見る。実行は既存の確かめ窓へ渡す。
  */
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'

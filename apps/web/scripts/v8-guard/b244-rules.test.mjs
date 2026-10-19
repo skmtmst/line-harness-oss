@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
-import scan from './b244-rules-browser.mjs'
+import scan from './rules-browser.mjs'
 const shell = body => `<style>body{margin:0}*{box-sizing:border-box}main{width:900px}input,button{height:36px}svg{width:16px;height:16px}</style><main data-page-template="list">${body}</main>`
 const icon = '<svg aria-hidden="true"><path d="M1 1h10"/></svg>'
 const item = (group, text, withIcon = true) => `<div data-menu-group="${group}"><button role="menuitem">${withIcon ? icon : ''}${text}</button></div>`

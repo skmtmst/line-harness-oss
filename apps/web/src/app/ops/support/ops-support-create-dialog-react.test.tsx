@@ -11,7 +11,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 /**
- * お問い合わせの「代わりに起票する」は V8-B 板 `Izau1` の小窓で出す。
+ * お問い合わせの「代わりに起票する」は V8-B 板  の小窓で出す。
  * 契約先・種類・優先度・件名・内容を持ち、送ったら知らせが出て閉じる。再発防止。
  */
 

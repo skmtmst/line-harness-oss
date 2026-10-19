@@ -13,9 +13,9 @@ import { ApiError } from '@/lib/api'
  * （422）を画面が黙って「成功」扱いにしないことは、実際にコンポーネントを
  * mountして保存ボタンを押さないと確かめられない。差し替えるのは
  * api.friendFields / api.friends（サーバーとの境界）と
- * next/navigation・next/link だけで、画面の中身（save() の分岐・表示）は
+ * next/navigation・next/link だけで、画面の中身（save の分岐・表示）は
  * 本物のまま動かす。fetchApi自体が422をApiErrorへ変換する契約は
- * api.test.ts 側で別に固定済みのため、ここでは境界の一段上（save()の
+ * api.test.ts 側で別に固定済みのため、ここでは境界の一段上（saveの
  * 呼び出し口）で同じ形の拒否を再現する。
  */
 

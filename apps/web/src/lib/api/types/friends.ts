@@ -98,7 +98,7 @@ export type FriendListParams = {
   scenarioId?: string
   /** サーバーへ保存したAND/OR条件。選択中のLINEアカウントが必須。 */
   savedSearchId?: string
-  /** V6の14軸。AND/ORを同じJSONのまま件数確認と一覧へ渡す。 */
+  /** 管理画面の14軸。AND/ORを同じJSONのまま件数確認と一覧へ渡す。 */
   conditions?: SavedSearchConditions
 
   // ── 詳細検索（設計 V2 2-2 の「絞り込み条件を設定」）─────────────────

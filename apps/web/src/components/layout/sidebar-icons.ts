@@ -3,8 +3,8 @@ import {
   LayoutGrid, MessageCircleMore, Send, Tag, Ticket, Trophy, Type, UserPlus, Users, Video, type LucideIcon,
 } from 'lucide-react'
 /*
- * ★V8 の左メニューの印（絵 d8X09・WQmep の「項目 〇〇 / 印」は lucide）。
- * V8 のときだけ使い、v7 は MENU_SECTIONS の線画のまま。載っていない項目も v7 の線画。鍵は MENU_SECTIONS の id。
+ * ★V8 の左メニューの印（絵 d8X09・ の「項目 〇〇 / 印」は lucide）。
+ * V8 のときだけ使い、互換経路は MENU_SECTIONS の線画のまま。載っていない項目も 管理画面 の線画。鍵は MENU_SECTIONS の id。
  */
 export const V8_NAV_ICONS: Record<string, LucideIcon> = {
   dashboard: House,

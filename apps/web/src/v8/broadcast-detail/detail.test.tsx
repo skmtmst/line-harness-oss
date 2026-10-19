@@ -2,7 +2,7 @@
 /*
  * V8 一斉配信の詳細・予約したあと（src/v8/broadcast-detail）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * V8 のテーマで表示し、下書きの続き・閲覧のみ（押せないボタンを置かない）・競合の帯・
- * 承認する人の操作・予約の取り消しの窓（BeNtj）のボタンの並びを確かめる。
+ * 承認する人の操作・予約の取り消しの窓のボタンの並びを確かめる。
  */
 import React, { act, createRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'

@@ -31,7 +31,7 @@ import nav from '@/components/layout/sidebar.module.css'
 import styles from './shell.module.css'
 
 /**
- * 運営コンソールの V8 の外枠（絵 `CyW0E` ほか運営の板一式）。
+ * 運営コンソールの V8 の外枠（絵  ほか運営の板一式）。
  *
  * 統括・店舗と同じ外側（左メニュー 240・上の帯 60・白い板1枚）に、
  * 運営のメニューだけを載せる。見た目は共通の左メニュー・外枠の class を
@@ -217,7 +217,7 @@ function OpsShellFrame({
 /**
  * 板の中の頭（題・説明・右の操作）と、その下の注意の帯
  * 「運営コンソール：契約先のデータを扱います。操作はすべて記録されます」。
- * v7 の上の環境帯（橙・墨）の役目をここが持つ。検証環境では帯の右に小さく出す。
+ * 管理画面 の上の環境帯（橙・墨）の役目をここが持つ。検証環境では帯の右に小さく出す。
  */
 export function OpsHead({
   title,
@@ -232,7 +232,7 @@ export function OpsHead({
   actions?: ReactNode
   environment?: 'production' | 'staging'
   stats?: ReactNode
-  /** 見出しと注意帯の間に置く数の帯（絵 P0jhqO：見出し→数の帯→注意帯の順）。 */
+  /** 見出しと注意帯の間に置く数の帯（絵 ：見出し→数の帯→注意帯の順）。 */
   band?: ReactNode
 }) {
   return (

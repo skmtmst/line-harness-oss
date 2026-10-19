@@ -273,7 +273,7 @@ export default function SupportMarkRulesPanel({
         />
       ) : state === 'not-connected' ? (
         /*
-          **押しても何も起きない操作を並べない**（`v6-common-rules` §5-5）。
+          **押しても何も起きない操作を並べない**（`管理画面-common-rules` §5-5）。
           読み直しの口も出さない——押しても直らないため。
         */
         <ListState

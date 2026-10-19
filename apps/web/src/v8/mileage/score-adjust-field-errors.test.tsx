@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-/* B-139：点数を手で直す窓（Nv7An）。確定で落ちた欄は、その欄が赤くなり真下に理由が出て、1つ目の欄へ移る。 */
+/* ：点数を手で直す窓。確定で落ちた欄は、その欄が赤くなり真下に理由が出て、1つ目の欄へ移る。 */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'

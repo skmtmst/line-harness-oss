@@ -115,7 +115,7 @@
     transform var(--motion-base) var(--motion-ease-out);
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .root { gap: 0; border-radius: var(--radius-panel); background: var(--color-shell); }
 :root .tile { flex: none; border-radius: var(--radius-panel); box-shadow: var(--shadow-board); }
 :root .tile > svg { width: 20px; height: 20px; }

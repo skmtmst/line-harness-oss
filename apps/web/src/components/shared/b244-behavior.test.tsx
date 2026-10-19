@@ -17,7 +17,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); forgetStaffIdentity(); vi.unstubAllGlobals() })
 
-describe('B-244 共通の必須と行メニュー', () => {
+describe('共通の必須と行メニュー', () => {
   it('空欄の検査と必須の札を1つの定義で決め、欄下の理由と赤枠をつなぐ', () => {
     const rule = requiredText('名前を入れてください')
     function Form() {
@@ -64,7 +64,7 @@ describe('B-244 共通の必須と行メニュー', () => {
   })
 })
 
-it('B-245：初めは開き、閉じた状態を人・画面ごとに覚える', () => {
+it('初めは開き、閉じた状態を人・画面ごとに覚える', () => {
   const person = (id: string) => rememberStaffIdentity({ id } as Parameters<typeof rememberStaffIdentity>[0])
   person('operator-a')
   const view = render(<ScreenExplanation title={<h2>予約</h2>} screenKey="booking">説明の本文</ScreenExplanation>)
@@ -83,7 +83,7 @@ it('B-245：初めは開き、閉じた状態を人・画面ごとに覚える',
   expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true')
 })
 
-it('B-246：保存中の二重実行を防ぎ、一部成功と残りの再試行を分ける', () => {
+it('保存中の二重実行を防ぎ、一部成功と残りの再試行を分ける', () => {
   const retry = vi.fn(), began = vi.fn()
   function Form() {
     const feedback = useSaveFeedback()
@@ -101,7 +101,7 @@ it('B-246：保存中の二重実行を防ぎ、一部成功と残りの再試�
   fireEvent.click(screen.getByText('残りだけもう一度')); expect(retry).toHaveBeenCalledOnce()
 })
 
-it('B-247 E1：名前をURLへ入れず、絞り込みだけ外して友だち詳細へ戻る', () => {
+it('E1：名前をURLへ入れず、絞り込みだけ外して友だち詳細へ戻る', () => {
   const href = friendFilterHref('/scenarios?active=1&friendId=old', 'fixture/a')
   expect(href).toBe('/scenarios?active=1&friendId=fixture%2Fa')
   render(<FriendFilterBand friend={{ id: 'fixture/a', displayName: '表示する名前' }} subject="シナリオ" listHref={href} />)
@@ -113,7 +113,7 @@ it('B-247 E1：名前をURLへ入れず、絞り込みだけ外して友だち�
   expect(back.getAttribute('href')).not.toContain('表示する名前')
 })
 
-it('B-247 E2：まだ・集計中・失敗・完成を分け、集計中は実行の口を出さない', () => {
+it('E2：まだ・集計中・失敗・完成を分け、集計中は実行の口を出さない', () => {
   const run = vi.fn()
   const view = render(<AggregationStatus state={{ kind: 'empty' }} onRun={run} />)
   fireEvent.click(screen.getByText('集計する')); expect(run).toHaveBeenCalledOnce()

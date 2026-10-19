@@ -6,7 +6,7 @@ import StaffNewV8 from './staff-new'
 import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
- * ★V8 予約スタッフを登録（CcA4k）の動き。
+ * ★V8 予約スタッフを登録の動き。
  * - メニューのチェックは4つまで並べ、残りは「ほかのメニュー（n）」で開く（絵は1行に4つ）。
  * - 右の見本の「指名なし」は、指名なしの枠に入る担当が1人でもいれば出る。
  */
@@ -121,7 +121,7 @@ test('REM3-06 new staff can choose registered media and save its public URL',asy
  expect(fixture.create.mock.calls[0][1]).toMatchObject({profile_image_url:'https://fixture.invalid/photo.png'})
 })
 
- test('B-241：担当見本の取得失敗は空にせず、読み直して指名なしの担当を復帰する', async () => {
+ test('担当見本の取得失敗は空にせず、読み直して指名なしの担当を復帰する', async () => {
     fixture.staff = [{id:'bs-2',name:'担当',display_name:'担当',role:'受付',sort_order:2,is_designation_optional:1,is_active:1}]
     fixture.listStaff.mockRejectedValueOnce(new Error('fixture failure'))
     render(<StaffNewV8 />)

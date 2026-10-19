@@ -56,8 +56,8 @@ export interface MessageComposerProps {
   busy?: boolean
   onBusyChange?: (busy: boolean) => void
   /**
-   * 保存で落ちた吹き出しの理由（B-139）。吹き出しごと。あると中身の下に理由、頭の右に赤い丸を出す。
-   * `bubbleFieldProps` で欄の誤り（useFormErrors().bind）を中身の枠に結び、1つ目の吹き出しへ移れるようにする。
+   * 保存で落ちた吹き出しの理由。吹き出しごと。あると中身の下に理由、頭の右に赤い丸を出す。
+   * `bubbleFieldProps` で欄の誤り（useFormErrors.bind）を中身の枠に結び、1つ目の吹き出しへ移れるようにする。
    */
   bubbleErrors?: ReadonlyArray<string | null | undefined>
   bubbleFieldProps?: (index: number) => { ref?: (el: HTMLElement | null) => void; onBlur?: () => void }

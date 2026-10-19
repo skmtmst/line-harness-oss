@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 同時編集の見比べ（板 `pvimJ`）。行の組み立てと帯の比べ口だけを確かめる。
+ * 同時編集の見比べ（板 ）。行の組み立てと帯の比べ口だけを確かめる。
  */
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'

@@ -54,9 +54,9 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
   })
 
   it('/reminders：操作は右端にそろえる', () => {
-    /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。絵に操作の見出しは無い。 */
-    const body = read('app', 'reminders', 'list-v8.tsx')
-    const css = read('app', 'reminders', 'list-v8.module.css')
+    /* 完全切り替え：管理画面 page は捨て、V8 の list-v8 を見る。絵に操作の見出しは無い。 */
+    const body = read("v8/reminders/list.tsx")
+    const css = read("app/reminders/list-v8.module.css")
     expect(body).toContain('styles.menuCell')
     expect(css).toContain('.menuCell')
     expect(css).toContain('text-align: right')

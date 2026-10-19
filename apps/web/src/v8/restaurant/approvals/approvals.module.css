@@ -1,5 +1,5 @@
 /*
- * ★V8 承認ワークフロー（t8WgD8・閲覧のみ n4DT7）。値は globals.css の `--tpl-rt-*`。
+ * ★V8 承認ワークフロー（・閲覧のみ ）。値は globals.css の `--tpl-rt-*`。
  * カード：余白20・段の間10・角12・細い輪郭。頭の段は間8（札・状態・店舗・…・ボタン）。
  */
 
@@ -105,7 +105,7 @@
   line-height: normal;
 }
 
-/* 差し戻す理由の小窓（n4j0Rm）。 */
+/* 差し戻す理由の小窓。 */
 .dialogBody {
   display: flex;
   flex-direction: column;

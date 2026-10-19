@@ -9,7 +9,7 @@ import styles from './folder-color-button.module.css'
 
 export type FolderColorOption = { value: string; name: string }
 
-/** IjVpM・iBuZH 共通：今の色の丸＋矢印。色なしは薄い灰の丸。 */
+/** ・iBuZH 共通：今の色の丸＋矢印。色なしは薄い灰の丸。 */
 export default function FolderColorButton({ value, onChange, colors = FOLDER_SELECT_COLORS, disabled = false, compact = false, allowClear = false, appearance = 'button', label = 'フォルダの色' }: {
   value: string | null
   onChange: (color: string | null) => void

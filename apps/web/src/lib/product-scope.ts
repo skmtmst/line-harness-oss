@@ -1,4 +1,4 @@
-/** B-381。販売の説明だけを共用し、APIの上限・対象業種・課金可否は変更しない。 */
+/** 。販売の説明だけを共用し、APIの上限・対象業種・課金可否は変更しない。 */
 import { term } from './terms'
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
 export const PRODUCT_SCOPE = {

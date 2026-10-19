@@ -23,8 +23,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 LINEアカウントの詳細から開く窓（送受信を止める CFAyf・資格情報を差し替える Msb1j・
- * アーカイブ WOfBN・登録の内容を編集する n9Z2P）。
+ * ★V8 LINEアカウントの詳細から開く窓（送受信を止める ・資格情報を差し替える ・
+ * アーカイブ ・登録の内容を編集する ）。
  *
  * 窓の枠は共通の Dialog。絵の幅・上からの位置は designWidth・designTop で渡す。
  * 中身（帯・入力欄・下の操作）はここで並べる。保存の口・本人確認の流れは今の画面
@@ -82,7 +82,7 @@ function ErrorLine({ message }: { message: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 送受信を止める・再開する（CFAyf）。理由は必須。 */
+/* 送受信を止める・再開する。理由は必須。 */
 
 export function StopDialog({ account, onClose, onDone }: {
   account: LineAccount | null
@@ -181,7 +181,7 @@ export function StopDialog({ account, onClose, onDone }: {
 }
 
 /* ------------------------------------------------------------------ */
-/* アーカイブ（WOfBN）。理由は任意。本人確認は窓の中で済ませる。 */
+/* アーカイブ。理由は任意。本人確認は窓の中で済ませる。 */
 
 /** アーカイブできない理由（API の blockers）を、運用者の言葉で。 */
 function archiveFailureMessage(caught: unknown): string {
@@ -354,7 +354,7 @@ export function RestoreDialog({ account, onClose, onDone }: {
 }
 
 /* ------------------------------------------------------------------ */
-/* 資格情報を差し替える（Msb1j）。空の欄は送らない（今の値を消さない）。 */
+/* 資格情報を差し替える。空の欄は送らない（今の値を消さない）。 */
 
 export type CredentialKind = 'messaging' | 'login'
 
@@ -478,7 +478,7 @@ function CredentialsDialogBody({ account, kind, onClose, onSaved }: {
 }
 
 /* ------------------------------------------------------------------ */
-/* 登録の内容を編集する（n9Z2P）。変えた欄だけ送る。 */
+/* 登録の内容を編集する。変えた欄だけ送る。 */
 
 export function EditDialog({ account, canEditTimezone, onClose, onSaved }: {
   account: AccountDetailView | null
@@ -520,7 +520,7 @@ function EditDialogBody({ account, canEditTimezone, onClose, onSaved }: {
     if (!busy) onClose()
   }
 
-  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る。 */
   const fields = useFormErrors()
   fields.define('name', 'アカウント名', () => (name.trim() ? null : 'アカウント名を入れてください。'), { required: true })
   fields.define('cap', '友だちの上限', () => (Number.isNaN(parseCount(capacity)) ? '数字で入れてください。' : null), { required: false })

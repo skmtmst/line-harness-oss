@@ -11,11 +11,11 @@ import ListState from '@/components/shared/list-state';
 import EmailThread from '@/components/support/email-thread';
 import { InboxConversationPane, InboxMessages } from '@/components/templates/inbox-page';
 import { formatDateTime, formatTime } from '@/lib/format';
-import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary } from '@/v8/ai-reply/inbox-ai';
+import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary } from '@/v8/ai-reply/public/inbox-ai/index'
 import AttachmentMessage from '@/v8/inbox-chat/attachment-message';
 import ConversationHead from '@/v8/inbox-chat/conversation-head';
 import { formatInboxListTime } from '@/v8/inbox-chat/list-time';
-import ChatSearchBar from '@/v8/inbox-search/chat-search-bar';
+import { ChatSearchBar } from '@/v8/inbox-search/public/chat-search-bar/index'
 import { Link2 } from 'lucide-react';
 import { AUTO_SOURCE_LABEL, CORRECTION_TEMPLATE, Chat, formatByteSize, formatDayJa, formatInboxDatetime, formatYmdSlash, sameYmd } from './inbox-model';
 import { ChatImageMessage, StickerMessageImage } from "./screen-gap-parts";
@@ -157,7 +157,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
                   } else if (msg.messageType === 'sticker') {
                     bubbleContent = <StickerMessageImage content={msg.content} />
                   } else if ((msg.messageType === 'video' || msg.messageType === 'file') && msg.direction === 'outgoing') {
-                    // B-6：送った動画・ファイルは JSON のまま出さず、再生できる枠・名前と期限の札にする。
+                    // ：送った動画・ファイルは JSON のまま出さず、再生できる枠・名前と期限の札にする。
                     bubbleContent = <AttachmentMessage messageType={msg.messageType} content={msg.content} />
                   } else {
                     bubbleContent = <span>{msg.content}</span>
@@ -190,7 +190,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
                     /*
                      * ★V8 やりとり（XqSvX「やりとり」）：日付は真ん中の小さな字、相手の吹き出しは白・薄い枠で
                      * 顔を置かない、時刻は吹き出しの横（相手は右・こちらは左）、こちらの吹き出しは薄い緑で
-                     * 下に「K Kenta が送信」／「自動：…」。引用・探すの印・取り消しの扱いは v7 と同じ。
+                     * 下に「K Kenta が送信」／「自動：…」。引用・探すの印・取り消しの扱いは 管理画面 と同じ。
                      */
                     const quotedNode = msg.quoted ? (
                       <InboxQuotedMessage>

@@ -61,14 +61,14 @@ function CommonVarsListInner() {
   const router = useRouter()
   const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
-  /* 1152 の板（`XIzkJ`）。フォルダの列は型が畳み、道具の段を2段にする。 */
+  /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
   /*
    * 書き込みの口（作成・更新・削除・状態切替・フォルダ操作）は
    * `requireRole('owner', 'admin')` で閉じている。staff へ操作を見せると
    * 押しても 403 になるだけなので、閲覧のみの帯を出して押せない形にする
-   * （板 `OxSw8`）。一覧・差し込み名のコピーは使える。CSVは管理者だけ。
+   * （板 ）。一覧・差し込み名のコピーは使える。CSVは管理者だけ。
    * 役割と鍵は本人APIで確かめ、答えが来るまでは変更操作を隠す。
    */
   const staffRole = useStaffRole()
@@ -100,7 +100,7 @@ function CommonVarsListInner() {
   /* 畳んだ板の「フォルダの操作」から、列と同じ窓（共通のフォルダの列）を開く。 */
   const folderControlRef = useRef<ManagedFolderControl | null>(null)
 
-  /** 選んでいるフォルダ。URLに出して、戻るとブックマークを壊さない（v7 と同じ `?folder=`）。 */
+  /** 選んでいるフォルダ。URLに出して、戻るとブックマークを壊さない（管理画面 と同じ `?folder=`）。 */
   const folderFilter = params.get('folder') ?? ''
   const setFolderFilter = (id: string) => {
     setPage(1)
@@ -196,7 +196,7 @@ function CommonVarsListInner() {
   )
   /*
    * 「下書き・止めた」は1枚の札にまとめる。絞り込みの共有関数に
-   * 触らず、この画面だけで下書きと止めたの和を取る（v7 の動きは変えない）。
+   * 触らず、この画面だけで下書きと止めたの和を取る（管理画面 の動きは変えない）。
    */
   const filtered = useMemo(
     () => chip === 'draftStopped'
@@ -255,7 +255,7 @@ function CommonVarsListInner() {
   }
 
   /*
-   * 止める窓（板 `Hhl9M`）。止めているあいだ、この共通情報を差し込んだ
+   * 止める窓（板 ）。止めているあいだ、この共通情報を差し込んだ
    * 配信は送られない。あとで再開できる。理由は記録に残すので必須。
    */
   const [statusTarget, setStatusTarget] = useState<CommonVar | null>(null)
@@ -269,7 +269,7 @@ function CommonVarsListInner() {
   const [panelStatus, setPanelStatus] = useState(false)
   /* 右クリックされた行（「…」と同じ項目を出す）。 */
   const [contextId, setContextId] = useState<string | null>(null)
-  /* 板 `Hhl9M`：予約中の配信があるときだけ出す帯。読めなくても止める操作は止めない。 */
+  /* 板 ：予約中の配信があるときだけ出す帯。読めなくても止める操作は止めない。 */
   const [statusScheduled, setStatusScheduled] = useState<CommonVarDeleteImpact['items']>([])
 
   const openStatusDialog = (item: CommonVar, action: 'stop' | 'resume') => {
@@ -337,7 +337,7 @@ function CommonVarsListInner() {
   }
 
   /*
-   * 削除の窓（板 `xxKtW`）。**窓を開けてから使用先を読む。**
+   * 削除の窓（板 ）。**窓を開けてから使用先を読む。**
    * 一覧を出すたびに全件ぶん読むと、消さない人にも使用先の走査が走る。
    * 使われているものは「まだ消せません」と言い、差し替えか止めるへ導く。
    * 差し替え・削除・止めるのどれにも理由が要る（版履歴に残すため）。
@@ -356,7 +356,7 @@ function CommonVarsListInner() {
   const [deleteReason, setDeleteReason] = useState('')
   /** 削除の確認のために打ってもらう差し込みキー。 */
   const [typedKey, setTypedKey] = useState('')
-  /** 使用先が多いときは畳む（板 `xxKtW` の「ほか 5か所・すべて見る」）。 */
+  /** 使用先が多いときは畳む（板  の「ほか 5か所・すべて見る」）。 */
   const [usageExpanded, setUsageExpanded] = useState(false)
   const deleteRequestRef = useRef({ accountId: selectedAccountId, itemId: null as string | null, generation: 0 })
 
@@ -539,7 +539,7 @@ function CommonVarsListInner() {
 
   /*
    * まとめて削除。使う前に使用先を確かめ、使われているものが混ざって
-   * いたら止める（v7 と同じ守り）。理由は版履歴に残すので必須。
+   * いたら止める（管理画面 と同じ守り）。理由は版履歴に残すので必須。
    */
   const [deleteTargets, setDeleteTargets] = useState<CommonVar[]>([])
   const [batchReason, setBatchReason] = useState('')
@@ -668,7 +668,7 @@ function CommonVarsListInner() {
   ) : null
 
   const folderPanel = (
-    /* 共通のフォルダの列（種類 common_var・B-136）。名前・色・並べ替え・消すは「…」から。消すと中身は未分類へ移るので一覧も読み直す。 */
+    /* 共通のフォルダの列（種類 common_var・）。名前・色・並べ替え・消すは「…」から。消すと中身は未分類へ移るので一覧も読み直す。 */
     <ManagedFolderPanel
       kind="common_var"
       accountId={selectedAccountId}
@@ -735,7 +735,7 @@ function CommonVarsListInner() {
   )
 
   /*
-   * 1152 の板（`XIzkJ`）：1段目「作る・フォルダ・探す … 件数」、2段目「札」。
+   * 1152 の板（）：1段目「作る・フォルダ・探す … 件数」、2段目「札」。
    * フォルダの追加・名前変更・削除は、縦の列が無いぶん、フォルダの印のメニューから。
    */
 
@@ -782,7 +782,7 @@ function CommonVarsListInner() {
   )
   const hasAlerts = Boolean((firstEmpty && !listFailed) || (listLimited && !listFailed) || (error && !listFailed))
 
-  /* ===== 一覧の中身（読込中・読み込めない・空・0件を分ける。状態の板 `RqO7O`） ===== */
+  /* ===== 一覧の中身（読込中・読み込めない・空・0件を分ける。状態の板 ） ===== */
   const listBody = renderCommonVarList({ accountLoading, activeId, allOnPageSelected, canWrite, clearVarFilters, contextItem, contextMenuItems, current, error, filtered, folderDotOf, items, listFailed, listFailure, load, loading, narrow, openMenuId, prepareRemoveSelected, rowMenuItems, selected, selectedAccountId, setActiveId, setContextId, setOpenMenuId, setSelected, someOnPageSelected, toggle })
 
   const listPager = listFailed || !selectedAccountId || filtered.length === 0 ? null : (
@@ -843,7 +843,7 @@ function CommonVarsListInner() {
         /> : null
       }
       tabs={canWrite ? undefined : (
-        /* 閲覧のみの帯（`OxSw8`）。数の帯の上。 */
+        /* 閲覧のみの帯（）。数の帯の上。 */
         <div className={styles.viewerBand}><ReadOnlyNotice role="status"></ReadOnlyNotice></div>
       )}
       stats={

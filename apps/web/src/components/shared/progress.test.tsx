@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 処理の進み（xiHO8）。
+ * ★管理画面 処理の進み（xiHO8）。
  * 4つの段階・読み上げ（role=progressbar と aria-valuenow、10% ごとの role=status）・
  * scaleX の伸び・止める／失敗のボタンの出し分けを見る。
  */
@@ -11,7 +11,7 @@ import Progress, { ProgressBar } from './progress'
 
 afterEach(() => cleanup())
 
-describe('処理の進み（★V7 xiHO8）', () => {
+describe('処理の進み（★管理画面 xiHO8）', () => {
   it('準備中は数が無い棒（aria-valuenow なし）で、背景処理の断りを出す', () => {
     render(<Progress state="preparing" title="送る準備をしています" note="宛先を数えています。この画面を閉じても止まりません。" />)
     const bar = screen.getByRole('progressbar', { name: '送る準備をしています' })

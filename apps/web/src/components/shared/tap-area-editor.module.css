@@ -29,7 +29,7 @@
 .area:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: -2px; }
 .areaLetter { font-size: 13px; font-weight: 600; line-height: 19px; text-shadow: 0 0 3px var(--color-canvas), 0 0 3px var(--color-canvas); pointer-events: none; }
 
-/* 面の一覧（Z0uO6）：記号は 22px・角丸 6・未選択は薄い地＋灰色の字。選んだ行は薄い緑・記号は濃い緑。 */
+/* 面の一覧：記号は 22px・角丸 6・未選択は薄い地＋灰色の字。選んだ行は薄い緑・記号は濃い緑。 */
 .row {
   display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0;
   border-radius: var(--radius-control, 8px); background: transparent; text-align: left; font: inherit; cursor: pointer;

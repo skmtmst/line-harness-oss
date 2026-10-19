@@ -96,7 +96,7 @@ async function flush(times = 6) {
   }
 }
 
-vi.mock('@/lib/api-gap1', () => ({ lineSenderApi: { list: async () => ({ success: true, data: [] }), create: vi.fn(), update: vi.fn(), deactivate: vi.fn() } }))
+vi.mock('@/lib/api/helpers/gap1', () => ({ lineSenderApi: { list: async () => ({ success: true, data: [] }), create: vi.fn(), update: vi.fn(), deactivate: vi.fn() } }))
 
 describe('R521 親一覧だけ失敗したときの詳細（本物のReact）', () => {
   it('本人の詳細は出し、親名称の欄だけ未取得＋取り直しにする', async () => {

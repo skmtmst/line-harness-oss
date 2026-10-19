@@ -43,7 +43,7 @@ import { postActionStepLabel,ratingAverageText,type DestinationWrite,type FormSu
 
 
 /*
- * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`）。
+ * ★V8 回答フォーム「集まった回答」（Pencil まとめて見る ・1件ずつ見る ）。
  *
  * 型（DetailPage）の頭とタブに、左の本文（まとめ／表）と右の列（フォームを編集・CSV・絞り込み・回答の詳細）をはめる。
  * 読み込み・検索・CSV・後処理のやり直しは今の作り（src/app/form-submissions/responses/page.tsx）と同じ口と同じ文。
@@ -146,7 +146,7 @@ function Responses() {
   const [formMissing, setFormMissing] = useState(false)
   const [formForbidden, setFormForbidden] = useState(false)
   const [query, setQuery] = useListUrlValue('q', '')
-  /* 絵（v0SbYR）は「まとめて見る」が先頭。 */
+  /* 絵は「まとめて見る」が先頭。 */
   const [view, setView] = useState<'rows' | 'summary'>('summary')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [asideExpanded, setAsideExpanded] = useState(false)
@@ -265,7 +265,7 @@ function Responses() {
     return { key, values: [...counts.entries()].sort((left, right) => right[1] - left[1]) }
   }), [fieldKeys, items])
 
-  /* 1件ずつ見るでは、右の詳細に最初の未完（無ければ先頭）を出しておく（絵 MKQyJ）。 */
+  /* 1件ずつ見るでは、右の詳細に最初の未完（無ければ先頭）を出しておく。 */
   const selected = items.find((item) => item.id === selectedId)
     ?? (view === 'rows' ? (items.find((item) => incompleteOf(item) === true) ?? items[0] ?? null) : null)
   const incompleteItems = items.filter((item) => incompleteOf(item) === true)
@@ -497,7 +497,7 @@ function Responses() {
                 const sub = rating
                   ? `5段階・全回答の平均 ${ratingAverageText(rating.average)}／棒は表示中の ${formatNumber(answered)} 件`
                   : `${kind ? `${kind}・` : ''}${answered === 0 ? '表示中の回答はありません' : `表示中の ${formatNumber(answered)} 件の回答`}`
-                /* 5段階は ★5・★4・★3以下 の3段にまとめる（絵 v0SbYR）。 */
+                /* 5段階は ★5・★4・★3以下 の3段にまとめる。 */
                 const values: Array<[string, number]> = block?.type === 'rating'
                   ? [
                       ['5', fieldSummary.values.filter(([value]) => Number(value) >= 5).reduce((acc, [, count]) => acc + count, 0)],

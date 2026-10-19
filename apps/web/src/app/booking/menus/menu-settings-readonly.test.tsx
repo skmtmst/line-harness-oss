@@ -3,7 +3,7 @@ import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import MenuSettingsPage from '@/v8/booking-menus/menu-settings-page'
-import { menuSettingsModel } from '@/v8/booking-menus/menu-settings.test.model'
+import { menuSettingsModel } from '@/v8/booking-menus/menu-settings.fixture'
 
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 

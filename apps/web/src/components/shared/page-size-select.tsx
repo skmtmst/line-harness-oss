@@ -29,7 +29,7 @@ export default function PageSizeSelect({
   /** 選べる件数。既定は 10・20・50。 */
   options?: readonly number[]
   className?: string
-  /** 板 `apLqS` は字ラベルなし（箱に「20件表示」）。他は今のまま。 */
+  /** 板  は字ラベルなし（箱に「20件表示」）。他は今のまま。 */
   label?: string | null
 } & Omit<SelectHTMLAttributes<HTMLSelectElement>, 'value' | 'onChange' | 'className' | 'size'>) {
   // Select は素の select の属性を全部は受けない。呼び出し側は value/onChange

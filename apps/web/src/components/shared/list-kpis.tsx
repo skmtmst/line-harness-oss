@@ -95,7 +95,7 @@ export default function ListKpis({
       {cards.map((card, i) => (
         // key は props に混ぜない。混ぜて spread すると React が
         // 「key を spread で渡すな」と毎回警告を出す。
-        // 数の帯は1本にまとめる（Pp3nS）。v8 の見た目だけ変わり v7 は不変。
+        // 数の帯は1本にまとめる（Pp3nS）。v8 の見た目だけ変わり 互換経路は不変。
         <KpiCard key={card.title || i} {...card} loading={loading} presentation="band" />
       ))}
     </KpiBand>

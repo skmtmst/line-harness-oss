@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { slotStartsAtIso } from '../lib/datetime.js';
-import { waitlistStartsAt } from './WaitlistSheet.js';
+import { waitlistStartsAt } from './waitlist-sheet.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
 
 /**
@@ -24,7 +24,7 @@ vi.mock('../lib/user-message.js', async (importOriginal) => {
 });
 
 const { api } = await import('../lib/api.js');
-const { default: Confirm } = await import('./Confirm.js');
+const { default: Confirm } = await import('./confirm.js');
 
 const MENU: MenuItem = {
   id: 'm1', name: 'カット', category_label: null, description: null,

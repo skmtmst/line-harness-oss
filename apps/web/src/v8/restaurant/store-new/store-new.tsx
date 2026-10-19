@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 飲食店向け 店舗を追加（Pencil：①利用規約への同意 `ao15G`・②店舗の基本情報 `faGn4`）。
+ * ★V8 飲食店向け 店舗を追加（Pencil：①利用規約への同意 ・②店舗の基本情報 ）。
  * ③LINE公式アカウントを作る・④Messaging APIで接続・⑤接続の確認は絵がまだ無いので、①②と同じ形で置く。
  *
  * 板の頭（題・「ステップ n / 5」）→ 手順の帯（5つ）→ 左：手順の中身／右：わからないときは（幅340）
@@ -68,7 +68,7 @@ function ManualButton({ href, children }: { href: string | null; children: React
 }
 
 function HelpPanel({ step }: { step: number }) {
-  /* 「アカウント作成方法・連携ガイド」は正本表の手順キー（①同意 ao15G・②基本情報 faGn4 で共通）。 */
+  /* 「アカウント作成方法・連携ガイド」は正本表の手順キー（①同意 ・②基本情報  で共通）。 */
   const guideHref = useTaskManualHref(ONBOARDING_GUIDE_KEY)
   const faq = <><p className={styles.helpSub}>よくある質問</p><p className={styles.faq}>{'・「Messaging APIを利用する」ボタンが表示されません\n・チャネルシークレットが正しくないと表示されます'}</p></>
   return (

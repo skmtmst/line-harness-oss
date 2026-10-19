@@ -1,4 +1,4 @@
-/** detect.cjs (B-191/192) の実寸判定。page.evaluate で単独に動く。 */
+/** detect.cjs (/192) の実寸判定。page.evaluate で単独に動く。 */
 export default function scanLayoutDefects() {
   const findings = []
   const root = document.querySelector('main') || document.body

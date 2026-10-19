@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import Avatar, { avatarInitials, avatarToneIndex } from './avatar'
 // @vitest-environment happy-dom
 /*
- * 友だちの顔（★V7 `KXDhj`）。画像が読み込めない時も空白にしない。
+ * 友だちの顔（★管理画面 `KXDhj`）。画像が読み込めない時も空白にしない。
  */
 
 afterEach(() => cleanup())

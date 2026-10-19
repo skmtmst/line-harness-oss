@@ -16,7 +16,7 @@ export interface TabItem {
   count?: number
   /** 確認待ちなど、注意して見る件数を丸い札で示す。 */
   countTone?: 'warning'
-  /** このタブの中の直す欄の数（B-139）。1以上で赤い丸を出す。`useFormErrors().countIn()` を渡す。 */
+  /** このタブの中の直す欄の数。1以上で赤い丸を出す。`useFormErrors.countIn` を渡す。 */
   errorCount?: number
   /** いま開いているタブ。 */
   current?: boolean
@@ -56,7 +56,7 @@ export function Tabs({
   label?: string
   /**
    * 段の詰め方。省くと今までどおり（v8 は文字20＋下12）。
-   * 'compact' は文字の行を詰めた段（E-1 hKRRF の店のタブ：高さ 30.5）。v7 では効かない。
+   * 'compact' は文字の行を詰めた段（E-1 hKRRF の店のタブ：高さ 30.5）。互換経路では効かない。
    */
   size?: 'compact' | 'settings' | 'short' | 'notification'
   /** 'settings' は設定の板のタブ間・下余白。指定した板だけに適用する。 */

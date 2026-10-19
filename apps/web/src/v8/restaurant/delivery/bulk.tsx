@@ -35,15 +35,15 @@ import {
   type DeliveryService,
   type DeliveryServiceState,
 } from '@/lib/restaurant-delivery-api'
-import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
+import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { DASH, INTAKE_STOP_PRESET_OPTIONS, SERVICE_TONES, formatYen } from './format'
 import styles from './delivery.module.css'
 
 /*
  * 受付停止の確認（XCVGd）。上からの位置は絵のとおり 230。
  * 幅は絵が 500 だが、窓の幅は正本で 480／560／720／960 の4段に決まっている
- * （docs/v8-design-rules.md §6.12 の項目8・B-177 の `DIALOG_WIDTHS`）。500 は4段に無いので
- * 共通部品の `dialogWidth()` が 480 へ寄せる。暗に寄せられるのに任せず、
+ * （docs/v8-design-rules.md §6.12 の項目8・ の `DIALOG_WIDTHS`）。500 は4段に無いので
+ * 共通部品の `dialogWidth` が 480 へ寄せる。暗に寄せられるのに任せず、
  * 実際に出る 480 をここに書く。中身は真ん中に並ぶので絵より左右 10 外へ出る
  * （この差は「絵と正本の食い違いを正本で解いた分」として記録する）。
  */

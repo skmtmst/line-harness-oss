@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 /*
  * 動きの物差し（Pencil ★V8 の動きの表 `NF3uI`）の契約。
  *
- * 部品ごとに 120ms・150ms・300ms と長さがばらばらだったので、V7 から
+ * 部品ごとに 120ms・150ms・300ms と長さがばらばらだったので、管理画面 から
  * `--motion-*` の4段と2本の曲線だけを使う。ここでは
  *   1. 物差しが `:root` にあること（`@theme` だと CSS Modules からは読めず消える）
  *   2. 動きを減らす設定で全部止まること
@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest'
 const SHARED = dirname(fileURLToPath(import.meta.url))
 const GLOBALS = readFileSync(join(SHARED, '..', '..', 'app', 'globals.css'), 'utf8')
 
-/** V7 より前から ms を直書きしている部品。トークンへ移したら消す。 */
+/** 管理画面 より前から ms を直書きしている部品。トークンへ移したら消す。 */
 /* 2026-10-07 動きの点検 18 番で5本とも --motion-* へ移した。増やさない。 */
 const BASELINE: string[] = []
 

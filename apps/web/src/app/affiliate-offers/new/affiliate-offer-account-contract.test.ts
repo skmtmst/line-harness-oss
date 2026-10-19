@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(join(import.meta.dirname, '../new-offer-v8.tsx'), 'utf8')
 
 /**
- * V6 案件作成のLINEアカウント選択の契約（#505 重大1 / #686 cross-account）。
+ * 管理画面 案件作成のLINEアカウント選択の契約（#505 重大1 / #686 cross-account）。
  *
  * 「すべてのアカウント」のまま送ると口が 400 で落とす（複数アカウントの
  * 運用者は既定のまま押すと必ず失敗した）。#686 差し戻し以降は、選ばせる

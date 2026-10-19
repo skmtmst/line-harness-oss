@@ -3,7 +3,7 @@ import React from 'react'
 import {render,screen,cleanup,fireEvent} from '@testing-library/react'
 import {afterEach,expect,it,vi} from 'vitest'
 import {LiffInput,LiffTextArea,LiffFieldLabel} from './controls'
-import Button from '../ui/Button'
+import Button from '../ui/button/index'
 afterEach(cleanup)
 it('LIFF の必須は札、任意は括弧と重ねない',()=>{
  const {container}=render(<><LiffFieldLabel htmlFor="name" label="お名前＊" required/><LiffInput id="name"/><LiffFieldLabel htmlFor="note" label="ご要望（任意）" optional/><LiffTextArea id="note"/></>)

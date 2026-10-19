@@ -37,7 +37,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import InlineSettings from '@/components/shared/inline-settings'
 
 /*
- * シナリオのアクションを編集する窓（設計 `V6 5 hz9ti 送信後のアクションを設定`）。
+ * シナリオのアクションを編集する窓（設計 `管理画面 5 hz9ti 送信後のアクションを設定`）。
  *
  * 段の並びは設計に合わせて **「追加する動作を選ぶ」が先、「実行する動作」が後**。
  * 先に一覧を出して最後に追加口を置くと、まだ1つも無いときに何をすれば
@@ -59,7 +59,7 @@ import InlineSettings from '@/components/shared/inline-settings'
  *     書く口も無い。入口だけ置くと、書いたものが消えたように見える・
  *     保存できるように見えて設定済みだと誤認させる（R241）。
  *   - 8つの動作 … 現行の編集口が持つ種別は `ScenarioActionType` の5つ。
- *     変更時は、安全に変換できる設定をV6下書きAPIへ同時保存する
+ *     変更時は、安全に変換できる設定を管理画面下書きAPIへ同時保存する
  *   - 「発動2回目以降も各動作を実行」をセクションに1つ … `repeatOnRefire` は
  *     動作1件ごとの列。1つにまとめると、動作ごとに違う値を持てなくなり、
  *     既にある設定を黙って上書きすることになる
@@ -113,7 +113,7 @@ const KIND_LABEL: Record<ScenarioActionType, string> = {
   event_booking: 'イベント予約操作',
 }
 
-/** 既存5種を、機能5 V6の下書き契約へ安全に写せる形だけ変換する。 */
+/** 既存5種を、機能5 管理画面の下書き契約へ安全に写せる形だけ変換する。 */
 function toDraftActions(actions: ScenarioAction[]): ScenarioDraftActionV6[] {
   return actions.flatMap<ScenarioDraftActionV6>((action, actionIndex) => {
     const config = (action.config ?? {}) as Record<string, unknown>

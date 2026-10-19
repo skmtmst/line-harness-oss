@@ -28,7 +28,7 @@ export type ActionChoice<T> = {
   }
 }
 
-/** B-169: 種類を選んでから対象を確定する。取消では空の行を追加しない。 */
+/** : 種類を選んでから対象を確定する。取消では空の行を追加しない。 */
 export function ActionAddButton<T>({ choices, onAdd, disabled = false, id, label = '行うことを足す', direct = false }: {
   choices: ActionChoice<T>[]
   onAdd: (item: T) => void

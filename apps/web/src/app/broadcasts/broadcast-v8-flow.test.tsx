@@ -159,7 +159,7 @@ describe('V8 一斉配信の通し', () => {
     await mount(<BroadcastListV8 />)
     await screen.findByText('はじめの配信')
 
-    // 「配信を作る ▾」の「詳しく作る」は5つの手順（/broadcasts/new）へ移る（絵 Xr6eu）。
+    // 「配信を作る ▾」の「詳しく作る」は5つの手順（/broadcasts/new）へ移る。
     await act(async () => {
       fireEvent.click(screen.getAllByRole('button', { name: '配信を作る' })[0])
     })

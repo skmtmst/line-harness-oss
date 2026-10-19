@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-// 文言の正本は rich-menu-errors.ts（★V7・★V8 の一覧で共有）。
+// 文言の正本は rich-menu-errors.ts（★管理画面・★V8 の一覧で共有）。
 const PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
   + readFileSync(new URL('../../v8/rich-menus/errors.ts', import.meta.url), 'utf8')
 

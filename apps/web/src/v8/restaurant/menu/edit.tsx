@@ -31,14 +31,14 @@ import { formatDateTime as polishFormatDateTime, formatYen } from '@/lib/format'
 import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
-import { MenuPaymentFields, PaymentConflictError, PaymentSideCard, useMenuPayment } from '../../booking-payments/menu-payment'
+import { MenuPaymentFields, PaymentConflictError, PaymentSideCard, useMenuPayment } from '@/v8/booking-payments/public/menu-payment/index'
 import styles from './edit.module.css'
 
 /*
  * ★V8 メニュー管理 › コース・単品の編集（修正案 f4bLF の mauOC）。1枚の編集ページ＋右の説明カード。
- * 前の「追加・変更の窓（NkmwU）」は消し、一覧の［変更］［メニューを追加する］はここへ来る（B-319）。
+ * 前の「追加・変更の窓」は消し、一覧の［変更］［メニューを追加する］はここへ来る。
  * 受け付ける指定：?id=<品目>（変更）・?store=<店舗>（追加）。
- * 送る形は前の窓と同じ（createMenu／updateMenu。価格を変えると承認へ申請）。お支払いは B-305 の段（コースだけ）。
+ * 送る形は前の窓と同じ（createMenu／updateMenu。価格を変えると承認へ申請）。お支払いは  の段（コースだけ）。
  * 「受ける人数」は今のデータに無いので置かない（口待ち）。所要時間は読むだけ。
  */
 

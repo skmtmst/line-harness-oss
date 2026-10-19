@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 一斉配信の書きかけを守る試験（★V7 sTJsh §5）。
+ * 一斉配信の書きかけを守る試験（★管理画面 sTJsh §5）。
  *
  * 見る筋書き:
  *   1. 通せる形で入力が2秒止まると、下書きへ静かに保存し「下書き保存済み」と出す。
@@ -125,7 +125,7 @@ async function waitForDebounce() {
   await flush()
 }
 
-describe('一斉配信の下書き自動保存（★V7 sTJsh §5）', () => {
+describe('一斉配信の下書き自動保存（★管理画面 sTJsh §5）', () => {
   beforeEach(() => {
     // 自動保存の2秒は入力した瞬間から数えるので、描く前から偽の時計にする。
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })

@@ -183,7 +183,7 @@ function EditCommonActionInner() {
 
   /*
     対象が無い（取得失敗）ときは、見出し・入力・右の案内・固定バー
-    のどれも出さない。代わりに ★V7 TargetMissing を出す。
+    のどれも出さない。代わりに ★管理画面 TargetMissing を出す。
   */
   if (error && !draftVersionId && loadFailure === 'forbidden') {
     return (
@@ -208,7 +208,7 @@ function EditCommonActionInner() {
   }
   /*
    * 監査 R583: 下書きなしは通信障害ではない。再読込の口ではなく、
-   * ★V7 TargetMissing で版の画面（前の版から新版を作る入口）へ戻す。
+   * ★管理画面 TargetMissing で版の画面（前の版から新版を作る入口）へ戻す。
    */
   if (error && !draftVersionId && loadFailure === 'no-draft') {
     return (

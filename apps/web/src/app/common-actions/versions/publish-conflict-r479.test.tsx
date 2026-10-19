@@ -2,7 +2,7 @@
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
  * 監査 R479: 版画面で公開が 409 reference_updated で止まったあと、
- * 自動の load() が setError('') で競合理由を消していた。
+ * 自動の load が setError('') で競合理由を消していた。
  * 最新版を読み直しても理由と次の操作が残ることを、本物の React で確かめる。
  *
  * 成功時・別の失敗・再試行時の表示もここで見る。

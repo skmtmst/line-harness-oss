@@ -79,7 +79,7 @@
   white-space: nowrap;
 }
 
-/* 押せない理由は省略せず全文を折り返して読ませる（窓の幅 320 まで・vKDj5）。行は理由の分だけ高くなる。 */
+/* 押せない理由は省略せず全文を折り返して読ませる（窓の幅 320 まで・）。行は理由の分だけ高くなる。 */
 .reason {
   color: var(--color-ink-faint);
   font-size: var(--text-nano);
@@ -193,13 +193,13 @@
   border-color: var(--color-border-soft);
 }
 
-/* ★V8：絵の行の「…」のメニューは項目の高さ 34・印と字の間 8（IIesG・SkY9V・C0lfUP）。 */
+/* ★V8：絵の行の「…」のメニューは項目の高さ 34・印と字の間 8（・・）。 */
 :root .item:not(.itemTall) {
   height: var(--tpl-menu-item-h);
   gap: var(--tpl-menu-item-gap);
 }
 
-/* ★V8：区切りは線1本だけで、上下の余白を足さない（項目の間 2 の並びのまま。SkY9V で「実行結果を見る」→「編集する」が 39＝36＋線と間 3）。 */
+/* ★V8：区切りは線1本だけで、上下の余白を足さない（項目の間 2 の並びのまま。 で「実行結果を見る」→「編集する」が 39＝36＋線と間 3）。 */
 :root .divider {
   margin: var(--tpl-menu-divider-margin);
 }
@@ -209,7 +209,7 @@
  * 120ms（--motion-fast）・0.96→1 で開く。起点は開いた向き（器の data-placement）と
  * 寄せ（data-align）から決める：下へ開く＝上の角、上へ開く＝下の角、
  * 右寄せ（既定）＝右の角、左寄せ＝左の角。器の無い（inline）ときは右上。
- * globals の lh-surface-in は v7 だけに当たる（層の外の指定がこれに勝たないように）。
+ * globals の lh-surface-in は 管理画面 だけに当たる（層の外の指定がこれに勝たないように）。
  * 動きを減らす設定では globals の末尾の規定で一瞬になる。
  */
 :root .menu {
@@ -246,6 +246,6 @@
 @keyframes action-menu-v8-leave { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { :root .menu[data-closing] { animation: none; opacity: 0; } }
 
-/* B-161：浮く面の影と薄い縁を共通化。 */
+/* ：浮く面の影と薄い縁を共通化。 */
 :root .menu { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
 :root .section { font-size: var(--text-micro); }

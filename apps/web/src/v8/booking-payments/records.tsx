@@ -23,7 +23,7 @@ import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { emptyValue } from '@/components/shared/empty-value'
 import { formatListTimestamp, formatYen } from '@/lib/format'
 import { ApiError } from '@/lib/api'
-import { bookingPaymentAdminApi, isNotReadyError, type PaymentRecord, type PaymentRecordsPage } from '@/lib/api-booking-payment-admin'
+import { bookingPaymentAdminApi, isNotReadyError, type PaymentRecord, type PaymentRecordsPage } from '@/lib/api/helpers/booking-payment-admin'
 import { PAYMENT_STATUS, paymentBadge } from '@/components/shared/payment-status'
 import StatusBadge from '@/components/shared/status-badge'
 import TestModeNote from '@/components/shared/test-mode-note'
@@ -88,7 +88,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   }, [accountId, query, status, method, period])
 
   useEffect(() => { void reload() }, [reload])
-  /* 試験モードの印（B-338：お金の数が出る所すべて）。 */
+  /* 試験モードの印（：お金の数が出る所すべて）。 */
   useEffect(() => {
     let alive = true
     void Promise.resolve().then(() => bookingPaymentAdminApi.connection(accountId))

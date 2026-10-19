@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B 配信を直す（w5pwG）の骨格。
- * 取得・保存の決めごとは v7（campaign-editor）と同じ。節の並びと保存を見る。
+ * ★V8-B 配信を直すの骨格。
+ * 取得・保存の決めごとは 管理画面（campaign-editor）と同じ。節の並びと保存を見る。
  */
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'

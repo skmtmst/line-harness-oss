@@ -31,7 +31,7 @@ type Options = {
 export function useFriendInfoEditing({ setLocalStatus, chatStatus, setLocalOperatorId, operatorId, setLocalNotes, setLocalTags, friend, revision, chatId, targetRef, onChatChanged, effectiveStatus, beginChange, effectiveOperatorId, operators, friendId, effectiveNotes, setFriend, memoAreaRef }: Options) {
 
   /*
-   * B-26（A-2 採用）：押した瞬間に変えて裏で保存し、白い知らせに［元に戻す］（5秒・乗せている間は止まる）。
+   * （A-2 採用）：押した瞬間に変えて裏で保存し、白い知らせに［元に戻す］（5秒・乗せている間は止まる）。
    * 失敗したら画面を戻し、理由と［もう一度試す］。
    * 同時に直したとき：対応状況・担当は版（revision）を送らず、その項目だけを変える（ほかの人が直した
    * メモや担当を巻き戻さない）。タグは1つずつ付ける・外す（足し引き）。メモは最後に直した方を残す（下の queueMemoSave）。

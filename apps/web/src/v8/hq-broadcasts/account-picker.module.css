@@ -1,4 +1,4 @@
-/* 2段目の状態（WjFWW）。ふだんは補足の灰色、要確認は琥珀、送れないは赤。 */
+/* 2段目の状態。ふだんは補足の灰色、要確認は琥珀、送れないは赤。 */
 .connection { flex: none; white-space: nowrap; }
 .connection[data-connection-tone='warning'] { color: var(--color-warning); }
 .connection[data-connection-tone='danger'] { color: var(--color-danger); }

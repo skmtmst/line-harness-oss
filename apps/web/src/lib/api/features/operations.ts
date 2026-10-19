@@ -1,6 +1,6 @@
 import { fetchApi } from '../transport/request'
 import type { ApiResponse, LineAccount, AccountHealthLog, AccountMigration } from '@line-crm/shared'
-import type { AccountHealthSummary } from '../../api-publication-types'
+import type { AccountHealthSummary } from '../types/publication-types'
 import type {
   LineWebhookRecoveryEvent,
   OperationHealthSnapshot,

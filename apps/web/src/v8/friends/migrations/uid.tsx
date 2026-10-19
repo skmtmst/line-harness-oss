@@ -32,7 +32,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 UID移行（Pencil `Z0jHp` 要確認の判断・`L48eY` 本移行と照合の完了）。/friends/migrations?tab=uid（`&run=` で履歴を選ぶ）。
+ * ★V8 UID移行（Pencil  要確認の判断・ 本移行と照合の完了）。/friends/migrations?tab=uid（`&run=` で履歴を選ぶ）。
  *
  * 判断・実行・切り戻しの口は今と同じ（use-uid-migration：行ごとの判断・実行と切り戻しは確認窓の確定だけ・
  * owner と作成者の決まり・結果不明のときの読み直し）。今の入口 /accounts?tab=migration はそのまま。
@@ -373,7 +373,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
   }
 
   return (
-    /* 要確認の判断（Z0jHp）は板を画面の高さまで伸ばし、キャンセルの帯を画面の下に追従させる。 */
+    /* 要確認の判断は板を画面の高さまで伸ばし、キャンセルの帯を画面の下に追従させる。 */
     <PageFrame kind="list" boardId={active && !reviewing ? 'L48eY' : 'Z0jHp'} heightMode={active && reviewing ? 'viewport' : undefined}>
       <FriendsSectionHead
         current="uid-migration"

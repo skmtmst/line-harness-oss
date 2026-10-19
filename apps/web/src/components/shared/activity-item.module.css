@@ -7,7 +7,7 @@
  *   左のレール 24 幅：印は 24x24 の正円（shell 地・中の印 12）
  *   縦線は 1x26（hairline）、印の真下から次の行へ繋がる
  *   題 13/500 ink・補足 12 ink-secondary・時刻 12 ink-faint
- *   V8 で新たに生えた部品のため v7 側の規定は持たない
+ *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない
  */
 
 .row {
@@ -66,7 +66,7 @@
   color: var(--color-ink-faint);
 }
 
-/* Pencil の文字は行の高さ 1.5（--text-lh）。v7 は書かない（既定のまま）。 */
+/* Pencil の文字は行の高さ 1.5（--text-lh）。互換経路は書かない（既定のまま）。 */
 :root .title,
 :root .note,
 :root .time {
@@ -82,7 +82,7 @@
 
 :root .marker svg { flex-shrink: 0; }
 
-/* B-152②：役割ごとの文字の段。 */
+/* ②：役割ごとの文字の段。 */
 :root .title { font-size: var(--polish-text-body); font-weight: var(--polish-weight-label); }
 
 :root .title { font-size: var(--text-body); }

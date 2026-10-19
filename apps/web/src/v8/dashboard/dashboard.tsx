@@ -18,9 +18,9 @@ import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { SetupCard,SetupWarningBands,setupSummary } from '@/v8/onboarding/setup-card'
+import { SetupCard, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
-import { useStyleSetup } from '@/v8/onboarding/use-style-setup'
+import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import type { DashboardCardId } from '@line-crm/shared'
 import { Calendar,Image as ImageIcon,Inbox,Package,Plus,SlidersHorizontal } from 'lucide-react'
 import dynamic from 'next/dynamic'
@@ -39,7 +39,7 @@ import { dashboardCardForStyle } from './style-cards'
 export { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 
 
-/* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
+/* 編集の引き出し（・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（管理画面 の部品は使わない）。 */
 /* はじめの質問の窓（xxpM9 ほか）も開くまで読まない。 */
 const EcSummary = dynamic(() => import('./ec-summary'))
 
@@ -49,7 +49,7 @@ const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module)
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
 
-/* 右の列の組み合わせ（WQmep）：どの本文の段の右に、どの右の列のカードを置くか。 */
+/* 右の列の組み合わせ：どの本文の段の右に、どの右の列のカードを置くか。 */
 const ASIDE_OF: Partial<Record<DashboardCardId, DashboardCardId[]>> = {
   'friend-trend': ['send-quota', 'operational-alerts'],
   'pending-inbox': ['support-mark-status', 'connection-status'],
@@ -71,7 +71,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
-  /* B-311〜B-313：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
+  /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
   const setup = useStyleSetup(d.selectedAccountId, role)
   const setupRest = setupSummary(setup.data)
   const params = useSearchParams()
@@ -255,7 +255,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
     if (!dashboardCardForStyle(item.id, usageStyle, d.preferenceVersion > 0)) continue
     if (item.id === 'shipment') {
       if (usageStyle === 'standard') continue
-      /* 件数は隠していても取り続ける（v7 と同じ）。出荷があるときだけ段として出す。 */
+      /* 件数は隠していても取り続ける（管理画面 と同じ）。出荷があるときだけ段として出す。 */
       const show = item.visible && (d.shipmentSummary?.soon ?? 0) > 0
       rows.push(
         <div key={item.id} className={show ? styles.shipmentRow : styles.hidden} aria-hidden={!show}>

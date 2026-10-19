@@ -29,7 +29,7 @@ export function utcToJstLocalInput(value: string | null): string {
   return new Date(parsed.getTime() + 9 * 3600_000).toISOString().slice(0, 16)
 }
 
-/** 競合の帯の時刻。「14:02」の形（板 `piWhz`）。 */
+/** 競合の帯の時刻。「14:02」の形（板 ）。 */
 export function formatHourMinute(value: string): string | null {
   const parsed = new Date(value)
   if (!Number.isFinite(parsed.getTime())) return null

@@ -508,6 +508,6 @@
 
 }
 
-/* 設定タブの①②は、タブの線から 28（上の余白 4＋24）あけて置く（fpPlW）。ほかのタブは見出しから始まるので変えない。 */
+/* 設定タブの①②は、タブの線から 28（上の余白 4＋24）あけて置く。ほかのタブは見出しから始まるので変えない。 */
 .body > .pair:first-child { padding-top: var(--tpl-e78-row-gap); }
 .receiptCount { width: var(--tpl-e78-col-stamps); flex: 0 0 auto; }

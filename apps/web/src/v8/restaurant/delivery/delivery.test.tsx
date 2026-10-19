@@ -289,7 +289,7 @@ describe('kDQHr デリバリー受注', () => {
     expect(screen.getAllByText('出前館').length).toBeGreaterThan(0)
     expect(screen.getAllByText('ロケットナウ').length).toBeGreaterThan(0)
 
-    // 行の右端は、主な操作を1つだけボタンにし、残り（断る）は「…」に入れる（B-360 C）。
+    // 行の右端は、主な操作を1つだけボタンにし、残り（断る）は「…」に入れる（ C）。
     // 新着は「受け付ける」、調理中は「準備完了にする」。
     expect(screen.getByLabelText('注文UE-1001を受け付ける')).toBeTruthy()
     expect(screen.queryByLabelText('注文UE-1001を拒否')).toBeNull()
@@ -349,7 +349,7 @@ describe('kDQHr デリバリー受注', () => {
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
 
-    // 自作の `<select>` ではなく、共通部品の押しボタン＋選ぶ窓であること（B-172）。
+    // 自作の `<select>` ではなく、共通部品の押しボタン＋選ぶ窓であること。
     const picker = screen.getByRole('button', { name: '店舗' })
     fireEvent.click(picker)
     expect(await screen.findByRole('dialog', { name: '店舗を選ぶ' })).toBeTruthy()

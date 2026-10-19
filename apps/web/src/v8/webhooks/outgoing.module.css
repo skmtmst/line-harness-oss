@@ -1,5 +1,5 @@
 /*
- * ★V8 外部連携「こちらから送る」の一覧（ZSbFY・1152 AsfFB・閲覧のみ l5SRfT）。
+ * ★V8 外部連携「こちらから送る」の一覧（・1152 ・閲覧のみ ）。
  * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  */
 
@@ -51,7 +51,7 @@
 .colState { width: var(--tpl-wh-col-state); min-width: 0; }
 .colOps { width: calc(var(--row-action-width) + var(--tpl-icon-btn-row-hit) + var(--tpl-wh-ops-gap)); }
 
-/* 1152 の4列（絵 AsfFB）。列の頭の位置は絵の x に合わせ、列の間は幅で持つ。 */
+/* 1152 の4列。列の頭の位置は絵の x に合わせ、列の間は幅で持つ。 */
 .colMonth { width: var(--tpl-af2-wh-col-month); display: flex; flex-direction: column; gap: var(--tpl-row-sub-gap); }
 .colStateNarrow { width: var(--tpl-af2-wh-col-state); display: flex; align-items: center; }
 .colOpsNarrow { width: var(--tpl-af2-wh-col-ops); }
@@ -93,7 +93,7 @@ a.name:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 ZSbFY の説明の行）。 */
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
 .nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
 .num {
   display: block;
@@ -114,7 +114,7 @@ a.name:hover {
 
 /* ようすの札（点つき）。 */
 
-/* 操作：行の右端の「…」だけ（B-253）。列の幅は共通の表が中身から決める。 */
+/* 操作：行の右端の「…」だけ。列の幅は共通の表が中身から決める。 */
 .opsBox {
   display: flex;
   align-items: center;
@@ -140,7 +140,7 @@ a.name:hover {
   padding: 0 var(--tpl-toolbar-pad-side) var(--tpl-toolbar-pad-block);
 }
 
-/* 1152 の板（AsfFB）：案内の帯 → 1段目 → 2段目。 */
+/* 1152 の板：案内の帯 → 1段目 → 2段目。 */
 .narrowTools {
   display: flex;
   flex-basis: 100%;
@@ -183,7 +183,7 @@ a.name:hover {
   gap: var(--tpl-toolbar-gap);
 }
 
-/* 読み込み中の骨（絵 wWrpY：丸と棒4本の行）。 */
+/* 読み込み中の骨（絵 ：丸と棒4本の行）。 */
 .skeletonRow {
   display: flex;
   align-items: center;

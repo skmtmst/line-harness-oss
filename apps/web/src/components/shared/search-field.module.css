@@ -108,7 +108,7 @@
 
 /*
  * ★V8「探す欄」（TkVyB）：高さ36・余白 0 12・アイコンとの間 8・
- * 文字は 13px（v7 の40px/14px から小さく引き締める）。
+ * 文字は 13px（管理画面 の40px/14px から小さく引き締める）。
  */
 :root .search {
   height: 36px;
@@ -131,7 +131,7 @@
 
 /*
  * 近道の印（例 ⌘K。TSV 実寸 19x17≒12px）。ふだんは隠し、v8 だけで
- * 箱の右端に出す（中の入力が flex:1 で右へ寄せる）。v7 は変えない。
+ * 箱の右端に出す（中の入力が flex:1 で右へ寄せる）。互換経路は変えない。
  */
 
 :root .shortcut {
@@ -143,21 +143,21 @@
   font-family: inherit;
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .search { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
 :root .searchIcon { width: 14px; height: 14px; flex-basis: 14px; }
 :root .input { padding: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 
 :root .search:has(.input[aria-invalid='true']) { outline-color: var(--color-danger); }
 }
-/* B-152・仕上げ5 */
+/* ・仕上げ5 */
 :root .searchIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); color: var(--color-ink-secondary); }
 
-/* B-152・仕上げ7：輪は検索欄の外側だけに出す。 */
+/* ・仕上げ7：輪は検索欄の外側だけに出す。 */
 html:root .search:has(.input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 html:root .search .input:focus-visible { outline: none; }
 html:root .disabled { opacity: var(--polish-disabled-opacity); }
 html:root .disabled .input:disabled { opacity: 1; }
 
-/* B-152・仕上げ8：検索の読み込みは aria-busy で伝え、回る印は保存ボタンだけにする。 */
+/* ・仕上げ8：検索の読み込みは aria-busy で伝え、回る印は保存ボタンだけにする。 */
 :root .loadingIcon { display: none; animation: none; }

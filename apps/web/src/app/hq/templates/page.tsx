@@ -18,7 +18,7 @@ function Content() {
     ? requested as TemplateType
     : 'template'
   /*
-   * ★V8（LRc93・X4JcOf・meBRB）は src/v8 の新しい画面。タグ・リッチメニュー・回答フォーム・
+   * ★V8（・・）は src/v8 の新しい画面。タグ・リッチメニュー・回答フォーム・
    * シナリオのひな形の中身は、今の編集部品をそのまま渡す（src/v8 は @/app を読まないため）。
    */
   return <HqTemplatesV8 type={type} DefinitionEditor={TemplateDefinitionEditor} />

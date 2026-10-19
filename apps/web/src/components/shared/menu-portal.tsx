@@ -17,7 +17,7 @@ export type MenuPortalProps = {
   getAnchor: () => HTMLElement | null
   /** 横の寄せ。既定は `end`（今までの `right-0` と同じく右寄せ）。 */
   align?: MenuPortalAlign
-  /** ボタンとのすき間。★V7 メニューは4px。既定は 4。 */
+  /** ボタンとのすき間。★管理画面 メニューは4px。既定は 4。 */
   gap?: number
   /**
    * 欄の幅に合わせる（候補つき入力・単一選択）。

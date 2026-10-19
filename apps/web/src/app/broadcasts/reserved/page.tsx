@@ -59,7 +59,7 @@ function belongsToAccount(broadcast: ApiBroadcast, selectedAccountId: string | n
 function ReservedBroadcastContent() {
   /*
    * ★V8：上の帯のパンくずは「一斉配信 › 予約しました」。
-   * v7 ではパンくずが描かれないので、渡しても見た目は変わらない。
+   * 互換経路ではパンくずが描かれないので、渡しても見た目は変わらない。
    */
   usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
   usePageTitle('予約しました')
@@ -143,7 +143,7 @@ function ReservedBroadcastContent() {
             setAudienceNames({ tags: tags ?? [], scenarios: scenarios ?? [] })
           })
       }
-      // 絵 cdZBf: 承認待ちの予約は状態行に「承認：名前」を出す。
+      // 絵 : 承認待ちの予約は状態行に「承認：名前」を出す。
       // 名前が取れなくても予約の表示は出し続ける（「承認待ち」の表記に残る）。
       if (result.data.approvalStatus === 'pending' && result.data.lineAccountId) {
         void Promise.allSettled([
@@ -340,7 +340,7 @@ function ReservedBroadcastContent() {
   /*
    * 予約の取消の確定。口の返事をそのまま出さない——409（もう予約中ではない）も
    * 通信の失敗も、運用者にできることは同じ（読み直して確かめる）。
-   * v7・V8 どちらの確認ダイアログからもここを呼ぶ。
+   * 管理画面・V8 どちらの確認ダイアログからもここを呼ぶ。
    */
   const confirmCancel = async () => {
     if (cancelling) return

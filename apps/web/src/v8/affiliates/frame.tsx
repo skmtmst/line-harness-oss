@@ -2,8 +2,8 @@
 
 /*
  * ★V8 成果とアフィリエイトの外枠（Pencil「★V8-B 画面の地図」の成果とアフィリエイトの行）。
- * アフィリエイター `nJlxX`・1152 `KdFRI`・閲覧のみ `v9JWQ`・案件 `h7dmB`・
- * 成果承認 `OylSV`・支払い `aINnz`・レポート `Eo56k`（状態は見本帳 `rRk0C`）。
+ * アフィリエイター ・1152 ・閲覧のみ ・案件 ・
+ * 成果承認 ・支払い ・レポート （状態は見本帳 ）。
  *
  * 板の頭（題・説明・右の操作）とタブの段・閲覧のみの帯は5つのタブで同じ。
  * 数の帯・フォルダの列・道具の段・表は各タブが一覧の型（ListPage）の枠へ渡す。
@@ -42,7 +42,7 @@ export function affiliateTabHref(key: AffiliateTabKey): string {
   return key === 'affiliates' ? '/affiliates' : `/affiliates?tab=${key}`
 }
 
-/** タブの名の横の件数（nJlxX：アフィリエイター 6・案件 4・成果承認 5）。 */
+/** タブの名の横の件数（：アフィリエイター 6・案件 4・成果承認 5）。 */
 export type AffiliateTabCounts = Partial<Record<AffiliateTabKey, string>>
 
 export interface AffiliateShellContext {
@@ -71,7 +71,7 @@ export function useAffiliateShell(): AffiliateShellContext {
   return useContext(AffiliateShell)
 }
 
-/** 閲覧のみの帯（v9JWQ）。数の帯の上。 */
+/** 閲覧のみの帯。数の帯の上。 */
 export function ViewerBand() {
   return (
     <div className={styles.viewerBand}><ReadOnlyNotice role="note"></ReadOnlyNotice></div>
@@ -106,7 +106,7 @@ export function CreateButton({
 export interface AffiliateFrameProps {
   /** 板の頭の右（CSV など）。 */
   help?: ReactNode
-  /** 一覧の操作の説明。道具の段の右端の「？」に出す（OylSV）。 */
+  /** 一覧の操作の説明。道具の段の右端の「？」に出す。 */
   listHelp?: ReactNode
   explanation?: ReactNode
   explanationKey?: string

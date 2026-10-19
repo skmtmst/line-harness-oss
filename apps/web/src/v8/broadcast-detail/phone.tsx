@@ -5,7 +5,7 @@ import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
 import styles from './phone.module.css'
 
 /**
- * ★V8 右の欄の「本物のスマホ」（絵 `cgiGB`・`pNiUk`・`F3X1Mo`・`cdZBf` の「スマホ 配信の中身」）。
+ * ★V8 右の欄の「本物のスマホ」（絵の の「スマホ 配信の中身」）。
  *
  * 外枠 330×690・黒い島・LINE の上の帯・トーク・下のメニュー。
  * テキストは絵の吹き出し（幅200）で出し、写真・カルーセルなどは
@@ -35,7 +35,7 @@ export default function BroadcastPhone({
   const plainText = broadcast.messageType === 'text' && single && !broadcast.messageOptions?.buttons?.length
   /* 写真1枚は絵の「画像」（200×200・角丸16）。URL が読めないときは枠と「写真」だけ。 */
   const photo = broadcast.messageType === 'image' && single ? { url: imageUrlOf(broadcast.messageContent) } : null
-  /* カルーセル1通は吹き出しに入れず、カードを横に並べる（絵 F3X1Mo）。読めない中身は今までどおり種別名。 */
+  /* カルーセル1通は吹き出しに入れず、カードを横に並べる。読めない中身は今までどおり種別名。 */
   const carousel = broadcast.messageType === 'carousel' && single ? carouselColumnsOf(broadcast.messageContent) : null
   if (carousel) {
     return (

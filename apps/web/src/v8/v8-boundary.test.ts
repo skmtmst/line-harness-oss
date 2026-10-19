@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 /*
  * V8 の画面（src/v8）を一から書く決まりの見張り（2026-10-06 オーナー決定）。
- * 古い画面ファイルを持ち込まない・v7 と分けない・CSS に数字を直書きしない。
+ * 古い画面ファイルを持ち込まない・管理画面 と分けない・CSS に数字を直書きしない。
  */
 const ROOT = __dirname
 const files = (dir: string): string[] =>

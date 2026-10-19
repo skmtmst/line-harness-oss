@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-/* B-177・R230：複製は確認窓を出さず、一覧の元の行の下へ下書きを追加する。 */
+/* ・R230：複製は確認窓を出さず、一覧の元の行の下へ下書きを追加する。 */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

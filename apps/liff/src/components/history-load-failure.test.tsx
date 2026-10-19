@@ -4,11 +4,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const net = vi.hoisted(() => ({ bookingWaitlists: vi.fn(), myEventBookings: vi.fn(), makeupCredits: vi.fn() }))
 vi.mock('../lib/api.js', () => ({ api: net }))
-vi.mock('./MakeupPicker.js', () => ({ default: () => null }))
-vi.mock('./AbsenceSheet.js', () => ({ default: () => null, mdHm: () => '' }))
-vi.mock('./WaitlistOfferSheet.js', () => ({ default: () => null }))
-import LessonHistorySection from './LessonHistorySection.js'
-import WaitlistSection from './WaitlistSection.js'
+vi.mock('./makeup-picker.js', () => ({ default: () => null }))
+vi.mock('./absence-sheet.js', () => ({ default: () => null, mdHm: () => '' }))
+vi.mock('./waitlist-offer-sheet.js', () => ({ default: () => null }))
+import LessonHistorySection from './lesson-history-section.js'
+import WaitlistSection from './waitlist-section.js'
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 it('キャンセル待ちの取得失敗は0件に置き換えず、再読込で回復する', async () => {
   net.bookingWaitlists.mockRejectedValueOnce(new Error('down')).mockResolvedValue({ waitlist: [] })

@@ -55,7 +55,7 @@ export default function DateTimeField({
 }: {
   value?: string
   defaultValue?: string
-  /** 細い欄（32px）。既定は日付と同じ36px（ほかの欄と同じ・B-145）。 */
+  /** 細い欄（32px）。既定は日付と同じ36px（ほかの欄と同じ・）。 */
   size?: 'default' | 'compact'
   onChange?: (value: string) => void
   min?: string

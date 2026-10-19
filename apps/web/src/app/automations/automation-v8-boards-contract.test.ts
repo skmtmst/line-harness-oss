@@ -7,8 +7,8 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (relative: string) => readFileSync(join(HERE, relative), 'utf8')
 
 /*
- * V8-B オートメーション3板（`LWQXd` 一覧・`J1VA8` 下書きを仕上げる・
- * `c7dxp` 見本12件）。F-14〜F-16 の口が入ったので、絵どおりに作り直した
+ * V8-B オートメーション3板（ 一覧・ 下書きを仕上げる・
+ *  見本12件）。F-14〜F-16 の口が入ったので、絵どおりに作り直した
  * 現役V8の外枠と操作を確認する。
  */
 describe('V8 オートメーション3板の印', () => {

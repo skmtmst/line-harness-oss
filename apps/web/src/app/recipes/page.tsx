@@ -16,12 +16,12 @@ import {
 import styles from './recipes.module.css'
 
 /**
- * 設計 ★V6 34-2「レシピ一覧」（`y0P0Qx`）。
+ * 設計 ★管理画面 34-2「レシピ一覧」（`y0P0Qx`）。
  *
  * レシピ・必要機能・複製回数はサーバの正本を読む。
  */
 export default function RecipesPage() {
-  /* ★V7 C7: 題はトップバーに一本化し、本文の大きな見出しを出さない（PageHeader が同じ題なら隠す）。 */
+  /* ★管理画面 C7: 題はトップバーに一本化し、本文の大きな見出しを出さない（PageHeader が同じ題なら隠す）。 */
   usePageTitle('レシピから作る')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const [recipes, setRecipes] = useState<Recipe[]>([])

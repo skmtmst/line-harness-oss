@@ -7,15 +7,15 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (relative: string) => readFileSync(join(HERE, relative), 'utf8')
 
 /*
- * V8 再撮の9板（`EML2F` `bIdqV` `rfdmA` `CRtK8` `dK1aE` `wfHIE` `tPm3e`
- * `p15At` `G9C4Uw`）。画面はどれも作り済みなので、同じ画面の外枠か
+ * V8 再撮の9板（`EML2F`  `rfdmA`
+ *  ）。画面はどれも作り済みなので、同じ画面の外枠か
  * 該当の場所に `data-design-node` を付けるだけ——付けないと進み具合に
- * 数えられない。v7・見せ方・API は何も変えない。
+ * 数えられない。管理画面・見せ方・API は何も変えない。
  */
 describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
   /*
    * 一覧の入口は src/v8/broadcasts/list.tsx（古い list-v8.tsx はもう描かれない）。
-   * 新しい一覧は板IDを型（ListPage の boardId）に渡す：1440＝l5V9a・閲覧のみ＝NtCE3・1152＝jjFNi。
+   * 新しい一覧は板IDを型（ListPage の boardId）に渡す：1440＝・閲覧のみ＝・1152＝。
    */
   it('一覧は板IDを型へ渡し、閲覧のみは NtCE3 と帯を出す', () => {
     const list = read('../../v8/broadcasts/list.tsx')
@@ -42,7 +42,7 @@ describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
   })
 
   it('重複検出の数の帯に G9C4Uw（1152）を付ける', () => {
-    const duplicates = read('../duplicates/duplicates-v8.tsx')
+    const duplicates = read("../duplicates/list-screen.tsx")
     expect(duplicates, '重複検出1152 の板が無い').toMatch(/(?:data-design-node|boardId)="G9C4Uw"/)
   })
 

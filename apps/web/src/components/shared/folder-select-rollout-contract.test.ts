@@ -36,10 +36,10 @@ const SCREENS: Array<[string, RegExp]> = [
   ['v8/common-vars-edit/edit.tsx', /onCreate=\{canWrite && selectedAccountId\s*\?/],
   ['v8/common-vars-edit/new.tsx', /onCreate=\{canWrite && selectedAccountId\s*\?/],
   ['v8/reminders/basics-form.tsx', /onCreate=\{canCreateFolder\s*\?/],
-  ['app/reminders/new/new-v8.tsx', /onCreate=\{canCreateFolder\s*\?/],
+  ['v8/reminders/new/new.tsx', /onCreate=\{canCreateFolder\s*\?/],
   ['v8/contents/list.tsx', /onCreateFolder=\{canManageMedia\s*\?/],
-  ['app/rich-menus/new/create-v8.tsx', /onCreate=\{!canOperate\s*\?\s*undefined/],
-  ['app/auto-replies/edit/wizard-v8.tsx', /onCreate=\{canManage\s*\?/],
+  ['v8/rich-menus/new/create.tsx', /onCreate=\{!canOperate\s*\?\s*undefined/],
+  ['v8/auto-replies/edit/wizard.tsx', /onCreate=\{canManage\s*\?/],
   ['components/broadcasts/broadcast-form.tsx', /onCreate=\{canCreateFolder \? createFolder : undefined\}/],
 ]
 

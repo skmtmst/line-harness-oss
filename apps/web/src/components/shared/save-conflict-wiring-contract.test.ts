@@ -10,14 +10,14 @@ import { describe, expect, it } from 'vitest'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const SCREENS: Array<[string, string]> = [
   ['v8/form-edit/edit.tsx', ''],
-  ['app/reminders/new/new-v8.tsx', ''],
+  ['v8/reminders/new/new.tsx', ''],
   ['v8/reminders/edit.tsx', 'k32cn'],
   ['v8/tag-edit/edit-form.tsx', 'xn95q'],
   ['v8/tag-edit/edit.tsx', 'xn95q'],
   ['v8/template-edit/message.tsx', 'NCbYn'],
-  ['app/auto-replies/edit/wizard-v8.tsx', 'UGrd2'],
+  ['v8/auto-replies/edit/wizard.tsx', 'UGrd2'],
   ['v8/friend-add/editor.tsx', 'h5rm8t'],
-  ['app/rich-menus/new/create-v8.tsx', 'r8dGXT'],
+  ['v8/rich-menus/new/create.tsx', 'r8dGXT'],
   ['v8/scenario-detail/detail.tsx', 'kz2B6'],
   ['v8/common-vars-edit/edit.tsx', 'piWhz'],
   ['v8/conversions/create.tsx', 'cXqlS'],

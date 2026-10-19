@@ -1,4 +1,4 @@
-/* ★V8 統合ユーザー（Pencil ADjK8）。値は globals.css の --tpl-fr-*。 */
+/* ★V8 統合ユーザー（Pencil ）。値は globals.css の --tpl-fr-*。 */
 .body { display: flex; flex-direction: column; min-width: 0; }
 
 /* 上の段：操作・数・絞り込み（段の間12・左右24・下16）。 */

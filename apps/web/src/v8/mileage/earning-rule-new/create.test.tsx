@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 たまる決めごとを作る（src/v8/mileage/earning-rule-new/create.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
- * 足りない入力は保存しない・保存は 作る→下書き の順・下書きが 409 で返ると競合の帯（BnrQp）・保存して動かすで一覧へ戻る。
+ * 足りない入力は保存しない・保存は 作る→下書き の順・下書きが 409 で返ると競合の帯・保存して動かすで一覧へ戻る。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'

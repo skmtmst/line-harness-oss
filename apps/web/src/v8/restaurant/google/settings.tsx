@@ -18,7 +18,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 
 
 /*
- * ★V8 Googleビジネス 設定（`CuHXG`：接続済み）。未接続・店舗の選択待ちも同じ場所で出す（今の画面と同じ口）。
+ * ★V8 Googleビジネス 設定（：接続済み）。未接続・店舗の選択待ちも同じ場所で出す（今の画面と同じ口）。
  * 接続・再接続は Google の認可画面へ移る。解除・取り消し・切り替えは確認画面を経る。
  * 接続を管理できない人には、接続・解除のボタンを置かない。
  */

@@ -1,5 +1,5 @@
 /*
- * ★V8 統括のアカウントの窓（設定 `HMpVx`・アーカイブ `D6ljr`・戻す `HFsO9`）の中身。
+ * ★V8 統括のアカウントの窓（設定 ・アーカイブ ・戻す ）の中身。
  * 頭・下の帯は dialog-head.module.css。値は globals.css の `--tpl-hq-*`。
  */
 .stack { display: flex; flex-direction: column; gap: var(--tpl-hq-body-gap); }
@@ -62,7 +62,7 @@
   gap: var(--tpl-hq-plan-head-gap);
 }
 
-/* 絵 D6ljr・HFsO9：題の下の説明は薄い灰の地の箱（余白10/12・角丸8・12px）。 */
+/* 絵の：題の下の説明は薄い灰の地の箱（余白10/12・角丸8・12px）。 */
 .lead {
   margin: 0;
   word-break: normal;

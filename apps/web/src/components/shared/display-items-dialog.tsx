@@ -39,7 +39,7 @@ export default function DisplayItemsDialog({title = '表示項目を編集', ite
   </div></section>
   const manageLink = manageHref ? <Link href={manageHref} onClick={onCancel} className={styles.manage}>情報欄を管理<ArrowUpRight size={14} aria-hidden="true" /></Link> : null
   return <Dialog open title={title} size="medium" onCancel={onCancel} onConfirm={() => onConfirm(chosen.map(item => item.key))} confirmLabel="保存する"
-    /* 絵 aZ8li：列の窓は題の下に1行の説明。説明は本文に重ねない。 */
+    /* 絵 ：列の窓は題の下に1行の説明。説明は本文に重ねない。 */
     description={columns && maxSelected !== undefined ? `出す列を選び、並べ替えます。友だちの名前のほかに ${maxSelected} 列まで出せます` : undefined}
     confirmDisabled={maxSelected !== undefined && chosen.length > maxSelected} confirmDisabledReason={full ? '選択数が上限を超えています。別の項目を外してから保存してください。' : undefined}>
     <div className={styles.body} data-presentation={presentation}>

@@ -6,16 +6,16 @@ import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { bookingApi,eventsApi } from '@/lib/api'
-import { reservationBoardApi } from '@/lib/api-reservation-board'
-import { styleApi } from '@/lib/api-styles'
+import { reservationBoardApi } from '@/lib/api/helpers/reservation-board'
+import { styleApi } from '@/lib/api/helpers/styles'
 import { formatDate } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { useStaffRole } from '@/lib/staff-role'
 import type { RestaurantClosureKind,RestaurantFloor,StyleCard } from '@line-crm/shared'
 import { usePathname,useRouter,useSearchParams } from 'next/navigation'
 import { useCallback,useEffect,useMemo,useRef,useState,type SetStateAction } from 'react'
-import { canWriteRole } from '../restaurant/dashboard/summarize'
-import { useStoreToday } from '../restaurant/dashboard/use-store-today'
+import { canWriteRole } from '@/v8/restaurant/dashboard/public/summarize/index'
+import { useStoreToday } from '@/v8/restaurant/dashboard/public/use-store-today/index'
 import { analyticsWindow,toAnalytics,toLayout,toToday } from './adapter'
 import { STYLE_CONFIG,rangeFromParam,tabFromParam,viewFromParam } from './config'
 import { jstToday } from './date-range'
@@ -230,7 +230,7 @@ export function useStyleDashboard(style: IndustryStyle) {
       if (input.refund !== 'none' || input.notify) openPayment()
     } catch (caught) { notifyToast(japaneseDetailOf(caught) || '取り消せませんでした。', { tone: 'error' }) } finally { setBusy(''); void reload() }
   }
-  /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（B-304 追記 4 ⑤）。 */
+  /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（ 追記 4 ⑤）。 */
   const saveResult = async (row: StyleRow, outcome: 'considering' | 'won' | 'lost') => {
     setBusy('result')
     try {

@@ -51,17 +51,17 @@
   font-weight: 600;
 }
 
-.badge_neutral {
+.badgeNeutral {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
 }
 
-.badge_warning {
+.badgeWarning {
   background: var(--color-status-warn-soft);
   color: var(--color-status-warn-deep);
 }
 
-.badge_danger {
+.badgeDanger {
   background: var(--color-danger-bg);
   color: var(--color-danger);
 }
@@ -200,7 +200,7 @@
  * 層の外に置く：呼び出し側が渡す並べ方（grid・gap などのユーティリティ）は
  * ユーティリティ層に属し、部品層の中の指定より常に勝つ。帯の隙間0・
  * 1列化を効かせるため、ここだけ層の外（どの層より強い）に置く。
- * v7 には効かない（すべて data-theme v8 限定）。
+ * 管理画面 には効かない（すべて data-theme v8 限定）。
  */
 :root .strip[data-kpi-presentation='band'] {
   display: grid;
@@ -254,7 +254,7 @@
 :root .valueRow[data-unit-spacing='tight'] .value { gap: var(--tpl-kpi-unit-gap-tight); }
 /* hQQlt：箱の中の小さな件数。通常のカード・数の帯は変えない。 */
 :root .card[data-kpi-presentation='inline'] { min-height: 0; justify-content: flex-start; display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; outline-color: transparent; border-radius: var(--radius-none); background: none; box-shadow: none; }
-/* 白いカードの中の小さな数（絵 mVUo3「今日の取り込み」）：題 11 の下に数 18/700。 */
+/* 白いカードの中の小さな数（絵 「今日の取り込み」）：題 11 の下に数 18/700。 */
 :root .card[data-kpi-presentation='inline'] .head { min-height: 0; }
 :root .card[data-kpi-presentation='inline'] .label { color: var(--color-ink-secondary); font-size: 11px; font-weight: 400; line-height: 16px; }
 :root .card[data-kpi-presentation='inline'] .number, :root .card[data-kpi-presentation='inline'] .unit { font-size: 18px; font-weight: 700; line-height: 26px; }
@@ -265,12 +265,12 @@
   border-block-width: 0; box-shadow: var(--shadow-wh-kpi-top);
 }
 
-/* 予約の帯（O2Z8u・GcyTr）：短い3段、詳しい説明は「？」へ。 */
+/* 予約の帯（・）：短い3段、詳しい説明は「？」へ。 */
 :root .strip[data-kpi-layout='booking'] .label { font-size: var(--text-caption); line-height: var(--tpl-booking-kpi-label-lh); }
 :root .strip[data-kpi-layout='booking'] .labelText { flex: 0 1 auto; }
 :root .strip[data-kpi-layout='booking'] .detailText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :root .strip[data-kpi-layout='booking'] .card { min-height: var(--tpl-booking-kpi-height); }
-/* 飲食の共通盤の数の帯（R2w4j / vOtK2）。 */
+/* 飲食の共通盤の数の帯（ / ）。 */
 :root .strip[data-restaurant-fusion] .card { padding: 14px 24px 16px; gap: 8px; }
 :root .strip[data-restaurant-fusion] .label { gap: 8px; }
 :root .strip[data-restaurant-fusion] .valueRow { padding-left: 0; }
@@ -282,6 +282,6 @@
 .valueAction { min-height: 0; display: inline-flex; align-items: inherit; gap: inherit; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .valueAction:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; border-radius: var(--radius-control); }
 
-/* 小さい帯の「9.8 → 9.2 kg」のような幅の要る数は1段小さく（18）し、横の余白も詰めて切れないようにする（健康日記 BVuYh）。帯の指定より後に置く。 */
+/* 小さい帯の「9.8 → 9.2 kg」のような幅の要る数は1段小さく（18）し、横の余白も詰めて切れないようにする（健康日記 ）。帯の指定より後に置く。 */
 :root .strip .card[data-kpi-density='compact'][data-kpi-range] { padding-inline: 12px; }
 :root .strip .card[data-kpi-density='compact'][data-kpi-range] .number { font-size: 18px; }

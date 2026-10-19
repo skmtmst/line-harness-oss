@@ -6,7 +6,7 @@ interface AffiliateRewardInput {
 }
 
 /**
- * V6 has two mutually exclusive payout modes.
+ * 管理画面 has two mutually exclusive payout modes.
  *
  * A positive commission rate means percentage payout. Otherwise, the fixed
  * reward already calculated from approved conversions and offer reward amounts

@@ -1,4 +1,4 @@
-import type { RichMenuPublishRun } from '../../api-rich-menu-publish-types'
+import type { RichMenuPublishRun } from './rich-menu-publish-types'
 
 export type FormDeleteImpact = {
   form: {

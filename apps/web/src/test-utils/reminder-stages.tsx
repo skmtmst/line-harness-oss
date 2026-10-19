@@ -1,6 +1,6 @@
 import React from 'react'
 import type { ReminderDraftSettings, ReminderDraftVersion, ReminderPreviewResult, ReminderPublishResult, ReminderValidationResult } from '@line-crm/shared'
-import ReminderEditV8, { TargetStageV8, ScheduleStageV8, ConfirmStageV8, DoneStageV8 } from '@/v8/reminders/edit'
+import { ReminderEditV8, TargetStageV8, ScheduleStageV8, ConfirmStageV8, DoneStageV8 } from '@/v8/reminders/public/edit/index'
 import type { ReminderTestRecipientView } from '@/components/reminders/use-reminder-test-recipient'
 
 // 旧フローの動作試験を現役の描画へつなぐ。値や動きはここに実装しない。

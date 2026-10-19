@@ -2,7 +2,7 @@ import { PAYMENT_METHOD_ONSITE as METHOD_ONSITE, PAYMENT_STATUS as STATUS, payme
 import type { StatusBadgeTone } from './status-badge'
 
 /*
- * 支払いの札の言葉と色（B-338・2026-10-16 オーナー「おすすめで」）。管理画面・LIFF・確かめの窓で同じ 1 か所を使う。
+ * 支払いの札の言葉と色（・2026-10-16 オーナー「おすすめで」）。管理画面・LIFF・確かめの窓で同じ 1 か所を使う。
  * 正本は @line-crm/shared の payment-status（LIFF も同じ物を読む）。ここは管理画面の StatusBadge の色の型で読み直すだけ。
  * 支払いの状態は 4 つ（未払い・支払い済み・返金済み・期限切れ）だけ。お店で払うのは状態ではなく払い方なので別の札。
  */

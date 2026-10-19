@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 運営ログインの V8（板 D9JALJ・src/v8/ops/login.tsx）。
+ * 運営ログインの V8（板 ・src/v8/ops/login.tsx）。
  * 絵（2026-10 版）どおり、ログインの下に「または」の区切りと LINE でログイン。
  * パスワードを忘れた方への入口と招待の案内はカードの下。
  */

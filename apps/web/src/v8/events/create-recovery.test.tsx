@@ -31,7 +31,7 @@ beforeEach(() => {
 afterEach(cleanup)
 
 function fill(){fireEvent.change(screen.getByLabelText('イベント名'),{target:{value:'元の名前'}});fireEvent.change(screen.getByLabelText('定員'),{target:{value:'2'}});}
-it('B-246 実画面: 枠失敗は公開済みの本体と残りを分け、変更は取得済みの版で更新する',async()=>{
+it('実画面: 枠失敗は公開済みの本体と残りを分け、変更は取得済みの版で更新する',async()=>{
  createEvent.mockResolvedValue({id:'fixture-event',version:1,is_published:1});updateEvent.mockResolvedValue({id:'fixture-event',version:2,is_published:1});createSlots.mockRejectedValueOnce(new Error('fixture slots offline')).mockImplementation(async (_account, eventId, slots) => ({ items: [{ ...slots[0], id: 'fixture-slot', event_id: eventId, version: 1 }] }));
  render(<EventsCreate/>);fill();fireEvent.click(screen.getByRole('button',{name:'公開する'}));
  expect(createEvent).not.toHaveBeenCalled();

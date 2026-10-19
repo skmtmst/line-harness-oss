@@ -27,9 +27,9 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 広告への送信履歴（Pencil `p0kA3`・`/inflow-links?tab=connections&view=history`）。
+ * ★V8 広告への送信履歴（Pencil ・`/inflow-links?tab=connections&view=history`）。
  *
- * 2026-10-07 src/v8 に一から書いた（今の V8 は 18%）。頭は広告連携（qSTVR）と同じ形。
+ * 2026-10-07 src/v8 に一から書いた（今の V8 は 18%）。頭は広告連携と同じ形。
  * 本文（間14）：道具の段（探す・状態・媒体・件数）→ 表（いつ・何の成果／媒体／流入元／状態／次の予定／操作）→ 注。
  * 呼ぶ口：媒体の一覧・送信記録のページ（今と同じ）、断られた1件のやり直し `POST /api/ad-platforms/logs/:id/retry`（F-22・owner）。
  * BEHAVIOR.md の「広告への送信履歴」。

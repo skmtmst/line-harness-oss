@@ -1,8 +1,8 @@
 
 /*
- * ★V8-B 運用状態の緊急コントロール（板 `OHwbU`）。
+ * ★V8-B 運用状態の緊急コントロール（板 ）。
  *
- * v7 の制御タブ（`page.tsx` 内の EmergencyControlPanel）とは別の部品として持つ。
+ * 管理画面 の制御タブ（`page.tsx` 内の EmergencyControlPanel）とは別の部品として持つ。
  * データの口・確認の言葉・本人確認・二重押し防止・競合の戻し方は同じ。
  * 違いは置き場と見せ方だけ——上に4枚の数の帯、何を止めますか・
  * 止めるアカウントのカード、止めているときの赤い帯、止めるとどうなるか・
@@ -59,7 +59,7 @@
 .accountRow {
   display: flex;
   flex-wrap: wrap;
-  /* ［選んだものを止める］は欄（題の下の選ぶ欄）と同じ高さにそろえる（絵 OHwbU）。 */
+  /* ［選んだものを止める］は欄（題の下の選ぶ欄）と同じ高さにそろえる。 */
   align-items: flex-end;
   justify-content: space-between;
   gap: var(--tpl-rest3-em-row-gap);

@@ -34,7 +34,7 @@ import type {
 import { ApiError } from '../transport/errors'
 
 export const opsMethods = {
-/** 運営コンソール（★V6 37）。形は `apps/worker/src/routes/ops.ts`。 */
+/** 運営コンソール（★管理画面 37）。形は `apps/worker/src/routes/ops.ts`。 */
   ops: {
     me: () => fetchApi<ApiResponse<OpsMe>>('/api/ops/me'),
     tenants: (params?: { q?: string; status?: string }) => {
@@ -77,7 +77,7 @@ export const opsMethods = {
       fetchApi<ApiResponse<{ staffId: string; activationState: OpsMemberActivationState }>>(`/api/ops/members/${encodeURIComponent(staffId)}/resend-invite`, { method: 'POST', body: JSON.stringify({}) }),
     setMemberActive: (staffId: string, isActive: boolean) =>
       fetchApi<ApiResponse<{ staffId: string; isActive: boolean }>>(`/api/ops/members/${encodeURIComponent(staffId)}`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
-    /** ダッシュボード ★V6 37-2。 */
+    /** ダッシュボード ★管理画面 37-2。 */
     dashboard: (period?: OpsDashboardPeriod) =>
       fetchApi<ApiResponse<OpsDashboard>>(`/api/ops/dashboard${period ? `?period=${period}` : ''}`),
     billingSync: async (months = 12) => {
@@ -93,7 +93,7 @@ export const opsMethods = {
       }
     },
     lineUnregistered: () => fetchApi<ApiResponse<OpsLineUnregistered>>('/api/ops/dashboard/line-unregistered'),
-    /** 運営専用ナレッジ ★V6 37-11。 */
+    /** 運営専用ナレッジ ★管理画面 37-11。 */
     knowledge: {
       list: (params: { q?: string; kind?: string; articleKind?: string; state?: string; offset?: number } = {}) => {
         const query = new URLSearchParams()
@@ -112,7 +112,7 @@ export const opsMethods = {
       process: (requestId: string) =>
         fetchApi<ApiResponse<NonNullable<OpsSupportDetail['knowledge']>>>(`/api/ops/knowledge/tickets/${encodeURIComponent(requestId)}/process`, { method: 'POST' }),
     },
-    /** お知らせ配信 ★V6 37-7。 */
+    /** お知らせ配信 ★管理画面 37-7。 */
     announcements: {
       list: () => fetchApi<ApiResponse<OpsAnnouncement[]> & { linked: { linked: number; total: number }; noticeLineConfigured: boolean }>('/api/ops/announcements'),
       preview: (input: { audienceKind: OpsAnnouncementAudience; audiencePlans: string[]; audienceTenantIds: string[] }) =>
@@ -136,7 +136,7 @@ export const opsMethods = {
     noticeLineAccount: () => fetchApi<ApiResponse<OpsNoticeLineAccount>>('/api/ops/notice-line-account'),
     setNoticeLineAccount: (lineAccountId: string | null) =>
       fetchApi<ApiResponse<{ currentId: string | null }>>('/api/ops/notice-line-account', { method: 'PUT', body: JSON.stringify({ lineAccountId }) }),
-    /** お問い合わせ（チケット）★V6 37-6。 */
+    /** お問い合わせ（チケット）★管理画面 37-6。 */
     support: {
       summary: () => fetchApi<ApiResponse<OpsSupportSummary>>('/api/ops/support/summary'),
       tickets: (params?: { stage?: OpsSupportStage | 'all'; priority?: OpsSupportPriority; q?: string; sort?: 'newest' | 'oldest' | 'priority'; limit?: number; offset?: number }) => {

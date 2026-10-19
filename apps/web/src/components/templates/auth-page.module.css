@@ -38,7 +38,7 @@
 .detailValue h3 { margin: 0; color: var(--color-ink-secondary); font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); }
 .detailValue strong { color: var(--color-ink); font-size: var(--polish-text-body); font-weight: var(--font-weight-bold); }
 
-/* 絵 tOPeY（運営のログイン 2段目）：窓は余白28・段の間14・浮いた影。題は左寄せで、ページの頭の余白を持ち込まない。 */
+/* 絵 （運営のログイン 2段目）：窓は余白28・段の間14・浮いた影。題は左寄せで、ページの頭の余白を持ち込まない。 */
 .card[data-auth-layout='ops'] { padding: 28px; gap: 14px; box-shadow: var(--shadow-float); }
 .card[data-auth-layout='ops'] > header { padding: 0; }
 .card[data-auth-layout='ops'] h1 { text-align: left; }

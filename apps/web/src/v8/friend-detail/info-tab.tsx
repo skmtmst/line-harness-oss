@@ -22,7 +22,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import AllergyField from '@/components/shared/allergy-field'
 
 /*
- * 情報欄タブ（Q5F2QE の 4.）。その人について決めた項目を2列に並べ、最後に1回保存する。
+ * 情報欄タブ（ の 4.）。その人について決めた項目を2列に並べ、最後に1回保存する。
  * 分類（すべて・基本・フォルダ）は URL の group で選ぶ（FRIEND-21・今と同じ指定）。
  * 権限が無い人は欄を読み取りだけにし、保存ボタンを置かずに理由だけ出す（N-045）。
  */
@@ -36,7 +36,7 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
   value: string
   onChange: (v: string) => void
   disabled: boolean
-  /** ほかの値から計算した値（年齢＝生年月日から）。灰色の読むだけの欄で見せる（絵 vX3wQ）。 */
+  /** ほかの値から計算した値（年齢＝生年月日から）。灰色の読むだけの欄で見せる。 */
   computed?: boolean
   id: string
 }) {
@@ -60,7 +60,7 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
     const ymd = field.type === 'date' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null
     // 日付はほかの日付の欄と同じ「2026年9月15日（火）」の書き方で見せる。
     const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : ymd ? formatDateLabel(new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))) : (value || emptyValue('unconfigured'))
-    // EC が正本の値は、年齢と同じ灰色の読むだけの欄にする（絵 vX3wQ）。
+    // EC が正本の値は、年齢と同じ灰色の読むだけの欄にする。
     return <SaveErrorField names={["shown"]}><TextField id={id} value={shown} readOnly disabled={!!field.ecIsMaster} aria-readonly="true" aria-label={`${field.name}の値`} title={shown} /></SaveErrorField>
   }
   if (field.type === 'select') {
@@ -119,7 +119,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
   const groupName = (key: string) => key === 'basic' ? '基本（決まった欄）' : key === 'dining' ? '飲食の情報' : key === 'unfiled' ? '未分類' : fieldFolders.find(folder => folder.id === key)?.name ?? '分類'
   /* 読み上げ名（区切りの名前）は今までどおり。 */
   const groupAria = (key: string) => key === 'basic' ? '基本' : key === 'dining' ? '飲食の情報' : `お店が作った項目（${groupName(key)}）`
-  /* vX3wQ：題の横の補足。決まった欄は回答フォームの答え、ほかはお店が作った項目。 */
+  /* ：題の横の補足。決まった欄は回答フォームの答え、ほかはお店が作った項目。 */
   const groupNote = (key: string) => key === 'basic' ? '回答フォームの答えが入ります' : key === 'dining' ? '飲食を使うアカウントの決まった欄' : 'お店が作った項目・分類ごとに出ます'
   const firstShopGroup = groups.find(key => key !== 'basic' && key !== 'dining')
   // 「情報欄を管理」はお店が作った分類の頭に出す。お店の分類が無いときは最初の分類の頭に出す。

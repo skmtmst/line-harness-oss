@@ -1,4 +1,4 @@
-/* ★V8-B 統括のテンプレート（LRc93・X4JcOf・meBRB）。
+/* ★V8-B 統括のテンプレート（・・）。
    寸法は app/globals.css の [data-theme="v8"] の --tpl-htn-* に1か所。ここには数字を書かない。 */
 
 .body { display: flex; flex-direction: column; gap: var(--tpl-htn-gap); padding: var(--tpl-htn-body-pad); min-width: 0; color: var(--color-ink); }
@@ -74,7 +74,7 @@
 .modePick :global(*) { max-width: 100%; }
 .tableNote { margin: 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 
-/* 作る（X4JcOf） */
+/* 作る */
 .editSplit { display: flex; align-items: flex-start; gap: var(--tpl-htn-edit-gap); }
 .editPanel {
   flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-htn-panel-gap); padding: var(--tpl-htn-panel-pad);
@@ -125,7 +125,7 @@
 .previewCopy span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
 .previewAction { padding: var(--tpl-htn-preview-action-pad); text-align: center; box-shadow: var(--tpl-htn-line-top); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); font-weight: 700; color: var(--tpl-htn-line-green); }
 
-/* 配る（meBRB） */
+/* 配る */
 .progressPanel {
   display: flex; flex-direction: column; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn-progress-pad);
   border-radius: var(--tpl-htn-radius-l);
@@ -135,7 +135,7 @@
 }
 .progressPanel h2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; }
 .progressRow { display: flex; align-items: center; gap: var(--tpl-htn-panel-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); }
-/* 絵（meBRB）：棒は高さ 8・地は薄い灰（#fafafc）。 */
+/* 絵：棒は高さ 8・地は薄い灰（#fafafc）。 */
 .progressTrack { flex: 1; height: var(--tpl-htn-dist-progress-h); border-radius: var(--tpl-htn-radius-pill); background: var(--tpl-htn-soft-bg); overflow: hidden; }
 .progressFill { display: block; height: 100%; border-radius: var(--tpl-htn-radius-pill); background: var(--color-accent-deep); }
 
@@ -145,7 +145,7 @@
   padding: var(--tpl-htn-footer-pad); background: var(--color-canvas); box-shadow: var(--tpl-htn-line-top);
 }
 
-/* 配った結果の窓（dEvJM）：名前 200・文・札。行は下に線、上下 8。窓の下の帯は薄い地。 */
+/* 配った結果の窓：名前 200・文・札。行は下に線、上下 8。窓の下の帯は薄い地。 */
 .resultSummary { margin: var(--tpl-htn-result-summary-pull) 0 0; font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-17); color: var(--color-ink-secondary); }
 .resultList { display: flex; flex-direction: column; align-self: stretch; }
 .resultRow { display: flex; align-items: center; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn-result-row-pad); box-shadow: var(--tpl-htn-line-bottom); }
@@ -158,7 +158,7 @@
   .listToolbar { margin-left: 0; }
   .listArea { padding-left: var(--tpl-htn-list-pad-narrow); }
 }
-/* 絵（dEvJM）は中身の最後と下の線の間が 14。窓の中身の下の余白（24）から詰める。 */
+/* 絵は中身の最後と下の線の間が 14。窓の中身の下の余白（24）から詰める。 */
 .resultList:last-child, .resultBand { margin-bottom: var(--tpl-htn-result-summary-pull); }
 
 /* G-4：列と畳む段は一覧の型に任せる。 */

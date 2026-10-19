@@ -8,7 +8,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => 
 
 import NotFoundV8 from './not-found'
 
-/** ★V8 見つからない画面（板 Nx5dz）。戻る道を2つ（前のページ・ダッシュボード）出す。 */
+/** ★V8 見つからない画面（板 ）。戻る道を2つ（前のページ・ダッシュボード）出す。 */
 describe('見つからない画面（V8）', () => {
   it('題・説明・前のページへ戻る（副）・ダッシュボードへ（主）', () => {
     const host = document.createElement('div')

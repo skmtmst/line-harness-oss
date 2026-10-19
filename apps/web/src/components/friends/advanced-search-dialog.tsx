@@ -1,6 +1,6 @@
 'use client'
 
-import { memberRanksApi } from '@/lib/api-gap3';
+import { memberRanksApi } from '@/lib/api/helpers/gap3';
 import { useOverlayLayer } from '@/components/shared/overlay-utils';
 import TagOverflow from '@/components/shared/tag-overflow';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
@@ -113,7 +113,7 @@ export default function AdvancedSearchDialog({
   const marksFeatureEnabled = features?.marks !== false
   const fieldsFeatureEnabled = features?.fields !== false
   const [blocks, setBlocks] = useState<Block[]>(() => defaultBlocks(fieldsFeatureEnabled))
-  /* ★V8 fmToi：会員ランクの段の候補。ランクを動かしていない店では空。 */
+  /* ★V8 ：会員ランクの段の候補。ランクを動かしていない店では空。 */
   const [rankTiers, setRankTiers] = useState<Array<{ id: string; name: string }>>([])
   useEffect(() => {
     if (!open || !accountId) return

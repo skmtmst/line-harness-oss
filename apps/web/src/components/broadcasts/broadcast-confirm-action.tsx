@@ -1,7 +1,7 @@
 'use client'
 
 import { ApiError,api,describeSaveFailure,type ApiBroadcast } from '@/lib/api'
-import { chatSafetyApi } from '@/lib/api-gap1'
+import { chatSafetyApi } from '@/lib/api/helpers/gap1'
 import type { SendConfirmationPreview } from '@line-crm/shared'
 import type { Dispatch,SetStateAction } from 'react'
 

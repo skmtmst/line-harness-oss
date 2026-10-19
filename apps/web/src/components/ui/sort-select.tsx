@@ -25,9 +25,9 @@ export default function SortSelect({
   value: string
   onChange: (value: string) => void
   className?: string
-  /** 板 `apLqS` は「並び：」。他は今のまま。 */
+  /** 板  は「並び：」。他は今のまま。 */
   label?: string
-  /** 'text' で枠なし文字＋上下矢印（x6QsVz の並び替え）。v8 だけ。 */
+  /** 'text' で枠なし文字＋上下矢印（ の並び替え）。v8 だけ。 */
   treatment?: 'box' | 'text'
 }) {
 

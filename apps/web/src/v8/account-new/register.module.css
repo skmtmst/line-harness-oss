@@ -1,4 +1,4 @@
-/* ★V8-B LINEアカウントを登録（xj3zz・JYfda・GwKE2・v2KMj・TvXII・qw80E）。
+/* ★V8-B LINEアカウントを登録（・・・・・）。
    寸法は app/globals.css の [data-theme="v8"] の --tpl-htn-* に1か所。ここには数字を書かない。 */
 
 .body {
@@ -75,7 +75,7 @@
 
 /* 下の帯：本文のすぐ下に置き、長いときは画面の下に追従する。ボタンは中央。 */
 
-/* 結果の窓（qw80E） */
+/* 結果の窓 */
 .result {
   align-self: stretch; display: flex; flex-direction: column; gap: var(--tpl-htn-result-gap);
   margin: var(--tpl-htn-result-pull-top) 0 var(--tpl-htn-result-pull-bottom);

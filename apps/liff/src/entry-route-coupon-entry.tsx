@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import EntryRouteCoupon from './pages/EntryRouteCoupon.js';
+import EntryRouteCoupon from './pages/entry-route-coupon.js';
 import { setLiffContext } from './lib/liff-auth.js';
 import './index.css';
 

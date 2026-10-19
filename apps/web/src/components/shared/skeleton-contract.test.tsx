@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
- * ★V7 仕上げ「読み込みと初回表示の動き」の契約（`z97zZN` §1・§3 / `sTJsh` §2）。
+ * ★管理画面 仕上げ「読み込みと初回表示の動き」の契約（`z97zZN` §1・§3 / `sTJsh` §2）。
  *
  * - §3 骨組み：0.3 秒以内に来たら出さない・出したら最低 0.4 秒。
  *   明滅は不透明度 1↔0.55・1.2 秒、光が流れる演出は無し。
@@ -25,7 +25,7 @@ const GLOBALS = readFileSync(join(HERE, '../../app/globals.css'), 'utf8')
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
 const FRIENDS_PAGE = readFileSync(join(HERE, '../../app/friends/page.tsx'), 'utf8')
 const FRIENDS_TABLE = readFileSync(join(HERE, '../friends/friend-list-table.tsx'), 'utf8')
-/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+/* 完全切り替え：管理画面 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
 // シナリオの入口は src/v8/scenarios/list.tsx（古い app/scenarios/list-v8.tsx はもう描かれない）。
 const SCENARIOS_PAGE = readFileSync(join(HERE, '../../v8/scenarios/list.tsx'), 'utf8')
 const SERVER_LIST = readFileSync(join(HERE, '../../lib/use-server-list.ts'), 'utf8')

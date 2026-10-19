@@ -29,7 +29,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 
 
 /*
- * ★V8 オートメーションの見本（Pencil `c7dxp`・`/automations?tab=templates`）。
+ * ★V8 オートメーションの見本（Pencil ・`/automations?tab=templates`）。
  *
  * 2026-10-07 src/v8 に一から書いた（今の V8 は 8%）。データの口・下書きを作る動き・権限・失敗時の扱いは
  * 今までの V8（app/automations/templates-v8.tsx）と同じ（BEHAVIOR.md）。違いは見せ方だけ——

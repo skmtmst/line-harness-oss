@@ -9,7 +9,7 @@ import { qrToDataURL } from '@/lib/qr-image'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
-import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '@/app/login/two-factor/two-factor-error'
+import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '@/v8/login/two-factor/two-factor-error'
 
 import { Steps } from '@/components/templates/steps'
 import { AuthPage, AuthForm } from '@/components/templates/auth-page'

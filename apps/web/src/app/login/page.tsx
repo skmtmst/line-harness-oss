@@ -27,7 +27,7 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
 const EMPTY_PASSWORD_MESSAGE = 'パスワードを入力してください'
 
 /**
- * ログイン。★V6 0-1（`UufG8`、カード `m3tWJ`）。
+ * ログイン。★管理画面 0-1（`UufG8`、カード `m3tWJ`）。
  *
  * メール＋パスワードが主、LINE ログインが副（決定 2026-09-13）。
  * 既存の権限者は今までどおり LINE で入れる。二段階認証を有効にしている人は

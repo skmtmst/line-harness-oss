@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
-import { splitCsvRecords } from '@/app/friends/migrations/friend-csv'
+import { splitCsvRecords } from '@/v8/friends/public/migrations-friend-csv/index'
 import { formatNumber } from '@/lib/format'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
@@ -91,7 +91,7 @@ export type UidMigrationDecision = 'link' | 'create' | 'exclude'
 
 /**
  * UID移行（/accounts?tab=migration）の状態と操作をまとめたフック。
- * v7 の表示（migration.tsx）と V8 の表示（uid-migration-v8.tsx）の
+ * 管理画面 の表示（migration.tsx）と V8 の表示（uid-migration-v8.tsx）の
  * 両方がこの口を使う。判断・実行・切り戻しの権限と失敗時の
  * 扱い（TECH-07/FRIEND-14/33/36）はここで一元管理する。
  */

@@ -3,8 +3,8 @@
 import { useUrlTab } from '@/lib/use-url-tab'
 
 /*
- * ★V8 予約枠・在庫（板 `Y8SjT2`・媒体を閉じる知らせ `Yyw6i`・予約経路の連携 `hQQlt`・競合 `qf3ky`・
- * 休業日・貸切 `UVnvR`／足す窓 `nVvXy`）。
+ * ★V8 予約枠・在庫（板 `Y8SjT2`・媒体を閉じる知らせ ・予約経路の連携 `hQQlt`・競合 ・
+ * 休業日・貸切 ／足す窓 ）。
  *
  * 板の頭 → 検証環境の帯 → タブ（時間帯ごとの在庫／予約経路の連携／休業日・貸切）→ 中身。
  * 「休業日・貸切」は絵（提案 E-10）どおり、頭の「？」が「店舗 ・ 総数」の説明（題の下に行は出さない）と［＋臨時休業・貸切を足す］になり、検証環境の帯を出さない。
@@ -18,11 +18,11 @@ import ListState from '@/components/shared/list-state'
 import { Tabs } from '@/components/shared/tabs'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import RestaurantShell, { type RestaurantV8Context } from '../booking-kit/shell'
-import ClosuresBoard from '../closures/closures'
-import type { ClosureDialogTarget } from '../closures/closure-dialog'
-import { todayIn } from '../closures/format'
-import { canWriteRole } from '../dashboard/summarize'
+import { RestaurantShell, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { ClosuresBoard } from '@/v8/restaurant/closures/public/closures/index'
+import type { ClosureDialogTarget } from '@/v8/restaurant/closures/public/closure-dialog/index'
+import { todayIn } from '@/v8/restaurant/closures/public/format/index'
+import { canWriteRole } from '@/v8/restaurant/dashboard/public/summarize/index'
 import StockBoard from './stock'
 import ChannelsBoard from './channels'
 import styles from './inventory.module.css'

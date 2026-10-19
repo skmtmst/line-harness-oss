@@ -37,7 +37,7 @@ import { REMINDER_TOKENS,exampleSendAt,formatJpDay,formatMd,formatShort,sampleBa
 import styles from './edit.module.css'
 import { PhoneV8,WizardFooterV8 } from './ui'
 
-/* ---------------- 手順3：通知の中身（p5YuP・1152 は r1l0bT） ---------------- */
+/* ---------------- 手順3：通知の中身（・1152 は ） ---------------- */
 export const MAX_STEPS = 10
 
 export const BODY_LIMIT = 5000
@@ -55,7 +55,7 @@ export function MessagesStageV8({
 }: {
   frame: StageFrame
   notice: ReactNode
-  /** 1152 の板（r1l0bT）：右の列は「LINEでの見え方を見る」と例だけにし、スマホは横から出す。 */
+  /** 1152 の板：右の列は「LINEでの見え方を見る」と例だけにし、スマホは横から出す。 */
   narrow: boolean
   settings: ReminderDraftSettings
   onChange: (value: ReminderDraftSettings) => void
@@ -305,7 +305,7 @@ export function FieldInsert({ fields, onInsert }: { fields: FriendField[]; onIns
 export type TimingUnit = 'day' | 'hour' | 'min'
 
 /**
- * 「基準日の [1] [日] [前] の [18:00]」の入力行（絵 p5YuP・r1l0bT）。
+ * 「基準日の [1] [日] [前] の [18:00]」の入力行。
  * 日で書く通（○日前の●時）と、時間・分で書く通（1時間前など）を単位で切り替える。
  * 日 → 時間・分にすると時刻は外れ、分の数で持つ。逆は 9:00 を入れる。
  */

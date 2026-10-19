@@ -7,7 +7,7 @@
 :root .row [data-skeleton] { display: block; background-color: var(--color-shell-gray); border-radius: 4px; }
 :root .row .face { border-radius: 50%; }
 
-/* B-152・仕上げ8 */
+/* ・仕上げ8 */
 .list { width: 100%; min-width: 0; }
 .listRow { display: flex; align-items: center; gap: var(--polish-space-section); height: var(--tpl-list-row-h); padding: 0 var(--polish-space-section); box-shadow: var(--shadow-row-line); }
 .listRow:last-child { box-shadow: none; }

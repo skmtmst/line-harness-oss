@@ -1,4 +1,4 @@
-/** B-177: 行き先の形と幅は共通部品が持つ。 */
+/** : 行き先の形と幅は共通部品が持つ。 */
 export const DIALOG_WIDTHS = [480, 560, 720, 960] as const
 export const CONFIRM_WIDTH = 480
 export const PICKER_WIDTH = 640

@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
-import Icon from './Icon';
-import styles from './Button.module.css';
+import Icon from './icon';
+import styles from './button.module.css';
 
 /**
  * ★V8 のボタン。主 (濃い緑・白文字・高さ48) は1画面に1つだけ置く。

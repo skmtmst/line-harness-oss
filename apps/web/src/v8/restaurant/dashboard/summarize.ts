@@ -3,8 +3,8 @@
  */
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { isWalkIn } from '../front-desk/walk-in'
-import { pad2, tableBusy } from '../front-desk/slots'
+import { isWalkIn } from '@/v8/restaurant/front-desk/public/walk-in/index'
+import { pad2, tableBusy } from '@/v8/restaurant/front-desk/public/slots/index'
 import type { StoreMedium } from './use-store-today'
 
 const INACTIVE = ['cancelled', 'no_show']

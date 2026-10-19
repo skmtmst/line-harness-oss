@@ -1,6 +1,6 @@
 'use client'
 import { api, type ChatDetail as ApiChatDetail, type ChatDetailMessage } from '@/lib/api';
-import { useChatSearch } from '@/v8/inbox-search/use-chat-search';
+import { useChatSearch } from '@/v8/inbox-search/public/use-chat-search/index'
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CHAT_SEARCH_FILL_MAX_ROUNDS, CHAT_SEARCH_FILL_PAGE } from './inbox-model';
@@ -18,7 +18,7 @@ type Options = {
 export function useInboxSearch({ chatDetail, messagesHasMore, selectedChatIdRef, detailAccountRef, setChatDetail, setMessagesHasMore, setError }: Options) {
 
   /*
-   * 会話の中を探す（V8.pen M0393 段13・枠 v7GV2、2026-10-07 オーナー採用）。V8 の画面だけ。
+   * 会話の中を探す（V8.pen  段13・枠 、2026-10-07 オーナー採用）。V8 の画面だけ。
    * 🔍 か ⌘F で頭の下に帯を出し、当たった吹き出しへ移る。
    * 当たりがまだ読み込んでいない昔の吹き出しなら、いま読んでいる最古の1件から
    * その当たりまでを会話詳細の口で続けて読み足してから移る。読んだ分は新しい方から

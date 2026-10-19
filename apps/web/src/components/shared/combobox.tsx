@@ -75,7 +75,7 @@ export default function Combobox({
   placeholder,
   value,
 }: ComboboxProps) {
-  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る。
   const field = useFieldContext()
   const invalid = Boolean(error) || Boolean(field?.invalid)
   const generatedId = useId()

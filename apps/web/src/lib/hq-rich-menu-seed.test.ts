@@ -1,5 +1,5 @@
 /*
- * 統括のリッチメニューを店の作る画面で作る口（B-36・gobhu〜gQabc）：画面の中の下書き ↔ 統括のひな形の定義。
+ * 統括のリッチメニューを店の作る画面で作る口（・gobhu〜gQabc）：画面の中の下書き ↔ 統括のひな形の定義。
  */
 import { describe, expect, it } from 'vitest'
 import { tapActionLiffUrl } from './tap-actions'

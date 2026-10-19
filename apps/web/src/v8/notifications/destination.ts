@@ -11,7 +11,7 @@ export function notificationDestination(item: NotificationCenterItem): string {
   return dashboardNotificationDestination(item)
 }
 
-/** 行の右に出す「どこへ移るか」の言葉（絵 y8QQV の「EC連携を開く →」など）。 */
+/** 行の右に出す「どこへ移るか」の言葉（「EC連携を開く →」など）。 */
 export function notificationLinkLabel(item: NotificationCenterItem): string {
   const to = notificationDestination(item)
   if (to.startsWith('/ec-commerce')) return 'EC連携を開く'

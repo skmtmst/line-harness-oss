@@ -4,7 +4,7 @@ import AuthCard from '@/components/auth/auth-card'
 import PlatformNotices from '@/components/hq/platform-notices'
 import Button from '@/components/shared/button'
 
-/** 契約先の利用停止案内。V6正本 `CXFjb9` が唯一の見た目の正本。 */
+/** 契約先の利用停止案内。管理画面正本 `CXFjb9` が唯一の見た目の正本。 */
 export default function TenantSuspended() {
   return (
     <AuthCard

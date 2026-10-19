@@ -172,7 +172,7 @@ describe('タグ V4 contract', () => {
 
   it('空・読込・エラー・権限不足を言い分ける', () => {
     const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
-    // 設計 ★V6 4-2-C `yKEdO`。共通部品に寄せる（自前で組むと画面ごとにずれる）。
+    // 設計 ★管理画面 4-2-C `yKEdO`。共通部品に寄せる（自前で組むと画面ごとにずれる）。
     expect(source).toContain("import ListState from '@/components/shared/list-state'")
     expect(source).toContain('<DelayedSkeleton loading={!ready}')
     expect(source).toContain("status === 'forbidden'")
@@ -338,7 +338,7 @@ describe('タグ V4 contract', () => {
 
   it('タグ編集の削除確認は参照件数の実値を出し、取れなければ押せなくする', () => {
     const source = read('components/friend-fields/edit-tag-page-v4.tsx') + read('v8/tag-edit/edit.tsx')
-    // `load()` で取った `dependencies` を窓へ渡す。固定値を書かない。
+    // `load` で取った `dependencies` を窓へ渡す。固定値を書かない。
     expect(source).toContain('api.tags.dependencies(tagId, selectedAccountId)')
     expect(source).toContain('dependencies={dependencies} dependenciesStatus={dependenciesStatus}')
     expect(source).not.toMatch(/参照<\/dt><dd[^>]*>3件/)

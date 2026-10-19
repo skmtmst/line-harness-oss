@@ -1,26 +1,9 @@
-import type { StarterSetItem } from '@/lib/api-styles'
-import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
+import type { IconKey, Choice, Question } from './question-types'
+export type { IconKey, Choice, Question } from './question-types'
+import type { StarterSetItem } from '@/lib/api/helpers/styles'
+import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
 import { bookingHost, styleTerm } from '@/lib/terms'
 import { Q } from './setup-questions'
-
-
-/*
- * はじめの質問（B-313）と初期セット（B-311）の決まりを画面から切り離した表。
- * 絵：修正案 DIHFx の列 VHp7p（xxpM9・RZW83・lS1Gh・rJ36f・oKSsG・Bdfxm）。
- * 口：組4（`lib/api-styles.ts` の styleApi）。質問のキーは口の `questionKeys`
- * （image/booking/approval/payment/reminders/stamps/coupons/tickets/outcome/content）だけ。口に無い質問は置かない（未定は入れない）。
- *
- * - どの質問にも「あとで設定する」「手動で設定する」がある（B-313 追記）。あとで＝何も入れない・
- *   はじめにやることに残る。手動＝その設定の画面へ案内する。
- * - おすすめの答えは業種ごとに先に選んでおく（飛ばしても困らない）。
- * - どの質問にも「あとから変えられます（どこで）」を出す。
- */
-
-export type IconKey =
-  | 'utensils' | 'scissors' | 'messages' | 'graduation' | 'bag' | 'grid'
-  | 'sparkles' | 'image' | 'folder' | 'download' | 'hourglass' | 'settings'
-  | 'circleCheck' | 'userCheck' | 'store' | 'card' | 'split' | 'calendarCheck' | 'clock' | 'bell' | 'bellOff'
-  | 'stamp' | 'ticket' | 'ban' | 'users' | 'user' | 'file'
 
 export const STYLE_CHOICES: ReadonlyArray<{ value: AccountStyle; icon: IconKey; label: string; note: string }> = [
   { value: 'restaurant', icon: 'utensils', label: styleTerm('restaurant', 'V01'), note: '席・コースの予約、前日のお知らせ、来店スタンプ' },
@@ -35,45 +18,6 @@ export function styleLabel(style: AccountStyle): string {
   return STYLE_CHOICES.find((choice) => choice.value === style)?.label ?? '標準'
 }
 
-/** 1問の選択肢。value は画面の値（'true'/'false' は口へ真偽で送る）。 */
-export type Choice = {
-  value: string; icon: IconKey; label: string; note: string
-  /** 口へ送る値が画面の値と違うとき（承認の「manual」は「手動で設定する」と同じ値になるので画面では分ける）。 */
-  apiValue?: string
-}
-
-export type Question = {
-  /** 口の質問キー。 */
-  key: string
-  /** 左の一覧と進みの右に出す短い名前。 */
-  short: string
-  title: string
-  description: string
-  choices: Choice[]
-  /** スタイルごとのおすすめ（無ければ最初の選択肢）。 */
-  recommended?: Partial<Record<AccountStyle, string>>
-  /** 「あとから変えられます（ここ）。」の（）の中。 */
-  where: string
-  /** 手動で設定するときに開く画面と、そのカードの説明。 */
-  manualHref: string
-  manualNote: string
-  /** 選んだ答えに付ける帯（お支払いの Stripe の案内など）。 */
-  info?: string
-  /** あとで設定したとき、はじめにやること・最後の一覧に出す文。 */
-  todo: { title: string; note: string; action: string }
-  /** 最後の一覧「入れなかった物」の説明。無ければ todo.note。 */
-  skipped?: string
-  /** 最後の一覧「入れなかった物」の題。無ければ short。 */
-  skippedTitle?: string
-  /** 設定の画面がまだ無いときの機能の名前。押すと準備中の窓（B-314）。 */
-  preparing?: string
-  /**
-   * 口（組4）がまだこの質問のキーを受け付けない。答えは画面の中だけで持ち、保存しない（札「準備中」）。
-   * 口が受け付けたら、ここを外して API_QUESTION_KEYS に足すだけでつながる。
-   */
-  pendingApi?: boolean
-}
-
 /** 口が受け付ける質問のキー（組4 `questionKeys`）。保存はこのキーだけ送る。 */
 export const API_QUESTION_KEYS = ['image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'tickets', 'outcome', 'content', 'cancelDeadline', 'seats', 'hours', 'partySize', 'nomination', 'assignment', 'classCapacity'] as const
 
@@ -84,7 +28,7 @@ export function answersForApi(answers: Record<string, SetupAnswer>): Record<stri
   return out
 }
 
-/* B-313（オーナー）が正：飲食は 11 問（lS1Gh の左の一覧の並び）。予約を使うかは「予約の確定の仕方」の答えから送る。 */
+/* （オーナー）が正：飲食は 11 問（lS1Gh の左の一覧の並び）。予約を使うかは「予約の確定の仕方」の答えから送る。 */
 const BY_STYLE: Record<AccountStyle, string[]> = {
   restaurant: ['approval', 'payment', 'cancelDeadline', 'reminders', 'stamps', 'coupons', 'seats', 'hours', 'partySize'],
   salon: ['approval', 'payment', 'cancelDeadline', 'reminders', 'tickets', 'stamps', 'coupons', 'nomination', 'hours'],
@@ -147,7 +91,7 @@ export function selectedValue(answer: SetupAnswer | undefined, question?: Questi
   return answer.mode === 'configured' ? String(answer.value ?? (answer.resourceId ? 'existing' : '')) : answer.mode
 }
 
-/* ── 開き直したときの保存（B-335 (2)） ─────────────────────────── */
+/* ── 開き直したときの保存（ (2)） ─────────────────────────── */
 
 /** 予約設定に書く答え（口は approval を予約設定の承認の仕方へ書く）。 */
 export const SETTINGS_KEYS = ['approval']
@@ -173,7 +117,7 @@ export function settingsChanges(saved: Record<string, SetupAnswer>, next: Record
   return lines
 }
 
-/** 予約確定のご案内の見本（いつもの確定の知らせと重なる。B-335 (3)・点検 1-3）。 */
+/** 予約確定のご案内の見本（いつもの確定の知らせと重なる。 (3)・点検 1-3）。 */
 export function isBookingConfirmSample(item: StarterSetItem): boolean {
   return item.kind === 'automation' && (item.key === 'reminder' || item.name.includes('予約確定'))
 }

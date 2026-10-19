@@ -4,16 +4,16 @@ import { AlertCircle } from 'lucide-react'
 import type { FormFieldProblem } from '@/lib/use-form-errors'
 
 /**
- * 送信時に落ちた欄のまとめ（★V7 sTJsh §6）。
+ * 送信時に落ちた欄のまとめ（★管理画面 sTJsh §6）。
  *
  * 欄の下に出る文だけだと、長い画面ではどこを直せばいいか見失う。
  * 保存を押したときに限って上に「何か所・どの欄か」を出し、
  * 「1つ目へ」で最初の欄へフォーカスを移す。欄が直るとまとめからも消える。
  *
  * `useFormErrors` と組み合わせて使う:
- * ```tsx
- * <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} />
- * ```
+ * `tsx
+ * <ValidationSummary problems={fields.listProblems} onFocusFirst={fields.focusFirst} />
+ * `
  */
 export default function ValidationSummary({
   problems,
@@ -23,7 +23,7 @@ export default function ValidationSummary({
   problems: FormFieldProblem[]
   onFocusFirst?: () => void
   /**
-   * この数から出す。欄で知らせる画面（B-139）は 2 を渡し、直す欄が1つのときは
+   * この数から出す。欄で知らせる画面は 2 を渡し、直す欄が1つのときは
    * 欄の赤と理由だけにする（帯と欄で同じことを二度言わない）。
    */
   minProblems?: number

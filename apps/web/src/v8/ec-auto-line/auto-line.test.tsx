@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const api = vi.hoisted(() => ({
   rules: vi.fn(), sends: vi.fn(), save: vi.fn(), enableMock: vi.fn(), test: vi.fn(),
 }))
-vi.mock('@/lib/api-gap3', () => ({ ecAutoLineApi: api }))
+vi.mock('@/lib/api/helpers/gap3', () => ({ ecAutoLineApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/ec-commerce', useSearchParams: () => new URLSearchParams() }))
 
 const { default: EcAutoLine } = await import('./auto-line')

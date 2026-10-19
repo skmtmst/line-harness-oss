@@ -67,7 +67,7 @@ export function renderValueFields({ canWrite, expiryBehavior, fallbackFieldError
               aria-label="フォルダ"
               label="フォルダ"
               id="cv-folder"
-              // 右の列の幅いっぱい（絵 AYc6O）。固定 240 は列（約206）より広く、縮んで字が真ん中に寄っていた。
+              // 右の列の幅いっぱい。固定 240 は列（約206）より広く、縮んで字が真ん中に寄っていた。
               size="full"
               value={folderId}
               onChange={(next) => { setSaved(false); setFolderId(next) }}

@@ -247,7 +247,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('動画と公開期間')
   })
 
-  it('B-169：対象を選んだ後に行を追加し、下書きの帯から視聴後の動きを保存する', async () => {
+  it('対象を選んだ後に行を追加し、下書きの帯から視聴後の動きを保存する', async () => {
     nav.search = 'id=webinar-1&pane=notifications'
     await render(<WebinarEditV8 />)
     await act(async () => fireEvent.click(screen.getAllByRole('button', { name: '行うことを足す' })[0]))
@@ -261,7 +261,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(screen.getByRole('button', { name: '完了のタグ' })).toBeTruthy()
   })
 
-  it('B-169：保存に失敗しても行を残し、もう一度保存できる', async () => {
+  it('保存に失敗しても行を残し、もう一度保存できる', async () => {
     nav.search = 'id=webinar-1&pane=notifications'
     await render(<WebinarEditV8 />)
     await act(async () => fireEvent.click(screen.getAllByRole('button', { name: '行うことを足す' })[0]))
@@ -310,7 +310,7 @@ describe('V8 ウェビナーの編集', () => {
     ] })
     expect(document.body.textContent).toContain('2件保存しました')
   })
-  it('B-139 CTA：別のカードに足りない欄があると、そのカードを開いて見出しの欄へ移り、カードの行に赤い印を付ける', async () => {
+  it('CTA：別のカードに足りない欄があると、そのカードを開いて見出しの欄へ移り、カードの行に赤い印を付ける', async () => {
     nav.search = 'id=webinar-1&pane=cta'
     await render(<WebinarEditV8 />)
     await act(async () => { buttonText('CTA カードを足す')!.click() })
@@ -336,7 +336,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.querySelector('#cta-title')?.getAttribute('aria-invalid')).toBeNull()
   })
 
-  it('B-139 動画：差し替えの長さが空なら保存せず、長さの欄に理由を出して移る', async () => {
+  it('動画：差し替えの長さが空なら保存せず、長さの欄に理由を出して移る', async () => {
     nav.search = 'id=webinar-1&pane=video'
     await render(<WebinarEditV8 />)
     const before = puts.length

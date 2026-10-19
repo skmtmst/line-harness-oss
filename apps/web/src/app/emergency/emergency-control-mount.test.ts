@@ -6,7 +6,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import type { LineAccount } from '@line-crm/shared'
 import type { OperationControl, OperationImpactPreview } from '@/lib/api'
 import EmergencyScreen from '@/v8/settings/emergency/screen'
-import EmergencyControlV8 from './control-v8'
+import EmergencyControlV8 from '../../v8/emergency/control'
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => new URLSearchParams('tab=control'), usePathname: () => '/emergency' }))
 vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))

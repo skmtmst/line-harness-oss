@@ -34,14 +34,14 @@ import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { CalendarPlus,Plus,Smartphone,Trash2,UserX } from 'lucide-react'
 import { useCallback,useEffect,useMemo,useRef,useState,type ReactNode } from 'react'
-import { bookingChannelsApi } from '../booking-menus/lib/booking-channels'
+import { bookingChannelsApi } from '@/v8/booking-menus/public/lib-booking-channels/index'
 import layout from './layout.module.css'
 import { PhoneDatetimeStep } from './phone'
 import styles from './shifts.module.css'
 
 /*
- * ★V8「勤務とシフト」（板 d5fmnM・管理者）・「自分の勤務」（板 E3YDK・スタッフ本人）・
- * 「ひも付けなし」（板 wvGke）。入口は app/booking/staff/shifts/page.tsx。
+ * ★V8「勤務とシフト」（板 ・管理者）・「自分の勤務」（板 ・スタッフ本人）・
+ * 「ひも付けなし」（板 ）。入口は app/booking/staff/shifts/page.tsx。
  *
  * 白い板1枚：頭（管理者は「← 担当スタッフへ」・題・説明）→ 中身
  * （左＝担当者の切り替え／ひも付けの帯・いつもの勤務時間・休憩・この日だけ・
@@ -217,11 +217,11 @@ function PageState({ node, self, title, desc, icon, actions, head }: {
   )
 }
 
-/* ───────────── 自分の勤務の入口（wvGke） ───────────── */
+/* ───────────── 自分の勤務の入口 ───────────── */
 
 /**
  * 本人が staff_id なしで来たとき、ひも付く予約スタッフを /staff/me で探して本人の勤務へ送る。
- * ひも付けが無ければ板 wvGke の案内。R579：2経路とも通信失敗なら「無い」と言わず再試行の口。
+ * ひも付けが無ければ板  の案内。R579：2経路とも通信失敗なら「無い」と言わず再試行の口。
  */
 function OwnShiftEntry() {
   const role = useStaffRole()
@@ -308,7 +308,7 @@ function OwnShiftEntry() {
   return <PageState node="wvGke" self head={head} title="読み込み中" desc="自分の勤務を探しています。" />
 }
 
-/* ───────────── 勤務とシフト（d5fmnM・E3YDK） ───────────── */
+/* ───────────── 勤務とシフト（・） ───────────── */
 
 function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boolean }) {
   const saveErrors = useSaveFormErrors()
@@ -347,7 +347,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const [reloadKey, setReloadKey] = useState(0)
   const [ruleError, setRuleError] = useState<string | null>(null)
   /*
-   * 保存で落ちた時刻の欄（B-139）。囲みの理由の文に加えて、その行の時刻の欄を赤くし、終わりの欄へ移る。
+   * 保存で落ちた時刻の欄。囲みの理由の文に加えて、その行の時刻の欄を赤くし、終わりの欄へ移る。
    * 欄は aria-label（「月曜の終わり」など）で見分ける。直したら消える。
    */
   const [badTimes, setBadTimes] = useState<string[]>([])

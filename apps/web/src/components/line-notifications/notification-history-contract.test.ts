@@ -30,7 +30,7 @@ describe('V6 LINE notification history contract', () => {
     expect(LIST).toContain('kind="loading"')
     expect(LIST).toContain('kind="empty"')
     expect(LIST).toContain('kind="error"')
-    // 板 DrwMm：送れなかった件数は口の合計。未取得のとき0にしない。
+    // 板 ：送れなかった件数は口の合計。未取得のとき0にしない。
     expect(LIST).toContain("kpiValue(summary?.failed ?? null)")
     expect(LIST).toContain("items.length === 0")
     expect(LIST).toContain('data-list-state={listState}')

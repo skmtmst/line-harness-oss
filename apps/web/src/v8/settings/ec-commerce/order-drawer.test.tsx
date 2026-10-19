@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B nAesv 注文の状況の引き出し：読む口・4つの段・失敗したものだけ理由と「もう一度やる」・権限なし。
+ * ★V8-B  注文の状況の引き出し：読む口・4つの段・失敗したものだけ理由と「もう一度やる」・権限なし。
  */
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -36,7 +36,7 @@ it('注文1件の口を読み、4つの段を時刻つきの行で出す', async
   for (const title of ['注文の内容', 'この注文に届いた出来事', '成果・マイル・スコア', '発送後に届く案内']) expect(screen.getByRole('heading', { name: title })).toBeTruthy()
   expect(screen.getByText('鹿肉ドライ 1kg ×1')).toBeTruthy()
   expect(screen.getByText('マイル +75')).toBeTruthy()
-  // 絵 nAesv：日付だけを短く出し、時刻つきの全文は乗せたときに見せる。
+  // 絵 ：日付だけを短く出し、時刻つきの全文は乗せたときに見せる。
   expect(screen.getByText('10/12 予定')).toBeTruthy()
   expect(screen.getByTitle('10月12日（月）10:00 予定')).toBeTruthy()
   // 済んだ出来事は1行だけ（理由もやり直しも出さない）

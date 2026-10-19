@@ -336,7 +336,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   0件の担当者も選択肢に残す（契約上、0件は配列に載らないので実値0として描く）。
                 */}
           {(
-            /* ★V8：共通の選ぶ欄（選んだ行は ✓ だけ）。担当者ごとの未読数は名前の後ろの（）に添える（未取得は「—」）。 */
+            /* ★V8：共通の選ぶ欄（選んだ行は ✓ だけ）。担当者ごとの未読数は名前の後ろのに添える（未取得は「—」）。 */
             <EntitySelect
               aria-label="担当者で絞り込む"
               label="担当者"
@@ -592,7 +592,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                       aria-describedby={(`${chat.isUnread ? `chat-row-unread-${chat.id} ` : ''}chat-row-preview-${chat.id}`)}
                       className={`w-full px-3 py-3 text-left transition-colors ${isSelected
                           ? 'bg-shell'
-                          /* 板 `M0393`：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
+                          /* 板 ：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
                           : 'hover:bg-shell'
                         } ${styles.row}`}
                     >

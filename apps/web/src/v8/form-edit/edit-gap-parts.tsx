@@ -5,8 +5,8 @@ import { type EditTab } from './model';
 
 
 /*
- * 回答フォームの編集（★V8）。板：中身 m1cWEy・1152 ITBAB・予約を入れるブロック ijxur・
- * 答え終わったあと XXFT4・受付と見た目 tpRRT・競合 J1pdB・この版を公開 Z9wXm。
+ * 回答フォームの編集（★V8）。板：中身 ・1152 ・予約を入れるブロック ・
+ * 答え終わったあと ・受付と見た目 ・競合 ・この版を公開 。
  *
  * 作る型（CreatePage）に、上の3つのタブ・左の段・右の「回答用URL」と
  * 「お客さまに見える形」（スマホ）を載せる。データの読み書き・保存・公開・
@@ -21,7 +21,7 @@ const TAB_ITEMS: { key: EditTab; label: string }[] = [
 ]
 
 
-/** 板の印（撮影と見比べのため）。1152 は ITBAB。 */
+/** 板の印（撮影と見比べのため）。1152 は 。 */
 const TAB_NODE: Record<EditTab, string> = { content: 'm1cWEy', after: 'XXFT4', appearance: 'tpRRT' }
 
 

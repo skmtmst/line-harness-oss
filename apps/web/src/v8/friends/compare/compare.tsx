@@ -27,7 +27,7 @@ import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 
 /*
- * ★V8 重複候補を比べて決める（Pencil `fcg2D`：判定の小窓を開いた形、1152 は `p15At`：閉じた形）。
+ * ★V8 重複候補を比べて決める（Pencil ：判定の小窓を開いた形、1152 は ：閉じた形）。
  * /friends/identity-candidates（`?id=` で候補を指定。無ければ未判定の先頭）。
  *
  * 読み込み・判定は今と同じ口（components/identity の useIdentityReview：
@@ -45,7 +45,7 @@ const DECISIONS: Array<{ value: IdentityCandidateDecision; label: string }> = [
   { value: 'different', label: '別の人' },
   { value: 'deferred', label: '保留' },
 ]
-/* 結び付けるときの3つの確認（絵 fcg2D の文）。3つそろうまで判定できない。 */
+/* 結び付けるときの3つの確認（文）。3つそろうまで判定できない。 */
 const CONSENTS = ['利用目的の範囲で結び付ける', '本人の同意（または正当な理由）がある', 'あとで戻せることを知っている']
 
 function CompareInner() {

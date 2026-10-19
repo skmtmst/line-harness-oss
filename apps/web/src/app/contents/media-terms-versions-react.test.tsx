@@ -163,7 +163,7 @@ async function setInputValue(input: HTMLInputElement, value: string) {
   })
 }
 
-/** 利用期限の日付の選択（★V7）で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
+/** 利用期限の日付の選択（★管理画面）で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
 async function pickExpiresDate(iso: string) {
   const [y, mo, d] = iso.split('-').map(Number)
   const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]

@@ -1,9 +1,9 @@
 /*
- * ★V8 タグ タグの一覧（Pencil I1E7Bt・1152 aPeD8・閲覧のみ fkGUR）。
+ * ★V8 タグ タグの一覧（Pencil ・1152 ・閲覧のみ ）。
  * 寸法は app/globals.css の :root の --tpl-tag-* と型の --tpl-*。
  */
 
-/* 閲覧のみの帯（fkGUR「帯の段 閲覧のみ」：左右24・下8、中は 10/14・印16・間10・字13/20）。 */
+/* 閲覧のみの帯（「帯の段 閲覧のみ」：左右24・下8、中は 10/14・印16・間10・字13/20）。 */
 .readonlyRow {
   padding: var(--tpl-tag-ro-pad);
   flex-shrink: 0;
@@ -18,7 +18,7 @@
   color: var(--color-action);
 }
 
-/* タブの段。高さ・文字・下線は共通の Tabs（B-180：36）に任せる。 */
+/* タブの段。高さ・文字・下線は共通の Tabs（：36）に任せる。 */
 .tabs {
   padding: 0 var(--tpl-head-pad-side);
   border-bottom: 1px solid var(--color-hairline);
@@ -116,7 +116,7 @@
   cursor: pointer;
 }
 
-/* 表（I1E7Bt「表の見出し」「行」：左右24・欄の間16・行 12/24）。 */
+/* 表（「表の見出し」「行」：左右24・欄の間16・行 12/24）。 */
 .table table {
   width: 100%;
   table-layout: fixed;
@@ -179,7 +179,7 @@
   white-space: nowrap;
 }
 
-.nameLink { color: var(--color-action); } /* 保存した検索の条件名は青い文字（絵 IWnYX）。 */
+.nameLink { color: var(--color-action); } /* 保存した検索の条件名は青い文字。 */
 
 .name:hover {
   color: var(--color-action);
@@ -248,7 +248,7 @@
   height: var(--tpl-tag-ro-icon);
 }
 
-/* ページ送り（I1E7Bt：10/20・件数 13/20）。 */
+/* ページ送り（：10/20・件数 13/20）。 */
 .pager {
   display: flex;
   flex-wrap: wrap;
@@ -417,7 +417,7 @@
   font-size: var(--text-label);
 }
 
-/* 1152 の板（型がフォルダの列を道具の段へ畳む幅）では「使っている所」を隠す（aPeD8）。 */
+/* 1152 の板（型がフォルダの列を道具の段へ畳む幅）では「使っている所」を隠す。 */
 @container v8-page (max-width: 1099px) {
   .colUsage {
     display: none;
@@ -428,7 +428,7 @@
 /* 閲覧のみで隠したフォルダを追加の場所（フォルダを消しても…の注が動かない）。 */
 .viewerFolderAddSpace { display: block; height: var(--tpl-viewer-folder-add-space); }
 
-/* ★V8 対応マークのタブ（vKDj5）：案内の帯の段（上14・左右24）。帯そのものは閲覧のみの帯と同じ形。 */
+/* ★V8 対応マークのタブ：案内の帯の段（上14・左右24）。帯そのものは閲覧のみの帯と同じ形。 */
 .infoRow {
   padding: var(--tpl-tg2-info-pad);
   flex-shrink: 0;
@@ -501,7 +501,7 @@
   font-size: var(--tpl-tg2-safety-body-size);
 }
 
-/* ★V8 保存した検索のタブ（IWnYX）：行61（名前19＋間2＋要約16、上下12）。つまみの列は無い。 */
+/* ★V8 保存した検索のタブ：行61（名前19＋間2＋要約16、上下12）。つまみの列は無い。 */
 .searchRow > td {
   height: var(--tpl-tg2-search-row-h);
   padding-block: 0;
@@ -524,7 +524,7 @@
   font-size: var(--tpl-tg2-safety-body-size);
 }
 
-/* ★V8 友だち情報欄のタブ（q5gbcM）：行58（名前19＋間2＋差し込み名13、上下12）。 */
+/* ★V8 友だち情報欄のタブ：行58（名前19＋間2＋差し込み名13、上下12）。 */
 .fieldRow > td {
   height: var(--tpl-tg2-field-row-h);
   padding-block: 0;

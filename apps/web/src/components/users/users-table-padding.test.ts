@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const TABLE = readFileSync(join(HERE, '../../app/users/users-v8.tsx'), 'utf8')
-const CSS = readFileSync(join(HERE, '../../app/friends/friends-v8.module.css'), 'utf8')
+const TABLE = readFileSync(new URL('../../app/users/users-screen.tsx', import.meta.url), 'utf8')
+const CSS = readFileSync(new URL('../../app/friends/friends-v8.module.css', import.meta.url), 'utf8')
 
 describe('統合ユーザーの表の左右の余白', () => {
   it('見出し行の左端と右端は現役の12px', () => {

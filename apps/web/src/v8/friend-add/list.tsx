@@ -54,8 +54,8 @@ import ListToolbar from '@/components/shared/list-toolbar';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 友だち追加時の配信の一覧（Pencil：一覧 `MRhef`・閲覧のみ `LEwkJ`・1152 `P20kYU`・
- * 受け皿の「…」`C0lfUP`・受け皿は止められない `cFo2p`・状態 `kFz4b`）。
+ * ★V8 友だち追加時の配信の一覧（Pencil：一覧 ・閲覧のみ ・1152 ・
+ * 受け皿の「…」・受け皿は止められない ・状態 ）。
  *
  * 型（ListPage）に、閲覧のみの帯＋区分のタブ・数の帯・左のフォルダの列（上に「初回案内を作る」）・
  * 案内の帯・道具の段・表（順・設定・最初に送るもの・状態・直近7日・…）を渡す。
@@ -282,7 +282,7 @@ function FriendAddList() {
     return () => clearTimeout(timer)
   }, [search, resetCursor])
 
-  // `?delete=<id>` で開いたときは、その設定の削除の確かめを出す（v7 と同じ口）。
+  // `?delete=<id>` で開いたときは、その設定の削除の確かめを出す（管理画面 と同じ口）。
   useEffect(() => {
     if (!requestedDeleteId || !data) return
     const found = data.items.find((item) => item.id === requestedDeleteId && !item.isFallback)
@@ -695,7 +695,7 @@ function FriendAddList() {
   } else if (!selectedAccountId) {
     listBody = <AccountRequiredState hasAccounts={accounts.length > 0} />
   } else if (error) {
-    /* 状態の板（kFz4b）：読めないときも道具はそのまま。数の帯は「—」。 */
+    /* 状態の板：読めないときも道具はそのまま。数の帯は「—」。 */
     listBody = (
       <ListState kind="error" title="設定を読み込めませんでした" description={errorStatus === 403 ? error : '数の帯は「—」、道具はそのまま使えます。条件を変えてから試し直せます。'}  action={<><Button onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
     )

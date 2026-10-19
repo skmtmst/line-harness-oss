@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 運用状態（Pencil：健全性チェック `Y4LkX1`・更新履歴 `I2V65v`・緊急コントロール `OHwbU`）。
+ * ★V8 運用状態（Pencil：健全性チェック ・更新履歴 ・緊急コントロール ）。
  *
  * 外側（型・中のメニュー）とタブ、健全性チェックはここで描く。更新履歴と緊急コントロールは
  * 今の部品を入口（app/emergency/page.tsx）から差し込む。動き（手動確認の連打止め N-458・
@@ -25,7 +25,7 @@ import { RowActions } from '@/components/shared/row-actions'
 import HistoryDetails, { type HistoryDetail } from './history-details'
 import Notice from '@/components/shared/notice'
 
-/** 板 Y4LkX1 の並び。健全性チェック・更新履歴・緊急コントロール。 */
+/** 板  の並び。健全性チェック・更新履歴・緊急コントロール。 */
 const TABS = [
   { key: 'health', label: '健全性チェック' },
   { key: 'history', label: '更新履歴' },
@@ -86,7 +86,7 @@ export default function EmergencyScreen({
         <RefreshCw className={styles.btnIcon} aria-hidden="true" />いますぐ確かめる
       </Button>
     : tab === 'control' && canManage
-      // 止める操作は赤（中の［選んだものを止める］と同じ・絵 OHwbU）。
+      // 止める操作は赤（中の［選んだものを止める］と同じ・絵 ）。
       ? <Button variant="danger" type="button" icon={<OctagonPause size={16} />} onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>
       : tab === 'history' ? <RowActions subjectName="履歴" menuItems={[
         { id: 'incidents', label: '止めた・戻した記録を見る', onSelect: () => setHistoryDetail('incidents') },

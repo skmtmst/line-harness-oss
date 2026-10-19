@@ -25,7 +25,7 @@ import styles from './editor.module.css';
 import { addTimeWindow,MESSAGE_TYPE_LABEL,removeTimeWindow,updateTimeWindow } from './flow';
 import { resendSuppressionText } from './text';
 
-/* ===== 作る③ 初回案内（板 `al47K`・競合 `h5rm8t`） ===== */
+/* ===== 作る③ 初回案内（板 ・競合 ） ===== */
 export const MESSAGE_TABS: Array<{ key: FriendAddRuleDefinition['messageType'] | 'none'; label: string; icon: typeof Pencil; enabled: boolean; reason?: string }> = [
   { key: 'text', label: 'この画面で書く', icon: Pencil, enabled: true },
   /* できていない形式は選べない形で出す（理由を title に）。 */

@@ -103,7 +103,7 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
     render(<BroadcastsPage />)
 
     // 応答を保留しているあいだ、ほかの一覧と同じ読込文言が出る。
-    // ★V7 `x63W5x`：件数（KPI）も「読み込んでいます」なので複数ある。
+    // ★管理画面 `x63W5x`：件数（KPI）も「読み込んでいます」なので複数ある。
     await waitFor(() => expect(screen.getAllByLabelText('読み込んでいます').length).toBeGreaterThan(0))
 
     slow.resolve({ success: true, data: [] })
@@ -120,7 +120,7 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
 
     await waitFor(() => expect(screen.getByText('一斉配信を読み込めませんでした')).toBeTruthy())
 
-    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
+    // ★管理画面 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
     await waitFor(() => expect(fixture.broadcastsList).toHaveBeenCalledTimes(2))
@@ -135,7 +135,7 @@ describe('#634 一斉配信の読込表示と再読み込み', () => {
 
     await waitFor(() => expect(screen.getByText('一斉配信を読み込めませんでした')).toBeTruthy())
 
-    // ★V7 `x63W5x`：失敗は1画面に1つ。一覧本体も失敗しているときは
+    // ★管理画面 `x63W5x`：失敗は1画面に1つ。一覧本体も失敗しているときは
     // 一覧の1枚へまとめ、フォルダ欄の小さい読み直しは出さない。
     expect(screen.getAllByRole('button', { name: 'もう一度読み込む' })).toHaveLength(1)
     expect(screen.queryByRole('button', { name: 'もう一度', exact: true })).toBeNull()

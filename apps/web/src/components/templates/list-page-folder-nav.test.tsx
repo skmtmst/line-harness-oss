@@ -5,7 +5,7 @@ import { join, relative, resolve } from 'node:path'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ts from 'typescript'
-import { ListPage, ListPageBody } from './index'
+import { ListPage, ListPageBody } from '.'
 import { FolderDotName } from '@/components/shared/folder-dot'
 
 afterEach(cleanup)

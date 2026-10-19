@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 候補つき入力（★V7 `WUVcz` §1）。
+ * 候補つき入力（★管理画面 `WUVcz` §1）。
  * 打って絞る・↑↓と Enter で選ぶ・Esc で閉じても文字は残す、までを見る。
  */
 import React, { useState } from 'react'
@@ -27,7 +27,7 @@ function Harness({ options = OPTIONS, ...rest }: Partial<React.ComponentProps<ty
   )
 }
 
-describe('候補つき入力（★V7 WUVcz）', () => {
+describe('候補つき入力（★管理画面 WUVcz）', () => {
   it('打つと絞られ、一致した所が太字、件数が読み上げに渡る', () => {
     render(<Harness />)
     const field = screen.getByRole('combobox', { name: 'テンプレート' })

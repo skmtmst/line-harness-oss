@@ -39,7 +39,7 @@ import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 
 /*
- * ★V8 統括 一括配信の一覧（絵 U4Eep0・V8.pen の行「統括」。2026-10-08 オーナー：店の一斉配信とほぼ同じ画面）。
+ * ★V8 統括 一括配信の一覧（絵のV8.pen の行「統括」。2026-10-08 オーナー：店の一斉配信とほぼ同じ画面）。
  *
  * 店の一斉配信の一覧（src/v8/broadcasts/list.tsx）と同じ型（ListPage）・同じ共通部品（数の帯・札・表・ページ送り）・
  * 同じ見た目（店の一覧の CSS をそのまま読む）で組む。違いは「送るアカウント」だけ：
@@ -98,7 +98,7 @@ export default function HqBroadcastList() {
   const [status, setStatus] = useState<StatusKey>('all')
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
-  /* 並び順（絵 U4Eep0 の「新しい順」）。口は作った順の新しい順で返すので、古い順は逆に並べる。 */
+  /* 並び順（「新しい順」）。口は作った順の新しい順で返すので、古い順は逆に並べる。 */
   const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
   /* 左の列のフォルダ（店の一斉配信と同じ。API-18 の統括のフォルダ）。読めなくても一覧は出す。 */
   const [folders, setFolders] = useState<HqFolder[] | null>(null)
@@ -160,9 +160,9 @@ export default function HqBroadcastList() {
   const delivered = sentRuns.reduce((sum, run) => sum + run.targets.filter((t) => !t.excluded).reduce((s, t) => s + t.successCount, 0), 0)
   const failedStores = all.reduce((sum, run) => sum + run.targets.filter((t) => !t.excluded && (t.status === 'failed' || failedCount(t) > 0)).length, 0)
   /*
-   * 平均の開封率（絵 U4Eep0 の4つ目）：送った配信の開いた人の合計÷届いた人の合計。開いた数を数えていない
+   * 平均の開封率（4つ目）：送った配信の開いた人の合計÷届いた人の合計。開いた数を数えていない
    * アカウントが1つでもあれば出さない（「—」）。一覧に送った日が無いので「過去28日」ではなく送った配信全体。
-   * 今月の送信枠（絵の2つ目）は統括の口に無いので、代わりにエラーを置く（見た目だけ置かない）。
+   * 今月の送信枠（2つ目）は統括の口に無いので、代わりにエラーを置く（見た目だけ置かない）。
    */
   const sentTargets = all.filter((run) => statusKeyOf(run) === 'sent' || statusKeyOf(run) === 'error').flatMap((run) => run.targets.filter((t) => !t.excluded && t.successCount > 0))
   const openKnown = sentTargets.length > 0 && sentTargets.every((t) => t.openedCount != null)
@@ -195,7 +195,7 @@ export default function HqBroadcastList() {
         onDelete: () => { setFolderError(''); setDeletingFolder(folder) },
       } : {}),
     })),
-    // 未分類はほかの一覧と同じく、フォルダが1つも無くても出す（B-136）。読めなかったときは出さない。
+    // 未分類はほかの一覧と同じく、フォルダが1つも無くても出す。読めなかったときは出さない。
     ...(folders ? [{ kind: 'unfiled' as const, id: 'none', label: '未分類', count: ready ? countIn('none') : null }] : []),
   ]
   const selectFolder = (id: string) => { setFolderFilter(id); setPage(1) }
@@ -256,7 +256,7 @@ export default function HqBroadcastList() {
     }
   }
 
-  /* 店の一覧（l5V9a）と同じ2段：探す／札 … 件数・並び。1段にまとめると件数と並びが縦に割れる。 */
+  /* 店の一覧と同じ2段：探す／札 … 件数・並び。1段にまとめると件数と並びが縦に割れる。 */
   const toolbar = (
     <ListToolbarFrame layout="stacked">
       <ListToolbarRow>

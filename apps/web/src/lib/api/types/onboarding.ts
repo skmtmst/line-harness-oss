@@ -1,7 +1,7 @@
-/** はじめの設定の段。設計 ★V6 34-1（`RAW35`）。 */
+/** はじめの設定の段。設計 ★管理画面 34-1（`RAW35`）。 */
 export type GettingStartedStep = import('@line-crm/shared').GettingStartedStep
 
-/** レシピ。設計 ★V6 34-2（`y0P0Qx`）。 */
+/** レシピ。設計 ★管理画面 34-2（`y0P0Qx`）。 */
 export interface Recipe {
   id: string
   name: string

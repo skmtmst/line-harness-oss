@@ -1,4 +1,4 @@
-/** B-219〜B-233。実寸と実際に描かれた状態を検査する。 */
+/** 〜。実寸と実際に描かれた状態を検査する。 */
 export default function scanPendec2Rules() {
   const root = document.body, findings = []
   const css = el => getComputedStyle(el)

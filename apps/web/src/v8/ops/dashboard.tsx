@@ -10,7 +10,7 @@ import { formatDateTime } from '@/lib/format'
 import { opsCall } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { formatYen, formatBytes } from '@/components/ops/ops-charts'
-import { contractDetail, minutesLabel, revenueDetail } from '@/app/ops/dashboard/format'
+import { contractDetail, minutesLabel, revenueDetail } from '@/v8/ops/dashboard/format'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import Dialog from '@/components/shared/dialog'
@@ -31,9 +31,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
 
 /**
- * 運営ダッシュボード V8（絵 `CyW0E`）。
+ * 運営ダッシュボード V8。
  *
- * 動きは v7（app/ops/dashboard）と同じ口を使う：期間（今月・先月・今年）で
+ * 動きは 管理画面（app/ops/dashboard）と同じ口を使う：期間（今月・先月・今年）で
  * /api/ops/dashboard を読み直す。要対応の4行は契約先一覧・お問い合わせへの入口。
  * 「Stripe と同期」は書ける運営メンバー（readOnly でない人）にだけ出す。
  */

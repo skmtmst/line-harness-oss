@@ -1,5 +1,5 @@
 /*
- * ★V8 流入リンクを作る（KMaMk・競合 vWJEm・競合の比べ E14GFm）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
+ * ★V8 流入リンクを作る（・競合 ・競合の比べ ）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * ここは段のカード（枠1・角12・余白20・間14）と、右の列（進む順・スマホ）の中身だけ。
  */
 
@@ -124,7 +124,7 @@
   background: var(--color-accent-deep);
   color: var(--color-canvas);
 }
-/* 違いを比べる窓（E14GFm）：違う項目だけの表（項目・いまの入力・保存されている内容）と、上書きできない理由の箱。 */
+/* 違いを比べる窓：違う項目だけの表（項目・いまの入力・保存されている内容）と、上書きできない理由の箱。 */
 .compareLead {
   margin: var(--tpl-cn-compare-lead-margin);
   color: var(--color-ink-secondary);
@@ -175,7 +175,7 @@
   line-height: var(--tpl-cn-sub-lh);
 }
 
-/* クーポン QR（絵 QUF2R）：スイッチ＋名前を左、札を右に1行で。 */
+/* クーポン QR：スイッチ＋名前を左、札を右に1行で。 */
 .couponSwitchRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
 .couponSwitchLabel { flex: 1; min-width: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; white-space: nowrap; }
 .couponAudience { display: flex; flex-direction: column; gap: var(--polish-space-row); }

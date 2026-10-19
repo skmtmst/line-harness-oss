@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { drawFields, stats } from './field-list.test.harness'
+import { drawFields, stats } from './field-list-test-harness'
 import { expect, it } from 'vitest'
 
 it('取得していない使用数をundefinedと出さない', async () => {

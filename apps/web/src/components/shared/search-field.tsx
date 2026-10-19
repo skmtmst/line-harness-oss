@@ -44,7 +44,7 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
   useEffect(() => cancel, [])
   const hasValue = draft.length > 0
   const innerRef = useRef<HTMLInputElement>(null)
-  // B-191: the list owns the slot, while the control knows its real text and chrome.
+  // : the list owns the slot, while the control knows its real text and chrome.
   // Keep the placeholder readable without changing either the query or its scope.
   useLayoutEffect(() => {
     const input = innerRef.current

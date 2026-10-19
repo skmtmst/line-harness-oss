@@ -14,9 +14,9 @@
  *   `BDOJu` データがありません
  *   `sZE9Q` 読み込んでいます
  * どちらも 高さ132・$surface-pearl・$radius-md(10)・padding 24・gap 8・中央寄せ で、
- * 変わるのは **絵・文言だけ**。数字を変えるときは Pencil を先に直す。
+ * 変わるのは **絵の文言だけ**。数字を変えるときは Pencil を先に直す。
  *
- * 失敗（`error`）はここで描かない。★V7 `x63W5x` の決まりで TargetMissing の
+ * 失敗（`error`）はここで描かない。★管理画面 `x63W5x` の決まりで TargetMissing の
  * error と同じ中立の見た目にするため、`list-state.tsx` から
  * `target-missing.tsx` の中身を使う。赤い三角・赤い見出しはやめた。
  */
@@ -115,12 +115,12 @@
 
 :root [data-list-state='empty'] .action { --shadow-primary-action: var(--v8-parts-primary-shadow); }
 
-/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 :root .root { -webkit-font-smoothing: auto; }
 
-/* B-152・仕上げ2 */
+/* ・仕上げ2 */
 :root .title { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
 
-/* B-152・仕上げ5：空の表示 */
+/* ・仕上げ5：空の表示 */
 :root [data-list-state='empty'] .iconWrap { width: var(--polish-icon-empty); height: var(--polish-icon-empty); border-radius: 0; outline-color: transparent; background: transparent; }
 :root [data-list-state='empty'] .iconWrap svg { width: var(--polish-icon-empty); height: var(--polish-icon-empty); stroke-width: var(--polish-icon-stroke); color: inherit; }

@@ -26,9 +26,9 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
 
 /**
- * ナレッジの記事 V8（絵 `R5ckwJ`）。一覧の「開く」から出す。
+ * ナレッジの記事 V8。一覧の「開く」から出す。
  *
- * 動きは v7（components/ops/knowledge-editor の全画面）と同じ：
+ * 動きは 管理画面（components/ops/knowledge-editor の全画面）と同じ：
  * - 承認待ち・要確認：見送る・下書きを保存・保存して承認（承認の前に「記事を承認する前に」で確かめる）
  * - 承認済み：保存すると承認待ちに戻る。一覧から行っていた「無効にする」もここに置く
  * 保存してから承認する（承認に失敗しても、勝手に有効にはならない）。
@@ -80,7 +80,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
     setForm((f) => ({ ...f, [key]: value })); setReadChecked(false)
   }
 
-  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る。 */
   const fields = useFormErrors()
   fields.define('title', '題名', () => (form.title.trim() ? null : '題名を入力してください'), { required: true })
   fields.define('question', '質問', () => (eligible && !form.question.trim() ? '質問を入力してください' : null), { required: eligible })
@@ -118,7 +118,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: fullPage && dirty, busy })
   const close = () => { if (busy) return; if (fullPage && dirty) setClosing(true); else onClose() }
-  // 全画面のときは、上の帯のパンくずの最後に保存済みの題名を出す（R5ckwJ）。
+  // 全画面のときは、上の帯のパンくずの最後に保存済みの題名を出す。
   usePageTitle(fullPage ? initial.title : null, fullPage)
   const ticketLabel = article.ticketNo == null ? '番号未取得' : `#${article.ticketNo}`
 

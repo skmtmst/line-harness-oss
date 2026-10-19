@@ -1,5 +1,5 @@
 /*
- * ★V8 流入と計測の一覧（Pencil xbHxg・1152 y1ztx・閲覧のみ EMUl9）。
+ * ★V8 流入と計測の一覧（Pencil ・1152 ・閲覧のみ ）。
  * 枠・見出し・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  * 寸法は app/globals.css の --tpl-il-* に置く。
  */
@@ -126,7 +126,7 @@
   gap: var(--tpl-chip-row-gap);
 }
 
-/* 1152 の板（y1ztx）：案内の帯 → 1段目 → 2段目。 */
+/* 1152 の板：案内の帯 → 1段目 → 2段目。 */
 
 /* フォルダの列の下の注。 */
 .folderNote {
@@ -159,7 +159,7 @@
 }
 
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
-/* 名前の前のフォルダの丸（xbHxg「フォルダの丸」）。2行目・札は名前の頭にそろえる（絵の「説明の行」の左 16）。 */
+/* 名前の前のフォルダの丸（「フォルダの丸」）。2行目・札は名前の頭にそろえる（「説明の行」の左 16）。 */
 .nameLine { display: flex; min-width: 0; max-width: 100%; }
 .dotIndentPad { padding-inline-start: var(--tpl-folder-dot-indent); }
 .dotIndentMargin { margin-inline-start: var(--tpl-folder-dot-indent); }

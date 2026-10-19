@@ -366,7 +366,7 @@ describe('エラー面の読み直し(N-287)', () => {
     fixture.tab = 'saved'
     await render()
 
-    // ★V7 `x63W5x`：口の生文言は出さず、一覧の場所の失敗の1枚だけ出す。
+    // ★管理画面 `x63W5x`：口の生文言は出さず、一覧の場所の失敗の1枚だけ出す。
     expect(host.textContent).toContain('保存した分析を読み込めませんでした')
     expect(host.textContent).not.toContain('接続できませんでした')
     expect(callsTo('/api/analytics/saved?')).toHaveLength(1)
@@ -409,7 +409,7 @@ describe('棒グラフと期間切替の読み上げ(N-288)', () => {
     fixture.tab = 'friends'
     await render()
 
-    // ★V7 h99Gb：棒は列全体のボタンになり、読み上げ名は「9月9日（水） 増えた5人・減った2人」。
+    // ★管理画面 h99Gb：棒は列全体のボタンになり、読み上げ名は「9月9日（水） 増えた5人・減った2人」。
     // 意図は同じ（日付と増減が読める・選んだ日が分かる）。
     const dayBar = host.querySelector('button[aria-label="9月9日（水） 増えた5人・減った2人"]') as HTMLButtonElement | null
     expect(dayBar).not.toBeNull()

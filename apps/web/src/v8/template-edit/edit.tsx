@@ -3,7 +3,7 @@
 /*
  * ★V8 テンプレートの作る・編集の入口（/templates/edit）。
  * 受け付ける指定は今の画面と同じ：?id=（編集）・?visual=1（見本の中身）・
- * ?kind=coupon|research（資産の作る画面）・?kind=rich_message（リッチメッセージを作る EFV8l）・
+ * ?kind=coupon|research（資産の作る画面）・?kind=rich_message（リッチメッセージを作る ）・
  * ?example=<見本の番号>（見本から作る F-5：メッセージを作るに見本の名前と本文を入れて開く）。
  */
 import { useSearchParams } from 'next/navigation'

@@ -54,7 +54,7 @@ describe('添付ファイルの行（★V8 ファイルを落とす欄）', () =
   })
 })
 
-describe('ファイルを落とす場所（★V7 NQMnx）', () => {
+describe('ファイルを落とす場所（★管理画面 NQMnx）', () => {
   it('ふだんは見出し・種類の説明・「ファイルを選ぶ」ボタン', () => {
     render(<FileDropzone title="ここに画像を落とす" hint="JPEG・PNG、10MB まで" onFiles={() => {}} />)
     expect(screen.getByText('ここに画像を落とす')).not.toBeNull()

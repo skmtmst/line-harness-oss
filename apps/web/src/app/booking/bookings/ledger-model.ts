@@ -51,7 +51,7 @@ export function sourceLabel(b: BookingRequest): string {
   return found?.label ?? '電話'
 }
 
-/** 表の日時：MM/DD（曜）HH:mm（B-152 の一覧の形）。 */
+/** 表の日時：MM/DD（曜）HH:mm（ の一覧の形）。 */
 export function formatLedgerDateTime(iso: string): string {
   if (Number.isNaN(new Date(iso).getTime())) return '—'
   return `${formatDate(iso, { style: 'list-day-weekday' })} ${formatTime(iso)}`

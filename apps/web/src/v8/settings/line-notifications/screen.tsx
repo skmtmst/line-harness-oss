@@ -39,11 +39,11 @@ import TruncatedText from '@/components/shared/truncated-text'
 import FilterChip from '@/components/shared/filter-chip'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
-import { readSaveFieldErrors } from '@/lib/api-field-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 /*
- * ★V8 LINE通知（Pencil `g3iDs`。運用者へのお知らせ `u8xibp`・送れなかったもの `DrwMm`・記録 `PZBVb`）。
+ * ★V8 LINE通知（Pencil 。運用者へのお知らせ ・送れなかったもの ・記録 ）。
  *
  * app/line-notifications/page.tsx を写して、見た目（外側の型・中のメニュー・タブ・数のカード・帯・札・表）だけを
  * 絵に合わせた（src/v8 は @/app を読めない）。動き（読み込み・下書き・保存・公開・止める・テスト送信・
@@ -286,7 +286,7 @@ type CustomerMutationOutcome =
  * `generation`/`currentGeneration` は同一アカウント内での読み直し
  * （再読み込みボタンなど）を見分ける。`forAccountId`/`currentAccountId` は
  * アカウント切替そのものを見分ける——`currentAccountId` は描画のたびに
- * 同期して更新される ref を指すので、切替後の load() が実際に走るより前の
+ * 同期して更新される ref を指すので、切替後の load が実際に走るより前の
  * 応答でも、ここだけで正しく古いと分かる（`loadGeneration` の発火待ちに
  * 頼らない）。
  */
@@ -693,10 +693,10 @@ function LineNotificationsPage() {
   /* 変える操作（出す・止める・文面を直す）はオーナー・管理者だけ。閲覧のみには押せないボタンを置かない。役割が分かるまでは今までどおり出す。 */
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
-  /* 運用者へのお知らせ（u8xibp）：板の頭の「CSVで書き出す」で開く理由の窓。 */
+  /* 運用者へのお知らせ：板の頭の「CSVで書き出す」で開く理由の窓。 */
   const [operatorExportOpen, setOperatorExportOpen] = useState(false)
   /*
-   * N-340: `loadGeneration` は load() の useEffect の中でしか進まない。
+   * N-340: `loadGeneration` は load の useEffect の中でしか進まない。
    * アカウント切替の描画コミットと、その useEffect が実際に発火する瞬間の
    * 間には隙間がある（渡された値が変わった描画そのものは同期的に終わるが、
    * useEffect は後回しになる）。保存・公開の応答がその隙間で返ると、
@@ -784,8 +784,8 @@ function LineNotificationsPage() {
      * 再開点の見張り。保存・公開・テスト送信の3経路と同じ形にそろえる（#695 T3）。
      *
      * 世代（loadGeneration）だけでは、アカウント切替の描画コミット後・この
-     * load() を差し替える次の load() が発火する前の隙間を見分けられない。
-     * 描画のたびに同期する selectedAccountRef も見て、この load() が
+     * load を差し替える次の load が発火する前の隙間を見分けられない。
+     * 描画のたびに同期する selectedAccountRef も見て、この load が
      * 「いま画面が向いているアカウントのものか」を確かめる。
      */
     const stale = () => generation !== loadGeneration.current || selectedAccountId !== selectedAccountRef.current
@@ -910,7 +910,7 @@ function LineNotificationsPage() {
       const fieldFailure = saveErrors.capture(error);
 
       if (!stale()) {
-        // ★V7 `x63W5x`：一覧の失敗でページ上の帯は出さない。
+        // ★管理画面 `x63W5x`：一覧の失敗でページ上の帯は出さない。
         // 一覧の場所の ListState error だけにまとめる。
         setLoadState(error instanceof ApiError && error.status === 403 ? 'forbidden' : 'error')
         // M031: 捕まえた失敗を ListState へ渡す。403は再試行なし、429は待ち案内になる。
@@ -982,7 +982,7 @@ function LineNotificationsPage() {
   /*
    * send-countsだけ取れなかったときは、そのカードだけ「読み込めませんでした」にする。
    * 一覧全体は ListState error にしない（設定・定義は表示を続ける）。
-   * 見た目は共通の失敗の1枚と同じ中立（赤を使わない。★V7 `x63W5x`）。
+   * 見た目は共通の失敗の1枚と同じ中立（赤を使わない。★管理画面 `x63W5x`）。
    */
   const kpisWithSendCountsState = sendCountsFailed
     ? kpis.map((kpi) => kpi.label === '今日 送った' ? { ...kpi, note: '送信件数を読み込めませんでした' } : kpi)
@@ -996,7 +996,7 @@ function LineNotificationsPage() {
     return item
   })
   const update = (eventType: string, patch: Partial<EcNotificationSetting>) => setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
-  // 板 g3iDs：共通の数カード4枚。0件のときは押し口を出さない。押しても何も無い。
+  // 板 ：共通の数カード4枚。0件のときは押し口を出さない。押しても何も無い。
   // 共通カードは数しか受けないので、「上限なし」の文字は valueText へ回す。
   const renderKpiCard = (kpi: CustomerNotificationKpi) => (
     <KpiCard

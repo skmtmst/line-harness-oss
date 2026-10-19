@@ -3,7 +3,7 @@
 import { CONSUMER_LABELS } from './version-consumer-labels'
 
 /*
- * ★V8 共通アクションの版と使われている場所（Pencil `ziSgL`）。
+ * ★V8 共通アクションの版と使われている場所（Pencil ）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
  * （共通アクションの既存API）と同じ（版の履歴・公開・前の版から新版・

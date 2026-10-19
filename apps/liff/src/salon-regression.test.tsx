@@ -2,8 +2,8 @@
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import BookingHistory from './pages/BookingHistory.js';
-import Confirm from './components/Confirm.js';
+import BookingHistory from './pages/booking-history.js';
+import Confirm from './components/confirm.js';
 import type { MenuItem, StaffItem } from './lib/api.js';
 import { setLiffContext } from './lib/liff-auth.js';
 const ctx={liffId:'fixture',lineUserId:'fixture-user',idToken:'fixture-token'};

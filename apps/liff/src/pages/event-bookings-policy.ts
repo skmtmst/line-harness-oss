@@ -1,6 +1,6 @@
 import type { EventBookingMine } from '../lib/api.js';
 
-/** 札の文字は設計どおり (★V8 y1bs9A：申し込み済み・キャンセル待ち…)。意味は今の状態名のまま変えない。 */
+/** 札の文字は設計どおり (★V8 ：申し込み済み・キャンセル待ち…)。意味は今の状態名のまま変えない。 */
 export const statusMeta: Record<string, { text: string; tone: 'confirmed' | 'pending' | 'neutral' }> = {
   confirmed: { text: '申し込み済み', tone: 'confirmed' },
   waitlisted: { text: 'キャンセル待ち', tone: 'pending' },

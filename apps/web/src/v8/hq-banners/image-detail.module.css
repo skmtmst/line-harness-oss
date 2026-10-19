@@ -1,5 +1,5 @@
 /*
- * ★V8 画像の詳細（rI5uh）。左 300・右 488・間 24、下に生成時の条件（2列）と操作。
+ * ★V8 画像の詳細。左 300・右 488・間 24、下に生成時の条件（2列）と操作。
  * 値は globals.css の `--tpl-hb-*`。
  */
 .body { display: flex; flex-direction: column; gap: var(--tpl-hb-detail-gap); width: 100%; }

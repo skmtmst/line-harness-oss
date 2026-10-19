@@ -16,10 +16,10 @@ import { describe, expect, it } from 'vitest'
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 /*
- * 完全切り替え：リマインダ・シナリオの v7 page.tsx は捨て、V8 を見る。
+ * 完全切り替え：リマインダ・シナリオの 管理画面 page.tsx は捨て、V8 を見る。
  * シナリオの入口は src/v8/scenarios/list.tsx（古い app/scenarios/list-v8.tsx はもう描かれない）。
  */
-const REMINDERS_V8 = '../../app/reminders/list-v8.tsx'
+const REMINDERS_V8 = '../../v8/reminders/list.tsx'
 const SCENARIOS_V8 = '../../v8/scenarios/list.tsx'
 
 /** 並び替えを持つ一覧（SortSelect を呼ぶ画面）。 */
@@ -53,12 +53,12 @@ const PAGE_SIZE_SELECT_USERS: Array<[string, string]> = [
  * 幅の実数（320・下限240）は ListToolbar の契約テストで守る。
  */
 const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
-  // 板 `apLqS`：検索 → 札 → 並び → 件数。部品は変数にまとめ（1152 の Iffil と共用）、広い板の道具の段で並べる。
+  // 板 ：検索 → 札 → 並び → 件数。部品は変数にまとめ（1152 の  と共用）、広い板の道具の段で並べる。
   ['リマインダ', REMINDERS_V8, ['<ListToolbar', '{statusChips}', '{sortSelect}', '{perPageSelect}']],
   /*
-   * ウェビナーの入口（page.tsx）は v7 と V8（src/v8/webinars/list.tsx）を出し分ける。readUiSource が
-   * `@/v8/` もたどるようになった（2026-10-06）ので、v7 の並びは v7 の本体（list-v8.tsx。名前は v8 だが
-   * 今は v7 のときに描かれる）で見て、V8 は部品を変数にまとめて並べる道具の段（wideToolbar）で見る。
+   * ウェビナーの入口（page.tsx）は 管理画面 と V8（src/v8/webinars/list.tsx）を出し分ける。readUiSource が
+   * `@/v8/` もたどるようになった（2026-10-06）ので、管理画面 の並びは 管理画面 の本体（list-v8.tsx。名前は v8 だが
+   * 今は 互換経路のときに描かれる）で見て、V8 は部品を変数にまとめて並べる道具の段（wideToolbar）で見る。
    */
   ['ウェビナー', '../../app/webinars/page.tsx', ['const wideToolbar', '<ListToolbar', 'search={{', 'filters={filterChips}', 'trailing={<>{sortBox}{savedBox}{perPageBox}</>}']],
   ['ウェビナー（V8）', '../../v8/webinars/list.tsx', ["search={{ placeholder: 'ウェビナー名で探す'", 'filters={filterChips}', 'trailing={<>{sortBox}', '{perPageBox}</>}']],
@@ -67,7 +67,7 @@ const TOOLBAR_ORDER: Array<[string, string, string[]]> = [
 
 /** 固定の絞り込みチップの前置きは「よく使う絞り込み」の1形（DETAIL-20 の語）。 */
 const FILTER_LABEL_USERS: Array<[string, string]> = [
-  // 板 `apLqS`：札に前置きは無い（絵どおり）。
+  // 板 ：札に前置きは無い（絵どおり）。
   ['シナリオ', SCENARIOS_V8],
   ['ウェビナー', '../../app/webinars/page.tsx'],
   ['リッチメニュー', '../../app/rich-menus/page.tsx'],

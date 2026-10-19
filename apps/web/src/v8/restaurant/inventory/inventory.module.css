@@ -1,5 +1,5 @@
 /*
- * ★V8 予約枠・在庫（Pencil Y8SjT2・競合 qf3ky・媒体を閉じる知らせ Yyw6i・予約経路の連携 hQQlt）。
+ * ★V8 予約枠・在庫（Pencil Y8SjT2・競合 ・媒体を閉じる知らせ ・予約経路の連携 hQQlt）。
  * 寸法は板の書き出しから読み、globals.css の --tpl-rs-* に置いた値だけを使う。
  */
 
@@ -7,7 +7,7 @@
   min-width: 0;
 }
 
-/* 休業日・貸切（UVnvR）：検証環境の帯が無いので、店のタブの下にタブを置く（絵の切り替えの文字の高さにそろえる） */
+/* 休業日・貸切：検証環境の帯が無いので、店のタブの下にタブを置く（切り替えの文字の高さにそろえる） */
 .tabsClosures {
   margin-top: var(--tpl-e10-tabs-top);
 }
@@ -372,7 +372,7 @@
 }
 
 .card { flex: 1 1 0; min-width: 0; }
-/* 今日の取り込み（絵 mVUo3：幅 300・中身の高さ） */
+/* 今日の取り込み（絵 ：幅 300・中身の高さ） */
 .todayCard { flex: 0 0 var(--tpl-rs-inv-today-card-w); min-width: 0; }
 
 .cardText {

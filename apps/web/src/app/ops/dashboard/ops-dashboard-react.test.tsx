@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsDashboardPage from './page'
-import { contractDetail, deltaLabel, minutesLabel, revenueDetail, revenueSourceLabel } from './format'
+import { contractDetail, deltaLabel, minutesLabel, revenueDetail, revenueSourceLabel } from '../../../v8/ops/dashboard/format'
 import { formatBytes, formatYen, formatYenShort, niceCeiling } from '@/components/ops/ops-charts'
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))

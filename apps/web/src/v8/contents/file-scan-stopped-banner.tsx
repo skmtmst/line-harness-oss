@@ -6,7 +6,7 @@ import NoteBar from '@/components/shared/note-bar'
 import { api } from '@/lib/api'
 
 /**
- * 検査が止まっている時の帯（B-3）。
+ * 検査が止まっている時の帯。
  *
  * 上げたファイルは持ちのまま、確かめ終わるまで使えない。
  * 赤は使わない。読み込めなかった時とは別の帯のため、

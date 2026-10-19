@@ -194,7 +194,7 @@
 .chart[data-chart-distribution='diverging'] .dayButton { flex: 0 0 auto; height: 100%; }
 .chart[data-chart-distribution='diverging'] .bars { position: relative; padding: 0; }
 .chart[data-chart-distribution='diverging'] .bar { position: absolute; }
-/* 分析の日ごとの増減（絵 L4Uov・eEhYU）：棒は細く（5px）、増えたは LINE の緑。凡例の四角も同じ色。 */
+/* 分析の日ごとの増減：棒は細く（5px）、増えたは LINE の緑。凡例の四角も同じ色。 */
 .chart[data-chart-distribution='diverging'] .bars { gap: 0; }
 .chart[data-chart-distribution='diverging'] .bar { width: var(--tpl-an-bar-w); min-width: var(--tpl-an-bar-w); max-width: var(--tpl-an-bar-w); left: calc(50% - var(--tpl-an-bar-w) / 2); }
 .chart[data-chart-distribution='diverging'] .addedBar,
@@ -209,7 +209,7 @@
  * ★V8 G3 はみ出し直し（parity 1004-0513：目盛り 58＞24 など 104 件）。
  * 狭い列で中央寄せの字が隣の列へはみ出すと、後に描かれる隣の列の棒の
  * 下に隠れる（.column が relative のため）。字を前に出す＋地を敷いて、
- * 曜日まで読めるようにする。位置・大きさは変えない。v7 は今までどおり。
+ * 曜日まで読めるようにする。位置・大きさは変えない。互換経路は今までどおり。
  */
 :root .axisLabel {
   position: relative;

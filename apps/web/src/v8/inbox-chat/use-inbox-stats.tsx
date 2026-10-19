@@ -126,7 +126,7 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
 
   /*
    * ★V8 状態の切り替えの件数（未対応 5・対応中 2…）。一覧と同じ条件（アカウント・担当・名前・
-   * 未読だけ・経路）で、状態ごとに件数の口へ聞く。失敗は0件にせず数を出さない。v7 では聞かない。
+   * 未読だけ・経路）で、状態ごとに件数の口へ聞く。失敗は0件にせず数を出さない。互換経路では聞かない。
    */
   const statusCountsKey = JSON.stringify([selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
 

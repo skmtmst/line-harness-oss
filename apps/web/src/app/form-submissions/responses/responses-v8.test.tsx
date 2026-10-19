@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * V8の集まった回答（v0SbYR・MKQyJ）を本物の React で確かめる。
+ * V8の集まった回答（・）を本物の React で確かめる。
  * テーマは `<html data-theme>` で替わるので、描画前に v8 を付ける。
  */
 import React, { act } from 'react'
@@ -214,13 +214,13 @@ async function openResponseDelete(fromDetail = false) {
   const remove = allButtons().find(b => b.textContent === '回答を削除する')!
   await act(async () => remove.click()); await settle()
 }
-it.each(['staff', 'viewer', null])('B-215: %sは回答一覧・詳細に削除の口が無い', async value => {
+it.each(['staff', 'viewer', null])('%sは回答一覧・詳細に削除の口が無い', async value => {
   role.current = value
   await rowView()
   expect(document.querySelector('[aria-label="回答 sub-1 の操作"]')).toBeNull()
   expect(document.querySelector('[aria-label="回答の詳細の操作"]')).toBeNull()
 })
-it.each([false, true])('B-215: 回答の%sから確認し、取消は送らない', async detail => {
+it.each([false, true])('回答の%sから確認し、取消は送らない', async detail => {
   if (!detail) fetchApi.mockImplementation(async (url: string) => ({ success: true, data: url.includes('/submissions') ? {
     ...submissionsPage, items: [{ ...submissionsPage.items[0], postActions: { state: 'completed', pending: [] } },
       { ...submissionsPage.items[0], id: 'sub-2', friendName: '別の回答者' }], total: 2,
@@ -236,7 +236,7 @@ it.each([false, true])('B-215: 回答の%sから確認し、取消は送らな�
   await act(async () => allButtons().find(b => b.textContent === 'キャンセル')!.click()); await settle()
   expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
 })
-it('B-215: 二重押下は1要求。失敗は窓を残してやり直し、成功後は再読込', async () => {
+it('二重押下は1要求。失敗は窓を残してやり直し、成功後は再読込', async () => {
   let reject!: (error: Error) => void
   fetchApi.mockImplementation(async (url: string, init?: RequestInit) => {
     if (init?.method === 'DELETE') return await new Promise((_, fail) => { reject = fail })

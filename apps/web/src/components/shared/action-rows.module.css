@@ -1,6 +1,6 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-/* ★V8 自動応答の作る③「返したあとに行うこと」の行（絵 rfhIf「処理」）。値は型の変数だけ。 */
+/* ★V8 自動応答の作る③「返したあとに行うこと」の行（絵 「処理」）。値は型の変数だけ。 */
 .list { display: flex; flex-direction: column; gap: var(--tpl-section-gap); }
 .empty { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
 .item {

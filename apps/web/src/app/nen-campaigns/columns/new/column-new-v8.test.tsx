@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B コラムを書く（yRDwW）の骨格。
- * 下書きの決めごとは v7（column-form）と同じ。節の並びと保存の口を見る。
+ * ★V8-B コラムを書くの骨格。
+ * 下書きの決めごとは 管理画面（column-form）と同じ。節の並びと保存の口を見る。
  */
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'

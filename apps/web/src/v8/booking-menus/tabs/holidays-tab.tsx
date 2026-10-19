@@ -15,7 +15,7 @@ import { requiredText, optionalText } from '@/lib/form-requirement'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
-/* ③ 休業日（KRgTQ）（settings-v8.tsx から分割。見た目・動きは変えない） */
+/* ③ 休業日（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 function monthWeeks(month: string): string[][] {
   const first = new Date(`${month}-01T00:00:00Z`)
@@ -219,7 +219,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           const isRegularOff = settings.businessHoursConfigured && closedDow.has(d.getUTCDay())
           const isToday = date === today
           const mark = exception ? '臨時休業' : isRegularOff ? '定休' : null
-          // 前後の月の日は空けておく（絵 KRgTQ）。
+          // 前後の月の日は空けておく。
           if (!inMonth) return <span key={date} className={`${styles.calDay} ${styles.calDayOutside}`} aria-hidden="true" />
           const dayLabel = `${jpDate(date)}${mark ? `（${mark}）` : ''}`
           const dayClass = [

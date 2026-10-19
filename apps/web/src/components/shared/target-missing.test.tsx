@@ -10,7 +10,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 
 /**
- * ★V7「開き先がない」（設計ノード `x5cgUH`）。
+ * ★管理画面「開き先がない」（設計ノード `x5cgUH`）。
  *
  * 赤い字だけ・ピンクの箱・灰色の文だけ・枠つきの箱とばらばらだった
  * 37画面を、1つの部品にそろえる。開き先が無いのは利用者の失敗では

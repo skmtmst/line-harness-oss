@@ -61,13 +61,13 @@ async function settle() {
 }
 
 describe('本部のアカウント一覧の見出し', () => {
-  it('/hq が見出し「アカウント」を出す', async () => {
+  it('hq が見出し「アカウント」を出す', async () => {
     await act(async () => { root.render(<HqPage />) })
     await settle()
     expect(titles.seen).toContain('アカウント')
   })
 
-  it('/hq/open が見出し「アカウント」を出す', async () => {
+  it('hq/open が見出し「アカウント」を出す', async () => {
     window.history.replaceState(null, '', '/hq/open?target=tags')
     await act(async () => { root.render(<HqOpenPage />) })
     await settle()

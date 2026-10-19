@@ -3,7 +3,7 @@ import type { ApiResponse } from '@line-crm/shared'
 import { formatNumber } from '@/lib/format'
 
 /**
- * 然-NEN- マイペット（★V6 37-3）／健康日記（★V6 37-4）。
+ * 然-NEN- マイペット（★管理画面 37-3）／健康日記（★管理画面 37-4）。
  * Worker `apps/worker/src/routes/nen-pets.ts`。ペットの正本は LINE 側（お客様がマイページで登録・更新）。
  */
 

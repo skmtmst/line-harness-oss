@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 マニュアルの正本表（Pencil `cIdA2`、状態は `bR6a1`）。
+ * ★V8 マニュアルの正本表（Pencil 、状態は ）。
  *
  * 動き（読み込み・権限・いま全部を確かめる・直す／決める・競合の読み直し）は
  * 今までの V8（app/settings/manual-links/manual-links-v8.tsx）と同じ。処理は同じ場所の

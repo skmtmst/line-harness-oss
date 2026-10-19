@@ -63,7 +63,7 @@ describe('統括の旧メッセージ編集（保存結果の再確認にも使�
   })
 })
 
-describe('統括のメッセージのひな形：欄ごとの誤り（B-139）', () => {
+describe('統括のメッセージのひな形：欄ごとの誤り', () => {
   function FieldsHarness({ initial, save }: { initial: MessageTemplateDefinition; save: (value: MessageTemplateDefinition) => void }) {
     const [value, setValue] = useState(initial)
     const fields = useFormErrors()

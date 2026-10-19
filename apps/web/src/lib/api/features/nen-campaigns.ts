@@ -22,7 +22,7 @@ function nenMetricsQuery(accountId: string, range: number | NenMetricsQueryRange
 
 export const nenCampaignsMethods = {
   nenCampaigns: {
-    /** 期間は日数か、★V6 37-6 の「今月・先月」のための from/to（ISO 8601）。 */
+    /** 期間は日数か、★管理画面 37-6 の「今月・先月」のための from/to（ISO 8601）。 */
     flowMetrics: (accountId: string, range: number | NenMetricsQueryRange = 30) => fetchApi<ApiResponse<NenFlowMetrics>>(
       `/api/nen-campaigns/metrics/flows?${nenMetricsQuery(accountId, range)}`,
     ),
@@ -117,7 +117,7 @@ export const nenCampaignsMethods = {
         `/api/nen-campaigns/columns-preview?${query}`,
       )
     },
-    /** ★V6 37-6-A「ECのコラムを取り込む」。宛先が決まらず未割り当てになっているECコラムを、このアカウントへ割り当てる。 */
+    /** ★管理画面 37-6-A「ECのコラムを取り込む」。宛先が決まらず未割り当てになっているECコラムを、このアカウントへ割り当てる。 */
     importColumns: (accountId: string) => fetchApi<ApiResponse<{ imported: number }>>(
       `/api/nen-campaigns/columns/import?lineAccountId=${encodeURIComponent(accountId)}`,
       { method: 'POST' },

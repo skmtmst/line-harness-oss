@@ -1,12 +1,12 @@
 'use client'
 
 import { cloneElement, createContext, useCallback, useContext, useId, useLayoutEffect, useMemo, useRef, type ReactElement, type ReactNode } from 'react'
-import { readSaveFieldErrors } from '@/lib/api-field-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { useFormErrors, type FormErrors } from '@/lib/use-form-errors'
 import { FieldContext, joinDescribedBy, useFieldContext } from './field-context'
 import { FieldError } from './form-controls'
 
-/** B-154：既存の検査・409の守りを残して、保存のcatchで欄の理由を受ける。 */
+/** ：既存の検査・409の守りを残して、保存のcatchで欄の理由を受ける。 */
 export function useSaveFormErrors() {
   const current = useFormErrors()
   const latest = useRef(current)

@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 はじめの設定（Pencil `xuJ7D`）。
+ * ★V8 はじめの設定（Pencil ）。
  *
  * 白い板の頭（題と説明）→ 左に「設定の中のメニュー」→ 右に
  * 進み具合の帯・6段の表・下の2枚（いま止まっている理由・気をつけること）。
@@ -10,7 +10,7 @@
  */
 import { Check } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
-import { useFirstRun } from '@/v8/onboarding/use-first-run'
+import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'

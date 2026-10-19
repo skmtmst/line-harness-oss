@@ -3,7 +3,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("ルール名を入力してください"),
 }
 
@@ -46,7 +46,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 
 /*
- * ★V8-B マイル「たまる決めごとを作る」（Pencil：作る `ctLwT`・競合 `BnrQp`）。
+ * ★V8-B マイル「たまる決めごとを作る」（Pencil：作る ・競合 ）。
  *
  * 型（CreatePage）に、4つの段（どのルールか・何マイル付けるか・受け取る人・使えるまで・付けすぎを防ぐ）と、
  * 右の列（この設定だとこう貯まります・気をつけること）、下の帯（キャンセル・保存して続けて作る・保存して動かす）を渡す。
@@ -124,7 +124,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [touched, setTouched] = useState(false)
-  /** BnrQp：保存が 409 で返ったとき。口が返した「だれが・いつ」を持つ。 */
+  /** ：保存が 409 で返ったとき。口が返した「だれが・いつ」を持つ。 */
   const [conflict, setConflict] = useState<{ who: string | null; at: string | null } | null>(null)
   const [trialBusy, setTrialBusy] = useState(false)
   const [trialError, setTrialError] = useState('')
@@ -162,7 +162,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const fieldErrors: Record<string, string> = {}
-  if ((b244Requirements.name.check(name) !== null)) fieldErrors['er-name'] = 'ルール名を入力してください'
+  if ((FIELD_REQUIREMENTS.name.check(name) !== null)) fieldErrors['er-name'] = 'ルール名を入力してください'
   if (!validAmount) fieldErrors['er-amount'] = '付与マイルは1以上の整数で入力してください'
   if (validFrom && validUntil && validFrom > validUntil) fieldErrors['er-until'] = '終了日は開始日より後にしてください'
   if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
@@ -249,7 +249,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
       else router.push(createPageReturnHref(LIST_HREF, res.data.id))
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
-      /* BnrQp：同時に作られた・版がずれたときは競合の帯で知らせる。 */
+      /* ：同時に作られた・版がずれたときは競合の帯で知らせる。 */
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(conflictWho(caught.data))
         { if (!fieldFailure)
@@ -360,7 +360,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
 
       <Card variant="form" aria-labelledby="er-new-rule">
         <CardHeader size="stacked" titleId="er-new-rule" title="どのルールか" meta="きっかけになる行動を選びます" />
-        <Field requirement={b244Requirements.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
+        <Field requirement={FIELD_REQUIREMENTS.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
           <SaveErrorField names={["name"]}><TextField ref={nameRef} id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
         <SettingsFormRow layout="columns">

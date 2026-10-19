@@ -331,7 +331,7 @@ describe('共通情報編集（V8）の画面', () => {
   })
 
   it('競合で入力を消さない。load()ではなく版だけ取り直す（IDEA-14）', () => {
-    // load() は名前・値・メモまで初期化する。409/428で呼ぶと入力が消える。
+    // load は名前・値・メモまで初期化する。409/428で呼ぶと入力が消える。
     const CATCH = sliceBetween(SAVE_FN, '} catch (e) {', '} finally {')
     expect(CATCH).toContain('await refreshBaseline(item.id, accountAtRequest, e)')
     expect(CATCH).not.toContain('void load()')

@@ -43,7 +43,7 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   onClose?: () => void
   /**
    * 読まなくても操作できる定義だけの補足。文のすぐ右の「？」へ入れる
-   * （★V7・§2-1b）。警告・失敗・操作の結果は入れない。
+   * （★管理画面・§2-1b）。警告・失敗・操作の結果は入れない。
    */
   help?: ReactNode
   /** 「？」の見出し。省略時は「この案内」。 */
@@ -52,8 +52,8 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   helpHref?: string
   /**
    * 左の図柄の差し替え。省略時は種類の既定印。
-   * `null` で図柄なし。rZEGN の帯は順序印（list-ordered）のため口を用意。
-   * 既定の描画は変えない（v7 の画素も不変）。
+   * `null` で図柄なし。 の帯は順序印（list-ordered）のため口を用意。
+   * 既定の描画は変えない（管理画面 の画素も不変）。
    */
   icon?: ReactNode
   /** アカウントの短い説明。既定の帯の色・寸法は変えない。 */

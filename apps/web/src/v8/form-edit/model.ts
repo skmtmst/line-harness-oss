@@ -26,7 +26,7 @@ export function conflictMessage(updatedAt: string): string {
     : 'ほかの人が先に保存しました。最新の内容を読み込んでから、もう一度お試しください。'
 }
 
-/** 帯の題（J1pdB）。だれが保存したかは返事に無いので「ほかの人」と言う。 */
+/** 帯の題。だれが保存したかは返事に無いので「ほかの人」と言う。 */
 export function conflictTitle(updatedAt: string, formName: string): string {
   const when = formatSavedAt(updatedAt)
   const name = formName.trim() ? `フォーム「${formName.trim()}」` : 'このフォーム'
@@ -86,7 +86,7 @@ const KIND_WORD: Record<FormBlock['kind'], string> = { input: '質問', button: 
 
 /**
  * 2つの中身の違いを、運用者が読める文にする。競合の「違いを比べる」と、
- * 公開の確かめ（Z9wXm）の「変わること」で使う。
+ * 公開の確かめの「変わること」で使う。
  */
 export function describeConflictDiff(mine: ConflictSide, incoming: ConflictSide, maxLines = 20): { lines: ConflictDiffLine[]; omitted: number } {
   const lines: ConflictDiffLine[] = []
@@ -134,7 +134,7 @@ export function describeConflictDiff(mine: ConflictSide, incoming: ConflictSide,
 }
 
 /**
- * 公開の確かめ（Z9wXm）の「変わること」。いま保存されている下書きから、
+ * 公開の確かめの「変わること」。いま保存されている下書きから、
  * 画面で直したところを「＋ 足した／－ 消した／・ 変えた」で言う。
  */
 export function describePublishChanges(saved: ConflictSide | null, current: ConflictSide): ConflictDiffLine[] {
@@ -200,7 +200,7 @@ const input = (type: FormInputType, patch: Partial<FormInputBlock> = {}) => (cou
 }
 
 /**
- * 足す欄の4組（J1pdB・ijxur・ITBAB）。
+ * 足す欄の4組（・・）。
  * メール・電話・住所・日付・時刻・ファイルは、足したときに質問文へその名前を入れておく（オーナー 2026-10-08：空のままだと何の欄か分からない）。
  */
 export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
@@ -254,7 +254,7 @@ export function emptyAction(kind: Exclude<FormAction['kind'], 'research_action'>
   }
 }
 
-/** 足すボタン（XXFT4 の下の列）。 */
+/** 足すボタン（ の下の列）。 */
 export const ACTION_ADDERS: { kind: Exclude<FormAction['kind'], 'research_action'>; label: string }[] = [
   { kind: 'send_text', label: 'テキスト' },
   { kind: 'send_template', label: 'テンプレート' },
@@ -264,7 +264,7 @@ export const ACTION_ADDERS: { kind: Exclude<FormAction['kind'], 'research_action
   { kind: 'reminder', label: 'リマインダ' },
 ]
 
-/** 行の文（XXFT4）。「テキストを送る「〇〇」」のように、何をするかを1行で。 */
+/** 行の文。「テキストを送る「〇〇」」のように、何をするかを1行で。 */
 export function describeAfterAction(action: FormAction, refs: FormRefs): string {
   const nameOf = (list: { id: string; name: string }[], id: string, missing: string) => list.find((x) => x.id === id)?.name ?? missing
   switch (action.kind) {

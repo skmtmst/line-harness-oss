@@ -34,10 +34,10 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 統合ユーザー（Pencil `ADjK8`）。/friends?tab=merged。
+ * ★V8 統合ユーザー（Pencil ）。/friends?tab=merged。
  *
  * データの口は今と同じ（/api/users-grouped・/api/duplicates/stats・CSV の全件書き出し）。
- * 詳細（`Hn9eE`）は今と同じく一覧の面を差し替える。URL の `?person=<id>` でも開ける。
+ * 詳細（）は今と同じく一覧の面を差し替える。URL の `?person=<id>` でも開ける。
  *
  * 絵の列「配信に使うアカウント」「結び付けた日」の値は一覧の API に無い。
  * 出せる分だけ出す：配信に使うアカウントは、友だちが1つだけの人はその名前、

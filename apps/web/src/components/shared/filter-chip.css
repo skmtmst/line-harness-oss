@@ -65,7 +65,7 @@
 
 /*
  * ★V8「絞り込みの札」（O2fCAt・XGJDa）：高さ36・文字12/500。
- * 選んだ札は B-211 の薄い緑の地・緑の枠・濃い緑の文字。
+ * 選んだ札は  の薄い緑の地・緑の枠・濃い緑の文字。
  */
 :root .v6-filter-chip {
   height: 36px;
@@ -80,7 +80,7 @@
   opacity: 0.85;
 }
 
-/* ★V8 仕上げ3回目（M10）②：切替の速さ・感じを --motion-* にそろえる（120ms）。v7 は今までどおり。 */
+/* ★V8 仕上げ3回目（M10）②：切替の速さ・感じを --motion-* にそろえる（120ms）。互換経路は今までどおり。 */
 :root .v6-filter-chip {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
@@ -98,5 +98,5 @@
 :root .v6-filter-chip { border-radius: 999px; }
 
 :root .v6-filter-chip[data-size='compact'] { height: var(--tpl-msg-composer-sticker-chip-h); padding: var(--tpl-msg-composer-sticker-chip-pad); }
-/* eovoGの3つのクイック絞り込み。通常の札の寸法は保つ。 */
+/* の3つのクイック絞り込み。通常の札の寸法は保つ。 */
 :root .v6-filter-chip[data-size='inbox'] { padding: 0 var(--tpl-inbox-composer-input-pad); }

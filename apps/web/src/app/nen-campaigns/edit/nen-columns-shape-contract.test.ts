@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(join(import.meta.dirname, '../../../v8/nen-campaigns/column-intros.tsx'), 'utf8')
 
 /**
- * V6 NENコラム編集の型の契約（#512 重大1）。
+ * 管理画面 NENコラム編集の型の契約（#512 重大1）。
  *
  * 実API（`routes/nen-campaigns.ts` の columns 口）もモックもラクダ語
  * （`introText`・`publishedAt`）で返す。ここだけヘビ語の別型で読んでいた

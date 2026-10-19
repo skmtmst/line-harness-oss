@@ -6,12 +6,12 @@ import ListState from '@/components/shared/list-state'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context'
-import { styleApi } from '@/lib/api-styles'
+import { styleApi } from '@/lib/api/helpers/styles'
 import { styleLabel } from './model'
 import styles from './style-entry.module.css'
 
 /*
- * スタイルを変える入口（B-335 (1)・設定 › アカウント）。今のアカウントのスタイルを出し、
+ * スタイルを変える入口（ (1)・設定 › アカウント）。今のアカウントのスタイルを出し、
  * ［スタイルを変える］でダッシュボードのスタイル選びの窓（xxpM9）を開く。オーナー・管理者だけ（呼ぶ側が決める）。
  * スタイルが読めないときは失敗と再読込を出し、分からない値を「標準」と言わない。
  */

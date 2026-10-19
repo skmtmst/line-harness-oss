@@ -151,7 +151,7 @@ describe('32: 狭幅で1列へ落ち、スイッチが域内に残る', () => {
     // 切替スイッチは狭幅でも描かれ、押せる状態で残る。
     const switches = [...host.querySelectorAll('[type="checkbox"]')]
     expect(switches.length).toBeGreaterThan(0)
-    // ★V8 ywFJT の言い方は「まとめて」（読み上げ名は「〇〇をまとめてオン／オフにする」）。
+    // ★V8  の言い方は「まとめて」（読み上げ名は「〇〇をまとめてオン／オフにする」）。
     expect(host.textContent).toContain('まとめて')
   })
 })

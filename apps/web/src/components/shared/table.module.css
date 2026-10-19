@@ -30,7 +30,7 @@
   white-space: nowrap;
 }
 
-/* ★V7の見出し行（高さ40px・一段沈んだ地）。付けないときは44pxのまま。 */
+/* ★管理画面の見出し行（高さ40px・一段沈んだ地）。付けないときは44pxのまま。 */
 .headComfortable {
   height: 40px;
   background: var(--color-canvas-sunken);
@@ -94,7 +94,7 @@
 
 /*
  * ★V8「表の見出し」：高さ44・左右20・地 table-head・上下に細い線・
- * 文字 12px/500 ink-secondary。v7 は枠カード内の見出しだったが、
+ * 文字 12px/500 ink-secondary。互換経路は枠カード内の見出しだったが、
  * V8 では白い板の中に直接置く（箱の中に箱を作らない）。
  */
 :root .headRow {
@@ -143,7 +143,7 @@
   padding: 0 var(--tpl-cell-gap-half);
   font-weight: 600;
 }
-/* 端の列は行の端の余白（--tpl-row-pad-side）にそろえる。見出しだけ内側にずれていた（MKQyJ）。 */
+/* 端の列は行の端の余白（--tpl-row-pad-side）にそろえる。見出しだけ内側にずれていた。 */
 :root .headRow[data-presentation='embedded'] .cell:first-child { padding-left: var(--tpl-row-pad-side); }
 :root .headRow[data-presentation='embedded'] .cell:last-child { padding-right: var(--tpl-row-pad-side); }
 .truncated {
@@ -153,7 +153,7 @@
   white-space: nowrap;
 }
 
-/* B-218：画面の名前リンクも共通部品が色と1行を所有する。 */
+/* ：画面の名前リンクも共通部品が色と1行を所有する。 */
 html:root .rowNameLink {
   display: block; min-width: 0; max-width: 100%; overflow: hidden;
   white-space: nowrap; text-overflow: ellipsis; color: var(--color-ink); font-weight: 700;

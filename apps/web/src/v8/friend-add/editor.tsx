@@ -530,7 +530,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
       ) : null}
     </LinePreview>
   )
-  /* 1152（xHpkS）：見え方は「LINEでの見え方を見る」で開き、列には設定内容だけを置く。 */
+  /* 1152：見え方は「LINEでの見え方を見る」で開き、列には設定内容だけを置く。 */
   const preview = step === 'basic' ? (
     <>
       {summary}
@@ -576,7 +576,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
           ? 'いまは下書きとして作ります。最後の「確認」で有効にします。'
           : `名前：${rule.name || emptyValue('unconfigured')}・いまは${statusLabel}です`}
       </>}
-      /* 先に保存されたとき（h5rm8t）：板の頭の下に、入力欄と右の列にまたがる帯（型の notice の置き場）。
+      /* 先に保存されたとき：板の頭の下に、入力欄と右の列にまたがる帯（型の notice の置き場）。
          帯は共通部品（save-conflict）。比べる窓は項目を左右に並べるこの画面のものを使う。 */
       notice={conflict ? (
         <SaveConflictBand reloadVariant="primary"

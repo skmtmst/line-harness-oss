@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const net = vi.hoisted(() => ({ group: vi.fn(), cancelGroup: vi.fn() }))
-vi.mock('@/lib/api-booking-advanced', () => ({ bookingAdvancedApi: net }))
+vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: net }))
 vi.mock('@/components/shared/toast', () => ({ notifySaved: vi.fn() }))
 import { BookingGroupSection } from './booking-group'
 afterEach(cleanup)

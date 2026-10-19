@@ -112,7 +112,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   line: 'LINE',
 }
 
-/** 右の見本の行の名前（絵 H5UoIu：友だち・配信を開いた・成果）。 */
+/** 右の見本の行の名前（絵 ：友だち・配信を開いた・成果）。 */
 const PREVIEW_LABEL: Partial<Record<string, string>> = { friends: '友だち', reactions: '配信を開いた', routes: '成果', mileage: 'マイル' }
 
 function sectionTitleOf(id: string): string {
@@ -120,7 +120,7 @@ function sectionTitleOf(id: string): string {
 }
 
 /*
- * G83vi「違いを比べる」の比べる文。版の本文ではなく設定の要約。
+ * 「違いを比べる」の比べる文。版の本文ではなく設定の要約。
  * 最新と入力中の2つを作り、VersionCompare（行ごとの比べる）へ渡す。
  */
 type ReportSummaryInput = {
@@ -512,7 +512,7 @@ function AnalyticsReportFormPage() {
    */
   const [conflictId, setConflictId] = useState<string | null>(null)
   /*
-   * G83vi: なおし中にほかの人が先に保存した（409）。
+   * : なおし中にほかの人が先に保存した（409）。
    * 入力は残したまま、板の頭の下に琥珀色の帯を出す。
    * 最新の取り直しができたら比べる文に使い、できなくても帯は出す。
    */
@@ -554,7 +554,7 @@ function AnalyticsReportFormPage() {
 
   /*
    * 保存する中身の検査と組み立て。submit（つくる・なおす）と
-   * saveOverLatest（G83vi「この内容で保存する」）の両方から使う。
+   * saveOverLatest（「この内容で保存する」）の両方から使う。
    * 文言・順番はそのまま。画面への表示は呼ぶ側が行う。
    */
   type ReportPayload = {
@@ -704,7 +704,7 @@ function AnalyticsReportFormPage() {
           })
         } catch (caught) {
           /*
-           * G83vi: ほかの人が先に保存した（409）。入力は残したまま、
+           * : ほかの人が先に保存した（409）。入力は残したまま、
            * 板の頭の下に注意の帯を出す。
            * 最新を取り直せたら「違いを比べる」の比べる文に使う。
            */
@@ -795,7 +795,7 @@ function AnalyticsReportFormPage() {
   }
 
   /*
-   * G83vi「最新を読み込んで続ける」。取り直せた最新があればそのまま
+   * 「最新を読み込んで続ける」。取り直せた最新があればそのまま
    * 画面へ戻し、なければ読み直す。どちらも入力中の内容は最新で置き換わる。
    */
   const applySchedule = (schedule: AnalyticsReportSchedule) => {
@@ -870,7 +870,7 @@ function AnalyticsReportFormPage() {
   }
 
   /*
-   * G83vi「比べてから保存」→比べる窓の「この内容で保存する」。
+   * 「比べてから保存」→比べる窓の「この内容で保存する」。
    * 比べたうえで、取り直した最新の版つきで保存し直す（相手の変更のうえに
    * 重ねる危ない操作なので、比べる窓の中からだけ押せる）。入力は残す。
    * 失敗したら窓は閉じず、その場で理由を出してもう一度押せる。
@@ -940,7 +940,7 @@ function AnalyticsReportFormPage() {
   }
 
   /*
-   * G83vi「違いを比べる」の2つの文。最新が取れていないときは比べる窓を出さない。
+   * 「違いを比べる」の2つの文。最新が取れていないときは比べる窓を出さない。
    */
   const staffNameOf = (id: string) => options?.recipients.find((item) => item.id === id)?.name ?? id
   const savedNameOf = (id: string) => options?.savedAnalyses.find((item) => item.id === id)?.name ?? id

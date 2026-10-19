@@ -1,7 +1,7 @@
 'use client'
 import ReservationBoard,{ReservationSource} from '@/components/shared/reservation-board'
 import {seatBoardEntry} from '@line-crm/shared'
-import {reservationBoardApi,allBoardPages} from '@/lib/api-reservation-board'
+import {reservationBoardApi,allBoardPages} from '@/lib/api/helpers/reservation-board'
 import {useAccount} from '@/contexts/account-context'
 
 /*
@@ -25,7 +25,7 @@ import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { StatRow } from '../booking-kit/shell'
+import { StatRow } from '@/v8/restaurant/booking-kit/public/shell/index'
 import {
   INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, floorOrder, hm, isHold, mdWeek, minutesOf,
   addDays, sameDay, shortCourse, slotLabel, sourceKind, sourceName, dayRange, toYmd,

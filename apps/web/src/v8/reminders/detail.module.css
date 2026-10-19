@@ -1,5 +1,5 @@
 /*
- * ★V8 リマインダの詳細（rbAig 概要・loVfW 登録者）。
+ * ★V8 リマインダの詳細（ 概要・ 登録者）。
  * 外の枠は型（PageFrame）。頭（戻る・題・説明・タブ）と、左の本文／右の列はここで組む。
  * 数字は globals.css の [data-theme="v8"] の段の --tpl-rm-* に置く。
  */
@@ -97,7 +97,7 @@
 .spacer { flex: 1; min-width: 0; }
 
 /* ---- 表（行は線で区切る。行の高さを増やさないよう線は内側の影） ---- */
-/* 行は 56 の高さで間を空けずに並べる（行の間隔 56・絵 rbAig・loVfW。線は行の下の影）。 */
+/* 行は 56 の高さで間を空けずに並べる（行の間隔 56・絵の。線は行の下の影）。 */
 .table { display: flex; flex-direction: column; gap: 0; }
 .headRow, .row {
   display: flex;

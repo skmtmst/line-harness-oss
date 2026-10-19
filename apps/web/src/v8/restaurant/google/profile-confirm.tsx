@@ -12,7 +12,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { ApiError } from '@/lib/api'
 import { restaurantGoogleApi, type GoogleChange, type GoogleChangeStatus, type GoogleDayHours, type GoogleProfileAddress, type GoogleWeeklyHours } from '@/lib/restaurant-google-api'
 import { errorMessage, formatYmdShort, formatPeriods, WEEKDAYS, WEEKDAY_JA } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 
 // Missing profile workflows use the current shared V8 parts; ordinary profile board stays intact.

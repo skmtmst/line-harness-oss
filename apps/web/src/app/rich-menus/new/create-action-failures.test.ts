@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, api } from '@/lib/api'
-import { ManualPublishAttempt } from '../edit/manual-publish-attempt'
-import { publishMenuNow } from './create-publish-actions'
-import { saveMenuDraft } from './create-save-actions'
-import type { Group } from './create-types'
+import { ManualPublishAttempt } from '../../../v8/rich-menus/edit/manual-publish-attempt'
+import { publishMenuNow } from '../../../v8/rich-menus/new/create-publish-actions'
+import { saveMenuDraft } from '../../../v8/rich-menus/new/create-save-actions'
+import type { Group } from '../../../v8/rich-menus/new/create-types'
 
 vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()

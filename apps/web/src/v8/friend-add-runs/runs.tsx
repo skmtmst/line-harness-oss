@@ -39,8 +39,8 @@ import { DataTable, TableHeadRow, Th, Tr, Td, PersonCell, ActionCell } from '@/c
 import { useAccount } from '@/contexts/account-context';
 import { api, type FriendAddRunList } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
-import { describeFriendAddFailure } from '@/v8/friend-add/failure';
-import { useCursorStack } from '@/v8/friend-add/use-cursor-stack';
+import { describeFriendAddFailure } from '@/v8/friend-add/public/failure/index'
+import { useCursorStack } from '@/v8/friend-add/public/use-cursor-stack/index'
 import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status';
 import styles from './runs.module.css'
 import { csvFileName } from '@/lib/csv-file-name';
@@ -50,11 +50,11 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 友だち追加時の配信の実行結果（Pencil `REIxB`）。
+ * ★V8 友だち追加時の配信の実行結果（Pencil ）。
  *
  * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→
  * 失敗の帯 → 実行の記録（道具の段・表・ページ送り）→ 経路ごとの内訳と二重送信を防ぐ・知らせ。
- * 並びと寸法は合格した自動応答の実行結果（`src/v8/auto-replies/runs.tsx`・`nWmLg`）と同じ。
+ * 並びと寸法は合格した自動応答の実行結果（`src/v8/auto-replies/runs.tsx`・）と同じ。
  * 取得・操作の動き（読み直し・絞り込み・カーソルのページ送り・一時停止・CSV）は
  * `app/friend-add-settings/runs/runs-v8.tsx` から写した（import はしない）。動きの一覧は BEHAVIOR.md。
  */

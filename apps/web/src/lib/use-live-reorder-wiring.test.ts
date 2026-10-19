@@ -13,7 +13,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SCREENS = [
   'v8/auto-replies/list.tsx',
   'v8/scenarios/list.tsx',
-  'app/reminders/list-v8.tsx',
+  'v8/reminders/list.tsx',
   'v8/tags/tags-tab.tsx',
   'v8/tags/fields-tab.tsx',
   'v8/tags/marks-tab.tsx',

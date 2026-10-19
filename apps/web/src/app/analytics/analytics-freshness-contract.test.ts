@@ -34,7 +34,7 @@ describe('分析の期間と締切の明示', () => {
 
 describe('未取得・未計測を0にしない', () => {
   it('曜日は端末の地域ではなく暦日(UTC)で決める', () => {
-    // getDay()/toLocaleDateString は端末の地域を使い、日本より遅い地域では
+    // getDay/toLocaleDateString は端末の地域を使い、日本より遅い地域では
     // 前日にずれる。日付列の曜日と日付表示は地域に依らない実装に固定する。
     expect(TIME).toContain('getUTCDay()')
     expect(PAGE).not.toContain('getDay()')
@@ -44,7 +44,7 @@ describe('未取得・未計測を0にしない', () => {
   it('グラフが描けない間は選択日の内訳を出さない', () => {
     // 「増加0人・減少0人・施策なし」は未取得の0を確定値に見せる。
     expect(PAGE).toContain('{daysShown && (selectedDay || overview.campaigns.length > 0)')
-    // ★V7 h99Gb：凡例は部品へ移り、施策名だけが残った。daysShown の門は残す。
+    // ★管理画面 h99Gb：凡例は部品へ移り、施策名だけが残った。daysShown の門は残す。
     expect(PAGE).toContain('overview.campaigns.map((item) =>')
   })
 })

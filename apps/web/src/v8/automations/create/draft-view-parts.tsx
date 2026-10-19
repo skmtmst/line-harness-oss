@@ -5,7 +5,7 @@ import { Bell, FileText, Play, Tag as TagIcon, Zap, type LucideIcon } from 'luci
 import styles from './create.module.css'
 
 /* することの行の見出し（行の種類が変わっても番号は動かない）。 */
-/* 行の印（絵 J1VA8）：タグ＝札・メッセージ＝紙・知らせ＝ベル・シナリオ＝再生・共通アクション＝稲妻。 */
+/* 行の印：タグ＝札・メッセージ＝紙・知らせ＝ベル・シナリオ＝再生・共通アクション＝稲妻。 */
 export function actionRowIcon(type: string): LucideIcon {
   if (type === 'add_tag') return TagIcon
   if (type === 'start_scenario') return Play

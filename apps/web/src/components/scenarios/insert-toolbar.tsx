@@ -65,7 +65,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
   const [vars, setVars] = useState<Option[]>([])
   const [targetDate, setTargetDate] = useState('')
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
-  /* B-221：本文の枠の中の共通行。種類と挿入処理だけを持つ。 */
+  /* ：本文の枠の中の共通行。種類と挿入処理だけを持つ。 */
 
 
   useEffect(() => {

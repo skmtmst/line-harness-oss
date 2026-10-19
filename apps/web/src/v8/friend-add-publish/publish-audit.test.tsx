@@ -27,7 +27,7 @@ it('WEB156: テスト待ちで切り替えても新しいアカウントを処�
  expect(view.container.textContent).not.toContain('テストが完了')
 })
 
-it('B-241：重なり取得のsuccess:falseを重なりなしとして公開確認に進めない',async()=>{
+it('重なり取得のsuccess:falseを重なりなしとして公開確認に進めない',async()=>{
  net.query='id=r';net.conflicts.mockResolvedValue({success:false,error:'fixture failure'})
  const view=render(<Page/>);await act(async()=>{})
  expect(view.container.textContent).toContain('読み込めませんでした')

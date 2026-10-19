@@ -6,7 +6,7 @@ const access = vi.hoisted(() => ({ role: 'staff', friendEdit: false, chatEdit: f
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => access.role, canManageRole: (role: string) => ['owner', 'admin'].includes(role) }))
 vi.mock('@/lib/staff-capability', () => ({ canEditFeature: (key: string) => key === '/friends' ? access.friendEdit : access.chatEdit }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-import { FriendsListHeadV8 } from './friends-nav-v8'
+import { FriendsListHeadV8 } from './friends-nav'
 it('閲覧のみには理由を出し、取り込みを押せないようにする。編集権限のある担当者には閲覧のみと表示しない', () => {
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   const host = document.createElement('div'); document.body.append(host)

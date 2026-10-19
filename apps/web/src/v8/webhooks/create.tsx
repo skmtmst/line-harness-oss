@@ -29,18 +29,18 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 外部連携「送り先を作る」（Pencil `hsD8e`、競合 `NGh7b`）。
+ * ★V8 外部連携「送り先を作る」（Pencil 、競合 ）。
  *
  * 型（CreatePage）に、どちら向き・どこへ・いつ・送れなかったときのカードと、
  * 右の列（届く中身の見本・試しに送る・気をつけること）、下の帯
  * （キャンセル・下書きを保存・つくって動かす）をはめる。
- * データの口は v7 と同じ（作成・本人確認・未保存の番兵）。`?event=` で見本の出来事を選んでおく。
+ * データの口は 管理画面 と同じ（作成・本人確認・未保存の番兵）。`?event=` で見本の出来事を選んでおく。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（競合の口が無い・それでも送れないときの口が無い など）。
  */
 
 /*
  * 送る出来事。正本は packages/db/src/webhooks.ts の KNOWN_OUTGOING_EVENT_TYPES。
- * 絵（hsD8e）の箱（友だち・運用・EC）に出すのはよく使うものだけ。ほかの出来事も消さずに、
+ * 絵の箱（友だち・運用・EC）に出すのはよく使うものだけ。ほかの出来事も消さずに、
  * 「詳細条件」を開くと選べる（選んであれば最初から開いておく）。
  */
 export const EVENT_GROUPS: ReadonlyArray<{ id: string; label: string; events: ReadonlyArray<{ value: string; label: string }> }> = [
@@ -144,7 +144,7 @@ function WebhooksCreateV8Inner() {
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
   const [secret, setSecret] = useState(generateSecret)
-  /* 既定は「選んだものだけ送る」（絵 hsD8e）。すべて送ると要らない個人情報まで出るので、選んでもらう。 */
+  /* 既定は「選んだものだけ送る」。すべて送ると要らない個人情報まで出るので、選んでもらう。 */
   const [sendAll, setSendAll] = useState(false)
   const [selectedEvents, setSelectedEvents] = useState<string[]>(presetValid && presetEvent ? [presetEvent] : [])
   const [incomingSources, setIncomingSources] = useState('')

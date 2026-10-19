@@ -1,7 +1,7 @@
-import { generateGoogleReviewDraft } from './api-google-review-draft'
+import { generateGoogleReviewDraft } from './api/helpers/google-review-draft'
 import { fetchApi } from './api'
 
-/** 飲食店向け「Googleビジネス」のAPI。第1段（設定＋口コミ）★V6 GB-1〜GB-3、GB-13、GB-15、GB-16。第2段（プロフィール・営業時間・変更履歴）GB-10〜GB-12、GB-17〜GB-19。 */
+/** 飲食店向け「Googleビジネス」のAPI。第1段（設定＋口コミ）★管理画面 GB-1〜GB-3、GB-13、GB-15、GB-16。第2段（プロフィール・営業時間・変更履歴）GB-10〜GB-12、GB-17〜GB-19。 */
 
 export type GoogleConnectionStatus = 'pending_location' | 'connected' | 'expired' | 'no_permission' | 'disconnected'
 export type GoogleReplyStatus = 'unreplied' | 'draft' | 'pending_confirm' | 'replied' | 'published'

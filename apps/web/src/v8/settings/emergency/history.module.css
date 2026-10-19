@@ -1,6 +1,6 @@
 /*
- * ★V8 運用状態 更新履歴（I2V65v）。数字は書かない（globals.css の [data-theme="v8"] の --tpl-rest3-em-*・--tpl-rest3-uh-*）。
- * 数のマスは緊急コントロール（OHwbU）と同じ形で3つ。
+ * ★V8 運用状態 更新履歴。数字は書かない（globals.css の [data-theme="v8"] の --tpl-rest3-em-*・--tpl-rest3-uh-*）。
+ * 数のマスは緊急コントロールと同じ形で3つ。
  */
 .board {
   display: flex;

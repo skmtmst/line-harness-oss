@@ -1,5 +1,5 @@
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
-import type { Choice,Question } from './model'
+import type { Choice, Question } from './question-types'
 
 
 export const RULES = '/booking/menus?tab=rules'

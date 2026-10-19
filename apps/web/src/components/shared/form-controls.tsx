@@ -32,7 +32,7 @@ export function RequiredBadge({ appearance = 'badge' }: { appearance?: 'badge' |
 }
 
 /**
- * 「任意」の札（Td4TN・RaMf3：括弧なし・11px/17・左に6・文と同じ行）。
+ * 「任意」の札（・：括弧なし・11px/17・左に6・文と同じ行）。
  * 必須のような丸い地は付けず、薄い灰の文字だけ。
  */
 export function OptionalBadge() {
@@ -83,7 +83,7 @@ export function Field({
   /** 小さな連携フォームのラベルと間隔。 */
   density?: 'compact' | 'input'
   grow?: boolean
-  /** 選ぶ欄の短いラベル（gjUz3・hiBO8）。既定の欄は変えない。 */
+  /** 選ぶ欄の短いラベル（・）。既定の欄は変えない。 */
   size?: 'compact'
   /** 横に並ぶ欄を等分する。 */
   fill?: boolean
@@ -107,7 +107,7 @@ export function Field({
   spacing?: 'section'
   /**
    * 言葉の意味・単位・いつ時点の値か。ラベルのすぐ右の「？」へ入れる
-   * （★V7・§2-1b）。必須の印・入力の直し方・失敗は入れない。
+   * （★管理画面・§2-1b）。必須の印・入力の直し方・失敗は入れない。
    */
   help?: ReactNode
   /** 「？」の見出し。省略時は label。読み上げ名は「{見出し}の説明」。 */
@@ -242,7 +242,7 @@ export function Field({
 /*
  * 1行・複数行の入力欄の正本は text-field.tsx（★V8 Ume2U・i5BW8b）。
  * ここの TextInput・TextArea は、その部品を呼ぶだけの薄い包み。
- * 足すのは v7 の見た目の差（読み取り専用の地・押せないときの薄さ・複数行の
+ * 足すのは 管理画面 の見た目の差（読み取り専用の地・押せないときの薄さ・複数行の
  * 大きさ固定）だけで、v8 では TextField・TextArea と同じ物になる。
  * 新しく書く画面は text-field.tsx を直接使う。
  */

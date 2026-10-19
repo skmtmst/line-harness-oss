@@ -22,7 +22,7 @@ function startedLabel(iso: string): string {
 }
 
 /**
- * 代理ログイン帯（★V6 37 共通 `WXp5T`）。代理ログイン中は全画面の上に常時出す。
+ * 代理ログイン帯（★管理画面 37 共通 `WXp5T`）。代理ログイン中は全画面の上に常時出す。
  *
  * - 閲覧中（赤 `status-danger`）: 「◯◯ として閲覧中（書き込みはできません）」
  * - 書き込み中（濃い赤 `danger`）: 「◯◯ として書き込み中」
@@ -87,7 +87,7 @@ export default function ImpersonationBar({
 
 
   /*
-   * V8-B `VtJQ6`「代理ログイン中（閲覧のみ）」。閲覧のみの帯だけ V8 の形にし、
+   * V8-B 「代理ログイン中（閲覧のみ）」。閲覧のみの帯だけ V8 の形にし、
    * 書き込み中・理由の窓・止め方は今のまま。押す先・API は変えない。
    */
   const v8ReadBanner = !writing ? (

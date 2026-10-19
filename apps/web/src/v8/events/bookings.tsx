@@ -29,7 +29,7 @@ import { useBookingRequests } from './booking-requests'
 import BookingRecords from './booking-records'
 
 /*
- * ★V8 イベント予約の「申込者」（Pencil `Mu8qW`）。
+ * ★V8 イベント予約の「申込者」（Pencil ）。
  *
  * 型（DetailPage）に、頭（題・戻る口・CSV・開催回の選び口）、数の帯（申込・承認待ち・キャンセル待ち・キャンセル）、
  * 申込者・キャンセル待ち・キャンセル・お知らせを送る の4枚をはめる。

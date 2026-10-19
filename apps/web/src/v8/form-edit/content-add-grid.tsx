@@ -38,7 +38,7 @@ export function blockIcon(block: FormBlock): ReactNode {
     case 'text': return <AlignLeft size={15} aria-hidden="true" />
     case 'button': return <MousePointerClick size={15} aria-hidden="true" />
     default:
-      // 絵 m1cWEy・ijxur：5段階は星、ファイルはクリップ、自由に書くは段落の印、予約はカレンダー、ほかの質問は「？」。
+      // 絵の：5段階は星、ファイルはクリップ、自由に書くは段落の印、予約はカレンダー、ほかの質問は「？」。
       if (block.type === 'booking') return <CalendarCheck size={15} aria-hidden="true" />
       if (block.type === 'rating') return <Star size={15} aria-hidden="true" />
       if (block.type === 'file') return <Paperclip size={15} aria-hidden="true" />

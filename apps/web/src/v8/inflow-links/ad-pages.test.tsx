@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * V8 広告とのつなぎ（FDBsG）・広告への送信履歴（p0kA3）の動きの試験。BEHAVIOR.md の両節を守る。
+ * V8 広告とのつなぎ・広告への送信履歴の動きの試験。BEHAVIOR.md の両節を守る。
  * 対応表（F-21）：返している／返していない・結びつけ（PUT・版つき）は owner・admin だけ。
  * 送信履歴（F-22）：断られた1件のやり直し（POST）は owner だけ。押せない人には置かない。
  */

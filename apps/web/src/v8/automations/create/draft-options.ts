@@ -13,10 +13,10 @@ import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } fro
 // 共通アクションと同じフック1本に寄せる（サーバの認可が正本）。
 
 /**
- * ルールを作る。Pencil ★V6 `Rv8Jv`（25-1-A つくる）。
+ * ルールを作る。Pencil ★管理画面 `Rv8Jv`（25-1-A つくる）。
  *
  * **画面名を本文に置かない。** 共通トップバーへ `usePageTitle` で渡す
- * （`docs/v6-common-rules.md` §1-1）。以前はトップバー・パンくず・本文の
+ * （`docs/管理画面-common-rules.md` §1-1）。以前はトップバー・パンくず・本文の
  * h1 で「ルールを作る」が三重に出ていた。説明文（サブタイトル）も本文には
  * 置かず、右カラムの固有カードへ移した（§1-1、`side-cards.tsx`）。
  *
@@ -30,8 +30,8 @@ import { AUTOMATION_DRAFT_ACTION_OPTIONS, AUTOMATION_DRAFT_TRIGGER_OPTIONS } fro
  * (`apps/worker/src/services/automation-drafts.ts` の
  * `AutomationDraftTriggerType`)と一致し、全部実行門で動く
  * (`apps/worker/src/services/automation-triggers.ts`)。
- * V6は「実装されていない選択肢を表示しない」と決めている
- * （`docs/v6-requirements/v6-25-automation-requirements-draft.md` §4-2・§11）。
+ * 管理画面は「実装されていない選択肢を表示しない」と決めている
+ * （`docs/管理画面-requirements/管理画面-25-automation-requirements-draft.md` §4-2・§11）。
  * 以前は設計の6種だけで、残り4種は下書き編集でしか作れなかった。
  * 共有の正本（`AUTOMATION_DRAFT_TRIGGER_OPTIONS`）が全部持つので、
  * ここはそのまま描き、説明文だけこの画面で足す。
@@ -83,12 +83,12 @@ export const ACTIONS: ReadonlyArray<{ value: string; label: string }> = [...AUTO
 
 /*
  * この画面で中身を作れる「すること」。担当へ知らせる（notify_staff）は知らせのルールを
- * 選ぶ口がこの画面に無く、選ぶと文面の送信として保存されてしまう（v7 の器でも同じ）。
+ * 選ぶ口がこの画面に無く、選ぶと文面の送信として保存されてしまう（管理画面 の器でも同じ）。
  * 作れるものだけを並べる。
  */
 export const EDITABLE_ACTIONS = ACTIONS.filter((action) => action.value !== 'notify_staff')
 
-/* 代表3件のカードの短い説明（絵 M4torY）。ほかは EVENT_NOTES をそのまま出す。 */
+/* 代表3件のカードの短い説明。ほかは EVENT_NOTES をそのまま出す。 */
 export const TRIGGER_SHORT_NOTES: Record<string, string> = {
   friend_add: '友だち追加で動きます',
   message_received: '届いたトークの言葉で絞れます',

@@ -4,10 +4,10 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import ProjectFormDialog from './project-form-dialog'
 
 /**
- * プロジェクトを作る V8（板 W7Z57）。
- * - 外枠に W7Z57 を付ける
+ * プロジェクトを作る V8（板 ）。
+ * - 外枠に  を付ける
  * - 名前が空のまま作らせない（作るボタンが押せない）
- * 完全切り替えのため v7 の分岐は持たない。
+ * 完全切り替えのため 管理画面 の分岐は持たない。
  */
 const fixture = vi.hoisted(() => ({ submit: vi.fn() }))
 

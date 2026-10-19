@@ -21,14 +21,14 @@ import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { storeComparisonApi } from '@/lib/api-gap3'
+import { storeComparisonApi } from '@/lib/api/helpers/gap3'
 import { diffTitle, formatDiff, formatMetric, METRICS, diffTone, worseCount, type MetricDef } from './metrics'
 import styles from './list.module.css'
 
 /*
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`）。行＝店、列＝7つの数。
  * 各マスに値と平均との差の札（良い＝緑・悪い＝赤）。行を押すと右の引き出し（G7-2 `z0fSYt`）。
- * CSV は書き出しの口（頼む→待つ→受け取る）につないだ。「店の組」の絞り込みは口がまだ無いので、形を残して共通の準備中の窓を出す（B-314）。
+ * CSV は書き出しの口（頼む→待つ→受け取る）につないだ。「店の組」の絞り込みは口がまだ無いので、形を残して共通の準備中の窓を出す。
  */
 
 type Status = 'loading' | 'ready' | 'error'

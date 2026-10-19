@@ -19,11 +19,11 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 マイル「マイルを手で増やす・減らす」（板 `M8zhjL`）。
+ * ★V8 マイル「マイルを手で増やす・減らす」（板 ）。
  * app/mileage/friends/detail/v8-mileage-adjust-dialog.tsx から写し、直書きの style を外した。
  *
  * 口と約束（理由必須・追記だけ・再送しても二重反映しない・
- * 境界以上は別のオーナー承認・通知の再送）は v7
+ * 境界以上は別のオーナー承認・通知の再送）は 管理画面
  * （mileage-adjustment-dialog.tsx）と同じ。見せ方だけ V8——
  * 対象の人・増やす／減らす／0にする・マイル数・有効期限・
  * 理由区分・調整元ID・詳しい理由・知らせる・この変更で起きること・
@@ -136,7 +136,7 @@ export default function MileageAdjustDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ（fields は描画ごとに新しい）
   }, [accountId, initialDirection, open])
 
-  /* 欄ごとの誤り（B-139）。欄の真下に出し、確定を押したら1つ目の欄へ移る。 */
+  /* 欄ごとの誤り。欄の真下に出し、確定を押したら1つ目の欄へ移る。 */
   const amountError = zeroing && currentBalance <= 0 ? '残高が0のため、0にすることはできません'
     : !Number.isInteger(amount) || amount <= 0 ? '1以上の整数でマイル数を入力してください'
       : amount > 1_000_000_000 ? 'マイル数が大きすぎます'

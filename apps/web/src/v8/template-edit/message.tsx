@@ -29,23 +29,24 @@ import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import { SettingCheckbox } from '@/components/shared/checkbox'
-import { buildTemplatePreview, extractMessageUrls, LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
+import { LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
+import { buildTemplatePreview, extractMessageUrls } from '../../components/templates/template-preview-model'
 import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateAccountBinding, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
 import { TemplateEditFrame } from './frame'
 import type { TemplateEditHost } from './host'
-import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave'
+import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import InsertRow from './insert-row'
 import { MessageBody } from '@/components/shared/message-insert-row'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import { referenceTokenNames } from '@/components/shared/insert-tokens'
-import { loadTemplateExamples } from '@/v8/templates/examples'
+import { loadTemplateExamples } from '@/v8/templates/public/examples/index'
 import styles from './edit.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
+ * ★V8「メッセージを作る／編集」（絵の1152 は ・競合は ）。
  *
  * 左：名前とフォルダ／中身（本文・差し込む）／本文の中のURL。
  * 右：送るときの名前／届き方（本物のスマホ）。1152 ではスマホを窓で開く。
@@ -55,7 +56,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 
-/** 競合の帯（NCbYn）。誰が・いつ・どれを保存したかと、2つの出口。 */
+/** 競合の帯。誰が・いつ・どれを保存したかと、2つの出口。 */
 type Conflict = { name: string; at: string; latest: TemplateDraft | null }
 
 /**
@@ -107,7 +108,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     setAutoCreated(null)
   }
   const { name, folderId, messageType, messageContent } = editor.draft
-  /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る（B-139）。 */
+  /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る。 */
   const fields = useFormErrors()
   fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'), { required: true })
   fields.define('content', messageType === 'text' ? '本文' : 'メッセージ内容', () => {
@@ -369,7 +370,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     }
   }
 
-  /* 保存して公開：使っている場所があれば、どこへ届くかを見せてから（cuR8I）。 */
+  /* 保存して公開：使っている場所があれば、どこへ届くかを見せてから。 */
   const onPublish = async () => {
     if (host) { hostSave(true); return }
     const savedId = await saveNow()

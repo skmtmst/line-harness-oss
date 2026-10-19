@@ -35,7 +35,7 @@ import { permissionDeniedMessage, withPermissionFailure } from '@/components/sha
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 
 /*
- * ★V8 対応マークを作る・編集（Pencil `ulq9Y`、確認画面は `fy5dz`）。
+ * ★V8 対応マークを作る・編集（Pencil 、確認画面は ）。
  *
  * 型（CreatePage）の左に段「基本」（マーク名・色）と段「自動で変えるきまり」、右の列に「出す場所と数」と案内の帯。
  * 下の帯は「保管する」が左端、キャンセル・保存が真ん中。

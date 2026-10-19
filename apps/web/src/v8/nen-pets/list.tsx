@@ -24,7 +24,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /*
- * ★V8-B 登録ペットの一覧（wTIej・1152 は t2SMXX）。
+ * ★V8-B 登録ペットの一覧（・1152 は ）。
  * 案内の帯 → 道具の段（探す・種別・主食・体重更新・並び・件数）→ 表 → 件数 → ヒント。
  * 表は「見出し 36・行 56」。1152 では 年齢・避妊去勢・運動量 を隠し、年齢は種類の後ろへ寄せる。
  * 取得の口・指定は今の画面と同じ（GET /api/nen/pets）。

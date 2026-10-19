@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import postcss from 'postcss'
 import ts from 'typescript'
+import { hasExportedV8Component, isV8Adapter } from './v8-component-source.mjs'
 
 export function sourceFiles(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -24,7 +25,7 @@ export function globalTokens(css) {
 }
 
 export function resolveValue(value, tokens, seen = new Set()) {
-  // var() の括弧を数え、入れ子のフォールバックも解く。
+  // var の括弧を数え、入れ子のフォールバックも解く。
   let out = '', cursor = 0
   while (true) {
     const start = value.indexOf('var(', cursor)
@@ -141,6 +142,11 @@ export function v8Sources(src, files = sourceFiles(src)) {
       if (next) scan(next)
     }
   }
-  for (const file of files.filter(f => !f.includes('.test.') && (f.includes('/v8/') || /v8[^/]*\.tsx$/.test(f)))) scan(file)
+  for (const file of files.filter(f => !f.includes('.test.') && /\.tsx?$/.test(f))) {
+    const ast = file.endsWith('.tsx') && ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const entry = /\/(?:page|layout)\.tsx$/.test(file) || file.includes('/test-utils/')
+    const v8Component = ast && (hasExportedV8Component(ast) || !entry && isV8Adapter(ast))
+    if (file.includes('/v8/') || /v8[^/]*\.tsx$/.test(file) || v8Component) scan(file)
+  }
   return [...active].filter(file => /\.tsx?$/.test(file) && !file.includes('.test.')).sort()
 }

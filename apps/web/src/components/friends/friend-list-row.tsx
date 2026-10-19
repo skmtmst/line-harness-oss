@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Circle, Star, MessageCircle, UserRound } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
-import type { FriendListColumn } from './friend-list-table'
+import type { FriendListColumn } from './friend-list-types'
 import { RowActions } from '@/components/shared/row-actions'
 import Avatar from '@/components/shared/avatar'
 import Checkbox from '@/components/shared/checkbox'
@@ -377,7 +377,7 @@ function messageTypeLabel(messageType: string): string {
   } as Record<string, string>)[messageType] ?? 'メッセージ'
 }
 
-/** M月D日（曜）。年が違う記録は YYYY年M月D日（★V7：数字の斜線より読みやすい）。 */
+/** M月D日（曜）。年が違う記録は YYYY年M月D日（★管理画面：数字の斜線より読みやすい）。 */
 function formatDate(iso: string): string {
   return formatDay(iso)
 }

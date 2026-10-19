@@ -5,7 +5,7 @@ import Dialog from '@/components/shared/dialog'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { notifySaved } from '@/components/shared/toast'
-import { bookingAdvancedApi } from '@/lib/api-booking-advanced'
+import { bookingAdvancedApi } from '@/lib/api/helpers/booking-advanced'
 import Card from '@/components/shared/card'
 
 import { DataTable, Tr, Th, Td } from '@/components/shared/table'

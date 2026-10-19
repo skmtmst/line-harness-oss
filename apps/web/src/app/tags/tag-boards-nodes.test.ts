@@ -16,7 +16,7 @@ const EDIT = readFileSync(join(HERE, '../../v8/tag-edit/edit.tsx'), 'utf8')
 describe('タグの残りの板ID', () => {
   it('状態の4場面に U0aKD が付く', () => {
     // 現役の読み込み・失敗・空の状態に同じ板の印が付く。
-    // 注釈の `U0aKD` を除き、札の値を4つ数える。
+    // 注釈の  を除き、札の値を4つ数える。
     const count = (TAB.match(/(?<!`)U0aKD(?!`)/g) ?? []).length
     expect(count).toBe(3)
   })

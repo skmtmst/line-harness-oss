@@ -7,8 +7,8 @@ import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import styles from './settings-screen.module.css'
 
 /*
- * ★V8 設定の板（機能設定 ywFJT・マニュアルの正本表 cIdA2・ファイルの検査 PfA4o・
- * 運用状態 Y4LkX1・EC連携 GmVR5・LINE通知 g3iDs）の共通の外側。
+ * ★V8 設定の板（機能設定 ・マニュアルの正本表 ・ファイルの検査 ・
+ * 運用状態 ・EC連携 ・LINE通知 ）の共通の外側。
  *
  * 型（SettingsPage）＋白い板の中の「設定の中のメニュー」（SettingsInnerNav inline）。
  * 型の値と絵の値が違う所（中のメニューの幅 208・メニューと本文の間 0・本文の幅の上限なし・

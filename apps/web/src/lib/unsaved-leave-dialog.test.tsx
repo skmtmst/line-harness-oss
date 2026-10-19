@@ -8,7 +8,7 @@ import { UnsavedLeaveDialog } from './unsaved-leave-dialog'
 afterEach(cleanup)
 
 describe('UnsavedLeaveDialog（未保存ガードの共通窓）', () => {
-  it('文言は固定で、画面ごとの違いは subject の名詞だけ（★V7 sTJsh §5）', () => {
+  it('文言は固定で、画面ごとの違いは subject の名詞だけ（★管理画面 sTJsh §5）', () => {
     render(<UnsavedLeaveDialog open subject="入力した共通情報" onConfirm={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByRole('heading', { name: '保存していない変更があります' })).toBeTruthy()
     expect(screen.getByText('このまま移ると、入力した共通情報が消えます。')).toBeTruthy()

@@ -36,7 +36,7 @@ export function sharedPrefix(names: string[]) {
   return words.every((word) => word === words[0]) && words[0] !== names[0] ? words[0] : ''
 }
 
-/* ===== 作る① 基本設定（板 `wDzkc`） ===== */
+/* ===== 作る① 基本設定（板 ） ===== */
 export function BasicStep({ rule, setRule, definition, setDefinition, options, canEdit, isExisting, nameError, onCreateFolder }: {
   rule: EditorRule
   setRule: Dispatch<SetStateAction<EditorRule>>
@@ -131,7 +131,7 @@ export function BasicStep({ rule, setRule, definition, setDefinition, options, c
   )
 }
 
-/* ===== 作る② 流入リンク（板 `h8uNW`・1152 `xHpkS`） ===== */
+/* ===== 作る② 流入リンク（板 ・1152 ） ===== */
 export function RoutesStep({ rule, definition, setDefinition, options, routeUses, toggleRoute, canEdit, routeError }: {
   rule: EditorRule
   definition: FriendAddRuleDefinition

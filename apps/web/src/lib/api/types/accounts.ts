@@ -53,7 +53,7 @@ export type LineAccountConnectData = {
   remainingActions: string[]
 }
 
-/** 事前確認の4区分。設計 ★V6 33-4 の言葉と1対1。 */
+/** 事前確認の4区分。設計 ★管理画面 33-4 の言葉と1対1。 */
 export type HandoverMatchBucket = 'auto' | 'review' | 'unmatched' | 'lookalike'
 
 export type HandoverMatchCounts = Record<HandoverMatchBucket, number>
@@ -170,5 +170,5 @@ export interface FriendMigrationJob {
   expires_at?: string | null
 }
 
-/** LINEアカウントのタグ（板 `JKjsE`・`HMpVx`）。 */
+/** LINEアカウントのタグ（板 ・）。 */
 export type LineAccountTag = { id: string; name: string; color: string | null; displayOrder: number }

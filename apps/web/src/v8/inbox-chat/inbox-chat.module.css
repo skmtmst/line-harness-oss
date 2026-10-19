@@ -1,5 +1,5 @@
 /*
- * ★V8 受信箱の真ん中・書く欄・窓（M0393）。値は globals.css の [data-theme="v8"] の --tpl-inbox-*。
+ * ★V8 受信箱の真ん中・書く欄・窓。値は globals.css の [data-theme="v8"] の --tpl-inbox-*。
  * このファイルは V8 の画面だけが読む（入口の page.tsx が v8 のときだけ部品を出す）。
  */
 
@@ -151,7 +151,7 @@
 .bottomRow { margin-top: 0; gap: var(--tpl-inbox-composer-gap); }
 .bottomRow > span:first-of-type span { font-size: var(--text-micro); }
 
-/* ── 添付（M0393「7. 添付」I7Skn・B-6） ─────────────── */
+/* ── 添付（「7. 添付」I7Skn・） ─────────────── */
 /* 書く欄の左下のクリップ：白地・薄い枠・32角・角丸10・印16（共通の副ボタン compact に大きさだけ） */
 .attachTrigger {
   flex: none;

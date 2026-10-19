@@ -2,7 +2,7 @@
 import React, { act, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { ManualPublishAttempt } from './manual-publish-attempt'
+import { ManualPublishAttempt } from '../../../v8/rich-menus/edit/manual-publish-attempt'
 
 function Harness({ calls, outcome }: { calls: string[]; outcome: 'fail' | 'success' }) {
   const attempt = useRef(new ManualPublishAttempt())

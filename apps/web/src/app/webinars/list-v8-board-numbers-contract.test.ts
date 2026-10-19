@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * ウェビナーの一覧と板 `UyUMw` の数値突き合わせ（2026-10-03）。
+ * ウェビナーの一覧と板  の数値突き合わせ（2026-10-03）。
  * 見本の数字が変わったらここも直す。共通部品の中身は M10 の持ち物なので見ない。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))

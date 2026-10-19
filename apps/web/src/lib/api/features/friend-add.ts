@@ -29,7 +29,7 @@ export function friendAddStopIdempotencyKey(ruleId: string, version: number): st
 export const friendAddMethods = {
 /**
    * @deprecated 旧互換の `friendAddRouting` client は #560 で削除済み。
-   * 以後はこの V6 rules/runs 契約だけを使う。
+   * 以後はこの 管理画面 rules/runs 契約だけを使う。
    */
   friendAddRules: {
     restore: (accountId: string, id: string, expectedVersion: number) => fetchApi<ApiResponse<{ id: string; status: 'draft'; version: number }>>(
@@ -203,7 +203,7 @@ export const friendAddMethods = {
         { method: 'DELETE' },
       ),
     /**
-     * 一覧のつまみで動かした順を優先順位としてまとめて書く（★V8 MRhef）。
+     * 一覧のつまみで動かした順を優先順位としてまとめて書く（V8）。
      * 受け皿を除く全件を順に渡す。件数が違えば 409（読み直し）。
      */
     reorder: (accountId: string, friendKind: FriendAddRuleKind, ids: string[]) =>

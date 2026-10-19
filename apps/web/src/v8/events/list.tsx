@@ -53,7 +53,7 @@ import ListState from '@/components/shared/list-state'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /*
- * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
+ * ★V8 イベント予約の一覧（Pencil ）。
  *
  * 型（ListPage）に、数の帯（これからの回・申込・あと少しで満席・申し込みが少ない）、
  * 左のフォルダの列（上に「イベントを作る」）、案内の帯と道具の段、表、ページ送りをはめる。

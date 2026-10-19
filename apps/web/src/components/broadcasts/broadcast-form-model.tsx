@@ -124,7 +124,7 @@ export function videoPreviewProblem(value: unknown): string | null {
 }
 
 /*
- * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。送る形（label・type: url/pdf・value）は今のまま。
+ * ボタンの押したら（共通の欄 TapActionField・YPzmo・）。送る形（label・type: url/pdf・value）は今のまま。
  * 予約・回答フォーム・予約履歴・来店スタンプは type 'url' のまま、value にアカウントの LIFF の URL を入れる
  * （LIFF ID がまだ分からないときは一斉配信で置き換わる {{liff_id}}）。テキストを送るは、このボタンの形
  * （URL・PDF）が持てないので出さない。
@@ -256,7 +256,7 @@ export function bubblesError(bubbles: BroadcastBubble[]): string {
 /*
  * 右側のプレビューの枠は、LINEのトーク画面に近い共通部品
  * `LinePreview`（`components/shared/line-preview`）を使う。
- * 画面ごとに枠の色を作らない（B-6）。
+ * 画面ごとに枠の色を作らない。
  */
 
 /**

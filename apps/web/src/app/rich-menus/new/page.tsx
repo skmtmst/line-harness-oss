@@ -1,6 +1,6 @@
 'use client'
 
-import RichMenuCreateV8 from './create-v8'
+import RichMenuCreateV8 from '../../../v8/rich-menus/new/create'
 
 export default function NewRichMenuPage() {
   return <RichMenuCreateV8 />

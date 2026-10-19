@@ -40,7 +40,7 @@ describe('N-385: 設定メニューはキーボードだけで開いて選べ、
 
 describe('N-386: 狭い幅では重要度の低い列を隠し、情報は詳細で見られる', () => {
   it('V8では名前列を伸ばし、短い文字列は1行で省略する', () => {
-    // V7の1180px分岐を持ち込まず、1152のV8でも採用済みの列を保つ。
+    // 管理画面の1180px分岐を持ち込まず、1152のV8でも採用済みの列を保つ。
     expect(INTERACTIONS).toContain('<Th grow className={styles.colName}>')
     expect(INTERACTIONS).toContain('<Td grow className={styles.colName}>')
     expect(STYLES).toContain('min-width: 0;')
@@ -61,7 +61,7 @@ describe('N-387: まとめて再試行は上限を越えた残りを黙って置
     expect(INTERACTIONS).toContain('d.remaining')
     expect(INTERACTIONS).toContain('もう一度押すと続きをやり直します')
     // IDEA-26: 結果不明で送らなかった分(needsReview)も残件として成功扱いにしない。
-    // 残件あり → 危険の帯に件数と続きの方法。残件なし → Toast（★V7 共通部品その2 §2）。
+    // 残件あり → 危険の帯に件数と続きの方法。残件なし → Toast（★管理画面 共通部品その2 §2）。
     expect(INTERACTIONS).toContain('d.failed > 0 || d.skipped > 0 || d.remaining > 0 || d.needsReview > 0')
     expect(INTERACTIONS).toContain('setNotice(message)')
     expect(INTERACTIONS).toContain('notifyToast(message)')

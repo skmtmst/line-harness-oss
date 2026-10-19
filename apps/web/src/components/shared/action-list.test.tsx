@@ -19,7 +19,7 @@ function Harness({ readOnly = false, initial = [], quickAddChoiceId }: { readOnl
 afterEach(cleanup)
 const data = () => JSON.parse(screen.getByTestId('value').textContent!) as Item[]
 const addMenu = () => fireEvent.click(screen.getByRole('button', { name: '行うことを足す' }))
-describe('B-169 行うことの共通部品', () => {
+describe('行うことの共通部品', () => {
   it('直接選ぶ入口も取消では追加せず、選択を確定してから追加する', () => {
     render(<Harness quickAddChoiceId="tag" />)
     fireEvent.click(screen.getByRole('button', { name: '共通アクションから選ぶ' }))

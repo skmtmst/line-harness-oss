@@ -1,5 +1,5 @@
 /*
- * 臨時休業・貸切（提案 E-10 `UVnvR`・`nVvXy`）の表示の形と数え方。画面から切り離して試験する。
+ * 臨時休業・貸切（提案 E-10 ・）の表示の形と数え方。画面から切り離して試験する。
  *
  * 日付は店舗の暦日（YYYY-MM-DD）のまま扱う。時刻の重なりだけ、店舗のタイムゾーンで UTC に直して比べる。
  */
@@ -7,7 +7,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import type { RestaurantClosure, RestaurantClosureInput, RestaurantClosureKind } from '@line-crm/shared'
 import type { RestaurantChannelCloseTask } from '@line-crm/shared'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { joinTableCodes } from '../inventory/format'
+import { joinTableCodes } from '@/v8/restaurant/inventory/public/format/index'
 
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土']
 

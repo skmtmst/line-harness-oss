@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 運営（契約者専用）の LINE を登録する窓（Pencil `D6fh3`）。
+ * ★V8 運営（契約者専用）の LINE を登録する窓（Pencil ）。
  * 読む口・閉じ方は `components/hq/notice-line-register-dialog.tsx` と同じ。
  * 見た目だけを絵どおりに組んだ：QR の箱と説明・6 桁を1字ずつの箱・下の真ん中に「あとで確認する」。
  */

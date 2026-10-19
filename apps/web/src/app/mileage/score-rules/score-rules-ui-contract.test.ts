@@ -12,7 +12,7 @@ const ADJUSTMENT = readFileSync(
 
 /*
  * ここは**画面の文字と幅**だけを見る。口とデータは #496 の
- * `mileage-v6-contract.test.ts` が見ている。
+ * `mileage-管理画面-contract.test.ts` が見ている。
  */
 describe('スコアのルール：失敗の文言', () => {
   it('`ApiError` の中身をそのまま出さない', () => {

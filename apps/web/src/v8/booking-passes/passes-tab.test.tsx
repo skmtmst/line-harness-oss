@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), holders: vi.fn(), start: vi.fn(), stop: vi.fn(), create: vi.fn() }))
-vi.mock('@/lib/api-gap3', () => ({ bookingPassPlansApi: api }))
+vi.mock('@/lib/api/helpers/gap3', () => ({ bookingPassPlansApi: api }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual, bookingApi: { ...actual.bookingApi, listMenus: async () => ({ menus: [{ id: 'm1', name: 'ヨガ（初級）' }, { id: 'm2', name: '朝ヨガ' }, { id: 'm3', name: 'カット' }] }) } }

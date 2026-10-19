@@ -1,12 +1,12 @@
 'use client'
 
 /*
- * ★V8 LINEアカウントの詳細（Pencil `ihjfd`）。
+ * ★V8 LINEアカウントの詳細（Pencil ）。
  *
  * 白い板の頭（題・状態の1行・右に「編集する」「乗り換え」）→ 左に「設定の中のメニュー」→
  * 中央に登録の内容・つづき・資格情報・Webhook、右にできること・気をつけること・つながる先・
- * 送受信を止める／アーカイブ。窓（止める CFAyf・資格情報 Msb1j・アーカイブ WOfBN・
- * 編集 n9Z2P）は dialogs.tsx。データの口は今の画面（app/accounts/detail）と同じ。
+ * 送受信を止める／アーカイブ。窓（止める ・資格情報 ・アーカイブ ・
+ * 編集 ）は dialogs.tsx。データの口は今の画面（app/accounts/detail）と同じ。
  * 動きの一覧は同じ場所の BEHAVIOR.md。
  */
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';

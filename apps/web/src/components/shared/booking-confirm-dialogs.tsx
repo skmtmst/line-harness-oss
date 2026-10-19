@@ -11,7 +11,7 @@ import TestModeNote from './test-mode-note'
 import styles from './booking-confirm-dialogs.module.css'
 
 /*
- * 予約・お金・連絡が絡む、戻せない操作の確かめの窓（B-338・2026-10-16）。どの画面も同じ部品で出す。
+ * 予約・お金・連絡が絡む、戻せない操作の確かめの窓（・2026-10-16）。どの画面も同じ部品で出す。
  * - 予約を取り消す（★V8 h2lHCH）：お支払いの扱い・理由（必須）・LINE で知らせる（文の見本）
  * - 返金する（Y8MWGs・PpBzn・v6mT4f）：2 段。①金額（全額／一部）と理由（必須）②確かめ
  * - 休講にする（Md9O3）：人数・お金と回数券の扱い・理由（必須）・送る LINE

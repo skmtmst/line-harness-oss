@@ -32,7 +32,7 @@ import {
   type ActionScoreRuleTestResult,
 } from '@/lib/api'
 import { localDateTime, utcDateTime } from '@/lib/presentation'
-import { validateRuleName, validateTestScore } from '@/app/mileage/score-rules/score-rules-validation'
+import { validateRuleName, validateTestScore } from '@/v8/mileage/score-rules/score-rules-validation'
 import { formatDay, formatNumber } from '@/lib/format'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 

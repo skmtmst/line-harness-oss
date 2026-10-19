@@ -3,9 +3,9 @@ import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AreaProperties } from './area-properties'
-import type { Area } from './canvas-editor'
+import type { Area } from './area-types'
 // @vitest-environment happy-dom
-// B-169: メニュー→選ぶ窓→確定。取消では保存値を変えない。
+// : メニュー→選ぶ窓→確定。取消では保存値を変えない。
 
 afterEach(() => cleanup())
 
@@ -54,7 +54,7 @@ function openTags() {
   return screen.getByRole('dialog', { name: 'タグを選ぶ' })
 }
 
-describe('ボタンのタグ選び（B-169・R19/R20）', () => {
+describe('ボタンのタグ選び（・R19/R20）', () => {
   it('打つと候補が絞り込める', async () => {
     render(<Harness />)
     const dialog = openTags()

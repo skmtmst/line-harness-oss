@@ -21,16 +21,16 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 統括のアカウントの3つの窓（板 `HMpVx` 設定・`D6ljr` アーカイブ・`HFsO9` 戻す）。
+ * ★V8 統括のアカウントの3つの窓（板  設定・ アーカイブ・ 戻す）。
  * 統括ホームのカードの「設定」・「戻す」から開く。
- * 読み書きの口・本人確認は v7（app/hq/account-settings-dialogs.tsx）と同じ（import できないので写した）。
- * 設定の窓だけ、見た目を絵 `HMpVx` どおりに組み直した。
+ * 読み書きの口・本人確認は 管理画面（app/hq/account-settings-dialogs.tsx）と同じ（import できないので写した）。
+ * 設定の窓だけ、見た目を絵  どおりに組み直した。
  */
 
-/** 絵 `HMpVx` の窓の幅と上からの位置（px）。 */
+/** 絵  の窓の幅と上からの位置（px）。 */
 const SETTINGS_WIDTH = 560
 const SETTINGS_TOP = 200
-/** 絵 `D6ljr`・`HFsO9` の窓の幅と上からの位置（px）。 */
+/** 絵の の窓の幅と上からの位置（px）。 */
 const ARCHIVE_WIDTH = 520
 const ARCHIVE_TOP = 240
 const RESTORE_TOP = 220
@@ -46,7 +46,7 @@ export function accountHandle(account: AccountWithStats): string {
   return lineHandle(account)
 }
 
-/* 板 `HMpVx`：アカウントの設定（名前・親・フォルダ・ほかの設定・アーカイブ）。2026-10-08 タグ→フォルダ（1つだけ・API-17）。 */
+/* 板 ：アカウントの設定（名前・親・フォルダ・ほかの設定・アーカイブ）。2026-10-08 タグ→フォルダ（1つだけ・API-17）。 */
 export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onArchive, onShowDetails, canCreateFolder = false, onFolderCreated }: {
   account: AccountWithStats
   accounts: AccountWithStats[]
@@ -221,7 +221,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
   )
 }
 
-/* 板 `D6ljr`：アカウントをアーカイブ（理由＋本人確認）。 */
+/* 板 ：アカウントをアーカイブ（理由＋本人確認）。 */
 export function AccountArchiveDialogV8({ account, onClose, onDone }: {
   account: AccountWithStats
   onClose: () => void
@@ -292,7 +292,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
   )
 }
 
-/* 板 `HFsO9`：アーカイブから戻す（本人確認）。戻った直後は止まっている状態。 */
+/* 板 ：アーカイブから戻す（本人確認）。戻った直後は止まっている状態。 */
 export function AccountRestoreDialogV8({ account, onClose, onDone }: {
   account: AccountWithStats
   onClose: () => void

@@ -130,7 +130,7 @@
   }
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .slot { height: 48px; border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; background: var(--color-shell); box-shadow: none; font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 20px; font-weight: 500; line-height: normal; caret-color: var(--color-ink); }
 :root .slot:focus { outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
 :root .group[data-state='success'] .slot { outline: 1.5px solid var(--color-success); outline-offset: -0.75px; background: var(--color-shell); box-shadow: none; }
@@ -193,7 +193,7 @@
 }
 
 /*
- * 入力中のマスは緑の輪郭（★V8 RfHCo・板 tOPeY）。共通のキーボードの輪（globals.css の
+ * 入力中のマスは緑の輪郭（★V8 RfHCo・板 ）。共通のキーボードの輪（globals.css の
  * html:root :is(input, …):focus-visible・青）は層の外にあって上の層の中の決まりより強いので、
  * このマスだけ層の外で緑に戻す。誤りの赤と、空のマスの入力の目印（2×24）も同じ理由で層の外に置く。
  */

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-/* 帯（Notice）。★V7 共通部品その2 §1 の4種類を1本で出す。 */
+/* 帯（Notice）。★管理画面 共通部品その2 §1 の4種類を1本で出す。 */
 import React from 'react'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'

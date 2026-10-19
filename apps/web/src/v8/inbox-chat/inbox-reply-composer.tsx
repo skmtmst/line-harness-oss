@@ -112,7 +112,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
       /*
        * ★V8（段2「2. 送信の設定（開いた）」）：見出し「送るキー」・切り替え（Enter／Shift+Enter）・
        * 説明1行の3段。前は選ぶカードの中で文字が切れ、丸が文字に重なっていた（オーナー指摘）。
-       * 保存先（この端末の chat.sendMode）と動きは v7 と同じ。
+       * 保存先（この端末の chat.sendMode）と動きは 管理画面 と同じ。
        */
       <div className={chatStyles.sendKey} data-inbox-v8="send-key">
         <p className={chatStyles.sendKeyTitle}>送るキー</p>
@@ -327,7 +327,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
                     アイコンを押すとファイルを選ぶ窓が開く。
                   */}
         {(
-          /* ★V8 B-6：左下のクリップ（32角）＋「画像・動画・ファイルを添付」。選べない・大きすぎるはここに理由。 */
+          /* ★V8 ：左下のクリップ（32角）＋「画像・動画・ファイルを添付」。選べない・大きすぎるはここに理由。 */
           <span className={chatStyles.attachLead}>
             <AttachMenu disabled={!selectedChatId} onPick={(file, slot) => void handlePickAttachment(file, slot)} />
             <span

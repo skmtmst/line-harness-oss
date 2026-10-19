@@ -8,7 +8,7 @@ import type {
   TemplateFolderOption,
   TemplateFolderStatus,
 } from './template-folder-select'
-import TemplatePickerView, { type TemplatePickerSideKey } from '@/v8/inbox-chat/template-picker-view'
+import { TemplatePickerView, type TemplatePickerSideKey } from '@/v8/inbox-chat/public/template-picker-view/index'
 
 type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -353,8 +353,8 @@ export default function TemplatePicker({
   }
 
   /*
-   * ★V8（M0393 段2「4. テンプレートを選ぶ」）：左はテンプレートの画面と同じフォルダの列。
-   * 「予約」「EC」の文字で拾う絞り込みはフォルダに統一したので出さない（絵の注）。
+   * ★V8（ 段2「4. テンプレートを選ぶ」）：左はテンプレートの画面と同じフォルダの列。
+   * 「予約」「EC」の文字で拾う絞り込みはフォルダに統一したので出さない（注）。
    */
   const sideActive: TemplatePickerSideKey = category === 'frequent'
     ? 'frequent'

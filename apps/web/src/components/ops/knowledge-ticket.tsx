@@ -11,7 +11,7 @@ import { knowledgeArticleKind } from './knowledge-format'
 import { BookOpen, ArrowRight } from 'lucide-react'
 import styles from './knowledge.module.css'
 
-/** Approved V6 37-6-C: automatic generation is separate from explicit human approval. */
+/** Approved 管理画面 37-6-C: automatic generation is separate from explicit human approval. */
 export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetail; onRefresh: () => void }) {
   const [article, setArticle] = useState<OpsKnowledgeArticle | null>(null)
   const [busy, setBusy] = useState(false)
@@ -60,7 +60,7 @@ export function TicketKnowledge({ detail, onRefresh }: { detail: OpsSupportDetai
   </section>
 }
 
-/** Approved V6 37-6-D LT8m5. Votes describe fit for this reply, not article correctness. */
+/** Approved 管理画面 37-6-D LT8m5. Votes describe fit for this reply, not article correctness. */
 export function KnowledgeReferences({ references, requestId, busy, onExclude }: {
   references: OpsKnowledgeReference[]; requestId: string; busy: boolean; onExclude: (id: string) => void
 }) {

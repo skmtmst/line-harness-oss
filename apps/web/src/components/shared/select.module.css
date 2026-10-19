@@ -70,8 +70,8 @@
 }
 
 /*
- * ★V8「選ぶ欄」（wMMk6）：高さ36・左右12・間8（wMMk6）。文字の段はB-159を優先。
- * 開いた矢印は ink-faint のまま（v7 と同じ）。
+ * ★V8「選ぶ欄」（wMMk6）：高さ36・左右12・間8（wMMk6）。文字の段はを優先。
+ * 開いた矢印は ink-faint のまま（管理画面 と同じ）。
  */
 :root .trigger {
   height: 36px;
@@ -115,7 +115,7 @@
   border-color: var(--color-danger);
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .trigger { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; padding: 0 var(--tpl-select-inset); gap: var(--tpl-select-gap); box-shadow: var(--control-shadow); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 :root .value { font-size: 13px; font-weight: 500; line-height: 20px; }
 :root .chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); }
@@ -123,11 +123,11 @@
 :root .invalid .trigger { outline-color: var(--color-danger); }
 :root .chevron { flex-basis: var(--polish-icon-control); }
 }
-/* B-192：左右12・間8・矢印16を含め、件数の文字を省略しない幅を共通で確保する。 */
+/* ：左右12・間8・矢印16を含め、件数の文字を省略しない幅を共通で確保する。 */
 :root .pageSize { width: max-content; min-width: max-content; flex-shrink: 0; display: flex; justify-content: flex-end; }
 
 /*
- * ★V8「枠なしの並び替え」（x6QsVz：枠なし文字＋上下矢印）。
+ * ★V8「枠なしの並び替え」（：枠なし文字＋上下矢印）。
  * treatment="text" のときだけ枠を消す。箱の合格は変えない。
  * 焦点の輪は .trigger:focus-visible が枠なしでも出す。
  */
@@ -155,8 +155,8 @@
 }
 
 /*
- * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞）。
- * 渡さないときは出ない。v7 は変えない。
+ * 箱の先頭の図柄（ のよく使う絞り込みの栞）。
+ * 渡さないときは出ない。互換経路は変えない。
  */
 
 :root .leadingIcon {
@@ -173,7 +173,7 @@
 
 /*
  * 欄いっぱい（full）で先頭の図柄があるときは、値を図柄のすぐ右に寄せる
- * （space-between のままだと値が箱の真ん中に浮く。受信箱の右の欄の対応状況・B-26）。
+ * （space-between のままだと値が箱の真ん中に浮く。受信箱の右の欄の対応状況・）。
  * 決まった幅の箱（会話の頭・よく使う絞り込み）は今のまま。
  */
 :root .full .leadingIcon + .value {
@@ -200,7 +200,7 @@
 /* WEB-006: 枠なしでも焦点の輪を残す。 */
 :root .textTrigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
-/* B-152・仕上げ7 */
+/* ・仕上げ7 */
 :root .trigger:disabled { opacity: var(--polish-disabled-opacity); }
 
 /* List controls reserve the whole selected label, icon and existing inset. */

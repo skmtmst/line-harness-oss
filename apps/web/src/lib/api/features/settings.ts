@@ -86,7 +86,7 @@ export const settingsMethods = {
     get: () =>
       fetchApi<ApiResponse<{ name: string | null; iconUrl: string | null }>>('/api/public/brand'),
   },
-/** 統括の課金（★V6 36-2）。形は `apps/worker/src/routes/hq-billing.ts`。 */
+/** 統括の課金（★管理画面 36-2）。形は `apps/worker/src/routes/hq-billing.ts`。 */
   postalCode: {
     search: (code: string) => fetchApi<ApiResponse<{
       status: 'invalid' | 'none' | 'matched' | 'multiple'

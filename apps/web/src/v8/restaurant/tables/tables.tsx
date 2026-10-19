@@ -2,12 +2,12 @@
 
 import { tableRequirements as b244Requirements } from './requirements'
 
-import {reservationBoardApi} from '@/lib/api-reservation-board'
+import {reservationBoardApi} from '@/lib/api/helpers/reservation-board'
 import {seatBoardEntry,type RestaurantFloor} from '@line-crm/shared'
 import RestaurantFloorEditor from '@/components/shared/restaurant-floor-editor'
 
 /*
- * ★V8 座席・卓管理（板 `BERxg`・卓を止める `eY9F3`・卓を追加・変更 `gBrCz`）。
+ * ★V8 座席・卓管理（板 `BERxg`・卓を止める ・卓を追加・変更 ）。
  *
  * 数4（卓数・総席数・結合可能・個室）→ 右上に「卓を追加する」→
  * 左にフロアマップ（結合グループは緑の地と札・停止中は薄く）、右に卓の詳細
@@ -30,8 +30,8 @@ import { TextField } from '@/components/shared/text-field'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
-import RestaurantShell, { Panel, QuietError, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
-import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
+import { RestaurantShell, Panel, QuietError, StatRow, Status, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { pickMoveTarget, reservationLine } from './move'
 import styles from './tables.module.css'
 import TableRowActions from './table-row-actions'
@@ -43,7 +43,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 座席・卓管理（板 `BERxg`・卓を止める `eY9F3`・卓を追加・変更 `gBrCz`）。
+ * ★V8 座席・卓管理（板 `BERxg`・卓を止める ・卓を追加・変更 ）。
  *
  * 数4（卓数・総席数・結合可能・個室）→ 右上に「卓を追加する」→
  * 左にフロアマップ（結合グループは緑の地と札・停止中は薄く）、右に卓の詳細
@@ -373,7 +373,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
 export default function TablesPage() {
   const [addRequest,setAddRequest]=useState(0)
   const canEdit=canManageRole(useStaffRole())
-  /* ?view=assign：卓の割り当て方（jmVYJ・B-306）。座席表へは［座席表を直す］で戻る。 */
+  /* ?view=assign：卓の割り当て方（jmVYJ・）。座席表へは［座席表を直す］で戻る。 */
   const assignView=useSearchParams().get('view')==='assign'
   if(assignView) return (
     <RestaurantShell templateHeading boundary={false} storeTab="tables" boardId="jmVYJ" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}<Button presentation="restaurant" href="/restaurant-test/tables"><MapIcon size={15} aria-hidden="true"/>座席表を直す</Button></>}>

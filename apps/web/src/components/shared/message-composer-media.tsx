@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { FolderOpen, Play, Pause, Upload } from 'lucide-react'
 import type { BroadcastBubble, MediaItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { hqAudioContent, hqMediaApi } from '@/lib/api-hq-media'
+import { hqAudioContent, hqMediaApi } from '@/lib/api/helpers/hq-media'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import { extractMediaMetadata, putMediaFile, validateMediaFile } from '@/v8/contents/media-direct-upload'
+import { extractMediaMetadata, putMediaFile, validateMediaFile } from '@/v8/contents/public/media-direct-upload/index'
 import { emptyMessageKindState, type MessageKindState } from '@/components/scenarios/message-kind-fields'
 import Button from './button'
 import { japaneseDetailOf } from './api-error-message'
@@ -67,7 +67,7 @@ export default function ComposerMedia({ bubble, accountId, onChange, disabled, o
     lock.current = true; setBusy(true); onBusyChange?.(true); setError('')
     try {
       if (audio && !accountId) {
-        /* 統括：テンプレートの置き場（API-hq-media）へ送り、URLと長さはファイルから入る。手で入れる欄は置かない（k0TPPS）。 */
+        /* 統括：テンプレートの置き場（API-hq-media）へ送り、URLと長さはファイルから入る。手で入れる欄は置かない。 */
         const media = await hqMediaApi.upload(file, 'audio')
         const content = hqAudioContent(media)
         if (live.current) onChange({ ...bubble.content, fileName: file.name, state: { ...state, audio: { ...state.audio, ...content.state.audio, duration: String(content.state.audio.duration) } } })
@@ -99,7 +99,7 @@ export default function ComposerMedia({ bubble, accountId, onChange, disabled, o
       </div>
       {url ? <div className={styles.attachment}><AudioPreview key={url} url={url} duration={state.audio.duration} name={String(bubble.content.fileName ?? '選んだ音声')} disabled={busy || disabled} /><Button size="composer-small" disabled={busy || disabled} onClick={() => onChange({ state: { ...state, audio: { originalContentUrl: '', duration: '' } } })}>外す</Button></div> : null}
     </> : (
-      /* 画像・動画は共通の「画像を追加する所」（MediaSlot・Z7vd2・B-128）。送り先と形式の検査はこの欄が持つ。 */
+      /* 画像・動画は共通の「画像を追加する所」（MediaSlot・Z7vd2・）。送り先と形式の検査はこの欄が持つ。 */
       <MediaSlot
         kind={video ? 'video' : 'image'}
         title={video ? '動画を追加' : '画像を追加'}

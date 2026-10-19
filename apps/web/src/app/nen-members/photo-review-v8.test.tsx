@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B 投稿（TkA4D・Jn95h・cniyw・SyQA1・ujcar・N1br7）の骨格。
- * データの口は v7 と同じ（photos・metrics・review・publications）。
+ * ★V8-B 投稿（・・・・・）の骨格。
+ * データの口は 管理画面 と同じ（photos・metrics・review・publications）。
  * 板の印・札・カードの操作・見送る窓・掲載の表を見る。
  */
 import React from 'react'

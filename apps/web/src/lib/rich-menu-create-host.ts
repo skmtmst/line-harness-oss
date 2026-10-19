@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import type { HqRichMenuSeed } from './hq-rich-menu-create'
 
 /**
- * 店のリッチメニューの作る画面（app/rich-menus/new/create-v8.tsx）を、統括のひな形から使う口（B-36・絵 gobhu・egdGx・K0gu1・gQabc）。
+ * 店のリッチメニューの作る画面（v8/rich-menus/new/create.tsx）を、統括のひな形から使う口（・絵 gobhu・egdGx・K0gu1・gQabc）。
  *
  * 店は手順①〜④のたびにサーバーへ下書きを保存するが、統括のひな形は一度に保存する形。
  * host を渡したときは、手順の間は画面の中に持ち（画像だけは統括の置き場へ先に上げる）、
@@ -25,7 +25,7 @@ export interface RichMenuCreateHost {
   uploadImage: (file: File, size: 'large' | 'compact') => Promise<{ r2Key: string }>
   /** 上げた画像の見本の URL。 */
   imageUrl: (r2Key: string) => string
-  /** 手順③「配る先」の頭の段（配るアカウント：1行の欄から共通の窓で選ぶ。絵 UgZPJ）。 */
+  /** 手順③「配る先」の頭の段（配るアカウント：1行の欄から共通の窓で選ぶ。絵 ）。 */
   distribute: ReactNode
   /** 選んだアカウントの数。 */
   selectedCount: number

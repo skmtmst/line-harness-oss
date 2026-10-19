@@ -4,14 +4,14 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const CSS = readFileSync(join(HERE, 'create-v8.module.css'), 'utf8')
-const TSX = readFileSync(join(HERE, 'create-v8.tsx'), 'utf8')
+const CSS = readFileSync(new URL('./create-v8.module.css', import.meta.url), 'utf8')
+const TSX = readFileSync(new URL('../../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 const FORM = readFileSync(
   join(HERE, '..', '..', '..', 'components', 'rich-menus', 'rich-menu-create-form.tsx'),
   'utf8',
 )
 
-/* JeINq の画像設定と共通部品の利用を守る。形の操作はLayoutPickerの動作試験で確認する。 */
+/*  の画像設定と共通部品の利用を守る。形の操作はLayoutPickerの動作試験で確認する。 */
 function block(selector: string): string {
   const at = CSS.indexOf(selector)
   if (at < 0) throw new Error(`missing ${selector}`)

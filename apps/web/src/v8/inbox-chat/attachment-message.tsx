@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 会話の中の動画・ファイル（B-6・API-15）。
+ * ★V8 会話の中の動画・ファイル（・API-15）。
  * 口は動画を {originalContentUrl, previewImageUrl}、ファイルを {attachmentId, filename, size, url, expiresAt}
  * の JSON で残す。そのまま文字で出さず、動画は再生できる枠、ファイルは名前・大きさ・期限の札にする。
  * 読めない形のときは今までどおり文字で出す（親が null を見て決める）。

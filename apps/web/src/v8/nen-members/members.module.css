@@ -1,10 +1,10 @@
 /*
- * ★V8-B 会員（一覧 AOWoJ・ランク設定 fb9NJ・ランクを消す dEv6G・競合 e5yBLx・ライフタイム zQ5vY）。
+ * ★V8-B 会員（一覧 ・ランク設定 ・ランクを消す ・競合 ・ライフタイム ）。
  * 寸法は globals.css の :root の --tpl-mb-* が持つ。ここに数は書かない。
  */
 
 /* ---------- 外枠 ---------- */
-/* タブの高さ・下線は共通 Tabs が持つ（B-180）。 */
+/* タブの高さ・下線は共通 Tabs が持つ。 */
 .band {
   border-block: 1px solid var(--color-hairline);
 }
@@ -24,7 +24,7 @@
 }
 .viewerBand { margin: var(--tpl-mb-ro-margin); }
 
-/* 競合の帯（e5yBLx）：タブの下に、琥珀の地・左に注意の印・右に2つのボタン。 */
+/* 競合の帯：タブの下に、琥珀の地・左に注意の印・右に2つのボタン。 */
 .conflictSlot {
   padding: var(--tpl-mb-conflict-slot-pad);
 }
@@ -218,7 +218,7 @@
   gap: var(--tpl-mb-gap-s);
 }
 
-/* ランクを消す（dEv6G）の中身。 */
+/* ランクを消すの中身。 */
 .removeBody,
 .editBody {
   display: flex;
@@ -420,7 +420,7 @@
   cursor: not-allowed;
 }
 
-/* ---------- 会員一覧（AOWoJ） ---------- */
+/* ---------- 会員一覧 ---------- */
 .listBody {
   display: flex;
   flex-direction: column;
@@ -538,7 +538,7 @@
   }
 }
 
-/* 会員一覧の表（AOWoJ）：白い板の幅いっぱい、行の内側 24・間 16。狭い板（1010 未満）は最終購入・マイル還元を畳む。 */
+/* 会員一覧の表：白い板の幅いっぱい、行の内側 24・間 16。狭い板（1010 未満）は最終購入・マイル還元を畳む。 */
 .mTable {
   margin-inline: calc(-1 * var(--tpl-rsa-bleed));
   container-type: inline-size;

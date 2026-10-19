@@ -86,7 +86,7 @@ export function shortUsageDate(value: string): string {
 
 export function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
   const total = groupFeatureCount(group)
-  // ★V8 ywFJT の言い方（「6つ中 5つ有効」「5つすべて有効」「9つ中 0 有効」）。
+  // ★V8  の言い方（「6つ中 5つ有効」「5つすべて有効」「9つ中 0 有効」）。
   if (total === 0) return '消せません（並びだけ変えられる）'
   const enabled = groupEnabledCount(group, features)
   if (enabled === total) return `${total}つすべて有効`
@@ -95,7 +95,7 @@ export function groupSummary(group: FeatureGroup, features: Record<string, boole
 }
 
 /**
- * 機能設定の状態と操作。V7・V8 のどちらの描画からも同じ口で使う。
+ * 機能設定の状態と操作。管理画面・V8 のどちらの描画からも同じ口で使う。
  * 動き（保存・競合・影響確認・離脱の番兵）はここに1つだけ置く。
  */
 export function useFeatureSettings() {
@@ -116,7 +116,7 @@ export function useFeatureSettings() {
   /** GET で受けた版。保存時に送り返し、競合(409)を検出する。 */
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [error, setError] = useState('')
-  /** ★V8 `ziYCN`：ほかの管理者が先に保存した。編集中身は残して帯で知らせる。 */
+  /** ★V8 ：ほかの管理者が先に保存した。編集中身は残して帯で知らせる。 */
   const [conflict, setConflict] = useState(false)
   /*
    * 監査 D019: 読み込みに失敗したら初期値のスイッチ一覧を本物の設定の
@@ -176,7 +176,7 @@ export function useFeatureSettings() {
     if (accountRef.current !== selectedAccountId) {
       accountRef.current = selectedAccountId
       accountGuard.advance()
-      // Aの未保存状態をBへ持ち込まない。Bの値は load() が改めて確定する。
+      // Aの未保存状態をBへ持ち込まない。Bの値は load が改めて確定する。
       setSavedFeatures(CATALOG_DEFAULT_FEATURES)
       setFeatures(CATALOG_DEFAULT_FEATURES)
       setSavedItemOrder({})

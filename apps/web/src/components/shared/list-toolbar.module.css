@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
   /*
-   * ★V7 `Xn1Mz`「一覧の上の道具の並び」。どの一覧も同じ2行。
+   * ★管理画面 `Xn1Mz`「一覧の上の道具の並び」。どの一覧も同じ2行。
    *
    * 1行目：検索（幅320・虫眼鏡つき・狭い時も240まで）→ 保存した検索 →
    * この条件を保存。検索を横いっぱいに伸ばさない。検索を枠付きの箱
@@ -84,7 +84,7 @@
 
   /*
    * ★V8「道具の1段」（c4n9Kr）：帯は1段・高さ64。余白は上下14・
-   * 左右24、道具の間は 8。v7 の2段組みは変えない。
+   * 左右24、道具の間は 8。管理画面 の2段組みは変えない。
    *
    * v8 では row1/row2/filters の入れ子を display:contents で
    * ほぐし、中身を帯の直接の子として1段に並べる。並びは
@@ -122,7 +122,7 @@
 
 :root .toolbar button:not(:focus-visible):not([class*='ghost']) { border: 0; }
 :root .trailing button:not(:focus-visible) { outline: 1px solid var(--color-hairline); outline-offset: -.5px; }
-/* 切り替え（SegmentedControl）の項目は器の地で区切る。1つずつ枠で囲まない（絵 Eo56k の期間）。 */
+/* 切り替え（SegmentedControl）の項目は器の地で区切る。1つずつ枠で囲まない（期間）。 */
 :root .trailing [data-appearance] > button:not(:focus-visible) { outline: 0; }
   /*
    * ★V8「道具の1段」（c4n9Kr）：探す欄は幅 280px・縮まない
@@ -151,8 +151,8 @@
 .optional > [data-toolbar-optional-content] { display: inline-flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 :root .row1 > .search { width: var(--list-search-width, 280px); min-width: 0; }
 /*
- * ★V8「道具の2段」（acRIl 予約管理）：1段目＝探す・担当・経路・CSV、
- * 2段目＝札。段の間 10・段の中の間 6。v7 の2段組みは変えない。
+ * ★V8「道具の2段」（ 予約管理）：1段目＝探す・担当・経路・CSV、
+ * 2段目＝札。段の間 10・段の中の間 6。管理画面 の2段組みは変えない。
  * layout="stacked" のときだけ段を残し、それ以外は1本の帯。
  */
 :root .toolbar[data-toolbar-layout='stacked'] { flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 10px; }
@@ -167,7 +167,7 @@
 :root .toolbar:not(:has(.optional)) { flex-wrap: wrap; }
 
 
-/* B-178：通常は1段。狭い板は検索を縮め、その次に右の道具を折り返す。 */
+/* ：通常は1段。狭い板は検索を縮め、その次に右の道具を折り返す。 */
 :root :global([data-list-skeleton]) .toolbar {
   flex-wrap: wrap; min-width: 0;
 }
@@ -182,7 +182,7 @@
   flex-wrap: wrap; align-items: center; gap: var(--tpl-list-gap);
 }
 
-/* B-178：独自の段組みを持っていた一覧の移行用。中身とイベントだけ渡す。 */
+/* ：独自の段組みを持っていた一覧の移行用。中身とイベントだけ渡す。 */
 .slots { display: flex; flex: 1 0 100%; width: 100%; flex-direction: column; min-width: 0; gap: var(--tpl-list-gap); }
 .slotsRow { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; gap: var(--tpl-list-gap); }
 .searchSlot { flex: 0 1 var(--list-search-width, var(--tpl-list-search-w)); min-width: min(var(--list-search-width, var(--tpl-list-search-min)), 100%); max-width: 100%; }
@@ -194,7 +194,7 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
 .filterNarrow { display: none; }
 
 
-/* B-191/205：札とほかの道具が入りきらない時だけ、共通の実寸判定で畳む。 */
+/* ：札とほかの道具が入りきらない時だけ、共通の実寸判定で畳む。 */
 .toolbar, .slots { container-type: inline-size; container-name: v8-list-toolbar; }
 .filterChoices[data-filter-collapsed] .filterWide { display: none; }
 .filterChoices[data-filter-collapsed] .filterNarrow { display: flex; }
@@ -209,7 +209,7 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
 .rowBreak { display: none; }
 .slots > :is([data-shared-part='notice'], div:has(> [data-shared-part='notice'])) { flex: 1 0 100%; }
 
-/* B-244：白い板が狭い時、役目で必ず2段。件数は2段目の右端。 */
+/* ：白い板が狭い時、役目で必ず2段。件数は2段目の右端。 */
 @container v8-page (max-width: 1099px) {
   :root .toolbar:is([data-toolbar-layout='band'], [data-toolbar-layout='stacked']) {
     display: flex; flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: var(--tpl-toolbar-gap);
@@ -243,7 +243,7 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
   :root .slots[data-toolbar-single-row] .slotsRow { display: contents; }
 }
 
-/* B-244：保存した条件などの道具は、狭い板の2段目へ。広い板の順は保つ。 */
+/* ：保存した条件などの道具は、狭い板の2段目へ。広い板の順は保つ。 */
 .actions { display: contents; }
 :root .actions > * { order: 3; }
 @container v8-page (max-width: 1099px) {
@@ -255,7 +255,7 @@ html:root :global([data-template-region='toolbar']):has(> div > :is([data-design
   row-gap: var(--polish-space-card);
 }
 
-/* B-191: reserve the measured placeholder, then wrap the other list tools. */
+/* : reserve the measured placeholder, then wrap the other list tools. */
 html:root :is(.toolbar, .slots) [data-toolbar-tools] :is(.search, .searchSlot)[data-toolbar-search] {
   min-width: min(var(--list-search-content-min, var(--tpl-list-search-min)), 100%);
   flex-basis: max(var(--list-search-width, var(--tpl-list-search-w)), var(--list-search-content-min, 0px));
@@ -286,7 +286,7 @@ html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) 
 .optional > summary { display: none; }
 .optional[data-toolbar-overflow-group]:not([data-collapsed]) { flex: 1; }
 .optional[data-toolbar-overflow-group]:not([data-collapsed]) > [data-toolbar-optional-content] { width: 100%; }
-/* details の中身は ::details-content の箱に入る。箱が中身の幅に縮むと、上の 100% が効かず右寄せ（ListToolbarEnd）が右端へ行かない（l5V9a）。 */
+/* details の中身は ::details-content の箱に入る。箱が中身の幅に縮むと、上の 100% が効かず右寄せ（ListToolbarEnd）が右端へ行かない。 */
 .optional[data-toolbar-overflow-group]:not([data-collapsed])::details-content { flex: 1; min-width: 0; width: 100%; }
 .optional[data-collapsed] { position: relative; min-width: 0; }
 .optional[data-collapsed] > summary {
@@ -309,7 +309,7 @@ html:root .leading[data-toolbar-persistent] { display: inline-flex; align-items:
 html:root .leading > :is(button, a) { width: max-content; flex: none; }
 
 /*
- * 設定の板の本文の中の道具の段は、上の知らせ・下の表と左端をそろえる（絵 PfA4o・cIdA2。
+ * 設定の板の本文の中の道具の段は、上の知らせ・下の表と左端をそろえる（絵の。
  * 2026-10-15 判定役：約16px 右へずれていた）。本文の段が左右の余白を持つので、部品は二重に持たない。
  */
 :root :global([data-page-template='settings'] [data-template-region='content']) .toolbar { padding-inline: 0; }

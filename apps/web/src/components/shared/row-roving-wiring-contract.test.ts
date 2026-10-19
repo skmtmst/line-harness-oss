@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const LISTS = [
   'v8/scenarios/list.tsx',
-  'app/reminders/list-v8.tsx',
+  'v8/reminders/list.tsx',
   'v8/auto-replies/list.tsx',
   'v8/tags/tags-tab.tsx',
   'v8/broadcasts/list.tsx',

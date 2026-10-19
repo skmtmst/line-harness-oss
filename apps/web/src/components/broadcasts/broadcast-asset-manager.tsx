@@ -78,7 +78,7 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
   const [error, setError] = useState('')
 
   /*
-   * 削除の確認。**ブラウザの `confirm()` は使わない。**
+   * 削除の確認。**ブラウザの `confirm` は使わない。**
    * 見た目がブラウザ任せで設計の確認窓と違ううえ、画像比較にも写らない。
    * 何が止まって何が残るのかを本文で読ませたいので、共通の窓へ移した。
    *

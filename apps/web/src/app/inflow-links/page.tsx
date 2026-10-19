@@ -6,7 +6,7 @@ import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { FeatureDisabledScreen } from '@/components/feature-disabled-gate'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import type { FeatureKey } from '@/lib/feature-settings'
+import type { FeatureKey } from '../../lib/feature-key'
 import AdConnectionsV8 from '@/v8/inflow-links/ad-connections'
 import AdHistoryV8 from '@/v8/inflow-links/ad-history'
 import SiteScriptV8 from '@/v8/inflow-links/site-script'
@@ -85,14 +85,14 @@ function InflowLinksPageHost() {
   const tabBlocked =
     !!tabFeature && visibility.status === 'ready' && !visibility.enabled(tabFeature)
   /*
-    ★V8 の一覧（src/v8/inflow-links）は絵（xbHxg）どおりタブを出さない。
+    ★V8 の一覧（src/v8/inflow-links）は絵どおりタブを出さない。
     ほかのページへは見出しの「広告とのつなぎ」「サイトスクリプト」と、
     数の帯の「広告連携」から行く。
   */
   const v8List = tab === 'links' && !tabBlocked
   if (v8List) return <InflowListV8 onRouteCountChange={setLinksCount} />
   /*
-    ★V8 のサイトスクリプト（XjOte）・広告連携（qSTVR）の絵にもタブは無い。見出しの「流入と計測へ」で戻る。
+    ★V8 のサイトスクリプト・広告連携の絵にもタブは無い。見出しの「流入と計測へ」で戻る。
   */
   const v8NoTabs = !tabBlocked
   return (

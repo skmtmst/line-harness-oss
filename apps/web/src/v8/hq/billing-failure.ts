@@ -6,7 +6,7 @@ import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-er
  *
  * Stripe への輸送失敗はサーバが 502 にして返す。画面では内部文
  * （`API error: 502`）を出さず、決済サービスの案内にする。
- * v7（app/hq/billing/failure-message.ts）の写し（src/v8 から @/app は読めない）。
+ * 管理画面（app/hq/billing/failure-message.ts）の写し（src/v8 から @/app は読めない）。
  */
 export const BILLING_UNREACHABLE = '決済サービスにつながりませんでした。少し待って、もう一度お試しください。'
 

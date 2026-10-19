@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 統括の友だち属性（絵 DzdC3・y0sapC・Qgjmc）：上の4つのタブ・?tab= の読み書き・受け口の無いタブの1行・
+ * 統括の友だち属性：上の4つのタブ・?tab= の読み書き・受け口の無いタブの1行・
  * タグの数の帯（未使用・整理の候補）と使用状態・付け方の絞り込み。
  */
 import React, { act } from 'react'
