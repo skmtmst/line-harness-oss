@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getRichMenuDeleteImpact } from '../src/rich-menus.js';
+import { getRichMenuDeleteImpact } from '../src/rich-menus/index.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   return {

@@ -1,19 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  emptyLayout,
-  fieldsToLayout,
-  formatAddressValue,
-  formatAnswerValue,
-  formatBookingStartsAt,
-  formatPostalCode,
-  layoutToFields,
-  normalizeBookingValue,
-  normalizePostalCodeDigits,
-  normalizeRatingValue,
-  validateAnswer,
-  validateFormBookingReady,
-  type FormInputBlock,
-} from './form-layout.js';
+import { emptyLayout, fieldsToLayout, formatAddressValue, formatAnswerValue, formatBookingStartsAt, formatPostalCode, layoutToFields, normalizeBookingValue, normalizePostalCodeDigits, normalizeRatingValue, validateAnswer, validateFormBookingReady } from './form-layout.js';
+import { type FormInputBlock } from './types/form-layout.js';
 
 function block(overrides: Partial<FormInputBlock> = {}): FormInputBlock {
   return {

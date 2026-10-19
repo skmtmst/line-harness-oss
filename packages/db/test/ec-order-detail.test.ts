@@ -142,7 +142,7 @@ describe('getEcOrderDetail', () => {
       eventId: 'ev-1', lineAccountId: 'account-1', status: 'succeeded',
     });
 
-    // 購読先別配送（通知・V6連携とも完了）。
+    // 購読先別配送（通知・連携とも完了）。
     sqlite.prepare(
       `INSERT INTO ec_v6_dispatches (event_id, subscriber, status, attempt_count, idempotency_key, updated_at)
        VALUES ('ev-1', 'notification', 'sent', 1, 'k1', '2026-09-16T00:01:00.000Z'),

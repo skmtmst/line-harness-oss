@@ -1,4 +1,4 @@
-/** V6 3-3-A 統合ユーザー詳細の読み取り・更新契約。 */
+/** 3-3-A 統合ユーザー詳細の読み取り・更新契約。 */
 export type MergedPersonStatus = "active" | "review" | "archived";
 
 export type MergedPersonProfileSource =

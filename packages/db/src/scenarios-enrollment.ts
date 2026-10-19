@@ -1,5 +1,2 @@
-// Public entry point. Implementation is organized by responsibility.
-export { getStepsForDelivery, completeFriendScenario, getFriendScenarioById } from './scenarios-enrollment-shared.js';
-export { scenarioStepExists, enrollFriendInScenario, moveFriendScenarioTo } from './scenarios-enrollment-entry.js';
-export { getFriendScenariosDueForDelivery, claimFriendScenarioForDelivery, recoverStuckDeliveries, pauseFriendScenarioDelivery, advanceFriendScenario } from './scenarios-enrollment-dispatch.js';
-export { pauseFriendScenario, resumeFriendScenario, resumeExistingFriendScenario, pauseFriendScenarioManual, resumeFriendScenarioById, retryFailedFriendScenario } from './scenarios-enrollment-state.js';
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { advanceFriendScenario, claimFriendScenarioForDelivery, completeFriendScenario, enrollFriendInScenario, getFriendScenarioById, getFriendScenariosDueForDelivery, getStepsForDelivery, moveFriendScenarioTo, pauseFriendScenario, pauseFriendScenarioDelivery, pauseFriendScenarioManual, recoverStuckDeliveries, resumeExistingFriendScenario, resumeFriendScenario, resumeFriendScenarioById, retryFailedFriendScenario, scenarioStepExists } from './scenarios/enrollment.js';

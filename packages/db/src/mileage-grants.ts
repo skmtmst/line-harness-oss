@@ -1,3 +1,2 @@
-// Public entry point. Implementation is organized by responsibility.
-export { resolveReferralMileageBeneficiary, mileageGrantExpiresAt, getMileageAvailableBalance, renderMileageGrantNotification, reserveMileageGrantNotification, reverseMileageGrantsForCancellation } from './mileage-grants-beneficiaries.js';
-export { applyMileageRulesImmediately, applyMileageRulesForEvent } from './mileage-grants-apply.js';
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { applyMileageRulesForEvent, applyMileageRulesImmediately, getMileageAvailableBalance, mileageGrantExpiresAt, renderMileageGrantNotification, reserveMileageGrantNotification, resolveReferralMileageBeneficiary, reverseMileageGrantsForCancellation } from './mileage/grants.js';

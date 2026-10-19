@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { asD1 } from './d1-test-helper.js';
 import { claimFormCapacitySlot, getFormSubmissionsByFriend, getFormSubmissionsByFriendCursor,
-  getFormSubmitClaimsBySubmissionIds, getFormVersionContentsByIds } from '../src/forms.js';
+  getFormSubmitClaimsBySubmissionIds, getFormVersionContentsByIds } from '../src/forms/index.js';
 let raw: Database.Database; let db: D1Database;
 beforeEach(() => {
   raw = new Database(':memory:');

@@ -21,7 +21,7 @@ const TTY_REQUIRED = /non[- ]?interactive|cloudflare_api_token|consent denied|au
 // Unregistered workers.dev subdomain. Wrangler prints this alongside a
 // non-interactive-context error (its registration prompt cannot be answered
 // through our pipe), so it would otherwise take the TTY-retry path below and
-// lose the message getHelp() keys on — rethrow immediately instead.
+// lose the message getHelp keys on — rethrow immediately instead.
 const WORKERS_DEV_SUBDOMAIN_UNREGISTERED = /register a workers\.dev subdomain/i;
 const RETRYABLE_NETWORK_ERROR =
   /fetch failed|connectivity issue|network connectivity|connection reset|socket hang up/i;
@@ -109,7 +109,7 @@ async function deployWorkerBundle(
     } catch (firstError) {
       // No retry can fix an unregistered subdomain — surface the original
       // WranglerError so setup's top-level catch renders the registration
-      // guidance (WranglerError.getHelp()).
+      // guidance (WranglerError.getHelp).
       if (isSubdomainUnregisteredError(firstError)) {
         throw firstError;
       }

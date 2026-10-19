@@ -162,7 +162,7 @@ export const FRIEND_ADD_ROUTING_DEFAULT: FriendAddRouting = {
   criteria: { firstTime: "unfollow_count_zero" },
 };
 
-/** V6の友だち追加履歴。Pencil共通デザインはこの契約だけを見て描画する。 */
+/** の友だち追加履歴。Pencil共通デザインはこの契約だけを見て描画する。 */
 export type FriendAddEventKind = "first_time" | "returning";
 
 export type FriendAddEventAttributionStatus = "captured" | "unavailable";
@@ -202,7 +202,7 @@ export interface FriendAddEventList {
   nextCursor: string | null;
 }
 
-/** 見た目から独立した画面状態。V6の共通スケルトン・空表示・エラー表示へ対応する。 */
+/** 見た目から独立した画面状態。の共通スケルトン・空表示・エラー表示へ対応する。 */
 export type FriendAddEventViewState =
   | { status: "loading" }
   | { status: "empty"; summary: FriendAddEventSummary }

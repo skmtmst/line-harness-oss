@@ -7,6 +7,7 @@ import { sqlIdSet } from './id-queries.js';
  */
 import { featureCatalogEntry, type FeatureId } from '@line-crm/shared';
 
+
 // SQL だけを組み立てる関数は D1 の型に触れないよう別ファイルへ置く。
 // scripts の型検査は Workers 型を読み込まないため、この表から
 // 直接 import されると壊れる。従来の import 先はそのまま使える。

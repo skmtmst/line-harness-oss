@@ -165,7 +165,7 @@ export interface DashboardOverview {
     operations: DashboardSectionStatus;
   };
   /**
-   * V6画面が使う、未取得をnullで区別できる指標契約。
+   * 画面が使う、未取得をnullで区別できる指標契約。
    * 上の既存フィールドは段階配備中の互換用に残す。
    */
   metrics: {
@@ -335,7 +335,7 @@ export interface ListStats {
   };
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number; failed: number };
   /**
-   * ★V8 回答フォーム一覧（I3L41O）の数の帯。
+   * ★V8 回答フォーム一覧の数の帯。
    * 「公開中」は受付中（is_active）の数、下書きは受付中でない数。
    * 今月・先月は日本時間の暦月。答え終えた割合は「今月開いた人のうち
    * 今月答え終えた人」の割合で、開いた人が 0 のとき null（「—」と出す）。

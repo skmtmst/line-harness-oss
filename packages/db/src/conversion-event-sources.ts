@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { jstNow } from './utils.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { trackConversion } from './conversions.js';
+import { trackConversion } from './conversions/index.js';
 
 /**
  * コンバージョン起点 → 実イベントの接続口。

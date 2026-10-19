@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PAYMENT_STATUS, paymentBadge, withAmount } from './payment-status.js';
 
-describe('支払いの札の共通の定義（B-338）', () => {
+describe('支払いの札の共通の定義', () => {
   it('状態の言葉は 4 つだけ', () => {
     expect(Object.values(PAYMENT_STATUS).map((item) => item.label)).toEqual(['未払い', '支払い済み', '返金済み', '期限切れ']);
   });

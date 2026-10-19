@@ -3,7 +3,7 @@ import type { StaffMember } from './staff.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 /**
- * メールで送る URL（会員登録の本登録・パスワード再設定）と、回数制限。★V6 36-4。
+ * メールで送る URL（会員登録の本登録・パスワード再設定）と、回数制限。★36-4。
  *
  * URL に入れた値は保存せず SHA-256 のハッシュだけを持つ（migration 292）。
  */

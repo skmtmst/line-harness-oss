@@ -11,7 +11,7 @@ import {
   buildTagUsageBlockingReferenceQueries,
   collectTagUsageBlockingTagIds,
   getTagsWithUsage,
-} from '../src/tags.js';
+} from '../src/tags/index.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -146,7 +146,7 @@ describe('タグの使用先集計', () => {
       used_in_scenarios: 2,
       used_in_auto_replies: 1,
       used_in_saved_searches: 1,
-      // タグ起点のシナリオ1・V6自動化2アクション・旧自動化1アクション。
+      // タグ起点のシナリオ1・自動化2アクション・旧自動化1アクション。
       // フォームや予約の「タグを付ける設定」は逆向きなので数えない。
       other_action_count: 4,
     });
@@ -208,7 +208,7 @@ describe('タグの使用先集計', () => {
     `);
 
     const tag = (await getTagsWithUsage(db)).find((row) => row.id === 'tag-main');
-    // シナリオ1件 + V6自動化2アクション + 旧自動化1アクション。
+    // シナリオ1件 + 自動化2アクション + 旧自動化1アクション。
     expect(tag?.other_action_count).toBe(4);
   });
 

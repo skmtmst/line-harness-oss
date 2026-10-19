@@ -20,7 +20,7 @@ export const FUNNEL_STEP_KINDS = [
 ] as const;
 export type FunnelStepKind = (typeof FUNNEL_STEP_KINDS)[number];
 
-// V6ファネルの運用状態。active 以外は一覧と再集計・対象者作成・新版保存から外す。
+// ファネルの運用状態。active 以外は一覧と再集計・対象者作成・新版保存から外す。
 // stopped は再開できる。archived は復帰しない終端状態。
 export type FunnelStatus = 'active' | 'stopped' | 'archived';
 
@@ -54,8 +54,8 @@ export async function getFunnels(db: D1Database, lineAccountId: string): Promise
 /**
  * 現行画面で扱える旧形式のファネルだけを返す。
  *
- * V6の版付きファネルは段の保存形式が異なるため、旧画面へ混ぜると
- * 「段が0件」の壊れた分析に見える。V6画面へ切り替わるまで一覧を分ける。
+ * の版付きファネルは段の保存形式が異なるため、旧画面へ混ぜると
+ * 「段が0件」の壊れた分析に見える。画面へ切り替わるまで一覧を分ける。
  */
 export async function getLegacyFunnels(
   db: D1Database,

@@ -157,7 +157,7 @@ export function friendTagSideEffectOpenStatements(
   onlyAfterNewTag = false,
 ): D1PreparedStatement[] {
   const now = jstNow();
-  // 新規付与の直後は changes()=1 の鎖で3工程を開く。既存タグの台帳は開き直さない。
+  // 新規付与の直後は changes=1 の鎖で3工程を開く。既存タグの台帳は開き直さない。
   return FRIEND_TAG_SIDE_EFFECT_STEPS.map(step => db.prepare(
     `INSERT INTO friend_tag_side_effect_runs
        (friend_id,tag_id,step_key,assigned_at,status,attempt_count,last_error,last_attempt_at,created_at,updated_at)

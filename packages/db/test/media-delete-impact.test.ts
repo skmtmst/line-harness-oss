@@ -7,7 +7,7 @@ import {
   applyMediaReplacementPlan,
   getMediaDeleteImpact,
   getMediaReplacementPlan,
-} from '../src/media.js';
+} from '../src/media/index.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   const d1 = {

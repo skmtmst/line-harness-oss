@@ -14,15 +14,15 @@ import {
   getMileageSummaryForFriend,
   postMileageAdjustment,
   postMileageEntry,
-} from '../src/mileage.js';
-import { voidMileageLedgerEntry } from '../src/mileage-approvals.js';
+} from '../src/mileage/index.js';
+import { voidMileageLedgerEntry } from '../src/mileage/approvals.js';
 import {
   MileageRewardError,
   createMileageRewardDraft,
   importMileageRewardCodes,
   publishMileageReward,
   reserveMileageRewardRedemption,
-} from '../src/mileage-rewards.js';
+} from '../src/mileage/rewards.js';
 import { asD1 } from './d1-test-helper.js';
 
 let sqlite: Database.Database;

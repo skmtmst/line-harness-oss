@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { reorderTags } from '../src/tags.js';
+import { reorderTags } from '../src/tags/index.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 

@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from 'vitest';
-import { getFriends } from '../src/friends.js';
+import { getFriends } from '../src/friends/index.js';
 import { getAutomationLogs } from '../src/automations.js';
 import { getStripeEvents } from '../src/stripe.js';
 import { getAdConversionLogs } from '../src/ad-platforms.js';
-import { getConversionEvents } from '../src/conversions.js';
+import { getConversionEvents } from '../src/conversions/index.js';
 import { getConversionApprovalQueue } from '../src/affiliate-report.js';
 import { getChats } from '../src/chats.js';
 

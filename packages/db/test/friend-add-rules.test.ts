@@ -111,7 +111,7 @@ function insertPublishedRule(
   ).run(versionId, input.id, JSON.stringify({ ...definition, routeIds: input.fallback ? [] : ['route-1'] }));
 }
 
-describe('friend add V6 rules', () => {
+describe('friend add rules', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -250,7 +250,7 @@ describe('friend add V6 rules', () => {
   });
 
   /*
-   * ★V8 MRhef の並び替え。一覧のつまみで動かした順を優先順位として
+   * ★V8  の並び替え。一覧のつまみで動かした順を優先順位として
    * まとめて書く口（PATCH /api/friend-add-rules/reorder が使う）。
    */
   test('並び順のid一覧は受け皿とアーカイブ済みを外し、優先順位順に返す', async () => {

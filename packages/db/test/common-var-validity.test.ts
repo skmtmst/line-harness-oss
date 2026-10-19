@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { normalizeCommonVarValidityAt, resolveCommonVarValuesAt } from '../src/common-vars.js';
+import { normalizeCommonVarValidityAt, resolveCommonVarValuesAt } from '../src/common-vars/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 describe('N-188 共通情報の実行時有効期間', () => {

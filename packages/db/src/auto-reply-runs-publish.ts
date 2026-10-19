@@ -1,4 +1,4 @@
-import type { AutoReply } from './auto-replies.js';
+import type { AutoReply } from './auto-reply-record-types.js';
 import { jstNow } from './utils.js';
 import { type AutoReplyVersionRow, type AutoReplyDraftSettings } from './auto-reply-runs-types.js';
 import { getAutoReplyDraftVersion, parseAutoReplyVersionSettings, getAutoReplyVersionById, autoReplyDefinitionSnapshot, getAutoReplyPublishedVersion, autoReplyRuntimeSnapshot } from './auto-reply-runs-settings.js';

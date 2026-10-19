@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { getRichMenuTargetingCandidates } from '../src/rich-menus.js';
+import { getRichMenuTargetingCandidates } from '../src/rich-menus/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 it('実際の表示候補は店舗・公開状態で絞り、優先順と同順位の作成順で返す', async () => {

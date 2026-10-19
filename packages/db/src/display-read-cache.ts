@@ -58,7 +58,7 @@ export function createDisplayReadCache(source: D1Database, now = Date.now) {
     return [typeof value, value];
   };
   const statement = (sql: string, original: D1PreparedStatement, params: unknown[]): D1PreparedStatement => {
-    // Only ordinary SELECT reads. CTEs, PRAGMAs, run(), and raw() go directly to
+    // Only ordinary SELECT reads. CTEs, PRAGMAs, run, and raw go directly to
     // D1. No SQL rewriting: binds, column selection and result form stay exact.
     const selectable = /^\s*SELECT\b/i.test(sql) && !/;\s*\S/.test(sql);
     const wrapped = new Proxy(original, {

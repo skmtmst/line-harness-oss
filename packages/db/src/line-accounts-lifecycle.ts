@@ -158,7 +158,7 @@ export const LINE_ACCOUNT_INACTIVE_REASONS: readonly LineAccountInactiveReason[]
 ];
 
 /**
- * 送受信を止める。理由は必須（v6-33 §10-1）。
+ * 送受信を止める。理由は必須（-33 §10-1）。
  * `reason` は区分、`detail` は運用者の自由記述。
  */
 export async function deactivateLineAccount(
@@ -182,7 +182,7 @@ export async function deactivateLineAccount(
   return getLineAccountById(db, id);
 }
 
-/** 送受信を再開する。止めた理由の記録は消す（v6-33 §10-2）。 */
+/** 送受信を再開する。止めた理由の記録は消す（-33 §10-2）。 */
 export async function activateLineAccount(
   db: D1Database,
   id: string,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeRatingValue, trimAsciiSpaces, validateAnswer, type FormInputBlock } from './form-layout.js';
+import { normalizeRatingValue, trimAsciiSpaces, validateAnswer } from './form-layout.js';
+import { type FormInputBlock } from './types/form-layout.js';
 
 describe('public form input CPU bounds', () => {
   it('F14: rejects oversized and ambiguous email input before expensive parsing', () => {

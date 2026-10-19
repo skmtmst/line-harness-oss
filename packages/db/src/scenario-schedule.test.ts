@@ -5,7 +5,7 @@ import { computeNextDeliveryAt, type ScenarioRow, type StepRow } from './scenari
  * computeNextDeliveryAt は「JST clock-time を UTC として表現する Date
  * (shifted frame)」を前提にしている(呼び出し元: apps/worker/src/routes/scenarios.ts,
  * apps/worker/src/services/step-delivery.ts — いずれも
- * `new Date(realInstant.getTime() + 9*60*60_000)` で作って渡す)。
+ * `new Date(realInstant.getTime + 9*60*60_000)` で作って渡す)。
  *
  * `new Date('...+09:00')` のような実オフセット付きの値は、その呼び出し元が
  * 渡す形と一致しない。JST の時計の値をそのまま `Z` 付きで書くことで

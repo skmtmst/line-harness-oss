@@ -2,13 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  getLineAccountConnectionChecksByIdempotencyKey,
-  getLineAccountListStats,
-  LineAccountRevisionConflictError,
-  saveLineAccountConnectionChecks,
-  type SaveLineAccountConnectionChecksInput,
-} from '../src/line-accounts.js';
+import { getLineAccountConnectionChecksByIdempotencyKey, getLineAccountListStats, LineAccountRevisionConflictError, saveLineAccountConnectionChecks } from '../src/line-accounts.js';
+import { type SaveLineAccountConnectionChecksInput } from '../src/line-accounts-types.js';
 import { asD1 } from './d1-test-helper.js';
 
 const connections: Database.Database[] = [];

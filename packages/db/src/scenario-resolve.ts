@@ -26,7 +26,7 @@ export interface ResolvedContent {
 /**
  * テンプレ message_type を scenario_steps の CHECK 制約 ('text','image','flex') に
  * 合わせて正規化する。templates テーブルには 'carousel' も存在するが、scenario の
- * buildMessage() は text/image/flex しか扱えないため flex (carousel は Flex の特殊形)
+ * buildMessage は text/image/flex しか扱えないため flex (carousel は Flex の特殊形)
  * に coerce する。
  */
 function normalizeMessageType(type: string): string {
