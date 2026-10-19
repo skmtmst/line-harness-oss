@@ -22,7 +22,7 @@ import BottomBar from './ui/BottomBar.js';
 import Button from './ui/Button.js';
 import Icon from './ui/Icon.js';
 import PrivacyNote from './ui/PrivacyNote.js';
-import { FormChoiceRow, ChoiceInput } from './forms/controls.js';
+import MeetingModeChoices from './MeetingModeChoices.js';
 
 /**
  * 1-d 内容の確認 (★V8・gLReL)。送った中身のカード＋ご要望＋案内の帯。
@@ -209,13 +209,7 @@ export default function Confirm({
   return (
     <div className="space-y-3.5" data-design-node={wide ? 'uZqMA' : 'gLReL'}>
       <h2 className="text-xl font-bold text-ink">内容を確かめてください</h2>
-      {menu.meeting_mode === 'customer_choice' ? <fieldset className="space-y-2">
-        <legend className="mb-2 text-sm font-bold text-ink">会い方を選んでください</legend>
-        {(['online', 'in_person'] as const).map((mode) => <FormChoiceRow key={mode} selected={meetingMode === mode}>
-          <ChoiceInput type="radio" name="meeting-mode" value={mode} checked={meetingMode === mode} disabled={submitting} onChange={() => setChosenMode(mode)} />
-          {mode === 'online' ? 'オンライン' : '対面'}
-        </FormChoiceRow>)}
-      </fieldset> : style === 'consult' && !meetingMode ? <p role="alert" className="text-[13px] leading-6 text-danger">会い方を読み込めませんでした。前の画面へ戻り、もう一度お試しください。</p> : null}
+      {menu.meeting_mode === 'customer_choice' ? <MeetingModeChoices name="meeting-mode" meetingMode={meetingMode} disabled={submitting} onChange={setChosenMode} /> : style === 'consult' && !meetingMode ? <p role="alert" className="text-[13px] leading-6 text-danger">会い方を読み込めませんでした。前の画面へ戻り、もう一度お試しください。</p> : null}
       <dl data-liff-card className="divide-y divide-liff-divider rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
         {party ? totals(party, menu).rows.map((r) => <Row alignEnd={policy !== null} key={r.index} label={personShort(r.index)} value={`${menuLine(r.menu, r.member)}・${(r.index === 0 ? (r.member.staff ?? staff) : r.member.staff)?.display_name ?? '指名なし'}`} />) : <Row alignEnd={policy !== null} label={words.bookingContent} value={menu.name} />}
         <Row
