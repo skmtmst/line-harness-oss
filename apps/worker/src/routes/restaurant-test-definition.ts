@@ -1,4 +1,5 @@
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
+import { normalizedPhoneSql } from '../lib/phone-sql.js';
 import type { OrganizationRow, OrganizationContext, SelectedRestaurantStore } from './restaurant-context-types.js';
 import { setRestaurantAttendance, type AttendanceInput } from '../services/restaurant-attendance.js';
 import { inputError } from '../lib/input-errors.js';
@@ -343,14 +344,21 @@ export async function insertSeatWaitlistEntry(
   if (existing) return { ok: false, error: 'already_waiting' };
   const id = crypto.randomUUID();
   try {
-    await db
+    const inserted = await db
       .prepare(`INSERT INTO rt_seat_waitlist
         (id, store_id, starts_at, guest_count, customer_name, customer_phone,
          line_uid, identity_key,ends_at,created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?)`)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?,?,?
+        WHERE ? IS NOT NULL OR (SELECT COUNT(*) FROM rt_seat_waitlist w
+          JOIN rt_stores s ON s.id=w.store_id
+          WHERE s.line_account_id=(SELECT line_account_id FROM rt_stores WHERE id=?)
+            AND w.status IN ('waiting','invited') AND w.line_uid IS NULL
+            AND (w.identity_key=? OR ${normalizedPhoneSql}=?))<3`)
       .bind(id, input.storeId, startsAt, input.guestCount, customerName,
-        customerPhone, input.lineUid, identityKey,input.endsAt??new Date(startsAtMs+DEFAULT_STAY_MINUTES*60_000).toISOString(),new Date().toISOString())
+        customerPhone, input.lineUid, identityKey,input.endsAt??new Date(startsAtMs+DEFAULT_STAY_MINUTES*60_000).toISOString(),new Date().toISOString(),
+        input.lineUid, input.storeId, identityKey, customerPhone)
       .run();
+    if (!inserted.meta.changes) return { ok: false, error: 'waitlist_limit' };
   } catch (error) {
     // 同時登録の race は部分一致キーが止める。
     if (/closure_conflict/.test(String(error))) return { ok: false, error: 'closure_conflict' };

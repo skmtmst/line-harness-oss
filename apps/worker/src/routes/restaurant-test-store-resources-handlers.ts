@@ -1,4 +1,5 @@
 import { normalizePhone } from '@line-crm/shared';
+import { normalizedPhoneSql as customerPhoneSql } from '../lib/phone-sql.js';
 import { validFloorCoordinate, validJoinGroup } from './restaurant-store-status.js';
 import { extractBroadcastTemplateIds, refreshScenarioReferences } from '@line-crm/db';
 import { parseBroadcastMessageParts, buildMessages } from '../features/broadcasts/broadcast-message-set/index.js';
@@ -514,14 +515,6 @@ export const get__api_restaurant_test_reservations_day_24 = async (c: Context<En
     ORDER BY r.starts_at, r.id`).bind(storeId, to, from).all();
   return c.json({ success: true, data: { date, reservations: rows.results, closures: (await closuresForRange(db, storeId, from, to)).map(publicClosure) } });
 };
-
-// 列名・置換値は固定。既存の表記は書き換えず、電話検索時だけ数字の形へ合わせる。
-const customerPhoneSql = (() => {
-  let sql = "COALESCE(customer_phone, '')";
-  for (const [from, to] of [...'０１２３４５６７８９'].map((digit, i) => [digit, String(i)])) sql = `REPLACE(${sql}, '${from}', '${to}')`;
-  for (const separator of ' -()（）－‐‑‒–—―−ー　') sql = `REPLACE(${sql}, '${separator}', '')`;
-  return sql;
-})();
 
 export const get__api_restaurant_test_customers_history_25 = async (c: Context<Env, "/api/restaurant-test/customers/history">) => {
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
