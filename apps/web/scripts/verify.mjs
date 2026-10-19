@@ -171,12 +171,12 @@ export function inspectB244Tree(root) {
     for (const entry of readdirSync(path.join(root, directory), { withFileTypes: true })) {
       const file = path.join(directory, entry.name)
       if (entry.isDirectory()) walk(file)
-      else if (/\.tsx$/.test(file) && !/\.(test|spec)\.|fixture|visual-qa/.test(file) && (file.startsWith('src/v8/') || /v8\.tsx$/.test(file))) files.push(file)
+      else if (/\.tsx$/.test(file) && !/\.(test|spec)\.|fixture|visual-qa/.test(file)) files.push(file)
     }
   }
   walk('src/v8'); walk('src/app')
-  // コピー元として残る旧いV8は検査せず、現在のV8へのimportがある物を対象にする。
-  const active = files.filter(f => f.startsWith('src/v8/') || !files.some(other => other.startsWith('src/v8/') && path.basename(other) === path.basename(f)))
+  // 改名や配置の変更で見張りから漏らさない。app と v8 の全実装を同じ条件で検査する。
+  const active = files
   const passed = passedFieldDefinitions(root, active)
   return { files: active.length, errors: active.flatMap(f => {
     const source = readFileSync(path.join(root, f), 'utf8')

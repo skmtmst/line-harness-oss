@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, renameSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -46,4 +46,23 @@ describe('feature entry verification', () => {
       expect(inspectB244Tree(root).errors.map((row: { kind: string }) => row.kind)).toEqual(['requirement-without-definition'])
     } finally { rmSync(root, { recursive: true, force: true }) }
   })
+
+  it('keeps field checks active when a screen is renamed without a generation suffix', () => {
+    const root = mkdtempSync(join(tmpdir(), 'renamed-screen-'))
+    try {
+      mkdirSync(join(root, 'src/v8'), { recursive: true })
+      mkdirSync(join(root, 'src/app/reservations'), { recursive: true })
+      const previous = join(root, 'src/app/reservations/editor-v8.tsx')
+      const current = join(root, 'src/app/reservations/editor.tsx')
+      writeFileSync(previous, '<Field required optional />')
+      expect(inspectB244Tree(root).errors.map((row: { kind: string }) => row.kind)).toEqual(['requirement-conflict'])
+      renameSync(previous, current)
+      expect(inspectB244Tree(root).errors.map((row: { kind: string }) => row.kind)).toEqual(['requirement-conflict'])
+      writeFileSync(current, "<Field requirement={fields.requirement('name')}/>")
+      expect(inspectB244Tree(root).errors.map((row: { kind: string }) => row.kind)).toEqual(['requirement-without-definition'])
+      writeFileSync(current, "fields.define('name','名前',check,{required:true}); <Field requirement={fields.requirement('name')}/>")
+      expect(inspectB244Tree(root).errors).toEqual([])
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+
 })
