@@ -1,4 +1,4 @@
-import { formatYen as yen } from '@line-crm/shared';
+import { formatYen } from '@line-crm/shared';
 import { LiffApiError } from '../../../../liff/src/lib/api-error.js';
 import { jstCalendar, jstDate } from '@line-crm/shared';
 import { StrictMode, useCallback, useEffect, useRef, useState } from 'react';
@@ -661,6 +661,7 @@ function OrdersView({ data, subscriptions }: { data: MemberData; subscriptions: 
 }
 
 
+const yen = formatYen;
 const man = (value: number) => (value % 10_000 === 0 ? `${value / 10_000}` : (value / 10_000).toFixed(1));
 
 /**
