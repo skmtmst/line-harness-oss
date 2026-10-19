@@ -1,6 +1,8 @@
 /** 入力・既存データの読取り用。許された区切りだけ外し、誤った文字は検査のため残す。 */
 export function normalizePhone(phone: string): string {
-  return phone.normalize('NFKC').replace(/[\s()\-‐‑‒–—―−ー]/g, '');
+  return phone
+    .replace(/[０-９]/g, digit => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
+    .replace(/[\s()（）\-－‐‑‒–—―−ー]/g, '');
 }
 
 /** 任意の電話欄。空欄は許し、値があれば日本の0始まり10〜11桁を確認する。 */
