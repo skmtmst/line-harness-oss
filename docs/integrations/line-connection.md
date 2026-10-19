@@ -561,6 +561,35 @@ PR #1751 は必須CIをすべて通過して**マージ済み**（マージSHA `
 
 **6b（大量件数での途中再開）は未確認のまま。** 実データで使える対象アカウントの友だちが13人しかなく、途中再開が起きる件数に届かないため実測できていない。
 
+### 2026-10-19 ②Step2 の Webhook URL は利用者が貼り付ける必要がある（v07デザイン）
+
+利用者が検証環境の `/accounts/new` を実機で確認した結果、**LINE Developers の「Messaging API設定」へ Webhook URL を貼り付けて「更新」を押すまで、その下の3つのスイッチ（Webhookの利用／再送／エラーの統計情報）が画面に出てこない**ことが分かった。
+
+- v06 の前提（`PUT /v2/bot/channel/webhook/endpoint` があるので URL 入力欄は不要）は**接続チェック（段3）の時点では正しいが、段2 Step2 の時点では成り立たない**。Step2 は③の接続チェックより前なので、musubo はまだ URL を登録していない。
+- 画面に出す URL の形は `apps/worker/src/lib/webhook-endpoint.ts` の `expectedWebhookUrl(workerUrl)` ＝ `{WorkerのURL}/webhook`。**アカウントごとではなく共通の1本**（`apps/worker/src/routes/webhook.ts` の `POST /webhook`）。検証環境は `https://nen-line-stg.skmtmst.workers.dev/webhook`。
+- デザイン：`/Users/masatosakamoto/Documents/LINE-Harness-Design/新規デザイン/2026-10-12_LINE追加画面のアップデート_LINE新規追加/LINE新規追加_v07.pen`（v06 は承認済みの版として未変更で保持）。段2 `Fqy29` の Step2 `f4AgA` に、Webhook URL の読み取り専用欄＋「コピー」ボタンのカード `Ds3E2` と、確認チェック `dqe2M`（3つ→4つ）を追加。Step1/2/3 の「musubo が自動で行うこと」から「Webhook URL の登録／」を削除。
+- **状態＝未承認。** 利用者へ提示済み・回答待ち。承認を受けるまで `apps/web/src/v8/account-new/` の実装・PR・配備は行わない。
+- 段3 `Lwxyh` の「musubo が自動で行う5つのこと」に残る「Webhook URL の登録」は**正しいので変更しない**。③の接続チェックは `apps/worker/src/services/line-account-connect.ts:163-166` で `PUT /v2/bot/channel/webhook/endpoint` を実際に呼び、`:170-178` で読み直して一致と `active === true` を確かめている。つまり「Step2 では利用者が貼り付ける／③では musubo が登録し直す」の両方が同時に成り立つ。
+
+### 2026-10-19 v07 を実装するときに触る場所（承認待ちのあいだに読み取りで特定）
+
+承認前なのでコードは1文字も変えていない。承認後にすぐ入れるよう、対象と既存の先例だけ先に調べた。
+
+**①URLの出どころ**：画面側に Webhook URL を作る処理はまだ無い。先例は `apps/web/src/v8/settings/pools/create.tsx:108` の `` `${process.env.NEXT_PUBLIC_API_URL ?? ''}/pool/...` `` で、同じ形で `` `${process.env.NEXT_PUBLIC_API_URL ?? ''}/webhook` `` を作れる。Worker 側の正解の形 `apps/worker/src/lib/webhook-endpoint.ts` の `expectedWebhookUrl()`（末尾スラッシュを落として `/webhook` を足す）と一致する。アカウント単位ではなく全社で1つの受け口。
+
+**②コピーボタン**：新しく作らない。共通部品 `apps/web/src/components/shared/copy-text-button.tsx`（`components/ui/copy-text-button.tsx` から再輸出）がそのまま使える。`variant="secondary"` で共通Buttonの形になり、コピーできない環境では読み取り専用の欄へ自動で切り替わる。`step2-connect.tsx` は `design-impact-baseline.txt` に既にあるので一覧の追記は不要。
+
+**③直す文言と件数**
+- `apps/web/src/v8/account-new/step2-connect.tsx:133` のリード文「Webhook URL（受信先のアドレス）は musubo が自動で登録します。入力は要りません。」＝利用者が1枚目で指摘した文。ここを直す。
+- `step2-connect.tsx:125-126` の同じ趣旨のコメント。
+- `step2-connect.tsx:158`「3つすべてにチェック」→ 4つ。
+- `apps/web/src/v8/account-new/logic.ts:204-207` の `WEBHOOK_ACKS` は3件。先頭に貼り付け確認の1件を足して4件にする。
+- `apps/web/src/v8/account-new/logic.test.ts:185,189,194` が3件・3ラベルを検査しているので同時に直す。
+
+**④変えないところ**：`check-rows.ts:19`・`logic.ts:21` の「Webhook URL の登録」は段3（接続確認）の行で、③が実際に API で登録し直すので正しい（上の節の根拠）。
+
+**⑤次に利用者へ確認すること（1回にまとめる）**：`apps/web/src/v8/account-new/precheck.ts:138` の①事前確認「用意するもの」に「Webhook URL やプロバイダーIDの入力はいりません」が残る。②Step2 で貼り付けが要るようになると①の案内と食い違うが、①は今回の v07 の対象フレームではない。①も直すかどうかは承認の返事と合わせて1回で聞く。
+
 ## 4. 気づいた不具合
 
 ### 4-1・4-2 は修正済み（2026-10-16・Claude）
@@ -873,7 +902,23 @@ Codexから「書き換え可能なstaging専用LINEチャネルを特定して�
   - **対応＝同一SHAでのジョブ再実行。コード変更はしない**。`apps/worker` のテスト設定を触ると、web画面レーンのPRに別レーンの差分が混ざり `Classify and validate the change` の対象と合わなくなる。`vitest.config.ts` に `retry` は未設定だが、**今回の失敗は `beforeAll` なので vitest の `retry` では救えない**（hookは再試行対象外）ため、設定追加では解決しない。恒久対策（準備処理の同期呼び出し回数を減らす等）が要るなら `apps/worker` を持つレーンの課題として別に立てる。
   - **ハーネス記録**：原因候補A（PRが原因）／B（miniflare同期プロキシの競合・再実行で対応）／C（Workerの実コード不具合）を `nen-harness decide` へ渡し、**B（確度1.0）**。
   - **次**：Codex へ `1a97e0c8b8` のまま `Worker typecheck and tests` の再実行を依頼し、合格後に `codex/development` へマージ → staging配備 → `/accounts/new` ②の3段表示の確認。**本番は対象外**。
-- 次の1手（**利用者本人が検証環境でLINEログインして①〜④を見る**／Claudeは待ち・Codexへの新規依頼は不要）：(1) 利用者が `https://stg-admin.musubo.jp/login` を開いてLINEログイン（**MFAが `'false'` なのでTOTPの登録は不要**。`login-mfa.ts:26`）→(2) `https://stg-admin.musubo.jp/accounts/new` で **①事前確認 → ②アカウント接続（`Step 1 / 3` Messaging API → `Step 2 / 3` Webhookの設定 → `Step 3 / 3` LINEログイン）→ ③接続確認** の表示と遷移を確認（**③の「登録する」は押さない**＝`register.tsx:338` で `connect` が走り、本番チャネルのWebhook宛先とLIFFが書き換わるため。§5 730-731行）→(3) **④使い方を選ぶ**は端末保存領域のキー `musubo-register-draft-v8` に `{"step":4,"sub":1}` を置いて `/accounts/new` を再読み込みすれば `connect` なしで描かれる（`logic.ts:116,133`／`register.tsx:120-135,675`）。④は次工程の6項目と併せて確認でもよい →(4) ログインできない／画面が違う場合は**その表示をClaudeへ伝える**（(a) `not_authorized`＝staging D1のスタッフ行、(b) `redirect_uri` のエラー＝LINEログインチャネルのコールバックURL登録。どちらもClaudeが受けて手当てを決める）。**⑤は対象外**（`register.tsx:700` の `currentStep === 5 && connection` で構造上不可・reactテスト `register-v8.react.test.tsx:148,264` で担保）。**新しい秘密設定の登録・D1の変更・本番への操作はしない。④の6項目は利用者が明示承認した縮小範囲なので不一致として扱わない。**
+- 2026-10-19（その12。**利用者本人がstagingで②実画面を確認（受入条件1=確認済み）／Webhook URLコピー表示の不一致を発見→新しいPencil版を用意**）：
+  - **確認結果（上の「次の1手」の(2)を実施済み）**：利用者が `https://stg-admin.musubo.jp/login` でLINEログインし `/accounts/new` の②を開いた。構造はv06通り＝`Step 2 / 3` 表示、左に「操作ステップ」列、右に「マニュアル」列。**この部分は一致として確認済み**。
+  - **新たに判明した不一致（利用者が実際にLINE Developers側で試して発見）**：②Step2/3「Webhook（受信のつなぎ）を設定する」の文言は「Webhook URL（受信先のアドレス）はmusuboが自動で登録します。入力は要りません」としており、チェック項目も「Webhookの利用／再送／エラー統計の3つのON」のみでWebhook URLの表示・コピー欄が無い。しかし実際のLINE Developers Messaging API設定は、**Webhook URLを先に入力しないとWebhookの利用等のチェック項目自体が表示されない**（＝musuboが裏で自動登録する設計は現在のLINE側仕様と噛み合わない）。利用者は競合製品「L Message」の同等画面（コピー欄＋コピーボタン＋「Webhook URLを入力した」を含む4項目チェック）を比較対象として提示した。
+  - **利用者の依頼**：②Step2/3へWebhook URLの表示＋コピー操作（コピー欄・コピーボタン・「URLを入力した」チェック相当）を追加する。これに伴い、①事前確認の「musuboが自動で行うこと」カードの文言からも「Webhook URL の登録／」の部分を削除する（アカウント名・@ID・アイコンの取り込み／LIFF作成の自動化はそのまま残す＝自動化できているため）。
+  - **扱い**：②Step2の見た目・操作フローを実質的に変える＝承認済み `LINE新規追加_v06.pen` からの変更。**V8正本・v06は上書きせず**、`新規デザイン/` 配下に新しい版のPencilファイルを作成し、利用者の明示承認を得てから実装する（標準の新規UI承認フロー）。承認対象は①事前確認カードの文言差分＋②Step2のWebhook URL表示UIの2箇所。
+  - **次**：Pencilで対象フレームを開き、現在の①・②Step2の実装内容を確認したうえで新版を作成し、変更点とスクリーンショットを利用者へ提示して承認を得る。承認後に該当コンポーネントを実装し、ローカル検証→Codexへ検証・配備を依頼する。
+- 2026-10-19（その13。**Codexから「受入条件1 未達」で差し戻し → 原因は実装ではなく引き継ぎ文のURL取り違え。回帰テストで固定**）：
+  - **差し戻しの内容**：Codexが承認済み v07 の検証中に「staging設定では承認版と異なるWebhook URLが表示される」と判断し、**条件1 未達として停止**（push・PR・CI・マージ・配備いずれも未実施）。停止条件「承認記録と実装の不一致を見つけたら返す」に沿った正しい停止。
+  - **調べた実値（4か所）**：① `apps/worker/wrangler.staging.toml:78-79` → `WORKER_PUBLIC_URL` / `WORKER_URL` = `https://stg-api.musubo.jp`（`routes` に `custom_domain = true` で登録）。② 同 `:81` → `WORKER_ALIAS_URLS` = `https://nen-line-stg.skmtmst.workers.dev`。③ staging配備の工程 → `STAGING_API_URL: https://stg-api.musubo.jp` を `NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}` としてwebのbuildへ渡す。④ `release.yml` / `required-pr-gate.yml` の `nen-line-stg.skmtmst.workers.dev` は **CI専用の試験値**（`release.yml:101` のコメント「外部へは出ない試験用の値を」、`release-workflow-env-contract.test.ts` の試験名「PR検査と同じ値を使う（外部へ出ない試験用URL）」が根拠）。
+  - **原因＝Claudeの引き継ぎ文の誤り。コードの不具合ではない**：引き継ぎ文に「staging では `https://nen-line-stg.skmtmst.workers.dev/webhook` になる」と書いたのが誤り。④のCI専用値を検証環境の値と取り違えた。正しくは **`https://stg-api.musubo.jp/webhook`**。実装 `logic.ts:220` の `musuboWebhookUrl()` は `<NEXT_PUBLIC_API_URL>/webhook` を作り、同じ `NEXT_PUBLIC_API_URL` は `api.ts:2302` がAPIの元としても使う。したがって**画面に出すURLとWorkerが正とするURLは構造上同じ元から来る**＝不一致は起きない。
+  - **別名も通る**：`acceptedWebhookUrls()`（`line-accounts.ts:287-303`）は `WORKER_PUBLIC_URL` / `WORKER_URL` / カンマ区切りの `WORKER_ALIAS_URLS` の各 `/webhook` を全て受け付ける。よって③接続チェックは custom domain でも workers.dev 別名でも合格し、**承認済み v07 の `vnh17` に書いた例示URL（workers.dev形）でも機能上の不一致にならない**。`vnh17` は動く欄の例示字であり、画面は配備環境の実値を出す。
+  - **デザインの再承認は不要**：2026-10-07の方針「リポジトリ更新で明文化された正本順位で解決する食い違いは再承認を求めず、その既存承認内で修正・検証する」に該当。正本順位は `wrangler.staging.toml` が検証環境のWorkerの正のURLを決める。見た目・文言・配置・操作フローの変更はしていない。
+  - **直し方（今回の差分）**：回帰テスト `apps/web/src/v8/account-new/webhook-url-origin-contract.test.ts` を追加（4件）。設定ファイルの実値で (a) Workerの正の元＝`https://stg-api.musubo.jp`・別名の存在、(b) staging配備がwebへ焼き込む `NEXT_PUBLIC_API_URL` がその正の元と同値、(c) 画面に出す字＝`<APIの元>/webhook`（末尾スラッシュを二重にしない）、(d) 元が未設定なら空（画面は「不明」）を固定する。併せて引き継ぎ文の期待URLを `https://stg-api.musubo.jp/webhook` へ訂正。
+  - **ローカル検証**：`npx vitest run src/v8/account-new/webhook-url-origin-contract.test.ts` → 4件合格。
+  - **次**：訂正した期待URLを明記してCodexへ再引き継ぎ。Codexは push → `codex/development` 向けPR → CI → マージ → staging配備 → 実画面で条件1〜4を確認（条件1のURLは **`https://stg-api.musubo.jp/webhook`**。workers.dev の字が出た場合も別名として接続は成立するが、配備が焼き込む値としては正しくないのでClaudeへ戻す）。**本番は対象外。**
+- 次の1手（**Codexへ再引き継ぎ**／利用者の操作は不要）：訂正済みの期待URL `https://stg-api.musubo.jp/webhook` を添えて、v07の push → PR → CI → マージ → staging配備 → 実画面での条件1〜4確認をCodexへ依頼する。不一致が残る場合はマージ・配備せずClaudeへ戻す。**本番（`main` / `admin.musubo.jp`）は対象外。③の「登録する」は押さない。D1・MFA・新しい秘密設定は触らない。**
+- 以前の1手（その12時点。**利用者本人が実施済み**）：(1) 利用者が `https://stg-admin.musubo.jp/login` を開いてLINEログイン（**MFAが `'false'` なのでTOTPの登録は不要**。`login-mfa.ts:26`）→(2) `https://stg-admin.musubo.jp/accounts/new` で **①事前確認 → ②アカウント接続（`Step 1 / 3` Messaging API → `Step 2 / 3` Webhookの設定 → `Step 3 / 3` LINEログイン）→ ③接続確認** の表示と遷移を確認（**③の「登録する」は押さない**＝`register.tsx:338` で `connect` が走り、本番チャネルのWebhook宛先とLIFFが書き換わるため。§5 730-731行）→(3) **④使い方を選ぶ**は端末保存領域のキー `musubo-register-draft-v8` に `{"step":4,"sub":1}` を置いて `/accounts/new` を再読み込みすれば `connect` なしで描かれる（`logic.ts:116,133`／`register.tsx:120-135,675`）。④は次工程の6項目と併せて確認でもよい →(4) ログインできない／画面が違う場合は**その表示をClaudeへ伝える**（(a) `not_authorized`＝staging D1のスタッフ行、(b) `redirect_uri` のエラー＝LINEログインチャネルのコールバックURL登録。どちらもClaudeが受けて手当てを決める）。**⑤は対象外**（`register.tsx:700` の `currentStep === 5 && connection` で構造上不可・reactテスト `register-v8.react.test.tsx:148,264` で担保）。**新しい秘密設定の登録・D1の変更・本番への操作はしない。④の6項目は利用者が明示承認した縮小範囲なので不一致として扱わない。**
 - 以前の1手（**不要になったので採用しない**／Codexは依頼文の自己矛盾により未実施／そもそもMFAが `'false'` の今は本人ログインで足りる）：**鍵の入れ替え予備枠で `env-owner` としてログインして①〜④を確認**。(1) `wrangler secret list --config apps/worker/wrangler.staging.toml` で**予備枠（`auth.ts:656-669` が受け付ける第2の環境変数）が未設定**であることを確認（既に設定済みなら実在の入れ替え作業中の可能性があるので**上書きせず**Claudeへ戻す）→(2) 新しいランダム値を**その予備枠へ staging 限定で登録**（現行の鍵とは別値。同値ガードのため。**値は会話・ログ・Gitへ出さない**）→(3) `POST https://stg-api.musubo.jp/api/auth/login` にその値を渡してcookieを得る（`env-owner` 分岐・MFA挑戦なし）→(4) `https://stg-admin.musubo.jp/accounts/new` で **①事前確認 → ②アカウント接続（`Step 1 / 3` Messaging API → `Step 2 / 3` Webhookの設定 → `Step 3 / 3` LINEログイン）→ ③接続確認** の表示と遷移を確認（**③の「登録する」は押さない**）。**④は端末保存領域のキー `musubo-register-draft-v8` に `{"step":4,"sub":1}` を置いて再読み込み**（`connect` を通さない）。確認後そのキーを削除 →(5) **登録した秘密設定を削除して原状復帰し、削除を実測**（途中で止める場合も必ず実施）→(6) 併せて **`Deploy Cloudflare Staging` run `39041385899` の `deployment_safety_metadata_unavailable:403:r2` の手当て**（対象stagingバケットのR2情報を読める最小権限のトークンを staging 用CIへ登録し直し、同じチェックの合格を再検証）→(7) 結果をClaudeへ返す。**⑤は対象外**（構造上不可・reactテストで担保）。**MFA設定・D1は触らない。本番は対象外。④の6項目は利用者が明示承認した縮小範囲なので不一致として扱わない。**
 - 以前の1手（Codexが拒否・**採用しない**）：**鍵を使わずDBにセッション行を作る経路**。(1) stagingのD1で `auth.mfa.required:00000000-0000-4000-8000-000000000001` が `'false'` のままであることを再確認（**変更しない**）→(2) `staff_members` から `is_active = 1` かつ **TOTP未登録**（`totp_enabled_at` または `totp_secret_enc` が未設定）の行を1件選ぶ →(3) ランダムな生トークンを決め、その **SHA-256 16進**を `token_hash`、選んだ `id` を `staff_id`、**UTCで数時間先**を `expires_at` として `admin_sessions` に1行INSERT →(4) `https://stg-admin.musubo.jp/accounts/new` を `#lh_session=<生トークン>` で開き、**①事前確認 → ②アカウント接続（`Step 1 / 3` Messaging API → `Step 2 / 3` Webhookの設定 → `Step 3 / 3` LINEログイン）→ ③接続確認** の表示と遷移を確認。**④は端末保存領域のキー `musubo-register-draft-v8` に `{"step":4,"sub":1}` を置いて再読み込み**（`connect` を通さない）→(5) **作ったセッション行を削除**し、消えたことを実測（途中で止める場合も必ず実施）→(6) 併せて **`Deploy Cloudflare Staging` run `39041385899` の `deployment_safety_metadata_unavailable:403:r2` の原因調査と手当て**→(7) 結果をClaudeへ返す。**⑤は対象外**（構造上不可・reactテストで担保）。**MFA設定は触らない。③の「登録する」は押さない。本番は対象外。④の6項目は利用者が明示承認した縮小範囲なので不一致として扱わない。**
 - 以前の1手（Codex・差し戻しにより未実施）：**stagingだけMFA必須を一時的に外して画面①〜⑤を認証済みで開いて確認し、終わったら設定を元へ戻す**。手順＝(1) stagingのD1で `platform_settings` の `auth.mfa.required:00000000-0000-4000-8000-000000000001` を確認し、無ければ `'false'` を登録 →(2) `POST https://nen-line-stg.skmtmst.workers.dev/api/auth/login` に staging の `API_KEY` を渡してセッションを得る（クロスサイトでcookieが届かない場合は `admin_sessions` の実トークンを `#lh_session=` で渡す口を使う） →(3) `https://nen-line-stg-admin.pages.dev/accounts/new` で ①事前確認 → ②アカウント接続（`Step 1 / 3` Messaging API → `Step 2 / 3` Webhookの設定 → `Step 3 / 3` LINEログイン）→ ③接続確認 → ④使い方を選ぶ → ⑤完了 の**表示だけ**を確認（本番チャネルへの書き込みはしない） →(4) **その1行を削除して必須へ戻し、戻ったことを実測** →(5) 結果をClaudeへ返す。**本番は対象外。④の6項目は利用者が明示承認した縮小範囲なので不一致として扱わない。**

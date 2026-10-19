@@ -6,7 +6,7 @@ import { templateOptions } from './check-rows'
 import styles from './register.module.css'
 
 /*
- * ★LINE新規追加_v06.pen（2026-10-15承認）④使い方を選ぶ X0pGdw の描画だけ。
+ * ★LINE新規追加_v07.pen（2026-10-18承認）④使い方を選ぶ X0pGdw の描画だけ。
  * register.tsx が行数の関所（apps/web/scripts/v8-guard/code-size.mjs）を越えたので
  * 切り出した。状態は持たず、register.tsx から受け取って出すだけ（見た目は変えていない）。
  */

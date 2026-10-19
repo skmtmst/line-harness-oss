@@ -81,7 +81,7 @@ beforeEach(() => {
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
-/** ②の中だけ進むボタンの名前が違う（v06 Fqy29）。 */
+/** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const back = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
 
@@ -89,7 +89,7 @@ const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { nam
 const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name }))
 
 /**
- * ①事前確認（v06 p6zMkA）を抜ける。Q1=ある／Q2=引き継がない／Q4=使っていない を選ぶと
+ * ①事前確認（v07 p6zMkA）を抜ける。Q1=ある／Q2=引き継がない／Q4=使っていない を選ぶと
  * Q3・Q5は尋ねないので、3問＋チェック結果の「次へ」で②-1 Messaging API に入る。
  */
 function clearPrecheck() {
@@ -103,7 +103,7 @@ function clearPrecheck() {
 }
 
 /**
- * v06（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * v07（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
  * 入力を変えると確認がやり直しになるので先に全部入れる。
  */
 function enterCheckStep() {
@@ -112,6 +112,7 @@ function enterCheckStep() {
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
   nextStep()
+  ack('Webhook URL を貼り付けて「更新」を押した')
   ack('Webhookの利用をONにした')
   ack('Webhookの再送をONにした')
   ack('エラーの統計情報をONにした')
@@ -146,7 +147,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
 
   /*
     絵の正本ノードは、ソース文字の検索ではなく実際に描かれた印で確かめる（B-273）。
-    v06（LINE新規追加_v06.pen・2026-10-15承認）: p6zMkA=①／Fqy29=②／Lwxyh=③／X0pGdw=④／Plmq1=⑤。
+    v07（LINE新規追加_v07.pen・2026-10-18承認）: p6zMkA=①／Fqy29=②／Lwxyh=③／X0pGdw=④／Plmq1=⑤。
     ノードとURLの対応は scripts/visual-qa/v8-design-map-route-contract.test.ts。
   */
   const shownNode = () => document.querySelector('[data-design-node]')?.getAttribute('data-design-node')
@@ -167,7 +168,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(await screen.findByText('準備ができました')).toBeTruthy()
   })
 
-  /** v06はアカウントを③で作るので、作ったあとも段の表示は⑤へ飛ばさない。 */
+  /** v07はアカウントを③で作るので、作ったあとも段の表示は⑤へ飛ばさない。 */
   it('段の表示は今いる段を指し、登録しても先へ飛ばさない', async () => {
     const current = () => screen.getByRole('navigation', { name: '登録の進捗' })
       .querySelector('[aria-current="step"]')?.textContent
@@ -212,6 +213,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(shownPanel()).toBe('Webhook（受信のつなぎ）を設定する')
     expect(document.getElementById('v8-login-channel-id')).toBeNull()
 
+    ack('Webhook URL を貼り付けて「更新」を押した')
     ack('Webhookの利用をONにした')
     ack('Webhookの再送をONにした')
     ack('エラーの統計情報をONにした')
@@ -228,6 +230,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     nextStep()
     const button = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
     expect(button().disabled).toBe(true)
+    ack('Webhook URL を貼り付けて「更新」を押した')
     ack('Webhookの利用をONにした')
     ack('Webhookの再送をONにした')
     expect(button().disabled).toBe(true)

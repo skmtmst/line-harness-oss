@@ -52,7 +52,7 @@ describe('LINEアカウントを登録（★V8）の小さな計算', () => {
   })
 })
 
-describe('①事前確認（v06 p6zMkA）の出しわけ', () => {
+describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
   it('Q3はQ2=はいのときだけ、Q5はQ4=はいのときだけ尋ねる', () => {
     expect(precheckAsked('q1', {})).toBe(true)
     expect(precheckAsked('q2', {})).toBe(true)
@@ -162,7 +162,7 @@ describe('①事前確認（v06 p6zMkA）の出しわけ', () => {
   })
 })
 
-describe('v06（LINE新規追加_v06.pen・2026-10-15承認）の小さな計算', () => {
+describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算', () => {
   it('②は3つ、③は2つの小さな段。札は「Step 2 / 3」の形で、段の無い画面では出さない', () => {
     expect([subTotal(1), subTotal(2), subTotal(3), subTotal(4), subTotal(5)]).toEqual([0, 3, 2, 0, 0])
     expect(stepLabel(2, 2)).toBe('Step 2 / 3')
@@ -181,17 +181,19 @@ describe('v06（LINE新規追加_v06.pen・2026-10-15承認）の小さな計算
     expect(loginChannelErrors({ loginChannelId: '2002', loginChannelSecret: 'x' })).toEqual({})
   })
 
-  it('②Step2の3つ・Step3の2つは、すべて入れないと次の段へ進めない', () => {
-    expect(WEBHOOK_ACKS).toHaveLength(3)
+  it('②Step2の4つ・Step3の2つは、すべて入れないと次の段へ進めない', () => {
+    expect(WEBHOOK_ACKS).toHaveLength(4)
     expect(LOGIN_ACKS).toHaveLength(2)
     expect(allAcked(WEBHOOK_ACKS, {})).toBe(false)
     expect(allAcked(WEBHOOK_ACKS, { webhookUse: true, webhookRedelivery: true })).toBe(false)
-    expect(allAcked(WEBHOOK_ACKS, { webhookUse: true, webhookRedelivery: true, webhookErrorStats: true })).toBe(true)
+    expect(allAcked(WEBHOOK_ACKS, { webhookUse: true, webhookRedelivery: true, webhookErrorStats: true })).toBe(false)
+    expect(allAcked(WEBHOOK_ACKS, { webhookUrlPasted: true, webhookUse: true, webhookRedelivery: true, webhookErrorStats: true })).toBe(true)
     expect(allAcked(LOGIN_ACKS, { addFriendLink: true, published: true })).toBe(true)
   })
 
-  it('②のチェックの文は承認した v06 のまま。どの行にも下の一文（理由）が付く', () => {
+  it('②のチェックの文は承認した v07 のまま。どの行にも下の一文（理由）が付く', () => {
     expect(WEBHOOK_ACKS.map((ack) => ack.label)).toEqual([
+      'Webhook URL を貼り付けて「更新」を押した',
       'Webhookの利用をONにした',
       'Webhookの再送をONにした',
       'エラーの統計情報をONにした',
@@ -200,7 +202,7 @@ describe('v06（LINE新規追加_v06.pen・2026-10-15承認）の小さな計算
       '友だち追加オプションで、この公式アカウントをリンクした',
       'チャネルを「開発中」から「公開済み」にした',
     ])
-    expect(WEBHOOK_ACKS[0].note).toBe('OFFのままだと、お客さまのメッセージが musubo に届きません。')
+    expect(WEBHOOK_ACKS[0].note).toBe('貼り付けて更新しないと、下の3つのスイッチが表示されません。')
     expect(LOGIN_ACKS[1].note).toBe('開発中のままだと、お客さま側でログインの画面が開きません。')
     for (const ack of [...WEBHOOK_ACKS, ...LOGIN_ACKS]) expect(ack.note.length).toBeGreaterThan(0)
   })
@@ -227,7 +229,7 @@ describe('v06（LINE新規追加_v06.pen・2026-10-15承認）の小さな計算
     expect(allV06RowsOk(waiting)).toBe(false)
   })
 
-  it('③Step1の5行の文は、承認済みの v06（Lwxyh）の5状態をそのまま出す', () => {
+  it('③Step1の5行の文は、承認済みの v07（Lwxyh）の5状態をそのまま出す', () => {
     const titles = ['LINEとつながるかの確認', '同じプロバイダーかの確認', 'Webhook URL の登録', 'アカウント名・@ID・アイコンの取り込み', '友だち追加の窓口（LIFF）の用意']
     // 押す前（EKLKb）：5行とも「これから何をするか」の文。
     const idle = toV06CheckRows(null, { running: false, cursor: 0 })

@@ -42,8 +42,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { describeActionFailure } from '@/lib/use-action-error'
 
 /*
- * ★v06 LINEアカウントを登録（板 ①p6zMkA ②Fqy29 ③Lwxyh ④X0pGdw ⑤Plmq1）。
- * 絵の正本は利用者承認済みの LINE新規追加_v06.pen（2026-10-15 承認）。
+ * ★v07 LINEアカウントを登録（板 ①p6zMkA ②Fqy29 ③Lwxyh ④X0pGdw ⑤Plmq1）。
+ * 絵の正本は利用者承認済みの LINE新規追加_v07.pen（2026-10-18 承認）。
  * ②の小さな段は正本どおり Messaging API → Webhook の設定 → LINE Login の順。
  * 段の中身・使う口・端末の下書きなど、動きの一覧は同じ場所の BEHAVIOR.md。
  */
@@ -88,7 +88,7 @@ export default function AccountRegisterV8() {
 function AccountRegistrationForm() {
   const saveErrors = useSaveFormErrors()
 
-  // ①事前確認（v06 p6zMkA）。答えと、いま出している面。
+  // ①事前確認（v07 p6zMkA）。答えと、いま出している面。
   const [precheck, setPrecheck] = useState<PrecheckAnswers>({})
   const [precheckAt, setPrecheckAt] = useState<PrecheckAt>('q1')
   const [currentStep, setCurrentStep] = useState<StepNumber>(1)
@@ -129,8 +129,7 @@ function AccountRegistrationForm() {
     setError('')
   }
   const createdId = connection?.id ?? ''
-  /* Webhook URL も Callback URL も musubo が自動で登録するので画面に出さない
-     （正本 v06 ②-2 の gcbIm、②-3 の CE8q1 には控えの欄が無い）。 */
+  // Webhook URLは②Step2で表示する。Callback URLは入力させない。
   const registrationStyle = useRegistrationStyle(createdId, currentStep === 4)
   const templateKey = registrationStyle.choice
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
@@ -386,7 +385,7 @@ function AccountRegistrationForm() {
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
       try { if (response.data.id) sessionStorage.setItem(REGISTRATION_STYLE_KEY, response.data.id) } catch (failure) { saveErrors.capture(failure) }
-      // v06：登録できたら③の2つめ（友だち追加のためし）へ進む。
+      // v07：登録できたら③の2つめ（友だち追加のためし）へ進む。
       setCurrentStep(3)
       setSub(2)
     } catch (caught) {
@@ -413,7 +412,7 @@ function AccountRegistrationForm() {
   const moveNext = () => {
     setError('')
     if (currentStep === 1) {
-      // ①は質問を1つずつ出す。最後の「チェック結果」まで来てから②へ渡す（v06 p6zMkA）。
+      // ①は質問を1つずつ出す。最後の「チェック結果」まで来てから②へ渡す（v07 p6zMkA）。
       if (precheckAt !== 'done') {
         const nextAt = precheckNext(precheckAt, precheck)
         if (!nextAt) return
@@ -496,7 +495,7 @@ function AccountRegistrationForm() {
     || (currentStep === 2 && sub === 3 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && !rowsOk)
     || (currentStep === 4 && (!templateKey || registrationStyle.version === null))
-  // v06 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
+  // v07 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
   const backLabel = currentStep === 3 && sub === 1 ? 'LINEログインへ戻る'
     : currentStep !== 2 ? '戻る'
     : sub === 1 ? '事前確認へ戻る' : sub === 2 ? 'Messaging API へ戻る' : 'Webhook の設定へ戻る'
@@ -507,11 +506,11 @@ function AccountRegistrationForm() {
       <PageHeading
         title="LINEアカウントを登録"
         help={shownStep.lead}
-        /* ★v06 p6zMkA〜Plmq1：手順は題と同じ行（題・手順・？の順）。 */
-        titleAccessory={(
-          <div><Steps
+        /* ★承認済み v07 p6zMkA〜Plmq1：手順は題と説明の下の行・左寄せ（板の頭 KPoLr のあと、中身の先頭 t0FvCX）。共通の決まり Fa8ED と同じ。 */
+        steps={(
+          <Steps
             label="登録の進捗"
-            /* v06はアカウントを③で作るので、作ったあとも⑤へ飛ばさない。 */
+            /* v07はアカウントを③で作るので、作ったあとも⑤へ飛ばさない。 */
             currentKey={String(currentStep)}
             steps={V8_STEPS.map((step) => ({
               key: String(step.number),
@@ -521,7 +520,7 @@ function AccountRegistrationForm() {
               /* 登録する前は、済んだ段を押すとその段へ戻る（入れた値はそのまま）。登録した後は戻らない。 */
               onSelect: !createdId && currentStep > step.number ? () => { setCurrentStep(step.number); setSub(1) } : undefined,
             }))}
-          /></div>
+          />
         )}
       />
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>

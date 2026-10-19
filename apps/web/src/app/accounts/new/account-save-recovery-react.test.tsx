@@ -55,13 +55,13 @@ beforeEach(() => {
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
-/** ②の中だけ進むボタンの名前が違う（v06 Fqy29）。 */
+/** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
 const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name }))
 
 /**
- * ①事前確認（v06 p6zMkA）を抜ける。Q1=ある／Q2=引き継がない／Q4=使っていない を選ぶと
+ * ①事前確認（v07 p6zMkA）を抜ける。Q1=ある／Q2=引き継がない／Q4=使っていない を選ぶと
  * Q3・Q5は尋ねないので、3問＋チェック結果の「次へ」で②-1 Messaging API に入る。
  */
 function clearPrecheck() {
@@ -75,7 +75,7 @@ function clearPrecheck() {
 }
 
 /**
- * v06（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * v07（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
  * 5行の確認が全部通ると「登録する」が出る（5行 × 420ms）。
  */
 function enterCheckStep() {
@@ -84,6 +84,7 @@ function enterCheckStep() {
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
   nextStep()
+  ack('Webhook URL を貼り付けて「更新」を押した')
   ack('Webhookの利用をONにした')
   ack('Webhookの再送をONにした')
   ack('エラーの統計情報をONにした')
