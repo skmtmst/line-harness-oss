@@ -33,8 +33,8 @@ export type DrawerProps = {
   /** falseは参照画像と同じ面だけをページ内に描画する。 */
   modal?: boolean
   /**
-   * 幅。省くと480。'narrow' は 480（E-2 電話予約 svUTk）。
-   * 'editor' は 540 の編集の引き出し（ダッシュボード編集 mcOqK：頭 16/20・閉じるは枠つき 30・
+   * 幅。省くと480。'narrow' は 480（E-2 電話予約 ）。
+   * 'editor' は 540 の編集の引き出し（ダッシュボード編集 ：頭 16/20・閉じるは枠つき 30・
    * 中 12/20・下 14/20・開くのは 200ms）。v8 だけで効く。
    */
   width?: 'narrow' | 'editor' | 'order' | 'composer'
@@ -53,7 +53,7 @@ export type DrawerProps = {
   /** 下の帯（footer）のすぐ上に置く知らせ（保存の失敗など）。中身の帯は呼び出し側の Notice。 */
   band?: ReactNode
   /**
-   * 開いたときに寄せる先。'panel' は面そのもの（輪を出さない）。題がその場で直せる板（tnTn9）で、
+   * 開いたときに寄せる先。'panel' は面そのもの（輪を出さない）。題がその場で直せる板で、
    * 開いただけで題に輪が出て編集の入口に見えるのを避ける。Tab で先頭の操作へ進める。
    */
   initialFocus?: 'panel'

@@ -12,7 +12,7 @@ import { BookingGapSections } from '@/v8/booking-gap'
  * ★V8-B 予約の詳細（`AjZhH`）。台帳の行から開く小窓。
  * 中身は引き出し（`TnDbq`）と同じ予約。差し替えるのは見た目だけ。
  * 卓・人数・アレルギーは予約のデータに無いので出さない。
- * v7 の引き出しは残し、`data-theme="v8"` のときだけ使う。
+ * 管理画面 の引き出しは残し、`data-theme="v8"` のときだけ使う。
  */
 
 /** 予約経路の言葉。台帳の絞り込み（`SOURCE_FILTERS`）と同じ語彙。 */

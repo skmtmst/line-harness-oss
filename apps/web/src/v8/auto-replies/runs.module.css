@@ -1,5 +1,5 @@
 /*
- * ★V8 自動応答の実行結果（Pencil nWmLg）。
+ * ★V8 自動応答の実行結果（Pencil ）。
  * 頭・本文の余白・数の帯は型（DetailPage・KpiBand）が持つ。ここは失敗の帯・実行の記録・下の2つの箱だけ。
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }

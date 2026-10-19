@@ -13,7 +13,7 @@ import TagPill from './tag-pill'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
-describe('一覧の行の決まり（B-190/193/194/195/198）', () => {
+describe('一覧の行の決まり（/193/194/195/198）', () => {
   it('編集は「…」から実行し、行の押下へ伝わらない。閲覧のみには出さない', () => {
     const edit = vi.fn(), row = vi.fn()
     render(<div onClick={row}><RowActions subjectName="名前" edit={{ onClick: edit }} /></div>)

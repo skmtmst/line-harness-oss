@@ -30,7 +30,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /*
- * 誤りを出す欄（B-139）。決めるを押したら、落ちた欄が赤くなり真下に理由が出て、1つ目へ移る。
+ * 誤りを出す欄。決めるを押したら、落ちた欄が赤くなり真下に理由が出て、1つ目へ移る。
  * 打っている途中には出さない（窓の下の帯にも出さない）。
  */
 function CheckedField({ id, label, fields, name, children }: { id: string; label: string; fields: FormErrors; name: string; children: React.ReactNode }) {

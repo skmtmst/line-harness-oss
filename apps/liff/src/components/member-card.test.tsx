@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { MemberCardView } from './MemberCard.js';
+import { MemberCardView } from './member-card.js';
 
 afterEach(cleanup);
 

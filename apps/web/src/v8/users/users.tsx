@@ -24,11 +24,11 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 統合ユーザー（Pencil `ADjK8`、採用版の流れは `sdbsQ` 板3、状態 `SXCb3`）。
+ * ★V8 統合ユーザー（Pencil ``、採用版の流れは `sdbsQ` 板3、状態 ``）。
  *
- * データの口は v7 と同じ `useMergedUsers`。違いは見せ方——タブの段は
+ * データの口は 管理画面 と同じ `useMergedUsers`。違いは見せ方——タブの段は
  * 「← 友だち一覧 › データ管理 › 統合ユーザー」＋「データ管理 ▾」に替える。
- * 詳細は v7 と同じく一覧の面を差し替える（merged-person-detail-v8.tsx）。
+ * 詳細は 管理画面 と同じく一覧の面を差し替える（merged-person-detail-v8.tsx）。
  *
  * 板にある「配信に使うアカウント」の列は /api/users-grouped の行に無いので
  * 出さない（DEVIN-QUESTIONS に未接続として記録）。

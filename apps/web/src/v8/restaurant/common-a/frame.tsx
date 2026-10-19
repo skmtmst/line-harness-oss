@@ -145,9 +145,9 @@ export default function RestaurantFrame({
   bodyPadTop?: number
   /** 中身の段の間を絵の値にする。渡さないときは共通の 16 のまま。 */
   bodyGap?: number
-  /** 店舗を選ぶ形。既定はタブ。`'select'` は絵の「店舗：〇〇 ▾」の選ぶ欄（幅210・融合の板 n9vvGx）。 */
+  /** 店舗を選ぶ形。既定はタブ。`'select'` は絵の「店舗：〇〇 ▾」の選ぶ欄（幅210・融合の板 ）。 */
   pickerAs?: 'tabs' | 'select'
-  /** 検証環境の帯を出すか。融合の板（n9vvGx）は帯を描かないので false。 */
+  /** 検証環境の帯を出すか。融合の板は帯を描かないので false。 */
   banner?: boolean
   /** 題の下の1行。選んでいる店舗から作る。 */
   subtitle?: (store: RestaurantStore | null) => ReactNode

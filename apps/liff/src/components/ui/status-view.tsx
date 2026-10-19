@@ -1,15 +1,15 @@
 import type { ReactNode } from 'react';
-import Icon, { type IconName } from './Icon.js';
-import Button from './Button.js';
+import Icon, { type IconName } from './icon.js';
+import Button from './button/index.js';
 
 /**
  * ★V8 の中央寄せの状態 (完了・待ち・空・開けない)。
  * 印＋題＋本文＋ボタン1つ。ボタンは action があるときだけ1つ出す。
  * 印は success だけ緑の丸。それ以外は灰色の線の印をそのまま置く
- * (ADutg・zz9R3 と同じ形)。ウェビナーの暗い地では dark を渡す。
+ * (・ と同じ形)。ウェビナーの暗い地では dark を渡す。
  * 待ち (キャンセル待ち・承認待ち) は tone="wait" で黄土色の丸にする。
- * 見つからない・開けない (板 aLU3r) は tone="muted" で薄い灰の丸に灰の印。
- * large は ★V8 の終わり・お知らせの板 (aNZKe・BjcuB・qVdiX) の形：
+ * 見つからない・開けない (板 ) は tone="muted" で薄い灰の丸に灰の印。
+ * large は ★V8 の終わり・お知らせの板 (・・) の形：
  * 丸・題 (20)・本文 (13/21) の間をすべて 16 空け、children を本文の下に足す。
  */
 export default function StatusView({

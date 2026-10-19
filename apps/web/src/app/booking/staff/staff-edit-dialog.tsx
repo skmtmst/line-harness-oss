@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * 予約スタッフの作成・編集の窓。v7 一覧（staff/page.tsx）と V8 予約設定の
+ * 予約スタッフの作成・編集の窓。管理画面 一覧（staff/page.tsx）と V8 予約設定の
  * 担当スタッフタブ（menus/settings-v8.tsx）の両方から使う。
  * 見た目・入力検査（parseBookingStaffInput）・紐づけ候補の取り方は変えない。
  */

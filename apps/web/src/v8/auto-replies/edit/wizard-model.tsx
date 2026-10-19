@@ -33,10 +33,10 @@ import styles from './wizard.module.css';
 /*
  * ★V8 自動応答の作成・編集・有効化。
  *
- * Pencil の正本：①基本設定 `K7HWG` ②どんなときに動くか `A0pDt`
- * ③何を返すか `rfhIf` ④優先順位 `Guoye` ⑤確認 `XJUqs`、完了 `V4LjH`。
+ * Pencil の正本：①基本設定 `` ②どんなときに動くか ``
+ * ③何を返すか `` ④優先順位 `` ⑤確認 ``、完了 ``。
  *
- * 一覧（uE9gf）から「作る」で入ると下書きとして作り、最後の「確認」で
+ * 一覧から「作る」で入ると下書きとして作り、最後の「確認」で
  * 有効にする。公開の確かめ（重なり・試し送り・公開前チェック）は
  * 手順4・5の中に畳み込み、別画面の公開フローには分けない。
  * URL の `?step=` が手順の正本。戻る・進むは step の移動として扱い、
@@ -275,7 +275,7 @@ export const STARTER_TEMPLATES: Array<{
 ]
 
 /**
- * 曜日のまとめ（`A0pDt`：つながりは「月〜金に反応」、ばらばらは「月・水・金に反応」）。
+ * 曜日のまとめ（``：つながりは「月〜金に反応」、ばらばらは「月・水・金に反応」）。
  * 日曜はじまりの番号のまま見る。土日（[0, 6]）はつながりにせず並べる。
  */
 export function weekdaySummary(days: number[]): string {
@@ -297,12 +297,12 @@ export function ruleTriggerSummary(rule: { keyword?: string | null; activeFrom?:
 }
 
 /** 差し込みに使える札。本文の末尾へトークンを足す。 */
-/** 絵 A0pDt「反応するメッセージの種類」：絵の4つを先に並べ、ほかは「ほかの種類」で出す（機能は残す）。 */
+/** 絵 「反応するメッセージの種類」：絵の4つを先に並べ、ほかは「ほかの種類」で出す（機能は残す）。 */
 export const MAIN_KINDS = ['テキスト', 'スタンプ', '画像', '位置情報']
 
 export const kindOrder = (label: string) => { const i = MAIN_KINDS.indexOf(label); return i < 0 ? 99 : i }
 
-/** 絵 A0pDt「反応するメッセージの種類」の札の印。 */
+/** 絵 「反応するメッセージの種類」の札の印。 */
 export const KIND_ICONS: Record<string, typeof Type> = { テキスト: Type, スタンプ: Sticker, 画像: ImageIcon, 位置情報: MapPin, 動画: Video, 音声: Mic, ファイル: File, ボタンのタップ: MousePointerClick }
 
 /** 「返すまで待つ時間」の選択肢。 */

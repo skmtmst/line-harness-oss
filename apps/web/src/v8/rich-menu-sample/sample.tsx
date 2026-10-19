@@ -22,12 +22,12 @@ import { SampleMenuTiles } from '@/v8/onboarding'
 import styles from './sample.module.css'
 
 /*
- * 見本のリッチメニュー（★V8 修正案の列 VHp7p `cAaGY`。決まり B-311・B-313 追記）。
+ * 見本のリッチメニュー（★V8 修正案の列 VHp7p `cAaGY`。決まり ・ 追記）。
  *
  * スタイルを選んだときに入った見本のリッチメニューを、ボタンごとに「押したら何が開くか・使えるか」で見せる。
  * 中身が決まっていない機能のボタンは、上の帯・表の札「中身が未設定」・右のお客さまの見え方
  * （押したときは準備中の案内）で知らせ、［決まりを入れる］でその設定の画面へ案内する。
- * 画像を変える・保存・押したときの変更は、組4の口ができるまで準備中の窓（B-314）。
+ * 画像を変える・保存・押したときの変更は、組4の口ができるまで準備中の窓。
  */
 
 const AREAS = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -64,7 +64,7 @@ export default function RichMenuSampleV8() {
   const shown = selected ?? (firstWarned >= 0 ? firstWarned : 0)
   const shownTile = menu.tiles[shown]
   const hrefOf = (feature: string) => featureHref(feature, warnings.find((warning) => warning.feature === feature)?.href ?? '/rich-menus', style ?? undefined)
-  /* 設定の画面がまだ無い機能（クーポン・回数券）は、［決まりを入れる］で準備中の窓（B-314）。 */
+  /* 設定の画面がまだ無い機能（クーポン・回数券）は、［決まりを入れる］で準備中の窓。 */
   const configure = (feature: string) => FEATURES[feature]?.preparing
     ? <Button onClick={() => preparing.open(FEATURES[feature]!.preparing!)}>決まりを入れる</Button>
     : <Button href={hrefOf(feature)}>決まりを入れる</Button>

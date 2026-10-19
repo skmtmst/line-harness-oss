@@ -2,7 +2,7 @@ import type { AdminVersionDetail } from './admin-version-cache'
 import { formatDateTime } from '@/lib/format'
 
 /**
- * メニューの下に出す版の表示（★V7 監査の直し E）の組み立て。
+ * メニューの下に出す版の表示（★管理画面 監査の直し E）の組み立て。
  *
  * - 1行目: `Ver. 2.7.0（a1b2c3d）`
  * - 2行目: `9/27 13:05 配備・検証環境`

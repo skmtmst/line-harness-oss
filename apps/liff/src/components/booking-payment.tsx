@@ -1,22 +1,22 @@
-import PaymentPreparingNote from './PaymentPreparingNote.js';
+import PaymentPreparingNote from './payment-preparing-note.js';
 import { useVisiblePolling } from '../lib/use-visible-polling.js';
 import { CUSTOMER_WORDS, PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import { useEffect, useRef, useState } from 'react';
 import liff from '@line/liff';
 import { api } from '../lib/api.js';
-import type { SlotPick } from './DateTimePicker.js';
+import type { SlotPick } from './date-time-picker.js';
 import { addMinutesHm, formatJpLong } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
-import Icon from './ui/Icon.js';
-import Button from './ui/Button.js';
-import BottomBar from './ui/BottomBar.js';
+import Icon from './ui/icon.js';
+import Button from './ui/button/index.js';
+import BottomBar from './ui/bottom-bar.js';
 
 type PayPhase = 'confirm' | 'waiting' | 'paid' | 'expired' | 'unknown';
 
 /**
  * お支払いありの予約の続き (★V8)。
- * ⑤確認 (CbGpr) → ⑥お支払い (RmjcT) → ⑦確定 (qJNti)。
- * 払い終わらなかったときは v9WJd。
+ * ⑤確認  → ⑥お支払い  → ⑦確定 。
+ * 払い終わらなかったときは 。
  * お支払いなしの店ではこの画面は出ない (出さない側で切り替える)。
  */
 export default function BookingPayment({

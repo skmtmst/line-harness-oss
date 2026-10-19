@@ -17,8 +17,8 @@ import { Loading } from './sections'
 import styles from './dashboard.module.css'
 
 /*
- * 対応が必要な受信（全アカウント）（WQmep 段B）。
- * 取り方は v7 の PendingInboxCard と同じ（`/api/support/inbox?status=open`・
+ * 対応が必要な受信（全アカウント）（ 段B）。
+ * 取り方は 管理画面 の PendingInboxCard と同じ（`/api/support/inbox?status=open`・
  * 30秒ごと・画面に戻ったとき・担当者ごとの表示件数）。上の数の帯の
  * メール件数・最長待ちの出どころでもあるので、件数を親へ知らせる。
  */

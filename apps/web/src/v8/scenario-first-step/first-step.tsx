@@ -53,13 +53,13 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 シナリオを作る②：1通目を設定（Pencil `V6xAo`・1152 `U5rxyH`）。
+ * ★V8 シナリオを作る②：1通目を設定（Pencil ``・1152 ``）。
  *
  * 型（CreatePage）に、戻る・題・手順の輪・説明・左の段（だれに送るか・1通目の内容）と、
  * 右の列（LINEでの見え方）・下の帯（キャンセル・1通目はあとで書く・作って編集へ）を渡す。
  * 1152 の板では右の列に「LINEでの見え方を見る」だけを置き、スマホは窓で開く。
  *
- * 動き（読み込み・保存・失敗時・1通目の復元）は v7（app/scenarios/first-step）と同じ。
+ * 動き（読み込み・保存・失敗時・1通目の復元）は 管理画面（app/scenarios/first-step）と同じ。
  * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
  * 適当な本文を入れて先へ進む。
  */

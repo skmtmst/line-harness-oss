@@ -6,7 +6,7 @@ import type { MenuItem, StaffItem } from '../lib/api.js';
 vi.mock('../lib/user-message.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../lib/user-message.js')>()), logFailure: vi.fn() }));
 vi.mock('../lib/api.js', () => ({ api: { seriesPreview: vi.fn() } }));
 const { api } = await import('../lib/api.js');
-const { default: RecurringCard } = await import('./RecurringCard.js');
+const { default: RecurringCard } = await import('./recurring-card.js');
 
 const menu = { id: 'm1', name: 'トリミング', recurring: { enabled: true, max_count: 12 } } as unknown as MenuItem;
 const staff = { id: 's1' } as StaffItem;

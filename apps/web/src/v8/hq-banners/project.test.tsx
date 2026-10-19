@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 バナー生成・プロジェクトの中（src/v8/hq-banners/project.tsx）の動きの試験。
- * 札と画像のます・アーカイブの確かめ（I0w2e）・画像の詳細（rI5uh）→ 一覧から外す確かめ（B24oNg）・
+ * 札と画像のます・アーカイブの確かめ・画像の詳細→ 一覧から外す確かめ・
  * 閲覧のみには取り込む・アーカイブ・生成パネル・星を置かない。
  */
 import React, { act } from 'react'
@@ -131,7 +131,7 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     expect(host.textContent).toContain('お気に入り 1')
     expect(host.textContent).toContain('配布済み 1')
     expect(host.textContent).toContain('リッチメッセージ・1:1')
-    // 下の帯のボタンは板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。
+    // 下の帯のボタンは板 `b1So7a`「生成する（2枚）」＝管理画面 と同じ言葉。
     expect(buttonNamed('生成する（1 枚）') ?? buttonNamed('生成する（4 枚）')).toBeTruthy()
   })
 

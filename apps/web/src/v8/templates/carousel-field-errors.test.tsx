@@ -21,7 +21,7 @@ vi.mock('@/components/auto-replies/inline-action-list', () => ({ useActionOption
 import Carousel from './carousel'
 
 /*
- * カルーセルの保存で落ちた欄（B-139・オーナーの写真の指摘：「すべてのカードに本文を入力してください」の帯だけだった）。
+ * カルーセルの保存で落ちた欄（・オーナーの写真の指摘：「すべてのカードに本文を入力してください」の帯だけだった）。
  * 欄が赤くなり真下に理由、別のカードならそのカードを開いて移り、カードの札に赤い丸が付く。
  */
 beforeEach(() => { calls.create.mockResolvedValue({ success: true, data: { id: 'template-1' } }) })
@@ -33,7 +33,7 @@ const fillFirst = () => {
   fireEvent.change(screen.getByLabelText(/本文（/), { target: { value: '1枚目の本文' } })
 }
 
-describe('カルーセルの欄ごとの誤り（B-139）', () => {
+describe('カルーセルの欄ごとの誤り', () => {
   it('ボタンごとに文字と動きの題を付け、最後の一つを隠し、削除後も残りの値を保つ', async () => {
     render(<Carousel />)
     expect(screen.queryByRole('button', { name: 'カード1のボタン1を外す' })).toBeNull()

@@ -81,7 +81,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const canDuplicate = role === null || canManageRole(role)
   const [loading, setLoading] = useState(true)
 
-  /* クラスのお支払い（B-305 追記 3・絵 XFRyO）。保存は「概要を保存する」と一緒。 */
+  /* クラスのお支払い（ 追記 3・絵 XFRyO）。保存は「概要を保存する」と一緒。 */
   const eventPayment = useMenuPayment('event', accountId, eventId)
   /* 下の帯の左端に［削除する］（絵 XFRyO）。権限と断りの文は一覧の削除と同じ。 */
   const canDelete = role === 'owner' || role === 'admin'
@@ -533,7 +533,7 @@ function SlotsTab({
   const [showAdd, setShowAdd] = useState(false)
   const [showBulk, setShowBulk] = useState(false)
   /*
-    確認は設計の窓で出す。**ブラウザの `confirm()` を使わない。**
+    確認は設計の窓で出す。**ブラウザの `confirm` を使わない。**
     何件できるのか・何が消えるのかを本文で読ませられず、画像比較にも写らない。
   */
   const [deleteSlotTarget, setDeleteSlotTarget] = useState<EventSlot | null>(null)
@@ -757,7 +757,7 @@ function SlotsTab({
           onClose={() => setShowBulk(false)}
           onSubmit={async (input) => {
             /*
-              作る前に**下見を出す**。件数が0でも `alert()` は使わず、
+              作る前に**下見を出す**。件数が0でも `alert` は使わず、
               同じ窓で理由を読ませて、作るボタンを出さない。
               生成は501件目で打ち切られる(DETAIL-12)。上限超過は
               例外として投げ、入力窓の中で理由を読ませる。

@@ -8,7 +8,7 @@ import scanBlankGap from './blank-gap-browser.mjs'
 
 export const GAP_ROUTES = {
   ...Object.fromEntries(Object.entries(ROUTES).filter(([name]) => name !== 'login')),
-  // B-187 で空白が報告された52画面。手元の報告ファイルには依存しない。
+  //  で空白が報告された52画面。手元の報告ファイルには依存しない。
   ...Object.fromEntries([
     "/accounts/new",
     "/affiliates/new",

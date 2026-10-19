@@ -1,5 +1,5 @@
 /*
- * 1通目設定（設計 `V6 5 kk8dz`）の契約。
+ * 1通目設定（設計 `管理画面 5 kk8dz`）の契約。
  *
  * 本体は、上限を超えた本文のまま保存を押せないこと。押せたところでLINEが
  * 弾くので、画面は「保存できたのに届かない」を作ることになる。
@@ -15,7 +15,7 @@ const PREVIEW = fs.readFileSync(new URL('../../../components/scenarios/step-prev
 
 describe('1通目設定の動きの契約', () => {
   it('作成の現在地と保存前の要点を同時に確認できる', () => {
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    // : 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(PREVIEW).toContain('<LinePreview')
     // R213: 通番号は変数で出す（2通目以降の編集で正しい番号になる）。
     // 新規1通目の既定は 1 のままなので、ここの見た目は変わらない。
@@ -51,7 +51,7 @@ describe('1通目設定の動きの契約', () => {
     expect(PAGE).toContain("setLoadState('ready')")
     expect(PAGE).toContain("setLoadState('error')")
     expect(PAGE).toContain('loadState !== \'ready\'')
-    // 再読み込みは ★V7 TargetMissing の error（onRetry が番号を進めて取り直す）。
+    // 再読み込みは ★管理画面 TargetMissing の error（onRetry が番号を進めて取り直す）。
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('onRetry={() => setReloadKey((k) => k + 1)}')
   })

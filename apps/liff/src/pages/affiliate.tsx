@@ -3,17 +3,17 @@ import { TextInput, FieldLabel } from '../components/forms/controls.js';
 import { fetchMe, postRegister, postAddLink, fetchOffers, fetchMileage, postEnrollOffer, type AffiliateData, type AffiliateLinkData, type OfferData, type MileageWalletData, type MileageOpportunity } from '../lib/affiliate-profile-api.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LOAD_FAILED_MESSAGE, SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import LoadingView from '../components/LoadingView.js';
-import HelpTip from '../components/HelpTip.js';
-import MileageRewards from '../components/MileageRewards.js';
-import MemberCard from '../components/MemberCard.js';
-import AffiliatePayments from '../components/AffiliatePayments.js';
-import Button from '../components/ui/Button.js';
-import Card from '../components/ui/Card.js';
-import Badge from '../components/ui/Badge.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import Icon from '../components/ui/Icon.js';
+import LoadErrorView from '../components/load-error-view.js';
+import LoadingView from '../components/loading-view.js';
+import HelpTip from '../components/help-tip.js';
+import MileageRewards from '../components/mileage-rewards.js';
+import MemberCard from '../components/member-card.js';
+import AffiliatePayments from '../components/affiliate-payments.js';
+import Button from '../components/ui/button/index.js';
+import Card from '../components/ui/card.js';
+import Badge from '../components/ui/badge.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import Icon from '../components/ui/icon.js';
 import { copyText, CopyButton } from "../components/affiliate-parts.js"
 
 type State =
@@ -54,7 +54,7 @@ function mileageSourceLabel(source: string): string {
 }
 
 /**
- * 貯まったマイル (★V8 S3uBl：深い緑の箱。オーナー「黒がいや」のため黒ではなく深い緑)。
+ * 貯まったマイル (★V8 ：深い緑の箱。オーナー「黒がいや」のため黒ではなく深い緑)。
  * 使えるマイルを大きく、その下に「これまでに得た」「使った」の2つの箱。
  * 確定待ちは紹介の箱の中へ移した (ReferralCard)。合算の注記はそのまま。
  */
@@ -267,7 +267,7 @@ function ReferralSummary({ links }: { links: AffiliateLinkData[] }) {
   );
 }
 
-/** 箱の中の1行のリンク (★V8 S3uBl)。「名前（URL）」とコピー。 */
+/** 箱の中の1行のリンク (V8)。「名前（URL）」とコピー。 */
 function CompactLinkRow({ link }: { link: AffiliateLinkData }) {
   const urlRef = useRef<HTMLInputElement>(null);
   const name = link.offerName ?? link.label ?? 'リンク';
@@ -329,7 +329,7 @@ function CompactOfferRow({
 }
 
 /**
- * お友だちを紹介する (★V8 S3uBl の白い箱)。
+ * お友だちを紹介する (★V8  の白い箱)。
  * 説明は最初の案件の説明。主ボタンで紹介のリンクを LINE で送る (送れない端末はコピー)。
  * その下に成果の3つの数・確定待ち・リンクの行。
  */
@@ -738,7 +738,7 @@ export default function Affiliate() {
     });
   }
 
-  // 並びは ★V8 S3uBl のとおり「貯まった → お友だちを紹介する → マイルの履歴」。
+  // 並びは ★V8  のとおり「貯まった → お友だちを紹介する → マイルの履歴」。
   // その下に、増やす取り組み・案件ごとのリンクの管理 (SNSごとの発行・数)。
   return (
     <div className="min-h-screen bg-canvas" data-design-node="S3uBl">

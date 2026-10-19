@@ -199,7 +199,7 @@ export function useScenarioCopy({
 
       setDuplicateRemainder(null)
       setDuplicateOpen(false)
-      /* B-177 ③（Al4Ek）：複製はその場にとどまり、下書きで作ったことをトーストで知らせる。コピーは一覧に下書きで並ぶ。 */
+      /*  ③：複製はその場にとどまり、下書きで作ったことをトーストで知らせる。コピーは一覧に下書きで並ぶ。 */
       notifyToast(copyName === `${scenario.name} のコピー` ? `「${scenario.name}」のコピーを下書きで作りました` : `「${copyName}」を下書きで作りました`)
     } catch (e) {
       const fieldFailure = saveErrors.capture(e);

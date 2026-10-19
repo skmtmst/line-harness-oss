@@ -1,4 +1,4 @@
-/* ★V8 重複検出の言葉（hn6Y8・fcg2D）。 */
+/* ★V8 重複検出の言葉（・）。 */
 import type { IdentityCandidateStatus, IdentityConfidenceLabel } from '@line-crm/shared'
 import { formatDate as polishFormatDate } from '@/lib/format'
 

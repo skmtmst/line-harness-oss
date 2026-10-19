@@ -18,7 +18,7 @@ import {
 // 2026-09-30 00:48 JST = 2026-09-29 15:48 UTC
 const NOW = '2026-09-29T15:48:00Z'
 
-describe('★V7 日付と数の書き方（板 ZzBqa §2）', () => {
+describe('★管理画面 日付と数の書き方（板 ZzBqa §2）', () => {
   it('日時は今年なら M月D日（曜）H:mm、秒も年も出さない', () => {
     expect(formatDateTime('2026-09-29T15:48:00Z', '—', NOW)).toBe('9月30日（水）00:48')
     expect(formatDateTime('2026-09-29T15:48:59Z', '—', NOW)).toBe('9月30日（水）00:48')
@@ -90,7 +90,7 @@ describe('★V7 日付と数の書き方（板 ZzBqa §2）', () => {
 })
 
 // UTCの日付とJSTの日付が違う境界・前年・無効値を守る。
-describe('B-152 一覧と詳細の書式', () => {
+describe('一覧と詳細の書式', () => {
   it('一覧は今年の日時を短く、別の年は年を出す', () => {
     expect(formatListDateTime('2026-10-08T01:12:00Z', '—', NOW)).toBe('10/08 10:12')
     expect(formatListDateTime('2025-10-08T01:12:00Z', '—', NOW)).toBe('2025/10/08')

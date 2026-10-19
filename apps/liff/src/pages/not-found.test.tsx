@@ -7,9 +7,9 @@ const liffMock = vi.hoisted(() => ({ isInClient: vi.fn(() => true), closeWindow:
 vi.mock('@line/liff', () => ({ default: liffMock }));
 vi.mock('../lib/api.js', () => ({ api: { liffConfig: () => Promise.resolve({ data: null }) } }));
 
-import NotFound, { closeOrBackToLine } from './NotFound.js';
+import NotFound, { closeOrBackToLine } from './not-found.js';
 
-/** ★V8 見つからない画面（板 aLU3r）。以前は灰色の文字1行だけで戻る道が無かった。 */
+/** ★V8 見つからない画面（板 ）。以前は灰色の文字1行だけで戻る道が無かった。 */
 describe('LIFF の見つからない画面', () => {
   it('題・説明・LINE に戻る・閉じる を出す', () => {
     const html = renderToStaticMarkup(<NotFound />);

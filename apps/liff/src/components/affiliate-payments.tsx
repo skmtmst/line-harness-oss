@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { affiliateBankFields } from '@line-crm/shared';
 import { affiliateSelfApi, SelfApiError, type BankInput, type BankProfile, type Statement } from '../lib/affiliate-self-api.js';
-import Button from './ui/Button.js';
-import Card from './ui/Card.js';
-import ConfirmDialog from './ui/ConfirmDialog.js';
+import Button from './ui/button/index.js';
+import Card from './ui/card.js';
+import ConfirmDialog from './ui/confirm-dialog.js';
 import { FormSelectControl, FormTextControl } from './forms/controls.js';
 
 const empty: BankInput = { bankCode: '', bankName: '', branchCode: '', branchName: '', accountType: 'ordinary', accountNumber: '', accountHolderName: '' };

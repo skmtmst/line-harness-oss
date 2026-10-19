@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import ConfirmDialog from './ConfirmDialog.js';
+import ConfirmDialog from './confirm-dialog.js';
 
 /**
  * 確認窓のキーボード操作と折れ方の描画試験。

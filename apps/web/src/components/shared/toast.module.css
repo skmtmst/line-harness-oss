@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 保存の知らせ（Toast）。★V7 共通部品その2 §2。
+ * 保存の知らせ（Toast）。★管理画面 共通部品その2 §2。
  *
  * 「保存しました」「削除しました」など、画面の中に文で出していた
  * 知らせを右下にまとめる。4秒で消える。読み上げには role=status で
@@ -27,7 +27,7 @@
 }
 
 /*
- * 知らせ1件。★V7 §2 の決まり「知らせは黒にしない（2026-09-30 オーナー）」に
+ * 知らせ1件。★管理画面 §2 の決まり「知らせは黒にしない（2026-09-30 オーナー）」に
  * そろえ、白地・細い線・段2（浮く）の影にする。文字は ink。
  * 成功・失敗は印の色だけで分ける（緑=成功、赤=失敗）。
  */
@@ -166,10 +166,10 @@
 :root .icon { width: 16px; height: 16px; }
 :root .undo { padding: 0; min-height: 0; font-weight: 600; text-decoration: none; line-height: 20px; }
 
-/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 :root .toast { -webkit-font-smoothing: auto; }
 
-/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+/* ・・：10-10 に採用した共通の形。 */
 html:root .host { bottom: var(--toast-bottom, var(--space-16)); }
 html:root .toast { background: var(--color-canvas); color: var(--color-ink); outline: 1px solid var(--color-code-border); box-shadow: var(--shadow-float); }
 html:root .message { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

@@ -3,9 +3,9 @@ import type { CustomerBookingWaitlist } from '@line-crm/shared';
 import { api } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import { utcToJstHm, utcToJstMd, formatWeekday } from '../lib/datetime.js';
-import Button from './ui/Button.js';
-import LoadErrorView from './LoadErrorView.js';
-import WaitlistOfferSheet from './WaitlistOfferSheet.js';
+import Button from './ui/button/index.js';
+import LoadErrorView from './load-error-view.js';
+import WaitlistOfferSheet from './waitlist-offer-sheet.js';
 
 /** 自分のキャンセル待ち。順番（先着・何番目か）は口が返す。口が無い間は番号を出さない。 */
 export type WaitlistRow = CustomerBookingWaitlist & { position?: number | null };

@@ -55,7 +55,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
     setDirty(true)
   }
 
-  /* B-335 (2)：開き直して保存するときは、変えた答えだけを送る（前の答えで予約設定を書き戻さない）。 */
+  /*  (2)：開き直して保存するときは、変えた答えだけを送る（前の答えで予約設定を書き戻さない）。 */
   const [saved, setSaved] = useState<Record<string, SetupAnswer>>(answersForApi(state.answers ?? {}))
   const [confirm, setConfirm] = useState<{ lines: string[]; run: () => void; cancel: () => void } | null>(null)
 
@@ -85,10 +85,10 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
     const [set, items] = await Promise.all([styleApi.starterSet(accountId, style), styleApi.starterItems(accountId)])
     if (!set.success || !items.success) throw new Error('summary failed')
     const pairs = pairStarterItems(set.data.definition.items, items.data.items)
-    /* B-335 (3)：予約確定の見本の自動送信は、いつもの確定の知らせと重なるので一覧に出さない（動かさせない）。 */
+    /*  (3)：予約確定の見本の自動送信は、いつもの確定の知らせと重なるので一覧に出さない（動かさせない）。 */
     const activation = pairs.filter((pair) => needsActivation(pair.state) && !isBookingConfirmSample(pair.item))
     setSummary({ inserted: pairs.filter((pair) => pair.item.kind in KIND_WORD), activation })
-    /* B-335 (3)：自動で送る物・予約メニューは最初から全部止めた状態。オンにするのは利用者が自分で。 */
+    /*  (3)：自動で送る物・予約メニューは最初から全部止めた状態。オンにするのは利用者が自分で。 */
     setEnabled(Object.fromEntries(activation.map((pair) => [pair.state.target_id, false])))
   }
 

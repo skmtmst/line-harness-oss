@@ -4,7 +4,7 @@
  * ★V8 友だちの「データ管理」メニュー（specs/friends-data-menu.md・採用 D、
  * Pencil `XWrGf`・`sdbsQ`）。
  *
- * v7 で見えていたタブ行（友だち一覧・重複検出・統合ユーザー・UID移行）は
+ * 管理画面 で見えていたタブ行（友だち一覧・重複検出・統合ユーザー・UID移行）は
  * v8 では出さない。低頻度の管理画面への行き先は右上の「データ管理 ▾」へ
  * まとめ、管理画面同士は「← 友だち一覧 › データ管理 › 今の画面」の段で
  * 往復できるようにする。
@@ -123,7 +123,7 @@ export function FriendsDataMenuV8({
 }
 
 /**
- * 一覧タブの板の頭（ywJ5H・sdbsQ）：題「友だち」＋説明1行、右に
+ * 一覧タブの板の頭（・sdbsQ）：題「友だち」＋説明1行、右に
  * 「データ管理 ▾」（副）→「友だちを取り込む」（主・緑は1つ）。
  * 「友だちを取り込む」の行き先は既にある CSV 取り込み（/friends/migrations）。
  * 一覧の表そのもの（KPI・絞り込み・表）は機能11の担当で、ここでは触らない。
@@ -133,7 +133,7 @@ export function FriendsListHeadV8({
 }: {
   onExportCurrentPage?: (() => void) | null
 }) {
-  /* 板 `x6QsVz`：閲覧のみは「取り込む」を押せない形にする（隠さない）。
+  /* 板 ``：閲覧のみは「取り込む」を押せない形にする（隠さない）。
      役割が読めるまでは今までどおり出す（このファイルの CSV と同じ守り）。 */
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)

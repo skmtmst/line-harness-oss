@@ -126,7 +126,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    * 統括のひな形（host）：手順の間は画面の中に持ち、最後に一度だけ保存する（店はこれまでどおり手順ごとに下書きを保存）。
    * 統括の画面で持てない欄（登録メディア・計測リンク・トークを開いたとき・出す相手の条件・公開の確かめ）は出さない。
    */
-  /* 統括（UgZPJ・BVSbe・ME78d）：③は「配る先」、④は「確かめて配る」。 */
+  /* 統括（・・）：③は「配る先」、④は「確かめて配る」。 */
   /* 統括の④「配ったときの扱い」（同じ名前があるとき）。配る前の確認の初めの選択として渡す。 */
   const [hqDuplicateMode, setHqDuplicateMode] = useState<'overwrite' | 'alias'>('overwrite')
   const stepLabel = (key: StepKey) => (host ? HQ_STEP_LABEL[key] : STEP_LABEL[key])
@@ -213,7 +213,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
   /*
-   * ★V8 `r8dGXT`：なおし中にほかの人が先に保存した（409）。
+   * ★V8 ``：なおし中にほかの人が先に保存した（409）。
    * 入力は残したまま、帯で知らせる。名前・時刻は API に無いので出さない。
    */
   const [conflict, setConflict] = useState(false)
@@ -492,7 +492,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   }
 
   /*
-   * 保存で落ちた欄（B-139）。名前・トーク画面の下の文言は①、切り替えの行き先は②の面。
+   * 保存で落ちた欄。名前・トーク画面の下の文言は①、切り替えの行き先は②の面。
    * 帯ではなく欄を赤くして真下に理由を出し、別の手順・タブ・面ならそこを開いて移る。面の一覧に赤い丸。
    */
   saveErrors.define('name', 'メニュー名', () => null, { required: true, reveal: () => setStep('shape') })
@@ -524,7 +524,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   function reloadGroup(groupId: string) { return reloadMenuGroup({ hydrate }, groupId) }
 
   /*
-   * `?id=<下書き>` で作りかけの下書きを開き直す（手順②〜④へ直接来る・撮影の作る② Z0uO6・kmTab）。
+   * `?id=<下書き>` で作りかけの下書きを開き直す（手順②〜④へ直接来る・撮影の作る② ・）。
    * 開けたら手順はどれでも選べる（①で作った後と同じ）。開けなければ理由を出し、新しく作る道は残す。
    */
   const resumeIdRef = useRef<string | null>(
@@ -570,7 +570,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     setError(null)
   }
 
-  /** ★V8 `r8dGXT`「最新を読み込んで続ける」。最新で入力を置き換える。 */
+  /** ★V8 ``「最新を読み込んで続ける」。最新で入力を置き換える。 */
   function acceptLatestAndContinue() {
     if (!conflictLatest) return
     hydrate(conflictLatest)
@@ -1100,12 +1100,12 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /*
    * 居場所は currentKey が決める。state は「済みか」だけを表すので、
    * いまいる段は done にしない（まだ入力中）。最後の「公開」は押して出すまで済みにしない
-   * （開き直した下書きで、まだ公開していないのに済みの印が付いていた。OxEMM）。
+   * （開き直した下書きで、まだ公開していないのに済みの印が付いていた。）。
    */
   const stepperSteps = STEP_KEYS.map((key, i) => ({
     key,
     label: stepLabel(key),
-    /* 統括（UgZPJ・BVSbe・ME78d）：今の手順より先は、直すときに押して進めても番号のまま（済みの印は前の手順だけ）。まだ公開していない「公開」の段は番号のまま（OxEMM）。 */
+    /* 統括（・・）：今の手順より先は、直すときに押して進めても番号のまま（済みの印は前の手順だけ）。まだ公開していない「公開」の段は番号のまま。 */
     state: (host ? i < stepIndex : i !== stepIndex && i <= maxStepIndex && (key !== 'publish' || done !== null)) ? 'done' as const : 'todo' as const,
     onSelect: i !== stepIndex && i <= maxStepIndex ? () => goToStep(key) : undefined,
     reachable: i !== stepIndex && i <= maxStepIndex,
@@ -1181,7 +1181,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         host ? (step === 'shape' ? 'gobhu' : step === 'buttons' ? 'egdGx' : step === 'audience' ? 'K0gu1' : 'gQabc')
           : step === 'shape' ? 'JeINq' : step === 'buttons' ? 'Z0uO6' : step === 'audience' ? 'OxEMM' : 'F4gELj'
       } headingSize="large" title={<>リッチメニューを作る</>} help={<>{headNote}{conditionHelp ? <p>{conditionHelp}</p> : null}</>} notice={conflict ? (
-          /* 板 `r8dGXT`：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
+          /* 板 ``：帯は頭の説明の下に横いっぱい（右の列の上まで）。見た目は共通部品（save-conflict）。比べる窓はこの画面の要約の比べ（VersionCompare）。 */
           <div className={styles.conflictSlot}>
             <SaveConflictBand reloadVariant="primary"
               title="ほかの人がこのメニューを更新しました"
@@ -1395,7 +1395,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   function slotImage(index: number): { src: string; name: string; dims: { w: number; h: number } | null; kb: number | null; removable: boolean } | null { return getSlotImage({ accountId, group, host, imageVersion, pages, pendingImages }, index) }
 
   /*
-   * 画像の枠は共通の「画像を追加する所」（MediaSlot・Z7vd2・B-128）。
+   * 画像の枠は共通の「画像を追加する所」（MediaSlot・Z7vd2・）。
    * 入れ方は今のまま（ファイル・登録メディア）。作る前は選んだファイルを手元に置き、作った後はページへ送る（handlePickedFile）。
    */
   function renderSingleImage() { return renderSingleImageSlot({ accountId, busy, clearPendingImage, handlePickedFile, host, setImageGuideOpen, setImagePickTarget, setMediaPickerOpen, size, slotImage }) }
@@ -1407,7 +1407,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   function renderButtons() { return renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }) }
 
   /*
-   * ======== 統括の手順③：配る先（絵 UgZPJ）========
+   * ======== 統括の手順③：配る先（絵 ）========
    * 配るアカウント（統括が渡す1行の欄）→ 各アカウントで誰に出すか。
    * 統括のひな形が持てるのは「全員（配った先の既定）」か「決めない（各アカウントで決める）」の2つ。
    * 「タグが付いた人」（displayTagName）と「トークを開いたとき」（defaultOpen）は組1の口（保存・配布）で持つ。
@@ -1418,7 +1418,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   function renderAudience() { return renderAudienceStep({ aggregateOnly, audience, canOperate, conditionCount, conditionEmpty, conditionUnsaved, currentDefaultMenu, defaultOpen, editGroupId, host, orderRows, renderHqAudience, setAudience, setDefaultOpen, setPriorityInput, setPriorityOpen, setTargetingCondition, setTargetingPriority, targetedMenus, targetingCondition, targetingPriority }) }
 
   /*
-   * ======== 統括の手順④：確かめて配る（絵 BVSbe）========
+   * ======== 統括の手順④：確かめて配る（絵 ）========
    * 確かめる（形と面ごとの動き）→ 足りないもの（画面の中で分かる所だけ）→ 配ったときの扱い（同じ名前があるとき）。
    * アカウントごとの足りないもの（そのアカウントに無いタグなど）と同じ名前のメニューの数は、
    * 保存したあとの「配る前の確認」で口（preflight）が返すので、ここでは数を作らない（機能待ち）。
@@ -1428,7 +1428,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   /* ======== 手順④：公開 ======== */
   function renderPublish() { return renderPublishStep({ accountId, aggregateOnly, areaActionSummary, audience, canOperate, checks, checksError, checksLoading, conditionEmpty, conditionUnsaved, done, endEnabled, goToStep, group, host, loadChecks, nowNote, pages, previewAreas, previewImageUrl, publishEffectNote, publishPlan, recording, recordSeen, renderHqPublish, restoreMenus, setActivePageId, setEndEnabled, setSelectedAreaId, size, staffRole, targetPreview, totalAreaCount, updatePublishPlan, validateWithLine, validating }) }
   /* ======== 右の列 ======== */
-  /* LINEでの見え方（スマホの見本）。広い板は右の列に、狭い板（kmTab）は右の列のボタンから窓で開く。 */
+  /* LINEでの見え方（スマホの見本）。広い板は右の列に、狭い板は右の列のボタンから窓で開く。 */
   function renderLinePreview() { return renderMenuLinePreview({ activePage, chatBarText, group, host, previewAreas, previewImageUrl, previewPage, previewPages, selectedAccount, size }) }
   function renderRail(inDialog = false) { return renderPreviewRail({ activePage, audience, conditionEmpty, conditionUnsaved, configuredCount, currentDefaultMenu, group, host, hqPreview, pages, previewImageUrl, renderLinePreview, selectedArea, step, tabCount, targetPreview, targetPreviewError, targetPreviewLoading, totalAreaCount }, inDialog) }
 }

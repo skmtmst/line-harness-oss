@@ -68,7 +68,7 @@ function fieldsOf(accountId: string) {
 
 beforeEach(() => {
   fixture.role = 'owner'
-  // V8 の作る画面を見る。本番は v7 のままなので分岐は残す。
+  // V8 の作る画面を見る。本番は 管理画面 のままなので分岐は残す。
   document.documentElement.dataset.theme = 'v8'
   fixture.account = 'account-1'
   fixture.foldersList.mockResolvedValue({ success: true, data: [] })

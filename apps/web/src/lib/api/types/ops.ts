@@ -1,7 +1,7 @@
 import type { HqSupportKind } from '../../hq-support'
 
 // ---------------------------------------------------------------------------
-// 運営コンソール（★V6 37）
+// 運営コンソール（★管理画面 37）
 // ---------------------------------------------------------------------------
 
 export type OpsImpersonation = {
@@ -93,7 +93,7 @@ export type OpsMemberSummary = {
 
 export type OperatorHistoryRow = { id: string; action: string; operatorName: string; reason: string | null; createdAt: string }
 
-/** 運営コンソールのお問い合わせ（★V6 37-6）。形は `apps/worker/src/routes/ops-support.ts`。 */
+/** 運営コンソールのお問い合わせ（★管理画面 37-6）。形は `apps/worker/src/routes/ops-support.ts`。 */
 export type OpsSupportStage = 'new' | 'in_progress' | 'waiting' | 'resolved' | 'closed'
 
 export type OpsSupportPriority = 'low' | 'medium' | 'high'
@@ -181,7 +181,7 @@ export type OpsSupportSummary = {
   }
 }
 
-/** 運営ダッシュボード（★V6 37-2）。売上はStripe入金実績、未接続時は定価。 */
+/** 運営ダッシュボード（★管理画面 37-2）。売上はStripe入金実績、未接続時は定価。 */
 export type OpsDashboardPeriod = 'month' | 'prev_month' | 'year'
 
 export type OpsDashboard = {
@@ -230,7 +230,7 @@ export type OpsLineUnregistered = {
   people: Array<{ staffId: string; name: string; tenantName: string; hasEmail: boolean }>
 }
 
-/** 運営からのお知らせ配信（★V6 37-7）。形は `apps/worker/src/routes/ops-announcements.ts`。 */
+/** 運営からのお知らせ配信（★管理画面 37-7）。形は `apps/worker/src/routes/ops-announcements.ts`。 */
 export type OpsAnnouncementAudience = 'all' | 'plan' | 'tenants'
 
 export type OpsAnnouncementChannel = 'line' | 'screen' | 'email'

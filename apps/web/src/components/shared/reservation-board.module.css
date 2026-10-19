@@ -39,7 +39,7 @@
 @media print{.print tr{animation:none!important;transition:none!important;opacity:1!important;transform:none!important;}}
 
 .facts{display:flex;flex-direction:column;gap:var(--tpl-rs-detail-fact-gap);}.facts>div{min-height:var(--tpl-rs-detail-fact-min-h);padding:var(--tpl-rs-detail-fact-pad);}.detailActions{display:flex;align-items:center;gap:var(--tpl-rs-detail-actions-gap);flex-wrap:nowrap;}.detailActions>*{flex:0 1 auto;min-width:0;white-space:nowrap;}
-/* 道具の段の色の見本（GcyTr）。箱の色は盤の見本（.legend）と同じ印を使う。 */
+/* 道具の段の色の見本。箱の色は盤の見本（.legend）と同じ印を使う。 */
 .legendInline{display:inline-flex;align-items:center;gap:12px;margin-left:auto;color:var(--color-ink-secondary);font-size:11px;line-height:16px;white-space:nowrap;}
 .legendInline [data-state]::before{content:'';display:inline-block;vertical-align:-2px;width:12px;height:12px;border-radius:var(--tpl-board-legend-radius);margin-right:4px;border:1px solid var(--color-status-info);background:var(--color-status-info-soft);}
 .legendInline [data-state='success']::before{border-color:var(--color-accent);background:var(--color-accent-soft);}

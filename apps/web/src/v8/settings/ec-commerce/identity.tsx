@@ -36,9 +36,9 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8-B `w1W8h`：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
+ * ★V8-B ``：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
  *
- * 外側は取り込みの記録（GmVR5）と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
+ * 外側は取り込みの記録と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
  * 数の帯（自動で結びついた・候補が見つかった・結びついていない・結びついていない注文の金額）→
  * 自動で結びつく条件の帯 → 並び（と絞り込み）・注意 → 候補の表（「候補を見る」「決める」、候補なしは「友だちを探す」）。
  * 動きは今の画面（app/ec-commerce/identity-candidates/page.tsx）と同じ：候補は本人照合の口、

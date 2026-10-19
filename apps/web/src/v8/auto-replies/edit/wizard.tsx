@@ -99,12 +99,12 @@ function AutoReplyWizardV8Inner() {
   formFingerprintRef.current = JSON.stringify(form)
   /** 最後に読み込み・保存した形。差分が dirty。 */
   const savedSnapshotRef = useRef(JSON.stringify(EMPTY_FORM))
-  // 編集の競合（`UGrd2`：409）。入力は捨てず、比べる・読み込むを選んでもらう。
+  // 編集の競合（``：409）。入力は捨てず、比べる・読み込むを選んでもらう。
   const [saveConflict, setSaveConflict] = useState(false)
   const [compareTarget, setCompareTarget] = useState<WizardForm | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
   const [compareError, setCompareError] = useState('')
-  // 作る②の1152（`Z2LIUx`）。折り畳みはCSSが担い、ここでは板IDだけを切り替える。
+  // 作る②の1152（``）。折り畳みはCSSが担い、ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; messageType: string; messageContent: string; folderId?: string | null; updatedAt?: string }>>([])
   const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
@@ -320,7 +320,7 @@ function AutoReplyWizardV8Inner() {
    */
   const saveDraftNow = useCallback(() => saveWizardDraft({ autoReplyId, buildInput, createKeyRef, form, router, savedSnapshotRef, savedVersionRef, saveErrors, setAutoReplyId, setConfirmState, setDryRun, setError, setInputIssue, setLifecycleStatus, setMatchedAccountId, setSaveConflict, setSaveNotice, setSaving, setValidation, setVersionNumber, setWeekdayNotice, showInputIssue, step, stepDataRequested, versionNumber }), [buildInput, autoReplyId, versionNumber, form, step, router, showInputIssue, saveErrors])
 
-  // `UGrd2`「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
+  // ``「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
   const inputFingerprint = JSON.stringify(form)
   const assessmentSubjectRef = useRef('')
   assessmentSubjectRef.current = `${autoReplyId}:${versionNumber}:${inputFingerprint}`
@@ -359,7 +359,7 @@ function AutoReplyWizardV8Inner() {
     setSaveNotice('最新の内容を読み込みました')
   }, [load])
 
-  // `UGrd2`「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
+  // ``「違いを比べる」。最新を取って比べるだけで、画面は書き換えない。
   const openCompare = useCallback(async () => {
     if (!autoReplyId || compareBusy) return
     setCompareBusy(true)
@@ -625,7 +625,7 @@ function AutoReplyWizardV8Inner() {
   })()
 
   /**
-   * 手順⑤「有効にする前の確認」（絵 XJUqs）：絵の3つ（重なり・試し・知らせる先）を絵の言葉で出す。
+   * 手順⑤「有効にする前の確認」（絵 ）：絵の3つ（重なり・試し・知らせる先）を絵の言葉で出す。
    * きっかけ・返す内容の関門は、足りないときだけ前に出す（有効にする条件は gates のまま変えない）。
    */
   const v8Checks = (() => {
@@ -688,7 +688,7 @@ function AutoReplyWizardV8Inner() {
     )
   }
 
-  /* ===== 完了（V4LjH） ===== */
+  /* ===== 完了 ===== */
   // 絵：作る型の頭（手順はすべて済み）の下に、中央の完了カード（幅560）。保存の帯と右の列は無い。
   if (stage === 'done') {
     const doneSteps: StepperStep[] = STEP_ORDER.map((key) => ({ key, label: STEP_LABELS_V8[key], state: 'done' }))
@@ -752,14 +752,14 @@ function AutoReplyWizardV8Inner() {
         : undefined,
   }))
 
-  // 絵（A0pDt ほか）：まだ有効にしていない下書きは「停止中として作っています」。
+  // 絵（ ほか）：まだ有効にしていない下書きは「停止中として作っています」。
   const statusBadge = isActive ? '有効' : '停止中'
 
   const moreKindsButton = !showMoreKinds && MESSAGE_KIND_WORDS.some((k) => !MAIN_KINDS.includes(k.label) && !form.messageKinds.includes(k.key)) ? (
     <button type="button" className={styles.moreKinds} onClick={() => setShowMoreKinds(true)}>ほかの種類</button>
   ) : null
 
-  // 1152 の板（Z2LIUx）では右の列にスマホを置かず、上の「LINEでの見え方を見る」から窓で開く。
+  // 1152 の板では右の列にスマホを置かず、上の「LINEでの見え方を見る」から窓で開く。
   const renderPreview = (withPhone: boolean) => renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged, step, testMessage, triggerSamples }, withPhone)
 
   return (

@@ -1,5 +1,5 @@
 /*
- * ★V8 変更の確認（hmr2P・窓 qUdNh）。枠・頭・右の列・下の帯は型（CreatePage）が持つ。
+ * ★V8 変更の確認（・窓 ）。枠・頭・右の列・下の帯は型（CreatePage）が持つ。
  * ここはカード（枠1・角12・余白18）と表・入力・右の列の中身だけ。
  */
 .card {
@@ -264,7 +264,7 @@
   line-height: var(--tpl-chip-label-lh);
 }
 
-/* 確かめる窓（qUdNh）。 */
+/* 確かめる窓。 */
 .confirmBody {
   margin-top: var(--tpl-ev-confirm-pull);
   display: flex;

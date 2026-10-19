@@ -208,7 +208,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
     <>
       {detail && ((
         /*
-         * ★V8-B 予約の詳細（`AjZhH`）。v7 の引き出しは残し、
+         * ★V8-B 予約の詳細（`AjZhH`）。管理画面 の引き出しは残し、
          * `data-theme="v8"` のときだけ小窓にする。
          */
         <BookingDetailV8
@@ -459,7 +459,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               <ListState kind="loading" title="予約を読み込んでいます" />
             </div>
           ) : error ? (
-            // ★V7 `x63W5x`：失敗を「まだありません」と言わない。
+            // ★管理画面 `x63W5x`：失敗を「まだありません」と言わない。
             // 空の案内と作成ボタンは出さない。
             <div className="bg-canvas rounded-card border-hairline border">
               <ListState

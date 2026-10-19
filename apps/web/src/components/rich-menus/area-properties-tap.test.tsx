@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * リッチメニューの面の「押したら」（共通の欄 TapActionField・YPzmo・B-129）。
+ * リッチメニューの面の「押したら」（共通の欄 TapActionField・YPzmo・）。
  * 6つは intent に戻して今の形で保存し、予約・予約履歴・来店スタンプは url の intent に LIFF の URL を入れる。
  * リッチメニューだけの種類（テンプレートを送る・電話・切り替えなど）は残す。
  */

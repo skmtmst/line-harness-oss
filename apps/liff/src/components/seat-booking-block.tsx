@@ -3,8 +3,8 @@ import { normalizeBookingValue, type FormBookingValue, type FormInputBlock, type
 import { restaurantBookingApi } from '../lib/api.js';
 import { zonedToday, zonedParts, addDays } from '../lib/seat-reserve.js';
 import { FieldLabel, TextInput } from './forms/controls.js';
-import CourseChoice from './CourseChoice.js';
-import Button from './ui/Button.js';
+import CourseChoice from './course-choice.js';
+import Button from './ui/button/index.js';
 
 export default function SeatBookingBlock({block,value,onChange}:{block:FormInputBlock;value:unknown;onChange:(next:FormBookingValue|'')=>void}) {
  const storeId=block.booking?.storeId??'';

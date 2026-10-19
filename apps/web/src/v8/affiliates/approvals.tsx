@@ -52,13 +52,13 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 成果とアフィリエイト「成果承認」（板 `OylSV`、まとめて操作は `hadfk`）。
+ * ★V8 成果とアフィリエイト「成果承認」（板 ``、まとめて操作は ``）。
  *
  * app/affiliates/v8-approvals-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
  * 組み直した。データの口・操作は今と同じ（承認の全件読み・続きの読み込み・認める・
  * 却下・まとめて判断・付帯動作のやり直し・成果の詳細と成果の付け方・CSV）。
  * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
- * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
+ * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」→ 確かめる → 結果。
  */
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import OnlineMeetingCard from './OnlineMeetingCard.js';
+import OnlineMeetingCard from './online-meeting-card.js';
 import { api } from '../lib/api.js';
 
 /* 予約のあとのオンラインの会議（B7・sjkwK・I5hxa）：確認待ちは URL を出さない。確定は開始 10 分前から終わりまでだけ参加のボタン。 */

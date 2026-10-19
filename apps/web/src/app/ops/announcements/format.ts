@@ -1,7 +1,7 @@
 import type { OpsAnnouncementChannel, OpsAudiencePreview } from '@/lib/api'
 
 /**
- * ★V6 37-7 お知らせ配信の表記の決まり。page.tsx から名前付き export すると Next.js の
+ * ★管理画面 37-7 お知らせ配信の表記の決まり。page.tsx から名前付き export すると Next.js の
  * Page 型検査（本番ビルド）で落ちるため、こちらに置いてページとテストの両方から使う。
  */
 /** datetime-local の値（日本時間）を +09:00 付きの ISO に。空なら null。 */

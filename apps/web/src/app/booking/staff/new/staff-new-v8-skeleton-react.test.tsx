@@ -7,7 +7,7 @@ import type { StaffMember } from '@line-crm/shared'
  * A: メニュー・ログインユーザーの読み込み中は目に見える「読み込み中」の
  *    文字を置かず、骨組みの入れ物が読み込み中と伝える。
  * B: 登録ボタンは押した直後に内側だけ「登録しています…」へ変わる。
- * v7 は従来の見た目のまま（この試験では触らない）。
+ * 管理画面 は従来の見た目のまま（この試験では触らない）。
  */
 import React from 'react'
 import { act } from 'react'

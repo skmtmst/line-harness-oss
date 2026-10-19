@@ -19,7 +19,7 @@ const toPicker = (filter: string) => filter === ALL_ACCOUNTS ? PICKER_ALL : filt
 const fromPicker = (folder: string) => folder === PICKER_ALL ? ALL_ACCOUNTS : folder === PICKER_UNFILED ? UNFILED : folder
 
 export default function DistributionAccountPicker({ accounts, folders, selected, onChange, filter, onFilter, search = '', onSearch, received = null, receivedFailed = false, busy, compact = false, accountState, notice, accountMeta, headerSearch = false, showCount = true, selectAll = false }: {
-  /** 一覧の上に「すべて選ぶ」（今のフォルダと検索で見えているアカウント）を置く（W2GYgL）。 */
+  /** 一覧の上に「すべて選ぶ」（今のフォルダと検索で見えているアカウント）を置く。 */
   selectAll?: boolean
   accountMeta?: (accountId: string) => ReactNode
   headerSearch?: boolean; showCount?: boolean; dialogLayout?: boolean

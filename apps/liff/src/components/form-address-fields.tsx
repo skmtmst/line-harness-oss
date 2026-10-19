@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type PostalCodeCandidate } from '../lib/api.js';
-import Button from '../components/ui/Button.js';
+import Button from './ui/button/index.js';
 import { AddressControls } from './forms/controls';
 
 

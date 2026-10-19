@@ -19,7 +19,7 @@ export interface SourcePickerFolder { id: string; name: string; color?: string |
 export interface SourcePickerCategory { id: string; label: string }
 
 /**
- * EpTBB：候補を選ぶ間は仮選択。使う操作だけが作成中の内容を変える。
+ * ：候補を選ぶ間は仮選択。使う操作だけが作成中の内容を変える。
  * 中身は共通の EntityPickerDialog（作ってあるものを選ぶ窓）。ここは一括配信①の呼び方を保つ。
  */
 export default function SourcePickerDialog({ items, preview, ...rest }: {

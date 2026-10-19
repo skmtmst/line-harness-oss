@@ -11,9 +11,9 @@ vi.hoisted(() => {
 import InflowLinksPage from '@/app/inflow-links/page'
 
 /*
- * ★V8-B サイトスクリプト（板 `XjOte`）の契約。
+ * ★V8-B サイトスクリプト（板 ``）の契約。
  * `<html data-theme="v8">` の下でだけ新しい画面に切り替わることを
- * 実DOMで固定する。v7 では従来のタブが出ることも固定する。
+ * 実DOMで固定する。管理画面 では従来のタブが出ることも固定する。
  */
 let search = 'tab=script'
 vi.mock('next/navigation', () => ({

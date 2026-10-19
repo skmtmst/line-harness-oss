@@ -285,7 +285,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
   const kpis = [
     { title: '項目', icon: List, value: summary?.total ?? null, unit: '件', detail: detailOf(typeof summary?.inUse === 'number' ? `使っている ${summary.inUse} 件` : '使っている数は未集計') },
     { title: '入力済みの友だち', icon: Users, value: summary?.registeredFriends ?? null, unit: '人', detail: detailOf('1つ以上入っている') },
-    // 口そのものが無いときは、読込・失敗とは別の言葉にする（v7 と同じ）。
+    // 口そのものが無いときは、読込・失敗とは別の言葉にする（管理画面 と同じ）。
     { title: '回答フォームで集める', icon: ClipboardList, value: summary?.formLinks ?? null, unit: '件', detail: kpiReason ?? (summary?.formLinks === null ? notConnectedText('回答フォームの登録先') : '回答で自動で入る') },
     { title: '今月の変更', icon: Pencil, value: summary?.updatedThisMonth ?? null, unit: '件', detail: detailOf('追加・名前の変更') },
   ]

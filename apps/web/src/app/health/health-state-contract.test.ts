@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 
-describe('/health のアカウント別状態契約', () => {
+describe('health のアカウント別状態契約', () => {
   it('成功応答だけを正常・警告・危険として扱う', () => {
     expect(PAGE).toContain("value === 'normal' || value === 'warning' || value === 'danger'")
     expect(PAGE).toContain('isRiskLevel(payload.riskLevel)')

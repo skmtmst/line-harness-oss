@@ -16,8 +16,8 @@ import { PageHeading } from '@/components/templates/page-frame'
 
 /*
  * ★V8 リマインダの作る・確かめる・詳細で共用する部品。
- * 板：VE1u5 / YChR6 / p5YuP / T0nis / ltAaq / hjNpJ / rbAig / loVfW。
- * 「data-theme="v8"」の下だけで描く。v7 の reminder-v6-ui は触らない。
+ * 板： /  /  /  /  /  /  / 。
+ * 「data-theme="v8"」の下だけで描く。管理画面 の reminder-管理画面-ui は触らない。
  */
 
 /** V8 の作る手順。URL 段（stage）と手順番号の対応はここだけで持つ。 */
@@ -69,7 +69,7 @@ function stepHref(step: ReminderV8StepKey, reminderId: string | null): string | 
 
 /**
  * 手順表示。済んだ段は押すとその手順へ戻れる。
- * 完了（hjNpJ）は current を外して全段 done にする。
+ * 完了は current を外して全段 done にする。
  */
 export function ReminderV8Stepper({
   current,

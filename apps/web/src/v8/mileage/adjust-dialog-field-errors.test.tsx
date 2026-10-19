@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * B-139：マイルを手で動かす窓（M8zhjL）。確定で足りない欄は、その欄が赤くなり
+ * ：マイルを手で動かす窓。確定で足りない欄は、その欄が赤くなり
  * 真下に理由が出て、1つ目の欄へ移る。窓の下の1行の帯だけで終わらせない。
  */
 import React, { act } from 'react'
@@ -43,7 +43,7 @@ afterEach(() => {
   document.documentElement.removeAttribute('data-theme')
 })
 
-describe('マイルを手で動かす：確定で欄に知らせる（B-139）', () => {
+describe('マイルを手で動かす：確定で欄に知らせる', () => {
   it('理由が空・マイル数が0なら口を呼ばず、2つの欄が赤くなり、マイル数の欄へ移る。開き直すと赤は消える', async () => {
     const render = (open: boolean) => root.render(
       <MileageAdjustDialog open={open} accountId="a" friendId="f" friendName="山田" friendRank={null} currentBalance={500} onCancel={() => {}} onCompleted={async () => {}} canConfigurePolicy={false} />,

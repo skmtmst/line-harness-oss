@@ -3,7 +3,7 @@ import type { ApiResponse, BookingConflict } from '@line-crm/shared'
 export type { BookingConflict } from '@line-crm/shared'
 
 /**
- * 予約の経路の連携と重なり（★V8-B ZyDd6・DFl3Q）。
+ * 予約の経路の連携と重なり（★V8-B ・）。
  * Worker `apps/worker/src/routes/booking.ts`。
  */
 

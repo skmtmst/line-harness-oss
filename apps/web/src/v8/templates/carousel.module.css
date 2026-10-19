@@ -1,5 +1,5 @@
 /*
- * ★V8 テンプレート カルーセルを作る（J60utH）だけの部品。段・欄・入力は question-new.module.css と同じ。
+ * ★V8 テンプレート カルーセルを作るだけの部品。段・欄・入力は question-new.module.css と同じ。
  * 札（角いっぱい・余白6/12）、画像の枠（160×106）、ボタンの行（文字220・押したら160・中身）、案内の帯。
  */
 .chipRow {
@@ -311,6 +311,6 @@
 
 .colBody[data-composer] { font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
-/* 保存で落ちた欄（B-139）：ボタンの行の真下に理由。札の右に直す欄の数の赤い丸。 */
+/* 保存で落ちた欄：ボタンの行の真下に理由。札の右に直す欄の数の赤い丸。 */
 .buttonBlock { display: flex; flex-direction: column; gap: var(--tpl-cn-field-gap); min-width: 0; }
 .chip:has([data-design-part='error-count-badge']) { display: inline-flex; align-items: center; gap: var(--tpl-cn-field-gap); }

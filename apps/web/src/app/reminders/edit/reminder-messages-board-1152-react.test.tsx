@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
  * 1152 幅の板の印（V8.pen の地図）。板が 1100px を切ったら（画面幅で約 1352px
- * 未満）、手順③の外枠に板 `r1l0bT` を付ける。広い板では `p5YuP` のまま。
+ * 未満）、手順③の外枠に板 `` を付ける。広い板では `` のまま。
  */
 
 let narrowMatches = false

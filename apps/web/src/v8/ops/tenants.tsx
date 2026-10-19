@@ -28,9 +28,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
- * 運営の契約先アカウント V8（絵 `XWtYC`・作る窓 `i0FTN`）。
+ * 運営の契約先アカウント V8（絵 ``・作る窓 ``）。
  *
- * 動きは v7（app/ops/tenants）と同じ口：/api/ops/tenants を検索語で読み、状態の札で絞る。
+ * 動きは 管理画面（app/ops/tenants）と同じ口：/api/ops/tenants を検索語で読み、状態の札で絞る。
  * `?status=` で絞り込みを受け取る（ダッシュボードの要対応から来る）。
  * 契約先の名前から詳細へ。代理ログインは詳細の画面から行う。
  * 「契約先を作る」は書ける運営メンバーにだけ出す（閲覧のみの人には出さない）。

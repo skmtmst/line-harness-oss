@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * ★V7「開き先がない」（設計ノード `x5cgUH`）。
+ * ★管理画面「開き先がない」（設計ノード `x5cgUH`）。
  *
  * 詳細・編集・結果の画面で、開く対象が無いときの1枚。
  * 幅いっぱいのカード（canvas＋hairline の枠・角丸）、中央に丸い印、

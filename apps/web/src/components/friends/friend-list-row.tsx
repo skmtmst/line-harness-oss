@@ -377,7 +377,7 @@ function messageTypeLabel(messageType: string): string {
   } as Record<string, string>)[messageType] ?? 'メッセージ'
 }
 
-/** M月D日（曜）。年が違う記録は YYYY年M月D日（★V7：数字の斜線より読みやすい）。 */
+/** M月D日（曜）。年が違う記録は YYYY年M月D日（★管理画面：数字の斜線より読みやすい）。 */
 function formatDate(iso: string): string {
   return formatDay(iso)
 }

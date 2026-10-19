@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { FormLayout } from '@line-crm/shared';
-import Form from './Form.js';
+import Form from './form.js';
 
 /**
  * 監査 L12：回答フォームの欄名・説明・直しの文を入力と結ぶ。

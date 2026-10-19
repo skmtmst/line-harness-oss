@@ -1,30 +1,30 @@
-import { useCustomerWords } from '../components/CustomerStyleScope.js';
+import { useCustomerWords } from '../components/customer-style-scope.js';
 import { useUrlStep } from '../lib/use-url-step.js';
-import WaitlistOfferSheet from '../components/WaitlistOfferSheet.js';
+import WaitlistOfferSheet from '../components/waitlist-offer-sheet.js';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import MenuList from '../components/MenuList.js';
-import BookingStorePhotos from '../components/BookingStorePhotos.js';
-import RepeatCard from '../components/RepeatCard.js';
-import StaffList, { nominationFee } from '../components/StaffList.js';
-import DateTimePicker, { type SlotPick } from '../components/DateTimePicker.js';
-import Confirm from '../components/Confirm.js';
-import BookingPayment from '../components/BookingPayment.js';
-import Done from '../components/Done.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import Stepper from '../components/ui/Stepper.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import Button from '../components/ui/Button.js';
+import MenuList from '../components/menu-list.js';
+import BookingStorePhotos from '../components/booking-store-photos.js';
+import RepeatCard from '../components/repeat-card.js';
+import StaffList, { nominationFee } from '../components/staff-list.js';
+import DateTimePicker, { type SlotPick } from '../components/date-time-picker.js';
+import Confirm from '../components/confirm.js';
+import BookingPayment from '../components/booking-payment.js';
+import Done from '../components/done.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import Stepper from '../components/ui/stepper/index.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import Button from '../components/ui/button/index.js';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
-import PartyMenuStep, { PartyStaffStep, PartySummary } from '../components/PartyStep.js';
+import PartyMenuStep, { PartyStaffStep, PartySummary } from '../components/party-step.js';
 import { initialParty, partyCapable, type PartyState } from '../lib/party.js';
 
 type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'payment' | 'done';
 
 
 /**
- * ご予約 (★V8・IruGD→biNP5→M2p63S/k3aJKU→gLReL→VU6Xi)。手順は4つ。
+ * ご予約 (★V8・→→/→→)。手順は4つ。
  * 進む操作は下の操作の帯に1つだけ。API・画面の流れ・保存の中身はそのまま。
  * 上の帯は ×・題・店名 (LiffHeader)。手順の印は短い緑の棒 (Stepper)。
  */
@@ -125,7 +125,7 @@ export default function Booking() {
     step === 'menu' ? 0 : step === 'staff' ? 1 : step === 'datetime' ? 2 : step === 'payment' ? 4 : 3;
   /**
    * メニュー・担当の読み込み中と失敗の間は、手順の印を出さない
-   * (★V8 AcTHQ・zz9R3 は上の帯の下がすぐ骨組み・失敗の案内)。
+   * (★V8 ・ は上の帯の下がすぐ骨組み・失敗の案内)。
    */
   const waiting = (step === 'menu' || step === 'staff') && !stepReady;
 

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * 1152 の一覧6画面：絵に名前の前のフォルダの丸を描き足した（板 Iffil・L7zA7C・WPrd5・XIzkJ・KdFRI・ZJIyl）。
+ * 1152 の一覧6画面：絵に名前の前のフォルダの丸を描き足した（板 ・・・・・）。
  * どの幅でも丸を出す（狭い幅で丸を消さない）。2行目の字下げは絵のとおり（リマインダだけ 1152 でも下げる）。
  */
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')

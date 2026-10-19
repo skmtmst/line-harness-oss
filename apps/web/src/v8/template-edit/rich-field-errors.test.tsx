@@ -13,7 +13,7 @@ vi.mock('@/lib/api', () => ({ api: { folders: { list: async () => ({ success: tr
 beforeEach(() => document.documentElement.setAttribute('data-theme', 'v8'))
 afterEach(() => { cleanup(); document.documentElement.removeAttribute('data-theme') })
 
-/* B-139：保存で落ちた欄は帯ではなく欄で知らせ、別の面ならその面を選んで移る。面の一覧に赤い丸。 */
+/* ：保存で落ちた欄は帯ではなく欄で知らせ、別の面ならその面を選んで移る。面の一覧に赤い丸。 */
 it('名前・画像が空、面 B の URL が空なら送らず、それぞれの欄に理由を出し、名前へ移る。面 B に赤い丸', async () => {
   render(<TemplateRichEditor />)
   fireEvent.click(screen.getByRole('radio', { name: '上下2面（面 A・B）' }))

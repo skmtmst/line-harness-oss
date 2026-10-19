@@ -2,12 +2,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import App from './App.js';
-import CustomerStyleScope from './components/CustomerStyleScope.js';
+import App from './app.js';
+import CustomerStyleScope from './components/customer-style-scope.js';
 import { api, type EventBookingMine } from './lib/api.js';
 
 vi.mock('./lib/liff-auth.js', () => ({ getLiffId: () => 'fixture', getLineUserId: () => 'me', getIdToken: () => 'fixture' }));
-vi.mock('./components/ui/LiffHeader.js', () => ({ default: ({ title }: { title: string }) => <header>{title}</header> }));
+vi.mock('./components/ui/liff-header.js', () => ({ default: ({ title }: { title: string }) => <header>{title}</header> }));
 vi.mock('./lib/liff-runtime.js', () => ({ default: { getProfile: async () => ({ displayName: '人工会員' }), closeWindow: () => {} } }));
 vi.mock('./lib/affiliate-self-api.js', () => ({ affiliateSelfApi: { rewards: async () => ({ availableMiles: 0, rewards: [] }) } }));
 vi.mock('./lib/api.js', () => ({ api: {

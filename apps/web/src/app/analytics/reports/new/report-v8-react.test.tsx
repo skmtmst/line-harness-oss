@@ -1,7 +1,7 @@
 import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
- * 分析レポート作成の V8（板 H5UoIu）と作成時の競合小窓（G83vi）。
+ * 分析レポート作成の V8（板 ）と作成時の競合小窓。
  *
  * V8 の頭・帯・右欄と、保存・競合時の入力保護を確認する。
  */

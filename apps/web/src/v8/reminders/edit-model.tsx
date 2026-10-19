@@ -21,9 +21,9 @@ export const REMINDER_TOKENS: readonly InsertTokenSpec[] = [
 
 /*
  * ★V8 リマインダを作る・手順1の直し〜5と完了（src/v8 に一から書いた版）。
- * 板：k32cn（手順1の直し・競合）/ YChR6（対象者と止める条件）/
- *     p5YuP・r1l0bT（通知の中身 1440・1152）/ T0nis（配信予定）/
- *     ltAaq（確認）/ hjNpJ（有効にした）。
+ * 板：（手順1の直し・競合）/ （対象者と止める条件）/
+ *     ・（通知の中身 1440・1152）/ （配信予定）/
+ *     （確認）/ （有効にした）。
  * 画面の枠は型（CreatePage）が持つ。動き（API・保存・競合・テスト送信・有効化）は
  * 既存のAPIと版管理を保持する。BEHAVIOR.md に一覧がある。
  */
@@ -104,7 +104,7 @@ export function stepShortTiming(step: ReminderDraftStep, mode: ReminderDraftSett
   return describeReminderTiming(step, mode)
 }
 
-/** 板が 1100px を切ったら（画面幅で約 1352px 未満）、通知の中身は 1152 の板 `r1l0bT` の形。 */
+/** 板が 1100px を切ったら（画面幅で約 1352px 未満）、通知の中身は 1152 の板 `` の形。 */
 export function useNarrowBoard() {
   const [narrow, setNarrow] = useState(false)
   useEffect(() => {
@@ -127,7 +127,7 @@ export type StageFrame = {
   identity: ReactNode
   steps: ReactNode
   help: ReactNode
-  /** 頭の線の下に板の幅で置く帯（競合 k32cn）。 */
+  /** 頭の線の下に板の幅で置く帯（競合 ）。 */
   notice?: ReactNode
   noticeSpacing?: 'band'
   /** 下の帯の左の文（下書きの自動保存の状態）。 */

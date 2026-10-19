@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * EC連携つなぎ先（`iLJmw`）の数字の契約。
- * 見本 `lint/V8-B/iLJmw.html` との突き合わせ（2026-10-03）。
+ * EC連携つなぎ先（``）の数字の契約。
+ * 見本 `lint/V8-B/.html` との突き合わせ（2026-10-03）。
  * 箱は余白16・題は16/600・入力は高さ36・選ぶ欄は折り返す1行。
  * 700の太字は使わない（管理画面の決まり）。
  */

@@ -92,7 +92,7 @@ async function renderPage() {
   await settle()
 }
 
-describe('/hq/open のアカウント読み込み失敗の案内', () => {
+describe('hq/open のアカウント読み込み失敗の案内', () => {
   it('403は権限不足と管理者への相談を出し、再読み込みを出さない', async () => {
     lineAccountsHandler = () => jsonResponse({ success: false, error: 'Forbidden' }, 403)
     await renderPage()

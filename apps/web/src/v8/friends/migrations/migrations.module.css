@@ -1,4 +1,4 @@
-/* ★V8 CSVで書き出す・取り込む（T9gblG）・UID移行（L48eY・Z0jHp）。値は globals.css の --tpl-fr-*。 */
+/* ★V8 CSVで書き出す・取り込む・UID移行（・）。値は globals.css の --tpl-fr-*。 */
 .body { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); padding: var(--tpl-fr-area-pad); min-width: 0; }
 
 .band {
@@ -92,7 +92,7 @@
 .pillMuted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 .faint { color: var(--color-ink-faint); }
 
-/* ── UID移行（Z0jHp・L48eY） ── */
+/* ── UID移行（・） ── */
 
 .toolRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); min-width: 0; }
 .chipRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
@@ -162,7 +162,7 @@
 .lineGood { color: var(--color-accent-deep); font-weight: 700; white-space: nowrap; }
 
 .footer { position: sticky; bottom: var(--tpl-fr-stack-gap); z-index: 20; }
-/* 板を画面の高さまで伸ばしたとき（Z0jHp）、下の帯は板の下端に置き、長いときは画面の下に追従する。 */
+/* 板を画面の高さまで伸ばしたとき、下の帯は板の下端に置き、長いときは画面の下に追従する。 */
 .body[data-fill] { flex: 1; }
 .body[data-fill] > .footer { margin-top: auto; }
 .footerBar {

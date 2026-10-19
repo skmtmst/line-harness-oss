@@ -4,7 +4,7 @@
 
 /* カードは1列で横幅いっぱい（上下左右20・行の間12）。
    角丸・線・影は共通の Card（appearance="outlined"）に任せる。
-   承認案 v03 の絵には影が無いが、B-168「カードの角丸と枠を持つ規則には共通の影がある」が正本なので共通の形に合わせる。 */
+   承認案 v03 の絵には影が無いが、「カードの角丸と枠を持つ規則には共通の影がある」が正本なので共通の形に合わせる。 */
 .card {
   gap: var(--tpl-e1-dl-card-gap); padding: var(--tpl-e1-dl-card-pad);
 }
@@ -19,7 +19,7 @@
 
 /* サービスごとの手順の注記：地は真珠色（承認案の $surface-pearl）。図柄は描かない。
    状態の色（接続エラー・申し込み受付中）はここで塗らず、共通の帯（Notice）に任せる
-   （B-172 status-badge）。この囲みは色の意味を持たない案内だけに使う。 */
+   （ status-badge）。この囲みは色の意味を持たない案内だけに使う。 */
 .note {
   margin: 0; padding: var(--tpl-e1-dl-note-pad);
   border-radius: var(--tpl-e1-dl-note-radius);

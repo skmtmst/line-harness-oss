@@ -12,11 +12,11 @@ vi.hoisted(() => {
 import CommonVarsPage from './page'
 
 /*
- * ★V8 共通情報の一覧（板 `FM94M`、閲覧のみ `OxSw8`）の契約。
+ * ★V8 共通情報の一覧（板 ``、閲覧のみ ``）の契約。
  * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
  * 数の帯・黄色の帯・行末の「…」が出ること、staff では閲覧のみの帯が
  * 出て作る操作が押せない形になることを実DOMで固定する。
- * v7 では従来の一覧が出ることも固定する。
+ * 管理画面 では従来の一覧が出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -161,11 +161,11 @@ async function renderPage() {
   })
 }
 
-test('v8 では新しい一覧（FM94M）が出て、v7 は出ない', async () => {
+test('v8 では新しい一覧（FM94M）が出て、管理画面 は出ない', async () => {
   window.localStorage.setItem('lh_staff_role', 'admin'); rememberStaffIdentity({ role: 'admin' } as StaffMember)
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
-  // 2026-10-06 入口は新しい一覧（src/v8/common-vars）。板の印は幅で FM94M（広い）か XIzkJ（1152）のどちらか。
+  // 2026-10-06 入口は新しい一覧（src/v8/common-vars）。板の印は幅で （広い）か （1152）のどちらか。
   expect(host?.querySelector('[data-design-node~="FM94M"],[data-design-node~="XIzkJ"]')).not.toBeNull()
   expect(host?.querySelector('[data-design-node="WuKzU"]')).toBeNull()
   expect(host?.textContent).toContain('差し込んでいる所')

@@ -42,7 +42,7 @@
   line-height: var(--tpl-rs-lh-13);
 }
 
-/* E 系の板の頭（休業日・貸切 UVnvR）：題 20/600・説明の行 20 */
+/* E 系の板の頭（休業日・貸切 ）：題 20/600・説明の行 20 */
 .headTitleCompact {
   font-size: var(--tpl-title-size);
   font-weight: var(--tpl-title-weight);

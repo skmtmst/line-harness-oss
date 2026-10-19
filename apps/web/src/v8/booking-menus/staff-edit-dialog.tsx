@@ -18,7 +18,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * 予約スタッフの作成・編集の窓。v7 一覧（staff/page.tsx）と V8 予約設定の
+ * 予約スタッフの作成・編集の窓。管理画面 一覧（staff/page.tsx）と V8 予約設定の
  * 担当スタッフタブ（menus/settings-v8.tsx）の両方から使う。
  * 見た目・入力検査（parseBookingStaffInput）・紐づけ候補の取り方は変えない。
  */
@@ -37,7 +37,7 @@ export function StaffEditModal({
   const saveErrors = useSaveFormErrors()
   const [form, setForm] = useState<Partial<BookingStaff>>(staff)
   const [saving, setSaving] = useState(false)
-  /* V8 のときだけボタンの内側の保存中表示へ。v7 は従来の文字のまま。 */
+  /* V8 のときだけボタンの内側の保存中表示へ。管理画面 は従来の文字のまま。 */
   const busySave = saving
   const [err, setErr] = useState<string | null>(null)
   // 保存の途中で窓だけ消えないよう、送信中はEscapeを止める。

@@ -69,7 +69,7 @@ describe('#704 正規のサイズトークンがある', () => {
     expect(token('text-body')).toBe('13px')
     expect(token('text-lead')).toBe('15px')
     expect(token('text-title')).toBe('20px')
-    // ★V7「見た目の物差し」§1: 大きな数は 28/700/1.3（#704 の 24px から改定）
+    // ★管理画面「見た目の物差し」§1: 大きな数は 28/700/1.3（#704 の 24px から改定）
     expect(token('text-hero')).toBe('28px')
   })
 
@@ -106,7 +106,7 @@ describe('#704 半端値を新規で使わない（ラチェット）', () => {
     expect(
       increased(counts, {
         // M10 polish で同pxトークンへ寄せた分は外す（0は新規1件で落ちる）。
-        // 残りは v7 側の見た目が変わるため残す（inbox-kpis・tag-list-v2）。
+        // 残りは 管理画面 側の見た目が変わるため残す（inbox-kpis・tag-list-v2）。
         'text-[26px]': 1,
         'text-[17px]': 1,
       }),

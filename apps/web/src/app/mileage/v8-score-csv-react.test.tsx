@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * V8 行動スコア：この頁のCSV書き出しボタンがある（v7 parity-D）。
+ * V8 行動スコア：この頁のCSV書き出しボタンがある（管理画面 parity-D）。
  * 押すと表と同じ6列のCSVを取り出す。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'

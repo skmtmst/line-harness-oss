@@ -117,7 +117,7 @@ describe('電話予約（E-2）', () => {
     }))
   })
 
-  it('B-139：お名前も時刻も無いまま入れると、口を呼ばず2つの欄に理由が出て、お名前の欄へ移る', async () => {
+  it('お名前も時刻も無いまま入れると、口を呼ばず2つの欄に理由が出て、お名前の欄へ移る', async () => {
     render(<PhoneReservationDrawer open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
     fireEvent.click(screen.getByText(/明日/))
     await screen.findByRole('button', { name: '19:00' })

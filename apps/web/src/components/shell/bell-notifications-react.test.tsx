@@ -7,7 +7,7 @@
  *   - 一覧は最大5件・未読が先。行を押すと既読にして行き先へ移る
  *   - すべて既読は押した瞬間に反映し、失敗したら戻す
  *   - 店を選んでいないときは読まずに案内だけ
- *   - 小窓を渡さない帯（v7 など）は、今までどおり通知の一覧へのリンク
+ *   - 小窓を渡さない帯（管理画面 など）は、今までどおり通知の一覧へのリンク
  */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { act, useState } from 'react'

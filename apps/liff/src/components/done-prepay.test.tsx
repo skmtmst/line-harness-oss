@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import Done from './Done.js';
+import Done from './done.js';
 
 /**
  * 完了画面の「事前のお支払いのお願い」(booking-plus 8)。

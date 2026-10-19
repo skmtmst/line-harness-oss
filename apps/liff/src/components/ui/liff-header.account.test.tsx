@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import LiffHeader from './LiffHeader.js';
+import LiffHeader from './liff-header.js';
 import { api } from '../../lib/api.js';
 
 const account = vi.hoisted(() => ({ id: 'header-a' }));

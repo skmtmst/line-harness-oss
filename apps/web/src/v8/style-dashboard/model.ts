@@ -43,7 +43,7 @@ export interface StyleRow {
   state?: StyleBadge
   /** 行の右の操作。visit＝来店（ボタン）・undo＝取り消す（文字）・meet＝Meet に入る・place＝場所を開く・done＝済み（文字）。 */
   action?: 'visit' | 'undo' | 'meet' | 'place' | 'done' | 'approve' | 'result' | null
-  /** 開始の時刻を過ぎたか。［無断にする］［欠席にする］はこの時だけ出す（B-338）。 */
+  /** 開始の時刻を過ぎたか。［無断にする］［欠席にする］はこの時だけ出す。 */
   past?: boolean
   /** 取り消せる（取消・無断・期限切れでない）予約か。 */
   live?: boolean

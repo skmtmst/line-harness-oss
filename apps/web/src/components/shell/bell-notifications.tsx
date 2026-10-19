@@ -16,7 +16,7 @@ export const BELL_POPOVER_LIMIT = 5
 /** 読む件数。通知の一覧と同じ 50 件から未読を先に並べ、先頭の5件を出す。 */
 const FETCH_LIMIT = 50
 
-/** 未読が先・それぞれの中は口の順（新しい順）。通知の一覧（y8QQV）と同じ並び。 */
+/** 未読が先・それぞれの中は口の順（新しい順）。通知の一覧と同じ並び。 */
 export function bellOrder(items: NotificationCenterItem[]): NotificationCenterItem[] {
   return [...items.filter((item) => !item.isRead), ...items.filter((item) => item.isRead)]
 }

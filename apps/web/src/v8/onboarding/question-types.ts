@@ -3,12 +3,12 @@
 import type { AccountStyle } from '@line-crm/shared'
 
 /*
- * はじめの質問（B-313）と初期セット（B-311）の決まりを画面から切り離した表。
+ * はじめの質問と初期セットの決まりを画面から切り離した表。
  * 絵：修正案 DIHFx の列 VHp7p（xxpM9・RZW83・lS1Gh・rJ36f・oKSsG・Bdfxm）。
  * 口：組4（`lib/api-styles.ts` の styleApi）。質問のキーは口の `questionKeys`
  * （image/booking/approval/payment/reminders/stamps/coupons/tickets/outcome/content）だけ。口に無い質問は置かない（未定は入れない）。
  *
- * - どの質問にも「あとで設定する」「手動で設定する」がある（B-313 追記）。あとで＝何も入れない・
+ * - どの質問にも「あとで設定する」「手動で設定する」がある（ 追記）。あとで＝何も入れない・
  *   はじめにやることに残る。手動＝その設定の画面へ案内する。
  * - おすすめの答えは業種ごとに先に選んでおく（飛ばしても困らない）。
  * - どの質問にも「あとから変えられます（どこで）」を出す。
@@ -37,7 +37,7 @@ export type Question = {
   choices: Choice[]
   /** スタイルごとのおすすめ（無ければ最初の選択肢）。 */
   recommended?: Partial<Record<AccountStyle, string>>
-  /** 「あとから変えられます（ここ）。」の（）の中。 */
+  /** 「あとから変えられます（ここ）。」のの中。 */
   where: string
   /** 手動で設定するときに開く画面と、そのカードの説明。 */
   manualHref: string
@@ -50,7 +50,7 @@ export type Question = {
   skipped?: string
   /** 最後の一覧「入れなかった物」の題。無ければ short。 */
   skippedTitle?: string
-  /** 設定の画面がまだ無いときの機能の名前。押すと準備中の窓（B-314）。 */
+  /** 設定の画面がまだ無いときの機能の名前。押すと準備中の窓。 */
   preparing?: string
   /**
    * 口（組4）がまだこの質問のキーを受け付けない。答えは画面の中だけで持ち、保存しない（札「準備中」）。

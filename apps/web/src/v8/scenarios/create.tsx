@@ -35,13 +35,13 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
+ * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil ``）。
  *
  * 型（CreatePage）に、戻る・題・手順の輪と、左の段（シナリオ情報・配信方式）、
  * 下の帯（キャンセル・あとで決める・この方式で保存する）を渡す。右の列は無い。
  *
  * 動き（読み込み・保存・失敗時）は今までの V8（app/scenarios/mode-v8.tsx）と
- * v7（app/scenarios/mode/page.tsx）と同じ。写して型に載せ直した。
+ * 管理画面（app/scenarios/mode/page.tsx）と同じ。写して型に載せ直した。
  * `id` なしで開いたときはまだ行を作らない。方式の確定か
  * 「あとで決める」ではじめて作成する（N-055）。
  */

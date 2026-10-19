@@ -11,7 +11,7 @@ vi.hoisted(() => {
 import FriendAddSettingsPage from './page'
 
 /*
- * ★V8 友だち追加時の配信の一覧（Pencil `MRhef`）の契約。
+ * ★V8 友だち追加時の配信の一覧（Pencil ``）の契約。
  * `<html data-theme="v8">` の下でだけ新しい一覧に切り替わり、
  * 見本が決めた帯・受け皿の守り（消せない・動かせない・止められない確かめ）
  */
@@ -233,7 +233,7 @@ test('v8 の受け皿は一番下・操作に「削除する」がなく消せ�
     expect(labels).not.toContain('止める')
     expect(labels).not.toContain('削除する')
     expect(menu!.textContent).toContain('この設定は消せません')
-    // 板 C0lfUP：受け皿の「…」を開いた印
+    // 板 ：受け皿の「…」を開いた印
     expect(host.querySelector('[data-design-node="C0lfUP"]')).toBeTruthy()
   })
 })
@@ -256,7 +256,7 @@ test('受け皿の理由を見ると停止できない説明を出す', async ()
     .find((item) => item.textContent?.includes('止められない理由を見る')) as HTMLElement
   await act(async () => { stop.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await eventually(() => {
-    // 板 cFo2p：止められない確かめ
+    // 板 ：止められない確かめ
     const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')
     expect(dialog?.textContent).toContain('止められません')
     expect(dialog?.textContent).toContain('12人')

@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = import.meta.dirname
 const PAGE = readFileSync(join(HERE, '../../v8/settings/line-notifications/screen.tsx'), 'utf8')
 
-/** 注釈を落とした page.tsx（customer-notifications-v6-contract と同じやり方）。 */
+/** 注釈を落とした page.tsx（customer-notifications-管理画面-contract と同じやり方）。 */
 const CODE = PAGE
   .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
   .replace(/\/\*[\s\S]*?\*\//g, '')

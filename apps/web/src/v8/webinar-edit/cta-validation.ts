@@ -8,7 +8,7 @@ export function parseMinSec(text: string): number | null {
   if (match) return Number(match[1]) * 60 + Number(match[2])
   return /^\d{1,7}$/.test(text.trim()) ? Number(text.trim()) : null
 }
-/** 1枚のカードの欄ごとの誤り（B-139）。欄の真下に出すので「n枚目」は付けない。 */
+/** 1枚のカードの欄ごとの誤り。欄の真下に出すので「n枚目」は付けない。 */
 export function cardFieldProblems(card: WebinarCtaCard, time: string, durationSeconds: number): { time: string | null; title: string | null; button: string | null; link: string | null } {
   const at = parseMinSec(time)
   const url = card.url?.trim() ?? ''

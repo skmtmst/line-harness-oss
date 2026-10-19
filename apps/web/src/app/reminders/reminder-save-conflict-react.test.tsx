@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /**
  * リマインダの作る・編集で保存がぶつかったとき（409）の道（動きの点検 16 番）。
- * 共通の save-conflict の帯（k32cn）と「違いを比べる／最新を読み込んで続ける」が出て、
+ * 共通の save-conflict の帯と「違いを比べる／最新を読み込んで続ける」が出て、
  * 入力は捨てず、読み込むと最新の版で続けられる。
  */
 import React, { act } from 'react'

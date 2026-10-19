@@ -5,21 +5,21 @@ import { createElement, type ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import EventBookings from './EventBookings.js';
+import EventBookings from './event-bookings.js';
 
 const calls = vi.hoisted(() => ({ read: vi.fn(), cancel: vi.fn(), leave: vi.fn() }));
 vi.mock('../lib/api.js', () => ({ api: { myEventBookings: calls.read, cancelMyEventBooking: calls.cancel, cancelMyEventWaitlist: calls.leave } }));
-vi.mock('../components/LiffLookScope.js', () => ({ default: ({ children }: { children: ReactNode }) => children }));
-vi.mock('../components/ui/LiffHeader.js', () => ({ default: () => null }));
+vi.mock('../components/liff-look-scope.js', () => ({ default: ({ children }: { children: ReactNode }) => children }));
+vi.mock('../components/ui/liff-header.js', () => ({ default: () => null }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 /**
- * イベント予約の取り消し確認を、ブラウザの `confirm()` から
+ * イベント予約の取り消し確認を、ブラウザの `confirm` から
  * LIFF 共通の確認窓 (`ui/ConfirmDialog`) へ移した契約。
  *
  * 動き・送る中身は変えない。閉じるを選ぶと何も起きず、
  * 取り消すを選ぶと今までどおり取り消しが動く。
- * 題と注意書きは V8 の板 nUYyb の形（日時の題・待ちへの案内・前日の締め切り）。
+ * 題と注意書きは V8 の板  の形（日時の題・待ちへの案内・前日の締め切り）。
  */
 
 const root = join(import.meta.dirname, '..');

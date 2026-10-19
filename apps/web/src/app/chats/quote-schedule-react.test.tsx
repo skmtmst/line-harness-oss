@@ -105,7 +105,7 @@ function responseFor(url: URL, init?: RequestInit): Response {
     fixture.scheduled = fixture.scheduled.filter((row) => row.id !== id)
     return json({ success: true, data: { cancelled: true } })
   }
-  /* B-6：受信箱の添付（API-15）。ファイルは期限30日のリンクとして届く。 */
+  /* ：受信箱の添付（API-15）。ファイルは期限30日のリンクとして届く。 */
   if (url.pathname === '/api/chats/friend-a/attachments/upload' && init?.method === 'POST') {
     const headers = new Headers(init.headers)
     fixture.uploads.push({ type: headers.get('Content-Type'), filename: headers.get('X-Filename') })
@@ -276,7 +276,7 @@ describe('N-025 引用返信と送信予約', () => {
       expect(document.querySelector('[role="dialog"]')).toBeTruthy()
     })
 
-    // 日時の選択（★V7）で 2027-09-17 09:00 を選ぶ。値は今までどおり日本時間の文字列。
+    // 日時の選択（★管理画面）で 2027-09-17 09:00 を選ぶ。値は今までどおり日本時間の文字列。
     await act(async () => { document.querySelector<HTMLElement>('#schedule-at')!.click() })
     const dialog = () => document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!
     await act(async () => {
@@ -321,7 +321,7 @@ describe('N-025 引用返信と送信予約', () => {
 })
 
 /*
- * ★V8（M0393 段2）：書く欄の上に「送る日時」の段を出さず、［予約］から窓で開く。
+ * ★V8（ 段2）：書く欄の上に「送る日時」の段を出さず、［予約］から窓で開く。
  * 送信の設定は「送るキー」の切り替え、画像は「添付」で動画・ファイルは理由を出して止める。
  */
 describe('★V8 書く欄：予約は窓・送るキーの切り替え・添付', () => {
@@ -406,7 +406,7 @@ describe('★V8 書く欄：予約は窓・送るキーの切り替え・添付'
   })
 
   /*
-   * B-6（M0393「7. 添付」I7Skn・API-15）：［添付］の道具はやめ、入力欄の左下のクリップから
+   * （「7. 添付」I7Skn・API-15）：［添付］の道具はやめ、入力欄の左下のクリップから
    * 画像・動画／ファイルを選ぶ。ファイルは先に準備（アップロード）し、札を出してから本文と一緒に送る。
    */
   const pickFile = async (file: File) => {

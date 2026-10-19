@@ -3,12 +3,12 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { FormLayout } from '@line-crm/shared';
-import Form from './Form.js';
+import Form from './form.js';
 import type { MenuItem } from '../lib/api.js';
-import { CustomerStyleContext } from '../components/CustomerStyleScope.js';
+import { CustomerStyleContext } from '../components/customer-style-scope.js';
 
 /**
- * 「予約を入れる」ブロック（g9osGN）。
+ * 「予約を入れる」ブロック。
  * - メニュー・担当・日にち→時刻の順に空き枠から選ぶ
  * - 回答の送信後に予約の受け口で確保する（未承認で入り、店が承認する）
  * - 予約だけ失敗しても回答は残し、取り直し・選び直しを出す

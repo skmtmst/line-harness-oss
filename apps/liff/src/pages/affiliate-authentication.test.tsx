@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import Affiliate from './Affiliate.js';
+import Affiliate from './affiliate.js';
 
 vi.mock('@line/liff', () => ({ default: { getAccessToken: () => 'private-fixture-token' } }));
-vi.mock('../components/MemberCard.js', () => ({ default: () => null }));
-vi.mock('../components/MileageRewards.js', () => ({ default: () => null }));
-vi.mock('../components/AffiliatePayments.js', () => ({ default: () => null }));
+vi.mock('../components/member-card.js', () => ({ default: () => null }));
+vi.mock('../components/mileage-rewards.js', () => ({ default: () => null }));
+vi.mock('../components/affiliate-payments.js', () => ({ default: () => null }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 it('F02: プロフィール・案件・残高の全GETは本人のBearerのみを送り、業務queryを保つ', async () => {

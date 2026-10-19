@@ -4,12 +4,12 @@ import {useNavigate,useSearchParams} from 'react-router-dom';
 import liff from '@line/liff';
 import type {VisitStampQrResult} from '@line-crm/shared';
 import {api,visitStampsApi} from '../lib/api.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import LoadingView from '../components/LoadingView.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import Button from '../components/ui/Button.js';
-import {StampQrCard,StampQrMessage} from '../components/ui/StampQrResult.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import LoadingView from '../components/loading-view.js';
+import LoadErrorView from '../components/load-error-view.js';
+import Button from '../components/ui/button/index.js';
+import {StampQrCard,StampQrMessage} from '../components/ui/stamp-qr-result.js';
 import styles from './visit-stamp-qr.module.css';
 
 /** G-8g〜j。QRの個数・友だちIDは渡さず、サーバの押印結果だけを表示。 */

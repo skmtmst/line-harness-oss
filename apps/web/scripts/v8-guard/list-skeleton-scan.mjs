@@ -1,4 +1,4 @@
-/** B-178: computed layout, including clipped overflow; executed in the page. */
+/** : computed layout, including clipped overflow; executed in the page. */
 export function scanListSkeleton() {
   const failures = []
   const roots = [...document.querySelectorAll('[data-list-skeleton]')].filter((root) => !root.parentElement?.closest('[data-list-skeleton]'))

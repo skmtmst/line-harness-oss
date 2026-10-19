@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import Confirm from './Confirm.js';
+import Confirm from './confirm.js';
 import { api } from '../lib/api.js';
 
 /* キャンセル料の決まり（B1・kwC8E・Q8HLq）：チェックは初めは空で、入れるまで予約のボタンは押せない。押すとカードを登録し、確かめた決まりの版と登録の印を一緒に送る。 */

@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * IDEA-18: 流入経路と注文の連結ブロック（★V8 の詳細 Q5le3 用に app/inflow-links/_components/ref-orders.tsx から写した。import はしない）。
+ * IDEA-18: 流入経路と注文の連結ブロック（★V8 の詳細  用に app/inflow-links/_components/ref-orders.tsx から写した。import はしない）。
  *
  * `/api/analytics/ref/:refCode/orders` が返す注文明細を出す。
  * 集計（ref-summary の orderCount・この口の total）と明細は worker 側で

@@ -21,7 +21,7 @@ import CommentViewerStats from './comment-stats'
 
 
 /*
- * ★V8 ウェビナーのコメント演出（Pencil Omqd4）。
+ * ★V8 ウェビナーのコメント演出（Pencil ）。
  * 左に流すコメントの表（秒数・名前・本文はその場で直せる。行の右端は消す）、右に視聴画面での見え方。
  * 口・件数の上限・JSON の読み込み・保存の決まりは BEHAVIOR.md。
  */

@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import { formatWeekday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
-import Button from './ui/Button.js';
-import Card from './ui/Card.js';
-import Icon from './ui/Icon.js';
+import Button from './ui/button/index.js';
+import Card from './ui/card.js';
+import Icon from './ui/icon.js';
 
 export type RecurrenceChoice = { index: number; action: 'keep' | 'skip' | 'alternative'; alternative_starts_at?: string };
 export type RecurrenceValue = { count: number; choices: RecurrenceChoice[]; made: number } | null;

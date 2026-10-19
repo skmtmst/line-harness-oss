@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
-import LoadingView from '../components/LoadingView.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import { liffDocumentTitle } from '../components/ui/LiffHeader.js';
+import LoadingView from '../components/loading-view.js';
+import LoadErrorView from '../components/load-error-view.js';
+import { liffDocumentTitle } from '../components/ui/liff-header.js';
 
 export default function Research() {
   const { id = '' } = useParams<{ id: string }>();

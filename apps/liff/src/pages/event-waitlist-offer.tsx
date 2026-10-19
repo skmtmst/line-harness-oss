@@ -1,16 +1,16 @@
-import { useCustomerWords } from '../components/CustomerStyleScope.js';
+import { useCustomerWords } from '../components/customer-style-scope.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import liff from '@line/liff';
 import { api, type EventWaitlistOfferDetail } from '../lib/api.js';
 import { formatHoldLeft, formatJstEventAt } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
-import Button from '../components/ui/Button.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import Icon from '../components/ui/Icon.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import StatusView from '../components/ui/StatusView.js';
+import Button from '../components/ui/button/index.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import Icon from '../components/ui/icon.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import StatusView from '../components/ui/status-view.js';
 
 /** 繰上げ案内の token だけを外した query（ほかの値は残す）。 */
 export function searchWithoutOfferToken(search: string): string {
@@ -26,7 +26,7 @@ type State = 'ready' | 'submitting' | 'confirmed' | 'expired' | 'unavailable' | 
  * キャンセル待ちの繰上げ承諾。LINE の案内から token で開く。
  * 状態の分け方 (成功・期限切れ・利用不能・失敗) はそのまま。
  * 失敗のときは行き止まりにせず、もう一度試せるボタンを出す。
- * 見た目だけ ★V7 (主ボタン1つ・札の代わりに印＋文)。
+ * 見た目だけ ★管理画面 (主ボタン1つ・札の代わりに印＋文)。
  */
 export default function EventWaitlistOffer({ token }: { token: string }) {
   const words = useCustomerWords();

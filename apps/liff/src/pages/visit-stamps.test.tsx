@@ -11,7 +11,7 @@ vi.mock('../lib/api.js', () => ({
   visitStampsApi: fx,
 }));
 vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));
-import VisitStamps, { cardState, latestRequest, paperPhotoProblem } from './VisitStamps.js';
+import VisitStamps, { cardState, latestRequest, paperPhotoProblem } from './visit-stamps.js';
 
 const card = {
   id: 'c1', name: '然 来店スタンプカード', accountIds: ['acc-1'], active: true, version: 1, expectedVersion: 1,
@@ -87,7 +87,7 @@ describe('来店スタンプ（お客さまの LIFF）', () => {
     await waitFor(() => expect(fx.useReward).toHaveBeenCalledWith('acc-1', 'red-1', '1234'));
     expect(await screen.findByText('使用済み')).toBeTruthy();
     expect(screen.getByText('残り 1個（次はドリンク 1杯）')).toBeTruthy();
-    /* 使った店員の名前（xe8ga の「担当」）。 */
+    /* 使った店員の名前（ の「担当」）。 */
     expect(screen.getByText('担当')).toBeTruthy();
     expect(screen.getByText('田村')).toBeTruthy();
   });
@@ -176,7 +176,7 @@ it('カードを開いた時点で倍率と初回ボーナスを知らせる', a
   expect(screen.getByText('週末：2倍（日・土曜日）')).toBeTruthy();
 });
 
-it('B-241: 紙のカードの履歴取得失敗を新規申請とせず、もう一度で確認待ちに戻る', async () => {
+it('紙のカードの履歴取得失敗を新規申請とせず、もう一度で確認待ちに戻る', async () => {
   fx.paperRequests.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ success: true, data: [{ id: 'p', status: 'pending', stamps: 3, createdAt: '2026-10-11T00:00:00Z' }] });
   render(<VisitStamps />);
   fireEvent.click(await screen.findByRole('button', { name: '紙のカードを移す' }));

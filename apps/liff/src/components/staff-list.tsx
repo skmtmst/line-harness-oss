@@ -1,11 +1,11 @@
 import { bookingPriceText } from '../lib/booking-price.js';
-import Button from './ui/Button.js';
+import Button from './ui/button/index.js';
 import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
-import LoadErrorView from './LoadErrorView.js';
-import LoadingView from './LoadingView.js';
-import Icon from './ui/Icon.js';
+import LoadErrorView from './load-error-view.js';
+import LoadingView from './loading-view.js';
+import Icon from './ui/icon.js';
 
 /** 指名料。指名なし（おまかせ）は 0。指名した担当は、担当の料金が基本の料金より高い分。 */
 export function nominationFee(menu: Pick<MenuItem, 'base_price'>, staff: Pick<StaffItem, 'price' | 'is_designation_optional'>): number {
@@ -14,7 +14,7 @@ export function nominationFee(menu: Pick<MenuItem, 'base_price'>, staff: Pick<St
 }
 
 /**
- * 1-b 担当を選ぶ (★V8・biNP5)。札を押すと選ばれるだけで、進むのは下の操作の帯。
+ * 1-b 担当を選ぶ (★V8・)。札を押すと選ばれるだけで、進むのは下の操作の帯。
  * 「指名なし」(is_designation_optional) は先頭に来る。脇の文は
  * 「いちばん早く空いている人」か「役職・指名料」。選んだ札は緑枠＋薄い緑。
  * 担当できる人がいないときは、その理由だけ出す (案内は付けない)。

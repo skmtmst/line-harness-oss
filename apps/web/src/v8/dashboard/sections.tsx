@@ -37,7 +37,7 @@ export function sectionUpdated(section: Section | undefined): string | null {
   return dashboardFreshnessText(section.freshness, section.asOf, section.reason)
 }
 
-/** 札（WQmep の黄色い札）。tone で緑・赤も出す。 */
+/** 札（ の黄色い札）。tone で緑・赤も出す。 */
 export function Tag({ children, tone = 'warning' }: { children: ReactNode; tone?: 'warning' | 'success' | 'danger' }) {
   return <span className={tone === 'success' ? `${styles.tag} ${styles.tag_success}` : tone === 'danger' ? `${styles.tag} ${styles.tag_danger}` : `${styles.tag} ${styles.tag_warning}`}>{children}</span>
 }
@@ -363,7 +363,7 @@ export function Upcoming({ accountId, bookings, loading, today, jstDay, startLoa
       </>
     )
   }
-  /* 旧Worker（upcoming 未返却）・取得失敗のときは予約だけに戻る（v7 と同じ）。 */
+  /* 旧Worker（upcoming 未返却）・取得失敗のときは予約だけに戻る（管理画面 と同じ）。 */
   const legacy = bookings ? activeUpcomingBookings(bookings) : []
   const legacyLoading = accountId ? (!failed || loading) && bookings === null : loading
   return (

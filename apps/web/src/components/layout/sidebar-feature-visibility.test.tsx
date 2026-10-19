@@ -98,7 +98,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     expect(fixture.get).not.toHaveBeenCalled()
   })
 
-  it('multi_store_hierarchy: 設定内でoffと応答欠落では「プール管理」を出さず、onで出す(#860・B-261)', async () => {
+  it('multi_store_hierarchy: 設定内でoffと応答欠落では「プール管理」を出さず、onで出す(#860・)', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
     rememberStaffIdentity({ role: 'staff' } as StaffMember)
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/broadcasts', '/pools']))

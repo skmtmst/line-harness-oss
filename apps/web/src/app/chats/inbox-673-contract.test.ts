@@ -39,7 +39,7 @@ describe('#673-受け URLから対象者を読み、会話を選ぶ', () => {
   it('`?friend=` を読み、旧い `?friendId=` の共有URLも受ける', () => {
     expect(deepLink).toContain("params.get('friend')")
     expect(deepLink).toContain("params.get('friendId')")
-    // メールの `?thread=` 読みも保つ（app-shell-v6 の契約）。
+    // メールの `?thread=` 読みも保つ（app-shell-管理画面 の契約）。
     expect(deepLink).toContain("params.get('thread')")
   })
 

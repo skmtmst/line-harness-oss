@@ -8,7 +8,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RegistrantsTab } from '@/v8/reminders/detail'
-// 登録者のタブは画面の説明の帯を持つので、画面と同じく説明の器の中に置く（loVfW）。
+// 登録者のタブは画面の説明の帯を持つので、画面と同じく説明の器の中に置く。
 import { PageExplanationProvider } from '@/components/shared/page-explanation'
 
 const apiMock = vi.hoisted(() => ({
@@ -58,7 +58,7 @@ const registrant = {
   updatedAt: '2026-09-01T00:00:00.000Z', cancelledAt: null, lockVersion: 4,
 }
 const detailSource = fs.readFileSync(sourceJoin(__dirname, '../../../v8/reminders/detail.tsx'), 'utf8')
-/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+/* 完全切り替え：管理画面 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
 const listSource = fs.readFileSync(new URL('../../../v8/reminders/list.tsx', import.meta.url), 'utf8')
 
 let host: HTMLDivElement
@@ -102,7 +102,7 @@ async function click(label: string) {
   await act(async () => { button.click(); await Promise.resolve(); await Promise.resolve() })
 }
 
-/** 基準日を日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm（日本時間）。 */
+/** 基準日を日時の選択（★管理画面）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm（日本時間）。 */
 async function pickTargetDate(label: string, iso: string) {
   const [date, time] = iso.split('T')
   const [hour, minute] = time.split(':')
@@ -175,7 +175,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
 
   it('取消後は再開だけを表示し、再開には取消後の版番号を渡す', async () => {
     await render()
-    // 行の操作は「…」1つの中（B-253）。
+    // 行の操作は「…」1つの中。
     await clickAria('田中 花子の操作')
     await click('取り消す')
     expect(apiMock.cancel).toHaveBeenCalledWith('reminder-1', 'registration-1', 4)
@@ -218,7 +218,7 @@ describe('リマインダ詳細の登録者管理 (#868)', () => {
     apiMock.list.mockResolvedValueOnce({ success: true, data: [jstRegistrant] })
     await render()
     const trigger = document.querySelector('button[aria-label="田中 花子の基準日"]')
-    // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す（表の欄は「9/16（水）10:00」の短い形・loVfW）。
+    // 実行端末はUTC+7でも、01:00ZはJST 10:00として画面に出す（表の欄は「9/16（水）10:00」の短い形・）。
     expect(trigger?.textContent).toContain('9/16（水）10:00')
     await pickTargetDate('田中 花子の基準日', '2026-09-16T10:30')
     await click('基準日を保存')

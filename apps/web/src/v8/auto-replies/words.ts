@@ -184,7 +184,7 @@ const ACTION_WORDS: Record<string, string> = {
   event_booking: 'イベント予約操作',
 }
 
-/** 一覧の行の短い言葉（絵 uE9gf「＋対応マーク・担当者へ通知」）。 */
+/** 一覧の行の短い言葉（絵 「＋対応マーク・担当者へ通知」）。 */
 const ACTION_SHORT_WORDS: Record<string, string> = {
   tag: 'タグ',
   friend_field: '友だち情報',
@@ -214,7 +214,7 @@ export function actionWord(actionType: string): string {
  * 片方だけ増えて「一覧では英語、編集では日本語」になる。
  */
 export const MESSAGE_KIND_WORDS: ReadonlyArray<{ key: string; label: string }> = [
-  // 絵の並び（A0pDt）：テキスト・スタンプ・画像・位置情報を先に、残りは後ろへ。
+  // 絵の並び：テキスト・スタンプ・画像・位置情報を先に、残りは後ろへ。
   { key: 'text', label: 'テキスト' },
   { key: 'sticker', label: 'スタンプ' },
   { key: 'image', label: '画像' },

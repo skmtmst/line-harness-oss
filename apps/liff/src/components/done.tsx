@@ -1,5 +1,5 @@
-import { useCustomerWords } from './CustomerStyleScope.js';
-import PaymentPreparingNote from './PaymentPreparingNote.js';
+import { useCustomerWords } from './customer-style-scope.js';
+import PaymentPreparingNote from './payment-preparing-note.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -7,14 +7,14 @@ import liff from '@line/liff';
 import { addMinutesHm, formatJpLong } from '../lib/datetime.js';
 import { api } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
-import Button from './ui/Button.js';
-import BottomBar from './ui/BottomBar.js';
-import Icon from './ui/Icon.js';
-import OnlineMeetingCard from './OnlineMeetingCard.js';
-import type { SlotPick } from './DateTimePicker.js';
+import Button from './ui/button/index.js';
+import BottomBar from './ui/bottom-bar.js';
+import Icon from './ui/icon.js';
+import OnlineMeetingCard from './online-meeting-card.js';
+import type { SlotPick } from './date-time-picker.js';
 
 /**
- * 1-e 受け付けました (★V8・VU6Xi)。緑の丸の印＋題＋送った内容のカード。
+ * 1-e 受け付けました (★V8・)。緑の丸の印＋題＋送った内容のカード。
  * 下の帯は「LINEに戻る」(主) と「予約の履歴を見る」(副)。
  * (撮影: ボタン名は「予約の履歴を見る」のまま)
  */
@@ -38,7 +38,7 @@ export default function Done({
   prepayNotice?: string | null;
 }) {
   const words = useCustomerWords();
-  // initLiff() は ?liffId=... をクエリから読むので、内部遷移でも保持する。
+  // initLiff は ?liffId=... をクエリから読むので、内部遷移でも保持する。
   // search を維持しないと「予約の履歴を見る」→ WebView 再読み込みで liffId が失われる。
   const { search } = useLocation();
   const navigate = useNavigate();

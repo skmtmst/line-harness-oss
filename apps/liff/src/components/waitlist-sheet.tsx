@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import { slotStartsAtIso } from '../lib/datetime.js';
-import Button from './ui/Button.js';
-import Icon from './ui/Icon.js';
+import Button from './ui/button/index.js';
+import Icon from './ui/icon.js';
 
 /**
  * 待ちの枠の開始 ISO。登録と照会で同じ文字列を使う。空き枠が返した開始の

@@ -9,7 +9,7 @@ process.env.TRAIN30_MOCK_PORT = String(mockPort)
 process.env.TRAIN30_WEB_PORT = String(webPort)
 export default defineConfig({
   outputDir: process.env.TRAIN30_OUTPUT_DIR ?? fileURLToPath(new URL('../../../test-results/train30-mfa', import.meta.url)),
-  testDir: '.', testMatch: 'train30-auth.spec.mjs', workers: 1, retries: 0,
+  testDir: '.', testMatch: 'auth.spec.mjs', workers: 1, retries: 0,
   reporter: 'list', timeout: 60000, expect: { timeout: 15000 },
   use: { baseURL: base },
   webServer: [

@@ -6,7 +6,7 @@ import { nextMonthResetLabel, type BannerUsage } from '@/lib/hq-banners'
 
 export type BannerLimitKind = 'blocked' | 'paused' | 'month' | 'today'
 
-/** 止まっている理由（v7 の limit-state と同じ判定）。止まっていなければ null。 */
+/** 止まっている理由（管理画面 の limit-state と同じ判定）。止まっていなければ null。 */
 export function bannerLimitKind(usage: BannerUsage | null): BannerLimitKind | null {
   if (!usage) return null
   if (usage.blocked) return 'blocked'
@@ -16,7 +16,7 @@ export function bannerLimitKind(usage: BannerUsage | null): BannerLimitKind | nu
   return null
 }
 
-/** 題と本文（v7 と同じ文）。数が取れないときは「—」。 */
+/** 題と本文（管理画面 と同じ文）。数が取れないときは「—」。 */
 export function bannerLimitWords(usage: BannerUsage | null): { kind: BannerLimitKind; title: string; body: string } | null {
   const kind = bannerLimitKind(usage)
   if (!kind || !usage) return null

@@ -1,19 +1,19 @@
-import { useCustomerWords } from './CustomerStyleScope.js';
+import { useCustomerWords } from './customer-style-scope.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
-import BookingCancelDeadline from './BookingCancelDeadline.js';
+import BookingCancelDeadline from './booking-cancel-deadline.js';
 import type { BookingHistoryItem } from '../lib/api.js';
 import { paymentText, type PaymentView } from '../lib/booking-payment-view.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
-import Card from './ui/Card.js';
-import Badge from './ui/Badge.js';
-import Button from './ui/Button.js';
-import Icon from './ui/Icon.js';
-import UnpaidPaymentNote from './UnpaidPaymentNote.js';
-import OnlineMeetingCard from './OnlineMeetingCard.js';
+import Card from './ui/card.js';
+import Badge from './ui/badge.js';
+import Button from './ui/button/index.js';
+import Icon from './ui/icon.js';
+import UnpaidPaymentNote from './unpaid-payment-note.js';
+import OnlineMeetingCard from './online-meeting-card.js';
 
 /**
  * 予約の履歴の札 (★V8・nWby5)。日付の四角＋メニュー名＋支払いの札（無いときは予約の状態の札）。
- * 支払い済み・返金済みは「領収書を見る」（Stripe のページ）。未払いは払う期限と［お支払いへ進む］（B-338）。
+ * 支払い済み・返金済みは「領収書を見る」（Stripe のページ）。未払いは払う期限と［お支払いへ進む］。
  * 下に「日時を変える／キャンセル」の2ボタン (F-6 本人の変更・取消)。
  * 押す口が渡されたときだけ出す (履歴の口が版などを返さないと送れないため、呼び側が決める)。
  */

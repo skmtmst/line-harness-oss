@@ -113,7 +113,7 @@ export function StatusPill({ tone, children }: { tone: 'active' | 'warn' | 'dang
   )
 }
 
-/** 空・絞り込みで0件・失敗の1枚（見本帳 rRk0C）。 */
+/** 空・絞り込みで0件・失敗の1枚（見本帳 ）。 */
 export function StateCard({
   tone = 'empty',
   icon,

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import KpiCard from './kpi-card'
 
 /**
- * 増減の数（差し引き）は、プラスのとき「+」を付け、単位も出す（絵 ws9wt「+47 人」）。
+ * 増減の数（差し引き）は、プラスのとき「+」を付け、単位も出す（絵 「+47 人」）。
  * signed を渡さない数のマスは今までどおり（+ を付けない）。
  */
 const text = (props: Partial<React.ComponentProps<typeof KpiCard>>) =>

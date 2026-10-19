@@ -20,7 +20,7 @@ import type { StyleClosureInput,StyleLayout,StyleLayoutItem } from './model'
 import styles from './style-dashboard.module.css'
 
 /*
- * ［表示を変える］の引き出し（wFmQa・B-294 追記 7・8・B-309 の 7）：
+ * ［表示を変える］の引き出し（wFmQa・ 追記 7・8・ の 7）：
  * 数の帯（5 つまで）と横のカードの出し入れ・上下の入れ替え・型に戻す・カードを足す。
  * 接続の異常の帯は隠せない（必ず出る）。
  */
@@ -31,7 +31,7 @@ export function ViewDrawer({ open, layout, busy, onClose, onSave, onReset, onCha
   onClose: () => void
   onSave: (next: StyleLayoutItem[]) => void
   onReset: () => void
-  /** ［型を変える］（B-294 追記 6）：業種の型を選び直す。データはそのまま。 */
+  /** ［型を変える］（ 追記 6）：業種の型を選び直す。データはそのまま。 */
   onChangeStyle: (style: 'restaurant' | 'salon' | 'consult' | 'lesson' | 'standard') => void
 }) {
   const [picking, setPicking] = useState(false)
@@ -85,7 +85,7 @@ export function ViewDrawer({ open, layout, busy, onClose, onSave, onReset, onCha
 }
 
 /*
- * ［休みを入れる］の窓（wXOm6・B-309 の 4・飲食店の臨時休業と同じ決まり）。
+ * ［休みを入れる］の窓（wXOm6・ の 4・飲食店の臨時休業と同じ決まり）。
  * 日付・時間帯（終日／時間を決める）・対象（店全体／担当者／卓）・理由（お客さまには出さない）。
  * 既存の予約は取り消さず、連絡は次の画面で選ぶ。
  */

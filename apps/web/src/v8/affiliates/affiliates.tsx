@@ -25,7 +25,7 @@ import ApprovalsTab from './approvals'
 import PaymentTab from './payment'
 import ReportTab from './report'
 
-/* 上の帯・タブの題は画面名だけ（タブ名を括弧で足さない。u8xibp・Eo56k と同じ・2026-10-15 判定役）。 */
+/* 上の帯・タブの題は画面名だけ（タブ名を括弧で足さない。・ と同じ・2026-10-15 判定役）。 */
 const PAGE_TITLE = '成果とアフィリエイト'
 
 function AffiliatesInner() {
@@ -42,7 +42,7 @@ function AffiliatesInner() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
   const role = useStaffRole()
-  /* v9JWQ：変える操作は出さない。CSV・検索・絞り込み・明細を見るは使える。 */
+  /* ：変える操作は出さない。CSV・検索・絞り込み・明細を見るは使える。 */
   const readonly = !canManageRole(role)
   const narrow = useNarrowViewport()
   const { selectedAccountId } = useAccount()

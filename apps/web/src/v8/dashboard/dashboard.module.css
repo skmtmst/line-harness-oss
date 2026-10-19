@@ -1,5 +1,5 @@
 /*
- * ★V8 ダッシュボード（Pencil WQmep）。
+ * ★V8 ダッシュボード（Pencil ）。
  * 枠・板の頭・段の線と右の列の幅は型（DashboardPage・DashboardRow）が持つ。
  * ここは段の中身だけ。寸法は app/globals.css の --tpl-db-* に1か所。
  */

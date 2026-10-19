@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 タグの一覧（Pencil：タグ `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`）。
+ * ★V8 タグの一覧（Pencil：タグ ``・1152 ``・閲覧のみ ``）。
  *
  * 型（PageFrame・PageHeading）で板の頭・閲覧のみの帯・タブの段を組み、
  * 本文はタブごとに切り替える。どのタブもこの場所に一から書いた
@@ -41,7 +41,7 @@ const TABS = [
 ] as const
 export type TagsTabKey = (typeof TABS)[number][0]
 
-/** タブと機能設定キーの対応（v7 `tags-page-v4.tsx` の TAB_FEATURE と同じ）。「タグ」は必須機能。 */
+/** タブと機能設定キーの対応（管理画面 `tags-page-v4.tsx` の TAB_FEATURE と同じ）。「タグ」は必須機能。 */
 const TAB_FEATURE: Partial<Record<TagsTabKey, FeatureKey>> = {
   fields: 'friend_fields',
   marks: 'support_marks',

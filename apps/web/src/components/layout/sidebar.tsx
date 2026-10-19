@@ -47,7 +47,7 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
 /** ★V8（夕44-A）：はじめから開く4組。ほかは見出しだけで畳む。 */
 const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['basic', 'delivery', 'contents', 'booking', 'hq'])
 
-/** ★V8 統括の左メニューの組の見出し（絵 `V8-B/JKjsE`）。v7 の統括は見出しの無い組のまま。 */
+/** ★V8 統括の左メニューの組の見出し（絵 `V8-B/`）。管理画面 の統括は見出しの無い組のまま。 */
 const HQ_V8_SECTION_LABEL = '統括'
 
 /** ★V8 統括の左下「統括の設定」が選ばれた形になる画面（統括の設定の中のメニューの4つ）。 */
@@ -91,7 +91,7 @@ export default function Sidebar({
   const pathname = usePathname()
   /*
    * 統括の左メニューは住所が /hq のときに出す。LINEアカウントの登録（/accounts/new）は
-   * 統括の「アカウント」から開く統括の画面なので、統括のメニューのままにする（絵 xj3zz・JYfda）。
+   * 統括の「アカウント」から開く統括の画面なので、統括のメニューのままにする（絵 ・）。
    */
   const isHq = isHqShellPath(pathname)
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -108,7 +108,7 @@ export default function Sidebar({
   const preparing = usePreparingDialog()
   /*
    * ★V8（夕44-A・部品 T7XSI6）：組の開閉と V2 モードの扱いにテーマが要る。
-   * SSR・最初の描画は v7 の形（hydration を一致させるため）で、
+   * SSR・最初の描画は 管理画面 の形（hydration を一致させるため）で、
    * レイアウト効果の中で本当のテーマへ揃える。
    */
 
@@ -155,8 +155,8 @@ export default function Sidebar({
    * ★V8 外側：左メニューの畳み（幅 64・アイコンだけ）。
    * 上の帯のボタンと ⌘\ が SIDEBAR_TOGGLE_EVENT を投げ、ここで受ける。
    * 状態はブラウザに覚える（lh-sidebar-collapsed）。保存がなければ
-   * 1152px 未満では畳んだ形で開く（1152 の絵 35 枚はどれも開いたまま）。v7 では見た目を変えないので、
-   * data-collapsed が立っていても v7 の見た目は動かない。
+   * 1152px 未満では畳んだ形で開く（1152 の絵 35 枚はどれも開いたまま）。管理画面 では見た目を変えないので、
+   * data-collapsed が立っていても 管理画面 の見た目は動かない。
    */
   const [collapsed, setCollapsed] = useState(false)
   const collapsedInitRef = useRef(false)
@@ -176,7 +176,7 @@ export default function Sidebar({
   }, [])
   useEffect(() => {
     const toggle = () => {
-      /* v7 では畳み機能を出さない。テーマが v7 のときは無視する。 */
+      /* 管理画面 では畳み機能を出さない。テーマが 管理画面 のときは無視する。 */
       setCollapsed((current) => {
         const next = !current
         try {
@@ -355,11 +355,11 @@ export default function Sidebar({
       ...section,
       items: section.items.filter((item) => {
         /*
-         * ★V7 C6: 統括のひな形配布（4画面）は Worker の受け口が無いあいだ
+         * ★管理画面 C6: 統括のひな形配布（4画面）は Worker の受け口が無いあいだ
          * 「利用できません」だけのページになるため、サイドバーには出さない。
          * ページ自体は残し、配布が有効になれば再表示する。
          * ★V8 は4画面とも中身を出す（app/hq/hq-template-page.tsx と同じ条件）ので、
-         * 左メニューにも出す（絵 `V8-B/JKjsE`・`LRc93` の6項目）。v7 は今までどおり。
+         * 左メニューにも出す（絵 `V8-B/`・`` の6項目）。管理画面 は今までどおり。
          */
 
         if (isHq) return true
@@ -405,7 +405,7 @@ export default function Sidebar({
    * アカウントごとの直近値をモジュールに共有しておき、表示はそれで
    * 即復帰させてから裏で取り直す。
    */
-  /* 統括の「対応が要るもの」の札（B-322）。全アカウントの件数の合計。読めないときは出さない。 */
+  /* 統括の「対応が要るもの」の札。全アカウントの件数の合計。読めないときは出さない。 */
   const [hqAttentionCount, setHqAttentionCount] = useState(0)
   useEffect(() => {
     if (!isHq) return
@@ -523,7 +523,7 @@ export default function Sidebar({
   }, [isOpen])
 
   /*
-   * スマホのメニューの焦点（★V7 修正方針 §2）。
+   * スマホのメニューの焦点（★管理画面 修正方針 §2）。
    * 開いたら中の先頭へ、Esc で閉じ、閉じたら焦点をハンバーガーへ戻す。
    * 閉じている間は aside に inert を付け、画面外の項目へ Tab が行かないようにする
    * （以前は閉じても11項目が Tab で選べ、焦点が見えない所へ行っていた）。
@@ -590,7 +590,7 @@ export default function Sidebar({
         // 統括の「店舗管理」(/hq) も完全一致にする。/hq/banners や /hq/members を
         // 開いたときに店舗管理が光ってしまうため。
         if (item.href === '/hq') {
-          // 統括から開く LINEアカウントの登録（/accounts/new）も「アカウント」の中（絵 `xj3zz` のパンくず）。
+          // 統括から開く LINEアカウントの登録（/accounts/new）も「アカウント」の中（絵 `` のパンくず）。
           if (activePathname === '/hq' || activePathname === '/accounts/new') best = '/hq'
           continue
         }

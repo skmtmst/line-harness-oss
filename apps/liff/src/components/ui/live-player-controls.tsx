@@ -1,4 +1,4 @@
-import Button from './button';
+import Button from './button/index';
 import Icon from './icon';
 import styles from './live-player-controls.module.css';
 

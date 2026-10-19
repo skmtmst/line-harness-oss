@@ -24,7 +24,7 @@ const PATHS = {
     <path key="c" d="M8 12h4" />,
     <path key="d" d="m2 2 20 20" />,
   ],
-  /** 準備中（B-314 の準備中の画面 K9HMJp） */
+  /** 準備中（ の準備中の画面 K9HMJp） */
   hammer: [
     <path key="a" d="m15 12-8.373 8.373a1 1 0 1 1-3-3L12 9" />,
     <path key="b" d="m18 15 4-4" />,
@@ -94,7 +94,7 @@ const PATHS = {
     <circle key="c" cx="12" cy="10" r="3" />,
   ],
   /** 待ち (キャンセル待ち・承認待ちの印) */
-  /** 空きが出た (BjcuB)。lucide party-popper と同じ線 */
+  /** 空きが出た 。lucide party-popper と同じ線 */
   'party-popper': [
     <path key="a" d="M5.8 11.3 2 22l10.7-3.79" />,
     <path key="b" d="M4 3h.01" />,

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 日付の選択（★V7 `Fw065`）。値は YYYY-MM-DD のまま、表示は日本語。
+ * 日付の選択（★管理画面 `Fw065`）。値は YYYY-MM-DD のまま、表示は日本語。
  */
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -19,7 +19,7 @@ function Harness({ initial = '2026-09-23', min, displayFormat }: { initial?: str
   )
 }
 
-describe('日付の選択（★V7）', () => {
+describe('日付の選択（★管理画面）', () => {
   it('短い表示でも年を含む全文と日付の選択を保持する', () => {
     render(<Harness displayFormat="short" />)
     const trigger = screen.getByRole('button', { name: '配信日' })

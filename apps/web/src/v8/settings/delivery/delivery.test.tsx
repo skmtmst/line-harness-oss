@@ -233,7 +233,7 @@ describe('設定 › デリバリー連携', () => {
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('接続エラー')).toBeTruthy()
     // 状態の注記は共通の帯（Notice）で出す。危険の帯は role="alert" で、
-    // 色は共通の `.danger` が持つ（自作の data-tone は持たない／B-172 status-badge）。
+    // 色は共通の `.danger` が持つ（自作の data-tone は持たない／ status-badge）。
     const notice = uberCard.getByText('注文を受け取れませんでした。musubo が確認しています。').closest('[data-design-part="notice"]')
     expect(notice).toBeTruthy()
     expect(notice?.getAttribute('role')).toBe('alert')

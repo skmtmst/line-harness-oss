@@ -22,7 +22,7 @@ const ACCOUNT_DRAG_TYPE = 'application/x-line-account-id'
 export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, onSaved }: {
   closeGuardRef?: RefObject<((close: () => void) => void) | null>
   onBusyChange?: (busy: boolean) => void
-  /** V8 の窓（a7lUk）として開く。閉じる・保存後に呼ぶ。 */
+  /** V8 の窓として開く。閉じる・保存後に呼ぶ。 */
   onClose?: () => void
   onSaved?: () => void
 } = {}) {
@@ -277,7 +277,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
     </div>
   }
 
-  // V8 の窓はこの共通の動きを使い、v7 の二列の編集画面はそのまま残す。
+  // V8 の窓はこの共通の動きを使い、管理画面 の二列の編集画面はそのまま残す。
   if (onClose) {
     const compactNode = (account: AccountItem, depth: number): ReactNode => {
       const parent = accounts.find((item) => item.id === account.parentLineAccountId)

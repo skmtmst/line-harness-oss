@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 
 /**
- * 契約者専用LINEの登録案内（★V6 33-2-現状5-B、ダイアログ GiwgF。決定 2026-09-18）。
+ * 契約者専用LINEの登録案内（★管理画面 33-2-現状5-B、ダイアログ GiwgF。決定 2026-09-18）。
  * 統括が LINE アカウントの登録（手順 5）を終えた直後に出す。案内だけで、ログインは止めない。
  * QR は友だち追加 URL を画面で描く。追加後に 6 桁の確認コードを LINE で送ると本人と紐づく。
  */

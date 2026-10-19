@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import EventConfirm from './EventConfirm.js';
+import EventConfirm from './event-confirm.js';
 import { api } from '../lib/api.js';
 vi.mock('../lib/api.js',()=>({api:{
   customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:'line'}}}),

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type EventBookingMine, type MakeupCredit } from '../lib/api.js';
 import { utcToJstHm } from '../lib/datetime.js';
-import AbsenceSheet, { mdHm } from './AbsenceSheet.js';
-import MakeupPicker from './MakeupPicker.js';
-import Button from './ui/Button.js';
-import Card from './ui/Card.js';
-import LoadErrorView from './LoadErrorView.js';
+import AbsenceSheet, { mdHm } from './absence-sheet.js';
+import MakeupPicker from './makeup-picker.js';
+import Button from './ui/button/index.js';
+import Card from './ui/card.js';
+import LoadErrorView from './load-error-view.js';
 
 /**
  * 予約の履歴に並ぶ教室の予約（B3・rx3FL・kzE16）。振替を使うクラスの行に［欠席する］、

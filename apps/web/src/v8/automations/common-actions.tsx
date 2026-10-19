@@ -60,7 +60,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 オートメーションの共通アクション（Pencil `LnGNw`）。
+ * ★V8 オートメーションの共通アクション（Pencil ``）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
  * （共通アクションの既存API）と同じ（一覧・検索・状態の絞り込み・複製・保管・CSV）。

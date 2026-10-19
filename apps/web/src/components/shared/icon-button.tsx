@@ -19,8 +19,8 @@ export default function IconButton({
   /** React 19 の ref（「…」のメニューの位置の基準などに使う）。 */
   ref?: Ref<HTMLButtonElement>
   /**
-   * 'small' は行の中の 24×24（印 12・角丸 6。ダッシュボード編集 mcOqK の上下）。
-   * 'row' は行の右端の「…」の 28×28（印 14・押せる所は 36。★V8 i0Ao0R ほか）。
+   * 'small' は行の中の 24×24（印 12・角丸 6。ダッシュボード編集  の上下）。
+   * 'row' は行の右端の「…」の 28×28（印 14・押せる所は 36。★V8  ほか）。
    * 'compact' は狭い道具の枠つき32角。通常の36角と行の「…」は保つ。
    */
   size?: 'small' | 'row' | 'compact'

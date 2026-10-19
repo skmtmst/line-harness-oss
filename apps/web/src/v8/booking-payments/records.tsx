@@ -88,7 +88,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
   }, [accountId, query, status, method, period])
 
   useEffect(() => { void reload() }, [reload])
-  /* 試験モードの印（B-338：お金の数が出る所すべて）。 */
+  /* 試験モードの印（：お金の数が出る所すべて）。 */
   useEffect(() => {
     let alive = true
     void Promise.resolve().then(() => bookingPaymentAdminApi.connection(accountId))

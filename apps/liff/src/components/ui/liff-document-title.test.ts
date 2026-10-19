@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@line/liff', () => ({ default: { closeWindow: () => {} } }));
 vi.mock('../../lib/api.js', () => ({ api: { liffConfig: () => Promise.resolve({ data: null }) } }));
 
-import { liffDocumentTitle } from './LiffHeader.js';
+import { liffDocumentTitle } from './liff-header.js';
 
 /**
  * タブ（LINE の上）の題は「<画面名> | musubo」（リリース前点検 2026-10-07）。

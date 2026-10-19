@@ -43,7 +43,7 @@ function topMenus(menus: BookingSalesSummaryMenu[], pick: (menu: BookingSalesSum
 }
 
 /**
- * 予約からの売上（B-1 X26oo）。予約管理 → 売上。
+ * 予約からの売上（ X26oo）。予約管理 → 売上。
  * 数は実データだけ。取れない数（読み込み前・失敗）は「—」。
  */
 export default function BookingSalesPage() {

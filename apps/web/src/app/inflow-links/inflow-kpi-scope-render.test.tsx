@@ -160,7 +160,7 @@ function kpiText(): string {
 
 /*
  * 帯の4枚を意味で特定する（順序: 経路・友だち追加・動きが未設定・広告とつないだ）。
- * 板 xbHxg の帯は絵どおりの4枚。クリックと平均の追加率の枚は無い。
+ * 板  の帯は絵どおりの4枚。クリックと平均の追加率の枚は無い。
  */
 function kpiCards(): string[] {
   const band = host.querySelector('[data-shared-part="kpi-band"]')

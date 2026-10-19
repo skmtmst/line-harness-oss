@@ -10,13 +10,13 @@ const CREATE = readFileSync(new URL('../../v8/rich-menus/new/create.tsx', import
 const CREATE_CSS = readFileSync(new URL('../../v8/rich-menus/new/create.module.css', import.meta.url), 'utf8')
 
 /*
- * V8 リッチメニューの残り（rZEGN・ZoKow・作る①〜④・r8dGXT）。
- * 一覧は板IDを付け（閲覧のみは `ZoKow`）、作る4手順は手順ごとに板IDを付け、
- * 編集中の競合は帯で知らせて書き換えない。v7 は変えない。
+ * V8 リッチメニューの残り（・・作る①〜④・）。
+ * 一覧は板IDを付け（閲覧のみは ``）、作る4手順は手順ごとに板IDを付け、
+ * 編集中の競合は帯で知らせて書き換えない。管理画面 は変えない。
  */
 describe('リッチメニューの残り板', () => {
   it('一覧は板IDを付ける（閲覧のみは ZoKow）', () => {
-    // 新しい一覧は型（ListPage）の boardId で板IDを付ける。1152 は Y9ASp。
+    // 新しい一覧は型（ListPage）の boardId で板IDを付ける。1152 は 。
     expect(LIST).toContain("boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}")
   })
 

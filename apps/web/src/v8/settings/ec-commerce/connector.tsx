@@ -29,7 +29,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 EC連携 つなぎ先（板 iLJmw）。
+ * ★V8 EC連携 つなぎ先（板 ）。
  *
  * 並び（絵）：上の段に「つなぎ先の情報」（種類・アドレス・鍵）と右の「取り込みのようす」（今日・この30日・失敗・最後に成功）。
  * その下に板の幅で「取り込みの状態」（止める・再開・止めたとき）→「どこの出来事を取り込むか」（1行に並べる）→

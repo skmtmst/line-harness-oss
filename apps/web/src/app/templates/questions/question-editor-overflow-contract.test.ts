@@ -24,7 +24,7 @@ describe('質問エディタのはみ出し（#973 U022）', () => {
   })
 
   it('友だち情報欄は選択と値を同じ行に押し込まない', () => {
-    // B-169: 共通の行を縦に開き、対象の選ぶ欄と値の入力を分ける。
+    // : 共通の行を縦に開き、対象の選ぶ欄と値の入力を分ける。
     expect(EDITOR).toContain('<EntityPickerField label="友だち情報欄"')
     expect(EDITOR).toContain('<TextField aria-label="友だち情報欄に書き込む値"')
     expect(EDITOR).not.toContain('const selectClass =')

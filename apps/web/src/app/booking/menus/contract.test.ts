@@ -60,7 +60,7 @@ describe('V8 予約設定', () => {
   })
 
   it('表示している一覧操作は実際に使える', () => {
-    // 分割先のコメントは画面の文言ではない。口が来るまでの「現在準備中です」の案内は B-314（オーナー）で認められた形なので除く。
+    // 分割先のコメントは画面の文言ではない。口が来るまでの「現在準備中です」の案内は （オーナー）で認められた形なので除く。
     expect(LIST.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').replaceAll('現在準備中です', '')).not.toContain('準備中')
     expect(LIST).toContain('bookingApi.getSettings(accountId)')
     expect(LIST).toContain('<Pagination page={safePage} pageCount={pageCount}')
@@ -68,7 +68,7 @@ describe('V8 予約設定', () => {
     expect(LIST).toContain('bookingApi.patchMenu(accountId, menu.id, version')
     expect(LIST).toContain('visibilityError ? <Notice')
     expect(LIST).not.toContain('メニュー名で検索')
-    // メニュー一覧（menus-tab）に CSV の書き出しは置かない。お支払いの記録（B-305）の書き出しは別のタブ。
+    // メニュー一覧（menus-tab）に CSV の書き出しは置かない。お支払いの記録の書き出しは別のタブ。
     expect(SETTINGS_MENUS_TAB).not.toContain('CSVで書き出す')
   })
 

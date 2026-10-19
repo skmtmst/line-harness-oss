@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import MakeupPicker from './MakeupPicker.js';
+import MakeupPicker from './makeup-picker.js';
 import { api, type MakeupCredit } from '../lib/api.js';
 
 vi.mock('../lib/api.js', () => ({ api: { makeupOptions: vi.fn(), useMakeup: vi.fn() } }));

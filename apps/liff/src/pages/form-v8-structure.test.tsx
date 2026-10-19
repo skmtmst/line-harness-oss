@@ -3,10 +3,10 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { FormLayout } from '@line-crm/shared';
-import Form from './Form.js';
+import Form from './form.js';
 
 /**
- * 回答フォーム ★V8 (B8rCt・aNZKe) の形。
+ * 回答フォーム ★V8 (・) の形。
  * - 上の帯 (LiffHeader)・進みの棒・題と説明
  * - 選択肢は大きな枠・戻るは主ボタンの下の小さな文字
  * - 送ったら「ご回答ありがとうございました」＋ LINEに戻る

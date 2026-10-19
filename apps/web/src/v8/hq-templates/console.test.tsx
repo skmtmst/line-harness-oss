@@ -1,9 +1,9 @@
 import { findPickerDialog, pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
- * 統括のテンプレート（B-29・B-36）：作るは店のテンプレートの作る画面（メッセージ HfK0O・クーポン C3qMCz）を使い、
+ * 統括のテンプレート（・）：作るは店のテンプレートの作る画面（メッセージ ・クーポン ）を使い、
  * 下の帯の主ボタンは［保存する］。保存は統括の口（ひな形）へ、配るは「アカウントへ配る」へ進む。
- * 詳細（pQ4fH）は「配った先」（API-14 の配った先のアカウント名）と［配る］（読み上げは「〇〇を配る」）。
+ * 詳細は「配った先」（API-14 の配った先のアカウント名）と［配る］（読み上げは「〇〇を配る」）。
  */
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -116,7 +116,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
     expect(requestId).toBeTruthy()
     expect(input).toMatchObject({ type: 'template', name: '予約前日', folderId: null })
     expect(input.definition.template).toMatchObject({ name: '予約前日', messageType: 'text', messageContent: '{{name}}さん、明日です' })
-    /* 保存のあとは「アカウントへ配る」（meBRB）。 */
+    /* 保存のあとは「アカウントへ配る」。 */
     expect(await screen.findByRole('checkbox', { name: /然 -NEN- 本店/ })).toBeTruthy()
   })
 
@@ -195,7 +195,7 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
     expect(await screen.findByRole('heading', { name: 'カルーセルを作る' })).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '定期便のご案内' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    /* B-139（オーナーの写真の指摘）：帯だけにせず、本文の欄を赤くして真下に理由を出し、そこへ移る。 */
+    /* （オーナーの写真の指摘）：帯だけにせず、本文の欄を赤くして真下に理由を出し、そこへ移る。 */
     const body = document.getElementById('cr-text') as HTMLInputElement
     await waitFor(() => expect(body.getAttribute('aria-invalid')).toBe('true'))
     expect(document.getElementById('cr-text-error')?.textContent).toBe('本文を入力してください')
@@ -309,7 +309,7 @@ describe('統括のテンプレートを作る（リッチメッセージ g8d6ai
     fireEvent.click(await screen.findByRole('tab', { name: /リッチメッセージ/ }))
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
     expect(await screen.findByRole('heading', { name: 'リッチメッセージを作る' })).toBeTruthy()
-    /* 普通のメッセージの作る画面（X4JcOf）には入らない。 */
+    /* 普通のメッセージの作る画面には入らない。 */
     expect(screen.queryByLabelText('本文')).toBeNull()
     expect(screen.queryByRole('button', { name: '登録メディアから選ぶ' })).toBeNull()
     fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '夏のキャンペーン告知' } })
@@ -503,7 +503,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
   const delivered = (id: string) => ({ runId: `run-${id}`, status: 'completed', stores: [{ accountId: 'a-1', status: 'succeeded', counts: { created: 1, overwritten: 0, aliased: 0 } }] })
   /** 配る先の欄から共通の窓を開き、アカウントを選んで確定する（dJZ7Q）。 */
   async function pickStores(dialog: HTMLElement, names: string[]) {
-    /* 絵 W2GYgL：配る先は窓の中のアカウントのチェックの一覧。 */
+    /* 絵 ：配る先は窓の中のアカウントのチェックの一覧。 */
     for (const name of names) fireEvent.click(await within(dialog).findByRole('checkbox', { name }))
   }
   async function selectFolder() {
@@ -523,7 +523,7 @@ describe('フォルダの「…」からまとめて配る（G-7）', () => {
   it('全種類のフォルダ内ひな形は全選択で始まり、片方0なら配れない', async () => {
     render(<HqTemplatesV8 type="template" />)
     const dialog = await selectFolder()
-    /* 絵 W2GYgL：配るテンプレートは窓の中のチェックの一覧（種類の札つき）。 */
+    /* 絵 ：配るテンプレートは窓の中のチェックの一覧（種類の札つき）。 */
     expect((within(dialog).getByRole('checkbox', { name: '別の種類のひな形' }) as HTMLInputElement).checked).toBe(true)
     expect(within(dialog).getByText('本文')).toBeTruthy()
     expect(within(dialog).getByText('カルーセル')).toBeTruthy()

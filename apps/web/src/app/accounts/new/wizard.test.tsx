@@ -14,7 +14,7 @@ const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), followerImportState: vi.fn(), stepFollowerImport: vi.fn(), list: vi.fn(), followerInsight: vi.fn(),
 }))
 const friends = vi.hoisted(() => ({ list: vi.fn() }))
-// 登録完了直後の契約者専用LINEの登録案内（★V6 37-7）。既定は「運営側で未設定」なので何も出ない
+// 登録完了直後の契約者専用LINEの登録案内（★管理画面 37-7）。既定は「運営側で未設定」なので何も出ない
 const accountTags = vi.hoisted(() => ({ list: vi.fn(async () => ({success:true,data:[{id:'tag-own',name:'店舗',color:null}]})) }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })), save: vi.fn(async () => ({ success: true, data: { version: 1 } })) } }))

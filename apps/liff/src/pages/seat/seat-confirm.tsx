@@ -1,14 +1,14 @@
-import Card from '../../components/ui/Card.js';
+import Card from '../../components/ui/card.js';
 import { TextInput, FieldLabel, FieldCount } from '../../components/forms/controls.js';
-import Button from '../../components/ui/Button.js';
+import Button from '../../components/ui/button/index.js';
 import { useEffect, useState } from 'react';
-import PrivacyNote from '../../components/ui/PrivacyNote.js';
+import PrivacyNote from '../../components/ui/privacy-note.js';
 import { changeRule, longDate, remainingText, stayText, zonedParts } from '../../lib/seat-reserve.js';
 import { LiffInput } from '../../components/forms/controls.js'
 
 
 /**
- * ② 確認 (★V8 B3oGt3)。お店・日時・人数・お席・お名前・電話の箱、ご要望、取り消しの決まり、仮押さえの残り時間。
+ * ② 確認 (V8)。お店・日時・人数・お席・お名前・電話の箱、ご要望、取り消しの決まり、仮押さえの残り時間。
  * 確定のボタンは下の操作の帯 (呼ぶ側) に置く。仮押さえの時間が切れたら onExpired を呼ぶ。
  *
  * ご要望（任意・200字）と電話（任意）は、確定の口へ送る（API-11）。お席は割り当てた卓・空いている卓の種類。

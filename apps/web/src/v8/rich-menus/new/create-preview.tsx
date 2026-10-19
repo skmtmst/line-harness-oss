@@ -69,7 +69,7 @@ export function MenuContent({
         </div>
       ) : null}
       {imageUrl ? (
-        /* 枠の比は大きさ（大 2500×1686・小 2500×843）で決める。画像が別の比・読み途中でも高さが潰れない（OxEMM）。 */
+        /* 枠の比は大きさ（大 2500×1686・小 2500×843）で決める。画像が別の比・読み途中でも高さが潰れない。 */
         <div className={styles.previewMenuImage} data-rich-menu-size={size} style={{ aspectRatio: `${dims.width} / ${dims.height}` }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- 認証つきの管理用URL */}
           <img src={imageUrl} alt="メニューの画像" />

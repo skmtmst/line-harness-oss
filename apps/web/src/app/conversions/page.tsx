@@ -49,7 +49,7 @@ function ConversionsPageHost() {
   const target = AFFILIATE_TABS.has(tab) ? `/affiliates?${params.toString()}` : null
   useEffect(() => { if (target) router.replace(target) }, [target, router])
   if (target) return <ListState kind="loading" title="成果とアフィリエイトへ移動しています" />
-  // V8 fixed: r6dJFy, BygrU, WSGvo.
+  // V8 fixed: , , .
   return <ConversionListV8 accountId={selectedAccountId} />
 }
 

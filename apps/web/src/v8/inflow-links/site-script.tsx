@@ -38,7 +38,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 サイトスクリプト（Pencil `XjOte`）。
+ * ★V8 サイトスクリプト（Pencil ``）。
  *
  * 頭（戻る・題・説明・右下に「貼りかたが分からないときは」）→ 成果を数えるサイトの表（板いっぱい）→
  * 左の列（サイトに貼るコード・計測を許可するドメイン・閲覧の記録への同意）と右の列（いま届いているか・
@@ -46,7 +46,7 @@ import Notice from '@/components/shared/notice'
  *
  * 呼ぶ口・権限・失敗の扱いは今のサイトスクリプト（components/inflow-links/site-script-v8.tsx）と同じ
  * （BEHAVIOR.md の「サイトスクリプト」）。違うのは見せ方だけ：
- * - 行の「…」を押すと、そのサイトの「編集・止める・再開する」を共通メニューで開く（B-202）
+ * - 行の「…」を押すと、そのサイトの「編集・止める・再開する」を共通メニューで開く
  * - 「貼りかたが分からないときは」は窓で開く（今は右の列のいちばん下の段）
  * - 閲覧のみ（owner・admin 以外）には、サイトを追加する・「…」を出さない
  */

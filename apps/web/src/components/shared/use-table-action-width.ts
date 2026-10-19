@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef } from 'react'
 
-/** B-199：列内のいちばん長い主操作にそろえる。文字や権限が変われば測り直す。 */
+/** ：列内のいちばん長い主操作にそろえる。文字や権限が変われば測り直す。 */
 export function useTableActionWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null)
   useLayoutEffect(() => {

@@ -1,4 +1,4 @@
-import Button from './ui/Button.js';
+import Button from './ui/button/index.js';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 /*

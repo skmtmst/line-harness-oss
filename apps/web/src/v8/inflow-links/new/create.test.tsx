@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 流入リンクを作る（src/v8/inflow-links/new/create.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
- * ?name=・?ref= で入れて開ける・発行が 409 で返ると競合の帯（vWJEm）・「違いを比べる」は違う項目だけの窓（E14GFm）・
+ * ?name=・?ref= で入れて開ける・発行が 409 で返ると競合の帯・「違いを比べる」は違う項目だけの窓・
  * 「最新を取り込んで直す」で保存されている値を入力へ写す・発行の送る形。
  */
 import React, { act } from 'react'
@@ -230,7 +230,7 @@ describe('V8 流入リンクを作る', () => {
 
 })
 
-it('B-241：分類候補の取得失敗を隠さず、入力を残して再取得する',async()=>{
+it('分類候補の取得失敗を隠さず、入力を残して再取得する',async()=>{
  const fixtureFetch=globalThis.fetch
  let failed=true,reads=0
  vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{

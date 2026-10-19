@@ -91,7 +91,7 @@ export function useInboxSchedule({ detailAccountRef, selectedChatIdRef, selected
     if (!selectedChatId || scheduling || scheduleLockRef.current) return
     const content = messageContent.trim()
     /*
-     * B-6（API-15）：予約でも画像・動画・ファイルを使える。添付は1通ずつ、本文は最後に予約する
+     * （API-15）：予約でも画像・動画・ファイルを使える。添付は1通ずつ、本文は最後に予約する
      * （同じ日時なので届く順は 添付 → 本文）。準備中・失敗の添付は予約しない。
      */
     const schedulingImage = pendingImage && pendingImage.mode === 'line-image' ? pendingImage : null

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 顧客の一覧表（ノード `F38Tqj`）の共通部品の強化。
+ * ★管理画面 顧客の一覧表（ノード `F38Tqj`）の共通部品の強化。
  * 既存の使い方を壊さないことが第一なので、互換の確認から始める。
  */
 import React from 'react'

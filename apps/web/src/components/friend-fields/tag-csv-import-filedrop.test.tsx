@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * タグCSV取り込みのファイル選択（★V7 NQMnx への置き換え）。
+ * タグCSV取り込みのファイル選択（★管理画面 NQMnx への置き換え）。
  * 落とす場所で選ぶ → 行に名前・件数・大きさ・外すが出る → 外すと消える。
  * 大きさの上限と誤り文は変えない。
  */
@@ -25,7 +25,7 @@ function chooseFile(name: string, content: string) {
   fireEvent.change(input, { target: { files: [new File([content], name, { type: 'text/csv' })] } })
 }
 
-describe('タグCSV取り込みのファイル選択（★V7 NQMnx）', () => {
+describe('タグCSV取り込みのファイル選択（★管理画面 NQMnx）', () => {
   it('落とす場所と「CSVを選ぶ」ボタンが出る', () => {
     openDialog()
     expect(screen.getByText('ここにCSVを置く')).not.toBeNull()

@@ -34,7 +34,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8-B 共通アクションを作る（Pencil `j2hfkS`）。
+ * ★V8-B 共通アクションを作る（Pencil ``）。
  *
  * 型（CreatePage）の左に段「どんなアクションか」「処理を上から順に並べる」「失敗したとき」、右の列に
  * 「版のこと」「つながる先」「気をつけること」。下の帯はキャンセル・下書きを保存を真ん中に。

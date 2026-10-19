@@ -10,7 +10,7 @@ const tokens = globalTokens(read(resolve(SRC, 'app/globals.css')))
 type Candidate = { file: string; selector: string }
 const key = ({ file, selector }: Candidate) => `${file} ${selector}`
 
-// B-168: ファイル全体・名前のパターンでは免除しない。該当する規則だけ。
+// : ファイル全体・名前のパターンでは免除しない。該当する規則だけ。
 // 新しい箱はここを足さず、共通の Card / content-card の形を使う。
 const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/combobox.module.css", ".popup", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
@@ -110,7 +110,7 @@ function candidates(): Candidate[] {
 
 const all = candidates()
 
-describe('B-168 カードの角丸・枠・影', () => {
+describe('カードの角丸・枠・影', () => {
   it('カードの角丸と枠を持つ規則には共通の影がある（理由つきの非カードだけ除外）', () => {
     const permitted = new Set(EXCEPTIONS.map(([file, selector]) => key({ file, selector })))
     const missing = all.filter(candidate => !permitted.has(key(candidate)))

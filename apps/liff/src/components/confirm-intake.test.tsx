@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import Confirm from './Confirm.js';
+import Confirm from './confirm.js';
 import { api } from '../lib/api.js';
 vi.mock('../lib/api.js', () => ({ api: { cancellationPreview: vi.fn().mockResolvedValue({ enabled: false, version: 0, freeUntil: null, afterPercent: 50, noShowPercent: 100, price: 0, deposit: null }), entitlements: vi.fn().mockResolvedValue([]), createRequest: vi.fn().mockResolvedValue({ booking_id: 'b1', status: 'confirmed' }) } }));
 afterEach(cleanup);

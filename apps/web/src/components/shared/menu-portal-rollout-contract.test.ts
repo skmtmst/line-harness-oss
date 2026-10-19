@@ -11,8 +11,8 @@ const mileage = read('../../app/mileage/page.tsx')
  * （details＋absolute に戻す）と赤くなる。
  */
 describe('m17j 表の中のメニューは最上層に出す', () => {
-  // ひな形一覧（app/hq/templates/template-console.tsx）は 2026-10-09 の V7 削除で V8（v8/hq-templates/console.tsx）を出すだけになった。
-  // V8 の行の「…」は共通の RowMenu（最上層に出す器を持つ）を使うので、v7 の MenuPortal の見張りは外した。
+  // ひな形一覧（app/hq/templates/template-console.tsx）は 2026-10-09 の 管理画面 削除で V8（v8/hq-templates/console.tsx）を出すだけになった。
+  // V8 の行の「…」は共通の RowMenu（最上層に出す器を持つ）を使うので、管理画面 の MenuPortal の見張りは外した。
 
   it('マイルの「公開版の中身を見る」は表の枠に切られない開き方にする', () => {
     expect(mileage).toContain('公開版の中身を見る')

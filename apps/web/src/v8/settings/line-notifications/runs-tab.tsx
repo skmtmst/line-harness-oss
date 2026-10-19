@@ -37,7 +37,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 LINE通知 送れなかったもの（板 DrwMm）・記録（板 PZBVb）。
+ * ★V8 LINE通知 送れなかったもの（板 ）・記録（板 ）。
  *
  * 並び（絵）：送れなかったものだけ数のマス4つ → 探す・対象・期間（記録は「クリック記録あり」）・右に再読み込み →
  * 表（日時・お知らせ・対象者・状態・理由・対応・試行・クリック。1行 53）→ 下の1行（送れなかったものは帯）。
@@ -149,7 +149,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   const retryingId = retrying.generation === generation ? retrying.id : null
   const items = useMemo(() => (result?.items ?? []) as RunItem[], [result])
   const summary = result?.summary ?? null
-  /* 数のマス（DrwMm）。口の集計に内訳が無いので、読み込んだ記録から数える。送れなかった件数だけは口の合計。 */
+  /* 数のマス。口の集計に内訳が無いので、読み込んだ記録から数える。送れなかった件数だけは口の合計。 */
   const breakdown = useMemo(() => {
     const blocked = items.filter((item) => item.reason?.includes('ブロック')).length
     const planned = items.filter((item) => item.nextRetryAt !== null)

@@ -28,7 +28,7 @@ interface Props {
   friends: FriendListItem[]
   status?: 'loading' | 'ready' | 'error'
   /*
-   * 読み直し中（★V7 sTJsh §2）。行が残っている再取得では一覧を
+   * 読み直し中（★管理画面 sTJsh §2）。行が残っている再取得では一覧を
    * 消さず、表を 0.55 に薄めて上に 2px の線の帯を出す。
    */
   refreshing?: boolean
@@ -257,7 +257,7 @@ export default function FriendListTable({
       <div>
         {status === 'loading' ? (
           /*
-           * ★V7 仕上げ §3: 表は中身の代わりに同じ形の骨組みを出す。
+           * ★管理画面 仕上げ §3: 表は中身の代わりに同じ形の骨組みを出す。
            * 列の見出しは上にそのまま出ているので、ここは行だけ。
            * 0.3 秒より早く来たら出さない（DelayedSkeleton）。
            */

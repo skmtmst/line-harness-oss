@@ -609,7 +609,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
   const [saving, setSaving] = useState(false), [statusSaving, setStatusSaving] = useState(false), [error, setError] = useState('')
   const [loginCount, setLoginCount] = useState<number | null>(null), [loginHistoryLoading, setLoginHistoryLoading] = useState(administrator), [loginHistoryFailed, setLoginHistoryFailed] = useState(false)
   /*
-   * **ブラウザの `confirm()` を使わない。**
+   * **ブラウザの `confirm` を使わない。**
    *
    * 見た目がブラウザ任せで設計の確認窓（`J6x4Q` / `H2S1T4`）と違ううえ、
    * 画像比較にも写らない。連携を外すと何が届かなくなるのかを本文で読ませたい
@@ -709,9 +709,9 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
 }
 
 /*
- * 板 `nku0f` 右の欄「役割でできること」。運用の目安の書き付け。
+ * 板 `` 右の欄「役割でできること」。運用の目安の書き付け。
  */
-/** 役割の札（絵 nku0f の色：オーナー墨・管理者緑・運用青・受付琥珀・見るだけ灰）。 */
+/** 役割の札（絵  の色：オーナー墨・管理者緑・運用青・受付琥珀・見るだけ灰）。 */
 type RoleKey = 'owner' | AccessRoleBundle
 const V8_ROLE_LABEL: Record<RoleKey, string> = {
   owner: 'オーナー', administrator: '管理者', operations: '運用', reception: '受付', view_only: '見るだけ', custom: '個別設定',
@@ -748,7 +748,7 @@ function twoFactorState(user: AccessUserItem): { label: string; tone: 'success' 
   return { label: '確認が必要', tone: 'warning' }
 }
 
-/** 右の「役割でできること」（絵 nku0f）。 */
+/** 右の「役割でできること」（絵 ）。 */
 function StaffRoleGuide() {
   const rows: Array<{ role: RoleKey; body: string }> = [
     { role: 'owner', body: 'すべて。お金・会社とロゴ・ほかの人の役割も変えられる' },
@@ -793,12 +793,12 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const [statusFilter, setStatusFilter] = useListUrlValue<'active' | 'suspended' | 'all'>('statusFilter', 'active')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
+  // ★管理画面 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
   const [summaryReady, setSummaryReady] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null), [settingTwoFactor, setSettingTwoFactor] = useState<StaffMember | null>(null), [permissionTarget, setPermissionTarget] = useState<AccessUserItem | null>(null)
   const [userPage, setUserPage] = useListUrlValue('userPage', 1)
   const USER_PAGE_SIZE = 6
-  /* ブラウザの `confirm()` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
+  /* ブラウザの `confirm` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
   const [removingTarget, setRemovingTarget] = useState<StaffMember | null>(null), [removing, setRemoving] = useState(false), [removeError, setRemoveError] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null), [resendError, setResendError] = useState('')
@@ -996,7 +996,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     }
   }
   /*
-   * ★V8：行の「…」から止める（絵 bMpC5「この所属ユーザーを停止しますか？」）・再開する。
+   * ★V8：行の「…」から止める（絵 「この所属ユーザーを停止しますか？」）・再開する。
    * 今までは「変更する」の窓の中の利用状態の切り替えだけだった。口は同じ（isActive の更新）。
    * 権限・利用状態の変更は 428 で止まるので、本人確認の窓を立てて同じ操作をやり直す。
    */

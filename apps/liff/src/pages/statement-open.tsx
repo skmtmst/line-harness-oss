@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import LiffLookScope from '../components/LiffLookScope.js';
-import LoadingView from '../components/LoadingView.js';
-import DownloadFailure from '../components/DownloadFailure.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import StatusView from '../components/ui/StatusView.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import Button from '../components/ui/Button.js';
-import Card from '../components/ui/Card.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import LoadingView from '../components/loading-view.js';
+import DownloadFailure from '../components/download-failure.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import StatusView from '../components/ui/status-view.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import Button from '../components/ui/button/index.js';
+import Card from '../components/ui/card.js';
 import { FileDownloadError, type FileFailureKind } from '../lib/file-download-api.js';
 import { fetchStatementBlob, issueStatement, type IssuedStatement } from '../lib/statement-download-api.js';
 import { logFailure } from '../lib/user-message.js';
-import { closeOrBackToLine } from './NotFound.js';
+import { closeOrBackToLine } from './not-found.js';
 
 type State =
   | { name: 'loading' }

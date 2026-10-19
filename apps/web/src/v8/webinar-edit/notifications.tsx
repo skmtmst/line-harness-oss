@@ -45,7 +45,7 @@ import { EntityPickerField } from '@/components/shared/entity-picker'
 import EntityRemoteField, { type RemoteEntityKind } from '@/components/shared/entity-remote-field'
 
 /*
- * ★V8 ウェビナーの ④通知（Pencil E7iAYs）。
+ * ★V8 ウェビナーの ④通知（Pencil ）。
  * 通知とリマインド（送った数・6つの通知の入／切と時刻）→ 視聴後にすること（3つの場合・本文・取れないとき）。
  * 右は LINE での見え方（選んだ通知の本文）。
  * 口・保存の順（通知の設定 → 版のある設定）・テスト送信は BEHAVIOR.md。

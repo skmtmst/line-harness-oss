@@ -16,7 +16,7 @@ function read(rel: string): string {
 describe('m22c 札・ボタンの折り返し', () => {
   it('受信箱の札はV8の共通部品で高さ36・折り返しなし（言葉は変えない）', () => {
     const source = read('app/chats/page.tsx')
-    // B-159の36px。画面の旧いTailwind指定ではなく、札の持ち主を確かめる。
+    // の36px。画面の旧いTailwind指定ではなく、札の持ち主を確かめる。
     const chipCss = fs.readFileSync(path.join(__dirname, 'components/shared/filter-chip.css'), 'utf8')
     expect(source).toContain('<FilterChip')
     expect(chipCss).toMatch(/:root \.v6-filter-chip\s*{[^}]*height:\s*36px/s)
@@ -41,5 +41,5 @@ describe('m22c 行き先リンクの見た目', () => {
     expect(source).not.toContain('font-semibold text-action')
   })
 
-  // V7の本文の戻るリンクは廃止。V8の経路はbreadcrumb-r177で守る。
+  // 管理画面の本文の戻るリンクは廃止。V8の経路はbreadcrumb-r177で守る。
 })

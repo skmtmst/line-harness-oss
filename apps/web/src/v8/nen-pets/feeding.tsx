@@ -27,7 +27,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8-B ごはんの目安（h7A2F）。
+ * ★V8-B ごはんの目安。
  * 左に「主食」「然の商品（おやつ・トッピング）＋おやつの上限」の2枚、右に「今日の目安の計算」。
  * 保存・キャンセルは画面の下に張り付く帯（中央）。保存していない変更は離れる前に確かめる。
  * 口は今の画面と同じ（GET/PUT /api/nen/feeding-products）。

@@ -191,7 +191,7 @@ beforeEach(() => {
 
   /*
    * 画面と同じ置き場。ログインの跡は sessionStorage、合言葉は localStorage。
-   * ここを用意しないと `adminSessionHeaders()` が空を返し、認証を通らない
+   * ここを用意しないと `adminSessionHeaders` が空を返し、認証を通らない
    * ことが「試験の都合」なのか「実装の欠陥」なのか見分けられない。
    */
   const store = (initial: Record<string, string>) => {

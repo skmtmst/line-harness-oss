@@ -101,7 +101,7 @@ async function openEdit(expectOp = true) {
     expect(screen.getByRole('button', { name: /の操作$/ })).toBeTruthy()
   })
   await act(async () => {
-    // B-193: 変更するは「…」から開く。
+    // : 変更するは「…」から開く。
     fireEvent.click(screen.getByRole('button', { name: /の操作$/ }))
   })
   await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '役割を変える' })) })

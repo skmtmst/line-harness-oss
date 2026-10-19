@@ -1,11 +1,11 @@
 /*
- * ★V8-B NEN配信の「コラムを書く」（yRDwW）と「配信を直す」（w5pwG）の中身。
+ * ★V8-B NEN配信の「コラムを書く」と「配信を直す」の中身。
  * 枠・頭・右の列・下の帯は型（CreatePage）が持つ。ここはカードと欄の寸法だけ。
  * 数字は app/globals.css の [data-theme="v8"] の --tpl-nc-* に置く。
  */
 
 
-/* カード（白・枠1・角12・余白20）。間は板によって 12（w5pwG）か 14（yRDwW）。 */
+/* カード（白・枠1・角12・余白20）。間は板によって 12か 14。 */
 .cardHead {
   display: flex;
   flex-direction: column;
@@ -174,7 +174,7 @@
   line-height: normal;
 }
 
-/* 届く形の選ぶカード（yRDwW：2枚並び・高さ98）。 */
+/* 届く形の選ぶカード（：2枚並び・高さ98）。 */
 .pickRow {
   display: flex;
   gap: var(--tpl-toolbar-gap);

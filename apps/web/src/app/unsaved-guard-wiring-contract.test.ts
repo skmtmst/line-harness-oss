@@ -22,7 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
-  // 友だち詳細の情報欄（vX3wQ）。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
+  // 友だち詳細の情報欄。保存前の入力があればタブ・ほかの画面へ移る前に確認する。
   'v8/friend-detail/info-tab.tsx',
   'v8/restaurant/organization/store-groups.tsx',
   'v8/inbox-chat/screen.tsx',
@@ -55,7 +55,7 @@ const GUARDED = [
   'v8/mileage/earning-rules.tsx',
   'v8/nen-campaigns/column-intros.tsx',
   'app/nen-campaigns/page.tsx',
-  // ★V8 マイペットのごはんの目安（h7A2F）。下の帯の保存まで画面に残る変更を useUnsavedGuard で守る。
+  // ★V8 マイペットのごはんの目安。下の帯の保存まで画面に残る変更を useUnsavedGuard で守る。
   'v8/nen-pets/feeding.tsx',
   'app/reminders/new/new-v8.tsx',
   'app/reminders/new/page.tsx',
@@ -404,7 +404,7 @@ const EDITOR_MIN_INPUTS = 3
  */
 const UNTRIAGED: Record<string, string> = {
   /* 予約設定V8化でスタッフ編集窓を staff-edit-dialog.tsx へ切り出し、page.tsx から編集画面の印が無くなったので行を消した。 */
-  /* ★V7: 書き出し項目を共通 Checkbox へ寄せたら入力の印が3未満になり、編集画面の印が無くなったので行を消した。 */
+  /* ★管理画面: 書き出し項目を共通 Checkbox へ寄せたら入力の印が3未満になり、編集画面の印が無くなったので行を消した。 */
   // 統括の入口はV8の再exportだけ。v8/hq/support.tsx の番兵を上の契約で点検する。
   'v8/inflow-links/edit-route-dialog.tsx':
     's3: 上の edit-route-modal.tsx の ★V8 の写し（src/v8/inflow-links/list.tsx から開く）。元と一緒に決める',

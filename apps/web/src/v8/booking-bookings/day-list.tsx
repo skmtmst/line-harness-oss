@@ -11,7 +11,7 @@ import type { usePeopleVisitMarks } from './use-visit-marks'
 import type { AccountStyle } from '@line-crm/shared'
 import { bookingWords } from './words'
 
-/** 日の台帳の一覧行。採用済みB-1のその場の来店印だけを移す。 */
+/** 日の台帳の一覧行。採用済みのその場の来店印だけを移す。 */
 export default function PeopleDayList({ rows, canMark, visits, onOpen, usageStyle }: {
   usageStyle?: AccountStyle
   rows: BookingRequest[]

@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * 自動応答の「差し込む」の札（絵 A0pDt の4つ）。見た目は wizard-v8.module.css の札のまま。
+ * 自動応答の「差し込む」の札（絵  の4つ）。見た目は wizard-v8.module.css の札のまま。
  *
  * 札が入れる文字は、送るときに本当に置き換わる形（{{name}}・{{field.x}}・{{var.x}}）だけ。
  * 以前は {name}・{field}・{var}・{booking_at} を入れていて、どれも置き換わらずに

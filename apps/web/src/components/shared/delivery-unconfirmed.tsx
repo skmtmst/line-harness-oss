@@ -11,7 +11,7 @@ export function DeliveryUnconfirmedBadge() {
   return <StatusBadge tone="warning" size="compact">要確認</StatusBadge>
 }
 
-/** B-248: 不明な送信に再送の操作を付けず、理由と確認方法をそろえる。 */
+/** : 不明な送信に再送の操作を付けず、理由と確認方法をそろえる。 */
 export function DeliveryUnconfirmedNotice({ action }: { action?: ReactNode }) {
   return <Notice tone="warn" heading="要確認：届いたか分からない配信があります" action={action}>
     {DELIVERY_UNCONFIRMED_REASON} {DELIVERY_UNCONFIRMED_ACTION}

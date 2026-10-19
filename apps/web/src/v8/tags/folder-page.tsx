@@ -19,7 +19,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 タグ「フォルダを追加」（Pencil `IjVpM`）。タグの一覧（src/v8/tags/list）の上に窓を重ねる。
+ * ★V8 タグ「フォルダを追加」（Pencil ``）。タグの一覧（src/v8/tags/list）の上に窓を重ねる。
  *
  * 読み込み・保存・削除・クエリの切り替え（古い応答を捨てる）は今の画面（app/tags/folders/new/page.tsx）と同じ。
  * 受け付ける URL：`/tags/folders/new`（タグのフォルダを追加）・`?id=<フォルダ>`（直す・削除）・

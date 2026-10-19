@@ -28,7 +28,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8「予約スタッフを登録」（板 CcA4k）。
+ * ★V8「予約スタッフを登録」（板 ）。
  *
  * 白い板1枚：頭（← 担当スタッフへ・題・説明）→ 中身（左＝4つのカード
  * 「お客さまに見える情報」「予約を受けられるメニュー」「受付と表示」
@@ -36,7 +36,7 @@ import Notice from '@/components/shared/notice'
  *
  * 動き（登録→担当メニューの割当、割当だけ失敗したときの「割当をやり直す」、
  * 未保存の離脱確認、権限が無いときの案内、読み込み失敗の言い分け）は
- * 今までの app/booking/staff/new（v7・staff-new-v8）から写した。BEHAVIOR.md を参照。
+ * 今までの app/booking/staff/new（管理画面・staff-new-v8）から写した。BEHAVIOR.md を参照。
  */
 
 export default function StaffNewV8() {

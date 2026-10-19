@@ -24,7 +24,7 @@ export interface MenuItem {
   max_party_size?: number;
   /** 追加メニュー（オプション）。メニューを選んだあと addons の口で読み足す。 */
   addons?: MenuAddon[];
-  /** お客さまの繰り返し予約（B4。初期オフ）。オンのメニューだけ確認に「毎週この時間で続ける」を出す。口が出来るまでの形（B-314）。 */
+  /** お客さまの繰り返し予約（B4。初期オフ）。オンのメニューだけ確認に「毎週この時間で続ける」を出す。口が出来るまでの形。 */
   recurring?: { enabled: boolean; max_count: number };
 }
 

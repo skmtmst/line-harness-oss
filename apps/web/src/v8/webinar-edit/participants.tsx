@@ -50,7 +50,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 
 /*
- * ★V8 ウェビナーの参加者（Pencil uNsEy）。
+ * ★V8 ウェビナーの参加者（Pencil ）。
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 案内の帯 → 道具の段 → 表 → ページ送り。
  * 口・権限・失敗の扱いは BEHAVIOR.md に記録。
  */

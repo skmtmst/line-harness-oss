@@ -2,7 +2,7 @@
 
 /*
  * 統合ユーザー一覧（`users/page.tsx` から移したロジックの正本）。
- * v7 の画面と ★V8 の画面（`users-v8.tsx`）が同じ口を使う。
+ * 管理画面 の画面と ★V8 の画面（`users-v8.tsx`）が同じ口を使う。
  * 絞り込み・ページ・再計算・CSV はここでだけ変える。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -37,7 +37,7 @@ export function useMergedUsers() {
   // フィルタ変更 / ページ移動で複数リクエストが in-flight になり、
   // 古い応答が後着で UI を上書きする事故を防ぐ。
   const requestSeqRef = useRef(0)
-  // 次の load() で最新状態を取り直すフラグ。
+  // 次の load で最新状態を取り直すフラグ。
   const [pendingForceRefresh, setPendingForceRefresh] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -169,7 +169,7 @@ export function useMergedUsers() {
         ].map(csvCell).join(',')),
       ]
       const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8' }))
-      // 先頭は UTF-8 BOM（Excel で開いても文字化けしないため）。v7 と同じ。
+      // 先頭は UTF-8 BOM（Excel で開いても文字化けしないため）。管理画面 と同じ。
       const anchor = document.createElement('a')
       anchor.href = url
       anchor.download = 'merged-users.csv'

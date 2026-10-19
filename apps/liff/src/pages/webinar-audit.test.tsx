@@ -28,7 +28,7 @@ vi.mock('../lib/user-message.js', async (importOriginal) => {
 });
 
 const { api } = await import('../lib/api.js');
-const { default: Webinar } = await import('./Webinar.js');
+const { default: Webinar } = await import('./webinar.js');
 const webinarState = vi.mocked(api.webinarState);
 const webinarComment = vi.mocked(api.webinarComment);
 
@@ -176,7 +176,7 @@ describe('監査 L8：開始時刻を過ぎた後の読み直し', () => {
 });
 
 
-describe('B-173 申込と視聴の画面を共用する', () => {
+describe('申込と視聴の画面を共用する', () => {
   it('開催回を選んで認証付きで申し込み、一覧を読み直す', async () => {
     const session = Math.floor(Date.now() / 1000) + 3600;
     webinarState.mockResolvedValue({ live: false, title: '秋の説明会', nextSessionAt: session, upcoming: [session], registeredSessionAt: null } as WebinarState);

@@ -63,7 +63,7 @@ import styles from './list.module.css'
 import { compareEvaluationOrder,movePriorityUpdates } from './order'
 import QuickCreateV8 from './quick-create'
 
-/* 作るボタン（板 `uE9gf` の ▾）。窓は1つだけ置き、押したボタンの位置に出す。 */
+/* 作るボタン（板 `` の ▾）。窓は1つだけ置き、押したボタンの位置に出す。 */
 function CreateRuleButton({ full, compact, disabled, disabledTitle, menuOpen, onOpenMenu }: {
   full?: boolean
   /** 1152 の板：▾ なし・＋は印（絵どおり）。押すと同じ窓が開く。 */
@@ -98,7 +98,7 @@ export default function AutoRepliesListV8() {
   const staffRole = useStaffRole()
   const featureAccess = useFeatureAccess('autoReplies')
   const canEdit = featureAccess
-  // 1152の板（`WPrd5`）。折り畳みはCSSのコンテナ問い合わせが担い、
+  // 1152の板（``）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
 
@@ -127,10 +127,10 @@ export default function AutoRepliesListV8() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  /* 板 `uE9gf`：作るボタンは ▾ で作り方を選ぶ。 */
+  /* 板 ``：作るボタンは ▾ で作り方を選ぶ。 */
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const createMenuAnchorRef = useRef<HTMLButtonElement | null>(null)
-  /* ★V8 かんたんに作る（板 `G4GejG`）。詳しい分け方（Xr6eu）は P6vbxn 待ち。 */
+  /* ★V8 かんたんに作る（板 ``）。詳しい分け方は  待ち。 */
   const [quickOpen, setQuickOpen] = useState(false)
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
   const [panelId, setPanelId] = useDetailPanelUrl('reply')
@@ -461,7 +461,7 @@ export default function AutoRepliesListV8() {
   /*
    * 複製（行の「…」→「複製する」）。複製の口は無いので、同じ内容で新しく作る。
    * コピーは必ず「停止中」で作る（AUTOREPLY-08：動かすのは別の操作）。
-   * 名前や確認の窓は出さず、その場で作る（B-177）。
+   * 名前や確認の窓は出さず、その場で作る。
    */
   const duplicateKeysRef = useRef(new Map<string, string>())
   const runDuplicate = (duplicateTarget: AutoReply) => duplicateAutoReply({ duplicateFeedback, duplicateKeysRef, duplicateLock, duplicating, load, nextPriority, saveErrors, selectedAccountId, setDuplicateError, setDuplicating }, duplicateTarget)
@@ -551,7 +551,7 @@ export default function AutoRepliesListV8() {
     )
   }
 
-  /* ===== 行の「…」（Pencil `IIesG`） ===== */
+  /* ===== 行の「…」（Pencil ``） ===== */
   const rowMenuItems = (r: AutoReply): ActionMenuItem[] => {
     const name = displayName(r)
     const readonly = !canEdit
@@ -773,7 +773,7 @@ export default function AutoRepliesListV8() {
    * 選択の列だけは実表が箱（Checkbox）付き・骨組みが共通 `Th` の空見出し。
    */
   // 見出しは本文と同じ左揃え（絵どおり）。Th（.cell の左余白20）だと本文より20右へずれる。型の持ち主へ依頼済み。
-  // 狭い板（WPrd5）は回数の列だけ出さない（絵どおり。選ぶ・つまみ・操作は残す）。フォルダの列は型が畳む。
+  // 狭い板は回数の列だけ出さない（絵どおり。選ぶ・つまみ・操作は残す）。フォルダの列は型が畳む。
   const tableHeadCells = (
     <>
       {canEdit ? <Th aria-label="並び替え" /> : null}
@@ -785,7 +785,7 @@ export default function AutoRepliesListV8() {
     </>
   )
 
-  /* 板 `G8i4xP`「読み込み中」：見出しなしの骨4行。 */
+  /* 板 ``「読み込み中」：見出しなしの骨4行。 */
   const loadingSkeleton = (
     <div className={styles.skeletonRows} aria-label="読み込み中">
       {[0, 1, 2, 3].map((n) => (
@@ -919,7 +919,7 @@ export default function AutoRepliesListV8() {
   )
 
   /*
-   * 1152 の板（WPrd5）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び・よく使う絞り込み（印だけ）」。
+   * 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び・よく使う絞り込み（印だけ）」。
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
 
@@ -1035,7 +1035,7 @@ export default function AutoRepliesListV8() {
               disabled={deleting || deleteTargetStale}
               busy={deleting}
               busyLabel="削除中…"
-              /* 絵 u8sKN：幅は「削除する」の文字で決める（結果の文字の分を控えない）。 */
+              /* 絵 ：幅は「削除する」の文字で決める（結果の文字の分を控えない）。 */
               widthReserve="idle"
               onClick={() => void runDelete()}
             >

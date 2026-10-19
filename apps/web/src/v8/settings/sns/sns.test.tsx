@@ -108,7 +108,7 @@ function igCard() {
   return within(screen.getByRole('region', { name: 'Instagram' }))
 }
 
-/* 解除は見出しの右の「…」の中（絵 y3GGTs）。 */
+/* 解除は見出しの右の「…」の中（絵 ）。 */
 async function openIgMenu() {
   fireEvent.click(await igCard().findByRole('button', { name: 'Instagram の連携のその他操作' }))
 }

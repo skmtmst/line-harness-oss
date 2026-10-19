@@ -1,4 +1,4 @@
-/* ★V8 友だちの段の頭とタブ（x6QsVz「タブの段」・ADjK8/hn6Y8「板の頭」）。値は globals.css の --tpl-fr-*。 */
+/* ★V8 友だちの段の頭とタブ（「タブの段」・/「板の頭」）。値は globals.css の --tpl-fr-*。 */
 .head {
   display: flex;
   flex-direction: column;
@@ -32,7 +32,7 @@
   min-width: 0;
 }
 
-/* 一覧の板：タブの段は下に細い線（x6QsVz。左右24は型のタブ枠が持つ）。 */
+/* 一覧の板：タブの段は下に細い線（。左右24は型のタブ枠が持つ）。 */
 .tabRowLine {
   border-bottom: 1px solid var(--color-hairline);
   align-items: flex-end;

@@ -5,7 +5,7 @@ import { loadFailureCopy } from '@/components/shared/api-error-message'
  * 候補一覧は残す。集計の失敗はこの1行で伝えて、やり直せるものだけ
  * 再試行の口を出す（403は権限の案内にし、押しても直らない再試行は出さない）。
  *
- * ★V7 `x63W5x`：失敗の帯は増やさず、取り直し失敗と同じ中立の1行
+ * ★管理画面 `x63W5x`：失敗の帯は増やさず、取り直し失敗と同じ中立の1行
  * （`text-ink-secondary text-xs`＋`text-action` の再試行）にする。赤は使わない。
  */
 export default function DuplicatesStatsNotice({

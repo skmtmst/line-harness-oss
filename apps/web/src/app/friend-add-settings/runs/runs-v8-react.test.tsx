@@ -10,7 +10,7 @@ vi.hoisted(() => {
 import FriendAddRunsPage from './page'
 
 /*
- * ★V8 友だち追加時の配信の実行結果（板 `REIxB`）の契約。
+ * ★V8 友だち追加時の配信の実行結果（板 ``）の契約。
  * `<html data-theme="v8">` の下でだけ新しい実行結果に切り替わり、
  * 数の帯・失敗の帯・表・下の2枚が出ることを実DOMで固定する。
  */

@@ -5,7 +5,7 @@
  * 手順・API・権限の言い分けは同じ。
  *
  * CSV で書き出す・取り込む（`friends/migrations/page.tsx` から移した
- * ロジックの正本）。v7 の画面と ★V8 の画面（`migrations-v8.tsx`）が
+ * ロジックの正本）。管理画面 の画面と ★V8 の画面（`migrations-v8.tsx`）が
  * 同じ口を使う——確認だけ→反映の順序、二重取り込みの指紋、
  * 権限の言い分けはここでだけ変える。
  */
@@ -149,7 +149,7 @@ export function useFriendMigrations() {
       const response = await api.friendMigrations.previewImport({ accountId, sourceFilename: file.name, sourceChecksum, rows })
       if (!response.success) { setMessage(response.error); return }
       setImportId(response.data.id); setSummary(response.data.result.summary)
-      // 初めての確認は、結果の箱の「まだ友だち情報は変えていません」で伝わるので帯を重ねない（絵 T9gblG）。
+      // 初めての確認は、結果の箱の「まだ友だち情報は変えていません」で伝わるので帯を重ねない（絵 ）。
       setMessage(response.data.duplicate ? '同じファイルの確認結果を表示しました。二重には反映しません。' : null)
       await load()
     } catch (error) { setMessage(operationFailureMessage(error, '確認')) }

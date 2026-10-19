@@ -37,7 +37,7 @@ import { jstDate } from '@/lib/jst-datetime'
 import styles from './entitlements.module.css'
 
 /*
- * 友だち詳細 › 予約タブの「回数券・月謝」（B-308 追記・絵 t7AmhL＝手で入れる窓、XrfOE＝履歴の引き出し）。
+ * 友だち詳細 › 予約タブの「回数券・月謝」（ 追記・絵 t7AmhL＝手で入れる窓、XrfOE＝履歴の引き出し）。
  * 口：組3 の bookingEntitlementsApi（付与・残りを直す・期限を延ばす・取り消す。理由は必須、誰がしたかは口が残す）。
  * 口が無い間は「現在準備中です」。
  */

@@ -11,7 +11,7 @@ import Notice from '@/components/shared/notice'
 import { authRequest, confirmError, passwordError } from '@/lib/auth-email'
 
 /**
- * 新しいパスワードを設定。★V6 36-6-B（`KN3y1`、カード `fWkBE`）。
+ * 新しいパスワードを設定。★管理画面 36-6-B（`KN3y1`、カード `fWkBE`）。
  *
  * メールの URL（`?token=`）から開く。設定するとその人のログインはすべて解除され、
  * 新しいパスワードでログインし直す。

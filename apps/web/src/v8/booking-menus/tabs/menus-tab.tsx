@@ -29,7 +29,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 
-/* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
+/* ① メニュー（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: MenusTabProps) {
   const saveErrors = useSaveFormErrors()
@@ -82,7 +82,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   const pageCount = Math.max(1, Math.ceil(shown.length / MENU_PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
 
-  /* 中身の直しはメニュー作成ページ（?menu=<id>、node QqER7）に集約する。 */
+  /* 中身の直しはメニュー作成ページ（?menu=<id>、node ）に集約する。 */
   function openMenuForm(menu: BookingMenu) {
     router.push(`/booking/menus/new?menu=${menu.id}`)
   }

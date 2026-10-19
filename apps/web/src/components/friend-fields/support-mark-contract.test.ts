@@ -61,7 +61,7 @@ describe('V8 対応マーク', () => {
 
   it('保管確認は fy5dz の位置と幅で、置換先と対象人数に絞る', () => {
     expect(LIST).toContain('<Dialog open confirmation role="alertdialog" designNode="fy5dz"')
-    // ★V8 fy5dz：窓 560。置き換え先は選んだマークの1行（変える）で示し、人数は説明の文に出す。
+    // ★V8 ：窓 560。置き換え先は選んだマークの1行（変える）で示し、人数は説明の文に出す。
     expect(LIST).toContain('そのまま保管できます')
     const css = fs.readFileSync(new URL('../shared/dialog.module.css', import.meta.url), 'utf8')
     expect(css).toContain('max-height: calc(100dvh - 32px)')

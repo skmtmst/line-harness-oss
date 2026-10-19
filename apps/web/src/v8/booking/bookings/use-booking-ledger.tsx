@@ -111,7 +111,7 @@ export function useBookingLedger() {
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [staffList, setStaffList] = useState<BookingStaff[]>([])
   const [staffBreaks, setStaffBreaks] = useState<Record<string, Array<{ weekday: number; start_time: string; end_time: string }>>>({})
-  /* 盤の「担当者」の絞り込み（GcyTr）。一覧の絞り込み（staffFilter）とは別に、盤の列だけを絞る。 */
+  /* 盤の「担当者」の絞り込み。一覧の絞り込み（staffFilter）とは別に、盤の列だけを絞る。 */
   const [boardStaff, setBoardStaff] = useState('all')
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
@@ -150,7 +150,7 @@ export function useBookingLedger() {
   const [menus, setMenus] = useState<BookingMenu[]>([])
   // 集計の読み込み失敗は0表示と分ける。黙って0のままだと運用者が気づけない。
   const [summaryError, setSummaryError] = useState(false)
-  // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
+  // ★管理画面 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
   const [summaryReady, setSummaryReady] = useState(false)
   const [summarySeq, setSummarySeq] = useState(0)
   // R89: 承認・取消の後にカレンダーの表示範囲の予約も読み直す合図。
@@ -197,7 +197,7 @@ export function useBookingLedger() {
   /*
    * V8「サクサク感」C①：一覧（表）の行の詳細パネル。URL に ?booking=<id> を残す。
    * 行を押すとつながる移り変わり（E）で右から出て、↑↓で前・次へ。
-   * v7 は今のまま（引き出し・小窓）で、1画素も変えない。
+   * 管理画面 は今のまま（引き出し・小窓）で、1画素も変えない。
    */
   const [activeBookingId, setActiveBookingId] = useDetailPanelUrl('booking')
   /* 返金はオーナー・管理者だけ（B1：スタッフは請求・請求しないまで）。 */
@@ -516,7 +516,7 @@ export function useBookingLedger() {
     })()
     return () => { alive = false }
   }, [selectedAccountId, view, calendarFrom, calendarTo, candidatesStatus, menus, staffList])
-  // 人（スタッフ）ごとの毎週の休憩。1日表示の盤に「休憩」の枠として出す（絵 O2Z8u）。読めなければ空き枠の失敗として示す。
+  // 人（スタッフ）ごとの毎週の休憩。1日表示の盤に「休憩」の枠として出す（絵 ）。読めなければ空き枠の失敗として示す。
   useEffect(() => {
     if (!selectedAccountId || view !== 'day' || staffList.length === 0) return
     let alive = true
@@ -531,7 +531,7 @@ export function useBookingLedger() {
   /**
    * 予約の状態を変える。**押す前に確認を出す。**
    *
-   * ブラウザの `confirm()` / `alert()` は見た目がブラウザ任せで、設計の
+   * ブラウザの `confirm` / `alert` は見た目がブラウザ任せで、設計の
    * 確認窓と違ううえ、**画像比較に写らない**（確認と失敗の絵をそもそも
    * 撮れない）。失敗は窓の中に出して、押した場所から動かさない。
    */

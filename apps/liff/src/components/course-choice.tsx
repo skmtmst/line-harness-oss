@@ -1,7 +1,7 @@
-import Button from './ui/Button.js';
+import Button from './ui/button/index.js';
 import { useId, useState } from 'react';
 import type { RestaurantCustomerCourse } from '@line-crm/shared';
-import Card from './ui/Card.js';
+import Card from './ui/card.js';
 import { ChoiceInput, FormChoiceRow, FieldLabel } from './forms/controls.js';
 
 export default function CourseChoice({courses,value,onChange,disabled=false,compact=false}:{courses:RestaurantCustomerCourse[];value:string|null;onChange:(id:string|null)=>void;disabled?:boolean;compact?:boolean}) {

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const here = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(new URL('../../../v8/scenarios/create.tsx', import.meta.url), 'utf8')
 
-describe('V6 シナリオ作成・配信方式 cCB7r', () => {
+describe('管理画面 シナリオ作成・配信方式 cCB7r', () => {
   it('既存のシナリオ用フォルダを読み、名前と分類を同じ受け口へ保存する', () => {
     /*
      * SCENARIO-20: フォルダはシナリオ所属（共通なら選択中）のアカウントで
@@ -67,7 +67,7 @@ describe('V6 シナリオ作成・配信方式 cCB7r', () => {
     expect(page).toContain("scenarioState === 'loading'")
     expect(page).toContain("scenarioState === 'ready' && scenario")
     expect(page).toContain("disabled={fieldsDisabled}")
-    // ★V7: 方式はカード全体を選ぶラジオ選択にし、確定は画面1つの主ボタン。
+    // ★管理画面: 方式はカード全体を選ぶラジオ選択にし、確定は画面1つの主ボタン。
     expect(page).toContain("<RadioCard")
     expect(page).toContain('name="delivery-mode"')
     expect(page).toContain("disabled={locked}")

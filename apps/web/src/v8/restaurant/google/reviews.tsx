@@ -44,7 +44,7 @@ import TextLink from '@/components/shared/text-link'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 Googleビジネス 口コミ（一覧 `j0Wcg`・返信を作る `x9HIR`・公開の確認 `xSudF`）。
+ * ★V8 Googleビジネス 口コミ（一覧 ``・返信を作る ``・公開の確認 `xSudF`）。
  * 口（一覧・絞り込み・並び・同期・下書き作成・保存・公開）は今の画面と同じ。
  */
 
@@ -176,7 +176,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
         </div>
       ) : null}
       {list && list.total > 0 ? (
-        /* 絵 j0Wcg：口コミの表は角丸の枠のカードに入る。 */
+        /* 絵 ：口コミの表は角丸の枠のカードに入る。 */
         <Card overflow="hidden"><DataTable density="reviews" columnSizing="controls" data-design="google-reviews"><thead>
           <TableHeadRow data-table-layout="columns">
             <Th>投稿者・評価</Th>
@@ -214,7 +214,7 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
   )
 }
 
-/** 返信を作る（x9HIR）＋公開の確認（xSudF）。 */
+/** 返信を作る＋公開の確認（xSudF）。 */
 export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { accountId: string; reviewId: string; data: GoogleConnectionData; go: GoogleNav; onPublished: () => void }) {
   const role = useStaffRole()
   const canEdit = role !== null && role !== 'viewer'

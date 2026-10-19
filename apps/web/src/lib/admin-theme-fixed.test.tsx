@@ -5,7 +5,7 @@ import { renderToString } from 'react-dom/server'
 import { Window } from 'happy-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// テーマの関数と実際のページ入口は差し替えない。V7が選ばれたらその場で失敗する。
+// テーマの関数と実際のページ入口は差し替えない。管理画面が選ばれたらその場で失敗する。
 vi.mock('@/v8/webinars/list', () => ({ default: () => <p data-screen="v8">ウェビナー</p> }))
 vi.mock('next/font/google', () => ({ Inter: () => ({ variable: 'inter' }), Noto_Sans_JP: () => ({ variable: 'noto' }) }))
 vi.mock('@/components/app-shell', () => ({ default: ({ children }: { children: ReactNode }) => children }))
@@ -26,7 +26,7 @@ afterEach(() => {
 })
 
 describe.each(['production', 'development'])('%sの画面はV8固定', (environment) => {
-  it.each([undefined, 'v7', 'v8'])('環境の選択=%s・保存済みV7でも最初の描画から旧画面を選ばない', async (choice) => {
+  it.each([undefined, 'v7', 'v8'])('環境の選択=%s・保存済み管理画面でも最初の描画から旧画面を選ばない', async (choice) => {
     vi.stubEnv('NODE_ENV', environment)
     vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', choice)
     // Node 26のglobalStorageを避け、ブラウザのStorageを試験へ渡す。
@@ -34,7 +34,7 @@ describe.each(['production', 'development'])('%sの画面はV8固定', (environm
     storage.setItem('lh-admin-theme', 'v7')
     vi.stubGlobal('localStorage', storage)
     expect(window.localStorage).toBe(storage)
-    // 古い値の読み取り・更新通知がV7の入口を開かないことも確認する。
+    // 古い値の読み取り・更新通知が管理画面の入口を開かないことも確認する。
     document.documentElement.dataset.theme = 'v7'
     const storageRead = vi.spyOn(storage, 'getItem')
     const page = renderToString(<WebinarsPage />)

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 ウェビナー一覧（src/v8）の動きの試験。BEHAVIOR.md の主な動きを守る。
- * 行の「…」からアーカイブの確かめ（VXZ6T）が開く・札に件数が出る・
+ * 行の「…」からアーカイブの確かめが開く・札に件数が出る・
  * フォルダの「…」は選んだ行だけ・終わった公開は「非公開」・公開ページの道。
  */
 import React, { act } from 'react'
@@ -163,7 +163,7 @@ describe('V8 ウェビナー一覧', () => {
   })
 })
 
-it('B-241：フォルダ取得失敗と空を分け、読み直して分類を復帰する',async()=>{
+it('フォルダ取得失敗と空を分け、読み直して分類を復帰する',async()=>{
  const fixtureFetch=globalThis.fetch
  let reads=0
  vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{

@@ -4,26 +4,26 @@ import { TextInput } from '../components/forms/controls.js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { visitStampDarkInk } from '@line-crm/shared';
 import stampStyles from './visit-stamps.module.css';
-import StampConditions from '../components/StampConditions.js';
+import StampConditions from '../components/stamp-conditions.js';
 import type { VisitStampCard, VisitStampPaperRequest, VisitStampRedemption, VisitStampReward, VisitStampWallet } from '@line-crm/shared';
 import { api, visitStampsApi } from '../lib/api.js';
 import { SUBMIT_FAILED_MESSAGE, logFailure } from '../lib/user-message.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import LoadingView from '../components/LoadingView.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import PreparingView from '../components/PreparingView.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import Button from '../components/ui/Button.js';
-import Badge from '../components/ui/Badge.js';
-import Icon from '../components/ui/Icon.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import LoadingView from '../components/loading-view.js';
+import LoadErrorView from '../components/load-error-view.js';
+import PreparingView from '../components/preparing-view.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import Button from '../components/ui/button/index.js';
+import Badge from '../components/ui/badge.js';
+import Icon from '../components/ui/icon.js';
 import { LiffInput } from '../components/forms/controls.js'
 import { useUrlStep } from '../lib/use-url-step.js';
 
 /**
  * ★V8 来店スタンプ（お客さまの LIFF・提案 E-8）。マイルとは別のスタンプカード。
- *  ① スタンプカード（jQRsr）→［店員に見せる］② 特典を店員に見せる（V2HU7）→ 店員が暗証番号を打つ → 使用済み（xe8ga）
- *  ①［紙のカードを移す］→ ③ 紙のカードを移す（h2HKh）→ 写真を預けて［申請する］→ お店の確認待ち（etLd8）
+ *  ① スタンプカード→［店員に見せる］② 特典を店員に見せる→ 店員が暗証番号を打つ → 使用済み
+ *  ①［紙のカードを移す］→ ③ 紙のカードを移す→ 写真を預けて［申請する］→ お店の確認待ち
  *    確認待ちの申請があるあいだは、③ を開くと確認待ちを出す（同じ紙を二重に送らない）。却下されたら理由を ③ に出す。
  * お客さま本人だけでは使用済みにできない（店員の4桁の暗証番号が要る。店員は暗証番号からサーバが当てる）。使用済み・取消済みの特典はサーバが二度と使わせない。
  * 店舗は /api/liff/config の accountId、本人は LINE の ID トークン（サーバが確かめる）。
@@ -188,7 +188,7 @@ export default function VisitStamps() {
 
   if (state === 'loading') return <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadingView /></LiffLookScope>;
   if (state === 'error') return <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas"><LiffHeader title="来店スタンプ" /><LoadErrorView note="スタンプはなくなっていません。" onRetry={() => void load()} /></LiffLookScope>;
-  /* B-313 追記：お店がまだカード（決まり）を入れていないときは、リッチメニューから押されても準備中の画面（K9HMJp）。 */
+  /*  追記：お店がまだカード（決まり）を入れていないときは、リッチメニューから押されても準備中の画面（K9HMJp）。 */
   if (state === 'empty' || !entry || !info) {
     return (
       <LiffLookScope appearance="stamp" className="min-h-screen bg-canvas">
@@ -408,7 +408,7 @@ function requestDate(value: string): Date {
 
 /**
  * ③ 紙のカードを移す。写真を預け（本人だけが読める置き場）、押してある数と一緒に申請する。お店が確かめてから足す。
- * 確認待ちの申請があるあいだは、確認待ち（etLd8）を出す。却下された申請があれば、その理由を上に出す。
+ * 確認待ちの申請があるあいだは、確認待ちを出す。却下された申請があれば、その理由を上に出す。
  */
 function PaperCard({ accountId, cardId, requests, onSent, onBack }: { accountId: string; cardId: string; requests: VisitStampPaperRequest[] | null; onSent: () => void; onBack: () => void }) {
   const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);

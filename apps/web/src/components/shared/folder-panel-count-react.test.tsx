@@ -47,7 +47,7 @@ function rowTexts(): string[] {
 }
 
 describe('FolderPanel の件数表示(#631)', () => {
-  // ★V7（2026-09-24）：数えていない行は「—」も出さず、何も出さない。0 と見せないのは同じ。
+  // ★管理画面（2026-09-24）：数えていない行は「—」も出さず、何も出さない。0 と見せないのは同じ。
   it('count が null の行は数を出さず、数を嘘つかない', async () => {
     await render([
       { id: '', label: 'すべて', count: null },

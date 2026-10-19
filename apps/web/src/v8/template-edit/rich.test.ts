@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { RICH_SHAPES, areaPlace, buildRichPayload, emptyAreaDraft } from './rich'
 
 /*
- * ★V8 リッチメッセージを作る（EFV8l）の保存値と面の呼び名。
+ * ★V8 リッチメッセージを作るの保存値と面の呼び名。
  * 保存値は今の画面（template-asset-editor.tsx）と同じ形：選んだ形の面だけを座標と動きつきで送る。
  */
 const shape = (value: string) => RICH_SHAPES.find((s) => s.value === value)!

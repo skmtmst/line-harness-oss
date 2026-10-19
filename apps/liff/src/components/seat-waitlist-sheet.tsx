@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
-import Button from './ui/Button.js';
+import Button from './ui/button/index.js';
 
 /** 人数を指定した満席の時刻だけを、既存の本人用APIへつなぐ。 */
 export default function SeatWaitlistSheet({ storeId, storeName, startsAt, guestCount, onClose }: {

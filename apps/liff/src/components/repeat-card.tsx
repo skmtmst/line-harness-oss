@@ -1,8 +1,8 @@
-import Button from './ui/Button.js';
+import Button from './ui/button/index.js';
 import { useEffect, useState } from 'react';
 import { api, type LastBookingResponse, type MenuItem, type StaffItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
-import Icon from './ui/Icon.js';
+import Icon from './ui/icon.js';
 
 /** 前回の日を「2026/9/20（土）」と出す。店の暦日（JST）で切る。 */
 export function formatPreviousDate(startsAt: string): string {

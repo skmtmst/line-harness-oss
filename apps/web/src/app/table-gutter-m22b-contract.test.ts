@@ -43,7 +43,7 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
 
   // common-actionsの手書きTd／固定120は廃止。ActionCellの実幅を実画面で測る。
 
-  it('/affiliate-offers（案件タブ）：操作は右端にそろえる', () => {
+  it('affiliate-offers（案件タブ）：操作は右端にそろえる', () => {
     const body = read('v8', 'affiliates', 'offers.tsx')
     const css = read('v8', 'affiliates', 'affiliates.module.css')
     expect(body).toContain('<Th className={styles.colOfferOps}>操作</Th>')
@@ -53,8 +53,8 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
     expect(css).toMatch(/\.rowActions\s*\{[^}]*display: flex;[^}]*align-items: center;/)
   })
 
-  it('/reminders：操作は右端にそろえる', () => {
-    /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。絵に操作の見出しは無い。 */
+  it('reminders：操作は右端にそろえる', () => {
+    /* 完全切り替え：管理画面 page は捨て、V8 の list-v8 を見る。絵に操作の見出しは無い。 */
     const body = read('app', 'reminders', 'list-v8.tsx')
     const css = read('app', 'reminders', 'list-v8.module.css')
     expect(body).toContain('styles.menuCell')
@@ -62,30 +62,30 @@ describe('m22b 表の左右の余白（操作列の右寄せ）', () => {
     expect(css).toContain('text-align: right')
   })
 
-  it('/rich-menus：操作の中身は枠いっぱいで右へ寄せる', () => {
+  it('rich-menus：操作の中身は枠いっぱいで右へ寄せる', () => {
     const body = read('v8', 'rich-menus', 'list.tsx')
     expect(body).toContain('className={styles.menuBox}')
     expect(read('v8', 'rich-menus', 'list.module.css')).toMatch(/\.menuBox[^}]*justify-content: flex-end/)
   })
 
-  it('/contents/vars：操作の中身は枠いっぱいで右へ寄せる', () => {
+  it('contents/vars：操作の中身は枠いっぱいで右へ寄せる', () => {
     expect(read('v8', 'common-vars', 'list.module.css')).toMatch(/\.menuBox[^}]*justify-content: flex-end/)
   })
 
-  it('/tags：操作列は中身＋共通の余白に広げる', () => {
+  it('tags：操作列は中身＋共通の余白に広げる', () => {
     const body = read('v8', 'tags', 'tags-tab.tsx')
     expect(body).toContain('<Th className={styles.colMenu}>')
   })
 })
 
 describe('m22b 表の左右の余白（文字だけのセルを包む）', () => {
-  it('/：日付と数字を包み、余白で測らせる', () => {
+  it('日付と数字を包み、余白で測らせる', () => {
     const body = read('components', 'dashboard', 'friend-trend-table.tsx')
     expect(body).toContain('<span>{diff === null')
     expect(body).toContain('<span>{formatNumber(row.active')
   })
 
-  it('/booking/menus：名前の操作を専用の欄に収め、省略する', () => {
+  it('booking/menus：名前の操作を専用の欄に収め、省略する', () => {
     const body = read('v8', 'booking-menus', 'tabs', 'menus-tab.tsx')
     const css = read('v8', 'booking-menus', 'settings.module.css')
     expect(body).toContain('className={styles.colName}')
@@ -93,19 +93,19 @@ describe('m22b 表の左右の余白（文字だけのセルを包む）', () =>
     expect(css).toMatch(/\.menuName\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/)
   })
 
-  it('/duplicates：先頭の文字を包む', () => {
+  it('duplicates：先頭の文字を包む', () => {
     const body = read('v8', 'friends', 'duplicates', 'list.tsx')
     expect(body).toContain('className={styles.cellText}')
     expect(body).toContain('title={row.accountName}>{row.accountName}</span>')
   })
 
-  it('/friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {
+  it('friends/migrations：V8の表は左右のセル余白を設計値で保つ', () => {
     const css = read('v8', 'friends', 'migrations', 'migrations.module.css')
     expect(css).toMatch(/\.table thead th\.th:first-child[^{]*\{[^}]*padding-left: var\(--tpl-fr-cell-inset\)/)
     expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)
   })
 
-  it('/friends/identity-candidates：V8の表は左右のセル余白を設計値で保つ', () => {
+  it('friends/identity-candidates：V8の表は左右のセル余白を設計値で保つ', () => {
     const css = read('v8', 'friends', 'compare', 'compare.module.css')
     expect(css).toMatch(/\.table thead th\.th:first-child[^{]*\{[^}]*padding-left: var\(--tpl-fr-cell-inset\)/)
     expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)

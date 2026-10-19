@@ -24,7 +24,7 @@ export function globalTokens(css) {
 }
 
 export function resolveValue(value, tokens, seen = new Set()) {
-  // var() の括弧を数え、入れ子のフォールバックも解く。
+  // var の括弧を数え、入れ子のフォールバックも解く。
   let out = '', cursor = 0
   while (true) {
     const start = value.indexOf('var(', cursor)

@@ -306,7 +306,7 @@ describe('DASH-03 新アカウントの読込中に前の予約・運用状態�
     const card = todayCard('今日の予約')
     /*
      * #673 で読込中の件数は「—」ではなく骨組み（スケルトン）に替わった。
-     * ★V7 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
+     * ★管理画面 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
      */
     await act(async () => { await vi.advanceTimersByTimeAsync(350) })
     expect(card.getAttribute('aria-busy')).toBe('true')

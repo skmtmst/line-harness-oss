@@ -95,7 +95,7 @@ describe('LoadErrorView は日本語＋読み直しだけ', () => {
     const view = src('components', 'LoadErrorView.tsx');
     expect(view).toContain('RETRY_LABEL');
     expect(view).toContain('onRetry');
-    // ★V8 (zz9R3): 切れた電波の印＋薄い文字。
+    // ★V8 : 切れた電波の印＋薄い文字。
     expect(view).toContain('wifi-off');
     expect(view).toContain('text-liff-idle');
     expect(view).toContain('LOAD_FAILED_MESSAGE');

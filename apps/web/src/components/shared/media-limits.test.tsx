@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import MediaSlot, { mediaLimitLabel } from './media-slot'
 afterEach(cleanup)
-it('B-158 決まり9：形式と上限の文は部品が出し、表示と受け付ける上限を一致させる', async () => {
+it('決まり9：形式と上限の文は部品が出し、表示と受け付ける上限を一致させる', async () => {
  const onFile = vi.fn()
  const { container } = render(<MediaSlot title="画像を追加" accept="image/jpeg,image/png" maxBytes={10*1024*1024} onFile={onFile} />)
  expect(screen.getByText('（PNG・JPEG・10MB まで）')).toBeTruthy()

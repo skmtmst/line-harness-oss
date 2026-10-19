@@ -31,17 +31,17 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 UID移行（Pencil `Z0jHp` 要確認の判断・`L48eY` 本移行の完了・
+ * ★V8 UID移行（Pencil `` 要確認の判断・`` 本移行の完了・
  * `sdbsQ` 板5）。
  *
- * v7 と同じ判断・実行・切り戻しの仕組み（use-uid-migration.ts）を使い、
+ * 管理画面 と同じ判断・実行・切り戻しの仕組み（use-uid-migration.ts）を使い、
  * 見た目だけを V8 に積み替える。
  *
- * - 5つの段を横のステッパーで示す（Z0jHp 上部）
+ * - 5つの段を横のステッパーで示す（ 上部）
  * - 分類ごとの人数を4枚の数カードで出す（自動一致／要確認／一致しない／競合）
  * - 要確認の行は「どうするか」の選び欄で1行ずつ確定する（保存は行ごと。
  *   まとめて保存のAPIは無い）
- * - 完了した履歴は L48eY の形（結果の帯＋照合の結果＋履歴）
+ * - 完了した履歴は  の形（結果の帯＋照合の結果＋履歴）
  * - 「本移行を実行」「切り戻す」は確認ダイアログを開くだけ（FRIEND-33/36）
  */
 
@@ -354,7 +354,7 @@ function HistoryRow({
   )
 }
 
-/** Z0jHp: 判断する帯。分類カード＋対応表＋下の追従帯。 */
+/** : 判断する帯。分類カード＋対応表＋下の追従帯。 */
 function MigrationReviewBoard({
   active,
   unresolved,
@@ -534,7 +534,7 @@ function MigrationReviewBoard({
   )
 }
 
-/** L48eY: 本移行と照合が終わった履歴。結果の帯＋照合の内訳。 */
+/** : 本移行と照合が終わった履歴。結果の帯＋照合の内訳。 */
 function MigrationResultBoard({
   active,
   rollbackBlockedReason,

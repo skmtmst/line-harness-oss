@@ -18,7 +18,7 @@ describe('対象が分からないときの言い方（#975 U096）', () => {
   it('共通アクション編集は、対象未指定を専用の案内にし一覧へ戻す', () => {
     expect(EDIT).toContain('編集する共通アクションが指定されていません')
     expect(EDIT).toContain('一覧から編集する共通アクションを選び直してください')
-    // 戻り先は ★V7 TargetMissing の backHref が持つ。
+    // 戻り先は ★管理画面 TargetMissing の backHref が持つ。
     expect(EDIT).toContain('backHref="/common-actions"')
     // 技術的な「IDが不正」は画面の文言から外す。
     expect(EDIT).not.toContain('IDが不正')
@@ -47,7 +47,7 @@ describe('対象が分からないときの言い方（#975 U096）', () => {
     expect(RICH_MENUS).toContain('permissionScope="store"')
     expect(RICH_MENUS).toContain('<ListState kind="forbidden"')
     expect(RICH_MENUS).toContain('backHref="/rich-menus"')
-    // 再読み込みは ★V7 TargetMissing の error（文言は部品が持つ。取り直し口があることだけ見る）。
+    // 再読み込みは ★管理画面 TargetMissing の error（文言は部品が持つ。取り直し口があることだけ見る）。
     expect(RICH_MENUS).toContain('onRetry={() => void loadGroup()}')
     expect(RICH_MENUS).toContain("loadState === 'forbidden'")
     // 旧来の技術的な言い回しは残さない。

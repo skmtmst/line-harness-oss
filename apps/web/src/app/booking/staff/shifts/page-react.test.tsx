@@ -124,7 +124,7 @@ function daysAhead(n: number) {
   return t
 }
 
-/** 日付の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DD。 */
+/** 日付の選択（★管理画面）で選ぶ。値は今までどおり YYYY-MM-DD。 */
 async function pickDateByLabel(label: string, date: Date) {
   fireEvent.click(screen.getByLabelText(label))
   const target = partsOf(date).y * 12 + partsOf(date).mo

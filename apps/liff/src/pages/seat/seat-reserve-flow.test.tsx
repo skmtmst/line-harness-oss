@@ -42,7 +42,7 @@ vi.mock('../../lib/user-message.js', async (importOriginal) => {
 });
 
 const { restaurantBookingApi: seat, api } = await import('../../lib/api.js');
-const { default: SeatReserve } = await import('./SeatReserve.js');
+const { default: SeatReserve } = await import('./seat-reserve.js');
 
 function slots(date: string): RestaurantCustomerSlot[] {
   return ['18:00', '19:00', '19:30'].map((hm) => {

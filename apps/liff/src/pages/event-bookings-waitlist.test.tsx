@@ -3,12 +3,12 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import EventBookings from './EventBookings.js';
+import EventBookings from './event-bookings.js';
 
 const calls = vi.hoisted(() => ({ read: vi.fn(), leave: vi.fn(), cancelBooking: vi.fn() }));
 vi.mock('../lib/api.js', () => ({ api: { myEventBookings: calls.read, cancelMyEventWaitlist: calls.leave, cancelMyEventBooking: calls.cancelBooking } }));
-vi.mock('../components/LiffLookScope.js', () => ({ default: ({ children }: { children: ReactNode }) => children }));
-vi.mock('../components/ui/LiffHeader.js', () => ({ default: () => null }));
+vi.mock('../components/liff-look-scope.js', () => ({ default: ({ children }: { children: ReactNode }) => children }));
+vi.mock('../components/ui/liff-header.js', () => ({ default: () => null }));
 vi.mock('../lib/user-message.js', async load => ({ ...await load<typeof import('../lib/user-message.js')>(), logFailure: vi.fn() }));
 const waiting = { id: 'w1', source: 'waitlist', status: 'waitlisted', queue_position: 2, event_id: 'e1', event_name: '撮影会', slot_starts_at: '2099-10-20T10:00:00Z', slot_ends_at: '2099-10-20T11:00:00Z' };
 beforeEach(() => {

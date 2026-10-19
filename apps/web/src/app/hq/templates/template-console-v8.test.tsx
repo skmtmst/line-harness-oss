@@ -5,8 +5,8 @@ import TemplateConsole from '@/test-utils/hq-template-console'
 import type { Preflight, TemplateDefinition, TemplateType } from '@/lib/hq-templates-api'
 
 /**
- * 配布の V8（板 meBRB）。
- * - 配る2段階（アカウント・重複確認）の外枠に meBRB を付ける
+ * 配布の V8（板 ）。
+ * - 配る2段階（アカウント・重複確認）の外枠に  を付ける
  * - 配っている間は「配布の進み具合」の箱を出す（数はまだ分からないので帯だけ）
  * 選び方・送り方・失敗の扱いは変えない。
  */

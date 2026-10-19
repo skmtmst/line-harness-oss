@@ -12,8 +12,8 @@ vi.hoisted(() => {
 import FriendAddSettingsPage from './page'
 
 /*
- * ★V8 友だち追加時の配信を作る手順（板 `wDzkc`・`h8uNW`・`al47K`・
- * `i1nThZ`・`U8Xm3X`）の契約。`<html data-theme="v8">` の下でだけ
+ * ★V8 友だち追加時の配信を作る手順（板 ``・``・``・
+ * ``・``）の契約。`<html data-theme="v8">` の下でだけ
  * 新しい作る手順に切り替わり、手順の輪・右の「設定内容」・下の帯が
  */
 const navigation = vi.hoisted(() => ({ account: 'account-a', query: 'view=new&step=basic' }))

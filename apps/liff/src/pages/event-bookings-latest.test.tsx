@@ -3,11 +3,11 @@ import { act, type ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, test, vi } from 'vitest';
-import EventBookings from './EventBookings.js';
+import EventBookings from './event-bookings.js';
 const read = vi.hoisted(() => vi.fn());
 vi.mock('../lib/api.js', () => ({ api: { myEventBookings: read } }));
-vi.mock('../components/LiffLookScope.js', () => ({ default: ({ children }: { children: ReactNode }) => children }));
-vi.mock('../components/ui/LiffHeader.js', () => ({ default: () => null }));
+vi.mock('../components/liff-look-scope.js', () => ({ default: ({ children }: { children: ReactNode }) => children }));
+vi.mock('../components/ui/liff-header.js', () => ({ default: () => null }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.unstubAllGlobals(); });
 
 test('OPSSET-02の仲間: 履歴の再試行を続けて押しても古い結果は戻らない', async () => {

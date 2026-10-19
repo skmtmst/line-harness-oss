@@ -44,8 +44,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 /*
- * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
- * 状態は見本帳 `zaqP9`）。
+ * ★V8 マイル「たまる決めごと」（板 ``・1152 ``・閲覧のみ ``、
+ * 状態は見本帳 ``）。
  *
  * app/mileage/v8-earning-rules-tab.tsx から動きを写し、見た目を一覧の型
  * （ListPage）で組み直した。データの口・操作は今と同じ（編集・テスト・
@@ -105,7 +105,7 @@ function folderOf(rule: MileageEarningRuleV6): Exclude<FolderKey, 'all'> {
 
 /*
  * きっかけの分け方（購入・配信の反応・紹介・そのほか）。決めごとの種類から決まる固定の分け方で、
- * 作ったフォルダではないので、左のフォルダの列ではなく上の絞り込みに置く（B-136 2026-10-09）。
+ * 作ったフォルダではないので、左のフォルダの列ではなく上の絞り込みに置く（ 2026-10-09）。
  */
 const FOLDERS: Array<{ key: FolderKey; label: string }> = [
   { key: 'all', label: 'きっかけ：すべて' },

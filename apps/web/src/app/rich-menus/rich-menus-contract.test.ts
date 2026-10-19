@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-// 「LINE上にあるメニュー」の取り込み画面は external-import.tsx（★V7・★V8 で共有）。
+// 「LINE上にあるメニュー」の取り込み画面は external-import.tsx（★管理画面・★V8 で共有）。
 const PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
   + readFileSync(new URL('../../v8/rich-menus/external-import.tsx', import.meta.url), 'utf8')
 const EDIT_PAGE = readUiSource(new URL('../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
@@ -14,7 +14,7 @@ const PUBLISHER = readFileSync(
   'utf8',
 )
 
-describe('V6リッチメニューの画面契約', () => {
+describe('管理画面リッチメニューの画面契約', () => {
   it('LINEアカウント切替前の応答を捨て、全件をページ送りでたどれる', () => {
     expect(PAGE).toContain('activeAccountRef.current !== accountId')
     expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
@@ -76,7 +76,7 @@ describe('V6リッチメニューの画面契約', () => {
   })
 })
 
-describe('V6リッチメニューの公開安全契約', () => {
+describe('管理画面リッチメニューの公開安全契約', () => {
   it('全画像の準備後にaliasを切り替え、旧メニューは最後に削除する', () => {
     expect(PUBLISHER).toContain('全ページを作成し、全画像を upload する')
     expect(PUBLISHER).toContain('ここが完走するまで alias は触らない')

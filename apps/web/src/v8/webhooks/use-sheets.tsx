@@ -20,7 +20,7 @@ import { RUN_KIND_LABEL, STALE_RUN_MS, groupRuns, syncResultProblem } from './sh
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 
-/* OAuth の戻り先の知らせ（v7 の google-sheets-panel と同じ言葉）。 */
+/* OAuth の戻り先の知らせ（管理画面 の google-sheets-panel と同じ言葉）。 */
 const CALLBACK_MESSAGES: Record<string, { tone: 'success' | 'warn' | 'danger'; text: string }> = {
   connected: { tone: 'success', text: 'Googleアカウントと接続しました。書き出し先のスプレッドシートを設定してください。' },
   reconnected: { tone: 'success', text: 'Googleアカウントを再接続しました。' },

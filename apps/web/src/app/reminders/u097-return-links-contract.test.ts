@@ -25,7 +25,7 @@ describe('一覧へ戻る操作を置く（#975 U097）', () => {
   })
 
   it('回答を見る画面は、対象未指定と対象なしの両方で一覧へ戻れる', () => {
-    // 戻り先は ★V7 TargetMissing の backHref が持つ。
+    // 戻り先は ★管理画面 TargetMissing の backHref が持つ。
     expect(RESPONSES).toContain('backHref="/form-submissions"')
     expect(RESPONSES).toContain('回答フォーム一覧へ戻る')
     expect(RESPONSES).toContain('見る回答フォームが指定されていません')

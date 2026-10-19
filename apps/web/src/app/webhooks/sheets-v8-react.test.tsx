@@ -10,10 +10,10 @@ vi.hoisted(() => {
 import WebhooksPage from './page'
 
 /*
- * ★V8-B 外部連携の Google Sheets（板 `DxAAA`）の契約。
+ * ★V8-B 外部連携の Google Sheets（板 ``）の契約。
  * `<html data-theme="v8">` の下でだけ新しい Sheets タブに切り替わり、
  * 見本が決めた書き出しカード・記録の表が出ることを実DOMで固定する。
- * v7 では従来の Sheets タブが出ることも固定する。
+ * 管理画面 では従来の Sheets タブが出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),

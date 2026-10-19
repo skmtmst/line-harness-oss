@@ -1,4 +1,4 @@
-/** B-158：状態の言葉の正本。API の値と表示の言葉を分ける。 */
+/** ：状態の言葉の正本。API の値と表示の言葉を分ける。 */
 export const STATUS_LABELS = {
   draft: '下書き', scheduled: '予約中', sent: '送信済み',
   published: '公開中', active: '有効', stopped: '停止中', archived: 'アーカイブ',

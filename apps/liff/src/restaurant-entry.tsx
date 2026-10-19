@@ -1,8 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import SeatReserve from './pages/seat/SeatReserve.js';
-import Form from './pages/Form.js';
+import SeatReserve from './pages/seat/seat-reserve.js';
+import Form from './pages/form.js';
 import { setLiffContext } from './lib/liff-auth.js';
 import { setCustomerLiffRuntime, type CustomerLiffRuntime } from './lib/liff-runtime.js';
 import './embedded.css';

@@ -8,7 +8,7 @@ vi.mock('../lib/api.js', () => ({
   api: { liffConfig: () => Promise.resolve({ data: { accountName: '然 渋谷店' } }), customerLook: () => Promise.reject(new Error('x')) },
 }));
 
-import StatementOpen from './StatementOpen.js';
+import StatementOpen from './statement-open.js';
 
 const ID = 'st-1';
 const DL = `/api/liff/affiliate/statements/${ID}/download`;

@@ -123,7 +123,7 @@ function input(selector: string): HTMLInputElement {
 
 const WEEK = '日月火水木金土'
 
-/** 日時の選択（★V7）で YYYY-MM-DDTHH:mm を選ぶ。値は今までどおり日本時間の文字列。 */
+/** 日時の選択（★管理画面）で YYYY-MM-DDTHH:mm を選ぶ。値は今までどおり日本時間の文字列。 */
 async function setDateTime(label: string, iso: string) {
   const [date, time] = iso.split('T')
   const [hour, minute] = time.split(':')

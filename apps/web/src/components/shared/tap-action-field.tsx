@@ -3,7 +3,7 @@ import type { TapActionSourceItem, TapActionSources } from './tap-action-source-
 export type { TapActionSourceItem, TapActionSources } from './tap-action-source-types'
 
 /*
- * 「押したら」の共通の欄（オーナー採用 B-129・Pen YPzmo・2026-10-09）。
+ * 「押したら」の共通の欄（オーナー採用 ・Pen YPzmo・2026-10-09）。
  *
  * 左に「押したら」（6つ＋画面が足す種類。開いた一覧は印＋名前＋1行の説明）、右に「中身」
  * （種類ごとに変わる）。カルーセル・リッチメッセージ・リッチメニュー・統括のひな形などが同じ部品を使う。
@@ -223,7 +223,7 @@ const NONE_ID = '__tap_none__'
 
 /**
  * 作ってあるもの（回答フォーム・予約メニュー・スタンプカード）を選ぶ窓。共通の「作ってあるものを選ぶ窓」
- * （EntityPicker・Pen dJZ7Q・B-131）を使う。窓の中は仮選択で、［選ぶ］でだけ値を変える（キャンセル・Esc では変えない）。
+ * （EntityPicker・Pen dJZ7Q・）を使う。窓の中は仮選択で、［選ぶ］でだけ値を変える（キャンセル・Esc では変えない）。
  * - 回答フォーム（必ず選ぶ）は EntityKindDialog（フォルダの列・見え方のスマホつき）
  * - 予約メニュー・スタンプカード（任意）は先頭に「選ばない」の行を置いた EntityPickerDialog
  * - 候補を読めなかったときは一覧の代わりに理由を出す

@@ -1,6 +1,6 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-/* 隠れた所の誤りの数（B-139）。タブの件数の札（warning）と同じ大きさで、色だけ危険。 */
+/* 隠れた所の誤りの数。タブの件数の札（warning）と同じ大きさで、色だけ危険。 */
 .badge {
   display: inline-flex;
   align-items: center;

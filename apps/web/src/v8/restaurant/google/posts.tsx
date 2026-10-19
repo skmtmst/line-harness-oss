@@ -56,7 +56,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 Googleビジネス 投稿（一覧 `Cfed0`・投稿を作る `T1j2Sw`）と公開前の確認。
+ * ★V8 Googleビジネス 投稿（一覧 ``・投稿を作る ``）と公開前の確認。
  * 口（一覧・状態の確認・下書きの保存・取消・削除・公開）は今の画面と同じ。
  * 端末からの画像のアップロードは、入口の page.tsx が渡す道具（mediaUpload）で行う
  * （src/v8 から @/app を読まないため）。渡されないときは登録メディアから選ぶだけ。
@@ -340,7 +340,7 @@ function draftInputFrom(form: PostForm, igAvailable: boolean): GooglePostDraftIn
   }
 }
 
-/** 投稿を作る・直す（T1j2Sw）。 */
+/** 投稿を作る・直す。 */
 export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUpload }: { accountId: string; kind: GooglePostKind; postId: string | null; go: GoogleNav; mediaUpload?: MediaUploadHelpers }) {
   const saveErrors = useSaveFormErrors()
 
@@ -539,7 +539,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         <div className={styles.postImageSlot}>
           <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><MediaSlot
             kind="image"
-            /* 絵 T1j2Sw：画像は本文の下、幅320・4:3。 */
+            /* 絵 ：画像は本文の下、幅320・4:3。 */
             aspectRatio="4 / 3"
             title="画像を追加"
             previewAlt={form.mediaFilename ?? '投稿の画像'}

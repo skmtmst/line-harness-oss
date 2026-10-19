@@ -218,7 +218,7 @@ describe('回答フォームの編集（V8）', () => {
     expect(screen.getByDisplayValue('来店アンケート')).toBeTruthy()
   })
 
-  it('B-139：2ページ目の質問文が空のまま保存すると、そのページとブロックを開いて質問文の欄へ移り、中身のタブに赤い印を付ける', async () => {
+  it('2ページ目の質問文が空のまま保存すると、そのページとブロックを開いて質問文の欄へ移り、中身のタブに赤い印を付ける', async () => {
     const broken = structuredClone(formData)
     ;(broken.layout.sections[1].blocks[0] as { label: string }).label = ''
     formsGet.mockImplementation(async () => ({ success: true, data: broken }))
@@ -237,7 +237,7 @@ describe('回答フォームの編集（V8）', () => {
     expect(screen.queryByText('タイトルが空のブロックがあります')).toBeNull()
   })
 
-  it('B-139：フォーム名が空のまま中身のタブで保存すると、受付と見た目のタブを開いて名前の欄へ移る', async () => {
+  it('フォーム名が空のまま中身のタブで保存すると、受付と見た目のタブを開いて名前の欄へ移る', async () => {
     formsGet.mockImplementation(async () => ({ success: true, data: { ...structuredClone(formData), name: '' } }))
     await render('id=form-1')
     await screen.findByText('ページ1 のブロック')
@@ -411,7 +411,7 @@ describe('参考の文字の保存と読み直し', () => {
   })
 })
 
-it('B-241：予約の担当候補が読めないとき、空にせず入力を保持してやり直す',async()=>{
+it('予約の担当候補が読めないとき、空にせず入力を保持してやり直す',async()=>{
  menuStaff.mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({staff:[]})
  await render('id=form-1')
  const error=await screen.findByText('予約の担当を読み込めませんでした')
@@ -422,7 +422,7 @@ it('B-241：予約の担当候補が読めないとき、空にせず入力を�
  expect(screen.getByDisplayValue('今日のご来店の目的は？')).toBeTruthy()
 })
 
-it('B-241：参照候補success:falseは空の候補で編集を進めない',async()=>{
+it('参照候補success:falseは空の候補で編集を進めない',async()=>{
  const spy=vi.spyOn(api.scenarios,'list').mockResolvedValue({success:false,error:'fixture failure'})
  await render('id=form-1')
  await waitFor(()=>expect(spy).toHaveBeenCalled())

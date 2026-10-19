@@ -98,7 +98,7 @@ describe('V8 オートメーション一覧の状態', () => {
     expect(PAGE).not.toContain('handleCreate')
     expect(PAGE).not.toContain('automations.create(')
     expect(PAGE).not.toContain('新規オートメーションを作成')
-    // #942 N-352: 稼働切替と「保管」はV6の定義ステータス遷移で行う。
+    // #942 N-352: 稼働切替と「保管」は管理画面の定義ステータス遷移で行う。
     // 削除は保管に置き換わり、旧 PUT/DELETE には接続しない。
     expect(PAGE).toContain('api.automations.setStatus(')
     expect(PAGE).toContain("'archived'")

@@ -2,15 +2,15 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
-import FileOpen from './FileOpen.js';
-import StatementOpen from './StatementOpen.js';
+import FileOpen from './file-open.js';
+import StatementOpen from './statement-open.js';
 import { fetchFileBlob, issueFile } from '../lib/file-download-api.js';
 import { fetchStatementBlob, issueStatement } from '../lib/statement-download-api.js';
 
 vi.mock('../lib/file-download-api.js', async (original) => ({ ...await original<typeof import('../lib/file-download-api.js')>(), issueFile: vi.fn(), fetchFileBlob: vi.fn() }));
 vi.mock('../lib/statement-download-api.js', () => ({ issueStatement: vi.fn(), fetchStatementBlob: vi.fn() }));
-vi.mock('../components/LiffLookScope.js', () => ({ default: ({ children }: { children: import('react').ReactNode }) => children }));
-vi.mock('../components/ui/LiffHeader.js', () => ({ default: () => null }));
+vi.mock('../components/liff-look-scope.js', () => ({ default: ({ children }: { children: import('react').ReactNode }) => children }));
+vi.mock('../components/ui/liff-header.js', () => ({ default: () => null }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 function Navigate() { const go = useNavigate(); return <button onClick={() => go('../second', { relative: 'path' })}>別の通知を開く</button>; }
 

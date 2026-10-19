@@ -1,5 +1,2 @@
-import type { ReactNode } from 'react';
-
-export default function FieldError({ children }: { children: ReactNode }) {
-  return <p role="alert" className="text-[13px] leading-5 text-danger">{children}</p>;
-}
+// 登録済み共通部品の公開入口。宣言の持ち主は外部の対応表と同時に移す。
+export { default } from './FieldError.js';

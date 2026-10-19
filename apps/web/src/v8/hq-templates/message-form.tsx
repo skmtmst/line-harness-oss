@@ -33,7 +33,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 統括 テンプレート「メッセージのひな形を作る」（板 X4JcOf）。
+ * ★V8 統括 テンプレート「メッセージのひな形を作る」（板 ）。
  * 左に「ひな形の中身」（名前・分類・画像・タイトル・本文・ボタン）、右に LINE での見え方。
  * 保存する中身（HqMessageCard と template 本体）・画像の受け取り・ボタンの参照先は今の画面
  * （app/hq/templates/template-definition-editor.tsx の CardEditor・template-message-v8.tsx）と同じ。
@@ -41,7 +41,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  */
 
 /*
- * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存の形（HqMessageCard の action・value）は今のまま。
+ * ボタンの押したら（共通の欄 TapActionField・YPzmo・）。保存の形（HqMessageCard の action・value）は今のまま。
  * 予約・予約履歴・来店スタンプは、統括カードの型（shared/hq-message-card.ts）と配る口が持てないので出さない
  * （要る API：action に booking・booking_history・visit_stamp を足し、配るときに各店の LIFF の URL に置き換える）。
  */
@@ -81,7 +81,7 @@ export interface MessageFormProps {
   onReceipt?: (media: TemplateMedia) => void
   /** 下に出す「前回の保存を再確認」などの知らせ。 */
   notice?: ReactNode
-  /** 保存で落ちた欄（B-139）。呼ぶ側の useFormErrors を渡すと、名前・本文・ボタンを欄ごとに検査して知らせる。 */
+  /** 保存で落ちた欄。呼ぶ側の useFormErrors を渡すと、名前・本文・ボタンを欄ごとに検査して知らせる。 */
   fields?: FormErrors
 }
 

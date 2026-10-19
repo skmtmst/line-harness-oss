@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import StatusBadge from './status-badge'
 import { STATUS_LABELS, statusLabel } from '@/lib/status-labels'
 
-describe('B-158 決まり1 状態の言葉', () => {
+describe('決まり1 状態の言葉', () => {
   it('用途の札は自動処理の状態へ読み替えず、別の意味なら両方を残す', () => {
     expect(statusLabel('使用中')).toBe('使用中')
     expect(statusLabel('使っている')).toBe('使っている')

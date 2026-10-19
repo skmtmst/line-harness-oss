@@ -30,7 +30,7 @@ function TagName({ name, color, folderName }: Pick<TagPillProps, 'name' | 'color
   </>
 }
 
-/** V8 のタグ札。V7 の呼び出し元は従来の部品を使う。リンクと外すボタンは兄弟にする。 */
+/** V8 のタグ札。管理画面 の呼び出し元は従来の部品を使う。リンクと外すボタンは兄弟にする。 */
 export default function TagPill({ name, color, folderName, size = 'md', compactAtNarrow, href, onRemove, 'aria-label': ariaLabel }: TagPillProps) {
   return (
     <span className={styles.pill} data-size={size} data-compact-narrow={compactAtNarrow || undefined} role="group" aria-label={ariaLabel ?? `タグ「${name}」`}>

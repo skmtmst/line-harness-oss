@@ -64,7 +64,7 @@ describe('集計失敗の1行（R598）', () => {
     expect(onRetry).not.toHaveBeenCalled()
   })
 
-  it('★V7：赤（素の赤・16進・危険トークン）を使わない', () => {
+  it('★管理画面：赤（素の赤・16進・危険トークン）を使わない', () => {
     for (const failure of [new ApiError(503), new ApiError(403), new ApiError(404)]) {
       const html = renderToStaticMarkup(
         <DuplicatesStatsNotice failure={failure} onRetry={() => {}} />,

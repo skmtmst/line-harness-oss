@@ -1,4 +1,4 @@
-/* 予約管理「今月」R8tlbw：数の帯の下の月送り・URLの段。 */
+/* 予約管理「今月」：数の帯の下の月送り・URLの段。 */
 .bar { display: flex; flex-direction: column; gap: var(--space-10); padding: var(--space-16) var(--space-24) 0; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-12); min-width: 0; }
 .nav { display: flex; align-items: center; gap: var(--space-8); flex-shrink: 0; }

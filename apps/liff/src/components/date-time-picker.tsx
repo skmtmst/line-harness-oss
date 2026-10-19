@@ -4,12 +4,12 @@ import { resolveLook, type LiffCalendarMode } from '../lib/liff-look.js';
 import { jstToday, addDays, formatJpLong, formatWeekday, addMinutesHm } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
-import LoadErrorView from './LoadErrorView.js';
-import LoadingView from './LoadingView.js';
-import WaitlistSheet from './WaitlistSheet.js';
-import Icon from './ui/Icon.js';
-import BottomBar from './ui/BottomBar.js';
-import Button from './ui/Button.js';
+import LoadErrorView from './load-error-view.js';
+import LoadingView from './loading-view.js';
+import WaitlistSheet from './waitlist-sheet.js';
+import Icon from './ui/icon.js';
+import BottomBar from './ui/bottom-bar.js';
+import Button from './ui/button/index.js';
 
 /**
  * 選んだ枠。date・start は店の暦日・壁時刻（表示用）。startUtc・timeZone は
@@ -198,7 +198,7 @@ function pickOf(day: string, t: TimeSlot): SlotPick {
 }
 
 /**
- * 選んだ日の時刻3列 (★V8・M2p63S)。埋まった時刻は灰色で押せない。
+ * 選んだ日の時刻3列 (★V8・)。埋まった時刻は灰色で押せない。
  * 埋まった時刻には鈴の印を付ける (booking-plus 2)。鈴を押すと
  * 「空いたら知らせる」の小さなシートが開く（時刻の札名は「10:00」のまま）。
  */
@@ -264,7 +264,7 @@ function DaySlots({
  * 空きの点は店が消せる（消しても読み上げは残す）。日を選んで
  * 「この日の時間を選ぶ」で週の表示へ移る。
  * 時刻の札を押すと選ばれるだけで、進むのは下の操作の帯。
- * 空きの無い週は「次の週を見る」「担当を選び直す」の手を出す (ADutg)。
+ * 空きの無い週は「次の週を見る」「担当を選び直す」の手を出す 。
  * (撮影: 時刻のボタン名は「10:00」のまま。qa-shots.mjs が名前で押す)
  */
 export default function DateTimePicker({
@@ -294,7 +294,7 @@ export default function DateTimePicker({
   onEmptyState?: (empty: boolean) => void;
 }) {
   const today = jstToday();
-  // 414 幅の板（`xvtSz`）は板 ID だけを替える。中身は同じ。
+  // 414 幅の板（``）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
   // 予約の設定（最初の形・受付期間・カレンダーの出し方・空きの点）。
   // 読めるまで切り替えは出さない。
@@ -706,7 +706,7 @@ export default function DateTimePicker({
         ) : weekLoading || !weekByDate || !loadedWins.has(winStart) ? (
           <LoadingView />
         ) : !weekShowsStrip ? (
-          // ★V8 (ADutg)：印・題・本文・ボタンを 12 ずつ空け、画面の真ん中の高さに置く。
+          // ★V8 ：印・題・本文・ボタンを 12 ずつ空け、画面の真ん中の高さに置く。
           <div className="flex min-h-[calc(100dvh-180px)] flex-col items-center justify-center gap-3 px-2 text-center" data-design-node="ADutg">
             <span className="text-liff-idle" aria-hidden="true">
               <Icon name="calendar-x" className="h-10 w-10" />

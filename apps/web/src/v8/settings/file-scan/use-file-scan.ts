@@ -17,7 +17,7 @@ export const FILE_SCAN_PAGE_SIZE = 50
 export type FileScanPhase = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /**
- * ファイルの検査（B-2）の状態と操作。V7・V8 のどちらの描画からも同じ口で使う。
+ * ファイルの検査の状態と操作。管理画面・V8 のどちらの描画からも同じ口で使う。
  * 権限・一覧・戻す・消す・外の検査の設定はここに1つだけ置く。
  */
 export function useFileScan() {
@@ -26,7 +26,7 @@ export function useFileScan() {
   const [items, setItems] = useState<FileScanItem[]>([])
   const [total, setTotal] = useState(0)
   const [statusFilter, setStatusFilter] = useListUrlValue('statusFilter', 'quarantined')
-  /** 板 `PfA4o` の札の件数。検索語を含めた今の条件での総数。 */
+  /** 板 `` の札の件数。検索語を含めた今の条件での総数。 */
   const [counts, setCounts] = useState({ quarantined: 0, pending: 0, released: 0 })
   const [query, setQuery] = useListUrlValue('q', '')
   const deferredQuery = useDeferredValue(query)

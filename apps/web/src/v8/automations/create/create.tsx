@@ -37,7 +37,7 @@ import { useAutomationTest } from './use-automation-test'
 export { actionDraftToPayload,draftDetailToForm } from './draft-model'
 
 /*
- * ★V8-B ルールを作る（板 `M4torY`・競合 `tJqST`）。src/v8 に一から書いた画面。
+ * ★V8-B ルールを作る（板 ``・競合 ``）。src/v8 に一から書いた画面。
  *
  * 型（CreatePage）に、戻る・題・説明・左の段（名前・どんなときに・だれに・何をするか）、
  * 右の列（文章にすると・人数・1人で試す・気をつけること・つながる先）、
@@ -45,9 +45,9 @@ export { actionDraftToPayload,draftDetailToForm } from './draft-model'
  * 動き（きっかけ・条件・することの並び・下書き保存・公開・1人テスト・人数・再開・競合）は
  * app/automations/new/new-v8.tsx から写した（src/v8 は @/app を読めない）。
  * することの中身は行の「…」→「中身を直す」の窓で選ぶ。だれにの条件は窓の ConditionBuilder。
- * 競合（tJqST）は頭の下の帯と、比べる窓・「比べてから保存」。
+ * 競合は頭の下の帯と、比べる窓・「比べてから保存」。
  *
- * `chrome` は写し元と同じ口（'draft' は下書きの仕上げ J1VA8 用）。入口 /automations/new は 'create'。
+ * `chrome` は写し元と同じ口（'draft' は下書きの仕上げ  用）。入口 /automations/new は 'create'。
  */
 export function NewAutomationV8({
   draftId,
@@ -122,7 +122,7 @@ export function NewAutomationV8({
    */
   const [resumeTarget, setResumeTarget] = useState<string | null | undefined>(draftId ?? undefined)
   const [resumeStatus, setResumeStatus] = useState<'none' | 'loading' | 'ready' | 'failed'>('none')
-  /* 下書きを仕上げる（J1VA8）の帯に出す、読んだときの名前（入力で名前を変えても帯は動かさない）。 */
+  /* 下書きを仕上げるの帯に出す、読んだときの名前（入力で名前を変えても帯は動かさない）。 */
   const [sourceName, setSourceName] = useState('')
   /*
    * R532: 再開の読み込みが失敗した理由。通信断・対象なし・権限なしで
@@ -138,7 +138,7 @@ export function NewAutomationV8({
   /* R491: 公開済みで戻ったとき、元のルールへ案内するための番号。 */
   const [publishedRuleId, setPublishedRuleId] = useState<string | null>(null)
   /*
-   * 競合（板 `tJqST`）：保存しようとしたら、ほかの人が先に同じ下書きを
+   * 競合（板 ``）：保存しようとしたら、ほかの人が先に同じ下書きを
    * 保存していた。自分の入力は残したまま、帯で知らせる。
    * 誰が・いつ保存したかは口が返さないため、帯の文言は相手を名指ししない。
    * 比べる窓は、自分のいまの入力と、取り直した保存済みの内容を並べる。
@@ -538,7 +538,7 @@ const { syncResumeUrl, bindAccountDraft, captureFormSnapshot, resumeBase } = use
             ? [
                 dirtySinceSave
                   ? '保存したあとに内容を変更しています'
-                  /* 読み込んだだけ（この画面でまだ保存していない）なら、下の帯に保存の知らせを出さない（絵 J1VA8）。 */
+                  /* 読み込んだだけ（この画面でまだ保存していない）なら、下の帯に保存の知らせを出さない（絵 ）。 */
                   : savedAt === null ? null : `下書きに保存しました（${formatClock(savedAt)}）`,
                 // AUTOMATION-03: 人数の確認の失敗は、保存の結果とは別に添える。
                 previewFailed ? '人数の確認に失敗しました。通信を確かめて、もう一度お試しください。' : null,
@@ -738,7 +738,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
   )
 
   /*
-   * 下書きを仕上げる（J1VA8）：見本から作った下書き。頭の下に「どの見本から作ったか」の帯を出し、
+   * 下書きを仕上げる：見本から作った下書き。頭の下に「どの見本から作ったか」の帯を出し、
    * 段の見出しに番号を付ける。戻る先・キャンセルは見本の一覧。
    */
   const isDraft = chrome === 'draft'
@@ -759,7 +759,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
     <SaveErrorScope errors={saveScopeErrors}><CreatePage
       boardId={conflict ? 'tJqST' : isDraft ? 'J1VA8' : 'M4torY'}
       title={isDraft ? '下書きを仕上げる' : 'ルールを作る'}
-      /* 見本の帯（J1VA8）は頭の中、説明のすぐ下（絵では頭の線より上）。 */
+      /* 見本の帯は頭の中、説明のすぐ下（絵では頭の線より上）。 */
       help={isDraft
         ? (
           <>
@@ -768,8 +768,8 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
           </>
         )
         : 'きっかけ・だれに・何をするかを決めます。1人で試してから動かすと、まちがいを防げます。'}
-      /* 競合の帯（tJqST）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
-      /* 見本の帯（J1VA8）は頭の中、題のすぐ下（絵では頭の線より上）。 */
+      /* 競合の帯は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
+      /* 見本の帯は頭の中、題のすぐ下（絵では頭の線より上）。 */
       subtitle={sourceBand ?? undefined}
       notice={conflictBand}
       noticeSpacing="band"

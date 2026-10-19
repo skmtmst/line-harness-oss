@@ -107,7 +107,7 @@ export interface UsageRow {
   key: string
   kind: string
   name: string
-  /** 使っている版（いまの版／版Nで固定）。固定は公開しても変わらない（カードの説明に書く・絵 UTbi1）。 */
+  /** 使っている版（いまの版／版Nで固定）。固定は公開しても変わらない（カードの説明に書く・絵 ）。 */
   version: string
   versionNumber: number | null
   /** 版を決めている（公開しても変わらない）。 */

@@ -28,7 +28,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8「担当メニューをまとめて決める」（板 ooufy）。
+ * ★V8「担当メニューをまとめて決める」（板 ）。
  *
  * 白い板1枚：頭（←予約へ・題・未保存の印・5タブ）→ 中身（左＝メニュー×
  * スタッフの升目表と升の中身を変える段、右＝空きの欄）→ 書きかけがある間だけ
@@ -38,7 +38,7 @@ import Notice from '@/components/shared/notice'
  * 升の緑の升を押すと「受ける／受けない」が切り替わり、その升の時間と料金を
  * 変える段が下に出る。担当が0人のメニューは黄色い帯で知らせる。
  * 動き（一括保存・未保存の離脱確認・権限での閲覧のみ化・失敗時の扱い）は
- * v7 の /booking/menus/staff と同じ。テーマが v7 のときはこのファイルは
+ * 管理画面 の /booking/menus/staff と同じ。テーマが 管理画面 のときはこのファイルは
  * 読まれず、従来の見た目が出る。
  */
 
@@ -101,7 +101,7 @@ export default function AssignMatrixV8() {
   const [staff, setStaff] = useState<BookingStaff[]>([])
   /** staffId → menuId → 設定。 */
   const [grid, setGrid] = useState<Record<string, Record<string, StaffMenuMatrix>>>({})
-  /* 保存済みの表を控えておき、差分が未保存と分かるようにする（v7 #975 U075 と同じ）。 */
+  /* 保存済みの表を控えておき、差分が未保存と分かるようにする（管理画面 #975 U075 と同じ）。 */
   const [savedGrid, setSavedGrid] = useState<Record<string, Record<string, StaffMenuMatrix>> | null>(null)
   /** 「元に戻す」が新しい書きかけを消さないための、今の表の写し。 */
   const gridRef = useRef(grid)
@@ -283,7 +283,7 @@ export default function AssignMatrixV8() {
     }
   }
 
-  /* 「いま受付できる人数」（有効の担当だけ）と「割ってある人数」を分ける（v7 R308 と同じ）。 */
+  /* 「いま受付できる人数」（有効の担当だけ）と「割ってある人数」を分ける（管理画面 R308 と同じ）。 */
   const assignedCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const m of menus) {
@@ -317,7 +317,7 @@ export default function AssignMatrixV8() {
   const loadFailed = error !== null && savedGrid === null
   const loadFailure = loadError ? loadFailureCopy(loadError, '担当スタッフの割り当て') : null
 
-  /* 読み込んだら、上書きのある最初の升を選んでおく（上書きがあることに気づけるように。絵 ooufy）。 */
+  /* 読み込んだら、上書きのある最初の升を選んでおく（上書きがあることに気づけるように。絵 ）。 */
   useEffect(() => {
     if (loading || selected !== null) return
     for (const m of menus) {

@@ -6,7 +6,7 @@ const fx = vi.hoisted(() => ({ receive: vi.fn(), use: vi.fn() }));
 vi.mock('../lib/api.js', () => ({ api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}), entryRouteCoupon: fx,
   bookingSettings: vi.fn().mockResolvedValue({}), liffConfig: vi.fn().mockResolvedValue({ success: true, data: { accountName: 'お店' } }) } }));
 vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));
-import EntryRouteCoupon from './EntryRouteCoupon.js';
+import EntryRouteCoupon from './entry-route-coupon.js';
 const receipt = { receiptId: 'receipt-1', name: '店頭10%オフ', assetId: 'c', usedCount: 0, receivedAt: '2026-10-10', payload: { description: '10%オフ', startsAt: '2026-01-01', endsAt: '2099-01-01', oncePerFriend: true } };
 beforeEach(() => { fx.receive.mockReset().mockResolvedValue(receipt); fx.use.mockReset().mockResolvedValue({ replayed: false }); });
 afterEach(cleanup);

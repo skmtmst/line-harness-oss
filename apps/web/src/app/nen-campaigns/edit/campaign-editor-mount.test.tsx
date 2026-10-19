@@ -208,7 +208,7 @@ describe('NEN配信本文の上限4500字（実mount・Issue #659）', () => {
     expect(saveButton().disabled).toBe(true)
 
     // ボタンが無効でもクリックを配ってみて、保存が起きないところまで見る
-    // （save() 自身も bodyCheck.fits を見て打ち切る、二重の守りになっている）。
+    // （save 自身も bodyCheck.fits を見て打ち切る、二重の守りになっている）。
     await click(saveButton())
     await settle()
 

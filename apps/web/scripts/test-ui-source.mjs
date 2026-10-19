@@ -34,7 +34,7 @@ export function readUiSource(path, encoding = 'utf8') {
   if (full.endsWith('/src/app/scenarios/detail/scenario-detail-client.tsx')) {
     return read(resolve(SRC, 'v8/scenario-detail/detail.tsx'), 0)
   }
-  // B-40: 廃止されたapp内のV8コピーは、そのURLの今の入口へ読み替える。
+  // : 廃止されたapp内のV8コピーは、そのURLの今の入口へ読み替える。
   // 現役の分割部品は読み替えない。共通部品・CSS・JSONも元の読み口を保つ。
   if (full.includes('/src/app/') && /(?:^v8-|[-.]v8\.tsx?$)/.test(full.split('/').at(-1))) {
     const routes = {

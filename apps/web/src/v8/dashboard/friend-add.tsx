@@ -18,7 +18,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import ListState from '@/components/shared/list-state'
 
 /*
- * 友だち追加リンク（WQmep 段C）。動きは v7 の FriendAddLinkCard と同じ：
+ * 友だち追加リンク（ 段C）。動きは 管理画面 の FriendAddLinkCard と同じ：
  * - 経路は選択中アカウントの有効なものだけ（DASH-09）
  * - QR の表示は URL に残す（`?qr=base` / `?qr=<経路ID>`）
  * - コピーに失敗したら黙らず、欄から選べることを伝える（DASH-29）

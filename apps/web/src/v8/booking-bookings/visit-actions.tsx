@@ -9,7 +9,7 @@ import type { BookingVisitMark } from '@/lib/api'
 import type { AccountStyle } from '@line-crm/shared'
 import { bookingWords } from './words'
 
-/** 採用B-1（lS8qh）。人の予約の印。席予約の来店処理には使わない。 */
+/** 採用（lS8qh）。人の予約の印。席予約の来店処理には使わない。 */
 export default function PeopleVisitActions({ mark, ready, busy, canMark, onMark, onUnmark, usageStyle }: {
   usageStyle?: AccountStyle
   mark: BookingVisitMark | null

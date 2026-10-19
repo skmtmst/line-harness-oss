@@ -8,7 +8,7 @@ import styles from './page-explanation.module.css'
 type ExplanationState = { open: boolean; toggle: () => void; bodyId: string; toggleId: string }
 const Context = createContext<ExplanationState | null>(null)
 
-/** B-245：人と画面ごとの開閉。保存できない端末でも、その場の開閉は保つ。 */
+/** ：人と画面ごとの開閉。保存できない端末でも、その場の開閉は保つ。 */
 export function PageExplanationProvider({ pageKey, children }: { pageKey: string; children: ReactNode }) {
   const staff = useStaffIdentity()
   const key = staff?.id ? `lh_page_explanation_v1:${staff.id}:${pageKey}` : null

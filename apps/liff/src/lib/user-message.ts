@@ -11,7 +11,7 @@ const clientLogger = createClientLogger('liff');
 
 /**
  * 読み込みの失敗を画面に出すときの1文。題の「読み込めませんでした」と
- * 重ねない (★V7)。画面ごとの一言は LoadErrorView の note に足す。
+ * 重ねない (★管理画面)。画面ごとの一言は LoadErrorView の note に足す。
  */
 export const LOAD_FAILED_MESSAGE = '電波のよいところで、もう一度お試しください。';
 

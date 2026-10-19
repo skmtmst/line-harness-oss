@@ -10,7 +10,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 
 /**
  * 契約者専用LINEに使うアカウントの指定（決定 2026-09-18 案A）。
- * 運営会社（既定の統括）に登録した公式アカウントから選ぶ。★V6 37-10「運営の情報」。
+ * 運営会社（既定の統括）に登録した公式アカウントから選ぶ。★管理画面 37-10「運営の情報」。
  */
 export default function NoticeLineAccountCard() {
   const [data, setData] = useState<OpsNoticeLineAccount | null>(null)

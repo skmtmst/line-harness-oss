@@ -1,11 +1,11 @@
-import { useCustomerWords, useCustomerStyle } from './CustomerStyleScope.js';
-import PaymentPreparingNote from './PaymentPreparingNote.js';
+import { useCustomerWords, useCustomerStyle } from './customer-style-scope.js';
+import PaymentPreparingNote from './payment-preparing-note.js';
 import { useEffect,useState } from 'react';
 import { api,type BookingEntitlement,type CreateBookingResponse,type MenuItem,type StaffItem } from '../lib/api.js';
 import { bookingPriceText } from '../lib/booking-price.js';
 import { useRef } from 'react';
 import { type BookingCancellationPreview } from '../lib/api.js';
-import CancellationPolicy from './CancellationPolicy.js';
+import CancellationPolicy from './cancellation-policy.js';
 import { addMinutesHm, formatJpLong, slotStartsAtIso } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
 
@@ -13,19 +13,19 @@ import { isNotReadyYet } from '../lib/not-ready.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
 
-import BookingIntake from './BookingIntake.js';
-import type { SlotPick } from './DateTimePicker.js';
-import PreparingOverlay from './PreparingOverlay.js';
-import RecurringCard, { type RecurrenceValue } from './RecurringCard.js';
+import BookingIntake from './booking-intake.js';
+import type { SlotPick } from './date-time-picker.js';
+import PreparingOverlay from './preparing-overlay.js';
+import RecurringCard, { type RecurrenceValue } from './recurring-card.js';
 import { menuLine, personShort, totals, yen, type PartyState } from '../lib/party.js';
-import BottomBar from './ui/BottomBar.js';
-import Button from './ui/Button.js';
-import Icon from './ui/Icon.js';
-import PrivacyNote from './ui/PrivacyNote.js';
-import MeetingModeChoices from './MeetingModeChoices.js';
+import BottomBar from './ui/bottom-bar.js';
+import Button from './ui/button/index.js';
+import Icon from './ui/icon.js';
+import PrivacyNote from './ui/privacy-note.js';
+import MeetingModeChoices from './meeting-mode-choices.js';
 
 /**
- * 1-d 内容の確認 (★V8・gLReL)。送った中身のカード＋ご要望＋案内の帯。
+ * 1-d 内容の確認 (★V8・)。送った中身のカード＋ご要望＋案内の帯。
  * 進む操作 (この内容で予約をリクエスト) は下の操作の帯にだけ置く。
  * 送信の失敗は入力を消さず、その場で理由を出す (動きはそのまま)。
  */
@@ -69,7 +69,7 @@ export default function Confirm({
   const meetingMode = menu.meeting_mode === 'customer_choice' ? chosenMode
     : menu.meeting_mode === 'online' || menu.meeting_mode === 'in_person' ? menu.meeting_mode : null;
   const missingMeetingMode = (style === 'consult' || menu.meeting_mode === 'customer_choice') && !meetingMode;
-  // 414 幅の板（`uZqMA`）は板 ID だけを替える。中身は同じ。
+  // 414 幅の板（``）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
   const deadline = menu.cancel_deadline_hours_before == null ? cancelDeadlineMinutesBefore : menu.cancel_deadline_hours_before * 60;
   const [note, setNote] = useState('');
@@ -102,7 +102,7 @@ export default function Confirm({
     return () => { alive = false; };
   }, [menu.id, staff.id, startsAt, currentPolicyKey, onPolicyChange, policyRetry]);
 
-  /* 続けて予約（B4）・2 人以上の組（B5）：口がまだ無い間は、送らずに「現在準備中です」を出す（B-314）。 */
+  /* 続けて予約（B4）・2 人以上の組（B5）：口がまだ無い間は、送らずに「現在準備中です」を出す。 */
   const [recurrence, setRecurrence] = useState<RecurrenceValue>(null);
   const [preparing, setPreparing] = useState<string | null>(null);
   /* 使う回数券・月謝（組3）。口が無い間は 'soon'＝準備中の 1 行だけ出す。使えるものが無ければ段ごと出さない。 */
@@ -299,7 +299,7 @@ export default function Confirm({
   );
 }
 
-/** 確認の1行。板 (gLReL) は 1行 40 (線を含む)・鍵と値は上ぞろえ。 */
+/** 確認の1行。板  は 1行 40 (線を含む)・鍵と値は上ぞろえ。 */
 function Row({ label, value, wideLabel = false, alignEnd = false }: { label: string; value: string; wideLabel?: boolean; alignEnd?: boolean }) {
   return (
     <div className="flex h-10 items-start gap-2 py-2.5">

@@ -115,7 +115,7 @@
 }
 
 /*
- * ★V8 行の「…」の左に置く、よく使う1つの操作（統括の一覧の［配る］：i0Ao0R・noVq4・DzdC3・wZPua）。
+ * ★V8 行の「…」の左に置く、よく使う1つの操作（統括の一覧の［配る］：・・・）。
  * 絵：幅60・高さ28・角丸8・薄い枠（control-border）・白い地、印13＋文字12の太字、間4。
  * 文字は短く1語（「配る」）。読み上げ名は呼ぶ側が「〇〇を配る」と渡す。
  */
@@ -172,7 +172,7 @@
 
 :root .action[data-size='small'] { min-height: 0; width: var(--tpl-icon-btn-sm); height: var(--tpl-icon-btn-sm); }
 
-/* B-199：同じ列の主操作は最長の文字に合わせた同じ幅。 */
+/* ：同じ列の主操作は最長の文字に合わせた同じ幅。 */
 html:root .rowButton, html:root .quickAction { width: var(--row-action-width, max-content); min-width: max-content; justify-content: center; }
 
 /* つまみと行操作の見た目はセルの色や素のbuttonの規則に左右されない。 */

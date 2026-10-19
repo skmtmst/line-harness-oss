@@ -61,7 +61,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
           /* 狭い幅（1152）：右の欄を畳み、「メニューごとの支払い方法」を窓で開く。 */
           <PreviewLauncher title="メニューごとの支払い方法" label="メニューごとの支払い方法を見る"><PaymentsSideV8 accountId={accountId} menus={menus} connected={paymentsConnected} /></PreviewLauncher>
         ) : withoutPreview ? undefined : (
-          /* 絵 VFxWU：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
+          /* 絵 ：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
           <div className={styles.narrowActions}>
             <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>
             {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}

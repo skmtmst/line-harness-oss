@@ -17,8 +17,8 @@ const COLOR_FUNC = /\b(?:rgba?|hsla?|oklch|oklab)\s*\(/g
 const ROUNDED_CLASS =
   /\brounded(?:-(?:tl|tr|bl|br|t|b|l|r|s|e|ss|se|ee|es))?-(?:sm|md|lg|xl|2xl|3xl|full|\[[^\]]*\])\b|\brounded\b(?!-)/g
 const RADIUS_STYLE = /\bborderRadius\s*:\s*['"`\d]/g
-// (?!\s*var\() はコロンの直後に置く。`\s*` の後ろに置くと、空白を
-// 読み戻して var() の手前で止まる道が残り、トークン参照まで数えてしまう。
+// (?!\s*var\ はコロンの直後に置く。`\s*` の後ろに置くと、空白を
+// 読み戻して var の手前で止まる道が残り、トークン参照まで数えてしまう。
 const RADIUS_CSS = /\bborder-radius\s*:(?!\s*var\()\s*[^;}\n]+/g
 
 /* 影も同じ。トークンは shadow-card / shadow-float / shadow-overlay。 */

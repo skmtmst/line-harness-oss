@@ -2,11 +2,11 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import App from './App.js';
-vi.mock('./pages/Booking.js', () => ({ default: () => <div>予約ページ</div> }));
-vi.mock('./pages/BookingHistory.js', () => ({ default: () => <div>予約履歴</div> }));
-vi.mock('./pages/Form.js', () => ({ default: () => <div>回答フォーム</div> }));
-vi.mock('./pages/VisitStamps.js', () => ({ default: () => <div>来店スタンプ</div> }));
+import App from './app.js';
+vi.mock('./pages/booking.js', () => ({ default: () => <div>予約ページ</div> }));
+vi.mock('./pages/booking-history.js', () => ({ default: () => <div>予約履歴</div> }));
+vi.mock('./pages/form.js', () => ({ default: () => <div>回答フォーム</div> }));
+vi.mock('./pages/visit-stamps.js', () => ({ default: () => <div>来店スタンプ</div> }));
 afterEach(cleanup);
 test.each([
   ['/?page=salon-book&menu_id=menu-1', '予約ページ'],

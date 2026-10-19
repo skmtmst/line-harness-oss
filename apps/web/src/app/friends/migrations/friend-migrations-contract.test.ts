@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { parseFriendCsv } from '../../../v8/friends/migrations/friend-csv'
 import { parseUidCsv } from '../../../v8/accounts/migration'
 
-describe('V6 機能3 UID・CSV移行', () => {
+describe('管理画面 機能3 UID・CSV移行', () => {
   it('UID対応表の必須列を読み取る', () => {
     expect(parseUidCsv('old_uid,new_uid\nold-1,new-1')).toEqual([
       { oldUid: 'old-1', newUid: 'new-1', evidenceType: 'operator_csv' },

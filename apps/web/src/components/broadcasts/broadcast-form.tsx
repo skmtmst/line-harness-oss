@@ -255,7 +255,7 @@ export default function BroadcastForm({
    *
    * **条件が変わった時点で古い確認は解除する（IDEA-06）。**
    * `preflightResult` は最後に返ってきた応答、`preflightKey` はその応答を
-   * 取ったときの入力の指紋（下の `preflightRequestBody()` のJSON）。
+   * 取ったときの入力の指紋（下の `preflightRequestBody` のJSON）。
    * 画面に出す・確定に使うのは、今の入力の指紋と一致する応答だけ。
    */
   const [preflightResult, setPreflightResult] = useState<BroadcastPreflight | null>(null)
@@ -272,7 +272,7 @@ export default function BroadcastForm({
   const submittingRef = useRef(false)
   /*
     最終確認（設計 `FpgxH`）。**「配信を予約する」で直に送らない。**
-    ここまでは、押した瞬間に `save()` が走って 1,000人以上へ予約が入り、
+    ここまでは、押した瞬間に `save` が走って 1,000人以上へ予約が入り、
     何人に何をいつ送るのかを読み合わせる場所が無かった。
   */
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -317,9 +317,9 @@ export default function BroadcastForm({
     schedule: '一斉配信を作成・送信設定',
     confirm: '一斉配信を作成・最終確認',
   }
-  /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（v7 はこれまでの帯）。
-     ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。 */
-  /* ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。手順は V8 だけ題と説明の下（Steps）。 */
+  /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（管理画面 はこれまでの帯）。
+     ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。管理画面 は今までどおり。 */
+  /* ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。管理画面 は今までどおり。手順は V8 だけ題と説明の下（Steps）。 */
 
   usePageTitle(
     preflightDialogOpen
@@ -374,7 +374,7 @@ export default function BroadcastForm({
   /*
    * 下書きの再開（BROADCAST-17）。
    *
-   * V6 の作成5段は「同じ下書きIDを使う」作りなので、詳細画面の
+   * 管理画面 の作成5段は「同じ下書きIDを使う」作りなので、詳細画面の
    * 「本文を編集」から来たときは同じ下書きをここで続けられる。
    * 保存はいつもの persistDraft へ流し、下書きIDと版を draftSession へ
    * 載せるので、新しい配信が増えることはない。
@@ -490,7 +490,7 @@ export default function BroadcastForm({
       draftSessionsByAccount.current.set(draftSession.current.accountId, draftSession.current)
       setEditingDraft(draft)
       saveConflict.clear()
-      // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
+      // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★管理画面 §5 未保存判定）。
       cleanFingerprintRef.current = null
     }).catch(() => {
       if (generation !== accountGenerationRef.current) return
@@ -794,7 +794,7 @@ export default function BroadcastForm({
     setConditionDialogOpen(true)
   }
   /*
-   * 保存・確認・テストで落ちた吹き出し（B-139）。帯ではなく吹き出しの中身の下に理由を出し、
+   * 保存・確認・テストで落ちた吹き出し。帯ではなく吹き出しの中身の下に理由を出し、
    * 吹き出しの頭に赤い丸、メッセージの段を開いて1つ目の吹き出しへ移る。ボタンは「ほかの設定」を開いて移る。
    * 配信名・対象者は段の帯（［〇〇へ移動］）のまま。
    */
@@ -834,7 +834,7 @@ export default function BroadcastForm({
   /**
    * R580: いまの入力に対する検査結果が、どの段の不備か。
    *
-   * `validate()` と同じ順序・同じ関数で判定する。別々に書くと、帯は
+   * `validate` と同じ順序・同じ関数で判定する。別々に書くと、帯は
    * 「対象者 済み」なのに保存で断られる、という一番困る形になる
    * （段の帯と保存の検査を同じ関数に寄せる契約と同じ考え）。
    * 送信設定の段は入力の不備を持たない（日時は保存の検査対象外）。
@@ -916,7 +916,7 @@ export default function BroadcastForm({
   const persistDraft = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number, autosaveStep?: typeof currentStep) => persistBroadcastFormDraft({ createKeyByAccount, currentStep, draftPayload, draftSession, draftSessionsByAccount, editingDraft, saveConflict, saveErrors, saveInFlightRef, selectedAccountIdRef, setError }, scheduledAt, saveAsDraft, confirmedCount, autosaveStep)
 
   /*
-   * ★V7 sTJsh §5: 書きかけを守る。
+   * ★管理画面 sTJsh §5: 書きかけを守る。
    * 保存に送るのと同じ組み立て（draftPayload）を指紋にして、
    * 「最後に保存した形」と違う間だけ未保存とする。開いた直後や
    * 下書き読み込み直後は指紋が基準になるので、何もしていないのに
@@ -980,7 +980,7 @@ export default function BroadcastForm({
   /*
     最終確認に並べる値。**どれも固定値で作らない。**
 
-    人数は `runPreflight()` が数えたものだけを使う（`preflight.audienceCount`）。
+    人数は `runPreflight` が数えたものだけを使う（`preflight.audienceCount`）。
     数えられていないときは `null` のままにして、下の `canConfirm` で
     送らせない。「たぶんこのくらい」を書くと、その数を根拠に押される。
   */
@@ -1074,7 +1074,7 @@ export default function BroadcastForm({
    * 確認の窓を開く。
    *
    * **入り口で止める。** 窓の中で初めて弾くと、読み合わせたのに送れない
-   * 形になる。`validate()` は保存のときと同じものを使う。
+   * 形になる。`validate` は保存のときと同じものを使う。
    */
   const openConfirm = () => {
     const validationError = validate()

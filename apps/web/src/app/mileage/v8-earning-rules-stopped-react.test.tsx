@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 たまる決めごと：「止めているのみ」の見方を選ぶと止めている決めごとだけ出る。
- * 以前は既定と同じ条件で、動いているものも混ざっていた（v7 parity-D）。
+ * 以前は既定と同じ条件で、動いているものも混ざっていた（管理画面 parity-D）。
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'

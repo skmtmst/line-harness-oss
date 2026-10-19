@@ -20,7 +20,7 @@ export interface SettingsPageProps extends PageHeadingProps {
   contentLayout?: 'wide' | 'account-detail' | 'account-handover'
   /** 保存の帯を本文幅に置く。省略時は板全体の下。 */
   savePlacement?: 'content'
-  /** 板の頭の下・中のメニューより上に置く帯（競合の帯など。ziYCN）。帯の段の余白で置く。 */
+  /** 板の頭の下・中のメニューより上に置く帯（競合の帯など。）。帯の段の余白で置く。 */
   notice?: ReactNode
 }
 export function SettingsPage({ boardId, heightMode, standalone, layout, navigation, children, saveActions, saveStatus, contentLayout, savePlacement, preview, previewLayout, explanation, explanationKey, titleAccessory, notice, ...heading }: SettingsPageProps) {

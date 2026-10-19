@@ -6,7 +6,7 @@ import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
 
 /**
- * V6: ブラウザの `confirm()` を共通の確認窓へ移した3本目の契約。
+ * 管理画面: ブラウザの `confirm` を共通の確認窓へ移した3本目の契約。
  *
  * **ファイル全体を `toContain` で見ない。** 画面のコードは長く、別の処理に
  * 同じ字が1つあるだけで通ってしまう。実際、`app/reminders/page.tsx` の

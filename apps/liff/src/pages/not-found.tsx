@@ -1,12 +1,12 @@
 import liff from '@line/liff';
-import LiffLookScope from '../components/LiffLookScope.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import StatusView from '../components/ui/StatusView.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import Button from '../components/ui/Button.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import StatusView from '../components/ui/status-view.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import Button from '../components/ui/button/index.js';
 
 /**
- * ★V8 見つからない画面（板 aLU3r・V8.pen の修正案「採用 2026-10-07 リリース前」）。
+ * ★V8 見つからない画面（板 ・V8.pen の修正案「採用 2026-10-07 リリース前」）。
  * どの住所にも当たらないときに出す。以前は灰色の文字1行だけで、戻る道が無かった。
  * 上の帯・薄い灰の丸の印（link-2-off）・題・説明2行、下の帯に［LINE に戻る］（主）［閉じる］。
  */

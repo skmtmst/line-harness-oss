@@ -10,7 +10,7 @@ vi.mock('../lib/api.js', () => ({
   visitStampsApi: { redeemQr: fx.redeemQr },
 }));
 vi.mock('@line/liff', () => ({ default: { isInClient: () => true, closeWindow: fx.closeWindow } }));
-import VisitStampQr from './VisitStampQr.js';
+import VisitStampQr from './visit-stamp-qr.js';
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 

@@ -2,11 +2,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import BookingHistory from './BookingHistory.js';
+import BookingHistory from './booking-history.js';
 import type { BookingHistoryItem } from '../lib/api.js';
 
 /**
- * F-6 予約の履歴（YvTJ3）：カードの「日時を変える」「キャンセル」。
+ * F-6 予約の履歴：カードの「日時を変える」「キャンセル」。
  * - 履歴の口が版（lock_version）を返した予約にだけ出す（無いと送れない）
  * - キャンセルは確認してから、版を添えて送り、一覧を読み直す
  * - 日時を変えるは空きから選び、選んだ日時（UTC）と版を添えて送る

@@ -5,11 +5,11 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(new URL('../../../v8/reminders/detail.tsx', import.meta.url), 'utf8')
-/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+/* 完全切り替え：管理画面 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
 const LIST_PAGE = fs.readFileSync(new URL('../../../v8/reminders/list.tsx', import.meta.url), 'utf8')
 const API = readApiSource(new URL('../../../lib/api.ts', import.meta.url), 'utf8')
 
-describe('V6 7-1-H リマインダ実行結果', () => {
+describe('管理画面 7-1-H リマインダ実行結果', () => {
   it('一覧から予定と履歴を選べ、予定は公開APIのplannedで絞る', () => {
     expect(LIST_PAGE).toContain('status=planned')
     expect(LIST_PAGE).toContain('<RowMenu')
@@ -55,7 +55,7 @@ describe('V6 7-1-H リマインダ実行結果', () => {
 
   it('読込・失敗・空を区別し、失敗した1通だけ再試行できる', () => {
     expect(PAGE).toContain('<DetailLoading')
-    // 対象の取得失敗は ★V7 TargetMissing の error（取り直し口つき）。
+    // 対象の取得失敗は ★管理画面 TargetMissing の error（取り直し口つき）。
     expect(PAGE).toContain('kind="error"')
     expect(PAGE).toContain('onRetry={() => void load()}')
     expect(PAGE).toContain('kind="empty"')

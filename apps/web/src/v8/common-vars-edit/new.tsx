@@ -36,7 +36,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 共通情報を作る（板 `p82v9`）。
+ * ★V8 共通情報を作る（板 ``）。
  *
  * 型は作る（CreatePage）：頭（戻る・題・説明）→ 左に3枚のカード（名前と差し込み名・
  * 種別と中身・使える期間）と社内メモ、右の列に秘密値の注意と差し込んだときの見え方、
@@ -46,7 +46,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
  */
 
 /*
- * 種別8つ。板 `p82v9` のカードの並び（標準・長文・数値・URL／
+ * 種別8つ。板 `` のカードの並び（標準・長文・数値・URL／
  * 画像・年月日・日時・はい／いいえ）にそろえる。種別は登録後に
  * 変えられない（値の意味が変わるため）。
  */
@@ -95,7 +95,7 @@ function sensitiveFieldLabels(value: string, memo: string): string[] {
   ]
 }
 
-/* 欄へ移る。閉じた段は開き、スクロールしてからフォーカスする（B-139）。 */
+/* 欄へ移る。閉じた段は開き、スクロールしてからフォーカスする。 */
 function focusField(id: string) {
   focusFieldById(id)
 }
@@ -273,7 +273,7 @@ export default function NewCommonVarV8() {
     }
     const accountAtRequest = selectedAccountId
     /*
-     * 欄の誤りは下の帯ではなく、その欄の真下に全部出し、上から1つ目へ移る（B-139）。
+     * 欄の誤りは下の帯ではなく、その欄の真下に全部出し、上から1つ目へ移る。
      * 帯に残すのはアカウントの選び直しなど欄に結び付かないものだけ。
      */
     const nameProblem = validateVarName(name) ?? ''

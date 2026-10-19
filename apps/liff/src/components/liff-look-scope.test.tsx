@@ -18,7 +18,7 @@ async function renderScope(
 ) {
   // 包みは読んだ見た目をモジュールに持つ。試験ごとに作り直す。
   vi.resetModules();
-  const { default: LiffLookScope } = await import('./LiffLookScope.js');
+  const { default: LiffLookScope } = await import('./liff-look-scope.js');
   const { api } = await import('../lib/api.js');
   const customerLook = vi.mocked(api.customerLook);
   if (settings instanceof Promise) {

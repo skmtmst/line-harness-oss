@@ -29,7 +29,7 @@ export const NEUTERED_LABEL = { yes: '済み', no: 'していない', unknown: '
 /*
  * #999 DEEP-25: CSV の1マス整形は共通の csvCell（先頭の = + - @ に ' を足す）。
  * #999 DEEP-24: 種類は共通の動物種別ラベル。「その他」を犬へ変換しない。
- * 列と並びは今の画面（v7）と同じ。
+ * 列と並びは今の画面（管理画面）と同じ。
  */
 export function petsToCsv(items: NenPetRow[]): string {
   const header = ['ペット名', '呼び名', '性別', '種類', '品種', '誕生日', '年齢', '体重(kg)', '避妊去勢', '運動量', '主食', '1日の目安(g)', '1日の必要カロリー(kcal)', '然の鹿肉の目安(g)', '体重の更新日', '飼い主', 'EC会員ID']

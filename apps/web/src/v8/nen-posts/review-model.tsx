@@ -10,7 +10,7 @@ export type PhotoView = 'list' | 'detail' | 'publications'
 
 export type ReviewReasonCode = 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
 
-/* 見送った理由（v7 と同じ5つ。選ぶとお客様への文章が自動でつくられる）。 */
+/* 見送った理由（管理画面 と同じ5つ。選ぶとお客様への文章が自動でつくられる）。 */
 export const REVIEW_REASONS: Array<{ value: ReviewReasonCode; label: string; message: string }> = [
   { value: 'quality', label: '暗くて見えにくいです', message: '明るいところで、もう一度お願いできますか。' },
   { value: 'privacy', label: 'ほかの人の顔が写っています', message: 'うしろに他のお客様が写っているようです。もう一度お願いできますか。' },

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B 案件を作る（Td4TN）。閲覧のみ（owner・admin 以外）には保存のボタンを置かずに帯を出す
+ * ★V8-B 案件を作る。閲覧のみ（owner・admin 以外）には保存のボタンを置かずに帯を出す
  * （2026-10-06 オーナー決定）。成果地点の欄は口が無いので押せない形で置く（F-23 待ち）。
  */
 import React, { act } from 'react'
@@ -58,7 +58,7 @@ describe('案件を作る（Td4TN）', () => {
     expect(host.textContent).toContain('閲覧のみで見ています')
   })
 
-  test('B-139：案件名と報酬が足りないまま保存すると、欄が赤くなり真下に理由が出て、案件名の欄へ移る', async () => {
+  test('案件名と報酬が足りないまま保存すると、欄が赤くなり真下に理由が出て、案件名の欄へ移る', async () => {
     await render()
     const save = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === '保存して公開')!
     await act(async () => { save.click() })

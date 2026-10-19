@@ -11,7 +11,7 @@ vi.hoisted(() => {
 import InflowLinkDetailPage from './page'
 
 /*
- * ★V8-B 流入と計測の詳細（Pencil `Q5le3`）の契約。
+ * ★V8-B 流入と計測の詳細（Pencil ``）の契約。
  * テーマを選ぶことなく現役V8を出し、
  * 見本が決めた見出し・数の帯・その後・友だちの表・つながる先・
  * QR の欄が出ることを実DOMで固定する。

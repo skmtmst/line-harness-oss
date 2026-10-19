@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 仕上げ §2「ボタンは6つの状態を持つ。幅は変えない」。
+ * ★管理画面 仕上げ §2「ボタンは6つの状態を持つ。幅は変えない」。
  * 平常・乗せた・押したは CSS、保存中・完了・失敗は busy/done の
  * 見た目としてここで契約化する。
  * DOM に出す文字は常に今のラベル1つだけ（`textContent === 'ラベル'`
@@ -17,7 +17,7 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('ボタンの6状態（★V7 z97zZN §2）', () => {
+describe('ボタンの6状態（★管理画面 z97zZN §2）', () => {
   it('busy の間は回る印＋「保存しています…」に見た目を切り替え、押せなくする', () => {
     render(<Button variant="primary" busy>保存する</Button>)
     const button = screen.getByRole('button')

@@ -77,7 +77,7 @@ describe('V8の作成画面', () => {
     expect(EDIT_PAGE).toContain('extractMessageUrls(messageContent)')
     expect(EDIT_PAGE).toContain('buildTemplatePreview(messageContent, references)')
     expect(MESSAGE_EDITOR).toContain('本文に入れたURLの扱い')
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    // : 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(MESSAGE_EDITOR).toContain('<LinePreview')
     expect(MESSAGE_EDITOR).toContain("if (name === 'name') return '山田 太郎'")
     expect(MESSAGE_EDITOR).toContain('preview.unresolved.length > 0')
@@ -90,7 +90,7 @@ describe('V8の作成画面', () => {
     expect(CAROUSEL_PAGE).toContain('ボタン（最大 ${MAX_ACTIONS} つ）')
     expect(CAROUSEL_PAGE).toContain('disabled={panel.actions.length >= MAX_ACTIONS}')
     expect(CAROUSEL_PAGE).toContain('画像は横1024 × 縦678pxを推奨')
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    // : 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(CAROUSEL_PAGE).toContain('<LinePreview')
   })
 

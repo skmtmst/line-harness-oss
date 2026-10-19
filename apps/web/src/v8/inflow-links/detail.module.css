@@ -1,7 +1,7 @@
 /*
- * ★V8 流入と計測の詳細（Pencil Q5le3）。
+ * ★V8 流入と計測の詳細（Pencil ）。
  * 頭・本文の余白・数の帯は型（DetailPage・KpiBand）が持つ。ここは その後の段・友だちになったときの帯・表・下の2つの箱だけ。
- * 表と下の箱は自動応答の実行結果（nWmLg）と同じ寸法なので、その変数を使う。
+ * 表と下の箱は自動応答の実行結果と同じ寸法なので、その変数を使う。
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); font-weight: 600; text-decoration: none; }
 .headActions { display: flex; align-items: center; gap: var(--tpl-rule-row-gap); }

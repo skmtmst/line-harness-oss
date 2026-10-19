@@ -2,7 +2,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import EventBookings from './EventBookings.js';
+import EventBookings from './event-bookings.js';
 import type { EventBookingMine, EventSlot } from '../lib/api.js';
 
 /**

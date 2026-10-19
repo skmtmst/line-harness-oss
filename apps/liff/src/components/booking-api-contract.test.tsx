@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import Confirm from './Confirm.js';
-import RecurringCard from './RecurringCard.js';
-import BookingHistoryCancelDialog from './BookingHistoryCancelDialog.js';
+import Confirm from './confirm.js';
+import RecurringCard from './recurring-card.js';
+import BookingHistoryCancelDialog from './booking-history-cancel-dialog.js';
 import { api, type MenuItem, type StaffItem, type BookingHistoryItem } from '../lib/api.js';
 
 vi.mock('../lib/liff-auth.js', () => ({ getLiffId: () => 'liff-a', getIdToken: () => 'token' }));

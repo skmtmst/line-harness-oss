@@ -9,7 +9,7 @@ const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'rich-menus', 'list.tsx')
 const CREATE_CSS = readFileSync(new URL('../../v8/rich-menus/new/create.module.css', import.meta.url), 'utf8')
 
 /*
- * V8 リッチメニューの数字合わせ（Y9ASp・Z0uO6・F4gELj・OxEMM・JeINq）。
+ * V8 リッチメニューの数字合わせ（・・・・）。
  * 数の帯は区切り線で並べる1本の帯。作る画面の右の列は見本どおり380。
  * 件数・金額などの中身は API の実データを出す。
  */

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-/* 一覧の絞り込み札（★V7・m13i）。全画面で1つの形にそろえるための契約。 */
+/* 一覧の絞り込み札（★管理画面・m13i）。全画面で1つの形にそろえるための契約。 */
 import React from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
@@ -100,7 +100,7 @@ describe('絞り込み札 FilterChip（m13i）', () => {
 
   it('現在のV8の高さ36・緑の選択を使い、タッチ44pxを保つ', () => {
     expect(CODE).toMatch(/:root \.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
-    // 現役の選択はB-211の薄い緑の地と濃い緑の文字。aria-pressed の動きも別の試験で守る。
+    // 現役の選択はの薄い緑の地と濃い緑の文字。aria-pressed の動きも別の試験で守る。
     expect(CODE).toMatch(
       /:root \.v6-filter-chip\[aria-pressed='true'\]\s*\{[^}]*background:\s*var\(--color-selection-bg\)/s,
     )

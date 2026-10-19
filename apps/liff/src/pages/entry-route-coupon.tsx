@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { EntryRouteCouponReceived } from '@line-crm/shared';
 import { api } from '../lib/api.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import Card from '../components/ui/Card.js';
-import Button from '../components/ui/Button.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import ConfirmDialog from '../components/ui/ConfirmDialog.js';
-import LoadingView from '../components/LoadingView.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import Card from '../components/ui/card.js';
+import Button from '../components/ui/button/index.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import ConfirmDialog from '../components/ui/confirm-dialog.js';
+import LoadingView from '../components/loading-view.js';
 
 export default function EntryRouteCoupon() {
   const [search] = useSearchParams();

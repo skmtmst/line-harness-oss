@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-/* B-139：ペットの情報を直す窓（eLjeQ）。保存で落ちた欄は、その欄が赤くなり真下に理由が出て、1つ目の欄へ移る。 */
+/* ：ペットの情報を直す窓。保存で落ちた欄は、その欄が赤くなり真下に理由が出て、1つ目の欄へ移る。 */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen } from '@testing-library/react'

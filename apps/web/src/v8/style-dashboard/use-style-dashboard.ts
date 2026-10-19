@@ -230,7 +230,7 @@ export function useStyleDashboard(style: IndustryStyle) {
       if (input.refund !== 'none' || input.notify) openPayment()
     } catch (caught) { notifyToast(japaneseDetailOf(caught) || '取り消せませんでした。', { tone: 'error' }) } finally { setBusy(''); void reload() }
   }
-  /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（B-304 追記 4 ⑤）。 */
+  /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（ 追記 4 ⑤）。 */
   const saveResult = async (row: StyleRow, outcome: 'considering' | 'won' | 'lost') => {
     setBusy('result')
     try {

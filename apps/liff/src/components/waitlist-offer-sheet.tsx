@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CustomerBookingWaitlist, CustomerSeatWaitlist } from '@line-crm/shared';
 import { api } from '../lib/api.js';
-import Button from './ui/Button.js';
-import BookingPayment from './BookingPayment.js';
+import Button from './ui/button/index.js';
+import BookingPayment from './booking-payment.js';
 /** 案内のリンクを開いた本人が、既存の予約口で期限内に確定する。 */
 export default function WaitlistOfferSheet({ id, seat = false, decline = false, onClose }: { id: string; seat?: boolean; decline?: boolean; onClose: () => void ;}) {
   const [entry, setEntry] = useState<CustomerBookingWaitlist | CustomerSeatWaitlist | null>(null);

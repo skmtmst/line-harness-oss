@@ -79,7 +79,7 @@ describe('★V8 設定の中のメニュー', () => {
     await waitFor(() => expect(view.queryByText('EC連携')).toBeTruthy())
   })
 
-  // 2026-10-06：設定の板（ihjfd ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。
+  // 2026-10-06：設定の板（ ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。
   it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携・LINE通知（SNS 連携は末尾）', async () => {
     fixture.visibility.mockResolvedValue({
       success: true,
@@ -89,7 +89,7 @@ describe('★V8 設定の中のメニュー', () => {
     await waitFor(() => expect(view.queryByRole('link', { name: 'プール管理' })).toBeTruthy())
     const links = view.getAllByRole('link').map((link) => link.textContent)
     expect(links).toEqual([
-      // B-237（10-11）で足したお客さまのデザイン。絵 ewM7i では会社とロゴ（API 待ち）の次。
+      // （10-11）で足したお客さまのデザイン。絵  では会社とロゴ（API 待ち）の次。
       'お客さまのデザイン',
       'はじめの設定',
       'LINEアカウント',
@@ -123,7 +123,7 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.getAllByRole('link').slice(-2)).toEqual([booking, delivery])
   })
 
-  it('本番でも飲食店の設定の入口を残す（B-368）', async () => {
+  it('本番でも飲食店の設定の入口を残す', async () => {
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
     expect(view.getByRole('link', { name: 'デリバリー連携' }).getAttribute('href')).toBe('/settings/delivery')

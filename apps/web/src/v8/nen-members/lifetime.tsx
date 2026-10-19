@@ -30,7 +30,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8-B 会員 › ライフタイム（zQ5vY）。
+ * ★V8-B 会員 › ライフタイム。
  *
  * 1枚のカードに「節目（ライフタイム）」の説明と右に合計、下に節目の表
  * （節目（累計）・称号・特典・到達した人・到達時の LINE 通知・行の「…」）。

@@ -157,7 +157,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
                   } else if (msg.messageType === 'sticker') {
                     bubbleContent = <StickerMessageImage content={msg.content} />
                   } else if ((msg.messageType === 'video' || msg.messageType === 'file') && msg.direction === 'outgoing') {
-                    // B-6：送った動画・ファイルは JSON のまま出さず、再生できる枠・名前と期限の札にする。
+                    // ：送った動画・ファイルは JSON のまま出さず、再生できる枠・名前と期限の札にする。
                     bubbleContent = <AttachmentMessage messageType={msg.messageType} content={msg.content} />
                   } else {
                     bubbleContent = <span>{msg.content}</span>
@@ -190,7 +190,7 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
                     /*
                      * ★V8 やりとり（XqSvX「やりとり」）：日付は真ん中の小さな字、相手の吹き出しは白・薄い枠で
                      * 顔を置かない、時刻は吹き出しの横（相手は右・こちらは左）、こちらの吹き出しは薄い緑で
-                     * 下に「K Kenta が送信」／「自動：…」。引用・探すの印・取り消しの扱いは v7 と同じ。
+                     * 下に「K Kenta が送信」／「自動：…」。引用・探すの印・取り消しの扱いは 管理画面 と同じ。
                      */
                     const quotedNode = msg.quoted ? (
                       <InboxQuotedMessage>

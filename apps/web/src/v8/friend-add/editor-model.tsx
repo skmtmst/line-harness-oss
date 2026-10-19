@@ -9,9 +9,9 @@ export const b244Requirements = {
 }
 
 /*
- * ★V8 友だち追加時の配信を作る・直す（Pencil：作る①基本設定 `wDzkc` → ②流入リンク `h8uNW`
- * （1152 `xHpkS`）→ ③初回案内 `al47K` → ④あわせて行うこと `i1nThZ` → ⑤確認 `U8Xm3X`、
- * 編集の競合 `h5rm8t`）。
+ * ★V8 友だち追加時の配信を作る・直す（Pencil：作る①基本設定 `` → ②流入リンク ``
+ * （1152 ``）→ ③初回案内 `` → ④あわせて行うこと `` → ⑤確認 ``、
+ * 編集の競合 ``）。
  *
  * 型（CreatePage）に、戻る・題・手順の輪・説明・左の段（カード）・右の「設定内容」と
  * LINEでの見え方・下に追従する帯（キャンセル・下書きを保存・次へ）を渡す。
@@ -72,7 +72,7 @@ export const EMPTY_DEFINITION: FriendAddRuleDefinition = {
   timeWindows: [{ start: '08:00', end: '21:00' }],
 }
 
-/** 保存済みかの比較には版番号を含めない（v7 の編集器と同じ）。 */
+/** 保存済みかの比較には版番号を含めない（管理画面 の編集器と同じ）。 */
 export function editorSnapshot(rule: EditorRule, definition: FriendAddRuleDefinition) {
   return JSON.stringify({
     name: rule.name,

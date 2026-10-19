@@ -71,7 +71,7 @@ describe('V8 オートメーションが動いた記録', () => {
   })
 
   it('見るだけの権限では操作を出さず、テスト実行の切替と版の区別を持つ (#1043)', () => {
-    // 権限不足 view: 再試行・取り消し・CSVを出さない（V6 §9）。
+    // 権限不足 view: 再試行・取り消し・CSVを出さない（管理画面 §9）。
     expect(PAGE).toContain('useAutomationRunManage')
     expect(PAGE).toContain('permissions.canOperate')
     expect(PAGE).toContain('permissions.canExport')

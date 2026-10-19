@@ -1,6 +1,6 @@
 import type {VisitStampCard,VisitStampWallet} from '@line-crm/shared';
 import {VISIT_STAMP_DEFAULT_COLOR,visitStampDarkInk} from '@line-crm/shared';
-import Icon from './Icon.js';
+import Icon from './icon.js';
 import styles from './stamp-qr-result.module.css';
 
 /** G-8g/h のカード。保存済みの設定・残高だけで描き、未取得を見本の数字で補わない。 */

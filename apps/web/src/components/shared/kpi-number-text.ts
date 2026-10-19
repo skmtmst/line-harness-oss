@@ -1,4 +1,4 @@
-/** B-195: 数字・金額・割合・時間だけ。状態や名称は札へ。 */
+/** : 数字・金額・割合・時間だけ。状態や名称は札へ。 */
 export function isKpiNumberText(text: string): boolean {
   if (text.trim() === '—') return true
   // 版の番号（v3）は数。アプリの版（v2.6.4）は名称なので札のまま。

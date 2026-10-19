@@ -104,7 +104,7 @@ afterEach(async () => {
 
 async function renderPage() {
   await act(async () => { root.render(<AccountDetailPage />) })
-  // load() の二重取得と staff/me を流す。
+  // load の二重取得と staff/me を流す。
   await act(async () => { await Promise.resolve() })
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 }

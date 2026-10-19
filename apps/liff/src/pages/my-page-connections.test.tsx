@@ -2,15 +2,15 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import MyPage from './MyPage.js';
+import MyPage from './my-page.js';
 import { api, visitStampsApi } from '../lib/api.js';
 import { affiliateSelfApi } from '../lib/affiliate-self-api.js';
 
 vi.mock('../lib/api.js', () => ({ api: { me: vi.fn(), menus: vi.fn(), bookingWaitlists: vi.fn(), entitlements: vi.fn(), liffConfig: vi.fn(), notificationPreferences: vi.fn(), updateNotificationPreference: vi.fn() }, visitStampsApi: { cards: vi.fn() } }));
 vi.mock('../lib/affiliate-self-api.js', () => ({ affiliateSelfApi: { rewards: vi.fn() } }));
 vi.mock('../lib/liff-runtime.js', () => ({ default: { getProfile: async () => ({ displayName: '人工会員' }) } }));
-vi.mock('../components/LiffLookScope.js', () => ({ default: ({ children }: { children: import('react').ReactNode }) => children }));
-vi.mock('../components/ui/LiffHeader.js', () => ({ default: () => null }));
+vi.mock('../components/liff-look-scope.js', () => ({ default: ({ children }: { children: import('react').ReactNode }) => children }));
+vi.mock('../components/ui/liff-header.js', () => ({ default: () => null }));
 beforeEach(() => {
   vi.mocked(api.me).mockResolvedValue({ upcoming: [], past: [] });
   vi.mocked(api.bookingWaitlists).mockResolvedValue({ waitlist: [] });

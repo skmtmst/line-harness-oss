@@ -37,7 +37,7 @@ import { describeReminderDiff } from '../edit/reminder-conflict-diff'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /**
- * ★V8 リマインダを作る・手順1「基本設定」（板 VE1u5）。
+ * ★V8 リマインダを作る・手順1「基本設定」（板 ）。
  * 保存したら手順2（対象者と止める条件）へ進む。保存せず進むことはない——
  * 手順2以降は下書きの id が要るため。
  */

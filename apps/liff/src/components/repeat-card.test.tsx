@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import RepeatCard from './RepeatCard.js';
+import RepeatCard from './repeat-card.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
 
 /**

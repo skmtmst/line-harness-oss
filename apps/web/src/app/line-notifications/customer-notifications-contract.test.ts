@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * 顧客へのお知らせ（★V6 `festr` / `Q55bb`）の寸法の見張り。
+ * 顧客へのお知らせ（★管理画面 `festr` / `Q55bb`）の寸法の見張り。
  *
  * **`Q55bb`（お知らせの中身を編集する）は、公開版と下書き版を分ける。**
  * 公開済みの版を直接書き換えず、下書き保存と公開を別操作にする。
@@ -26,7 +26,7 @@ const CODE = PAGE
   .replace(/^\s*\/\/.*$/gm, '')
 
 describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
-  // 板 g3iDs：一覧は全部出し、ページ送りは置かない。種類の数だけ並ぶ。
+  // 板 ：一覧は全部出し、ページ送りは置かない。種類の数だけ並ぶ。
   it('一覧はページ送りなしで全部出す', () => {
     expect(PAGE).not.toContain('CUSTOMER_PAGE_SIZE')
     expect(PAGE).not.toContain('<Pagination')
@@ -34,7 +34,7 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
     expect(PAGE).toContain('return <Tr key={setting.eventType}>')
   })
 
-  // 板 g3iDs：絞り込み・表・数カードは共通部品。手描きのv6行・分類ボタンは置かない。
+  // 板 ：絞り込み・表・数カードは共通部品。手描きの管理画面行・分類ボタンは置かない。
   it('絞り込み・表・数カードは共通部品を使う', () => {
     expect(PAGE).toContain('<FilterChip')
     expect(PAGE).toContain('<DataTable label="顧客へのお知らせ"')
@@ -88,17 +88,17 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
     expect(PAGE).toContain("if (outcome.kind === 'stale' || generation !== loadGeneration.current) return")
   })
 
-  it('load()の再開点も、世代だけでなく選択中accountを見る（4経路で形をそろえる）', () => {
+  it('loadの再開点も、世代だけでなく選択中accountを見る（4経路で形をそろえる）', () => {
     // 保存・公開・テスト送信と同じ形。世代だけでは、切替の描画コミット後・
-    // 次のload()発火前の隙間で前アカウントの一覧応答を見分けられない。
+    // 次のload発火前の隙間で前アカウントの一覧応答を見分けられない。
     expect(PAGE).toContain('const stale = () => generation !== loadGeneration.current || selectedAccountId !== selectedAccountRef.current')
-    // load() の再開点が世代だけの照合へ戻っていないこと。
+    // load の再開点が世代だけの照合へ戻っていないこと。
     expect(PAGE).not.toContain('if (generation !== loadGeneration.current) return')
   })
 
   it('テスト送信の完了判定も、保存・公開と同じ見張り（世代とアカウント）を通す', () => {
     // testSend だけ loadGeneration しか見ていないと、A→Bの描画コミット後・
-    // Bのload()発火前に返った旧Aの結果がBの画面へ入りうる。
+    // Bのload発火前に返った旧Aの結果がBの画面へ入りうる。
     expect(PAGE).toContain('async function sendCustomerTestNotification(args: {')
     expect(PAGE).toContain('if (isStale(guard)) return { kind: \'stale\' }')
     expect(PAGE).toContain('const outcome = await sendCustomerTestNotification({')
@@ -106,7 +106,7 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
   })
 
   it('世代の照合はuseEffectの発火待ちに頼らない。選択中accountを描画のたびに同期させたrefでも見る', () => {
-    // loadGeneration は load() の useEffect の中でしか進まない。切替の描画コミットと
+    // loadGeneration は load の useEffect の中でしか進まない。切替の描画コミットと
     // その発火の間には隙間があるため、世代だけでなく account の一致も独立して見る。
     expect(PAGE).toContain('const selectedAccountRef = useRef(selectedAccountId)')
     expect(PAGE).toContain('selectedAccountRef.current = selectedAccountId')

@@ -5,12 +5,12 @@ import { logFailure } from '../lib/user-message.js';
 import {
   MAX_ADDONS, addonsOf, menuLine, menuOf, memberMinutes, personLabel, personShort, resize, totals, yen, type PartyMember, type PartyState,
 } from '../lib/party.js';
-import Button from './ui/Button.js';
+import Button from './ui/button/index.js';
 import { ChoiceInput } from './forms/controls.js';
-import Card from './ui/Card.js';
-import Icon from './ui/Icon.js';
-import LoadErrorView from './LoadErrorView.js';
-import LoadingView from './LoadingView.js';
+import Card from './ui/card.js';
+import Icon from './ui/icon.js';
+import LoadErrorView from './load-error-view.js';
+import LoadingView from './loading-view.js';
 
 /** 下の帯に出す内訳（人ごと・合計）。 */
 export function PartySummary({ party, first, withFee = false }: { party: PartyState; first: MenuItem; withFee?: boolean }) {
@@ -40,7 +40,7 @@ export default function PartyMenuStep({ menu, party, onParty, onChangeMenu }: {
   /** 1 人目のメニューを選び直す。 */
   onChangeMenu: () => void;
 }) {
-  /* 2 人以上は口がまだ無いので、形は 3 人まで見せ、予約を送るときに「現在準備中です」を出す（B-314）。 */
+  /* 2 人以上は口がまだ無いので、形は 3 人まで見せ、予約を送るときに「現在準備中です」を出す。 */
   const max = 3;
   const [picking, setPicking] = useState<number | null>(null);
   const setMember = (index: number, patch: Partial<PartyMember>) => onParty({ ...party, members: party.members.map((m, i) => (i === index ? { ...m, ...patch } : m)) });

@@ -146,7 +146,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
   })
 
   /*
-    絵の正本ノードは、ソース文字の検索ではなく実際に描かれた印で確かめる（B-273）。
+    絵の正本ノードは、ソース文字の検索ではなく実際に描かれた印で確かめる。
     v07（LINE新規追加_v07.pen・2026-10-18承認）: p6zMkA=①／Fqy29=②／Lwxyh=③／X0pGdw=④／Plmq1=⑤。
     ノードとURLの対応は scripts/visual-qa/v8-design-map-route-contract.test.ts。
   */

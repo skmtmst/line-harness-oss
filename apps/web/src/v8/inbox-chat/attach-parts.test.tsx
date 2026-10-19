@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 B-6 書く欄の左下のクリップ・書く欄の上の札・会話の中の動画とファイル（M0393「7. 添付」I7Skn）。
+ * ★V8  書く欄の左下のクリップ・書く欄の上の札・会話の中の動画とファイル（「7. 添付」I7Skn）。
  */
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'

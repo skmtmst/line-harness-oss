@@ -52,7 +52,7 @@ const cases = [
     node: () => <AutomationList /> },
 ]
 
-describe('B-173 一覧の保管から戻す操作', () => {
+describe('一覧の保管から戻す操作', () => {
   it('ルールの保管は「保管する」と表示し、確認後に保管状態を送る', async () => {
     state.rules = (state.rules as Array<Record<string, unknown>>).map(rule => ({ ...rule, status: 'stopped' }))
     render(<AutomationList />)

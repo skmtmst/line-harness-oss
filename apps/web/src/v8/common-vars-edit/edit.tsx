@@ -64,7 +64,7 @@ function EditCommonVarV8Inner() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  // 1152 の板（C67dE）：右の列の上に「LINEでの見え方を見る」を置き、スマホは窓で開く。
+  // 1152 の板：右の列の上に「LINEでの見え方を見る」を置き、スマホは窓で開く。
   const narrow = useNarrowViewport()
 
   /*
@@ -97,7 +97,7 @@ function EditCommonVarV8Inner() {
   const [valueFieldError, setValueFieldError] = useState('')
   const [fallbackFieldError, setFallbackFieldError] = useState('')
   const [scheduleFieldError, setScheduleFieldError] = useState('')
-  /* 欄の誤りは帯ではなく欄の真下に出して移る（B-139）。 */
+  /* 欄の誤りは帯ではなく欄の真下に出して移る。 */
   const [nameFieldError, setNameFieldError] = useState('')
   const [periodFieldError, setPeriodFieldError] = useState('')
   const [scheduleDateError, setScheduleDateError] = useState('')
@@ -114,7 +114,7 @@ function EditCommonVarV8Inner() {
 
   const [impact, setImpact] = useState<CommonVarDeleteImpact | CommonVarChangeImpact | null>(null)
   const [impactState, setImpactState] = useState<ChangeImpactState>('loading')
-  /** 狭い板ではスマホの見え方を窓で見る（板 `C67dE`）。 */
+  /** 狭い板ではスマホの見え方を窓で見る（板 ``）。 */
   const [previewOpen, setPreviewOpen] = useState(false)
 
   const loadImpact = useCallback(async (
@@ -218,7 +218,7 @@ function EditCommonVarV8Inner() {
   }, [load])
 
   /*
-   * 競合の帯（板 `piWhz`）。保存が409で止まったとき、入力を残したまま
+   * 競合の帯（板 ``）。保存が409で止まったとき、入力を残したまま
    * いま保存されている版へ合わせ、誰がいつ保存したかを見せる。
    */
   const [conflict, setConflict] = useState<{
@@ -608,7 +608,7 @@ function EditCommonVarV8Inner() {
         {historyCard}
       </>
     ) : conflict ? (
-      /* 競合のとき（piWhz）：決めた日と見え方を上に。名前・期間・メモ・履歴は下へ回す（消さない）。 */
+      /* 競合のとき：決めた日と見え方を上に。名前・期間・メモ・履歴は下へ回す（消さない）。 */
       <>
         {scheduleCard}
         {previewTalk}
@@ -653,7 +653,7 @@ function EditCommonVarV8Inner() {
       noticeSpacing="band"
       identity={<></>}
       preview={preview}
-      /* 1152（C67dE）は右の列を畳まず、スマホだけをボタンにして「決めた日に変える」を右に残す（畳むと予定の欄が見えなくなっていた）。 */
+      /* 1152は右の列を畳まず、スマホだけをボタンにして「決めた日に変える」を右に残す（畳むと予定の欄が見えなくなっていた）。 */
       hidePreviewWhenNarrow={!narrow}
       previewCompactWhenNarrow
       destructive={canWrite && item ? (

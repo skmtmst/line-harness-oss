@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import CustomerStyleScope, { useCustomerWords } from './CustomerStyleScope.js';
+import CustomerStyleScope, { useCustomerWords } from './customer-style-scope.js';
 import { api } from '../lib/api.js';
 
 const identity = vi.hoisted(() => ({ account: 'a', user: 'one' }));
 vi.mock('../lib/liff-auth.js', () => ({ getLiffId: () => identity.account, getLineUserId: () => identity.user }));
 vi.mock('../lib/api.js', () => ({ api: { liffConfig: vi.fn() } }));
-vi.mock('./ui/LiffHeader.js', () => ({ default: () => null }));
+vi.mock('./ui/liff-header.js', () => ({ default: () => null }));
 function Content() { const words = useCustomerWords(); return <><p>{`${words.bookingContent}・${words.approvalPending}`}</p><input aria-label="入力" /></>; }
 const config = (style: unknown) => ({ success: true, data: { accountId: identity.account, accountName: '', botBasicId: '', style } });
 beforeEach(() => { identity.account = 'a'; identity.user = 'one'; });

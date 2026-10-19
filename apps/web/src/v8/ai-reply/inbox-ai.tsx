@@ -42,7 +42,7 @@ const time = (value: string) => formatDate(value, { style: 'time', fallback: '' 
  * messages は今の会話の吹き出し（最後の受信の id で「新しいメッセージ」と［使わない］の続きを決める）。
  */
 export function useInboxAi(chatIdIn: string | null, accountIdIn: string | null, messages: ChatMessageLike[] | undefined) {
-  /* 会話の AI を出さない間（B-355）は、設定も要約も返信案も読まない。 */
+  /* 会話の AI を出さない間は、設定も要約も返信案も読まない。 */
   const enabled = conversationAiUiEnabled()
   const chatId = enabled ? chatIdIn : null
   const accountId = enabled ? accountIdIn : null

@@ -31,7 +31,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8-B プール管理「プールを作る」（Pencil `D0AOyx`・/pools/new）。
+ * ★V8-B プール管理「プールを作る」（Pencil ``・/pools/new）。
  *
  * 設定の板（中のメニューつき）の中に、左に「1. どのプールか」「2. いまの受け入れ先」の2枚、
  * 右に「プレビュー」。保存の帯は画面の下（キャンセル・保存してURLを発行）。

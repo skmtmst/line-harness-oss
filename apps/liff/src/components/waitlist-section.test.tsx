@@ -4,9 +4,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 
 vi.mock('../lib/user-message.js', async (importOriginal) => ({ ...(await importOriginal<typeof import('../lib/user-message.js')>()), logFailure: vi.fn() }));
 vi.mock('../lib/api.js', () => ({ api: { bookingWaitlists: vi.fn(), cancelWaitlist: vi.fn(), registerWaitlist: vi.fn(), seatWaitlists: vi.fn() } }));
-vi.mock('./WaitlistOfferSheet.js', () => ({ default: ({ id }: { id: string }) => <div role="dialog" aria-label="案内">{id}</div> }));
+vi.mock('./waitlist-offer-sheet.js', () => ({ default: ({ id }: { id: string }) => <div role="dialog" aria-label="案内">{id}</div> }));
 const { api } = await import('../lib/api.js');
-const { default: WaitlistSection } = await import('./WaitlistSection.js');
+const { default: WaitlistSection } = await import('./waitlist-section.js');
 
 const base = { staff_id: 's1', menu_id: 'm1', hold_minutes: 30, created_at: '2026-10-15T01:00:00.000Z', menu_name: 'トリミング（小型犬）', staff_name: '佐々木' };
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });

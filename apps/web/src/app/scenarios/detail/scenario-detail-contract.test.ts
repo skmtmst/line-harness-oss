@@ -17,7 +17,7 @@ const DIALOGS = fs.readFileSync(
   'utf8',
 )
 
-describe('V6 シナリオ編集の契約', () => {
+describe('管理画面 シナリオ編集の契約', () => {
   it('上部の一括テスト送信を既存の全通テスト送信へ接続する', () => {
     expect(PAGE).toContain(
       "onClick={() => setTestSend({ stepId: null, label: 'すべての通' })}",
@@ -55,7 +55,7 @@ describe('V6 シナリオ編集の契約', () => {
   })
 
   it('一覧のフォルダ追加を既存の共通ダイアログへ接続する', () => {
-    // 追加・「…」の窓は共通のフォルダの列（ManagedFolderPanel → FolderAddDialog）が持つ（B-136）。
+    // 追加・「…」の窓は共通のフォルダの列（ManagedFolderPanel → FolderAddDialog）が持つ。
     expect(LIST).toContain("import ManagedFolderPanel from '@/components/shared/managed-folder-panel'")
     expect(LIST).toMatch(/<ManagedFolderPanel[\s\S]*?kind="scenario"[\s\S]*?canManage=\{canEdit\}/)
     expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
@@ -65,14 +65,14 @@ describe('V6 シナリオ編集の契約', () => {
     /*
       NEXT-25: 各行の幅176pxのフォルダ select は名前列を潰していたため、
       行の「その他→フォルダを移動」と複数選択の一括操作へ集約した。
-      移動先を選ぶ窓の select は `v6-select` のまま。
+      移動先を選ぶ窓の select は `管理画面-select` のまま。
     */
     expect(LIST).toContain('const folderId = moveDraft || null')
     expect(LIST).toContain('api.scenarios.update(id, { folderId })')
     expect(LIST).toContain("failureMessage: 'フォルダを移動できませんでした。'")
     expect(LIST).toContain('フォルダへ移す')
     expect(LIST_TABLE).toContain('フォルダ')
-    // 移動先の選び欄は共通 Select（素の select・v6-select は置かない）。
+    // 移動先の選び欄は共通 Select（素の select・管理画面-select は置かない）。
     expect(LIST_TABLE).toContain('<Select')
     expect(LIST_TABLE).toContain('aria-label="移動先のフォルダ"')
     expect(LIST_TABLE).toContain('フォルダへ移す')

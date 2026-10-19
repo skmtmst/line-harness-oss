@@ -1,14 +1,14 @@
 
 import { useEffect, useRef } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
-import Button from './Button.js';
-import Icon from './Icon.js';
+import Button from './button/index.js';
+import Icon from './icon.js';
 
 /**
  * LIFF 共通の確認窓。管理画面の ConfirmDialog と同じ形
  * (題・影響・「閉じる」と危ない操作のボタン)。
  *
- * ブラウザの `confirm()` は使わない。見た目が OS 任せで、
+ * ブラウザの `confirm` は使わない。見た目が OS 任せで、
  * 何を取り消すのかを読ませられず、押し間違いを止められない。
  * 取り消せない操作 (`destructive`) は赤い実行ボタン＋警告の印にする。
  *

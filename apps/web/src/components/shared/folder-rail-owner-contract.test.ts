@@ -6,7 +6,7 @@ const APP = resolve(import.meta.dirname, '../../app')
 const GRID_PAGES = [
   'rich-menus/page.tsx',
 ]
-/* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る（幅は CSS の `.split` で付ける）。 */
+/* 完全切り替え：管理画面 page は捨て、V8 の list-v8 を見る（幅は CSS の `.split` で付ける）。 */
 const V8_FOLDER_PAGES = [
   'reminders/list-v8.tsx',
 ]
@@ -86,7 +86,7 @@ describe('オーナー指示 #582 のフォルダ欄', () => {
 
   it('V8のイベント一覧はイベント専用のフォルダを取得・作成する', () => {
     const events = readFileSync(resolve(SRC_V8, 'events/list.tsx'), 'utf8')
-    // フォルダの列・追加の窓・「…」は共通の ManagedFolderPanel（kind="event"）が持ち、変えたら読み直す（B-136）。
+    // フォルダの列・追加の窓・「…」は共通の ManagedFolderPanel（kind="event"）が持ち、変えたら読み直す。
     expect(events).toContain("api.folders.list('event', selectedAccountId)")
     expect(events).toMatch(/<ManagedFolderPanel[\s\S]*?kind="event"[\s\S]*?onChanged=\{loadFolders\}[\s\S]*?canManage=/)
   })

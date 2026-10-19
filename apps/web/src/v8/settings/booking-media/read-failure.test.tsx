@@ -14,7 +14,7 @@ vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:{
 }}))
 import BookingMedia from './screen'
 afterEach(()=>{cleanup();vi.clearAllMocks()})
-it.each(['channels','members'])('B-241 booking media %s read failure is visible and retryable',async(kind)=>{
+it.each(['channels','members'])('booking media %s read failure is visible and retryable',async(kind)=>{
  net.fetch.mockResolvedValue({data:[]});net.snapshot.mockResolvedValue({data:{memberships:[]}})
  if(kind==='channels')net.fetch.mockRejectedValueOnce(new Error('人工取得失敗'))
  else net.snapshot.mockRejectedValueOnce(new Error('人工取得失敗'))

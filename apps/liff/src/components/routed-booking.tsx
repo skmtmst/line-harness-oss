@@ -1,8 +1,8 @@
-import { useCustomerWords } from './CustomerStyleScope.js';
+import { useCustomerWords } from './customer-style-scope.js';
 import type { RoutedTarget } from '../lib/api.js';
 import { bookingPriceText } from '../lib/booking-price.js';
-import Card from './ui/Card.js';
-import Icon from './ui/Icon.js';
+import Card from './ui/card.js';
+import Icon from './ui/icon.js';
 
 /**
  * 答えで予約の行き先が決まったときの案内（B6・Z76uuv）。担当を選ばせず、すぐ日時から始める。

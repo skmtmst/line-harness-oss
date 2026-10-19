@@ -1,4 +1,4 @@
-/* ★V8 ウェビナーの参加者（uNsEy）。枠・数の帯の置き場・道具の段の余白は型（ListPageBody）が持つ。 */
+/* ★V8 ウェビナーの参加者。枠・数の帯の置き場・道具の段の余白は型（ListPageBody）が持つ。 */
 
 .statsNotice { padding: var(--tpl-wc-stats-notice-pad); }
 

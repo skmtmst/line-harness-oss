@@ -13,7 +13,7 @@ it('UI-N04 担当更新の途中失敗後は保存済みの版で再試行する
  m.save.mockResolvedValue({success:true,data:{...settings,version:4}});m.staff.mockRejectedValue(new Error('fixture staff unavailable'));
  render(<RulesTabV8 accountId="fixture-a" settings={settings} status="ready" error={null} staff={[{id:'s',is_active:1,is_designation_optional:0} as unknown as React.ComponentProps<typeof RulesTabV8>['staff'][number]]} staffReady canEdit onSaved={m.saved} onReload={()=>{}}/>);
  fireEvent.click(screen.getByRole('switch',{name:'「指名なし」を出す'}));await act(async()=>m.onSave!());await waitFor(()=>expect(m.staff).toHaveBeenCalledTimes(1));await act(async()=>m.onSave!());
- // B-246：同じ内容の再試行で、完了したルールを再保存しない。
+ // ：同じ内容の再試行で、完了したルールを再保存しない。
  expect(m.save.mock.calls.map(c=>c[1].expectedVersion)).toEqual([3]);expect(m.staff).toHaveBeenCalledTimes(2);expect(m.saved).not.toHaveBeenCalled();
 });
 
@@ -27,7 +27,7 @@ it('担当を一部だけ更新できた時は、再試行で未完了の担当�
  expect(m.staff.mock.calls.map(c=>c[1])).toEqual(['s1','s2','s2']);
 })
 
-it('B-244 数の欄の必須と保存検査をそろえ、欄下の理由と入力を保つ', async () => {
+it('数の欄の必須と保存検査をそろえ、欄下の理由と入力を保つ', async () => {
  const settings={version:3,timeZone:'Asia/Tokyo',bookingWindowDays:30,cutoffMinutesBefore:60,cancelDeadlineMinutesBefore:60,maxActiveBookingsPerFriend:3,approvalMode:'auto',holdMinutes:10,slotGranularityMinutes:30,reminderHoursBefore:4,businessHours:[],exceptions:[]} as unknown as React.ComponentProps<typeof RulesTabV8>['settings'];
  render(<RulesTabV8 accountId="fixture-a" settings={settings} status="ready" error={null} staff={[]} staffReady canEdit onSaved={m.saved} onReload={()=>{}}/>);
  const hold=screen.getByLabelText('仮押さえの保持時間') as HTMLInputElement;

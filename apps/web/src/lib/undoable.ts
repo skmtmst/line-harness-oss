@@ -5,7 +5,7 @@ import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api'
 
 /*
- * ★V7 sTJsh §1・§4「押したらすぐ反映」「確認の代わりに元に戻す」。
+ * ★管理画面 sTJsh §1・§4「押したらすぐ反映」「確認の代わりに元に戻す」。
  *
  * - §4 消す系の操作（`runUndoable`）：画面からはすぐ消し、
  *   サーバーへは5秒後に送る。「元に戻す」で止めたら送らない。
@@ -99,7 +99,7 @@ export function runUndoable(options: {
 }
 
 /**
- * 軽い操作を「押した瞬間」に画面へ反映し、裏で保存する（★V7 sTJsh §1）。
+ * 軽い操作を「押した瞬間」に画面へ反映し、裏で保存する（★管理画面 sTJsh §1）。
  *
  * `apply` で先に画面を変えてから呼ぶ。`request` が失敗したら `revert`
  * で戻し、「もう一度」で同じ操作をやり直せる知らせを出す。
@@ -138,7 +138,7 @@ export function runOptimistic(options: {
 const failureReason = (error: unknown): string => japaneseDetailOf(error)
 
 /**
- * ★V8 受信箱の右の欄でその場で直す（A-2 採用・B-26）。
+ * ★V8 受信箱の右の欄でその場で直す（A-2 採用・）。
  *
  * 呼び出し側が画面を先に変えてから呼ぶ。裏で `request` を送り、
  * - 通ったら白い知らせ「〇〇にしました ［元に戻す］」（5秒。乗せている間・押している間は止まる）。
@@ -188,7 +188,7 @@ export function runOptimisticWithUndo(options: {
       options.onSuccess?.(res)
       const undoRequest = options.undoRequest
       const message = options.successMessageOf?.() ?? options.successMessage
-      // 文が空なら知らせない（v7 の画面は今までどおり静かに終わる）。
+      // 文が空なら知らせない（管理画面 の画面は今までどおり静かに終わる）。
       if (!message) return
       dismissCurrent = notifyToast(message, undoRequest ? {
         actionLabel: '元に戻す',

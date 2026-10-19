@@ -92,7 +92,7 @@ export function useAutomationSave({
   }
 
   /*
-   * 競合（tJqST）の記録。保存済みのいまの内容を取り直し、
+   * 競合の記録。保存済みのいまの内容を取り直し、
    * 自分の入力は残したまま帯で知らせる。比べる窓の材料にもする。
    */
   const recordConflict = async (targetDraftId: string, targetAccountId: string): Promise<boolean> => {
@@ -254,7 +254,7 @@ export function useAutomationSave({
       const saved = await api.automations.getDraft(draft.id, accountId)
       if (!saved.success) throw new Error(saved.error)
       /*
-       * R489・tJqST: 承知の上書き（force）でなければ、ほかの人の保存と
+       * R489・: 承知の上書き（force）でなければ、ほかの人の保存と
        * 重なったら帯で知らせる。自分の入力は残す。
        */
       if (!forcedVersion && saved.data.draftVersionId !== res.data.draftVersionId) {
@@ -343,7 +343,7 @@ export function useAutomationSave({
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
       /*
-       * tJqST: 版の重なり（409）は帯で知らせる。結び付き・控えは捨てず、
+       * : 版の重なり（409）は帯で知らせる。結び付き・控えは捨てず、
        * 自分の入力のまま比べ直せるようにする。消えた下書き（404）だけ
        * 従来どおり控えを捨てて作り直す。
        */

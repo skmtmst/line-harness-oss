@@ -239,7 +239,7 @@ const RULES = [
 ]
 
 describe('m22d 同じ件数は1画面に1か所', () => {
-  it('/auto-replies は有効・要確認の件数を重ねず、名前を1行にする', async () => {
+  it('auto-replies は有効・要確認の件数を重ねず、名前を1行にする', async () => {
     fns.autoRepliesList.mockResolvedValue({ success: true, data: AUTO_REPLIES })
     fns.templatesList.mockResolvedValue({ success: true, data: [] })
     fns.autoRepliesSummary.mockResolvedValue({ success: true, data: { conflicts: [], conflictCount: 3, receiveSourceCounts: null, matchedLast28Days: null } })
@@ -249,14 +249,14 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('ほか3つ')
   })
 
-  it('/auto-replies/runs は失敗した行に理由を出す（「失敗1件」を出さない）', async () => {
+  it('auto-replies/runs は失敗した行に理由を出す（「失敗1件」を出さない）', async () => {
     fns.autoRepliesRuns.mockResolvedValue({ success: true, data: { ...AUTO_REPLY_RUNS, pagination: { total: 4, limit: 20, offset: 0 } } })
     await renderPage(React.createElement(AutoReplyRunsPage))
     expectNoDuplicateCounts()
     expect(host.textContent).toContain('LINEへの返信を受け付けてもらえませんでした')
   })
 
-  it('/friend-add-settings は数の帯を重ねず、B-231のページ送りに表示範囲を出す', async () => {
+  it('friend-add-settings は数の帯を重ねず、のページ送りに表示範囲を出す', async () => {
     fns.friendAddRulesList.mockResolvedValue({
       success: true,
       data: {
@@ -275,13 +275,13 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     await renderPage(React.createElement(FriendAddSettingsPage))
     const pagination = host.querySelector('[data-pagination]')!
     expect(pagination.textContent).toContain('4件中 1〜4件')
-    // B-231の範囲表示を除き、すべての件数の重複を引き続き見張る。
+    // の範囲表示を除き、すべての件数の重複を引き続き見張る。
     expectNoDuplicateCounts(true)
     expect(host.textContent).toContain('初回案内')
   })
 
-  it('/friend-add-settings/runs は失敗した実行の行に理由を出す', async () => {
-    /* 見本の5行目（再追加・Instagram）は V8 の絵 REIxB のための行。経路の内訳が「1件」を4つ並べるのはデータの都合なので、
+  it('friend-add-settings/runs は失敗した実行の行に理由を出す', async () => {
+    /* 見本の5行目（再追加・Instagram）は V8 の絵  のための行。経路の内訳が「1件」を4つ並べるのはデータの都合なので、
        この見張り（同じ件数の繰り返し）は従来の4行で見る。 */
     fns.friendAddRulesRuns.mockResolvedValue({ success: true, data: { ...FRIEND_ADD_RUNS, items: FRIEND_ADD_RUNS.items.slice(0, 4) } })
     fns.friendAddRulesGet.mockResolvedValue({ success: true, data: { rule: { id: 'rule-shop', version: 1 } } })
@@ -290,14 +290,14 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     expect(host.textContent).toContain('失敗した処理')
   })
 
-  it('/ec-commerce/identity-candidates は売上カードの副文で件数を繰り返さない', async () => {
+  it('ec-commerce/identity-candidates は売上カードの副文で件数を繰り返さない', async () => {
     fns.ecIdentity.mockResolvedValue({ success: true, data: EC_IDENTITY_CANDIDATES })
     await renderPage(React.createElement(IdentityCandidatesPage))
     expectNoDuplicateCounts()
     expect(host.textContent).not.toContain('この24件ぶん')
   })
 
-  it('/friends/migrations は行の単位を見出しに寄せ、一覧の件数は ListRange に出す', async () => {
+  it('friends/migrations は行の単位を見出しに寄せ、一覧の件数は ListRange に出す', async () => {
     fns.friendMigrationsJobs.mockResolvedValue({
       success: true,
       data: [
@@ -312,7 +312,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     expect(host.textContent).toContain('書き出し・取り込みの履歴')
   })
 
-  it('/ops/audit は一覧の件数の1か所（見出しの横に出さない）', async () => {
+  it('ops/audit は一覧の件数の1か所（見出しの横に出さない）', async () => {
     fns.opsAudit.mockResolvedValue({
       success: true,
       data: [
@@ -326,7 +326,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     expect(host.querySelector('[title="2件中 1〜2件を表示"]')).not.toBeNull()
   })
 
-  it('/ops/dashboard はプラン別の行を割合だけにする', async () => {
+  it('ops/dashboard はプラン別の行を割合だけにする', async () => {
     fns.opsDashboard.mockResolvedValue({
       success: true,
       data: {
@@ -359,7 +359,7 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     expectNoDuplicateCounts()
   })
 
-  it('/ops/support は一覧の件数と詳細の来歴を書き分ける', async () => {
+  it('ops/support は一覧の件数と詳細の来歴を書き分ける', async () => {
     fns.opsSupportSummary.mockResolvedValue({
       success: true,
       data: {
@@ -391,14 +391,14 @@ describe('m22d 同じ件数は1画面に1か所', () => {
     expect(host.querySelector('[title*="これまで2のうち未解決1件"]')).not.toBeNull()
   })
 
-  it('/affiliates/new は「1件あたり」を注記と欄名で重ねない', async () => {
+  it('affiliates/new は「1件あたり」を注記と欄名で重ねない', async () => {
     fns.friendsList.mockResolvedValue({ success: true, data: { items: [], total: 231 } })
     await renderPage(React.createElement(NewAffiliatePage))
     expectNoDuplicateCounts()
     expect(host.textContent).not.toContain('1件あたりの金額を決めます')
   })
 
-  it('/conversions/new は「1件」を試算の1か所に集約する', async () => {
+  it('conversions/new は「1件」を試算の1か所に集約する', async () => {
     fns.conversionsPreview.mockResolvedValue({ success: true, data: CONVERSION_DEFINITION_PREVIEW })
     fns.funnelsList.mockResolvedValue({ success: true, data: [] })
     fns.nenSettings.mockResolvedValue({ success: true, data: [] })

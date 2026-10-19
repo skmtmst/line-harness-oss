@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * useFormErrors の契約試験（★V7 sTJsh §6）。
+ * useFormErrors の契約試験（★管理画面 sTJsh §6）。
  *
  * - 欄から離れた時点で1回だけ理由を出す（開いた直後・未タッチの欄には出さない）
  * - 直すと描画の時点で誤りが消える
@@ -69,7 +69,7 @@ async function type(id: string, value: string) {
   })
 }
 
-describe('useFormErrors（★V7 sTJsh §6）', () => {
+describe('useFormErrors（★管理画面 sTJsh §6）', () => {
   it('開いた直後・まだ触っていない欄には何も出さない', async () => {
     await render()
     expect(host.querySelector('[data-field-error]')).toBeNull()
@@ -131,7 +131,7 @@ describe('useFormErrors（★V7 sTJsh §6）', () => {
     expect(captured).toEqual([])
   })
 
-  it('隠れたカードの欄は、そのカードを開いてから移り、札に赤い印を付ける（B-139）', async () => {
+  it('隠れたカードの欄は、そのカードを開いてから移り、札に赤い印を付ける', async () => {
     function CardsHarness() {
       const [bodies, setBodies] = useState(['あ', ''])
       const [active, setActive] = useState(0)

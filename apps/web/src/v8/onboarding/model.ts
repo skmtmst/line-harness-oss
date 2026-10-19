@@ -28,7 +28,7 @@ export function answersForApi(answers: Record<string, SetupAnswer>): Record<stri
   return out
 }
 
-/* B-313（オーナー）が正：飲食は 11 問（lS1Gh の左の一覧の並び）。予約を使うかは「予約の確定の仕方」の答えから送る。 */
+/* （オーナー）が正：飲食は 11 問（lS1Gh の左の一覧の並び）。予約を使うかは「予約の確定の仕方」の答えから送る。 */
 const BY_STYLE: Record<AccountStyle, string[]> = {
   restaurant: ['approval', 'payment', 'cancelDeadline', 'reminders', 'stamps', 'coupons', 'seats', 'hours', 'partySize'],
   salon: ['approval', 'payment', 'cancelDeadline', 'reminders', 'tickets', 'stamps', 'coupons', 'nomination', 'hours'],
@@ -91,7 +91,7 @@ export function selectedValue(answer: SetupAnswer | undefined, question?: Questi
   return answer.mode === 'configured' ? String(answer.value ?? (answer.resourceId ? 'existing' : '')) : answer.mode
 }
 
-/* ── 開き直したときの保存（B-335 (2)） ─────────────────────────── */
+/* ── 開き直したときの保存（ (2)） ─────────────────────────── */
 
 /** 予約設定に書く答え（口は approval を予約設定の承認の仕方へ書く）。 */
 export const SETTINGS_KEYS = ['approval']
@@ -117,7 +117,7 @@ export function settingsChanges(saved: Record<string, SetupAnswer>, next: Record
   return lines
 }
 
-/** 予約確定のご案内の見本（いつもの確定の知らせと重なる。B-335 (3)・点検 1-3）。 */
+/** 予約確定のご案内の見本（いつもの確定の知らせと重なる。 (3)・点検 1-3）。 */
 export function isBookingConfirmSample(item: StarterSetItem): boolean {
   return item.kind === 'automation' && (item.key === 'reminder' || item.name.includes('予約確定'))
 }

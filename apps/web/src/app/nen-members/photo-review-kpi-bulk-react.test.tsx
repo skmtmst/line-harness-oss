@@ -130,7 +130,7 @@ async function selectPhoto(index: number) {
   await act(async () => { target.click() })
 }
 
-/** B-245: read the actual explanation opened from the shared help button. */
+/** : read the actual explanation opened from the shared help button. */
 async function averageTimeValue(): Promise<string | undefined> {
   const button = host.querySelector<HTMLButtonElement>('button[aria-label="投稿の説明"]')
   if (!button) return undefined

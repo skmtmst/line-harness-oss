@@ -19,7 +19,7 @@ it('支払い一覧の壊れた返事を空の一覧にせず、読み直す',as
  await screen.findByText('今回締められる報酬はありません')
  expect(f.summaries).toHaveBeenCalledTimes(2)
 })
-it.each(['summaries','current'] as const)('B-241：支払いの%s拒否を未処理なし・未締めとして扱わず読み直す',async(key)=>{
+it.each(['summaries','current'] as const)('支払いの%s拒否を未処理なし・未締めとして扱わず読み直す',async(key)=>{
  f[key].mockRejectedValueOnce(new Error('fixture failure'))
  render(<PaymentTab/>)
  const error=await screen.findByText('支払いの集計を読み込めませんでした')

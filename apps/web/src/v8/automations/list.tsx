@@ -78,7 +78,7 @@ import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/
 import FriendPickerField from '@/components/shared/friend-picker-field'
 
 /*
- * ★V8 オートメーションのルール一覧（Pencil：一覧 `LWQXd`・1152 `En14p`・閲覧のみ `nH9L8`）。
+ * ★V8 オートメーションのルール一覧（Pencil：一覧 ``・1152 ``・閲覧のみ ``）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・保存・権限・失敗時の扱いは
  * 今までの V8 一覧（app/automations/list-v8.tsx）と同じ（BEHAVIOR.md）。違いは見せ方だけ——
@@ -158,7 +158,7 @@ export default function AutomationListV8() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { selectedAccountId, loading: accountLoading } = useAccount()
-  // 1152 の板（`En14p`）。道具の段の並びと列だけを切り替える。
+  // 1152 の板（``）。道具の段の並びと列だけを切り替える。
   const narrow = useNarrowViewport()
   /*
    * 閲覧のみ（変える権限が無い人）：作る・編集・複製・1人で試す・止める・削除・フォルダを追加は
@@ -461,7 +461,7 @@ export default function AutomationListV8() {
   const notice = (
     null
   )
-  /* 1152 の板（En14p）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
+  /* 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
 
   const wideToolbar = (
     <>

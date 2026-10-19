@@ -10,7 +10,7 @@ import { Tabs } from './tabs'
 import { DashboardPage, DashboardRow } from '../templates/dashboard-page'
 
 /*
- * 提案 E（今日のお店 hKRRF・電話予約 svUTk・ウォークイン PUWyq）で足した共通部品・型の口。
+ * 提案 E（今日のお店 hKRRF・電話予約 ・ウォークイン ）で足した共通部品・型の口。
  * どれも「渡さなければ今までどおり」。渡した画面だけが絵の寸法になる。
  */
 afterEach(() => cleanup())

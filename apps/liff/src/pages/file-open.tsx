@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import LiffLookScope from '../components/LiffLookScope.js';
-import LoadingView from '../components/LoadingView.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import Button from '../components/ui/Button.js';
-import Card from '../components/ui/Card.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import LoadingView from '../components/loading-view.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import Button from '../components/ui/button/index.js';
+import Card from '../components/ui/card.js';
 import {
   FileDownloadError,
   fetchFileBlob,
@@ -14,8 +14,8 @@ import {
   type IssuedFile,
 } from '../lib/file-download-api.js';
 import { logFailure } from '../lib/user-message.js';
-import DownloadFailure from '../components/DownloadFailure.js';
-import { closeOrBackToLine } from './NotFound.js';
+import DownloadFailure from '../components/download-failure.js';
+import { closeOrBackToLine } from './not-found.js';
 
 /** 失敗の言葉は docs/security/SIGNED-DOWNLOADS.md「失敗の文言と画面の状態」と同じ。 */
 export const FILE_TEXT = {

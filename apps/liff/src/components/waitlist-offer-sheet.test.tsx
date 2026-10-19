@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import WaitlistOfferSheet from './WaitlistOfferSheet.js';
+import WaitlistOfferSheet from './waitlist-offer-sheet.js';
 const mocks = vi.hoisted(() => ({ bookingWaitlists: vi.fn(), seatWaitlists: vi.fn(), acceptWaitlist: vi.fn(), acceptSeatWaitlist: vi.fn(), cancelWaitlist: vi.fn(), cancelSeatWaitlist: vi.fn() }));
 vi.mock('../lib/api.js', () => ({ api: mocks }));
-vi.mock('./BookingPayment.js', () => ({ default: () => <div>お支払い</div> }));
+vi.mock('./booking-payment.js', () => ({ default: () => <div>お支払い</div> }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const offer = { id: 'w', staff_id: 's', menu_id: 'm', starts_at: '2099-01-01T05:00:00Z', ends_at: '2099-01-01T06:00:00Z', status: 'invited', hold_expires_at: '2099-01-01T04:00:00Z', hold_minutes: 30, created_at: '2026-01-01', menu_name: '試験メニュー', staff_name: '試験担当' };
 describe('本人用の案内シート', () => {

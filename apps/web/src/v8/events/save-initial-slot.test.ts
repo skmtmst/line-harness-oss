@@ -5,7 +5,7 @@ import { saveInitialSlot, type InitialSlotCache } from './save-initial-slot'
 const input = { starts_at: '2026-10-20T05:00:00Z', ends_at: '2026-10-20T06:00:00Z', capacity: 3, client_key: 'first-slot:event-1' }
 const original: EventSlot = { ...input, id: 'slot-1', event_id: 'event-1', capacity: 2, version: 4, is_active: 1, sort_order: 0 }
 
-describe('B-246 作成応答を失った最初の枠', () => {
+describe('作成応答を失った最初の枠', () => {
   it('同じキーで戻った既存枠を、返された版で今の入力へ更新する', async () => {
     const api = { createSlots: vi.fn().mockResolvedValue({ items: [original] }), listSlots: vi.fn(), updateSlot: vi.fn().mockResolvedValue({ ...original, ...input, version: 5 }) }
     const capture = vi.fn()

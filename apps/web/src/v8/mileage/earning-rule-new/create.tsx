@@ -46,7 +46,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 
 /*
- * ★V8-B マイル「たまる決めごとを作る」（Pencil：作る `ctLwT`・競合 `BnrQp`）。
+ * ★V8-B マイル「たまる決めごとを作る」（Pencil：作る ``・競合 ``）。
  *
  * 型（CreatePage）に、4つの段（どのルールか・何マイル付けるか・受け取る人・使えるまで・付けすぎを防ぐ）と、
  * 右の列（この設定だとこう貯まります・気をつけること）、下の帯（キャンセル・保存して続けて作る・保存して動かす）を渡す。
@@ -124,7 +124,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [touched, setTouched] = useState(false)
-  /** BnrQp：保存が 409 で返ったとき。口が返した「だれが・いつ」を持つ。 */
+  /** ：保存が 409 で返ったとき。口が返した「だれが・いつ」を持つ。 */
   const [conflict, setConflict] = useState<{ who: string | null; at: string | null } | null>(null)
   const [trialBusy, setTrialBusy] = useState(false)
   const [trialError, setTrialError] = useState('')
@@ -249,7 +249,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
       else router.push(createPageReturnHref(LIST_HREF, res.data.id))
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
-      /* BnrQp：同時に作られた・版がずれたときは競合の帯で知らせる。 */
+      /* ：同時に作られた・版がずれたときは競合の帯で知らせる。 */
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(conflictWho(caught.data))
         { if (!fieldFailure)

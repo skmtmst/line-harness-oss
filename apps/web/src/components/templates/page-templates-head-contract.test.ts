@@ -13,7 +13,7 @@ const globals = readFileSync(join(HERE, '..', '..', 'app', 'globals.css'), 'utf8
  * 題 22px/700/行32・間 4px・説明 13px/行19・上の余白 20。
  * 小さい「部品どおり」（EnlYo）は compact の変わり形に残す。
  * regular と未指定は既定（22/32）と同じにする。
- * v7 には効かない（すべて data-theme v8 限定）。
+ * 管理画面 には効かない（すべて data-theme v8 限定）。
  */
 describe('型の見出し（379板の絵）', () => {
   it('寸法は先頭の変数に1か所まとめ・値は絵どおり', () => {

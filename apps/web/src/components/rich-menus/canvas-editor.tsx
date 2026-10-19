@@ -99,7 +99,7 @@ export function CanvasEditor({
   const dims = RICH_MENU_DIMENSIONS[size]
   const [scale, setScale] = useState(appearance === 'v8' ? 0.24 : 0.3)
   const [drag, setDrag] = useState<DragState>(null)
-  /** 上限に当たったときの知らせ。**`alert()` の代わりに画面へ残す。** */
+  /** 上限に当たったときの知らせ。**`alert` の代わりに画面へ残す。** */
   const [limitNotice, setLimitNotice] = useState('')
 
   useEffect(() => {
@@ -111,7 +111,7 @@ export function CanvasEditor({
       if (width <= 0) return
       // 採用案 Wmch0：置き場の幅いっぱい、maxWidth まで。
       if (maxWidth !== undefined) setScale(Math.min(width, maxWidth) / dims.width)
-      // 絵（Z0uO6・kmTab）：画像は左右に 22 ずつ空けて、幅は 600 まで（1152 の板で 480）。
+      // 絵（・）：画像は左右に 22 ずつ空けて、幅は 600 まで（1152 の板で 480）。
       else setScale(Math.min(width - 44, 600) / dims.width)
     }
     fit()
@@ -231,7 +231,7 @@ export function CanvasEditor({
         if (w >= MIN_AREA && h >= MIN_AREA) {
           /*
             LINEの上限（1ページに20個）を先に止める。超えて足すと、保存や
-            登録のときに断られる。**`alert()` では出さない**——見た目が
+            登録のときに断られる。**`alert` では出さない**——見た目が
             ブラウザ任せで、画像比較にも写らない。画面に文で残す。
           */
           if (areas.length >= 20) {

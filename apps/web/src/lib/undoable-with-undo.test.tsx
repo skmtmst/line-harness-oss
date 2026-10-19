@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 B-26（A-2 採用）受信箱の右の欄でその場で直す：押した瞬間に変えて裏で保存し、
+ * ★V8 （A-2 採用）受信箱の右の欄でその場で直す：押した瞬間に変えて裏で保存し、
  * 通ったら［元に戻す］付きの白い知らせ（5秒・乗せている間は止まる）、失敗したら戻して
  * 理由と［もう一度試す］。共通の知らせ（ToastHost）で確かめる。
  */
@@ -104,7 +104,7 @@ describe('runOptimisticWithUndo（その場で直す）', () => {
     expect(container.textContent).toContain('元に戻せませんでした')
   })
 
-  it('成功の文が空なら知らせない（v7 の画面は静かに終わる）', async () => {
+  it('成功の文が空なら知らせない（管理画面 の画面は静かに終わる）', async () => {
     const onSuccess = vi.fn()
     const { container } = render(<ToastHost />)
     await act(async () => {

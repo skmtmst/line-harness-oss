@@ -79,7 +79,7 @@ export default function TargetMissing({
 }: TargetMissingProps) {
   const Icon = ICONS[kind]
   /*
-   * RqO7O：v8 の絵の失敗の題は「読み込めませんでした」。共通の文（ListState・失敗の言い分け）と、
+   * ：v8 の絵の失敗の題は「読み込めませんでした」。共通の文（ListState・失敗の言い分け）と、
    * 画面が渡す「〇〇を表示できませんでした」を、v8 では「〇〇を読み込めませんでした」で出す。
    */
   const shownTitle = kind === 'error' ? title.replace(/表示できませんでした$/, '読み込めませんでした') : title
@@ -102,7 +102,7 @@ export default function TargetMissing({
       </Button>
     )
   } else if (showRetry) {
-    /* RqO7O：v8 の絵は「もう一度試す」。 */
+    /* ：v8 の絵は「もう一度試す」。 */
     /* 読み上げ名は見えている文字と同じにする（別の名前を付けると、声で操作する人が呼べない）。 */
     action = (
       <Button type="button" variant="secondary" onClick={retry} disabled={retrying} busy={retrying} busyLabel="読み込んでいます">

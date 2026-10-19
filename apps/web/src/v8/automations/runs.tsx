@@ -41,7 +41,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 オートメーションの動いた記録（Pencil `g98F9`）。
+ * ★V8 オートメーションの動いた記録（Pencil ``）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
  * （app/automations/runs-v8.tsx）と同じ（一覧・検索・結果の絞り込み・テスト実行の出し分け・CSV・

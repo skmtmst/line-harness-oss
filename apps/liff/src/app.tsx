@@ -1,30 +1,30 @@
 import { liffActionFromUrl } from '@line-crm/shared';
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation, useSearchParams } from 'react-router-dom';
-import LoadingView from './components/LoadingView.js';
-import { useCustomerStyle } from './components/CustomerStyleScope.js';
-import CustomerBookingEntry from './components/CustomerBookingEntry.js';
+import LoadingView from './components/loading-view.js';
+import { useCustomerStyle } from './components/customer-style-scope.js';
+import CustomerBookingEntry from './components/customer-booking-entry.js';
 
 // 画面ごとに束を分ける。開いた画面のぶんだけ読む。
-const Booking = lazy(() => import('./pages/Booking.js'));
-const BookingHistory = lazy(() => import('./pages/BookingHistory.js'));
-const MyPage = lazy(() => import('./pages/MyPage.js'));
-const Event = lazy(() => import('./pages/Event.js'));
-const EventConfirm = lazy(() => import('./pages/EventConfirm.js'));
-const EventDone = lazy(() => import('./pages/EventDone.js'));
-const EventBookings = lazy(() => import('./pages/EventBookings.js'));
-const Affiliate = lazy(() => import('./pages/Affiliate.js'));
-const Webinar = lazy(() => import('./pages/Webinar.js'));
-const Research = lazy(() => import('./pages/Research.js'));
-const Form = lazy(() => import('./pages/Form.js'));
-const EventWaitlistOffer = lazy(() => import('./pages/EventWaitlistOffer.js'));
-const VisitStampQr = lazy(() => import('./pages/VisitStampQr.js'));
-const VisitStamps = lazy(() => import('./pages/VisitStamps.js'));
-const SeatReserve = lazy(() => import('./pages/seat/SeatReserve.js'));
-const EntryRouteCoupon = lazy(() => import('./pages/EntryRouteCoupon.js'));
-const FileOpen = lazy(() => import('./pages/FileOpen.js'));
-const StatementOpen = lazy(() => import('./pages/StatementOpen.js'));
-const NotFound = lazy(() => import('./pages/NotFound.js'));
+const Booking = lazy(() => import('./pages/booking.js'));
+const BookingHistory = lazy(() => import('./pages/booking-history.js'));
+const MyPage = lazy(() => import('./pages/my-page.js'));
+const Event = lazy(() => import('./pages/event.js'));
+const EventConfirm = lazy(() => import('./pages/event-confirm.js'));
+const EventDone = lazy(() => import('./pages/event-done.js'));
+const EventBookings = lazy(() => import('./pages/event-bookings.js'));
+const Affiliate = lazy(() => import('./pages/affiliate.js'));
+const Webinar = lazy(() => import('./pages/webinar.js'));
+const Research = lazy(() => import('./pages/research.js'));
+const Form = lazy(() => import('./pages/form.js'));
+const EventWaitlistOffer = lazy(() => import('./pages/event-waitlist-offer.js'));
+const VisitStampQr = lazy(() => import('./pages/visit-stamp-qr.js'));
+const VisitStamps = lazy(() => import('./pages/visit-stamps.js'));
+const SeatReserve = lazy(() => import('./pages/seat/seat-reserve.js'));
+const EntryRouteCoupon = lazy(() => import('./pages/entry-route-coupon.js'));
+const FileOpen = lazy(() => import('./pages/file-open.js'));
+const StatementOpen = lazy(() => import('./pages/statement-open.js'));
+const NotFound = lazy(() => import('./pages/not-found.js'));
 
 function Loading() {
   return <LoadingView />;

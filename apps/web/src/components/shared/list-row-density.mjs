@@ -1,4 +1,4 @@
-/** B-254: count rendered text lines within each cell, never across columns. */
+/** : count rendered text lines within each cell, never across columns. */
 export function listRowContentLines(row) {
   const doc = row.ownerDocument
   const view = doc.defaultView

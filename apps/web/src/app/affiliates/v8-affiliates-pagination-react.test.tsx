@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * V8 アフィリエイター一覧：表の下に件数とページ送りを出す（v7 parity-D）。
+ * V8 アフィリエイター一覧：表の下に件数とページ送りを出す（管理画面 parity-D）。
  * 20件表示で25人いるとき、1頁に25人全員は出さず、2頁へ動ける。
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'

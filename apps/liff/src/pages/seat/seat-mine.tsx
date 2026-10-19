@@ -1,5 +1,5 @@
 import type { RestaurantCustomerBooking } from '@line-crm/shared';
-import Button from '../../components/ui/Button.js';
+import Button from '../../components/ui/button/index.js';
 import {
   STATUS_LABEL,
   deadlineText,

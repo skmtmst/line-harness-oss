@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import Confirm from './Confirm.js';
-import { CustomerStyleContext } from './CustomerStyleScope.js';
+import Confirm from './confirm.js';
+import { CustomerStyleContext } from './customer-style-scope.js';
 import { api, type MenuItem } from '../lib/api.js';
 
 vi.mock('../lib/api.js', () => ({ api: { cancellationPreview: vi.fn(), entitlements: vi.fn(), createRequest: vi.fn() } }));

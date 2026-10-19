@@ -7,7 +7,7 @@ import { readSessionSnapshot } from '@/lib/session-snapshot'
 import NoteBar from '@/components/shared/note-bar'
 
 /**
- * V-2: いつもと違う端末・場所からのログイン帯（v6-30 §14）。
+ * V-2: いつもと違う端末・場所からのログイン帯（管理画面-30 §14）。
  *
  * /api/auth/session が unfamiliarAt を返すときだけ描く。帯は AuthGuard の
  * 内側に載るので、答えは AuthGuard が取ったものを読む（readSessionSnapshot）。

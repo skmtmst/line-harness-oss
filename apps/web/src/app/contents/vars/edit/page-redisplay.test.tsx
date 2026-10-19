@@ -139,7 +139,7 @@ async function click(element: HTMLElement) {
   await act(async () => { element.click() })
 }
 
-/** 暦で YYYY-MM-DD の日を選ぶ（日付・日時の選択の★V7）。 */
+/** 暦で YYYY-MM-DD の日を選ぶ（日付・日時の選択の★管理画面）。 */
 async function pickCalendarDay(iso: string) {
   const [y, mo, d] = iso.split('-').map(Number)
   const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]

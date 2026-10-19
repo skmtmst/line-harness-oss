@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
-describe('V6 機能20 分析', () => {
+describe('管理画面 機能20 分析', () => {
   it('クロス分析とファネルは旧集計へ戻らず、版付きの不変結果を使う', () => {
     for (const path of [
       '/api/analytics/cross/query',
@@ -96,7 +96,7 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('友だち情報欄を読み込めませんでした。')
     expect(PAGE).toContain('ファネルを読み込めませんでした。')
     // 開き直ししかできなかったエラー面には、同じ条件で読み直す導線を付ける。
-    // ★V7 `x63W5x`：ボタンの文言は共通部品（ListState）が持つ。ここでは口があることだけ見る。
+    // ★管理画面 `x63W5x`：ボタンの文言は共通部品（ListState）が持つ。ここでは口があることだけ見る。
     expect(PAGE).toContain('onRetry')
     expect(PAGE).toContain('fieldsReload')
     expect(PAGE).toContain('funnelsReload')

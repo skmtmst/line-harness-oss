@@ -1,4 +1,4 @@
-/* 絵 GcyTr「次の予約」のカード：顔と名前／状態の札と経路／印つきの行／操作2つを横に。 */
+/* 絵 「次の予約」のカード：顔と名前／状態の札と経路／印つきの行／操作2つを横に。 */
 .card { display: flex; flex-direction: column; gap: var(--tpl-next-booking-gap-1); }
 .who { display: flex; align-items: center; gap: var(--tpl-next-booking-gap-2); min-width: 0; }
 .names { display: flex; flex-direction: column; min-width: 0; }

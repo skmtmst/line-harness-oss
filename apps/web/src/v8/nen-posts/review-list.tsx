@@ -73,7 +73,7 @@ export type ReviewListV8Props = {
 export const RAIL_REASON_CODES: ReviewReasonCode[] = ['quality', 'privacy', 'unrelated']
 
 /**
- * 審査の札（TkA4D・Jn95h・見送り）と採用の札（cniyw）。
+ * 審査の札（・・見送り）と採用の札。
  * 審査待ちは「道具の段・写真3列・説明」の左の列＋右に決まりの棚（幅300）。
  * 採用は棚なしで、幅288のカードを左から並べる。
  */
@@ -286,7 +286,7 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
 }
 
 /**
- * この写真を見送る（ujcar）。真ん中の小窓。
+ * この写真を見送る。真ん中の小窓。
  * 理由をえらぶとお客様への文章が自動でつくられる。
  * 見送ってもマイルは減らない。
  */

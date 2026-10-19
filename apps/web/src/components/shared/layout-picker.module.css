@@ -1,6 +1,6 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-/* 案A（JeINq・EFV8l）：寸法は部品が持ち、呼ぶ画面から上書きしない。 */
+/* 案A（・）：寸法は部品が持ち、呼ぶ画面から上書きしない。 */
 .list { display: flex; flex-wrap: wrap; gap: 8px; }
 .tile { width: 120px; min-height: 110px; align-items: center; }
 .tile > span:last-child { order: -1; }
@@ -12,7 +12,7 @@
 .tile:has(input:checked) .area { color: var(--color-accent-deep); }
 }
 
-/* リッチメッセージの6面を1段に置く。右上のラジオの下へ見本を置き、重ねない（B-203/229）。 */
+/* リッチメッセージの6面を1段に置く。右上のラジオの下へ見本を置き、重ねない（/229）。 */
 html:root .list[data-preview='message'] .tile {
   width: 104px;
 }

@@ -1,4 +1,4 @@
-/** B-244/245：必須/任意と保存時検証の定義が矛盾しないことを確認する。 */
+/** /245：必須/任意と保存時検証の定義が矛盾しないことを確認する。 */
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'

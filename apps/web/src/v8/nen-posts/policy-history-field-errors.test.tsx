@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-/* B-139：報酬の決まりの新しい版（N1br7）。保存で落ちた欄は、その欄が赤くなり真下に理由が出て、1つ目の欄へ移る。 */
+/* ：報酬の決まりの新しい版。保存で落ちた欄は、その欄が赤くなり真下に理由が出て、1つ目の欄へ移る。 */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, waitFor } from '@testing-library/react'

@@ -12,7 +12,7 @@ import WebinarsPage from './page'
 import type { WebinarListItem } from '@/lib/api'
 
 /*
- * ★V8-B ウェビナー一覧（板 `UyUMw`・状態 `eAQ3t`・閲覧のみ `jiNg0`）の契約。
+ * ★V8-B ウェビナー一覧（板 ``・状態 ``・閲覧のみ ``）の契約。
  * V8だけの一覧で、
  * 見本が決めた帯・表・札・押せない形が出ることを実DOMで固定する。
  */
@@ -142,7 +142,7 @@ test('v8 では UyUMw の一覧（帯・表・視聴の2行）が出る', async 
   expect(document.querySelector('[role="menu"]')?.textContent).toContain('編集する')
 })
 
-/* 公開期間が終わった行の札は、一覧の絵（UyUMw・uBMuB・jiNg0）どおり「非公開」。 */
+/* 公開期間が終わった行の札は、一覧の絵（・・）どおり「非公開」。 */
 test('v8 の公開予定・非公開の札が出る', async () => {
   listItems = [
     webinar({ id: 'w-future', title: 'EC連携実践講座', publicationState: 'scheduled' }),

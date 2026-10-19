@@ -1,23 +1,23 @@
-import { useCustomerWords, useCustomerStyle } from '../components/CustomerStyleScope.js';
+import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type EventBookingMine, type EventSlot } from '../lib/api.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import LoadingView from '../components/LoadingView.js';
-import Card from '../components/ui/Card.js';
-import Badge from '../components/ui/Badge.js';
-import Button from '../components/ui/Button.js';
-import ConfirmDialog from '../components/ui/ConfirmDialog.js';
-import Icon from '../components/ui/Icon.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import StatusView from '../components/ui/StatusView.js';
+import LoadErrorView from '../components/load-error-view.js';
+import LoadingView from '../components/loading-view.js';
+import Card from '../components/ui/card.js';
+import Badge from '../components/ui/badge.js';
+import Button from '../components/ui/button/index.js';
+import ConfirmDialog from '../components/ui/confirm-dialog.js';
+import Icon from '../components/ui/icon.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import StatusView from '../components/ui/status-view.js';
 
 import { statusMeta, canLeaveWaitlist } from './event-bookings-policy.js';
-import LessonHistorySection from '../components/LessonHistorySection.js';
-import AbsenceSheet from '../components/AbsenceSheet.js';
+import LessonHistorySection from '../components/lesson-history-section.js';
+import AbsenceSheet from '../components/absence-sheet.js';
 
 function canCancel(b: EventBookingMine): boolean {
   if (b.status !== 'requested' && b.status !== 'confirmed') return false;
@@ -29,7 +29,7 @@ function canCancel(b: EventBookingMine): boolean {
 /**
  * 3-b 自分のイベント。「これから／これまで」の切り替え。
  * キャンセルは期限まで。確認の出し方と失敗の文言はそのまま。
- * 見た目だけ ★V7 (日付の四角＋名前＋札＋補足)。
+ * 見た目だけ ★管理画面 (日付の四角＋名前＋札＋補足)。
  */
 /** 変更の断りが確定した応答（同じ受付キーで送り直しても結果は変わらない）。 */
 const DECIDED_CHANGE_ERRORS = new Set([
@@ -85,7 +85,7 @@ export default function EventBookings() {
     return () => { requestGeneration.current++; };
   }, [refresh]);
 
-  // 取り消す予約。開いている間だけ持つ。ブラウザの `confirm()` は使わず、
+  // 取り消す予約。開いている間だけ持つ。ブラウザの `confirm` は使わず、
   // 共通の確認窓で聞く (やめるを選ぶとここが空のまま終わる)。
   const [pendingCancel, setPendingCancel] = useState<EventBookingMine | null>(null);
 

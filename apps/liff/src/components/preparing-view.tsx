@@ -1,14 +1,14 @@
 import liff from '../lib/liff-runtime.js';
-import LiffHeader from './ui/LiffHeader.js';
-import StatusView from './ui/StatusView.js';
-import BottomBar from './ui/BottomBar.js';
-import Button from './ui/Button.js';
+import LiffHeader from './ui/liff-header.js';
+import StatusView from './ui/status-view.js';
+import BottomBar from './ui/bottom-bar.js';
+import Button from './ui/button/index.js';
 
 /** 準備中を表す言葉（管理画面の preparing-dialog と同じ）。 */
 export const PREPARING_TITLE = '現在準備中です';
 
 /**
- * お客さまの準備中の画面（★V8 修正案の列 VHp7p `K9HMJp`。決まり B-313 追記・B-314）。
+ * お客さまの準備中の画面（★V8 修正案の列 VHp7p `K9HMJp`。決まり  追記・）。
  *
  * リッチメニューなどにボタンはあるのに、お店がまだ中身（決まり）を入れていない機能を押したとき、
  * 壊れた画面や空の画面ではなくこれを出す。上の帯は機能の名前、真ん中に印・題・本文、下の帯に［トークに戻る］。

@@ -54,7 +54,7 @@ export function WizardConfirmStep({ actionOptions, autoReplyId, confirmState, ef
                   </SummaryRow>
                   <SummaryRow label="いつ" onEdit={() => goToStep('trigger')}>
                     {[
-                      // 絵 XJUqs「月〜金・いつでも」：手順②の「まとめて」と同じ言い方
+                      // 絵 「月〜金・いつでも」：手順②の「まとめて」と同じ言い方
                       weekdaySummary(form.weekdays).replace(/に反応$/, ''),
                       form.timeMode === 'custom' && (form.activeFrom || form.activeUntil)
                         ? `${form.activeFrom || '00:00'}〜${form.activeUntil || '24:00'}`

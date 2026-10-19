@@ -16,7 +16,7 @@ export class ApiError extends Error {
   readonly data: unknown
   /**
    * 追跡番号（incidentId / requestId）。失敗の問い合わせに使う番号で、
-   * 画面は「（追跡番号 …）」として添える（要件 v6-34 §9-1）。
+   * 画面は「（追跡番号 …）」として添える（要件 管理画面-34 §9-1）。
    */
   readonly trackingId: string | undefined
   readonly requestId: string | undefined

@@ -2,7 +2,7 @@
 /*
  * V8 テンプレートの一覧（src/v8）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * 行が出る・公開の札・閲覧のみの帯（サーバの役割で決まる）・
- * 使っていない（0か所）ものは窓なしで外して5秒は元に戻せる・数が分からないものは削除の確認（V6JFnd）、使っているものは削除できない窓（Z0g3si）。
+ * 使っていない（0か所）ものは窓なしで外して5秒は元に戻せる・数が分からないものは削除の確認、使っているものは削除できない窓。
  */
 import React, { act } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
@@ -226,7 +226,7 @@ describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作�
   })
 })
 
-it('B-241：見本の取得失敗を見本なしとして消さず、同じ窓で読み直す',async()=>{
+it('見本の取得失敗を見本なしとして消さず、同じ窓で読み直す',async()=>{
  role.value='owner'
  listTemplates.mockResolvedValue({success:true,data:[used]})
  fetchApi.mockReset().mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({success:true,data:[]})

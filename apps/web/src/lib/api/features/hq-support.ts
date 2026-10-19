@@ -9,7 +9,7 @@ import type {
 } from '../../hq-support'
 
 export const hqSupportMethods = {
-/** 統括から運営へのお問い合わせ（★V6 36-3）。形は `apps/worker/src/routes/hq-support.ts`。 */
+/** 統括から運営へのお問い合わせ（★管理画面 36-3）。形は `apps/worker/src/routes/hq-support.ts`。 */
   hqSupport: {
     summary: () => fetchApi<ApiResponse<{ total: number; newCount: number; inProgressCount: number; assignedInProgressCount: number; resolvedThisMonth: number; resolvedPreviousMonth: number; averageFirstReplyHours: number | null; firstReplySampleCount: number }>>('/api/hq/support/summary'),
     context: () => fetchApi<ApiResponse<HqSupportContext>>('/api/hq/support/context'),
@@ -26,7 +26,7 @@ export const hqSupportMethods = {
         method: 'POST',
         body: JSON.stringify(input),
       }),
-    /** 1 件のやり取り（★V6 36-3-A）。 */
+    /** 1 件のやり取り（★管理画面 36-3-A）。 */
     detail: (id: string) => fetchApi<ApiResponse<HqSupportDetail>>(`/api/hq/support/requests/${encodeURIComponent(id)}`),
     /** 続きを送る。運営のチケットは対応中へ戻る。 */
     followUp: (id: string, input: { body: string; attachments?: Array<{ mimeType: string; data: string }> }) =>

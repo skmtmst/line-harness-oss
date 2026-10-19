@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import DateTimePicker from './DateTimePicker.js';
-import { dayStateLabel } from './DateTimePicker.js';
+import DateTimePicker from './date-time-picker.js';
+import { dayStateLabel } from './date-time-picker.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
 
 /**
- * 1-2 週で見る／カレンダー切替の描画試験 (★V8・M2p63S/k3aJKU)。
+ * 1-2 週で見る／カレンダー切替の描画試験 (★V8・/)。
  * 今日は 2026-10-15（木）に固定し、設定・空き枠は偽物で返す。
  */
 

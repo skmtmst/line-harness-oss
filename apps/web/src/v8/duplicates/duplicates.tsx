@@ -19,13 +19,13 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 重複検出（Pencil `hn6Y8`、タブを消した採用版は `sdbsQ` 板1、
- * 状態は `SXCb3`。再撮の板 `G9C4Uw`（1152）を数の帯に付ける）。
+ * ★V8 重複検出（Pencil ``、タブを消した採用版は `sdbsQ` 板1、
+ * 状態は ``。再撮の板 ``（1152）を数の帯に付ける）。
  *
- * データの口は v7 と同じ `use-duplicates-data`。違いは見せ方だけ——
+ * データの口は 管理画面 と同じ `use-duplicates-data`。違いは見せ方だけ——
  * タブの段を「← 友だち一覧 › データ管理 › 重複検出」と「データ管理 ▾」に
  * 替え、数の帯・道具の段・候補の表を板どおりに組む。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
+ * 管理画面 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
  */
 
 const CONFIDENCE_LABEL = { very_high: '最高', high: '高', medium: '中', low: '低' } as const

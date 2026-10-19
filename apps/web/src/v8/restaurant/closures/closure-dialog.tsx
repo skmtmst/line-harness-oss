@@ -31,7 +31,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 臨時休業・貸切を足す／変える窓（提案 E-10 `nVvXy`）。
+ * ★V8 臨時休業・貸切を足す／変える窓（提案 E-10 ``）。
  *
  * 種類 → はじめの日〜おわりの日 → 時間（終日／時間帯だけ）→ 閉じる卓（全部／選ぶ）→ メモ
  * → 重なる予約（保存しても取り消さない・1件ずつ「LINE で連絡する」）→ 他の予約サイトと Google。

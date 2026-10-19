@@ -48,7 +48,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 成果地点を作る（Pencil：作る `j8p3yj`・競合 `cXqlS`）。
+ * ★V8 成果地点を作る（Pencil：作る ``・競合 ``）。
  *
  * 型（CreatePage）に、4つの段（何が起きたら・何回まで・金額・数えない条件）と
  * 下書き・詳細設定の段、右の列（この30日にあてはめると・使う場所）、下の帯を渡す。
@@ -56,7 +56,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
  * 聞く項目・保存の口・送る形は今の作る画面（app/conversions/new/conversion-create-v8.tsx）と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ：
  * - 使う場所は種類ごとの1行（チェック＝その種類を全部使う／外す）。1つずつ選ぶのは「使う場所を足す」の窓で
- * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
+ * - 競合：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
  *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
  */
 

@@ -3,11 +3,11 @@ import { join } from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe,expect,it } from 'vitest';
-import Badge from '../components/ui/Badge.js';
+import Badge from '../components/ui/badge.js';
 import { statusMeta } from './event-bookings-policy.js';
 
 /**
- * LIFF ★V7 その2 (イベント) の契約。
+ * LIFF ★管理画面 その2 (イベント) の契約。
  *
  * 流儀は ui-contract.test.ts と同じ (描画試験はしない。文面を読む)。
  * 文言の固定ではなく、動き (選んでから進む・確認してから消す・
@@ -143,7 +143,7 @@ describe('承認待ちと確定は別の印と文', () => {
 
 describe('自分のイベントは期限まで取り消せる', () => {
   it('取り消しの確認を出してから消す', () => {
-    // ブラウザの confirm() は使わず、LIFF 共通の確認窓で聞く。
+    // ブラウザの confirm は使わず、LIFF 共通の確認窓で聞く。
     expect(bookings).toContain('ConfirmDialog');
     expect(bookings).toContain('setPendingCancel(b)');
     expect(bookings).toContain('をキャンセルしますか');
@@ -192,7 +192,7 @@ describe('読み込み中・失敗の間は帯や操作を出さない', () => {
 
 describe('案内の帯は1画面に1本', () => {
   it('確認の帯は注意 1つ (承認制の文は同じ帯に足す)・期限があれば日時で出す', () => {
-    // V8 の板 EscPA：注意の帯は --color-liff-note。期限が無いときだけ「自分のイベント」へ案内する。
+    // V8 の板 ：注意の帯は --color-liff-note。期限が無いときだけ「自分のイベント」へ案内する。
     expect(confirm.match(/bg-liff-note/g)?.length ?? 0).toBe(1);
     expect(confirm).not.toContain('bg-info-bg');
     expect(confirm).toContain('formatJstDeadline(slot.starts_at, event.cancel_deadline_hours_before)');
@@ -209,7 +209,7 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
     expect(event).toContain('満席');
     // 押せない時の地は1つだけ (bg-shell-gray)。白と重ねると白く見える。
     expect(event).toContain('unavailable={disabled}');
-    const button = readFileSync(new URL('../components/ui/button.tsx', import.meta.url), 'utf8');
+    const button = readFileSync(new URL('../components/ui/button/index', import.meta.url), 'utf8');
     const disabledTone = button.match(/unavailable\s*\?\s*'[^']*'/g)?.find((tone) => tone.includes('border-hairline')) ?? '';
     expect(disabledTone).toContain('bg-liff-off-bg');
     expect(disabledTone).not.toContain('bg-canvas');
@@ -220,7 +220,7 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
 
   it('選んだ時間は濃い緑の地＋白文字 (gVjiC・予約の日時選びと同じ形)', () => {
     expect(event).toContain('variant="optionRow" selected={selected}');
-    expect(readFileSync(new URL('../components/ui/button.tsx', import.meta.url), 'utf8')).toContain('border-liff-primary bg-liff-primary');
+    expect(readFileSync(new URL('../components/ui/button/index', import.meta.url), 'utf8')).toContain('border-liff-primary bg-liff-primary');
     expect(event).toContain('setSelectedId(s.id)');
   });
 

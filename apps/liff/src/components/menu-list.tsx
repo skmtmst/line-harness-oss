@@ -1,17 +1,17 @@
-import { useCustomerWords } from './CustomerStyleScope.js';
+import { useCustomerWords } from './customer-style-scope.js';
 import { bookingPriceText } from '../lib/booking-price.js';
-import Button from './ui/Button.js';
+import Button from './ui/button/index.js';
 import { useEffect, useMemo, useState } from 'react';
 import { api, type MenuItem } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
-import LoadErrorView from './LoadErrorView.js';
-import LoadingView from './LoadingView.js';
-import Icon from './ui/Icon.js';
+import LoadErrorView from './load-error-view.js';
+import LoadingView from './loading-view.js';
+import Icon from './ui/icon.js';
 
 const ALL_CATEGORY = 'すべて';
 
 /**
- * 1-a メニューを選ぶ (★V8・IruGD)。札を押すと選ばれるだけで、進むのは下の操作の帯。
+ * 1-a メニューを選ぶ (★V8・)。札を押すと選ばれるだけで、進むのは下の操作の帯。
  * 種類の札 (すべて・トリミング…) で絞る。選んだ札は緑枠＋薄い緑の地＋緑のチェック。
  * (撮影: ボタン名にメニュー名をそのまま出す。qa-shots.mjs が名前で押す)
  */

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 資格情報の差し替え（Msb1j）を StrictMode の下で確かめる（WEB132 の追加確認）。
+ * 資格情報の差し替えを StrictMode の下で確かめる（WEB132 の追加確認）。
  *
  * Next.js App Router は開発時に StrictMode が既定で有効で、Effect を「付ける→外す→付ける」と
  * 1回多く回す。外すときだけ「生きている」印を false にすると、付いているのに false が残り、

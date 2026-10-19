@@ -6,14 +6,14 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const NEW_PAGE = readFileSync(new URL('./earning-rules/new/v8-earning-rule-new.tsx', import.meta.url), 'utf8')
 const EDIT_PAGE = readFileSync(new URL('./earning-rules/edit/page.tsx', import.meta.url), 'utf8')
 
-describe('V6 たまる決めごと（N46cQ）の見せ方', () => {
+describe('管理画面 たまる決めごと（N46cQ）の見せ方', () => {
   it('未知の行動は内部語を出さず、運用者の言葉にする', () => {
     expect(ruleEventLabel('message_received', { message_received: 'メッセージ' })).toBe('メッセージ')
     expect(ruleEventLabel('internal_new_event', {})).toBe('その他の行動')
   })
 })
 
-describe('V6 たまる決めごと（N46cQ）の画面', () => {
+describe('管理画面 たまる決めごと（N46cQ）の画面', () => {
   it('並び順は一括口へまとめて保存する(N-243)', () => {
     // 1件ずつPATCHすると途中失敗で一部だけ反映されるため、全順序を1回で送る。
     expect(PAGE).toContain('api.mileage.saveEarningRulesOrder')
@@ -66,12 +66,12 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
     // 新規作成と同じ選択肢を使う（直しが片方だけに残らないように）。
     expect(EDIT_PAGE).toContain("from '../rule-fields'")
     expect(NEW_PAGE).toContain("from './rule-fields'")
-    // 見つからない・読み込めないを言い分ける（★V7 共通部品その2）。
+    // 見つからない・読み込めないを言い分ける（★管理画面 共通部品その2）。
     expect(EDIT_PAGE).toContain('この決めごとが見つかりません')
     expect(EDIT_PAGE).toContain('たまる決めごとを読み込めませんでした')
   })
 
-  it('V6の30日集計・版・失効条件を表示する', () => {
+  it('管理画面の30日集計・版・失効条件を表示する', () => {
     expect(PAGE).toContain('api.mileage.earningRulesV6')
     expect(PAGE).toContain('api.mileage.history')
     expect(PAGE).toContain('api.mileage.friendsV6')
@@ -133,8 +133,8 @@ describe('V6 たまる決めごと（N46cQ）の画面', () => {
   })
 })
 
-describe('V6 たまる決めごとをつくる（BmoGY）の対象条件', () => {
-  it('共通の条件部品で15軸を組み合わせ、V6下書きへ保存する', () => {
+describe('管理画面 たまる決めごとをつくる（BmoGY）の対象条件', () => {
+  it('共通の条件部品で15軸を組み合わせ、管理画面下書きへ保存する', () => {
     expect(NEW_PAGE).toContain("import ConditionBuilder, {")
     expect(NEW_PAGE).toContain('<ConditionBuilder')
     expect(NEW_PAGE).toContain('value={targetConditions}')

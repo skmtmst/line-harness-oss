@@ -197,8 +197,8 @@ async function render(el: HTMLDivElement, r: Root) {
 }
 
 /**
- * `root.render()` をactで包まずに生で呼ぶと、Reactはcommit(DOM反映)と
- * passive effect(useEffectで走るload())のflushを別タスクとして積む。
+ * `root.render` をactで包まずに生で呼ぶと、Reactはcommit(DOM反映)と
+ * passive effect(useEffectで走るload)のflushを別タスクとして積む。
  * MutationObserverはDOM変異の直後にマイクロタスクとして呼ばれるので、
  * commit直後・useEffect未実行の瞬間をこの1点で捕まえられる。
  */
@@ -353,7 +353,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
   })
 
   /*
-   * 司令塔切り分け(2026-09-10、列車229のartifactで実証): 検索欄debounceの
+   * 司令塔切り分け(2026-09-10、作業のartifactで実証): 検索欄debounceの
    * useEffect([query, setPage])は、マウント直後のqueryの初期値('')でも
    * 必ず1回実行され、300ms後に無条件でsetPage(1)を呼んでいた。一覧が
    * 表示された直後(300ms以内)に「次のページ」を押した利用者が、その後

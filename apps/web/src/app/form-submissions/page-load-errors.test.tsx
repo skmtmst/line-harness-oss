@@ -97,7 +97,7 @@ function mockFoldersOk() {
 }
 
 beforeEach(() => {
-  // V8だけ見る（v7側は触らない）。この印でV8を出す。
+  // V8だけ見る（管理画面側は触らない）。この印でV8を出す。
   document.documentElement.dataset.theme = 'v8'
   const storage = new MemoryStorage()
   storage.setItem('lh_staff_role', 'admin')
@@ -193,7 +193,7 @@ describe('R603: フォルダだけ失敗しても一覧と件数を残す', () =
     // 取得済みのフォームは残る。
     expect(host.textContent).toContain('箱フォーム')
     expect(host.textContent).toContain('未分類フォーム')
-    // 件数も残る（全面エラー・0件にしない）。1ページでも範囲とページ送りを出す（B-231）。
+    // 件数も残る（全面エラー・0件にしない）。1ページでも範囲とページ送りを出す。
     expect(host.textContent).toContain('2件中 1〜2件')
     expect(host.querySelector('[data-list-state="error"]')).toBeNull()
     // フォルダ欄だけ失敗と再試行。

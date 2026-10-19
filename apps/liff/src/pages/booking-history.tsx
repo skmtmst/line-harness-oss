@@ -1,27 +1,27 @@
-import { useCustomerWords, useCustomerStyle } from '../components/CustomerStyleScope.js';
+import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
-import PaymentPreparingNote from '../components/PaymentPreparingNote.js';
-import BookingHistoryCancelDialog from '../components/BookingHistoryCancelDialog.js';
+import PaymentPreparingNote from '../components/payment-preparing-note.js';
+import BookingHistoryCancelDialog from '../components/booking-history-cancel-dialog.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api, type BookingHistoryItem } from '../lib/api.js';
 import { addDays, slotStartsAtIso, jstToday, formatMd, formatWeekday } from '../lib/datetime.js';
-import ConfirmDialog from '../components/ui/ConfirmDialog.js';
+import ConfirmDialog from '../components/ui/confirm-dialog.js';
 import { logFailure } from '../lib/user-message.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import LoadingView from '../components/LoadingView.js';
-import HistoryCard from '../components/HistoryCard.js';
-import WaitlistSection from '../components/WaitlistSection.js';
-import LessonHistorySection from '../components/LessonHistorySection.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import StatusView from '../components/ui/StatusView.js';
+import LoadErrorView from '../components/load-error-view.js';
+import LoadingView from '../components/loading-view.js';
+import HistoryCard from '../components/history-card.js';
+import WaitlistSection from '../components/waitlist-section.js';
+import LessonHistorySection from '../components/lesson-history-section.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import StatusView from '../components/ui/status-view.js';
 import liff from '@line/liff';
 
-import BottomBar from '../components/ui/BottomBar.js';
-import Button from '../components/ui/Button.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import Button from '../components/ui/button/index.js';
 
-import Icon from '../components/ui/Icon.js';
+import Icon from '../components/ui/icon.js';
 
 import { loadPaymentViews,type PaymentView } from '../lib/booking-payment-view.js';
 
@@ -111,7 +111,7 @@ export default function BookingHistory() {
   function openReceipt(view: PaymentView) {
     setActionError(null);
     if (!view.receiptUrl) {
-      // 領収書の URL を返す口は組1 に依頼中（B-314：入口は置き、押すと準備中の案内）。
+      // 領収書の URL を返す口は組1 に依頼中（：入口は置き、押すと準備中の案内）。
       setNotice('領収書は現在準備中です。必要なときはトークでご利用先にご連絡ください。');
       return;
     }

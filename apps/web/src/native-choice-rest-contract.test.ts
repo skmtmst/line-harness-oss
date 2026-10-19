@@ -19,7 +19,7 @@ const EXCEPTIONS = new Set([
   /*
    * リマインダV8の選ぶカード（ChoiceCardV8）は共通 RadioCard が持たない
    * 「アイコン左上・丸右上」の形。丸は本物の input[type=radio] で、
-   * 意味は保ったまま。★V8板（YChR6等）の見た目を守るために残す。
+   * 意味は保ったまま。★V8板（等）の見た目を守るために残す。
    */
   'app/reminders/wizard-v8-ui.tsx',
   /*

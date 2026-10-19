@@ -41,7 +41,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 広告連携（Pencil：画面 `qSTVR`・広告費を手で入れる `ZxKL5`）。
+ * ★V8 広告連携（Pencil：画面 ``・広告費を手で入れる ``）。
  *
  * 頭（戻る・題・説明・右下に「費用を手で入れる」）→ 数の4枚 → 媒体の4枚 → 流入元ごとの費用 → 注 → 手で入れた費用。
  *
@@ -49,7 +49,7 @@ import Notice from '@/components/shared/notice'
  * （BEHAVIOR.md の「広告連携」）。違うのは見せ方と、次の3つ：
  * - 送信履歴の口（/api/ad-platforms/logs）はこの画面に出す所が無いので呼ばない（履歴の画面は今のまま）
  * - 成果1件あたりは口（/api/ad-costs の conversionCost）が返す値を出す（今は「—」固定）
- * - 未接続の媒体の「つなぐ」は、今の広告とのつなぎ（v7）と同じ接続の窓を開く
+ * - 未接続の媒体の「つなぐ」は、今の広告とのつなぎ（管理画面）と同じ接続の窓を開く
  * 閲覧のみ（owner・admin 以外）には、費用を手で入れる・つなぐ・再読み込み・行の「…」・操作の行を出さない。
  */
 

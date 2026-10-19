@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 動画と公開期間（`VWNaA`）・開催回（`LPOe7`）の描画。
+ * ★V8 動画と公開期間（``）・開催回（``）の描画。
  * 差し替えるのは通信だけ。段の見出し・枠の一覧・数え方が実在する。
  */
 import { fireEvent } from '@testing-library/react'

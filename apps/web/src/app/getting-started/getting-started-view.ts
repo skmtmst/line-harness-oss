@@ -9,7 +9,7 @@ import type { GettingStartedStep } from '@/lib/api'
 import type { FeatureSetEntry } from './feature-presets'
 
 /**
- * 設計板 xuJ7D「はじめの設定」の順路（6段）。
+ * 設計板 「はじめの設定」の順路（6段）。
  *
  * **画面を開いたかではなく、実際に作られたもので判断する。**
  * だから判定はすべてサーバから取った実物（アカウント・タグ・ルール・シナリオ）

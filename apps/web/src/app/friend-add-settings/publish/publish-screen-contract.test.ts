@@ -108,7 +108,7 @@ describe('友だち追加時配信の公開画面', () => {
   })
 
   it('設計の最終確認に必要な時刻・プレビュー・監視状態を表示する', () => {
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    // : 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(PAGE).toContain('<LinePreview')
     expect(PAGE).toContain('detail?.staffNotification?.status')
     expect(PAGE).toContain("status === 'connected'")

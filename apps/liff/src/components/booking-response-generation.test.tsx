@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import Confirm from './Confirm.js';
+import Confirm from './confirm.js';
 import { ConfirmScreen } from '../../../worker/src/client/event-booking/main.js';
 import { api } from '../lib/api.js';
 

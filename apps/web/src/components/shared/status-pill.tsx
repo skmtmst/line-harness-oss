@@ -14,7 +14,7 @@ export function StatusDot({ tone = 'neutral', color }: { tone?: StatusBadgeTone;
   return <span className={styles.dot} data-tone={tone} style={color ? { backgroundColor: color } : undefined} aria-hidden="true" />
 }
 
-/** B-71③：対応状況は色の点・薄い地・濃い文字の丸い札。 */
+/** ③：対応状況は色の点・薄い地・濃い文字の丸い札。 */
 export default function StatusPill({ children, tone = 'neutral', color, ...props }: Omit<HTMLAttributes<HTMLSpanElement>, 'children' | 'color' | 'className'> & {
   children: ReactNode
   tone?: StatusBadgeTone

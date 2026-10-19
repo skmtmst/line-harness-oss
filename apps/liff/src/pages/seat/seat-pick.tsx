@@ -1,6 +1,6 @@
-import Icon from '../../components/ui/Icon.js';
+import Icon from '../../components/ui/icon.js';
 import { HiddenDateInput, RestaurantTimeChoices, FieldError } from '../../components/forms/controls.js';
-import Button from '../../components/ui/Button.js';
+import Button from '../../components/ui/button/index.js';
 import { useRef } from 'react';
 import type { RestaurantCustomerSlot, RestaurantUnavailableReason } from '@line-crm/shared';
 import {
@@ -19,7 +19,7 @@ import {
 export type DaySlots = RestaurantCustomerSlot[] | 'loading' | 'error' | 'closed';
 
 /**
- * ① 人数・日時・コース (★V8 KRppA)。人数は増減、日にちは端末の選択、時刻は空きの札。
+ * ① 人数・日時・コース (V8)。人数は増減、日にちは端末の選択、時刻は空きの札。
  * 選べない時刻 (満席) は押せない。空きを1つも持たない日は札を押せない形にし、下に注を出す。
  */
 export default function SeatPick({

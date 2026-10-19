@@ -302,7 +302,7 @@ export type EventWaitlistPromotionResult =
   | { kind: 'noop'; occurrenceVersion: number; promoted: null; reason: string };
 
 /**
- * U: イベントの保存する状態（v6-29 §11-2）。
+ * U: イベントの保存する状態（管理画面-29 §11-2）。
  * 「満席」「申込が少ない」は保存せず、開催回・定員・日時からの計算で札を出す。
  */
 export type EventLifecycleStatus = 'draft' | 'published' | 'paused' | 'ended' | 'cancelled';

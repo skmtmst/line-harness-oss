@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
-import WaitlistOfferSheet from './WaitlistOfferSheet.js';
-import WaitlistSheet from './WaitlistSheet.js';
+import WaitlistOfferSheet from './waitlist-offer-sheet.js';
+import WaitlistSheet from './waitlist-sheet.js';
 vi.mock('../lib/api.js', () => ({ api: { bookingWaitlists: vi.fn(), seatWaitlists: vi.fn(), acceptWaitlist: vi.fn(), acceptSeatWaitlist: vi.fn(), cancelWaitlist: vi.fn(), cancelSeatWaitlist: vi.fn(), waitlistMine: vi.fn() } }));
 const { api } = await import('../lib/api.js');
 afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });

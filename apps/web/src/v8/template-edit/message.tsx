@@ -46,7 +46,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8「メッセージを作る／編集」（絵 u5YC6・1152 は a1k3d・競合は NCbYn）。
+ * ★V8「メッセージを作る／編集」（絵 ・1152 は ・競合は ）。
  *
  * 左：名前とフォルダ／中身（本文・差し込む）／本文の中のURL。
  * 右：送るときの名前／届き方（本物のスマホ）。1152 ではスマホを窓で開く。
@@ -56,7 +56,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 const snapshot = (draft: TemplateDraft) => JSON.stringify(draft)
 
-/** 競合の帯（NCbYn）。誰が・いつ・どれを保存したかと、2つの出口。 */
+/** 競合の帯。誰が・いつ・どれを保存したかと、2つの出口。 */
 type Conflict = { name: string; at: string; latest: TemplateDraft | null }
 
 /**
@@ -108,7 +108,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     setAutoCreated(null)
   }
   const { name, folderId, messageType, messageContent } = editor.draft
-  /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る（B-139）。 */
+  /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る。 */
   const fields = useFormErrors()
   fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'), { required: true })
   fields.define('content', messageType === 'text' ? '本文' : 'メッセージ内容', () => {
@@ -370,7 +370,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     }
   }
 
-  /* 保存して公開：使っている場所があれば、どこへ届くかを見せてから（cuR8I）。 */
+  /* 保存して公開：使っている場所があれば、どこへ届くかを見せてから。 */
   const onPublish = async () => {
     if (host) { hostSave(true); return }
     const savedId = await saveNow()

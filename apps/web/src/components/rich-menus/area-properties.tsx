@@ -35,7 +35,7 @@ type Props = {
   taps: { count: number; viaTrackedLink: number } | null
   onUpdate: (patch: Partial<Area>) => void
   onDelete?: () => void
-  /** 保存で落ちた、この面の動きの理由（B-139）。欄の真下に出し、欄を赤くする。 */
+  /** 保存で落ちた、この面の動きの理由。欄の真下に出し、欄を赤くする。 */
   error?: string | null
   /** 新規作成では座標・実績・削除を隠し、動きの設定だけを使う。 */
   showManagementDetails?: boolean

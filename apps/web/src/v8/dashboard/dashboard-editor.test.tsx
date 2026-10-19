@@ -5,7 +5,7 @@ import { defaultDashboardPreferences, V8_DASHBOARD_DEFAULT_VISIBILITY } from '@/
 import DashboardEditorV8 from './dashboard-editor'
 
 /*
- * ★V8 ダッシュボード編集（mcOqK）の動き。v7 の編集（components/dashboard/dashboard-editor）と
+ * ★V8 ダッシュボード編集の動き。管理画面 の編集（components/dashboard/dashboard-editor）と
  * 同じ保存の形・並べ替え・4枠の計算を守り、絵で足した状態（4枠の注意・確認の窓・下の帯）を見る。
  */
 afterEach(cleanup)

@@ -164,7 +164,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
         designWidth={480}
         designTop={240}
         designHeaderPadding="24px 24px 0"
-        /* 絵 xxKtW：まだ消せないときは赤い題にしない（差し替え・止めるへ導く窓）。消せるときだけ赤。 */
+        /* 絵 ：まだ消せないときは赤い題にしない（差し替え・止めるへ導く窓）。消せるときだけ赤。 */
         tone={deleteImpact && !deleteImpact.canDelete ? 'default' : 'destructive'}
         title={deleteTarget
           ? deleteImpact && !deleteImpact.canDelete
@@ -175,11 +175,11 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
         error={deleteError || undefined}
         onCancel={closeDelete}
         footer={deleteTarget ? (
-          /* 絵 xxKtW：キャンセルは真ん中、実行は右端。 */
+          /* 絵 ：キャンセルは真ん中、実行は右端。 */
           <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
             {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
-              /* 必須は欄の中の文（理由（必須…））と aria-required で伝え、下の帯を1行に保つ（絵 xxKtW の帯の高さ）。 */
+              /* 必須は欄の中の文（理由（必須…））と aria-required で伝え、下の帯を1行に保つ（絵  の帯の高さ）。 */
               <span><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
                 aria-required={reasonRequirement.required}
                 value={deleteReason}

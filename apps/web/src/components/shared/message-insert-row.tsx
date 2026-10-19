@@ -15,7 +15,7 @@ export const MessageInsertButton = forwardRef<HTMLButtonElement, {
   const Icon = ICONS[kind]
   return <button ref={ref} type="button" data-message-insert-button={kind} className={styles.button} onClick={onClick} disabled={disabled} title={title} aria-expanded={expanded} aria-haspopup={expanded === undefined ? undefined : 'menu'}><Icon aria-hidden="true" />{label}</button>
 })
-/** moreFirst：広いときは「その他」に畳む項目を先に並べる（統括の店の差し込み・絵 pIHp3）。狭いときは今までどおり末尾の「その他」。 */
+/** moreFirst：広いときは「その他」に畳む項目を先に並べる（統括の店の差し込み・絵 ）。狭いときは今までどおり末尾の「その他」。 */
 export default function MessageInsertRow({ children, count, more, readOnly = false, moreFirst = false }: { children: ReactNode; count?: ReactNode; more?: ReactNode; readOnly?: boolean; moreFirst?: boolean }) {
   const rowRef = useRef<HTMLDivElement>(null)
   const moreRef = useRef<HTMLButtonElement>(null)

@@ -1,9 +1,9 @@
-import Button from './Button.js';
+import Button from './button/index.js';
 import { useEffect, useState } from 'react';
 import liff from '../../lib/liff-runtime.js';
 import { api } from '../../lib/api.js';
 import { logFailure } from '../../lib/user-message.js';
-import Icon from './Icon.js';
+import Icon from './icon.js';
 import { getLiffId } from '../../lib/liff-auth.js';
 
 // 店名は画面ごとに読み直さない。最初に取れた値をモジュールに持つ。

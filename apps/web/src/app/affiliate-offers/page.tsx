@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 /**
  * 旧「案件・承認」ページ。機能は /affiliates?tab=offers に統合された。
  * ブックマーク互換のため、このページは即リダイレクトする薄いページとして残す。
- * output: 'export'（静的エクスポート）構成では next/navigation の redirect() が
+ * output: 'export'（静的エクスポート）構成では next/navigation の redirect が
  * 使えないため、chats ページ同様クライアント側で router.replace する。
  */
 export default function AffiliateOffersRedirectPage() {

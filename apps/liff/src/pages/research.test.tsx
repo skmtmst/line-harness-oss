@@ -2,7 +2,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import Research from './Research.js';
+import Research from './research.js';
 const researchForm = vi.hoisted(() => vi.fn());
 vi.mock('../lib/api.js', () => ({ api: { researchForm } }));
 afterEach(() => { cleanup(); researchForm.mockReset(); });

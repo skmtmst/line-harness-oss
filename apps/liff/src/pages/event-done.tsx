@@ -1,20 +1,20 @@
-import { useCustomerWords } from '../components/CustomerStyleScope.js';
+import { useCustomerWords } from '../components/customer-style-scope.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import liff from '@line/liff';
 import { api, type EventWaitlistMine } from '../lib/api.js';
 import { formatJstEventAt, utcToJstHm } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import StatusView from '../components/ui/StatusView.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import Button from '../components/ui/Button.js';
-import Icon from '../components/ui/Icon.js';
-import ConfirmDialog from '../components/ui/ConfirmDialog.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import StatusView from '../components/ui/status-view.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import Button from '../components/ui/button/index.js';
+import Icon from '../components/ui/icon.js';
+import ConfirmDialog from '../components/ui/confirm-dialog.js';
 
 /**
- * 2-c 申し込みが確定した・2-d キャンセル待ちに入った (★V8 qVdiX)。
+ * 2-c 申し込みが確定した・2-d キャンセル待ちに入った (V8)。
  * 承認制で承認待ちのときは 2-d と同じ待ちの印で出す (文言は承認待ちのまま)。
  * 上の帯と下の帯の間の真ん中に、丸・題・本文・申し込みの箱を置く。
  * 下の帯は「LINEに戻る」と「自分のイベントを見る」。

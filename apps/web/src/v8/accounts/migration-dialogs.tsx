@@ -68,7 +68,7 @@ export function runStatusView(run: UidMigrationDetail, unresolved: number | null
   }
 }
 
-/** 行の「詳細を見る」で開く読み取り専用ダイアログ。v7/v8 で共用する。 */
+/** 行の「詳細を見る」で開く読み取り専用ダイアログ。管理画面 で共用する。 */
 export function MigrationItemDialog({
   detailItem,
   active,
@@ -127,7 +127,7 @@ export function MigrationItemDialog({
   )
 }
 
-/** 本移行の実行確認（v7/v8 共用）。確定ボタンだけが execute を呼ぶ。 */
+/** 本移行の実行確認（管理画面 共用）。確定ボタンだけが execute を呼ぶ。 */
 export function ExecuteConfirmDialog({
   active,
   accounts,
@@ -173,7 +173,7 @@ export function ExecuteConfirmDialog({
   )
 }
 
-/** 切り戻しの確認（v7/v8 共用）。 */
+/** 切り戻しの確認（管理画面 共用）。 */
 export function RollbackConfirmDialog({
   active,
   me,

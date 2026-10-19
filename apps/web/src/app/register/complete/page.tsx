@@ -14,7 +14,7 @@ import { authRequest, confirmError, internalAuthFailureCopy, passwordError, read
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 /**
- * 会員登録の本登録。★V6 36-4-B（`jk88n`、カード `oVX3x`）。
+ * 会員登録の本登録。★管理画面 36-4-B（`jk88n`、カード `oVX3x`）。
  *
  * メールの URL（`?token=`）から開く。会社名・名前・パスワードを入れると
  * 統括（トライアル 30 日）とオーナー権限者ができ、そのまま統括の画面へ。

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * V8 会員一覧：並び順を選べる（v7 parity-D）。
+ * V8 会員一覧：並び順を選べる（管理画面 parity-D）。
  * 変えると口へ新しい並びを渡して読み直す。
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'

@@ -25,7 +25,7 @@ it('OPS-C02 auto reply ordinary failure is presented as no retryable work',async
  expect(host.textContent).toContain('1 件をもう一度実行できませんでした');expect(host.textContent).not.toContain('もう一度実行できる処理はありませんでした。');
 });
 
-it('B-248: 送達不明は要確認と確認方法を表示し、canRetryが残っていても再実行しない', async()=>{
+it('送達不明は要確認と確認方法を表示し、canRetryが残っていても再実行しない', async()=>{
  const response = await f.runs();
  response.data.items[0].errorCode = 'delayed_delivery_unknown';
  f.runs.mockResolvedValue(response);

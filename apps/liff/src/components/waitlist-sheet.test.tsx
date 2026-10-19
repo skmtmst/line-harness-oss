@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import WaitlistSheet from './WaitlistSheet.js';
+import WaitlistSheet from './waitlist-sheet.js';
 import type { MenuItem, StaffItem } from '../lib/api.js';
 
 /**

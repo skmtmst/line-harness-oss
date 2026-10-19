@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { paymentText, paymentView } from './booking-payment-view.js';
 import { isNotReadyYet } from './not-ready.js';
-import { entitlementDetail, entitlementSummary } from '../pages/MyPage.js';
+import { entitlementDetail, entitlementSummary } from '../pages/my-page.js';
 import type { BookingEntitlement, MenuItem } from './api.js';
 
 const menu = (over: Partial<MenuItem> = {}): MenuItem => ({

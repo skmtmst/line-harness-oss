@@ -1,9 +1,9 @@
-import { useCustomerWords, useCustomerStyle } from '../components/CustomerStyleScope.js';
+import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
 import { liffErrorMessage } from '../lib/api-error.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
-import SeatBookingBlock from '../components/SeatBookingBlock.js';
+import SeatBookingBlock from '../components/seat-booking-block.js';
 import { restaurantBookingApi } from '../lib/api.js';
-import FormReception, { choiceReceptionLabel } from '../components/FormReception.js';
+import FormReception, { choiceReceptionLabel } from '../components/form-reception.js';
 import { TextInput, ChoiceInput, FieldLabel, FieldCount } from '../components/forms/controls.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
@@ -11,22 +11,22 @@ import liff from '../lib/liff-runtime.js';
 import { PREFECTURES, collectInputs, isOtherFreeText, formChoiceIsSelected, nextSectionIndex, normalizeBookingValue, normalizeFormTheme, normalizeRatingValue, validateAnswer, type FormAvailability, type FormBlock, type FormBookingValue, type FormInputBlock, type FormLayout } from '@line-crm/shared';
 import { submitButtonText } from '../lib/form-button-text.js';
 import { api, type MenuItem, type PublicForm, type RoutedTarget, type StaffItem } from '../lib/api.js';
-import Stepper from '../components/ui/Stepper.js';
-import { NoRoutedSlots, RoutedBanner, RoutedConfirm } from '../components/RoutedBooking.js';
+import Stepper from '../components/ui/stepper/index.js';
+import { NoRoutedSlots, RoutedBanner, RoutedConfirm } from '../components/routed-booking.js';
 import { addDays, formatWeekday, slotStartsAtIso, formatJstEventAt, jstToday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 import { conflictMessage, decideFormSubmitStep, FORM_SUBMIT_INCOMPLETE_MESSAGE } from '../lib/form-submit-flow.js';
 import { logFailure } from '../lib/user-message.js';
 import { useWideViewport } from '../lib/use-wide-viewport.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import LoadingView from '../components/LoadingView.js';
-import Button from '../components/ui/Button.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import PrivacyNote from '../components/ui/PrivacyNote.js';
-import StatusView from '../components/ui/StatusView.js';
-import Icon from '../components/ui/Icon.js';
-import FieldError from '../components/ui/FieldError.js';
-import MeetingModeChoices from '../components/MeetingModeChoices.js';
+import LoadErrorView from '../components/load-error-view.js';
+import LoadingView from '../components/loading-view.js';
+import Button from '../components/ui/button/index.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import PrivacyNote from '../components/ui/privacy-note.js';
+import StatusView from '../components/ui/status-view.js';
+import Icon from '../components/ui/icon.js';
+import FieldError from '../components/ui/field-error.js';
+import MeetingModeChoices from '../components/meeting-mode-choices.js';
 import { DateYmdField, BookingControls, FormChoiceRow, FormFileControl, FormSelectControl, FormTextControl, RatingStars } from '../components/forms/controls';
 import { type AddressDraft, AddressFields } from "../components/form-address-fields.js"
 /**
@@ -114,7 +114,7 @@ export default function Form() {
    */
   const testToken = search.get('test_token');
 
-  // 414 幅の板（`wPfqW`）は板 ID だけを替える。中身は同じ。
+  // 414 幅の板（``）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
   const [form, setForm] = useState<PublicForm | null>(null);
   const [answers, setAnswers] = useState<Answers>({});
@@ -128,7 +128,7 @@ export default function Form() {
   const [done, setDone] = useState(false);
   const [confirming, setConfirming] = useState(false);
   /**
-   * 欄ごとの直し方。★V7 (4-a) は欄のすぐ下に出す。
+   * 欄ごとの直し方。★管理画面 (4-a) は欄のすぐ下に出す。
    * 画面下の `error` はサーバの失敗 (送信・画像) だけに使い、検証とは分ける。
    */
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -529,7 +529,7 @@ export default function Form() {
   const theme = normalizeFormTheme(options.theme);
   /**
    * デザイン設定でフォームの色を決めているときだけ true。
-   * 決めていなければ ★V8 (B8rCt) の白い地のままにし、既定の薄緑は付けない。
+   * 決めていなければ ★V8  の白い地のままにし、既定の薄緑は付けない。
    */
   const hasCustomTheme = options.theme !== undefined && options.theme !== null;
 
@@ -547,7 +547,7 @@ export default function Form() {
   }
 
   if (done) {
-    // ★V8 (aNZKe)：お礼を題に、予約を入れたときはその日時と次の動きを本文に出す。
+    // ★V8 ：お礼を題に、予約を入れたときはその日時と次の動きを本文に出す。
     const bookingNote = booked
       .map((b) => {
         const [m, d] = utcToJstMd(b.startsAt).split('/');
@@ -618,13 +618,13 @@ export default function Form() {
 
   const pageTitle = options.pageTitle || form.name;
   /**
-   * ★V8 (B8rCt・g9osGN)：1ページ目はフォームの題と説明、2ページ目からは
+   * ★V8 (・)：1ページ目はフォームの題と説明、2ページ目からは
    * そのページ (セクション) の名前を題にする。
    */
   const firstPage = sectionIndex === 0;
   const heading = firstPage || !section?.name ? pageTitle : section.name;
   /**
-   * ページの先頭に並ぶ画像は、題の上の表紙として出す (★V8 B8rCt の「画像」)。
+   * ページの先頭に並ぶ画像は、題の上の表紙として出す (★V8  の「画像」)。
    * 共通ヘッダは今までどおり題の下・ページの中身の前に出す。
    */
   const pageBlocks = section?.blocks ?? [];
@@ -928,7 +928,7 @@ function PeopleBookingSlotPicker({
     return <p className="text-sm text-ink-secondary">空き枠を読めませんでした。時間をおいて開き直してください。</p>;
   }
 
-  // ★V8 (g9osGN)：枠のある日はすべて並べ、空きの無い日は灰色で押せなくする。
+  // ★V8 ：枠のある日はすべて並べ、空きの無い日は灰色で押せなくする。
   const dates = routed ? Array.from({ length: 7 }, (_, i) => addDays(today, i)) : Object.keys(byDate).sort();
   const hasOpen = (d: string) => Boolean(byDate[d]?.some((t) => t.open));
   const daySlots = (selectedDate && byDate[selectedDate]) || [];
@@ -996,7 +996,7 @@ function PeopleBookingSlotPicker({
 
 /**
  * ブロック1つを描く。
- * 直し方 (error) は欄のすぐ下に出す (★V7 4-a)。枠の色も直しの色にする。
+ * 直し方 (error) は欄のすぐ下に出す (★管理画面 4-a)。枠の色も直しの色にする。
  */
 function BlockView({
   block,
@@ -1015,7 +1015,7 @@ function BlockView({
   routed?: RoutedState;
   onRoutedEmpty?: (empty: boolean) => void;
   block: FormBlock;
-  /** ページの先頭の画像 (題の上の表紙)。★V8 B8rCt は高さ 96・角丸 12 の帯。 */
+  /** ページの先頭の画像 (題の上の表紙)。★V8  は高さ 96・角丸 12 の帯。 */
   cover?: boolean;
   answers: Answers;
   onChange: (name: string, value: unknown) => void;

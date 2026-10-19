@@ -14,8 +14,8 @@ import { formatDelay } from './schedule-label';
 
 /*
  * ★V8 シナリオ配信の編集（src/v8 に一から組み直した版）。
- * 板：有効 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、
- * 窓：止める確認 `OPGU2`・複製 `Al4Ek`・開始の確認 `F1LK4e`。
+ * 板：有効 ``・始めた直後 ``・停止中 ``・競合 ``、
+ * 窓：止める確認 ``・複製 ``・開始の確認 ``。
  *
  * 動き（読み込み・保存・複製・削除・開始/停止・通の編集）は今までの
  * app/scenarios/detail/detail-v8.tsx から写した（src/v8 は @/app を読めない）。
@@ -61,14 +61,14 @@ export const messageTypeOptions: { value: MessageType; label: string }[] = [
   { value: 'carousel', label: 'カルーセル' },
 ]
 
-/** 板の頭の説明の行に出す配信方式の名前（絵 PMLkX「配信方式：時刻で指定」）。 */
+/** 板の頭の説明の行に出す配信方式の名前（絵 「配信方式：時刻で指定」）。 */
 export const MODE_LABEL: Record<DeliveryMode, string> = {
   relative: '従来の方式',
   elapsed: '経過時間で指定',
   absolute_time: '時刻で指定',
 }
 
-/** 「最後の1通の後」の行の値（絵 PMLkX・ARuZ4）。窓の選択肢名より、行として読める言い方にする。 */
+/** 「最後の1通の後」の行の値（絵 ・）。窓の選択肢名より、行として読める言い方にする。 */
 export const ON_COMPLETE_SENTENCE: Record<OnCompleteMode, string> = {
   pause: '何もしない（一時停止）',
   resume_previous: '1つ前のシナリオを再開する',
@@ -95,7 +95,7 @@ export function stepKindShort(
   return messageTypeOptions.find((o) => o.value === step.messageType)?.label ?? step.messageType
 }
 
-/** 行の題。テンプレートを使う通は本文の1行目に「（テンプレート「名前」）」を添える（絵 PMLkX の4通目）。 */
+/** 行の題。テンプレートを使う通は本文の1行目に「（テンプレート「名前」）」を添える（絵  の4通目）。 */
 export function stepRowTitle(step: { messageContent: string; question?: unknown }, templateName: string | null): string {
   if (!templateName) return stepListTitle(step, null)
   const bodyLine = (step.messageContent || '').split('\n')[0].slice(0, 60).trim()
@@ -103,7 +103,7 @@ export function stepRowTitle(step: { messageContent: string; question?: unknown 
 }
 
 /**
- * 行の時刻。時刻指定は1通目だけ「購読開始から0日後 10:00」、2通目からは「1日後 20:00」（絵 PMLkX）。
+ * 行の時刻。時刻指定は1通目だけ「購読開始から0日後 10:00」、2通目からは「1日後 20:00」（絵 ）。
  * ほかの方式は今までの言い方のまま。
  */
 export function stepWhenLabel(mode: DeliveryMode, step: ScenarioStep, index: number): string {

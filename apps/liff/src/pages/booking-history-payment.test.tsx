@@ -2,11 +2,11 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import BookingHistory from './BookingHistory.js';
+import BookingHistory from './booking-history.js';
 import type { BookingHistoryItem } from '../lib/api.js';
 
 /*
- * 予約の履歴のお支払い（B-338・nWby5・hOILq）：
+ * 予約の履歴のお支払い（・nWby5・hOILq）：
  * 未払いは札・払う期限・［お支払いへ進む］、払い済みのキャンセルは全額返金を先に知らせる。札の言葉は共通の定義。
  */
 

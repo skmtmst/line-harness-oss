@@ -268,7 +268,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     expect(put?.body).toEqual({ timezone: 'Europe/Paris' })
   })
 
-  it('B-139：名前を消し、警告を上限より大きくして保存すると、送らず2つの欄に理由を出し、名前の欄へ移る', async () => {
+  it('名前を消し、警告を上限より大きくして保存すると、送らず2つの欄に理由を出し、名前の欄へ移る', async () => {
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
     await click(buttons('編集する')[0])

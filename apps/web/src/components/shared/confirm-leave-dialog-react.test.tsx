@@ -11,7 +11,7 @@ function primaryClass(button: HTMLElement): string {
   return button.className
 }
 
-describe('未保存の離脱確認の向き（★V7）', () => {
+describe('未保存の離脱確認の向き（★管理画面）', () => {
   it('主の緑は「編集を続ける」、枠線は「保存せずに移る」、印は付けない', () => {
     render(<ConfirmDialog
       primaryAction="cancel"

@@ -75,7 +75,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
 
   /*
    * 顧客情報の節（基本情報・マイル・次の対応・タグ・★つき・リッチメニュー・友だち情報・フォーム回答）。
-   * v7 は今までどおり右の欄に線で並べ、★V8 は角丸の枠（顧客情報）の中に並べる。中身は同じ。
+   * 管理画面 は今までどおり右の欄に線で並べ、★V8 は角丸の枠（顧客情報）の中に並べる。中身は同じ。
    */
   const renderSupport = (friend: FriendDetail) => (
     <div data-customer-section="support" style={sectionStyle('support')} className={`space-y-3 px-5 py-4`}>
@@ -84,7 +84,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
       <div>
         <span className="text-micro text-ink-faint">対応状況（Sキー）</span>
         {canEditChat ? (
-          /* ★V8 B-26：共通の選ぶ欄（会話の頭と同じ色の点）。選んだ瞬間に変えて裏で保存・知らせに元に戻す。保留も選べる。 */
+          /* ★V8 ：共通の選ぶ欄（会話の頭と同じ色の点）。選んだ瞬間に変えて裏で保存・知らせに元に戻す。保留も選べる。 */
           <div ref={statusButtonRef} className={v8.editField}>
             <Select
               size="full"
@@ -129,7 +129,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
       <div>
         <label htmlFor="inbox-panel-assignee" className="text-micro text-ink-faint">担当者</label>
         {canEditChat && operators ? (
-          /* ★V8 B-26：共通の選ぶ欄（選んだ行は ✓ だけ）。 */
+          /* ★V8 ：共通の選ぶ欄（選んだ行は ✓ だけ）。 */
           <div className={v8.editField}>
             <EntitySelect
               id="inbox-panel-assignee"
@@ -148,7 +148,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
       <div data-customer-memo>
         <label htmlFor="inbox-panel-memo" className="text-micro text-ink-faint">メモ（Mキー）{memoSaving ? '・保存中…' : ''}</label>
         {canEditChat ? (
-          /* ★V8 B-26：共通の複数行の入力欄。書くのをやめて1秒で保存し、知らせに元に戻す。 */
+          /* ★V8 ：共通の複数行の入力欄。書くのをやめて1秒で保存し、知らせに元に戻す。 */
           <div className={v8.editField}>
             <TextArea
               id="inbox-panel-memo"
@@ -269,7 +269,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
         <p className="text-micro text-ink-faint italic mt-1.5">タグなし</p>
       ) : null}
       {canEditFriend ? (
-        /* ★V8 B-26：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
+        /* ★V8 ：共通の候補つき入力。選ぶと付け、無ければ「＋ 新しく作る」で作って付ける。 */
         <div id="inbox-panel-tag-picker" hidden={!tagPickerOpen} className={v8.editField}>
           {/* GBTyR：タグは選ぶ窓（S2Vgi の形）でまとめて選ぶ。付け外しは1つずつ送る（ほかの人の変更を消さない）。 */}
           <EntityPickerField multiple
@@ -385,7 +385,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
     </div>
   )
 
-  // 見出し・枠は共通欄が持ち、v7 の節の中身と操作を再利用する。
+  // 見出し・枠は共通欄が持ち、管理画面 の節の中身と操作を再利用する。
   const stripSectionHeadings = (children: React.ReactNode): React.ReactNode => Children.map(children, child => {
     if (!isValidElement<{ children?: React.ReactNode }>(child)) return child
     if (child.type === 'h4') return null

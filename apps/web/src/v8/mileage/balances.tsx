@@ -48,7 +48,7 @@ import { formatMileageDate } from './display'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 マイル「友だちの残高」（板 `CJlf4`、状態は見本帳 `zaqP9`）。
+ * ★V8 マイル「友だちの残高」（板 ``、状態は見本帳 ``）。
  *
  * app/mileage/v8-balances-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
  * フォルダの列は無い（絵どおり）。表は「友だち・ランク・いまの残高・今月の増減・
@@ -521,7 +521,7 @@ export default function BalancesTab() {
       <Pagination page={currentPage} pageCount={pageCount} range={{ total: filteredTotal, first: offset + 1, last: Math.min(offset + members.length, filteredTotal), unit: '人' }} onPageChange={(nextPage) => setOffset((nextPage - 1) * pageSize)} disabled={loading} />
     </div>
   ) : null
-  /* 絵 CJlf4：表 → ページ送り → 下の案内の順。 */
+  /* 絵 ：表 → ページ送り → 下の案内の順。 */
   const footer = !loading && !loadError && members.length > 0 ? (
     <>
       {pager}

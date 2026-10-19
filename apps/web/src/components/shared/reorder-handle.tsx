@@ -45,7 +45,7 @@ export type ReorderHandleProps = HandleButtonProps & {
    * title と読み上げ（sr-only）で置く。
    */
   disabledReason?: string | null
-  /** 理由の文言が無くても動かせない（v7 の旧 ReorderGrip の disabled だけが使う）。 */
+  /** 理由の文言が無くても動かせない（管理画面 の旧 ReorderGrip の disabled だけが使う）。 */
   locked?: boolean
   /**
    * 見た目。`icon` は 32×32 の当たりに6点の図柄（Pencil `K65Uhe`、旧 DragHandle）。

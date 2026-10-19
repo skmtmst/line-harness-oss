@@ -235,7 +235,7 @@ describe('休業日・貸切の数え方', () => {
   })
 })
 
-it.each(['tasks','media'])('B-241 closure auxiliary %s failure is visible and retryable',async(kind)=>{
+it.each(['tasks','media'])('closure auxiliary %s failure is visible and retryable',async(kind)=>{
  const call=kind==='tasks'?fixture.channelCloseTasks:fixture.mediaLinks
  call.mockRejectedValueOnce(new Error('人工取得失敗'))
  render(<InventoryPage />)

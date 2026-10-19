@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /*
- * 送れなかったもの・記録（板 DrwMm・PZBVb）と運用者検索（板 u8xibp）の
+ * 送れなかったもの・記録（板 ・）と運用者検索（板 ）の
  * 数字の契約。見本HTMLとの突き合わせ（2026-10-03）。
  * 検索は13・行の日時は12/600・試行と理由は12。
  * 表の見出し・札・名のセルは共通部品（M10へ）。

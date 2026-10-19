@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { requestUnsavedAction } from './unsaved-action'
 
-/** B-158：ほかの絞り込みとハッシュを残し、タブだけを置き換える。入れ子は親/子。 */
+/** ：ほかの絞り込みとハッシュを残し、タブだけを置き換える。入れ子は親/子。 */
 export function tabHref(href: string, tab: string, parent?: string): string {
   const url = new URL(href, 'http://localhost')
   url.searchParams.set('tab', parent ? `${parent}/${tab}` : tab)

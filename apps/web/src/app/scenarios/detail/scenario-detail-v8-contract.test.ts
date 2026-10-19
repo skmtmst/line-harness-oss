@@ -11,9 +11,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
  * ★V8 シナリオ配信の編集・配信結果の契約（#1161）。
  *
  * 文字の契約ではなく「Pencil の板と受け口が繋がっているか」の契約。
- * - detail-v8.tsx … `PMLkX`（有効）/ `nMSiE`（始めた直後）/ `ARuZ4`（停止中）、
- *   小窓 `F1LK4e`（開始の確認）・`OPGU2`（停止の確認）・`Al4Ek`（複製）
- * - results-v8.tsx … `X4STXS`（配信結果）
+ * - detail-v8.tsx … ``（有効）/ ``（始めた直後）/ ``（停止中）、
+ *   小窓 ``（開始の確認）・``（停止の確認）・``（複製）
+ * - results-v8.tsx … ``（配信結果）
  * - page.tsx 2 つ … 現役 V8 に固定
  *
  * 動きの契約（API・確認キー・購読操作）はここに固定する。
@@ -101,10 +101,10 @@ describe('★V8 シナリオ配信結果（X4STXS）の契約', () => {
 
 describe('★V8 シナリオの CSS モジュールの契約', () => {
 
-  it('v7 に効かせる指定を持たない（data-theme セレクタの直書きは無い）', () => {
+  it('管理画面 に効かせる指定を持たない（data-theme セレクタの直書きは無い）', () => {
     /*
      * V8 の画面は component 側の分岐でだけ出るので、CSS 側で
-     * [data-theme] を条件にする必要は無い。付いていたら v7 の
+     * [data-theme] を条件にする必要は無い。付いていたら 管理画面 の
      * 見た目へ漏れ出す危険があるので契約で止める。
      */
     expect(V8_DETAIL_CSS.replace(/\/\*[\s\S]*?\*\//g, '')).not.toContain('[data-theme')

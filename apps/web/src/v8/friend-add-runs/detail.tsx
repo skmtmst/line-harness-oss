@@ -4,7 +4,7 @@ import { ActivityTime } from '@/components/shared/activity-item'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 
 /*
- * ★V8 友だち追加時の配信の実行の詳細（Pencil `N43uVX`・失敗あり）。
+ * ★V8 友だち追加時の配信の実行の詳細（Pencil ``・失敗あり）。
  *
  * 型の頭（戻る・題・説明）→ 線 → 左（失敗の帯・行ったこと）と右の欄（この追加について・トーク・設定）。
  * 白い板が 1100px を切ったら右の欄を左の下へ畳む。

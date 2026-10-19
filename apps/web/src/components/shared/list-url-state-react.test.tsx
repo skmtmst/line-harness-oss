@@ -206,7 +206,7 @@ describe('アカウントを替えたときだけ戻す', () => {
   })
 })
 
-it('B-12: スクロール直後に詳細へ移っても最後の位置を覚える', () => {
+it('スクロール直後に詳細へ移っても最後の位置を覚える', () => {
   vi.useFakeTimers()
   window.history.replaceState(null, '', '/scenarios')
   const view = render(<ScrollProbe ready />)

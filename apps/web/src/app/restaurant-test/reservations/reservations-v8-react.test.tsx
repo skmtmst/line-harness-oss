@@ -11,7 +11,7 @@ vi.hoisted(() => {
 import ReservationsPage from './page'
 
 /*
- * ★V8-B 予約台帳（板 `Z3FoM` 一覧・`l9NlC0` 今日・`rm92Y` 電話の予約）。
+ * ★V8-B 予約台帳（板 `Z3FoM` 一覧・`l9NlC0` 今日・`` 電話の予約）。
  * テーマにかかわらず V8 を描き、見方・電話予約・古い応答の破棄を守る。
  */
 vi.mock('next/navigation', () => ({

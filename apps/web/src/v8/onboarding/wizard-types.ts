@@ -6,7 +6,7 @@ import { type StarterItemState, type StyleState } from './model'
 
 /*
  * はじめの質問（★V8 修正案の列 VHp7p：xxpM9 スタイル選び・RZW83 見た目・lS1Gh/rJ36f 1問の画面・
- * oKSsG 最後の［まとめて動かす］。決まり B-311・B-313）。動きは BEHAVIOR.md。
+ * oKSsG 最後の［まとめて動かす］。決まり ・）。動きは BEHAVIOR.md。
  *
  * 窓の幅は V8 の 4 段の 960（xxpM9 の絵は 880 → 絵を直す）。
  */

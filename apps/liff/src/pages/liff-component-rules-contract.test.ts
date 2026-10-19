@@ -11,7 +11,7 @@ function components(dir: string): string[] {
   });
 }
 
-describe('B-158：LIFF の操作と入力は共通部品を通す', () => {
+describe('LIFF の操作と入力は共通部品を通す', () => {
   it('素のボタンと入力を描くのは Button と forms/controls だけ', () => {
     const sources = [...components(join(ROOT, 'pages')), ...components(join(ROOT, 'components'))];
     for (const path of sources) {

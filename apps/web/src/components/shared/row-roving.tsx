@@ -17,7 +17,7 @@ import { useFlipRows } from '@/lib/use-live-reorder'
  *   Space           : 名前・行の上で押すと、その行を選ぶ（選ぶ欄がある行だけ）
  *   Esc             : 選択を外す（一括バー側の useEscapeToClearSelection が受け持つ）
  *
- * 決まり:
+ * 決まり：
  *   - 入力欄・メニュー・窓の中のキーは奪わない
  *   - 自分で ↑↓ を使う部品（並び替えのつまみ）は data-roving-own="vertical" を付けると ↑↓ を譲る
  *   - 止まりから外したもの（tabindex=-1）には data-roving を付け、元から外れていたものと区別する

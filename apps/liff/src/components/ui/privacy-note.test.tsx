@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import PrivacyNote, { MUSUBO_PRIVACY_URL, privacyPolicyUrl } from './PrivacyNote.js';
+import PrivacyNote, { MUSUBO_PRIVACY_URL, privacyPolicyUrl } from './privacy-note.js';
 
 /** 送る画面のプライバシーポリシーの一行（2026-10-07 オーナー決定）。 */
 describe('プライバシーポリシーの一行', () => {

@@ -10,7 +10,7 @@ vi.hoisted(() => {
 
 import ConversionsPage from './page'
 
-/* B-226: 行から右の詳細へ移り、停止は理由必須の確認窓で実行する。
+/* : 行から右の詳細へ移り、停止は理由必須の確認窓で実行する。
  * 読み取り権限とAPIへの理由・保存版の受け渡しも守る。 */
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
@@ -194,13 +194,13 @@ test('v8 の下では Pencil r6dJFy の新しい一覧に切り替わる', async
   expect(host.textContent).toContain('この30日の成果')
   expect(host.textContent).toContain('52')
   expect(host.textContent).toContain('¥412,000')
-  // 狭い試験環境では 1152 の板（BygrU）の言葉「使われていない」になる
+  // 狭い試験環境では 1152 の板の言葉「使われていない」になる
   expect(host.textContent).toContain('使われていない')
   // 行の中身（名前・状態・数・金額・使う場所・操作）
   expect(host.textContent).toContain('商品を買った')
   expect(host.textContent).toContain('動いている')
   expect(host.textContent).toContain('止めている')
-  // B-200：使う場所を足す操作は行の「…」に残す。
+  // ：使う場所を足す操作は行の「…」に残す。
   const menu = host.querySelector<HTMLButtonElement>('[aria-label="成果地点「商品を買った」の操作"]')
   await act(async () => menu!.click())
   await settle()

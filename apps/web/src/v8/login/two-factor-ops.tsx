@@ -25,14 +25,14 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8-B 運営 ログイン 2段目（板 `tOPeY`「6桁の確認」）。
+ * ★V8-B 運営 ログイン 2段目（板 ``「6桁の確認」）。
  *
  * 運営のログイン（/ops/login）でパスワードを確かめたあと、`/login/two-factor?next=ops#lh_2fa=…`
  * で来たときだけ出す。動き（合言葉の受け取り・確認の口・運営権限の確かめ・失敗の文）は
- * v7 の app/login/two-factor/page.tsx と同じ。見た目だけ絵どおりに1枚のカードへまとめた。
+ * 管理画面 の app/login/two-factor/page.tsx と同じ。見た目だけ絵どおりに1枚のカードへまとめた。
  */
 
-/* 通信断・JSON でない返事は技術文言を出さない（v7 の two-factor-error と同じ決まりを写した）。 */
+/* 通信断・JSON でない返事は技術文言を出さない（管理画面 の two-factor-error と同じ決まりを写した）。 */
 export function opsTwoFactorFailureMessage(caught: unknown, fallback = '認証できませんでした'): string {
   const message = caught instanceof Error ? caught.message : ''
   if (caught instanceof TypeError || /Failed to fetch|NetworkError|Load failed|Network request failed/i.test(message)) {
@@ -58,7 +58,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
   const [error, setError] = useState('')
   const [method, setMethod] = useState<TwoFactorMethod>('line')
 
-  // 方法の受け取りは合言葉より先に（合言葉の受け取りで hash が消えるため。v7 と同じ順）。
+  // 方法の受け取りは合言葉より先に（合言葉の受け取りで hash が消えるため。管理画面 と同じ順）。
   useEffect(() => { setMethod(captureTwoFactorMethod()); setChallenge(captureTwoFactorChallenge()); setReady(true) }, [])
 
   const missingChallenge = ready && !challenge

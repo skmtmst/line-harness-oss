@@ -10,7 +10,7 @@ function Editor({ initial }: { initial: FormAction[] }) {
   return <><output data-testid="value">{JSON.stringify(value)}</output><ActionEditor value={value} onChange={setValue} refs={EMPTY_REFS} /></>
 }
 afterEach(cleanup)
-describe('B-169 フォームの動作は行の下で編集する', () => {
+describe('フォームの動作は行の下で編集する', () => {
   it('本文の改訂を保存用の値へ返す', () => {
     render(<Editor initial={[{ kind: 'send_text', text: 'ありがとうございます' }]} />)
     fireEvent.click(screen.getByRole('button', { name: 'テキストを送る「ありがとうございます」' }))

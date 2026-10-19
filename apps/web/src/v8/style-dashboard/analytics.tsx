@@ -17,7 +17,7 @@ import styles from './style-dashboard.module.css'
 /*
  * 「分析」のタブ（KcRVI 飲食・hqQLV サロン・UTxFu 面談・tMIuZ 教室）。
  * 小タブ → 数のカード 6 → 日ごとのグラフ（この期間と前の期間）→ 切り口の表｜右：内訳のカード。
- * 売上（料金×確定数）と入金額（オンライン）は別の数（B-305）。「出せない」は 0 と別。
+ * 売上（料金×確定数）と入金額（オンライン）は別の数。「出せない」は 0 と別。
  */
 export function StyleAnalyticsView({ data, error, onTab, onRetry, onRowOpen }: {
   data: StyleAnalytics | null

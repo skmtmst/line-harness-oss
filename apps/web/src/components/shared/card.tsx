@@ -35,8 +35,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
 }
 
 /*
- * 上下・左右を分けた余白（例 '8px 12px'）は max() に入らず、余白が 0 になっていた。
- * かっこの外に空白がある値だけ、最低16を掛けずにそのまま使う（a7lUk の階層の行）。
+ * 上下・左右を分けた余白（例 '8px 12px'）は max に入らず、余白が 0 になっていた。
+ * かっこの外に空白がある値だけ、最低16を掛けずにそのまま使う（ の階層の行）。
  */
 function hasSides(value: string): boolean {
   let flat = value

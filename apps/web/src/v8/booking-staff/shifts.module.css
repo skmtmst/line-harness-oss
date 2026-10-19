@@ -1,4 +1,4 @@
-/* ★V8 勤務とシフト（d5fmnM）・自分の勤務（E3YDK）・ひも付けなし（wvGke）。骨組みは layout.module.css。 */
+/* ★V8 勤務とシフト・自分の勤務・ひも付けなし。骨組みは layout.module.css。 */
 .fieldset {
   display: contents;
   min-width: 0;
@@ -243,7 +243,7 @@
 .mark [data-mark='休'] { color: var(--color-ink-faint); }
 .markDay { color: var(--color-ink-faint); }
 
-/* 読み込み中・失敗・ひも付けなし（wvGke）：右の列なしで板の幅いっぱいのカード。 */
+/* 読み込み中・失敗・ひも付けなし：右の列なしで板の幅いっぱいのカード。 */
 .stateBody { padding: var(--tpl-bks-main-pad); }
 
 .stateCard {
@@ -294,7 +294,7 @@
 
 .stateLink:hover { text-decoration: underline; }
 
-/* 何週分かのシフトを作る：開始日・週の数・［作る］を1行に並べる（板 E3YDK・d5fmnM）。 */
+/* 何週分かのシフトを作る：開始日・週の数・［作る］を1行に並べる（板 ・）。 */
 .genRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

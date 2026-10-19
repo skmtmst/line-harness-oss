@@ -14,7 +14,7 @@ import { partialFailureLabels, partialFailuresWithoutCard } from '@/components/d
 import { ConnectionStatus, SupportStatus, webhookState } from './sections'
 
 /*
- * ★V8 ダッシュボード（d8X09・WQmep）：右の列は上の数の帯の1マス分。
+ * ★V8 ダッシュボード（d8X09・）：右の列は上の数の帯の1マス分。
  * 縦の線を帯の線と一直線にするため、段は帯と同じ等分の格子に載る。
  * 実際の座標（1440〜1152・左メニュー開閉で ±0px）は撮影で確かめた。ここは仕組みを見張る。
  */
@@ -39,7 +39,7 @@ describe('右の列を帯の1マス分にする口', () => {
     expect(css).toMatch(/\.dashboardRow\[data-aside-size='column'\] \{ display: grid; grid-template-columns: repeat\(var\(--tpl-dash-cols\), minmax\(0, 1fr\)\); \}/)
     expect(css).toMatch(/\[data-aside-size='column'\] > \.dashboardCell \{ grid-column: 1 \/ -2; \}/)
     expect(css).toMatch(/\[data-aside-size='column'\] > \.dashboardAside \{ grid-column: -2 \/ -1; width: auto; \}/)
-    // 横並びの段も等分の格子（flex の配分だと線の太さ分ずれる）。高さは絵（WQmep の下の4つ＝200）に合わせた下限だけ置く（中身が増えれば伸びる）。
+    // 横並びの段も等分の格子（flex の配分だと線の太さ分ずれる）。高さは絵（ の下の4つ＝200）に合わせた下限だけ置く（中身が増えれば伸びる）。
     expect(css).toMatch(/\.dashboardColumns \{ min-height: 200px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax\(0, 1fr\); \}/)
   })
 

@@ -14,7 +14,7 @@ function historyMarkup(hasSource: boolean) {
 }
 
 /**
- * 運用者の画面に、内部IDとデータベースの語を出さない（V6の5画面）。
+ * 運用者の画面に、内部IDとデータベースの語を出さない（管理画面の5画面）。
  *
  * 実装画像を1枚ずつ見て見つかったもの:
  *
@@ -111,7 +111,7 @@ function between(source: string, start: string, end: string): string {
   return source.slice(from, to)
 }
 
-describe('V6の画面に内部IDとDBの語を出さない', () => {
+describe('管理画面の画面に内部IDとDBの語を出さない', () => {
   for (const screen of SCREENS) {
     it(`${screen.path}（${screen.node}）の表示部分に内部の語が無い`, () => {
       const text = displayText(read(screen.path))

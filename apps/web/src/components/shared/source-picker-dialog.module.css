@@ -38,7 +38,7 @@
   .date { flex-basis: 100%; }
 }
 }
-/* dJZ7Q：作ってあるもの・配るアカウントを選ぶ窓の大きさ。EpTBB（一括配信①）は変えない。 */
+/* dJZ7Q：作ってあるもの・配るアカウントを選ぶ窓の大きさ。（一括配信①）は変えない。 */
 @layer components {
 .panel[data-size='picker'], .panel[data-size='picker-narrow'] { width: min(100%, var(--tpl-picker-width)); height: min(var(--tpl-picker-height), calc(100dvh - var(--tpl-bcpick-margin) * 2)); }
 .panel[data-size='picker-narrow'] { width: min(100%, var(--tpl-picker-narrow-width)); }

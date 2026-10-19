@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, type BookingHistoryItem } from '../lib/api.js';
-import Icon from './ui/Icon.js';
-import Button from './ui/Button.js';
-import { useCustomerStyle } from './CustomerStyleScope.js';
+import Icon from './ui/icon.js';
+import Button from './ui/button/index.js';
+import { useCustomerStyle } from './customer-style-scope.js';
 
 /**
  * 予約が済んだあとのオンラインの会議（B7・★V8 sjkwK・I5hxa）。

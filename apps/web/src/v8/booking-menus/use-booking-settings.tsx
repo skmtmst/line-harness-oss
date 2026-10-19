@@ -19,7 +19,7 @@ import { V8TabKey, V8_TAB_KEYS, V8_TAB_NODE, previewRange } from './settings-par
 
 export function useBookingSettings(accountId: string | null) {
   usePageTitle('予約設定')
-  // 左メニューの項目そのものの画面なので、上の帯は「ホーム › 予約設定」だけ（絵 VLEaj・P6EdLW）。
+  // 左メニューの項目そのものの画面なので、上の帯は「ホーム › 予約設定」だけ（絵 ・）。
   usePageCrumbs(null)
   const samePageUrl = useSamePageUrl()
   const searchParams = useSearchParams()
@@ -45,7 +45,7 @@ export function useBookingSettings(accountId: string | null) {
   const tabNode = narrow && tab === 'menus' ? 'P6EdLW' : narrow && tab === 'hours' ? 'VFxWU' : V8_TAB_NODE[tab]
   const canEditMenus = useBookingEdit('/booking/menus')
   const canEditSettings = useBookingEdit('booking.settings')
-  /* 開いているタブを変えられない人には、頭の下に「閲覧のみ」の帯を出す（板 C9fv7A）。 */
+  /* 開いているタブを変えられない人には、頭の下に「閲覧のみ」の帯を出す（板 ）。 */
   const tabReadOnly = tab === 'photos' ? !canEditMenus && !canEditSettings : tab === 'menus' ? !canEditMenus : !canEditSettings
 
   const [menus, setMenus] = useState<BookingMenu[]>([])
@@ -59,7 +59,7 @@ export function useBookingSettings(accountId: string | null) {
   const [staffError, setStaffError] = useState<string | null>(null)
   const [staffMatrices, setStaffMatrices] = useState<Record<string, StaffMenuMatrix[]>>({})
   const [staffExtras, setStaffExtras] = useState<Record<string, { work: string | null; calendar: 'loading' | 'connected' | 'none' | 'error' }>>({})
-  /** 板 VFxWU（1152）：畳んだスマホの代わりに開く見え方窓。 */
+  /** 板 （1152）：畳んだスマホの代わりに開く見え方窓。 */
   const [phoneOpen, setPhoneOpen] = useState(false)
   const [members, setMembers] = useState<StaffMember[]>([])
   const [resources, setResources] = useState<BookingResource[] | null>(null)

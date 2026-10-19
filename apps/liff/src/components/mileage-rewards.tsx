@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { affiliateSelfApi, type Redemption, type Reward } from '../lib/affiliate-self-api.js';
-import Button from './ui/Button.js';
-import Card from './ui/Card.js';
-import ConfirmDialog from './ui/ConfirmDialog.js';
+import Button from './ui/button/index.js';
+import Card from './ui/card.js';
+import ConfirmDialog from './ui/confirm-dialog.js';
 import { FormTextControl } from './forms/controls.js';
 
 export default function MileageRewards({ onChanged }: { onChanged: () => Promise<void> }) {

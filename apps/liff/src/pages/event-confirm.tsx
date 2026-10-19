@@ -1,4 +1,4 @@
-import { useCustomerWords } from '../components/CustomerStyleScope.js';
+import { useCustomerWords } from '../components/customer-style-scope.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import { TextInput, TextArea, ChoiceInput, FieldLabel, FieldCount, FormChoiceRow } from '../components/forms/controls.js';
 import { useEffect, useMemo, useState } from 'react';
@@ -6,14 +6,14 @@ import { useLocation, useNavigate, useParams, useSearchParams } from 'react-rout
 import { api, type EventDetail, type EventSlot } from '../lib/api.js';
 import { formatJstDeadline, formatJstEventSpan } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import LoadingView from '../components/LoadingView.js';
-import Icon from '../components/ui/Icon.js';
-import Button from '../components/ui/Button.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import PrivacyNote from '../components/ui/PrivacyNote.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
+import LoadErrorView from '../components/load-error-view.js';
+import LoadingView from '../components/loading-view.js';
+import Icon from '../components/ui/icon.js';
+import Button from '../components/ui/button/index.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import PrivacyNote from '../components/ui/privacy-note.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LiffLookScope from '../components/liff-look-scope.js';
 import { LiffInput, LiffTextArea } from '../components/forms/controls.js'
 
 function nanoid(): string {
@@ -23,7 +23,7 @@ function nanoid(): string {
 /**
  * 2-b 申し込みの確認。送る中身のカード＋案内の帯＋備考。
  * 進む操作 (申し込む) は下の操作の帯にだけ置く。
- * 質問・備考・冪等キー・送信の失敗の扱いはそのまま。見た目だけ ★V7。
+ * 質問・備考・冪等キー・送信の失敗の扱いはそのまま。見た目だけ ★管理画面。
  *
  * 満席で待ちに入ったとき Worker は 200 で {waitlisted: true} を返す。
  * そのときは 2-d (キャンセル待ちに入りました) へ進む。
@@ -187,7 +187,7 @@ export default function EventConfirm() {
     );
   }
 
-  // 期限があれば日時で出す（板 EscPA「キャンセルは 10月10日 18:00 まで。」）。無ければ「自分のイベント」へ案内する。
+  // 期限があれば日時で出す（板 「キャンセルは 10月10日 18:00 まで。」）。無ければ「自分のイベント」へ案内する。
   const cancelText = event.cancel_deadline_hours_before != null
     ? `キャンセルは ${formatJstDeadline(slot.starts_at, event.cancel_deadline_hours_before)} まで。`
     : `キャンセルは期限まで「${words.myEvents}」からできます（期限は${words.event}ごとに違います）。`;
@@ -316,7 +316,7 @@ export default function EventConfirm() {
   );
 }
 
-/** 確認の1行。板 EscPA は 1行 40 (線を含む)・鍵と値は上ぞろえ (予約の確認と同じ)。 */
+/** 確認の1行。板  は 1行 40 (線を含む)・鍵と値は上ぞろえ (予約の確認と同じ)。 */
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex h-10 items-start gap-2 py-2.5">

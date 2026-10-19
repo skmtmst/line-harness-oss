@@ -182,7 +182,7 @@ beforeEach(() => {
   if (!g.crypto) g.crypto = {}
   if (!g.crypto.randomUUID) g.crypto.randomUUID = () => 'test-uuid-1'
   document.documentElement.dataset.theme = 'v8'
-  // 板 JV2oR（閲覧のみ）：作る操作は localStorage の役職で決まる。試験では店長として通す。
+  // 板 （閲覧のみ）：作る操作は localStorage の役職で決まる。試験では店長として通す。
   // このファイルの happy-dom には localStorage が無いので、無ければ小さな置き換えを置く。
   const w = window as unknown as { localStorage?: Storage }
   if (!w.localStorage) {
@@ -257,7 +257,7 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(1))
 
-    // この版を公開する（公開の確かめ Z9wXm が出るので窓の中でもう一度押す。
+    // この版を公開する（公開の確かめ  が出るので窓の中でもう一度押す。
     // 画面の知らせとトーストの両方に出る）。
     fireEvent.click(screen.getByRole('button', { name: 'この版を公開' }))
     const publishDialog = await screen.findByRole('dialog', { name: 'この版を公開する' })

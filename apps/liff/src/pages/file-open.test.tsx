@@ -9,7 +9,7 @@ vi.mock('../lib/api.js', () => ({
   api: { liffConfig: () => Promise.resolve({ data: { accountName: '然 渋谷店' } }), customerLook: () => Promise.reject(new Error('x')) },
 }));
 
-import FileOpen from './FileOpen.js';
+import FileOpen from './file-open.js';
 
 const ID = '11111111-2222-3333-4444-555555555555';
 const future = () => new Date(Date.now() + 10 * 60_000).toISOString();

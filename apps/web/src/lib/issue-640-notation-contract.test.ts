@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-/* 完全切り替え：v7 の scenario-list.tsx は捨て、V8 を見る。入口は src/v8/scenarios/list.tsx（古い list-v8.tsx はもう描かれない）。 */
+/* 完全切り替え：管理画面 の scenario-list.tsx は捨て、V8 を見る。入口は src/v8/scenarios/list.tsx（古い list-v8.tsx はもう描かれない）。 */
 const SCENARIO_LIST = read('../v8/scenarios/list.tsx')
 const AUTO_REPLIES = readUiSource(new URL('../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
 const FRIEND_ADD = read('../v8/friend-add/list.tsx')
@@ -20,24 +20,24 @@ const ANALYTICS_TIME = read('../app/analytics/analytics-time.ts')
  * - 日時は JST・画面ごとの統一フォーマットで出す。
  */
 describe('#640 省略表示の全文確認（title）', () => {
-  it('/scenarios: 数のセルは title で全文を出す', () => {
+  it('scenarios: 数のセルは title で全文を出す', () => {
     // V8 の数セルに導線リンクは無い。数はそのまま出し、全文は title で読める。
     expect(SCENARIO_LIST).toMatch(/title=\{`購読中[\s\S]{0,200}?読み終えた/)
   })
 
-  it('/auto-replies V8: 応答数・長い条件・連動内容に全文確認を残す', () => {
+  it('auto-replies V8: 応答数・長い条件・連動内容に全文確認を残す', () => {
     expect(AUTO_REPLIES).toContain('title={`今月 ${r.hits?.period')
-    expect(AUTO_REPLIES).toContain('title={name}') // B-194: 条件の補足は名前の下に出さない
-    expect(AUTO_REPLIES).not.toContain('sub={') // B-194: 連動の補足は名前の下に出さない
+    expect(AUTO_REPLIES).toContain('title={name}') // : 条件の補足は名前の下に出さない
+    expect(AUTO_REPLIES).not.toContain('sub={') // : 連動の補足は名前の下に出さない
   })
 
-  it('/friend-add-settings V8: 設定名・経路・送るものに全文確認を残す', () => {
+  it('friend-add-settings V8: 設定名・経路・送るものに全文確認を残す', () => {
     expect(FRIEND_ADD).toContain('title={rule.name}')
-    expect(FRIEND_ADD).not.toContain('styles.nameSub}') // B-194: 経路は詳細で見る
+    expect(FRIEND_ADD).not.toContain('styles.nameSub}') // : 経路は詳細で見る
     expect(FRIEND_ADD).toContain('title={line}')
   })
 
-  it('/contents/vars: 省略した中身・使用箇所・更新と操作に全文を残す', () => {
+  it('contents/vars: 省略した中身・使用箇所・更新と操作に全文を残す', () => {
     expect(VARS).toContain('<TableHeadRow>')
     expect(VARS).toContain("title={displayValue(valueText, 'unconfigured')}")
     expect(VARS).toContain('title={`${formatNumber(item.usageCount)}か所で使われています`}')
@@ -46,7 +46,7 @@ describe('#640 省略表示の全文確認（title）', () => {
     expect(VARS).toContain('label={`共通情報「${item.name}」の操作`}')
   })
 
-  it('/nen-campaigns: 配信名の補足・送った先・並び順に title', () => {
+  it('nen-campaigns: 配信名の補足・送った先・並び順に title', () => {
     expect(NEN_OVERVIEW).toContain('title={setting.title}')
     expect(NEN_OVERVIEW).toContain('title={who}')
     expect(NEN_OVERVIEW).toContain("const who = `${delivery.friendName || '名前未取得'}・${delivery.lineAccountName}`")
@@ -54,7 +54,7 @@ describe('#640 省略表示の全文確認（title）', () => {
 
   })
 
-  it('/tags: フォルダ行・使用先セルに title', () => {
+  it('tags: フォルダ行・使用先セルに title', () => {
     // フォルダの列は選び直し欄を置かず文字だけ出す（m21o）。
     // 欄の幅が列を超えて隣へ重なっていたため。長い名前は省略し、
     // 全文は title で確認できる（#640 の意図は残す）。
@@ -70,12 +70,12 @@ describe('#640 省略表示の全文確認（title）', () => {
 })
 
 describe('#640 日時表記の統一（JST・フォーマット）', () => {
-  it('/analytics: 配信日時は共通の日本時間の一覧表示にそろえる', () => {
+  it('analytics: 配信日時は共通の日本時間の一覧表示にそろえる', () => {
     expect(ANALYTICS).not.toContain("slice(0, 16).replace('T', ' ')")
     expect(ANALYTICS).toContain('shortDateTime(item.sentAt)')
   })
 
-  it('/analytics: 集計期間・結果履歴は formatAnalyticsDate にそろえる', () => {
+  it('analytics: 集計期間・結果履歴は formatAnalyticsDate にそろえる', () => {
     expect(ANALYTICS).toMatch(/集計期間 \$\{formatAnalyticsDate\(from\)\}〜\$\{formatAnalyticsDate\(to\)\}/)
     expect(ANALYTICS).toContain('formatAnalyticsDate(item.latestSnapshot.periodFrom)')
     expect(ANALYTICS).toContain('formatAnalyticsDate(snapshot.periodFrom)')
@@ -84,12 +84,12 @@ describe('#640 日時表記の統一（JST・フォーマット）', () => {
     expect(ANALYTICS.match(/periodTo\.slice\(0, 10\)/g) ?? []).toHaveLength(0)
   })
 
-  it('/tags: 登録日は端末の地域ではなく JST 固定で出す', () => {
+  it('tags: 登録日は端末の地域ではなく JST 固定で出す', () => {
     expect(TAGS).toMatch(/function formatDate[\s\S]{0,400}?formatDay\(d\)/)
     expect(TAGS).not.toContain('d.getFullYear()')
   })
 
-  it('/contents/vars: 更新日は JST、日付型の値は formatStamp の「/」区切り', () => {
+  it('contents/vars: 更新日は JST、日付型の値は formatStamp の「/」区切り', () => {
     expect(VARS).toMatch(/function formatListDate[\s\S]{0,400}?formatListTimestamp\(value\)/)
     expect(VARS).toMatch(/formatVarValue\(item\.type, item\.value\)/)
     expect(VARS).toMatch(/formatVarValue\(item\.type, pending\.value\)/)

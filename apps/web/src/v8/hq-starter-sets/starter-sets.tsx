@@ -32,12 +32,12 @@ import { STYLE_CHOICES, styleLabel } from '@/v8/onboarding'
 import styles from './starter-sets.module.css'
 
 /*
- * 統括の「スタイルの初期セット」（★V8 修正案の列 VHp7p `J6647`。決まり B-311）。
+ * 統括の「スタイルの初期セット」（★V8 修正案の列 VHp7p `J6647`。決まり ）。
  *
  * スタイルごとに、新しいアカウントで自動で入れる物（リッチメニュー・テンプレート・オートメーション・
  * 予約メニュー・ダッシュボードの型）を束ねて見せる。自動で送る物は「止めた状態で入る」。
  * 読みは組4の `GET /api/hq/style-starter-sets`。作る・直す・配る・標準に戻す・自動で入れるの切り替えは
- * 口が入るまで準備中の窓（B-314）。
+ * 口が入るまで準備中の窓。
  */
 
 const KIND_ROWS: ReadonlyArray<{ kind: StarterSetItem['kind']; label: string; how: { text: string; tone: 'neutral' | 'warning' } }> = [
@@ -72,7 +72,7 @@ export default function HqStarterSetsV8() {
   const [removing, setRemoving] = useState<StarterSetItem['kind'] | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
-  /* テンプレートの見本（B-311 追記4・組4 hqStyleApi.templateSamples）。業種を替えたら読み直す。 */
+  /* テンプレートの見本（ 追記4・組4 hqStyleApi.templateSamples）。業種を替えたら読み直す。 */
   const [samples, setSamples] = useState<StyleTemplateSample[] | null>(null)
   const [samplesError, setSamplesError] = useState(false)
   const [sampleOpen, setSampleOpen] = useState<StyleTemplateSample | null>(null)

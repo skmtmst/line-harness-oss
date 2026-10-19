@@ -8,7 +8,7 @@ export function normalize(value) {
   v = v.replace(/#([0-9a-f])([0-9a-f])([0-9a-f])\b/g, '#$1$1$2$2$3$3')
   v = v.replace(/(^|[\s(,])\.(\d)/g, '$10.$2')
   v = v.replace(/\s*,\s*/g, ',')
-  // CSSの最適化は rgba() と8桁hexを相互に変える。色は8bitへそろえ、書式だけの違いで落とさない。
+  // CSSの最適化は rgba と8桁hexを相互に変える。色は8bitへそろえ、書式だけの違いで落とさない。
   v = v.replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/g, (all, r, g, b, a = '1') => {
     const channels = [Number(r), Number(g), Number(b), Math.round(Number(a) * 255)]
     if (channels.some((c) => !Number.isFinite(c) || c < 0 || c > 255)) return all

@@ -56,7 +56,7 @@ describe('LIFF の決まり (sxNO5)', () => {
     const error = src('components', 'LoadErrorView.tsx');
     expect(error).toContain('data-design-node="zz9R3"');
     expect(error).toContain('RETRY_LABEL');
-    // 空きがないときは次の週・指名なしへの手を出す (ADutg)。
+    // 空きがないときは次の週・指名なしへの手を出す 。
     const picker = src('components', 'DateTimePicker.tsx');
     expect(picker).toContain('次の週');
     expect(picker).toContain('指名なし');

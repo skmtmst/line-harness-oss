@@ -153,7 +153,7 @@ async function settle(ms = 300) {
 }
 
 /**
- * ★V7 日付の選択（DateField）で日付を選ぶ。暦を開き、見出し（「2026年11月」）を見ながら
+ * ★管理画面 日付の選択（DateField）で日付を選ぶ。暦を開き、見出し（「2026年11月」）を見ながら
  * 月を送って、その日を押す。今日の日付が変わっても同じ手順で届く。
  */
 async function pickDate(value: string) {

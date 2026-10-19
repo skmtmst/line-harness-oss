@@ -10,7 +10,7 @@ import {ApiError} from '@/lib/api'
 beforeEach(()=>{f.list.mockReset().mockResolvedValue({success:true,data:[]});f.get.mockReset()})
 afterEach(cleanup)
 const props={open:true,onClose:()=>{},accountName:'人工店',baseLink:'https://fixture.invalid/base'}
-it('B-241：QR窓の経路取得失敗と空を分けて読み直す',async()=>{
+it('QR窓の経路取得失敗と空を分けて読み直す',async()=>{
  f.list.mockRejectedValueOnce(new Error('fixture failure'))
  render(<QrDialog {...props}/>)
  const error=await screen.findByText('経路を読み込めませんでした')
@@ -18,7 +18,7 @@ it('B-241：QR窓の経路取得失敗と空を分けて読み直す',async()=>{
  await waitFor(()=>expect(screen.queryByText('経路を読み込めませんでした')).toBeNull())
  expect(f.list).toHaveBeenCalledTimes(2)
 })
-it('B-241：指定経路の500を消えた経路と扱わず、同じ経路を再取得する',async()=>{
+it('指定経路の500を消えた経路と扱わず、同じ経路を再取得する',async()=>{
  f.get.mockRejectedValueOnce(new ApiError(500,'fixture failure')).mockResolvedValue({success:true,data:{id:'r',name:'復帰した経路',refCode:'r',isActive:true}})
  render(<QrDialog {...props} routes={[]} initialRouteId="r"/>)
  const error=await screen.findByText('経路を読み込めませんでした')

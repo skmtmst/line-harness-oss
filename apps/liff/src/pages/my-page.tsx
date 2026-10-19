@@ -1,8 +1,8 @@
-import { useCustomerWords, useCustomerStyle } from '../components/CustomerStyleScope.js';
-import PaymentPreparingNote from '../components/PaymentPreparingNote.js';
+import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
+import PaymentPreparingNote from '../components/payment-preparing-note.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
-import PageHeading from '../components/ui/PageHeading.js';
-import FieldError from '../components/ui/FieldError.js';
+import PageHeading from '../components/ui/page-heading.js';
+import FieldError from '../components/ui/field-error.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -20,17 +20,17 @@ import liff from '@line/liff';
 import liffRuntime from '../lib/liff-runtime.js';
 import { isNotReadyYet } from '../lib/not-ready.js';
 import { logFailure } from '../lib/user-message.js';
-import LiffLookScope from '../components/LiffLookScope.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import LoadingView from '../components/LoadingView.js';
-import Card from '../components/ui/Card.js';
-import Button from '../components/ui/Button.js';
-import Badge from '../components/ui/Badge.js';
-import { holdDeadlineText } from '../components/UnpaidPaymentNote.js';
-import Icon, { type IconName } from '../components/ui/Icon.js';
+import LiffLookScope from '../components/liff-look-scope.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LoadErrorView from '../components/load-error-view.js';
+import LoadingView from '../components/loading-view.js';
+import Card from '../components/ui/card.js';
+import Button from '../components/ui/button/index.js';
+import Badge from '../components/ui/badge.js';
+import { holdDeadlineText } from '../components/unpaid-payment-note.js';
+import Icon, { type IconName } from '../components/ui/icon.js';
 
-/** 準備中の案内（B-314）。本物の口が来るまで、入口は置いて押すとこれを出す。 */
+/** 準備中の案内。本物の口が来るまで、入口は置いて押すとこれを出す。 */
 const COMING_SOON = '現在準備中です';
 
 /**
@@ -91,7 +91,7 @@ export default function MyPage() {
   const [failed, setFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [nextPayment, setNextPayment] = useState<PaymentView | null>(null);
-  /* これからの予約のうち、未払いのいちばん早い 1 件（B-338・L5g75：上に琥珀の箱で出す）。 */
+  /* これからの予約のうち、未払いのいちばん早い 1 件（・L5g75：上に琥珀の箱で出す）。 */
   const [unpaid, setUnpaid] = useState<{ booking: BookingHistoryItem; payment: PaymentView } | null>(null);
   const [payBusy, setPayBusy] = useState(false);
   const [waitlist, setWaitlist] = useState<RowState>(LOADING);

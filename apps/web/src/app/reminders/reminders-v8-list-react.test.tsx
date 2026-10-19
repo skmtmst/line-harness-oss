@@ -11,7 +11,7 @@ vi.hoisted(() => {
 import RemindersPage from './page'
 
 /*
- * ★V8 一覧（Pencil `apLqS`）の契約。V8 だけを出す。
+ * ★V8 一覧（Pencil ``）の契約。V8 だけを出す。
  * 見本が決めた文言・帯・行の操作が出ることを実DOMで固定する。
  */
 const navigation = vi.hoisted(() => ({ push: vi.fn() }))
@@ -131,7 +131,7 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('8')
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('42')
   expect(host.querySelector('[data-design="KPIs"]')?.textContent).toContain('1')
-  // B-194: 名前は1行。状態の札、予定・次回の実値は専用の列へ
+  // : 名前は1行。状態の札、予定・次回の実値は専用の列へ
   expect(host.textContent).toContain('契約終了の前に知らせる')
   expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('基準日の 3日前 09:00')
   expect(host.textContent).toContain('5通')
@@ -176,7 +176,7 @@ test('v8 の行の操作は見本の並びを持つ', async () => {
       'リマインダの詳細を見る', '配信予定を見る', '実行結果を見る', '登録者を管理',
       '編集する', '複製する', 'フォルダへ移す', '一時停止する', '削除する',
     ])
-    // 板 SkY9V：行の「…」を開いた印
+    // 板 ：行の「…」を開いた印
     expect(host.querySelector('[data-design-node="SkY9V"]')).toBeTruthy()
   })
 })
@@ -209,7 +209,7 @@ test('v8 の行の「登録者を管理」「配信予定を見る」「実行�
   }
 })
 
-// 2026-10-06 オーナー決定：閲覧のみには押せないボタン・項目を置かずに隠す（帯は出す）。板 a5C1p。
+// 2026-10-06 オーナー決定：閲覧のみには押せないボタン・項目を置かずに隠す（帯は出す）。板 。
 test('v8 の閲覧のみ（a5C1p）は選ぶ枠と作る・一括・変更の操作を出さず、閲覧のみの帯を出す', async () => {
   document.documentElement.dataset.theme = 'v8'
   handler = (url) => {

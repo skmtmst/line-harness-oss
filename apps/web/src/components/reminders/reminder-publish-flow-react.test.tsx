@@ -229,7 +229,7 @@ describe('リマインダ公開フローの実データ表示', () => {
     expect(screen.queryByText('配信予定を確認しています')).toBeNull()
     expect(screen.queryByText('送信予定はまだありません')).toBeNull()
     expect(screen.getByText('今後7日 —通')).toBeTruthy()
-    // V7 x63W5x：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
+    // 管理画面 x63W5x：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     fireEvent.click(screen.getAllByRole('button', { name: 'もう一度読み込む' })[0])
     expect(retry).toHaveBeenCalledTimes(1)
   })
@@ -257,7 +257,7 @@ describe('リマインダ公開フローの実データ表示', () => {
     const retry = vi.fn()
     render(<ConfirmStage draft={DRAFT} settings={SETTINGS} validation={null} validationFailed onRetryValidation={retry} onPublish={() => {}} busy={false} />)
     expect(screen.getAllByText(/チェックを実行できませんでした/).length).toBeGreaterThanOrEqual(1)
-    // V7 x63W5x：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
+    // 管理画面 x63W5x：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     fireEvent.click(screen.getAllByRole('button', { name: 'もう一度読み込む' })[0])
     expect(retry).toHaveBeenCalledTimes(1)
   })

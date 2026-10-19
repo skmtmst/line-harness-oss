@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 コメント演出（`Omqd4`）の描画。
+ * ★V8 コメント演出（``）の描画。
  * 差し替えるのは通信だけ。一覧・追加・貼り付け・保存が実在する。
  */
 import React, { act } from 'react'

@@ -1,6 +1,6 @@
 import type { RestaurantCustomerBooking } from '@line-crm/shared';
-import StatusView from '../../components/ui/StatusView.js';
-import CompletionPanel from '../../components/ui/CompletionPanel.js';
+import StatusView from '../../components/ui/status-view.js';
+import CompletionPanel from '../../components/ui/completion-panel.js';
 import { STATUS_LABEL, changeRule, longDate, zonedParts } from '../../lib/seat-reserve.js';
 
 /**

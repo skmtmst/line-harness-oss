@@ -43,7 +43,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
+ * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド ・日時指定と開催回 ）。
  * 動画（差し替える・準備の段）→ 公開期間（オンデマンド）／開催回（日時指定）→ 配信枠 → 視聴の数え方。
  * 右は公開ページでの見え方。
  * 口・保存の決まりは BEHAVIOR.md に記録。
@@ -97,7 +97,7 @@ const STAGES = [
   { key: 'thumbnail', label: '表紙' },
   { key: 'ready', label: '準備完了' },
 ] as const
-/* 段の順番はサーバーの順（配信の形 → 表紙）。絵（LPOe7）は表紙を先に描いているが、済んでいない段に ✓ を付けない。 */
+/* 段の順番はサーバーの順（配信の形 → 表紙）。絵は表紙を先に描いているが、済んでいない段に ✓ を付けない。 */
 const STAGE_ORDER: WebinarVideoAsset['stage'][] = ['uploaded', 'inspecting', 'converting', 'packaging', 'thumbnail', 'ready']
 const NEXT_STAGE: Record<string, WebinarVideoAsset['stage'][]> = {
   uploaded: ['inspecting', 'failed'], inspecting: ['converting', 'failed'], converting: ['packaging', 'failed'],
@@ -436,7 +436,7 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
   const save = async () => {
     if (readOnly || lock.current) return
     const capacity = input.trim() === '' ? null : Number(input)
-    /* 定員の誤りは、その欄を赤くして移る（B-139）。 */
+    /* 定員の誤りは、その欄を赤くして移る。 */
     if (capacity !== null && (!Number.isSafeInteger(capacity) || capacity < 1)) { setCapError('定員は1人以上の整数で入れてください。空にすると無制限です。'); setError(''); focusFieldById(capId); return }
     setCapError('')
     lock.current = true
@@ -491,7 +491,7 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [localError, setLocalError] = useState('')
-  /* 日付の誤りは、その欄の真下に出して移る（B-139）。 */
+  /* 日付の誤りは、その欄の真下に出して移る。 */
   const [dateErrors, setDateErrors] = useState<{ date?: string; from?: string; to?: string }>({})
   const failDate = (key: 'date' | 'from' | 'to', message: string) => {
     setDateErrors({ [key]: message })

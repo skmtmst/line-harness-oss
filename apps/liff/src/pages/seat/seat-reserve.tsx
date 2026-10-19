@@ -1,22 +1,22 @@
 import { useRequestGeneration } from '../../lib/use-request-generation.js';
 import { FieldError } from '../../components/forms/controls.js';
-import CourseChoice from '../../components/CourseChoice.js';
-import Card from '../../components/ui/Card.js';
+import CourseChoice from '../../components/course-choice.js';
+import Card from '../../components/ui/card.js';
 import { useUrlStep } from '../../lib/use-url-step.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import liff from '../../lib/liff-runtime.js';
 import type { RestaurantCustomerBooking, RestaurantLateArrivalPolicy, RestaurantUnavailableReason } from '@line-crm/shared';
-import LiffHeader from '../../components/ui/LiffHeader.js';
-import LiffLookScope from '../../components/LiffLookScope.js';
-import Stepper from '../../components/ui/Stepper.js';
-import BottomBar from '../../components/ui/BottomBar.js';
-import Button from '../../components/ui/Button.js';
-import Icon from '../../components/ui/Icon.js';
-import ConfirmDialog from '../../components/ui/ConfirmDialog.js';
-import LoadingView from '../../components/LoadingView.js';
-import LoadErrorView from '../../components/LoadErrorView.js';
-import StatusView from '../../components/ui/StatusView.js';
+import LiffHeader from '../../components/ui/liff-header.js';
+import LiffLookScope from '../../components/liff-look-scope.js';
+import Stepper from '../../components/ui/stepper/index.js';
+import BottomBar from '../../components/ui/bottom-bar.js';
+import Button from '../../components/ui/button/index.js';
+import Icon from '../../components/ui/icon.js';
+import ConfirmDialog from '../../components/ui/confirm-dialog.js';
+import LoadingView from '../../components/loading-view.js';
+import LoadErrorView from '../../components/load-error-view.js';
+import StatusView from '../../components/ui/status-view.js';
 import { restaurantBookingApi } from '../../lib/api.js';
 import { logFailure } from '../../lib/user-message.js';
 import {
@@ -37,11 +37,11 @@ import {
   zonedToday,
   type DayChip,
 } from '../../lib/seat-reserve.js';
-import SeatWaitlistSheet from '../../components/SeatWaitlistSheet.js';
-import SeatPick, { type DaySlots } from './SeatPick.js';
-import SeatConfirm from './SeatConfirm.js';
-import SeatDone from './SeatDone.js';
-import SeatMine from './SeatMine.js';
+import SeatWaitlistSheet from '../../components/seat-waitlist-sheet.js';
+import SeatPick, { type DaySlots } from './seat-pick.js';
+import SeatConfirm from './seat-confirm.js';
+import SeatDone from './seat-done.js';
+import SeatMine from './seat-mine.js';
 
 import type { View, Course, Store } from './seat-reserve-types.js';
 
@@ -49,7 +49,7 @@ const STEPS = ['人数・日時・コース', '確認'];
 const DEFAULT_GUESTS = 2;
 
 /**
- * 飲食店の席の予約 (E-11・★V8 KRppA→B3oGt3→sAnyy)。入口は ?page=restaurant&token=...。
+ * 飲食店の席の予約 (E-11・★V8 →→sAnyy)。入口は ?page=restaurant&token=...。
  * token は管理画面の「LINE 予約の URL」から店を決める。?view=mine で変更・取り消しから開く。
  * 流れ：① 人数と日時 → 仮押さえ → ② 確認 (残り時間) → 確定 → ③ 受け付けました。
  * 変更は ① で選び直して ② で「この内容に変える」(仮押さえなし・版を指定)。

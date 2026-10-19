@@ -12,7 +12,7 @@ import { type NenCoupon, type NenTab } from '@/v8/nen-campaigns/display'
 /*
  * 419: 誕生日クーポン設定の「2月29日生まれの子」3択が
  * 保存値を表示し、変更がそのまま onCouponChange へ流れること。
- * ★V6 37-6 では誕生日配信の行から開く右パネル（Drawer は body 直下に描く）。
+ * ★管理画面 37-6 では誕生日配信の行から開く右パネル（Drawer は body 直下に描く）。
  */
 
 let container: HTMLDivElement

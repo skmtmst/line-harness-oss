@@ -1,4 +1,4 @@
-/** B-155/163/164/165/175: growing entity lists must use the shared dialog. */
+/** /163/164/165/175: growing entity lists must use the shared dialog. */
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -42,7 +42,7 @@ export function inspectPickers(text, file = 'component.tsx') {
     for (const edit of edits.sort((a, b) => b.start - a.start)) value = value.slice(0, edit.start) + edit.text + value.slice(edit.end)
     return value
   }
-  // V8 already replaces these explicitly hidden V7 branches. No filename exemption.
+  // V8 already replaces these explicitly hidden 管理画面 branches. No filename exemption.
   function legacyOnly(node) {
     for (let child = node, parent = node.parent; parent; child = parent, parent = parent.parent) {
       const element = ts.isJsxElement(parent) ? parent.openingElement : ts.isJsxSelfClosingElement(parent) ? parent : undefined
@@ -61,7 +61,7 @@ export function inspectPickers(text, file = 'component.tsx') {
       if (identifier && definitions.has(identifier)) options = definitions.get(identifier)
       options = expandOptions(options)
 
-      // Folder rails collapse to a Select by B-164. Identity comparisons choose between two existing values.
+      // Folder rails collapse to a Select by . Identity comparisons choose between two existing values.
       const comparison = /sourceFriendId/.test(options) && /identity-decision-dialog|friends\/compare/.test(file)
       const folderRail = /templates\/list-page\.tsx$/.test(file) && /rows\.map/.test(options)
       const folderPicker = /shared\/entity-picker\.tsx$/.test(file) && /folderRows/.test(options)

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 公開の前に確かめる（`XCUNf`）の描画。
+ * ★V8 公開の前に確かめる（``）の描画。
  * 差し替えるのは通信だけ。検査の一覧・まとめ・公開ボタンが実在する。
  */
 import React, { act } from 'react'

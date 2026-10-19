@@ -2,8 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import EventWaitlistOffer, { searchWithoutOfferToken } from './EventWaitlistOffer.js';
-import App from '../App.js';
+import EventWaitlistOffer, { searchWithoutOfferToken } from './event-waitlist-offer.js';
+import App from '../app.js';
 
 /**
  * 監査 L2：繰上げ案内（?eventWaitlistToken=…）から「自分のイベントを見る」で
@@ -11,7 +11,7 @@ import App from '../App.js';
  */
 
 vi.mock('@line/liff', () => ({ default: { closeWindow: vi.fn() } }));
-vi.mock('./EventBookings.js', () => ({ default: Probe }));
+vi.mock('./event-bookings.js', () => ({ default: Probe }));
 vi.mock('../lib/api.js', () => ({
   api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
     eventWaitlistOffer: vi.fn().mockRejectedValue(new Error('offline')),

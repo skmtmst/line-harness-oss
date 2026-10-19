@@ -32,7 +32,7 @@ function shortWhen(value: string | null | undefined): string {
   return polishFormatDate(value, { style: 'list', fallback: '—' })
 }
 
-/** N1br7.html の表＋予約中の版＋新しい版の入力。保存は既存の版APIへ送る。 */
+/** .html の表＋予約中の版＋新しい版の入力。保存は既存の版APIへ送る。 */
 export default function PhotoPolicyHistoryV8({ open, canEdit, onClose, onChanged }: {
   open: boolean; canEdit: boolean; onClose: () => void; onChanged: () => void
 }) {

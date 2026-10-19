@@ -78,7 +78,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
   const [allPhotosError, setAllPhotosError] = useState('')
   const [allPhotosLoading, setAllPhotosLoading] = useState(false)
   const [reviewing, setReviewing] = useState<string | null>(null)
-  // 審査・見送りの口は owner/admin だけ。staff は見るだけ（Jn95h）。
+  // 審査・見送りの口は owner/admin だけ。staff は見るだけ。
   const [canEdit, setCanEdit] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const loadSequence = useRef(0)
@@ -716,7 +716,7 @@ function viewsText(value: unknown): string {
 }
 
 /**
- * 公式サイト掲載（SyQA1）。列：写真・ペット・どこで使っているか・
+ * 公式サイト掲載。列：写真・ペット・どこで使っているか・
  * 過去30日に見た・公開の同意・掲載先から外す。右に出すときの決めごと。
  * 30日集計は日別の記録から表示し、記録がなければ「—」。掲載先の編集・撤回の整理・外した履歴を保つ。
  */

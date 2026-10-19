@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import Button from './ui/Button.js';
-import ConfirmDialog from './ui/ConfirmDialog.js';
+import Button from './ui/button/index.js';
+import ConfirmDialog from './ui/confirm-dialog.js';
 
 const labels = { exterior: '外観', interior: '店内', waiting: '待合' };
 type Photo = { slot: keyof typeof labels; url: string };

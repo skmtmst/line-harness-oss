@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isHttpsUrl } from './Event.js';
+import { isHttpsUrl } from './event.js';
 
 /**
  * #607：会場URL・画像URLは安全な https だけ表示する。

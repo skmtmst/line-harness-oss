@@ -10,11 +10,11 @@ vi.hoisted(() => {
 import WebhooksPage from './page'
 
 /*
- * ★V8-B 外部連携の見本（板 `SAUCs`）の契約。
+ * ★V8-B 外部連携の見本（板 ``）の契約。
  * `<html data-theme="v8">` の下でだけ新しい見本タブに切り替わり、
  * 節の名付けがタブ名（こちらで受け取る・こちらから送る）とそろい、
  * 受け取る5＋送る4の見本カードが出ることを実DOMで固定する。
- * v7 では従来の見本タブが出ることも固定する。
+ * 管理画面 では従来の見本タブが出ることも固定する。
  */
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),

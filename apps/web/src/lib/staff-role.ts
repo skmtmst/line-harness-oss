@@ -10,7 +10,7 @@ export function canManageRole(role: string | null | undefined): boolean {
 }
 
 /**
- * ログイン中の担当者の役割。`api.staff.me()` で入り直して読む。
+ * ログイン中の担当者の役割。`api.staff.me` で入り直して読む。
  * 手元の保存値は書き換え可能なので判定に使わない。
  *
  * 確認が終わるまで・読めなかったときは null を返す。呼び出し側は

@@ -1,6 +1,6 @@
 /*
- * ★V8 友だち一覧の言葉と日付の書き方（x6QsVz）。
- * 状態の名前は受信箱・詳細と同じ（v7 の friend-list-row と同じ4つ）。
+ * ★V8 友だち一覧の言葉と日付の書き方。
+ * 状態の名前は受信箱・詳細と同じ（管理画面 の friend-list-row と同じ4つ）。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
 import type { FriendListItem } from '@/lib/api'
@@ -14,7 +14,7 @@ export function statusOf(status: FriendListItem['chatStatus']): { label: string;
   return { label: '対応済み', tone: 'ok' }
 }
 
-/** 最終接触は受信・送信の新しい方（R112・v7 と同じ式）。 */
+/** 最終接触は受信・送信の新しい方（R112・管理画面 と同じ式）。 */
 export function lastContactOf(friend: FriendListItem): string {
   const incomingAt = friend.latestIncomingMessage?.createdAt
   const outgoingAt = friend.latestOutgoingAt
@@ -47,7 +47,7 @@ export function monthDay(iso: string): string {
 }
 
 /**
- * 8月14日 7:58。受信の時刻は記録の文字のまま読む（v7 の一覧と同じ：時差の換算をしない）。
+ * 8月14日 7:58。受信の時刻は記録の文字のまま読む（管理画面 の一覧と同じ：時差の換算をしない）。
  */
 export function monthDayTime(iso: string): string {
   const local = /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2})/.exec(iso)?.[1]

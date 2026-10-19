@@ -30,7 +30,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8「タグを作る」（Pencil `d9xoI`）。
+ * ★V8「タグを作る」（Pencil ``）。
  *
  * 型（CreatePage）に、段「基本」（タグ名・所属フォルダ・友だち一覧に出す）と段「付け方（どこで付けるか）」、
  * 右の列「このあと」、下の帯（キャンセル・保存して続けて作る・タグを作る）を渡す。

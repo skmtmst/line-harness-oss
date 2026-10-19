@@ -1,5 +1,5 @@
 /*
- * ★V8 タグの作る・直す画面（タグを作る d9xoI ほか）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
+ * ★V8 タグの作る・直す画面（タグを作る  ほか）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * ここは段のカード（枠1・角12・余白20・間14）と欄・右の列の中身だけ。寸法は globals.css の --tpl-cn-*・--tpl-tg2-*。
  */
 .backLink {
@@ -183,7 +183,7 @@ a.way:hover {
   line-height: var(--tpl-tg2-aside-text-lh);
 }
 
-/* ★友だち情報欄を作る・編集（w9zY5）。 */
+/* ★友だち情報欄を作る・編集。 */
 .labelStrong {
   color: var(--color-ink);
   font-size: var(--text-label);
@@ -296,7 +296,7 @@ a.way:hover {
   color: var(--color-ink-secondary);
 }
 
-/* ★対応マークの作る・編集（ulq9Y）。 */
+/* ★対応マークの作る・編集。 */
 .colorField {
   display: flex;
   flex-direction: column;
@@ -417,7 +417,7 @@ a.way:hover {
   accent-color: var(--color-accent-deep);
 }
 
-/* ★フォルダを追加の窓（IjVpM）：幅560・余白24・段の間16、ボタンは右寄せ。 */
+/* ★フォルダを追加の窓：幅560・余白24・段の間16、ボタンは右寄せ。 */
 .dialogBody {
   display: flex;
   flex-direction: column;

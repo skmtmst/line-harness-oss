@@ -11,7 +11,7 @@ const FORM = readFileSync(
   'utf8',
 )
 
-/* JeINq の画像設定と共通部品の利用を守る。形の操作はLayoutPickerの動作試験で確認する。 */
+/*  の画像設定と共通部品の利用を守る。形の操作はLayoutPickerの動作試験で確認する。 */
 function block(selector: string): string {
   const at = CSS.indexOf(selector)
   if (at < 0) throw new Error(`missing ${selector}`)

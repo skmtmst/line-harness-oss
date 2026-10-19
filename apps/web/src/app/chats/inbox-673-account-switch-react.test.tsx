@@ -13,7 +13,7 @@ import ChatsPage from './page'
  * 競合を再現していない（司令塔の独立再審査での指摘）。
  *
  * ここは本物のReact(react-dom/client)で本物の `ChatsPage` を mount し、
- * `useAccount()` が返す `selectedAccountId` を試験の途中で書き換えて
+ * `useAccount` が返す `selectedAccountId` を試験の途中で書き換えて
  * 再レンダリングすることで、chats画面が実際に受け取る効果の再実行を
  * そのまま通す。差し替えるのは通信(fetch)・アカウント文脈・ルーティング
  * だけで、画面本体・`api.ts`は実物を通す。

@@ -10,7 +10,7 @@ const baseline = readDesignImpactBaseline()
 const targets = baseline.tableHeaderMigrationTargets
 const nativeHeaderExceptions = new Set(baseline.nativeTableHeaderExceptions)
 // V8で作り直した画面のローカル部品にある表見出し。
-// 旧v7のTh移行対象へ戻さず、確認済みの件数を上限として見張る。
+// 旧管理画面のTh移行対象へ戻さず、確認済みの件数を上限として見張る。
 const v8NativeHeaders: Record<string, number> = {
   'app/accounts/migration.tsx': 8,
   'app/duplicates/page.tsx': 12,
@@ -31,7 +31,7 @@ describe('表見出しの第1段階移行', () => {
     // 2026-09-04: テンプレートに「置き場」列を足して66（台帳 #124。
     // フォルダへ入れる口ができたので、行から直接移せるようにした）。
     // 2026-09-06: リマインダ一覧を正本 M1EXwB の6列へ合わせ、旧9列から3列減らした。
-    // 2026-09-06: 機能16の案件・成果承認をV6の6列へまとめ直し、
+    // 2026-09-06: 機能16の案件・成果承認を管理画面の6列へまとめ直し、
     // 重複していた9見出しを減らした。減少後の実測値へ締め直す。
     expect(migrated).toBeGreaterThan(0)
 
@@ -83,7 +83,7 @@ describe('表見出しの第1段階移行', () => {
 
     const debt = totals(countDebt().counts) as Record<string, number>
     // 2026-08-29: 統合ユーザー一覧の見出し6つを共通 `Th` へ寄せ、
-    // V6の7列へ増やしても直書きを残さなかった。
+    // 管理画面の7列へ増やしても直書きを残さなかった。
     // 分析の死んだ旧UIから直書き見出し15個を削除した。現在画面の見出しは
     // 共通の `Th` を通すため、この数へは戻さない。
     // シナリオ一覧と友だち情報欄に加え、対応マークの見出しも共通 `Th` へ寄せた。

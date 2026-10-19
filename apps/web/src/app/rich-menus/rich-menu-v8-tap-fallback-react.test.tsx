@@ -105,7 +105,7 @@ async function renderV8List() {
 }
 
 describe('リッチメニューV8一覧のタップ数', () => {
-  test('月の集計が無い行は期間の集計で補う（v7と同じ）', async () => {
+  test('月の集計が無い行は期間の集計で補う（管理画面と同じ）', async () => {
     fixture.listPage = () => Promise.resolve(listResult([groupItem('g1', '秋メニュー')]))
     fixture.tapStats = () => Promise.resolve(tapResult([{ groupId: 'g1', taps: 7 }]))
     const rendered = await renderV8List()

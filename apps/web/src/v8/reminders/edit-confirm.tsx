@@ -40,7 +40,7 @@ import { countLabel,formatMd } from './edit-model'
 import styles from './edit.module.css'
 import { PhoneV8,SummaryCardV8,WizardFooterV8 } from './ui'
 
-/* ---------------- 手順5：確認（ltAaq）＝ 設定の確認・テスト送信・有効にする前の確認 ---------------- */
+/* ---------------- 手順5：確認＝ 設定の確認・テスト送信・有効にする前の確認 ---------------- */
 export function editHref(reminderId: string, stage: 'basics' | 'target' | 'preview' | null): string {
   return `/reminders/edit?id=${encodeURIComponent(reminderId)}${stage ? `&stage=${stage}` : ''}`
 }
@@ -266,7 +266,7 @@ export function CheckRow({ ok, title, note, action }: { ok: boolean; title: stri
   )
 }
 
-/* ---------------- 完了（hjNpJ） ---------------- */
+/* ---------------- 完了 ---------------- */
 export function DoneStageV8({
   frame,
   reminderId,
@@ -286,7 +286,7 @@ export function DoneStageV8({
   const next7 = preview?.summary.next7Days ?? published?.plannedDeliveries ?? null
   const { boardId, ...heading } = frame
 
-  // 完了には下の帯が無い（絵 hjNpJ）。型の枠と頭はそのまま使い、本文だけ真ん中のカードにする。
+  // 完了には下の帯が無い（絵 ）。型の枠と頭はそのまま使い、本文だけ真ん中のカードにする。
   return (
     <PageFrame kind="create" boardId={boardId}>
       <PageHeading {...heading} />

@@ -133,7 +133,7 @@ import RemindersPage from './page'
 import NewReminderPage from './new/page'
 import SingleFriendActions from '@/components/friends/single-friend-actions'
 import { RegistrantsTab } from '@/v8/reminders/detail'
-// 登録者のタブは画面の説明の帯を持つので、画面と同じく説明の器の中に置く（loVfW）。
+// 登録者のタブは画面の説明の帯を持つので、画面と同じく説明の器の中に置く。
 import { PageExplanationProvider } from '@/components/shared/page-explanation'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'

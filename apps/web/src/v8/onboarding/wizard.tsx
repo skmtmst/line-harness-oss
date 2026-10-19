@@ -28,7 +28,7 @@ import { useStarterMenu } from './use-starter-menu'
 import SetupLinks from './setup-links'
 
 /*
- * B-335 (1)：スタイルを変えると、ダッシュボードが数える予約が変わる（前の予約は消えないが、出なくなる）。
+ *  (1)：スタイルを変えると、ダッシュボードが数える予約が変わる（前の予約は消えないが、出なくなる）。
  * 「データはそのまま使えます」は、前の予約も見えることを口が保証してから出す。今は前のスタイルの予約の行き先を出す。
  */
 const BOOKING_PLACE: Record<AccountStyle, string> = {

@@ -2,24 +2,24 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('../../v8/inflow-links/list.tsx', import.meta.url), 'utf8')
-// 「まとめて操作」の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
+// 「まとめて操作」の窓は 管理画面・V8 の両方で使う共用部品へ移した（中身は同じ）。
 // まとめて操作の窓は一覧の画面（page.tsx）の中にある。古い _components/bulk-routes-dialog.tsx はどこからも描かれないので 2026-10-07 に消した。
 const BULK = readFileSync(new URL('../../v8/inflow-links/bulk-dialog.tsx', import.meta.url), 'utf8')
 
 /**
- * 流入と計測の一覧（板 xbHxg）の契約。
+ * 流入と計測の一覧（板 ）の契約。
  *
  * 空・読込・取得失敗の3つを言い分ける。素の入力欄・素の `<select>`・
  * 素の前後ボタン・素のTailwind色を共通部品とトークンへ寄せたことも、
  * ここで止める。
  */
-describe('V6 流入経路一覧の契約', () => {
+describe('管理画面 流入経路一覧の契約', () => {
   it('共通フォルダ欄の統一幅を使い、追加ボタンを欄内だけに置く', () => {
     expect(PAGE).toContain('folders={<>')
     expect(PAGE).toContain('<ListPage')
     expect(PAGE).not.toContain('選ぶと右側のリンクが切り替わります')
     expect(PAGE).toContain("onAddFolder={canManageFolders ? () => setEditingGenre('new') : undefined}")
-    // EMUl9: 閲覧のみは追加の口を渡さない（欄内の追加印も出ない）。
+    // : 閲覧のみは追加の口を渡さない（欄内の追加印も出ない）。
     expect(PAGE).not.toMatch(/<Button[^>]*>フォルダを追加<\/Button>/)
   })
 
@@ -69,7 +69,7 @@ describe('V6 流入経路一覧の契約', () => {
   })
 
   it('検索・並び順・表示件数を共通部品にし、動く並び替えだけを載せる', () => {
-    // 板 xbHxg：検索は共通 SearchField をそのまま置く。素の input 検索に戻さない。
+    // 板 ：検索は共通 SearchField をそのまま置く。素の input 検索に戻さない。
     expect(PAGE).toContain("from '@/components/shared/list-toolbar'")
     expect(PAGE).toContain('<ListToolbar')
     expect(PAGE).toContain('search={{ placeholder: searchLabel')
@@ -116,7 +116,7 @@ describe('V6 流入経路一覧の契約', () => {
 
   it('まとめて操作は対象選択→操作→影響件数の確認へ接続する（NEXT-21）', () => {
     expect(PAGE).toContain("setBulkAction('pause')")
-    // ★V7：選択は共通のチェックボックス（本物の checkbox を包んでいる）。
+    // ★管理画面：選択は共通のチェックボックス（本物の checkbox を包んでいる）。
     expect(PAGE).toContain('<Checkbox')
     expect(PAGE).toContain('selectedRouteIds')
     // 実行は既存の更新口へ、1件ずつ結果を分けて出す（共用部品の中身）。

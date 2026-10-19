@@ -384,7 +384,7 @@ export function useAutomationDraftResume({
           testRun: null,
         }
         setResumeStatus('ready')
-        /* 見本から作った下書き（J1VA8）は頭の下の帯がどこから来たかを伝えるので、読み込みの知らせは重ねない。 */
+        /* 見本から作った下書きは頭の下の帯がどこから来たかを伝えるので、読み込みの知らせは重ねない。 */
         if (chrome !== 'draft') setNotice('保存した下書きを読み込みました。続きを直せます。')
         if (restored.conditionUnreadable) {
           /*

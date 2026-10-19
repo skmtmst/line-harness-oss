@@ -3,9 +3,9 @@
 import { PageContent } from '@/components/templates/page-frame'
 
 /*
- * ★V8 統括の請求（Pencil `JB8V1`）。
+ * ★V8 統括の請求（Pencil ``）。
  *
- * v7 の画面（app/hq/billing/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
+ * 管理画面 の画面（app/hq/billing/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
  * （型のフォルダの列）・契約の帯・周期の切り替えと「支払い方法を管理」・プラン3枚・
  * 支払い履歴の表。
@@ -86,7 +86,7 @@ function invoiceDate(iso: string): string {
 }
 
 function BillingInner() {
-  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/JB8V1`）。
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/`）。
   usePageTitle('請求')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const settingsNav = useHqSettingsFolderNav('billing')

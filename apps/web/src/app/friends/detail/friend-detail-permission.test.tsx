@@ -288,7 +288,7 @@ describe('N-037 staffの情報欄は読み取り専用（403と画面を一致�
     expect(input!.disabled).toBe(false)
     expect(buttonsByText('保存する')).toHaveLength(1)
     expect(buttonsByText('キャンセル')).toHaveLength(1)
-    // 項目を作るのは「情報欄を管理」から（下の帯は［キャンセル］［保存する］だけ・絵 vX3wQ）。
+    // 項目を作るのは「情報欄を管理」から（下の帯は［キャンセル］［保存する］だけ・絵 ）。
     expect(linksByText('情報欄を管理').length).toBeGreaterThan(0)
     expect(document.body.textContent).not.toContain('保存できるのはオーナー・管理者')
   })

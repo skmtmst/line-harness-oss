@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
-/** `export default function …() { … }` の本体だけを取り出す。 */
+/** `export default function … { … }` の本体だけを取り出す。 */
 const defaultExportBody = (source: string): string =>
   source.match(/export default function \w+\(\) \{[\s\S]*?\n\}/)?.[0] ?? ''
 
@@ -22,7 +22,7 @@ describe('#1058 必須パラメータ欠落時のガード', () => {
     const page = read('accounts/detail/page.tsx')
     expect(page).toContain('if (!id)')
     expect(page).toContain('見るアカウントが指定されていません')
-    // 戻り先は ★V7 TargetMissing の backHref が持つ。
+    // 戻り先は ★管理画面 TargetMissing の backHref が持つ。
     expect(page).toContain('backHref="/accounts"')
   })
 
@@ -46,7 +46,7 @@ describe('#1058 必須パラメータ欠落時のガード', () => {
     expect(page).toContain('編集する対応マークが指定されていません')
     expect(page).toContain('backHref="/tags?tab=marks"')
     expect(page).toContain('if (!id)')
-    // V8 の編集入口へ指定した対象を渡す。V7 の器は削除済み。
+    // V8 の編集入口へ指定した対象を渡す。管理画面 の器は削除済み。
     expect(page).toContain('<MarkEditorV8 markId={id} />')
     // 新規作成は /tags/marks/new が担う。編集側へ undefined を渡さない。
     expect(page).not.toContain('markId={id ?? undefined}')

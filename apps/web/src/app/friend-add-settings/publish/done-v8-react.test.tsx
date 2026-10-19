@@ -12,7 +12,7 @@ import FriendAddDoneV8 from '@/v8/friend-add-publish/done'
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 /*
- * ★V8 友だち追加時の配信の有効化の完了（板 `e0FD1J`）の契約。
+ * ★V8 友だち追加時の配信の有効化の完了（板 ``）の契約。
  * 公開したときの数（設定名・順番・知らせ）をそのまま出し、
  * 3つの行き先（一覧・流入リンク・実行結果）を持つ。
  */

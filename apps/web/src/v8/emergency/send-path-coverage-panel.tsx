@@ -16,7 +16,7 @@ export const SEND_PATH_KIND_LABEL: Record<OperationSendPath['kind'], string> = {
 
 /*
  * 台帳（Worker）の言葉には作り手向けの語（cron・manual 指定・ヘッダ名・claim など）が混じる。
- * 運用者が読む画面では運用の言葉に置き換え、置き換えられない補足は出さない（OHwbU 2026-10-15）。
+ * 運用者が読む画面では運用の言葉に置き換え、置き換えられない補足は出さない（ 2026-10-15）。
  */
 const DEV_WORDS = /cron|claim|tick|pending|queued|failed|outbox|sweep|retry_wait|requested|active|replyToken|push|multicast|broadcast|send_|process[A-Z]|nen-|\bjob\b|\btoken\b|#\d|\b\d{3}\b/
 export function operatorPathLabel(label: string): string {
@@ -32,9 +32,9 @@ export function operatorPathNote(text: string | null | undefined): string | null
 }
 
 /*
- * 停止ボタンが届く経路の一覧 (#1050)。v7 の control タブと V8 の
+ * 停止ボタンが届く経路の一覧 (#1050)。管理画面 の control タブと V8 の
  * control-v8 で同じ台帳を見せるため、page.tsx から切り出した共通部品。
- * 見た目・文言は v7 のまま変えない。
+ * 見た目・文言は 管理画面 のまま変えない。
  *
  * 「止める」と押したとき実際にどの送信経路が止まるか、口が返す台帳
  * (`GET /api/operations/send-paths`) をそのまま見せる。対象外の経路も

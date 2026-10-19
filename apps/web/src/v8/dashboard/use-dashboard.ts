@@ -24,9 +24,9 @@ import {
 } from '@/components/dashboard/dashboard-preference-defaults'
 
 /*
- * ★V8 ダッシュボード（WQmep）の読み書き。
+ * ★V8 ダッシュボードの読み書き。
  *
- * v7 の `app/page.tsx` の DashboardPageInner から、データの取り方・保存・
+ * 管理画面 の `app/page.tsx` の DashboardPageInner から、データの取り方・保存・
  * 失敗の扱いをそのまま写した（src/v8 からは @/app を読めないため）。
  * 変えたのは見た目に関わらない2点だけ：
  * - 稼働（health）は板の頭の「動きの状態」に使うので、右の列のカードを
@@ -44,7 +44,7 @@ export const PERIODS = [
 export type PeriodKey = (typeof PERIODS)[number]['key']
 export type HealthRisk = 'normal' | 'warning' | 'danger' | null
 
-/** 配置の手元の写し。v7 と同じ名前（切り替えの日に持ち越す）。 */
+/** 配置の手元の写し。管理画面 と同じ名前（切り替えの日に持ち越す）。 */
 export function dashboardStorageKey(accountId: string | null): string {
   return `lh_dashboard_v4:${accountId ?? 'default'}`
 }
@@ -236,7 +236,7 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
       if (selectedAccountIdRef.current !== accountId) return
       const conflict = caught instanceof Error && 'status' in caught && caught.status === 409
       setPreferenceSaveError({
-        /* 言葉は絵 mcOqK の 4（引き出しの下の帯）。 */
+        /* 言葉は絵  の 4（引き出しの下の帯）。 */
         message: conflict ? 'ほかの人が配置を変えました。最新の配置を読み込んでから直してください。' : '配置を保存できませんでした。通信を確かめてください。',
         conflict,
       })
@@ -524,7 +524,7 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
   const activeFriends = data?.metrics === undefined
     ? sectionAvailable('friends') ? data?.friends.active ?? null : null
     : data.metrics.activeFriends.value
-  /* 「対応が必要な受信」の数え方は v7 と同じ（IDEA-01）。 */
+  /* 「対応が必要な受信」の数え方は 管理画面 と同じ（IDEA-01）。 */
   const inboxSectionOk = data !== null && sectionAvailable('inbox')
   const lineUnread = inboxSectionOk ? (data.inbox.line?.unanswered ?? data.inbox.unanswered) : null
   const mailUnread = inboxSectionOk && data.inbox.email

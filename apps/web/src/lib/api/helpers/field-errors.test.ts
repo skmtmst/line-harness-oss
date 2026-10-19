@@ -5,7 +5,7 @@ beforeAll(async () => {
   api = await import('../../api')
 })
 afterEach(() => vi.unstubAllGlobals())
-describe('B-154 APIの欄ごとの理由', () => {
+describe('APIの欄ごとの理由', () => {
   it.each([400, 422])('%iの保存失敗をApiError.fieldsからフォームへ渡せる', async status => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       error: '入力内容を確認してください', fields: { name: '名前を入力してください', 'steps.0.messageContent': '本文は5,000文字までです' },

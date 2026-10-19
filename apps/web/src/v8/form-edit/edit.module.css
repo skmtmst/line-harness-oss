@@ -2,15 +2,15 @@
 
 /* ---------- 型への差し込み（この画面だけ） ---------- */
 
-/* 1152 の板（ITBAB）：右の列の余白と中身の幅。型の値をこの画面の中だけ替える。 */
+/* 1152 の板：右の列の余白と中身の幅。型の値をこの画面の中だけ替える。 */
 :global([data-page-template='create']):has(.root) {
   --tpl-preview-narrow-width: var(--tpl-fe-rail-narrow-w);
   --tpl-preview-narrow-content-width: var(--tpl-fe-rail-narrow-content-w);
 }
-/* 1152 の板（ITBAB）では右の列の余白が 16。狭い幅の判定は画面（useNarrowViewport）が板の印で渡す。 */
+/* 1152 の板では右の列の余白が 16。狭い幅の判定は画面（useNarrowViewport）が板の印で渡す。 */
 :global([data-page-template='create'][data-design-node='ITBAB']):has(.root) { --tpl-preview-pad: var(--tpl-fe-rail-narrow-pad); }
 
-/* 競合の帯（J1pdB）は左右の列の上に横いっぱい。型の「狭い板の切り替え」の置き場を借りて、そこだけ出す。 */
+/* 競合の帯は左右の列の上に横いっぱい。型の「狭い板の切り替え」の置き場を借りて、そこだけ出す。 */
 :global(:root [data-page-template='create']) > div:has(> .bandSlot) { display: block; padding: 0; }
 .bandSlot { padding: var(--tpl-fe-band-slot-pad); }
 /* 帯そのものは共通の save-conflict（動きの点検 16 番）。 */
@@ -144,7 +144,7 @@
 .limitRow { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); }
 .limitInput { width: var(--tpl-fe-limit-w); }
 .tight { display: flex; flex-direction: column; gap: var(--tpl-fe-words-gap); }
-.subBox { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); } /* 絵 e875x：段は枠なし・余白なしでカードの中に並べる */
+.subBox { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); } /* 絵 ：段は枠なし・余白なしでカードの中に並べる */
 .subTitle { margin: 0; font-size: var(--tpl-fe-sub-title-size); font-weight: 700; line-height: var(--tpl-fe-sub-title-lh); color: var(--color-ink); }
 .wells { display: flex; flex-direction: column; gap: var(--tpl-fe-wells-gap); }
 .well { display: flex; align-items: center; gap: var(--tpl-fe-save-gap); font-size: var(--tpl-fe-note-size); color: var(--color-ink-faint); }
@@ -170,7 +170,7 @@
 .urlTitle { margin: 0; font-size: var(--tpl-fe-body-size); font-weight: 700; line-height: var(--tpl-fe-body-lh); color: var(--color-ink); }
 .urlRow { display: flex; align-items: center; gap: var(--tpl-fe-field-gap); }
 .urlValue {
-  /* 字は1行のまま、はみ出す分は「…」で省く（flex だと文字の省略の印が出ない。e875x）。 */
+  /* 字は1行のまま、はみ出す分は「…」で省く（flex だと文字の省略の印が出ない。）。 */
   flex: 1; min-width: 0; height: var(--tpl-fe-choice-h); display: block; line-height: var(--tpl-fe-choice-h); padding: var(--tpl-fe-url-pad);
   border-radius: var(--radius-control); background: var(--color-surface-pearl); font-size: var(--tpl-fe-small-size); color: var(--color-ink-secondary);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -199,7 +199,7 @@
   .bookingRow { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* ---------- 公開の確かめ（Z9wXm） ---------- */
+/* ---------- 公開の確かめ ---------- */
 
 .changes { display: flex; flex-direction: column; gap: var(--tpl-fe-change-gap); padding: var(--tpl-fe-changes-pad); border-radius: var(--radius-control); background: var(--color-surface-pearl); }
 .changesTitle { margin: 0; font-size: var(--tpl-fe-note-size); font-weight: 700; color: var(--color-ink); }

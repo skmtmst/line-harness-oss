@@ -40,7 +40,7 @@ describe('友だち追加時の配信の確認（V8）の決まり', () => {
     }))).toBe('送るシナリオを直してください。')
   })
 
-  it('二重公開を防ぐ鍵は v7 と同じ作り（アカウントと版）', () => {
+  it('二重公開を防ぐ鍵は 管理画面 と同じ作り（アカウントと版）', () => {
     expect(idempotencyKeyFor({ accountId: 'acc', versionId: 'v1' })).toBe('friend-add-publish-acc-v1')
   })
 

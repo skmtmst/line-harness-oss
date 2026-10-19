@@ -9,7 +9,7 @@ import styles from './settings-nav-v8.module.css'
 import { Palette, Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, Store, Truck, type LucideIcon } from 'lucide-react'
 
 /**
- * 設定の中のメニュー（★V8 `ywFJT` の左欄）。
+ * 設定の中のメニュー（★V8 `` の左欄）。
  * 設定系の画面へ行くための2段目のメニュー。「機能設定」には
  * その配下の画面（マニュアルの正本表・ファイルの検査）を畳んで付ける。
  */

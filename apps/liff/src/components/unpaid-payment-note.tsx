@@ -1,8 +1,8 @@
-import Icon from './ui/Icon.js';
+import Icon from './ui/icon.js';
 import { formatWeekday, utcToJstHm, utcToJstMd } from '../lib/datetime.js';
 
 /**
- * 未払いの払う期限（★V8 nWby5・L5g75・B-338）。履歴のカードとマイページで同じ言葉を出す。
+ * 未払いの払う期限（★V8 nWby5・L5g75・）。履歴のカードとマイページで同じ言葉を出す。
  * 「10/24（金）18:00 までにお支払いください」＋「過ぎると…」。期限が分からないときは期限の行を出さない。
  */
 export function holdDeadlineText(holdUntil: string): string {

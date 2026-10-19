@@ -26,7 +26,7 @@ import { FILE_SCAN_PAGE_SIZE,useFileScan } from './use-file-scan'
 
 
 /*
- * ★V8 ファイルの検査（Pencil `PfA4o`、状態は `bR6a1`）。
+ * ★V8 ファイルの検査（Pencil ``、状態は ``）。
  *
  * 動き（権限・一覧・札の絞り込み・探す・ページ送り・使えるように戻す・消す・外の検査の設定）は
  * 今までの V8（app/settings/file-scan/file-scan-v8.tsx）と同じ。処理は同じ場所の use-file-scan.ts（写し）。
@@ -37,7 +37,7 @@ const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
 const SAFETY_NOTICE = <Notice tone="info" icon={<ShieldCheck aria-hidden="true" />}>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
-/* 板の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
+/* 板の札。`使えません`・`使えます` の絞り込みは 管理画面 の画面に残す。 */
 const STATUS_CHIPS = [
   { value: 'quarantined', label: 'しまったファイル' },
   { value: 'pending', label: '確かめ中' },

@@ -49,7 +49,7 @@ export const statusFilters: { key: StatusFilter; label: string }[] = [
 ]
 
 /*
- * ★V8（M0393 XqSvX「状態」）：絵の切り替えは 未対応・対応中・保留・対応済み の4つで、件数つき。
+ * ★V8（ XqSvX「状態」）：絵の切り替えは 未対応・対応中・保留・対応済み の4つで、件数つき。
  * 「すべて」は無い。選んでいる所をもう一度押すと絞り込みを外す（すべてに戻る）。
  */
 export const statusFiltersV8 = statusFilters.filter((f) => f.key !== 'all')

@@ -2,12 +2,12 @@
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
 /*
- * ★V8 統括の上の帯（絵 V8-B/JKjsE・オーナー 2026-10-07「統括の方が全然良くない」）。
+ * ★V8 統括の上の帯（絵 V8-B/・オーナー 2026-10-07「統括の方が全然良くない」）。
  *
  *   - 統括の画面では、切替の札に「統括」と統括名（/api/tenants/me）、名前の下に「統括」
  *   - パンくずの「ホーム」は統括のホーム（/hq）
  *   - 札から店を選んだら、その店へ入る（/ へ移る）
- *   - 店の画面・v7 の統括は今までどおり（「LINEアカウント」・役割の言葉）
+ *   - 店の画面・管理画面 の統括は今までどおり（「LINEアカウント」・役割の言葉）
  */
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { act } from 'react'

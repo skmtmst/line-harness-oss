@@ -5,7 +5,7 @@ import Button from './button'
 import Notice from './notice'
 import styles from './friend-filter-band.module.css'
 
-/** B-247 E1：名前は画面にだけ出し、移動先へ渡すのは友だちIDだけ。 */
+/**  E1：名前は画面にだけ出し、移動先へ渡すのは友だちIDだけ。 */
 export function friendFilterHref(path: string, friendId: string | null) {
   const url = new URL(path, 'https://line-harness.invalid')
   if (url.origin !== 'https://line-harness.invalid') throw new Error('一覧の移動先は管理画面内を指定してください')

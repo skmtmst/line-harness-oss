@@ -27,9 +27,9 @@ import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null; stepUpMethod?: string }
 
 /**
- * 運営コンソールの 2要素認証の設定 V8（絵 `qod6X`）。
+ * 運営コンソールの 2要素認証の設定 V8（絵 ``）。
  *
- * 動きは v7（app/ops/two-factor）と同じ。招待を受けた人（awaiting_totp）と、
+ * 動きは 管理画面（app/ops/two-factor）と同じ。招待を受けた人（awaiting_totp）と、
  * 登録済みで未設定の運営メンバーだけが開ける。確認が通るとサーバーが
  * ログインを解除するので、ログインし直しを案内する。
  */

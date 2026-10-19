@@ -13,7 +13,7 @@ export function UpdateButton({ targetVersion }: { targetVersion: string }) {
   const [loading, setLoading] = useState(false)
   const [updateId, setUpdateId] = useState<string | null>(null)
   /**
-   * 失敗の理由。**`alert()` の代わりに画面へ残す。**
+   * 失敗の理由。**`alert` の代わりに画面へ残す。**
    * 消えると原因を確かめ直せないし、画像比較にも写らない。
    */
   const [error, setError] = useState('')

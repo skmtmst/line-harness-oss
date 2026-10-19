@@ -1,7 +1,7 @@
 import { PRODUCT_SCOPE } from '@/lib/product-scope'
 import { formatNumber } from '@/lib/format'
 /**
- * 統括の課金（★V6 36-2）の型と小さな計算。API の形は `apps/worker/src/routes/hq-billing.ts` が正本。
+ * 統括の課金（★管理画面 36-2）の型と小さな計算。API の形は `apps/worker/src/routes/hq-billing.ts` が正本。
  */
 
 export type BillingState = 'exempt' | 'trialing' | 'active' | 'past_due' | 'trial_expired' | 'canceled'

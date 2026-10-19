@@ -53,7 +53,7 @@ export default function HqHomeV8() {
   const router = useRouter()
   const role = useStaffRole()
   /*
-   * 運営が「閲覧のみ」で代理ログインしているあいだ（絵 VtJQ6）は、役割がオーナーでも変える口を出さない。
+   * 運営が「閲覧のみ」で代理ログインしているあいだ（絵 ）は、役割がオーナーでも変える口を出さない。
    * サーバも書き込みを断る。決まり：閲覧のみには押せないボタンを置かず隠す（2026-10-06）。
    */
   const readOnlyImpersonation = readSessionSnapshot()?.impersonation?.mode === 'read'

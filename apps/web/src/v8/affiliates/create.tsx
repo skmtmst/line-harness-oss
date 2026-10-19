@@ -39,7 +39,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 アフィリエイターを作る（板 `RaMf3`、競合の絵 `Gqve5` は同時編集APIが必要）。
+ * ★V8 アフィリエイターを作る（板 ``、競合の絵 `` は同時編集APIが必要）。
  *
  * app/affiliates/new-affiliate-v8.tsx から動きを写し、作る型（CreatePage）で組み直した。
  * データの口・動きは今と同じ：登録（合言葉 operationId つき）→ 追加情報の保存。追加情報だけ
@@ -48,7 +48,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 絵との違い：
  * - 「タグを付ける」の段は、登録の口にタグを付ける項目が無いので置かない。同じ場所に
  *   「すぐに計測を始める」（今の画面にある）を同じ形で置く。
- * - Gqve5 の同時編集の比較・再読込はAPIが無いため出さない。紹介コードの重複は欄で知らせる。
+ * -  の同時編集の比較・再読込はAPIが無いため出さない。紹介コードの重複は欄で知らせる。
  */
 
 const FRIEND_PAGE_SIZE = 20
@@ -56,7 +56,7 @@ const LIST_PATH = '/affiliates'
 
 type PayoutKind = 'per_conversion' | 'rate' | 'none'
 
-/* 絵（RaMf3）の並び：報酬なし → 割合 → 1件ごと。 */
+/* 絵の並び：報酬なし → 割合 → 1件ごと。 */
 const PAYOUT_KINDS: Array<{ value: PayoutKind; label: string; note: string }> = [
   { value: 'none', label: '報酬なし（計測のみ）', note: '成果の件数だけを記録' },
   { value: 'rate', label: '売上に対する割合', note: '注文金額の ◯% を報酬に' },

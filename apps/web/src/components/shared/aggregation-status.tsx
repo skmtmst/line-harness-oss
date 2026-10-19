@@ -14,7 +14,7 @@ function time(value: string | null) {
   return new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(value))
 }
 
-/** B-247 E2：読み込みの404と、件数が0の完成した集計を区別する。 */
+/**  E2：読み込みの404と、件数が0の完成した集計を区別する。 */
 export default function AggregationStatus({ state, onRun, disabled = false, canRun = true }: { state: AggregationState; onRun: () => void; disabled?: boolean; canRun?: boolean }) {
   const label = state.kind === 'empty' ? '集計する' : state.kind === 'failed' ? 'もう一度' : '集計し直す'
   return <Notice tone={state.kind === 'failed' ? 'danger' : 'info'} role="status" data-aggregation-state={state.kind}

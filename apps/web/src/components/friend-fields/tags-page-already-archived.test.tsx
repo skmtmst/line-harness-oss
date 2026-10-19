@@ -138,7 +138,7 @@ async function openDeleteDialog() {
   clearToastsForTest()
   render(<><TagsList accountId="account-a" /><ToastHost /></>)
   // 表と狭幅カードの両方に同じ操作が出るため、見えている側として先頭を取る。
-  // ★V7 `Xn1Mz`：削除は「…」メニューの中の危ない操作へ。赤いゴミ箱だけの
+  // ★管理画面 `Xn1Mz`：削除は「…」メニューの中の危ない操作へ。赤いゴミ箱だけの
   // ボタンは行に直に置かない。確認窓の動き（#708）はそのまま守る。
   const moreButton = (await screen.findAllByRole('button', { name: 'タグ「旧キャンペーン」の操作' }))[0]
   await act(async () => { fireEvent.click(moreButton) })

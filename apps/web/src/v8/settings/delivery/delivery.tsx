@@ -61,7 +61,7 @@ import styles from './delivery.module.css'
  *
  * 承認案と作りが食い違うところ（`docs/v8-design-rules.md` §1 正本の順位で決めた。詳しくは同じ場所の `BEHAVIOR.md`）：
  *  - 社名のうしろの半角の空き … 絵のとおり直した（`withParticle`）。
- *  - 窓の左のボタン … 絵は「やめる」だが、オーナーの決まり B-146（入力をやめる＝「キャンセル」、
+ *  - 窓の左のボタン … 絵は「やめる」だが、オーナーの決まり （入力をやめる＝「キャンセル」、
  *    「やめる」は使わない）が絵より上なので「キャンセル」のまま。
  *  - 右上の×と窓の高さ … ×は共通部品が必ず出す（UI-25、`dialog-close-ui25.test.tsx` の見張り）。
  *    絵には×がないが「見張りに反する絵は、今の作りに合わせて絵を直す」ため、×は消さない。
@@ -273,7 +273,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
             const state = STATUS[service.status]
             const connectable = service.connect !== 'login' || service.ready
             return (
-              /* 角丸・線・影は共通の Card に任せる（B-168）。中の間と余白だけ承認案 v03 の寸法で足す。 */
+              /* 角丸・線・影は共通の Card に任せる。中の間と余白だけ承認案 v03 の寸法で足す。 */
               <Card key={service.id} appearance="outlined" layout="vertical" className={styles.card} aria-labelledby={`delivery-${service.id}-title`}>
                 <div className={styles.cardHead}>
                   <h2 id={`delivery-${service.id}-title`} className={styles.cardTitle}>{service.name}</h2>

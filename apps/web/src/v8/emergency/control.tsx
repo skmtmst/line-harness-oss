@@ -37,7 +37,7 @@ import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 
-/* ★V8-B 緊急コントロール（板 OHwbU）。停止・復旧・本人確認・冪等キーと
+/* ★V8-B 緊急コントロール（板 ）。停止・復旧・本人確認・冪等キーと
  * 競合後の読み直しは、この現役の部品だけで守る。 */
 
 type StopTarget = 'broadcasts' | 'scenarios' | 'reminders' | 'automations'
@@ -87,7 +87,7 @@ function failureText(error: unknown, fallback: string): string {
 type Feedback = { tone: 'success' | 'warning' | 'danger'; text: string } | null
 
 const HISTORY_FETCH_LIMIT = 200
-/** 記録の表の「何を」は短い言い方（絵 OHwbU：一斉配信・シナリオ）。全文は title で見る。 */
+/** 記録の表の「何を」は短い言い方（絵 ：一斉配信・シナリオ）。全文は title で見る。 */
 const CAPABILITY_SHORT: Partial<Record<keyof typeof CAPABILITY_LABEL, string>> = {
   broadcast_dispatch: '一斉配信',
   scenario_dispatch: 'シナリオ',
@@ -377,7 +377,7 @@ const EmergencyControlV8 = (
     setConfirmWord('')
   }
 
-  /** 板 `EA8rM`（1枚の確認窓）で止められる条件。理由・言葉・番号の1つでも欠けたら止まる。 */
+  /** 板 ``（1枚の確認窓）で止められる条件。理由・言葉・番号の1つでも欠けたら止まる。 */
   const stopCodeOk = stepUpMethod === 'none'
     ? true
     : stepUpMethod === 'password'

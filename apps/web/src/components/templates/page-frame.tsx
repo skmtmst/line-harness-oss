@@ -31,7 +31,7 @@ export interface PageHeadingProps {
   subtitleSize?: 'body'
   /** 一覧・詳細の頭と本文の間を詰める口。指定しない画面には効かない。 */
   bottomSpacing?: 'compact'
-  /** B-245：画面全体の説明。題の横から開閉し、人ごと・画面ごとに覚える。 */
+  /** ：画面全体の説明。題の横から開閉し、人ごと・画面ごとに覚える。 */
   help?: ReactNode
   /** 詳細の顔など、題の前に置く識別の印。 */
   leading?: ReactNode

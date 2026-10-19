@@ -332,7 +332,7 @@ export const scenariosMethods = {
         ? { success: true, data: response.data }
         : { success: false, error: '配信予定を確認できませんでした' }
     },
-    /** V6送信後アクションを楽観ロック付き下書きへまとめて保存する。 */
+    /** 管理画面送信後アクションを楽観ロック付き下書きへまとめて保存する。 */
     saveDraft: async (
       id: string,
       data: { lineAccountId: string; expectedVersion: number; afterActions: ScenarioDraftActionV6[] },

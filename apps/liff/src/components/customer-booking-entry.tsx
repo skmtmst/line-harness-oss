@@ -1,9 +1,9 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useCustomerStyle } from './CustomerStyleScope.js';
-import LiffHeader from './ui/LiffHeader.js';
-import StatusView from './ui/StatusView.js';
-import BottomBar from './ui/BottomBar.js';
-import Button from './ui/Button.js';
+import { useCustomerStyle } from './customer-style-scope.js';
+import LiffHeader from './ui/liff-header.js';
+import StatusView from './ui/status-view.js';
+import BottomBar from './ui/bottom-bar.js';
+import Button from './ui/button/index.js';
 import type { ReactNode } from 'react';
 
 /** 古い予約ボタンでも別機能へ勝手に転送せず、実在する本人向けの行き先を示す。 */

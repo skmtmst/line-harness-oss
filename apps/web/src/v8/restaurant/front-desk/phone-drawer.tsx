@@ -138,7 +138,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
     if (item) setName(item.name)
   }
 
-  /* 予約を入れるときに落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  /* 予約を入れるときに落ちた欄は、その欄の真下に理由を出して移る。 */
   const fields = useFormErrors()
   fields.define('name', 'お名前', () => (name.trim() ? null : 'お名前を入れてください。'), { required: true })
   fields.define('date', '日付', () => (date ? null : '日付を選んでください。'), { required: true })

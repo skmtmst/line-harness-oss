@@ -50,7 +50,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
 
   const handleSendMessage = async () => {
     if (!selectedChatId || sending || sendLockRef.current) return
-    // B-6：動画・ファイルは準備が済んだものだけ送る。準備中・失敗のまま送らない（本文も止める）。
+    // ：動画・ファイルは準備が済んだものだけ送る。準備中・失敗のまま送らない（本文も止める）。
     const sendingAttachment = pendingAttachment
     if (sendingAttachment && sendingAttachment.status !== 'ready') {
       setError(sendingAttachment.status === 'uploading'
@@ -183,7 +183,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           } : c))
         })
       }
-      // --- B-6 動画・ファイル（準備済みの添付を1通で送る。ファイルはリンクの文で届く） ---
+      // ---  動画・ファイル（準備済みの添付を1通で送る。ファイルはリンクの文で届く） ---
       if (sendingAttachment?.attachment && (sendingAttachment.kind === 'video' || sendingAttachment.kind === 'file')) {
         const input = attachmentSendInput(sendingAttachment.attachment)
         const signature = JSON.stringify({ chatId: sendingChatId, ...input, quotedMessageId: useCombined ? null : quotedMessage?.id ?? null })
@@ -269,7 +269,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
             status: 'in_progress' as const,
             // 一覧の preview も即時更新する。incoming 優先ロジックで上書きされ得るが、
             // 楽観 UI では「operator が今送った文面」が一瞬見えるのが期待動作。
-            // 次回 loadChats() で server 側の真の最新 (incoming 優先) に reconcile される。
+            // 次回 loadChats で server 側の真の最新 (incoming 優先) に reconcile される。
             lastMessageContent: content,
             lastMessageDirection: 'outgoing' as const,
             lastMessageType: 'text' as const,

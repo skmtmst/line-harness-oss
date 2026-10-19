@@ -37,7 +37,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
   const [confirmation, setConfirmation] = useState(initialConfirmation)
   const confirmationId = useId()
   /*
-   * 参照件数は `load()` で取った実値を出す。取れていないときは `—`。
+   * 参照件数は `load` で取った実値を出す。取れていないときは `—`。
    * 0件と書くと「消しても大丈夫」と読み違える。**取れていないあいだは
    * 削除を押せなくする。** 失敗を「参照0件」と読み違えて使用中の
    * タグを消させないため(一覧の `DeleteTagDialog` と同じ作法)。

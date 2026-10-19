@@ -22,7 +22,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 ウェビナーを作る ①基本設定（Pencil j7PP04。入口 app/webinars/new/page.tsx。この画面に固定）。
+ * ★V8 ウェビナーを作る ①基本設定（Pencil 。入口 app/webinars/new/page.tsx。この画面に固定）。
  * 下書きとして作り、「動画の設定へ」で編集の ②動画へ進む。
  * 口・確かめ・離れる前の確かめは BEHAVIOR.md に記録。
  */

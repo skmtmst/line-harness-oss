@@ -1,5 +1,2 @@
-import type { ReactNode } from 'react';
-
-export default function PageHeading({ children, title }: { children: ReactNode; title?: string }) {
-  return <h1 className="truncate text-xl font-bold text-ink" title={title}>{children}</h1>;
-}
+// 登録済み共通部品の公開入口。宣言の持ち主は外部の対応表と同時に移す。
+export { default } from './PageHeading.js';

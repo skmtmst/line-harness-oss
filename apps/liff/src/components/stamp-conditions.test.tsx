@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import StampConditions from './StampConditions.js';
+import StampConditions from './stamp-conditions.js';
 afterEach(cleanup);
   it('初回・受け取り・金額・曜日と時間の倍率・ランク・重ねた上限を知らせる', () => {
     render(<StampConditions settings={{ mode: 'amount', amountUnit: 1000, firstVisitBonus: 3, receiptBonus: 2, maxPerVisit: 10, maxStackedStamps: 20, stackingOrder: 'multipliers_then_bonus', expiryMonths: null, timezone: 'Asia/Tokyo', multipliers: [{ name: '朝の倍率', multiplier: 2, weekdays: [1, 3], startMinute: 540, endMinute: 720 }, { name: '停止', active: false, multiplier: 9 }], rankMultipliers: [{ tagName: 'VIP', name: '常連', multiplier: 3 }], rewards: [] }} />);

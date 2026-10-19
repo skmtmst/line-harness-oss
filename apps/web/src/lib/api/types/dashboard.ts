@@ -18,7 +18,7 @@ export type DashboardFriendTrendPoint = {
   sources?: Array<{ name: string | null; count: number }>
 }
 
-/** ダッシュボードが1回で読む数（設計 `V6 1-1 ダッシュボード`）。 */
+/** ダッシュボードが1回で読む数（設計 `管理画面 1-1 ダッシュボード`）。 */
 export type DashboardOverview = {
   period: 'today' | 'last7' | 'last28' | 'last30'
   /** 集計した時刻。カードごとの基準がずれていないことの手がかり。 */
@@ -86,7 +86,7 @@ export type DashboardOverview = {
       period: 'today' | 'last7' | 'last28' | 'last30' | 'latest' | 'last7-fixed' | 'this-month'
     }
   >
-  /** V6指標。段階配備中の旧Workerでは未返却。 */
+  /** 管理画面指標。段階配備中の旧Workerでは未返却。 */
   metrics?: {
     activeFriends: DashboardMetric<number>
     monthlyQuota: DashboardMetric<{

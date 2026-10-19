@@ -4,11 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * LIFF ★V7 その3 (回答フォーム・マイル・ウェビナー) の契約。
+ * LIFF ★管理画面 その3 (回答フォーム・マイル・ウェビナー) の契約。
  *
  * 流儀は ui-contract.test.ts と同じ (描画試験はしない。文面を読む)。
  * 動き (送信・二重押し防止・時刻の同期・計測) の本体は変えず、
- * 見た目だけ ★V7 (4-form・6-mile・7-webinar) に寄せたことを見る。
+ * 見た目だけ ★管理画面 (4-form・6-mile・7-webinar) に寄せたことを見る。
  */
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
@@ -80,7 +80,7 @@ describe('回答フォームの動きは変えない', () => {
 
 describe('マイル・紹介は中身を全部残し、★V8 S3uBl の順に並べる', () => {
   it('並びは「貯まった → お友だちを紹介する → マイルの履歴 → 増やす → 案件」', () => {
-    // 紹介者に登録済みの画面 (S3uBl) の並びを見る。
+    // 紹介者に登録済みの画面  の並びを見る。
     const all = affiliate();
     const src = all.slice(all.indexOf('並びは ★V8 S3uBl'));
     const order = [
@@ -102,7 +102,7 @@ describe('マイル・紹介は中身を全部残し、★V8 S3uBl の順に並�
     expect(src).toContain('これまでに得た');
     expect(src).toContain('使った');
     expect(src).toContain('合算しています');
-    // ★V8 S3uBl：深い緑の箱。確定待ちは紹介の箱の中の一行。
+    // ★V8 ：深い緑の箱。確定待ちは紹介の箱の中の一行。
     expect(src).toContain('bg-liff-deep');
     expect(src).toContain('（成果の確認後に入ります）');
     expect(src).toContain('紹介のリンクを送る');
@@ -159,7 +159,7 @@ describe('マイル・紹介は中身を全部残し、★V8 S3uBl の順に並�
 describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・送信する)', () => {
   it('必須は欄名の横の小さな赤い札。入力の失敗の赤とは分ける', () => {
     const src = formSrc();
-    // 必須の印は ★V8 (B8rCt・g9osGN) の赤い札 (地 #fdecec・文字 liff-sun)
+    // 必須の印は ★V8 (・) の赤い札 (地 #fdecec・文字 liff-sun)
     const controls = readFileSync(join(ROOT, '..', 'components', 'forms', 'controls.tsx'), 'utf8');
     const styles = readFileSync(join(ROOT, '..', 'components', 'forms', 'controls.module.css'), 'utf8');
     expect(src).toContain('<FieldLabel');
@@ -174,7 +174,7 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
   it('題名は本文の題 (20) に、その下に説明を出す', () => {
     const src = formSrc();
     expect(src).toContain('options.pageTitle');
-    // ★V8 (B8rCt): 白い帯は作らず、LIFF の上の帯の下に題と説明を直接出す
+    // ★V8 : 白い帯は作らず、LIFF の上の帯の下に題と説明を直接出す
     expect(src).toContain('<LiffHeader');
     expect(src).toContain('text-xl font-bold');
     // 題の下の説明 (例「3分ほどで終わります」)

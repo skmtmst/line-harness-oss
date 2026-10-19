@@ -386,7 +386,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
               : 'hjNpJ'
 
   /*
-   * 競合（k32cn）の帯は頭の線の下・本文の上、板の幅いっぱい。型の「帯の段」
+   * 競合の帯は頭の線の下・本文の上、板の幅いっぱい。型の「帯の段」
    * （notice・noticeSpacing='band'）に入れる。
    */
   const conflictBand = conflict ? (
@@ -564,7 +564,7 @@ export default function ReminderEditV8({ reminderId, stage }: { reminderId: stri
 }
 
 
-/* ---------------- 手順2：対象者と止める条件（YChR6） ---------------- */
+/* ---------------- 手順2：対象者と止める条件 ---------------- */
 export function TargetStageV8({
   frame,
   notice,

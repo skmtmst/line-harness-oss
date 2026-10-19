@@ -6,7 +6,7 @@
  *     探す欄は帯から外した（オーナー決定 2026-10-01）。
  *     左メニューは畳める（64px・⌘\・localStorage）
  *   - 黄色の版の帯は v8 では出さない
- *   - 全部 v8 だけに効く（v7 の見た目を動かさない）
+ *   - 全部 v8 だけに効く（管理画面 の見た目を動かさない）
  */
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
@@ -106,7 +106,7 @@ describe('外側の殻（V8 移行③）', () => {
     expect(topBar).toContain('aria-label="ログアウト"')
   })
 
-  it('v8 の帯は 1024px から出す（v7 は 1280px のまま）', () => {
+  it('v8 の帯は 1024px から出す（管理画面 は 1280px のまま）', () => {
     expect(globals).toContain('.v8-topbar-wrap')
     expect(appTopBar).toContain('hidden xl:block v8-topbar-wrap')
   })

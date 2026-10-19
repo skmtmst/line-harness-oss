@@ -1,4 +1,4 @@
-import { useCustomerWords } from '../components/CustomerStyleScope.js';
+import { useCustomerWords } from '../components/customer-style-scope.js';
 import { createClientLogger } from '@line-crm/shared';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -11,13 +11,13 @@ import {
   utcToJstWeekday,
 } from '../lib/datetime.js';
 import { logFailure } from '../lib/user-message.js';
-import LoadErrorView from '../components/LoadErrorView.js';
-import LoadingView from '../components/LoadingView.js';
-import Icon from '../components/ui/Icon.js';
-import Button from '../components/ui/Button.js';
-import BottomBar from '../components/ui/BottomBar.js';
-import LiffHeader from '../components/ui/LiffHeader.js';
-import LiffLookScope from '../components/LiffLookScope.js';
+import LoadErrorView from '../components/load-error-view.js';
+import LoadingView from '../components/loading-view.js';
+import Icon from '../components/ui/icon.js';
+import Button from '../components/ui/button/index.js';
+import BottomBar from '../components/ui/bottom-bar.js';
+import LiffHeader from '../components/ui/liff-header.js';
+import LiffLookScope from '../components/liff-look-scope.js';
 const clientLogger = createClientLogger('liff');
 
 
@@ -40,13 +40,13 @@ function seatLabel(s: EventSlot): string {
 
 /**
  * 2-a イベントの詳細。時間を選んでから下の操作の帯で進む。
- * API・上限の数え方・失敗の扱いはそのまま。見た目だけ ★V7。
+ * API・上限の数え方・失敗の扱いはそのまま。見た目だけ ★管理画面。
  */
 export default function Event() {
   const words = useCustomerWords();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  // initLiff() は ?liffId=... をクエリから読むので、内部遷移でも保持する。
+  // initLiff は ?liffId=... をクエリから読むので、内部遷移でも保持する。
   // search を維持しないと再読み込みで liffId が失われる。
   const { search } = useLocation();
   const [event, setEvent] = useState<EventDetail | null>(null);
@@ -152,7 +152,7 @@ export default function Event() {
       : rems.length === 0
         ? `定員 ${caps.reduce((a, b) => a + b, 0)} 席`
         : `残り ${rems.reduce((a, b) => a + b, 0)} 席（定員 ${caps.reduce((a, b) => a + b, 0)}）`;
-  /** 残席があるときだけ、残りの行を黄土色で出す (gVjiC)。 */
+  /** 残席があるときだけ、残りの行を黄土色で出す 。 */
   const hasSeats = rems.reduce((a, b) => a + b, 0) > 0;
 
   function goConfirm() {
@@ -232,7 +232,7 @@ export default function Event() {
                 const full = isFull(s);
                 const disabled = overLimit || (full && !waitlistOpen);
                 const selected = selectedId === s.id;
-                // 選んだ時間は濃い緑の地＋白文字 (gVjiC・予約の日時選びと同じ形)。
+                // 選んだ時間は濃い緑の地＋白文字 (・予約の日時選びと同じ形)。
                 // 満席は押せない灰色の箱。白 (bg-canvas) と重ねると白く見えるので
                 // 押せない時は地を1つ (bg-shell-gray) だけにする。
                 // 待ちに入る満席の枠は白のまま、黄土色の札で分かるようにする。

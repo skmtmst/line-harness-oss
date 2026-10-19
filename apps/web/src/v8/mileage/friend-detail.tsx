@@ -321,7 +321,7 @@ function FriendDetailInner() {
     const found = items.find((candidate) => candidate.reason === key)
     if (found) { found.count += 1; found.amount += item.amount } else items.push({ reason: key, count: 1, amount: item.amount })
     return items
-  /* 回数の多い順（絵 R6kIG は 32回・4回・1回）。同じ回数なら新しく起きた順のまま。 */
+  /* 回数の多い順（絵  は 32回・4回・1回）。同じ回数なら新しく起きた順のまま。 */
   }, []).sort((a, b) => b.count - a.count)
   const earnedReasons = reasonSummary.filter((item) => item.amount >= 0).slice(0, 5)
   const spentReasons = reasonSummary.filter((item) => item.amount < 0).slice(0, 5)

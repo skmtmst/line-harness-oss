@@ -8,10 +8,10 @@ const shared = (name: string) => readFileSync(join(HERE, '..', 'shared', name), 
 const css = readFileSync(join(HERE, 'page-templates.module.css'), 'utf8')
 
 /*
- * 一覧の型の寸法（design/v8/LIST-TEMPLATE-SPEC.md・絵 apLqS）。
+ * 一覧の型の寸法（design/v8/LIST-TEMPLATE-SPEC.md・絵 ）。
  * 頭87（20/24/12・題22/700/32・間4・説明13/19）・帯116で頭の直下・
- * フォルダ200・道具64（14/24/36/間8）・見出し40（12/24）・行はB-254で中身1行52／2行以上60
- * （実寸はlist-row-height.test.mjsで確認）・下は上下10。v7 には効かない。
+ * フォルダ200・道具64（14/24/36/間8）・見出し40（12/24）・行はで中身1行52／2行以上60
+ * （実寸はlist-row-height.test.mjsで確認）・下は上下10。管理画面 には効かない。
  */
 describe('一覧の型の寸法（LIST-TEMPLATE-SPEC）', () => {
   it('表の見出しは中身で40（上下12・左右24・中身16）', () => {

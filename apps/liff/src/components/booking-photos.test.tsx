@@ -6,9 +6,9 @@ import type { MenuItem } from '../lib/api.js';
 
 const net = vi.hoisted(() => ({ menus: vi.fn(), staffOf: vi.fn(), storePhotos: vi.fn() }));
 vi.mock('../lib/api.js', () => ({ api: net }));
-const { default: MenuList } = await import('./MenuList.js');
-const { default: StaffList } = await import('./StaffList.js');
-const { default: StorePhotos } = await import('./BookingStorePhotos.js');
+const { default: MenuList } = await import('./menu-list.js');
+const { default: StaffList } = await import('./staff-list.js');
+const { default: StorePhotos } = await import('./booking-store-photos.js');
 const menu: MenuItem = { id: 'm', name: 'カット', category_label: null, description: null, duration_minutes: 30, buffer_after_minutes: 0, base_price: 1000, sort_order: 0, photo_url: 'https://worker.test/media/p/content' };
 beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);

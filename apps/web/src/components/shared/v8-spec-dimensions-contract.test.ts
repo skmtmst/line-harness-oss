@@ -15,7 +15,7 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     expect(css).toMatch(/:root \.name \{[^}]*line-height:\s*18px/s)
     expect(css).toMatch(/:root \.sub \{[^}]*line-height:\s*16px/s)
     expect(css).toMatch(/:root \.memo \{[^}]*line-height:\s*16px/s)
-    // v7（52 の前身 58px の行）は変えない。
+    // 管理画面（52 の前身 58px の行）は変えない。
     expect(css).not.toMatch(/^\.name \{[^}]*line-height/m)
   })
 
@@ -42,7 +42,7 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     expect(css).toMatch(/:root \.accountPill \{[^}]*flex-shrink:\s*0/s)
     expect(css).toMatch(/:root \.crumbCurrent/s)
     expect(css).toMatch(/min-width:\s*0/)
-    // v7 の札（縮む側）は変えない。
+    // 管理画面 の札（縮む側）は変えない。
     expect(css).not.toMatch(/^\.accountPill \{[^}]*flex-shrink/m)
   })
 
@@ -50,7 +50,7 @@ describe('V8 寸法契約（見本との突き合わせ）', () => {
     const css = read('./page-header.module.css')
     expect(css).toMatch(/:root \.heading \{[^}]*gap:\s*var\(--tpl-head-gap\)/s)
     expect(css).toMatch(/:root \.header\[data-header-size='compact'\] \.heading \{[^}]*gap:\s*var\(--tpl-compact-gap\)/s)
-    // v7 の 5 は変えない。
+    // 管理画面 の 5 は変えない。
     expect(css).not.toMatch(/^\.heading \{[^}]*gap:\s*5px/ms)
   })
 })

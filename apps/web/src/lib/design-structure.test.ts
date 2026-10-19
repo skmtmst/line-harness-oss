@@ -98,7 +98,7 @@ describe('current page entries and V8 components', () => {
 
   it.each(MAINB_V8_SCREENS)('%s のV8本体は共通の型を使う', async (route, _module, file, template) => {
     if (route === '/booking/menus' || route === '/booking/menus/new' || route === '/booking/menus/staff') {
-      // B-273: the old heading's source spelling cannot prove the page frame exists.
+      // : the old heading's source spelling cannot prove the page frame exists.
       const screenModule = route === '/booking/menus' ? await import('@/v8/booking-menus/settings')
         : route === '/booking/menus/new' ? await import('@/v8/booking-menus/menu-form')
           : await import('@/v8/booking-menus/assign')

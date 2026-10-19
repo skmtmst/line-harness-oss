@@ -5,7 +5,7 @@ import { PAYMENT_STATUS, type PaymentTone } from '@line-crm/shared';
 
 /**
  * 予約の支払いの状態を、お客さまに見せる札にする（★V8・nWby5 / L5g75）。
- * 言葉と色は管理画面と同じ共通の定義（@line-crm/shared の payment-status・B-338）：
+ * 言葉と色は管理画面と同じ共通の定義（@line-crm/shared の payment-status・）：
  * 状態の札 4 つ（未払い・支払い済み・返金済み・期限切れ）＋払い方の札「お店で払う」。
  * オンラインの支払いの記録が無く、メニューが「お店で払う」のときだけ「お店で払う」。
  * どちらでもない（支払いの無い店）は札を出さない。

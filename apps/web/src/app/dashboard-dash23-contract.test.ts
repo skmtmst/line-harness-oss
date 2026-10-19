@@ -14,7 +14,7 @@ const sideCards = readFileSync(join(HERE, '..', 'components', 'dashboard', 'side
  */
 describe('DASH-23 ダッシュボードの見出しは期間ラベルを折り返さない', () => {
 
-  // ★V7：「運用アラート」は切らずに出し、件数と札は本文の段へ出す。
+  // ★管理画面：「運用アラート」は切らずに出し、件数と札は本文の段へ出す。
   // 見出しは SideCard の題に残る。題に省略（truncate）を付けない。
   it('運用アラートの見出しは省略しない', () => {
     expect(source).toContain('title="運用アラート"')

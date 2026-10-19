@@ -161,7 +161,7 @@ function EmptyCell({ href, label }: { href?: string; label?: string }) {
   // 受け付けられる枠だけが入口になり、取れないマス（営業時間外・休み・
   // 満席・まだ読み込み中）は「—」で示す。
   if (!href) {
-    // ★V7：受け付けていないマスは空のまま（読み上げだけ伝える）。全マスに「—」が並ぶと、表が記号で埋まって
+    // ★管理画面：受け付けていないマスは空のまま（読み上げだけ伝える）。全マスに「—」が並ぶと、表が記号で埋まって
     // 「あき ＋」の入口が目立たなかった。
     return <span className="sr-only">受け付けていない時間</span>
   }
@@ -455,7 +455,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
   items: BookingRequest[]
   onOpen: (id: string) => void
   /**
-   * ★V7：一覧の読み込み状態。取れていない間、カレンダー内の件数に 0 を
+   * ★管理画面：一覧の読み込み状態。取れていない間、カレンダー内の件数に 0 を
    * 出さない。「—」と出し、読み込み中と失敗を言い分ける。
    */
   dataState?: 'loading' | 'error' | 'ready'
@@ -617,7 +617,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         ? `受付${hoursText(capacity.acceptableMs)}のうち${hoursText(capacity.bookedMs)}を使用中`
         : '受付可能な時間がありません'
 
-  // ★V7：一覧が取れていない間、カレンダー内の件数に 0 を出さない。
+  // ★管理画面：一覧が取れていない間、カレンダー内の件数に 0 を出さない。
   const listMissing = dataState !== 'ready'
   const listMissingDetail = dataState === 'error' ? '読み込めませんでした' : '読み込んでいます'
 

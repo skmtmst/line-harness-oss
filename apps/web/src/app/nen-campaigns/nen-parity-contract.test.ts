@@ -10,7 +10,7 @@ const NEW_COLUMN = fs.readFileSync(new URL('../../v8/nen-campaigns/column-new.ts
 const EDIT = fs.readFileSync(new URL('../../v8/nen-campaigns/column-intros.tsx', import.meta.url), 'utf8')
 
 /*
- * ★V6 37-6（`z4q1K`）自動配信／37-6-A（`u66A0`）コラム の画面契約。
+ * ★管理画面 37-6（`z4q1K`）自動配信／37-6-A（`u66A0`）コラム の画面契約。
  * 設計の骨組み（タブ・数値カード・案内帯・一覧操作・表・右パネル・下部追従バー）と、
  * 点検 #512／#727／#733 で決めた振る舞いが残っていることを見る。
  */
@@ -61,7 +61,7 @@ describe('V8 NEN配信の取得と操作の契約', () => {
     expect(PREVIEW).toContain("COLUMN_PET_NAME_FALLBACK = '大切なご家族'")
     // 送る相手の人数は実口 columns-preview から。
     expect(PAGE).toContain('api.nenCampaigns.columnAudience(')
-    // ヘッダーは ★V6 37-6-A どおり「ECのコラムを取り込む」（未割り当てのECコラムを割り当てる実口）。
+    // ヘッダーは ★管理画面 37-6-A どおり「ECのコラムを取り込む」（未割り当てのECコラムを割り当てる実口）。
     expect(PAGE).toContain('ECのコラムを取り込む')
     expect(PAGE).toContain('api.nenCampaigns.importColumns(')
     // LINE配信の状態は日本語で（内部値をそのまま出さない）。
@@ -73,7 +73,7 @@ describe('V8 NEN配信の取得と操作の契約', () => {
 
   it('読込失敗と空状態を共通状態部品で示す', () => {
     expect(PAGE).toContain('kind="loading"')
-    // ★V7 `x63W5x`：読み直す口は一覧の場所の1枚（`onRetryTab`）が持つ。帯は出さない。
+    // ★管理画面 `x63W5x`：読み直す口は一覧の場所の1枚（`onRetryTab`）が持つ。帯は出さない。
     expect(OVERVIEW).toContain('kind="error"')
     expect(OVERVIEW).toContain('onRetryTab')
     expect(OVERVIEW).toContain('kind="empty"')
@@ -83,7 +83,7 @@ describe('V8 NEN配信の取得と操作の契約', () => {
   it('タブごとに取り、失敗はそのタブの一覧の場所の1枚で示す(点検 #512 の中3)', () => {
     expect(PAGE).toContain('loadTab')
     expect(PAGE).toContain('tabErrors')
-    // ★V7 `x63W5x`：同じ失敗は1画面に1つ。ページ上の帯は出さない。
+    // ★管理画面 `x63W5x`：同じ失敗は1画面に1つ。ページ上の帯は出さない。
     expect(PAGE).not.toContain('tone="danger"')
     expect(OVERVIEW).toContain('tabError')
     expect(OVERVIEW).toContain('onRetryTab')
@@ -104,7 +104,7 @@ describe('V8 NEN配信の取得と操作の契約', () => {
   })
 
   it('一覧側の配信日時も新規作成と同じく日本時間で送る(点検 #512 の中5)', () => {
-    // 端末の時差で解釈する new Date(...).toISOString() を使わない。
+    // 端末の時差で解釈する new Date(...).toISOString を使わない。
     expect(OVERVIEW).toContain('publishedAtIso(plan.scheduledAt)')
     expect(OVERVIEW).not.toContain('new Date(event.target.value).toISOString()')
   })

@@ -45,11 +45,11 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import IncomingActions from './incoming-actions'
 
 /*
- * ★V8 外部連携「こちらで受け取る」タブ（Pencil `gW0F2`、作る窓 `H031gC`）。
+ * ★V8 外部連携「こちらで受け取る」タブ（Pencil ``、作る窓 ``）。
  *
  * 左に受け取り口の列（上に「受け取り口を作る」）、右に選んだ口の設定カード
  * （どこから受け取るか・だれの出来事か・届いたらすること・人が見つからなかった
- * 届物・届いたつもりで試す）。データの口は v7 と同じ（一覧・詳細・未照合の箱・
+ * 届物・届いたつもりで試す）。データの口は 管理画面 と同じ（一覧・詳細・未照合の箱・
  * 試し・作成・動かす/止める・合言葉・名前・削除）。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた。
  */
@@ -59,7 +59,7 @@ type LoadStatus = 'loading' | 'ready' | 'error'
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
 const UNMATCHED_PAGE_SIZE = 50
 
-/* 「どこから来るか」の見本（v7 と同じ値）。見本に無いものは「その他（自分で書く）」。 */
+/* 「どこから来るか」の見本（管理画面 と同じ値）。見本に無いものは「その他（自分で書く）」。 */
 const SOURCE_PRESETS = [
   { value: 'line', label: 'LINE公式アカウント' },
   { value: 'booking', label: '予約サービス' },
@@ -159,7 +159,7 @@ export default function WebhooksIncomingV8() {
   const [togglingIds, setTogglingIds] = useState<string[]>([])
   const [optimisticActive, setOptimisticActive] = useState<Record<string, boolean>>({})
 
-  /* 見本タブから `?source=` 付きで来たときは、作る窓を開いて種類を選んでおく（v7 と同じ）。 */
+  /* 見本タブから `?source=` 付きで来たときは、作る窓を開いて種類を選んでおく（管理画面 と同じ）。 */
   const requestedSource = searchParams.get('source') ?? ''
   const initialSource = SOURCE_PRESETS.some((preset) => preset.value === requestedSource) ? requestedSource : ''
   const [showCreate, setShowCreate] = useState(initialSource !== '')
@@ -422,7 +422,7 @@ export default function WebhooksIncomingV8() {
     }
   }
 
-  /* ===== 受け取り口を作る（窓 H031gC） ===== */
+  /* ===== 受け取り口を作る（窓 ） ===== */
   const openCreate = () => {
     setCreateFieldError({})
     if (!createSecret) setCreateSecret(generateSecret())

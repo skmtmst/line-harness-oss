@@ -48,7 +48,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 /*
- * ★V8-B Googleビジネス（板 `j0Wcg`）の契約。
+ * ★V8-B Googleビジネス（板 ``）の契約。
  * 口コミタブの頭・数4・道具の段・表・足元の帯が出て、
  * 下書き画面への行き先が保たれることを固定する。
  */
@@ -115,7 +115,7 @@ describe('j0Wcg GoogleビジネスのV8', () => {
 })
 
 
-it('B-368 本番で飲食店の試験を閉じてもGoogleだけで読み込める', async () => {
+it('本番で飲食店の試験を閉じてもGoogleだけで読み込める', async () => {
   vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'false')
   vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
   try {

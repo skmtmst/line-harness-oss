@@ -2,9 +2,9 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { api } from '../lib/api.js';
 import { getLiffId, getLineUserId } from '../lib/liff-auth.js';
 import { customerWords, parseCustomerStyle, type CustomerStyle } from '../lib/customer-style.js';
-import LiffHeader from './ui/LiffHeader.js';
-import LoadErrorView from './LoadErrorView.js';
-import LoadingView from './LoadingView.js';
+import LiffHeader from './ui/liff-header.js';
+import LoadErrorView from './load-error-view.js';
+import LoadingView from './loading-view.js';
 
 export const CustomerStyleContext = createContext<CustomerStyle | null>(null);
 export const useCustomerStyle = () => useContext(CustomerStyleContext);

@@ -3,7 +3,7 @@ export type { SimulatedPaymentResult, PaymentLinkPreview } from '../types/bookin
 import { ApiError, fetchApi, fetchApiBlob } from '../../api'
 
 /*
- * 予約のお支払い（管理画面）の口（B-305・B-315）。作業役Dの形を保持する。
+ * 予約のお支払い（管理画面）の口（・）。作業役Dの形を保持する。
  * 通知履歴・コース/クラスの設定には663〜665の適用が必要。
  * 支払いリンクは模擬のみ。sent:false を送信成功として表示しない。
  */
@@ -136,7 +136,7 @@ export const bookingPaymentAdminApi = {
     fetchApi<Result<{ unitPrice: number; version: number }>>(`/api/events/admin/events/${encodeURIComponent(eventId)}/price?${q(accountId)}`, { method: 'PUT', body: JSON.stringify({ unitPrice, expectedVersion }) }),
 };
 
-/** 口がまだ無い・表がまだ無い（B-314 の「現在準備中です」で出す）か。 */
+/** 口がまだ無い・表がまだ無い（ の「現在準備中です」で出す）か。 */
 export function isNotReadyError(error: unknown): boolean {
   if (!(error instanceof ApiError)) return false;
   if (error.status === 404 || error.status === 405 || error.status === 501) return true;

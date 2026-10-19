@@ -86,7 +86,7 @@ input.nightInput:not([type='radio']):not([type='checkbox']) { height: var(--liff
 .fileSlot:focus-visible, .fileSelect:focus-visible, .fileRemove:focus-visible { outline: 2px solid var(--color-liff-primary, var(--color-accent)); outline-offset: 2px; }
 .input[aria-invalid="true"] { border-color: var(--color-danger); outline: 1px solid var(--color-danger); }
 
-/* B-203：本番LIFFと管理画面の入力見本に同じ輪・点・チェック。 */
+/* ：本番LIFFと管理画面の入力見本に同じ輪・点・チェック。 */
 .choice[data-selected] { border-color: transparent; outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -1px; background: var(--color-choice-selected); }
 .choiceInput, .choice input { appearance: none; width: var(--choice-size); height: var(--choice-size); margin: 0; border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }
 input.choiceInput[type='radio'], .choice input[type='radio'] { border-radius: 50%; }

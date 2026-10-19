@@ -54,7 +54,7 @@ export type ScenarioAction = {
   complete?: boolean
 }
 
-/** 機能5 V6の副作用なし試算。開始前の人数と通ごとの予定を同じ計算で返す。 */
+/** 機能5 管理画面の副作用なし試算。開始前の人数と通ごとの予定を同じ計算で返す。 */
 export type ScenarioSimulation = {
   scenarioId: string
   lineAccountId: string
@@ -100,7 +100,7 @@ export type FriendScenarioSubscription = {
   updatedAt: string
 }
 
-/** 購読・テスト送信・送信枠・通別結果をまとめた機能5 V6の読取結果。 */
+/** 購読・テスト送信・送信枠・通別結果をまとめた機能5 管理画面の読取結果。 */
 export type ScenarioRuns = {
   summary: { active: number; paused: number; completed: number; delivering: number }
   subscriptions: Array<{

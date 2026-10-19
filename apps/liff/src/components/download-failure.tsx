@@ -1,4 +1,4 @@
-import StatusView from './ui/StatusView.js';
+import StatusView from './ui/status-view.js';
 import type { FileFailureKind } from '../lib/file-download-api.js';
 
 export interface DownloadFailureCopy {

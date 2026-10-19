@@ -1,5 +1,5 @@
 /*
- * ★V8-B オートメーション ルールを作る（M4torY・競合 tJqST）。
+ * ★V8-B オートメーション ルールを作る（・競合 ）。
  * 枠・頭・右の列の外枠・下の帯は型（CreatePage）が持つ。ここは段（カード）と右の列の中身だけ。
  */
 
@@ -22,7 +22,7 @@
   min-width: 0;
 }
 
-/* 競合の帯（tJqST）：頭の下・左右の列の上に板いっぱい。型の「頭と本文の間の段」に置く。 */
+/* 競合の帯：頭の下・左右の列の上に板いっぱい。型の「頭と本文の間の段」に置く。 */
 :global(:root [data-page-template='create']) > :global(div):has(> .conflictBand) {
   display: block;
 }
@@ -375,7 +375,7 @@
   gap: var(--tpl-rule-row-gap);
 }
 
-/* 下書きを仕上げる（J1VA8）：どの見本から作ったかの帯。頭の説明のすぐ下（間 8）。 */
+/* 下書きを仕上げる：どの見本から作ったかの帯。頭の説明のすぐ下（間 8）。 */
 .sourceBand {
   display: flex;
   margin-top: var(--tpl-ro-band-after);

@@ -95,7 +95,7 @@ type Props = {
   onChange: (next: InlineAction[]) => void
 } & ActionOptions
 
-/** 既存の呼び出し口も、B-169 の共通の行で描く。 */
+/** 既存の呼び出し口も、 の共通の行で描く。 */
 
 export default function InlineActionList(props: Props) {
   return <InlineActionRowsV8 { ...props}

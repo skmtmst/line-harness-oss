@@ -23,7 +23,7 @@ interface UnsavedLeaveDialogProps {
   cancelLabel?: string
   busy?: boolean
   /**
-   * 「保存して移る」を出す（★V7 sTJsh §5）。保存が通ったらそのまま移動を
+   * 「保存して移る」を出す（★管理画面 sTJsh §5）。保存が通ったらそのまま移動を
    * 続ける。失敗したら画面に留まるので、保存側は従来どおり理由を出す。
    * 保存に async 処理が要る画面だけ渡す。省略すると「編集を続ける」＋
    * 「保存せずに移る」の2択のまま。
@@ -37,7 +37,7 @@ interface UnsavedLeaveDialogProps {
  * 未保存の離脱確認の共通窓。
  *
  * `useUnsavedGuard` の `leaveTarget` と組み合わせて使う。
- * 文言と向きはここで1つに固定する（★V7：残る方が主の緑、離れる方は枠線、
+ * 文言と向きはここで1つに固定する（★管理画面：残る方が主の緑、離れる方は枠線、
  * 印は付けない）。画面ごとの違いは `subject` の名詞だけにする。
  *
  * ```tsx
@@ -70,7 +70,7 @@ export function UnsavedLeaveDialog({
       try {
         const saved = await onSave()
         /*
-         * 保存が通ればそのまま移動。通らなければ画面へ戻す（★V7 sTJsh §5
+         * 保存が通ればそのまま移動。通らなければ画面へ戻す（★管理画面 sTJsh §5
          * 「失敗したら画面に戻る」）。理由は画面側が従来どおり欄の下に出す。
          */
         if (saved) onConfirm()

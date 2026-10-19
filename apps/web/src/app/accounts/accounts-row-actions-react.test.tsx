@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 板 V7vn3：LINEアカウント一覧の行操作は「⋯」にまとめる。
+ * 板 ：LINEアカウント一覧の行操作は「⋯」にまとめる。
  * 開くと詳細・確かめ直し・引き継ぎ・アーカイブが出ることを実マウントで確かめる。
  */
 import React, { act } from 'react'

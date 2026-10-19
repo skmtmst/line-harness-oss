@@ -32,7 +32,7 @@ export type ReminderTestSendPhase =
     }
 
 /**
- * `send()` の呼び出し側への結果。画面に出す状態は `phase` が持つので、
+ * `send` の呼び出し側への結果。画面に出す状態は `phase` が持つので、
  * ここでは「窓を閉じるか・送信先を読み直すか」といった後始末の分岐だけを返す。
  */
 export type ReminderTestSendOutcome =

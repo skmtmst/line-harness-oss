@@ -40,7 +40,7 @@ import ImageFrame from '@/components/shared/image-frame'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * 「受付と見た目」のタブ（tpRRT）。受付のきまり・色と文字・背景とリンクの見え方・
+ * 「受付と見た目」のタブ。受付のきまり・色と文字・背景とリンクの見え方・
  * ボタンの言葉。いちばん下に、フォームの名前と覚え書き（お客さまには出ない）。
  * 色と書体の決まり（文字と背景の差 4.5:1）は今までのデザイン設定と同じ。
  */

@@ -31,8 +31,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 Googleビジネス（Pencil：口コミ `j0Wcg`・返信を作る `x9HIR`・投稿 `Cfed0`・投稿を作る `T1j2Sw`・
- * パフォーマンス `SrmVs`・プロフィール `JUTGz`・設定 `CuHXG`）。
+ * ★V8 Googleビジネス（Pencil：口コミ ``・返信を作る ``・投稿 ``・投稿を作る ``・
+ * パフォーマンス ``・プロフィール ``・設定 ``）。
  *
  * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール・設定）
  * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。
@@ -44,10 +44,10 @@ export type { MediaUploadHelpers } from './posts'
 export const TAB_LABELS = { reviews: '口コミ', posts: '投稿', performance: 'パフォーマンス', profile: 'プロフィール', settings: '設定' } as const
 export type GoogleTab = keyof typeof TAB_LABELS
 
-/** 口コミの一覧の帯だけ、返信が実際に Google に届くことを知らせる（j0Wcg）。 */
+/** 口コミの一覧の帯だけ、返信が実際に Google に届くことを知らせる。 */
 /**
  * 板の頭の「？」に入れる説明。画面の中（タブの下・表の下）に説明の行や注記の箱は置かない。
- * 口コミだけは「Googleへ送ると『反映確認中』になる」までを書く（j0Wcg）。
+ * 口コミだけは「Googleへ送ると『反映確認中』になる」までを書く。
  */
 const HELP_BASE = 'Google の口コミ・投稿・営業時間を、店舗ごとに管理します。'
 const TAB_HELP: Record<GoogleTab, string> = {

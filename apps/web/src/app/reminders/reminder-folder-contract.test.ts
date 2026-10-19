@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-/* 完全切り替え：v7 の page.tsx は捨て、V8 の new-v8.tsx と basics-form-v8.tsx を見る。 */
+/* 完全切り替え：管理画面 の page.tsx は捨て、V8 の new-v8.tsx と basics-form-v8.tsx を見る。 */
 const LIST = read('list-v8.tsx')
 const CREATE = read('new', 'new-v8.tsx')
 const BASICS = read('basics-form-v8.tsx')

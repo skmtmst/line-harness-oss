@@ -1,5 +1,5 @@
 /*
- * ★V8 機能設定（ywFJT・1152 bKipf・競合 ziYCN）。外側（型・中のメニュー）は sb-frame。
+ * ★V8 機能設定（・1152 ・競合 ）。外側（型・中のメニュー）は sb-frame。
  * 数字は書かない（globals.css の [data-theme="v8"] の --tpl-sb-*）。
  */
 
@@ -282,7 +282,7 @@
   white-space: nowrap;
 }
 
-/* 競合の帯（ziYCN）。題の下・本文の上、板の幅いっぱい。 */
+/* 競合の帯。題の下・本文の上、板の幅いっぱい。 */
 .conflictSlot {
   display: block;
   margin-top: var(--tpl-sb-conflict-band-top);

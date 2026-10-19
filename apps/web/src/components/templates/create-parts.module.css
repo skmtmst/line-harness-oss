@@ -1,6 +1,6 @@
 /*
  * 作る画面の共通の形（create-parts.tsx）。値は globals.css の --tpl-* だけ。
- * 見本：自動応答の作る① K7HWG（98%）・リマインダを作る① VE1u5（98%）。
+ * 見本：自動応答の作る① （98%）・リマインダを作る① （98%）。
  */
 
 /* 右の列の「設定内容」の箱。枠は outline（border だと中身が1つ下がる）。 */
@@ -74,7 +74,7 @@
   overflow-wrap: anywhere;
 }
 
-/* RaMf3 の発行されるリンク。既定の設定内容の箱の寸法は変えない。 */
+/*  の発行されるリンク。既定の設定内容の箱の寸法は変えない。 */
 .summary[data-variant='link'] { gap: var(--tpl-side-card-gap); }
 .summaryHead { display: flex; flex-direction: column; gap: var(--tpl-wa-af-side-gap); }
 .summary[data-variant='link'] .summaryTitle { line-height: var(--tpl-wa-af-side-title-lh); }
@@ -156,7 +156,7 @@
   line-height: var(--tpl-side-title-lh);
 }
 .starterLine {
-  /* B-152⑩：条件と返信の説明は省略せず、必要な行数で読む。 */
+  /* ⑩：条件と返信の説明は省略せず、必要な行数で読む。 */
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
@@ -181,10 +181,10 @@
   }
 }
 
-/* B-152・仕上げ2 */
+/* ・仕上げ2 */
 .rowValue { font-weight: var(--polish-weight-body); }
 
-/* B-180：設定内容・右欄の段の題。欄のラベルはFormFieldが12/500を持つ。 */
+/* ：設定内容・右欄の段の題。欄のラベルはFormFieldが12/500を持つ。 */
 :root .summaryTitle,
 :root .summary[data-variant='link'] .summaryTitle,
 :root .starterTitle {

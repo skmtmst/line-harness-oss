@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import liff from '@line/liff';
-import Card from './ui/Card.js';
-import ProgressBar from './ui/ProgressBar.js';
+import Card from './ui/card.js';
+import ProgressBar from './ui/progress-bar.js';
 
 /*
  * 会員証の段（G5-3 板 I2pkdP）。マイル・紹介の画面の上に、今のランク・次の段まで・下がる予定を出す。

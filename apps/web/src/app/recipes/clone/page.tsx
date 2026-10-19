@@ -29,7 +29,7 @@ import {
 } from '../recipe-catalog'
 import styles from './clone.module.css'
 
-/** 設計 ★V6 34-3「レシピを複製する」（`D5UaX`）。 */
+/** 設計 ★管理画面 34-3「レシピを複製する」（`D5UaX`）。 */
 function RecipeClone() {
   /*
     **`[recipeId]` は使えない。** 静的書き出し（`output: 'export'`）なので

@@ -57,14 +57,14 @@ export default function ScenarioDetailV8({
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
-  /* ★V7: コンテンツ表の操作は「編集＋…」の1行に収める。…の中身は行ごとに開く。 */
+  /* ★管理画面: コンテンツ表の操作は「編集＋…」の1行に収める。…の中身は行ごとに開く。 */
   const [stepMenuId, setStepMenuId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   /** 404・空で見つからないとき。取得の失敗（error）とは分ける。 */
   const [scenarioMissing, setScenarioMissing] = useState(false)
   /*
-   * ★V8 `kz2B6`：ほかの人が先に保存したら帯で知らせる。
+   * ★V8 ``：ほかの人が先に保存したら帯で知らせる。
    * この画面は書き換えない（読み直すまで古い内容のまま）。
    * 名前・時刻は API に無いので出さない。
    */
@@ -105,7 +105,7 @@ export default function ScenarioDetailV8({
   const [previewLabels, setPreviewLabels] = useState<Record<number, string>>({})
   /** 開始のきっかけの一覧（件数だけだと箱に名前を出せない）。 */
   const [triggerItems, setTriggerItems] = useState<ScenarioTriggerItem[] | null>(null)
-  /* 配信を始める前の確認（★V8 `F1LK4e`）・止める確認（`OPGU2`）。 */
+  /* 配信を始める前の確認（★V8 ``）・止める確認（``）。 */
   const [startOpen, setStartOpen] = useState(false)
   const [startBusy, setStartBusy] = useState(false)
   const [startError, setStartError] = useState('')
@@ -113,12 +113,12 @@ export default function ScenarioDetailV8({
   const [stopOpen, setStopOpen] = useState(false)
   const [stopBusy, setStopBusy] = useState(false)
   const [stopError, setStopError] = useState('')
-  /* 複製の窓（★V8 `Al4Ek`：新しい名前を本人が決める）。 */
+  /* 複製の窓（★V8 ``：新しい名前を本人が決める）。 */
   const [duplicateOpen, setDuplicateOpen] = useState(false)
   const [duplicateName, setDuplicateName] = useState('')
   /* 名前・説明・フォルダを変える窓（題の横の鉛筆）。 */
   const [renameOpen, setRenameOpen] = useState(false)
-  /* 始めた直後の知らせ（`nMSiE`）。URL の started=1 か、この画面で始めたとき。 */
+  /* 始めた直後の知らせ（``）。URL の started=1 か、この画面で始めたとき。 */
   const [justStarted, setJustStarted] = useState(showStarted)
   useEffect(() => {
     if (showStarted) setJustStarted(true)
@@ -198,7 +198,7 @@ export default function ScenarioDetailV8({
   usePageTitle(editingStepId ? `${stepForm.stepOrder} 通目を編集` : 'シナリオ配信')
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
-  /* 通の保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。検査は保存の直前に1つずつ見る形なので fail で結び付ける。 */
+  /* 通の保存で落ちた欄は、その欄の真下に理由を出して移る。検査は保存の直前に1つずつ見る形なので fail で結び付ける。 */
   const stepFields = useFormErrors()
   for (const [key, label] of [['question', '質問'], ['content', 'メッセージ内容'], ['template', 'テンプレート'], ['time', '配信する時刻']] as const) stepFields.define(key, label, () => null)
   const failStep = (key: 'question' | 'content' | 'template' | 'time', message: string) => {
@@ -410,7 +410,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
        />
   )
 
-  /* ===== ここから下は ★V8 の描画（PMLkX 有効 / nMSiE 始めた直後 / ARuZ4 停止中） ===== */
+  /* ===== ここから下は ★V8 の描画（ 有効 /  始めた直後 /  停止中） ===== */
 
   if (loading) {
     return (
@@ -502,7 +502,7 @@ const { saveErrors: copySaveErrors, handleDuplicate, handleDeleteScenario, handl
   )
 
   /*
-   * 開始前の確認（F1LK4e）の中身。画面が常に持っている試算・運用記録・
+   * 開始前の確認の中身。画面が常に持っている試算・運用記録・
    * きっかけ一覧をそのまま使う（窓のために取り直さない）。
    * preflight が動いているあいだは「確認中」、両方取れないときは
    * 「試算できません」として開始ボタンを止める（SCENARIO-07 と同じ判断）。

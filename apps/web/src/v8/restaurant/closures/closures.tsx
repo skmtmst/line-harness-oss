@@ -27,11 +27,11 @@ import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form
 
 
 /*
- * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 `UVnvR`。採用 2026-10-07）。
+ * ★V8 予約枠・在庫 ›「休業日・貸切」タブ（提案 E-10 ``。採用 2026-10-07）。
  *
  * 上：他の予約サイトの枠を閉じる知らせ（休業・貸切の分）→ 左：月のカレンダー（臨時休業・貸切・定休）
  * ｜右：これからの休業・貸切（「…」から変える・消す）と Google の営業時間。
- * 足す・変える窓（`nVvXy`）は closure-dialog.tsx。動きは BEHAVIOR.md。
+ * 足す・変える窓（``）は closure-dialog.tsx。動きは BEHAVIOR.md。
  */
 
 type MediaLink = { code: string; name: string; loginUrl: string | null; closeOnBooking: boolean }

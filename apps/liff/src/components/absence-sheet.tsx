@@ -2,8 +2,8 @@ import { useRef, useState } from 'react';
 import { api, type EventBookingMine, type MakeupCredit } from '../lib/api.js';
 import { logFailure } from '../lib/user-message.js';
 import { utcToJstHm, utcToJstMd, formatWeekday } from '../lib/datetime.js';
-import Button from './ui/Button.js';
-import Icon from './ui/Icon.js';
+import Button from './ui/button/index.js';
+import Icon from './ui/icon.js';
 
 const jstDay = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3_600_000).toISOString().slice(0, 10);
 export const mdHm = (iso: string) => `${utcToJstMd(iso)}（${formatWeekday(jstDay(iso))}）${utcToJstHm(iso)}`;

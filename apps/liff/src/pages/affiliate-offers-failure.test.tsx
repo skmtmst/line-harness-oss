@@ -3,14 +3,14 @@ import { act } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { setLiffContext } from '../lib/liff-auth.js';
-import Affiliate from './Affiliate.js';
+import Affiliate from './affiliate.js';
 import { mountAffiliate, unmountAffiliate } from '../../../worker/src/client/affiliate/main.js';
 vi.mock('@line/liff', () => ({ default: { getAccessToken: () => 'fixture' } }));
-vi.mock('../components/MileageRewards.js', () => ({ default: () => null }));
-vi.mock('../components/AffiliatePayments.js', () => ({ default: () => null }));
+vi.mock('../components/mileage-rewards.js', () => ({ default: () => null }));
+vi.mock('../components/affiliate-payments.js', () => ({ default: () => null }));
 let failed = true;
 afterEach(async () => { await act(async () => unmountAffiliate()); cleanup(); vi.unstubAllGlobals(); });
-test.each([['worker', false], ['liff', false], ['worker', true], ['liff', true]] as const)('B-241: %s・登録後%sの案件取得失敗は0件とせず再試行できる', async (entry, afterRegister) => {
+test.each([['worker', false], ['liff', false], ['worker', true], ['liff', true]] as const)('%s・登録後%sの案件取得失敗は0件とせず再試行できる', async (entry, afterRegister) => {
   let registered = !afterRegister;
   let postCount = 0;
   setLiffContext({ liffId: 'store', lineUserId: 'friend', idToken: 'fixture' });
