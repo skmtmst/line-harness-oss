@@ -582,3 +582,9 @@
 - [1777-masato-owner-only-line-register.md](release-log/unreleased/1777-masato-owner-only-line-register.md)
 
 - [LINE接続の分離](release-log/unreleased/1778-masato-line-webhook-isolation.md)
+
+## 台本整理で加わった文書
+
+- [台本とCIの入口](../scripts/README.md)
+- [S02Cの検査記録](qa/cleanup-s02c-1019.md)
+- [S02Cの変更履歴](release-log/unreleased/0000-kenta-cleanup-s02c.md)

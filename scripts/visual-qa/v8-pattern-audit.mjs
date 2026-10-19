@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
  * 型の対応表（docs/v8-pattern-catalog.md）の機械の表 v8-pattern-catalog.json を読み、
- * 型ごとに「持ち主（正の部品）以外で同じ形を作っている所」を探す（B-143・B-168・B-172）。
+ * 型ごとに「持ち主（正の部品）以外で同じ形を作っている所」を探す。
  *
  *   node scripts/visual-qa/v8-pattern-audit.mjs \
- *     --code ~/lh-work/lh-train-12 --pen ~/lh-work/design/v8/html \
+ *     --code /path/to/line-harness --pen ~/lh-work/design/v8/html \
  *     --out ~/lh-work/design/v8/review/pattern-audit-run [--only card,kpi-band] [--top 15]
  *
- * 型ごとに4つを数える（B-172）。
+ * 型ごとに4つを数える。
  *   (a) 手書き：持ち主以外で同じ形を作っている所（コードの目印。file:line）
  *   (b) 上書き：画面が部品の見た目を上書きしている所
  *       - 部品に className / style を渡している（JSX）

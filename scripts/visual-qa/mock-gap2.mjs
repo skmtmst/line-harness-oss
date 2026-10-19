@@ -50,7 +50,7 @@ export function gap2Respond(method, pathname, body = {}) {
   if (method === 'GET' && /^\/api\/booking\/admin\/series\/[^/]+$/.test(pathname)) return ok({ series: { id: 's1', version: 3, rule_json: JSON.stringify({ freq: 'weekly' }), status: 'active' }, bookings: SERIES_BOOKINGS })
   if (method === 'PATCH' && /^\/api\/booking\/admin\/series\/[^/]+$/.test(pathname)) return ok({ changed: body.scope === 'this' ? ['bk-series-4'] : ['bk-series-4', 'bk-series-5', 'bk-series-8'], conflicts: body.scope === 'this' ? [] : ['bk-series-7'], version: 4 })
   if (method === 'POST' && /^\/api\/booking\/admin\/series\/[^/]+\/cancel$/.test(pathname)) return ok({ cancelled: body.scope === 'this' ? ['bk-series-4'] : ['bk-series-4', 'bk-series-5', 'bk-series-7', 'bk-series-8'], fees: [{ bookingId: 'bk-series-4', feeNow: 4200 }], version: 4 })
-  /* 口がまだ無い物（B-314 で形を残す）の見本：前もっての見込み・同伴の組。 */
+  /* 口がまだ無い物（で形を残す）の見本：前もっての見込み・同伴の組。 */
   if (method === 'POST' && /^\/api\/booking\/admin\/series\/[^/]+\/impact$/.test(pathname)) {
     return ok({ items: ['2026-12-11', '2026-12-18', '2026-12-25', '2027-01-01', '2027-01-08'].map((day, i) => ({ bookingId: `bk-series-${i + 4}`, startsAt: `${day}T05:00:00.000Z`, after: `${day}T07:00:00.000Z`, blocked: i === 3, fee: i === 0 ? { amount: 4200, percent: 50, reason: '24 時間前を過ぎた' } : null })) })
   }
