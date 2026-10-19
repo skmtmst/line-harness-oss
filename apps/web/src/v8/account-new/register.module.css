@@ -22,7 +22,7 @@
 /* 中の字は Card ではなく中の h2・p に直接あてる。Card へ渡す .aside には見た目を書かない。 */
 .asideH2 { margin: 0; font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
 .asideP { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
-/* 正本 v06 ②の右の列（RtWJZ）の小さな題（右題3）と、その上の細い区切り（sKgxt／D4k4qv）。 */
+/* 正本 v07 ②の右の列（RtWJZ）の小さな題（右題3）と、その上の細い区切り（sKgxt／D4k4qv）。 */
 .asideH3 { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }
 .asideLine { height: 1px; background: var(--color-hairline); }
 
@@ -88,7 +88,7 @@
 
 .manualAck { padding: var(--tpl-htn-ack-pad); }
 
-/* ===== ここから v06（p6zMkA・Fqy29・Lwxyh・X0pGdw・Plmq1）。寸法は globals.css の --tpl-htn6-*。 ===== */
+/* ===== ここから v07（p6zMkA・Fqy29・Lwxyh・X0pGdw・Plmq1）。寸法は globals.css の --tpl-htn6-*。 ===== */
 
 /* ②③の段の札（Step 2 / 3） */
 .subBadge {
@@ -114,11 +114,21 @@
 .outlineCount,
 .outlineText p,
 .outlineAuto p,
+.webhookUrlTitle,
 .ackNote { margin: 0; }
 .precheckHead { display: flex; align-items: center; gap: var(--tpl-htn6-pre-head-gap); }
 .precheckHead .subBadge { margin-inline-start: auto; }
 .precheckHelpMark { flex-shrink: 0; display: inline-flex; align-items: center; color: var(--color-ink-faint); }
 .precheckLead { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-19); color: var(--color-ink-secondary); }
+
+/* 承認済み v07 ②Step2 の Ds3E2「musubo の Webhook URL」。白い枠の中にURL、右に［コピー］。 */
+.webhookUrlTitle {
+  display: flex; align-items: center; gap: var(--tpl-htn-chip-gap);
+  font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17);
+  font-weight: 700; color: var(--color-ink);
+}
+.webhookUrlRow { display: flex; align-items: center; gap: var(--tpl-htn6-pre-head-gap); min-width: 0; }
+.webhookUrlRow > :first-child { flex: 1 1 0; min-width: 0; }
 
 /* 答えた質問の一覧。1行ずつ「ラベル　→　答え」と「変更」。 */
 .precheckSummary { display: flex; flex-direction: column; gap: var(--tpl-htn6-pre-row-gap); }
@@ -133,7 +143,7 @@
 .precheckQuestion { display: flex; flex-direction: column; gap: var(--tpl-htn6-pre-group-gap); }
 .precheckQuestionTitle { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
 
-/* 選択肢の下の案内。v06 は白地の案内（SwjOv・細枠あり）と砂色の注意（Z0v3c・枠なし）で地が違う。 */
+/* 選択肢の下の案内。v07 は白地の案内（SwjOv・細枠あり）と砂色の注意（Z0v3c・枠なし）で地が違う。 */
 .precheckNote {
   display: flex; flex-direction: column; border-radius: var(--radius-control);
   font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink);
@@ -253,7 +263,7 @@
 .accountId { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 .useRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-gap-s); }
 
-/* ② 左の細い列「AC左 操作ステップ」（正本 v06 Fqy29 の g48QV）。
+/* ② 左の細い列「AC左 操作ステップ」（正本 v07 Fqy29 の g48QV）。
    いまどこを触っているかと、musubo が自動でやることを、3つの段で見せる。 */
 .outlineCard {
   flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs);
@@ -295,6 +305,6 @@
 }
 .outlineAutoTitle { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); font-weight: 700; color: var(--color-accent-deep); }
 .outlineAutoBody { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-secondary); }
-/* ②の入力は縦に積む（正本 v06 の AC入力）。横2列にしない。 */
+/* ②の入力は縦に積む（正本 v07 の AC入力）。横2列にしない。 */
 .acInputs { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-input-gap); min-width: 0; }
 .acField { display: flex; flex-direction: column; gap: var(--tpl-htn6-ac-field-gap); min-width: 0; }

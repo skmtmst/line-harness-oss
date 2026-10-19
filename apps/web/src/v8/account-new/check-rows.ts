@@ -2,7 +2,7 @@ import type { LineAccountConnectData } from '@/lib/api'
 import { allV8RowsPassed, toV8CheckRows, type V8CheckRow } from './logic'
 
 /*
- * ★LINE新規追加_v06.pen（2026-10-15承認）③接続確認 Lwxyh・④使い方 X0pGdw・⑤完了 Plmq1 の、
+ * ★LINE新規追加_v07.pen（2026-10-18承認）③接続確認 Lwxyh・④使い方 X0pGdw・⑤完了 Plmq1 の、
  * 画面に依らない小さな計算。logic.ts が行数の関所（1ファイル400行）を越えたため切り出した。
  * 中身・判定は変えていない。
  */

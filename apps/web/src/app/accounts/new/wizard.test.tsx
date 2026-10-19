@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import NewLineAccountPage from './page'
 
 /*
- * v06（LINE新規追加_v06.pen・2026-10-15承認）の5段の通し。
+ * v07（LINE新規追加_v07.pen・2026-10-18承認）の5段の通し。
  * ②は3つ、③は2つの小さな段に分かれ、登録は③Step1の「登録する」で行う。
  * 登録前のタグ・親アカウント・担当範囲・既存LIFF IDの入力は承認済みの設計で外したので、
  * ここでは確かめない（wire の tagIds などは空のまま送る）。
@@ -54,13 +54,13 @@ beforeEach(() => {
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
-/** ②の中だけ進むボタンの名前が違う（v06 Fqy29）。 */
+/** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
 const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name }))
 
 /**
- * ①事前確認（v06 p6zMkA）を最短で通す。質問は1つずつ出るので、答えるたびに「次へ」を押す。
+ * ①事前確認（v07 p6zMkA）を最短で通す。質問は1つずつ出るので、答えるたびに「次へ」を押す。
  * Q1=はい → Q2=いいえ（Q3は尋ねない）→ Q4=使っていません（Q5は尋ねない）→ チェック結果 → ②へ。
  */
 function passPrecheck() {
@@ -75,7 +75,7 @@ function passPrecheck() {
 }
 
 /**
- * v06（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * v07（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
  * 入力を変えると確認がやり直しになるので、先に全部入れる。
  */
 function enterCheckStep() {
@@ -84,6 +84,7 @@ function enterCheckStep() {
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
   nextStep()
+  ack('Webhook URL を貼り付けて「更新」を押した')
   ack('Webhookの利用をONにした')
   ack('Webhookの再送をONにした')
   ack('エラーの統計情報をONにした')
@@ -124,6 +125,7 @@ describe('LINEアカウント作成ウィザード', () => {
     nextStep()
     expect(screen.getByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 2 / 3')).toBeTruthy()
+    ack('Webhook URL を貼り付けて「更新」を押した')
     ack('Webhookの利用をONにした')
     ack('Webhookの再送をONにした')
     ack('エラーの統計情報をONにした')
@@ -138,6 +140,7 @@ describe('LINEアカウント作成ウィザード', () => {
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
     nextStep()
+    ack('Webhook URL を貼り付けて「更新」を押した')
     ack('Webhookの利用をONにした')
     ack('Webhookの再送をONにした')
     ack('エラーの統計情報をONにした')
@@ -194,7 +197,7 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
     expect(document.getElementById('channel-access-token')).toBeNull()
     expect(document.getElementById('liff-id')).toBeNull()
-    /* 承認済み v06 の ②-1（A2cEg1）では、取りに行く先は青い囲みの「LINE Developers を開く」1つ。
+    /* 承認済み v07 の ②-1（A2cEg1）では、取りに行く先は青い囲みの「LINE Developers を開く」1つ。
        マニュアルは右の列からいつでも開ける。どちらも別タブ。 */
     const developers = screen.getByRole('link', { name: /LINE Developers を開く/ })
     expect(developers.getAttribute('href')).toBe('https://developers.line.biz/console/')

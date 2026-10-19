@@ -120,7 +120,7 @@ export const DRAFT_KEY = 'musubo-register-draft-v8'
 export type StepNumber = 1 | 2 | 3 | 4 | 5
 export interface DraftState {
   step: StepNumber
-  /** v06：②③の中の小さな段（1始まり）。段の無い画面では1。 */
+  /** v07：②③の中の小さな段（1始まり）。段の無い画面では1。 */
   sub: number
   accountMethod: 'existing' | 'new'
   /** ①事前確認の答えと、今出している面。古い下書きには無いので既定へ寄せる。 */
@@ -164,7 +164,7 @@ export function channelErrors(form: ChannelFields): Record<string, string> {
   return { ...messagingApiErrors(form), ...loginChannelErrors(form) }
 }
 
-/* ===== ここから v06（LINE新規追加_v06.pen・2026-10-15承認）の小さな計算 ===== */
+/* ===== ここから v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算 ===== */
 
 /** ②の Step1 で入れる Messaging API の2項目だけを調べる。 */
 export function messagingApiErrors(form: Pick<ChannelFields, 'channelId' | 'channelSecret'>): Record<string, string> {
@@ -202,6 +202,9 @@ export function stepLabel(stage: StepNumber, sub: number): string {
  */
 export interface AckItem { key: string; label: string; note: string }
 export const WEBHOOK_ACKS: ReadonlyArray<AckItem> = [
+  /* 承認済み v07（LINE新規追加_v07.pen・2026-10-18承認）で足した印（dqe2M）。
+     URLを貼って「更新」を押すまで、LINE側に下の3つのスイッチが出てこない。 */
+  { key: 'webhookUrlPasted', label: 'Webhook URL を貼り付けて「更新」を押した', note: '貼り付けて更新しないと、下の3つのスイッチが表示されません。' },
   { key: 'webhookUse', label: 'Webhookの利用をONにした', note: 'OFFのままだと、お客さまのメッセージが musubo に届きません。' },
   { key: 'webhookRedelivery', label: 'Webhookの再送をONにした', note: '通信が一時的に失敗したとき、LINEが送り直してくれます。' },
   { key: 'webhookErrorStats', label: 'エラーの統計情報をONにした', note: '届かなかったときの原因が分かるようになります。' },
@@ -214,6 +217,16 @@ export const LOGIN_ACKS: ReadonlyArray<AckItem> = [
 /** 印がすべて入っているか。1つでも残っていれば次の段へ進めない。 */
 export function allAcked(acks: ReadonlyArray<{ key: string }>, checked: Record<string, boolean>): boolean {
   return acks.every((ack) => checked[ack.key] === true)
+}
+
+/**
+ * 承認済み v07 ②Step2 の「musubo の Webhook URL」（Ds3E2 の vnh17）に出す字。
+ * 受け取り口は apps/worker の expectedWebhookUrl と同じ `<APIの元>/webhook`。
+ * 元が未設定のときは字を作らない（画面側で「不明」を出す）。
+ */
+export function musuboWebhookUrl(): string {
+  const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/+$/, '')
+  return base ? `${base}/webhook` : ''
 }
 
 /** LINE Developers のチャネル画面。配下の画面名は未確認なのでチャネルの入口まで。 */

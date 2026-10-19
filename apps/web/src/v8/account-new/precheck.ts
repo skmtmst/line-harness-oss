@@ -1,4 +1,4 @@
-/* ===== ①事前確認（LINE新規追加_v06.pen・2026-10-15承認／p6zMkA）の小さな計算 =====
+/* ===== ①事前確認（LINE新規追加_v07.pen・2026-10-18承認／p6zMkA）の小さな計算 =====
  *
  * もとは logic.ts にあった。行数の関所（apps/web/scripts/v8-guard/code-size.mjs・
  * 1ファイル400行）を越えたので切り出した。中身・判定は変えていない。
@@ -99,7 +99,7 @@ export function precheckBack(at: PrecheckAt, answers: PrecheckAnswers): Precheck
 
 /**
  * 答えた質問を「Qn. ラベル　→　答え」で並べる（絵 mDP83・y36RB・plqG6 など）。
- * 今いる質問も、すでに答えてあれば並べる（v06 ①-9 は Q2 の面で Q1・Q2 の2行）。
+ * 今いる質問も、すでに答えてあれば並べる（v07 ①-9 は Q2 の面で Q1・Q2 の2行）。
  */
 export interface PrecheckSummaryRow { key: PrecheckKey; label: string; value: string }
 export function precheckSummary(at: PrecheckAt, answers: PrecheckAnswers): PrecheckSummaryRow[] {
