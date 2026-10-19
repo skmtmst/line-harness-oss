@@ -5,6 +5,7 @@ import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountMigration from './migration'
 import UidMigrationV8 from '@/v8/friends/migrations/uid'
+import { SESSION_LOST_EVENT } from '@/lib/session-events'
 
 /**
  * Issue #1012 FRIEND-14/15/16/33/36 の回帰試験。
@@ -567,6 +568,21 @@ describe('R398 一部反映の500で「未変更」と残さない', () => {
 })
 
 describe('UID移行の閲覧のみ', () => {
+  it.each(['legacy', 'v8'])('確認窓を開いた後に本人確認が失効したら承認と除外を隠し、内容は残す: %s', async entry => {
+    await act(async () => { root.render(entry === 'v8' ? <UidMigrationV8 initialRunId="run-1" /> : <AccountMigration />) })
+    await flush()
+    fireEvent.click(entry === 'v8' ? buttonContaining('UOLD-1') : buttonByText('開く'))
+    await flush()
+    expect(buttonByText('この組合せを承認', openDialog())).toBeTruthy()
+    await act(async () => { window.dispatchEvent(new Event(SESSION_LOST_EVENT)) })
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('UOLD-1')
+    const labels = [...dialog.querySelectorAll('button')].map(button => button.textContent?.trim())
+    expect(labels).not.toContain('この組合せを承認')
+    expect(labels).not.toContain('除外する')
+    expect(writes()).toHaveLength(0)
+  })
   it.each([
     { id: 'owner-2', role: 'owner', readOnly: true },
     { id: 'owner-2', role: 'owner', roleBundle: 'view_only' },

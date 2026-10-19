@@ -53,7 +53,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
   const active = m.active
 
   const executeBlockedReason = m.me
-    ? m.me.role !== 'owner'
+    ? !isOwnerRole(m.me.role)
       ? '本移行の実行はownerの権限が必要です。'
       : m.me.id === active?.createdBy
         ? 'この移行はあなたが作成したため、別のownerが実行してください。'
