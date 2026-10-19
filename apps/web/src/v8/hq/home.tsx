@@ -38,7 +38,7 @@ import { useAccount, type AccountWithStats } from '@/contexts/account-context';
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs';
 import { connectionReasonLine } from './connection-reasons';
 import styles from './home.module.css';
-import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/public/folder-colors'
+import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/public/folder-colors/index'
 import StatusBadge from '@/components/shared/status-badge';
 import TagPill from '@/components/shared/tag-pill';
 import TagOverflow from '@/components/shared/tag-overflow';

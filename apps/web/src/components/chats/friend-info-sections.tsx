@@ -1,6 +1,6 @@
 'use client'
 import { asArray } from './friend-detail-shape'
-import { PrepayBadgeV8 } from '@/v8/booking'
+import { PrepayBadgeV8 } from '@/v8/booking/index'
 import Button from '@/components/shared/button'
 import { EntityPickerField, type EntityPickerFolder } from '@/components/shared/entity-picker'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'

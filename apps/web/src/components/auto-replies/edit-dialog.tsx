@@ -9,7 +9,7 @@ import { saveAutoReplyDialog } from './edit-dialog-save'
 import { AutoReplyTriggerFields } from './edit-dialog-trigger'
 export { toDraft,toVersionDraft,type AutoReplyDraft,type AutoReplyOrderHint } from './edit-dialog-model'
 
-import { responseTypeWord } from '@/v8/auto-replies/public/auto-reply-words'
+import { responseTypeWord } from '@/v8/auto-replies/public/auto-reply-words/index'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
 import LinePreview from '@/components/shared/line-preview'

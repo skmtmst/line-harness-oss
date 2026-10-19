@@ -16,9 +16,9 @@ import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
-import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice'
-import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft'
+import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import { TextField } from '@/components/shared/text-field';
 import { Field } from '@/components/shared/form-controls';

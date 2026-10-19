@@ -23,7 +23,7 @@ import HelpTip from '@/components/shared/help-tip';
 import Notice from '@/components/shared/notice';
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
-import { tagNameProblem } from '@/v8/tags/public/tag-name'
+import { tagNameProblem } from '@/v8/tags/public/tag-name/index'
 import Select from '@/components/shared/select';
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select';
 import { SettingCheckbox } from '@/components/shared/checkbox';

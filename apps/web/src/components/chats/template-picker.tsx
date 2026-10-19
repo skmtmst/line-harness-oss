@@ -8,7 +8,7 @@ import type {
   TemplateFolderOption,
   TemplateFolderStatus,
 } from './template-folder-select'
-import { TemplatePickerView, type TemplatePickerSideKey } from '@/v8/inbox-chat/public/template-picker-view'
+import { TemplatePickerView, type TemplatePickerSideKey } from '@/v8/inbox-chat/public/template-picker-view/index'
 
 type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 

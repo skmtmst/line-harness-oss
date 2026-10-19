@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import { loadFeatureSettings } from '@/lib/feature-settings-cache'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
-import { buildStepsFromApi, featureSetEntry, insertFeatureSet, type StepResult } from '@/v8/settings/public/steps'
+import { buildStepsFromApi, featureSetEntry, insertFeatureSet, type StepResult } from '@/v8/settings/public/steps/index'
 
 /** ダッシュボードと設定の完了条件の正本は同じ V8 API。訪問・招待人数では判定しない。 */
 export async function loadFirstRunSteps(accountId: string | null): Promise<StepResult[]> {

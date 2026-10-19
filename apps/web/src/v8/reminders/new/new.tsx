@@ -19,7 +19,7 @@ import { SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle, useSave
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave'
+import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import {
   EMPTY_BASICS,
   basicsBaseSummary,

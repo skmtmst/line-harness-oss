@@ -29,7 +29,7 @@ import DateField from '@/components/shared/date-field';
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
 import { TimeField } from '@/components/shared/date-time-field';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
-import { MenuPaymentCard, PaymentConflictError, useMenuPayment } from '@/v8/booking-payments/public/menu-payment'
+import { MenuPaymentCard, PaymentConflictError, useMenuPayment } from '@/v8/booking-payments/public/menu-payment/index'
 import FormSection from '@/components/shared/form-section';
 import ListState from '@/components/shared/list-state';
 import { Tabs } from '@/components/shared/tabs';

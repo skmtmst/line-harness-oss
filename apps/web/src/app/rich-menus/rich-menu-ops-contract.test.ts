@@ -29,7 +29,7 @@ describe('一覧の検索はボタン名にも当たる', () => {
 /** #899 / N-164: 登録メディアの選択が作成フォームへ戻る */
 describe('作成画面の登録メディア選択', () => {
   it('メディア選択ダイアログを今のアカウントで開き、選択がフォームへ戻る', () => {
-    expect(NEW_PAGE).toContain("import { MediaPickerDialog } from '@/v8/contents/public/media-picker-dialog'")
+    expect(NEW_PAGE).toContain("import { MediaPickerDialog } from '@/v8/contents/public/media-picker-dialog/index'")
     expect(NEW_PAGE).toContain('accountId={accountId}')
     expect(NEW_PAGE).toContain('onSelect={handlePickedMedia}')
     expect(NEW_PAGE).toContain('setPendingImageAt(imagePickTarget, { file: null, url: null, dims: null, media: item })')

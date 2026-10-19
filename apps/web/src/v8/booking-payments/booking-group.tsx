@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { bookingAdvancedApi } from '@/lib/api/helpers/booking-advanced'
 import type { BookingGroupView } from '@line-crm/shared'
 import ListState from '@/components/shared/list-state'
-import { PartySection } from '@/v8/booking-gap/public/party-section'
+import { PartySection } from '@/v8/booking-gap/public/party-section/index'
 
 /** 組の表示は Nx1kq の共通段へ集約する。別店・別予約の返事は表示しない。 */
 export function BookingGroupSection({ accountId, bookingId, canOperate, onChanged }: { accountId: string; bookingId: string; canOperate: boolean; onChanged?: () => void }) {

@@ -24,7 +24,7 @@ import {
   type DeliveryOrderStatus,
   type DeliveryUrgency,
 } from '@/lib/restaurant-delivery-api'
-import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts'
+import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import {
   CANCEL_REASON_OPTIONS,
   DASH,

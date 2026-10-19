@@ -43,9 +43,9 @@ import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { restoreFirstStep, scheduleToPayload } from './first-step-form';
 import styles from './first-step.module.css'
-import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice'
-import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft'
+import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 import { permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';

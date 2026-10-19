@@ -31,7 +31,7 @@ import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { ROLE_LABELS } from '@/lib/hq-members';
 import { isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
-import { NoPermissionBoard } from '@/v8/no-permission'
+import { NoPermissionBoard } from '@/v8/no-permission/index'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';
 import { runUndoable, runOptimistic } from '@/lib/undoable';

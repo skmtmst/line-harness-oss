@@ -5,8 +5,8 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingAdminDetail, type BookingRequest } from '@/lib/api'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 import type { AccountStyle } from '@line-crm/shared'
-import { bookingWords } from '@/v8/booking-bookings/public/words'
-import { BookingGapSections } from '@/v8/booking-gap/public/booking-gap-sections'
+import { bookingWords } from '@/v8/booking-bookings/public/words/index'
+import { BookingGapSections } from '@/v8/booking-gap/public/booking-gap-sections/index'
 
 /*
  * ★V8-B 予約の詳細（`AjZhH`）。台帳の行から開く小窓。

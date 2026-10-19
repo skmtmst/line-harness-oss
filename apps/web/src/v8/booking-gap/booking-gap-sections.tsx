@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Gap2Booking, Gap2Series } from '@line-crm/shared'
 import { bookingSeriesApi } from '@/lib/api/helpers/gap2'
 
-import { BookingGroupSection } from '@/v8/booking-payments/public/booking-group'
+import { BookingGroupSection } from '@/v8/booking-payments/public/booking-group/index'
 import SeriesPanelSection from './series-panel-section'
 
 /*

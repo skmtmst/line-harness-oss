@@ -20,8 +20,8 @@ type RichMenuTargetPreview
 } from '@/lib/api'
 import { formatDateTime,formatNumber } from '@/lib/format'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
-import { RichMenuSchedules } from '@/v8/rich-menu-edit/public/schedules'
-import { RichMenuTestApply } from '@/v8/rich-menu-edit/public/test-apply'
+import { RichMenuSchedules } from '@/v8/rich-menu-edit/public/schedules/index'
+import { RichMenuTestApply } from '@/v8/rich-menu-edit/public/test-apply/index'
 import {
 RICH_MENU_DIMENSIONS
 } from '@line-crm/shared'

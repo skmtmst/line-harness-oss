@@ -59,10 +59,10 @@ import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbl
 import HqTemplatePicker from './template-picker';
 import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker';
 import { SourcePickerSelection, type SourcePickerItem, type SourcePickerFolder } from '@/components/shared/source-picker-dialog';
-import { CarouselV8 } from '@/v8/templates/public/carousel'
-import { TemplateRichEditor } from '@/v8/template-edit/public/rich'
-import type { TemplateEditHost } from '@/v8/template-edit/public/host'
-import { hostDefinition } from '@/v8/hq-templates/public/console'
+import { CarouselV8 } from '@/v8/templates/public/carousel/index'
+import { TemplateRichEditor } from '@/v8/template-edit/public/rich/index'
+import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
+import { hostDefinition } from '@/v8/hq-templates/public/console/index'
 import { freshDefinition } from '@/lib/hq-template-authoring';
 import styles from './create.module.css';
 import MessageComposer from '@/components/shared/message-composer';

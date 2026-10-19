@@ -21,7 +21,7 @@ import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import type { AccountStyle } from '@line-crm/shared'
 import { hqStyleApi } from '@/lib/api/helpers/styles'
-import { styleLabel } from '@/v8/onboarding/public/model'
+import { styleLabel } from '@/v8/onboarding/public/model/index'
 import styles from './attention.module.css'
 
 /*

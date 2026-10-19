@@ -28,7 +28,7 @@ import { HQ_NEXT_LABEL,HQ_STEP_LABEL,NEXT_LABEL,STEP_KEYS,STEP_LABEL,V8_LAYOUT_K
 
 import ListState from '@/components/shared/list-state'
 
-import { MediaPickerDialog } from '@/v8/contents/public/media-picker-dialog'
+import { MediaPickerDialog } from '@/v8/contents/public/media-picker-dialog/index'
 import { ManualPublishAttempt } from '@/v8/rich-menus/edit/manual-publish-attempt'
 import {
 DEFAULT_PUBLISH_PLAN,

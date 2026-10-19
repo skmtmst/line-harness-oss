@@ -10,7 +10,7 @@
  */
 import { Check } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
-import { useFirstRun } from '@/v8/onboarding/public/use-first-run'
+import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'

@@ -8,11 +8,11 @@ import { readUiSource } from '../../scripts/test-ui-source.mjs'
 import { inspectB244Tree } from '../../scripts/verify.mjs'
 
 describe('feature entry verification', () => {
-  it('follows a transparent index to the screen and retains the implementation depth', () => {
+  it('follows an explicit public index to its declared implementation', () => {
     const root = mkdtempSync(join(tmpdir(), 'public-entry-'))
     try {
       mkdirSync(join(root, 'src/v8/feature'), { recursive: true })
-      writeFileSync(join(root, 'src/v8/entry.tsx'), "import { Screen } from './feature'; <Screen />")
+      writeFileSync(join(root, 'src/v8/entry.tsx'), "import { Screen } from './feature/index'; <Screen />")
       writeFileSync(join(root, 'src/v8/feature/index.ts'), "export { Screen } from './screen'")
       writeFileSync(join(root, 'src/v8/feature/screen.tsx'), "import { body } from './body'; export function Screen(){return body}")
       writeFileSync(join(root, 'src/v8/feature/body.ts'), "export const body = 'implementation-visible'")

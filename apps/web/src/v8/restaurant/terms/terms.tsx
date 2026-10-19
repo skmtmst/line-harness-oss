@@ -9,7 +9,7 @@
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { TermsBody, termsSectionId } from '@/v8/restaurant/store-new/public/terms-body'
+import { TermsBody, termsSectionId } from '@/v8/restaurant/store-new/public/terms-body/index'
 import styles from './terms.module.css'
 
 /** 「2026-08-23」→「2026/08/23」。 */

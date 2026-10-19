@@ -21,7 +21,7 @@ import { restaurantTestApi,type RestaurantIntakeAddress,type RestaurantMembershi
 import type { RestaurantLoginMember } from '@line-crm/shared'
 import { Check,MailPlus,MessageCircle,Plus,type LucideIcon } from 'lucide-react'
 import { useCallback,useEffect,useState,type FormEvent,type ReactNode } from 'react'
-import { formatStamp, Panel, Status } from '@/v8/restaurant/common-a/public/parts'
+import { formatStamp, Panel, Status } from '@/v8/restaurant/common-a/public/parts/index'
 import styles from './organization.module.css'
 
 export const roleLabel: Record<RestaurantMembership['role'], string> = {

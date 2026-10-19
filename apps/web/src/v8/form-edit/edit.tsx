@@ -27,7 +27,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { useStaffRole } from '@/lib/staff-role';
-import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave'
+import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import { requestUnsavedAction } from '@/lib/unsaved-action';
 import { hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter';
 import type { FormEditHost } from './host';

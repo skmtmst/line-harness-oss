@@ -19,16 +19,14 @@ export function readUiSource(path, encoding = 'utf8') {
     seen.add(file)
     const source = readFileSync(file, encoding)
     if (!['.tsx', '.ts'].includes(extname(file)) || typeof source !== 'string' || depth > 4) return source
-    const declarations = source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '').trim()
-    const transparentEntry = /\/index\.tsx?$/.test(file) && /^(?:export\s+(?:type\s+)?\{[^}]*\}\s+from\s+['"][^'"]+['"];?\s*)+$/.test(declarations)
     let result = source
     for (const match of source.matchAll(/(?:from\s*|import\s*(?:\(\s*)?)['"](\.[^'"]+|@\/v8\/[^'"]+)['"]/g)) {
       const spec = match[1]
       const base = spec.startsWith('@/') ? resolve(SRC, spec.slice(2)) : resolve(dirname(file), spec)
       if (/\.test\./.test(base)) continue
-      for (const child of [base, `${base}.tsx`, `${base}.ts`, `${base}/index.tsx`, `${base}/index.ts`]) {
+      for (const child of [base, `${base}.tsx`, `${base}.ts`, `${base}/index.tsx`]) {
         if (!['.tsx', '.ts'].includes(extname(child))) continue
-        try { result += '\n' + read(child, depth + (transparentEntry ? 0 : 1)); break } catch { /* 次の候補 */ }
+        try { result += '\n' + read(child, depth + 1); break } catch { /* 次の候補 */ }
       }
     }
     return result
@@ -36,7 +34,7 @@ export function readUiSource(path, encoding = 'utf8') {
   if (full.endsWith('/src/app/scenarios/detail/scenario-detail-client.tsx')) {
     return read(resolve(SRC, 'v8/scenario-detail/detail.tsx'), 0)
   }
-  // : 廃止されたapp内のV8コピーは、そのURLの今の入口へ読み替える。
+  // B-40: 廃止されたapp内のV8コピーは、そのURLの今の入口へ読み替える。
   // 現役の分割部品は読み替えない。共通部品・CSS・JSONも元の読み口を保つ。
   if (full.includes('/src/app/') && /(?:^v8-|[-.]v8\.tsx?$)/.test(full.split('/').at(-1))) {
     const routes = {

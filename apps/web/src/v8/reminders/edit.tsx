@@ -28,7 +28,7 @@ import { ApiError,api } from '@/lib/api'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave'
+import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import {
 type ReminderDraftSettings,
 type ReminderDraftVersion,

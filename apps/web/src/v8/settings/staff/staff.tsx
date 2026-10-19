@@ -1,7 +1,7 @@
 'use client'
 import SelfMfa from './self-mfa'
 import MfaPolicy from './mfa-policy'
-import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes'
+import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
 import TotpQr from '@/components/shared/totp-qr'
 
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';

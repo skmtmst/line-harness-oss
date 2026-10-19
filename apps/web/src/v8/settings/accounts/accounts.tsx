@@ -25,7 +25,7 @@ import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { StyleEntry } from '@/v8/onboarding/public/style-entry'
+import { StyleEntry } from '@/v8/onboarding/public/style-entry/index'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import {
   ACCOUNT_FILTERS,

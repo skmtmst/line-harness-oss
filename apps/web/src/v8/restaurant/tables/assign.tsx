@@ -16,8 +16,8 @@ import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { jstDate } from '@/lib/jst-datetime'
 import type { RestaurantTable } from '@/lib/restaurant-test-api'
-import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '@/v8/booking-payments/public/assignment'
-import type { RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell'
+import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '@/v8/booking-payments/public/assignment/index'
+import type { RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import styles from './tables.module.css'
 
 /*

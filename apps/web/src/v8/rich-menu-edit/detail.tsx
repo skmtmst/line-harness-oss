@@ -18,7 +18,7 @@ import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
-import { richMenuError, richMenuErrorAll, unpublishWarningText } from '@/v8/rich-menus/public/errors'
+import { richMenuError, richMenuErrorAll, unpublishWarningText } from '@/v8/rich-menus/public/errors/index'
 import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from './model';
 import styles from './detail.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format';

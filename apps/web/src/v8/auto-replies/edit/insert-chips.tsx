@@ -11,7 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import ActionMenu from '@/components/shared/action-menu'
-import { EMPTY_REFERENCES, loadTemplateReferences, type TemplateReferences } from '@/v8/template-edit/public/core'
+import { EMPTY_REFERENCES, loadTemplateReferences, type TemplateReferences } from '@/v8/template-edit/public/core/index'
 import { MessageInsertButton } from '@/components/shared/message-insert-row'
 
 export const NAME_TOKEN = '{{name}}'

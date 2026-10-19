@@ -39,8 +39,8 @@ import { DataTable, TableHeadRow, Th, Tr, Td, PersonCell, ActionCell } from '@/c
 import { useAccount } from '@/contexts/account-context';
 import { api, type FriendAddRunList } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
-import { describeFriendAddFailure } from '@/v8/friend-add/public/failure'
-import { useCursorStack } from '@/v8/friend-add/public/use-cursor-stack'
+import { describeFriendAddFailure } from '@/v8/friend-add/public/failure/index'
+import { useCursorStack } from '@/v8/friend-add/public/use-cursor-stack/index'
 import { csvCell, elapsedText, formatJstDateTime, jstTime, routingAction, routingLabel } from './status';
 import styles from './runs.module.css'
 import { csvFileName } from '@/lib/csv-file-name';

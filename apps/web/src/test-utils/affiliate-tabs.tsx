@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { AffiliatorsTab as AffiliatorsV8 } from '@/v8/affiliates/public/affiliators'
-import { ApprovalsTab as ApprovalsV8 } from '@/v8/affiliates/public/approvals'
-import { OffersTab as OffersV8 } from '@/v8/affiliates/public/offers'
-import { AffiliateShell, type AffiliateTabKey } from '@/v8/affiliates/public/frame'
+import { AffiliatorsTab as AffiliatorsV8 } from '@/v8/affiliates/public/affiliators/index'
+import { ApprovalsTab as ApprovalsV8 } from '@/v8/affiliates/public/approvals/index'
+import { OffersTab as OffersV8 } from '@/v8/affiliates/public/offers/index'
+import { AffiliateShell, type AffiliateTabKey } from '@/v8/affiliates/public/frame/index'
 
 export { distributionUrl } from '@/v8/affiliates/display'
 

@@ -6,7 +6,7 @@ import ListState from '@/components/shared/list-state'
 import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
 import { useAccount } from '@/contexts/account-context'
 import type { IndustryStyle, UsageStyle } from './model'
-import { DashboardV8 as StandardDashboard } from '@/v8/dashboard'
+import { DashboardV8 as StandardDashboard } from '@/v8/dashboard/index'
 
 /*
  * ホーム（/）の入口。アカウントの使い方のスタイルで出し分ける。
