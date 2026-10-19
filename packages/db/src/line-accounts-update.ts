@@ -59,7 +59,7 @@ export async function updateLineAccount(
     values.push(updates.login_channel_id);
   }
   if (updates.login_channel_secret !== undefined) {
-    // 平文の列には書かない。値は暗号化列だけに置き、平文は消す（v6-33 §19-2）。
+    // 平文の列には書かない。値は暗号化列だけに置き、平文は消す（-33 §19-2）。
     fields.push('login_channel_secret = ?');
     values.push(null);
     fields.push('login_channel_secret_encrypted = ?');
@@ -167,7 +167,7 @@ export async function updateLineAccountFields(
     binds.push(input.loginChannelId);
   }
   if (input.loginChannelSecret !== undefined) {
-    // 平文の列には書かない。値は暗号化列だけに置き、平文は消す（v6-33 §19-2）。
+    // 平文の列には書かない。値は暗号化列だけに置き、平文は消す（-33 §19-2）。
     sets.push('login_channel_secret = ?');
     binds.push(null);
     sets.push('login_channel_secret_encrypted = ?');

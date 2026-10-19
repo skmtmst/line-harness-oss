@@ -1,11 +1,11 @@
 import { jstNow } from './utils.js';
-import type { AnalyticsMetric } from './analytics-overviews.js';
+import type { AnalyticsMetric } from './analytics-overviews-types.js';
 import type { AnalyticsCrossResult } from './analytics-cross.js';
 import type { FunnelGroupEvaluation, FunnelRunResult } from './analytics-funnels.js';
 import type { SavedAnalyticsSummary } from './analytics-saved.js';
 
 /**
- * v6-20 分析の非同期CSV書き出し（要件 §8 `POST /api/analytics/exports`）の台帳と、
+ * -20 分析の非同期CSV書き出し（要件 §8 `POST /api/analytics/exports`）の台帳と、
  * 画面内のCSVと同じ中身を組み立てる builder。
  *
  * 列の並び・見出し・空欄の扱いは `apps/web/src/app/analytics/page.tsx` の

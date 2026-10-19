@@ -1,4 +1,4 @@
-import { type ActionDefinition } from './automation-engine.js';
+import { type ActionDefinition } from '../features/automations/automation-engine/index.js';
 
 export const SUPPORTED_ACTION_TYPES = new Set([
   'add_tag',

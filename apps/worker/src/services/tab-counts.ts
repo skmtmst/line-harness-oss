@@ -1,4 +1,4 @@
-import { listAutomationTemplates } from './automation-drafts.js';
+import { listAutomationTemplates } from '../features/automations/automation-drafts/index.js';
 
 export async function automationTabCounts(db: D1Database, accountId: string) {
   const row = await db.prepare(`SELECT

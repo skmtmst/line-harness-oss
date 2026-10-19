@@ -2,8 +2,8 @@ import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { companySettings } from './company-settings.js';
 import { routeClassification } from '../middleware/feature-enforcement.js';
 

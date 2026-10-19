@@ -5,7 +5,7 @@ import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { navigationProof } from '../lib/navigation-proof.js';
 import { signCrossAccountToken } from '../lib/cross-account-token.js';
 import { liffRoutes } from './liff.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 let f: SqliteD1;
 let env: Env['Bindings'];

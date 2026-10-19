@@ -1,3 +1,2 @@
-// Public entry point. Implementation is organized by responsibility.
-export { MileageAdjustmentError, parseAdjustmentMetadata, adjustmentResult, buildAdjustmentFingerprint, findCommittedMileageAdjustment, adjustmentLotSpendOrderSql, readLotConsumed, recordLotConsumed, lotRepairLiveExcessGateSql, repairAdjustmentLotShortfall, tryParseMetadata } from './mileage-adjustments-lots.js';
-export { postMileageAdjustment } from './mileage-adjustments-post.js';
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { adjustmentLotSpendOrderSql, adjustmentResult, buildAdjustmentFingerprint, findCommittedMileageAdjustment, lotRepairLiveExcessGateSql, MileageAdjustmentError, parseAdjustmentMetadata, postMileageAdjustment, readLotConsumed, recordLotConsumed, repairAdjustmentLotShortfall, tryParseMetadata } from './mileage/adjustments.js';

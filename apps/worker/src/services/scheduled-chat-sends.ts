@@ -11,6 +11,7 @@ import {
   activeTenantLineAccountSql,
   recordSkippedDelivery,
 } from '@line-crm/db';
+
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { resolveLineToken } from './line-token.js';
 import { reserveOutboundSend, hashOutboundPayload, completeOutboundSendStatement, classifyLineOutboundFailure } from './outbound-idempotency.js';
@@ -86,7 +87,7 @@ async function dispatchOne(
   }
 
   /*
-   * アカウント停止中（X-1、v6-33 §10-1）。既定アカウントのトークンへ
+   * アカウント停止中（X-1、-33 §10-1）。既定アカウントのトークンへ
    * 逃がすと別名義で届いてしまうので、送らずに失敗行として残す。
    * 再開しても自動では送り直さない（retryable=false）。
    */

@@ -1,8 +1,9 @@
 import { reconcileRestaurantInventory } from './restaurant-inventory-rules.js';
 import PostalMime from 'postal-mime';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
-import { parserFor, type ParsedReservationEmail } from './parsers/index.js';
+import { parserFor } from './parsers/index.js';
+import { type ParsedReservationEmail } from './parsers/types.js';
 
 const MAX_PARSE_BYTES = 2 * 1024 * 1024;
 export const DEFAULT_STAY_MINUTES = 120;

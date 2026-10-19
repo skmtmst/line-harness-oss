@@ -32,6 +32,8 @@ import {
   TagArchiveError,
 } from '@line-crm/db';
 import type { Tag as DbTag, TagGroup as DbTagGroup, TagWithUsage } from '@line-crm/db';
+
+
 import type {
   TagCsvImportInputRow,
   TagCsvImportPreview,
@@ -39,7 +41,7 @@ import type {
   TagCsvImportRowResult,
   TagCsvImportSummary,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { listResponse } from '../lib/list-etag.js';
@@ -1203,7 +1205,7 @@ tags.post('/api/tags', requireRole('owner', 'admin'), inputJsonBoundary(), async
     if (!name) {
       return inputError(c, { success: false, error: 'name is required' }, 400, ["name"]);
     }
-    // V6経路と同じ決まり。長い・改行入りタグが一覧・CSV・他画面の表示を崩す。
+    // 経路と同じ決まり。長い・改行入りタグが一覧・CSV・他画面の表示を崩す。
     if (name.length > 80) {
       return inputError(c, { success: false, error: 'name must be between 1 and 80 characters' }, 400, ["name"]);
     }

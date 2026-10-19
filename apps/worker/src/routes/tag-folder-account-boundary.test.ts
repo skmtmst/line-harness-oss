@@ -5,7 +5,7 @@ import { createTagDefinition, updateTagDefinition, assignTagToGroup } from '@lin
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { friendAttributes } from './friend-attributes.js';
 import { tags } from './tags.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 let fixture: SqliteD1;
 let actor: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; tenantId: string };

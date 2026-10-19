@@ -1,5 +1,6 @@
 import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
 
+
 /** Only the selected public style crosses the customer boundary. Answers and internal flags stay private. */
 export async function accountCustomerStyle(db: D1Database, accountId: string): Promise<AccountStyle | null> {
   const row = await db.prepare(

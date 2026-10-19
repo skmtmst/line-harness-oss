@@ -1,4 +1,4 @@
-/** B-306: 人の予約はLINEアカウント、席の予約は飲食店舗を設定の単位にする。 */
+/** 人の予約はLINEアカウント、席の予約は飲食店舗を設定の単位にする。 */
 export type BookingAssignmentMethod = 'balanced' | 'priority' | 'random';
 export type BookingAssignmentPeriod = 'day' | 'week';
 export type BookingAssignmentPriority = 'preferred' | 'normal' | 'low';

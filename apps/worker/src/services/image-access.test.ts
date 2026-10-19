@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { privateImageResponseMiddleware, privateImageSignatureValid, signPrivateImageUrl } from './image-access.js';
 
 const { scope, identity } = vi.hoisted(() => ({ scope: vi.fn(), identity: vi.fn() }));

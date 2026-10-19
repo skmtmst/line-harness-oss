@@ -1,6 +1,7 @@
 import { type AdConversionOutboxRow, type RefTracking } from '@line-crm/db';
 
 
+
 export function refFromOutboxSnapshot(row: AdConversionOutboxRow): RefTracking | null {
   if (row.selection_reason !== 'eligible'
     || !row.ref_tracking_id || !row.click_id || !row.click_id_type

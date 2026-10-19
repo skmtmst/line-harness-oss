@@ -1,9 +1,9 @@
-import { EntitlementError } from '../../services/booking-entitlements.js';
+import { EntitlementError } from '../../features/booking/booking-entitlements/index.js';
 import { discardUnacceptedEventBooking, assertEventPassRequirement, validateEventEntitlement, eventEntitlementUse } from '../../services/event-entitlements.js';
 import { logger } from '@line-crm/shared/server';
 import { prepareEventNotification } from '../../services/event-notification-plan.js';
 import { prepareEventReminders } from '../../services/event-reminder-plan.js';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { eventModeRemaining } from '../../services/event-mode-capacity.js';
 import { bad } from '../../services/event-input-error.js';
@@ -16,7 +16,7 @@ import { reserveEventIdempotency, finalizeEventIdempotencyResponse } from '../..
 import { computeRemindersForBooking, insertRemindersForBooking } from '../../services/event-booking-reminders.js';
 import { sendEventBookingNotification, type EventNotificationKind } from '../../services/event-booking-notifier.js';
 import { awardActivityMileage } from '../../services/activity-mileage.js';
-import { dispatchAutomationEventWithLogging } from '../../services/automation-triggers.js';
+import { dispatchAutomationEventWithLogging } from '../../features/automations/automation-triggers/index.js';
 import { applyActionScoreEvent } from '../../services/action-score-events.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { getEventOccurrenceUsedSeats } from '../../services/event-waitlist.js';
@@ -54,6 +54,7 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
     now: new Date(),
   });
   if (reservation.kind === 'cached') {
+    if (reservation.status >= 500) throw new Error('event_booking_cached_failure');
     return c.json(
       reservation.body as Record<string, unknown>,
       reservation.status as 200 | 201 | 400 | 409 | 410 | 422,
@@ -82,8 +83,8 @@ events.post('/api/liff/events/:id/bookings', inputJsonBoundary(), async (c) => {
   } catch (e) {
     if(e instanceof EntitlementError)return finalize(e.status,{error:e.code});
     if(e instanceof Error&&e.message.includes('entitlement_unavailable'))return finalize(409,{error:'entitlement_unavailable'});
-    logger.error("routes_events_failed");
-    return finalize(500, { error: 'internal_error' });
+    await finalize(500, { error: 'internal_error' });
+    throw e;
   }
 
   async function runBookingFlow(): Promise<Response> {

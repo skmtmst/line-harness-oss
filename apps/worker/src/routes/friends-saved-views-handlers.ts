@@ -3,7 +3,7 @@ import { deleteCustomerData, deletionJournal, DeletionFailure } from '../service
 import { inputError } from '../lib/input-errors.js';
 
 import { getFriendById, getSavedSearchById, getSavedSearches, createSavedSearch, countSavedSearches, validateSearchConditions, SAVED_SEARCH_LIMIT } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { compileSavedSearch } from '../services/saved-search-filter.js';

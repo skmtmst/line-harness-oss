@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { inputError } from '../lib/input-errors.js';
 
 const modes = ['none', 'onsite', 'online', 'customer_choice'];

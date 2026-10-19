@@ -1,5 +1,5 @@
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError,gapBody,gapKey,gapVersion} from '../services/gap-common.js';
 import {validPushEndpoint,unbase64} from '../services/web-push.js';
 import {deliverOperatorPush} from '../services/operator-push.js';

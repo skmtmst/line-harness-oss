@@ -1,12 +1,12 @@
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {liffActionFromUrl} from '@line-crm/shared';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
-import {notifyForBooking,previewBookingConfirmation} from './booking-notification.js';
-import {getBookingAdminDetail} from './booking-admin-detail.js';
-import {processDueReminders} from './booking-reminders.js';
+import {notifyForBooking,previewBookingConfirmation} from '../features/booking/booking-notification.js';
+import {getBookingAdminDetail} from '../features/booking/booking-admin-detail.js';
+import {processDueReminders} from '../features/booking/booking-reminders.js';
 import {prepareEventNotification} from './event-notification-plan.js';
-import {sendBookingNotification,type SendNotificationParams} from './booking-notifier.js';
-vi.mock('./booking-notifier.js',async original=>({...await original<typeof import('./booking-notifier.js')>(),sendBookingNotification:vi.fn(async()=>{})}));
+import {sendBookingNotification,type SendNotificationParams} from '../features/booking/booking-notifier.js';
+vi.mock('../features/booking/booking-notifier.js',async original=>({...await original<typeof import('../features/booking/booking-notifier.js')>(),sendBookingNotification:vi.fn(async()=>{})}));
 vi.mock('./feature-enforcement.js',()=>({featureJobCanRun:async()=>true}));
 let item:SqliteD1;
 const NOW=new Date('2026-11-02T00:00:00Z');

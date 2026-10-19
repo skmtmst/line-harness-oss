@@ -1,7 +1,9 @@
 import type { FormSnapshot, BookingResource } from './form-snapshot-types.js';
 import { normalizeScopedTagName } from '@line-crm/db';
 import { collectInputs, layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
-import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateStatement, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan, } from './contract.js';
+
+import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
+import { type HqTemplateStatement } from '@line-crm/db';
 import { bindScenarioGraphRevision, loadScenarioReferenceGraph, scenarioGraphSnapshotToken, ScenarioGraphError } from './scenario-graph.js';
 /** Unbound callers remain closed until the common executor provides dependencies. */
 export const formHqTemplateAdapter = unsupportedHqTemplateAdapter('form');

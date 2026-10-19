@@ -1,6 +1,6 @@
 import { applyPublishedActionScoreRules } from '@line-crm/db';
 import type { ActionScoreApplication } from '@line-crm/db';
-import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
+import { dispatchAutomationEventWithLogging } from '../features/automations/automation-triggers/index.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 
 const BAND_RANK = { low: 0, normal: 1, high: 2 } as const;
@@ -18,7 +18,7 @@ function crossedBands(application: ActionScoreApplication): Array<'normal' | 'hi
 }
 
 /**
- * V6行動スコアへ元イベントを1回だけ反映し、層をまたいだ瞬間だけ
+ * 行動スコアへ元イベントを1回だけ反映し、層をまたいだ瞬間だけ
  * オートメーションへ別イベントを渡す。元イベントIDが無い呼び出しは
  * 推測せず、DBヘルパーが未設定扱いとして止める。
  */

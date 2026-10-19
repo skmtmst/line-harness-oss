@@ -3,6 +3,7 @@ export type { RefTracking } from './entry-route-tracking-types.js';
 import { jstNow, nextVersionToken } from './utils.js';
 import { ensureEntryRouteGenre } from './entry-route-genres.js';
 import { DEFAULT_TENANT_ID, type EntryRouteMonth } from '@line-crm/shared';
+
 export interface EntryRoute {
   id: string;
   ref_code: string;
@@ -170,7 +171,7 @@ export async function createEntryRoute(
   // Backfill historical ref_tracking rows that were recorded *before* this
   // entry_route existed (e.g. X Harness UUIDs first seen as unregistered
   // inflow, later registered via the /inflow-links 登録 button). Without
-  // this, getEntryRouteFunnel() — which counts clicks via
+  // this, getEntryRouteFunnel — which counts clicks via
   // ref_tracking.entry_route_id — would drop every pre-registration click
   // even though the same rows still show in the inflow-links list. Only
   // touch rows whose entry_route_id is NULL so we don't clobber attribution

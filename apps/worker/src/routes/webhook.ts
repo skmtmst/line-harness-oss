@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { post__webhook_1 } from './webhook-receive.js';
 

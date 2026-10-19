@@ -1,0 +1,17 @@
+// Public operations. Internal modules import their dependencies directly.
+export { canApproveBroadcast, countActiveOperators, evaluateApprovalGate, getBroadcastApprovalThreshold, notifyBroadcastApproval, readApprovalStatus, recordBroadcastApprovalEvent, setBroadcastApprovalThreshold } from './broadcast-approval.js';
+export { fetchQuota, releaseQuotaSlot, tryReserveQuotaSlot } from './broadcast-quota-guard.js';
+export { MAX_BROADCAST_MESSAGES, addTestLabel, assertMessagePartsResolved, autoTrackMessageParts, buildMessages, combinedMessageContent, hasRecipientVariablesInParts, parseBroadcastMessageParts, renderMessageParts, unsupportedMessageVariables, varyTextMessages } from './broadcast-message-set.js';
+export type { BroadcastMessagePart } from './broadcast-message-set.js';
+export { abAudience, abSettings, abStats, decideAbTests, finishMockRemainder, splitAb, startAbMock } from './broadcast-ab.js';
+export { buildMessage, guardScheduledBroadcastQuota, processBroadcastSend, processQueuedBroadcasts, processScheduledBroadcasts } from './broadcast.js';
+export { createBroadcastRetryKey } from './broadcast-retry-key.js';
+export { processBroadcastSimulation, purposeAliases, saveSimulationDraft, scheduleSimulation, simulationContext, simulationPreview } from './broadcast-simulation.js';
+export type { BroadcastPurpose } from './broadcast-simulation.js';
+export { storeBroadcastMedia } from './broadcast-media-storage.js';
+export { buildWarnings, hasRecentSimilarBroadcast, previewAudience } from './broadcast-preflight.js';
+export { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
+export { processBroadcastAfterActions } from './broadcast-after-actions.js';
+export { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
+export { getBroadcastAudiencePreview } from './broadcast-audience-preview.js';
+export { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';

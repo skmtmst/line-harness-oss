@@ -1,7 +1,9 @@
 import { normalizeScopedTagName } from '@line-crm/db';
 import { validateRichMenuGroupForPublish } from '../../lib/rich-menu-publisher.js';
 import type { HqRichMenuDefinition, LiffAction } from '@line-crm/shared';
-import type { HqTemplateAuthority, HqTemplateStatement } from './contract.js';
+
+import type { HqTemplateAuthority } from './contract.js';
+import type { HqTemplateStatement } from '@line-crm/db';
 import { HqTemplateError } from './tag.js';
 
 type Area = HqRichMenuDefinition['richMenu']['pages'][number]['areas'][number];

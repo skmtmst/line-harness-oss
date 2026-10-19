@@ -42,7 +42,7 @@ afterEach(() => {
 // If the SDK changes a path or a body field, these fail on purpose.
 
 describe('friends HTTP contract (POST /api/friends/:id/messages etc.)', () => {
-  it('list() with accountId calls GET /api/friends with lineAccountId', async () => {
+  it('list with accountId calls GET /api/friends with lineAccountId', async () => {
     const page = { items: [], total: 0, hasNextPage: false }
     const http = mockHttp({ get: vi.fn().mockResolvedValue({ success: true, data: page }) })
     const resource = new FriendsResource(http)
@@ -50,7 +50,7 @@ describe('friends HTTP contract (POST /api/friends/:id/messages etc.)', () => {
     expect(http.get).toHaveBeenCalledWith('/api/friends?limit=20&offset=0&lineAccountId=acc-9')
   })
 
-  it('sendMessage() calls POST /api/friends/:id/messages with the message body', async () => {
+  it('sendMessage calls POST /api/friends/:id/messages with the message body', async () => {
     const http = mockHttp({ post: vi.fn().mockResolvedValue({ success: true, data: { messageId: 'm1' } }) })
     const resource = new FriendsResource(http)
     await resource.sendMessage('f1', 'hi', 'text', undefined, { trackLinks: true })
@@ -63,13 +63,13 @@ describe('friends HTTP contract (POST /api/friends/:id/messages etc.)', () => {
 })
 
 describe('broadcasts HTTP contract', () => {
-  it('list() with accountId calls GET /api/broadcasts?lineAccountId=', async () => {
+  it('list with accountId calls GET /api/broadcasts?lineAccountId=', async () => {
     const http = mockHttp({ get: vi.fn().mockResolvedValue({ success: true, data: [] }) })
     await new BroadcastsResource(http).list({ accountId: 'acc-1' })
     expect(http.get).toHaveBeenCalledWith('/api/broadcasts?lineAccountId=acc-1')
   })
 
-  it('create() calls POST /api/broadcasts with lineAccountId in the body', async () => {
+  it('create calls POST /api/broadcasts with lineAccountId in the body', async () => {
     const http = mockHttp({ post: vi.fn().mockResolvedValue({ success: true, data: { id: 'b1' } }) })
     await new BroadcastsResource(http).create({
       title: 'Sale',
@@ -87,13 +87,13 @@ describe('broadcasts HTTP contract', () => {
     })
   })
 
-  it('send() calls POST /api/broadcasts/:id/send', async () => {
+  it('send calls POST /api/broadcasts/:id/send', async () => {
     const http = mockHttp({ post: vi.fn().mockResolvedValue({ success: true, data: { id: 'b1' } }) })
     await new BroadcastsResource(http).send('b1')
     expect(http.post).toHaveBeenCalledWith('/api/broadcasts/b1/send')
   })
 
-  it('sendToSegment() calls POST /api/broadcasts/:id/send-segment with conditions', async () => {
+  it('sendToSegment calls POST /api/broadcasts/:id/send-segment with conditions', async () => {
     const http = mockHttp({ post: vi.fn().mockResolvedValue({ success: true, data: { id: 'b1' } }) })
     const conditions = { operator: 'AND', rules: [] } as never
     await new BroadcastsResource(http).sendToSegment('b1', conditions)
@@ -102,7 +102,7 @@ describe('broadcasts HTTP contract', () => {
 })
 
 describe('scenarios HTTP contract', () => {
-  it('create() calls POST /api/scenarios with lineAccountId in the body', async () => {
+  it('create calls POST /api/scenarios with lineAccountId in the body', async () => {
     const http = mockHttp({ post: vi.fn().mockResolvedValue({ success: true, data: { id: 's1' } }) })
     await new ScenariosResource(http).create({ name: 'W', triggerType: 'manual', lineAccountId: 'acc-1' })
     expect(http.post).toHaveBeenCalledWith('/api/scenarios', {
@@ -112,13 +112,13 @@ describe('scenarios HTTP contract', () => {
     })
   })
 
-  it('enroll() calls POST /api/scenarios/:id/enroll/:friendId', async () => {
+  it('enroll calls POST /api/scenarios/:id/enroll/:friendId', async () => {
     const http = mockHttp({ post: vi.fn().mockResolvedValue({ success: true, data: { id: 'enr-1' } }) })
     await new ScenariosResource(http).enroll('s1', 'f1')
     expect(http.post).toHaveBeenCalledWith('/api/scenarios/s1/enroll/f1')
   })
 
-  it('addStep() calls POST /api/scenarios/:id/steps', async () => {
+  it('addStep calls POST /api/scenarios/:id/steps', async () => {
     const http = mockHttp({ post: vi.fn().mockResolvedValue({ success: true, data: { id: 'st-1' } }) })
     const step = { stepOrder: 1, delayMinutes: 30, messageType: 'text', messageContent: 'hi' } as never
     await new ScenariosResource(http).addStep('s1', step)
@@ -127,7 +127,7 @@ describe('scenarios HTTP contract', () => {
 })
 
 describe('conversations HTTP contract', () => {
-  it('list() calls GET /api/conversations with lineAccountId', async () => {
+  it('list calls GET /api/conversations with lineAccountId', async () => {
     const http = mockHttp({ get: vi.fn().mockResolvedValue({ success: true, data: { total: 0, items: [] } }) })
     await new ConversationsResource(http).list({ lineAccountId: 'acc-1', minHoursSince: 2, limit: 50, offset: 0 })
     expect(http.get).toHaveBeenCalledWith(
@@ -135,7 +135,7 @@ describe('conversations HTTP contract', () => {
     )
   })
 
-  it('get() calls GET /api/conversations/:friendId with limit', async () => {
+  it('get calls GET /api/conversations/:friendId with limit', async () => {
     const http = mockHttp({ get: vi.fn().mockResolvedValue({ success: true, data: { messages: [] } }) })
     await new ConversationsResource(http).get({ friendId: 'f7', limit: 50 })
     expect(http.get).toHaveBeenCalledWith('/api/conversations/f7?limit=50')
@@ -143,14 +143,14 @@ describe('conversations HTTP contract', () => {
 })
 
 describe('forms + rich menus HTTP contract', () => {
-  it('forms.create() calls POST /api/forms', async () => {
+  it('forms.create calls POST /api/forms', async () => {
     const http = mockHttp({ post: vi.fn().mockResolvedValue({ success: true, data: { id: 'form-1' } }) })
     const input = { name: 'Survey', fields: [] } as never
     await new FormsResource(http).create(input)
     expect(http.post).toHaveBeenCalledWith('/api/forms', input)
   })
 
-  it('forms.getSubmissions() calls GET /api/forms/:id/submissions', async () => {
+  it('forms.getSubmissions calls GET /api/forms/:id/submissions', async () => {
     const http = mockHttp({ get: vi.fn().mockResolvedValue({ success: true, data: [] }) })
     await new FormsResource(http).getSubmissions('form-1')
     expect(http.get).toHaveBeenCalledWith('/api/forms/form-1/submissions')

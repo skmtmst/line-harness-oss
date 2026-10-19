@@ -177,13 +177,13 @@ describe('injectVersion.hashDirectory', () => {
 
   // Test D — final walk order is independent of stack/readdir traversal order.
   //
-  // walkSorted() uses a LIFO stack: without the final `out.sort()` call, two
+  // walkSorted uses a LIFO stack: without the final `out.sort` call, two
   // sibling subdirectories would be visited in reverse push-order (`sub_b`
   // before `sub_a`) and the resulting walk would be order-dependent on the
   // LIFO discipline. The trailing sort is what makes hashDirectory truly
   // deterministic for trees with multiple sibling directories. We anchor that
   // property here with a fixture that pre-computes the SHA256 for the *sorted*
-  // walk order. If anyone drops `out.sort()`, this test fails because the
+  // walk order. If anyone drops `out.sort`, this test fails because the
   // emitted byte stream becomes `sub_b/y.txt …, sub_a/x.txt …` instead of
   // `sub_a/x.txt …, sub_b/y.txt …`.
   it('produces sorted walk order across sibling subdirectories (final sort anchor)', () => {

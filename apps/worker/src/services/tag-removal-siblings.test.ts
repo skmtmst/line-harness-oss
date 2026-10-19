@@ -1,7 +1,7 @@
 import { afterEach,beforeEach,expect,test,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { runActionRows,type ScenarioActionRow } from './scenario-actions.js';
-import { handleQuestionAnswer } from './scenario-question-answer.js';
+import { runActionRows,type ScenarioActionRow } from '../features/scenarios/scenario-actions.js';
+import { handleQuestionAnswer } from '../features/scenarios/scenario-question-answer.js';
 import type { LineClient } from '@line-crm/line-sdk';
 import { fireEvent } from './event-bus.js';
 vi.mock('./event-bus.js',()=>({fireEvent:vi.fn(async()=>undefined)}));

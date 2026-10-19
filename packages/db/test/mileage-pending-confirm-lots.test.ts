@@ -11,14 +11,14 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getMileageSummaryForFriend, postMileageEntry } from '../src/mileage.js';
-import { confirmPendingMileageEntry, voidMileageLedgerEntry } from '../src/mileage-approvals.js';
+import { getMileageSummaryForFriend, postMileageEntry } from '../src/mileage/index.js';
+import { confirmPendingMileageEntry, voidMileageLedgerEntry } from '../src/mileage/approvals.js';
 import {
   createMileageRewardDraft,
   importMileageRewardCodes,
   publishMileageReward,
   reserveMileageRewardRedemption,
-} from '../src/mileage-rewards.js';
+} from '../src/mileage/rewards.js';
 import { asD1 } from './d1-test-helper.js';
 
 let sqlite: Database.Database;

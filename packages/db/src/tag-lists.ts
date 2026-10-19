@@ -1,5 +1,5 @@
 import { sqlIdSet } from './id-queries.js';
-import type { Tag, TagWithCount } from './tags.js';
+import type { Tag, TagWithCount } from './tags/types.js';
 
 export interface TagReadScope {
   allowedAccountIds: string[];

@@ -1,6 +1,6 @@
 import { bad } from '../services/event-input-error.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { ACCOUNT_ACCESS_ERROR } from './events/input.js';
 import { registerAdminCatalog } from './events/register-admin-catalog.js';

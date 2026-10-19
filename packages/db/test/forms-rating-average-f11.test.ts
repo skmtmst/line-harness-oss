@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, test } from 'vitest';
-import { getFormSubmissionAnalytics } from '../src/forms.js';
+import { getFormSubmissionAnalytics } from '../src/forms/index.js';
 
 const migration = readFileSync(
   join(import.meta.dirname, '..', 'migrations', '312_form_submission_analytics.sql'),

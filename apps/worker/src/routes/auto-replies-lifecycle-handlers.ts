@@ -1,10 +1,12 @@
 import { logger } from '@line-crm/shared/server';
-import { readPriority } from '../services/auto-reply-priority.js';
+import { readPriority } from '../features/auto-replies/auto-reply-priority/index.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getAutoReplyById, createAutoReply, updateAutoReply, deleteAutoReply, restoreAutoReply, stopAutoReply, getTemplateById, autoReplyDraftSettingsFromRow, autoReplyRuleCreateFingerprint, createAutoReplyWithDraftVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, saveAutoReplyDraftVersion } from '@line-crm/db';
 import type { AutoReply as DbAutoReply, AutoReplyDraftSettings } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateFlexContent } from '@line-crm/shared';

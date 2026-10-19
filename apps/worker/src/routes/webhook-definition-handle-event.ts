@@ -14,18 +14,18 @@ import { LineClient } from '@line-crm/line-sdk';
 import { parseTapPostbackData } from '../lib/rich-menu-tap.js';
 import { parseCarouselPostbackData } from '../lib/carousel-tap.js';
 import { handleCarouselTap } from '../services/carousel-tap.js';
-import { handleRichMenuTap } from '../services/rich-menu-tap.js';
+import { handleRichMenuTap } from '../features/rich-menus/rich-menu-tap/index.js';
 import type { WebhookEvent, TextEventMessage } from '@line-crm/line-sdk';
 import { createStickerMessageContent } from '@line-crm/shared';
 import { updateFriendFollowStatus, getFriendByLineUserIdForAccount, upsertChatOnMessage, jstNow, resolveLineCredential, toJstString, recordIncomingLineMessage, recordLineMessageUnsend } from '@line-crm/db';
 
 import { fireEvent } from '../services/event-bus.js';
-import { matchAndReply } from '../services/auto-reply.js';
+import { matchAndReply } from '../features/auto-replies/auto-reply/index.js';
 import { buildMessage } from '../services/step-delivery.js';
 
-import { parseQuestionPostback } from '../services/scenario-question.js';
-import { handleQuestionAnswer } from '../services/scenario-question-answer.js';
-import type { Env } from '../index.js';
+import { parseQuestionPostback } from '../features/scenarios/scenario-question/index.js';
+import { handleQuestionAnswer } from '../features/scenarios/scenario-question-answer/index.js';
+import type { Env } from '../worker-env.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 
 import { snapshotLineReplyPolicy } from '../services/line-webhook-reply-policy.js';

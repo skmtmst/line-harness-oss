@@ -5,7 +5,7 @@ import { conversionApprovalCounts } from '../services/tab-counts.js';
 
 import { getConversionPoints, getConversionPointById, canRecordConversion, createConversionPoint, hasConversionPointActivity, updateConversionPoint, stopConversionPoint, trackConversion, getConversionEvents, getConversionApprovalQueue, addConversionDefinitionUsage, getConversionDefinitionReport, listConversionDefinitionsForExport, appendConversionReversal, getReversedEventIds, listConversionReversals, CONVERSION_DEFINITION_USAGE_KINDS } from '@line-crm/db';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -516,7 +516,7 @@ export const get__api_conversions_report_11 = async (c: Context<Env, "/api/conve
   try {
     if (c.req.query('startDate') !== undefined || c.req.query('endDate') !== undefined) {
       /*
-       * N-269: 旧応答形(startDate/endDate→地点別行)もV6の集計
+       * N-269: 旧応答形(startDate/endDate→地点別行)もの集計
        * (getConversionDefinitionReport)から作る。暦日の解釈・
        * スナップショット固定・取消控除を新レポートと一致させ、
        * 2系統の集計で数値がずれる状態を解消する。

@@ -1,6 +1,8 @@
+export type { CodexAutoMergeMessage } from './codex-auto-merge-types.js';
+import type { CodexAutoMergeMessage } from './codex-auto-merge-types.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { decodeSlackTextEntities } from './slack-text.js';
 
 const AUDIT_MARKER = '[claude->codex]';
@@ -55,16 +57,6 @@ type GitHubCommitStatus = {
 
 type GitHubIssueComment = {
   body?: string;
-};
-
-export type CodexAutoMergeMessage = {
-  kind: 'auto_merge';
-  slackEventId: string;
-  channelId: string;
-  threadTs: string;
-  requesterUserId: string;
-  prNumber: number;
-  approvedHeadSha: string;
 };
 
 export type PullRequestBlockReason =

@@ -16,7 +16,8 @@ import {
   isOperationCapabilityStopped,
   type AutomationRunDomainStatus,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
@@ -29,7 +30,7 @@ import {
   listAutomationTemplates,
   publishAutomationDraft,
   updateAutomationDraft,
-} from '../services/automation-drafts.js';
+} from '../features/automations/automation-drafts/index.js';
 import {
   AutomationDefinitionError,
   listAutomationDefinitions,
@@ -37,13 +38,13 @@ import {
   runAutomationTest,
   updateAutomationDefinitionStatus,
   restoreAutomationDefinition,
-} from '../services/automation-definitions.js';
+} from '../features/automations/automation-definitions/index.js';
 import {
   AutomationRunCancelError,
   AutomationRunRetryError,
   cancelAutomationRun,
   retryAutomationRun,
-} from '../services/automation-engine.js';
+} from '../features/automations/automation-engine/index.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
 import { listLimit } from './list-pagination.js';
 import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
@@ -442,8 +443,8 @@ function boundedInteger(raw: string | undefined, fallback: number, max: number):
 
 async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<void>) {
   const id = c.req.param('id')!;
-  // #942: 一覧が返すidは V6 の automation_definitions。旧 automations 表の
-  // 行だけを見ると、V6の定義への操作が全部 404 になる。先にV6を見る。
+  // #942: 一覧が返すidは の automation_definitions。旧 automations 表の
+  // 行だけを見ると、の定義への操作が全部 404 になる。先にを見る。
   const definition = await c.env.DB.prepare(
     `SELECT line_account_id FROM automation_definitions WHERE id = ?`,
   ).bind(id).first<{ line_account_id: string }>();
@@ -685,7 +686,7 @@ automations.post(
   },
 );
 
-/** V6 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
+/** 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
 automations.get(
   '/api/automation-runs',
   requireAutomationViewPermission,
@@ -710,7 +711,7 @@ automations.get(
           : undefined;
     const wantsCsv = c.req.query('format') === 'csv';
     if (wantsCsv) {
-      // V6 §9: CSV書き出しは個別権限 `automation.run.export`。
+      // §9: CSV書き出しは個別権限 `automation.run.export`。
       // 見るだけの権限（/automations）では出せない。
       const staff = c.get('staff');
       if (staff.role === 'staff' && !staff.permissionKeys?.includes('automation.run.export')) {
@@ -725,7 +726,7 @@ automations.get(
     const defaults = defaultWindow();
     const from = c.req.query('from') || defaults.from;
     const to = c.req.query('to') || defaults.to;
-    // テスト実行は既定で除き、切替のときだけ含める（V6 25-1-B）。
+    // テスト実行は既定で除き、切替のときだけ含める（25-1-B）。
     const includeTest = c.req.query('include_test') === '1' || c.req.query('include_test') === 'true';
 
     const result = await getAutomationExecutionRuns(c.env.DB, {
@@ -865,7 +866,7 @@ automations.get(
  *
  * 待機中・実行中・再試行待ちの実行を cancelled で閉じる。
  * 終わった実行は 409、無い・範囲外は 404、取消済みはそのまま成功。
- * V6 §9: 取り消しは再実行と同じ `automation.run.retry` の個別権限。
+ * §9: 取り消しは再実行と同じ `automation.run.retry` の個別権限。
  */
 automations.post(
   '/api/automation-runs/:id/cancel',
@@ -894,7 +895,7 @@ automations.post(
 automations.use('/api/automations/:id', requireVisibleAutomation);
 automations.use('/api/automations/:id/*', requireVisibleAutomation);
 
-/** V6定義のアカウントを引く（requireVisibleAutomation が範囲を確かめ済み）。 */
+/** 定義のアカウントを引く（requireVisibleAutomation が範囲を確かめ済み）。 */
 async function definitionAccountId(c: Context<Env>): Promise<string | Response> {
   const row = await c.env.DB.prepare(
     `SELECT line_account_id FROM automation_definitions WHERE id = ?`,

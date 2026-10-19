@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getRichMenuGroupById, getRichMenuGroupWithPages, getLineAccountById, getFollowingLineUserIdsByTag, recordRichMenuAssignmentsByLineUserIds, duplicateRichMenuGroupAtomic, createRichMenuTestApplyAtomic, getActiveRichMenuTestApply, getRichMenuTestApplyById, listRichMenuTestApplies, captureRichMenuTestApplyPrevious, recordRichMenuTestApplyShells, markRichMenuTestApplyApplied, markRichMenuTestApplyFailed, getStaffById, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';

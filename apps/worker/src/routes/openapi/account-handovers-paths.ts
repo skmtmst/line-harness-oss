@@ -1,6 +1,6 @@
 // Definitions only. Runtime handlers remain in their feature routes.
 export const accountHandoversPaths = {
-  // ── アカウントの乗り換え（引き継ぎ。X-3・設計 ★V6 33-4）──────────────
+  // ── アカウントの乗り換え（引き継ぎ。X-3・設計 ★33-4）──────────────
   '/api/account-handovers': {
     post: {
       tags: ['LINE Accounts'],

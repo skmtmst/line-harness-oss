@@ -6,13 +6,16 @@ import { signDownload, validDownload } from '../services/download-capability.js'
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { getAffiliateByFriendId, createAffiliate, createAffiliateLink, listAffiliateLinks, countAffiliateLinks, generateRefSlug, getAffiliateLinkStats, listAffiliateOffers, getCurrentOfferVersion, getOfferCapStatus, enrollAffiliateInOffer, getMileageSummaryForFriend, getMileageHistoryForFriend, getMileageSelfInsights, getMileageEarningOpportunitiesForFriend, listMileageRewards, getMileageRewardRedemptionCounts, reserveMileageRewardRedemption, MileageRewardError, encryptCredential, getAffiliateBankProfile, saveAffiliateBankProfile, listAffiliateStatementsForSelf, getAffiliateStatementDownload, type Affiliate, type AffiliateLink, type AffiliateLinkStat } from '@line-crm/db';
+
+
+
 import { affiliateBankFields } from '@line-crm/shared';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import { signCrossAccountToken } from '../lib/cross-account-token.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
-import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
+import { deliverMileageReward } from '../features/mileage/mileage-reward-delivery/index.js';
 
 /**
  * Self-serve affiliate API for LIFF clients.

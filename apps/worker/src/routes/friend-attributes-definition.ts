@@ -1,11 +1,16 @@
 import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
 import { createSavedSearch, jstNow, validateSearchConditions, validateSavedSegmentConditions, type SupportMarkWithUsage, type SupportMarkScope, type SavedSearch, type SavedSearchAccess, type SavedSearchConditionFormat, type SavedSearchReference, type Folder } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+
+
+import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { getSavedSearchMatchPreview, type SavedSearchMatchInsight, type SavedSearchMatchPreview } from '../services/saved-search-insights.js';
 import { SUPPORT_MARK_RULE_EVENTS, type SaveSupportMarkAutomationRule, type SupportMarkRuleEvent } from '../services/support-mark-automation.js';
-import { buildSegmentWhere, type SegmentCondition } from '../services/segment-query.js';
+import { buildSegmentWhere } from '../services/segment-query.js';
+import { type SegmentCondition } from '@line-crm/shared';
 
 export function serializeMarkImpact(row: SupportMarkWithUsage) {
   return {

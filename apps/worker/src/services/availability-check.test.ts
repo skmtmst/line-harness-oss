@@ -406,7 +406,7 @@ describe('explainBookingSlot', () => {
         starts_at: '2026-05-09T01:00:00Z', block_ends_at: '2026-05-09T02:00:00Z',
       }],
     };
-    // 店舗営業時間は businessHours 行が要る。stub では all() が空を返すため
+    // 店舗営業時間は businessHours 行が要る。stub では all が空を返すため
     // 店舗定員は無制限 → store_full にはならず other_booking になる。
     // （店舗定員の単体条件は availability.test.ts 側で担保済み）
     const result = await check(data, '10:00');

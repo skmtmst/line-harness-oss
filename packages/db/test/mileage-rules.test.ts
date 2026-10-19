@@ -18,9 +18,9 @@ import {
   postMileageAdjustment,
   postMileageEntry,
   updateMileageRule,
-} from '../src/mileage.js';
-import { addTagToFriend, enqueueHistoricTagMileage } from '../src/tags.js';
-import { updateFriendFollowStatus } from '../src/friends.js';
+} from '../src/mileage/index.js';
+import { addTagToFriend, enqueueHistoricTagMileage } from '../src/tags/index.js';
+import { updateFriendFollowStatus } from '../src/friends/index.js';
 import {
   getMileageManualAdjustmentPolicy,
   setMileageManualAdjustmentPolicy,

@@ -4,7 +4,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { candidateFromStaffRow, isPlatformAdminRow } from './platform-admin.js';
 
 /**
- * ★V6 37 の初期登録。platform_admins が空の間は「既定の統括のオーナー」だけを
+ * ★37 の初期登録。platform_admins が空の間は「既定の統括のオーナー」だけを
  * 互換で通す。この判定は API（requirePlatformAdmin）だけでなく、LINE ログインの
  * 運営コンソール分岐と /api/auth/session でも同じでなければならない。
  * 片方だけ厳しいと、最初の 1 人が画面に入れず初期登録ができない。

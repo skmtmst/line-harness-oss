@@ -1,8 +1,8 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
-import { verifyStaffCalendarConnection } from '../../services/booking-calendar-sync.js';
+import { verifyStaffCalendarConnection } from '../../features/booking/booking-calendar-sync/index.js';
 import { requireOwnBookingStaffOrAdmin, resolveAccountIdAdmin, assertStaffInAccount } from './identity.js';
 import { googleCredentials, isValidShiftDate, isValidTimeRange } from './availability.js';
 

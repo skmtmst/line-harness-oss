@@ -12,7 +12,7 @@ import {
   publishScenarioVersion,
   reorderScenarios,
   getScenarios,
-} from '../src/scenarios.js';
+} from '../src/scenarios/index.js';
 
 import { asD1 } from './d1-test-helper.js';
 

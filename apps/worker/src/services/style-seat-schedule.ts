@@ -1,4 +1,5 @@
 import type { StyleSchedule, StyleSnapshot, RestaurantOpeningDay } from '@line-crm/shared';
+
 import { civilDate, instant } from './style-analytics.js';
 import { StyleError } from './style-setup.js';
 

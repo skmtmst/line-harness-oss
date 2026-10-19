@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getPostalReadiness, normalizePostalQuery, searchPostalCodes, type PostalCodeCandidate } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 
 const postalCode = new Hono<Env>();
 

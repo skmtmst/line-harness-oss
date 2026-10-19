@@ -3,13 +3,13 @@ import { inputError } from '../lib/input-errors.js';
 
 import { listMileageRewardFolders, createMileageRewardFolder, reorderMileageRewardFolders, moveMileageRewardToFolder, getMileageAdminHistory, getMileageEarningRulesV6, getMileageFriendsV6, getMileageRewardReachMetrics, saveMileageEarningRuleDraft, getActionScoreOverview, createMileageRewardDraft, createMileageRewardDraftFromPublished, getMileageReward, getMileageRewardAdminOverview, getMileageRedemption, isMileageRefundComplete, listMileageRedemptions, refundMileageRewardRedemption, importMileageRewardCodes, publishMileageReward, reorderMileageEarningRules, reorderMileageRewards, reserveMileageRewardRedemption, setMileageRewardStatus, encryptCredential, MileageRewardError } from '@line-crm/db';
 import type { MileageRedemptionListStatus, MileageRewardDraftInput } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { sha256Hex } from '../middleware/auth.js';
-import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
+import { deliverMileageReward } from '../features/mileage/mileage-reward-delivery/index.js';
 import { canUseMileageAccount, mileageCsvCell, mileageRewardError, publicMileageRedemption, MILEAGE_REDEMPTION_LIST_STATUSES, mileageV6Error } from './scoring-definition.js';
 import type { Context, Next } from 'hono';
 

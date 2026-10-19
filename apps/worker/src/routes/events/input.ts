@@ -1,7 +1,7 @@
 import { normalizeEventQuestions } from '../event-input.js';
 import type { EventQuestion } from '../event-input.js';
 import { type Context } from 'hono';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import { getFolderById } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../../services/account-access.js';
 

@@ -37,7 +37,7 @@ export async function countInboxSavedViewMatches(
   }
   if (conditions.query) {
     /*
-     * #625: LIKE ではなく instr() で部分一致する。
+     * #625: LIKE ではなく instr で部分一致する。
      * D1 の LIKE/GLOB パターンは最大50バイトのため、長い検索語で500になっていた。
      */
     where.push(`(instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
@@ -124,7 +124,7 @@ export async function countInboxSavedViewMatches(
     emailWhere.push(`(${clauses.join(' OR ')})`);
   }
   if (conditions.query) {
-    // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+    // #625: LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
     emailWhere.push(`(instr(lower(t.customer_email), lower(?)) > 0
       OR instr(lower(t.customer_name), lower(?)) > 0
       OR instr(lower(t.subject), lower(?)) > 0

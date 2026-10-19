@@ -1,8 +1,9 @@
 import { serializeGroup } from './rich-menu-group-display.js';
 import { type ExternalLineArea } from './rich-menu-external-types.js';
 import { type RichMenuGroupWithPages, type RichMenuPageInput, type RichMenuAreaInput, type CreateRichMenuGroupInput, type UpdateRichMenuGroupMetaInput } from '@line-crm/db';
-import { RICH_MENU_ACTION_TYPE_BY_INTENT, RICH_MENU_DB_ACTION_TYPE_BY_INTENT, RICH_MENU_MAX_PAGES, type RichMenuAreaIntent } from '@line-crm/shared';
-import { type SegmentCondition } from '../services/segment-query.js';
+import { RICH_MENU_ACTION_TYPE_BY_INTENT, RICH_MENU_DB_ACTION_TYPE_BY_INTENT, RICH_MENU_MAX_PAGES } from '@line-crm/shared';
+import { type RichMenuAreaIntent } from '@line-crm/shared';
+import { type SegmentCondition } from '@line-crm/shared';
 import { type LineRichMenuClient } from '../lib/rich-menu-publisher.js';
 
 export function serializeGroupWithPages(row: RichMenuGroupWithPages) {

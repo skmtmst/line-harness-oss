@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from './account-access.js';
 import { verifyCallerLineIdentity } from './liff-auth.js';
 import { hasStaffPermission } from '../middleware/role-guard.js';

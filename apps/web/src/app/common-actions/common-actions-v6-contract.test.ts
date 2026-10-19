@@ -18,7 +18,7 @@ const EDITOR = read('..', '..', 'components', 'automations', 'common-action-edit
 const PERMISSION = read('..', '..', 'components', 'automations', 'use-can-manage.ts')
 const API = readApi('..', '..', 'lib', 'api.ts')
 // Workerの分岐・参照版・保管の動きは services/common-actions.test.ts の実DB試験で守る。
-const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'services', 'automation-engine.ts')
+const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'features', 'automations', 'automation-engine.ts')
 const FOUNDATION = read('..', '..', '..', '..', '..', 'packages', 'db', 'migrations', '181_automation_v6_foundation.sql')
 
 describe('V6共通アクションの画面契約', () => {

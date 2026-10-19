@@ -4,6 +4,7 @@ import {
   type IndustryStyle,
   type StyleTemplateSample,
 } from '@line-crm/shared';
+
 import { HQ_AUTHORED_MESSAGE_ID } from './hq-templates/authoring-media.js';
 
 type Sample = [key: string, name: string, text: string];

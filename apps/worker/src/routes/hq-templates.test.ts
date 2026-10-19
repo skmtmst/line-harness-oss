@@ -2,8 +2,8 @@ import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { hqTemplates } from './hq-templates.js';
 import { routeClassification } from '../middleware/feature-enforcement.js';
 import { listTemplates } from '../services/hq-templates/distribution.js';
@@ -63,7 +63,7 @@ beforeEach(() => {
   app.use('*', async (c,next) => { c.set('staff', staff); await next(); }); app.route('/', hqTemplates);
 });
 afterEach(() => {
- // B-354: distribution must never silently enable account AI.
+ // distribution must never silently enable account AI.
  expect(sql.prepare("SELECT count(*) n FROM ai_settings WHERE mode NOT IN('off','suspended')").get()).toEqual({n:0});
  expect(sql.prepare('SELECT count(*) n FROM account_ai_features WHERE enabled=1').get()).toEqual({n:0});
  sql.close();

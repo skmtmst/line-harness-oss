@@ -11,7 +11,8 @@
 import { NEN_SIGNATURE_HEADER, NEN_TIMESTAMP_HEADER, verifyNenWebhook } from '../lib/hmac.js';
 import { deliveryWebhookSecret } from './delivery-webhook-ip.js';
 import { uberWebhookSecret } from './restaurant-delivery.js';
-import type { DeliveryEnv, DeliveryService } from './restaurant-delivery.js';
+import type { DeliveryEnv } from './restaurant-delivery.js';
+import type { DeliveryService } from './delivery-service-types.js';
 import { UBER_SIGNATURE_HEADER, verifyWebhookSignature } from './uber-eats.js';
 
 /** 自社方式の見出しの名前。Uber 以外のサービスはこの2つを使う。 */

@@ -2,7 +2,9 @@ import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import type { Context } from 'hono';
 import { getChatById, getFriendById, getLineAccountById, type InboxSavedViewConditions, type SavedSearchAccess, type ScheduledChatSendRow, jstNow } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';

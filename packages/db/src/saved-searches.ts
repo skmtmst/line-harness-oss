@@ -1,3 +1,5 @@
+export type { SavedSearchUsageCount, SavedSearchReferenceUsageCount } from './saved-search-usage-types.js';
+import type { SavedSearchUsageCount, SavedSearchReferenceUsageCount } from './saved-search-usage-types.js';
 import {savedSearchMonth,getSavedSearchUsageCounts,getSavedSearchReferenceUsageCounts} from './saved-search-usage-read.js';
 export {getSavedSearchUsageCounts,getSavedSearchReferenceUsageCounts} from './saved-search-usage-read.js';
 import { sqlIdSet } from './id-queries.js';
@@ -67,16 +69,6 @@ export interface SavedSearchReference {
   revision?: number | null;
   last_used_at: string | null;
   created_at: string;
-}
-
-export interface SavedSearchUsageCount {
-  saved_search_id: string;
-  call_count_this_month: number;
-}
-
-export interface SavedSearchReferenceUsageCount extends SavedSearchUsageCount {
-  reference_kind: string;
-  reference_id: string | null;
 }
 
 export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const;

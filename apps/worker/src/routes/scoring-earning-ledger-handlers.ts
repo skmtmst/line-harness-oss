@@ -4,12 +4,12 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getMileageAdminOverview, getMileageAdminHistory, getMileageHistoryPeriodSummary, getMileageManualAdjustmentPolicy, setMileageManualAdjustmentPolicy, findCommittedMileageAdjustment, postMileageAdjustment, MileageAdjustmentError, publishMileageEarningRule, confirmPendingMileageEntry, voidMileageLedgerEntry, createMileageAdjustmentApprovalRequest, listMileageAdjustmentApprovalRequests, approveMileageAdjustmentRequest, rejectMileageAdjustmentRequest, cancelMileageAdjustmentRequest } from '@line-crm/db';
 import type { MileageEntryStatus, MileageEntryType } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
-import { mileageAdjustmentMessage, sendMileageAdjustmentNotification } from '../services/mileage-adjustment-notification.js';
+import { mileageAdjustmentMessage, sendMileageAdjustmentNotification } from '../features/mileage/mileage-adjustment-notification/index.js';
 import { canUseMileageAccount, mileageV6Error, MILEAGE_ENTRY_TYPES, MILEAGE_ENTRY_STATUSES, MILEAGE_MODES, MILEAGE_ADJUSTMENT_REASON_CATEGORIES } from './scoring-definition.js';
 import type { Context } from 'hono';
 

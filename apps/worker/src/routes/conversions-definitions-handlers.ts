@@ -3,7 +3,7 @@ import { consumePublicIngressReceipt } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 
 import { trackConversion, listConversionDefinitions, getConversionDefinitionDetail, createConversionDefinition, previewConversionDefinition, getConversionDefinitionDeleteImpact, stopConversionDefinition, replaceConversionDefinitionUsages, reviseConversionDefinition, deleteUnusedConversionDefinition, publishConversionDefinition, issueConversionIngestSecret, setConversionIngestDisabled, getConversionPointForIngest, resolveConversionIngestSecret, recordConversionIngestionEvent, listConversionIngestionEvents, listConversionDefinitionEvents, CONVERSION_DEFINITION_USAGE_KINDS } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { listLimit } from './list-pagination.js';

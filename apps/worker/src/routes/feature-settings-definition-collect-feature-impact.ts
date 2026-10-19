@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { getAccountSetting } from '@line-crm/db';
 import { type FeatureId } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { type FeatureImpactCoverageEntry, BROADCAST_ACCOUNT_SCOPE, FORM_ACCOUNT_SCOPE, type ToggleableFeature, type FeatureImpactItemWithIds, IMPACT_IDS_LIMIT, isToggleable, type OffConfirmation, OFF_CONFIRM_KEY, type FeatureImpact } from './feature-settings-definition-is-toggleable.js';
 
 export const FEATURE_IMPACT_COVERAGE: Readonly<Record<FeatureId, FeatureImpactCoverageEntry>> = {

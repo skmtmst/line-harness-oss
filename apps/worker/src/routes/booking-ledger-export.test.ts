@@ -11,7 +11,7 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const availabilityMocks = vi.hoisted(() => ({
   getAvailability: vi.fn(async () => ({ by_staff: [] })),
@@ -25,8 +25,8 @@ const notifierMocks = vi.hoisted(() => ({
   sendBookingNotification: vi.fn(async () => undefined),
 }));
 // 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -256,7 +256,7 @@ describe('GET /api/booking/admin/bookings.csv (N-397)', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/csv');
     expect(res.headers.get('content-disposition')).toContain('attachment');
-    // BOM は text() が剥がすので、生バイトで確かめる（Excelが文字化けしない印）。
+    // BOM は text が剥がすので、生バイトで確かめる（Excelが文字化けしない印）。
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect([bytes[0], bytes[1], bytes[2]]).toEqual([0xef, 0xbb, 0xbf]);
     const text = new TextDecoder().decode(bytes);

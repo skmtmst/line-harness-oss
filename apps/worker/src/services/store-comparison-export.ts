@@ -2,7 +2,7 @@ import { withDisplayReadCache } from '@line-crm/db/src/display-read-cache.js';
 import {GapError} from './gap-common.js';
 import {comparisonKeys,comparisonUnits,comparisonPeriod,storeNumbers,type ComparisonKey} from './store-comparison.js';
 import {getVisibleLineAccountScope} from './account-access.js';
-import type {AuthenticatedStaff} from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 export async function comparisonData(db:D1Database,visible:Array<{id:string}>,tenant:string,filters:Record<string,string>,allRows=false){
  return withDisplayReadCache(db, async db => {
  const q=(key:string)=>filters[key];

@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
 import type { VisitStampSettings, VisitStampCardInput, VisitStampCard, VisitStampWallet, VisitStampEntry, VisitStampRedemption } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getStaffById } from '@line-crm/db';
 import { getVisibleLineAccountScope } from './account-access.js';
 import { featureJobCanRun } from './feature-enforcement.js';

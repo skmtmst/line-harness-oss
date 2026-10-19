@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const access = vi.hoisted(() => ({ allowed: true }));
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: async () => access.allowed }));

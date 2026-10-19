@@ -5,12 +5,12 @@ import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import {
   paymentBadges,
   paymentSummary,
-} from '../services/booking-payment-admin.js';
+} from '../features/booking/booking-payment-admin/index.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import {

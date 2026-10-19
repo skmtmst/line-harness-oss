@@ -5,7 +5,7 @@ import type { Friend as DbFriend } from '@line-crm/db';
  *
  * Bare-row variant — emits ONLY columns that exist on the friends table.
  * Used by GET /api/friends/:id and metadata-update responses where we read
- * via plain `getFriendById()` and have no JOINed columns. The list endpoint
+ * via plain `getFriendById` and have no JOINed columns. The list endpoint
  * uses `serializeFriendListRow` instead, which adds firstTrackedLinkName +
  * chatStatus from the JOINed query.
  */

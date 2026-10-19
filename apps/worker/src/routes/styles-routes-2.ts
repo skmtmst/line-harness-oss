@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { hasStaffPermission } from '../middleware/role-guard.js';
 import { StyleError } from '../services/style-setup.js';

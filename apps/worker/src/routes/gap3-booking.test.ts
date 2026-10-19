@@ -2,7 +2,7 @@ import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import {bookingGap3} from './booking-gap3.js';
 import booking from './booking.js';
-import {depositEstimate} from '../services/booking-deposit.js';
+import {depositEstimate} from '../features/booking/booking-deposit.js';
 let d:ReturnType<typeof gapFixture>;
 beforeEach(()=>{d=gapFixture();d.raw.exec("UPDATE menus SET max_party_size=6,customer_recurring_enabled=1,recurring_freqs_json='[\"weekly\"]',recurring_max_count=12; UPDATE booking_settings SET max_active_bookings_per_friend=52,approval_mode='automatic'; INSERT INTO staff_menus(staff_id,menu_id,is_offered) VALUES('bs2','menu',1)");for(const s of ['bs','bs2'])for(const date of ['2026-11-20','2026-11-27','2026-12-04'])d.raw.prepare("INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES(?,?,?,'09:00','18:00')").run(s+date,s,date);vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));});
 afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { hqTemplates } from './hq-templates.js';
 import { messageListFacts } from '../services/hq-templates/message-list-facts.js';
 
@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 afterEach(() => { sql.raw.close(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
-describe('Upx1c: 保存した通数・差し込みで統括テンプレートを探す', () => {
+describe(': 保存した通数・差し込みで統括テンプレートを探す', () => {
   it('保存→一覧→絞り込みを実SQLで確認し、本文を返さず外部通信・書込みを行わない', async () => {
     const ids = [await create('名前 {{name}} 様'), await create('本文だけ', '{{name}} は名前にだけ'), await create('共通 {予約ページ}')];
     const writes = totalChanges();
@@ -107,7 +107,7 @@ describe('Upx1c: 保存した通数・差し込みで統括テンプレートを
   });
 });
 
-describe('Qgjmc: 対応状況とマーク変更を別々に集計する', () => {
+describe(': 対応状況とマーク変更を別々に集計する', () => {
   function seed() {
     sql.raw.exec("UPDATE line_accounts SET is_active=0 WHERE id='inactive'; UPDATE line_accounts SET archived_at=datetime('now') WHERE id='archived'");
     for (const [id,account,status,hidden] of [

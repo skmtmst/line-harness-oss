@@ -12,7 +12,7 @@ import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
  * - 機能「restaurant_test」がオフのアカウントは gate で止める（google-sheets と同じ作法）。
  * - ログは種別名（error.kind / error.name）だけ。応答本文・トークンは出さない。
  */
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
 import { GoogleBusinessError, listAllReviews, type FetchLike } from './google-business.js';
 import { listLocalPosts } from './google-business-posts.js';

@@ -377,7 +377,7 @@ function makeEventDb(state: {
             ).length;
             return { c } as T;
           }
-          // POST の sameIdentityActive 検出 (window 関数 COUNT(*) OVER () で total を返す)
+          // POST の sameIdentityActive 検出 (window 関数 COUNT(*) OVER  で total を返す)
           if (sql.includes('FROM event_bookings b') && sql.includes('identity_key') && sql.includes('COUNT(*) OVER')) {
             const [event_id, idKey] = bound as [string, string];
             const matches = (state.bookings ?? [])
@@ -2747,7 +2747,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
     expect(res.status).toBe(409);
   });
 
-  test('200 retry for already-cancelled booking repairs V6 instead of 409 (N-065)', async () => {
+  test('200 retry for already-cancelled booking repairs instead of 409 (N-065)', async () => {
     const futureMs = Date.now() + 7 * 24 * 3600_000;
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1', is_published: 1, cancel_deadline_hours_before: 24 })],
@@ -2762,7 +2762,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
       method: 'POST',
       headers: { 'Authorization': 'Bearer t' },
     });
-    // N-065: V6 取消が投げた直後の再送は、業務が済みでも V6 だけ直して 200 を返す。
+    // N-065: 取消が投げた直後の再送は、業務が済みでも だけ直して 200 を返す。
     expect(res.status).toBe(200);
   });
 
@@ -3187,7 +3187,7 @@ describe('admin bookings management', () => {
   });
 });
 
-describe('V6 occurrence applicants / waitlist promotion routes', () => {
+describe('occurrence applicants / waitlist promotion routes', () => {
   const state = {
     events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
     accounts: [{ id: 'la1', liff_id: 'L1', is_active: 1 }],

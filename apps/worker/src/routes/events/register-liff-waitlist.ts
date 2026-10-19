@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
 import { inputJsonBoundary } from '../../lib/input-errors.js';
@@ -8,7 +8,7 @@ import { verifyCallerLineUserId } from '../../services/liff-auth.js';
 import { computeRemindersForBooking, insertRemindersForBooking } from '../../services/event-booking-reminders.js';
 import { sendEventBookingNotification } from '../../services/event-booking-notifier.js';
 import { awardActivityMileage } from '../../services/activity-mileage.js';
-import { dispatchAutomationEventWithLogging } from '../../services/automation-triggers.js';
+import { dispatchAutomationEventWithLogging } from '../../features/automations/automation-triggers/index.js';
 import { applyActionScoreEvent } from '../../services/action-score-events.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { acceptEventWaitlistOffer, getEventWaitlistOffer, getEventWaitlistOfferAccountId } from '../../services/event-waitlist.js';

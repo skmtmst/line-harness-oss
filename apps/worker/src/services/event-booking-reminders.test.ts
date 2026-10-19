@@ -1,5 +1,5 @@
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { BookingExternalCircuits } from './booking-external-circuits.js';
+import { BookingExternalCircuits } from '../features/booking/booking-external-circuits.js';
 import { afterEach,describe, expect, test, vi } from 'vitest';
 import {
   computeRemindersForBooking,

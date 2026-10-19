@@ -1,8 +1,8 @@
 import { readNotificationStyle } from './notification-words.js';
 import { workflowBindings, workflowJson } from '@line-crm/db';
-import { bookingLinePlan } from './booking-line-delivery.js';
+import { bookingLinePlan } from '../features/booking/booking-line-delivery/index.js';
 import { renderEventNotificationText, type EventNotificationContext, type EventNotificationKind } from './event-booking-notifier.js';
-import type { EventNotificationSubject } from './event-notification-recovery.js';
+import type { EventNotificationSubject } from './event-notification-subject.js';
 import { computeRemindersForBooking } from './event-reminder-schedule.js';
 import { prepareEventReminders } from './event-reminder-plan.js';
 

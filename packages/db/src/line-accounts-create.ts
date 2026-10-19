@@ -60,7 +60,7 @@ export async function createLineAccount(
       now,
       input.loginChannelSecret ? now : null,
       input.loginChannelId ?? null,
-      // 平文の列には書かない。値は暗号化列だけに置く（v6-33 §19-2）。
+      // 平文の列には書かない。値は暗号化列だけに置く（-33 §19-2）。
       null,
       encryptedLoginSecret,
       input.liffId ?? null,
@@ -120,7 +120,7 @@ export async function getLineAccountConnectionChecksByIdempotencyKey(
  * Saves one complete check run and advances the account revision in one D1 batch.
  * Each INSERT requires the preceding statement to have written one row: first
  * the guarded UPDATE, then the preceding check INSERT. A rejected UPDATE therefore
- * keeps changes() at zero throughout the batch, even if another run owns nextRevision.
+ * keeps changes at zero throughout the batch, even if another run owns nextRevision.
  */
 export async function saveLineAccountConnectionChecks(
   db: D1Database,

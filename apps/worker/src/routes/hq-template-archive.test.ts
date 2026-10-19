@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { HqTemplate } from '@line-crm/db';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { hqTemplates } from './hq-templates.js';
 import { hqFormTests } from './hq-form-tests.js';
 

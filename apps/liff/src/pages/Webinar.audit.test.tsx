@@ -45,6 +45,40 @@ const LIVE: WebinarState = {
   registeredForThisSession: true,
 } as WebinarState;
 
+describe('配信中と待機中の表示・操作', () => {
+  it('実際のライブ画面に動画・案内・送信を出し、待機画面へ戻れる', async () => {
+    vi.useFakeTimers();
+    webinarState.mockResolvedValue({ ...LIVE, cta: {
+      label: '詳しく見る', url: 'https://example.invalid/details', showAtSeconds: 0,
+    } } as WebinarState);
+    webinarComment.mockResolvedValue({ ok: true });
+    open();
+    await advanceSeconds(2);
+
+    const video = document.querySelector('video');
+    expect(video).not.toBeNull();
+    expect(video?.closest('.bg-night-deep')).not.toBeNull();
+    expect(video?.closest('.aspect-video')).not.toBeNull();
+    expect(screen.getByRole('button', { name: '詳しく見る' }).classList.contains('bg-night-cta')).toBe(true);
+    const send = screen.getByRole('button', { name: '送信する' }) as HTMLButtonElement;
+    expect(send.classList.contains('bg-liff-primary')).toBe(true);
+    expect(send.disabled).toBe(true);
+    await act(async () => {
+      fireEvent.change(screen.getByRole('textbox', { name: 'コメントを書く' }), { target: { value: '確認のコメント' } });
+      fireEvent.click(send);
+    });
+    expect(webinarComment).toHaveBeenCalledTimes(1);
+    expect(webinarComment.mock.calls[0]![3]).toBe('確認のコメント');
+
+    cleanup();
+    webinarState.mockResolvedValue({ live: false, title: LIVE.title, nextSessionAt: null });
+    open();
+    await advanceSeconds(1);
+    expect(screen.getByText('次回の開催は未定です').closest('.bg-canvas')).not.toBeNull();
+    expect(document.querySelector('video')).toBeNull();
+  });
+});
+
 function open() {
   render(
     <MemoryRouter initialEntries={['/webinar/w1']}>

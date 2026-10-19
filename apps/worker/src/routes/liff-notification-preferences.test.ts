@@ -3,7 +3,7 @@ import { beforeEach,afterEach,expect,test,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { liffNotificationPreferences } from './liff-notification-preferences.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 vi.mock('../services/liff-auth.js',()=>({verifyCallerLineIdentity:vi.fn()}));
 let f:SqliteD1,app:Hono<Env>;
 interface Preferences {items:Array<{purpose:string;state:string;enabled:boolean|null;recorded:boolean;version:number}>;purposeSpecificEnforcement:boolean}

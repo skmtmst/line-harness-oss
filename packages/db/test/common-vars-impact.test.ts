@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getCommonVarMap, getCommonVarUsageImpact } from '../src/common-vars';
+import { getCommonVarMap, getCommonVarUsageImpact } from '../src/common-vars/index';
 import { asD1 } from './d1-test-helper';
 
 describe('common variable usage impact', () => {

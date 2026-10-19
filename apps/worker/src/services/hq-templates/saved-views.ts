@@ -2,6 +2,7 @@ import type { HqTemplateAuthority } from './contract.js';
 import { boundedText, HqTemplateError } from './tag.js';
 import { TEMPLATE_KINDS, type HqTemplateArchiveStatus } from '@line-crm/shared';
 
+
 export interface TemplateViewFilters {
   kind?: typeof TEMPLATE_KINDS[number];
   messageCount?: 'single' | 'multiple';

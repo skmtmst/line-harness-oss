@@ -168,7 +168,7 @@ function hashContentMap(map: Map<string, Buffer>): string {
   for (const key of keys) {
     hash.update(Buffer.from(key, 'utf8'));
     hash.update(NUL);
-    // map.get cannot return undefined here because `key` came from map.keys().
+    // map.get cannot return undefined here because `key` came from map.keys.
     hash.update(map.get(key) as Buffer);
     hash.update(NUL);
   }

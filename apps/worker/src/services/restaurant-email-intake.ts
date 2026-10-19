@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { accountFeatureOffExclusionSql } from '@line-crm/db';
 import { dbFor } from './db-router.js';
 import {

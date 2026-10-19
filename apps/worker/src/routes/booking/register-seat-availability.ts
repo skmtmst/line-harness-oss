@@ -1,4 +1,4 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { inputError } from '../../lib/input-errors.js';
 import { openSeatTables } from '../../services/restaurant-closures.js';

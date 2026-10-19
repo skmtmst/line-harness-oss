@@ -14,6 +14,7 @@ import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 import { buildTapPostbackData } from './rich-menu-tap.js';
 import { RICH_MENU_DIMENSIONS, RICH_MENU_MAX_PAGES, richMenuUriError, liffActionUrl, type LiffAction } from '@line-crm/shared';
 
+
 export type Bounds = { x: number; y: number; width: number; height: number };
 
 export type ActionType =

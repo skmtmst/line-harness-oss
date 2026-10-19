@@ -1,3 +1,5 @@
+export { starter } from './style-starter-set.js';
+import { starter } from './style-starter-set.js';
 import { type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 import { storeFeatureInitialization } from '@line-crm/db/src/store-feature-initialization.js';
 
@@ -9,52 +11,6 @@ import { readDefinition, standardStarter } from './style-starter-definition.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
 export {profile,profileAnswers,type StyleProfile} from './style-profile.js';
 import {profile,profileAnswers} from './style-profile.js';
-export async function starter(
-  db: D1Database,
-  tenant: string | null,
-  style: AccountStyle,
-) {
-  const saved = await db
-    .prepare(
-      `SELECT * FROM style_starter_sets WHERE style=? AND archived_at IS NULL AND (tenant_id=? OR tenant_id IS NULL) ORDER BY tenant_id IS NULL LIMIT 1`,
-    )
-    .bind(style, tenant)
-    .first<{
-      id: string;
-      version: number;
-      definition_json: string;
-      auto_insert: number;
-    }>();
-  return saved
-    ? {
-        id: saved.id,
-        version: saved.version,
-        autoInsert: !!saved.auto_insert,
-        definition: readDefinition(
-          {
-            items: (
-              JSON.parse(saved.definition_json)
-                .items as import('./style-starter-definition.js').StarterItem[]
-            ).filter(
-              (i) =>
-                !(
-                  i.kind === 'automation' &&
-                  (i.triggerType !== 'restaurant.departed' ||
-                    i.key === 'reminder' ||
-                    /予約確定/.test(i.name))
-                ),
-            ),
-          },
-          style,
-        ),
-      }
-    : {
-        id: 'musubo:' + style,
-        version: 1,
-        autoInsert: true,
-        definition: standardStarter(style),
-      };
-}
 function assertVersion(expected: unknown, actual: number) {
   if (!Number.isInteger(expected) || expected !== actual)
     throw new StyleError('version_conflict', 409);

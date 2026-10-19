@@ -9,7 +9,7 @@ import {
   isResourceInScenarioAccount,
   parseScenarioVersionSteps,
   publishScenarioVersion,
-} from '../src/scenarios.js';
+} from '../src/scenarios/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

@@ -37,7 +37,9 @@ import {
   type FriendFieldType,
 } from '@line-crm/db';
 import { recordLoginAudit } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import { requireVisibleFriend } from './friends.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -260,7 +262,7 @@ function convertMigrationValue(value: string, targetType: FriendFieldType): Omit
   if (targetType === 'number') {
     /*
      * R549: 保存側（validateFriendFieldValue）と同じ物差しで判定する。
-     * 以前は Number() で見ていたため 0x10・1e5 などを「移せる」と数え、
+     * 以前は Number で見ていたため 0x10・1e5 などを「移せる」と数え、
      * 保存では拒否されて件数が合わなかった。カンマ区切りは両側で外す。
      */
     const normalized = trimmed.replace(/,/g, '');

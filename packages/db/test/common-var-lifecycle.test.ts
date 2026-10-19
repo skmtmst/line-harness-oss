@@ -16,7 +16,7 @@ import {
   resolveCommonVarValuesAt,
   setCommonVarStatus,
   updateCommonVar,
-} from '../src/common-vars.js';
+} from '../src/common-vars/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 /*

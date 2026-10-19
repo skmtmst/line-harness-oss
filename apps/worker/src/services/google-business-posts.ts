@@ -238,7 +238,7 @@ function hasControlChars(text: string): boolean {
 }
 
 /**
- * 投稿案を検証する。today は店舗タイムゾーンの"YYYY-MM-DD"（呼び出し側が todayIn() で用意する）。
+ * 投稿案を検証する。today は店舗タイムゾーンの"YYYY-MM-DD"（呼び出し側が todayIn で用意する）。
  * 第3段は「今すぐ公開」のみ扱うため schedule はEVENT/OFFERの開催期間としてのみ検証し、
  * publish_mode='scheduled'（予約投稿）はここでは弾かない（route層が 400 not_supported で断る）。
  */

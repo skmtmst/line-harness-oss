@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
 import { describe, expect, it } from 'vitest'
 import { BUNDLE_PRESETS, DELIVERY_FEATURE_POLICIES, scopeLevelsToKeys, type DeliveryFeature } from '@line-crm/shared'
+
 import { permissionForApiPath } from './auth.js'
 import { requireDeliveryAccess } from './role-guard.js'
-import type { Env } from '../index.js'
+import type { Env } from '../worker-env.js';
 
 describe('配信束のAPI門', () => {
   const keys = scopeLevelsToKeys(BUNDLE_PRESETS.operations.levels).edit

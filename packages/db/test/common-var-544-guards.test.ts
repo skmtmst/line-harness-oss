@@ -10,7 +10,7 @@ import {
   getCommonVarById,
   getCommonVars,
   updateCommonVar,
-} from '../src/common-vars.js';
+} from '../src/common-vars/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 describe('#544 N6 フォルダの存在と種別の検証', () => {

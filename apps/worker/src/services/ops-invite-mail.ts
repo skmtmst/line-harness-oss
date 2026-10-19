@@ -1,7 +1,7 @@
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sendPlainMail } from './plain-mail.js';
 
-/** 運営メンバーの招待メール（★V6 37-10）。URL と有効期限だけを書く。 */
+/** 運営メンバーの招待メール（★37-10）。URL と有効期限だけを書く。 */
 export const OPS_INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 
 export async function sendOpsInviteMail(

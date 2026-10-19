@@ -322,6 +322,7 @@ import * as dbModule from '@line-crm/db';
 import { processMultiAccountDedupBroadcast } from './dedup-broadcast.js';
 import type { LineClient, Message } from '@line-crm/line-sdk';
 
+
 class MockLineClient {
   calls: Array<{ method: string; args: unknown[] }> = [];
   throwOn?: { method: string; afterNCalls?: number };
@@ -342,7 +343,7 @@ class MockLineClient {
   }
 }
 
-// fakeDb for send-side: handles `db.prepare(...).bind(...).run()` for the
+// fakeDb for send-side: handles `db.prepare(...).bind(...).run` for the
 // failed_account_ids UPDATE and `db.batch(...)` for messages_log INSERTs.
 // Also handles the SQL fingerprints from computeDedupBroadcastPreview (which
 // runs inside the executor — we provide canned results matching what the
@@ -360,8 +361,8 @@ function makeSendDb(opts: {
 }) {
   const updates: Record<string, unknown> = {};
   // Per-batch progress UPDATE 履歴。resume テスト用に full snapshot を取る。
-  // bind() タイミングで capture することで、run()/batch() どちらの実行経路でも
-  // 拾えるようにする (現在の実装は db.batch() 経由のため、run() フックだと取れない)。
+  // bind タイミングで capture することで、run/batch どちらの実行経路でも
+  // 拾えるようにする (現在の実装は db.batch 経由のため、run フックだと取れない)。
   const progressUpdates: Array<{ progress: unknown; successCount: unknown }> = [];
   const batches: unknown[][] = [];
   const db = {
@@ -379,7 +380,7 @@ function makeSendDb(opts: {
             progressUpdates.push({ progress: params[0], successCount: params[1] });
           }
           return {
-            // batch() に載った文を後から見分けるための印。どの文が
+            // batch に載った文を後から見分けるための印。どの文が
             // どの batch に入ったか（= 何と何が同時に確定するか）を
             // 試験が読めるようにする。
             __sql: sql,

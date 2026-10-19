@@ -2,7 +2,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 
 import { get__api_media_quota_1, post__api_media_upload_sessions_2, post__api_media_upload_sessions_id_complete_3, post__api_media_id_versions_4, post__api_media_id_replacement_preview_5, get__api_media_counts_6, get__api_media_7, get__api_media_id_8, get__api_media_id_download_9, get__api_media_id_content_10, get__api_media_id_versions_versionNo_download_11 } from './contents-uploads-handlers.js';

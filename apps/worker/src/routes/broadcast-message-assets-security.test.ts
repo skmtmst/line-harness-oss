@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
-import type { Env } from '../index'
+import type { Env } from '../worker-env';
 import { broadcastMessageAssets, validateBroadcastMediaUpload } from './broadcast-message-assets'
 vi.mock('../services/file-scan.js', () => ({ checkKeyGate: async () => ({ allowed: true }) }));
 

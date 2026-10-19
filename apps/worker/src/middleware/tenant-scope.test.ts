@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from './auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from './auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { ACCOUNT_QUERY_KEYS, tenantScopeMiddleware } from './tenant-scope.js';
 

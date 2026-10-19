@@ -4,11 +4,11 @@ import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-er
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
 import { isWebinarSource, privateImageKey, privateImageSignatureValid, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
-import { imageDimensions } from '../services/media-metadata.js';
+import { imageDimensions } from '../features/media/media-metadata/index.js';
 
 const images = new Hono<Env>();
 

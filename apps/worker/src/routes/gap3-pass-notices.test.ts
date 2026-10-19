@@ -2,8 +2,8 @@ import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
 import {useSqliteClock} from '../test-utils/sqlite-clock.js';
 import {bookingPassNotices} from './booking-pass-notices.js';
-import {processPassNotices} from '../services/booking-pass-notices.js';
-import {entitlementUseStatement} from '../services/booking-entitlements.js';
+import {processPassNotices} from '../features/booking/booking-pass-notices.js';
+import {entitlementUseStatement} from '../features/booking/booking-entitlements.js';
 let d:ReturnType<typeof gapFixture>;
 let now:Date;
 beforeEach(()=>{

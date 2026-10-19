@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hashPassword } from '../services/password-hash.js';
 import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
@@ -19,7 +19,7 @@ vi.mock('../services/turnstile.js', async importOriginal => {
   return { ...actual, verifyTurnstile: verify };
 });
 
-/** B-263: default-On applies to every human, with explicit Off compatibility tests. */
+/** default-On applies to every human, with explicit Off compatibility tests. */
 const MASTER_KEY = 'test-master-key-which-is-longer-than-32-characters';
 const SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 

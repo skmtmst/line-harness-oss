@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 export const ACCOUNT_KEYS = ['account_id', 'accountId', 'line_account_id', 'lineAccountId'] as const;
 

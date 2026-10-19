@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
+ * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。台帳 #133。
  *
  * ここで守りたいのは 3 点。
  *   **合計が合わない数を通さない**（合わないと、どこかの人が消えたように見える）

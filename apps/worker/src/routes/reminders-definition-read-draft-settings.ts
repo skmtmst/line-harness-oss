@@ -1,7 +1,8 @@
 import { type Context } from 'hono';
 import { getReminderById, getReminderSteps, listReminderRegistrants, moveReminderRegistrantTargetDate, getReminderRegistrantById, getReminderVersionSteps, type ResumeExpectedRun, parseReminderVersionSettings, type ReminderDraftSettings, type ReminderVersionRow } from '@line-crm/db';
+
 import { LEAP_YEAR_POLICIES, REMINDER_NAME_MAX_LENGTH, REMINDER_NAME_TOO_LONG_MESSAGE, resolveReminderSendAt } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { buildPublicSegmentQuery, isEmptySegmentCondition } from '../services/segment-query.js';
 import { TRIGGER_TYPES, type TriggerType, DELIVERY_MODES, REMINDER_MESSAGE_TYPES, readTargetCondition } from './reminders-definition-is-reminder-row-scoped-path.js';
 

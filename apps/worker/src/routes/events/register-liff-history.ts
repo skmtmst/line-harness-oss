@@ -1,4 +1,4 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
 import { inputJsonBoundary } from '../../lib/input-errors.js';
@@ -183,7 +183,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
     occurrenceId: row.slot_id,
     sourceKey: `booking:${row.id}:cancelled`,
   };
-  // 再試行の受付: V6 取消が投げた直後の再送は V6 だけ直す。
+  // 再試行の受付: 取消が投げた直後の再送は だけ直す。
   // 送信権の貸出中は 409 で再試行させる (strict fence。live claim を残して
   // 成功にしない)。待機者ジョブの再登録も受け付ける (二重登録なし)。
   if (row.status === 'cancelled') {
@@ -205,7 +205,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
       throw error;
     }
     // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
-    // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+    // 再送でそろえる (fence 成功後なので 409 で巻き戻す物は無い)。
     await cancelPendingRemindersFor(c.env.DB, row.id);
     await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
     return c.json({ ok: true });
@@ -227,8 +227,8 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
     .bind(nowIso, nowIso, row.id,row.lock_version)
     .run();
   if ((upd.meta?.changes ?? 0) === 0) return bad(c, 'invalid_state', 409);
-  // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-  // 旧表の取消は V6 fence 成功の後に回す (409 では旧表も含めて完全 rollback)。
+  // N-065: の未送信予定だけを止める。送信済み履歴は残す。
+  // 旧表の取消は fence 成功の後に回す (409 では旧表も含めて完全 rollback)。
   // 送信権の貸出中は状態更新を巻き戻して 409 にする
   // (取消確定後の送信を起こさない)。
   try {
@@ -256,7 +256,7 @@ events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async 
     }
     throw error;
   }
-  // 旧表の取消は V6 fence 成功の後 (409 では旧表も含めて完全 rollback)。
+  // 旧表の取消は fence 成功の後 (409 では旧表も含めて完全 rollback)。
   await cancelPendingRemindersFor(c.env.DB, row.id);
   await enqueueEventWaitlistPromotion(c.env.DB, waitlistParams);
   return c.json({ ok: true });

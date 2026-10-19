@@ -3,9 +3,9 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 
 import { jstNow } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { currentFriend } from '../services/nen-member-identity.js';
-import { imageDimensions, stripImageMetadata } from '../services/media-metadata.js';
+import { imageDimensions, stripImageMetadata } from '../features/media/media-metadata/index.js';
 import { runBuiltinScanAndStore } from '../services/file-scan.js';
 import { ensureFileScanForUpload } from './file-scan.js';
 import { ACTIVITY_LABELS, nenProducts, planForPetRow, refreshStoredFeeding } from '../services/nen-feeding.js';
@@ -180,7 +180,7 @@ export const post__api_liff_nen_pets_4 = async (c: Context<Env, "/api/liff/nen/p
   const birthday = birthdayRaw === 'invalid' ? null : birthdayRaw;
   const concerns = Array.isArray(body?.concerns) ? body.concerns.filter((v): v is string => typeof v === 'string' && CONCERNS.has(v)).slice(0, 10) : [];
   const gender = petGender(body?.gender);
-  // 性別は必須（呼び名「くん」「ちゃん」を決めるため。★V6 37-2-A-2）
+  // 性別は必須（呼び名「くん」「ちゃん」を決めるため。★37-2-A-2）
   if (!name || name.length > 80 || !animalType || !breed || !birthday || !Number.isFinite(weightKg) || weightKg < 0.2 || weightKg > 150 || gender === 'unknown') {
     return inputError(c, { success: false, error: '入力内容を確認してください' }, 400, ["name","animalType","breed","birthday","weightKg","gender"]);
   }

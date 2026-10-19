@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { getBroadcastListPage, getBroadcasts } from '../src/broadcasts.js';
+import { getBroadcastListPage, getBroadcasts } from '../src/broadcasts/index.js';
 import { deriveBroadcastDisplayStatus } from '../src/broadcast-ledger-display.js';
 import { asD1 } from './d1-test-helper.js';
 test('SCALE-01 状態の札・件数・フォルダ・ページ切替は元の10状態の契約を保つ', async()=>{

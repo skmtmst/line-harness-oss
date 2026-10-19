@@ -1,6 +1,6 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
-import { getBookingCustomerContext } from '../../services/booking-admin-detail.js';
+import { getBookingCustomerContext } from '../../features/booking/booking-admin-detail/index.js';
 import { resolveAccountIdAdmin } from './identity.js';
 
 export function registerCustomerContext(booking: Hono<Env>): void {

@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getRichMenuGroupWithPages, getLineAccountById, getActiveRichMenuTestApply, getRichMenuTestApplyById, beginRichMenuTestApplyRevert, markRichMenuTestApplyReverted, markRichMenuTestApplyRevertFailed, recordAuditEvent, maskAuditIp, auditDeviceFamily } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { deleteRichMenuShells } from '../lib/rich-menu-publisher.js';

@@ -1,6 +1,7 @@
 import { detectImageMeta, validateRichMenuImage } from '../../lib/image-validator.js';
 import { requireHqTemplateAuthority, type HqTemplateAuthority } from './contract.js';
-import { readMessageTemplateSourceBytes, TemplateHqTemplateError, type MessageTemplateMediaDefinition } from './template.js';
+import { readMessageTemplateSourceBytes, TemplateHqTemplateError } from './template.js';
+import { type MessageTemplateMediaDefinition } from '@line-crm/shared';
 
 // This marker denotes an HQ-authored resource, not a synthetic line account.
 // Runtime authority must still come from the immutable tenant-scoped HQ version.
@@ -92,7 +93,7 @@ export async function deleteHqImage(bucket: R2Bucket, authority: HqTemplateAutho
 }
 
 /** LINEイメージマップ用5サイズ。統括の登録画像からだけ作り、配布時は全サイズをコピーする。 */
-export async function uploadHqImagemap(env: import('../../index.js').Env['Bindings'], authority: HqTemplateAuthority, request: Request, origin: string): Promise<import('@line-crm/shared').TemplateImagemapUpload> {
+export async function uploadHqImagemap(env: import('../../worker-env.js').Env['Bindings'], authority: HqTemplateAuthority, request: Request, origin: string): Promise<import('@line-crm/shared').TemplateImagemapUpload> {
   if (!env.CF_IMAGES) error('IMAGE_TRANSFORM_UNAVAILABLE');
   const url=new URL(request.url); const richVideo = url.searchParams.get('purpose') === 'rich_video_preview';
   url.searchParams.set('purpose',richVideo ? 'rich_video_preview' : 'message');

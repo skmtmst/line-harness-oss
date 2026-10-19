@@ -1,11 +1,11 @@
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 const mocks = vi.hoisted(() => ({
   send: vi.fn(async (_env: unknown, _input: unknown) => true),
 }));
-vi.mock('../services/booking-automatic-line.js', () => ({
+vi.mock('../features/booking/booking-automatic-line.js', () => ({
   sendAutomaticBookingLine: mocks.send,
 }));
 vi.mock('../services/waitlist-tick.js', () => ({

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AnalyticsOverviewContext, AnalyticsReportSchedule } from '@line-crm/db';
+
 import type { AlertRuleEvaluation } from './analytics-reports.js';
 
 /*

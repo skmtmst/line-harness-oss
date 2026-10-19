@@ -1,10 +1,10 @@
 import { createHmac } from 'node:crypto';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
-import { paymentEvent, processPaymentEvent, receivePaymentEvent } from '../services/booking-payment-events.js';
+import { paymentEvent, processPaymentEvent, receivePaymentEvent } from '../features/booking/booking-payment-events.js';
 import type { WebhookOutcome } from '../services/payment-providers.js';
 import { createStripeTestProvider } from '../services/payment-providers.js';
 vi.mock('../services/account-access.js',()=>({canAccessAllLineAccounts:vi.fn(async()=>true)}));

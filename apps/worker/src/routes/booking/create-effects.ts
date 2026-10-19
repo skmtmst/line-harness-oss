@@ -1,6 +1,6 @@
-import { getReminderTiming, insertConfirmationReminders } from '../../services/booking-confirm.js';
+import { getReminderTiming, insertConfirmationReminders } from '../../features/booking/booking-confirm/index.js';
 import { recordBookingAudit } from '@line-crm/db';
-import { queueBookingOperation } from '../../services/booking-operation-runs.js';
+import { queueBookingOperation } from '../../features/booking/booking-operation-runs/index.js';
 import { BOOKING_CONFIRMED_AUTOMATION_EVENT } from './availability.js';
 
 /**

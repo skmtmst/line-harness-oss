@@ -1,4 +1,2 @@
-// Public entry point. Implementation is organized by responsibility.
-export { getPendingReminderDeliveries, markReminderStepDelivered, completeReminderIfDone, LINE_RETRY_KEY_VALIDITY_MS, holdExpiredLineRetryRuns, getFriendReminderSendGate, bookingPolicyGateSql, activeRuleGateSql, ownerGateSql } from './reminders-delivery-gates.js';
-export { claimReminderDeliveryRun, releaseClaimedReminderRun, verifyClaimedRunBeforeSend } from './reminders-delivery-claims.js';
-export { completeReminderDeliveryRunStatement, skipReminderDeliveryRun, failReminderDeliveryRun, getReminderDeliveryRunById, getReminderDeliveryRunSentPayload, saveReminderDeliveryRunSentPayload, retryReminderDeliveryRun } from './reminders-delivery-outcomes.js';
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { activeRuleGateSql, bookingPolicyGateSql, claimReminderDeliveryRun, completeReminderDeliveryRunStatement, completeReminderIfDone, failReminderDeliveryRun, getFriendReminderSendGate, getPendingReminderDeliveries, getReminderDeliveryRunById, getReminderDeliveryRunSentPayload, holdExpiredLineRetryRuns, LINE_RETRY_KEY_VALIDITY_MS, markReminderStepDelivered, ownerGateSql, releaseClaimedReminderRun, retryReminderDeliveryRun, saveReminderDeliveryRunSentPayload, skipReminderDeliveryRun, verifyClaimedRunBeforeSend } from './reminders/delivery.js';

@@ -1,5 +1,5 @@
 import { computeIdentityKey } from '../lib/identity-key.js'
-import { AutomationActionError, type AutomationActionContext } from './automation-engine.js'
+import { AutomationActionError, type AutomationActionContext } from '../features/automations/automation-engine/index.js'
 import { getSlotsWithRemaining } from './event-availability.js'
 import { computeRemindersForBooking, insertRemindersForBooking, cancelPendingRemindersFor } from './event-booking-reminders.js'
 import { cancelByTrigger, enrollByTrigger } from './reminder-trigger.js'
@@ -18,7 +18,7 @@ interface EventConfig {
   entry_cutoff_hours_before: number | null; visible_tag_id: string | null
 }
 
-/** B-179: 回の指定が無ければ、開始時刻順で次に空いている回へ1人分申し込む。 */
+/** 回の指定が無ければ、開始時刻順で次に空いている回へ1人分申し込む。 */
 export async function executeEventBookingAction(context: AutomationActionContext): Promise<void> {
   const { db, friendId, lineAccountId, idempotencyKey } = context
   const params = context.action.params

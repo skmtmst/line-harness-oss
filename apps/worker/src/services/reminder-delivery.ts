@@ -381,7 +381,7 @@ export async function processReminderDeliveries(
       continue;
     }
     /*
-     * アカウント停止中（X-1、v6-33 §10-1）。期限の来た通は skipped の
+     * アカウント停止中（X-1、-33 §10-1）。期限の来た通は skipped の
      * 実行行として残すので、再開しても自動では送り直さない。
      */
     if (accountId && activeByAccount.get(accountId) === false) {
@@ -493,7 +493,7 @@ export async function processReminderDeliveries(
         continue enrollmentLoop;
       }
 
-      // Meet個別相談のV6行は、結び付き予約の版・日時・本人・状態が
+      // Meet個別相談の行は、結び付き予約の版・日時・本人・状態が
       // 一致するときだけ送る。古い版の予定はここで止める (版なし旧行は通す)。
       // 取消後に残った実行行は送らず止める。
       // 本文解決の前に送信候補の写しを読み、最終送信権と突き合わせる。
@@ -593,7 +593,7 @@ export async function processReminderDeliveries(
           result.skipped++;
           continue;
         }
-        // Meet個別相談のV6行は、認証・本文の解決awaitの後の早期選別でも
+        // Meet個別相談の行は、認証・本文の解決awaitの後の早期選別でも
         // 送信候補の写しと結び付き関係を確かめる。最終判断は停止確認の後の
         // 最終送信権UPDATEで行う。古ければ実行行だけ取り消す
         // (勝者の新版通知には触れない)。

@@ -1,4 +1,4 @@
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // ---------------------------------------------------------------------------
 // Admin auth configuration & topology resolution

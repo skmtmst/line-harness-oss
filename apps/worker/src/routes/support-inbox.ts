@@ -2,7 +2,7 @@ import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-inbox.js';
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
@@ -215,7 +215,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
-        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+        // #625: LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         searchSql = `AND (
           instr(lower(t.customer_email), lower(?)) > 0
           OR instr(lower(t.customer_name), lower(?)) > 0

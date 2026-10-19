@@ -1,6 +1,6 @@
-import type { AuthenticatedStaff } from './middleware/auth.js';
-import { type ServerTiming } from './lib/server-timing.js';
-import { type ImpersonationContext } from './middleware/impersonation.js';
+import type { AuthenticatedStaff } from './middleware/auth/principal/auth.js';
+import { type ServerTiming } from './lib/server-timing-types.js';
+import { type ImpersonationContext } from './middleware/impersonation-types.js';
 import type { WorkerBindings } from './worker-bindings.js';
 
 export type Env = {
@@ -14,7 +14,7 @@ export type Env = {
     mfaAuditRecorded?: boolean;
     outputAuditRecorded?: boolean;
     outputAudit?: { count: number | null; accountId?: string; accountIds?: string[]; accountCounts?: Record<string, number>; targetId?: string; phase?: 'requested' | 'download' };
-    /** 代理ログイン中（★V6 37-5）。middleware/impersonation.ts が入れる。 */
+    /** 代理ログイン中（★37-5）。middleware/impersonation.ts が入れる。 */
     impersonation?: ImpersonationContext;
     /** 段ごとの経過時間（V6R-CX-a）。lib/server-timing.ts が入れる。 */
     serverTiming?: ServerTiming;

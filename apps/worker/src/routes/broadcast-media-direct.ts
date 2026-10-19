@@ -1,11 +1,11 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { jstNow } from '@line-crm/db';
 import { requirePermission, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
-import { storeBroadcastMedia } from '../services/broadcast-media-storage.js';
+import { storeBroadcastMedia } from '../features/broadcasts/broadcast-media-storage/index.js';
 import { validateBroadcastMediaUpload } from './broadcast-message-assets.js';
 import { ensureFileScanForUpload } from './file-scan.js';
 

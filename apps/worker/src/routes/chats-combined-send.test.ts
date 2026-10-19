@@ -11,8 +11,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const pushMessage = vi.fn().mockResolvedValue({ sentMessages: [{}, {}] });
 vi.mock('@line-crm/line-sdk', () => ({
@@ -192,7 +192,7 @@ describe('結合送信(N-022)', () => {
 });
 
 
-test('B-333 ブロック後のまとめて送信は送信0回', async () => {
+test('ブロック後のまとめて送信は送信0回', async () => {
   sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
   const response = await postCombined({ text: '送らない' }, KEY1);
   expect(response.status).toBe(409);

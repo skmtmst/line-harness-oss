@@ -1,7 +1,7 @@
 import { orderFor } from './restaurant-delivery-common.js';
 import type { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import type { AuditAction } from '../lib/audit-log.js';

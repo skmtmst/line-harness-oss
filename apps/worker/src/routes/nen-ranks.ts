@@ -21,7 +21,8 @@ import {
   type NenMemberListOptions,
   type NenRankSetting,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { NenRankSyncError, buildNenRankSyncPayload, pushNenRankSettingsToEc } from '../services/nen-rank-sync.js';
@@ -41,7 +42,7 @@ import {
 } from '../services/nen-feeding.js';
 
 /**
- * 然-NEN- 会員（ランク・ライフタイム・マイル）。★V6 37-1（`IqL2Z`）／37-1-A（`p7xHl`）／37-1-B（`Vt65m`）。
+ * 然-NEN- 会員（ランク・ライフタイム・マイル）。★37-1（`IqL2Z`）／37-1-A（`p7xHl`）／37-1-B（`Vt65m`）。
  *
  * - 設定の正本はここ（LINE管理画面）。保存すると版が上がり、ECへ署名付きで送る。
  * - 計算はEC側。結果は `POST /api/integrations/eccube/events` の `membership` で届く。
@@ -304,7 +305,7 @@ nenRanks.post('/api/nen/rank-settings/resync', requireRole('owner', 'admin'), in
 });
 
 /**
- * 主食のカロリー表（★V6 37-1 会員 › 給与量）。マイページ「今日の目安」のグラム数はここから決まる。
+ * 主食のカロリー表（★37-1 会員 › 給与量）。マイページ「今日の目安」のグラム数はここから決まる。
  * ペットの正本は LINE 側。EC には送らない。
  */
 function feedingProductsResponse(products: Awaited<ReturnType<typeof listFeedingProducts>>, petCount: number, treatLimitPercent: number) {

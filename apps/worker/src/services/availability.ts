@@ -6,11 +6,11 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 // is the high-level entry point that fetches working hours, busy intervals,
 // and applies lead-time / virtual-staff rules.
 
-import type { AvailabilityByStaff } from './booking-types.js';
-import { SLOT_GRANULARITY_CHOICES, SLOT_GRANULARITY_MINUTES } from './booking-types.js';
-import { getStaffGoogleBusy } from './booking-calendar-sync.js';
+import type { AvailabilityByStaff } from '../features/booking/booking-types/index.js';
+import { SLOT_GRANULARITY_CHOICES, SLOT_GRANULARITY_MINUTES } from '../features/booking/booking-types/index.js';
+import { getStaffGoogleBusy } from '../features/booking/booking-calendar-sync/index.js';
 import type { GoogleServiceAccountCredentials } from './google-service-account.js';
-import { storeSeatsForSlot, type StoreCapacityWindow } from './booking-store-capacity.js';
+import { storeSeatsForSlot, type StoreCapacityWindow } from '../features/booking/booking-store-capacity/index.js';
 
 export interface Interval {
   start: string; // HH:MM
@@ -781,7 +781,7 @@ async function loadAvailabilityData(
   // 受付の締め切り。全体の最短リード時間とメニューごとの締め切りの、
   // 遅い方を採る。片方だけを見ると、どちらかの設定が黙って無視される。
   // R92: メニューの個別指定が無いとき、お客さま向け (applyStoreRules) は
-  // 店舗共通ルールを既定値として使う。要件 v6-28 §受付期間・締切:
+  // 店舗共通ルールを既定値として使う。要件 -28 §受付期間・締切:
   // 「店舗既定値を持ち、メニューは必要な項目だけ上書きする」。
   // 手編集で壊れた店舗値は無視し、メニュー値だけを見る（従来どおり）。
   const storeCutoffMinutes = intInRange(settingsRow?.cutoff_minutes_before, 0, 43_200);

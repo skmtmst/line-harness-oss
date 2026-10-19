@@ -3,11 +3,12 @@ import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getRichMenuGroups, getRichMenuGroupById, getRichMenuGroupWithPages, getRichMenuDeleteImpact, createRichMenuGroup, saveRichMenuGroupDraft, deleteRichMenuGroup, setRichMenuPageImage, listRichMenuSchedulesByGroup, cancelRichMenuSchedule, getMediaById, jstNow } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateRichMenuImage } from '../lib/image-validator.js';
-import { buildSegmentWhere, parseCondition, type SegmentCondition } from '../services/segment-query.js';
+import { buildSegmentWhere, parseCondition } from '../services/segment-query.js';
+import { type SegmentCondition } from '@line-crm/shared';
 import { countPreviewRules, PREVIEW_MAX_RULES, serializeGroupWithPages, parseCreateBody, isJsonRecord, parsePatchBody } from './rich-menu-groups-definition.js';
 import type { Context } from 'hono';
 

@@ -27,7 +27,8 @@ import {
   type AnnouncementInput,
   type PlatformAnnouncement,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { clientIp } from '../services/admin-session.js';
@@ -35,7 +36,7 @@ import { dbFor } from '../services/db-router.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { deliverAnnouncement, loadNoticeLineAccount, previewAudience } from '../services/platform-announcements.js';
 
-/** 運営からのお知らせ配信 ★V6 37-7 `q2CokV`。運営マスターだけが呼べる。 */
+/** 運営からのお知らせ配信 ★37-7 `q2CokV`。運営マスターだけが呼べる。 */
 export const opsAnnouncements = new Hono<Env>();
 
 opsAnnouncements.use('/api/ops/announcements', requirePlatformAdmin());

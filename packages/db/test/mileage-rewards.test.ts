@@ -17,7 +17,7 @@ import {
   reserveMileageRewardRedemption,
   setMileageRewardStatus,
   updateMileageRewardDraft,
-} from '../src/mileage-rewards.js';
+} from '../src/mileage/rewards.js';
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BENIGN = /duplicate column name|already exists/i;
@@ -100,7 +100,7 @@ function asD1(sqlite: Database.Database): D1Database {
   } as unknown as D1Database;
 }
 
-describe('V6 mileage rewards', () => {
+describe('mileage rewards', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -322,7 +322,7 @@ describe('V6 mileage rewards', () => {
     await setMileageRewardStatus(db, { id: draft.id, lineAccountId: 'account-1', status: 'stopped' });
     expect((await getMileageReward(db, { id: draft.id, lineAccountId: 'account-1' }))?.status).toBe('stopped');
 
-    const { createMileageRewardDraftFromPublished } = await import('../src/mileage-rewards.js');
+    const { createMileageRewardDraftFromPublished } = await import('../src/mileage/rewards.js');
     const next = await createMileageRewardDraftFromPublished(db, {
       id: draft.id, lineAccountId: 'account-1',
     });

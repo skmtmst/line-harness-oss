@@ -149,7 +149,7 @@ describe('V8 掲載APIと追加報酬（実SQL）', () => {
     ]);
     expect(responses.map(response=>response.status).sort()).toEqual([200,409]);
   });
-  it('V7など追加点数を送らない保存でも、掲載報酬の設定を保つ', async () => {
+  it('など追加点数を送らない保存でも、掲載報酬の設定を保つ', async () => {
     expect((await request('/api/nen-members/photo-reward-policy/versions','POST',{points:10},'old-ui-policy')).status).toBe(200);
     expect(db.raw.prepare('SELECT publication_points FROM photo_reward_policies WHERE version_number=2').get()).toEqual({publication_points:200});
   });

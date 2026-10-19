@@ -1,5 +1,7 @@
 import { liffActionUrl, type HqMessageCard, type HqMessageReference } from '@line-crm/shared';
+
 import { normalizeScopedTagName, type HqTemplateStatement } from '@line-crm/db';
+
 import type { HqTemplateAuthority } from './contract.js';
 import { HqTemplateError } from './tag.js';
 

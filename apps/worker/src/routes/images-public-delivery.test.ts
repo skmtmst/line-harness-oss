@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { signPrivateImageUrl } from '../services/image-access.js';
 
 vi.mock('../middleware/role-guard.js', async (importOriginal) => ({

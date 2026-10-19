@@ -1,12 +1,12 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { getBookingSyncRules, saveBookingSyncRules, validateBookingSyncRules, listBookingSyncNotices } from '@line-crm/db';
 import { createBookingAvailabilityException, getBookingAdminSettings, saveBookingAdminSettings, listBookingAdminResources, getBookingAvailabilityException, listBookingAvailabilityExceptions, updateBookingAvailabilityException, deleteBookingAvailabilityException, createBookingResource, deleteBookingResourceSafely, updateBookingResourceSafely } from '@line-crm/db';
 import { BOOKING_SETTINGS_KEY } from '@line-crm/shared';
 import { requireRole, requirePermission } from '../../middleware/role-guard.js';
-import { saveBookingAutoAssign, getBookingChannels, EXTERNAL_BOOKING_CHANNELS, getBookingChannelSetting, saveBookingChannelSetting, listBookingConflicts } from '../../services/booking-channels.js';
+import { saveBookingAutoAssign, getBookingChannels, EXTERNAL_BOOKING_CHANNELS, getBookingChannelSetting, saveBookingChannelSetting, listBookingConflicts } from '../../features/booking/booking-channels/index.js';
 import { assignmentSettingsResponse } from '../booking-assignment-settings.js';
 import { resolveAccountIdAdmin } from './identity.js';
 import { googleCredentials } from './availability.js';

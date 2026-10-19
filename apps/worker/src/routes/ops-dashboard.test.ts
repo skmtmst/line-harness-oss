@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { createHqSupportRequest, recordBillingEvent } from '@line-crm/db';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { jstIso, jstMonthStart, opsDashboard, resolvePeriod } from './ops-dashboard.js';
 
-/** ★V6 37-2 運営ダッシュボード。Stripe入金実績と定価フォールバック。 */
+/** ★37-2 運営ダッシュボード。Stripe入金実績と定価フォールバック。 */
 
 let testDb: SqliteD1;
 

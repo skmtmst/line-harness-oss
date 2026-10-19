@@ -1,11 +1,11 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import { countActivePlatformAdmins, getPlatformAdminByStaffId } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { dbFor } from '../services/db-router.js';
 
 /**
- * 運営マスター（★V6 37）の門番。
+ * 運営マスター（★37）の門番。
  *
  * 判定は platform_admins に登録され、かつ有効であること。役割（owner/admin）や
  * 所属する統括とは別の軸で見る。
@@ -40,7 +40,7 @@ export async function legacyDefaultTenantOwner(c: Context<Env>): Promise<boolean
 /**
  * ログイン処理の途中など、まだ c.get('staff') が無い場面向け。staff_members の
  * 行（または同じ形）から同じ判定をする。LINE ログインの運営コンソール分岐
- * （★V6 37-1）と /api/auth/session が使う。判定の中身は isPlatformAdmin と同じ。
+ * （★37-1）と /api/auth/session が使う。判定の中身は isPlatformAdmin と同じ。
  */
 export type PlatformAdminCandidate = {
   id: string;

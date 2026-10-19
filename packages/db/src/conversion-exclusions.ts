@@ -1,9 +1,5 @@
-import {
-  buildSegmentWhere,
-  matchesCondition,
-  type SegmentCondition,
-  type SegmentRule,
-} from './segment-conditions.js';
+import { buildSegmentWhere, matchesCondition } from './segment-conditions.js';
+import { type SegmentCondition, type SegmentRule } from '@line-crm/shared';
 
 /**
  * 成果地点の「数えない条件」(R40)。

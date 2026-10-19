@@ -18,7 +18,8 @@ vi.mock('@line-crm/db', () => ({
   recoverStuckDeliveries: vi.fn(),
 }));
 
-import { qrHandler, type Env } from './index.js';
+import { qrHandler } from './index.js';
+import { type Env } from './worker-env.js';
 
 const REF_LINK = 'https://worker.example.com/r/spring-campaign-2026';
 
@@ -197,7 +198,7 @@ const read = (relative: string) => readFileSync(path.join(repoRoot, relative), '
 const QR_CALL_SITES = [
   { file: 'apps/web/src/components/dashboard/qr-dialog.tsx', kind: 'bounded', fixedSize: null },
   // V8のQR小窓はDashboardQrDialogへ委譲し、URL生成とサイズ上限を共用する。
-  // ★V8 流入と計測の詳細（Q5le3）の「QRを保存」。data は同じく「土台のURL + /r/ + 合言葉」。
+  // ★V8 流入と計測の詳細の「QRを保存」。data は同じく「土台のURL + /r/ + 合言葉」。
   { file: 'apps/web/src/v8/inflow-links/detail.tsx', kind: 'bounded', fixedSize: '320x320' },
   { file: 'apps/worker/src/index.ts', kind: 'passthrough', fixedSize: '240x240' },
   { file: 'apps/worker/src/routes/liff-oauth-start-handlers.ts', kind: 'passthrough', fixedSize: '240x240' },

@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID, RESTAURANT_EXTERNAL_PROVIDERS, reservationInstant, type RestaurantExternalLink, type RestaurantExternalProvider } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';

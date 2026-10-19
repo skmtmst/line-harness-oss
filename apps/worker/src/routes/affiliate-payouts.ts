@@ -18,7 +18,7 @@ import {
   previewAffiliateAccountSettlement,
 } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role-guard.js';

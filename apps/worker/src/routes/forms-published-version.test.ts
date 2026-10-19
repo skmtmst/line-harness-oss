@@ -3,9 +3,9 @@ import { Hono } from 'hono';
 import { createForm } from '@line-crm/db';
 import { emptyLayout } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-vi.mock('../services/friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: vi.fn(),
 }));
 vi.mock('../services/event-bus.js', () => ({

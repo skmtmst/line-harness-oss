@@ -1,17 +1,17 @@
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
-import { patchFriendMetadata } from '../services/friend-metadata.js';
+import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { type Context } from 'hono';
 import { getEntryRouteByRefCode, recordFriendAddAttributionCandidate, addTagToFriend, getTrackedLinkById, getAffiliateLinkByRefCode, getAffiliateOfferById, getAffiliateById, enrollFriendInScenario, findOrCreateGlobalTag, isLineAccountTenantActive } from '@line-crm/db';
 import { isStoppedEntryRouteRef } from '../services/entry-route-stop.js';
-import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
+import { attachTagAndFireSideEffects } from '../features/friends/friend-tag-attach/index.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
 import { notifyAffiliateFriendAdd } from '../services/affiliate-notifier.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
-export // OAuth state base64 helpers. btoa() only accepts Latin-1, so a single
+export // OAuth state base64 helpers. btoa only accepts Latin-1, so a single
 // multibyte query param (e.g. utm_campaign=夏キャンペーン) used to throw
 // InvalidCharacterError and turn the whole /auth/line request into a 500.
 // Encode via UTF-8 bytes instead. decodeState is byte-compatible with

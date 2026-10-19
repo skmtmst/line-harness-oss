@@ -4,7 +4,7 @@ import { refreshInboxSla } from '../services/inbox-sla.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 
 import { getChatById, getFriendById, markInboxConversationRead, jstNow } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { listLimit } from './list-pagination.js';
 
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -107,7 +107,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     //   旧実装は messages_log (96k 行) を ROW_NUMBER × 2 + GROUP BY で 3 回スキャンし、
     //   さらに LIMIT なしで全 friend (10k 行) を返していた → 本番 D1 実測 3.47 秒 / 781k rows_read。
     //   新実装は (a) ROW_NUMBER を argmax GROUP BY に置換 (SQLite の bare-column +
-    //   単一 MAX() は max 行の値を返す documented 挙動)、(b) CTE を MATERIALIZED して
+    //   単一 MAX は max 行の値を返す documented 挙動)、(b) CTE を MATERIALIZED して
     //   二重評価を防止、(c) page CTE で先に対象 friend を limit 件に確定してから
     //   preview を計算、(d) デフォルト LIMIT 200
     //   (最終行は 未読 DESC, last_message_at DESC, friend_id DESC)。
@@ -195,7 +195,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       conditionBindings.push(lineAccountId);
     }
     if (query) {
-      // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+      // #625: LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
       conditions.push(`(
         instr(lower(f.display_name), lower(?)) > 0 OR EXISTS (
           SELECT 1 FROM messages_log mq
@@ -216,7 +216,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
     // incoming が無い (broadcast push など outbound only) chat は最新 outbound にフォールバック。
     // text 以外 (flex/image/sticker 等) は content を NULL にして payload size を抑える
     // (フロントは type で 📋 Flex / 📷 画像 等のラベルを出すので content は不要)。
-    // any_agg の bare column (content 等) は「単一 MAX() を含む集約は max 行の
+    // any_agg の bare column (content 等) は「単一 MAX を含む集約は max 行の
     // 値を返す」という SQLite の documented 挙動で argmax として使っている。
     // 集約は page 確定後の friend に絞って実行する (全 friend 分の content を
     // materialize しない)。last_any は並び順決定専用のスリムな全走査 1 回のみ。

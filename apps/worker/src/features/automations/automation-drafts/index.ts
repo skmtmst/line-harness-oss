@@ -1,0 +1,2 @@
+// Public entry for this operation; importing it does not initialize unrelated operations.
+export { AutomationDraftError, automationRevisionToken, createAutomationDraftFromDefinition, createAutomationDraftFromTemplate, duplicateAutomationDefinition, getAutomationDraft, listAutomationDraftResources, listAutomationTemplates, publishAutomationDraft, updateAutomationDraft } from '../automation-drafts.js';

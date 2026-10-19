@@ -2,7 +2,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess, requireRole, denyReadOnly } from '../middleware/role-guard.js';
 
 import { patch__api_reminders_reorder_1, get__api_reminders_2, post__api_reminders_drafts_3, get__api_reminders_id_4, get__api_reminders_id_draft_5, put__api_reminders_id_draft_6, post__api_reminders_id_validate_7, post__api_reminders_id_audience_8, post__api_reminders_id_message_preview_9, post__api_reminders_id_preview_10, get__api_reminders_id_test_recipient_11, post__api_reminders_id_test_send_12, post__api_reminders_id_publish_13 } from './reminders-drafts-handlers.js';
@@ -25,7 +25,7 @@ reminders.patch('/api/reminders/reorder', requireDeliveryAccess('reminders'), in
 
 reminders.get('/api/reminders', requireRole('owner', 'admin', 'staff'), get__api_reminders_2);
 
-/** V6 7-1-B: 定義と初版下書きを一度に作る。 */
+/** 7-1-B: 定義と初版下書きを一度に作る。 */
 reminders.post('/api/reminders/drafts', requireDeliveryAccess('reminders'), inputJsonBoundary(), post__api_reminders_drafts_3);
 
 reminders.use('/api/reminders/:id', requireVisibleReminder);
@@ -65,7 +65,7 @@ reminders.post('/api/reminders/:id/test-send', requireDeliveryAccess('reminders'
 
 reminders.post('/api/reminders/:id/publish', requireDeliveryAccess('reminders'), inputJsonBoundary(), post__api_reminders_id_publish_13);
 
-/** V6 7-1-H: 予定・成功・失敗を、未取得と0件を混ぜずに返す。 */
+/** 7-1-H: 予定・成功・失敗を、未取得と0件を混ぜずに返す。 */
 reminders.get('/api/reminders/:id/runs', get__api_reminders_id_runs_1);
 
 reminders.post('/api/reminders', requireDeliveryAccess('reminders'), inputJsonBoundary({"name":["string"],"description":["string"],"lineAccountId":["null","string"]}), post__api_reminders_2);

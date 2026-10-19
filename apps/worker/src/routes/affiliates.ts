@@ -2,7 +2,6 @@ import { logger } from '@line-crm/shared/server';
 import { serializeAffiliate } from './affiliate-serialization.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
-import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getAffiliates,
   getAffiliateById,
@@ -27,10 +26,13 @@ import {
   listAffiliateOffers,
   type AffiliateScope,
 } from '@line-crm/db';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
+
+
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';

@@ -1,4 +1,4 @@
-import type { FeatureJobMetadata } from './feature-enforcement.js';
+import type { FeatureJobMetadata } from './feature-job-types.js';
 
 // Retention keeps running when a product feature is disabled. Each service
 // still applies its own store policy, hold and data-protection checks.

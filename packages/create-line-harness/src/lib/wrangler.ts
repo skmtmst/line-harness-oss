@@ -105,7 +105,7 @@ export interface WranglerOptions {
   cwd?: string;
   /**
    * When true, inherit *all* stdio (stdin/stdout/stderr) from the parent so
-   * wrangler's `isInteractive()` check passes. Wrangler requires BOTH stdin
+   * wrangler's `isInteractive` check passes. Wrangler requires BOTH stdin
    * and stdout to be a TTY before it will refresh OAuth tokens or prompt the
    * user — half-piping stdout silently demotes it to non-interactive mode and
    * we hit the bogus `CLOUDFLARE_API_TOKEN required` error.

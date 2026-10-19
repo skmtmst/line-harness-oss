@@ -6,7 +6,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { recordBookingAudit, upsertEcEventReadModels, createWebinar, saveWebinarEditorSettings, updateWebinar, getWebinarEditorSettings, updateMedia } from '@line-crm/db';
 import { scoring } from './scoring.js';
 import { affiliates } from './affiliates.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 let t: SqliteD1;
 beforeEach(() => {
   t = createTestD1();
@@ -26,7 +26,7 @@ function seedConversion(id: string, type: string, policy = 'source_cancelled', a
   t.raw.prepare('INSERT INTO conversion_events (id,conversion_point_id,friend_id,metadata,value_snapshot) VALUES (?,?,?,?,1000)').run(id,'p'+id,'f'+account,JSON.stringify({ bookingId:'booking', orderNumber:'order-1' }));
 }
 
-describe('B-333 元業務の取消と成果', () => {
+describe('元業務の取消と成果', () => {
   test('予約取消の確定後に自動取消し、再実行でも1件・元の金額は保持', async () => {
     seedConversion('auto','reservation_confirmed'); seedConversion('manual','reservation_confirmed','manual'); seedConversion('other','reservation_confirmed','source_cancelled','b');
     const audit = { bookingId:'booking', lineAccountId:'a', action:'status_changed', after:{ status:'cancelled' }, actorType:'system' as const, occurredAt:new Date().toISOString() };
@@ -43,7 +43,7 @@ describe('B-333 元業務の取消と成果', () => {
   });
 });
 
-test('B-333 ウェビナー基本保存も原子的に版を進め、古い版を上書きしない', async () => {
+test('ウェビナー基本保存も原子的に版を進め、古い版を上書きしない', async () => {
   const webinar = await createWebinar(t.db,{ accountId:'a',title:'最初',slug:'test',durationSeconds:100,status:'active' });
   await saveWebinarEditorSettings(t.db,webinar.id,0,{});
   expect(await updateWebinar(t.db,webinar.id,{ title:'先に保存' },1)).toMatchObject({ title:'先に保存' });
@@ -52,13 +52,13 @@ test('B-333 ウェビナー基本保存も原子的に版を進め、古い版�
   expect(t.raw.prepare('SELECT version,state FROM webinar_versions WHERE webinar_id=? ORDER BY version').all(webinar.id)).toEqual([{version:1,state:'draft'},{version:2,state:'draft'}]);
 });
 
-test('B-333 メディア名の保存は同じ版を使って二度上書きできない', async () => {
+test('メディア名の保存は同じ版を使って二度上書きできない', async () => {
   t.raw.prepare("INSERT INTO media (id,line_account_id,kind,filename,mime_type,size_bytes,r2_key) VALUES ('m','a','image','old.png','image/png',1,'test.png')").run();
   expect(await updateMedia(t.db,'m','a',{filename:'first.png',expectedRevision:1})).toMatchObject({filename:'first.png',revision:2});
   expect(await updateMedia(t.db,'m','a',{filename:'stale.png',expectedRevision:1})).toBeNull();
 });
 
-describe('B-333 マイル・スコアのCSVと旧口', () => {
+describe('マイル・スコアのCSVと旧口', () => {
   const request = (instance: ReturnType<typeof app>, kind: string, reason = '月次確認') => instance.request('/api/mileage/exports',{ method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountId:'a',kind,reason}) });
   test.each(['balances','history','rewards','scores'])('%s は閲覧のみと許可なしを断り、監査してから渡す', async kind => {
     expect((await request(app('owner',true),kind)).status).toBe(403);
@@ -80,7 +80,7 @@ describe('B-333 マイル・スコアのCSVと旧口', () => {
 });
 
 
-test('B-333 紹介者一覧は両店を見られる管理者にも選んだ店だけ返す', async () => {
+test('紹介者一覧は両店を見られる管理者にも選んだ店だけ返す', async () => {
   for (const id of ['a','b']) t.raw.prepare('INSERT INTO affiliates (id,line_account_id,name,code,tenant_id) VALUES (?,?,?,?,?)').run('affiliate-'+id,id,'紹介者'+id,'code-'+id,DEFAULT_TENANT_ID);
   const response = await app().request('/api/affiliates?accountId=a');
   expect(response.status).toBe(200);
@@ -88,7 +88,7 @@ test('B-333 紹介者一覧は両店を見られる管理者にも選んだ店�
 });
 
 
-test('B-333 許可された管理者はCSVを出せるが別種類の鍵は流用できない', async () => {
+test('許可された管理者はCSVを出せるが別種類の鍵は流用できない', async () => {
   for (const [kind,key] of [['balances','mileage.ledger.export'],['scores','action_score.list.export']]) {
     const response = await app('admin',false,[key]).request('/api/mileage/exports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountId:'a',kind,reason:'確認'})});
     expect(response.status).toBe(200);
@@ -98,14 +98,14 @@ test('B-333 許可された管理者はCSVを出せるが別種類の鍵は流�
 });
 
 
-test('B-333 スタッフのシナリオ作成は有効指定を省いても下書きだけになる', async () => {
+test('スタッフのシナリオ作成は有効指定を省いても下書きだけになる', async () => {
   const response = await app('staff',false,['/scenarios','scenario.definition.edit']).request('/api/scenarios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'下書き',triggerType:'manual',lineAccountId:'a'})});
   expect(response.status).toBe(201);
   expect(t.raw.prepare("SELECT is_active FROM scenarios WHERE name='下書き'").get()).toEqual({is_active:0});
 });
 
 
-test.each([{accountId:1,kind:'balances',reason:'確認'},{accountId:'a',kind:'balances',reason:3}])('B-333 CSVの不正な入力型を500にせず断る: %j', async body => {
+test.each([{accountId:1,kind:'balances',reason:'確認'},{accountId:'a',kind:'balances',reason:3}])('CSVの不正な入力型を500にせず断る: %j', async body => {
   const response=await app().request('/api/mileage/exports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   expect(response.status).toBe(400);
 });

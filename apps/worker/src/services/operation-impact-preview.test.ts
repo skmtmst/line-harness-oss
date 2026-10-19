@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { getBroadcastAudiencePreview } from './broadcast-audience-preview.js';
+import { getBroadcastAudiencePreview } from '../features/broadcasts/broadcast-audience-preview.js';
 import { getOperationImpactPreview } from './operation-impact-preview.js';
 
 let testDb: ReturnType<typeof createTestD1>;

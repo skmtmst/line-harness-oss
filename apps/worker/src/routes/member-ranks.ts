@@ -1,10 +1,10 @@
 import {resolveAccountIdFromLiff,verifyCallerLineUserId,resolveFriendId} from './booking.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite,gapKey} from '../services/gap-common.js';
 import {rankProgram,rankPreview,rankEvaluationStatements,type RankTier,processRankNotices} from '../services/member-ranks.js';
-import {assertChanged,clearAssertions} from '../services/booking-series.js';
+import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 export const memberRanks=new Hono<Env>();
 memberRanks.use('/api/member-ranks*',requirePermission('/mileage'));
 memberRanks.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'ranks_unavailable'},e instanceof GapError?e.status:503));

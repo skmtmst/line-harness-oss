@@ -1,4 +1,4 @@
-import { createAutomationActionExecutors, type AutomationActionExecutorDependencies } from './automation-action-executors.js';
+import { createAutomationActionExecutors, type AutomationActionExecutorDependencies } from '../features/automations/automation-action-executors/index.js';
 import { stableWebhookStepId } from './incoming-webhook-receipts.js';
 
 /** 共通の実行一覧へ渡す。送信とマイルの重複防止キーは出来事・対象・処理から固定する。 */

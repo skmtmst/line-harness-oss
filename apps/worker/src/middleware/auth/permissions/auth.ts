@@ -35,9 +35,9 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   // (N-065 #623 司令塔裁定。`/api/meet-callback` は公開コールバックのため対象外)。
   ['/api/meet-consultations', '/booking/bookings'],
   ['/api/ec-commerce', '/ec-commerce'],
-  // 然の会員（★V6 37-1）。メニューの href は /nen/members。
+  // 然の会員（★37-1）。メニューの href は /nen/members。
   ['/api/nen/rank-settings', '/nen/members'], ['/api/nen/lifetime-milestones', '/nen/members'], ['/api/nen/members', '/nen/members'],
-  // 然のマイペット・健康日記（★V6 37-3／37-4）。主食のカロリー表はマイペット画面へ移した。
+  // 然のマイペット・健康日記（★37-3／37-4）。主食のカロリー表はマイペット画面へ移した。
   ['/api/nen/feeding-products', '/nen/pets'], ['/api/nen/pets', '/nen/pets'], ['/api/nen/health', '/nen/health'],
   // ログインユーザー一覧・権限のかたまり・監査の閲覧は「設定」の点キーで守る（N-424）。
   // route 側の requirePermission が最終判定を握る。
@@ -272,7 +272,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['POST', '/api/restaurant-test/google/hours/from-closure'],
   ['GET', '/api/restaurant-test/inventory-rules'],
   ['GET', '/api/restaurant-test/channel-close-tasks'],
-  // Googleビジネス（★V6 GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
+  // Googleビジネス（★GB-2/GB-3）：担当者も口コミを読み、同期し、下書きを作れる。公開・接続は店舗管理者以上。
   ['GET', '/api/restaurant-test/google/connection'],
   ['GET', '/api/restaurant-test/google/reviews'],
   ['POST', '/api/restaurant-test/google/reviews/sync'],
@@ -299,7 +299,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   ['GET', '/api/restaurant-test/delivery/history.csv'],
   ['GET', '/api/restaurant-test/delivery/menu-items'],
   ['POST', '/api/restaurant-test/delivery/menu-items/bulk-sold-out'],
-  // 運営からのお知らせ（★V6 37-7）は本人宛て。担当者でも読んで既読にできる。
+  // 運営からのお知らせ（★37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
 ];

@@ -1,4 +1,4 @@
-import type { FriendScenarioStatus } from './scenarios.js';
+import type { FriendScenarioStatus } from './scenarios/types.js';
 export interface FriendScenario {
   id: string;
   friend_id: string;

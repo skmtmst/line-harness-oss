@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { processEventWaitlistPromotionJobs, promoteEventWaitlist, type EventWaitlistOfferSender } from './event-waitlist.js';
+import { processEventWaitlistPromotionJobs, promoteEventWaitlist } from './event-waitlist.js';
+import { type EventWaitlistOfferSender } from './event-waitlist-sender.js';
 
 let fixture: SqliteD1;
 const now = new Date('2026-10-11T00:00:00.000Z');
