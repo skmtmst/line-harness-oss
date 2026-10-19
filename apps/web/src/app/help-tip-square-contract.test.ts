@@ -28,6 +28,7 @@ describe('「？」の正円', () => {
   it('文字の「？」を専用の円に置き、アイコンへ置き換えない', () => {
     expect(TSX).not.toContain('lucide')
     expect(TSX).not.toContain('CircleHelp')
+    expect(TSX).toContain('className={styles.mark}>?</span>')
     expect(CSS).not.toContain('.button svg')
     expect(CSS).toMatch(/:root \.button\s*\{[^}]*background:\s*transparent;/)
   })

@@ -237,6 +237,7 @@ describe('U088/U089: 共通アクセシブル部品と閉じる操作', () => {
     const dialog = screen.getByRole('dialog')
     expect(dialog.getAttribute('aria-modal')).toBe('true')
     expect(dialog.getAttribute('aria-labelledby')).toBeTruthy()
+    expect(SOURCE).toContain("from '@/components/shared/dialog'")
   })
 
   it('名前の無い × を置かず、「キャンセル」が閉じる操作になる', async () => {
