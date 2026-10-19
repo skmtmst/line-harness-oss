@@ -1,3 +1,5 @@
+> 文書：運用者へのお知らせを作る・なおす（★V8 gjUz3・hiBO8・公開前の確認 sDXNy）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 運用者へのお知らせを作る・なおす（★V8 gjUz3・hiBO8・公開前の確認 sDXNy）
 
 画面：`operator-edit.tsx`。入口：`app/line-notifications/operator/new/page.tsx`（V8 だけ。v7 の作成画面は 2026-10-04 に捨てた）。

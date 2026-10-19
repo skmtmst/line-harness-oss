@@ -1,6 +1,8 @@
+> 文書：統括のひな形｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 統括のひな形
 
-`NEXT_PUBLIC_HQ_TEMPLATE_DISTRIBUTION_ENABLED=1` のとき、`/hq/templates?type=...` から4種類の一覧、作成・編集、アカウント選択、重複確認、配布結果を開く。この設定はWorkerの同一APIと結合テストが配備済みの場合だけ有効にする。既定値では画面を公開せず、既存のアカウント別タグ管理へ案内する。`/accounts/new` の動作は変更しない。
+`/hq/templates?type=...` から一覧・作成・編集・配布を開く。入口は `apps/web/src/app/hq/templates/page.tsx` がV8の画面を直接表示する。権限と配布先の検査はWorkerのAPIで行う。現在の入口には公開用の環境変数による切り替えはない。
 
 - Pencil: `nen-order-inventory-fulfillment.pen` の rsyjI / ZsLly / E0CmCp / Uhd35 / FxHyL。
 - 保存・削除は期待revision付き。共通fetchApiによるセッション・CSRF保護を利用する。

@@ -1,3 +1,5 @@
+> 文書：飲食（融合1〜4：予約盤・来店と退店・前日の返事・席予約と紹介） 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 飲食（融合1〜4：予約盤・来店と退店・前日の返事・席予約と紹介） 操作と挙動（受け入れ）
 
 要件の正本：[融合1](../restaurant-fusion-contract.md)・[融合2](../restaurant-fusion2-contract.md)・[融合3](../restaurant-fusion3-contract.md)・[融合4](../restaurant-fusion4-contract.md)・[v8-booking-additions.md](../v8-booking-additions.md) §2（F-24）。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。

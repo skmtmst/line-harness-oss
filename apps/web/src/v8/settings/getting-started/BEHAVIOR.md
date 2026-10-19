@@ -1,3 +1,5 @@
+> 文書：はじめの設定の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # はじめの設定の動き（BEHAVIOR.md）
 
 対象：`app/getting-started/page.tsx`（今の画面）から写して `getting-started.tsx` を一から書いた。板 `xuJ7D`。

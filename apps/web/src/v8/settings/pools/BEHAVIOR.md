@@ -1,3 +1,5 @@
+> 文書：プール管理の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # プール管理の動き（BEHAVIOR.md）
 
 対象：`app/pools/page.tsx`（今の画面）から写して `pools.tsx` を一から書いた。板 `u3iab3`。

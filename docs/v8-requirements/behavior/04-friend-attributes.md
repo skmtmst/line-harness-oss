@@ -1,3 +1,5 @@
+> 文書：04 友だちの属性 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 04 友だちの属性 操作と挙動（受け入れ）
 
 要件の正本：[4 友だち属性](../../v6-requirements/v6-04-friend-attributes-requirements-draft.md)・[友だちの決まった欄と表示項目](../friend-fixed-fields.md)・[共通基盤 §3・§6-2・§9・§11・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[30 ログインユーザー §7〜§8](../../v6-requirements/v6-30-login-users-requirements-draft.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。

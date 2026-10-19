@@ -1,9 +1,0 @@
-
- RUN  v3.2.7 /private/tmp/train41-pattern-mutations
-
- ✓ pattern-css-evidence.test.ts (10 tests) 64ms
-
- Test Files  1 passed (1)
-      Tests  10 passed (10)
-   Start at  15:36:57
-   Duration  420ms (transform 33ms, setup 0ms, collect 212ms, tests 64ms, environment 0ms, prepare 29ms)

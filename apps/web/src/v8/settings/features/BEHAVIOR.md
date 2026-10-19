@@ -1,3 +1,5 @@
+> 文書：機能設定の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 機能設定の動き（BEHAVIOR.md）
 
 対象：`screen.tsx`（★V8 `ywFJT`・1152 `bKipf`・競合 `ziYCN`・状態の見本帳 `bR6a1`）。
