@@ -4,7 +4,7 @@ import type { Env } from '../../index.js';
 import { requirePermission } from '../../middleware/role-guard.js';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { logger } from '@line-crm/shared/server';
-import { BookingPhotoError, bookingPhoto, getBookingPhotos, readPhotoId, readStorePhotos, saveBookingPhoto, saveBookingStorePhotos } from '../../services/booking-photos.js';
+import { BookingPhotoError, bookingPhoto, getBookingPhotos, readPhotoId, readStorePhotos, saveBookingPhoto, saveBookingStorePhotos, storePhotoVisibility } from '../../services/booking-photos.js';
 import { resolveAccountIdAdmin, resolveAccountIdFromLiff } from './identity.js';
 
 function origin(c: Context<Env>): string {
@@ -55,12 +55,14 @@ export function registerPhotos(booking: Hono<Env>): void {
     const accountId = await resolveAccountIdFromLiff(c);
     if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
     try {
-    const row = await c.env.DB.prepare(`SELECT store_photo_media_id,store_photo_interior_media_id,store_photo_waiting_media_id,store_photo_order_json
-      FROM booking_settings WHERE line_account_id=?`).bind(accountId)
-      .first<{ store_photo_media_id: string | null; store_photo_interior_media_id: string | null; store_photo_waiting_media_id: string | null; store_photo_order_json: string }>();
+    const row = await c.env.DB.prepare(`SELECT bs.store_photo_media_id,bs.store_photo_interior_media_id,bs.store_photo_waiting_media_id,bs.store_photo_order_json,flags.value AS visibility_json
+      FROM booking_settings bs LEFT JOIN account_settings flags ON flags.line_account_id=bs.line_account_id AND flags.key='booking.store_photo_visibility' WHERE bs.line_account_id=?`).bind(accountId)
+      .first<{ store_photo_media_id: string | null; store_photo_interior_media_id: string | null; store_photo_waiting_media_id: string | null; store_photo_order_json: string; visibility_json: string | null }>();
     const values = { exterior: row?.store_photo_media_id, interior: row?.store_photo_interior_media_id, waiting: row?.store_photo_waiting_media_id };
     const order = row ? JSON.parse(row.store_photo_order_json) as Array<keyof typeof values> : [];
+    const visibility = storePhotoVisibility(row?.visibility_json);
     return c.json({ success: true, data: order.flatMap(slot => {
+      if (!visibility[slot]) return [];
       const photo = bookingPhoto(origin(c), values[slot]);
       return photo ? [{ slot, url: photo.url }] : [];
     }) });
