@@ -20,6 +20,7 @@ const sidebarCss = readFileSync(join(WEB, 'src/components/layout/sidebar.module.
 const topBar = readFileSync(join(WEB, 'src/components/shared/top-bar.tsx'), 'utf8')
 const topBarCss = readFileSync(join(WEB, 'src/components/shared/top-bar.module.css'), 'utf8')
 const appTopBar = readFileSync(join(WEB, 'src/components/shell/app-top-bar.tsx'), 'utf8')
+const events = readFileSync(join(WEB, 'src/lib/events.ts'), 'utf8')
 const friends = readFileSync(join(WEB, 'src/app/friends/page.tsx'), 'utf8')
 
 describe('外側の殻（V8 移行③）', () => {
@@ -63,6 +64,7 @@ describe('外側の殻（V8 移行③）', () => {
 
   it('左メニューは畳める（幅 64・状態をブラウザに覚える・⌘\\ とボタンで切替）', () => {
     expect(sidebarCss).toMatch(/\.desktop\[data-collapsed\][\s\S]*?width: 64px/)
+    expect(events).toContain("SIDEBAR_TOGGLE_EVENT = 'lh:sidebar-toggle'")
   })
 
   it('帯は高さ 60・地の上・下線なし。左にパンくず（アカウント › 画面名）', () => {
