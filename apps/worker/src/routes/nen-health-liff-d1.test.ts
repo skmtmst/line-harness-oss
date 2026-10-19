@@ -17,9 +17,11 @@ const { nenMembers } = await import('./nen-members.js');
 
 let sql: Database.Database;
 let db: D1Database;
-const day = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
+const day = (daysAgo: number) => new Date(Date.parse('2026-10-20T00:00:00Z') - daysAgo * 86_400_000).toISOString().slice(0, 10);
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-19T15:09:00Z')); // 日本の10月20日00:09。見本の日付もこの暦日。
   const created = createTestD1();
   sql = created.raw;
   db = created.db;
