@@ -160,7 +160,7 @@ const baseExecutionCtx = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{id:'account-main',channel_secret:'env-default-secret',channel_access_token:'account-token',is_active:1} as never]);
+  vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{id:'account-main',channel_secret:'env-default-secret',channel_access_token:'account-token',is_active:1,tenant_status:'active'} as never]);
 });
 
 describe('POST /webhook — friend-add ledger', () => {
@@ -168,7 +168,7 @@ describe('POST /webhook — friend-add ledger', () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
-      channel_access_token: 'account-token', is_active: 1,
+      channel_access_token: 'account-token', is_active: 1, tenant_status: 'active',
     } as never]);
     lineClientMocks.getProfile.mockResolvedValue({ displayName: '田中さん' });
     vi.mocked(upsertFriend).mockResolvedValue({
@@ -186,7 +186,7 @@ describe('POST /webhook — friend-add ledger', () => {
     const response = await setupApp().request('/webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
-      body: JSON.stringify({ events: [{
+      body: JSON.stringify({ destination: 'bot', events: [{
         type: 'follow', webhookEventId: 'webhook-follow-1', timestamp: 1787530800000,
         source: { type: 'user', userId: 'U-1' }, replyToken: 'reply-1',
         follow: { isUnblocked: true },
@@ -215,7 +215,7 @@ describe('POST /webhook — 分析イベント', () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
-      channel_access_token: 'account-token', is_active: 1,
+      channel_access_token: 'account-token', is_active: 1, tenant_status: 'active',
     } as never]);
     vi.mocked(getFriendByLineUserIdForAccount).mockResolvedValue({
       id: 'friend-1', line_user_id: 'U-1', line_account_id: 'account-main',
@@ -225,7 +225,7 @@ describe('POST /webhook — 分析イベント', () => {
     const response = await setupApp().request('/webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
-      body: JSON.stringify({ events: [{
+      body: JSON.stringify({ destination: 'bot', events: [{
         type: 'unfollow', webhookEventId: 'webhook-unfollow-1', timestamp: 1787530800000,
         source: { type: 'user', userId: 'U-1' },
       }] }),
@@ -297,7 +297,7 @@ describe('POST /webhook — DoS defenses (#104)', () => {
           'Content-Length': String(2 * 1024 * 1024), // 2 MiB > 1 MiB cap
           'X-Line-Signature': 'whatever',
         },
-        body: JSON.stringify({ events: [] }),
+        body: JSON.stringify({ destination: 'bot', events: [] }),
       },
       baseEnv,
       baseExecutionCtx,
@@ -366,7 +366,7 @@ describe('POST /webhook — DoS defenses (#104)', () => {
           'Content-Type': 'application/json',
           // Missing X-Line-Signature header entirely.
         },
-        body: JSON.stringify({ events: [] }),
+        body: JSON.stringify({ destination: 'bot', events: [] }),
       },
       baseEnv,
       baseExecutionCtx,
@@ -427,7 +427,7 @@ describe('POST /webhook — postback events', () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
-      channel_access_token: 'account-token', is_active: 1,
+      channel_access_token: 'account-token', is_active: 1, tenant_status: 'active',
     } as never]);
     vi.mocked(getFriendByLineUserIdForAccount).mockResolvedValue({
       id: 'friend-1', line_user_id: 'U-existing', line_account_id: 'account-main',
@@ -438,7 +438,7 @@ describe('POST /webhook — postback events', () => {
     const response = await setupApp().request('/webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
-      body: JSON.stringify({ events: [{
+      body: JSON.stringify({ destination: 'bot', events: [{
         type: 'postback',
         replyToken: 'reply-token-carousel',
         postback: { data: 'ctpl=template-1&c=0&a=1' },
@@ -656,7 +656,7 @@ describe('POST /webhook — first-contact existing friends', () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main',
-      is_active: 1,
+      is_active: 1, tenant_status: 'active',
       channel_secret: 'env-default-secret',
       channel_access_token: 'env-default-token',
     }] as never);
@@ -786,7 +786,7 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'account-main', channel_secret: 'env-default-secret',
-      channel_access_token: 'account-token', is_active: 1,
+      channel_access_token: 'account-token', is_active: 1, tenant_status: 'active',
     } as never]);
     lineClientMocks.getProfile.mockResolvedValue({ displayName: '田中さん' });
     vi.mocked(upsertFriend).mockResolvedValue({
@@ -803,7 +803,7 @@ describe('POST /webhook — friend-add抑止理由の台帳記録 (#622)', () =>
     const response = await setupApp().request('/webhook', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
-      body: JSON.stringify({ events: [{
+      body: JSON.stringify({ destination: 'bot', events: [{
         type: 'follow', webhookEventId: 'webhook-follow-1', timestamp: 1787530800000,
         source: { type: 'user', userId: 'U-1' }, replyToken: 'reply-1',
         follow: { isUnblocked: false },

@@ -422,6 +422,8 @@
 
 ## セキュリティ
 
+- [LINE受信の安全対策](security/line-webhook-isolation-2026-10-19.md)
+
 - [Security Policy](../SECURITY.md)
 - [Admin Authentication (cookie session + CSRF)](ADMIN-AUTH.md)
 - [権限・tenant・LINEアカウント境界の土台と後続接続表(board #800)](account-boundary-foundation.md)
@@ -578,3 +580,5 @@
 - [0000-kenta-cleanup-q03.md](release-log/unreleased/0000-kenta-cleanup-q03.md)
 - [0000-kenta-cleanup-s02b.md](release-log/unreleased/0000-kenta-cleanup-s02b.md)
 - [1777-masato-owner-only-line-register.md](release-log/unreleased/1777-masato-owner-only-line-register.md)
+
+- [LINE接続の分離](release-log/unreleased/1778-masato-line-webhook-isolation.md)

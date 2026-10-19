@@ -20,6 +20,8 @@ export async function recordIncomingLineMessage(
     content: string;
     lineAccountId: string | null;
     lineMessageAccountKey: string;
+    /** Read-only migration hint: may suppress this receipt, never authorizes mutation. */
+    legacyLineMessageAccountKey?: string;
     lineMessageId: string;
     createdAt: string;
     /**
@@ -31,6 +33,7 @@ export async function recordIncomingLineMessage(
     quoteToken?: string | null;
   },
 ): Promise<IncomingLineMessageRecord> {
+  const scoped = input.lineAccountId != null && input.lineMessageAccountKey === `account:${input.lineAccountId}`;
   const inserted = await db
     .prepare(
       `INSERT OR IGNORE INTO messages_log
@@ -39,11 +42,16 @@ export async function recordIncomingLineMessage(
           line_event_at,
           line_message_id, line_message_account_key, quote_token, unsent_at)
        SELECT ?, ?, 'incoming', ?,
-              CASE WHEN u.line_message_id IS NULL THEN ? ELSE '' END,
-              NULL, NULL, 'user', ?, ?, ?, ?, ?, ?, u.unsent_at
+              CASE WHEN COALESCE(u.unsent_at, legacy.unsent_at) IS NULL THEN ? ELSE '' END,
+              NULL, NULL, 'user', ?, ?, ?, ?, ?, ?, COALESCE(u.unsent_at, legacy.unsent_at)
          FROM (SELECT 1) AS seed
          LEFT JOIN line_message_unsends u
-           ON u.line_message_account_key = ? AND u.line_message_id = ?`,
+           ON u.line_message_account_key = ? AND u.line_message_id = ?
+         LEFT JOIN line_message_unsends legacy
+           ON legacy.line_message_account_key = ? AND legacy.line_message_id = ?
+          AND legacy.source_user_id = (SELECT line_user_id FROM friends WHERE id = ? AND line_account_id IS ?)
+        ${scoped ? `WHERE NOT EXISTS (SELECT 1 FROM messages_log existing
+          WHERE existing.line_account_id = ? AND existing.line_message_id = ? AND existing.direction = 'incoming')` : ''}`,
     )
     .bind(
       input.id,
@@ -58,6 +66,11 @@ export async function recordIncomingLineMessage(
       input.quoteToken ?? null,
       input.lineMessageAccountKey,
       input.lineMessageId,
+      scoped ? input.legacyLineMessageAccountKey ?? null : null,
+      input.lineMessageId,
+      input.friendId,
+      input.lineAccountId,
+      ...(scoped ? [input.lineAccountId, input.lineMessageId] : []),
     )
     .run();
 
@@ -65,9 +78,9 @@ export async function recordIncomingLineMessage(
     .prepare(
       `SELECT id, unsent_at
          FROM messages_log
-        WHERE line_message_account_key = ? AND line_message_id = ?`,
+        WHERE ${scoped ? "line_account_id = ? AND direction = 'incoming'" : 'line_message_account_key = ?'} AND line_message_id = ?`,
     )
-    .bind(input.lineMessageAccountKey, input.lineMessageId)
+    .bind(scoped ? input.lineAccountId : input.lineMessageAccountKey, input.lineMessageId)
     .first<{ id: string; unsent_at: string | null }>();
 
   if (!row) throw new Error('line message record unavailable');
@@ -89,9 +102,14 @@ export async function recordLineMessageUnsend(
     lineMessageAccountKey: string;
     lineMessageId: string;
     sourceUserId: string | null;
+    /** Authenticated owner. Also cancels historical destination-key rows of this owner only. */
+    lineAccountId?: string | null;
     unsentAt: string;
   },
 ): Promise<void> {
+  if (input.lineAccountId !== undefined && (!input.lineAccountId || input.lineMessageAccountKey !== `account:${input.lineAccountId}`)) {
+    throw new Error('LINE unsend account mismatch');
+  }
   await db.batch([
     db.prepare(
       `INSERT OR IGNORE INTO line_message_unsends
@@ -110,11 +128,11 @@ export async function recordLineMessageUnsend(
                 SELECT unsent_at FROM line_message_unsends
                  WHERE line_message_account_key = ? AND line_message_id = ?
               )
-        WHERE line_message_account_key = ? AND line_message_id = ?`,
+        WHERE ${input.lineAccountId === undefined ? 'line_message_account_key = ?' : "line_account_id = ? AND direction = 'incoming'"} AND line_message_id = ?`,
     ).bind(
       input.lineMessageAccountKey,
       input.lineMessageId,
-      input.lineMessageAccountKey,
+      input.lineAccountId === undefined ? input.lineMessageAccountKey : input.lineAccountId,
       input.lineMessageId,
     ),
   ]);

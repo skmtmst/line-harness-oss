@@ -183,6 +183,7 @@ async function postFollow(app: Hono<Env>, env: Env['Bindings'], userId: string, 
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
       body: JSON.stringify({
+        destination: 'bot-acc1',
         events: [{
           type: 'follow',
           replyToken: 'rt1',

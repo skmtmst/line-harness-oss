@@ -91,10 +91,12 @@ async function handleStoppedTenantEvent(
   event: WebhookEvent,
   lineAccountId: string | null,
   lineMessageAccountKey: string,
+  legacyLineMessageAccountKey?: string,
 ): Promise<void> {
   if (event.type === 'unsend') {
     await recordLineMessageUnsend(db, {
       lineMessageAccountKey,
+      lineAccountId,
       lineMessageId: event.unsend.messageId,
       sourceUserId: event.source.type === 'user' ? event.source.userId : null,
       unsentAt: toJstString(new Date(event.timestamp)),
@@ -175,6 +177,7 @@ async function handleStoppedTenantEvent(
     content,
     lineAccountId,
     lineMessageAccountKey,
+    legacyLineMessageAccountKey,
     lineMessageId: message.id,
     createdAt: jstNow(),
     lineEventAt: toJstString(new Date(event.timestamp)),
