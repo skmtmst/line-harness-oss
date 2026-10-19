@@ -1,4 +1,4 @@
-import { EVENT_DEFAULT_DRAFT as CREATE_DEFAULT_DRAFT,ENTRY_CUTOFF_OPTIONS } from '@/v8/events/shared'
+import { EVENT_DEFAULT_DRAFT as CREATE_DEFAULT_DRAFT,ENTRY_CUTOFF_OPTIONS,jstDay,jstTime } from '@/v8/events/shared'
 import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe,expect,it } from 'vitest'
@@ -167,10 +167,10 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
 
   it('編集画面の日時表示は端末の時間帯に依存しない(EVENT-05)', () => {
     expect(formatJpDateTime('2026-10-16T16:30:00Z')).toMatch(/10月17日（土）01:30$/)
-    // 一覧側は既に JST 固定。両方が同じ固定を持つことだけを見る。
+    // 一覧と編集の実際の表示結果を、日本時間の日またぎでそろえる。
     expect(LIST_PAGE).toContain("import { jstDay, jstTime } from './shared'")
-    expect(read('..', '..', 'v8', 'events', 'shared.ts')).toContain('time + 9 * 3600_000')
-    expect(read('..', '..', 'v8', 'events', 'shared.ts')).toContain('getUTCDate()')
+    expect(jstDay('2026-10-16T16:30:00Z')).toBe('10/17（土）')
+    expect(jstTime('2026-10-16T16:30:00Z')).toBe('01:30')
   })
 
   it('枠の更新は保存後に一覧を読み直す(EVENT-01)', () => {
@@ -186,4 +186,15 @@ describe('イベント作成・編集の締切・取消・時刻表示(EVENT-01�
     // 枠だけ失敗した公開済み本体の再試行では、公開状態を下書きへ戻さない。
     expect(CREATE).toContain('is_published: publish || saved?.is_published === 1 ? 1 : 0')
   })
+})
+
+
+it.each([
+  ['2026-09-30T15:00:00Z', '00:00'],
+  ['2026-09-30T23:59:59Z', '08:59'],
+  ['2026-10-01T00:00:00Z', '09:00'],
+])('一覧と編集の日本時間は同じ暦日と時刻になる: %s', (at, time) => {
+  expect(jstDay(at)).toBe('10/1（木）')
+  expect(jstTime(at)).toBe(time)
+  expect(formatJpDateTime(at)).toMatch(new RegExp(`10月1日（木）${time}$`))
 })
