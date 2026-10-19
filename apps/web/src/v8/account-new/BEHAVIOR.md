@@ -21,6 +21,13 @@
 ## 入口と外枠
 - `app/accounts/new/page.tsx` はV8の入口。共通の外枠（左メニュー・上の帯）で表示する。
 
+## 誰ができるか（権限）
+- **この画面はオーナーだけ**。要件 v6-33 §15 の `account.line.register`「登録、接続確認」が owner だけで、サーバも `requireRole('owner')`（`apps/worker/src/routes/line-accounts.ts`）。`requireRole` は上下関係を見ないので、管理者でも403になる。
+- 管理者・閲覧のみが開いたら手順を出さず、「LINEアカウントの登録はオーナーだけができます。オーナーに頼んでください。」と「LINEアカウントの一覧へ戻る」だけを出す。押せるのに③で403になる入口は残さない（2026-10-18 利用者報告「管理者なのに権限がありませんと表示されました」）。
+- 役割がまだ読めていない（`useStaffRole()` が `null`）あいだは今までどおり手順を出す。オーナーに一瞬だけ権限の案内を見せないため。**最後の守りはサーバの403**のまま（`lib/staff-role.ts` の決まり）。
+- その403の文は `describeActionFailure(..., 'owner')` で「オーナーに頼んでください。」にする。既定の「オーナーか管理者に頼んでください。」だと、管理者が自分自身に頼む言い方になる。
+- 見張りは `owner-only-wizard.test.tsx` と `components/shared/api-error-message.test.ts`。
+
 ## 受け付ける URL と指定
 - なし（今までも URL の指定を読まない）。手順は画面の中だけで持つ。
 

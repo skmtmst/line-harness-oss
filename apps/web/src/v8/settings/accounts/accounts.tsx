@@ -7,7 +7,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { ArrowUpDown, CircleDot, Plus, Star, Cable, CircleCheck, TriangleAlert, Users } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { canManageRole, isOwnerRole, useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
@@ -59,6 +59,8 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
+/** 管理者に出す一文。押せない入口を出すより、誰に頼めばよいかを先に書く。 */
+const OWNER_ONLY_REGISTER = 'LINEアカウントの登録はオーナーだけができます'
 
 export default function AccountsV8() {
   usePageTitle(TITLE)
@@ -66,6 +68,13 @@ export default function AccountsV8() {
   const role = useStaffRole()
   // 役割が読めるまでは今までどおり出し、見るだけと分かったら変える操作を隠す（最後の守りはサーバ）。
   const canManage = canManageRole(role)
+  /*
+   * 登録はオーナーだけ（要件 v6-33 §15 `account.line.register`「登録、接続確認」）。
+   * 管理者に入口を出すと③接続確認でサーバの403に当たって行き止まりになるので、
+   * 入口を出さずに理由を書く。並び順・親子やスタイルは `account.metadata.edit` で
+   * 管理者も持っているため、ここでは分けない。
+   */
+  const canRegister = isOwnerRole(role)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useListUrlValue('q', '')
@@ -179,9 +188,11 @@ export default function AccountsV8() {
       <Button variant="secondary" onClick={() => setOrderingOpen(true)}>
         <ArrowUpDown size={15} aria-hidden="true" />並び順と親子を変える
       </Button>
-      <Button variant="primary" href="/accounts/new">
-        <Plus size={15} aria-hidden="true" />LINEアカウントを登録
-      </Button>
+      {canRegister ? (
+        <Button variant="primary" href="/accounts/new">
+          <Plus size={15} aria-hidden="true" />LINEアカウントを登録
+        </Button>
+      ) : <span className={styles.ownerOnly}>{OWNER_ONLY_REGISTER}</span>}
     </div>
   ) : undefined
 
@@ -235,9 +246,13 @@ export default function AccountsV8() {
               kind="empty"
               emptyPreset={accounts.length === 0 ? 'createable' : 'filtered'}
               title={accounts.length === 0 ? 'LINEアカウントがありません' : undefined}
-              description={accounts.length === 0 ? '「＋ LINEアカウントを登録」から、送受信に使うアカウントを登録してください。' : undefined}
+              description={accounts.length === 0
+                ? (canRegister
+                  ? '「＋ LINEアカウントを登録」から、送受信に使うアカウントを登録してください。'
+                  : '送受信に使うアカウントの登録はオーナーだけができます。オーナーに頼んでください。')
+                : undefined}
               action={accounts.length === 0
-                ? (canManage ? <Button href="/accounts/new" variant="primary"><Plus size={15} aria-hidden="true" />LINEアカウントを登録</Button> : undefined)
+                ? (canRegister ? <Button href="/accounts/new" variant="primary"><Plus size={15} aria-hidden="true" />LINEアカウントを登録</Button> : undefined)
                 : <Button type="button" onClick={() => { setQuery(''); setFilter('all') }}>条件を外す</Button>}
             />
           </div>

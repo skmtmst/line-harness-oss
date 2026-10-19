@@ -15,7 +15,7 @@ const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), stepFollowerImport: vi.fn(), list: vi.fn(),
 }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return { ...actual, api: { lineAccounts: calls, hqNotices: notices, friends: { list: async () => ({success:true,data:{total:0}}) }, lineAccountTags: { list: async () => ({success:true,data:[]}) }, staff: { list: async () => ({success:true,data:[]}) } } }
@@ -152,7 +152,7 @@ describe('R523 保存の応答消失と重複（本物のReact）', () => {
 
 describe('接続確認の失敗後も入力と権限の案内を保つ', () => {
   it.each([
-    [403, 'この操作の権限がありません。オーナーか管理者に頼んでください。'],
+    [403, 'この操作の権限がありません。オーナーに頼んでください。'],
     [429, '混み合っています。60秒ほど待ってから、もう一度お試しください。'],
   ])('%iでは原因を案内し、登録せず入力を残す', async (status, message) => {
     enterCheckStep()

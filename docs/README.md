@@ -577,3 +577,4 @@
 - [0000-kenta-cleanup-q01w4.md](release-log/unreleased/0000-kenta-cleanup-q01w4.md)
 - [0000-kenta-cleanup-q03.md](release-log/unreleased/0000-kenta-cleanup-q03.md)
 - [0000-kenta-cleanup-s02b.md](release-log/unreleased/0000-kenta-cleanup-s02b.md)
+- [1777-masato-owner-only-line-register.md](release-log/unreleased/1777-masato-owner-only-line-register.md)
