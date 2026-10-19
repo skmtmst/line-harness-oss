@@ -35,6 +35,12 @@ describe('構成の境界を実際の依存から守る', () => {
       expect(rules(files)).toEqual([]);
     }
   });
+  test('公開入口が無い新しいアプリ機能への直接読込も検出する', () => {
+    const files = fixture();
+    files.delete(root + '/index.ts');
+    files.set('apps/web/src/v8/dashboard/main.ts', "import { OrderList } from '@/v8/orders/list'");
+    expect(rules(files)).toContain('public-entry');
+  });
   test('機能内部から自分のbarrelへ戻る故障を検出する', () => {
     const files = fixture();
     files.set(root + '/model.ts', "import { OrderList } from './index'; export const formatOrder = OrderList");

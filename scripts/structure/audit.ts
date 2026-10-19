@@ -116,7 +116,7 @@ export function auditStructure(files: SourceMap, packages = new Map<string, stri
     for (const edge of edges) {
       const targetFeature = featureOf(edge.target);
       const configurationLink = /\.config\.[cm]?[jt]s$/.test(file) && /\.config\.[cm]?[jt]s$/.test(edge.target);
-      if (targetFeature && targetFeature !== feature && files.has(targetFeature + '/index.ts') && !/\/index\.[jt]sx?$/.test(edge.target) && !compatibilityEntry && !configurationLink && !testPath.test(file) && !(nextEntry.test(file) && edge.target.startsWith('apps/web/src/v8/'))) {
+      if (targetFeature && targetFeature !== feature && (targetFeature.startsWith('apps/') || files.has(targetFeature + '/index.ts')) && !/\/index\.[jt]sx?$/.test(edge.target) && !compatibilityEntry && !configurationLink && !testPath.test(file) && !(nextEntry.test(file) && edge.target.startsWith('apps/web/src/v8/'))) {
         findings.push({ rule: 'public-entry', file, target: edge.target, detail: '機能の外からは公開 index を使う' });
       }
       if (feature && edge.target === feature + '/index.ts' && !testPath.test(file)) findings.push({ rule: 'self-barrel', file, target: edge.target, detail: '機能の中から自分の公開 index を読み戻さない' });
