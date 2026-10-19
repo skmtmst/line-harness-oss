@@ -2,7 +2,8 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getSupportMarkById, setFriendSupportMarkBulk, getSavedSearches, getSavedSearchById, createSavedSearch, reorderSavedSearches, updateSavedSearchWithRevision, deleteSavedSearch, countSavedSearches, getSavedSearchReferences, getSavedSearchUsageCounts, getSavedSearchReferenceUsageCounts, validateSearchConditions, SAVED_SEARCH_LIMIT, getLoginAudit, getStaffMembers, LOGIN_AUDIT_ACTIONS, type LoginAuditRow, type LoginAuditAction, getFolders, getFolderItemCounts, isFolderKind, getWebinarFolderCounts } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';

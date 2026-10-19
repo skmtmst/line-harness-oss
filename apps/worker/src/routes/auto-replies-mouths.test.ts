@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { autoReplies } from './auto-replies.js';
 
@@ -88,7 +88,7 @@ function insertRule(
   })));
 }
 
-describe('V6 自動応答の一覧・競合・下書き保存口', () => {
+describe('自動応答の一覧・競合・下書き保存口', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {

@@ -1,4 +1,4 @@
-import type { AutomationAction, AutomationEventType } from "./types";
+import type { AutomationAction, AutomationEventType } from './types/automations';
 
 /** オートメーションのきっかけ表示名の正本。 */
 export const AUTOMATION_TRIGGER_LABELS: Record<AutomationEventType, string> = {

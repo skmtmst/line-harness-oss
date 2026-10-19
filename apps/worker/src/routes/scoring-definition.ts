@@ -3,7 +3,10 @@ import { inputError } from '../lib/input-errors.js';
 import { type Context, type MiddlewareHandler } from 'hono';
 import { getFriendById, MileageV6Error, getMileageRedemption, updateMileageRewardDraft, MileageRewardError } from '@line-crm/db';
 import type { ActionScoreFilter, ActionScoreSort, MileageEntryStatus, MileageEntryType, MileageRewardDraftInput } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
@@ -177,7 +180,7 @@ export type MileageRuleCreateInput = {
   isActive?: boolean;
 };
 
-export // ========== 行動スコア（V6 17-2） ==========
+export // ========== 行動スコア（17-2） ==========
 
 const ACTION_SCORE_FILTERS = new Set<ActionScoreFilter>(['all', 'high', 'normal', 'low', 'decreased']);
 export const ACTION_SCORE_SORTS = new Set<ActionScoreSort>([

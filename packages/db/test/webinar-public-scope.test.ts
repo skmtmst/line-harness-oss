@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
-import { getWebinarBySlug } from '../src/webinars.js';
+import { getWebinarBySlug } from '../src/webinars/index.js';
 const opened: Database.Database[] = [];
 afterEach(() => { opened.splice(0).forEach(db => db.close()); });
 function fixture() {

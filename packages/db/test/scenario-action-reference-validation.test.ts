@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { validateScenarioActionReferences } from '../src/scenarios.js';
+import { validateScenarioActionReferences } from '../src/scenarios/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

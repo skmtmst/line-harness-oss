@@ -7,15 +7,19 @@ import { inputError } from '../lib/input-errors.js';
 import { getScenarioById, createScenario, updateScenario, deleteScenario, createScenarioStep, listMoveReferrers } from '@line-crm/db';
 import { reorderScenarios } from '@line-crm/db';
 import type { ScenarioWithStepCount as DbScenarioWithStepCount, ScenarioTriggerType, MessageType, DeliveryMode } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { getWorkflowStep } from '@line-crm/db';
+
+
+
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { listLimit, listPage } from './list-pagination.js';
-import { resumeQuestionAnswer, registerLegacyQuestionAnswers } from '../services/scenario-question-answer.js';
+import { resumeQuestionAnswer, registerLegacyQuestionAnswers } from '../features/scenarios/scenario-question-answer/index.js';
 import { LineClient } from '@line-crm/line-sdk';
-import { getWorkflowStep } from '@line-crm/db';
+
 import { serializeScenario, serializeStep, VALID_DELIVERY_MODES, validateStepSchedule, validateStepCondition, validateQuestionForStorage } from './scenarios-definition.js';
 import type { Context } from 'hono';
 
@@ -116,7 +120,7 @@ export const get__api_scenarios_4 = async (c: Context<Env, "/api/scenarios">) =>
     const query = c.req.query('query')?.trim();
     if (query) {
       /*
-       * #625: LIKE ではなく instr() で部分一致する。
+       * #625: LIKE ではなく instr で部分一致する。
        * D1 は LIKE/GLOB パターンを最大50バイトに制限するため、
        * `%<検索語>%` を束縛すると48バイト超の検索語で500になっていた。
        * 記号はワイルドカードとして効かず文字どおり探す点は ESCAPE 版と同じ。

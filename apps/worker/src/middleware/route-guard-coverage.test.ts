@@ -41,11 +41,13 @@ beforeEach(() => { authState.role = 'staff'; authState.readOnly = false; authSta
 
 import {
   authMiddleware,
+  gap2ReadOperation,
   isPublicApiBoundary,
   isStaffExplicitAllow,
   isStaffSelfRouteTemplate,
   permissionForApiPath,
 } from './auth.js';
+import { gap2SelfPreference } from './auth/permissions/auth.js';
 
 /** 更新ルートごとのmiddleware引数と、登録済みの親のガードを確認する。 */
 const ROUTES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'routes');
@@ -249,6 +251,7 @@ describe('更新系の権限ガードの網羅', () => {
       && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
     ).map(route => [`${route.method} ${route.path}`, route])).values()];
     expect(routes.length).toBeGreaterThan(100);
+    const report: Array<{ method: string; path: string; unauthenticated: number; readOnly: number; withoutPermission: number | string }> = [];
     let requestIndex = 0;
     for (const route of routes) {
       const authorization = `Bearer ${String(++requestIndex).padStart(16, '0')}`;
@@ -262,13 +265,78 @@ describe('更新系の権限ガードの網羅', () => {
         headers: { Authorization: authorization, 'CF-Connecting-IP': `readonly-${path}` } }, env as never);
       expect(readOnly.status, `${route.method} ${route.path}: readonly`).toBe(403);
       authState.readOnly = false;
+      const result = { method: route.method, path: route.path, unauthenticated: unauth.status,
+        readOnly: readOnly.status, withoutPermission: 'self_or_explicit_or_platform' as number | string };
+      report.push(result);
       // 本人系と明示許可は正当な契約。運営用は専用の登録・権限試験が守る。
       if (isStaffSelfRouteTemplate(route.method, route.path)
         || isStaffExplicitAllow(route.method, route.path) || path.startsWith('/api/ops/')) continue;
       const denied = await app.request(path, { method: route.method,
         headers: { Authorization: authorization, 'CF-Connecting-IP': `staff-${path}` } }, env as never);
       expect(denied.status, `${route.method} ${route.path}: no permission`).toBe(403);
+      result.withoutPermission = denied.status;
     }
+    if (process.env.WRITE_AUTHORIZATION_REPORT) writeFileSync(process.env.WRITE_AUTHORIZATION_REPORT,
+      JSON.stringify(report, null, 2) + '\n');
+  });
+
+  it('編集権限が付いていても全役割の閲覧のみは業務の更新に到達しない', async () => {
+    const routes = [...new Map(app.routes.filter(route =>
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method)
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
+      // Preview and personal notification preferences intentionally have a
+      // separate read-only contract; they are not business write operations.
+      && !gap2ReadOperation(route.method, route.path)
+      && !gap2SelfPreference(route.method, route.path)
+    ).map(route => [`${route.method} ${route.path}`, route])).values()];
+    const report: string[] = [];
+    authState.readOnly = true;
+    let requestIndex = 100_000;
+    for (const role of ['owner', 'admin', 'staff'] as const) {
+      authState.role = role;
+      for (const route of routes) {
+        const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
+        const permission = permissionForApiPath(path);
+        authState.permissionKeys = permission ? [permission] : [];
+        const response = await app.request(path, { method: route.method, headers: {
+          Authorization: `Bearer ${String(++requestIndex).padStart(16, '0')}`,
+          'CF-Connecting-IP': `readonly-edit-${requestIndex}`,
+        } }, { ...stagingEnvironment, DB: {} } as never);
+        expect(response.status, `${role} ${route.method} ${route.path}: readonly with edit permission`).toBe(403);
+        report.push(`${role}\t${route.method}\t${route.path}\t${permission ?? '-'}\t${response.status}`);
+      }
+    }
+    expect(routes.length).toBeGreaterThan(0);
+    if (process.env.READONLY_WRITE_REPORT) writeFileSync(process.env.READONLY_WRITE_REPORT,
+      'role\tmethod\tpath\tedit_permission\tstatus\n' + report.join('\n') + '\n');
+  });
+
+  it('機能の閲覧キーだけでは同じ機能の業務を更新できない', async () => {
+    const routes = [...new Map(app.routes.filter(route =>
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method)
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
+      && !isStaffSelfRouteTemplate(route.method, route.path)
+      && !isStaffExplicitAllow(route.method, route.path)
+      && !route.path.startsWith('/api/ops/') && route.path !== '/api/auth/two-factor/policy'
+      && !gap2ReadOperation(route.method, route.path)
+      && permissionForApiPath(route.path) !== null
+    ).map(route => [`${route.method} ${route.path}`, route])).values()];
+    const report: string[] = [];
+    let requestIndex = 110_000;
+    for (const route of routes) {
+      const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
+      const permission = permissionForApiPath(path)!;
+      authState.viewKeys = [permission];
+      const response = await app.request(path, { method: route.method, headers: {
+        Authorization: `Bearer ${String(++requestIndex).padStart(16, '0')}`,
+        'CF-Connecting-IP': `view-write-${requestIndex}`,
+      } }, { ...stagingEnvironment, DB: {} } as never);
+      expect(response.status, `${route.method} ${route.path}: view permission cannot write`).toBe(403);
+      report.push(`${route.method}\t${route.path}\t${permission}\t${response.status}`);
+    }
+    expect(routes.length).toBeGreaterThan(0);
+    if (process.env.VIEW_ONLY_WRITE_REPORT) writeFileSync(process.env.VIEW_ONLY_WRITE_REPORT,
+      'method\tpath\tview_permission\tstatus\n' + report.join('\n') + '\n');
   });
 
   it('すべての管理更新APIはルート単位で保護されている', () => {

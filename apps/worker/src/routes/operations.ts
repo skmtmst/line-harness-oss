@@ -27,7 +27,8 @@ import {
   type OperationCapability,
 } from '@line-crm/db';
 
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { sensitiveStepUpSatisfied } from '../lib/step-up.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';

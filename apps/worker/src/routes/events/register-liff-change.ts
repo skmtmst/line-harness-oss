@@ -1,7 +1,7 @@
 import { replacementEventTransition } from '../../services/event-transition-plan.js';
 import { transferEventEntitlement } from '../../services/event-entitlements.js';
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
 import { inputJsonBoundary } from '../../lib/input-errors.js';
@@ -18,7 +18,7 @@ import { EventDbRow, SlotDbRow } from './time-input.js';
 export function registerLiffChange(events: Hono<Env>): void {
 // ----------------------------------------------------------------
 // U-3 LIFF: my booking occurrence change (atomic)
-// v6-29 §7-3。本人の開催回変更は「新しい席を確保できた時だけ元の申込を
+// -29 §7-3。本人の開催回変更は「新しい席を確保できた時だけ元の申込を
 // 取り消す」まとめて1つの操作。確保に失敗したら旧予約を維持する。
 // ----------------------------------------------------------------
 events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (c) => {
@@ -45,6 +45,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
     now: new Date(),
   });
   if (reservation.kind === 'cached') {
+    if (reservation.status >= 500) throw new Error('event_booking_change_cached_failure');
     return c.json(
       reservation.body as Record<string, unknown>,
       reservation.status as 200 | 201 | 400 | 409 | 410 | 422,
@@ -67,8 +68,8 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
     return await runChangeFlow();
   } catch (e) {
     if(e instanceof Error&&e.message.includes('entitlement_unavailable'))return finalize(409,{error:'entitlement_unavailable'});
-    logger.error("routes_events_failed");
-    return finalize(500, { error: 'internal_error' });
+    await finalize(500, { error: 'internal_error' });
+    throw e;
   }
 
   async function runChangeFlow(): Promise<Response> {

@@ -15,7 +15,7 @@ import {
   enqueuePendingOperationAlertNotifications,
   reconcileOperationHealthAlerts,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { processOperationAlertNotificationOutbox } from './operation-alert-notifications.js';
 

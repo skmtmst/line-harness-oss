@@ -24,9 +24,11 @@ import {
   type AdPlatformWriteScope,
 } from '@line-crm/db';
 import type { AdConversionLog } from '@line-crm/db';
+
+
 import { verifyAdPlatformReadAccess } from '../services/ad-cost-import.js';
 import { sendAdConversions, retryAdConversion, AdConversionRetryError } from '../services/ad-conversion.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listLimit, listPage } from './list-pagination.js';

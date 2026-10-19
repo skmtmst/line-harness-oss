@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { activeTenantLineAccountSql, getFriendById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { verifyCallerLineIdentity } from './liff-auth.js';
 
 /** R2 selects the owner; a caller cannot choose a friend or a different shop. */

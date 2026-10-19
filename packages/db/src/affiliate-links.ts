@@ -1,5 +1,5 @@
 import { jstNow } from './utils.js';
-import type { Affiliate } from './affiliates.js';
+import type { Affiliate } from './affiliate-record-types.js';
 // =============================================================================
 // Affiliate Links — ASP ref-code CRUD + slug generation
 // =============================================================================

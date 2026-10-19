@@ -1,9 +1,9 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { requireRole } from '../../middleware/role-guard.js';
-import { finishExpiredWaitlists, promoteBookingWaitlist } from '../../services/booking-waitlist.js';
+import { finishExpiredWaitlists, promoteBookingWaitlist } from '../../features/booking/booking-waitlist/index.js';
 import { resolveAccountIdAdmin } from './identity.js';
 import { insertWaitlistEntry, WAITLIST_ERROR_STATUS, WaitlistEntryLike } from './waitlist-input.js';
 

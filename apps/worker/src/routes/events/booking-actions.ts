@@ -99,7 +99,7 @@ export async function notifyBookingFriend(
 }
 
 /**
- * 落選ずみの予約の V6 未送信予定だけを止める (再送の修復受付と初回で共用)。
+ * 落選ずみの予約の 未送信予定だけを止める (再送の修復受付と初回で共用)。
  * 状態更新の後に呼ぶ。送信権の貸出中は投げる (呼び出し側は 409 で再試行)。
  */
 export async function repairRejectedBookingV6(

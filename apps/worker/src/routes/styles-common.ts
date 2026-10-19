@@ -1,7 +1,7 @@
 import { type Context } from 'hono';
 import { type IndustryStyle } from '@line-crm/shared';
 import { getStaffById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { hasStaffPermission } from '../middleware/role-guard.js';
 import { StyleError } from '../services/style-setup.js';

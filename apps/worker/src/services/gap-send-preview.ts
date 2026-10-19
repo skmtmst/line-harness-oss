@@ -1,6 +1,8 @@
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { buildSegmentWhere, type Broadcast, type SegmentCondition } from '@line-crm/db';
-import { getBroadcastApprovalThreshold } from './broadcast-approval.js';
+
+
+import { getBroadcastApprovalThreshold } from '../features/broadcasts/broadcast-approval/index.js';
 
 /** 人数だけをSQLで集計する。本文・全宛先はWorkerへ読み出さない。 */
 export async function sendAudienceCounts(db: D1Database, accountId: string, condition?: SegmentCondition) {

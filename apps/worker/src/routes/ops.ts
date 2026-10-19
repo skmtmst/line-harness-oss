@@ -27,7 +27,8 @@ import {
   upsertPlatformAdminInvite,
   type PlatformAuditAction,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { toImpersonationContext } from '../middleware/impersonation.js';
 import { clientIp, randomToken } from '../services/admin-session.js';
@@ -38,7 +39,7 @@ import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { parseFeaturePacks } from './tenants.js';
 
 /**
- * 運営コンソール（★V6 37 マスター）の API。すべて運営マスターだけが呼べる。
+ * 運営コンソール（★37 マスター）の API。すべて運営マスターだけが呼べる。
  *
  * ここでは統括（tenants）をまたいで読む。tenantScopeMiddleware は LINE アカウント
  * の query しか見ないので、この下の各ルートで統括 ID を必ず検証する。
@@ -56,7 +57,7 @@ function reasonFrom(body: unknown): string | null {
   return trimmed;
 }
 
-/** 招待メールに書く URL（★V6 37-10-A）。トークンは # の後ろに置き、サーバーのログに残さない。 */
+/** 招待メールに書く URL（★37-10-A）。トークンは # の後ろに置き、サーバーのログに残さない。 */
 function opsInviteUrl(c: Context<Env>, token: string): string {
   const base = (c.env.ADMIN_PUBLIC_URL ?? new URL(c.req.url).origin).replace(/\/+$/, '');
   return `${base}/ops/invite#${new URLSearchParams({ invite: token }).toString()}`;
@@ -423,7 +424,7 @@ ops.get('/api/ops/members', async (c) => {
       totpEnabled: Boolean(m.totp_enabled_at),
       lineLinked: Boolean(m.line_user_id),
       inviteStatus: m.invite_status,
-      // 招待の進み具合（★V6 37-10）: invited → awaiting_totp → active
+      // 招待の進み具合（★37-10）: invited → awaiting_totp → active
       activationState: m.activation_state,
       invitedAt: m.invited_at,
       approvedBy: m.approved_by,
@@ -443,7 +444,7 @@ ops.get('/api/ops/members', async (c) => {
 });
 
 /**
- * 運営メンバーを招待する（★V6 37-10）。メールで招待 → パスワード設定 → 2要素認証の
+ * 運営メンバーを招待する（★37-10）。メールで招待 → パスワード設定 → 2要素認証の
  * 登録が終わって初めて運営マスターになる。
  *
  * - 新しいメール: 運営会社（既定の統括）の権限者として staff_members を作り、招待を送る

@@ -1,9 +1,9 @@
 import { getRestaurantInventoryRules } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
 import { readCloseNotificationSettings } from './restaurant-close-settings.js';
 import { tzDateStr } from './availability.js';
-import { sendAutomaticBookingLine } from './booking-automatic-line.js';
+import { sendAutomaticBookingLine } from '../features/booking/booking-automatic-line/index.js';
 
 async function defaultResponsibleMembers(db:D1Database,storeId:string,date:string) {
  return (await db.prepare(`SELECT m.id,m.line_uid FROM rt_memberships m JOIN rt_stores st ON st.organization_id=m.organization_id

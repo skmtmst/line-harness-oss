@@ -2,7 +2,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { requireRole } from '../middleware/role-guard.js';
 
@@ -17,10 +17,10 @@ const conversions = new Hono<Env>();
 
 // ── Conversion Points ───────────────────────────────────────────────────────
 
-// GET /api/conversions/definitions - V6 list, filters, state counts and metrics
+// GET /api/conversions/definitions - list, filters, state counts and metrics
 conversions.get('/api/conversions/definitions', conversionPermission('view'), get__api_conversions_definitions_1);
 
-// POST /api/conversions/definitions - save the complete V6 definition and its initial usages
+// POST /api/conversions/definitions - save the complete definition and its initial usages
 conversions.post('/api/conversions/definitions', conversionPermission('edit'), inputJsonBoundary(), post__api_conversions_definitions_2);
 
 // POST /api/conversions/definitions/preview - calculate from the submitted draft without saving it
@@ -148,7 +148,7 @@ conversions.post(
   inputJsonBoundary(), post__api_conversions_events_id_reversals_10,
 );
 
-// GET /api/conversions/report - V6 report; keep the old date-query response for the current screen
+// GET /api/conversions/report - report; keep the old date-query response for the current screen
 conversions.get('/api/conversions/report', conversionPermission('view'), get__api_conversions_report_11);
 
 // GET /api/conversions/approvals?status=pending|approved|rejected

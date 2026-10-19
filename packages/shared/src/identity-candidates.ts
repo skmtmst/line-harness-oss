@@ -1,4 +1,4 @@
-/** V6 3-2-A / 23-1-A が共有する、本人照合候補の読み取り契約。 */
+/** 3-2-A / 23-1-A が共有する、本人照合候補の読み取り契約。 */
 export type IdentityCandidateKind = "friend_duplicate" | "ec_member";
 
 export type IdentityCandidateStatus =

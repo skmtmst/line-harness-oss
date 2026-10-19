@@ -4,10 +4,11 @@ import { stagingQa } from './staging-qa.js';
 import { lineProxy } from './line-proxy.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { authenticateApiToken, sha256Hex } from '../middleware/auth.js';
 import { resolveImpersonation } from '../middleware/impersonation.js';
 import { QA_PREFIX, QA_STAGING_DATABASE, qaSafeBindings, withQaOutboundBoundary, type QaRun } from '../services/staging-qa-safety.js';
+
 import { verifyPassword } from '../services/password-hash.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 

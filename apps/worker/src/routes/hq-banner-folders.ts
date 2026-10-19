@@ -2,7 +2,8 @@ import { folderInputError, inputError, inputJsonBoundary } from '../lib/input-er
 import { Hono } from 'hono';
 import { HqFolderError, listHqBannerFolders, saveHqBannerFolder, deleteHqBannerFolder, swapHqFolderOrder } from '@line-crm/db';
 import { DEFAULT_TENANT_ID, isFolderSelectColor, type HqBannerFolderKind } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 
 async function body(c: { req: { json(): Promise<unknown> } }): Promise<Record<string, unknown>> {

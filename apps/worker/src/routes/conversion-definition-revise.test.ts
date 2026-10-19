@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /*
  * POST /api/conversions/definitions/:id/revise の口の契約（N-252）。
@@ -225,7 +225,7 @@ describe('成果地点の編集の口（N-252）', () => {
  */
 const MUTATING_ENDPOINTS: Array<{
   action: string;
-  /** `hono.request()` は Response をそのまま返すこともあるので、どちらも受ける。 */
+  /** `hono.request` は Response をそのまま返すこともあるので、どちらも受ける。 */
   request: () => Response | Promise<Response>;
 }> = [
   {

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { afterEach, expect, it } from 'vitest';
-import { getFormSubmitClaimsBySubmissionIds, getFormVersionContentsByIds } from '../src/forms.js';
+import { getFormSubmitClaimsBySubmissionIds, getFormVersionContentsByIds } from '../src/forms/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 let raw: Database.Database;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeCommonVarValue } from '../src/common-vars.js';
+import { normalizeCommonVarValue } from '../src/common-vars/index.js';
 
 describe('N-187 共通情報の追加型', () => {
   it('長文・真偽・実在する年月日と日時を保存用に正規化する', () => {

@@ -2,7 +2,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { requireRole } from '../middleware/role-guard.js';
 
@@ -49,7 +49,7 @@ webhooks.get('/api/webhooks/incoming/:id/unmatched', requireRole('owner', 'admin
 /**
  * S (#939 機能26): 受け取りの試し。見本のJSONを照合と行動の組み立てまで
  * 試して結果を返す。届物の受領・行動の実行・箱への記録は一切行わない。
- * 結果だけはやり取り台帳へ「試し」として分けて残す(v6-26 §9)。
+ * 結果だけはやり取り台帳へ「試し」として分けて残す(-26 §9)。
  */
 webhooks.post('/api/webhooks/incoming/:id/test', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), post__api_webhooks_incoming_id_test_9);
 

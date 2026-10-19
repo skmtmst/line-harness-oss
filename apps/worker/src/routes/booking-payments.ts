@@ -1,6 +1,6 @@
 import { logger } from '@line-crm/shared/server';
-import { runBookingPaymentStart } from '../services/booking-payment-start.js';
-import { safeReceiptUrl } from '../services/booking-payment-history.js';
+import { runBookingPaymentStart } from '../features/booking/booking-payment-start/index.js';
+import { safeReceiptUrl } from '../features/booking/booking-payment-history/index.js';
 import { expireBookingPaymentIfHeld } from './booking-payment-expiration.js';
 export { expireBookingPaymentIfHeld } from './booking-payment-expiration.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -18,8 +18,9 @@ import {
   type BookingPaymentMode,
   type BookingPaymentProviderName,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
-import { PaymentActionError, linkPaymentBooking, parseRefundInput, refundHistory, simulatePaymentRefund } from '../services/booking-payment-refunds.js';
+
+import type { Env } from '../worker-env.js';
+import { PaymentActionError, linkPaymentBooking, parseRefundInput, refundHistory, simulatePaymentRefund } from '../features/booking/booking-payment-refunds/index.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -33,8 +34,8 @@ import {
   registerPaymentProvider,
   type PaymentProvider,
 } from '../services/payment-providers.js';
-import { reconcileExpiredBookingPayment, reconcilePaidBookingPayment } from '../services/booking-payment-recovery.js';
-import { receivePaymentEvent } from '../services/booking-payment-events.js';
+import { reconcileExpiredBookingPayment, reconcilePaidBookingPayment } from '../features/booking/booking-payment-recovery/index.js';
+import { receivePaymentEvent } from '../features/booking/booking-payment-events/index.js';
 
 /**
  * 予約の支払い（決済サービスを差し替えられる作り）。
@@ -346,7 +347,8 @@ async function accessiblePayment(c: import('hono').Context<Env>) {
 bookingPayments.onError((error,c) => {
   if (error instanceof PaymentActionError) return c.json({success:false,error:error.code,code:error.code},error.status);
   const missing = /no such (table|column).*?(booking_payment_refunds|booking_payment_booking_links|refunded_amount|actor_label)/.test(String(error));
-  const code = missing ? 'payment_refund_storage_not_ready' : 'payment_action_unavailable';
+  if (!missing) throw error;
+  const code = 'payment_refund_storage_not_ready';
   logger.error(code);
   return c.json({success:false,error:code,code}, /\/(refund|refunds|booking)$/.test(c.req.path) ? 503 : 500);
 });

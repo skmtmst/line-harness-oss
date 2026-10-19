@@ -8,8 +8,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 
-import type { Env } from '../index';
-import type { AuthenticatedStaff } from '../middleware/auth';
+import type { Env } from '../worker-env';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { scenarios } from './scenarios';
 

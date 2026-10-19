@@ -1,0 +1,30 @@
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { emptyLayout } from '@line-crm/shared';
+import { createTestD1, insertFriend, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
+import { applyFormLayoutEffects } from './form-layout-effects.js';
+let fixture: SqliteD1;
+beforeEach(()=>{fixture=createTestD1();insertFriend(fixture.raw,'f');vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('real transport forbidden')}));});
+afterEach(()=>{fixture.raw.close();vi.unstubAllGlobals();});
+test('R-FORM02: 情報欄失敗・メモ成功の再送で成功したメモを二重にしない',async()=>{
+  const layout=emptyLayout();layout.sections[0].blocks=[{id:'name',name:'name',kind:'input',type:'text',label:'名前',destinations:{friendFieldIds:['fixed-kana'],note:true,displayName:true}}];
+  const done=new Set<string>();
+  const input={db:fixture.db,layout,friendId:'f',answers:{name:'人工回答'},formId:'form',idempotencyPrefix:'form-submit:fixture',skipEffect:(id:string)=>done.has(id),onEffectComplete:async(id:string)=>{done.add(id)}};
+  fixture.raw.exec("CREATE TEMP TRIGGER fail_field BEFORE INSERT ON friend_field_values BEGIN SELECT RAISE(ABORT,'sqlite artificial failure'); END");
+  expect((await applyFormLayoutEffects(input)).failedEffects).toContain('destinations:name');
+  expect(fixture.raw.prepare('SELECT notes FROM chats WHERE friend_id=?').get('f')).toEqual({notes:'人工回答'});
+  fixture.raw.exec('DROP TRIGGER fail_field');
+  expect((await applyFormLayoutEffects(input)).failedEffects).toEqual([]);
+  expect(fixture.raw.prepare('SELECT notes FROM chats WHERE friend_id=?').get('f')).toEqual({notes:'人工回答'});
+  expect(fixture.raw.prepare('SELECT system_display_name FROM friends WHERE id=?').get('f')).toEqual({system_display_name:'人工回答'});
+  await applyFormLayoutEffects(input);
+  expect(fixture.raw.prepare('SELECT revision FROM chats WHERE friend_id=?').get('f')).toEqual({revision:0});
+});
+test('R-FORM02: メモの確定直後・上位工程記録前に落ちても一度だけ追記する',async()=>{
+  const layout=emptyLayout();layout.sections[0].blocks=[{id:'memo',name:'memo',kind:'input',type:'text',label:'メモ',destinations:{note:true}}];
+  const original=fixture.db.batch.bind(fixture.db);let failed=false;
+  fixture.db.batch=async<T=unknown>(statements:D1PreparedStatement[])=>{const result=await original<T>(statements);if(!failed&&statements.some(item=>/INSERT INTO chats/.test((item as unknown as {sql:string}).sql))){failed=true;throw new Error('sqlite interrupted after commit')}return result};
+  const input={db:fixture.db,layout,friendId:'f',answers:{memo:'一度だけ'},idempotencyPrefix:'form-submit:crash'};
+  expect((await applyFormLayoutEffects(input)).failedEffects).toContain('destinations:memo');
+  expect((await applyFormLayoutEffects(input)).failedEffects).toEqual([]);
+  expect(fixture.raw.prepare('SELECT notes,revision FROM chats WHERE friend_id=?').get('f')).toEqual({notes:'一度だけ',revision:0});
+});

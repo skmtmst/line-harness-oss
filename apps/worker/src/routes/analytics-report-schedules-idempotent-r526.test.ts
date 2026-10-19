@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * R526: 定期レポート作成の応答消失後に再試行しても、有効な予約は1件。

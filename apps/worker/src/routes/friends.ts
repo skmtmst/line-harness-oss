@@ -4,7 +4,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { denyReadOnly, requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 
@@ -21,12 +21,12 @@ const friends = new Hono<Env>();
 export { escapeLikePattern } from './friends-definition.js';
 export { requireVisibleFriend } from './friends-definition.js';
 
-// B-215: customer-requested erasure. Unfollow never calls this route.
+// customer-requested erasure. Unfollow never calls this route.
 friends.delete('/api/friends/:id/data', requireRole('owner', 'admin'), denyReadOnly(), requireIrreversibleConfirmation('delete-friend-data'), delete__api_friends_id_data_1);
 
 registerFriendDeliveryConsents(friends, requireVisibleFriend);
 
-// V6 機能3の正規URL。旧 /api/saved-searches は互換口として残す。
+// 機能3の正規URL。旧 /api/saved-searches は互換口として残す。
 friends.get('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), get__api_friends_saved_views_2);
 
 friends.post('/api/friends/saved-views', requireRole('owner', 'admin', 'staff'), inputJsonBoundary(), post__api_friends_saved_views_3);

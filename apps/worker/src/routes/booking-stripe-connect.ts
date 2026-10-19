@@ -1,9 +1,9 @@
 import type { Hono, MiddlewareHandler, Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
-import { connectHash, exchangeStripeConnectCode, revokeStripeConnect, STRIPE_CONNECT_CALLBACK, stripeConnectConfig, StripeConnectError } from '../services/booking-stripe-connect.js';
+import { connectHash, exchangeStripeConnectCode, revokeStripeConnect, STRIPE_CONNECT_CALLBACK, stripeConnectConfig, StripeConnectError } from '../features/booking/booking-stripe-connect/index.js';
 
 type State = { line_account_id: string; state_hash: string };
 const base = '/api/booking/admin/payment-connection';

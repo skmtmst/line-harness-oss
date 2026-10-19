@@ -3,6 +3,7 @@ import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import {openSeatTables} from './restaurant-closures.js';
 import {saveRestaurantFloor,validRestaurantFloor} from './restaurant-floor.js';
 import {floorBoxesOverlap,floorBoxInside,peopleBoardEntry,seatBoardEntry,reservationOccupies,type RestaurantFloorWrite} from '@line-crm/shared';
+
 let test:SqliteD1;
 const start='2027-10-01T09:00:00Z',end='2027-10-01T11:00:00Z';
 function reserve(id:string,table='t1',count=2,starts=start,ends=end,status='confirmed'){

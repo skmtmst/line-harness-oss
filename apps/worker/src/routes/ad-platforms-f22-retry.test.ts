@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { adConversionRetryExpired, drainAdConversionOutbox, retryAdConversion, sendAdConversions } from '../services/ad-conversion';
-import type { Env } from '../index';
+import type { Env } from '../worker-env';
 
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: async (_db: unknown, _staff: unknown, ids: unknown[]) => ids.every(id => id === 'account-a'),

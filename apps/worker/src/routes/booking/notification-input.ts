@@ -1,5 +1,5 @@
 import { type Context } from 'hono';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 
 // ---- 予約の変更履歴 (N-394) ----
 

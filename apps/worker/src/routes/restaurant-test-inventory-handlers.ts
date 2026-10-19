@@ -7,7 +7,7 @@ import { publicClosure, closurePreview, openSeatTables, type ClosureRow } from '
 import { safeRestaurantHttpsUrl, restaurantReservationEmbed } from '../services/restaurant-media-links.js';
 import { getRestaurantInventoryRules, saveRestaurantInventoryRules, validateRestaurantInventoryRules, listRestaurantCloseTasks } from '@line-crm/db';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { dbFor } from '../services/db-router.js';
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';

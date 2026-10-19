@@ -1,6 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
+
 import { Hono } from 'hono';
 import {
   getAutoReplies,
@@ -10,13 +11,14 @@ import {
   type AutoReplyEvaluationStatus,
   type AutoReplyRunListRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   AutoReplyActionRetryError,
   retryAutoReplyActionRuns,
-} from '../services/auto-reply.js';
+} from '../features/auto-replies/auto-reply/index.js';
 
 const autoReplyRuns = new Hono<Env>();
 

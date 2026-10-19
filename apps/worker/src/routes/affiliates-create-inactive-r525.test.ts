@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * R525: 「すぐに計測を始める」をオフで登録したら、最初のINSERTから

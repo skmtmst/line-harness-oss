@@ -1,5 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
 import { isApiErrorCode, readApiError, type ApiErrorResponse, type ApiFieldErrors } from '@line-crm/shared';
+
+
 import { createInvocationContext, currentInvocation, logger, runWithInvocation } from '@line-crm/shared/server';
 import { inputErrorMessage, readBoundedText } from '../lib/input-errors.js';
 
@@ -60,7 +62,7 @@ export const apiContractMiddleware: MiddlewareHandler = async (c, next) => {
     const started = Date.now();
     await next();
     const response = c.res;
-    // Honoのheader()はResponseを複製する。WebSocketの101は複製できない。
+    // HonoのheaderはResponseを複製する。WebSocketの101は複製できない。
     if (response.status === 101) {
       try { response.headers.set('X-Request-ID', context.requestId); } catch { /* immutableなupgradeは接続を優先する。 */ }
       logger.info('request.finished', { status: response.status, durationMs: Date.now() - started });

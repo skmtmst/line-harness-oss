@@ -1,8 +1,8 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
-import { buildConfirmationReminderSchedule, getReminderTiming } from '../../services/booking-confirm.js';
+import { buildConfirmationReminderSchedule, getReminderTiming } from '../../features/booking/booking-confirm/index.js';
 import { listBookingAuditLogs } from '@line-crm/db';
-import { getBookingAdminDetail } from '../../services/booking-admin-detail.js';
+import { getBookingAdminDetail } from '../../features/booking/booking-admin-detail/index.js';
 import { resolveAccountIdAdmin } from './identity.js';
 
 export function registerDetail(booking: Hono<Env>): void {

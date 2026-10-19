@@ -3,7 +3,7 @@ import { sqlIdSet } from './id-queries.js';
 import { jstNow, nextVersionToken } from './utils.js';
 
 /**
- * 運営からのお知らせ配信 ★V6 37-7 と契約者専用LINE（migration 429）。
+ * 運営からのお知らせ配信 ★37-7 と契約者専用LINE（migration 429）。
  */
 
 export const ANNOUNCEMENT_AUDIENCES = ['all', 'plan', 'tenants'] as const;

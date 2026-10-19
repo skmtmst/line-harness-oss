@@ -1,5 +1,5 @@
 import { sqlIdSet } from './id-queries.js';
-import type { AutoReply } from './auto-replies.js';
+import type { AutoReply } from './auto-reply-record-types.js';
 import { jstNow } from './utils.js';
 import { type AutoReplyDraftSettings, type AutoReplyVersionRow } from './auto-reply-runs-types.js';
 

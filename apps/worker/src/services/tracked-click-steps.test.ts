@@ -1,12 +1,12 @@
 vi.mock('./feature-enforcement.js',()=>({featureJobCanRun:async()=>true}));
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {createTestD1,insertFriend,type SqliteD1} from '../test-utils/d1-sqlite.js';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 const fault=vi.hoisted(()=>({tag:true}));
 vi.mock('./activity-mileage.js',()=>({awardActivityMileage:async(db:D1Database)=>db.prepare("UPDATE effects SET n=n+1 WHERE id='mileage'").run()}));
 vi.mock('./action-score-events.js',()=>({applyActionScoreEvent:async(db:D1Database)=>db.prepare("UPDATE effects SET n=n+1 WHERE id='score'").run()}));
-vi.mock('./automation-triggers.js',()=>({dispatchAutomationEventWithLogging:async(db:D1Database)=>{await db.prepare("UPDATE effects SET n=n+1 WHERE id='automation'").run();return []}}));
-vi.mock('./friend-tag-attach.js',()=>({attachTagAndFireSideEffects:async(db:D1Database)=>{
+vi.mock('../features/automations/automation-triggers.js',()=>({dispatchAutomationEventWithLogging:async(db:D1Database)=>{await db.prepare("UPDATE effects SET n=n+1 WHERE id='automation'").run();return []}}));
+vi.mock('../features/friends/friend-tag-attach.js',()=>({attachTagAndFireSideEffects:async(db:D1Database)=>{
  await db.prepare("UPDATE effects SET n=n+1 WHERE id='tag'").run();if(fault.tag)throw new Error('tag after write failed');
 }}));
 import {recordTrackedClick,processTrackedClick,processDueTrackedClicks} from './tracked-click-steps.js';

@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { expect,it } from 'vitest';
 import { asD1 } from './d1-test-helper.js';
-import { getConfirmedConversionCount } from '../src/conversion-definitions.js';
+import { getConfirmedConversionCount } from '../src/conversion-definitions/index.js';
 it('確定成果は承認・取消・所属・日本時間の期間を同時に守る',async()=>{
  const db=new Database(':memory:');
  try {

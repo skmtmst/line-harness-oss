@@ -35,7 +35,9 @@ import {
   type SupportStage,
   type SupportTicketRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { clientIp } from '../services/admin-session.js';
 import { dbFor } from '../services/db-router.js';
@@ -45,7 +47,7 @@ import { serializeKnowledge } from './ops-knowledge.js';
 import { knowledgeNames, redactKnowledgeText, KnowledgeAiTimeout } from '../services/platform-knowledge.js';
 
 /**
- * 運営コンソールのお問い合わせ（チケット）★V6 37-6 / 37-6-A / 37-6-B。
+ * 運営コンソールのお問い合わせ（チケット）★37-6 / 37-6-A / 37-6-B。
  *
  * 表は統括側 36-3 と同じ hq_support_requests。運営マスターだけが呼べる。
  * 返信は統括の登録メールへ送り、統括の画面（36-3 の履歴）にも載る。
@@ -353,7 +355,7 @@ function aiText(result: unknown): string {
   return typeof content === 'string' ? content.trim() : '';
 }
 
-/** AI に渡す材料（★V6 37-6-A）。個人のメールアドレスや LINE ID は渡さない。 */
+/** AI に渡す材料（★37-6-A）。個人のメールアドレスや LINE ID は渡さない。 */
 export function buildDraftPrompt(input: {
   ticket: { ticketLabel: string; subject: string; body: string; kindLabel: string; staffName: string; staffRole: string | null; tenantName: string; planLabel: string };
   messages: Array<{ authorKind: 'tenant' | 'ops'; authorName: string; body: string }>;

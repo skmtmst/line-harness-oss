@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware, sha256Hex } from '../middleware/auth.js';
 import { tenantScopeMiddleware } from '../middleware/tenant-scope.js';
 import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.js';

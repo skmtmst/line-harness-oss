@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 
 // We assert on the SQL/binds the route forwards to D1. The DB-helper path
@@ -39,9 +39,9 @@ vi.mock('../services/feature-enforcement.js', async (importOriginal) => ({
 const { automations } = await import('./automations.js');
 
 /*
- * #942: requireVisibleAutomation は先に V6 の automation_definitions を
+ * #942: requireVisibleAutomation は先に の automation_definitions を
  * db.prepare で引く。旧テストは `{}` を渡していたため prepare が無く 500
- * になった。ここでは「V6には無い」= null を返す最小のD1を用意し、
+ * になった。ここでは「には無い」= null を返す最小のD1を用意し、
  * 旧 automations 表のモック（getAutomationById）へ落ちる経路を残す。
  */
 const fakeD1 = () => ({
@@ -513,7 +513,7 @@ describe('CSV書き出し（#942 N-353）', () => {
     expect(res.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
     expect(res.headers.get('Content-Disposition')).toContain('automation-runs.csv');
     // Excelで日本語が化けない先頭の目印（BOM）は生のバイト列で確かめる
-    // （Response.text() はUTF-8のBOMを読み飛ばすため）。
+    // （Response.text はUTF-8のBOMを読み飛ばすため）。
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect(Array.from(bytes.slice(0, 3))).toEqual([0xEF, 0xBB, 0xBF]);
     const lines = new TextDecoder().decode(bytes.subarray(3)).split('\r\n');
@@ -563,7 +563,7 @@ describe('CSV書き出し（#942 N-353）', () => {
   });
 
   /*
-   * #1043 / V6 §9: CSV書き出しは個別権限 `automation.run.export`。
+   * #1043 / §9: CSV書き出しは個別権限 `automation.run.export`。
    * 見るだけ（/automations）では出せず、export キーで出せる。
    */
   test('見るだけの権限ではCSVを出せず、書き出し権限のstaffは出せる', async () => {
@@ -693,7 +693,7 @@ describe('POST /api/automation-runs/:id/cancel（#942 N-353）', () => {
     const denied = await setupApp(testDb.db, STAFF_WITHOUT_KEY)
       .request('/api/automation-runs/run-1/cancel', { method: 'POST' });
     expect(denied.status).toBe(403);
-    // #1043 / V6 §9: 取り消しは automation.run.retry の個別権限。
+    // #1043 / §9: 取り消しは automation.run.retry の個別権限。
     // 見るだけの権限（/automations）では取りやめられない。
     const viewOnly = await setupApp(testDb.db, STAFF_WITH_KEY)
       .request('/api/automation-runs/run-1/cancel', { method: 'POST' });

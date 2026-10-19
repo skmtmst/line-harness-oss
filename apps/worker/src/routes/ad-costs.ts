@@ -13,7 +13,7 @@ import {
   normalizeCostCurrency,
   upsertAdCostEntry,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { importAdCostNow } from '../services/ad-cost-import.js';

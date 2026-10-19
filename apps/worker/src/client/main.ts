@@ -55,7 +55,7 @@ if (!LIFF_ID) {
   throw new Error('LIFF ID not found. Set ?liffId= in LIFF endpoint URL or VITE_LIFF_ID env.');
 }
 const UUID_STORAGE_KEY = 'lh_uuid';
-// Bot basic ID — resolved dynamically from API after liff.init()
+// Bot basic ID — resolved dynamically from API after liff.init
 let BOT_BASIC_ID = '';
 let signedRedirectTarget: string | null = null;
 
@@ -609,7 +609,7 @@ async function initAffiliate(): Promise<void> {
   // 取得し、未友達なら friend-add gate、友達なら React mount。
   //
   // booking 系は id_token で verify するが、affiliate API は LINE access token
-  // (liff.getAccessToken()) を /oauth2/v2.1/verify + /v2/profile で検証するため
+  // (liff.getAccessToken) を /oauth2/v2.1/verify + /v2/profile で検証するため
   // ここでは accessToken を取り出して mount context に渡す。
   const [profile, accessToken, friendship] = await Promise.all([
     liff.getProfile(),

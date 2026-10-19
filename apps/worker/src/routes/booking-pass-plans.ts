@@ -1,8 +1,8 @@
 import {requirePermission} from '../middleware/role-guard.js';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapVersion,gapWrite} from '../services/gap-common.js';
-import {eventScopeInput,passPlanInput,passPlanView} from '../services/booking-pass-plans.js';
+import {eventScopeInput,passPlanInput,passPlanView} from '../features/booking/booking-pass-plans/index.js';
 export const bookingPassPlans=new Hono<Env>();
 bookingPassPlans.use('/api/booking/admin/pass-plans*',requirePermission('/booking/bookings'));
 bookingPassPlans.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'pass_plans_unavailable'},e instanceof GapError?e.status:503));

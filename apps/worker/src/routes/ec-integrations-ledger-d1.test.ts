@@ -1,4 +1,4 @@
-import { processDueEcRetries } from '../services/ec-retry.js';
+import { processDueEcRetries } from '../features/ec-commerce/ec-retry.js';
 /*
  * N-328 / N-330 (#943): ECイベントからの顧客通知送信を、実D1で共通送信台帳
  * (notification_instances / notification_deliveries /
@@ -12,7 +12,7 @@ import { processDueEcRetries } from '../services/ec-retry.js';
  */
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index';
+import type { Env } from '../worker-env';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
@@ -34,7 +34,7 @@ vi.mock('../services/nen-engagement.js', () => ({
 }));
 
 const { ecIntegrations } = await import('./ec-integrations.js');
-const { ecNotificationRetryKey } = await import('../services/ec-event-publish.js');
+const { ecNotificationRetryKey } = await import('../features/ec-commerce/ec-event-publish.js');
 
 const LINE_USER_ID = `U${'a'.repeat(32)}`;
 

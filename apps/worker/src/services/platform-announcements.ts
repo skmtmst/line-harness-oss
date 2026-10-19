@@ -14,12 +14,13 @@ import {
   type AudienceStaffRow,
   type PlatformAnnouncement,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { sendPlainMail } from './plain-mail.js';
 
 /**
- * 運営からのお知らせ配信 ★V6 37-7。
+ * 運営からのお知らせ配信 ★37-7。
  *
  * 送り方は line（契約者専用LINE）／screen（統括の管理画面）／email（登録メール）。
  * LINE は契約者専用LINEの友だちとして紐づいた権限者にだけ push する（誰に届いたかを数えるため）。

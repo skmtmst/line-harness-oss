@@ -12,8 +12,8 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
-import { d1AssignmentSettingsStore } from '../services/booking-assignment-settings.js';
+import type { Env } from '../worker-env.js';
+import { d1AssignmentSettingsStore } from '../features/booking/booking-assignment-settings.js';
 
 const availabilityMocks = vi.hoisted(() => ({
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
@@ -49,8 +49,8 @@ const notifierMocks = vi.hoisted(() => ({
   sendBookingNotification: vi.fn(async () => undefined),
 }));
 // 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -60,8 +60,8 @@ const accountAccessMocks = vi.hoisted(() => ({
 vi.mock('../services/account-access.js', () => accountAccessMocks);
 
 const conflictHooks = vi.hoisted(() => ({ notifyBookingConflicts: vi.fn(async () => undefined) }));
-vi.mock('../services/booking-channels.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-channels.js')>()),
+vi.mock('../features/booking/booking-channels.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-channels.js')>()),
   ...conflictHooks,
 }));
 

@@ -8,6 +8,7 @@ import {
   type BannerReferenceMode,
 } from '@line-crm/db';
 
+
 export { BANNER_MAX_REFERENCE_IMAGES, isBannerReferenceMode };
 export type { BannerReference, BannerReferenceMode };
 
@@ -147,7 +148,7 @@ function referenceParts(references: BannerReference[]): string[] {
 export function buildBannerPrompt(input: BannerPromptInput): string {
   const parts: string[] = [];
 
-  // 参照画像（★V6 35-2・★BG-C `cOgWE`）。添えた画像をどう扱うかを最初に言い切る。
+  // 参照画像（★35-2・★BG-C `cOgWE`）。添えた画像をどう扱うかを最初に言い切る。
   parts.push(...referenceParts((input.references ?? []).slice(0, BANNER_MAX_REFERENCE_IMAGES)));
 
   if (input.mode === 'free') {

@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
-import { menuAudience } from '../../services/booking-audience.js';
+import { menuAudience } from '../../features/booking/booking-audience/index.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { listMenuVersions, revertMenuToVersion, menuVersionContentLines, replaceBookingMenuResources } from '@line-crm/db';

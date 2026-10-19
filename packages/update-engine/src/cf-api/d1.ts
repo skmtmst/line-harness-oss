@@ -1,5 +1,5 @@
 import type { CfApiCreds } from '../types.js';
-import { authHeader, d1QueryApiUrl, readBodyExcerpt } from './_shared.js';
+import { authHeader, d1QueryApiUrl, readBodyExcerpt } from './shared.js';
 
 /**
  * Cloudflare D1 Query API helper.

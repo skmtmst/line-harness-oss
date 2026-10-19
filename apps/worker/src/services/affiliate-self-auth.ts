@@ -1,6 +1,6 @@
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getFriendByLineUserIdForAccount, listLineAccountsWithTenantStatus } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 

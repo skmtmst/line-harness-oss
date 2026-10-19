@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import { Hono } from 'hono';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import {
   AutomationActionError,
   processAutomationRun,
   retryAutomationRun,
   startAutomationRun,
-} from '../services/automation-engine.js';
+} from '../features/automations/automation-engine.js';
 import { automations } from './automations.js';
 
 // #736: 実DBで旧PUTの許可/拒否と再送受け付けを確かめる。dbのからくりは使わない。

@@ -1,7 +1,7 @@
 import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 
 import { get__api_friend_add_runs_1, get__api_friend_add_runs_id_2, post__api_friend_add_runs_id_retry_3, post__api_friend_add_rules_folders_4, patch__api_friend_add_rules_folders_id_5, delete__api_friend_add_rules_folders_id_6, get__api_friend_add_rules_7, patch__api_friend_add_rules_reorder_8, put__api_friend_add_rules_order_9 } from './friend-add-rules-runs-handlers.js';
@@ -31,7 +31,7 @@ friendAddRules.get('/api/friend-add-rules', requireRole('owner', 'admin', 'staff
 
 /*
  * PATCH /api/friend-add-rules/reorder — 一覧のつまみで動かした順を
- * 優先順位としてまとめて書く（★V8 MRhef）。
+ * 優先順位としてまとめて書く（★V8 ）。
  *
  * priority は版ではなく行の値で、実行側がそのまま読むため下書きを経ず
  * すぐ効く。受け皿（経路が分からなかった人）は常に最後なので対象外。

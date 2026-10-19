@@ -3,10 +3,10 @@ import { FEATURE_IDS } from '@line-crm/shared';
 import { saveVersionedAccountSetting } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-const { processScheduledBroadcasts } = await import('./broadcast.js');
+const { processScheduledBroadcasts } = await import('../features/broadcasts/broadcast.js');
 const { processStepDeliveries } = await import('./step-delivery.js');
-const { processDueReminders } = await import('./booking-reminders.js');
-const { processAutomationRun } = await import('./automation-engine.js');
+const { processDueReminders } = await import('../features/booking/booking-reminders.js');
+const { processAutomationRun } = await import('../features/automations/automation-engine.js');
 const { processNenDeliveries } = await import('./nen-engagement.js');
 const { isCommonVarsEnabled } = await import('@line-crm/db');
 const { accountFeatureIsEnabled } = await import('./feature-enforcement.js');

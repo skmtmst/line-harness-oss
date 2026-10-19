@@ -1,15 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  CredentialEncryptionKeyError,
-  decryptCredential,
-  decryptLineAccountCredentials,
-  encryptCredential,
-  createLineAccount,
-  getLineAccountCredentialHealth,
-  resolveLineCredential,
-  DEFAULT_TENANT_ID,
-  type LineAccount,
-} from '../src/index.js';
+import { CredentialEncryptionKeyError, decryptCredential, decryptLineAccountCredentials, encryptCredential, createLineAccount, getLineAccountCredentialHealth, resolveLineCredential, DEFAULT_TENANT_ID } from '../src/index.js';
+import { type LineAccount } from '../src/line-accounts-types.js';
 
 const KEY = btoa('0123456789abcdef0123456789abcdef');
 const OTHER_KEY = btoa('abcdef0123456789abcdef0123456789');

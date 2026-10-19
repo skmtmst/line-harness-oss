@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { asD1 } from './d1-test-helper.js';
 import { purgeExpiredAutomationRuns } from '../src/automation-retention.js';
 import { getFriendFieldListSummary, countFriendFieldValuesForScopes } from '../src/friend-fields.js';
-import { createMileageRewardDraft, importMileageRewardCodes } from '../src/mileage-rewards.js';
+import { createMileageRewardDraft, importMileageRewardCodes } from '../src/mileage/rewards.js';
 import { captureFriendAddEventAttribution } from '../src/friend-add-events.js';
 import { recordLinkClick } from '../src/tracked-links.js';
 import { addScore } from '../src/scoring.js';

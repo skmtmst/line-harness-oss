@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { VisitStampSettings } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { processVisitStampQueue, saveStampCard, stampWallet } from './visit-stamps.js';
 let f: SqliteD1; let card: string;
 const tenant='00000000-0000-4000-8000-000000000001';

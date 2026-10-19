@@ -1,4 +1,4 @@
-/** B-349: API contracts for the third gap tranche. No live external writes. */
+/** API contracts for the third gap tranche. No live external writes. */
 export type InboxStrategy='none'|'even'|'priority'|'random_weighted';
 export interface InboxRoutingTarget {staffId:string;priority:number;cap:number}
 export interface RankTier {id:string;name:string;threshold:number;mileMultiplier:number;tagId?:string;benefitDescriptions?:string[];couponCode?:string|null;upgradeMessages?:Array<{type:"text";text:string}>;downgradeMessages?:Array<{type:"text";text:string}>}

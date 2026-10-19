@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { deliveryAccessGuard } from './restaurant-delivery-common.js';
 import { registerDeliveryOrderReads } from './restaurant-delivery-orders-read.js';
 import { registerDeliveryOrderActions } from './restaurant-delivery-orders-actions.js';

@@ -4,7 +4,7 @@ import { workflowLineClient } from '../services/workflow-line-client.js';
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
 import type { WebhookRequestBody } from '@line-crm/line-sdk';
 import { listLineAccountsWithTenantStatus } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { processLineWebhookEvents } from '../services/line-webhook-events.js';
 import { MAX_WEBHOOK_BODY_SIZE, handleStoppedTenantEvent, handleNoticeLinkCode, handleEvent } from './webhook-definition.js';
 import type { Context } from 'hono';
@@ -133,7 +133,7 @@ export const post__webhook_1 = async (c: Context<Env, "/webhook">) => {
           lineMessageAccountKey,
         );
       }
-      // 契約者専用LINE（★V6 37-7）: 6 桁の確認コードなら権限者の紐づけとして受ける。
+      // 契約者専用LINE（★37-7）: 6 桁の確認コードなら権限者の紐づけとして受ける。
       // 対象アカウント以外・コード以外は何もしないので、店舗のアカウントには影響しない。
       if (await handleNoticeLinkCode(c.env, execution.mutationDb('notice_code'), ownedClient, event, matchedAccountId)) return;
       return handleEvent(

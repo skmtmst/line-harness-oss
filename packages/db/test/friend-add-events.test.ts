@@ -61,7 +61,7 @@ function setup(): Database.Database {
 }
 
 
-describe('friend add V6 event ledger', () => {
+describe('friend add event ledger', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

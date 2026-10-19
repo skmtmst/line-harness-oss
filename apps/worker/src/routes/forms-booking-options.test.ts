@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID, emptyLayout, type FormBookingConfig, type FormInputBlock } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { authMiddleware } from '../middleware/auth.js';
 
-vi.mock('../services/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects: vi.fn() }));
+vi.mock('../features/friends/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects: vi.fn() }));
 vi.mock('../services/event-bus.js', () => ({ fireEvent: vi.fn(), logOutgoingMessage: vi.fn() }));
 const { forms } = await import('./forms.js');
 let sqlite: SqliteD1;

@@ -1,5 +1,8 @@
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
+import type { Env } from '../worker-env.js';
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 
 // 分類は純粋関数なので実物を差す。ロジックを試験側へ複写すると
@@ -96,7 +99,7 @@ const authMock = { verifyCallerLineUserId: vi.fn() };
 vi.mock('../services/liff-auth.js', () => authMock);
 
 const tagMock = { attachTagAndFireSideEffects: vi.fn(), detachTagAndFireSideEffects: vi.fn() };
-vi.mock('../services/friend-tag-attach.js', () => tagMock);
+vi.mock('../features/friends/friend-tag-attach.js', () => tagMock);
 
 const localProxyMock = { dispatchLineProxyLocally: vi.fn() };
 vi.mock('../services/local-line-proxy.js', () => localProxyMock);
@@ -109,7 +112,7 @@ const webinarNotificationMocks = {
   saveWebinarNotificationSettings: vi.fn(),
   sendWebinarNotificationTest: vi.fn(),
 };
-vi.mock('../services/webinar-notifications.js', () => webinarNotificationMocks);
+vi.mock('../features/webinars/webinar-notifications.js', () => webinarNotificationMocks);
 
 const accountAccessMock = {
   canAccessAllLineAccounts: vi.fn(async (
@@ -122,7 +125,7 @@ const accountAccessMock = {
 vi.mock('../services/account-access.js', () => accountAccessMock);
 
 const audienceMock = vi.hoisted(() => ({ countRecentWebinarViewers: vi.fn(async () => 0) }));
-vi.mock('../services/webinar-audience.js', () => ({
+vi.mock('../features/webinars/webinar-audience.js', () => ({
   ...audienceMock, WEBINAR_AUDIENCE_WINDOW_SECONDS: 60,
 }));
 
@@ -177,6 +180,7 @@ adminApp.use('*', async (c, next) => {
   return next();
 });
 adminApp.route('/', webinarRoutes);
+adminApp.onError(unhandledWorkerError);
 
 function adminReq(path: string, init?: RequestInit) {
   if (init?.method === 'PUT' && /^\/api\/webinars\/[^/]+$/.test(path) && typeof init.body === 'string') {
@@ -1332,7 +1336,14 @@ describe('webinar notification settings', () => {
     const res = await adminReq('/api/webinars/w1/notifications/test', { method: 'POST' });
 
     expect(res.status).toBe(expectedStatus);
-    expect(await res.json()).toMatchObject({ success: false });
+    const body = await res.json<{ incidentId?: string }>();
+    expect(body).toMatchObject({ success: false });
+    if (expectedStatus === 500) {
+      expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
+    } else {
+      expect(report).not.toHaveBeenCalled();
+    }
   });
 });
 
@@ -2528,7 +2539,7 @@ describe('GET /api/liff/webinars/:slug/audience', () => {
 });
 
 
-describe('B-333 ウェビナーの見逃し・完了・保存', () => {
+describe('ウェビナーの見逃し・完了・保存', () => {
   test('期限の切れた見逃しは専用リンクでも開けない', async () => {
     vi.setSystemTime(new Date((SESSION_START + 9 * 86400) * 1000));
     dbMocks.isWebinarMissedInWindow.mockResolvedValueOnce(false);

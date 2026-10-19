@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { dbFor } from './db-router.js';

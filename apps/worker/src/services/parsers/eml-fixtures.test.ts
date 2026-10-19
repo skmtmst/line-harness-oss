@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import PostalMime from 'postal-mime';
 import { describe, expect, it } from 'vitest';
 import { validateParsedReservationEmail } from '../restaurant-reservation-email.js';
-import { parserFor, type ParsedReservationEmail, type ReservationEmailKind } from './index.js';
+import { parserFor } from './index.js';
+import { type ParsedReservationEmail, type ReservationEmailKind } from './types.js';
 
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 const validationNow = new Date('2026-08-22T00:00:00+09:00');

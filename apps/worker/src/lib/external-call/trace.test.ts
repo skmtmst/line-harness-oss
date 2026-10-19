@@ -1,7 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { LineClient } from '@line-crm/line-sdk';
 import { currentInvocation, currentRequestId, logger, withInvocation } from '@line-crm/shared/server';
-import { createCallState, createExternalCall, API_RETRY_WAIT, MemoryCircuitStore, type CallState } from './index.js';
+import { createCallState, createExternalCall, API_RETRY_WAIT, MemoryCircuitStore } from './index.js';
+import { type CallState } from './types.js';
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 it('LINEの差し替えたtransportにも3つの低層通信から同じ番号を渡す', async () => {

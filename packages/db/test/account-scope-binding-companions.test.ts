@@ -2,9 +2,9 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { getCalendarConnections } from '../src/calendar.js';
-import { getTagGroups } from '../src/tags.js';
+import { getTagGroups } from '../src/tags/index.js';
 import { getAffiliates } from '../src/affiliates.js';
-import { getConversionPoints } from '../src/conversions.js';
+import { getConversionPoints } from '../src/conversions/index.js';
 import { asD1 } from './d1-test-helper.js';
 test('SCALE-02 仲間の201店舗の所属範囲も100変数を超えない', async()=>{
  const raw=new Database(':memory:');raw.exec(readFileSync(new URL('../bootstrap.sql',import.meta.url),'utf8'));

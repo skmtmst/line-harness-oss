@@ -4,7 +4,7 @@ import { inputError } from '../../lib/input-errors.js';
 import { type Context, type MiddlewareHandler } from 'hono';
 import { getLineAccounts } from '@line-crm/db';
 import { BOOKING_STAFF_OWN_KEY } from '@line-crm/shared';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import { hasStaffPermission } from '../../middleware/role-guard.js';
 import { staffAuditActor } from './notification-input.js';
 

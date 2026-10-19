@@ -4,7 +4,7 @@ import {
   getReminderById,
   saveReminderDraftVersion,
   updateReminder,
-} from './reminders.js';
+} from './reminders/index.js';
 
 const OLD_STAMP = '2026-09-27T10:00:00.000+09:00';
 
@@ -33,7 +33,7 @@ function asD1(sqlite: Database.Database): D1Database {
           return runSync<T>();
         },
         raw: async () => [],
-        // batch 用の同期実行口。async run() は失敗を rejected promise に変えるため、
+        // batch 用の同期実行口。async run は失敗を rejected promise に変えるため、
         // better-sqlite3 の transaction が巻き戻しを見逃す。ここでは投げ直す。
         runSyncForBatch: <T>() => runSync<T>(),
       } as unknown as D1PreparedStatement;

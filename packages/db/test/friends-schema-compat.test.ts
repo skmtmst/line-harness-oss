@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, test } from 'vitest';
-import { upsertFriend } from '../src/friends.js';
+import { upsertFriend } from '../src/friends/index.js';
 
 const databases: Database.Database[] = [];
 

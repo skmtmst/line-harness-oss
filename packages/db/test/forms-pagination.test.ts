@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getFormSubmissions, getFormSubmissionsPage } from '../src/forms.js';
+import { getFormSubmissions, getFormSubmissionsPage } from '../src/forms/index.js';
 import { MAX_LIST_LIMIT } from '../src/utils.js';
 
 describe('getFormSubmissionsPage', () => {

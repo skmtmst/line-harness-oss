@@ -21,7 +21,7 @@ export interface OpenAIImageRequest {
   /** 0〜100。JPEG の圧縮率。 */
   outputCompression?: number;
   /**
-   * 参照画像（★V6 35-2 の参照画像欄）。あるときは generations ではなく edits を呼ぶ。
+   * 参照画像（★35-2 の参照画像欄）。あるときは generations ではなく edits を呼ぶ。
    * 「土台に描き直す」も「雰囲気を参考にする」も同じ入口で、違いはプロンプトで伝える。
    */
   referenceImage?: OpenAIReferenceImage;

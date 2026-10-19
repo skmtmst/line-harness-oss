@@ -1,6 +1,6 @@
 import { logger, traceQueueMessage } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { verifySupportRelay } from '../services/support-relay.js';
 import {
   handleSlackTaskAction,
@@ -11,19 +11,8 @@ import {
 } from '../services/codex-slack-relay.js';
 import { verifySlackRequest } from '../services/slack-signature.js';
 import { parseCodexAuditApproval } from '../services/codex-auto-merge.js';
-import {
-  hasClaudeToCodexMarker,
-  hasActualSlackMention,
-  isAllowedRelayChannel,
-  isAllowedRelaySource,
-  isAutomaticCodexRelay,
-  isCodexRelayEnabled,
-  markCodexMentionFailed,
-  observeOfficialCodexReply,
-  parseSlackEventEnvelope,
-  recordSlackMention,
-  type CodexMentionQueueMessage,
-} from '../services/codex-cloud-monitor.js';
+import { hasClaudeToCodexMarker, hasActualSlackMention, isAllowedRelayChannel, isAllowedRelaySource, isAutomaticCodexRelay, isCodexRelayEnabled, markCodexMentionFailed, observeOfficialCodexReply, parseSlackEventEnvelope, recordSlackMention } from '../services/codex-cloud-monitor.js';
+import { type CodexMentionQueueMessage } from '../services/codex-cloud-types.js';
 
 const MAX_BODY_BYTES = 32 * 1024;
 const ALLOWED_EVENT_TYPES = new Set(['prompt_submitted', 'turn_completed', 'approval_required']);

@@ -5,7 +5,7 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getScenarioById, getFriendScenarioById, pauseFriendScenarioManual, resumeFriendScenarioById, retryFailedFriendScenario, moveFriendScenarioTo, getFriendById, publishScenarioVersion, validateScenarioActionReferences } from '@line-crm/db';
 import { getScenarioTriggers, addScenarioTrigger, removeScenarioTrigger } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validScenarioPublishKey, serializeAction, VALID_ACTION_HOOKS, VALID_ACTION_TYPES, validateActionConfig, runTestSend, requireScenarioAccountScope, parseJson, runFriendScenarioOp, serializeFriendScenario } from './scenarios-definition.js';

@@ -2,7 +2,7 @@ import { activeTenantLineAccountSql, resolveLineCredential } from '@line-crm/db'
 import { type Message } from '@line-crm/line-sdk';
 import { currentEventNotificationSubject, type EventNotificationSubject } from './event-notification-subject.js';
 import { sendPreparedEventBookingNotification } from './event-booking-notifier.js';
-import { deliverBookingLine } from './booking-line-delivery.js';
+import { deliverBookingLine } from '../features/booking/booking-line-delivery/index.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import { isOperationCapabilityStopped } from '@line-crm/db';
 

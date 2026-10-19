@@ -1,19 +1,19 @@
 import { logger } from '@line-crm/shared/server';
 import type { SelfBookingChange } from '../booking-self-meet-sync.js';
-import { notifyForBooking } from '../../services/booking-notification.js';
+import { notifyForBooking } from '../../features/booking/booking-notification/index.js';
 import { inputError } from '../../lib/input-errors.js';
 import { type Context } from 'hono';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import { cancelByTrigger, reconcileV6ToStartsAt, rescheduleByTrigger } from '../../services/reminder-trigger.js';
 import { getStoreCapacitySnapshot } from '../../services/availability.js';
-import { STORE_CAPACITY_GUARD_EXCLUDE_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../../services/booking-store-capacity.js';
-import { BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL, bookingResourceGuardExcludeBindings } from '../../services/booking-resource-capacity.js';
-import { runBookingGoogleSync } from '../../services/booking-calendar-sync.js';
-import { buildConfirmationReminderSchedule, getReminderTiming, type BookingReminderScheduleItem } from '../../services/booking-confirm.js';
-import { type BookingStatus } from '../../services/booking-types.js';
+import { STORE_CAPACITY_GUARD_EXCLUDE_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../../features/booking/booking-store-capacity/index.js';
+import { BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL, bookingResourceGuardExcludeBindings } from '../../features/booking/booking-resource-capacity/index.js';
+import { runBookingGoogleSync } from '../../features/booking/booking-calendar-sync/index.js';
+import { buildConfirmationReminderSchedule, getReminderTiming, type BookingReminderScheduleItem } from '../../features/booking/booking-confirm/index.js';
+import { type BookingStatus } from '../../features/booking/booking-types/index.js';
 import { bookingAuditInsert, recordBookingAudit } from '@line-crm/db';
-import { listBookingOperations, queueBookingOperation } from '../../services/booking-operation-runs.js';
-import { bookingAutomaticNotificationAllowed } from '../../services/booking-channels.js';
+import { listBookingOperations, queueBookingOperation } from '../../features/booking/booking-operation-runs/index.js';
+import { bookingAutomaticNotificationAllowed } from '../../features/booking/booking-channels/index.js';
 import { resolveAccountIdAdmin, readSelfBookingRules, assertStaffInAccount, selfAuditActor } from './identity.js';
 import { googleCredentials, reverifyLatestSlot, bookingConflictAlternatives } from './availability.js';
 import { readNotificationPolicySnapshot, BookingNotificationPolicy, readNotificationPolicyPatch } from './notification-input.js';
@@ -459,7 +459,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
   }
   const remindersCreated = (timingChanged || policyChanged) ? reminderSchedule.length : 0;
 
-  // ---- V6 トリガ連動 ----
+  // ---- トリガ連動 ----
   // 変更は「新しい起点へ移す」ので cancel ではなく reschedule を使う。
   // R336: 応答を返す前に終わらせ、失敗は握りつぶさず応答と監査へ残す。
   // 予約変更自体は成立ずみのため 200 のまま (落とさない)。
@@ -580,7 +580,7 @@ export async function updateAdminBooking(c: Context<Env>, override?: AdminBookin
       : googleSync === 'skipped' ? 'not_configured' : 'not_applicable',
     change_notification: wantsChangeNotice ? 'queued' : 'not_applicable',
     change_notification_reason: !wantsChangeNotice && changeNoticeRequested ? 'sending_stopped' : null,
-    // R336: V6 通知同期の結果。failed のときは監査 (v6_sync_failed) にも残し、
+    // R336: 通知同期の結果。failed のときは監査 (v6_sync_failed) にも残し、
     // 日時差分の無い再保存でも reconcile で回復する。
     v6_sync: v6Sync,
     reminders: (reminderRows.results ?? []).map((reminder) => ({

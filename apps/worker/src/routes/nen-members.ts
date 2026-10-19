@@ -2,7 +2,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requirePhotoPermission } from './nen-photo-operations.js';
 
@@ -31,7 +31,7 @@ nenMembers.get('/api/public/nen/gallery-preview', get__api_public_nen_gallery_pr
 nenMembers.post('/api/liff/nen/pets', inputJsonBoundary({}, { maxBytes: Math.ceil(1_500_000 / 3) * 4 + 4096 }), post__api_liff_nen_pets_4);
 
 /**
- * ペットの変更（★V6 37-2 マイペット「編集」）。体重・避妊去勢・活動量・主食・お悩みなど、
+ * ペットの変更（★37-2 マイペット「編集」）。体重・避妊去勢・活動量・主食・お悩みなど、
  * 送られてきた項目だけを変える。目安（daily_kcal / recommended_*）はそのたびに計算し直す。
  */
 nenMembers.put('/api/liff/nen/pets/:id', inputJsonBoundary(), put__api_liff_nen_pets_id_5);
@@ -43,7 +43,7 @@ nenMembers.post('/api/liff/nen/health-logs', inputJsonBoundary(), post__api_liff
 nenMembers.get('/api/liff/nen/health-logs', get__api_liff_nen_health_logs_8);
 
 /**
- * 「獣医師に見せる（直近30日のまとめ）」（★V6 37-2-B）。管理画面の 30日のまとめ（★V6 37-4）と同じ計算。
+ * 「獣医師に見せる（直近30日のまとめ）」（★37-2-B）。管理画面の 30日のまとめ（★37-4）と同じ計算。
  * 本人のペットだけ。医療判断は含めない。
  */
 nenMembers.get('/api/liff/nen/health-logs/summary', get__api_liff_nen_health_logs_summary_9);

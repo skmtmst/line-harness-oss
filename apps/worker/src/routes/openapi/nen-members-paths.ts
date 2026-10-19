@@ -1,6 +1,6 @@
 // Definitions only. Runtime handlers remain in their feature routes.
 export const nenMembersPaths = {
-  // ── NEN Members (会員ランク・ライフタイム・マイル ★V6 37-1) ──────────────
+  // ── NEN Members (会員ランク・ライフタイム・マイル ★37-1) ──────────────
   '/api/public/nen/adopted-photos': {
     get: {
       tags: ['NEN Members'],
@@ -111,7 +111,7 @@ export const nenMembersPaths = {
       responses: { '200': { description: 'Saved products' }, '400': { description: 'Validation failed' }, '403': { description: 'Owner or admin role required' } },
     },
   },
-  // ── NEN Pets / Health（★V6 37-3／37-4） ──────────────────────────────
+  // ── NEN Pets / Health（★37-3／37-4） ──────────────────────────────
   '/api/nen/pets': {
     get: {
       tags: ['NEN Members'], summary: 'マイペット一覧（今日の目安・避妊去勢・運動量・主食・体重の更新）と数値を取得',
@@ -151,7 +151,7 @@ export const nenMembersPaths = {
       responses: { '200': { description: '30-day summary' }, '403': { description: 'Account not visible' }, '404': { description: 'Pet not found' } },
     },
   },
-  // ── LIFF：然のマイページ（★V6 37-2） ──────────────────────────────────
+  // ── LIFF：然のマイページ（★37-2） ──────────────────────────────────
   '/api/liff/nen/pets/{id}': {
     put: {
       tags: ['NEN Members'], summary: 'マイペットの変更（体重・避妊去勢・運動量・主食）。保存すると「今日の目安」を計算し直す',

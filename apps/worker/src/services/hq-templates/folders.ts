@@ -3,6 +3,7 @@ import { boundedText, HqTemplateError } from './tag.js';
 import { saveTemplate, templateDetail, templateCreationRequestId } from './distribution.js';
 import { isFolderSelectColor, type HqTemplateFolder } from '@line-crm/shared';
 
+
 function folderAudit(db: D1Database, auth: HqTemplateAuthority, id: string, action: string) {
   return db.prepare(`INSERT INTO audit_events(id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result) VALUES (?,?,'business',?,?,?,'hq_template_folder',?,'success')`).bind(crypto.randomUUID(), auth.tenantId, auth.actorId, auth.role, `hq_template.folder_${action}`, id);
 }

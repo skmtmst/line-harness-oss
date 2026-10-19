@@ -10,9 +10,9 @@ import type { Broadcast } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
 import { calculateStaggerDelay, sleep, addMessageVariation } from './stealth.js';
 import { buildSegmentQuery } from './segment-query.js';
-import type { SegmentCondition } from './segment-query.js';
-import { buildMessage } from './broadcast.js';
-import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
+import type { SegmentCondition } from '@line-crm/shared';
+import { buildMessage } from '../features/broadcasts/broadcast/index.js';
+import { aggregationUnitFor, aggregationUnits } from '../features/broadcasts/broadcast-aggregation/index.js';
 
 // LINE の multicast は 1 リクエストで最大 500 人まで（LINE の仕様）。増やせない。
 const MULTICAST_BATCH_SIZE = 500;

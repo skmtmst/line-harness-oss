@@ -1,5 +1,6 @@
 import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
 
+
 /** Customer-facing words follow terms.md; no new style or feature is enabled. */
 export function notificationWords(style: AccountStyle = 'standard') {
   return {

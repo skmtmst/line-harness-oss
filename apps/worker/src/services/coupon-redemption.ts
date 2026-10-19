@@ -1,7 +1,8 @@
-import { runActionRows, type ScenarioActionRow, type RunActionRowsOptions } from './scenario-actions.js';
+import { runActionRows, type ScenarioActionRow, type RunActionRowsOptions } from '../features/scenarios/scenario-actions/index.js';
 import { applyTapExtras } from './tap-extras.js';
 import { couponDate, couponPayloadError } from '@line-crm/shared';
 import { getBroadcastMessageAsset, toJstString, type Friend } from '@line-crm/db';
+
 
 async function confirmReceipt(db: D1Database, receiptId: string | undefined, now: Date) {
   if (receiptId) await db.prepare(`UPDATE entry_route_coupon_receipts

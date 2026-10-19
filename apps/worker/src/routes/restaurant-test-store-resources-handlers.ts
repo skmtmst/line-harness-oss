@@ -1,6 +1,6 @@
 import { validFloorCoordinate, validJoinGroup } from './restaurant-store-status.js';
 import { extractBroadcastTemplateIds, refreshScenarioReferences } from '@line-crm/db';
-import { parseBroadcastMessageParts, buildMessages } from '../services/broadcast-message-set.js';
+import { parseBroadcastMessageParts, buildMessages } from '../features/broadcasts/broadcast-message-set/index.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 import { validRestaurantFloor, readRestaurantFloor, firstTablePlacement, tablePlacementFits } from '../services/restaurant-floor.js';
@@ -9,9 +9,9 @@ import { publicClosure, closuresForRange, closureAffectsTable, openSeatTables } 
 import type { RestaurantTableLayoutInput } from '@line-crm/shared';
 import { updateStaffPolicy } from './staff.js';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-import { assignRestaurantTable } from '../services/booking-assignment.js';
+import { assignRestaurantTable } from '../features/booking/booking-assignment/index.js';
 import { dbFor } from '../services/db-router.js';
 
 import { restaurantTableCapacity, validateRestaurantOpeningHours } from '../services/restaurant-inventory.js';

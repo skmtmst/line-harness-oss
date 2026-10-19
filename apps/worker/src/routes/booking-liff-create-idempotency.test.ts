@@ -1,11 +1,11 @@
-import { grantEntitlement } from '../services/booking-entitlements.js';
+import { grantEntitlement } from '../features/booking/booking-entitlements.js';
 import { bookingEntitlements } from './booking-entitlements.js';
 import { bookingPayments } from './booking-payments.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { recoverOrphanedOnlineBookings } from '../services/booking-payment-recovery.js';
+import { recoverOrphanedOnlineBookings } from '../features/booking/booking-payment-recovery.js';
 
 const availability = vi.hoisted(() => ({ getAvailability: vi.fn() }));
 vi.mock('../services/availability.js', async (original) => ({
@@ -179,7 +179,7 @@ describe('W1 LIFF予約のキー確保と保存失敗回収（実SQL・FK有効�
   });
 });
 
-describe('B-308/B-316 LIFFの券と本人が選ぶ支払い',()=>{
+describe('LIFFの券と本人が選ぶ支払い',()=>{
  const choice=()=>sql.raw.exec(`INSERT INTO booking_payment_configs(line_account_id,mode,provider,hold_minutes,created_at,updated_at)
  VALUES('w1-account','customer_choice','stripe',10,'2026-10-01','2026-10-01')`);
  it.each(['onsite','online'] as const)('本人が%sを選んだ方法を保存し、再送/設定変更後も同じ予約を返す',async method=>{

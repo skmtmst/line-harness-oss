@@ -1,4 +1,4 @@
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * 店舗（テナント）から使用するD1を決める。

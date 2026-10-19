@@ -8,7 +8,7 @@ import { join } from "node:path";
  * which have no wrangler subcommand) with the same identity the user already
  * authorized via `wrangler login`.
  *
- * The path resolution mirrors wrangler's `getGlobalConfigPath()`
+ * The path resolution mirrors wrangler's `getGlobalConfigPath`
  * (cloudflare/workers-sdk, packages/workers-utils/src/global-wrangler-config-path.ts):
  *   1. A pre-existing legacy `~/.wrangler` directory wins.
  *   2. Otherwise the XDG-compliant config dir:

@@ -1,4 +1,4 @@
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
 import { getSlotsWithRemaining } from '../../services/event-availability.js';

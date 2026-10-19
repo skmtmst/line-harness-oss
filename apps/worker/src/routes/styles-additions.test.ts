@@ -7,9 +7,9 @@ import {
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { styles } from './styles.js';
 import { hqTemplates } from './hq-templates.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { permissionForApiPath } from '../middleware/auth.js';
-import * as googleCalendar from '../services/booking-calendar-sync.js';
+import * as googleCalendar from '../features/booking/booking-calendar-sync.js';
 import { readWindow, instant } from '../services/style-analytics.js';
 import {
   initializeAccountStyle,
@@ -83,7 +83,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('B-311 template samples', () => {
+describe('template samples', () => {
   test.each(ACCOUNT_STYLES)(
     '%s returns supported placeholders and its exact starter samples',
     async (style) => {
@@ -292,7 +292,7 @@ function book(id: string, start: string, end: string, staff = 's') {
     )
     .run(id, staff, start, end, end);
 }
-describe('B-318 range and schedule', () => {
+describe('range and schedule', () => {
   test('Google busy times block availability and connection failure is unavailable rather than zero', async () => {
     const busy = vi
       .spyOn(googleCalendar, 'getStaffGoogleBusy')

@@ -2,16 +2,19 @@ import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import type { Context, MiddlewareHandler } from 'hono';
 import { getScenarioById, getFriendScenarioById, getFriendById, jstNow } from '@line-crm/db';
-import { SUPPORTED_CONDITION_TYPES, isSupportedConditionType } from '../services/step-delivery.js';
-import { parseQuestion } from '../services/scenario-question.js';
-import { isScenarioActionComplete } from '../services/scenario-actions.js';
 import type { Scenario as DbScenario, ScenarioStep as DbScenarioStep, FriendScenario as DbFriendScenario, DeliveryMode } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { SUPPORTED_CONDITION_TYPES, isSupportedConditionType } from '../services/step-delivery.js';
+import { parseQuestion } from '../features/scenarios/scenario-question/index.js';
+import { isScenarioActionComplete } from '../features/scenarios/scenario-actions/index.js';
+
+
+
+import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess } from '../middleware/role-guard.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
-import { ScenarioContractError } from '../services/scenario-v6-contract.js';
+import { ScenarioContractError } from '../features/scenarios/scenario-contract/index.js';
 import { LineClient } from '@line-crm/line-sdk';
 
 export const scenarioPermission = (operation: 'view' | 'edit') => requireDeliveryAccess('scenarios', operation);
@@ -471,7 +474,7 @@ async function runTestSend(
 
   const token = c.env.LINE_CHANNEL_ACCESS_TOKEN;
   const { LineClient } = await import('@line-crm/line-sdk');
-  const { testSendSteps } = await import('../services/scenario-test-send.js');
+  const { testSendSteps } = await import('../features/scenarios/scenario-test-send.js');
   try {
     const result = await testSendSteps(
       c.env.DB,
@@ -541,7 +544,7 @@ async function runFriendScenarioOp(
   // 操作本体（リクエスト）の写し。move の移し先のように本体に引数を持つ
   // 操作は、同じキーでも本体が違えば別操作として 409 にするため台帳へ残す
   // （scenario_publish_keys の content_snapshot と同じ考え方）。
-  // Hono は読んだ本体を写しとして持つので、handler 側の c.req.json() は
+  // Hono は読んだ本体を写しとして持つので、handler 側の c.req.json は
   // このあとも普通に動く。
   const requestFingerprint = await sha256Hex(await c.req.text());
 

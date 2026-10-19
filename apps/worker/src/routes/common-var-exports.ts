@@ -23,7 +23,8 @@ import {
   updateCommonVarExportProgress,
   type CommonVarExportJobMeta,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';

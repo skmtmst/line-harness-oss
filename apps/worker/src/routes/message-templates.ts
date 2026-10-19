@@ -10,7 +10,7 @@ import {
 } from '@line-crm/db';
 import type { MessageTemplate } from '@line-crm/db';
 import { listResponse } from '../lib/list-etag.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 
 const messageTemplates = new Hono<Env>();

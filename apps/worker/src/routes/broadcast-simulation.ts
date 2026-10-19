@@ -1,9 +1,9 @@
 import {BROADCAST_DEFINITION_EDIT_KEY,BROADCAST_DEFINITION_PUBLISH_KEY} from '@line-crm/shared';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite} from '../services/gap-common.js';
-import {saveSimulationDraft,simulationPreview,scheduleSimulation,processBroadcastSimulation} from '../services/broadcast-simulation.js';
+import {saveSimulationDraft,simulationPreview,scheduleSimulation,processBroadcastSimulation} from '../features/broadcasts/broadcast-simulation/index.js';
 export const broadcastSimulation=new Hono<Env>();
 broadcastSimulation.use('/api/broadcasts/*',requirePermission('/broadcasts'));
 broadcastSimulation.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:/CHECK constraint/.test(String(e))?'version_conflict':'simulation_unavailable'},e instanceof GapError?e.status:/CHECK constraint/.test(String(e))?409:503));

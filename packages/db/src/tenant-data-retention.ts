@@ -2,7 +2,7 @@ import { DATA_RETENTION_MS } from '@line-crm/shared';
 import { jstNow, toJstString } from './utils.js';
 
 /**
- * 統括(テナント)の顧客データ保存期限（★V6 36-2）。
+ * 統括(テナント)の顧客データ保存期限（★36-2）。
  *
  * 解約または無料体験の終了を起点に数え、期限が切れた統括の顧客データを消す。
  * ここは「誰をいつ消すか」を決める部分で、実際に表を消す処理は

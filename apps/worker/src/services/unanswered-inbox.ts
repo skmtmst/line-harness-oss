@@ -124,10 +124,10 @@ function queryFilters(opts: UnansweredInboxOptions, includeSearch: boolean): {
   }
   if (includeSearch && opts.q?.trim()) {
     /*
-     * #625: LIKE ではなく instr() で部分一致する。
+     * #625: LIKE ではなく instr で部分一致する。
      * D1 の LIKE/GLOB パターンは最大50バイトのため、48バイト超の検索語で
      * SQLite エラー(500)になっていた。COLLATE NOCASE と同じく
-     * 大文字小文字は ASCII だけ畳む (SQLite の lower() と同じ範囲)。
+     * 大文字小文字は ASCII だけ畳む (SQLite の lower と同じ範囲)。
      */
     conditions.push(`(
       instr(lower(f.display_name), lower(?)) > 0

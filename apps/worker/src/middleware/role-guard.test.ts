@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { denyReadOnly, requireIrreversibleConfirmation, requireRole } from './role-guard.js';
 
 /**

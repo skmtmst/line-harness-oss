@@ -5,7 +5,8 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { getChatById, getFriendById, jstNow } from '@line-crm/db';
 import { CHAT_FILE_TTL_MS, CHAT_IMAGE_MAX_BYTES, type ChatAttachment } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { denyReadOnly, requirePermission, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';

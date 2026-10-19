@@ -1,4 +1,4 @@
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from '../services/db-router.js';
 import { type GoogleReview } from '../services/google-business.js';
 

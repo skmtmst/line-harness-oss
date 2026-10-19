@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // 権限キーと通知設定の検証(#515 中3)。DBに触れる前に400で断つ。
 const dbMocks = vi.hoisted(() => ({

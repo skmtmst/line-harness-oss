@@ -1,7 +1,7 @@
 import { logger } from '@line-crm/shared/server';
 import type { MiddlewareHandler } from 'hono';
 import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { canonicalDenyAuditFor } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';

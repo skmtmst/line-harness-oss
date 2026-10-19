@@ -2,14 +2,14 @@ import { logger } from '@line-crm/shared/server';
 import { parseReservationFilter } from './restaurant-reservation-filter.js';
 import { deriveStoreLineStatuses, isValidTimezone, uniqueStoreConflict } from './restaurant-store-status.js';
 import type { RestaurantStoreRow, SelectedRestaurantStore } from './restaurant-context-types.js';
-import { processScenarioSourceJobs } from '../services/scenario-source-jobs.js';
+import { processScenarioSourceJobs } from '../features/scenarios/scenario-source-jobs/index.js';
 import { processRestaurantEvents } from '../services/restaurant-events.js';
 import { inputError } from '../lib/input-errors.js';
 import { processVisitStampQueue } from '../services/visit-stamps.js';
 import { reconcileRestaurantInventory } from '../services/restaurant-inventory-rules.js';
 
 import { CredentialEncryptionKeyError, createLineAccount, deleteUncommittedLineAccount } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { assignmentSettingsResponse } from './booking-assignment-settings.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';

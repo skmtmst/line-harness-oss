@@ -23,10 +23,11 @@ import {
   type BroadcastMessageAssetKind,
   type BroadcastMessageAssetStatus,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { validateAssetPayload } from '@line-crm/shared';
 import { requireRole } from '../middleware/role-guard.js';
-import { storeBroadcastMedia } from '../services/broadcast-media-storage.js';
+import { storeBroadcastMedia } from '../features/broadcasts/broadcast-media-storage/index.js';
 import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
 import { ensureFileScanForUpload } from './file-scan.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';

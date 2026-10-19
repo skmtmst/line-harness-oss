@@ -8,13 +8,9 @@ import {
 } from './style-starter-resource.js';
 import { type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 
-import {
-  profile,
-  starter,
-  StyleError,
-  readCards,
-  defaultCards,
-} from './style-setup.js';
+import { profile } from './style-profile.js';
+import type { starter } from './style-starter-set.js';
+import { StyleError, readCards, defaultCards } from './style-setup-core.js';
 export async function insertStyleStarterItems(
   db: D1Database,
   account: string,

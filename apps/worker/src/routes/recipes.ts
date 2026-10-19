@@ -21,18 +21,21 @@ import {
   type RecipeItem,
 } from '@line-crm/db';
 import { getVersionedAccountSetting } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 
 /** 機能設定の保存キー。`routes/feature-settings.ts` と同じ値。 */
 const FEATURE_SETTINGS_BUNDLE_KEY = 'feature.settings_bundle_v1';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { sha256Hex, type AuthenticatedStaff } from '../middleware/auth.js';
+import { sha256Hex } from '../middleware/auth.js';
+import { type AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 /**
- * レシピ。設計 ★V6 34-2（`y0P0Qx`）/ 34-3（`D5UaX`）。台帳 #134。
+ * レシピ。設計 ★34-2（`y0P0Qx`）/ 34-3（`D5UaX`）。台帳 #134。
  *
- * **複製の途中失敗は全部戻す**（要件 v6-34 §7-3）。部分的に作らない。
+ * **複製の途中失敗は全部戻す**（要件 -34 §7-3）。部分的に作らない。
  * 半分だけできた状態は、運用者が何を消せばよいか分からない。
  */
 const recipes = new Hono<Env>();

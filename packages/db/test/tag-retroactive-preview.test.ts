@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { getTagRetroactiveMileagePreview } from '../src/tags.js';
+import { getTagRetroactiveMileagePreview } from '../src/tags/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 /*

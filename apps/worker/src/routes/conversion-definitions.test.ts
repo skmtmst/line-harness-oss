@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const dbMocks = vi.hoisted(() => ({
   getConversionPoints: vi.fn(),
@@ -125,7 +125,7 @@ beforeEach(() => {
   dbMocks.deleteUnusedConversionDefinition.mockResolvedValue({ id: 'point-a', deleted: true });
 });
 
-describe('conversion definition V6 routes', () => {
+describe('conversion definition routes', () => {
   it('通常・空状態を成功応答にし、一覧条件をDBへ渡す', async () => {
     const response = await app().request(
       '/api/conversions/definitions?from=2026-09-01&to=2026-09-07&lineAccountId=account-a&q=%E8%B3%BC%E5%85%A5&status=active&sourceType=purchase&sort=value_desc',
@@ -226,7 +226,7 @@ describe('conversion definition V6 routes', () => {
     expect(repeated.status).toBe(200);
   });
 
-  it('レポートはV6構造、旧日付クエリは既存画面向け配列を返す', async () => {
+  it('レポートは構造、旧日付クエリは既存画面向け配列を返す', async () => {
     const report = await app('staff').request('/api/conversions/report?from=2026-09-01&to=2026-09-07');
     expect(report.status).toBe(200);
     expect(await report.json()).toMatchObject({ success: true, data: { kpis: { netCount: 0 }, daily: [] } });

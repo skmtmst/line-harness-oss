@@ -18,7 +18,7 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -63,8 +63,8 @@ vi.mock('../services/account-access.js', () => ({
   })),
 }));
 
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
   notifyForBooking: vi.fn(async () => undefined),
 }));
@@ -76,8 +76,8 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
   ...availabilityMocks,
 }));
 
-vi.mock('../services/booking-calendar-sync.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-calendar-sync.js')>()),
+vi.mock('../features/booking/booking-calendar-sync.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-calendar-sync.js')>()),
   syncConfirmedBookingToGoogle: vi.fn(async () => ({ synced: false })),
   removeBookingFromGoogle: vi.fn(async () => undefined),
 }));
@@ -87,10 +87,10 @@ const { forms } = await import('../routes/forms.js');
 const { webinarRoutes } = await import('../routes/webinars.js');
 const { trackedLinks } = await import('../routes/tracked-links.js');
 const { ecIntegrations } = await import('../routes/ec-integrations.js');
-const { attachTagAndFireSideEffects } = await import('./friend-tag-attach.js');
+const { attachTagAndFireSideEffects } = await import('../features/friends/friend-tag-attach.js');
 const { recordConversionSourceEvent } = await import('@line-crm/db');
 const { friends: friendsRoutes } = await import('../routes/friends.js');
-const { createAutomationActionExecutors } = await import('./automation-action-executors.js');
+const { createAutomationActionExecutors } = await import('../features/automations/automation-action-executors.js');
 
 // ---- 実 SQLite を D1 の形にかぶせる ----------------------------------------
 

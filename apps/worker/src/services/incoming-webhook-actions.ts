@@ -4,12 +4,13 @@ import {
   type IncomingWebhookActionRef,
   type IncomingWebhookIdentityMatch,
 } from '@line-crm/db';
-import type { ActionDefinition, AutomationActionContext } from './automation-engine.js';
+
+import type { ActionDefinition, AutomationActionContext } from '../features/automations/automation-engine/index.js';
 import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
 import {
   createAutomationActionExecutors,
   type AutomationActionExecutorDependencies,
-} from './automation-action-executors.js';
+} from '../features/automations/automation-action-executors/index.js';
 
 type ActionRunResult = {
   matchedFriendId: string | null;

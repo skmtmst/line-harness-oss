@@ -9,7 +9,7 @@
 
 import { LineHarness } from '@line-harness/sdk'
 import { MyServiceClient } from './external-api.js'
-import type { Env } from './index.js'
+import type { Env } from './env.js';
 
 function createClients(env: Env) {
   const harness = new LineHarness({

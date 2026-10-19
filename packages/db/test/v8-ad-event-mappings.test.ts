@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect,it } from 'vitest';
 import { asD1 } from './d1-test-helper.js';
 import { listAdEventMappings,saveAdEventMapping,queueMappedAdConversion,recoverMappedAdConversions } from '../src/ad-event-mappings.js';
-import { trackConversion } from '../src/conversions.js';
+import { trackConversion } from '../src/conversions/index.js';
 function setup(){
  const raw=new Database(':memory:');raw.exec(readFileSync('bootstrap.sql','utf8'));const db=asD1(raw);const now=new Date().toISOString();
  raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','a','A','token','secret'),('b','b','B','token','secret');

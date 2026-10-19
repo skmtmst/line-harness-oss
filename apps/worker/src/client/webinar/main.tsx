@@ -2,23 +2,27 @@ import { responseLiffError } from '../../../../liff/src/lib/api-error.js';
 import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
 import { createClientLogger } from '@line-crm/shared';
 import { jstDate } from '@line-crm/shared';
-// main.tsx — Auto-webinar (疑似ライブ) LIFF entry. Loaded via dynamic import
-// from apps/worker/src/client/main.ts (?page=webinar&slug=<slug>).
-// Worker の入口と apps/liff の入口が共用する、申込・視聴・回答の本体。
-//
-// 時刻の権威はサーバー:
-//   期待位置 = offsetSeconds + (performance.now() - t0) / 1000
-// 動画側がバッファ等で 5 秒以上ズレたら期待位置へ強制シーク。
-// シークバー・一時停止 UI は出さない (controls なし)。
-
-import { StrictMode, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import {
   buildFormSubmitHeaders,
   newFormIdempotencyKey,
   toFormIdempotencyKey,
   type FormIdempotencyKey,
 } from '@line-crm/shared';
+
+
+// main.tsx — Auto-webinar (疑似ライブ) LIFF entry. Loaded via dynamic import
+// from apps/worker/src/client/main.ts (?page=webinar&slug=<slug>).
+// Worker の入口と apps/liff の入口が共用する、申込・視聴・回答の本体。
+//
+// 時刻の権威はサーバー:
+//   期待位置 = offsetSeconds + (performance.now - t0) / 1000
+// 動画側がバッファ等で 5 秒以上ズレたら期待位置へ強制シーク。
+// シークバー・一時停止 UI は出さない (controls なし)。
+
+import { StrictMode, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+
+
 import { buildMeetingDateOptions } from './date-options.js';
 import './styles.css';
 import '../../../../liff/src/index.css';
@@ -212,8 +216,8 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
   rateRef.current = rate;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const t0Ref = useRef(0);            // state 受信時の performance.now()
-  const waitT0Ref = useRef(0);        // 待機ルーム受信時の Date.now()
+  const t0Ref = useRef(0);            // state 受信時の performance.now
+  const waitT0Ref = useRef(0);        // 待機ルーム受信時の Date.now
   const baseOffsetRef = useRef(0);    // state.offsetSeconds
   const commentIdxRef = useRef(0);    // 次に表示するサクラコメント index
   const ctaIdxRef = useRef(0);        // 次に表示する CTA カード index
@@ -878,7 +882,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
     );
   }
 
-  // ---- ライブ中 (★V8 RpW2h) / 終了画面 ----
+  // ---- ライブ中 (★V8 ) / 終了画面 ----
   // PC の横長ウィンドウで video (w-full) が画面高を食い尽くしてチャット欄が
   // 潰れないよう、全体をスマホ幅カラム (max-w-md) に閉じ込めて中央寄せする。
   // スマホでは max-w-md は効かないので挙動不変。

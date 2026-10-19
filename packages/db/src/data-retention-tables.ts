@@ -1,7 +1,7 @@
 import manifest from './data-retention-tables.json';
 
 /**
- * 退会後の顧客データ削除（★V6 36-2）で、bootstrap.sql の表を1つずつ分類した表。
+ * 退会後の顧客データ削除（★36-2）で、bootstrap.sql の表を1つずつ分類した表。
  *
  * 分類は3つだけにする。
  *   purge  … その統括の顧客データ。保存期限が切れたら消す。

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import { Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: vi.fn(async () => true) }));
 import { bookingPaymentAdmin } from './booking-payment-admin.js';
 

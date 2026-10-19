@@ -2,11 +2,11 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createTag, getTags, getTagsWithCounts, getTagsWithUsage } from '../src/tags.js';
-import { getReminders } from '../src/reminders.js';
+import { createTag, getTags, getTagsWithCounts, getTagsWithUsage } from '../src/tags/index.js';
+import { getReminders } from '../src/reminders/index.js';
 import { getFriendScoreHistory } from '../src/scoring.js';
-import { getMileageAdminOverview, postMileageEntry, ensureDefaultMileageProgram } from '../src/mileage.js';
-import { getMileageFriendsV6 } from '../src/mileage-admin-v6.js';
+import { getMileageAdminOverview, postMileageEntry, ensureDefaultMileageProgram } from '../src/mileage/index.js';
+import { getMileageFriendsV6 } from '../src/mileage/admin-operations.js';
 import { asD1 } from './d1-test-helper.js';
 
 let raw: Database.Database;

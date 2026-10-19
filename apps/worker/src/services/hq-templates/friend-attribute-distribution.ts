@@ -1,4 +1,5 @@
 import { beginHqTemplateDistributionRun, normalizeScopedTagName, type HqTemplatePreflight, type HqTemplateStatement } from '@line-crm/db';
+
 import type { HqFriendAttributeType, HqFriendAttributeMode, HqFriendFieldDefinition, HqMarkDefinition, HqFriendFieldOption } from '@line-crm/shared';
 import type { HqTemplateAuthority } from './contract.js';
 import { digest, requireTargetAccounts, templateDetail } from './distribution.js';

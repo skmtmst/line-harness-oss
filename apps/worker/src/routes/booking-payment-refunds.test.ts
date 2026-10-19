@@ -1,11 +1,14 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
-import { paymentRecords, paymentSummary } from '../services/booking-payment-admin.js';
-import { customerBookingPayments } from '../services/booking-payment-history.js';
-import { receivePaymentEvent, processPaymentEvent } from '../services/booking-payment-events.js';
+import { paymentRecords, paymentSummary } from '../features/booking/booking-payment-admin.js';
+import { customerBookingPayments } from '../features/booking/booking-payment-history.js';
+import { receivePaymentEvent, processPaymentEvent } from '../features/booking/booking-payment-events.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 const scope=vi.hoisted(()=>({allowed:true}));
 vi.mock('../services/account-access.js',()=>({canAccessAllLineAccounts:vi.fn(async()=>scope.allowed)}));
 import { bookingPayments } from './booking-payments.js';
@@ -16,6 +19,7 @@ function request(part='refund',body:unknown=input,method='POST',payment='p') {
   const app=new Hono<Env>();
   app.use('*',async(c,next)=>{c.set('staff',{id:'s1',name:'担当 甲',role,readOnly});await next();});
   app.route('/',bookingPayments);
+  app.onError(unhandledWorkerError);
   return app.request(`/api/booking/payments/${payment}/${part}`,{method,
     ...(method==='GET'?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})},{DB:f.db} as Env['Bindings']);
 }
@@ -73,7 +77,11 @@ describe('模擬の部分返金と監査',()=>{
   });
   it('履歴または残額の保存が失敗したら両方戻し、再送で回復する',async()=>{
     f.raw.exec("CREATE TRIGGER crash BEFORE UPDATE OF refunded_amount ON booking_payments BEGIN SELECT RAISE(ABORT,'private-customer-error'); END");
-    const r=await request();expect(r.status).toBe(503);expect(JSON.stringify(await r.json())).not.toContain('private-customer-error');
+    const r=await request();expect(r.status).toBe(500);
+    const body = await r.json<{ incidentId: string }>();
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
+    expect(JSON.stringify(body)).not.toContain('private-customer-error');
     expect(state()).toEqual({status:'paid',refunded_amount:0});
     expect(f.raw.prepare('SELECT COUNT(*) n FROM booking_payment_refunds').get()).toEqual({n:0});
     f.raw.exec('DROP TRIGGER crash');expect((await request()).status).toBe(200);
@@ -137,7 +145,11 @@ describe('予約連結と本人の支払い表示',()=>{
   });
   it('連結更新の途中失敗は履歴も戻し、理由なしは拒否する',async()=>{
     f.raw.exec("UPDATE booking_payments SET booking_id=NULL; CREATE TRIGGER link_crash BEFORE UPDATE OF booking_id ON booking_payments BEGIN SELECT RAISE(ABORT,'crash'); END");
-    expect((await request('booking',{bookingId:'bk',reason:'照合'})).status).toBe(503);
+    const failed = await request('booking',{bookingId:'bk',reason:'照合'});
+    expect(failed.status).toBe(500);
+    const body = await failed.json<{ incidentId: string }>();
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
     expect(f.raw.prepare('SELECT COUNT(*) n FROM booking_payment_booking_links').get()).toEqual({n:0});
     expect((await request('booking',{bookingId:'bk',reason:''})).status).toBe(400);
   });

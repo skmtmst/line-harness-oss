@@ -4,13 +4,13 @@ import { inputError } from '../lib/input-errors.js';
 
 import { getFriendScore, getFriendScoreHistory, addScore, getMileageRules, getMileageRuleById, createMileageRule, updateMileageRule, deleteMileageRule, getMileageEarningRulesV6, applyMileageRulesForEvent, getMileageAdjustmentNotificationRecord, getActionScoreOverview, getActionScoreBands, testMileageEarningRuleDraft, validateMileageEarningRuleDraft } from '@line-crm/db';
 import type { ActionScoreFilter, ActionScoreSort } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundary } from '../services/request-boundary.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
-import { mileageAdjustmentMessage, sendMileageAdjustmentNotification } from '../services/mileage-adjustment-notification.js';
+import { mileageAdjustmentMessage, sendMileageAdjustmentNotification } from '../features/mileage/mileage-adjustment-notification/index.js';
 import { canUseMileageAccount, mileageV6Error, mileageRuleEventLabel, mileageCsvCell, ACTION_SCORE_FILTERS, ACTION_SCORE_SORTS } from './scoring-definition.js';
 import type { Context } from 'hono';
 

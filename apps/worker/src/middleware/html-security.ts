@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /** Worker-generated LIFF/OGP HTML also needs protection; _headers covers static assets only. */
 export const htmlSecurityMiddleware: MiddlewareHandler<Env> = async (c, next) => {

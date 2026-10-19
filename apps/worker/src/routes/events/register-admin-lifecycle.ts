@@ -1,5 +1,5 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
 import { inputJsonBoundary } from '../../lib/input-errors.js';
@@ -23,7 +23,7 @@ events.delete('/api/events/admin/events/:id', requireRole('owner', 'admin'), asy
   // any account listed in account_ids, not only the sentinel line_account_id.
   if (!(await ownsEvent(c.env.DB, id, account_id))) return bad(c, 'not_found', 404);
   // Block deletion while live bookings exist — once the event row is
-  // soft-deleted ownsEvent() hides it from admin endpoints, leaving any
+  // soft-deleted ownsEvent hides it from admin endpoints, leaving any
   // requested/confirmed bookings unmanageable but still firing reminders.
   const active = await c.env.DB
     .prepare(

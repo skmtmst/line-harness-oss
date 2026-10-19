@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import {ecAutoLine} from './ec-auto-line.js';
-import {ingestBehavior,processAutoLineMock} from '../services/ec-auto-line.js';
+import {ingestBehavior,processAutoLineMock} from '../features/ec-commerce/ec-auto-line.js';
 import {encryptCredential} from '@line-crm/db';
 let d:ReturnType<typeof gapFixture>;
 const encryptionKey=btoa('x'.repeat(32));

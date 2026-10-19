@@ -4,6 +4,8 @@ import { inspectR2RuntimeStore, executeR2RuntimeStore, type R2RuntimeBinding } f
 import { preflightDistribution } from './distribution.js';
 import type { HqTemplateAdapterContext, HqTemplateAuthority } from './contract.js';
 import { hqLiffActionLocator, liffActionFromUrl, type HqMessageCard, type LiffAction } from '@line-crm/shared';
+
+
 const resources:ReturnType<typeof createTestD1>[]=[];
 afterEach(()=>{for(const f of resources.splice(0))f.raw.close()});
 const digest=async(v:string|Uint8Array)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',typeof v==='string'?new TextEncoder().encode(v):v)),n=>n.toString(16).padStart(2,'0')).join('');
@@ -86,7 +88,7 @@ async function tapFixture(place: 'card' | 'carousel' | 'card_asset' | 'rich_mess
   return { ...f, locator };
 }
 describe('押したら6つ × 統括の配布', () => {
-  test.each(['card', 'carousel', 'card_asset'] as const)('%s の既存LIFFリンクを店ごとに置き換え、本文は保つ（B-129）', async place => {
+  test.each(['card', 'carousel', 'card_asset'] as const)('%s の既存LIFFリンクを店ごとに置き換え、本文は保つ', async place => {
     const url = 'https://liff.line.me/liff-source/?page=salon-book&view=history';
     const f = await tapFixture(place, { action: 'url', value: url });
     const source = f.raw.prepare("SELECT definition_json FROM hq_template_versions WHERE id='v'").get();
@@ -508,7 +510,7 @@ describe('DB-bound R2 store executor',()=>{
 
 });
 
-test('B-173: リサーチの回答後に使う店舗のマーク・リマインダ・通知先を照合し付け替える', async () => {
+test('リサーチの回答後に使う店舗のマーク・リマインダ・通知先を照合し付け替える', async () => {
  const f=await fixture('template');
  for(const [id,account] of [['source-mark','source'],['target-mark','a']]) {
   f.raw.prepare("INSERT INTO support_marks(id,name) VALUES (?,'確認済み')").run(id);
@@ -524,7 +526,7 @@ test('B-173: リサーチの回答後に使う店舗のマーク・リマイン�
  const row=f.raw.prepare("SELECT payload_json FROM broadcast_message_assets WHERE line_account_id='a'").get() as {payload_json:string};
  expect(JSON.parse(row.payload_json).answerActions.map((a:any)=>a.config)).toEqual([{markId:'target-mark'},{reminderId:'target-reminder'},{notificationRuleId:'target-notice',notificationRuleVersion:1,message:'回答されました'}]);
 });
-test('B-173: リサーチの配布先の通知先が別店へ移ったら事前検査を取り直す', async () => {
+test('リサーチの配布先の通知先が別店へ移ったら事前検査を取り直す', async () => {
  const f=await fixture('template');
  for(const [id,account] of [['source-notice','source'],['target-notice','a']]) f.raw.prepare("INSERT INTO notification_rules(id,name,line_account_id,event_type) VALUES (?,'回答通知',?,'manual')").run(id,account);
  const definition={...f.message,media:[],asset:{kind:'research',payload:{questions:[{text:'質問',format:'free',required:true}],answerActions:[{actionType:'notify_staff',config:{notificationRuleId:'source-notice',notificationRuleVersion:1,message:'回答されました'}}]}}};
@@ -532,7 +534,7 @@ test('B-173: リサーチの配布先の通知先が別店へ移ったら事前�
  const ctx=await f.preflight('a','overwrite');f.raw.exec("UPDATE notification_rules SET line_account_id='foreign' WHERE id='target-notice'");
  expect(await f.execute(ctx)).toMatchObject({status:'version_conflict'});expect(f.raw.prepare("SELECT id FROM broadcast_message_assets").all()).toEqual([]);
 });
-test('B-173: リサーチで指定したタグフォルダを店舗の同名フォルダへ付け替える', async () => {
+test('リサーチで指定したタグフォルダを店舗の同名フォルダへ付け替える', async () => {
   const f=await fixture('template');
   for(const [id,account] of [['source-folder','source'],['target-folder','a']]) f.raw.prepare("INSERT INTO folders(id,kind,name,account_id) VALUES (?,'tag','回答済み',?)").run(id,account);
   const definition={...f.message,media:[],asset:{kind:'research',payload:{questions:[{text:'質問',format:'free',required:true}],answerActions:[{actionType:'tag',config:{op:'add',folderId:'source-folder'}}]}}};

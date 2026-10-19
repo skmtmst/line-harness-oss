@@ -1,4 +1,2 @@
-// Public entry point. Implementation is organized by responsibility.
-export { createRichMenuGroup, updateRichMenuGroupMeta, buildMetaSets } from './rich-menus-drafts-groups.js';
-export { replaceRichMenuPages, loadPageKeepMeta, buildPageReplaceStatements } from './rich-menus-drafts-pages.js';
-export { isVersionGuardTrip, saveRichMenuGroupDraft, deleteRichMenuGroup, setRichMenuPageImage, pageBelongsToGroup } from './rich-menus-drafts-save.js';
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { buildMetaSets, buildPageReplaceStatements, createRichMenuGroup, deleteRichMenuGroup, isVersionGuardTrip, loadPageKeepMeta, pageBelongsToGroup, replaceRichMenuPages, saveRichMenuGroupDraft, setRichMenuPageImage, updateRichMenuGroupMeta } from './rich-menus/drafts.js';

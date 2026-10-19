@@ -1,8 +1,10 @@
 import { supportMarkImpactRevision } from './support-mark-impact-revision.js';
-import type { SupportMark, SupportMarkWithUsage } from './support-mark-impact-revision.js';
+import type { SupportMark } from './support-mark-types.js';
+import type { SupportMarkWithUsage } from './support-mark-impact-revision.js';
 export { supportMarkImpactRevision } from './support-mark-impact-revision.js';
 export type { SupportMark, SupportMarkWithUsage } from './support-mark-impact-revision.js';
 import { parseSupportMarkLocations, type SupportMarkLocation } from '@line-crm/shared';
+
 import { recordOperation } from './operation-audit.js';
 import { jstNow } from './utils.js';
 
@@ -849,7 +851,7 @@ export interface SupportMarkArchiveResult {
 }
 
 /**
- * V6の確認版に一致する場合だけ、友だちの置換と保管を一括で行う。
+ * の確認版に一致する場合だけ、友だちの置換と保管を一括で行う。
  * 同じIdempotency-Keyの再送は保存済み結果を返す。
  *
  * R180: 使っている友だちが0人のときは置換先なし（null）で保管できる。

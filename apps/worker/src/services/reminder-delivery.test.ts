@@ -1050,7 +1050,7 @@ describe('監査の直し (R337・R339・R340・R341・R342・R344)', () => {
   })
 })
 
-describe('Meet個別相談のV6送信の最終関係フェンス', () => {
+describe('Meet個別相談の送信の最終関係フェンス', () => {
   const NOW = new Date('2026-08-28T09:00:00.000Z')
   const TARGET = '2026-08-28T10:00:00.000Z'
 
@@ -1169,8 +1169,8 @@ describe('Meet個別相談のV6送信の最終関係フェンス', () => {
     const endB = '2026-11-03T11:00:00.000Z'
     const { db, raw } = createTestD1()
     seedMeetLinked(raw, targetA)
-    // 勝者の実再登録が V6 登録を動かすための予約ルール (published)。
-    // 登録-1をこのルールへ結び替える (製品のmeet V6登録と同じ所属)。
+    // 勝者の実再登録が 登録を動かすための予約ルール (published)。
+    // 登録-1をこのルールへ結び替える (製品のmeet 登録と同じ所属)。
     raw.prepare(
       `INSERT INTO reminders
          (id, name, line_account_id, is_active, trigger_type, delivery_mode, lifecycle_status)
@@ -1297,7 +1297,7 @@ describe('Meet個別相談のV6送信の最終関係フェンス', () => {
       now: NOW,
       pause: noPause,
       resolveClient: async () => client,
-      // 最終送信権の直前に勝者が相談を取り消した想定。V6の登録・実行行は
+      // 最終送信権の直前に勝者が相談を取り消した想定。の登録・実行行は
       // 生きたまま (共有取消が版ガードで止められた残差)。旧実装は送っていた。
       beforePush: async () => {
         await db.prepare(
@@ -1325,7 +1325,7 @@ describe('Meet個別相談のV6送信の最終関係フェンス', () => {
 })
 
 
-it('B-333 登録前に過ぎた通は送らず、送らなかった記録を残す', async () => {
+it('登録前に過ぎた通は送らず、送らなかった記録を残す', async () => {
   const { db, raw } = createTestD1(); seedReminder(raw);
   raw.prepare("UPDATE friend_reminders SET created_at = '2026-08-28T09:30:00Z', updated_at = '2026-08-28T09:30:00Z' WHERE id = 'enrollment-1'").run();
   let pushes = 0;
@@ -1337,7 +1337,7 @@ it('B-333 登録前に過ぎた通は送らず、送らなかった記録を残�
 });
 
 
-it('B-333 古いJST形式の登録日時でも未来だった通を誤って捨てない', async () => {
+it('古いJST形式の登録日時でも未来だった通を誤って捨てない', async () => {
   const {db,raw}=createTestD1(); seedReminder(raw);
   raw.prepare("UPDATE friend_reminders SET updated_at='2026-08-28T17:30:00.000' WHERE id='enrollment-1'").run();
   let pushes=0; const client=makeClient(async()=>{pushes++;return {requestId:null};});

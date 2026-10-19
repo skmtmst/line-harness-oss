@@ -11,7 +11,7 @@ import {
   NEN_CAMPAIGN_BODY_MAX_LENGTH,
   NEN_PET_NAME_MAX_LENGTH,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import {
   type CampaignRow,
@@ -526,7 +526,7 @@ nenCampaigns.get('/api/nen-campaigns/metrics/flows', requireRole('owner', 'admin
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   try {
-    // ★V6 37-6: 「今月」「先月」の数値カードは from/to で月の範囲を渡す（deliveries 口と同じ決めごと）。
+    // ★37-6: 「今月」「先月」の数値カードは from/to で月の範囲を渡す（deliveries 口と同じ決めごと）。
     const data = await getNenFlowMetrics(c.env.DB, accountId, nenDeliveryRange({
       from: c.req.query('from'), to: c.req.query('to'), days: c.req.query('days'),
     }));
@@ -1201,7 +1201,7 @@ async function resolveSoleActiveAccountId(db: D1Database): Promise<string | null
 
 /**
  * 未割り当て（line_account_id IS NULL）の EC コラムを、選択中の LINE アカウントへ割り当てる。
- * ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届くが、
+ * ★37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届くが、
  * 宛先が決められなかった分（アカウントが複数ある・古いコラム）がここに残る。
  */
 nenCampaigns.post('/api/nen-campaigns/columns/import', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {

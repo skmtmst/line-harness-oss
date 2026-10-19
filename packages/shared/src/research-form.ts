@@ -1,5 +1,7 @@
 import { tapExtrasError, type TapExtras } from './tap-extras.js';
-import { emptyLayout, type FormAction, type FormInputBlock, type FormLayout } from './form-layout.js';
+import { emptyLayout } from './form-layout.js';
+import { type FormAction } from './form-choice-types.js';
+import { type FormInputBlock, type FormLayout } from './types/form-layout.js';
 
 import type { ResearchAnswerAction } from './types/research.js';
 export type { ResearchAnswerAction, ResearchGate } from './types/research.js';

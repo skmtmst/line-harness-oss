@@ -2,7 +2,7 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { requireIrreversibleConfirmation, requireRole, requirePermission } from '../middleware/role-guard.js';
 import { BROADCAST_DEFINITION_EDIT_KEY, BROADCAST_DEFINITION_PUBLISH_KEY, BROADCAST_JOB_RETRY_KEY, BROADCAST_JOB_STOP_KEY, BROADCAST_TEST_SEND_KEY } from '@line-crm/shared';

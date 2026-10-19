@@ -20,7 +20,7 @@ export function nonNegativeListOffset(value: number | undefined): number {
  * Format: YYYY-MM-DDTHH:mm:ss.sss+09:00
  *
  * All timestamps in this project are standardized to JST.
- * The +09:00 suffix ensures new Date() parses correctly for epoch comparisons.
+ * The +09:00 suffix ensures new Date parses correctly for epoch comparisons.
  */
 export function jstNow(): string {
   return toJstString(new Date());

@@ -4,7 +4,7 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest';
 import { asD1 } from '@line-crm/db/test/d1-test-helper.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { styles } from './styles.js';
 import {
   styleSnapshot,

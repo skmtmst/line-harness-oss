@@ -5,7 +5,7 @@ import {
   hasCarouselTap,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
-import { runActionRows, type ScenarioActionRow } from './scenario-actions.js';
+import { runActionRows, type ScenarioActionRow } from '../features/scenarios/scenario-actions/index.js';
 import { pickCarouselActions, type CarouselTapPostback } from '../lib/carousel-tap.js';
 import { logOutgoingMessage } from './event-bus.js';
 

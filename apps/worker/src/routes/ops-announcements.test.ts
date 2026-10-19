@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_env: unknown, _m: { to: string; subject: string; body: string }) => {}) }));
@@ -16,7 +16,7 @@ const { opsAnnouncements } = await import('./ops-announcements.js');
 const { hqNotices } = await import('./hq-notices.js');
 const { processDueAnnouncements, tryLinkStaffByCode } = await import('../services/platform-announcements.js');
 
-/** ★V6 37-7 お知らせ配信と契約者専用LINE（決定 2026-09-18 案A）。 */
+/** ★37-7 お知らせ配信と契約者専用LINE（決定 2026-09-18 案A）。 */
 
 let testDb: SqliteD1;
 

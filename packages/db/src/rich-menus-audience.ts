@@ -1,4 +1,2 @@
-// Public entry point. Implementation is organized by responsibility.
-export { getRichMenuAreaTapTarget, recordRichMenuAreaTap } from './rich-menus-audience-taps.js';
-export { recordRichMenuAssignment, recordRichMenuAssignmentsByLineUserIds, clearRichMenuAssignmentsForGroup } from './rich-menus-audience-assignment.js';
-export { getRichMenuAudienceStats, getRichMenuTapStats } from './rich-menus-audience-statistics.js';
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { clearRichMenuAssignmentsForGroup, getRichMenuAreaTapTarget, getRichMenuAudienceStats, getRichMenuTapStats, recordRichMenuAreaTap, recordRichMenuAssignment, recordRichMenuAssignmentsByLineUserIds } from './rich-menus/audience.js';

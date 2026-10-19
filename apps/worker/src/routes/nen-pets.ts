@@ -1,6 +1,6 @@
 import { inputError } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { ACTIVITY_LABELS, DEFAULT_TREAT_LIMIT_PERCENT, getTreatLimitPercent, listFeedingProducts, planForPetRow, pickProduct, stapleProducts, type FeedingProductRow } from '../services/nen-feeding.js';
 import { petCallName, petGender } from '../services/nen-pet-name.js';
@@ -10,7 +10,7 @@ import {
 } from '../services/nen-health-admin.js';
 
 /**
- * 然-NEN- マイペット（★V6 37-3 `hetvN`）／健康日記（★V6 37-4 `mtoCA`）の管理画面。
+ * 然-NEN- マイペット（★37-3 `hetvN`）／健康日記（★37-4 `mtoCA`）の管理画面。
  *
  * ペットの正本は LINE 側（nen_pet_profiles）。お客様がマイページで登録・更新し、ここでは一覧と気づきを出す。
  * 「今日の目安」は `services/nen-feeding.ts`（NRC／FEDIAF）で表示のたびに計算する。

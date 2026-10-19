@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 

@@ -1,6 +1,7 @@
 import type { Broadcast, OperationCapability } from '@line-crm/db';
 
-import { getBroadcastAudiencePreview } from './broadcast-audience-preview.js';
+
+import { getBroadcastAudiencePreview } from '../features/broadcasts/broadcast-audience-preview/index.js';
 
 export type OperationImpactMetric = {
   /** 停止対象になる設定・配信の数。 */

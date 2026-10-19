@@ -1,3 +1,2 @@
-// Public entry point. Implementation is organized by responsibility.
-export { CONVERSION_DEFINITION_USAGE_KINDS, usageName, ConversionDefinitionError, USAGE_REF_CHECKS, assertUsageRefExists, accountWhere, INVALID_CONFIG_SQL, SOURCE_STOPPED_SQL, UNUSED_SQL, stateFilterSql, definitionWhere, metricsCte, selectDefinitionsSql, orderBy, cancellationMetrics, reversalMetrics, deriveDefinitionState, serializeDefinition, serializeUsage } from './conversion-definitions-reads-query-parts.js';
-export { listConversionDefinitions, getConversionDefinitionDetail } from './conversion-definitions-reads-lists.js';
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { accountWhere, assertUsageRefExists, cancellationMetrics, CONVERSION_DEFINITION_USAGE_KINDS, ConversionDefinitionError, definitionWhere, deriveDefinitionState, getConversionDefinitionDetail, INVALID_CONFIG_SQL, listConversionDefinitions, metricsCte, orderBy, reversalMetrics, selectDefinitionsSql, serializeDefinition, serializeUsage, SOURCE_STOPPED_SQL, stateFilterSql, UNUSED_SQL, USAGE_REF_CHECKS, usageName } from './conversion-definitions/reads.js';

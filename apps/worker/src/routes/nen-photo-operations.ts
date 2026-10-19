@@ -25,12 +25,13 @@ import {
   type BulkPhotoDecisionItem,
   type BulkPhotoDecisionResult,
 } from '@line-crm/db';
+
 import {
   deliverPhotoReviewNotification,
   loadPhotoReviewRecipient,
   type PhotoReviewReasonCode,
-} from './nen-members.js';
-import type { Env } from '../index.js';
+} from './nen-members-definition.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { getFileScanBySubject } from '../services/file-scan.js';
 import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
@@ -401,7 +402,7 @@ nenPhotoOperations.post(
     }
     const lineAccountId = body.lineAccountId.trim();
     if (!await accountVisible(c, lineAccountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
-    // 検査が終わっていない写真は一括採用の対象にできない（v6-22 §4）。
+    // 検査が終わっていない写真は一括採用の対象にできない（-22 §4）。
     const approveTargets = decisions.filter((decision) => decision.decision === 'approve');
     if (approveTargets.length > 0) {
       for (const target of approveTargets) {

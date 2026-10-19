@@ -1,7 +1,7 @@
 import {Hono,type Context} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite} from '../services/gap-common.js';
-import {absence,expireMakeup,makeupRule,makeupOptions,useMakeup} from '../services/booking-makeup.js';
+import {absence,expireMakeup,makeupRule,makeupOptions,useMakeup} from '../features/booking/booking-makeup/index.js';
 import {resolveAccountIdFromLiff,verifyCallerLineUserId,resolveFriendId} from './booking.js';
 import {requirePermission} from '../middleware/role-guard.js';
 export const bookingMakeup=new Hono<Env>();

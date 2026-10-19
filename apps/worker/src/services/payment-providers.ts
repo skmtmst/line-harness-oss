@@ -1,4 +1,4 @@
-import { safeReceiptUrl } from './booking-payment-history.js';
+import { safeReceiptUrl } from '../features/booking/booking-payment-history/index.js';
 import { verifyStripeSignature } from './stripe-signature.js';
 import type { BookingPaymentStatus } from '@line-crm/db';
 

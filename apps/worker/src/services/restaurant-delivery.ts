@@ -1,3 +1,7 @@
+export type { DeliveryService } from './delivery-service-types.js';
+export { DELIVERY_SERVICES } from './delivery-service-types.js';
+import { DELIVERY_SERVICES } from './delivery-service-types.js';
+import type { DeliveryService } from './delivery-service-types.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * 飲食店向け（テスト）「デリバリー受注」の土台。
@@ -12,7 +16,7 @@ import { tracedFetch as fetch } from '@line-crm/shared/server';
  * - 急ぎ度はここ（バックエンド）だけで決める。画面には結果と理由の文だけを渡し、
  *   判定に使う仕組みの名称は出さない（利用者指示 2026-10-09）。
  * - rt_delivery_* の時刻列はすべて INTEGER。単位は **エポック秒** に統一する。
- *   ミリ秒を混ぜると経過時間と急ぎ度が静かに壊れるので、時刻は必ず nowSec() を通す。
+ *   ミリ秒を混ぜると経過時間と急ぎ度が静かに壊れるので、時刻は必ず nowSec を通す。
  * - サービスから返った自由文・本文・例外は保存しない。分類済みの符号だけを残す。
  */
 import {
@@ -22,9 +26,6 @@ import {
 import type { DeliveryWebhookEnv } from './delivery-webhook-ip.js';
 import type { UberOAuthClient } from './uber-eats.js';
 import { uberHosts, type UberHostEnv } from './uber-eats-hosts.js';
-
-export const DELIVERY_SERVICES = ['ubereats', 'demaecan', 'rocketnow'] as const;
-export type DeliveryService = (typeof DELIVERY_SERVICES)[number];
 
 /** 画面に出すサービス名（D-1のカードと表のしるし、D-4の内訳、D-6の選択行）。 */
 export const DELIVERY_SERVICE_LABELS: Record<DeliveryService, string> = {

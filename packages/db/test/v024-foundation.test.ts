@@ -58,7 +58,7 @@ import {
   applyDueCommonVarSchedules,
   getCommonVarById,
   getCommonVarVersions,
-} from '../src/common-vars.js';
+} from '../src/common-vars/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');
@@ -320,7 +320,7 @@ describe('友だち情報欄', () => {
     expect(await countFriendFieldValues(db, field.id)).toBe(0);
   });
 
-  test.each(['datetime', 'image', 'pdf'] as const)('V6の%s型を既存表を残したまま保存できる', async (type) => {
+  test.each(['datetime', 'image', 'pdf'] as const)('の%s型を既存表を残したまま保存できる', async (type) => {
     const field = await createFriendField(db, { name: type, fieldKey: `field_${type}`, type });
     expect(field.type).toBe(type);
     const stored = sqlite.prepare(`SELECT type, type_v6, version, status FROM friend_fields WHERE id = ?`).get(field.id) as {
@@ -998,7 +998,7 @@ describe('共通情報の日付切り替え', () => {
 
 describe('タグの分類は folders を見る', () => {
   test('分類を作ると folders(kind=tag) に入る', async () => {
-    const { createTagGroup, getTagGroups } = await import('../src/tags.js');
+    const { createTagGroup, getTagGroups } = await import('../src/tags/index.js');
     const group = await createTagGroup(db, { name: 'お悩み', sortOrder: 1 });
     // 形は変えていない。中で見るテーブルだけ差し替えた。
     expect(group).toMatchObject({ name: 'お悩み', sort_order: 1 });
@@ -1013,7 +1013,7 @@ describe('タグの分類は folders を見る', () => {
   });
 
   test('タグの所属は folder_id に入る', async () => {
-    const { createTagGroup, createTag, assignTagToGroup } = await import('../src/tags.js');
+    const { createTagGroup, createTag, assignTagToGroup } = await import('../src/tags/index.js');
     const group = await createTagGroup(db, { name: 'お悩み' });
     const tag = await createTag(db, { name: '腰痛', groupId: group.id });
     expect(tag.folder_id).toBe(group.id);
@@ -1024,7 +1024,7 @@ describe('タグの分類は folders を見る', () => {
   });
 
   test('分類を消してもタグは残り、未分類に戻る', async () => {
-    const { createTagGroup, createTag, deleteTagGroup } = await import('../src/tags.js');
+    const { createTagGroup, createTag, deleteTagGroup } = await import('../src/tags/index.js');
     const group = await createTagGroup(db, { name: 'お悩み' });
     const tag = await createTag(db, { name: '腰痛', groupId: group.id });
     await deleteTagGroup(db, group.id);
@@ -1035,7 +1035,7 @@ describe('タグの分類は folders を見る', () => {
   });
 
   test('別の種類のフォルダは分類として出てこない', async () => {
-    const { getTagGroups } = await import('../src/tags.js');
+    const { getTagGroups } = await import('../src/tags/index.js');
     await createFolder(db, { kind: 'template', name: 'よく使う' });
     expect(await getTagGroups(db)).toHaveLength(0);
   });

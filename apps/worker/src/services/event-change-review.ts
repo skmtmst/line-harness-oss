@@ -1,7 +1,7 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 // U: イベントの状態・変更確認・開催回変更の土台。
 //
-// v6-29 §10（開催変更・中止）・§11-2（イベント状態）と確定文書 U の決めごと。
+// -29 §10（開催変更・中止）・§11-2（イベント状態）と確定文書 U の決めごと。
 // 状態を変える操作は「誰が・いつ・何を・理由」を event_change_logs に残す。
 // 記録は消さない。取り消しは逆向きの記録を足す。
 //
@@ -18,7 +18,7 @@ import {
   rescheduleByTrigger,
 } from './reminder-trigger.js';
 
-/** v6-29 §11-2 の保存する状態。「満席」「申込が少ない」は保存しない。 */
+/** -29 §11-2 の保存する状態。「満席」「申込が少ない」は保存しない。 */
 export type EventLifecycleStatus =
   | 'draft'
   | 'published'

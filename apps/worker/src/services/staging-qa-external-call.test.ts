@@ -1,9 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { LineClient } from '@line-crm/line-sdk';
-import {
-  API_RETRY_WAIT, createCallState, createExternalCall, createHttpAttempt, lineTransport, MemoryCircuitStore,
-  type CallState,
-} from '../lib/external-call/index.js';
+import { API_RETRY_WAIT, createCallState, createExternalCall, createHttpAttempt, lineTransport, MemoryCircuitStore } from '../lib/external-call/index.js';
+import { type CallState } from '../lib/external-call/types.js';
 import { QA_STAGING_DATABASE, withQaOutboundBoundary } from './staging-qa-safety.js';
 import type { WorkerBindings } from '../worker-bindings.js';
 

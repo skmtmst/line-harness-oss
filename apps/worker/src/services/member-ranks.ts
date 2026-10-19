@@ -1,4 +1,4 @@
-import {assertChanged,clearAssertions} from './booking-series.js';
+import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 import {GapError} from './gap-common.js';
 export type RankTier={id:string;name:string;threshold:number;mileMultiplier:number;tagId?:string;benefitDescriptions?:string[];couponCode?:string|null;upgradeMessages?:Array<{type:"text";text:string}>;downgradeMessages?:Array<{type:"text";text:string}>};
 export async function rankProgram(db:D1Database,a:string){

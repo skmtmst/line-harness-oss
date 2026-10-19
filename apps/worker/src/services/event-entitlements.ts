@@ -1,4 +1,4 @@
-import { EntitlementError, entitlementMonth, entitlementViews } from './booking-entitlements.js';
+import { EntitlementError, entitlementMonth, entitlementViews } from '../features/booking/booking-entitlements/index.js';
 import { getAccountTimeZone } from './availability.js';
 
 /** Event scopes are opt-in. A menu-only or another person's grant cannot pay for a class. */

@@ -1,7 +1,7 @@
 import type { DeliveryOrderRow, DeliveryOrderItemRow, DeliveryServiceStateRow } from './restaurant-delivery-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import type { Context, MiddlewareHandler } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -10,7 +10,8 @@ import { tenantHasFeaturePack } from '../services/tenant-features.js';
 import { accountId, fail, staffTenantId, storeFor } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
 import { DELIVERY_SERVICES, dispatchToDeliveryService } from '../services/restaurant-delivery.js';
-import type { DeliveryAction, DeliveryDispatchResult, DeliveryOrderStatus, DeliveryService } from '../services/restaurant-delivery.js';
+import type { DeliveryAction, DeliveryDispatchResult, DeliveryOrderStatus } from '../services/restaurant-delivery.js';
+import type { DeliveryService } from '../services/delivery-service-types.js';
 
 /** 署名で守る外部受信の入口。管理画面の認証・統括ゲートは通さない。 */
 export const WEBHOOK_PREFIX = '/api/restaurant-test/delivery/webhooks/';
@@ -57,7 +58,7 @@ export function isoOrNull(seconds: number | null | undefined): string | null {
 }
 
 /**
- * Uber 接続（636 の表）だけは時刻をミリ秒で持つ。書き込み側が `Date.now()` のため、
+ * Uber 接続（636 の表）だけは時刻をミリ秒で持つ。書き込み側が `Date.now` のため、
  * 秒を前提にした上の `isoOrNull` と混ぜると1970年になる。読み取り口はこちらを使う。
  */
 export function isoFromMs(ms: number | null | undefined): string | null {

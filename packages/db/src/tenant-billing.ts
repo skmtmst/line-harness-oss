@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 
 /**
- * 統括の課金（★V6 36-2）。tenants の課金列と、Stripe Webhook の重複防止。
+ * 統括の課金（★36-2）。tenants の課金列と、Stripe Webhook の重複防止。
  */
 
 export const TENANT_PLAN_STATUSES = ['exempt', 'trialing', 'active', 'past_due', 'canceled'] as const;

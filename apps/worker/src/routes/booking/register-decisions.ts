@@ -1,17 +1,17 @@
 import { logger } from '@line-crm/shared/server';
-import type { Env } from '../../index.js';
+import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
-import { notifyForBooking } from '../../services/booking-notification.js';
-import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../../services/booking-confirmed-effects.js';
+import { notifyForBooking } from '../../features/booking/booking-notification/index.js';
+import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../../features/booking/booking-confirmed-effects/index.js';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { requireRole } from '../../middleware/role-guard.js';
 import { cancelByTrigger } from '../../services/reminder-trigger.js';
-import { canTransition, nextStatus, type BookingAction } from '../../services/booking-state.js';
-import { enqueueCalendarDeleteOperation, removeBookingFromGoogle, runCalendarDeleteOperation } from '../../services/booking-calendar-sync.js';
+import { canTransition, nextStatus, type BookingAction } from '../../features/booking/booking-state/index.js';
+import { enqueueCalendarDeleteOperation, removeBookingFromGoogle, runCalendarDeleteOperation } from '../../features/booking/booking-calendar-sync/index.js';
 import { fireOutgoingWebhooks } from '../../services/event-bus.js';
-import { type BookingStatus } from '../../services/booking-types.js';
+import { type BookingStatus } from '../../features/booking/booking-types/index.js';
 import { recordBookingAudit } from '@line-crm/db';
-import { promoteBookingWaitlist } from '../../services/booking-waitlist.js';
+import { promoteBookingWaitlist } from '../../features/booking/booking-waitlist/index.js';
 import { resolveAccountIdAdmin } from './identity.js';
 import { cancelLegacyBookingReminders, cancelObsoleteConfirmationRuns } from './ledger-input.js';
 import { googleCredentials } from './availability.js';
@@ -40,7 +40,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       decided_at: string | null;
     }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
-  // 再試行の受付: V6 取消が投げた直後の再送は、業務が済みでも V6 だけ直す (409 にしない)。
+  // 再試行の受付: 取消が投げた直後の再送は、業務が済みでも だけ直す (409 にしない)。
   // Calendar 削除も同じ鍵の台帳で再試行する (ずみなら触らず、一時失敗なら再実行)。
   // 却下ずみの再送も受け付ける (却下は終端のため通常遷移では 409 になる)。
   const isCancelRetry =
@@ -68,7 +68,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     // 却下では Calendar 予定を作らないため削除の再試行は要らない。
     if (isCancelRetry) {
       // 初回の途中失敗で旧表だけ未取消のまま残ることがある。同じ取消要求の
-      // 再送でそろえる (V6 fence 成功後なので 409 で巻き戻す物は無い)。
+      // 再送でそろえる (fence 成功後なので 409 で巻き戻す物は無い)。
       await cancelLegacyBookingReminders(c.env.DB, id);
       // 台帳行が durable に残るまで成功応答しない。enqueue の DB 失敗は
       // 落とさず投げ (連続失敗でも台帳なし200にしない)、再送で回復する。
@@ -125,7 +125,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       }, accountId).catch((err) => logger.error("routes_booking_failed")),
     );
   } else if (next === 'rejected') {
-    // N-065: 却下でも V6 の未送信予定は止める (通知だけでは送り続ける)。
+    // N-065: 却下でも の未送信予定は止める (通知だけでは送り続ける)。
     // 送信権の貸出中は 409 で再試行させる (取消確定後の送信を起こさない)。
     try {
       await cancelByTrigger(c.env.DB, {
@@ -164,8 +164,8 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       ),
     );
   } else if (next === 'cancelled' || next === 'expired') {
-    // N-065: V6 の未送信予定だけを止める。送信済み履歴は残す。
-    // 旧表の取消は V6 fence 成功の後に回す: fence の 409 では旧表も
+    // N-065: の未送信予定だけを止める。送信済み履歴は残す。
+    // 旧表の取消は fence 成功の後に回す: fence の 409 では旧表も
     // 含めて完全 rollback する (先に止めると巻き戻せない)。
     // 送信権の貸出中は状態更新を巻き戻して 409 にする
     // (取消確定後の送信を起こさない)。
@@ -198,7 +198,7 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
     await cancelLegacyBookingReminders(c.env.DB, id);
     // R324: 取消・期限切れが確定したら古い確定案内などの未成功行を止める。
     await cancelObsoleteConfirmationRuns(c.env.DB, id, accountId);
-    // Calendar 削除は台帳駆動 (安定キーで1行)。V6 の fence 成功後に登録する:
+    // Calendar 削除は台帳駆動 (安定キーで1行)。の fence 成功後に登録する:
     // 送信権の貸出中で巻き戻した 409 の後に queued 行が残ると、cron が確定
     // ずみの予約の予定を消してしまう。登録の失敗は落とさず投げる
     // (取消再試行で回復できる)。一時失敗は retry_wait に残し、

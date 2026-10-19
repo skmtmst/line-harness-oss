@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { it, expect, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 const mocks = vi.hoisted(() => ({ stats: vi.fn() }));
 vi.mock('@line-crm/db', async (original) => ({ ...(await original<typeof import('@line-crm/db')>()), getFriendStats: mocks.stats }));
 vi.mock('../services/account-access.js', async (original) => ({ ...(await original<typeof import('../services/account-access.js')>()), getVisibleLineAccountScope: async () => ({ allowedAccountIds: ['a'], canSeeUnassigned: false }) }));

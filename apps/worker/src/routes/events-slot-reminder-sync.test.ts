@@ -1,9 +1,9 @@
 /**
- * N-065 回帰テスト (5件目): イベント枠の日程変更は、枠更新より先に V6 を移す。
+ * N-065 回帰テスト (5件目): イベント枠の日程変更は、枠更新より先に を移す。
  *
- * 枠を先に更新すると、V6 の初回 batch 失敗後の同一リクエスト再送で
+ * 枠を先に更新すると、の初回 batch 失敗後の同一リクエスト再送で
  * 旧起点が分からなくなり (old === new で reschedule を飛ばす)、
- * 移行前の行が旧日の active のまま残る。V6 先行なら失敗時は枠が untouched
+ * 移行前の行が旧日の active のまま残る。先行なら失敗時は枠が untouched
  * のまま 500 になるため、再送がそのまま回復になる。
  *
  * 本物の SQLite (createTestD1) に Hono ルートを載せて確かめる。
@@ -12,7 +12,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
@@ -20,7 +20,7 @@ const accountAccessMocks = vi.hoisted(() => ({
 }));
 vi.mock('../services/account-access.js', () => accountAccessMocks);
 
-// 通知の外部送信は抑える (V6連動の検証が目的)。
+// 通知の外部送信は抑える (連動の検証が目的)。
 const notifierMocks = vi.hoisted(() => ({ sendEventBookingNotification: vi.fn(async () => {}) }));
 vi.mock('../services/event-booking-notifier.js', () => notifierMocks);
 
@@ -106,12 +106,12 @@ async function putSlot(app: Hono<Env>, env: { DB: D1Database }) {
 }
 
 describe('イベント枠の日程変更の再送可能性', () => {
-  it('初回V6失敗では枠を変えず、同一リクエスト再送でlegacy行も新日時へ直る', async () => {
+  it('初回失敗では枠を変えず、同一リクエスト再送でlegacy行も新日時へ直る', async () => {
     const { db, raw } = createTestD1();
     seed(raw);
     const { app, env } = makeApp(db);
 
-    // V6 の書き込みだけ落とす失敗注入 (枠更新は通る状態)。
+    // の書き込みだけ落とす失敗注入 (枠更新は通る状態)。
     raw.exec(
       `CREATE TRIGGER v6_update_fail BEFORE UPDATE ON friend_reminders
        BEGIN SELECT RAISE(ABORT, 'injected-v6-failure'); END;`,
@@ -139,12 +139,12 @@ describe('イベント枠の日程変更の再送可能性', () => {
     ).toEqual({ target_date: NEW_STARTS_AT, status: 'active' });
   });
 
-  it('落選ずみへの却下の再送はV6修復を受け付けて200 (N-065)', async () => {
+  it('落選ずみへの却下の再送は修復を受け付けて200 (N-065)', async () => {
     const { db, raw } = createTestD1();
     seed(raw);
     const { app, env } = makeApp(db);
 
-    // 状態だけ先に落選ずみで、V6 が旧起点に残った壊れ方 (初回の V6 失敗相当)。
+    // 状態だけ先に落選ずみで、が旧起点に残った壊れ方 (初回の 失敗相当)。
     raw.prepare(`UPDATE event_bookings SET status = 'rejected', decided_at = ? WHERE id = 'eb-1'`)
       .run('2026-09-01T00:00:00.000Z');
 

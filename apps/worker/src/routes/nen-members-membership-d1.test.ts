@@ -1,5 +1,5 @@
 /*
- * LIFF マイページ（★V6 37-2）に出す会員ランク・マイル（`membership`）を実D1で固定する。
+ * LIFF マイページ（★37-2）に出す会員ランク・マイル（`membership`）を実D1で固定する。
  *  1. ECからランクが届いている友だちは、その値（通年・ランク・還元率・残高）を返す
  *  2. 届いていない友だちは、設定のしきい値と暫定の累計（購入額の足し算）からランクを求める
  *  3. 連携前（スナップショット無し）はレギュラー・0
@@ -94,7 +94,7 @@ describe('GET /api/liff/nen/member membership', () => {
     const body = await member('U-c');
     expect(body.data.membership).toMatchObject({ rankKey: 'regular', rankName: 'レギュラー', annualMilesYen: 0, lifetimeMilesYen: 0, mileBalance: 0, next: { name: 'シルバー' } });
   });
-  it('B-333 写真の同意と実際のサイト掲載を分け、採用点を返す',async()=>{
+  it('写真の同意と実際のサイト掲載を分け、採用点を返す',async()=>{
     sql.prepare("INSERT INTO nen_pet_profiles(id,friend_id,name,created_at,updated_at) VALUES('p','friend-a','犬','2026-01-01','2026-01-01')").run();
     sql.prepare(`INSERT INTO nen_photo_submissions(id,friend_id,pet_id,r2_key,image_url,content_type,status,awarded_points,publication_consent_at,created_at,updated_at,line_account_id)
       VALUES('photo','friend-a','p','photo.jpg','https://image.test/photo.jpg','image/jpeg','adopted',100,'2026-01-01','2026-01-01','2026-01-01','account-nen')`).run();

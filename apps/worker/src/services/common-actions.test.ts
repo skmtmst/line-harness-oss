@@ -37,7 +37,7 @@ const tagAction = (tagId: string) => [{
   onFailure: 'stop',
 }];
 
-describe('V6共通アクション', () => {
+describe('共通アクション', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {

@@ -3,7 +3,7 @@ import { inputError } from '../lib/input-errors.js';
 import { getPublicationThirtyDayViews } from '@line-crm/db';
 
 import { findRewardedAdoptedDuplicate, getEffectivePhotoRewardPolicy, jstNow, publishPhoto, savePhotoPublicationOrder, nextVersionToken, toJstString } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { getFileScanBySubject } from '../services/file-scan.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';

@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // 権限の検証は meet-consultations.security.test.ts が持つ。ここで見たいのは
 // 本番ルートの取消・再送の挙動なので、認証は通った状態にしてから渡す。
@@ -103,7 +103,7 @@ const postBody = {
   meetUrl: 'https://meet.google.com/abc-defg-hij',
 };
 
-describe('Meet V6連動 (実ルート)', () => {
+describe('Meet 連動 (実ルート)', () => {
   test('日程変更で送信ずみ前日通知は履歴のまま、未来分だけ再設定する', async () => {
     const sqlite = new Database(':memory:');
     try {
@@ -128,7 +128,7 @@ describe('Meet V6連動 (実ルート)', () => {
       expect(sqlite.prepare(
         `SELECT status, scheduled_at FROM meet_consultation_notification_runs WHERE kind='hour_before' ORDER BY schedule_revision DESC LIMIT 1`,
       ).get()).toEqual({ status: 'pending', scheduled_at: S2_HOUR_BEFORE });
-      // V6 も新しい起点へ直る。
+      // も新しい起点へ直る。
       expect(sqlite.prepare(
         `SELECT target_date, status FROM friend_reminders WHERE id = 'FR-meet'`,
       ).get()).toEqual({ target_date: S2, status: 'active' });

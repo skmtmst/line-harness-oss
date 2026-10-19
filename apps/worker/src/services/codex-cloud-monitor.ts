@@ -1,10 +1,9 @@
+export type { CodexMentionQueueMessage } from './codex-cloud-types.js';
+import type { CodexMentionQueueMessage } from './codex-cloud-types.js';
 import { tracedFetch as fetch, logger, traceQueueMessage } from '@line-crm/shared/server';
-import type { Env } from '../index.js';
-import {
-  githubFailureDetails,
-  processCodexAutoMerge,
-  type CodexAutoMergeMessage,
-} from './codex-auto-merge.js';
+import type { Env } from '../worker-env.js';
+import { githubFailureDetails, processCodexAutoMerge } from './codex-auto-merge.js';
+import { type CodexAutoMergeMessage } from './codex-auto-merge-types.js';
 import { decodeSlackTextEntities } from './slack-text.js';
 
 const AUTO_RELAY_MARKER = '【Claude依頼の自動中継】';
@@ -20,33 +19,6 @@ export type CodexMonitorStatus =
   | 'duplicate_risk'
   | 'completed'
   | 'failed';
-
-export type CodexMentionQueueMessage = (
-  | CodexAutoMergeMessage
-  | {
-      kind: 'inspect_official';
-      slackEventId: string;
-      teamId: string;
-      channelId: string;
-      messageTs: string;
-      threadTs: string;
-      requesterUserId: string;
-      prompt: string;
-    }
-  | {
-      kind: 'inspect_relay';
-      slackEventId: string;
-      channelId: string;
-      threadTs: string;
-    }
-  | {
-      kind: 'notify_duplicate';
-      slackEventId: string;
-      channelId: string;
-      threadTs: string;
-      officialTaskUrl?: string;
-    }
-) & { requestId?: string };
 
 export type SlackEventEnvelope = {
   type?: string;

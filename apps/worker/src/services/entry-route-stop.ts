@@ -9,6 +9,8 @@ import type {
   FriendAddCandidateSource,
 } from '@line-crm/db';
 
+
+
 // N-244: 停止した流入経路の判定を各入口 (/r/:ref、/auth/line、/auth/oauth、
 // /auth/callback、/api/liff/*、follow webhook) で共通化する。
 // entry_routes に行があり is_active != 1 のときだけ true (停止/アーカイブ)。

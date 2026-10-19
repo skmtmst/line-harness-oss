@@ -9311,8 +9311,8 @@ var ZodObject = class _ZodObject extends ZodType {
   //   > => {
   //     return new ZodObject({
   //       ...def,
-  //       shape: () => ({
-  //         ...def.shape(),
+  //       shape:  => ({
+  //         ...def.shape,
   //         ...augmentation,
   //       }),
   //     }) as any;
@@ -9372,8 +9372,8 @@ var ZodObject = class _ZodObject extends ZodType {
   //   const merged: any = new ZodObject({
   //     unknownKeys: merging._def.unknownKeys,
   //     catchall: merging._def.catchall,
-  //     shape: () =>
-  //       objectUtil.mergeShapes(this._def.shape(), merging._def.shape()),
+  //     shape:  =>
+  //       objectUtil.mergeShapes(this._def.shape, merging._def.shape),
   //     typeName: ZodFirstPartyTypeKind.ZodObject,
   //   }) as any;
   //   return merged;
@@ -9390,14 +9390,14 @@ var ZodObject = class _ZodObject extends ZodType {
   //   Incoming["_def"]["catchall"]
   // > {
   //   // const mergedShape = objectUtil.mergeShapes(
-  //   //   this._def.shape(),
-  //   //   merging._def.shape()
+  //   //   this._def.shape,
+  //   //   merging._def.shape
   //   // );
   //   const merged: any = new ZodObject({
   //     unknownKeys: merging._def.unknownKeys,
   //     catchall: merging._def.catchall,
-  //     shape: () =>
-  //       objectUtil.mergeShapes(this._def.shape(), merging._def.shape()),
+  //     shape:  =>
+  //       objectUtil.mergeShapes(this._def.shape, merging._def.shape),
   //     typeName: ZodFirstPartyTypeKind.ZodObject,
   //   }) as any;
   //   return merged;
@@ -9671,7 +9671,7 @@ var ZodDiscriminatedUnion = class _ZodDiscriminatedUnion extends ZodType {
     return this._def.optionsMap;
   }
   /**
-   * The constructor of the discriminated union schema. Its behaviour is very similar to that of the normal z.union() constructor.
+   * The constructor of the discriminated union schema. Its behaviour is very similar to that of the normal z.union constructor.
    * However, it only allows a union of objects, all of which need to share a discriminator property. This property must
    * have a different value for each object in the union.
    * @param discriminator the name of the discriminator property
@@ -13847,7 +13847,7 @@ function _array(Class2, element, params) {
   return new Class2({
     type: "array",
     element,
-    // get element() {
+    // get element {
     //   return element;
     // },
     ...normalizeParams(params)
@@ -18824,7 +18824,7 @@ var Protocol = class {
    * }
    * ```
    *
-   * @experimental Use `client.experimental.tasks.requestStream()` to access this method.
+   * @experimental Use `client.experimental.tasks.requestStream` to access this method.
    */
   async *requestStream(request, resultSchema, options) {
     const { task } = options ?? {};
@@ -18888,7 +18888,7 @@ var Protocol = class {
   /**
    * Sends a request and waits for a response.
    *
-   * Do not use this method to emit notifications! Use notification() instead.
+   * Do not use this method to emit notifications! Use notification instead.
    */
   request(request, resultSchema, options) {
     const { relatedRequestId, resumptionToken, onresumptiontoken, task, relatedTask } = options ?? {};
@@ -19012,7 +19012,7 @@ var Protocol = class {
   /**
    * Gets the current status of a task.
    *
-   * @experimental Use `client.experimental.tasks.getTask()` to access this method.
+   * @experimental Use `client.experimental.tasks.getTask` to access this method.
    */
   async getTask(params, options) {
     return this.request({ method: "tasks/get", params }, GetTaskResultSchema, options);
@@ -19020,7 +19020,7 @@ var Protocol = class {
   /**
    * Retrieves the result of a completed task.
    *
-   * @experimental Use `client.experimental.tasks.getTaskResult()` to access this method.
+   * @experimental Use `client.experimental.tasks.getTaskResult` to access this method.
    */
   async getTaskResult(params, resultSchema, options) {
     return this.request({ method: "tasks/result", params }, resultSchema, options);
@@ -19028,7 +19028,7 @@ var Protocol = class {
   /**
    * Lists tasks, optionally starting from a pagination cursor.
    *
-   * @experimental Use `client.experimental.tasks.listTasks()` to access this method.
+   * @experimental Use `client.experimental.tasks.listTasks` to access this method.
    */
   async listTasks(params, options) {
     return this.request({ method: "tasks/list", params }, ListTasksResultSchema, options);
@@ -19036,7 +19036,7 @@ var Protocol = class {
   /**
    * Cancels a specific task.
    *
-   * @experimental Use `client.experimental.tasks.cancelTask()` to access this method.
+   * @experimental Use `client.experimental.tasks.cancelTask` to access this method.
    */
   async cancelTask(params, options) {
     return this.request({ method: "tasks/cancel", params }, CancelTaskResultSchema, options);
@@ -19353,7 +19353,7 @@ var AjvJsonSchemaValidator = class {
    * ```typescript
    * // Use default configuration (recommended for most cases)
    * import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
-   * const validator = new AjvJsonSchemaValidator();
+   * const validator = new AjvJsonSchemaValidator;
    *
    * // Or provide custom AJV instance for advanced configuration
    * import { Ajv } from 'ajv';
@@ -20715,7 +20715,7 @@ var McpServer = class {
     return registeredTool;
   }
   /**
-   * tool() implementation. Parses arguments passed to overrides defined above.
+   * tool implementation. Parses arguments passed to overrides defined above.
    */
   tool(name, ...rest) {
     if (this._registeredTools[name]) {

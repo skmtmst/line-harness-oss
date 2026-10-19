@@ -1,4 +1,2 @@
-// Public entry point. Implementation is organized by responsibility.
-export { parseReminderVersionSettings, getReminderVersionById, getReminderDraftVersion, getReminderPublishedVersion, reminderVersionStepStatements, createReminderWithDraftVersion, saveReminderDraftVersion, recordReminderDraftTest } from './reminders-versions-drafts.js';
-export { publishReminderDraftVersion, getReminderVersionSteps } from './reminders-versions-publication.js';
-export { getReminderSteps, createReminderStep, deleteReminderStep, ensureReminderPublishedVersion } from './reminders-versions-steps.js';
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { createReminderStep, createReminderWithDraftVersion, deleteReminderStep, ensureReminderPublishedVersion, getReminderDraftVersion, getReminderPublishedVersion, getReminderSteps, getReminderVersionById, getReminderVersionSteps, parseReminderVersionSettings, publishReminderDraftVersion, recordReminderDraftTest, reminderVersionStepStatements, saveReminderDraftVersion } from './reminders/versions.js';
