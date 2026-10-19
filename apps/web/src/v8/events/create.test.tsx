@@ -11,7 +11,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: vi.fn() }
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: React.PropsWithChildren<{ href: string }>) => <a href={href} {...rest}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/use-unsaved-guard', () => ({ useUnsavedGuard: () => ({ leaveTarget: null, confirmLeave: vi.fn(), cancelLeave: vi.fn() }) }))
 vi.mock('./application-preview', () => ({ default: () => null }))
 import EventsCreate from './create'

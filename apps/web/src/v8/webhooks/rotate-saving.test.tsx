@@ -7,7 +7,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', accounts: [] }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
-vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => null, useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffIdentity: () => null, useStaffRole: () => 'owner' }))
 vi.mock('./shell', async importOriginal => {
   const actual = await importOriginal<typeof import('./shell')>()
   const deliverySummary = { total: 0, failed: 0, pending: 0, lastResult: null, canRetry: false }

@@ -11,7 +11,7 @@ vi.mock('@/lib/api', () => ({ api: { hqBilling: calls }, ApiError: class extends
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/billing', useRouter: () => ({push: vi.fn()}) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
 
-vi.mock('@/lib/staff-role', () => ({useStaffRole: () => 'owner'}))
+vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole: () => 'owner'}))
 
 const plans: BillingPlanView[] = [
   { key: 'light', name: 'ライト', monthlyYen: 9800, yearlyYen: 99000 },

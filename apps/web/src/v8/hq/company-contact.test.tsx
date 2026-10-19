@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({ read:vi.fn(), save:vi.fn(), postal:vi.fn(), na
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => ({
   ...(await importOriginal()), api:{tenants:{companyContact:mocks.read,saveCompanyContact:mocks.save,me:mocks.name},postalCode:{search:mocks.postal}},
 }))
-vi.mock('@/lib/staff-role', () => ({useStaffRole:()=>mocks.role}))
+vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole:()=>mocks.role}))
 vi.mock('@/components/shell/page-chrome', () => ({usePageCrumbs:()=>{},usePageTitle:()=>{}}))
 vi.mock('next/navigation', () => ({useRouter:()=>({push:vi.fn(),replace:vi.fn()}),usePathname:()=>'/hq/settings',useSearchParams:()=>new URLSearchParams()}))
 vi.mock('next/link', () => ({default:({children,href,...props}: React.AnchorHTMLAttributes<HTMLAnchorElement>)=><a href={href} {...props}>{children}</a>}))
