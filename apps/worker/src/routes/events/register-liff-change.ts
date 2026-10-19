@@ -45,6 +45,7 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
     now: new Date(),
   });
   if (reservation.kind === 'cached') {
+    if (reservation.status >= 500) throw new Error('event_booking_change_cached_failure');
     return c.json(
       reservation.body as Record<string, unknown>,
       reservation.status as 200 | 201 | 400 | 409 | 410 | 422,
@@ -67,8 +68,8 @@ events.post('/api/events/liff/bookings/:id/change', inputJsonBoundary(), async (
     return await runChangeFlow();
   } catch (e) {
     if(e instanceof Error&&e.message.includes('entitlement_unavailable'))return finalize(409,{error:'entitlement_unavailable'});
-    logger.error("routes_events_failed");
-    return finalize(500, { error: 'internal_error' });
+    await finalize(500, { error: 'internal_error' });
+    throw e;
   }
 
   async function runChangeFlow(): Promise<Response> {

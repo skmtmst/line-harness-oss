@@ -380,8 +380,7 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
             ? await getFormSubmissionById(c.env.DB, existing.submission_id)
             : null;
           if (!saved) {
-            logger.error("form_submit_claim_is_completed_without_an_answer_row");
-            return c.json({ success: false, error: 'Internal server error' }, 500);
+            throw new Error('form_submit_claim_is_completed_without_an_answer_row');
           }
           c.header('Idempotency-Replayed', 'true');
           return c.json({ success: true, data: serializeIdempotentReplay(saved) }, 200);
@@ -858,7 +857,6 @@ export const post__api_forms_id_submit_1 = async (c: Context<Env, "/api/forms/:i
     if (err instanceof Error && ['document_attachment_failed', 'document_already_submitted', 'document_attachment_conflict'].includes(err.message)) {
       return c.json({ success: false, code: 'document_attachment_failed', error: '書類を回答に付けられませんでした。書類をもう一度選んで、送信してください' }, 409);
     }
-    logger.error("routes_forms_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

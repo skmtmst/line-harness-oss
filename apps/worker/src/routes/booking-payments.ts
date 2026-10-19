@@ -347,7 +347,8 @@ async function accessiblePayment(c: import('hono').Context<Env>) {
 bookingPayments.onError((error,c) => {
   if (error instanceof PaymentActionError) return c.json({success:false,error:error.code,code:error.code},error.status);
   const missing = /no such (table|column).*?(booking_payment_refunds|booking_payment_booking_links|refunded_amount|actor_label)/.test(String(error));
-  const code = missing ? 'payment_refund_storage_not_ready' : 'payment_action_unavailable';
+  if (!missing) throw error;
+  const code = 'payment_refund_storage_not_ready';
   logger.error(code);
   return c.json({success:false,error:code,code}, /\/(refund|refunds|booking)$/.test(c.req.path) ? 503 : 500);
 });

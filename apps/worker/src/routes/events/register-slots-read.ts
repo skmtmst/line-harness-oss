@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { bad } from '../../services/event-input-error.js';
@@ -96,48 +95,43 @@ events.get(
   '/api/events/admin/occurrences/:id/applicants.csv',
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
-    try {
-      const accountId = getAccountId(c);
-      if (!accountId) return bad(c, 'account_id_required', 400);
-      const occurrenceId = c.req.param('id');
-      const snapshotId = c.req.query('snapshot_id');
-      if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
-      const loaded = await getEventApplicantSnapshot(c.env.DB, {
-        id: snapshotId,
-        lineAccountId: accountId,
-        occurrenceId,
-        staffId: c.get('staff')!.id,
-      });
-      if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
-      if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
-      if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
-      c.set('outputAudit', { count: loaded.snapshot.data.applicants.length, accountId, targetId: occurrenceId });
-      const rows = loaded.snapshot.data.applicants.map((applicant) => [
-        applicant.displayName,
-        applicant.source === 'waitlist' ? 'キャンセル待ち' : '申込',
-        applicant.status,
-        applicant.partySize,
-        applicant.appliedAt,
-        applicant.offerExpiresAt,
-      ].map(csvCell).join(','));
-      const safeId = occurrenceId.replace(/[^A-Za-z0-9_-]/g, '') || 'occurrence';
-      auditLog(c, 'event.applicant.export', { kind: 'event_occurrence', id: occurrenceId }, {
-        lineAccountId: accountId,
-      });
-      return new Response(`\uFEFF${[
-        ['申込者', '区分', '状態', '人数', '申込日時', '案内期限'].map(csvCell).join(','),
-        ...rows,
-      ].join('\r\n')}\r\n`, {
-        headers: {
-          'Content-Type': 'text/csv; charset=utf-8',
-          'Content-Disposition': `attachment; filename="event-${safeId}-applicants.csv"`,
-          'Cache-Control': 'no-store',
-        },
-      });
-    } catch (error) {
-      logger.error("routes_events_failed");
-      return c.json({ error: 'applicants_export_failed' }, 500);
-    }
+    const accountId = getAccountId(c);
+    if (!accountId) return bad(c, 'account_id_required', 400);
+    const occurrenceId = c.req.param('id');
+    const snapshotId = c.req.query('snapshot_id');
+    if (!snapshotId) return bad(c, 'applicant_snapshot_required', 422);
+    const loaded = await getEventApplicantSnapshot(c.env.DB, {
+      id: snapshotId,
+      lineAccountId: accountId,
+      occurrenceId,
+      staffId: c.get('staff')!.id,
+    });
+    if (loaded.kind === 'not_found') return bad(c, 'not_found', 404);
+    if (loaded.kind === 'expired') return bad(c, 'applicant_snapshot_expired', 410);
+    if (loaded.kind === 'invalid') return bad(c, 'applicant_snapshot_invalid', 409);
+    c.set('outputAudit', { count: loaded.snapshot.data.applicants.length, accountId, targetId: occurrenceId });
+    const rows = loaded.snapshot.data.applicants.map((applicant) => [
+      applicant.displayName,
+      applicant.source === 'waitlist' ? 'キャンセル待ち' : '申込',
+      applicant.status,
+      applicant.partySize,
+      applicant.appliedAt,
+      applicant.offerExpiresAt,
+    ].map(csvCell).join(','));
+    const safeId = occurrenceId.replace(/[^A-Za-z0-9_-]/g, '') || 'occurrence';
+    auditLog(c, 'event.applicant.export', { kind: 'event_occurrence', id: occurrenceId }, {
+      lineAccountId: accountId,
+    });
+    return new Response(`\uFEFF${[
+      ['申込者', '区分', '状態', '人数', '申込日時', '案内期限'].map(csvCell).join(','),
+      ...rows,
+    ].join('\r\n')}\r\n`, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="event-${safeId}-applicants.csv"`,
+        'Cache-Control': 'no-store',
+      },
+    });
   },
 );
 }

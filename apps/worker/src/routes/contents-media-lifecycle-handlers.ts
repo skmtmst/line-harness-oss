@@ -16,259 +16,239 @@ import { isValidUsageExpiryDate, uploaderNameMap, serializeMedia, mediaArchiveRo
 import type { Context } from 'hono';
 
 export const get__media_id_content_1 = async (c: Context<Env, "/media/:id/content">) => {
-  try {
-    const media = await getMediaLiveTarget(c.env.DB, c.req.param('id'));
-    if (!media) return c.json({ success: false, error: 'Not found' }, 404);
-    if (privateImageKey(media.r2_key) || !publicImageKey(media.r2_key)
-      || !publicDeliveryContentType(media.mime_type, true) || await isWebinarSource(c.env.DB, media.r2_key)) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    // 配信の本文に埋まる公開URLも、clean の版だけ出す。
-    const liveFull = await getMediaGateInfo(c.env.DB, media.id);
-    if (!liveFull) return c.json({ success: false, error: 'Not found' }, 404);
-    const liveGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
-      id: media.id,
-      lineAccountId: liveFull.lineAccountId,
-      r2Key: media.r2_key,
-      filename: media.filename,
-      mimeType: media.mime_type,
-      sizeBytes: liveFull.sizeBytes,
-      width: liveFull.width,
-      height: liveFull.height,
-    });
-    if (!liveGate.allowed) {
-      return c.json({ success: false, code: liveGate.code, error: liveGate.message }, 409);
-    }
-    const object = await c.env.IMAGES.get(media.r2_key);
-    if (!object) return c.json({ success: false, error: 'Not found' }, 404);
-    const etag = typeof object.etag === 'string' && object.etag ? object.etag : null;
-    if (etag && c.req.header('if-none-match') === etag) {
-      return new Response(null, { status: 304 });
-    }
-    // 判別不能なまま開かせない。画像以外はそのまま表示せず添付で渡す。
-    const inline = media.mime_type.toLowerCase().startsWith('image/');
-    return new Response(object.body, {
-      headers: {
-        'Content-Type': media.mime_type,
-        'Content-Disposition': inline
-          ? `inline; filename*=UTF-8''${encodeURIComponent(media.filename)}`
-          : `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(media.filename)}`,
-        'Cache-Control': 'public, max-age=0, must-revalidate',
-        'X-Content-Type-Options': 'nosniff',
-        ...(etag ? { ETag: etag } : {}),
-      },
-    });
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+  const media = await getMediaLiveTarget(c.env.DB, c.req.param('id'));
+  if (!media) return c.json({ success: false, error: 'Not found' }, 404);
+  if (privateImageKey(media.r2_key) || !publicImageKey(media.r2_key)
+    || !publicDeliveryContentType(media.mime_type, true) || await isWebinarSource(c.env.DB, media.r2_key)) {
+    return c.json({ success: false, error: 'Not found' }, 404);
   }
+  // 配信の本文に埋まる公開URLも、clean の版だけ出す。
+  const liveFull = await getMediaGateInfo(c.env.DB, media.id);
+  if (!liveFull) return c.json({ success: false, error: 'Not found' }, 404);
+  const liveGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+    id: media.id,
+    lineAccountId: liveFull.lineAccountId,
+    r2Key: media.r2_key,
+    filename: media.filename,
+    mimeType: media.mime_type,
+    sizeBytes: liveFull.sizeBytes,
+    width: liveFull.width,
+    height: liveFull.height,
+  });
+  if (!liveGate.allowed) {
+    return c.json({ success: false, code: liveGate.code, error: liveGate.message }, 409);
+  }
+  const object = await c.env.IMAGES.get(media.r2_key);
+  if (!object) return c.json({ success: false, error: 'Not found' }, 404);
+  const etag = typeof object.etag === 'string' && object.etag ? object.etag : null;
+  if (etag && c.req.header('if-none-match') === etag) {
+    return new Response(null, { status: 304 });
+  }
+  // 判別不能なまま開かせない。画像以外はそのまま表示せず添付で渡す。
+  const inline = media.mime_type.toLowerCase().startsWith('image/');
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': media.mime_type,
+      'Content-Disposition': inline
+        ? `inline; filename*=UTF-8''${encodeURIComponent(media.filename)}`
+        : `attachment; filename="download"; filename*=UTF-8''${encodeURIComponent(media.filename)}`,
+      'Cache-Control': 'public, max-age=0, must-revalidate',
+      'X-Content-Type-Options': 'nosniff',
+      ...(etag ? { ETag: etag } : {}),
+    },
+  });
 };
 
 export const patch__api_media_id_2 = async (c: Context<Env, "/api/media/:id">) => {
+  const id = c.req.param('id');
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  const existing = await getMediaById(c.env.DB, id, accountId);
+  if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+  const body = await c.req.json<{
+    filename?: string;
+    folderId?: string | null;
+    usageExpiresAt?: unknown;
+    usageConsentNote?: unknown;
+    usageReference?: {
+      refKind?: unknown;
+      refId?: unknown;
+      mode?: unknown;
+      versionNo?: unknown;
+    };
+  }>();
+  const revisionHeader = c.req.header('If-Match')?.replace(/^"|"$/g, '');
+  const expectedRevision = Number(revisionHeader);
+  if (!revisionHeader || !Number.isInteger(expectedRevision) || expectedRevision < 1) return inputError(c, { success: false, code: 'EXPECTED_VERSION_REQUIRED', error: 'If-Match に確認した版が必要です' }, 400, []);
+  if (expectedRevision !== (existing.revision ?? 1)) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
+  // 名前は空・長すぎ・制御文字を受け付けない（直接アップロードの申告時と同じ決まり）。
+  const filename = body.filename === undefined ? undefined : String(body.filename).trim();
+  if (filename !== undefined) {
+    if (!filename) return inputError(c, { success: false, error: 'ファイル名を入力してください' }, 400, ["filename"]);
+    if (filename.length > 255) {
+      return inputError(c, { success: false, error: 'ファイル名は255文字までで入力してください' }, 400, ["filename"]);
+    }
+    if (/[\u0000-\u001f]/.test(filename)) {
+      return inputError(c, { success: false, error: 'ファイル名に使えない文字が含まれています' }, 400, ["filename"]);
+    }
+  }
+  // 存在しない・別種のフォルダを指すと、一覧の絞り込みから消える。
+  let folderId: string | null | undefined;
+  if ('folderId' in body) {
+    folderId = body.folderId ? String(body.folderId) : null;
+    if (folderId) {
+      const folder = await getFolderById(c.env.DB, folderId);
+      if (!folder || folder.kind !== 'media') {
+        return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId"]);
+      }
+    }
+  }
+  /*
+    既知の利用期限・同意情報の記録（IDEA-15）。
+    日付は実在する YYYY-MM-DD だけを受け付け、null/空で消す。
+    推測で値を作らないので、形式が合わない入力は書き込まず拒否する。
+  */
+  let usageExpiresAt: string | null | undefined;
+  if ('usageExpiresAt' in body) {
+    const raw = body.usageExpiresAt;
+    if (raw === null || raw === undefined || raw === '') {
+      usageExpiresAt = null;
+    } else if (typeof raw === 'string' && isValidUsageExpiryDate(raw.trim())) {
+      usageExpiresAt = raw.trim();
+    } else {
+      return inputError(c, { success: false, error: '利用期限は日付（YYYY-MM-DD）で入力してください' }, 400, ["usageExpiresAt"]);
+    }
+  }
+  let usageConsentNote: string | null | undefined;
+  if ('usageConsentNote' in body) {
+    const raw = body.usageConsentNote;
+    if (raw === null || raw === undefined) {
+      usageConsentNote = null;
+    } else if (typeof raw === 'string') {
+      const note = raw.trim();
+      if (note.length > 500) {
+        return inputError(c, { success: false, error: '同意・権利の記録は500文字までで入力してください' }, 400, ["usageConsentNote"]);
+      }
+      usageConsentNote = note || null;
+    } else {
+      return inputError(c, { success: false, error: '同意・権利の記録は文字列で入力してください' }, 400, ["usageConsentNote"]);
+    }
+  }
+  const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+  if (body.usageReference === undefined) {
+    const media = await updateMedia(c.env.DB, id, accountId, {
+      expectedRevision,
+      ...(filename !== undefined ? { filename } : {}),
+      ...(folderId !== undefined ? { folderId } : {}),
+      ...(usageExpiresAt !== undefined ? { usageExpiresAt } : {}),
+      ...(usageConsentNote !== undefined ? { usageConsentNote } : {}),
+    });
+    if (!media) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
+    const names = await uploaderNameMap(c.env.DB, [media!]);
+    return c.json({ success: true, data: serializeMedia(media!, workerUrl, names) });
+  }
+
+  /*
+    使用先ごとの参照切替。指定した1か所の本文だけを書き換え、
+    他の使用先には触れない。切り替え後は走査し直して使用先の記録を
+    新しい参照の形へ合わせる。
+  */
+  const usageReference = body.usageReference;
+  const refKind = typeof usageReference?.refKind === 'string' ? usageReference.refKind : '';
+  const refId = typeof usageReference?.refId === 'string' ? usageReference.refId.trim() : '';
+  if (!refId || !(MEDIA_REF_KINDS as readonly string[]).includes(refKind)) {
+    return inputError(c, { success: false, error: '切り替える使用先を指定してください' }, 400, ["usageReference"]);
+  }
+  const versionNo = usageReference?.versionNo;
+  const target = usageReference?.mode === 'live'
+    ? { mode: 'live' as const }
+    : usageReference?.mode === 'pinned'
+      && Number.isInteger(versionNo)
+      && Number(versionNo) >= 1
+      ? { mode: 'pinned' as const, versionNo: Number(versionNo) }
+      : null;
+  if (!target) {
+    return inputError(c, { success: false, error: '参照方法（常に最新・固定する版）を指定してください' }, 400, ["usageReference"]);
+  }
   try {
-    const id = c.req.param('id');
-    const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return inputError(c, { success: false, error: 'accountId query param required' }, 400, ["accountId"]);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const existing = await getMediaById(c.env.DB, id, accountId);
-    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    const body = await c.req.json<{
-      filename?: string;
-      folderId?: string | null;
-      usageExpiresAt?: unknown;
-      usageConsentNote?: unknown;
-      usageReference?: {
-        refKind?: unknown;
-        refId?: unknown;
-        mode?: unknown;
-        versionNo?: unknown;
-      };
-    }>();
-    const revisionHeader = c.req.header('If-Match')?.replace(/^"|"$/g, '');
-    const expectedRevision = Number(revisionHeader);
-    if (!revisionHeader || !Number.isInteger(expectedRevision) || expectedRevision < 1) return inputError(c, { success: false, code: 'EXPECTED_VERSION_REQUIRED', error: 'If-Match に確認した版が必要です' }, 400, []);
-    if (expectedRevision !== (existing.revision ?? 1)) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
-    // 名前は空・長すぎ・制御文字を受け付けない（直接アップロードの申告時と同じ決まり）。
-    const filename = body.filename === undefined ? undefined : String(body.filename).trim();
-    if (filename !== undefined) {
-      if (!filename) return inputError(c, { success: false, error: 'ファイル名を入力してください' }, 400, ["filename"]);
-      if (filename.length > 255) {
-        return inputError(c, { success: false, error: 'ファイル名は255文字までで入力してください' }, 400, ["filename"]);
-      }
-      if (/[\u0000-\u001f]/.test(filename)) {
-        return inputError(c, { success: false, error: 'ファイル名に使えない文字が含まれています' }, 400, ["filename"]);
-      }
-    }
-    // 存在しない・別種のフォルダを指すと、一覧の絞り込みから消える。
-    let folderId: string | null | undefined;
-    if ('folderId' in body) {
-      folderId = body.folderId ? String(body.folderId) : null;
-      if (folderId) {
-        const folder = await getFolderById(c.env.DB, folderId);
-        if (!folder || folder.kind !== 'media') {
-          return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId"]);
-        }
-      }
-    }
-    /*
-      既知の利用期限・同意情報の記録（IDEA-15）。
-      日付は実在する YYYY-MM-DD だけを受け付け、null/空で消す。
-      推測で値を作らないので、形式が合わない入力は書き込まず拒否する。
-    */
-    let usageExpiresAt: string | null | undefined;
-    if ('usageExpiresAt' in body) {
-      const raw = body.usageExpiresAt;
-      if (raw === null || raw === undefined || raw === '') {
-        usageExpiresAt = null;
-      } else if (typeof raw === 'string' && isValidUsageExpiryDate(raw.trim())) {
-        usageExpiresAt = raw.trim();
-      } else {
-        return inputError(c, { success: false, error: '利用期限は日付（YYYY-MM-DD）で入力してください' }, 400, ["usageExpiresAt"]);
-      }
-    }
-    let usageConsentNote: string | null | undefined;
-    if ('usageConsentNote' in body) {
-      const raw = body.usageConsentNote;
-      if (raw === null || raw === undefined) {
-        usageConsentNote = null;
-      } else if (typeof raw === 'string') {
-        const note = raw.trim();
-        if (note.length > 500) {
-          return inputError(c, { success: false, error: '同意・権利の記録は500文字までで入力してください' }, 400, ["usageConsentNote"]);
-        }
-        usageConsentNote = note || null;
-      } else {
-        return inputError(c, { success: false, error: '同意・権利の記録は文字列で入力してください' }, 400, ["usageConsentNote"]);
-      }
-    }
-    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
-    if (body.usageReference === undefined) {
-      const media = await updateMedia(c.env.DB, id, accountId, {
+    const result = await retargetMediaUsageReference(c.env.DB, {
+      media: existing,
+      lineAccountId: accountId,
+      refKind,
+      refId,
+      target,
+      mediaUpdate: {
         expectedRevision,
         ...(filename !== undefined ? { filename } : {}),
         ...(folderId !== undefined ? { folderId } : {}),
-        ...(usageExpiresAt !== undefined ? { usageExpiresAt } : {}),
-        ...(usageConsentNote !== undefined ? { usageConsentNote } : {}),
-      });
-      if (!media) return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
-      const names = await uploaderNameMap(c.env.DB, [media!]);
-      return c.json({ success: true, data: serializeMedia(media!, workerUrl, names) });
-    }
-
-    /*
-      使用先ごとの参照切替。指定した1か所の本文だけを書き換え、
-      他の使用先には触れない。切り替え後は走査し直して使用先の記録を
-      新しい参照の形へ合わせる。
-    */
-    const usageReference = body.usageReference;
-    const refKind = typeof usageReference?.refKind === 'string' ? usageReference.refKind : '';
-    const refId = typeof usageReference?.refId === 'string' ? usageReference.refId.trim() : '';
-    if (!refId || !(MEDIA_REF_KINDS as readonly string[]).includes(refKind)) {
-      return inputError(c, { success: false, error: '切り替える使用先を指定してください' }, 400, ["usageReference"]);
-    }
-    const versionNo = usageReference?.versionNo;
-    const target = usageReference?.mode === 'live'
-      ? { mode: 'live' as const }
-      : usageReference?.mode === 'pinned'
-        && Number.isInteger(versionNo)
-        && Number(versionNo) >= 1
-        ? { mode: 'pinned' as const, versionNo: Number(versionNo) }
-        : null;
-    if (!target) {
-      return inputError(c, { success: false, error: '参照方法（常に最新・固定する版）を指定してください' }, 400, ["usageReference"]);
-    }
+      },
+    });
     try {
-      const result = await retargetMediaUsageReference(c.env.DB, {
-        media: existing,
-        lineAccountId: accountId,
-        refKind,
-        refId,
-        target,
-        mediaUpdate: {
-          expectedRevision,
-          ...(filename !== undefined ? { filename } : {}),
-          ...(folderId !== undefined ? { folderId } : {}),
-        },
+      await scanSingleMediaUsage(c.env.DB, jstNow(), {
+        id: existing.id,
+        r2_key: existing.r2_key,
       });
-      try {
-        await scanSingleMediaUsage(c.env.DB, jstNow(), {
-          id: existing.id,
-          r2_key: existing.r2_key,
-        });
-      } catch (scanError) {
-        // 切替自体は確定済み。記録の更新は次の走査でも追いつく。
-        logger.error("routes_contents_failed");
-      }
-      const fresh = await getMediaById(c.env.DB, id, accountId);
-      const names = await uploaderNameMap(c.env.DB, [fresh ?? existing]);
-      return c.json({
-        success: true,
-        data: {
-          ...serializeMedia(fresh ?? existing, workerUrl, names),
-          usageReference: {
-            refKind,
-            refId,
-            mode: result.state.mode,
-            versionNo: result.state.versionNo,
-            changed: result.changed,
-          },
-        },
-      });
-    } catch (error) {
-      if (error instanceof MediaUsageReferenceError) {
-        switch (error.code) {
-          case 'media_metadata_conflict':
-            return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
-          case 'media_usage_not_found':
-            return c.json({ success: false, error: 'その使用先は見つかりませんでした' }, 404);
-          case 'media_version_not_found':
-            return c.json({ success: false, error: '指定の版が見つかりませんでした' }, 404);
-          case 'media_usage_shared':
-            return c.json({
-              success: false,
-              code: 'media_reference_shared',
-              error: '複数のLINEアカウントで共有しているため、この画面からは切り替えられません',
-            }, 409);
-          case 'media_reference_unsupported':
-            return c.json({
-              success: false,
-              code: 'media_reference_unsupported',
-              error: 'この使用先ではその参照方法を使えません',
-            }, 409);
-          default:
-            return c.json({
-              success: false,
-              code: 'media_reference_changed',
-              error: '使用先の内容が変わりました。読み直してから、もう一度お試しください',
-            }, 409);
-        }
-      }
-      throw error;
+    } catch (scanError) {
+      // 切替自体は確定済み。記録の更新は次の走査でも追いつく。
+      logger.error("routes_contents_failed");
     }
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    const fresh = await getMediaById(c.env.DB, id, accountId);
+    const names = await uploaderNameMap(c.env.DB, [fresh ?? existing]);
+    return c.json({
+      success: true,
+      data: {
+        ...serializeMedia(fresh ?? existing, workerUrl, names),
+        usageReference: {
+          refKind,
+          refId,
+          mode: result.state.mode,
+          versionNo: result.state.versionNo,
+          changed: result.changed,
+        },
+      },
+    });
+  } catch (error) {
+    if (error instanceof MediaUsageReferenceError) {
+      switch (error.code) {
+        case 'media_metadata_conflict':
+          return c.json({ success: false, code: 'VERSION_CONFLICT', error: 'ほかの人が先に保存しました。読み直してください' }, 409);
+        case 'media_usage_not_found':
+          return c.json({ success: false, error: 'その使用先は見つかりませんでした' }, 404);
+        case 'media_version_not_found':
+          return c.json({ success: false, error: '指定の版が見つかりませんでした' }, 404);
+        case 'media_usage_shared':
+          return c.json({
+            success: false,
+            code: 'media_reference_shared',
+            error: '複数のLINEアカウントで共有しているため、この画面からは切り替えられません',
+          }, 409);
+        case 'media_reference_unsupported':
+          return c.json({
+            success: false,
+            code: 'media_reference_unsupported',
+            error: 'この使用先ではその参照方法を使えません',
+          }, 409);
+        default:
+          return c.json({
+            success: false,
+            code: 'media_reference_changed',
+            error: '使用先の内容が変わりました。読み直してから、もう一度お試しください',
+          }, 409);
+      }
+    }
+    throw error;
   }
 };
 
 export const post__api_media_id_archive_3 = async (c: Context<Env, "/api/media/:id/archive">) => {
-  try {
-    return await mediaArchiveRoute(c, true, c.req.param('id'));
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
+  return await mediaArchiveRoute(c, true, c.req.param('id'));
 };
 
 export const post__api_media_id_restore_4 = async (c: Context<Env, "/api/media/:id/restore">) => {
-  try {
-    return await mediaArchiveRoute(c, false, c.req.param('id'));
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
+  return await mediaArchiveRoute(c, false, c.req.param('id'));
 };
 
 export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/media/:id/delete-impact">) => {
@@ -550,42 +530,37 @@ export const delete__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) 
 };
 
 export const get__api_common_vars_9 = async (c: Context<Env, "/api/common-vars">) => {
-  try {
-    const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const rawLimit = Number(c.req.query('limit'));
-    const limit = Number.isFinite(rawLimit)
-      ? Math.max(1, Math.min(Math.floor(rawLimit), COMMON_VARS_LIST_LIMIT))
-      : COMMON_VARS_LIST_LIMIT;
-    const folderId = c.req.query('folderId') || undefined;
-    const [items, total] = await Promise.all([
-      getCommonVars(c.env.DB, { lineAccountId: accountId, folderId, limit }),
-      countCommonVars(c.env.DB, { lineAccountId: accountId, folderId }),
-    ]);
-    const usageSummaries = await getCommonVarUsageSummaries(
-      c.env.DB,
-      items.map((item) => item.var_key),
-      accountId,
-    );
-    for (const item of items) {
-      const summary = usageSummaries.get(item.var_key);
-      item.usage_count = summary?.total ?? 0;
-      item.usage_by_kind = summary?.byKind ?? Object.fromEntries(
-        Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [kind, 0]),
-      ) as CommonVar['usage_by_kind'];
-    }
-    return c.json({
-      success: true,
-      data: items.map(serializeVar),
-      meta: { total, limited: total > items.length, limit },
-    });
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Not found' }, 404);
   }
+  const rawLimit = Number(c.req.query('limit'));
+  const limit = Number.isFinite(rawLimit)
+    ? Math.max(1, Math.min(Math.floor(rawLimit), COMMON_VARS_LIST_LIMIT))
+    : COMMON_VARS_LIST_LIMIT;
+  const folderId = c.req.query('folderId') || undefined;
+  const [items, total] = await Promise.all([
+    getCommonVars(c.env.DB, { lineAccountId: accountId, folderId, limit }),
+    countCommonVars(c.env.DB, { lineAccountId: accountId, folderId }),
+  ]);
+  const usageSummaries = await getCommonVarUsageSummaries(
+    c.env.DB,
+    items.map((item) => item.var_key),
+    accountId,
+  );
+  for (const item of items) {
+    const summary = usageSummaries.get(item.var_key);
+    item.usage_count = summary?.total ?? 0;
+    item.usage_by_kind = summary?.byKind ?? Object.fromEntries(
+      Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [kind, 0]),
+    ) as CommonVar['usage_by_kind'];
+  }
+  return c.json({
+    success: true,
+    data: items.map(serializeVar),
+    meta: { total, limited: total > items.length, limit },
+  });
 };
 
 export const get__api_common_vars_id_10 = async (c: Context<Env, "/api/common-vars/:id">) => {

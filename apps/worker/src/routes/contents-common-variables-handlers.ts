@@ -101,8 +101,7 @@ export const post__api_common_vars_1 = async (c: Context<Env, "/api/common-vars"
     if (err instanceof CommonVarKeyConflictError) {
       return c.json({ success: false, error: 'その差し込み名は既に使われています' }, 409);
     }
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -252,8 +251,7 @@ export const patch__api_common_vars_id_2 = async (c: Context<Env, "/api/common-v
         currentVersion: err.currentVersion,
       }, 409);
     }
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -308,8 +306,7 @@ export const post__api_common_vars_id_status_3 = async (c: Context<Env, "/api/co
         currentVersion: err.currentVersion,
       }, 409);
     }
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -544,20 +541,15 @@ export const delete__api_common_vars_id_7 = async (c: Context<Env, "/api/common-
 };
 
 export const get__api_common_vars_id_schedules_8 = async (c: Context<Env, "/api/common-vars/:id/schedules">) => {
-  try {
-    const accountId = c.req.query('accountId')?.trim();
-    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-      return c.json({ success: false, error: 'Not found' }, 404);
-    }
-    const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
-    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    const items = await getCommonVarSchedules(c.env.DB, c.req.param('id'));
-    return c.json({ success: true, data: items.map(serializeSchedule) });
-  } catch (err) {
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+  const accountId = c.req.query('accountId')?.trim();
+  if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Not found' }, 404);
   }
+  const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+  if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+  const items = await getCommonVarSchedules(c.env.DB, c.req.param('id'));
+  return c.json({ success: true, data: items.map(serializeSchedule) });
 };
 
 export const post__api_common_vars_id_schedules_9 = async (c: Context<Env, "/api/common-vars/:id/schedules">) => {
@@ -614,24 +606,18 @@ export const post__api_common_vars_id_schedules_9 = async (c: Context<Env, "/api
     if (err instanceof RequestBodyError) {
       return inputError(c, { success: false, error: err.message }, err.status, []);
     }
-    logger.error("routes_contents_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
 export const delete__api_common_vars_id_schedules_scheduleId_10 = async (c: Context<Env, "/api/common-vars/:id/schedules/:scheduleId">) => {
-    try {
-      const accountId = c.req.query('accountId')?.trim();
-      if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
-      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
-        return c.json({ success: false, error: 'Not found' }, 404);
-      }
-      const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
-      if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-      await deleteCommonVarSchedule(c.env.DB, c.req.param('scheduleId'), existing.id);
-      return c.json({ success: true, data: null });
-    } catch (err) {
-      logger.error("routes_contents_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+    const accountId = c.req.query('accountId')?.trim();
+    if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
     }
+    const existing = await getCommonVarById(c.env.DB, c.req.param('id'), accountId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    await deleteCommonVarSchedule(c.env.DB, c.req.param('scheduleId'), existing.id);
+    return c.json({ success: true, data: null });
   };
