@@ -1,4 +1,5 @@
 'use client'
+import Notice from '@/components/shared/notice'
 
 import type { FolderSelectCreate } from '@/components/shared/folder-select'
 
@@ -28,6 +29,8 @@ type BroadcastBasicStepContext = {
   goToStep: (step: BroadcastStepKey) => void | undefined
   internalMemo: string
   recentBroadcasts: ApiBroadcast[]
+  recentState: 'unselected' | 'loading' | 'error' | 'ready'
+  retryRecent: () => void
   setComposerTemplateIndex: Dispatch<SetStateAction<number | null>>
   setComposerTemplateKind: Dispatch<SetStateAction<string | undefined>>
   setDeliveryMethod: Dispatch<SetStateAction<"new" | "template" | "duplicate">>
@@ -39,7 +42,7 @@ type BroadcastBasicStepContext = {
   title: string
 }
 
-export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }: BroadcastBasicStepContext) {
+export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }: BroadcastBasicStepContext) {
   return (<section id="broadcast-step-basic" className={shows('basic') ? styles.section : 'hidden'}>
           <h3>配信方法</h3>
               <SaveErrorField names={["broadcast-delivery-method","value","deliveryMethod"]}><RadioCardGroup legend="配信方法" className={styles.methodCards}>
@@ -82,7 +85,10 @@ export function BroadcastBasicStep({ canCreateFolder, createFolder, deliveryMeth
           </div>
           <div className={styles.recentHeader}><h3>最近の配信</h3><Link href="/broadcasts">一斉配信の一覧を見る →</Link></div>
           <div className={styles.recentList}>
-            {recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
+            {recentState === 'unselected' ? <p className="text-xs text-ink-faint">LINEアカウントを選ぶと最近の配信を表示します。</p>
+              : recentState === 'loading' ? <p role="status" className="text-xs text-ink-faint">最近の配信を読み込んでいます…</p>
+              : recentState === 'error' ? <Notice tone="danger" action={<Button onClick={retryRecent}>もう一度読み込む</Button>}>最近の配信を読み込めませんでした。</Notice>
+              : recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
               <div key={broadcast.id} className={styles.recentRow}>
                 <Send size={14} aria-hidden /><span className={styles.recentName} title={broadcast.title}>{broadcast.title}</span>
                 <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'} ・ {broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>

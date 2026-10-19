@@ -104,7 +104,15 @@ function EditInner() {
   const loadRequestId = useRef(0)
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
-  const [analyticsId, setAnalyticsId] = useState<string | null>(null)
+  const analyticsRequest = useRef<string | null>(null)
+  const analyticsGeneration = useRef(0)
+  const retryAnalytics = useCallback(() => {
+    analyticsGeneration.current += 1
+    analyticsRequest.current = null
+    setAnalytics(null)
+    setAnalyticsState('idle')
+  }, [])
+  useEffect(() => () => { analyticsGeneration.current += 1; analyticsRequest.current = null }, [])
 
   const webinar = loaded && loaded.id === id ? loaded.webinar : null
   const editor = loaded && loaded.id === id ? loaded.editor : null
@@ -203,9 +211,7 @@ function EditInner() {
   useEffect(() => {
     if (!id) return
     const requestId = ++loadRequestId.current
-    setAnalytics(null)
-    setAnalyticsId(null)
-    setAnalyticsState('idle')
+    retryAnalytics()
     Promise.all([webinarApi.get(id), webinarApi.editor(id)])
       .then(([webinarResponse, editorResponse]) => {
         if (requestId !== loadRequestId.current) return
@@ -224,7 +230,7 @@ function EditInner() {
         }
       })
     return () => { loadRequestId.current += 1 }
-  }, [id, reloadKey])
+  }, [id, reloadKey, retryAnalytics])
 
   /*
     集計は重い口。公開後に見る3つ（参加者・分析・コメント演出：タブの「参加者 124」）を開いたときだけ取り、
@@ -235,30 +241,26 @@ function EditInner() {
     if (!id) return
     if (!isDetailPane) {
       if (analyticsState === 'error') {
-        setAnalytics(null)
-        setAnalyticsId(null)
-        setAnalyticsState('idle')
+        retryAnalytics()
       }
       return
     }
-    if (analyticsId === id && analyticsState !== 'idle') return
-    let cancelled = false
+    if (analyticsRequest.current === id) return
+    const generation = analyticsGeneration.current
+    analyticsRequest.current = id
     setAnalyticsState('loading')
     webinarApi.analytics(id)
       .then((response) => {
-        if (cancelled) return
+        if (generation !== analyticsGeneration.current) return
         setAnalytics(response.data)
-        setAnalyticsId(id)
         setAnalyticsState('ready')
       })
       .catch(() => {
-        if (cancelled) return
+        if (generation !== analyticsGeneration.current) return
         setAnalytics(null)
-        setAnalyticsId(id)
         setAnalyticsState('error')
       })
-    return () => { cancelled = true }
-  }, [id, isDetailPane, analyticsId, analyticsState])
+  }, [id, isDetailPane, analyticsState, reloadKey, retryAnalytics])
 
   if (!id) {
     return <>
@@ -315,7 +317,7 @@ function EditInner() {
     onCtasReport: handleCtasReport,
     onPublished: disarm,
     goStep,
-    retryAnalytics: () => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') },
+    retryAnalytics,
   }
 
   const stepPane: StepKey = (STEP_KEYS.includes(pane) ? pane : 'basic') as StepKey

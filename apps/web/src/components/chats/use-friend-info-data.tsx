@@ -1,5 +1,6 @@
 'use client'
 import { describeApiFailure } from '@/components/shared/api-error-message'
+import { asArray, isFriendDetailShape } from './friend-detail-shape'
 import { api } from '@/lib/api'
 import { useEffect,useState } from 'react'
 import { FriendFieldsState,MileageState,PurchaseState,RichMenuState,UpcomingState } from './friend-info-model'
@@ -46,7 +47,7 @@ export function useFriendInfoData({ friendId, accountId }: Options) {
     setError(null)
     api.friends.get(friendId).then((res) => {
       if (cancelled) return
-      if (res.success && res.data) {
+      if (res.success && isFriendDetailShape(res.data) && res.data?.id === friendId) {
         setFriend(res.data as unknown as FriendDetail)
       } else {
         // 内部の例外文字列はそのまま出さない。利用者向けの短い理由にする。
@@ -70,8 +71,8 @@ export function useFriendInfoData({ friendId, accountId }: Options) {
     setMileage({ kind: 'loading' })
     api.friends.mileage(friendId, 10).then((res) => {
       if (cancelled) return
-      if (res.success && res.data) {
-        setMileage({ kind: 'data', ...res.data })
+      if (res.success && res.data?.summary) {
+        setMileage({ kind: 'data', summary: res.data.summary, history: asArray(res.data.history) })
       } else {
         setMileage({ kind: 'error' })
       }
@@ -93,7 +94,7 @@ export function useFriendInfoData({ friendId, accountId }: Options) {
     api.friendFields.forFriend(friendId, { suppressFeatureDisabledEvent: true }).then((res) => {
       if (cancelled) return
       if (res.success && res.data) {
-        setFriendFields({ kind: 'data', items: res.data.items, hiddenPersonalCount: res.data.hiddenPersonalCount })
+        setFriendFields({ kind: 'data', items: asArray(res.data.items), hiddenPersonalCount: res.data.hiddenPersonalCount })
       } else {
         setFriendFields({ kind: 'error' })
       }

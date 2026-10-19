@@ -39,6 +39,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: []
 import type { WebinarEditor } from '@/lib/api'
 
 const SETTINGS = {
+  version: 1,
   registrationEnabled: true,
   dayBeforeEnabled: true,
   dayBeforeTime: '19:00',
@@ -130,4 +131,47 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     expect(apiMocks.saveNotifications.mock.calls[1][1].registrationEnabled).toBe(false)
   })
 
+})
+
+it('送信済みの結果は後続GETの失敗で消さず、再試行はGETだけにする', async () => {
+  apiMocks.testNotifications.mockResolvedValue({ data: { sent: 2, failed: 0 } })
+  apiMocks.editor.mockRejectedValueOnce(new Error('reload'))
+  const host = render()
+  await act(async () => undefined)
+  const trigger = [...host.querySelectorAll('button')].find(el => el.textContent?.trim() === 'テストを送る')!
+  await act(async () => { trigger.click() })
+  const dialog = document.querySelector('[role="dialog"]')!
+  const confirm = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === 'テストを送る')!
+  await act(async () => { confirm.click(); confirm.click() })
+  expect(apiMocks.testNotifications).toHaveBeenCalledTimes(1)
+  expect(host.textContent).toContain('テスト送信しました。成功 2 件・失敗 0 件')
+  expect(host.textContent).not.toContain('テスト送信できませんでした')
+  expect(trigger.disabled).toBe(true)
+  for (const button of [...host.querySelectorAll('button')].filter(el => el.textContent?.includes('テストを送る'))) {
+    expect(button.disabled).toBe(true)
+    expect(button.title).toContain('送信済みの結果を読み直してください')
+  }
+  const retry = [...host.querySelectorAll('button')].find(el => el.textContent?.trim() === '送信結果を読み直す')!
+  await act(async () => { retry.click() })
+  expect(apiMocks.editor).toHaveBeenCalledTimes(2)
+  expect(apiMocks.testNotifications).toHaveBeenCalledTimes(1)
+  expect(host.textContent).not.toContain('確認状態を読み込めませんでした')
+})
+
+it('通知保存後に版の読込が失敗しても、再開時は保存を繰り返さず最新版を取得する', async () => {
+  apiMocks.saveEditor.mockResolvedValueOnce({ data: { ...EDITOR, version: 10 } })
+  apiMocks.editor.mockRejectedValueOnce(new Error('reload')).mockResolvedValueOnce({ data: { ...EDITOR, version: 9 } })
+  const host = render()
+  await act(async () => undefined)
+  await act(async () => { fireEvent.click(host.querySelector('input[aria-label="申込のお礼"]')!) })
+  await act(async () => { fireEvent.change(host.querySelector('input[aria-label="視聴完了メッセージ本文"]')!, { target: { value: '再開後も残す本文' } }) })
+  const save = [...host.querySelectorAll('button')].find(el => el.textContent === '下書きを保存')!
+  await act(async () => { save.click() })
+  expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
+  expect(host.textContent).toContain('入力を残しました')
+  expect(apiMocks.saveEditor).not.toHaveBeenCalled()
+  await act(async () => { save.click() })
+  expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
+  expect(apiMocks.editor).toHaveBeenCalledTimes(2)
+  expect(apiMocks.saveEditor).toHaveBeenCalledExactlyOnceWith('webinar-1', { expectedVersion: 9, actionTemplateBody: '再開後も残す本文', missingResultPolicy: 'escalate' })
 })

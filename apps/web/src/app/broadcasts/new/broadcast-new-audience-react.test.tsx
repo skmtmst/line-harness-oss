@@ -262,7 +262,7 @@ describe('タグ候補の取得失敗と再試行(R581)', () => {
     expect(host.textContent).toContain('タグを読み込めませんでした')
     expect(host.textContent).not.toContain('タグはまだありません')
     const retry = [...host.querySelectorAll('button')].find(
-      (item) => (item.textContent ?? '').includes('もう一度読み込む'),
+      (item) => (item.textContent ?? '').includes('もう一度読み込む') && item.parentElement?.textContent?.includes('タグを読み込めませんでした'),
     )
     expect(retry, '再試行がありません').toBeTruthy()
   })
@@ -277,7 +277,7 @@ describe('タグ候補の取得失敗と再試行(R581)', () => {
     await selectTagMode()
     expect(host.textContent).toContain('タグを読み込めませんでした')
     const retry = [...host.querySelectorAll('button')].find(
-      (item) => (item.textContent ?? '').includes('もう一度読み込む'),
+      (item) => (item.textContent ?? '').includes('もう一度読み込む') && item.parentElement?.textContent?.includes('タグを読み込めませんでした'),
     )
     const callsBefore = mocks.tagsList.mock.calls.length
     await act(async () => {
