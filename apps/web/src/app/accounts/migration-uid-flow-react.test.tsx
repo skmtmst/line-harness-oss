@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountMigration from './migration'
 import UidMigrationV8 from '@/v8/friends/migrations/uid'
@@ -568,6 +568,17 @@ describe('R398 一部反映の500で「未変更」と残さない', () => {
 })
 
 describe('UID移行の閲覧のみ', () => {
+  it('一括確認を開いた後に本人確認が失効したら確定窓を閉じる', async () => {
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    fireEvent.click(buttonByText('要確認をまとめて「結び付ける」'))
+    await flush()
+    expect(buttonByText('結び付ける', openDialog())).toBeTruthy()
+    await act(async () => { window.dispatchEvent(new Event(SESSION_LOST_EVENT)) })
+    await flush()
+    await waitFor(() => expect(document.body.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull())
+    expect(writes()).toHaveLength(0)
+  })
   it.each(['legacy', 'v8'])('確認窓を開いた後に本人確認が失効したら承認と除外を隠し、内容は残す: %s', async entry => {
     await act(async () => { root.render(entry === 'v8' ? <UidMigrationV8 initialRunId="run-1" /> : <AccountMigration />) })
     await flush()
