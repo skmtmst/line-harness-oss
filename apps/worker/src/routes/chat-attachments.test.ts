@@ -156,6 +156,13 @@ describe('受信箱の添付アップロード', () => {
 });
 
 describe('受信箱の送信・期限付きリンク', () => {
+  beforeEach(() => {
+    // 同じ時刻のURLを比較する。署名の秒境界で再生成URLが変わる揺れを防ぐ。
+    const issuedAt = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(issuedAt);
+  });
+  afterEach(() => { vi.restoreAllMocks(); });
+
   it('動画をvideoで送り、決まったPNGのプレビューを使う', async () => {
     const { attachment } = await video();
     expect((await send('video', { originalContentUrl: attachment.url })).status).toBe(200);
