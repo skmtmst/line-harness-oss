@@ -22,8 +22,11 @@ export interface WebhookCheck {
 }
 
 /** こちらの受け口。`webhook.ts` の `POST /webhook` と揃える。 */
-export function expectedWebhookUrl(workerUrl: string): string {
-  return `${workerUrl.replace(/\/+$/, '')}/webhook`;
+export function expectedWebhookUrl(workerUrl: string, channelId?: string): string {
+  const base = `${workerUrl.replace(/\/+$/, '')}/webhook`;
+  if (channelId === undefined) return base;
+  if (!/^\d+$/.test(channelId)) throw new Error('Invalid LINE channel ID');
+  return `${base}/${channelId}`;
 }
 
 /**

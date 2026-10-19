@@ -1034,7 +1034,6 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `line_busy` | [宣言](../apps/worker/src/services/hq-broadcasts.ts)（1か所） |
 | `line_connection` | [宣言](../apps/worker/src/services/hq-broadcasts.ts)（1か所） |
 | `LINE_DELIVERY_UNKNOWN` | [宣言](../apps/worker/src/services/outbound-idempotency.ts)（1か所） |
-| `line_event_reservation_failed` | [宣言](../apps/worker/src/services/line-webhook-events.ts)（1か所） |
 | `line_not_linked` | [宣言](../apps/worker/src/routes/rich-menu-groups-audience.ts)（1か所） |
 | `line_notification_unavailable` | [宣言](../apps/worker/src/lib/input-errors.ts)（4か所） |
 | `line_rate_limited` | [宣言](../apps/worker/src/services/external-delivery-retry.ts)（1か所） |

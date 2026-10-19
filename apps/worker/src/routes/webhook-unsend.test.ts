@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
@@ -22,7 +23,7 @@ vi.mock('@line-crm/line-sdk', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/line-sdk')>('@line-crm/line-sdk');
   return {
     ...actual,
-    verifySignature: vi.fn().mockResolvedValue(true),
+    verifySignature: actual.verifySignature,
     LineClient: vi.fn().mockImplementation(function () { return lineClient; }),
   };
 });
@@ -94,10 +95,11 @@ async function postEvent(
   expectScheduled = true,
 ): Promise<void> {
   const waitUntil = vi.fn();
+  const body = JSON.stringify({ destination: `destination-${account}`, events: [event] });
   const response = await webhookApp().request('/webhook', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
-    body: JSON.stringify({ destination: `destination-${account}`, events: [event] }),
+    headers: { 'Content-Type': 'application/json', 'X-Line-Signature': createHmac('sha256', `secret-${account}`).update(body).digest('base64') },
+    body,
   }, {
     DB: db.db,
     LINE_CHANNEL_SECRET: `secret-${account}`,
@@ -404,7 +406,7 @@ describe('N-024 LINE送信取消', () => {
     ]);
     expect(db.raw.prepare(`
       SELECT COUNT(*) AS count FROM line_message_unsends
-       WHERE line_message_account_key = 'destination:destination-a' AND line_message_id = 'line-message-shared'
+       WHERE line_message_account_key = 'account:account-a' AND line_message_id = 'line-message-shared'
     `).get()).toEqual({ count: 1 });
 
     const env = { DB: db.db } as Env['Bindings'];
@@ -450,7 +452,7 @@ describe('N-024 LINE送信取消', () => {
     expect(db.raw.prepare(`
       SELECT content, unsent_at IS NOT NULL AS is_unsent
         FROM messages_log
-       WHERE line_message_account_key = 'destination:destination-a' AND line_message_id = 'line-message-late'
+       WHERE line_message_account_key = 'account:account-a' AND line_message_id = 'line-message-late'
     `).get()).toEqual({ content: '', is_unsent: 1 });
     expect(autoReply).not.toHaveBeenCalled();
     expect(mileage).not.toHaveBeenCalled();
@@ -507,13 +509,13 @@ describe('N-024 LINE送信取消', () => {
        WHERE line_message_id = 'line-message-resolution-change'
     `).get()).toEqual({
       line_account_id: 'account-a',
-      line_message_account_key: 'destination:destination-a',
+      line_message_account_key: 'account:account-a',
       content: '',
       is_unsent: 1,
     });
     expect(db.raw.prepare(`
       SELECT COUNT(*) AS count FROM line_message_unsends
-       WHERE line_message_account_key = 'destination:destination-a'
+       WHERE line_message_account_key = 'account:account-a'
          AND line_message_id = 'line-message-resolution-change'
     `).get()).toEqual({ count: 1 });
   });

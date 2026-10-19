@@ -1,6 +1,6 @@
 'use client'
 
-import { useStaffRole } from '@/lib/staff-role'
+import { isOwnerRole, useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -70,16 +70,17 @@ export default function AccountRegisterV8() {
   const role = useStaffRole()
   const [resumeId, setResumeId] = useState('')
   useEffect(() => {
-    if (role !== 'owner') return
+    if (!isOwnerRole(role)) return
     try { setResumeId(sessionStorage.getItem(REGISTRATION_STYLE_KEY) ?? '') } catch { /* 接続を新規作成する前に通常の重複検査も行う。 */ }
   }, [role])
   usePageTitle('LINEアカウントを登録')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'アカウント', href: '/hq' }])
 
   // API の接続・登録と同じくオーナーだけ。権限確認前に下書きの復元や変更処理を起動しない。
-  if (role !== 'owner') return <PageFrame kind="wizard" boardId="p6zMkA">
+  if (!isOwnerRole(role)) return <PageFrame kind="wizard" boardId="p6zMkA">
     <PageHeading title="LINEアカウントを登録" />
-    <PageContent layout="stats">{role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>閲覧のみで見ています。LINEアカウントの登録はオーナーに頼んでください。</ReadOnlyNotice>}</PageContent>
+    <PageContent layout="stats">{role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>LINEアカウントの登録はオーナーだけができます。オーナーに頼んでください。</ReadOnlyNotice>}</PageContent>
+    <StickyBar actions={<Button variant="secondary" href="/accounts">LINEアカウントの一覧へ戻る</Button>} />
   </PageFrame>
   if (resumeId) return <ResumeRegistrationStyle accountId={resumeId} />
   return <AccountRegistrationForm />
@@ -350,8 +351,10 @@ function AccountRegistrationForm() {
       setCheckRunning(false)
       const fieldFailure = saveErrors.capture(saveFailure)
       /* 「時間をおいて」の一文に畳むと、権限不足の人が待ち続け、混み合いの人が連打する。
-         403・404・429・入力の直しは原因どおりに言い分ける（共通の describeActionFailure）。 */
-      if (!fieldFailure) setError(describeActionFailure(saveFailure, '接続の確認'))
+         403・404・429・入力の直しは原因どおりに言い分ける（共通の describeActionFailure）。
+         この口は要件 v6-33 §15 `account.line.register` でオーナーだけなので、
+         403は 'owner'（管理者が「管理者に頼め」と言われて行き止まりにならないため）。 */
+      if (!fieldFailure) setError(describeActionFailure(saveFailure, '接続の確認', 'owner'))
     } finally {
       busyLock.current = false
       setBusyAction(null)

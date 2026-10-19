@@ -33,7 +33,7 @@ function installFetch(failure: Failure = null, existingLiffId?: string, register
     }
     if (url.endsWith('/v2/bot/channel/webhook/endpoint') && method === 'PUT') return Response.json({});
     if (url.endsWith('/v2/bot/channel/webhook/endpoint')) {
-      return Response.json({ endpoint: registeredEndpoint ?? `${input.baseUrl}/webhook`, active: failure !== 'webhook-inactive' });
+      return Response.json({ endpoint: registeredEndpoint ?? `${input.baseUrl}/webhook/${input.channelId}`, active: failure !== 'webhook-inactive' });
     }
     if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
     if (url.endsWith('/liff/v1/apps') && method === 'GET') {
@@ -92,11 +92,11 @@ describe('LINEアカウント自動接続', () => {
    * 新規追加だけ完全一致で止まっていた。同じ受け口一覧で判定する。
    */
   it('別名URLで登録されたWebhookも同じ受け口として通し、末尾スラッシュの違いも無視する', async () => {
-    const alias = 'https://nen-line-stg-alias.skmtmst.workers.dev/webhook/';
+    const alias = 'https://nen-line-stg-alias.skmtmst.workers.dev/webhook/123456789/';
     installFetch(null, undefined, alias);
     const accepted = await prepareLineConnection({
       ...input,
-      acceptedWebhookUrls: [`${input.baseUrl}/webhook`, 'https://nen-line-stg-alias.skmtmst.workers.dev/webhook'],
+      acceptedWebhookUrls: [`${input.baseUrl}/webhook/${input.channelId}`, 'https://nen-line-stg-alias.skmtmst.workers.dev/webhook/123456789'],
     });
     expect(accepted.success).toBe(true);
     expect(accepted.webhook.registeredUrl).toBe(alias);
@@ -106,7 +106,7 @@ describe('LINEアカウント自動接続', () => {
     installFetch(null, undefined, 'https://example.com/webhook');
     const result = await prepareLineConnection({
       ...input,
-      acceptedWebhookUrls: [`${input.baseUrl}/webhook`],
+      acceptedWebhookUrls: [`${input.baseUrl}/webhook/${input.channelId}`],
     });
     expect(result.success).toBe(false);
     expect(result.steps.find((item) => item.state === 'failed')?.order).toBe(3);

@@ -1,4 +1,5 @@
 import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { expectedWebhookUrl } from '../lib/webhook-endpoint.js';
 import { issueLineAccessToken, LineTokenIssueError } from './token-refresh.js';
 
 export type LineConnectStepState = 'passed' | 'failed' | 'skipped';
@@ -130,7 +131,7 @@ export async function prepareLineConnection(input: {
   acceptedWebhookUrls?: readonly string[];
 }): Promise<PreparedLineConnection> {
   const completed: LineConnectStep[] = [];
-  const webhookUrl = `${input.baseUrl.replace(/\/$/, '')}/webhook`;
+  const webhookUrl = expectedWebhookUrl(input.baseUrl, input.channelId);
   const webhook: PreparedLineConnection['webhook'] = {
     expectedUrl: webhookUrl,
     registeredUrl: null,

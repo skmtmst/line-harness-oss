@@ -10,7 +10,16 @@ export function canManageRole(role: string | null | undefined): boolean {
 }
 
 /**
- * ログイン中の担当者の役割。`api.staff.me` で入り直して読む。
+ * オーナーだけの操作。要件 v6-33 §15 で `account.line.register`（登録・接続確認）や
+ * 資格情報の差し替えなど、管理者にも渡していない鍵がある。
+ * 管理者に入口を出すとサーバの403で行き止まりになるので、出す側でここを使って分ける。
+ */
+export function isOwnerRole(role: string | null | undefined): boolean {
+  return role === 'owner'
+}
+
+/**
+ * ログイン中の担当者の役割。`api.staff.me()` で入り直して読む。
  * 手元の保存値は書き換え可能なので判定に使わない。
  *
  * 確認が終わるまで・読めなかったときは null を返す。呼び出し側は
