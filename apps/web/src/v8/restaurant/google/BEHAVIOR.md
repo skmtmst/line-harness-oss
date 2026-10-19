@@ -1,3 +1,5 @@
+> 文書：Googleビジネス（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # Googleビジネス（V8）の動き
 
 入口：`app/restaurant-test/google/page.tsx`（V8 で出す。今までどおり完全切り替え）。

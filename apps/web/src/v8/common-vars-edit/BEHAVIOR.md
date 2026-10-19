@@ -1,3 +1,5 @@
+> 文書：共通情報の作る・編集の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 共通情報の作る・編集の動き（BEHAVIOR.md）
 
 一覧（/contents/vars）は `src/v8/common-vars`（PR 1510）。ここは作る（`new.tsx`・板 p82v9）と編集（`edit.tsx`・板 AYc6O／1152 の C67dE／競合 piWhz）だけ。

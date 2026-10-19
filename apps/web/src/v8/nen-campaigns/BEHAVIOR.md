@@ -1,3 +1,5 @@
+> 文書：NEN配信の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # NEN配信の動き（BEHAVIOR.md）
 
 対象：`list.tsx`（一覧：自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・誕生日クーポンの決めごと `oqSJP`）、

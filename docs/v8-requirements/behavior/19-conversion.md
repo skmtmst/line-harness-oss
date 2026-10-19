@@ -1,3 +1,5 @@
+> 文書：19 コンバージョン（成果地点） 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 19 コンバージョン（成果地点） 操作と挙動（受け入れ）
 
 要件の正本：[19 コンバージョン](../../v6-requirements/v6-19-conversion-requirements-draft.md)（§23 の Web 計測・取消の確定を含む）・[共通基盤 §6-2・§8・§9・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[索引 §5 横断契約](../../v6-requirements/v6-requirements-master-index.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
