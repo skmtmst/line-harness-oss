@@ -1,3 +1,5 @@
+> 文書：回答フォーム一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 回答フォーム一覧の動き（BEHAVIOR.md）
 
 対象：`app/form-submissions/list-v8.tsx`（今までの V8 一覧）。このファイルの動きを写して `list.tsx` を一から書いた。見た目は型（ListPage）と部品で組み直した。板は 一覧 `I3L41O`・1152 `GrnO4`・閲覧のみ `JV2oR`・アーカイブ・削除の窓 `GVizd`。

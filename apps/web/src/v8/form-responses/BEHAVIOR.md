@@ -1,6 +1,8 @@
+> 文書：集まった回答（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 集まった回答（V8）の動き
 
-入口：`app/form-submissions/responses/page.tsx`（V8 のときだけ `src/v8/form-responses/responses.tsx`）。v7 の画面・試験は触らない。
+入口：`app/form-submissions/responses/page.tsx`（V8専用で `src/v8/form-responses/responses.tsx`）。動き・権限・入力保持の試験は維持する。
 絵：まとめて見る `v0SbYR`・1件ずつ見る `MKQyJ`。型と言葉は `summary.ts`（今の response-summary.ts の写し）。
 
 ## 受け付ける URL と指定（今と同じ）

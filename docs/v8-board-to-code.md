@@ -1,3 +1,5 @@
+> 文書：V8 の絵（Pencil の板）と画面のコードの対応表｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # V8 の絵（Pencil の板）と画面のコードの対応表
 
 - 作り直し：`node scripts/visual-qa/build-v8-board-to-code.mjs`（手で直さない）。URL は `scripts/visual-qa/v8-design-map.json` と同じもの（実URL・タブ指定）。入口・画面のファイルは、その URL の入口（`page.tsx`、`?` の後ろは外して探す）が読む `@/v8/…` または `*-v8` のファイル。共通の見出し（`readonly-header-v8`）は画面のファイルに数えない。

@@ -1,3 +1,5 @@
+> 文書：一斉配信一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 一斉配信一覧の動き（BEHAVIOR.md）
 
 対象：`app/broadcasts/list-v8.tsx`（今までの V8 一覧）。このファイルの動きを写して `list.tsx` を一から書いた。見た目は型（ListPage）と共通部品（KpiBand・KpiCard・FolderPanel・FilterChip・DataTable）で組み直した。

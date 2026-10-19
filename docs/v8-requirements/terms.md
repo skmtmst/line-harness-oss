@@ -1,3 +1,5 @@
+> 文書：言葉の表（正本）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 言葉の表（正本）
 
 musubo の画面（管理画面とお客さまの画面＝LIFF）に出す言葉を、この1枚で決める。
@@ -239,6 +241,6 @@ TM-S24 は入口を残すと決まった未実装の操作の共通表示。**B8
 
 ## 8. コードにする形（決まり。作り方の案は TERMS-DRIFT-1016.md の「実装の案」）
 
-- 正本の言葉はこの文書。コードの写しは `packages/shared/src/terms.ts`（全体の言葉）と `packages/shared/src/terms-style.ts`（§5 の言い換え）。キーは ID（`TM-V17` → `noShowBadge` のような名前に付け替えず、`terms.V17` の形で ID を残す）。
+- 正本の言葉はこの文書。コードの写しは `apps/web/src/lib/terms.ts`（管理画面の辞書と業種別の言い換え。共有型は `@line-crm/shared`）。キーは ID（`TM-V17` → `noShowBadge` のような名前に付け替えず、`terms.V17` の形で ID を残す）。
 - 画面（管理画面・LIFF）は言葉を直書きせず、`term('A04')`・`styleTerm(style, 'V17')` で読む。支払いの札は今の `packages/shared/src/payment-status.ts`（TM-S19・TM-S20）をこの形の最初の例として残す。
 - 見張り：「使わない」列の言葉を画面のコードから探し、増えたら落とす（今あるファイルは「直す途中」の一覧に入れ、一覧に無いファイルで出たら落ちる。`apps/web/src/app/glossary-contract.test.ts` と同じ形）。

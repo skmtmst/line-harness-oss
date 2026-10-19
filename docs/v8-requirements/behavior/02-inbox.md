@@ -1,3 +1,5 @@
+> 文書：02 受信箱 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 02 受信箱 操作と挙動（受け入れ）
 
 要件の正本：[02 受信箱](../../v6-requirements/v6-02-inbox-requirements-draft.md)・[02 担当者ごとの未読数 引き継ぎ](../../v6-requirements/v6-02-inbox-assignee-unread-handoff.md)・[共通基盤 §3・§6-2・§9・§11・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[30 ログインユーザー §7〜§8](../../v6-requirements/v6-30-login-users-requirements-draft.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
