@@ -1,3 +1,5 @@
+> 文書：@line-harness/sdk｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # @line-harness/sdk
 
 AI-native SDK for LINE Harness — programmatic LINE official account automation.

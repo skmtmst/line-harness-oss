@@ -1,3 +1,5 @@
+> 文書：運営コンソールの動きと設定｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 運営コンソールの動きと設定
 
 入口は `/ops`、ログインは `/ops/login`。動きの共通契約は[要件の索引](v6-requirements/v6-requirements-master-index.md)、見た目は[見た目の決まり](v8-design-rules.md)に従います。契約先・代理ログイン・監査・メンバー・お問い合わせ・AI・売上・お知らせを扱います。
@@ -34,7 +36,7 @@
 | `apps/web/src/app/ops/**` | 画面 |
 | `apps/web/src/components/ops/**` | 外枠・環境帯・代理ログイン帯 |
 | `apps/web/src/components/app-shell.tsx` | `/ops` は運営の外枠、それ以外には代理ログイン帯 |
-| `apps/web/src/components/hq/operator-history.tsx` | 運営の操作（書き込みのみ）の一覧。2026-10-06 から契約先の画面には出していない（部品と API は残置） |
+| `apps/web/src/lib/api/features/ops.ts` | 運営の操作履歴を読むAPIの口。契約先の画面に運営用の履歴を表示しない |
 
 ## 運営メンバーの登録
 

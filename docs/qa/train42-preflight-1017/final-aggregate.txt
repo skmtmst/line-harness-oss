@@ -1,1 +1,0 @@
-required-pr-gate: 合格

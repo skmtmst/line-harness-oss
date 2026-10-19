@@ -1,10 +1,12 @@
+> 文書：回答フォームの編集の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 回答フォームの編集の動き（BEHAVIOR.md）
 
-対象：今までの画面 `app/form-submissions/edit/page.tsx`（v7 と、その中の `renderV8Edit`）。ここから動きを写して `edit.tsx` を一から書いた。見た目は作る型（CreatePage）と共通部品で組んだ。
+対象：`app/form-submissions/edit/page.tsx` から表示するV8の `edit.tsx`。見た目は作る型（CreatePage）と共通部品で組んだ。
 板：中身 `m1cWEy`・1152 `ITBAB`・予約を入れるブロック `ijxur`・答え終わったあと `XXFT4`・受付と見た目 `tpRRT`・競合 `J1pdB`・この版を公開 `Z9wXm`。
 
 ## 入口
-- `app/form-submissions/edit/page.tsx`：V8 のテーマのときだけ `@/v8/form-edit/edit` を出す。v7 の画面と `renderV8Edit`（契約の試験が読む）は切り替えの日まで残す。
+- `app/form-submissions/edit/page.tsx`：V8専用で `@/v8/form-edit/edit` を出す。テーマによる切り替えと旧表示のための契約は使わない。保存・権限・失敗時の動作の試験を保つ。
 
 ## 受け付ける URL と指定
 - `?id=`：編集するフォーム（必須。無ければ「指定されていません」）。

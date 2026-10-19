@@ -1,3 +1,5 @@
+> 文書：来店とスタンプAPI｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 来店とスタンプAPI
 
 スタンプはマイルと別の残高・台帳です。共通型は `packages/shared`、管理側は `visit-stamps-api.ts`、LIFF側は `visitStampsApi`。`visit_stamps` の機能設定は予約から独立し、管理API・LIFF・自動押印で確認します。

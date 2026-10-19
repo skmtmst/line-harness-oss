@@ -1,3 +1,5 @@
+> 文書：01 ダッシュボード 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 01 ダッシュボード 操作と挙動（受け入れ）
 
 要件：[V6 1 ダッシュボード 要件定義](../../v6-requirements/v6-01-dashboard-requirements-draft.md)（動きの正本）。共通の動き・権限は [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限・§6-2 再試行の既定・§9 未取得の表示・§11 応答コード・§15 進み・トースト）、権限の正本は [30 ログインとユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。見た目は ★V8 の板（WQmep・編集 mcOqK）と [V8 の決まり](../../v8-design-rules.md)。

@@ -1,3 +1,5 @@
+> 文書：飲食の入口（restaurant/dashboard）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 飲食の入口（restaurant/dashboard）
 
 - 前の「今日のお店」（提案 E-1 hKRRF）は B-319 で飲食の業種ダッシュボード（NqAvL）に置き換えた。画面と動きは `../../style-dashboard/BEHAVIOR.md`。
