@@ -585,3 +585,9 @@
 - [金額と電話番号の共通化](release-log/unreleased/0000-kenta-cleanup-q01f1.md)
 - [画面コードの置き場と名前の整理](release-log/unreleased/0000-kenta-cleanup-s02a.md)
 - [画面コード整理の検査記録](qa/cleanup-s02a-1019.md)
+
+## 台本整理で加わった文書
+
+- [台本とCIの入口](../scripts/README.md)
+- [S02Cの検査記録](qa/cleanup-s02c-1019.md)
+- [S02Cの変更履歴](release-log/unreleased/0000-kenta-cleanup-s02c.md)

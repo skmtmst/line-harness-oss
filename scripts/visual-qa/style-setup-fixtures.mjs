@@ -1,5 +1,5 @@
 /*
- * B-311〜B-313（はじめの質問・スタイルの初期セット・対応が要るもの）の見本。形の正本は apps/web/src/lib/api-styles.ts。
+ * （はじめの質問・スタイルの初期セット・対応が要るもの）の見本。形の正本は apps/web/src/lib/api-styles.ts。
  * 絵：VHp7p の Bdfxm（7 / 11 済み・警告 1・あとで 2・止めている自動の送信 3）・oKSsG・cAaGY・J6647・Kyf8U。
  */
 export const STYLE_SETUP_STATE = {

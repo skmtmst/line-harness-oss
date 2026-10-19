@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "4.20260317.1",
-    "typescript": "^5.7.0",
+    "typescript": "^5.9.3",
     "vitest": "4.1.11",
     "@types/better-sqlite3": "^7.6.13",
     "better-sqlite3": "^12.9.0"

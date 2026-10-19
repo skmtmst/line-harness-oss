@@ -29,7 +29,7 @@
     "happy-dom": "^20.14.0",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.0",
+    "typescript": "^5.9.3",
     "vite": "^6.4.3"
   }
 }
