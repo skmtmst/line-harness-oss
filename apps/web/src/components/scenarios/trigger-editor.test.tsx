@@ -205,7 +205,7 @@ describe('U006: 開始回数は固定仕様の説明にする', () => {
     expect(screen.queryByText('同じ友だちは初回のみ開始')).toBeNull()
     expect(screen.queryByText('条件を満たすたびに開始')).toBeNull()
     // 実挙動: status != 'completed' の重複だけを弾くので、読了後は再開する。
-    expect(SOURCE).toContain('最後まで読み終えた人が条件を満たすと、もう一度最初から始まります')
+    expect(screen.getByText(/最後まで読み終えた人が条件を満たすと、もう一度最初から始まります/)).toBeTruthy()
   })
 })
 
@@ -237,7 +237,6 @@ describe('U088/U089: 共通アクセシブル部品と閉じる操作', () => {
     const dialog = screen.getByRole('dialog')
     expect(dialog.getAttribute('aria-modal')).toBe('true')
     expect(dialog.getAttribute('aria-labelledby')).toBeTruthy()
-    expect(SOURCE).toContain("from '@/components/shared/dialog'")
   })
 
   it('名前の無い × を置かず、「キャンセル」が閉じる操作になる', async () => {

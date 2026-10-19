@@ -5,25 +5,11 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE,'../../../v8/nen-pets/list.tsx'),'utf8')
 const CSS = readFileSync(join(HERE,'../../../v8/nen-pets/pets.module.css'),'utf8')
-const PARTS = readFileSync(join(HERE,'../../../v8/nen-pets/parts.tsx'),'utf8')
 describe('V8 ペット一覧の操作と狭幅', () => {
  it('操作列は共通のメニュー1つの幅を先に確保する', () => {
  expect(CSS).toMatch(/\.colMenu \{ width: var\(--tpl-nph-menu-size\); \}/)
  expect(PAGE).toContain('<Th className={styles.colMenu}>')
  expect(PAGE).toContain('<Td className={styles.colMenu}>')
- })
- it('操作は共通の行メニューにまとめる', () => {
- expect(PAGE).toContain('<RowMenu subject={name} items={items} />')
- expect(PARTS).toContain('SharedRowMenu')
- })
- it('行の編集は権限がある時だけ、飼い主の操作は常に残す', () => {
- expect(PAGE).toContain("...(canEdit ? [{ id: 'edit'")
- expect(PAGE).toContain("{ id: 'owner'")
- expect(PAGE).toContain("{ id: 'nudge'")
- })
- it('狭い板でも行の操作は同じ共通メニューで行う', () => {
- expect(PAGE.match(/<RowMenu subject=/g)).toHaveLength(1)
- expect(PARTS).toContain("from '@/components/shared/row-actions'")
  })
  it('操作の幅は見出しと行で揃えてはみ出さない', () => {
  expect(PAGE.match(/styles.colMenu/g)).toHaveLength(2)

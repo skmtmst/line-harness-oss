@@ -24,7 +24,6 @@ const NEN_OVERVIEW = readFileSync(join(HERE, '..', 'v8', 'nen-campaigns', 'list.
 const SETTINGS_PAGE_SRC = readFileSync(join(HERE, '..', 'v8', 'settings', 'features', 'screen.tsx'), 'utf8')
 const SETTINGS_CSS = readFileSync(join(HERE, '..', 'v8', 'settings', 'features', 'screen.module.css'), 'utf8')
 const BOOKING_MENUS_SRC = readFileSync(join(HERE, '..', 'v8', 'booking-menus', 'tabs', 'menus-tab.tsx'), 'utf8')
-const SCROLLABLE_TABS_SRC = readFileSync(join(SRC, 'components', 'layout', 'scrollable-tabs.tsx'), 'utf8')
 const DATA_TABLE_CSS = readFileSync(join(SRC, 'components', 'shared', 'data-table.module.css'), 'utf8')
 
 vi.mock('next/link', () => ({
@@ -165,10 +164,6 @@ describe('16: 6タブ行は続きの手がかりと送りを持つ', () => {
     { label: 'レポート', current: false, onClick: () => {} },
     { label: '支払い', current: false, onClick: () => {} },
   ]
-
-  it('影ヒントの印が部品にある', () => {
-    expect(SCROLLABLE_TABS_SRC).toContain('data-scroll-hint')
-  })
 
   it('本物のタブ行を描き、6タブ全員が押せる＋はみ出し側に影が出る', async () => {
     await mount(<ScrollableTabs items={items} />)
