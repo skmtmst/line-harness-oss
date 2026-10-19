@@ -11,7 +11,7 @@ vi.mock('./components/ui/LiffHeader.js', () => ({ default: ({ title }: { title: 
 vi.mock('./lib/liff-runtime.js', () => ({ default: { getProfile: async () => ({ displayName: '人工会員' }), closeWindow: () => {} } }));
 vi.mock('./lib/affiliate-self-api.js', () => ({ affiliateSelfApi: { rewards: async () => ({ availableMiles: 0, rewards: [] }) } }));
 vi.mock('./lib/api.js', () => ({ api: {
-  liffConfig: vi.fn(), customerLook: vi.fn(), menus: vi.fn(), staffOf: vi.fn(), lastBooking: vi.fn(), addons: vi.fn(), bookingSettings: vi.fn(),
+  liffConfig: vi.fn(), customerLook: vi.fn(), menus: vi.fn(), storePhotos: vi.fn(), staffOf: vi.fn(), lastBooking: vi.fn(), addons: vi.fn(), bookingSettings: vi.fn(),
   me: vi.fn(), bookingWaitlists: vi.fn(), entitlements: vi.fn(), notificationPreferences: vi.fn(),
   myEventBookings: vi.fn(), makeupCredits: vi.fn(), makeupOptions: vi.fn(), eventAbsence: vi.fn(), useMakeup: vi.fn(),
   getEvent: vi.fn(), getEventSlots: vi.fn(), createEventBooking: vi.fn(), createRequest: vi.fn(),
@@ -29,6 +29,7 @@ function mount(style: string, route = '/?liffId=fixture') {
 beforeEach(() => {
   vi.mocked(api.customerLook).mockResolvedValue({ success: true, data: { settings: {} } } as never);
   vi.mocked(api.menus).mockResolvedValue({ menus: [menu] });
+  vi.mocked(api.storePhotos).mockResolvedValue([]);
   vi.mocked(api.lastBooking).mockResolvedValue({ available: false });
   vi.mocked(api.addons).mockResolvedValue([]);
   vi.mocked(api.bookingSettings).mockResolvedValue({ liff_date_view: 'list', booking_window_days: 60 });
@@ -45,8 +46,11 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 it.each(['standard', 'restaurant', 'salon', 'consult'])('%s の入口は同じ所属の予約メニューへ進む', async (style) => {
+  vi.mocked(api.storePhotos).mockResolvedValue([{ slot: 'exterior', url: '/media/booking-photo/content' }]);
   mount(style);
   expect(await screen.findByRole('button', { name: /人工メニュー/ })).toBeTruthy();
+  fireEvent.click(await screen.findByText('お店の案内'));
+  expect((await screen.findByRole('img', { name: 'お店の外観' })).getAttribute('src')).toBe('/media/booking-photo/content');
   expect(screen.getByTestId('location').textContent).toBe('/booking?liffId=fixture');
   expect(api.createRequest).not.toHaveBeenCalled();
 });

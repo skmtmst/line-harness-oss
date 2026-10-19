@@ -19,6 +19,9 @@ export const MEDIA_REF_KINDS = [
   'nen_column',
   'event',
   'webinar',
+  'booking_menu',
+  'booking_staff',
+  'booking_settings',
 ] as const;
 export type MediaRefKind = (typeof MEDIA_REF_KINDS)[number];
 
