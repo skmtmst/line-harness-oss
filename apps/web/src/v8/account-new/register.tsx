@@ -36,7 +36,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { describeActionFailure } from '@/lib/use-action-error'
-import { isOwnerRole, useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 
 /*
  * ★v07 LINEアカウントを登録（板 ①p6zMkA ②Fqy29 ③Lwxyh ④X0pGdw ⑤Plmq1）。
@@ -332,9 +332,8 @@ export default function AccountRegisterV8() {
       const fieldFailure = saveErrors.capture(saveFailure)
       /* 「時間をおいて」の一文に畳むと、権限不足の人が待ち続け、混み合いの人が連打する。
          403・404・429・入力の直しは原因どおりに言い分ける（共通の describeActionFailure）。
-         この口は要件 v6-33 §15 `account.line.register` でオーナーだけなので、
-         403は 'owner'（管理者が「管理者に頼め」と言われて行き止まりにならないため）。 */
-      if (!fieldFailure) setError(describeActionFailure(saveFailure, '接続の確認', 'owner'))
+         登録・接続確認はオーナーと管理者が行える。 */
+      if (!fieldFailure) setError(describeActionFailure(saveFailure, '接続の確認'))
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -483,18 +482,12 @@ export default function AccountRegisterV8() {
     : sub === 1 ? '事前確認へ戻る' : sub === 2 ? 'Messaging API へ戻る' : 'Webhook の設定へ戻る'
   const nextLabel = currentStep === 3 && sub === 1 ? '登録する' : currentStep === 2 ? '次のステップへ' : '次へ'
 
-  /*
-   * 登録はオーナーだけ（要件 v6-33 §15 `account.line.register`「登録、接続確認」）。
-   * 管理者がここまで来られると、③で「接続を確かめる」を押した瞬間にサーバの403で
-   * 行き止まりになる。手順を出さず、誰に頼めばよいかと戻る道を先に出す。
-   * 役割が読めるまで（null）は今までどおり手順を出す——オーナーに一瞬だけ
-   * 「権限がありません」を見せないため。最後の守りはサーバの403のまま。
-   */
-  if (role !== null && !isOwnerRole(role)) {
+  // 2026-10-20: 登録はオーナーと管理者。取得中の表示は維持し、サーバでも検査する。
+  if (role !== null && !canManageRole(role)) {
     return (
       <PageFrame kind="wizard">
         <PageHeading title="LINEアカウントを登録" help="LINE 公式アカウントを musubo につなぐ手順です。" />
-        <Notice tone="warn" message="LINEアカウントの登録はオーナーだけができます。オーナーに頼んでください。" />
+        <Notice tone="warn" message="LINEアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。" />
         <StickyBar actions={<Button variant="secondary" href="/accounts">LINEアカウントの一覧へ戻る</Button>} />
       </PageFrame>
     )
