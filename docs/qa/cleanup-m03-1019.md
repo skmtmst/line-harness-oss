@@ -54,3 +54,40 @@
 
 証拠は `~/lh-work/design/v8/review/CLEANUP-1017/M03-EVIDENCE/`。
 新しいmigration・番号案は不要。push・PR・DB更新・配備・実送信・実決済・外部書き込みなし。
+
+## まとめ枝取り込みの続き（2026-10-19）
+
+- 開始は前回の最終記録c8344c838a、作業木clean・DOCTOR_LOCAL=1のdoctor合格。指定まとめ枝の取得時点684142dea6a9489b56cb24016ab48382f29ada8bを、mergeコミット0019dd4ba6da83f68980c983cd07c80cba40cbe1に包含。rebase・force・stashなし。
+- 競合はaccount-new/register.tsxだけ。承認済み②のStep2Connect・URLの控え欄を出さない判断と、T02のuseRegistrationStyleによる版付き保存・同ID再開・Step5Completion分割を保持。移動先へ移った完了画面のアイコンと、承認版が使わない旧URL変数は入口へ戻さない。閲覧のみのPageContent layout=statsは、T02の帯の余白を保持する。
+- ②の210行・CSS・共通Card/列の型・接続判定・M02のデリバリー画面/結果不明フェンスは前回M03から差分0。取り込み範囲のSQLはまとめ枝に既存の承認済み変更だけ。今回独自のmigration作成・番号提案・DB適用0。
+- PLAN primaryBundle=M03・LONG bundle=M03は共に0。前回と同じ範囲の和集合で16ファイル2935行→20ファイル3096行、最大706→672行、any0。ローカル11モジュール循環0。試験の削除・移動・改名0、外した見張り/許可追加/上限変更0。
+- 開始時に確認した親側（line-harness-nen）は既存の.nodeterm/project.json・.nodeterm/settings.json・lh-hq.code-workspaceが未整理。今回触らない。M03自体は開始clean。
+- 新しい証拠はM03-EVIDENCE/merge2-1019/。merge-proof.json、scope-metrics.json、dependency-graph.json、inherited-gates-proof.jsonを保存。以下の検査確定分は終了後に追記する。
+
+### 続きの検査確定分
+
+- Node22の重点11ファイル92試験、Web型、変更した登録画面のlint、production build（211生成・208HTML・641scripts）は成功。製品/試験/依存/workflowの検査対象は0019dd4ba6。
+- 接続Browserで8状態を確認。横はみ出し0、未確認の次へは無効、閲覧のみform/textbox0。Browserの読取実装はNodeFilter/parseFloat等を持たず3検出器が実行不能であり、その結果を崩れ0に数えない。Chromeの幅・文字の差やAXスクロールの画像も、承認版との比較に使わない。Browserタブを閉じviewportを復元した。
+- その後、前回のリポジトリ用撮影命令を検査内容を変えず再実行。②の6状態と閲覧のみ2状態の主8状態は全検出器で崩れ/横はみ出し0、実行時例外/外部要求0。閲覧のみは22読取/変更0。下端を含む15PNGを保存した。
+- 追加manual1152の2指摘は前回M03と同じ内容・実寸。9状態の元のassertはexit1のまま保持し、主8状態の0と分ける。承認版を優先するB-389に従い、この背景の扱いはG01/司令塔へ残す。
+- ②の6状態は前回のgeometry（全テキスト/入力/操作/枠）と完全一致。前回保存済みの承認版#1773画像との本文比較範囲は6条件とも厳密な画素差0（headless/pixel-comparison.jsonのclip）。1152の範囲外の下端も画像で確認。閲覧のみの帯だけはT02のlayout=statsに合わせて上へ16px、左右24・見出し下12を保持。画像を目視した。
+- 撮影用APIはmock-localが取得した既存listenerへ本物の手元HTTP requestを渡し、GETだけ許可する。検出器・モック本体・期待値・上限・許可は編集しない。撮影サーバーを停止した。
+- Worker全試験は13511成功/1失敗。前回と同じ構造化ログ検査のUber Eats 193/295行で、試験と対象ソースのSHA256も前回・指定開始と一致。S03/司令塔へ保持する。
+- 初回ci-localは未設定変数を未指定のまま実行したため、WorkerビルドとV8のジョブを正しく再現できない。GitHubの変数名だけを再取得し、VITE_LIFF_ID/VITE_BOT_BASIC_ID/VITE_CALENDAR_CONNECTION_ID/V8_SPEED_ENFORCEMENTが全て未設定であることを確認した。同じ0019dd4ba6のcleanな読み取り用worktreeから、これらをGitHubと同じ空文字として明示したWorkerビルド/V8の再検査を開始。元の失敗・実行不能は保存し、再検査の結果と分ける。GitHub設定の変更・値や秘密値の取得なし。
+
+### 続きの最終結果（製品0019dd4ba6）
+
+| 実行 | 結果 | 扱い |
+| --- | --- | --- |
+| 全体CI・最初の実行 | 55成功・7失敗・53省略（実行不能26）、exit1 | 原結果を保存。未指定の変数によるWorkerビルド省略とV8実行不能を含む |
+| 未設定4変数をGitHubと同じ空文字で明示したWorkerビルド/V8再検査 | 29成功・5失敗・9省略（実行不能1）、exit1 | 同じ0019dd4ba6。Workerビルド/実効設定/安全なheaders/LIFF入口/SDK互換は全て成功。V8の残る失敗5つは速度18〜22 |
+
+- 最初の全体CIでもWeb全2316ファイル13687試験・全体lint/型/build、Webhook16件とEC切替/通知/保管/本人確認/安全性の実ブラウザが成功。DB2330・LIFF582・scripts1109（skip1）・共有397×2TZ・SDK/MCP・docs6も成功。Workerは13511成功・継承ログ1失敗。
+- 正しい未設定変数でのV8は、3幅基本36条件の崩れ0、比較201条件の新規/既存/許可すべて0、故障対照79、一覧132、骨組み93、読み込み対照19、入力保持/予約日付/仮想表の操作を確認した。
+- 速度はcomplete=false・測定0のまま。profile=ci・5回・倍率1.3を維持。GET /api/dashboard/style の模擬要求で500／TypeError: req.on is not a functionを改めて再現。原因4ファイルのSHA256は前回・指定開始と一致する。F01が持つ7工程（共通の形15候補・固定試験393・速度5つ）を重複修正しない。S03のWorkerログ1失敗も対象/試験のSHA256が同じ。マニュアル背景2件はG01/司令塔へ残す。
+- 正式PRが無いため履歴ゲート1工程は再検査でも実行不能。指定#0000を正式PRの代わりに使わず、採番後の確認は司令塔へ残す。全体CI合格とは扱わない。元の集約ゲートの失敗も保持する。
+- 本線を再fetchし、89361a99b8772133bd5dacb4ce775f16d267b6fcがCI開始時のbaseと同じで、HEADの祖先であることを確認。製品コードの追加差分0。全体CIと補正版のresults/summary/manifest/workflow、補正版の成果物JSONを保存した。
+- 直検査用API/サーバー停止、Browserタブ閉/viewport復元、CIの両実行完走、読み取り用source worktreeはclean確認後に通常remove。親側の既存設定3件は変更しない。DONE-M03.tsvは4種類の記録へ更新する。
+- 最後はこの記録・受けた指示・Memoryだけをコミットする。製品/試験/依存/workflow/反映履歴は検査済み0019dd4ba6と同じ。最終SHAとcleanは外部引き継ぎへ記録する。push/PR/DB適用/配備/実送信/実決済/外部サービス書込0。独自のmigration/番号案なし。
+
+- 最終のまとめ枝確認：検査中にまとめ枝はb7b25e0708118a271f87e9c9ee7424a724d92b08へ進み、2b7f4c3229のUber Eatsログ修正と後続P01の32ファイルが追加された。M03で検査した取り込み先は684142dea6／製品0019dd4ba6。後続のP01/API/見本の変更を未検査のままM03の結果へ混ぜず、最新まとめとM03の再統合・同版の全体検査は司令塔へ渡す。ログ失敗1件の修正は最新まとめに既にあり、重複修正は不要。F01の共通検査/速度と正式PRの照合は別途確認する。
