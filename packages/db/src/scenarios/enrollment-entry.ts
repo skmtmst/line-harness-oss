@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import type { FriendScenario } from '../friend-scenario-types.js';
 import { jstNow } from '../utils.js';
 import { computeNextDeliveryAt } from '../scenario-schedule.js';
@@ -111,7 +112,7 @@ export async function enrollFriendInScenario(
       .first<FriendScenario>())!;
   }
 
-  const enrolledAtDate = new Date(Date.now() + 9 * 60 * 60_000);
+  const enrolledAtDate = japanCalendar();
   // 予定の組み立ては固定した版の値で行う。開始後に配信方式を変えても、
   // 既存の購読の予定は変わらない。
   const nextDeliveryDate = computeNextDeliveryAt(

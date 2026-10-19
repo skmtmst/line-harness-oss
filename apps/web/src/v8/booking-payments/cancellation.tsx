@@ -1,5 +1,6 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
 
 import { SettingCheckbox } from '@/components/shared/checkbox'
@@ -47,13 +48,13 @@ const yen = (value: number) => `¥${Math.floor(value).toLocaleString('ja-JP')}`
 
 /** 見本の予約（来週の金曜 14:00・料金 ¥8,400）。お客さまへの文の見本に使う。 */
 function sampleStart(): Date {
-  const now = new Date(Date.now() + 9 * 3600_000)
+  const now = japanCalendar()
   const day = now.getUTCDay()
   const add = ((5 - day + 7) % 7) || 7
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + add, 14 - 9, 0))
 }
 function jstLabel(date: Date): string {
-  const j = new Date(date.getTime() + 9 * 3600_000)
+  const j = japanCalendar(date)
   return `${j.getUTCMonth() + 1}/${j.getUTCDate()}（${'日月火水木金土'[j.getUTCDay()]}）${String(j.getUTCHours()).padStart(2, '0')}:${String(j.getUTCMinutes()).padStart(2, '0')}`
 }
 

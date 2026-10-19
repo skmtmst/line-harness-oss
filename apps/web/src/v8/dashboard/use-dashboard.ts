@@ -1,5 +1,6 @@
 'use client'
 import { loadStaffIdentity } from '@/lib/staff-role'
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { dashboardCardForStyle } from './style-cards'
 
 import { jstDate, jstDayStartIso } from '@/lib/jst-datetime'
@@ -57,7 +58,7 @@ export function jstDay(iso: string | number | Date): string {
 }
 
 function monthKey(offset: number): string {
-  const now = new Date(Date.now() + 9 * 3600_000)
+  const now = japanCalendar()
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1))
   return d.toISOString().slice(0, 7)
 }

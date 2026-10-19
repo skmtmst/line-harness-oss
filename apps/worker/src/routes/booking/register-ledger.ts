@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
 import { hasStaffPermission } from '../../middleware/role-guard.js';
@@ -100,7 +101,7 @@ booking.get('/api/booking/admin/bookings.csv', async (c) => {
     row.internal_note ?? '',
   ].map(csvCell).join(','));
   const csv = `${[headerNote, headers.map(csvCell).join(','), ...body].join('\r\n')}\r\n`;
-  const date = new Date().toISOString().slice(0, 10).replaceAll('-', '');
+  const date = japanDate().replaceAll('-', '');
   return new Response(`\uFEFF${csv}`, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',

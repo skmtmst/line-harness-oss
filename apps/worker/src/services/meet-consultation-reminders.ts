@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 export type { MeetReminderKind, RegisterMeetConsultationInput, MeetReminderSchedule } from './meet-reminder-types.js';
 import type { MeetReminderKind, RegisterMeetConsultationInput, MeetReminderSchedule } from './meet-reminder-types.js';
 import { persistMeetGeneration } from './meet-notification-generations.js';
@@ -162,7 +163,7 @@ export function calculateMeetReminderSchedule(
 
 export function renderMeetReminderText(kind: MeetReminderKind, startsAt: string, meetUrl: string): string {
   const start = normalizeDate(startsAt, 'startsAt');
-  const jst = new Date(start.getTime() + 9 * HOUR_MS);
+  const jst = japanCalendar(start);
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   const iso = jst.toISOString();
   const month = Number(iso.slice(5, 7));

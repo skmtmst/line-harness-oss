@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 
 
 // ----------------------------------------------------------------
@@ -36,9 +37,10 @@ export interface SlotDbRow {
   deleted_at: string | null;
 }
 
+
 export const JST_OFFSET_MS = 9 * 3600_000;
 
 export function startsAtJst(utcIso: string): string {
-  const jst = new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
+  const jst = japanCalendar(new Date(utcIso)).toISOString();
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
 }

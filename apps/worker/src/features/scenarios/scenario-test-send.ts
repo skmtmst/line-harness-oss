@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { stripTapExtras } from '@line-crm/shared';
 /*
  * シナリオのテスト送信。
@@ -46,7 +47,7 @@ async function claimScenarioTestSend(
   friendId: string,
   dedupeKey: string,
 ): Promise<boolean> {
-  const now = new Date(Date.now() + 9 * 60 * 60_000)
+  const now = japanCalendar()
   const cutoff = new Date(now.getTime() - TEST_SEND_DEBOUNCE_MS)
   const fmt = (d: Date) => d.toISOString().slice(0, -1) + '+09:00'
   const result = await db

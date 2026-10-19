@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { sqlIdSet } from './id-queries.js';
 import { dbTableExists, jstNow } from './utils.js';
 
@@ -476,7 +477,7 @@ export async function getNenMemberKpis(db: D1Database, accountIds: Array<string 
   if (await dbTableExists(db, 'ec_orders')) {
     const monthScope = accountWhere(accountIds, 'o.line_account_id');
     // JSTの月頭 00:00 をUTCの瞬間へ直す（JST 1日0時＝UTC 前月末日15時）。
-    const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const jstNow = japanCalendar();
     const monthStartUtc = new Date(Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), 1) - 9 * 60 * 60 * 1000).toISOString();
     const monthly = await db.prepare(
       `SELECT COALESCE(SUM(o.total_amount_minor), 0) AS yen,

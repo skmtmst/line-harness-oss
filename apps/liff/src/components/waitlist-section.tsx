@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { useCallback, useEffect, useState } from 'react';
 import type { CustomerBookingWaitlist } from '@line-crm/shared';
 import { api } from '../lib/api.js';
@@ -10,7 +11,7 @@ import WaitlistOfferSheet from './waitlist-offer-sheet.js';
 /** 自分のキャンセル待ち。順番（先着・何番目か）は口が返す。口が無い間は番号を出さない。 */
 export type WaitlistRow = CustomerBookingWaitlist & { position?: number | null };
 
-const jstDay = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3_600_000).toISOString().slice(0, 10);
+const jstDay = (iso: string) => japanDate(new Date(iso));
 
 /**
  * 予約の履歴 › 「キャンセル待ち中（N）」（★V8・Zm2Vh・xANkO）。

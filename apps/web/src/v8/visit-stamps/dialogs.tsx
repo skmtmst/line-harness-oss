@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset as japanDateOffset } from '@/lib/jst-datetime'
+
 import { Field as SharedField } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import { useEffect, useState } from 'react'
@@ -71,8 +73,7 @@ const toIso = (date: string, nextDay = false) => {
 }
 const toDate = (iso: string | undefined, prevDay = false) => {
   if (!iso) return ''
-  const d = new Date(Date.parse(iso) + 9 * 3_600_000 - (prevDay ? 86_400_000 : 0))
-  return d.toISOString().slice(0, 10)
+  return japanDateOffset(prevDay ? -1 : 0, new Date(iso))
 }
 
 export function MultiplierDialog({ open, multiplier, onClose, onSave }: {

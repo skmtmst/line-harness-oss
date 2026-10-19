@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { activeTenantLineAccountSql, type V6WriteGuard } from '@line-crm/db';
 import { isOperationCapabilityStopped } from '@line-crm/db';
 
@@ -65,7 +66,7 @@ export async function recoverEventTransitions(db:D1Database,now:Date,limit:numbe
       const kind:EventNotificationKind|null=row.action==='reject'?'rejected':row.action==='cancel'&&snapshot.cancelledBy!=='friend'?'cancelled_by_admin'
         :row.action==='schedule_changed'||row.action==='change_to'?'schedule_changed':row.action==='confirmed'?'confirmed':null;
       if(kind&&!steps.notification&&snapshot.recipient&&await current()) {
-        const starts=new Date(Date.parse(snapshot.startsAt)+9*3600000).toISOString();
+        const starts=japanCalendar(new Date(Date.parse(snapshot.startsAt))).toISOString();
         const plan=await prepareEventNotification(db,{accountId:row.line_account_id,operationId:row.operation_key,to:snapshot.recipient,kind,
           ctx:{eventName:snapshot.eventName,startsAtJst:`${starts.slice(0,10)} ${starts.slice(11,16)}`,venueName:snapshot.venueName,venueUrl:snapshot.venueUrl},
           subject:{bookingId:row.booking_id,slotId:snapshot.slotId,status:snapshot.status,startsAt:snapshot.startsAt,version:row.booking_version},now});

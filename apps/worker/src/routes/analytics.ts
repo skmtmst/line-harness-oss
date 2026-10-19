@@ -1,3 +1,4 @@
+import { jstDate as japanDate, jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { serializeFunnel, funnelErrorStatus } from './analytics-funnel-display.js';
 import { bookingAudience } from './styles.js';
@@ -52,11 +53,11 @@ const MAX_RANGE_DAYS = 366;
 function readRange(
   c: { req: { query: (k: string) => string | undefined } },
 ): { ok: true; value: { from: string; to: string } } | { ok: false; error: string; field?: string } {
-  const jstNow = new Date(Date.now() + 9 * 3600_000);
-  const toRaw = c.req.query('to') ?? jstNow.toISOString().slice(0, 10);
+  const now = new Date();
+  const toRaw = c.req.query('to') ?? japanDate(now);
   const fromRaw =
     c.req.query('from') ??
-    new Date(jstNow.getTime() - 30 * 24 * 3600_000).toISOString().slice(0, 10);
+    japanDateOffset(-30, now);
 
   if (!isExistingCalendarDate(fromRaw) || !isExistingCalendarDate(toRaw)) {
     return { ok: false, error: '期間は 2026-08-01 の形で指定してください' };

@@ -214,6 +214,38 @@ describe('featureEnforcementMiddleware', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  test.each(['account_id', 'accountId', 'line_account_id', 'lineAccountId'])(
+    '本文の %s で指定した店舗の機能設定を確認する', async key => {
+      mocks.getAccountSetting.mockResolvedValue(JSON.stringify({ enabled: true }));
+      const { app, handler } = testApp();
+      const response = await app.request('/api/webinars', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ [key]: '  account-1  ' }),
+      }, env);
+
+      expect(response.status).toBe(200);
+      expect(handler).toHaveBeenCalledOnce();
+      expect(mocks.accountFeatureAvailability).toHaveBeenCalledWith(
+        env.DB, 'account-1', 'webinars', expect.anything(),
+      );
+    },
+  );
+
+  test('URL と本文の店舗が違えば処理せず拒否する', async () => {
+    const { app, handler } = testApp();
+    const response = await app.request('/api/webinars?account_id=account-query', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-body' }),
+    }, env);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'LINE_ACCOUNT_MISMATCH' });
+    expect(handler).not.toHaveBeenCalled();
+    expect(mocks.accountFeatureAvailability).not.toHaveBeenCalled();
+  });
+
   test('core API は機能設定に関係なく従来処理へ進む', async () => {
     const { app, handler } = testApp();
     const response = await app.request('/api/settings/features', {}, env);

@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 
 import { datetimeLocalJstToUtcIso, jstDate } from '@/lib/jst-datetime'
 /**
@@ -22,8 +23,8 @@ const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
  * 付かなかった。同じ日なら従来どおり時刻だけにする。
  */
 export function formatSlotJp(startsAt: string, endsAt: string): string {
-  const s = new Date(new Date(startsAt).getTime() + 9 * 3600_000)
-  const e = new Date(new Date(endsAt).getTime() + 9 * 3600_000)
+  const s = japanCalendar(new Date(startsAt))
+  const e = japanCalendar(new Date(endsAt))
   const hhmm = (d: Date) =>
     `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
   const day = (d: Date) => `${d.getUTCMonth() + 1}月${d.getUTCDate()}日(${WEEKDAY_JP[d.getUTCDay()]})`
@@ -46,7 +47,7 @@ export function utcIsoToJstDate(iso: string): string {
 
 /** UTC の ISO → JST の HH:MM。枠の編集窓で保存値を時刻入力へ戻す。 */
 export function utcIsoToJstHHMM(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(11, 16)
+  return japanCalendar(new Date(iso)).toISOString().slice(11, 16)
 }
 
 /** 「14:00〜17:00 を 90 分ずつ」→ [14:00-15:30, 15:30-17:00]。端数は切り捨てる。 */

@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import type { RecurrenceFrequency as SeriesFreq, SeriesOccurrence } from '@line-crm/shared'
 
 /** 繰り返しの予約の言葉と並べ方（言葉の表：繰り返す・毎週・隔週・毎月第 N 曜・飛ばす。「シリーズ」「定期」は使わない）。 */
@@ -7,7 +8,7 @@ export const FREQ_OPTIONS: { value: SeriesFreq; label: string }[] = [
   { value: 'monthly_nth', label: '毎月' },
 ]
 const WEEK = ['日', '月', '火', '水', '木', '金', '土']
-const jst = (iso: string) => new Date(new Date(iso).getTime() + 9 * 3_600_000)
+const jst = (iso: string) => japanCalendar(new Date(iso))
 export const weekdayOf = (iso: string) => jst(iso).getUTCDay()
 export const timeOf = (iso: string) => { const d = jst(iso); return `${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}` }
 export const dayOf = (iso: string) => { const d = jst(iso); return `${d.getUTCMonth() + 1}/${String(d.getUTCDate()).padStart(2, '0')}` }

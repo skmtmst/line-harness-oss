@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { verifyNenWebhook } from '../lib/hmac.js';
 import { WEBHOOK_BODY_BYTES, isWebhookBodyTooLarge } from '../lib/webhook-body.js';
@@ -1320,7 +1321,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', inputJsonBoundary(),
     ? null
     : typeof body.used_at === 'string' && Number.isFinite(Date.parse(body.used_at))
       // issued_at と同じく日本時間の壁時計で残す（台帳の日付列をそろえる）。
-      ? new Date(Date.parse(body.used_at) + 9 * 3600_000).toISOString().slice(0, 19).replace('T', ' ')
+      ? japanCalendar(new Date(Date.parse(body.used_at))).toISOString().slice(0, 19).replace('T', ' ')
       : 'invalid';
   const orderNumber = typeof body.order_number === 'string' && body.order_number.trim()
     ? body.order_number.trim().slice(0, 64) : null;

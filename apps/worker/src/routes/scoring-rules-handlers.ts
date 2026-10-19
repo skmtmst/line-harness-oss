@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { createMileageRuleIdempotent, serializeMileageRule } from './mileage-rule-create.js';
 import { inputError } from '../lib/input-errors.js';
@@ -144,7 +145,7 @@ export const get__api_mileage_rules_export_4 = async (c: Context<Env, "/api/mile
     const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(mileageCsvCell).join(',')).join('\r\n')}\r\n`;
     c.set('outputAudit', { count: items.length, accountId });
     auditLog(c, 'mileage.rule.export', { kind: 'mileage_earning_rule_export', id: accountId });
-    const day = new Date().toISOString().slice(0, 10);
+    const day = japanDate();
     return new Response(csv, {
       status: 200,
       headers: {

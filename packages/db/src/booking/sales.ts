@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { fetchSalesRows } from './sales-rows.js';
 import type { SalesRow } from './sales-rows.js';
 import { jstNow } from '../utils.js';
@@ -90,7 +91,7 @@ export async function saveNoshowSettings(
 
 /** 数える期間の始まり（JSTの今から○か月前）。 */
 export function noshowWindowSince(windowMonths: number, nowMs = Date.now()): string {
-  const now = new Date(nowMs + 9 * 3600_000);
+  const now = japanCalendar(new Date(nowMs));
   const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - windowMonths, now.getUTCDate()));
   return since.toISOString();
 }

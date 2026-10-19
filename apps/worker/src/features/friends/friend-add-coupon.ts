@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { jstNow } from '@line-crm/db';
 import type { EccubeCouponInput } from '../../services/eccube-coupon.js';
 
@@ -66,7 +67,7 @@ export type FriendAddCouponDependencies = {
 };
 
 function jstIsoDate(date: Date): string {
-  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(date);
   return `${jst.toISOString().slice(0, 19)}+09:00`;
 }
 

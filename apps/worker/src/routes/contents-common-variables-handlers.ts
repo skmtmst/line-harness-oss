@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
@@ -572,7 +573,7 @@ export const post__api_common_vars_id_schedules_9 = async (c: Context<Env, "/api
     }
     // 過ぎた日時は受け付けない。入れた瞬間に次のCronで当たり、
     // 「予約したつもりが今すぐ変わった」になる。
-    const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 16);
+    const jstNowIso = japanCalendar().toISOString().slice(0, 16);
     if (effectiveFrom < jstNowIso) {
       return inputError(c, { success: false, error: '過去の日時は指定できません' }, 400, ["effectiveFrom"]);
     }

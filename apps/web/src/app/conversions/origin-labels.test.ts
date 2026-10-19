@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { originInfoOf } from './origin-labels'
-import { readExclusionView } from './conversion-exclusion'
+import { originInfoOf } from '@/v8/conversions/origin-labels'
+import { readExclusionView } from '@/v8/conversions/exclusion'
 
 /**
  * R41: 起点ごとの名前・対象・金額の説明は1つの対応表だけが持つ。

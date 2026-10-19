@@ -1,5 +1,8 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { jstDate as japanDate } from '@/lib/jst-datetime'
+
 import { Fragment, useRef, type DragEvent } from 'react'
 import type { ReservationBoardEntry, ReservationBoardMove, ReservationBoardResource } from '@line-crm/shared'
 import { MessageCircle, Phone, TriangleAlert } from 'lucide-react'
@@ -11,8 +14,8 @@ import { formatDay, formatTime } from '@/lib/format'
 import styles from './reservation-people-grid.module.css'
 
 type Slot = { resourceId: string; startsAt: string; href?: string }
-const civil = (iso: string) => new Date(Date.parse(iso) + 9 * 3600000)
-const dayOf = (iso: string) => civil(iso).toISOString().slice(0, 10)
+const civil = (iso: string) => japanCalendar(new Date(Date.parse(iso)))
+const dayOf = (iso: string) => japanDate(new Date(iso))
 const minuteOf = (iso: string) => civil(iso).getUTCHours() * 60 + civil(iso).getUTCMinutes()
 
 /** 人の当日盤。移動の保存は共通盤の版付き契約に戻す。 */

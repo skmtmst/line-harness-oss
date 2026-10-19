@@ -13,7 +13,12 @@ export function datetimeLocalJstToUtcIso(value: string): string {
 
 /** 日付の境目は、日本の午前0時。端末の地域に左右されない。 */
 export function jstDate(date: Date = new Date()): string {
-  return new Date(date.getTime() + 9 * 3_600_000).toISOString().slice(0, 10)
+  return jstCalendar(date).toISOString().slice(0, 10)
+}
+
+/** 保存用の日本時間ISO（ミリ秒・+09:00付き）。瞬間は変えない。 */
+export function jstTimestamp(date: Date = new Date()): string {
+  return jstCalendar(date).toISOString().slice(0, -1) + '+09:00'
 }
 
 /** 日本時間の日付と時刻から予約時刻を作る。存在しない日付・時刻は拒否する。 */
@@ -21,7 +26,7 @@ export function scheduledJstIso(date: string, time: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null
   const parsed = new Date(`${date}T${time}:00+09:00`)
   if (Number.isNaN(parsed.getTime())) return null
-  const shifted = new Date(parsed.getTime() + 9 * 3_600_000).toISOString()
+  const shifted = jstCalendar(parsed).toISOString()
   return shifted.slice(0, 16) === `${date}T${time}` ? parsed.toISOString() : null
 }
 
