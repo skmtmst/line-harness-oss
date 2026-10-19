@@ -1,26 +1,32 @@
-import { BookOpen, CircleHelp, Info, LifeBuoy, Lock, Save } from 'lucide-react'
+import { BookOpen, CircleHelp, Copy, Info, LifeBuoy, Link as LinkIcon, Lock, Save } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
+import CopyTextButton from '@/components/shared/copy-text-button'
+import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { TextField } from '@/components/shared/text-field'
+import TruncatedText from '@/components/shared/truncated-text'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
-import { LOGIN_ACKS, WEBHOOK_ACKS, developerChannelUrl } from './logic'
+import { LOGIN_ACKS, WEBHOOK_ACKS, developerChannelUrl, musuboWebhookUrl } from './logic'
 import styles from './register.module.css'
 
 /*
- * ★LINE新規追加_v06.pen（2026-10-15承認）②アカウント接続 Fqy29 の描画だけ。
+ * ★LINE新規追加_v07.pen（2026-10-18承認）②アカウント接続 Fqy29 の描画だけ。
  * register.tsx が行数の関所（apps/web/scripts/v8-guard/code-size.mjs）を越えたので
- * 切り出した。状態は持たず、register.tsx から受け取って出すだけ（見た目は変えていない）。
+ * 切り出した。状態は持たず、register.tsx から受け取って出すだけ。
  */
 
 const MANUAL = '/manuals/line-connect/index.html'
 
-/* 正本 v06 ②の左の細い列「AC左 操作ステップ」（g48QV）。いまどこを触っているかを3段で見せる。 */
+/* 承認済み v07 Ds3E2 に出す受け取り口。APIの元は組み立てのときに決まるので、一度だけ作る。 */
+const WEBHOOK_URL = musuboWebhookUrl()
+
+/* 正本 v07 ②の左の細い列「AC左 操作ステップ」（fbgO8）。いまどこを触っているかを3段で見せる。 */
 const AC_OUTLINE: ReadonlyArray<{ title: string; note: string }> = [
   { title: 'Messaging API の2項目', note: 'LINE Developers からコピー' },
-  { title: 'Webhook の設定', note: 'LINE Developers で3つをONに' },
+  { title: 'Webhook の設定', note: 'URLを貼り付けて3つをONに' },
   { title: 'LINEログインの2項目', note: '同じプロバイダーの中に作る' },
 ]
 
@@ -50,7 +56,8 @@ function AcOutline({ sub }: { sub: number }) {
       <div className={styles.outlineSpacer} aria-hidden="true" />
       <div className={styles.outlineAuto}>
         <p className={styles.outlineAutoTitle}>musubo が自動で行うこと</p>
-        <p className={styles.outlineAutoBody}>Webhook URL の登録／アカウント名・@ID・アイコンの取り込み／LIFF（友だち追加）の作成。入力は不要です。</p>
+        {/* 承認済み v07 iaTqO：Webhook URL は自動登録されないので、ここから外した。 */}
+        <p className={styles.outlineAutoBody}>アカウント名・@ID・アイコンの取り込み／LIFF（友だち追加）の作成。入力は不要です。</p>
       </div>
     </div>
   )
@@ -74,7 +81,7 @@ export default function Step2Connect({
   onToggleAck: (key: string, next: boolean) => void
 }) {
   return (
-    /* 正本 v06 ②の右の列（Step1 msf5n／Step2 RtWJZ／Step3 J84XB は同じ中身）。
+    /* 正本 v07 ②の右の列（Step1 msf5n／Step2 RtWJZ／Step3 J84XB は同じ中身）。
        白い板の中に、マニュアル → 区切り → 途中保存して閉じる → 区切り → うまくいかないとき → サポートに聞く。 */
     <CreateStepColumns data-design-node="Fqy29" outlineTitle="操作ステップ" outline={<AcOutline sub={sub} />} previewTitle="マニュアル" preview={(
       <Card className={styles.aside} layout="vertical" surface="standard" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="マニュアル">
@@ -88,7 +95,7 @@ export default function Step2Connect({
       </Card>
       )}>
       {sub === 1 && (
-        /* 正本 v06 Fqy29 → ②-1（msf5n）の A2cEg1。入力は縦に2つだけで、
+        /* 正本 v07 Fqy29 → ②-1（msf5n）の A2cEg1。入力は縦に2つだけで、
            ほかの項目は musubo が自動で設定するので欄も控えも置かない。 */
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Messaging API の情報を入れる">
           <p className={styles.subBadge}>{badge}</p>
@@ -122,15 +129,15 @@ export default function Step2Connect({
         </Card>
       )}
       {sub === 2 && (
-        /* 正本 v06 Fqy29 → ②-2（f4AgA）の S1KaUa。Webhook URL は musubo が自動で登録するので
-           入力欄も控えも置かない。利用者がやるのは LINE Developers の3つのスイッチだけ。 */
+        /* 正本 v07 Fqy29 → ②Step2 の S1KaUa。LINE は Webhook URL を書き換える API を出していないので、
+           利用者が「Messaging API設定」へ貼り付ける。貼って「更新」を押すまで3つのスイッチが出てこないため、
+           URLの控えと［コピー］（Ds3E2）を置き、印は「貼り付けた」を先頭にして全4つにした。 */
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook（受信のつなぎ）を設定する">
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
             <h2 className={styles.panelTitle}>Webhook（受信のつなぎ）を設定する</h2>
             <span className={styles.precheckHelpMark} title="LINE からのメッセージを musubo が受け取るための通り道です。" aria-label="LINE からのメッセージを musubo が受け取るための通り道です。"><CircleHelp size={14} aria-hidden="true" /></span>
           </div>
-          <p className={styles.precheckLead}>Webhook URL（受信先のアドレス）は musubo が自動で登録します。入力は要りません。ここでは LINE Developers の画面にある3つのスイッチだけ、ご自身でONにしてください。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
             <p className={styles.precheckNoteTitle}>LINE Developers の Webhook 設定を開いてください</p>
             <p>ステップ1で入れたチャネルIDを使って、このチャネルの「Messaging API設定」を直接開きます。プロバイダーやチャネルを選び直す必要はありません。</p>
@@ -139,13 +146,24 @@ export default function Step2Connect({
               <p className={styles.help}>必ずこのボタンから操作してください</p>
             </div>
           </div>
+          {/* 承認済み v07 Ds3E2「AC Webhook URL」。白い枠＋細い線で、上下の色付きの箱と見分ける。 */}
+          <Card surface="bordered" layout="vertical" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn6-pre-head-gap)" data-design-node="Ds3E2">
+            <p className={styles.webhookUrlTitle}><LinkIcon size={14} aria-hidden="true" />musubo の Webhook URL</p>
+            <p className={styles.precheckLead}>下のURLをコピーし、「Messaging API設定」のWebhook URLに貼り付けて「更新」を押します。</p>
+            <div className={styles.webhookUrlRow}>
+              <Card surface="bordered" corner="control" contentPadding="var(--tpl-htn-endpoint-pad)">
+                <span className={styles.endpointValue}><TruncatedText value={WEBHOOK_URL || String(emptyValue('unknown'))} url /></span>
+              </Card>
+              <CopyTextButton value={WEBHOOK_URL} label="コピー" variant="secondary" icon={<Copy size={15} aria-hidden="true" />} aria-label="Webhook URL をコピー" disabled={!WEBHOOK_URL} />
+            </div>
+          </Card>
           <div className={`${styles.precheckNote} ${styles.precheckNoteWarn}`}>
             <p className={styles.precheckNoteTitle}>すでにほかのツールのURLが入っているとき</p>
             <p>Webhook URL の欄に別の配信ツールのURLが入っている場合、あとの「接続チェック」で musubo のURLに書きかわり、そのツールの受信は止まります。使い続けたいときは、ここで「途中保存して閉じる」を押して、既存のWebhook URLを別途保存してから進めてください。</p>
           </div>
           <div className={styles.field}>
             <p className={styles.groupLabel}>設定手順の確認</p>
-            <p className={styles.help}>「Messaging API設定」の画面でONにしたら、下のチェックを入れてください。</p>
+            <p className={styles.help}>URLを貼り付けて更新すると、下の3つのスイッチが出てきます。ONにしたら、それぞれチェックを入れてください。</p>
           </div>
           <div className={styles.ackList}>
             {WEBHOOK_ACKS.map((ack) => (
@@ -155,11 +173,11 @@ export default function Step2Connect({
               </div>
             ))}
           </div>
-          <p className={styles.help}>3つすべてにチェックを入れると「次のステップへ」が押せるようになります。</p>
+          <p className={styles.help}>4つすべてにチェックを入れると「次のステップへ」が押せるようになります。</p>
         </Card>
       )}
       {sub === 3 && (
-        /* 正本 v06 Fqy29 → ②-3（J84XB）の wI40b。Callback URL は musubo が自動で登録するので
+        /* 正本 v07 Fqy29 → ②-3（J84XB）の wI40b。Callback URL は musubo が自動で登録するので
            控えの欄を置かない。開くボタンは、ステップ1のチャネルIDから同じプロバイダーをたどる。 */
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINEログインの情報を入れる">
           <p className={styles.subBadge}>{badge}</p>

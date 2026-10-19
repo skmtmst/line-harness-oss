@@ -14,7 +14,7 @@ import {
 import styles from './register.module.css'
 
 /*
- * ★LINE新規追加_v06.pen（2026-10-15承認）①事前確認 p6zMkA の描画だけ。
+ * ★LINE新規追加_v07.pen（2026-10-18承認）①事前確認 p6zMkA の描画だけ。
  * register.tsx が行数の関所（apps/web/scripts/v8-guard/code-size.mjs）を越えたので
  * 切り出した。状態は持たず、register.tsx から受け取って出すだけ（見た目は変えていない）。
  */
@@ -54,7 +54,7 @@ export default function Step1Precheck({
         {draftRestored && (
           <Notice tone="info" message="端末の下書きから続けます。チャネルシークレットだけ入れ直してください。" onClose={onCloseDraftNotice} />
         )}
-        {/* カードの頭は 題・？・のび・札 の順（v06 B2SpuV）。 */}
+        {/* カードの頭は 題・？・のび・札 の順（v07 B2SpuV）。 */}
         <div className={styles.precheckHead}>
           <h2 className={styles.panelTitle}>ご利用環境の確認</h2>
           <span className={styles.precheckHelpMark} title="答えに合わせて、このあとの手順が変わります。" aria-label="答えに合わせて、このあとの手順が変わります。"><CircleHelp size={14} aria-hidden="true" /></span>
@@ -77,7 +77,7 @@ export default function Step1Precheck({
           <div className={styles.precheckQuestion}>
             <h3 className={styles.precheckQuestionTitle}>{PRECHECK_TITLES[precheckAt]}</h3>
             <p className={styles.help}>{PRECHECK_HELPS[precheckAt]}</p>
-            {/* Q5 だけ説明付きの3択なので縦に積む。ほかは2列（v06 aSRi4・s70iLZ）。 */}
+            {/* Q5 だけ説明付きの3択なので縦に積む。ほかは2列（v07 aSRi4・s70iLZ）。 */}
             <RadioCardGroup legend={PRECHECK_TITLES[precheckAt]} columns={precheckAt === 'q5' ? undefined : 2}>
               {PRECHECK_CHOICES[precheckAt].map((choice) => (
                 <RadioCard

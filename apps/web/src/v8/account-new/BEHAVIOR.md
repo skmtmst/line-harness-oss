@@ -1,6 +1,6 @@
 # LINEアカウントを登録の動き（BEHAVIOR.md）
 
-対象：`register.tsx`。絵の正本は **`LINE新規追加_v06.pen`**（利用者承認 2026-10-15）。
+対象：`register.tsx`。絵の正本は **`LINE新規追加_v07.pen`**（利用者承認 2026-10-18。v06 からの違いは ②Step2 の Webhook URL の控えと印4つ）。
 フレームは ①事前確認 `p6zMkA`・②アカウント接続 `Fqy29`・③接続確認 `Lwxyh`・④使い方を選ぶ `X0pGdw`・⑤完了 `Plmq1`。
 （V8-B の `xj3zz`／`JYfda`／`GwKE2`／`v2KMj`／`TvXII`／`qw80E` は v06 で置き換えた。）
 判定の小さな計算は `logic.ts`（`connection-check-view.ts`・`account-recovery.ts` の写し）。
@@ -26,9 +26,10 @@
 ## 入れてもらうもの（v06で減らした）
 - ②Step1：チャネルID・チャネルシークレット（Messaging API）。②Step3：チャネルID・チャネルシークレット（LINE Login）。この4項目だけが必須（②Step2 に入力欄は無い）。
 - **登録の前にタグ・親アカウント・担当範囲・既存のLIFF ID・表示名は聞かない**（承認済みの v06 で外した）。保存の口（`connect`）の形は変えていないので、`tagIds` などは空のまま送る。
-- ②Step2（Webhook の3つ）・②Step3（LINEログインの2つ）には「LINE側でやったこと」の印（チェック）がある。全部入れるまで進めない。アクセストークンと LIFF ID は musubo 側で作るので入力欄を置かない。
+- ②Step2（Webhook の4つ）・②Step3（LINEログインの2つ）には「LINE側でやったこと」の印（チェック）がある。全部入れるまで進めない。アクセストークンと LIFF ID は musubo 側で作るので入力欄を置かない。
 - ②Step2 の題は絵の正本（`②-2` の `S1KaUa`）どおり「Webhook（受信のつなぎ）を設定する」。段の名前（戻るボタンの行き先）は「Webhook の設定」。
-- **②Step2 に Webhook URL の控え（写す欄）は置かない**。URL は musubo が自動で登録するので、絵の正本も「入力は要りません」と書いている。URL が登録できたことは③の接続チェックの行「Webhook URL の登録」で知らせる。
+- **②Step2 に Webhook URL の控え（写す欄）と［コピー］を置く**（承認済み `LINE新規追加_v07.pen`・2026-10-18承認の `Ds3E2`）。LINE の「Messaging API設定」に URL を貼って「更新」を押すまで、LINE 側に Webhook の3つのスイッチが出てこないため、利用者が自分で貼る必要がある。字は `musuboWebhookUrl()`（`<NEXT_PUBLIC_API_URL>/webhook`・`apps/worker` の `expectedWebhookUrl` と同じ形）。
+- そのため印は4つで、先頭が「Webhook URL を貼り付けて「更新」を押した」（`dqe2M`）。左の細い列の「musubo が自動で行うこと」からは **「Webhook URL の登録」を外した**（自動登録しないので・`iaTqO`）。③の接続チェックの行「Webhook URL の登録」は、貼られた URL が musubo のものと合っているかの確認として残す。
 - ②Step1・Step3 の青い囲みから **「LINE Developers を開く」**（別タブ）。チャネルIDが入っていればそのチャネルの画面、空なら一覧を開く（`developerChannelUrl`）。v05 までの「取得方法を見る」は承認済み v06 で外した。マニュアル全文は②の右の列の「マニュアルを開く」（`/manuals/line-connect/index.html`・別タブ）から。
 
 ## ②の左の列（操作ステップ）
