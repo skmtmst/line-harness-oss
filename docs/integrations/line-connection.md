@@ -16,6 +16,8 @@ Messaging APIとLINEログインは同じプロバイダーのチャネルを使
 
 ③の接続確認では、musuboがWebhook URLを登録し直し、URLの一致と有効状態を読み直す。②の手作業と③の自動確認は別の段であり、両方を保つ。接続確認にはLINEへの書き込みがあるので、表示だけの点検で実行しない。過去のv06の「URLの入力は不要」「確認は3項目」という案内を現在の手順へ戻さない。
 
+承認済みv07のURL枠は、共通Cardに縦横の余白を別々に渡して表示する（PR #1776）。余白をひとつのCSS変数へまとめて渡した旧形へ戻さない。枠の確認は実際の描画と共通Cardの動きで行う。
+
 ## 実装の入口
 
 - 画面は `apps/web/src/v8/account-new/`。入口は `apps/web/src/app/accounts/new/page.tsx`。②は `step2-connect.tsx`。

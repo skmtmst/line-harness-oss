@@ -571,3 +571,4 @@
 - [F01の変更履歴](release-log/unreleased/0000-kenta-cleanup-f01.md)
 - [X01Cの変更履歴](release-log/unreleased/0000-kenta-cleanup-x01c.md)
 - [LINE接続の変更履歴](release-log/unreleased/1775-masato-line-webhook-v07.md)
+- [LINE接続URL枠の変更履歴](release-log/unreleased/1776-masato-line-webhook-padding.md)
