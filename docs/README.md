@@ -622,7 +622,3 @@
 
 - [品質の後戻りを防ぐ仕組みの更新履歴](release-log/unreleased/0000-kenta-cleanup-q00.md)
 - [品質の後戻りを防ぐ仕組みの検査記録](qa/cleanup-q00-1020.md)
-
-- [担当者情報と権限確認の共通化の履歴](release-log/unreleased/0000-kenta-cleanup-q01s1.md)
-- [管理者によるLINEアカウント登録の履歴](release-log/unreleased/1779-masato-admin-line-registration.md)
-- [LINEアカウントの受信確認の履歴](release-log/unreleased/1780-masato-line-receipt-gate.md)
