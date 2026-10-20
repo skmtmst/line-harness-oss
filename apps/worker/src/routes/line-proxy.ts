@@ -163,7 +163,7 @@ async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCa
       accountCount: active.length,
     };
   }
-  if (token === c.env.LINE_CHANNEL_ACCESS_TOKEN) {
+  if (token === c.env.LINE_CHANNEL_ACCESS_TOKEN && !registeredByToken) {
     return { upstreamToken: token, lineAccountId: null, accountCount: active.length };
   }
 
@@ -207,6 +207,14 @@ async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCa
     };
   }
   if (c.env.LINE_CHANNEL_ACCESS_TOKEN) {
+    // Registered channels retain their lifecycle even when no active account
+    // remains. Only an unregistered legacy default may use the null scope.
+    const registeredDefault = accounts.some(
+      (a) => a.channel_access_token === c.env.LINE_CHANNEL_ACCESS_TOKEN,
+    );
+    if (registeredDefault || !await canAccessAllLineAccounts(c.env.DB, staff, [null])) {
+      return c.json({ message: 'LINE account not found' }, 404);
+    }
     return {
       upstreamToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
       lineAccountId: null,
