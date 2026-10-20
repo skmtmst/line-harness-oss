@@ -33,7 +33,7 @@ import { useAutomationManage } from './shell'
 import { describeVersionChanges } from './version-diff'
 import styles from './versions.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
 import { useManualHref } from '@/lib/use-manual-href'
@@ -158,9 +158,7 @@ function VersionsInner() {
         setError(permissionDeniedMessage('store'))
         setLoadFailure('forbidden')
       } else {
-        setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')
-          ? caught.message
-          : '版と利用先を読み込めませんでした。通信の状態を確認してください。')
+        setError(describeApiFailure(caught, '読み込み'))
         setLoadFailure('error')
       }
     }
@@ -190,7 +188,7 @@ function VersionsInner() {
       await load()
       return true
     } catch (caught) {
-      const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '操作を完了できませんでした'
+      const message = describeApiFailure(caught, '保存')
       setError(message)
       return message
     } finally {

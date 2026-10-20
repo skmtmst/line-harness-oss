@@ -6,7 +6,7 @@ import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus } from 'lucid
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import { formatDate, formatDateTime, PLAN_STATUS_LABEL, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -39,8 +39,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 function loadDescription(err: unknown): string | undefined {
   if (isForbiddenOrRateLimited(err)) return undefined
   if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
-  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
-  return undefined
+  return describeApiFailure(err, '読み込み', { scope: 'hq' })
 }
 
 const STATUS_FILTERS: Array<{ key: string; label: string }> = [
@@ -123,7 +122,7 @@ export default function OpsTenantsV8() {
   }
 
   const create = async () => {
-    if (createBusy) return
+
     if (!newName.trim()) { setCreateError('統括名を入力してください'); return }
     setCreateBusy(true)
     setCreateError('')

@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react'
 import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
@@ -111,7 +112,7 @@ export default function MediaReplacementDialog({
       { if (!fieldFailure)
 
 
-      setError(caught instanceof Error ? caught.message : '差し替えたときの影響を確認できませんでした') }
+      setError(describeApiFailure(caught, '読み込み')) }
     }
   }
 
@@ -145,9 +146,7 @@ export default function MediaReplacementDialog({
       const fieldFailure = saveErrors.capture(caught);
 
 
-      const message = caught instanceof ApiError || caught instanceof Error
-        ? caught.message
-        : '使用先を差し替えられませんでした'
+      const message = describeApiFailure(caught, '保存')
       { if (!fieldFailure)
 
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -271,7 +272,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       { if (!fieldFailure)
 
 
-      setError(explainStartError(code, code || 'クロス分析を開始できませんでした')) }
+      setError(explainStartError(code, describeApiFailure(caught, 'クロス分析の開始'))) }
       setLoading(false)
     } finally {
       crossStartInFlight.current = false
@@ -344,7 +345,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       { if (!fieldFailure)
 
 
-      setError(caught instanceof Error ? caught.message : '対象者を準備できませんでした') }
+      setError(describeApiFailure(caught, '対象者の準備')) }
     } finally { setAudienceBusy(false) }
   }
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react'
 import { FolderOpen, Play, Pause, Upload } from 'lucide-react'
 import type { BroadcastBubble, MediaItem } from '@line-crm/shared'
@@ -88,7 +89,7 @@ export default function ComposerMedia({ bubble, accountId, onChange, disabled, o
         if (!result.success) throw new Error(result.error || 'アップロードできませんでした。')
         if (live.current) onChange({ ...bubble.content, fileName: file.name, originalContentUrl: result.data.url, previewImageUrl: video ? String(bubble.content.previewImageUrl ?? '') : result.data.url })
       }
-    } catch (cause) { if (live.current) setError(japaneseDetailOf(cause) || (cause instanceof Error && cause.message && !/^API error: /.test(cause.message) && /[ぁ-んァ-ヶ一-龠]/u.test(cause.message) ? cause.message : 'アップロードできませんでした。もう一度お試しください。')) }
+    } catch (cause) { if (live.current) setError(japaneseDetailOf(cause) || (describeApiFailure(cause, '画像の登録'))) }
     finally { lock.current = false; if (live.current) setBusy(false); onBusyChange?.(false) }
   }
   return <>

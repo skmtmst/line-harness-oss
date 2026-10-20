@@ -620,6 +620,8 @@
 - [使われていない処理と重複する検査の整理記録](qa/cleanup-x02b-1020.md)
 - [使われていない処理と重複する検査の整理履歴](release-log/unreleased/0000-kenta-cleanup-x02b.md)
 
-
+- [失敗時の案内と連続押しの防止](release-log/unreleased/0000-kenta-cleanup-q01s4.md)
+- [Q01S4 検査記録](qa/cleanup-q01s4-1020.md)
+- [支払いリンクの期限確認の修正履歴](release-log/unreleased/0000-kenta-cleanup-f03.md)
 - [品質の後戻りを防ぐ仕組みの更新履歴](release-log/unreleased/0000-kenta-cleanup-q00.md)
 - [品質の後戻りを防ぐ仕組みの検査記録](qa/cleanup-q00-1020.md)

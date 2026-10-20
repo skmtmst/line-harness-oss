@@ -10,7 +10,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { classifyApiFailure, isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, classifyApiFailure, isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
 import { useBookingEdit } from './lib/edit-permission'
 import { CreatePage } from '@/components/templates/create-page'
@@ -181,7 +181,7 @@ export default function AssignMatrixV8() {
         setError(loadFailureCopy(e, '担当スタッフの割り当て').description ?? '読み込めませんでした。')
       }
       } else {
-        const message = e instanceof Error ? e.message : ''
+        const message = describeApiFailure(e, '読み込み')
         { if (!fieldFailure)
         setError(message && !/^API error: /.test(message) ? message : '読み込めませんでした。画面を再読み込みして確認してください。')
       }

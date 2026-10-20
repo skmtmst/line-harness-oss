@@ -1,6 +1,7 @@
 'use client'
 
-import { type DrawerTab, DRAWER_TABS } from './drawer-tabs'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { DRAWER_TABS } from './drawer-tabs'
 import { Tabs } from '@/components/shared/tabs'
 import { useUrlTab } from '@/lib/use-url-tab'
 import { notifySaved } from '@/components/shared/toast'
@@ -574,7 +575,7 @@ function SettlementEditor({
 
       { if (!fieldFailure)
 
-      setError(e instanceof Error ? e.message : '保存できませんでした。通信を確かめて、もう一度お試しください。') }
+      setError(describeApiFailure(e, '保存')) }
     } finally {
       setSaving(false)
     }

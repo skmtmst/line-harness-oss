@@ -4,7 +4,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Plus, RefreshCw } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { GitCompareArrows, TriangleAlert } from 'lucide-react';
+
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
@@ -343,7 +343,7 @@ export default function RankSettingsV8({
           </div>
           {readonly ? null : (
             <div className={styles.syncAction}>
-              <Button variant="secondary" onClick={() => void resync()} disabled={busy || dirty} busy={Boolean(busy)} busyLabel="処理中…">
+              <Button variant="secondary" onClick={() => resync()} disabled={busy || dirty} busy={Boolean(busy)} busyLabel="処理中…">
                 <RefreshCw size={15} aria-hidden="true" />もう一度同期
               </Button>
             </div>

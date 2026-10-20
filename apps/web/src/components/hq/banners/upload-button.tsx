@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import Button from '@/components/shared/button'
@@ -41,7 +42,7 @@ export default function UploadButton({
       const data = await readFileAsBase64(file)
       await onUpload({ filename: file.name, mimeType: file.type, data })
     } catch (caught) {
-      onError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
+      onError(describeApiFailure(caught, '取り込み', { scope: 'hq' }))
     } finally {
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ''

@@ -69,7 +69,7 @@ export const SERVICES: DeliveryService[] = [
   {
     id: 'uber',
     name: 'Uber Eats',
-    sub: 'Uber Eats に入った注文を、この画面へ取り込みます',
+    sub: 'Uber Eats への接続を設定します。注文の取り込みはまだ利用できません',
     connect: 'login',
     guide:
       'ボタンを押すと Uber Eats のログイン画面が開きます。ふだんお使いの Uber Eats のIDでログインし、「許可」を押してください。そのあと、つなぐお店を選ぶ画面に戻ります。',
@@ -130,7 +130,7 @@ export const UBER_STATE_NOTE: Partial<Record<UberConnectionStatus, StateNote>> =
     tone: 'danger',
   },
   no_permission: {
-    text: 'Uber Eats 側の許可が外れているため、注文を取り込めません。musubo が Uber Eats へ確認します。',
+    text: 'Uber Eats 側の接続の許可が外れています。musubo が Uber Eats へ確認します。',
     tone: 'danger',
   },
 }

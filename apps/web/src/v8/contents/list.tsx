@@ -10,7 +10,7 @@ import { deleteMediaItem } from './list-delete-action'
 import { MediaCardV8 } from './list-media-card'
 import { isKnownUnused,KINDS,MediaDetailFailure,mediaDetailIdFromLocation,MediaDetailPhase,MediaKpis,MediaManagementPermission,MediaSort,MediaView,PAGE_SIZE_OPTIONS,SORT_OPTIONS,UNGROUPED } from './list-model'
 
-import { classifyApiFailure,permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, classifyApiFailure,permissionDeniedMessage } from '@/components/shared/api-error-message'
 import BulkBar from '@/components/shared/bulk-bar'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -519,7 +519,7 @@ export default function MediaLibraryListV8() {
       { if (!fieldFailure)
 
 
-      setError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした') }
+      setError(describeApiFailure(caught, 'ダウンロード')) }
     } finally {
       setDownloadingIds((current) => {
         const next = new Set(current)

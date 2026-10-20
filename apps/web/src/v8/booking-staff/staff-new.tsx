@@ -15,7 +15,7 @@ import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
@@ -210,7 +210,7 @@ export default function StaffNewV8() {
 
 
   async function save() {
-    if (saving) return
+
     const validationError = validate()
     if (validationError) {
       focusInvalid.current = true
@@ -266,9 +266,7 @@ export default function StaffNewV8() {
       if (!current()) return
       const fieldFailure = saveErrors.capture(e)
       { if (!fieldFailure)
-      setSaveError(e instanceof Error && e.message && !/^API error: /.test(e.message)
-        ? e.message
-        : 'スタッフを登録できませんでした。入力は残っています。もう一度お試しください。') }
+      setSaveError(describeApiFailure(e, '登録')) }
     } finally {
       if (current()) setSaving(false)
     }
@@ -326,7 +324,7 @@ export default function StaffNewV8() {
           </>}
           footerActions={<>
             <Button href="/booking/menus?tab=staff">キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="登録しています…">
+            <Button variant="primary" onClick={() => save()} disabled={saving} busy={saving} busyLabel="登録しています…">
               {createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
             </Button>
           </>}

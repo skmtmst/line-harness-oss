@@ -224,7 +224,7 @@ export default function ScenarioCreateV8() {
   }
 
   const choose = async (mode: DeliveryMode) => {
-    if (saving) return
+
     if (id && !scenario) return
     if (detailsSavePromise.current) {
       const saved = await detailsSavePromise.current
@@ -277,7 +277,7 @@ export default function ScenarioCreateV8() {
   }
 
   const continueAsDraft = async () => {
-    if (saving || detailsSaving) return
+    if (detailsSaving) return
     if (id && !scenario) return
     if (!id) {
       // 新規で「あとで決める」も行を作る確定操作。方式は暫定で「時刻で指定」。
@@ -397,13 +397,13 @@ export default function ScenarioCreateV8() {
           <Button type="button" onClick={cancel}>キャンセル</Button>
           {canEdit ? (
             <>
-              <Button disabled={locked} onClick={() => void continueAsDraft()} busy={Boolean(detailsSaving)} busyLabel="処理中…">
+              <Button disabled={locked} onClick={() => continueAsDraft()} busy={Boolean(detailsSaving)} busyLabel="処理中…">
                 あとで決める（下書きとして保存）
               </Button>
               <Button
                 variant="primary"
                 disabled={locked}
-                onClick={() => void choose(selectedMode)}
+                onClick={() => choose(selectedMode)}
                 busy={saving !== null}
                 busyLabel="作成中…"
               >

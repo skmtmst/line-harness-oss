@@ -44,7 +44,9 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => fixture.role }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  const mocked = await (() => ({
   api: {
     folders: { list: fixture.foldersList },
     friendFields: { list: fixture.friendFieldsList },
@@ -53,7 +55,9 @@ vi.mock('@/lib/api', () => ({
     staff: { me: async () => ({ success: true, data: { role: 'owner' } }) },
   },
   eventsApi: { listEvents: fixture.listEvents },
-}))
+}))()
+  return { ...actual, ...mocked }
+})
 
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 import NewReminderPage from './page'

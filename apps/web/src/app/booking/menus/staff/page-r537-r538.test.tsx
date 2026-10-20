@@ -38,7 +38,9 @@ vi.mock('@/lib/staff-capability', () => ({
   canViewFeature: () => true,
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  const mocked = await (() => ({
   ApiError: class ApiError extends Error {
     status?: number
   },
@@ -49,7 +51,9 @@ vi.mock('@/lib/api', () => ({
     listStaffMenusBulk: (...args: unknown[]) => fixture.listStaffMenusBulk!(...(args as [])),
     putStaffMenusBulk: (...args: unknown[]) => fixture.putStaffMenusBulk!(...args),
   },
-}))
+}))()
+  return { ...actual, ...mocked }
+})
 
 import { ApiError as MockApiError } from '@/lib/api'
 import MenuStaffMatrix from './page'

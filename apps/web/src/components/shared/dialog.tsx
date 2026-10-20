@@ -194,16 +194,16 @@ export default function Dialog({
     setAutomaticBusy(false)
     setAutomaticError('')
   }, [open])
-  const busy = providedBusy ?? automaticBusy
+  const busy = providedBusy === true || automaticBusy
   const runConfirm = onConfirm ? () => {
     if (busy || automaticLock.current) return
     const pending = onConfirm() as unknown
-    if (providedBusy !== undefined || !pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
+    if (!pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
     const generation = automaticGeneration.current
     automaticLock.current = true
     setAutomaticBusy(true)
     setAutomaticError('')
-    void Promise.resolve(pending).catch(() => {
+    return Promise.resolve(pending).catch(() => {
       if (generation === automaticGeneration.current) setAutomaticError('実行できませんでした。もう一度お試しください。')
     }).finally(() => {
       if (generation !== automaticGeneration.current) return

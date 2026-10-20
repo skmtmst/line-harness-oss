@@ -1,12 +1,12 @@
 'use client'
 import { formatYen } from '@line-crm/shared';
 
-import { DAY_MS, definitionRange } from './list-export'
+import { definitionRange } from './list-export'
 
 import { downloadCsvBlob } from './list-export'
 
-import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { useStaffRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
 import TruncatedText from '@/components/shared/truncated-text'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
@@ -18,7 +18,7 @@ import { useFolderMove } from '@/components/shared/use-folder-move';
 import { moveConversionToFolder } from '@/lib/move-to-folder';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation';
-import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug, Eye } from 'lucide-react'
+import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug } from 'lucide-react'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { ListPage } from '@/components/templates';
@@ -61,7 +61,7 @@ import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog,
 import { notifyToast } from '@/components/shared/toast';
 import { focusConversionField, type ConversionFieldIssue } from './field-issue';
 import styles from './list.module.css'
-import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { describeApiFailure, withPermissionFailure } from '@/components/shared/api-error-message';
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -527,7 +527,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
-      setReversalError(err instanceof Error ? err.message : '記録できませんでした') }
+      setReversalError(describeApiFailure(err, '保存')) }
     } finally {
       setReversalBusy(false)
     }
@@ -935,11 +935,11 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       {ingestError ? <Notice tone="danger" >{ingestError}</Notice> : null}
       <div className={styles.panelButtons}>
         {canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
-          <Button onClick={() => void issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={15} aria-hidden="true" />鍵を発行する</Button>
+          <Button onClick={() => issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={15} aria-hidden="true" />鍵を発行する</Button>
         ) : null}
         {canEdit && panelPoint.status !== 'stopped' ? <Button onClick={() => openEdit(panelPoint)}>編集する</Button> : null}
         {canEdit && panelPoint.state === 'draft' ? (
-          <Button onClick={() => void publishDraft(panelPoint)} disabled={publishing} busy={publishing} busyLabel="公開しています">公開する</Button>
+          <Button onClick={() => publishDraft(panelPoint)} disabled={publishing} busy={publishing} busyLabel="公開しています">公開する</Button>
         ) : null}
       </div>
       {canEdit && panelPoint.status !== 'stopped' && panelPoint.state !== 'draft' ? (
@@ -961,7 +961,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           variant={stopAction === 'delete' ? 'danger' : 'primary'}
           disabled={stopping || stopImpactLoading || !stopReason.trim() || (stopAction === 'replace' && !replacementId)}
           disabledReason={stopping ? '止めています。' : stopImpactLoading ? '利用先と影響を確認しています。' : !stopReason.trim() ? '止める理由を入力してください。' : stopAction === 'replace' && !replacementId ? '差し替え先を選んでください。' : undefined}
-          onClick={() => void runStop()}
+          onClick={() => runStop()}
           busy={stopping || stopImpactLoading}
           busyLabel="止めています" widthReserve="idle"
         >
@@ -1181,7 +1181,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       headingSize="regular"
       title="コンバージョン"
       actions={
-        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
+        <Button onClick={() => exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
           <Download size={15} aria-hidden="true" />CSV で書き出す
         </Button>
       }

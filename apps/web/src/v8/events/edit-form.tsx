@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { jstDate } from '@/lib/jst-datetime';
 import { RowActions } from '@/components/shared/row-actions';
 import { RowMenu } from '@/components/shared/row-actions';
@@ -24,7 +25,7 @@ import { notifyToast } from '@/components/shared/toast';
 import Select from '@/components/shared/select';
 import Checkbox from '@/components/shared/checkbox';
 import { Field, TextInput } from '@/components/shared/form-controls';
-import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor';
+import EventQuestionsEditor from '@/components/events/event-questions-editor';
 import DateField from '@/components/shared/date-field';
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
 import { TimeField } from '@/components/shared/date-time-field';
@@ -35,7 +36,7 @@ import ListState from '@/components/shared/list-state';
 import { Tabs } from '@/components/shared/tabs';
 import { TextArea } from '@/components/shared/text-field';
 import { EVENT_CANCEL_DEADLINE_OPTIONS, EVENT_DEFAULT_DRAFT, EVENT_DESCRIPTION_MAX_LENGTH, EVENT_ENTRY_CUTOFF_OPTIONS, EVENT_NAME_MAX_LENGTH, deadlineOptionsWithSaved, deadlineSelectValue, parseDeadlineSelect } from '@/components/events/event-draft-shared';
-import { formatDateTime, formatDay, formatTime } from '@/lib/format';
+
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { AddSlotDialog, EditSlotDialog } from "./edit-form-gap-parts"
@@ -285,7 +286,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       setError(
         e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
           ? '別の画面でイベントが更新されました。開き直してからもう一度保存してください。'
-          : e instanceof Error ? e.message : String(e),
+          : describeApiFailure(e, '保存'),
       )
     } finally {
       setSaving(false)
@@ -670,7 +671,7 @@ function SlotsTab({
       await updateSlotWithConflictRefresh(s, { is_active: s.is_active === 1 ? 0 : 1 })
       await refresh()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(describeApiFailure(e, '保存'))
     } finally {
       setBusy(false)
     }
@@ -875,7 +876,7 @@ export function BulkSlotDialog({
       })
     } catch (e) {
       saveErrors.capture(e)
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(describeApiFailure(e, '保存'))
     } finally {
       submitLock.current = false
       setBusy(false)

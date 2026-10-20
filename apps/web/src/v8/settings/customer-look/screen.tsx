@@ -60,7 +60,7 @@ export default function CustomerLookScreen() {
   help="予約・回答フォーム・履歴・スタンプなど、お客さまに見える画面のデザインを決めます。型を選ぶと右の見本が変わり、保存するとお客さまの画面に反映されます。"
   preview={status==='ready'?<CustomerLookPreview look={draft} accountName={selectedAccount?.name??'公式アカウント'}/>:undefined}
   saveStatus={error?<><FieldError id="customer-look-save-error">{error}</FieldError>{conflict?<Button disabled={saving} onClick={()=>void reloadLatest()}>最新を読み直す</Button>:null}</>:undefined}
-  saveActions={canEdit&&status==='ready'?<><Button disabled={saving||!dirty} disabledReason={saving ? '保存しています' : !dirty ? '変更していません' : undefined} onClick={()=>guard.guarded(()=>{if(saved)setDraft(saved);setError('')})}>キャンセル</Button><Button variant="primary" disabled={!dirty||!!conflict} disabledReason={conflict ? '最新のデザインを読み直してから保存してください' : !dirty ? '変更していません' : undefined} busy={saving} onClick={()=>void save()}>保存する</Button></>:undefined}>
+  saveActions={canEdit&&status==='ready'?<><Button disabled={saving||!dirty} disabledReason={saving ? '保存しています' : !dirty ? '変更していません' : undefined} onClick={()=>guard.guarded(()=>{if(saved)setDraft(saved);setError('')})}>キャンセル</Button><Button variant="primary" disabled={!dirty||!!conflict} disabledReason={conflict ? '最新のデザインを読み直してから保存してください' : !dirty ? '変更していません' : undefined} busy={saving} onClick={()=>save()}>保存する</Button></>:undefined}>
    {!selectedAccountId?<ListState kind="empty" title="店を選んでください"/>:status==='loading'?<ListState kind="loading" title="デザインを読み込んでいます"/>:status==='error'?<ListState kind="error" title={error} action={<Button onClick={()=>setRetry(current=>current+1)}>もう一度読み込む</Button>}/>:<>
     {!canEdit?<ReadOnlyNotice/>:null}
     <Card padding="roomy" layout="vertical" gap="normal"><SectionHeader title="デザインの型" description="型を押すと、右の見本がすぐ変わります"/>

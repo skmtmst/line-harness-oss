@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { viewName, isGranted, PRESETS, monthStart, daysAgo } from './history-model'
 import { validateHistoryPeriod } from './history-period'
 import DateField from '@/components/shared/date-field'
@@ -16,22 +17,14 @@ import {
   type MileageAdminHistoryItem,
   type MileageHistoryItem,
 } from '@/lib/api'
-import { formatNumber } from '@/lib/format'
+
 import { csvCell } from '@/lib/presentation'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import {
-  formatMileageChange,
-  formatMileageShortDateTime,
-  mileageEntryTypeLabel,
-  mileagePaginationTotal,
-  mileageSourceLabel,
-  mileageSourceNoteText,
-  mileageStatusLabel,
-} from './display'
+import { mileagePaginationTotal } from './display'
 import HistoryTable from './history-table'
 import HistoryStats from './history-stats'
 import HistoryPager from './history-pager'
@@ -40,7 +33,7 @@ import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, Too
 import styles from './mileage.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
-import { emptyValue } from '@/components/shared/empty-value'
+
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 export default function HistoryTab() {
@@ -214,7 +207,7 @@ export default function HistoryTab() {
       setPendingReason('')
       await load()
     } catch (caught) {
-      setPendingError(caught instanceof Error ? caught.message : '処理できませんでした。もう一度お試しください。')
+      setPendingError(describeApiFailure(caught, '保存'))
     } finally {
       setPendingBusy(false)
     }

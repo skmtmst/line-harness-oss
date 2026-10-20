@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Link from '@/components/shared/list-navigation'
@@ -280,7 +281,7 @@ export default function NewReminderV8() {
         return null
       }
       // 機械の文（API error: 500）は出さず、何が起きた・どうすればよいかを出す（動きの点検 7 番）。
-      if (!silent) { if (!fieldFailure) setError(caught instanceof Error ? humanizeErrorText(caught.message) : '下書きを保存できませんでした') }
+      if (!silent) { if (!fieldFailure) setError(humanizeErrorText(describeApiFailure(caught, '下書きの保存'))) }
       return null
     } finally {
       saveInFlight.current = null

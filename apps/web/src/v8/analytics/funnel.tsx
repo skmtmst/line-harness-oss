@@ -1,6 +1,7 @@
 'use client'
 
-import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { FunnelChart } from '@/components/shared/charts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowDownRight, CalendarClock, Flag, LogIn, Plus, RefreshCw, Send, Users } from 'lucide-react'
@@ -174,7 +175,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
 
       const code = error instanceof Error ? error.message : ''
       { if (!fieldFailure)
-      setRunError(explainStartError(code, code || '再集計できませんでした')) }
+      setRunError(explainStartError(code, describeApiFailure(error, '再集計'))) }
     } finally {
       runningScopes.current.delete(scope)
       if (generation === viewGeneration.current) setRunning(false)
@@ -293,7 +294,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       if (generation !== viewGeneration.current) return
       const fieldFailure = saveErrors.capture(error)
       { if (!fieldFailure)
-      setRunError(explainStartError(error instanceof Error ? error.message : '', '対象者を準備できませんでした')) }
+      setRunError(explainStartError(error instanceof Error ? error.message : '', describeApiFailure(error, '対象者の準備'))) }
     } finally { setAudienceBusy(false) }
   }
 

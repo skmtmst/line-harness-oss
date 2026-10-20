@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, api, type NenColumn } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -147,7 +148,7 @@ export default function ColumnIntros() {
         setSaveError({ id: column.id, message: 'ほかの人が先に保存しました。最新の内容を確認してから、もう一度保存してください。入力した内容はそのまま残っています。' })
         return
       }
-      setSaveError({ id: column.id, message: e instanceof Error ? e.message : '保存に失敗しました。時間をおいてもう一度お試しください。' })
+      setSaveError({ id: column.id, message: describeApiFailure(e, '保存') })
     } finally {
       saveLocks.current.delete(column.id)
       setSavingId(null)

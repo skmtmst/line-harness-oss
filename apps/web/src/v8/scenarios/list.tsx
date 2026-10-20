@@ -1,8 +1,8 @@
 'use client'
 import FolderSelect from '@/components/shared/folder-select'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { useStaffRole } from '@/lib/staff-role';
+import ListToolbar from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -16,12 +16,12 @@ import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag,
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Bookmark, CalendarPlus, CheckCheck, Copy, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, Users, Workflow } from 'lucide-react';
+import { Bookmark, CalendarPlus, CheckCheck, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, Square, Users, Workflow } from 'lucide-react';
 
 
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Eye, TriangleAlert } from 'lucide-react';
+
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared';
 import { api, type ListStats } from '@/lib/api';
 import { useOffsetServerList } from '@/lib/use-server-list';
@@ -30,7 +30,7 @@ import { completeReorder } from '@/lib/complete-reorder';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { ROLE_LABELS } from '@/lib/hq-members';
-import { isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { describeApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
 import { NoPermissionBoard } from '@/v8/no-permission/index'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';
@@ -50,14 +50,14 @@ import PageSizeSelect from '@/components/shared/page-size-select'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot';
+
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import type { ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
-import { TextField } from '@/components/shared/text-field';
+
 import { withViewTransition } from '@/components/shared/view-transition';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import Pagination from '@/components/shared/pagination'
@@ -66,7 +66,7 @@ import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs';
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls';
+
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors';
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
@@ -574,7 +574,7 @@ export default function ScenariosListV8() {
       if (e instanceof DuplicateAborted) {
         setDuplicateError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが一覧に残っています。`)
       } else {
-        setDuplicateError(e instanceof Error && e.message ? e.message : '複製に失敗しました。通信を確かめて、もう一度お試しください。')
+        setDuplicateError(describeApiFailure(e, '複製'))
       }
       void loadScenarios()
     } finally {

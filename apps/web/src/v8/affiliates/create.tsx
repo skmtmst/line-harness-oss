@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const FIELD_REQUIREMENTS = {
   name: requiredText("名前・屋号を入力してください"),
@@ -312,7 +313,7 @@ export default function CreateAffiliateV8() {
       const fieldFailure = saveErrors.capture(caught);
 
 
-      const message = caught instanceof ApiError ? describeSaveFailure(caught) : caught instanceof Error ? caught.message : '保存できませんでした'
+      const message = caught instanceof ApiError ? describeSaveFailure(caught) : describeApiFailure(caught, '保存')
       if (message.includes('既に使われています')) {
         setFieldErrors({ code: message })
         focusField('code')

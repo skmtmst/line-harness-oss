@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
@@ -174,7 +175,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
       { if (!fieldFailure)
 
 
-      setError(caught instanceof Error && caught.message ? caught.message : '予約を入れられませんでした。もう一度お試しください。') }
+      setError(describeApiFailure(caught, '保存')) }
     } finally {
       setBusy(false)
     }

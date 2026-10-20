@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ManualPublishAttempt } from '@/v8/rich-menus/edit/manual-publish-attempt'
 import {
 clearPublishPlanDraft
@@ -72,7 +73,7 @@ export async function publishMenuNow({ audience, group, loadChecks, persistDraft
         /targetingPriority/.test(raw)
           ? '出す順番は1以上の整数で入力してください。小数は使えません。'
           : isValidationMessage
-            ? raw
+            ? describeApiFailure(e, '公開')
             : draftSaved
               ? 'LINEへ登録できませんでした。下書きは保存済みです。LINEへの登録だけもう一度お試しください。'
               : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',

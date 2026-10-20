@@ -1,9 +1,10 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const changeReasonRequirement = requiredText('変更理由を入力してください。')
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { MediaDeleteImpactReference, MediaItem } from '@line-crm/shared'
-import { ApiError, api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
+import { api, type MediaVersionBlocker, type MediaVersionPreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import MediaSlot from '@/components/shared/media-slot'
@@ -187,7 +188,7 @@ export default function MediaDetailDialog({
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setDownloadError(caught instanceof Error ? caught.message : 'ダウンロードできませんでした') }
+      setDownloadError(describeApiFailure(caught, 'ダウンロード')) }
     } finally {
       setDownloading(false)
     }
@@ -210,7 +211,7 @@ export default function MediaDetailDialog({
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setVersionDownloadError(caught instanceof Error ? caught.message : 'この版をダウンロードできませんでした') }
+      setVersionDownloadError(describeApiFailure(caught, 'ダウンロード')) }
     } finally {
       setDownloadingVersion(null)
     }
@@ -241,9 +242,7 @@ export default function MediaDetailDialog({
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setTermsError(caught instanceof ApiError || caught instanceof Error
-        ? caught.message
-        : '利用期限・同意の記録を保存できませんでした') }
+      setTermsError(describeApiFailure(caught, '保存')) }
     } finally {
       setTermsBusy(false)
     }
@@ -298,9 +297,7 @@ export default function MediaDetailDialog({
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setUsageError(caught instanceof ApiError || caught instanceof Error
-        ? caught.message
-        : '参照方法を切り替えられませんでした') }
+      setUsageError(describeApiFailure(caught, '切り替え')) }
     } finally {
       setUsageSwitching(null)
     }
@@ -387,9 +384,7 @@ export default function MediaDetailDialog({
       const fieldFailure = saveErrors.capture(caught)
       setVersionPhase('error')
       { if (!fieldFailure)
-      setVersionError(caught instanceof ApiError || caught instanceof Error
-        ? caught.message
-        : '差し替え内容を確認できませんでした') }
+      setVersionError(describeApiFailure(caught, '読み込み')) }
     }
   }
 
@@ -410,9 +405,7 @@ export default function MediaDetailDialog({
       const fieldFailure = saveErrors.capture(caught)
       setVersionPhase('preview')
       { if (!fieldFailure)
-      setVersionError(caught instanceof ApiError || caught instanceof Error
-        ? caught.message
-        : '新しい版を追加できませんでした') }
+      setVersionError(describeApiFailure(caught, '保存')) }
     }
   }
 

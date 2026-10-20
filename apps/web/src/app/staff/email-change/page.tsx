@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -44,7 +45,7 @@ export default function StaffEmailChangePage() {
       setToken('')
       setView('complete')
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'メールアドレスの変更を確定できませんでした。')
+      setError(describeApiFailure(caught, '保存'))
       setView('ready')
     }
   }

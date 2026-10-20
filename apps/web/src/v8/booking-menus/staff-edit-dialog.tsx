@@ -1,9 +1,10 @@
 'use client'
-import { useOverlayFocus } from '@/components/shared/overlay-utils';
+import { describeApiFailure } from '@/components/shared/api-error-message'
+
 
 import { Field } from '@/components/shared/form-controls'
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
+
 import { BOOKING_STAFF_LIMITS, parseBookingStaffInput, type StaffMember } from '@line-crm/shared'
 import {useAccount} from '@/contexts/account-context'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
@@ -70,7 +71,7 @@ export function StaffEditModal({
       await onSave(form.id ? { id: form.id, ...parsed.value } : parsed.value)
     } catch (e) {
       saveErrors.capture(e)
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(describeApiFailure(e, '保存'))
     } finally {
       setSaving(false)
     }

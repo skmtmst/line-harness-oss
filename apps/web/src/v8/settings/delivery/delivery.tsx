@@ -7,7 +7,7 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
-import { usePreparingDialog } from '@/components/shared/preparing-dialog'
+import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
@@ -261,7 +261,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         <PageHeading
           headingSize="compact"
           title="デリバリー連携"
-          help={`Uber Eats・出前館・ロケットナウに入った注文を、musubo の「デリバリー受注」画面にまとめて取り込みます。${
+          help={`デリバリーサービスへの接続を設定します。Uber Eats の接続が完了しても、注文の取り込み・受注操作・営業状態の変更・メニューの同期はまだ利用できません。${
             anyConnected
               ? 'つながっているサービスの状態をここに出します。お店での入力はありません。うまくいっていない時は musubo が原因を確認し、必要な手続きを行います。'
               : 'お店での入力はありません。Uber Eats は「ログインしてつなぐ」を押して Uber Eats の画面で許可するだけ、出前館とロケットナウは「連携を申し込む」を押すだけです。鍵・接続先アドレス・通知の設定は、すべて musubo 側で行います。'
@@ -280,7 +280,14 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                   <p className={styles.cardSub}>{service.sub}</p>
                 </div>
 
-                <CustomerInfoRows rows={[{ label: 'いまの状態', value: <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge> }]} />
+                <CustomerInfoRows rows={[
+                  { label: '接続の状態', value: <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge> },
+                  ...(service.id === 'uber' ? [{ label: '注文の連携', value: (
+                    <Button size="compact" onClick={() => preparing.open('Uber Eats の注文の連携')}>
+                      {`注文の連携は${PREPARING_WORD}`}
+                    </Button>
+                  ) }] : []),
+                ]} />
 
                 {/* 状態の注記は自作の色分け（`.note[data-tone]`）をやめ、共通の帯（Notice）に任せる
                     （B-172 status-badge）。つなぐ手順の案内は色の意味を持たないので真珠色の囲みのまま。 */}
@@ -359,7 +366,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         footerDivider
         tone="destructive"
         title={`${withParticle(disconnecting?.name ?? '', 'の')}連携を解除しますか`}
-        description={`${withParticle(disconnecting?.name ?? '', 'との')}つなぎを外します。これから入る注文は「デリバリー受注」に届かなくなります。すでに届いている注文はそのまま残ります。`}
+        description={`${withParticle(disconnecting?.name ?? '', 'との')}つなぎを外します。保存済みの注文や過去の履歴はそのまま残ります。`}
         confirmLabel="解除する"
         onConfirm={disconnect}
         onCancel={() => setDisconnecting(null)}
@@ -401,7 +408,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           ))}
         </RadioCardGroup>
         <p className={styles.note}>
-          選んだお店の注文が「デリバリー受注」に届きます。あとから変えるときは、この画面で一度解除してからもう一度ログインしてください。
+          選んだお店への接続を設定します。注文の連携はまだ利用できません。あとから変えるときは、この画面で一度解除してからもう一度ログインしてください。
         </p>
       </Dialog>
       {preparing.dialog}

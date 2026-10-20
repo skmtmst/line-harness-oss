@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { memberRanksApi } from '@/lib/api/helpers/gap3';
 import { useOverlayLayer } from '@/components/shared/overlay-utils';
 import TagOverflow from '@/components/shared/tag-overflow';
@@ -7,7 +8,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react';
 import TagPill from '@/components/shared/tag-pill';
 import type { SavedSearchCondition, Scenario, Tag } from '@line-crm/shared';
-import { api, type FriendListParams } from '@/lib/api';
+import { api } from '@/lib/api';
 import { conditionsToEditorState, describeSavedCondition, describeSavedVisibility, editorStateToConditions, hasSavedSearchFilter, type FriendSearchBlock, type FriendSearchEditorState, type FriendVisibilityChoice, type SavedSearchConditionLabels } from './saved-search-utils';
 import { TextInput } from '@/components/shared/form-controls';
 import DateField from '@/components/shared/date-field';
@@ -402,7 +403,7 @@ export default function AdvancedSearchDialog({
     } catch (error) {
       const fieldFailure = saveErrors.capture(error)
 
-      { if (!fieldFailure) setSaveError(error instanceof Error ? error.message : '条件を保存できませんでした') }
+      { if (!fieldFailure) setSaveError(describeApiFailure(error, '保存')) }
     } finally {
       setSaving(false)
     }

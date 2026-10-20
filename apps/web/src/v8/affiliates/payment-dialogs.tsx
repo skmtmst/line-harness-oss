@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useState } from 'react'
 import { CircleHelp, Download, Lock } from 'lucide-react'
 import {
@@ -70,7 +71,7 @@ export function SettlementCloseDialog({
 
 
       if (!fieldFailure) {
-      setError(cause instanceof Error ? cause.message : '締め処理を完了できませんでした') }
+      setError(describeApiFailure(cause, '締め処理')) }
     } finally {
       setBusy(false)
     }
@@ -185,7 +186,7 @@ export function PayoutStepUpDialog({
       onExported(exported.data.downloadUrl)
       onClose()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '銀行用CSVを出力できませんでした')
+      setError(describeApiFailure(cause, 'CSVの出力'))
     } finally {
       setBusy(false)
     }

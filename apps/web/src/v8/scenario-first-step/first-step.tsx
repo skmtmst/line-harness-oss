@@ -1,7 +1,7 @@
 'use client'
-import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { useStaffRole } from '@/lib/staff-role';
 import { jstDate } from '@/lib/jst-datetime';
-import { formatDate as polishFormatDate, formatNumber } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
 import { notifySaved } from '@/components/shared/toast';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useEffect, useRef, useState } from 'react';
@@ -47,7 +47,7 @@ import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
 import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
-import { permissionDeniedMessage } from '@/components/shared/api-error-message';
+
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -589,7 +589,7 @@ export default function ScenarioFirstStepV8() {
             <Button
               variant="primary"
               type="button"
-              onClick={() => void submit()}
+              onClick={() => submit()}
               disabled={saving || bodyOverLimit}
               busy={saving}
               busyLabel="保存中…"

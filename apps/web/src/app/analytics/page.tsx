@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import AnalyticsV8, { type AnalyticsSlotsV8 } from '@/v8/analytics/analytics'
 import FunnelFormV8 from '@/v8/analytics/funnel-form'
 import { useEffect, useState } from 'react'
@@ -83,7 +84,7 @@ function SaveAnalysisAction({
       setSaved(true)
       setOpen(false)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '分析結果を保存できませんでした')
+      setError(describeApiFailure(caught, '保存'))
     } finally {
       setSaving(false)
     }

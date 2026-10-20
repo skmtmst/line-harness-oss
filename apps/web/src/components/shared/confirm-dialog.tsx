@@ -121,7 +121,7 @@ export default function ConfirmDialog({
   const [executing, setExecuting] = useState(false)
   const [executionError, setExecutionError] = useState('')
   const lock = useRef(false)
-  const runConfirm = onConfirm ? async () => {
+  const runConfirm = onConfirm ? () => {
     if (lock.current || busy) return
     lock.current = true
     setExecutionError('')
@@ -129,14 +129,17 @@ export default function ConfirmDialog({
       const pending = onConfirm() as unknown
       if (pending && typeof (pending as PromiseLike<unknown>).then === 'function') {
         setExecuting(true)
-        await pending
+        return Promise.resolve(pending).catch(() => {
+          setExecutionError('実行できませんでした。もう一度お試しください。')
+        }).finally(() => {
+          lock.current = false
+          setExecuting(false)
+        })
       }
     } catch {
       setExecutionError('実行できませんでした。もう一度お試しください。')
-    } finally {
-      lock.current = false
-      setExecuting(false)
     }
+    lock.current = false
   } : undefined
 
   /*

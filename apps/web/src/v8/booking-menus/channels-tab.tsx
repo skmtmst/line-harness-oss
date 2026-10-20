@@ -157,7 +157,7 @@ export function ConflictDialog({
       notifyToast(notify ? `${targetName}へ移して知らせました。` : `${targetName}へ移しました。`)
       onDone()
     } catch (e) {
-      setError(describeApiFailure(e, '移せませんでした。空きを確かめてやり直してください。'))
+      setError(`${describeApiFailure(e, '予約の移動')} 空きを確かめてやり直してください。`)
     } finally {
       setBusy(false)
     }

@@ -402,7 +402,7 @@ describe('saveCarousel', () => {
 
     const result = await Testing.saveCarousel(baseInput, { create, update } as never)
 
-    expect(result).toEqual({ ok: false, error: 'network down', createdId: 'tpl-new' })
+    expect(result).toEqual({ ok: false, error: '保存に失敗しました。時間をおいて、もう一度お試しください。', createdId: 'tpl-new' })
   })
 
   it('作成済み id を渡した再試行は、作成せず更新だけを送る', async () => {

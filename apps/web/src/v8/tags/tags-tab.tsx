@@ -5,11 +5,11 @@ import { useActionError } from '@/lib/use-action-error'
 import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
-import { Bookmark, Check, CircleDashed, Folder, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react';
+import { Bookmark, Check, CircleDashed, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { RowNameLink } from '@/components/shared/table';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { AlertCircle } from 'lucide-react';
+
 import type { Tag, TagGroup } from '@line-crm/shared';
 import { api, ApiError, type ListStats } from '@/lib/api';
 import { useRowLeaving } from '@/lib/use-row-leaving';
@@ -445,7 +445,7 @@ export default function TagsTab({
       const fieldFailure = saveErrors.capture(reason)
       setGroups(previous);
 
-      const message = reason instanceof Error ? reason.message : '並び順を変更できませんでした'
+      const message = describeApiFailure(reason, '保存')
       { if (!fieldFailure)
       setFolderError(message) }
       notifyToast(message, {
@@ -473,7 +473,7 @@ export default function TagsTab({
       const fieldFailure = saveErrors.capture(reason)
 
       { if (!fieldFailure)
-      setFolderError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした') }
+      setFolderError(describeApiFailure(reason, '削除')) }
     } finally {
       setFolderBusy(false)
     }
@@ -675,7 +675,7 @@ export default function TagsTab({
   const table = status === 'forbidden' ? (
     <ListState kind="error" title="タグを見る権限がありません" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。"  />
   ) : status === 'error' ? (
-    <ListState kind="error" title="タグを読み込めませんでした" description="再読み込みしても直らない場合はエラー報告へ。" data-design-node="U0aKD" action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
+    <ListState kind="error" title="タグを読み込めませんでした" description="再読み込みしても直らない場合はエラー報告へ。" data-design-node="U0aKD" action={<><Button type="button" onClick={() => void load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : ready && visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList

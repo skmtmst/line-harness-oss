@@ -16,6 +16,7 @@ import Checkbox from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListToolbar from '@/components/shared/list-toolbar'
+import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
 import Pagination from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -165,14 +166,18 @@ function ServiceCard({
   busy,
   onStop,
   onResume,
+  uberConnectionStatus,
 }: {
   state: DeliveryServiceState
+  uberConnectionStatus: DeliveryConnectionStatus | null
   canManage: boolean
   busy: boolean
   onStop: (service: DeliveryService) => void
   onResume: (service: DeliveryService) => void
 }) {
   const label = state.label || DELIVERY_SERVICE_LABELS[state.service]
+  const preparing = state.service === 'ubereats'
+  const connectionStatus = preparing ? uberConnectionStatus : state.connectionStatus
   const stopped = state.intakeStatus === 'stopped'
   /* 絵（kDQHr）の札は1行。いつまで止めているかは札の説明に入れ、行を増やさない。 */
   const stopNote = stopped && state.stopUntil ? `${formatClock(state.stopUntil)} まで停止` : undefined
@@ -192,6 +197,8 @@ function ServiceCard({
             <Button
               size="compact"
               textTone="accent"
+              disabled={preparing}
+              title={preparing ? PREPARING_WORD : undefined}
               busy={busy}
               busyLabel=""
               doneLabel=""
@@ -204,6 +211,8 @@ function ServiceCard({
             <Button
               size="compact"
               textTone="danger"
+              disabled={preparing}
+              title={preparing ? PREPARING_WORD : undefined}
               aria-label={`${label}の受付を止める`}
               onClick={() => onStop(state.service)}
             >
@@ -214,12 +223,12 @@ function ServiceCard({
       </div>
       <div className={styles.serviceBottom}>
         <span className={styles.serviceBadges}>
-          <StatusBadge tone={CONNECTION_TONES[state.connectionStatus]} size="delivery">
-            {CONNECTION_LABELS[state.connectionStatus]}
+          <StatusBadge tone={connectionStatus ? CONNECTION_TONES[connectionStatus] : 'neutral'} size="delivery">
+            {connectionStatus ? CONNECTION_LABELS[connectionStatus] : '接続未確認'}
           </StatusBadge>
-          <span title={stopNote}>
-            <StatusBadge tone={INTAKE_TONES[state.intakeStatus]} size="delivery">
-              {INTAKE_LABELS[state.intakeStatus]}
+          <span title={preparing ? undefined : stopNote}>
+            <StatusBadge tone={preparing ? 'neutral' : INTAKE_TONES[state.intakeStatus]} size="delivery">
+              {preparing ? PREPARING_WORD : INTAKE_LABELS[state.intakeStatus]}
             </StatusBadge>
           </span>
         </span>
@@ -263,6 +272,7 @@ function OrderRow({
   onReject: (order: DeliveryOrderSummary) => void
   onReady: (order: DeliveryOrderSummary) => void
 }) {
+  const preparing = order.service === 'ubereats'
   const [menuOpen, setMenuOpen] = useState(false)
   /* 行の右端：主な操作は1つだけボタン、残りは「…」（共通の ActionCell。オーナー決定 ）。 */
   const openItem = { id: 'open', label: '詳細を見る', onSelect: () => onOpen(order.id) }
@@ -325,6 +335,8 @@ function OrderRow({
                 variant="primary"
                 size="compact"
                 busy={busy}
+                disabled={preparing}
+                title={preparing ? PREPARING_WORD : undefined}
                 busyLabel="受付中"
                 doneLabel="受付済"
                 aria-label={`注文${order.orderNumber}を受け付ける`}
@@ -337,7 +349,7 @@ function OrderRow({
                 label={`注文${order.orderNumber}のその他の操作`}
                 open={menuOpen}
                 onOpenChange={setMenuOpen}
-                items={[openItem, { id: 'reject', label: '断る', disabled: busy, onSelect: () => onReject(order) }]}
+                items={[openItem, { id: 'reject', label: '断る', disabled: busy || preparing, onSelect: () => onReject(order) }]}
               />
             </>
           ) : order.status === 'cooking' && canManage ? (
@@ -346,6 +358,8 @@ function OrderRow({
                 size="compact"
                 textTone="accent"
                 busy={busy}
+                disabled={preparing}
+                title={preparing ? PREPARING_WORD : undefined}
                 busyLabel="変更中"
                 doneLabel="準備済"
                 aria-label={`注文${order.orderNumber}を準備完了にする`}
@@ -378,6 +392,7 @@ function OrderRow({
 
 export interface OrdersBoardProps {
   data: DeliveryOrdersData
+  uberConnectionStatus: DeliveryConnectionStatus | null
   /** 見せているページ（1から）と1ページの件数（10・20・50）。 */
   page: number
   perPage: number
@@ -410,6 +425,7 @@ export interface OrdersBoardProps {
 
 export default function OrdersBoard({
   data,
+  uberConnectionStatus,
   page,
   perPage,
   busyOrderId,
@@ -443,7 +459,7 @@ export default function OrdersBoard({
    * まとめ送りの口はWorkerに無いので、親が1件ずつ順に送る（絵の操作は変えない）。
    */
   const selectedSet = new Set(selected)
-  const selectableIds = visible.filter((order) => order.status === 'new').map((order) => order.id)
+  const selectableIds = visible.filter((order) => order.status === 'new' && order.service !== 'ubereats').map((order) => order.id)
   const checkedCount = selectableIds.filter((id) => selectedSet.has(id)).length
   const allChecked = selectableIds.length > 0 && checkedCount === selectableIds.length
   const someChecked = checkedCount > 0 && !allChecked
@@ -463,6 +479,7 @@ export default function OrdersBoard({
           <ServiceCard
             key={state.service}
             state={state}
+            uberConnectionStatus={uberConnectionStatus}
             canManage={canManage}
             busy={busyService === state.service}
             onStop={onStopService}
@@ -561,7 +578,7 @@ export default function OrdersBoard({
               busy={busyOrderId === order.id || bulkBusy}
               canManage={canManage}
               checked={selectedSet.has(order.id)}
-              selectable={canManage && order.status === 'new'}
+              selectable={canManage && order.status === 'new' && order.service !== 'ubereats'}
               onToggleSelect={onToggleSelect}
               onOpen={onOpenOrder}
               onAccept={onAccept}

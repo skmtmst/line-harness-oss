@@ -3,10 +3,14 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ create: vi.fn(), send: vi.fn(), get: vi.fn(), request: vi.fn(), preflight: vi.fn(), config: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: {
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  const mocked = await (() => ({ api: {
   tags: { list: async () => ({ success: true, data: [{ id: 'tag-a', name: '購入者' }] }) },
   broadcasts: { ...mocks, approval: { config: mocks.config, request: mocks.request, candidates: async () => ({ success: true, data: [{ id: 'owner', name: '担当', role: 'owner' }] }) } },
-} }))
+} }))()
+  return { ...actual, ...mocked }
+})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
 vi.mock('@/components/shared/select', () => ({ default: ({ value, onChange, options, ...props }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; 'aria-label': string }) => <select aria-label={props['aria-label']} value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> }))

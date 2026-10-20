@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
 import { Check, Trash2 } from 'lucide-react'
@@ -163,7 +164,7 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
-      setMessage({ text: `JSON が不正です: ${err instanceof Error ? err.message : String(err)}`, error: true }) }
+      setMessage({ text: `JSON が不正です: ${describeApiFailure(err, '保存')}`, error: true }) }
     }
   }
 

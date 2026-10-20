@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
@@ -87,9 +88,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       setLoadError(
         caught instanceof TypeError
           ? '通信できませんでした。ネットワークを確認してもう一度お試しください'
-          : caught instanceof Error && caught.message
-            ? caught.message
-            : '運営コンソールを読み込めませんでした',
+          : describeApiFailure(caught, '読み込み', { scope: 'hq' }),
       )
       setChecked(true)
       return
@@ -104,9 +103,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       setMeError(
         caught instanceof TypeError
           ? '通信できませんでした。ネットワークを確認してもう一度お試しください'
-          : caught instanceof Error && caught.message
-            ? caught.message
-            : '担当者の情報を読み込めませんでした',
+          : describeApiFailure(caught, '読み込み', { scope: 'hq' }),
       )
     }
     setChecked(true)

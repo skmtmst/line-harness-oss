@@ -1,13 +1,13 @@
 'use client'
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
+
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { createPageReturnHref } from '@/components/shared/create-page';
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlignLeft, ArrowLeft, CalendarClock, CalendarDays, Hash, Image as ImageIcon, Link2, ToggleLeft, Type, Upload } from 'lucide-react';
+import { AlignLeft, CalendarClock, CalendarDays, Hash, Image as ImageIcon, Link2, ToggleLeft, Type, Upload } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Copy, Eye } from 'lucide-react';
+
 import type { Folder } from '@line-crm/shared';
 import { api, ApiError, describeSaveFailure } from '@/lib/api';
 import { commonVarValueError, isSecretLikeVarValue, COMMON_VAR_VALUE_REQUIRED } from '@/lib/common-vars';
@@ -424,14 +424,14 @@ export default function NewCommonVarV8() {
           {/* 閲覧のみには押せない保存を置かない（隠す）。 */}
           {canWrite ? (
             <>
-              <Button type="button" disabled={saveDisabled} onClick={() => void save(false, true)} busy={Boolean(saving)} busyLabel="処理中…">
+              <Button type="button" disabled={saveDisabled} onClick={() => save(false, true)} busy={Boolean(saving)} busyLabel="処理中…">
                 下書きを保存
               </Button>
               <Button
                 type="button"
                 variant="primary"
                 disabled={saveDisabled}
-                onClick={() => void save()}
+                onClick={() => save()}
                 busy={saving}
                 busyLabel="保存中…"
               >
@@ -660,7 +660,7 @@ export default function NewCommonVarV8() {
             >
               入力に戻って修正する
             </Button>
-            <Button type="button" disabled={saving} onClick={() => void save(true)} busy={Boolean(saving)} busyLabel="処理中…">
+            <Button type="button" disabled={saving} onClick={() => save(true)} busy={Boolean(saving)} busyLabel="処理中…">
               内容を確認して登録する
             </Button>
           </div>
