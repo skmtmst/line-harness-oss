@@ -192,7 +192,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     await act(async () => { root.render(<NewPage />) })
     await flush()
 
-    expect(text()).toContain('選択肢を読み込めませんでした')
+    expect(text()).toContain('読み込みに失敗しました')
     expect(buttonNamed('選択肢をもう一度読み込む'), '選択肢だけの再取得ボタンがある').toBeTruthy()
     // 失敗時は真の0件（選べる◯◯がありません）と混ぜない。
     expect(text()).not.toContain('選べるタグがありません')
@@ -207,7 +207,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     net.resourcesMode = 'failing-then-ok'
     await act(async () => { root.render(<NewPage />) })
     await flush()
-    expect(text()).toContain('選択肢を読み込めませんでした')
+    expect(text()).toContain('読み込みに失敗しました')
 
     // 未保存の入力を入れてから再取得する。
     const nameInput = container.querySelector('input') as HTMLInputElement | null
@@ -222,7 +222,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     await flush()
 
     // 失敗文は消え、入力は保たれる。
-    expect(text()).not.toContain('選択肢を読み込めませんでした')
+    expect(text()).not.toContain('読み込みに失敗しました')
     expect((container.querySelector('input') as HTMLInputElement).value).toBe('監査の記録')
     // 候補が戻る（空でない取得なので真の0件の文は出ない）。共有Selectは
     // 閉じている間は候補名を描かないため、0件文の不在で戻りを確かめる。
@@ -237,7 +237,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     await act(async () => { root.render(<NewPage />) })
     await flush()
 
-    expect(text()).not.toContain('選択肢を読み込めませんでした')
+    expect(text()).not.toContain('読み込みに失敗しました')
     await act(async () => { (container.querySelector('[data-action-row] button[aria-expanded]') as HTMLButtonElement).click() })
     expect(text()).toContain('選べるタグがありません')
     const save = buttonNamed('下書きを保存')

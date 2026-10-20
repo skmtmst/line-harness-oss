@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const FIELD_REQUIREMENTS = {
   name: requiredText("名前・屋号を入力してください"),
@@ -312,7 +313,7 @@ export default function CreateAffiliateV8() {
       const fieldFailure = saveErrors.capture(caught);
 
 
-      const message = caught instanceof ApiError ? describeSaveFailure(caught) : caught instanceof Error ? caught.message : '保存できませんでした'
+      const message = caught instanceof ApiError ? describeSaveFailure(caught) : describeApiFailure(caught, '保存')
       if (message.includes('既に使われています')) {
         setFieldErrors({ code: message })
         focusField('code')
@@ -370,10 +371,10 @@ export default function CreateAffiliateV8() {
       status={saving ? '登録しています' : partialSave ? '基本情報は保存済み・追加情報は未保存' : 'まだ保存していません'}
       footerActions={<>
         <Button href={LIST_PATH}>キャンセル</Button>
-        {canEdit ? <><Button variant="secondary" disabled={saving} busy={saving} busyLabel="保存しています" onClick={() => void runSave('continue')}>
+        {canEdit ? <><Button variant="secondary" disabled={saving} busy={saving} busyLabel="保存しています" onClick={() => runSave('continue')}>
           {partialSave ? '追加情報の保存を再開する' : '保存して続けて作る'}
         </Button>
-        <Button variant="primary" disabled={saving} busy={saving} busyLabel="登録しています" onClick={() => void runSave('finish')}>
+        <Button variant="primary" disabled={saving} busy={saving} busyLabel="登録しています" onClick={() => runSave('finish')}>
           <Check size={15} aria-hidden="true" /> 登録して紹介リンクを発行する
         </Button>
       </> : null}</>} dirty={false}

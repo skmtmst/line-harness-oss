@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
@@ -211,7 +212,7 @@ function OneTimeResultView({ accountId, schedule, runs, canManage, onRetryDone }
       notifyToast('送り直しを受け付けました。結果はこの画面で確認できます。')
       onRetryDone()
     } catch (caught) {
-      setRetryError(caught instanceof Error ? caught.message : '送り直しを受け付けられませんでした')
+      setRetryError(describeApiFailure(caught, '保存'))
     } finally {
       setRetrying(false)
     }

@@ -14,6 +14,7 @@
  *   4. 開始のきっかけを写す
  *   5. アクションを写す（通にぶら下がるものは写した先の通へ張り替える）
  */
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { DeliveryMode } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
@@ -28,7 +29,7 @@ export class DuplicateAborted extends Error {
     readonly stage: string,
     cause?: unknown,
   ) {
-    super(cause instanceof Error && cause.message ? cause.message : '複製できませんでした')
+    super(describeApiFailure(cause, '複製'))
   }
 }
 
@@ -113,7 +114,7 @@ export async function duplicateScenario(sourceId: string, copyName: string): Pro
       })
       .catch((cause) => ({
         success: false as const,
-        error: cause instanceof Error && cause.message ? cause.message : '通をコピーできませんでした',
+        error: describeApiFailure(cause, '複製'),
       }))
     if (!copied.success) {
       throw new DuplicateAborted(copyId, `${step.stepOrder}通目のコピー`, new Error(copied.error))

@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { daysUntilClose } from './payment-dates'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -179,7 +180,7 @@ export default function PaymentTab() {
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
-      setOperationError(cause instanceof Error ? cause.message : '支払明細を発行できませんでした') }
+      setOperationError(describeApiFailure(cause, '支払明細の発行')) }
     } finally {
       setOperationBusy(false)
     }
@@ -199,7 +200,7 @@ export default function PaymentTab() {
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
-      setOperationError(cause instanceof Error ? cause.message : '振込先を確認できませんでした') }
+      setOperationError(describeApiFailure(cause, '振込先の確認')) }
     } finally {
       setOperationBusy(false)
     }

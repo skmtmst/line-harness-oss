@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const FIELD_REQUIREMENTS = {
   siteDialog_label: requiredText("サイトの名前を入力してください"),
@@ -204,7 +205,7 @@ export default function SiteScriptV8() {
       if (moved()) return
       saveErrors.capture(err);
 
-      const message = err instanceof Error ? err.message : '保存できませんでした'
+      const message = describeApiFailure(err, '保存')
       const field = err instanceof ApiError && err.status === 400
         ? message.includes('ドメイン') ? 'site-domains' : message.includes('サイトの名前') ? 'site-name' : null
         : null
@@ -242,7 +243,7 @@ export default function SiteScriptV8() {
     } catch (err) {
       if (moved()) return
       saveErrors.capture(err)
-      setStopDialog({ ...stopDialog, error: err instanceof Error ? err.message : '停止できませんでした' })
+      setStopDialog({ ...stopDialog, error: describeApiFailure(err, '保存') })
     } finally {
       setSiteBusy(false)
     }
@@ -265,7 +266,7 @@ export default function SiteScriptV8() {
       const fieldFailure = saveErrors.capture(err)
       setResumeTarget(null)
       { if (!fieldFailure)
-      setSiteActionError(err instanceof Error ? err.message : '再開できませんでした') }
+      setSiteActionError(describeApiFailure(err, '保存')) }
     } finally {
       setSiteBusy(false)
     }
@@ -427,7 +428,7 @@ export default function SiteScriptV8() {
                       <p className={styles.faint}>コードを貼ったあと、サイトを開くと数分で表示されます。</p>
                     </>
                   )}
-                  <span><Button onClick={() => load()} busyLabel="処理中…"><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
+                  <span><Button onClick={() => void load()} busyLabel="処理中…"><RefreshCw size={15} aria-hidden="true" />いま届いているか確かめる</Button></span>
                 </div>
                 <DataTable aria-label="ページごとの表示" columnLayout={INFLOW_TABLE_LAYOUT}><thead>
                   <TableHeadRow data-table-layout="columns">

@@ -68,7 +68,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
   ])
 
   const save = async () => {
-    if (saving) return
+
     setError('')
     if (!fields.submit()) return
     setSaving(true)

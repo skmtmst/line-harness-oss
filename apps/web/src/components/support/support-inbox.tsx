@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Avatar from '@/components/shared/avatar'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -400,10 +400,10 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   <p className="mt-1 truncate text-xs text-ink-faint">{detail.thread.customer_name || selected.customerName} · {detail.thread.customer_email}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => void updateStatus('in_progress')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'in_progress' ? 'bg-warning text-on-accent' : 'bg-warning-bg text-warning'}`}>対応中</button>
-                  <button onClick={() => void updateStatus('on_hold')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
-                  <button onClick={() => void updateStatus('resolved')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'resolved' ? 'bg-success text-on-accent' : 'bg-success-bg text-success'}`}>✓ 対応済み</button>
-                  {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs font-semibold text-ink-secondary">再オープン</button>}
+                  <button onClick={() => updateStatus('in_progress')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'in_progress' ? 'bg-warning text-on-accent' : 'bg-warning-bg text-warning'}`}>対応中</button>
+                  <button onClick={() => updateStatus('on_hold')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
+                  <button onClick={() => updateStatus('resolved')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'resolved' ? 'bg-success text-on-accent' : 'bg-success-bg text-success'}`}>✓ 対応済み</button>
+                  {detail.thread.status === 'resolved' && <button onClick={() => updateStatus('unread')} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs font-semibold text-ink-secondary">再オープン</button>}
                 </div>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
@@ -421,7 +421,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-card border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-micro text-ink-faint">From: contact-shed@nen-petfood.com</p>
-                  <Button variant="primary" className="rounded-card px-6 py-2.5 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" onClick={() => void sendReply()} disabled={!reply.trim() || sending}>{sending ? '送信中…' : 'メールで返信'}</Button>
+                  <Button variant="primary" className="rounded-card px-6 py-2.5 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" onClick={() => sendReply()} disabled={!reply.trim() || sending} busy={sending} busyLabel="送信中…" widthReserve="idle">{'メールで返信'}</Button>
                 </div>
               </div>
             </>
@@ -435,7 +435,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
               <p className="text-xs text-ink-secondary">お問い合わせの形式が読み取れませんでした。一覧を読み直してください。</p>
               <button
                 type="button"
-                onClick={() => void loadInbox()}
+                onClick={() => loadInbox()}
                 className="text-sm font-bold text-action underline"
               >
                 もう一度読み込む

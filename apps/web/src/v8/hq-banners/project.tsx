@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
@@ -231,7 +232,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を作れませんでした。もう一度お試しください。') }
+      setGenerationError(describeApiFailure(caught, '画像の登録', { scope: 'hq' })) }
       void loadUsage()
     } finally {
       // 先に最新の状態を読み直してから止める（順を逆にすると、古い「生成中」を見た再開がもう一度状態確認を始める）。
@@ -291,7 +292,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。') }
+      setGenerationError(describeApiFailure(caught, '保存', { scope: 'hq' })) }
       void loadUsage()
     } finally {
       startingRef.current = false
@@ -324,7 +325,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setActionError(caught instanceof Error && caught.message ? caught.message : `${label}できませんでした。もう一度お試しください。`) }
+      setActionError(describeApiFailure(caught, '保存', { scope: 'hq' })) }
       return null
     } finally {
       setBusyAction(null)
@@ -473,7 +474,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setActionError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした') }
+      setActionError(describeApiFailure(caught, '取り込み', { scope: 'hq' })) }
     } finally {
       setUploading(false)
     }
@@ -511,7 +512,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした') }
+      setGenerationError(describeApiFailure(caught, '取り込み', { scope: 'hq' })) }
     } finally {
       setReferenceBusy(false)
     }

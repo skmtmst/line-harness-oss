@@ -57,7 +57,7 @@ describe('統括 バナー生成', () => {
     expect(projectPage).toContain('api.hqBanners.projects.createGeneration(')
     expect(projectPage).toContain('api.hqBanners.generations.get(current.id)')
     expect(projectPage).toContain("if (!['queued', 'running'].includes(current.status)) break")
-    expect(projectPage).toContain('setGenerationError(caught instanceof Error')
+    expect(projectPage).toContain('setGenerationError(describeApiFailure(caught')
     expect(projectPage).toContain('api.hqBanners.generations.cancel(running.id)')
     // 画面を離れて戻ったとき、途中の生成があれば続きから動かす
     expect(projectPage).toContain('activeGeneration(generations)')

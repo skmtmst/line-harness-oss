@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const FIELD_REQUIREMENTS = {
   draft_customerName: requiredText("お客さまのお名前を入れてください。"),
@@ -159,7 +160,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
       body: JSON.stringify({ customerName: draft.customerName.trim(), guestCount: Number(draft.guestCount), startsAt }),
     })
       .then(() => { setImporting(null); setMessage({ tone: 'success', text: '予約台帳へ取り込みました。卓は空いている卓から自動で選びました。' }); setReload((n) => n + 1) })
-      .catch((error: unknown) => setImportError(error instanceof Error ? error.message : '取り込めませんでした。'))
+      .catch((error: unknown) => setImportError(describeApiFailure(error, '取り込み')))
       .finally(() => setBusy(false))
   }
 

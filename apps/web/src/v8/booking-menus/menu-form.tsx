@@ -856,7 +856,7 @@ export default function MenuFormV8() {
       }
       } else {
         { if (!fieldFailure)
-        setSaveError(e instanceof Error ? e.message : bookingErrorText(e, '保存')) }
+        setSaveError(bookingErrorText(e, '保存')) }
       }
     } finally {
       setSaving(null)

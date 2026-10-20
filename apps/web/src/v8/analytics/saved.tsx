@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
@@ -131,7 +132,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       onCountChange?.(response.data.length)
     }).catch((caught: unknown) => {
       if (!active) return
-      setError(caught instanceof Error ? caught.message : '保存した分析を確認できませんでした')
+      setError(describeApiFailure(caught, '読み込み'))
       onCountChange?.(null)
     }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -146,7 +147,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   }, [])
   // 再読込の応答も「どのアカウントへ向けた取得か」の世代で比べる（切替後の遅い旧応答を捨てる）。
   const schedulesGen = useRef(0)
-  const scheduleErrorText = (caught: unknown) => caught instanceof TypeError ? '定期レポートを確認できませんでした' : caught instanceof Error ? caught.message : '定期レポートを確認できませんでした'
+  const scheduleErrorText = (caught: unknown) => caught instanceof TypeError ? '定期レポートを確認できませんでした' : describeApiFailure(caught, '読み込み')
   const reloadSchedules = useCallback(() => {
     const gen = (schedulesGen.current += 1)
     setSchedulesLoading(true)
@@ -194,7 +195,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
 
 
       if (!fieldFailure) {
-      setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした') }
+      setSchedulesError(describeApiFailure(caught, '更新')) }
     } finally {
       setScheduleBusyId('')
     }
@@ -209,7 +210,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       if (!response.success) throw new Error(response.error)
       setSnapshots(response.data)
       setSnapshotError('')
-    }).catch((caught: unknown) => { if (active) setSnapshotError(caught instanceof Error ? caught.message : '結果の履歴を確認できませんでした') })
+    }).catch((caught: unknown) => { if (active) setSnapshotError(describeApiFailure(caught, '読み込み')) })
       .finally(() => { if (active) setSnapshotLoading(false) })
     return () => { active = false }
   }, [accountId, selectedId, snapshotReload])

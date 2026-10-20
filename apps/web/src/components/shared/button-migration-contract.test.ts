@@ -120,7 +120,7 @@ describe('標準ボタンの第1段階移行', () => {
       expect(all).toContain(handler)
     }
     const create = readFileSync(join(SRC, 'v8/affiliates/create.tsx'), 'utf8')
-    expect(create).toContain("onClick={() => void runSave('finish')}")
+    expect(create).toContain("onClick={() => runSave('finish')}")
     expect(create).toContain('const affiliateId = await save()')
     expect(create).toContain('<Button href={LIST_PATH}>キャンセル</Button>')
     expect(readFileSync(join(SRC, 'v8/reminders/ui.tsx'), 'utf8')).toContain('onClick={onCancel}')

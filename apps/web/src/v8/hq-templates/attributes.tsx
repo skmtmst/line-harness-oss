@@ -1,7 +1,7 @@
 'use client'
 import { markNameRequirement } from '@/v8/tags/public/mark-requirement/index'
 
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FriendField, Folder, HqFriendAttributeDetail, HqFriendAttributeInput, HqFriendAttributeTemplate, HqFriendAttributeType, HqFriendAttributeListStats, HqTemplateFolder, HqMarkDefinition } from '@line-crm/shared'
@@ -41,7 +41,7 @@ type Attempt = { input: HqFriendAttributeInput; requestId: string; distribute: b
 type Entry = { row: HqFriendAttributeTemplate; detail: HqFriendAttributeDetail }
 const title = 'タグ'
 const description = 'タグ・友だち情報欄・対応マークのひな形を作り、各 LINE アカウントへ配ります。'
-const errorText = (cause: unknown) => (cause && typeof cause === 'object' && 'status' in cause && cause.status === 403 ? permissionDeniedMessage('hq') : cause instanceof Error && cause.message && !/^API error: /.test(cause.message) ? cause.message : '処理できませんでした。もう一度確認してください。')
+const errorText = (cause: unknown) => (cause && typeof cause === 'object' && 'status' in cause && cause.status === 403 ? permissionDeniedMessage('hq') : describeApiFailure(cause, '読み込み', { scope: 'hq' }))
 
 export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttributeType; tab: 'fields' | 'marks'; onTab: (tab: AttributeTabKey) => void }) {
   const saveErrors = useSaveFormErrors()

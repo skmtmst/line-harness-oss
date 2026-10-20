@@ -5,7 +5,7 @@ import { DetailV8 } from './review-detail'
 import { RejectDialogV8,ReviewListV8 } from './review-list'
 import { PHOTO_PAGE_SIZE,PhotoPageResponse,PhotoStatus,PhotoView,REVIEW_REASONS,ReviewReasonCode,boardNode,photoPagePath } from './review-model'
 
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import { collectUncountedListRows } from '@/components/shared/collect-list-rows'
 import Dialog from '@/components/shared/dialog'
@@ -492,7 +492,7 @@ export default function PhotoReviewV8({ accountId }: { accountId: string | null 
 
       if (generation === accountGeneration.current) {
         { if (!fieldFailure)
-        setNotice(error instanceof Error ? error.message : 'LINE通知を再送できませんでした。') }
+        setNotice(describeApiFailure(error, '保存')) }
       }
     } finally {
       setReviewing(null)

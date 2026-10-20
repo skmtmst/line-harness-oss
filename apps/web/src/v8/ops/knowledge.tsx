@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import { KNOWLEDGE_ARTICLE_KINDS, KNOWLEDGE_KINDS, knowledgeState, knowledgeArticleKind } from '@/components/ops/knowledge-format'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
@@ -37,8 +37,7 @@ const STATE_TONE: Record<string, StatusBadgeTone> = { 承認済み: 'success', �
 function loadDescription(err: unknown): string | undefined {
   if (isForbiddenOrRateLimited(err)) return undefined
   if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
-  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
-  return undefined
+  return describeApiFailure(err, '読み込み', { scope: 'hq' })
 }
 
 /** 表の「種類」は短い名前で出す（使い方について → 使い方）。 */

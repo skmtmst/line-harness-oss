@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const FIELD_REQUIREMENTS = {
   button_label: requiredText("ボタンの文字を入力してください"),
@@ -284,7 +285,7 @@ function ImagePick({ value = null, disabled, onUploaded, onBusyChange, onReceipt
       const media = await hqTemplatesApi.uploadImage(file, 'message')
       if (alive.current) { onReceipt?.(media); onUploaded(media) }
     } catch (e) {
-      if (alive.current) setError(e instanceof Error ? e.message : '画像を登録できませんでした。')
+      if (alive.current) setError(describeApiFailure(e, '登録', { scope: 'hq' }))
     } finally {
       locked.current = false
       if (alive.current) { setUploading(false); onBusyChange?.(false) }

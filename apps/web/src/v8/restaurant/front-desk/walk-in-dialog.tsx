@@ -7,6 +7,7 @@
  * 人数を変えると座れる卓だけに絞り直す。満席のときは「いま座れる卓はありません」と次に空く目安。
  * 入れる口は walk-in.ts の1か所（予約なしの来店の口ができたら差し替える）。動きは BEHAVIOR.md。
  */
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
 import { Armchair, LogIn, Minus, Plus } from 'lucide-react'
@@ -14,7 +15,7 @@ import Dialog from '@/components/shared/dialog'
 import IconButton from '@/components/shared/icon-button'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { restaurantTestApi, type RestaurantReservation, type RestaurantTable } from '@/lib/restaurant-test-api'
-import { freeTables, pad2, tableBusy, tableNote, toYmd } from './slots'
+import { freeTables, tableBusy, tableNote, toYmd } from './slots'
 import { seatWalkIn } from './walk-in'
 import styles from './front-desk.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -88,7 +89,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
 
-      { if (!fieldFailure) setError(caught instanceof Error && caught.message ? caught.message : '入店にできませんでした。もう一度お試しください。') }
+      { if (!fieldFailure) setError(describeApiFailure(caught, '保存')) }
     } finally {
       setBusy(false)
     }

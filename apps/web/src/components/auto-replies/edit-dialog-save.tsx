@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { readLineImageContent } from './edit-dialog-model'
 
 
@@ -225,7 +226,7 @@ export async function saveAutoReplyDialog({ actions, activeFrom, activeUntil, co
           currentVersion?: number
           current?: { keyword?: string; responseContent?: string }
         } | null
-        setError(e.message || 'ほかの変更が先に保存されました。最新の状態を読み直してください')
+        setError(describeApiFailure(e, '保存'))
         if (data?.current) {
           setConflictInfo({
             keyword: typeof data.current.keyword === 'string' ? data.current.keyword : '',

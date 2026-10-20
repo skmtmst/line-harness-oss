@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import MediaSlot from '@/components/shared/media-slot'
@@ -11,8 +12,7 @@ import ImageFrame from '@/components/shared/image-frame'
 
 /** 受け取りの失敗理由。日本語の理由だけを出し、「API error: 500」などの英語は案内文に置き換える。 */
 function uploadReasonOf(caught: unknown): string {
-  const text = caught instanceof Error ? String(caught.message) : ''
-  return /^API error: /.test(text) || !/[ぁ-んァ-ヶ一-龠]/u.test(text) ? '' : text
+  return describeApiFailure(caught, '画像の登録')
 }
 
 /** カードの画像。共通の画像を入れる所（MediaSlot・Z7vd2）の小さい形。店と統括で送る口だけ替える。失敗しても元の画像・選んだファイルを残す。 */

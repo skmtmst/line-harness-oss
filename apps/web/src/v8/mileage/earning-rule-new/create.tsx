@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Card, { CardHeader } from '@/components/shared/card'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 
@@ -12,7 +13,7 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Check, Hourglass, RefreshCw, Share2, TriangleAlert, User, Zap } from 'lucide-react'
+import { Check, Hourglass, Share2, User, Zap } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -257,7 +258,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
       }
       } else {
         { if (!fieldFailure)
-        setSaveError(caught instanceof Error ? caught.message : '保存できませんでした。もう一度お試しください。') }
+        setSaveError(describeApiFailure(caught, '保存')) }
       }
     } finally {
       setSaving(false)
@@ -277,7 +278,7 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
       const fieldFailure = saveErrors.capture(caught)
       setTrial(null)
       { if (!fieldFailure)
-      setTrialError(caught instanceof Error ? caught.message : '試算できませんでした。もう一度お試しください。') }
+      setTrialError(describeApiFailure(caught, '試算')) }
     } finally {
       setTrialBusy(false)
     }

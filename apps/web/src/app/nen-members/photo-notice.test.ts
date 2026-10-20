@@ -22,9 +22,9 @@ describe('写真審査の失敗文面', () => {
     expect(photoNoticeFor(new ApiError(403), FALLBACK)).toContain('権限')
   })
 
-  it('口の日本語(400の本文)はそのまま見せる', () => {
+  it('400の入力案内に日本語の理由を添える', () => {
     expect(photoNoticeFor(new ApiError(400, '見送る理由を選んでください'), FALLBACK))
-      .toBe('見送る理由を選んでください')
+      .toBe('入力を直してください。見送る理由を選んでください')
   })
 
   it('知らない失敗は呼び出し側の文面を使う', () => {

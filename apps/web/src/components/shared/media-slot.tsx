@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { FileAudio,File as FileIcon,FileUp,Loader } from 'lucide-react'
 import {
 useCallback,
@@ -102,8 +103,7 @@ export function fileMatchesAccept(file: { type?: string; name?: string }, accept
 
 /** 受け取りの失敗理由。日本語の理由だけを出し、「API error: 500」などの英語は案内文に置き換える。 */
 function reasonOf(caught: unknown): string {
-  const text = caught instanceof Error ? String(caught.message) : typeof caught === 'string' ? caught : ''
-  return /^API error: /.test(text) || !/[ぁ-んァ-ヶ一-龠]/u.test(text) ? '' : text
+  return describeApiFailure(caught, '画像の登録')
 }
 
 export interface MediaSlotProps {

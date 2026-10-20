@@ -24,7 +24,7 @@ vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/tes
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/api')>()),
   api: { staff: { list: async () => ({ success: true, data: [] }) } },
   bookingApi: {
     listStaff: (...args: unknown[]) => fixture.listStaff!(...(args as [])),
@@ -32,7 +32,7 @@ vi.mock('@/lib/api', () => ({
     updateStaff: vi.fn(async () => ({ ok: true })),
     deleteStaff: vi.fn(async () => ({ ok: true })),
   },
-}))
+} ))
 
 const memStorage = vi.hoisted(() => {
   const values = new Map<string, string>()
@@ -104,7 +104,7 @@ describe('担当一覧（V8）の読み込みと保存ボタン', () => {
     fireEvent.change(screen.getByPlaceholderText('顧客に表示される名前'), { target: { value: '佐藤' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
 
-    expect(await screen.findByRole('button', { name: '保存しています…' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '保存中…' })).toBeTruthy()
 
     await act(async () => { gate.resolve({ ok: true }) })
     await waitFor(() => { expect(fixture.createStaff).toHaveBeenCalled() })

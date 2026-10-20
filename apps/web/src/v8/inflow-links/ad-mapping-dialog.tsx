@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import type { AdEventMapping } from '@line-crm/shared'
 import Dialog from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -22,14 +22,13 @@ export default function AdMappingDialog({ item, onClose, onSave }: {
   const [name, setName] = useState(item.eventName ?? '')
   const [actionId, setActionId] = useState(item.googleActionId ?? '')
   const [busy, setBusy] = useState(false)
-  const busyRef = useRef(false)
+
   const [error, setError] = useState('')
   const errors = useSaveFormErrors()
   const dirty = mode !== item.mode || name !== (item.eventName ?? '') || actionId !== (item.googleActionId ?? '')
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy })
   const save = async () => {
-    if (busyRef.current) return
-    busyRef.current = true
+
     setBusy(true)
     setError('')
     try {
@@ -37,12 +36,12 @@ export default function AdMappingDialog({ item, onClose, onSave }: {
     } catch (failure) {
       if (!errors.capture(failure)) setError(describeSaveFailure(failure))
     } finally {
-      busyRef.current = false
+
       setBusy(false)
     }
   }
   return <SaveErrorScope errors={errors}>
-    <Dialog open title={`${item.pointName}の広告への対応`} busy={busy} dirty={dirty} error={error} onCancel={onClose} onConfirm={() => void save()} confirmLabel="保存">
+    <Dialog open title={`${item.pointName}の広告への対応`} busy={busy} dirty={dirty} error={error} onCancel={onClose} onConfirm={() => save()} confirmLabel="保存">
       <Field label="対応方法"><Select aria-label={`${item.pointName} ${item.provider}の対応方法`} value={mode} disabled={busy} onChange={value => setMode(value as AdEventMapping['mode'])} options={[{ value: 'auto', label: '自動で対応' }, { value: 'manual', label: '名前を指定する' }, { value: 'off', label: '送らない' }]} /></Field>
       {mode === 'manual' ? <Field label="広告に返す名前"><TextField aria-label={`${item.pointName} ${item.provider}に返す名前`} value={name} maxLength={100} disabled={busy} onChange={event => setName(event.target.value)} /></Field> : null}
       {item.provider === 'google' && mode !== 'off' ? <Field label="Googleの成果ID" note="空欄なら連携設定を使います。Google広告で確認して入力してください。"><TextField aria-label={`${item.pointName} Googleの成果ID`} value={actionId} disabled={busy} onChange={event => setActionId(event.target.value)} /></Field> : null}

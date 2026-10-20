@@ -155,7 +155,7 @@ export default function OpsTwoFactorV8() {
         ) : state === 'done' && recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => void logoutAndGoToLogin('/ops/login')} /> : state === 'done' ? (
           <>
             <NoteBar tone="info">2要素認証を登録しました。安全のため一度ログアウトしています。メールとパスワード、次に6桁の数字でログインし直してください。</NoteBar>
-            <Button fullWidth variant="primary" onClick={() => void logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>
+            <Button fullWidth variant="primary" onClick={() => logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>
           </>
         ) : (
           <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>

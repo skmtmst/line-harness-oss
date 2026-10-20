@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { responseApiError } from '@/lib/api'
 import { useEffect, useState } from 'react'
 import { LogIn } from 'lucide-react'
@@ -40,7 +41,7 @@ export function opsTwoFactorFailureMessage(caught: unknown, fallback = '認証�
   }
   if (caught instanceof Error && caught.message) {
     if (caught instanceof SyntaxError) return fallback
-    return caught.message
+    return describeApiFailure(caught, '認証')
   }
   return fallback
 }

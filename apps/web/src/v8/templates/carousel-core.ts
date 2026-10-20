@@ -1,3 +1,4 @@
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { TapExtras } from '@line-crm/shared'
 /*
  * 現役の画面と動作試験で使う組み立て/保存の正本。
@@ -294,6 +295,6 @@ export async function saveCarousel(
     }
     return { ok: true, id: createdId }
   } catch (e) {
-    return { ...fail(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。'), ...(tapExtraSaveError(e) ? { tapExtraError: tapExtraSaveError(e)! } : {}) }
+    return { ...fail(describeApiFailure(e, '保存')), ...(tapExtraSaveError(e) ? { tapExtraError: tapExtraSaveError(e)! } : {}) }
   }
 }

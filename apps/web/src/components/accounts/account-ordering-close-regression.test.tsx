@@ -3,7 +3,7 @@ import { useRef, useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const apiMocks = vi.hoisted(() => ({ list: vi.fn(), update: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { lineAccounts: { list: apiMocks.list, updateHierarchy: apiMocks.update } } }))
+vi.mock('@/lib/api', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/api')>()), api: { lineAccounts: { list: apiMocks.list, updateHierarchy: apiMocks.update } } } ))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 import AccountOrdering from './account-ordering'
 import Dialog from '../shared/dialog'

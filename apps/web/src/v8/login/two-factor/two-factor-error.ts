@@ -1,8 +1,11 @@
+import { describeApiFailure } from '@/components/shared/api-error-message'
+
 /**
  * 二段階認証の失敗の扱い（R506・R508）。
  *
  * page.tsx は default 以外を export できないので、試験で使う関数は
- * このファイルに置き、画面と試験の両方から import する。
+ * このファイルに置き、画面と試験の両方から import { describeApiFailure } from '@/components/shared/api-error-message'
+import する。
  */
 
 /*
@@ -18,7 +21,7 @@ export function twoFactorFailureMessage(caught: unknown, fallback = '認証で�
   if (isNetworkFailure(caught)) return '通信が切れています。接続を確かめて、もう一度お試しください。'
   if (caught instanceof Error && caught.message) {
     if (caught instanceof SyntaxError) return fallback
-    return caught.message
+    return describeApiFailure(caught, '認証')
   }
   return fallback
 }

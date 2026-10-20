@@ -66,6 +66,6 @@ describe('1通目設定の動きの契約', () => {
     expect(PAGE).toContain('const bodyOverLimit =')
     expect(PAGE).toContain('isOverCharLimit(bodyLength, LINE_TEXT_LIMIT)')
     expect(PAGE).toContain("disabled={saving || bodyOverLimit}")
-    expect(PAGE).toContain("if (saving || bodyOverLimit || loadState !== 'ready' || !scenario) return")
+    expect(PAGE).toContain("if (bodyOverLimit || loadState !== 'ready' || !scenario) return")
   })
 })

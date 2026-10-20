@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import StatusBadge from '@/components/shared/status-badge'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -202,7 +203,7 @@ export default function CommonActionsV8() {
       if (!response.success) throw new Error(response.error)
       router.push(`/common-actions/edit?id=${encodeURIComponent(response.data.id)}`)
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : '共通アクションを複製できませんでした')
+      setActionError(describeApiFailure(caught, '複製'))
       setDuplicatingId(null)
     }
   }
@@ -224,7 +225,7 @@ export default function CommonActionsV8() {
       setArchiving(null)
       await load()
     } catch (caught) {
-      setArchiveError(caught instanceof Error ? caught.message : '操作を完了できませんでした')
+      setArchiveError(describeApiFailure(caught, '保存'))
     } finally {
       setArchivingBusy(false)
     }

@@ -19,7 +19,7 @@ MESSAGE_KIND_WORDS
 import { canPublish,publishGates } from '@/v8/auto-replies/publish/publish-flow'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { renderPreviewBody } from '@/components/scenarios/step-preview'
-import { loadFailureCopy } from '@/components/shared/api-error-message'
+import { describeApiFailure, loadFailureCopy } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import { CardHeader } from '@/components/shared/card'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -570,7 +570,7 @@ function AutoReplyWizardV8Inner() {
 
       setError(
         caught instanceof ApiError && caught.status === 409
-          ? caught.message || '公開する直前に状態が変わりました。最新の状態を読み直してください。'
+          ? describeApiFailure(caught, '公開')
           : '自動応答を有効化できませんでした。状態を読み直してからお試しください。',
       ) }
       void loadValidation(autoReplyId)

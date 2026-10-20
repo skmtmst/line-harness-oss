@@ -79,7 +79,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
   }, [])
 
   const save = async () => {
-    if (busy) return
+
     if (accountNameRequirement.check(name)) {
       setNameError('名前を入力してください。')
       setError('')
@@ -149,7 +149,7 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
           </Button>
           <div className={head.footerGroup}>
             <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
-            <Button type="button" variant="primary" onClick={() => void save()} disabled={busy} busy={busy} busyLabel="保存中…">保存</Button>
+            <Button type="button" variant="primary" onClick={() => save()} disabled={busy} busy={busy} busyLabel="保存中…">保存</Button>
           </div>
         </div>
       }
@@ -268,7 +268,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
       footer={
         <div className={`${head.footer} ${head.footerEnd}`}>
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="danger" onClick={() => void archive()} disabled={busy} busy={busy} busyLabel="アーカイブ中…">本人確認してアーカイブする</Button>
+          <Button type="button" variant="danger" onClick={() => archive()} disabled={busy} busy={busy} busyLabel="アーカイブ中…">本人確認してアーカイブする</Button>
         </div>
       }
     >
@@ -338,7 +338,7 @@ export function AccountRestoreDialogV8({ account, onClose, onDone }: {
       footer={
         <div className={`${head.footer} ${head.footerEnd}`}>
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void restore()} disabled={busy} busy={busy} busyLabel="戻しています…">
+          <Button type="button" variant="primary" onClick={() => restore()} disabled={busy} busy={busy} busyLabel="戻しています…">
             <RotateCcw aria-hidden="true" className={styles.icon} />本人確認して戻す
           </Button>
         </div>

@@ -1,3 +1,4 @@
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api'
 
 /**
@@ -26,7 +27,7 @@ export function photoNoticeFor(error: unknown, fallback: string): string {
     }
   }
   if (error instanceof Error && error.message && !/^API error: \d+$/.test(error.message)) {
-    return error.message
+    return describeApiFailure(error, '審査結果の保存')
   }
   return fallback
 }

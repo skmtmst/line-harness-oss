@@ -1,9 +1,10 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useId, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+
+
 import type { Folder } from '@line-crm/shared'
-import { ApiError, api } from '@/lib/api'
+import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Chip from '@/components/shared/chip'
 import { AttachmentRow } from '@/components/shared/file-drop'
@@ -173,18 +174,14 @@ export default function MediaUploadDialog({
             }
           }
         } catch (caught) {
-          const message = caught instanceof ApiError || caught instanceof Error
-            ? caught.message
-            : '登録できませんでした'
+          const message = describeApiFailure(caught, '登録')
           setEntries((current) => current.map((item, entryIndex) => (
             entryIndex === index ? { ...item, state: 'error', message, retryable: true } : item
           )))
         }
       }
     } catch (caught) {
-      const message = caught instanceof ApiError || caught instanceof Error
-        ? caught.message
-        : '送信を準備できませんでした'
+      const message = describeApiFailure(caught, '送信')
       setEntries((current) => current.map((item) => (
         item.state === 'preparing' ? { ...item, state: 'error', message, retryable: true } : item
       )))

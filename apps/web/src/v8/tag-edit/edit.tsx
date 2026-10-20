@@ -1,5 +1,5 @@
 'use client'
-import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -18,7 +18,7 @@ import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } 
 import { describeTagDiff } from './conflict-diff'
 import styles from './edit.module.css'
 import { TagEditForm } from './edit-form'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
@@ -215,7 +215,7 @@ export default function TagEditV8() {
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
 
-      setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
+      setError(describeApiFailure(reason, '削除')) }
       setDeleteOpen(false)
     } finally {
       if (stillHere()) setDeleting(false)

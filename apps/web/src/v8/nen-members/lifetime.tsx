@@ -129,7 +129,7 @@ export default function LifetimeV8({
 
   const save = async () => {
     const target = activeAccount.current
-    if (busy || draftAccountId !== accountId) return
+    if (draftAccountId !== accountId) return
     setBusy(true)
     setError('')
     setNotice('')
@@ -233,7 +233,7 @@ export default function LifetimeV8({
       {readonly ? null : (
         <div className={styles.saveRow}>
           <Button variant="secondary" onClick={() => { setDirty(false); setError(''); if (settings) setDrafts(fromSettings(settings)) }} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '変更がありません' : undefined}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '節目を変更すると保存できます' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
+          <Button variant="primary" onClick={() => save()} disabled={busy || !dirty} title={busy ? '保存しています' : !dirty ? '節目を変更すると保存できます' : undefined} busy={Boolean(busy)} busyLabel="処理中…">
             <Check size={15} aria-hidden="true" />保存して EC へ同期する
           </Button>
         </div>

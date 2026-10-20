@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -169,7 +170,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)
 
-      { if (!fieldFailure) setError(cause instanceof Error && cause.message && !cause.message.startsWith('API error') ? cause.message : '構成を保存できませんでした。もう一度お試しください。') }
+      { if (!fieldFailure) setError(describeApiFailure(cause, '保存')) }
     } finally {
       setSaving(false)
     }
@@ -301,7 +302,7 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
         designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 0" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
         footer={<div className={compact.footer}>
           <Button onClick={() => { cancelChanges(); onClose() }} disabled={saving}>キャンセル</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…"><Save size={14} aria-hidden="true" />構成を保存する</Button>
+          <Button variant="primary" onClick={() => save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…"><Save size={14} aria-hidden="true" />構成を保存する</Button>
         </div>}>
         <div className={compact.body}>
           <p className={compact.description}>カードの「…」から「最上位（親）にする」「○○の子にする」を選ぶか、親にしたいカードの上へドラッグします。親・子・孫の3階層まで設定できます。</p>
@@ -330,13 +331,13 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
   return <SaveErrorScope errors={saveErrors}><section className="mt-6 border-t border-hairline pt-6" aria-labelledby="account-ordering-title">
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div><h2 id="account-ordering-title" className="font-bold text-ink">LINEアカウントの並び替え</h2><p className="mt-1 text-xs text-ink-secondary">登録済みアカウントをドラッグするか、カードの「…」から移動先を選んで、親・子・孫の順に整理します。</p></div>
-      <Button variant="primary" className="whitespace-nowrap px-4 py-2 font-medium disabled:bg-hairline border-0 h-auto" onClick={() => void save()} disabled={changed.length === 0 || saving}>▣ {saving ? '保存中…' : '並びを保存する'}</Button>
+      <Button variant="primary" className="whitespace-nowrap px-4 py-2 font-medium disabled:bg-hairline border-0 h-auto" onClick={() => save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…" widthReserve="idle">▣ {'並びを保存する'}</Button>
     </div>
     <Notice tone="info" className="mb-4">⚓ 登録済みのLINEアカウントをドラッグ＆ドロップ、またはカードの「…」→移動先の選択で、親・子・孫の3階層まで紐付けます。下位階層を表示・操作できるのは「他アカウント権限」がONの管理者だけです。</Notice>
     {error && <Notice tone="danger" className="mb-4">{error}</Notice>}
     <div className="grid items-start gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
       <section className="rounded-card border border-warning bg-warning-bg p-4"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold text-warning">▧ 未設定のLINEアカウント</h2><span className="rounded-pill bg-canvas px-2 py-1 text-xs font-semibold text-warning">{unassigned.length}件</span></div><p className="mt-2 text-micro leading-5 text-ink-secondary">まだ親・子・孫に紐づいていません。カードを中央へドラッグするか、「…」から移動先を選びます。</p><div className="mt-3 space-y-2">{loading ? <p className="text-xs text-ink-faint">読み込み中…</p> : unassigned.length === 0 ? <p className="rounded-control bg-canvas px-3 py-4 text-center text-xs text-ink-faint">未設定はありません</p> : unassigned.map((account) => <div key={account.id} data-account-id={account.id} draggable={!saving} onDragStart={(event) => startDrag(event, account.id)} onDragEnd={finishDrag} className={`flex cursor-grab items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-3 ${draggedId === account.id ? 'opacity-45' : ''}`}><span className="text-ink-faint">⠇</span><span className="text-success">▧</span><div className="min-w-0"><p className="truncate whitespace-nowrap text-xs font-semibold">{account.displayName || account.name}</p><p className="text-nano text-ink-faint">階層未設定</p></div><span className="ml-auto text-nano font-semibold text-success">未設定</span>{moveMenu(account)}</div>)}</div></section>
-      <section className="rounded-card border content-card bg-canvas p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold text-ink">LINEアカウント階層を編集</h2><p className="mt-1 text-xs text-ink-faint">登録済みのLINE公式アカウントを移動して、親・子・孫を設定します。</p></div>{changed.length > 0 && <span className="rounded-pill bg-warning-bg px-3 py-1 text-xs font-semibold text-warning">◉ 未保存の変更 {changed.length}件</span>}</div><div className="mt-4">{loading ? <p className="py-12 text-center text-sm text-ink-faint">読み込み中…</p> : hierarchyRoots.length === 0 ? <div data-hierarchy-root-drop onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }} onDrop={(event) => dropOn(event, null)} className={`rounded-control border border-dashed border-info bg-info-bg px-5 py-14 text-center text-sm text-info transition-shadow ${draggedId ? 'ring-2 ring-info/20' : ''}`}>{draggedId ? 'ここで離すと親候補として配置します' : '左のLINEアカウントをここへドロップして構成を作ります'}</div> : hierarchyRoots.map((account) => node(account, 0))}</div><DropLine onDrop={(event) => dropOn(event, null)} label="親LINEの直下へドロップすると「親」になります" blue dragging={Boolean(draggedId)} /><p className="mt-3 rounded-control bg-accent-soft px-4 py-3 text-xs font-semibold text-success">◉ 親・子・孫はすべてLINE公式アカウントです。「他アカウント権限」がONのユーザーだけが、担当LINEより下の階層を表示・操作できます。</p>{changed.length > 0 && <div className="mt-4 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={cancelChanges} disabled={saving}>キャンセル</Button><Button variant="primary" className="px-4 py-2 border-0 h-auto whitespace-normal" onClick={() => void save()} disabled={saving}>▣ 構成を保存する</Button></div>}</section>
+      <section className="rounded-card border content-card bg-canvas p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold text-ink">LINEアカウント階層を編集</h2><p className="mt-1 text-xs text-ink-faint">登録済みのLINE公式アカウントを移動して、親・子・孫を設定します。</p></div>{changed.length > 0 && <span className="rounded-pill bg-warning-bg px-3 py-1 text-xs font-semibold text-warning">◉ 未保存の変更 {changed.length}件</span>}</div><div className="mt-4">{loading ? <p className="py-12 text-center text-sm text-ink-faint">読み込み中…</p> : hierarchyRoots.length === 0 ? <div data-hierarchy-root-drop onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }} onDrop={(event) => dropOn(event, null)} className={`rounded-control border border-dashed border-info bg-info-bg px-5 py-14 text-center text-sm text-info transition-shadow ${draggedId ? 'ring-2 ring-info/20' : ''}`}>{draggedId ? 'ここで離すと親候補として配置します' : '左のLINEアカウントをここへドロップして構成を作ります'}</div> : hierarchyRoots.map((account) => node(account, 0))}</div><DropLine onDrop={(event) => dropOn(event, null)} label="親LINEの直下へドロップすると「親」になります" blue dragging={Boolean(draggedId)} /><p className="mt-3 rounded-control bg-accent-soft px-4 py-3 text-xs font-semibold text-success">◉ 親・子・孫はすべてLINE公式アカウントです。「他アカウント権限」がONのユーザーだけが、担当LINEより下の階層を表示・操作できます。</p>{changed.length > 0 && <div className="mt-4 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={cancelChanges} disabled={saving}>キャンセル</Button><Button variant="primary" className="px-4 py-2 border-0 h-auto whitespace-normal" onClick={() => save()} disabled={saving}>▣ 構成を保存する</Button></div>}</section>
     </div>
     <UnsavedLeaveDialog open={leaveTarget !== null} subject="アカウント構成への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
   </section></SaveErrorScope>
