@@ -1,6 +1,7 @@
+import { fail } from '../lib/fail.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * #838 第2段: Google Sheets への直接書き出し（OAuth + Sheets API）。
  *
@@ -71,16 +72,6 @@ type ConnectionStatus = 'disconnected' | 'pending_target' | 'connected' | 'expir
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-function fail(
-  c: Context<Env>,
-  status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503,
-  error: string,
-  extra: Record<string, unknown> = {},
-  fieldKeys: readonly string[] = [],
-) {
-  return inputError(c, { success: false, error, ...extra }, status, fieldKeys);
 }
 
 function staffTenantId(c: Context<Env>): string {

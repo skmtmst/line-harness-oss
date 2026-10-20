@@ -1,3 +1,4 @@
+import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -136,7 +137,7 @@ async function safeBody(c: { req: { json<T>(): Promise<T> } }): Promise<unknown>
 
 function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof IdentityCandidateError) {
-    return inputError(c, { success: false, error: error.message, code: error.code }, error.status, []);
+    return fail(c, error.status, error.code, { error: error.message }, []);
   }
   logger.error("routes_identity_candidates_failed");
   return c.json(

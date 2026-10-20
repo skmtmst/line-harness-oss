@@ -1,3 +1,4 @@
+import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -29,7 +30,7 @@ function bulkErrorFields(code: string): string[] {
 
 function errorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof FriendBulkRunError) {
-    return inputError(c, { success: false, error: error.message, code: error.code }, error.status as ContentfulStatusCode, bulkErrorFields(error.code));
+    return fail(c, error.status as ContentfulStatusCode, error.code, { error: error.message }, bulkErrorFields(error.code));
   }
   logger.error("routes_friend_bulk_runs_failed");
   return c.json({ success: false, error: '一括操作を処理できませんでした' }, 500);

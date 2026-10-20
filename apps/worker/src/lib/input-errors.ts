@@ -189,7 +189,7 @@ export function inputErrorMessage(code: string, fallback = '入力内容を確�
     ambiguous_video_source: '動画の指定方法は1つにしてください',
     dst_gap: '夏時間への切り替えで存在しない時刻です。別の時刻を選んでください',
   };
-  return messages[code] ?? fallback;
+  return Object.hasOwn(messages, code) ? messages[code]! : fallback;
 }
 
 /** フォルダの口で使うJSONの鍵を、DB側の共通エラーへ対応させる。 */

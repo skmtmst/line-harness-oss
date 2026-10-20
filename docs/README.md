@@ -575,6 +575,7 @@
 - [1775-masato-line-webhook-v07.md](release-log/unreleased/1775-masato-line-webhook-v07.md)
 - [1776-masato-line-webhook-padding.md](release-log/unreleased/1776-masato-line-webhook-padding.md)
 - [0000-kenta-cleanup-q01w1.md](release-log/unreleased/0000-kenta-cleanup-q01w1.md)
+- [0000-kenta-cleanup-q01w3.md](release-log/unreleased/0000-kenta-cleanup-q01w3.md)
 - [0000-kenta-cleanup-q01w4.md](release-log/unreleased/0000-kenta-cleanup-q01w4.md)
 - [0000-kenta-cleanup-q03.md](release-log/unreleased/0000-kenta-cleanup-q03.md)
 - [0000-kenta-cleanup-s02b.md](release-log/unreleased/0000-kenta-cleanup-s02b.md)
@@ -611,7 +612,3 @@
 - [構成と接続の整理の検査記録](qa/cleanup-s02z-1020.md)
 - [使われていない処理と重複する検査の整理記録](qa/cleanup-x02b-1020.md)
 - [使われていない処理と重複する検査の整理履歴](release-log/unreleased/0000-kenta-cleanup-x02b.md)
-
-- [日本時間の扱いの整理履歴](release-log/unreleased/0000-kenta-cleanup-q01w6.md)
-- [共通部品の動作確認の整理履歴](release-log/unreleased/0000-kenta-cleanup-q02a3.md)
-- [重複整理とAI操作の失敗通知の更新履歴](release-log/unreleased/0000-kenta-cleanup-x02a.md)
