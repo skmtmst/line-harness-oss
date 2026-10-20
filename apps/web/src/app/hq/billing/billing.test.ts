@@ -7,7 +7,11 @@ import type { BillingPlanView, BillingSummary } from '@/lib/hq-billing'
 import HqBillingPage from './page'
 
 const calls = vi.hoisted(() => ({ summary: vi.fn(), invoices: vi.fn(), checkout: vi.fn(), portal: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  const mocked = await (() => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))()
+  return { ...actual, ...mocked }
+})
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/billing', useRouter: () => ({push: vi.fn()}) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
 
