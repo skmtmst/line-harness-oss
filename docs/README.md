@@ -582,10 +582,20 @@
 
 - [LINE接続の分離](release-log/unreleased/1778-masato-line-webhook-isolation.md)
 
+- [cleanup-q02a1-1019.md](qa/cleanup-q02a1-1019.md)
+
+- [cleanup-q02a1-source-tests.tsv](qa/cleanup-q02a1-source-tests.tsv)
+
+- [0000-kenta-cleanup-q02a1.md](release-log/unreleased/0000-kenta-cleanup-q02a1.md)
+
 - [Q02A2の整理・検証記録](qa/cleanup-q02a2-1019.md)
 - [0000-kenta-cleanup-q02a2.md](release-log/unreleased/0000-kenta-cleanup-q02a2.md)
 - [0000-kenta-cleanup-s02a.md](release-log/unreleased/0000-kenta-cleanup-s02a.md)
 - [S02Aの検査記録](qa/cleanup-s02a-1019.md)
+- [Q01W6の整理履歴](release-log/unreleased/0000-kenta-cleanup-q01w6.md)
+- [Q02A3の整理履歴](release-log/unreleased/0000-kenta-cleanup-q02a3.md)
+- [X02Aの整理履歴](release-log/unreleased/0000-kenta-cleanup-x02a.md)
+
 ## 台本整理で加わった文書
 
 - [台本とCIの入口](../scripts/README.md)
