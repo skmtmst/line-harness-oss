@@ -9,6 +9,10 @@ queue useful and safe.
 
 日本語での Issue / PR も歓迎です。英語で書く必要はありません。
 
+Before changing code, read [the code structure and purpose-based examples](docs/code-structure.md).
+Follow its comment rules: explain why a constraint exists; keep work history in Git and PRs.
+Run `pnpm quality:check --base <PR-base-SHA>` and reduce the measured baseline when violations decrease.
+
 ## Repository Model
 
 LINE Harness is maintained with two repositories:

@@ -2,6 +2,7 @@ import { apiContractMiddleware } from '../middleware/api-contract.js';
 vi.mock('../services/line-messaging-identity.js', () => ({ verifyLineMessagingIdentity: vi.fn().mockResolvedValue(true) }));
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../worker-env.js';
 
 // Mock @line-crm/db so we can assert on the values the route forwards to the
 // DB layer without needing a real D1Database. The route's responsibility is
@@ -61,6 +62,9 @@ vi.mock('@line-crm/line-sdk', () => ({
 
 // Re-import after mock so the module picks up mocked deps.
 const { lineAccounts } = await import('./line-accounts.js');
+const { unhandledWorkerError } = await import('../lib/unhandled-error.js');
+const receiptErrorReport = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: receiptErrorReport }));
 
 type TestEnv = {
   Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean; tenantId?: string | null } };
@@ -126,6 +130,25 @@ const fakeAccount = {
 };
 
 describe('GET /api/line-accounts/:id/registration-receipt', () => {
+  test.each(['account scope', 'inbound receipt'])('unexpected %s failure reaches the shared incident handler', async (stage) => {
+    const secret = 'private-customer secret-token';
+    const db = makeDbStub();
+    if (stage === 'account scope') dbMocks.getLineAccountScopeEntries.mockRejectedValueOnce(new Error(secret));
+    else vi.mocked(db.prepare).mockImplementationOnce(() => { throw new Error(secret); });
+    const app = new Hono<Env>().route('/', setupApp('owner', db));
+    app.onError(unhandledWorkerError);
+    const response = await app.request('/api/line-accounts/acc-1/registration-receipt?token=secret-token');
+    const body = await response.json<{ incidentId: string }>();
+    expect(response.status).toBe(500);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(receiptErrorReport).toHaveBeenLastCalledWith(expect.anything(), {
+      source: 'worker', message: 'unhandled_worker_error',
+      path: 'GET /api/line-accounts/:id/registration-receipt', incidentId: body.incidentId,
+    });
+    expect(JSON.stringify([body, receiptErrorReport.mock.calls])).not.toMatch(/private-customer|secret-token/);
+  });
+
   test('only exposes a receipt in the current account scope', async () => {
     const app = setupApp('owner', makeDbStub(), {
       assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,

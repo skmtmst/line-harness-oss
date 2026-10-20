@@ -317,6 +317,14 @@ jobs:
       - name: Test the setup CLI
         run: pnpm --config.enable-pre-post-scripts=false --filter create-line-harness test
       - run: pnpm test:scripts
+      - name: Ratchet code quality against the PR base
+        env:
+          QUALITY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          pnpm quality:test
+          pnpm quality:typecheck
+          base="${QUALITY_BASE_SHA:-$(git rev-parse HEAD^)}"
+          pnpm quality:check --base "$base"
       - name: Check names and public dependency boundaries
         run: pnpm exec tsx scripts/structure/check.ts
       - name: Typecheck repository scripts

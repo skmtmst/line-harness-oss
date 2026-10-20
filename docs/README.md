@@ -618,3 +618,11 @@
 - [構成と接続の整理の検査記録](qa/cleanup-s02z-1020.md)
 - [使われていない処理と重複する検査の整理記録](qa/cleanup-x02b-1020.md)
 - [使われていない処理と重複する検査の整理履歴](release-log/unreleased/0000-kenta-cleanup-x02b.md)
+
+
+- [品質の後戻りを防ぐ仕組みの更新履歴](release-log/unreleased/0000-kenta-cleanup-q00.md)
+- [品質の後戻りを防ぐ仕組みの検査記録](qa/cleanup-q00-1020.md)
+
+- [担当者情報と権限確認の共通化の履歴](release-log/unreleased/0000-kenta-cleanup-q01s1.md)
+- [管理者によるLINEアカウント登録の履歴](release-log/unreleased/1779-masato-admin-line-registration.md)
+- [LINEアカウントの受信確認の履歴](release-log/unreleased/1780-masato-line-receipt-gate.md)
