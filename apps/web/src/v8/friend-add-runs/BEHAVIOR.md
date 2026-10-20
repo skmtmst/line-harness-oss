@@ -1,9 +1,9 @@
-> 文書：友だち追加時の配信の実行結果（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：友だち追加時の配信の実行結果（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # 友だち追加時の配信の実行結果（V8）の動き
 
 入口：`app/friend-add-settings/runs/page.tsx`（V8専用で `src/v8/friend-add-runs/runs.tsx`）。
-絵：実行結果 `REIxB`。写し元（動き）：`app/friend-add-settings/runs/runs-v8.tsx`・`run-status.ts`・`csv.ts`（import はしない）。
+絵：実行結果 `REIxB`。写し元（動き）：[現役の入口・本体](README.md)・`run-status.ts`・`csv.ts`（import はしない）。
 
 ## 受け付ける URL と指定（今と同じ）
 - `/friend-add-settings/runs`：すべての記録
@@ -51,7 +51,7 @@
 # 実行の詳細（V8）の動き
 
 入口：`app/friend-add-settings/runs/detail/page.tsx`（V8専用で `src/v8/friend-add-runs/detail.tsx`）。
-絵：実行の詳細（失敗あり）`N43uVX`。写し元（動き）：`app/friend-add-settings/runs/detail/detail-v8.tsx`（import はしない）。
+絵：実行の詳細（失敗あり）`N43uVX`。写し元（動き）：[現役の入口・本体](README.md)（import はしない）。
 
 ## 受け付ける URL と指定（今と同じ）
 - `/friend-add-settings/runs/detail?id=<実行のID>`

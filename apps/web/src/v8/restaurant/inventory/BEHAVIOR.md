@@ -1,8 +1,8 @@
-> 文書：予約枠・在庫の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：予約枠・在庫の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # 予約枠・在庫の動き（BEHAVIOR.md）
 
-対象：`app/restaurant-test/v8/inventory.tsx`・`inventory-channels.tsx`（今の V8）から写して一から書いた。板 Y8SjT2・競合 qf3ky・媒体を閉じる知らせ Yyw6i・予約経路の連携 hQQlt。
+対象：[現役の入口・本体](../README.md)・`inventory-channels.tsx`（今の V8）から写して一から書いた。板 Y8SjT2・競合 qf3ky・媒体を閉じる知らせ Yyw6i・予約経路の連携 hQQlt。
 
 ## 入口・受け付ける URL
 - `app/restaurant-test/inventory/page.tsx`：V8 だけを描く（2026-10-09 オーナー決定）。

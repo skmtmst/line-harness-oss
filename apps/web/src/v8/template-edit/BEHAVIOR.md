@@ -1,15 +1,13 @@
-> 文書：テンプレートの作る・編集の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：テンプレートの作る・編集の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # テンプレートの作る・編集の動き（BEHAVIOR.md）
 
 対象：`message.tsx`（メッセージを作る・編集：u5YC6／1152 は a1k3d／競合は NCbYn）と
 `asset.tsx`（クーポンを作る S6FEuB・リサーチを作る EsYo4）と `rich.tsx`（リッチメッセージを作る EFV8l）。
-写し元：`app/templates/edit-v8.tsx`・`edit/edit-core.tsx`・`template-detail-data.ts`・
-`edit/template-conflict-diff.ts`・`asset-editor-v8.tsx`・`template-asset-editor.tsx`・
-`app/contents/media-picker-dialog.tsx`（`media-picker.tsx` に写した）。
+入口・公開名・API・試験の案内は [README](README.md)。
 
 ## 入口と受け付ける URL・指定（今と同じ名前・同じ意味）
-- `app/templates/edit/page.tsx`：`theme === 'v8'` のときは `edit.tsx`（2026-10-07 からリッチメッセージも）。v7 はそのまま。
+- `app/templates/edit/page.tsx`：`edit.tsx` を直接表示し、kindで編集対象を選ぶ。管理画面はV8に固定。
 - `?kind=rich_message`：リッチメッセージを作る（`rich.tsx`）。
 - `?id=<テンプレートID>`：編集。無ければ作る。
 - `?kind=coupon` ／ `?kind=research`：資産の作る画面（`asset.tsx`）。
@@ -17,8 +15,7 @@
 - `?example=<見本の番号>`（F-5・2026-10-07 に足した）：作るときだけ、`GET /api/templates/examples` の見本の名前と本文（テキスト）を1回入れて開く。保存はしない（入力と同じ扱いなので、名前があれば自動保存の決まりどおりに下書きができる）。見本が無い・読めないときは白紙のまま「見本が見つかりませんでした／読み込めませんでした。白紙から作れます。」
 
 ## 権限
-- 役割はサーバー（`/api/staff/me`・`useStaffRole`）から読む。確認が終わるまでは操作を出し、`staff` と分かったら
-  下の帯（キャンセル・下書きを保存・保存して公開）を置かず、頭の下に「閲覧のみ」の帯を出す。最後の守りはサーバーの 403。
+- 役割はサーバー（`/api/staff/me`・`useStaffRole`）から読む。共通の機能権限 `useFeatureAccess('templates')` で変更可否を決める。確認中・取得失敗・閲覧のみでは変更操作を隠す。統括からはhostのreadOnlyを優先する。最後の守りはサーバーの 403。
 
 ## メッセージ（message.tsx）
 - 読み込み：`GET /api/templates/:id`。形の番人（`isTemplateDetailData`）に合わない応答は「読み込めませんでした。開き直してください。」で保存を閉じる。
@@ -56,7 +53,7 @@
 - 右の列：クーポンは「公開したあとに見られる数」（保存前は —、抽選しないときは「抽選なし」）、リサーチは「回答フォームとの使い分け」。届き方は、クーポンはスマホの中のカード、リサーチはお客さまが答える画面（回答フォームの LIFF と同じ形・次へは下に固定。B-173）。
 
 ## リッチメッセージ（rich.tsx）
-- 写し元：`app/templates/asset-editor-v8.tsx`・`template-asset-editor.tsx`（形・面の座標・保存値の組み立て）。
+- 形・面の座標・保存値は現役の `rich.tsx` と関連する純粋な関数で組み立てる。
 - 保存：`POST /api/broadcast-message-assets`（`kind: rich_message`・`payload` は imageUrl・imageMediaId・imageMediaKind・shape・tapAreas・folder）。今と同じ形。
   公開の口が無いので、下書きを保存は保存して留まり、保存して公開は保存して一覧へ戻る（クーポン・リサーチと同じ）。
 - 面の分け方：1面・上下2面・左右2面・上1・下2・4面・6面。設定のある面が消える形へ替えるときは確かめの窓を出す。

@@ -1,8 +1,8 @@
-> 文書：組織・権限（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：組織・権限（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # 組織・権限（V8）の動き
 
-入口：`app/restaurant-test/organization/page.tsx`（`data-theme="v8"` のとき V8）。絵：`bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`。
+入口：`app/restaurant-test/organization/page.tsx`（V8を直接表示）。絵：`bSp4h`、店舗の窓 `vCEKM`、ユーザーの窓 `ou60i`、停止の確認 `bMpC5`、再発行の確認 `rSRFK`。
 
 ## 受け付ける URL と指定
 - `/restaurant-test/organization`：指定なし。

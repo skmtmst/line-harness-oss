@@ -1,9 +1,9 @@
-> 文書：たまる決めごとを作る（V8・create.tsx・板 ctLwT・競合 BnrQp）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：たまる決めごとを作る（V8・create.tsx・板 ctLwT・競合 BnrQp）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # たまる決めごとを作る（V8・create.tsx・板 ctLwT・競合 BnrQp）
 
 入口：`app/mileage/earning-rules/new/page.tsx`（`src/v8/mileage/earning-rule-new/create.tsx` へ固定）。
-写し元：`app/mileage/earning-rules/new/v8-earning-rule-new.tsx`・`../rule-fields.ts`（`rule-fields.ts` は写し。import はしない）。古い Muse の PR #1436 は使っていない。
+写し元：[現役の入口・本体](../README.md)・`../rule-fields.ts`（`rule-fields.ts` は写し。import はしない）。古い Muse の PR #1436 は使っていない。
 
 ## 呼ぶ口（今と同じ）
 - `api.tags.list({ accountId })`（倍率の注を出すかどうか）

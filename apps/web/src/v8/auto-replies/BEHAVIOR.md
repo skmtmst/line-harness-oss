@@ -1,11 +1,11 @@
-> 文書：自動応答一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：自動応答一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # 自動応答一覧の動き（BEHAVIOR.md）
 
-対象：`app/auto-replies/list-v8.tsx`（V8一覧、`uE9gf`）。このファイルから写して `list.tsx` を一から書く。
+対象：現役の `list.tsx`（V8一覧、`uE9gf`）。入口・公開名・API・試験の案内は [README](README.md)。
 
 ## 入口
-- `app/auto-replies/page.tsx`：`theme === 'v8'` のときだけ V8一覧を出す。v7側は触らない。
+- `app/auto-replies/page.tsx`：V8一覧を直接表示する。
 
 ## 読み込み（APIs）
 - 見るだけの人（`canEdit=false`、`roles` に `manage` 無し、またはオーナー代理で `tenantOwner=false`）は一覧だけ読み、数は読まない。
@@ -52,14 +52,14 @@
 
 # 実行結果の動き（runs.tsx・板 nWmLg）
 
-写し元：`app/auto-replies/runs/runs-v8.tsx`（import はしない）。入口 `app/auto-replies/runs/page.tsx` の V8 の import だけ差し替えた。v7（同じ page.tsx の AutoReplyRunsInner）は触らない。
+入口 `app/auto-replies/runs/page.tsx` は現役の `runs.tsx` を直接表示する。
 
 ## 受け付ける URL と指定
 - `/auto-replies/runs?id=<ルールID>`：そのルールの実行結果。`id` が無ければ全ルール。返ってきたルールの ID が違うときは捨てる（古い返事で上書きしない）。
 
 ## 読み込み（APIs）
 - `GET /api/auto-reply-runs?ruleId=&from=&to=&limit=&offset=`（`api.autoReplies.runs`）。返事の形が違えば「読み込めませんでした」＋再読み込み。古い呼び出しの返事は捨てる（連番）。
-- 期間：既定は「今月」（月の初日から）。この7日・この30日・すべての期間・日付で決める（2つの日付欄を出す）。**v7 と旧 V8 は既定が「すべて」だった**（絵 nWmLg の「今月」に合わせて変えた）。
+- 期間：既定は「今月」（月の初日から）。この7日・この30日・すべての期間・日付で決める（2つの日付欄を出す）。
 - 1ページの件数：10・20・50件（既定20）。ページ送りは共通の Pagination（「214件中 1〜20件」）。
 
 ## 帯・札・表

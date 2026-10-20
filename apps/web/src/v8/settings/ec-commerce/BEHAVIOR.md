@@ -1,4 +1,4 @@
-> 文書：EC連携の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：EC連携の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # EC連携の動き（BEHAVIOR.md）
 
@@ -6,7 +6,7 @@
 写し元：`app/ec-commerce/page.tsx` の EventsPanel・`ec-tabs-view.tsx`。
 
 ## 入口・URL
-- `app/ec-commerce/page.tsx`：見た目が v8 のときだけこの画面。v7 は今の画面のまま。
+- `app/ec-commerce/page.tsx`：このV8画面を直接表示する。
 - `?tab=events|subscriptions|connector`（`useMergedTab`）。会員のつき合わせは `/ec-commerce/identity-candidates`。
 
 ## 読み込み（API）
@@ -27,10 +27,9 @@
 - 済んだ出来事は1行だけ。止まった・失敗・見送りの出来事は、その下に状態・止まった段階・失敗の理由（分類と次にすること）・回数・「もう一度やる」（押すと戻して読み直す）・通知と配送の失敗を足す。
 - 成果は承認待ち・却下・紹介者・報酬・支払いの段階・確定後の取消・同じ注文の重複を、あるときだけ下に足す。発送後の案内は送った時刻・見送り／失敗の理由を、あるときだけ足す。
 - 権限なし（403）は「見る権限がありません」、それ以外の失敗は「読み込めませんでした」＋もう一度。閉じ方は右上の×・幕を押す・Esc。
-- 今までの引き出し（app/ec-commerce/order-detail-drawer.tsx）は v7 の画面だけが使う（v8 の入口から外した）。
 
 ## 会員のつき合わせ（`identity.tsx`・★V8-B `w1W8h`）
-- 入口：`app/ec-commerce/identity-candidates/page.tsx`（見た目が v8 のときだけ）。外側と中の切り替えは取り込みの記録と同じ（右上は「つなぎ先の設定」）。
+- 入口：`app/ec-commerce/identity-candidates/page.tsx`（V8を直接表示）。外側と中の切り替えは取り込みの記録と同じ（右上は「つなぎ先の設定」）。
 - 口は今と同じ：候補は本人照合の口（`useIdentityReview('ec_member')`）、数と金額は `GET /api/ec-commerce/identity-candidates`（EC運用の集計）。アカウントを切り替えたら古い集計の応答は捨てる。集計だけの失敗は数の帯に出し、候補の表は残す（数は 0 と書かず —）。
 - 数の帯：自動で結びついた・候補が見つかった（つき合わせ N のうち）・結びついていない・結びついていない注文の金額。
 - 自動で結びつく条件は1行の帯（入りきらないときは「…」と title）。
@@ -39,7 +38,7 @@
 - 続きがあれば「続きを読み込む」。表の下に件数（読めていなければ —）。
 
 ## 定期便（`subscriptions.tsx`・★V8-B `wqC8x`）
-- V8 はこの場所の画面を使い、v7 の `app/ec-commerce/subscriptions-panel.tsx` は残す。
+- 定期便は現役の `subscriptions.tsx` を使う。
 - `GET /api/ec-commerce/subscriptions` にアカウント・状態・limit・offsetを送る。表示件数は10・20・50。総数はサーバが返した値。検索は取得したページ内にだけ効く。
 - 表はお客様と中身・1回の金額・次の発送・続いた回数・ようす・操作。友だちへ移る、ECが返した変更先を開く動きは保持。
 - 説明は表の下、月別の集計はその下の開閉する欄に移した。対象を選んで送る操作は表の下に残し、閲覧のみには出さない。

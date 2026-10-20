@@ -1,8 +1,8 @@
-> 文書：運用状態の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：運用状態の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # 運用状態の動き（BEHAVIOR.md）
 
-対象：`screen.tsx`・`health.tsx`（★V8 健全性チェック `Y4LkX1`）・`history.tsx`（更新履歴 `I2V65v`）。緊急コントロール（`OHwbU`）は現役の `app/emergency/control-v8.tsx` を入口から差し込む。
+対象：`screen.tsx`・`health.tsx`（★V8 健全性チェック `Y4LkX1`）・`history.tsx`（更新履歴 `I2V65v`）。緊急コントロール（`OHwbU`）は現役の [現役の入口・本体](../README.md) を入口から差し込む。
 
 ## 入口・URL
 - `app/emergency/page.tsx`：この V8 画面に固定。`?tab=health|history|control`。

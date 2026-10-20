@@ -1,8 +1,8 @@
-> 文書：メニュー管理の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：メニュー管理の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # メニュー管理の動き（BEHAVIOR.md）
 
-対象：`app/restaurant-test/v8/menu.tsx`（今の V8）から写して `menu.tsx` を一から書いた。板 MJoJR・停止 MV5Os・追加と変更 NkmwU。
+対象：[現役の入口・本体](../README.md)（今の V8）から写して `menu.tsx` を一から書いた。板 MJoJR・停止 MV5Os・追加と変更 NkmwU。
 
 ## 入口・受け付ける URL
 - `app/restaurant-test/menu/page.tsx`：V8 だけで出す（今と同じ完全切り替え）。指定（?）は受け付けない（今と同じ）。

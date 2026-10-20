@@ -1,4 +1,4 @@
-> 文書：予約設定（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：予約設定（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # 予約設定（V8）の動き
 
@@ -7,7 +7,7 @@
 - `app/booking/menus/new/page.tsx` → `src/v8/booking-menus/menu-form.tsx`（作る・直す・競合）
 - `app/booking/menus/staff/page.tsx` → `src/v8/booking-menus/assign.tsx`（担当メニューをまとめて決める）
 
-写し元：`app/booking/menus/settings-v8.tsx`・`settings-tabs/*`・`channels-tab-v8.tsx`・`liff-phone-v8.tsx`・`menu-version-history.tsx`・`new/menu-form-v8.tsx`・`staff/assign-v8.tsx`・`app/booking/staff/staff-edit-dialog.tsx` と、それらが読む `lib/*`（`src/v8` からは `@/app` を読めないので写した）。
+写し元：[現役の入口・本体](README.md)・`settings-tabs/*`・`channels-tab-v8.tsx`・`liff-phone-v8.tsx`・`menu-version-history.tsx`・`new/menu-form-v8.tsx`・`staff/assign-v8.tsx`・`app/booking/staff/staff-edit-dialog.tsx` と、それらが読む `lib/*`（`src/v8` からは `@/app` を読めないので写した）。
 
 絵：メニュー `owaS3`・1152 `P6EdLW`・閲覧のみ `C9fv7A`・受付枠 `yRPxl`・1152 `VFxWU`・休業日 `KRgTQ`・予約のルール `x1OZS6`・予約経路 `ZyDd6`・状態 `xCoDe`・作る `QqER7`・競合 `v5L19Z`・担当まとめ `ooufy`。
 
@@ -24,7 +24,7 @@
 - 担当：`listStaff`・`createStaff`・`updateStaff`・`deleteStaff`・`getStaffMenus`・`putStaffMenus`・`listStaffMenusBulk`・`putStaffMenusBulk`（「指名なし」は全員の `is_designation_optional`）
 - 作る・直す：`createMenu`・`updateMenu`・`saveMenuResources`・`listMenuVersions`・`revertMenuVersion`
 - 予約経路：`/api/booking/admin/channels`・`conflicts`・`channels/settings`（自動割り当て）・`staff/:id/google-calendar`
-- 右の写し：`getAvailability(menuId, from, to, applyStoreRules)`。お客さまの予約画面の写しなので、店舗のルール（休業日・受付の範囲）を当てた空きを読む（`apply_store_rules=1`。勤務とシフトの v7 のお客さまの見本と同じ口）
+- 右の写し：`getAvailability(menuId, from, to, applyStoreRules)`。お客さまの予約画面の写しなので、店舗のルール（休業日・受付の範囲）を当てた空きを読む（`apply_store_rules=1`。勤務とシフトのお客さま向けの見本も同じ口）
 
 ## 権限
 - 変えられるかはサーバーの役割（`/api/staff/me`）で決める：オーナー・管理者は変えられる、担当者は項目キー（`/booking/menus`・`booking.settings`）を持つときだけ。答えが来るまでは今までどおり手元の判定（`canEditFeature`）。

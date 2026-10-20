@@ -1,11 +1,11 @@
-> 文書：リッチメニューの編集・詳細の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：リッチメニューの編集・詳細の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # リッチメニューの編集・詳細の動き（BEHAVIOR.md）
 
 板：作る③ 誰に出すか `OxEMM`・作る④ 公開 `F4gELj`・編集（競合）`r8dGXT`・公開した（公開の進み）`hKr8f`。
 
 ## 入口（app/rich-menus/edit/page.tsx の V8）
-- `/rich-menus/edit?id=<ID>&step=<手順>`：作るのウィザード（`app/rich-menus/new/create-v8.tsx`）で直す。下書きを読み込んで手順①〜④の入力に入れ、すべての手順へ戻れる。`step` は作ると同じ `shape|buttons|audience|publish` と、今までの編集画面の `targeting`（→ audience）・`actions`（→ buttons）を受け付ける。読み込めない・見つからないときは TargetMissing。
+- `/rich-menus/edit?id=<ID>&step=<手順>`：作るのウィザード（[現役の入口・本体](README.md)）で直す。下書きを読み込んで手順①〜④の入力に入れ、すべての手順へ戻れる。`step` は作ると同じ `shape|buttons|audience|publish` と、今までの編集画面の `targeting`（→ audience）・`actions`（→ buttons）を受け付ける。読み込めない・見つからないときは TargetMissing。
 - `/rich-menus/edit?id=<ID>`（手順の指定なし）：このフォルダの `detail.tsx`（hKr8f）。下書きは見せる物が無いので `?step=shape` へ送る。
 - ウィザードは採用済みの create-v8.tsx で続ける。入口はV8だけを読み込み、旧編集の本体と旧セクションは除去済み。
 

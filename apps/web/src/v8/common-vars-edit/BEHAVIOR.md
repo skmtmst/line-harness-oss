@@ -1,9 +1,9 @@
-> 文書：共通情報の作る・編集の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：共通情報の作る・編集の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # 共通情報の作る・編集の動き（BEHAVIOR.md）
 
 一覧（/contents/vars）は `src/v8/common-vars`（PR 1510）。ここは作る（`new.tsx`・板 p82v9）と編集（`edit.tsx`・板 AYc6O／1152 の C67dE／競合 piWhz）だけ。
-写し元：`app/contents/vars/new/new-v8.tsx`・`app/contents/vars/edit/edit-v8.tsx`、言葉と判定は `app/contents/vars/change-impact.ts`・`delete-impact.ts`・`impact-review.tsx` を `impact.ts` に写した（src/v8 から @/app は読まない）。入口 `app/contents/vars/new|edit/page.tsx` は V8 に固定し、旧画面の分岐を削除した。
+写し元：[現役の入口・本体](README.md)・[現役の入口・本体](README.md)、言葉と判定は `app/contents/vars/change-impact.ts`・`delete-impact.ts`・`impact-review.tsx` を `impact.ts` に写した（src/v8 から @/app は読まない）。入口 `app/contents/vars/new/page.tsx`・`app/contents/vars/edit/page.tsx` は V8 に固定し、旧画面の分岐を削除した。
 
 ## 受け付ける URL と指定
 - 作る：`/contents/vars/new`（指定なし）。

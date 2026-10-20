@@ -1,8 +1,8 @@
-> 文書：利用規約（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：利用規約（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # 利用規約（V8）の動き
 
-入口：`app/restaurant-test/terms/page.tsx`（`data-theme="v8"` のとき V8）。絵：`VdKOK`。
+入口：`app/restaurant-test/terms/page.tsx`（V8を直接表示）。絵：`VdKOK`。
 
 ## 受け付ける URL と指定
 - `/restaurant-test/terms`：指定なし。

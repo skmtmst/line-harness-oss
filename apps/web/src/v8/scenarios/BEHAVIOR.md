@@ -1,12 +1,12 @@
-> 文書：シナリオ配信一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：シナリオ配信一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
 
 # シナリオ配信一覧の動き（BEHAVIOR.md）
 
 対象：`list.tsx`（★V8 一覧 `axFrW`・1152 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`）。
-今までの一覧 `app/scenarios/list-v8.tsx` から動きを写し、見た目だけを型（ListPage）で絵どおりに組み直した。
+今までの一覧 [現役の入口・本体](README.md) から動きを写し、見た目だけを型（ListPage）で絵どおりに組み直した。
 
 ## 入口
-- `app/scenarios/page.tsx` がこの一覧だけを出す（v7 は 2026-10-04 に捨てた）。
+- `app/scenarios/page.tsx` がこの一覧だけを出す。
 
 ## 受け付ける URL と指定
 - なし（今までの一覧も URL の指定を読んでいない）。絞り込み・件数は画面の中だけで持つ。
@@ -49,11 +49,11 @@
 
 # シナリオを作る①：シナリオ情報・配信方式（create.tsx）の動き
 
-対象：`create.tsx`（★V8 `dnzqC`）。今までの V8（`app/scenarios/mode-v8.tsx`）と v7（`app/scenarios/mode/page.tsx`）から動きを写し、型（CreatePage）で絵どおりに組み直した。
+対象：`create.tsx`（★V8 `dnzqC`）。型（CreatePage）で絵どおりに組み直した。
 
 ## 入口
-- `app/scenarios/mode/page.tsx`：V8 のときこの画面、それ以外は v7。
-- `app/scenarios/new/page.tsx`：V8 のときこの画面をそのまま出す（撮影の対応表が `/scenarios/new` を指すため）。v7 は今までどおり `/scenarios/mode` へ移す（`?id=` があれば引き継ぐ）。
+- `app/scenarios/mode/page.tsx`：このV8画面を直接表示する。
+- `app/scenarios/new/page.tsx`：このV8画面を直接表示する。`?id=` の意味を保つ。
 
 ## 受け付ける URL と指定（今と同じ）
 - `?id=<シナリオ>`：あれば既存の下書きを読み、名前・フォルダ・方式を出す（「下書きを作りました」の帯）。無ければ「これから作る」（まだ行を作らない）。
@@ -79,10 +79,10 @@
 
 # シナリオの配信結果（results.tsx）の動き
 
-対象：`results.tsx`（★V8 `X4STXS`）。今までの V8（`app/scenarios/results/results-v8.tsx`）から動きを写し、型（DetailPage）で絵どおりに組み直した。
+対象：`results.tsx`（★V8 `X4STXS`）。今までの V8（[現役の入口・本体](README.md)）から動きを写し、型（DetailPage）で絵どおりに組み直した。
 
 ## 入口
-- `app/scenarios/results/page.tsx`：V8 のときこの画面、それ以外は v7。
+- `app/scenarios/results/page.tsx`：このV8画面を直接表示する。
 
 ## 受け付ける URL と指定（今と同じ）
 - `?id=<シナリオ>`：無い → 「指定されていません」、404・空 → 「見つかりません」、通信の失敗 → 「読み込めませんでした」＋もう一度
