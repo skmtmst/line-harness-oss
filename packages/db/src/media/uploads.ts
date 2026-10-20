@@ -227,7 +227,7 @@ export async function failMediaUploadSession(
 ): Promise<void> {
   await db.prepare(
     `UPDATE media_upload_sessions SET status = 'failed', failure_code = ?, completed_at = ?
-      WHERE id = ? AND line_account_id = ? AND status IN ('pending','verified')`,
+      WHERE id = ? AND line_account_id = ? AND status = 'pending'`,
   ).bind(failureCode, jstNow(), id, lineAccountId).run();
 }
 
@@ -238,6 +238,7 @@ export async function verifyMediaUploadSession(
   etag: string,
   measured?: Partial<MediaMetadata> | null,
   overwriteDeclared = false,
+  finalizedR2Key?: string,
 ): Promise<MediaUploadSession | null> {
   // overwriteDeclared: 実体から測れる内容（画像の寸法）は申告値を残さず
   // 実測値へ完全に置き換える。測れなかった場合は null にして
@@ -249,10 +250,10 @@ export async function verifyMediaUploadSession(
         codec = COALESCE(?, codec)`;
   await db.prepare(
     `UPDATE media_upload_sessions SET status = 'verified', etag = ?, completed_at = ?,
-        ${setClause}
+        r2_key = COALESCE(?, r2_key), ${setClause}
       WHERE id = ? AND line_account_id = ? AND status = 'pending'`,
   ).bind(
-    etag, jstNow(),
+    etag, jstNow(), finalizedR2Key ?? null,
     measured?.width ?? null, measured?.height ?? null, measured?.duration_ms ?? null,
     measured?.page_count ?? null, measured?.codec ?? null,
     id, lineAccountId,
@@ -273,22 +274,24 @@ export async function completeNewMediaUpload(
       `INSERT INTO media
          (id, line_account_id, folder_id, kind, filename, mime_type, size_bytes,
           width, height, duration_ms, r2_key, public_url, uploaded_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?
+        FROM media_upload_sessions WHERE id = ? AND status = 'verified' AND result_media_id IS NULL`,
     ).bind(
       mediaId, session.line_account_id, session.folder_id, session.kind, session.filename,
       session.expected_mime, session.expected_size, session.width, session.height,
-      session.duration_ms, session.r2_key, session.created_by, now,
+      session.duration_ms, session.r2_key, session.created_by, now, session.id,
     ),
     db.prepare(
       `INSERT INTO media_versions
          (id, media_id, version_no, r2_key, mime_type, size_bytes, width, height,
           duration_ms, page_count, codec, etag, scan_status,
           scanned_at, uploaded_by, created_at, published_at)
-       VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'verified', ?, ?, ?, ?)`,
+       SELECT ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'verified', ?, ?, ?, ?
+         WHERE EXISTS (SELECT 1 FROM media WHERE id = ?)`,
     ).bind(
       versionId, mediaId, session.r2_key, session.expected_mime, session.expected_size,
       session.width, session.height, session.duration_ms, session.page_count,
-      session.codec, session.etag, now, session.created_by, now, now,
+      session.codec, session.etag, now, session.created_by, now, now, mediaId,
     ),
     db.prepare(
       `UPDATE media_upload_sessions
@@ -296,9 +299,10 @@ export async function completeNewMediaUpload(
         WHERE id = ? AND line_account_id = ? AND status = 'verified'`,
     ).bind(mediaId, now, session.id, session.line_account_id),
   ]);
+  const completed = await getMediaUploadSession(db, session.id, session.line_account_id);
   const media = await db.prepare(
     `SELECT * FROM media WHERE id = ? AND line_account_id = ?`,
-  ).bind(mediaId, session.line_account_id).first<Media>();
+  ).bind(completed?.result_media_id ?? mediaId, session.line_account_id).first<Media>();
   if (!media) throw new Error('completed media is unavailable');
   return media;
 }

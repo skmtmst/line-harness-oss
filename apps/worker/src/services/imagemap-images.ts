@@ -1,3 +1,4 @@
+import { getPinnedMediaObject } from './media-upload-storage.js';
 import { richMessageActions, type AssetPayloadInput } from '@line-crm/shared';
 
 import type { Env } from '../worker-env.js';
@@ -18,7 +19,7 @@ export async function prepareImagemapImages(env: Env['Bindings'], payload: Recor
   if (!media && !/^broadcast-media\/[\da-f-]{36}\.(jpg|png)$/i.test(key)) throw new Error('画像を登録メディアから選び直してください');
   const gate = media ? await checkMediaGate(env.DB,env.IMAGES,{id:media.id,lineAccountId:media.line_account_id,r2Key:key,filename:media.filename,mimeType:media.mime_type,sizeBytes:media.size_bytes}) : await checkKeyGate(env.DB,env.IMAGES,'broadcast_asset',key);
   if (!gate.allowed) throw new Error('画像の安全性の確認が終わっていません');
-  const object = await env.IMAGES.get(key);
+  const object = await getPinnedMediaObject(env.IMAGES, key, gate.etag);
   if (!object || object.size > 10 * 1024 * 1024) throw new Error('画像は10MBまでです');
   const bytes = new Uint8Array(await object.arrayBuffer());
   const type = bytes[0] === 0x89 ? 'image/png' : 'image/jpeg';

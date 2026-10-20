@@ -1,3 +1,4 @@
+import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import { getMediaVersionKeys } from '@line-crm/db';
 import { getMediaById, getFolderById, updateMedia, deleteMedia, getMediaUsages, getMediaDeleteImpactSnapshot, isMissingTableError, applyMediaReplacementPlan, getMediaVersionList, getMediaLiveTarget, getMediaUsageReferenceStates, retargetMediaUsageReference, MediaUsageReferenceError, MEDIA_REF_KINDS, jstNow, getCommonVars, countCommonVars, COMMON_VARS_LIST_LIMIT, getCommonVarUsageSummaries, getCommonVarByIdIncludingArchived, getCommonVarUsageImpact, getCommonVarVersions, type CommonVar } from '@line-crm/db';
@@ -38,7 +39,7 @@ export const get__media_id_content_1 = async (c: Context<Env, "/media/:id/conten
   if (!liveGate.allowed) {
     return c.json({ success: false, code: liveGate.code, error: liveGate.message }, 409);
   }
-  const object = await c.env.IMAGES.get(media.r2_key);
+  const object = await getPinnedMediaObject(c.env.IMAGES, media.r2_key, liveGate.etag);
   if (!object) return c.json({ success: false, error: 'Not found' }, 404);
   const etag = typeof object.etag === 'string' && object.etag ? object.etag : null;
   if (etag && c.req.header('if-none-match') === etag) {

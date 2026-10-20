@@ -1,3 +1,5 @@
+import { checkMediaGate } from '../services/file-scan.js';
+import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import {serializeProject,parseTextLines,parseEmphasisLines,serializeGeneration,serializeMedia,serializeImage} from './hq-banner-serializers.js';
 import {GapError,gapAccount,gapWrite} from '../services/gap-common.js';
@@ -716,6 +718,12 @@ hqBanners.post('/api/hq/banners/images/:id/deliver', inputJsonBoundary(), async 
       return c.json({ success: false, error: '渡す先に、この統括の店舗ではないものが含まれています' }, 404);
     }
 
+    const sourceGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+      id: image.media.id, lineAccountId: image.media.line_account_id, r2Key: image.media.r2_key,
+      filename: image.media.filename, mimeType: image.media.mime_type, sizeBytes: image.media.size_bytes,
+      width: image.media.width, height: image.media.height,
+    });
+    if (!sourceGate.allowed) return c.json({ success: false, code: sourceGate.code, error: sourceGate.message }, 409);
     const results: Array<{ lineAccountId: string; mediaId: string; alreadyDelivered: boolean }> = [];
     for (const lineAccountId of lineAccountIds) {
       const existing = await getBannerImageDelivery(c.env.DB, image.id, lineAccountId);
@@ -723,7 +731,7 @@ hqBanners.post('/api/hq/banners/images/:id/deliver', inputJsonBoundary(), async 
         results.push({ lineAccountId, mediaId: existing.media_id, alreadyDelivered: true });
         continue;
       }
-      const source = await c.env.IMAGES.get(image.media.r2_key);
+      const source = await getPinnedMediaObject(c.env.IMAGES, image.media.r2_key, sourceGate.etag);
       if (!source) {
         return c.json({ success: false, error: '画像の実体が見つかりません。もう一度生成してください' }, 409);
       }

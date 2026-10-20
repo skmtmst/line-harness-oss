@@ -84,7 +84,7 @@ async function call(
 }
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 1, 2, 3]);
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+const PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aR1sAAAAASUVORK5CYII='), value => value.charCodeAt(0));
 const toB64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 
 async function createProject(name = '春のキャンペーン') {
@@ -725,12 +725,12 @@ describe('WEB205 idempotent generation creation', () => {
     const headers = { 'Idempotency-Key': 'same-operation' };
     const responses = await Promise.all([call('POST',path,GENERATE_BODY,{headers}), call('POST',path,GENERATE_BODY,{headers})]);
     expect(responses.map(r=>r.status)).toEqual([201,201]);
-    const ids = await Promise.all(responses.map(async r=>(await r.json() as any).data.id));
+    const ids = await Promise.all(responses.map(async r=>(await r.json() as { data: { id: string } }).data.id));
     expect(ids[0]).toBe(ids[1]);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM banner_generations').get()).toEqual({ n: 1 });
     const replay = await call('POST',path,GENERATE_BODY,{headers,env:{ OPENAI_API_KEY: undefined }});
     expect(replay.status).toBe(201);
-    expect((await replay.json() as any).data.id).toBe(ids[0]);
+    expect((await replay.json() as { data: { id: string } }).data.id).toBe(ids[0]);
     expect((await call('POST',path,{...GENERATE_BODY,count:1},{headers})).status).toBe(409);
     expect((await call('POST',path,GENERATE_BODY,{headers,staff:hqAdmin({tenantId:'tenant-2'})})).status).toBe(404);
     const other = await createProject('別の試み');
@@ -774,4 +774,35 @@ describe('WEB206 server-owned continuation',()=>{
   await processDueBannerGenerations(env());expect(openai.generate).toHaveBeenCalledOnce();
   expect(testDb.raw.prepare('SELECT status,stop_requested_at FROM banner_generations').get()).toMatchObject({status:'canceled',stop_requested_at:expect.any(String)});
  });
+});
+
+
+describe('登録画像の検査状態をコピー先へ持ち越す', () => {
+  async function quarantinedImage() {
+    const project = await createProject();
+    const uploaded = await call('POST', `/api/hq/banners/projects/${project.id}/uploads`, { filename: 'reference.png', data: `data:image/png;base64,${toB64(PNG)}` });
+    expect(uploaded.status).toBe(201);
+    const image = (await uploaded.json<{ data: { id: string } }>()).data;
+    const row = testDb.raw.prepare('SELECT media_id FROM banner_images WHERE id=?').get(image.id) as { media_id: string };
+    testDb.raw.prepare(`INSERT INTO media_file_scans(id,subject_kind,subject_id,media_id,filename,mime_type,size_bytes,status) VALUES ('source-scan','media',?,?,'reference.png','image/png',?,'quarantined')`).run(row.media_id, row.media_id, PNG.length);
+    return { project, image };
+  }
+  it('しまった画像を店舗へ複製せず、確認済みになれば従来どおり渡す', async () => {
+    const { image } = await quarantinedImage();
+    const before = r2.store.size;
+    expect((await call('POST', `/api/hq/banners/images/${image.id}/deliver`, { lineAccountIds: ['account-1'] })).status).toBe(409);
+    expect(r2.store.size).toBe(before);
+    expect(testDb.raw.prepare('SELECT count(*) AS n FROM banner_image_deliveries').get()).toEqual({ n: 0 });
+    testDb.raw.prepare("UPDATE media_file_scans SET status='clean' WHERE id='source-scan'").run();
+    expect((await call('POST', `/api/hq/banners/images/${image.id}/deliver`, { lineAccountIds: ['account-1'] })).status).toBe(200);
+    expect(r2.store.size).toBe(before + 1);
+  });
+  it('しまった画像を生成サービスへ渡さない', async () => {
+    const { project, image } = await quarantinedImage();
+    const queued = await call('POST', `/api/hq/banners/projects/${project.id}/generations`, { ...GENERATE_BODY, count: 1, referenceImageId: image.id, referenceMode: 'edit' });
+    expect(queued.status).toBe(201);
+    const generation = (await queued.json<{ data: { id: string } }>()).data;
+    expect((await call('POST', `/api/hq/banners/generations/${generation.id}/run`)).status).toBe(400);
+    expect(openai.generate).not.toHaveBeenCalled();
+  });
 });

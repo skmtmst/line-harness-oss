@@ -70,12 +70,18 @@ function serializeScan(row: FileScanRow) {
 async function findR2Key(
   db: D1Database,
   scan: FileScanRow,
-): Promise<{ key: string; width: number | null; height: number | null } | null> {
-  if (scan.subject_kind === 'upload_session' || scan.subject_kind === 'media_version') {
+): Promise<{ key: string; width: number | null; height: number | null; etag?: string } | null> {
+  if (scan.subject_kind === 'media_version') {
+    const version = await db.prepare(
+      `SELECT r2_key, width, height, etag FROM media_versions WHERE id = ? AND media_id = ?`,
+    ).bind(scan.subject_id, scan.media_id).first<{ r2_key: string; width: number | null; height: number | null; etag: string | null }>();
+    return version ? { key: version.r2_key, width: version.width, height: version.height, ...(version.etag ? { etag: version.etag.replace(/^"|"$/g, '') } : {}) } : null;
+  }
+  if (scan.subject_kind === 'upload_session') {
     const session = await db.prepare(
       `SELECT r2_key, width, height FROM media_upload_sessions WHERE id = ?`,
     ).bind(scan.subject_id).first<{ r2_key: string; width: number | null; height: number | null }>();
-    if (session) return { key: session.r2_key, width: session.width, height: session.height };
+    return session ? { key: session.r2_key, width: session.width, height: session.height } : null;
   }
   if (scan.subject_kind === 'media' || scan.media_id) {
     const media = await db.prepare(
@@ -127,7 +133,8 @@ export async function processDueFileScans(
       );
       if (external) {
         // 外の検査は設定があれば使う。鍵は設定の secret_ref が指す環境値から。
-        const head = await env.IMAGES.get(target.key, target.key.startsWith('private/form-documents/') ? undefined : { range: { offset: 0, length: 256 * 1024 } });
+        const head = await env.IMAGES.get(target.key, { ...(target.key.startsWith('private/form-documents/') ? {} : { range: { offset: 0, length: 256 * 1024 } }), ...(target.etag ? { onlyIf: { etagMatches: target.etag } } : {}) });
+        if ((target.etag && !head) || (head && !('body' in head))) throw new ScanRetryableError('object_changed');
         if (isPrivateFormDocumentScan(scan) && !head) throw new ScanRetryableError('document_missing');
         const bytes = head ? new Uint8Array(await head.arrayBuffer()) : new Uint8Array();
         try {
@@ -154,7 +161,7 @@ export async function processDueFileScans(
       }, {
         maxBytes: config?.max_bytes_override ?? null,
         maxPixels: config?.max_pixels_override ?? null,
-      });
+      }, target.etag);
       if (next.status === 'pending') stillPending += 1;
     } catch (err) {
       logger.error("routes_file_scan_failed");

@@ -1,3 +1,5 @@
+import { checkMediaGate } from '../services/file-scan.js';
+import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError } from '../lib/input-errors.js';
@@ -323,7 +325,13 @@ export const post__api_rich_menu_groups_8 = async (c: Context<Env, "/api/rich-me
       if (!media || media.kind !== 'image' || media.archived_at) {
         return inputError(c, { success: false, error: '選ばれたメディアはこのアカウントの画像として使えません', data: serializeGroupWithPages(created) }, 400, ["imageMediaId"]);
       }
-      const obj = await c.env.IMAGES.get(media.r2_key);
+      const gate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+        id: media.id, lineAccountId: media.line_account_id, r2Key: media.r2_key,
+        filename: media.filename, mimeType: media.mime_type, sizeBytes: media.size_bytes,
+        width: media.width, height: media.height,
+      });
+      if (!gate.allowed) return inputError(c, { success: false, code: gate.code, error: gate.message, data: serializeGroupWithPages(created) }, 400, ['imageMediaId']);
+      const obj = await getPinnedMediaObject(c.env.IMAGES, media.r2_key, gate.etag);
       if (!obj) throw new Error('media object not found in storage');
       const buf = new Uint8Array(await new Response(obj.body).arrayBuffer());
       const validation = validateRichMenuImage(buf, buf.byteLength);
