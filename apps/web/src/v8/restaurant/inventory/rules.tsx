@@ -19,6 +19,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -40,6 +41,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
   const [loadError, setLoadError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [fieldError, setFieldError] = useState('')
+  const saveErrors = useSaveFormErrors()
   const [confirm, setConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [date, setDate] = useState(today)
@@ -55,10 +57,10 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
     try {
       const response = await restaurantTestApi.inventoryRules(accountId, storeId)
       if (!alive.current) return false
-      setSaved(response.data); setDraft(toDraft(response.data))
+      setSaved(response.data); setDraft(toDraft(response.data)); saveErrors.reset()
       return true
     } catch (error) { if (alive.current) setLoadError(describeApiFailure(error, '読み込み', { scope: 'store' })); return false }
-  }, [accountId, storeId])
+  }, [accountId, storeId, saveErrors])
   const loadState = useCallback(async () => {
     const request = ++stateRequest.current
     setState(null); setStateError('')
@@ -89,7 +91,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
       if (!alive.current) return
       setConfirm(false)
       if (isSaveConflict(error)) conflict.mark()
-      else setSaveError(describeApiFailure(error, '保存', { scope: 'store' }))
+      else if (!saveErrors.capture(error)) setSaveError(describeApiFailure(error, '保存', { scope: 'store' }))
     } finally { if (alive.current) setSaving(false) }
   }
   if (!saved || !draft) return <PageContent><ListState kind={loadError ? 'error' : 'loading'} description={loadError || undefined} onRetry={load} /></PageContent>
@@ -97,7 +99,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
     ...(conflict.latest.threshold !== Number(draft.threshold) ? [{ text: `止める基準：入力 ${draft.threshold}席 ／ 最新 ${conflict.latest.threshold}席` }] : []),
     ...SWITCHES.filter(([key]) => conflict.latest![key] !== draft[key]).map(([key, label]) => ({ text: `${label}：入力 ${draft[key] ? '有効' : '停止中'} ／ 最新 ${conflict.latest![key] ? '有効' : '停止中'}` })),
   ] : null
-  return <>
+  return <SaveErrorScope errors={saveErrors}><>
     <PageContent>
       {!canEdit ? <ReadOnlyNotice /> : null}
       {conflict.conflict ? <SaveConflictBand title="ほかの担当者が先にルールを保存しました" onCompare={conflict.compare} compareBusy={conflict.compareBusy} onReload={conflict.reloadLatest} /> : null}
@@ -109,18 +111,18 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
         if (draft.threshold.trim() === '' || !Number.isSafeInteger(Number(draft.threshold)) || Number(draft.threshold) < 0 || Number(draft.threshold) > 10000) {
           setFieldError('0〜10000の整数を入れてください'); return
         }
-        setFieldError(''); setSaveError(''); setConfirm(true)
+        setFieldError(''); setSaveError(''); saveErrors.reset(); setConfirm(true)
       }}>
         <SettingsFormRow layout="columns" columns={3}>
           <Field label="残り席がこの数以下で止める" optional={false} error={fieldError}>
-            {canEdit ? <NumberField aria-label="残り席がこの数以下で止める" value={draft.threshold} min={0} max={10000} step={1} unit="席" disabled={saving} onChange={(event) => { setDraft({ ...draft, threshold: event.target.value }); setFieldError('') }} /> : `${saved.threshold}席`}
+            {canEdit ? <SaveErrorField names={['threshold']}><NumberField aria-label="残り席がこの数以下で止める" value={draft.threshold} min={0} max={10000} step={1} unit="席" disabled={saving} onChange={(event) => { setDraft({ ...draft, threshold: event.target.value }); setFieldError('') }} /></SaveErrorField> : `${saved.threshold}席`}
           </Field>
           {SWITCHES.slice(0, 2).map(([key, label]) => <Field key={key} label={label} optional={false} help={key === 'stopSameDay' ? '当日受付は店頭・電話の枠とは別です。店頭・電話の枠は自動で止めません。' : '初めは停止中です。有効にして保存した店舗だけ、自動で調整します。'}>
-            {canEdit ? <Toggle label={label} checked={draft[key]} disabled={saving} onChange={(next) => setDraft({ ...draft, [key]: next })} /> : saved[key] ? '有効' : '停止中'}
+            {canEdit ? <SaveErrorField names={[key]}><Toggle label={label} checked={draft[key]} disabled={saving} onChange={(next) => setDraft({ ...draft, [key]: next })} /></SaveErrorField> : saved[key] ? '有効' : '停止中'}
           </Field>)}
         </SettingsFormRow>
         <Field label="担当にLINEで知らせる" optional={false} help="媒体の受付を閉じる・再開する作業を店長や当日の責任者へ知らせます。媒体への自動書き戻しは行いません。">
-          {canEdit ? <Toggle label="担当にLINEで知らせる" checked={draft.notify} disabled={saving} onChange={(next) => setDraft({ ...draft, notify: next })} /> : saved.notify ? '有効' : '停止中'}
+          {canEdit ? <SaveErrorField names={['notify']}><Toggle label="担当にLINEで知らせる" checked={draft.notify} disabled={saving} onChange={(next) => setDraft({ ...draft, notify: next })} /></SaveErrorField> : saved.notify ? '有効' : '停止中'}
         </Field>
       </SettingsFormCard>
       <SectionHeader title="停止中の枠・戻った記録" help="自動停止中は配分を手で変更できません。席が戻るか停止ルールを外すと、保存していた元の配分へ戻ります。記録は選んだ日の枠が対象です。" helpLabel="自動調整の記録の説明" actions={<ListToolbarEnd>
@@ -130,11 +132,11 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
       <RulesState state={state} error={stateError} onRetry={loadState} timezone={timezone} />
     </PageContent>
     {canEdit ? <StickyBar actions={<>
-      <Button disabled={!dirty || saving} onClick={() => { setDraft(toDraft(saved)); setFieldError('') }}>キャンセル</Button>
+      <Button disabled={!dirty || saving} onClick={() => { setDraft(toDraft(saved)); setFieldError(''); saveErrors.reset() }}>キャンセル</Button>
       <Button type="submit" form="inventory-rules-form" variant="primary" busy={saving} disabled={!dirty || Boolean(conflict.conflict)}>ルールを保存する</Button>
     </>} /> : null}
     <ConfirmDialog open={confirm && canEdit} title="自動調整のルールを保存しますか？" description="保存すると、すでにある予約を含めて受付枠を数え直します。受付停止を外すと、保持していた配分へ戻ります。担当への通知を有効にすると、自動通知の対象になります。" confirmLabel="保存する" busy={saving} onConfirm={save} onCancel={() => { if (!saving) setConfirm(false) }} />
     <SaveConflictCompareDialog open={conflict.compareOpen} busy={conflict.compareBusy} error={conflict.compareError} lines={diff} onReload={conflict.reloadLatest} onCancel={conflict.closeCompare} />
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="自動調整ルールの変更" busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
-  </>
+  </></SaveErrorScope>
 }

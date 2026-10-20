@@ -93,6 +93,25 @@ it('409は下書きを保って最新と比較し、明示した読込でだけ�
   fireEvent.click(within(dialog).getByRole('button', { name: '最新を読み込んで続ける' }))
   await waitFor(() => expect(threshold().value).toBe('6'))
 })
+it.each([
+  ['threshold', 'spinbutton', '残り席がこの数以下で止める'],
+  ['stopLine', 'switch', 'LINEの受付を自動で止める'],
+  ['stopSameDay', 'switch', '当日受付を自動で止める'],
+  ['notify', 'switch', '担当にLINEで知らせる'],
+])('保存時の%sの理由をその欄へ返し、打ち直すと解除して再保存できる', async (key, role, name) => {
+  api.saveInventoryRules.mockRejectedValueOnce(new ApiError(422, '入力を確認してください', undefined, undefined, undefined, undefined, { [key]: 'この設定を確認してください' }))
+  render(<RulesBoard {...props} />); await edit(); await confirmSave()
+  await screen.findByText('この設定を確認してください')
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(threshold().value).toBe('4')
+  const control = screen.getByRole(role, { name })
+  expect(control.getAttribute('aria-invalid')).toBe('true')
+  if (role === 'spinbutton') fireEvent.change(control, { target: { value: '5' } })
+  else fireEvent.click(control)
+  await waitFor(() => expect(screen.queryByText('この設定を確認してください')).toBeNull())
+  await confirmSave()
+  await waitFor(() => expect(api.saveInventoryRules).toHaveBeenCalledTimes(2))
+})
 it('空・小数・上限超えのしきい値を保存しない', async () => {
   render(<RulesBoard {...props} />); await screen.findByRole('spinbutton')
   for (const value of ['', '1.5', '10001', '-1']) {
