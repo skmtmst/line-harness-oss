@@ -343,9 +343,13 @@ export async function getLinkClicks(
 ): Promise<LinkClickWithFriend[]> {
   const result = await db
     .prepare(
-      `SELECT lc.*, f.display_name as friend_display_name
+      `SELECT lc.id, lc.tracked_link_id, f.id AS friend_id, lc.clicked_at, f.display_name as friend_display_name
        FROM link_clicks lc
+       JOIN tracked_links tl ON tl.id = lc.tracked_link_id
+       LEFT JOIN scenarios sc ON sc.id = tl.scenario_id
        LEFT JOIN friends f ON f.id = lc.friend_id
+         AND f.line_account_id IS COALESCE(tl.line_account_id, sc.line_account_id)
+         AND (tl.line_account_id IS NOT NULL OR tl.scenario_id IS NULL OR sc.id IS NOT NULL)
        WHERE lc.tracked_link_id = ?
        ORDER BY lc.clicked_at DESC`,
     )

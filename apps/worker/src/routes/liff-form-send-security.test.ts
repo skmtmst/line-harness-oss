@@ -1,3 +1,4 @@
+import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -26,6 +27,8 @@ beforeEach(() => {
     INSERT INTO friends(id,line_user_id,display_name,line_account_id)
     VALUES ('friend-a','user-a','Fixture A','account-a'),('friend-b','user-b','Fixture B','account-b');`);
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (url === 'https://api.line.me/oauth2/v2.1/token') return Response.json({ access_token: 'fixture-access', id_token: 'fixture-token' });
+    if (url === 'https://api.line.me/v2/profile') return Response.json({ userId: identity, displayName: 'Fixture' });
     if (url === 'https://api.line.me/oauth2/v2.1/verify') {
       const channel = new URLSearchParams(init?.body as string).get('client_id');
       return channel === 'channel-a' && tokenValid
@@ -68,5 +71,71 @@ describe('Q03 form send keeps identity and account validation before the narrowe
     identity = 'user-b';
     expect((await send({ ...valid, lineUserId: 'user-b' })).status).toBe(404);
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('form intro referral ownership', () => {
+  function seedLink(account: string | null, active = 1) {
+    db.raw.prepare(`INSERT INTO message_templates(id,name,message_type,message_content) VALUES('intro','Intro','text','Campaign hello {formUrl}')`).run();
+    db.raw.prepare(`INSERT INTO tracked_links(id,name,original_url,line_account_id,is_active,intro_template_id)
+      VALUES('ref-link','Ref','https://example.test',?,?, 'intro')`).run(account, active);
+  }
+  function firstLink() { return db.raw.prepare("SELECT first_tracked_link_id FROM friends WHERE id='friend-a'").get(); }
+  it('pins an active same-account ref and sends the normal campaign intro', async () => {
+    seedLink('account-a');
+    expect((await send({ ...valid, ref: 'ref-link' })).status).toBe(200);
+    expect(firstLink()).toEqual({ first_tracked_link_id: 'ref-link' });
+    expect(JSON.stringify(push.mock.calls[0][0])).toContain('Campaign hello');
+  });
+  it.each([['account-b',1], ['account-a',0]] as const)('ignores foreign/inactive ref %s/%i while preserving generic form guidance', async (account, active) => {
+    seedLink(account, active);
+    expect((await send({ ...valid, ref: 'ref-link' })).status).toBe(200);
+    expect(firstLink()).toEqual({ first_tracked_link_id: null });
+    const message = JSON.stringify(push.mock.calls[0][0]);
+    expect(message).not.toContain('Campaign hello');
+    expect(message).not.toContain('ref-link');
+    expect(message).toContain('form-fixture');
+  });
+  it.each(['account-a', 'account-b'])('resolves scenario ownership before accepting a legacy direct owner: %s', async account => {
+    seedLink(null);
+    db.raw.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id)VALUES('scenario','Campaign','manual',?)").run(account);
+    db.raw.exec("UPDATE tracked_links SET scenario_id='scenario' WHERE id='ref-link'");
+    expect((await send({ ...valid, ref: 'ref-link' })).status).toBe(200);
+    expect(firstLink()).toEqual({ first_tracked_link_id: account === 'account-a' ? 'ref-link' : null });
+    expect(JSON.stringify(push.mock.calls[0][0]).includes('Campaign hello')).toBe(account === 'account-a');
+  });
+  it('keeps a stopped entry route suppressed even when its ref matches an active tracked link', async () => {
+    seedLink('account-a');
+    db.raw.exec("INSERT INTO entry_routes(id,ref_code,name,is_active)VALUES('stopped','ref-link','Stopped',0)");
+    expect((await send({ ...valid, ref: 'ref-link' })).status).toBe(200);
+    expect(firstLink()).toEqual({ first_tracked_link_id: null });
+    expect(JSON.stringify(push.mock.calls[0][0])).not.toContain('Campaign hello');
+    expect(JSON.stringify(push.mock.calls[0][0])).not.toContain('ref-link');
+  });
+  it.each([['account-a',1,true], ['account-b',1,false], ['account-a',0,false], [null,1,true]] as const)
+    ('applies the same referral boundary in OAuth form delivery: %s/%i', async (account, active, allowed) => {
+      seedLink(account, active);
+      const signed = await signedLiffState('fixture-signing-key', { account: 'bot-a', form: 'form-fixture', ref: 'ref-link' });
+      const response = await liffRoutes.request(`https://api.fixture.test/auth/callback?code=fixture&state=${encodeURIComponent(signed.state)}`,
+        { headers: { Cookie: signed.cookie } }, { DB: db.db, LINE_CHANNEL_SECRET: 'fixture-signing-key',
+          LINE_LOGIN_CHANNEL_ID: 'channel-a', LINE_LOGIN_CHANNEL_SECRET: 'fixture-login', LINE_CHANNEL_ACCESS_TOKEN: 'unused' } as Env['Bindings']);
+      expect(response.status).toBe(200);
+      expect(push).toHaveBeenCalledTimes(1);
+      expect(firstLink()).toEqual({ first_tracked_link_id: allowed ? 'ref-link' : null });
+      const message = JSON.stringify(push.mock.calls[0][0]);
+      expect(message.includes('Campaign hello')).toBe(allowed);
+      expect(message.includes('ref-link')).toBe(allowed);
+      expect(message).toContain('form-fixture');
+    });
+  it('accepts legacy null owner only for the default tenant', async () => {
+    seedLink(null);
+    expect((await send({ ...valid, ref: 'ref-link' })).status).toBe(200);
+    expect(firstLink()).toEqual({ first_tracked_link_id: 'ref-link' });
+    db.raw.exec("UPDATE friends SET first_tracked_link_id=NULL; UPDATE line_accounts SET tenant_id='foreign-tenant' WHERE id='account-a'; INSERT INTO tenants(id,name)VALUES('foreign-tenant','Other')");
+    push.mockClear();
+    expect((await send({ ...valid, ref: 'ref-link' })).status).toBe(200);
+    expect(firstLink()).toEqual({ first_tracked_link_id: null });
+    expect(JSON.stringify(push.mock.calls[0][0])).not.toContain('Campaign hello');
   });
 });

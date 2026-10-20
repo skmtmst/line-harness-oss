@@ -70,5 +70,9 @@ it('F9: LINE identity never leaves the Worker origin or appears on non-tracking 
   const external = 'https://evil.example/t/x';
   expect(attributedRedirectTarget(external, 'https://worker.test', 'Uprivate')).toBe(external);
   expect(attributedRedirectTarget('/thanks?next=/t/x', 'https://worker.test', 'Uprivate')).toBe('/thanks?next=/t/x');
-  expect(attributedRedirectTarget('/t/x?other=1#fragment', 'https://worker.test', 'Uprivate')).toBe('https://worker.test/t/x?other=1&lu=Uprivate#fragment');
+  expect(attributedRedirectTarget('/t/x?other=1#fragment', 'https://worker.test', 'Uprivate')).toBe('https://worker.test/t/x?other=1&identity=Uprivate#fragment');
+});
+
+it('marks a failed LIFF identification attempt without raw IDs so the redirect can finish anonymously', () => {
+  expect(attributedRedirectTarget('/t/x?f=raw&lu=raw', 'https://worker.test', '')).toBe('https://worker.test/t/x?identity=');
 });

@@ -17,7 +17,7 @@ beforeEach(()=>{item=createTestD1();fault.tag=true;insertFriend(item.raw,'f',{li
 afterEach(()=>item.raw.close());
 describe('PKG68 durable click stages',()=>{
  it('persists the queue before redirect work and resumes only the unfinished effects',async()=>{
-  const saved=await recordTrackedClick(item.db,{linkId:'l',friendId:'f',accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  const saved=await recordTrackedClick(item.db,{linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
   const env={DB:item.db} as Env['Bindings'];
   await expect(processTrackedClick(env,saved.id,saved.plan)).rejects.toThrow();
   expect(item.raw.prepare("SELECT status FROM workflow_steps WHERE step_key='__run'").get()).toEqual({status:'failed'});
@@ -32,4 +32,29 @@ describe('PKG68 durable click stages',()=>{
   expect(item.raw.prepare('SELECT count(*) AS n FROM link_clicks').get()).toEqual({n:0});
   expect(item.raw.prepare('SELECT click_count FROM tracked_links').get()).toEqual({click_count:0});
  });
+});
+
+
+it.each(['b', null])('rejects a foreign or null account before persisting an identified click: %s', async accountId => {
+  await expect(recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId,tagId:null,scenarioId:null,linkName:'link',conversionPointIds:[]}))
+    .rejects.toThrow('tracked_click_account_changed');
+  expect(item.raw.prepare('SELECT COUNT(*) AS n FROM link_clicks').get()).toEqual({n:0});
+  expect(item.raw.prepare('SELECT COUNT(*) AS n FROM workflow_steps').get()).toEqual({n:0});
+});
+it('refuses a queued friend moved to NULL before any effects run', async () => {
+  const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  item.raw.exec("UPDATE friends SET line_account_id=NULL WHERE id='f'");
+  await expect(processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,saved.plan)).rejects.toThrow('tracked_click_account_changed');
+  expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:0},{n:0},{n:0},{n:0}]);
+});
+
+it('refuses old persisted identified plans without verified identity provenance', async () => {
+  const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  const legacy = {...saved.plan};
+  delete legacy.identityVerified;
+  item.raw.prepare("UPDATE workflow_steps SET input_json=? WHERE step_key='__run'").run(JSON.stringify(legacy));
+  await expect(processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,legacy)).rejects.toThrow('tracked_click_identity_unverified');
+  expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:0},{n:0},{n:0},{n:0}]);
+  await expect(recordTrackedClick(item.db, {linkId:'l',friendId:'f',accountId:'a',tagId:null,scenarioId:null,linkName:'link',conversionPointIds:[]}))
+    .rejects.toThrow('tracked_click_identity_unverified');
 });

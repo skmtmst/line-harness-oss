@@ -307,7 +307,18 @@ async function linkAndAddFlow() {
         linkPromise,
         new Promise((r) => setTimeout(r, 500)),
       ]);
-      window.location.href = attributedRedirectTarget(redirectUrl, window.location.origin, profile.userId);
+      let identityToken = '';
+      const target = new URL(redirectUrl, window.location.origin);
+      if (target.origin === window.location.origin && target.pathname.startsWith('/t/') && rawIdToken) {
+        try {
+          const response = await apiCall('/api/liff/tracked-link-identity', {
+            method: 'POST', body: JSON.stringify({ linkId: decodeURIComponent(target.pathname.slice(3)), idToken: rawIdToken }),
+          });
+          const result = await response.json() as { data?: { token?: string } };
+          if (response.ok) identityToken = result.data?.token || '';
+        } catch { /* 本人を確認できなくても匿名でリンク先を開く。 */ }
+      }
+      window.location.href = attributedRedirectTarget(redirectUrl, window.location.origin, identityToken);
       return;
     }
 

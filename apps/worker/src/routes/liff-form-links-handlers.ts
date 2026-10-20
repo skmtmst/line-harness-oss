@@ -1,3 +1,4 @@
+import { trackedLinkReferralMatchesAccount } from '../services/tracked-link-identity.js';
 import { navigationProof } from '../lib/navigation-proof.js';
 import { storedRedirectTarget } from '../lib/safe-redirect.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
@@ -231,8 +232,11 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
     // N-244差戻: 停止 ref は再送しない (下流の form 受付で帰属が復活するのを
     // 止める)。tracked 解決も後段で止める。不存在 ref は従来どおり載せる。
     const stoppedFormRef = await isStoppedEntryRouteRef(db, ref);
-    const externalRefForForm =
-      ref && !ref.startsWith('xh:') && !stoppedFormRef ? ref : '';
+    const refLink = ref && !stoppedFormRef ? await getTrackedLinkById(db, ref) : null;
+    const trackedLink = refLink && await trackedLinkReferralMatchesAccount(db, refLink, friend.line_account_id ?? null)
+      ? refLink : null;
+    const externalRefForForm = ref && !ref.startsWith('xh:') && !stoppedFormRef
+      && (!refLink || trackedLink) ? ref : '';
     const formQuery = new URLSearchParams();
     formQuery.set('page', 'form');
     formQuery.set('id', formId);
@@ -268,17 +272,14 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
     // N-244差戻: 停止 entry route と同名の tracked link があっても fallback
     // しない (帰属の復活を止める)。不存在 ref は従来どおり解決する。
     let introTemplate = null;
-    if (ref && !stoppedFormRef) {
-      const trackedLink = await getTrackedLinkById(c.env.DB, ref);
-      if (trackedLink) {
-        try {
-          const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
-          await setFriendFirstTrackedLinkIfNull(c.env.DB, friend.id, trackedLink.id);
-        } catch (e) {
-          logger.error("routes_liff_failed");
-        }
+    if (trackedLink) {
+      try {
+        const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
+        await setFriendFirstTrackedLinkIfNull(c.env.DB, friend.id, trackedLink.id);
+      } catch {
+        logger.error("routes_liff_failed");
       }
-      if (trackedLink?.intro_template_id) {
+      if (trackedLink.intro_template_id) {
         introTemplate = await getMessageTemplateById(c.env.DB, trackedLink.intro_template_id);
       }
     }
