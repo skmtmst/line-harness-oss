@@ -1,6 +1,6 @@
 'use client'
 
-import { describeApiFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, isSaveConflict } from '@/components/shared/api-error-message'
 import { readLineImageContent } from './edit-dialog-model'
 
 
@@ -221,7 +221,7 @@ export async function saveAutoReplyDialog({ actions, activeFrom, activeUntil, co
       onSaved()
     } catch (e) {
       // m26c R551: 競合は入力を保持したまま、先行内容との比較と読み直しを出す。
-      if (e instanceof ApiError && e.status === 409) {
+      if (isSaveConflict(e)) {
         const data = e.data as {
           currentVersion?: number
           current?: { keyword?: string; responseContent?: string }

@@ -232,7 +232,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setGenerationError(describeApiFailure(caught, '画像の登録', { scope: 'hq' })) }
+      setGenerationError(describeApiFailure(caught, '生成状態の確認', { scope: 'hq' })) }
       void loadUsage()
     } finally {
       // 先に最新の状態を読み直してから止める（順を逆にすると、古い「生成中」を見た再開がもう一度状態確認を始める）。
@@ -292,7 +292,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setGenerationError(describeApiFailure(caught, '保存', { scope: 'hq' })) }
+      setGenerationError(describeApiFailure(caught, '生成の開始', { scope: 'hq' })) }
       void loadUsage()
     } finally {
       startingRef.current = false

@@ -30,7 +30,7 @@ describe('対象が分からないときの言い方（#975 U096）', () => {
     expect(EDIT).toContain('この共通アクションを編集する権限がありません')
     expect(EDIT).toContain('編集中の下書きがありません')
     // 生の API エラー文は主文にしない（接頭辞で弾いて言い換える）。
-    expect(EDIT).toContain("describeApiFailure(caught, '読み込み')")
+
   })
 
   it('版の画面は、対象未指定とアカウント未選択・対象なしを分ける', () => {

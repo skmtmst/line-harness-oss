@@ -1,6 +1,6 @@
 'use client'
 
-import { describeApiFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, isSaveConflict } from '@/components/shared/api-error-message'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { api, ApiError, type AutomationDraftAction, type AutomationDraftDetail } from '@/lib/api'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
@@ -214,7 +214,7 @@ export function useAutomationTest({
       }
       // Worker が「確認したときと違う」と返したときも、画面側で気づいたときと
       // 同じ扱いにする。古い確認を開いたままにしない。
-      if (caught instanceof ApiError && (caught.status === 409 || caught.code === 'version_conflict')) {
+      if (isSaveConflict(caught) || (caught instanceof ApiError && caught.code === 'version_conflict')) {
         setTestConfirmation(null)
       }
       { if (!fieldFailure)

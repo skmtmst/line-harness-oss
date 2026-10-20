@@ -331,7 +331,7 @@ export default function ScenarioFirstStepV8() {
 
   const submit = async () => {
     // ボタンの disabled だけに頼らない。上限超え・未取得のままの保存を通さない。
-    if (bodyOverLimit || loadState !== 'ready' || !scenario) return
+    if (saving || bodyOverLimit || loadState !== 'ready' || !scenario) return
     setSaving(true)
     setError('')
     setTargetError('')
