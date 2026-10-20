@@ -123,7 +123,7 @@ describe('tracked click caller identity and current ownership', () => {
     fixture.raw.exec("UPDATE tracked_links SET is_active=0 WHERE id='link-a'");
     expect((await exchange()).status).toBe(404);
   });
-  it('refuses orphaned scenario ownership and suspending tenants even for previously valid signatures', async () => {
+  it('refuses orphaned scenario ownership and suspended tenants even with a valid signature', async () => {
     const signed = await token();
     fixture.raw.exec("INSERT INTO tenants(id,name,status)VALUES('tenant-a','A','suspended'); UPDATE line_accounts SET tenant_id='tenant-a' WHERE id='a'");
     await click(`?identity=${signed}`);
