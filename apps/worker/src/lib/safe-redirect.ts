@@ -49,9 +49,12 @@ export function safeRedirectTarget(raw: string | null | undefined, origin?: stri
 }
 
 /** Customer identity belongs only on this Worker's own tracking endpoint. */
-export function attributedRedirectTarget(target: string, origin: string, lineUserId: string): string {
+export function attributedRedirectTarget(target: string, origin: string, identityToken: string): string {
   const parsed = new URL(target, origin);
   if (parsed.origin !== new URL(origin).origin || !parsed.pathname.startsWith('/t/')) return target;
-  parsed.searchParams.set('lu', lineUserId);
+  parsed.searchParams.delete('lu');
+  parsed.searchParams.delete('f');
+  parsed.searchParams.delete('identity');
+  parsed.searchParams.set('identity', identityToken);
   return parsed.toString();
 }

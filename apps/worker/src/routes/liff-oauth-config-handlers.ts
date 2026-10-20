@@ -1,3 +1,4 @@
+import { trackedLinkReferralMatchesAccount } from '../services/tracked-link-identity.js';
 import { getCookie, deleteCookie } from 'hono/cookie';
 import { verifyNavigationProof } from '../lib/navigation-proof.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -41,7 +42,6 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
   let utmMedium = '';
   let utmCampaign = '';
   let accountParam = '';
-  let uidParam = '';
   let igParam = '';
   let igaParam = '';
   let iganParam = '';
@@ -423,8 +423,11 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         // elsewhere in this file for QR codes / external LIFF URLs.
         // N-244: 停止 ref は案内文の URL にも載せない。下流の form 受付で
         // 帰属が復活するのを止める。不存在 ref は従来どおり載せる。
-        const externalRefForForm =
-          ref && !ref.startsWith('xh:') && !stoppedCallbackRef ? ref : '';
+        const refLink = ref && !stoppedCallbackRef ? await getTrackedLinkById(db, ref) : null;
+        const trackedLink = refLink && await trackedLinkReferralMatchesAccount(db, refLink, friend.line_account_id ?? null)
+          ? refLink : null;
+        const externalRefForForm = ref && !ref.startsWith('xh:') && !stoppedCallbackRef
+          && (!refLink || trackedLink) ? ref : '';
         const formQuery = new URLSearchParams();
         formQuery.set('page', 'form');
         formQuery.set('id', formId);
@@ -463,18 +466,15 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         // re-running this flow with a different ref.
         let introTemplate = null;
         // N-244: 停止 entry route の ref は tracked fallback へ落とさない。
-        if (ref && !stoppedCallbackRef) {
-          const trackedLink = await getTrackedLinkById(db, ref);
-          if (trackedLink) {
-            try {
-              const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
-              await setFriendFirstTrackedLinkIfNull(db, friend.id, trackedLink.id);
-            } catch (e) {
-              logger.error("routes_liff_failed");
-            }
-            if (trackedLink.intro_template_id) {
-              introTemplate = await getMessageTemplateById(db, trackedLink.intro_template_id);
-            }
+        if (trackedLink) {
+          try {
+            const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
+            await setFriendFirstTrackedLinkIfNull(db, friend.id, trackedLink.id);
+          } catch (e) {
+            logger.error("routes_liff_failed");
+          }
+          if (trackedLink.intro_template_id) {
+            introTemplate = await getMessageTemplateById(db, trackedLink.intro_template_id);
           }
         }
         // intro テンプレートの {{var.*}} は送信時点の値へ置き換える。
