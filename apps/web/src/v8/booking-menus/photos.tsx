@@ -25,10 +25,10 @@ const LABELS = { exterior: '外観', interior: '店内', waiting: '待合' }
 type Target = { owner: BookingPhotoOwner; id: string; name: string }
 const keyOf = (target: Target) => `${target.owner}:${target.id}`
 
-function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, disabledReason, onPick, onRemove, onSave, orderActions, visibilityControl }: {
+function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, disabledReason, onPick, onRemove, onSave, orderActions, visibilityControl, visibilityLabel }: {
   name: string; fieldKey: string; photo: BookingPhoto | null; accountId: string; editable: boolean; changed: boolean; busy: boolean
   onPick: () => void; onRemove: () => void; onSave?: () => void; orderActions?: React.ReactNode
-  disabledReason?: string; visibilityControl?: React.ReactNode
+  disabledReason?: string; visibilityControl?: React.ReactNode; visibilityLabel?: string
 }) {
   return <Card layout="vertical" overflow="hidden" aria-label={`${name}の写真`}>
     <div className={styles.photo}>
@@ -36,7 +36,7 @@ function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, 
         : <ListEmptyMessage>写真はありません</ListEmptyMessage>}
     </div>
     <CardContent>
-      <SectionHeader title={<TruncatedText value={name} />} />
+      <SectionHeader title={<TruncatedText value={name} />} description={visibilityLabel} />
       {visibilityControl}
       {editable ? <SaveErrorField names={[fieldKey]}><div className={orderActions ? styles.storeActions : styles.actions} role="group" aria-label={`${name}の写真を選ぶ操作`}>
         <Button onClick={onPick} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を選ぶ`}>{photo ? '替える' : '写真を選ぶ'}</Button>
@@ -173,13 +173,14 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {error ? <Button onClick={() => void load()} disabled={busy || loading} disabledReason={busy ? '写真を保存しています。' : '写真を読み直しています。'}>入力を残して読み直す</Button> : null}
     <SaveErrorField names={['store:']}><section className={styles.section} aria-label="お店の写真">
-      <SectionHeader title="お店" description="外観・店内・待合を各1枚。矢印で表示順を変えられます。"
+      <SectionHeader title="お店" description="外観・店内・待合を各1枚。「前へ」「後へ」で表示順を変えられます。"
         actions={canEditSettings && storeChanged ? <Button variant="primary" onClick={() => void save({ owner: 'store', id: '', name: 'お店' })} disabled={disabled} disabledReason={disabledReason}>お店の写真を保存する</Button> : undefined} />
       <ListPageCards>
         {storeOrder.map((slot, index) => {
           const target = { owner: 'store' as const, id: slot, name: LABELS[slot] }
           return <PhotoCard key={slot} name={target.name} fieldKey={keyOf(target)} photo={value(target, store?.photos[slot] ?? null)} accountId={accountId} editable={canEditSettings}
             changed={storeChanged} busy={disabled} disabledReason={disabledReason} onPick={() => setPicker(target)} onRemove={() => change(target, null)}
+            visibilityLabel={canEditSettings ? undefined : visibility[slot] ? 'お客さまの予約画面に出す' : 'お客さまの予約画面に出さない'}
             visibilityControl={canEditSettings ? <SaveErrorField names={[`store:visibility:${slot}`]}><Checkbox
               aria-label={`${target.name}をお客さまの予約画面に出す`} checked={visibility[slot]} disabled={disabled}
               onCheckedChange={next => { saveErrors.clear('store:'); saveErrors.clear(`store:visibility:${slot}`); setVisibilityDraft(current => ({ ...current, [slot]: next })) }}
