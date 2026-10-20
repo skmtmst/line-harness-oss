@@ -27,7 +27,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useBookingEdit } from './lib/edit-permission'
-import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { classifyApiFailure, describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
 import { api, ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
@@ -856,7 +856,7 @@ export default function MenuFormV8() {
       }
       } else {
         { if (!fieldFailure)
-        setSaveError(bookingErrorText(e, '保存')) }
+        setSaveError(describeApiFailure(e, '予約メニューの保存')) }
       }
     } finally {
       setSaving(null)

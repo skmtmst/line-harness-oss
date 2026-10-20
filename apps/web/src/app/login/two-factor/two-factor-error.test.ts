@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ApiError } from '@/lib/api'
 import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '../../../v8/login/two-factor/two-factor-error'
 
 /**
@@ -29,6 +30,21 @@ describe('二段階認証の失敗文（R506）', () => {
     expect(twoFactorFailureMessage(new Error('入力回数を超えました。ログインからやり直してください'))).toBe(
       '入力回数を超えました。ログインからやり直してください',
     )
+  })
+
+  it.each([200, 400, 401, 429])('%iの認証応答は、安全なやり直し先を残す', (status) => {
+    const message = '入力回数を超えました。ログインからやり直してください'
+    expect(twoFactorFailureMessage(new ApiError(status, message))).toBe(message)
+  })
+
+  it.each(['認証失敗 token=private-value', '<html>認証が失敗しました</html>', 'SQLITE_ERROR: 認証失敗 SELECT * FROM staff'])('認証応答の内部情報を出さない: %s', (message) => {
+    expect(twoFactorFailureMessage(new ApiError(401, message))).not.toContain(message)
+    expect(twoFactorFailureMessage(new ApiError(401, message))).toContain('もう一度')
+  })
+
+  it('サーバー障害の本文は認証の入力案内へ流さない', () => {
+    const message = 'サーバー内部の障害の詳細'
+    expect(twoFactorFailureMessage(new ApiError(500, message))).not.toContain(message)
   })
 
   it('予期しない応答本文は汎用文にする', () => {

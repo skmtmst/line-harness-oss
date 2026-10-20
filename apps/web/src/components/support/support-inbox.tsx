@@ -400,10 +400,10 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                   <p className="mt-1 truncate text-xs text-ink-faint">{detail.thread.customer_name || selected.customerName} · {detail.thread.customer_email}</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => updateStatus('in_progress')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'in_progress' ? 'bg-warning text-on-accent' : 'bg-warning-bg text-warning'}`}>対応中</button>
-                  <button onClick={() => updateStatus('on_hold')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
-                  <button onClick={() => updateStatus('resolved')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'resolved' ? 'bg-success text-on-accent' : 'bg-success-bg text-success'}`}>✓ 対応済み</button>
-                  {detail.thread.status === 'resolved' && <button onClick={() => updateStatus('unread')} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs font-semibold text-ink-secondary">再オープン</button>}
+                  <button onClick={() => void updateStatus('in_progress')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'in_progress' ? 'bg-warning text-on-accent' : 'bg-warning-bg text-warning'}`}>対応中</button>
+                  <button onClick={() => void updateStatus('on_hold')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'on_hold' ? 'bg-action text-on-action' : 'bg-action-soft text-action'}`}>保留</button>
+                  <button onClick={() => void updateStatus('resolved')} className={`rounded-control px-3 py-2 text-xs font-semibold ${detail.thread.status === 'resolved' ? 'bg-success text-on-accent' : 'bg-success-bg text-success'}`}>✓ 対応済み</button>
+                  {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs font-semibold text-ink-secondary">再オープン</button>}
                 </div>
               </div>
               <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
@@ -435,7 +435,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
               <p className="text-xs text-ink-secondary">お問い合わせの形式が読み取れませんでした。一覧を読み直してください。</p>
               <button
                 type="button"
-                onClick={() => loadInbox()}
+                onClick={() => void loadInbox()}
                 className="text-sm font-bold text-action underline"
               >
                 もう一度読み込む
