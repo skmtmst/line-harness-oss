@@ -607,6 +607,7 @@
 - [コードの構成と名前](code-structure.md)
 
 - [構成と接続の整理の更新履歴](release-log/unreleased/0000-kenta-cleanup-s02z.md)
+- [予約写真とお客さまの画面・設定カードの表示改善](release-log/unreleased/0000-kenta-cleanup-n01.md)
 
 - [構成と接続の整理の検査記録](qa/cleanup-s02z-1020.md)
 - [使われていない処理と重複する検査の整理記録](qa/cleanup-x02b-1020.md)
