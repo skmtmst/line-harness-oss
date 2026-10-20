@@ -7,7 +7,7 @@ import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { AutoReply,displayName } from './list-model'
 import { NO_WRITE_PERMISSION } from './words'
 
-type duplicateAutoReplyContext = {
+type DuplicateAutoReplyContext = {
   duplicateFeedback: { highlightedId: string | null; clear(): void; mark(sourceId: string, copyId: string): void; order<T extends { id: string; }>(rows: readonly T[], allRows?: readonly T[]): readonly T[]; }
   duplicateKeysRef: RefObject<Map<string, string>>
   duplicateLock: RefObject<boolean>
@@ -20,7 +20,7 @@ type duplicateAutoReplyContext = {
   setDuplicating: Dispatch<SetStateAction<boolean>>
 }
 
-export async function duplicateAutoReply({ duplicateFeedback, duplicateKeysRef, duplicateLock, duplicating, load, nextPriority, saveErrors, selectedAccountId, setDuplicateError, setDuplicating }: duplicateAutoReplyContext, duplicateTarget: AutoReply) {
+export async function duplicateAutoReply({ duplicateFeedback, duplicateKeysRef, duplicateLock, duplicating, load, nextPriority, saveErrors, selectedAccountId, setDuplicateError, setDuplicating }: DuplicateAutoReplyContext, duplicateTarget: AutoReply) {
     if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
     duplicateLock.current = true

@@ -11,7 +11,7 @@ const LIST = readFileSync(new URL('../../v8/settings/line-notifications/runs-tab
 const STATE = readFileSync(new URL('./notification-run-state.ts', import.meta.url), 'utf8')
 const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
-describe('V6 LINE notification history contract', () => {
+describe("管理画面 LINE notification history contract", () => {
   it('keeps the page title in the shared top bar and places history in the tab row', () => {
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).toContain('<Tabs')

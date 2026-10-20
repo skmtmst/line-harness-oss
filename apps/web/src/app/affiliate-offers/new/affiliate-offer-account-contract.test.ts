@@ -12,7 +12,7 @@ const PAGE = readFileSync(join(import.meta.dirname, '../new-offer-v8.tsx'), 'utf
  * のではなく画面上部で選んでいるLINEアカウントへ固定し、他アカウントへ
  * 誤って作成できないようにする。
  */
-describe('V6 案件作成のアカウント選択の契約', () => {
+describe("管理画面 案件作成のアカウント選択の契約", () => {
   it('選択中のLINEアカウントが無いときは押させない', () => {
     expect(PAGE).toContain('if (!selectedAccountId) return \'LINEアカウントを選んでください（画面上部で選べます）\'')
   })

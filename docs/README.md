@@ -572,7 +572,6 @@
 - [pending-kenta-testfix-1015.md](release-log/unreleased/pending-kenta-testfix-1015.md)
 - [pending-kenta-train40-evening.md](release-log/unreleased/pending-kenta-train40-evening.md)
 - [0000-kenta-cleanup-f01.md](release-log/unreleased/0000-kenta-cleanup-f01.md)
-- [0000-kenta-cleanup-x01c.md](release-log/unreleased/0000-kenta-cleanup-x01c.md)
 - [1775-masato-line-webhook-v07.md](release-log/unreleased/1775-masato-line-webhook-v07.md)
 - [1776-masato-line-webhook-padding.md](release-log/unreleased/1776-masato-line-webhook-padding.md)
 - [0000-kenta-cleanup-q01w1.md](release-log/unreleased/0000-kenta-cleanup-q01w1.md)
@@ -583,14 +582,36 @@
 
 - [LINE接続の分離](release-log/unreleased/1778-masato-line-webhook-isolation.md)
 
+- [cleanup-q02a1-1019.md](qa/cleanup-q02a1-1019.md)
+
+- [cleanup-q02a1-source-tests.tsv](qa/cleanup-q02a1-source-tests.tsv)
+
+- [0000-kenta-cleanup-q02a1.md](release-log/unreleased/0000-kenta-cleanup-q02a1.md)
+
 - [Q02A2の整理・検証記録](qa/cleanup-q02a2-1019.md)
 - [0000-kenta-cleanup-q02a2.md](release-log/unreleased/0000-kenta-cleanup-q02a2.md)
 - [0000-kenta-cleanup-s02a.md](release-log/unreleased/0000-kenta-cleanup-s02a.md)
 - [S02Aの検査記録](qa/cleanup-s02a-1019.md)
+- [Q01W6の整理履歴](release-log/unreleased/0000-kenta-cleanup-q01w6.md)
+- [Q02A3の整理履歴](release-log/unreleased/0000-kenta-cleanup-q02a3.md)
+- [X02Aの整理履歴](release-log/unreleased/0000-kenta-cleanup-x02a.md)
+
 ## 台本整理で加わった文書
 
 - [台本とCIの入口](../scripts/README.md)
 - [S02Cの検査記録](qa/cleanup-s02c-1019.md)
 - [S02Cの変更履歴](release-log/unreleased/0000-kenta-cleanup-s02c.md)
+
+
+
+- [コードの構成と名前](code-structure.md)
+
+- [構成と接続の整理の更新履歴](release-log/unreleased/0000-kenta-cleanup-s02z.md)
+
+- [構成と接続の整理の検査記録](qa/cleanup-s02z-1020.md)
 - [使われていない処理と重複する検査の整理記録](qa/cleanup-x02b-1020.md)
 - [使われていない処理と重複する検査の整理履歴](release-log/unreleased/0000-kenta-cleanup-x02b.md)
+
+- [日本時間の扱いの整理履歴](release-log/unreleased/0000-kenta-cleanup-q01w6.md)
+- [共通部品の動作確認の整理履歴](release-log/unreleased/0000-kenta-cleanup-q02a3.md)
+- [重複整理とAI操作の失敗通知の更新履歴](release-log/unreleased/0000-kenta-cleanup-x02a.md)

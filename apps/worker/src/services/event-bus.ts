@@ -53,8 +53,8 @@ import {
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
-import { dispatchAutomationEventWithLogging } from '../features/automations/automation-triggers/index.js';
-import { applyActionScoreEvent } from './action-score-events.js';
+import { dispatchAutomationEventWithLogging } from '../features/automations/automation-trigger-handlers/index.js';
+import { applyActionScoreEvent } from './action-score-handlers.js';
 
 import {
   applyRichMenuTargeting,
@@ -209,7 +209,7 @@ export async function fireEvent(
       friendId: enrichedPayload.friendId,
       eventData: enrichedPayload.eventData,
       lineAccessToken,
-    }));
+    }, { emitEvent: fireEvent }));
   }
 
   // Phase 3: リッチメニューの出し分けを見直す。
@@ -419,7 +419,7 @@ export async function processScoring(
           : null,
         occurredAt: payload.occurredAt,
         lineAccessToken,
-      });
+      }, fireEvent);
       // 公開後または明示停止後は旧ルールへ戻さず、二重加点を防ぐ。
       if (v6.configured) return;
     }

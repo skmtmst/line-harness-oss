@@ -28,7 +28,7 @@ describe('フォルダの色の丸', () => {
     expect(html).toContain('data-folder-dot="filed"')
   })
 
-  it('色の無いフォルダは名前から9色の1つを決まった形で選ぶ（灰色の丸にしない・B-136）', () => {
+  it("色の無いフォルダは名前から9色の1つを決まった形で選ぶ（灰色の丸にしない）", () => {
     const palette: string[] = FOLDER_SELECT_COLORS.map((c) => c.value)
     const a = folderDisplayColor({ name: '会員', color: null })
     expect(palette).toContain(a)
@@ -53,7 +53,7 @@ describe('フォルダの色の丸', () => {
     expect(html.indexOf('data-folder-dot')).toBeLessThan(html.indexOf('>NEN会員'))
   })
 
-  it('B-194: dot={false} の古い指定でも丸と名前の1行を出す', () => {
+  it("dot={false} の古い指定でも丸と名前の1行を出す", () => {
     const html = renderToStaticMarkup(<FolderDotName folder={{ name: '会員', color: '#e07b24' }} dot={false}>NEN会員</FolderDotName>)
     expect(html).toContain('data-folder-dot')
     expect(html).toContain('title="NEN会員"')

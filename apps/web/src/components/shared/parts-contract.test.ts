@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const here = dirname(fileURLToPath(import.meta.url))
 const read = (name: string) => readFileSync(join(here, name), 'utf8')
 
-describe('V6共通部品の実装境界', () => {
+describe("管理画面共通部品の実装境界", () => {
   it('押せる部品はキーボードフォーカスを表示する', () => {
     for (const name of [
       'tabs.module.css',

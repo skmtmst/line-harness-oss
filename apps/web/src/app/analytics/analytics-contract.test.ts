@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
-describe('V6 機能20 分析', () => {
+describe("管理画面 機能20 分析", () => {
   it('クロス分析とファネルは旧集計へ戻らず、版付きの不変結果を使う', () => {
     for (const path of [
       '/api/analytics/cross/query',

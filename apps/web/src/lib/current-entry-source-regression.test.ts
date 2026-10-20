@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import { readUiSource } from '../../scripts/test-ui-source.mjs'
-it('B-40: 古いV8コピーを指定した試験も実際のページ入口を読む', () => {
+it("古いV8コピーを指定した試験も実際のページ入口を読む", () => {
   const dir = mkdtempSync(join(tmpdir(), 'bcommon-entry-'))
   try {
     const route = join(dir, 'src/app/tags'), impl = join(dir, 'src/v8/tags')

@@ -19,7 +19,7 @@ type KeywordRuleDraft
 } from './draft-fields'
 import { AutoReplyDraft,ResponseMode } from './edit-dialog-model'
 
-type saveAutoReplyDialogContext = {
+type SaveAutoReplyDialogContext = {
   actions: InlineAction[]
   activeFrom: string
   activeUntil: string
@@ -57,7 +57,7 @@ type saveAutoReplyDialogContext = {
   weekdays: number[]
 }
 
-export async function saveAutoReplyDialog({ actions, activeFrom, activeUntil, cooldown, createKey, draft, folderId, friendConditions, holidayRule, internalMemo, isActive, keyword, keywordMatchMode, keywordRules, matchType, messageKinds, mode, oncePerFriend, onSaved, page, priority, receiveSources, replyDelaySeconds, respondToAll, responseContent, ruleName, setConflictInfo, setDraftSaved, setError, setSaving, skipWhenOperatorActive, templateId, templates, unmatchedMode, weekdays }: saveAutoReplyDialogContext) {
+export async function saveAutoReplyDialog({ actions, activeFrom, activeUntil, cooldown, createKey, draft, folderId, friendConditions, holidayRule, internalMemo, isActive, keyword, keywordMatchMode, keywordRules, matchType, messageKinds, mode, oncePerFriend, onSaved, page, priority, receiveSources, replyDelaySeconds, respondToAll, responseContent, ruleName, setConflictInfo, setDraftSaved, setError, setSaving, skipWhenOperatorActive, templateId, templates, unmatchedMode, weekdays }: SaveAutoReplyDialogContext) {
     /*
      * R29: 空の行は送らない（送るとAPIが400で断る）。
      * 先頭の keyword / matchType は行と同じものを送る。判定側が読むのは

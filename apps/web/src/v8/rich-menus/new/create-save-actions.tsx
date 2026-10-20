@@ -24,7 +24,7 @@ import { groupFromSeed } from './create-model'
 import { type Group,type Page,type PendingImage } from './create-types'
 import { imageUploadErrorText } from './image-upload-error'
 
-type createMenuDraftContext = {
+type CreateMenuDraftContext = {
   accountId: string | null
   audience: "all" | "tag" | "none" | "targeted"
   chatBarText: string
@@ -48,7 +48,7 @@ type createMenuDraftContext = {
   validateBasics: () => boolean
 }
 
-export async function createMenuDraft({ accountId, audience, chatBarText, defaultOpen, folderId, host, hostSeedFromShape, hydrate, name, pendingImages, reloadGroup, saveErrors, setError, setPendingImages, size, tabCount, tabNameAt, targetingCondition, targetingPriority, templateKey, validateBasics }: createMenuDraftContext): Promise<boolean> {
+export async function createMenuDraft({ accountId, audience, chatBarText, defaultOpen, folderId, host, hostSeedFromShape, hydrate, name, pendingImages, reloadGroup, saveErrors, setError, setPendingImages, size, tabCount, tabNameAt, targetingCondition, targetingPriority, templateKey, validateBasics }: CreateMenuDraftContext): Promise<boolean> {
     if (host) {
       const seed = await hostSeedFromShape()
       if (!seed) return false
@@ -114,7 +114,7 @@ export async function createMenuDraft({ accountId, audience, chatBarText, defaul
     return true
   }
 
-type persistMenuDraftContext = {
+type PersistMenuDraftContext = {
   accountId: string | null
   audience: "all" | "tag" | "none" | "targeted"
   chatBarText: string
@@ -128,7 +128,7 @@ type persistMenuDraftContext = {
   targetingPriority: number
 }
 
-export async function persistMenuDraft({ accountId, audience, chatBarText, defaultOpen, folderId, group, host, name, pages, targetingCondition, targetingPriority }: persistMenuDraftContext): Promise<void> {
+export async function persistMenuDraft({ accountId, audience, chatBarText, defaultOpen, folderId, group, host, name, pages, targetingCondition, targetingPriority }: PersistMenuDraftContext): Promise<void> {
     if (!group) throw new Error('下書きがまだ作られていません')
     if (host) return
     if (group.accountId !== accountId) throw new Error('この下書きのアカウントへ戻してから保存してください。')
@@ -156,7 +156,7 @@ export async function persistMenuDraft({ accountId, audience, chatBarText, defau
     if (!res.success) throw new Error(res.error ?? '保存失敗')
   }
 
-type saveMenuDraftContext = {
+type SaveMenuDraftContext = {
   createDraft: () => Promise<boolean>
   group: Group | null
   host: RichMenuCreateHost | undefined
@@ -173,7 +173,7 @@ type saveMenuDraftContext = {
   validateBasics: () => boolean
 }
 
-export async function saveMenuDraft({ createDraft, group, host, persistDraft, reloadGroup, saveErrors, saving, setCompareOpen, setConflict, setConflictLatest, setError, setNotice, setSaving, validateBasics }: saveMenuDraftContext): Promise<boolean> {
+export async function saveMenuDraft({ createDraft, group, host, persistDraft, reloadGroup, saveErrors, saving, setCompareOpen, setConflict, setConflictLatest, setError, setNotice, setSaving, validateBasics }: SaveMenuDraftContext): Promise<boolean> {
     if (saving) return false
     if (!validateBasics()) return false
     setSaving(true)

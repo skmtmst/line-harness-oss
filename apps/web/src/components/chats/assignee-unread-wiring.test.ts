@@ -16,7 +16,7 @@ const EFFECT = PAGE.slice(START, PAGE.indexOf('}, [selectedAccountId])', START))
  * 画面側の配線。**考え方が正しくても、繋いでいなければ効かない。**
  * 純粋関数の試験（`assignee-unread.test.ts`）と対で見る。
  */
-describe('V6 担当者ごとの未読数（YZaDK）の配線', () => {
+describe("管理画面 担当者ごとの未読数（YZaDK）の配線", () => {
   it('選び口へ集計から引いた数を渡す', () => {
     /*
       **素の `select` へ戻さない。** 共通の `OperatorDropdown` に

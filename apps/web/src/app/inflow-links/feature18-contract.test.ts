@@ -12,7 +12,7 @@ const SITE = readFileSync(join(ROOT, '../../v8/inflow-links/site-script.tsx'), '
 const API = readApiSource(join(ROOT, '..', '..', 'lib', 'api.ts'), 'utf8')
 const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 
-describe('V6 機能18の画面契約', () => {
+describe("管理画面 機能18の画面契約", () => {
   it('タブの件数は固定値でなく、一覧と同じ集計から出す(#980)', () => {
     // 設計が描いた作り物の件数を書かない。一覧0件のアカウントでも
     // 「流入経路 24」「広告連携 3」「広告とのつなぎ 5」と出ていた。
@@ -68,7 +68,7 @@ describe('V6 機能18の画面契約', () => {
   })
 })
 
-describe('V6 機能18の計測鍵の契約(#514-2)', () => {
+describe("管理画面 機能18の計測鍵の契約", () => {
   it('計測コードに固定の鍵を埋めない', () => {
     expect(SITE).not.toContain('hk_9f3a2c81b4')
     expect(API).not.toContain('hk_9f3a2c81b4')

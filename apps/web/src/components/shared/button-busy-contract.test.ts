@@ -34,7 +34,7 @@ function violations(source: string, file = 'fixture.tsx'): string[] {
   return errors
 }
 
-describe('B-157：処理中の文字は共通Buttonのbusy／busyLabelで出す', () => {
+describe("処理中の文字は共通Buttonのbusy／busyLabelで出す", () => {
   it('V8全体とappのV8ファイルに手作りの切替が残っていない', () => {
     const found = files.flatMap((file) => violations(readFileSync(file, 'utf8'), relative(root, file)))
     expect(found).toEqual([])

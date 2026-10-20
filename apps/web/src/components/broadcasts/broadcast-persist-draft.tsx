@@ -13,7 +13,7 @@ import { newBroadcastDraftSession,persistBroadcastDraft,type BroadcastDraftSessi
 import type { SegmentCondition } from '@/lib/segment-condition'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
-type persistBroadcastFormDraftContext = {
+type PersistBroadcastFormDraftContext = {
   createKeyByAccount: RefObject<Map<string | null, string>>
   currentStep: BroadcastStepKey | null
   draftPayload: (scheduledAt: string | null, saveAsDraft?: boolean, confirmedCount?: number) => { saveAsDraft?: boolean | undefined; draftStep?: BroadcastStepKey | undefined; trackLinks: boolean; folderId: string | null; measureOpens: boolean; stealthSpreadMinutes: number; internalMemo: string | null; messageOptions: { buttons: BroadcastMessageButton[]; } | null; afterActionVersionId: string | null; confirmedRecipientCount?: number | undefined; lineAccountId: string | null; scheduledAt: string | null; targetType: "tag"; targetTagId: string; segmentConditions: undefined; title: string; messageType: BroadcastMessageKind; messageContent: string; messageBubbles: BroadcastBubble[] | undefined; } | { saveAsDraft?: boolean | undefined; draftStep?: BroadcastStepKey | undefined; trackLinks: boolean; folderId: string | null; measureOpens: boolean; stealthSpreadMinutes: number; internalMemo: string | null; messageOptions: { buttons: BroadcastMessageButton[]; } | null; afterActionVersionId: string | null; confirmedRecipientCount?: number | undefined; lineAccountId: string | null; scheduledAt: string | null; targetType: "segment"; targetTagId: null; segmentConditions: SegmentCondition; title: string; messageType: BroadcastMessageKind; messageContent: string; messageBubbles: BroadcastBubble[] | undefined; }
@@ -27,7 +27,7 @@ type persistBroadcastFormDraftContext = {
   setError: Dispatch<SetStateAction<string>>
 }
 
-export async function persistBroadcastFormDraft({ createKeyByAccount, currentStep, draftPayload, draftSession, draftSessionsByAccount, editingDraft, saveConflict, saveErrors, saveInFlightRef, selectedAccountIdRef, setError }: persistBroadcastFormDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number, autosaveStep?: typeof currentStep): Promise<ApiBroadcast | null> {
+export async function persistBroadcastFormDraft({ createKeyByAccount, currentStep, draftPayload, draftSession, draftSessionsByAccount, editingDraft, saveConflict, saveErrors, saveInFlightRef, selectedAccountIdRef, setError }: PersistBroadcastFormDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number, autosaveStep?: typeof currentStep): Promise<ApiBroadcast | null> {
     const accountId = selectedAccountIdRef.current || null
     /*
      * 編集中にアカウントが切り替わったまま保存すると、下書きが別アカウントの

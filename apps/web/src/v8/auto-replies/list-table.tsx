@@ -30,7 +30,7 @@ import { type SortKey } from './list-options'
 import styles from './list.module.css'
 import { conditionChips,LOAD_STATE_WORDS,responseTypeWord,stopNote,templateWord,triggerSummary,type LoadState } from './words'
 
-type renderAutoReplyListContext = {
+type RenderAutoReplyListContext = {
   allOnPageSelected: boolean
   canEdit: boolean
   clearFilters: () => void
@@ -86,7 +86,7 @@ type renderAutoReplyListContext = {
   visibleLoadState: LoadState
 }
 
-export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, loadingSkeleton, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState }: renderAutoReplyListContext) {
+export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, loadingSkeleton, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState }: RenderAutoReplyListContext) {
   return (visibleLoadState === 'loading' ? (
     <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
       <DelayedSkeleton loading skeleton={loadingSkeleton} />

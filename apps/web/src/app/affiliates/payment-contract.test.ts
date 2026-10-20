@@ -8,7 +8,7 @@ const DIALOGS = readFileSync(new URL('../../v8/affiliates/dialogs.tsx', import.m
 const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const PAYOUTS = readFileSync(new URL('../../../../worker/src/routes/affiliate-payouts.ts', import.meta.url), 'utf8')
 
-describe('V6 支払いの追記台帳契約', () => {
+describe("管理画面 支払いの追記台帳契約", () => {
   it('LINEアカウントと締め期間を渡して締め対象を読む', () => {
     expect(API).toContain('settlementPreview:')
     expect(API).toContain('/api/affiliate-settlements/preview?')

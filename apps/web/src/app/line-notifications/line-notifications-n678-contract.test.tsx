@@ -608,7 +608,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
    * 一度も発火していない・loadGenerationが据え置きのままの
    * layout境界——で旧Aの保存応答を解放する。
    */
-  it('実物のLineNotificationsPageをmountし、layout境界（Bへコミット直後・load()のuseEffect発火前）で旧Aの応答を返しても、Aの控え・dirtyは保持されBへ漏れない', async () => {
+  it("実物のLineNotificationsPageをmountし、layout境界（Bへコミット直後・loadのuseEffect発火前）で旧Aの応答を返しても、Aの控え・dirtyは保持されBへ漏れない", async () => {
     fixture.settings.mockImplementation((accountId: string) => Promise.resolve({
       success: true,
       data: [setting({
@@ -1481,7 +1481,7 @@ describe('#988 条件説明と表示例は実際の意味に合わせる', () =>
   })
 })
 
-it('B-154：通知の共通保存関数は422の欄の理由を呼び出した画面へ残す', async () => {
+it("通知の共通保存関数は422の欄の理由を呼び出した画面へ残す", async () => {
   const { saveCustomerNotification: saveV8 } = await import('@/v8/settings/line-notifications/screen')
   const sent = setting()
   fixture.updateDraft.mockRejectedValueOnce({ status: 422, fields: { introText: 'ご案内文を短くしてください' } })

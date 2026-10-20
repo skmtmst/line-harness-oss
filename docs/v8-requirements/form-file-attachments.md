@@ -23,14 +23,14 @@
 - 形式の根拠：`apps/worker/src/routes/form-documents.ts`（許す形式の一覧と、欄の種類に無い形式は400）。
 - 空のファイルは受け取らない。
 - 新しい質問では画像・PDFだけを選べる。本人確認・表裏・専用保存日数の編集欄は出さない。既存の本人確認を含む設定への新しいアップロードと回答の添付も拒否する。
-- 枚数：`apps/worker/src/services/form-documents.ts`（表と裏は 2、ほかは 1〜10）。欄の設定も 1〜10 に限る（`packages/shared/src/form-layout.ts`）。
+- 枚数：`apps/worker/src/features/forms/form-documents.ts`（表と裏は 2、ほかは 1〜10）。欄の設定も 1〜10 に限る（`packages/shared/src/form-layout.ts`）。
 - 新しい `file_kind` は写真を `image`、PDFを `pdf` と記録する。実際の形式は `mime_type` に保存し、PDFを写真へ読み替えない。既存の `identity` は新規受付を再開せず、元の閲覧権限と保存期限を保つ。
 
 ## 3. 以前に受け取った本人確認書類の扱い
 
-- 見られる人は**オーナーと管理者だけ**。スタッフには、中身もファイル名も出さず「見る権限がありません」と出す（`apps/worker/src/services/form-documents.ts`、`apps/worker/src/routes/form-documents.ts`、`apps/web/src/v8/form-responses/responses.tsx`）。
+- 見られる人は**オーナーと管理者だけ**。スタッフには、中身もファイル名も出さず「見る権限がありません」と出す（`apps/worker/src/features/forms/form-documents.ts`、`apps/worker/src/routes/form-documents.ts`、`apps/web/src/v8/form-responses/responses.tsx`）。
 - 表と裏は同じ扱い。
-- 保存期限は受け取った時から数える（`apps/worker/src/routes/form-documents.ts`）。既定は 90 日（`apps/worker/src/services/form-documents.ts`）。
+- 保存期限は受け取った時から数える（`apps/worker/src/routes/form-documents.ts`）。既定は 90 日（`apps/worker/src/features/forms/form-documents.ts`）。
 - 既存書類の保存期限と自動削除を維持する。新しい受付をやめたことを理由に期間を延長したり、期限削除を止めたりしない。
 - 編集画面に本人確認書類・表裏・専用保存日数の選択肢を出さない。既存の設定を読み込んでも受付の再開へ誘導しない。
 
@@ -46,15 +46,15 @@
 4. 外部の検査（設定があるときだけ）。問題があれば隔離を記録して実体をすぐ消し、422。外部に届かないときは検査中のまま 201 を返す。
 5. 問題がなければ clean。
 
-- 検査中（pending）の書類は、回答の送信で使えない（`apps/worker/src/services/form-documents.ts`）。LIFF では「（検査中）」と出す（`apps/liff/src/components/forms/controls.tsx`）。
+- 検査中（pending）の書類は、回答の送信で使えない（`apps/worker/src/features/forms/form-documents.ts`）。LIFF では「（検査中）」と出す（`apps/liff/src/components/forms/controls.tsx`）。
 - 止まった検査は、cron が5分おきに拾って再試行する（`apps/worker/src/routes/file-scan.ts`）。上限に達した書類の再試行や、隔離した書類を戻す操作は許さない。
 - pending を clean に格上げしない。最初の失敗を含め、検査の失敗は最大5回。5回目で `rejected`（却下）にし、次の再試行の時刻を外す。自動再試行は1分→5分→15分→1時間。書類以外の検査の間隔は変更しない。却下後は別のファイルを選ぶ。
 - 落ちた書類は回答に付かない。お客さまは別のファイルを選び直す。
 
 ## 5. 保存と自動で消す
 
-- 本人確認書類：受け取りから保存日数が過ぎたら、cron が R2 の実体を消し、行に消した印（`deleted_at`、`deletion_reason = 'expired'`）を残す（`apps/worker/src/services/form-documents.ts`、`apps/worker/src/index.ts`）。
-- 回答に付かないまま 1 日経った書類（写真・PDF・本人確認書類のすべて）は、`deletion_reason = 'abandoned'` で消す（`apps/worker/src/services/form-documents.ts`）。
+- 本人確認書類：受け取りから保存日数が過ぎたら、cron が R2 の実体を消し、行に消した印（`deleted_at`、`deletion_reason = 'expired'`）を残す（`apps/worker/src/features/forms/form-documents.ts`、`apps/worker/src/index.ts`）。
+- 回答に付かないまま 1 日経った書類（写真・PDF・本人確認書類のすべて）は、`deletion_reason = 'abandoned'` で消す（`apps/worker/src/features/forms/form-documents.ts`）。
 - 消す順番は R2 が先。R2 の削除が失敗したら行は消さず、次の cron でやり直す。
 - **90日の自動削除の範囲は決定どおり**：本人確認書類だけに期限を付ける。回答に付いた通常の写真・PDFに90日の期限は付けない（B-213）。
 - 外部の検査で問題のあった書類は、アップロード時も再試行時もすぐR2から消す。R2の削除が失敗した場合は隔離の記録と鍵を残し、次の書類削除cronで1日を待たず消し直す。削除理由は `unsafe`。
@@ -134,7 +134,7 @@
 - migration：`packages/db/migrations/621_form_submission_files.sql:2-24`（表・上限 10,485,760 バイトの CHECK は `:15`、期限は `:18`、削除の印は `:19-20`）。
 - 受け取り・保存・配信：`apps/worker/src/routes/form-documents.ts`（全体）。
 - 検査・再試行：`apps/worker/src/services/file-scan.ts`、`apps/worker/src/routes/file-scan.ts`、`apps/worker/src/index.ts`、`apps/worker/wrangler.toml:44`。
-- 状態・権限・期限・削除：`apps/worker/src/services/form-documents.ts`（全体）。
+- 状態・権限・期限・削除：`apps/worker/src/features/forms/form-documents.ts`（全体）。
 - 回答フォームの経路：`apps/worker/src/routes/forms.ts`（欄の受け取り・送信時の確認・回答への紐づけ）、`apps/worker/src/routes/friends.ts`、`apps/worker/src/middleware/feature-enforcement.ts`。
 - 管理画面とLIFFでも、内蔵の検査が標準・外部の検査は設定した店だけと案内する。
 - 画面：`apps/liff/src/components/forms/controls.tsx`、`apps/web/src/v8/form-responses/responses.tsx`、`apps/web/src/v8/form-edit/edit.tsx`。

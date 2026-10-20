@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(new URL('../../v8/rich-menus/list.tsx', import.meta.url), 'utf8')
   + readFileSync(new URL('../../v8/rich-menus/errors.ts', import.meta.url), 'utf8')
 
-describe('V6 リッチメニューのエラー表示', () => {
+describe("管理画面 リッチメニューのエラー表示", () => {
   it('APIの内部エラーを画面や警告へそのまま出さない', () => {
     expect(PAGE).toContain("api, ApiError, type RichMenuDeleteImpact")
     expect(PAGE).toContain("setError(richMenuError(e, 'load'))")

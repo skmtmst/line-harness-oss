@@ -43,7 +43,7 @@ import { CheckIcon,MenuContent } from './create-preview'
 import { type Group,type Page,type PrepublishState } from './create-types'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
-type renderHqPublishStepContext = {
+type RenderHqPublishStepContext = {
   areaActionSummary: (area: Area) => string
   goToStep: (key: StepKey) => void
   group: Group | null
@@ -56,7 +56,7 @@ type renderHqPublishStepContext = {
   totalAreaCount: number
 }
 
-export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, hqDuplicateMode, pages, setHqDuplicateMode, size, tabCount, totalAreaCount }: renderHqPublishStepContext) {
+export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, hqDuplicateMode, pages, setHqDuplicateMode, size, tabCount, totalAreaCount }: RenderHqPublishStepContext) {
     const sizeLabel = (group?.size ?? size) === 'large' ? '大きい' : '小さい'
     const pageCount = group ? pages.length : tabCount + 1
     const showTab = pageCount > 1
@@ -178,7 +178,7 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
     )
   }
 
-type renderPublishStepContext = {
+type RenderPublishStepContext = {
   accountId: string | null
   aggregateOnly: boolean
   areaActionSummary: (area: Area) => string
@@ -217,7 +217,7 @@ type renderPublishStepContext = {
   validating: boolean
 }
 
-export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary, audience, canOperate, checks, checksError, checksLoading, conditionEmpty, conditionUnsaved, done, endEnabled, goToStep, group, host, loadChecks, nowNote, pages, previewAreas, previewImageUrl, publishEffectNote, publishPlan, recording, recordSeen, renderHqPublish, restoreMenus, setActivePageId, setEndEnabled, setSelectedAreaId, size, staffRole, targetPreview, totalAreaCount, updatePublishPlan, validateWithLine, validating }: renderPublishStepContext) {
+export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary, audience, canOperate, checks, checksError, checksLoading, conditionEmpty, conditionUnsaved, done, endEnabled, goToStep, group, host, loadChecks, nowNote, pages, previewAreas, previewImageUrl, publishEffectNote, publishPlan, recording, recordSeen, renderHqPublish, restoreMenus, setActivePageId, setEndEnabled, setSelectedAreaId, size, staffRole, targetPreview, totalAreaCount, updatePublishPlan, validateWithLine, validating }: RenderPublishStepContext) {
     if (host) return renderHqPublish()
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (done) {

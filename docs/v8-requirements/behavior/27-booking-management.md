@@ -65,7 +65,7 @@
 コードは `~/lh-work/lh-claude-f`（2026-10-16 時点）。直していない。
 
 1. **指名なしの自動割り当てが先頭の担当に偏る**：`apps/worker/src/routes/booking.ts:696-710` は空いている担当の一覧の先頭を選ぶだけ。B-306 の均等・優先順・ランダムは API 組3 の枝（未取り込み）にある。
-2. **リマインダの再試行が共通基盤と違う**：`apps/worker/src/services/booking-reminders.ts:229` と `REMINDER_MAX_RETRY = 3`（`event-booking-types.ts:107`）で初回を含め 3 回・間隔は 5 分ごとの cron 任せ。§6-2 は 1・5・30 分の最大 3 回（初回を含め 4 回）、429 は Retry-After 優先。
+2. **リマインダの再試行が共通基盤と違う**：`apps/worker/src/features/booking/booking-reminders.ts:229` と `REMINDER_MAX_RETRY = 3`（`event-booking-types.ts:107`）で初回を含め 3 回・間隔は 5 分ごとの cron 任せ。§6-2 は 1・5・30 分の最大 3 回（初回を含め 4 回）、429 は Retry-After 優先。
 3. **ブロック中・友だち解除を区別しない**：同ファイル `:95-103` は友だちのフォロー状態を見ずに送り、失敗として数える。27 §7「ブロック中、友だち解除、送信先なしを区別する」と違う。
 4. **競合の候補はある**：管理の代理予約は 409 に候補を返す（`booking.ts:4690-4697`）。LIFF の申込は 422 `slot_not_available` で候補なし（`booking.ts:857`）。LIFF に候補を返すかは要件に書いていない（仕様が無い）。 → 決定 B-337 Q-56
 

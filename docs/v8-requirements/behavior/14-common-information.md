@@ -3,7 +3,7 @@
 # 14 共通情報 操作と挙動（受け入れ）
 
 - 正本の要件：[v6-14 共通情報](../../v6-requirements/v6-14-common-information-requirements-draft.md)（§24 の確定条件を含む）。共通の動き・権限は [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限・§6-2 再試行・§11 応答・§15 進みとトースト）と [30 ログインユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。
-- 読んだコード：`apps/web/src/v8/common-vars/`・`apps/web/src/v8/common-vars-edit/`・`apps/web/src/app/contents/vars/`・`apps/worker/src/routes/contents.ts`（共通情報の口）・`apps/worker/src/routes/common-var-exports.ts`・`apps/worker/src/services/common-var-expiry-sweep.ts`・`packages/db/src/common-vars.ts`・`apps/worker/src/middleware/impersonation.ts`。
+- 読んだコード：`apps/web/src/v8/common-vars/`・`apps/web/src/v8/common-vars-edit/`・`apps/web/src/app/contents/vars/`・`apps/worker/src/routes/contents.ts`（共通情報の口）・`apps/worker/src/routes/common-var-exports.ts`・`apps/worker/src/services/common-var-expiry-sweep.ts`・`packages/db/src/common-vars/index.ts`・`apps/worker/src/middleware/impersonation.ts`。
 - 書いた日：2026-10-16（B-333）。本当の送信はしない。検証環境では「試験用の LINE アカウント・試験用の友だち」だけで確かめる。
 
 ## 操作と挙動
@@ -76,19 +76,19 @@
 | # | 要件 | 今の作り | 根拠 |
 |---|---|---|---|
 | 1 | 期限の知らせは 1日前・3日前・7日前から選ぶ。旧案の 14日前・3日前は採らない（§24・§8-1） | 14日前と3日前の固定で知らせる。選ぶ口が無い | `apps/worker/src/services/common-var-expiry-sweep.ts:1-18,64-69` |
-| 2 | 状態は 下書き・使用中・期限切れ・止めた（blocked）・アーカイブ の5つ（§5-1・§24） | 状態を変える口は「使用中」「止めた」の2つだけ。アーカイブは削除の口でだけ入る | `apps/worker/src/routes/contents.ts:2381-2384`、`packages/db/src/common-vars.ts:1150-1170` |
+| 2 | 状態は 下書き・使用中・期限切れ・止めた（blocked）・アーカイブ の5つ（§5-1・§24） | 状態を変える口は「使用中」「止めた」の2つだけ。アーカイブは削除の口でだけ入る | `apps/worker/src/routes/contents.ts:2381-2384`、`packages/db/src/common-vars/index.ts:1150-1170` |
 | 3 | 下書き更新は版の一致（If-Match）必須（§13）・競合は 409（§6-2） | 版番号なしの保存も受ける（その場合は衝突を検出しない） | `apps/worker/src/routes/contents.ts:2231-2236,2245-2246` |
 | 4 | 名前・フォルダ・メモの変更は値変更と分ける（§6-2） | 名前・メモだけの保存でも影響の確認値が無いと 428 で止まる | `apps/worker/src/routes/contents.ts:2299-2308` |
 | 5 | 数値の代入・加算・減算を原子的・冪等に（§9-1）、口は `POST /operations`（§13） | 数値を増減する口が無い | `apps/worker/src/routes/contents.ts:2035-2770`（共通情報の口の一覧に無い） |
-| 6 | 予約は代入・加算・減算・繰り返し・冪等キー（§8-2） | 予約は1回の値の代入だけ（日時と値） | `packages/db/src/common-vars.ts:1459-1475` |
+| 6 | 予約は代入・加算・減算・繰り返し・冪等キー（§8-2） | 予約は1回の値の代入だけ（日時と値） | `packages/db/src/common-vars/index.ts:1459-1475` |
 | 7 | 画像は登録メディアの ID を参照（§5-2） | 画像は https の URL 文字列で受ける | `apps/worker/src/routes/contents.ts:2156-2163` |
 | 8 | 差し込み名は 1〜64 文字、`{会社名}` のような日本語で見せられる（§5-1・§5-3） | 半角英小文字はじまり・英小文字・数字・下線・32 文字まで | `packages/db/src/friend-fields.ts:145-150`（`contents.ts:2135` から使う） |
 | 9 | 範囲は 組織・アカウントのまとまり・LINEアカウント（§5-4）、「全アカウント共通」を明示 | LINEアカウント1つの範囲だけ（`accountId` 必須） | `apps/worker/src/routes/contents.ts:2037-2041` |
 | 10 | 編集の URL は `/contents/vars/{varId}/edit`、旧 `edit?id=` は転送（§4） | `/contents/vars/edit?id=` のまま | `apps/web/src/app/contents/vars/edit/page.tsx`、`apps/web/src/v8/common-vars-edit/BEHAVIOR.md` |
-| 11 | 一覧は カーソルで続きを読む（§13） | 最大 200 件で打ち切り、帯で知らせるだけ | `packages/db/src/common-vars.ts:640`、`apps/worker/src/routes/contents.ts:2042-2066` |
+| 11 | 一覧は カーソルで続きを読む（§13） | 最大 200 件で打ち切り、帯で知らせるだけ | `packages/db/src/common-vars/index.ts:640`、`apps/worker/src/routes/contents.ts:2042-2066` |
 | 12 | 使用先の全件 `GET /usages`・履歴 `GET /versions`・戻す `restore`（§13） | 口が無い。詳細に使用先 15 件・履歴 20 件を載せるだけ | `apps/worker/src/routes/contents.ts:2083-2113` |
-| 13 | 「このまま削除」は「このままアーカイブ」と呼ぶ（§11-3） | 画面の言葉は「削除」。中身はアーカイブ（`archived_at`） | `apps/web/src/v8/common-vars/BEHAVIOR.md`（削除の窓）、`packages/db/src/common-vars.ts:1164-1168` |
-| 14 | 予定の削除も操作の記録を残す（§6-3 の追記型の考え） | 予定の削除は理由なしで行ごと消す | `packages/db/src/common-vars.ts:1478-1484`、`apps/worker/src/routes/contents.ts:2751-2770` |
+| 13 | 「このまま削除」は「このままアーカイブ」と呼ぶ（§11-3） | 画面の言葉は「削除」。中身はアーカイブ（`archived_at`） | `apps/web/src/v8/common-vars/BEHAVIOR.md`（削除の窓）、`packages/db/src/common-vars/index.ts:1164-1168` |
+| 14 | 予定の削除も操作の記録を残す（§6-3 の追記型の考え） | 予定の削除は理由なしで行ごと消す | `packages/db/src/common-vars/index.ts:1478-1484`、`apps/worker/src/routes/contents.ts:2751-2770` |
 
 ### 仕様が無い
 

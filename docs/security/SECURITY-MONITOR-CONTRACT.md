@@ -6,7 +6,7 @@
 
 ## API
 
-すべて既存の管理者ログイン・CSRF・所属検査の対象。画面側は `apps/web/src/lib/api-security-monitor.ts` の `securityMonitorApi` を使う（共通 `fetchApi` 経由）。共有の型は `packages/shared/src/security-monitor.ts`。
+すべて既存の管理者ログイン・CSRF・所属検査の対象。画面側は `apps/web/src/lib/api/helpers/security-monitor.ts` の `securityMonitorApi` を使う（共通 `fetchApi` 経由）。共有の型は `packages/shared/src/security-monitor.ts`。
 
 一覧・受領・解消の6経路と検証専用の1経路は`GET /openapi.json`にも掲載。入力・返却値・エラーの記載は`apps/worker/src/routes/security-monitor-openapi.ts`。既存の仕様と同じ確認表で、記載の欠落を検査する。
 

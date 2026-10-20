@@ -1,6 +1,6 @@
 export { getMileageHistoryPeriodSummary } from './history-summary.js';
 import { getActionScoreBands } from '../action-score-rules';
-import { publishedRuleContentFromDraft } from './index.js';
+import { publishedRuleContentFromDraft } from './rules.js';
 import type { SegmentCondition } from '@line-crm/shared';
 import { jstMonthStartString, jstNow } from '../utils.js';
 

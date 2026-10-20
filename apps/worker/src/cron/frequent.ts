@@ -54,7 +54,7 @@ export async function runFrequentHeavyJobs(
     if (account.is_active) lineClients.set(account.id, new LineClient(account.channel_access_token));
   }
   try {
-    const { processAutoReplyDeliveries } = await import('../features/auto-replies/auto-reply-delivery.js');
+    const { processAutoReplyDeliveries } = await import('../features/auto-replies/auto-reply-delivery/index.js');
     await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
   } catch (error) { logger.error("src_index_failed"); }
 
@@ -85,7 +85,7 @@ export async function runFrequentHeavyJobs(
       // claim で二重実行なし。停止中は回さない。
       name: 'ec event retry',
       run: async () => {
-        const { processDueEcRetries } = await import('../features/ec-commerce/ec-retry.js');
+        const { processDueEcRetries } = await import('../features/ec-commerce/ec-retry/index.js');
         const result = await processDueEcRetries(env.DB, {
           now: new Date(event.scheduledTime).toISOString(),
           credentialKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
@@ -97,12 +97,12 @@ export async function runFrequentHeavyJobs(
     },
     {
       name: 'calendar busy cache and switch jobs',
-      run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('../features/booking/booking-calendar-settings.js');const credentials={email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY};await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime));},
+      run: async () => {const {refreshCalendarBusyCaches,processCalendarSwitchJobs}=await import('../features/booking/booking-calendar-settings/index.js');const credentials={email:env.GOOGLE_SERVICE_ACCOUNT_EMAIL,privateKey:env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY};await refreshCalendarBusyCaches(env.DB,credentials,new Date(event.scheduledTime));await processCalendarSwitchJobs(env.DB,credentials,new Date(event.scheduledTime));},
     },
     {
       name: 'booking sync notices',
       run: async () => {
-        const { processBookingSyncNoticeQueue } = await import('../features/booking/booking-sync-rules.js');
+        const { processBookingSyncNoticeQueue } = await import('../features/booking/booking-sync-rules/index.js');
         await processBookingSyncNoticeQueue(env);
       },
     },
@@ -112,7 +112,7 @@ export async function runFrequentHeavyJobs(
       name: 'booking calendar delete retry',
       run: async () => {
         const { processPendingCalendarDeleteOperations, removeBookingFromGoogle } = await import(
-          '../features/booking/booking-calendar-sync.js'
+          '../features/booking/booking-calendar-sync/index.js'
         );
         const result = await processPendingCalendarDeleteOperations(env.DB, {
           now: new Date(event.scheduledTime),
@@ -219,7 +219,7 @@ export async function runFrequentHeavyJobs(
         // OFF のルールは予約自体が無い。公開URLが無い環境では送らず残す。
         if (env.WORKER_PUBLIC_URL) {
           const { deliverDueMileageGrantNotifications } = await import(
-            '../features/mileage/mileage-grant-notification.js'
+            '../features/mileage/mileage-grant-notification/index.js'
           );
           const { dispatchLineProxyLocally } = await import('../services/local-line-proxy.js');
           const notified = await deliverDueMileageGrantNotifications(
@@ -350,7 +350,7 @@ export async function runFrequentHeavyJobs(
       // 見つけたずれは直さず台帳に残す。直すのは運用者が K-2 画面で行う。
       name: 'rich menu daily reconcile',
       run: async () => {
-        const { processDailyRichMenuReconcile } = await import('../features/rich-menus/rich-menu-daily-reconcile.js');
+        const { processDailyRichMenuReconcile } = await import('../features/rich-menus/rich-menu-daily-reconcile/index.js');
         const result = await processDailyRichMenuReconcile(env.DB, {
           now: new Date(event.scheduledTime),
         });

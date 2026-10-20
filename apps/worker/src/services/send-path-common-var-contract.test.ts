@@ -34,7 +34,7 @@ const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
   { file: 'features/auto-replies/auto-reply.ts', mustCall: 'resolveSendInterpolationExtra', label: '自動応答の実送信' },
   { file: 'routes/forms.ts', mustCall: 'resolveSendInterpolationExtra', label: 'フォーム回答の自動返信' },
   { file: 'routes/broadcasts.ts', mustCall: 'resolveSendCommonVars', label: '一斉配信のテスト送信' },
-  { file: 'features/automations/automation-action-executors.ts', mustCall: 'expandSendCommonVars', label: 'オートメーションの送信アクション' },
+  { file: 'features/automations/automation-action-handlers.ts', mustCall: 'expandSendCommonVars', label: 'オートメーションの送信アクション' },
   { file: 'services/event-bus.ts', mustCall: 'expandSendCommonVars', label: '旧イベント連携の送信アクション' },
   { file: 'features/rich-menus/rich-menu-tap.ts', mustCall: 'expandSendCommonVars', label: 'リッチメニューのテンプレート送信' },
   { file: 'features/forms/form-layout-effects.ts', mustCall: 'expandSendCommonVars', label: 'フォーム演出の送信' },

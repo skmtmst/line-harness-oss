@@ -29,7 +29,7 @@ const CSS = readFileSync(new URL('../friends/friends-v8.module.css', import.meta
  * **引用符・列ずれの行を結び付けない**こと、**一致先なしに
  * 新規作成を選ばせない**ことを守る。
  */
-describe('V6 機能3 UID移行の対応表', () => {
+describe("管理画面 機能3 UID移行の対応表", () => {
   it('引用符の中のカンマで列をずらさない', () => {
     expect(splitUidCsvLine('U1,"山田,太郎",x')).toEqual(['U1', '山田,太郎', 'x'])
   })
@@ -204,7 +204,7 @@ describe('UID移行の5段階表示（#1015 CHK-06）', () => {
  * 親を縦並び＋gap-4 にし、子ごとの mb/mt で間隔を作らない。
  * 空の案内も白地・枠・角丸のカードの中に出す（灰色の地だけにしない）。
  */
-describe('UID移行のカード間隔（★V7 gap-4）', () => {
+describe("UID移行のカード間隔", () => {
   it('画面の親は縦並び＋gap-4 で、カード間の mb/mt を持たない', () => {
     expect(PAGE).toContain('className={styles.board} data-design-node="Z0jHp"')
     expect(CSS).toMatch(/\.board\s*\{[^}]*gap: 16px/s)

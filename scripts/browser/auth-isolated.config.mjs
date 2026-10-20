@@ -1,6 +1,6 @@
 import { createServer } from 'node:net'
 import { fileURLToPath } from 'node:url'
-import original from '../../apps/web/src/v8/login/train30-auth.config.mjs'
+import original from '../../apps/web/src/v8/login/auth.config.mjs'
 
 async function reservePort(value) {
   if (value !== undefined) {

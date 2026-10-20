@@ -13,7 +13,7 @@ const DIALOG = readFileSync(join(import.meta.dirname, '../../../v8/inflow-links/
  * 口から取れない数を定数で書いていた（残り78人・ブロック8人・今月240回・
  * 1人あたり¥1,493・既定名・18人）。取れない数は出さない。未取得は「—」。
  */
-describe('V6 流入リンク詳細の数字の契約', () => {
+describe("管理画面 流入リンク詳細の数字の契約", () => {
   it('口から取れない定数を書かない', () => {
     expect(PAGE).not.toContain('value={78}')
     expect(PAGE).not.toContain('今月 240回')

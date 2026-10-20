@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8') + fs.readFileSync(path.join(__dirname, '../../../v8/broadcast-detail/detail.tsx'), 'utf8')
 
-describe('V6 一斉配信詳細の契約', () => {
+describe("管理画面 一斉配信詳細の契約", () => {
   it('概要・宛先・記録を押せるタブとして示す', () => {
     // #816（★管理画面 C-2）。押せない5連の飾り（概要・クリック・友だち・エラー・
     // 配信内容）は、押せる3つのタブ（概要・宛先・記録）へ置き換えた。
@@ -45,7 +45,7 @@ describe('V6 一斉配信詳細の契約', () => {
   })
 })
 
-describe('V6 一斉配信詳細の、取れない数の断り', () => {
+describe("管理画面 一斉配信詳細の、取れない数の断り", () => {
   it('クリック率を開封で割った作り値にしない', () => {
     expect(PAGE).toContain("rateText(insight?.clickRate)")
   })
@@ -66,7 +66,7 @@ describe('V6 一斉配信詳細の、取れない数の断り', () => {
   })
 })
 
-describe('V6 一斉配信詳細の、送信前の進み具合', () => {
+describe("管理画面 一斉配信詳細の、送信前の進み具合", () => {
   it('Progress は送信中だけに出す（下書き・予約では棒も回る印も出さない）', () => {
     // 予約しただけの配信に preparing の棒を出すと、送り始めているように見える。
     expect(PAGE).toContain('state="active"')

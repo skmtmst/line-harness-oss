@@ -27,7 +27,7 @@ function rawDurationDeclarations(css: string): string[] {
     .filter((declaration) => /(?<![\d.])(?!0m?s\b)\d+(?:\.\d+)?m?s\b/.test(declaration))
 }
 
-describe('動きの物差し（★V7 基礎 動き）', () => {
+describe("動きの物差し", () => {
   it('4段の長さと2本の曲線が :root にある', () => {
     const root = GLOBALS.match(/:root\s*\{[\s\S]*?\n\}/g)?.find((block) => block.includes('--motion-base')) ?? ''
     expect(root).toMatch(/--motion-instant:\s*80ms;/)

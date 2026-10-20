@@ -33,7 +33,7 @@ describe('タグ V4 contract', () => {
     expect(source).toContain("rows.push({ name: '使用中の版'")
   })
 
-  it('タグ編集と対応マーク保管はV6の結果を正しく案内する', () => {
+  it("タグ編集と対応マーク保管は管理画面の結果を正しく案内する", () => {
     const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
     const markList = (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx'))
     expect(editor).toContain('このタグを消すと、上の配信やフォームの条件から外れます')
@@ -42,7 +42,7 @@ describe('タグ V4 contract', () => {
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 
-  it('タグ作成・編集は画面名をトップバーだけに置き、V6の操作を下部へまとめる', () => {
+  it("タグ作成・編集は画面名をトップバーだけに置き、管理画面の操作を下部へまとめる", () => {
     const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
     expect(editor).toContain("title={host?.title ?? (tag.name || 'タグを編集')}")
     expect(editor).toContain('<CreatePage')

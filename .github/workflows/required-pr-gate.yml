@@ -317,6 +317,8 @@ jobs:
       - name: Test the setup CLI
         run: pnpm --config.enable-pre-post-scripts=false --filter create-line-harness test
       - run: pnpm test:scripts
+      - name: Check names and public dependency boundaries
+        run: pnpm exec tsx scripts/structure/check.ts
       - name: Typecheck repository scripts
         run: pnpm typecheck:scripts
       - name: Test shared

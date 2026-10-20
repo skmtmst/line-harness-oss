@@ -898,7 +898,7 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `invalid_payment_setting` | [宣言](../apps/worker/src/routes/booking-payment-settings.ts)（1か所） |
 | `invalid_period` | [宣言](../apps/worker/src/features/booking/booking-pass-billing.ts)（3か所） |
 | `INVALID_PHASE` | [宣言](../apps/worker/src/services/hq-templates/form.ts)（4か所） |
-| `invalid_photo_media_id` | [宣言](../apps/worker/src/services/booking-photos.ts)（1か所） |
+| `invalid_photo_media_id` | [宣言](../apps/worker/src/features/booking/booking-photos.ts)（1か所） |
 | `invalid_photo_version` | [宣言](../apps/worker/src/routes/booking/register-photos.ts)（3か所） |
 | `invalid_plan` | [宣言](../apps/worker/src/features/booking/booking-pass-plans.ts)（1か所） |
 | `INVALID_PREFLIGHT` | [宣言](../apps/worker/src/services/hq-templates/distribution.ts)（3か所） |
@@ -966,8 +966,8 @@ A06の保存済みcall stateにはrequestIdを含め、cronで再開しても同
 | `invalid_state` | [宣言](../apps/worker/src/routes/events/register-liff-change.ts)（1か所） |
 | `INVALID_STATUS` | [宣言](../apps/worker/src/routes/identity-candidates.ts)（3か所） |
 | `invalid_status_transition` | [宣言](../apps/worker/src/routes/contents-common-variables-handlers.ts)（1か所） |
-| `invalid_store_photo_visibility` | [宣言](../apps/worker/src/services/booking-photos.ts)（1か所） |
-| `invalid_store_photos` | [宣言](../apps/worker/src/services/booking-photos.ts)（1か所） |
+| `invalid_store_photo_visibility` | [宣言](../apps/worker/src/features/booking/booking-photos.ts)（1か所） |
+| `invalid_store_photos` | [宣言](../apps/worker/src/features/booking/booking-photos.ts)（1か所） |
 | `invalid_stored_assignment_settings` | [宣言](../apps/worker/src/features/booking/booking-assignment-settings.ts)（1か所） |
 | `invalid_style` | [宣言](../apps/worker/src/routes/line-accounts.ts)（4か所） |
 | `invalid_style_mode` | [宣言](../apps/worker/src/services/style-setup.ts)（2か所） |

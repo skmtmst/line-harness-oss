@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 // @ts-expect-error Node のソース検査を同じ故障注入で確認する。
 import { inspectB244Source, inspectB244Tree } from '../../scripts/verify.mjs'
 
-describe('B-244/245 ソースの見張り', () => {
+describe("必須欄と保存失敗を調べるソースの見張り", () => {
   it('必須・任意の矛盾と保存検査の定義抜けを止める', () => {
     expect(inspectB244Source('<Field required optional />').map((r: {kind:string}) => r.kind)).toEqual(['requirement-conflict'])
     expect(inspectB244Source("fields.define('name','名前',check); <Field requirement={fields.requirement('name')} />").map((r: {kind:string}) => r.kind)).toEqual(['requirement-without-definition'])

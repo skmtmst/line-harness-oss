@@ -7,7 +7,7 @@ const PAGE = readFileSync(new URL('page.tsx', import.meta.url), 'utf8') + readFi
 const FORM = readUiSource(join(process.cwd(), 'src/components/broadcasts/broadcast-form.tsx'), 'utf8')
 const NEW_PAGE = readFileSync(join(process.cwd(), 'src/app/broadcasts/new/page.tsx'), 'utf8')
 
-describe('V6 一斉配信の予約完了', () => {
+describe("管理画面 一斉配信の予約完了", () => {
   it('作成結果の実IDを完了画面へ渡す', () => {
     expect(FORM).toContain('await persistDraft(')
     expect(FORM).toContain('scheduledAtIso(),')

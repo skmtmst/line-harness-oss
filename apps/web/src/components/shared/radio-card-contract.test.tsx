@@ -128,7 +128,7 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
     }
   })
 
-  it('B-203の選択の枠と、題・説明の文字を保つ', () => {
+  it("共通部品の選択の枠と、題・説明の文字を保つ", () => {
     const c = css()
     expect(c).toMatch(/html:root\s*\.checked[^{]*\{[^}]*outline:\s*var\(--choice-card-ring\) solid var\(--color-selection-border\)/s)
     const titles = [...c.matchAll(/:root\s*\.title\s*\{[^}]*\}/gs)].map((m) => m[0])

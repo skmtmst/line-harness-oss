@@ -3,13 +3,13 @@
  * Build-time hash injection.
  *
  * Computes SHA256 of the worker bundle, admin static output and LIFF dist,
- * then writes `apps/worker/src/_version.ts` so the Worker runtime can expose
+ * then writes `apps/worker/src/release-version.ts` so the Worker runtime can expose
  * `/_version` for self-diagnostics, upgrade-flow checks and rollback hints.
  *
  * Library API (`injectVersion`):
  *   - hashFile(path)      → "sha256:<hex>"
  *   - hashDirectory(dir)  → "sha256:<hex>"   (deterministic, recursive)
- *   - write(outPath, v)   → writes _version.ts
+ *   - write(outPath, v)   → writes release-version.ts
  *
  * CLI:
  *   tsx inject-version.ts \
@@ -17,7 +17,7 @@
  *     --worker dist/index.js \
  *     --admin ../web/out \
  *     --liff ../liff/dist \
- *     --out src/_version.ts
+ *     --out src/release-version.ts
  *     --commit <sha> (optional; default: $GITHUB_SHA or `git rev-parse HEAD`, else 'unknown')
  *
  * Prints `{ workerHash, adminHash, liffHash, commit }` JSON to stdout so GH Actions

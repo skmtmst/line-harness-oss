@@ -57,7 +57,7 @@
 ## 要件と今の作りの食い違い
 
 1. **F-24 の「LINE の受付枠を 0・当日枠を 0・元の値へ戻す」が動いていない**：設定 `stopLine`・`stopSameDay` は保存されるが（`packages/db/src/restaurant-inventory-rules.ts:2-16`、`apps/worker/src/routes/restaurant-test.ts:2550`）、どこからも使われていない。動いているのは知らせ（画面のタスクと LINE）だけ（`apps/worker/src/services/restaurant-inventory-rules.ts:98-104`）。前→後の書き換えの記録も無い。
-2. **売上の無断率・取消率の式**：`packages/db/src/booking-sales.ts:399-423` は分母に取消を含む全予約、売上は `confirmed` だけ（完了を含まない）、分母 0 で 0 を返す（「取れない数字は 0 にしない」と違う）。飲食の無断率（`services/restaurant-rotation.ts:29`）は取消と仮押さえを除く。**同じ言葉が 2 つの式**。API 組4 の枝で直しているが、この木には無い。
+2. **売上の無断率・取消率の式**：`packages/db/src/booking/sales.ts:399-423` は分母に取消を含む全予約、売上は `confirmed` だけ（完了を含まない）、分母 0 で 0 を返す（「取れない数字は 0 にしない」と違う）。飲食の無断率（`services/restaurant-rotation.ts:29`）は取消と仮押さえを除く。**同じ言葉が 2 つの式**。API 組4 の枝で直しているが、この木には無い。
 3. **「知らせる」を切ると媒体を閉じるタスクも作らない**：`restaurant-inventory-rules.ts:98` は `!rule.notify` のとき閉じるタスクを「開けてよい」へ戻す。要件は「知らせるか」を設定の 1 つにしているだけで、タスク（時間帯×媒体）は別に出す読み方もできる（どちらが正か要件に書いていない）。
 
 仕様が無い：F-24 の当日枠を戻すとき、手で変えた値とぶつかったらどちらを採るか。前払いのみの人がお客さまが選ぶ支払いのメニューを予約するとき、選ばせるか（[style-and-money.md](style-and-money.md) でも同じ）。 → 決定 B-337 Q-56：当日枠を戻すとき手で変えた値を優先。→ 決定 B-337 Q-24：前払いのみの人にはお店で払うを出さず先払いだけ出す（理由は出さない）。

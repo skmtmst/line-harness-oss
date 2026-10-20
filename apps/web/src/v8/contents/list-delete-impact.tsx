@@ -6,7 +6,7 @@ import type { MediaDeleteImpact,MediaItem } from '@line-crm/shared'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
 
-type loadMediaDeleteImpactContext = {
+type LoadMediaDeleteImpactContext = {
   deleteRequestRef: RefObject<number>
   impactRequestRef: RefObject<{ accountId: string | null; mediaId: string | null; generation: number; }>
   saveErrors: ReturnType<typeof useSaveFormErrors>
@@ -17,7 +17,7 @@ type loadMediaDeleteImpactContext = {
   setImpactPhase: Dispatch<SetStateAction<"error" | "idle" | "loading" | "ready">>
 }
 
-export async function loadMediaDeleteImpact({ deleteRequestRef, impactRequestRef, saveErrors, selectedAccountId, setDeleteError, setDeleting, setImpact, setImpactPhase }: loadMediaDeleteImpactContext, item: MediaItem) {
+export async function loadMediaDeleteImpact({ deleteRequestRef, impactRequestRef, saveErrors, selectedAccountId, setDeleteError, setDeleting, setImpact, setImpactPhase }: LoadMediaDeleteImpactContext, item: MediaItem) {
     deleteRequestRef.current += 1
     setDeleting(item)
     setDeleteError('')

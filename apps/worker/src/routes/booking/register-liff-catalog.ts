@@ -9,7 +9,7 @@ import { getAvailability } from '../../services/availability.js';
 import { DEFAULT_ACCOUNT_SETTINGS } from '../../features/booking/booking-types/index.js';
 import { resolveSelfBookingCaller, resolveAccountIdFromLiff, verifyCallerLineUserId, resolveFriendId } from './identity.js';
 import { googleCredentials } from './availability.js';
-import { bookingPhoto } from '../../services/booking-photos.js';
+import { bookingPhoto } from '../../features/booking/booking-photos/index.js';
 
 export function registerLiffCatalog(booking: Hono<Env>): void {
 // ================================================================

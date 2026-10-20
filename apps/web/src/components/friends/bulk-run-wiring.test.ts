@@ -8,7 +8,7 @@ const PAGE = readFileSync(join(__dirname, '..', '..', 'app', 'friends', 'page.ts
   + readFileSync(join(__dirname, '..', '..', 'lib', 'staff-role.ts'), 'utf8')
 
 /** 画面側の配線。**考え方が正しくても、繋いでいなければ効かない。** */
-describe('V6 友だち一括操作（IAf7j）の配線', () => {
+describe("管理画面 友だち一括操作（IAf7j）の配線", () => {
   it('既存の /friends の中に作り、別ルートを増やさない', () => {
     expect(PAGE).toContain('<BulkRunDialog')
     expect(DIALOG).toContain('data-design-node="IAf7j"')

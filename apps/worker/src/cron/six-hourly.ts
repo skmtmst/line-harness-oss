@@ -76,7 +76,7 @@ export async function runSixHourlyHeavyJobs(
       // 日常更新は各保存経路で原子的に行う。ここは欠損補修だけの経路。
       name: 'media usage scan',
       run: async () => {
-        const { scanMediaUsage } = await import('../features/media/media-usage-scan.js');
+        const { scanMediaUsage } = await import('../features/media/media-usage-scan/index.js');
         const scanStartedAt = japanCalendar().toISOString().replace('Z', '');
         const result = await scanMediaUsage(env.DB, scanStartedAt);
         if (result.matched > 0 || result.pruned > 0) {

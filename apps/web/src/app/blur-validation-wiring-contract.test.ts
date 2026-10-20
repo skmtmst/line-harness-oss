@@ -16,7 +16,7 @@ const WIRED = [
   'v8/settings/staff/create.tsx',
 ]
 
-describe('blur検証の配線（★V7 sTJsh §6）', () => {
+describe("blur検証の配線", () => {
   for (const file of WIRED) {
     it(`${file} は useFormErrors を CreatePage へ渡している`, () => {
       const source = readFileSync(join(SRC, file.replace(/^app\//, 'app/')), 'utf8')

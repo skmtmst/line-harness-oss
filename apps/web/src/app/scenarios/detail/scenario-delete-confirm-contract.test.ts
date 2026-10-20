@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./scenario-detail-client.tsx', import.meta.url), 'utf8')
 
-describe('V6 dqFft シナリオ全体を削除する確認', () => {
+describe("管理画面 dqFft シナリオ全体を削除する確認", () => {
   it('ブラウザ標準confirmを使わず安定した押し口から共通窓を開く', () => {
     expect(PAGE).not.toContain('if (!confirm(message)) return')
     expect(PAGE).toContain("id: 'delete'")

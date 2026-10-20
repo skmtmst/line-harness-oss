@@ -39,7 +39,7 @@ const OFFERS: AffiliateOffer[] = [
   offer({ id: 'c', name: '定期便', rewardAmount: 1200, rewardMiles: 50, isActive: true, createdAt: '2026-01-15T00:00:00.000Z' }),
 ]
 
-describe('V6 案件一覧（GH8VL）の見せ方', () => {
+describe("管理画面 案件一覧（GH8VL）の見せ方", () => {
   it('絞り込みの札は読み込んだ行から数えられるものだけ持つ', () => {
     expect(OFFER_FILTERS.map((f) => f.key)).toEqual(['open', 'draft', 'hasYen', 'hasMiles'])
   })
@@ -141,7 +141,7 @@ describe('V6 案件一覧（GH8VL）の見せ方', () => {
   })
 })
 
-describe('V6 案件一覧（GH8VL）の画面', () => {
+describe("管理画面 案件一覧（GH8VL）の画面", () => {
   it('口の無い「並び順を保存」を操作として置かない', () => {
     // 注記としては書いてよい。押せる形（JSXの本文）で出ていないことを見る。
     expect(TABS).not.toMatch(/>\s*並び順を保存\s*</)
@@ -168,8 +168,8 @@ describe('V6 案件一覧（GH8VL）の画面', () => {
   })
 })
 
-describe('V6 アフィリエイターを作る（xqT1Z）', () => {
-  it('未接続の断り書きは出さない（★V7 C6）', () => {
+describe("管理画面 アフィリエイターを作る（xqT1Z）", () => {
+  it("未接続の断り書きは出さない", () => {
     expect(NEW_PAGE).not.toContain('まだ繋がっていません')
   })
 

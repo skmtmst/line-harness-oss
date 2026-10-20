@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('./scenario-detail-client.tsx', import.meta.url), 'utf8')
 
-describe('V6 dqFft シナリオの通を削除する確認', () => {
+describe("管理画面 dqFft シナリオの通を削除する確認", () => {
   it('ブラウザ標準confirmを使わず共通の取り消せない操作の窓を使う', () => {
     expect(PAGE).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
     expect(PAGE).not.toContain("confirm('このステップを削除してもよいですか？')")

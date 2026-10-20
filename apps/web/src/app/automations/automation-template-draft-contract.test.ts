@@ -6,7 +6,7 @@ const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const GALLERY = readFileSync(new URL('../../v8/automations/templates.tsx', import.meta.url), 'utf8')
 const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
-describe('V6 25-1-C 見本から下書きを作る', () => {
+describe("管理画面 25-1-C 見本から下書きを作る", () => {
   it('見本タブを実Nodeへ接続し、サーバーから使える見本だけを読む', () => {
     expect(PAGE).toContain("{ key: 'templates', label: '見本' }")
     expect(PAGE).toContain("tab === 'templates' ? <AutomationTemplatesV8 /> : <AutomationListV8 />")

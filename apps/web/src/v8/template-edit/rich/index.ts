@@ -1,0 +1,12 @@
+export type { RichArea } from '../rich';
+export type { RichShape } from '../rich';
+export { buildAreas } from '../rich';
+export { RICH_SHAPES } from '../rich';
+export { areaPlace } from '../rich';
+export type { AreaActionKind } from '../rich';
+export type { AreaDraft } from '../rich';
+export { emptyAreaDraft } from '../rich';
+export { areaDraftConfigured } from '../rich';
+export { RICH_MESSAGE_TEXT_MAX } from '../rich';
+export { buildRichPayload } from '../rich';
+export { default } from '../rich';

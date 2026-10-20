@@ -58,7 +58,7 @@ export async function dispatchWaitlistInvites(env: Env['Bindings'], accountId?: 
     for (const row of rows) {
       if(table==='rt_seat_waitlist') {
         const managed=await db.prepare(`SELECT t.store_id FROM rt_store_followup_templates t JOIN rt_seat_waitlist w ON w.store_id=t.store_id JOIN rt_reservation_events e ON json_extract(e.payload_json,'$.waitlistId')=w.id JOIN rt_reservation_event_receipts r ON r.event_id=e.id AND r.consumer_key='followup' WHERE w.id=?`).bind(row.id).first<{store_id:string}>();
-        if(managed){const {processRestaurantEvents}=await import('../../services/restaurant-events.js');const {processScenarioSourceJobs}=await import('../scenarios/scenario-source-jobs.js');await processRestaurantEvents(env,managed.store_id);await processScenarioSourceJobs(env);continue;}
+        if(managed){const {processRestaurantEvents}=await import('../../services/restaurant-events.js');const {processScenarioSourceJobs}=await import('../scenarios/scenario-source-jobs/index.js');await processRestaurantEvents(env,managed.store_id);await processScenarioSourceJobs(env);continue;}
       }
 
       const claim = await db.prepare(`UPDATE ${table} SET notification_claim_until=? WHERE id=? AND status='invited' AND julianday(hold_expires_at)>julianday('now') AND notified_at IS NULL AND (notification_claim_until IS NULL OR julianday(notification_claim_until)<=julianday(?))`).bind(new Date(Date.now() + 60_000).toISOString(), row.id, now).run();
