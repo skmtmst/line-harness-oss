@@ -1604,6 +1604,37 @@ describe('V8 フロア配置と結合グループ',()=>{
 
 describe('枠の自動調整ルールと媒体閉鎖通知のAPI',()=>{
  const input={storeId:'store-ginza',threshold:2,stopLine:true,stopSameDay:true,notify:true,expectedVersion:0};
+ it('自動停止中の手変更は409で拒否し、LINE・当日受付の元値と店頭枠を保つ',async()=>{
+  seedRestaurantFixture();
+  testDb.raw.exec("INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity,line_capacity,same_day_capacity,walk_in_capacity) VALUES('stopped','store-ginza','2027-01-01T10:00:00Z',4,2,1,1)");
+  expect((await requestWithMethod('/api/restaurant-test/inventory-rules?account_id=account-1','PUT',{...input,threshold:4,notify:false})).status).toBe(200);
+  const version=(testDb.raw.prepare("SELECT version FROM rt_inventory_slots WHERE id='stopped'").get() as {version:number}).version;
+  expect((await requestWithMethod('/api/restaurant-test/inventory/stopped?account_id=account-1','PUT',{otaCapacity:0,lineCapacity:1,walkInCapacity:1,sameDayCapacity:1,expectedVersion:version})).status).toBe(409);
+  expect(testDb.raw.prepare("SELECT line_capacity,same_day_capacity,walk_in_capacity,auto_line_original,auto_same_day_original FROM rt_inventory_slots WHERE id='stopped'").get()).toEqual({line_capacity:0,same_day_capacity:0,walk_in_capacity:1,auto_line_original:2,auto_same_day_original:1});
+  expect((await requestWithMethod('/api/restaurant-test/inventory-rules?account_id=account-1','PUT',{...input,stopLine:false,stopSameDay:false,notify:false,expectedVersion:1})).status).toBe(200);
+  expect(testDb.raw.prepare("SELECT line_capacity,same_day_capacity,walk_in_capacity FROM rt_inventory_slots WHERE id='stopped'").get()).toEqual({line_capacity:2,same_day_capacity:1,walk_in_capacity:1});
+ });
+ it('指定日の停止・復元は店舗の時間帯で読み、顧客・予約の識別子を返さない',async()=>{
+  seedRestaurantFixture();
+  testDb.raw.exec(`INSERT INTO rt_inventory_rule_log(store_id,slot_id,starts_at,before_line,after_line,before_same_day,after_same_day,cause) VALUES
+   ('store-ginza','night','2026-11-01T15:00:00Z',0,2,0,1,'rt_reservations:update:private-reservation'),
+   ('store-ginza','boundary','2026-11-02T15:00:00Z',0,2,0,1,'rules_saved'),
+   ('store-yokohama','other','2026-11-01T15:00:00Z',0,2,0,1,'rules_saved');`);
+  const path='/api/restaurant-test/inventory-rules?account_id=account-1&storeId=store-ginza';
+  const body=await (await request(path+'&date=2026-11-02')).json();
+  expect(body).toMatchObject({success:true,data:{stopLine:false,stopSameDay:false,version:0},state:{historyTotal:1,history:[{startsAt:'2026-11-01T15:00:00Z',cause:'reservation',beforeLine:0,afterLine:2}]}});
+  expect(JSON.stringify(body)).not.toContain('private-reservation');
+  expect((await request(path+'&date=2026-02-30')).status).toBe(400);
+  expect((await request(path.replace('store-ginza','outside')+'&date=2026-11-02')).status).toBe(404);
+  expect(await (await request(path)).json()).not.toHaveProperty('state');
+ });
+ it('閲覧のみでも状態を読めるが、有効化・しきい値保存は拒否する',async()=>{
+  seedRestaurantFixture();
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'readonly',name:'閲覧担当',role:'admin',access_level:'read_only',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0});
+  expect((await requestWithMethod('/api/restaurant-test/inventory-rules?account_id=account-1&storeId=store-ginza&date=2026-11-01','GET',undefined,'readonly-key')).status).toBe(200);
+  expect((await requestWithMethod('/api/restaurant-test/inventory-rules?account_id=account-1','PUT',input,'readonly-key')).status).toBe(403);
+  expect(testDb.raw.prepare('SELECT COUNT(*) n FROM rt_inventory_rules').get()).toEqual({n:0});
+ });
  it('担当者は閲覧と媒体閉鎖の報告ができるが、在庫画面の権限があってもルールを保存できない',async()=>{
   seedRestaurantFixture();
   testDb.raw.exec(`INSERT INTO rt_inventory_slots(id,store_id,starts_at,total_capacity) VALUES('rules-slot','store-ginza','2027-01-01T10:00:00Z',4);
