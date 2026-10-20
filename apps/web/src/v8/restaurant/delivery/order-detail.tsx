@@ -166,7 +166,7 @@ export function OrderDetailDialog({
     if (order.status === 'new') {
       return (
         <>
-          <Button variant="danger-outline" disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onCancelOrder}>
+          <Button variant={preparing ? 'secondary' : 'danger-outline'} disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onCancelOrder}>
             <Ban size={16} aria-hidden="true" />注文をキャンセルする
           </Button>
           <span className={styles.spacer} />
@@ -174,7 +174,7 @@ export function OrderDetailDialog({
             <X size={16} aria-hidden="true" />断る
           </Button>
           {/* 絵（hjdqV）の足は幅114。結果の文字の分は控えないよう共通の任意引数で頼む。 */}
-          <Button variant="primary" busy={busy} busyLabel="受付中…" widthReserve="idle" disabled={preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onAccept}>
+          <Button variant={preparing ? 'secondary' : 'primary'} busy={busy} busyLabel="受付中…" widthReserve="idle" disabled={preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onAccept}>
             <Check size={16} aria-hidden="true" />受け付ける
           </Button>
         </>
@@ -183,12 +183,12 @@ export function OrderDetailDialog({
     if (order.status === 'cooking') {
       return (
         <>
-          <Button variant="danger-outline" disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onCancelOrder}>
+          <Button variant={preparing ? 'secondary' : 'danger-outline'} disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onCancelOrder}>
             <Ban size={16} aria-hidden="true" />注文をキャンセルする
           </Button>
           <span className={styles.spacer} />
           <Button onClick={onClose} disabled={busy}>閉じる</Button>
-          <Button variant="primary" busy={busy} busyLabel="変更中…" widthReserve="idle" disabled={preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onReady}>
+          <Button variant={preparing ? 'secondary' : 'primary'} busy={busy} busyLabel="変更中…" widthReserve="idle" disabled={preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onReady}>
             準備完了にする
           </Button>
         </>
@@ -226,7 +226,7 @@ export function OrderDetailDialog({
       ) : null}
       {order ? (
         <>
-          {preparing ? <Notice tone="info" density="compact">{`Uber Eats の注文の連携は${PREPARING_WORD}です。注文内容と履歴は確認できます。`}</Notice> : null}
+          {preparing ? <Notice tone="info" density="compact">{`Uber Eats の注文の連携は${PREPARING_WORD}です。受け付け・拒否・キャンセル・準備完了の操作はまだ利用できません。注文内容と履歴は確認できます。`}</Notice> : null}
           <div className={styles.detailHead}>
             <span className={styles.orderNumber}>{formatOrderNumber(order.orderNumber)}</span>
             {/*

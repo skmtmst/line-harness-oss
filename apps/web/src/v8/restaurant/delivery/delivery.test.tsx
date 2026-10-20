@@ -586,15 +586,40 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     render(<DeliveryPage />)
     const dialog = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
     await dialog.findByText('唐揚げ弁当')
+    expect(dialog.getByText(/受け付け・拒否・キャンセル・準備完了の操作はまだ利用できません/)).toBeTruthy()
     for (const name of status === 'new' ? ['注文をキャンセルする', '断る', '受け付ける'] : ['注文をキャンセルする', '準備完了にする']) {
       const button = dialog.getByRole('button', { name }) as HTMLButtonElement
       expect(button.disabled).toBe(true)
+      expect(button.title).toBe('準備中')
       fireEvent.click(button)
     }
     expect(fixture.accept).not.toHaveBeenCalled()
     expect(fixture.reject).not.toHaveBeenCalled()
     expect(fixture.ready).not.toHaveBeenCalled()
     expect(fixture.cancel).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['demaecan', '出前館', 'new', '受け付ける', 'accept'],
+    ['rocketnow', 'ロケットナウ', 'new', '受け付ける', 'accept'],
+    ['demaecan', '出前館', 'cooking', '準備完了にする', 'ready'],
+    ['rocketnow', 'ロケットナウ', 'cooking', '準備完了にする', 'ready'],
+  ] as const)('%s（%s）の%s注文で%sを送れる', async (service, serviceLabel, status, label, action) => {
+    const original = await fixture.order()
+    fixture.order.mockResolvedValue({ ...original, order: { ...original.order, service, serviceLabel, status } })
+    fixture.orders.mockResolvedValue(ordersData([order('o1', 'OTHER-1001', { service, serviceLabel, status })]))
+    fixture[action].mockResolvedValue({ success: true })
+    at('/restaurant-test/delivery?id=o1')
+    render(<DeliveryPage />)
+    const dialog = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
+    const actionButton = await dialog.findByRole('button', { name: label })
+    expect((actionButton as HTMLButtonElement).disabled).toBe(false)
+    expect(dialog.queryByText(/操作はまだ利用できません/)).toBeNull()
+    for (const name of status === 'new' ? ['注文をキャンセルする', '断る'] : ['注文をキャンセルする']) {
+      expect((dialog.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(false)
+    }
+    fireEvent.click(actionButton)
+    await waitFor(() => expect(fixture[action]).toHaveBeenCalledWith('account-1', 'o1'))
   })
 
   it('一括停止でUberを選べず、他社だけを送る', async () => {

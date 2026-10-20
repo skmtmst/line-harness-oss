@@ -283,9 +283,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                 <CustomerInfoRows rows={[
                   { label: '接続の状態', value: <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge> },
                   ...(service.id === 'uber' ? [{ label: '注文の連携', value: (
-                    <Button size="compact" onClick={() => preparing.open('Uber Eats の注文の連携')}>
-                      {`注文の連携は${PREPARING_WORD}`}
-                    </Button>
+                    <StatusBadge tone="neutral" size="compact">{PREPARING_WORD}</StatusBadge>
                   ) }] : []),
                 ]} />
 
