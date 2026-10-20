@@ -608,7 +608,7 @@ describe('N-365 #746 受信Webhookの再送を弾く', () => {
     const broken = '{"order_id": "A-1"';
     const rejected = await receive(broken);
     expect(rejected.status).toBe(400);
-    await expect(rejected.json()).resolves.toMatchObject({ success: false, error: { code: 'BAD_REQUEST', message: '入力内容を確認してください。' } });
+    await expect(rejected.json()).resolves.toMatchObject({ success: false, error: { code: 'INVALID_JSON', message: '送信内容を読み取れません。入力内容を確認してください。' } });
     // 予約を先に取っていたら、ここが 1 になる。
     expect(counts(db)).toMatchObject({ receipts: 0, logs: 0, fired: 0 });
 

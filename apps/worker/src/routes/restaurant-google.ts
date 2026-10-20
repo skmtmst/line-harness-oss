@@ -1,10 +1,11 @@
+import { fail } from '../lib/fail.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
 import {requireAccountAi} from '../services/account-ai-features.js';
 import {GapError} from '../services/gap-common.js';
 import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 export { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第1段：設定（Google接続）と口コミ。
  *
@@ -192,9 +193,7 @@ export function staffTenantId(c: Context<Env>): string {
   return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
 }
 
-export function fail(c: Context<Env>, status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503 | 504, error: string, extra: Record<string, unknown> = {}, fieldKeys: readonly string[] = []) {
-  return inputError(c, { success: false, error, ...extra }, status, fieldKeys);
-}
+export { fail } from '../lib/fail.js';
 
 function readCookie(header: string | undefined, name: string): string | null {
   if (!header) return null;
