@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { CircleCheck, Circle, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
@@ -54,7 +55,7 @@ export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOp
     return `済み ${summary.done}件（${names}${summary.doneNames.length > 3 ? ' ほか' : ''}）`
   }, [summary])
   return (
-    <section className={styles.card} aria-labelledby="setup-card-title" data-design-node="Bdfxm">
+    <Card layout="vertical" contentPadding="var(--sc-pad)" gap="var(--sc-gap)" className={styles.card} aria-labelledby="setup-card-title" data-design-node="Bdfxm">
       <div className={styles.head}>
         <h2 id="setup-card-title" className={styles.title}>使い方の設定</h2>
         <HelpTip label="使い方の設定の説明">選んだ機能だけの設定です。「はじめの設定」の完了条件とは別に、あとで設定する物や動かす前の確認を表示します。</HelpTip>
@@ -77,7 +78,7 @@ export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOp
         </p>
       ) : null}
       {preparing.dialog}
-    </section>
+    </Card>
   )
 }
 

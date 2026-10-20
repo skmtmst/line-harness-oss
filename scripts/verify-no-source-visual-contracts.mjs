@@ -42,12 +42,13 @@ const execution = new Set(['render','renderToString','renderToStaticMarkup','set
 
 class Scope {
   constructor(parent = null) { this.parent = parent; this.bindings = new Map(); this.hooks=[]; this.hookNodes=new Set() }
-  get(name) { return this.bindings.get(name) ?? this.parent?.get(name) ?? (['Map','Set','Object','Math'].includes(name) ? value({intrinsic:name}) : value()) }
+  get(name) { return this.bindings.get(name) ?? this.parent?.get(name) ?? (['Map','Set','Object','Math','JSON'].includes(name) ? value({intrinsic:name}) : value()) }
   set(name, result) { this.bindings.set(name, result) }
   assign(name, result) { if(this.bindings.has(name)||!this.parent)this.set(name,result);else this.parent.assign(name,result) }
 }
 
-export function analyzeSourceTests(files, entries = [...files.keys()].filter(isTest)) {
+export function analyzeSourceTests(files, entries = [...files.keys()].filter(isTest), statementBudget = 500000) {
+  if (!Number.isSafeInteger(statementBudget) || statementBudget < 1 || statementBudget > 500000) throw Error('Invalid AST statement budget')
   const modules = new Map(), findings = [], active = new Set()
   const sourceCalls = new WeakMap(), fixtureWrites = new Map()
   const readers=new Set(),imports=new Map()
@@ -70,7 +71,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
   while(added){added=false;for(const [file,dependencies]of imports)if(!readers.has(file)&&dependencies.some(path=>readers.has(path))){readers.add(file);added=true}}
   const fsModule = () => {
     const reader = value({ reader: true })
-    return value({ props: new Map([['readFileSync',reader],['readFile',reader],...['existsSync','accessSync','statSync','lstatSync','access','stat','lstat'].map(name=>[name,value({fileInfo:true})]),['promises',value({props:new Map([['readFile',reader]])})]]) })
+    return value({ props: new Map([['readFileSync',reader],['readFile',reader],['realpathSync',value({pathIdentity:true})],...['existsSync','accessSync','statSync','lstatSync','access','stat','lstat'].map(name=>[name,value({fileInfo:true})]),['promises',value({props:new Map([['readFile',reader]])})]]) })
   }
   const emit = (ctx, node, actual, expected, reason) => {
     if (!actual.reads.length) return
@@ -103,7 +104,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
   const statements = (nodes, scope, ctx, depth) => {
     const returns = []
     for (const node of nodes) {
-      if (++steps > 500000) throw Error(`AST analysis exceeded its bound: ${ctx.file}`)
+      if (++steps > statementBudget) throw Error(`AST analysis exceeded its bound: ${ctx.file}`)
       if (ts.isVariableStatement(node)) for (const decl of node.declarationList.declarations) bind(decl.name, evaluate(decl.initializer,scope,ctx,depth),scope)
       else if (ts.isFunctionDeclaration(node) && node.name) scope.set(node.name.text,value({ fn: node, scope, ctx }))
       else if (ts.isClassDeclaration(node) && node.name) scope.set(node.name.text,value({classNode:node,scope,ctx}))
@@ -247,6 +248,16 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     if(callable.reader){sourceCalls.set(node,'file');return read(args[0]??value(),ctx,node,callable.helper)}
     if(callable.fileInfo)return value()
+    if(callable.pathIdentity)return args[0]??value()
+    if(callable.hashFactory)return value({hash:true})
+    if(receiver.hash&&name==='update')return {...union([receiver,...args]),hash:true}
+    if(receiver.hash&&name==='digest')return value({reads:receiver.reads})
+    if(receiver.intrinsic==='JSON'&&['parse','stringify'].includes(name)){
+      const seen=new Set(),parts=[]
+      const collect=part=>{if(!part||seen.has(part))return;seen.add(part);parts.push(part);for(const child of part.props?.values()??[])collect(child);for(const child of part.items??[])collect(child)}
+      args.forEach(collect)
+      return union(parts)
+    }
     if(name==='require'&&args[0]?.strings.some(s=>/^(?:node:)?fs$/.test(s)))return fsModule()
     if(name==='require'&&args[0]?.strings.some(s=>/^(?:node:)?assert(?:\/strict)?$/.test(s)))return value({assert:true})
     if(callable.assertMatcher){matcher(callable.assertMatcher,/^doesNot|^not/.test(callable.assertMatcher),args[0]??value(),args[1]??value(),ctx,node);return value()}
@@ -265,9 +276,13 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     if(name==='URL')return args[0]?.strings.length&&args[1]?.strings.length?value({strings:atoms(args[0].strings.flatMap(path=>args[1].strings.map(base=>posix.normalize(posix.join(posix.dirname(base),path)))))}) : args[0]??value()
     if(name==='mkdtempSync')return value({strings:['__fixture__/'+digest(ctx.file+ctx.test+canonical(node))]})
     if(name==='cwd'&&ts.isPropertyAccessExpression(call)&&ts.isIdentifier(call.expression)&&call.expression.text==='process')return value({strings:[/^apps\/[^/]+/.exec(ctx.file)?.[0]??'']})
-    if(['execFileSync','execSync'].includes(name)){
+    if(['execFileSync','execSync'].includes(name)||['spawnSync','spawn','execFile'].includes(name)&&!callable.fn){
       const command=args.flatMap(a=>a.strings).join(' ')
-      if(/\b(?:show|cat|rg|grep)\b/.test(command))return read(value({strings:[command]}),ctx,node)
+      if(/\b(?:show|cat|rg|grep)\b/.test(command)){
+        const fixtureRoots=args.flatMap(arg=>arg.props?.get('cwd')?.strings??[]).filter(path=>path.startsWith('__fixture__/'))
+        if(fixtureRoots.length)return union([...fixtureWrites].filter(([path])=>fixtureRoots.some(root=>path.startsWith(root+'/'))).map(([,content])=>content))
+        return read(value({strings:[command]}),ctx,node)
+      }
       return value()
     }
     if(['includes','startsWith','endsWith','test','indexOf'].includes(name))return {...union([receiver,...args]),...(name==='indexOf'?{index:true}:{predicate:{sign:1}})}
@@ -328,7 +343,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       if(!ts.isImportDeclaration(statement))continue
       const specifier=statement.moduleSpecifier.text,local=modulePath(file,specifier)
       const pathModule=/^(?:node:)?path$/.test(specifier)?value({props:new Map(['join','resolve','dirname','basename','extname','relative'].map(pathOp=>[pathOp,value({pathOp})]))}):null
-      const imported=pathModule??(specifier==='typescript'?value({typescript:true}):specifier.includes('?raw')?read(value({strings:[specifier]}),ctx,statement):/^(?:node:)?fs(?:\/promises)?$/.test(specifier)?fsModule():/^(?:node:)?assert(?:\/strict)?$/.test(specifier)?value({assert:true}):local?readers.has(local)?value({props:load(local).exports}):value({localModule:local}):value())
+      const imported=pathModule??(specifier==='typescript'?value({typescript:true}):specifier.includes('?raw')?read(value({strings:[specifier]}),ctx,statement):/^(?:node:)?fs(?:\/promises)?$/.test(specifier)?fsModule():/^(?:node:)?crypto$/.test(specifier)?value({props:new Map([['createHash',value({hashFactory:true})]])}):/^(?:node:)?assert(?:\/strict)?$/.test(specifier)?value({assert:true}):local?readers.has(local)?value({props:load(local).exports}):value({localModule:local}):value())
       const clause=statement.importClause
       if(clause?.name)scope.set(clause.name.text,imported.assert?imported:imported.localModule?value({localModule:local,exportName:'default'}):imported.props?.get('default')??imported)
       if(clause?.namedBindings&&ts.isNamespaceImport(clause.namedBindings))scope.set(clause.namedBindings.name.text,imported)
@@ -349,11 +364,13 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     return mod
   }
-  for(const entry of entries)load(entry)
+  // The bound protects one root analysis; adding independent test files must
+  // not consume another root's budget. A costly root still fails closed.
+  for(const entry of entries){steps=0;load(entry)}
   return findings
 }
 
-export const isTest = path => /^apps\/web\/(?:src\/.*\.test\.tsx?|scripts\/.*\.test\.mjs)$/.test(path)
+export const isTest = path => /^(?:apps\/(?:web|worker|liff)\/|scripts\/).*\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path)
 
 /** Git cannot pair a split module once its wrapper drops below rename similarity.
  * A unique, named default implementation retains its identity across the split.
@@ -486,7 +503,7 @@ export function checkRepository(root, base) {
   const untracked=git('ls-files','--others','--exclude-standard','-z').split('\0').filter(Boolean)
   const baseNames=git('ls-tree','-r','--name-only','-z',base).split('\0').filter(Boolean)
   const load=(paths,ref)=>{
-    const selected=paths.filter(path=>/^(?:apps\/web\/|scripts\/)/.test(path)&&/\.(?:[cm]?[jt]sx?)$/.test(path))
+    const selected=paths.filter(path=>/^(?:apps\/(?:web|worker|liff)\/|scripts\/)/.test(path)&&/\.(?:[cm]?[jt]sx?)$/.test(path))
     if(!ref)return new Map(selected.map(path=>[path,existsSync(resolve(root,path))?readFileSync(resolve(root,path),'utf8'):'']))
     if(selected.some(path=>/[\r\n]/.test(path)))throw Error('Unsupported newline in source path')
     const bytes=execFileSync('git',['cat-file','--batch'],{cwd:root,input:selected.map(path=>ref+':'+path).join('\n')+'\n',maxBuffer:128*1024*1024})

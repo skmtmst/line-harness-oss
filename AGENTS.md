@@ -141,6 +141,7 @@
 
 ## 起動時の必読(全エージェント共通)
 
+- 実装・試験・台本を作る前に `docs/code-structure.md` を読み、「目的に合う書き方」と品質の見張りに従ってください。新しい入口は `pnpm new:screen`・`pnpm new:route` の雛形から始めます。
 - 新しいセッションを始めたら、回答の前にこの順で読んでください: `AGENTS.md` → `docs/brain/Memory.md`(この仕事の事実と判断基準) → `docs/brain/rules/corrections.md`(受けた修正指示。恒久的に守る) → `docs/brain/rules/mistakes.md`(やらかしと再発防止) → 自分の担当の決まり(画面＝`docs/v8-design-rules.md`・`apps/web/src/v8/README.md`・`~/lh-work/design/v8/HOW-TO-90.md`、API＝司令塔の依頼書と `docs/v8-requirements/`)。
 - 利用者に訂正・要望を言われたら、その場で `docs/brain/rules/corrections.md` に 3 行(日付 / 指摘 / 今後)で追記してください。同じ失敗を 2 回指摘されたら `docs/brain/rules/mistakes.md` に追記してください。
 - `docs/brain/Memory.md` の「進行中」が実態とずれていたら、気づいた人が直してください。

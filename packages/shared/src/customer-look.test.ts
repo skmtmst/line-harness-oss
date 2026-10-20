@@ -1,5 +1,5 @@
 import {expect,test} from 'vitest';
-import {CUSTOMER_DESIGNS,DEFAULT_CUSTOMER_LOOK,customerLookError,resolveCustomerFormTheme,customerFormTheme} from './customer-look';
+import {CUSTOMER_DESIGNS,DEFAULT_CUSTOMER_LOOK,customerLookError,resolveCustomerFormTheme,customerFormTheme,customerPalette} from './customer-look';
 import {FORM_THEME_DEFAULT,formThemeContrastError,emptyLayout,validateFormDefinition} from './form-layout';
 test('店の継承・固定型・カスタム・旧色の優先順位が保存後も同じ',()=>{
  const account={...DEFAULT_CUSTOMER_LOOK,preset:'natural' as const};
@@ -13,4 +13,14 @@ test('店の継承・固定型・カスタム・旧色の優先順位が保存�
 test('任意CSS・未知の型・書体を保存できない',()=>{
  for(const patch of [{primaryColor:'red;display:none'},{backgroundColor:'#abc'},{headingFont:'url(evil)'},{preset:'unknown'}]) expect(customerLookError({...DEFAULT_CUSTOMER_LOOK,...patch})).not.toBeNull();
  const layout=emptyLayout();layout.options.customerDesign={mode:'fixed',preset:'unknown'} as never;expect(validateFormDefinition(layout)).toContain('デザイン');
+});
+test('既定の白地をフォームへ継承し、店が選んだ型とカスタム色は保つ',()=>{
+ expect(customerPalette(DEFAULT_CUSTOMER_LOOK).background).toBe('#ffffff');
+ expect(resolveCustomerFormTheme({customerDesign:{mode:'account',preset:'line'}}).sub).toBe('#ffffff');
+ for(const preset of ['natural','gentle','night'] as const) {
+  const look={...DEFAULT_CUSTOMER_LOOK,preset};
+  expect(resolveCustomerFormTheme({customerDesign:{mode:'account',preset:'line'}},look).sub).toBe(customerPalette(look).background);
+ }
+ const custom={...DEFAULT_CUSTOMER_LOOK,preset:'custom' as const,backgroundColor:'#f7f5f0'};
+ expect(resolveCustomerFormTheme({customerDesign:{mode:'account',preset:'line'}},custom).sub).toBe('#f7f5f0');
 });

@@ -307,3 +307,60 @@ test('renaming a case title preserves its assertion; a new case copying it still
   assert.equal(newSourceAssertions(before, run('describes behavior', 'new-label')).length, 1)
   assert.equal(newSourceAssertions(before, run('describes behavior', 'label', 'other.tsx')).length, 1)
 })
+
+// 回帰用の小さなプログラムを実行し、解析器の返す値と終了値を検証する。
+function regressionCase(run) {
+  const program = `import assert from 'node:assert/strict';
+    import { analyzeSourceTests, newSourceAssertions, checkRepository, splitModuleMoves } from ${JSON.stringify(new URL('./verify-no-source-visual-contracts.mjs', import.meta.url).href)};
+    const entry = ${JSON.stringify(entry)};
+    const analyze = ${analyze.toString()};
+    (${run.toString()})();`
+  execFileSync(process.execPath, ['--input-type=module', '-e', program], { stdio: 'pipe' })
+}
+
+test('Worker, LIFF and scripts source assertions use the same diff guard as Web', () => regressionCase(() => {
+  for (const file of ['apps/worker/src/routes/example.test.ts', 'apps/liff/src/example.test.tsx', 'scripts/example.test.mjs']) {
+    const before = analyzeSourceTests(new Map([[file, `import{it,expect}from'vitest';it('runs',()=>expect(1+1).toBe(2))`]]))
+    const after = analyzeSourceTests(new Map([[file, `import{readFileSync}from'node:fs';import{it,expect}from'vitest';const source=readFileSync('example.ts');it('shape',()=>expect(source).toContain('return true'))`]]))
+    assert.equal(before.length, 0)
+    assert.equal(newSourceAssertions(before, after).length, 1)
+    assert.deepEqual(newSourceAssertions(after, after), [])
+  }
+}))
+
+test('independent entries each retain the same analysis budget and one oversized entry still fails closed', () => regressionCase(() => {
+  const body = `import{readFileSync}from'node:fs';import{it,expect}from'vitest';const src=readFileSync('source.ts');it('case',()=>expect(src).toContain('return true'))`
+  const files = new Map(Array.from({length: 12}, (_, i) => [`apps/worker/src/example-${i}.test.ts`, body]))
+  assert.equal(analyzeSourceTests(files, [...files.keys()], 4).length, 12)
+  assert.throws(() => analyzeSourceTests(new Map([[entry, body + ';const extra=0']]), [entry], 4), /exceeded its bound/)
+  assert.throws(() => analyzeSourceTests(files, [...files.keys()], 500001), /Invalid AST statement budget/)
+}))
+
+test('subprocess test results are executable behavior; subprocess source reads retain their provenance', () => regressionCase(() => {
+  const run = (command, args, property) => analyzeSourceTests(new Map([[entry, `import{spawnSync}from'node:child_process';import{it,expect}from'vitest';it('result',()=>expect(spawnSync('${command}',${JSON.stringify(args)}).${property}).toBe(0))`]]))
+  assert.deepEqual(run('node', ['script.mjs'], 'status'), [])
+  assert.ok(run('cat', ['view.tsx'], 'stdout').length)
+}))
+
+test('hashing and JSON encoding are pure transformations; comparing transformed product source still fails', () => regressionCase(() => {
+  const run = input => analyzeSourceTests(new Map([[entry, `import{createHash as hash}from'node:crypto';import{readFileSync}from'node:fs';import{it,expect}from'vitest';it('value',()=>expect(JSON.stringify(hash('sha256').update(${input}).digest('hex'))).toBe('expected'))`]]))
+  assert.deepEqual(run("'view.tsx'"), [])
+  assert.ok(run("readFileSync('view.tsx')").length)
+  assert.ok(analyze(`expect(JSON.stringify({source:src})).toContain('className')`).length)
+}))
+
+test('resolving a temporary fixture path preserves fixture provenance and copied product source stays tainted', () => regressionCase(() => {
+  const run = content => analyzeSourceTests(new Map([[entry, `import{mkdtempSync,realpathSync,readFileSync,writeFileSync}from'node:fs';import{join}from'node:path';import{it,expect}from'vitest';it('fixture',()=>{const root=realpathSync(mkdtempSync('/tmp/fixture-'));const path=join(root,'view.tsx');writeFileSync(path,${content});expect(readFileSync(path)).toContain('className')})`]]))
+  assert.deepEqual(run(`'<div className="fixture"/>'`), [])
+  assert.ok(run(`readFileSync('apps/web/src/example.tsx')`).length)
+}))
+
+
+
+
+
+test('git reads from temporary fixtures are data; copied product source keeps its origin', () => regressionCase(() => {
+  const run=content=>analyzeSourceTests(new Map([[entry,`import{execFileSync}from'node:child_process';import{mkdtempSync,writeFileSync,readFileSync}from'node:fs';import{join}from'node:path';import{it,expect}from'vitest';it('fixture',()=>{const root=mkdtempSync('/tmp/repo-');writeFileSync(join(root,'view.tsx'),${content});expect(execFileSync('git',['show','HEAD:view.tsx'],{cwd:root})).toContain('className')})`]]))
+  assert.deepEqual(run(`'<div className="fixture"/>'`),[])
+  assert.ok(run(`readFileSync('apps/web/src/example.tsx')`).length)
+}))

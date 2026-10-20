@@ -1,5 +1,6 @@
+import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type {
@@ -161,13 +162,10 @@ function mergedPersonErrorFields(c: Context<Env>, code: string): string[] {
 
 function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof MergedPersonError) {
-    return inputError(c, { success: false, error: error.message, code: error.code }, error.status, mergedPersonErrorFields(c, error.code));
+    return fail(c, error.status, error.code, { error: error.message }, mergedPersonErrorFields(c, error.code));
   }
   logger.error("routes_merged_people_failed");
-  return c.json(
-    { success: false, error: '統合ユーザーを処理できませんでした', code: 'INTERNAL_ERROR' },
-    500,
-  );
+  return fail(c, 500, 'INTERNAL_ERROR', { error: '統合ユーザーを処理できませんでした' });
 }
 
 async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {
