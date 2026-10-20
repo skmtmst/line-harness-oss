@@ -51,13 +51,6 @@ describe('オートメーションの発生元配線', () => {
     expect(event).toContain(`sourceEventId: result.bookingId`);
   });
 
-  it('5分Cronが日時起動と待機・再試行の再開を同じ実行器へ接続する', () => {
-    const text = source('cron/scheduled.ts');
-    expect(text).toContain('processScheduledAutomationTriggers(env.DB');
-    expect(text).toContain('processDueAutomationRuns(env.DB');
-    expect(text).toContain('createAutomationActionExecutors({');
-    expect(text).toContain('processOverdueSupportMarkTriggers(env.DB');
-  });
 
   it('担当割当と手動返信は保存後の不変IDで対応マークルールを評価する', () => {
     const text = source('routes/chats.ts');

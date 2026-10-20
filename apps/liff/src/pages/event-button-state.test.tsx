@@ -117,6 +117,7 @@ describe('上限に達している時', () => {
     );
     const button = await screen.findByRole('button', { name: '予約上限に達しています' });
     expect(button.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText('このイベントへの予約上限（1）に達しています。')).toBeTruthy();
     // 枠はどれも選べない。
     const slotButton = screen.getByRole('button', { name: '10:00〜11:00 残り 5' });
     expect(slotButton.hasAttribute('disabled')).toBe(true);

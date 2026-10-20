@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
 import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -115,8 +115,7 @@ function confirmChannels(form: Form, preview: OpsAudiencePreview | null): string
 function loadDescription(err: unknown): string | undefined {
   if (isForbiddenOrRateLimited(err)) return undefined
   if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
-  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
-  return undefined
+  return describeApiFailure(err, '読み込み', { scope: 'hq' })
 }
 
 export default function OpsAnnouncementsV8() {

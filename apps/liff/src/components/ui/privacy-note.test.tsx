@@ -18,7 +18,7 @@ describe('プライバシーポリシーの一行', () => {
   });
 
   it('予約・イベントの申し込み・フォーム・席の予約の送る画面に置いてある', () => {
-    for (const f of ['../Confirm.tsx', '../../pages/event-confirm.tsx', '../../pages/form.tsx', '../../pages/seat/seat-confirm.tsx']) {
+    for (const f of ['../confirm.tsx', '../../pages/event-confirm.tsx', '../../pages/form.tsx', '../../pages/seat/seat-confirm.tsx']) {
       expect(readFileSync(fileURLToPath(new URL(f, import.meta.url)), 'utf8'), f).toContain('<PrivacyNote');
     }
   });

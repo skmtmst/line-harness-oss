@@ -1,11 +1,12 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X , Trash2 } from 'lucide-react'
+import { Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X, Trash2 } from 'lucide-react'
 import { isSavedSearchOpAllowed, isSavedSearchValueOptionalOp } from '@line-crm/shared'
 import type { FriendField, SavedSearch, SavedSearchCondition, SavedSearchConditionKind, SavedSearchConditions, Scenario, SupportMark, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from '@/lib/api'
@@ -748,7 +749,7 @@ export default function SavedSearchEditV8() {
 
       { if (!fieldFailure)
 
-      setError(saveError instanceof Error ? saveError.message : '変更を保存できませんでした') }
+      setError(describeApiFailure(saveError, '保存')) }
     } finally {
       setSaving(false)
     }
@@ -773,7 +774,7 @@ export default function SavedSearchEditV8() {
 
       { if (!fieldFailure)
 
-      setError(duplicateError instanceof Error ? duplicateError.message : '複製できませんでした') }
+      setError(describeApiFailure(duplicateError, '複製')) }
     } finally {
       setSaving(false)
     }

@@ -1,7 +1,7 @@
 'use client'
 import { useUrlTab } from '@/lib/use-url-tab'
 import type { FormRequirement } from '@/lib/form-requirement'
-import { LogIn, Wallet, Store, Users, Inbox } from 'lucide-react'
+import { LogIn } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useSearchParams } from 'next/navigation'
@@ -333,7 +333,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
   const problem = nameRequirement.check(confirmName) ?? reasonRequirement.check(reason)
 
   const submit = async () => {
-    if (busy) return
+
     if (problem) {
       setError(problem)
       return

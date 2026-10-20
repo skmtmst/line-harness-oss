@@ -120,6 +120,7 @@ const GUARDED = [
   'v8/scenario-detail/detail.tsx',
   'v8/accounts-detail/handover.tsx',
   'v8/restaurant/inventory/stock.tsx',
+  'v8/restaurant/inventory/rules.tsx',
   'v8/hq/support.tsx',
   'v8/hq/support-detail.tsx',
   /* 2026-10-07：src/v8 に一から書いた画面（まとめの取り込みで見張りの対象に入った）。それぞれ自分で useUnsavedGuard と離脱確認を持つ。 */

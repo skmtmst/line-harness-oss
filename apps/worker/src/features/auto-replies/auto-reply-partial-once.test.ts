@@ -1,3 +1,4 @@
+import { resolveSendInterpolationExtra } from '../../services/interpolation-context.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1,insertFriend,type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { getFriendById,ensureAutoReplyPublishedVersion,type AutoReply } from '@line-crm/db';
@@ -7,6 +8,10 @@ import { hasAlreadyRepliedOnce } from './auto-reply-conditions.js';
 import { processAutoReplyDeliveries } from './auto-reply-delivery.js';
 const actions=vi.hoisted(()=>vi.fn());
 vi.mock('./auto-reply-operator-action.js',async original=>({...await original<Record<string,unknown>>(),runAutoReplyAction:actions}));
+vi.mock('../../services/interpolation-context.js',async original=>{
+ const actual=await original<typeof import('../../services/interpolation-context.js')>();
+ return {...actual,resolveSendInterpolationExtra:vi.fn(actual.resolveSendInterpolationExtra)};
+});
 vi.mock('../../services/send-entitlements.js',()=>({getSendPermissionForAccount:async()=>({allowed:true})}));
 let f:SqliteD1;
 const success={executed:1,failed:0,skippedByCondition:0,skippedByOnce:0,skippedIncomplete:0,scenarioTouched:false};
@@ -29,6 +34,7 @@ describe('SEND-S04: 部分失敗で1人1回を消化せず、届いた返信を�
   const pushMessageWithRequestId=vi.fn(async()=>({requestId:'fake'}));
   const client={replyMessageWithRequestId,pushMessageWithRequestId} as never;
   await reply('event-1',client);
+  expect(resolveSendInterpolationExtra).toHaveBeenCalledWith(f.db,'f',expect.any(String),{kind:'auto_reply',id:'r'});
   if(delayed) await processAutoReplyDeliveries({DB:f.db} as never,new Date(Date.now()+2000),async()=>client);
   expect(await hasAlreadyRepliedOnce(f.db,{id:'r',once_per_friend:1,reply_delay_seconds:delayed?1:0},'f')).toBe(false);
   expect(f.raw.prepare('SELECT COUNT(*) n FROM auto_reply_hits').get()).toEqual({n:0});

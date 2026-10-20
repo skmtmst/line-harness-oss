@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
@@ -190,7 +191,7 @@ function TagCreate() {
 
       { if (!fieldFailure)
 
-      setError(reason instanceof Error ? reason.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。') }
+      setError(describeApiFailure(reason, '保存')) }
     } finally {
       setSaving(false)
     }
@@ -228,9 +229,9 @@ function TagCreate() {
           </div>
         )}
         footerActions={<>
-          <Button type="button" onClick={() => guard.guarded(() => router.push('/tags'))} disabled={saving}>キャンセル</Button>
-          <Button type="button" onClick={() => void save(true)} disabled={saving} busy={Boolean(saving)} busyLabel="処理中…"><Plus size={15} aria-hidden="true" />保存して続けて作る</Button>
-          <Button type="button" variant="primary" onClick={() => void save(false)} busy={saving} busyLabel="作っています…"><Check size={15} aria-hidden="true" />タグを作る</Button>
+          <Button type="button" onClick={() => guard.guarded(() => router.push('/tags'))} disabled={saving} disabledReason={saving ? 'タグを作っています。終わるまでお待ちください。' : undefined}>キャンセル</Button>
+          <Button type="button" onClick={() => save(true)} disabled={saving} busy={Boolean(saving)} busyLabel="処理中…"><Plus size={15} aria-hidden="true" />保存して続けて作る</Button>
+          <Button type="button" variant="primary" onClick={() => save(false)} busy={saving} busyLabel="作っています…"><Check size={15} aria-hidden="true" />タグを作る</Button>
         </>} dirty={false}
       >
         {createdName ? <Notice tone="success" message={`「${createdName}」を作成しました。続けて新しいタグを作れます。`} /> : null}

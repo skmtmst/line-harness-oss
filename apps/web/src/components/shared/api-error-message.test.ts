@@ -134,3 +134,21 @@ it('決まり6：日本語の403でも画面独自の頼む先へ戻さず、統
   expect(describeApiFailure(error, '表示')).toBe('この操作の権限がありません。オーナーか管理者に頼んでください。')
   expect(loadFailureCopy(error, '会員', 'hq')).toMatchObject({ description: 'この操作の権限がありません。統括の管理者に頼んでください。', retryable: false })
 })
+
+
+it('画面内の日本語の検証理由は残し、内部情報や英語の例外は共通の案内にする', () => {
+  expect(describeApiFailure(new Error('出す相手の条件を設定してください。'), '公開'))
+    .toBe('出す相手の条件を設定してください。')
+  for (const raw of ['Failed to fetch', 'SQLITE_ERROR: 保存失敗 SELECT * FROM friends', '<html>サーバーの失敗</html>', '認証失敗 token=private-value', '保存失敗 at handler.ts:12']) {
+    const message = describeApiFailure(new Error(raw), '保存')
+    expect(message).toBe('保存に失敗しました。時間をおいて、もう一度お試しください。')
+    expect(message).not.toContain(raw)
+  }
+  expect(describeApiFailure(new ApiError(500, '保存失敗 SELECT * FROM friends'), '保存'))
+    .toBe('保存に失敗しました。時間をおいて、もう一度お試しください。')
+})
+
+it('期限切れの招待は期限と次の操作を残す', () => {
+  expect(describeApiFailure(new ApiError(410, 'この招待は期限切れです。招待を送り直してもらってください。'), '招待の確認'))
+    .toBe('この招待は期限切れです。招待を送り直してもらってください。')
+})

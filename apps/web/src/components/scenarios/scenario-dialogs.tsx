@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useId, useState } from 'react';
 import { api, type ScenarioFriendPlan } from '@/lib/api';
 import { shortDateTime } from '@/lib/hq-banners';
@@ -181,8 +182,8 @@ export function ConditionDialog({
               } finally {
                 setSaving(false)
               }
-            }}>
-            {saving ? '保存中…' : 'この条件を反映'}
+            }} busy={saving} busyLabel="保存中…" widthReserve="idle">
+            {'この条件を反映'}
           </Button>
         </>
       }
@@ -511,8 +512,8 @@ export function OnCompleteDialog({
               } finally {
                 setSaving(false)
               }
-            }}>
-            {saving ? '保存中…' : '編集'}
+            }} busy={saving} busyLabel="保存中…" widthReserve="idle">
+            {'編集'}
           </Button>
         </>
       }
@@ -577,7 +578,7 @@ export function OnCompleteDialog({
               <button
                 type="button"
                 className="text-info font-medium hover:underline"
-                onClick={() => void loadCandidates(() => false)}
+                onClick={() => loadCandidates(() => false)}
               >
                 もう一度読み込む
               </button>
@@ -919,7 +920,7 @@ export function TestSendDialog({
     } catch (sendError) {
       setResult({
         ok: false,
-        message: sendError instanceof Error ? sendError.message : 'テスト送信に失敗しました。',
+        message: describeApiFailure(sendError, '送信'),
       })
     } finally {
       setSending(false)
@@ -981,7 +982,7 @@ export function TestSendDialog({
                 )}
               </Notice>
             )}
-          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed || !contentConfirmed} onClick={() => void sendTest()} busy={sending} busyLabel="送信中…">{result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
+          </div><div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{result?.ok ? (<><Button onClick={() => setConfirming(false)}>別の相手へ送る</Button><Button variant="primary" onClick={onClose}>閉じる</Button></>) : (<><Button onClick={() => setConfirming(false)} disabled={sending}>戻る</Button><Button variant="primary" disabled={!selected || sending || !allConfirmed || !contentConfirmed} onClick={() => sendTest()} busy={sending} busyLabel="送信中…">{result ? 'もう一度送る' : 'テストを送る'}</Button></>)}</div></div>
         </div>
       </div>
     )

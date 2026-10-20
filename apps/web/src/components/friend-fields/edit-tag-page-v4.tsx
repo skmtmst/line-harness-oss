@@ -119,7 +119,7 @@ export function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
   const saveKeysRef = useRef(new IdempotencyKeyStore())
 
   const save = async () => {
-    if (saving) return
+
     setSaving(true)
     setError('')
     try {
@@ -144,7 +144,7 @@ export function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
     <SaveErrorScope errors={saveErrors}><CreatePage title="保管済みタグを直す" busy={saving} dirty={false}
       footerActions={<>
         <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
+        <Button variant="primary" onClick={() => save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
       </>}>
       <Notice tone="warn">
         <p className="font-bold">このタグは保管済みです</p>

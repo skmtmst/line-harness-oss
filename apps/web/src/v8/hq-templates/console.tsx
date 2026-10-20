@@ -8,7 +8,7 @@ export { formDistributedLine,formStatusLine } from './form-status-line'
 import type { ConsoleProps,DefinitionEditorProps } from './console-types'
 
 import { hqFormDefinitionToEditor,hqFormEditorToDefinition } from '@/components/forms/hq-form-definition-adapter'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
@@ -96,7 +96,7 @@ const EDIT_TITLES: Record<TemplateType, string> = { tag: 'タグのひな形', t
 const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る' }
 
 type Stage = 'saved' | 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
-const errorText = (error: unknown) => error instanceof Error ? error.message : '処理できませんでした。時間をおいて再確認してください。'
+const errorText = (error: unknown) => describeApiFailure(error, '読み込み', { scope: 'hq' })
 
 export default function HqTemplatesV8(props: ConsoleProps) {
   const attribute = useAttributeTab('/hq/friend-attributes')

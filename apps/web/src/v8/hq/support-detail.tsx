@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { loadStaffIdentity, useStaffRole, canManageRole } from '@/lib/staff-role'
 import { PageContent } from '@/components/templates/page-frame'
@@ -177,7 +178,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
       setNotice(sentNotice(hasSenderEmail))
       await load(id)
     } catch (caught) {
-      setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:') ? caught.message : '送信できませんでした。もう一度お試しください。')
+      setError(describeApiFailure(caught, '送信', { scope: 'hq' }))
     } finally {
       setSending(false)
     }

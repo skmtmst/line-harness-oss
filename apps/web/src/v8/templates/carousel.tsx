@@ -2,7 +2,7 @@
 
 import Card, { CardHeader } from '@/components/shared/card'
 import { CreatePage } from '@/components/templates/create-page'
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
+
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { tapExtrasError, type TapExtras } from '@line-crm/shared'
@@ -11,7 +11,7 @@ import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEve
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ChevronDown, Copy, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucide-react'
+import { Copy, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucide-react'
 import type { Folder, MediaItem, MessageTemplateMediaDefinition } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
@@ -438,8 +438,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         footerActions={(
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
-            <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || loadFailed} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={15} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" onClick={() => onSaveDraft()} disabled={busy || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
+            <Button type="button" variant="primary" onClick={() => onPublish()} disabled={busy || loadFailed} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={15} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >

@@ -66,7 +66,7 @@ describe('production DB flow with local files and fully stubbed providers', () =
     expect(readdirSync(dir).some(name => name.startsWith('production-backup-'))).toBe(false);
   });
   it('applies a nonempty approved plan only after durable backup, then requires zero remaining', async () => {
-    const name = readdirSync('packages/db/migrations').find(file => /^\d{3,}_[A-Za-z0-9_-]+\.sql$/.test(file))!;
+    const name = '001_round2.sql';
     vi.stubEnv('APPROVED_MIGRATIONS', JSON.stringify([{ name, sha256: digest(readFileSync(join('packages/db/migrations', name))) }]));
     pending.read.mockReturnValue({ count: 1, pending: [name], ledgerExists: true });
     expect(planDatabase()).toBe(1);

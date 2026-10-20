@@ -1,4 +1,5 @@
 'use client'
+import { twoFactorFailureMessage } from '@/v8/login/two-factor/two-factor-error'
 import { responseApiError } from '@/lib/api'
 import { useEffect, useState } from 'react'
 import { LogIn } from 'lucide-react'
@@ -34,15 +35,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 /* 通信断・JSON でない返事は技術文言を出さない（管理画面 の two-factor-error と同じ決まりを写した）。 */
 export function opsTwoFactorFailureMessage(caught: unknown, fallback = '認証できませんでした'): string {
-  const message = caught instanceof Error ? caught.message : ''
-  if (caught instanceof TypeError || /Failed to fetch|NetworkError|Load failed|Network request failed/i.test(message)) {
-    return '通信が切れています。接続を確かめて、もう一度お試しください。'
-  }
-  if (caught instanceof Error && caught.message) {
-    if (caught instanceof SyntaxError) return fallback
-    return caught.message
-  }
-  return fallback
+  return twoFactorFailureMessage(caught, fallback)
 }
 
 export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: 'ops' | 'admin'; brandName?: string }) {

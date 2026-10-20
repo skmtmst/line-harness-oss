@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import React, { useCallback, useState } from 'react'
 import { api, ApiError, type StepUpPurpose } from '@/lib/api'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
@@ -35,7 +36,7 @@ export function stepUpFailureMessage(error: unknown): string {
       return `入力回数の上限に達しました。約${minutes}分待ってからやり直してください。正しい内容でも待ち時間中は通りません。`
     }
   }
-  return error instanceof Error ? error.message : '確認できませんでした。もう一度お試しください。'
+  return describeApiFailure(error, '読み込み')
 }
 
 type PendingStepUp = { purpose: StepUpPurpose; action: string; resolve: (token: string | null) => void }

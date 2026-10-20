@@ -1,4 +1,4 @@
-import { ApiError, describeSaveFailure } from '@/lib/api'
+import { ApiError, describeSaveFailure, extractApiErrorMessage } from '@/lib/api'
 
 /**
  * APIの失敗を原因どおりに言い分ける（R32・m23mで429を分離）。
@@ -95,8 +95,14 @@ export function describeApiFailure(
   if (kind === 'rateLimited') {
     return describeRateLimited(retryAfterSecondsOf(err))
   }
-  if (err instanceof ApiError && [401, 409, 428].includes(err.status)) {
+  if (err instanceof ApiError && [401, 409, 410, 428].includes(err.status)) {
     return describeSaveFailure(err)
+  }
+  // 画面内の検証や、旧APIのsuccess:falseをErrorへ包んだ理由も共通の
+  // 本文検査に通す。日本語を含むだけでSQL・HTML・秘密値を表示しない。
+  if (!(err instanceof ApiError) && err instanceof Error && !(err instanceof TypeError) && !(err instanceof SyntaxError)) {
+    const detail = extractApiErrorMessage(JSON.stringify({ error: err.message }), 400)
+    if (/[ぁ-んァ-ヶ一-龠]/u.test(detail)) return detail
   }
   return `${action}に失敗しました。時間をおいて、もう一度お試しください。`
 }

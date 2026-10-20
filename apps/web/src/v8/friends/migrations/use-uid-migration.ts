@@ -6,7 +6,7 @@ import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
 import { splitCsvRecords } from './friend-csv'
 import { formatNumber } from '@/lib/format'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 
 /*
  * ★V8 の写し（app/accounts/use-uid-migration.ts から。src/v8 は @/app を読めない）。
@@ -87,8 +87,8 @@ export const decisionLabel = { pending: '未判断', link: '結び付ける', cr
 /** 失敗応答の日本語だけを画面へ出す。内部文言・HTML は ApiError が捨てている。 */
 function apiErrorMessage(error: unknown, fallback: string): string {
   // 「API error: 500」のような内部の文は出さない。画面で作った日本語の文はそのまま出す。
-  if (error instanceof ApiError) return japaneseDetailOf(error) || fallback
-  if (error instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) return error.message
+  if (error instanceof ApiError && !japaneseDetailOf(error)) return fallback
+  if (error instanceof Error) return describeApiFailure(error, 'UID移行')
   return fallback
 }
 

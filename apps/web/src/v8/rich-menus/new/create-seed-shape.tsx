@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { createAreaDrafts } from '@/components/rich-menus/action-drafts'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
@@ -7,7 +8,7 @@ import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { TEMPLATES } from '@/lib/rich-menu-templates'
 import type { Dispatch,SetStateAction } from 'react'
 import { type PendingImage } from './create-types'
-import { imageUploadErrorText } from './image-upload-error'
+
 
 
 type SeedMenuShapeContext = {
@@ -50,7 +51,7 @@ export async function seedMenuShape({ audience, chatBarText, defaultOpen, folder
 
         { if (!fieldFailure)
 
-        setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e)) }
+        setError(describeApiFailure(e, '画像の登録')) }
         return null
       }
     }

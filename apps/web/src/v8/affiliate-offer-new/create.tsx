@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { formatYen } from '@line-crm/shared';
 import { notifySaved } from '@/components/shared/toast';
 import { useEffect, useRef, useState } from 'react';
@@ -215,7 +216,7 @@ export default function AffiliateOfferCreateV8() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setSaveError(caught instanceof Error ? caught.message : '保存できませんでした') }
+      setSaveError(describeApiFailure(caught, '保存')) }
     } finally {
       setSaving(false)
     }
@@ -272,10 +273,10 @@ export default function AffiliateOfferCreateV8() {
           <Button href="/affiliates">キャンセル</Button>
           {canEdit ? (
             <>
-              <Button variant="secondary" disabled={saving} busy={saving} busyLabel="保存中..." onClick={() => void runSave(false)}>
+              <Button variant="secondary" disabled={saving} busy={saving} busyLabel="保存中..." onClick={() => runSave(false)}>
                 保存して続けて作る
               </Button>
-              <Button variant="primary" disabled={saving} busy={saving} busyLabel="保存中..." onClick={() => void runSave(true)}>
+              <Button variant="primary" disabled={saving} busy={saving} busyLabel="保存中..." onClick={() => runSave(true)}>
                 <Check size={15} aria-hidden="true" />保存して公開
               </Button>
             </>

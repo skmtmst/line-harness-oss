@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { RowNameLink } from '@/components/shared/table';
 import { useListUrlValue, writeListUrlParam } from '@/components/shared/list-url-state';
@@ -8,11 +9,11 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Activity, Archive, Copy, CircleCheck, CircleHelp, FilePen, Link2, Lock, MessageSquareMore, Pause, Pencil, Plus, Route, Send, UserPlus } from 'lucide-react';
+import { Activity, Archive, Copy, CircleCheck, CircleHelp, FilePen, Lock, MessageSquareMore, Pause, Pencil, Plus, Send, UserPlus } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { AlertCircle, Eye, Users } from 'lucide-react';
+
 import type { FriendAddRule, FriendAddRuleKind, FriendAddRuleListData, FriendAddRuleStatus } from '@/lib/api';
 import { api } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
@@ -392,9 +393,7 @@ function FriendAddList() {
 
       { if (!fieldFailure)
       setActionError(
-        caught instanceof Error && caught.message
-          ? `並び替えを保存できませんでした。${caught.message}`
-          : '並び替えを保存できませんでした。状態を読み直してから、もう一度お試しください。',
+        describeApiFailure(caught, '並び替えの保存'),
       ) }
     } finally {
       void load()

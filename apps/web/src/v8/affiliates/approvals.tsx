@@ -1,7 +1,8 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, Check, CircleCheck, CircleHelp, Download, Hourglass, ListChecks, ShieldAlert, X } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
@@ -189,7 +190,7 @@ export default function ApprovalsTab() {
         setActionError(res.error ?? `${action === 'approved' ? '承認' : '却下'}できませんでした。通信を確かめて、もう一度お試しください。`)
       }
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : `${action === 'approved' ? '承認' : '却下'}できませんでした。通信を確かめて、もう一度お試しください。`)
+      setActionError(describeApiFailure(e, '承認・却下'))
     }
     setActioning(null)
   }, [actioning, loadItems])
@@ -216,7 +217,7 @@ export default function ApprovalsTab() {
       }
     } catch (e) {
       await loadItems({ fresh: true })
-      setActionError(e instanceof Error ? e.message : 'まとめて処理できませんでした')
+      setActionError(describeApiFailure(e, '保存'))
     } finally {
       setBulkConfirm(null)
       setActioning(null)

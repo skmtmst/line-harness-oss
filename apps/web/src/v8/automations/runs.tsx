@@ -34,7 +34,7 @@ import {
 } from './shell'
 import styles from './runs.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -314,7 +314,7 @@ export default function AutomationRunsV8() {
       await load()
     } catch (caught) {
       if (selectedAccountRef.current !== accountAtStart) return
-      setNotice(caught instanceof Error ? caught.message : '実行を取りやめられませんでした')
+      setNotice(describeApiFailure(caught, '取りやめ'))
     } finally {
       setCancellingId(null)
     }
@@ -338,7 +338,7 @@ export default function AutomationRunsV8() {
       await load()
     } catch (caught) {
       if (selectedAccountRef.current !== accountAtStart) return
-      const failureMessage = caught instanceof Error ? caught.message : '再実行できませんでした'
+      const failureMessage = describeApiFailure(caught, '再実行')
       await load()
       try {
         const detail = await api.automations.getRun(run.id)

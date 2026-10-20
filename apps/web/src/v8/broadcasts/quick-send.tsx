@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { ListOrdered, Send, Users } from 'lucide-react'
@@ -254,7 +255,7 @@ export default function QuickSendV8({
       { if (!fieldFailure)
 
 
-      setError(e instanceof Error ? e.message : '送れませんでした。もう一度お試しください。') }
+      setError(describeApiFailure(e, '保存')) }
     } finally {
       sendingRef.current = false
       setBusy(false)

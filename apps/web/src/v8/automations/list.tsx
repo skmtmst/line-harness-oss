@@ -56,7 +56,7 @@ import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
-import { TextField } from '@/components/shared/text-field'
+
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import {
@@ -646,7 +646,7 @@ export default function AutomationListV8() {
           footer={testing && !testDone ? (
             <>
               <Button variant="secondary" onClick={closeTestDialog}>やめる</Button>
-              <Button onClick={() => void runSingleTest()} disabled={testBusy || !testFriendId.trim()} busy={testBusy} busyLabel="動かしています…">試しに動かす</Button>
+              <Button onClick={() => runSingleTest()} disabled={testBusy || !testFriendId.trim()} busy={testBusy} busyLabel="動かしています…">試しに動かす</Button>
             </>
           ) : (
             <Button onClick={closeTestDialog}>閉じる</Button>

@@ -8,13 +8,14 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 
 const net = vi.hoisted(() => ({
-  getMode: 'ok' as 'ok' | 'no-draft' | 'failing' | 'failing-then-ok',
+  getMode: 'ok' as 'internal' | 'ok' | 'no-draft' | 'failing' | 'failing-then-ok',
   resourcesMode: 'ok-empty' as 'ok-empty' | 'ok-with-tags' | 'failing' | 'failing-then-ok',
   getCount: 0,
   resourcesCount: 0,
+  duplicate: vi.fn(),
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -48,10 +49,14 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
+      folders: { ...actual.api.folders, list: async () => ({ success: true, data: [], unfiledCount: 1 }) },
       commonActions: {
         ...actual.api.commonActions,
+        duplicate: net.duplicate,
+        list: async () => ({ success: true, data: [{ id: 'ca-1', name: '来店の案内', description: null, status: 'draft', draftVersion: 1, publishedVersion: null, actionCount: 1, bindingCount: 0, oldVersionBindingCount: 0, executionCountThisMonth: 0, failureCountThisMonth: 0, lastRunAt: null, updatedAt: '2026-10-20T00:00:00Z' }] }),
         get: async () => {
           net.getCount += 1
+          if (net.getMode === 'internal') throw new actual.ApiError(500, '内部の失敗 SELECT * FROM customers')
           if (net.getMode === 'failing' || (net.getMode === 'failing-then-ok' && net.getCount === 1)) {
             throw new actual.ApiError(503, 'API error: 503')
           }
@@ -94,6 +99,8 @@ vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/tes
   usePageChrome: () => ({ title: null }),
 }))
 
+vi.mock('@/v8/automations/shell', async importOriginal => ({ ...(await importOriginal<typeof import('@/v8/automations/shell')>()), useAutomationManage: () => true, useAutomationRunManage: () => ({ canExport: true }), useAutomationTabCounts: () => ({ rules: 0, commonActions: 1, runs: 0 }) }))
+const { default: ListPage } = await import('@/v8/automations/common-actions')
 const { default: EditPage } = await import('./edit/page')
 const { default: NewPage } = await import('./new/page')
 
@@ -192,7 +199,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     await act(async () => { root.render(<NewPage />) })
     await flush()
 
-    expect(text()).toContain('選択肢を読み込めませんでした')
+    expect(text()).toContain('読み込みに失敗しました')
     expect(buttonNamed('選択肢をもう一度読み込む'), '選択肢だけの再取得ボタンがある').toBeTruthy()
     // 失敗時は真の0件（選べる◯◯がありません）と混ぜない。
     expect(text()).not.toContain('選べるタグがありません')
@@ -207,7 +214,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     net.resourcesMode = 'failing-then-ok'
     await act(async () => { root.render(<NewPage />) })
     await flush()
-    expect(text()).toContain('選択肢を読み込めませんでした')
+    expect(text()).toContain('読み込みに失敗しました')
 
     // 未保存の入力を入れてから再取得する。
     const nameInput = container.querySelector('input') as HTMLInputElement | null
@@ -222,7 +229,7 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     await flush()
 
     // 失敗文は消え、入力は保たれる。
-    expect(text()).not.toContain('選択肢を読み込めませんでした')
+    expect(text()).not.toContain('読み込みに失敗しました')
     expect((container.querySelector('input') as HTMLInputElement).value).toBe('監査の記録')
     // 候補が戻る（空でない取得なので真の0件の文は出ない）。共有Selectは
     // 閉じている間は候補名を描かないため、0件文の不在で戻りを確かめる。
@@ -237,11 +244,34 @@ describe('R585 選択肢の失敗と真の0件の言い分け（本物のReact�
     await act(async () => { root.render(<NewPage />) })
     await flush()
 
-    expect(text()).not.toContain('選択肢を読み込めませんでした')
+    expect(text()).not.toContain('読み込みに失敗しました')
     await act(async () => { (container.querySelector('[data-action-row] button[aria-expanded]') as HTMLButtonElement).click() })
     expect(text()).toContain('選べるタグがありません')
     const save = buttonNamed('下書きを保存')
     expect(save, '保存ボタンがある').toBeTruthy()
     expect(save!.disabled).toBe(false)
   })
+})
+
+
+it('編集の内部の失敗を表示せず、次の操作を案内する', async () => {
+  net.getMode = 'internal'
+  await act(async () => { root.render(<EditPage />) })
+  await flush()
+  expect(text()).toContain('下書きを読み込めませんでした')
+  expect(text()).not.toContain('SELECT * FROM customers')
+  expect(buttonNamed('もう一度読み込む')).toBeTruthy()
+})
+
+it('複製が失敗したら内部の本文を出さず、編集画面へ移動せずに操作を戻す', async () => {
+  net.duplicate.mockReset().mockRejectedValue(new Error('内部の失敗 SELECT * FROM customers'))
+  await act(async () => { root.render(<ListPage />) })
+  await flush()
+  fireEvent.click(screen.getByRole('button', { name: '共通アクション「来店の案内」の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '複製して下書きを作る' }))
+  await waitFor(() => expect(text()).toContain('複製に失敗しました'))
+  expect(text()).not.toContain('SELECT * FROM customers')
+  expect(net.duplicate).toHaveBeenCalledTimes(1)
+  expect(net.duplicate).toHaveBeenCalledWith('ca-1', 'account-1')
+  expect(text()).toContain('来店の案内')
 })

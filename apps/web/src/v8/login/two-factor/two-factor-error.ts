@@ -1,3 +1,6 @@
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { ApiError } from '@/lib/api'
+
 /**
  * 二段階認証の失敗の扱い（R506・R508）。
  *
@@ -18,7 +21,12 @@ export function twoFactorFailureMessage(caught: unknown, fallback = '認証で�
   if (isNetworkFailure(caught)) return '通信が切れています。接続を確かめて、もう一度お試しください。'
   if (caught instanceof Error && caught.message) {
     if (caught instanceof SyntaxError) return fallback
-    return caught.message
+    // 認証の本文はresponseApiErrorで検査済み。コードの直し方や、
+    // 無効になった合言葉のやり直し先を保ち、共通の本文検査も通す。
+    const failure = caught instanceof ApiError && caught.status > 0 && caught.status < 500
+      ? new Error(caught.message)
+      : caught
+    return describeApiFailure(failure, '認証')
   }
   return fallback
 }

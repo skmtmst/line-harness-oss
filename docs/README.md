@@ -612,18 +612,22 @@
 
 - [構成と接続の整理の更新履歴](release-log/unreleased/0000-kenta-cleanup-s02z.md)
 - [予約写真とお客さまの画面・設定カードの表示改善](release-log/unreleased/0000-kenta-cleanup-n01.md)
+- [LINE受付枠の自動調整の設定と記録](release-log/unreleased/0000-kenta-cleanup-f24s.md)
+- [自動で合わせるルールの日付と席数入力の改善](release-log/unreleased/0000-kenta-cleanup-f24n.md)
+- [画面の権限確認の統一](release-log/unreleased/0000-kenta-cleanup-q01s1.md)
+- [管理者によるLINEアカウント登録と接続確認](release-log/unreleased/1779-masato-admin-line-registration.md)
+- [LINEアカウント登録後の受信確認](release-log/unreleased/1780-masato-line-receipt-gate.md)
 
 - [構成と接続の整理の検査記録](qa/cleanup-s02z-1020.md)
 - [使われていない処理と重複する検査の整理記録](qa/cleanup-x02b-1020.md)
 - [使われていない処理と重複する検査の整理履歴](release-log/unreleased/0000-kenta-cleanup-x02b.md)
 
-
+- [失敗時の案内と連続押しの防止](release-log/unreleased/0000-kenta-cleanup-q01s4.md)
+- [Q01S4 検査記録](qa/cleanup-q01s4-1020.md)
+- [支払いリンクの期限確認の修正履歴](release-log/unreleased/0000-kenta-cleanup-f03.md)
 - [品質の後戻りを防ぐ仕組みの更新履歴](release-log/unreleased/0000-kenta-cleanup-q00.md)
 - [品質の後戻りを防ぐ仕組みの検査記録](qa/cleanup-q00-1020.md)
 
-- [担当者情報と権限確認の共通化の履歴](release-log/unreleased/0000-kenta-cleanup-q01s1.md)
-- [管理者によるLINEアカウント登録の履歴](release-log/unreleased/1779-masato-admin-line-registration.md)
-- [LINEアカウントの受信確認の履歴](release-log/unreleased/1780-masato-line-receipt-gate.md)
 
 ## 引き継ぎで加わった文書
 
@@ -714,3 +718,6 @@
 - [0000-kenta-cleanup-d02](release-log/unreleased/0000-kenta-cleanup-d02.md)
 - [v8-change-map](v8-change-map.md)
 - [見つからないページのコード案内](../apps/web/src/v8/not-found/README.md)
+- [デリバリー注文連携の提供状況](release-log/unreleased/0000-kenta-cleanup-u01l.md)
+- [検査結果と品質記録の整合](release-log/unreleased/0000-kenta-cleanup-f04.md)
+- [デリバリー連携の準備状況を明確化](release-log/unreleased/0000-kenta-cleanup-u01m.md)

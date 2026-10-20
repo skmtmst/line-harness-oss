@@ -1,5 +1,5 @@
 'use client'
-import { isOwnerOrAdmin } from '@/lib/staff-capability'
+
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -142,7 +142,7 @@ function OperatorEditInner() {
       setTeamId(result.data.id); setRecipientIds(result.data.staffIds)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught);
- if (generation === teamGeneration.current) { if (!fieldFailure) setTeamError(caught instanceof Error ? caught.message : '保存できませんでした。') } }
+ if (generation === teamGeneration.current) { if (!fieldFailure) setTeamError(describeApiFailure(caught, '保存')) } }
     finally { setTeamBusy(false) }
   }
 
@@ -484,7 +484,7 @@ function OperatorEditInner() {
                   </LinePreviewMessage>
                 </div>
                 {canWrite ? (
-                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => void testSend()} disabled={saveDisabled} busy={Boolean(saving)} busyLabel="処理中…">
+                  <Button type="button" variant="secondary" className={styles.wideButton} onClick={() => testSend()} disabled={saveDisabled} busy={Boolean(saving)} busyLabel="処理中…">
                     <Send size={15} aria-hidden="true" />自分にテストを送る
                   </Button>
                 ) : null}
@@ -607,7 +607,7 @@ function OperatorEditInner() {
                   {canWrite && teamFormOpen ? (
                     <div className={styles.teamForm}>
                       <SaveErrorField names={["teamName","name","team_name"]}><TextField aria-label="チーム名" placeholder="チーム名" value={teamName} maxLength={100} disabled={teamBusy} onChange={event => setTeamName(event.target.value)} /></SaveErrorField>
-                      <Button variant="secondary" disabled={teamBusy} onClick={() => void saveTeam()} busy={Boolean(teamBusy)} busyLabel="処理中…">{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
+                      <Button variant="secondary" disabled={teamBusy} onClick={() => saveTeam()} busy={Boolean(teamBusy)} busyLabel="処理中…">{teamId ? 'チームを更新する' : 'チームを作る'}</Button>
                     </div>
                   ) : null}
                   {teamError ? (
@@ -647,8 +647,8 @@ function OperatorEditInner() {
                 <Button href="/line-notifications?tab=operator" variant="secondary">キャンセル</Button>
                 {canWrite ? (
                   <>
-                    <Button onClick={() => void saveDraft()} disabled={saveDisabled} busy={saving && !preparingPublish}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
-                    <Button onClick={() => void openPublishConfirm()} disabled={saveDisabled} busy={preparingPublish} variant="primary">
+                    <Button onClick={() => saveDraft()} disabled={saveDisabled} busy={saving && !preparingPublish}>{editId ? '下書きを保存する' : '下書きを保存'}</Button>
+                    <Button onClick={() => openPublishConfirm()} disabled={saveDisabled} busy={preparingPublish} variant="primary">
                       <Check size={15} aria-hidden="true" />運用者へのお知らせを公開
                     </Button>
                   </>
@@ -703,7 +703,7 @@ function OperatorEditInner() {
             <Button
               type="button"
               variant="primary"
-              onClick={() => void publish()}
+              onClick={() => publish()}
               disabled={publishing || selectedRecipients.length === 0}
               busy={publishing}
               busyLabel="公開中…"

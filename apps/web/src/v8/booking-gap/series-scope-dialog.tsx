@@ -87,7 +87,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
   const newTime = newStartsAt ? hm(newStartsAt) : ''
 
   async function run() {
-    if (busy || !items || !impact || count === 0 || (changing && !newStartsAt)) return
+    if (!items || !impact || count === 0 || (changing && !newStartsAt)) return
     setBusy(true); setError('')
     try {
       if (changing && newStartsAt) {

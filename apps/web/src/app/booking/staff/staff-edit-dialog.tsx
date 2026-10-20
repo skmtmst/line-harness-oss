@@ -5,6 +5,7 @@
  * 担当スタッフタブ（menus/settings-v8.tsx）の両方から使う。
  * 見た目・入力検査（parseBookingStaffInput）・紐づけ候補の取り方は変えない。
  */
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
@@ -72,7 +73,7 @@ export function StaffEditModal({
     try {
       await onSave(form.id ? { id: form.id, ...parsed.value } : parsed.value)
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(describeApiFailure(e, '保存'))
     } finally {
       setSaving(false)
     }
@@ -179,8 +180,8 @@ export function StaffEditModal({
           >
             キャンセル
           </button>
-          <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={submit} disabled={saving} busy={busySave}>
-            {busySave === undefined && saving ? '保存中…' : '保存する'}
+          <Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={submit} disabled={saving} busy={busySave ?? saving} busyLabel="保存中…" widthReserve="idle">
+            {'保存する'}
           </Button>
         </div>
       </div>

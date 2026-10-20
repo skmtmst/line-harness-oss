@@ -72,7 +72,6 @@ describe('LIFF にブラウザの確認窓を残さない', () => {
 
 describe('イベント予約の取り消し確認', () => {
   it('共通の確認窓を開くだけで、ブラウザの confirm を呼ばない', () => {
-    expect(page).toContain("import ConfirmDialog from '../components/ui/confirm-dialog.js'");
     expect(code(page), 'ブラウザのconfirmへ戻っている').not.toMatch(BROWSER_DIALOG);
     expect(page).toContain('setPendingCancel(b)');
   });
@@ -82,6 +81,8 @@ describe('イベント予約の取り消し確認', () => {
     calls.read.mockResolvedValue({ items: [booking] });
     calls.cancel.mockResolvedValue({ ok: true });
     render(createElement(MemoryRouter, null, createElement(EventBookings)));
+    const detail=await screen.findByRole('button',{name:'撮影会のイベントを見る'});
+    expect(detail.classList.contains('liff-hit')).toBe(true);
     fireEvent.click(await screen.findByRole('button', { name: 'キャンセルする' }));
     const confirmation = screen.getByRole('alertdialog');
     expect(confirmation.getAttribute('aria-label')).toBe('10/20 19:00 の撮影会をキャンセルしますか');

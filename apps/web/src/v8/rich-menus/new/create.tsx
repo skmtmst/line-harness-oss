@@ -43,11 +43,10 @@ import { intentLabelOf,intentOf } from '@/components/rich-menus/area-properties'
 import { areaDisplayName } from '@/components/rich-menus/canvas-editor'
 import { type Area } from '../../../components/rich-menus/area-types'
 import { describeCondition } from '@/components/scenarios/scenario-dialogs'
-import {
+import { describeApiFailure,
 isForbidden,
 isForbiddenOrRateLimited,
-loadFailureNotice
-} from '@/components/shared/api-error-message'
+loadFailureNotice } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -667,7 +666,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
         { if (!fieldFailure)
 
-        setError(e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) ? e.message : imageUploadErrorText(e)) }
+        setError(describeApiFailure(e, '画像の登録')) }
       }
       return
     }

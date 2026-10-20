@@ -1,12 +1,13 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { isOwnerRole, useStaffRole } from '@/lib/staff-role'
 import { ListToolbarFrame } from '@/components/shared/list-toolbar'
 import HelpTip from '@/components/shared/help-tip'
 import { jstDateOffset } from '@/lib/jst-datetime'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Check, CircleDot, Clock3, Download, RefreshCw, TrendingDown, TrendingUp, Undo2, Users, Wallet } from 'lucide-react'
@@ -21,7 +22,7 @@ import {
 import { formatNumber } from '@/lib/format'
 import { csvCell } from '@/lib/presentation'
 import Button from '@/components/shared/button'
-import { RowMenu } from '@/components/shared/row-actions'
+
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
@@ -226,7 +227,7 @@ export default function BalancesTab() {
       await loadApprovals()
       await loadOverview().catch(() => {})
     } catch (caught) {
-      setApprovalError(caught instanceof Error ? caught.message : '処理できませんでした。もう一度お試しください。')
+      setApprovalError(describeApiFailure(caught, '保存'))
     } finally {
       setApprovalBusyId(null)
     }

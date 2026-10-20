@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useState } from 'react'
 import { startUpdate } from '@/lib/update-client'
 import { ProgressModal } from './progress-modal'
@@ -25,7 +26,7 @@ export function UpdateButton({ targetVersion }: { targetVersion: string }) {
       setUpdateId(r.updateId)
     } catch (e) {
       // **内部語を出さない。** `update failed:` は運用者の言葉ではない。
-      setError(e instanceof Error ? e.message : 'アップデートを始められませんでした。しばらくおいてから、もう一度お試しください。')
+      setError(describeApiFailure(e, '保存'))
     } finally {
       setLoading(false)
     }

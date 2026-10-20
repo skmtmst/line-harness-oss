@@ -1,3 +1,4 @@
+import ts from 'typescript';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -221,11 +222,26 @@ function sourceFilesUnder(directory: string): string[] {
   return found;
 }
 
+function hasQrEndpoint(source: string): boolean {
+  const tree=ts.createSourceFile('caller.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
+  let found=false;
+  const visit=(node:ts.Node):void=>{
+    if((ts.isStringLiteralLike(node)||ts.isTemplateHead(node)||ts.isTemplateMiddle(node)||ts.isTemplateTail(node))&&node.text.includes('/api/qr?'))found=true;
+    ts.forEachChild(node,visit);
+  };
+  visit(tree);return found;
+}
+
 describe('/api/qr を呼ぶ側が渡せる大きさ', () => {
+  it('QRの実URLの式を拾い、説明のコメントは呼出し元に数えない',()=>{
+    expect(hasQrEndpoint("const qr='/api/qr?size=240x240' ")).toBe(true);
+    expect(hasQrEndpoint('const qr=`/api/qr?data=${value}`')).toBe(true);
+    expect(hasQrEndpoint('// /api/qr?size=240x240')).toBe(false);
+  });
   it('QRのURLを組み立てている箇所は数え上げたものだけ', () => {
     // 増えたらここに足して、その呼び出し元の上限も下の検査へ入れる。
     const builders = [...sourceFilesUnder('apps/web/src'), ...sourceFilesUnder('apps/worker/src')].filter((file) =>
-      read(file).includes('/api/qr?'),
+      hasQrEndpoint(read(file)),
     );
     expect(builders.sort()).toEqual(QR_CALL_SITES.map((site) => site.file).sort());
   });

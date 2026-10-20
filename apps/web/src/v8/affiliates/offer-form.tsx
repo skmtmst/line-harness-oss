@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
@@ -237,7 +238,7 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
       const fieldFailure = saveErrors.capture(e)
 
       { if (!fieldFailure)
-      setFormError(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。') }
+      setFormError(describeApiFailure(e, '保存')) }
     } finally {
       setSubmitting(false)
     }

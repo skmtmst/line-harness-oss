@@ -3,7 +3,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const apiMock = vi.hoisted(() => ({ createDraft: vi.fn(), saveDraft: vi.fn(), conflicts: vi.fn(), publishDraft: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { autoReplies: apiMock }, describeSaveFailure: () => '保存失敗' }))
+vi.mock('@/lib/api', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/api')>()), api: { autoReplies: apiMock }, describeSaveFailure: () => '保存失敗' }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
 import QuickCreate from './quick-create'
@@ -80,4 +80,24 @@ it('日本語の変換を確定する Enter では言葉を札にしない（変
   expect(input.value).toBe('えいぎょう')
   fireEvent.keyDown(input, { key: 'Enter' })
   expect(screen.getByRole('button', { name: '「えいぎょう」を外す' })).toBeTruthy()
+})
+
+it('保存ボタンを続けて押しても下書き作成は1回で、失敗後は入力を残してやり直せる', async () => {
+  let reject!: (reason: Error) => void
+  apiMock.createDraft.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+  render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
+  fireEvent.change(screen.getByLabelText('追加する言葉'), { target: { value: '営業時間' } })
+  fireEvent.keyDown(screen.getByLabelText('追加する言葉'), { key: 'Enter' })
+  fireEvent.change(screen.getByLabelText('返す文'), { target: { value: '10時からです' } })
+  const button = screen.getByRole('button', { name: '有効にして保存' }) as HTMLButtonElement
+  act(() => { button.click(); button.click() })
+  expect(apiMock.createDraft).toHaveBeenCalledTimes(1)
+  expect(apiMock.publishDraft).not.toHaveBeenCalled()
+  expect(button.disabled).toBe(true)
+  await act(async () => { reject(new TypeError('Failed to fetch')) })
+  expect((screen.getByLabelText('返す文') as HTMLTextAreaElement).value).toBe('10時からです')
+  expect(button.disabled).toBe(false)
+  await save()
+  expect(apiMock.createDraft).toHaveBeenCalledTimes(2)
+  expect(apiMock.publishDraft).not.toHaveBeenCalled()
 })

@@ -17,7 +17,7 @@ import { Check } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, describeSaveFailure, type CommonActionResources, type CommonActionStep } from '@/lib/api'
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
-import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -108,7 +108,7 @@ export function CommonActionNew() {
           setResourcesError(loadFailureNotice(caught, '選択肢'))
           return
         }
-        const message = caught instanceof Error ? caught.message : ''
+        const message = describeApiFailure(caught, '読み込み')
         setResourcesError(message && !/^API error: /.test(message) ? message : '選択肢を読み込めませんでした。通信の状態を確認して、もう一度読み込んでください。')
       })
       .finally(() => {
@@ -118,7 +118,7 @@ export function CommonActionNew() {
   }, [accountLoading, canManage, selectedAccountId, resourcesReloadKey])
 
   const save = async () => {
-    if (saving) return
+
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     setError('')
     if ((FIELD_REQUIREMENTS.name.check(name) !== null)) return setInputError({ target: 'ca-name', message: '共通アクション名を入力してください' })
@@ -202,7 +202,7 @@ export function CommonActionNew() {
         <Button href="/common-actions">キャンセル</Button>
         <Button
           variant="primary"
-          onClick={() => void save()}
+          onClick={() => save()}
           disabled={saving || resourcesLoading || resourcesFailed}
           title={resourcesFailed ? '選択肢を読み込めていないため保存できません' : undefined}
           busy={saving}

@@ -10,6 +10,7 @@
  * 「最新の内容を読み込んで続ける」と「比べてから保存」を出す。
  */
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
@@ -192,7 +193,7 @@ function EditInner() {
       if (error instanceof ApiError && error.status === 409) {
         setConflict(true)
       } else {
-        setSaveError(error instanceof Error ? error.message : '保存できませんでした。もう一度お試しください。')
+        setSaveError(describeApiFailure(error, '保存'))
       }
     } finally {
       setSaving(false)

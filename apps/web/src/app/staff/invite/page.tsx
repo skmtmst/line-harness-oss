@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -38,7 +39,7 @@ export default function StaffInvitationPage() {
     } catch (caught) {
       // D016: サーバの日本語案内（410の期限切れなど）はそのまま出す。
       // 内部文（`API error: NNN`）だけ汎用文へ落とす。
-      const message = caught instanceof Error ? caught.message : ''
+      const message = describeApiFailure(caught, '招待の確認')
       setError(message && !/^API error: /.test(message) ? message : '招待を確認できませんでした。時間をおいて、もう一度お試しください。')
       setView('ready')
     }

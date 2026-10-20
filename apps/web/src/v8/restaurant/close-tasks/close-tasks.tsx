@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useUrlTab } from '@/lib/use-url-tab'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -122,7 +123,7 @@ export default function CloseTasksPage() {
 
 
       if (!fieldFailure) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' }) }
+      notifyToast(describeApiFailure(caught, '保存'), { tone: 'error' }) }
     } finally {
       await load()
       setBusyId('')

@@ -43,6 +43,13 @@ function read(query = 'account_id=delivery-account') {
 }
 
 describe('registered delivery access boundary', () => {
+  it('keeps the read routes and protected write routes registered', () => {
+    for (const [method,paths] of [
+      ['POST',['/api/restaurant-test/delivery/orders/:id/accept','/api/restaurant-test/delivery/orders/:id/cancel','/api/restaurant-test/delivery/menu-items/bulk-sold-out','/api/restaurant-test/delivery/intake/stop']],
+      ['GET',['/api/restaurant-test/delivery/orders','/api/restaurant-test/delivery/orders/:id','/api/restaurant-test/delivery/history','/api/restaurant-test/delivery/menu-items']],
+    ] as const) for(const path of paths)expect(restaurantDelivery.routes.some(route=>route.method===method&&route.path===path)).toBe(true);
+  });
+
   it('keeps a valid same-tenant store readable', async () => {
     const response = await read();
     expect(response.status).toBe(200);
@@ -62,6 +69,13 @@ describe('registered delivery access boundary', () => {
   it('requires the current restaurant feature pack', async () => {
     database.raw.prepare(`UPDATE tenants SET feature_packs = '[]' WHERE id = ?`).run(tenant);
     expect((await read()).status).toBe(404);
+  });
+
+  it('keeps an account without a linked store unavailable', async () => {
+    database.raw.prepare('DELETE FROM rt_stores WHERE id = ?').run('delivery-store');
+    const response=await read();
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({error:'このLINEアカウントに店舗が紐付いていません'});
   });
 
   it('rejects a requested tenant different from the authenticated tenant', async () => {

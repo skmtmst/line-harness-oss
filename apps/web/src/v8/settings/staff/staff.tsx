@@ -12,7 +12,7 @@ import { avatarInitials } from '@/components/shared/avatar';
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UserPlus } from 'lucide-react';
-import { Eye, X } from 'lucide-react';
+
 import Link from '@/components/shared/list-navigation'
 import { useMergedTab } from '@/components/layout/merged-tabs';
 import LoginAudit from '@/components/staff/login-audit'
@@ -21,7 +21,7 @@ import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/compo
 import Checkbox from '@/components/shared/checkbox'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { Tabs } from '@/components/shared/tabs';
@@ -49,7 +49,7 @@ import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePii
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels';
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input';
 import TruncatedText from '@/components/shared/truncated-text'
-import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { describeApiFailure, withPermissionFailure } from '@/components/shared/api-error-message';
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -94,7 +94,7 @@ const EDIT_PERMISSION_PATHS = ['/', '/chats', '/friends', '/tags', '/scenarios',
 const PERMISSIONS: Array<readonly [string, string]> = EDIT_PERMISSION_PATHS.map((path) => [path, PERMISSION_LABELS[path]] as const)
 
 
-function messageOf(error: unknown): string { return error instanceof ApiError || error instanceof Error ? error.message : '通信に失敗しました。通信を確かめて、もう一度お試しください。' }
+function messageOf(error: unknown): string { return describeApiFailure(error, '保存') }
 
 function auditActionLabel(action: string): string {
   const normalized = action.toLowerCase()
@@ -657,9 +657,9 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
 
 
  setError(messageOf(caught)) } } finally { setStatusSaving(false) } }
-  return <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface} open title="ログインユーザーを編集する" onCancel={onClose} footer={<div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} busyLabel="確認中…" disabled={saving}>✓ 保存する</Button></div>}><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
+  return <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface} open title="ログインユーザーを編集する" onCancel={onClose} footer={<div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => save()} busyLabel="確認中…" disabled={saving}>✓ 保存する</Button></div>}><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}{emailNotice && <p role="status" className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">{emailNotice}</p>}
-    {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)} busy={Boolean(statusSaving)} busyLabel="変更中…">{member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
+    {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)} busy={Boolean(statusSaving)} busyLabel="変更中…">{member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <Field label="名前" required htmlFor="staff-edit-name" error={fieldErrors.name}><SaveErrorField names={["name"]}><TextField ref={nameRef} id="staff-edit-name" value={name} onChange={(e) => { setName(e.target.value); setFieldErrors((current) => ({ ...current, name: undefined })) }} /></SaveErrorField></Field>}<Field label="メールアドレス" required htmlFor="staff-edit-email" error={fieldErrors.email}><SaveErrorField names={["email"]}><TextField ref={emailRef} id="staff-edit-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })) }} /></SaveErrorField></Field></div>
     {administrator && <div className="mt-5"><p className="text-sm font-semibold text-ink">役割</p><div className="mt-2 grid grid-cols-3 gap-2">{(['admin', 'staff', 'viewer'] as const).map((value) => <Button variant="secondary" className={(`cursor-pointer rounded-control border px-3 py-3 text-sm ${role === value ? 'border-accent bg-accent-soft font-medium text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={value} onClick={() => setRole(value)}>{ROLE_LABEL[value]}</Button>)}</div></div>}
     {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-semibold text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <SaveErrorField names={["key","permissions"]} key={key}><Checkbox key={key} checked={permissions.includes(key)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, key))}>{label}</Checkbox></SaveErrorField>)}</div><p className="mt-3 text-sm font-medium text-ink">成果の操作権限</p><p className="mt-1 text-xs text-ink-faint">選ぶと「成果とアフィリエイト」の表示も組で付きます。表示を外すと操作権限も外れます。</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><SaveErrorField names={["CONVERSION_APPROVAL_EDIT_KEY","permissions","_c_o_n_v_e_r_s_i_o_n__a_p_p_r_o_v_a_l__e_d_i_t__k_e_y"]}><Checkbox checked={permissions.includes(CONVERSION_APPROVAL_EDIT_KEY)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, CONVERSION_APPROVAL_EDIT_KEY))} aria-label="成果を承認・却下する">{PERMISSION_LABELS[CONVERSION_APPROVAL_EDIT_KEY]}</Checkbox></SaveErrorField></div></div>}
@@ -700,7 +700,7 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
 
 
  setError(otpFailureMessage(messageOf(caught))) } } finally { setSaving(false) } }
-  return <SaveErrorScope errors={saveErrors}><Dialog open title={recoveryCodes.length ? '回復コードを保存' : '二段階認証を設定'} onCancel={onClose} footer={recoveryCodes.length ? undefined : <Button variant="primary" onClick={() => void save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button>}>
+  return <SaveErrorScope errors={saveErrors}><Dialog open title={recoveryCodes.length ? '回復コードを保存' : '二段階認証を設定'} onCancel={onClose} footer={recoveryCodes.length ? undefined : <Button variant="primary" onClick={() => save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button>}>
     {recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => window.location.assign('/login')} /> : <>
       {error ? <Notice tone="danger" message={error} /> : null}
       <TotpQr qr={qr} manualKey={manualKey} />

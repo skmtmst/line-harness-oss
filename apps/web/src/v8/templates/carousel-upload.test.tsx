@@ -5,10 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TemplateEditHost } from '../template-edit/host'
 
 const calls = vi.hoisted(() => ({ prepare: vi.fn(), put: vi.fn(), complete: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn() }))
-vi.mock('@/lib/api', () => ({ ApiError: class extends Error {}, api: {
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  const mocked = await (() => ({ ApiError: class extends Error {}, api: {
   media: { prepareUploads: calls.prepare, completeUpload: calls.complete, detail: calls.detail },
   templates: { create: calls.create, update: calls.update }, folders: { list: async () => ({ success: true, data: [] }) },
-} }))
+} }))()
+  return { ...actual, ...mocked }
+})
 vi.mock('../contents/media-direct-upload', async (original) => ({
   ...await original<Record<string, unknown>>(), extractMediaMetadata: async () => ({ width: 1040, height: 1040 }), putMediaFile: calls.put,
 }))

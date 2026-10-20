@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CircleCheck, Download, Info, TriangleAlert, X } from 'lucide-react'
@@ -138,7 +139,7 @@ export default function TagCsvImportDialog({
     } catch (reason) {
       const fieldFailure = saveErrors.capture(reason)
 
-      { if (!fieldFailure) setError(reason instanceof Error ? reason.message : '取り込む内容を確認できませんでした') }
+      { if (!fieldFailure) setError(describeApiFailure(reason, '取り込み')) }
     }
   }
 
@@ -156,7 +157,7 @@ export default function TagCsvImportDialog({
       const fieldFailure = saveErrors.capture(reason)
 
       setPhase('preview')
-      { if (!fieldFailure) setError(reason instanceof Error ? reason.message : 'タグを登録できませんでした') }
+      { if (!fieldFailure) setError(describeApiFailure(reason, '登録')) }
     }
   }
 

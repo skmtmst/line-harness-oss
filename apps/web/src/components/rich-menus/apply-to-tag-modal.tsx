@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/lib/api'
@@ -96,7 +97,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
   }
 
   async function confirmSetDefault() {
-    if (defaultBusy) return
+
     setDefaultBusy(true)
     setDefaultError('')
     try {
@@ -128,7 +129,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
       setResult(res.data)
       setPhase('done')
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setError(describeApiFailure(e, '保存'))
       setPhase('error')
     }
   }
@@ -294,7 +295,7 @@ export function ApplyToTagModal({ groupId, groupName, onClose }: Props) {
         confirmLabel="全員のデフォルトにする"
         busy={defaultBusy}
         error={defaultError}
-        onConfirm={() => void confirmSetDefault()}
+        onConfirm={() => confirmSetDefault()}
         onCancel={() => {
           if (defaultBusy) return
           setDefaultError('')

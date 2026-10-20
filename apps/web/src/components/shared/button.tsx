@@ -181,7 +181,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const [automaticError, setAutomaticError] = useState('')
   const automaticLock = useRef(false)
   const stateful = busy !== undefined || done !== undefined || props.busyLabel !== undefined || automaticBusy
-  const busyNow = busy === true || (busy === undefined && automaticBusy)
+  const busyNow = busy === true || automaticBusy
 
   /* done が true になったら 1.2 秒だけ ✓ を出して元の文字へ戻す。 */
   const [doneFlashing, setDoneFlashing] = useState(false)
@@ -244,10 +244,21 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (busyNow || disabled || automaticLock.current) return
-    setAutomaticError('')
-    const pending = onClick?.(event) as unknown
-    if (busy !== undefined || !pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
+    // Reactがbusyを描き直す前と、onClick内からの再入も共通の門で止める。
     automaticLock.current = true
+    setAutomaticError('')
+    let pending: unknown
+    try {
+      pending = onClick?.(event)
+      if (!pending || typeof (pending as PromiseLike<unknown>).then !== 'function') {
+        automaticLock.current = false
+        return
+      }
+    } catch {
+      automaticLock.current = false
+      setAutomaticError('処理できませんでした。もう一度お試しください。')
+      return
+    }
     setAutomaticBusy(true)
     void Promise.resolve(pending).catch(() => {
       setAutomaticError('処理できませんでした。もう一度お試しください。')

@@ -1,6 +1,6 @@
 'use client'
 import Link from '@/components/shared/list-navigation'
-import { ArrowLeft, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
@@ -128,7 +128,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
         {/* 全画面の戻り道はパンくずと左のメニュー（R5ckwJ は頭に主ボタンだけ）。窓のときは閉じる口として残す。 */}
         {!fullPage ? <Button onClick={close} disabled={busy}>キャンセル</Button> : null}
         {editing ? (
-          <Button variant="primary" onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
+          <Button variant="primary" onClick={() => save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
         ) : (
           <Button variant="primary" disabled={busy || !canApprove} onClick={() => { setError(''); setApproving(true) }}><Check aria-hidden="true" />保存して承認</Button>
         )}
@@ -170,12 +170,12 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
             {editing ? (
               <>
                 <Button onClick={close} disabled={busy}>保存せず閉じる</Button>
-                <Button variant="danger" onClick={() => void review('disable')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">無効にする</Button>
+                <Button variant="danger" onClick={() => review('disable')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">無効にする</Button>
               </>
             ) : (
               <>
-                {article.reviewState !== 'dismissed' ? <Button onClick={() => void review('dismiss')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">見送る</Button> : null}
-                <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
+                {article.reviewState !== 'dismissed' ? <Button onClick={() => review('dismiss')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">見送る</Button> : null}
+                <Button onClick={() => save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
               </>
             )}
           </div>
@@ -207,8 +207,8 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
           onCancel={() => { if (!busy) setApproving(false) }}
           footer={(
             <DialogActions>
-              <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
-              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? ticketError || (sourceTicket ? '元の問い合わせを解決にしてから承認してください' : '元の問い合わせの状態を確認しています') : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}><Check aria-hidden="true" />保存して承認</Button>
+              <Button onClick={() => save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
+              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? ticketError || (sourceTicket ? '元の問い合わせを解決にしてから承認してください' : '元の問い合わせの状態を確認しています') : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => save(true)}><Check aria-hidden="true" />保存して承認</Button>
             </DialogActions>
           )}
         >

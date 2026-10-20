@@ -24,7 +24,7 @@ import SearchField from '@/components/shared/search-field';
 import SegmentedControl from '@/components/shared/segmented';
 import Select from '@/components/shared/select';
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog';
-import { classifyApiFailure, loadFailureNotice } from '@/components/shared/api-error-message';
+import { describeApiFailure, classifyApiFailure, loadFailureNotice } from '@/components/shared/api-error-message';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import AccountEditModal from '@/components/accounts/account-edit-modal';
 import PlatformNotices from '@/components/hq/platform-notices';
@@ -35,7 +35,7 @@ import { formatNumber } from '@/lib/format';
 import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { readSessionSnapshot } from '@/lib/session-snapshot';
 import { useAccount, type AccountWithStats } from '@/contexts/account-context';
-import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8, accountHandle } from './account-dialogs';
+import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8 } from './account-dialogs';
 import { connectionReasonLine } from './connection-reasons';
 import styles from './home.module.css';
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/public/folder-colors/index'
@@ -281,7 +281,7 @@ export default function HqHomeV8() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setFolderError(caught instanceof Error ? caught.message : 'フォルダを保存できませんでした') }
+      setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' })) }
     } finally {
       setFolderSaving(false)
     }
@@ -307,7 +307,7 @@ export default function HqHomeV8() {
 
   /* 消す：中のアカウントは消えず未分類へ（API-17 の DELETE）。 */
   const removeFolder = async (target: Folder) => {
-    if (folderSaving) return
+
     setFolderSaving(true)
     setFolderError('')
     try {
@@ -321,7 +321,7 @@ export default function HqHomeV8() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setFolderError(caught instanceof Error ? caught.message : 'フォルダを消せませんでした') }
+      setFolderError(describeApiFailure(caught, '保存', { scope: 'hq' })) }
     } finally {
       setFolderSaving(false)
     }

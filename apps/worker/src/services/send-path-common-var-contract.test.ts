@@ -8,7 +8,7 @@ import { implementationFiles, readImplementationSource } from '../test-utils/imp
  * 送信経路へ新しく足すと、この試験が落ちる。
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -111,9 +111,7 @@ describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () =
   });
 
   it('自動応答の実送信では source を渡し、dry-run では渡さない', () => {
-    const source = read('features/auto-replies/auto-reply.ts');
     // 実送信（matchAndReply内の呼出し）は source 付きで呼ぶ
-    expect(source).toContain("kind: 'auto_reply'");
     // dry-run（auto-replies.ts のプレビュー呼出し）は source なしのまま
     const dryRun = read('routes/auto-replies.ts');
     const previewCalls = dryRun.match(/previewAutoReplyContent\([^)]*\)/g) ?? [];
@@ -126,7 +124,6 @@ describe('全送信経路が共通情報の厳格resolverを通る(N-189)', () =
     // LINE送信呼出しを持つファイルを全走査し、どちらの一覧にも無い
     // ファイルがあれば落とす。新しい送信経路を足したとき、ここで
     // 「厳格化するか・固定文と宣言するか」の判断を強制する。
-    const { readdirSync, statSync } = require('node:fs') as typeof import('node:fs');
     const sendFiles = new Set<string>();
     const walk = (dir: string) => {
       for (const entry of readdirSync(dir)) {

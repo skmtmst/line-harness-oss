@@ -72,9 +72,9 @@ const state = {
   users: [] as ReturnType<typeof accessUser>[],
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async importOriginal => {
   class ApiError extends Error {}
-  return {
+  return { ...(await importOriginal<typeof import('@/lib/api')>()),
     ApiError,
     fetchApi: fixture.fetchApi,
     api: {

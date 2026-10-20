@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const projectNameRequirement = requiredText('プロジェクト名を入力してください')
 
@@ -178,7 +179,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
       if (!res.success) throw new Error(res.error)
       onDone(projectId)
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
+      setError(describeApiFailure(caught, '取り込み', { scope: 'hq' }))
     } finally {
       setUploading(false)
     }

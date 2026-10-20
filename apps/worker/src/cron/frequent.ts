@@ -56,7 +56,7 @@ export async function runFrequentHeavyJobs(
   try {
     const { processAutoReplyDeliveries } = await import('../features/auto-replies/auto-reply-delivery/index.js');
     await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
-  } catch (error) { logger.error("src_index_failed"); }
+  } catch { logger.error("src_index_failed"); }
 
   const defaultLineClient = new LineClient(env.LINE_CHANNEL_ACCESS_TOKEN);
   const jobs: ScheduledJob[] = [

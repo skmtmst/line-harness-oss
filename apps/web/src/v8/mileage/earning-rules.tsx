@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { responseApiError } from '@/lib/api'
 
 import StatusBadge from '@/components/shared/status-badge'
@@ -437,9 +438,7 @@ export default function EarningRulesTab() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setDeleteError(caught instanceof Error && caught.message && !/^API error/.test(caught.message)
-        ? caught.message
-        : '削除できませんでした。もう一度お試しください。') }
+      setDeleteError(describeApiFailure(caught, '削除')) }
     } finally {
       setSavingId(null)
     }
@@ -521,7 +520,7 @@ export default function EarningRulesTab() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setTestError(caught instanceof Error ? caught.message : 'テストできませんでした。もう一度お試しください。') }
+      setTestError(describeApiFailure(caught, '送信')) }
     } finally {
       setTestBusy(false)
     }

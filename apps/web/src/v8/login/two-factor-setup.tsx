@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Link from 'next/link'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
@@ -73,7 +74,7 @@ export default function TwoFactorSetupPage() {
         // 合言葉の期限切れ。再試行は通らないので入力を終わらせる。
         setExpired(true)
         setSetup(null)
-        setError(failure.message || '設定を始められませんでした')
+        setError(describeApiFailure(failure, '設定の開始'))
       } else {
         setSetupError(failure)
       }
