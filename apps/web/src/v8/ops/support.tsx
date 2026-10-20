@@ -126,7 +126,6 @@ export default function OpsSupportV8() {
   }, [])
 
   const loadSummary = useCallback(async () => {
-    if (moreBusy) return
     const res = await opsCall(api.ops.support.summary())
     if (res.success) setSummary(res.data)
   }, [])
@@ -138,7 +137,7 @@ export default function OpsSupportV8() {
   const [mayHaveMore, setMayHaveMore] = useState(false)
   const [moreBusy, setMoreBusy] = useState(false)
   const loadMore = async () => {
-
+    if (moreBusy) return
     const sequence = listRequest.current
     setMoreBusy(true)
     const res = await opsCall(api.ops.support.tickets({ stage, priority: priority || undefined, q: q.trim() || undefined, sort, limit: TICKET_PAGE, offset: tickets.length }))
