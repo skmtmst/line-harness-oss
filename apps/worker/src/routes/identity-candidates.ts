@@ -140,10 +140,7 @@ function errorResponse(c: Context<Env>, error: unknown): Response {
     return fail(c, error.status, error.code, { error: error.message }, []);
   }
   logger.error("routes_identity_candidates_failed");
-  return c.json(
-    { success: false, error: '本人照合の記録を処理できませんでした', code: 'INTERNAL_ERROR' },
-    500,
-  );
+  return fail(c, 500, 'INTERNAL_ERROR', { error: '本人照合の記録を処理できませんでした' });
 }
 
 identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin', 'staff'), async (c) => {
