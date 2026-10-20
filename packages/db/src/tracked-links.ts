@@ -1,3 +1,4 @@
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 // =============================================================================
 // Tracked Links — URL click tracking with automatic actions
@@ -347,8 +348,13 @@ export async function getLinkClicks(
        FROM link_clicks lc
        JOIN tracked_links tl ON tl.id = lc.tracked_link_id
        LEFT JOIN scenarios sc ON sc.id = tl.scenario_id
+       LEFT JOIN line_accounts owner ON owner.id = COALESCE(tl.line_account_id, sc.line_account_id)
        LEFT JOIN friends f ON f.id = lc.friend_id
-         AND f.line_account_id IS COALESCE(tl.line_account_id, sc.line_account_id)
+         AND (f.line_account_id IS COALESCE(tl.line_account_id, sc.line_account_id)
+           OR (f.line_account_id IS NULL AND owner.id IS NOT NULL
+             AND COALESCE(owner.tenant_id, '${DEFAULT_TENANT_ID}') = '${DEFAULT_TENANT_ID}'
+             AND NOT EXISTS (SELECT 1 FROM friends exact_friend
+               WHERE exact_friend.line_user_id = f.line_user_id AND exact_friend.line_account_id = owner.id)))
          AND (tl.line_account_id IS NOT NULL OR tl.scenario_id IS NULL OR sc.id IS NOT NULL)
        WHERE lc.tracked_link_id = ?
        ORDER BY lc.clicked_at DESC`,

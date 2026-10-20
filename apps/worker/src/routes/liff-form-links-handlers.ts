@@ -218,6 +218,8 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
+    const friendAccountId = verifiedLineAccountId ?? friend.line_account_id ?? null;
+
     // IG cross-link for LIFF flows that hit this endpoint (existing friends
     // tapping a reward DM URL).
     const igLinkOk = await linkIgIgsid(c, friend.id, ig || '');
@@ -233,7 +235,7 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
     // 止める)。tracked 解決も後段で止める。不存在 ref は従来どおり載せる。
     const stoppedFormRef = await isStoppedEntryRouteRef(db, ref);
     const refLink = ref && !stoppedFormRef ? await getTrackedLinkById(db, ref) : null;
-    const trackedLink = refLink && await trackedLinkReferralMatchesAccount(db, refLink, friend.line_account_id ?? null)
+    const trackedLink = refLink && await trackedLinkReferralMatchesAccount(db, refLink, friendAccountId)
       ? refLink : null;
     const externalRefForForm = ref && !ref.startsWith('xh:') && !stoppedFormRef
       && (!refLink || trackedLink) ? ref : '';
@@ -246,8 +248,8 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
     let formLiffUrl = `${new URL(c.req.url).origin}?${formQuery.toString()}`;
     const { LineClient } = await import('@line-crm/line-sdk');
     let accountToken: string | null = null;
-    if (friend.line_account_id) {
-      const account = await getLineAccountById(db, friend.line_account_id);
+    if (friendAccountId) {
+      const account = await getLineAccountById(db, friendAccountId);
       accountToken = account?.channel_access_token ?? null;
       if (account?.liff_id) {
         formLiffUrl = `https://liff.line.me/${account.liff_id}?${formQuery.toString()}`;
@@ -256,7 +258,7 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
     const accessToken = resolveLineToken({
       accountToken,
       defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-      accountId: friend.line_account_id ?? null,
+      accountId: friendAccountId,
       context: 'liff.form-send',
     });
     if (formLiffUrl.startsWith(`${new URL(c.req.url).origin}`)) {
@@ -292,7 +294,7 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
         message_content: await expandSendCommonVars(
           c.env.DB, introTemplate.message_content,
           { kind: 'liff', id: introTemplate.id },
-          { lineAccountId: friend.line_account_id ?? null, friendId: friend.id, messageType: introTemplate.message_type },
+          { lineAccountId: friendAccountId, friendId: friend.id, messageType: introTemplate.message_type },
         ),
       };
     }

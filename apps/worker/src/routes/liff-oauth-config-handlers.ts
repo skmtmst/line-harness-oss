@@ -423,8 +423,9 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         // elsewhere in this file for QR codes / external LIFF URLs.
         // N-244: 停止 ref は案内文の URL にも載せない。下流の form 受付で
         // 帰属が復活するのを止める。不存在 ref は従来どおり載せる。
+        const formAccountId = loginLineAccountId ?? friend.line_account_id ?? null;
         const refLink = ref && !stoppedCallbackRef ? await getTrackedLinkById(db, ref) : null;
-        const trackedLink = refLink && await trackedLinkReferralMatchesAccount(db, refLink, friend.line_account_id ?? null)
+        const trackedLink = refLink && await trackedLinkReferralMatchesAccount(db, refLink, formAccountId)
           ? refLink : null;
         const externalRefForForm = ref && !ref.startsWith('xh:') && !stoppedCallbackRef
           && (!refLink || trackedLink) ? ref : '';
@@ -438,8 +439,8 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         const { LineClient } = await import('@line-crm/line-sdk');
         const { getLineAccountById: getAcctById } = await import('@line-crm/db');
         let accountToken: string | null = null;
-        if (friend.line_account_id) {
-          const account = await getAcctById(db, friend.line_account_id);
+        if (formAccountId) {
+          const account = await getAcctById(db, formAccountId);
           accountToken = account?.channel_access_token ?? null;
           if (account?.liff_id) {
             formLiffUrl = `https://liff.line.me/${account.liff_id}?${formQuery.toString()}`;
@@ -448,7 +449,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
         const accessToken = resolveLineToken({
           accountToken,
           defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
-          accountId: friend.line_account_id,
+          accountId: formAccountId,
           context: 'liff.oauth-form-send',
         });
         if (formLiffUrl.startsWith(`${new URL(c.req.url).origin}`)) {
@@ -486,7 +487,7 @@ export const get__auth_callback_1 = async (c: Context<Env, "/auth/callback">) =>
             message_content: await expandSendCommonVars(
               db, introTemplate.message_content,
               { kind: 'liff', id: introTemplate.id },
-              { lineAccountId: friend.line_account_id, friendId: friend.id, messageType: introTemplate.message_type },
+              { lineAccountId: formAccountId, friendId: friend.id, messageType: introTemplate.message_type },
             ),
           };
         }
