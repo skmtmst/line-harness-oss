@@ -2,6 +2,8 @@
 
 /* app/settings/file-scan/use-file-scan.ts から写した（src/v8 は @/app を読めない）。動きは同じ。 */
 
+import { readStaffIdentity } from '@/lib/staff-identity-state'
+import { loadStaffIdentity, useStaffRole, canManageRole } from '@/lib/staff-role'
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useDeferredValue, useEffect, useState } from 'react'
@@ -21,6 +23,7 @@ export type FileScanPhase = 'loading' | 'ready' | 'error' | 'forbidden'
  * 権限・一覧・戻す・消す・外の検査の設定はここに1つだけ置く。
  */
 export function useFileScan() {
+  const canEdit = canManageRole(useStaffRole())
   const { selectedAccountId } = useAccount()
   const [phase, setPhase] = useState<FileScanPhase>('loading')
   const [items, setItems] = useState<FileScanItem[]>([])
@@ -84,7 +87,7 @@ export function useFileScan() {
     try {
       const trimmedQuery = deferredQuery.trim() || undefined
       const [me, list, configRes, quarantinedRes, pendingRes, releasedRes] = await Promise.all([
-        api.staff.me(),
+        loadStaffIdentity(),
         api.fileScan.list(selectedAccountId, {
           status: statusFilter,
           q: trimmedQuery,
@@ -105,7 +108,7 @@ export function useFileScan() {
         pending: pendingRes.success ? pendingRes.data.total : 0,
         released: releasedRes.success ? releasedRes.data.total : 0,
       })
-      if (me.data.role !== 'owner' && me.data.role !== 'admin') {
+      if (!canManageRole(readStaffIdentity()?.role)) {
         setPhase('forbidden')
         return
       }
@@ -128,6 +131,7 @@ export function useFileScan() {
   }, [load])
 
   async function release() {
+    if (!canEdit) return
     if (!selectedAccountId || !releaseTarget) return
     /* 監査 D018: 必須の理由が空なら送らず、窓の中で理由を促す。 */
     if (!releaseReason.trim()) {
@@ -157,6 +161,7 @@ export function useFileScan() {
   }
 
   async function remove() {
+    if (!canEdit) return
     if (!selectedAccountId || !deleteTarget) return
     setDeleteBusy(true)
     setDeleteError('')
@@ -180,6 +185,7 @@ export function useFileScan() {
   }
 
   async function saveConfig() {
+    if (!canEdit) return
     if (!selectedAccountId) return
     setActionError('')
     if (configFields.submit().length > 0) return
@@ -214,6 +220,7 @@ export function useFileScan() {
    * 実際に消す。空に保存すると送信は止まる（部分だけの空はAPIが弾く）。
    */
   async function stopExternalConfig() {
+    if (!canEdit) return
     if (!selectedAccountId) return
     setConfigBusy(true)
     setStopError('')
@@ -262,6 +269,7 @@ export function useFileScan() {
   }
 
   return {
+    canEdit,
     selectedAccountId,
     phase,
     items,

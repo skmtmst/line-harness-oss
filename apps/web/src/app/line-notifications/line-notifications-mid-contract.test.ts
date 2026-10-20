@@ -53,7 +53,7 @@ describe('点検・中: LINE通知の画面契約', () => {
 
   it('中9: 再試行ボタンは店長だけに出し、権限不足の文言を持つ', () => {
     expect(RUN_LIST).toContain('canRetry')
-    expect(RUN_LIST).toContain("response.data.role === 'owner'")
+    // この出し分けは ../../v8/settings/line-notifications/runs-tab-kpis.test.tsx の動きと故障対照で確かめる。
     expect(RUN_LIST).toContain('送信の再試行は店長だけができます')
   })
 

@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useStaffIdentity } from '@/lib/staff-role'
 import Link from '@/components/shared/list-navigation'
 import { usePathname } from 'next/navigation'
-import { api } from '@/lib/api'
-import {canEditManualLinks as canEditTable} from '@/lib/manual-link-access'
+import { canViewManualLinks } from '@/lib/manual-link-access'
 import styles from './settings-nav-v8.module.css'
 import { Palette, Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activity, ShoppingCart, Share2, Bell, Store, Truck, type LucideIcon } from 'lucide-react'
 
@@ -16,20 +15,7 @@ import { Palette, Rocket, MessageCircle, Layers, Users, SlidersHorizontal, Activ
 
 /** マニュアルの正本表は運営だけ。見える人だけに出す（表の画面でも断る）。 */
 function useManualLinkAccess(): boolean {
-  const [allowed, setAllowed] = useState(false)
-  useEffect(() => {
-    let active = true
-    void api.staff.me()
-      .then((response) => {
-        if (!active || !response.success) return
-        setAllowed(canEditTable(response.data))
-      })
-      .catch(() => {})
-    return () => {
-      active = false
-    }
-  }, [])
-  return allowed
+  return canViewManualLinks(useStaffIdentity())
 }
 
 type NavLink = { href: string; label: string; icon?: LucideIcon }

@@ -26,7 +26,7 @@ import { TextArea,TextField } from '@/components/shared/text-field';
 import TextLink from '@/components/shared/text-link';
 import UriTapActionField from '@/components/shared/uri-tap-action-field';
 import { api } from '@/lib/api';
-import { useStaffRole } from '@/lib/staff-role';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { FIXED_FRIEND_FIELDS,fixedFieldForBlock,newBlockId,type FormBlock,type FormInputBlock,type FormLayout } from '@line-crm/shared';
 import {
 CalendarCheck,
@@ -346,7 +346,7 @@ function AllergyOptionsSave({accountId, block, set}: {accountId: string; block: 
     return () => { active = false }
   }, [accountId])
   return <SaveErrorScope errors={saveErrors}><p className={styles.cardNote}>この店の回答フォームと顧客情報で使う選択肢です。「そのほか」は自由に書けます。</p>
-    {role === 'owner' || role === 'admin' ? <Button disabled={version === null} busy={busy} onClick={async () => {
+    {canManageRole(role) ? <Button disabled={version === null} busy={busy} onClick={async () => {
       if (version === null) return
       setBusy(true); setMessage('')
       try {

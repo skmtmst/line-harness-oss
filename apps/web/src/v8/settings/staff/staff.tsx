@@ -1,4 +1,5 @@
 'use client'
+import { loadStaffIdentity, canManageRole, useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import SelfMfa from './self-mfa'
 import MfaPolicy from './mfa-policy'
 import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
@@ -787,7 +788,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const [accessSummary, setAccessSummary] = useState<AccessUserSummary>(EMPTY_ACCESS_SUMMARY)
   const [accessRoles, setAccessRoles] = useState<AccessRoleItem[]>([])
   const [accountNames, setAccountNames] = useState<Record<string, string>>({})
-  const [me, setMe] = useState<StaffMember | null>(null)
+  const me = useStaffIdentity()
   const [audits, setAudits] = useState<AuditEventItem[]>([])
   const [query, setQuery] = useListUrlValue('q', '')
   const [statusFilter, setStatusFilter] = useListUrlValue<'active' | 'suspended' | 'all'>('statusFilter', 'active')
@@ -809,7 +810,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const resendingRef = useRef(false)
   const removingRef = useRef(false)
   // 閲覧専用（代理ログインの見るだけ等）のオーナー・管理者は、変える操作を出さず閲覧のみの形にする。
-  const administrator = (me?.role === 'admin' || me?.role === 'owner') && !me?.readOnly
+  const staffRole = useStaffRole()
+  const administrator = canManageRole(staffRole)
   usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
   const load = useCallback(async () => {
     setLoading(true)
@@ -819,7 +821,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       const scope = selectedAccountId ?? undefined
       const [staffResult, meResult, accountsResult, usersResult, rolesResult] = await Promise.all([
         api.staff.list(),
-        api.staff.me(),
+        loadStaffIdentity(),
         api.lineAccounts.list(),
         api.access.users({ lineAccountId: scope, limit: 200 }),
         api.access.roles(scope),
@@ -828,7 +830,6 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
         throw new Error('必要な情報を読み込めませんでした')
       }
       setMembers(staffResult.data)
-      setMe(meResult.data)
       setAccountNames(Object.fromEntries(accountsResult.data.map((account) => [account.id, account.name])))
       setAccessUsers(usersResult.data.items)
       setUsersTotal(usersResult.data.pagination?.total ?? usersResult.data.items.length)
@@ -930,7 +931,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   useEffect(() => { setUserPage(1) }, [query, statusFilter, tab])
   const activeAdministratorCount = members.filter(isActiveAdministrator).length
   const missing = Math.max(accessSummary.active - accessSummary.mfaEnabled, 0)
-  const canEdit = (member: StaffMember) => Boolean(administrator || (me?.role === 'staff' && me.id === member.id))
+  const canEdit = (member: StaffMember) => Boolean(administrator || (staffRole === 'staff' && me?.id === member.id))
   const openTwoFactor = (member: StaffMember) => { if (member.twoFactorEnabled) { setDisableError(''); setDisablingTarget(member) } else setSettingTwoFactor(member) }
   /**
    * 二段階認証を外す。
@@ -1057,7 +1058,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     const items: ActionMenuItem[] = []
     if (editable && member) items.push({ id: 'edit', label: '役割を変える', qaOpen: 'EOTS4-edit', onSelect: () => { close(); router.push(`/staff/edit?id=${encodeURIComponent(member.id)}`) } })
     items.push({ id: 'scope', label: administrator ? '見える画面' : '見える画面を見る', onSelect: () => { close(); openPermissions(user) } })
-    if (isSelf && member) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '2段階の確認を解除する' : '2段階の確認を設定する', onSelect: () => { close(); openTwoFactor(member) } })
+    if (isSelf && member && editable) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '2段階の確認を解除する' : '2段階の確認を設定する', onSelect: () => { close(); openTwoFactor(member) } })
     if (resendable && member) items.push({ id: 'resend', label: 'もう一度送る', disabled: resendingId !== null, disabledReason: resendingId === member.id ? '送信中…' : undefined, onSelect: () => { close(); void runResend(member) } })
     if (administrator && member && !isSelf) {
       const policy = staffActionPolicy({ member, currentUserId: me?.id ?? null, administrator: true, activeAdministratorCount })

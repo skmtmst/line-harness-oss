@@ -1,15 +1,5 @@
 // @vitest-environment happy-dom
-/*
- * 設定 › LINEアカウントの［＋ LINEアカウントを登録］はオーナーだけ
- * （要件 v6-33 §15 `account.line.register`「登録、接続確認」）。
- *
- * 管理者にも入口を出していたため、押して③まで進んだところでサーバの403に当たり
- * 行き止まりになっていた（2026-10-18 利用者報告）。押せない入口を出すより、
- * 誰に頼めばよいかを先に書く——mcp-connect の「オーナーだけが作れます」と同じ作り。
- *
- * 一方で並び順と親子・スタイルは `account.metadata.edit`（owner、admin）なので、
- * 管理者から取り上げない。ここを一緒に隠さないことまで見る。
- */
+/* 登録・接続確認はオーナーと管理者。スタッフ・閲覧のみは入口も直アクセスも拒否する。 */
 import React from 'react'
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -59,20 +49,20 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-const OWNER_ONLY = 'LINEアカウントの登録はオーナーだけができます'
+const MANAGER_ONLY = 'LINEアカウントの登録はオーナーか管理者ができます'
 
 async function open() {
   render(<AccountsV8 />)
   await act(async () => {})
 }
 
-describe('一覧の登録の入口はオーナーだけ', () => {
-  it('管理者には登録の入口を出さず、頼む先を書く', async () => {
-    fixture.role.value = 'admin'
+describe('一覧の登録権限', () => {
+  it.each(['staff', 'viewer'])('%s には登録の入口を出さず、頼む先を書く', async (role) => {
+    fixture.role.value = role
     await open()
     expect(screen.queryByRole('link', { name: /LINEアカウントを登録/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /LINEアカウントを登録/ })).toBeNull()
-    expect(screen.getByText(OWNER_ONLY)).toBeTruthy()
+    expect(screen.getByText('送受信に使うアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。')).toBeTruthy()
   })
 
   it('管理者から並び順と親子は取り上げない（account.metadata.edit）', async () => {
@@ -81,16 +71,16 @@ describe('一覧の登録の入口はオーナーだけ', () => {
     expect(screen.getByRole('button', { name: /並び順と親子を変える/ })).toBeTruthy()
   })
 
-  it('1件も無いときも、管理者には押せない入口でなく頼む先を出す', async () => {
-    fixture.role.value = 'admin'
+  it.each(['staff', 'viewer'])('1件も無いときも %s には頼む先を出す', async (role) => {
+    fixture.role.value = role
     await open()
-    expect(screen.getByText('送受信に使うアカウントの登録はオーナーだけができます。オーナーに頼んでください。')).toBeTruthy()
+    expect(screen.getByText('送受信に使うアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。')).toBeTruthy()
   })
 
-  it('オーナーには今までどおり登録の入口を出す', async () => {
-    fixture.role.value = 'owner'
+  it.each(['owner', 'admin'])('%s は空の一覧から登録を開始できる', async (role) => {
+    fixture.role.value = role
     await open()
-    expect(screen.getAllByRole('link', { name: /LINEアカウントを登録/ }).length).toBeGreaterThan(0)
-    expect(screen.queryByText(OWNER_ONLY)).toBeNull()
+    expect(screen.getAllByRole('link', { name: /LINEアカウントを登録/ }).length).toBe(2)
+    expect(screen.queryByText(MANAGER_ONLY)).toBeNull()
   })
 })

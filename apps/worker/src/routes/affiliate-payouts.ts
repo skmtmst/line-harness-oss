@@ -1,3 +1,4 @@
+import { formatYen } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { simplePdf } from '../services/affiliate-statement-pdf.js';
 import { customerDownloadEntry } from '../services/download-entrypoints.js';
@@ -371,7 +372,7 @@ affiliatePayouts.post(
         c.env.DB,
         c.env,
         body.affiliateId,
-        `支払明細を発行しました。確定額: ¥${snapshot.totalAmount.toLocaleString('ja-JP')}。LINEで本人確認して確認できます。\n${customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', statement.id)}`,
+        `支払明細を発行しました。確定額: ${formatYen(snapshot.totalAmount)}。LINEで本人確認して確認できます。\n${customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', statement.id)}`,
       );
       return c.json({ success: true, data: statement, notificationAttempted: true }, 201);
     } catch (error) {

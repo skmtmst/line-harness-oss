@@ -1,4 +1,5 @@
 import { getBookingAdminSettings } from '@line-crm/db';
+import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import type {
   RestaurantCustomerAvailability,
@@ -32,12 +33,12 @@ export type CustomerReservationRow = {
 export function customerBooking(r: CustomerReservationRow): RestaurantCustomerBooking {
   return { id:r.id, storeId:r.store_id, startsAt:r.starts_at, endsAt:r.ends_at, guestCount:r.guest_count,
     status:r.status, version:r.customer_version, holdExpiresAt:r.hold_expires_at,
-    note:r.note, customerPhone:r.customer_phone, seatType:r.seat_type, courseId:r.course_id ?? null, courseName:r.course_name ?? null };
+    note:r.note, customerPhone:r.customer_phone ? normalizePhone(r.customer_phone) : null, seatType:r.seat_type, courseId:r.course_id ?? null, courseName:r.course_name ?? null };
 }
 /** 任意欄はUnicodeの文字数で検査。空欄・nullは保存済みの値を消す。 */
 export function validCustomerDetails(b: {note?: unknown; customerPhone?: unknown}): boolean {
   return (b.note == null || (typeof b.note === 'string' && Array.from(b.note).length <= 200))
-    && (b.customerPhone == null || (typeof b.customerPhone === 'string' && b.customerPhone.length <= 50 && (!b.customerPhone.trim() || /^[+0-9０-９()（）\s-]+$/.test(b.customerPhone))));
+    && (b.customerPhone == null || (typeof b.customerPhone === 'string' && !phoneProblem(b.customerPhone)));
 }
 export const customerDetailValue = (v: string | null | undefined) => v?.trim() || null;
 export type CustomerStore = {

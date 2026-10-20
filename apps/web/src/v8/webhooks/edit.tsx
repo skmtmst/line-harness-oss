@@ -1,5 +1,6 @@
 'use client'
 
+import { useStaffRole, isOwnerRole, loadStaffIdentity } from '@/lib/staff-role'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
@@ -43,17 +44,8 @@ function EditWebhookPageInner() {
    * 送り先の変更は統括だけ（R32）。口側が `requireRole('owner')` で守っている。
    * 直接URLで開いた管理者には作らず、統括への依頼を案内する。
    */
-  const [staffRole, setStaffRole] = useState<string | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    void api.staff.me()
-      .then((response) => {
-        if (cancelled || !response.success) return
-        setStaffRole(response.data.role)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [])
+  const staffRole = useStaffRole()
+
 
   useEffect(() => {
     let cancelled = false
@@ -117,13 +109,14 @@ function EditWebhookPageInner() {
     )
   }
 
-  if (staffRole !== null && staffRole !== 'owner') {
+  if (!isOwnerRole(staffRole)) {
     return (
       <div className="flex flex-col gap-4">
         <Notice tone="info">
-          送り先の変更は統括だけができます。必要なときは統括に頼んでください。
+          {staffRole === null ? '権限の確認が終わるまで編集できません。確認できないときは、もう一度読み込んでください。' : '送り先の変更は統括だけができます。必要なときは統括に頼んでください。'}
         </Notice>
         <div>
+          {staffRole === null ? <Button variant="secondary" onClick={() => { void loadStaffIdentity().catch(() => {}) }}>もう一度読み込む</Button> : null}
           <Button variant="secondary" href="/webhooks">外部連携の一覧へ戻る</Button>
         </div>
       </div>

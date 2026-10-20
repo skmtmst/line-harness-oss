@@ -1,3 +1,4 @@
+import { formatYen as yen } from '@line-crm/shared';
 import type { BookingPassPlan } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 
@@ -26,9 +27,7 @@ export function periodLabel(plan: Pick<BookingPassPlan, 'kind' | 'validDays'>): 
   return plan.kind === 'monthly' ? '毎月' : `買って ${validLabel(plan.validDays)}`
 }
 
-export function yen(value: number): string {
-  return `¥${new Intl.NumberFormat('ja-JP').format(value)}`
-}
+export { yen };
 
 export function failureText(reason: unknown, doing: string): string {
   const code = reason instanceof ApiError ? reason.code : undefined

@@ -11,7 +11,7 @@ import NewLineAccountPage from './page'
  */
 
 const calls = vi.hoisted(() => ({
-  connectCheck: vi.fn(), connect: vi.fn(), followerImportState: vi.fn(), stepFollowerImport: vi.fn(), list: vi.fn(), followerInsight: vi.fn(),
+  connectCheck: vi.fn(), connect: vi.fn(), followerImportState: vi.fn(), stepFollowerImport: vi.fn(), list: vi.fn(), followerInsight: vi.fn(), registrationReceipt: vi.fn(),
 }))
 const friends = vi.hoisted(() => ({ list: vi.fn() }))
 // 登録完了直後の契約者専用LINEの登録案内（★管理画面 37-7）。既定は「運営側で未設定」なので何も出ない
@@ -51,6 +51,7 @@ beforeEach(() => {
   calls.list.mockResolvedValue({success:true,data:[]}); calls.followerInsight.mockResolvedValue({success:true,data:{total:null}});
   calls.connectCheck.mockResolvedValue(checked)
   calls.connect.mockResolvedValue({ success: true, data: { ...checked.data, id: 'new-account' } })
+  calls.registrationReceipt.mockResolvedValue({ success: true, data: { status: 'confirmed', receivedAt: '2026-10-20T10:00:02.000+09:00' } })
   friends.list.mockResolvedValue({ success: true, data: { total: 0 } })
   notices.lineRegistration.mockResolvedValue({ success: true, data: { available: false } })
 })
@@ -109,9 +110,10 @@ async function runCheck() {
 /** ③Step1で登録し、③Step2・④を通って⑤まで進む。 */
 async function saveAndFinish() {
   fireEvent.click(screen.getByRole('button', { name: '登録する' }))
-  await screen.findByText('ためしに友だち追加してみましょう', { selector: 'h2' })
+  await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
+  await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
   next()
-  fireEvent.click(screen.getByRole('radio', { name: /飲食店/ }))
+  fireEvent.click(await screen.findByRole('radio', { name: /飲食店/ }))
   await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
   next()
 }

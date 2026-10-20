@@ -1,3 +1,5 @@
+import { normalizePhone, phoneProblem } from './phone.js';
+
 /** 統括の正式な会社情報。表示用の統括名とは別に保存する。 */
 export interface TenantCompanyContact {
   legalCompanyName: string | null;
@@ -47,11 +49,10 @@ export function parseTenantCompanyContact(value: unknown):
   }
   if (!/^\d{3}-?\d{4}$/.test(data.postalCode!)) return { error: '郵便番号は7桁で入力してください。' };
   data.postalCode = data.postalCode!.replace('-', '');
-  const digits = data.phone!.replace(/\D/g, '');
-  if (!/^\+?[0-9][0-9 ()-]*$/.test(data.phone!) || digits.length < 10 || digits.length > 15
-    || (!data.phone!.startsWith('+') && !/^0\d{9,10}$/.test(digits))) {
+  if (phoneProblem(data.phone!)) {
     return { error: '電話番号を確認してください。例：03-1234-5678' };
   }
+  data.phone = normalizePhone(data.phone!);
   if (!/^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(data.contactEmail!)) return { error: '担当者のメールをメールアドレスの形で入力してください。' };
   return { data };
 }

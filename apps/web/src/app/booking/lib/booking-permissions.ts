@@ -14,6 +14,8 @@ export const BOOKING_EDIT_KEY = '/booking/bookings'
 
 type StaffPermissionLike = {
   role?: string | null
+  readOnly?: boolean
+  roleBundle?: string | null
   permissionKeys?: string[] | null
 } | null | undefined
 
@@ -23,7 +25,7 @@ type StaffPermissionLike = {
  * viewer（閲覧のみ）と未判定(null)は不可。
  */
 export function canOperateBookings(staff: StaffPermissionLike): boolean {
-  if (!staff) return false
+  if (!staff || staff.readOnly || staff.roleBundle === 'view_only' || staff.role === 'viewer') return false
   if (staff.role === 'owner' || staff.role === 'admin') return true
   if (staff.role === 'staff') return (staff.permissionKeys ?? []).includes(BOOKING_EDIT_KEY)
   return false

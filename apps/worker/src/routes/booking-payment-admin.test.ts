@@ -32,12 +32,13 @@ function booking(id:string,account='a',status='requested',starts='2026-10-15T03:
 }
 function payment(id:string,status='paid',account='a',created='2026-10-10T04:00:00Z',paid:string|null='2026-10-10T04:00:00Z',updated='2026-10-10T04:00:00Z') {
   booking(id+'b',account);
+  // Keep the default fixture unexpired; expiration and clock-skew tests set their own deadline.
   f.raw.prepare(`INSERT INTO booking_payments(id,line_account_id,booking_id,amount,status,provider,provider_payment_id,idempotency_key,created_at,updated_at,paid_at,hold_until)
-    VALUES(?,?,?,1000,?,'stripe',?,?,?,?,?,?)`).run(id,account,id+'b',status,`pi_test_${id}b`,id+'b',created,updated,paid,'2026-10-20T00:00:00Z');
+    VALUES(?,?,?,1000,?,'stripe',?,?,?,?,?,?)`).run(id,account,id+'b',status,`pi_test_${id}b`,id+'b',created,updated,paid,'2099-12-31T00:00:00Z');
 }
 beforeEach(()=>{
   vi.useFakeTimers();vi.setSystemTime(now);vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('外部通信は禁止');}));
-  f=createTestD1();seedAssignmentFixture(f);access.allow=true;role='owner';readOnly=false;sequence=0;
+  f=createTestD1({now:()=>new Date()});seedAssignmentFixture(f);access.allow=true;role='owner';readOnly=false;sequence=0;
   f.raw.exec(`INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES('f','Utest','山田','a'),('fb','Uother','別店の秘密','b');
     INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('mb','b','別店のメニュー',30,1000);
     INSERT INTO events(id,line_account_id,name) VALUES('ev','a','試験クラス'),('evb','b','別クラス');

@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { api, eventsApi, type EventBookingItem, type EventDetail, type EventOccurrenceApplicant, type EventOccurrenceApplicants, type EventSlot } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { DetailPage } from '@/components/templates'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
@@ -281,7 +281,7 @@ function Bookings({ eventId }: { eventId: string }) {
   const cancelledCount = history.filter((entry) => entry.status === 'cancelled').length
   const attendance = applicants?.attendance ?? null
   /* お知らせの口は統括・管理者だけ（Worker の requireRole('owner','admin')）。役割はサーバーから読む。 */
-  const canBroadcast = staffRole === 'owner' || staffRole === 'admin'
+  const canBroadcast = canManageRole(staffRole)
 
   async function decide(applicant: EventOccurrenceApplicant, action: 'confirm' | 'reject') {
     if (!selectedAccountId || busy) return

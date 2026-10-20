@@ -1,3 +1,4 @@
+import { formatYen as yen } from '@line-crm/shared';
 import { styleTerm, term } from '@/lib/terms'
 import type { StyleBooking, StyleCard, StyleMetric, StyleSchedule, StyleScheduleEntry, StyleSnapshot } from '@line-crm/shared'
 import type {
@@ -22,7 +23,6 @@ function parts(iso: string, tz: string) {
 export const hm = (iso: string, tz: string) => parts(iso, tz).time
 const md = (iso: string, tz: string) => { const p = parts(iso, tz); return `${p.month}/${String(p.day).padStart(2, '0')}（${p.week}）` }
 const dayLabel = (date: string) => { const d = new Date(`${date}T00:00:00Z`); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEK[d.getUTCDay()]}）` }
-const yen = (n: number) => `¥${Math.round(n).toLocaleString('ja-JP')}`
 
 const isRate = (m?: StyleMetric) => Boolean(m && (m.unit === '' || m.unit === 'ratio' || m.unit === '%' || m.unit === '率') && m.denominator !== undefined)
 const isYen = (m?: StyleMetric) => m?.unit === '円'

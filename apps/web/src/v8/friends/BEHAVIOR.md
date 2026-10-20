@@ -20,7 +20,7 @@
 ## 保存先（今と同じ）
 - sessionStorage `lh_friends_list_state_v1:<アカウント>`：一覧の絞り込み・ページ（IDEA-03）
 - localStorage `friends.visibleColumns`：表示項目
-- 変えられるかの判定：役割はサーバ（`api.staff.me()`）、担当者の項目キーは `lh_staff_permissions`。手元の役割の保存値（`lh_staff_role`）は使わない
+- 変えられるかの判定：役割はサーバ（`本人情報の共通読取（useStaffRole / loadStaffIdentity）`）、担当者の項目キーは `lh_staff_permissions`。手元の役割の保存値（`lh_staff_role`）は使わない
 
 ## 友だち一覧（list/、x6QsVz）
 - API：`friends.list`（今と同じ引数）・`friendStats.get`・`tags.list`・`loadOperators`・`scenarios.list`・`supportMarks.list`（任意機能がオンのときだけ）・`savedSearches.detail`

@@ -22,7 +22,7 @@ describe("管理画面 URqOA 定期レポート作成", () => {
     expect(PAGE).toContain('<ListState kind="loading"')
     expect(PAGE).toContain('<ListState kind="error"')
     expect(PAGE).toContain('kind="empty"')
-    expect(PAGE).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
+    // この出し分けは report-v8-react.test.tsx の動きと故障対照で確かめる。
     expect(PAGE).toContain('disabled={saving || !canManage || !hasRecipient || hasInvalidEmail}')
   })
 

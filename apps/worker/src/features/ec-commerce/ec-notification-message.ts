@@ -1,3 +1,4 @@
+import { formatYen as yen } from '@line-crm/shared';
 import type { Message } from '@line-crm/line-sdk';
 import type { EcEvent } from './member-snapshot.js';
 
@@ -18,11 +19,7 @@ const BANK_DETAILS = [
   ['名義', 'シェッドプロダクツ（カ'],
 ] as const;
 
-function yen(value: number | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? `¥${Math.round(value).toLocaleString('ja-JP')}`
-    : '—';
-}
+
 
 function itemText(event: EcEvent): string {
   const items = event.order?.items ?? event.subscription?.items ?? [];

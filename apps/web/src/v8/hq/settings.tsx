@@ -10,7 +10,7 @@ import { TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import CompanyContactCard from './company-contact'
 import styles from './settings.module.css'
@@ -38,7 +38,7 @@ export default function HqSettingsV8() {
   const settingsNav = useHqSettingsFolderNav('info')
   /* 役割はサーバ（/api/staff/me）から読む。変えられるのはオーナーと管理者だけ。 */
   const role = useStaffRole()
-  const canEdit = role === 'owner' || role === 'admin'
+  const canEdit = canManageRole(role)
 
   return (
     <ListPage boardId="K7HYu" title={TITLE} help={DESCRIPTION} folders={<HqSettingsNavV8 active="info" />} folderWidth={200} folderNav={settingsNav}>

@@ -1,4 +1,6 @@
 'use client'
+import { yenPercent } from '@line-crm/shared';
+import { formatYen as yen } from '@line-crm/shared';
 
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowRight, CreditCard } from 'lucide-react'
@@ -52,7 +54,6 @@ export function useMenuDeposit(accountId: string | null, menuId: string | null) 
 }
 export type MenuDepositState = ReturnType<typeof useMenuDeposit>
 
-const yen = (value: number) => `¥${Math.floor(value).toLocaleString('ja-JP')}`
 
 export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { payment: MenuPaymentState; deposit: MenuDepositState; price: number | null; readOnly: boolean }) {
   const depositOn = Boolean(deposit.draft && !deposit.draft.inherit && deposit.draft.kind !== 'none')
@@ -63,7 +64,7 @@ export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { 
     if (deposit.draft) deposit.setDraft({ ...deposit.draft, inherit: next !== 'deposit', kind: next === 'deposit' ? (deposit.draft.kind === 'none' ? 'percent' : deposit.draft.kind) : 'none', value: next === 'deposit' ? deposit.draft.value ?? 30 : deposit.draft.value })
   }
   const rule = deposit.draft
-  const amount = rule && price !== null && rule.value ? (rule.kind === 'percent' ? Math.floor(price * rule.value / 100) : Math.min(rule.value, price)) : null
+  const amount = rule && price !== null && rule.value ? (rule.kind === 'percent' ? yenPercent(price, rule.value) : Math.min(rule.value, price)) : null
   const header = <CardHeader size="stacked" title="お支払い" help={<HelpTip label="お支払いの説明">いつもの方法は予約設定 › お支払いのとおりです。デポジットは予約のときに一部を先に払ってもらい、残りはお店で払います。</HelpTip>} />
   if (payment.status === 'loading') return <Card variant="form" gap="normal">{header}<p className={styles.minor}>お支払いの設定を読み込んでいます…</p></Card>
   if (!payment.connected) return <Card variant="form" gap="normal">{header}<p className={styles.sideCardLink}><CreditCard size={15} aria-hidden="true" />先払い・デポジットを受けるには<TextLink href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={14} aria-hidden="true" /></TextLink></p></Card>

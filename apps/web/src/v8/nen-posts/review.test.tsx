@@ -15,7 +15,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-const fixture = vi.hoisted(() => ({ role: 'owner' as string }))
+const fixture = vi.hoisted(() => ({ role: 'owner' as string, readOnly: false, roleBundle: undefined as string | undefined }))
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => children }))
 vi.mock('next/navigation', () => ({
@@ -64,6 +64,8 @@ let host: HTMLDivElement
 
 beforeEach(() => {
   fixture.role = 'owner'
+  fixture.readOnly = false
+  fixture.roleBundle = undefined
   document.documentElement.dataset.theme = 'v8'
   window.history.replaceState(null, '', '/nen-members')
   host = document.createElement('div')
@@ -71,7 +73,7 @@ beforeEach(() => {
   root = createRoot(host)
   vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
     const url = new URL(String(input), 'http://worker.test')
-    if (url.pathname === '/api/staff/me') return json({ success: true, data: { id: 'me', name: 'K', role: fixture.role, email: null } })
+    if (url.pathname === '/api/staff/me') return json({ success: true, data: { id: 'me', name: 'K', role: fixture.role, readOnly: fixture.readOnly, roleBundle: fixture.roleBundle, email: null } })
     if (url.pathname === '/api/nen-members/photos') return json({ success: true, data: PHOTOS })
     if (url.pathname === '/api/nen-members/photos/review-metrics') return json({ success: true, data: { pendingCount: 3, reviewedCount: 3, averageReviewMinutes: null, oldestPendingAt: null, attentionCount: 0 } })
     if (url.pathname === '/api/nen-members/photos/publications') return json({ success: true, data: { summary: { publishedCount: 18 }, items: [], pendingWithdrawals: [], withdrawnItems: [] } })
@@ -189,8 +191,13 @@ describe('V8 投稿（審査）', () => {
     expect(dialog()!.textContent).toContain('審査結果を保存できませんでした')
   })
 
-  it('閲覧のみには帯を出し、押せない操作を置かない（無効のボタンが1つも無い）', async () => {
-    fixture.role = 'staff'
+  it.each([
+    { role: 'staff', readOnly: false, roleBundle: undefined },
+    { role: 'viewer', readOnly: false, roleBundle: undefined },
+    { role: 'admin', readOnly: true, roleBundle: undefined },
+    { role: 'owner', readOnly: false, roleBundle: 'view_only' },
+  ])('閲覧のみには帯を出し、押せない操作を置かない: %j', async (identity) => {
+    Object.assign(fixture, identity)
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
     for (const label of ['見送る', '採用する', 'まとめて', '公式サイトに出す', 'LINE通知を再送']) {
