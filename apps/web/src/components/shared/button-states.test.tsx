@@ -95,3 +95,29 @@ it('busyを省略した非同期ボタンも処理中は二重実行せず、失
   expect(button.disabled).toBe(false)
   expect(screen.getByRole('alert').textContent).toContain('処理できませんでした')
 })
+
+
+it.each([false, null, undefined])('busy=%s でも同じ保存を描画前に二重実行しない', async (busy) => {
+  let finish!: () => void
+  const save = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+  render(<Button busy={busy} onClick={save}>保存する</Button>)
+  const button = screen.getByRole('button') as HTMLButtonElement
+  act(() => { button.click(); button.click() })
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(button.disabled).toBe(true)
+  await act(async () => { finish() })
+  expect(button.disabled).toBe(false)
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(2)
+  await act(async () => { finish() })
+})
+
+it('処理開始中の再入でも1回だけ送り、同期の失敗後も操作できる', () => {
+  const save = vi.fn(() => { if (save.mock.calls.length === 1) (screen.getByRole('button') as HTMLButtonElement).click() })
+  render(<Button onClick={save}>送る</Button>)
+  const button = screen.getByRole('button') as HTMLButtonElement
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(1)
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(2)
+})
