@@ -8,6 +8,7 @@ export function inputError<T extends Record<string, unknown>>(
   payload: T,
   status: ContentfulStatusCode,
   keys: readonly string[] = [],
+  validationReason?: string,
 ) {
   if (!['POST', 'PUT', 'PATCH'].includes(c.req.method) || (status !== 400 && status !== 422)) return c.json(payload, status);
   const legacyError = typeof payload.error === 'string' ? payload.error : '入力内容を確認してください';
@@ -18,7 +19,8 @@ export function inputError<T extends Record<string, unknown>>(
     || (payload.errors && typeof payload.errors === 'object' && !Array.isArray(payload.errors));
   // 必須欄が複数ある検査でも、すでに入っている欄は赤にしない。
   const body = c.get('validatedInputBody') as Record<string, unknown> | undefined;
-  const missingKeys = body && /required|必須/i.test(legacyError)
+  // fail()で文言を言い換えた場合も、必須欄の判定には元の理由を使う。
+  const missingKeys = body && /required|必須/i.test(validationReason ?? legacyError)
     ? keys.filter(key => body[key] === undefined || body[key] === null || body[key] === '')
     : [];
   const affectedKeys = missingKeys.length ? missingKeys : keys;
@@ -189,7 +191,7 @@ export function inputErrorMessage(code: string, fallback = '入力内容を確�
     ambiguous_video_source: '動画の指定方法は1つにしてください',
     dst_gap: '夏時間への切り替えで存在しない時刻です。別の時刻を選んでください',
   };
-  return messages[code] ?? fallback;
+  return Object.hasOwn(messages, code) ? messages[code]! : fallback;
 }
 
 /** フォルダの口で使うJSONの鍵を、DB側の共通エラーへ対応させる。 */

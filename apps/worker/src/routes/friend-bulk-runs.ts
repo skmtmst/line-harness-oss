@@ -1,5 +1,6 @@
+import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { DEFAULT_TENANT_ID, getFriendBulkRunDetail } from '@line-crm/db';
@@ -29,10 +30,10 @@ function bulkErrorFields(code: string): string[] {
 
 function errorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof FriendBulkRunError) {
-    return inputError(c, { success: false, error: error.message, code: error.code }, error.status as ContentfulStatusCode, bulkErrorFields(error.code));
+    return fail(c, error.status as ContentfulStatusCode, error.code, { error: error.message }, bulkErrorFields(error.code));
   }
   logger.error("routes_friend_bulk_runs_failed");
-  return c.json({ success: false, error: '一括操作を処理できませんでした' }, 500);
+  return fail(c, 500, 'INTERNAL_SERVER_ERROR', { error: '一括操作を処理できませんでした' });
 }
 
 function idempotencyKey(c: { req: { header(name: string): string | undefined } }): string {

@@ -1,30 +1,10 @@
 import type { MiddlewareHandler } from 'hono';
-import { isApiErrorCode, readApiError, type ApiErrorResponse, type ApiFieldErrors } from '@line-crm/shared';
-
-
+import { readApiError, type ApiErrorResponse, type ApiFieldErrors } from '@line-crm/shared';
 import { createInvocationContext, currentInvocation, logger, runWithInvocation } from '@line-crm/shared/server';
-import { inputErrorMessage, readBoundedText } from '../lib/input-errors.js';
+import { readBoundedText } from '../lib/input-errors.js';
 
-export const HTTP_ERROR_CODES: Record<number, { code: string; message: string }> = {
-  400: { code: 'BAD_REQUEST', message: '入力内容を確認してください。' },
-  401: { code: 'UNAUTHORIZED', message: 'ログインの状態を確認し、開き直してください。' },
-  403: { code: 'FORBIDDEN', message: 'この操作は許可されていません。アカウントと権限を確認してください。' },
-  404: { code: 'NOT_FOUND', message: '対象が見つかりません。一覧から開き直してください。' },
-  405: { code: 'METHOD_NOT_ALLOWED', message: 'この方法では操作できません。画面を開き直してください。' },
-  409: { code: 'CONFLICT', message: '内容や状態が変わりました。最新の内容を確認してください。' },
-  410: { code: 'GONE', message: '有効期限を過ぎたか、利用できなくなりました。開き直してください。' },
-  411: { code: 'LENGTH_REQUIRED', message: 'ファイルのサイズを確認できません。ファイルを選び直してください。' },
-  413: { code: 'PAYLOAD_TOO_LARGE', message: '送信内容が大きすぎます。サイズを確認してください。' },
-  415: { code: 'UNSUPPORTED_MEDIA_TYPE', message: '送信内容の形式を確認してください。' },
-  416: { code: 'RANGE_NOT_SATISFIABLE', message: '指定した範囲を取得できません。開き直してください。' },
-  422: { code: 'VALIDATION_ERROR', message: '入力内容を確認してください。' },
-  428: { code: 'PRECONDITION_REQUIRED', message: '操作に必要な確認を済ませてください。' },
-  429: { code: 'RATE_LIMITED', message: '操作が集中しています。少し待ってからお試しください。' },
-  500: { code: 'INTERNAL_SERVER_ERROR', message: '処理を完了できませんでした。状態を確認し、管理者にお問い合わせください。' },
-  502: { code: 'UPSTREAM_ERROR', message: '連携先の処理結果を確認できません。状態を確認し、管理者にお問い合わせください。' },
-  503: { code: 'SERVICE_UNAVAILABLE', message: '現在処理を利用できません。時間をおいて状態を確認してください。' },
-  504: { code: 'GATEWAY_TIMEOUT', message: '連携先の応答を確認できません。処理の状態を確認してください。' },
-};
+import { failureDetail } from '../lib/fail.js';
+export { HTTP_ERROR_CODES } from '../lib/http-errors.js';
 
 function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -39,9 +19,9 @@ function operatorMessage(value: unknown, fallback: string): string {
 export function normalizeApiFailure(value: unknown, status: number, requestId: string): ApiErrorResponse & Record<string, unknown> {
   const body = record(value);
   const parsed = readApiError(body);
-  const fallback = HTTP_ERROR_CODES[status] ?? HTTP_ERROR_CODES[status >= 500 ? 500 : 400]!;
-  const code = parsed.code ?? fallback.code;
-  const message = operatorMessage(parsed.message, inputErrorMessage(code, fallback.message));
+  const detail = failureDetail(parsed.message, status, parsed.code);
+  const code = detail.code;
+  const message = operatorMessage(detail.localized ? detail.message : parsed.message, detail.message);
   const fields: ApiFieldErrors = { ...parsed.fields };
   // inputErrorを通らない旧来のバリデータも、同じfieldErrorsへまとめる。
   for (const [field, reason] of Object.entries(record(body.errors))) if (typeof reason === 'string') fields[field] = reason;
@@ -49,8 +29,10 @@ export function normalizeApiFailure(value: unknown, status: number, requestId: s
     if (Array.isArray(reasons) && typeof reasons[0] === 'string' && fields[field] === undefined) fields[field] = reasons[0];
   }
   if (typeof body.field === 'string' && !fields[body.field]) fields[body.field] = message;
-  const fieldErrors = Object.entries(fields).map(([field, reason]) => ({ field,
-    message: operatorMessage(reason, isApiErrorCode(reason) ? inputErrorMessage(reason, message) : message) }));
+  const fieldErrors = Object.entries(fields).map(([field, reason]) => {
+    const detail = failureDetail(reason, status, undefined, message);
+    return { field, message: operatorMessage(detail.localized ? detail.message : reason, detail.message) };
+  });
   const { error: _error, code: _code, message: _message, requestId: _requestId, fields: _fields, ...extra } = body;
   return { ...extra, success: false, error: { code, message, requestId, fieldErrors } };
 }

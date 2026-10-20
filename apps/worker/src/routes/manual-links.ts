@@ -1,3 +1,4 @@
+import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -27,7 +28,7 @@ function canOperate(c: AppContext): boolean {
 }
 
 function forbidden(c: AppContext) {
-  return c.json({ success: false, error: 'この操作には運営権限が必要です', code: 'FORBIDDEN' }, 403);
+  return fail(c, 403, 'FORBIDDEN', { error: 'この操作には運営権限が必要です' });
 }
 
 function serialize(row: Awaited<ReturnType<typeof getManualLink>>) {

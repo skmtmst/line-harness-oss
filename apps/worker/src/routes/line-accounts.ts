@@ -31,111 +31,10 @@ import { getLineRegistrationReceipt } from '../services/line-registration-receip
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
+import { readCapacity, normalizeOptionalString, validateLoginChannelPair } from './line-accounts-input.js';
+import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
+
 const lineAccounts = new Hono<Env>();
-
-/**
- * 友だち数の上限と警告値を検証する。
- *
- * 警告値が上限を超えていたら弾く。超えた値は永久に鳴らないので、
- * 設定したつもりで一度も警告が出ない、という壊れ方をする。
- */
-function readCapacity(
-  body: { friendCapacity?: unknown; capacityWarnAt?: unknown },
-  current: { friend_capacity: number | null; capacity_warn_at: number | null } | null,
-): { ok: true; value: { friendCapacity?: number | null; capacityWarnAt?: number | null } } | { ok: false; error: string } {
-  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
-  const out: { friendCapacity?: number | null; capacityWarnAt?: number | null } = {};
-
-  const parse = (raw: unknown): number | null | 'invalid' => {
-    if (raw === null || raw === '' || raw === undefined) return null;
-    const n = Number(raw);
-    if (!Number.isInteger(n) || n < 1 || n > 100_000_000) return 'invalid';
-    return n;
-  };
-
-  if (has('friendCapacity')) {
-    const v = parse(body.friendCapacity);
-    if (v === 'invalid') return { ok: false, error: 'friendCapacity must be a positive integer' };
-    out.friendCapacity = v;
-  }
-  if (has('capacityWarnAt')) {
-    const v = parse(body.capacityWarnAt);
-    if (v === 'invalid') return { ok: false, error: 'capacityWarnAt must be a positive integer' };
-    out.capacityWarnAt = v;
-  }
-
-  const effectiveCapacity =
-    out.friendCapacity !== undefined ? out.friendCapacity : (current?.friend_capacity ?? null);
-  const effectiveWarn =
-    out.capacityWarnAt !== undefined ? out.capacityWarnAt : (current?.capacity_warn_at ?? null);
-  if (effectiveCapacity != null && effectiveWarn != null && effectiveWarn > effectiveCapacity) {
-    return { ok: false, error: 'capacityWarnAt must not exceed friendCapacity' };
-  }
-  return { ok: true, value: out };
-}
-
-function serializeLineAccount(row: DbLineAccount) {
-  return {
-    id: row.id,
-    channelId: row.channel_id,
-    name: row.name,
-    displayName: row.line_display_name || row.name,
-    folderId: row.folder_id ?? null,
-    pictureUrl: row.line_picture_url ?? null,
-    basicId: row.line_basic_id ?? null,
-    isActive: Boolean(row.is_active),
-    isDefault: Boolean(row.is_default),
-    archivedAt: row.archived_at ?? null,
-    // 止めた理由。動いていれば null（-33 §10-1）。
-    inactiveReason: row.inactive_reason ?? null,
-    inactiveReasonDetail: row.inactive_reason_detail ?? null,
-    inactivatedAt: row.inactivated_at ?? null,
-    lastWebhookReceivedAt: row.last_webhook_received_at ?? null,
-    webhookSilenceExempt: Boolean(row.webhook_silence_exempt ?? 0),
-    country: row.country,
-    role: row.role,
-    timezone: row.timezone ?? 'Asia/Tokyo',
-    revision: row.revision ?? 1,
-    displayOrder: row.display_order,
-    // login_channel_id and liff_id are non-secret identifiers (visible in
-    // LINE Developers console, embedded in public LIFF URLs). Safe to expose
-    // in list responses so the admin UI can show "Login/LIFF configured?"
-    // without a separate fetch.
-    loginChannelId: row.login_channel_id,
-    liffId: row.liff_id,
-    ogSiteName: row.og_site_name,
-    ogDefaultImageUrl: row.og_default_image_url,
-    ogDefaultDescription: row.og_default_description,
-    officialProfileUrl: row.official_profile_url ?? null,
-    // 上限とアイコンは鍵ではない。閲覧のみの人にも見せる。
-    friendCapacity: row.friend_capacity ?? null,
-    capacityWarnAt: row.capacity_warn_at ?? null,
-    iconUrl: row.icon_url ?? null,
-    parentLineAccountId: row.parent_line_account_id ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    channelAccessTokenConfigured: Boolean(
-      row.channel_access_token_encrypted || row.channel_access_token,
-    ),
-    channelAccessTokenLast4: row.channel_access_token_last4 ?? null,
-    channelAccessTokenUpdatedAt: row.channel_access_token_updated_at ?? null,
-    channelSecretConfigured: Boolean(row.channel_secret_encrypted || row.channel_secret),
-    channelSecretLast4: row.channel_secret_last4 ?? null,
-    channelSecretUpdatedAt: row.channel_secret_updated_at ?? null,
-    loginChannelSecretConfigured: Boolean(
-      row.login_channel_secret_encrypted || row.login_channel_secret,
-    ),
-    loginChannelSecretLast4: row.login_channel_secret_last4 ?? null,
-    loginChannelSecretUpdatedAt: row.login_channel_secret_updated_at ?? null,
-  };
-}
-
-function serializeLineAccountFull(row: DbLineAccount) {
-  // Credential values are deliberately never returned after persistence.
-  // Owners rotate them by submitting a new value; the UI only sees whether
-  // each credential is configured.
-  return serializeLineAccount(row);
-}
 
 function lifecycleConflict(error: unknown): { success: false; error: string } | null {
   if (!(error instanceof LineAccountLifecycleError)) return null;
@@ -872,14 +771,9 @@ lineAccounts.get(
 // Only the registered account's signed inbound receipt can unlock the wizard.
 lineAccounts.get('/api/line-accounts/:id/registration-receipt', requireRole('owner', 'admin'), async (c) => {
   c.header('Cache-Control', 'no-store');
-  try {
-    const account = await getAuthorizedLineAccount(c, c.req.param('id'));
-    if (!account || account.archived_at) return c.json({ success: false, error: 'LINE account not found' }, 404);
-    return c.json({ success: true, data: await getLineRegistrationReceipt(c.env.DB, account.id) });
-  } catch {
-    logger.error('line_registration_receipt_failed');
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
+  const account = await getAuthorizedLineAccount(c, c.req.param('id'));
+  if (!account || account.archived_at) return c.json({ success: false, error: 'LINE account not found' }, 404);
+  return c.json({ success: true, data: await getLineRegistrationReceipt(c.env.DB, account.id) });
 });
 
 // GET /api/line-accounts/:id - get single without persisted secret values
@@ -1031,63 +925,6 @@ lineAccounts.post(
     return c.json({ success: true, data: await run });
   },
 );
-
-// Normalize optional string inputs from the UI:
-//   undefined → undefined (caller skips the column)
-//   null      → null      (explicit clear)
-//   ""        → null      (UI cleared the field)
-//   non-string → undefined (defensive: silently drop bad input)
-//
-// Defined here (and in PATCH below) rather than shared, because the create
-// path treats undefined and "" identically (both "no value provided"), while
-// the partial-update path needs to distinguish "field absent" (no change)
-// from "field cleared" (set to null). Keep the helper local so future
-// behavior changes don't accidentally couple the two paths.
-function normalizeOptionalString(v: unknown): string | null | undefined {
-  if (v === undefined) return undefined;
-  if (v === null) return null;
-  if (typeof v !== 'string') return undefined;
-  const trimmed = v.trim();
-  return trimmed === '' ? null : trimmed;
-}
-
-// Pair-validate Login Channel ID / Secret. Required because the OAuth flow
-// asymmetrically gates on the two columns:
-//   /auth/line       — switches to account-specific client_id as soon as
-//                      login_channel_id is set (regardless of secret)
-//   /auth/callback   — only uses account-specific creds when BOTH are set
-// → an account with id-only or secret-only ends up half-configured: looks
-// fine in the list, breaks token exchange for new friend-add flows.
-//
-// Rule: within a single request, the two fields must end up consistent.
-// "current" reflects the state already stored (used on update paths so the
-// caller can leave the secret unchanged when only renaming the ID).
-function validateLoginChannelPair(
-  next: { loginChannelId?: string | null | undefined; loginChannelSecret?: string | null | undefined },
-  current: { login_channel_id: string | null; login_channel_secret: string | null } | null,
-): string | null {
-  // Resolve the post-update state for each field.
-  // undefined = "not in request" → keep current value
-  // null/string = "explicit set"  → use as-is
-  const finalId =
-    next.loginChannelId === undefined
-      ? current?.login_channel_id ?? null
-      : next.loginChannelId;
-  const finalSecret =
-    next.loginChannelSecret === undefined
-      ? current?.login_channel_secret ?? null
-      : next.loginChannelSecret;
-
-  const idSet = finalId !== null && finalId !== '';
-  const secretSet = finalSecret !== null && finalSecret !== '';
-
-  if (idSet !== secretSet) {
-    return idSet
-      ? 'loginChannelSecret must be provided when loginChannelId is set'
-      : 'loginChannelId must be provided when loginChannelSecret is set';
-  }
-  return null;
-}
 
 // Reject duplicate login_channel_id / liff_id across accounts.
 // /auth/callback and /api/liff/config both resolve the row with `.first`

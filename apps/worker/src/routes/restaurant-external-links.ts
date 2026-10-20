@@ -1,3 +1,4 @@
+import { fail } from '../lib/fail.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID, RESTAURANT_EXTERNAL_PROVIDERS, reservationInstant, type RestaurantExternalLink, type RestaurantExternalProvider } from '@line-crm/shared';
 
@@ -107,9 +108,9 @@ async function readLink(c: Context<Env>, storeId: string, id: string) {
   return dbFor(c.env, storeId).prepare(`${readSql} WHERE l.store_id = ? AND l.id = ?`).bind(storeId, id).first<LinkRow>();
 }
 function conflict(c: Context<Env>, code = 'version_conflict') {
-  return c.json({ success: false, code, error: code === 'duplicate_external_id'
+  return fail(c, 409, code, { error: code === 'duplicate_external_id'
     ? 'この外部予約はすでに登録されています。対応を読み直して結び直してください'
-    : '対応が変わりました。最新を読み込んでください' }, 409);
+    : '対応が変わりました。最新を読み込んでください' });
 }
 function provider(value: unknown): value is RestaurantExternalProvider {
   return typeof value === 'string' && (RESTAURANT_EXTERNAL_PROVIDERS as readonly string[]).includes(value);

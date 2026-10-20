@@ -9,7 +9,7 @@ export const CUSTOMER_DESIGNS = [
   {id:'modern',label:'モダン',note:'白と黒・すっきり',main:'#2b2d31',background:'#ffffff',sub:'#f5f5f5',text:'#111111',font:'sans',radius:'medium'},
   {id:'gentle',label:'やさしい',note:'あたたかい色・丸い書体',main:'#b5532f',background:'#fff8f3',sub:'#f8eeea',text:'#3b2a22',font:'marugothic',radius:'round'},
   {id:'night',label:'夜（深い紺）',note:'深い紺に金・夜のお店に',main:'#c9a96a',background:'#0f1c33',sub:'#172a47',text:'#f2f5fa',font:'mincho',radius:'round'},
-  {id:'line',label:'LINEらしい',note:'LINEの緑・なじみの形',main:'#03873a',background:'#f7f5f0',sub:'#e8f8ee',text:'#1d1d1f',font:'sans',radius:'medium'},
+  {id:'line',label:'LINEらしい',note:'LINEの緑・なじみの形',main:'#03873a',background:'#ffffff',sub:'#e8f8ee',text:'#1d1d1f',font:'sans',radius:'medium'},
 ] as const;
 export function customerLookError(raw: unknown): string | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'デザインの設定を確認してください';

@@ -223,4 +223,18 @@ describe('BA-19 予約写真の編集', () => {
     expect((within(waiting).getByRole('button', { name: '待合の写真を外す' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('閲覧のみでも写真ごとの公開設定を読め、操作や保存はできない', async () => {
+    const latest = catalog()
+    latest.store!.visibility = { exterior: true, interior: false, waiting: false }
+    net.list.mockResolvedValue({ success: true, data: latest })
+    show({ canEditMenus: false, canEditSettings: false })
+    for (const [name, label] of [['外観', '出す'], ['店内', '出さない'], ['待合', '出さない']]) {
+      const card = await screen.findByRole('region', { name: `${name}の写真` })
+      expect(within(card).getByText(`お客さまの予約画面に${label}`)).toBeTruthy()
+      expect(within(card).queryAllByRole('button')).toHaveLength(0)
+      expect(within(card).queryAllByRole('checkbox')).toHaveLength(0)
+    }
+    expect(net.saveStore).not.toHaveBeenCalled()
+  })
+
 });

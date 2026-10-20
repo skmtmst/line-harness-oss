@@ -1,3 +1,4 @@
+import { fail } from '../lib/fail.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { getTenantCompanyContact, saveTenantCompanyContact } from '@line-crm/db';
@@ -53,7 +54,7 @@ async function canManageTenants(c: Context<Env>): Promise<boolean> {
 }
 
 function forbidden(c: Context<Env>) {
-  return c.json({ success: false, error: '統括を管理する権限がありません' }, 403);
+  return fail(c, 403, 'FORBIDDEN', { error: '統括を管理する権限がありません' });
 }
 
 /** Read-only migration diagnostics. This route never returns LINE credentials. */
