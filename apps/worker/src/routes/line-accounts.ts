@@ -15,7 +15,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import { getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountListStats, getLineAccountTagsByAccountIds, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
 import type { LineAccount as DbLineAccount, LineAccountConnectionCheck, LineAccountScopeEntry } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
-import { requireRole } from '../middleware/role-guard.js';
+import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
 import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
@@ -27,6 +27,7 @@ import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
+import { getLineRegistrationReceipt } from '../services/line-registration-receipt.js';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
@@ -526,7 +527,8 @@ async function getAuthorizedLineAccount(
 // 保存前の接続確認。成功してもDBには一切書き込まない。
 lineAccounts.post(
   '/api/line-accounts/verify-connection',
-  requireRole('owner'),
+  requireRole('owner', 'admin'),
+  denyReadOnly(),
   inputJsonBoundary({"channelAccessToken":["string"],"loginChannelId":["string"],"loginChannelSecret":["string"],"liffId":["string"]}), async (c) => {
     const body = await c.req.json<{
       channelAccessToken?: string;
@@ -866,6 +868,19 @@ lineAccounts.get(
     }
   },
 );
+
+// Only the registered account's signed inbound receipt can unlock the wizard.
+lineAccounts.get('/api/line-accounts/:id/registration-receipt', requireRole('owner', 'admin'), async (c) => {
+  c.header('Cache-Control', 'no-store');
+  try {
+    const account = await getAuthorizedLineAccount(c, c.req.param('id'));
+    if (!account || account.archived_at) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    return c.json({ success: true, data: await getLineRegistrationReceipt(c.env.DB, account.id) });
+  } catch {
+    logger.error('line_registration_receipt_failed');
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 // GET /api/line-accounts/:id - get single without persisted secret values
 lineAccounts.get('/api/line-accounts/:id', async (c) => {
@@ -1268,7 +1283,7 @@ function publicConnectData(
 }
 
 // UI用の自動接続確認。LINE側のWebhook・LIFFは設定するが、musuboのDBには書き込まない。
-lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), inputJsonBoundary(), async (c) => {
+lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
   const parsed = await readConnectRequest(c);
   if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 'status' in parsed ? parsed.status : 422, ["name","channelId","channelSecret"]);
   let registration;
@@ -1303,7 +1318,7 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner'), inpu
 });
 
 // UI用の自動接続・保存。5段目が完了しなければ作成途中の行を必ず巻き戻す。
-lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonBoundary(), async (c) => {
+lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
   // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1427,7 +1442,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner'), inputJsonB
 });
 
 // POST /api/line-accounts - create
-lineAccounts.post('/api/line-accounts', requireRole('owner'), inputJsonBoundary(), async (c) => {
+lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
   // LINE の接続の追加は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');

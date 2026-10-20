@@ -7,7 +7,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { ArrowUpDown, CircleDot, Plus, Star, Cable, CircleCheck, TriangleAlert, Users } from 'lucide-react'
 import type { LineAccount } from '@line-crm/shared'
 import { ApiError, api, describeSaveFailure } from '@/lib/api'
-import { canManageRole, isOwnerRole, useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
@@ -60,7 +60,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
 /** 管理者に出す一文。押せない入口を出すより、誰に頼めばよいかを先に書く。 */
-const OWNER_ONLY_REGISTER = 'LINEアカウントの登録はオーナーだけができます'
+const MANAGER_ONLY_REGISTER = 'LINEアカウントの登録はオーナーか管理者ができます'
 
 export default function AccountsV8() {
   usePageTitle(TITLE)
@@ -74,7 +74,7 @@ export default function AccountsV8() {
    * 入口を出さずに理由を書く。並び順・親子やスタイルは `account.metadata.edit` で
    * 管理者も持っているため、ここでは分けない。
    */
-  const canRegister = isOwnerRole(role)
+  const canRegister = canManageRole(role)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useListUrlValue('q', '')
@@ -192,7 +192,7 @@ export default function AccountsV8() {
         <Button variant="primary" href="/accounts/new">
           <Plus size={15} aria-hidden="true" />LINEアカウントを登録
         </Button>
-      ) : <span className={styles.ownerOnly}>{OWNER_ONLY_REGISTER}</span>}
+      ) : <span className={styles.ownerOnly}>{MANAGER_ONLY_REGISTER}</span>}
     </div>
   ) : undefined
 
@@ -249,7 +249,7 @@ export default function AccountsV8() {
               description={accounts.length === 0
                 ? (canRegister
                   ? '「＋ LINEアカウントを登録」から、送受信に使うアカウントを登録してください。'
-                  : '送受信に使うアカウントの登録はオーナーだけができます。オーナーに頼んでください。')
+                  : '送受信に使うアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。')
                 : undefined}
               action={accounts.length === 0
                 ? (canRegister ? <Button href="/accounts/new" variant="primary"><Plus size={15} aria-hidden="true" />LINEアカウントを登録</Button> : undefined)

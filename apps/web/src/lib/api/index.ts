@@ -739,3 +739,5 @@ export type {
 } from './types/webinars'
 export { webinarApi } from './webinars'
 export { bookingSyncApi } from './booking-sync'
+
+export type { LineRegistrationReceipt } from './types/accounts'

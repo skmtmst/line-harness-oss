@@ -125,6 +125,23 @@ const fakeAccount = {
   updated_at: '2026-05-08T00:00:00.000',
 };
 
+describe('GET /api/line-accounts/:id/registration-receipt', () => {
+  test('only exposes a receipt in the current account scope', async () => {
+    const app = setupApp('owner', makeDbStub(), {
+      assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,
+    });
+    const allowed = await app.request('/api/line-accounts/acc-1/registration-receipt');
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get('Cache-Control')).toBe('no-store');
+    expect(await allowed.json()).toEqual({
+      success: true, data: { status: 'waiting', receivedAt: null },
+    });
+    const denied = await app.request('/api/line-accounts/acc-other/registration-receipt');
+    expect(denied.status).toBe(404);
+    expect(await denied.json()).toEqual({ success: false, error: 'LINE account not found' });
+  });
+});
+
 beforeEach(() => {
   styleMocks.initializeAccountStyle.mockClear();
   for (const fn of Object.values(dbMocks)) {
@@ -670,11 +687,11 @@ describe('POST /api/line-accounts/connect', () => {
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
 
-  test('検査の成功時はV8の5行に載る内訳（verification）を返す', async () => {
+  test.each(['owner', 'admin'] as const)('%s の接続検査の成功時はV8の5行に載る内訳を返す', async (role) => {
     installAutoConnectFetch();
     lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
     lineClientMocks.getFollowersInsight.mockResolvedValue({ status: 'ready', followers: 1284 });
-    const res = await setupApp('owner').request('/api/line-accounts/connect/check', {
+    const res = await setupApp(role).request('/api/line-accounts/connect/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(autoConnectBody),
@@ -716,7 +733,7 @@ describe('POST /api/line-accounts/connect', () => {
     expect(body.data.verification.followerTotal).toBeNull();
   });
 
-  test('5段成功時に1行だけ保存し、認証済みなら友だち取り込みを開始する', async () => {
+  test.each(['owner', 'admin'] as const)('%s は自分の統括に保存し、認証済みなら友だち取り込みを開始する', async (role) => {
     installAutoConnectFetch();
     let followerSetting: string | null = null;
     dbMocks.getAccountSetting.mockImplementation(async () => followerSetting);
@@ -734,15 +751,16 @@ describe('POST /api/line-accounts/connect', () => {
     dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
     lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
 
-    const res = await setupApp('owner').request('/api/line-accounts/connect', {
+    const res = await setupApp(role, makeDbStub(), { tenantId: 'tenant-current' }).request('/api/line-accounts/connect', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(autoConnectBody),
+      body: JSON.stringify({ ...autoConnectBody, tenantId: 'forged-tenant' }),
     });
     expect(res.status).toBe(201);
     expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();
     expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account',expect.anything(),expect.anything(),undefined);
     expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
+      tenantId: 'tenant-current',
       name: 'LINE公式名',
       channelAccessToken: 'issued-token',
       loginChannelId: '2007123456',
@@ -820,7 +838,7 @@ describe('POST /api/line-accounts/connect', () => {
 });
 
 describe('POST /api/line-accounts', () => {
-  test('passes loginChannelId / loginChannelSecret / liffId through to createLineAccount', async () => {
+  test.each(['owner', 'admin'] as const)('%s registers credentials in the authenticated tenant only', async (role) => {
     dbMocks.createLineAccount.mockResolvedValue({
       ...fakeAccount,
       login_channel_id: '2009624792',
@@ -828,11 +846,12 @@ describe('POST /api/line-accounts', () => {
       liff_id: '2009624792-XXXX',
     });
 
-    const app = setupApp('owner', makeDbStub(), { tenantId: 'tenant-line-owner' });
+    const app = setupApp(role, makeDbStub(), { tenantId: 'tenant-line-owner' });
     const res = await app.request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        tenantId: 'forged-tenant',
         channelId: '123456789',
         name: 'メイン',
         channelAccessToken: 'token',
@@ -917,9 +936,9 @@ describe('POST /api/line-accounts', () => {
     });
   });
 
-  test('担当範囲外の親アカウントは存在を明かさず404にする', async () => {
+  test.each(['owner', 'admin'] as const)('%s にも担当範囲外の親アカウントは存在を明かさず404にする', async (role) => {
     dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, id: 'visible' }]);
-    const res = await setupApp('owner').request('/api/line-accounts', {
+    const res = await setupApp(role).request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -938,8 +957,8 @@ describe('POST /api/line-accounts', () => {
     expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
 
-  test('adminはアカウントを登録できない', async () => {
-    const res = await setupApp('admin').request('/api/line-accounts', {
+  test('staffはアカウントを登録できない', async () => {
+    const res = await setupApp('staff').request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1875,4 +1894,51 @@ test('a mismatched Messaging credential cannot be saved by the owner', async () 
   });
   expect(response.status).toBe(422);
   expect(dbMocks.updateLineAccount).not.toHaveBeenCalled();
+});
+
+
+describe('registration authorization boundaries', () => {
+  const endpoints = ['/api/line-accounts/verify-connection', '/api/line-accounts/connect/check', '/api/line-accounts/connect', '/api/line-accounts'];
+  test.each(endpoints)('%s rejects staff and read-only managers before LINE or DB side effects', async (path) => {
+    for (const actor of [{ role: 'staff', readOnly: false }, { role: 'admin', readOnly: true }, { role: 'owner', readOnly: true }] as const) {
+      const res = await setupApp(actor.role, makeDbStub(), { readOnly: actor.readOnly }).request(path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(autoConnectBody),
+      });
+      expect(res.status).toBe(403);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test.each(['/api/line-accounts/connect', '/api/line-accounts'])('%s still requires admin step-up verification', async (path) => {
+    dbMocks.consumeStepUpGrant.mockResolvedValueOnce(false);
+    const res = await setupApp('admin').request(path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(autoConnectBody),
+    });
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toMatchObject({ code: 'STEP_UP_REQUIRED' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test.each(['owner', 'admin'] as const)('%s can verify credentials before saving', async (role) => {
+    const res = await setupApp(role).request('/api/line-accounts/verify-connection', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channelAccessToken: 'token', loginChannelId: '2007123456', loginChannelSecret: 'secret', liffId: '2007123456-test' }),
+    });
+    expect(res.status).toBe(200);
+    expect(fetch).toHaveBeenCalled();
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+});
+
+
+test.each(['/api/line-accounts/connect/check', '/api/line-accounts/connect'])('admin cannot grant staff access through registration: %s', async (path) => {
+  const response = await setupApp('admin').request(path, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...autoConnectBody, staffIds: ['another-staff'] }),
+  });
+  expect(response.status).toBe(403);
+  expect(fetch).not.toHaveBeenCalled();
+  expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
 });

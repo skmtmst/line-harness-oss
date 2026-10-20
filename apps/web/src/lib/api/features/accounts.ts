@@ -1,6 +1,6 @@
 import { fetchApi } from '../transport/request'
 import type { ApiResponse, LineAccount, TrafficPool, PoolAccount } from '@line-crm/shared'
-import type { LineAccountTag, LineAccountConnectData, FollowerImportState } from '../types/accounts'
+import type { LineAccountTag, LineAccountConnectData, FollowerImportState, LineRegistrationReceipt } from '../types/accounts'
 import type { FetchApiOptions } from '../types/transport'
 
 export const accountsMethods = {
@@ -46,6 +46,8 @@ export const accountsMethods = {
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),
     get: (id: string) =>
       fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`),
+    registrationReceipt: (id: string) =>
+      fetchApi<ApiResponse<LineRegistrationReceipt>>(`/api/line-accounts/${id}/registration-receipt`, { cache: 'no-store' }),
     create: (data: {
       style?: import('@line-crm/shared').AccountStyle;
       channelId: string;
