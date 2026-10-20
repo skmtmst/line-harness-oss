@@ -465,3 +465,8 @@ export const FAILURE_MESSAGES: Readonly<Record<string, readonly [code: string, m
   "url is required": ["URL_IS_REQUIRED", "URLを入力してください。"],
   "windowDays must be an integer between 1 and 365": ["WINDOW_DAYS_MUST_BE_AN_INTEGER_BETWEEN_1_AND_365", "集計日数は1〜365の整数で指定してください。"],
 };
+
+/** Canonical codes can be used by new handlers without an English legacy reason. */
+export const FAILURE_CODE_MESSAGES: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.values(FAILURE_MESSAGES).map(([code, message]) => [code, message]),
+);
