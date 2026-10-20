@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { app } from '../index.js';
 import { routeClassification } from '../middleware/feature-enforcement.js';
@@ -148,6 +147,7 @@ const ALLOWLIST_MAX = 769;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'POST /api/liff/tracked-link-identity',
   'GET /api/booking/admin/menus/photos',
   'GET /api/liff/booking/store-photos',
   'PUT /api/booking/admin/menus/{id}/photo',

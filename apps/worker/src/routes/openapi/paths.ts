@@ -1,4 +1,5 @@
 import { stagingQaPaths } from './staging-qa-paths.js';
+import { trackedLinkIdentityPaths } from './tracked-link-identity-paths.js';
 import { bookingPhotosPaths } from './booking-photos-paths.js';
 import { broadcastUploadPaths } from './broadcast-upload-paths.js';
 import { mileageFolderPaths } from './mileage-folders-paths.js';
@@ -81,6 +82,7 @@ import { webinarsPaths } from './webinars-paths.js';
 
 // Keep spread precedence and insertion order: later feature definitions may override earlier ones.
 export const paths = {
+  ...trackedLinkIdentityPaths,
   ...bookingPhotosPaths,
   ...stagingQaPaths,
   ...api1AuthoringPaths,
