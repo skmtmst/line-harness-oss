@@ -119,6 +119,7 @@ Nextのpage・route・layoutなどは必要な画面やhandlerへ直接つなぐ
 
 `pnpm quality:check --base <PRのbase SHA>` で画面の直接通信、担当者情報の直接読込、routeの独自500、日本日付のUTC切出し、コメント・題名・ファイル名の経緯、循環、長大ファイル、文字だけの試験を集計する。検査の本体は `scripts/structure/quality-inventory.mjs`、実測の一覧は `scripts/structure/quality-baseline.json`。`--json` は場所と根拠を含む全明細を返す。
 
+- 画面の直接通信はWebのapp/v8/componentsとLIFFのUI層（components/pages/features/appと直下のTSX）が対象。通信の正規窓口であるlibは画面に含めない。
 - baselineは実測の件数そのもの。許可するファイルや無視する場所の一覧ではない。各件数はPRのbaseにあるbaseline以下に限る。初回導入だけは依頼で指定された整理済み土台 `845f200c0b5d74e51fcd638b06d2552c5b038383` のソースを同じ解析器で実測する。この土台をHEADが含まない場合は失敗し、現在の値で代用しない。以後はPRのbaseの一覧を使い、初回の土台へ戻らない。
 - 実測とbaselineが一致しない場合も失敗する。違反を減らしたら `pnpm quality:update --base <同じSHA>` で一覧も減らす。この命令もbaseからの増加を拒み、水増しできない。
 - 長大ファイルは既存の分割対象「1,500行以上」のファイル数と、その合計行数を測る。個別ファイルの行数を凍結する上限は足さない。分割で合計が減った時は両指標を更新する。

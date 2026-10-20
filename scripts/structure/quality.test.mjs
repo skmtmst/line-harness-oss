@@ -57,6 +57,8 @@ test('type, runtime, re-export and dynamic cycles cannot be introduced', () => {
 test('data strings and harmless comments are not source violations', () => fixture(({put, cli}) => {
   put('apps/web/src/v8/sample/list.tsx', `const sample="fetch('/api') B-123";const day=jstDate(new Date()); // 店舗のタイムゾーンを保つ\napi.tags.list()`)
   put('apps/web/src/v8/sample/list.module.css', `.sample::before {content: '/* B-123 */';}`)
+  put('apps/liff/src/lib/api.ts', `export const request = () => fetch('/api/sample')`)
+  put('apps/web/src/lib/api/transport.ts', `export const request = () => fetch('/api/sample')`)
   const result = cli(); assert.equal(result.status, 0, result.stderr); assert.deepEqual(JSON.parse(result.stdout).counts, empty)
 }))
 

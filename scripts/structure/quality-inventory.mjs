@@ -5,7 +5,7 @@ import { importsOf, moduleResolver, cyclesOf } from './audit.ts'
 export const ruleNames = ['screen-fetch', 'screen-staff-me', 'route-500', 'utc-date-slice', 'history-comment', 'history-name', 'history-test-title', 'cycle', 'long-files', 'long-file-lines', 'source-assertion']
 const testPath = /(?:^|\/)(?:test|tests|__tests__|fixtures|test-utils)(?:\/|$)|\.(?:test|spec)\./
 const codePath = /^(?:apps\/|packages\/|scripts\/).*\.[cm]?[jt]sx?$/
-const screenPath = /^apps\/(?:web\/src\/(?:app|v8|components)\/|liff\/src\/)/
+const screenPath = /^apps\/(?:web\/src\/(?:app|v8|components)\/|liff\/src\/(?:(?:components|pages|features|app)\/|[^/]+\.tsx$))/
 const routePath = /^apps\/worker\/src\/(?:routes\/|features\/)/
 const history = /\b(?:B-\d+|N-\d+|R\d{3,}|U\d{3,})\b|#\d{3,}|20\d\d-\d\d-\d\d|オーナー(?:決定|指摘|判断|承認)|司令塔|マサト|ケンタ|作業役|以前は|前は|だったので|直した|に戻した|指摘|事故|再発防止|回帰試験|消した|外した|\b(?:used to|previously|regression|Codex|Devin|Muse)\b/i
 const unwrap = node => {
