@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(new URL('../../../v8/scenarios/results.tsx', import.meta.url), 'utf8')
 const DETAIL = readFileSync(new URL('../detail/scenario-detail-client.tsx', import.meta.url), 'utf8')
 
-describe('V6 5-1-L シナリオ配信結果', () => {
+describe("管理画面 5-1-L シナリオ配信結果", () => {
   it('実Node IDとシナリオ・統計・開始記録APIを使う', () => {
     expect(PAGE).toContain('boardId="X4STXS"')
     expect(PAGE).toContain('scenarioReferenceData.scenario(id)')

@@ -10,7 +10,7 @@ import { type PendingImage } from './create-types'
 import { imageUploadErrorText } from './image-upload-error'
 
 
-type seedMenuShapeContext = {
+type SeedMenuShapeContext = {
   audience: "all" | "tag" | "none" | "targeted"
   chatBarText: string
   defaultOpen: boolean
@@ -29,7 +29,7 @@ type seedMenuShapeContext = {
   validateBasics: () => boolean
 }
 
-export async function seedMenuShape({ audience, chatBarText, defaultOpen, folderId, host, hqTagName, name, pendingImages, saveErrors, setError, size, tabCount, tabNameAt, targetingPriority, templateKey, validateBasics }: seedMenuShapeContext): Promise<HqRichMenuSeed | null> {
+export async function seedMenuShape({ audience, chatBarText, defaultOpen, folderId, host, hqTagName, name, pendingImages, saveErrors, setError, size, tabCount, tabNameAt, targetingPriority, templateKey, validateBasics }: SeedMenuShapeContext): Promise<HqRichMenuSeed | null> {
     if (!host || !validateBasics()) return null
     const template = TEMPLATES.find((t) => t.key === templateKey)
     if (!template) {

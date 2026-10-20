@@ -14,7 +14,7 @@ import type { Dispatch,SetStateAction } from 'react'
 import styles from './edit.module.css'
 
 import { readOnlyDate,ReadOnlyValue } from './edit-impact'
-type renderValueFieldsContext = {
+type RenderValueFieldsContext = {
   canWrite: boolean
   expiryBehavior: "stop" | "fallback"
   fallbackFieldError: string
@@ -44,7 +44,7 @@ type renderValueFieldsContext = {
   validUntil: string
 }
 
-export function renderValueFields({ canWrite, expiryBehavior, fallbackFieldError, fallbackValue, folderId, folders, foldersError, item, loadFolders, memo, name, nameFieldError, periodFieldError, selectedAccountId, setExpiryBehavior, setFallbackValue, setFolderId, setFolders, setMemo, setName, setNameFieldError, setPeriodFieldError, setSaved, setValidFrom, setValidUntil, validFrom, validUntil }: renderValueFieldsContext) {
+export function renderValueFields({ canWrite, expiryBehavior, fallbackFieldError, fallbackValue, folderId, folders, foldersError, item, loadFolders, memo, name, nameFieldError, periodFieldError, selectedAccountId, setExpiryBehavior, setFallbackValue, setFolderId, setFolders, setMemo, setName, setNameFieldError, setPeriodFieldError, setSaved, setValidFrom, setValidUntil, validFrom, validUntil }: RenderValueFieldsContext) {
   return (item ? (
     <div className={styles.sideGroup}>
       <section className={styles.sideCard} aria-labelledby="cv-edit-name-heading">

@@ -3,7 +3,7 @@ export interface ReleaseEntry {
   released_at: string;
   /**
    * Identity hash of the Worker: computed on the FIRST-pass build (before
-   * `_version.ts` is embedded) and baked into the shipped Worker, which
+   * `release-version.ts` is embedded) and baked into the shipped Worker, which
    * self-reports it via /admin/version. detectFork compares against this.
    * NOT the byte hash of the bundle's worker/index.js — an artifact cannot
    * contain its own hash.

@@ -75,7 +75,7 @@ describe('設計の実測値に合わせる', () => {
     expect(token('radius-pill')).toBe('999px')
   })
 
-  it('V6の18pxをTailwind既定の rounded-lg へ流し込まない', () => {
+  it("管理画面の18pxをTailwind既定の rounded-lg へ流し込まない", () => {
     // `--radius-lg` をここで定義すると、管理画面専用の2箇所だけでなく
     // 既存の `rounded-lg` 利用先85ファイルが8pxから18pxへ変わる。
     expect(CSS).not.toMatch(/--radius-lg:\s*18px/)
@@ -104,7 +104,7 @@ describe('設計の実測値に合わせる', () => {
     )
   })
 
-  it('V6 の別系統トークンを残さない', () => {
+  it("管理画面 の別系統トークンを残さない", () => {
     // `--color-管理画面-*` `--radius-管理画面-*` `--shadow-管理画面-*` は 1 系統へ畳んだ。
     const theme = CSS.slice(CSS.indexOf('@theme {'), CSS.indexOf('\n}\n', CSS.indexOf('@theme {')))
     const left = [...theme.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/^\s*(--[a-z0-9-]*-v6-[a-z0-9-]+):/gm)].map((m) => m[1])

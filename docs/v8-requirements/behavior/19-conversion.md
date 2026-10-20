@@ -8,7 +8,7 @@
 
 - 画面：`apps/web/src/v8/conversions/`（一覧・作る・窓）、入口 `apps/web/src/app/conversions/`（`page.tsx`・`new/`・`edit/`）
 - API：`apps/worker/src/routes/conversions.ts`・`apps/worker/src/routes/web-measurement.ts`
-- データ：`packages/db/src/conversion-definitions.ts`・`packages/db/src/conversions.ts`・`packages/db/src/web-measurement.ts`
+- データ：`packages/db/src/conversion-definitions/index.ts`・`packages/db/src/conversions/index.ts`・`packages/db/src/web-measurement.ts`
 - 権限：`packages/shared/src/staff-permissions.ts`、代理ログイン `apps/worker/src/middleware/impersonation.ts`
 
 試験はすべて検証環境の試験用アカウント・試験用の友だちで行う。外からの受信は検証の印（本文に `"test": true`）を付けると成果の表に書かず台帳だけに残るので、それを使う。本当の注文・決済はしない。

@@ -91,20 +91,20 @@
 
 | # | 要件 | 今の作り | 根拠 |
 |---|---|---|---|
-| D-1 | 実行の順は「返信 → 後続の動作」（§5 の 6・7） | 後続の動作を先に全部動かしてから返信する。動作が遅いと返信の期限（約 1 分）に近づく | apps/worker/src/services/auto-reply.ts:661-713（動作）、:758（返信） |
-| D-2 | 返信失敗は運用者へ知らせる（§3-3・§13） | 返信失敗でも「当たった」扱いで返すため、受信箱の未読にならない。失敗の枝に知らせの呼び出しも無い。運用者が気づくのは実行結果を開いた時だけ | apps/worker/src/services/auto-reply.ts:800-813、apps/worker/src/routes/webhook.ts:1660（当たらない時だけ未読にする） |
-| D-3 | 同じ人に 1 人 1 回（§3-2・§5） | 「返信済みか」を確かめてから返信し、返信の後に記録する。同じ人の 2 通がほぼ同時に届いた時、間を止める鍵が無く、両方が「まだ」と判定しうる | apps/worker/src/services/auto-reply-conditions.ts:152-175、apps/worker/src/services/auto-reply.ts:790 |
-| D-4 | 時間外などを理由つきで表示（§11） | 祝日で外れた時も理由は「曜日が対象外」と同じ言葉になり、祝日だからとは分からない | apps/worker/src/services/auto-reply-conditions.ts:278-280 |
+| D-1 | 実行の順は「返信 → 後続の動作」（§5 の 6・7） | 後続の動作を先に全部動かしてから返信する。動作が遅いと返信の期限（約 1 分）に近づく | apps/worker/src/features/auto-replies/auto-reply.ts:661-713（動作）、:758（返信） |
+| D-2 | 返信失敗は運用者へ知らせる（§3-3・§13） | 返信失敗でも「当たった」扱いで返すため、受信箱の未読にならない。失敗の枝に知らせの呼び出しも無い。運用者が気づくのは実行結果を開いた時だけ | apps/worker/src/features/auto-replies/auto-reply.ts:800-813、apps/worker/src/routes/webhook.ts:1660（当たらない時だけ未読にする） |
+| D-3 | 同じ人に 1 人 1 回（§3-2・§5） | 「返信済みか」を確かめてから返信し、返信の後に記録する。同じ人の 2 通がほぼ同時に届いた時、間を止める鍵が無く、両方が「まだ」と判定しうる | apps/worker/src/features/auto-replies/auto-reply-conditions.ts:152-175、apps/worker/src/features/auto-replies/auto-reply.ts:790 |
+| D-4 | 時間外などを理由つきで表示（§11） | 祝日で外れた時も理由は「曜日が対象外」と同じ言葉になり、祝日だからとは分からない | apps/worker/src/features/auto-replies/auto-reply-conditions.ts:278-280 |
 | D-5 | 公開した版を固定（§1）。共通ルールも公開を通す | 稼働中の共通ルール（全アカウント）を owner が編集すると、下書きを通らず稼働中の定義を直接変える | apps/worker/src/routes/auto-replies.ts:2013-2019、:2069 |
 | D-6 | 作成は冪等キー必須（§6） | 下書きの作成で Idempotency-Key は任意（無くても作る） | apps/worker/src/routes/auto-replies.ts:1282 |
-| D-7 | 画面のルート `/auto-replies/new`・`/conflicts`・`/test`（§2） | 別の画面は無く、`/auto-replies/edit` の中の手順として競合とテストを出す。他は `/auto-replies/publish`・`/auto-replies/runs` | apps/web/src/app/auto-replies/（edit・publish・runs だけ）、apps/web/src/app/auto-replies/edit/wizard-v8.tsx:480・:630-632 |
+| D-7 | 画面のルート `/auto-replies/new`・`/conflicts`・`/test`（§2） | 別の画面は無く、`/auto-replies/edit` の中の手順として競合とテストを出す。他は `/auto-replies/publish`・`/auto-replies/runs` | apps/web/src/app/auto-replies/（edit・publish・runs だけ）、apps/web/src/v8/auto-replies/edit/wizard.tsx:480・:630-632 |
 
 ### 仕様が無い
 > 2026-10-16 オーナー「おすすめで」（B-337）で下の項目は全部決まった。各行の → が決定。問いは design/v8/review/SPEC-QUESTIONS-1016.md。
 
-- クールダウンの範囲。今は「その人へのどの自動応答でも」最後の返信から数える（ルールごとではない）（apps/worker/src/services/auto-reply-conditions.ts:177-193）。ルールごとか全体か決まっていない。 → 決定 B-337 Q-45：その人へのどの自動応答でも数える（今のまま）。
-- 遅延返信（○秒後に返す）は要件に無い。push で送るので送信数に数え、見回りの間隔で数分遅れる（apps/worker/src/services/auto-reply-delivery.ts、apps/worker/src/routes/auto-replies.ts:427-437、上限 86,400 秒）。使う場面・上限・遅れの許容が決まっていない。 → 決定 B-337 Q-69：上限は 1 時間。送信数に数えると画面に書く。
-- 画像・スタンプ等に「すべてに応答」ルールが種別の指定なしで当たるか（今は種別の指定が無いと全部の種別に当たる。apps/worker/src/services/auto-reply.ts:175-191）。 → 決定 B-337 Q-45：種類を指定しないルールは文字だけに当てる。
+- クールダウンの範囲。今は「その人へのどの自動応答でも」最後の返信から数える（ルールごとではない）（apps/worker/src/features/auto-replies/auto-reply-conditions.ts:177-193）。ルールごとか全体か決まっていない。 → 決定 B-337 Q-45：その人へのどの自動応答でも数える（今のまま）。
+- 遅延返信（○秒後に返す）は要件に無い。push で送るので送信数に数え、見回りの間隔で数分遅れる（apps/worker/src/features/auto-replies/auto-reply-delivery.ts、apps/worker/src/routes/auto-replies.ts:427-437、上限 86,400 秒）。使う場面・上限・遅れの許容が決まっていない。 → 決定 B-337 Q-69：上限は 1 時間。送信数に数えると画面に書く。
+- 画像・スタンプ等に「すべてに応答」ルールが種別の指定なしで当たるか（今は種別の指定が無いと全部の種別に当たる。apps/worker/src/features/auto-replies/auto-reply.ts:175-191）。 → 決定 B-337 Q-45：種類を指定しないルールは文字だけに当てる。
 - Webhook の処理が途中で落ちて「進行中」のまま残った評価を、誰がいつ片づけるか（自動で返し直すか・受信箱へ出すか）。 → 決定 B-337 Q-45：「進行中」のまま 10 分残った物は返し直さず、受信箱へ「自動応答できなかった」と出す。
 - 受信本文の短期保存の日数（§13「短期保存」の具体の日数）。 → 決定 B-337 Q-04：受信本文の短期保存は 30 日。 （仮の値・専門家に確かめる（B-337））
 - 臨時休業（店の休みの日）を自動応答の時間外として扱う設定。 → 決定 B-337 Q-45：臨時休業の日は時間外として扱う。

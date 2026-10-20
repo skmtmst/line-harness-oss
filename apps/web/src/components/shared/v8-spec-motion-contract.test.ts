@@ -30,7 +30,7 @@ describe('V8 仕上げ3回目の動き', () => {
     expect(button).toMatch(/busyLabel = '保存しています…'/)
   })
 
-  it('⑤ プルダウンの開いた中身は提案 F で 150ms（StFE7・B-45）。候補つき入力は200ms・色・暦ポップは120msのまま。「…」は 120ms', () => {
+  it("⑤ プルダウンの開いた中身は提案 F で 150ms（StFE7）。候補つき入力は200ms・色・暦ポップは120msのまま。「…」は 120ms", () => {
     // 1つ選ぶプルダウンの開いた中身は共通部品 select-menu。150ms・動きを減らす設定では動かさない。
     const selectMenu = readFileSync(new URL('./select-menu.module.css', import.meta.url), 'utf8')
     expect(selectMenu).toMatch(/@media \(prefers-reduced-motion: no-preference\) \{\s*\.surface \{\s*animation: select-menu-enter var\(--select-menu-enter\) var\(--motion-ease-out\)/s)

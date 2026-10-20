@@ -1,2 +1,10 @@
-// Public operations. Internal modules import their dependencies directly.
 export { canApproveBroadcast, countActiveOperators, evaluateApprovalGate, getBroadcastApprovalThreshold, notifyBroadcastApproval, readApprovalStatus, recordBroadcastApprovalEvent, setBroadcastApprovalThreshold } from '../broadcast-approval.js';
+export { BROADCAST_APPROVAL_THRESHOLD_DEFAULT } from '../broadcast-approval.js';
+export { BROADCAST_APPROVAL_THRESHOLD_KEY } from '../broadcast-approval.js';
+export type { BroadcastApprovalStatus } from '../broadcast-approval.js';
+export { countApprovalRecipients } from '../broadcast-approval.js';
+export type { ApprovalGate } from '../broadcast-approval.js';
+export { expireOverdueBroadcastApprovals } from '../broadcast-approval.js';
+export { sweepBroadcastApprovalExpiry } from '../broadcast-approval.js';
+export { enforceBroadcastSendApproval } from '../broadcast-approval.js';
+export { checkScheduledBroadcastApproval } from '../broadcast-approval.js';

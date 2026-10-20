@@ -159,7 +159,7 @@ describe('画面に「準備中」を置かない', () => {
     }
   })
 
-  it('B-314 の準備中は共通部品の1か所だけ（数を増やさない）', () => {
+  it("共通部品の準備中は共通部品の1か所だけ（数を増やさない）", () => {
     for (const [p, allowed] of Object.entries(PREPARING_COMPONENTS)) {
       const f = FILES.find((x) => x.p === p)
       expect(f, `${p} が無い。表から消す`).toBeDefined()

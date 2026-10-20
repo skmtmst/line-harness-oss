@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(join(import.meta.dirname, '../../../v8/inflow-links/detail.tsx'), 'utf8')
-describe('V6 流入リンクの削除確認 UIaM7', () => {
+describe("管理画面 流入リンクの削除確認 UIaM7", () => {
   it('ブラウザ標準の確認ではなく画面内ダイアログを使う', () => {
     expect(PAGE).not.toMatch(/\b(?:window\.)?confirm\s*\(/)
     expect(PAGE).toContain('designNode="UIaM7"')

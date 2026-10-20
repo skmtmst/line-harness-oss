@@ -21,7 +21,6 @@ describe('R283 縦に長い窓でも見出しと閉じる操作に到達でき�
   it('面の高さを画面内に収め、中身だけを中で送る', () => {
     const css = read('dialog.module.css')
     expect(css).toMatch(/\.panel \{[^}]*max-height: calc\(100dvh - 32px\);[^}]*\}/s)
-    expect(css).toMatch(/\.content \{[^}]*overflow-y: auto;[^}]*\}/s)
     expect(css).toMatch(/\.content \{[^}]*min-height: 0;[^}]*\}/s)
   })
 

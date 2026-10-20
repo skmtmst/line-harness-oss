@@ -18,7 +18,7 @@ describe('V8 NEN配信の運用者向け文言契約', () => {
     expect(PAGE).not.toContain('title="準備中です"')
   })
 
-  it('コラムの状態を内部値のまま表示しない（★V6 37-6-A の LINE配信 列）', () => {
+  it("コラムの状態を内部値のまま表示しない", () => {
     for (const label of ['送っていない', '予約中', '配信待ち', '送信済み']) expect(OVERVIEW).toContain(label)
     expect(OVERVIEW).toContain('columnBadge(column, metric?.sent ?? null)')
     expect(OVERVIEW).not.toContain('{column.deliveryStatus}</span>')

@@ -9,7 +9,7 @@ const NOTIFICATIONS = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-
 const BUTTON = fs.readFileSync(path.join(__dirname, '../../../components/shared/button.tsx'), 'utf8')
 const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/edit.tsx'), 'utf8')
 
-describe('V6 ウェビナー公開ページ確認の契約', () => {
+describe("管理画面 ウェビナー公開ページ確認の契約", () => {
   it('実ノードと行き先が分かる操作名を持つ', () => {
     expect(REVIEW).toContain('boardId="XCUNf"')
     expect(NOTIFICATIONS).toContain('公開ページを見る')

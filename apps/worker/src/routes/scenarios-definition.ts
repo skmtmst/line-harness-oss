@@ -474,7 +474,7 @@ async function runTestSend(
 
   const token = c.env.LINE_CHANNEL_ACCESS_TOKEN;
   const { LineClient } = await import('@line-crm/line-sdk');
-  const { testSendSteps } = await import('../features/scenarios/scenario-test-send.js');
+  const { testSendSteps } = await import('../features/scenarios/scenario-test-send/index.js');
   try {
     const result = await testSendSteps(
       c.env.DB,

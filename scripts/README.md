@@ -22,4 +22,6 @@
 
 移行調査の入口は `pnpm db:dry-run-automations`・`pnpm db:dry-run-analytics`・`pnpm db:dry-run-funnels` です。従来の `db:dry-run-v6-*` も同じ入口へ接続し、運用中の呼出しを保っています。これらを整理作業の確認のために実DBへ実行する必要はありません。
 
-`check-migrations.ts` は外部HQのci-all.sh、`fetch-jp-postal-data.*` と `codex/overlay-ready.mjs` はアプリ・パッケージからも直接読み込まれるため、統合担当が利用元と同時に移すまで元の入口に置きます。見た目の比較地図・外部の撮影命令・安全な失敗の対照で使うIDや機械コードは、経緯だけのコメントと区別して保持します。
+`check-migrations.ts` は外部HQのci-all.shが使うため元のCLI入口を保持します。郵便データは `db/fetch-jp-postal-data.*`、画面の待ち合わせは `browser/overlay-ready.mjs` へ、アプリ・パッケージの利用元と同時に移しました。見た目の比較地図・外部の撮影命令・安全な失敗の対照で使うIDや機械コードは、経緯だけのコメントと区別して保持します。
+
+構成の決まりは [コードの構成と名前](../docs/code-structure.md)。`pnpm exec tsx scripts/structure/check.ts` が名前・公開入口・循環を検査し、`pnpm test:scripts` がその故障対照を実行します。

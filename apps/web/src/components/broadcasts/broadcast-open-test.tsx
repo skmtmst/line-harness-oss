@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
 
-type openBroadcastTestContext = {
+type OpenBroadcastTestContext = {
   rejectValidation: (validationError: string) => void
   saveErrors: ReturnType<typeof useSaveFormErrors>
   selectedAccountId: string | null
@@ -16,7 +16,7 @@ type openBroadcastTestContext = {
   validate: () => string
 }
 
-export async function openBroadcastTest({ rejectValidation, saveErrors, selectedAccountId, setTestDialogOpen, setTestRecipients, setTestRecipientState, testRecipientsGeneration, validate }: openBroadcastTestContext) {
+export async function openBroadcastTest({ rejectValidation, saveErrors, selectedAccountId, setTestDialogOpen, setTestRecipients, setTestRecipientState, testRecipientsGeneration, validate }: OpenBroadcastTestContext) {
     const generation = ++testRecipientsGeneration.current
     const validationError = validate()
     if (validationError) { rejectValidation(validationError); return }

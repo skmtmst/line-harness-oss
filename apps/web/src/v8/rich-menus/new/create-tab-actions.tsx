@@ -7,7 +7,7 @@ import type { Dispatch,SetStateAction } from 'react'
 import { type Group,type Page,type PendingImage } from './create-types'
 
 
-type requestMenuTabCountContext = {
+type RequestMenuTabCountContext = {
   applyTabCount: (next: number) => void
   group: Group | null
   pageHasSettings: (page: Page) => boolean
@@ -18,7 +18,7 @@ type requestMenuTabCountContext = {
   tabCount: number
 }
 
-export function requestMenuTabCount({ applyTabCount, group, pageHasSettings, pages, pendingImages, removePageBlockers, setPendingTabCount, tabCount }: requestMenuTabCountContext, next: number) {
+export function requestMenuTabCount({ applyTabCount, group, pageHasSettings, pages, pendingImages, removePageBlockers, setPendingTabCount, tabCount }: RequestMenuTabCountContext, next: number) {
     if (!group) {
       if (next === tabCount) return
       if (pendingImages.slice(next + 1).some(Boolean)) {
@@ -37,7 +37,7 @@ export function requestMenuTabCount({ applyTabCount, group, pageHasSettings, pag
     applyTabCount(next)
   }
 
-type applyMenuTabCountContext = {
+type ApplyMenuTabCountContext = {
   activePageId: string | null
   group: Group | null
   host: RichMenuCreateHost | undefined
@@ -53,7 +53,7 @@ type applyMenuTabCountContext = {
   templateKey: string
 }
 
-export function applyMenuTabCount({ activePageId, group, host, pages, removePageBlockers, setActivePageId, setPages, setPendingImages, setPendingTabCount, setSelectedAreaId, setTabCount, setTabNames, templateKey }: applyMenuTabCountContext, next: number) {
+export function applyMenuTabCount({ activePageId, group, host, pages, removePageBlockers, setActivePageId, setPages, setPendingImages, setPendingTabCount, setSelectedAreaId, setTabCount, setTabNames, templateKey }: ApplyMenuTabCountContext, next: number) {
     setPendingTabCount(null)
     setTabCount(next)
     if (!group) {

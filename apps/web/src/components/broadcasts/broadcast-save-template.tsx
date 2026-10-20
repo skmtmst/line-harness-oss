@@ -13,7 +13,7 @@ import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { bubblesError } from './broadcast-form-model'
 
 
-type saveBroadcastTemplateContext = {
+type SaveBroadcastTemplateContext = {
   bubbles: BroadcastBubble[]
   composerBusy: boolean
   saveErrors: ReturnType<typeof useSaveFormErrors>
@@ -29,7 +29,7 @@ type saveBroadcastTemplateContext = {
   templateSaveName: string
 }
 
-export async function saveBroadcastTemplate({ bubbles, composerBusy, saveErrors, selectedAccount, selectedAccountId, selectedAccountIdRef, setComposerBusy, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, templateSaveCreatedId, templateSaveIndex, templateSaveName }: saveBroadcastTemplateContext) {
+export async function saveBroadcastTemplate({ bubbles, composerBusy, saveErrors, selectedAccount, selectedAccountId, selectedAccountIdRef, setComposerBusy, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, templateSaveCreatedId, templateSaveIndex, templateSaveName }: SaveBroadcastTemplateContext) {
     if (templateSaveIndex === null || !selectedAccountId || composerBusy) return
     if (!templateSaveName.trim()) { setTemplateSaveError('テンプレート名を入力してください。'); return }
     const bubble = bubbles[templateSaveIndex]

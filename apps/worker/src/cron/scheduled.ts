@@ -68,12 +68,12 @@ export async function scheduled(
         const {processStoreComparison}=await import('../services/store-comparison.js');
         await processStoreComparison(env.DB,now);
       }},
-      {name:'pass notice simulations',run:async()=>{const {processPassNotices}=await import('../features/booking/booking-pass-notices.js');await processPassNotices(env.DB,new Date(event.scheduledTime));}},
-      {name:'pass billing grace',run:async()=>{const {expirePassGrace}=await import('../features/booking/booking-pass-billing.js');await expirePassGrace(env.DB,new Date(event.scheduledTime));}},
+      {name:'pass notice simulations',run:async()=>{const {processPassNotices}=await import('../features/booking/booking-pass-notices/index.js');await processPassNotices(env.DB,new Date(event.scheduledTime));}},
+      {name:'pass billing grace',run:async()=>{const {expirePassGrace}=await import('../features/booking/booking-pass-billing/index.js');await expirePassGrace(env.DB,new Date(event.scheduledTime));}},
       {name:'comparison CSV jobs',run:async()=>{const {processComparisonExports}=await import('../services/store-comparison-export.js');await processComparisonExports(env.DB,new Date(event.scheduledTime));}},
       {name:'rank notice simulations',run:async()=>{const {processRankNotices}=await import('../services/member-ranks.js');await processRankNotices(env.DB,new Date(event.scheduledTime));}},
       {name:'EC automatic LINE simulation',run:async()=>{
-        const {processAutoLineMock}=await import('../features/ec-commerce/ec-auto-line.js');
+        const {processAutoLineMock}=await import('../features/ec-commerce/ec-auto-line/index.js');
         await processAutoLineMock(env.DB,new Date(event.scheduledTime));
       }},
       {name:'inbox first response deadlines',run:async()=>{
@@ -160,7 +160,7 @@ export async function scheduled(
   }
 
   try {
-    const { processAutoReplyDeliveries } = await import('../features/auto-replies/auto-reply-delivery.js');
+    const { processAutoReplyDeliveries } = await import('../features/auto-replies/auto-reply-delivery/index.js');
     await processAutoReplyDeliveries(env,new Date(event.scheduledTime));
   } catch (error) { logger.error("src_index_failed"); }
 
@@ -303,7 +303,7 @@ export async function scheduled(
   // booking 系リマインドと同じく重いジョブより先に実行する。
   try {
     await observeDispatch('webinar reminders', async () => {
-      const { processWebinarReminders } = await import('../features/webinars/webinar-reminders.js');
+      const { processWebinarReminders } = await import('../features/webinars/webinar-reminders/index.js');
       const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
       const result = await processWebinarReminders(
         env.DB,
@@ -327,7 +327,7 @@ export async function scheduled(
   // 同じ申込へ二重送信しない。
   try {
     await observeDispatch('webinar notifications', async () => {
-      const { processWebinarNotificationJobs } = await import('../features/webinars/webinar-notifications.js');
+      const { processWebinarNotificationJobs } = await import('../features/webinars/webinar-notifications/index.js');
       const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
       const result = await processWebinarNotificationJobs(env.DB, {
         proxyBaseUrl:
@@ -418,8 +418,8 @@ export async function scheduled(
   // 予約時のスナップショットを公開し、期間モードは終了時に元メニューへ戻す。
   // 失敗しても他の処理は続ける。実LINE送信はここで行うが、DB配備は別工程。
   try {
-    const { processDueRichMenuSchedules } = await import('../features/rich-menus/rich-menu-schedule-executor.js');
-    const { assembleRichMenuGroupInput, richMenuLiveToSnapshot } = await import('../features/rich-menus/rich-menu-group-input.js');
+    const { processDueRichMenuSchedules } = await import('../features/rich-menus/rich-menu-schedule-executor/index.js');
+    const { assembleRichMenuGroupInput, richMenuLiveToSnapshot } = await import('../features/rich-menus/rich-menu-group-input/index.js');
     const {
       getRichMenuGroupWithPages,
       getLineAccountById,
@@ -553,7 +553,7 @@ export async function scheduled(
       },
     });
     const buildGroupInput = async (snapshot: unknown, fallbackGroupId: string) => {
-      const record = snapshot as import('../features/rich-menus/rich-menu-group-input.js').RichMenuGroupSnapshot;
+      const record = snapshot as import('../features/rich-menus/rich-menu-group-input/index.js').RichMenuGroupSnapshot;
       const groupId = typeof record.id === 'string' ? record.id : fallbackGroupId;
       const group = await getRichMenuGroupWithPages(env.DB, groupId);
       const account = group ? await getLineAccountById(env.DB, group.account_id) : null;
@@ -757,7 +757,7 @@ export async function scheduled(
   // 段階別に自動追客する。対象は followup config で有効化したウェビナーだけ。
   try {
     await observeDispatch('webinar followups', async () => {
-      const { processWebinarFollowups } = await import('../features/webinars/webinar-followups.js');
+      const { processWebinarFollowups } = await import('../features/webinars/webinar-followups/index.js');
       const liffMatch = /liff\.line\.me\/([^/?]+)/.exec(env.LIFF_URL ?? '');
       const result = await processWebinarFollowups(env.DB, {
         proxyBaseUrl:
@@ -791,7 +791,7 @@ export async function scheduled(
       // 送信後動作の取り残し回収（受理済みだが実行が終わっていない宛先）。
       // 失敗・送達不明の宛先は対象外。送達自体は変えない。
       try {
-        const { sweepBroadcastAfterActions } = await import('../features/broadcasts/broadcast-after-actions.js');
+        const { sweepBroadcastAfterActions } = await import('../features/broadcasts/broadcast-after-actions/index.js');
         const swept = await sweepBroadcastAfterActions(env.DB);
         if (swept.done + swept.failed > 0) {
           logger.log("broadcast_after_actions_sweep");

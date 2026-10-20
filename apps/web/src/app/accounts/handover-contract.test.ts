@@ -12,7 +12,7 @@ const PAGE = readFileSync(join(HERE, '../../v8/accounts-detail/handover.tsx'), '
  * **「本実行へ進む」は確認窓つきで本実行の口へつながる**こと。
  * 決め残しがある間は押せない。
  */
-describe('V6 33-4 乗り換えの本実行', () => {
+describe("管理画面 33-4 乗り換えの本実行", () => {
   it('本実行の口へ確認窓つきでつなぐ', () => {
     expect(PAGE).toContain('api.accountHandovers.execute')
     expect(PAGE).toContain('ConfirmDialog')

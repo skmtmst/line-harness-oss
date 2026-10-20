@@ -25,7 +25,7 @@ import { ENTITY_KINDS, TEMPLATE_CATEGORIES, toPickerItems, useEntityFolders, use
  * データは今の画面が読んでいる行をそのまま渡す。窓を開いたときだけフォルダ・見本を読む。
  */
 
-const FormPhone = dynamic(() => import('@/v8/form-edit/phone').then((mod) => mod.FormPhone), { ssr: false, loading: () => <ListState kind="loading" /> })
+const FormPhone = dynamic(() => import('../../v8/form-edit/phone/index').then((mod) => mod.FormPhone), { ssr: false, loading: () => <ListState kind="loading" /> })
 
 export { ENTITY_KINDS, TEMPLATE_CATEGORIES, toPickerItems, useEntityFolders } from './entity-picker-data'
 export type { EntityKind,EntityLike

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
 const API = readApiSource(new URL('../../../../lib/api.ts', import.meta.url), 'utf8')
 
-describe('V6 URqOA 定期レポート作成', () => {
+describe("管理画面 URqOA 定期レポート作成", () => {
   it('設計の入力・予告・関係先を持つ', () => {
     for (const text of [
       '何を入れますか', 'いつ送りますか', 'だれに送りますか', '知らせの決めごと',

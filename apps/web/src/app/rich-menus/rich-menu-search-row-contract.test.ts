@@ -17,7 +17,7 @@ const PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
  */
 const barBlock = PAGE.slice(PAGE.indexOf('const wideToolbar'), PAGE.indexOf('/* ===== 一覧の中身'))
 
-describe('リッチメニューの検索行（U015 → ★V7 Xn1Mz）', () => {
+describe("リッチメニューの検索行（U015 → ★既存の見た目 Xn1Mz）", () => {
   it('検索は共通 ListToolbar の1行目に置く', () => {
     expect(PAGE).toContain("from '@/components/shared/list-toolbar'")
     expect(barBlock).toContain('<ListToolbar')

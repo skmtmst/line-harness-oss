@@ -5,7 +5,7 @@ import { api,type BroadcastPreflight } from '@/lib/api'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
-type runBroadcastPreflightContext = {
+type RunBroadcastPreflightContext = {
   preflightRequestBody: () => { targetType: "tag" | "segment"; targetTagId: string | null; segmentConditions: SegmentCondition | null; lineAccountId: string | null; messageContent: string; scheduledAt: string | null; messageCount: number; }
   preflightSeq: RefObject<number>
   saveErrors: ReturnType<typeof useSaveFormErrors>
@@ -15,7 +15,7 @@ type runBroadcastPreflightContext = {
   setPreflightStatus: Dispatch<SetStateAction<"error" | "idle" | "loading" | "ready">>
 }
 
-export async function runBroadcastPreflight({ preflightRequestBody, preflightSeq, saveErrors, setError, setPreflightKey, setPreflightResult, setPreflightStatus }: runBroadcastPreflightContext, silent = false) {
+export async function runBroadcastPreflight({ preflightRequestBody, preflightSeq, saveErrors, setError, setPreflightKey, setPreflightResult, setPreflightStatus }: RunBroadcastPreflightContext, silent = false) {
     if (!silent) setError('')
     setPreflightStatus('loading')
     setPreflightResult(null)

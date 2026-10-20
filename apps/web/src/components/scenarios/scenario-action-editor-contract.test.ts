@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 
 const EDITOR = fs.readFileSync(path.join(__dirname, 'action-editor.tsx'), 'utf8')
 
-describe('V6 送信後アクションの契約', () => {
+describe("管理画面 送信後アクションの契約", () => {
   /*
    * 設計はセクションに1つだが、`repeatOnRefire` は動作1件ごとの列。
    * 1つにまとめると動作ごとに違う値を持てず、既にある設定を黙って
@@ -34,7 +34,7 @@ describe('V6 送信後アクションの契約', () => {
     expect(kinds).toContain("type: 'event_booking'")
   })
 
-  it('変更後の安全な設定をV6下書きAPIへ保存する', () => {
+  it("変更後の安全な設定を管理画面下書きAPIへ保存する", () => {
     expect(EDITOR).toContain('api.scenarios.getDraft(scenarioId, selectedAccountId)')
     expect(EDITOR).toContain('api.scenarios.saveDraft(scenarioId')
     expect(EDITOR).toContain('expectedVersion: draftVersion')

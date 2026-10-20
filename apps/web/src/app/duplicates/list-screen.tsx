@@ -11,7 +11,7 @@ import { isForbidden, loadFailureCopy } from '@/components/shared/api-error-mess
 import { FriendsManageNavV8 } from '@/app/friends'
 import { formatNumber } from '@/lib/format'
 import { CANDIDATE_PAGE_SIZE, formatRelative, useDuplicatesData } from '@/v8/friends/public/duplicates-use-duplicates-data/index'
-import DuplicatesStatsNotice from '../../v8/duplicates/duplicates-stats-notice'
+import DuplicatesStatsNotice from '../../v8/duplicates/duplicates-stats-notice/index'
 import { formatDateTime } from '@/lib/format'
 import styles from '@/app/friends/friends-v8.module.css'
 import { emptyValue } from '@/components/shared/empty-value'

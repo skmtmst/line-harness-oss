@@ -1055,7 +1055,7 @@
 
 - **持ち主**：`shared/form-controls`のField・RequiredBadge、`lib/form-requirement`と`use-form-errors`の検査定義。行の組は`shared/action-menu`（RowMenuも同じ順を使う）、道具は`shared/list-toolbar`とListPageBodyが渡す先頭の口。
 - **決まり**：§6.43・B-244。必須と検査を共有、欄下の理由と読み上げ、見る→整理→停止・削除と線・5項目から見出し、狭い白い板の2段と右端の件数。
-- **見張り**：`b244-behavior.test.tsx`、`action-menu-v7-contract.test.tsx`（V8へ更新）、`list-toolbar-contract.test.tsx`、`apps/web/scripts/v8-guard/b244-rules-browser.mjs`。既存の頭・道具・表の値はmatch2が持ち、新しい口だけを追加する。
+- **見張り**：`b244-behavior.test.tsx`、`action-menu-v7-contract.test.tsx`（V8へ更新）、`list-toolbar-contract.test.tsx`、`apps/web/scripts/v8-guard/rules-browser.mjs`。既存の頭・道具・表の値はmatch2が持ち、新しい口だけを追加する。
 
 <a id="screen-explanation"></a>
 ## screen-explanation この画面の説明（B-245）

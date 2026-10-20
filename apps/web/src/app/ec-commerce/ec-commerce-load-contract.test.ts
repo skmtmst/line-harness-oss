@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
 
-describe('V6 23-1 EC連携の読み込み', () => {
+describe("管理画面 23-1 EC連携の読み込み", () => {
   it('集計と取込一覧を別々に読み込み、片方の失敗で両方を消さない', () => {
     expect(source).toContain('const loadOverview = useCallback')
     expect(source).toContain('const loadRecords = useCallback')
@@ -47,7 +47,7 @@ describe('V6 23-1 EC連携の読み込み', () => {
  * Bの集計が500/403で落ちると、Aの111件がBの数字として残っていた。
  * 取得した値を取得元アカウントと一体で持ち、描く前に突き合わせる、を見張る。
  */
-describe('V6 23-1 EC連携のアカウント切替', () => {
+describe("管理画面 23-1 EC連携のアカウント切替", () => {
   it('集計も一覧も取得元アカウントと一体で持つ', () => {
     expect(source).toContain('type AccountBound<T> = { accountId: string | null; state: LoadState; data: T }')
     expect(source).toContain('useState<AccountBound<OverviewWithLatency | null>>')
@@ -87,7 +87,7 @@ describe('V6 23-1 EC連携のアカウント切替', () => {
  * `ec-commerce-events-panel-mount.test.tsx` の実React mount試験へ移した。
  * ここは実装の存在確認にとどめ、書式そのものを固定する表明は置かない。
  */
-describe('V6 23-1 EC連携の再試行とアカウント切替の順序', () => {
+describe("管理画面 23-1 EC連携の再試行とアカウント切替の順序", () => {
   it('最新アカウントをrefで持ち、描画本体で直接更新する', () => {
     expect(source).toContain('const currentAccountIdRef = useRef(accountId)')
     expect(source).toContain('currentAccountIdRef.current = accountId')

@@ -24,14 +24,14 @@ export function copyBroadcastDraft(broadcast: ApiBroadcast) {
     }
   }
 
-type copyRecentBroadcastContext = {
+type CopyRecentBroadcastContext = {
   duplicateCopy: (broadcast: ApiBroadcast) => { title: string; bubbles: { id: string; type: BroadcastBubbleType; content: Record<string, unknown>; }[]; }
   setBubbles: Dispatch<SetStateAction<BroadcastBubble[]>>
   setDeliveryMethod: Dispatch<SetStateAction<"new" | "template" | "duplicate">>
   setTitle: Dispatch<SetStateAction<string>>
 }
 
-export function copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMethod, setTitle }: copyRecentBroadcastContext, broadcast: ApiBroadcast) {
+export function copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMethod, setTitle }: CopyRecentBroadcastContext, broadcast: ApiBroadcast) {
     const copy = duplicateCopy(broadcast)
     setTitle(copy.title)
     setBubbles(copy.bubbles)

@@ -1296,7 +1296,7 @@ function attachFormEvents(): void {
 
 // ========== Init ==========
 
-export async function initForm(formId: string | null): Promise<void> {
+export async function initForm(formId: string | null, openBookingForm?: () => Promise<void>): Promise<void> {
   if (!formId) {
     renderFormError('フォームIDが指定されていません');
     return;
@@ -1365,8 +1365,8 @@ export async function initForm(formId: string | null): Promise<void> {
 
     // 予約ブロックは共通の画面へ。通常のフォームの既存受付・再送は保つ。
     if (json.data.layout && collectInputs(json.data.layout).some(block => block.type === 'booking')) {
-      const { initRestaurantForm } = await import('./main.js');
-      await initRestaurantForm();
+      if (!openBookingForm) throw new Error('booking_form_opener_missing');
+      await openBookingForm();
       return;
     }
 

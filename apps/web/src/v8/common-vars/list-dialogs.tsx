@@ -26,7 +26,7 @@ import { formatListDate,formatVarValue } from './list-model'
 import styles from './list.module.css'
 import { blockedReason,canDelete as canDeleteVar,checkedAtText,consequenceText,placeholderText,reasonRequirement,splitItems,typedKeyRequirement,unavailableText,usageText } from './model'
 
-type renderCommonVarDialogsContext = {
+type RenderCommonVarDialogsContext = {
   activeIndex: number
   activeItem: CommonVar | null
   activeStopped: boolean
@@ -85,7 +85,7 @@ type renderCommonVarDialogsContext = {
   usageExpanded: boolean
 }
 
-export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped, applyStatus, batchReason, batchRequestRef, canWrite, closeDelete, closeStatusDialog, confirmDirectDelete, confirmReplacement, confirmStopInstead, current, deleteBatchError, deleteBusy, deleteChoice, deleteError, deleteImpact, deletePhase, deleteReason, deleteTarget, deleteTargets, deleting, folderDotOf, items, openDelete, openStatusDialog, panelStatus, removeSelected, renameVar, replacementCandidates, replacementId, replacementImpact, replacementPhase, router, selectedAccountId, selectReplacement, setActiveId, setBatchReason, setDeleteBatchError, setDeleteChoice, setDeleteReason, setDeleteTargets, setPanelStatus, setStatusError, setStatusReason, setTypedKey, setUsageExpanded, statusAction, statusBusy, statusError, statusReason, statusScheduled, statusTarget, typedKey, usageExpanded }: renderCommonVarDialogsContext) {
+export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped, applyStatus, batchReason, batchRequestRef, canWrite, closeDelete, closeStatusDialog, confirmDirectDelete, confirmReplacement, confirmStopInstead, current, deleteBatchError, deleteBusy, deleteChoice, deleteError, deleteImpact, deletePhase, deleteReason, deleteTarget, deleteTargets, deleting, folderDotOf, items, openDelete, openStatusDialog, panelStatus, removeSelected, renameVar, replacementCandidates, replacementId, replacementImpact, replacementPhase, router, selectedAccountId, selectReplacement, setActiveId, setBatchReason, setDeleteBatchError, setDeleteChoice, setDeleteReason, setDeleteTargets, setPanelStatus, setStatusError, setStatusReason, setTypedKey, setUsageExpanded, statusAction, statusBusy, statusError, statusReason, statusScheduled, statusTarget, typedKey, usageExpanded }: RenderCommonVarDialogsContext) {
   return ((
     <>
       {/* 止める窓（板 `Hhl9M`）。下の窓を隠すため、削除の窓とは同時に出さない。 */}

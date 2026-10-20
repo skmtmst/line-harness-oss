@@ -7,8 +7,8 @@
  * - 形式説明 https://www.post.japanpost.jp/service/search/zipcode/download/utf-readme.html
  *
  * 使い方:
- *   node scripts/fetch-jp-postal-data.mjs --fetch --url <zipの直URL> [--out data/postal]
- *   node scripts/fetch-jp-postal-data.mjs --from-file <csv> [--source <名>] [--out <dir>]
+ *   node scripts/db/fetch-jp-postal-data.mjs --fetch --url <zipの直URL> [--out data/postal]
+ *   node scripts/db/fetch-jp-postal-data.mjs --from-file <csv> [--source <名>] [--out <dir>]
  *
  * --fetch は公式配布のzipを落とし、解凍し、CSVを読み、重複・不正行を除き、
  * 取り込み用SQL（postal_codes＋完了記録postal_import_manifest）と
@@ -270,8 +270,8 @@ async function main() {
   }
 
   console.log('使い方:');
-  console.log('  node scripts/fetch-jp-postal-data.mjs --fetch --url <zipの直URL> [--out data/postal]');
-  console.log('  node scripts/fetch-jp-postal-data.mjs --from-file <csv> [--source <名>] [--out <dir>]');
+  console.log('  node scripts/db/fetch-jp-postal-data.mjs --fetch --url <zipの直URL> [--out data/postal]');
+  console.log('  node scripts/db/fetch-jp-postal-data.mjs --from-file <csv> [--source <名>] [--out <dir>]');
   console.log(`配布ページ: ${DEFAULT_PAGE}`);
 }
 

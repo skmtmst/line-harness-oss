@@ -8,7 +8,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 
-describe('V6 外部連携の一覧状態', () => {
+describe("管理画面 外部連携の一覧状態", () => {
   it('受信と送信を別々に読込・成功・失敗へ分ける', () => {
     expect(PAGE).toContain("type LoadStatus = 'loading' | 'ready' | 'error'")
     expect(PAGE).toContain("const [incomingStatus, setIncomingStatus]")

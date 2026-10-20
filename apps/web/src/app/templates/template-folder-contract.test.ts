@@ -25,7 +25,7 @@ const ROW_ACTIONS = read('../../components/shared/folder-row-actions.tsx')
  * **空のフォルダを作れず、名前を直すと中身が散らばった。**
  * 本物のフォルダ（`folders.kind = 'template'`）へ寄せる。
  */
-describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
+describe("管理画面 テンプレートのフォルダ操作（CzndJ）", () => {
   it('文字列ではなく、本物のフォルダを読む', () => {
     expect(PAGE).toContain("api.folders.list('template', accountId)")
     // `category` から帯を組み立てる作りへ戻さない。

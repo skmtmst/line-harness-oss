@@ -6,7 +6,7 @@ import type { SendConfirmationPreview } from '@line-crm/shared'
 import type { Dispatch,SetStateAction } from 'react'
 
 
-type confirmBroadcastMessageContext = {
+type ConfirmBroadcastMessageContext = {
   onSuccess: (broadcast: ApiBroadcast) => void
   scheduledAtIso: () => string | null
   sendPreview: { state: "loading" | "error" | "ready"; data: SendConfirmationPreview | null; broadcast: ApiBroadcast | null; }
@@ -15,7 +15,7 @@ type confirmBroadcastMessageContext = {
   setPreviewSeq: Dispatch<SetStateAction<number>>
 }
 
-export async function confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendPreview, setConfirmOpen, setError, setPreviewSeq }: confirmBroadcastMessageContext) {
+export async function confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendPreview, setConfirmOpen, setError, setPreviewSeq }: ConfirmBroadcastMessageContext) {
     const { data, broadcast } = sendPreview
     if (!data || !broadcast) return
     setError('')

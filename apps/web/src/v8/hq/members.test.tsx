@@ -116,7 +116,7 @@ describe('V8 統括のメンバーの窓', () => {
     expect(document.querySelector('[role="dialog"]')!.textContent).toContain('閲覧のみ（見るだけ）')
   })
 
-  it('B-139：招待で名前が空・担当するアカウントが0なら送らず、両方の欄に理由を出し、名前の欄へ移る', async () => {
+  it("招待で名前が空・担当するアカウントが0なら送らず、両方の欄に理由を出し、名前の欄へ移る", async () => {
     await act(async () => { buttonByText('権限者を招待')!.click() })
     await flush()
     const dialog = document.querySelector('[role="dialog"]')!

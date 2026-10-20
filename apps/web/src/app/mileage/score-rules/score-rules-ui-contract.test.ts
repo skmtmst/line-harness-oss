@@ -52,7 +52,7 @@ describe('スコアのルール：失敗の文言', () => {
   })
 })
 
-describe('スコアのルール：V6の配置', () => {
+describe("スコアのルール：管理画面の配置", () => {
   it('詳しい入力は共通ダイアログで直す', () => {
     expect(PAGE).toContain('title="できごとの設定を直す"')
     expect(PAGE).toContain('setEditRuleIndex(index)')

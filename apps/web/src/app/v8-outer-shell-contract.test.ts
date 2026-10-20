@@ -101,7 +101,7 @@ describe('外側の殻（V8 移行③）', () => {
     expect(topBar).toContain('aria-label="ログアウト"')
   })
 
-  it('v8 の帯は 1024px から出す（v7 は 1280px のまま）', () => {
+  it("v8 の帯は 1024px から出す（既存の見た目は 1280px のまま）", () => {
     expect(globals).toContain('.v8-topbar-wrap')
     expect(appTopBar).toContain('hidden xl:block v8-topbar-wrap')
   })

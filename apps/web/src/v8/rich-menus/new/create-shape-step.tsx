@@ -25,7 +25,7 @@ import { SIZE_OPTIONS,TAB_COUNT_OPTIONS,V8_LAYOUT_KEYS,V8_LAYOUT_LABEL } from '.
 import { type Group,type Page } from './create-types'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
-type renderShapeStepContext = {
+type RenderShapeStepContext = {
   accountId: string | null
   busy: boolean
   canOperate: boolean
@@ -57,7 +57,7 @@ type renderShapeStepContext = {
   updatePage: (pageId: string, patch: Partial<Page>) => void
 }
 
-export function renderShapeStep({ accountId, busy, canOperate, chatBarText, defaultTabName, fields, folderId, folders, group, host, locked, name, pages, renderSingleImage, renderTabImageSlot, requestTabCount, setChatBarText, setFolderId, setFolders, setName, setSize, setTabNames, setTemplateKey, shownLayouts, size, tabCount, tabNames, templateKey, updatePage }: renderShapeStepContext) {
+export function renderShapeStep({ accountId, busy, canOperate, chatBarText, defaultTabName, fields, folderId, folders, group, host, locked, name, pages, renderSingleImage, renderTabImageSlot, requestTabCount, setChatBarText, setFolderId, setFolders, setName, setSize, setTabNames, setTemplateKey, shownLayouts, size, tabCount, tabNames, templateKey, updatePage }: RenderShapeStepContext) {
     const dims = RICH_MENU_DIMENSIONS[size]
     /* タブの数（ページの数）。作った後はページの数、作る前は①で選んだ数。 */
     const slotCount = group ? pages.length : tabCount + 1

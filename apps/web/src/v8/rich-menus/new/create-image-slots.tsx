@@ -16,7 +16,7 @@ import type { Dispatch,SetStateAction } from 'react'
 import { type Group,type Page,type PendingImage } from './create-types'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
-type getSlotImageContext = {
+type GetSlotImageContext = {
   accountId: string | null
   group: Group | null
   host: RichMenuCreateHost | undefined
@@ -25,7 +25,7 @@ type getSlotImageContext = {
   pendingImages: (PendingImage | null)[]
 }
 
-export function getSlotImage({ accountId, group, host, imageVersion, pages, pendingImages }: getSlotImageContext, index: number): { src: string; name: string; dims: { w: number; h: number } | null; kb: number | null; removable: boolean } | null {
+export function getSlotImage({ accountId, group, host, imageVersion, pages, pendingImages }: GetSlotImageContext, index: number): { src: string; name: string; dims: { w: number; h: number } | null; kb: number | null; removable: boolean } | null {
     if (!group) {
       const image = pendingImages[index]
       if (!image) return null
@@ -54,7 +54,7 @@ export function getSlotImage({ accountId, group, host, imageVersion, pages, pend
     }
   }
 
-type renderSingleImageSlotContext = {
+type RenderSingleImageSlotContext = {
   accountId: string | null
   busy: boolean
   clearPendingImage: (index: number) => void
@@ -67,7 +67,7 @@ type renderSingleImageSlotContext = {
   slotImage: (index: number) => { src: string; name: string; dims: { w: number; h: number; } | null; kb: number | null; removable: boolean; } | null
 }
 
-export function renderSingleImageSlot({ accountId, busy, clearPendingImage, handlePickedFile, host, setImageGuideOpen, setImagePickTarget, setMediaPickerOpen, size, slotImage }: renderSingleImageSlotContext) {
+export function renderSingleImageSlot({ accountId, busy, clearPendingImage, handlePickedFile, host, setImageGuideOpen, setImagePickTarget, setMediaPickerOpen, size, slotImage }: RenderSingleImageSlotContext) {
     const dims = RICH_MENU_DIMENSIONS[size]
     const image = slotImage(0)
     const imageOk = image?.dims ? image.dims.w === dims.width && image.dims.h === dims.height : null
@@ -116,7 +116,7 @@ export function renderSingleImageSlot({ accountId, busy, clearPendingImage, hand
     )
   }
 
-type renderTabSlotContext = {
+type RenderTabSlotContext = {
   accountId: string | null
   busy: boolean
   clearPendingImage: (index: number) => void
@@ -131,7 +131,7 @@ type renderTabSlotContext = {
   tabNameAt: (index: number) => string
 }
 
-export function renderTabSlot({ accountId, busy, clearPendingImage, group, handlePickedFile, host, pages, setImagePickTarget, setMediaPickerOpen, size, slotImage, tabNameAt }: renderTabSlotContext, index: number) {
+export function renderTabSlot({ accountId, busy, clearPendingImage, group, handlePickedFile, host, pages, setImagePickTarget, setMediaPickerOpen, size, slotImage, tabNameAt }: RenderTabSlotContext, index: number) {
     const dims = RICH_MENU_DIMENSIONS[size]
     const image = slotImage(index)
     const imageOk = image?.dims ? image.dims.w === dims.width && image.dims.h === dims.height : null

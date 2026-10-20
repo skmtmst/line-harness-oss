@@ -14,7 +14,7 @@ const NEW_PAGE = readFileSync(new URL('./new/page.tsx', import.meta.url), 'utf8'
  * 併せて、押せない検索・並び順・期間・書き出し・前後ボタンを、
  * 動く共通部品か「繋がっていない」の言葉のどちらかにする。
  */
-describe('V6 成果地点一覧の契約', () => {
+describe("管理画面 成果地点一覧の契約", () => {
 
   it('空・読込・取得失敗の3状態を共通ListStateで言い分ける', () => {
     expect(PAGE).toContain("import ListState from '@/components/shared/list-state'")
@@ -27,7 +27,7 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).toContain('const [loadFailed, setLoadFailed] = useState(false)')
   })
 
-  it('V6一覧APIの集計・状態・利用先をそのまま使う', () => {
+  it("管理画面一覧APIの集計・状態・利用先をそのまま使う", () => {
     expect(PAGE).toContain('api.conversions.definitions({')
     expect(PAGE).toContain('formatNumber(point.metrics.netCount')
     // 金額セルはconversion-points-v8-react.test.tsxで実表示を検査する。
@@ -50,7 +50,7 @@ describe('V6 成果地点一覧の契約', () => {
     expect(PAGE).not.toContain('ページの切り替えは準備中です')
   })
 
-  it('期間・V6レポート・CSVを実際の口へつなぐ', () => {
+  it("期間・管理画面レポート・CSVを実際の口へつなぐ", () => {
     expect(PAGE).toContain('api.conversions.definitionReport({')
     expect(PAGE).toContain('api.conversions.exportDefinitions({')
     expect(PAGE).toContain('CSV で書き出す')

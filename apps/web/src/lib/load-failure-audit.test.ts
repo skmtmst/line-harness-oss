@@ -3,7 +3,7 @@ import {fileURLToPath} from 'node:url'
 import {describe,it,expect} from 'vitest'
 // @ts-expect-error JS AST inspector is exercised at runtime.
 import {auditLoadFailures,auditScreenLoads,unapprovedLoadFailures} from '../../scripts/load-failure-audit.mjs'
-describe('B-241 failure versus empty AST guard',()=>{
+describe("failure versus empty AST guard",()=>{
  it.each([
   'function Page(){ list().catch(()=>setItems([])) }',
   'function Page(){ list().catch(()=>setItems([] as Row[])) }',

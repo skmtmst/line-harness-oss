@@ -19,7 +19,7 @@ const MIGRATED = [
   'components/rich-menus/apply-to-tag-modal.tsx',
 ]
 
-describe('V6 確認窓への移行（4本目）', () => {
+describe("管理画面 確認窓への移行（4本目）", () => {
   it.each(MIGRATED)('%s は共通の確認窓を使い、ブラウザの確認・警告を残さない', (rel) => {
     const src = withoutComments(read(rel))
     expect(src).toMatch(/from '@\/(?:components\/shared\/confirm-dialog|lib\/unsaved-leave-dialog)'/)

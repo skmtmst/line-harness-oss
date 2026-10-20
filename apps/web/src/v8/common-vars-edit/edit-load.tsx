@@ -5,7 +5,7 @@ import { api,ApiError,type CommonVarDetail } from '@/lib/api'
 import type { CommonVarSchedule,Folder } from '@line-crm/shared'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
-type loadCommonVarContext = {
+type LoadCommonVarContext = {
   accountLoading: boolean
   applyDetail: (found: CommonVarDetail) => void
   id: string
@@ -23,7 +23,7 @@ type loadCommonVarContext = {
   setSchedulesError: Dispatch<SetStateAction<boolean>>
 }
 
-export async function loadCommonVar({ accountLoading, applyDetail, id, latestAccountRef, saveErrors, selectedAccountId, setConflict, setError, setFolders, setFoldersError, setItem, setLoadFailure, setLoading, setSchedules, setSchedulesError }: loadCommonVarContext) {
+export async function loadCommonVar({ accountLoading, applyDetail, id, latestAccountRef, saveErrors, selectedAccountId, setConflict, setError, setFolders, setFoldersError, setItem, setLoadFailure, setLoading, setSchedules, setSchedulesError }: LoadCommonVarContext) {
     if (!id) {
       setLoading(false)
       setError('')

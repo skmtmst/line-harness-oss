@@ -31,7 +31,7 @@ import { Template,excerptOf,publishStateOf,sendCountText } from './list-model'
 import styles from './list.module.css'
 import { messageTypeText,type TemplatesFailure } from './words'
 
-type renderTemplateListContext = {
+type RenderTemplateListContext = {
   accountLoading: boolean
   accounts: AccountWithStats[]
   activeId: string | null
@@ -74,7 +74,7 @@ type renderTemplateListContext = {
   view: TemplatesListView
 }
 
-export function renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, openPicker, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: renderTemplateListContext) {
+export function renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, openPicker, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: RenderTemplateListContext) {
   return (accountLoading || view === 'loading' ? (
     <div className={styles.skeletonRows} aria-label="読み込み中" data-design-node="susGP">
       {[0, 1, 2, 3].map((i) => (

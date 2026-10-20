@@ -10,7 +10,7 @@ name: Release
 #   3. Migration safety check (additive-only policy).
 #   4. Build Worker, Admin, LIFF.
 #   5. Compute SHA256 hashes via inject-version, then rebuild Worker with
-#      _version.ts embedded so /_version reflects the shipping bundle.
+#      release-version.ts embedded so /_version reflects the shipping bundle.
 #   6. Produce `bundle.tar.gz` via scripts/release/build-bundle.ts.
 #   7. Generate `release-entry.json` (version, hashes, sizes, migrations,
 #      required_secrets, min_from_version).
@@ -152,11 +152,11 @@ jobs:
           pnpm --filter worker exec wrangler deploy --dry-run \
             --config wrangler.ci.toml --outdir dist-release
 
-      - name: Compute hashes + inject _version.ts
+      - name: Compute hashes + inject release-version.ts
         id: hashes
         run: |
           # Hash the wrangler-built single-file artifact. This value is
-          # baked into _version.ts as the Worker's self-reported identity
+          # baked into release-version.ts as the Worker's self-reported identity
           # (worker_hash); the final artifact's byte hash is computed
           # separately as worker_bundle_hash after the rebuild.
           json=$(pnpm tsx apps/worker/scripts/inject-version.ts \
@@ -164,7 +164,7 @@ jobs:
             --worker apps/worker/dist-release/index.js \
             --admin apps/web/out \
             --liff apps/liff/dist \
-            --out apps/worker/src/_version.ts)
+            --out apps/worker/src/release-version.ts)
 
           echo "json<<EOF" >> "$GITHUB_OUTPUT"
           echo "$json" >> "$GITHUB_OUTPUT"
@@ -181,7 +181,7 @@ jobs:
           echo "liff_hash=${liff_hash}" >> "$GITHUB_OUTPUT"
           echo "released_at=${released_at}" >> "$GITHUB_OUTPUT"
 
-      - name: Rebuild Worker artifact (with embedded _version.ts)
+      - name: Rebuild Worker artifact (with embedded release-version.ts)
         run: |
           rm -rf apps/worker/dist-release
           pnpm --filter worker exec wrangler deploy --dry-run \

@@ -6,7 +6,7 @@ import { messageTemplateToBubble,type BroadcastTemplateOption } from '@/lib/broa
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
 
-type applyBroadcastTemplateContext = {
+type ApplyBroadcastTemplateContext = {
   placeTemplateBubble: (bubble: BroadcastBubble) => void
   saveErrors: ReturnType<typeof useSaveFormErrors>
   selectedAccountId: string | null
@@ -17,7 +17,7 @@ type applyBroadcastTemplateContext = {
   templateApplyLock: RefObject<boolean>
 }
 
-export async function applyBroadcastTemplate({ placeTemplateBubble, saveErrors, selectedAccountId, selectedAccountIdRef, setComposerBusy, setShowTemplatePicker, setTemplateApplyError, templateApplyLock }: applyBroadcastTemplateContext, template: BroadcastTemplateOption) {
+export async function applyBroadcastTemplate({ placeTemplateBubble, saveErrors, selectedAccountId, selectedAccountIdRef, setComposerBusy, setShowTemplatePicker, setTemplateApplyError, templateApplyLock }: ApplyBroadcastTemplateContext, template: BroadcastTemplateOption) {
     const accountId = selectedAccountId
     if (templateApplyLock.current) return
     setTemplateApplyError('')

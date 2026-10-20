@@ -91,10 +91,10 @@
 
 | # | 要件 | 今の作り | 根拠 |
 |---|---|---|---|
-| D-1 | 過去時刻へ遡って送らない（§9）。プレビューで「過去のため作られない通」を出す（§3-4） | 送る見回りは「予定の時刻 ≦ いま」だけを見ており、古すぎる予定を除く条件が無い。登録の時にも過去の通を外していない。基準日が近い人を登録すると、過ぎた「3 日前」などの通が次の見回りで届く | packages/db/src/reminders.ts:2037（`AND scheduled_at <= ?` のみ）、packages/db/src/reminders.ts:965-1030（enrollFriendInReminder に過去の通の除外なし）、apps/worker/src/services/reminder-delivery.ts:464-483 |
+| D-1 | 過去時刻へ遡って送らない（§9）。プレビューで「過去のため作られない通」を出す（§3-4） | 送る見回りは「予定の時刻 ≦ いま」だけを見ており、古すぎる予定を除く条件が無い。登録の時にも過去の通を外していない。基準日が近い人を登録すると、過ぎた「3 日前」などの通が次の見回りで届く | packages/db/src/reminders/index.ts:2037（`AND scheduled_at <= ?` のみ）、packages/db/src/reminders/index.ts:965-1030（enrollFriendInReminder に過去の通の除外なし）、apps/worker/src/services/reminder-delivery.ts:464-483 |
 | D-2 | 開始（登録）は冪等キー必須（§5） | 登録 API は Idempotency-Key を受け取らない。二重押しで同じ人が 2 回登録されうる | apps/worker/src/routes/reminders.ts:1650-1668 |
-| D-3 | 日付不正・参照先・権限不足を理由として表示（§10） | 登録 API は「日付が正しくない」「未公開」「アカウント違い」を全部 500「Internal server error」で返す | apps/worker/src/routes/reminders.ts:1672-1675、packages/db/src/reminders.ts:979-999（REMINDER_INVALID_TARGET_DATE・REMINDER_NOT_PUBLISHED・REMINDER_ACCOUNT_MISMATCH を投げる） |
-| D-4 | 予定プレビューと実行時刻が一致（§10） | 送る見回りは登録を 500 件ずつしか読まず、次の 500 件は次の 5 分後。登録中が多いと（例 5,000 件で約 50 分）予定より大きく遅れる | packages/db/src/reminders.ts:1759（pageSize 500）、:1808（カーソルを次回へ持ち越し）、apps/worker/src/services/scheduled-job-isolation.ts:13（5 分ごと） |
+| D-3 | 日付不正・参照先・権限不足を理由として表示（§10） | 登録 API は「日付が正しくない」「未公開」「アカウント違い」を全部 500「Internal server error」で返す | apps/worker/src/routes/reminders.ts:1672-1675、packages/db/src/reminders/index.ts:979-999（REMINDER_INVALID_TARGET_DATE・REMINDER_NOT_PUBLISHED・REMINDER_ACCOUNT_MISMATCH を投げる） |
+| D-4 | 予定プレビューと実行時刻が一致（§10） | 送る見回りは登録を 500 件ずつしか読まず、次の 500 件は次の 5 分後。登録中が多いと（例 5,000 件で約 50 分）予定より大きく遅れる | packages/db/src/reminders/index.ts:1759（pageSize 500）、:1808（カーソルを次回へ持ち越し）、apps/worker/src/services/scheduled-job-isolation.ts:13（5 分ごと） |
 | D-5 | 失敗時の再試行は 1 分・5 分・30 分（共通基盤 §6-2） | 間隔は合っているが、見回りが 5 分ごとなので「1 分後」は実際には次の 5 分の見回り | apps/worker/src/services/external-delivery-retry.ts:3、apps/worker/src/index.ts:2809（配信の見回りでだけ動く） |
 | D-6 | 取消時に送ってしまった場合も記録（§3-7 の状態） | 送った直後に取消が確定した場合、運用の記録は Worker のログ 1 行だけで、実行履歴の画面には出ない | apps/worker/src/services/reminder-delivery.ts:693-697 |
 | D-7 | 画面のルート `/reminders/{id}`・`?tab=enrollments` など（§2） | 実際は `/reminders/detail`・`/reminders/edit` と `?tab=overview/schedule/runs/registrants` | apps/web/src/v8/reminders/detail.tsx:71-75、apps/web/src/app/reminders/ |
@@ -102,7 +102,7 @@
 ### 仕様が無い
 > 2026-10-16 オーナー「おすすめで」（B-337）で下の項目は全部決まった。各行の → が決定。問いは design/v8/review/SPEC-QUESTIONS-1016.md。
 
-- 基準日が「日付だけ」（時刻なし）の登録を「○分前」方式で使ったときの起点時刻。今は日本時間の 9:00 起点として数える（UTC 0 時）。友だち情報からの登録は 0:00 起点。どちらにそろえるか決まっていない（packages/db/src/reminders.ts:970-972、apps/worker/src/services/friend-field-reminders.ts:128）。 → 決定 B-337 Q-47：日付だけの基準は 9:00 起点にそろえる。
+- 基準日が「日付だけ」（時刻なし）の登録を「○分前」方式で使ったときの起点時刻。今は日本時間の 9:00 起点として数える（UTC 0 時）。友だち情報からの登録は 0:00 起点。どちらにそろえるか決まっていない（packages/db/src/reminders/index.ts:970-972、apps/worker/src/features/friends/friend-field-reminders.ts:128）。 → 決定 B-337 Q-47：日付だけの基準は 9:00 起点にそろえる。
 - 見回りが長く止まった後（障害の復旧後）に、どれだけ遅れた通まで送ってよいか（何時間遅れたら送らないか）。 → 決定 B-337 Q-12：予定から 3 時間以上遅れた物は送らず「遅れたので送らなかった」で閉じ、一覧から人が送れる。
 - 夜間（例 22 時〜8 時）に当たる通を送るか・ずらすか（静かな時間帯）。 → 決定 B-337 Q-11：既定 21〜8 時（店ごとに変えられる）。宣伝は翌朝 8 時へずらし、予約のリマインドとお客さまが今した操作への返事は送る。
 - 同じ人が同じリマインダに別の基準日で 2 つ登録されたとき（予約 2 件）を許すか。 → 決定 B-337 Q-47：許す。

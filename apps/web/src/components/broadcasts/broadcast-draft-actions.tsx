@@ -10,7 +10,7 @@ import { bubbleLegacyMessage,bubblesForSave } from '@/lib/broadcast-template'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
-type buildBroadcastDraftContext = {
+type BuildBroadcastDraftContext = {
   afterActionVersionId: string
   bubbles: BroadcastBubble[]
   currentStep: BroadcastStepKey | null
@@ -25,7 +25,7 @@ type buildBroadcastDraftContext = {
   trackLinks: boolean
 }
 
-export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, selectedAccountId, spreadMinutes, targetPayload, title, trackLinks }: buildBroadcastDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) {
+export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, selectedAccountId, spreadMinutes, targetPayload, title, trackLinks }: BuildBroadcastDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) {
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     return {
@@ -52,7 +52,7 @@ export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep
     }
   }
 
-type saveBroadcastDraftContext = {
+type SaveBroadcastDraftContext = {
   cleanFingerprintRef: RefObject<string | null>
   draftAutosave: { autosaving: boolean; savedAt: number | null; failed: boolean; markSaved: () => void; retry: () => void; label: string | null; }
   formFingerprint: string
@@ -67,7 +67,7 @@ type saveBroadcastDraftContext = {
   validate: () => string
 }
 
-export async function saveBroadcastDraft({ cleanFingerprintRef, draftAutosave, formFingerprint, onDraftSaved, persistDraft, rejectValidation, saveErrors, scheduledAtIso, selectedAccountIdRef, setError, setSaving, validate }: saveBroadcastDraftContext): Promise<boolean> {
+export async function saveBroadcastDraft({ cleanFingerprintRef, draftAutosave, formFingerprint, onDraftSaved, persistDraft, rejectValidation, saveErrors, scheduledAtIso, selectedAccountIdRef, setError, setSaving, validate }: SaveBroadcastDraftContext): Promise<boolean> {
     /*
      * 監査 R206: 下書き保存も確認・テスト送信と同じ検査を通す。
      * 通さないと、ボタンの不備が Worker で断られて「保存できませんでした」

@@ -8,7 +8,7 @@ const DONE = fs.readFileSync(path.join(__dirname, '..', '..', 'app', 'webinars',
 /** 撮影モックの公開応答は、本物と同じ器で返す。 */
 const MOCK = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 
-describe('V6 ウェビナー公開前確認と公開完了の契約', () => {
+describe("管理画面 ウェビナー公開前確認と公開完了の契約", () => {
   it('下書きから公開へ変えるときだけ確認を挟む', () => {
     /*
       未保存判定の正本は「最後に保存できた内容」（baseline）。
