@@ -87,8 +87,8 @@ bookingPaymentAdmin.post('/api/booking/admin/payments/:id/send-link',guard(true)
   const row=await c.env.DB.prepare(`SELECT b.id,b.line_account_id,b.price_at_booking,b.status,p.provider,p.idempotency_key
     FROM booking_payments p JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
     WHERE p.id=? AND p.line_account_id=? AND p.status IN ('unpaid','pending')
-      AND (p.hold_until IS NULL OR julianday(p.hold_until)>julianday('now'))`)
-    .bind(c.req.param('id'),account).first<{id:string;line_account_id:string;price_at_booking:number;status:string;provider:string;idempotency_key:string}>();
+      AND (p.hold_until IS NULL OR julianday(p.hold_until)>julianday(?))`)
+    .bind(c.req.param('id'),account,new Date().toISOString()).first<{id:string;line_account_id:string;price_at_booking:number;status:string;provider:string;idempotency_key:string}>();
   if (!row) return c.json({success:false,error:'payment_not_available'},404);
   if (row.provider!=='stripe') return c.json({success:false,error:'simulation_only',code:'simulation_only'},409);
   // 既存の開始処理を使い、リンクを重複作成しない。LINEや外部Stripeへ通信しない。

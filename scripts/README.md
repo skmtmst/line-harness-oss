@@ -25,3 +25,5 @@
 `check-migrations.ts` は外部HQのci-all.shが使うため元のCLI入口を保持します。郵便データは `db/fetch-jp-postal-data.*`、画面の待ち合わせは `browser/overlay-ready.mjs` へ、アプリ・パッケージの利用元と同時に移しました。見た目の比較地図・外部の撮影命令・安全な失敗の対照で使うIDや機械コードは、経緯だけのコメントと区別して保持します。
 
 構成の決まりは [コードの構成と名前](../docs/code-structure.md)。`pnpm exec tsx scripts/structure/check.ts` が名前・公開入口・循環を検査し、`pnpm test:scripts` がその故障対照を実行します。
+
+品質の後戻りは `pnpm quality:check --base <PRのbase SHA>`、違反を減らした後の実測更新は `pnpm quality:update --base <同じSHA>`、故障対照は `pnpm quality:test`。新しい入口は `pnpm new:screen <name> --title <title> --board <ID>`・`pnpm new:route <name> --method get` で生成します。先に `--dry-run` で保存先を確かめます。詳細は構成の正本を参照してください。

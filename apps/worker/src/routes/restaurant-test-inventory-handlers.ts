@@ -5,7 +5,7 @@ import { seatBoardEntry } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 import { publicClosure, closurePreview, openSeatTables, type ClosureRow } from '../services/restaurant-closures.js';
 import { safeRestaurantHttpsUrl, restaurantReservationEmbed } from '../services/restaurant-media-links.js';
-import { getRestaurantInventoryRules, saveRestaurantInventoryRules, validateRestaurantInventoryRules, listRestaurantCloseTasks } from '@line-crm/db';
+import { getRestaurantInventoryRules, getRestaurantInventoryRuleState, saveRestaurantInventoryRules, validateRestaurantInventoryRules, listRestaurantCloseTasks } from '@line-crm/db';
 
 import type { Env } from '../worker-env.js';
 
@@ -112,7 +112,13 @@ export const get__api_restaurant_test_inventory_rules_4 = async (c: Context<Env,
  if(!hasOrganizationSelector(c))return requiredAccount(c);
  const org=await organizationFor(c);const storeId=c.req.query('storeId')||org?.scopedStoreId;
  if(!org||!storeId||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗が正しくありません'},404);
- return c.json({success:true,data:await getRestaurantInventoryRules(dbFor(c.env,storeId),storeId)});
+ const db=dbFor(c.env,storeId), date=c.req.query('date');
+ if(date!==undefined&&!validRestaurantDate(date))return inputError(c,{success:false,error:'日付を確認してください'},400,['date']);
+ const data=await getRestaurantInventoryRules(db,storeId);
+ if(date===undefined)return c.json({success:true,data});
+ const store=await db.prepare('SELECT timezone FROM rt_stores WHERE id=?').bind(storeId).first<{timezone:string}>();
+ const state=await getRestaurantInventoryRuleState(db,storeId,restaurantCivilTime(date,0,store!.timezone),restaurantCivilTime(date,1440,store!.timezone));
+ return c.json({success:true,data,state});
 };
 
 export const put__api_restaurant_test_inventory_rules_5 = async (c: Context<Env, "/api/restaurant-test/inventory-rules">) => {

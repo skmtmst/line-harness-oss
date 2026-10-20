@@ -32,7 +32,13 @@
     "qa:shot": "playwright test scripts/visual-qa/capture.spec.mjs",
     "db:dry-run-automations": "tsx scripts/db/dry-run-automations.ts",
     "db:dry-run-analytics": "tsx scripts/db/dry-run-analytics.ts",
-    "db:dry-run-funnels": "tsx scripts/db/dry-run-funnels.ts"
+    "db:dry-run-funnels": "tsx scripts/db/dry-run-funnels.ts",
+    "quality:check": "tsx scripts/structure/quality-check.mjs",
+    "quality:update": "tsx scripts/structure/quality-check.mjs --update",
+    "quality:test": "tsx --test scripts/structure/quality.test.mjs",
+    "new:screen": "tsx scripts/scaffold/new.ts screen",
+    "new:route": "tsx scripts/scaffold/new.ts route",
+    "quality:typecheck": "tsc --noEmit --allowJs --checkJs --skipLibCheck --module nodenext --target es2022 --allowImportingTsExtensions scripts/structure/quality-inventory.mjs scripts/structure/repository-files.mjs scripts/structure/quality-check.mjs"
   },
   "packageManager": "pnpm@9.15.4",
   "engines": {

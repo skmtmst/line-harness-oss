@@ -1259,7 +1259,7 @@ export {
   getBookingSyncRules, listBookingSyncNotices, saveBookingSyncRules, validateBookingSyncRules,
 } from './booking/sync-rules.js';
 export {
-  getRestaurantInventoryRules, listRestaurantCloseTasks, saveRestaurantInventoryRules, validateRestaurantInventoryRules,
+  getRestaurantInventoryRules, getRestaurantInventoryRuleState, listRestaurantCloseTasks, saveRestaurantInventoryRules, validateRestaurantInventoryRules,
 } from './restaurant-inventory-rules.js';
 export {
   getFriendSummary,

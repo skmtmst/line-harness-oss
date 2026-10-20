@@ -8,7 +8,7 @@ function add(id: string, count = 2, uid = 'test-user-0', start = slot) { test.ra
 function promote(table = 't') { return promoteSeatWaitlist(test.db, { storeId: 'store', startsAt: slot, tableId: table }); }
 function reserve(id: string, uid: string, waitlistId: string | null = null, table = 't') { test.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,waitlist_entry_id) VALUES(?,'store','line','試験の組',?,2,?,?,?,'confirmed',?)`).run(id, uid, slot, new Date(Date.parse(slot) + 7200000).toISOString(), table, waitlistId); }
 describe('席のキャンセル待ち・先着順', () => {
-  it('旧形式の待機が3件あっても、数字に直した新規番号で上限を抜けない', async () => {
+  it('文字列で保存された待機が3件あっても、採番時に待機人数の上限を守る', async () => {
     const phones=['090-1234-5678','０９０－１２３４－５６７８','090 1234 5678'];
     for (const [index,phone] of phones.entries()) test.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,guest_count,customer_name,customer_phone,identity_key) VALUES(?,'store',?,2,'電話の組',?,?)`).run(`old-${index}`,futureSlot(index+3),phone,`phone:${phone}`);
     const before=test.raw.prepare('SELECT * FROM rt_seat_waitlist ORDER BY id').all();
