@@ -205,6 +205,7 @@ async function runFormPostEffects(input: {
   {
     const { getFriendById, getTrackedLinkById, getMessageTemplateById } = await import('@line-crm/db');
     const { resolveRewardTemplate } = await import('../services/reward-resolver.js');
+    const { trackedLinkReferralMatchesAccount } = await import('../services/tracked-link-identity.js');
     rewardTemplate = await resolveRewardTemplate(
       db,
       {
@@ -212,7 +213,7 @@ async function runFormPostEffects(input: {
         requestedTrackedLinkId: input.trackedLinkId,
         expectedLineAccountId: input.expectedLineAccountId,
       },
-      { getFriendById, getTrackedLinkById, getMessageTemplateById },
+      { getFriendById, getTrackedLinkById, getMessageTemplateById, trackedLinkReferralMatchesAccount },
     );
   }
 

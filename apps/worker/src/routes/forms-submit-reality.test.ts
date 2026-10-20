@@ -212,8 +212,16 @@ afterEach(async () => {
 
 describe('W12 特典の参照先（実DB・回答API）', () => {
   for (const source of ['ref', 'first-touch'] as const) {
-    for (const account of ['account-a', 'account-b', null]) {
-      test(`${source}: 所属 ${account ?? '共有'} の特典を回答アカウントと照合する`, async () => {
+    for (const ownership of [
+      { name: '同じ店', account: 'account-a', allowed: true },
+      { name: '別の店', account: 'account-b', allowed: false },
+      { name: '未割当・別の統括', account: null, allowed: false },
+      { name: '未割当・既定統括', account: null, defaultTenant: true, allowed: true },
+      { name: '同じ店のシナリオ', account: null, scenarioAccount: 'account-a', allowed: true },
+      { name: '別の店のシナリオ', account: null, scenarioAccount: 'account-b', allowed: false },
+      { name: '停止中', account: 'account-a', inactive: true, allowed: false },
+    ]) {
+      test(`${source}: ${ownership.name}の特典を回答アカウントと照合する`, async () => {
         sqlite.exec(`
           INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
           VALUES ('account-b', 'ch-b', 'B', 'tok-b', 'sec-b', 'tenant-1');
@@ -224,7 +232,13 @@ describe('W12 特典の参照先（実DB・回答API）', () => {
           INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-reward', 'account-a');
         `);
         sqlite.prepare(`INSERT INTO tracked_links (id, name, original_url, reward_template_id, line_account_id)
-          VALUES ('reward-link', '入口', 'https://example.test', 'reward', ?)` ).run(account);
+          VALUES ('reward-link', '入口', 'https://example.test', 'reward', ?)` ).run(ownership.account);
+        if (ownership.defaultTenant) sqlite.exec("UPDATE line_accounts SET tenant_id=NULL WHERE id='account-a'");
+        if (ownership.inactive) sqlite.exec("UPDATE tracked_links SET is_active=0 WHERE id='reward-link'");
+        if (ownership.scenarioAccount) {
+          sqlite.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id)VALUES('reward-scenario','Reward','manual',?)").run(ownership.scenarioAccount);
+          sqlite.exec("UPDATE tracked_links SET scenario_id='reward-scenario' WHERE id='reward-link'");
+        }
         if (source === 'first-touch') {
           sqlite.exec(`UPDATE friends SET first_tracked_link_id = 'reward-link' WHERE id = 'friend-1'`);
         }
@@ -234,7 +248,7 @@ describe('W12 特典の参照先（実DB・回答API）', () => {
             ...(source === 'ref' ? { trackedLinkId: 'reward-link' } : {}) }),
         }), env());
         expect(response.status).toBe(201);
-        expect(pushCalls[0]?.messages).toEqual([{ type: 'text', text: account === 'account-b' ? 'フォーム返信' : 'リンク特典' }]);
+        expect(pushCalls[0]?.messages).toEqual([{ type: 'text', text: ownership.allowed ? 'リンク特典' : 'フォーム返信' }]);
         expect(count('form_submissions')).toBe(1);
         expect(claimStatus(KEY, 'friend-1')).toBe('completed');
         const repeat = await app().fetch(new Request(`https://worker.example.test/api/forms/form-reward/submit`, {
