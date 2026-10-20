@@ -3,6 +3,13 @@ export interface RestaurantInventoryRules {
   storeId: string; threshold: number; stopLine: boolean; stopSameDay: boolean; notify: boolean; version: number;
 }
 export type RestaurantInventoryRulesInput = Omit<RestaurantInventoryRules, 'version'> & { expectedVersion: number };
+/** 指定日の停止状態と配分変更。顧客情報や予約IDを含めない。 */
+export interface RestaurantInventoryRuleState {
+ stopped: Array<{slotId:string;startsAt:string;lineOriginal:number|null;sameDayOriginal:number|null;remainingSeats:number;threshold:number}>;
+ stoppedTotal: number;
+ history: Array<{id:number;startsAt:string;beforeLine:number;afterLine:number;beforeSameDay:number;afterSameDay:number;cause:'reservation'|'tables'|'rules'|'inventory';createdAt:string}>;
+ historyTotal: number;
+}
 export interface RestaurantChannelCloseTask {
  reservationId?:string; closureId?:string; closureVersion?:number; closureKind?:import('./restaurant-closures').RestaurantClosureKind;
  startDate?:string; endDate?:string; allDay?:boolean; startTime?:string|null; endTime?:string|null; tableIds?:string[]; endsAt?:string;
