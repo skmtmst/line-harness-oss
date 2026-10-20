@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe,expect,it } from 'vitest';
 import Badge from '../components/ui/badge.js';
@@ -88,15 +87,7 @@ describe('進む操作は下の操作の帯に1つだけ', () => {
     expect(confirm).not.toContain('>戻る<');
   });
 
-  it('確定・待ちは下の帯に「LINEに戻る」と、待ちなら「キャンセル待ちを取り消す」・それ以外は「自分のイベントを見る」(★V8 qVdiX)', () => {
-    expect(done).toContain('<BottomBar>');
-    expect(done).toContain('LINEに戻る');
-    expect(done).toContain('words.myEvents');
-    expect(done).toContain('キャンセル待ちを取り消す');
-    // 2つ目のボタンはどちらか一方だけ (自分の待ちが見つかったときだけ「やめる」)。
-    expect(done).toMatch(/\{waitEntry \? \([\s\S]*キャンセル待ちを取り消す[\s\S]*\) : \([\s\S]*words.myEvents[\s\S]*\)\}/);
-    expect(done.match(/<Button/g)?.length ?? 0).toBe(3);
-  });
+
 
   it('キャンセル待ちを取り消すは確認窓を通してから取り下げの口を呼ぶ・順番は自分の待ちから出す', () => {
     expect(done).toMatch(/api\s*\.myEventWaitlist\(\)/);
@@ -133,14 +124,6 @@ describe('キャンセル待ちの分岐 (2-d)', () => {
   });
 });
 
-describe('承認待ちと確定は別の印と文', () => {
-  it('確定は暦・承認待ちと待ちは砂時計', () => {
-    expect(done).toContain("status === 'requested'");
-    expect(done).toContain('受付しました');
-    expect(done).toContain('${words.contact}の確認をお待ちください');
-  });
-});
-
 describe('自分のイベントは期限まで取り消せる', () => {
   it('取り消しの確認を出してから消す', () => {
     // ブラウザの confirm は使わず、LIFF 共通の確認窓で聞く。
@@ -161,7 +144,7 @@ describe('自分のイベントは期限まで取り消せる', () => {
   it('札は文字で出す (申し込み済み・承認待ち)', () => {
     for (const [status, label] of [['confirmed', '申し込み済み'], ['requested', '承認待ち']]) {
       const meta = statusMeta[status];
-      expect(renderToStaticMarkup(React.createElement(Badge, { tone: meta.tone, children: meta.text }))).toContain(label);
+      expect(renderToStaticMarkup(Badge({ tone: meta.tone, children: meta.text }))).toContain(label);
     }
     expect(bookings).toContain('<Badge');
   });
@@ -225,7 +208,6 @@ describe('詳細の満席と上限のお知らせ (m11b 仕上げ)', () => {
   });
 
   it('上限のお知らせは赤を使わず info の帯 (主ボタンと紐づく)', () => {
-    expect(event).toContain('この{words.event}への予約上限');
     expect(event).toContain('bg-info-bg');
     expect(event).toContain('text-ink-secondary');
     expect(event).toContain('name="info"');

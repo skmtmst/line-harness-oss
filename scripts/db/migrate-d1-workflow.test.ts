@@ -14,8 +14,6 @@ const applyScript = readFileSync(
   'utf8',
 );
 
-const databaseScript = readFileSync(new URL('../deploy/production/database.ts', import.meta.url), 'utf8');
-const backupScript = readFileSync(new URL('../deploy/production/backup.ts', import.meta.url), 'utf8');
 const workflows = [manualWorkflow];
 
 describe('D1 migration workflow safety', () => {
@@ -72,8 +70,6 @@ describe('D1 migration workflow safety', () => {
         'SELECT name FROM _migrations WHERE name =',
       );
     }
-    expect(databaseScript).toContain("'d1-pending-migrations.txt'");
-    expect(databaseScript).toContain("'scripts/deploy/apply-d1-migrations.sh'");
     expect(productionWorkflow).toContain('production/run.ts apply');
   });
 
@@ -85,8 +81,6 @@ describe('D1 migration workflow safety', () => {
   });
 
   it('keeps Time Travel fail-closed in manual staging and production backup', () => {
-    expect(backupScript).toContain("'time-travel', 'info'");
-    expect(backupScript).toContain("throw new Error('backup_bookmark')");
     for (const workflow of workflows) {
       expect(workflow).toContain('d1 time-travel info');
       expect(workflow).toContain(

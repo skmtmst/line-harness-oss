@@ -625,3 +625,7 @@
 - [支払いリンクの期限確認の修正履歴](release-log/unreleased/0000-kenta-cleanup-f03.md)
 - [品質の後戻りを防ぐ仕組みの更新履歴](release-log/unreleased/0000-kenta-cleanup-q00.md)
 - [品質の後戻りを防ぐ仕組みの検査記録](qa/cleanup-q00-1020.md)
+
+- [デリバリー注文連携の提供状況](release-log/unreleased/0000-kenta-cleanup-u01l.md)
+- [検査結果と品質記録の整合](release-log/unreleased/0000-kenta-cleanup-f04.md)
+- [デリバリー連携の準備状況を明確化](release-log/unreleased/0000-kenta-cleanup-u01m.md)

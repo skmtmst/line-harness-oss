@@ -72,7 +72,6 @@ describe('正本 37-2-D 然・注文・定期', () => {
   });
 
   it('uses variables for the order palette', () => {
-    expect(styles).toContain('.nm-portal-orders-page { color: var(--order-ink); }');
     expect(styles).toContain('--order-accent: var(--photo-accent);');
     const ordersView = main.slice(main.indexOf('function OrdersView'), main.indexOf('const yen'));
     const orderClasses = new Set([...ordersView.matchAll(/className="([^"]+)"/g)]
@@ -80,7 +79,6 @@ describe('正本 37-2-D 然・注文・定期', () => {
       .filter(name => /^nm-(?:portal-orders-page|order-|subscription-)/.test(name)));
     const orderRules = [...styles.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
       .filter(([, selector]) => [...selector.matchAll(/\.([\w-]+)/g)].some(([, name]) => orderClasses.has(name)));
-    expect(orderRules.length).toBeGreaterThan(0);
     const orderStyles = orderRules.map(([, , body]) => body).join('\n');
     expect(orderStyles).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i);
   });

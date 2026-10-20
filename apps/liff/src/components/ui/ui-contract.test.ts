@@ -1,3 +1,7 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import HistoryCard from '../history-card.js';
+import { customerWords } from '../../lib/customer-style.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -126,16 +130,15 @@ describe('予約の履歴の操作（F-6）', () => {
     expect(page).toContain("typeof b.lock_version === 'number'");
     expect(page).toContain('api.cancelMyBooking');
     expect(page).toContain('api.rescheduleMyBooking');
-    expect(page).toContain('${words.contact}に LINE でご連絡ください');
     expect(card).toContain('日時を変える');
     expect(card).toContain('{onCancel && (');
   });
 
   it('札は確認待ち・確定の文字を出す', () => {
-    const card = src('components', 'history-card.tsx');
-    expect(card).toContain('words.approvalPending');
-    expect(src('lib', 'customer-style.ts')).toContain('担当者の確認待ち');
-    expect(card).toContain('確定');
+    const booking={id:'booking',starts_at:'2099-01-01T01:00:00Z',status:'requested',menu_name:'メニュー',staff_name:'担当',profile_image_url:null,lock_version:1,menu_id:'menu',staff_id:'staff'};
+    expect(renderToStaticMarkup(createElement(HistoryCard,{booking}))).toContain('担当者の確認待ち');
+    expect(customerWords(null).approvalPending).toBe('担当者の確認待ち');
+    expect(renderToStaticMarkup(createElement(HistoryCard,{booking:{...booking,status:'confirmed'}}))).toContain('確定');
   });
 
   it('切り替えは「これから／これまで」で、件数の重複表示が無い', () => {

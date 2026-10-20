@@ -50,7 +50,7 @@ class Scope {
 export function analyzeSourceTests(files, entries = [...files.keys()].filter(isTest), statementBudget = 500000) {
   if (!Number.isSafeInteger(statementBudget) || statementBudget < 1 || statementBudget > 500000) throw Error('Invalid AST statement budget')
   const modules = new Map(), findings = [], active = new Set()
-  const sourceCalls = new WeakMap(), fixtureWrites = new Map()
+  const sourceCalls = new WeakMap(), fixtureWrites = new Map(), mockedReaders = new Map()
   const readers=new Set(),imports=new Map()
   let steps = 0
   const bind = (name, result, scope) => {
@@ -70,8 +70,8 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
   let added=true
   while(added){added=false;for(const [file,dependencies]of imports)if(!readers.has(file)&&dependencies.some(path=>readers.has(path))){readers.add(file);added=true}}
   const fsModule = () => {
-    const reader = value({ reader: true })
-    return value({ props: new Map([['readFileSync',reader],['readFile',reader],['realpathSync',value({pathIdentity:true})],...['existsSync','accessSync','statSync','lstatSync','access','stat','lstat'].map(name=>[name,value({fileInfo:true})]),['promises',value({props:new Map([['readFile',reader]])})]]) })
+    const reader = name => value({ reader: true, readerName: name })
+    return value({ props: new Map([['readFileSync',reader('readFileSync')],['readFile',reader('readFile')],['realpathSync',value({pathIdentity:true})],...['existsSync','accessSync','statSync','lstatSync','access','stat','lstat'].map(name=>[name,value({fileInfo:true})]),['promises',value({props:new Map([['readFile',reader('readFile')]])})]]) })
   }
   const emit = (ctx, node, actual, expected, reason) => {
     if (!actual.reads.length) return
@@ -144,25 +144,25 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     if (!fn.fn || depth > 12 || active.has(fn.fn)) return union(args)
     active.add(fn.fn)
     const scope = new Scope(fn.scope), ctx = {...fn.ctx, entry:caller.entry??caller.file, test:caller.test}
-    fn.fn.parameters?.forEach((param,i) => bind(param.name,param.dotDotDotToken?value({items:args.slice(i),collection:true}):args[i] ?? evaluate(param.initializer,scope,ctx,depth+1),scope))
+    fn.fn.parameters?.forEach((param,i) => bind(param.name,param.dotDotDotToken?value({items:args.slice(i),collection:true}):(!args[i]||args[i].undefined)?evaluate(param.initializer,scope,ctx,depth+1):args[i],scope))
     const result = ts.isBlock(fn.fn.body) ? statements(fn.fn.body.statements,scope,ctx,depth+1) : evaluate(fn.fn.body,scope,ctx,depth+1)
     active.delete(fn.fn)
     return result
   }
   const evaluate = (node,scope,ctx,depth=0) => {
-    if (!node) return value()
+    if (!node) return value({undefined:true})
     if (ts.isStringLiteralLike(node) || ts.isNumericLiteral(node) || ts.isRegularExpressionLiteral(node)) return value({strings:atoms([node.text])})
     if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) return value({bool:node.kind===ts.SyntaxKind.TrueKeyword})
-    if (ts.isIdentifier(node)) return scope.get(node.text)
+    if (ts.isIdentifier(node)) return node.text==='undefined'?value({undefined:true}):scope.get(node.text)
     if(node.kind===ts.SyntaxKind.ThisKeyword)return scope.get('this')
     if (ts.isParenthesizedExpression(node) || ts.isAwaitExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node) || ts.isTypeAssertionExpression(node)) return evaluate(node.expression,scope,ctx,depth)
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return value({fn:node,scope,ctx})
-    if (ts.isArrayLiteralExpression(node)) {const items=node.elements.map(el=>evaluate(ts.isSpreadElement(el)?el.expression:el,scope,ctx,depth));return {...union(items),items,collection:true}}
+    if (ts.isArrayLiteralExpression(node)) {const items=node.elements.flatMap(el=>{const item=evaluate(ts.isSpreadElement(el)?el.expression:el,scope,ctx,depth);return ts.isSpreadElement(el)?item.items??[item]:[item]});return {...union(items),items,collection:true}}
     if (ts.isObjectLiteralExpression(node)) {const props=new Map();for(const property of node.properties){if(ts.isPropertyAssignment(property))props.set(property.name.text,evaluate(property.initializer,scope,ctx,depth));else if(ts.isShorthandPropertyAssignment(property))props.set(property.name.text,scope.get(property.name.text));}return value({props})}
     if (ts.isPropertyAccessExpression(node)) {
       const receiver=evaluate(node.expression,scope,ctx,depth)
       if (receiver.props) {
-        const member=receiver.props.get(node.name.text)??value()
+        const member=receiver.props.get(node.name.text)??value({undefined:true})
         return member.getter?invoke(member,[],ctx,node,depth):member
       }
       if(receiver.localModule)return value({localModule:receiver.localModule,exportName:node.name.text})
@@ -176,7 +176,12 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       const receiver=evaluate(node.expression,scope,ctx,depth), key=evaluate(node.argumentExpression,scope,ctx,depth)
       return receiver.props?.get(key.strings[0]) ?? receiver.items?.[Number(key.strings[0])] ?? receiver
     }
-    if (ts.isConditionalExpression(node)) return union([evaluate(node.whenTrue,scope,ctx,depth),evaluate(node.whenFalse,scope,ctx,depth)])
+    if (ts.isConditionalExpression(node)) {
+      const condition=evaluate(node.condition,scope,ctx,depth)
+      if(condition.undefined||condition.bool===false)return evaluate(node.whenFalse,scope,ctx,depth)
+      if(condition.bool===true)return evaluate(node.whenTrue,scope,ctx,depth)
+      return union([evaluate(node.whenTrue,scope,ctx,depth),evaluate(node.whenFalse,scope,ctx,depth)])
+    }
     if (ts.isPrefixUnaryExpression(node)) {
       const operand=evaluate(node.operand,scope,ctx,depth)
       if(node.operator===ts.SyntaxKind.ExclamationToken)return {...operand,predicate:operand.predicate?{sign:-operand.predicate.sign}:{sign:-1}}
@@ -190,6 +195,8 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     if (ts.isBinaryExpression(node)) {
       const left=evaluate(node.left,scope,ctx,depth),right=evaluate(node.right,scope,ctx,depth),op=node.operatorToken.kind
+      if(left.undefined&&op===ts.SyntaxKind.AmpersandAmpersandToken)return left
+      if(left.undefined&&[ts.SyntaxKind.QuestionQuestionToken,ts.SyntaxKind.BarBarToken].includes(op))return right
       if(op===ts.SyntaxKind.EqualsToken){if(ts.isIdentifier(node.left))scope.assign(node.left.text,right);else if(ts.isPropertyAccessExpression(node.left))evaluate(node.left.expression,scope,ctx,depth).props?.set(node.left.name.text,right);else bind(node.left,right,scope);return right}
       if(op===ts.SyntaxKind.PlusToken)return {...union([left,right]),strings:combine(left.strings,right.strings)}
       const result=union([left,right])
@@ -199,6 +206,11 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     if (!ts.isCallExpression(node) && !ts.isNewExpression(node)) return value()
     const call=node.expression,syntacticName=ts.isPropertyAccessExpression(call)?call.name.text:ts.isIdentifier(call)?call.text:''
+    // import() executes a module; it does not return its source text.
+    if(call.kind===ts.SyntaxKind.ImportKeyword){
+      const specifier=evaluate(node.arguments?.[0],scope,ctx,depth)
+      return specifier.strings.some(path=>path.includes('?raw'))?value({props:new Map([['default',read(specifier,ctx,node)]])}):value()
+    }
     const name=(ts.isIdentifier(call)?scope.get(call.text).pathOp:undefined)??syntacticName
     const args=(node.arguments??[]).flatMap(arg=>ts.isSpreadElement(arg)?evaluate(arg.expression,scope,ctx,depth).items??[evaluate(arg.expression,scope,ctx,depth)]:[evaluate(arg,scope,ctx,depth)])
     if(['beforeEach','beforeAll'].includes(name)){
@@ -228,9 +240,17 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     const receiver=ts.isPropertyAccessExpression(call)?evaluate(call.expression,scope,ctx,depth):value()
     const callable=evaluate(call,scope,ctx,depth)
+    if(receiver.moduleLoader&&name==='resolve')return value({reads:union(args).reads})
+    if(receiver.vitest&&name==='hoisted'&&args[0]?.fn)return invoke(args[0],[],ctx,node,depth)
+    if(receiver.vitest&&name==='mock'&&args[0]?.strings.some(path=>/^(?:node:)?fs$/.test(path))&&args[1]?.fn){
+      const mock=invoke(args[1],[],ctx,node,depth).props?.get('readFileSync')
+      if(mock?.fn)mockedReaders.set(ctx.entry??ctx.file,mock)
+      return value()
+    }
     if(ts.isNewExpression(node)&&['Map','Set'].includes(callable.intrinsic))return value({container:callable.intrinsic,items:args[0]?.items??[],reads:union(args).reads})
     if(receiver.container&&name==='get')return union((receiver.items??[]).filter(row=>row.items?.[0]?.strings.some(key=>args[0]?.strings.includes(key))).map(row=>row.items[1]))
-    if(receiver.container&&['has','set','add','delete','clear','keys','values','entries'].includes(name))return value({reads:union([receiver,...args]).reads})
+    if(receiver.container&&name==='add'){receiver.items.push(...args);receiver.reads=union(receiver.items).reads;return receiver}
+    if(receiver.container&&['has','set','delete','clear','keys','values','entries'].includes(name))return value({reads:union([receiver,...args]).reads})
     if(['Object','Math'].includes(receiver.intrinsic))return union(args)
     if(ts.isNewExpression(node)&&callable.classNode){
       const instance=value({props:new Map()}),instanceScope=new Scope(callable.scope)
@@ -246,7 +266,11 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       }
       return instance
     }
-    if(callable.reader){sourceCalls.set(node,'file');return read(args[0]??value(),ctx,node,callable.helper)}
+    if(callable.reader){
+      const mock=callable.readerName==='readFileSync'?mockedReaders.get(ctx.entry??ctx.file):null
+      if(mock?.fn&&!active.has(mock.fn))return invoke(mock,args,ctx,node,depth)
+      sourceCalls.set(node,'file');return read(args[0]??value(),ctx,node,callable.helper)
+    }
     if(callable.fileInfo)return value()
     if(callable.pathIdentity)return args[0]??value()
     if(callable.hashFactory)return value({hash:true})
@@ -272,6 +296,8 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       const strings=name==='relative'?args[0].strings.flatMap(from=>(args[1]?.strings??[]).map(to=>posix.relative(from,to))):args[0].strings.map(path=>posix[name](path))
       return value({strings:atoms(strings),reads:union(args).reads})
     }
+    if(callable.moduleFactory)return value({moduleLoader:true})
+    if(callable.moduleLoader&&args[0]?.strings.some(path=>/^(?:node:)?fs$/.test(path)))return fsModule()
     if(name==='fileURLToPath')return args[0]??value()
     if(name==='URL')return args[0]?.strings.length&&args[1]?.strings.length?value({strings:atoms(args[0].strings.flatMap(path=>args[1].strings.map(base=>posix.normalize(posix.join(posix.dirname(base),path)))))}) : args[0]??value()
     if(name==='mkdtempSync')return value({strings:['__fixture__/'+digest(ctx.file+ctx.test+canonical(node))]})
@@ -293,7 +319,14 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       else if(args[0]?.strings.length===1)search=args[0].strings[0]
       if(search!==undefined)return value({strings:atoms(receiver.strings.map(text=>text[name](search,args[1].strings[0])))})
     }
-    if(transforms.has(name))return {...union([receiver,...args]),collection:['split','match','matchAll'].includes(name)}
+    if(transforms.has(name)){
+      // Offsets and replacement patterns are arguments, not the text returned
+      // by a string operation. Their provenance still flows into the result.
+      let strings=receiver.strings
+      if(['slice','substring','substr'].includes(name)&&args.every(arg=>arg.strings.length===1&&/^-?\d+$/.test(arg.strings[0])))strings=strings.map(text=>text[name](...args.map(arg=>Number(arg.strings[0]))))
+      else if(['trim','trimStart','trimEnd','toLowerCase','toUpperCase'].includes(name))strings=strings.map(text=>text[name]())
+      return {...union([receiver,...args]),strings,collection:['split','match','matchAll'].includes(name)}
+    }
     if(['map','flatMap','filter','forEach','some','every'].includes(name)){
       if(['map','flatMap'].includes(name)&&receiver.items){
         const fn=args.find(arg=>arg.fn),items=fn?receiver.items.map((input,index)=>invoke(fn,[input,value({strings:[String(index)]})],ctx,node,depth)):[]
@@ -304,13 +337,14 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     if(name==='createSourceFile')return value({astReads:union(args).reads,astRoot:true})
     if(['getText','getFullText'].includes(name)&&receiver.astReads?.length)return value({reads:receiver.astReads})
+    if(name==='sort'&&receiver.collection)return receiver
     if(name==='push'&&receiver.items){receiver.items.push(...args);return value()}
     if(['writeFileSync','writeFile'].includes(name)){
       for(const path of args[0]?.strings??[])if(path.startsWith('__fixture__/'))fixtureWrites.set(path,union([fixtureWrites.get(path)??value(),args[1]??value()]))
       return value()
     }
     if(execution.has(name))return value()
-    if(receiver.typescript)return value({astReads:union(args).astReads})
+    if(receiver.typescript)return value({typescript:true,astReads:union(args).astReads})
     if(callable.fn){
       const result=invoke(callable,args,ctx,node,depth)
       const body=callable.fn.body
@@ -343,7 +377,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       if(!ts.isImportDeclaration(statement))continue
       const specifier=statement.moduleSpecifier.text,local=modulePath(file,specifier)
       const pathModule=/^(?:node:)?path$/.test(specifier)?value({props:new Map(['join','resolve','dirname','basename','extname','relative'].map(pathOp=>[pathOp,value({pathOp})]))}):null
-      const imported=pathModule??(specifier==='typescript'?value({typescript:true}):specifier.includes('?raw')?read(value({strings:[specifier]}),ctx,statement):/^(?:node:)?fs(?:\/promises)?$/.test(specifier)?fsModule():/^(?:node:)?crypto$/.test(specifier)?value({props:new Map([['createHash',value({hashFactory:true})]])}):/^(?:node:)?assert(?:\/strict)?$/.test(specifier)?value({assert:true}):local?readers.has(local)?value({props:load(local).exports}):value({localModule:local}):value())
+      const imported=pathModule??(/^(?:node:)?module$/.test(specifier)?value({props:new Map([['createRequire',value({moduleFactory:true})]])}):specifier==='vitest'?value({props:new Map([['vi',value({vitest:true})]])}):specifier==='typescript'?value({typescript:true}):specifier.includes('?raw')?read(value({strings:[specifier]}),ctx,statement):/^(?:node:)?fs(?:\/promises)?$/.test(specifier)?fsModule():/^(?:node:)?crypto$/.test(specifier)?value({props:new Map([['createHash',value({hashFactory:true})]])}):/^(?:node:)?assert(?:\/strict)?$/.test(specifier)?value({assert:true}):local?readers.has(local)?value({props:load(local).exports}):value({localModule:local}):value())
       const clause=statement.importClause
       if(clause?.name)scope.set(clause.name.text,imported.assert?imported:imported.localModule?value({localModule:local,exportName:'default'}):imported.props?.get('default')??imported)
       if(clause?.namedBindings&&ts.isNamespaceImport(clause.namedBindings))scope.set(clause.namedBindings.name.text,imported)
@@ -360,7 +394,13 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
         if(ts.isClassDeclaration(statement)&&statement.name)exports.set(statement.modifiers.some(m=>m.kind===ts.SyntaxKind.DefaultKeyword)?'default':statement.name.text,scope.get(statement.name.text))
         if(ts.isVariableStatement(statement))for(const decl of statement.declarationList.declarations)if(ts.isIdentifier(decl.name))exports.set(decl.name.text,scope.get(decl.name.text))
       }
-      if(ts.isExportDeclaration(statement)&&statement.exportClause&&ts.isNamedExports(statement.exportClause))for(const binding of statement.exportClause.elements)exports.set(binding.name.text,scope.get(binding.propertyName?.text??binding.name.text))
+      if(ts.isExportDeclaration(statement)&&statement.exportClause&&ts.isNamedExports(statement.exportClause)){
+        const target=statement.moduleSpecifier&&ts.isStringLiteral(statement.moduleSpecifier)?modulePath(file,statement.moduleSpecifier.text):null
+        for(const binding of statement.exportClause.elements){
+          const name=binding.propertyName?.text??binding.name.text
+          exports.set(binding.name.text,target?load(target).exports.get(name)??value():scope.get(name))
+        }
+      }
     }
     return mod
   }
@@ -384,6 +424,20 @@ export function splitModuleMoves(before, after, moves = new Map()) {
     }
   }
   const candidates = new Map(), result = new Map(moves)
+  // A retained compatibility entry may forward all exports to its renamed
+  // implementation. Require a pure, single-target re-export, never imports or
+  // a wrapper with executable statements.
+  for(const [file,source]of before){
+    if(isTest(file)||result.has(file)||!after.has(file))continue
+    const ast=ts.createSourceFile(file,after.get(file),ts.ScriptTarget.Latest,true)
+    if(!ast.statements.length||!ast.statements.every(node=>ts.isExportDeclaration(node)&&node.moduleSpecifier&&ts.isStringLiteral(node.moduleSpecifier)&&node.exportClause&&ts.isNamedExports(node.exportClause)))continue
+    if(!ast.statements.some(node=>node.exportClause.elements.some(binding=>binding.name.text==='default'&&(binding.propertyName?.text??binding.name.text)==='default')))continue
+    const specifiers=[...new Set(ast.statements.map(node=>node.moduleSpecifier.text))]
+    if(specifiers.length!==1||!specifiers[0].startsWith('.'))continue
+    const stem=posix.normalize(posix.join(posix.dirname(file),specifiers[0]))
+    const target=[stem,stem+'.ts',stem+'.tsx',stem.replace(/\.js$/,'.ts'),stem.replace(/\.js$/,'.tsx')].find(path=>after.has(path)&&path!==file)
+    if(target&&primary(file,source)&&primary(target,after.get(target))===primary(file,source))result.set(file,target)
+  }
   for (const [file, source] of after) {
     if (isTest(file)) continue
     const name = primary(file, source)
@@ -482,6 +536,10 @@ export function newSourceAssertions(before, after, moves = new Map(), sourceFile
           oldParts[2]=newParts[2]
           if(JSON.stringify(oldParts)===plain)return true
           const oldRoots=oldParts[3],newRoots=newParts[3]
+          if(newRoots.length&&newRoots.every(root=>oldRoots.includes(root))){
+            const subset=[...oldParts];subset[3]=newRoots
+            if(JSON.stringify(subset)===plain)return true
+          }
           // Extracted code may be read explicitly alongside its old root. Only
           // actual imports of that retained root qualify; unrelated new roots fail.
           if(!oldRoots.length||!oldRoots.every(path=>newRoots.includes(path)))continue

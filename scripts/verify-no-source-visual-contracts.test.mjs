@@ -236,7 +236,7 @@ test('renaming the read source keeps an unchanged assertion while unrelated read
   }
 })
 
-test('a named default implementation retains lineage when split; ambiguous or unrelated defaults do not', () => {
+test('a named default implementation retains lineage when split; ambiguous or unrelated defaults do not', () => regressionCase(() => {
   const old = 'apps/web/src/old.tsx', next = 'apps/web/src/feature/main.tsx'
   const before = new Map([[old, 'export default function Orders(){ return <Old/> }']])
   const after = new Map([[next, "import { Body } from './body';export default function Orders(){return <Body/>}"]])
@@ -249,7 +249,7 @@ test('a named default implementation retains lineage when split; ambiguous or un
   assert.equal(newSourceAssertions(run(old), run(next), moves).length, 0)
   assert.equal(newSourceAssertions(run(old), [...run(next), ...run(next)], moves).length, 1)
   assert.equal(newSourceAssertions(run(old), run('unrelated.tsx'), moves).length, 1)
-})
+}))
 
 test('aliased path functions and array reads retain separate roots, and a new root or copied assertion fails', () => {
   const run = (parts, file = entry) => analyzeSourceTests(new Map([[file, `import{readFileSync}from'node:fs';import{join as sourceJoin}from'node:path';import{it,expect}from'vitest';const text=${JSON.stringify(parts)}.map(name=>readFileSync(sourceJoin(__dirname,name))).join('');it('case',()=>expect(text).toContain('label'))`]]))

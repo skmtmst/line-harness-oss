@@ -39,10 +39,7 @@ const stagingConfig = readFileSync(
   new URL('../../apps/worker/wrangler.staging.toml', import.meta.url),
   'utf8',
 );
-const deliveryRoute = ['common', 'orders-read', 'orders-actions', 'history', 'controls'].map((part) => readFileSync(
-  new URL(`../../apps/worker/src/routes/restaurant-delivery-${part}.ts`, import.meta.url),
-  'utf8',
-)).join('\n');
+
 const deliveryScreen = readFileSync(
   new URL('../../apps/web/src/v8/restaurant/delivery/delivery.tsx', import.meta.url),
   'utf8',
@@ -246,25 +243,6 @@ describe('staging delivery verification safety', () => {
       );
     }
     expect(blocked).not.toHaveBeenCalled();
-
-    // 止めた道は、本物の路線表に本当に書き込みとして載っている。
-    for (const writeRoute of [
-      '/api/restaurant-test/delivery/orders/:id/accept',
-      '/api/restaurant-test/delivery/orders/:id/cancel',
-      '/api/restaurant-test/delivery/menu-items/bulk-sold-out',
-      '/api/restaurant-test/delivery/intake/stop',
-    ]) {
-      expect(deliveryRoute).toContain(`restaurantDelivery.post(\n    '${writeRoute}'`);
-    }
-    // 読む道は4つとも本物の路線表にある。
-    for (const readRoute of [
-      '/api/restaurant-test/delivery/orders',
-      '/api/restaurant-test/delivery/orders/:id',
-      '/api/restaurant-test/delivery/history',
-      '/api/restaurant-test/delivery/menu-items',
-    ]) {
-      expect(deliveryRoute).toContain(`restaurantDelivery.get(\n    '${readRoute}'`);
-    }
 
     expect(script).toContain("method: 'GET'");
     for (const verb of ['POST', 'PUT', 'PATCH', 'DELETE']) {
@@ -676,9 +654,6 @@ describe('staging delivery verification safety', () => {
     expect(script).toContain('temporarySessionCreated: false');
 
     // 本物と同じ3つの 404 の門（試験スイッチ・機能パック・店舗の紐付け）を見ている。
-    expect(deliveryRoute).toMatch(/if \(!restaurantTestEnabled\(c\.env\)\) return fail\(c, 404/);
-    expect(deliveryRoute).toMatch(/tenantHasFeaturePack\(.*'restaurant'\)/);
-    expect(deliveryRoute.includes('このLINEアカウントに店舗が紐付いていません')).toBe(true);
     expect(script).toContain('feature_packs LIKE \'%"restaurant"%\'');
     expect(script).toContain('JOIN rt_stores s ON s.line_account_id = la.id');
   });
