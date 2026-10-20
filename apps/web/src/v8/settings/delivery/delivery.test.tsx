@@ -189,6 +189,7 @@ describe('設定 › デリバリー連携', () => {
     expect(await screen.findByText('渋谷店')).toBeTruthy()
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('接続中')).toBeTruthy()
+    expect(uberCard.getByRole('button', { name: '注文の連携は準備中' })).toBeTruthy()
     expect(uberCard.getByText('つないだお店')).toBeTruthy()
   })
 
@@ -322,6 +323,8 @@ describe('設定 › デリバリー連携', () => {
     const uberCard = card('Uber Eats')
     expect(uberCard.getByText('接続中')).toBeTruthy()
     expect(uberCard.getByText('渋谷店')).toBeTruthy()
+    fireEvent.click(uberCard.getByRole('button', { name: '注文の連携は準備中' }))
+    expect(screen.getByRole('dialog', { name: '現在準備中です' })).toBeTruthy()
     expect(screen.queryByText(/Uber Eats へのログインは受け取りました/)).toBeNull()
   })
 

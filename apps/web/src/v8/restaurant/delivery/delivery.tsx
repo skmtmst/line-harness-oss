@@ -25,6 +25,7 @@ import { DEFAULT_PAGE_SIZE } from '@/components/shared/page-size-select'
 import ListState from '@/components/shared/list-state'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
+import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
 import EntitySelect from '@/components/shared/entity-select'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -49,6 +50,7 @@ import { CancelOrderDialog, OrderDetailDialog } from './order-detail'
 import HistoryBoard from './history'
 import SoldOutBoard, { IntakeStopDialog } from './bulk'
 import { DASH, errorMessage, formatClock, storeToday } from './format'
+import { useUberConnection } from './use-uber-connection'
 import styles from './delivery.module.css'
 
 /** 板の印（撮影と見張りの試験が読む）。 */
@@ -79,7 +81,7 @@ const REFRESH_MS = 30_000
 const PAGE_META: Record<DeliveryView, { title: string; description: string }> = {
   orders: {
     title: 'デリバリー受注',
-    description: 'Uber Eats・出前館・ロケットナウの注文をこの画面でまとめて受け付けます',
+    description: '保存済みの注文を確認できます。Uber Eats の注文の取り込みと操作はまだ利用できません',
   },
   history: {
     title: '注文履歴・売上',
@@ -87,7 +89,7 @@ const PAGE_META: Record<DeliveryView, { title: string; description: string }> = 
   },
   'sold-out': {
     title: '品切れ一括設定',
-    description: '品切れにした商品は、Uber Eats・出前館・ロケットナウのすべてで注文できなくなります',
+    description: '保存済みの商品を確認できます。Uber Eats を含む商品の品切れ・販売再開・メニュー同期はまだ利用できません',
   },
 }
 
@@ -96,8 +98,11 @@ function DeliveryInner() {
   const samePageUrl = useSamePageUrl()
   const { selectedAccountId, setSelectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
+  const preparing = usePreparingDialog({ note: '接続の完了とは別の機能です。注文の取り込み・受ける・断る・取消・準備完了・営業状態の変更・メニュー同期はまだ利用できません。保存済みの注文や商品、過去の履歴は確認できます。' })
   /* 閲覧のみの人には送るボタンを置かず、閲覧のみの帯を出す（Worker側の 403 が最後の守り）。役割を読み込む前も置かない。 */
   const canManage = role !== null && canManageRole(role)
+  // 接続情報の読み口も管理者専用。閲覧のみでは照会せず、接続未確認として扱う。
+  const uberConnectionStatus = useUberConnection(canManage ? selectedAccountId : null)
 
   /* ── URL から今の見た目を決める ───────────────────────────── */
   const requestedView = searchParams.get('view')
@@ -334,7 +339,8 @@ function DeliveryInner() {
     successText: string,
     fallback: string,
   ) => {
-    if (!selectedAccountId) return
+    const order = data?.orders.find((item) => item.id === id) ?? (detail?.order.id === id ? detail.order : null)
+    if (!canManage || !selectedAccountId || !order || order.service === 'ubereats') return
     setBusyOrderId(id)
     setDetailBusy(true)
     setNotice(null)
@@ -349,7 +355,7 @@ function DeliveryInner() {
       setBusyOrderId(null)
       setDetailBusy(false)
     }
-  }, [selectedAccountId, loadOrders, loadDetail, orderId])
+  }, [canManage, data, detail, selectedAccountId, loadOrders, loadDetail, orderId])
 
   const acceptOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
     void runOrderAction(
@@ -383,9 +389,9 @@ function DeliveryInner() {
    * 途中で失敗しても残りは続け、終わったあとに数で伝える。
    */
   const bulkAccept = useCallback(async () => {
-    if (!selectedAccountId || selected.length === 0) return
+    if (!canManage || !selectedAccountId || selected.length === 0) return
     const targets = (data?.orders ?? []).filter(
-      (order) => order.status === 'new' && selected.includes(order.id),
+      (order) => order.status === 'new' && order.service !== 'ubereats' && selected.includes(order.id),
     )
     if (targets.length === 0) return
     setBulkBusy(true)
@@ -411,11 +417,11 @@ function DeliveryInner() {
         text: `${done}件を受け付けました。${failed}件は受け付けられませんでした。もう一度お試しください。`,
       })
     }
-  }, [selectedAccountId, selected, data, loadOrders])
+  }, [canManage, selectedAccountId, selected, data, loadOrders])
 
   const submitCancel = useCallback(async () => {
     const order = detail?.order
-    if (!selectedAccountId || !order) return
+    if (!canManage || !selectedAccountId || !order || order.service === 'ubereats') return
     setCancelBusy(true)
     setCancelError(null)
     try {
@@ -429,21 +435,22 @@ function DeliveryInner() {
     } finally {
       setCancelBusy(false)
     }
-  }, [selectedAccountId, detail, cancelReason, loadOrders, closeDetail])
+  }, [canManage, selectedAccountId, detail, cancelReason, loadOrders, closeDetail])
 
   /* ── 受付の停止・再開 ───────────────────────────────────── */
   const openStop = useCallback((service?: DeliveryService) => {
-    const open = (data?.services ?? []).filter((state) => state.intakeStatus === 'open')
+    if (!canManage || service === 'ubereats') return
+    const open = (data?.services ?? []).filter((state) => state.intakeStatus === 'open' && state.service !== 'ubereats')
     setStopSelected(service
       ? [service]
       : open.map((state) => state.service))
     setStopPreset('60m')
     setStopError(null)
     setStopOpen(true)
-  }, [data])
+  }, [canManage, data])
 
   const submitStop = useCallback(async () => {
-    if (!selectedAccountId || stopSelected.length === 0) return
+    if (!canManage || !selectedAccountId || stopSelected.length === 0 || stopSelected.includes('ubereats')) return
     setStopBusy(true)
     setStopError(null)
     try {
@@ -463,10 +470,10 @@ function DeliveryInner() {
     } finally {
       setStopBusy(false)
     }
-  }, [selectedAccountId, stopSelected, stopPreset, loadOrders])
+  }, [canManage, selectedAccountId, stopSelected, stopPreset, loadOrders])
 
   const resumeService = useCallback(async (service: DeliveryService) => {
-    if (!selectedAccountId) return
+    if (!canManage || !selectedAccountId || service === 'ubereats') return
     setBusyService(service)
     setNotice(null)
     try {
@@ -480,11 +487,11 @@ function DeliveryInner() {
     } finally {
       setBusyService(null)
     }
-  }, [selectedAccountId, loadOrders])
+  }, [canManage, selectedAccountId, loadOrders])
 
   /* ── 品切れの送信 ───────────────────────────────────────── */
   const submitSoldOut = useCallback(async (soldOut: boolean) => {
-    if (!selectedAccountId || selectedItems.length === 0) return
+    if (!canManage || !selectedAccountId || selectedItems.length === 0 || selectedItems.some((id) => !items?.some((item) => item.id === id && !item.services.some(({ service }) => service === 'ubereats')))) return
     setSoldOutBusy(true)
     setNotice(null)
     try {
@@ -501,10 +508,10 @@ function DeliveryInner() {
     } finally {
       setSoldOutBusy(false)
     }
-  }, [selectedAccountId, selectedItems, loadItems])
+  }, [canManage, items, selectedAccountId, selectedItems, loadItems])
 
   const toggleOneSoldOut = useCallback(async (id: string, soldOut: boolean) => {
-    if (!selectedAccountId) return
+    if (!canManage || !selectedAccountId || !items?.some((item) => item.id === id && !item.services.some(({ service }) => service === 'ubereats'))) return
     setBusyItemId(id)
     setNotice(null)
     try {
@@ -518,7 +525,7 @@ function DeliveryInner() {
     } finally {
       setBusyItemId(null)
     }
-  }, [selectedAccountId, loadItems])
+  }, [canManage, items, selectedAccountId, loadItems])
 
   /* ── CSVで保存 ─────────────────────────────────────────── */
   const saveCsv = useCallback(async () => {
@@ -641,6 +648,7 @@ function DeliveryInner() {
     return (
       <OrdersBoard
         data={data}
+        uberConnectionStatus={uberConnectionStatus}
         page={page}
         perPage={perPage}
         busyOrderId={busyOrderId}
@@ -653,7 +661,7 @@ function DeliveryInner() {
           checked ? [...new Set([...prev, id])] : prev.filter((item) => item !== id)
         ))}
         onToggleSelectAll={(checked) => setSelected(checked
-          ? data.orders.filter((order) => order.status === 'new').map((order) => order.id)
+          ? data.orders.filter((order) => order.status === 'new' && order.service !== 'ubereats').map((order) => order.id)
           : [])}
         onBulkAccept={() => { void bulkAccept() }}
         onTab={(next) => go({ tab: next === 'new' ? undefined : next })}
@@ -712,7 +720,7 @@ function DeliveryInner() {
         checked ? [...new Set([...prev, id])] : prev.filter((item) => item !== id)
       ))}
       onToggleAll={(checked) => setSelectedItems(checked
-        ? filteredItems.slice((itemsPage - 1) * itemsPerPage, itemsPage * itemsPerPage).map((item) => item.id)
+        ? filteredItems.slice((itemsPage - 1) * itemsPerPage, itemsPage * itemsPerPage).filter((item) => !item.services.some(({ service }) => service === 'ubereats')).map((item) => item.id)
         : [])}
       onToggleOne={(id, soldOut) => { void toggleOneSoldOut(id, soldOut) }}
       onSubmit={(soldOut) => { void submitSoldOut(soldOut) }}
@@ -735,6 +743,8 @@ function DeliveryInner() {
       {role !== null && !canManage ? <ReadOnlyNotice /> : null}
       <BoundaryBanner note="デリバリー3社とは検証用の接続・本番の注文は流れません" />
 
+      <Button onClick={() => preparing.open('Uber Eats の注文の連携')}>{`Uber Eats の注文の連携は${PREPARING_WORD}`}</Button>
+
       {notice ? (
         <Notice tone={notice.tone} density="compact" onClose={() => setNotice(null)}>
           {notice.text}
@@ -749,6 +759,7 @@ function DeliveryInner() {
        * 後ろの窓の文字が確認の窓に隠れて切れる（重なり）。
        * orderId は残すので、確認の「戻る」で詳細へそのまま戻れる。
        */}
+      {preparing.dialog}
       <OrderDetailDialog
         open={Boolean(orderId) && !cancelOpen}
         loading={detailLoading}

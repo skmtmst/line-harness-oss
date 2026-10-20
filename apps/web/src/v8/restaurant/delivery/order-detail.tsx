@@ -15,6 +15,7 @@ import { AlertTriangle, Ban, Check, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
+import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import {
@@ -130,6 +131,7 @@ export function OrderDetailDialog({
   onCancelOrder,
 }: OrderDetailDialogProps) {
   const order = detail?.order ?? null
+  const preparing = order?.service === 'ubereats'
   const items = detail?.items ?? []
   const serviceLabel = order
     ? order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]
@@ -164,15 +166,15 @@ export function OrderDetailDialog({
     if (order.status === 'new') {
       return (
         <>
-          <Button variant="danger-outline" disabled={busy} onClick={onCancelOrder}>
+          <Button variant="danger-outline" disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onCancelOrder}>
             <Ban size={16} aria-hidden="true" />注文をキャンセルする
           </Button>
           <span className={styles.spacer} />
-          <Button disabled={busy} onClick={onReject}>
+          <Button disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onReject}>
             <X size={16} aria-hidden="true" />断る
           </Button>
           {/* 絵（hjdqV）の足は幅114。結果の文字の分は控えないよう共通の任意引数で頼む。 */}
-          <Button variant="primary" busy={busy} busyLabel="受付中…" widthReserve="idle" onClick={onAccept}>
+          <Button variant="primary" busy={busy} busyLabel="受付中…" widthReserve="idle" disabled={preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onAccept}>
             <Check size={16} aria-hidden="true" />受け付ける
           </Button>
         </>
@@ -181,12 +183,12 @@ export function OrderDetailDialog({
     if (order.status === 'cooking') {
       return (
         <>
-          <Button variant="danger-outline" disabled={busy} onClick={onCancelOrder}>
+          <Button variant="danger-outline" disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onCancelOrder}>
             <Ban size={16} aria-hidden="true" />注文をキャンセルする
           </Button>
           <span className={styles.spacer} />
           <Button onClick={onClose} disabled={busy}>閉じる</Button>
-          <Button variant="primary" busy={busy} busyLabel="変更中…" widthReserve="idle" onClick={onReady}>
+          <Button variant="primary" busy={busy} busyLabel="変更中…" widthReserve="idle" disabled={preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onReady}>
             準備完了にする
           </Button>
         </>
@@ -224,6 +226,7 @@ export function OrderDetailDialog({
       ) : null}
       {order ? (
         <>
+          {preparing ? <Notice tone="info" density="compact">{`Uber Eats の注文の連携は${PREPARING_WORD}です。注文内容と履歴は確認できます。`}</Notice> : null}
           <div className={styles.detailHead}>
             <span className={styles.orderNumber}>{formatOrderNumber(order.orderNumber)}</span>
             {/*
