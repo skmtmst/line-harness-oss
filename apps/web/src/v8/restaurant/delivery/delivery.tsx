@@ -97,11 +97,12 @@ function DeliveryInner() {
   const searchParams = useSearchParams()
   const samePageUrl = useSamePageUrl()
   const { selectedAccountId, setSelectedAccountId, loading: accountLoading } = useAccount()
-  const uberConnectionStatus = useUberConnection(selectedAccountId)
   const role = useStaffRole()
   const preparing = usePreparingDialog({ note: '接続の完了とは別の機能です。注文の取り込み・受ける・断る・取消・準備完了・営業状態の変更・メニュー同期はまだ利用できません。保存済みの注文や商品、過去の履歴は確認できます。' })
   /* 閲覧のみの人には送るボタンを置かず、閲覧のみの帯を出す（Worker側の 403 が最後の守り）。役割を読み込む前も置かない。 */
   const canManage = role !== null && canManageRole(role)
+  // 接続情報の読み口も管理者専用。閲覧のみでは照会せず、接続未確認として扱う。
+  const uberConnectionStatus = useUberConnection(canManage ? selectedAccountId : null)
 
   /* ── URL から今の見た目を決める ───────────────────────────── */
   const requestedView = searchParams.get('view')

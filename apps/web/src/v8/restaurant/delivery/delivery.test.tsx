@@ -388,6 +388,15 @@ describe('?view= で板を入れ替える', () => {
 })
 
 describe('閲覧のみ（staff）', () => {
+  it('権限の取得中は管理者用の接続情報を照会しない', async () => {
+    fixture.role.value = null
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    expect(fixture.ubereatsConnection).not.toHaveBeenCalled()
+    expect(screen.getByText('接続未確認')).toBeTruthy()
+    expect(screen.queryByLabelText('注文UE-1001を受け付ける')).toBeNull()
+  })
+
   it('受け付ける・拒否・準備完了・停止・再開を置かない', async () => {
     fixture.role.value = 'staff'
     render(<DeliveryPage />)
@@ -402,6 +411,8 @@ describe('閲覧のみ（staff）', () => {
     // 閲覧のみの帯を出す。
     expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
 
+    expect(fixture.ubereatsConnection).not.toHaveBeenCalled()
+    expect(screen.getByText('接続未確認')).toBeTruthy()
     // 見るだけの操作は残す。
     expect(screen.getByLabelText('注文UE-1001の詳細')).toBeTruthy()
   })
