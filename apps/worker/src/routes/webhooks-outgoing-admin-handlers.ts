@@ -1,3 +1,4 @@
+import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { outgoingEventTypes } from './webhook-event-types.js';
 import { exportWebhookInteractions } from './webhook-interactions-export.js';
@@ -166,11 +167,11 @@ export const put__api_webhooks_outgoing_id_3 = async (c: Context<Env, "/api/webh
         (!Number.isSafeInteger(body.expectedVersion) || body.expectedVersion < 1)) {
       return inputError(c, { success: false, error: 'expectedVersion は1以上の整数を指定してください' }, 400, ["expectedVersion"]);
     }
-    const conflict = (current: typeof existing) => c.json({
-      success: false, code: 'VERSION_CONFLICT', error: '送り先が更新されています。読み直してください',
+    const conflict = (current: typeof existing) => fail(c, 409, 'VERSION_CONFLICT', {
+      error: '送り先が更新されています。読み直してください',
       data: { currentVersion: current.version ?? 1, updatedBy: current.updated_by_staff_id ?? null,
         updatedAt: current.updated_at },
-    }, 409);
+    });
     if (body.expectedVersion !== undefined && body.expectedVersion !== (existing.version ?? 1)) {
       return conflict(existing);
     }
