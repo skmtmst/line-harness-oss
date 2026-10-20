@@ -34,6 +34,7 @@ const fixture = vi.hoisted(() => ({
   stopIntake: vi.fn(),
   resumeIntake: vi.fn(),
   snapshot: vi.fn(),
+  ubereatsConnection: vi.fn(),
   role: { value: 'owner' as string | null },
 }))
 
@@ -42,6 +43,7 @@ vi.mock('@/lib/restaurant-delivery-api', async (importOriginal) => {
   return {
     ...actual,
     restaurantDeliveryApi: {
+      ubereatsConnection: fixture.ubereatsConnection,
       orders: fixture.orders,
       order: fixture.order,
       accept: fixture.accept,
@@ -213,6 +215,7 @@ function at(url: string) {
 
 beforeEach(() => {
   fixture.role.value = 'owner'
+  fixture.ubereatsConnection.mockResolvedValue({ connection: { status: 'connected', lastError: null } })
   fixture.snapshot.mockResolvedValue({ success: true, data: { stores: [store()] } })
   fixture.orders.mockResolvedValue(ordersData([
     order('o1', 'UE-1001'),
@@ -291,11 +294,17 @@ describe('kDQHr デリバリー受注', () => {
 
     // 行の右端は、主な操作を1つだけボタンにし、残り（断る）は「…」に入れる（ C）。
     // 新着は「受け付ける」、調理中は「準備完了にする」。
-    expect(screen.getByLabelText('注文UE-1001を受け付ける')).toBeTruthy()
+    const accept = screen.getByLabelText('注文UE-1001を受け付ける') as HTMLButtonElement
+    expect(accept.disabled).toBe(true)
+    fireEvent.click(accept)
+    expect(fixture.accept).not.toHaveBeenCalled()
     expect(screen.queryByLabelText('注文UE-1001を拒否')).toBeNull()
     expect(screen.getByLabelText('注文DM-2002を準備完了にする')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '注文UE-1001のその他の操作' }))
-    expect(await screen.findByRole('menuitem', { name: '断る' })).toBeTruthy()
+    const reject = await screen.findByRole('menuitem', { name: '断る' })
+    expect((reject as HTMLButtonElement).disabled || reject.getAttribute('aria-disabled') === 'true').toBe(true)
+    fireEvent.click(reject)
+    expect(fixture.reject).not.toHaveBeenCalled()
 
     // 停止中のサービスには再開を置く。
     expect(screen.getByLabelText('ロケットナウの受付を再開')).toBeTruthy()
@@ -312,7 +321,8 @@ describe('kDQHr デリバリー受注', () => {
     expect(document.body.textContent).not.toMatch(/Clef/i)
   })
 
-  it('まとめて受け付けるは新着だけを1件ずつ順に送る', async () => {
+  it('まとめて受け付けるはUberを除いた新着だけを1件ずつ順に送る', async () => {
+    fixture.orders.mockResolvedValue(ordersData([order('o1', 'UE-1001'), order('other-new', 'DM-NEW', { service: 'demaecan', serviceLabel: '出前館' }), order('o2', 'DM-2002', { service: 'demaecan', status: 'cooking' })]))
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
 
@@ -325,7 +335,8 @@ describe('kDQHr デリバリー受注', () => {
 
     fireEvent.click(screen.getByText('まとめて受け付ける'))
     await waitFor(() => expect(fixture.accept).toHaveBeenCalledTimes(1))
-    expect(fixture.accept).toHaveBeenCalledWith('account-1', 'o1')
+    expect(fixture.accept).toHaveBeenCalledWith('account-1', 'other-new')
+    expect(fixture.accept).not.toHaveBeenCalledWith('account-1', 'o1')
   })
 
   it('注文番号を押すと ?id= が付いて注文の詳細が開く', async () => {
@@ -430,6 +441,8 @@ describe('一覧と確認の操作を保つ', () => {
   })
 
   it('キャンセルの確認（dgeTy）は白地の頭＋注意三角で、危険用の帯を出さない', async () => {
+    const original = await fixture.order()
+    fixture.order.mockResolvedValue({ ...original, order: { ...original.order, service: 'demaecan', serviceLabel: '出前館' } })
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
     fireEvent.click(screen.getByLabelText('注文UE-1001の詳細'))
@@ -521,5 +534,98 @@ describe('注文履歴のページ送り', () => {
     expect(await within(table).findByText('#PAGE-11')).toBeTruthy()
     expect(within(table).getByText('#PAGE-20')).toBeTruthy()
     expect(within(table).queryByText('#PAGE-10')).toBeNull()
+  })
+})
+
+
+describe('Uberの接続と未完成の操作を分ける', () => {
+  it('保存済みの接続を読み、注文連携の説明は共通の窓で開く', async () => {
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    expect(fixture.ubereatsConnection).toHaveBeenCalledWith('account-1')
+    const uber = within(screen.getByRole('region', { name: 'Uber Eats' }))
+    expect(uber.getByText('接続済み')).toBeTruthy()
+    expect(uber.queryByText('受付中')).toBeNull()
+    expect((uber.getByRole('button', { name: 'Uber Eatsの受付を止める' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(uber.getByRole('button', { name: 'Uber Eatsの受付を止める' }))
+    expect(fixture.stopIntake).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Uber Eats の注文の連携は準備中' }))
+    expect(await screen.findByRole('dialog', { name: '現在準備中です' })).toBeTruthy()
+    expect(fixture.accept).not.toHaveBeenCalled()
+  })
+
+  it('停止済みのUberも再開を送れず、他社の再開は残す', async () => {
+    const data = ordersData([])
+    data.services[0].intakeStatus = 'stopped'
+    fixture.orders.mockResolvedValue(data)
+    fixture.resumeIntake.mockResolvedValue({ failed: [] })
+    render(<DeliveryPage />)
+    const uber = await screen.findByRole('button', { name: 'Uber Eatsの受付を再開' })
+    expect((uber as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(uber)
+    expect(fixture.resumeIntake).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'ロケットナウの受付を再開' }))
+    await waitFor(() => expect(fixture.resumeIntake).toHaveBeenCalledWith('account-1', ['rocketnow']))
+  })
+
+  it.each(['new', 'cooking'] as const)('Uberの%s詳細は読めるが変更を送れない', async (status) => {
+    const original = await fixture.order()
+    fixture.order.mockResolvedValue({ ...original, order: { ...original.order, status } })
+    at('/restaurant-test/delivery?id=o1')
+    render(<DeliveryPage />)
+    const dialog = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
+    await dialog.findByText('唐揚げ弁当')
+    for (const name of status === 'new' ? ['注文をキャンセルする', '断る', '受け付ける'] : ['注文をキャンセルする', '準備完了にする']) {
+      const button = dialog.getByRole('button', { name }) as HTMLButtonElement
+      expect(button.disabled).toBe(true)
+      fireEvent.click(button)
+    }
+    expect(fixture.accept).not.toHaveBeenCalled()
+    expect(fixture.reject).not.toHaveBeenCalled()
+    expect(fixture.ready).not.toHaveBeenCalled()
+    expect(fixture.cancel).not.toHaveBeenCalled()
+  })
+
+  it('一括停止でUberを選べず、他社だけを送る', async () => {
+    fixture.stopIntake.mockResolvedValue({ stopped: ['demaecan'], failed: [] })
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    fireEvent.click(screen.getByText('受付をまとめて止める'))
+    const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+    const uber = dialog.getByRole('checkbox', { name: /Uber Eatsの受付を止める/ }) as HTMLInputElement
+    expect(uber.disabled).toBe(true)
+    expect(uber.checked).toBe(false)
+    fireEvent.click(uber)
+    fireEvent.click(dialog.getByRole('button', { name: '止める' }))
+    await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m'))
+  })
+
+  it('Uberを含む商品の同期を止め、他社だけの商品は残す', async () => {
+    const other = { ...menuItem('other', '他社だけの商品'), services: [{ service: 'demaecan', label: '出前館' }] }
+    fixture.menuItems.mockResolvedValue({ success: true, items: [menuItem('m1', 'Uberの商品'), other] })
+    fixture.bulkSoldOut.mockResolvedValue({ updated: ['other'], failed: [] })
+    at('/restaurant-test/delivery?view=sold-out')
+    render(<DeliveryPage />)
+    await screen.findByText('Uberの商品')
+    const toggle = screen.getByRole('switch', { name: 'Uberの商品の販売' })
+    expect((toggle as HTMLInputElement).disabled || toggle.getAttribute('aria-disabled') === 'true').toBe(true)
+    fireEvent.click(toggle)
+    expect(fixture.bulkSoldOut).not.toHaveBeenCalled()
+    expect((screen.getByLabelText('Uberの商品を選ぶ') as HTMLInputElement).disabled).toBe(true)
+    fireEvent.click(screen.getByLabelText('表示中をすべて選ぶ'))
+    fireEvent.click(screen.getByRole('button', { name: '選んだ商品を品切れにする' }))
+    await waitFor(() => expect(fixture.bulkSoldOut).toHaveBeenCalledWith('account-1', ['other'], true))
+  })
+
+  it('Uberの過去の注文・詳細・CSVを引き続き確認できる', async () => {
+    fixture.history.mockResolvedValue({ success: true, totals: { count: 1, amount: 3480, byService: [], canceledCount: 0 }, orders: [order('o1', 'UE-1001')] })
+    fixture.historyCsv.mockResolvedValue({ truncated: false })
+    at('/restaurant-test/delivery?view=history')
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    fireEvent.click(screen.getByRole('button', { name: /CSV/ }))
+    await waitFor(() => expect(fixture.historyCsv).toHaveBeenCalledWith('account-1', expect.objectContaining({ from: expect.any(String), to: expect.any(String) })))
+    fireEvent.click(screen.getByRole('button', { name: '注文UE-1001の詳細' }))
+    expect(await screen.findByRole('dialog', { name: '注文の詳細' })).toBeTruthy()
   })
 })

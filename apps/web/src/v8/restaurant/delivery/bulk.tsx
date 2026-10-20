@@ -20,6 +20,7 @@ import Checkbox from '@/components/shared/checkbox'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
+import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
 import Pagination from '@/components/shared/pagination'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import CheckCard from '@/components/shared/check-card'
@@ -98,7 +99,7 @@ export interface SoldOutBoardProps {
   onPerPage: (perPage: number) => void
 }
 
-/** D-5 `h7OeT`。品切れにした品は3つのサービスすべてで注文できなくなる。 */
+/** D-5 `h7OeT`。保存済みの商品を確認する。Uberを含む商品は同期しない。 */
 export default function SoldOutBoard({
   loading,
   error,
@@ -128,8 +129,10 @@ export default function SoldOutBoard({
   const firstIndex = (currentPage - 1) * perPage
   const visible = items.slice(firstIndex, firstIndex + perPage)
   const selectedSet = new Set(selected)
-  const checkedCount = visible.filter((item) => selectedSet.has(item.id)).length
-  const allChecked = visible.length > 0 && checkedCount === visible.length
+  const canSync = (item: DeliveryMenuItem) => !item.services.some(({ service }) => service === 'ubereats')
+  const checkedCount = visible.filter((item) => canSync(item) && selectedSet.has(item.id)).length
+  const selectableCount = visible.filter(canSync).length
+  const allChecked = selectableCount > 0 && checkedCount === selectableCount
   const someChecked = checkedCount > 0 && !allChecked
   // 権限の有無は帯ごと出す・出さないで分ける。ここは「選んでいないので押せない」だけ。
   const canSubmit = checkedCount > 0 && !busy
@@ -170,6 +173,7 @@ export default function SoldOutBoard({
                     aria-label="表示中をすべて選ぶ"
                     checked={allChecked}
                     indeterminate={someChecked}
+                    disabled={selectableCount === 0 || busy}
                     onCheckedChange={onToggleAll}
                   />
                 </Th>
@@ -197,7 +201,8 @@ export default function SoldOutBoard({
                     <Td>
                       <Checkbox
                         aria-label={`${item.name || '商品'}を選ぶ`}
-                        checked={selectedSet.has(item.id)}
+                        checked={canSync(item) && selectedSet.has(item.id)}
+                        disabled={!canSync(item) || busy}
                         onCheckedChange={(checked) => onToggle(item.id, checked)}
                       />
                     </Td>
@@ -218,10 +223,11 @@ export default function SoldOutBoard({
                   </Td>
                   {canManage ? (
                     <Td>
+                      {!canSync(item) ? <StatusBadge tone="neutral" size="compact">{PREPARING_WORD}</StatusBadge> : null}
                       <Toggle
                         label={`${item.name || '商品'}の販売`}
                         checked={!item.soldOut}
-                        disabled={busy || busyItemId === item.id}
+                        disabled={!canSync(item) || busy || busyItemId === item.id}
                         onChange={(next) => onToggleOne(item.id, !next)}
                       />
                     </Td>
@@ -290,7 +296,7 @@ export function IntakeStopDialog({
   onSubmit,
 }: IntakeStopDialogProps) {
   const selectedSet = new Set(selected)
-  const stoppable = services.filter((state) => state.intakeStatus === 'open')
+  const stoppable = services.filter((state) => state.intakeStatus === 'open' && state.service !== 'ubereats')
   const canSubmit = !busy && stoppable.some((state) => selectedSet.has(state.service))
 
   return (
@@ -341,14 +347,15 @@ export function IntakeStopDialog({
           ) : (
             services.map((state) => {
               const label = state.label || DELIVERY_SERVICE_LABELS[state.service]
+              const preparing = state.service === 'ubereats'
               const stopped = state.intakeStatus === 'stopped'
-              const picked = !stopped && selectedSet.has(state.service)
+              const picked = !preparing && !stopped && selectedSet.has(state.service)
               return (
                 <CheckCard
                   key={state.service}
                   size="row"
                   checked={picked}
-                  disabled={stopped || busy}
+                  disabled={preparing || stopped || busy}
                   onChange={(checked) => onToggleService(state.service, checked)}
                   title={(
                     <>
@@ -357,7 +364,7 @@ export function IntakeStopDialog({
                       <StatusBadge tone={SERVICE_TONES[state.service]} size="compact" dot={false}>{label}</StatusBadge>
                     </>
                   )}
-                  note={stopped ? 'すでに停止中・対象外' : `現在 受付中・${state.todayCount}件対応中`}
+                  note={preparing ? `営業状態の連携は${PREPARING_WORD}` : stopped ? 'すでに停止中・対象外' : `現在 受付中・${state.todayCount}件対応中`}
                 />
               )
             })
