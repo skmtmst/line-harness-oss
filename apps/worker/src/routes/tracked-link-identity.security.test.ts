@@ -95,6 +95,7 @@ describe('tracked click caller identity and current ownership', () => {
     fixture.raw.prepare('UPDATE friends SET line_account_id=? WHERE id=?').run('b', 'fa');
     await click(`?identity=${signed}`);
     expect(jobs.record).toHaveBeenLastCalledWith(fixture.db, expect.objectContaining({ friendId: null }));
+    fixture.raw.exec("INSERT INTO tenants(id,name)VALUES('other-tenant','Other'); UPDATE line_accounts SET tenant_id='other-tenant' WHERE id='a'");
     fixture.raw.prepare('UPDATE friends SET line_account_id=NULL WHERE id=?').run('fa');
     await click(`?identity=${signed}`);
     expect(jobs.record).toHaveBeenLastCalledWith(fixture.db, expect.objectContaining({ friendId: null }));
@@ -140,6 +141,28 @@ describe('tracked click caller identity and current ownership', () => {
     expect(jobs.record).toHaveBeenLastCalledWith(fixture.db, expect.objectContaining({ friendId: 'legacy', accountId: null }));
     fixture.raw.exec("UPDATE friends SET line_account_id='a' WHERE id='legacy'");
     await click(`?identity=${signed}`, 'short-null');
+    expect(jobs.record).toHaveBeenLastCalledWith(fixture.db, expect.objectContaining({ friendId: null }));
+  });
+  it('keeps verified default-tenant NULL friends and their click history visible', async () => {
+    fixture.raw.exec("UPDATE friends SET line_account_id=NULL WHERE id='fa'");
+    const response = await exchange();
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { token: string } };
+    await click(`?identity=${body.data.token}`);
+    expect(jobs.record).toHaveBeenLastCalledWith(fixture.db, expect.objectContaining({ friendId: 'fa', accountId: 'a', identityVerified: true }));
+    fixture.raw.exec("INSERT INTO link_clicks(id,tracked_link_id,friend_id,clicked_at)VALUES('legacy-click','link-a','fa','2026-01-01')");
+    expect((await getLinkClicks(fixture.db, 'link-a'))[0].friend_id).toBe('fa');
+  });
+  it('rejects NULL friends outside the default tenant and a friend reassigned to another account', async () => {
+    const signed = await token('legacy');
+    expect(signed).toBeTruthy();
+    fixture.raw.exec("INSERT INTO link_clicks(id,tracked_link_id,friend_id,clicked_at)VALUES('legacy-click','link-a','legacy','2026-01-01'); INSERT INTO tenants(id,name)VALUES('other','Other'); UPDATE line_accounts SET tenant_id='other' WHERE id='a'");
+    expect(await token('legacy')).toBeNull();
+    await click(`?identity=${signed}`);
+    expect(jobs.record).toHaveBeenLastCalledWith(fixture.db, expect.objectContaining({ friendId: null }));
+    expect((await getLinkClicks(fixture.db, 'link-a'))[0].friend_id).toBeNull();
+    fixture.raw.exec("UPDATE line_accounts SET tenant_id=NULL WHERE id='a'; UPDATE friends SET line_account_id='b' WHERE id='legacy'");
+    await click(`?identity=${signed}`);
     expect(jobs.record).toHaveBeenLastCalledWith(fixture.db, expect.objectContaining({ friendId: null }));
   });
   it('hides foreign historical friend IDs and names from link click history', async () => {

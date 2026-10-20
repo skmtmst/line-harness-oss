@@ -1,3 +1,4 @@
+import { trackedLinkFriendMatches } from './tracked-link-identity.js';
 import { PREFIX } from './tap-extra-links.js';
 export { extrasFromTrackedLink, validateTapExtraReferences, decorateTapExtras } from './tap-extra-links.js';
 import { extrasFromTrackedLink, validateTapExtraReferences, decorateTapExtras } from './tap-extra-links.js';
@@ -8,8 +9,7 @@ import { attachTagAndFireSideEffects } from '../features/friends/friend-tag-atta
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 export async function applyTapExtras(db: D1Database, friendId: string, accountId: string | null, extras: TapExtras, eventId: string): Promise<void> {
   if (tapExtrasError(extras)) throw new Error('invalid_tap_extras');
-  const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id=?').bind(friendId).first<{ line_account_id: string | null }>();
-  if (!friend || friend.line_account_id !== accountId) throw new Error('tap_extra_account_mismatch');
+  if (!await trackedLinkFriendMatches(db, friendId, accountId)) throw new Error('tap_extra_account_mismatch');
   const ids = [...new Set(extras.tagIds ?? [])];
   if (ids.length && !(await validateScenarioActionReferences(db, accountId, 'tag', { op: 'add', tagIds: ids })).ok) throw new Error('tap_extra_tag_unavailable');
   for (const id of ids) {

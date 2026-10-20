@@ -1,5 +1,5 @@
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { getLineAccountById, isLineAccountTenantActive, type TrackedLink } from '@line-crm/db';
+import { getLineAccountById, getFriendByLineUserIdForAccount, isLineAccountTenantActive, type TrackedLink } from '@line-crm/db';
 import { navigationProof, verifyNavigationProof } from '../lib/navigation-proof.js';
 
 const MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
@@ -23,9 +23,11 @@ export async function trackedLinkSigningAccount(db: D1Database, accountId: strin
 }
 
 export async function trackedLinkFriendMatches(db: D1Database, friendId: string, accountId: string | null): Promise<boolean> {
-  const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id = ?')
-    .bind(friendId).first<{ line_account_id: string | null }>();
-  return !!friend && friend.line_account_id === accountId;
+  const friend = await db.prepare('SELECT line_user_id FROM friends WHERE id = ?')
+    .bind(friendId).first<{ line_user_id: string | null }>();
+  if (!friend?.line_user_id) return false;
+  const scoped = await getFriendByLineUserIdForAccount(db, friend.line_user_id, accountId);
+  return scoped?.id === friendId;
 }
 
 /** URLを持つ人に限る期限付き資格。リンク・友だち・店のどれも差し替えられない。 */

@@ -83,6 +83,14 @@ describe('リッチメッセージのテキストと追加処理（実SQL）', (
     expect(sql.raw.prepare('SELECT COUNT(*) n FROM friend_scores').get()).toEqual({ n: 1 });
   });
 
+  it('既定統括の未割当の友だちも署名を確認して追加処理を再開する', async () => {
+    sql.raw.exec("UPDATE line_accounts SET tenant_id=NULL WHERE id='account'; UPDATE friends SET line_account_id=NULL WHERE id='friend'");
+    const {url} = await prepare();
+    expect((await click(await identifiedUrl(url))).headers.get('location')).toBe(destination);
+    assertEffects();
+    expect(sql.raw.prepare('SELECT friend_id FROM link_clicks').get()).toEqual({friend_id:'friend'});
+    expect(sql.raw.prepare("SELECT status FROM workflow_steps WHERE process_kind='tracked_click' AND step_key='__run'").get()).toEqual({status:'succeeded'});
+  });
   it('一斉配信では自店LIFFで友だちを特定した後にだけ1回数える', async () => {
     const { url, link } = await prepare();
     const identify = await click(url, 'Line/15.0');

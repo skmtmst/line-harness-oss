@@ -105,6 +105,22 @@ describe('form intro referral ownership', () => {
     expect(firstLink()).toEqual({ first_tracked_link_id: account === 'account-a' ? 'ref-link' : null });
     expect(JSON.stringify(push.mock.calls[0][0]).includes('Campaign hello')).toBe(account === 'account-a');
   });
+  it('uses the verified default account for a NULL friend campaign intro and delivery', async () => {
+    seedLink('account-a');
+    db.raw.exec("UPDATE friends SET line_account_id=NULL WHERE id='friend-a'");
+    expect((await send({...valid,ref:'ref-link'})).status).toBe(200);
+    expect(firstLink()).toEqual({first_tracked_link_id:'ref-link'});
+    expect(JSON.stringify(push.mock.calls[0][0])).toContain('Campaign hello');
+    expect(JSON.stringify(push.mock.calls[0][0])).toContain('liff-a');
+    expect(push.mock.calls[0][1]).toBe('Bearer fixture-token-a');
+  });
+  it('does not borrow a NULL friend for a nondefault tenant', async () => {
+    seedLink('account-a');
+    db.raw.exec("INSERT INTO tenants(id,name)VALUES('other','Other'); UPDATE line_accounts SET tenant_id='other' WHERE id='account-a'; UPDATE friends SET line_account_id=NULL WHERE id='friend-a'");
+    expect((await send({...valid,ref:'ref-link'})).status).toBe(404);
+    expect(firstLink()).toEqual({first_tracked_link_id:null});
+    expect(push).not.toHaveBeenCalled();
+  });
   it('keeps a stopped entry route suppressed even when its ref matches an active tracked link', async () => {
     seedLink('account-a');
     db.raw.exec("INSERT INTO entry_routes(id,ref_code,name,is_active)VALUES('stopped','ref-link','Stopped',0)");
@@ -113,9 +129,10 @@ describe('form intro referral ownership', () => {
     expect(JSON.stringify(push.mock.calls[0][0])).not.toContain('Campaign hello');
     expect(JSON.stringify(push.mock.calls[0][0])).not.toContain('ref-link');
   });
-  it.each([['account-a',1,true], ['account-b',1,false], ['account-a',0,false], [null,1,true]] as const)
-    ('applies the same referral boundary in OAuth form delivery: %s/%i', async (account, active, allowed) => {
+  it.each([['account-a',1,true,false], ['account-b',1,false,false], ['account-a',0,false,false], [null,1,true,false], ['account-a',1,true,true]] as const)
+    ('applies the same referral boundary in OAuth form delivery: %s/%i', async (account, active, allowed, nullFriend) => {
       seedLink(account, active);
+      if (nullFriend) db.raw.exec("UPDATE friends SET line_account_id=NULL WHERE id='friend-a'");
       const signed = await signedLiffState('fixture-signing-key', { account: 'bot-a', form: 'form-fixture', ref: 'ref-link' });
       const response = await liffRoutes.request(`https://api.fixture.test/auth/callback?code=fixture&state=${encodeURIComponent(signed.state)}`,
         { headers: { Cookie: signed.cookie } }, { DB: db.db, LINE_CHANNEL_SECRET: 'fixture-signing-key',

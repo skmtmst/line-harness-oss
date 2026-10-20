@@ -214,6 +214,7 @@ describe('W12 特典の参照先（実DB・回答API）', () => {
   for (const source of ['ref', 'first-touch'] as const) {
     for (const ownership of [
       { name: '同じ店', account: 'account-a', allowed: true },
+      { name: '既定統括の未割当の友だち', account: 'account-a', nullFriend: true, defaultTenant: true, allowed: true },
       { name: '別の店', account: 'account-b', allowed: false },
       { name: '未割当・別の統括', account: null, allowed: false },
       { name: '未割当・既定統括', account: null, defaultTenant: true, allowed: true },
@@ -234,6 +235,7 @@ describe('W12 特典の参照先（実DB・回答API）', () => {
         sqlite.prepare(`INSERT INTO tracked_links (id, name, original_url, reward_template_id, line_account_id)
           VALUES ('reward-link', '入口', 'https://example.test', 'reward', ?)` ).run(ownership.account);
         if (ownership.defaultTenant) sqlite.exec("UPDATE line_accounts SET tenant_id=NULL WHERE id='account-a'");
+        if (ownership.nullFriend) sqlite.exec("UPDATE friends SET line_account_id=NULL WHERE id='friend-1'");
         if (ownership.inactive) sqlite.exec("UPDATE tracked_links SET is_active=0 WHERE id='reward-link'");
         if (ownership.scenarioAccount) {
           sqlite.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id)VALUES('reward-scenario','Reward','manual',?)").run(ownership.scenarioAccount);

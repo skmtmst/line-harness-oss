@@ -58,3 +58,21 @@ it('refuses old persisted identified plans without verified identity provenance'
   await expect(recordTrackedClick(item.db, {linkId:'l',friendId:'f',accountId:'a',tagId:null,scenarioId:null,linkName:'link',conversionPointIds:[]}))
     .rejects.toThrow('tracked_click_identity_unverified');
 });
+
+
+it('records and continues a verified default-tenant NULL friend', async () => {
+  item.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret)VALUES('a','a','A','token','secret'); UPDATE friends SET line_account_id=NULL WHERE id='f'");
+  fault.tag = false;
+  const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  expect(item.raw.prepare('SELECT friend_id FROM link_clicks').get()).toEqual({friend_id:'f'});
+  await processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,saved.plan);
+  expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:1},{n:1},{n:1},{n:1}]);
+});
+it('refuses a queued NULL friend reassigned to another account', async () => {
+  item.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret)VALUES('a','a','A','token','secret'); UPDATE friends SET line_account_id=NULL WHERE id='f'");
+  const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  item.raw.exec("UPDATE friends SET line_account_id='b' WHERE id='f'");
+  await expect(processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,saved.plan)).rejects.toThrow('tracked_click_account_changed');
+  await expect(recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:null,scenarioId:null,linkName:'link',conversionPointIds:[]})).rejects.toThrow('tracked_click_account_changed');
+  expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:0},{n:0},{n:0},{n:0}]);
+});
