@@ -1,4 +1,4 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { formatYen, jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { currentOrderState, orderNumberFromPayload } from './nen-order-state.js';
 import { EXTERNAL_DELIVERY_MAX_ATTEMPTS as MAX_DELIVERY_ATTEMPTS } from './external-delivery-retry.js';
@@ -531,7 +531,7 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
   const items = event ? orderSummary(event) : '';
   if (items) details.push({ type: 'text', text: items, size: 'sm', color: '#64748B', wrap: true });
   if (typeof event?.order?.total === 'number') {
-    details.push({ type: 'text', text: `合計：¥${Math.round(event.order.total).toLocaleString('ja-JP')}`, size: 'sm', color: '#64748B', wrap: true });
+    details.push({ type: 'text', text: `合計：${formatYen(event.order.total)}`, size: 'sm', color: '#64748B', wrap: true });
   }
   if (event?.order?.delivery_date) {
     details.push({

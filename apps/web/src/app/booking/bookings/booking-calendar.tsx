@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { jstDate as japanDate } from '@/lib/jst-datetime'
@@ -12,7 +13,7 @@ import Link from 'next/link'
 import type { BookingRequest } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import { formatDay, formatNumber, formatRange, formatTime } from '@/lib/format'
+import { formatDay, formatRange, formatTime } from '@/lib/format'
 
 // BOOKING-01: 9〜18時の固定10マスは「空き枠」ではなく、空き枠APIの実績が
 // まだ届いていないときの表示レンジ。実際に受け付けられる枠が届いたら、
@@ -108,7 +109,7 @@ const CARD_STATUS_LABEL: Record<string, string> = {
 }
 
 function money(value: number): string {
-  return `¥${formatNumber(value)}`
+  return `${formatYen(value)}`
 }
 
 function BookingCard({ booking, compact = false, onOpen }: {

@@ -1,4 +1,5 @@
 'use client'
+import { normalizePhone, phoneProblem } from '@line-crm/shared'
 
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { loadStaffIdentity } from '@/lib/staff-role'
@@ -112,12 +113,8 @@ function timeRangeLabel(
   return `${dateLabel(startUtc, timeZone)} 〜 ${formatTime(endsAt, '—', timeZone)}`
 }
 
-// サーバ側 packages/db/src/booking-customers.ts の normalizeBookingCustomerPhone と
-// 同じ約束を先に確かめる。出す直前で落とすと入れ直しになる。
 function phoneDigitsError(phone: string): string | null {
-  const compact = phone.normalize('NFKC').trim().replace(/[\s()（）\-‐‑–—ー]/g, '')
-  if (!/^\+?\d{7,15}$/.test(compact)) return '電話番号は数字7〜15桁で入力してください'
-  return null
+  return phoneProblem(phone) || null
 }
 
 function scheduleLabel(value: string, timeZone = 'Asia/Tokyo'): string {
@@ -194,7 +191,7 @@ export default function NewProxyBookingPage() {
   const restoredAccount = useRef<string | null>(null)
   const [draftRestored, setDraftRestored] = useState(false)
 
-  const selectionKey = [selectedAccountId ?? '', friend?.id ?? (phoneCustomer ? [customerName.trim(), customerPhone.trim(), petName.trim()].join('|') : customer?.id ?? ''), menuId, staffId, date, time].join('\u001f')
+  const selectionKey = [selectedAccountId ?? '', friend?.id ?? (phoneCustomer ? [customerName.trim(), normalizePhone(customerPhone), petName.trim()].join('|') : customer?.id ?? ''), menuId, staffId, date, time].join('\u001f')
   const latestSelectionKey = useRef(selectionKey)
   latestSelectionKey.current = selectionKey
 
@@ -204,7 +201,7 @@ export default function NewProxyBookingPage() {
   // 下書き復元などで保存時の値が分からないときは、保存済みを信じる。
   const savedMatchesInput = customer == null
     || (customerSavedInput.current?.name === customerName.trim()
-      && customerSavedInput.current?.phone === customerPhone.trim()
+      && customerSavedInput.current?.phone === normalizePhone(customerPhone)
       && customerSavedInput.current?.pet === petName.trim())
   const customerLabel = friend?.displayName
     ?? (customer && savedMatchesInput ? customer.display_name : (customerName.trim() || 'お客様'))
@@ -304,7 +301,7 @@ export default function NewProxyBookingPage() {
           if (draft.customer?.id) {
             setCustomer(draft.customer as BookingCustomerSummary)
             customerSavedInput.current = draft.customerSavedInput ?? {
-              name: draft.customer.display_name, phone: typeof draft.customerPhone === 'string' ? draft.customerPhone.trim() : '', pet: draft.customer.pet_name ?? '',
+              name: draft.customer.display_name, phone: typeof draft.customerPhone === 'string' ? normalizePhone(draft.customerPhone) : '', pet: draft.customer.pet_name ?? '',
             }
           }
           setPhoneCustomer(draft.phoneCustomer === true)
@@ -576,13 +573,13 @@ export default function NewProxyBookingPage() {
     // 保存済みと入力が同じなら作り直さない（連打・続けてもう1件で二重にしない）。
     if (customer && (
       customerSavedInput.current != null && (customerSavedInput.current?.name === customerName.trim()
-        && customerSavedInput.current?.phone === customerPhone.trim()
+        && customerSavedInput.current?.phone === normalizePhone(customerPhone)
         && customerSavedInput.current?.pet === petName.trim())
     )) return customer
     if (!selectedAccountId) return null
     // R559: 応答消失後の再送で台帳を二重作成しないよう、確定操作ごとの
     // キー（予約本体のキーから派生）で送る。
-    const snapshot = { name: customerName.trim(), phone: customerPhone.trim(), pet: petName.trim() }
+    const snapshot = { name: customerName.trim(), phone: normalizePhone(customerPhone), pet: petName.trim() }
     const response = await bookingApi.createCustomer(selectedAccountId, {
       display_name: snapshot.name, phone: snapshot.phone, pet_name: snapshot.pet || undefined,
     }, customerIdempotencyKey.current || undefined)

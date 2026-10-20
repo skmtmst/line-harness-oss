@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import PageSizeSelect, { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
@@ -343,7 +344,7 @@ function InflowDetailContent() {
     ? (accounts.find((account) => account.id === route.lineAccountId)?.name ?? route.lineAccountId)
     : emptyValue('unknown')
   const createdDate = route ? `${Number(route.createdAt.slice(5, 7))}月${Number(route.createdAt.slice(8, 10))}日` : ''
-  const yen = (amount: number | null | undefined) => (amount == null ? emptyValue('unknown') : `¥${formatNumber(amount)}`)
+  const yen = (amount: number | null | undefined) => formatYen(amount, emptyValue('unknown'))
 
   // 友だち表の絞り込み。検索・札・期間の3つを重ねる。
   const normalizedFriendSearch = friendSearch.trim().toLocaleLowerCase('ja')
@@ -483,7 +484,7 @@ function InflowDetailContent() {
             <KpiCard presentation="band" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
               detail={blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`} />
             <KpiCard presentation="band" icon={<Target size={14} aria-hidden="true" />} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
-              detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(Math.round(funnel.valuePerFriend))}`} />
+              detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(funnel.valuePerFriend)}`} />
           </KpiBand>}
         </div>
 

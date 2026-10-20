@@ -1,4 +1,6 @@
 'use client'
+import { yenPercent } from '@line-crm/shared';
+import { formatYen as yen } from '@line-crm/shared';
 
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
@@ -44,7 +46,6 @@ type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'n
 const SAMPLE_PRICE = 8400
 const CARD_LABEL: Record<CancellationOptions['cardRequiredFor'], string> = { all: 'カードの登録：全員', no_show_flagged: 'カードの登録：無断の印がある人だけ', conditions: 'カードの登録：条件で決める' }
 
-const yen = (value: number) => `¥${Math.floor(value).toLocaleString('ja-JP')}`
 
 /** 見本の予約（来週の金曜 14:00・料金 ¥8,400）。お客さまへの文の見本に使う。 */
 function sampleStart(): Date {
@@ -261,7 +262,7 @@ export function DepositSection({ state, connected, canEdit }: { state: Cancellat
   }
   const rule = state.depositDraft
   const set = (patch: Partial<DepositRule>) => rule && state.setDepositDraft({ ...rule, ...patch })
-  const now = rule && rule.kind !== 'none' && rule.value ? (rule.kind === 'percent' ? Math.floor(SAMPLE_PRICE * rule.value / 100) : Math.min(rule.value, SAMPLE_PRICE)) : null
+  const now = rule && rule.kind !== 'none' && rule.value ? (rule.kind === 'percent' ? yenPercent(SAMPLE_PRICE, rule.value) : Math.min(rule.value, SAMPLE_PRICE)) : null
   return (
     <section className={settings.section} aria-label="デポジット">
       {head}

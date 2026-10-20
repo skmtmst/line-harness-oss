@@ -1,4 +1,3 @@
-import { formatNumber } from '@/lib/format'
 import { formatYen } from './display'
 
 export interface Agg {
@@ -20,5 +19,5 @@ export function rewardText(row: Agg): string {
   if (row.prevReward === 0) return `${base}（初めて）`
   const diff = row.reward - row.prevReward
   if (diff === 0) return `${base}（±¥0）`
-  return `${base}（${diff > 0 ? '+' : '−'}¥${formatNumber(Math.abs(diff))}）`
+  return `${base}（${diff > 0 ? '+' : '−'}${formatYen(Math.abs(diff))}）`
 }

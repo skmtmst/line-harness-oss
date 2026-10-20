@@ -1,3 +1,4 @@
+import { formatYen } from '@line-crm/shared';
 import type { BookingHistoryItem } from '../lib/api.js';
 import type { PaymentView } from '../lib/booking-payment-view.js';
 import { utcToJstHm, utcToJstMd } from '../lib/datetime.js';
@@ -46,7 +47,7 @@ export default function BookingHistoryCancelDialog({ booking, payment, busy, err
         {/* 払い済みの予約のキャンセル（hOILq・B-338）：試験の返金であることを先に知らせる。 */}
         {paid ? (
           <div className="flex flex-col gap-1 rounded-(--liff-radius) bg-liff-ok-bg px-3.5 py-3" data-refund-note>
-            <p className="text-[14px] leading-[20px] font-bold text-liff-ok-ink">{paid.amount == null ? '試験の全額返金を記録します（金額は未取得です）' : `試験のお支払い ¥${Math.round(paid.amount).toLocaleString('ja-JP')} の全額返金を試験で記録します`}</p>
+            <p className="text-[14px] leading-[20px] font-bold text-liff-ok-ink">{paid.amount == null ? '試験の全額返金を記録します（金額は未取得です）' : `試験のお支払い ${formatYen(paid.amount)} の全額返金を試験で記録します`}</p>
             <p className="text-[12px] leading-[18px] text-ink">実際のカードへの請求・返金は行われません。カード決済は準備中です。</p>
           </div>
         ) : null}
