@@ -227,7 +227,7 @@ describe('範囲・未準備・模擬リンク',()=>{
     useSqliteClock(f.raw,()=>databaseNow);
     for (const [id,offset,expected] of [['future',1,200],['boundary',0,404],['past',-1,404],['unlimited',null,200]] as const) {
       payment(id,status);
-      // SQLが先でも期限前は利用可能、SQLが遅れていても期限ちょうどから拒否する。
+      // SQLが進んでいても期限内なら利用可能。SQLが遅れていても期限と同時から拒否する。
       databaseNow=new Date(now.getTime()+(expected===200?86400000:-86400000));
       f.raw.prepare('UPDATE booking_payments SET hold_until=? WHERE id=?')
         .run(offset===null?null:new Date(now.getTime()+offset).toISOString(),id);
