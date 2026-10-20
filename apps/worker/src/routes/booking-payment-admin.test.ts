@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
 import { paymentPeriod, paymentSummary } from '../features/booking/booking-payment-admin.js';
 const access=vi.hoisted(()=>({allow:true}));
 vi.mock('../services/account-access.js',()=>({
@@ -217,6 +218,24 @@ describe('範囲・未準備・模擬リンク',()=>{
     payment('other','pending','b');payment('old','pending');payment('paid');
     f.raw.exec("UPDATE booking_payments SET hold_until='2026-10-01T00:00:00Z' WHERE id='old'");
     for(const id of ['other','old','paid'])expect((await request(path(`payments/${id}/send-link`),'POST',{dryRun:true})).status).toBe(404);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each(['unpaid','pending'])('SQLの時計がずれていても%sのリンク期限を開始処理と同じ時計で守る',async status=>{
+    f.raw.exec(`INSERT INTO booking_payment_configs VALUES('a','online','stripe',30,'2026-10-01','2026-10-01')`);
+    let databaseNow=new Date(now.getTime()+86400000);
+    useSqliteClock(f.raw,()=>databaseNow);
+    for (const [id,offset,expected] of [['future',1,200],['boundary',0,404],['past',-1,404],['unlimited',null,200]] as const) {
+      payment(id,status);
+      // SQLが先でも期限前は利用可能、SQLが遅れていても期限ちょうどから拒否する。
+      databaseNow=new Date(now.getTime()+(expected===200?86400000:-86400000));
+      f.raw.prepare('UPDATE booking_payments SET hold_until=? WHERE id=?')
+        .run(offset===null?null:new Date(now.getTime()+offset).toISOString(),id);
+      const response=await request(path(`payments/${id}/send-link`),'POST',{dryRun:true});
+      expect(response.status).toBe(expected);
+      if(expected===200)expect(await response.json()).toMatchObject({data:{paymentId:id,sent:false,simulation:true}});
+      else expect(await response.json()).toMatchObject({error:'payment_not_available'});
+    }
+    expect(f.raw.prepare('SELECT COUNT(*) n FROM booking_payments').get()).toEqual({n:4});
     expect(fetch).not.toHaveBeenCalled();
   });
 });
