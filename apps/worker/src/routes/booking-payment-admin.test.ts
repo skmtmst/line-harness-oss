@@ -31,8 +31,10 @@ function booking(id:string,account='a',status='requested',starts='2026-10-15T03:
 }
 function payment(id:string,status='paid',account='a',created='2026-10-10T04:00:00Z',paid:string|null='2026-10-10T04:00:00Z',updated='2026-10-10T04:00:00Z') {
   booking(id+'b',account);
+  // The route compares hold_until with SQLite's real clock, not Vitest's frozen JS clock.
+  // Keep the default fixture unexpired; expiration tests set their own past deadline.
   f.raw.prepare(`INSERT INTO booking_payments(id,line_account_id,booking_id,amount,status,provider,provider_payment_id,idempotency_key,created_at,updated_at,paid_at,hold_until)
-    VALUES(?,?,?,1000,?,'stripe',?,?,?,?,?,?)`).run(id,account,id+'b',status,`pi_test_${id}b`,id+'b',created,updated,paid,'2026-10-20T00:00:00Z');
+    VALUES(?,?,?,1000,?,'stripe',?,?,?,?,?,?)`).run(id,account,id+'b',status,`pi_test_${id}b`,id+'b',created,updated,paid,'2099-12-31T00:00:00Z');
 }
 beforeEach(()=>{
   vi.useFakeTimers();vi.setSystemTime(now);vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('外部通信は禁止');}));
