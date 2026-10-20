@@ -229,13 +229,13 @@ WorkerのHono実登録にある管理認証の外の入口は **204経路**（�
 
 ログイン前でも、有効な確認票を持つ人へメールや名前を返す口がある。票は一時的な取得権限なので、URLの流出を無害と考えない。登録は24時間、再設定は1時間（`services/auth-mail.ts`）。他の招待・OAuth・MFAは保存した期限と目的を照合する。外部のログへquery/票を写さず、票なし・期限切れ・使用済みの検査を維持する。GETの移動だけの口と、本人確認後に処理するPOSTを混同しない。
 
-## Static asset・SPA（上の201とは別）
+## Static asset・SPA（上の204とは別）
 
 | 面 | ID/回数制限 | 個人情報・期限・残る条件 |
 | --- | --- | --- |
 | 管理画面の `apps/web/out` のHTML・JS・CSS・公開画像・version.json | 固定パスとビルドのhash。静的配信の回数制限はCloudflare側、未確認 | ログイン画面の骨組みは公開。顧客データは管理APIの本人確認後。CSPは[CSP記録](csp.md)。ビルドへ秘密を埋めない |
 | LIFFの `apps/liff/dist` とWorkerの `dist/client`、未知の非APIパスのSPA fallback | 画面のパス、ID/slugは秘密ではない。Worker経由は共通IP枠、Pages直配信は別確認 | 予約確認/フォーム/本人履歴の骨組みは公開。個人情報の取得は表のAPIで検証。外部ログインの実試験は今回は行わない |
-| 管理専用の添付 `/api/form-files/:id/content` | 管理認証の外ではないため201に含めない。本人確認書類はowner/admin、所属と期限・検査状態を照合 | `routes/form-documents.ts`。`private/form-documents/` のR2原本は公開画像口では404。期限付きURLへ切り替えたという意味ではない |
+| 管理専用の添付 `/api/form-files/:id/content` | 管理認証の外ではないため204に含めない。本人確認書類はowner/admin、所属と期限・検査状態を照合 | `routes/form-documents.ts`。`private/form-documents/` のR2原本は公開画像口では404。期限付きURLへ切り替えたという意味ではない |
 
 ## API列車で加わった入口（全一覧の再生成ではない）
 
@@ -253,6 +253,6 @@ WorkerのHono実登録にある管理認証の外の入口は **204経路**（�
 
 ## 再確認
 
-`SECURITY_INVENTORY_REPORT=docs/security/API-ROUTE-INVENTORY-1016.tsv pnpm --filter worker exec vitest run src/middleware/route-guard-coverage.test.ts` をリポジトリルートから使うと出力先がWorker基準になるため、実行時はレポート先を絶対パスで指定する。次に `pnpm --filter worker exec vitest run src/routes/public-entrypoints.security.test.ts src/middleware/public-referral-rate-limit.security.test.ts`。重い検査はheavy経由で行う。
+`SECURITY_INVENTORY_REPORT=docs/security/API-ROUTE-INVENTORY-1016.tsv pnpm --filter worker exec vitest run src/middleware/route-guard-coverage.test.ts` をリポジトリルートから使うと出力先がWorker基準になるため、実行時はレポート先を絶対パスで指定する。次に `pnpm --filter worker exec vitest run src/routes/public-entrypoints-security.test.ts src/middleware/public-referral-rate-limit-security.test.ts`。重い検査はheavy経由で行う。
 
 既存の画像・書類・LINE本人/所属・Webhook署名の試験も合わせる。本番の顧客データや本物の送信を確認用に使わない。配備の設定を読んだ証拠がなければ「分からない」のまま残す。
