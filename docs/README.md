@@ -721,4 +721,4 @@
 - [デリバリー注文連携の提供状況](release-log/unreleased/1781-kenta-cleanup-u01l.md)
 - [検査結果と品質記録の整合](release-log/unreleased/1781-kenta-cleanup-f04.md)
 - [デリバリー連携の準備状況を明確化](release-log/unreleased/1781-kenta-cleanup-u01m.md)
-- [公開前の点検と更新履歴の参照](release-log/unreleased/0000-kenta-cleanup-f05.md)
+- [公開前の点検と更新履歴の参照](release-log/unreleased/1781-kenta-cleanup-f05.md)
