@@ -232,6 +232,8 @@ describe('LINEアカウント作成ウィザード', () => {
   })
 
   it('5つの確認が通ってから登録し、完了画面まで進む', async () => {
+    let finishNotice!: (response: { success: boolean; data: { available: boolean } }) => void
+    notices.lineRegistration.mockReturnValueOnce(new Promise((resolve) => { finishNotice = resolve }))
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
@@ -247,7 +249,9 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByRole('link', { name: '統括コンソールへ戻る' }).getAttribute('href')).toBe('/hq')
     expect(document.body.textContent).not.toContain('synthetic-secret')
     await waitFor(() => expect(notices.lineRegistration).toHaveBeenCalled())
-    expect(document.body.textContent).not.toContain('musubo 運営（契約者専用）')
+    expect(screen.getByText('読み込んでいます…')).toBeTruthy()
+    finishNotice({ success: true, data: { available: false } })
+    await waitFor(() => expect(document.body.textContent).not.toContain('musubo 運営（契約者専用）'))
   })
 
   it('登録完了の直後に、契約者専用LINEの登録案内を一度だけ出す（案内だけで、閉じられる）', async () => {
