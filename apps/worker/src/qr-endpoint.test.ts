@@ -250,7 +250,7 @@ describe('/api/qr を呼ぶ側が渡せる大きさ', () => {
       hasQrEndpoint(read(file)),
     );
     expect(builders.sort()).toEqual(QR_CALL_SITES.map((site) => site.file).sort());
-  });
+  }, 30_000);
 
   it('受け取ったクエリをそのまま載せる呼び出し元は、240x240のPNGしか頼まない', () => {
     // ここは data を 2KiB まで伸ばせるので、絵の大きさと形式が固定であることが

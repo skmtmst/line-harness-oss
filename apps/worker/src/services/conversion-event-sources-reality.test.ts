@@ -20,6 +20,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vi
 
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { getTrackedLinkById } from '@line-crm/db';
+import { issueTrackedLinkIdentity } from './tracked-link-identity.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BOOTSTRAP = readFileSync(
@@ -248,8 +250,22 @@ describe('起点1: ページを見た (url_reach)', () => {
     const app = new Hono<Env>();
     app.route('/', trackedLinks);
     const exec = makeExecCtx();
-    const res = await app.fetch(
+    const anonymous = await app.fetch(
       new Request('https://worker.example.test/t/link-1?f=friend-1', {
+        headers: { 'user-agent': 'Mozilla/5.0' },
+      }),
+      env(),
+      exec.ctx,
+    );
+    await exec.drain();
+    expect(anonymous.status).toBe(302);
+    expect(countEvents('url_reach')).toBe(0);
+
+    const link = (await getTrackedLinkById(db, 'link-1'))!;
+    const identity = await issueTrackedLinkIdentity(db, link, 'friend-1');
+    expect(identity).toBeTypeOf('string');
+    const res = await app.fetch(
+      new Request(`https://worker.example.test/t/link-1?identity=${identity}`, {
         headers: { 'user-agent': 'Mozilla/5.0' },
       }),
       env(),
