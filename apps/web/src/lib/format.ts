@@ -226,8 +226,4 @@ export function formatPointDiff(value: number | null | undefined, fallback = '�
   return `${value > 0 ? '+' : ''}${value.toFixed(1)}pt`
 }
 
-/** ¥12,400（半角の¥。Intl の￥は全角なので直結合）。税込みか税抜きかは見出しに書く。 */
-export function formatYen(value: number | null | undefined, fallback = '—'): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return fallback
-  return `¥${commaFmt.format(Math.round(value))}`
-}
+export { formatYen } from '@line-crm/shared'

@@ -780,6 +780,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/integrations/tiktok-pnl/status',
   'GET /api/line-accounts',
   'GET /api/line-accounts/{id}',
+  'GET /api/line-accounts/{id}/registration-receipt',
   'GET /api/line-accounts/{id}/handovers',
   'GET /api/line-accounts/{id}/skipped-deliveries',
   'GET /api/line-accounts/summary',

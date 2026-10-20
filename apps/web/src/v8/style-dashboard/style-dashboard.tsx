@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { CancelClassDialog,CancelReservationDialog,RefundDialog } from '@/components/shared/booking-confirm-dialogs'
 import Button from '@/components/shared/button'
@@ -246,14 +247,14 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       {preparing.dialog}
       {cancelRow ? (
         <CancelReservationDialog open title={`${cancelRow.name}さまの予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${cancelRow.people}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
-          facts={[{ label: 'お支払い', value: cancelRow.booking?.price ? `¥${(cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1)).toLocaleString('ja-JP')}（支払いの記録は決済の口から）` : 'お支払いなし' }]}
+          facts={[{ label: 'お支払い', value: cancelRow.booking?.price ? `${formatYen(cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1))}（支払いの記録は決済の口から）` : 'お支払いなし' }]}
           fullAmount={cancelRow.booking?.price ? cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1) : null} testMode={testMode} busy={busy === 'cancel'}
           messageFor={(i) => `${cancelRow.name}さま　${i.reason ? `${i.reason}で` : 'お店の都合で'} ${cancelRow.time} のご予約を取り消しました。申し訳ありません。${i.refund === 'full' ? 'お支払いは全額を返金します。' : ''}`}
           onClose={() => setCancelRow(null)} onConfirm={(i) => void confirmCancel(cancelRow, i)} />
       ) : null}
       {refundRow ? (
         <RefundDialog open subtitle={`${refundRow.name}さま・${refundRow.time}${refundRow.course ? ` ${refundRow.course}` : ''}${refundRow.people ? ` ${refundRow.people}名` : ''}`}
-          facts={[{ label: '支払った額', value: refundRow.booking?.price ? `¥${(refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1)).toLocaleString('ja-JP')}` : '—' }, { label: 'これまでの返金', value: 'なし' }]}
+          facts={[{ label: '支払った額', value: refundRow.booking?.price ? `${formatYen(refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1))}` : '—' }, { label: 'これまでの返金', value: 'なし' }]}
           paidAmount={refundRow.booking?.price ? refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1) : 0} testMode={testMode}
           onClose={() => setRefundRow(null)} onConfirm={() => { setRefundRow(null); openPayment() }} />
       ) : null}

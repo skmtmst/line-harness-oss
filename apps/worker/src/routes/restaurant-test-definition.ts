@@ -1,3 +1,5 @@
+import { normalizePhone, phoneProblem } from '@line-crm/shared';
+import { normalizedPhoneSql } from '../lib/phone-sql.js';
 import type { OrganizationRow, OrganizationContext, SelectedRestaurantStore } from './restaurant-context-types.js';
 import { setRestaurantAttendance, type AttendanceInput } from '../services/restaurant-attendance.js';
 import { inputError } from '../lib/input-errors.js';
@@ -310,7 +312,7 @@ export async function insertSeatWaitlistEntry(
   },
 ): Promise<
   | { ok: true; id: string }
-  | { ok: false; error: 'invalid_slot' | 'invalid_party' | 'invalid_starts_at' | 'starts_at_in_past' | 'missing_customer' | 'already_waiting' | 'registration_closed' | 'waitlist_limit' | 'closure_conflict' }
+  | { ok: false; error: 'invalid_slot' | 'invalid_party' | 'invalid_starts_at' | 'starts_at_in_past' | 'missing_customer' | 'invalid_phone' | 'already_waiting' | 'registration_closed' | 'waitlist_limit' | 'closure_conflict' }
 > {
   const startsAtMs = Date.parse(input.startsAt);
   if (Number.isNaN(startsAtMs)) return { ok: false, error: 'invalid_starts_at' };
@@ -321,6 +323,8 @@ export async function insertSeatWaitlistEntry(
   if (!Number.isInteger(input.guestCount) || input.guestCount < 1 || input.guestCount > 100) {
     return { ok: false, error: 'invalid_party' };
   }
+  if (input.customerPhone != null && phoneProblem(input.customerPhone)) return { ok: false, error: 'invalid_phone' };
+  const customerPhone = normalizePhone(input.customerPhone ?? '') || null;
   const customerName = input.customerName.trim();
   if (!customerName) return { ok: false, error: 'missing_customer' };
   const startsAt = new Date(startsAtMs).toISOString();
@@ -329,26 +333,32 @@ export async function insertSeatWaitlistEntry(
   if ((await closuresForRange(db, input.storeId, startsAt, endsAt)).length && !(await openSeatTables(db, input.storeId, startsAt, endsAt, input.guestCount, true)).length) return { ok: false, error: 'closure_conflict' };
   const identityKey = input.lineUid
     ? `line:${input.lineUid}`
-    : input.customerPhone
-      ? `phone:${input.customerPhone}`
+    : customerPhone
+      ? `phone:${customerPhone}`
       : `name:${customerName}`;
-  const existing = await db
-    .prepare(`SELECT id FROM rt_seat_waitlist
-      WHERE store_id = ? AND starts_at = ? AND identity_key = ?
-        AND status IN ('waiting', 'invited')`)
-    .bind(input.storeId, startsAt, identityKey)
-    .first<{ id: string }>();
+  // 旧行は書き換えず、同じ枠の有効な待機者だけを読んで表記ゆれを照合する。
+  const existing = (await db.prepare(`SELECT id,identity_key,customer_phone,line_uid FROM rt_seat_waitlist
+      WHERE store_id = ? AND starts_at = ? AND status IN ('waiting', 'invited')`)
+    .bind(input.storeId, startsAt).all<{ id: string; identity_key: string; customer_phone: string | null; line_uid: string | null }>()).results
+    .some(row => row.identity_key === identityKey || (!input.lineUid && !row.line_uid && customerPhone !== null && normalizePhone(row.customer_phone ?? '') === customerPhone));
   if (existing) return { ok: false, error: 'already_waiting' };
   const id = crypto.randomUUID();
   try {
-    await db
+    const inserted = await db
       .prepare(`INSERT INTO rt_seat_waitlist
         (id, store_id, starts_at, guest_count, customer_name, customer_phone,
          line_uid, identity_key,ends_at,created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?)`)
+        SELECT ?, ?, ?, ?, ?, ?, ?, ?,?,?
+        WHERE ? IS NOT NULL OR (SELECT COUNT(*) FROM rt_seat_waitlist w
+          JOIN rt_stores s ON s.id=w.store_id
+          WHERE s.line_account_id=(SELECT line_account_id FROM rt_stores WHERE id=?)
+            AND w.status IN ('waiting','invited') AND w.line_uid IS NULL
+            AND (w.identity_key=? OR ${normalizedPhoneSql}=?))<3`)
       .bind(id, input.storeId, startsAt, input.guestCount, customerName,
-        input.customerPhone, input.lineUid, identityKey,input.endsAt??new Date(startsAtMs+DEFAULT_STAY_MINUTES*60_000).toISOString(),new Date().toISOString())
+        customerPhone, input.lineUid, identityKey,input.endsAt??new Date(startsAtMs+DEFAULT_STAY_MINUTES*60_000).toISOString(),new Date().toISOString(),
+        input.lineUid, input.storeId, identityKey, customerPhone)
       .run();
+    if (!inserted.meta.changes) return { ok: false, error: 'waitlist_limit' };
   } catch (error) {
     // 同時登録の race は部分一致キーが止める。
     if (/closure_conflict/.test(String(error))) return { ok: false, error: 'closure_conflict' };
@@ -363,6 +373,7 @@ export async function insertSeatWaitlistEntry(
 }
 
 export const SEAT_WAITLIST_ERROR_STATUS: Record<string, number> = {
+  invalid_phone: 400,
   invalid_slot: 400,
   invalid_party: 400,
   invalid_starts_at: 400,

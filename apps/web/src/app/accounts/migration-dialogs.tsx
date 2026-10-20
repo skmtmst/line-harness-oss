@@ -1,5 +1,6 @@
 'use client'
 import type { LineAccount } from '@line-crm/shared'
+import { canManageRole, isOwnerRole } from '@/lib/staff-role'
 import type { UidMigrationItem } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -98,7 +99,7 @@ export function MigrationItemDialog({
         <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
           {active && !['review', 'ready', 'failed'].includes(active.status) ? (
             <span className="text-ink-faint text-xs">この移行の状態では判断を変更できません。</span>
-          ) : me && !['owner', 'admin'].includes(me.role) ? (
+          ) : !canManageRole(me?.role) ? (
             <span className="text-ink-faint text-xs">判断の保存はowner/adminが行います。</span>
           ) : (<>
             {detailItem.decision !== 'exclude' && (
@@ -167,8 +168,8 @@ export function ExecuteConfirmDialog({
         <li>実行権限：ownerのみ。テスト移行を作成した本人は実行できません。</li>
         <li>復旧：実行後、この履歴から反映済みの分だけ切り戻せます。移行後に別の変更があった行は切り戻しを止めて表示します。</li>
       </ul>
-      {me && me.role !== 'owner' && <p className="text-danger mt-2 text-sm font-semibold">本移行の実行はownerの権限が必要です。</p>}
-      {me && me.role === 'owner' && me.id === active.createdBy && <p className="text-danger mt-2 text-sm font-semibold">この移行はあなたが作成したため、別のownerが実行してください。</p>}
+      {me && !isOwnerRole(me.role) && <p className="text-danger mt-2 text-sm font-semibold">本移行の実行はownerの権限が必要です。</p>}
+      {me && isOwnerRole(me.role) && me.id === active.createdBy && <p className="text-danger mt-2 text-sm font-semibold">この移行はあなたが作成したため、別のownerが実行してください。</p>}
     </ConfirmDialog>
   )
 }
@@ -218,7 +219,7 @@ export function RollbackConfirmDialog({
           {conflicts.map((conflict) => <li key={conflict.itemId}>{conflict.oldUid}：{conflict.reason}</li>)}
         </ul>
       )}
-      {me && me.role !== 'owner' && <p className="text-danger mt-2 text-sm font-semibold">切り戻しはownerの権限が必要です。</p>}
+      {me && !isOwnerRole(me.role) && <p className="text-danger mt-2 text-sm font-semibold">切り戻しはownerの権限が必要です。</p>}
     </ConfirmDialog>
   )
 }

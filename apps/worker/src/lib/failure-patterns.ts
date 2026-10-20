@@ -1,0 +1,52 @@
+/** Legacy templates containing sizes, counts or identifiers. Captures are never echoed. */
+const PATTERNS: ReadonlyArray<readonly [pattern: RegExp, code: string, message: string]> = [
+  [/^(?:選ばれた画像を使えません: )?file size \d+ exceeds 1MB limit$/, 'RICH_MENU_IMAGE_TOO_LARGE', '画像は1MB以下にしてください。'],
+  [/^(?:選ばれた画像を使えません: )?dimensions \d+x\d+ are not supported \(need \d+x\d+ or \d+x\d+\)$/, 'INVALID_RICH_MENU_IMAGE_DIMENSIONS', '画像の大きさは2500×1686、または2500×843にしてください。'],
+  [/^選ばれた画像を使えません: unrecognized image format \(PNG or JPEG only\)$/, 'UNRECOGNIZED_IMAGE_FORMAT', '画像はPNGまたはJPEG形式を選んでください。'],
+  [/^friendIds must contain at most \d+ items$/, 'TOO_MANY_TEST_RECIPIENTS', 'テストの宛先が多すぎます。対象を減らしてください。'],
+  [/^Platform "[^\r\n]*" not found$/, 'PLATFORM_NOT_FOUND', '指定した広告サービスが見つかりません。連携の設定を確認してください。'],
+  [/^Link limit reached \(max \d+\)$/, 'LINK_LIMIT_REACHED', '登録できるリンクの上限に達しています。登録済みのリンクを確認してください。'],
+  [/^responseHolidayRule must be one of .+$/, 'INVALID_HOLIDAY_RULE', '祝日の応答方法を選び直してください。'],
+  [/^keywords must be an array of \{ keyword, matchType\?, minLength\?, caseSensitive\? \} \(at most \d+ items, \d+ characters each\)$/, 'INVALID_KEYWORDS', 'キーワードの一覧、件数、文字数を確認してください。'],
+  [/^keyword must be \d+ characters or fewer$/, 'KEYWORD_TOO_LONG', 'キーワードが長すぎます。文字数を減らしてください。'],
+  [/^responseContent must be \d+ characters or fewer$/, 'RESPONSE_CONTENT_TOO_LONG', '返信内容が長すぎます。文字数を減らしてください。'],
+  [/^messageKinds must be an array of .+$/, 'INVALID_MESSAGE_KINDS', '応答するメッセージの種類を一覧で指定してください。'],
+  [/^Unsupported broadcast variables: .+$/, 'UNSUPPORTED_BROADCAST_VARIABLES', '利用できない差し込み項目があります。配信内容を確認してください。'],
+  [/^Cannot personalize broadcast: \d+ recipient\(s\) have no display name$/, 'RECIPIENT_DISPLAY_NAME_MISSING', '表示名がない宛先があります。宛先または名前の差し込みを確認してください。'],
+  [/^messageBubbles must contain 1 to \d+ items$/, 'INVALID_MESSAGE_BUBBLES', '配信するメッセージの件数を確認してください。'],
+  [/^items must be 1-\d+ approval decisions$/, 'INVALID_APPROVAL_ITEMS', '承認・却下する対象の件数を確認してください。'],
+  [/^measureMethod must be one of .+$/, 'INVALID_MEASURE_METHOD', '成果の計測方法を選び直してください。'],
+  [/^X-[A-Za-z-]+ header is required$/i, 'INGEST_SIGNATURE_REQUIRED', '成果通知の署名がありません。連携の設定を確認してください。'],
+  [/^X-[A-Za-z-]+ header or sourceEventId is required$/i, 'INGEST_EVENT_ID_REQUIRED', '成果通知のイベント番号を指定してください。'],
+  [/^Unsupported image type: .+\. Allowed: .+$/, 'UNSUPPORTED_IMAGE_TYPE', '対応していない画像形式です。利用できる形式の画像を選んでください。'],
+  [/^loginChannelId '[^\r\n]*' is already assigned to another account$/, 'LOGIN_CHANNEL_IN_USE', 'このLINEログインチャネルは別のアカウントに登録されています。'],
+  [/^liffId '[^\r\n]*' is already assigned to another account$/, 'LIFF_ID_IN_USE', 'このお客さま用画面は別のアカウントに登録されています。'],
+  [/^messages_log has \d+ entries — refusing to reset \(would lose send trace\)$/, 'SEND_HISTORY_RESET_REFUSED', '送信履歴があるため初期化できません。記録を残したまま状態を確認してください。'],
+  [/^scope "[A-Za-z0-9_.:-]+" is required$/, 'SCOPE_REQUIRED', 'この操作に必要な権限がありません。連携の権限を確認してください。'],
+  [/^triggerType must be one of .+$/, 'INVALID_TRIGGER_TYPE', '通知のきっかけを選び直してください。'],
+  [/^leapYearPolicy must be one of .+$/, 'INVALID_LEAP_YEAR_POLICY', 'うるう年の日付の扱いを選び直してください。'],
+  [/^deliveryMode must be one of .+$/, 'INVALID_DELIVERY_MODE', '送る方法を選び直してください。'],
+  [/^messageType must be one of .+$/, 'INVALID_MESSAGE_TYPE', 'メッセージの種類を選び直してください。'],
+  [/^area\.\w+ must be a non-negative number$/, 'INVALID_AREA_POSITION', 'タップ領域の位置と大きさは0以上の数値で指定してください。'],
+  [/^area\.actionType must be one of .+$/, 'INVALID_AREA_ACTION_TYPE', 'タップしたときの動作を選び直してください。'],
+  [/^area\.intent must be one of .+$/, 'INVALID_AREA_INTENT', 'タップしたときの目的を選び直してください。'],
+  [/^area\.\w+ must be non-empty string when present$/, 'INVALID_AREA_VALUE', 'タップ領域の項目を指定する場合は、空にしないでください。'],
+  [/^area\.actionData\.\w+ must be a valid identifier$/, 'INVALID_AREA_ACTION_DATA', 'タップしたときの動作の対象を選び直してください。'],
+  [/^pages exceeds limit of \d+$/, 'TOO_MANY_PAGES', 'ページ数が上限を超えています。ページを減らしてください。'],
+  [/^page\.id "[^\r\n]*" is duplicated in pages array$/, 'DUPLICATE_PAGE_ID', '同じページが重複しています。ページの一覧を確認してください。'],
+  [/^LINE rich menu list failed: \d{3}$/, 'LINE_RICH_MENU_LIST_FAILED', 'LINEのリッチメニューを取得できませんでした。連携の状態を確認してください。'],
+  [/^image size '[^\r\n]*' does not match group size '[^\r\n]*'$/, 'IMAGE_SIZE_MISMATCH', '画像の大きさがメニューと一致しません。画像を選び直してください。'],
+  [/^Failed to (?:un)?link rich menu (?:to|from) friend: .+$/, 'RICH_MENU_LINK_FAILED', '友だちのリッチメニューを変更できませんでした。適用の状態を確認してください。'],
+  [/^Failed to (?:fetch|create|delete|set default) rich menus?: .+$/, 'RICH_MENU_OPERATION_FAILED', 'リッチメニューを操作できませんでした。LINEの適用の状態を確認してください。'],
+  [/^Unsupported conditionType "[^\r\n]*" \(supported: .+\)$/, 'UNSUPPORTED_CONDITION_TYPE', '利用できない条件の種類です。条件を選び直してください。'],
+  [/^Cannot activate webhook: secret must be at least \d+ characters\. Update the secret first\.$/, 'WEBHOOK_SECRET_TOO_SHORT', '通知を有効にする前に、署名用の秘密の文字列を必要な長さで設定してください。'],
+  [/^Cannot activate webhook: .+$/, 'WEBHOOK_ACTIVATION_REFUSED', '通知を有効にできません。通知先と署名の設定を確認してください。'],
+  [/^name must be 1-\d+ characters$/, 'INVALID_NAME_LENGTH', '名前の文字数を確認してください。'],
+  [/^scopes must be a non-empty subset of: .+$/, 'INVALID_SCOPES', '利用できる権限を1つ以上選んでください。'],
+];
+
+export function patternedFailure(reason: unknown): readonly [string, string] | undefined {
+  if (typeof reason !== 'string' || reason.length > 2000) return undefined;
+  const match = PATTERNS.find(([pattern]) => pattern.test(reason));
+  return match ? [match[1], match[2]] : undefined;
+}

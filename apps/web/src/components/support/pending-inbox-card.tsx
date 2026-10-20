@@ -1,8 +1,9 @@
 'use client'
 
+import { loadStaffIdentity } from '@/lib/staff-role'
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError, api, fetchApi } from '@/lib/api'
+import { ApiError, fetchApi } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
 import Pagination from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -133,7 +134,7 @@ export default function PendingInboxCard({
    */
   useEffect(() => {
     let cancelled = false
-    void api.staff.me()
+    void loadStaffIdentity()
       .then((response) => {
         if (cancelled || !response.success) return
         staffIdRef.current = response.data.id

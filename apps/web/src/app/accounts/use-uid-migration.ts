@@ -1,5 +1,6 @@
 'use client'
 
+import { useStaffIdentity, useStaffRole, isOwnerRole, canManageRole } from '@/lib/staff-role'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
@@ -125,7 +126,9 @@ export function useUidMigration() {
   const detailTicket = useRef(0)
   const [detailBusy, setDetailBusy] = useState(false)
   /* FRIEND-33/36: 実行・切り戻しの権限と作成者判定に使う自分自身の情報。 */
-  const [me, setMe] = useState<{ id: string; role: string } | null>(null)
+  const identity = useStaffIdentity()
+  const staffRole = useStaffRole()
+  const me = identity && staffRole ? { id: identity.id, role: staffRole } : null
   /* FRIEND-14: 「詳細を見る」は読み取り専用。判断はダイアログ内の明示操作だけ。 */
   const [detailItem, setDetailItem] = useState<UidMigrationItem | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
@@ -189,18 +192,7 @@ export function useUidMigration() {
     } catch {
       setStatus('error')
     }
-    /*
-      実行権限の案内用に自分のid/roleだけ取る。失敗しても画面は出す
-      （実行可否はサーバーが最終判断する）。
-    */
-    try {
-      const meResponse = await api.staff.me()
-      if (meResponse.success && meResponse.data) {
-        setMe({ id: meResponse.data.id, role: meResponse.data.role })
-      }
-    } catch {
-      /* 権限が読めなくても操作自体はサーバーが止める */
-    }
+
   }, [loadDetail])
 
   useEffect(() => { void load() }, [load])
@@ -228,6 +220,7 @@ export function useUidMigration() {
   }
 
   const createDryRun = async () => {
+    if (!canManageRole(me?.role) || busy) return
     if (!file || mappingsFile !== file || mappings.length === 0 || !fromAccountId || !toAccountId || !purpose.trim()) {
       setMessage('移行元・移行先・利用目的と、old_uid / new_uid 列を持つCSVを選んでください。')
       return
@@ -256,7 +249,7 @@ export function useUidMigration() {
   }
 
   const decide = async (item: UidMigrationItem, decision: UidMigrationDecision) => {
-    if (!active || busy || detailBusy) return
+    if (!canManageRole(me?.role) || !active || busy || detailBusy) return
     setBusy(true)
     setMessage(null)
     setDetailError(null)
@@ -298,11 +291,11 @@ export function useUidMigration() {
     作成者本人・owner以外はここで理由を示し、確定ボタンを出さない
     （サーバー側でも 409/403 で拒否する）。
   */
-  const canRunExecute = me ? me.role === 'owner' && me.id !== active?.createdBy : true
-  const canRunRollback = me ? me.role === 'owner' : true
+  const canRunExecute = Boolean(me && isOwnerRole(me.role) && me.id !== active?.createdBy)
+  const canRunRollback = Boolean(me && isOwnerRole(me.role))
 
   const execute = async () => {
-    if (!active || busy) return
+    if (!canRunExecute || !active || busy) return
     setBusy(true)
     setExecuteError(null)
     try {
@@ -357,7 +350,7 @@ export function useUidMigration() {
     対象件数・制約・権限を示し、競合があればサーバーの409をそのまま表示する。
   */
   const rollback = async () => {
-    if (!active || busy) return
+    if (!canRunRollback || !active || busy) return
     setBusy(true)
     setRollbackError(null)
     setRollbackConflicts([])

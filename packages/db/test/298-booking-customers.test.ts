@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createBookingCustomer,
+  normalizeBookingCustomerPhone,
   getBookingCustomer,
   searchBookingCustomers,
 } from '../src/booking/customers.js';
@@ -179,5 +180,15 @@ describe('298 booking customers', () => {
     } finally {
       legacy.close();
     }
+  });
+});
+
+describe('予約顧客の国内電話の境界', () => {
+  it('全角と区切りを数字だけにそろえる', () => {
+    expect(normalizeBookingCustomerPhone('（０９０）１２３４－５６７８')).toBe('09012345678');
+    expect(normalizeBookingCustomerPhone('03 1234 5678')).toBe('0312345678');
+  });
+  it.each(['1234567890','090123456','090123456789','+819012345678','090abc12345678',''])('不正な番号%sを保存しない', phone => {
+    expect(() => normalizeBookingCustomerPhone(phone)).toThrow('booking_customer_phone_invalid');
   });
 });

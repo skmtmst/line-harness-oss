@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -114,7 +115,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
   const summary = data?.summary
   return <>
     <KpiBand presentation="band">
-      <KpiCard title="続いている定期便" icon={<Repeat2 size={13} />} value={summary?.active} unit="件" detail={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`} />
+      <KpiCard title="続いている定期便" icon={<Repeat2 size={13} />} value={summary?.active} unit="件" detail={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ${formatYen(summary.monthlyAmount)}`} />
       <KpiCard title="今月 はじまった" icon={<Play size={13} />} value={summary?.startedThisMonth} unit="件" detail="初回の発送済み —" help="初回の発送数はまだ数えていません。開始日はECの定期便から集計しています。" />
       <KpiCard title="今月 止まった" icon={<Pause size={13} />} value={summary?.cancelledThisMonth} unit="件" detail="休止 —・解約 —" help="休止と解約は現在の契約数です。今月の内訳は未取得です。" />
       <KpiCard title="支払いを確認" icon={<CreditCard size={13} />} value={summary?.atRisk} unit="件" detail="ECから届いた決済状態" />
@@ -127,7 +128,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
       <thead><TableHeadRow><Th>お客様と中身</Th><Th align="right">1回の金額</Th><Th>次の発送</Th><Th align="right">続いた回数</Th><Th>ようす</Th><Th aria-label="操作" /></TableHeadRow></thead>
       <tbody>{shown.map((item) => <Tr key={item.id} data-row-id={item.id}>
         <Td><span className={shared.stack}><span className={shared.main} title={item.ownerName ?? undefined}>{item.ownerName ?? 'お客様名 —'}{item.petName ? `（${item.petName}）` : ''}</span><span className={shared.sub} title={item.items ?? undefined}>{[item.items ?? '中身 未取得', item.cycle].filter(Boolean).join('・')}</span></span></Td>
-        <Td align="right">{item.amount == null ? emptyValue('unknown') : `¥${formatNumber(item.amount)}`}</Td>
+        <Td align="right">{item.amount == null ? emptyValue('unknown') : `${formatYen(item.amount)}`}</Td>
         <Td>{shortDate(item.nextShippingAt)}</Td>
         <Td align="right">{item.continuedCount == null ? emptyValue('unknown') : `${item.continuedCount}回`}</Td>
         <Td><span className={shared.stack}><StatusBadge tone={STATUS_TONE[item.status]} size="compact">{FILTERS.find((f) => f.key === item.status)?.label ?? item.statusLabel}</StatusBadge>{item.riskReason || item.cancellationReason ? <span className={shared.sub} title={item.riskReason ?? item.cancellationReason ?? undefined}>{item.riskReason ?? `理由「${item.cancellationReason}」`}</span> : null}</span></Td>
@@ -142,6 +143,6 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
       <PageSizeSelect value={v8PageSize} options={[10, 20, 50]} onChange={(value) => { setV8PageSize(value); setPage(1) }} />
       <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / pageSize))} onPageChange={setPage} ariaLabel="定期便のページ送り" />
     </div>
-    {(summary?.monthlyStats ?? []).length > 0 ? <Disclosure title="月別の定期便" size="compact" hint={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ¥${formatNumber(summary.monthlyAmount)}`}><DataTable><thead><TableHeadRow><Th>月</Th><Th>契約数</Th><Th align="right">金額</Th></TableHeadRow></thead><tbody>{summary?.monthlyStats.slice(-6).map((item) => <Tr key={item.month}><Td>{item.month}</Td><Td>{formatNumber(item.count)} 件</Td><Td align="right">¥{formatNumber(item.amount)}</Td></Tr>)}</tbody></DataTable></Disclosure> : null}
+    {(summary?.monthlyStats ?? []).length > 0 ? <Disclosure title="月別の定期便" size="compact" hint={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ${formatYen(summary.monthlyAmount)}`}><DataTable><thead><TableHeadRow><Th>月</Th><Th>契約数</Th><Th align="right">金額</Th></TableHeadRow></thead><tbody>{summary?.monthlyStats.slice(-6).map((item) => <Tr key={item.month}><Td>{item.month}</Td><Td>{formatNumber(item.count)} 件</Td><Td align="right">{formatYen(item.amount)}</Td></Tr>)}</tbody></DataTable></Disclosure> : null}
   </>
 }

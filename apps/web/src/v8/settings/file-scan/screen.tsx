@@ -1,5 +1,6 @@
 'use client'
 
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
@@ -54,6 +55,7 @@ export default function FileScanScreen() {
   const {
     selectedAccountId,
     phase,
+    canEdit,
     items,
     total,
     counts,
@@ -211,7 +213,7 @@ export default function FileScanScreen() {
         ) : (
           <ListState kind="empty" title="LINEアカウントを選んでください" description="ファイルの検査はLINEアカウントごとに管理します。" />
         )}
-        {dialogs}
+        {canEdit ? dialogs : null}
       </SbSettingsScreen>
     )
   }
@@ -268,13 +270,13 @@ export default function FileScanScreen() {
                   {item.reasonLabel ?? '確認が必要です'}
                 </GridCell>
                 <GridCell role="cell" className={styles.actions}>
-                  {item.status === 'quarantined' ? (
+                  {canEdit && item.status === 'quarantined' ? (
                     <Button variant="text" onClick={() => openRelease(item)}>
                       <RotateCcw className={styles.btnIcon} aria-hidden="true" />
                       使えるように戻す
                     </Button>
                   ) : null}
-                  {item.status === 'quarantined' || item.status === 'rejected' ? (
+                  {canEdit && (item.status === 'quarantined' || item.status === 'rejected') ? (
                     <span className={styles.menuBox}>
                       <RowMenu
                         label={`${item.filename}のその他操作`}
@@ -304,18 +306,19 @@ export default function FileScanScreen() {
         </div>
       ) : null}
 
+      {!canEdit ? <ReadOnlyNotice /> : null}
       <Card variant="form" aria-label="外の検査サービス">
         <CardHeader title="外の検査サービス" size="content" meta={externalOn
                 ? '外の検査への送信は有効です。接続先の稼働状況を確認した表示ではありません。'
                 : externalConfigured && config?.externalEnabled === undefined
                   ? '外の検査への送信状態を確認できません。読み直してください。'
-                  : '外の検査への送信は停止中です。いまは内蔵の簡易検査だけです。'} action={<>
+                  : '外の検査への送信は停止中です。いまは内蔵の簡易検査だけです。'} action={canEdit ? <>
           {externalConfigured ? <Button variant="secondary" type="button" disabled={configBusy} onClick={() => { setStopExternal(true); setStopError('') }}>外の検査を止める</Button> : null}
           <Button variant="secondary" type="button" actionWording onClick={toggleConfigOpen}><SlidersHorizontal aria-hidden="true" />{configOpen ? '設定を閉じる' : '設定を編集'}</Button>
-        </>} />
+        </> : undefined} />
         {legacySecret ? <Notice tone="warn">古い鍵の名前は使えません。運営が用意した検査専用の鍵の名前へ変更してください。</Notice> : null}
         {externalConfigured && !externalOn && config?.externalEnabled === false && !legacySecret ? <Notice tone="warn">現在の設定では外の検査へ送信できません。送り先と鍵の名前の組を運営に確認してください。</Notice> : null}
-        {configOpen ? (
+        {canEdit && configOpen ? (
           <div className={styles.form}>
             <Field label="提供元" htmlFor="file-scan-provider" requirement={configFields.requirement('externalProvider')} error={configFields.error('externalProvider')}>
               <SaveErrorField names={["externalProvider","provider"]}><TextField {...configFields.bind('externalProvider')} id="file-scan-provider" value={provider} onChange={(event) => setProvider(event.target.value)} placeholder="例：example-scan" /></SaveErrorField>
@@ -335,7 +338,7 @@ export default function FileScanScreen() {
         ) : null}
       </Card>
 
-      {dialogs}
+      {canEdit ? dialogs : null}
     </SbSettingsScreen>
   )
 }

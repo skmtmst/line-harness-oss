@@ -1,3 +1,4 @@
+import { formatYen as yen } from '@line-crm/shared';
 import type { EcItem } from '../features/ec-commerce/member-snapshot/index.js';
 export { syncMemberSnapshot } from '../features/ec-commerce/member-snapshot/index.js';
 import { syncMemberSnapshot } from '../features/ec-commerce/member-snapshot/index.js';
@@ -82,11 +83,7 @@ export function validateEvent(value: unknown): value is EcEvent {
   return true;
 }
 
-function yen(value: number | undefined): string {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? `¥${Math.round(value).toLocaleString('ja-JP')}`
-    : '—';
-}
+
 
 function itemSummary(items: EcItem[] | undefined): string {
   if (!items?.length) return '商品情報なし';

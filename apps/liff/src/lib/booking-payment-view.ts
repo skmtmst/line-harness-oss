@@ -1,3 +1,4 @@
+import { formatYen as yen } from '@line-crm/shared';
 import { CUSTOMER_WORDS } from './customer-words.js';
 import { api, type BookingHistoryItem, type BookingPayment, type MenuItem } from './api.js';
 import { logFailure } from './user-message.js';
@@ -34,9 +35,7 @@ const LABELS: Record<PaymentKind, { label: string; tone: PaymentView['tone'] }> 
   onsite: { label: CUSTOMER_WORDS.payOnsite, tone: TONE.info },
 };
 
-export function yen(amount: number): string {
-  return `¥${amount.toLocaleString('ja-JP')}`;
-}
+export { yen };
 
 /** 札の文字（「お支払い済み ¥8,800」）。金額が分からないときは名前だけ。 */
 export function paymentText(view: PaymentView, onsiteLabel = CUSTOMER_WORDS.payOnsite): string {

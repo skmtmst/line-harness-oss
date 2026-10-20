@@ -1,5 +1,6 @@
 'use client'
 
+import { canManageRole, isOwnerRole } from '@/lib/staff-role'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
 import { Steps } from '@/components/templates/steps'
@@ -107,14 +108,14 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
   }
 
   const executeBlockedReason = me
-    ? me.role !== 'owner'
+    ? !isOwnerRole(me.role)
       ? '本移行の実行はownerの権限が必要です。'
       : me.id === active?.createdBy
         ? 'この移行はあなたが作成したため、別のownerが実行してください。'
         : null
-    : null
-  const rollbackBlockedReason = me && me.role !== 'owner' ? '切り戻しはownerの権限が必要です。' : null
-  const canDecideItems = !me || ['owner', 'admin'].includes(me.role)
+    : '権限を確認できません。読み直してください。'
+  const rollbackBlockedReason = canRunRollback ? null : '切り戻しはownerの権限が必要です。'
+  const canDecideItems = canManageRole(me?.role)
 
   const currentStep = !active
     ? 0
@@ -289,7 +290,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         accounts={accounts}
         me={me}
         busy={busy}
-        open={confirmExecute}
+        open={confirmExecute && isOwnerRole(me?.role)}
         error={executeError}
         canRun={canRunExecute}
         onConfirm={() => void execute()}
@@ -299,7 +300,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         active={active}
         me={me}
         busy={busy}
-        open={confirmRollback}
+        open={confirmRollback && canRunRollback}
         error={rollbackError}
         conflicts={rollbackConflicts}
         canRun={canRunRollback}

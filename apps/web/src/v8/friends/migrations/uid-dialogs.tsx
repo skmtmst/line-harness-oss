@@ -6,6 +6,7 @@
  * 文言・権限の言い分け・確定ボタンだけが実行する決まりは同じ。見た目のクラスだけ V8 の画面 CSS に替えた。
  */
 import type { LineAccount } from '@line-crm/shared'
+import { canManageRole, isOwnerRole } from '@/lib/staff-role'
 import type { UidMigrationItem } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -80,7 +81,7 @@ export function MigrationItemDialog({
         <div className={styles.dialogActions}>
           {active && !['review', 'ready', 'failed'].includes(active.status) ? (
             <span className={styles.small}>この移行の状態では判断を変更できません。</span>
-          ) : me && !['owner', 'admin'].includes(me.role) ? (
+          ) : !canManageRole(me?.role) ? (
             <span className={styles.small}>判断の保存はowner/adminが行います。</span>
           ) : (
             <>
@@ -140,8 +141,8 @@ export function ExecuteConfirmDialog({
         <li>実行権限：ownerのみ。テスト移行を作成した本人は実行できません。</li>
         <li>復旧：実行後、この履歴から反映済みの分だけ切り戻せます。移行後に別の変更があった行は切り戻しを止めて表示します。</li>
       </ul>
-      {me && me.role !== 'owner' ? <p className={styles.dangerNote}>本移行の実行はownerの権限が必要です。</p> : null}
-      {me && me.role === 'owner' && me.id === active.createdBy ? <p className={styles.dangerNote}>この移行はあなたが作成したため、別のownerが実行してください。</p> : null}
+      {me && !isOwnerRole(me.role) ? <p className={styles.dangerNote}>本移行の実行はownerの権限が必要です。</p> : null}
+      {me && isOwnerRole(me.role) && me.id === active.createdBy ? <p className={styles.dangerNote}>この移行はあなたが作成したため、別のownerが実行してください。</p> : null}
     </ConfirmDialog>
   )
 }
@@ -183,7 +184,7 @@ export function RollbackConfirmDialog({
           {conflicts.map((conflict) => <li key={conflict.itemId}>{`${conflict.oldUid}：${conflict.reason}`}</li>)}
         </ul>
       ) : null}
-      {me && me.role !== 'owner' ? <p className={styles.dangerNote}>切り戻しはownerの権限が必要です。</p> : null}
+      {me && !isOwnerRole(me.role) ? <p className={styles.dangerNote}>切り戻しはownerの権限が必要です。</p> : null}
     </ConfirmDialog>
   )
 }

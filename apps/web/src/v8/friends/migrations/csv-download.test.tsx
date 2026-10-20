@@ -2,7 +2,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
 const model = vi.hoisted(() => ({ role: 'owner', download: vi.fn() }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => model.role }))
+vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => model.role }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, downloadApiFile: model.download, api: { ...actual.api,

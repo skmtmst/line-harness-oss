@@ -1,4 +1,5 @@
 'use client'
+import { formatYen as yen } from '@line-crm/shared';
 import { useEffect, useState, type ReactNode } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Steps } from '@/components/templates/steps'
@@ -65,7 +66,7 @@ export function CancelReservationDialog({ open, title, subtitle, facts, fullAmou
           <Field label="お支払いの扱い" optional={false}>
             <div className={styles.choices} role="radiogroup" aria-label="お支払いの扱い">
               <Radio name="cancel-refund" checked={refund === 'none'} onChange={() => setRefund('none')}>決まりどおり返金しない</Radio>
-              <Radio name="cancel-refund" checked={refund === 'full'} onChange={() => setRefund('full')}>{`全額を返金する（¥${fullAmount.toLocaleString('ja-JP')}）`}</Radio>
+              <Radio name="cancel-refund" checked={refund === 'full'} onChange={() => setRefund('full')}>{`全額を返金する（${yen(fullAmount)}）`}</Radio>
               <Radio name="cancel-refund" checked={refund === 'partial'} onChange={() => setRefund('partial')}>一部を返金する（次で金額を入れる）</Radio>
             </div>
           </Field>
@@ -105,7 +106,6 @@ export function RefundDialog({ open, subtitle, facts, paidAmount, testMode, busy
   useEffect(() => { if (open) { setStep(1); setMode('full'); setAmountText(''); setReason(''); setNotify(true) } }, [open])
   const amount = mode === 'full' ? paidAmount : Number(amountText.replace(/[^0-9]/g, '')) || 0
   const amountOk = amount > 0 && amount <= paidAmount
-  const yen = (n: number) => `¥${n.toLocaleString('ja-JP')}`
   const steps = <Steps label="返金の手順" currentKey={String(step)} steps={[{ key: '1', label: '金額と理由', state: step > 1 ? 'done' : 'todo' }, { key: '2', label: '確かめ', state: 'todo' }]} />
   return (
     <Dialog contentLayout="form" open={open} title={step === 1 ? '返金する' : `${yen(amount)} を返金しますか？`} description={subtitle} designWidth={480} busy={busy} error={error} steps={steps} stepKey={step}
@@ -176,7 +176,7 @@ export function CancelClassDialog({ open, subtitle, facts, counts, testMode, bus
         <Facts facts={facts} testMode={testMode} testText="本当の返金は起きません" />
         {counts.paid || counts.tickets || counts.unpaid ? <Field label="お金と回数券の扱い" optional={false}>
           <div className={styles.choices}>
-            {counts.paid ? <Checkbox checked={refundPaid} onCheckedChange={setRefundPaid}>{`支払い済みの ${counts.paid}人に全額を返金する（¥${counts.paidAmount.toLocaleString('ja-JP')}）`}</Checkbox> : null}
+            {counts.paid ? <Checkbox checked={refundPaid} onCheckedChange={setRefundPaid}>{`支払い済みの ${counts.paid}人に全額を返金する（${yen(counts.paidAmount)}）`}</Checkbox> : null}
             {counts.tickets ? <Checkbox checked={restoreTickets} onCheckedChange={setRestoreTickets}>{`回数券の ${counts.tickets}人に 1回分を戻す`}</Checkbox> : null}
             {counts.unpaid ? <Checkbox checked={stopPaymentLinks} onCheckedChange={setStopPaymentLinks}>{`未払いの ${counts.unpaid}人の支払いのリンクを止める`}</Checkbox> : null}
           </div>

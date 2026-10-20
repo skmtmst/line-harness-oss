@@ -1,3 +1,4 @@
+import { fail } from '../lib/fail.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -65,7 +66,7 @@ opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), inputJso
   const before = await getKnowledgeArticle(db, c.req.param('id'));
   if (!before) return c.json({ success: false, error: '記事が見つかりません' }, 404);
   const ticket = await getSupportTicket(db, before.source_request_id);
-  if (!ticket) return c.json(conflict, 409);
+  if (!ticket) return fail(c, 409, 'CONFLICT', conflict);
   const messages = await listSupportMessages(db, ticket.id);
   const names = knowledgeNames(ticket, messages);
   const input: KnowledgeArticleInput = {
@@ -79,7 +80,7 @@ opsKnowledge.put('/api/ops/knowledge/:id', requirePlatformAdminWrite(), inputJso
   const evidence = contentChanged
     ? retainExistingKnowledgeEvidence(JSON.parse(before.evidence), knowledgeSources(ticket, messages))
     : JSON.parse(before.evidence);
-  if (!(await editKnowledgeArticle(db, before.id, Number(body.version), input, articleKind, evidence))) return c.json(conflict, 409);
+  if (!(await editKnowledgeArticle(db, before.id, Number(body.version), input, articleKind, evidence))) return fail(c, 409, 'CONFLICT', conflict);
   const staff = c.get('staff');
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name, action: 'knowledge.update',
     detail: { articleId: before.id, version: before.version + 1, articleKind }, visibleToTenant: false });
@@ -98,11 +99,11 @@ opsKnowledge.post('/api/ops/knowledge/:id/review', requirePlatformAdminWrite(), 
     if (article.article_kind === 'verified') {
       const ticket = await getSupportTicket(db, article.source_request_id);
       const messages = ticket ? await listSupportMessages(db, ticket.id) : [];
-      if (!ticket || !validateKnowledgeEvidence(JSON.parse(article.evidence), knowledgeSources(ticket, messages))) return c.json(conflict, 409);
+      if (!ticket || !validateKnowledgeEvidence(JSON.parse(article.evidence), knowledgeSources(ticket, messages))) return fail(c, 409, 'CONFLICT', conflict);
     }
   }
   const staff = c.get('staff');
-  if (!(await reviewKnowledgeArticle(db, article.id, Number(body.version), action, staff.id))) return c.json(conflict, 409);
+  if (!(await reviewKnowledgeArticle(db, article.id, Number(body.version), action, staff.id))) return fail(c, 409, 'CONFLICT', conflict);
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name, action: 'knowledge.status',
     detail: { articleId: article.id, action, version: Number(body.version) + 1,
       articleKind: article.article_kind }, visibleToTenant: false });
@@ -113,7 +114,7 @@ opsKnowledge.post('/api/ops/knowledge/:id/feedback', requirePlatformAdminWrite()
   const body = await c.req.json<{ requestId?: unknown; feedback?: unknown }>().catch(() => null);
   if (!body || typeof body.requestId !== 'string' || (body.feedback !== 'helpful' && body.feedback !== 'unhelpful')) return inputError(c, invalid, 400, ["requestId","feedback"]);
   const db = dbFor(c.env);
-  if (!(await knowledgeFeedback(db, c.req.param('id'), body.requestId, body.feedback))) return c.json(conflict, 409);
+  if (!(await knowledgeFeedback(db, c.req.param('id'), body.requestId, body.feedback))) return fail(c, 409, 'CONFLICT', conflict);
   const staff = c.get('staff');
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name, action: 'knowledge.feedback',
     detail: { articleId: c.req.param('id'), requestId: body.requestId, feedback: body.feedback }, visibleToTenant: false });
@@ -137,7 +138,7 @@ opsKnowledge.post('/api/ops/knowledge/tickets/:id/process', requirePlatformAdmin
 
 opsKnowledge.post('/api/ops/knowledge/tickets/:id/retry', requirePlatformAdminWrite(), inputJsonBoundary(), async c => {
   const db = dbFor(c.env);
-  if (!(await retryKnowledgeJob(db, c.req.param('id')))) return c.json(conflict, 409);
+  if (!(await retryKnowledgeJob(db, c.req.param('id')))) return fail(c, 409, 'CONFLICT', conflict);
   const staff = c.get('staff');
   await recordPlatformAudit(db, { staffId: staff.id, staffName: staff.name, action: 'knowledge.update',
     detail: { requestId: c.req.param('id'), operation: 'retry' }, visibleToTenant: false });

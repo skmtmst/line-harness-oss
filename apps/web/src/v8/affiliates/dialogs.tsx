@@ -1,4 +1,5 @@
 'use client'
+import { formatYen as yen } from '@line-crm/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Landmark, X } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -29,9 +30,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 type LoadPhase = 'loading' | 'ready' | 'empty' | 'error'
 
-function yen(value: number): string {
-  return `¥${formatNumber(Math.round(value))}`
-}
+
 
 function dateLabel(value: string | null): string {
   return polishFormatDate(value, { style: 'day', fallback: '—' })

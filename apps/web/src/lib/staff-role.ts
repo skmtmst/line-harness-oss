@@ -10,8 +10,8 @@ export function canManageRole(role: string | null | undefined): boolean {
 }
 
 /**
- * オーナーだけの操作。要件 v6-33 §15 で `account.line.register`（登録・接続確認）や
- * 資格情報の差し替えなど、管理者にも渡していない鍵がある。
+ * オーナーだけの操作。資格情報の差し替えなど、管理者にも渡していない鍵がある。
+ * LINEアカウントの新規登録・接続確認は canManageRole を使う。
  * 管理者に入口を出すとサーバの403で行き止まりになるので、出す側でここを使って分ける。
  */
 export function isOwnerRole(role: string | null | undefined): boolean {
@@ -26,9 +26,44 @@ export function isOwnerRole(role: string | null | undefined): boolean {
  * そのあいだ変更操作を隠す。
  * 最後の守りはサーバの 403（失敗時は権限不足の文を出す）。
  */
-let pendingIdentity: Promise<void> | null = null
+let pendingIdentity: ReturnType<typeof requestStaffIdentity> | null = null
 let consumers = 0
 const serverIdentity = () => null
+
+/** 読み取り専用の束は役割の表示名より優先する。 */
+export function effectiveStaffRole(identity: Pick<StaffMember, 'role' | 'readOnly' | 'roleBundle'> | null): StaffMember['role'] | null {
+  return identity ? identity.readOnly || identity.roleBundle === 'view_only' ? 'viewer' : identity.role : null
+}
+
+/** 本人ID等も必要な非同期の読み込み用。失敗・古いセッションは許可へ変えない。 */
+async function requestStaffIdentity(generation: number) {
+  try {
+    const response = await api.staff.me()
+    if (generation !== staffIdentityGeneration()) throw new Error('Staff session changed')
+    if (!response.success) {
+      forgetStaffIdentity()
+      return response
+    }
+    // フックがセッション失効を監視している間だけ共有する。
+    // 名前・IDだけの単発読取を、次のログインの権限キャッシュにしない。
+    if (consumers > 0) rememberStaffIdentity(response.data)
+    return { ...response, data: { ...response.data, role: effectiveStaffRole(response.data)! } }
+  } catch (error) {
+    if (generation === staffIdentityGeneration()) forgetStaffIdentity()
+    throw error
+  }
+}
+
+export function loadStaffIdentity() {
+  if (!pendingIdentity) {
+    const generation = staffIdentityGeneration()
+    const request = Promise.resolve().then(() => requestStaffIdentity(generation)).finally(() => {
+      if (pendingIdentity === request) pendingIdentity = null
+    })
+    pendingIdentity = request
+  }
+  return pendingIdentity
+}
 
 export function useStaffIdentity(): StaffMember | null {
   const identity = useSyncExternalStore(subscribeStaffIdentity, readStaffIdentity, serverIdentity)
@@ -41,14 +76,7 @@ export function useStaffIdentity(): StaffMember | null {
     window.addEventListener(SESSION_LOST_EVENT, invalidate)
     window.addEventListener('storage', onStorage)
     if (!readStaffIdentity() && !pendingIdentity) {
-      const generation = staffIdentityGeneration()
-      const request = Promise.resolve().then(() => api.staff.me()).then((response) => {
-        if (generation !== staffIdentityGeneration() || !response.success) return
-        rememberStaffIdentity(response.data)
-      }).catch(() => {}).finally(() => {
-        if (pendingIdentity === request) pendingIdentity = null
-      })
-      pendingIdentity = request
+      void loadStaffIdentity().catch(() => {})
     }
     return () => {
       window.removeEventListener(SESSION_LOST_EVENT, invalidate)
@@ -61,8 +89,7 @@ export function useStaffIdentity(): StaffMember | null {
 
 export function useStaffRole(): string | null {
   const identity = useStaffIdentity()
-  if (!identity) return null
-  return identity.readOnly || identity.roleBundle === 'view_only' ? 'viewer' : identity.role
+  return effectiveStaffRole(identity)
 }
 
 /** 統括のひな形・配信は全社の管理者だけ（APIのaccount_scope判定と同じ）。 */

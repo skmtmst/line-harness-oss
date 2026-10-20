@@ -1,4 +1,5 @@
 import { allergyValues } from './fixed-friend-fields.js';
+import { maskPhone } from './phone.js';
 /** 共通盤。保存先・状態・版は種類ごとの既存契約を保つ。 */
 export type ReservationAxis = 'resource' | 'floor' | 'list' | 'month';
 export type DiningSnapshot = { allergy: string | null; anniversary: string | null; seatPreference: string | null; courseId: string | null; courseAllergens?: string[]; capturedAt: string };
@@ -38,7 +39,7 @@ export function seatBoardEntry(r:Record<string,unknown>):ReservationBoardEntry {
  return {id:String(r.id),kind:'seats',version:Number(r.customer_version??1),scopeId:String(r.store_id),
  startsAt:reservationInstant(r.starts_at),endsAt:reservationInstant(r.ends_at),status:String(r.status),customerName:String(r.customer_name),
  guestCount:Number(r.guest_count),resourceIds:links.length?links:r.table_id?[String(r.table_id)]:[],resourceLabel:r.table_label?String(r.table_label):null,
- contactLabel:r.line_uid?'LINE UID':r.customer_phone?String(r.customer_phone).replace(/^(\d{3})[- ]?\d+[- ]?(\d{4})$/,'$1-****-$2'):'電話未登録',currentAllergy:r.allergy_note?String(r.allergy_note):null,source:String(r.source),courseName:r.course_name?String(r.course_name):null,note:r.note?String(r.note):null,
+ contactLabel:r.line_uid?'LINE UID':r.customer_phone?maskPhone(String(r.customer_phone)):'電話未登録',currentAllergy:r.allergy_note?String(r.allergy_note):null,source:String(r.source),courseName:r.course_name?String(r.course_name):null,note:r.note?String(r.note):null,
  arrivedAt:r.arrived_at?reservationInstant(r.arrived_at):null,departedAt:r.departed_at?reservationInstant(r.departed_at):null,dining:diningSnapshot(r.dining_snapshot_json),holdExpiresAt:r.hold_expires_at?reservationInstant(r.hold_expires_at):null};
 }
 export function peopleBoardEntry(r:Record<string,unknown>):ReservationBoardEntry {

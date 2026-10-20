@@ -1,7 +1,7 @@
 'use client'
 
 import { useFeatureAccess } from '@/lib/use-feature-access';
-import { useStaffRole } from '@/lib/staff-role';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw, ShieldCheck } from 'lucide-react';
@@ -52,7 +52,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
   const role = useStaffRole()
   const canOperate = useFeatureAccess('richMenus')
-  const canInspectOperations = role === 'owner' || role === 'admin'
+  const canInspectOperations = canManageRole(role)
   const aggregateOnly = role === 'staff' || role === 'viewer'
 
   const [progress, setProgress] = useState<{ steps: ProgressStep[]; message: string | null; failed: boolean; completed: boolean } | null>(null)

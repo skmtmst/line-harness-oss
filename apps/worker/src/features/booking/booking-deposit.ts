@@ -1,4 +1,5 @@
 import type {DepositRule} from '@line-crm/shared';
+import { yenPercent } from '@line-crm/shared';
 import {GapError} from '../../services/gap-common.js';
 export const noDeposit:DepositRule={kind:'none',value:null,conditions:{always:true,minPeople:null,weekdays:null,timeBand:null},version:0};
 export function validDeposit(b:Record<string,unknown>){
@@ -15,7 +16,7 @@ export async function depositEstimate(db:D1Database,a:string,menu:string,price:n
  const date=new Date(starts);if(!Number.isFinite(date.getTime()))throw new GapError('invalid_starts_at');
  const weekday=new Date(date.toLocaleString('en-US',{timeZone:tz})).getDay(),time=new Intl.DateTimeFormat('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(date),c=r.conditions;
  const applicable=r.kind!=='none'&&(c.always||(!c.minPeople||people>=c.minPeople)&&(!c.weekdays||c.weekdays.includes(weekday))&&(!c.timeBand||(time>=c.timeBand.slice(0,5)&&time<c.timeBand.slice(6))));
- return {amount:applicable?(r.kind==='percent'?Math.floor(price*Number(r.value)/100):Math.min(price,Number(r.value))):0,rule:r,testMode:true,paymentCollectionAvailable:false};
+ return {amount:applicable?(r.kind==='percent'?yenPercent(price,Number(r.value)):Math.min(price,Number(r.value))):0,rule:r,testMode:true,paymentCollectionAvailable:false};
 }
 
 /** A stored option must affect the actual request, not just its settings page. */
