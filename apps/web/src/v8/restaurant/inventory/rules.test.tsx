@@ -114,11 +114,21 @@ it.each([
 })
 it('空・小数・上限超えのしきい値を保存しない', async () => {
   render(<RulesBoard {...props} />); await screen.findByRole('spinbutton')
+  expect(screen.queryByText('0〜10000')).toBeNull()
+  expect(screen.queryByText('0〜10,000 の数で入れてください')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '残り席がこの数以下で止めるの説明' }))
+  expect(await screen.findByText('0〜10,000 席の範囲で整数を入れます。')).toBeTruthy()
   for (const value of ['', '1.5', '10001', '-1']) {
     fireEvent.change(threshold(), { target: { value } })
+    expect(await screen.findByText('0〜10,000 の数で入れてください')).toBeTruthy()
+    expect(threshold().getAttribute('aria-invalid')).toBe('true')
     fireEvent.submit(screen.getByRole('form', { name: '自動で合わせるルール' }))
-    await screen.findByText('0〜10000の整数を入れてください')
     expect(api.saveInventoryRules).not.toHaveBeenCalled()
+  }
+  for (const value of ['0', '10000']) {
+    fireEvent.change(threshold(), { target: { value } })
+    expect(screen.queryByText('0〜10,000 の数で入れてください')).toBeNull()
+    expect(threshold().getAttribute('aria-invalid')).not.toBe('true')
   }
 })
 it('停止理由・元値・復元の記録を表示し、状態の再取得失敗を0件と表示しない', async () => {
