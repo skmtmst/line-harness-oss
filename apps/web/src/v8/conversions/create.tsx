@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 import { requiredText } from '@/lib/form-requirement'
 const FIELD_REQUIREMENTS = {
@@ -466,7 +467,7 @@ function ConversionCreate() {
         </div>
         <dl className={styles.previewRows}>
           <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : emptyValue('unknown')}</dd></div>
-          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `¥${formatNumber(preview.estimatedValue)}` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `${formatYen(preview.estimatedValue)}` : emptyValue('unknown')}</dd></div>
           <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)}人` : emptyValue('unknown')}</dd></div>
           <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? emptyValue('unknown') : `${formatNumber(excluded)}件`}</dd></div>
         </dl>

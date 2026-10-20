@@ -60,7 +60,7 @@ const pointActive = {
   usageNames: ['ファネル2', 'アフィリエイト1'],
   metrics: {
     recordedCount: 55, netCount: 52, reversedCount: 3, reversedValue: 9000,
-    netValue: 412000, reversalState: 'available', reversalReason: '純額定義',
+    netValue: 412000.9, reversalState: 'available', reversalReason: '純額定義',
     cancellationCount: 0, cancellationValue: 0,
   },
   stoppedAt: null,
@@ -202,6 +202,7 @@ test('v8 の下では Pencil r6dJFy の新しい一覧に切り替わる', async
   expect(host.textContent).toContain('止めている')
   // ：使う場所を足す操作は行の「…」に残す。
   const menu = host.querySelector<HTMLButtonElement>('[aria-label="成果地点「商品を買った」の操作"]')
+  expect(Array.from(menu!.closest('tr')!.querySelectorAll('td'), cell => cell.textContent)).toContain('¥412,000')
   await act(async () => menu!.click())
   await settle()
   expect(document.querySelector('[role="menu"]')?.textContent).toContain('使う場所を足す')

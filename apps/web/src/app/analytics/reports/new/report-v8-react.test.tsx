@@ -59,7 +59,8 @@ const net = vi.hoisted(() => ({
   getDeferred: [] as Array<(value: Response) => void>,
   latestVersion: '2026-09-01T00:00:00.000Z',
   latestName: null as string | null,
-  role: 'owner' as 'owner' | 'staff',
+  role: 'owner' as 'owner' | 'admin' | 'staff' | 'viewer',
+  readOnly: false, roleBundle: undefined as string | undefined,
   noStaff: false,
   posts: [] as Record<string, unknown>[],
 }))
@@ -69,7 +70,7 @@ function installFetch() {
     const raw = typeof input === 'string' ? input : String(input)
     const url = new URL(raw.startsWith('http') ? raw : `https://worker.example.com${raw}`)
     if (url.pathname === '/api/staff/me') {
-      return new Response(JSON.stringify({ success: true, data: { role: net.role } }), { status: 200 })
+      return new Response(JSON.stringify({ success: true, data: { role: net.role, readOnly: net.readOnly, roleBundle: net.roleBundle } }), { status: 200 })
     }
     if (url.pathname.startsWith('/api/analytics/report-schedules/report-1') && (init?.method ?? 'GET') === 'PUT') {
       if (net.putMode === 'failure') {
@@ -155,6 +156,7 @@ async function click(element: HTMLElement) {
 }
 
 beforeEach(() => {
+  net.role = 'owner'; net.readOnly = false; net.roleBundle = undefined
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   document.documentElement.dataset.theme = 'v8'
   fixture.editId = null
@@ -208,8 +210,10 @@ describe('V8 レポート作成（H5UoIu）', () => {
     expect(container.textContent).toContain('宛先がブロックしていると、LINE では届きません')
   })
 
-  it('閲覧のみ：作る・送る・宛先を足す・選ぶ・札の × を置かない（帯は出す）', async () => {
-    net.role = 'staff'
+  it.each([
+    { role: 'staff' as const }, { role: 'viewer' as const }, { role: 'admin' as const, readOnly: true }, { role: 'owner' as const, roleBundle: 'view_only' },
+  ])('閲覧のみ：作る・送る・宛先を足す・選ぶ・札の × を置かない: %j', async identity => {
+    Object.assign(net, identity)
     try {
       await mount()
       await settle()

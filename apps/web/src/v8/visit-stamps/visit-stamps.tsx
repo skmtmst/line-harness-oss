@@ -143,7 +143,7 @@ function VisitStampsScreen() {
   const role = useStaffRole()
   /* 役割が分かるまでは出す（最後の守りはサーバの 403）。閲覧のみ（viewer）には変える操作を置かない。 */
   const canManage = canManageRole(role)
-  const canStamp = role !== 'viewer'
+  const canStamp = canManageRole(role) || role === 'staff'
 
   const [cards, setCards] = useState<VisitStampCard[] | null>(null)
   const [loadError, setLoadError] = useState<unknown>(null)

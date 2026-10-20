@@ -167,7 +167,7 @@ const liff = (
 });
 const customerDetails = {
   note: {type:['string','null'],maxLength:200,description:'ご要望（任意）。空欄またはnullで消す'},
-  customerPhone: {type:['string','null'],maxLength:50,description:'電話（任意）。数字・空白・括弧・ハイフン・+。空欄またはnullで消す'},
+  customerPhone: {type:['string','null'],maxLength:50,description:'電話（任意）。全角・空白・括弧・ハイフンを受け、0始まりの国内10〜11桁を確認して半角数字だけ保存。空欄またはnullで消す'},
 };
 const lateArrivalPolicy = {type:'object',required:['cancelAfterMinutes','message'],properties:{cancelAfterMinutes:{type:'integer',minimum:1,maximum:1440},message:{type:'string',minLength:1,maxLength:1000}}};
 const unavailableReason = {type:'string',enum:['temporary_closed','private_event','regular_closed','full']};

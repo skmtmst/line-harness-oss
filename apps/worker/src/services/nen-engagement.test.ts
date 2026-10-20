@@ -25,6 +25,11 @@ const campaign = {
 };
 
 describe('buildNenFlexMessage', () => {
+  it('通知の円表示も請求と同じ切り捨てにし、1円を上乗せしない', () => {
+    const messages = buildNenDeliveryMessages(campaign, { event: { order: { total: 1000.99 } } });
+    expect(JSON.stringify(messages)).toContain('合計：¥1,000');
+    expect(JSON.stringify(messages)).not.toContain('¥1,001');
+  });
   it('keeps only supported NEN editor actions', () => {
     expect(parseNenCampaignAfterActions([
       { kind: 'open_form', formId: 'form-review', formName: ' 口コミ ', buttonLabel: '感想を書く' },

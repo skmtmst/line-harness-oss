@@ -1,5 +1,6 @@
 'use client'
 
+import { canManageRole } from '@/lib/staff-role'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { useEffect, useId, useState, type ReactNode } from 'react'
@@ -280,7 +281,7 @@ export default function MemberDialogV8({
 
 const ROLE_WORD: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: '担当者', viewer: '閲覧のみ' }
 /** 請求の画面を見られるのはオーナーと管理者だけ。 */
-const seesBilling = (role: string) => role === 'owner' || role === 'admin'
+const seesBilling = (role: string) => canManageRole(role)
 
 /** 板 「権限を変える確認」。変える前に変更前→変更後を並べる。 */
 export function MemberChangeConfirmV8({ member, value, accountNames, busy, error, onCancel, onConfirm }: {

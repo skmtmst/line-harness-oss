@@ -1,3 +1,4 @@
+import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import {
   CredentialEncryptionKeyError,
   decryptCredential,
@@ -33,9 +34,8 @@ function encryptionSecret(secret: string | undefined): string {
 }
 
 export function normalizeBookingCustomerPhone(input: string): string {
-  const normalized = input.normalize('NFKC').trim();
-  const compact = normalized.replace(/[\s()（）\-‐‑–—ー]/g, '');
-  if (!/^\+?\d{7,15}$/.test(compact)) {
+  const compact = normalizePhone(input);
+  if (!compact || phoneProblem(input)) {
     throw new Error('booking_customer_phone_invalid');
   }
   return compact;
@@ -138,7 +138,7 @@ export async function getBookingCustomer(
       ? decryptCredential(row.email_encrypted, encryptionKey)
       : Promise.resolve(null),
   ]);
-  return { ...summary(row), phone, email };
+  return { ...summary(row), phone: normalizePhone(phone), email };
 }
 
 export async function searchBookingCustomers(
@@ -154,12 +154,9 @@ export async function searchBookingCustomers(
   const limit = Number.isFinite(input.limit)
     ? Math.max(1, Math.min(Math.trunc(input.limit!), 50))
     : 20;
-  let phone: string | null = null;
-  try {
-    phone = query ? normalizeBookingCustomerPhone(query) : null;
-  } catch {
-    phone = null;
-  }
+  // 読取検索は過去に受け付けた海外番号のハッシュも探せるようにする。
+  const compact = normalizePhone(query);
+  const phone = /^\+?\d{7,15}$/.test(compact) ? compact : null;
   const hash = phone ? await phoneHash(phone, input.encryptionKey) : null;
   const escaped = query.replace(/[\\%_]/g, (character) => `\\${character}`);
   const rows = await db.prepare(

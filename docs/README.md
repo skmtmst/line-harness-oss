@@ -582,6 +582,9 @@
 - [1777-masato-owner-only-line-register.md](release-log/unreleased/1777-masato-owner-only-line-register.md)
 
 - [LINE接続の分離](release-log/unreleased/1778-masato-line-webhook-isolation.md)
+- [金額と電話番号の共通化](release-log/unreleased/0000-kenta-cleanup-q01f1.md)
+- [画面コードの置き場と名前の整理](release-log/unreleased/0000-kenta-cleanup-s02a.md)
+- [画面コード整理の検査記録](qa/cleanup-s02a-1019.md)
 
 - [cleanup-q02a1-1019.md](qa/cleanup-q02a1-1019.md)
 
@@ -591,11 +594,9 @@
 
 - [Q02A2の整理・検証記録](qa/cleanup-q02a2-1019.md)
 - [0000-kenta-cleanup-q02a2.md](release-log/unreleased/0000-kenta-cleanup-q02a2.md)
-- [0000-kenta-cleanup-s02a.md](release-log/unreleased/0000-kenta-cleanup-s02a.md)
-- [S02Aの検査記録](qa/cleanup-s02a-1019.md)
-- [Q01W6の整理履歴](release-log/unreleased/0000-kenta-cleanup-q01w6.md)
-- [Q02A3の整理履歴](release-log/unreleased/0000-kenta-cleanup-q02a3.md)
-- [X02Aの整理履歴](release-log/unreleased/0000-kenta-cleanup-x02a.md)
+- [日本時間の日付の共通化](release-log/unreleased/0000-kenta-cleanup-q01w6.md)
+- [画面と共通処理の試験の整理](release-log/unreleased/0000-kenta-cleanup-q02a3.md)
+- [未使用処理と重複試験の整理](release-log/unreleased/0000-kenta-cleanup-x02a.md)
 
 ## 台本整理で加わった文書
 

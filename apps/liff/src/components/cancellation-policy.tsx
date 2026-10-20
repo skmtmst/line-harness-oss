@@ -1,4 +1,4 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { formatYen as yen, yenPercent, jstCalendar as japanCalendar } from '@line-crm/shared';
 import type { BookingCancellationPreview } from '../lib/api.js';
 import { ChoiceInput } from './forms/controls.js';
 
@@ -7,7 +7,7 @@ import { ChoiceInput } from './forms/controls.js';
  * 決まりがオンの店だけ出す。チェックは初めは空で、入れるまで予約のボタンは押せない（Confirm 側）。
  * 金額は料金からの割合で出す（端数は切り捨て）。デポジットがあるときは確認のカードに今払う額・お店で払う額を足す。
  */
-export const yen = (value: number) => `¥${Math.floor(value).toLocaleString('ja-JP')}`;
+export { yen };
 const WEEKDAY = ['日', '月', '火', '水', '木', '金', '土'];
 
 /** 「11/19（木）14:00」。日本時間で出す。 */
@@ -28,7 +28,7 @@ export default function CancellationPolicy({
   onAcceptedChange: (next: boolean) => void;
 }) {
   const tiers = preview.tiers?.filter((tier) => tier.percent > 0) ?? [{ beforeHours: 0, percent: preview.afterPercent }];
-  const fee = (percent: number) => `料金の ${percent}%（${yen((preview.price * percent) / 100)}）`;
+  const fee = (percent: number) => `料金の ${percent}%（${yen(yenPercent(preview.price, percent))}）`;
   return (
     <section aria-labelledby="cancellation-policy-heading" className="space-y-3.5">
       <h3 id="cancellation-policy-heading" className="text-base font-bold text-ink">

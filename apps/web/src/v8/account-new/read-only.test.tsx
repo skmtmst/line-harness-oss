@@ -16,7 +16,8 @@ it.each([
   { role: 'owner', readOnly: true },
   { role: 'owner', readOnly: false, roleBundle: 'view_only' },
   { role: 'staff', readOnly: true, roleBundle: 'view_only' },
-  { role: 'admin', readOnly: false },
+  { role: 'admin', readOnly: true },
+  { role: 'admin', readOnly: false, roleBundle: 'view_only' },
 ])('サーバーの権限が%jなら、保存済みの途中の段を復元せず登録操作を隠す', async identity => {
   const draft = JSON.stringify({ step: 5, sub: 1, name: '途中の下書き', channelId: '123', importFriends: true })
   localStorage.setItem(DRAFT_KEY, draft)
@@ -24,7 +25,7 @@ it.each([
   localStorage.setItem('lh_staff_role', 'owner')
   calls.me.mockResolvedValue({ success: true, data: { id: 'reader', name: '閲覧者', ...identity } })
   const view = render(<RegisterV8 />)
-  await screen.findByText('LINEアカウントの登録はオーナーだけができます。オーナーに頼んでください。')
+  await screen.findByText('LINEアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。')
   expect(view.container.querySelector('form')).toBeNull()
   expect(screen.queryByRole('radio')).toBeNull()
   expect(screen.queryByRole('textbox')).toBeNull()

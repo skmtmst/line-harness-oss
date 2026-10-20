@@ -1,4 +1,4 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { formatYen, jstCalendar as japanCalendar } from '@line-crm/shared';
 import PaymentPreparingNote from './payment-preparing-note.js';
 import { useVisiblePolling } from '../lib/use-visible-polling.js';
 import { CUSTOMER_WORDS, PAYMENT_UNKNOWN } from '../lib/customer-words.js';
@@ -244,7 +244,7 @@ export default function BookingPayment({
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
         <Button variant="primary" onClick={handleStart} disabled={starting || !ready}>
-          {starting ? '準備中...' : `¥${amount.toLocaleString()}の試験へ進む`}
+          {starting ? '準備中...' : `${formatYen(amount)}の試験へ進む`}
         </Button>
       </BottomBar>
     </div>
@@ -280,7 +280,7 @@ function PaymentCard({
       </div>
       <div className="flex items-baseline gap-2 py-2.5">
         <dt className="w-18 shrink-0 text-xs text-liff-sub">金額</dt>
-        <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">¥{amount.toLocaleString()}</dd>
+        <dd className="min-w-0 flex-1 text-sm font-semibold text-ink">{formatYen(amount)}</dd>
       </div>
       <div className="flex items-baseline gap-2 py-2.5">
         <dt className="w-18 shrink-0 text-xs text-liff-sub">状態</dt>

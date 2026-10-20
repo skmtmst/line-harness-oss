@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import PageSizeSelect, { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
@@ -138,7 +139,7 @@ function InflowDetailContent() {
   const [deleteError, setDeleteError] = useState('')
   const [deleteConfirmationName, setDeleteConfirmationName] = useState('')
   const [deleteChoice, setDeleteChoice] = useState<DeleteChoice>('stop')
-  const [canPermanentlyDelete, setCanPermanentlyDelete] = useState(false)
+  const canPermanentlyDelete = canManageRole(useStaffRole())
   // 「別の流入リンクへ送る」の転送先。先頭を自動採用しない（#514 重大4）。
   const [redirectTargetId, setRedirectTargetId] = useState('')
   const [qrOpen, setQrOpen] = useState(false)
@@ -166,13 +167,10 @@ function InflowDetailContent() {
         ? api.pools.list({ suppressFeatureDisabledEvent: true })
         : { success: false as const, error: 'feature_disabled' },
     )
-    void Promise.allSettled([api.entryRoutes.list(), poolsRequest, api.staff.me()]).then(([r, p, me]) => {
+    void Promise.allSettled([api.entryRoutes.list(), poolsRequest]).then(([r, p]) => {
       if (cancelled) return
       if (r.status === 'fulfilled' && r.value.success) setRoutes(r.value.data)
       if (p.status === 'fulfilled' && p.value.success) setPools(p.value.data)
-      if (me.status === 'fulfilled' && me.value.success) {
-        setCanPermanentlyDelete(me.value.data.role === 'owner' || me.value.data.role === 'admin')
-      }
       setLoading(false)
     })
     return () => {
@@ -346,7 +344,7 @@ function InflowDetailContent() {
     ? (accounts.find((account) => account.id === route.lineAccountId)?.name ?? route.lineAccountId)
     : emptyValue('unknown')
   const createdDate = route ? `${Number(route.createdAt.slice(5, 7))}月${Number(route.createdAt.slice(8, 10))}日` : ''
-  const yen = (amount: number | null | undefined) => (amount == null ? emptyValue('unknown') : `¥${formatNumber(amount)}`)
+  const yen = (amount: number | null | undefined) => formatYen(amount, emptyValue('unknown'))
 
   // 友だち表の絞り込み。検索・札・期間の3つを重ねる。
   const normalizedFriendSearch = friendSearch.trim().toLocaleLowerCase('ja')
@@ -486,7 +484,7 @@ function InflowDetailContent() {
             <KpiCard presentation="band" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
               detail={blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`} />
             <KpiCard presentation="band" icon={<Target size={14} aria-hidden="true" />} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
-              detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(Math.round(funnel.valuePerFriend))}`} />
+              detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(funnel.valuePerFriend)}`} />
           </KpiBand>}
         </div>
 

@@ -9,7 +9,7 @@
  * 同じ口を使う——確認だけ→反映の順序、二重取り込みの指紋、
  * 権限の言い分けはここでだけ変える。
  */
-import { useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useCallback, useEffect, useState, useRef } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, downloadApiFile, type FriendMigrationJob } from '@/lib/api'
@@ -86,7 +86,7 @@ export function useFriendMigrations() {
   const operationFailureMessage = (caught: unknown, action: string): string =>
     japaneseDetailOf(caught) || describeApiFailure(caught, action, { forbidden: MANAGE_FORBIDDEN })
   // 役割が分かっていて owner/admin でないときだけ、ボタンの近くに理由を出す。
-  const manageLocked = role !== '' && role !== 'owner' && role !== 'admin'
+  const manageLocked = !canManageRole(role)
 
   const toggleColumn = (column: 'basic' | 'tags_fields' | 'support') => {
     setColumns((current) => current.includes(column) ? current.filter((value) => value !== column) : [...current, column])

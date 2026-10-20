@@ -8,7 +8,7 @@ import { Globe, User, Users, X } from 'lucide-react'
 import { ApiError, eventsApi, type EventDetail, type EventQuestion } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
@@ -95,7 +95,7 @@ function EventsCreateV8Inner() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canEdit = role === 'owner' || role === 'admin'
+  const canEdit = canManageRole(role)
 
   /*
    * 今の作りは ①を保存すると /events/new?id=…&step=2 で続きを開く。

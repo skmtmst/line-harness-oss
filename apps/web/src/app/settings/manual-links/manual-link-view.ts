@@ -152,13 +152,4 @@ export const VERIFY_SCHEDULE_NOTE =
  * 最終の可否はサーバーが決める。権限が足りない操作は 403 として
  * 理由と依頼先を画面に出す。
  */
-export function canEditTable(staff: {
-  id?: string | null
-  role?: string | null
-  permissionKeys?: string[] | null
-} | null): boolean {
-  if (!staff) return false
-  if (staff.id === 'env-owner') return true
-  if ((staff.permissionKeys ?? []).includes('manual.link.edit')) return true
-  return staff.role === 'owner'
-}
+export { canEditManualLinks as canEditTable } from '@/lib/manual-link-access'

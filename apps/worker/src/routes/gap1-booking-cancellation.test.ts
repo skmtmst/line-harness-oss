@@ -5,6 +5,17 @@ import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 import {cancellationQuote,cancellationPolicy} from '../features/booking/booking-cancellation.js';
 let d:SqliteD1;
 const policy={enabled:true,tiers:[{beforeHours:24,percent:0},{beforeHours:0,percent:50}],noShowPercent:100,expectedVersion:0};
+
+test('端数の取消料は見積もりと実際に作る請求行が一致する', async () => {
+ connect();await save();seedGapBooking(d);
+ d.raw.exec("UPDATE bookings SET price_at_booking=1001 WHERE id='bk'");cancel();
+ const snapshot=JSON.parse((d.raw.prepare('SELECT policy_snapshot_json FROM bookings WHERE id=?').get('bk') as {policy_snapshot_json:string}).policy_snapshot_json);
+ const quote=cancellationQuote(snapshot,'2026-11-20T05:00:00Z',1001,new Date('2026-11-20T04:00:00Z'));
+ expect(quote.feeNow).toBe(500);
+ expect(quote.text).toContain('50%（¥500）');
+ expect(d.raw.prepare('SELECT amount FROM booking_charges WHERE booking_id=?').get('bk')).toEqual({amount:quote.feeNow});
+ expect(fetch).not.toHaveBeenCalled();
+});
 const app=()=>gapApp(d,[bookingCancellation]);
 const path='/api/booking/admin/cancellation-policy?account_id=a';
 async function save(){return gapCall(app(),path,'PUT',policy);}

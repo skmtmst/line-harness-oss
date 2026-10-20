@@ -36,7 +36,7 @@ beforeEach(() => {
     }
     if (url.endsWith('/api/hq/support/requests/r1')) return json({ success: true, data: detail })
     if (url.endsWith('/api/hq/support/requests')) return json({ success: true, data: [detail] })
-    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', email: 'yamada@example.com' } })
+    if (url.endsWith('/api/staff/me')) return json({ success: true, data: { id: 's1', name: '山田 太郎', role: 'staff', email: 'yamada@example.com' } })
     if (url.endsWith('/api/tenants/me')) return json({ success: true, data: { name: '株式会社サンプル' } })
     return json({ success: false, error: `unexpected ${url}` }, 404)
   }))
