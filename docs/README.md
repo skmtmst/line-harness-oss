@@ -581,6 +581,9 @@
 - [1777-masato-owner-only-line-register.md](release-log/unreleased/1777-masato-owner-only-line-register.md)
 
 - [LINE接続の分離](release-log/unreleased/1778-masato-line-webhook-isolation.md)
+- [金額と電話番号の共通化](release-log/unreleased/0000-kenta-cleanup-q01f1.md)
+- [画面コードの置き場と名前の整理](release-log/unreleased/0000-kenta-cleanup-s02a.md)
+- [画面コード整理の検査記録](qa/cleanup-s02a-1019.md)
 
 - [cleanup-q02a1-1019.md](qa/cleanup-q02a1-1019.md)
 
@@ -590,8 +593,9 @@
 
 - [Q02A2の整理・検証記録](qa/cleanup-q02a2-1019.md)
 - [0000-kenta-cleanup-q02a2.md](release-log/unreleased/0000-kenta-cleanup-q02a2.md)
-- [0000-kenta-cleanup-s02a.md](release-log/unreleased/0000-kenta-cleanup-s02a.md)
-- [S02Aの検査記録](qa/cleanup-s02a-1019.md)
+- [日本時間の日付の共通化](release-log/unreleased/0000-kenta-cleanup-q01w6.md)
+- [画面と共通処理の試験の整理](release-log/unreleased/0000-kenta-cleanup-q02a3.md)
+- [未使用処理と重複試験の整理](release-log/unreleased/0000-kenta-cleanup-x02a.md)
 
 ## 台本整理で加わった文書
 
@@ -609,9 +613,10 @@
 - [使われていない処理と重複する検査の整理記録](qa/cleanup-x02b-1020.md)
 - [使われていない処理と重複する検査の整理履歴](release-log/unreleased/0000-kenta-cleanup-x02b.md)
 
-- [日本時間の扱いの整理履歴](release-log/unreleased/0000-kenta-cleanup-q01w6.md)
-- [共通部品の動作確認の整理履歴](release-log/unreleased/0000-kenta-cleanup-q02a3.md)
-- [重複整理とAI操作の失敗通知の更新履歴](release-log/unreleased/0000-kenta-cleanup-x02a.md)
 
 - [品質の後戻りを防ぐ仕組みの更新履歴](release-log/unreleased/0000-kenta-cleanup-q00.md)
 - [品質の後戻りを防ぐ仕組みの検査記録](qa/cleanup-q00-1020.md)
+
+- [担当者情報と権限確認の共通化の履歴](release-log/unreleased/0000-kenta-cleanup-q01s1.md)
+- [管理者によるLINEアカウント登録の履歴](release-log/unreleased/1779-masato-admin-line-registration.md)
+- [LINEアカウントの受信確認の履歴](release-log/unreleased/1780-masato-line-receipt-gate.md)

@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 /*
  * ★V8-B ：EC連携 注文の状況（引き出し）。取り込みの記録の行の「…」→「注文の状況を見る」で開く。
@@ -47,7 +48,7 @@ function shortDay(value: string): string {
 
 function money(currency: string, amount: number | null): string | null {
   if (amount === null) return null
-  return `${currency === 'JPY' ? '¥' : ''}${formatNumber(amount)}`
+  return currency === 'JPY' ? formatYen(amount) : formatNumber(amount)
 }
 
 function signed(amount: number): string {
@@ -254,12 +255,12 @@ export default function OrderDrawer({
                       const notes = [
                         conversion.approvalStatus ? APPROVAL_TEXT[conversion.approvalStatus] : undefined,
                         conversion.affiliateName ? `紹介者：${conversion.affiliateName}` : undefined,
-                        conversion.affiliateName || conversion.rewardAmount != null ? `報酬：${conversion.rewardAmount != null ? `¥${formatNumber(conversion.rewardAmount)}` : '未確定'}` : undefined,
+                        conversion.affiliateName || conversion.rewardAmount != null ? `報酬：${conversion.rewardAmount != null ? `${formatYen(conversion.rewardAmount)}` : '未確定'}` : undefined,
                         conversion.rewardEntryStatus ? `支払い確定：${REWARD_ENTRY_STATUS_TEXT[conversion.rewardEntryStatus] ?? conversion.rewardEntryStatus}` : undefined,
                         conversion.settlementState ? `締め：${SETTLEMENT_STATE_TEXT[conversion.settlementState] ?? conversion.settlementState}` : undefined,
                         conversion.payoutBatchState ? `支払いCSV：${PAYOUT_BATCH_STATE_TEXT[conversion.payoutBatchState] ?? conversion.payoutBatchState}` : undefined,
                         conversion.payoutResult ? `結果：${PAYOUT_RESULT_TEXT[conversion.payoutResult] ?? conversion.payoutResult}` : undefined,
-                        conversion.reversedAmount != null ? `確定後の取消：−¥${formatNumber(conversion.reversedAmount)}（次の支払いで差し引かれます）` : undefined,
+                        conversion.reversedAmount != null ? `確定後の取消：−${formatYen(conversion.reversedAmount)}（次の支払いで差し引かれます）` : undefined,
                       ].filter(Boolean)
                       return (
                         <TimeRow
@@ -272,7 +273,7 @@ export default function OrderDrawer({
                             </span>
                           ) : null}
                         >
-                          {`成果「${conversion.pointName ?? '計測地点'}」${conversion.value !== null ? `¥${formatNumber(conversion.value)}` : ''}`}
+                          {`成果「${conversion.pointName ?? '計測地点'}」${conversion.value !== null ? `${formatYen(conversion.value)}` : ''}`}
                         </TimeRow>
                       )
                     })}

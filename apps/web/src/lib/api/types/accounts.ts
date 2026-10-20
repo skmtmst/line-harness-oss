@@ -172,3 +172,8 @@ export interface FriendMigrationJob {
 
 /** LINEアカウントのタグ（板 ・）。 */
 export type LineAccountTag = { id: string; name: string; color: string | null; displayOrder: number }
+
+export type LineRegistrationReceipt = {
+  status: 'waiting' | 'confirmed' | 'error'
+  receivedAt: string | null
+}

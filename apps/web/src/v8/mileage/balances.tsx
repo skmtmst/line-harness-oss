@@ -1,5 +1,6 @@
 'use client'
 
+import { isOwnerRole, useStaffRole } from '@/lib/staff-role'
 import { ListToolbarFrame } from '@/components/shared/list-toolbar'
 import HelpTip from '@/components/shared/help-tip'
 import { jstDateOffset } from '@/lib/jst-datetime'
@@ -107,7 +108,7 @@ export default function BalancesTab() {
   const [approvalError, setApprovalError] = useState('')
   const [rejectTarget, setRejectTarget] = useState<MileageAdjustmentApprovalRequest | null>(null)
   const [rejectReason, setRejectReason] = useState('')
-  const [isOwner, setIsOwner] = useState(false)
+  const isOwner = isOwnerRole(useStaffRole())
   const [exportError, setExportError] = useState('')
 
   const chipActive = withBalanceOnly || pendingOnly
@@ -189,14 +190,7 @@ export default function BalancesTab() {
     return () => window.clearTimeout(timer)
   }, [searchInput])
 
-  useEffect(() => {
-    let current = true
-    void api.staff.me().then((response) => {
-      if (!current || !response.success) return
-      setIsOwner(response.data.role === 'owner')
-    }).catch(() => {})
-    return () => { current = false }
-  }, [])
+
 
   const loadApprovals = useCallback(async () => {
     if (!selectedAccountId) {

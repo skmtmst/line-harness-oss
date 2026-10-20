@@ -1,4 +1,5 @@
 'use client'
+import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
 import { jstCalendar } from '@/lib/jst-datetime'
 
@@ -120,6 +121,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
   const fields = useFormErrors()
   fields.define('person', 'お客さま', () => kind !== 'customer' || whoTab !== 'line' || person ? null : '名前・電話番号で探して、お客さまを選んでください。', { required: true })
   fields.define('name', 'お名前', () => kind !== 'customer' || whoTab !== 'phone' || manualName.trim() ? null : 'お名前を入れてください。', { required: true })
+  fields.define('phone', '電話番号', () => kind !== 'customer' ? null : phoneProblem(person?.phone || manualPhone) || null)
   fields.define('date', '日付', () => /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(`${date}T00:00:00`)) ? null : '日付を選んでください。', { required: true })
   fields.define('count', '人数', () => Number.isInteger(guests) && guests >= 1 && guests <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
   fields.define('time', '時間', () => time && times.includes(time) ? null : '空いている時間を選んでください。', { required: true })
@@ -224,7 +226,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
     const startsAt = new Date(`${date}T${time.padStart(5, '0')}:00+09:00`).toISOString()
     const endsAtIso = new Date(new Date(startsAt).getTime() + STAY_MINUTES * 60_000).toISOString()
     void onSave({
-      kind, holdMinutes: Number(holdMinutes), source: 'phone', storeId, customerName: name, customerPhone: phone || null, lineUid: lineUid || null,
+      kind, holdMinutes: Number(holdMinutes), source: 'phone', storeId, customerName: name, customerPhone: normalizePhone(phone) || null, lineUid: lineUid || null,
       guestCount: guests, startsAt, endsAt: endsAtIso,
       tableId: tableMode === 'auto' ? null : tableMode,
       courseId: courseId || null,
@@ -350,8 +352,8 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
                 </>
               ) : (
                 <SettingsFormRow layout="columns">
-                  <Field label="電話番号" htmlFor="rs-phone-tel">
-                    <SaveErrorField names={["manualPhone","manual_phone"]}><TextField id="rs-phone-tel" inputMode="tel" value={manualPhone} onChange={(event) => setManualPhone(event.target.value)} /></SaveErrorField>
+                  <Field label="電話番号" htmlFor="rs-phone-tel" error={fields.error('phone')}>
+                    <SaveErrorField names={["manualPhone","manual_phone"]}><TextField id="rs-phone-tel" invalid={fields.invalid('phone')} inputMode="tel" value={manualPhone} onChange={(event) => setManualPhone(event.target.value)} /></SaveErrorField>
                   </Field>
                   <Field label="お名前" htmlFor="rs-phone-name" error={fields.error('name')} requirement={fields.requirement('name')}>
                     <SaveErrorField names={["manualName","manual_name"]}><TextField id="rs-phone-name" value={manualName} onChange={(event) => setManualName(event.target.value)} /></SaveErrorField>

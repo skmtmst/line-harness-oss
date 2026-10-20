@@ -1,3 +1,4 @@
+import { formatYen as sharedFormatYen } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { LineClient } from '@line-crm/line-sdk';
 import { resolveLineToken } from './line-token.js';
@@ -90,7 +91,7 @@ export async function notifyAffiliate(db: D1Database, env: AffiliateNotifierEnv,
 
 /** Format the reward line with a thousands separator, e.g. 12345 → "12,345". */
 function formatYen(amount: number): string {
-  return new Intl.NumberFormat('en-US').format(amount);
+  return sharedFormatYen(amount).replace(/^¥/, '');
 }
 
 /**

@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import type { ReactNode } from 'react'
@@ -14,7 +15,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { ReservationFacts, ReservationSource } from '@/components/shared/reservation-board'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './next-booking.module.css'
-import { formatDay, formatNumber, formatTime } from '@/lib/format'
+import { formatDay, formatTime } from '@/lib/format'
 import { jstDate } from '@/lib/jst-datetime'
 import type { BookingRequest } from '@/lib/api'
 import type { AccountStyle } from '@line-crm/shared'
@@ -89,7 +90,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
       { label: '予約', value: ready ? `${summary.active}件` : '—' }, { label: 'うちLINEから', value: ready ? `${summary.line}件` : '—' },
       { label: 'うち電話', value: ready ? `${summary.phone}件` : '—' },
       ...(ready && summary.other > 0 ? [{ label: 'その他の受付', value: `${summary.other}件` }] : []),
-      { label: '売上見込み', value: ready ? `¥${formatNumber(summary.sales)}` : '—' },
+      { label: '売上見込み', value: ready ? formatYen(summary.sales) : '—' },
     ]} /></BookingSidebarSection>
     <BookingSidebarSection title="つながる先"><BookingSidebarLinks links={[
       { href: '/booking/menus', label: '予約設定', note: 'メニューと受付枠' },

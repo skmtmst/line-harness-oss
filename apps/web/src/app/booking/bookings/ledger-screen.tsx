@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { statusTone } from './booking-status-tone'
 
 import ReservationBoard, { ReservationLegend } from '@/components/shared/reservation-board'
@@ -538,7 +539,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                         {/* R88: 受付経路は source で分ける。担当者の代理入力をLINEにしない。 */}
                         <Td>{isLineBooking(b) ? 'LINE' : sourceLabel(b)}</Td>
                         <Td align="right" className="tabular-nums">
-                          ¥{formatNumber(b.price_at_booking)}
+                          {formatYen(b.price_at_booking)}
                         </Td>
                         <StatusCell primary={<StatusBadge tone={statusTone[b.status] ?? 'neutral'}>{statusLabel[b.status] ?? b.status}</StatusBadge>} />
                         <ActionCell>
@@ -663,7 +664,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
               </DetailRow>
               <DetailRow label={words.staff}>{activeBooking.staff_name}</DetailRow>
               <DetailRow label="料金">
-                <span className="tabular-nums">¥{formatNumber(activeBooking.price_at_booking)}</span>
+                <span className="tabular-nums">{formatYen(activeBooking.price_at_booking)}</span>
               </DetailRow>
               <DetailRow label="予約経路">{isLineBooking(activeBooking) ? 'LINE' : '電話・店頭'}</DetailRow>
               <DetailRow label="状態">{statusLabel[activeBooking.status] ?? activeBooking.status}</DetailRow>

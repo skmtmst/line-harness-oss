@@ -65,15 +65,21 @@ const summary = {
   failed: 2, resultUnknown: 0, outgoingFailed: 2, retryable: 2, averageDurationMs: 400,
 }
 
+let staffIdentity: { role: string; readOnly?: boolean; roleBundle?: string }
+let mutationRequests = 0
+
 beforeEach(() => {
+  staffIdentity = { role: 'owner' }
+  mutationRequests = 0
   items = [interaction()]
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method && !['GET', 'HEAD'].includes(init.method)) mutationRequests++
     const url = String(input)
     if (url.includes('/api/staff/me') || url.includes('/staff/me')) {
-      return json({ success: true, data: { role: 'owner' } })
+      return json({ success: true, data: staffIdentity })
     }
     if (url.includes('/api/webhooks/outgoing')) return json({ success: true, data: [] })
     if (url.includes('/incoming')) return json({ success: true, data: [] })
@@ -204,4 +210,18 @@ test('v8 の読み込み中は記録の表の形の骨組みが出て「読み�
   } finally {
     vi.useRealTimers()
   }
+})
+
+test.each([
+  { role: 'staff' }, { role: 'viewer' }, { role: 'admin', readOnly: true }, { role: 'owner', roleBundle: 'view_only' },
+])('変更できない担当者は記録と中身を読めるが単体・一括の送り直しはない: %j', async identity => {
+  staffIdentity = identity
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const board = host.querySelector('[data-design-node="Uv9AA"]')!
+  expect(board.textContent).toContain('500 エラー')
+  expect([...board.querySelectorAll('button')].some(button => button.textContent?.includes('失敗したものをまとめてやり直す'))).toBe(false)
+  await openContents(board)
+  expect([...document.querySelectorAll('button')].filter(button => button.textContent?.includes('送り直す'))).toHaveLength(0)
+  expect(mutationRequests).toBe(0)
 })

@@ -1,3 +1,5 @@
+import { normalizePhone } from '@line-crm/shared';
+import { normalizedPhoneSql as customerPhoneSql } from '../lib/phone-sql.js';
 import { validFloorCoordinate, validJoinGroup } from './restaurant-store-status.js';
 import { extractBroadcastTemplateIds, refreshScenarioReferences } from '@line-crm/db';
 import { parseBroadcastMessageParts, buildMessages } from '../features/broadcasts/broadcast-message-set/index.js';
@@ -520,10 +522,10 @@ export const get__api_restaurant_test_customers_history_25 = async (c: Context<E
   if (!organization) return c.json({ success: false, error: '組織が見つかりません' }, 404);
   const storeId = c.req.query('storeId') || '';
   const lineUid = c.req.query('lineUid')?.trim();
-  const phone = c.req.query('phone')?.replace(/[\s()-]/g, '');
+  const phone = normalizePhone(c.req.query('phone') ?? '');
   if ((!lineUid && !phone) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗と連絡先を確認してください' }, 400);
   const db = dbFor(c.env, storeId);
-  const where = `r.store_id = ? AND r.status IN ('visited', 'seated') AND ${lineUid ? 'r.line_uid = ?' : "REPLACE(REPLACE(REPLACE(REPLACE(r.customer_phone, '-', ''), ' ', ''), '(', ''), ')', '') = ?"}`;
+  const where = `r.store_id = ? AND r.status IN ('visited', 'seated') AND ${lineUid ? 'r.line_uid = ?' : `${customerPhoneSql} = ?`}`;
   const args = [storeId, lineUid || phone];
   const count = await db.prepare(`SELECT COUNT(*) AS total FROM rt_reservations r WHERE ${where}`).bind(...args).first<{ total: number }>();
   const rows = await db.prepare(`SELECT r.id, r.starts_at, r.guest_count, r.allergy_note, t.label AS table_label, m.name AS course_name
@@ -541,14 +543,14 @@ export const get__api_restaurant_test_customers_search_26 = async (c: Context<En
   if (q.length < 2 || q.length > 100 || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗と検索文字を確認してください' }, 400);
   const rows = await dbFor(c.env, storeId).prepare(`SELECT customer_name AS name, customer_phone AS phone, line_uid AS lineUid
     FROM rt_reservations WHERE store_id = ? AND hold_expires_at IS NULL
-      AND (INSTR(customer_name, ?) > 0 OR INSTR(COALESCE(customer_phone, ''), ?) > 0)
+      AND (INSTR(customer_name, ?) > 0 OR INSTR(${customerPhoneSql}, ?) > 0)
       AND (customer_phone IS NOT NULL OR line_uid IS NOT NULL)
     GROUP BY COALESCE(line_uid, customer_phone) UNION
     SELECT COALESCE(f.display_name, 'LINEの友だち') AS name, NULL AS phone, f.line_user_id AS lineUid
     FROM friends f JOIN rt_stores s ON s.line_account_id = f.line_account_id
     WHERE s.id = ? AND f.is_following = 1 AND INSTR(COALESCE(f.display_name, ''), ?) > 0 LIMIT 20`)
-    .bind(storeId, q, q, storeId, q).all();
-  return c.json({ success: true, data: rows.results });
+    .bind(storeId, q, normalizePhone(q) || q, storeId, q).all<{ name: string; phone: string | null; lineUid: string | null }>();
+  return c.json({ success: true, data: rows.results.map(row => ({ ...row, phone: row.phone ? normalizePhone(row.phone) : null })) });
 };
 
 export const get__api_restaurant_test_inventory_day_27 = async (c: Context<Env, "/api/restaurant-test/inventory/day">) => {

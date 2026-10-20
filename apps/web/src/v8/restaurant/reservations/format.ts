@@ -92,12 +92,7 @@ export function mdWeek(day: Date): string {
 }
 
 /** 電話番号は真ん中を伏せる（「090-****-1234」）。 */
-export function maskPhone(phone: string | null): string {
-  if (!phone) return ''
-  const parts = phone.split('-')
-  if (parts.length === 3) return `${parts[0]}-****-${parts[2]}`
-  return phone
-}
+export { maskPhone } from '@line-crm/shared'
 
 export function dayRange(day: Date): { from: string; to: string } {
   return { from: new Date(`${toYmd(day)}T00:00:00+09:00`).toISOString(), to: addDays(day, 1).toISOString() }

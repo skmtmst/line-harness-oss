@@ -2,11 +2,29 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { waitlistFixture, futureSlot } from '../test-utils/waitlist-fixture.js';
 import type { SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { promoteSeatWaitlist } from './restaurant-seat-waitlist.js';
+import { insertSeatWaitlistEntry } from '../routes/restaurant-test-definition.js';
 let test: SqliteD1, slot: string; beforeEach(() => { test = waitlistFixture(); slot = futureSlot(); }); afterEach(() => test.raw.close());
 function add(id: string, count = 2, uid = 'test-user-0', start = slot) { test.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,guest_count,customer_name,line_uid,identity_key) VALUES(?,'store',?,?,'試験の組',?,?)`).run(id, start, count, uid, 'line:' + uid); }
 function promote(table = 't') { return promoteSeatWaitlist(test.db, { storeId: 'store', startsAt: slot, tableId: table }); }
 function reserve(id: string, uid: string, waitlistId: string | null = null, table = 't') { test.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,waitlist_entry_id) VALUES(?,'store','line','試験の組',?,2,?,?,?,'confirmed',?)`).run(id, uid, slot, new Date(Date.parse(slot) + 7200000).toISOString(), table, waitlistId); }
 describe('席のキャンセル待ち・先着順', () => {
+  it('文字列で保存された待機が3件あっても、採番時に待機人数の上限を守る', async () => {
+    const phones=['090-1234-5678','０９０－１２３４－５６７８','090 1234 5678'];
+    for (const [index,phone] of phones.entries()) test.raw.prepare(`INSERT INTO rt_seat_waitlist(id,store_id,starts_at,guest_count,customer_name,customer_phone,identity_key) VALUES(?,'store',?,2,'電話の組',?,?)`).run(`old-${index}`,futureSlot(index+3),phone,`phone:${phone}`);
+    const before=test.raw.prepare('SELECT * FROM rt_seat_waitlist ORDER BY id').all();
+    expect(await insertSeatWaitlistEntry(test.db,{storeId:'store',startsAt:slot,guestCount:2,customerName:'電話の組',customerPhone:'09012345678',lineUid:null})).toEqual({ok:false,error:'waitlist_limit'});
+    expect(test.raw.prepare('SELECT * FROM rt_seat_waitlist ORDER BY id').all()).toEqual(before);
+  });
+  it('電話は数字だけ保存し、表記を替えた再登録と旧行への重複を拒否する', async () => {
+    const input={storeId:'store',startsAt:slot,guestCount:2,customerName:'電話の組',customerPhone:'０９０－１２３４－５６７８',lineUid:null};
+    expect(await insertSeatWaitlistEntry(test.db,input)).toMatchObject({ok:true});
+    expect(test.raw.prepare('SELECT customer_phone,identity_key FROM rt_seat_waitlist').get()).toEqual({customer_phone:'09012345678',identity_key:'phone:09012345678'});
+    test.raw.exec("UPDATE rt_seat_waitlist SET customer_phone='０９０－１２３４－５６７８',identity_key='phone:０９０－１２３４－５６７８'");
+    expect(await insertSeatWaitlistEntry(test.db,{...input,customerPhone:'090 1234 5678'})).toEqual({ok:false,error:'already_waiting'});
+    expect(test.raw.prepare('SELECT customer_phone FROM rt_seat_waitlist').get()).toEqual({customer_phone:'０９０－１２３４－５６７８'});
+    expect(await insertSeatWaitlistEntry(test.db,{...input,customerPhone:'090abc12345678'})).toEqual({ok:false,error:'invalid_phone'});
+    expect(test.raw.prepare('SELECT COUNT(*) n FROM rt_seat_waitlist').get()).toEqual({n:1});
+  });
   it('先頭に入らない卓では後ろの小さい組も追い越さない', async () => { add('first', 6); add('second', 2, 'test-user-1'); expect(await promote()).toMatchObject({ promoted: false, reason: 'no_fitting_table' }); expect((await promote('large')).promoted).toBe(true); expect((await promote()).promoted).toBe(true); });
   it('卓の滞在時間を仮押さえし、別の人の予約は拒否する', async () => { add('w0'); await promote(); expect(() => reserve('steal', 'test-user-1')).toThrow('restaurant_table_conflict'); expect(() => reserve('ok', 'test-user-0', 'w0')).not.toThrow(); expect(test.raw.prepare("SELECT status FROM rt_seat_waitlist WHERE id='w0'").get()).toMatchObject({ status: 'converted' }); });
   it('予約が残る卓には案内を出さない', async () => { reserve('full', 'test-user-7'); add('w0'); expect((await promote()).promoted).toBe(false); });

@@ -75,7 +75,7 @@ describe('作成画面の登録メディア選択', () => {
 /** #900 / N-151: 履歴・失敗だけの再試行・照合 */
 describe('公開履歴・再試行・照合', () => {
   it('編集画面に履歴セクションがあり owner/admin のみ出す', () => {
-    expect(PUBLISH_HISTORY).toContain("const canInspectOperations = role === 'owner' || role === 'admin'")
+    // この出し分けは edit/publish-history-react.test.tsx の動きと故障対照で確かめる。
     expect(PUBLISH_HISTORY).toContain('aria-label="公開の履歴とLINEとの照合"')
   })
 

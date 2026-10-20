@@ -424,3 +424,18 @@ describe('ファイルの検査の設定画面', () => {
     expect(screen.getByLabelText(/理由/)).toBeTruthy()
   })
 })
+
+test.each([{ role: 'admin', readOnly: true }, { role: 'owner', roleBundle: 'view_only' }])('閲覧のみの管理者は検査結果を読めるが変更操作はない: %j', async identity => {
+  ready()
+  mocks.me.mockResolvedValue({ success: true, data: identity })
+  mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1 } })
+  render(<FileScanSettingsPage />)
+  await screen.findByText('invoice.pdf')
+  expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+  for (const name of ['使えるように戻す', 'invoice.pdfのその他操作', '設定を編集', '外の検査を止める']) {
+    expect(screen.queryByRole('button', { name })).toBeNull()
+  }
+  expect(mocks.release).not.toHaveBeenCalled()
+  expect(mocks.remove).not.toHaveBeenCalled()
+  expect(mocks.saveConfig).not.toHaveBeenCalled()
+})

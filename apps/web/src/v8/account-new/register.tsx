@@ -1,6 +1,6 @@
 'use client'
 
-import { isOwnerRole, useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -8,7 +8,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   ArrowLeft, ArrowRight, Check, CircleAlert, CircleDashed, Copy, Plug,
 } from 'lucide-react'
-import { api, type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
+import { api, type FollowerImportState, type LineAccountConnectData, type LineRegistrationReceipt } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
@@ -70,16 +70,16 @@ export default function AccountRegisterV8() {
   const role = useStaffRole()
   const [resumeId, setResumeId] = useState('')
   useEffect(() => {
-    if (!isOwnerRole(role)) return
+    if (!canManageRole(role)) return
     try { setResumeId(sessionStorage.getItem(REGISTRATION_STYLE_KEY) ?? '') } catch { /* 接続を新規作成する前に通常の重複検査も行う。 */ }
   }, [role])
   usePageTitle('LINEアカウントを登録')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'アカウント', href: '/hq' }])
 
-  // API の接続・登録と同じくオーナーだけ。権限確認前に下書きの復元や変更処理を起動しない。
-  if (!isOwnerRole(role)) return <PageFrame kind="wizard" boardId="p6zMkA">
+  // API の接続・登録と同じくオーナー・管理者だけ。権限確認前に下書きの復元や変更処理を起動しない。
+  if (!canManageRole(role)) return <PageFrame kind="wizard" boardId="p6zMkA">
     <PageHeading title="LINEアカウントを登録" />
-    <PageContent layout="stats">{role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>LINEアカウントの登録はオーナーだけができます。オーナーに頼んでください。</ReadOnlyNotice>}</PageContent>
+    <PageContent layout="stats">{role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>LINEアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。</ReadOnlyNotice>}</PageContent>
     <StickyBar actions={<Button variant="secondary" href="/accounts">LINEアカウントの一覧へ戻る</Button>} />
   </PageFrame>
   if (resumeId) return <ResumeRegistrationStyle accountId={resumeId} />
@@ -107,7 +107,9 @@ function AccountRegistrationForm() {
   const [checkRunning, setCheckRunning] = useState(false)
   const [checkAttempted, setCheckAttempted] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState('')
-  const [testFollowed, setTestFollowed] = useState(false)
+  const [receipt, setReceipt] = useState<LineRegistrationReceipt>({ status: 'waiting', receivedAt: null })
+  const [receiptRequestFailed, setReceiptRequestFailed] = useState(false)
+  const [receiptChecking, setReceiptChecking] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [insightTotal, setInsightTotal] = useState<number | null>(null)
   const [draftRestored, setDraftRestored] = useState(false)
@@ -206,23 +208,28 @@ function AccountRegistrationForm() {
     return () => { cancelled = true }
   }, [currentStep, sub, addFriendUrl, saveErrors])
 
-  // ③-2：友だちが1人でも届いたら「届きました」に変える。
+  // ③-2：人数ではなく、このアカウントに登録後届いた署名付きWebhookの記録を確認する。
   useEffect(() => {
-    if (currentStep !== 3 || sub !== 2 || !createdId || testFollowed) return
+    if (currentStep !== 3 || sub !== 2 || !createdId || (receipt.status === 'confirmed' && !receiptRequestFailed)) return
     let active = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const poll = async () => {
       try {
-        const response = await api.friends.list({ accountId: createdId, limit: 1, includeTags: false })
+        const response = await api.lineAccounts.registrationReceipt(createdId)
         if (!active) return
-        if (response.success && response.data.total > 0) { setTestFollowed(true); return }
-      } catch (saveFailure) {
-        saveErrors.capture(saveFailure) /* 一度届かなくても次で拾う。 */ }
+        if (response.success) {
+          setReceipt(response.data)
+          setReceiptRequestFailed(false)
+          if (response.data.status === 'confirmed') return
+        } else setReceiptRequestFailed(true)
+      } catch {
+        if (active) setReceiptRequestFailed(true)
+      }
       if (active) timer = setTimeout(() => void poll(), 5000)
     }
     void poll()
     return () => { active = false; if (timer) clearTimeout(timer) }
-  }, [currentStep, sub, createdId, testFollowed, saveErrors])
+  }, [currentStep, sub, createdId, receipt.status, receiptRequestFailed])
 
   /* ⑤：読み取りだけだと次の cron（5分ごと）まで進まないので、画面を開いている間は
    * 1 回ぶんが終わるたびに次を呼ぶ。閉じたあとは cron と「入る」が続きを拾う。 */
@@ -345,6 +352,8 @@ function AccountRegistrationForm() {
         return
       }
       setConnection(response.data)
+      setReceipt({ status: 'waiting', receivedAt: null })
+      setReceiptRequestFailed(false)
       if (response.data.basicId) setForm((current) => ({ ...current, lineId: response.data.basicId ?? current.lineId }))
       // 止まった行は③の一覧が赤で示し、下の帯が「どこを直すか」を言う。同じ文を重ねない。
     } catch (saveFailure) {
@@ -352,9 +361,8 @@ function AccountRegistrationForm() {
       const fieldFailure = saveErrors.capture(saveFailure)
       /* 「時間をおいて」の一文に畳むと、権限不足の人が待ち続け、混み合いの人が連打する。
          403・404・429・入力の直しは原因どおりに言い分ける（共通の describeActionFailure）。
-         この口は要件 v6-33 §15 `account.line.register` でオーナーだけなので、
-         403は 'owner'（管理者が「管理者に頼め」と言われて行き止まりにならないため）。 */
-      if (!fieldFailure) setError(describeActionFailure(saveFailure, '接続の確認', 'owner'))
+         登録・接続確認はオーナーと管理者が行える。 */
+      if (!fieldFailure) setError(describeActionFailure(saveFailure, '接続の確認'))
     } finally {
       busyLock.current = false
       setBusyAction(null)
@@ -451,8 +459,26 @@ function AccountRegistrationForm() {
         void save()
         return
       }
-      setCurrentStep(4)
-      setSub(1)
+      if (receipt.status !== 'confirmed' || receiptChecking || !createdId) return
+      // 表示済みの結果だけを信じず、押した時点でサーバの受信記録をもう一度確かめる。
+      setReceiptChecking(true)
+      void (async () => {
+        try {
+          const response = await api.lineAccounts.registrationReceipt(createdId)
+          if (response.success) {
+            setReceipt(response.data)
+            setReceiptRequestFailed(false)
+            if (response.data.status === 'confirmed') {
+              setCurrentStep(4)
+              setSub(1)
+            }
+          } else setReceiptRequestFailed(true)
+        } catch {
+          setReceiptRequestFailed(true)
+        } finally {
+          setReceiptChecking(false)
+        }
+      })()
       return
     }
     if (currentStep === 4) {
@@ -497,6 +523,7 @@ function AccountRegistrationForm() {
     || (currentStep === 2 && sub === 2 && !allAcked(WEBHOOK_ACKS, acks))
     || (currentStep === 2 && sub === 3 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && !rowsOk)
+    || (currentStep === 3 && sub === 2 && (receipt.status !== 'confirmed' || receiptRequestFailed || receiptChecking))
     || (currentStep === 4 && (!templateKey || registrationStyle.version === null))
   // v07 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
   const backLabel = currentStep === 3 && sub === 1 ? 'LINEログインへ戻る'
@@ -599,13 +626,13 @@ function AccountRegistrationForm() {
             <CreateStepColumns data-design-node="Lwxyh" previewTitle="ためしに友だち追加" preview={(
                 <Card className={styles.aside} layout="vertical" surface="muted" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-aside-gap)" aria-label="ためしに友だち追加">
                 <h2 className={styles.asideH2}>ためしに友だち追加</h2>
-                <p className={styles.asideP}>自分のスマホの LINE で QR を読み取って、友だち追加してみてください。</p>
-                <p className={styles.asideP}>届かなくても先へ進めます。あとから友だち一覧で確かめられます。</p>
+                <p className={styles.asideP}>まだ友だちでなければ、スマホの LINE で QR を読み取って追加してください。</p>
+                <p className={styles.asideP}>すでに友だちなら、この公式アカウントとのトークに「接続テスト」と送ってください。受信が確認できると次へ進めます。</p>
               </Card>
               )}>
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
                 <p className={styles.subBadge}>{badge}</p>
-                <h2 className={styles.panelTitle}>ためしに友だち追加してみましょう</h2>
+                <h2 className={styles.panelTitle}>友だち追加できるか確かめます</h2>
                 <div className={styles.qrBlock}>
                   <div className={styles.qrFrame}>
                     {qrDataUrl ? (
@@ -621,10 +648,26 @@ function AccountRegistrationForm() {
                       <span className={styles.endpointValue} ><TruncatedText value={addFriendUrl || String(emptyValue('unknown'))} url /></span>
                       <CopyButton value={addFriendUrl || String(emptyValue('unknown'))} />
                     </Card>
-                    <div className={testFollowed ? `${styles.errorBox} ${styles.errorBoxInfo}` : styles.errorBox}>
-                      <p>{testFollowed ? '友だち追加が届きました' : 'まだ届いていません'}</p>
-                      <p>{testFollowed ? 'musubo の友だち一覧に入りました。次へ進んでください。' : '読み取って友だち追加すると、ここが自動で変わります。届かなくても先へ進めます。'}</p>
+                    <div className={`${styles.receiptState} ${(receiptRequestFailed || receipt.status === 'error') ? styles.receiptError : receipt.status === 'confirmed' ? styles.receiptSuccess : ''}`} role="status" aria-live="polite">
+                      <p>{receiptRequestFailed ? '受信を確認できませんでした' : receipt.status === 'confirmed' ? '接続を確認できました' : receipt.status === 'error' ? '受信の確認に問題があります' : '接続を待っています…'}</p>
+                      <p>{receiptRequestFailed
+                        ? '通信の状態を確認しています。しばらく待っても変わらない場合は、画面を読み直してください。'
+                        : receipt.status === 'confirmed'
+                          ? 'このアカウントの友だち追加、またはテストメッセージを musubo で確認できました。「次へ」を押してください。'
+                          : receipt.status === 'error'
+                            ? '受信処理に失敗しました。設定を確認して再度お試しください。解消しない場合はサポートにお問い合わせください。'
+                            : '友だち追加の通知が musubo に届くと、この画面が「接続を確認できました」に変わります。確認後に「次へ」を押してください。'}</p>
                     </div>
+                    <div className={styles.receiptAccount}>
+                      <span className={styles.receiptAccountIcon} aria-hidden="true">{(connection.displayName ?? form.name).slice(0, 1) || 'L'}</span>
+                      <span><strong>{connection.displayName ?? form.name}</strong><br />{basicId || String(emptyValue('unknown'))}</span>
+                    </div>
+                    <div className={styles.receiptInstructions}>
+                      <strong>すでに友だち追加している場合</strong>
+                      <p>このアカウントの LINE トークから「接続テスト」と送ってください。QR を開き直すだけでは確認できません。</p>
+                    </div>
+                    <p className={styles.receiptHelp}>変わらない場合は LINE Developers で Webhook の利用がオンか確認してください。</p>
+                    <p className={styles.receiptHelp}><a href="/hq/support">変わらない場合はサポートに問い合わせ</a></p>
                   </div>
                 </div>
               </Card>

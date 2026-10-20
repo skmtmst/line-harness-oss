@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { notifySaved } from '@/components/shared/toast';
 import { useEffect, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation'
@@ -240,7 +241,7 @@ export default function AffiliateOfferCreateV8() {
         <Card surface="muted" corner="control" padding="compact" layout="vertical" gap="tight">
           <p className={styles.previewName}>{name.trim() || '（案件名）'}</p>
           {description.trim() ? <p className={styles.previewDesc}>{description.trim()}</p> : null}
-          <p className={styles.previewReward}>{`報酬 ¥${formatNumber(yen)}${miles > 0 ? ` ＋ ${formatNumber(miles)}マイル` : ''} / 件`}</p>
+          <p className={styles.previewReward}>{`報酬 ${formatYen(yen)}${miles > 0 ? ` ＋ ${formatNumber(miles)}マイル` : ''} / 件`}</p>
         </Card>
       </Card>
       <Card variant="aside" contentPadding="var(--space-16)" gap="var(--space-8)" aria-labelledby="af-new-care">

@@ -346,6 +346,18 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     await click('予約内容を確認する')
     expect(all('button').some((b) => b.textContent?.includes('この内容で予約を入れる'))).toBe(true)
   })
+  it('電話の表記をそろえて保存し、予約失敗後の再確認でも台帳を二重作成しない', async () => {
+    api.createProxyBooking.mockRejectedValueOnce(new Error('network'))
+    seedDraft({ customerPhone: '０９０－１２３４－５６７８' })
+    await mount(); await flush()
+    const click = async (text: string) => { await act(async () => { all('button').find((b) => b.textContent?.includes(text))!.click() }); await flush() }
+    await click('予約内容を確認する'); await click('この内容で予約を入れる')
+    expect(api.createCustomer).toHaveBeenCalledWith('account-ny', expect.objectContaining({ phone: '09012345678' }), expect.any(String))
+    await click('入力に戻る')
+    await act(async () => { setValue(byLabel('電話客の電話番号'), '090 1234 5678') }); await flush()
+    await click('予約内容を確認する'); await click('この内容で予約を入れる')
+    expect(api.createCustomer).toHaveBeenCalledTimes(1)
+  })
   it('WEB304：復元した電話客の名前を直したら新しい入力で確定する', async () => {
     seedDraft({ customer: { id: 'old', line_account_id: 'account-ny', display_name: '山田 花子', phone_last4: '5678', pet_name: 'ポチ', is_line_linked: false } })
     await mount(); await flush()
@@ -398,7 +410,7 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     const confirm = all('button').find(b => b.textContent?.includes('予約内容を確認する'))! as HTMLButtonElement
     await act(async () => { confirm.click() }); await flush()
     expect(all('button').some(b => b.textContent?.includes('この内容で予約を入れる'))).toBe(false)
-    expect(container.textContent).toContain('電話番号は数字7〜15桁で入力してください')
+    expect(container.textContent).toContain('電話番号は0から始まる10〜11桁の数字で入れてください。')
     expect(api.createCustomer).not.toHaveBeenCalled()
     expect(api.createProxyBooking).not.toHaveBeenCalled()
   })

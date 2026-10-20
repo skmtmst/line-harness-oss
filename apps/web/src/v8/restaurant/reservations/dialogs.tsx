@@ -1,4 +1,5 @@
 'use client'
+import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
 import { datetimeLocalJstToUtcIso, jstDateTimeLocal, jstCalendar } from '@/lib/jst-datetime'
 
@@ -75,6 +76,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   }, [reservation])
   const fields = useFormErrors()
   fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。', { required: true })
+  fields.define('phone', '電話番号', () => phoneProblem(draft.customerPhone) || null)
   fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
   fields.define('start', '開始日時', () => Number.isFinite(Date.parse(draft.startsAt)) ? null : '開始日時を選んでください。', { required: true })
   fields.define('end', '終了日時', () => Number.isFinite(Date.parse(draft.endsAt)) && Date.parse(draft.endsAt) > Date.parse(draft.startsAt) ? null : '終了日時は開始日時より後にしてください。', { required: true })
@@ -91,7 +93,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     }
     onSave({
     customerName: draft.customerName,
-    customerPhone: draft.customerPhone || null,
+    customerPhone: normalizePhone(draft.customerPhone) || null,
     guestCount: Number(draft.guestCount),
     startsAt: datetimeLocalJstToUtcIso(draft.startsAt),
     endsAt: datetimeLocalJstToUtcIso(draft.endsAt),
@@ -142,8 +144,8 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
             <Field label="お客様名" htmlFor="rs-edit-name" error={fields.error('name')} requirement={fields.requirement('name')}>
               <SaveErrorField names={["customerName","draft.customerName","customer_name","draft.customer_name"]}><TextField id="rs-edit-name" invalid={fields.invalid('name')} required readOnly={!canWrite} value={draft.customerName} onChange={(event) => setDraft({ ...draft, customerName: event.target.value })} /></SaveErrorField>
             </Field>
-            <Field label="電話番号" htmlFor="rs-edit-phone">
-              <SaveErrorField names={["customerPhone","draft.customerPhone","customer_phone","draft.customer_phone"]}><TextField id="rs-edit-phone" readOnly={!canWrite} value={draft.customerPhone} onChange={(event) => setDraft({ ...draft, customerPhone: event.target.value })} /></SaveErrorField>
+            <Field label="電話番号" htmlFor="rs-edit-phone" error={fields.error('phone')}>
+              <SaveErrorField names={["customerPhone","draft.customerPhone","customer_phone","draft.customer_phone"]}><TextField id="rs-edit-phone" invalid={fields.invalid('phone')} readOnly={!canWrite} value={draft.customerPhone} onChange={(event) => setDraft({ ...draft, customerPhone: event.target.value })} /></SaveErrorField>
             </Field>
           </div>
           <div className={styles.pair}>

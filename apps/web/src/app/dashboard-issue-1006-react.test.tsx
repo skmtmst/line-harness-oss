@@ -93,6 +93,7 @@ function installFetch() {
     const raw = typeof input === 'string' ? input : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
     net.calls.push(`${init?.method ?? 'GET'} ${path}`)
+    if (path.startsWith('/api/staff/me')) return jsonResponse({ status: 200, body: { success: true, data: { id: 'test-owner', role: 'owner' } } })
     if (path.startsWith('/api/dashboard/overview')) {
       return jsonResponse(await net.overview(path))
     }
