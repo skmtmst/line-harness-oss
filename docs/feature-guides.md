@@ -2,7 +2,7 @@
 
 # 機能の案内
 
-Nextの入口から到達する機能と、動きの説明を持つ機能を一覧にしました。補助フォルダへ同じ文書を量産せず、利用側から追います。機能READMEは入口・本体・APIのimport・公開index・同所の試験を示します。登録したパスの実在を確認したもので、全操作を試験済みという意味ではありません。
+Nextのpage・特別な入口から到達する機能と、動きの説明を持つ機能を一覧にしました。補助フォルダへ同じ文書を量産せず、利用側から追います。機能READMEは入口・本体・APIのimport・公開index・同所の試験を示します。登録したパスの実在を確認したもので、全操作を試験済みという意味ではありません。
 
 | 機能 | 入口の数 | 公開index | 同所の試験ファイル |
 |---|---:|---:|---:|
@@ -59,6 +59,7 @@ Nextの入口から到達する機能と、動きの説明を持つ機能を一�
 | [nen-pets](../apps/web/src/v8/nen-pets/README.md) | 1 | 1 | 3 |
 | [nen-posts](../apps/web/src/v8/nen-posts/README.md) | 1 | 1 | 5 |
 | [no-permission](../apps/web/src/v8/no-permission/README.md) | 0 | 1 | 1 |
+| [not-found](../apps/web/src/v8/not-found/README.md) | 特別な入口1 | 1 | 1 |
 | [notifications](../apps/web/src/v8/notifications/README.md) | 1 | 2 | 2 |
 | [onboarding](../apps/web/src/v8/onboarding/README.md) | 0 | 9 | 3 |
 | [ops](../apps/web/src/v8/ops/README.md) | 11 | 3 | 7 |
@@ -86,6 +87,13 @@ Nextの入口から到達する機能と、動きの説明を持つ機能を一�
 
 入口のない説明用の機能は、呼び出し側から利用します。APIのimportがない機能はProps・共通hook・利用側を確認します。単独のpageがないことを未使用の根拠にしません。
 
-READMEを置かない補助のまとまりは `not-found`・`booking`・`autosave`・`broadcast-ab`・`ec-auto-line`。単独のNextページからの直接接続もBEHAVIORも確認できないため、別の機能案内を作りません。削除せず、利用側と公開indexを確認します。
+READMEを置かない補助のまとまりは `booking`・`autosave`・`broadcast-ab`・`ec-auto-line`。単独のNextページからの直接接続もBEHAVIORも確認できないため、別の機能案内を作りません。削除せず、利用側と公開indexを確認します。
+
+| 補助のまとまり | 公開する名前の宣言元 | 利用側の入口 |
+|---|---|---|
+| 受信箱の前払い表示 | [booking/index.ts](../apps/web/src/v8/booking/index.ts) | [友だち情報の欄](../apps/web/src/components/chats/friend-info-sidebar.tsx) |
+| 入力途中の保存 | [autosave/index.ts](../apps/web/src/v8/autosave/index.ts) | [テンプレート編集](../apps/web/src/v8/template-edit/README.md)、[シナリオ](../apps/web/src/v8/scenarios/README.md) |
+| 配信のAB比較 | [broadcast-ab/index.ts](../apps/web/src/v8/broadcast-ab/index.ts) | [配信フォーム](../apps/web/src/components/broadcasts/broadcast-form.tsx)、[配信詳細](../apps/web/src/v8/broadcast-detail/README.md) |
+| ECから自動LINE | [ec-auto-line/index.ts](../apps/web/src/v8/ec-auto-line/index.ts) | [EC設定画面](../apps/web/src/v8/settings/ec-commerce/screen.tsx) |
 
 APIの詳細は [追い方](handoff-api.md)、構成・名前は [正本](code-structure.md) へ進んでください。
