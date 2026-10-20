@@ -23,6 +23,7 @@ import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
+import { getLineRegistrationReceipt } from '../services/line-registration-receipt.js';
 import type { Env } from '../index.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
@@ -863,6 +864,19 @@ lineAccounts.get(
     }
   },
 );
+
+// Only the registered account's signed inbound receipt can unlock the wizard.
+lineAccounts.get('/api/line-accounts/:id/registration-receipt', requireRole('owner', 'admin'), async (c) => {
+  c.header('Cache-Control', 'no-store');
+  try {
+    const account = await getAuthorizedLineAccount(c, c.req.param('id'));
+    if (!account || account.archived_at) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    return c.json({ success: true, data: await getLineRegistrationReceipt(c.env.DB, account.id) });
+  } catch {
+    console.error(JSON.stringify({ code: 'line_registration_receipt_failed' }));
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 // GET /api/line-accounts/:id - get single without persisted secret values
 lineAccounts.get('/api/line-accounts/:id', async (c) => {

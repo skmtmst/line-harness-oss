@@ -3085,6 +3085,11 @@ export type LineAccountConnectData = {
   remainingActions: string[]
 }
 
+export type LineRegistrationReceipt = {
+  status: 'waiting' | 'confirmed' | 'error'
+  receivedAt: string | null
+}
+
 export type FriendFormSubmission = {
   id: string
   formId: string
@@ -9422,6 +9427,8 @@ export const api = {
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),
     get: (id: string) =>
       fetchApi<ApiResponse<LineAccount>>(`/api/line-accounts/${id}`),
+    registrationReceipt: (id: string) =>
+      fetchApi<ApiResponse<LineRegistrationReceipt>>(`/api/line-accounts/${id}/registration-receipt`, { cache: 'no-store' }),
     create: (data: {
       channelId: string;
       name: string;

@@ -5227,6 +5227,19 @@ const spec = {
         },
       },
     },
+    '/api/line-accounts/{id}/registration-receipt': {
+      get: {
+        tags: ['LINE Accounts'],
+        summary: '登録後のLINE受信を確認する',
+        description: '登録したアカウント宛ての友だち追加またはメッセージの受信記録を返す。'
+          + '既存の友だち数や空の設定テストは成功と見なさない。',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': { description: 'waiting / confirmed / error のいずれか' },
+          '404': { description: 'アカウントが見つからないか、閲覧権限がない' },
+        },
+      },
+    },
     '/api/line-accounts/verify-connection': {
       post: {
         tags: ['LINE Accounts'],
