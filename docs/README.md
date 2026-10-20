@@ -613,3 +613,6 @@
 - [使われていない処理と重複する検査の整理記録](qa/cleanup-x02b-1020.md)
 - [使われていない処理と重複する検査の整理履歴](release-log/unreleased/0000-kenta-cleanup-x02b.md)
 - [支払いリンクの期限確認の修正履歴](release-log/unreleased/0000-kenta-cleanup-f03.md)
+- [画面の権限確認の共通化](release-log/unreleased/0000-kenta-cleanup-q01s1.md)
+- [管理者によるLINEアカウントの登録](release-log/unreleased/1779-masato-admin-line-registration.md)
+- [LINEアカウント登録後の受信確認](release-log/unreleased/1780-masato-line-receipt-gate.md)
