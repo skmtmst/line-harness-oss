@@ -229,7 +229,7 @@ function TagCreate() {
           </div>
         )}
         footerActions={<>
-          <Button type="button" onClick={() => guard.guarded(() => router.push('/tags'))} disabled={saving}>キャンセル</Button>
+          <Button type="button" onClick={() => guard.guarded(() => router.push('/tags'))} disabled={saving} disabledReason={saving ? 'タグを作っています。終わるまでお待ちください。' : undefined}>キャンセル</Button>
           <Button type="button" onClick={() => save(true)} disabled={saving} busy={Boolean(saving)} busyLabel="処理中…"><Plus size={15} aria-hidden="true" />保存して続けて作る</Button>
           <Button type="button" variant="primary" onClick={() => save(false)} busy={saving} busyLabel="作っています…"><Check size={15} aria-hidden="true" />タグを作る</Button>
         </>} dirty={false}
