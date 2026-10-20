@@ -36,7 +36,7 @@ function payment(id:string,status='paid',account='a',created='2026-10-10T04:00:0
 }
 beforeEach(()=>{
   vi.useFakeTimers();vi.setSystemTime(now);vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('外部通信は禁止');}));
-  f=createTestD1();seedAssignmentFixture(f);access.allow=true;role='owner';readOnly=false;sequence=0;
+  f=createTestD1({now:()=>new Date()});seedAssignmentFixture(f);access.allow=true;role='owner';readOnly=false;sequence=0;
   f.raw.exec(`INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES('f','Utest','山田','a'),('fb','Uother','別店の秘密','b');
     INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('mb','b','別店のメニュー',30,1000);
     INSERT INTO events(id,line_account_id,name) VALUES('ev','a','試験クラス'),('evb','b','別クラス');
