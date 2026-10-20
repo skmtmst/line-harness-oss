@@ -223,6 +223,9 @@ function sourceFilesUnder(directory: string): string[] {
 }
 
 function hasQrEndpoint(source: string): boolean {
+  // 対象の文字もエスケープもなければ、構文を読んでも対象のURLにはならない。
+  // エスケープがある物はUnicodeやテンプレートも含めて従来どおり構文で調べる。
+  if (!source.includes('/api/qr?') && !source.includes('\\')) return false;
   const tree=ts.createSourceFile('caller.tsx',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
   let found=false;
   const visit=(node:ts.Node):void=>{
@@ -237,6 +240,9 @@ describe('/api/qr を呼ぶ側が渡せる大きさ', () => {
     expect(hasQrEndpoint("const qr='/api/qr?size=240x240' ")).toBe(true);
     expect(hasQrEndpoint('const qr=`/api/qr?data=${value}`')).toBe(true);
     expect(hasQrEndpoint('// /api/qr?size=240x240')).toBe(false);
+    expect(hasQrEndpoint(String.raw`const qr='\u002fapi/qr?data=x'`)).toBe(true);
+    expect(hasQrEndpoint('const qr=`/api/\\u0071r?data=${value}`')).toBe(true);
+    expect(hasQrEndpoint(String.raw`// /api/\u0071r?data=x`)).toBe(false);
   });
   it('QRのURLを組み立てている箇所は数え上げたものだけ', () => {
     // 増えたらここに足して、その呼び出し元の上限も下の検査へ入れる。

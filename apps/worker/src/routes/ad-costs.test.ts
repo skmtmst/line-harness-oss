@@ -1,11 +1,18 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { AdConversionCostSummary } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { adCosts } from './ad-costs.js';
 
 const NOW = '2026-09-21T00:00:00+09:00';
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(NOW));
+});
+afterEach(() => vi.useRealTimers());
 
 function staff(id: string, tenantId: string, role: AuthenticatedStaff['role'] = 'owner'): AuthenticatedStaff {
   return { id, name: id, role, readOnly: false, tenantId };
@@ -94,6 +101,28 @@ describe('GET /api/ad-costs', () => {
       '/api/ad-costs?accountId=a1&from=not-a-date',
     );
     expect(res.status).toBe(400);
+  });
+
+  it('既定の期間は現在の日本日付に追従し、過去の費用は期間指定で取得できる', async () => {
+    const testDb = createTestD1();
+    try {
+      seed(testDb);
+      testDb.raw.exec(`INSERT INTO ad_cost_entries
+        (id, line_account_id, source_label, day, amount_minor, currency, source)
+        VALUES ('past', 'a1', 'チラシ', '2026-09-20', 8000, 'JPY', 'manual')`);
+      const handler = app(staff('owner-1', 'tenant-1'));
+      const get = async (query = '') => {
+        const response = await req(handler, testDb, `/api/ad-costs?accountId=a1${query}`);
+        expect(response.status).toBe(200);
+        return response.json() as Promise<{ data: { rows: Array<{ sourceLabel: string }> } }>;
+      };
+      expect((await get()).data.rows.map(row => row.sourceLabel)).toEqual(['チラシ']);
+      // UTCではまだ10月20日でも、日本では21日となり9月20日は範囲外。
+      vi.setSystemTime(new Date('2026-10-20T15:00:00Z'));
+      expect((await get()).data.rows).toEqual([]);
+      expect((await get('&from=2026-09-01&to=2026-09-30')).data.rows.map(row => row.sourceLabel))
+        .toEqual(['チラシ']);
+    } finally { testDb.raw.close(); }
   });
 
   it('別統括のアカウントは見えない', async () => {
@@ -268,10 +297,11 @@ it('円の費用を確定成果で割り、通貨混在・成果なし・逆期�
     INSERT INTO conversion_events(id,conversion_point_id,friend_id,created_at) VALUES('ce','cp','f','2026-09-20T12:00:00+09:00');
     INSERT INTO ad_cost_entries(id,line_account_id,source_label,day,amount_minor,currency,source) VALUES('cost','a1','広告','2026-09-20',1200,'JPY','manual');`);
   const get = async (from='2026-09-20',to=from) => req(app(staff('owner-1','tenant-1')),testDb,`/api/ad-costs?accountId=a1&from=${from}&to=${to}`);
-  expect((await (await get()).json() as any).data.conversionCost).toMatchObject({confirmedConversionCount:1,costPerConversionMinor:1200,currency:'JPY'});
+  type CostResponse = { data: { conversionCost: AdConversionCostSummary } };
+  expect((await (await get()).json() as CostResponse).data.conversionCost).toMatchObject({confirmedConversionCount:1,costPerConversionMinor:1200,currency:'JPY'});
   testDb.raw.exec("UPDATE ad_cost_entries SET currency='USD'");
-  expect((await (await get()).json() as any).data.conversionCost.costPerConversionMinor).toBeNull();
-  expect((await (await get('2026-09-19')).json() as any).data.conversionCost).toMatchObject({confirmedConversionCount:0,costPerConversionMinor:null});
+  expect((await (await get()).json() as CostResponse).data.conversionCost.costPerConversionMinor).toBeNull();
+  expect((await (await get('2026-09-19')).json() as CostResponse).data.conversionCost).toMatchObject({confirmedConversionCount:0,costPerConversionMinor:null});
   expect((await get('2026-09-20','2026-09-19')).status).toBe(400);
  } finally {testDb.raw.close();}
 });

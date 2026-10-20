@@ -173,20 +173,30 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
     sources.set(resolve(file), readFileSync(file, 'utf8'));
   }
   sources.set(resolve(srcDir, 'index.ts'), readFileSync(join(srcDir, 'index.ts'), 'utf8'));
-  // Each file is parsed once for mount metadata, regardless of how many routers
-  // or factories refer to it. Keep this cache within one scan so edits cannot
-  // leave the next inventory with stale registrations.
-  const metadata = new Map([...sources].map(([file, source]) => {
+  // Parse only sources reached through mounted routers/factories. Handler-only
+  // modules remain in the source set, so moving a registration cannot hide it.
+  // Keep both caches within this scan: edits must be visible on the next call.
+  function parseMetadata(file: string, source: string) {
     const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-    return [file, {
+    return {
       ast, imported: importedRouters(ast), exported: exportedRouters(ast),
       mounts: registrations(ast).filter(call => call.method === 'ROUTE'),
       invocations: ast.statements.filter(ts.isExpressionStatement)
         .map(statement => statement.expression).filter(ts.isCallExpression),
       factories: new Map(ast.statements.filter(ts.isFunctionDeclaration)
         .filter(node => node.name).map(node => [node.name!.text, node])),
-    }] as const;
-  }));
+    };
+  }
+  const metadata = new Map<string, ReturnType<typeof parseMetadata>>();
+  function getMetadata(file: string) {
+    const cached = metadata.get(file);
+    if (cached) return cached;
+    const source = sources.get(file);
+    if (source === undefined) return undefined;
+    const parsed = parseMetadata(file, source);
+    metadata.set(file, parsed);
+    return parsed;
+  }
   const constantSources = new Map<string, ts.SourceFile>();
   function importedStringConstant(file: string, name: string, seen = new Set<string>()): string[] {
     const key = `${file}:${name}`;
@@ -216,17 +226,23 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
     if (imported) return importedStringConstant(resolve(dirname(file), imported.module.replace(/\.js$/, '.ts')), imported.exported, nextSeen);
     return [];
   }
-  const routes = new Map([...sources].map(([file]) => [file, inspectScopedRouteSource(file, metadata.get(file)!.ast, (module, name) => {
-    return importedStringConstant(resolve(dirname(file), module.replace(/\.js$/, '.ts')), name);
-  })]));
+  const routes = new Map<string, SecurityRoute[]>();
+  function getRoutes(file: string, ast: ts.SourceFile): SecurityRoute[] {
+    const cached = routes.get(file);
+    if (cached) return cached;
+    const inspected = inspectScopedRouteSource(file, ast, (module, name) =>
+      importedStringConstant(resolve(dirname(file), module.replace(/\.js$/, '.ts')), name));
+    routes.set(file, inspected);
+    return inspected;
+  }
   function mounted(file: string, router: string, prefix = '', ancestors = new Set<string>(), inherited: SecurityRoute[] = []): SecurityRoute[] {
     const key = `${file}:${router}`;
     if (ancestors.has(key)) throw new Error('Cyclic router mount');
     const nextAncestors = new Set(ancestors).add(key);
-    const meta = metadata.get(file);
+    const meta = getMetadata(file);
     if (!meta) throw new Error(`Unresolved router source: ${file}`);
     const { ast, imported } = meta;
-    const registered = (routes.get(file) ?? []).filter(route => route.router === router);
+    const registered = getRoutes(file, ast).filter(route => route.router === router);
     const middleware = registered.filter(route => route.method === 'USE');
     const inheritAt = (position: number) => [...inherited, ...middleware.filter(route => route.position < position)
       .map(route => ({ ...route, path: prefix + (prefix && route.path === '*' ? '/*' : route.path) }))];
@@ -245,7 +261,7 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
       if (!ts.isIdentifier(call.expression)) continue;
       const importedFactory = imported.get(call.expression.text);
       const factoryFile = importedFactory ? resolve(dirname(file), importedFactory.module.replace(/\.js$/, '.ts')) : file;
-      const factoryMeta = metadata.get(factoryFile);
+      const factoryMeta = getMetadata(factoryFile);
       if (!factoryMeta) continue;
       const factoryAst = factoryMeta.ast;
       const name = importedFactory?.exported ?? call.expression.text;
@@ -261,7 +277,7 @@ export function collectSecurityRoutes(srcDir: string): SecurityRoute[] {
       const importedRouter = imported.get(mount.mountedRouter ?? '');
       const childFile = importedRouter ? resolve(dirname(file), importedRouter.module.replace(/\.js$/, '.ts')) : file;
       const childRouter = importedRouter
-        ? metadata.get(childFile)?.exported.get(importedRouter.exported) : mount.mountedRouter;
+        ? getMetadata(childFile)?.exported.get(importedRouter.exported) : mount.mountedRouter;
       if (!childRouter) throw new Error(`Unresolved mounted router: ${file}:${mount.mountedRouter}`);
       own.push(...mounted(childFile, childRouter, prefix + (mount.path === '/' ? '' : mount.path.replace(/\/$/, '')), nextAncestors, inheritAt(mount.position)));
     }
