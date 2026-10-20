@@ -611,6 +611,7 @@
 - [構成と接続の整理の更新履歴](release-log/unreleased/0000-kenta-cleanup-s02z.md)
 - [予約写真とお客さまの画面・設定カードの表示改善](release-log/unreleased/0000-kenta-cleanup-n01.md)
 - [LINE受付枠の自動調整の設定と記録](release-log/unreleased/0000-kenta-cleanup-f24s.md)
+- [自動で合わせるルールの日付と席数入力の改善](release-log/unreleased/0000-kenta-cleanup-f24n.md)
 - [画面の権限確認の統一](release-log/unreleased/0000-kenta-cleanup-q01s1.md)
 - [管理者によるLINEアカウント登録と接続確認](release-log/unreleased/1779-masato-admin-line-registration.md)
 - [LINEアカウント登録後の受信確認](release-log/unreleased/1780-masato-line-receipt-gate.md)

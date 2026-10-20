@@ -8,7 +8,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
-import { ListToolbarEnd } from '@/components/shared/list-toolbar'
+import { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
 import NumberField from '@/components/shared/number-field'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -32,6 +32,7 @@ const SWITCHES = [
 ] as const
 type Draft = Pick<RestaurantInventoryRules, 'stopLine' | 'stopSameDay' | 'notify'> & { threshold: string }
 const toDraft = (rule: RestaurantInventoryRules): Draft => ({ threshold: String(rule.threshold), stopLine: rule.stopLine, stopSameDay: rule.stopSameDay, notify: rule.notify })
+const thresholdError = (value: string) => value.trim() === '' || !Number.isSafeInteger(Number(value)) || Number(value) < 0 || Number(value) > 10000 ? '0〜10,000 の数で入れてください' : ''
 
 export default function RulesBoard({ accountId, storeId, today, timezone, canEdit }: {
   accountId: string; storeId: string; today: string; timezone?: string; canEdit: boolean
@@ -108,14 +109,15 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
       <SettingsFormCard id="inventory-rules-form" title="自動で合わせるルール" description="残り席が基準以下になると受付枠を0にし、席が戻れば元の配分に戻します。" onSubmit={(event) => {
         event.preventDefault()
         if (!canEdit || !dirty || saving) return
-        if (draft.threshold.trim() === '' || !Number.isSafeInteger(Number(draft.threshold)) || Number(draft.threshold) < 0 || Number(draft.threshold) > 10000) {
-          setFieldError('0〜10000の整数を入れてください'); return
+        const error = thresholdError(draft.threshold)
+        if (error) {
+          setFieldError(error); return
         }
         setFieldError(''); setSaveError(''); saveErrors.reset(); setConfirm(true)
       }}>
         <SettingsFormRow layout="columns" columns={3}>
-          <Field label="残り席がこの数以下で止める" optional={false} error={fieldError}>
-            {canEdit ? <SaveErrorField names={['threshold']}><NumberField aria-label="残り席がこの数以下で止める" value={draft.threshold} min={0} max={10000} step={1} unit="席" disabled={saving} onChange={(event) => { setDraft({ ...draft, threshold: event.target.value }); setFieldError('') }} /></SaveErrorField> : `${saved.threshold}席`}
+          <Field label="残り席がこの数以下で止める" optional={false} help="0〜10,000 席の範囲で整数を入れます。" error={fieldError}>
+            {canEdit ? <SaveErrorField names={['threshold']}><NumberField aria-label="残り席がこの数以下で止める" value={draft.threshold} min={0} max={10000} step={1} unit="席" note={false} disabled={saving} onChange={(event) => { setDraft({ ...draft, threshold: event.target.value }); setFieldError(thresholdError(event.target.value)) }} /></SaveErrorField> : `${saved.threshold}席`}
           </Field>
           {SWITCHES.slice(0, 2).map(([key, label]) => <Field key={key} label={label} optional={false} help={key === 'stopSameDay' ? '当日受付は店頭・電話の枠とは別です。店頭・電話の枠は自動で止めません。' : '初めは停止中です。有効にして保存した店舗だけ、自動で調整します。'}>
             {canEdit ? <SaveErrorField names={[key]}><Toggle label={label} checked={draft[key]} disabled={saving} onChange={(next) => setDraft({ ...draft, [key]: next })} /></SaveErrorField> : saved[key] ? '有効' : '停止中'}
@@ -125,10 +127,10 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
           {canEdit ? <SaveErrorField names={['notify']}><Toggle label="担当にLINEで知らせる" checked={draft.notify} disabled={saving} onChange={(next) => setDraft({ ...draft, notify: next })} /></SaveErrorField> : saved.notify ? '有効' : '停止中'}
         </Field>
       </SettingsFormCard>
-      <SectionHeader title="停止中の枠・戻った記録" help="自動停止中は配分を手で変更できません。席が戻るか停止ルールを外すと、保存していた元の配分へ戻ります。記録は選んだ日の枠が対象です。" helpLabel="自動調整の記録の説明" actions={<ListToolbarEnd>
+      <SectionHeader title="停止中の枠・戻った記録" help="自動停止中は配分を手で変更できません。席が戻るか停止ルールを外すと、保存していた元の配分へ戻ります。記録は選んだ日の枠が対象です。" helpLabel="自動調整の記録の説明" actions={<ListToolbarOptional>
         <DateField aria-label="自動調整を見る日" value={date} clearable={false} size="compact" onChange={setDate} />
         <Button onClick={loadState}>もう一度読み込む</Button>
-      </ListToolbarEnd>} />
+      </ListToolbarOptional>} />
       <RulesState state={state} error={stateError} onRetry={loadState} timezone={timezone} />
     </PageContent>
     {canEdit ? <StickyBar actions={<>
