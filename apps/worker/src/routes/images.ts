@@ -1,3 +1,4 @@
+import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import { photoImageScanAllowed } from '../services/photo-image-gate.js';
 import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
@@ -6,7 +7,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
+import { builtinFileScan, checkKeyGate, checkMediaGate } from '../services/file-scan.js';
 import { isWebinarSource, privateImageKey, privateImageSignatureValid, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
 import { imageDimensions } from '../features/media/media-metadata/index.js';
 
@@ -164,6 +165,26 @@ images.get('/images/*', async (c) => {
   // Webinar originals use the existing enrollment-gated playback API.
   // A webinar may refer to a media key, so namespace checks alone are insufficient.
   if (!isPrivate && await isWebinarSource(c.env.DB, key)) return c.json({ success: false, error: 'Image not found' }, 404);
+  let mediaEtag: string | undefined;
+  if (key.startsWith('media/')) {
+    // Only the exact current or published historical object is a public asset.
+    const published = await c.env.DB.prepare(`
+      SELECT m.id, m.line_account_id, m.filename,
+        COALESCE(v.mime_type, m.mime_type) AS mime_type,
+        COALESCE(v.size_bytes, m.size_bytes) AS size_bytes,
+        COALESCE(v.width, m.width) AS width, COALESCE(v.height, m.height) AS height
+      FROM media m LEFT JOIN media_versions v ON v.media_id = m.id AND v.r2_key = ? AND v.published_at IS NOT NULL
+      WHERE m.r2_key = ? OR v.id IS NOT NULL LIMIT 1
+    `).bind(key, key).first<{ id: string; line_account_id: string; filename: string; mime_type: string; size_bytes: number; width: number | null; height: number | null }>();
+    if (!published) return c.json({ success: false, error: 'Image not found' }, 404);
+    const gate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+      id: published.id, lineAccountId: published.line_account_id, r2Key: key,
+      filename: published.filename, mimeType: published.mime_type, sizeBytes: published.size_bytes,
+      width: published.width, height: published.height,
+    });
+    if (!gate.allowed) return c.json({ success: false, code: gate.code, error: gate.message }, 409);
+    mediaEtag = gate.etag;
+  }
   // 検査が終わるまで出さない。記録が無い古いファイルは通す。
   const gateKind = key.startsWith('form-uploads/')
     ? 'form_file'
@@ -179,7 +200,7 @@ images.get('/images/*', async (c) => {
       return c.json({ success: false, code: gate.code, error: gate.message }, 409);
     }
   }
-  const object = await c.env.IMAGES.get(key);
+  const object = await getPinnedMediaObject(c.env.IMAGES, key, mediaEtag);
 
   if (!object) {
     return c.json({ success: false, error: 'Image not found' }, 404);

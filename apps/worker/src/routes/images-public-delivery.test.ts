@@ -51,7 +51,7 @@ it('来店スタンプの紙写真は公開画像口から読めず、R2にも�
 });
 
 
-it.each(['delivery.jpg', 'rich-menus/account/group/page/image.png', 'media/account/form-layout.png', 'banner/b/image.jpg', 'imagemaps/asset/1040', 'hq-templates/tenant/uploads/image.png'])('S11 keeps existing published image location %s visible', async key => {
+it.each(['delivery.jpg', 'rich-menus/account/group/page/image.png', 'banner/b/image.jpg', 'imagemaps/asset/1040', 'hq-templates/tenant/uploads/image.png'])('S11 keeps existing published image location %s visible', async key => {
  get.mockReset(); get.mockResolvedValue({ body: 'synthetic-image', etag: 'test', httpMetadata: { contentType: 'image/png' } });
  const res=await app().request(`/images/${key}`); expect(res.status).toBe(200); expect(get).toHaveBeenCalledWith(key);
 });
@@ -92,4 +92,10 @@ it('private delivery rechecks signatures and retains no-store even with a matchi
  const response=await app().request(url,{headers:{'If-None-Match':'*'}});
  expect(response.status).toBe(200);expect(response.headers.get('Cache-Control')).toBe('private, no-store');
  get.mockClear();expect((await app().request(url.replace('photo.jpg','other.jpg'),{headers:{'If-None-Match':'*'}})).status).toBe(404);expect(get).not.toHaveBeenCalled();
+});
+
+it('requires a published media record even for an existing R2 object and a cache validator', async () => {
+ get.mockReset(); get.mockResolvedValue({ body: 'synthetic-image', etag: 'test', httpMetadata: { contentType: 'image/png' } });
+ expect((await app().request('/images/media/account/unpublished.png', { headers: { 'If-None-Match': '*' } })).status).toBe(404);
+ expect(get).not.toHaveBeenCalled();
 });

@@ -12,7 +12,8 @@ import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { imageDimensions, IMAGE_METADATA_PREFIX_BYTES } from '../features/media/media-metadata/index.js';
 import { createR2PresignedPutUrl } from '../services/r2-presigned-upload.js';
-import { checkMediaGate, runScanForStoredObject } from '../services/file-scan.js';
+import { mediaUploadKey, isFinalMediaKey, finalMediaKey, copyMediaUpload, getPinnedMediaObject } from '../services/media-upload-storage.js';
+import { checkMediaGate, getFileScanBySubject, runScanForStoredObject } from '../services/file-scan.js';
 import { ensureFileScanForUpload } from './file-scan.js';
 import { directUploadConfig, DIRECT_ALLOWED, extensionOf, parseUploadMetadata, normalizedEtag, mediaVersionPreview, uploaderNameMap, serializeMedia, serveMediaFile } from './contents-definition.js';
 import type { Context } from 'hono';
@@ -116,7 +117,7 @@ export const post__api_media_upload_sessions_2 = async (c: Context<Env, "/api/me
     const sessions = [];
     for (const file of validated) {
       const id = crypto.randomUUID();
-      const r2Key = `media/${accountId}/${crypto.randomUUID()}.${extensionOf(file.filename)}`;
+      const r2Key = finalMediaKey(accountId, extensionOf(file.filename));
       await createMediaUploadSession(c.env.DB, {
         id,
         lineAccountId: accountId,
@@ -132,7 +133,7 @@ export const post__api_media_upload_sessions_2 = async (c: Context<Env, "/api/me
         createdBy: c.get('staff')?.id ?? null,
       });
       const signed = await createR2PresignedPutUrl(config, {
-        key: r2Key,
+        key: mediaUploadKey(id),
         contentType: file.mimeType,
         lineAccountId: accountId,
         uploadSessionId: id,
@@ -174,63 +175,77 @@ export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<E
         data: { uploadSessionId: session.id, status: 'completed', mediaId: session.result_media_id },
       });
     }
-    if (session.status === 'verified') {
-      return c.json({
-        success: true,
-        data: { uploadSessionId: session.id, status: 'verified', targetMediaId: session.target_media_id },
-      });
-    }
-    if (session.status !== 'pending') {
+    if (session.status !== 'pending' && session.status !== 'verified') {
       return c.json({ success: false, code: 'media_upload_not_pending', error: 'このアップロードは確定できません' }, 409);
     }
-    if (Date.parse(session.expires_at) <= Date.now()) {
-      await failMediaUploadSession(c.env.DB, session.id, accountId, 'expired');
-      return c.json({ success: false, code: 'media_upload_expired', error: 'アップロード期限が切れました' }, 409);
+    if (session.status === 'pending') {
+      if (Date.parse(session.expires_at) <= Date.now()) {
+        await failMediaUploadSession(c.env.DB, session.id, accountId, 'expired');
+        return c.json({ success: false, code: 'media_upload_expired', error: 'アップロード期限が切れました' }, 409);
+      }
+      // Old pending sessions used their public key as the PUT target. Copy those too.
+      const sourceKey = isFinalMediaKey(session.r2_key) ? mediaUploadKey(session.id) : session.r2_key;
+      const object = await c.env.IMAGES.head(sourceKey);
+      const objectEtag = object?.etag ? normalizedEtag(object.etag) : '';
+      const contentType = object?.httpMetadata?.contentType ?? '';
+      const metadata = object?.customMetadata ?? {};
+      const metadataAccountId = metadata['line-account-id'] ?? metadata.lineAccountId;
+      const metadataSessionId = metadata['upload-session-id'] ?? metadata.uploadSessionId;
+      if (!object || Number(object.size) !== Number(session.expected_size)
+        || contentType !== session.expected_mime || objectEtag !== suppliedEtag
+        || metadataAccountId !== accountId || metadataSessionId !== session.id) {
+        await failMediaUploadSession(c.env.DB, session.id, accountId, 'object_mismatch');
+        return c.json({
+          success: false,
+          code: 'media_upload_mismatch',
+          error: 'アップロードしたファイルを確認できませんでした',
+        }, 409);
+      }
+      const headBytes = session.kind === 'image' ? IMAGE_METADATA_PREFIX_BYTES : 16;
+      const bodyObject = await c.env.IMAGES.get(sourceKey, {
+        range: { offset: 0, length: headBytes }, onlyIf: { etagMatches: object.etag },
+      });
+      if (!bodyObject || !('body' in bodyObject)) {
+        return c.json({ success: false, code: 'media_upload_mismatch', error: 'ファイルが変更されました' }, 409);
+      }
+      const signatureBytes = new Uint8Array(await bodyObject.arrayBuffer());
+      if (!hasMediaSignature(signatureBytes, session.expected_mime)) {
+        await failMediaUploadSession(c.env.DB, session.id, accountId, 'signature_mismatch');
+        return c.json({
+          success: false,
+          code: 'media_signature_mismatch',
+          error: 'ファイルの実際の形式が申告と一致しません',
+        }, 409);
+      }
+      // 画像は実体の先頭から寸法を測り、申告値ではなく実測値を正本として残す。
+      // 測れなかった場合は寸法を null に戻し、版追加は「判定材料不足」で拒否する。
+      const measured = session.kind === 'image'
+        ? imageDimensions(signatureBytes, session.expected_mime)
+        : null;
+      const finalKey = finalMediaKey(accountId, extensionOf(session.filename));
+      if (!await copyMediaUpload(c.env.IMAGES, sourceKey, finalKey, object.etag, session.expected_size, session.expected_mime)) {
+        return c.json({ success: false, code: 'media_upload_mismatch', error: 'ファイルが変更されました' }, 409);
+      }
+      session = await verifyMediaUploadSession(
+        c.env.DB, session.id, accountId, objectEtag,
+        session.kind === 'image'
+          ? { width: measured?.width ?? null, height: measured?.height ?? null }
+          : undefined,
+        session.kind === 'image',
+        finalKey,
+      );
+      // Each completion owns its candidate key. A losing request only deletes its own copy.
+      if (session?.r2_key !== finalKey) await c.env.IMAGES.delete(finalKey);
+      if (!session) throw new Error('verified upload session is unavailable');
+      if (session.status === 'completed') {
+        return c.json({ success: true, data: { uploadSessionId: session.id, status: 'completed', mediaId: session.result_media_id } });
+      }
+      if (session.status !== 'verified') return c.json({ success: false, code: 'media_upload_not_pending', error: 'このアップロードは確定できません' }, 409);
     }
-    const object = await c.env.IMAGES.head(session.r2_key);
-    const objectEtag = object?.etag ? normalizedEtag(object.etag) : '';
-    const contentType = object?.httpMetadata?.contentType ?? '';
-    const metadata = object?.customMetadata ?? {};
-    const metadataAccountId = metadata['line-account-id'] ?? metadata.lineAccountId;
-    const metadataSessionId = metadata['upload-session-id'] ?? metadata.uploadSessionId;
-    if (!object || Number(object.size) !== Number(session.expected_size)
-      || contentType !== session.expected_mime || objectEtag !== suppliedEtag
-      || metadataAccountId !== accountId || metadataSessionId !== session.id) {
-      await failMediaUploadSession(c.env.DB, session.id, accountId, 'object_mismatch');
-      await c.env.IMAGES.delete(session.r2_key);
-      return c.json({
-        success: false,
-        code: 'media_upload_mismatch',
-        error: 'アップロードしたファイルを確認できませんでした',
-      }, 409);
+    // Pre-deployment verified sessions still refer to a reusable signed key.
+    if (!isFinalMediaKey(session.r2_key)) {
+      return c.json({ success: false, code: 'media_upload_not_verified', error: 'ファイルをアップロードし直してください' }, 409);
     }
-    const headBytes = session.kind === 'image' ? IMAGE_METADATA_PREFIX_BYTES : 16;
-    const bodyObject = await c.env.IMAGES.get(session.r2_key, { range: { offset: 0, length: headBytes } });
-    const signatureBytes = bodyObject
-      ? new Uint8Array(await bodyObject.arrayBuffer())
-      : new Uint8Array();
-    if (!hasMediaSignature(signatureBytes, session.expected_mime)) {
-      await failMediaUploadSession(c.env.DB, session.id, accountId, 'signature_mismatch');
-      await c.env.IMAGES.delete(session.r2_key);
-      return c.json({
-        success: false,
-        code: 'media_signature_mismatch',
-        error: 'ファイルの実際の形式が申告と一致しません',
-      }, 409);
-    }
-    // 画像は実体の先頭から寸法を測り、申告値ではなく実測値を正本として残す。
-    // 測れなかった場合は寸法を null に戻し、版追加は「判定材料不足」で拒否する。
-    const measured = session.kind === 'image'
-      ? imageDimensions(signatureBytes, session.expected_mime)
-      : null;
-    session = await verifyMediaUploadSession(
-      c.env.DB, session.id, accountId, objectEtag,
-      session.kind === 'image'
-        ? { width: measured?.width ?? null, height: measured?.height ?? null }
-        : undefined,
-      session.kind === 'image',
-    );
-    if (!session) throw new Error('verified upload session is unavailable');
     if (session.target_media_id) {
       // 版の差し替えも検査の対象にする。検査が終わるまで版は出さない。
       // 記録に失敗しても確定自体は返す（門番は出す前にその場で回す）。
@@ -263,8 +278,8 @@ export const post__api_media_upload_sessions_id_complete_3 = async (c: Context<E
     const newScan = await ensureFileScanForUpload({
       db: c.env.DB,
       lineAccountId: accountId,
-      subjectKind: 'media',
-      subjectId: media.id,
+      subjectKind: 'upload_session',
+      subjectId: session.id,
       mediaId: media.id,
       filename: media.filename,
       mimeType: media.mime_type,
@@ -308,10 +323,22 @@ export const post__api_media_id_versions_4 = async (c: Context<Env, "/api/media/
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
+    const incoming = await getMediaUploadSession(c.env.DB, uploadSessionId, accountId);
+    const incomingScan = await getFileScanBySubject(c.env.DB, 'upload_session', uploadSessionId);
+    if (!incoming || incoming.target_media_id !== c.req.param('id') || incoming.status !== 'verified'
+      || !isFinalMediaKey(incoming.r2_key) || incomingScan?.status !== 'clean') {
+      return c.json({ success: false, code: 'media_upload_not_verified', error: '差し替え用ファイルの検査が完了していません' }, 409);
+    }
     const preview = await mediaVersionPreview(
       c, c.req.param('id'), uploadSessionId, accountId,
     );
     if (!preview) return c.json({ success: false, error: 'Not found' }, 404);
+    const parentGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+      id: preview.media.id, lineAccountId: accountId, r2Key: preview.media.r2_key,
+      filename: preview.media.filename, mimeType: preview.media.mime_type, sizeBytes: preview.media.size_bytes,
+      width: preview.media.width, height: preview.media.height,
+    });
+    if (!parentGate.allowed) return c.json({ success: false, code: parentGate.code, error: parentGate.message }, 409);
     if (preview.previewToken !== previewToken) {
       return c.json({
         success: false,
@@ -527,18 +554,18 @@ export const get__api_media_id_versions_versionNo_download_11 = async (c: Contex
   const versionGate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
     id: media.id,
     lineAccountId: media.line_account_id,
-    r2Key: media.r2_key,
+    r2Key: version.r2_key,
     filename: media.filename,
-    mimeType: media.mime_type,
-    sizeBytes: media.size_bytes,
-    width: media.width,
-    height: media.height,
+    mimeType: version.mime_type,
+    sizeBytes: version.size_bytes,
+    width: version.width,
+    height: version.height,
   });
   if (!versionGate.allowed) {
     auditLog(c, 'media.download', { kind: 'media', id }, { result: 'denied', lineAccountId: accountId });
     return c.json({ success: false, code: versionGate.code, error: versionGate.message }, 409);
   }
-  const object = await c.env.IMAGES.get(version.r2_key);
+  const object = await getPinnedMediaObject(c.env.IMAGES, version.r2_key, versionGate.etag);
   if (!object) return c.json({ success: false, error: 'Not found' }, 404);
   auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
   // どの版か分かる名前で保存する（例: a.png → a-v1.png）。

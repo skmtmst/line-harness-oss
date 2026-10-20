@@ -1,3 +1,4 @@
+import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
@@ -338,7 +339,7 @@ async function serveMediaFile(
     }
     return c.json({ success: false, code: gate.code, error: gate.message }, 409);
   }
-  const object = await c.env.IMAGES.get(media.r2_key);
+  const object = await getPinnedMediaObject(c.env.IMAGES, media.r2_key, gate.etag);
   if (!object) return c.json({ success: false, error: 'Not found' }, 404);
   if (opts.auditDownload) {
     auditLog(c, 'media.download', { kind: 'media', id }, { result: 'success', lineAccountId: accountId });
