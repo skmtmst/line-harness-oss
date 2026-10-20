@@ -112,7 +112,7 @@ it.each([false, null, undefined])('busy=%s でも同じ保存を描画前に二�
   await act(async () => { finish() })
 })
 
-it('処理開始中の再入でも1回だけ送り、同期の失敗後も操作できる', () => {
+it('処理開始中の再入を1回に抑え、同期の処理後はもう一度押せる', () => {
   const save = vi.fn(() => { if (save.mock.calls.length === 1) (screen.getByRole('button') as HTMLButtonElement).click() })
   render(<Button onClick={save}>送る</Button>)
   const button = screen.getByRole('button') as HTMLButtonElement
@@ -120,4 +120,18 @@ it('処理開始中の再入でも1回だけ送り、同期の失敗後も操作
   expect(save).toHaveBeenCalledTimes(1)
   fireEvent.click(button)
   expect(save).toHaveBeenCalledTimes(2)
+})
+
+
+it('同期の例外でも内部の本文を出さず、次の操作のロックを解除する', () => {
+  const save = vi.fn().mockImplementationOnce(() => { throw new Error('private fixture detail') }).mockImplementation(() => undefined)
+  render(<Button onClick={save}>保存する</Button>)
+  const button = screen.getByRole('button') as HTMLButtonElement
+  fireEvent.click(button)
+  expect(screen.getByRole('alert').textContent).toBe('処理できませんでした。もう一度お試しください。')
+  expect(document.body.textContent).not.toContain('private fixture detail')
+  expect(button.disabled).toBe(false)
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(2)
+  expect(screen.queryByRole('alert')).toBeNull()
 })

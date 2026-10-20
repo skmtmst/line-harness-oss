@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { PageTitle } from '@/components/templates/page-frame'
 
 import { useEffect, useState } from 'react'
@@ -56,7 +57,7 @@ export default function UpdatesPage() {
         // 運用者を驚かせる赤エラーではなく状況の説明を出す。
         const msg = e instanceof Error ? e.message : String(e)
         if (/ 40[13]$/.test(msg)) setState({ kind: 'unconfigured' })
-        else setState({ kind: 'error', message: msg })
+        else setState({ kind: 'error', message: describeApiFailure(e, '更新履歴の読み込み') })
       })
   }, [])
 
@@ -81,7 +82,7 @@ export default function UpdatesPage() {
       )}
       {state.kind === 'error' && (
         <Notice tone="warn" className="mb-4">
-          履歴を取得できませんでした（{state.message}）。時間をおいて再読み込みしてください。
+          {state.message}
         </Notice>
       )}
       {state.kind === 'ready' && rows.length === 0 && (
