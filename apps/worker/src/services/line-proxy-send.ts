@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import type { Message } from '@line-crm/line-sdk';
 import type { OperationCapability } from '@line-crm/db';
 import { OPERATION_PROXY_CAPABILITY_HEADER } from './operation-send-paths.js';

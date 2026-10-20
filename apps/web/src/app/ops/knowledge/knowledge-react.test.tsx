@@ -104,7 +104,7 @@ describe('V8 knowledge UI', () => {
     expect(usage?.querySelector('[data-kpi-icon] .lucide-thumbs-up')).toBeTruthy()
   })
   it('requires evidence confirmation and saves the edited version before approval', async () => {
-    // 板 `eSXxA`「記事を承認する前に」：2つ確かめてから保存して承認する。
+    // 板 「記事を承認する前に」：2つ確かめてから保存して承認する。
     const closed = vi.fn()
     await act(async () => root.render(<KnowledgeEditor article={article} onClose={closed} onSaved={() => {}} />))
     await act(async () => button('保存して承認').click())

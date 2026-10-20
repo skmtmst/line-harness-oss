@@ -104,7 +104,7 @@ describe('送信Webhookのアカウント・統括分離', () => {
         .filter((text) => text.includes('outgoing_webhook_event_types_broken'));
       expect(events).toHaveLength(2);
       for (const text of events) {
-        expect(JSON.parse(text)).toEqual({ code: 'outgoing_webhook_event_types_broken' });
+        expect(JSON.parse(text)).toEqual({ code: 'outgoing_webhook_event_types_broken', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
         expect(text).not.toContain('webhook-broken');
         expect(text).not.toContain('https://example.com');
       }

@@ -1,8 +1,8 @@
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite} from '../services/gap-common.js';
-import {processPassNotices} from '../services/booking-pass-notices.js';
+import {processPassNotices} from '../features/booking/booking-pass-notices/index.js';
 export const bookingPassNotices=new Hono<Env>();
 bookingPassNotices.use('/api/booking/admin/*',requirePermission('/booking/bookings'));
 bookingPassNotices.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'pass_notices_unavailable'},e instanceof GapError?e.status:503));

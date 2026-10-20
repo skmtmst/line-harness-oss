@@ -1,5 +1,6 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { encryptCredential, decryptCredential } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { detectImageMeta } from '../lib/image-validator.js';
 export class InstagramError extends Error {
   constructor(

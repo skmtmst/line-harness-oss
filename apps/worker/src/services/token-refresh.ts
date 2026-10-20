@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 /**
  * Token auto-refresh — proactively renew LINE channel access tokens before expiry.
  *
@@ -15,10 +17,9 @@ import type { LineAccount } from '@line-crm/db';
 import { fetchBotProfile } from '../lib/bot-profile.js';
 
 const REFRESH_THRESHOLD_MS = 7 * 24 * 60 * 60_000; // 7 days
-const JST_OFFSET_MS = 9 * 60 * 60_000;
 
 function jstNow(): string {
-  const jst = new Date(Date.now() + JST_OFFSET_MS);
+  const jst = japanCalendar();
   return jst.toISOString().slice(0, -1) + '+09:00';
 }
 
@@ -115,7 +116,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
     if (shouldRefresh(account)) {
       try {
         const token = await issueLineAccessToken(account.channel_id, account.channel_secret);
-        const expiresAt = new Date(Date.now() + token.expires_in * 1000 + JST_OFFSET_MS);
+        const expiresAt = japanCalendar(new Date(Date.now() + token.expires_in * 1000));
         const expiresAtJst = expiresAt.toISOString().slice(0, -1) + '+09:00';
 
         await updateLineAccount(db, account.id, {
@@ -124,9 +125,9 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
         });
         accessToken = token.access_token;
 
-        console.log(JSON.stringify({"code":"services_token_refresh_log"}));
+        logger.log("services_token_refresh_log");
       } catch (err) {
-        console.error(JSON.stringify({"code":"services_token_refresh_failed"}));
+        logger.error("services_token_refresh_failed");
       }
     }
 
@@ -142,7 +143,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
           });
         }
       } catch (err) {
-        console.error(JSON.stringify({"code":"services_token_refresh_failed"}));
+        logger.error("services_token_refresh_failed");
       }
     }
   }

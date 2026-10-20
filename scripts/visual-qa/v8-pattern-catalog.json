@@ -884,8 +884,7 @@
             "apps/web/src/components/shared/detail-panel.tsx",
             "apps/web/src/components/shared/detail-panel.module.css",
             "apps/web/src/components/shared/drawer.tsx",
-            "apps/web/src/components/shared/drawer.module.css",
-            "apps/web/src/components/shared/slide-panel.tsx"
+            "apps/web/src/components/shared/drawer.module.css"
           ],
           "components": [
             "DetailPanel",
@@ -1059,7 +1058,6 @@
         "code": {
           "files": [
             "apps/web/src/components/shared/entity-picker.tsx",
-            "apps/web/src/components/shared/entity-picker-window.tsx",
             "apps/web/src/components/shared/entity-picker.module.css",
             "apps/web/src/components/shared/entity-picker-sources.tsx",
             "apps/web/src/components/shared/hq-account-picker.tsx"

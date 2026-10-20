@@ -7,7 +7,7 @@ import {
 import {
   automationRevisionToken,
   publishAutomationDraft,
-} from '../services/automation-drafts.js';
+} from '../features/automations/automation-drafts/index.js';
 
 import { Hono } from 'hono';
 
@@ -17,7 +17,7 @@ import {
   publishReminderDraftVersion,
   createBookingAvailabilityException,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { hasStaffPermission } from '../middleware/role-guard.js';
 import { StyleError, profile } from '../services/style-setup.js';

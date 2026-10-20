@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 統括のテンプレートの詳細（絵 V8.pen pQ4fH・B-36）。
+ * ★V8 統括のテンプレートの詳細（絵 V8.pen ・）。
  *
  * 店のテンプレートの詳細（src/v8/template-detail）と同じ枠（DetailFrame）・同じ CSS・同じ並び（本文・配った先・版の履歴・
  * 右の列の操作・このテンプレートについて・届き方）で組む。違いは「使っている所」の代わりの「配った先」と、帯の［配る］。
@@ -20,7 +20,7 @@ import TagPill from '@/components/shared/tag-pill'
 import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { DetailPage } from '@/components/templates/detail-page'
-import { ChangeBox } from '@/v8/template-detail/detail'
+import { ChangeBox } from '@/v8/template-detail/public/detail/index'
 import type { HqAccount, HqTemplateListItem, TemplateDetail } from '@/lib/hq-templates-api'
 import { KIND_TABS, sentLabel } from './store-list'
 import styles from '../template-detail/detail.module.css'
@@ -101,7 +101,7 @@ export default function HqTemplateDetail({
   onDuplicate: () => void
   /** 配った先のアカウントに入る（店の画面へ切り替える）。 */
   onEnterAccount: (accountId: string) => void
-  /** 右上の「…」の［削除する］（店の詳細と同じ置き場。絵 pQ4fH）。渡さなければ「…」を出さない。 */
+  /** 右上の「…」の［削除する］（店の詳細と同じ置き場。絵 ）。渡さなければ「…」を出さない。 */
   onRemove?: () => void
 }) {
   const [compare, setCompare] = useState<{ from: number; to: number; result: HqTemplateVersionComparison | null; error: string } | null>(null)

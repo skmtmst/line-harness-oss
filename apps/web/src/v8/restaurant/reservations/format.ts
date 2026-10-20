@@ -1,5 +1,6 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
- * 予約台帳（l9NlC0・Z3FoM・rm92Y・xzCK6）の表示の形。今の画面
+ * 予約台帳（l9NlC0・Z3FoM・・xzCK6）の表示の形。今の画面
  * （app/restaurant-test/v8/reservations.tsx・reservation-phone.tsx）から写し、絵の書き方に合わせた。
  */
 import { formatDate, formatYmd } from '@/lib/format'
@@ -91,12 +92,7 @@ export function mdWeek(day: Date): string {
 }
 
 /** 電話番号は真ん中を伏せる（「090-****-1234」）。 */
-export function maskPhone(phone: string | null): string {
-  if (!phone) return ''
-  const parts = phone.split('-')
-  if (parts.length === 3) return `${parts[0]}-****-${parts[2]}`
-  return phone
-}
+export { maskPhone } from '@line-crm/shared'
 
 export function dayRange(day: Date): { from: string; to: string } {
   return { from: new Date(`${toYmd(day)}T00:00:00+09:00`).toISOString(), to: addDays(day, 1).toISOString() }
@@ -126,7 +122,7 @@ export function floorOrder(a: RestaurantTable, b: RestaurantTable): number {
 
 export function minutesOf(value: string): number {
   const date = new Date(value)
-  const jst=new Date(date.getTime()+9*3600000)
+  const jst=japanCalendar(date)
   return jst.getUTCHours() * 60 + jst.getUTCMinutes()
 }
 

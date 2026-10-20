@@ -1,7 +1,8 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 /*
- * ★V8 分析「経路と成果」（Pencil `PFe9c`）と、その中の「成果地点ごとのレポート」（`AzrZq`）の共通部分。
+ * ★V8 分析「経路と成果」（Pencil ）と、その中の「成果地点ごとのレポート」（）の共通部分。
  * 数の帯（友だちになった・成果・かかった広告費・差し引き）→ 道具の段（期間・データの範囲・
  * Search Console・CSV）→ 左に全体の流れ、右に経路ごとの表。
  * 呼ぶ口・合計の出し方・CSV は今の画面（RoutesOverviewTab）と同じ。
@@ -29,7 +30,7 @@ function metricSum(metrics: Array<AnalyticsMetric<number>>): number | null {
   const values = metrics.map(shownValue)
   return values.some((value) => value === null) ? null : values.reduce<number>((sum, value) => sum + (value ?? 0), 0)
 }
-const yen = (value: number | null, signed = false) => value === null ? undefined : `${signed && value > 0 ? '+' : ''}¥${formatNumber(value)}`
+const yen = (value: number | null, signed = false) => value === null ? undefined : `${signed && value > 0 ? '+' : ''}${formatYen(value)}`
 
 /** 経路と成果の数の帯と道具の段を読み込み、本文は呼び出し側（経路の表／成果地点のレポート）が描く。 */
 export function useRoutesOverview(accountId: string, controlled?: { days: number; setDays: (days: number) => void; customRange?: PeriodRange | null; setRange?: (range: PeriodRange) => void }) {
@@ -53,7 +54,7 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
   onDaysChange?: (days: number) => void
   customRange?: PeriodRange | null
   onRangeChange?: (range: PeriodRange) => void
-  /** 道具の段より下。渡さないときは経路の表（PFe9c）。 */
+  /** 道具の段より下。渡さないときは経路の表。 */
   children?: (overview: AnalyticsRoutesOverview['data'] | null) => ReactNode
   exportCsv?: () => void
   exportDisabled?: boolean

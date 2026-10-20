@@ -1,2 +1,0 @@
-board	reference	url	clock	steps
-sAnyy	kxmnZ	/restaurant/reserve/qa-seat	2026-10-07T09:00:00+09:00	コース：席のみ→秋の鹿肉コース→19:00 残りわずか→この時刻で進む→予約を確定する。コースなしは先頭2操作を省く。偽LIFF/ローカルAPIのみ。

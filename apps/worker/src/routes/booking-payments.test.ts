@@ -3,10 +3,10 @@
  * 外へ通信しない。Stripeは署名付きの試験の知らせで進める。
  * 本物のお金は動かさない。
  */
-import { runExpirer } from '../services/booking-expirer.js';
+import { runExpirer } from '../features/booking/booking-expirer.js';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index';
+import type { Env } from '../worker-env';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { getBookingPaymentConfig, saveBookingPaymentConfig } from '@line-crm/db';
 import { applyPaidBookingPayment, registerTestPaymentProvider } from './booking-payments.js';
@@ -419,7 +419,7 @@ describe('予約の支払いの共通口', () => {
   });
 });
 
-describe('B-316 お客さまが選ぶ支払い設定',()=>{
+describe('お客さまが選ぶ支払い設定',()=>{
  it('店の既定・メニュー上書き・解除を保存し、Stripe以外との組合せは断る',async()=>{
   seedBooking();const headers={'Content-Type':'application/json'};
   const store='/api/booking/admin/payment-config?account_id=account-a';

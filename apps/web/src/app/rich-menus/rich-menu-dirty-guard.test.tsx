@@ -80,7 +80,9 @@ const GROUP = {
   }],
 }
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  const mocked = await (() => ({
   ApiError: class ApiError extends Error {},
   describeSaveFailure: () => '保存できませんでした。もう一度お試しください。',
   api: {
@@ -110,9 +112,11 @@ vi.mock('@/lib/api', () => ({
     // N-152/N-156: 編集画面は操作者の役割を読んで staff には集計だけを出す。
     staff: { me: () => Promise.resolve({ success: true, data: { role: 'owner' } }) },
   },
-}))
+}))()
+  return { ...actual, ...mocked }
+})
 
-import NewRichMenuPage from './new/create-v8'
+import NewRichMenuPage from '../../v8/rich-menus/new/create'
 import RichMenuDetailV8 from '@/v8/rich-menu-edit/detail'
 
 function CurrentRichMenuEdit() {

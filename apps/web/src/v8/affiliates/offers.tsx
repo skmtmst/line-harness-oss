@@ -52,7 +52,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 成果とアフィリエイト「案件」（板 `h7dmB`）。
+ * ★V8 成果とアフィリエイト「案件」（板 ）。
  *
  * app/affiliates/v8-offers-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
  * 組み直した。データの口は今と同じ（案件・アカウント・タグ・シナリオの名前・承認の全件）。

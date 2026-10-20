@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { validateRuleName, validateTestScore } from './score-rules-validation'
+import { validateRuleName, validateTestScore } from '../../../v8/mileage/score-rules/score-rules-validation'
 
 const BANDS = { min: 0, max: 100 }
 

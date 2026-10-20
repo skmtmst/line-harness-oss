@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 const get = vi.fn(); const change = vi.fn(); const cancel = vi.fn()
-vi.mock('@/lib/api-gap2', () => ({ bookingSeriesApi: { get: (...a: unknown[]) => get(...a), change: (...a: unknown[]) => change(...a), cancel: (...a: unknown[]) => cancel(...a) } }))
+vi.mock('@/lib/api/helpers/gap2', () => ({ bookingSeriesApi: { get: (...a: unknown[]) => get(...a), change: (...a: unknown[]) => change(...a), cancel: (...a: unknown[]) => cancel(...a) } }))
 const impact = vi.fn()
-vi.mock('@/lib/api-gap2-pending', () => ({ seriesImpactApi: { impact: (...a: unknown[]) => impact(...a) } }))
+vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: { impact: (...a: unknown[]) => impact(...a) } }))
 const notifySaved = vi.fn()
 vi.mock('@/components/shared/toast', () => ({ notifySaved: (...a: unknown[]) => notifySaved(...a), notifyToast: vi.fn() }))
 const { default: SeriesScopeDialog } = await import('./series-scope-dialog')
@@ -15,7 +15,7 @@ const bookings = [b(2, '2026-12-04T05:00:00.000Z'), b(3, '2026-12-11T05:00:00.00
 const target = { seriesId: 's1', customerName: '山田 花子', ruleText: '毎週金曜 14:00', menuName: 'トリミング（小型犬）', index: 4, bookingId: 'b3', startsAt: '2026-12-11T05:00:00.000Z' }
 
 beforeEach(() => {
-  impact.mockRejectedValue(new Error('404'))
+  impact.mockImplementation(async (_a, _id, input) => ({ success: true, data: { items: bookings.filter(b => b.status !== 'cancelled' && b.series_index >= 3).filter((_, i) => input.scope !== 'this' || i === 0).map(b => ({ bookingId: b.id, startsAt: b.starts_at, after: input.change?.startsAt ?? null, blocked: false, fee: null })) } }))
   get.mockResolvedValue({ success: true, data: { series: { id: 's1', version: 3 }, bookings } })
   change.mockResolvedValue({ success: true, data: { changed: ['b3', 'b4'], conflicts: ['b6'], version: 4 } })
   cancel.mockResolvedValue({ success: true, data: { cancelled: ['b3', 'b4', 'b6'], fees: [{ bookingId: 'b3', feeNow: 4200 }], version: 4 } })
@@ -46,13 +46,14 @@ test('取り消す：この回だけにすると 1 件。キャンセル料は�
 test('対象の日を読めないときは実行できない', async () => {
   get.mockRejectedValue(new Error('503'))
   render(<SeriesScopeDialog open mode="cancel" accountId="a1" target={target} onClose={() => {}} onDone={() => {}} />)
-  expect(await screen.findByText(/対象の日を読み込めませんでした/)).toBeTruthy()
+  expect(await screen.findByText(/対象の日とキャンセル料の見込みを確認できませんでした/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: /件を取り消す/ })?.hasAttribute('disabled') ?? true).toBe(true)
 })
 
-test('前もっての見込みの口があるとき：埋まっている回は前のままにして数えず、キャンセル料を表に出す。口が無い間は準備中', async () => {
+test('埋まっている回を数えず、見込みの取得失敗は実行を止める', async () => {
   impact.mockResolvedValue({ success: true, data: { items: [
     { bookingId: 'b3', startsAt: bookings[1].starts_at, blocked: false, fee: { amount: 4200, percent: 50, reason: '24 時間前を過ぎた' } },
+    { bookingId: 'b4', startsAt: bookings[2].starts_at, after: '2026-12-18T07:00:00.000Z', blocked: false, fee: null },
     { bookingId: 'b6', startsAt: bookings[4].starts_at, blocked: true, fee: null },
   ] } })
   render(<SeriesScopeDialog open mode="change" accountId="a1" target={target} newStartsAt="2026-12-11T16:00:00+09:00" onClose={() => {}} onDone={() => {}} />)
@@ -63,6 +64,7 @@ test('前もっての見込みの口があるとき：埋まっている回は�
   cleanup()
   impact.mockRejectedValue(new Error('404'))
   render(<SeriesScopeDialog open mode="cancel" accountId="a1" target={target} onClose={() => {}} onDone={() => {}} />)
-  fireEvent.click((await screen.findAllByRole('button', { name: '見込みを見る' }))[0])
-  expect(await screen.findByText('現在準備中です')).toBeTruthy()
+  expect(await screen.findByText(/対象の日とキャンセル料の見込みを確認できませんでした/)).toBeTruthy()
+  expect(screen.queryByText('かかりません')).toBeNull()
+  expect(cancel).not.toHaveBeenCalled()
 })

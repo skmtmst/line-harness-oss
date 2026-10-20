@@ -1,4 +1,6 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import PageSizeSelect, { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -47,7 +49,7 @@ import { Field } from '@/components/shared/form-controls'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 流入と計測の詳細（Pencil `Q5le3`）。
+ * ★V8 流入と計測の詳細（Pencil ）。
  *
  * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→ その後（この経路から来た人）→
  * 友だちになったときの帯 → この経路から来た友だちの表（道具の段・表・ページ送り）→ 下の2つの箱。
@@ -97,7 +99,7 @@ export function monthKeyOf(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
-  return new Date(d.getTime() + 9 * 60 * 60_000).toISOString().slice(0, 7)
+  return japanCalendar(d).toISOString().slice(0, 7)
 }
 
 function InflowDetailContent() {
@@ -137,7 +139,7 @@ function InflowDetailContent() {
   const [deleteError, setDeleteError] = useState('')
   const [deleteConfirmationName, setDeleteConfirmationName] = useState('')
   const [deleteChoice, setDeleteChoice] = useState<DeleteChoice>('stop')
-  const [canPermanentlyDelete, setCanPermanentlyDelete] = useState(false)
+  const canPermanentlyDelete = canManageRole(useStaffRole())
   // 「別の流入リンクへ送る」の転送先。先頭を自動採用しない（#514 重大4）。
   const [redirectTargetId, setRedirectTargetId] = useState('')
   const [qrOpen, setQrOpen] = useState(false)
@@ -165,13 +167,10 @@ function InflowDetailContent() {
         ? api.pools.list({ suppressFeatureDisabledEvent: true })
         : { success: false as const, error: 'feature_disabled' },
     )
-    void Promise.allSettled([api.entryRoutes.list(), poolsRequest, api.staff.me()]).then(([r, p, me]) => {
+    void Promise.allSettled([api.entryRoutes.list(), poolsRequest]).then(([r, p]) => {
       if (cancelled) return
       if (r.status === 'fulfilled' && r.value.success) setRoutes(r.value.data)
       if (p.status === 'fulfilled' && p.value.success) setPools(p.value.data)
-      if (me.status === 'fulfilled' && me.value.success) {
-        setCanPermanentlyDelete(me.value.data.role === 'owner' || me.value.data.role === 'admin')
-      }
       setLoading(false)
     })
     return () => {
@@ -327,7 +326,7 @@ function InflowDetailContent() {
     return Math.round((funnel.friend_add_count / funnel.click_count) * 1000) / 10
   }, [funnel])
 
-  const nowDate = new Date(Date.now() + 9 * 60 * 60_000)
+  const nowDate = japanCalendar()
   const thisMonthKey = nowDate.toISOString().slice(0, 7)
   const lastMonthKey = new Date(Date.UTC(nowDate.getUTCFullYear(), nowDate.getUTCMonth() - 1, 1)).toISOString().slice(0, 7)
   const isBlockedFriend = (friend: AttributedFriend) => (friend.currentStatus ?? '').includes('ブロック')
@@ -345,7 +344,7 @@ function InflowDetailContent() {
     ? (accounts.find((account) => account.id === route.lineAccountId)?.name ?? route.lineAccountId)
     : emptyValue('unknown')
   const createdDate = route ? `${Number(route.createdAt.slice(5, 7))}月${Number(route.createdAt.slice(8, 10))}日` : ''
-  const yen = (amount: number | null | undefined) => (amount == null ? emptyValue('unknown') : `¥${formatNumber(amount)}`)
+  const yen = (amount: number | null | undefined) => formatYen(amount, emptyValue('unknown'))
 
   // 友だち表の絞り込み。検索・札・期間の3つを重ねる。
   const normalizedFriendSearch = friendSearch.trim().toLocaleLowerCase('ja')
@@ -485,7 +484,7 @@ function InflowDetailContent() {
             <KpiCard presentation="band" icon={<Ban size={14} aria-hidden="true" />} title="ブロック" value={funnel?.blockedCount ?? null} unit="人"
               detail={blockRate == null ? '割合は集計できません' : `友だちになった人の ${blockRate}%`} />
             <KpiCard presentation="band" icon={<Target size={14} aria-hidden="true" />} title="成果（コンバージョン）" value={funnel ? funnel.cv_count : null} unit="件"
-              detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(Math.round(funnel.valuePerFriend))}`} />
+              detail={`累計・1人あたり ${funnel?.valuePerFriend == null ? emptyValue('unknown') : yen(funnel.valuePerFriend)}`} />
           </KpiBand>}
         </div>
 

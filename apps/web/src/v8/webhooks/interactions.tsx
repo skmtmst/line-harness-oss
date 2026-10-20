@@ -7,7 +7,7 @@ import type { WebhookInteraction, WebhookInteractionList } from '@line-crm/share
 import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatNumber } from '@/lib/format'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -34,10 +34,10 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 外部連携「やり取りの記録」タブ（Pencil `Uv9AA`、中身は `DA0Ag`）。
+ * ★V8 外部連携「やり取りの記録」タブ（Pencil 、中身は ）。
  *
  * 型（ListPage）に、タブ・やり取りの帯・案内の帯・道具の段（探す・札4つ・
- * まとめてやり直す）・表・ページ送りをはめる。データの口は v7 と同じ
+ * まとめてやり直す）・表・ページ送りをはめる。データの口は 管理画面 と同じ
  * （一覧・送り直し・まとめて送り直し）。URL・鍵・本文は一覧にも中身にも出さない。
  * 絵と今の作りが合わない所は BEHAVIOR.md に書いた（CSV の書き出し口が無い など）。
  */
@@ -86,7 +86,7 @@ function seconds(ms: number | null): string {
   return ms == null ? emptyValue('unknown') : `${(Math.round(ms / 100) / 10).toFixed(1)} 秒`
 }
 
-/* その記録をここからやり直せるかを業務の言葉で説明する（v7 と同じ定義）。 */
+/* その記録をここからやり直せるかを業務の言葉で説明する（管理画面 と同じ定義）。 */
 function retryabilityText(item: WebhookInteraction, allowed: boolean): string {
   if (item.eventType === 'incoming_webhook.test') return '受け取りの試しの記録です。実際の受け取りと処理の実行はしていないため、送り直す対象ではありません。'
   if (item.status === 'succeeded') return '届いた記録なので、送り直す必要はありません。'
@@ -163,8 +163,8 @@ export default function WebhooksInteractionsV8() {
   accountRef.current = selectedAccountId
   const generationRef = useRef(0)
   const staffRole = useStaffRole()
-  /* 送り直しは統括と管理者（v7 と同じ）。確認が終わるまでは出す。 */
-  const canRetry = staffRole === 'owner' || staffRole === 'admin'
+  /* 送り直しは統括と管理者（管理画面 と同じ）。確認が終わるまでは出す。 */
+  const canRetry = canManageRole(staffRole)
   const isOwner = staffRole === 'owner'
   const overview = useWebhookOverview()
 
@@ -290,7 +290,7 @@ export default function WebhooksInteractionsV8() {
   const known = loaded ? summary : null
   const bandCells: BandCell[] = [
     {
-      // 数の帯の題はタブをまたいで「直近30日 送った」にそろえる（絵 Uv9AA）。期間を変えたらその日数で出す。
+      // 数の帯の題はタブをまたいで「直近30日 送った」にそろえる。期間を変えたらその日数で出す。
       key: 'sent', title: `直近${periodDays}日 送った`, icon: <History size={13} aria-hidden="true" />,
       value: known ? known.outgoing : null, unit: '回',
       detail: known ? `成功 ${formatNumber(Math.max(0, known.outgoing - known.outgoingFailed))}` : '集計を読み込めませんでした',
@@ -312,7 +312,7 @@ export default function WebhooksInteractionsV8() {
     },
   ]
 
-  /* 絞り込みの札は文字と数だけ（意味のない印は付けない・絵 Uv9AA）。 */
+  /* 絞り込みの札は文字と数だけ（意味のない印は付けない・絵 ）。 */
   const chip = (label: string, count: number, on: boolean, select: () => void) => (
     <FilterChip selected={on} onChange={() => { select(); setPage(1) }}>
       {loaded ? `${label} ${formatNumber(count)}` : label}
@@ -523,7 +523,7 @@ function payloadText(body: unknown): string {
 }
 
 /*
- * やり取りの中身の窓（絵 `DA0Ag`：幅680・上から110・題 18/700 と状態の札・1行の説明・
+ * やり取りの中身の窓（絵 ：幅680・上から110・題 18/700 と状態の札・1行の説明・
  * 8行の項目・送った・届いた中身・伏せている旨・下の段 技術的な記録／閉じる／送り直す）。
  * 本文は F-18 の口（伏せ字にした本文）から読む。URL・鍵は出さない。
  */

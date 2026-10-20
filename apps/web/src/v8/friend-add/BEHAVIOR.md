@@ -1,6 +1,8 @@
+> 文書：友だち追加時の配信（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 友だち追加時の配信（V8）の動き
 
-入口：`app/friend-add-settings/page.tsx`（V8 のときだけ `src/v8/friend-add/list.tsx`・`editor.tsx`、それ以外は今の v7 の画面）。
+入口：`app/friend-add-settings/page.tsx`（V8専用で `src/v8/friend-add/list.tsx`・`editor.tsx`）。
 絵：一覧 `MRhef`・閲覧のみ `LEwkJ`・1152 `P20kYU`・受け皿の「…」`C0lfUP`・受け皿は止められない `cFo2p`・状態 `kFz4b`（見本帳）／
 作る① `wDzkc`・② `h8uNW`（1152 `xHpkS`）・③ `al47K`・④ `i1nThZ`・⑤ `U8Xm3X`・編集の競合 `h5rm8t`。
 

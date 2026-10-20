@@ -34,7 +34,7 @@ function loadDb(): Database.Database {
 function makeD1Adapter(db: Database.Database): D1Like {
   return {
     prepare: (sql: string) => ({
-      bind: (...args: any[]) => ({
+      bind: (...args: unknown[]) => ({
         run: async () => db.prepare(sql).run(...args),
         first: async <T>() =>
           (db.prepare(sql).get(...args) as T | undefined) ?? null,
@@ -153,7 +153,7 @@ describe('snapshot CRUD', () => {
   });
 
   describe('updateStatus', () => {
-    it("sets completed_at to Date.now() when status='success'", async () => {
+    it("sets completed_at to Date.now when status='success'", async () => {
       const id = await createSnapshot(d1, { from: '0.5.0', to: '0.6.0' });
       const before = Date.now();
       await updateStatus(d1, id, 'success');
@@ -225,6 +225,16 @@ describe('snapshot CRUD', () => {
       }
       const rows = await listRecent(d1, 2);
       expect(rows.length).toBe(2);
+    });
+
+    it('uses the ID to keep equal timestamps in a stable order', async () => {
+      const ids = [];
+      for (let i = 0; i < 3; i++) {
+        const id = await createSnapshot(d1, { from: '0.5.0', to: '0.6.0' });
+        ids.push(id);
+        rawDb.prepare('UPDATE update_history SET started_at = 1000 WHERE id = ?').run(id);
+      }
+      expect((await listRecent(d1, 2)).map(row => row.id)).toEqual(ids.sort().reverse().slice(0, 2));
     });
 
     it('defaults limit to 20', async () => {

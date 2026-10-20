@@ -18,7 +18,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { restaurantGoogleApi, type GooglePhoto, type GoogleProfileData, type GoogleProfileProposal } from '@/lib/restaurant-google-api'
 import { errorMessage } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -73,7 +73,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
   const changedFields = form && base ? (Object.keys(form) as Array<keyof ProfileForm>).filter((k) => form[k].trim() !== base[k].trim()) : []
   const addressChanged = changedFields.some((k) => k === 'postalCode' || k === 'administrativeArea' || k === 'locality' || k === 'addressLines')
   const dirty = changedFields.length > 0 || adds.length > 0 || deletes.length > 0
-  const { leaveTarget, confirmLeave, cancelLeave, disarm, guarded } = useUnsavedGuard({ dirty, busy })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy })
 
   const openPicker = async () => {
     const request = ++pickerRequest.current
@@ -121,7 +121,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
   }
 
   if (loading) return <ListState kind="loading" title="プロフィールを読み込んでいます" />
-  if (loadError || !data || !form) return <ListState kind="error" title="プロフィールを表示できませんでした" description={loadError} onRetry={() => go({ tab: 'profile', view: 'edit' })} action={<Button onClick={() => go({ tab: 'profile' })}>プロフィールへ戻る</Button>} />
+  if (loadError || !data || !form) return <ListState kind="error" title="プロフィールを表示できませんでした" description={loadError} onRetry={() => go({ tab: 'profile', view: 'edit' })} />
 
   const set = (key: keyof ProfileForm) => (value: string) => setForm({ ...form, [key]: value })
   const storeName = data.profile.title ?? data.store.name
@@ -132,7 +132,6 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
   const closePicker = () => { pickerRequest.current += 1; setPicker((value) => ({ ...value, open: false, loading: false })) }
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <div className={styles.buttonRow}><Button onClick={() => guarded(() => go({ tab: 'profile' }))}>プロフィールへ戻る</Button></div>
       <SectionHeader title="プロフィールを編集" note={<StatusBadge tone="warning">まだ反映していません</StatusBadge>} />
       <p className={styles.muted}>対象店舗：{storeName} / 変更した項目だけをGoogleへ送ります。送信前に確認画面を表示します。</p>
       {!canEdit ? <ReadOnlyNotice>閲覧のみです。店舗情報を確認できます。</ReadOnlyNotice> : null}
@@ -179,7 +178,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
       </Card>
       {canEdit ? <StickyBar actions={<>
         <Button onClick={() => { setForm(formFrom(data)); setAdds([]); setDeletes([]); setActionError('') }} disabled={busy || !dirty}>入力をクリア</Button>
-        <Button variant="primary" onClick={() => void submit()} disabled={busy || !dirty || data.closed || form.description.length > 750} busy={busy} busyLabel="確認中…">変更内容を確認</Button>
+        <Button variant="primary" onClick={() => void submit()} disabled={busy || !dirty || data.closed || form.description.length > 750} busy={busy} busyLabel="確認中…">変更内容を確認する</Button>
       </>} /> : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="プロフィールの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </></SaveErrorScope>

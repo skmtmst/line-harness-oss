@@ -37,7 +37,7 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
   const [confirmation, setConfirmation] = useState(initialConfirmation)
   const confirmationId = useId()
   /*
-   * 参照件数は `load()` で取った実値を出す。取れていないときは `—`。
+   * 参照件数は `load` で取った実値を出す。取れていないときは `—`。
    * 0件と書くと「消しても大丈夫」と読み違える。**取れていないあいだは
    * 削除を押せなくする。** 失敗を「参照0件」と読み違えて使用中の
    * タグを消させないため(一覧の `DeleteTagDialog` と同じ作法)。
@@ -119,7 +119,7 @@ export function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
   const saveKeysRef = useRef(new IdempotencyKeyStore())
 
   const save = async () => {
-    if (saving) return
+
     setSaving(true)
     setError('')
     try {
@@ -144,7 +144,7 @@ export function ArchivedTagEditor({ tag, accountId, onCancel, onSaved }: {
     <SaveErrorScope errors={saveErrors}><CreatePage title="保管済みタグを直す" busy={saving} dirty={false}
       footerActions={<>
         <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
-        <Button variant="primary" onClick={() => void save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
+        <Button variant="primary" onClick={() => save()} disabled={saving || !name.trim()} busy={saving}>保存する</Button>
       </>}>
       <Notice tone="warn">
         <p className="font-bold">このタグは保管済みです</p>

@@ -1,4 +1,4 @@
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sendPlainMail as send } from './plain-mail.js';
 
 type Invite = { name: string; email: string; verifyUrl?: string; lineUrl?: string };

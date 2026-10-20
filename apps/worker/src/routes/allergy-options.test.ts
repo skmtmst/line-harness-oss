@@ -5,7 +5,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { authMiddleware } from '../middleware/auth';
 import { accountSettings } from './account-settings';
 import { applyAccountAllergyOptions } from '../services/allergy-options';
-import type { Env } from '../index';
+import type { Env } from '../worker-env';
 let f: SqliteD1, app: Hono<Env>;
 beforeEach(()=>{
   f=createTestD1({ loginPolicy: 'off',foreignKeys:true});

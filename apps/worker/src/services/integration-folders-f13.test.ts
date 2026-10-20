@@ -6,9 +6,9 @@ import {
   getFolderItemCounts, readFolderAssignment,
 } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
-import { createAutomationDraftFromTemplate, getAutomationDraft, updateAutomationDraft } from './automation-drafts';
+import { createAutomationDraftFromTemplate, getAutomationDraft, updateAutomationDraft } from '../features/automations/automation-drafts';
 import { createCommonAction, getCommonActionDetail, updateCommonActionDraft } from './common-actions';
-import type { Env } from '../index';
+import type { Env } from '../worker-env';
 
 vi.mock('./account-access.js', () => ({
   getVisibleLineAccountScope: async () => ({ allowedAccountIds: ['account-a'], ids: ['account-a'], canSeeUnassigned: false }),

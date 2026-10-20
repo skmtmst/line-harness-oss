@@ -1,3 +1,7 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
+export type { OperatorRuleConditions } from './operator-rule-types.js';
+import type { OperatorRuleConditions } from './operator-rule-types.js';
 import {deliverOperatorPush} from './operator-push.js';
 import { ensureOperatorInstance } from './operator-notification-instance.js';
 // N-327 (#663): 公開済み運用者通知ルールの自動実行と回復。
@@ -14,6 +18,7 @@ import {
   eligibleTeamStaffIds,
   type NotificationRuleRow,
 } from '@line-crm/db';
+
 import { sendOperationEmail } from './operation-notifications.js';
 import { isKnownOperatorEventType } from './operator-notification-registry.js';
 import {
@@ -76,19 +81,6 @@ export type OperatorRecipient = {
   email_verified_at: string | null;
   line_user_id: string | null;
   notification_preferences: string;
-};
-
-export type OperatorRuleConditions = {
-  teamId?: string;
-  schedule?: 'anytime'|'business_hours'|'morning_digest';
-  threshold?: 'one'|'three'|'ten';
-  onlyAvailable?: boolean;
-  importance?: string;
-  recipientIds?: string[];
-  recipientLabel?: string;
-  message?: string;
-  actionUrl?: string;
-  dedupeMinutes?: number;
 };
 
 export type OperatorDispatchPerRule = {
@@ -555,7 +547,7 @@ export async function operatorRuleDeferredUntil(db: D1Database, accountId: strin
   if (conditions.schedule === 'morning_digest') {
     const setting = await db.prepare("SELECT value FROM account_settings WHERE line_account_id=? AND key='notifications.digest_time'").bind(accountId).first<{value:string}>();
     const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(setting?.value ?? '') ? setting!.value : '09:00';
-    const day = new Date(new Date(instance!.created_at).getTime()+9*3600_000+86400_000).toISOString().slice(0,10);
+    const day = japanDateOffset(1, new Date(instance!.created_at));
     const due = new Date(`${day}T${time}:00+09:00`);
     if (due > now) return due.toISOString();
   }
@@ -576,7 +568,7 @@ export async function operatorRuleDeferredUntil(db: D1Database, accountId: strin
 }
 
 async function operatorIsOnShift(db: D1Database, accountId: string, recipientId: string, now=new Date()): Promise<boolean> {
-  const local=new Date(now.getTime()+9*3600_000).toISOString();
+  const local=japanCalendar(now).toISOString();
   return Boolean(await db.prepare(`SELECT 1 FROM staff_shifts sh JOIN staff s ON s.id=sh.staff_id
     WHERE s.staff_member_id=? AND s.line_account_id=? AND s.is_active=1 AND s.deleted_at IS NULL
       AND sh.work_date=? AND sh.start_time<=? AND sh.end_time>?`).bind(recipientId,accountId,local.slice(0,10),local.slice(11,16),local.slice(11,16)).first());

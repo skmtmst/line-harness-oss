@@ -15,7 +15,7 @@ const LIST_V8 = readFileSync('src/app/contents/list-v8.tsx', 'utf8')
 const PAGE = readFileSync('src/app/contents/page.tsx', 'utf8')
 
 /*
- * ★V8 登録メディア一覧（板 `O7hUt7`）の契約。
+ * ★V8 登録メディア一覧（板 ）の契約。
  * テーマの古い属性が残っていてもV8一覧に固定し、
  * 数の帯・フォルダの列・道具の段・札の格子・表示範囲とページ送りが出ること、
  * staff では閲覧のみの帯が出て管理操作が押せない形になることを実DOMで固定する。
@@ -206,7 +206,22 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     expect(host!.textContent).toContain('メニュー表.pdf')
   })
 
-  test('v8 では新しい一覧（O7hUt7）が出て、v7 は出ない', async () => {
+  test('共通の表示件数から10・20・50件を選べる', async () => {
+    await renderPage()
+    const trigger = host!.querySelector<HTMLButtonElement>('button[aria-label="表示件数"]')!
+    expect(trigger).not.toBeNull()
+    await act(async () => { trigger.click() })
+    expect([...document.querySelectorAll('[role="listbox"] [role="option"]')].map(option => option.textContent?.trim())).toEqual(['10件表示', '20件表示', '50件表示'])
+    for (const size of [10, 50, 20]) {
+      if (size !== 10) await act(async () => { trigger.click() })
+      const option = [...document.querySelectorAll<HTMLElement>('[role="listbox"] [role="option"]')].find(row => row.textContent?.trim() === `${size}件表示`)!
+      await act(async () => { option.querySelector('button')!.click() })
+      expect(trigger.textContent).toContain(`${size}件表示`)
+    }
+    expect(host!.textContent).toContain('秋の新商品.jpg')
+  })
+
+  test("v8 では新しい一覧が出て、既存の見た目は出ない", async () => {
     document.documentElement.dataset.theme = 'v8'
     await renderPage()
     expect(host?.querySelector('[data-design-node="O7hUt7"]')).not.toBeNull()
@@ -268,8 +283,6 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     expect(LIST_V8).toContain('aria-label="並べ方"')
     expect(LIST_V8).toContain('...SORT_OPTIONS.map')
     expect(LIST_V8).toContain('aria-label="表示件数"')
-    expect(LIST_V8).toContain('10件表示')
-    expect(LIST_V8).toContain('50件表示')
     expect(LIST_V8).toContain('<ListRange')
     expect(LIST_V8).toContain('<Pagination')
     expect(LIST_V8).toContain('<BulkBar')
@@ -287,7 +300,7 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     expect(LIST_V8).not.toContain('186')
   })
 
-  test('v6 の列・絞り込み・操作を残す', () => {
+  test("管理画面 の列・絞り込み・操作を残す", () => {
     // 列（札の中身）。
     expect(LIST_V8).toContain('formatMediaDetails(item)')
     expect(LIST_V8).toContain('どこでも使っていない')
@@ -298,7 +311,7 @@ describe('V8 登録メディア一覧（O7hUt7）の作り', () => {
     expect(LIST_V8).toContain("{ value: 'near-limit', label: '上限に近いものだけ' }")
     expect(LIST_V8).toContain("showArchivedOnly ? 'archived'")
     expect(LIST_V8).toContain('使われている順')
-    // フォルダの列は共通の ManagedFolderPanel（名前・色・並べ替え・消すまで・B-136）。
+    // フォルダの列は共通の ManagedFolderPanel（名前・色・並べ替え・消すまで・）。
     expect(LIST_V8).toMatch(/<ManagedFolderPanel[\s\S]*?kind="media"/)
     // 操作。
     expect(LIST_V8).toContain('使用箇所を見る')

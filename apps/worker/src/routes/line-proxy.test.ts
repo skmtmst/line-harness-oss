@@ -1,5 +1,6 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 const lineClientMocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -386,6 +387,100 @@ describe('harness API key auth', () => {
     );
     expect(res.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('legacy environment account authorization', () => {
+  beforeEach(() => {
+    vi.mocked(getLineAccounts).mockResolvedValue([]);
+    vi.mocked(authenticateApiToken).mockResolvedValue({
+      id: 'staff-legacy', name: 'Operator', role: 'staff', readOnly: false,
+      permissionKeys: ['/chats'], tenantId: DEFAULT_TENANT_ID,
+    });
+  });
+
+  test.each(['foreign tenant', 'assigned accounts', 'feature scope'] as const)(
+    '%s cannot use the environment channel through either proxy', async (restriction) => {
+      if (restriction === 'foreign tenant') {
+        vi.mocked(authenticateApiToken).mockResolvedValue({
+          id: 'foreign-staff', name: 'Operator', role: 'staff', readOnly: false,
+          permissionKeys: ['/chats'], tenantId: 'other-tenant',
+        });
+      } else if (restriction === 'assigned accounts') {
+        vi.mocked(getStaffById).mockResolvedValueOnce({ account_scope: 'accounts' } as never);
+        vi.mocked(getStaffAccountScopeIds).mockResolvedValueOnce(['acc-1']);
+      } else {
+        vi.mocked(authenticateApiToken).mockResolvedValue({
+          id: 'feature-staff', name: 'Operator', role: 'staff', readOnly: false,
+          permissionKeys: ['/chats'], tenantId: DEFAULT_TENANT_ID,
+          featureEnabledLineAccountIds: ['acc-1'],
+        });
+      }
+      const { db, executed } = fakeDb();
+      for (const request of [
+        pushRequest('staff-key'),
+        new Request('http://worker.test/line-api-data/v2/bot/message/message-1/content', {
+          headers: { Authorization: 'Bearer staff-key' },
+        }),
+      ]) {
+        const res = await setupApp().request(request, {}, env(db));
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ message: 'LINE account not found' });
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(executed).toEqual([]);
+    },
+  );
+
+  test.each([
+    { is_active: 0, tenant_status: 'active', directStatus: 401 },
+    { is_active: 1, tenant_status: 'suspended', directStatus: 403 },
+    { is_active: 1, tenant_status: 'archived', directStatus: 403 },
+  ])('registered unavailable default $is_active/$tenant_status cannot fall back to legacy', async (state) => {
+    const registered = { ...ACCOUNT, ...state, channel_access_token: 'env-token' };
+    vi.mocked(getLineAccounts).mockResolvedValue([registered] as never);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([registered] as never);
+    vi.mocked(authenticateApiToken).mockImplementation(async (_c, token) => token === 'staff-key'
+      ? { id: 'staff-legacy', name: 'Operator', role: 'staff', readOnly: false,
+        permissionKeys: ['/chats'], tenantId: DEFAULT_TENANT_ID }
+      : null);
+    const { db, executed } = fakeDb();
+    for (const [token, status] of [['staff-key', 404], ['env-token', state.directStatus]] as const) {
+      const res = await setupApp().request(pushRequest(token), {}, env(db));
+      expect(res.status).toBe(status);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+  });
+
+  test.each(['staff-legacy', 'env-owner'])(
+    'authorized default-tenant %s retains unregistered environment access', async (id) => {
+      vi.mocked(authenticateApiToken).mockResolvedValue({
+        id, name: 'Operator', role: id === 'env-owner' ? 'owner' : 'staff', readOnly: false,
+        permissionKeys: ['/chats'], tenantId: DEFAULT_TENANT_ID,
+      });
+      const { db, executed } = fakeDb();
+      const res = await setupApp().request(pushRequest('staff-key'), {}, env(db));
+      expect(res.status).toBe(200);
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://api.line.me/v2/bot/message/push',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: 'Bearer env-token' }),
+        }),
+      );
+      expect(loggedRows(executed)[0].lineAccountId).toBeNull();
+    },
+  );
+
+  test('an active registered environment token keeps its account identity', async () => {
+    vi.mocked(getLineAccounts).mockResolvedValue([
+      { ...ACCOUNT, channel_access_token: 'env-token' },
+    ] as never);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(pushRequest('env-token'), {}, env(db));
+    expect(res.status).toBe(200);
+    expect(loggedRows(executed)[0].lineAccountId).toBe('acc-1');
+    expect(authenticateApiToken).not.toHaveBeenCalled();
   });
 });
 

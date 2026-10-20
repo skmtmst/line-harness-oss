@@ -25,8 +25,8 @@
 }
 
 /*
- * 画面の絵での段の箱（d9xoI「段 基本」・T9gblG「箱 CSVで書き出す」・
- * JB8V1「推薦カード」）：内側の余白 20px。既定（16・18）の合格は
+ * 画面の絵での段の箱（「段 基本」・「箱 CSVで書き出す」・
+ * 「推薦カード」）：内側の余白 20px。既定（16・18）の合格は
  * 変えない。変わり形として足す。
  */
 
@@ -112,7 +112,7 @@
 }
 }
 
-/* V8 の段の箱（j8p3yj・r6dJFy）。指定された箱だけに効かせる。 */
+/* V8 の段の箱（・）。指定された箱だけに効かせる。 */
 :root :is(.form, .aside, .panel) {
   display: flex;
   flex-direction: column;
@@ -188,22 +188,22 @@ html:root .headerContent .meta { display: flex; flex-direction: column; align-it
 :root .spacingTight { gap: var(--tpl-nc-field-gap); }
 :root .spacingControls { gap: var(--tpl-toolbar-gap); }
 
-/* B-152・仕上げ1 */
+/* ・仕上げ1 */
 :root .paddingDefault, :root .paddingCompact { padding: var(--polish-space-card); }
 :root .paddingRoomy, :root .paddingSpacious { padding: var(--polish-space-section); }
 :root .header { padding-inline: var(--polish-space-card); gap: var(--polish-space-field); }
 :root .gapTight { gap: var(--polish-space-row); }
 
-/* B-152・仕上げ2 */
+/* ・仕上げ2 */
 :root :is(.title, .headerStacked .title, .headerPanel .title) { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }
 :root .meta { font-weight: var(--polish-weight-body); }
 :root .action { font-size: var(--polish-text-body); font-weight: var(--polish-weight-body); }
 
-/* B-159：入れ子の面には影を重ねない。外のカードの内側だけをそろえる。 */
+/* ：入れ子の面には影を重ねない。外のカードの内側だけをそろえる。 */
 :root .paddingCompact,
 :root .paddingDefault { padding: var(--tpl-card-pad); }
 
-/* B-180：中身の段の題は型や配置によらず15/700。 */
+/* ：中身の段の題は型や配置によらず15/700。 */
 :root .header .title,
 :root .headerStacked .title,
 :root .headerPanel .title {
@@ -215,9 +215,9 @@ html:root .headerContent .meta { display: flex; flex-direction: column; align-it
 :root .headerRestaurant .title{font-size:15px;line-height:23px;}
 :root .headerRestaurant .meta{font-size:14px;line-height:21px;}
 
-/* B-187・208：枠から中身は最低16。段の間は spacing・gap・variant の指定を使う。 */
+/* ・208：枠から中身は最低16。段の間は spacing・gap・variant の指定を使う。 */
 /* 固定HTMLの枠は内側のoutline。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
-html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']) {
+html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']):where(:not([data-card-frame='ring'])) {
   border: 0;
   outline: 1px solid var(--card-edge);
   outline-offset: -0.5px;
@@ -225,10 +225,10 @@ html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface=
 html:root .paddingCompact { padding: var(--space-16); }
 html:root .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
 html:root .card[data-card-spacing][data-card-spacing-sides] { padding: var(--card-content-padding); }
-/* B-208 の16は箱の端。中の見出しと本文・欄の間は指定した8〜12も使える。 */
+/*  の16は箱の端。中の見出しと本文・欄の間は指定した8〜12も使える。 */
 html:root .vertical { gap: max(var(--space-8), var(--card-content-gap, var(--space-16))); }
 
-/* B-208：余白の口を持たない既存の箱にも、枠から16を確保する。表の器は平らなまま。 */
+/* ：余白の口を持たない既存の箱にも、枠から16を確保する。表の器は平らなまま。 */
 html:root .card[data-card-padding='none'][data-card-variant='default']:not([data-card-unframed]):not([data-spacing]):not([data-card-spacing]):not(:has([data-shared-part='list-table'], table)) { padding: var(--space-16); }
 
 /* 失敗した処理の箱。形と余白はCardのまま、状態だけ共通の赤。 */
@@ -248,3 +248,8 @@ html:root .headerStacked { padding: 0; }
 html:root .card[data-card-surface='muted'] { border: 0; outline: revert; box-shadow: none; background: var(--color-surface-pearl); }
 
 html:root .card[data-card-selected] { --card-edge: var(--color-accent-deep); background: var(--color-accent-soft); }
+
+/* 内側の線だけの面。外枠・影で本文の寸法を増やさず、既存のカードは変えない。 */
+html:root .card[data-card-frame='ring'] {
+  border: 0; box-shadow: var(--tpl-sa-ring);
+}

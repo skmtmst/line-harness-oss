@@ -5,8 +5,9 @@
  * `inbound_only` を型と実行時の両方で固定し、誤って双方向化できないようにする。
  */
 
-import { selectAssignment } from './booking-assignment-selector.js';
-import { defaultAssignmentResource } from './booking-assignment-settings.js';
+import { selectAssignment } from '../features/booking/booking-assignment-selector/index.js';
+import { defaultAssignmentResource } from '../features/booking/booking-assignment-settings/index.js';
+import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
 export const RESTAURANT_RESERVATION_SOURCES = [
   'restaurant_board',
@@ -78,12 +79,15 @@ export function validateInboundReservation(value: unknown):
     ? row.status as InboundReservation['status']
     : 'confirmed';
   const optional = (key: string) => typeof row[key] === 'string' ? String(row[key]).trim() || null : null;
+  if (row.customerPhone != null && (typeof row.customerPhone !== 'string' || phoneProblem(row.customerPhone))) {
+    return { ok: false, error: '電話番号は0から始まる10〜11桁の数字で入れてください。', field: 'customerPhone' };
+  }
   return {
     ok: true,
     value: {
       externalId,
       customerName,
-      customerPhone: optional('customerPhone'),
+      customerPhone: normalizePhone(optional('customerPhone') ?? '') || null,
       lineUid: optional('lineUid'),
       guestCount,
       startsAt: new Date(start).toISOString(),

@@ -13,7 +13,7 @@ const sendXServerMail = vi.hoisted(() =>
 vi.mock('./support-relay.js', () => ({ sendViaXServerRelay }));
 vi.mock('./xserver-mail.js', () => ({ sendXServerMail }));
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { mailFromName, MUSUBO_FROM_NAME, NEN_FROM_NAME } from './mail-from-name.js';
 import { sendPlainMail } from './plain-mail.js';
 

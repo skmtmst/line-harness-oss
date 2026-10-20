@@ -2,7 +2,7 @@ import type { listTemplateViews } from '../services/hq-templates/saved-views.js'
 import { Hono } from 'hono';
 import { beforeEach,afterEach,describe,it,expect } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { hqTemplates } from './hq-templates.js';
 let sql:ReturnType<typeof createTestD1>,app:Hono<Env>,staff:NonNullable<Env['Variables']['staff']>;
 type View=Awaited<ReturnType<typeof listTemplateViews>>[number];
@@ -18,7 +18,7 @@ beforeEach(()=>{
 });
 afterEach(()=>sql.raw.close());
 const input={name:'差し込みあり',filters:{kind:'message',hasInterpolations:false,messageCount:'multiple',undistributed:true,search:'予約'},scope:'personal'};
-describe('Upx1c saved views',()=>{
+describe(' saved views',()=>{
  it('roundtrips filters and revisions, rejects stale saves, archives without deleting',async()=>{
   const created=await request('','POST',input);expect(created.status,JSON.stringify(created.body)).toBe(201);const id=created.body.data.id;
   expect(created.body.data).toMatchObject({...input,revision:1});expect((await request()).body.data).toHaveLength(1);

@@ -1,12 +1,13 @@
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(new URL('page.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../../../v8/broadcast-detail/reserved.tsx', import.meta.url), 'utf8')
-const FORM = readFileSync(join(process.cwd(), 'src/components/broadcasts/broadcast-form.tsx'), 'utf8')
+const FORM = readUiSource(join(process.cwd(), 'src/components/broadcasts/broadcast-form.tsx'), 'utf8')
 const NEW_PAGE = readFileSync(join(process.cwd(), 'src/app/broadcasts/new/page.tsx'), 'utf8')
 
-describe('V6 一斉配信の予約完了', () => {
+describe("管理画面 一斉配信の予約完了", () => {
   it('作成結果の実IDを完了画面へ渡す', () => {
     expect(FORM).toContain('await persistDraft(')
     expect(FORM).toContain('scheduledAtIso(),')

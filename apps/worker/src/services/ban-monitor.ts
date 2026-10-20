@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * BAN検知モニター — cronトリガーで定期実行
  *
@@ -17,7 +19,8 @@ import {
   type LineAccount,
 } from '@line-crm/db';
 
-/** Webhook が無いまま警告を出すまでの時間（v6-33 §11-1 の既定24時間）。 */
+
+/** Webhook が無いまま警告を出すまでの時間（-33 §11-1 の既定24時間）。 */
 const WEBHOOK_SILENCE_WARNING_MS = 24 * 60 * 60 * 1000;
 /** 「正常」が続いたらプールへ自動で戻すまでの時間（X の確定値・24時間）。 */
 const POOL_RETURN_NORMAL_MS = 24 * 60 * 60 * 1000;
@@ -33,14 +36,14 @@ export async function checkAccountHealth(
     try {
       await checkSingleAccount(db, account);
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_ban_monitor_failed"}));
+      logger.error("services_ban_monitor_failed");
     }
   }
 
   try {
     await returnRecoveredAccountsToPools(db);
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_ban_monitor_failed"}));
+    logger.error("services_ban_monitor_failed");
   }
 }
 
@@ -148,9 +151,9 @@ async function checkSingleAccount(
   }
 
   if (riskLevel === 'danger') {
-    console.error(JSON.stringify({"code":"services_ban_monitor_failed"}));
+    logger.error("services_ban_monitor_failed");
     /*
-     * 自動切替（v6-33 §11-2、X-2）。トラフィックプールに入っている
+     * 自動切替（-33 §11-2、X-2）。トラフィックプールに入っている
      * アカウントが danger になったら、プールの中だけで止めて、
      * 友だち追加先を同じ組の予備へ切り替える。
      * アカウント自体の is_active は触らない（配信・受信の停止は別の決まり）。
@@ -208,7 +211,7 @@ async function returnRecoveredAccountsToPools(db: D1Database): Promise<void> {
   const switchedOut = await listAutoSwitchedOutPoolAccounts(db);
   // account_health_logs.created_at は JST(+09:00) 表記。同じ形で比べる。
   const since =
-    new Date(Date.now() - POOL_RETURN_NORMAL_MS + 9 * 60 * 60 * 1000)
+    japanCalendar(new Date(Date.now() - POOL_RETURN_NORMAL_MS))
       .toISOString()
       .slice(0, -1) + '+09:00';
 

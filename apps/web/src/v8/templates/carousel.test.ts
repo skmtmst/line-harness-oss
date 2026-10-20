@@ -4,7 +4,7 @@ import { chipName, choiceKindOptions, inlineActionsText, panelsFromContent } fro
 import { buildCarouselContent, carouselChoiceProblems, choiceFromUri, emptyChoice, type Choice, type Panel } from './carousel-core'
 
 describe('カルーセルを作る（J60utH）の札と動きの1行', () => {
-  it('札の名前はタイトルの（）書きを外す', () => {
+  it('札の名前はタイトルの書きを外す', () => {
     expect(chipName('夏の定番セット（送料込み）')).toBe('夏の定番セット')
     expect(chipName('定期便')).toBe('定期便')
   })

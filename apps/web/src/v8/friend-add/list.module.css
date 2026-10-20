@@ -1,5 +1,5 @@
 /*
- * ★V8 友だち追加時の配信の一覧（MRhef・LEwkJ・P20kYU・C0lfUP・cFo2p・kFz4b）。
+ * ★V8 友だち追加時の配信の一覧（・・・・・）。
  * 枠・見出し・数の帯・フォルダの列は型（ListPage）が持つ。ここは帯・道具・表の中身だけ。
  */
 
@@ -128,7 +128,7 @@
   font-size: var(--tpl-row-sub-size);
   line-height: var(--tpl-row-sub-lh);
 }
-/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 MRhef の説明の行）。 */
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
 .nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
 .sub > svg {
   flex-shrink: 0;
@@ -232,7 +232,7 @@
   gap: var(--tpl-toolbar-gap);
 }
 
-/* 状態の板（kFz4b）：読み込み中・失敗・空。 */
+/* 状態の板：読み込み中・失敗・空。 */
 .stateCard {
   display: flex;
   flex-direction: column;
@@ -267,7 +267,7 @@
   font-size: var(--text-caption);
 }
 
-/* 受け皿は止められない（cFo2p）の注意の1行。 */
+/* 受け皿は止められないの注意の1行。 */
 .warnNote {
   display: flex;
   align-items: flex-start;
@@ -294,7 +294,7 @@
   background: var(--color-canvas);
 }
 
-/* 1152 の板（P20kYU）：直近7日の列は出さない（設定・送るもの・状態・…）。 */
+/* 1152 の板：直近7日の列は出さない（設定・送るもの・状態・…）。 */
 @container v8-page (max-width: 1099px) {
   .colRecent { display: none !important; }
 }

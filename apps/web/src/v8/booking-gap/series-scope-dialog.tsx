@@ -1,4 +1,5 @@
 'use client'
+import { formatYen as yen } from '@line-crm/shared';
 
 import Notice from '@/components/shared/notice'
 
@@ -10,8 +11,9 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifySaved } from '@/components/shared/toast'
 import Checkbox from '@/components/shared/checkbox'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
-import { bookingSeriesApi } from '@/lib/api-gap2'
-import { seriesImpactApi, type SeriesImpactItem } from '@/lib/api-gap2-pending'
+import { bookingSeriesApi } from '@/lib/api/helpers/gap2'
+import { bookingAdvancedApi } from '@/lib/api/helpers/booking-advanced'
+type SeriesImpactItem = Awaited<ReturnType<typeof bookingAdvancedApi.impact>>['data']['items'][number]
 import type { Gap2Booking } from '@line-crm/shared'
 import { dayOf, dayWithWeekday, hm } from './series-model'
 import styles from './series-scope-dialog.module.css'
@@ -28,13 +30,12 @@ export type SeriesTarget = {
   startsAt: string
 }
 
-const yen = (n: number) => `¥${n.toLocaleString('ja-JP')}`
 
 /*
  * 繰り返しの予約を変える・取り消す確かめの窓（B4-2・i1NoP と YoXiY）。
  * 「この回だけ」「この回から後ぜんぶ（N 件）」を選ぶと、対象の日の表を中に出す。
  * 口は変えられなかった回（conflicts）を前のまま残して返すので、その件数は結果の知らせに出す。
- * キャンセル料は口が取り消しの結果で返す（事前の見込みの口は無い）ので、結果の知らせで金額を出す。
+ * キャンセル料・変わる日時・埋まっている回は、同じ範囲と版の見込みを確認してから実行する。
  */
 export default function SeriesScopeDialog({ open, mode, accountId, target, newStartsAt, onClose, onDone }: {
   open: boolean
@@ -47,7 +48,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
   onDone: (result: { count: number }) => void
 }) {
   const [all, setAll] = useState<Gap2Booking[] | null>(null)
-  /* 前もっての見込み（埋まっている回・キャンセル料）。口がまだ無い間は読めず、その列は準備中にする。 */
+  /* 前もっての見込み。取得不能は「かかりません」と表示しない。 */
   const [impact, setImpact] = useState<Record<string, SeriesImpactItem> | null>(null)
   const preparing = usePreparingDialog()
   const [version, setVersion] = useState(0)
@@ -61,19 +62,22 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
   useEffect(() => {
     if (!open) return
     let current = true
-    setAll(null); setLoadError(false)
+    setAll(null); setImpact(null); setLoadError(false)
     void bookingSeriesApi.get(accountId, target.seriesId)
-      .then((res) => {
+      .then(async (res) => {
+        const preview = await bookingAdvancedApi.impact(accountId, target.seriesId, { scope, fromBookingId: target.bookingId, expectedVersion: res.data.series.version, change: mode === 'change' && newStartsAt ? { startsAt: newStartsAt } : undefined })
         if (!current) return
         const from = res.data.bookings.find((b) => b.id === target.bookingId)?.series_index ?? target.index
+        const candidates = res.data.bookings.filter((b) => (b.series_index ?? 0) >= from && !['cancelled', 'rejected', 'expired'].includes(b.status)).sort((a, b) => (a.series_index ?? 0) - (b.series_index ?? 0))
+        const selected = scope === 'this' ? candidates.slice(0, 1) : candidates
+        if (selected.some((b) => !preview.data.items.some((item) => item.bookingId === b.id))) throw new Error('見込みの一部を確認できませんでした')
         setVersion(res.data.series.version)
-        void Promise.resolve().then(() => seriesImpactApi.impact(accountId, target.seriesId, { scope: 'following', fromBookingId: target.bookingId, change: newStartsAt ? { startsAt: newStartsAt } : undefined }))
-          .then((r) => { if (current) setImpact(Object.fromEntries(r.data.items.map((i) => [i.bookingId, i]))) }).catch(() => { if (current) setImpact(null) })
-        setAll(res.data.bookings.filter((b) => (b.series_index ?? 0) >= from && !['cancelled', 'rejected', 'expired'].includes(b.status)).sort((a, b) => (a.series_index ?? 0) - (b.series_index ?? 0)))
+        setImpact(Object.fromEntries(preview.data.items.map((item) => [item.bookingId, item])))
+        setAll(candidates)
       })
       .catch(() => { if (current) setLoadError(true) })
     return () => { current = false }
-  }, [open, accountId, target.seriesId, target.bookingId, target.index, retry])
+  }, [open, accountId, target.seriesId, target.bookingId, target.index, retry, scope, newStartsAt, mode])
   const items = all ? (scope === 'this' ? all.slice(0, 1) : all) : null
 
   const changing = mode === 'change'
@@ -83,7 +87,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
   const newTime = newStartsAt ? hm(newStartsAt) : ''
 
   async function run() {
-    if (busy || !items || count === 0) return
+    if (!items || !impact || count === 0 || (changing && !newStartsAt)) return
     setBusy(true); setError('')
     try {
       if (changing && newStartsAt) {
@@ -114,7 +118,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
       confirmation
       confirmLabel={`${count} 件を${changing ? '変える' : '取り消す'}`}
       busyLabel={changing ? '変えています…' : '取り消しています…'}
-      confirmDisabled={!items || count === 0}
+      confirmDisabled={!items || !impact || count === 0 || (changing && !newStartsAt)}
       footerAlign="center"
       busy={busy}
       error={error || undefined}
@@ -129,7 +133,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
             note={changing ? `${dayOf(target.startsAt)} から ${dayOf(last)} まで ${newTime} に変える。埋まっている回は前のまま` : `${dayOf(target.startsAt)} から ${dayOf(last)} まで取り消す。繰り返しはここで終わる`} />
         </RadioCardGroup>
         <h3 className={styles.heading}>{changing ? (items && count !== items.length ? `変わる日（${items.length} 件のうち ${count} 件）` : `変わる日（${items?.length ?? '…'} 件）`) : `取り消す日（${items?.length ?? '…'} 件）`}</h3>
-        {loadError ? <Notice tone="danger">対象の日を読み込めませんでした。<button type="button" className={styles.retry} onClick={() => setRetry((n) => n + 1)}>もう一度</button></Notice> : null}
+        {loadError ? <Notice tone="danger">対象の日とキャンセル料の見込みを確認できませんでした。<button type="button" className={styles.retry} onClick={() => setRetry((n) => n + 1)}>もう一度</button></Notice> : null}
         {!loadError ? <DataTable aria-busy={!items}>
           <thead><Tr><Th>日</Th><Th>{changing ? '前' : '時間'}</Th><Th>{changing ? '後' : 'キャンセル料'}</Th></Tr></thead>
           <tbody>
@@ -138,9 +142,9 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
                 <Td>{dayWithWeekday(item.starts_at)}</Td>
                 <Td>{hm(item.starts_at)}</Td>
                 <Td><span className={(changing ? blockedIds.has(item.id) : impact?.[item.id]?.fee) ? styles.feeNotice : undefined}>
-                  {changing ? (blockedIds.has(item.id) ? `埋まっています・${hm(item.starts_at)} のまま` : newTime)
+                  {changing ? (blockedIds.has(item.id) ? `埋まっています・${hm(item.starts_at)} のまま` : impact?.[item.id]?.after ? hm(impact[item.id].after!) : newTime)
                     : impact ? (impact[item.id]?.fee ? `${yen(impact[item.id].fee!.amount)}（${impact[item.id].fee!.percent}%・${impact[item.id].fee!.reason}）` : 'かかりません')
-                    : <button type="button" className={styles.retry} onClick={() => preparing.open('キャンセル料の前もっての見込み')}>見込みを見る</button>}
+                    : '確認できません'}
                 </span></Td>
               </Tr>
             ))}

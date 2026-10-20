@@ -12,9 +12,9 @@ import { Tabs } from '@/components/shared/tabs'
 import { V8TabEditContext, AccountIcon, StateCard } from './tabs/shared'
 import styles from './settings.module.css'
 import ChannelsTabV8 from './channels-tab'
-import PassesTabV8 from '../booking-passes/passes-tab'
-import type { useBookingSettings } from './settings'
-import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, PaymentsTabV8, PaymentsSideV8, V8_TABS } from './settings-parts'
+import { PassesTabV8 } from '@/v8/booking-passes/index'
+import type { useBookingSettings } from './use-booking-settings'
+import { MenusTabV8, HoursTabV8, HolidaysTabV8, RulesTabV8, StaffTabV8, PaymentsTabV8, PaymentsSideV8, PhotosTabV8, V8_TABS } from './settings-parts'
 import { useSearchParams } from 'next/navigation'
 
 export default function BookingSettingsView({ accountId, tab, previewUrl, tabNode, canEditMenus, canEditSettings, tabReadOnly, menus, menusStatus, menusError, settings, settingsStatus, settingsError, staff, staffStatus, staffError, staffMatrices, staffExtras, members, resources, resourcesStatus, resourcesError, closedBookingCount, storeExceptions, tabEdit, hasChanges, registerTabEdit, switchTarget, setSwitchTarget, requestTab, confirmSwitch, reloadCore, saveSettings, saveResource, createResource, deleteResource, retryResources, closedWeekdays, phone }: ReturnType<typeof useBookingSettings> & { phone: ReactNode }) {
@@ -25,7 +25,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
   /* つなぐ前（UteeA）も右の欄を出さない。 */
   const paymentsWide = tab === 'payments' && (paymentsView === 'records' || paymentsView === 'events')
   /* 担当スタッフは割り当て方（QJMoY）が入って横いっぱいの表になった。スマホの見本は出さない。 */
-  const withoutPreview = tab === 'channels' || tab === 'payments' || tab === 'staff' || tab === 'passes'
+  const withoutPreview = tab === 'photos' || tab === 'channels' || tab === 'payments' || tab === 'staff' || tab === 'passes'
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
@@ -61,7 +61,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
           /* 狭い幅（1152）：右の欄を畳み、「メニューごとの支払い方法」を窓で開く。 */
           <PreviewLauncher title="メニューごとの支払い方法" label="メニューごとの支払い方法を見る"><PaymentsSideV8 accountId={accountId} menus={menus} connected={paymentsConnected} /></PreviewLauncher>
         ) : withoutPreview ? undefined : (
-          /* 絵 VFxWU：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
+          /* 絵 ：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
           <div className={styles.narrowActions}>
             <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>
             {previewUrl ? <Button href={previewUrl}><Smartphone size={15} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
@@ -161,6 +161,8 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
                 canEdit={canEditSettings}
                 onReload={reloadCore}
               />
+            ) : tab === 'photos' ? (
+              <PhotosTabV8 key={accountId} accountId={accountId} canEditMenus={canEditMenus} canEditSettings={canEditSettings} onSaved={reloadCore} />
             ) : tab === 'passes' ? (
               <PassesTabV8 accountId={accountId} canEdit={canEditSettings} />
             ) : tab === 'payments' ? (

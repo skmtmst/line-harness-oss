@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import NewLineAccountPage from './page'
+import { ApiError } from '@/lib/api'
 
 /**
  * R523: LINEアカウント登録の保存応答を失うと未保存と誤案内し、再試行で重複する。
@@ -14,6 +15,7 @@ const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), stepFollowerImport: vi.fn(), list: vi.fn(),
 }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
   return { ...actual, api: { lineAccounts: calls, hqNotices: notices, friends: { list: async () => ({success:true,data:{total:0}}) }, lineAccountTags: { list: async () => ({success:true,data:[]}) }, staff: { list: async () => ({success:true,data:[]}) } } }
@@ -76,7 +78,7 @@ function clearPrecheck() {
  * v07（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
  * 5行の確認が全部通ると「登録する」が出る（5行 × 420ms）。
  */
-async function enterSaveStep() {
+function enterCheckStep() {
   render(<NewLineAccountPage />)
   clearPrecheck()
   fill('v8-channel-id', '123456789')
@@ -92,6 +94,10 @@ async function enterSaveStep() {
   ack('友だち追加オプションで、この公式アカウントをリンクした')
   ack('チャネルを「開発中」から「公開済み」にした')
   nextStep()
+}
+
+async function enterSaveStep() {
+  enterCheckStep()
   fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
   await waitFor(() => expect(screen.getByRole('button', { name: '登録する' })).toBeTruthy(), { timeout: 5000 })
 }
@@ -140,5 +146,29 @@ describe('R523 保存の応答消失と重複（本物のReact）', () => {
 
     await screen.findByText('登録できませんでした。時間をおいて、もう一度お試しください。')
     expect(screen.queryByText(/DBには保存していません/)).toBeNull()
+  })
+})
+
+
+describe('接続確認の失敗後も入力と権限の案内を保つ', () => {
+  it.each([
+    [403, 'この操作の権限がありません。オーナーか管理者に頼んでください。'],
+    [429, '混み合っています。60秒ほど待ってから、もう一度お試しください。'],
+  ])('%iでは原因を案内し、登録せず入力を残す', async (status, message) => {
+    enterCheckStep()
+    calls.connectCheck.mockRejectedValue(new ApiError(status, undefined, undefined, undefined, undefined, 60))
+    fireEvent.click(screen.getByRole('button', { name: '接続を確かめる' }))
+    await screen.findByText(message)
+    expect(calls.connectCheck).toHaveBeenCalledOnce()
+    expect(calls.connect).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: '登録する' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'もう一度確かめる' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'LINEログインへ戻る' }))
+    expect((document.getElementById('v8-login-channel-id') as HTMLInputElement).value).toBe('2007123456')
+    expect((document.getElementById('v8-login-channel-secret') as HTMLInputElement).value).toBe('synthetic-login-secret')
+    fireEvent.click(screen.getByRole('button', { name: 'Webhook の設定へ戻る' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Messaging API へ戻る' }))
+    expect((document.getElementById('v8-channel-id') as HTMLInputElement).value).toBe('123456789')
+    expect((document.getElementById('v8-channel-secret') as HTMLInputElement).value).toBe('synthetic-secret')
   })
 })

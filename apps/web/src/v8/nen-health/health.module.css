@@ -1,5 +1,5 @@
 /*
- * ★V8-B 健康日記（mIwA4・BVuYh・z2tvtX）。
+ * ★V8-B 健康日記（・・）。
  * 枠・見出し・タブの段・数の帯の並びは型（ListPage）が持つ。ここは板の中の寸法だけ。
  * 数字は app/globals.css の :root の --tpl-nph-* に置く（マイペットと同じ物差し）。
  */
@@ -238,7 +238,7 @@
   line-height: normal;
 }
 
-/* 記録の項目（z2tvtX）。数の帯の直下に表（見出し 36・行は中身なり・上下 10）。 */
+/* 記録の項目。数の帯の直下に表（見出し 36・行は中身なり・上下 10）。 */
 .itemTable {
   display: flex;
   flex-direction: column;
@@ -282,8 +282,8 @@
 }
 
 /*
- * 30日のまとめ（BVuYh）。共通の引き出し（幅 660・頭に線）を、絵の幅 600・
- * 頭の線なし・余白 24・間 16 に合わせる（NEN配信の oqSJP と同じやり方）。
+ * 30日のまとめ。共通の引き出し（幅 660・頭に線）を、絵の幅 600・
+ * 頭の線なし・余白 24・間 16 に合わせる（NEN配信の  と同じやり方）。
  */
 .summaryBody {
   display: flex;
@@ -294,7 +294,7 @@
   margin: 0;
   padding: var(--tpl-nph-summary-note-pad);
   border-radius: var(--radius-control);
-  /* 絵（BVuYh）：案内の青の地。 */
+  /* 絵：案内の青の地。 */
   background: var(--color-status-info-soft);
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);

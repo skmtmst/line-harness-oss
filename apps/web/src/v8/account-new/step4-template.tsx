@@ -1,6 +1,6 @@
 import Card from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import StatusBadge from '@/components/shared/status-badge'
+import type { AccountStyle } from '@line-crm/shared'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
 import { templateOptions } from './check-rows'
 import styles from './register.module.css'
@@ -12,7 +12,7 @@ import styles from './register.module.css'
  */
 export default function Step4Template({ templateKey, onPick }: {
   templateKey: string
-  onPick: (key: string) => void
+  onPick: (key: AccountStyle) => void
 }) {
   return (
     <CreateStepColumns data-design-node="X0pGdw" previewTitle="あとから変えられます" preview={(
@@ -28,9 +28,8 @@ export default function Step4Template({ templateKey, onPick }: {
           {templateOptions().map((option) => (
             <RadioCard
               key={option.key} name="template" value={option.key} title={option.label} note={option.note}
-              checked={templateKey === option.key} disabled={!option.enabled}
-              ariaLabel={option.enabled ? option.label : `${option.label}（順次公開）`}
-              icon={option.enabled ? null : <StatusBadge tone="info" size="compact" dot={false}>順次公開</StatusBadge>}
+              checked={templateKey === option.key}
+              ariaLabel={option.label}
               onChange={() => onPick(option.key)}
             />
           ))}

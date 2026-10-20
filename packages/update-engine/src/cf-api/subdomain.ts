@@ -1,5 +1,5 @@
 import type { CfApiCreds } from '../types.js';
-import { authHeader, readBodyExcerpt } from './_shared.js';
+import { authHeader, readBodyExcerpt } from './shared.js';
 
 /**
  * Cloudflare error codes for the workers.dev subdomain endpoints, as used by

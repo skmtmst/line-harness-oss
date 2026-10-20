@@ -22,17 +22,17 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-const FRIENDS_TS = join(process.cwd(), 'src/routes/friends.ts');
+const TIMELINE_SOURCE_TS = join(process.cwd(), 'src/routes/friends-timeline-handlers.ts');
 
-/** friends.ts からタイムラインの問い合わせをそのまま抜き出す。 */
+/** friends-timeline-handlers.ts からタイムラインの問い合わせをそのまま抜き出す。 */
 function extractTimelineQuery(): string {
-  const source = readFileSync(FRIENDS_TS, 'utf8');
+  const source = readFileSync(TIMELINE_SOURCE_TS, 'utf8');
   const match = /`(WITH group_a AS[\s\S]*?LIMIT \? OFFSET \?)`/.exec(source);
   if (!match) {
     throw new Error(
-      'friends.ts からタイムラインの問い合わせを抜き出せませんでした。' +
+      'friends-timeline-handlers.ts からタイムラインの問い合わせを抜き出せませんでした。' +
         'クエリの書き方を変えたなら、この抽出パターンも合わせて直してください。',
     );
   }

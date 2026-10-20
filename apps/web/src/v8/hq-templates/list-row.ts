@@ -1,9 +1,9 @@
-import { messageTypeText } from '../templates/words'
+import { messageTypeText } from '@/v8/templates/public/words/index'
 import { emptyValue } from '@/components/shared/empty-value'
 import type { HqTemplate } from '@/lib/hq-templates-api'
 
 /**
- * 統括のひな形一覧（絵 LRc93）の行に出す小さい字。
+ * 統括のひな形一覧の行に出す小さい字。
  * 名前の下は内容の要約（例「本文・画像 1」）。要約が無い古い返事・読めない内容は今までどおり説明か種類名。
  */
 export function templateSubLine(row: Pick<HqTemplate, 'content_summary' | 'description'>, typeLabel: string): string {

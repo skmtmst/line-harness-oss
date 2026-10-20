@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import {ecAutoLine} from './ec-auto-line.js';
-import {simulateAttribution,simulationResults} from '../services/ec-auto-line-attribution.js';
+import {simulateAttribution,simulationResults} from '../features/ec-commerce/ec-auto-line-attribution.js';
 let d:ReturnType<typeof gapFixture>;const now=new Date('2026-10-18T00:00:00Z');
 beforeEach(()=>{d=gapFixture();vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));d.raw.exec("INSERT INTO ec_behavior_events(id,account_id,friend_id,type,product_id,product_snapshot_json,occurred_at,received_at,dedupe_key) VALUES('e','a','f','cart_add','p','{}','2026-10-16T00:00:00Z','now','e');INSERT INTO ec_auto_line_sends(id,account_id,friend_id,rule_kind,product_id,trigger_event_id,scheduled_at,original_due_at,messages_snapshot_json,status,sent_at) VALUES('send','a','f','cart','p','e','now','now','[]','simulated','2026-10-16T03:00:00Z')");});
 afterEach(()=>{expect(fetch).not.toHaveBeenCalled();d.raw.close();vi.unstubAllGlobals();});

@@ -4,7 +4,7 @@ import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { DetailLoading } from '@/components/templates/detail-page'
 import TargetMissing from '@/components/shared/target-missing'
-import RichMenuCreateV8 from '../new/create-v8'
+import RichMenuCreateV8 from '../../../v8/rich-menus/new/create'
 import RichMenuDetailV8 from '@/v8/rich-menu-edit/detail'
 
 function RichMenuEditEntry() {

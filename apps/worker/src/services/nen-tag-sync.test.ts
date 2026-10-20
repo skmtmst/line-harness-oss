@@ -16,7 +16,7 @@ const tagMocks = vi.hoisted(() => ({
     return { removed };
   }),
 }));
-vi.mock('./friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: tagMocks.attach,
   detachTagAndFireSideEffects: tagMocks.detach,
 }));

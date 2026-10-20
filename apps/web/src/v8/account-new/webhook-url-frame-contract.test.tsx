@@ -42,7 +42,7 @@ function urlFrame() {
 
 describe('②Step2 の Webhook URL の枠は承認済み v07 どおり', () => {
   it('左右別々の余白として渡せている（潰れて 0 に落ちない）', () => {
-    // これが無いと共通の下限16の規則に当たり、max() に2値が入って padding が 0 になる。
+    // これが無いと共通の下限16の規則に当たり、max に2値が入って padding が 0 になる。
     expect(urlFrame().hasAttribute('data-card-spacing-sides')).toBe(true)
   })
 

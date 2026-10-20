@@ -1,4 +1,4 @@
-import type { Friend } from './friends.js';
+import type { Friend } from './friends/types/index.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 /**

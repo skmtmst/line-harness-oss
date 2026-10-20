@@ -28,7 +28,7 @@ const keyRequirement = requiredText('差し込みの名前を入力してくだ�
 const ecPathRequirement = requiredText('EC側の項目名を入力してください')
 
 /*
- * ★V8 友だち情報欄を作る・編集（Pencil `w9zY5`）。
+ * ★V8 友だち情報欄を作る・編集（Pencil ）。
  *
  * 型（CreatePage）の左に段「基本」（項目名・差し込みの名前・フォルダ）と段「種類」（よく使う6つの選ぶカード）、
  * 右の列に「種類（つづき）」の札・「値の扱い」（選択肢・既定値）・「オプション」3つの箱と「出す場所」、

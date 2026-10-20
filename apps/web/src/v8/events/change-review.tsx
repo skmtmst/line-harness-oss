@@ -24,7 +24,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 イベント予約「変更の確認」（Pencil `hmr2P`、確かめる窓 `qUdNh`）。
+ * ★V8 イベント予約「変更の確認」（Pencil 、確かめる窓 ）。
  *
  * 型（CreatePage）に、左の「開催回（どの回を変えるか選ぶ表）」「変える内容」と、
  * 右の「影響の確認」「日時・会場を変えるときの約束」をはめる。下の帯は キャンセル・変えてお知らせする。

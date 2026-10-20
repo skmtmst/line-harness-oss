@@ -32,7 +32,7 @@ const AC_OUTLINE: ReadonlyArray<{ title: string; note: string }> = [
 
 function AcOutline({ sub }: { sub: number }) {
   return (
-    <div className={styles.outlineCard} data-design-node="g48QV">
+    <Card className={styles.outlineCard} frame="ring" contentPadding="var(--tpl-htn-aside-pad)" gap="var(--tpl-htn-gap-xs)" data-design-node="g48QV">
       <p className={styles.outlineTitle}>操作ステップ</p>
       <p className={styles.outlineCount}>全{AC_OUTLINE.length}ステップ</p>
       <div className={styles.outlineGap} aria-hidden="true" />
@@ -59,7 +59,7 @@ function AcOutline({ sub }: { sub: number }) {
         {/* 承認済み v07 iaTqO：Webhook URL は自動登録されないので、ここから外した。 */}
         <p className={styles.outlineAutoBody}>アカウント名・@ID・アイコンの取り込み／LIFF（友だち追加）の作成。入力は不要です。</p>
       </div>
-    </div>
+    </Card>
   )
 }
 

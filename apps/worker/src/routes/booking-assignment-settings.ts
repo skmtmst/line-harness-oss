@@ -1,7 +1,8 @@
+import { logger } from '@line-crm/shared/server';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { inputError } from '../lib/input-errors.js';
-import { assignmentResourceIds, assignmentSettingsWithResources, d1AssignmentSettingsStore, validAssignmentWrite, type AssignmentScope } from '../services/booking-assignment-settings.js';
+import { assignmentResourceIds, assignmentSettingsWithResources, d1AssignmentSettingsStore, validAssignmentWrite, type AssignmentScope } from '../features/booking/booking-assignment-settings/index.js';
 
 /** 所属・店舗・予約設定権限は既存の各ルートで確認する。 */
 export async function assignmentSettingsResponse(c: Context<Env>, db: D1Database, scope: AssignmentScope) {
@@ -20,7 +21,7 @@ export async function assignmentSettingsResponse(c: Context<Env>, db: D1Database
     if (status === 'conflict') return c.json({ success: false, error: 'version_conflict' }, 409);
     return c.json({ success: true, data: await assignmentSettingsWithResources(db, scope) });
   } catch {
-    console.error(JSON.stringify({ code: 'assignment_settings_unavailable' }));
+    logger.error("assignment_settings_unavailable");
     return c.json({ success: false, error: 'assignment_settings_unavailable' }, 503);
   }
 }

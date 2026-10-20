@@ -1,8 +1,10 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { fail } from '../lib/fail.js';
+import { logger } from '@line-crm/shared/server';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { DEFAULT_TENANT_ID, getFriendBulkRunDetail } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import {
@@ -13,9 +15,9 @@ import {
   requireFriendBulkRunAccess,
   retryFriendBulkRun,
   startFriendBulkRun,
-} from '../services/friend-bulk-runs.js';
+} from '../features/friends/friend-bulk-runs/index.js';
 
-import { approveBulkMessage, getBulkMessageApproval } from '../services/friend-bulk-message-approval.js';
+import { approveBulkMessage, getBulkMessageApproval } from '../features/friends/friend-bulk-message-approval/index.js';
 
 export const friendBulkRuns = new Hono<Env>();
 
@@ -28,10 +30,10 @@ function bulkErrorFields(code: string): string[] {
 
 function errorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof FriendBulkRunError) {
-    return inputError(c, { success: false, error: error.message, code: error.code }, error.status as ContentfulStatusCode, bulkErrorFields(error.code));
+    return fail(c, error.status as ContentfulStatusCode, error.code, { error: error.message }, bulkErrorFields(error.code));
   }
-  console.error(JSON.stringify({"code":"routes_friend_bulk_runs_failed"}));
-  return c.json({ success: false, error: '一括操作を処理できませんでした' }, 500);
+  logger.error("routes_friend_bulk_runs_failed");
+  return fail(c, 500, 'INTERNAL_SERVER_ERROR', { error: '一括操作を処理できませんでした' });
 }
 
 function idempotencyKey(c: { req: { header(name: string): string | undefined } }): string {
@@ -46,7 +48,7 @@ function keepRunning(c: { executionCtx: ExecutionContext }, promise: Promise<unk
   try {
     c.executionCtx.waitUntil(promise);
   } catch {
-    void promise.catch((error) => console.error(JSON.stringify({"code":"routes_friend_bulk_runs_failed"})));
+    void promise.catch((error) => logger.error("routes_friend_bulk_runs_failed"));
   }
 }
 

@@ -43,7 +43,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 const openMenu = (name: string) => fireEvent.click(screen.getByRole('button', { name: `メニュー「${name}」の操作` }))
 
-/* ★V8 メニュー管理（板 MJoJR・停止 MV5Os・追加と変更 NkmwU）の動き。 */
+/* ★V8 メニュー管理（板 ・停止 ・追加と変更 ）の動き。 */
 describe('MJoJR メニュー管理', () => {
   it('数5・「…」の決まりの帯・一覧が出て、アーカイブだけ再開が出る', async () => {
     render(<MenuPage />)

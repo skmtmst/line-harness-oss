@@ -1,6 +1,8 @@
+> 文書：受信箱：会話の中を探す（V8.pen M0393 段13・枠 v7GV2・会話 W5pVg）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 受信箱：会話の中を探す（V8.pen M0393 段13・枠 v7GV2・会話 W5pVg）
 
-2026-10-07 オーナー採用。入口は `app/chats/page.tsx`（受信箱）。V8 の見た目のときだけ出す（v7 の本番には出さない）。
+2026-10-07 オーナー採用。入口は `app/chats/page.tsx`（受信箱）。現役のV8受信箱から開く。見た目の切り替えはない。
 
 ## 開き方・閉じ方
 - 会話の頭の🔍（顧客情報の出し入れの左）を押す、または会話を開いている間に ⌘F / Ctrl+F。ブラウザのページ内検索の代わりに帯を出し、探す欄へ入る
@@ -33,5 +35,5 @@
 
 ## 試験
 - `src/v8/inbox-search/chat-search.test.tsx`（探す・移る・塊の読み方・0件・閉じる）
-- `src/app/chats/inbox-search-react.test.tsx`（⌘F・読み足して太い枠・全件数・v7 では出さない）
+- `src/app/chats/inbox-search-react.test.tsx`（⌘F・読み足して太い枠・全件数）
 - `src/components/chats/chat-window-react.test.tsx`（全件数の読み上げ・当たりを真ん中へ）

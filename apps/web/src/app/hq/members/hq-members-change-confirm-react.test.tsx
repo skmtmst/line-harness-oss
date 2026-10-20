@@ -69,7 +69,7 @@ import { inviteExpiryLabel } from '@/components/hq/members/member-dialog'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 /**
- * 統括メンバーの権限変更は V8-B 板 `M4jS9` の確認を通してから変える。
+ * 統括メンバーの権限変更は V8-B 板  の確認を通してから変える。
  * 役割の変更前→変更後と「変わる」が出て、変えると保存口へ送る。再発防止。
  */
 

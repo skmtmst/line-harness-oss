@@ -10,11 +10,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
-vi.mock('../services/broadcast.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/broadcast.js')>();
+vi.mock('../features/broadcasts/broadcast.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../features/broadcasts/broadcast.js')>();
   return {
     ...actual,
     processQueuedBroadcasts: vi.fn().mockResolvedValue(undefined),
@@ -31,7 +31,7 @@ const owner: AuthenticatedStaff = {
 };
 const keyStaff: AuthenticatedStaff = {
   id: 'staff-key', name: '配信権あり', role: 'staff', readOnly: false, tenantId: 'tenant-1',
-  // v6-06 §6：範囲の鍵に加え、操作ごとの個別キーも要る。
+  // -06 §6：範囲の鍵に加え、操作ごとの個別キーも要る。
   permissionKeys: [
     '/broadcasts',
     'broadcast.definition.edit',

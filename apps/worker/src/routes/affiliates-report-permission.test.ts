@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // #554 点検#505中9: 紹介者の成績・動線の参照に権限検査を付ける。
 // owner・admin は素通し、staff は鍵 affiliate.report.view が要る。

@@ -1,4 +1,8 @@
-import type { Env } from '../index.js';
+export type { CodexAutoMergeMessage } from './codex-auto-merge-types.js';
+import type { CodexAutoMergeMessage } from './codex-auto-merge-types.js';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
+import type { Env } from '../worker-env.js';
 import { decodeSlackTextEntities } from './slack-text.js';
 
 const AUDIT_MARKER = '[claude->codex]';
@@ -53,16 +57,6 @@ type GitHubCommitStatus = {
 
 type GitHubIssueComment = {
   body?: string;
-};
-
-export type CodexAutoMergeMessage = {
-  kind: 'auto_merge';
-  slackEventId: string;
-  channelId: string;
-  threadTs: string;
-  requesterUserId: string;
-  prNumber: number;
-  approvedHeadSha: string;
 };
 
 export type PullRequestBlockReason =
@@ -370,7 +364,7 @@ export async function processCodexAutoMerge(
   fetcher: typeof fetch = fetch,
 ): Promise<void> {
   if (!env.SLACK_BOT_TOKEN) {
-    console.error('Codex auto-merge stopped: SLACK_BOT_TOKEN is not configured');
+    logger.error("Codex_auto_merge_stopped_SLACK_BOT_TOKEN_is_not_configured");
     return;
   }
 
@@ -406,7 +400,7 @@ export async function processCodexAutoMerge(
   } catch (error) {
     const failure = githubFailureDetails(error);
     if (!failure) throw error;
-    console.error(JSON.stringify({"code":"codex_auto_merge_github_failed"}));
+    logger.error("codex_auto_merge_github_failed");
     const reason = failure.kind === 'ledger'
       ? `マージ済みですが台帳に記録できませんでした。二重マージ防止の記録がないため、人が確認してください (${failure.status} ${failure.path})`
       : `GitHub APIが失敗しました (${failure.status} ${failure.path})`;

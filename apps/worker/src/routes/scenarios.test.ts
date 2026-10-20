@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
@@ -26,7 +26,7 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-vi.mock('../services/scenario-stats.js', () => ({
+vi.mock('../features/scenarios/scenario-stats.js', () => ({
   computeScenarioStats: vi.fn(),
 }));
 
@@ -242,7 +242,7 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     );
     expect(res.status).toBe(200);
     const listCall = calls.find((call) => /SELECT s\.\*, COUNT\(ss\.id\)/i.test(call.sql));
-    // #625: D1 の LIKE パターン50バイト制限を避けるため instr() で部分一致する。
+    // #625: D1 の LIKE パターン50バイト制限を避けるため instr で部分一致する。
     // 束縛は `%夏%` ではなく検索語そのもの。
     expect(listCall?.sql).toMatch(/instr\(lower\(s\.name\), lower\(\?\)\) > 0/);
     expect(listCall?.sql).toMatch(/s\.is_active = 0/);

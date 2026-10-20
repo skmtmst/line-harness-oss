@@ -113,11 +113,11 @@ describe('電話予約（E-2）', () => {
     fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ lineFailed: false }))
     expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({
-      source: 'phone', customerName: '鈴木 美咲', customerPhone: '090-1234-5678', lineUid: 'U-1', guestCount: 2, tableId: 't1', notifyLine: true,
+      source: 'phone', customerName: '鈴木 美咲', customerPhone: '09012345678', lineUid: 'U-1', guestCount: 2, tableId: 't1', notifyLine: true,
     }))
   })
 
-  it('B-139：お名前も時刻も無いまま入れると、口を呼ばず2つの欄に理由が出て、お名前の欄へ移る', async () => {
+  it('お名前も時刻も無いまま入れると、口を呼ばず2つの欄に理由が出て、お名前の欄へ移る', async () => {
     render(<PhoneReservationDrawer open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
     fireEvent.click(screen.getByText(/明日/))
     await screen.findByRole('button', { name: '19:00' })

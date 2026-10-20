@@ -1,3 +1,4 @@
+import { formatYen as yen } from '@line-crm/shared';
 import type { MenuAddon, MenuItem, StaffItem } from './api.js';
 
 /*
@@ -61,7 +62,7 @@ export function sameStaffSequence(party: PartyState): boolean {
 
 export const personLabel = (index: number): string => (index === 0 ? '1 人目（あなた）' : `${index + 1} 人目（お連れさま）`);
 export const personShort = (index: number): string => `${index + 1} 人目`;
-export const yen = (n: number): string => `¥${n.toLocaleString('ja-JP')}`;
+export { yen };
 export function menuLine(menu: MenuItem, member: PartyMember): string {
   const extra = addonsOf(menu, member).map((a) => a.name);
   return extra.length ? `${menu.name}＋${extra.join('＋')}` : menu.name;

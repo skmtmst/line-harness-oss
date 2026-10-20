@@ -1,6 +1,7 @@
+import { logger } from '@line-crm/shared/server';
 import type { Context, MiddlewareHandler } from 'hono';
 import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -68,7 +69,7 @@ export const businessAuditMiddleware: MiddlewareHandler<Env> = async (c, next) =
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error(JSON.stringify({"code":"middleware_business_audit_failed"}));
+    logger.error("middleware_business_audit_failed");
   });
 
   try {

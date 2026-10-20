@@ -9,7 +9,7 @@
  *     （toggle-off トークンと同値なのでそれを借りる）
  *   角丸は共有のチェック（checkbox.tsx）と同じ radius-icon を使う
  *   オンで白いチェック（12）が左下→右上へ描かれる（120ms）
- *   V8 で新たに生えた部品のため v7 側の規定は持たない
+ *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない
  */
 
 .card {
@@ -121,7 +121,7 @@
 :root .body { align-items: flex-start; }
 :root .note { width: 100%; }
 
-/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 :root .card { -webkit-font-smoothing: auto; }
 
 /* 誤りの口を渡した選択欄だけ。フォーカスしても赤い枠を残す。 */
@@ -135,24 +135,24 @@
 :root .compact .title { font-size: 13px; font-weight: 600; line-height: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root .compact .note { font-size: 11px; line-height: 16px; white-space: nowrap; }
 
-/* 単独の確認行（Yyw6i）。既定のカード寸法は変えない。 */
+/* 単独の確認行。既定のカード寸法は変えない。 */
 :root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; border-radius: var(--radius-control); }
 :root .row .title { font-size: 13px; font-weight: 500; line-height: 20px; }
 
-/* B-152①：チェック付きカードも内側16。 */
+/* ①：チェック付きカードも内側16。 */
 :root .card { padding: var(--polish-space-card); gap: var(--polish-space-field); }
 
-/* B-152②：役割ごとの文字の段。 */
+/* ②：役割ごとの文字の段。 */
 :root .title, html:root .card:is(.compact, .row) .title { font-size: var(--text-body); font-weight: var(--polish-weight-label); line-height: 20px; }
 :root .note { font-size: var(--polish-text-note); font-weight: var(--polish-weight-body); color: var(--color-ink-faint); }
 
-/* B-152・仕上げ7：誤りのある欄もキーボードの輪は青。 */
+/* ・仕上げ7：誤りのある欄もキーボードの輪は青。 */
 :root .box:focus-visible, :root .invalid .box:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 
-/* B-152⑩：説明文は省略せず、必要な行数で読む。 */
+/* ⑩：説明文は省略せず、必要な行数で読む。 */
 :root .note, html:root .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 
-/* B-152⑦：カード全体の地と濃さをそろえ、箱を二重に薄くしない。 */
+/* ⑦：カード全体の地と濃さをそろえ、箱を二重に薄くしない。 */
 :root .card {
   --polish-overlay-strength: var(--polish-overlay-idle);
   background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
@@ -168,7 +168,7 @@ html:root .disabled .box:disabled { opacity: var(--polish-enabled-opacity); }
 
 :root .card { padding: var(--tpl-card-pad); }
 
-/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+/* ・・：10-10 に採用した共通の形。 */
 :root .card { outline: 1px solid var(--color-choice-border); outline-offset: -1px; }
 :root .checked, :root .checked:hover { outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; background: var(--color-choice-selected); }
 html:root .boxWrap, html:root .box { width: var(--choice-size); height: var(--choice-size); }
@@ -176,7 +176,7 @@ html:root .mark { inset: 0; margin: auto; }
 html:root .card:has(.box:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 html:root .invalid { outline-color: var(--color-danger); }
 
-/* 単独の確認行（Yyw6i・v5L19Z の担当の札）：上の共通の内側16（--tpl-card-pad）に負けないよう、高さ36・内側 8/10・印は真ん中。 */
+/* 単独の確認行（・ の担当の札）：上の共通の内側16（--tpl-card-pad）に負けないよう、高さ36・内側 8/10・印は真ん中。 */
 html:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; }
 /* 箱は行の高さ（24）の中で下へ落ちないよう、包みの中で塊として置く（印と箱の位置をそろえる）。 */
 html:root .box { display: block; }

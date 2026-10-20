@@ -223,9 +223,9 @@ describe('POST /api/affiliates — friend binding', () => {
 
     const res = await post('/api/affiliates', { friendId: 'friend-1' });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { success: boolean; error: string };
+    const body = (await res.json()) as { success: boolean; error: { code: string; message: string } };
     expect(body.success).toBe(false);
-    expect(body.error).toBe('この友だちは既にアフィリエイターです');
+    expect(body.error.message).toBe('この友だちは既にアフィリエイターです');
   });
 });
 
@@ -263,8 +263,8 @@ describe('POST /api/affiliates — legacy explicit code (back-compat)', () => {
     dbMocks.createAffiliate.mockRejectedValue(UNIQUE_CODE_ERR);
     const res = await post('/api/affiliates', { name: 'Dup', code: 'takenCode' });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('このコードは既に使われています');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toBe('このコードは既に使われています');
   });
 });
 
@@ -401,9 +401,9 @@ describe('紹介者の停止と履歴保持', () => {
     });
     const res = await remove('/api/affiliates/aff-1');
     expect(res.status).toBe(405);
-    const body = (await res.json()) as { code: string; error: string };
-    expect(body.code).toBe('PHYSICAL_DELETE_DISABLED');
-    expect(body.error).toContain('紹介を止める操作');
+    const body = (await res.json()) as { code: string; error: { code: string; message: string } };
+    expect(body.error.code).toBe('PHYSICAL_DELETE_DISABLED');
+    expect(body.error.message).toContain('紹介を止める操作');
     expect(dbMocks.deleteAffiliate).not.toHaveBeenCalled();
   });
 
@@ -427,8 +427,8 @@ describe('報酬率の範囲検査（#554 点検#505中2）', () => {
   it.each([101, 1000, -1, Number.NaN, 'high'])('commissionRate=%s の作成を400で弾く', async (rate) => {
     const res = await post('/api/affiliates', { name: 'Alice', commissionRate: rate });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('0から100');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toContain('0から100');
     expect(dbMocks.createAffiliateWithRandomCode).not.toHaveBeenCalled();
     expect(dbMocks.createAffiliate).not.toHaveBeenCalled();
   });

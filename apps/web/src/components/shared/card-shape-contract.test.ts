@@ -10,7 +10,7 @@ const tokens = globalTokens(read(resolve(SRC, 'app/globals.css')))
 type Candidate = { file: string; selector: string }
 const key = ({ file, selector }: Candidate) => `${file} ${selector}`
 
-// B-168: ファイル全体・名前のパターンでは免除しない。該当する規則だけ。
+// : ファイル全体・名前のパターンでは免除しない。該当する規則だけ。
 // 新しい箱はここを足さず、共通の Card / content-card の形を使う。
 const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/combobox.module.css", ".popup", "開いた入力欄の選ぶ面。浮く面の影を使い、カードの影を重ねない。"],
@@ -41,7 +41,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/tap-area-editor.module.css", ".frame", "押したら行うことの入れ子の編集欄。影を重ねない。"],
   ["components/shared/time-field-v8.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/toast.module.css", ":root .toast", "一時的な知らせ。知らせ専用の影を保つ。"],
-  ["v8/account-new/register.module.css", ".outlineCard", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["v8/analytics/analytics.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/analytics/analytics.module.css", ".reportTable", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/analytics/analytics.module.css", ".waitBox", "警告・閲覧のみ・状態・待機の帯。線で区別する。"],
@@ -60,17 +59,15 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/inbox-chat/inbox-chat.module.css", ".inputBox", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["v8/inbox-chat/inbox-chat.module.css", ".attachPop", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["v8/inflow-links/list.module.css", ".presetPanel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
-  ["v8/inflow-links/qr-dialog.module.css", ".qr", "札・印・画像・端末の見本。カードの影を付けない。"],
   ["v8/nen-posts/review.module.css", ".tableWrap", "投稿の公開記録を表示する表の枠。影を重ねない。"],
   ["v8/ops/auth.module.css", ".digit", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["v8/restaurant/closures/closures.module.css", ".grid", "表・一覧の行。外側のカードと影を重ねない。"],
-  ["v8/restaurant/delivery/delivery.module.css", ".sumCard", "数の帯のマス。B-153に従い線で区切る。"],
   ["v8/scenarios/results.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/settings/accounts/accounts.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/templates/question-new.module.css", ".choice", "入力欄・補助操作・選択肢。中身のカードではない。"],
-  ["app/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
+  ["v8/emergency/send-path-coverage-panel.tsx", "className=\"border-hairline rounded-card border bg-canvas px-4 py-3 text-xs text-ink-faint\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-approval.tsx", "className=\"bg-warning-bg rounded-card border-hairline border p-5\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
-  ["components/broadcasts/broadcast-form.tsx", "className=\"border-hairline mt-4 rounded-card border bg-canvas p-5\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
+  ["components/broadcasts/broadcast-form-model.tsx", "className=\"border-hairline mt-4 rounded-card border bg-canvas p-5\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["components/broadcasts/broadcast-form.tsx", "className=\"rounded-card border border-hairline bg-canvas p-8 text-center\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-form.tsx", "className=\"bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/broadcasts/broadcast-form.tsx", "className=\"border-hairline bg-canvas-sunken text-ink-secondary mt-3 rounded-card border px-4 py-2 text-xs\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
@@ -94,8 +91,8 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/automations/branch-editor.tsx", "className=\"border-hairline bg-canvas-sunken mt-3 rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/contents/media-detail-dialog.tsx", "className=\"bg-canvas-sunken rounded-card flex min-h-96 items-center justify-center overflow-hidden border border-hairline\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/nen-posts/detail.tsx", "className=\"mt-4 rounded-card border border-hairline bg-canvas p-4\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
-  ["v8/scenario-detail/detail.tsx", "className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
-  ["v8/scenario-detail/detail.tsx", "className=\"border-hairline rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
+  ["v8/scenario-detail/scenario-step-form.tsx", "className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
+  ["v8/scenario-detail/scenario-step-form.tsx", "className=\"border-hairline rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/settings/staff/staff.tsx", "className=\"rounded-card border border-hairline bg-canvas p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/settings/staff/staff.tsx", "className=\"mt-2 divide-y divide-hairline overflow-hidden rounded-card border border-hairline\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["v8/templates/staff-asset-list.tsx", "className=\"bg-canvas border-hairline text-ink-faint col-span-full rounded-card border border-dashed p-12 text-center text-sm\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
@@ -113,7 +110,7 @@ function candidates(): Candidate[] {
 
 const all = candidates()
 
-describe('B-168 カードの角丸・枠・影', () => {
+describe("カードの角丸・枠・影", () => {
   it('カードの角丸と枠を持つ規則には共通の影がある（理由つきの非カードだけ除外）', () => {
     const permitted = new Set(EXCEPTIONS.map(([file, selector]) => key({ file, selector })))
     const missing = all.filter(candidate => !permitted.has(key(candidate)))

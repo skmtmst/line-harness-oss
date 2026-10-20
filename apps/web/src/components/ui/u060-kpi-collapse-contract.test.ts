@@ -63,7 +63,7 @@ describe('V8の数の帯とメンバー一覧', () => {
   })
 
   it('メンバー管理は共通の数の帯と一覧と設定の案内を出す', () => {
-    // 入口（app/hq/members/page.tsx）は V8 の画面を出すだけになった（2026-10-09 V7 削除）。V8 の本体を見る。
+    // 入口（app/hq/members/page.tsx）は V8 の画面を出すだけになった（2026-10-09 管理画面 削除）。V8 の本体を見る。
     const page = read('v8/hq/members.tsx')
     expect(page).toContain('<HqSettingsNavV8 active="members"')
     expect(page).toContain('<GridTable label="権限者の一覧"')
@@ -78,7 +78,7 @@ describe('KPI折りたたみの適用（#975 U060）', () => {
     ['v8/conversions/list.tsx', 'KpiBand'],
     ['v8/automations/shell.tsx', 'KpiBand'],
     ['app/automations/runs/page.tsx', 'KpiBand'],
-    // app/hq/page.tsx は V8 のホーム（v8/hq/home.tsx・絵どおりの数の帯）を出すだけになったので外した（2026-10-09 V7 削除）。
+    // app/hq/page.tsx は V8 のホーム（v8/hq/home.tsx・絵どおりの数の帯）を出すだけになったので外した（2026-10-09 管理画面 削除）。
     ['v8/nen-campaigns/list.tsx', 'KpiBand'],
     ['v8/settings/ec-commerce/screen.tsx', 'KpiBand'],
     ['v8/settings/emergency/history-details.tsx', 'KpiBand'],

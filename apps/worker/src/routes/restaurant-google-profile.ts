@@ -1,3 +1,5 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第2段：プロフィール・営業時間・変更履歴。
@@ -16,7 +18,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getMediaById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
@@ -653,7 +655,7 @@ restaurantGoogleProfile.post('/api/restaurant-test/google/hours/propose', inputJ
     try {
       raw = await runGoogleAi(c, prompt, { temperature: 0.1, maxTokens: 400 });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_restaurant_google_profile_failed","route":"POST /api/restaurant-test/google/hours/propose"}));
+      logger.error("routes_restaurant_google_profile_failed");
       return fail(c, error instanceof GoogleAiTimeout ? 504 : 502, '読み取りに失敗しました。もう一度お試しください', { code: error instanceof GoogleAiTimeout ? 'ai_timeout' : 'ai_failed' });
     }
     const parsed = parseHoursResponse(raw);

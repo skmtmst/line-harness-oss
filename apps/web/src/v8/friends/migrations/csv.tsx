@@ -29,7 +29,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 CSVで書き出す・取り込む（Pencil `T9gblG`）。/friends/migrations。
+ * ★V8 CSVで書き出す・取り込む（Pencil ）。/friends/migrations。
  *
  * 手順・API は今と同じ（書き出しを作る → 取り込みは「まず確認だけ」→ 内訳を見て反映）。
  * 見せ方：頭（← 友だちへ・タブ）→ 案内 → 書き出す／取り込むの2枚 → 確認の結果 → 履歴。

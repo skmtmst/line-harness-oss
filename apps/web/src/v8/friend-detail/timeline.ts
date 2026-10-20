@@ -80,7 +80,7 @@ export function timelineStatusLabel(type: string, status: string | null) {
 
 /**
  * 元情報へのリンク。実在する画面・URLだけを出す（IDEA-03「無いデータをあるように出さない」）。
- * label は履歴タブの「元」の列の言葉（絵 Q5F2QE の 3. 履歴）。
+ * label は履歴タブの「元」の列の言葉（ 3. 履歴）。
  */
 export function timelineSourceHref(item: FriendTimelineItem, friendId: string): { href: string; external: boolean; label: string } | null {
   const source = item.source

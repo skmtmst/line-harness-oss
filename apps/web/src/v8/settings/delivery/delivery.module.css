@@ -4,7 +4,7 @@
 
 /* カードは1列で横幅いっぱい（上下左右20・行の間12）。
    角丸・線・影は共通の Card（appearance="outlined"）に任せる。
-   承認案 v03 の絵には影が無いが、B-168「カードの角丸と枠を持つ規則には共通の影がある」が正本なので共通の形に合わせる。 */
+   承認案 v03 の絵には影が無いが、「カードの角丸と枠を持つ規則には共通の影がある」が正本なので共通の形に合わせる。 */
 .card {
   gap: var(--tpl-e1-dl-card-gap); padding: var(--tpl-e1-dl-card-pad);
 }
@@ -14,17 +14,12 @@
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-e1-dl-title-size); font-weight: 700; line-height: var(--tpl-e1-dl-title-lh); }
 .cardSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-e1-dl-sub-lh); }
 
-/* 行：ことば＋余白＋こたえ（12/700） */
-.row { display: flex; align-items: baseline; gap: var(--tpl-e1-dl-row-gap); min-width: 0; font-size: var(--text-caption); line-height: var(--tpl-e1-dl-row-lh); }
-/* 状態の行は札（StatusBadge）を並べるので中央で揃える */
-.rowCenter { align-items: center; }
-.rowLabel { flex: 0 0 auto; color: var(--color-ink-secondary); }
+/* 行（ことば＋こたえ）は共通の CustomerInfoRows が持つ。ここには置かない。 */
 .rowSpacer { flex: 1 1 0; min-width: 0; }
-.rowValue { overflow: hidden; color: var(--color-ink); font-weight: 700; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 
 /* サービスごとの手順の注記：地は真珠色（承認案の $surface-pearl）。図柄は描かない。
    状態の色（接続エラー・申し込み受付中）はここで塗らず、共通の帯（Notice）に任せる
-   （B-172 status-badge）。この囲みは色の意味を持たない案内だけに使う。 */
+   （ status-badge）。この囲みは色の意味を持たない案内だけに使う。 */
 .note {
   margin: 0; padding: var(--tpl-e1-dl-note-pad);
   border-radius: var(--tpl-e1-dl-note-radius);

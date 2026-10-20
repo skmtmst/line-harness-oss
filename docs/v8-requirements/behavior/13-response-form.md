@@ -1,9 +1,11 @@
+> 文書：13 回答フォーム 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 13 回答フォーム 操作と挙動（受け入れ）
 
 要件の正本：[13 回答フォーム](../../v6-requirements/v6-13-response-form-requirements-draft.md)（§14 の確定条件を含む）・[回答フォームの書類の添付](../form-file-attachments.md)（B-176・B-213・B-215）・[お客さまの画面のデザイン](../customer-look.md)・[決まった欄](../friend-fixed-fields.md)・[V8 の LIFF](../v8-liff.md)・[共通基盤 §3・§6-2・§9・§11・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[30 ログインユーザー §7〜§8](../../v6-requirements/v6-30-login-users-requirements-draft.md)。オーナーの決定は B-36・B-101・B-109・B-131・B-154・B-155・B-166・B-169・B-170・B-176・B-203・B-213・B-215・B-225・B-235・B-236（`~/lh-work/design/v8/V8-INTRO-CHECKLIST.md`）。見た目は ★V8 と [docs/v8-design-rules.md](../../v8-design-rules.md)。
 この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
 
-読んだコード：`apps/web/src/v8/forms/`・`apps/web/src/v8/form-edit/`・`apps/web/src/v8/form-responses/`・`apps/web/src/app/form-submissions/`・`apps/worker/src/routes/forms.ts`・`apps/worker/src/routes/form-documents.ts`・`apps/worker/src/middleware/impersonation.ts`・`apps/liff/src/pages/Form.tsx`・`apps/liff/src/components/forms/`・`packages/shared/src/staff-permissions.ts`・`packages/db/migrations/`（348・383・390・482・621）。
+読んだコード：`apps/web/src/v8/forms/`・`apps/web/src/v8/form-edit/`・`apps/web/src/v8/form-responses/`・`apps/web/src/app/form-submissions/`・`apps/worker/src/routes/forms.ts`・`apps/worker/src/routes/form-documents.ts`・`apps/worker/src/middleware/impersonation.ts`・`apps/liff/src/pages/form.tsx`・`apps/liff/src/components/forms/`・`packages/shared/src/staff-permissions.ts`・`packages/db/migrations/`（348・383・390・482・621）。
 
 ## 操作と挙動
 

@@ -1,4 +1,6 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
+import { readFileSync as readImplementation } from 'node:fs'
+import ts from 'typescript'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -88,10 +90,11 @@ describe('メディアの削除確認', () => {
 
 /** まとめて削除（点検 #498 の M2・M3／票 #550）。 */
 describe('まとめて削除の途中交代と結果', () => {
-  const bulkDelete = PAGE.slice(
-    PAGE.indexOf('async function runBulkDelete'),
-    PAGE.indexOf('async function openDelete'),
-  )
+  const source = readImplementation(join(dirname(fileURLToPath(import.meta.url)), '../../v8/contents/list-bulk-delete.tsx'), 'utf8')
+  const tree = ts.createSourceFile('list-bulk-delete.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const declaration = tree.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'deleteMediaSelection')
+  if (!declaration || !ts.isFunctionDeclaration(declaration) || !declaration.body) throw new Error('deleteMediaSelection が見つかりません')
+  const bulkDelete = declaration.body.getText(tree)
 
   it('#550 M2 アカウントが変わったら処理中の窓を閉じて抜ける', () => {
     // 戻さずに抜けると「処理中…」のまま窓が閉じなくなる。

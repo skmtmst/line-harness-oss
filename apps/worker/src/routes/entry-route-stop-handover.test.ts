@@ -1,3 +1,4 @@
+import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import Database from 'better-sqlite3';
@@ -7,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // N-244差戻(台帳): 実DB結合テスト。停止由来の引き継ぎを次の順序で固定する。
 // T0 対照: active経路は通常どおり帰属・シナリオが動く (0件主張の空振り防止)。
@@ -140,11 +141,12 @@ async function seedDb(dbs: SqliteD1) {
   });
 }
 
-function postCallback(app: Hono<Env>, env: Env['Bindings'], ref: string, extra: Record<string, string> = {}) {
-  const state = btoa(JSON.stringify({ ref, ...extra }));
+async function postCallback(app: Hono<Env>, env: Env['Bindings'], ref: string, extra: Record<string, string> = {}) {
+  const signed = await signedLiffState(env.LINE_CHANNEL_SECRET, { ref, ...extra });
+  const state = signed.state;
   return app.request(
     `/auth/callback?code=x&state=${encodeURIComponent(state)}`,
-    {},
+    { headers: { Cookie: signed.cookie } },
     env,
   );
 }

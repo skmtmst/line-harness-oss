@@ -1,7 +1,8 @@
 'use client'
+import { loadStaffIdentity, canManageRole, useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import SelfMfa from './self-mfa'
 import MfaPolicy from './mfa-policy'
-import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
+import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
 import TotpQr from '@/components/shared/totp-qr'
 
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
@@ -11,7 +12,7 @@ import { avatarInitials } from '@/components/shared/avatar';
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { UserPlus } from 'lucide-react';
-import { Eye, X } from 'lucide-react';
+
 import Link from '@/components/shared/list-navigation'
 import { useMergedTab } from '@/components/layout/merged-tabs';
 import LoginAudit from '@/components/staff/login-audit'
@@ -20,7 +21,7 @@ import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/compo
 import Checkbox from '@/components/shared/checkbox'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
+
 import SearchField from '@/components/shared/search-field'
 import FilterChip from '@/components/shared/filter-chip'
 import { Tabs } from '@/components/shared/tabs';
@@ -48,7 +49,7 @@ import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePii
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels';
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input';
 import TruncatedText from '@/components/shared/truncated-text'
-import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { describeApiFailure, withPermissionFailure } from '@/components/shared/api-error-message';
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -93,7 +94,7 @@ const EDIT_PERMISSION_PATHS = ['/', '/chats', '/friends', '/tags', '/scenarios',
 const PERMISSIONS: Array<readonly [string, string]> = EDIT_PERMISSION_PATHS.map((path) => [path, PERMISSION_LABELS[path]] as const)
 
 
-function messageOf(error: unknown): string { return error instanceof ApiError || error instanceof Error ? error.message : '通信に失敗しました。通信を確かめて、もう一度お試しください。' }
+function messageOf(error: unknown): string { return describeApiFailure(error, '保存') }
 
 function auditActionLabel(action: string): string {
   const normalized = action.toLowerCase()
@@ -609,7 +610,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
   const [saving, setSaving] = useState(false), [statusSaving, setStatusSaving] = useState(false), [error, setError] = useState('')
   const [loginCount, setLoginCount] = useState<number | null>(null), [loginHistoryLoading, setLoginHistoryLoading] = useState(administrator), [loginHistoryFailed, setLoginHistoryFailed] = useState(false)
   /*
-   * **ブラウザの `confirm()` を使わない。**
+   * **ブラウザの `confirm` を使わない。**
    *
    * 見た目がブラウザ任せで設計の確認窓（`J6x4Q` / `H2S1T4`）と違ううえ、
    * 画像比較にも写らない。連携を外すと何が届かなくなるのかを本文で読ませたい
@@ -656,9 +657,9 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
 
 
  setError(messageOf(caught)) } } finally { setStatusSaving(false) } }
-  return <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface} open title="ログインユーザーを編集する" onCancel={onClose} footer={<div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => void save()} busyLabel="確認中…" disabled={saving}>✓ 保存する</Button></div>}><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
+  return <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface} open title="ログインユーザーを編集する" onCancel={onClose} footer={<div className="mt-6 flex justify-end gap-2"><Button variant="secondary" className="px-4 py-2 h-auto whitespace-normal" onClick={onClose}>キャンセル</Button><Button variant="primary" className="px-4 py-2 font-medium disabled:opacity-50 border-0 h-auto whitespace-normal" onClick={() => save()} busyLabel="確認中…" disabled={saving}>✓ 保存する</Button></div>}><div data-design-node="EOTS4"><div className="flex items-start justify-between"><div><p className="mt-1 text-xs text-ink-secondary">役割・表示機能・担当範囲を確認し、このユーザーに必要な範囲だけを設定します。</p></div></div>
     <div className="mt-5 rounded-control bg-canvas-sunken p-3"><p className="font-semibold text-ink">{member.name}</p><p className="text-xs text-ink-secondary">{ROLE_LABEL[member.role]}</p></div>{error && <p className="mt-4 rounded-control bg-danger-bg p-3 text-sm text-danger">{error}</p>}{emailNotice && <p role="status" className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent-deep">{emailNotice}</p>}
-    {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => void toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)} busy={Boolean(statusSaving)} busyLabel="変更中…">{member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
+    {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)} busy={Boolean(statusSaving)} busyLabel="変更中…">{member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <Field label="名前" required htmlFor="staff-edit-name" error={fieldErrors.name}><SaveErrorField names={["name"]}><TextField ref={nameRef} id="staff-edit-name" value={name} onChange={(e) => { setName(e.target.value); setFieldErrors((current) => ({ ...current, name: undefined })) }} /></SaveErrorField></Field>}<Field label="メールアドレス" required htmlFor="staff-edit-email" error={fieldErrors.email}><SaveErrorField names={["email"]}><TextField ref={emailRef} id="staff-edit-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })) }} /></SaveErrorField></Field></div>
     {administrator && <div className="mt-5"><p className="text-sm font-semibold text-ink">役割</p><div className="mt-2 grid grid-cols-3 gap-2">{(['admin', 'staff', 'viewer'] as const).map((value) => <Button variant="secondary" className={(`cursor-pointer rounded-control border px-3 py-3 text-sm ${role === value ? 'border-accent bg-accent-soft font-medium text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={value} onClick={() => setRole(value)}>{ROLE_LABEL[value]}</Button>)}</div></div>}
     {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-semibold text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <SaveErrorField names={["key","permissions"]} key={key}><Checkbox key={key} checked={permissions.includes(key)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, key))}>{label}</Checkbox></SaveErrorField>)}</div><p className="mt-3 text-sm font-medium text-ink">成果の操作権限</p><p className="mt-1 text-xs text-ink-faint">選ぶと「成果とアフィリエイト」の表示も組で付きます。表示を外すと操作権限も外れます。</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><SaveErrorField names={["CONVERSION_APPROVAL_EDIT_KEY","permissions","_c_o_n_v_e_r_s_i_o_n__a_p_p_r_o_v_a_l__e_d_i_t__k_e_y"]}><Checkbox checked={permissions.includes(CONVERSION_APPROVAL_EDIT_KEY)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, CONVERSION_APPROVAL_EDIT_KEY))} aria-label="成果を承認・却下する">{PERMISSION_LABELS[CONVERSION_APPROVAL_EDIT_KEY]}</Checkbox></SaveErrorField></div></div>}
@@ -699,7 +700,7 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
 
 
  setError(otpFailureMessage(messageOf(caught))) } } finally { setSaving(false) } }
-  return <SaveErrorScope errors={saveErrors}><Dialog open title={recoveryCodes.length ? '回復コードを保存' : '二段階認証を設定'} onCancel={onClose} footer={recoveryCodes.length ? undefined : <Button variant="primary" onClick={() => void save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button>}>
+  return <SaveErrorScope errors={saveErrors}><Dialog open title={recoveryCodes.length ? '回復コードを保存' : '二段階認証を設定'} onCancel={onClose} footer={recoveryCodes.length ? undefined : <Button variant="primary" onClick={() => save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button>}>
     {recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => window.location.assign('/login')} /> : <>
       {error ? <Notice tone="danger" message={error} /> : null}
       <TotpQr qr={qr} manualKey={manualKey} />
@@ -709,9 +710,9 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
 }
 
 /*
- * 板 `nku0f` 右の欄「役割でできること」。運用の目安の書き付け。
+ * 板  右の欄「役割でできること」。運用の目安の書き付け。
  */
-/** 役割の札（絵 nku0f の色：オーナー墨・管理者緑・運用青・受付琥珀・見るだけ灰）。 */
+/** 役割の札（色：オーナー墨・管理者緑・運用青・受付琥珀・見るだけ灰）。 */
 type RoleKey = 'owner' | AccessRoleBundle
 const V8_ROLE_LABEL: Record<RoleKey, string> = {
   owner: 'オーナー', administrator: '管理者', operations: '運用', reception: '受付', view_only: '見るだけ', custom: '個別設定',
@@ -748,7 +749,7 @@ function twoFactorState(user: AccessUserItem): { label: string; tone: 'success' 
   return { label: '確認が必要', tone: 'warning' }
 }
 
-/** 右の「役割でできること」（絵 nku0f）。 */
+/** 右の「役割でできること」。 */
 function StaffRoleGuide() {
   const rows: Array<{ role: RoleKey; body: string }> = [
     { role: 'owner', body: 'すべて。お金・会社とロゴ・ほかの人の役割も変えられる' },
@@ -787,18 +788,18 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const [accessSummary, setAccessSummary] = useState<AccessUserSummary>(EMPTY_ACCESS_SUMMARY)
   const [accessRoles, setAccessRoles] = useState<AccessRoleItem[]>([])
   const [accountNames, setAccountNames] = useState<Record<string, string>>({})
-  const [me, setMe] = useState<StaffMember | null>(null)
+  const me = useStaffIdentity()
   const [audits, setAudits] = useState<AuditEventItem[]>([])
   const [query, setQuery] = useListUrlValue('q', '')
   const [statusFilter, setStatusFilter] = useListUrlValue<'active' | 'suspended' | 'all'>('statusFilter', 'active')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // ★V7 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
+  // ★管理画面 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
   const [summaryReady, setSummaryReady] = useState(false)
   const [editing, setEditing] = useState<StaffMember | null>(null), [settingTwoFactor, setSettingTwoFactor] = useState<StaffMember | null>(null), [permissionTarget, setPermissionTarget] = useState<AccessUserItem | null>(null)
   const [userPage, setUserPage] = useListUrlValue('userPage', 1)
   const USER_PAGE_SIZE = 6
-  /* ブラウザの `confirm()` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
+  /* ブラウザの `confirm` をやめて、共通の確認窓へ移した（理由は EditModal と同じ）。 */
   const [disablingTarget, setDisablingTarget] = useState<StaffMember | null>(null), [disablingTwoFactor, setDisablingTwoFactor] = useState(false), [disableError, setDisableError] = useState('')
   const [removingTarget, setRemovingTarget] = useState<StaffMember | null>(null), [removing, setRemoving] = useState(false), [removeError, setRemoveError] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null), [resendError, setResendError] = useState('')
@@ -809,7 +810,8 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const resendingRef = useRef(false)
   const removingRef = useRef(false)
   // 閲覧専用（代理ログインの見るだけ等）のオーナー・管理者は、変える操作を出さず閲覧のみの形にする。
-  const administrator = (me?.role === 'admin' || me?.role === 'owner') && !me?.readOnly
+  const staffRole = useStaffRole()
+  const administrator = canManageRole(staffRole)
   usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
   const load = useCallback(async () => {
     setLoading(true)
@@ -819,7 +821,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       const scope = selectedAccountId ?? undefined
       const [staffResult, meResult, accountsResult, usersResult, rolesResult] = await Promise.all([
         api.staff.list(),
-        api.staff.me(),
+        loadStaffIdentity(),
         api.lineAccounts.list(),
         api.access.users({ lineAccountId: scope, limit: 200 }),
         api.access.roles(scope),
@@ -828,7 +830,6 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
         throw new Error('必要な情報を読み込めませんでした')
       }
       setMembers(staffResult.data)
-      setMe(meResult.data)
       setAccountNames(Object.fromEntries(accountsResult.data.map((account) => [account.id, account.name])))
       setAccessUsers(usersResult.data.items)
       setUsersTotal(usersResult.data.pagination?.total ?? usersResult.data.items.length)
@@ -930,7 +931,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   useEffect(() => { setUserPage(1) }, [query, statusFilter, tab])
   const activeAdministratorCount = members.filter(isActiveAdministrator).length
   const missing = Math.max(accessSummary.active - accessSummary.mfaEnabled, 0)
-  const canEdit = (member: StaffMember) => Boolean(administrator || (me?.role === 'staff' && me.id === member.id))
+  const canEdit = (member: StaffMember) => Boolean(administrator || (staffRole === 'staff' && me?.id === member.id))
   const openTwoFactor = (member: StaffMember) => { if (member.twoFactorEnabled) { setDisableError(''); setDisablingTarget(member) } else setSettingTwoFactor(member) }
   /**
    * 二段階認証を外す。
@@ -996,7 +997,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     }
   }
   /*
-   * ★V8：行の「…」から止める（絵 bMpC5「この所属ユーザーを停止しますか？」）・再開する。
+   * ★V8：行の「…」から止める（絵 「この所属ユーザーを停止しますか？」）・再開する。
    * 今までは「変更する」の窓の中の利用状態の切り替えだけだった。口は同じ（isActive の更新）。
    * 権限・利用状態の変更は 428 で止まるので、本人確認の窓を立てて同じ操作をやり直す。
    */
@@ -1057,7 +1058,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     const items: ActionMenuItem[] = []
     if (editable && member) items.push({ id: 'edit', label: '役割を変える', qaOpen: 'EOTS4-edit', onSelect: () => { close(); router.push(`/staff/edit?id=${encodeURIComponent(member.id)}`) } })
     items.push({ id: 'scope', label: administrator ? '見える画面' : '見える画面を見る', onSelect: () => { close(); openPermissions(user) } })
-    if (isSelf && member) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '2段階の確認を解除する' : '2段階の確認を設定する', onSelect: () => { close(); openTwoFactor(member) } })
+    if (isSelf && member && editable) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '2段階の確認を解除する' : '2段階の確認を設定する', onSelect: () => { close(); openTwoFactor(member) } })
     if (resendable && member) items.push({ id: 'resend', label: 'もう一度送る', disabled: resendingId !== null, disabledReason: resendingId === member.id ? '送信中…' : undefined, onSelect: () => { close(); void runResend(member) } })
     if (administrator && member && !isSelf) {
       const policy = staffActionPolicy({ member, currentUserId: me?.id ?? null, administrator: true, activeAdministratorCount })

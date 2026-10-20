@@ -41,7 +41,7 @@ vi.mock('@/components/shared/select', () => ({
   ),
 }))
 
-/** ★V6 37-7 お知らせ配信。作成欄・送り方・宛先の見込み・一覧（LINE送達／画面で既読）が API の形どおりに出ること。 */
+/** ★管理画面 37-7 お知らせ配信。作成欄・送り方・宛先の見込み・一覧（LINE送達／画面で既読）が API の形どおりに出ること。 */
 
 const sent = {
   id: 'a1', subject: '9月20日 深夜のメンテナンスのお知らせ', body: '本文', audienceKind: 'all', audiencePlans: [], audienceTenantIds: [],
@@ -103,7 +103,7 @@ afterEach(() => {
   delete document.documentElement.dataset.theme
 })
 
-/** 行の右端の「…」を開き、中の「編集する」を返す（B-253：行の右端は「…」1つ）。 */
+/** 行の右端の「…」を開き、中の「編集する」を返す（：行の右端は「…」1つ）。 */
 async function openRowEdit(subject: string): Promise<HTMLElement> {
   const more = host.querySelector<HTMLButtonElement>(`button[aria-label="「${subject}」の操作"]`)
   expect(more).not.toBeNull()
@@ -168,7 +168,7 @@ describe('画面', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: '契約者専用LINE', exact: true }))
     await act(async () => { button('今すぐ送る')!.click() })
     await flush()
-    // 板 `TJUUl`「送る前の確認」：宛先・届く方法・日時と件名・本文を見てから送る。
+    // 板 「送る前の確認」：宛先・届く方法・日時と件名・本文を見てから送る。
     const confirm = document.body.querySelector('[data-design-node="TJUUl"]')
     expect(confirm, '送る前の確認の窓が出ない').not.toBeNull()
     for (const row of ['このお知らせを送りますか？', '宛先', '届く方法', '送る日時', '件名：メンテナンスのお知らせ', '取り下げられます', '戻って直す', '今すぐ送る']) {

@@ -6,7 +6,7 @@
  *     探す欄は帯から外した（オーナー決定 2026-10-01）。
  *     左メニューは畳める（64px・⌘\・localStorage）
  *   - 黄色の版の帯は v8 では出さない
- *   - 全部 v8 だけに効く（v7 の見た目を動かさない）
+ *   - 全部 v8 だけに効く（管理画面 の見た目を動かさない）
  */
 import { readUiSource as readFileSync } from '../../scripts/test-ui-source.mjs'
 import { join } from 'node:path'
@@ -16,7 +16,6 @@ const WEB = join(__dirname, '..', '..')
 const globals = readFileSync(join(WEB, 'src/app/globals.css'), 'utf8')
 const appShell = readFileSync(join(WEB, 'src/components/app-shell.tsx'), 'utf8')
 const appShellCss = readFileSync(join(WEB, 'src/components/app-shell.module.css'), 'utf8')
-const sidebar = readFileSync(join(WEB, 'src/components/layout/sidebar.tsx'), 'utf8')
 const sidebarCss = readFileSync(join(WEB, 'src/components/layout/sidebar.module.css'), 'utf8')
 const topBar = readFileSync(join(WEB, 'src/components/shared/top-bar.tsx'), 'utf8')
 const topBarCss = readFileSync(join(WEB, 'src/components/shared/top-bar.module.css'), 'utf8')
@@ -65,11 +64,7 @@ describe('外側の殻（V8 移行③）', () => {
 
   it('左メニューは畳める（幅 64・状態をブラウザに覚える・⌘\\ とボタンで切替）', () => {
     expect(sidebarCss).toMatch(/\.desktop\[data-collapsed\][\s\S]*?width: 64px/)
-    expect(sidebar).toContain('lh-sidebar-collapsed')
-    expect(sidebar).toContain('data-collapsed')
-    expect(sidebar).toContain('SIDEBAR_TOGGLE_EVENT')
     expect(events).toContain("SIDEBAR_TOGGLE_EVENT = 'lh:sidebar-toggle'")
-    expect(topBar).toContain('SIDEBAR_TOGGLE_EVENT')
   })
 
   it('帯は高さ 60・地の上・下線なし。左にパンくず（アカウント › 画面名）', () => {
@@ -106,7 +101,7 @@ describe('外側の殻（V8 移行③）', () => {
     expect(topBar).toContain('aria-label="ログアウト"')
   })
 
-  it('v8 の帯は 1024px から出す（v7 は 1280px のまま）', () => {
+  it("v8 の帯は 1024px から出す（既存の見た目は 1280px のまま）", () => {
     expect(globals).toContain('.v8-topbar-wrap')
     expect(appTopBar).toContain('hidden xl:block v8-topbar-wrap')
   })

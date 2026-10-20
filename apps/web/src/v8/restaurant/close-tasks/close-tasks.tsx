@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useUrlTab } from '@/lib/use-url-tab'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -23,14 +24,14 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
-import { type CloseGroup, canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle } from '../dashboard/summarize'
-import { type StoreMedium, loadStoreMedia } from '../dashboard/use-store-today'
+import { type CloseGroup, canWriteRole, groupCloseTasks, openItems, reasonText, slotTitle } from '@/v8/restaurant/dashboard/public/summarize/index'
+import { type StoreMedium, loadStoreMedia } from '@/v8/restaurant/dashboard/public/use-store-today/index'
 import styles from './close-tasks.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 `YMVFD`。ダッシュボードの「すべて見る」から）。
+ * ★V8 他のサイトの枠を閉じる知らせ（提案 E-5 。ダッシュボードの「すべて見る」から）。
  *
  * 未対応／閉じた で切り替え。1行＝1つの枠（時刻）。閉じる媒体は札で並べ、閉じた媒体には ✓。
  * ［閉じた］は媒体ごと（まだ閉じていない先頭の媒体。ほかの媒体は「…」から）。
@@ -39,7 +40,7 @@ import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/
 
 type Tab = 'open' | 'done'
 
-/* 絵 YMVFD：表の下に件数とページ送り。1ページの行数。 */
+/* 絵 ：表の下に件数とページ送り。1ページの行数。 */
 
 
 /* 手を動かす順：未対応 → 残りあり → もう開けてよい → 閉じた（同じ状態の中は時刻順）。 */
@@ -122,7 +123,7 @@ export default function CloseTasksPage() {
 
 
       if (!fieldFailure) {
-      notifyToast(caught instanceof Error && caught.message ? caught.message : '印を付けられませんでした。', { tone: 'error' }) }
+      notifyToast(describeApiFailure(caught, '保存'), { tone: 'error' }) }
     } finally {
       await load()
       setBusyId('')
@@ -151,7 +152,7 @@ export default function CloseTasksPage() {
             const remaining = openItems(group)
             const target = remaining[0] ?? null
             /*
-             * 「もう開けてよい」の行は、閉じた媒体の管理画面で枠を開け直す（絵 YMVFD）。
+             * 「もう開けてよい」の行は、閉じた媒体の管理画面で枠を開け直す。
              * 開け直した印を付ける口（［開けた］）はまだ無い（BEHAVIOR.md の「今の口で出せないもの」）。
              */
             const linkItem = target ?? (group.state === 'reopen' ? group.items[0] ?? null : null)

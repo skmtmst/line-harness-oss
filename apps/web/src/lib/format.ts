@@ -1,5 +1,6 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
- * B-152（2026-10-09）：管理画面の日付と数は、この共通書式を使う。
+ * （2026-10-09）：管理画面の日付と数は、この共通書式を使う。
  * 一覧は MM/DD HH:mm、過去の別年は YYYY/MM/DD。
  * 詳細は M月D日（曜）HH:mm。店舗の時間帯は指定して保つ。
  * 件数は3桁区切りと単位の前の半角空き、金額は ¥29,800、割合は12.4%。
@@ -22,7 +23,7 @@ interface JstParts {
 }
 
 function jstParts(epoch: number): JstParts {
-  const j = new Date(epoch + JST_OFFSET_MS)
+  const j = japanCalendar(new Date(epoch))
   return {
     y: j.getUTCFullYear(),
     m: j.getUTCMonth() + 1,
@@ -88,7 +89,7 @@ function nowJst(now?: DateInput): JstParts {
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const weekday = (w: number) => `（${WEEKDAYS[w]}）`
 
-/** B-152：日付の表示はこの1つの関数で作る。保存値・CSVには使わない。 */
+/** ：日付の表示はこの1つの関数で作る。保存値・CSVには使わない。 */
 export function formatDate(
   value: DateInput,
   options: { style?: 'detail' | 'list' | 'list-time' | 'list-day' | 'list-day-weekday' | 'day' | 'time'; fallback?: string; now?: DateInput; timeZone?: string } = {},
@@ -225,8 +226,4 @@ export function formatPointDiff(value: number | null | undefined, fallback = '�
   return `${value > 0 ? '+' : ''}${value.toFixed(1)}pt`
 }
 
-/** ¥12,400（半角の¥。Intl の￥は全角なので直結合）。税込みか税抜きかは見出しに書く。 */
-export function formatYen(value: number | null | undefined, fallback = '—'): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return fallback
-  return `¥${commaFmt.format(Math.round(value))}`
-}
+export { formatYen } from '@line-crm/shared'

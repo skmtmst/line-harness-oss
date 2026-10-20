@@ -1,5 +1,8 @@
 'use client'
+import { yenPercent } from '@line-crm/shared';
+import { formatYen as yen } from '@line-crm/shared';
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
 
 import { SettingCheckbox } from '@/components/shared/checkbox'
@@ -25,16 +28,17 @@ import TextLink from '@/components/shared/text-link'
 import { RowMenu } from '@/components/shared/row-actions'
 import { Field } from '@/components/shared/form-controls'
 import { ApiError } from '@/lib/api'
-import { bookingCancellationApi } from '@/lib/api-gap1'
-import { gapDraftApi, type CancellationOptions, type DepositRule } from '@/lib/api-gap-draft'
-import { isNotReadyError } from '@/lib/api-booking-payment-admin'
+import { bookingCancellationApi } from '@/lib/api/helpers/gap1'
+import { bookingAdvancedApi } from '@/lib/api/helpers/booking-advanced'
+import type { CancellationOptions, DepositRule } from '@line-crm/shared'
+import { isNotReadyError } from '@/lib/api/helpers/booking-payment-admin'
 import settings from '../booking-menus/settings.module.css'
 import styles from './cancellation.module.css'
 
 /*
  * 予約設定 › お支払いの「キャンセル料」と「デポジット（一部前払い）」（B1・絵 FcGmv／つなぐ前は i2iv4g）。
  * キャンセル料の段・無断の率は gap1 の口（bookingCancellationApi・版つき）。
- * カードを登録してもらう条件・請求の仕方・デポジットは口の案（api-gap-draft：口が要る）。無い間は共通の案内の窓で出す。
+ * カード条件・請求方法・デポジットは版付きの実APIで読み書きする。
  * 物差しは「予約の開始の何時間前か」1 つだけ（時刻の物差しは使わない）。段の穴・重なり・100% 超は Worker が断る。
  */
 
@@ -42,17 +46,16 @@ type Load<T> = { state: 'loading' } | { state: 'ready'; value: T } | { state: 'n
 const SAMPLE_PRICE = 8400
 const CARD_LABEL: Record<CancellationOptions['cardRequiredFor'], string> = { all: 'カードの登録：全員', no_show_flagged: 'カードの登録：無断の印がある人だけ', conditions: 'カードの登録：条件で決める' }
 
-const yen = (value: number) => `¥${Math.floor(value).toLocaleString('ja-JP')}`
 
 /** 見本の予約（来週の金曜 14:00・料金 ¥8,400）。お客さまへの文の見本に使う。 */
 function sampleStart(): Date {
-  const now = new Date(Date.now() + 9 * 3600_000)
+  const now = japanCalendar()
   const day = now.getUTCDay()
   const add = ((5 - day + 7) % 7) || 7
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + add, 14 - 9, 0))
 }
 function jstLabel(date: Date): string {
-  const j = new Date(date.getTime() + 9 * 3600_000)
+  const j = japanCalendar(date)
   return `${j.getUTCMonth() + 1}/${j.getUTCDate()}（${'日月火水木金土'[j.getUTCDay()]}）${String(j.getUTCHours()).padStart(2, '0')}:${String(j.getUTCMinutes()).padStart(2, '0')}`
 }
 
@@ -85,8 +88,8 @@ export function useCancellationSettings(accountId: string) {
         .catch((cause) => { if (alive) { set({ state: isNotReadyError(cause) ? 'not-ready' : 'error' }); setDraftValue(null) } })
     setPolicy({ state: 'loading' }); setOptions({ state: 'loading' }); setDeposit({ state: 'loading' })
     void read(() => bookingCancellationApi.getPolicy(accountId), setPolicy, setDraft)
-    void read(() => gapDraftApi.cancellationOptions(accountId), setOptions, setOptionsDraft)
-    void read(() => gapDraftApi.depositRule(accountId), setDeposit, setDepositDraft)
+    void read(() => bookingAdvancedApi.cancellationOptions(accountId), setOptions, setOptionsDraft)
+    void read(() => bookingAdvancedApi.depositRule(accountId), setDeposit, setDepositDraft)
     return () => { alive = false }
   }, [accountId, reloadSeq])
 
@@ -104,12 +107,12 @@ export function useCancellationSettings(accountId: string) {
     }
     if (options.state === 'ready' && optionsDraft && !same(optionsDraft, options.value)) {
       const { version, ...body } = optionsDraft
-      const response = await gapDraftApi.saveCancellationOptions(accountId, { ...body, expectedVersion: version })
+      const response = await bookingAdvancedApi.saveCancellationOptions(accountId, { ...body, expectedVersion: version })
       setOptions({ state: 'ready', value: response.data }); setOptionsDraft(response.data)
     }
     if (deposit.state === 'ready' && depositDraft && !same(depositDraft, deposit.value)) {
       const { version, ...body } = depositDraft
-      const response = await gapDraftApi.saveDepositRule(accountId, { ...body, expectedVersion: version })
+      const response = await bookingAdvancedApi.saveDepositRule(accountId, { ...body, expectedVersion: version })
       setDeposit({ state: 'ready', value: response.data }); setDepositDraft(response.data)
     }
   }, [accountId, policy, draft, options, optionsDraft, deposit, depositDraft])
@@ -246,7 +249,7 @@ function TierDialog({ editing, tiers, noShowPercent, onClose, onApply }: { editi
   )
 }
 
-/** デポジットの区画（FcGmv の下）。口の案（口が要る）。 */
+/** デポジットの区画（FcGmv の下）。 */
 export function DepositSection({ state, connected, canEdit }: { state: CancellationSettings; connected: boolean; canEdit: boolean }) {
   const head = (
     <div className={styles.head}>
@@ -259,7 +262,7 @@ export function DepositSection({ state, connected, canEdit }: { state: Cancellat
   }
   const rule = state.depositDraft
   const set = (patch: Partial<DepositRule>) => rule && state.setDepositDraft({ ...rule, ...patch })
-  const now = rule && rule.kind !== 'none' && rule.value ? (rule.kind === 'percent' ? Math.floor(SAMPLE_PRICE * rule.value / 100) : Math.min(rule.value, SAMPLE_PRICE)) : null
+  const now = rule && rule.kind !== 'none' && rule.value ? (rule.kind === 'percent' ? yenPercent(SAMPLE_PRICE, rule.value) : Math.min(rule.value, SAMPLE_PRICE)) : null
   return (
     <section className={settings.section} aria-label="デポジット">
       {head}

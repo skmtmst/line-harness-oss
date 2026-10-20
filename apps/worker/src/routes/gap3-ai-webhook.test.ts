@@ -1,11 +1,11 @@
 import {createHmac} from 'node:crypto';
 import {Hono} from 'hono';
 import {afterEach,beforeEach,expect,test,vi} from 'vitest';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {gapFixture} from '../test-utils/gap1.js';
 const mocks=vi.hoisted(()=>({keyword:vi.fn(async()=>({matched:false,replyTokenConsumed:false})),reply:vi.fn(),push:vi.fn(),event:vi.fn(async()=>undefined)}));
 vi.mock('@line-crm/line-sdk',async original=>({...await original<typeof import('@line-crm/line-sdk')>(),LineClient:vi.fn(function(){return {replyMessage:mocks.reply,pushMessage:mocks.push};})}));
-vi.mock('../services/auto-reply.js',()=>({matchAndReply:mocks.keyword}));
+vi.mock('../features/auto-replies/auto-reply.js',()=>({matchAndReply:mocks.keyword}));
 vi.mock('../services/activity-mileage.js',()=>({awardActivityMileage:vi.fn(async()=>undefined)}));
 vi.mock('../services/event-bus.js',()=>({fireEvent:mocks.event,logOutgoingMessage:vi.fn(async()=>undefined)}));
 import {webhook} from './webhook.js';

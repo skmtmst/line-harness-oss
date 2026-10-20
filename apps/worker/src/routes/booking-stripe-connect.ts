@@ -1,13 +1,13 @@
-import type { Hono, MiddlewareHandler, Context } from 'hono';
-import type { Env } from '../index.js';
+import { fail } from '../lib/fail.js';
+import type { Hono, MiddlewareHandler } from 'hono';
+import type { Env } from '../worker-env.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
-import { connectHash, exchangeStripeConnectCode, revokeStripeConnect, STRIPE_CONNECT_CALLBACK, stripeConnectConfig, StripeConnectError } from '../services/booking-stripe-connect.js';
+import { connectHash, exchangeStripeConnectCode, revokeStripeConnect, STRIPE_CONNECT_CALLBACK, stripeConnectConfig, StripeConnectError } from '../features/booking/booking-stripe-connect/index.js';
 
 type State = { line_account_id: string; state_hash: string };
 const base = '/api/booking/admin/payment-connection';
-const fail = (c: Context<Env>, code: string, status: 400 | 403 | 409 | 503) => c.json({ success: false, error: code, code }, status);
 const expiresAt = () => new Date(Date.now() + 10 * 60 * 1000).toISOString();
 const opaqueState = () => crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
 
@@ -36,19 +36,19 @@ export function registerStripeConnectRoutes(app: Hono<Env>, guard: (write?: bool
 
   app.post(base + '/authorize', guard(true), inputJsonBoundary(), async c => {
     const session = await adminSessionTokenHashFromRequest(c);
-    if (c.get('staff').credential !== 'session' || !session) return fail(c, 'stripe_connect_session_required', 403);
+    if (c.get('staff').credential !== 'session' || !session) return fail(c, 403, 'stripe_connect_session_required');
     try {
       const config = stripeConnectConfig(c.env);
       const state = opaqueState(), hash = await connectHash(state);
       const account = c.req.query('account_id')!.trim();
       const existing = await c.env.DB.prepare('SELECT test_mode FROM booking_payment_connections WHERE line_account_id=? AND disconnected_at IS NULL').bind(account).first<{test_mode:number}>();
-      if (existing?.test_mode === 0) return fail(c, 'stripe_connect_test_only', 409);
-      if (!await begin(c.env.DB, account, c.get('staff').id, session, hash, 'pending')) return fail(c, 'stripe_connect_busy', 409);
+      if (existing?.test_mode === 0) return fail(c, 409, 'stripe_connect_test_only');
+      if (!await begin(c.env.DB, account, c.get('staff').id, session, hash, 'pending')) return fail(c, 409, 'stripe_connect_busy');
       const url = new URL('https://connect.stripe.com/oauth/authorize');
       url.search = new URLSearchParams({ response_type: 'code', client_id: config.clientId, scope: 'read_write', redirect_uri: config.redirectUri, state }).toString();
       return c.json({ success: true, data: { authorizationUrl: url.href, expiresAt: expiresAt(), testMode: true } });
     } catch (error) {
-      if (error instanceof StripeConnectError) return fail(c, error.code, 503);
+      if (error instanceof StripeConnectError) return fail(c, 503, error.code);
       throw error;
     }
   });
@@ -57,33 +57,34 @@ export function registerStripeConnectRoutes(app: Hono<Env>, guard: (write?: bool
   const callback: MiddlewareHandler<Env> = async c => {
     const staff = c.get('staff'), session = await adminSessionTokenHashFromRequest(c);
     if (!staff || staff.readOnly || !['owner', 'admin'].includes(staff.role) || staff.credential !== 'session' || !session) {
-      return fail(c, 'stripe_connect_session_required', 403);
+      return fail(c, 403, 'stripe_connect_session_required');
     }
     const body = c.req.method === 'GET' ? c.req.query() : await c.req.json<Record<string, unknown>>().catch(() => null);
-    if (!body || typeof body.state !== 'string' || !/^[a-f0-9]{64}$/.test(body.state)) return fail(c, 'stripe_connect_invalid_state', 400);
+    if (!body || typeof body.state !== 'string' || !/^[a-f0-9]{64}$/.test(body.state)) return fail(c, 400, 'stripe_connect_invalid_state');
     const hash = await connectHash(body.state);
     const row = await c.env.DB.prepare(`SELECT line_account_id,state_hash FROM booking_stripe_connect_states
       WHERE state_hash=? AND staff_id=? AND session_hash=? AND status='pending' AND julianday(expires_at)>julianday(?)`)
       .bind(hash, staff.id, session, new Date().toISOString()).first<State>();
-    if (!row) return fail(c, 'stripe_connect_invalid_state', 400);
+    if (!row) return fail(c, 400, 'stripe_connect_invalid_state');
     const account = row.line_account_id;
     if ((c.req.query('account_id') && c.req.query('account_id') !== account)
       || (staff.featureEnabledLineAccountIds && !staff.featureEnabledLineAccountIds.includes(account))
       || !await canAccessAllLineAccounts(c.env.DB, staff, [account])
-      || !await c.env.DB.prepare('SELECT id FROM line_accounts WHERE id=?').bind(account).first()) return fail(c, 'forbidden', 403);
+      || !await c.env.DB.prepare('SELECT id FROM line_accounts WHERE id=?').bind(account).first()) return fail(c, 403, 'forbidden');
     if (body.error !== undefined) {
-      if (body.error !== 'access_denied') return fail(c, 'stripe_connect_invalid_callback', 400);
+      if (body.error !== 'access_denied') return fail(c, 400, 'stripe_connect_invalid_callback');
       const denied = await c.env.DB.prepare("UPDATE booking_stripe_connect_states SET status='finished',updated_at=datetime('now') WHERE state_hash=? AND status='pending' RETURNING line_account_id").bind(hash).first();
-      if (!denied) return fail(c, 'stripe_connect_invalid_state', 400);
-      return fail(c, 'stripe_connect_access_denied', 400);
+      if (!denied) return fail(c, 400, 'stripe_connect_invalid_state');
+      return fail(c, 400, 'stripe_connect_access_denied');
     }
-    if (typeof body.code !== 'string' || !/^ac_[A-Za-z0-9]{1,1000}$/.test(body.code)) return fail(c, 'stripe_connect_invalid_callback', 400);
+    if (typeof body.code !== 'string' || !/^ac_[A-Za-z0-9]{1,1000}$/.test(body.code)) return fail(c, 400, 'stripe_connect_invalid_callback');
     try {
       const config = stripeConnectConfig(c.env);
       // codeはStripeで再利用すると接続が失効する。外部通信より先に一度だけ獲得する。
       const claimed = await c.env.DB.prepare("UPDATE booking_stripe_connect_states SET status='exchanging',updated_at=datetime('now') WHERE state_hash=? AND status='pending' RETURNING line_account_id").bind(hash).first();
-      if (!claimed) return fail(c, 'stripe_connect_invalid_state', 400);
-      const providerAccount = await exchangeStripeConnectCode(config, body.code);
+      if (!claimed) return fail(c, 400, 'stripe_connect_invalid_state');
+      const providerAccount = await exchangeStripeConnectCode(config, body.code,{db:c.env.DB,accountId:account,operationId:hash,
+        authorize:()=>canAccessAllLineAccounts(c.env.DB,staff,[account])});
       const at = new Date().toISOString();
       // 別店で有効な同じStripeアカウントを上書きしない。選択と保存は1つのSQLで行う。
       const results = await c.env.DB.batch([
@@ -98,12 +99,12 @@ export function registerStripeConnectRoutes(app: Hono<Env>, guard: (write?: bool
       ]);
       if (!results[0].results.length) {
         await finish(c.env.DB, hash, 'failed');
-        return fail(c, 'stripe_connect_account_in_use', 409);
+        return fail(c, 409, 'stripe_connect_account_in_use');
       }
       return c.json({ success: true, data: { connected: true, testMode: true, accountIdTail: providerAccount.slice(-4), connectedAt: at, dashboardUrl: null } });
     } catch (error) {
       await finish(c.env.DB, hash, 'failed');
-      if (error instanceof StripeConnectError) return fail(c, error.code, 503);
+      if (error instanceof StripeConnectError) return fail(c, 503, error.code);
       throw error;
     }
   };
@@ -112,20 +113,21 @@ export function registerStripeConnectRoutes(app: Hono<Env>, guard: (write?: bool
 
   app.delete(base, guard(true), async c => {
     const staff = c.get('staff'), session = await adminSessionTokenHashFromRequest(c);
-    if (staff.credential !== 'session' || !session) return fail(c, 'stripe_connect_session_required', 403);
+    if (staff.credential !== 'session' || !session) return fail(c, 403, 'stripe_connect_session_required');
     const account = c.req.query('account_id')!.trim();
     try {
       const config = stripeConnectConfig(c.env);
       const lock = await connectHash(opaqueState());
-      if (!await begin(c.env.DB, account, staff.id, session, lock, 'disconnecting')) return fail(c, 'stripe_connect_busy', 409);
+      if (!await begin(c.env.DB, account, staff.id, session, lock, 'disconnecting')) return fail(c, 409, 'stripe_connect_busy');
       try {
-        const row = await c.env.DB.prepare('SELECT provider_account_id,test_mode FROM booking_payment_connections WHERE line_account_id=? AND disconnected_at IS NULL')
-          .bind(account).first<{provider_account_id:string;test_mode:number}>();
+        const row = await c.env.DB.prepare('SELECT provider_account_id,test_mode,connected_at FROM booking_payment_connections WHERE line_account_id=? AND disconnected_at IS NULL')
+          .bind(account).first<{provider_account_id:string;test_mode:number;connected_at:string}>();
         if (row && row.test_mode !== 1) throw new StripeConnectError('stripe_connect_test_only');
         if (row) {
           const shared = await c.env.DB.prepare('SELECT 1 FROM booking_payment_connections WHERE provider_account_id=? AND line_account_id<>? AND disconnected_at IS NULL').bind(row.provider_account_id, account).first();
           if (shared) throw new StripeConnectError('stripe_connect_account_in_use');
-          await revokeStripeConnect(config, row.provider_account_id);
+          await revokeStripeConnect(config, row.provider_account_id,{db:c.env.DB,accountId:account,
+            operationId:`disconnect:${row.provider_account_id}:${row.connected_at}`,authorize:()=>canAccessAllLineAccounts(c.env.DB,staff,[account])});
           await c.env.DB.batch([
             c.env.DB.prepare("UPDATE booking_payment_connections SET disconnected_at=?,updated_at=datetime('now') WHERE line_account_id=? AND provider_account_id=?")
               .bind(new Date().toISOString(), account, row.provider_account_id),
@@ -137,7 +139,7 @@ export function registerStripeConnectRoutes(app: Hono<Env>, guard: (write?: bool
       } catch (error) { await finish(c.env.DB, lock, 'failed'); throw error; }
       return c.json({ success: true, data: { connected: false, testMode: true, accountIdTail: null, connectedAt: null, dashboardUrl: null } });
     } catch (error) {
-      if (error instanceof StripeConnectError) return fail(c, error.code, 503);
+      if (error instanceof StripeConnectError) return fail(c, 503, error.code);
       throw error;
     }
   });

@@ -14,7 +14,7 @@ import styles from './merged-delivery-dialog.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
- * 配信元の優先順を変える窓（設計 `Hn9eE`「優先順位を変更」）。
+ * 配信元の優先順を変える窓（設計 「優先順位を変更」）。
  *
  * **全部を「使わない」にすると、この人へはどこからも送れなくなる。**
  * 契約では空配列がそのまま「全部解除」になるので、押し間違いで送られないよう、

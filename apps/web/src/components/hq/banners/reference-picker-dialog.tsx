@@ -26,7 +26,7 @@ import {
 type Scope = 'all' | 'favorite' | 'project'
 
 /**
- * 参照画像をライブラリから選ぶ。承認済み ★BG-C `cOgWE`（旧 ★V8 `UcBQ5`）。
+ * 参照画像をライブラリから選ぶ。承認済み ★BG-C `cOgWE`（旧 ★V8 ）。
  *
  * 最大 3 枚まで選べる。タイルを押すと選ばれ、下の「選んだ画像の使い方」で
  * 1 枚ずつ使い方（土台にする／素材を一部使う／雰囲気を参考にする）を決める。
@@ -55,14 +55,14 @@ export default function ReferencePickerDialog({
   /** 選び終わったとき。使い方つきの参照と、その画像の実体（親が手元に置く）を渡す。 */
   onPick: (references: BannerReference[], images: BannerImage[]) => void
   /**
-   * 渡すと、押したその場で親の参照に入る（UcBQ5：［この画像を使う］の帯を持たない窓）。
+   * 渡すと、押したその場で親の参照に入る（：［この画像を使う］の帯を持たない窓）。
    * 使い方は生成パネルの行で決める。下に手元の画像を落とす欄を置く。
    */
   onLivePick?: (references: BannerReference[], images: BannerImage[]) => void
   onUpload: (file: File) => void
   /** V8 の板が別の窓枠を描くときの差し替え。選択・検索・送信の動きは共有する。 */
   frame?: ComponentType<DialogProps>
-  /** UcBQ5：検索を次の行に置く4列の板。ほかの選択窓は変えない。 */
+  /** ：検索を次の行に置く4列の板。ほかの選択窓は変えない。 */
   hqLayout?: boolean
 }) {
 

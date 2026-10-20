@@ -37,7 +37,7 @@ describe('送信ボタンは緑の地に白い文字 (既定・設計 4-form)', 
 
   it('Form.tsx の送信・確認の2つのボタンがこの決め方を使う', () => {
     const root = fileURLToPath(new URL('..', import.meta.url));
-    const src = readFileSync(join(root, 'pages', 'Form.tsx'), 'utf8');
+    const src = readFileSync(new URL('../pages/form.tsx', import.meta.url), 'utf8');
     // 送信ボタンと確認ダイアログの決定ボタンの2か所
     expect(src.match(/submitButtonText\(theme, hasCustomTheme\)/g)?.length ?? 0).toBe(2);
     // 地の色はテーマの main のまま

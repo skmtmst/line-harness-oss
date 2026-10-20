@@ -5,14 +5,12 @@ import { normalizeScopedTagName } from '@line-crm/db';
 import { HqTemplateError } from './tag.js';
 import { resolveHqLiffActions } from './liff-actions.js';
 import { RICH_MENU_DB_ACTION_TYPE_BY_INTENT, isLiffActionKind, liffActionUrl, liffActionFromUrl, type LiffAction, type HqRichMenuDefinition } from '@line-crm/shared';
+
+
 import { resolveSwitcherActions, validateRichMenuGroupForPublish, type AreaInput } from '../../lib/rich-menu-publisher.js';
 import { buildTapPostbackData } from '../../lib/rich-menu-tap.js';
-import {
-  unsupportedHqTemplateAdapter, requireHqTemplateAuthority, createHqTemplateSnapshotToken,
-  type HqTemplateAdapter, type HqTemplateAdapterInput, type HqTemplateAdapterContext,
-  type HqTemplateAuthority, type HqTemplateReference, type HqTemplateMatchedReference,
-  type HqTemplateStatement, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan,
-} from './contract.js';
+import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, createHqTemplateSnapshotToken, type HqTemplateAdapter, type HqTemplateAdapterInput, type HqTemplateAdapterContext, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateMatchedReference, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
+import { type HqTemplateStatement } from '@line-crm/db';
 
 /** Registry remains fail-closed until the store coordinator binds DB, R2 and reference adapters. */
 export const richMenuHqTemplateAdapter = unsupportedHqTemplateAdapter('rich_menu');
@@ -162,7 +160,7 @@ const GROUP_COLUMNS = ['id', 'name', 'chat_bar_text', 'size', 'default_page_id',
 const PAGE_COLUMNS = ['id', 'group_id', 'order_index', 'name', 'image_r2_key', 'line_richmenu_id', 'updated_at', 'alias_id', 'image_content_type', 'created_at'];
 const AREA_COLUMNS = ['id', 'page_id', 'action_type', 'action_data', 'intent', 'tag_ids', 'form_id', 'template_id', 'tracked_link_id', 'bounds_x', 'bounds_y', 'bounds_width', 'bounds_height', 'updated_at', 'label', 'score_change', 'created_at'];
 
-/** Bound adapter. snapshot() is persisted by the preflight coordinator, not recomputed on apply. */
+/** Bound adapter. snapshot is persisted by the preflight coordinator, not recomputed on apply. */
 export function createRichMenuHqTemplateAdapter(options: RichMenuAdapterOptions): HqTemplateAdapter & {
   snapshot(targetAccountId: string): Promise<HqTemplateSnapshotToken>;
 } {

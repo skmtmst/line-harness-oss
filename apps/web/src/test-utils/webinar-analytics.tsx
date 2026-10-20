@@ -1,5 +1,5 @@
 import type { Webinar, WebinarAnalytics, WebinarEditor } from '@/lib/api'
-import AnalyticsPane from '@/v8/webinar-edit/analytics'
+import { AnalyticsPane } from '@/v8/webinar-edit/public/analytics/index'
 import { webinarEditContext, webinarDetailChrome } from './webinar-edit'
 
 export function webinarAnalytics(overrides: Partial<WebinarAnalytics> = {}): WebinarAnalytics {

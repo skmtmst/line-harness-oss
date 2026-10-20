@@ -7,8 +7,10 @@ import { rethrowR2 } from './distribution-errors.js'
 import { isDeliveryType, parseDeliveryDefinition, deliverySnapshot, inspectDelivery, planDelivery, validateDeliveryReferences, deliveryReferenceItems } from './delivery.js';
 import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
 import { templateKind, type HqTemplateListDisplay } from '@line-crm/shared'
-import { parseTextOverrides } from './text-overrides.js';
 import type { HqTemplateArchiveStatus } from '@line-crm/shared';
+
+import { parseTextOverrides } from './text-overrides.js';
+
 import { messageListFacts } from './message-list-facts.js';
 import { templateContentSummary } from './list-display.js';
 import { captureDistributionName, targetDistributionVersion } from './distribution-display.js';
@@ -18,6 +20,7 @@ import {
   type HqTemplate, type HqTemplatePreflight, type HqTemplatePreflightResolution,
   type HqTemplateDistributionResult, type HqTemplateStatement, type HqTemplateType,
 } from '@line-crm/db';
+
 import { type HqTemplateAuthority, type HqTemplateResolution, type HqTemplateAdapterResult, type HqTemplateSnapshotToken, VERSION_CONFLICT_MESSAGE } from './contract.js';
 import { getHqTemplateAdapter } from './registry.js';
 import { boundedText, HqTemplateError, inspectTags, parseTagDefinition, planTags, tagSnapshot } from './tag.js';

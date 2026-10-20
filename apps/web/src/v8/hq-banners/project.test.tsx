@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 バナー生成・プロジェクトの中（src/v8/hq-banners/project.tsx）の動きの試験。
- * 札と画像のます・アーカイブの確かめ（I0w2e）・画像の詳細（rI5uh）→ 一覧から外す確かめ（B24oNg）・
+ * 札と画像のます・アーカイブの確かめ・画像の詳細→ 一覧から外す確かめ・
  * 閲覧のみには取り込む・アーカイブ・生成パネル・星を置かない。
  */
 import React, { act } from 'react'
@@ -131,7 +131,7 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     expect(host.textContent).toContain('お気に入り 1')
     expect(host.textContent).toContain('配布済み 1')
     expect(host.textContent).toContain('リッチメッセージ・1:1')
-    // 下の帯のボタンは板 `b1So7a`「生成する（2枚）」＝v7 と同じ言葉。
+    // 下の帯のボタンは板 `b1So7a`「生成する（2枚）」＝管理画面 と同じ言葉。
     expect(buttonNamed('生成する（1 枚）') ?? buttonNamed('生成する（4 枚）')).toBeTruthy()
   })
 
@@ -306,3 +306,23 @@ it('WEB206: an open screen polls state and displays server continuation without 
   expect(host.textContent).toContain('閉じても作り続けます');expect(getGeneration).toHaveBeenCalled();expect(runGeneration).not.toHaveBeenCalled();
  }finally{vi.clearAllTimers();vi.useRealTimers()}
 });
+
+
+it('生成の拒否で内部の失敗文を出さず、条件を残して再試行できる', async () => {
+  createGeneration.mockReset().mockRejectedValue(new Error('内部の失敗 SELECT * FROM customers'))
+  await act(async () => { root.render(<HqBannerProjectV8 />) })
+  await flush()
+  const line = document.querySelector('input[aria-label="テキスト 1行目"], textarea[aria-label="テキスト 1行目"]') as HTMLInputElement
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(line), 'value')!.set!.call(line, '秋の新商品')
+    line.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  const start = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('生成する（')) as HTMLButtonElement
+  await act(async () => { start.click() })
+  await flush()
+  expect(createGeneration).toHaveBeenCalledTimes(1)
+  expect(host.textContent).toContain('生成の開始に失敗しました')
+  expect(host.textContent).not.toContain('SELECT * FROM customers')
+  expect(line.value).toBe('秋の新商品')
+  expect(start.disabled).toBe(false)
+})

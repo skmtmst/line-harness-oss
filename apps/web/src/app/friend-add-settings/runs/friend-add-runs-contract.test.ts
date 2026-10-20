@@ -1,15 +1,14 @@
 import fs from 'node:fs'
-import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
+import { routingLabel, routingAction } from '@/v8/friend-add-runs/status'
+import type { FriendAddEventRoutingStatus } from '@line-crm/shared'
 
 const PAGE = fs.readFileSync(new URL('../../../v8/friend-add-runs/runs.tsx', import.meta.url), 'utf8')
 const DETAIL = fs.readFileSync(new URL('../../../v8/friend-add-runs/detail.tsx', import.meta.url), 'utf8')
-const RUN_STATUS = fs.readFileSync(path.join(__dirname, 'run-status.ts'), 'utf8')
 const SETTINGS = fs.readFileSync(new URL('../../../v8/friend-add/list.tsx', import.meta.url), 'utf8')
-const HOOK = fs.readFileSync(path.join(__dirname, '..', 'use-cursor-stack.ts'), 'utf8')
 
-describe('V6 友だち追加時配信・実行結果の契約', () => {
+describe("管理画面 友だち追加時配信・実行結果の契約", () => {
   it('実ノードと実行結果への往復導線を持つ', () => {
     expect(PAGE).toContain("usePageTitle('実行結果：友だち追加時の配信')")
     expect(PAGE).not.toContain('<Header')
@@ -58,17 +57,20 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
 
   it('5つの処理状態を利用者の言葉で表示する', () => {
     // 状態の言葉は一覧と詳細で共有する（R267）
-    expect(RUN_STATUS).toContain("pending: { label: 'テスト待ち'")
-    expect(RUN_STATUS).toContain("completed: { label: '成功'")
-    expect(RUN_STATUS).toContain("failed: { label: 'エラー'")
-    expect(RUN_STATUS).toContain("suppressed: { label: '配信なし'")
-    expect(RUN_STATUS).toContain("partial_failed: { label: '再送待ち'")
+    const states: FriendAddEventRoutingStatus[] = ['pending', 'completed', 'failed', 'suppressed', 'partial_failed']
+    const labels = states.map((status) => routingLabel(status, null).label)
+    expect(new Set(labels).size).toBe(5)
+    states.forEach((status, index) => {
+      expect(labels[index].length).toBeGreaterThan(0)
+      expect(labels[index]).not.toBe(status)
+    })
+    expect(routingLabel('failed', null).tone).toBe('danger')
   })
 
   it('送達不明は「再送待ち」と別に見せる（自動では送り直さない）', () => {
-    expect(RUN_STATUS).toContain("const DELIVERY_UNKNOWN_CODE = 'delivery_unknown'")
-    expect(RUN_STATUS).toContain("DELIVERY_UNKNOWN_LABEL = { label: '送達不明', tone: 'danger' }")
-    expect(RUN_STATUS).toContain('送達不明・要確認（自動では送り直しません）')
+    expect(routingLabel('partial_failed', 'delivery_unknown')).toMatchObject({ label: '送達不明', tone: 'danger' })
+    expect(routingLabel('partial_failed', 'delivery_unknown')).not.toEqual(routingLabel('partial_failed', null))
+    expect(routingAction('partial_failed', 'delivery_unknown')).toContain('自動では送り直しません')
     // 一覧の見出し・行動文・CSV・詳細のどれも同じ判定を通す（R267）
     expect(PAGE).toContain('routingLabel(item.status, item.errorCode)')
     expect(PAGE).toContain('routingAction(item.status, item.errorCode)')
@@ -79,17 +81,11 @@ describe('V6 友だち追加時配信・実行結果の契約', () => {
   })
 
   it('将来の状態が来ても描画を落とさない', () => {
-    expect(RUN_STATUS).toContain('UNKNOWN_ROUTING_LABEL')
-    expect(RUN_STATUS).toContain('UNKNOWN_ROUTING_ACTION')
-  })
-
-  it('カーソルを積んだページ送りで前後へ移動できる', () => {
-    expect(PAGE).toContain('useCursorStack(')
-    expect(PAGE).toContain("goPrev()")
-    expect(PAGE).toContain("goNext(data.nextCursor)")
-    expect(PAGE).toContain("data?.nextCursor")
-    expect(HOOK).toContain('current.length > 1 ? current.slice(0, -1) : current')
-    expect(HOOK).toContain('setStack((current) => [...current, nextCursor])')
+    const future = 'future_state' as FriendAddEventRoutingStatus
+    expect(routingLabel(future, null)).toMatchObject({ tone: 'neutral' })
+    expect(routingLabel(future, null).label.length).toBeGreaterThan(0)
+    expect(routingAction(future, null).length).toBeGreaterThan(0)
+    expect(routingAction(future, 'delivery_unknown')).toContain('自動では送り直しません')
   })
 
   it('実配信・シナリオ開始・平均送信時間をAPI集計で表示する', () => {

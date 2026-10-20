@@ -111,7 +111,7 @@ async function clickRetry() {
 
 describe('R597 同名確認の取得失敗は明示して再試行を付ける', () => {
   it('同名判定のもとを握りつぶさず、失敗と再試行を出す', () => {
-    // 失敗を無かったことにしない（以前の `.catch(() => undefined)` へ戻さない）。
+    // 失敗を無かったことにしない（以前の `.catch( => undefined)` へ戻さない）。
     expect(NEW_PAGE).toContain('setPointsFailed(true)')
     expect(NEW_PAGE).toContain('同名の確認を再読み込み')
   })

@@ -41,7 +41,7 @@ export function prepareWorkflowStep(db:D1Database,ref:WorkflowStepRef,
   return db.prepare(`INSERT OR IGNORE INTO workflow_steps
     (scope_id,process_kind,subject_id,step_key,retry_key,input_json,max_attempts,status,created_at,updated_at,attempt_count)
     VALUES (?,?,?,?,?,?,?,?,?,?,?)`).bind(...workflowBindings(ref), options.retryKey ?? crypto.randomUUID(),
-      options.input === undefined ? null : workflowJson(options.input), options.maxAttempts ?? 5,
+      options.input === undefined ? null : workflowJson(options.input), options.maxAttempts ?? 4,
       options.status ?? 'pending', now, now,options.initialAttempts ?? 0);
 }
 export async function getWorkflowStep(db: D1Database, ref: WorkflowStepRef): Promise<WorkflowStepRow | null> {
@@ -84,16 +84,17 @@ export async function finishWorkflowStep(db: D1Database, ref: WorkflowStepRef, o
     WHERE ${WORKFLOW_WHERE} AND lease_owner=?`).bind(workflowJson(options.result),now,...workflowBindings(ref),owner)]);
 }
 export async function failWorkflowStep(db: D1Database, ref: WorkflowStepRef, owner: string,
-  options: { now?: number; permanent?: boolean; unknown?: boolean; code?: string; delayMs?: number } = {},
+  options: { now?: number; permanent?: boolean; unknown?: boolean; code?: string; delayMs?: number; providerRequestId?: string | null } = {},
 ): Promise<void> {
   const now=options.now ?? Date.now();
   // Callers supply constant classifications, never raw exception messages.
   const code=/^[a-z_]{1,80}$/.test(options.code ?? '') ? options.code! : 'processing_failed';
   await db.prepare(`UPDATE workflow_steps SET status=CASE WHEN ? THEN 'unknown'
     WHEN ? OR attempt_count>=max_attempts THEN 'exhausted' ELSE 'failed' END,
-    error_code=?,next_attempt_at=?,lease_owner=NULL,lease_expires_at=NULL,updated_at=?
+    error_code=?,next_attempt_at=?,result_json=COALESCE(?,result_json),lease_owner=NULL,lease_expires_at=NULL,updated_at=?
     WHERE ${WORKFLOW_WHERE} AND status='running' AND lease_owner=? AND lease_expires_at>?`)
-    .bind(options.unknown ? 1:0,options.permanent ? 1:0,code,now+(options.delayMs ?? 60_000),now,
+    .bind(options.unknown ? 1:0,options.permanent ? 1:0,code,now+(options.delayMs ?? 60_000),
+      options.providerRequestId ? workflowJson({ requestId: options.providerRequestId }) : null,now,
       ...workflowBindings(ref),owner,now).run();
 }
 export async function releaseWorkflowStep(db: D1Database,ref: WorkflowStepRef,owner: string, now = Date.now()): Promise<void> {

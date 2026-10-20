@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * V8 殻合わせ（絵 `V8-B/JKjsE`・オーナー 2026-10-07「統括の方が全然良くない」）。統括の脇の頭と下：
+ * V8 殻合わせ（絵のオーナー 2026-10-07「統括の方が全然良くない」）。統括の脇の頭と下：
  * 頭は店の画面と同じ部品（会社の印＋会社名＋小さく musubo）。
- * 下は店の画面と同じく「統括の設定」（歯車）と版。左下のアカウントの行は v7 だけ。
- * v7 の札・v7 の下は変えない。動き（出る・出ない）は v8-sidebar-groups.react.test.tsx が描いて確かめる。
+ * 下は店の画面と同じく「統括の設定」（歯車）と版。左下のアカウントの行は 管理画面 だけ。
+ * 管理画面 の札・管理画面 の下は変えない。動き（出る・出ない）は v8-sidebar-groups.react.test.tsx が描いて確かめる。
  */
 const HERE = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(HERE, 'sidebar.tsx'), 'utf8');

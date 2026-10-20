@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 
 
 /**
@@ -13,7 +14,7 @@ export function outgoingEventTypes(raw: string | null | undefined, webhookId: st
     if (!Array.isArray(parsed)) throw new Error('event_types is not an array');
     return parsed.map((entry) => String(entry));
   } catch {
-    console.error(JSON.stringify({"code":"outgoing_webhook_event_types_broken"}));
+    logger.error("outgoing_webhook_event_types_broken");
     return [];
   }
 }

@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountMigration from './migration'
 import UidMigrationV8 from '@/v8/friends/migrations/uid'
+import { SESSION_LOST_EVENT } from '@/lib/session-events'
 
 /**
  * Issue #1012 FRIEND-14/15/16/33/36 の回帰試験。
@@ -36,7 +37,7 @@ const net = vi.hoisted(() => ({
   /** run id ごとの対応表応答を差し替える。 */
   detailResponders: new Map<string, () => Promise<Response>>(),
   /** 自分自身（実行権限の案内に使う）。 */
-  me: { id: 'owner-2', role: 'owner' } as { id: string; role: string } | null,
+  me: { id: 'owner-2', role: 'owner' } as { id: string; role: string; readOnly?: boolean; roleBundle?: string } | null,
   /** TECH-07: 通信断・応答喪失を再現する。'network' で fetch が投げる。 */
   failItemPatch: null as null | 'network' | { status: number; error: string },
   failExecute: null as null | 'network' | { status: number; error: string },
@@ -466,7 +467,7 @@ describe('通信例外の結果不明（TECH-07 / FRIEND-33/34）', () => {
 })
 
 /**
- * カード間隔そろえ（★V7 gap-4・2026-09-26）の描画試験。
+ * カード間隔そろえ（★管理画面 gap-4・2026-09-26）の描画試験。
  * 空（履歴なし）・読み込み中・失敗・正常の主な状態を押さえる。
  */
 describe('UID移行の空と履歴のカード表示', () => {
@@ -563,5 +564,47 @@ describe('R398 一部反映の500で「未変更」と残さない', () => {
     fireEvent.click(buttonByText('本移行を実行', openDialog()))
     await flush()
     expect(openDialog().textContent).toContain('実行結果を確認できませんでした')
+  })
+})
+
+describe('UID移行の閲覧のみ', () => {
+  it('一括確認を開いた後に本人確認が失効したら確定窓を閉じる', async () => {
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    fireEvent.click(buttonByText('要確認をまとめて「結び付ける」'))
+    await flush()
+    expect(buttonByText('結び付ける', openDialog())).toBeTruthy()
+    await act(async () => { window.dispatchEvent(new Event(SESSION_LOST_EVENT)) })
+    await flush()
+    await waitFor(() => expect(document.body.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull())
+    expect(writes()).toHaveLength(0)
+  })
+  it.each(['legacy', 'v8'])('確認窓を開いた後に本人確認が失効したら承認と除外を隠し、内容は残す: %s', async entry => {
+    await act(async () => { root.render(entry === 'v8' ? <UidMigrationV8 initialRunId="run-1" /> : <AccountMigration />) })
+    await flush()
+    fireEvent.click(entry === 'v8' ? buttonContaining('UOLD-1') : buttonByText('開く'))
+    await flush()
+    expect(buttonByText('この組合せを承認', openDialog())).toBeTruthy()
+    await act(async () => { window.dispatchEvent(new Event(SESSION_LOST_EVENT)) })
+    await flush()
+    const dialog = openDialog()
+    expect(dialog.textContent).toContain('UOLD-1')
+    const labels = [...dialog.querySelectorAll('button')].map(button => button.textContent?.trim())
+    expect(labels).not.toContain('この組合せを承認')
+    expect(labels).not.toContain('除外する')
+    expect(writes()).toHaveLength(0)
+  })
+  it.each([
+    { id: 'owner-2', role: 'owner', readOnly: true },
+    { id: 'owner-2', role: 'owner', roleBundle: 'view_only' },
+  ])('履歴は読めるが登録・判断・本移行・切り戻しを出さない: %j', async identity => {
+    net.me = identity
+    await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+    await flush()
+    expect(host.querySelector('[aria-labelledby="uid-history"]')).toBeTruthy()
+    expect(host.textContent).toContain('閲覧のみで見ています')
+    const labels = [...host.querySelectorAll('button')].map(button => button.textContent?.trim())
+    for (const label of ['テスト移行を実行', '新しい移行を登録', '本移行へ進む', '切り戻す']) expect(labels).not.toContain(label)
+    expect(net.calls.filter(call => call.method !== 'GET')).toHaveLength(0)
   })
 })

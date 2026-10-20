@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Database from 'better-sqlite3'
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
-import { runActionRows, type ScenarioActionRow } from './scenario-actions.js'
+import { runActionRows, type ScenarioActionRow } from '../features/scenarios/scenario-actions.js'
 
 let db: D1Database
 let raw: Database.Database
@@ -35,7 +35,7 @@ function seed(id: string, friend = 'f2', slot = 'early', event = 'e') {
 }
 function followed() { expect(raw.prepare('SELECT tag_id FROM friend_tags WHERE friend_id=?').all('f1')).toEqual([{ tag_id: 'tag' }]) }
 
-describe('B-179 イベントの行うこと', () => {
+describe('イベントの行うこと', () => {
   it('表示順でなく、次の空いている回へ申し込み、同じ出来事の再実行は重複しない', async () => {
     expect((await run({ eventId: 'e' })).failed).toBe(0)
     await run({ eventId: 'e' })
@@ -123,7 +123,7 @@ it('同じ取消を再送しても知らせの取消と空き待ちを二重に�
 })
 
 it('イベントの下書きにも申込・取消・指定回を保存でき、別店の参照を拒む', async () => {
-  const { saveScenarioDraft } = await import('./scenario-v6-contract.js')
+  const { saveScenarioDraft } = await import('../features/scenarios/scenario-contract.js')
   raw.exec(`INSERT INTO scenarios (id,line_account_id,name,trigger_type,delivery_mode) VALUES ('scenario','a','案内','manual','relative')`)
   const draftAction = { id: 'act', hook: 'scenario_completed', stepId: null, choiceKey: null, type: 'event_booking', params: { eventId: 'e', slotId: 'later', op: 'cancel' }, condition: null, onFailure: 'continue', sortOrder: 0 }
   await saveScenarioDraft(db, { scenarioId: 'scenario', lineAccountId: 'a', expectedVersion: 0, afterActions: [draftAction], staffId: 'owner' })

@@ -1,5 +1,5 @@
 /*
- * ★V8 テンプレート 質問を作る（l87p1J）。外枠は template-edit/frame。
+ * ★V8 テンプレート 質問を作る。外枠は template-edit/frame。
  * ここは段のカード（枠1・角12・余白20・間14）、選択肢のカード（角12・余白14・間10）、答え方の切り替えだけ。
  */
 .back {
@@ -105,7 +105,7 @@
   outline: var(--tpl-tag-ring) solid var(--color-focus-ring);
 }
 
-/* 保存で落ちた欄（B-139）。枠を危険の色にする。 */
+/* 保存で落ちた欄。枠を危険の色にする。 */
 .input[aria-invalid='true'],
 .input[aria-invalid='true']:focus-visible {
   outline-color: var(--color-danger);

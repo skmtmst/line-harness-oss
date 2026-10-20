@@ -39,7 +39,7 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value }))
+vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => role.value }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ setSelectedAccountId: () => {}, refreshAccounts: async () => {} }),
 }))
@@ -85,7 +85,7 @@ async function render() {
 }
 
 describe('統括のアカウント', () => {
-  it('B-46：カードの入口は短い「入る」にし、読み上げにはアカウント名を残す', async () => {
+  it('カードの入口は短い「入る」にし、読み上げにはアカウント名を残す', async () => {
     await render()
     const enter = container.querySelector('button[aria-label="然 -NEN- TEST へ入る"]')!
     expect(enter.textContent).toBe('入る')

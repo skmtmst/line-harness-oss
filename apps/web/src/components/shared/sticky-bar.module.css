@@ -32,11 +32,11 @@
 /*
  * ★A の下の帯（M10）：V8 は下から 12px 浮かせ、枠線をやめて
  * ふんわり影にする。角丸と並び（削除は左端・操作は中央）はそのまま。
- * v7 は今までどおり。
+ * 互換経路は今までどおり。
  */
 :root .bar {
   bottom: 12px;
-  min-height: 60px; /* 絵 K7HWG ほか：padding 12・ボタン36 で高さ60 */
+  min-height: 60px; /* 絵  ほか：padding 12・ボタン36 で高さ60 */
   border: 0;
   box-shadow: var(--shadow-bar-float);
 }
@@ -76,7 +76,7 @@
 
 .status {
   min-width: 0;
-  /* 状態の文は切らない（「下書き（保存してから配ると…」が「…」で切れていた：N4T9mO・u5MM7・e875x）。入らなければ文節で2行に折る。 */
+  /* 状態の文は切らない（「下書き（保存してから配ると…」が「…」で切れていた：・・）。入らなければ文節で2行に折る。 */
   overflow: visible;
   overflow-wrap: anywhere;
   word-break: auto-phrase;
@@ -100,7 +100,7 @@
  * 一言を渡さない画面（40画面以上）は3列・中央寄せのままで変わらない。
  */
 .withInfo {
-  /* 左の文が残りの幅を使い、一言と操作は中身の幅で右端に並ぶ（操作を2段に折らない・zOpMG）。 */
+  /* 左の文が残りの幅を使い、一言と操作は中身の幅で右端に並ぶ（操作を2段に折らない・）。 */
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 

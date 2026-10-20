@@ -15,9 +15,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = vi.hoisted(() => ({ canAccess: vi.fn(), scope: vi.fn() }));
 vi.mock('../services/account-access.js', () => ({
@@ -227,4 +227,19 @@ describe('#731 定期便の一覧と集計', () => {
     expect(body.data.summary.monthlyStats).toEqual([]);
     expect(body.data.risk.predictiveScoreAvailable).toBe(false);
   });
+});
+
+
+afterEach(() => vi.useRealTimers());
+test.each(['2026-09-30T15:00:00Z', '2026-09-30T23:59:59Z'])('日本時間の月初の朝に今月の定期便開始・取消を数える: %s', async (at) => {
+  vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(at));
+  seedContracts(2);
+  sqlite.prepare('UPDATE nen_ec_member_snapshots SET subscription_json=? WHERE friend_id=?').run(JSON.stringify({ contracts: [
+    { id: 'current', status_code: 'cancelled', amount: 1000, started_at: '2026-10-01', cancelled_at: '2026-10-01' },
+    { id: 'previous', status_code: 'cancelled', amount: 1000, started_at: '2026-09-01', cancelled_at: '2026-09-30' },
+    { id: 'previous-2', status_code: 'cancelled', amount: 500, started_at: '2026-09-15', cancelled_at: '2026-09-30' },
+  ] }), 'f0000');
+  const res = await app().request('/api/ec-commerce/subscriptions?lineAccountId=account-a&limit=10');
+  expect(res.status).toBe(200);
+  expect(await res.json()).toMatchObject({ data: { summary: { startedThisMonth: 1, cancelledThisMonth: 1 } } });
 });

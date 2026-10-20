@@ -8,6 +8,7 @@ export function inputError<T extends Record<string, unknown>>(
   payload: T,
   status: ContentfulStatusCode,
   keys: readonly string[] = [],
+  validationReason?: string,
 ) {
   if (!['POST', 'PUT', 'PATCH'].includes(c.req.method) || (status !== 400 && status !== 422)) return c.json(payload, status);
   const legacyError = typeof payload.error === 'string' ? payload.error : '入力内容を確認してください';
@@ -18,7 +19,8 @@ export function inputError<T extends Record<string, unknown>>(
     || (payload.errors && typeof payload.errors === 'object' && !Array.isArray(payload.errors));
   // 必須欄が複数ある検査でも、すでに入っている欄は赤にしない。
   const body = c.get('validatedInputBody') as Record<string, unknown> | undefined;
-  const missingKeys = body && /required|必須/i.test(legacyError)
+  // fail()で文言を言い換えた場合も、必須欄の判定には元の理由を使う。
+  const missingKeys = body && /required|必須/i.test(validationReason ?? legacyError)
     ? keys.filter(key => body[key] === undefined || body[key] === null || body[key] === '')
     : [];
   const affectedKeys = missingKeys.length ? missingKeys : keys;
@@ -46,7 +48,7 @@ export function inputJsonBoundary(shape: InputShape = {}, options: { maxBytes?: 
       && (options.maxBytes !== undefined || /^application\/(?:[\w.+-]+\+)?json(?:\s*;|$)/i.test(c.req.header('content-type') ?? ''))) {
       try {
         // 上限のある口では clone へ全文を貯めず、元のストリームを上限まで読む。
-        // 上限内の本文だけを後続の Hono json()/text() に渡す。
+        // 上限内の本文だけを後続の Hono json/text に渡す。
         let body: unknown;
         if (options.maxBytes !== undefined) {
           const text = await readBoundedText(c.req.raw, options.maxBytes);
@@ -73,7 +75,7 @@ export function inputJsonBoundary(shape: InputShape = {}, options: { maxBytes?: 
 /**
  * inputJsonBoundary が読んで検査し終えた本文。
  * この口を通ったルートが本文を使うときは、自分で読み直さずこれを使う。
- * 読み直すと clone() で分けた同じ本文を二度読むことになり、
+ * 読み直すと clone で分けた同じ本文を二度読むことになり、
  * 中身は正しいのに読み取りの失敗で 400 になる余地が残る。
  * この口を通らない（本文が無い・JSON以外・除外パス）場合は undefined。
  */
@@ -82,13 +84,13 @@ export function validatedInputBody(c: Context): Record<string, unknown> | undefi
 }
 
 /** 宣言値でも実バイト数でも止める。超過時は残りを読まず、本文を保持しない。 */
-export async function readBoundedText(request: Request, maxBytes: number): Promise<string | null> {
+export async function readBoundedText(request: Pick<Request, 'headers' | 'body'>, maxBytes: number): Promise<string | null> {
   const bytes = await readBoundedBytes(request, maxBytes);
   return bytes === null ? null : new TextDecoder().decode(bytes);
 }
 
 /** Read only the allowed body bytes; never allocate the full incoming upload. */
-export async function readBoundedBytes(request: Request, maxBytes: number): Promise<Uint8Array | null> {
+export async function readBoundedBytes(request: Pick<Request, 'headers' | 'body'>, maxBytes: number): Promise<Uint8Array | null> {
   const declared = Number(request.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) return null;
   const reader = request.body?.getReader();
@@ -131,7 +133,7 @@ export function boundedUploadBody(maxBinaryBytes: number): MiddlewareHandler {
 }
 export type InputShape = Record<string, readonly InputKind[]>;
 
-/** 型の違う値を .trim() 等へ渡して500にしない。必須・範囲・相関の検証は各ルートで行う。 */
+/** 型の違う値を .trim 等へ渡して500にしない。必須・範囲・相関の検証は各ルートで行う。 */
 export function inputShapeErrors(body: Record<string, unknown>, shape: InputShape): ApiFieldErrors {
   const fields: ApiFieldErrors = {};
   for (const [key, kinds] of Object.entries(shape)) {
@@ -144,7 +146,7 @@ export function inputShapeErrors(body: Record<string, unknown>, shape: InputShap
 }
 
 /** 旧来の error に入っていた機械コードは code に残し、本文は人向けの文にする。 */
-function inputErrorMessage(code: string): string {
+export function inputErrorMessage(code: string, fallback = '入力内容を確認してください'): string {
   const messages: Record<string, string> = {
     INVALID_INPUT: '入力内容の形式を確認してください',
     INVALID_FOLDER_KIND: 'フォルダの種類を確認してください',
@@ -189,7 +191,7 @@ function inputErrorMessage(code: string): string {
     ambiguous_video_source: '動画の指定方法は1つにしてください',
     dst_gap: '夏時間への切り替えで存在しない時刻です。別の時刻を選んでください',
   };
-  return messages[code] ?? '入力内容を確認してください';
+  return Object.hasOwn(messages, code) ? messages[code]! : fallback;
 }
 
 /** フォルダの口で使うJSONの鍵を、DB側の共通エラーへ対応させる。 */

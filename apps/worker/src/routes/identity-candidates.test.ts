@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const identityMocks = vi.hoisted(() => {
   class TestIdentityCandidateError extends Error {
@@ -35,10 +35,10 @@ const profileMocks = vi.hoisted(() => ({
   getFriendProfileCandidates: vi.fn(),
 }));
 
-vi.mock('../services/identity-candidates.js', () => identityMocks);
+vi.mock('../features/identity/identity-candidates.js', () => identityMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
-vi.mock('../services/friend-duplicate-candidates.js', () => detectorMocks);
-vi.mock('../services/friend-profile-candidates.js', () => profileMocks);
+vi.mock('../features/friends/friend-duplicate-candidates.js', () => detectorMocks);
+vi.mock('../features/friends/friend-profile-candidates.js', () => profileMocks);
 
 const { identityCandidates } = await import('./identity-candidates.js');
 

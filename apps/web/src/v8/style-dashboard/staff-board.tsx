@@ -1,4 +1,5 @@
 'use client'
+import { term, styleTerm } from '@/lib/terms'
 import { CalendarSlotButton, CalendarLegendItem } from '@/components/shared/calendar-parts'
 import { CalendarX2, CircleHelp, Plus, Star } from 'lucide-react'
 import { useRef, useState, type CSSProperties } from 'react'
@@ -94,7 +95,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
       </div>
       {opened ? <ActionMenu open items={entryItems(opened)} anchorRef={anchor} ariaLabel={`${opened.name}の操作`} onClose={() => setOpenId(null)} /> : null}
       <div className={styles.boardLegend}>
-        {[['booked', '予約中'], ['active', '施術中'], ['done', '来店済み'], ['pending', '承認待ち'], ['off', '休み']].map(([k, l]) => <CalendarLegendItem key={k} state={k}>{l}</CalendarLegendItem>)}
+        {[['booked', term('S11')], ['active', styleTerm('salon', 'V15')], ['done', styleTerm('salon', 'V16')], ['pending', term('S10')], ['off', '休み']].map(([k, l]) => <CalendarLegendItem key={k} state={k}>{l}</CalendarLegendItem>)}
         <CalendarLegendItem state="star"><Star size={12} aria-hidden="true" />指名</CalendarLegendItem>
         <span className={styles.grow} />
         {canWrite ? <span className={styles.cellMuted}>空いている所を押すと予約を入れられます</span> : null}

@@ -1,12 +1,13 @@
 'use client'
 
 /*
- * ★V8 マニュアルの正本表（Pencil `cIdA2`、状態は `bR6a1`）。
+ * ★V8 マニュアルの正本表（Pencil 、状態は ）。
  *
  * 動き（読み込み・権限・いま全部を確かめる・直す／決める・競合の読み直し）は
  * 今までの V8（app/settings/manual-links/manual-links-v8.tsx）と同じ。処理は同じ場所の
  * use-manual-links.ts（写し）に置く。見た目だけを型（SettingsPage）と部品で組み直した。
  */
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { RefreshCw } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -49,6 +50,7 @@ export default function ManualLinksScreen() {
     actionError,
     notice,
     canEdit,
+    canView,
     loadInitial,
     checkAll,
     startEdit,
@@ -59,8 +61,8 @@ export default function ManualLinksScreen() {
 
   const frame = (children: React.ReactNode) => (
     <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION} explanation="この表を直せるのは運営だけです。お客さまの組織からは見えません。"
-      saveStatus={editingKey ? `${rows.find(row => (row.taskId ?? row.screenId) === editingKey)?.name ?? ''}の行き先を編集中` : undefined}
-      saveActions={editingKey ? <>
+      saveStatus={canEdit && editingKey ? `${rows.find(row => (row.taskId ?? row.screenId) === editingKey)?.name ?? ''}の行き先を編集中` : undefined}
+      saveActions={canEdit && editingKey ? <>
         <Button variant="secondary" disabled={saving} onClick={cancelEdit}>キャンセル</Button>
         <Button variant="primary" actionWording disabled={saving} onClick={() => void saveEdit()} busy={saving} busyLabel="保存しています…">決める</Button>
       </> : undefined}>
@@ -81,7 +83,7 @@ export default function ManualLinksScreen() {
     )
   }
 
-  if (!canEdit) {
+  if (!canView) {
     return frame(
       <ListState
         kind="forbidden"
@@ -97,6 +99,7 @@ export default function ManualLinksScreen() {
     <>
 
 
+      {!canEdit ? <ReadOnlyNotice /> : null}
       <ListToolbar
         search={{ value: query, onChange: setQuery, placeholder: '画面ID・画面名で探す' }}
         filters={<>
@@ -105,7 +108,7 @@ export default function ManualLinksScreen() {
         </>}
         trailing={<>
           <span className={styles.schedule}>{SCHEDULE}</span>
-          <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…"><RefreshCw aria-hidden="true" />いま全部を確かめる</Button>
+          {canEdit ? <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…"><RefreshCw aria-hidden="true" />いま全部を確かめる</Button> : null}
         </>}
       />
 
@@ -136,7 +139,7 @@ export default function ManualLinksScreen() {
           <div role="rowgroup">
             {shown.map((row) => {
               const key = row.taskId ?? row.screenId
-              const editing = editingKey === key
+              const editing = canEdit && editingKey === key
               const checked = row.checkedAt ? formatDate(row.checkedAt, { style: 'list', fallback: checkedLabel(row.checkedAt) }) : emptyValue('unknown')
               return (
                 <GridRow key={key} data-broken={row.status !== 'ok' || undefined}>
@@ -158,7 +161,7 @@ export default function ManualLinksScreen() {
                     <StatusBadge tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}>{row.status === 'unset' ? emptyValue('unconfigured') : LINK_STATUS_LABEL[row.status]}</StatusBadge>
                   </GridCell>
                   <GridCell role="cell" className={styles.actions}>
-                    {editing ? null : <RowActions subjectName={row.name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', onSelect: () => startEdit(key) }]} />}
+                    {!canEdit || editing ? null : <RowActions subjectName={row.name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', onSelect: () => startEdit(key) }]} />}
                   </GridCell>
                 </GridRow>
               )

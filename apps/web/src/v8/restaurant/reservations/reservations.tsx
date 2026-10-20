@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 予約台帳（板 `l9NlC0` 今日・`xzCK6` 今日 1152・`Z3FoM` 一覧・`rm92Y` 電話の予約を入れる）。
+ * ★V8 予約台帳（板 `l9NlC0` 今日・`xzCK6` 今日 1152・`Z3FoM` 一覧・ 電話の予約を入れる）。
  *
  * 板の頭に店舗・見方（今日／今週／今月／一覧）・枠を押さえる・電話の予約を入れる。
  * 今日は時間×卓、今週・今月・一覧は予約タイムラインの表。電話の予約は作る型の画面に切り替わる。
@@ -16,12 +16,12 @@ import TextLink from '@/components/shared/text-link'
 import { notifyToast } from '@/components/shared/toast'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi,type ReservationQuery,type RestaurantClosure,type RestaurantReservation } from '@/lib/restaurant-test-api'
-import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { Lock,Phone } from 'lucide-react'
 import { useCallback,useEffect,useMemo,useState,type ReactNode } from 'react'
-import ReservationDetailDialog from '../../restaurant-reservations/detail-dialog'
-import RestaurantShell,{ type RestaurantV8Context } from '../booking-kit/shell'
-import { KIND_LABEL,dayTitle,scopeText } from '../closures/format'
+import { ReservationDetailDialog } from '@/v8/restaurant-reservations/index'
+import { RestaurantShell, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { KIND_LABEL, dayTitle, scopeText } from '@/v8/restaurant/closures/public/format/index'
 import { CancelReservationDialog,EditReservationDialog,InboundTrialDialog,type ReservationPatch } from './dialogs'
 import { dayRange,monthRange,sameDay,toYmd,weekRange,type LedgerView } from './format'
 import ListView,{ PAGE_SIZE } from './list'
@@ -33,7 +33,7 @@ import SeatWaitlistDialog from './waitlist'
 
 /** 予約を変えられる役割か（口は owner・admin・staff。閲覧のみは 403）。読めるまでは出す（最後の守りは口の 403）。 */
 function canWriteRole(role: string | null | undefined): boolean {
-  return role === 'owner' || role === 'admin' || role === 'staff'
+  return canManageRole(role) || role === 'staff'
 }
 
 /* 頭の右：見方の切り替え（数はその月を取り直して今日・今週・今月で数える。遅い応答は捨てる）と主ボタン。 */

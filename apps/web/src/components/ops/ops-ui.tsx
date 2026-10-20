@@ -1,11 +1,12 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { ReactNode } from 'react'
 import Chip, { type ChipTone } from '@/components/shared/chip'
 import { ApiError } from '@/lib/api'
 
 /**
- * 運営コンソール（★V6 37）だけで使う小さな部品と表記の決まり。
+ * 運営コンソール（★管理画面 37）だけで使う小さな部品と表記の決まり。
  *
  * 札は共通の `Chip`、数値カードは共通の `KpiCard`、表は共通の `DataTable`
  * を使う。ここには「状態をどの札で出すか」と「日付・プランの表記」だけを置く。
@@ -122,6 +123,6 @@ export async function opsCall<T>(call: Promise<T>): Promise<T | { success: false
   } catch (error) {
     if (error instanceof ApiError) return { success: false, error: opsErrorMessage(error) }
     if (error instanceof TypeError) return { success: false, error: '通信できませんでした。ネットワークを確認してもう一度お試しください' }
-    return { success: false, error: error instanceof Error && error.message ? error.message : '処理に失敗しました。通信を確かめて、もう一度お試しください。' }
+    return { success: false, error: describeApiFailure(error, '保存', { scope: 'hq' }) }
   }
 }

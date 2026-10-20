@@ -14,7 +14,7 @@ import { api, ApiError, eventsApi, fetchApi, type EventListItem, type EventListS
 import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query'
 import { withRequestTimeout } from '@/lib/request-timeout'
 import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -53,7 +53,7 @@ import ListState from '@/components/shared/list-state'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select'
 
 /*
- * ★V8 イベント予約の一覧（Pencil `e2ekFu`）。
+ * ★V8 イベント予約の一覧（Pencil ）。
  *
  * 型（ListPage）に、数の帯（これからの回・申込・あと少しで満席・申し込みが少ない）、
  * 左のフォルダの列（上に「イベントを作る」）、案内の帯と道具の段、表、ページ送りをはめる。
@@ -108,7 +108,7 @@ export default function EventsListV8() {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   /* 作る・名前の変更・削除・フォルダの追加は統括と管理者だけ（Worker も同じ権限）。 */
-  const canEdit = role === 'owner' || role === 'admin'
+  const canEdit = canManageRole(role)
   const [highlightedId, setHighlightedId] = useState<string | null>(useSearchParams().get('highlight'))
   const activeAccountRef = useRef(selectedAccountId)
   activeAccountRef.current = selectedAccountId

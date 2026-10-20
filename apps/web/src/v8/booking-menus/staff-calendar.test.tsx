@@ -6,8 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 /* 担当スタッフのつなぐ先（B7・uRd8A・GcYWx）：読み込み・書き込みは別々に保存、書き込みのオフは確かめの窓を通す。閲覧のみは押せるものを置かない。 */
 
 const net = vi.hoisted(() => ({ getSwitches: vi.fn(), saveSwitches: vi.fn(), getStaffUrl: vi.fn(), saveStaffUrl: vi.fn() }))
-vi.mock('@/lib/api-gap1', async (load) => {
-  const actual = await load<typeof import('@/lib/api-gap1')>()
+vi.mock('@/lib/api/helpers/gap1', async (load) => {
+  const actual = await load<typeof import('@/lib/api/helpers/gap1')>()
   return { ...actual, bookingCalendarApi: { ...actual.bookingCalendarApi, ...net } }
 })
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/booking/menus', useSearchParams: () => new URLSearchParams() }))

@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { claimRedemptionStep, claimRedemptionStepForRecovery, clearRedemptionStepIntent, getMileageRewardDeliveryPlan, getReservedMileageRewardCode, hasSentRedemptionSteps, markRedemptionStepSent, MILEAGE_REWARD_RETRY_KEY_VALIDITY_MS, MileageRedemptionConfirmError, selectRedemptionStep } from './mileage/rewards-delivery.js';

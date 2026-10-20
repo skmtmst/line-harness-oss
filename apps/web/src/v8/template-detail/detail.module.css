@@ -1,5 +1,5 @@
 /*
- * ★V8 テンプレートの詳細（UTbi1・窓 Z0g3si・cuR8I）。
+ * ★V8 テンプレートの詳細（・窓 ・）。
  * 頭は型（PageFrame・PageHeading の「作る」）。ここは左右の列・カード・窓の中身だけ。
  */
 .page { display: contents; }
@@ -26,7 +26,7 @@
 .usageVersion,
 .usageVersionFixed { flex: 0 0 var(--tpl-eds-ver-w); overflow: hidden; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
 .usageState { flex: 0 0 var(--tpl-eds-state-w); overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-eds-note-lh); text-overflow: ellipsis; white-space: nowrap; }
-/* 統括の詳細（pQ4fH）の配った先は「新しい版を未配布」まで1行で出す幅。 */
+/* 統括の詳細の配った先は「新しい版を未配布」まで1行で出す幅。 */
 .usageStateWide { flex-basis: var(--tpl-eds-state-wide-w); }
 .ghostButton { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: var(--tpl-eds-ghost-gap); height: var(--tpl-eds-ghost-h); padding: var(--tpl-eds-ghost-pad); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--color-ink-secondary); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-chip-label-lh); text-decoration: none; white-space: nowrap; cursor: pointer; }
 .ghostButton:hover { background: var(--color-surface-pearl); }

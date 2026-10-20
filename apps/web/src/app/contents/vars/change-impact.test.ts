@@ -2,6 +2,7 @@ import type { CommonVarChangeImpact } from '@line-crm/shared'
 import { readFileSync } from 'node:fs'
 import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { describe, expect, it } from 'vitest'
+import ts from 'typescript'
 import type { CommonVarDeleteImpact, CommonVarDeleteImpactItem } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 import {
@@ -39,9 +40,17 @@ function sliceBetween(source: string, start: string, end: string): string {
   return source.slice(from, to)
 }
 
-const SAVE_FN = sliceBetween(EDIT, '  const save = async () => {', '  const remove = async () => {')
+// 分割後も対象の処理だけを検査し、別の関数の同じ語で通さない。
+function implementationBody(file: URL, name: string): string {
+  const source = readFileSync(file, 'utf8')
+  const tree = ts.createSourceFile(file.pathname, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const declaration = tree.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name)
+  if (!declaration || !ts.isFunctionDeclaration(declaration) || !declaration.body) throw new Error(`${name} が見つかりません`)
+  return declaration.body.getText(tree)
+}
+const SAVE_FN = implementationBody(new URL('../../../v8/common-vars-edit/edit-save.tsx', import.meta.url), 'saveCommonVar')
 const IMPACT_SECTION = sliceBetween(EDIT, '<section className={styles.card} aria-labelledby="cv-edit-impact-heading">', '</section>')
-const IMPACT_ROWS = sliceBetween(EDIT, 'function ImpactRows(', 'export default function EditCommonVarV8')
+const IMPACT_ROWS = implementationBody(new URL('../../../v8/common-vars-edit/edit-impact.tsx', import.meta.url), 'ImpactRows')
 
 function usage(over: Partial<CommonVarDeleteImpactItem> = {}): CommonVarDeleteImpactItem {
   return {
@@ -321,8 +330,8 @@ describe('共通情報編集（V8）の画面', () => {
     expect(EDIT).not.toContain('配信中の設定にも反映されます')
   })
 
-  it('競合で入力を消さない。load()ではなく版だけ取り直す（IDEA-14）', () => {
-    // load() は名前・値・メモまで初期化する。409/428で呼ぶと入力が消える。
+  it("競合で入力を消さない。loadではなく版だけ取り直す", () => {
+    // load は名前・値・メモまで初期化する。409/428で呼ぶと入力が消える。
     const CATCH = sliceBetween(SAVE_FN, '} catch (e) {', '} finally {')
     expect(CATCH).toContain('await refreshBaseline(item.id, accountAtRequest, e)')
     expect(CATCH).not.toContain('void load()')

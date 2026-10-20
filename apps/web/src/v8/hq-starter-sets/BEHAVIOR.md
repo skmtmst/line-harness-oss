@@ -1,3 +1,5 @@
+> 文書：統括のスタイルの初期セット（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 統括のスタイルの初期セット（BEHAVIOR.md）
 
 絵：VHp7p `J6647`（B-311）。入口 `app/hq/templates/starter-sets/page.tsx`（`/hq/templates/starter-sets`。左メニューはテンプレートが選ばれた形）。

@@ -1,4 +1,7 @@
+export { starter } from './style-starter-set.js';
+import { starter } from './style-starter-set.js';
 import { type AccountStyle, type SetupAnswer } from '@line-crm/shared';
+import { storeFeatureInitialization } from '@line-crm/db/src/store-feature-initialization.js';
 
 export * from './style-setup-core.js';
 export * from './style-starter-definition.js';
@@ -6,81 +9,8 @@ export { featureReadiness, styleWarnings } from './style-readiness.js';
 import { StyleError, checkStyle, readAnswers } from './style-setup-core.js';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
-export type StyleProfile = {
-  line_account_id: string;
-  style: AccountStyle;
-  answers_json: string;
-  cards_json: string | null;
-  metrics_json: string | null;
-  settings_json: string;
-  selected_at: string | null;
-  selection_mode: SetupAnswer['mode'];
-  version: number;
-  updated_at: string;
-};
-export function profileAnswers(
-  p: StyleProfile | null,
-): Record<string, SetupAnswer> {
-  return {
-    ...JSON.parse(p?.answers_json ?? '{}'),
-    style: {
-      mode: p?.selection_mode ?? 'later',
-      ...(p?.selection_mode === 'configured' ? { value: p.style } : {}),
-    },
-  };
-}
-export async function profile(db: D1Database, account: string) {
-  return db
-    .prepare('SELECT * FROM account_styles WHERE line_account_id=?')
-    .bind(account)
-    .first<StyleProfile>();
-}
-export async function starter(
-  db: D1Database,
-  tenant: string | null,
-  style: AccountStyle,
-) {
-  const saved = await db
-    .prepare(
-      `SELECT * FROM style_starter_sets WHERE style=? AND archived_at IS NULL AND (tenant_id=? OR tenant_id IS NULL) ORDER BY tenant_id IS NULL LIMIT 1`,
-    )
-    .bind(style, tenant)
-    .first<{
-      id: string;
-      version: number;
-      definition_json: string;
-      auto_insert: number;
-    }>();
-  return saved
-    ? {
-        id: saved.id,
-        version: saved.version,
-        autoInsert: !!saved.auto_insert,
-        definition: readDefinition(
-          {
-            items: (
-              JSON.parse(saved.definition_json)
-                .items as import('./style-starter-definition.js').StarterItem[]
-            ).filter(
-              (i) =>
-                !(
-                  i.kind === 'automation' &&
-                  (i.triggerType !== 'restaurant.departed' ||
-                    i.key === 'reminder' ||
-                    /予約確定/.test(i.name))
-                ),
-            ),
-          },
-          style,
-        ),
-      }
-    : {
-        id: 'musubo:' + style,
-        version: 1,
-        autoInsert: true,
-        definition: standardStarter(style),
-      };
-}
+export {profile,profileAnswers,type StyleProfile} from './style-profile.js';
+import {profile,profileAnswers} from './style-profile.js';
 function assertVersion(expected: unknown, actual: number) {
   if (!Number.isInteger(expected) || expected !== actual)
     throw new StyleError('version_conflict', 409);
@@ -193,6 +123,9 @@ export async function saveProfile(
     string,
     SetupAnswer
   >;
+  statements.push(
+    storeFeatureInitialization(db, account, tenant, actor, Date.parse(now)),
+  );
   const changedAnswers = Object.fromEntries(
     Object.entries(submittedAnswers).filter(
       ([key, value]) =>
@@ -256,7 +189,11 @@ export async function initializeAccountStyle(
   account: string,
   tenant: string | null,
   actor: string,
+  selectedStyle?: AccountStyle,
 ) {
+  if (selectedStyle !== undefined) {
+    return saveProfile(db, account, tenant, actor, { expectedVersion: 0, style: checkStyle(selectedStyle) });
+  }
   const saved = await saveProfile(db, account, tenant, actor, {
     expectedVersion: 0,
     style: 'standard',

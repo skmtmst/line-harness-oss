@@ -176,7 +176,7 @@ describe('api.nenMembers の写真審査運用契約', () => {
   })
 })
 
-describe('api.conversions の V6一覧・レポート契約', () => {
+describe('api.conversions の 管理画面一覧・レポート契約', () => {
   it('期間と選択中アカウントを新しい一覧・レポート・CSVへ渡す', async () => {
     const fetchSpy = vi.fn(async (url: string | URL | Request) => {
       const path = String(url)
@@ -257,7 +257,7 @@ describe('api.conversions の旧口・取得更新停止記録の契約(N-254/N-
   })
 })
 
-describe('api.friends のV6検索・本人照合契約', () => {
+describe('api.friends の管理画面検索・本人照合契約', () => {
   it('14軸のAND/ORを同じ条件JSONで一覧へ渡す', async () => {
     const fetchSpy = vi.fn(async () => new Response(
       JSON.stringify({ success: true, data: { items: [], total: 0 } }),
@@ -329,7 +329,7 @@ describe('api.friends のV6検索・本人照合契約', () => {
   })
 })
 
-describe('api.autoReplies の V6 集計・下書き契約', () => {
+describe('api.autoReplies の 管理画面 集計・下書き契約', () => {
   it('選択中のLINEアカウントを競合集計へ渡す', async () => {
     const conflict: AutoReplyConflictPair = {
       leftAutoReplyId: 'auto-reply-1',
@@ -751,7 +751,7 @@ describe('api.mileage rules contract(#532/#521)', () => {
   })
 })
 
-describe('api.mileage V6 admin contract', () => {
+describe('api.mileage 管理画面 admin contract', () => {
   it('残高・付与ルールを選択中アカウントで読み、下書きを版付きで保存する', async () => {
     const fetchSpy = vi.fn(async () => new Response(
       JSON.stringify({ success: true, data: {} }),
@@ -861,7 +861,7 @@ describe('eventsApi.createSlots', () => {
 
   it('500 slots are accepted and posted in 400/100 chunks (点検#520の中9補足)', async () => {
     // 500 と 400 の出どころ:
-    // - 500 はクライアント側の誤指定ガード(createSlots の例外。列車189で導入。
+    // - 500 はクライアント側の誤指定ガード(createSlots の例外。作業で導入。
     //   「誤指定で何千件も作らないよう」以外の根拠は無い)。
     // - 400 はサーバ側の1口上限(apps/worker/src/routes/events.ts の
     //   `body.slots.length > 400` → 422)に合わせた分割幅。
@@ -886,7 +886,7 @@ describe('eventsApi.createSlots', () => {
   })
 })
 
-describe('api.friendAddRules V6 data contract', () => {
+describe('api.friendAddRules 管理画面 data contract', () => {
   it('一覧・競合・実行結果を選択中アカウントとカーソルへ結びつける', async () => {
     const spy = vi.fn(async () => new Response(
       JSON.stringify({ success: true, data: { items: [], summary: {}, nextCursor: null } }),
@@ -1017,7 +1017,7 @@ describe('api.actionScores rule contract', () => {
   })
 })
 
-describe('api.scenarios V6 operation contract', () => {
+describe('api.scenarios 管理画面 operation contract', () => {
   it('試算・配信記録・下書きをシナリオ専用APIへ渡す', async () => {
     const responses = [
       {
@@ -2004,7 +2004,7 @@ describe('フォルダAPIの追加呼び口',()=>{
  });
 });
 
-describe('B-169 受信Webhookの行うこと', () => {
+describe('受信Webhookの行うこと', () => {
   it('版と照合方法を保って既存のconfig保存口へ送る', async () => {
     const fetchSpy = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ success: true, data: {} }), { status: 200 }))
     vi.stubGlobal('fetch', fetchSpy)

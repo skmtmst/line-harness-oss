@@ -5,7 +5,7 @@ import ListState from './list-state'
 
 describe('ListState の再読み込み', () => {
   it('失敗の1枚は TargetMissing の error と同じ中身にする', () => {
-    // ★V7 `x63W5x`：赤い三角・赤い見出しをやめ、中立の見た目にそろえる。
+    // ★管理画面 `x63W5x`：赤い三角・赤い見出しをやめ、中立の見た目にそろえる。
     // 見た目が2か所でずれないよう、中身は TargetMissing の error を使う。
     const html = renderToStaticMarkup(<ListState kind="error" onRetry={vi.fn()} />)
     expect(html).toContain('data-target-missing="error"')

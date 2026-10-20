@@ -8,8 +8,6 @@
  *  - 急ぎ度は結果と理由の文だけを出し、判定の仕組みの名前（Clef）は画面に出さない。
  *  - 閲覧のみ（staff）には送るボタンを置かない。
  */
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -36,6 +34,7 @@ const fixture = vi.hoisted(() => ({
   stopIntake: vi.fn(),
   resumeIntake: vi.fn(),
   snapshot: vi.fn(),
+  ubereatsConnection: vi.fn(),
   role: { value: 'owner' as string | null },
 }))
 
@@ -44,6 +43,7 @@ vi.mock('@/lib/restaurant-delivery-api', async (importOriginal) => {
   return {
     ...actual,
     restaurantDeliveryApi: {
+      ubereatsConnection: fixture.ubereatsConnection,
       orders: fixture.orders,
       order: fixture.order,
       accept: fixture.accept,
@@ -215,6 +215,7 @@ function at(url: string) {
 
 beforeEach(() => {
   fixture.role.value = 'owner'
+  fixture.ubereatsConnection.mockResolvedValue({ connection: { status: 'connected', lastError: null } })
   fixture.snapshot.mockResolvedValue({ success: true, data: { stores: [store()] } })
   fixture.orders.mockResolvedValue(ordersData([
     order('o1', 'UE-1001'),
@@ -291,10 +292,19 @@ describe('kDQHr デリバリー受注', () => {
     expect(screen.getAllByText('出前館').length).toBeGreaterThan(0)
     expect(screen.getAllByText('ロケットナウ').length).toBeGreaterThan(0)
 
-    // 新着は「受け付ける」「拒否」、調理中は「準備完了」。
-    expect(screen.getByLabelText('注文UE-1001を受け付ける')).toBeTruthy()
-    expect(screen.getByLabelText('注文UE-1001を拒否')).toBeTruthy()
+    // 行の右端は、主な操作を1つだけボタンにし、残り（断る）は「…」に入れる（ C）。
+    // 新着は「受け付ける」、調理中は「準備完了にする」。
+    const accept = screen.getByLabelText('注文UE-1001を受け付ける') as HTMLButtonElement
+    expect(accept.disabled).toBe(true)
+    fireEvent.click(accept)
+    expect(fixture.accept).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('注文UE-1001を拒否')).toBeNull()
     expect(screen.getByLabelText('注文DM-2002を準備完了にする')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '注文UE-1001のその他の操作' }))
+    const reject = await screen.findByRole('menuitem', { name: '断る' })
+    expect((reject as HTMLButtonElement).disabled || reject.getAttribute('aria-disabled') === 'true').toBe(true)
+    fireEvent.click(reject)
+    expect(fixture.reject).not.toHaveBeenCalled()
 
     // 停止中のサービスには再開を置く。
     expect(screen.getByLabelText('ロケットナウの受付を再開')).toBeTruthy()
@@ -311,7 +321,8 @@ describe('kDQHr デリバリー受注', () => {
     expect(document.body.textContent).not.toMatch(/Clef/i)
   })
 
-  it('まとめて受け付けるは新着だけを1件ずつ順に送る', async () => {
+  it('まとめて受け付けるはUberを除いた新着だけを1件ずつ順に送る', async () => {
+    fixture.orders.mockResolvedValue(ordersData([order('o1', 'UE-1001'), order('other-new', 'DM-NEW', { service: 'demaecan', serviceLabel: '出前館' }), order('o2', 'DM-2002', { service: 'demaecan', status: 'cooking' })]))
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
 
@@ -320,11 +331,12 @@ describe('kDQHr デリバリー受注', () => {
     expect(cooking.disabled).toBe(true)
 
     fireEvent.click(screen.getByLabelText('新着の注文をすべて選ぶ'))
-    expect(screen.getByText('選択中 1件')).toBeTruthy()
+    expect(screen.getByText('1件を選択中')).toBeTruthy()
 
     fireEvent.click(screen.getByText('まとめて受け付ける'))
     await waitFor(() => expect(fixture.accept).toHaveBeenCalledTimes(1))
-    expect(fixture.accept).toHaveBeenCalledWith('account-1', 'o1')
+    expect(fixture.accept).toHaveBeenCalledWith('account-1', 'other-new')
+    expect(fixture.accept).not.toHaveBeenCalledWith('account-1', 'o1')
   })
 
   it('注文番号を押すと ?id= が付いて注文の詳細が開く', async () => {
@@ -348,7 +360,7 @@ describe('kDQHr デリバリー受注', () => {
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
 
-    // 自作の `<select>` ではなく、共通部品の押しボタン＋選ぶ窓であること（B-172）。
+    // 自作の `<select>` ではなく、共通部品の押しボタン＋選ぶ窓であること。
     const picker = screen.getByRole('button', { name: '店舗' })
     fireEvent.click(picker)
     expect(await screen.findByRole('dialog', { name: '店舗を選ぶ' })).toBeTruthy()
@@ -376,6 +388,15 @@ describe('?view= で板を入れ替える', () => {
 })
 
 describe('閲覧のみ（staff）', () => {
+  it('権限の取得中は管理者用の接続情報を照会しない', async () => {
+    fixture.role.value = null
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    expect(fixture.ubereatsConnection).not.toHaveBeenCalled()
+    expect(screen.getByText('接続未確認')).toBeTruthy()
+    expect(screen.queryByLabelText('注文UE-1001を受け付ける')).toBeNull()
+  })
+
   it('受け付ける・拒否・準備完了・停止・再開を置かない', async () => {
     fixture.role.value = 'staff'
     render(<DeliveryPage />)
@@ -385,64 +406,20 @@ describe('閲覧のみ（staff）', () => {
     expect(screen.queryByLabelText('注文UE-1001を拒否')).toBeNull()
     expect(screen.queryByLabelText('注文DM-2002を準備完了にする')).toBeNull()
     expect(screen.queryByLabelText('ロケットナウの受付を再開')).toBeNull()
-    expect(screen.queryByLabelText('Uber Eatsの受付を停止')).toBeNull()
-    expect(screen.queryByText('受付を一括停止')).toBeNull()
+    expect(screen.queryByLabelText('Uber Eatsの受付を止める')).toBeNull()
+    expect(screen.queryByText('受付をまとめて止める')).toBeNull()
+    // 閲覧のみの帯を出す。
+    expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
 
+    expect(fixture.ubereatsConnection).not.toHaveBeenCalled()
+    expect(screen.getByText('接続未確認')).toBeTruthy()
     // 見るだけの操作は残す。
     expect(screen.getByLabelText('注文UE-1001の詳細')).toBeTruthy()
   })
 })
 
-/*
- * 承認v02（★承認済み デリバリー受注_v02.pen／2026-10-09 利用者承認）の見え方を守る。
- * ここは絵との「一致」を測る場ではない（happy-dom に寸法の計算は無いので、
- * 1行か2行か・窓の高さは測れない）。測るのは scripts/visual-qa/frame-parity.mjs の役目。
- * この組は、絵に合わせて決めた作り（並べ方の組・頭の印・札の種類・札の数）が
- * あとから静かに戻っていないかを見張る。
- */
-describe('承認v02の見え方を守る', () => {
-  const css = readFileSync(join(__dirname, 'delivery.module.css'), 'utf8')
-
-  it('注文一覧（kDQHr）のサービス札は1行に3つ並べる', () => {
-    // 絵（kDQHr）は札3つを横一列。縦積みにすると KPI も表もまるごと下へずれる。
-    expect(css).toMatch(/\.serviceRow \{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/)
-  })
-
-  it('3枚の中身の余白は器の任意の引数で渡す（絵 kDQHr 14/12・OzHLO 4・h7OeT 0/12）', () => {
-    // 共通の器 CHz31 は上16・段の間16。絵は板ごとに違うので、画面CSSから器を
-    // 上書きせず、RestaurantPage の bodyPadTop/bodyGap で板ごとに渡す。
-    const page = readFileSync(join(__dirname, 'delivery.tsx'), 'utf8')
-    expect(page).toMatch(/orders: \{ padTop: 14, gap: 12 \}/)
-    expect(page).toMatch(/history: \{ padTop: 4 \}/)
-    expect(page).toMatch(/'sold-out': \{ padTop: 0, gap: 12 \}/)
-    expect(page).toMatch(/bodyPadTop=\{VIEW_BODY\[view\]\.padTop\}/)
-    expect(page).toMatch(/bodyGap=\{VIEW_BODY\[view\]\.gap\}/)
-    // 品切れ（h7OeT）の帯を負の margin で器の外へ引き上げない。
-    expect(css).not.toMatch(/selectBarFlush/)
-  })
-
-  it('3枚の板の頭も器の任意の引数で渡す（絵 上20・間4・説明は題の下）', () => {
-    // 絵は説明を題のすぐ下に 1 行で描き、「?」は描かない。共通の器の既定（上24・間8・
-    // 説明は HelpTip の中）は変えず、RestaurantPage の任意の引数で板ごとに渡す。
-    // 題は絵のとおり kDQHr 22/700/32・注文履歴と品切れ 18/700/27（正本の順位は 絵 > 決まりの板）。
-    const page = readFileSync(join(__dirname, 'delivery.tsx'), 'utf8')
-    expect(page).toMatch(/const HEAD_PAD_TOP = 20/)
-    expect(page).toMatch(/const HEAD_TEXT_GAP = 4/)
-    expect(page).toMatch(/orders: \{ descriptionSize: 'body' \}/)
-    expect(page).toMatch(/history: \{ titleSize: 'sub' \}/)
-    expect(page).toMatch(/'sold-out': \{ titleSize: 'sub' \}/)
-    expect(page).toMatch(/descriptionAs="text"/)
-    expect(page).toMatch(/headPadTop=\{HEAD_PAD_TOP\}/)
-    expect(page).toMatch(/headTextGap=\{HEAD_TEXT_GAP\}/)
-  })
-
-  it('注文一覧（kDQHr）の表はタブと同じ塊に入れて間0にする', () => {
-    // 絵は表がタブの段にくっついている。負の margin で引き戻すのではなく、
-    // タブ・選んだ数の帯・表を自分の塊（間0）にまとめる。
-    expect(css).toMatch(/\.tabTableGroup \{[^}]*gap: 0;/)
-    const orders = readFileSync(join(__dirname, 'orders.tsx'), 'utf8')
-    expect(orders).toMatch(/<div className=\{styles\.tabTableGroup\}>/)
-  })
+/* 見た目は実ブラウザで測る。この組は一覧と確認の操作を守る。 */
+describe('一覧と確認の操作を保つ', () => {
 
   it('品切れ（h7OeT）の「品切れ」の札は赤（tone="danger"）', async () => {
     // 重ねた絵の色を測ったら、絵の「品切れ」は赤 #b3261e、画面は橙 #c2410c(warning) だった。
@@ -455,85 +432,28 @@ describe('承認v02の見え方を守る', () => {
     expect(screen.getByText('販売中').closest('[data-tone]')?.getAttribute('data-tone')).toBe('success')
   })
 
-  it('共通部品の見た目を画面CSSから上書きしない', () => {
-    // 設計ルール「部品の見た目を画面側で上書きしない（直すときは部品を直す）」。
-    // 親の共通器へ :has で届く指定と、別の場所で出る共通の窓への指定を置かない。
-    expect(css).not.toMatch(/\bdiv:has\(/)
-    expect(css).not.toMatch(/\[data-design-part='dialog'\]/)
-  })
-
-  it('確認の窓の題の段は共通部品の任意の引数で絵に合わせる', () => {
-    // 絵（dgeTy・XCVGd）は印と題が縦の中央・間12・題 18/700。画面CSSで上書きせず、
-    // 共通の窓の titleRow="mark" を渡す。渡さない窓の既定（上そろえ・間8・600）は変えない。
-    expect(readFileSync(join(__dirname, 'order-detail.tsx'), 'utf8')).toMatch(/titleRow="mark"/)
-    expect(readFileSync(join(__dirname, 'bulk.tsx'), 'utf8')).toMatch(/titleRow="mark"/)
-    const shared = readFileSync(join(__dirname, '../../../components/shared/dialog.module.css'), 'utf8')
-    expect(shared).toMatch(/\[data-design-title-row='mark'\] \.titleRow \{[^}]*align-items: center;[^}]*gap: 12px;/)
-    expect(shared).toMatch(/\[data-design-title-row='mark'\] \.title \{[^}]*font-weight: 700;/)
-  })
-
-  it('注文詳細（hjdqV）の頭は題＋受信・希望の1行で、窓の上端は絵の100', () => {
-    /*
-     * 絵は窓が y100 から始まり、題の段が 77（上20＋題27＋間4＋補足18＋下8）。
-     * 補足の行は共通の窓の任意の引数 titleNote で出し、渡さない窓の並びは変えない。
-     */
-    const detail = readFileSync(join(__dirname, 'order-detail.tsx'), 'utf8')
-    expect(detail).toMatch(/const DETAIL_TOP = 100/)
-    expect(detail).toMatch(/const DETAIL_HEAD_H = 77/)
-    expect(detail).toMatch(/titleNote=\{summaryLine\}/)
-    expect(detail).toMatch(/headerHeight=\{DETAIL_HEAD_H\}/)
-    // 絵の下のボタンの段に線は無い。
-    expect(detail).toMatch(/footerPlain/)
-    const shared = readFileSync(join(__dirname, '../../../components/shared/dialog.module.css'), 'utf8')
-    expect(shared).toMatch(/:root \.titleNote \{[^}]*font-size: var\(--text-caption\)/)
-  })
-
-  it('注文詳細（hjdqV）の数量と金額は離れた2つの右寄せの列にする', () => {
-    // 絵の右端は 884 と 976。隣り合わせに並べると金額が数量にくっつく。
-    expect(css).toMatch(/\.itemQty \{[^}]*flex: 0 0 var\(--tpl-rt-dlv-item-qty\)/)
-    expect(css).toMatch(/\.itemAmount \{[^}]*flex: 0 0 var\(--tpl-rt-dlv-item-amount\)/)
-    expect(css).toMatch(/\.itemQty,\n\.itemAmount \{[^}]*text-align: right/)
-    // 列の間に余白を入れると数量の右端が絵からずれる。
-    expect(css).toMatch(/\.itemRow \{[^}]*gap: 0;/)
-  })
-
-  it('注文詳細（hjdqV）は品目と受け取り情報を1行ずつ線で区切る', () => {
-    /*
-     * 絵は品目の行（41／補足つき61）と受け取り情報の段（33）をどれも薄い線で区切り、
-     * 合計の前だけ濃い線。最後の段には線を引かない。
-     */
-    expect(css).toMatch(/\.itemRow \{[^}]*padding-bottom: var\(--tpl-rt-dlv-item-pad\);[^}]*border-bottom: 1px solid var\(--color-divider\)/)
-    expect(css).toMatch(/\.itemRow \+ \.itemRow \{\n  padding-top: var\(--tpl-rt-dlv-item-pad\);/)
-    expect(css).toMatch(/\.itemList > \.itemRow:last-child \{\n  border-bottom-color: var\(--color-hairline\);/)
-    expect(css).toMatch(/\.factKey,\n\.factValue \{[^}]*border-bottom: 1px solid var\(--color-divider\)/)
-    expect(css).toMatch(/\.detailFacts > :nth-last-child\(-n \+ 2\) \{[^}]*border-bottom: 0;/)
-    // 合計の上の線は最後の品目の行が持つので、合計自身は線を引かない。
-    expect(css).not.toMatch(/\.total \{[^}]*border-top/)
-  })
-
-  it('注文履歴（OzHLO）の絞り込みは折り返さない', () => {
-    // 折り返すと板の頭が2段に伸びて、下の集計・表がまるごとずれる。
-    expect(css).toMatch(/\.filterRowOneLine \{[^}]*flex-wrap: nowrap/)
-  })
-
-  it('注文履歴（OzHLO）は大きく出す値を売上金額にし、件数は頭の右に小さく置く', async () => {
+  it('注文履歴（OzHLO）は売上の4つの数を線で区切った1本の帯（KpiBand）で出す', async () => {
     at('/restaurant-test/delivery?view=history')
     render(<DeliveryPage />)
     await waitFor(() => expect(fixture.history).toHaveBeenCalled())
 
-    // 絞り込みは1行の組を足した側に出す。
-    const date = await screen.findByLabelText('日付')
-    expect(date.closest('[class*="filterRowOneLine"]')).toBeTruthy()
+    // 絞り込みは共通の道具の段（ListToolbarRow）。日付は月日の書き方で切れない。
+    expect(await screen.findByLabelText('日付')).toBeTruthy()
 
-    // 大きい値（.sumAmount は p）は金額。件数（.sumCount は span）はその前＝頭の中。
-    const amount = await screen.findByText('¥41,200')
-    expect(amount.tagName).toBe('P')
-    const count = screen.getByText('12件')
-    expect(count.tagName).toBe('SPAN')
-    expect(count.compareDocumentPosition(amount) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const band = await waitFor(() => {
+      const el = document.querySelector('[data-shared-part="kpi-band"][data-design="ZuE0v"]')
+      expect(el).toBeTruthy()
+      return el as HTMLElement
+    })
+    expect(within(band).getByText('¥41,200')).toBeTruthy()
+    expect(within(band).getByText('12件')).toBeTruthy()
+    // 合計＋サービス3つの4マス。
+    expect(band.querySelectorAll('[data-kpi-label]').length).toBe(4)
   })
 
   it('キャンセルの確認（dgeTy）は白地の頭＋注意三角で、危険用の帯を出さない', async () => {
+    const original = await fixture.order()
+    fixture.order.mockResolvedValue({ ...original, order: { ...original.order, service: 'demaecan', serviceLabel: '出前館' } })
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
     fireEvent.click(screen.getByLabelText('注文UE-1001の詳細'))
@@ -543,7 +463,7 @@ describe('承認v02の見え方を守る', () => {
       expect(el).toBeTruthy()
       return el
     })) as HTMLElement
-    fireEvent.click(within(detail).getByRole('button', { name: 'キャンセル' }))
+    fireEvent.click(within(detail).getByRole('button', { name: '注文をキャンセルする' }))
 
     const dialog = (await waitFor(() => {
       const el = document.querySelector('[data-design-node="dgeTy"]')
@@ -560,10 +480,10 @@ describe('承認v02の見え方を守る', () => {
     expect(mark?.querySelector('svg')).toBeTruthy()
   })
 
-  it('受付の一括停止（XCVGd）は枠付きのサービス札と、別々の時間札4つを置く', async () => {
+  it('受付の一括停止（XCVGd）は共通のチェックの札（CheckCard）と、別々の時間札4つを置く', async () => {
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
-    fireEvent.click(screen.getByText('受付を一括停止'))
+    fireEvent.click(screen.getByText('受付をまとめて止める'))
 
     const dialog = (await waitFor(() => {
       const el = document.querySelector('[data-design-node="XCVGd"]')
@@ -573,13 +493,12 @@ describe('承認v02の見え方を守る', () => {
 
     expect(dialog.querySelector('[data-qa-dialog-callout]')).toBeNull()
 
-    // 枠付きの札（.stopCard）をサービスごとに置き、中に選ぶ印と丸い札を入れる。
+    // サービスごとに共通のチェックの札を置き、中に丸い札を入れる。
     for (const label of ['Uber Eats', '出前館', 'ロケットナウ']) {
-      const box = within(dialog).getByLabelText(`${label}の受付を停止する`)
-      expect(box.closest('[class*="stopCard"]')).toBeTruthy()
-      expect(within(dialog).getByText(label)).toBeTruthy()
+      const box = within(dialog).getByRole('checkbox', { name: new RegExp(`${label}の受付を止める`) })
+      expect(box.closest('label')).toBeTruthy()
+      expect(within(dialog).getAllByText(label).length).toBeGreaterThan(0)
     }
-    expect(css).toMatch(/\.stopCard \{[^}]*outline: 1px solid var\(--color-choice-border\)/)
 
     // 時間は共通の切り替え部品に任せ、つながった帯ではなく離れた札4つにする。
     const times = within(dialog).getByRole('group', { name: '停止する時間' })
@@ -594,5 +513,155 @@ describe('承認v02の見え方を守る', () => {
       'false',
       'false',
     ])
+  })
+})
+
+
+describe('注文履歴のページ送り', () => {
+  it('次のページと表示件数を変えても重複や抜けなく注文を読める', async () => {
+    fixture.history.mockResolvedValue({
+      success: true,
+      range: { from: '2026-10-09', to: '2026-10-09' },
+      filter: { service: null, status: null },
+      totals: { count: 25, amount: 87000, canceledCount: 0, byService: [] },
+      orders: Array.from({ length: 25 }, (_, index) => order(`page-${index}`, `PAGE-${index + 1}`)),
+    })
+    at('/restaurant-test/delivery?view=history')
+    render(<DeliveryPage />)
+    const table = await screen.findByRole('table', { name: 'デリバリーの注文履歴' })
+    await within(table).findByText('#PAGE-20')
+    expect(within(table).queryByText('#PAGE-21')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+    expect(await within(table).findByText('#PAGE-21')).toBeTruthy()
+    expect(within(table).getByText('#PAGE-25')).toBeTruthy()
+    expect(within(table).queryByText('#PAGE-20')).toBeNull()
+    expect(screen.getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '表示件数' }))
+    fireEvent.click(screen.getByRole('option', { name: '10件表示' }).querySelector('button')!)
+    expect(await within(table).findByText('#PAGE-1')).toBeTruthy()
+    expect(within(table).getByText('#PAGE-10')).toBeTruthy()
+    expect(within(table).queryByText('#PAGE-11')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '次のページ' }))
+    expect(await within(table).findByText('#PAGE-11')).toBeTruthy()
+    expect(within(table).getByText('#PAGE-20')).toBeTruthy()
+    expect(within(table).queryByText('#PAGE-10')).toBeNull()
+  })
+})
+
+
+describe('Uberの接続と未完成の操作を分ける', () => {
+  it('保存済みの接続を読み、注文連携の説明は共通の窓で開く', async () => {
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    expect(fixture.ubereatsConnection).toHaveBeenCalledWith('account-1')
+    const uber = within(screen.getByRole('region', { name: 'Uber Eats' }))
+    expect(uber.getByText('接続済み')).toBeTruthy()
+    expect(uber.queryByText('受付中')).toBeNull()
+    expect((uber.getByRole('button', { name: 'Uber Eatsの受付を止める' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(uber.getByRole('button', { name: 'Uber Eatsの受付を止める' }))
+    expect(fixture.stopIntake).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Uber Eats の注文の連携は準備中' }))
+    expect(await screen.findByRole('dialog', { name: '現在準備中です' })).toBeTruthy()
+    expect(fixture.accept).not.toHaveBeenCalled()
+  })
+
+  it('停止済みのUberも再開を送れず、他社の再開は残す', async () => {
+    const data = ordersData([])
+    data.services[0].intakeStatus = 'stopped'
+    fixture.orders.mockResolvedValue(data)
+    fixture.resumeIntake.mockResolvedValue({ failed: [] })
+    render(<DeliveryPage />)
+    const uber = await screen.findByRole('button', { name: 'Uber Eatsの受付を再開' })
+    expect((uber as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(uber)
+    expect(fixture.resumeIntake).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'ロケットナウの受付を再開' }))
+    await waitFor(() => expect(fixture.resumeIntake).toHaveBeenCalledWith('account-1', ['rocketnow']))
+  })
+
+  it.each(['new', 'cooking'] as const)('Uberの%s詳細は読めるが変更を送れない', async (status) => {
+    const original = await fixture.order()
+    fixture.order.mockResolvedValue({ ...original, order: { ...original.order, status } })
+    at('/restaurant-test/delivery?id=o1')
+    render(<DeliveryPage />)
+    const dialog = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
+    await dialog.findByText('唐揚げ弁当')
+    expect(dialog.getByText(/受け付け・拒否・キャンセル・準備完了の操作はまだ利用できません/)).toBeTruthy()
+    for (const name of status === 'new' ? ['注文をキャンセルする', '断る', '受け付ける'] : ['注文をキャンセルする', '準備完了にする']) {
+      const button = dialog.getByRole('button', { name }) as HTMLButtonElement
+      expect(button.disabled).toBe(true)
+      expect(button.title).toBe('準備中')
+      fireEvent.click(button)
+    }
+    expect(fixture.accept).not.toHaveBeenCalled()
+    expect(fixture.reject).not.toHaveBeenCalled()
+    expect(fixture.ready).not.toHaveBeenCalled()
+    expect(fixture.cancel).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['demaecan', '出前館', 'new', '受け付ける', 'accept'],
+    ['rocketnow', 'ロケットナウ', 'new', '受け付ける', 'accept'],
+    ['demaecan', '出前館', 'cooking', '準備完了にする', 'ready'],
+    ['rocketnow', 'ロケットナウ', 'cooking', '準備完了にする', 'ready'],
+  ] as const)('%s（%s）の%s注文で%sを送れる', async (service, serviceLabel, status, label, action) => {
+    const original = await fixture.order()
+    fixture.order.mockResolvedValue({ ...original, order: { ...original.order, service, serviceLabel, status } })
+    fixture.orders.mockResolvedValue(ordersData([order('o1', 'OTHER-1001', { service, serviceLabel, status })]))
+    fixture[action].mockResolvedValue({ success: true })
+    at('/restaurant-test/delivery?id=o1')
+    render(<DeliveryPage />)
+    const dialog = within(await screen.findByRole('dialog', { name: '注文の詳細' }))
+    const actionButton = await dialog.findByRole('button', { name: label })
+    expect((actionButton as HTMLButtonElement).disabled).toBe(false)
+    expect(dialog.queryByText(/操作はまだ利用できません/)).toBeNull()
+    for (const name of status === 'new' ? ['注文をキャンセルする', '断る'] : ['注文をキャンセルする']) {
+      expect((dialog.getByRole('button', { name }) as HTMLButtonElement).disabled).toBe(false)
+    }
+    fireEvent.click(actionButton)
+    await waitFor(() => expect(fixture[action]).toHaveBeenCalledWith('account-1', 'o1'))
+  })
+
+  it('一括停止でUberを選べず、他社だけを送る', async () => {
+    fixture.stopIntake.mockResolvedValue({ stopped: ['demaecan'], failed: [] })
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    fireEvent.click(screen.getByText('受付をまとめて止める'))
+    const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+    const uber = dialog.getByRole('checkbox', { name: /Uber Eatsの受付を止める/ }) as HTMLInputElement
+    expect(uber.disabled).toBe(true)
+    expect(uber.checked).toBe(false)
+    fireEvent.click(uber)
+    fireEvent.click(dialog.getByRole('button', { name: '止める' }))
+    await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m'))
+  })
+
+  it('Uberを含む商品の同期を止め、他社だけの商品は残す', async () => {
+    const other = { ...menuItem('other', '他社だけの商品'), services: [{ service: 'demaecan', label: '出前館' }] }
+    fixture.menuItems.mockResolvedValue({ success: true, items: [menuItem('m1', 'Uberの商品'), other] })
+    fixture.bulkSoldOut.mockResolvedValue({ updated: ['other'], failed: [] })
+    at('/restaurant-test/delivery?view=sold-out')
+    render(<DeliveryPage />)
+    await screen.findByText('Uberの商品')
+    const toggle = screen.getByRole('switch', { name: 'Uberの商品の販売' })
+    expect((toggle as HTMLInputElement).disabled || toggle.getAttribute('aria-disabled') === 'true').toBe(true)
+    fireEvent.click(toggle)
+    expect(fixture.bulkSoldOut).not.toHaveBeenCalled()
+    expect((screen.getByLabelText('Uberの商品を選ぶ') as HTMLInputElement).disabled).toBe(true)
+    fireEvent.click(screen.getByLabelText('表示中をすべて選ぶ'))
+    fireEvent.click(screen.getByRole('button', { name: '選んだ商品を品切れにする' }))
+    await waitFor(() => expect(fixture.bulkSoldOut).toHaveBeenCalledWith('account-1', ['other'], true))
+  })
+
+  it('Uberの過去の注文・詳細・CSVを引き続き確認できる', async () => {
+    fixture.history.mockResolvedValue({ success: true, totals: { count: 1, amount: 3480, byService: [], canceledCount: 0 }, orders: [order('o1', 'UE-1001')] })
+    fixture.historyCsv.mockResolvedValue({ truncated: false })
+    at('/restaurant-test/delivery?view=history')
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    fireEvent.click(screen.getByRole('button', { name: /CSV/ }))
+    await waitFor(() => expect(fixture.historyCsv).toHaveBeenCalledWith('account-1', expect.objectContaining({ from: expect.any(String), to: expect.any(String) })))
+    fireEvent.click(screen.getByRole('button', { name: '注文UE-1001の詳細' }))
+    expect(await screen.findByRole('dialog', { name: '注文の詳細' })).toBeTruthy()
   })
 })

@@ -22,6 +22,9 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
+  "dependencies": {
+    "@line-crm/shared": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5.9.3"
   },

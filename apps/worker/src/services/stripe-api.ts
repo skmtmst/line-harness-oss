@@ -1,3 +1,5 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { boundedHttpRequest } from '../lib/external-call/bounded-http.js';
 /**
  * Stripe の API を呼ぶ小さな道具。SDK は使わず fetch で叩く（Workers で軽く保つ）。
  *
@@ -12,11 +14,13 @@ export interface StripeEnv {
 export class StripeApiError extends Error {
   readonly status: number;
   readonly code: string | null;
-  constructor(status: number, message: string, code: string | null = null) {
+  readonly resultUnknown: boolean;
+  constructor(status: number, message: string, code: string | null = null, resultUnknown = false) {
     super(message);
     this.name = 'StripeApiError';
     this.status = status;
     this.code = code;
+    this.resultUnknown = resultUnknown;
   }
 }
 
@@ -46,7 +50,7 @@ export async function stripeRequest<T>(
   method: 'GET' | 'POST',
   path: string,
   body?: Record<string, FormValue>,
-  options: { idempotencyKey?: string; fetchImpl?: typeof fetch } = {},
+  options: { idempotencyKey?: string; fetchImpl?: typeof fetch; signal?: AbortSignal } = {},
 ): Promise<T> {
   if (!env.STRIPE_SECRET_KEY) throw new StripeApiError(503, 'Stripe の接続設定がまだありません', 'not_configured');
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -71,9 +75,9 @@ export async function stripeRequest<T>(
    */
   let res: Response;
   try {
-    res = await fetchImpl(url, { method, headers, body: payload });
+    res = await boundedHttpRequest(url, { method, headers, body: payload, signal: options.signal }, { timeoutMs: 10_000, maxResponseBytes: 1024 * 1024, fetch: fetchImpl });
   } catch {
-    throw new StripeApiError(502, '決済サービスにつながりませんでした', 'network_unreachable');
+    throw new StripeApiError(502, '決済サービスにつながりませんでした', 'network_unreachable', method === 'POST');
   }
   const text = await res.text();
   let json: unknown = null;
@@ -84,7 +88,7 @@ export async function stripeRequest<T>(
   }
   if (!res.ok) {
     const error = (json as { error?: { message?: string; code?: string } } | null)?.error;
-    throw new StripeApiError(res.status, error?.message ?? `Stripe error ${res.status}`, error?.code ?? null);
+    throw new StripeApiError(res.status, error?.message ?? `Stripe error ${res.status}`, error?.code ?? null, method === 'POST' && (res.status === 408 || res.status >= 500));
   }
   return json as T;
 }

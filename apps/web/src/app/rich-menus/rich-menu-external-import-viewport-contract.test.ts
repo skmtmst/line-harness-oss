@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 const directory = dirname(fileURLToPath(import.meta.url))
-// 取り込み画面の中身は external-import.tsx（★V7・★V8 の一覧で共有）。
+// 取り込み画面の中身は external-import.tsx（★管理画面・★V8 の一覧で共有）。
 const source = readFileSync(join(directory, '../../v8/rich-menus/list.tsx'), 'utf8')
   + readFileSync(join(directory, '../../v8/rich-menus/external-import.tsx'), 'utf8')
 const listCss = readFileSync(join(directory, '../../v8/rich-menus/list.module.css'), 'utf8')

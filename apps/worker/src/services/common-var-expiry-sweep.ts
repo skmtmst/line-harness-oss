@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 // Q: 共通情報の期限の14日前と3日前に運用者へ知らせる。
 //
 // 送る口は運用者通知ルール（common_var_expiry）なので、届け先は
@@ -12,6 +13,7 @@ import {
   markCommonVarExpiryNotice,
   type CommonVarExpiryCandidate,
 } from '@line-crm/db';
+
 import { dispatchOperatorEvent } from './operator-notification-dispatch.js';
 import type { sendOperationEmail } from './operation-notifications.js';
 
@@ -49,7 +51,7 @@ export async function sweepCommonVarExpiryNotices(
       result.notified += notified;
     } catch (error) {
       result.errors += 1;
-      console.error(JSON.stringify({"code":"common_var_expiry_notice_error"}));
+      logger.error("common_var_expiry_notice_error");
     }
   }
   return result;

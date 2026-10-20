@@ -33,7 +33,7 @@ import { listOperatorEventTypes } from './operator-notification-registry.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCREEN_OPTIONS_FILE = join(
   HERE, '..', '..', '..', '..',
-  'apps', 'web', 'src', 'app', 'line-notifications', 'operator-event-options.ts',
+  'apps', 'web', 'src', 'v8', 'line-notifications', 'operator-event-options.ts',
 );
 
 /**
@@ -45,8 +45,8 @@ const SCREEN_OPTIONS_FILE = join(
  * 自体が抑止**になる。
  */
 const SCREEN_HIDDEN_EVENT_TYPES: ReadonlyArray<{ eventType: string; reason: string }> = [
-  {eventType:'inbox_new_inquiry',reason:'B-349 G4はAPIのみの担当。画面の選択肢・PWAはClaudeの接続待ち。APIから通知ルールを作れる。画面の接続時にこの例外を消す。'},
-  {eventType:'inbox_assigned_reply',reason:'B-349 G4はAPIのみの担当。画面の選択肢・PWAはClaudeの接続待ち。APIから通知ルールを作れる。画面の接続時にこの例外を消す。'},
+  {eventType:'inbox_new_inquiry',reason:'担当者通知はAPIのみの担当。画面の選択肢・PWAはClaudeの接続待ち。APIから通知ルールを作れる。画面の接続時にこの例外を消す。'},
+  {eventType:'inbox_assigned_reply',reason:'担当者通知はAPIのみの担当。画面の選択肢・PWAはClaudeの接続待ち。APIから通知ルールを作れる。画面の接続時にこの例外を消す。'},
 ];
 
 const screenSource = readFileSync(SCREEN_OPTIONS_FILE, 'utf8');

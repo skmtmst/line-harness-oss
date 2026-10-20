@@ -43,7 +43,7 @@ export function rateText(rate: number | null | undefined): string {
 
 /**
  * 作成の5つの手順（`draft_step` と同じ並び）。言葉は ★V8 の絵
- * （詳細の下書き `cgiGB`・予約したあと `cdZBf`）どおり。
+ * （詳細の下書き ・予約したあと ）どおり。
  * key は作成画面の `?step=` と同じ。
  */
 export const CREATION_STEPS: ReadonlyArray<{ key: string; order: number; label: string }> = [
@@ -61,7 +61,7 @@ export function formatBroadcastDateTime(value: string | null | undefined): strin
 
 
 
-/** スマホの札の短い日時「8/24（月）10:00」（絵 `pNiUk`・`cdZBf`）。 */
+/** スマホの札の短い日時「8/24（月）10:00」。 */
 export function formatShortDateTime(value: string | null | undefined): string {
   return polishFormatDate(value, { style: 'list', fallback: '' })
 }

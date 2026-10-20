@@ -1,4 +1,4 @@
-import type { EventOccurrenceApplicants } from './event-waitlist.js';
+import type { EventOccurrenceApplicants } from './event-waitlist-types.js';
 
 export const EVENT_APPLICANT_SNAPSHOT_TTL_MS = 15 * 60 * 1_000;
 

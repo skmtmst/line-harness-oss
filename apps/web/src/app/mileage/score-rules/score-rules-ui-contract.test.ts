@@ -12,7 +12,7 @@ const ADJUSTMENT = readFileSync(
 
 /*
  * ここは**画面の文字と幅**だけを見る。口とデータは #496 の
- * `mileage-v6-contract.test.ts` が見ている。
+ * `mileage-管理画面-contract.test.ts` が見ている。
  */
 describe('スコアのルール：失敗の文言', () => {
   it('`ApiError` の中身をそのまま出さない', () => {
@@ -52,7 +52,7 @@ describe('スコアのルール：失敗の文言', () => {
   })
 })
 
-describe('スコアのルール：V6の配置', () => {
+describe("スコアのルール：管理画面の配置", () => {
   it('詳しい入力は共通ダイアログで直す', () => {
     expect(PAGE).toContain('title="できごとの設定を直す"')
     expect(PAGE).toContain('setEditRuleIndex(index)')

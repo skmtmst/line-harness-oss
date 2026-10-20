@@ -3,14 +3,14 @@
 /*
  * LINE プレビューの枠（Pencil ★V8 `cfVyj`）。
  *
- * V7 はトーク背景色のパネルだけ。V8 は白い板の中に置かれるので、
+ * 互換経路はトーク背景色のパネルだけ。V8 は白い板の中に置かれるので、
  * 板の決まり（細い枠・radius-panel・board の薄い影）にそろえる。
  * 吹き出し・カードなど中身の改修は各画面側で別途行う。
  */
 
 
 /*
- * 電話枠なしの平らなカード（If9Mh お客様にはこう届きます）。
+ * 電話枠なしの平らなカード（ お客様にはこう届きます）。
  * 白・内側12・間4。角丸は絵14にいちばん近い既存トークンを使う。
  */
 .flat {
@@ -18,7 +18,6 @@
   padding: 12px; border-radius: var(--radius-card); background: var(--color-canvas);
   outline: 1px solid var(--color-hairline); outline-offset: -0.5px;
 }
-.flatEmpty { margin: 0; color: var(--color-ink-faint); font-size: 12px; line-height: 1.5; }
 }
 
 
@@ -26,7 +25,7 @@
  * ★V8（夕15・cfVyj / specs/line-preview-real-phone.md）：本物のスマホ。
  * LINE アプリの画面なのでテーマトークンではなく globals.css の
  * `[data-theme="v8"]` に置いた `--v8-line-*` を読む（直値は globals に
- * だけ書き、ここでは var() で読む）。v7 では部品がこの枠を描かない。
+ * だけ書き、ここでは var で読む）。互換経路では部品がこの枠を描かない。
  * ------------------------------------------------------------------ */
 
 .phoneRoot {
@@ -43,7 +42,7 @@
   color: var(--color-ink);
 }
 
-/* v8 のスマホに内の題は置かない（cfVyj・j7PP04 どおり）。題は外が担う。 */
+/* v8 のスマホに内の題は置かない（cfVyj・ どおり）。題は外が担う。 */
 
 /* 器 330×690・黒・縁 2px・内側 10・角丸 52・下への影。 */
 .phone {
@@ -211,7 +210,7 @@
   background: var(--v8-line-homebar);
 }
 
-/* cfVyj の実測。既存の v7 パネルには適用しない。 */
+/* cfVyj の実測。既存の 管理画面 パネルには適用しない。 */
 :root .phoneRoot { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; }
 :root .statusBar { align-items: flex-start; }
 :root .statusIcons { flex-shrink: 0; }
@@ -247,13 +246,13 @@
 :root .bubbleText { flex: 1; word-break: normal; }
 :root .clock { font-variant-numeric: normal; }
 
-/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 :root .phoneRoot { -webkit-font-smoothing: auto; }
 
 /* LINEの時刻は正本のInterと同じ比例幅。管理画面の等幅数字を継承しない。 */
 :root .messageTime { font-variant-numeric: normal; }
 
-/* ★V8 絵（JeINq「段の題 LINEでの見え方」）：題は右の列の幅いっぱいで左寄せ・15px/600/23・? との間6。スマホは下の真ん中。 */
+/* ★V8 絵（「段の題 LINEでの見え方」）：題は右の列の幅いっぱいで左寄せ・15px/600/23・? との間6。スマホは下の真ん中。 */
 :root .phoneRoot { width: 100%; }
 :root .phoneTitle { justify-content: flex-start; font-size: var(--tpl-preview-title-size); font-weight: 600; line-height: var(--tpl-preview-title-lh); }
 :root .phone { margin-inline: auto; }
@@ -267,12 +266,12 @@
 :root .messageRow { min-width: 0; }
 :root .senderBody { flex: 0 1 auto; min-width: 0; }
 :root .bubbleRow { max-width: 100%; }
-/* 吹き出しは文の幅 186＋左右の余白 12（絵 UTbi1 の吹き出し 210）。 */
+/* 吹き出しは文の幅 186＋左右の余白 12（吹き出し 210）。 */
 :root .bubble { width: auto; min-height: 0; max-width: 210px; flex-shrink: 1; }
 :root .tail { display: none; }
 :root .bubbleBody { display: block; width: auto; min-height: 0; padding: 8px 12px; border-radius: var(--radius-mini) var(--radius-large) var(--radius-large) var(--radius-large); color: var(--color-ink); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
 :root .bubbleText { display: inline; }
-/* 行末の1〜3字だけが次の行へ落ちないよう、日本語は文節で折り、最後の数行の折り返しを整える（UTbi1「は。」）。URL は .urlLine で1行。 */
+/* 行末の1〜3字だけが次の行へ落ちないよう、日本語は文節で折り、最後の数行の折り返しを整える（「は。」）。URL は .urlLine で1行。 */
 :root .bubbleBody, :root .bubbleBody .bubbleText, :root .outgoingBubble { text-wrap: pretty; word-break: auto-phrase; }
 :root .urlLine { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 

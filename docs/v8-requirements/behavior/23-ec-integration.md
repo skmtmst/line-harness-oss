@@ -1,3 +1,5 @@
+> 文書：23 EC連携 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 23 EC連携 操作と挙動（受け入れ）
 
 要件の正本：[V6 23 EC連携 要件定義](../../v6-requirements/v6-23-ec-integration-requirements-draft.md)。共通の動き・権限は [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限、§6-2 再試行、§9 未取得の表示、§11 応答コード、§15 進み・トースト）と [30 ログインユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。
@@ -88,8 +90,8 @@
 コードを読んで確かめたものだけ。直していない。
 
 1. つなぎ先の「どこの出来事を取り込むか」「照合のルール」は保存されるが、受け口でも処理でも使われていない。外しても出来事は取り込まれる（要件 §4 の event subscription）。根拠：`apps/worker/src/routes/ec-commerce.ts:901-910`（保存だけ）、受け口がつなぎ先から読むのは鍵だけ `apps/worker/src/routes/ec-integrations.ts:456-458`。`event_types_json`・`identity_rules_json` をほかで読む所は無い。
-2. 会員のつき合わせの候補（EC 会員と友だちの組）を作る処理が無い。候補を書く口は友だちの重複にしか使われず、検出の口も友だちの重複だけを受け付ける。候補の表は、別の手段で入れない限り空のまま（要件 §7）。根拠：`apps/worker/src/services/friend-duplicate-candidates.ts:129-131`（唯一の呼び出し・`friend_duplicate`）、`apps/worker/src/routes/identity-candidates.ts:188`。
-3. 「会員の確認待ち」になった出来事は、あとで友だちになっても・つき合わせで結んでも処理し直されない。処理を始めるのは「受け取り」「失敗」の行だけで、送信の宛先は出来事の LINE ID だけで探し、結んだ記録（EC 会員と友だちの結びつき）は見ない（要件 §7「過去eventを再処理する範囲を選ぶ」）。根拠：`apps/worker/src/services/ec-event-processing.ts:133-137`・`211`、`apps/worker/src/services/ec-retry.ts:28` の注記。
+2. 会員のつき合わせの候補（EC 会員と友だちの組）を作る処理が無い。候補を書く口は友だちの重複にしか使われず、検出の口も友だちの重複だけを受け付ける。候補の表は、別の手段で入れない限り空のまま（要件 §7）。根拠：`apps/worker/src/features/friends/friend-duplicate-candidates.ts:129-131`（唯一の呼び出し・`friend_duplicate`）、`apps/worker/src/routes/identity-candidates.ts:188`。
+3. 「会員の確認待ち」になった出来事は、あとで友だちになっても・つき合わせで結んでも処理し直されない。処理を始めるのは「受け取り」「失敗」の行だけで、送信の宛先は出来事の LINE ID だけで探し、結んだ記録（EC 会員と友だちの結びつき）は見ない（要件 §7「過去eventを再処理する範囲を選ぶ」）。根拠：`apps/worker/src/features/ec-commerce/ec-event-processing.ts:133-137`・`211`、`apps/worker/src/features/ec-commerce/ec-retry.ts:28` の注記。
 4. アカウント指定（ヘッダー）の無い受け取りを今も許し、指定が無く LINE ID も無い出来事は、動いているアカウントが2つ以上あると 400 で断られ記録に残らない。要件 §4・§18 は「アカウント指定を必須」「LINE ID が無くても捨てない」。根拠：`apps/worker/src/routes/ec-integrations.ts:412-430`・`570-589`。
 5. 署名を確かめる前に、ヘッダーで指定したアカウントにつなぎ先の鍵があるかどうかで応答が 503 と 401 に分かれる（全体の鍵が無い環境のとき）。要件 §4「署名を確かめる前にアカウントの有無を応答へ出さない」。根拠：`apps/worker/src/routes/ec-integrations.ts:544-551`。
 6. 鍵の差し替えで古い鍵は即座に使えなくなる（古い新しいを短い間だけ両方受ける仕組みが無い。両方受けるのは「つなぎ先の鍵」と「全体の鍵」の組だけ）。要件 §4「旧新を短期間併用」。根拠：`apps/worker/src/routes/ec-commerce.ts:889-897`、`apps/worker/src/routes/ec-integrations.ts:573-575`。

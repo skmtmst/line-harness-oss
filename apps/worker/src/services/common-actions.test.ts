@@ -37,7 +37,7 @@ const tagAction = (tagId: string) => [{
   onFailure: 'stop',
 }];
 
-describe('V6共通アクション', () => {
+describe('共通アクション', () => {
   let testDb: SqliteD1;
 
   beforeEach(() => {
@@ -442,6 +442,8 @@ describe('V6共通アクション', () => {
     // R472: 動かしていない箇所は0件。同じ実行を重ねて数えない。
     expect(byId.get('b-root')).toMatchObject({ runningCount: 1, waitingCount: 1 });
     expect(byId.get('b-never')).toMatchObject({ runningCount: 0, waitingCount: 0 });
+    expect(byId.get('b-root')).toMatchObject({ consumerPath: 'root' });
+    expect(byId.get('b-never')).toMatchObject({ consumerPath: 'never' });
 
     // v2 を公開して root の利用先だけ切り替える。実行中の2件は旧版のまま。
     const draft2 = await createCommonActionDraft(testDb.db, {

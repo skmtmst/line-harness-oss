@@ -1,5 +1,6 @@
+import { logger } from '@line-crm/shared/server';
 import type { VisitStampSettings, VisitStampCardInput, VisitStampCard, VisitStampWallet, VisitStampEntry, VisitStampRedemption } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getStaffById } from '@line-crm/db';
 import { getVisibleLineAccountScope } from './account-access.js';
 import { featureJobCanRun } from './feature-enforcement.js';
@@ -384,14 +385,14 @@ export async function reconcileStampVisit(db:D1Database,kind:StampVisitKind,id:s
 export async function processVisitStampQueue(env:Env['Bindings']) {
   const db=dbFor(env);let queue:Array<{kind:StampVisitKind;visit_id:string;generation:number}>;
   try {queue=(await db.prepare('SELECT kind,visit_id,generation FROM visit_stamp_visit_queue ORDER BY updated_at LIMIT 100').all<{kind:StampVisitKind;visit_id:string;generation:number}>()).results;}
-  catch {console.error(JSON.stringify({"code":"visit_stamp_queue_unavailable"}));return;}
+  catch {logger.error("visit_stamp_queue_unavailable");return;}
   for(const q of queue) {
     try {await reconcileStampVisit(db,q.kind,q.visit_id,q.generation);await db.prepare('DELETE FROM visit_stamp_visit_queue WHERE kind=? AND visit_id=? AND generation=?').bind(q.kind,q.visit_id,q.generation).run();}
     catch {
       // 失敗を先頭に固定しない。並走して積まれた新しい世代は触らない。
       await db.prepare("UPDATE visit_stamp_visit_queue SET updated_at=strftime('%Y-%m-%d %H:%M:%f','now') WHERE kind=? AND visit_id=? AND generation=?")
         .bind(q.kind,q.visit_id,q.generation).run().catch(()=>undefined);
-      console.error(JSON.stringify({"code":"visit_stamp_reconcile_pending"}));
+      logger.error("visit_stamp_reconcile_pending");
     }
   }
 }

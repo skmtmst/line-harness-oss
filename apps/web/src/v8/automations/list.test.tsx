@@ -30,7 +30,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageCrumbs: () => {},
 }))
 
-// 1440 の板で見る（1152 の板 En14p は狭い幅のとき）。
+// 1440 の板で見る（1152 の板  は狭い幅のとき）。
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
 
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
@@ -286,7 +286,7 @@ describe('V8 オートメーションの共通アクション（LnGNw）', () =>
   })
 })
 
- it.each([['ルール',AutomationListV8],['共通アクション',CommonActionsV8]])('B-241：%sのフォルダ取得失敗と空を分け、読込だけやり直す', async (_label,Component) => {
+ it.each([['ルール',AutomationListV8],['共通アクション',CommonActionsV8]])('%sのフォルダ取得失敗と空を分け、読込だけやり直す', async (_label,Component) => {
    const fetchFixture=globalThis.fetch
    let folderReads=0
    vi.stubGlobal('fetch', async (input: RequestInfo|URL,init?:RequestInit) => {

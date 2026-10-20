@@ -1,5 +1,6 @@
 'use client'
 
+import { canManageRole } from '@/lib/staff-role'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { useEffect, useId, useState, type ReactNode } from 'react'
@@ -23,9 +24,9 @@ import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 
 /*
- * ★V8 統括のメンバーの窓（Pencil `yLKwV` 権限者を招待・`BHEl9` 権限を変更する・`M4jS9` 変える前の確認）。
+ * ★V8 統括のメンバーの窓（Pencil  権限者を招待・ 権限を変更する・ 変える前の確認）。
  *
- * 読み書きの中身は v7（components/hq/members/member-dialog.tsx）と同じ：
+ * 読み書きの中身は 管理画面（components/hq/members/member-dialog.tsx）と同じ：
  *   招待＝名前・メール・役割・担当範囲・最初に表示するアカウント
  *   変更＝役割・担当範囲・最初に表示するアカウント・状態（名前とメールは本人が持つ）
  * 見た目だけを絵どおりに組んだ：幅 620・上から 110 の窓、欄は全幅で縦に並べ、担当範囲と状態は
@@ -33,10 +34,10 @@ import { folderDisplayColor } from '@/components/shared/folder-dot'
  * 窓の枠・×・題は共通の Dialog、頭の寸法は dialog-head.module.css。
  */
 
-/** 絵 `yLKwV`・`BHEl9` の窓の幅と上からの位置（px）。 */
+/** 絵の の窓の幅と上からの位置（px）。 */
 const MEMBER_WIDTH = 620
 const MEMBER_TOP = 110
-/** 絵 `M4jS9` の確認の窓。 */
+/** 絵  の確認の窓。 */
 const CONFIRM_TOP = 220
 
 export type MemberRole = 'admin' | 'staff' | 'viewer'
@@ -53,7 +54,7 @@ export type MemberDialogValue = {
 
 /**
  * 招待メールは送った日から7日（実装 `staff-invite.ts` が7日で送る）。
- * 絵 `yLKwV` の「10/9（金）18:40」の形で出す。
+ * 絵  の「10/9（金）18:40」の形で出す。
  */
 export function inviteExpiryLabel(now: Date = new Date()): string {
   return polishFormatDate(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), { style: 'detail', now })
@@ -72,12 +73,12 @@ function initial(member: StaffMember | null, accounts: LineAccount[]): MemberDia
     name: member?.name ?? '',
     email: member?.email ?? '',
     /*
-     * 招待は「閲覧のみ」から始める（絵 `yLKwV`）。広い権限は選んだときだけ渡す。
-     * 変更は今の役割のまま（v7 は担当者を管理者に置き換えていた）。
+     * 招待は「閲覧のみ」から始める。広い権限は選んだときだけ渡す。
+     * 変更は今の役割のまま（互換経路は担当者を管理者に置き換えていた）。
      */
     role: member ? (member.role === 'viewer' ? 'viewer' : member.role === 'staff' ? 'staff' : 'admin') : 'viewer',
     assignedLineAccountId: member?.assignedLineAccountId ?? accounts[0]?.id ?? '',
-    /* 招待は「指定したアカウントだけ」＋最初に表示するアカウントから始める（絵 `yLKwV`）。 */
+    /* 招待は「指定したアカウントだけ」＋最初に表示するアカウントから始める。 */
     accountScope: member ? member.accountScope ?? 'all' : accounts[0] ? 'accounts' : 'all',
     scopedLineAccountIds: member ? member.scopedLineAccountIds ?? [] : accounts[0] ? [accounts[0].id] : [],
     isActive: member?.isActive ?? true,
@@ -118,7 +119,7 @@ export default function MemberDialogV8({
   const [value, setValue] = useState<MemberDialogValue>(initial(member, accounts))
   const [localError, setLocalError] = useState('')
   const accountFolders = useHqAccountFolders(open)
-  /* 板 `ukPgd`：名前・メールの間違いは欄の下に赤で出し、直すまで送るボタンを押せなくする。 */
+  /* 板 ：名前・メールの間違いは欄の下に赤で出し、直すまで送るボタンを押せなくする。 */
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; scope?: string; assigned?: string }>({})
 
   useEffect(() => {
@@ -136,7 +137,7 @@ export default function MemberDialogV8({
   }
 
   const submit = () => {
-    /* 欄の誤りは全部その欄の下に出し、上から1つ目へ移る（板 ukPgd・B-139）。 */
+    /* 欄の誤りは全部その欄の下に出し、上から1つ目へ移る（板 ・）。 */
     const errors = {
       name: member ? undefined : inviteRequirements.name.check(value.name) ?? undefined,
       email: member ? undefined : inviteRequirements.email.check(value.email) ?? undefined,
@@ -154,7 +155,7 @@ export default function MemberDialogV8({
     onSubmit({ ...value, name: value.name.trim(), email: value.email.trim() })
   }
 
-  /* 絵 `BHEl9`：変更の窓には決まりの注をいつも出す（自分・招待中の人のどちらでも同じ文）。 */
+  /* 絵 ：変更の窓には決まりの注をいつも出す（自分・招待中の人のどちらでも同じ文）。 */
   const note = member ? '自分の役割と状態は変えられません。招待中の人には「招待メールを再送」が出ます。' : ''
   /* 担当者は今その役割の人にだけ出す（新しく担当者にするには機能ごとの権限が要るので、ログインユーザーの画面で決める）。 */
   const roleOptions = [
@@ -178,7 +179,7 @@ export default function MemberDialogV8({
           ? member.email ? `${member.name}（${member.email}）` : member.name
           : `招待メールは送った日から 7 日（${inviteExpiryLabel()} まで）有効です。メールの確認と LINE の連携が済むとログインできます。`
       }
-      /* 板 `ukPgd`：招待の入力の間違いは同じ窓の状態として印を付ける。 */
+      /* 板 ：招待の入力の間違いは同じ窓の状態として印を付ける。 */
       designNode={member ? 'BHEl9' : fieldErrors.name || fieldErrors.email ? 'ukPgd' : 'yLKwV'}
       designWidth={MEMBER_WIDTH}
       designTop={MEMBER_TOP}
@@ -280,9 +281,9 @@ export default function MemberDialogV8({
 
 const ROLE_WORD: Record<string, string> = { owner: 'オーナー', admin: '管理者', staff: '担当者', viewer: '閲覧のみ' }
 /** 請求の画面を見られるのはオーナーと管理者だけ。 */
-const seesBilling = (role: string) => role === 'owner' || role === 'admin'
+const seesBilling = (role: string) => canManageRole(role)
 
-/** 板 `M4jS9`「権限を変える確認」。変える前に変更前→変更後を並べる。 */
+/** 板 「権限を変える確認」。変える前に変更前→変更後を並べる。 */
 export function MemberChangeConfirmV8({ member, value, accountNames, busy, error, onCancel, onConfirm }: {
   member: StaffMember
   value: MemberDialogValue

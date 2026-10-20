@@ -1,4 +1,4 @@
-import type { FriendFieldType } from './types.js';
+import type { FriendFieldType } from './types/friend-fields.js';
 import type { HqTemplateListStats } from "./hq-template-distribution-display.js";
 import type { HqTemplateListDisplay } from './hq-template-list.js';
 export type HqFriendAttributeType = 'friend_field' | 'mark';

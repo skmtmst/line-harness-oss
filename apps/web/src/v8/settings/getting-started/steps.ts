@@ -8,9 +8,8 @@ import type {
 import type { GettingStartedStep } from '@/lib/api'
 
 /*
- * ★V8 はじめの設定（xuJ7D）の6段の判定。
- * app/getting-started/getting-started-view.ts と feature-presets.ts から写した（src/v8 は @/app を読めない）。
- * 判定の中身は同じ。直すときは両方を直す（V8 に切り替える日に古い方を消す）。
+ * ★V8 はじめの設定の6段の判定。
+ * V8 の両入口が使う表示モデル。完了の判定はAPIの実際の状態を優先する。
  * 画面に出す2段目の言葉だけ絵どおり（「チャネル ID」「自分の LINE」の空き）。
  */
 
@@ -229,14 +228,7 @@ function scenarioStep(input: GettingStartedInput): StepResult {
   }
 }
 
-/**
- * 最終確認 最初の1通を受け取る。
- *
- * **数えられない。** 「1通目が実際に届いたか」を返す口がまだ無い
- * （要件 §6-1 は `messages_log` の `succeeded` を見ると決めているが、
- * 画面から引ける口が用意されていない）。
- * 数を作らず、確かめられないことをそのまま言う。
- */
+/** 最初の1通の判定は V8 の実APIが行う。画面単独の判定では未確認のまま。 */
 function firstMessageStep(input: GettingStartedInput): StepResult {
   const allowed = !isViewer(input.role)
   return {
@@ -247,9 +239,9 @@ function firstMessageStep(input: GettingStartedInput): StepResult {
     state: allowed ? 'unknown' : 'forbidden',
     condition: '友だち追加時の配信かシナリオの1通目が、実際に1件届いている',
     next: allowed
-      ? '届いたかどうかを数える口がまだありません。QRを読んで自分を友だちに追加するか、テスト受信者へ送って、受信箱で確かめてください。'
+      ? 'QRを読んで自分を友だちに追加するか、シナリオのテスト送信で確かめてください。受信箱からの手動返信は完了条件に含めません。'
       : 'QRを読んで自分を友だちに追加するか、テスト受信者へ送ります。',
-    action: allowed ? { label: 'テストを送る', href: '/chats' } : null,
+    action: allowed ? { label: '受信の確認方法を見る', href: '/getting-started#first-message' } : null,
     blockedReason: allowed ? null : '管理者に頼んでください',
   }
 }
@@ -269,8 +261,7 @@ export function buildSteps(input: GettingStartedInput): StepResult[] {
  * サーバが判定した段を、設計の説明と操作へ結び付ける。
  * 完了判定を画面で再計算しないため、状態・権限・行き先は必ずAPIを正本にする。
  *
- * 初期セット（段2）は口に無いのでここでは含めない。ダッシュボードの帯は
- * この5段のまま数える。はじめの設定の画面で `insertFeatureSet` を足す。
+ * 初期セットを含む V8 の6段を両入口へ同じ形で渡す。旧応答の不足は未確認とする。
  */
 export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>): StepResult[] {
   const byKey = new Map<string, GettingStartedStep>(serverSteps.map((step) => [step.key, step]))
@@ -327,13 +318,13 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
       attributes: '友だちの分け方へ',
       friendAdd: '友だち追加時の配信へ',
       scenario: state === 'todo' ? 'レシピから作る' : 'シナリオ配信へ',
-      firstMessage: 'テストを送る',
+      firstMessage: '受信の確認方法を見る',
     }
     let href: string | null = server.href
     // まだ無いものを作りに行く行き先は、口の保存先ではなく作る画面にする。
     if (base.key === 'scenario' && state === 'todo') href = '/recipes'
-    // テスト送信は受信箱で行う（口の権限表 `message.test.send` の持ち場）。
-    if (base.key === 'firstMessage') href = '/chats'
+    // 送信ボタンではなく、既存のQR・シナリオのテスト送信までの道順を開く。
+    if (base.key === 'firstMessage' && href) href = '/getting-started#first-message'
     const action = href && state !== 'forbidden' ? { label: labels[base.key], href } : null
 
     return {

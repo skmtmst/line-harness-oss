@@ -6,7 +6,7 @@ import {
   isFriendLineUserIdConflict,
   updateFriendFollowStatus,
   upsertFriend,
-} from '../src/friends.js';
+} from '../src/friends/index.js';
 
 /**
  * Issue #961: 同一 LINE user ID が複数アカウントに存在するとき、

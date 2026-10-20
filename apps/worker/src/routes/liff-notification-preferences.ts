@@ -1,6 +1,6 @@
 import { isLineAccountTenantActive, activeTenantLineAccountSql } from '@line-crm/db';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 

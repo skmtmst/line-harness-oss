@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   form_name: requiredText("流入元の名前を入力してください"),
 }
 
@@ -29,6 +29,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict, isConflictResponse } from '@/components/shared/save-conflict'
 import EditorSurface from '@/components/shared/editor-surface'
 
 /*
@@ -119,21 +120,45 @@ export default function EditRouteModal({
   // the user from accidentally renaming the ref and orphaning the prior stats.
   const refCodeLocked = isNew && !!initialRefCode
   const genreLocked = isNew && !!initialGenre
-  const [form, setForm] = useState<CreateEntryRouteInput>(() => ({
-    refCode: route?.refCode ?? initialRefCode ?? '',
-    genre: route?.genre ?? initialGenre ?? '',
-    name: route?.name ?? '',
-    tagId: route?.tagId ?? null,
-    poolId: route?.poolId ?? mainPool?.id ?? null,
-    scenarioId: route?.scenarioId ?? null,
-    introTemplateId: route?.introTemplateId ?? null,
-    couponEnabled: route?.couponEnabled ?? false,
-    couponAssetId: route?.couponAssetId ?? null,
-    couponAudience: route?.couponAudience ?? 'new_friends',
-    runAccountFriendAddScenarios: route?.runAccountFriendAddScenarios ?? true,
-    redirectUrl: route?.redirectUrl ?? null,
-    isActive: route?.isActive ?? true,
-  }))
+  const formValues = (source: EntryRoute | null): CreateEntryRouteInput => ({
+    refCode: source?.refCode ?? initialRefCode ?? '',
+    genre: source?.genre ?? initialGenre ?? '',
+    name: source?.name ?? '',
+    tagId: source?.tagId ?? null,
+    poolId: source?.poolId ?? mainPool?.id ?? null,
+    scenarioId: source?.scenarioId ?? null,
+    introTemplateId: source?.introTemplateId ?? null,
+    couponEnabled: source?.couponEnabled ?? false,
+    couponAssetId: source?.couponAssetId ?? null,
+    couponAudience: source?.couponAudience ?? 'new_friends',
+    runAccountFriendAddScenarios: source?.runAccountFriendAddScenarios ?? true,
+    redirectUrl: source?.redirectUrl ?? null,
+    isActive: source?.isActive ?? true,
+  })
+  const [form, setForm] = useState<CreateEntryRouteInput>(() => formValues(route))
+  const [baseline, setBaseline] = useState(route?.updatedAt)
+  const conflict = useSaveConflict({
+    contextKey: route?.id,
+    fetchLatest: async () => {
+      if (!route) return null
+      const res = await api.entryRoutes.get(route.id)
+      return res.success ? res.data : null
+    },
+    reload: async () => {
+      if (!route) return
+      try {
+        const res = await api.entryRoutes.get(route.id)
+        if (!res.success) throw new Error('reload_failed')
+        const latest = res.data
+        setForm(formValues(latest))
+        setBaseline(latest.updatedAt)
+        conflict.clear()
+        setError('')
+      } catch {
+        setError('最新の内容を読み込めませんでした。入力は残っています。もう一度お試しください。')
+      }
+    },
+  })
   const [submitting, setSubmitting] = useState(false)
   const [warning, setWarning] = useState<string | null>(null)
   const [error, setError] = useState('')
@@ -141,7 +166,7 @@ export default function EditRouteModal({
 
   const validateFields = () => {
     const errors: Record<string, string> = {}
-    if ((b244Requirements.form_name.check(form.name) !== null)) errors['route-name'] = '流入元の名前を入力してください'
+    if ((FIELD_REQUIREMENTS.form_name.check(form.name) !== null)) errors['route-name'] = '流入元の名前を入力してください'
     if (!/^[A-Za-z0-9_-]{1,64}$/.test(form.refCode)) errors['route-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
     if (form.couponEnabled && !form.couponAssetId) errors['route-coupon'] = '渡すクーポンを選んでください'
     setFieldErrors(errors)
@@ -174,10 +199,12 @@ export default function EditRouteModal({
       }
       const res = isNew
         ? await api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })
-        : await api.entryRoutes.update(route!.id, form)
+        : await api.entryRoutes.update(route!.id, { ...form, expectedUpdatedAt: baseline })
       if (res.success) onSaved(res.data, isNew)
       else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')
     } catch (err) {
+      // 新規の識別子重複と、更新時の版の競合は別の409。新規は入力を直して再試行できるままにする。
+      if (!isNew && isConflictResponse(err) && err.code === 'VERSION_CONFLICT') { conflict.mark(); return }
       const fieldFailure = saveErrors.capture(err)
       // 400系はAPIの理由、403・5xxは運用の言葉へ写す（WRITE-01）。
       { if (!fieldFailure)
@@ -199,7 +226,12 @@ export default function EditRouteModal({
   }
 
   // R270: 作成と同じくフォルダは任意。空欄は未分類のまま保存する。
-  const saveDisabled = submitting
+  const saveDisabled = submitting || conflict.conflict !== null
+  const latestForm = conflict.latest ? formValues(conflict.latest) : null
+  const comparisonLines = latestForm ? Object.entries(form)
+    .filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(latestForm[key as keyof CreateEntryRouteInput]))
+    .map(([key, value]) => ({ text: `${routeFieldLabel(key)}：下書き ${routeFieldValue(key, value, { tags, pools, scenarios, templates })} ／ 最新 ${routeFieldValue(key, latestForm[key as keyof CreateEntryRouteInput], { tags, pools, scenarios, templates })}` })) : null
+
   return (
     <SaveErrorScope errors={saveErrors}><EditorSurface surface={surface}
       open
@@ -215,12 +247,14 @@ export default function EditRouteModal({
           <Button
             variant="primary"
             onClick={onSubmit}
-            disabled={saveDisabled} busy={submitting}>
+            disabled={saveDisabled} title={conflict.conflict ? '最新の内容を読み込んでから保存してください' : undefined} busy={submitting}>
             {isNew ? '作る' : '保存する'}
           </Button>
         </div>
       }
     >
+      {conflict.conflict ? <SaveConflictBand title="ほかの人が先にこの流入リンクを保存しました" onCompare={conflict.compare} compareBusy={conflict.compareBusy} onReload={conflict.reloadLatest} /> : null}
+      <SaveConflictCompareDialog open={conflict.compareOpen} error={conflict.compareError} lines={comparisonLines} onReload={conflict.reloadLatest} onCancel={conflict.closeCompare} />
       <div className="space-y-3">
         <Field note={<>
             {genreLocked
@@ -243,7 +277,7 @@ export default function EditRouteModal({
 
         </Field>
 
-        <Field label="流入元の名前" htmlFor="route-name" error={fieldErrors['route-name']} requirement={b244Requirements.form_name}>
+        <Field label="流入元の名前" htmlFor="route-name" error={fieldErrors['route-name']} requirement={FIELD_REQUIREMENTS.form_name}>
           <SaveErrorField names={["name","form.name"]}><TextField
             value={form.name}
             onChange={(e) => { setForm({ ...form, name: e.target.value }); setFieldErrors((old) => ({ ...old, 'route-name': '' })) }}
@@ -259,15 +293,16 @@ export default function EditRouteModal({
             // R271: 作成済みの識別子は口も変更を拒否する。保存時にはじめて
             // 拒否せず、欄自体を読み取り専用にして理由を近くに出す。
             disabled={refCodeLocked || !isNew}
+            aria-describedby={refCodeLocked || !isNew ? 'route-ref-lock-reason' : undefined}
             placeholder="例：youtube"
           /></SaveErrorField>
           {refCodeLocked && (
-            <p className="text-ink-faint mt-1 text-xs">
+            <p id="route-ref-lock-reason" className="text-ink-faint mt-1 text-xs">
               既に流入があった識別子を登録中のため、URLに出る識別子は変更できません。
             </p>
           )}
           {!isNew && (
-            <p className="text-ink-faint mt-1 text-xs">
+            <p id="route-ref-lock-reason" className="text-ink-faint mt-1 text-xs">
               URLに出る識別子は作成後に変更できません。新しいURLが必要な場合は、新しいリンクを作成してください。
             </p>
           )}
@@ -361,4 +396,18 @@ export default function EditRouteModal({
         onChange={(next) => { setForm((current) => ({ ...current, ...next })); setFieldErrors((current) => ({ ...current, 'route-coupon': '' })) }} />
     </EditorSurface></SaveErrorScope>
   )
+}
+
+function routeFieldLabel(key: string): string {
+  return ({ refCode: '紹介コード', genre: 'フォルダ', name: '名前', tagId: '自動付与タグ', poolId: '送り先', scenarioId: '起動シナリオ', introTemplateId: '送信テンプレート', couponEnabled: 'クーポンの配布', couponAssetId: '配布クーポン', couponAudience: 'クーポンの対象', runAccountFriendAddScenarios: '友だち追加時のシナリオ', redirectUrl: '行き先URL', isActive: '公開' } as Record<string, string>)[key] ?? '設定'
+}
+
+function routeFieldValue(key: string, value: unknown, resources: { tags: Tag[]; pools: TrafficPool[]; scenarios: Scenario[]; templates: MessageTemplate[] }): string {
+  if (value === null || value === undefined || value === '') return '未設定'
+  if (typeof value === 'boolean') return value ? 'する' : 'しない'
+  const list = key === 'tagId' ? resources.tags : key === 'poolId' ? resources.pools : key === 'scenarioId' ? resources.scenarios : key === 'introTemplateId' ? resources.templates : null
+  if (list) return list.find(item => item.id === value)?.name ?? '選択済み（名前を読み込めませんでした）'
+  if (key === 'couponAudience') return value === 'new_friends' ? '新しく友だちになった人' : 'すべての人'
+  if (key === 'couponAssetId') return '選択済みのクーポン'
+  return String(value)
 }

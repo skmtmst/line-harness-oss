@@ -16,7 +16,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifySaved } from '@/components/shared/toast'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
-import { customerSegmentsApi } from '@/lib/api-gap3'
+import { customerSegmentsApi } from '@/lib/api/helpers/gap3'
 import { formatNumber } from '@/lib/format'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './segments.module.css'
@@ -25,7 +25,7 @@ import styles from './segments.module.css'
  * ★V8 分析「深く見る」の「お客さまの分け方」（G5-1 `RMajm`）。
  * 縦＝最後の来店・購入の日、横＝回数（または金額）の 5×5。マスに名前と人数。押すと右の引き出しで人の一覧。
  * 5×5 と「表の外（来店・購入なし）」の合計が全員。毎朝 4 時以降に作り直す控えを読む。
- * CSV の書き出しは受け口がまだ無いので、形を残して「現在準備中です」を出す（B-314）。
+ * CSV の書き出しは受け口がまだ無いので、形を残して「現在準備中です」を出す。
  */
 
 type Basis = 'both' | 'visit' | 'purchase'

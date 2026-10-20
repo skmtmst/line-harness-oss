@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B w1W8h 会員のつき合わせ：候補の行・候補なしの行・決める窓・集計だけの失敗。
+ * ★V8-B  会員のつき合わせ：候補の行・候補なしの行・決める窓・集計だけの失敗。
  */
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -40,7 +40,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
-it('候補の行は「…」の中に「候補を見る」「決める」、候補なしの行は「友だちを探す」（行の右端は「…」1つ・B-253）', async () => {
+it('候補の行は「…」の中に「候補を見る」「決める」、候補なしの行は「友だちを探す」（行の右端は「…」1つ・）', async () => {
   render(<EcIdentityCandidatesScreen />)
   const table = await screen.findByRole('table', { name: '会員のつき合わせの候補' })
   expect(within(table).getByRole('columnheader', { name: '操作' })).toBeTruthy()

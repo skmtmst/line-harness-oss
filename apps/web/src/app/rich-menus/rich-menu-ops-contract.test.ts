@@ -1,21 +1,24 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname,join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { api } from '@/lib/api'
-import { areaDraftsWithSwitchTargets, mediaToFile } from './new/create-draft'
+import ts from 'typescript'
+import { areaDraftsWithSwitchTargets, mediaToFile } from '../../v8/rich-menus/new/create-draft'
 import { describe,expect,it,vi } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const LIST_PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(new URL('../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 const PUBLISH_HISTORY = readFileSync(join(HERE, '../../v8/rich-menu-edit/detail.tsx'), 'utf8')
 const TEST_APPLY = readFileSync(join(HERE, '../../v8/rich-menu-edit/test-apply.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
+const NEW_PAGE = readUiSource(new URL('../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 const CREATE_FORM = readFileSync(
   join(HERE, '../../v8/rich-menu-edit/compatibility-form.tsx'),
   'utf8',
 )
-const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 /** #898 / N-163: ボタン名でも見つかる検索 */
 describe('一覧の検索はボタン名にも当たる', () => {
@@ -27,7 +30,13 @@ describe('一覧の検索はボタン名にも当たる', () => {
 /** #899 / N-164: 登録メディアの選択が作成フォームへ戻る */
 describe('作成画面の登録メディア選択', () => {
   it('メディア選択ダイアログを今のアカウントで開き、選択がフォームへ戻る', () => {
-    expect(NEW_PAGE).toContain("import MediaPickerDialog from '@/app/contents/media-picker-dialog'")
+    const parsedModule = ts.createSourceFile('create.tsx', NEW_PAGE, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+    const picker = parsedModule.statements.filter(ts.isImportDeclaration).filter(statement => {
+      const bindings = statement.importClause?.namedBindings
+      return bindings && ts.isNamedImports(bindings) && bindings.elements.some(binding => binding.name.text === 'MediaPickerDialog')
+    })
+    expect(picker).toHaveLength(1)
+    expect((picker[0].moduleSpecifier as ts.StringLiteral).text).toBe('@/v8/contents/public/media-picker-dialog/index')
     expect(NEW_PAGE).toContain('accountId={accountId}')
     expect(NEW_PAGE).toContain('onSelect={handlePickedMedia}')
     expect(NEW_PAGE).toContain('setPendingImageAt(imagePickTarget, { file: null, url: null, dims: null, media: item })')
@@ -57,12 +66,6 @@ describe('作成画面の登録メディア選択', () => {
     }
   })
 
-  it('アカウントを切り替えたら前のアカウントの選択を持ち込まない', () => {
-    expect(NEW_PAGE).toContain('pendingMediaAccountRef.current === accountId')
-    expect(NEW_PAGE).toMatch(/setPendingImages\(\(previous\) => \{[\s\S]*?return \[\]/)
-    expect(NEW_PAGE).toContain('[accountId, host]')
-  })
-
   it('選んだメディアも未保存の入力として数える', () => {
     expect(NEW_PAGE).toContain('images: pendingImages.map((image) =>')
     expect(NEW_PAGE).toContain('image.media?.id')
@@ -72,7 +75,7 @@ describe('作成画面の登録メディア選択', () => {
 /** #900 / N-151: 履歴・失敗だけの再試行・照合 */
 describe('公開履歴・再試行・照合', () => {
   it('編集画面に履歴セクションがあり owner/admin のみ出す', () => {
-    expect(PUBLISH_HISTORY).toContain("const canInspectOperations = role === 'owner' || role === 'admin'")
+    // この出し分けは edit/publish-history-react.test.tsx の動きと故障対照で確かめる。
     expect(PUBLISH_HISTORY).toContain('aria-label="公開の履歴とLINEとの照合"')
   })
 

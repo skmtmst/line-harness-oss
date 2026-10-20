@@ -1,13 +1,13 @@
 'use client'
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
+
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { createPageReturnHref } from '@/components/shared/create-page';
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlignLeft, ArrowLeft, CalendarClock, CalendarDays, Hash, Image as ImageIcon, Link2, ToggleLeft, Type, Upload } from 'lucide-react';
+import { AlignLeft, CalendarClock, CalendarDays, Hash, Image as ImageIcon, Link2, ToggleLeft, Type, Upload } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Copy, Eye } from 'lucide-react';
+
 import type { Folder } from '@line-crm/shared';
 import { api, ApiError, describeSaveFailure } from '@/lib/api';
 import { commonVarValueError, isSecretLikeVarValue, COMMON_VAR_VALUE_REQUIRED } from '@/lib/common-vars';
@@ -36,7 +36,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 共通情報を作る（板 `p82v9`）。
+ * ★V8 共通情報を作る（板 ）。
  *
  * 型は作る（CreatePage）：頭（戻る・題・説明）→ 左に3枚のカード（名前と差し込み名・
  * 種別と中身・使える期間）と社内メモ、右の列に秘密値の注意と差し込んだときの見え方、
@@ -46,7 +46,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
  */
 
 /*
- * 種別8つ。板 `p82v9` のカードの並び（標準・長文・数値・URL／
+ * 種別8つ。板  のカードの並び（標準・長文・数値・URL／
  * 画像・年月日・日時・はい／いいえ）にそろえる。種別は登録後に
  * 変えられない（値の意味が変わるため）。
  */
@@ -95,7 +95,7 @@ function sensitiveFieldLabels(value: string, memo: string): string[] {
   ]
 }
 
-/* 欄へ移る。閉じた段は開き、スクロールしてからフォーカスする（B-139）。 */
+/* 欄へ移る。閉じた段は開き、スクロールしてからフォーカスする。 */
 function focusField(id: string) {
   focusFieldById(id)
 }
@@ -273,7 +273,7 @@ export default function NewCommonVarV8() {
     }
     const accountAtRequest = selectedAccountId
     /*
-     * 欄の誤りは下の帯ではなく、その欄の真下に全部出し、上から1つ目へ移る（B-139）。
+     * 欄の誤りは下の帯ではなく、その欄の真下に全部出し、上から1つ目へ移る。
      * 帯に残すのはアカウントの選び直しなど欄に結び付かないものだけ。
      */
     const nameProblem = validateVarName(name) ?? ''
@@ -424,14 +424,14 @@ export default function NewCommonVarV8() {
           {/* 閲覧のみには押せない保存を置かない（隠す）。 */}
           {canWrite ? (
             <>
-              <Button type="button" disabled={saveDisabled} onClick={() => void save(false, true)} busy={Boolean(saving)} busyLabel="処理中…">
+              <Button type="button" disabled={saveDisabled} onClick={() => save(false, true)} busy={Boolean(saving)} busyLabel="処理中…">
                 下書きを保存
               </Button>
               <Button
                 type="button"
                 variant="primary"
                 disabled={saveDisabled}
-                onClick={() => void save()}
+                onClick={() => save()}
                 busy={saving}
                 busyLabel="保存中…"
               >
@@ -660,7 +660,7 @@ export default function NewCommonVarV8() {
             >
               入力に戻って修正する
             </Button>
-            <Button type="button" disabled={saving} onClick={() => void save(true)} busy={Boolean(saving)} busyLabel="処理中…">
+            <Button type="button" disabled={saving} onClick={() => save(true)} busy={Boolean(saving)} busyLabel="処理中…">
               内容を確認して登録する
             </Button>
           </div>

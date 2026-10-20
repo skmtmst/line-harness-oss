@@ -1,17 +1,18 @@
+import { readApiSource } from '../../../../scripts/test-api-source.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
+import { readImplementationSource } from '../../../../../worker/src/test-utils/implementation-source'
 
 const PAGE = fs.readFileSync(path.join(__dirname, '../../../v8/webinar-edit/cta.tsx'), 'utf8') + fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
-const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const ERROR_TEXT = fs.readFileSync(
   path.join(__dirname, '..', '..', '..', 'components', 'webinars', 'webinar-error-text.ts'),
   'utf8',
 )
-const WORKER = fs.readFileSync(
+const WORKER = readImplementationSource(
   path.join(__dirname, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'webinars.ts'),
-  'utf8',
 )
 
 describe('N-113 ウェビナーの申込フォーム選択の契約', () => {

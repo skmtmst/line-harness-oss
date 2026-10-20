@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 勤務とシフト（d5fmnM）・自分の勤務（E3YDK）・ひも付けなし（wvGke）の動き。
+ * ★V8 勤務とシフト・自分の勤務・ひも付けなしの動き。
  * - 役割はサーバー（/api/staff/me）で決める（手元の保存値が owner でも、サーバーが staff なら本人の画面）。
  * - 休憩は同じ時刻の曜日を1行にまとめ、保存のときは曜日ごとに広げる。
  * - 変える権限が無い人には保存・足す・ごみ箱のボタンを置かない。
@@ -182,7 +182,7 @@ describe('勤務とシフト（管理者）', () => {
     expect(rows.map((r) => r.weekday)).toEqual([1, 2, 4, 5])
   })
 
-  test('B-139：曜日の時間が逆さまのまま保存すると、送らずその曜日の時刻の欄を赤くし、終わりの欄へ移る', async () => {
+  test('曜日の時間が逆さまのまま保存すると、送らずその曜日の時刻の欄を赤くし、終わりの欄へ移る', async () => {
     fixture.rules = [{ weekday: 1, start_time: '19:00', end_time: '10:00' }]
     render(<StaffShiftsV8 staffId="bs-1" />)
     await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })

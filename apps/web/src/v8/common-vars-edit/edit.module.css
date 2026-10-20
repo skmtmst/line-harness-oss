@@ -1,5 +1,5 @@
 /*
- * ★V8 共通情報の編集（Pencil AYc6O・1152 の C67dE・競合 piWhz）。
+ * ★V8 共通情報の編集（Pencil ・1152 の ・競合 ）。
  * 頭・左右の列・下の帯の余白は型（CreatePage）が持つ。ここはカードの中身と右の列の箱だけ。
  */
 .backLink { display: inline-flex; align-items: center; gap: var(--tpl-label-tag-gap); font-size: var(--text-label); text-decoration: none; }
@@ -45,7 +45,7 @@
 }
 .fieldInput { height: var(--tpl-chip-h); }
 .fieldArea { padding-block: var(--tpl-body-gap); resize: vertical; }
-/* 保存で落ちた欄（B-139）。枠を危険の色にする。 */
+/* 保存で落ちた欄。枠を危険の色にする。 */
 .fieldInput[aria-invalid='true'],
 .fieldArea[aria-invalid='true'] { outline-color: var(--color-danger); }
 .fieldHint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-text-sm-lh); }
@@ -55,7 +55,7 @@
 .selectBox :global(button) { width: 100%; }
 
 
-/* いまの中身・新しい中身は題の行をそろえる（絵 AYc6O）。新しい中身だけ文字数の行があるので下ぞろえにしない。 */
+/* いまの中身・新しい中身は題の行をそろえる。新しい中身だけ文字数の行があるので下ぞろえにしない。 */
 .valueRow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: var(--tpl-rule-row-gap); }
 /* 矢印は欄の高さの中央：共通の欄の題の行20＋間6だけ下げる。 */
 .valueArrow { display: inline-flex; align-items: center; height: var(--tpl-chip-h); margin-top: var(--tpl-field-control-offset); color: var(--color-ink-faint); }
@@ -141,7 +141,7 @@
 }
 .schedTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-ar-cv-sched-title-lh); }
 .schedNote { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
-/* 予定を足す・消すは1行（絵 C67dE：字12・余白16）。1152 の右の欄は枠線の1px だけ絵より狭いので、間は 4 に詰めて折り返さない。 */
+/* 予定を足す・消すは1行（絵 ：字12・余白16）。1152 の右の欄は枠線の1px だけ絵より狭いので、間は 4 に詰めて折り返さない。 */
 .schedActions { display: flex; flex-wrap: wrap; row-gap: var(--tpl-body-gap); column-gap: var(--space-4); }
 .kv { display: flex; flex-direction: column; margin: 0; }
 .kvRow {
@@ -213,12 +213,12 @@
 .talkTime { color: var(--v8-line-time); font-size: var(--tpl-ar-cv-talk-time-size); white-space: nowrap; }
 
 
-/* 競合の帯（piWhz）の置き場：頭の「使っています」の行の下。帯の見た目は共通部品（save-conflict）。 */
+/* 競合の帯の置き場：頭の「使っています」の行の下。帯の見た目は共通部品（save-conflict）。 */
 .conflictSlot {
   margin: var(--tpl-ar-ed-band-mt) 0 var(--tpl-ar-ed-band-mb);
 }
 
-/* 1152 の板（C67dE）：右の列は 幅280・余白16。上に「LINEでの見え方を見る」。 */
+/* 1152 の板：右の列は 幅280・余白16。上に「LINEでの見え方を見る」。 */
 :global([data-page-template='create']):has(.narrowPhoneOpen) {
   --tpl-preview-pad: var(--tpl-ar-ed-narrow-pad);
   --tpl-preview-narrow-content-width: var(--tpl-ar-ed-narrow-side-w);

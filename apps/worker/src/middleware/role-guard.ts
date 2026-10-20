@@ -1,7 +1,8 @@
 import { hasDeliveryAccess, type DeliveryFeature, type StaffFeatureOperation } from '@line-crm/shared';
+
 import type { Context, MiddlewareHandler } from 'hono';
-import type { Env } from '../index.js';
-import type { StaffRole } from './auth.js';
+import type { Env } from '../worker-env.js';
+import type { StaffRole } from './auth/principal/auth.js';
 
 /**
  * 役割による門番。

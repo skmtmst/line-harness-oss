@@ -3,7 +3,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'account-a'})}))
-vi.mock('@/lib/api', () => ({ api: { staff: { list: async () => ({ success: true, data: [] }) }, media: {contentUrl:()=> 'https://fixture.invalid/photo.png',list:async()=>({success:true,data:{items:[{id:'photo',filename:'人工画像',kind:'image',url:'https://fixture.invalid/photo.png',lineAccountId:'account-a'}],total:1}})} } }))
+vi.mock('@/lib/api', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/api')>()), api: { staff: { list: async () => ({ success: true, data: [] }) }, media: {contentUrl:()=> 'https://fixture.invalid/photo.png',list:async()=>({success:true,data:{items:[{id:'photo',filename:'人工画像',kind:'image',url:'https://fixture.invalid/photo.png',lineAccountId:'account-a'}],total:1}})} } } ))
 import { StaffEditModal } from './staff-edit-dialog'
 afterEach(cleanup)
 it('保存中は×・キャンセル・Escを止め、失敗後は閉じられる', async () => {

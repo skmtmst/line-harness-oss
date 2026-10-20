@@ -1,4 +1,4 @@
-import { processDueEcRetries } from '../services/ec-retry.js';
+import { processDueEcRetries } from '../features/ec-commerce/ec-retry.js';
 /*
  * N-328 / N-330 (#943): ECイベントからの顧客通知送信を、実D1で共通送信台帳
  * (notification_instances / notification_deliveries /
@@ -11,8 +11,8 @@ import { processDueEcRetries } from '../services/ec-retry.js';
  *  - 従来の ec_v6_dispatches / イベント台帳の動きは維持する
  */
 import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Env } from '../worker-env';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn());
@@ -34,7 +34,7 @@ vi.mock('../services/nen-engagement.js', () => ({
 }));
 
 const { ecIntegrations } = await import('./ec-integrations.js');
-const { ecNotificationRetryKey } = await import('../services/ec-event-publish.js');
+const { ecNotificationRetryKey } = await import('../features/ec-commerce/ec-event-publish.js');
 
 const LINE_USER_ID = `U${'a'.repeat(32)}`;
 
@@ -62,6 +62,8 @@ beforeEach(() => {
   `);
   pushMessageWithRequestId.mockResolvedValue({ data: {}, requestId: 'req-1' });
 });
+
+afterEach(()=>vi.useRealTimers());
 
 const app = new Hono<Env>();
 app.route('/', ecIntegrations);
@@ -193,7 +195,7 @@ describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
 
     expect(instances()[0]).toMatchObject({ status: 'failed' });
     expect(deliveries()[0]).toMatchObject({
-      status: 'failed', attempts: 1, error_code: 'line_temporary_failure',
+      status: 'failed', attempts: 1, error_code: 'delivery_unknown',
     });
     expect(String(deliveries()[0].error_message_safe)).not.toContain('Request failed');
     expect(attemptRows()).toHaveLength(1);
@@ -201,11 +203,15 @@ describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
     expect(dispatch()).toMatchObject({ subscriber: 'notification', status: 'failed' });
   });
 
-  it('失敗後の再送は同じ冪等キーの行を受理へ確定し、試行は2回になる', async () => {
+  it('確定した429の拒否は待機後に同じ冪等キーで再試行し、物理要求だけ数える', async () => {
+    vi.useFakeTimers();
     pushMessageWithRequestId.mockRejectedValueOnce(Object.assign(
-      new Error('Request failed with status 500'), { status: 500 },
+      new Error('Request failed with status 429'), { status: 429 },
     ));
     expect((await post(baseEvent())).status).toBe(503);
+    expect((await post(baseEvent())).status).toBe(503);
+    expect(pushMessageWithRequestId).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(60_000);
     pushMessageWithRequestId.mockResolvedValueOnce({ data: {}, requestId: 'req-2' });
     expect((await post(baseEvent())).status).toBe(200);
 
@@ -217,6 +223,28 @@ describe('N-328: EC顧客通知を共通送信台帳へ書く', () => {
     expect(attemptRows()).toHaveLength(2);
     expect(attemptRows()[0]).toMatchObject({ attempt_number: 1, outcome: 'failed' });
     expect(attemptRows()[1]).toMatchObject({ attempt_number: 2, outcome: 'provider_accepted' });
+  });
+
+
+  it('応答が不明なEC通知は再受信しても元の送信行を保持し、再送も架空の試行も増やさない',async()=>{
+    pushMessageWithRequestId.mockRejectedValueOnce(new Error('lost response'));
+    expect((await post(baseEvent())).status).toBe(503);
+    const first=deliveries()[0];
+    expect((await post(baseEvent())).status).toBe(503);
+    expect(pushMessageWithRequestId).toHaveBeenCalledOnce();expect(deliveries()).toHaveLength(1);
+    expect(deliveries()[0]).toMatchObject({id:first.id,idempotency_key:first.idempotency_key,attempts:1,error_code:'delivery_unknown'});
+    expect(attemptRows()).toHaveLength(1);
+  });
+
+  it('受理後の保存失敗でも元のEC送信行へprovider参照を残し、再送しない',async()=>{
+    sqlite.exec("CREATE TRIGGER fail_ec_checkpoint BEFORE UPDATE ON workflow_steps WHEN NEW.step_key='customer_notification' AND NEW.status='succeeded' BEGIN SELECT RAISE(ABORT,'injected'); END");
+    expect((await post(baseEvent())).status).toBe(503);
+    const receipt=sqlite.prepare("SELECT status,result_json,retry_key FROM workflow_steps WHERE step_key='customer_notification'").get() as {status:string,result_json:string,retry_key:string};
+    expect(receipt.status).toBe('unknown');expect(JSON.parse(receipt.result_json)).toEqual({requestId:'req-1'});
+    expect((await post(baseEvent())).status).toBe(503);
+    expect(pushMessageWithRequestId).toHaveBeenCalledOnce();
+    expect(deliveries()).toHaveLength(1);expect(deliveries()[0]).toMatchObject({attempts:1,idempotency_key:receipt.retry_key});
+    expect(attemptRows()).toHaveLength(1);
   });
 
   it('処理済みイベントの再送は新しい台帳行を作らない', async () => {

@@ -1,5 +1,6 @@
 import { getNenRankRules, getNenRankSettings, jstNow, type NenRankSetting } from '@line-crm/db';
 
+
 export class NenRankDeleteError extends Error {
   constructor(message: string, readonly status: 400 | 404 | 409) { super(message); }
 }

@@ -4,7 +4,7 @@ import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /*
- * 失敗の文は、立て直し方まで書く（★V7 修正方針 §5、2026-09-24 の点検・better-writing）。
+ * 失敗の文は、立て直し方まで書く（★管理画面 修正方針 §5、2026-09-24 の点検・better-writing）。
  *
  * 「保存に失敗しました」だけでは、次に何をすればよいかが分からない。
  * 「保存に失敗しました。通信を確かめて、もう一度お試しください。」のように続ける。

@@ -11,7 +11,7 @@ const hqOpenPage = readFileSync(join(here, 'open', 'page.tsx'), 'utf8')
 
 describe('HQ account create entry', () => {
   it('HQ page links to the general account flow', () => {
-    // 登録口は板 `JKjsE` の左の列（一覧の部品）と、空のときの案内に置く。
+    // 登録口は板  の左の列（一覧の部品）と、空のときの案内に置く。
     assert.match(hqPage, /href="\/accounts\/new"/)
     assert.match(hqBrowser, /href="\/accounts\/new"/)
     assert.match(hqBrowser, /アカウントを登録/)

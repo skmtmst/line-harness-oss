@@ -43,7 +43,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 タグ「対応マーク」タブ（Pencil `vKDj5`）。
+ * ★V8 タグ「対応マーク」タブ（Pencil ）。
  *
  * 動き（読み込み・数の帯・絞り込み・並べ替え・保管の確認・行の詳細パネル・右クリック・
  * 名前のその場の直し）は現役の V8 タブ（src/v8/tags/marks-tab.tsx）から写した。数え方・判定・
@@ -502,7 +502,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
         onConfirm={() => void confirmRestore()} onCancel={() => { if (!restoring) setRestoreTarget(null) }} />
       <ListPageBody
         pagination={status === 'ready' ? (
-          // ページ送りは表の下の安全確認のあと、板の下（絵 vKDj5）。
+          // ページ送りは表の下の安全確認のあと、板の下。
           <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="対応マークのページ送り"
             range={{ total: visible.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, visible.length) }} />
         ) : undefined}

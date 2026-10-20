@@ -60,7 +60,7 @@ test('止められなかったら知らせて残り、もう一度押すと止�
   expect(puts).toBe(2)
 })
 
-test('B-139：名前とURLが足りないまま保存すると、帯で済ませず欄が赤くなり、1つ目（名前）の欄へ移る', async () => {
+test('名前とURLが足りないまま保存すると、帯で済ませず欄が赤くなり、1つ目（名前）の欄へ移る', async () => {
   vi.stubGlobal('fetch', async () => json({ success: true, data: [] }))
   render(<WebhooksCreateV8 />)
   fireEvent.change(document.querySelector('#wh-new-url')!, { target: { value: 'http://example.com' } })

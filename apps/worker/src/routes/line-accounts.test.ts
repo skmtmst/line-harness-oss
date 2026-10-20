@@ -1,6 +1,8 @@
+import { apiContractMiddleware } from '../middleware/api-contract.js';
 vi.mock('../services/line-messaging-identity.js', () => ({ verifyLineMessagingIdentity: vi.fn().mockResolvedValue(true) }));
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../worker-env.js';
 
 // Mock @line-crm/db so we can assert on the values the route forwards to the
 // DB layer without needing a real D1Database. The route's responsibility is
@@ -60,6 +62,9 @@ vi.mock('@line-crm/line-sdk', () => ({
 
 // Re-import after mock so the module picks up mocked deps.
 const { lineAccounts } = await import('./line-accounts.js');
+const { unhandledWorkerError } = await import('../lib/unhandled-error.js');
+const receiptErrorReport = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: receiptErrorReport }));
 
 type TestEnv = {
   Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean; tenantId?: string | null } };
@@ -125,6 +130,25 @@ const fakeAccount = {
 };
 
 describe('GET /api/line-accounts/:id/registration-receipt', () => {
+  test.each(['account scope', 'inbound receipt'])('unexpected %s failure reaches the shared incident handler', async (stage) => {
+    const secret = 'private-customer secret-token';
+    const db = makeDbStub();
+    if (stage === 'account scope') dbMocks.getLineAccountScopeEntries.mockRejectedValueOnce(new Error(secret));
+    else vi.mocked(db.prepare).mockImplementationOnce(() => { throw new Error(secret); });
+    const app = new Hono<Env>().route('/', setupApp('owner', db));
+    app.onError(unhandledWorkerError);
+    const response = await app.request('/api/line-accounts/acc-1/registration-receipt?token=secret-token');
+    const body = await response.json<{ incidentId: string }>();
+    expect(response.status).toBe(500);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(receiptErrorReport).toHaveBeenLastCalledWith(expect.anything(), {
+      source: 'worker', message: 'unhandled_worker_error',
+      path: 'GET /api/line-accounts/:id/registration-receipt', incidentId: body.incidentId,
+    });
+    expect(JSON.stringify([body, receiptErrorReport.mock.calls])).not.toMatch(/private-customer|secret-token/);
+  });
+
   test('only exposes a receipt in the current account scope', async () => {
     const app = setupApp('owner', makeDbStub(), {
       assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,
@@ -757,7 +781,7 @@ describe('POST /api/line-accounts/connect', () => {
     });
     expect(res.status).toBe(201);
     expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();
-    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account',expect.anything(),expect.anything());
+    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account',expect.anything(),expect.anything(),undefined);
     expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
       tenantId: 'tenant-current',
       name: 'LINE公式名',
@@ -1836,6 +1860,44 @@ test('登録に選んだタグを保存し、秘密と分けてLINE取得項目�
  expect(insertTags).toHaveBeenCalledExactlyOnceWith('created-account','tag-own', expect.any(String));
  expect(db.batch).toHaveBeenCalledOnce();
  expect(await response.json()).toMatchObject({data:{basicId:'@line',pictureUrl:'https://example.com/icon.png'}});
+});
+
+
+describe('selected registration style', () => {
+  test.each(['standard','ec','restaurant','salon','consult','lesson'])('%s reaches the same account initializer',async style=>{
+    installAutoConnectFetch();
+    let followerSetting:string|null=null;
+    dbMocks.getAccountSetting.mockImplementation(async()=>followerSetting);
+    dbMocks.setAccountSetting.mockImplementation(async(_db,_id,_key,value)=>{followerSetting=value;});
+    dbMocks.createLineAccount.mockResolvedValue({...fakeAccount,id:'created-account',tenant_id:'tenant-1',channel_access_token:'issued-token'});
+    dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
+    lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});
+    const res=await setupApp('owner').request('/api/line-accounts/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...autoConnectBody,style})});
+    expect(res.status).toBe(201);
+    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account','tenant-1','test-staff',style);
+  });
+  test.each(['meeting','',null,{},42])('rejects invalid style %j before external calls and creation',async style=>{
+    const external=vi.fn();vi.stubGlobal('fetch',external);
+    for(const path of ['/api/line-accounts','/api/line-accounts/connect']){
+      const res=await setupApp('owner').request(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...autoConnectBody,style})});
+      expect(res.status).toBeGreaterThanOrEqual(400);expect(res.status).toBeLessThan(500);
+    }
+    expect(external).not.toHaveBeenCalled();expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+  test('returns the created account for style retry without deleting it or creating a second account',async()=>{
+    installAutoConnectFetch();
+    let followerSetting:string|null=null;
+    dbMocks.getAccountSetting.mockImplementation(async()=>followerSetting);dbMocks.setAccountSetting.mockImplementation(async(_db,_id,_key,value)=>{followerSetting=value;});
+    dbMocks.createLineAccount.mockResolvedValue({...fakeAccount,id:'created-account',channel_access_token:'issued-token'});
+    dbMocks.updateLineAccountFields.mockResolvedValue(fakeAccount);
+    lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});
+    styleMocks.initializeAccountStyle.mockRejectedValueOnce(new Error('db failure'));
+    const app=new Hono<TestEnv>();app.use('*',apiContractMiddleware);app.route('/',setupApp('owner'));
+    const res=await app.request('/api/line-accounts/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...autoConnectBody,style:'consult'})});
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({success:false,error:{code:'style_save_failed',requestId:res.headers.get('X-Request-ID'),fieldErrors:[]},data:{accountId:'created-account',style:'consult',styleSaved:false,retryAt:'/api/dashboard/style?account_id=created-account'}});
+    expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();expect(dbMocks.deleteUncommittedLineAccount).not.toHaveBeenCalled();
+  });
 });
 
 test.each(['/api/line-accounts/connect/check', '/api/line-accounts/connect'])('registered channels are rejected before LINE changes: %s', async (path) => {

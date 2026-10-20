@@ -1,6 +1,6 @@
-import {purposeAliases,type BroadcastPurpose} from '../services/broadcast-simulation.js';
+import {purposeAliases,type BroadcastPurpose} from '../features/broadcasts/broadcast-simulation/index.js';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {gapAccount,gapBody,GapError} from '../services/gap-common.js';
 export const deliveryPurposePreview=new Hono<Env>();

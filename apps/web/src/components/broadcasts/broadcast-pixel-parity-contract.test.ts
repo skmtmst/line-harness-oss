@@ -1,9 +1,10 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const FORM = readFileSync(
+const FORM = readUiSource(
   join(dirname(fileURLToPath(import.meta.url)), 'broadcast-form.tsx'),
   'utf8',
 )
@@ -12,9 +13,9 @@ const CSS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'broadcas
 
 describe('一斉配信のV8構造（視覚一致は撮影で確認）', () => {
   it('作成画面の列幅を設計にそろえ、LINEプレビューは共通部品にする', () => {
-    // B-6: 画面ごとの枠色（V6 の青い地）はやめ、共通の LinePreview に寄せた。
+    // : 画面ごとの枠色（管理画面 の青い地）はやめ、共通の LinePreview に寄せた。
     // 見た目の正本は `components/shared/line-preview` が持つ。
-    // 列車31b：列幅と縮め方は共通の作成型が持つ。
+    // 作業b：列幅と縮め方は共通の作成型が持つ。
     expect(FORM).toContain('<CreateColumns>')
     expect(CSS).toContain('@container broadcast-create (width < 1100px)')
     expect(FORM).toContain("@/components/shared/line-preview'")

@@ -1,0 +1,742 @@
+'use client'
+import { unreadLookup } from '@/components/chats/assignee-unread';
+import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
+import { buildOperatorRows } from '@/components/chats/inbox-dropdown';
+import InboxFilterPanel from '@/components/chats/inbox-filter-panel';
+import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
+import Avatar from '@/components/shared/avatar';
+import Button from '@/components/shared/button';
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
+import FilterChip from '@/components/shared/filter-chip';
+import { InboxFloatingPanel } from '@/components/shared/inbox-content';
+import { InboxFilterControls, InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListSearch } from '@/components/shared/inbox-list';
+import { RowMenu } from '@/components/shared/row-actions';
+import SearchField from '@/components/shared/search-field';
+import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
+import { InboxListPane } from '@/components/templates/inbox-page';
+import { PageTitle } from '@/components/templates/page-frame';
+import { api, fetchApi, type ChatListItem } from '@/lib/api';
+import { SEARCH_QUERY_MAX_LENGTH, clampSearchQuery } from '@/lib/search-query';
+import { formatInboxListTime } from '@/v8/inbox-chat/list-time';
+import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
+import { Bookmark, Clock3, ListFilter, Reply } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import type { Dispatch, RefObject, SetStateAction } from 'react';
+import { CHANNELS, ChannelBadge, EmailInboxItem, InboxSavedView, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd, statusFiltersV8 } from './inbox-model';
+import styles from './list-parts.module.css';
+import { savedViewSummary } from './saved-view-summary';
+import { normalizeSavedViewConditions } from './saved-view-types';
+import { SlaBadge, assigneeLabel, type ChatSlaFields } from './sla';
+
+type Props = {
+  unreadOnly: boolean
+  selectedChatId: string | null
+  selectedThreadId: string | null
+  setFilterOpen: Dispatch<SetStateAction<boolean>>
+  filterOpen: boolean
+  setSavedViewsOpen: Dispatch<SetStateAction<boolean>>
+  setSavedViewError: Dispatch<SetStateAction<string>>
+  savedViewsOpen: boolean
+  savedViews: InboxSavedView[]
+  applySavedView: (view: InboxSavedView) => void
+  operatorNames: Map<string, string>
+  setSavedViewMenuId: Dispatch<SetStateAction<string | null>>
+  savedViewMenuId: string | null
+  selectedAccountId: string | null
+  loadSavedViews: () => Promise<void>
+  setSavedViewSuccess: Dispatch<SetStateAction<boolean>>
+  setSaveDialogOpen: Dispatch<SetStateAction<boolean>>
+  savedViewError: string
+  setSlaReload: Dispatch<SetStateAction<number>>
+  slaEnabled: boolean
+  overdueTotal: number | null
+  quickFilter: "all" | "reply" | "overdue"
+  setQuickFilter: Dispatch<SetStateAction<"all" | "reply" | "overdue">>
+  dropSavedViewParam: () => void
+  quickCountsNow: { all: number; reply: number; overdue: number; } | null
+  saveDialogOpen: boolean
+  statusFilter: StatusFilter
+  assigneeFilter: string
+  operators: { id: string; name: string; }[]
+  savingView: boolean
+  setSavedViewName: Dispatch<SetStateAction<string>>
+  createSavedView: (draft?: SavedViewDraft) => Promise<SavedViewSaveResult>
+  showTemplatePicker: boolean
+  setStatusFilter: Dispatch<SetStateAction<StatusFilter>>
+  setAssigneeFilter: Dispatch<SetStateAction<string>>
+  setUnreadOnly: Dispatch<SetStateAction<boolean>>
+  channel: "email" | "all" | "line"
+  router: ReturnType<typeof useRouter>
+  nameQuery: string
+  setNameQuery: Dispatch<SetStateAction<string>>
+  assigneeUnreadStatus: "error" | "ready" | "loading"
+  assigneeUnread: { operatorId: string | null; operatorName: string | null; unread: number; }[] | null
+  handleStatusFilterKeyDown: (event: React.KeyboardEvent) => void
+  statusCountsNow: Record<"in_progress" | "resolved" | "unread" | "on_hold", number> | null
+  statusFilterButtonRefs: RefObject<(HTMLButtonElement | null)[]>
+  listScrollRef: RefObject<HTMLDivElement | null>
+  emailError: string
+  loadEmails: (offset?: number, append?: boolean) => Promise<void>
+  chatListFailed: boolean
+  loadChats: () => Promise<void>
+  emailItems: EmailInboxItem[]
+  deepLinkRequestIdRef: RefObject<number>
+  deepLinkIdRef: RefObject<string | null>
+  setDeepLinkNotice: Dispatch<SetStateAction<string>>
+  setSelectedChatId: Dispatch<SetStateAction<string | null>>
+  setSelectedThreadId: Dispatch<SetStateAction<string | null>>
+  savedViewParam: string
+  setEmailItems: Dispatch<SetStateAction<EmailInboxItem[]>>
+  chats: ChatListItem[]
+  handleSelectChat: (chatId: string) => void
+  inboxListLoading: boolean
+  hasMoreChats: boolean
+  hasMoreEmails: boolean
+  inboxListFailed: boolean
+  hasInboxFilters: boolean
+  clearInboxFilters: () => void
+  loadingMore: boolean
+  loadMoreChats: () => Promise<void>
+  loadingMoreEmails: boolean
+}
+
+export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef, setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats, handleSelectChat, inboxListLoading, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails }: Props) {
+  return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
+    {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
+
+    <InboxListHeader
+      data-design="Filters"
+      data-inbox-v4="quick-filters"
+      aria-label="受信箱のクイック絞り込み"
+    >
+      <InboxListHeadline><PageTitle>受信箱</PageTitle>
+        {/*
+          設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
+          右から420pxのパネルが出る（`bXyEA`）。
+
+          以前は `<details>` の小さな箱（208px）で、中身は対応状況だけだった。
+          設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
+          6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
+        */}
+        <Button type="button" size="compact" className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+          <ListFilter aria-hidden size={16} />
+        </Button>
+        {/*
+          INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
+          この行（section.relative）を基準に右端を合わせる。ボタン基準の
+          right-0 だと、狭い画面でボタンが左に折り返されたときパネルの
+          左側が画面外へ出た。幅も画面の左右16px以内に収める。
+        */}
+        <div>
+          {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
+          <Button
+            type="button"
+            size="compact"
+            className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="保存した検索" title="保存した検索"
+            onClick={() => {
+              setSavedViewsOpen((open) => !open)
+              setSavedViewError('')
+            }}
+            aria-expanded={savedViewsOpen}
+          >
+            <Bookmark aria-hidden size={16} />
+          </Button>
+          {savedViewsOpen && (
+            <InboxFloatingPanel placement="below">
+              <p className="text-ink text-sm font-bold">保存した検索</p>
+              <div className="mt-3 space-y-1">
+                {savedViews.length === 0 ? (
+                  <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-3 text-xs">
+                    まだ保存した検索はありません。
+                  </p>
+                ) : savedViews.map((view) => (
+                  <div key={view.id} className="hover:bg-canvas-sunken flex items-center gap-2 rounded-control px-2 py-1.5">
+                    <button
+                      type="button"
+                      onClick={() => applySavedView(view)}
+                      className="text-ink min-w-0 flex-1 truncate text-left text-xs font-semibold"
+                      title={view.name}
+                    >
+                      {view.name}{view.isShared ? '（共有）' : ''}
+                      {/*
+                        **名前の下に、何で絞ったかを出す。**
+                        設計 `ASsb3` は「対応マーク：未対応／期限：超過」のように書く。
+                        名前だけだと、`未対応・期限超過` と `河野担当の未対応` の
+                        どちらを押せばいいのかが、名前の付け方頼みになる。
+                      */}
+                      <span className="text-ink-faint mt-0.5 block truncate text-micro font-normal">
+                        {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
+                      </span>
+                    </button>
+                    <span className="text-ink-secondary shrink-0 text-xs tabular-nums">
+                      {typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'}
+                    </span>
+                    <div className="relative shrink-0">
+                      <RowMenu
+                        label={`${view.name}の操作`}
+                        triggerProps={{ 'data-qa-open': view.id === savedViews[0]?.id ? 'ASsb3-menu' : undefined }}
+                        onOpenChange={(open) => setSavedViewMenuId(open ? view.id : null)}
+                        open={savedViewMenuId === view.id}
+                        items={[
+                          {
+                            id: `${view.id}-delete`,
+                            label: '保存した検索を削除',
+                            tone: 'danger',
+                            onSelect: () => {
+                              void (async () => {
+                                if (!selectedAccountId) return
+                                await api.chats.savedViews.delete(view.id, selectedAccountId)
+                                setSavedViewMenuId(null)
+                                await loadSavedViews()
+                              })()
+                            },
+                          },
+                        ]}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {savedViews.some((view) => typeof view.matchCount !== 'number') ? (
+                <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+                  該当件数は、保存した条件ごとの集計が接続されると表示されます。「—件」は0件ではありません。
+                </p>
+              ) : null}
+              {/*
+                前はここに名前の入力欄と保存ボタンが直接並んでいた。
+                **何を保存しようとしているのかが書いていない**ので、絞り込みを
+                変えたつもりで前の条件を保存してしまう。設計（`Ln4zS`）は
+                名前と「保存する条件」を並べて見せてから保存させる。
+              */}
+              <div className="border-hairline mt-3 border-t pt-3">
+                <Button variant="primary" type="button" onClick={() => {
+                  setSavedViewSuccess(false)
+                  setSaveDialogOpen(true)
+                }}>
+                  現在の条件を保存する
+                </Button>
+                {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
+              </div>
+            </InboxFloatingPanel>
+          )}
+        </div>
+        {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
+        {(
+          /*
+           * ★V8：絵（XqSvX）の「対応ルール」は settings-2 の印。押してもページを移らず、
+           * その場で小窓を開く（オーナー指摘：別のページへ飛ぶのはおかしい）。
+           */
+          <InboxRulesPopover accountId={selectedAccountId ?? null} onRoutingSaved={() => setSlaReload((n) => n + 1)} />
+        )}
+      </InboxListHeadline>
+      {[
+        { key: 'all' as const, label: 'すべて', title: undefined, icon: null },
+        { key: 'reply' as const, label: '要返信', title: '対応状況が「未対応」の会話', icon: Reply },
+        /*
+         * INBOX-10: ここで数えるのは対応期限ではなく、未対応のまま
+         * 最後のやり取りから1時間以上たった会話。「期限超過」と書くと
+         * 設定した期限の超過に読めるため、実態に合う名前にする。
+         *
+         * m22c: 右の操作（絞り込み・保存した検索・対応ルール）と同じ
+         * 高さ32にそろえる。行の中で高さが違うと、同じ1行でも上端が
+         * ずれて2行に見える（見た目の自動点検 k=5）。
+         */
+        slaEnabled
+          ? { key: 'overdue' as const, label: overdueTotal === null ? '期限超過' : `期限超過 ${overdueTotal}`, title: '最初の返事の期限を過ぎた会話', icon: Clock3 }
+          : { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話', icon: Clock3 },
+      ].sort((a, b) => (slaEnabled ? Number(b.key === 'overdue') - Number(a.key === 'overdue') : 0)).map((filter) => (
+        <FilterChip
+          size="inbox"
+          key={filter.key}
+          selected={quickFilter === filter.key}
+          onChange={() => { setQuickFilter(filter.key); dropSavedViewParam() }}
+          title={filter.title}
+          showCheck={false}
+          icon={filter.icon ? <filter.icon aria-hidden size={14} /> : undefined}
+        >
+          {filter.label}
+          {quickCountsNow && !(slaEnabled && filter.key === 'overdue') ? <span className="sr-only tabular-nums">{quickCountsNow[filter.key]}</span> : null}
+        </FilterChip>
+      ))}
+      <SavedViewDialog
+        open={saveDialogOpen}
+        initialValue={{
+          status: statusFilter,
+          quickFilter,
+          channel,
+          assignee: assigneeFilter,
+          unreadOnly,
+          favorite: true,
+        }}
+        operators={operators}
+        existingNames={savedViews.map((view) => view.name)}
+        saving={savingView}
+        onSave={async (draft) => {
+          setSavedViewName(draft.name)
+          return createSavedView(draft)
+        }}
+        onClose={() => setSaveDialogOpen(false)}
+      />
+      {filterOpen || showTemplatePicker ? (
+        <style>{`
+            [aria-label="テンプレートを選択"] {
+              background-color: var(--color-scrim) !important;
+            }
+            div:has(> section[aria-label="絞り込み"]) > div[aria-hidden="true"] {
+              background-color: transparent !important;
+            }
+          `}</style>
+      ) : null}
+      <InboxFilterPanel
+        open={filterOpen}
+        value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
+        operators={operators}
+        onChange={(next) => {
+          setStatusFilter(next.status as StatusFilter)
+          setAssigneeFilter(next.assignee)
+          setUnreadOnly(next.unreadOnly)
+          if (next.channel !== channel) {
+            // 手動の条件変更なので savedView は残さない(N-021)。
+            router.push(buildInboxUrl(next.channel, null))
+          } else {
+            dropSavedViewParam()
+          }
+        }}
+        onReset={() => {
+          setStatusFilter('all')
+          setAssigneeFilter('all')
+          setUnreadOnly(false)
+          router.push('/chats')
+        }}
+        onClose={() => setFilterOpen(false)}
+      />
+    </InboxListHeader>
+    {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
+    <InboxListSearch>
+      {(
+        /* ★V8：共通の検索欄（自作の入力欄をやめる）。 */
+        <SearchField
+          value={nameQuery}
+          onChange={(value) => { setNameQuery(clampSearchQuery(value)); dropSavedViewParam() }}
+          onClear={() => { setNameQuery(''); dropSavedViewParam() }}
+          maxLength={SEARCH_QUERY_MAX_LENGTH}
+          placeholder="名前・メールアドレス・内容で探す"
+          aria-label="名前・メールアドレス・内容で検索"
+        />
+      )}
+      {/*
+              #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
+              プルダウンが自分で名乗るため、外の字は置かない。
+            */}
+      <InboxFilterControls>
+        <>
+          {/*
+                  未読数は集計の口から渡す。**画面に見えている行から数えない**
+                  ——一覧はページ送りされるので、2ページ目の未読が落ちる。
+                  0件の担当者も選択肢に残す（契約上、0件は配列に載らないので実値0として描く）。
+                */}
+          {(
+            /* ★V8：共通の選ぶ欄（選んだ行は ✓ だけ）。担当者ごとの未読数は名前の後ろのに添える（未取得は「—」）。 */
+            <EntitySelect
+              aria-label="担当者で絞り込む"
+              label="担当者"
+              valuePrefix="担当者："
+              width={138}
+              size="full"
+              value={assigneeFilter}
+              onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
+              options={buildOperatorRows(operators, true).map((row) => {
+                if (row.id === 'all') return { ...entityOptionMetadata(row), value: row.id, label: row.name }
+                const unread = assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(row.id)
+                return { ...entityOptionMetadata(row), value: row.id, label: `${row.name}（${unread === null ? '—' : unread}）` }
+              })}
+            />
+          )}
+        </>
+        <EntitySelect
+          width={124}
+          aria-label="受信経路で絞り込む"
+          label="経路"
+          valuePrefix="経路："
+          value={channel}
+          onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))}
+          options={CHANNELS.map((item) => ({ value: item.key, label: item.label }))}
+        />
+      </InboxFilterControls>
+    </InboxListSearch>
+
+    {/*
+            状態の絞り込みは5等分の切り替え。左の欄（開いている間は288px）でも
+            必ず1行に収まるよう、折り返さない・5つで幅いっぱいにする。
+            選んだ所は白地に濃い文字。読み上げはラジオの決まり。
+          */}
+    <div className={`border-b border-hairline px-3 py-2 ${styles.statusBlock}`}>
+      <div
+        role="radiogroup"
+        aria-label="対応状況で絞り込む"
+        onKeyDown={handleStatusFilterKeyDown}
+        className={`bg-shell flex h-8 flex-nowrap items-stretch rounded-control p-0.5 ${styles.statusSeg}`}
+      >
+        {statusFiltersV8.map((f, index) => {
+          const selected = statusFilter === f.key
+          // V8：「すべて」の所が無いので、何も選んでいない（すべて）ときは先頭に Tab で入れる。
+          const focusable = selected || ((statusFilter === 'all') && index === 0)
+          const count = statusCountsNow ? statusCountsNow[f.key as Exclude<StatusFilter, 'all'>] : null
+          return (
+            <button
+              key={f.key}
+              ref={(el) => { statusFilterButtonRefs.current[index] = el }}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              tabIndex={focusable ? 0 : -1}
+              title={selected ? `${f.label}（もう一度押すとすべて）` : f.label}
+              onClick={() => { setStatusFilter(selected ? 'all' : f.key); dropSavedViewParam() }}
+              // #639 の素のボタンの最小高さ32pxをここだけ外す。
+              // 切り替え全体の高さ32pxの中に収めるため。
+              style={{ minHeight: 0 }}
+              className={`min-w-0 flex-1 truncate rounded-mini px-1 text-center text-xs whitespace-nowrap transition-colors ${styles.statusItem} ${selected
+                  ? 'bg-canvas font-semibold text-ink shadow-card'
+                  : 'text-ink-secondary hover:text-ink font-medium'
+                }`}
+            >
+              {f.label}
+              {count === null || count === undefined ? null : <span className={styles.statusCount}>{count}</span>}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+
+    <p data-inbox-sort="fixed" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>{slaEnabled ? '並び順：期限が近い順（過ぎた物が先）' : '並び順：未読が先・新しい順'}</p>
+    {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
+    <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
+      <>
+        {/*
+                  メール一覧の失敗行。LINEだけ見ているときは出さない。
+                  以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
+                  ふだん（成功時）は何も出ないので、一覧の見た目は変わらない。
+                */}
+        {channel !== 'line' && emailError && (
+          <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
+            <p className="text-sm text-danger">{emailError}</p>
+            <button
+              type="button"
+              onClick={() => { void loadEmails() }}
+              className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
+            >
+              メールを読み込み直す
+            </button>
+          </div>
+        )}
+        {/*
+                  LINE一覧の失敗行。メールだけ見ているときは出さない。
+                  「もう一度お試しください」とだけ書かれた帯では、直す手段が
+                  ページ全体の再読み込みしかない(N-030)。失敗した一覧の場所で
+                  同じ条件の再取得へ戻れるようにする。
+                */}
+        {channel !== 'email' && chatListFailed && (
+          <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
+            <p className="text-sm text-danger">チャットの読み込みに失敗しました。</p>
+            <button
+              type="button"
+              onClick={() => { void loadChats() }}
+              className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
+            >
+              会話を読み込み直す
+            </button>
+          </div>
+        )}
+        {/*
+                  メールの問い合わせを同じ一覧の先頭に混ぜる。
+                  設計 `V2 2-1 受信箱` の一覧は「✉ 定期便の解約について」のように
+                  メールも同じ並びに入っている。出どころで場所を分けると、
+                  返信を待っている人を2か所で探すことになる。
+
+                  押したときの行き先だけは分ける。LINEはこの画面のトーク、
+                  メールはメールの往復で、中央に出すものの作りが違う。
+                */}
+        {/*
+                  LINE とメールを1本に混ぜる。どちらも口側で「未読が先・
+                  新しい順」に並んでいるので、画面では並べ替えない。
+                  受け取った順のまま、先頭同士を比べて混ぜるだけで全体が
+                  保たれる。ページ送りで足された分も、各出どころの続き
+                  として正しい場所に入る。
+
+                  行の中身の作りは出どころで違う（メールは件名、LINE は
+                  最後のメッセージと未対応の印）ので、描き方はそれぞれ
+                  残したまま、混ぜ方だけそろえる。
+                */}
+        {(() => {
+          const mailRows = (channel === 'line' ? [] : emailItems)
+            .filter((item) =>
+              nameQuery.trim() === ''
+                ? true
+                : [item.customerName, item.customerIdentifier, item.subject, item.preview]
+                  .filter(Boolean)
+                  .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
+            )
+            .filter((item) => statusFilter === 'all' || item.status === statusFilter)
+            .map((item) => ({
+              at: item.lastMessageAt ?? item.lastIncomingAt,
+              unread: item.isUnread,
+              key: `email:${item.id}`,
+              // 描くのは見えている行だけ（窓分け）。中身はその時に作る。
+              render: () => (
+                // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
+                // 直書きボタンの借金に数えられる (design-debt)。
+                <div key={item.id} className="border-b border-hairline">
+                  <button
+                    onClick={() => {
+                      // LINEの選択を外す。両方開いていると中央に何を
+                      // 出すのか決まらない。URL指定の案内とURL状態も外す。
+                      // friend を残すと、再読込で古いLINE会話へ戻る(#673)。
+                      deepLinkRequestIdRef.current += 1
+                      deepLinkIdRef.current = null
+                      setDeepLinkNotice('')
+                      setSelectedChatId(null)
+                      setSelectedThreadId(item.threadId)
+                      router.replace(buildInboxUrl(channel, savedViewParam || null))
+                      setEmailItems((prev) => prev.map((email) => (
+                        email.threadId === item.threadId ? { ...email, isUnread: false } : email
+                      )))
+                      void fetchApi(`/api/support/email/threads/${encodeURIComponent(item.threadId)}/read`, {
+                        method: 'POST',
+                      }).catch(() => undefined)
+                    }}
+                    className={`w-full px-3 py-3 text-left transition-colors ${selectedThreadId === item.threadId ? 'bg-accent-soft' : 'hover:bg-shell'
+                      } ${styles.row}`}
+                  >
+                    <div className={`flex items-start gap-3 ${styles.rowInner}`}>
+                      <div className="relative shrink-0">
+                        {/* メールの行も名前の頭文字（以前は全員「M」で、誰の会話か目で追えなかった）。 */}
+                        <Avatar name={item.customerName} size={34} />
+                        {item.isUnread && (
+                          <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2">
+                          {/* 板 `M0393`：未対応は顔の赤い点＋名前の太字。行の地は塗らない。 */}
+                          <p className={`text-ink truncate text-sm ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
+                          {(
+                            <span className={styles.rowTime} data-unread={item.isUnread || undefined}>{formatInboxListTime(item.lastIncomingAt)}</span>
+                          )}
+                        </div>
+                        <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
+                          <p className={`text-ink-faint line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview}`}>
+                            {item.subject || item.preview}
+                          </p>
+                        </div>
+                        <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
+                          <ChannelBadge channel="email" />
+                          <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
+                            <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
+                              {(item.assignedStaffName ?? '未').charAt(0)}
+                            </span>
+                            <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              ),
+            }))
+          const lineRows = (channel === 'email' ? [] : chats)
+            .map((chat) => ({
+              at: chat.lastMessageAt ?? '',
+              unread: chat.isUnread,
+              key: chat.id,
+              // 描くのは見えている行だけ（窓分け）。中身はその時に作る。
+              render: () => {
+                const isSelected = selectedChatId === chat.id
+                const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? null
+                // 「真の自発（要対応）」= chat.status='unread'。webhook 側で auto_reply に
+                // マッチしなかった incoming のみ unread に設定される。auto_reply trigger
+                // (キーワード "コスト比較" 等) は matched 扱いで unread 化しない。
+                // 太字と印の表示はこの status を使う。direction だけだと button 押下も
+                // 強調してしまって S/N 比が悪化する。
+                const needsAttention = chat.status === 'unread'
+                /*
+                  設計 `xGLVe` は、今日届いてまだ返していない行だけ待ち時間を
+                  出す。古い行まで「◯◯時間待ち」にすると桁が伸びて読めない。
+                */
+                const waitingLabel = needsAttention
+                  && chat.lastMessageAt
+                  && sameYmd(chat.lastMessageAt, new Date().toISOString())
+                  ? formatWaitingDuration(chat.lastMessageAt, Date.now())
+                  : null
+                // 最新メッセージの本文 preview。flex/image は文字列で見せても意味が薄いので type 表記に置換。
+                const previewRaw = chat.lastMessageContent ?? ''
+                const preview = (() => {
+                  // 絵文字は付けない。言葉だけで何かは分かる。
+                  if (chat.lastMessageType === 'image') return '画像'
+                  if (chat.lastMessageType === 'flex') return 'Flexメッセージ'
+                  if (chat.lastMessageType === 'sticker') return 'スタンプ'
+                  if (chat.lastMessageType === 'video') return '動画'
+                  if (chat.lastMessageType === 'audio') return '音声'
+                  if (chat.lastMessageType === 'file') return 'ファイル'
+                  if (chat.lastMessageType === 'location') return '位置情報'
+                  if (chat.lastMessageType === 'unsent') return '送信を取り消しました'
+                  return previewRaw.replace(/\n+/g, ' ').slice(0, 60)
+                })()
+                // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
+                // 直書きボタンの借金に数えられる (design-debt)。
+                const node = (
+                  <div key={chat.id} className="border-b border-hairline">
+                    <button
+                      onClick={() => handleSelectChat(chat.id)}
+                      /* 名前は相手の名前だけ、未読と本文は説明に回す（読み上げで名前から入れる）。 */
+                      aria-labelledby={(`chat-row-name-${chat.id}`)}
+                      aria-describedby={(`${chat.isUnread ? `chat-row-unread-${chat.id} ` : ''}chat-row-preview-${chat.id}`)}
+                      className={`w-full px-3 py-3 text-left transition-colors ${isSelected
+                          ? 'bg-shell'
+                          /* 板 ：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
+                          : 'hover:bg-shell'
+                        } ${styles.row}`}
+                    >
+                      <div className={`flex items-start gap-3 ${styles.rowInner}`}>
+                        <div className="relative shrink-0">
+                          {/* ★V7 友だちの顔：画像が読めない時も色つきの頭文字。 */}
+                          <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={34} />
+                          {chat.isUnread && (
+                            <span id={`chat-row-unread-${chat.id}`} className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
+                              <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
+                            </div>
+                            {(
+                              /* ★V8（XqSvX）：右上は「2時間前」「昨日」「8月16日」。未読は濃い字・太字。待ち時間の札は置かない。 */
+                              <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={waitingLabel ?? undefined}>{formatInboxListTime(chat.lastMessageAt)}</span>
+                            )}
+                          </div>
+                          {/* 板 `M0393`：行ごとの状態の札は置かない（赤い点＋太字と上の切り替えで足りる）。 */}
+                          <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
+                            <p
+                              id={`chat-row-preview-${chat.id}`}
+                              className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview} ${needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
+                                }`}
+                              title={preview}
+                            >
+                              {chat.lastMessageDirection === 'outgoing' && (
+                                <span className="text-ink-faint mr-1">返信：</span>
+                              )}
+                              {preview || <span className="text-ink-faint italic">(まだメッセージなし)</span>}
+                            </p>
+                          </div>
+                          <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
+                            <ChannelBadge channel="line" />
+                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
+                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
+                                {(operatorName ?? '未').charAt(0)}
+                              </span>
+                              <span className="truncate">{`担当：${assigneeLabel(operatorName, chat as ChatSlaFields)}`}</span>
+                            </span>
+                            <span className="ml-auto shrink-0"><SlaBadge fields={chat as ChatSlaFields} now={Date.now()} /></span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                )
+                return node
+              },
+            }))
+          // 両方とも口側で「未読が先・新しい順」。未読の有無が違う
+          // 行同士は時刻に関わらず未読が先、同じ中では新しい順。
+          const precedes = (
+            a: { at: string; unread: boolean },
+            b: { at: string; unread: boolean },
+          ): number =>
+            Number(b.unread) - Number(a.unread)
+            || String(b.at).localeCompare(String(a.at))
+          const rows: ChatListWindowItem[] = []
+          if (slaEnabled) {
+            // 期限が近い順（過ぎた物が先）。期限の無い行・メールは後ろへ。「期限超過」は期限を過ぎた行だけ。
+            const dueOf = (chat: ChatSlaFields) => (chat.slaDueAt ? Date.parse(chat.slaDueAt) : Infinity)
+            const linePicked = (quickFilter === 'overdue' ? chats.filter((chat) => (chat as ChatSlaFields).slaState === 'overdue') : chats)
+            const keyed = new Set(linePicked.map((chat) => chat.id))
+            const lineByDue = lineRows.filter((row) => keyed.has(row.key)).sort((a, b) => dueOf(chats.find((chat) => chat.id === a.key) as ChatSlaFields) - dueOf(chats.find((chat) => chat.id === b.key) as ChatSlaFields))
+            rows.push(...lineByDue, ...(quickFilter === 'overdue' ? [] : mailRows))
+          } else {
+            let i = 0
+            let j = 0
+            while (i < mailRows.length && j < lineRows.length) {
+              if (precedes(mailRows[i], lineRows[j]) <= 0) rows.push(mailRows[i++])
+              else rows.push(lineRows[j++])
+            }
+            while (i < mailRows.length) rows.push(mailRows[i++])
+            while (j < lineRows.length) rows.push(lineRows[j++])
+          }
+          if (inboxListLoading) {
+            return (
+              /*
+               * 会話の行の形の骨組み（動きの点検 15 番）。0.3 秒以内に届けば出さない。
+               * 読み上げには「読み込んでいます」を残す。
+               */
+              <div role="status" aria-busy="true" data-inbox-list-state="loading">
+                <span className="sr-only">会話を読み込んでいます...</span>
+                <DelayedSkeleton
+                  loading
+                  skeleton={
+                    <div aria-hidden="true">
+                      {[0, 1, 2, 3, 4, 5].map((row) => <SkeletonRow key={row} />)}
+                    </div>
+                  }
+                />
+              </div>
+            )
+          }
+          if (rows.length > 0) {
+            return <ChatListWindow items={rows} scrollerRef={listScrollRef} hasMore={hasMoreChats || hasMoreEmails} />
+          }
+          // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
+          if (inboxListFailed) return null
+          return (
+            <div
+              data-inbox-list-state={hasInboxFilters ? 'filtered-empty' : 'empty'}
+              className="text-ink-faint flex min-h-36 flex-col items-center justify-center px-4 py-8 text-center"
+            >
+              <p className="text-sm font-semibold text-ink-secondary">
+                {hasInboxFilters ? '条件に一致する会話がありません' : 'まだ会話がありません'}
+              </p>
+              {hasInboxFilters && (
+                <button
+                  type="button"
+                  onClick={clearInboxFilters}
+                  className="text-action mt-3 text-sm font-semibold underline underline-offset-2"
+                >
+                  絞り込みを解除
+                </button>
+              )}
+            </div>
+          )
+        })()}
+
+        {hasMoreChats && (
+          <InboxHistoryButton context="list" busy={loadingMore}
+            onClick={() => { void loadMoreChats() }}
+          >
+            さらに読み込む
+          </InboxHistoryButton>
+        )}
+        {/*
+                  メールの続き。メールは上限200件で切れていた分を offset で遡る。
+                  LINEの「さらに読み込む」とは別物なので文言を分ける。
+                */}
+        {hasMoreEmails && (
+          <InboxHistoryButton context="list" busy={loadingMoreEmails}
+            onClick={() => { void loadEmails(emailItems.length, true) }}
+          >
+            メールの続きを読み込む
+          </InboxHistoryButton>
+        )}
+      </>
+    </div>
+  </InboxListPane>)
+}

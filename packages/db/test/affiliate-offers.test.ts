@@ -13,7 +13,7 @@ import {
   setConversionApproval,
   getConversionApprovalNotifyInfo,
 } from '../src/affiliate-offers.js';
-import { trackConversion } from '../src/conversions.js';
+import { trackConversion } from '../src/conversions/index.js';
 import {
   getMileageHistoryForFriend,
   getMileageSummaryForFriend,
@@ -21,7 +21,7 @@ import {
   processPendingMileageEvents,
   recordEngagementEvent,
   syncAffiliateConversionMileage,
-} from '../src/mileage.js';
+} from '../src/mileage/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(__dirname, '..');

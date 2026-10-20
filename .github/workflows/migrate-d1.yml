@@ -2,7 +2,7 @@ name: Migrate D1
 
 # 手で走らせる D1 のマイグレーション。
 #
-# 本番は deploy-cloudflare-worker.yml が main への push で自動的に当てる。
+# 本番の適用は承認付き deploy-cloudflare-production.yml の子だけが行う。
 # ここは、その前に検証環境（nen-line-stg）で先に試すための入口。
 # 検証用のデプロイスクリプト（scripts/deploy/staging-deploy.sh）は
 # マイグレーションを当てないので、これが無いと本番が初見になる。
@@ -127,7 +127,11 @@ jobs:
           pnpm exec tsx scripts/recovery/booking-hours-20260922.ts apply
 
   migrate:
-    if: inputs.operation == 'migrate'
+    # Standalone production is read-only; all production writes belong to the parent release.
+    if: inputs.operation == 'migrate' && (inputs.environment == 'staging' || (inputs.environment == 'production' && inputs.mode == 'dry-run' && github.ref == 'refs/heads/main'))
+    concurrency:
+      group: ${{ inputs.environment == 'production' && 'cloudflare-production' || 'migrate-d1-staging' }}
+      cancel-in-progress: false
     environment:
       name: ${{ inputs.environment }}
     runs-on: ubuntu-latest
@@ -176,7 +180,7 @@ jobs:
             fi
           fi
           echo "name=$name" >> "$GITHUB_OUTPUT"
-          echo "対象: $name ($ENVIRONMENT)"
+          echo "データベースの選択: PASS"
 
       - name: Check the credentials
         run: |
@@ -231,7 +235,7 @@ jobs:
           {
             echo "## 未適用のマイグレーション: ${pending_count} 件"
             echo
-            echo "対象: \`$DB_NAME\`"
+            echo "データベースの選択: PASS"
             echo
             if [ "$pending_count" -gt 0 ]; then
               echo '```'
@@ -353,7 +357,7 @@ jobs:
       - name: Verify D1, delivery batches, and notification rules
         run: |
           set -o pipefail
-          pnpm tsx scripts/verify-staging-operational-path.ts \
+          pnpm tsx scripts/verification/verify-staging-operational-path.ts \
             | tee "$RUNNER_TEMP/staging-verification.json"
 
       - name: Publish aggregate-only result
@@ -406,7 +410,7 @@ jobs:
       - name: Verify the Instagram cross-post state, posts, and reviews
         run: |
           set -o pipefail
-          pnpm tsx scripts/verify-staging-instagram-cross-post.ts \
+          pnpm tsx scripts/verification/verify-staging-instagram-cross-post.ts \
             | tee "$RUNNER_TEMP/instagram-verification.json"
 
       - name: Publish aggregate-only result
@@ -463,7 +467,7 @@ jobs:
       - name: Verify the delivery reads and the three screens
         run: |
           set -o pipefail
-          pnpm tsx scripts/verify-staging-restaurant-delivery.ts \
+          pnpm tsx scripts/verification/verify-staging-restaurant-delivery.ts \
             | tee "$RUNNER_TEMP/delivery-verification.json"
 
       - name: Publish aggregate-only result

@@ -1,10 +1,11 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import { listErrorMessages } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 
 /**
- * エラー文面の対応表。設計 ★V6 34（要件 v6-34 §9）。台帳 #134。
+ * エラー文面の対応表。設計 ★34（要件 -34 §9）。台帳 #134。
  *
  * **画面は起動時に一度取って版ごとキャッシュする**（§12）。
  * 表に無いコードは画面側で汎用文面と追跡番号に落とす——
@@ -29,7 +30,7 @@ errorMessages.get('/api/error-messages', requireRole('owner', 'admin', 'staff'),
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_error_messages_failed","route":"GET /api/error-messages"}));
+    logger.error("routes_error_messages_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

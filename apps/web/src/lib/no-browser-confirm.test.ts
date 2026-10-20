@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const SRC = path.join(__dirname, '..')
 
-/** コメントを外す。注意書きの中の `confirm()` に当てないため。 */
+/** コメントを外す。注意書きの中の `confirm` に当てないため。 */
 function code(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
@@ -20,14 +20,14 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 /**
- * **ブラウザの `confirm()` `alert()` `prompt()` を使わない。**
+ * **ブラウザの `confirm` `alert` `prompt` を使わない。**
  *
  * 見た目がブラウザ任せで、設計の確認窓（`J6x4Q` / `H2S1T4`）と違う。
  * 何が消えるのか・戻せるのかを本文で読ませられず、押し間違いを止められない。
  * さらに**画像比較に写らない**ので、確認と失敗の絵をそもそも撮れない
  * （`Y0Sn3` の失敗状態が撮れなかったのはこれが理由だった）。
  *
- * `alert()` はもう1つ悪いところがある。**押した瞬間しか読めない。**
+ * `alert` はもう1つ悪いところがある。**押した瞬間しか読めない。**
  * 消えると理由を確かめ直せないので、原因を追えない。実際
  * `update failed: …` `rollback not implemented in MVP — use CLI`
  * `areas は最大 20 個` のように、**内部語がそのまま出ていた**。
@@ -85,7 +85,7 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
   })
 
   /**
-   * `prompt()` は**まだ残っている。減る一方の表で数える。**
+   * `prompt` は**まだ残っている。減る一方の表で数える。**
    *
    * 多くは「コピーできなかったとき、URLを選べる形で出す」代わりに使って
    * いる（`navigator.clipboard` が使えない環境の逃げ道）。逃げ道そのものは
@@ -93,7 +93,7 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
    *
    * `app/form-submissions/edit` の「ページの名前」は、そもそも入力欄を持つ窓に
    * するのが正しい。
-   * 手本は `app/rich-menus/new/create-v8.tsx`——`Dialog` の `children` に
+   * 手本は `v8/rich-menus/new/create.tsx`——`Dialog` の `children` に
    * 入力欄を置いている。
    *
    * **増やせない。0 になったら行ごと消す**（消し忘れるとここで落ちる）。
@@ -111,10 +111,10 @@ describe('ブラウザの確認・知らせの窓を使わない', () => {
   })
 
   it('リマインダの削除が共通の確認窓を使う', () => {
-    /* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
-    const src = fs.readFileSync(path.join(SRC, 'app', 'reminders', 'list-v8.tsx'), 'utf8')
+    /* 完全切り替え：管理画面 page は捨て、V8 の list-v8 を見る。 */
+    const src = fs.readFileSync(new URL('../v8/reminders/list.tsx', import.meta.url), 'utf8')
     /*
-     * 2026-10-06：V8 の削除の窓（絵 VsSyu：幅600・危ない操作は左端・「代わりに一時停止」）は
+     * 2026-10-06：V8 の削除の窓（絵 ：幅600・危ない操作は左端・「代わりに一時停止」）は
      * 共通の ConfirmDialog の形に無いため、src/v8/reminders/sheet-dialog（useOverlayFocus の面）で組む。
      * どちらでも「ブラウザの confirm に戻らない・危ない操作として出す」ことを見る。
      */

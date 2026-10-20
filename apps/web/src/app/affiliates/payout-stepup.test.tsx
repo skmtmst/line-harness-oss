@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 銀行用CSVの本人確認窓（★V8-B `CVz5d`）。
+ * 銀行用CSVの本人確認窓（★V8-B ）。
  * 6桁コードを入れる前に、書き出す中身（件数・合計）を見せます。
  */
 import { cleanup, render, screen } from '@testing-library/react'

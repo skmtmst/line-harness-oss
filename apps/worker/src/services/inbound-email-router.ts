@@ -1,4 +1,5 @@
-import type { Env } from '../index.js';
+import { logger } from '@line-crm/shared/server';
+import type { Env } from '../worker-env.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
 import { isRestaurantIntakeRecipient, receiveRestaurantIntakeEmail } from './restaurant-email-intake.js';
 import { receiveSupportEmail } from './support-email.js';
@@ -27,7 +28,7 @@ export async function routeInboundEmail(
     try {
       await handlers.receiveRestaurantIntakeEmail(message, env);
     } catch (error) {
-      console.error(JSON.stringify({"code":"restaurant_email_receive_failed"}));
+      logger.error("restaurant_email_receive_failed");
       message.setReject('予約メール受信処理に失敗しました');
     }
     return;
@@ -37,7 +38,7 @@ export async function routeInboundEmail(
   try {
     await handlers.receiveSupportEmail(message, env);
   } catch (error) {
-    console.error(JSON.stringify({"code":"support_email_receive_failed"}));
+    logger.error("support_email_receive_failed");
     message.setReject('メール受信処理に失敗しました');
   }
 }

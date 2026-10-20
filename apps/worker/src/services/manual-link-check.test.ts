@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * マニュアル導線の週1回の点検（要件 v6-34 §8-4）。台帳 #134。
+ * マニュアル導線の週1回の点検（要件 -34 §8-4）。台帳 #134。
  *
  * 守りたいのは 3 点。
  *   1. 週1に絞る（cron は短い間隔で回るので、ここで止める）
@@ -49,7 +49,7 @@ beforeEach(() => {
 describe('checkAllManualLinks', () => {
   it('URL が無い行を broken に混ぜない', async () => {
     db.listManualLinks.mockResolvedValue([LINKS.unset]);
-    const result = await checkAllManualLinks({} as D1Database);
+    const result = await checkAllManualLinks({} as D1Database, { lookupHost: async () => ['93.184.216.34'] });
     expect(result.unset).toBe(1);
     expect(result.broken).toBe(0);
   });
@@ -57,7 +57,7 @@ describe('checkAllManualLinks', () => {
   it('新たに壊れたものだけを newlyBroken に入れる', async () => {
     db.listManualLinks.mockResolvedValue([LINKS.ok, LINKS.brokenAlready]);
     prepare({ 'friends': async () => ({ ok: false, status: 404 }), 'reminders': async () => ({ ok: false, status: 404 }) });
-    const result = await checkAllManualLinks({} as D1Database);
+    const result = await checkAllManualLinks({} as D1Database, { lookupHost: async () => ['93.184.216.34'] });
     // '3-1' は ok→broken（新たに壊れた）、'7-1' は broken→broken（前から壊れていた）
     expect(result.newlyBroken).toEqual(['3-1']);
     expect(result.broken).toBe(2);
@@ -68,7 +68,7 @@ describe('checkAllManualLinks', () => {
     db.listManualLinks.mockResolvedValue([unsafe]);
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
-    const result = await checkAllManualLinks({} as D1Database);
+    const result = await checkAllManualLinks({} as D1Database, { lookupHost: async () => ['93.184.216.34'] });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(result.unsafe).toBe(1);
   });
@@ -123,4 +123,12 @@ describe('notifyBrokenManualLinks（1回だけ知らせる）', () => {
     await notifyBrokenManualLinks(dbStub, {} as never, []);
     expect(dispatch.dispatchOperatorEvent).not.toHaveBeenCalled();
   });
+});
+
+it('does not issue HEAD when a public name resolves to a private address', async () => {
+  db.listManualLinks.mockResolvedValue([LINKS.ok]);
+  const fetchSpy = vi.fn(); vi.stubGlobal('fetch', fetchSpy);
+  const result = await checkAllManualLinks({} as D1Database, { lookupHost: async () => ['93.184.216.34', '10.0.0.1'] });
+  expect(fetchSpy).not.toHaveBeenCalled();
+  expect(result).toMatchObject({ checked: 1, broken: 1, newlyBroken: ['3-1'] });
 });

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -16,10 +17,11 @@ import {
   toJstString,
   decryptCredential,
 } from '@line-crm/db';
+
 import { GoogleCalendarClient } from '../services/google-calendar.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const calendar = new Hono<Env>();
 
@@ -56,7 +58,7 @@ calendar.get('/api/integrations/google-calendar', requireRole('owner', 'admin'),
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"GET /api/integrations/google-calendar"}));
+    logger.error("routes_calendar_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -85,7 +87,7 @@ calendar.post('/api/integrations/google-calendar/connect', requireRole('owner', 
       data: { id: conn.id, calendarId: conn.calendar_id, authType: conn.auth_type, isActive: Boolean(conn.is_active), createdAt: conn.created_at },
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"POST /api/integrations/google-calendar/connect"}));
+    logger.error("routes_calendar_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -97,7 +99,7 @@ calendar.delete('/api/integrations/google-calendar/:id', requireRole('owner', 'a
     if (!deleted) return c.json({ success: false, error: 'Calendar connection not found' }, 404);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"DELETE /api/integrations/google-calendar/:id"}));
+    logger.error("routes_calendar_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -143,7 +145,7 @@ calendar.get('/api/integrations/google-calendar/slots', requireRole('owner', 'ad
         googleBusyIntervals = await gcal.getFreeBusy(timeMin, timeMax);
       } catch (err) {
         // Google API 失敗はベストエフォート — D1 のみでフォールバック
-        console.warn(JSON.stringify({"code":"routes_calendar_warn","route":"GET /api/integrations/google-calendar/slots"}));
+        logger.warn("routes_calendar_warn");
       }
     }
 
@@ -179,7 +181,7 @@ calendar.get('/api/integrations/google-calendar/slots', requireRole('owner', 'ad
 
     return c.json({ success: true, data: slots });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"GET /api/integrations/google-calendar/slots"}));
+    logger.error("routes_calendar_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -221,7 +223,7 @@ calendar.get('/api/integrations/google-calendar/bookings', requireRole('owner', 
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"GET /api/integrations/google-calendar/bookings"}));
+    logger.error("routes_calendar_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -273,14 +275,14 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
           try {
             await gcal.deleteEvent(eventId);
           } catch (cleanupError) {
-            console.warn(JSON.stringify({"code":"routes_calendar_warn","route":"POST /api/integrations/google-calendar/book"}));
+            logger.warn("routes_calendar_warn");
           }
           return c.json({ success: false, error: 'Calendar booking changed during sync' }, 409);
         }
         booking.event_id = eventId;
       } catch (err) {
         // Google API 失敗はベストエフォート — D1 予約は維持する
-        console.warn(JSON.stringify({"code":"routes_calendar_warn","route":"POST /api/integrations/google-calendar/book"}));
+        logger.warn("routes_calendar_warn");
       }
     }
 
@@ -299,7 +301,7 @@ calendar.post('/api/integrations/google-calendar/book', requireRole('owner', 'ad
       },
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"POST /api/integrations/google-calendar/book"}));
+    logger.error("routes_calendar_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -331,7 +333,7 @@ calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRol
             });
             await gcal.deleteEvent(booking.event_id);
           } catch (err) {
-            console.warn(JSON.stringify({"code":"routes_calendar_warn","route":"PUT /api/integrations/google-calendar/bookings/:id/status"}));
+            logger.warn("routes_calendar_warn");
           }
         }
       }
@@ -339,7 +341,7 @@ calendar.put('/api/integrations/google-calendar/bookings/:id/status', requireRol
 
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_calendar_failed","route":"PUT /api/integrations/google-calendar/bookings/:id/status"}));
+    logger.error("routes_calendar_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

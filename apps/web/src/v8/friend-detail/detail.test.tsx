@@ -277,12 +277,12 @@ async function friendMoreMenu() {
   const menu = document.querySelector<HTMLButtonElement>('[aria-label="その他の操作"]')!
   act(() => menu.click()); await flush()
 }
-it.each(['staff', 'viewer', null])('B-215: %sの友だち詳細にはデータ削除を出さない', async value => {
+it.each(['staff', 'viewer', null])('%sの友だち詳細にはデータ削除を出さない', async value => {
   role.current = value
   await render(); await friendMoreMenu()
   expect(bodyButtons().some(button => button.textContent === '友だちのデータを削除する')).toBe(false)
 })
-it('B-215: 友だち削除の確認窓に消す物・残す物を出し、取消は削除しない', async () => {
+it('友だち削除の確認窓に消す物・残す物を出し、取消は削除しない', async () => {
   await render(); await friendMoreMenu()
   act(() => bodyButtons().find(button => button.textContent === '友だちのデータを削除する')!.click()); await flush()
   const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
@@ -292,7 +292,7 @@ it('B-215: 友だち削除の確認窓に消す物・残す物を出し、取消
   act(() => bodyButtons().find(button => button.textContent === 'キャンセル')!.click()); await flush()
   expect(fetchApi.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false)
 })
-it('B-215: 友だち削除は確認のヘッダーを付け、失敗の窓から再試行できる', async () => {
+it('友だち削除は確認のヘッダーを付け、失敗の窓から再試行できる', async () => {
   const normal = fetchApi.getMockImplementation()!
   let attempts = 0
   fetchApi.mockImplementation(async (path: string, init?: RequestInit) => {
@@ -309,7 +309,7 @@ it('B-215: 友だち削除は確認のヘッダーを付け、失敗の窓から
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)) })
   expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
 })
-it('B-215: 保存記録の構造変更が必要な場合は案内を出し、再押下で消さない', async () => {
+it('保存記録の構造変更が必要な場合は案内を出し、再押下で消さない', async () => {
   const normal = fetchApi.getMockImplementation()!
   fetchApi.mockImplementation(async (path: string, init?: RequestInit) => {
     if (init?.method === 'DELETE') throw new ApiError(409, '変更承認が必要です', 'deletion_schema_approval_required')

@@ -1,5 +1,6 @@
 'use client'
 
+import { loadStaffIdentity, useTenantWideAccess } from '@/lib/staff-role'
 import { PageContent } from '@/components/templates/page-frame'
 import { Plus, Users, UserPlus, Eye, Building2 } from 'lucide-react'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
@@ -27,10 +28,10 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { RowActions } from '@/components/shared/row-actions'
 
 /*
- * ★V8 統括のメンバー（Pencil `r4ARpV`。招待の窓 `yLKwV`・権限を変える窓 `BHEl9`・
- * 変える前の確認 `M4jS9`）。
+ * ★V8 統括のメンバー（Pencil 。招待の窓 ・権限を変える窓 ・
+ * 変える前の確認 ）。
  *
- * v7 の画面（app/hq/members/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
+ * 管理画面 の画面（app/hq/members/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
  * （型のフォルダの列）・数のカード4枚・権限者の表・役割の説明。
  */
@@ -53,7 +54,7 @@ const STATUS_WORDS: Record<MemberStatus, string> = {
   inactive: '停止中',
 }
 
-/** 状態の札の色（絵 `r4ARpV` の「状態の札」：有効＝緑・招待中＝青・停止中＝灰）。 */
+/** 状態の札の色（「状態の札」：有効＝緑・招待中＝青・停止中＝灰）。 */
 const STATUS_TONES: Record<MemberStatus, StatusBadgeTone> = {
   active: 'success',
   invited: 'info',
@@ -73,7 +74,7 @@ export default function HqMembersV8() {
 
 function MembersInner() {
   const saveErrors = useSaveFormErrors()
-  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/r4ARpV`）。
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」。
   usePageTitle('メンバー')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const settingsNav = useHqSettingsFolderNav('members')
@@ -92,7 +93,7 @@ function MembersInner() {
   const [resendingId, setResendingId] = useState<string | null>(null)
   /* 権限変更が STEP_UP_REQUIRED で止まったときの本人確認。通ったら grant を付けて同じ保存をやり直す。 */
   const [stepUp, setStepUp] = useState<null | { retry: (token: string) => Promise<void> }>(null)
-  /* 板 `M4jS9`「権限を変える確認」。変える前に変更前→変更後を見せる。 */
+  /* 板 「権限を変える確認」。変える前に変更前→変更後を見せる。 */
   const [confirmChange, setConfirmChange] = useState<{ member: StaffMember; value: MemberDialogValue } | null>(null)
 
   const load = useCallback(async () => {
@@ -101,7 +102,7 @@ function MembersInner() {
     try {
       // M025: 範囲限定の担当者に一覧は出さない（口も403で断る）。
       // 先に自分を読んで理由の分かる面を出し、通らない一覧は呼ばない。
-      const meRes = await api.staff.me()
+      const meRes = await loadStaffIdentity()
       if (!meRes.success) throw new Error(meRes.error)
       setMe(meRes.data)
       if (meRes.data.accountScope === 'accounts') {
@@ -131,10 +132,10 @@ function MembersInner() {
 
 
   const accountNames = useMemo(() => new Map(accounts.map((a) => [a.id, a.name])), [accounts])
-  /* 絵 `r4ARpV` の並び：状態→役割（オーナー→管理者→担当者→閲覧のみ）→名前。 */
+  /* 絵  の並び：状態→役割（オーナー→管理者→担当者→閲覧のみ）→名前。 */
   const rows = sortMembersByRole(members)
   const kpis = useMemo(() => memberKpis(members), [members])
-  const canManage = !me?.readOnly && me?.accountScope !== 'accounts' && (me?.role === 'owner' || me?.role === 'admin')
+  const canManage = useTenantWideAccess()
   const restricted = me?.accountScope === 'accounts'
 
   const submitDialog = async (value: MemberDialogValue, stepUpToken?: string) => {
@@ -287,7 +288,7 @@ function MembersInner() {
       </PageContent>
 
       <MemberDialogV8
-        /* 確認（M4jS9）を出す間は閉じる。確認をやめたら入れた中身のまま戻る。 */
+        /* 確認を出す間は閉じる。確認をやめたら入れた中身のまま戻る。 */
         open={dialog.open && !confirmChange}
         session={dialogSession}
         member={dialog.member}

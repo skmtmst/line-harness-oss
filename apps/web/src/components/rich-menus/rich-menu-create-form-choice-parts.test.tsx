@@ -12,10 +12,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/components/shared/condition-builder', () => ({ default: () => null }))
 
-import RichMenuCreateForm, {
-  freshRichMenuCreateValue,
-  type RichMenuCreateValue,
-} from './rich-menu-create-form'
+import RichMenuCreateForm from './rich-menu-create-form'
+import { freshRichMenuCreateValue, type RichMenuCreateValue } from './rich-menu-create-model'
 
 let host: HTMLDivElement
 let root: Root

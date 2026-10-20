@@ -1,3 +1,5 @@
+> 文書：統括の対応が要るもの（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 統括の対応が要るもの（BEHAVIOR.md）
 
 絵：VHp7p `Kyf8U`（B-312）。入口 `app/hq/attention/page.tsx`（`/hq/attention`）。

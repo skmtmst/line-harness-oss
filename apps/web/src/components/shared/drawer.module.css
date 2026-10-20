@@ -17,7 +17,7 @@
   flex-direction: column;
   border-left: 1px solid var(--color-hairline);
   background: var(--color-canvas);
-  /* ★V7 の影は3段。画面の端から出る引き出しは最前面（段3）。 */
+  /* ★管理画面 の影は3段。画面の端から出る引き出しは最前面（段3）。 */
   color: var(--color-ink);
 }
 
@@ -171,7 +171,7 @@
 /*
  * ★V8 仕上げ（M10）「横から出る面」：右から入る（240ms ease-out）。
  * 閉じるときは逆（150ms）。閉じの印 `data-closing` は drawer.tsx が
- * V8 のときだけ付ける（v7・試験は今までどおり即時に消える）。
+ * V8 のときだけ付ける（管理画面・試験は今までどおり即時に消える）。
  */
 /*
  * 開く・閉じるは「移り変わり（transition）」で動かす（フルード・インタラクション ①）。
@@ -231,7 +231,7 @@
 }
 
 /*
- * 編集の引き出し（width="editor"・ダッシュボード編集 mcOqK）。540・頭 16/20・題 17/600・
+ * 編集の引き出し（width="editor"・ダッシュボード編集 ）。540・頭 16/20・題 17/600・
  * 閉じるは枠つき 30・中 12/20・下 14/20。開くのは 200ms（提案 F）。既定と narrow は変えない。
  */
 :root .panel[data-width='editor'] {
@@ -318,7 +318,7 @@
 :root .panel[data-layout='inset'] .body { padding: 0; }
 :root .panel[data-layout='inset'] .footer { padding: 0; border: 0; gap: var(--tpl-toolbar-gap); }
 :root .panel[data-layout='inset'] .close { width: var(--tpl-af-dr-close); height: var(--tpl-af-dr-close); flex-basis: var(--tpl-af-dr-close); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); color: var(--color-ink-secondary); }
-/* 注文の参照（nAesv）：本文と頭の間16・下の操作は左右。ほかの幅は変えない。 */
+/* 注文の参照：本文と頭の間16・下の操作は左右。ほかの幅は変えない。 */
 :root .panel[data-width='order'] { width: min(var(--tpl-st2-od-w), 100%); gap: var(--tpl-st2-od-gap); }
 :root .panel[data-width='order'] .header { border: 0; padding: var(--tpl-st2-od-pad) var(--tpl-st2-od-pad) 0; }
 :root .panel[data-width='order'] .title { font-size: var(--tpl-st2-od-title); font-weight: 700; line-height: var(--tpl-st2-od-title-lh); }
@@ -335,16 +335,16 @@
 
 .titleRow { display: flex; align-items: center; gap: var(--tpl-msg-composer-content-gap); flex-wrap: wrap; }
 
-/* B-158：幅の段は共通部品の指定を最後に適用する。 */
+/* ：幅の段は共通部品の指定を最後に適用する。 */
 :root .panel[data-design-width] { width: min(var(--drawer-design-width), 100%); }
-/* B-187：短い本文は中身の高さで止め、長い本文だけ縦に送る。下の操作は常に板の下端。 */
+/* ：短い本文は中身の高さで止め、長い本文だけ縦に送る。下の操作は常に板の下端。 */
 :root .panel:not(.inline) { height: auto; max-height: 100dvh; align-self: flex-start; }
 :root .panel:not(.inline) .body { flex: 0 1 auto; }
 
-/* B-161：浮く面の影と薄い縁を共通化。 */
+/* ：浮く面の影と薄い縁を共通化。 */
 :root .panel { border: 0; outline: 1px solid var(--card-edge); outline-offset: -1px; box-shadow: var(--shadow-controls-pop); }
 
-/* B-180：幅の指定がある引き出しでも窓の題の段をそろえる。 */
+/* ：幅の指定がある引き出しでも窓の題の段をそろえる。 */
 :root .panel.panel .title {
   font-size: var(--tpl-dialog-title-size);
   font-weight: var(--tpl-dialog-title-weight);

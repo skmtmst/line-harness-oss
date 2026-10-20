@@ -63,7 +63,7 @@ async function open(entry: 'apps' | 'worker', query: string) {
   if (entry === 'worker') await act(async () => { await import('../../worker/src/client/main.js'); });
   else {
     const { initLiff } = await import('./lib/liff-auth.js'); await initLiff();
-    const { default: App } = await import('./App.js'); render(<BrowserRouter><App /></BrowserRouter>);
+    const { default: App } = await import('./app.js'); render(<BrowserRouter><App /></BrowserRouter>);
   }
 }
 for (const entry of ['apps', 'worker'] as const) {
@@ -115,7 +115,7 @@ for (const entry of ['apps', 'worker'] as const) {
     fireEvent.click(screen.getByRole('button', { name: '送信する' }));
     await screen.findByText('予約の確保に失敗しました。回答は保存されています。');
     failFormBooking = false; fireEvent.click(screen.getByRole('button', { name: '予約を取り直す' }));
-    await screen.findByText(/お店の確認待ちです/);
+    await screen.findByText(/次回のご予約.*担当者の確認待ちです/);
     const answers = writes.filter(w => w.path.endsWith('/submit'));
     const reserves = writes.filter(w => w.path === '/api/liff/booking/requests');
     expect(answers).toHaveLength(1); expect(reserves).toHaveLength(2);

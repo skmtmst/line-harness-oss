@@ -13,12 +13,12 @@ import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConfli
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { formatYen } from '@/lib/format'
 import { bookingApi } from '@/lib/api'
-import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode } from '@/lib/api-booking-payment-admin'
+import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode } from '@/lib/api/helpers/booking-payment-admin'
 import { MODE_LABEL, providerFor } from './labels'
 import styles from './payments.module.css'
 
 /*
- * メニュー・コース・クラスごとの「お支払い」の段（B-305 追記 3・絵 mauOC・XFRyO・QqER7）。
+ * メニュー・コース・クラスごとの「お支払い」の段（ 追記 3・絵 mauOC・XFRyO・）。
  * いつもの方法を使う／このメニューだけ変える（オンラインで先払い・お店で払う・お客さまが選ぶ）。
  * 決済をつないでいない店では段を出さず、1 行だけ「お支払いをつなぐ →」（押せない形にしない）。
  * 予約メニューは saveMenuPayment／clearMenuPayment、コース・クラスは組3 の口（版つき。古いと 409 → 共通の比べる窓）。
@@ -143,7 +143,7 @@ export function useMenuPayment(kind: MenuPaymentKind, accountId: string | null, 
   }
 }
 
-/** ぶつかったときの共通の帯と比べる窓（B-319：比べる窓は共通の部品）。 */
+/** ぶつかったときの共通の帯と比べる窓（：比べる窓は共通の部品）。 */
 export function MenuPaymentConflict({ state, subject }: { state: MenuPaymentState; subject: string }) {
   const { conflict } = state
   if (!conflict.conflict) return null

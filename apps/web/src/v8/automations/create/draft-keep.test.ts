@@ -1,5 +1,5 @@
 /*
- * 下書きを仕上げる（J1VA8）：見本から作った下書きの「担当へ知らせる」を、読んで保存し直しても
+ * 下書きを仕上げる：見本から作った下書きの「担当へ知らせる」を、読んで保存し直しても
  * 消さない（知らせのルールと文面をそのまま戻す）。この画面では選び直せないため。
  */
 import { describe, expect, it, vi } from 'vitest'
@@ -51,4 +51,13 @@ describe('下書きを仕上げる：担当へ知らせるを保つ', () => {
     expect(payload.map(row => row.id)).toEqual(['step-2', 'step-3'])
     expect(payload[0].params).toEqual({ tagId: 'tag-1' })
   })
+})
+
+it('曜日と対象を正規化して保存し、表示用の友だち名を本文へ混ぜない', async () => {
+  const { normalizeTriggerConfigFor } = await import('./draft-model')
+  const input = { weekdays: '1,3,', friendIds: ['friend-a', '', 'friend-a'], friendNames: { 'friend-a': '表示用の名前' }, time: '12:00' }
+  const saved = normalizeTriggerConfigFor('weekly', input, '')
+  expect(saved).toEqual({ weekdays: [1, 3], friendIds: ['friend-a'], time: '12:00' })
+  expect(input.friendNames).toEqual({ 'friend-a': '表示用の名前' })
+  expect(input.weekdays).toBe('1,3,')
 })

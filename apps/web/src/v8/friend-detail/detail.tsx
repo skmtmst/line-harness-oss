@@ -45,7 +45,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 
 /*
- * ★V8 友だち詳細（Pencil「★P1-4 友だち詳細」Q5F2QE・概要は JCDRm）。
+ * ★V8 友だち詳細（Pencil「★P1-4 友だち詳細」・概要は ）。
  *
  * 入口は app/friends/detail/page.tsx（V8 のときだけこの画面）。
  * データの口・権限・失敗の扱いは今の画面と同じ（BEHAVIOR.md）。見せ方だけ絵どおり：
@@ -222,7 +222,7 @@ function FriendDetailV8Inner() {
         <HistoryTab friend={friend} friendId={friendId} data={data} />
       ) : tab === 'info' ? (
         fieldsEnabled ? (
-          /* vX3wQ：情報欄タブも左に概要と同じ要点（顧客情報・対応・タグ・マイル・メモ）を置く。 */
+          /* ：情報欄タブも左に概要と同じ要点（顧客情報・対応・タグ・マイル・メモ）を置く。 */
           <div className={styles.overview}>
             <FriendSummaryRail friend={friend} friendId={friendId} data={data} perms={perms} fields={data.fields} values={data.values} realName={realName} onEditSupport={() => void support.openEditor()} />
             <InfoTab friendId={friendId} group={group} data={data} perms={perms} />

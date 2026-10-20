@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import {
-  API_RETRY_WAIT, createCallState, createExternalCall, createHttpAttempt, MemoryCircuitStore, parseRetryAfter,
-  type CallIdentity, type CallJournal, type CallPolicy, type CallRequest, type CallState, type Outcome,
-} from './index.js';
+import { API_RETRY_WAIT, createCallState, createExternalCall, createHttpAttempt, MemoryCircuitStore, parseRetryAfter } from './index.js';
+import { type CallIdentity, type CallJournal, type CallPolicy, type CallRequest, type CallState, type Outcome } from './types.js';
 
 const start = 1_800_000_000_000;
 const identity: CallIdentity = { scope: { accountId: 'account-a', storeId: 'store-a', destination: 'line', connectionId: 'connection-a' },

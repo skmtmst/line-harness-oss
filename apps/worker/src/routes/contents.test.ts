@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 class MockCommonVarVersionConflictError extends Error {
   constructor(readonly currentVersion: number) {
@@ -147,13 +147,13 @@ vi.mock('@line-crm/db', async () => {
 const accessMocks = { canAccessAllLineAccounts: vi.fn(async () => true) };
 vi.mock('../services/account-access.js', () => accessMocks);
 const scanMocks = { scanSingleMediaUsage: vi.fn() };
-vi.mock('../services/media-usage-scan.js', () => scanMocks);
+vi.mock('../features/media/media-usage-scan.js', () => scanMocks);
 const signingMocks = { createR2PresignedPutUrl: vi.fn() };
 vi.mock('../services/r2-presigned-upload.js', () => signingMocks);
-// 検査の門番は別ファイル（file-scan-gate.test.ts）で本物を見る。
-// ここではDBが空モックのため、門番だけ差し替えて通す。
+// 門番はここでは空DB向けに差し替え、file-scan-gate.test.tsで実物を見る。
 const fileScanServiceMocks = {
   checkMediaGate: vi.fn(async () => ({ allowed: true })),
+  getFileScanBySubject: vi.fn(async () => ({ status: 'clean' })),
   getMediaGateInfo: vi.fn(async () => ({ lineAccountId: 'acc-1', sizeBytes: 100, width: 1, height: 1 })),
   runScanForStoredObject: vi.fn(async (_db: unknown, _store: unknown, scan: { id: string }) => scan),
 };
@@ -162,12 +162,12 @@ vi.mock('./file-scan.js', () => ({
   ensureFileScanForUpload: vi.fn(async () => ({ id: 'scan-test-1' })),
 }));
 
+vi.mock('../services/media-upload-storage.js', async importOriginal => ({ ...await importOriginal<typeof import('../services/media-upload-storage.js')>(), copyMediaUpload: vi.fn(async () => true) }));
 const { contents } = await import('./contents.js');
 // 実物のエラークラス（モックは actual を引き継ぐので本物の instanceof が効く）
 const { MediaVersionIncompatibleError } = await import('@line-crm/db');
 
-// R2 の put/delete は Promise を返す。undefined を返すモックにすると、
-// 実装の .catch() が落ちて本物と違う結果になる。
+// R2 の put/delete は実装の .catch に合わせて Promise を返す。
 const put = vi.fn().mockResolvedValue(undefined);
 const del = vi.fn().mockResolvedValue(undefined);
 const head = vi.fn();
@@ -246,7 +246,7 @@ const UPLOAD_SESSION = {
   kind: 'image',
   expected_mime: 'image/png',
   expected_size: 8,
-  r2_key: 'media/account-1/a.png',
+  r2_key: 'media/account-1/final/a.png',
   status: 'pending',
   failure_code: null,
   etag: null,
@@ -371,6 +371,7 @@ beforeEach(() => {
     },
   });
   get.mockResolvedValue({
+    body: new Blob([PNG_640x480_PREFIX]).stream(),
     arrayBuffer: async () => PNG_640x480_PREFIX.buffer.slice(0),
   });
   accessMocks.canAccessAllLineAccounts.mockResolvedValue(true);
@@ -645,19 +646,18 @@ describe('メディアの容量・直接アップロード・版', () => {
       accountId: 'account-1', etag: '"etag-1"',
     });
     expect(res.status).toBe(201);
-    expect(head).toHaveBeenCalledWith(UPLOAD_SESSION.r2_key);
-    // 画像はシグネチャだけでなく寸法を測るため、先頭を広めに読む
-    expect(get).toHaveBeenCalledWith(UPLOAD_SESSION.r2_key, {
-      range: { offset: 0, length: 256 * 1024 },
+    expect(head).toHaveBeenCalledWith('private/media-uploads/upload-1');
+    expect(get).toHaveBeenCalledWith('private/media-uploads/upload-1', {
+      range: { offset: 0, length: 256 * 1024 }, onlyIf: { etagMatches: 'etag-1' },
     });
     expect(mocks.verifyMediaUploadSession).toHaveBeenCalledWith(
       env.DB, 'upload-1', 'account-1', 'etag-1',
-      { width: 640, height: 480 }, true,
+      { width: 640, height: 480 }, true, expect.stringMatching(/^media\/account-1\/final\//),
     );
     expect(mocks.completeNewMediaUpload).toHaveBeenCalled();
   });
 
-  it('R2実体がセッションと違えば削除して409にする', async () => {
+  it('R2実体がセッションと違えば公開済みコピーを削除せず409にする', async () => {
     head.mockResolvedValueOnce({
       size: 9,
       etag: 'etag-1',
@@ -675,7 +675,7 @@ describe('メディアの容量・直接アップロード・版', () => {
     expect(mocks.failMediaUploadSession).toHaveBeenCalledWith(
       env.DB, 'upload-1', 'account-1', 'object_mismatch',
     );
-    expect(del).toHaveBeenCalledWith(UPLOAD_SESSION.r2_key);
+    expect(del).not.toHaveBeenCalled();
   });
 
   it('既存メディア用は確認済みで止め、版APIで不変の次版を作る', async () => {
@@ -1955,7 +1955,7 @@ describe('共通情報', () => {
     expect(await conflict.json()).toMatchObject({ code: 'common_var_version_conflict', currentVersion: 4 });
   });
 
-  it('B-333 版番号なしの上書きを断る', async () => {
+  it('版番号なしの上書きを断る', async () => {
     // 影響の確認値があっても、読み込んだ版を欠く保存は通さない。
     const preview = await req('/api/common-vars/cv-1/impact-preview?accountId=account-1', 'POST', {
       accountId: 'account-1', nextValue: '11-20',
@@ -2632,14 +2632,14 @@ describe('公開配信の安全ヘッダ', () => {
 });
 
 
-it('B-333 メディアは版の指定なし・古い版で保存しない', async () => {
+it('メディアは版の指定なし・古い版で保存しない', async () => {
   const missing = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' }, 'owner', null);
   expect(missing.status).toBe(400);
   const stale = await req('/api/media/md-1?accountId=account-1', 'PATCH', { filename: 'b.png' }, 'owner', '999');
   expect(stale.status).toBe(409);
   expect(mocks.updateMedia).not.toHaveBeenCalled();
 });
-it('B-333 保管庫の削除に失敗したら記録を消さず再試行できる', async () => {
+it('保管庫の削除に失敗したら記録を消さず再試行できる', async () => {
   vi.mocked(env.IMAGES.delete).mockRejectedValueOnce(new Error('R2 unavailable'));
   const response = await req('/api/media/md-1?accountId=account-1', 'DELETE');
   expect(response.status).toBe(503);

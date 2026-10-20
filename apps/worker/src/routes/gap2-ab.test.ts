@@ -1,8 +1,8 @@
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {broadcastAb} from './broadcast-ab.js';
 import {broadcasts} from './broadcasts.js';
-import {setBroadcastApprovalThreshold} from '../services/broadcast-approval.js';
-import {abWinner,splitAb,startAbMock,decideAbTests} from '../services/broadcast-ab.js';
+import {setBroadcastApprovalThreshold} from '../features/broadcasts/broadcast-approval.js';
+import {abWinner,splitAb,startAbMock,decideAbTests} from '../features/broadcasts/broadcast-ab.js';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 let d:SqliteD1;const p='/api/broadcasts/br/ab-test';

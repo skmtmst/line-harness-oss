@@ -33,7 +33,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 運用状態 健全性チェック（Pencil `Y4LkX1`）。
+ * ★V8 運用状態 健全性チェック（Pencil ）。
  *
  * 現役の健全性と異常の受領・通知をここに集める。絵の並びは：上の「全体の状態」の帯／表の上に「開いている異常」／9行の表／下の3枚。
  * 動き（初回だけ読み込み中・5分ごとの取り直し・手動確認の世代照合・受領・通知のやり直し・
@@ -65,7 +65,7 @@ interface HealthCheckItem {
   stale: boolean
 }
 
-/** 板 Y4LkX1 の9行。並び・言葉は板が正本。 */
+/** 板  の9行。並び・言葉は板が正本。 */
 const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'title' | 'sub' | 'threshold' | 'href'>> = [
   { id: 'line', title: 'LINE のアカウントとつながっているか', sub: 'アカウント', threshold: 'LINE の確認で問題が出ると「注意」・重いと「エラー」', href: '/accounts' },
   { id: 'monitoring', title: '5分ごとの確認が動いているか', sub: '自動確認', threshold: '10分（2回分）止まると「エラー」', href: '/emergency?tab=health' },

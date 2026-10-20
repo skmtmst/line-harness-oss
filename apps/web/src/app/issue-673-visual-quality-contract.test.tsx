@@ -38,7 +38,7 @@ describe('#673 A. カード・パネルの立体感', () => {
 
   it('モーダル・フォルダパネル・パネル内メニューは属性入口でトークンを読む', () => {
     // components/shared/ は変更できないため、globals.css の属性規定で上書きする。
-    // ★V7: ダイアログは最前面（段3）の影 `--shadow-overlay`。
+    // ★管理画面: ダイアログは最前面（段3）の影 `--shadow-overlay`。
     expect(GLOBALS_CODE).toMatch(/\[data-design-part="dialog"\]\[data-design-node\]\s*\{[^}]*var\(--shadow-overlay\)/)
     expect(GLOBALS_CODE).toMatch(/:root aside\[aria-label="フォルダ"\]\s*\{[^}]*box-shadow:\s*none/)
     expect(GLOBALS_CODE).toMatch(/aside\[aria-label="フォルダ"\] \.shadow-lg\s*\{[^}]*var\(--shadow-float\)/)
@@ -65,7 +65,7 @@ describe('#673 A. カード・パネルの立体感', () => {
 })
 
 describe('#673 B. 触った感触', () => {
-  it('ボタンは motion-instant(80ms) で 0.98倍に沈む（★V7 仕上げ §2）', () => {
+  it("ボタンは motion-instant(80ms) で 0.98倍に沈む", () => {
     // 0.98 は変数（--press-scale）に置いた（動きの点検 6 番）。
     expect(GLOBALS_CODE).toMatch(/--press-scale:\s*0\.98;/)
     expect(GLOBALS_CODE).toMatch(/:active[\s\S]*?scale:\s*var\(--press-scale\)/)

@@ -1,15 +1,18 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { readImplementationSource } from '../../../../worker/src/test-utils/implementation-source'
 
 const ROOT = process.cwd()
-const FLOW = readFileSync(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
-const NEW_PAGE = readFileSync(join(ROOT, 'src/app/reminders/new/new-v8.tsx'), 'utf8')
-const STEP_EDITOR = readFileSync(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
-const EDIT_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
+const FLOW = readUiSource(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
+const NEW_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/new/new.tsx'), 'utf8')
+const STEP_EDITOR = readUiSource(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
+const EDIT_PAGE = readUiSource(join(ROOT, 'src/v8/reminders/edit.tsx'), 'utf8')
 const DETAIL_PAGE = readFileSync(join(ROOT, 'src/v8/reminders/detail.tsx'), 'utf8')
-const API = readFileSync(join(ROOT, 'src/lib/api.ts'), 'utf8')
-const WORKER_ROUTE = readFileSync(join(ROOT, '../worker/src/routes/reminders.ts'), 'utf8')
+const API = readApiSource(join(ROOT, 'src/lib/api.ts'), 'utf8')
+const WORKER_ROUTE = readImplementationSource(join(ROOT, '../worker/src/routes/reminders.ts'))
 
 describe('リマインダの公開フロー', () => {
   it('作成時に公開せず、下書きから対象確認へ進む', () => {

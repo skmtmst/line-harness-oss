@@ -108,7 +108,7 @@ describe('友だち追加時配信の公開画面', () => {
   })
 
   it('設計の最終確認に必要な時刻・プレビュー・監視状態を表示する', () => {
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    // : 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(PAGE).toContain('<LinePreview')
     expect(PAGE).toContain('detail?.staffNotification?.status')
     expect(PAGE).toContain("status === 'connected'")
@@ -129,7 +129,7 @@ describe('友だち追加時配信の公開画面', () => {
     for (const label of ['未送信', '二重送信', 'シナリオ開始失敗']) expect(PAGE).toContain(label)
   })
 
-  it.todo('ルールAPIに複製の口ができたら、別の経路用の複製を検証する')
+  // 複製の実API・元の不変・別経路・所属外・閲覧のみは duplicate-api.test.ts で実SQLiteへ確認する。
 
   it('公開中にアカウントを変えられたら、返事を映さない', () => {
     /*

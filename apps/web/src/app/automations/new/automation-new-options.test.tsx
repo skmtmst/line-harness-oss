@@ -198,6 +198,10 @@ describe('新規作成の選択可能一覧(#734)', () => {
     // #975 U073: 動かし始める前に確認ダイアログを挟む。
     await clickButton(el, 'つくって動かす')
     await act(async () => { await drainMicrotasks() })
+    expect(mockPublish).not.toHaveBeenCalled()
+    const confirmation = document.querySelector('[role="dialog"]')!
+    expect(confirmation.querySelector('[title="確認用ルール"]')).toBeTruthy()
+    expect(confirmation.querySelectorAll('dd [title]')).toHaveLength(5)
     await clickButton(document.body, '保存して動かし始める')
     await act(async () => { await drainMicrotasks() })
     expect(mockUpdate).toHaveBeenCalled()
@@ -205,4 +209,19 @@ describe('新規作成の選択可能一覧(#734)', () => {
     expect(sent.actions[0]).toMatchObject({ type: 'start_scenario', params: { scenarioId: 'scenario-1' } })
     expect(mockPublish).toHaveBeenCalled()
   })
+})
+
+
+it('きっかけを検索すると一致する物だけ出し、選んだ物の設定だけを開く', async () => {
+  const el = await mountPage()
+  await clickButton(el, `ほかのきっかけもすべて見る（あと${AUTOMATION_DRAFT_TRIGGER_OPTIONS.length - 3} 件）`)
+  const query = el.querySelector('input[aria-label="きっかけを探す"]') as HTMLInputElement
+  await typeText(query, '曜日')
+  const radios = Array.from(el.querySelectorAll<HTMLInputElement>('input[name="v8-trigger"]'))
+  expect(radios.map(input => input.value)).toEqual(['weekly'])
+  await act(async () => { radios[0].click() })
+  expect(el.querySelector('[aria-label="実行時刻"]')).toBeTruthy()
+  expect(el.querySelector('[aria-label="実行日時"]')).toBeNull()
+  expect(mockUpdate).not.toHaveBeenCalled()
+  expect(mockPublish).not.toHaveBeenCalled()
 })

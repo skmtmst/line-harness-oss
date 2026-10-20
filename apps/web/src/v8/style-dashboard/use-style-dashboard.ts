@@ -6,16 +6,16 @@ import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { bookingApi,eventsApi } from '@/lib/api'
-import { reservationBoardApi } from '@/lib/api-reservation-board'
-import { styleApi } from '@/lib/api-styles'
+import { reservationBoardApi } from '@/lib/api/helpers/reservation-board'
+import { styleApi } from '@/lib/api/helpers/styles'
 import { formatDate } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { useStaffRole } from '@/lib/staff-role'
 import type { RestaurantClosureKind,RestaurantFloor,StyleCard } from '@line-crm/shared'
 import { usePathname,useRouter,useSearchParams } from 'next/navigation'
-import { useCallback,useEffect,useMemo,useState } from 'react'
-import { canWriteRole } from '../restaurant/dashboard/summarize'
-import { useStoreToday } from '../restaurant/dashboard/use-store-today'
+import { useCallback,useEffect,useMemo,useRef,useState,type SetStateAction } from 'react'
+import { canWriteRole } from '@/v8/restaurant/dashboard/public/summarize/index'
+import { useStoreToday } from '@/v8/restaurant/dashboard/public/use-store-today/index'
 import { analyticsWindow,toAnalytics,toLayout,toToday } from './adapter'
 import { STYLE_CONFIG,rangeFromParam,tabFromParam,viewFromParam } from './config'
 import { jstToday } from './date-range'
@@ -42,9 +42,27 @@ export function useStyleDashboard(style: IndustryStyle) {
   const [staff, setStaff] = useState('all')
   const [compare, setCompare] = useState(COMPARE[0].value)
   const [search, setSearch] = useState('')
-  const [data, setData] = useState<StyleToday | null>(null)
+  const scope = JSON.stringify([accountId, style, range, date, staff, compare, view])
+  const currentScope = useRef(scope)
+  currentScope.current = scope
+  const loadSequence = useRef(0)
+  const analyticsSequence = useRef(0)
+  const [dataState, setDataState] = useState<{ scope: string; value: StyleToday } | null>(null)
+  const data = dataState?.scope === scope ? dataState.value : null
+  const setData = (value: SetStateAction<StyleToday | null>) => setDataState((previous) => {
+    const next = typeof value === 'function' ? value(previous?.scope === scope ? previous.value : null) : value
+    return next ? { scope, value: next } : null
+  })
   const [failed, setFailed] = useState(false)
-  const [analytics, setAnalytics] = useState<StyleAnalytics | null>(null)
+  const analyticsScope = JSON.stringify([scope, tab, days, subTab])
+  const currentAnalyticsScope = useRef(analyticsScope)
+  currentAnalyticsScope.current = analyticsScope
+  const [analyticsState, setAnalyticsState] = useState<{ scope: string; value: StyleAnalytics } | null>(null)
+  const analytics = analyticsState?.scope === analyticsScope ? analyticsState.value : null
+  const setAnalytics = (value: SetStateAction<StyleAnalytics | null>) => setAnalyticsState((previous) => {
+    const next = typeof value === 'function' ? value(previous?.scope === analyticsScope ? previous.value : null) : value
+    return next ? { scope: analyticsScope, value: next } : null
+  })
   const [analyticsFailed, setAnalyticsFailed] = useState(false)
   const [layout, setLayout] = useState<StyleLayout | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
@@ -70,6 +88,8 @@ export function useStyleDashboard(style: IndustryStyle) {
   const staffId = staff === 'all' ? undefined : staff
   const compareParam = compare as 'previous' | 'last_year' | 'last_week'
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
+    setFailed(false)
     if (!accountId) return
     try {
       // 数は summary、盤・一覧・日週月は schedule（API-CONTRACT-4 §10）。
@@ -78,28 +98,36 @@ export function useStyleDashboard(style: IndustryStyle) {
         styleApi.summary(accountId, { ...query, compare: compareParam }),
         styleApi.schedule(accountId, { ...query, display: view === 'calendar' ? 'calendar' : view === 'list' ? 'list' : 'board', calendar_view: range === 'month' ? 'month' : range === 'week' ? 'week' : 'day', ...(style === 'restaurant' && view === 'board' ? { axis: 'table' as const } : {}) }),
       ])
-      setData(toToday(style, summary.data, schedule.data, date, range)); setFailed(false)
+      if (sequence !== loadSequence.current || currentScope.current !== scope) return
+      setDataState({ scope, value: toToday(style, summary.data, schedule.data, date, range) }); setFailed(false)
+      setLoadedAt(new Date())
     } catch {
-      setFailed(true)
+      if (sequence !== loadSequence.current || currentScope.current !== scope) return
+      setDataState(null); setLoadedAt(null); setFailed(true)
     }
-    setLoadedAt(new Date())
-  }, [accountId, style, range, date, staffId, compareParam, view])
-  useEffect(() => { void load() }, [load])
+  }, [accountId, style, range, date, staffId, compareParam, view, scope])
+  useEffect(() => { void load(); return () => { loadSequence.current += 1 } }, [load])
 
   const loadAnalytics = useCallback(async () => {
+    const sequence = ++analyticsSequence.current
+    setAnalyticsFailed(false)
     if (!accountId || tab !== 'analytics') return
     try {
       const res = await styleApi.analytics(accountId, { style, ...analyticsWindow(date, Number(days) || 30), staff_id: staffId, compare: compareParam === 'last_week' ? 'previous' : compareParam })
       const names = Object.fromEntries((data?.staff ?? []).map((x) => [x.id, x.name]))
-      setAnalytics(toAnalytics(style, res.data, subTab, names)); setAnalyticsFailed(false)
-    } catch { setAnalyticsFailed(true) }
-  }, [accountId, style, tab, days, subTab, staffId, compareParam, date, data?.staff])
-  useEffect(() => { void loadAnalytics() }, [loadAnalytics])
+      if (sequence !== analyticsSequence.current || currentAnalyticsScope.current !== analyticsScope) return
+      setAnalyticsState({ scope: analyticsScope, value: toAnalytics(style, res.data, subTab, names) }); setAnalyticsFailed(false)
+    } catch { if (sequence === analyticsSequence.current && currentAnalyticsScope.current === analyticsScope) { setAnalyticsState(null); setAnalyticsFailed(true) } }
+  }, [accountId, style, tab, days, subTab, staffId, compareParam, date, data?.staff, analyticsScope])
+  useEffect(() => { void loadAnalytics(); return () => { analyticsSequence.current += 1 } }, [loadAnalytics])
 
   const [cardDefaults, setCardDefaults] = useState<StyleCard[] | undefined>(undefined)
   useEffect(() => {
     if (!accountId || !viewOpen) return
-    void styleApi.get(accountId).then((r) => setLayout(toLayout(style, r.data.cards, r.data.version, cardDefaults))).catch(() => setLayout(null))
+    let active = true
+    setLayout(null)
+    void styleApi.get(accountId).then((r) => { if (active) setLayout(toLayout(style, r.data.cards, r.data.version, cardDefaults)) }).catch(() => { if (active) setLayout(null) })
+    return () => { active = false }
   }, [accountId, style, viewOpen, cardDefaults])
 
   // 教室の名簿は今のイベント予約の一覧から読む（API-CONTRACT-4 §9）。
@@ -202,7 +230,7 @@ export function useStyleDashboard(style: IndustryStyle) {
       if (input.refund !== 'none' || input.notify) openPayment()
     } catch (caught) { notifyToast(japaneseDetailOf(caught) || '取り消せませんでした。', { tone: 'error' }) } finally { setBusy(''); void reload() }
   }
-  /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（B-304 追記 4 ⑤）。 */
+  /** 面談の結果（検討中・成約・見送り）。予約ごとに持つ（ 追記 4 ⑤）。 */
   const saveResult = async (row: StyleRow, outcome: 'considering' | 'won' | 'lost') => {
     setBusy('result')
     try {

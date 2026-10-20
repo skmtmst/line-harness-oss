@@ -1,19 +1,17 @@
 'use client'
 
 /*
- * ★V8 はじめの設定（Pencil `xuJ7D`）。
+ * ★V8 はじめの設定（Pencil ）。
  *
  * 白い板の頭（題と説明）→ 左に「設定の中のメニュー」→ 右に
  * 進み具合の帯・6段の表・下の2枚（いま止まっている理由・気をつけること）。
  * データの口は今の画面（app/getting-started/page.tsx）と同じ：
  * はじめの設定の口（`'v8'` の6段）と、段2を確かめる機能設定の実物。
  */
-import { useCallback, useEffect, useState } from 'react'
 import { Check } from 'lucide-react'
-import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { loadFeatureSettings } from '@/lib/feature-settings-cache'
-import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings'
+import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
+import { useStaffRole } from '@/lib/staff-role'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
@@ -24,12 +22,10 @@ import { GridTable, GridRow, GridCell } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import {
   type StepResult,
-  buildStepsFromApi,
   doneCount,
-  featureSetEntry,
-  insertFeatureSet,
   progressHeadline,
   stoppedReasons,
 } from './steps'
@@ -42,49 +38,8 @@ const CARE_LINES = ['・手順は飛ばしても使えます', '・あとから�
 export default function GettingStartedV8() {
   usePageTitle('はじめの設定')
   const { selectedAccountId, loading: accountLoading } = useAccount()
-  const [steps, setSteps] = useState<StepResult[]>([])
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [loadError, setLoadError] = useState<unknown>(null)
-
-  const load = useCallback(async () => {
-    if (accountLoading) return
-    const accountId = selectedAccountId
-    setStatus('loading')
-    setLoadError(null)
-    try {
-      const res = await api.gettingStarted.get(accountId ?? undefined, 'v8')
-      if (!res.success) throw new Error(res.error)
-      // 段2（初期セット）は機能設定の実物で確かめる。取れなければ未確認のまま。
-      let entry = null
-      if (accountId) {
-        try {
-          const features = await loadFeatureSettings(accountId)
-          if (!features.success) throw new Error(features.error)
-          entry = featureSetEntry({ forbidden: false, version: features.data.version ?? 0 })
-        } catch (caught) {
-          entry = caught instanceof ApiError && caught.status === 403 ? { kind: 'forbidden' } as const : null
-        }
-      }
-      setSteps(res.data.steps.some((step) => step.key === 'featureSet')
-        ? buildStepsFromApi(res.data.steps)
-        : insertFeatureSet(buildStepsFromApi(res.data.steps), entry))
-      setStatus('ready')
-    } catch (caught) {
-      setLoadError(caught)
-      setStatus('error')
-    }
-  }, [accountLoading, selectedAccountId])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  // 機能設定で保存されたら段2を読み直す。
-  useEffect(() => {
-    const refresh = () => { void load() }
-    window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, refresh)
-    return () => window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, refresh)
-  }, [load])
+  const role = useStaffRole()
+  const { steps, status, error: loadError, reload } = useFirstRun(selectedAccountId, !accountLoading)
 
   const reasons = stoppedReasons(steps)
   const done = doneCount(steps)
@@ -96,12 +51,13 @@ export default function GettingStartedV8() {
         title="はじめの設定"
         help="musubo を使いはじめるまでの6つの手順です。上から順に進めると、最初の1通が届くまでたどり着けます。"
         navigation={<SettingsInnerNav inline />}
+        notice={role === 'viewer' ? <ReadOnlyNotice /> : undefined}
       >
         {status !== 'ready' ? (
           <ListState
             kind={status === 'error' ? 'error' : 'loading'}
             error={status === 'error' ? loadError : undefined}
-            onRetry={() => void load()}
+            onRetry={reload}
           />
         ) : (
           <>
@@ -112,8 +68,19 @@ export default function GettingStartedV8() {
 
             <Card padding="rows" overflow="hidden">
               <GridTable label="はじめの設定の順路" framed={false} design={{ columns: "max-content minmax(0, 1fr) max-content", gap: "var(--polish-space-card)", rowPadding: "var(--polish-space-card)", fontSize: "var(--text-body)" }}>
-                {steps.map((step) => <StepRow key={step.key} step={step} />)}
+                {steps.map((step) => <StepRow key={step.key} step={step} readOnly={!role || role === 'viewer'} />)}
               </GridTable>
+            </Card>
+
+            <Card id="first-message" variant="form" aria-label="最初の1通の確認方法">
+              <CardHeader size="stacked" title="最初の1通の確認方法" />
+              <p className={styles.cardLine}>自分のLINEで受け取る方法を選びます。QRから友だち追加時の配信を受け取るか、シナリオを選んで「まとめてテストを送る」を開き、自分をテスト受信者に選んでください。</p>
+              <p className={styles.cardLine}>送信の記録は友だち追加時の配信かシナリオの1通目で判定します。送らずに判定するテストと受信箱の手動返信は完了に数えません。記録が済みでも、LINEの端末で本文を確認してください。</p>
+              {role && role !== 'viewer' && steps.find((step) => step.key === 'firstMessage')?.action ? <div className={styles.bottom}>
+                <Button href="/?qr=base">友だち追加のQRを開く</Button>
+                <Button href="/scenarios">シナリオを選んでテスト送信する</Button>
+              </div> : null}
+              <Button onClick={reload}>受信後に状態を読み直す</Button>
             </Card>
 
             <div className={styles.bottom}>
@@ -140,7 +107,7 @@ export default function GettingStartedV8() {
 }
 
 /** 1段。済みは緑の丸と札、まだは番号の丸と行き先のボタン。押せない段は理由の文字。 */
-function StepRow({ step }: { step: StepResult }) {
+function StepRow({ step, readOnly }: { step: StepResult; readOnly: boolean }) {
   const done = step.state === 'done'
   return (
     <GridRow data-step-state={step.state}>
@@ -150,7 +117,7 @@ function StepRow({ step }: { step: StepResult }) {
         <span className={styles.stepSub}><TruncatedText value={step.sub} /></span>
       </div></GridCell>
       <GridCell align="right">
-        {done ? <StatusBadge tone="success" size="compact">済み</StatusBadge> : step.action ? (
+        {done ? <StatusBadge tone="success" size="compact">済み</StatusBadge> : step.action && !readOnly ? (
           <Button href={step.action.href} variant="secondary">{step.action.label}</Button>
         ) : <span className={styles.stepBlocked}>{step.blockedReason}</span>}
       </GridCell>

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
- * 禁止文言の全画面ガード（要件 v6-34 §10・§16）。
+ * 禁止文言の全画面ガード（要件 管理画面-34 §10・§16）。
  *
  * 画面に出す字で「取得できません」を使わない。読めなかった失敗は
  * 対応表の文面と追跡番号で言う（§9）。
@@ -48,11 +48,9 @@ const KNOWN_FILES: string[] = [
   'app/getting-started/getting-started-view.ts',
   'app/health/page.tsx',
 
-  // page.tsx から分けた取り込み画面へ、v7 の持ち越し文が移った分。
-  // 2026-10-04 完全切り替え：v7 page を捨て、V8 の list-v8 にしたので外す。
+  // page.tsx から分けた取り込み画面へ、管理画面 の持ち越し文が移った分。
+  // 2026-10-04 完全切り替え：管理画面 page を捨て、V8 の list-v8 にしたので外す。
   // ★V8 版も同じ持ち越し文言を使う（直すときは page.tsx と一緒に直す）
-  'app/updates/page.tsx',
-  'components/chats/friend-info-sidebar.tsx',
   'components/scenarios/scenario-dialogs.tsx',
   'components/shared/list-kpis.tsx',
   'components/staff/login-audit.tsx',

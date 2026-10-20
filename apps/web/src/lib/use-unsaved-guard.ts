@@ -16,7 +16,7 @@ export type UnsavedLeaveTarget =
  * - 左メニュー等の画面内リンク: クリックを捕まえて確認対話を出す
  * - 戻る操作: popstate で元の履歴位置へ戻してから確認対話を出す
  *
- * 保存成功や「保存せずに移る」の確認後は markClean() で dirty を外し、
+ * 保存成功や「保存せずに移る」の確認後は markClean で dirty を外し、
  * 警告がもう出ないようにする。
  */
 export function useUnsavedGuard(options: {

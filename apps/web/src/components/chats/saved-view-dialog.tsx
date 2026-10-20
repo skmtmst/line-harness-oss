@@ -332,8 +332,8 @@ export default function SavedViewDialog({
               <Button variant="secondary" className="text-ink-secondary whitespace-nowrap px-4 py-2 h-auto" type="button" onClick={onClose}>
                 キャンセル
               </Button>
-              <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={() => void submit()} disabled={saving || nameMissing} title={nameMissing ? '検索名を入力してください' : undefined} >
-                {saving ? '保存中' : '検索条件を保存する'}
+              <Button variant="primary" className="whitespace-nowrap px-5 py-2 font-bold border-0 h-auto" type="button" onClick={() => submit()} disabled={saving || nameMissing} title={nameMissing ? '検索名を入力してください' : undefined}  busy={saving} busyLabel="保存中" widthReserve="idle">
+                {'検索条件を保存する'}
               </Button>
             </>
           )}

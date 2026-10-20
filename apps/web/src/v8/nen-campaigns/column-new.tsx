@@ -36,7 +36,7 @@ import { ColumnPreviewCard } from './preview'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8-B コラムを書く（`yRDwW`）。
+ * ★V8-B コラムを書く（）。
  *
  * 下書きの決めごと（validateDraft・canSubmit・toCreateInput・failureOf）は今の画面と同じ
  * （column-form.ts に写して持つ）。違いは置き場と見せ方だけ——

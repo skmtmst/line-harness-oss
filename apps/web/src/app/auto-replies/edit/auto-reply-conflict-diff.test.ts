@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { describeAutoReplyDiff } from './auto-reply-conflict-diff'
-import type { WizardForm } from './wizard-v8'
+import { describeAutoReplyDiff } from '../../../v8/auto-replies/edit/auto-reply-conflict-diff'
+import type { WizardForm } from '../../../v8/auto-replies/edit/wizard'
 
 function form(overrides: Partial<WizardForm> = {}): WizardForm {
   return {

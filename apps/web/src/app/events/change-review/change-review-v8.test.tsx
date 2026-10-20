@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B イベント予約の「変更の確認」（板 `hmr2P`）。
+ * ★V8-B イベント予約の「変更の確認」（板 ）。
  * 現役の入力・自動の影響確認・人数付きの確認窓を通して変更する。
  */
 import React, { act } from 'react'
@@ -157,7 +157,7 @@ describe('V8-B 変更の確認（hmr2P）', () => {
     await act(async () => { applyButton!.click() })
     await flush()
     expect(applyEventChange).not.toHaveBeenCalled()
-    // 確認の窓（qUdNh）が出て、人数入りの確定押しで変える口を叩く。
+    // 確認の窓が出て、人数入りの確定押しで変える口を叩く。
     expect(document.querySelector('[data-design-node="qUdNh"]'), '確認の窓の印がある').toBeTruthy()
     const confirmButton = [...document.querySelectorAll('button')].find((b) => b.textContent?.includes('人にお知らせする'))
     expect(confirmButton, '確認の窓に確定の押しがある').toBeTruthy()
@@ -171,7 +171,7 @@ describe('V8-B 変更の確認（hmr2P）', () => {
   it('V8 の型・色直書きなし・準備中なしを守る', () => {
     expect(v8tsx).toContain("import { CreatePage } from '@/components/templates'")
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
-    // 影は共通のカードの影だけ（2026-10-09 オーナー採用 B-137）。ほかの影は直書きしない。
+    // 影は共通のカードの影だけ（2026-10-09 オーナー採用 ）。ほかの影は直書きしない。
     expect(v8css.replace(/box-shadow:\s*(?:var\(--(?:card-shadow|shadow-row-line)\)|none)/g, '')).not.toMatch(/box-shadow\s*:/)
     expect(v8tsx).toMatch(/(?:data-design-node|boardId)="hmr2P"/)
     expect(v8tsx).not.toContain('準備中')

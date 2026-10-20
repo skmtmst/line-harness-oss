@@ -1,11 +1,13 @@
+import type { WebhookSafetyOptions } from './outgoing-webhook-delivery.js';
+import { publicHttpsRequest } from './public-https-request.js';
 import {
   listManualLinks,
   recordCheck,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * マニュアル導線の週1回の点検（要件 v6-34 §8-4）。台帳 #134。
+ * マニュアル導線の週1回の点検（要件 -34 §8-4）。台帳 #134。
  *
  * **開けたかどうかを、確かめて初めて言う。** URL が入っているだけでは
  * 「開けます」と書かない。読めなかったものは `broken` にして、
@@ -59,7 +61,7 @@ export interface ManualLinkCheckResult {
  */
 export async function checkAllManualLinks(
   db: D1Database,
-  opts: { checkedBy?: string | null } = {},
+  opts: { checkedBy?: string | null } & WebhookSafetyOptions = {},
 ): Promise<ManualLinkCheckResult> {
   const rows = await listManualLinks(db);
   const targets = rows.filter((row) => row.url && isSafePublicHttpsUrl(row.url));
@@ -71,11 +73,11 @@ export async function checkAllManualLinks(
     let httpStatus: number | undefined;
     let errorCode: string | null = null;
     try {
-      const res = await fetch(row.url!, {
+      const res = await publicHttpsRequest(row.url!, {
         method: 'HEAD',
         redirect: 'manual',
         signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
-      });
+      }, opts);
       okNow = res.ok;
       httpStatus = res.status;
       if (!okNow) errorCode = `HTTP_${res.status}`;

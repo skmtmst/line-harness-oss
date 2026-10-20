@@ -1,9 +1,0 @@
-state	route	open	expectedWidth	expectedTop
-PUWyq	/restaurant-test/dashboard	ウォークイン	480	140
-RwVo5	/reminders/detail?id=reminder-1	一時停止する	480	260
-YZ57z	/webhooks?tab=sheets	接続を解除する	480	280
-VsSyu	/reminders	の操作 → 削除	480	260
-u8sKN	/auto-replies	の操作 → 削除する	480	280
-RwVo5-list	/reminders	の操作 → 一時停止する	480	260
-svUTk-table-picker	/restaurant-test/dashboard	電話予約 → pick-phone-time-with-choices → 変える → 卓を選ぶ	640	None
-VLEaj-staff-picker	/booking/menus?tab=staff	スタッフを登録 → ログインユーザーとの紐づけ	640	None

@@ -9,7 +9,7 @@ const fixture = vi.hoisted(() => ({
   board: null as null | { loadPrintEntries: () => Promise<Array<{ status: string }>>; printContext: string },
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account' }) }))
-vi.mock('@/lib/api-reservation-board', () => ({
+vi.mock('@/lib/api/helpers/reservation-board', () => ({
   reservationBoardApi: { floors: async () => ({ data: [] }) },
   allBoardPages: fixture.allPages,
 }))

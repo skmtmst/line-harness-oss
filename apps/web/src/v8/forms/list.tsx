@@ -1,75 +1,60 @@
 'use client'
-import { pageSizeOptions } from '@/components/shared/page-size-options'
-import { canEditFeature, isOwnerOrAdmin } from '@/lib/staff-capability';
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import ListToolbar, { ListToolbarEnd, ListToolbarSort, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
-import { useListUrlValue, useListScrollMemory } from '@/components/shared/list-url-state';
+
+import { renderFormDialogs } from './list-dialogs'
+import { VIEWER_NOTE } from './list-helpers'
+import { loadFormsPage } from './list-load'
+
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useFeatureAccess } from '@/lib/use-feature-access';
-import { useSamePageUrl } from '@/lib/use-same-page-url';
-import { useState, useEffect, useCallback, useMemo, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Archive, CircleCheck, ClipboardList, FileText, IdCard, Inbox, Percent, Plus, TriangleAlert } from 'lucide-react';
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
+import ListToolbar,{ ListToolbarFrame,ListToolbarSort } from '@/components/shared/list-toolbar'
+import { useListScrollMemory,useListUrlValue } from '@/components/shared/list-url-state'
+import { pageSizeOptions } from '@/components/shared/page-size-options'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useSamePageUrl } from '@/lib/use-same-page-url'
+import { Archive,CircleCheck,ClipboardList,FileText,IdCard,Inbox,Percent,Plus,TriangleAlert } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { useCallback,useEffect,useMemo,useRef,useState,type MouseEvent as ReactMouseEvent,type ReactNode } from 'react'
 
 import Link from '@/components/shared/list-navigation'
-import { RowNameLink, StatusCell } from '@/components/shared/table';
+import { RowNameLink,StatusCell } from '@/components/shared/table'
 
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Eye, Link2 } from 'lucide-react';
-import { displayFormName, hasStoredDestination, type Folder } from '@line-crm/shared';
-import { fetchApi, api, ApiError, type FormDeleteImpact, type ListStats } from '@/lib/api';
-import { useAccount } from '@/contexts/account-context';
-import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { formatNumber } from '@/lib/format';
-import { runUndoable } from '@/lib/undoable';
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { ListPage } from '@/components/templates';
+import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { loadFailureCopy } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
+import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-menu'
 import EmptyList from '@/components/shared/empty-list'
-import Select from '@/components/shared/select'
-import SearchField from '@/components/shared/search-field'
+import { emptyValue } from '@/components/shared/empty-value'
 import FilterChip from '@/components/shared/filter-chip'
+import FolderPanel,{ FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import StatusBadge from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
-import FolderAddDialog from '@/components/shared/folder-add-dialog'
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
-import { FolderDotName } from '@/components/shared/folder-dot';
-import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog, { DialogActions } from '@/components/shared/dialog'
-import InlineEdit from '@/components/shared/inline-edit'
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
-import { withViewTransition } from '@/components/shared/view-transition';
-import { type ActionMenuItem } from '@/components/shared/action-menu';
-import { RowMenu } from '@/components/shared/row-actions';
-import Pagination from '@/components/shared/pagination'
-import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
-import { notifyToast } from '@/components/shared/toast';
-import { loadFailureCopy } from '@/components/shared/api-error-message';
-import { FORM_PAGE_SIZES, SORT_OPTIONS, UNFILED_VALUE, answerSubText, destinationText, formAnswerCount, formAnswerUrl, listQueryString, referenceLabel, sortForms, subLineText, validFilter, validPage, validPageSize, validSort, type Form, type FormFilter, type FormListResponse, type FormSort } from './model';
-import styles from './list.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls';
-import { emptyValue } from '@/components/shared/empty-value';
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
-import { insertDuplicateAfter, useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-
-/*
- * ★V8 回答フォームの一覧（Pencil「★V8 画面の地図」の回答フォームの行）。
- * 一覧 `I3L41O`・1152 `GrnO4`・閲覧のみ `JV2oR`・アーカイブ・削除の窓 `GVizd`。
- *
- * 動き（呼ぶ API・権限・失敗の扱い・URL の指定）は今までの V8 一覧
- * （app/form-submissions/list-v8.tsx）と同じ。見た目だけを型（ListPage）と部品で組み直した。
- * 動きの一覧は同じ場所の BEHAVIOR.md。
- */
-
-const VIEWER_NOTE = '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'
+import Pagination from '@/components/shared/pagination'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { RowMenu } from '@/components/shared/row-actions'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Select from '@/components/shared/select'
+import { DelayedSkeleton,Skeleton } from '@/components/shared/skeleton'
+import StatusBadge from '@/components/shared/status-badge'
+import { DataTable,NameCell,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
+import { notifyToast } from '@/components/shared/toast'
+import TruncatedText from '@/components/shared/truncated-text'
+import { insertDuplicateAfter,useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { withViewTransition } from '@/components/shared/view-transition'
+import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
+import { ListPage } from '@/components/templates'
+import { useAccount } from '@/contexts/account-context'
+import { api,ApiError,fetchApi,type FormDeleteImpact,type ListStats } from '@/lib/api'
+import { formatNumber } from '@/lib/format'
+import { canManageRole,useStaffRole } from '@/lib/staff-role'
+import { runUndoable } from '@/lib/undoable'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { displayFormName,hasStoredDestination,type Folder } from '@line-crm/shared'
+import { Link2 } from 'lucide-react'
+import styles from './list.module.css'
+import { answerSubText,destinationText,FORM_PAGE_SIZES,formAnswerCount,formAnswerUrl,listQueryString,SORT_OPTIONS,sortForms,subLineText,UNFILED_VALUE,validFilter,validPage,validPageSize,validSort,type Form,type FormFilter,type FormListResponse,type FormSort } from './model'
 
 /* 行の「…」を右クリックでも開けるように直す。中身は「…」と同じ。 */
 function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
@@ -93,12 +78,12 @@ export default function FormsListV8() {
   /*
    * 箱の作成・名前変更・削除・並び替えは `/api/folders` が owner/admin で閉じている。
    * 役割と鍵は本人APIで確かめ、答えが来るまでは変更操作を隠す。
-   * 変えられない人には操作を出さず、閲覧のみの帯（`JV2oR`）を出す。
+   * 変えられない人には操作を出さず、閲覧のみの帯（）を出す。
    */
   const staffRole = useStaffRole()
   const canManageFolders = canManageRole(staffRole)
   const canEditForms = useFeatureAccess('forms')
-  /* 1152 の板（`GrnO4`）。フォルダの列は型が畳み、道具の段を2段にする。 */
+  /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
   const [forms, setForms] = useState<Form[]>([])
@@ -140,7 +125,7 @@ export default function FormsListV8() {
   const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const [duplicating, setDuplicating] = useState(false)
   const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
-  /* アーカイブ・削除の窓（`GVizd`）。開いたら影響を読んでから2つの道を出す。 */
+  /* アーカイブ・削除の窓（）。開いたら影響を読んでから2つの道を出す。 */
   const [deleteTarget, setDeleteTarget] = useState<Form | null>(null)
   const [deleteImpact, setDeleteImpact] = useState<FormDeleteImpact | null>(null)
   const [deleteImpactLoading, setDeleteImpactLoading] = useState(false)
@@ -202,101 +187,7 @@ export default function FormsListV8() {
     setFolderTotal(0)
   }
 
-  const loadForms = useCallback(async () => {
-    const request = ++formRequest.current
-    if (reviewMode && selectedAccountId) {
-      setLoading(true)
-      setLoadError('')
-      setLoadFailure(null)
-      setReviewForbidden(false)
-      try {
-        const account = `account_id=${encodeURIComponent(selectedAccountId)}`
-        const res = await fetchApi<{ success: boolean; data: Form[] }>(`/api/forms/unassigned?${account}`)
-        if (!res.success) throw new Error('load_failed')
-        if (request !== formRequest.current) return
-        // 未割り当て口は配列で返す契約。配列でない応答では一覧を空にして描く。
-        const unassigned = Array.isArray(res.data) ? res.data : []
-        setForms(unassigned)
-        setFolders([])
-        setUnfiledCount(null)
-        setFormTotal(unassigned.length)
-        setFolderTotal(unassigned.length)
-      } catch (error) {
-        if (request !== formRequest.current) return
-        const fieldFailure = saveErrors.capture(error)
-        // 権限が無い人は専用口が 403/404 を返す。エラー画面にせず「確認できるものは無い」と伝える。
-        if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
-          setReviewForbidden(true)
-        } else {
-          { if (!fieldFailure)
-          setLoadFailure(error) }
-          { if (!fieldFailure)
-          setLoadError('回答フォームを読み込めませんでした。') }
-        }
-        clearList()
-      } finally {
-        if (request === formRequest.current) setLoading(false)
-      }
-      return
-    }
-    if (!selectedAccountId) {
-      clearList()
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    setLoadError('')
-    setLoadFailure(null)
-    try {
-      const account = `account_id=${encodeURIComponent(selectedAccountId)}`
-      const folder = `&folder_id=${encodeURIComponent(activeFolderId)}`
-      /* 絞り込み・検索・並び替え・ページ切りは Worker に任せる（1ページ分だけ届く）。 */
-      const paging = `&with_list_summary=1&page=${page}&limit=${pageSize}`
-        + `&filter=${formFilter}&sort=${formSort}`
-        + (fetchQuery.trim() ? `&q=${encodeURIComponent(fetchQuery.trim())}` : '')
-      /* フォームと箱は別々に回収する。箱だけ失敗しても一覧と件数は残す。 */
-      const [formsResult, foldersResult] = await Promise.allSettled([
-        fetchApi<{ success: boolean; data: FormListResponse }>(`/api/forms?${account}${folder}${paging}`),
-        api.folders.list('form', selectedAccountId),
-      ])
-      if (request !== formRequest.current) return
-      const formsData = formsResult.status === 'fulfilled' && formsResult.value.success
-        ? formsResult.value.data
-        : null
-      if (formsData === null) {
-        setLoadFailure(formsResult.status === 'rejected' ? formsResult.reason : new Error('load_failed'))
-        setLoadError('回答フォームを読み込めませんでした。')
-        clearList()
-        return
-      }
-      const items = Array.isArray(formsData) ? formsData : formsData.items
-      setForms(items)
-      setFormTotal(Array.isArray(formsData) ? items.length : formsData.total)
-      setFolderTotal(Array.isArray(formsData) ? items.length : (formsData.all_total ?? formsData.total))
-      const folderResponse = foldersResult.status === 'fulfilled' && foldersResult.value.success
-        ? foldersResult.value
-        : null
-      if (folderResponse === null) {
-        setFolders([])
-        setUnfiledCount(null)
-        setFolderError('フォルダを読み込めませんでした。')
-      } else {
-        setFolderError('')
-        setFolders(folderResponse.data)
-        setUnfiledCount(folderResponse.unfiledCount ?? null)
-      }
-    } catch (error) {
-      if (request !== formRequest.current) return
-      const fieldFailure = saveErrors.capture(error)
-      { if (!fieldFailure)
-      setLoadFailure(error) }
-      { if (!fieldFailure)
-      setLoadError('回答フォームを読み込めませんでした。') }
-      clearList()
-    } finally {
-      if (request === formRequest.current) setLoading(false)
-    }
-  }, [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery, saveErrors])
+  const loadForms = useCallback(() => loadFormsPage({ activeFolderId, clearList, fetchQuery, formFilter, formRequest, formSort, page, pageSize, reviewMode, saveErrors, selectedAccountId, setFolderError, setFolders, setFolderTotal, setForms, setFormTotal, setLoadError, setLoadFailure, setLoading, setReviewForbidden, setUnfiledCount }), [reviewMode, selectedAccountId, activeFolderId, page, pageSize, formFilter, formSort, fetchQuery, saveErrors])
 
   useEffect(() => {
     void loadForms()
@@ -1025,7 +916,7 @@ export default function FormsListV8() {
     </div>
   )
 
-  /* 1152 の板（GrnO4）：1段目「作る・フォルダ・探す … 件数」、2段目「札・並び」。 */
+  /* 1152 の板：1段目「作る・フォルダ・探す … 件数」、2段目「札・並び」。 */
 
 
   const wideToolbar = (
@@ -1277,277 +1168,12 @@ export default function FormsListV8() {
     />
   )
 
-  /* 閲覧のみの帯（`JV2oR`）。見出しの下・数の帯の上。 */
+  /* 閲覧のみの帯（）。見出しの下・数の帯の上。 */
   const viewerBand = !canEditForms ? (
     <div className={styles.viewerBand}><ReadOnlyNotice role="status" data-design-node="JV2oR">{VIEWER_NOTE}</ReadOnlyNotice></div>
   ) : null
 
-  const overlays = (
-    <>
-      {(folderDialogOpen || editingFolder) && selectedAccountId ? (
-        <FolderAddDialog key={editingFolder?.id ?? 'new'} kind="form" accountId={selectedAccountId}
-          folder={editingFolder ?? undefined}
-          note="フォームを分けてしまう箱です。消しても、中のフォームは未分類に残ります。"
-          onClose={() => { setFolderDialogOpen(false); setEditingFolder(null) }}
-          onAdded={() => { setEditingFolder(null); void loadForms() }} />
-      ) : null}
-
-      <ConfirmDialog
-        open={deletingFolder !== null}
-        title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}
-        description={`削除しても、中のフォームは未分類に残ります。${
-          deletingFolderCount === null
-            ? 'いまこのフォルダに入っている件数を確認できませんでした。'
-            : `いまこのフォルダに入っているのは${formatNumber(deletingFolderCount)} 件です。`
-        }`}
-        confirmLabel="削除する"
-        destructive
-        busy={folderBusy}
-        error={folderError || undefined}
-        onConfirm={() => removeFolder()}
-        onCancel={() => {
-          if (folderBusy) return
-          setDeletingFolder(null)
-          setFolderError('')
-        }}
-      />
-
-      {moveTarget !== null ? (
-        <DetailPanel
-          open
-          title={`「${displayFormName(moveTarget.name)}」をどのフォルダへ移しますか？`}
-          description="回答やURLは変わりません。入れる箱だけが変わります。"
-          onClose={() => withViewTransition(closeMove)}
-          footer={(
-            <div className={styles.panelFooter}>
-              <Button type="button" variant="secondary" disabled={moveBusy} onClick={closeMove}>キャンセル</Button>
-              <Button type="button" variant="primary" busy={moveBusy} busyLabel="処理中" disabled={moveBusy} onClick={() => void moveForm()}>
-                移動する
-              </Button>
-            </div>
-          )}
-        >
-          {moveError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{moveError}</Notice> : null}
-          <SaveErrorField names={["move-folder","id","folder.id","moveFolderId"]}><RadioCardGroup legend="移動先のフォルダ" className={styles.radioList}>
-            {[{ id: UNFILED_VALUE, name: '未分類' }, ...folders.map((folder) => ({ id: folder.id, name: folder.name }))].map((folder) => (
-              <RadioCard
-                key={folder.id}
-                name="move-folder"
-                value={folder.id}
-                checked={moveFolderId === folder.id}
-                onChange={() => setMoveFolderId(folder.id)}
-                title={folder.name}
-              />
-            ))}
-          </RadioCardGroup></SaveErrorField>
-        </DetailPanel>
-      ) : null}
-
-      <DetailPanel
-        open={active !== null}
-        title={active ? displayFormName(active.name) : ''}
-        description={active ? subLineText(active) : undefined}
-        onClose={closeDetail}
-        hasPrev={activeIndex > 0}
-        hasNext={activeIndex >= 0 && activeIndex < visibleForms.length - 1}
-        onPrev={activeIndex > 0 ? () => goDetail(-1) : undefined}
-        onNext={activeIndex >= 0 && activeIndex < visibleForms.length - 1 ? () => goDetail(1) : undefined}
-        footer={active ? (
-          <div className={styles.panelFooterSplit}>
-            <Button type="button" variant="secondary" href={`/form-submissions/responses?id=${encodeURIComponent(active.id)}`}>
-              集まった回答
-            </Button>
-            {canEditForms ? <Button type="button" variant="primary" href={`/form-submissions/edit?id=${encodeURIComponent(active.id)}&tab=basic`}>
-              編集する
-            </Button> : null}
-          </div>
-        ) : undefined}
-      >
-        {active ? (
-          <div>
-            <p className={styles.panelLabel}>フォーム名</p>
-            {canEditForms ? <InlineEdit
-              value={active.name}
-              label="フォーム名"
-              placeholder="名称未設定のフォーム"
-              onSave={(next) => renameForm(active, next)}
-            /> : <p className={styles.panelValue}>{displayFormName(active.name)}</p>}
-            <p className={styles.panelLabel}>状態</p>
-            <p className={styles.panelValueRow}>
-              <span className={styles.statusPill} data-tone={active.isActive ? 'live' : 'draft'}>
-                <span className={styles.dot} aria-hidden="true" />
-                {active.isActive ? '公開中' : '下書き'}
-              </span>
-              {(active.pendingPostActionCount ?? 0) > 0 ? (
-                <span className={styles.pendingBadge}>
-                  <span className={styles.dot} aria-hidden="true" />
-                  {`後処理の未完 ${active.pendingPostActionCount}`}
-                </span>
-              ) : null}
-            </p>
-            <p className={styles.panelLabel}>保存先</p>
-            <p className={styles.panelValue}>{destinationText(active)}</p>
-            <p className={styles.panelLabel}>回答</p>
-            <p className={styles.panelValue}>
-              {`${formatNumber(formAnswerCount(active))} 件　${answerSubText(active)}`}
-            </p>
-            <div className={styles.panelButtons}>
-              {canEditForms ? <>
-              <Button type="button" variant="secondary" onClick={() => { closeDetail(); openDuplicate(active) }}>複製</Button>
-              {active.isActive ? (
-                <Button type="button" variant="secondary" onClick={() => { closeDetail(); return openStop(active) }} busyLabel="処理中…">受付を止める</Button>
-              ) : null}
-              <Button type="button" variant="secondary" onClick={() => { closeDetail(); openMove(active) }}>フォルダへ移す</Button>
-              <Button type="button" variant="secondary" onClick={() => { closeDetail(); return openDelete(active) }} busyLabel="処理中…">アーカイブ・削除</Button>
-              </> : null}
-              <CopyTextButton value={formAnswerUrl(selectedAccount?.liffId, active.id) ?? ''} aria-label="回答フォームのURLをコピー" disabled={!formAnswerUrl(selectedAccount?.liffId, active.id)} />
-            </div>
-          </div>
-        ) : null}
-      </DetailPanel>
-
-      {/* 受付を止める（メニューから直行）。止めると URL を開いた人には「受付を終了しました」が出る。 */}
-      <ConfirmDialog
-        open={stopTarget !== null}
-        title={stopTarget ? `「${displayFormName(stopTarget.name)}」の受付を止めますか？` : '受付を止めますか？'}
-        description="配っている URL を開いた人には「受付を終了しました」と出ます。集まった回答と一覧への表示は残ります。"
-        confirmLabel="受付を止める"
-        destructive
-        busy={stopping || stopImpactLoading}
-        error={stopError || undefined}
-        onConfirm={stopError || stopRevision !== null ? () => stopAccepting() : undefined}
-        onCancel={() => {
-          if (stopping) return
-          setStopTarget(null)
-          setStopRevision(null)
-          setStopError('')
-        }}
-      >
-        {stopImpactLoading ? <p className={styles.dialogNote}>フォームの状態を確認しています。</p> : null}
-      </ConfirmDialog>
-
-      {/*
-       * アーカイブ・削除の窓（`GVizd`）。2枚の説明カード（アーカイブ＝おすすめ・削除）と
-       * 利用先の注意、下に「削除する｜キャンセル・アーカイブする」。
-       * 削除できるのは「未公開・回答なし・利用先なし」のときだけ。
-       */}
-      <Dialog
-        open={deleteTarget !== null}
-        designNode="GVizd"
-        /* 絵は幅 640・上から 220。 */
-        designWidth={640}
-        designTop={220}
-        title={deleteTarget ? `「${displayFormName(deleteTarget.name)}」をどうしますか` : 'フォームをどうしますか'}
-        designHeaderPadding="var(--tpl-fm2-dialog-head-pad)"
-        busy={deleting || deleteImpactLoading}
-        onCancel={closeDelete}
-        footer={(
-          <DialogActions leadingAction={
-              <Button
-                type="button"
-                variant="danger"
-                disabled={deleting || deleteImpactLoading || !deleteImpact?.canDelete}
-                title={deleteImpact && !deleteImpact.canDelete ? '未公開・回答なし・利用先なしのフォームだけ削除できます' : undefined}
-                onClick={() => void removeForm(true)} busy={Boolean(deleting)} busyLabel="処理中…"
-              >
-                削除する
-              </Button>
-          }>
-            <Button type="button" variant="secondary" disabled={deleting || deleteImpactLoading} onClick={closeDelete}>
-              キャンセル
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              busy={deleting}
-              busyLabel="処理中"
-              disabled={deleting || deleteImpactLoading || !deleteImpact?.canArchive}
-              onClick={() => void removeForm(false)}
-            >
-              <Archive size={15} aria-hidden="true" />
-              アーカイブする
-            </Button>
-          </DialogActions>
-        )}
-      >
-        {/* 絵は頭（題と×）・説明・2枚のカード・注意の帯・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}
-        <div className={styles.archiveBody}>
-        {deleteImpact?.form.isActive ? (
-          <p className={styles.archiveLead}>配っている URL を開いた人には「受付を終了しました」と出ます。</p>
-        ) : null}
-        {deleteImpactLoading ? (
-          <p className={styles.dialogNote}>公開状態・回答数・利用中の場所を確認しています。</p>
-        ) : deleteImpact ? (
-          <>
-          <div className={styles.impactOptions}>
-            <div className={styles.impactOption} data-tone="recommended">
-              <p className={styles.impactOptionTitle}>アーカイブする（おすすめ）</p>
-              <p className={styles.impactOptionDesc}>
-                {`一覧から隠します。集まった回答 ${formatNumber(deleteImpact.submissionCount)} 件 と友だち情報に保存した答えは残ります。`}
-              </p>
-            </div>
-            <div className={styles.impactOption} data-disabled={deleteImpact.canDelete ? undefined : ''}>
-              <p className={styles.impactOptionTitle} data-tone="danger">削除する</p>
-              <p className={styles.impactOptionDesc}>
-                {deleteImpact.canDelete
-                  ? '未公開・回答なし・利用先なしのため、完全に削除できます。この操作は元に戻せません。'
-                  : '回答や利用先があるので削除できません。削除できるのは、未公開・回答なし・利用先なしのフォームだけです。'}
-              </p>
-            </div>
-          </div>
-            {deleteImpact.references.length > 0 ? (
-              <p className={styles.impactWarn} title={deleteImpact.answerUrl ? `開けなくなる公開URL：${deleteImpact.answerUrl}` : undefined}>
-                <TriangleAlert size={16} aria-hidden="true" />
-                <span>{`${deleteImpact.references.map(referenceLabel).join('と')}がこのフォームを開きます。`}</span>
-              </p>
-            ) : null}
-            {/* 利用先の注意があるときは、その札の title に URL を入れる（絵の窓に URL の行は無い）。 */}
-            {deleteImpact.answerUrl && deleteImpact.references.length === 0 ? (
-              <p className={styles.dialogNote}>
-                開けなくなる公開URL：<span className={styles.breakAll}>{deleteImpact.answerUrl}</span>
-              </p>
-            ) : null}
-          </>
-        ) : null}
-        {deleteError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{deleteError}</Notice> : null}
-        </div>
-      </Dialog>
-
-      {/* 名前を変更。回答データやURLは変わらない。 */}
-      <Dialog
-        open={renameTarget !== null}
-        title="フォーム名を変更"
-        description="回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。"
-        busy={renaming}
-        onCancel={closeRename}
-        footer={(
-          <div className={styles.panelFooter}>
-            <Button type="button" variant="secondary" disabled={renaming} onClick={closeRename}>キャンセル</Button>
-            <Button
-              type="button"
-              variant="primary"
-              busy={renaming}
-              busyLabel="保存中"
-              disabled={renaming || !renameName.trim()}
-              onClick={() => void saveRename()}
-            >
-              保存する
-            </Button>
-          </div>
-        )}
-      >
-        <Field label="フォーム名"><SaveErrorField names={["renameName","rename_name"]}><input
-            type="text"
-            value={renameName}
-            onChange={(e) => setRenameName(e.target.value)}
-            disabled={renaming}
-            maxLength={100}
-            className={styles.panelInput}
-          /></SaveErrorField></Field>
-        {renameError ? <p className={styles.alertText} role="alert">{renameError}</p> : null}
-      </Dialog>
-    </>
-  )
+  const overlays = renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget, visibleForms })
 
   return (
     /* 一覧の状態（読込中・失敗・空・表）を外から待てるように出す。箱は作らない（display: contents）。 */

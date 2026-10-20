@@ -1,6 +1,6 @@
 import { LineClient } from '@line-crm/line-sdk';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sendOperationEmail } from './operation-notifications.js';
 
 type OutboxRow = {

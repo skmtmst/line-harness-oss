@@ -10,7 +10,7 @@ import styles from './checkbox.module.css'
  * 形の手本は kobra.systems の Checkbox（コードは写していない）。
  *
  * - 本物の `<input type="checkbox">` を四角の上に透明に重ねる。クリック・Space・読み上げは
- *   ブラウザの標準のまま。見た目だけを ★V7 に合わせる
+ *   ブラウザの標準のまま。見た目だけを ★管理画面 に合わせる
  * - 未選択の枠は `$ink-faint`（白地と 4.8:1）。`$hairline` は 1.4:1 で、部品の見分けに要る 3:1 に届かない
  * - `indeterminate`（一部選択）は一覧の見出しの「表示中をすべて選ぶ」に使う
  * - 文字（children）を押しても切り替わる。文字が無いときは `aria-label` を必ず渡す

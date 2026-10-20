@@ -1,4 +1,7 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { jstNow } from '@line-crm/db';
+import { isFinalMediaKey } from './media-upload-storage.js';
+import { imageDimensions } from '../features/media/media-metadata/index.js';
 import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
 
 /*
@@ -445,18 +448,19 @@ export async function runBuiltinScanAndStore(
 export interface ScanObjectStore {
   get(
     key: string,
-    options?: { range: { offset: number; length?: number } | { suffix: number } },
-  ): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
+    options?: { range?: { offset: number; length?: number } | { suffix: number }; onlyIf?: { etagMatches: string } },
+  ): Promise<{ etag?: string; arrayBuffer?: () => Promise<ArrayBuffer> } | null>;
 }
 
 async function readSlice(
   store: ScanObjectStore,
   key: string,
   range: { offset: number; length?: number } | { suffix: number },
+  etag?: string,
 ): Promise<Uint8Array | null> {
   try {
-    const obj = await store.get(key, { range });
-    if (!obj) return null;
+    const obj = await store.get(key, { range, ...(etag ? { onlyIf: { etagMatches: etag } } : {}) });
+    if (!obj?.arrayBuffer) return null;
     return new Uint8Array(await obj.arrayBuffer());
   } catch {
     return null;
@@ -474,27 +478,33 @@ export async function runScanForStoredObject(
   r2Key: string,
   dims?: { width?: number | null; height?: number | null },
   overrides?: { maxBytes?: number | null; maxPixels?: number | null },
+  etag?: string,
 ): Promise<FileScanRow> {
-  const head = await readSlice(store, r2Key, { offset: 0, length: FILE_SCAN_HEAD_BYTES });
+  const head = await readSlice(store, r2Key, { offset: 0, length: FILE_SCAN_HEAD_BYTES }, etag);
   if (!head || head.length === 0) {
     const status = await markFileScanPendingRetry(db, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined);
     return { ...scan, status, attempts: scan.attempts + 1 };
   }
   const tail = scan.size_bytes > head.length
-    ? await readSlice(store, r2Key, { suffix: FILE_SCAN_TAIL_BYTES })
+    ? await readSlice(store, r2Key, { suffix: FILE_SCAN_TAIL_BYTES }, etag)
     : null;
+  if (scan.size_bytes > head.length && !tail) {
+    const status = await markFileScanPendingRetry(db, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined);
+    return { ...scan, status, attempts: scan.attempts + 1 };
+  }
+  const measured = scan.mime_type.startsWith('image/') ? imageDimensions(head, scan.mime_type) : null;
   return runBuiltinScanAndStore(db, scan, head, {
     filename: scan.filename,
     mimeType: scan.mime_type,
     sizeBytes: scan.size_bytes,
-    width: dims?.width ?? null,
-    height: dims?.height ?? null,
+    width: dims?.width ?? measured?.width ?? null,
+    height: dims?.height ?? measured?.height ?? null,
     tail,
   }, overrides);
 }
 
 export type MediaGateResult =
-  | { allowed: true }
+  | { allowed: true; etag?: string }
   | { allowed: false; code: 'file_scan_pending' | 'file_scan_blocked'; message: string };
 
 export interface MediaGateInfo {
@@ -539,22 +549,58 @@ export async function checkMediaGate(
     height?: number | null;
   },
 ): Promise<MediaGateResult> {
-  let scan = await getLatestMediaScan(db, media.id);
+  const pending: MediaGateResult = { allowed: false, code: 'file_scan_pending', message: '確かめています。確かめ終わるまで使えません' };
+  // A clean replacement must never override the quarantine of its parent media.
+  const parent = await getFileScanBySubject(db, 'media', media.id);
+  if (parent?.status === 'pending') return pending;
+  if (parent && (parent.status === 'quarantined' || parent.status === 'rejected')) {
+    return { allowed: false, code: 'file_scan_blocked', message: '確認のため使えません。管理者が確かめるまで、どこにも出ません' };
+  }
+  const session = await db.prepare(
+    `SELECT id, status, expires_at, filename FROM media_upload_sessions
+      WHERE r2_key = ? AND line_account_id = ? ORDER BY created_at DESC LIMIT 1`,
+  ).bind(media.r2Key, media.lineAccountId).first<{ id: string; status: string; expires_at: string; filename: string }>();
+  if (session && (session.status !== 'completed'
+    || (!isFinalMediaKey(media.r2Key) && Date.parse(session.expires_at) > Date.now()))) return pending;
+  const version = await db.prepare(`SELECT id, etag FROM media_versions WHERE media_id = ? AND r2_key = ? AND published_at IS NOT NULL LIMIT 1`)
+    .bind(media.id, media.r2Key).first<{ id: string; etag: string | null }>();
+  // Old signed requests can finish after their URL expires. Pin every scan and
+  // subsequent read to the originally verified version, even after that hold.
+  const etag = session && !isFinalMediaKey(media.r2Key) ? version?.etag?.replace(/^"|"$/g, '') : undefined;
+  if (session && !isFinalMediaKey(media.r2Key) && !etag) return pending;
+  // Exact bytes get their own result. In particular, 'verified' on a version is
+  // only format validation, and another version's clean result is not reusable.
+  const subjectKind = session && isFinalMediaKey(media.r2Key) ? 'upload_session' : version ? 'media_version' : 'media';
+  const subjectId = subjectKind === 'upload_session' ? session!.id : subjectKind === 'media_version' ? version!.id : media.id;
+  let scanFilename = session?.filename ?? media.filename;
+  if (!session) {
+    const current = version && !media.r2Key.startsWith('banner/')
+      ? await db.prepare('SELECT r2_key FROM media WHERE id = ?').bind(media.id).first<{ r2_key: string }>()
+      : null;
+    // Historical files have no stored original name. A later replacement's
+    // display name cannot determine their format. Keep current upload checks strict.
+    if (media.r2Key.startsWith('banner/') || (version && current?.r2_key !== media.r2Key)) {
+      const basename = media.r2Key.slice(media.r2Key.lastIndexOf('/') + 1);
+      const spec = ALLOWED_MIME[media.mimeType];
+      scanFilename = spec?.ext.includes(extensionOf(basename)) ? basename : spec ? `stored.${spec.ext[0]}` : scanFilename;
+    }
+  }
+  let scan = await getFileScanBySubject(db, subjectKind, subjectId);
   if (!scan) {
     scan = await createFileScan(db, {
       lineAccountId: media.lineAccountId,
-      subjectKind: 'media',
-      subjectId: media.id,
+      subjectKind,
+      subjectId,
       mediaId: media.id,
-      filename: media.filename,
+      filename: scanFilename,
       mimeType: media.mimeType,
       sizeBytes: media.sizeBytes,
     });
     scan = await runScanForStoredObject(db, store, scan, media.r2Key, {
       width: media.width ?? null, height: media.height ?? null,
-    });
+    }, undefined, etag);
   }
-  if (scan.status === 'clean') return { allowed: true };
+  if (scan.status === 'clean') return { allowed: true, ...(etag ? { etag } : {}) };
   if (scan.status === 'pending') {
     return {
       allowed: false, code: 'file_scan_pending',

@@ -23,7 +23,7 @@ import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-describe('V6 定期レポート', () => {
+describe('定期レポート', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

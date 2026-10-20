@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { afterEach, expect,it,vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { adPlatforms } from './ad-platforms.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 afterEach(()=>vi.unstubAllGlobals());
 it('疎通成功だけ接続し、他所属・staff・外部失敗を拒む',async()=>{
  const {db,raw}=createTestD1();

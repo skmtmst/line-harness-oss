@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { paymentText, paymentView } from './booking-payment-view.js';
 import { isNotReadyYet } from './not-ready.js';
-import { entitlementDetail, entitlementSummary } from '../pages/MyPage.js';
+import { entitlementDetail, entitlementSummary } from '../pages/my-page.js';
 import type { BookingEntitlement, MenuItem } from './api.js';
 
 const menu = (over: Partial<MenuItem> = {}): MenuItem => ({
@@ -16,7 +16,7 @@ describe('予約の支払いの札（nWby5）', () => {
     expect(paymentText(paymentView({ id: 'p', status: 'refunded', amount: 4400 }, undefined)!)).toBe('返金済み ¥4,400');
     // 期限切れは払っていないので金額を出さない。
     expect(paymentText(paymentView({ id: 'p', status: 'expired', amount: 4400 }, undefined)!)).toBe('期限切れ');
-    expect(paymentText(paymentView(null, menu({ payment_mode: 'onsite' }))!)).toBe('お店で払う ¥3,300');
+    expect(paymentText(paymentView(null, menu({ payment_mode: 'onsite' }))!)).toBe('当日払う ¥3,300');
   });
 
   it('支払いの無い店では札を出さない', () => {
@@ -51,5 +51,7 @@ describe('マイページの回数券（L5g75）', () => {
     expect(entitlementSummary([monthly])).toBe('今月 あと 3 回');
     expect(entitlementDetail(monthly)).toBe('今月 1／4 回 利用');
     expect(entitlementSummary([])).toBeNull();
+    expect(entitlementSummary([{ ...base, remaining: null }])).toBe('残り — 回');
+    expect(entitlementDetail({ ...base, kind: 'monthly', monthUsed: null, monthAllowance: null, monthlyLimit: null })).toContain('今月 —／— 回 利用');
   });
 });

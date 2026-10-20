@@ -1,3 +1,4 @@
+import { readApiSource } from '../../apps/web/scripts/test-api-source.mjs'
 /*
  * NENコラム下書き作成の形が4者で約束違いしていないかの試験(点検 #512 の中8)。
  *
@@ -16,7 +17,7 @@ const root = (...parts: string[]) => join(HERE, '..', '..', ...parts);
 const FIXTURES = readFileSync(join(HERE, 'fixtures.mjs'), 'utf8');
 const MOCK_API = readFileSync(join(HERE, 'mock-api.mjs'), 'utf8');
 const WORKER_ROUTE = readFileSync(root('apps', 'worker', 'src', 'routes', 'nen-campaigns.ts'), 'utf8');
-const CLIENT_API = readFileSync(root('apps', 'web', 'src', 'lib', 'api.ts'), 'utf8');
+const CLIENT_API = readApiSource(root('apps', 'web', 'src', 'lib', 'api.ts'), 'utf8');
 
 describe('NENコラム下書き作成の形', () => {
   it('本番口は id と queued を201で返す', () => {

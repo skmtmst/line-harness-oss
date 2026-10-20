@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * 友だち追加時の配信の一覧と板 `MRhef` の数値突き合わせ（2026-10-03）。
+ * 友だち追加時の配信の一覧と板  の数値突き合わせ（2026-10-03）。
  * 見本の数字が変わったらここも直す。共通部品の中身は M10 の持ち物なので見ない。
  *
  * 2026-10-07：入口は src/v8/friend-add/list.tsx（古い list-v8.tsx はもう描かれない）。

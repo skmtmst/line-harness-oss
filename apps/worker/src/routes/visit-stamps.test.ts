@@ -1,6 +1,6 @@
 import {featureEnforcementMiddleware} from '../middleware/feature-enforcement.js';
 import {Hono} from 'hono';import {describe,it,expect,beforeEach,afterEach,vi} from 'vitest';
-import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';import {visitStamps} from './visit-stamps.js';import type {Env} from '../index.js';import {saveStampCard,grantStamps} from '../services/visit-stamps.js';
+import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';import {visitStamps} from './visit-stamps.js';import type { Env } from '../worker-env.js';import {saveStampCard,grantStamps} from '../services/visit-stamps.js';
 const tenant='00000000-0000-4000-8000-000000000001';let f:SqliteD1;let card:string;let app:Hono<Env>;let readonly=false;
 beforeEach(async()=>{f=createTestD1();for(const a of ['shop','other'])f.raw.prepare('INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id,login_channel_id) VALUES(?,?,?,\'unused\',\'token\',?,?)').run(a,a,a,tenant,'login-'+a);
  f.raw.exec("INSERT INTO friends(id,line_user_id,line_account_id) VALUES('friend','U-mine','shop'),('other-friend','U-other','other');");f.raw.prepare("INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('staff','店員','admin','unused',?)").run(tenant);

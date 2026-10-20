@@ -94,7 +94,7 @@ function tabLabels(): string[] {
     .map((el) => el.textContent?.trim() ?? '')
 }
 
-describe('/tags のタブが機能設定に従う(#861)', () => {
+describe('tags のタブが機能設定に従う(#861)', () => {
   beforeEach(() => {
     // 表示可否は画面間で共有される（V6R-S0-b）。試験ごとに応答を替えるので毎回捨てる。
     clearFeatureVisibilityCache()

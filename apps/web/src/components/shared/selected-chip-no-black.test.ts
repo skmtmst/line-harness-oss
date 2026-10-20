@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
  *
  * 2026-10-07：一斉配信の一覧（broadcasts/list-v8.module.css）と友だち追加の編集
  * （friend-add-settings/editor-v8.module.css）の2か所は、入口が src/v8 に替わり描かれなくなった
- * ので見張りを外した。共通の札は10-11固定版とB-211の薄い緑・緑の枠と文字を守る。
+ * ので見張りを外した。共通の札は10-11固定版との薄い緑・緑の枠と文字を守る。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
 const APP = join(HERE, '..', '..', 'app')
@@ -29,12 +29,12 @@ function expectWhiteGreen(rule: string, file: string) {
 
 describe('選んだ札6か所は白＋緑（黒をなくす #4）', () => {
   it('リマインダの札', () => {
-    const css = readFileSync(join(APP, 'reminders', 'wizard-v8.module.css'), 'utf8')
+    const css = readFileSync(new URL('../../app/reminders/wizard-v8.module.css', import.meta.url), 'utf8')
     expectWhiteGreen(selectedRule(css, /\.filterChipOn \{[^}]*\}/s, 'reminders'), 'reminders')
   })
 
   it('リッチメニューの札', () => {
-    const css = readFileSync(join(APP, 'rich-menus', 'new', 'create-v8.module.css'), 'utf8')
+    const css = readFileSync(new URL('../../app/rich-menus/new/create-v8.module.css', import.meta.url), 'utf8')
     expectWhiteGreen(selectedRule(css, /\.pageChipOn \{[^}]*\}/s, 'rich-menus'), 'rich-menus')
   })
 
@@ -45,7 +45,7 @@ describe('選んだ札6か所は白＋緑（黒をなくす #4）', () => {
     expect(rule).toMatch(/color:\s*var\(--color-canvas\)/)
   })
 
-  it('共通のV8札は10-11固定版とB-211の薄い緑・緑の枠と文字に合わせる', () => {
+  it("共通のV8札は10-11固定版との薄い緑・緑の枠と文字に合わせる", () => {
     const css = readFileSync(join(HERE, 'filter-chip.css'), 'utf8')
     const rule = selectedRule(css, /:root \.v6-filter-chip\[aria-pressed='true'\] \{[^}]*\}/s, 'shared')
     expect(rule).toMatch(/background:\s*var\(--color-selection-bg\)/)

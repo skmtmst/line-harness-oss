@@ -1,5 +1,5 @@
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite} from '../services/gap-common.js';
 import {AI_DISCLOSURE,AI_DISCLOSURE_VERSION,accountAiSetting,type AccountAiFeature} from '../services/account-ai-features.js';
 import {sensitiveStepUpSatisfied,stepUpRequiredResponse} from '../lib/step-up.js';

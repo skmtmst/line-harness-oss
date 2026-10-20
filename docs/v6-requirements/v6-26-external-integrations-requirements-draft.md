@@ -1,3 +1,5 @@
+> 文書：V6 26 外部連携 要件定義（実装照合版・下書き）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # V6 26 外部連携 要件定義（実装照合版・下書き）
 
 > この文書は機能（動き）の正本。見た目は ★V8（[docs/v8-design-rules.md](../v8-design-rules.md)）が正本で、この文書の見た目・ノードID・V6 の絵の指定は使わない。
@@ -447,7 +449,7 @@ secretとtokenはstep-up MFA必須。作成、公開、停止、rotate、retry�
 
 - V6 4画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
 - 主操作ごとに、成功・失敗・権限不足(`view` と `none`)の 3 経路を自動テストで確認する
-- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
+- 画面遷移は 現在のV8画面対応表（`docs/v8-board-to-code.md`） の対象画面一覧と過不足なく一致する
 - 接続・配送がorganization/LINE accountを越境しない
 - 送受信のHMAC、timestamp、event ID、replay拒否が通る
 - secretが暗号化され、list/detail/logへ出ない

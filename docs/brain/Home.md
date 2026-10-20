@@ -6,16 +6,19 @@ topic: 玄関
 tags: [home, core]
 ---
 
+> 文書：Home.md — 玄関(目次)｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
+
 # Home.md — 玄関(目次)
 
 > 迷ったらここから。**起動時の必読順は `[[Memory]]` → `[[rules/corrections]]` → `[[rules/mistakes]]`**、そのあと担当の指示書。
 
 ## 必読
 
-- [[Memory]] — この仕事の事実と判断基準
-- [[rules/corrections]] — オーナーから受けた修正指示(恒久ルール)
-- [[rules/mistakes]] — やらかしと再発防止
-- [[rules/lint]] — 週次の点検観点
+- [Memory](Memory.md) — この仕事の事実と判断基準
+- [rules/corrections](rules/corrections.md) — オーナーから受けた修正指示(恒久ルール)
+- [rules/mistakes](rules/mistakes.md) — やらかしと再発防止
+- [rules/lint](rules/lint.md) — 週次の点検観点
 
 ## 役割と指示
 

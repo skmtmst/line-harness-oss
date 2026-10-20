@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { jstDate } from '@/lib/jst-datetime';
 import { RowActions } from '@/components/shared/row-actions';
 import { RowMenu } from '@/components/shared/row-actions';
@@ -24,18 +25,18 @@ import { notifyToast } from '@/components/shared/toast';
 import Select from '@/components/shared/select';
 import Checkbox from '@/components/shared/checkbox';
 import { Field, TextInput } from '@/components/shared/form-controls';
-import EventQuestionsEditor, { parseEventQuestions } from '@/components/events/event-questions-editor';
+import EventQuestionsEditor from '@/components/events/event-questions-editor';
 import DateField from '@/components/shared/date-field';
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table';
 import { TimeField } from '@/components/shared/date-time-field';
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
-import { MenuPaymentCard, PaymentConflictError, useMenuPayment } from '../booking-payments/menu-payment';
+import { MenuPaymentCard, PaymentConflictError, useMenuPayment } from '@/v8/booking-payments/public/menu-payment/index'
 import FormSection from '@/components/shared/form-section';
 import ListState from '@/components/shared/list-state';
 import { Tabs } from '@/components/shared/tabs';
 import { TextArea } from '@/components/shared/text-field';
 import { EVENT_CANCEL_DEADLINE_OPTIONS, EVENT_DEFAULT_DRAFT, EVENT_DESCRIPTION_MAX_LENGTH, EVENT_ENTRY_CUTOFF_OPTIONS, EVENT_NAME_MAX_LENGTH, deadlineOptionsWithSaved, deadlineSelectValue, parseDeadlineSelect } from '@/components/events/event-draft-shared';
-import { formatDateTime, formatDay, formatTime } from '@/lib/format';
+
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { AddSlotDialog, EditSlotDialog } from "./edit-form-gap-parts"
@@ -81,10 +82,10 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const canDuplicate = role === null || canManageRole(role)
   const [loading, setLoading] = useState(true)
 
-  /* クラスのお支払い（B-305 追記 3・絵 XFRyO）。保存は「概要を保存する」と一緒。 */
+  /* クラスのお支払い（ 追記 3・絵 XFRyO）。保存は「概要を保存する」と一緒。 */
   const eventPayment = useMenuPayment('event', accountId, eventId)
   /* 下の帯の左端に［削除する］（絵 XFRyO）。権限と断りの文は一覧の削除と同じ。 */
-  const canDelete = role === 'owner' || role === 'admin'
+  const canDelete = canManageRole(role)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -285,7 +286,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       setError(
         e instanceof ApiError && e.status === 409 && e.code === 'version_conflict'
           ? '別の画面でイベントが更新されました。開き直してからもう一度保存してください。'
-          : e instanceof Error ? e.message : String(e),
+          : describeApiFailure(e, '保存'),
       )
     } finally {
       setSaving(false)
@@ -533,7 +534,7 @@ function SlotsTab({
   const [showAdd, setShowAdd] = useState(false)
   const [showBulk, setShowBulk] = useState(false)
   /*
-    確認は設計の窓で出す。**ブラウザの `confirm()` を使わない。**
+    確認は設計の窓で出す。**ブラウザの `confirm` を使わない。**
     何件できるのか・何が消えるのかを本文で読ませられず、画像比較にも写らない。
   */
   const [deleteSlotTarget, setDeleteSlotTarget] = useState<EventSlot | null>(null)
@@ -670,7 +671,7 @@ function SlotsTab({
       await updateSlotWithConflictRefresh(s, { is_active: s.is_active === 1 ? 0 : 1 })
       await refresh()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(describeApiFailure(e, '保存'))
     } finally {
       setBusy(false)
     }
@@ -757,7 +758,7 @@ function SlotsTab({
           onClose={() => setShowBulk(false)}
           onSubmit={async (input) => {
             /*
-              作る前に**下見を出す**。件数が0でも `alert()` は使わず、
+              作る前に**下見を出す**。件数が0でも `alert` は使わず、
               同じ窓で理由を読ませて、作るボタンを出さない。
               生成は501件目で打ち切られる(DETAIL-12)。上限超過は
               例外として投げ、入力窓の中で理由を読ませる。
@@ -875,7 +876,7 @@ export function BulkSlotDialog({
       })
     } catch (e) {
       saveErrors.capture(e)
-      setErr(e instanceof Error ? e.message : String(e))
+      setErr(describeApiFailure(e, '保存'))
     } finally {
       submitLock.current = false
       setBusy(false)

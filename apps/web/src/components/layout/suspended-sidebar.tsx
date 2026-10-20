@@ -7,7 +7,7 @@ import { useBrand } from '@/lib/use-brand'
 import styles from './sidebar.module.css'
 import identityStyles from './sidebar-identity.module.css'
 
-/** V6 `IwfA0`。停止中はお問い合わせ以外の導線を出さない。 */
+/** 管理画面 `IwfA0`。停止中はお問い合わせ以外の導線を出さない。 */
 export default function SuspendedSidebar() {
   const [name, setName] = useState('—')
   const brand = useBrand()

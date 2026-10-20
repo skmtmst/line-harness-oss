@@ -1,4 +1,4 @@
-/** 日時を選ぶ段の見せ方。'list' が週5日の並び (M2p63S)、'calendar' が月の表 (k3aJKU)。 */
+/** 日時を選ぶ段の見せ方。'list' が週5日の並び 、'calendar' が月の表 。 */
 export type DateView = 'list' | 'calendar';
 
 const VIEW_STORAGE_KEY = 'liff-booking-date-view';

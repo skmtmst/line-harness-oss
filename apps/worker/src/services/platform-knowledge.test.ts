@@ -3,7 +3,7 @@ import {
   knowledgePrompt, parseKnowledgeSuggestion, redactKnowledgeText, runKnowledgeAi, validateKnowledgeEvidence,
   type KnowledgeSource,
 } from './platform-knowledge.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type { SupportMessage, SupportTicketRow } from '@line-crm/db';
 
 const sources: KnowledgeSource[] = [

@@ -1,8 +1,8 @@
 import { Hono, type MiddlewareHandler } from 'hono';
 import { activeTenantLineAccountSql } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { CHAT_ATTACHMENT_ID, CHAT_ATTACHMENT_PREFIX, ChatAttachmentError, ownedAttachment } from '../services/chat-attachments.js';
-import { isCustomerFileOwner } from '../services/customer-file-access.js';
+import { customerFileOwner } from '../services/customer-file-access.js';
 import { customerLiffDownload, privateDownloadHeaders } from '../services/download-entrypoints.js';
 import { signDownload } from '../services/download-capability.js';
 
@@ -22,11 +22,11 @@ customerDownloads.get('/api/liff/files/:id/download', async c => {
   if (!CHAT_ATTACHMENT_ID.test(id)) return c.json({ success: false, code: 'DOWNLOAD_UNAVAILABLE', error: 'このファイルは利用できません。お店へお問い合わせください' }, 404);
   try {
     const object = await c.env.IMAGES.head(`${CHAT_ATTACHMENT_PREFIX}${id}`);
-    if (!object || !await isCustomerFileOwner(c, object)) {
+    const owner = object ? await customerFileOwner(c, object) : null;
+    if (!owner) {
       return c.json({ success: false, code: 'DOWNLOAD_UNAVAILABLE', error: 'このファイルは利用できません。お店へお問い合わせください' }, 404);
     }
     const origin = c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin;
-    const owner = { friendId: object.customMetadata!.friendId, lineAccountId: object.customMetadata!.lineAccountId };
     const file = await ownedAttachment(c.env.IMAGES, id, owner, origin);
     if (file.expiresAt && (!Number.isFinite(Date.parse(file.expiresAt)) || Date.parse(file.expiresAt) <= Date.now())) throw new ChatAttachmentError('期限切れ');
     if (!c.env.API_KEY) return c.json({ success: false, code: 'DOWNLOAD_UNCONFIGURED', error: 'ただいま取得できません。お店へお問い合わせください' }, 503);

@@ -12,7 +12,7 @@ import StickyBar from '@/components/shared/sticky-bar'
 import { ApiError } from '@/lib/api'
 import { restaurantGoogleApi, type GoogleChange, type GoogleChangeStatus, type GoogleDayHours, type GoogleProfileAddress, type GoogleWeeklyHours } from '@/lib/restaurant-google-api'
 import { errorMessage, formatYmdShort, formatPeriods, WEEKDAYS, WEEKDAY_JA } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 
 // Missing profile workflows use the current shared V8 parts; ordinary profile board stays intact.
@@ -114,7 +114,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
         if (data?.change) setChange(data.change)
       } else if (err instanceof ApiError && err.status === 502) {
         await load()
-        setActionError('Googleへの送信結果を確認できませんでした。重複を防ぐため、次に「Googleに変更を送信」を押したときはGoogle側の状態を照合してから送ります。')
+        setActionError('Googleへの送信結果を確認できませんでした。重複を防ぐため、次に「Googleに変更を送信する」を押したときはGoogle側の状態を照合してから送ります。')
       } else {
         setActionError(errorMessage(err, 'Googleへの送信に失敗しました。'))
         if (err instanceof ApiError && (err.data as { change?: GoogleChange } | undefined)?.change) setChange((err.data as { change: GoogleChange }).change)
@@ -141,13 +141,12 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
   }
 
   if (loading) return <ListState kind="loading" title="変更内容を読み込んでいます" />
-  if (loadError || !change || !store) return <ListState kind="error" title="変更内容を表示できませんでした" description={loadError} onRetry={() => void load()} action={<Button onClick={() => go({ tab: 'profile' })}>プロフィールへ戻る</Button>} />
+  if (loadError || !change || !store) return <ListState kind="error" title="変更内容を表示できませんでした" description={loadError} onRetry={() => void load()} />
 
   const isHours = change.kind === 'special_hours' || change.kind === 'regular_hours'
   const field = 'field' in change.target ? change.target.field : null
   const status = STATUS_LABEL[change.status]
   const done = change.status === 'applied' || change.status === 'accepted'
-  const backLabel = isHours ? '入力に戻る' : '編集に戻る'
   const backTo = () => (isHours ? go({ tab: 'profile', view: 'hours', mode: change.source === 'weekly' ? 'weekly' : change.source === 'calendar' ? 'calendar' : 'text' }) : go({ tab: 'profile', view: 'edit' }))
   const title = isHours
     ? change.kind === 'special_hours'
@@ -175,20 +174,15 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
 
   return (
     <>
-      <div className={styles.buttonRow}>
-        <Button onClick={() => (done || change.status === 'cancelled' ? go({ tab: 'profile' }) : backTo())}>
-          {done || change.status === 'cancelled' ? 'プロフィールへ戻る' : backLabel}
-        </Button>
-      </div>
       <SectionHeader title={done ? (isHours ? '営業時間の変更をGoogleに送信しました' : 'プロフィールの変更をGoogleに送信しました') : isHours ? 'この内容で営業時間を変更しますか？' : 'この内容でプロフィールを変更しますか？'}
         note={<StatusBadge tone={status.tone}>{status.label}</StatusBadge>} />
       <p className={styles.muted}>{`対象店舗：${store.name} / ${isHours ? store.timeZone : `変更する項目：${FIELD_LABEL[field ?? ''] ?? ''}`}`}</p>
       {ids.length > 1 ? <p className={styles.muted}>{index + 1} / {ids.length}件目</p> : null}
       {sent ? <Notice tone="success">{sent.alreadyApplied ? 'この内容はすでにGoogleに反映されていました。送信はしていません。' : change.status === 'applied' ? 'Googleに変更を送信し、反映を確認しました。' : 'Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します。審査・同期に時間がかかることがあります。'}</Notice> : null}
-      {conflict !== null ? <Notice tone="danger" action={<Button variant="text" onClick={() => go({ tab: 'profile' })}>最新の内容を確認</Button>}>
+      {conflict !== null ? <Notice tone="danger" action={<Button variant="text" onClick={() => go({ tab: 'profile' })}>最新の内容を確認する</Button>}>
         別の担当者が{isHours ? '営業時間' : 'この項目'}を変更しました。古い値で上書きしないため送信を止めました。Google側の現在の値：{isHours ? describeHours(conflict, change.kind) : describeProfileValue(field ?? '', conflict)}
       </Notice> : null}
-      {change.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。「Googleに変更を送信」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
+      {change.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。「Googleに変更を送信する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}
       {change.status === 'failed' && !sent ? <Notice tone="danger">前回の送信は失敗しました{change.error ? `（${change.error}）` : ''}。内容を確認して、もう一度送信できます。</Notice> : null}
       {change.status === 'cancelled' ? <Notice tone="warn">この変更は取り消されています。</Notice> : null}
       {!writeEnabled ? <Notice tone="warn">この環境ではGoogleへの送信が許可されていません。変更案の作成と確認まではできます。</Notice> : null}
@@ -216,12 +210,11 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
       </Card> : null}
       <StickyBar actions={done || change.status === 'cancelled' ? <>
         {ids.length > 1 && index < ids.length - 1 ? <Button variant="primary" onClick={() => setIndex(index + 1)}>次の変更へ</Button> : null}
-        <Button onClick={() => go({ tab: 'profile' })}>プロフィールへ戻る</Button>
         <Button onClick={() => go({ tab: 'profile', view: 'history' })}>変更履歴を見る</Button>
       </> : <>
         <Button onClick={backTo} disabled={busy}>修正する</Button>
         {canSend && (change.status === 'failed' || change.status === 'conflict') ? <Button onClick={() => void cancel()} disabled={busy}>キャンセル</Button> : null}
-        {canSend && writeEnabled ? <Button variant="primary" onClick={() => void send()} disabled={!canPress} busy={busy} busyLabel="送信中…">Googleに変更を送信</Button> : null}
+        {canSend && writeEnabled ? <Button variant="primary" onClick={() => void send()} disabled={!canPress} busy={busy} busyLabel="送信中…">Googleに変更を送信する</Button> : null}
       </>} />
     </>
   )

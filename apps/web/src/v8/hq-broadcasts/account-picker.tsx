@@ -9,7 +9,7 @@ import styles from './account-picker.module.css'
 
 export type BroadcastAccount = LineAccount & { friendCount: number | null }
 
-/** 行の2段目の状態（絵 WjFWW：「1,284 人・つながっています」）。送れない・要確認は色で分ける。 */
+/** 行の2段目の状態（絵 ：「1,284 人・つながっています」）。送れない・要確認は色で分ける。 */
 function AccountConnection({ account }: { account: BroadcastAccount }) {
   const text = account.isActive === false ? '今は送れません（アカウントを停止中）'
     : account.channelAccessTokenConfigured === false ? '今は送れません（LINE のトークンが未設定）'

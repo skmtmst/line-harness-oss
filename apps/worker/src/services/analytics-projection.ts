@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   rebuildAnalyticsDailyMetricsChunk,
   recentAnalyticsProjectionRange,
@@ -7,6 +8,7 @@ import {
   saveAnalyticsProjectionSchedulerCursor,
   type LineAccount,
 } from '@line-crm/db';
+
 import { featureJobCanRun } from './feature-enforcement.js';
 
 export interface AnalyticsProjectionRefreshResult {
@@ -74,7 +76,7 @@ export async function refreshRecentAnalyticsProjections(
     else result.mismatched = 1;
   } catch (error) {
     result.failed = 1;
-    console.error(JSON.stringify({"code":"analytics_projection_failed"}));
+    logger.error("analytics_projection_failed");
   } finally {
     // 成否に関係なく次のアカウントへ進め、大きい・壊れた1社が他社を塞がないようにする。
     await saveAnalyticsProjectionSchedulerCursor(db, account.id, cutoffAt);

@@ -1,3 +1,5 @@
+> 文書：05 シナリオ配信 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 05 シナリオ配信 操作と挙動（受け入れ）
 
 要件の正本：[05 シナリオ配信](../../v6-requirements/v6-05-scenario-delivery-requirements-draft.md)・[共通基盤 §3・§6-2・§9・§11・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[30 ログインユーザー §7〜§8](../../v6-requirements/v6-30-login-users-requirements-draft.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
@@ -87,20 +89,20 @@
 | # | 要件 | 今の作り | 根拠 |
 |---|---|---|---|
 | 1 | 公開・停止は owner/admin だけ（`scenario.definition.publish`、§7） | 公開は「下書き編集」の権限（`scenario.definition.edit`）で通る。`scenario.definition.publish` はどこでも使っていない | apps/worker/src/routes/scenarios.ts:97-108・1593 |
-| 2 | 一時失敗の再試行は 1分・5分・30分の最大3回、429 は Retry-After 優先（共通 §6-2、§13） | 回数の上限なしで5分ごとに戻して送り直し、24時間で送達不明として止める。Retry-After を見ない | apps/worker/src/services/step-delivery.ts:216-221・297-305・654-665、packages/db/src/scenarios.ts:1927-1945 |
+| 2 | 一時失敗の再試行は 1分・5分・30分の最大3回、429 は Retry-After 優先（共通 §6-2、§13） | 回数の上限なしで5分ごとに戻して送り直し、24時間で送達不明として止める。Retry-After を見ない | apps/worker/src/services/step-delivery.ts:216-221・297-305・654-665、packages/db/src/scenarios/index.ts:1927-1945 |
 | 3 | ブロック・友だち解除は状態として分ける（§4） | ブロック中の友だちは「完了」にする | apps/worker/src/services/step-delivery.ts:416-418 |
 | 4 | 通ごとの実行台帳 `scenario_step_runs`（一意 `(subscription_id, step_id, run_key)`）と `scenario_action_runs`（§5-3） | 表が無い。二重送信は送信の予約表（outbound_send_requests）と再試行キーで防いでいる | packages/db/migrations（該当なし）、apps/worker/src/services/step-delivery.ts:653-676 |
-| 5 | 中断スタック（10段、§3-7・§13） | 1つ前のシナリオを1件だけ控える列 | packages/db/migrations/123_friend_scenario_previous.sql:3、apps/worker/src/services/scenario-actions.ts:694-710 |
-| 6 | 通番号を実行の参照にしない（安定した step_id、§3-4） | 進行位置は `current_step_order`、分岐先は通番号 | packages/db/src/scenarios.ts:1907-1921、apps/worker/src/routes/scenarios.ts:849、apps/worker/src/services/step-delivery.ts:492 |
+| 5 | 中断スタック（10段、§3-7・§13） | 1つ前のシナリオを1件だけ控える列 | packages/db/migrations/123_friend_scenario_previous.sql:3、apps/worker/src/features/scenarios/scenario-actions.ts:694-710 |
+| 6 | 通番号を実行の参照にしない（安定した step_id、§3-4） | 進行位置は `current_step_order`、分岐先は通番号 | packages/db/src/scenarios/index.ts:1907-1921、apps/worker/src/routes/scenarios.ts:849、apps/worker/src/services/step-delivery.ts:492 |
 | 7 | 開始APIは公開版ID・開始イベントID・冪等キーを受ける（§6） | 手動登録は冪等キーも開始イベントも受けない。二重は 409「Already enrolled in this scenario」（英語） | apps/worker/src/routes/scenarios.ts:1531・1576-1579 |
 | 8 | 停止は監査理由を保存（§6） | API は止める理由を受けるが、V8 の詳細の止める確認は理由を送らない（BEHAVIOR.md も「口が無い」と古いまま） | apps/worker/src/routes/scenarios.ts:695・716-721、apps/web/src/v8/scenario-detail/BEHAVIOR.md「絵にあって置いていないもの」 |
 | 9 | 一覧の数：有効・進行中・24時間以内の予定・要対応の失敗（§3-1） | 合計（有効・停止中）・購読中・読み終えた・今週送った。24時間以内と要対応の失敗が無い（絵どおりなら要件側を直す判断が要る） | apps/web/src/v8/scenarios/list.tsx:691-717 |
-| 10 | 失敗した通の再実行は通の実行IDで（`/step-runs/{runId}/retry`、§6） | 購読単位の `/api/scenario-subscriptions/:id/retry`。理由は「配信失敗」の購読だけ | apps/worker/src/routes/scenarios.ts:2351-2380、packages/db/src/scenarios.ts:2184-2202 |
+| 10 | 失敗した通の再実行は通の実行IDで（`/step-runs/{runId}/retry`、§6） | 購読単位の `/api/scenario-subscriptions/:id/retry`。理由は「配信失敗」の購読だけ | apps/worker/src/routes/scenarios.ts:2351-2380、packages/db/src/scenarios/index.ts:2184-2202 |
 
 ### 仕様が無い
 > 2026-10-16 オーナー「おすすめで」（B-337）で下の項目は全部決まった。各行の → が決定。問いは design/v8/review/SPEC-QUESTIONS-1016.md。
 
-- 一時停止から再開したとき、止めていた間に過ぎた通をまとめて送るか、再開時刻を起点に組み直すか（今は組み直し：packages/db/src/scenarios.ts:2096-2101）。 → 決定 B-337 Q-12：再開時刻から組み直す（今のまま）。
+- 一時停止から再開したとき、止めていた間に過ぎた通をまとめて送るか、再開時刻を起点に組み直すか（今は組み直し：packages/db/src/scenarios/index.ts:2096-2101）。 → 決定 B-337 Q-12：再開時刻から組み直す（今のまま）。
 - シナリオ全体を止めて再開したとき、予定を過ぎた分を一気に送ってよいか（今は購読が active のまま残り、再開で過ぎた分から届く：packages/db/src/scenario-delivery-timestamps.ts:15-22）。アカウント停止は一時停止にするので扱いが揃っていない。 → 決定 B-337 Q-12：一気に送らない。全体停止の再開も再開時刻から組み直し、予定から 3 時間以上遅れた物は「遅れたので送らなかった」で閉じる。
 - 送る速さの上限（5分で40件）で、どこまでの遅れを許すか・遅れを画面に出すか。 → 決定 B-337 Q-35：シナリオの遅れが 30 分を超えたら異常として知らせる。
 - アカウントの間の公平さ（予定の古い順だけで並べるので、1アカウントの大量の予定が他を待たせる）。 → 決定 B-337 Q-70：アカウントの間は順番に回す。

@@ -39,7 +39,7 @@ describe('分析の曜日', () => {
 
   it('端末の地域ではなく暦日の曜日を返す', () => {
     // 月曜の日付は、日本より遅い地域(例: ハワイ)で開いても月曜。
-    // getDay() なら前日(日曜)を返す環境がある。
+    // getDay なら前日(日曜)を返す環境がある。
     const monday = '2026-03-16'
     expect(analyticsWeekday(monday)).toBe(
       ['日', '月', '火', '水', '木', '金', '土'][new Date(`${monday}T00:00:00Z`).getUTCDay()],

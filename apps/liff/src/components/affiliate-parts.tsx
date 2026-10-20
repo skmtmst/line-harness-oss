@@ -1,7 +1,7 @@
-import { TextInput } from '../components/forms/controls.js';
+import { TextInput } from './forms/controls.js';
 import { useState, type RefObject } from 'react';
-import Button from '../components/ui/Button.js';
-import Icon from '../components/ui/Icon.js';
+import Button from './ui/button/index.js';
+import Icon from './ui/icon.js';
 
 
 /**
@@ -49,7 +49,7 @@ function CopyButton({
 }: {
   url: string;
   urlRef: RefObject<HTMLInputElement | null>;
-  /** 箱の中の1行 (S3uBl) では小さな四角のボタンにする。 */
+  /** 箱の中の1行  では小さな四角のボタンにする。 */
   compact?: boolean;
 }) {
   const [copied, setCopied] = useState(false);

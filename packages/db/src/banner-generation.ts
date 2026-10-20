@@ -3,7 +3,7 @@ export {getBannerUsageToday,countRecentFailedBannerGenerations,getBannerUsageThi
 import { sqlIdSet } from './id-queries.js';
 import { readHqBannerFolderAssignment } from './hq-folders.js';
 import { jstNow } from './utils.js';
-import type { Media } from './media.js';
+import type { Media } from './media/primitives/index.js';
 
 /**
  * 統括の「バナー生成」。

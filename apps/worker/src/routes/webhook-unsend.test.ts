@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const lineClient = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('@line-crm/line-sdk', async () => {
     LineClient: vi.fn().mockImplementation(function () { return lineClient; }),
   };
 });
-vi.mock('../services/auto-reply.js', () => ({ matchAndReply: autoReply }));
+vi.mock('../features/auto-replies/auto-reply.js', () => ({ matchAndReply: autoReply }));
 vi.mock('../services/activity-mileage.js', () => ({ awardActivityMileage: mileage }));
 vi.mock('../services/event-bus.js', () => ({
   fireEvent: fire,

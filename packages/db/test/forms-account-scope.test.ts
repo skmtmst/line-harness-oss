@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import { getFormsWithStats } from '../src/forms.js';
+import { getFormsWithStats } from '../src/forms/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 function setup(): D1Database {

@@ -141,7 +141,7 @@ it.each(readCases)('LFで実際に始まる第2文は改行種別によらず拒
   expect((await db.prepare('SELECT * FROM effects').all()).results).toEqual([{ id: 'original', value: 'safe' }]);
 });
 
-it('列車3: WITH は受信の柵では拒否のまま、工程記録の DB だけ書き込みとして扱う', () => {
+it('WITH は受信の柵では拒否のまま、工程記録の DB だけ書き込みとして扱う', () => {
   const sql = "WITH q AS (SELECT 1) UPDATE effects SET value='x'";
   expect(() => classifySingleStatement(sql)).toThrow('unsupported_sql');
   expect(classifySingleStatement(sql, { withAsMutation: true })).toEqual({ readOnly: false, sql });

@@ -34,7 +34,7 @@ describe('友だち一覧(PhxG6)を共通部品へ載せ替える契約', () => 
     expect(FRIENDS_BODY).toContain('<Chip key={summary} tone="neutral">')
   })
 
-  // ★V7「友だちの顔」（KXDhj）：共通 Avatar の 40px の丸。画像が読めない時も頭文字（2026-09-24）。
+  // ★管理画面「友だちの顔」（KXDhj）：共通 Avatar の 40px の丸。画像が読めない時も頭文字（2026-09-24）。
   it('行の顔は共通 Avatar（32px）', () => {
     expect(ROW_BODY).toContain('<Avatar name={friend.displayName} src={friend.pictureUrl} size={32} />')
     expect(ROW_BODY, '画像を直接描いている').not.toMatch(/<img src=\{friend\.pictureUrl\}/)
@@ -90,7 +90,7 @@ describe('重複検出で取れない数を作らない契約', () => {
   it('読込中と取得失敗を状態の言葉でそろえる', () => {
     expect(DUPLICATES_BODY).toContain('aria-busy={d.candidatesLoading}')
     expect(DUPLICATES_BODY).toContain('読み込めませんでした')
-    // ★V7 `x63W5x`：失敗の1枚は共通部品の error（副ボタン「もう一度読み込む」つき）。
+    // ★管理画面 `x63W5x`：失敗の1枚は共通部品の error（副ボタン「もう一度読み込む」つき）。
     // 文言は部品が持つ。ここでは口（`onRetry`）があることだけ見る。
     expect(DUPLICATES_BODY, '取得失敗にやり直す口が無い').toContain('onClick={() => void (d.data ? d.loadCandidates() : d.load())}')
     expect(DUPLICATES_BODY).not.toContain('読み込み中…')

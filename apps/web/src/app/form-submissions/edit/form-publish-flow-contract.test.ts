@@ -11,7 +11,7 @@ describe('回答フォームの下書きと公開を分ける', () => {
   })
 
   it('V8では公開の前に確かめの窓を挟み、実行で保存＋公開する', () => {
-    // 板 Z9wXm。現役の下の帯から確認を開く。
+    // 板 。現役の下の帯から確認を開く。
     expect(source).toContain('この版を公開する')
     expect(source).toContain('designNode="Z9wXm"')
     expect(source).toContain('await save(true)')

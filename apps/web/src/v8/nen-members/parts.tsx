@@ -1,11 +1,11 @@
 'use client'
+import { formatYen as yen } from '@line-crm/shared';
 
 /*
  * ★V8 会員の小さな部品（金額の形・CSV のセル・ランクの札・型）。
  * 今の画面（app/nen/members の rank-view・friends の csv-export）から写した。
  * src/v8 は @/app を読めないので、同じ約束のまま持つ。
  */
-import { formatNumber } from '@/lib/format'
 import type { NenRankSettingsData } from '@/lib/nen-ranks-api'
 import StatusBadge from '@/components/shared/status-badge'
 import { formatDate as polishFormatDate } from '@/lib/format'
@@ -16,10 +16,7 @@ export type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 export type SavedHandler = (forAccountId: string, next: NenRankSettingsData) => void
 
 /** 金額（円）。画面の数字はすべてこの形。 */
-export function yen(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return '—'
-  return `¥${formatNumber(Math.round(value))}`
-}
+export { yen };
 
 /** 入力の「200000」「200,000」「¥200,000」を数へ。読めなければ NaN。 */
 export function parseYen(value: string): number {
@@ -47,7 +44,7 @@ export function csvLine(values: Array<string | null | undefined>): string {
   return values.map((value) => csvCell(value)).join(',')
 }
 
-/** ランクは状態ではないので、共通の灰色の札で文字だけ示す（B-202・B-240）。 */
+/** ランクは状態ではないので、共通の灰色の札で文字だけ示す（・）。 */
 export function RankChip({ name }: { name: string }) {
   return <StatusBadge tone="neutral" dot={false}>{name}</StatusBadge>
 }

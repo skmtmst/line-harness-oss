@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   getConversionDefinitionReport,
   getConversionReport,
-} from './conversion-definitions.js';
+} from './conversion-definitions/index.js';
 
 /*
  * R284/R285: レポートの取消集計の回帰試験。実SQLiteで実SQLを回す。

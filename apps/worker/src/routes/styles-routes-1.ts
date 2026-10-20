@@ -1,14 +1,16 @@
+import { styleEcSummary } from './style-ec-summary.js';
+import { styleMenuButtons } from '../services/style-menu-buttons.js';
 import {styleTemplateSamples} from './style-template-samples-api.js';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import {
   paymentBadges,
   paymentSummary,
-} from '../services/booking-payment-admin.js';
+} from '../features/booking/booking-payment-admin/index.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import {
@@ -43,6 +45,7 @@ import {
   bookingAudience,
 } from './styles-common.js';
 export const styles = new Hono<Env>();
+styles.route('/', styleEcSummary);
 
 styles.get(base, async (c) => {
   const id = await account(c),
@@ -97,12 +100,15 @@ styles.get(base + '/warnings', async (c) =>
 );
 
 styles.get(base + '/starter-set', async (c) => {
-  await account(c);
+  const id = await account(c);
   const style = checkStyle(c.req.query('style'));
-  return c.json({
-    success: true,
-    data: await starter(c.env.DB, c.get('staff').tenantId ?? null, style),
-  });
+  const set = await starter(c.env.DB, c.get('staff').tenantId ?? null, style);
+  const p = await profile(c.env.DB, id);
+  const answers = profileAnswers(p);
+  const preview = await Promise.all(set.definition.items.filter(item => item.kind === 'rich_menu').map(async item => ({
+    key: item.key, buttons: await styleMenuButtons(c.env.DB, id, style, item, answers),
+  })));
+  return c.json({ success: true, data: { ...set, preview } });
 });
 styles.route('/',styleTemplateSamples);
 

@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { ListOrdered, Send, Users } from 'lucide-react'
@@ -23,12 +24,12 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 一斉配信 かんたんに送る（板 `P6vbxn`・小窓 640）。
+ * ★V8 一斉配信 かんたんに送る（板 ・小窓 640）。
  *
  * 今の部品（app/broadcasts/quick-send-dialog.tsx。一覧から開く口が無かった）の動きを写して一から書いた。
  * 本文・相手・いつ・人数の見込み・承認の順。1,000人以上に送るときは承認する人を選んで頼む。
  * 口は今と同じ（tags.list・approval.candidates・preflight・create・send・approval.request）。
- * 入口：一斉配信一覧の「配信を作る ▾」の「かんたんに送る」（絵 `Xr6eu` の分け方）。
+ * 入口：一斉配信一覧の「配信を作る ▾」の「かんたんに送る」（分け方）。
  */
 
 /** 承認を頼む境目（絵の文どおり）。 */
@@ -254,7 +255,7 @@ export default function QuickSendV8({
       { if (!fieldFailure)
 
 
-      setError(e instanceof Error ? e.message : '送れませんでした。もう一度お試しください。') }
+      setError(describeApiFailure(e, '保存')) }
     } finally {
       sendingRef.current = false
       setBusy(false)

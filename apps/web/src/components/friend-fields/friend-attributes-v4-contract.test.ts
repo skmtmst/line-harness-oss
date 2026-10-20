@@ -33,7 +33,7 @@ describe('タグ V4 contract', () => {
     expect(source).toContain("rows.push({ name: '使用中の版'")
   })
 
-  it('タグ編集と対応マーク保管はV6の結果を正しく案内する', () => {
+  it("タグ編集と対応マーク保管は管理画面の結果を正しく案内する", () => {
     const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
     const markList = (read('v8/tags/marks-tab.tsx') + read('components/friend-fields/mark-list.tsx'))
     expect(editor).toContain('このタグを消すと、上の配信やフォームの条件から外れます')
@@ -42,7 +42,7 @@ describe('タグ V4 contract', () => {
     expect(markList).not.toContain('対応マークが未設定へ戻ります')
   })
 
-  it('タグ作成・編集は画面名をトップバーだけに置き、V6の操作を下部へまとめる', () => {
+  it("タグ作成・編集は画面名をトップバーだけに置き、管理画面の操作を下部へまとめる", () => {
     const editor = read('v8/tag-edit/edit-form.tsx') + read('components/friend-fields/tag-editor-v4.tsx') + read('components/shared/action-list.tsx') + read('components/friend-fields/linked-action-list.tsx')
     expect(editor).toContain("title={host?.title ?? (tag.name || 'タグを編集')}")
     expect(editor).toContain('<CreatePage')
@@ -172,7 +172,7 @@ describe('タグ V4 contract', () => {
 
   it('空・読込・エラー・権限不足を言い分ける', () => {
     const source = read('v8/tags/tags-tab.tsx') + read('v8/tags/list.tsx') + read('components/friend-fields/tags-page-v4.tsx')
-    // 設計 ★V6 4-2-C `yKEdO`。共通部品に寄せる（自前で組むと画面ごとにずれる）。
+    // 設計 ★管理画面 4-2-C `yKEdO`。共通部品に寄せる（自前で組むと画面ごとにずれる）。
     expect(source).toContain("import ListState from '@/components/shared/list-state'")
     expect(source).toContain('<DelayedSkeleton loading={!ready}')
     expect(source).toContain("status === 'forbidden'")
@@ -338,7 +338,7 @@ describe('タグ V4 contract', () => {
 
   it('タグ編集の削除確認は参照件数の実値を出し、取れなければ押せなくする', () => {
     const source = read('components/friend-fields/edit-tag-page-v4.tsx') + read('v8/tag-edit/edit.tsx')
-    // `load()` で取った `dependencies` を窓へ渡す。固定値を書かない。
+    // `load` で取った `dependencies` を窓へ渡す。固定値を書かない。
     expect(source).toContain('api.tags.dependencies(tagId, selectedAccountId)')
     expect(source).toContain('dependencies={dependencies} dependenciesStatus={dependenciesStatus}')
     expect(source).not.toMatch(/参照<\/dt><dd[^>]*>3件/)

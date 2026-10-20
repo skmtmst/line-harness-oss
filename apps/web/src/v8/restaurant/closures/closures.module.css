@@ -1,6 +1,6 @@
 /*
- * ★V8 休業日・貸切（提案 E-10 UVnvR）と足す窓（nVvXy）。
- * 寸法は Pencil の書き出し（design/v8/html/UVnvR.html・nVvXy.html）から読み、globals.css の --tpl-e10-*・--tpl-e1-* だけを使う。
+ * ★V8 休業日・貸切（提案 E-10 ）と足す窓。
+ * 寸法は Pencil の書き出し（design/v8/html/.html・.html）から読み、globals.css の --tpl-e10-*・--tpl-e1-* だけを使う。
  */
 
 .state {
@@ -371,7 +371,7 @@
   color: var(--color-status-danger);
 }
 
-/* 足す窓（nVvXy）：段の間 16・欄の題と中身 6 */
+/* 足す窓：段の間 16・欄の題と中身 6 */
 .form {
   display: flex;
   flex-direction: column;

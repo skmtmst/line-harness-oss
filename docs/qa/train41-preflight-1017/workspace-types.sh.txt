@@ -1,9 +1,0 @@
-#!/bin/bash
-set -eu
-export PATH=/Users/kentakenta/lh-work/tools/hq/ci-local/runtime/node_modules/node/bin:$PATH
-export NEXT_PUBLIC_API_URL=http://127.0.0.1:8788
-export TZ=UTC CI=true GITHUB_ACTIONS=true
-node --version
-pnpm install --frozen-lockfile
-pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/sdk --filter @line-harness/update-engine --filter @line-crm/db build
-pnpm typecheck

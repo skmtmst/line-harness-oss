@@ -18,18 +18,16 @@
 .options { display: flex; flex-direction: column; gap: var(--tpl-fdt-summary-gap); }
 
 .option { display: flex; align-items: center; gap: var(--tpl-fdt-group-gap); }
-
-.basicOptions { display: flex; flex-direction: column; gap: var(--tpl-fdt-group-gap); padding-top: var(--tpl-fdt-summary-gap); border-top: 1px solid var(--color-hairline); }
 .allergies { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-fdt-group-gap); min-width: 0; }
 .row dd > .allergies { flex: 1; min-width: 0; }
-/* 編集中のアレルギーは題の下に全幅で札を横に並べ、下に「選んで足す」（e5uuD0）。細い右の列だと札が1つずつ縦に積まれた。 */
+/* 編集中のアレルギーは題の下に全幅で札を横に並べ、下に「選んで足す」。細い右の列だと札が1つずつ縦に積まれた。 */
 .row[data-layout='stack'] { grid-template-columns: minmax(0, 1fr); }
 .allergyAdd { width: 100%; justify-content: space-between; }
 .other { display: flex; gap: var(--tpl-fdt-group-gap); align-items: center; min-width: 0; }
 .editActions { display: flex; gap: var(--tpl-fdt-group-gap); justify-content: flex-end; }
 }
 
-/* B-212：欄の内側は16以上。基本の値と出どころの印を横に並べる。 */
+/* ：欄の内側は16以上。基本の値と出どころの印を横に並べる。 */
 .panel { padding: var(--polish-space-section); border: 0; border-radius: var(--radius-flat); box-shadow: none; }
 .profile { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
 .profileName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; }
@@ -44,14 +42,14 @@
 .profileName { flex: 1; }
 .profileDate { margin-left: auto; }
 
-/* B-212：追加した連絡欄も72の見出し幅で1行。 */
+/* ：追加した連絡欄も72の見出し幅で1行。 */
 .content dl dt { font-size: var(--polish-text-body); white-space: nowrap; }
 
-/* B-152/B-212: 段は16、段内は8。節の線・上下の余白を重ねない。 */
+/* /: 段は16、段内は8。節の線・上下の余白を重ねない。 */
 .panel { gap: var(--space-16); }
 .section + .section { padding-top: 0; border-top: 0; }
 
-/* 絵 eovoG：節の中身が文字だけ（メモ・リッチメニュー名）のときも、行の値と同じ本文の大きさ。 */
+/* 絵 ：節の中身が文字だけ（メモ・リッチメニュー名）のときも、行の値と同じ本文の大きさ。 */
 .content { color: var(--color-ink); font-size: var(--polish-text-body); line-height: var(--tpl-inbox-row-preview-lh); }
-/* 受信箱の右の列（絵 eovoG）：見出し84。「次の自動配信」が値にくっつかない。 */
+/* 受信箱の右の列：見出し84。「次の自動配信」が値にくっつかない。 */
 .panel[data-label-width='wide'] { --tpl-customer-label: 84px; }

@@ -2,7 +2,7 @@ import type { HqSupportKind, HqSupportStatus } from '@/lib/hq-support'
 import { formatDate as polishFormatDate } from '@/lib/format'
 
 
-/** 絵の言葉（`b8xBtZ`・`OhguS`）。運営が見ている間は「対応中」、閉じたら「解決済み」。 */
+/** 絵の言葉（・）。運営が見ている間は「対応中」、閉じたら「解決済み」。 */
 export const SUPPORT_STATUS_WORDS: Record<HqSupportStatus, string> = {
   open: '対応中',
   answered: '回答済み',
@@ -14,7 +14,7 @@ export function supportTime(iso: string): string {
   return polishFormatDate(iso, { style: 'list', fallback: '—' })
 }
 
-/** 絵の種類の言葉（`b8xBtZ`・`OhguS`：「不具合」「料金」）。受け口の言葉（「不具合の報告」など）は長く、表の列で切れるので短くする。 */
+/** 絵の種類の言葉（・：「不具合」「料金」）。受け口の言葉（「不具合の報告」など）は長く、表の列で切れるので短くする。 */
 export const SUPPORT_KIND_WORDS: Record<HqSupportKind, string> = {
   usage: '使い方',
   bug: '不具合',

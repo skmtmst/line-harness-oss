@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, test, vi, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const availabilityMocks = vi.hoisted(() => ({
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
@@ -48,8 +48,8 @@ const notifierMocks = vi.hoisted(() => {
   return { calls, sendBookingNotification };
 });
 // 送る側だけ差し替える。文面の組み立て（notificationTiming・formatStartsAtForStore）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -235,7 +235,7 @@ describe('通知の再試行 (R323・R324)', () => {
     expect(retry.status).toBe(200);
     expect(notifierMocks.sendBookingNotification).toHaveBeenCalledTimes(1);
     // R323: 同じ行の再送は安定キーで行う。
-    expect(notifierMocks.calls[0]).toMatchObject({ retryKey: 'booking-notification-retry:OP1' });
+    expect(notifierMocks.calls[0]).toMatchObject({ retryKey: 'OP1' });
   });
 
   test('R324: 取消ずみの確定通知は送らず、未成功行は止まる', async () => {
@@ -267,7 +267,7 @@ describe('通知の再試行 (R323・R324)', () => {
 
   test('R329: 送信中の取消は 409 で巻き戻し、成立していない履歴を残さない', async () => {
     insertBooking(sqlite, { id: 'B1', friend: 'f1' });
-    // V6 の送信権を持つ登録を用意する (liveGuard が止める)。
+    // の送信権を持つ登録を用意する (liveGuard が止める)。
     // friend_reminders.reminder_id は reminders への外部キー。
     sqlite.exec(`
       INSERT INTO reminders (id, line_account_id, name, trigger_type, delivery_mode, is_active, lifecycle_status,
@@ -421,7 +421,7 @@ describe('予約の変更と通知予定 (R325・R326・R335・R336)', () => {
     expect(run.status).toBe('cancelled');
   });
 
-  test('R336: 日時変更でV6登録が新日時に移る', async () => {
+  test('R336: 日時変更で登録が新日時に移る', async () => {
     const { startsAt } = insertBooking(sqlite, { id: 'B1', friend: 'f1' });
     seedBookingRule(sqlite);
     sqlite.prepare(

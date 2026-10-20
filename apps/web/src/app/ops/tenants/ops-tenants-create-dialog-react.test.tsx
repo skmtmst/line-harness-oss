@@ -12,7 +12,7 @@ const mockPush = vi.fn()
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 /**
- * 契約先一覧の「作る」は V8-B 板 `i0FTN` の小窓で出す。
+ * 契約先一覧の「作る」は V8-B 板  の小窓で出す。
  * 統括名＋飲食店機能＋案内文を持ち、空のままでは作らず理由を出す。再発防止。
  */
 

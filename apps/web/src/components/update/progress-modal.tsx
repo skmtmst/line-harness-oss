@@ -1,10 +1,13 @@
 'use client'
+import { createClientLogger } from '@line-crm/shared';
 
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { openUpdateStream, getUpdateStatus } from '@/lib/update-client'
 import type { UpdateEvent } from '@line-harness/update-engine'
+const clientLogger = createClientLogger('admin');
+
 
 /**
  * ProgressModal — live timeline for an in-flight update.
@@ -100,13 +103,13 @@ export function ProgressModal({
         // (the orchestrator finished, we should NOT degrade to polling).
         // The `completed` flag distinguishes them.
         if (cancelled || completed) return
-        console.warn(JSON.stringify({"code":"update_progress_modal_warn"}))
+        clientLogger.warn("update_progress_modal_warn")
         es?.close()
         es = null
         startPolling()
       }
     } catch (e) {
-      console.warn(JSON.stringify({"code":"update_progress_modal_warn"}))
+      clientLogger.warn("update_progress_modal_warn")
       startPolling()
     }
 

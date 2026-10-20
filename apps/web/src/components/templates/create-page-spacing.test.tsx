@@ -17,7 +17,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null, selectedAccount: null }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner', useTenantWideAccess: () => true }))
-import { CreatePage } from './index'
+import { CreatePage } from '.'
 
 const WEB = process.cwd()
 const read = (path: string) => readFileSync(join(WEB, path), 'utf8')
@@ -44,7 +44,7 @@ describe('作成の型の余白の口', () => {
     expect(preview.getAttribute('data-preview-surface')).toBe('plain')
   })
 
-  it('口の寸法は型の CSS と globals の値に1か所（E-9 p17Qku：B-152：上8・左右24・下24、段の間24）', () => {
+  it("口の寸法は型の CSS と globals の値に1か所（E-9 p17Qku：上8・左右24・下24、段の間24）", () => {
     const css = read('src/components/templates/page-templates.module.css')
     expect(css).toContain(".createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }")
     expect(css).toContain(".preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }")

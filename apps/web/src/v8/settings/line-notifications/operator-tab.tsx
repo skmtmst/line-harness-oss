@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   exportReason: requiredText("書き出す理由を入れてください。"),
 }
 
@@ -29,7 +29,7 @@ import { TextField } from '@/components/shared/text-field'
 import ListRange from '@/components/ui/list-range'
 import { ApiError, api, type OperatorNotificationRule } from '@/lib/api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
-import { EVENT_OPTIONS } from '../../line-notifications/operator-words'
+import { EVENT_OPTIONS } from '@/v8/line-notifications/public/operator-words/index'
 import styles from './screen.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { csvFileName } from '@/lib/csv-file-name'
@@ -37,9 +37,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 LINE通知 運用者へのお知らせ（板 u8xibp）。
+ * ★V8 LINE通知 運用者へのお知らせ（板 ）。
  *
- * 並び（絵）：数のマス4つ → 宛先の帯 → 探す・並び → 表（お知らせ・きっかけ・受け取る人・送る時間・今日・状態・操作）。
+ * 並び：数のマス4つ → 宛先の帯 → 探す・並び → 表（お知らせ・きっかけ・受け取る人・送る時間・今日・状態・操作）。
  * 「CSVで書き出す」「運用者へのお知らせを作る」は板の頭の右（screen.tsx が置く）。書き出しの理由の窓はここが持つ。
  * 口・動き（公開・止める・自分にテスト・CSV の理由）は今の部品（app/line-notifications/operator-notification-rules.tsx）と同じ。
  */
@@ -80,7 +80,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   exportOpen: boolean
   onExportClose: () => void
 }) {
-  // 上の帯の最後はタブ名ではなく画面名「LINE通知」（絵 u8xibp）。題は左メニューの名前に任せる。
+  // 上の帯の最後はタブ名ではなく画面名「LINE通知」。題は左メニューの名前に任せる。
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [rules, setRules] = useState<OperatorNotificationRule[]>([])
   const [summary, setSummary] = useState<OperatorNotificationSummary | null>(null)
@@ -148,7 +148,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   const closeExport = () => { if (busy === 'csv') return; setExportError(''); setExportReasonError(''); onExportClose() }
   const exportCsv = async () => {
     if (!lineAccountId || busy) return
-    if ((b244Requirements.exportReason.check(exportReason) !== null)) {
+    if ((FIELD_REQUIREMENTS.exportReason.check(exportReason) !== null)) {
       setExportReasonError('書き出す理由を入れてください。')
       exportReasonRef.current?.focus()
       exportReasonRef.current?.scrollIntoView?.({ block: 'center' })
@@ -261,7 +261,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
       onConfirm={() => exportCsv()}
       onCancel={closeExport}
     >
-      <Field htmlFor="operator-export-reason" label="書き出す理由" error={exportReasonError} requirement={b244Requirements.exportReason}><SaveErrorField names={["exportReason","exportReasonError","export_reason","export_reason_error"]}><TextField ref={exportReasonRef} id="operator-export-reason" value={exportReason} onChange={(event) => { setExportReasonError(''); setExportReason(event.target.value) }} placeholder="例：月次の運用確認" autoFocus /></SaveErrorField></Field>
+      <Field htmlFor="operator-export-reason" label="書き出す理由" error={exportReasonError} requirement={FIELD_REQUIREMENTS.exportReason}><SaveErrorField names={["exportReason","exportReasonError","export_reason","export_reason_error"]}><TextField ref={exportReasonRef} id="operator-export-reason" value={exportReason} onChange={(event) => { setExportReasonError(''); setExportReason(event.target.value) }} placeholder="例：月次の運用確認" autoFocus /></SaveErrorField></Field>
     </ConfirmDialog>
   </>
 }

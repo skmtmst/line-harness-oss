@@ -17,15 +17,14 @@ const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> 
   line: { name: 'LINE（musubo の予約）', sub: '予約ページ・リッチメニュー', how: 'そのまま予約管理へ' },
   manual: { name: '電話・店頭', sub: 'スタッフが入れる', how: '予約管理で手入力' },
   hot_pepper_beauty: { name: 'Hot Pepper Beauty', sub: '予約サイト', how: 'Google に書き出し / メールを読む' },
-  google_reserve: { name: 'Google で予約', sub: 'Google ビジネス プロフィール', how: '予約通知メールを読む' },
   epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む' },
 }
 /*
- * 外の予約サイト（Hot Pepper・Google・EPARK）の行末の「…」（絵 ZyDd6・行末の決まり B-253）。
+ * 外の予約サイト（Hot Pepper・EPARK）の行末の「…」（絵の行末の決まり ）。
  * 連携を始める・止める口はまだ無い（Codex 待ち）ので、今ある行き先だけを出す：
  * 入った予約を見る（予約管理）と、Google カレンダー経由の媒体はスタッフのカレンダーの段へ。
  */
-const OUTSIDE_CHANNELS = new Set(['hot_pepper_beauty', 'google_reserve', 'epark'])
+const OUTSIDE_CHANNELS = new Set(['hot_pepper_beauty', 'epark'])
 function outsideChannelMenu(key: string): ActionMenuItem[] {
   return [
     { id: 'bookings', label: '予約管理で見る', href: '/booking/bookings' },
@@ -76,7 +75,7 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
       <p data-card-footer className={ch.cardDesc}>どこから入った予約も「予約管理」に集めます。入り口ごとの受け取り方と、今日の件数です。</p>
       <DataTable aria-label="予約経路" columnSizing="content" columnLayout={TABLE_LAYOUT}>
         <thead><TableHeadRow data-table-layout="columns"><Th grow truncate>予約経路</Th><Th collapseAt="narrow" truncate>受け取り方</Th><Th truncate>状態</Th><Th align="right" truncate>今日</Th><Th collapseAt="narrow" truncate>最後に届いた</Th><Th showActionLabel>操作</Th></TableHeadRow></thead>
-        <tbody>{data.channels.map(channel => {
+        <tbody>{data.channels.filter(channel => channel.key !== 'google_reserve').map(channel => {
           const label = CHANNEL_LABEL[channel.key] ?? { name: channel.key, sub: '', how: '' }
           return <Tr key={channel.key} data-table-layout="columns">
             <Td grow title={`受け取り方：${label.how || emptyValue('unknown')}`}><span className={ch.nameCell}><OneLine text={label.name} tone="name" />{label.sub ? <OneLine text={label.sub} tone="sub" /> : null}</span></Td>

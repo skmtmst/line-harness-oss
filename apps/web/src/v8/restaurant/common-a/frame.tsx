@@ -13,6 +13,7 @@ import {
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
+import TruncatedText from '@/components/shared/truncated-text'
 import Select from '@/components/shared/select'
 import styles from './frame.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
@@ -50,10 +51,10 @@ export function BoundaryBanner({ note = '予約媒体は受信専用・外部更
   return (
     <div className={styles.boundary}>
       <span className={styles.boundaryBadge}>検証環境専用</span>
-      <p className={styles.boundaryText}>既存の然-NEN運用とは分離された飲食店向けテスト領域です。</p>
+      <p className={styles.boundaryText}><TruncatedText value="既存の然-NEN運用とは分離された飲食店向けテスト領域です。" /></p>
       <span className={styles.boundarySpacer} aria-hidden="true" />
       <span className={styles.boundaryDot} aria-hidden="true" />
-      <span className={styles.boundaryNote}>{note}</span>
+      <span className={styles.boundaryNote}><TruncatedText value={note} /></span>
     </div>
   )
 }
@@ -144,9 +145,9 @@ export default function RestaurantFrame({
   bodyPadTop?: number
   /** 中身の段の間を絵の値にする。渡さないときは共通の 16 のまま。 */
   bodyGap?: number
-  /** 店舗を選ぶ形。既定はタブ。`'select'` は絵の「店舗：〇〇 ▾」の選ぶ欄（幅210・融合の板 n9vvGx）。 */
+  /** 店舗を選ぶ形。既定はタブ。`'select'` は絵の「店舗：〇〇 ▾」の選ぶ欄（幅210・融合の板 ）。 */
   pickerAs?: 'tabs' | 'select'
-  /** 検証環境の帯を出すか。融合の板（n9vvGx）は帯を描かないので false。 */
+  /** 検証環境の帯を出すか。融合の板は帯を描かないので false。 */
   banner?: boolean
   /** 題の下の1行。選んでいる店舗から作る。 */
   subtitle?: (store: RestaurantStore | null) => ReactNode

@@ -51,7 +51,7 @@ describe('ログインユーザーの軽修正(#581)', () => {
     // 操作権限は定数参照で分類表に載せる（魔法文字列を増やさない）。
     expect(groupBlock, '操作権限が分類表に無い').toContain('CONVERSION_APPROVAL_EDIT_KEY')
     expect(PERMISSION_LABELS['conversion.approval.edit'], '操作権限の表示名が正本に無い').toBe('成果を承認・却下する')
-    // 一斉配信の操作キー（v6-06 §6・P0-8）。
+    // 一斉配信の操作キー（管理画面-06 §6・P0-8）。
     expect(PERMISSION_LABELS['broadcast.definition.edit']).toBe('一斉配信の下書き作成・編集')
     expect(PERMISSION_LABELS['broadcast.test.send']).toBe('一斉配信のテスト送信')
     expect(PERMISSION_LABELS['broadcast.definition.publish']).toBe('一斉配信の予約・送信')

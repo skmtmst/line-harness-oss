@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { friendAttributes } from './friend-attributes.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /*
  * V6R-S2-c: 隣り合う2つのフォルダの並びを1回で入れ替える。

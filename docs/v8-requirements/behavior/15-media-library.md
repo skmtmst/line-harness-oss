@@ -1,3 +1,5 @@
+> 文書：15 登録メディア 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 15 登録メディア 操作と挙動（受け入れ）
 
 - 正本の要件：[v6-15 登録メディア](../../v6-requirements/v6-15-media-library-requirements-draft.md)。共通の動き・権限は [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限・§6-2 再試行・§7 Media契約・§7-1 危険なファイルの検査・§11 応答・§15 進みとトースト）と [30 ログインユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。

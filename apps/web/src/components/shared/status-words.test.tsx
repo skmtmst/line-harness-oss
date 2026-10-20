@@ -10,7 +10,7 @@ afterEach(async () => {
   await act(async () => cleanup())
 })
 
-describe('B-158 status words', () => {
+describe('status words', () => {
   it('keeps the approved state vocabulary in one shared table', () => {
     expect(STATUS_WORDS).toEqual({
       sending: ['下書き', '予約中', '送信済み'],

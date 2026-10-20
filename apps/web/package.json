@@ -6,8 +6,6 @@
     "dev": "next dev --port 3001",
     "predev": "node scripts/build-release-log.mjs",
     "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
-    "update:raw-color-baseline": "node ./scripts/raw-color-baseline.mjs",
-    "update:direct-values-baseline": "node ./scripts/direct-values-baseline.mjs",
     "build": "next build",
     "postbuild": "node ../../scripts/security/externalize-bootstrap.mjs out",
     "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
@@ -16,9 +14,8 @@
     "release-log": "node scripts/build-release-log.mjs",
     "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "test": "vitest run --config vitest.config.ts",
-    "verify:design": "node scripts/verify-b244.mjs && node scripts/verify-v8-rule-values.mjs && node scripts/verify-design-values.mjs",
+    "verify:design": "node scripts/verify-b244.mjs",
     "design:debt:check": "node scripts/design-debt.mjs",
-    "design:debt:update": "node scripts/design-debt.mjs --update",
     "design:impact": "node scripts/design-impact.mjs"
   },
   "dependencies": {
@@ -36,13 +33,13 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "25.5.0",
+    "@types/node": "22.19.15",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "happy-dom": "^20.14.0",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.9.3"
   }
 }

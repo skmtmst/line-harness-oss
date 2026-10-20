@@ -15,9 +15,9 @@ const css = (src('index.css') + src('components', 'ui', 'liff-skin.css'));
 describe('押す手応え (0.96・80ms・離すとばね160ms)', () => {
   it('ボタン・選ぶ行・日時の枠が共通の押しを通す', () => {
     expect(src('components', 'ui', 'Button.tsx')).toContain('liff-press');
-    expect(src('components', 'MenuList.tsx')).toContain('<Button variant="option"');
-    expect(src('components', 'StaffList.tsx')).toContain('<Button variant="option"');
-    expect(src('components', 'DateTimePicker.tsx')).toContain('<Button variant="time"');
+    expect(src('components', 'menu-list.tsx')).toContain('<Button variant="option"');
+    expect(src('components', 'staff-list.tsx')).toContain('<Button variant="option"');
+    expect(src('components', 'date-time-picker.tsx')).toContain('<Button variant="time"');
   });
 
   it('押しの値は指示どおり (80ms・0.96・ばね160ms)', () => {
@@ -39,7 +39,7 @@ describe('読み込みの光 (1.2s・0.3秒以内は出さない)', () => {
 
 describe('手順の移り変わり (右から24px＋薄く・240ms)', () => {
   it('段が替わるたび中身だけ移り変わる', () => {
-    const booking = src('pages', 'Booking.tsx');
+    const booking = src('pages', 'booking.tsx');
     expect(booking).toContain('key={step}');
     expect(booking).toContain('liff-step');
     expect(css).toContain('translateX(24px)');

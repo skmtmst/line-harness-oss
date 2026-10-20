@@ -7,16 +7,23 @@
  * 急ぎ度の判定はWorker側だけで行い、ここには結果と理由の文しか来ない（仕組みの名前は出さない）。
  */
 
-import { Banknote, Clock, ShoppingBag, Timer, Zap, type LucideIcon } from 'lucide-react'
+import { Banknote, Clock, History, ShoppingBag, Timer, Zap, type LucideIcon } from 'lucide-react'
 import { useState } from 'react'
+import BulkBar from '@/components/shared/bulk-bar'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
+import Pagination from '@/components/shared/pagination'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import { RowMenu } from '@/components/shared/row-actions'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
+import { ActionCell, DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
 import { Tabs, type TabItem } from '@/components/shared/tabs'
+import TruncatedText from '@/components/shared/truncated-text'
 import {
   DELIVERY_SERVICE_LABELS,
   type DeliveryConnectionStatus,
@@ -41,9 +48,9 @@ import {
 import styles from './delivery.module.css'
 
 const CONNECTION_LABELS: Record<DeliveryConnectionStatus, string> = {
-  connected: '接続中',
+  connected: '接続済み',
   disconnected: '未接続',
-  error: '接続エラー',
+  error: '接続の異常',
 }
 
 const CONNECTION_TONES: Record<DeliveryConnectionStatus, StatusBadgeTone> = {
@@ -96,13 +103,13 @@ const URGENCY_ICONS: Record<DeliveryUrgency, LucideIcon | null> = {
  * 札そのものは共通の `StatusBadge` が描く。ここは急ぎ度ごとの色と印を
  * 決めて渡すだけの差し込みで、札を自作しているわけではない。2つの画面で
  * 同じ形にするため置き場所は1つに保ち、見張りの「状態の札を自作」と
- * 読み違えない名前にしている（B-172）。
+ * 読み違えない名前にしている。
  */
 export function UrgencyMark({ urgency }: { urgency: DeliveryUrgency }) {
   const Icon = URGENCY_ICONS[urgency]
   return (
     <StatusBadge tone={URGENCY_TONES[urgency]} size="delivery" dot={false}>
-      {Icon ? <Icon size={12} aria-hidden="true" /> : null}
+      {Icon ? <Icon size={16} aria-hidden="true" /> : null}
       {urgencyLabel(urgency)}
     </StatusBadge>
   )
@@ -159,82 +166,82 @@ function ServiceCard({
   busy,
   onStop,
   onResume,
+  uberConnectionStatus,
 }: {
   state: DeliveryServiceState
+  uberConnectionStatus: DeliveryConnectionStatus | null
   canManage: boolean
   busy: boolean
   onStop: (service: DeliveryService) => void
   onResume: (service: DeliveryService) => void
 }) {
   const label = state.label || DELIVERY_SERVICE_LABELS[state.service]
+  const preparing = state.service === 'ubereats'
+  const connectionStatus = preparing ? uberConnectionStatus : state.connectionStatus
   const stopped = state.intakeStatus === 'stopped'
   /* 絵（kDQHr）の札は1行。いつまで止めているかは札の説明に入れ、行を増やさない。 */
   const stopNote = stopped && state.stopUntil ? `${formatClock(state.stopUntil)} まで停止` : undefined
   /* 数は推測しない。取れないときは「—」で、単位も出さない（D021/D024）。 */
   const hasCount = typeof state.todayCount === 'number' && Number.isFinite(state.todayCount)
   return (
-    <div className={styles.serviceCard}>
-      <span className={styles.serviceMark} aria-hidden="true">
-        {SERVICE_MARKS[state.service]}
-      </span>
-      <div className={styles.serviceMid}>
+    <Card appearance="outlined" layout="vertical" gap="tight" className={styles.serviceCard} aria-label={label}>
+      {/* 1段目：印・名前・操作。2段目：札・数。狭い幅でも札と数が重ならないよう、2段に分ける。 */}
+      <div className={styles.serviceTop}>
+        <span className={styles.serviceMark} aria-hidden="true">
+          {SERVICE_MARKS[state.service]}
+        </span>
         <span className={styles.serviceName}>{label}</span>
+        <span className={styles.spacer} />
+        {canManage ? (
+          stopped ? (
+            <Button
+              size="compact"
+              textTone="accent"
+              disabled={preparing}
+              title={preparing ? PREPARING_WORD : undefined}
+              busy={busy}
+              busyLabel=""
+              doneLabel=""
+              aria-label={`${label}の受付を再開`}
+              onClick={() => onResume(state.service)}
+            >
+              再開
+            </Button>
+          ) : (
+            <Button
+              size="compact"
+              textTone="danger"
+              disabled={preparing}
+              title={preparing ? PREPARING_WORD : undefined}
+              aria-label={`${label}の受付を止める`}
+              onClick={() => onStop(state.service)}
+            >
+              止める
+            </Button>
+          )
+        ) : null}
+      </div>
+      <div className={styles.serviceBottom}>
         <span className={styles.serviceBadges}>
-          <StatusBadge tone={CONNECTION_TONES[state.connectionStatus]} size="delivery">
-            {CONNECTION_LABELS[state.connectionStatus]}
+          <StatusBadge tone={connectionStatus ? CONNECTION_TONES[connectionStatus] : 'neutral'} size="delivery">
+            {connectionStatus ? CONNECTION_LABELS[connectionStatus] : '接続未確認'}
           </StatusBadge>
-          <span title={stopNote}>
-            <StatusBadge tone={INTAKE_TONES[state.intakeStatus]} size="delivery">
-              {INTAKE_LABELS[state.intakeStatus]}
+          <span title={preparing ? undefined : stopNote}>
+            <StatusBadge tone={preparing ? 'neutral' : INTAKE_TONES[state.intakeStatus]} size="delivery">
+              {preparing ? PREPARING_WORD : INTAKE_LABELS[state.intakeStatus]}
             </StatusBadge>
           </span>
         </span>
+        <span className={styles.spacer} />
+        <div className={styles.serviceStat}>
+          <span className={styles.serviceCount}>
+            {hasCount ? state.todayCount : DASH}
+            {hasCount ? <span className={styles.serviceCountUnit}>件</span> : null}
+          </span>
+          <span className={styles.serviceCaption}>本日の注文</span>
+        </div>
       </div>
-      <span className={styles.spacer} />
-      <div className={styles.serviceStat}>
-        <span className={styles.serviceCount}>
-          {hasCount ? state.todayCount : DASH}
-          {hasCount ? <span className={styles.serviceCountUnit}>件</span> : null}
-        </span>
-        <span className={styles.serviceCaption}>本日の注文</span>
-      </div>
-      {canManage ? (
-        stopped ? (
-          /*
-           * 絵（kDQHr `zFulL`）の「再開」は字2つぶんの小さな札（44px）。
-           * 共通のボタンは押している間に幅が動かないよう、「押している間の文字＋
-           * 回る印（21px）」と「終わったときの文字＋21px」も先に測って幅に留める。
-           * 既定のままだと「保存しました」（6字）で測られて106pxまで広がり、
-           * 左の札（接続中・停止中）の居場所を奪って「本日の注文」が2行目へ回る。
-           * この札には回る印と文字を並べる幅が無いので、文字を空にして回る印だけを
-           * 出す。読み上げは `aria-label` と `aria-busy` が伝える（共通部品は他の
-           * 画面でも使うので触らない）。
-           */
-          <Button
-            size="delivery-row"
-            textTone="accent"
-            className={styles.svcAction}
-            busy={busy}
-            busyLabel=""
-            doneLabel=""
-            aria-label={`${label}の受付を再開`}
-            onClick={() => onResume(state.service)}
-          >
-            再開
-          </Button>
-        ) : (
-          <Button
-            size="delivery-row"
-            textTone="danger"
-            className={styles.svcAction}
-            aria-label={`${label}の受付を停止`}
-            onClick={() => onStop(state.service)}
-          >
-            停止
-          </Button>
-        )
-      ) : null}
-    </div>
+    </Card>
   )
 }
 
@@ -265,8 +272,12 @@ function OrderRow({
   onReject: (order: DeliveryOrderSummary) => void
   onReady: (order: DeliveryOrderSummary) => void
 }) {
+  const preparing = order.service === 'ubereats'
+  const [menuOpen, setMenuOpen] = useState(false)
+  /* 行の右端：主な操作は1つだけボタン、残りは「…」（共通の ActionCell。オーナー決定 ）。 */
+  const openItem = { id: 'open', label: '詳細を見る', onSelect: () => onOpen(order.id) }
   return (
-    <Tr density="comfortable">
+    <Tr data-table-layout="columns">
       {/* 閲覧のみの人には「選ぶ」を押せない形で置かずに列ごと出さない（★V8 2026-10-06）。 */}
       {canManage ? (
         <Td>
@@ -290,25 +301,23 @@ function OrderRow({
         </Button>
       </Td>
       <Td>
-        {/* 絵のサービス札（kDQHr `jrPce` ほか）は点なしの丸い札。状態札とは違い点を出さない。 */}
+        {/* サービス札（kDQHr `jrPce` ほか）は点なしの丸い札。状態札とは違い点を出さない。 */}
         <StatusBadge tone={SERVICE_TONES[order.service]} size="compact" dot={false}>
           {order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]}
         </StatusBadge>
       </Td>
-      <Td>
-        <span className={styles.items} title={order.itemSummary}>
-          {order.itemSummary || DASH}
-        </span>
+      <Td grow>
+        <TruncatedText value={order.itemSummary || DASH} />
       </Td>
-      {/* 絵（kDQHr）の「金額」「経過」は中身も列の左端から始まる（`セル 金額`/`セル 経過`）。 */}
-      <Td>
+      <Td align="right" data-list-number>
         <span className={styles.amount}>{formatYen(order.totalAmount)}</span>
       </Td>
-      <Td>
+      {/* 経過は狭い幅（白い板が 1100 未満）では畳む。急ぎ度の札が同じ知らせを持つ。 */}
+      <Td data-list-number collapseAt="narrow">
         <span className={styles.elapsed}>{formatElapsed(order.receivedAt, nowMs)}</span>
       </Td>
       <Td>
-        {/* 絵（kDQHr）の一覧は印だけ。理由の文は幅を押し広げるので注文の詳細（hjdqV）で出す。 */}
+        {/* 一覧は印だけ。理由の文は幅を押し広げるので注文の詳細（hjdqV）で出す。 */}
         <span className={styles.urgencyCell} title={order.urgencyReason || undefined}>
           <UrgencyMark urgency={order.urgency} />
         </span>
@@ -318,27 +327,16 @@ function OrderRow({
           {order.statusLabel || DASH}
         </StatusBadge>
       </Td>
-      <Td>
+      <ActionCell>
         <span className={styles.rowActions}>
           {order.status === 'new' && canManage ? (
             <>
-              {/*
-                * 絵（kDQHr `HYOW5`）の「受け付ける」は 字12・左右の余白10 で約80px。
-                * 共通のボタンは押している間に幅がぶれないよう、平常時の幅と
-                * 「押している間の文字＋回る印（21px）」と「終わったときの文字＋21px」の
-                * うち一番広いものを幅に留める。
-                * 終わったときの文字を書かないと既定の「保存しました」（6字）で測られ、
-                * 平常時よりずっと広がって絵からはみ出す。この行は受け付ける操作なので
-                * 「保存しました」は文言としても合わない。
-                * 押している間の文字も「受付中…」の4字ではなく点々を外した3字にして、
-                * 回る印を足しても平常時の幅に収まるようにする。一番広いのが平常時の
-                * 「受け付ける」になれば、留める幅は見た目に出ない
-                * （共通部品は他の画面も使うので触らない）。
-                */}
               <Button
                 variant="primary"
-                size="delivery-row"
+                size="compact"
                 busy={busy}
+                disabled={preparing}
+                title={preparing ? PREPARING_WORD : undefined}
                 busyLabel="受付中"
                 doneLabel="受付済"
                 aria-label={`注文${order.orderNumber}を受け付ける`}
@@ -346,95 +344,58 @@ function OrderRow({
               >
                 受け付ける
               </Button>
-              {/*
-                * 絵（kDQHr `AuCyJ`・`HKAi1`）の「拒否」は白地・灰の細枠で、字は #4a5565。
-                * 白地・細枠は既定（variant="secondary"）がそのまま絵と同じで、
-                * 字の色だけ共通ボタンの `textTone="quiet"` で渡す（画面CSSから上書きしない）。
-                */}
-              <Button
-                size="delivery-row"
-                textTone="quiet"
-                aria-label={`注文${order.orderNumber}を拒否`}
-                onClick={() => onReject(order)}
-              >
-                拒否
-              </Button>
+              <RowMenu
+                size="row"
+                label={`注文${order.orderNumber}のその他の操作`}
+                open={menuOpen}
+                onOpenChange={setMenuOpen}
+                items={[openItem, { id: 'reject', label: '断る', disabled: busy || preparing, onSelect: () => onReject(order) }]}
+              />
             </>
           ) : order.status === 'cooking' && canManage ? (
-            /*
-             * 絵（kDQHr `WvPd6`・`jEsnn`）の「準備完了」は白地・灰の細枠で、字だけが緑。
-             * 緑のべた塗り（variant="primary"）ではないので、既定の白い形のまま
-             * 字の色だけ共通ボタンの `textTone="accent"` で緑へ渡す（画面CSSから上書きしない）。
-             */
-            <Button
-              size="delivery-row"
-              textTone="accent"
-              busy={busy}
-              busyLabel="変更中"
-              doneLabel="準備済"
-              aria-label={`注文${order.orderNumber}を準備完了にする`}
-              onClick={() => onReady(order)}
-            >
-              準備完了
-            </Button>
+            <>
+              <Button
+                size="compact"
+                textTone="accent"
+                busy={busy}
+                disabled={preparing}
+                title={preparing ? PREPARING_WORD : undefined}
+                busyLabel="変更中"
+                doneLabel="準備済"
+                aria-label={`注文${order.orderNumber}を準備完了にする`}
+                onClick={() => onReady(order)}
+              >
+                準備完了にする
+              </Button>
+              <RowMenu
+                size="row"
+                label={`注文${order.orderNumber}のその他の操作`}
+                open={menuOpen}
+                onOpenChange={setMenuOpen}
+                items={[openItem]}
+              />
+            </>
           ) : (
-            /*
-             * 絵（kDQHr `SdVq6`）の「詳細」は枠も地色も無い青い字だけ。
-             * 共通の `variant="text" size="inline"` が v8 で 字12・太字600・枠なし・
-             * 色 #0b63ce になり、絵とそのまま同じ（注文履歴の注文番号と同じ使い方）。
-             */
-            <Button
-              variant="text"
-              size="inline"
-              aria-label={`注文${order.orderNumber}を開く`}
-              onClick={() => onOpen(order.id)}
-            >
-              詳細
-            </Button>
+            <RowMenu
+              size="row"
+              label={`注文${order.orderNumber}のその他の操作`}
+              open={menuOpen}
+              onOpenChange={setMenuOpen}
+              items={[openItem]}
+            />
           )}
         </span>
-      </Td>
+      </ActionCell>
     </Tr>
-  )
-}
-
-/**
- * 数の帯の「…」（kDQHr）。この画面から行ける先だけを出す。
- * いまはどの数も「今日の数」なので、行き先は注文履歴・売上（OzHLO）の1つ。
- *
- * 数の札そのものは共通の `KpiCard` が描き、ここはその `menu` へ入れる
- * 共通の `RowMenu` だけを持つ。札を自作しているわけではないので、
- * 見張りの「自作の数の札」と読み違えない名前にしている（B-172）。
- */
-function OrderHistoryMenu({ title, onOpenHistory }: { title: string; onOpenHistory: () => void }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <span className={styles.kpiMenu}>
-      <RowMenu
-        appearance="plain"
-        className={styles.kpiMenuButton}
-        label={`${title}の操作`}
-        open={open}
-        onOpenChange={setOpen}
-        items={[
-          {
-            id: 'history',
-            label: '注文履歴・売上を開く',
-            onSelect: () => {
-              setOpen(false)
-              onOpenHistory()
-            },
-          },
-        ]}
-      />
-    </span>
   )
 }
 
 export interface OrdersBoardProps {
   data: DeliveryOrdersData
-  /** いま表から見せている件数（「さらに表示」で増える）。 */
-  shown: number
+  uberConnectionStatus: DeliveryConnectionStatus | null
+  /** 見せているページ（1から）と1ページの件数（10・20・50）。 */
+  page: number
+  perPage: number
   /** 送信中の注文（二重送信を防ぐため、その行のボタンだけ回す）。 */
   busyOrderId: string | null
   /** 受付の再開を送っているサービス。 */
@@ -450,7 +411,7 @@ export interface OrdersBoardProps {
   /** 選んだ新着注文をまとめて受け付ける。 */
   onBulkAccept: () => void
   onTab: (tab: DeliveryOrderTab) => void
-  /** 数の帯の「…」から注文履歴・売上（OzHLO）へ移る。 */
+  /** 数の帯の「…」をやめた行き先。注文履歴・売上（OzHLO）へは道具の段のボタンから行く。 */
   onOpenHistory: () => void
   onOpenOrder: (id: string) => void
   onAccept: (order: DeliveryOrderSummary) => void
@@ -458,12 +419,15 @@ export interface OrdersBoardProps {
   onReady: (order: DeliveryOrderSummary) => void
   onStopService: (service: DeliveryService) => void
   onResumeService: (service: DeliveryService) => void
-  onShowMore: () => void
+  onPage: (page: number) => void
+  onPerPage: (perPage: number) => void
 }
 
 export default function OrdersBoard({
   data,
-  shown,
+  uberConnectionStatus,
+  page,
+  perPage,
   busyOrderId,
   busyService,
   canManage,
@@ -481,17 +445,21 @@ export default function OrdersBoard({
   onReady,
   onStopService,
   onResumeService,
-  onShowMore,
+  onPage,
+  onPerPage,
 }: OrdersBoardProps) {
   const kpis = data.kpis
   const total = data.tabCounts[data.tab]
-  const visible = data.orders.slice(0, shown)
+  const pageCount = Math.max(1, Math.ceil(data.orders.length / perPage))
+  const currentPage = Math.min(page, pageCount)
+  const firstIndex = (currentPage - 1) * perPage
+  const visible = data.orders.slice(firstIndex, firstIndex + perPage)
   /*
    * 「まとめて受け付ける」は新着だけを相手にする。
    * まとめ送りの口はWorkerに無いので、親が1件ずつ順に送る（絵の操作は変えない）。
    */
   const selectedSet = new Set(selected)
-  const selectableIds = visible.filter((order) => order.status === 'new').map((order) => order.id)
+  const selectableIds = visible.filter((order) => order.status === 'new' && order.service !== 'ubereats').map((order) => order.id)
   const checkedCount = selectableIds.filter((id) => selectedSet.has(id)).length
   const allChecked = selectableIds.length > 0 && checkedCount === selectableIds.length
   const someChecked = checkedCount > 0 && !allChecked
@@ -511,6 +479,7 @@ export default function OrdersBoard({
           <ServiceCard
             key={state.service}
             state={state}
+            uberConnectionStatus={uberConnectionStatus}
             canManage={canManage}
             busy={busyService === state.service}
             onStop={onStopService}
@@ -519,138 +488,124 @@ export default function OrdersBoard({
         ))}
       </div>
 
-      <KpiBand gridClassName="">
+      <KpiBand>
         <KpiCard
           presentation="cell"
           title="本日の注文"
-          icon={<ShoppingBag size={13} />}
+          icon={<ShoppingBag size={16} />}
           value={kpis.todayCount}
           unit="件"
           delta={deltaMark(signedCount(kpis.todayCountDelta, '件'), 'success')}
           detail={`受け渡し済み ${countText(kpis.handedOverCount)}`}
-          menu={<OrderHistoryMenu title="本日の注文" onOpenHistory={onOpenHistory} />}
         />
         <KpiCard
           presentation="cell"
           title="本日の売上"
-          icon={<Banknote size={13} />}
+          icon={<Banknote size={16} />}
           value={kpis.todaySales}
           unit=""
           valueText={formatYen(kpis.todaySales)}
           delta={deltaMark(signedPercent(kpis.todaySalesDeltaPercent), 'success')}
           detail={`平均単価 ${formatYen(kpis.averageAmount)}`}
-          menu={<OrderHistoryMenu title="本日の売上" onOpenHistory={onOpenHistory} />}
         />
         <KpiCard
           presentation="cell"
           title="急ぎ対応"
-          icon={<Zap size={13} />}
+          icon={<Zap size={16} />}
           value={kpis.urgentCount}
           unit="件"
           delta={deltaMark(kpis.urgentCount > 0 ? '要対応' : undefined, 'danger')}
           detail="待ち時間と注文内容から自動判定"
-          menu={<OrderHistoryMenu title="急ぎ対応" onOpenHistory={onOpenHistory} />}
         />
         <KpiCard
           presentation="cell"
           title="平均準備時間"
-          icon={<Timer size={13} />}
+          icon={<Timer size={16} />}
           value={kpis.averagePrepMinutes}
           unit="分"
           delta={deltaMark(signedCount(kpis.averagePrepMinutesDelta, '分'), 'success')}
           detail="目標 15分以内"
-          menu={<OrderHistoryMenu title="平均準備時間" onOpenHistory={onOpenHistory} />}
         />
       </KpiBand>
 
-      {/*
-        * 絵（kDQHr）の並びは サービス3枚 → 数の帯 → タブ → 表。
-        * 絵ではタブと表がくっついている（間0）ので、器の段の間（この板では12）が
-        * 入らないように、タブ・選んだ数の帯・表をひとつの塊にまとめる。
-        */}
-      <div className={styles.tabTableGroup}>
-        <Tabs items={tabs} label="注文の状態" />
+      <Tabs items={tabs} label="注文の状態" />
 
-        {/* 閲覧のみの人は選べないので、選んだ数の帯もまとめての札も出さない。 */}
-        {canManage && checkedCount > 0 ? (
-          <div className={styles.selectBar}>
-            <span className={styles.selectCount}>選択中 {checkedCount}件</span>
-            <span className={styles.spacer} />
-            <Button
-              variant="primary"
-              size="delivery-bulk"
-              busy={bulkBusy}
-              busyLabel="受付中…"
-              disabled={bulkBusy}
-              onClick={onBulkAccept}
-            >
-              まとめて受け付ける
-            </Button>
-          </div>
-        ) : null}
-
-        <DataTable className={styles.table} data-design="kDQHr" presentation="delivery" label="デリバリーの注文一覧"><thead>
-          <TableHeadRow>
-            {canManage ? (
-              <Th className={styles.th}>
-                <Checkbox
-                  aria-label="新着の注文をすべて選ぶ"
-                  checked={allChecked}
-                  indeterminate={someChecked}
-                  disabled={selectableIds.length === 0 || bulkBusy}
-                  onCheckedChange={onToggleSelectAll}
-                />
-              </Th>
-            ) : null}
-            <Th className={styles.th}>注文番号</Th>
-            <Th className={styles.th}>サービス</Th>
-            <Th className={styles.th}>注文内容</Th>
-            {/* 絵（kDQHr）の見出しは9つとも列の左端から書き出す（`列 金額`/`列 経過`/`列 操作`）。 */}
-            <Th className={styles.th}>金額</Th>
-            <Th className={styles.th}>経過</Th>
-            <Th className={styles.th}>急ぎ度</Th>
-            <Th className={styles.th}>状態</Th>
-            <Th className={styles.th}>操作</Th>
-          </TableHeadRow></thead><tbody>
-          {visible.length === 0 ? (
-            <TableStateRow
-              colSpan={canManage ? COLUMN_COUNT : COLUMN_COUNT_VIEW_ONLY}
-              kind="empty"
-              title="この状態の注文はありません"
-              description="新しい注文が届くと、ここに表示されます。"
-            />
-          ) : (
-            visible.map((order) => (
-              <OrderRow
-                key={order.id}
-                order={order}
-                nowMs={nowMs}
-                busy={busyOrderId === order.id || bulkBusy}
-                canManage={canManage}
-                checked={selectedSet.has(order.id)}
-                selectable={canManage && order.status === 'new'}
-                onToggleSelect={onToggleSelect}
-                onOpen={onOpenOrder}
-                onAccept={onAccept}
-                onReject={onReject}
-                onReady={onReady}
-              />
-            ))
-          )}
-        </tbody></DataTable>
-      </div>
-
-      <div className={styles.tableFoot}>
-        <p className={styles.muted}>
-          {countText(total)}中 1〜{visible.length}件を表示
-        </p>
-        <span className={styles.spacer} />
-        {visible.length < data.orders.length ? (
-          <Button size="compact" onClick={onShowMore}>
-            さらに表示
+      <ListToolbar
+        filters={(
+          <Button onClick={onOpenHistory}>
+            <History size={16} aria-hidden="true" />
+            注文履歴・売上
           </Button>
-        ) : null}
-      </div>
+        )}
+        trailing={<PageSizeSelect value={perPage} onChange={onPerPage} />}
+      />
+
+      <Card overflow="hidden"><DataTable density="reviews" columnSizing="content" data-design="kDQHr" label="デリバリーの注文一覧"><thead>
+        <TableHeadRow data-table-layout="columns">
+          {canManage ? (
+            <Th>
+              <Checkbox
+                aria-label="新着の注文をすべて選ぶ"
+                checked={allChecked}
+                indeterminate={someChecked}
+                disabled={selectableIds.length === 0 || bulkBusy}
+                onCheckedChange={onToggleSelectAll}
+              />
+            </Th>
+          ) : null}
+          <Th>注文番号</Th>
+          <Th>サービス</Th>
+          <Th grow>注文内容</Th>
+          <Th align="right">金額</Th>
+          <Th collapseAt="narrow">経過</Th>
+          <Th>急ぎ度</Th>
+          <Th>状態</Th>
+          <Th><span className="sr-only">操作</span></Th>
+        </TableHeadRow></thead><tbody>
+        {visible.length === 0 ? (
+          <TableStateRow
+            colSpan={canManage ? COLUMN_COUNT : COLUMN_COUNT_VIEW_ONLY}
+            kind="empty"
+            title="この状態の注文はありません"
+            description="新しい注文が届くと、ここに表示されます。"
+          />
+        ) : (
+          visible.map((order) => (
+            <OrderRow
+              key={order.id}
+              order={order}
+              nowMs={nowMs}
+              busy={busyOrderId === order.id || bulkBusy}
+              canManage={canManage}
+              checked={selectedSet.has(order.id)}
+              selectable={canManage && order.status === 'new' && order.service !== 'ubereats'}
+              onToggleSelect={onToggleSelect}
+              onOpen={onOpenOrder}
+              onAccept={onAccept}
+              onReject={onReject}
+              onReady={onReady}
+            />
+          ))
+        )}
+      </tbody></DataTable></Card>
+
+      {/* 閲覧のみの人は選べないので、まとめての帯は出さない。選んだ数の帯は共通の一括バー。 */}
+      {canManage ? (
+        <BulkBar count={checkedCount} unit="件">
+          <Button variant="primary" busy={bulkBusy} busyLabel="受付中…" disabled={bulkBusy} onClick={onBulkAccept}>
+            まとめて受け付ける
+          </Button>
+        </BulkBar>
+      ) : null}
+
+      {data.orders.length > 0 ? (
+        <Pagination
+          page={currentPage}
+          pageCount={pageCount}
+          onPageChange={onPage}
+          summary={`${countText(total)}中 ${firstIndex + 1}〜${firstIndex + visible.length}件を表示`}
+        />
+      ) : null}
     </>
   )
 }

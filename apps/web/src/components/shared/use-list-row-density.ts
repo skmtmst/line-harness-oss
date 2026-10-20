@@ -3,7 +3,7 @@
 import { useLayoutEffect, type RefObject } from 'react'
 import { listRowContentLines } from './list-row-density.mjs'
 
-/** B-254: the table owns density, including wrapping, loading and filtering. */
+/** : the table owns density, including wrapping, loading and filtering. */
 export function useListRowDensity(ref: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     const table = ref.current

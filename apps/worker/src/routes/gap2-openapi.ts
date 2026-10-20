@@ -1,4 +1,4 @@
-// B-349: API契約の第2弾。画面の呼び出し関数はapi-gap2.ts。
+// API契約の第2弾。画面の呼び出し関数はapi-gap2.ts。
 const responses={
  '200':{description:'成功。各操作のdataの形はdescriptionを参照。'},
  '201':{description:'作成済み。同じキーの再送は同じ結果。'},

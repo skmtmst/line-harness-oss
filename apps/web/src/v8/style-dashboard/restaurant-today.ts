@@ -1,10 +1,10 @@
 import { formatDate } from '@/lib/format'
 import type { StyleAlert, StyleKpi, StyleRow, StyleToday } from './model'
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { isWalkIn } from '../restaurant/front-desk/walk-in'
-import { sourceName } from '../restaurant/reservations/format'
-import { canMarkVisited, groupCloseTasks, openItems, reasonText, slotTitle, summarizeToday, visitState } from '../restaurant/dashboard/summarize'
-import type { StoreToday } from '../restaurant/dashboard/use-store-today'
+import { isWalkIn } from '@/v8/restaurant/front-desk/public/walk-in/index'
+import { sourceName } from '@/v8/restaurant/reservations/public/format/index'
+import { canMarkVisited, groupCloseTasks, openItems, reasonText, slotTitle, summarizeToday, visitState } from '@/v8/restaurant/dashboard/public/summarize/index'
+import type { StoreToday } from '@/v8/restaurant/dashboard/public/use-store-today/index'
 
 /*
  * 飲食の業種ダッシュボードの中身を、今ある飲食の口（今日の予約・卓・枠を閉じる知らせ）から組み立てる。

@@ -1,5 +1,8 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { loadStaffIdentity, useStaffRole, canManageRole } from '@/lib/staff-role'
 import { PageContent } from '@/components/templates/page-frame'
 import StatusBadge from '@/components/shared/status-badge'
 import { Paperclip, Send, X } from 'lucide-react'
@@ -30,13 +33,13 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 お問い合わせのやり取り（Pencil `OhguS`）。
+ * ★V8 お問い合わせのやり取り（Pencil ）。
  *
- * v7 の画面（app/hq/support/detail/page.tsx）と読み書きの口・失敗時の扱いは同じ。
+ * 管理画面 の画面（app/hq/support/detail/page.tsx）と読み書きの口・失敗時の扱いは同じ。
  * 見た目だけを絵どおりに一から組んだ：頭（題＝件名・説明＝受付番号・種類・店舗・送った日時）・
  * 左の「統括の設定」の列・状態の札・やり取りのカード（自分は右の緑、運営は左の灰）・
  * 続きを送るカード・右に送信者とこれまでの問い合わせ。
- * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（v7 と同じ）。
+ * 静的書き出しのため動的セグメントは使わず `?id=` で受ける（管理画面 と同じ）。
  */
 
 type Attachment = { name: string; mimeType: string; data: string; size: number; previewUrl: string }
@@ -48,7 +51,7 @@ function statusNote(status: HqSupportRequest['status'], hasEmail: boolean): stri
   return '解決済みです。続きを送ると、運営がもう一度確認します'
 }
 
-/** 送るボタンの横の一言（v7 の supportSendStatus を短くした絵の言葉）。 */
+/** 送るボタンの横の一言（管理画面 の supportSendStatus を短くした絵の言葉）。 */
 const SEND_NOTE = '送ると運営の対応は「対応中」に戻ります'
 
 function sentNotice(hasEmail: boolean): string {
@@ -83,6 +86,8 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const [loadError, setLoadError] = useState('')
   const [detailMissing, setDetailMissing] = useState(false)
   const [detailLoading, setDetailLoading] = useState(true)
+  const role = useStaffRole()
+  const canReply = canManageRole(role) || role === 'staff'
   const [me, setMe] = useState<StaffMember | null>(null)
   const [tenantName, setTenantName] = useState('')
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
@@ -126,7 +131,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
     if (id === undefined) return
     if (id) void load(id)
     // 送信者と履歴は id が無くても読む（U099：右の一覧から正しい件へ戻れるように）。
-    void Promise.allSettled([api.staff.me(), api.tenants.me(), api.hqSupport.list(), api.hqSupport.context()]).then(([meRes, tenantRes, listRes, contextRes]) => {
+    void Promise.allSettled([loadStaffIdentity(), api.tenants.me(), api.hqSupport.list(), api.hqSupport.context()]).then(([meRes, tenantRes, listRes, contextRes]) => {
       if (meRes.status === 'fulfilled' && meRes.value.success) setMe(meRes.value.data)
       if (tenantRes.status === 'fulfilled' && tenantRes.value.success) setTenantName(tenantRes.value.data.name)
       if (listRes.status === 'fulfilled' && listRes.value.success) setHistory(listRes.value.data)
@@ -159,6 +164,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const blocked = !body.trim() ? '本文を入力してください' : body.length > SUPPORT_BODY_MAX ? `本文は${SUPPORT_BODY_MAX}文字以内で入力してください` : ''
 
   const send = async () => {
+    if (!canReply) return
     if (!id || blocked || sending) return
     setSending(true)
     setError('')
@@ -172,7 +178,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
       setNotice(sentNotice(hasSenderEmail))
       await load(id)
     } catch (caught) {
-      setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:') ? caught.message : '送信できませんでした。もう一度お試しください。')
+      setError(describeApiFailure(caught, '送信', { scope: 'hq' }))
     } finally {
       setSending(false)
     }
@@ -181,7 +187,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   const ready = !idMissing && !detailLoading && id !== undefined && !detailMissing && !loadError && detail
   const accountName = detail?.lineAccountId ? accounts.find((a) => a.id === detail.lineAccountId)?.name ?? null : null
   const title = ready ? detail.subject : 'お問い合わせのやり取り'
-  // ★V8 パンくずは「ホーム › 統括の設定 › お問い合わせ › 番号」（絵 `V8-B/OhguS`）。番号が無い・読み込み中は「お問い合わせ」。
+  // ★V8 パンくずは「ホーム › 統括の設定 › お問い合わせ › 番号」。番号が無い・読み込み中は「お問い合わせ」。
   const ticketLabel = ready ? detail.ticketLabel ?? '' : ''
   usePageTitle(ticketLabel || 'お問い合わせ')
   usePageCrumbs(ticketLabel ? [{ label: '統括の設定', href: '/hq/settings' }, { label: 'お問い合わせ', href: '/hq/support' }] : [{ label: '統括の設定', href: '/hq/settings' }])
@@ -215,7 +221,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                 ))}
               </ol>
 
-              <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><SaveErrorField names={["body"]}><TextArea
+              {canReply ? <div className={styles.compose}><Field label="続きを送る" htmlFor={`${uid}-body`}><SaveErrorField names={["body"]}><TextArea
                   id={`${uid}-body`}
                   value={body}
                   onChange={(event) => { setBody(event.target.value); setNotice('') }}
@@ -257,7 +263,7 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
                   </Button>
                 </div>
 {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
-{error ? <Notice tone="danger" >{error}</Notice> : null}</Field></div>
+{error ? <Notice tone="danger" >{error}</Notice> : null}</Field></div> : <ReadOnlyNotice />}
             </>
           )}
         </div>

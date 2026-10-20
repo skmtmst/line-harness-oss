@@ -1,3 +1,5 @@
+import { checkMediaGate } from './file-scan.js';
+import { getPinnedMediaObject } from './media-upload-storage.js';
 import {requireAccountAi} from './account-ai-features.js';
 import {
   bannerReferencesFromRow,claimWorkflowStep,ensureWorkflowStep,failWorkflowStep,finishWorkflowStep,
@@ -5,7 +7,9 @@ import {
   countRecentFailedBannerGenerations,toJstString,releaseWorkflowStep,workflowFence,getWorkflowStep,
   type BannerGeneration,type WorkflowStepRef,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { resolveEntitlements } from './billing-plans.js';
 import { findBannerPreset } from './banner-prompt.js';
 import { resizeBannerToPreset,type BannerCropPosition } from './banner-resize.js';
@@ -100,8 +104,15 @@ async function processNextImage(env:Env['Bindings'],g:BannerGeneration,root:Work
           const references:OpenAIReferenceImage[]=[];
           for(const entry of bannerReferencesFromRow(g)){
             const image=await getBannerImageWithDetail(db,entry.imageId,g.tenant_id);
-            const object=image && !image.deleted_at ? await env.IMAGES.get(image.media.r2_key) : null;
-            if(!image || !object)throw new Error('banner_reference_missing');
+            if(!image || image.deleted_at)throw new Error('banner_reference_missing');
+            const gate=await checkMediaGate(db,env.IMAGES,{
+              id:image.media.id,lineAccountId:image.media.line_account_id,r2Key:image.media.r2_key,
+              filename:image.media.filename,mimeType:image.media.mime_type,sizeBytes:image.media.size_bytes,
+              width:image.media.width,height:image.media.height,
+            });
+            if(!gate.allowed)throw new Error('banner_reference_missing');
+            const object=await getPinnedMediaObject(env.IMAGES,image.media.r2_key,gate.etag);
+            if(!object)throw new Error('banner_reference_missing');
             references.push({bytes:new Uint8Array(await object.arrayBuffer()),mimeType:image.media.mime_type,filename:image.media.filename});
           }
           const latest=await getBannerGeneration(db,g.id,g.tenant_id);
@@ -152,7 +163,7 @@ async function processNextImage(env:Env['Bindings'],g:BannerGeneration,root:Work
       const references=bannerReferencesFromRow(g),edited=references.find(entry=>entry.mode==='edit'),now=toJstString(new Date());
       await finishWorkflowStep(db,slot,slotOwner,{result:{imageId,resized:shaped.resized},statements:[workflowFence(db,root,owner),
         db.prepare(`INSERT INTO media(id,line_account_id,kind,filename,mime_type,size_bytes,width,height,r2_key,uploaded_by,created_at)
-          VALUES(?,NULL,'image',?,?,?,?,?,?,?,?)`).bind(mediaId,`banner-${sequence}.jpg`,mimeType,shaped.bytes.byteLength,shaped.width ?? null,shaped.height ?? null,key,g.created_by,now),
+          VALUES(?,NULL,'image',?,?,?,?,?,?,?,?)`).bind(mediaId,`banner-${sequence}.${mimeType === 'image/png' ? 'png' : 'jpg'}`,mimeType,shaped.bytes.byteLength,shaped.width ?? null,shaped.height ?? null,key,g.created_by,now),
         db.prepare(`INSERT INTO media_versions(id,media_id,version_no,r2_key,mime_type,size_bytes,width,height,scan_status,scanned_at,uploaded_by,created_at,published_at)
           VALUES(?,?,1,?,?,?,?,?,'verified',?,?,?,?)`).bind(versionId,mediaId,key,mimeType,shaped.bytes.byteLength,shaped.width ?? null,shaped.height ?? null,now,g.created_by,now,now),
         db.prepare(`INSERT INTO banner_images(id,tenant_id,project_id,generation_id,media_id,sequence,source,parent_image_id,created_by,created_at)

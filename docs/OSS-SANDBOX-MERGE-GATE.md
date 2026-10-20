@@ -1,3 +1,5 @@
+> 文書：OSS Sandbox Merge Gate｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # OSS Sandbox Merge Gate
 
 OSS PR を merge する前に、利用者の本番環境を壊さないための運用ルールです。

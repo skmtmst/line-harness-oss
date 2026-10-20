@@ -1,3 +1,5 @@
+> 文書：ログインユーザーの動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # ログインユーザーの動き（BEHAVIOR.md）
 
 対象：`app/staff/page.tsx` は `staff.tsx` を常に出す。板 `nku0f`（管理者）・`A35Gh`（閲覧のみ）・`wbDHy`（1152）・`bMpC5`（止める）。
@@ -11,9 +13,9 @@
 - `?tab=members|invited|audit|roles`（`useMergedTab`。今と同じ名前・同じ意味）。
 
 ## 読み込み（API）
-- `api.staff.list()`・`api.staff.me()`・`api.lineAccounts.list()`・`api.access.users({ lineAccountId, limit: 200 })`・`api.access.roles()`。
+- `api.staff.list()`・`本人情報の共通読取（useStaffRole / loadStaffIdentity）`・`api.lineAccounts.list()`・`api.access.users({ lineAccountId, limit: 200 })`・`api.access.roles()`。
 - 入った記録タブだけ `api.audit.events`（CSV で書き出す）。
-- 役割は `api.staff.me()` の返事で決める（手元の保存値は使わない）。
+- 役割は `本人情報の共通読取（useStaffRole / loadStaffIdentity）` の返事で決める（手元の保存値は使わない）。
 
 ## 見せ方
 - 頭：題・説明・タブ（いまいる人・招待中・入った記録・権限のかたまり）。閲覧のみは頭の下に帯。

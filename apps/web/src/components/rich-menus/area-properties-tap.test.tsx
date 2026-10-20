@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * リッチメニューの面の「押したら」（共通の欄 TapActionField・YPzmo・B-129）。
+ * リッチメニューの面の「押したら」（共通の欄 TapActionField・YPzmo・）。
  * 6つは intent に戻して今の形で保存し、予約・予約履歴・来店スタンプは url の intent に LIFF の URL を入れる。
  * リッチメニューだけの種類（テンプレートを送る・電話・切り替えなど）は残す。
  */
@@ -9,7 +9,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AreaProperties, intentLabelOf } from './area-properties'
 import { isAreaActionConfigured } from './action-drafts'
-import type { Area } from './canvas-editor'
+import type { Area } from './area-types'
 import { HQ_RICH_MENU_INTENTS } from '@/lib/hq-rich-menu-create'
 
 afterEach(cleanup)

@@ -1,7 +1,7 @@
 'use client'
-import { markNameRequirement } from '@/v8/tags/mark-requirement'
+import { markNameRequirement } from '@/v8/tags/public/mark-requirement/index'
 
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FriendField, Folder, HqFriendAttributeDetail, HqFriendAttributeInput, HqFriendAttributeTemplate, HqFriendAttributeType, HqFriendAttributeListStats, HqTemplateFolder, HqMarkDefinition } from '@line-crm/shared'
@@ -22,11 +22,11 @@ import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import Checkbox from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import FieldsTab from '@/v8/tags/fields-tab'
-import MarksTab from '@/v8/tags/marks-tab'
-import FieldEditor, { type FieldEditorValues } from '@/v8/tags/field-editor'
-import MarkBasicFields from '@/v8/tags/mark-basic-fields'
-import type { AttributeListHost } from '@/v8/tags/attribute-host'
+import { FieldsTab } from '@/v8/tags/public/fields-tab/index'
+import { MarksTab } from '@/v8/tags/public/marks-tab/index'
+import { FieldEditor, type FieldEditorValues } from '@/v8/tags/public/field-editor/index'
+import { MarkBasicFields } from '@/v8/tags/public/mark-basic-fields/index'
+import type { AttributeListHost } from '@/v8/tags/public/attribute-host/index'
 import { AttributeTabs, type AttributeTabKey } from './attribute-tabs'
 import AttributeDistribution from './attribute-distribution'
 import { fieldOf, fieldDefinition, markOf } from './attribute-model'
@@ -41,7 +41,7 @@ type Attempt = { input: HqFriendAttributeInput; requestId: string; distribute: b
 type Entry = { row: HqFriendAttributeTemplate; detail: HqFriendAttributeDetail }
 const title = 'タグ'
 const description = 'タグ・友だち情報欄・対応マークのひな形を作り、各 LINE アカウントへ配ります。'
-const errorText = (cause: unknown) => (cause && typeof cause === 'object' && 'status' in cause && cause.status === 403 ? permissionDeniedMessage('hq') : cause instanceof Error && cause.message && !/^API error: /.test(cause.message) ? cause.message : '処理できませんでした。もう一度確認してください。')
+const errorText = (cause: unknown) => (cause && typeof cause === 'object' && 'status' in cause && cause.status === 403 ? permissionDeniedMessage('hq') : describeApiFailure(cause, '読み込み', { scope: 'hq' }))
 
 export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttributeType; tab: 'fields' | 'marks'; onTab: (tab: AttributeTabKey) => void }) {
   const saveErrors = useSaveFormErrors()
@@ -183,7 +183,7 @@ export default function HqAttributes({ type, tab, onTab }: { type: HqFriendAttri
   const fieldRows = entries.filter((entry): entry is Entry & { detail: Extract<HqFriendAttributeDetail, { template: { template_type: 'friend_field' } }> } => entry.detail.template.template_type === 'friend_field').map((entry) => fieldOf(entry.detail, entry.row.friend_count))
   const markRows = type === 'mark' ? entries.map((entry) => markOf(entry.detail, entry.row.friend_count)) : []
   /* 対応マーク：受信箱の対応状況（友だち人数）と、記録に残ったマーク変更は別の数（API 組5 の stats）。取れなければ「—」。 */
-  const markStats = stats as unknown as { supportStatus?: import('@/lib/api-feature-wait').HqMarkListStats['supportStatus']; markChanges?: import('@/lib/api-feature-wait').HqMarkListStats['markChanges'] } | null
+  const markStats = stats as unknown as { supportStatus?: import('@/lib/api/helpers/feature-wait').HqMarkListStats['supportStatus']; markChanges?: import('@/lib/api/helpers/feature-wait').HqMarkListStats['markChanges'] } | null
   const kpis = type === 'friend_field' ? [
     { title: '項目', icon: List, value: status === 'ready' ? stats?.totalTemplates ?? entries.length : null, unit: '件', detail: '使っている —' },
     { title: '入力済みの友だち', icon: Users, value: null, unit: '人', detail: '1つ以上入っている' },

@@ -1,7 +1,7 @@
 import type { MileageRuleRow } from '@line-crm/db';
 import { completeOutboundSendStatement, hashOutboundPayload, reserveOutboundSend } from '../services/outbound-idempotency.js';
 import { getMileageRuleById, ensureDefaultMileageProgram, jstNow } from '@line-crm/db';
-import type { MileageRuleCreateInput } from './scoring.js';
+import type { MileageRuleCreateInput } from './scoring-definition.js';
 
 
 export function serializeMileageRule(rule: MileageRuleRow) {

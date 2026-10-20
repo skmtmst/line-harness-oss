@@ -3,7 +3,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-const ROW = fs.readFileSync(path.join(__dirname, '../../app/users/users-v8.tsx'), 'utf8')
+const ROW = fs.readFileSync(new URL('../../app/users/users-screen.tsx', import.meta.url), 'utf8')
 
 /** 注釈を落とす。「なぜ消したか」を書いた文が、消したはずの字面に当たるのを避ける。 */
 function code(src: string): string {

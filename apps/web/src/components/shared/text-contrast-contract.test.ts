@@ -72,7 +72,7 @@ describe('LINE の緑は管理画面の文字色に使わない（LINEの写し�
       .filter((path) => {
         let css = readFileSync(path, 'utf8')
         // cfVyj は LINE アプリの写し。V8 の商品操作だけは正本のLINE緑を使う。
-        // 管理画面のボタン・リンクや、v7には例外を広げない。
+        // 管理画面のボタン・リンクや、管理画面には例外を広げない。
         if (path === join(SRC, 'components/shared/line-preview.module.css')) {
           css = css.replace(/:root \.productAction \{[^}]*\}/g, '')
         }

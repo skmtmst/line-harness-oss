@@ -1,3 +1,7 @@
+import { issueTrackedLinkIdentity, verifyTrackedLinkIdentity, resolveTrackedLinkAccountId, trackedLinkSigningAccount } from '../services/tracked-link-identity.js';
+import { tracedFetch } from '@line-crm/shared/server';
+import { escapeHtml, scriptString } from '../lib/html-escape.js';
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { extrasFromTrackedLink } from '../services/tap-extras.js';
@@ -12,10 +16,11 @@ import {
   deleteTrackedLink,
   getLinkClicks,
   getFriendByLineUserIdForAccount,
+  isLineAccountTenantActive,
 } from '@line-crm/db';
 import { getUrlReachConversionPoints } from '@line-crm/db';
-import type { TrackedLink } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { LineAccount, TrackedLink } from '@line-crm/db';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { isLinkPreviewBot } from '../lib/og-bot.js';
 import { buildOgHtml } from '../lib/og-html.js';
@@ -37,7 +42,8 @@ async function adminAccountScope(c: Context<Env>) {
 
 const requireVisibleTrackedLink: MiddlewareHandler<Env> = async (c, next) => {
   const link = await getTrackedLinkById(c.env.DB, c.req.param('id') ?? '');
-  if (!link || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [link.line_account_id])) {
+  const accountId = link ? await resolveTrackedLinkAccountId(c.env.DB, link) : undefined;
+  if (!link || accountId === undefined || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return c.json({ success: false, error: 'Tracked link not found' }, 404);
   }
   await next();
@@ -85,29 +91,16 @@ async function resolveApiLinkBase(c: { env: { DB: D1Database }; req: { url: stri
 async function resolveLinkAccount(
   db: D1Database,
   link: TrackedLink,
-): Promise<Record<string, unknown> | null> {
+): Promise<LineAccount | null> {
   const accountId = await resolveLinkAccountId(db, link);
   if (!accountId) return null;
   return db
     .prepare(`SELECT * FROM line_accounts WHERE id = ?`)
     .bind(accountId)
-    .first<Record<string, unknown>>();
+    .first<LineAccount>();
 }
 
-async function resolveLinkAccountId(
-  db: D1Database,
-  link: TrackedLink,
-): Promise<string | null> {
-  let accountId: string | null = link.line_account_id ?? null;
-  if (!accountId && link.scenario_id) {
-    const scRow = await db
-      .prepare(`SELECT line_account_id FROM scenarios WHERE id = ?`)
-      .bind(link.scenario_id)
-      .first<{ line_account_id: string | null }>();
-    accountId = scRow?.line_account_id ?? null;
-  }
-  return accountId;
-}
+const resolveLinkAccountId = resolveTrackedLinkAccountId;
 
 // GET /api/tracked-links — list all
 trackedLinks.get('/api/tracked-links', async (c) => {
@@ -128,7 +121,7 @@ trackedLinks.get('/api/tracked-links', async (c) => {
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: items.map((item) => serializeTrackedLink(item, base)) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"GET /api/tracked-links"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -156,7 +149,7 @@ trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) 
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"GET /api/tracked-links/:id"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -200,7 +193,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), inputJson
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: serializeTrackedLink(link, base) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"POST /api/tracked-links"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -234,7 +227,7 @@ trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requ
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: serializeTrackedLink(link, base) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"PATCH /api/tracked-links/:id"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -250,7 +243,7 @@ trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), req
     await deleteTrackedLink(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_tracked_links_failed","route":"DELETE /api/tracked-links/:id"}));
+    logger.error("routes_tracked_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -298,13 +291,16 @@ function getAndroidPackage(url: string): string | null {
 }
 
 function buildAppRedirectHtml(destinationUrl: string): string {
-  const escaped = destinationUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  destinationUrl = new URL(destinationUrl).href;
+  if (!/^https?:$/.test(new URL(destinationUrl).protocol)) throw new Error('unsafe_destination');
+  const escaped = escapeHtml(destinationUrl);
   const androidPackage = getAndroidPackage(destinationUrl);
   // intent://path#Intent;scheme=https;package=com.xxx;S.browser_fallback_url=https://...;end
   const intentUrl = androidPackage
     ? `intent://${destinationUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=${androidPackage};S.browser_fallback_url=${encodeURIComponent(destinationUrl)};end`
     : null;
-  const intentEscaped = intentUrl ? intentUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;') : '';
+  const destinationScript = scriptString(destinationUrl);
+  const intentScript = scriptString(intentUrl ?? '');
 
   return `<!DOCTYPE html>
 <html><head>
@@ -317,10 +313,10 @@ function buildAppRedirectHtml(destinationUrl: string): string {
 <script>
 (function(){
   var isAndroid = /Android/i.test(navigator.userAgent);
-  if(isAndroid && "${intentEscaped}"){
-    window.location.href="${intentEscaped}";
+  if(isAndroid && ${intentScript}){
+    window.location.href=${intentScript};
   } else {
-    window.location.href="${escaped}";
+    window.location.href=${destinationScript};
   }
 })();
 </script>
@@ -328,12 +324,41 @@ function buildAppRedirectHtml(destinationUrl: string): string {
 </body></html>`;
 }
 
+// 本人のID tokenを検証し、遷移先へ生のtokenやLINE IDを載せずに引き継ぐ。
+trackedLinks.post('/api/liff/tracked-link-identity', inputJsonBoundary({ linkId: ['string'], idToken: ['string'] }), async (c) => {
+  const { linkId, idToken } = await c.req.json<{ linkId: string; idToken: string }>();
+  if (!linkId || !idToken) return c.json({ success: false, error: 'Identity required' }, 401);
+  const link = await getTrackedLinkByIdOrShortCode(c.env.DB, linkId);
+  if (!link?.is_active) return c.json({ success: false, error: 'Link not found' }, 404);
+  const accountId = await resolveLinkAccountId(c.env.DB, link);
+  if (accountId === undefined) return c.json({ success: false, error: 'Link not found' }, 404);
+  const account = await trackedLinkSigningAccount(c.env.DB, accountId);
+  if (!account?.is_active || account.archived_at || !await isLineAccountTenantActive(c.env.DB, account.id)) {
+    return c.json({ success: false, error: 'Account unavailable' }, 503);
+  }
+  const channelId = account.login_channel_id || (accountId === null ? c.env.LINE_LOGIN_CHANNEL_ID : '');
+  if (!channelId) return c.json({ success: false, error: 'Identity unavailable' }, 401);
+  const response = await tracedFetch('https://api.line.me/oauth2/v2.1/verify', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ id_token: idToken, client_id: channelId }),
+  });
+  if (!response.ok) return c.json({ success: false, error: 'Invalid ID token' }, 401);
+  const identity = await response.json() as { sub?: unknown };
+  if (typeof identity.sub !== 'string' || !identity.sub) return c.json({ success: false, error: 'Invalid ID token' }, 401);
+  const friend = await getFriendByLineUserIdForAccount(c.env.DB, identity.sub, accountId);
+  const token = friend ? await issueTrackedLinkIdentity(c.env.DB, link, friend.id, 5 * 60) : null;
+  if (!token) return c.json({ success: false, error: 'Friend not found' }, 404);
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, data: { token } });
+});
+
 // GET /t/:linkId — click tracking redirect (no auth, fast redirect)
 // :linkId accepts both the legacy UUID and the 7-char short code.
 trackedLinks.get('/t/:linkId', async (c) => {
   const linkId = c.req.param('linkId');
-  const lineUserId = c.req.query('lu') ?? null;
-  let friendId = c.req.query('f') ?? null;
+  let friendId: string | null = null;
+  c.header('Referrer-Policy', 'no-referrer');
+  c.header('Cache-Control', 'no-store');
 
   // Look up the link first
   const link = await getTrackedLinkByIdOrShortCode(c.env.DB, linkId);
@@ -350,11 +375,13 @@ trackedLinks.get('/t/:linkId', async (c) => {
     // link.line_account_id 優先、無ければ scenario 経由でアカウントを解決する。
     // どちらも無いリンクは account=null（og:site_name='LINE' フォールバック）。
     const account = await resolveLinkAccount(c.env.DB, link);
-    const og = resolveOgForTrackedLink(link, account as any, canonical);
+    const og = resolveOgForTrackedLink(link, account, canonical);
     return c.html(buildOgHtml(og));
   }
 
   const useAppRedirect = isAppLinkDomain(link.original_url);
+  const identityToken = c.req.query('identity');
+  if (identityToken) friendId = await verifyTrackedLinkIdentity(c.env.DB, link, identityToken);
 
   // If no user ID yet, check if this is LINE's in-app browser → redirect to LIFF for identification
   // Skip LIFF redirect for app-link domains (they'll come from Safari via externalBrowser)
@@ -362,7 +389,7 @@ trackedLinks.get('/t/:linkId', async (c) => {
   // LIFF はリンクを所有するアカウントのものを使う。グローバル env.LIFF_URL 固定だと
   // 他アカウントの友だちに①の同意画面が出る（未同意チャネルの LIFF に飛ぶため）。
   const isLineApp = /\bLine\b/i.test(ua);
-  if (!useAppRedirect && !lineUserId && !friendId && isLineApp) {
+  if (!useAppRedirect && !friendId && identityToken === undefined && !c.req.query('lu') && !c.req.query('f') && isLineApp) {
     let liffBase: string | null = null;
     const account = await resolveLinkAccount(c.env.DB, link);
     const liffId = (account?.liff_id as string | null | undefined) ?? null;
@@ -375,26 +402,13 @@ trackedLinks.get('/t/:linkId', async (c) => {
     }
   }
 
-  // Resolve friendId from LINE user ID if provided
-  if (!friendId && lineUserId) {
-    const accountId = await resolveLinkAccountId(c.env.DB, link);
-    const friend = await getFriendByLineUserIdForAccount(
-      c.env.DB,
-      lineUserId,
-      accountId,
-    );
-    if (friend) {
-      friendId = friend.id;
-    }
-  }
-
   // Record the click and its fixed work plan before returning the redirect. Cron owns continuation.
-  const accountId=await resolveLinkAccountId(c.env.DB,link);
+  const accountId=(await resolveLinkAccountId(c.env.DB,link)) ?? null;
   const points=friendId ? await getUrlReachConversionPoints(c.env.DB,link.original_url,accountId) : [];
   const click=await recordTrackedClick(c.env.DB,{linkId:link.id,friendId,accountId,tagId:link.tag_id,scenarioId:link.scenario_id,
-    linkName:link.name,conversionPointIds:points.map(point=>point.id),tapExtras:extrasFromTrackedLink(link)});
+    linkName:link.name,identityVerified:friendId ? true : undefined,conversionPointIds:points.map(point=>point.id),tapExtras:extrasFromTrackedLink(link)});
   c.executionCtx.waitUntil(processTrackedClick(c.env,click.id,click.plan).catch(()=>{
-    console.error('tracked_click_work_pending');
+    logger.error("tracked_click_work_pending");
   }));
 
   // App-link domains: return HTML with JS redirect for Universal Link support

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { normalizeStoreInterpolations, isBroadcastAssetKind } from '@line-crm/shared';
 import {
   getFriendFieldMap,
@@ -5,6 +6,7 @@ import {
   resolveCommonVarValuesAt,
   type CommonVarResolutionFailureReason,
 } from '@line-crm/db';
+
 import { commonVarKeysInContent } from './common-var-snapshot.js';
 
 /**
@@ -131,7 +133,7 @@ export async function resolveSendCommonVars(
       )));
     } catch (ledgerError) {
       // 台帳の書き込み失敗で送信拒否自体を潰さない。拒否は必ず成立させる。
-      console.error(JSON.stringify({"code":"services_interpolation_context_failed"}));
+      logger.error("services_interpolation_context_failed");
     }
     throw new CommonVarResolutionFailedError(resolved.failures, source);
   }

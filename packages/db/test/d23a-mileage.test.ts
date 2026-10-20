@@ -19,12 +19,12 @@ import {
   getMileageHistoryForFriend,
   getMileageSummaryForFriend,
   postMileageAdjustment,
-} from '../src/mileage.js';
+} from '../src/mileage/index.js';
 import {
   getMileageFriendsV6,
   markMileageAdjustmentNotification,
   reserveMileageAdjustmentNotification,
-} from '../src/mileage-admin-v6.js';
+} from '../src/mileage/admin-operations.js';
 import { linkFriendToUser } from '../src/users.js';
 import { asD1 } from './d1-test-helper.js';
 

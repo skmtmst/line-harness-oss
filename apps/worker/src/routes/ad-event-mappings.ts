@@ -2,7 +2,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { listAdEventMappings,saveAdEventMapping,adMappingPointExists } from '@line-crm/db';
 import type { SaveAdEventMappingRequest } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 export const adEventMappings=new Hono<Env>();

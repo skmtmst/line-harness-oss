@@ -4,7 +4,7 @@ import { SaveConflictBand } from '@/components/shared/save-conflict';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Plus, RefreshCw } from 'lucide-react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { GitCompareArrows, TriangleAlert } from 'lucide-react';
+
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
@@ -76,7 +76,7 @@ export default function RankSettingsV8({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  /** 競合（e5yBLx）：読み込んだあとにほかの人が保存した形。latest はその時点で取り直した設定。 */
+  /** 競合：読み込んだあとにほかの人が保存した形。latest はその時点で取り直した設定。 */
   const [conflict, setConflict] = useState<{ latest: NenRankSettingsData } | null>(null)
   const [comparing, setComparing] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<number | null>(null)
@@ -190,7 +190,7 @@ export default function RankSettingsV8({
     } catch (caught) {
       if (activeAccount.current !== target) return
       const fieldFailure = saveErrors.capture(caught)
-      /* 保存の口が版の違いを 409 で返したときも、競合の帯へ（e5yBLx）。 */
+      /* 保存の口が版の違いを 409 で返したときも、競合の帯へ。 */
       if (caught instanceof ApiError && caught.status === 409) {
         await showConflict()
       } else {
@@ -204,7 +204,7 @@ export default function RankSettingsV8({
     }
   }
 
-  /** ごみ箱：保存前の行はその場で外す。保存済みの行は確かめてから消す（dEv6G）。 */
+  /** ごみ箱：保存前の行はその場で外す。保存済みの行は確かめてから消す。 */
   const askRemove = (index: number) => {
     const row = drafts[index]
     if (!row) return
@@ -293,7 +293,7 @@ export default function RankSettingsV8({
     }
   }
 
-  /* 競合の帯（e5yBLx）。保存した人の名前は API に無いので「ほかの人」と時刻で伝える。 */
+  /* 競合の帯。保存した人の名前は API に無いので「ほかの人」と時刻で伝える。 */
   const conflictAt = conflict?.latest.rules ? shortTime(conflict.latest.rules.updatedAt) : null
   useEffect(() => {
     onTopBand(conflict ? (
@@ -343,7 +343,7 @@ export default function RankSettingsV8({
           </div>
           {readonly ? null : (
             <div className={styles.syncAction}>
-              <Button variant="secondary" onClick={() => void resync()} disabled={busy || dirty} busy={Boolean(busy)} busyLabel="処理中…">
+              <Button variant="secondary" onClick={() => resync()} disabled={busy || dirty} busy={Boolean(busy)} busyLabel="処理中…">
                 <RefreshCw size={15} aria-hidden="true" />もう一度同期
               </Button>
             </div>

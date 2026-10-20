@@ -13,7 +13,7 @@ import CommonActionEditor from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import { isSaveConflict } from '@/components/shared/api-error-message'
+import { describeApiFailure, isSaveConflict } from '@/components/shared/api-error-message'
 import { Field } from '@/components/shared/form-controls'
 import { CreatePage } from '@/components/templates'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -106,9 +106,7 @@ function EditCommonActionInner() {
         setError('この共通アクションを編集する権限がありません。')
         setLoadFailure('forbidden')
       } else {
-        setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')
-          ? caught.message
-          : '下書きを読み込めませんでした。通信の状態を確認して、もう一度お試しください。')
+        setError(describeApiFailure(caught, '読み込み'))
         setLoadFailure('error')
       }
     }).finally(() => {
@@ -140,7 +138,7 @@ function EditCommonActionInner() {
       router.push(`/common-actions/versions?id=${encodeURIComponent(id)}`)
     } catch (caught) {
       saveErrors.capture(caught)
-      setError(caught instanceof ApiError || caught instanceof Error ? caught.message : '下書きを保存できませんでした')
+      setError(describeApiFailure(caught, '保存'))
       // 監査 R473: 先行保存との競合は入力を保持したまま、読み直しへ導く。
       if (isSaveConflict(caught)) setSaveConflict(true)
     } finally {
@@ -183,7 +181,7 @@ function EditCommonActionInner() {
 
   /*
     対象が無い（取得失敗）ときは、見出し・入力・右の案内・固定バー
-    のどれも出さない。代わりに ★V7 TargetMissing を出す。
+    のどれも出さない。代わりに ★管理画面 TargetMissing を出す。
   */
   if (error && !draftVersionId && loadFailure === 'forbidden') {
     return (
@@ -208,7 +206,7 @@ function EditCommonActionInner() {
   }
   /*
    * 監査 R583: 下書きなしは通信障害ではない。再読込の口ではなく、
-   * ★V7 TargetMissing で版の画面（前の版から新版を作る入口）へ戻す。
+   * ★管理画面 TargetMissing で版の画面（前の版から新版を作る入口）へ戻す。
    */
   if (error && !draftVersionId && loadFailure === 'no-draft') {
     return (

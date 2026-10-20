@@ -1,7 +1,7 @@
 import {Hono,type Context} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {gapAccount,gapBody,gapKey,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
-import {cancellationPolicy,validCancellationPolicy,requireCancellationTestConnection,bookingCancellationQuote,cancellationSetupUrl} from '../services/booking-cancellation.js';
+import {cancellationPolicy,validCancellationPolicy,requireCancellationTestConnection,bookingCancellationQuote,cancellationSetupUrl} from '../features/booking/booking-cancellation/index.js';
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
 import {verifyStripeSignature} from '../services/stripe-signature.js';
 export const bookingCancellation=new Hono<Env>();

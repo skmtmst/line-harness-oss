@@ -3,7 +3,7 @@
 import { LineChart, FunnelChart } from '@/components/shared/charts'
 
 /*
- * ★V8 ウェビナーの分析（Pencil z2dgw）。
+ * ★V8 ウェビナーの分析（Pencil ）。
  * 頭（戻る・題・説明・CSV）→ タブ → 数の帯 → 「どこで人数が減っているか」→「どこまで見られたか」。
  * その下に、前からある詳しい数字（回別・日別・フォーム）と視聴者コメントを畳んで残す。
  * 口・権限・失敗の扱いは BEHAVIOR.md に記録。

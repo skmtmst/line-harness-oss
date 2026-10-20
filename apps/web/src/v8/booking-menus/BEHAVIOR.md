@@ -1,16 +1,18 @@
+> 文書：予約設定（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 予約設定（V8）の動き
 
-入口（V8 のときだけ新しい画面。v7 はそのまま）：
-- `app/booking/menus/page.tsx` → `src/v8/booking-menus/settings.tsx`（5タブ＋予約経路、右にお客さまの予約画面の写し）
+入口（管理画面はV8に固定）：
+- `app/booking/menus/page.tsx` → `src/v8/booking-menus/settings.tsx`（メニュー・受付枠・休業日・ルール・担当・お支払い・券・予約経路・写真。必要なタブには右にお客さまの予約画面の写し）
 - `app/booking/menus/new/page.tsx` → `src/v8/booking-menus/menu-form.tsx`（作る・直す・競合）
 - `app/booking/menus/staff/page.tsx` → `src/v8/booking-menus/assign.tsx`（担当メニューをまとめて決める）
 
-写し元：`app/booking/menus/settings-v8.tsx`・`settings-tabs/*`・`channels-tab-v8.tsx`・`liff-phone-v8.tsx`・`menu-version-history.tsx`・`new/menu-form-v8.tsx`・`staff/assign-v8.tsx`・`app/booking/staff/staff-edit-dialog.tsx` と、それらが読む `lib/*`（`src/v8` からは `@/app` を読めないので写した）。
+写し元：[現役の入口・本体](README.md)・`settings-tabs/*`・`channels-tab-v8.tsx`・`liff-phone-v8.tsx`・`menu-version-history.tsx`・`new/menu-form-v8.tsx`・`staff/assign-v8.tsx`・`app/booking/staff/staff-edit-dialog.tsx` と、それらが読む `lib/*`（`src/v8` からは `@/app` を読めないので写した）。
 
 絵：メニュー `owaS3`・1152 `P6EdLW`・閲覧のみ `C9fv7A`・受付枠 `yRPxl`・1152 `VFxWU`・休業日 `KRgTQ`・予約のルール `x1OZS6`・予約経路 `ZyDd6`・状態 `xCoDe`・作る `QqER7`・競合 `v5L19Z`・担当まとめ `ooufy`。
 
 ## 受け付ける URL と指定（今と同じ）
-- `/booking/menus?tab=menus|hours|holidays|rules|staff|channels`（無い・知らない値はメニュー）
+- `/booking/menus?tab=menus|hours|holidays|rules|staff|channels|payments|passes|photos`（無い・知らない値はメニュー）
 - `/booking/menus/new`（作る）・`/booking/menus/new?menu=<id>`（直す）
 - `/booking/menus/staff`（`?menu_id=<id>` でその行に色を付ける）
 
@@ -22,11 +24,22 @@
 - 担当：`listStaff`・`createStaff`・`updateStaff`・`deleteStaff`・`getStaffMenus`・`putStaffMenus`・`listStaffMenusBulk`・`putStaffMenusBulk`（「指名なし」は全員の `is_designation_optional`）
 - 作る・直す：`createMenu`・`updateMenu`・`saveMenuResources`・`listMenuVersions`・`revertMenuVersion`
 - 予約経路：`/api/booking/admin/channels`・`conflicts`・`channels/settings`（自動割り当て）・`staff/:id/google-calendar`
-- 右の写し：`getAvailability(menuId, from, to, applyStoreRules)`。お客さまの予約画面の写しなので、店舗のルール（休業日・受付の範囲）を当てた空きを読む（`apply_store_rules=1`。勤務とシフトの v7 のお客さまの見本と同じ口）
+- 右の写し：`getAvailability(menuId, from, to, applyStoreRules)`。お客さまの予約画面の写しなので、店舗のルール（休業日・受付の範囲）を当てた空きを読む（`apply_store_rules=1`。勤務とシフトのお客さま向けの見本も同じ口）
 
 ## 権限
 - 変えられるかはサーバーの役割（`/api/staff/me`）で決める：オーナー・管理者は変えられる、担当者は項目キー（`/booking/menus`・`booking.settings`）を持つときだけ。答えが来るまでは今までどおり手元の判定（`canEditFeature`）。
 - 閲覧のみの人：頭の下に「閲覧のみで見ています。変える操作は管理者に頼んでください。」の帯。作る・つまみ・下の保存帯は置かない（作るボタン・つまみは場所だけ空ける）。「…」は版の履歴が見られるので残す。
+
+## 写真（BA-19・P02、2026-10-19）
+
+- `?tab=photos` → `photos.tsx`。型は既存の `CreatePage`、カード列は `ListPageCards`、面は `Card`、画像は `MediaThumbnail`、選択は共通 `MediaPickerDialog`。★V8 `NQtrW` のお店・メニュー・スタッフの3段を使う。
+- 同じLINEアカウントの登録画像から選ぶ。新たにアップロードする場所は作らない。共有・別アカウント・退避済み・画像以外は選べない。
+- メニュー・スタッフ各1枚、お店は外観・店内・待合各1枚。お店の前後の操作は写真の分類を変えず、LIFFに出す順だけを変える。解除は写真の削除ではなく参照を外す操作で、保存すると反映される。
+- お店の写真は枠ごとに公開を選んで保存する。選択が未設定の写真は非公開。公開APIとLIFFは選んだ写真だけを保存順で返し、0枚ならお店の案内ごと出さない。LIFFは小さな写真を横に並べ、押すと拡大し、閉じる・Escapeで元の写真へ焦点を戻す。
+- `bookingPhotosApi.list/saveMenu/saveStaff/saveStore` を呼ぶ。選択・解除後に明示保存する。メニューはメニューの編集権限、スタッフと店は予約設定の編集権限を使い、閲覧のみには選ぶ・外す・順変更・保存を出さない。
+- 保存中は連打を止める。失敗・409でも選択を残す。409後は保存を止め、最新の写真と版を読み直してから明示保存する。タブ移動・離脱は既存の書きかけ確認へ渡す。アカウント切替後の古い読込・保存の応答は捨てる。
+- 写真の保存と使用先の記録は735の同じSQL処理で更新する。使用中の写真はメディアの削除確認で止め、予約設定の写真タブへ案内する。走査の予約3種類はR2キーの部分一致ではなくメディアIDの完全一致。
+- LIFFのメニュー選び・担当選びに登録写真を出す。メニュー選びの「お店の案内」は公開を選んだ登録写真だけを保存順で表示する。スタッフの写真を外した場合は従来のプロフィール画像を保つ。写真の取得失敗は予約入力を消さず再読込できる。
 
 ## 今の V8 と違うところ
 - 頭：タブの下に余白（絵どおり）。閲覧のみの帯は各タブの中ではなく、頭の下に1本。

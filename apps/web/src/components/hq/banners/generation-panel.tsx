@@ -89,17 +89,17 @@ export default function GenerationPanel({
   /** 「ファイルを選ぶ」。親がプロジェクトへ取り込んでから参照にする。 */
   onUploadReference: (file: File) => void
   referenceBusy?: boolean
-  /** 上限の帯（板 zOpMG）。上限のときだけ出す。 */
+  /** 上限の帯（板 ）。上限のときだけ出す。 */
   usage?: BannerUsage | null
   onReloadUsage?: () => void
   /**
    * 利用量の棒の上に見出し「利用量」を置く（承認済み ★BG-B `qIp42` の `ta8eS` 1042,1843 37x17）。
-   * 板がそう描いている V8 のプロジェクトの中だけが渡す。v7 の既定は変えない。
+   * 板がそう描いている V8 のプロジェクトの中だけが渡す。管理画面 の既定は変えない。
    */
   usageHeading?: boolean
   /** G-6：枚数のそばに残り枚数を置く。 */
   monthRemaining?: boolean
-  /** 統括 V8 の板だけの並び。v7 の既定は変えない。 */
+  /** 統括 V8 の板だけの並び。管理画面 の既定は変えない。 */
   v8Layout?: boolean
 }) {
   const uid = useId()
@@ -198,7 +198,7 @@ export default function GenerationPanel({
             {value.references.length < BANNER_MAX_REFERENCE_IMAGES ? (
               <>
                 {v8Layout ? (
-                  /* 絵 iMnph：参照画像は落とす欄（題・ドラッグ＆ドロップ・制限）と、その中の「ライブラリから選ぶ」。 */
+                  /* 絵 ：参照画像は落とす欄（題・ドラッグ＆ドロップ・制限）と、その中の「ライブラリから選ぶ」。 */
                   <ImageMultiUpload presentation="reference" disabled={disabled} busy={referenceBusy} onPickLibrary={onPickReference} onUpload={onUploadReference} />
                 ) : <div className="grid grid-cols-2 gap-2">
                   <Button disabled={disabled || referenceBusy} onClick={onPickReference} className="w-full">
@@ -537,7 +537,7 @@ function Field({
 /**
  * 出力サイズ。Pencil ★BG-B `xy4EW` の小さい箱（`o2XyUk`/`aCyxg`）。
  *
- * LINE の規格を小さいカードで並べ（V8 は絵 zOpMG・p03ImY・tSgl6 どおり1列の低い行：左に全文の名前と寸法、右に丸）、選んだカードを淡い緑にする（共通のラジオカード）。
+ * LINE の規格を小さいカードで並べ（V8 は絵の どおり1列の低い行：左に全文の名前と寸法、右に丸）、選んだカードを淡い緑にする（共通のラジオカード）。
  * 390px の脇のパネルに収まる細さにするため `variant="compact"` を使う
  * （2026-10-06 オーナー指示「出力サイズのボタンが大きい。もっとスマートな幅に」）。
  * Instagram・X・OGP などは普段使わないので、最初は畳んで「ほかの用途から選ぶ」の

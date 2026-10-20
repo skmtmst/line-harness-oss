@@ -1,3 +1,5 @@
+> 文書：Uber Eats 接続台帳｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # Uber Eats 接続台帳
 
 対象：デリバリー受注（`/restaurant-test/delivery`）へ Uber Eats の注文を取り込む連携。

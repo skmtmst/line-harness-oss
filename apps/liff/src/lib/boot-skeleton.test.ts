@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * LIFF の初期化中を白い画面にしない（リリース前点検 2026-10-07）。
- * main.tsx は initLiff() が終わるまで描かないので、index.html の #root に骨組みを先に置く。
+ * main.tsx は initLiff が終わるまで描かないので、index.html の #root に骨組みを先に置く。
  */
 describe('起動中の骨組み', () => {
   const html = readFileSync(fileURLToPath(new URL('../../index.html', import.meta.url)), 'utf8');

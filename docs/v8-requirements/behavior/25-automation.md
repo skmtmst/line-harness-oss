@@ -1,3 +1,5 @@
+> 文書：25 オートメーション 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 25 オートメーション 操作と挙動（受け入れ）
 
 要件の正本：[25 オートメーション](../../v6-requirements/v6-25-automation-requirements-draft.md)・[きっかけ接続契約](../../v6-requirements/v6-25-automation-trigger-contract.md)・[共通アクション接続契約（カタログ正本）](../../v6-requirements/v6-25-automation-action-contract.md)・[共通基盤 §3・§6-2・§6-3・§9・§11・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[30 §7〜§8 権限](../../v6-requirements/v6-30-login-users-requirements-draft.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
@@ -81,16 +83,16 @@
 
 1. 公開と稼働切替・アーカイブの権限：要件 §9 は staff ×（公開・有効化・停止・アーカイブ）。今は権限キー `/automations` を持つ staff も下書きの公開・止める・動かす・保管ができる。根拠：apps/worker/src/routes/automations.ts:572-589（publish）・:948-970（status）。
 2. 共通アクションの下書き作成：要件 §9 は staff も個別権限（automation.definition.edit）で作れる。今はオーナー・管理者だけ。根拠：apps/worker/src/routes/common-actions.ts:149・229・239。
-3. 送信 Webhook の再試行回数：接続契約 §6 は「26 のみの例外値（最大 8 回・24 時間）」。今はオートメーションの中の送信 Webhook も 1 分・5 分・30 分の最大 4 回（初回含む）で、26 の配送台帳を通らず直接送る。根拠：apps/worker/src/services/automation-engine.ts:14-15・647-648、apps/worker/src/services/automation-action-executors.ts:599-605（postWebhookSafely を直接呼ぶ）。
-4. runtime gate の拒否：要件 §8-4・きっかけ契約は「拒否は skipped と理由を記録して終了」。今は機能オフ・緊急停止のとき実行を queued のまま残して後で続ける（記録に拒否の理由が残らない）。根拠：apps/worker/src/services/automation-engine.ts:745-752・789-799。
-5. 実行の取り消し：要件 §4-3・§7 は `waiting` の実行だけで、それ以外は 409。今は queued・running も取り消せる。根拠：apps/worker/src/services/automation-engine.ts:1055-1068。
-6. 日時のきっかけの上限：契約は「1 回に最大 100 人。超過は設定エラー」。今は cron 1 回の合計 100 件で、先に数えたルールで埋まると後のルール（各 100 人以下でも）が設定エラーになる。さらに 100 件に達した時点で残りの候補は記録なしで飛ばされ、5 分の窓を過ぎるので動かない。根拠：apps/worker/src/services/automation-triggers.ts:447・468・479-488・509、apps/worker/src/index.ts:2215-2217（limit: 100）。
-7. タグのきっかけ：タグを外したとき・フォームや予約・一括操作などから付けたときは、発生元 ID とアカウントを渡さずに出来事を出すので、V6 のルール（tag_change）は動かない。根拠：apps/worker/src/routes/friends.ts:1449、apps/worker/src/services/friend-tag-attach.ts:124・365・407、apps/worker/src/services/event-bus.ts:222（sourceEventId とアカウントがあるときだけ）。
+3. 送信 Webhook の再試行回数：接続契約 §6 は「26 のみの例外値（最大 8 回・24 時間）」。今はオートメーションの中の送信 Webhook も 1 分・5 分・30 分の最大 4 回（初回含む）で、26 の配送台帳を通らず直接送る。根拠：apps/worker/src/features/automations/automation-engine.ts:14-15・647-648、apps/worker/src/features/automations/automation-action-executors.ts:599-605（postWebhookSafely を直接呼ぶ）。
+4. runtime gate の拒否：要件 §8-4・きっかけ契約は「拒否は skipped と理由を記録して終了」。今は機能オフ・緊急停止のとき実行を queued のまま残して後で続ける（記録に拒否の理由が残らない）。根拠：apps/worker/src/features/automations/automation-engine.ts:745-752・789-799。
+5. 実行の取り消し：要件 §4-3・§7 は `waiting` の実行だけで、それ以外は 409。今は queued・running も取り消せる。根拠：apps/worker/src/features/automations/automation-engine.ts:1055-1068。
+6. 日時のきっかけの上限：契約は「1 回に最大 100 人。超過は設定エラー」。今は cron 1 回の合計 100 件で、先に数えたルールで埋まると後のルール（各 100 人以下でも）が設定エラーになる。さらに 100 件に達した時点で残りの候補は記録なしで飛ばされ、5 分の窓を過ぎるので動かない。根拠：apps/worker/src/features/automations/automation-triggers.ts:447・468・479-488・509、apps/worker/src/index.ts:2215-2217（limit: 100）。
+7. タグのきっかけ：タグを外したとき・フォームや予約・一括操作などから付けたときは、発生元 ID とアカウントを渡さずに出来事を出すので、V6 のルール（tag_change）は動かない。根拠：apps/worker/src/routes/friends.ts:1449、apps/worker/src/features/friends/friend-tag-attach.ts:124・365・407、apps/worker/src/services/event-bus.ts:222（sourceEventId とアカウントがあるときだけ）。
 8. 旧形式の実行がまだ動く：要件 §6-3 は所属アカウントが空の旧行は隔離して動かさない・最後に旧エンジンを止める。今は旧 `automations` の有効な行を、所属が空の物も含めて毎回の出来事で実行する。根拠：apps/worker/src/services/event-bus.ts:217・468-472。
 9. 旧エンジンの「外部 Webhook へ送る」は任意 URL に署名なしで送る（接続契約 §7 は登録済み Webhook の ID だけ）。根拠：apps/worker/src/services/event-bus.ts:689-711。
 10. 物理削除：要件 §4-1・§5-2 は削除しない（アーカイブ）。旧 `DELETE /api/automations/:id` が残っていて旧表の行を物理削除する。根拠：apps/worker/src/routes/automations.ts:1079-1087、packages/db/src/automations.ts:296-297。
-11. ブロック・フォロー解除のきっかけ（要件 §4-2）が無い。根拠：apps/worker/src/services/automation-triggers.ts:32-53（EVENT_TRIGGER_TYPES に無い）。
-12. カタログとの違い：契約 §1 の「マイルを増減する（adjust_mileage・符号付き）」は今 `grant_mileage` で付与だけ（1〜100 万）。「担当者を割り当てる」「コンバージョンを記録・訂正する」は無い。カタログに無い `start_reminder`・`stop_reminder`・`notify_staff` がある。根拠：apps/worker/src/services/common-actions.ts:9-28、apps/worker/src/services/automation-action-executors.ts:702-712・717-740。
+11. ブロック・フォロー解除のきっかけ（要件 §4-2）が無い。根拠：apps/worker/src/features/automations/automation-triggers.ts:32-53（EVENT_TRIGGER_TYPES に無い）。
+12. カタログとの違い：契約 §1 の「マイルを増減する（adjust_mileage・符号付き）」は今 `grant_mileage` で付与だけ（1〜100 万）。「担当者を割り当てる」「コンバージョンを記録・訂正する」は無い。カタログに無い `start_reminder`・`stop_reminder`・`notify_staff` がある。根拠：apps/worker/src/services/common-actions.ts:9-28、apps/worker/src/features/automations/automation-action-executors.ts:702-712・717-740。
 13. 動いた記録の「移行前の記録」の別タブ（要件 §4-3）が V8 の画面に無い。根拠：apps/web/src/v8/automations/runs.tsx（該当の文言なし。grep で 0 件）。
 14. 一覧の行の「同じきっかけのルールが他にあります。両方動きます」（要件 §4-1）は作る画面にだけあり、一覧の行に無い。根拠：apps/web/src/v8/automations/create/create.tsx:2473-2474、apps/web/src/v8/automations/list.tsx（該当の文言なし）。
 15. ルール・共通アクションをフォルダへ入れる口が無く、箱を選ぶと 0 件。根拠：apps/web/src/v8/automations/BEHAVIOR.md「今の V8 と違うところ」。

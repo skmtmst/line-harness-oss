@@ -44,7 +44,7 @@ describe('マイル履歴の表示', () => {
   })
 
   it('短い日時は絵どおりに出す（9/30 14:12・9/30）', () => {
-    /* 絵の板 `oRbJi`・`R6kIG`・`IRPw8`。日本時間に直す。 */
+    /* 絵の板 ・・。日本時間に直す。 */
     expect(formatMileageShortDateTime('2026-09-30T05:12:00.000Z')).toBe('9/30 14:12')
     expect(formatMileageShortDateTime('2026-10-02T06:20:00.000Z')).toBe('10/2 15:20')
     expect(formatMileageShortDateTime(null)).toBe('—')

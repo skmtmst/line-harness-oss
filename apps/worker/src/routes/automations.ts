@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {defaultWindow} from './automation-execution-window.js';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -15,7 +16,8 @@ import {
   isOperationCapabilityStopped,
   type AutomationRunDomainStatus,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
@@ -28,7 +30,7 @@ import {
   listAutomationTemplates,
   publishAutomationDraft,
   updateAutomationDraft,
-} from '../services/automation-drafts.js';
+} from '../features/automations/automation-drafts/index.js';
 import {
   AutomationDefinitionError,
   listAutomationDefinitions,
@@ -36,13 +38,13 @@ import {
   runAutomationTest,
   updateAutomationDefinitionStatus,
   restoreAutomationDefinition,
-} from '../services/automation-definitions.js';
+} from '../features/automations/automation-definitions/index.js';
 import {
   AutomationRunCancelError,
   AutomationRunRetryError,
   cancelAutomationRun,
   retryAutomationRun,
-} from '../services/automation-engine.js';
+} from '../features/automations/automation-engine/index.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
 import { listLimit } from './list-pagination.js';
 import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
@@ -128,7 +130,7 @@ async function definitionEndpoint<T>(c: Context<Env>, run: () => Promise<T>): Pr
     return c.json({ success: true, data: await run() });
   } catch (error) {
     if (error instanceof AutomationDefinitionError) return definitionErrorResponse(c, error);
-    console.error(JSON.stringify({"code":"automation_definition_api_failed"}));
+    logger.error("automation_definition_api_failed");
     return c.json({ success: false, error: 'オートメーションを処理できませんでした' }, 500);
   }
 }
@@ -142,7 +144,7 @@ async function draftEndpoint<T>(
     return c.json({ success: true, data: await run() }, successStatus as 200);
   } catch (error) {
     if (error instanceof AutomationDraftError) return draftErrorResponse(c, error);
-    console.error(JSON.stringify({"code":"automation_draft_api_failed"}));
+    logger.error("automation_draft_api_failed");
     return c.json({ success: false, error: 'オートメーションの下書きを処理できませんでした' }, 500);
   }
 }
@@ -441,8 +443,8 @@ function boundedInteger(raw: string | undefined, fallback: number, max: number):
 
 async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<void>) {
   const id = c.req.param('id')!;
-  // #942: 一覧が返すidは V6 の automation_definitions。旧 automations 表の
-  // 行だけを見ると、V6の定義への操作が全部 404 になる。先にV6を見る。
+  // #942: 一覧が返すidは の automation_definitions。旧 automations 表の
+  // 行だけを見ると、の定義への操作が全部 404 になる。先にを見る。
   const definition = await c.env.DB.prepare(
     `SELECT line_account_id FROM automation_definitions WHERE id = ?`,
   ).bind(id).first<{ line_account_id: string }>();
@@ -591,7 +593,7 @@ automations.get('/api/automations/counts', requireAutomationViewPermission, asyn
   try {
     return c.json({ success: true, data: await automationTabCounts(c.env.DB, accountId) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automations/counts"}));
+    logger.error("routes_automations_failed");
     return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
   }
 });
@@ -633,7 +635,7 @@ automations.get(
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automations"}));
+    logger.error("routes_automations_failed");
     return c.json({ success: false, error: 'オートメーションを表示できませんでした' }, 500);
   }
 });
@@ -684,7 +686,7 @@ automations.post(
   },
 );
 
-/** V6 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
+/** 25-1-B: 既存automation_runsを、共通実行記録契約で読む。 */
 automations.get(
   '/api/automation-runs',
   requireAutomationViewPermission,
@@ -709,7 +711,7 @@ automations.get(
           : undefined;
     const wantsCsv = c.req.query('format') === 'csv';
     if (wantsCsv) {
-      // V6 §9: CSV書き出しは個別権限 `automation.run.export`。
+      // §9: CSV書き出しは個別権限 `automation.run.export`。
       // 見るだけの権限（/automations）では出せない。
       const staff = c.get('staff');
       if (staff.role === 'staff' && !staff.permissionKeys?.includes('automation.run.export')) {
@@ -724,7 +726,7 @@ automations.get(
     const defaults = defaultWindow();
     const from = c.req.query('from') || defaults.from;
     const to = c.req.query('to') || defaults.to;
-    // テスト実行は既定で除き、切替のときだけ含める（V6 25-1-B）。
+    // テスト実行は既定で除き、切替のときだけ含める（25-1-B）。
     const includeTest = c.req.query('include_test') === '1' || c.req.query('include_test') === 'true';
 
     const result = await getAutomationExecutionRuns(c.env.DB, {
@@ -773,7 +775,7 @@ automations.get(
     };
     return c.json({ success: true, data: body });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automation-runs"}));
+    logger.error("routes_automations_failed");
     return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
   }
 });
@@ -805,7 +807,7 @@ automations.post(
         const status = error.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
-      console.error(JSON.stringify({"code":"automation_run_retry_failed","route":"POST /api/automation-runs/:id/retry"}));
+      logger.error("automation_run_retry_failed");
       return c.json({ success: false, error: '失敗した処理を再実行できませんでした' }, 500);
     }
   },
@@ -853,7 +855,7 @@ automations.get(
         },
       });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automation-runs/:id"}));
+      logger.error("routes_automations_failed");
       return c.json({ success: false, error: '実行記録を読み込めませんでした' }, 500);
     }
   },
@@ -864,7 +866,7 @@ automations.get(
  *
  * 待機中・実行中・再試行待ちの実行を cancelled で閉じる。
  * 終わった実行は 409、無い・範囲外は 404、取消済みはそのまま成功。
- * V6 §9: 取り消しは再実行と同じ `automation.run.retry` の個別権限。
+ * §9: 取り消しは再実行と同じ `automation.run.retry` の個別権限。
  */
 automations.post(
   '/api/automation-runs/:id/cancel',
@@ -884,7 +886,7 @@ automations.post(
         const status = error.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, error: error.message, code: error.code }, status, []);
       }
-      console.error(JSON.stringify({"code":"automation_run_cancel_failed","route":"POST /api/automation-runs/:id/cancel"}));
+      logger.error("automation_run_cancel_failed");
       return c.json({ success: false, error: '実行を取りやめられませんでした' }, 500);
     }
   },
@@ -893,7 +895,7 @@ automations.post(
 automations.use('/api/automations/:id', requireVisibleAutomation);
 automations.use('/api/automations/:id/*', requireVisibleAutomation);
 
-/** V6定義のアカウントを引く（requireVisibleAutomation が範囲を確かめ済み）。 */
+/** 定義のアカウントを引く（requireVisibleAutomation が範囲を確かめ済み）。 */
 async function definitionAccountId(c: Context<Env>): Promise<string | Response> {
   const row = await c.env.DB.prepare(
     `SELECT line_account_id FROM automation_definitions WHERE id = ?`,
@@ -1013,7 +1015,7 @@ automations.get(
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automations/:id"}));
+    logger.error("routes_automations_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1068,7 +1070,7 @@ automations.put('/api/automations/:id', requireRole('owner', 'admin'), inputJson
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_automations_failed","route":"PUT /api/automations/:id"}));
+    logger.error("routes_automations_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1078,7 +1080,7 @@ automations.delete('/api/automations/:id', requireRole('owner', 'admin'), async 
     await deleteAutomation(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_automations_failed","route":"DELETE /api/automations/:id"}));
+    logger.error("routes_automations_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1107,7 +1109,7 @@ automations.get(
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_automations_failed","route":"GET /api/automations/:id/logs"}));
+    logger.error("routes_automations_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

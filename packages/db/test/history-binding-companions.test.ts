@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import { getLastLoginByStaff } from '../src/login-audit.js';
 import { getStaffNameMap, getStaffAccountScopeMap } from '../src/staff.js';
 import { countRepliesForRequests } from '../src/ops-support.js';
-import { getRemindersByIds } from '../src/reminders.js';
+import { getRemindersByIds } from '../src/reminders/index.js';
 import { getAccountSettings } from '../src/account-settings.js';
 import { asD1 } from './d1-test-helper.js';
 

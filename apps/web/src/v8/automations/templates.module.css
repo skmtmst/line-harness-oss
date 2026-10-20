@@ -1,10 +1,10 @@
 /*
- * ★V8 オートメーションの見本（Pencil `c7dxp`）。枠・見出し・タブ・数の帯は型（ListPage）と shell が持つ。
+ * ★V8 オートメーションの見本（Pencil ）。枠・見出し・タブ・数の帯は型（ListPage）と shell が持つ。
  * ここは本文（きっかけの札の段・4列のカード・注記）だけ。値は globals.css の `--tpl-wb-tm-*`。
  */
 
 
-/* きっかけの札の段（1行・札の続きに再読み込み。絵 c7dxp）。 */
+/* きっかけの札の段（1行・札の続きに再読み込み。絵 ）。 */
 .tools {
   display: flex;
   align-items: center;

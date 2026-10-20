@@ -6,9 +6,9 @@ import type { MenuItem, StaffItem } from '../lib/api.js';
 vi.mock('../lib/api.js', () => ({ api: { menus: vi.fn(), staffOf: vi.fn() } }));
 vi.mock('../lib/use-wide-viewport.js', () => ({ useWideViewport: () => false }));
 import { api } from '../lib/api.js';
-import MenuList from './MenuList.js';
-import StaffList from './StaffList.js';
-import Confirm from './Confirm.js';
+import MenuList from './menu-list.js';
+import StaffList from './staff-list.js';
+import Confirm from './confirm.js';
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 test.each([['inquiry',0,'お問い合わせ'],['inquiry',5000,'お問い合わせ'],['free',5000,'無料'],['fixed',5000,'¥5,000'],['fixed',0,'¥0']] as const)('%s %sの料金をメニュー・担当・確認で同じ意味で表示する', async (mode, amount, expected) => {
   const menu = { id:'m', name:'相談', description:null, category_label:null, duration_minutes:60, base_price: amount, price_mode:mode } as MenuItem;

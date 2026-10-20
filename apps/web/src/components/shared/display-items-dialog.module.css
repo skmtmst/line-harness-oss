@@ -22,7 +22,7 @@
 .subheading { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); font-weight: 600; }
 .manage { display: inline-flex; align-items: center; gap: var(--tpl-dic-gap-tight); color: var(--color-accent-deep); font-size: var(--text-micro); font-weight: 600; white-space: nowrap; }
 .section { display: flex; flex-direction: column; gap: 0; }
-/* 絵 aZ8li：列の窓は「足せる列」だけが枠の中で流れる。3列に並べる。 */
+/* 絵 ：列の窓は「足せる列」だけが枠の中で流れる。3列に並べる。 */
 .body[data-presentation='columns'] { gap: var(--polish-space-card); }
 .body[data-presentation='columns'] .heading { color: var(--color-ink); }
 .body[data-presentation='columns'] .available { height: var(--tpl-dic-available-h); max-height: none; display: flex; flex-direction: column; gap: var(--polish-space-row); }

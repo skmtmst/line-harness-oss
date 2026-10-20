@@ -2,7 +2,7 @@
  * `bootstrap.sql` が、実際のマイグレーションと合っているか。
  *
  * `bootstrap.sql` は「schema.sql ＋ 全マイグレーション」を1枚にした生成物。
- * Gitでは管理せず、ビルド・テスト・配布物作成の前に毎回生成する。
+ * Gitで管理し、ビルド・テスト・配布物作成の前にも生成して整合を確認する。
  *
  * 実際に起きた: `158_auto_reply_name.sql` がファイルとしては入っているのに、
  * `bootstrap.sql` にも `bootstrap-meta.json` にも入っていなかった。別のPRの

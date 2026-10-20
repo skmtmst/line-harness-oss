@@ -1,7 +1,7 @@
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { recordPlatformAudit } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { syncBillingInvoices } from '../services/billing-invoices-sync.js';
 import { dbFor } from '../services/db-router.js';

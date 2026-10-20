@@ -9,7 +9,7 @@ import {
   getFormById,
   getFormDeleteImpact,
   getFormsWithStats,
-} from '../src/forms.js';
+} from '../src/forms/index.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   return {

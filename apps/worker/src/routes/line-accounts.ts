@@ -1,6 +1,10 @@
+import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { verifyLineMessagingIdentity } from '../services/line-messaging-identity.js';
 import { expectedWebhookUrl as accountWebhookUrl } from '../lib/webhook-endpoint.js';
 import { readOfficialProfileUrl } from './line-account-profile-url.js';
+import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
+
 import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -16,7 +20,7 @@ import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up
 import { auditLog } from '../lib/audit-log.js';
 import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
 import { detectFollowerImportCapability, getFollowerImportState, processFollowerImportStep, startFollowerImport } from '../services/follower-import.js';
-import type { FollowerImportClient } from '../services/follower-import.js';
+import type { FollowerImportClient } from '../services/follower-import-state.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope, validateAccountHierarchy } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
@@ -24,114 +28,13 @@ import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
 import { getLineRegistrationReceipt } from '../services/line-registration-receipt.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
+import { readCapacity, normalizeOptionalString, validateLoginChannelPair } from './line-accounts-input.js';
+import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
+
 const lineAccounts = new Hono<Env>();
-
-/**
- * 友だち数の上限と警告値を検証する。
- *
- * 警告値が上限を超えていたら弾く。超えた値は永久に鳴らないので、
- * 設定したつもりで一度も警告が出ない、という壊れ方をする。
- */
-function readCapacity(
-  body: { friendCapacity?: unknown; capacityWarnAt?: unknown },
-  current: { friend_capacity: number | null; capacity_warn_at: number | null } | null,
-): { ok: true; value: { friendCapacity?: number | null; capacityWarnAt?: number | null } } | { ok: false; error: string } {
-  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
-  const out: { friendCapacity?: number | null; capacityWarnAt?: number | null } = {};
-
-  const parse = (raw: unknown): number | null | 'invalid' => {
-    if (raw === null || raw === '' || raw === undefined) return null;
-    const n = Number(raw);
-    if (!Number.isInteger(n) || n < 1 || n > 100_000_000) return 'invalid';
-    return n;
-  };
-
-  if (has('friendCapacity')) {
-    const v = parse(body.friendCapacity);
-    if (v === 'invalid') return { ok: false, error: 'friendCapacity must be a positive integer' };
-    out.friendCapacity = v;
-  }
-  if (has('capacityWarnAt')) {
-    const v = parse(body.capacityWarnAt);
-    if (v === 'invalid') return { ok: false, error: 'capacityWarnAt must be a positive integer' };
-    out.capacityWarnAt = v;
-  }
-
-  const effectiveCapacity =
-    out.friendCapacity !== undefined ? out.friendCapacity : (current?.friend_capacity ?? null);
-  const effectiveWarn =
-    out.capacityWarnAt !== undefined ? out.capacityWarnAt : (current?.capacity_warn_at ?? null);
-  if (effectiveCapacity != null && effectiveWarn != null && effectiveWarn > effectiveCapacity) {
-    return { ok: false, error: 'capacityWarnAt must not exceed friendCapacity' };
-  }
-  return { ok: true, value: out };
-}
-
-function serializeLineAccount(row: DbLineAccount) {
-  return {
-    id: row.id,
-    channelId: row.channel_id,
-    name: row.name,
-    displayName: row.line_display_name || row.name,
-    folderId: row.folder_id ?? null,
-    pictureUrl: row.line_picture_url ?? null,
-    basicId: row.line_basic_id ?? null,
-    isActive: Boolean(row.is_active),
-    isDefault: Boolean(row.is_default),
-    archivedAt: row.archived_at ?? null,
-    // 止めた理由。動いていれば null（v6-33 §10-1）。
-    inactiveReason: row.inactive_reason ?? null,
-    inactiveReasonDetail: row.inactive_reason_detail ?? null,
-    inactivatedAt: row.inactivated_at ?? null,
-    lastWebhookReceivedAt: row.last_webhook_received_at ?? null,
-    webhookSilenceExempt: Boolean(row.webhook_silence_exempt ?? 0),
-    country: row.country,
-    role: row.role,
-    timezone: row.timezone ?? 'Asia/Tokyo',
-    revision: row.revision ?? 1,
-    displayOrder: row.display_order,
-    // login_channel_id and liff_id are non-secret identifiers (visible in
-    // LINE Developers console, embedded in public LIFF URLs). Safe to expose
-    // in list responses so the admin UI can show "Login/LIFF configured?"
-    // without a separate fetch.
-    loginChannelId: row.login_channel_id,
-    liffId: row.liff_id,
-    ogSiteName: row.og_site_name,
-    ogDefaultImageUrl: row.og_default_image_url,
-    ogDefaultDescription: row.og_default_description,
-    officialProfileUrl: row.official_profile_url ?? null,
-    // 上限とアイコンは鍵ではない。閲覧のみの人にも見せる。
-    friendCapacity: row.friend_capacity ?? null,
-    capacityWarnAt: row.capacity_warn_at ?? null,
-    iconUrl: row.icon_url ?? null,
-    parentLineAccountId: row.parent_line_account_id ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    channelAccessTokenConfigured: Boolean(
-      row.channel_access_token_encrypted || row.channel_access_token,
-    ),
-    channelAccessTokenLast4: row.channel_access_token_last4 ?? null,
-    channelAccessTokenUpdatedAt: row.channel_access_token_updated_at ?? null,
-    channelSecretConfigured: Boolean(row.channel_secret_encrypted || row.channel_secret),
-    channelSecretLast4: row.channel_secret_last4 ?? null,
-    channelSecretUpdatedAt: row.channel_secret_updated_at ?? null,
-    loginChannelSecretConfigured: Boolean(
-      row.login_channel_secret_encrypted || row.login_channel_secret,
-    ),
-    loginChannelSecretLast4: row.login_channel_secret_last4 ?? null,
-    loginChannelSecretUpdatedAt: row.login_channel_secret_updated_at ?? null,
-  };
-}
-
-function serializeLineAccountFull(row: DbLineAccount) {
-  // Credential values are deliberately never returned after persistence.
-  // Owners rotate them by submitting a new value; the UI only sees whether
-  // each credential is configured.
-  return serializeLineAccount(row);
-}
 
 function lifecycleConflict(error: unknown): { success: false; error: string } | null {
   if (!(error instanceof LineAccountLifecycleError)) return null;
@@ -229,7 +132,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
     );
     return c.json({ success: true, data: results });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -253,7 +156,7 @@ lineAccounts.get('/api/line-accounts/summary', async (c) => {
     ).bind(...sqlIdSet(visibleActiveIds).binds).first<{ count: number }>();
     return c.json({ success: true, data: { uniqueFriendCount: row?.count ?? 0 } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/summary"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -603,7 +506,7 @@ lineAccounts.post(
       if (error instanceof LineAccountRevisionConflictError) {
         return c.json({ success: false, error: 'REVISION_CONFLICT' }, 409);
       }
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/connection-checks"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -638,7 +541,7 @@ lineAccounts.put('/api/line-accounts/default', requireRole('owner'), inputJsonBo
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PUT /api/line-accounts/default"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -690,7 +593,7 @@ lineAccounts.post('/api/line-accounts/:id/archive', requireRole('owner'), inputJ
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/archive"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -711,13 +614,13 @@ lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), inputJ
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/restore"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
 /**
- * 送受信を止める（v6-33 §10-1、X-1）。
+ * 送受信を止める（-33 §10-1、X-1）。
  * 理由は必須。止めている間の受信は署名検証から外れ、予約配信は
  * 「止めていたので送らなかった」として一覧に残る。
  */
@@ -756,13 +659,13 @@ lineAccounts.post('/api/line-accounts/:id/deactivate', requireRole('owner', 'adm
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/deactivate"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
 /**
- * 送受信を再開する（v6-33 §10-2、X-1）。
+ * 送受信を再開する（-33 §10-2、X-1）。
  * 理由は必須。再開の前に接続を確かめ、LINE との接続（bot_info）が
  * 通らないときは再開しない。確かめた結果は台帳にも残す。
  */
@@ -806,7 +709,7 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
       });
     } catch (checkError) {
       // 台帳への記録が失敗しても再開判定は止めない（検査自体は済んでいる）。
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/activate"}));
+      logger.error("routes_line_accounts_failed");
     }
     if (!connectionOk) {
       return inputError(c, {
@@ -829,13 +732,13 @@ lineAccounts.post('/api/line-accounts/:id/activate', requireRole('owner', 'admin
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/activate"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
 /**
- * 「止めていたので送らなかった」の一覧（v6-33 §10-2）。
+ * 「止めていたので送らなかった」の一覧（-33 §10-2）。
  * 再開の画面で運用者が確認し、再実行は別途選ぶ。
  */
 lineAccounts.get(
@@ -859,7 +762,7 @@ lineAccounts.get(
         })),
       });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/:id/skipped-deliveries"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -868,14 +771,9 @@ lineAccounts.get(
 // Only the registered account's signed inbound receipt can unlock the wizard.
 lineAccounts.get('/api/line-accounts/:id/registration-receipt', requireRole('owner', 'admin'), async (c) => {
   c.header('Cache-Control', 'no-store');
-  try {
-    const account = await getAuthorizedLineAccount(c, c.req.param('id'));
-    if (!account || account.archived_at) return c.json({ success: false, error: 'LINE account not found' }, 404);
-    return c.json({ success: true, data: await getLineRegistrationReceipt(c.env.DB, account.id) });
-  } catch {
-    console.error(JSON.stringify({ code: 'line_registration_receipt_failed' }));
-    return c.json({ success: false, error: 'Internal server error' }, 500);
-  }
+  const account = await getAuthorizedLineAccount(c, c.req.param('id'));
+  if (!account || account.archived_at) return c.json({ success: false, error: 'LINE account not found' }, 404);
+  return c.json({ success: true, data: await getLineRegistrationReceipt(c.env.DB, account.id) });
 });
 
 // GET /api/line-accounts/:id - get single without persisted secret values
@@ -887,7 +785,7 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
     }
     return c.json({ success: true, data: serializeLineAccount(account) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/:id"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -913,7 +811,7 @@ lineAccounts.get(
     } catch {
       // Do not serialize the underlying error: crypto/runtime errors can contain
       // implementation details that are unnecessary for this diagnostic.
-      console.error(JSON.stringify({"code":"line_credential_health_check_failed","route":"GET /api/line-accounts/:id/credential-health"}));
+      logger.error("line_credential_health_check_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -946,7 +844,7 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
     });
   } catch (err) {
     const lineStatus = typeof (err as { status?: unknown } | null)?.status === 'number' ? (err as { status: number }).status : null; // LINEの状態番号(401失効/403権限不足/429上限)だけ残す。本文・トークンは出さない
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"GET /api/line-accounts/:id/follower-insight"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Failed to fetch LINE follower insight', lineStatus }, 502);
   }
 });
@@ -983,7 +881,7 @@ lineAccounts.post(
       return c.json({ success: true, data: state });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts/:id/follower-import/detect"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: '利用可否の確認に失敗しました' }, 502);
     }
   },
@@ -1028,65 +926,8 @@ lineAccounts.post(
   },
 );
 
-// Normalize optional string inputs from the UI:
-//   undefined → undefined (caller skips the column)
-//   null      → null      (explicit clear)
-//   ""        → null      (UI cleared the field)
-//   non-string → undefined (defensive: silently drop bad input)
-//
-// Defined here (and in PATCH below) rather than shared, because the create
-// path treats undefined and "" identically (both "no value provided"), while
-// the partial-update path needs to distinguish "field absent" (no change)
-// from "field cleared" (set to null). Keep the helper local so future
-// behavior changes don't accidentally couple the two paths.
-function normalizeOptionalString(v: unknown): string | null | undefined {
-  if (v === undefined) return undefined;
-  if (v === null) return null;
-  if (typeof v !== 'string') return undefined;
-  const trimmed = v.trim();
-  return trimmed === '' ? null : trimmed;
-}
-
-// Pair-validate Login Channel ID / Secret. Required because the OAuth flow
-// asymmetrically gates on the two columns:
-//   /auth/line       — switches to account-specific client_id as soon as
-//                      login_channel_id is set (regardless of secret)
-//   /auth/callback   — only uses account-specific creds when BOTH are set
-// → an account with id-only or secret-only ends up half-configured: looks
-// fine in the list, breaks token exchange for new friend-add flows.
-//
-// Rule: within a single request, the two fields must end up consistent.
-// "current" reflects the state already stored (used on update paths so the
-// caller can leave the secret unchanged when only renaming the ID).
-function validateLoginChannelPair(
-  next: { loginChannelId?: string | null | undefined; loginChannelSecret?: string | null | undefined },
-  current: { login_channel_id: string | null; login_channel_secret: string | null } | null,
-): string | null {
-  // Resolve the post-update state for each field.
-  // undefined = "not in request" → keep current value
-  // null/string = "explicit set"  → use as-is
-  const finalId =
-    next.loginChannelId === undefined
-      ? current?.login_channel_id ?? null
-      : next.loginChannelId;
-  const finalSecret =
-    next.loginChannelSecret === undefined
-      ? current?.login_channel_secret ?? null
-      : next.loginChannelSecret;
-
-  const idSet = finalId !== null && finalId !== '';
-  const secretSet = finalSecret !== null && finalSecret !== '';
-
-  if (idSet !== secretSet) {
-    return idSet
-      ? 'loginChannelSecret must be provided when loginChannelId is set'
-      : 'loginChannelId must be provided when loginChannelSecret is set';
-  }
-  return null;
-}
-
 // Reject duplicate login_channel_id / liff_id across accounts.
-// /auth/callback and /api/liff/config both resolve the row with `.first()`
+// /auth/callback and /api/liff/config both resolve the row with `.first`
 // after a `WHERE col = ?` lookup, so duplicates would silently bind events
 // to whichever row D1 happens to return first. Two layers:
 //   1. this app-level pre-check for the sequential path (409 with the value),
@@ -1148,6 +989,7 @@ function duplicateAccountError(
 }
 
 type ConnectBody = {
+  style?: unknown;
   tagIds?: unknown; staffIds?: unknown; parentLineAccountId?: unknown; liffId?: unknown;
   name?: unknown;
   channelId?: unknown;
@@ -1157,8 +999,9 @@ type ConnectBody = {
 };
 
 function readConnectBody(body: ConnectBody):
-  | { ok: true; value: { name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
+  | { ok: true; value: { style?: AccountStyle; name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string; tagIds: string[]; staffIds?: string[]; parentLineAccountId?: string | null; liffId?: string } }
   | { ok: false; error: string } {
+  if (body.style !== undefined && !ACCOUNT_STYLES.includes(body.style as AccountStyle)) return { ok: false, error: 'invalid_style' };
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
   const channelSecret = typeof body.channelSecret === 'string' ? body.channelSecret.trim() : '';
@@ -1174,7 +1017,7 @@ function readConnectBody(body: ConnectBody):
   for(const value of [body.tagIds,body.staffIds]) if(value!==undefined && (!Array.isArray(value)||value.length>50||value.some(v=>!id(v))||new Set(value).size!==value.length)) return {ok:false,error:'タグ・担当者の指定を確認してください'};
   if(body.parentLineAccountId!==undefined && body.parentLineAccountId!==null && !id(body.parentLineAccountId)) return {ok:false,error:'親アカウントを確認してください'};
   if(body.liffId!==undefined && (typeof body.liffId!=='string'||!/^\d+-[A-Za-z0-9_-]+$/.test(body.liffId))) return {ok:false,error:'LIFF IDを確認してください'};
-  return { ok: true, value: { name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:(body.tagIds ?? []) as string[],staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
+  return { ok: true, value: { style: body.style as AccountStyle | undefined, name, channelId, channelSecret, loginChannelId, loginChannelSecret, tagIds:(body.tagIds ?? []) as string[],staffIds:body.staffIds as string[]|undefined,parentLineAccountId:body.parentLineAccountId as string|null|undefined,liffId:body.liffId as string|undefined } };
 }
 
 async function readConnectRequest(c: Context<Env>) {
@@ -1201,7 +1044,7 @@ async function probeFollowerCapability(channelAccessToken: string): Promise<'ava
 }
 
 /*
- * V8 登録 ④接続確認（`v2KMj`）用の検証の内訳。`steps` の5段とは切り口が
+ * V8 登録 ④接続確認（``）用の検証の内訳。`steps` の5段とは切り口が
  * 違い、画面の5行（チャネル・同じプロバイダー・Webhook・LINE ID・友だち
  * 追加URL）にそのまま載る。LINEにプロバイダ照合の口は無いため、
  * 同じプロバイダーは「Messaging APIとLINE Loginの両方の認証が通ったこと」
@@ -1226,15 +1069,11 @@ function stepPassed(steps: LineConnectStep[], order: LineConnectStep['order']): 
 
 /* 友だち数の統計は前日分しか無い。日本時間の昨日を yyyyMMdd で返す。 */
 export function insightDateJst(now: Date = new Date()): string {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000 - 24 * 60 * 60 * 1000);
-  const year = jst.getUTCFullYear();
-  const month = String(jst.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(jst.getUTCDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
+  return japanDateOffset(-1, now).replaceAll('-', '');
 }
 
 /*
- * 登録前の友だち総数。V8 ④の結果窓（`qw80E`）のボット情報に出す。
+ * 登録前の友だち総数。V8 ④の結果窓（``）のボット情報に出す。
  * 取れなければ null（表示は名前だけにする）。検査の合否には使わない。
  */
 export async function fetchPreConnectFollowerTotal(channelAccessToken: string): Promise<number | null> {
@@ -1346,6 +1185,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
   if (duplicate) return c.json({ success: false, error: duplicate }, 409);
 
   let account: DbLineAccount | null = null;
+  let savingStyle = false;
   try {
     account = await createLineAccount(c.env.DB, {
       channelId: parsed.value.channelId,
@@ -1403,7 +1243,9 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
-    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
+    savingStyle = true;
+    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style);
+    savingStyle = false;
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
     return c.json({
       success: true,
@@ -1413,6 +1255,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
       }, account.id),
     }, 201);
   } catch (error) {
+    if (account && savingStyle) return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: parsed.value.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}` } }, 502);
     if (account) await deleteUncommittedLineAccount(c.env.DB, account.id);
     if (error instanceof RegistrationOptionsError) return inputError(c, {success:false,error:'登録中にタグ・親・担当範囲が変わりました。選び直してください',code:error.code}, error.status, []);
     if (error instanceof CredentialEncryptionKeyError) {
@@ -1446,6 +1289,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
   let attemptedLiffId: string | null = null;
   try {
     let body: {
+      style?: AccountStyle;
       channelId: string;
       name: string;
       channelAccessToken: string;
@@ -1470,6 +1314,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
       return inputError(c, { success: false, error: 'request body must be valid JSON' }, 422, []);
     }
 
+    if (body.style !== undefined && !ACCOUNT_STYLES.includes(body.style)) return inputError(c, { success: false, error: 'invalid_style' }, 422, ['style']);
     if (!body.channelId || !body.name || !body.channelAccessToken || !body.channelSecret) {
       return inputError(c, { success: false, error: 'channelId, name, channelAccessToken, and channelSecret are required' }, 400, ["channelId","name","channelAccessToken","channelSecret"]);
     }
@@ -1604,7 +1449,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
         await copyLineAccountSettings(c.env.DB, copyFromAccountId, account.id, copyItems);
       } catch (copyError) {
         await deleteUncommittedLineAccount(c.env.DB, account.id);
-        console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts"}));
+        logger.error("routes_line_accounts_failed");
         return c.json({ success: false, error: '設定のコピーに失敗したため、アカウントは追加していません' }, 500);
       }
     }
@@ -1619,10 +1464,14 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
         account.id,
       );
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts"}));
+      logger.error("routes_line_accounts_failed");
     }
 
-    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id);
+    try {
+      await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,body.style);
+    } catch {
+      return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: body.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}` } }, 502);
+    }
     return c.json({ success: true, data: serializeLineAccountFull(account) }, 201);
   } catch (err) {
     if (err instanceof CredentialEncryptionKeyError) {
@@ -1641,7 +1490,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     if (duplicate) {
       return inputError(c, { success: false, error: duplicate.error }, duplicate.status, []);
     }
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"POST /api/line-accounts"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1718,7 +1567,7 @@ lineAccounts.patch(
       );
       return c.json({ success: true, data: relationships });
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PATCH /api/line-accounts/hierarchy"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1761,7 +1610,7 @@ lineAccounts.patch(
     } catch (err) {
       const conflict = lifecycleConflict(err);
       if (conflict) return c.json(conflict, 409);
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PATCH /api/line-accounts/order"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -1819,12 +1668,13 @@ lineAccounts.patch(
 
       // Normalize: trim non-empty strings; treat empty/whitespace-only as null.
       // Empty-string-from-UI represents "user cleared the field" — store as NULL,
-      // not as empty string, so countryFlag() lookup degrades gracefully.
+      // not as empty string, so countryFlag lookup degrades gracefully.
       const country = normalizeOptionalString(body.country);
       const role = normalizeOptionalString(body.role);
       const loginChannelId = normalizeOptionalString(body.loginChannelId);
       const loginChannelSecret = normalizeOptionalString(body.loginChannelSecret);
       const liffId = normalizeOptionalString(body.liffId);
+    if (liffId && !/^\d+-[A-Za-z0-9]+$/.test(liffId)) return inputError(c, { success: false, error: 'LIFF IDを確認してください' }, 400, ['liffId']);
       const ogSiteName = normalizeOptionalString(body.ogSiteName);
       const ogDefaultImageUrl = normalizeOptionalString(body.ogDefaultImageUrl);
       const ogDefaultDescription = normalizeOptionalString(body.ogDefaultDescription);
@@ -1938,7 +1788,7 @@ lineAccounts.patch(
     } catch (err) {
       const conflict = lifecycleConflict(err);
       if (conflict) return c.json(conflict, 409);
-      console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PATCH /api/line-accounts/:id"}));
+      logger.error("routes_line_accounts_failed");
       return c.json({ success: false, error: 'Internal server error' }, 500);
     }
   },
@@ -2001,6 +1851,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
     const loginChannelId = normalizeOptionalString(body.loginChannelId);
     const loginChannelSecret = normalizeOptionalString(body.loginChannelSecret);
     const liffId = normalizeOptionalString(body.liffId);
+    if (liffId && !/^\d+-[A-Za-z0-9]+$/.test(liffId)) return inputError(c, { success: false, error: 'LIFF IDを確認してください' }, 400, ['liffId']);
     const ogSiteName = normalizeOptionalString(body.ogSiteName);
     const ogDefaultImageUrl = normalizeOptionalString(body.ogDefaultImageUrl);
     const ogDefaultDescription = normalizeOptionalString(body.ogDefaultDescription);
@@ -2100,7 +1951,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), inputJsonBounda
     if (err instanceof CredentialEncryptionKeyError) {
       return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
     }
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"PUT /api/line-accounts/:id"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -2112,7 +1963,7 @@ lineAccounts.delete('/api/line-accounts/:id', requireRole('owner'), async (c) =>
   } catch (err) {
     const conflict = lifecycleConflict(err);
     if (conflict) return c.json(conflict, 409);
-    console.error(JSON.stringify({"code":"routes_line_accounts_failed","route":"DELETE /api/line-accounts/:id"}));
+    logger.error("routes_line_accounts_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

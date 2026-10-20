@@ -1,5 +1,5 @@
 import type { CfApiCreds } from '../types.js';
-import { authHeader, throwHttpError, workersApiBase } from './_shared.js';
+import { authHeader, throwHttpError, workersApiBase } from './shared.js';
 
 /**
  * Cloudflare Workers binding shape used by the Workers Scripts API.

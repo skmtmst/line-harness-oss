@@ -1,7 +1,7 @@
 import { publishedVersionStatement } from '@line-crm/db';
 import { reminderReplacement } from './style-starter-reminder.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
-import { profile } from './style-setup.js';
+import { profile } from './style-profile.js';
 import type { AccountStyle, SetupAnswer } from '@line-crm/shared';
 import type { StarterItem } from './style-starter-definition.js';
 import { StyleError } from './style-setup-core.js';

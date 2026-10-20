@@ -13,7 +13,7 @@ import { insertDuplicateAfter } from './use-duplicate-feedback'
 import EditorSurface from './editor-surface'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
-describe('B-177: 行き先の共通の約束', () => {
+describe('行き先の共通の約束', () => {
   it.each([['small',480],['medium',560],['large',720],['wide',960]] as const)('確認の中身に合わせて共通の%s幅を選べる', (size, width) => {
     render(<ConfirmDialog open size={size} title="確かめる" description="対象を確認します" onCancel={() => {}} />)
     expect(screen.getByRole('dialog').style.getPropertyValue('--dialog-design-width')).toBe(`${width}px`)

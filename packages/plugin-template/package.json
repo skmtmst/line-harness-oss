@@ -8,6 +8,7 @@
   "main": "./dist/index.js",
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts",
+    "test": "vitest run",
     "build:mcp": "tsup mcp-server/index.ts --format esm --out-dir dist-mcp",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -20,9 +21,9 @@
   "devDependencies": {
     "@cloudflare/workers-types": "4.20260317.1",
     "@modelcontextprotocol/sdk": "1.31.0",
-    "@types/node": "^22.0.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.5.0",
+    "@types/node": "22.19.15",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
     "wrangler": "4.77.0",
     "zod": "^3.24.4"
   }

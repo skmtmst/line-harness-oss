@@ -1,4 +1,4 @@
-/* 運営のナレッジ V8（一覧 h114s・記事 R5ckwJ）。値は --tpl-op-*。
+/* 運営のナレッジ V8（一覧 ・記事 ）。値は --tpl-op-*。
  * ファイル名を knowledge.module.css にしない。ビルド後の組の名前が今のナレッジ（knowledge_*）と同じになり、
  * 設計値の照合（verify-design-values）がこちらの値を ops-knowledge の値として読んでしまう。 */
 
@@ -43,7 +43,7 @@
   height: var(--tpl-op-dash-alert-h);
 }
 
-/* --- 記事（R5ckwJ） --- */
+/* --- 記事 --- */
 .articleError {
   margin-bottom: var(--tpl-op-row-gap);
 }

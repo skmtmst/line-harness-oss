@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // 概要の口に viewers 以外の権限ゲートが付いているか(#517 中4)。
 // orders / action-executions / identity-candidates と同じく
@@ -20,7 +20,7 @@ const accessMocks = vi.hoisted(() => ({
 vi.mock('@line-crm/db', () => dbMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
 vi.mock('../services/event-bus.js', () => ({ logOutgoingMessage: vi.fn() }));
-vi.mock('../services/ec-notification-message.js', () => ({ ecFlexMessage: vi.fn() }));
+vi.mock('../features/ec-commerce/ec-notification-message.js', () => ({ ecFlexMessage: vi.fn() }));
 vi.mock('./line-notifications.js', () => ({ notificationDeliveriesResponse: vi.fn() }));
 vi.mock('./ec-integrations.js', () => ({ EC_EVENT_TYPES: [] }));
 

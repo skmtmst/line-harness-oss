@@ -1,8 +1,8 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { createAutomationActionExecutors } from './automation-action-executors.js';
-import { runActionRows, type ScenarioActionRow } from './scenario-actions.js';
-import type { AutomationActionContext } from './automation-engine.js';
+import { createAutomationActionExecutors } from '../features/automations/automation-action-executors.js';
+import { runActionRows, type ScenarioActionRow } from '../features/scenarios/scenario-actions.js';
+import type { AutomationActionContext } from '../features/automations/automation-engine.js';
 const line = vi.hoisted(() => ({ pushMessage: vi.fn(async () => ({ requestId: 'accepted' })) }));
 vi.mock('@line-crm/line-sdk', async original => ({ ...await original<any>(), LineClient: class { pushMessage = line.pushMessage } }));
 let db: ReturnType<typeof createTestD1>;
@@ -52,7 +52,7 @@ test('ウェビナー完了のタグ以外の処理も実行し、再送で重�
   db.raw.exec(`INSERT INTO webinars(id,account_id,title,slug,created_at,updated_at) VALUES('w','a','相談','consultation','2026-10-09','2026-10-09');
     INSERT INTO webinar_actions(id,webinar_id,trigger,action_type,config_json,position,version,enabled,created_at,updated_at)
       VALUES('wa','w','completed','send_message','{"content":"参加ありがとうございます"}',0,1,1,'2026-10-09','2026-10-09');`);
-  const { runWebinarTriggerActions } = await import('./webinar-action-runner.js');
+  const { runWebinarTriggerActions } = await import('../features/webinars/webinar-action-runner.js');
   const input = {webinarId:'w',friendId:'f',sessionStartAt:1,trigger:'completed' as const};
   await runWebinarTriggerActions(db.db,input); await runWebinarTriggerActions(db.db,input);
   expect(line.pushMessage).toHaveBeenCalledTimes(1);

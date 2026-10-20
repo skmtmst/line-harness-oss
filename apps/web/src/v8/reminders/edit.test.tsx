@@ -199,7 +199,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
 
   it('通知の中身：開いた通知は日・前・時刻で書き、閉じた通知は本文の頭だけを出す', async () => {
     await render(null)
-    // happy-dom の窓は幅 1024 なので 1152 の板（r1l0bT）：右の列は「LINEでの見え方を見る」と例だけ。
+    // happy-dom の窓は幅 1024 なので 1152 の板：右の列は「LINEでの見え方を見る」と例だけ。
     expect(host.querySelector('[data-page-template="create"]')?.getAttribute('data-design-node')).toBe('r1l0bT')
     expect(buttonByText('LINEでの見え方を見る')).toBeTruthy()
     expect(host.querySelector('[aria-label="届く日時の例"]')?.textContent).toContain('2 通目')

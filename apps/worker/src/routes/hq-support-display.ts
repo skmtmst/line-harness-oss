@@ -1,5 +1,6 @@
 import { type HqSupportKind, type HqSupportRequest, formatTicketNo } from '@line-crm/db';
 
+
 export const HQ_SUPPORT_KIND_LABELS: Record<HqSupportKind, string> = {
   usage: '使い方について',
   bug: '不具合の報告',
@@ -30,7 +31,7 @@ export function serialize(row: HqSupportRequest, base: string, replies: ReplyVie
     staffName: row.staff_name,
     notified: row.notified_at !== null,
     createdAt: row.created_at,
-    // 運営側のチケット番号と返信（★V6 37-6 の返信は統括の履歴にも載る）
+    // 運営側のチケット番号と返信（★37-6 の返信は統括の履歴にも載る）
     ticketLabel: formatTicketNo(row.ticket_no ?? null),
     stage: row.stage,
     replies,

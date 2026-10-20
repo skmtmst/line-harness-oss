@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), save: vi.fn(), start: vi.fn() }))
 const env = vi.hoisted(() => ({ role: 'owner' as string | null, push: vi.fn(), search: '' }))
-vi.mock('@/lib/api-gap3', () => ({ bookingPassPlansApi: api }))
+vi.mock('@/lib/api/helpers/gap3', () => ({ bookingPassPlansApi: api }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: env.push, replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
   usePathname: () => '/booking/passes/new',

@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("ペットの名前を入れてください。"),
 }
 
@@ -22,7 +22,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8-B ペットの情報を直す（eLjeQ）。真ん中の窓（幅 560・上から 170）。
+ * ★V8-B ペットの情報を直す。真ん中の窓（幅 560・上から 170）。
  * 窓の枠は共通の Dialog。中身は 対象のペット → 種別 → 名前・品種 → 性別 → 誕生日・体重 → 補足。
  * 口は今の画面と同じ（PUT /api/nen-campaigns/pets/:id、版つき保存）。
  * 誕生日を変えると、予約中の誕生日クーポン配信は新しい誕生日で組み直される（Worker 側）。
@@ -61,14 +61,14 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
   const weightText = weight.replace(/kg/i, '').trim()
   const weightKg = weightText === '' ? null : Number(weightText)
   const fields = useFieldValidation([
-    ...((b244Requirements.name.check(name) !== null) ? [{ id: 'pet-edit-name', message: 'ペットの名前を入れてください。' }] : []),
+    ...((FIELD_REQUIREMENTS.name.check(name) !== null) ? [{ id: 'pet-edit-name', message: 'ペットの名前を入れてください。' }] : []),
     ...(normalized === 'invalid' ? [{ id: 'pet-edit-birthday', message: '誕生日は「2020-03-15」か「03-15」（月日だけ）で入力してください。' }] : []),
     ...(weightKg !== null && (!Number.isFinite(weightKg) || weightKg < 0.01 || weightKg > 200)
       ? [{ id: 'pet-edit-weight', message: '体重は 0.01〜200kg で入力してください。' }] : []),
   ])
 
   const save = async () => {
-    if (saving) return
+
     setError('')
     if (!fields.submit()) return
     setSaving(true)
@@ -140,7 +140,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           </span>
         </div>
         <div className={styles.editorPair}>
-          <Field label="ペットの名前" requirement={b244Requirements.name}><SaveErrorField names={["name"]}><TextField {...fields.bind('pet-edit-name')} aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
+          <Field label="ペットの名前" requirement={FIELD_REQUIREMENTS.name}><SaveErrorField names={["name"]}><TextField {...fields.bind('pet-edit-name')} aria-label="ペットの名前" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} /></SaveErrorField>
 <FieldError id="pet-edit-name-error">{fields.error('pet-edit-name')}</FieldError></Field>
           <Field label="品種"><SaveErrorField names={["breed"]}><TextField aria-label="品種" value={breed} maxLength={80} onChange={(event) => setBreed(event.target.value)} /></SaveErrorField></Field>
         </div>

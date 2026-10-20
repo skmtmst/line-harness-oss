@@ -1,5 +1,5 @@
 /*
- * ★V8 リマインダを作る・手順1の直し〜5と完了（板 k32cn・YChR6・p5YuP・r1l0bT・T0nis・ltAaq・hjNpJ）。
+ * ★V8 リマインダを作る・手順1の直し〜5と完了（板 ・・・・・・）。
  * 枠・頭・右の列・下の帯は型（CreatePage）が持つ。ここは本文の中身だけ。
  * 数字は globals.css の [data-theme="v8"] の段の --tpl-rm-* に置く（ここには書かない）。
  */
@@ -16,7 +16,7 @@
 }
 .backLink:hover { text-decoration: underline; }
 
-/* 競合の帯（k32cn）：頭の線の下・板の幅いっぱい。型の帯の段（上 0・左右 24・下 8）に入れる。 */
+/* 競合の帯：頭の線の下・板の幅いっぱい。型の帯の段（上 0・左右 24・下 8）に入れる。 */
 .conflictBand {
   display: flex;
   align-items: center;
@@ -62,11 +62,11 @@
   line-height: var(--tpl-rm-note-lh);
 }
 .spacer { flex: 1; min-width: 0; }
-/* 手順1の直し（基本設定）は合格した VE1u5 と同じ行の高さ。 */
+/* 手順1の直し（基本設定）は合格した  と同じ行の高さ。 */
 .formTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-rm-form-title-lh); }
 .formNote { margin: 0; color: var(--color-ink-faint); font-size: var(--tpl-rm-note-size); line-height: var(--tpl-rm-form-note-lh); }
 
-/* ---- 手順1（基本設定）の入力：合格した VE1u5 と同じ値 ---- */
+/* ---- 手順1（基本設定）の入力：合格した  と同じ値 ---- */
 .templateCard { gap: var(--tpl-label-tag-gap); height: var(--tpl-rm-tpl-card-h); min-width: 0; }
 .field { display: flex; flex-direction: column; gap: var(--tpl-label-tag-gap); min-width: 0; }
 .label { color: var(--color-ink); font-size: var(--tpl-rm-label-size); font-weight: 500; }
@@ -96,7 +96,7 @@
   line-height: var(--tpl-text-sm-lh);
 }
 
-/* ---- 手順2（YChR6）：対象者・人数の帯・止める条件・決まり ---- */
+/* ---- 手順2：対象者・人数の帯・止める条件・決まり ---- */
 .choiceRow { display: grid; gap: var(--tpl-rm-choice-gap); grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .countBand {
   display: flex;
@@ -151,7 +151,7 @@
 }
 .sideRow dt { flex: 1; color: var(--color-ink-secondary); }
 .sideRow dd { margin: 0; color: var(--color-ink); font-weight: 600; white-space: nowrap; }
-/* 1152（r1l0bT）：右の列は余白16。型の余白24との差だけ外へ広げる。 */
+/* 1152：右の列は余白16。型の余白24との差だけ外へ広げる。 */
 .narrowSide {
   display: flex;
   flex-direction: column;
@@ -161,7 +161,7 @@
 }
 .wideButton { width: 100%; }
 
-/* ---- 手順3（p5YuP・r1l0bT）：通知のカード ---- */
+/* ---- 手順3（・）：通知のカード ---- */
 .stepCard {
   display: flex;
   flex-direction: column;
@@ -247,7 +247,7 @@
 .insertLabel { color: var(--color-ink-faint); font-size: var(--tpl-rm-small-size); line-height: var(--tpl-rm-small-lh); white-space: nowrap; }
 .charCount { color: var(--color-ink-faint); font-size: var(--tpl-rm-tiny-size); line-height: var(--tpl-rm-tiny-lh); white-space: nowrap; }
 
-/* ---- 手順4（T0nis）：予定の表 ---- */
+/* ---- 手順4：予定の表 ---- */
 .rangeRow { display: flex; align-items: center; gap: var(--tpl-rm-row-gap-lg); }
 .rangeCount { color: var(--color-ink); font-size: var(--tpl-rm-note-size); font-weight: 600; line-height: var(--tpl-text-sm-lh); white-space: nowrap; }
 .planTable { display: flex; flex-direction: column; }
@@ -289,7 +289,7 @@
 }
 .infoBand > svg { flex: none; color: var(--color-action); }
 
-/* ---- 手順5（ltAaq）：確認 ---- */
+/* ---- 手順5：確認 ---- */
 .confirmRows { display: flex; flex-direction: column; gap: var(--tpl-section-gap); }
 .confirmRow {
   display: flex;
@@ -320,7 +320,7 @@
 .checkTitle { color: var(--color-ink); font-size: var(--tpl-rm-label-size); font-weight: 600; }
 .checkNote { color: var(--color-ink-faint); font-size: var(--tpl-rm-small-size); }
 
-/* ---- 完了（hjNpJ） ---- */
+/* ---- 完了 ---- */
 .doneBody { display: flex; justify-content: center; padding: var(--tpl-rm-done-pad); }
 .doneCard { width: var(--tpl-rm-done-w); max-width: 100%; }
 .doneFacts { display: flex; flex-direction: column; width: 100%; margin: 0; }
@@ -350,7 +350,7 @@
   line-height: var(--tpl-rm-bubble-lh);
   white-space: pre-wrap;
   word-break: break-word;
-  /* 行末の1字だけが次の行へ落ちないよう、文節で折る（共通の LINE の見本と同じ・p5YuP「くださ／い。」）。 */
+  /* 行末の1字だけが次の行へ落ちないよう、文節で折る（共通の LINE の見本と同じ・「くださ／い。」）。 */
   word-break: auto-phrase;
   overflow-wrap: break-word;
   text-wrap: pretty;

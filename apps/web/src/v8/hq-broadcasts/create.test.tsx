@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 統括 一括配信を作る（B-37・BBRDb：店の一斉配信と同じ5段＋送るアカウント）・詳細（xOXuY）の動きの試験。
+ * 統括 一括配信を作る（・：店の一斉配信と同じ5段＋送るアカウント）・詳細（xOXuY）の動きの試験。
  * ① 配信名 → ② 送るアカウント（窓で選ぶ）→ ③ 本文 → ④ 時刻 → ⑤ 確かめる（作る → preflight → 問題のある店を外す）→ 送る（確かめの窓 → send）。
  * 詳細は失敗した店へのやり直し。閲覧のみ（担当者）には作る画面を出さない。
  */
@@ -28,7 +28,7 @@ const replace = vi.hoisted(() => vi.fn())
 const params = vi.hoisted(() => ({ value: new URLSearchParams() }))
 
 vi.mock('@/lib/hq-broadcasts-api', () => ({ hqBroadcastsApi: hq }))
-vi.mock('@/lib/api-gap1', () => ({ chatSafetyApi: { hqSendPreview: async () => ({ success: true, data: { recipients: 6120, excluded: { blocked: 0, optedOut: 0, duplicate: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2, perAccount: [] } }) } }))
+vi.mock('@/lib/api/helpers/gap1', () => ({ chatSafetyApi: { hqSendPreview: async () => ({ success: true, data: { recipients: 6120, excluded: { blocked: 0, optedOut: 0, duplicate: 0 }, purpose: 'marketing', scheduledAt: null, quietHoursShiftTo: null, needsApproval: false, firstText: '本文', sender: null, expectedVersion: 2, perAccount: [] } }) } }))
 vi.mock('@/lib/hq-templates-api', async (original) => ({ ...await original<typeof import('@/lib/hq-templates-api')>(), hqTemplatesApi: tpl }))
 /*
  * その場で作る：店のカルーセル・リッチメッセージの作る部品（host の口）は、ここでは口だけの代わりにする。
@@ -116,7 +116,7 @@ describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送�
     expect(date.textContent).toContain('2026年10月11日')
   })
 
-  it('B-139：本文の無い吹き出しは帯にせず、吹き出しの下に理由と頭に赤い丸を出し、そこへ移る', async () => {
+  it('本文の無い吹き出しは帯にせず、吹き出しの下に理由と頭に赤い丸を出し、そこへ移る', async () => {
     render(<HqBroadcastCreate />)
     await toMessage()
     fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
@@ -631,7 +631,7 @@ describe('一括配信の詳細（xOXuY ⑤ 送った結果）', () => {
   })
 })
 
-it('B-173: 統括でリサーチの質問と公開版を読み込み下書きへ保存する', async () => {
+it('統括でリサーチの質問と公開版を読み込み下書きへ保存する', async () => {
  tpl.listByKind.mockResolvedValue([{id:'research1',name:'健康調査',kind:'research',content_summary:'リサーチ'}]);
  tpl.get.mockResolvedValue({template:{id:'research1',name:'健康調査',template_type:'template',current_version_id:'v1'},definition:{schemaVersion:1,media:[],template:{id:'source1',name:'健康調査',messageType:'text',messageContent:''},asset:{kind:'research',payload:{questions:[{text:'体調',format:'free',required:true}],answerActions:[]}}}});
  render(<HqBroadcastCreate />);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'健康調査'}});fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店');fireEvent.click(screen.getByRole('button',{name:'メッセージ設定へ'}));

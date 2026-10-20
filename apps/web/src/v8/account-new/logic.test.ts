@@ -299,13 +299,13 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     expect(other?.body).toContain('もう一度確かめて')
   })
 
-  it('④のひな型は6枚。初回のローンチは飲食店だけ選べる', () => {
+  it('④のひな型は6枚。6つの正式キーを選べる', () => {
     const options = templateOptions()
     expect(options).toHaveLength(6)
-    expect(options.filter((option) => option.enabled).map((option) => option.key)).toEqual(['restaurant'])
+    expect(options.filter((option) => option.enabled).map((option) => option.key)).toEqual(['restaurant', 'salon', 'consult', 'ec', 'lesson', 'standard'])
     expect(options[0].node).toBe('MELvy')
     expect(options.map((option) => option.node)).toEqual(['MELvy', 'J1tGCr', 'U74H4', 'Y0ldyt', 'd0vdd', 'H2d2y'])
-    expect(options.map((option) => option.label)).toEqual(['飲食店向け', 'サロン', '面談・相談', 'ECサイト', '教室・レッスン', '標準'])
+    expect(options.map((option) => option.label)).toEqual(['飲食店', 'サロン', '面談・相談', 'EC', '教室・レッスン', '標準'])
     expect(options[0].note).toBe('今日の来店（時刻・席・人数）を先頭に出します。席の予約が始めから使えます')
     expect(options[5].note).toBe('今のダッシュボードのままです。カードは、あとから自分で足し引きできます')
   })

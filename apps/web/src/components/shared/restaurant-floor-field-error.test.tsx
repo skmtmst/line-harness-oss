@@ -3,7 +3,7 @@ import React from 'react'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const net = vi.hoisted(() => ({ floors: vi.fn(), save: vi.fn() }))
-vi.mock('@/lib/api-reservation-board', () => ({ reservationBoardApi: { floors: net.floors, saveFloor: net.save } }))
+vi.mock('@/lib/api/helpers/reservation-board', () => ({ reservationBoardApi: { floors: net.floors, saveFloor: net.save } }))
 vi.mock('next/navigation', () => ({ useRouter:()=>({push:vi.fn(),replace:vi.fn()}),usePathname:()=>'/restaurant-test/front-desk' }))
 import RestaurantFloorEditor from './restaurant-floor-editor'
 import { ApiError } from '@/lib/api'

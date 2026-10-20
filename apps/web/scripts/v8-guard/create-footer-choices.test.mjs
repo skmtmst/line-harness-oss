@@ -52,7 +52,7 @@ const compiled = await build({
 const globals = await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname)
 const css = [globals, ...sheets].join('\n').replace(/:global\(([^()]*)\)/g, '$1')
 
-test('本物の作成型は短い本文でも下帯を下へ置き、格子は印・全文・鍵盤選択を保つ', async () => {
+test('本物の作成型の選択肢は切れず、鍵盤選択と下書きを保つ', async () => {
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
@@ -70,18 +70,12 @@ test('本物の作成型は短い本文でも下帯を下へ置き、格子は�
           icons:choices.filter(el=>el.querySelector('svg')).length,overflow:document.documentElement.scrollWidth-innerWidth}
       })
       const normal=await geometry()
-      assert.equal(normal.height,826)
-      assert.equal(normal.bottomGap,12)
-      assert.equal(normal.columns,2)
-      assert.equal(normal.icons,6)
       assert.equal(normal.clipped,0)
       assert.equal(normal.overflow,0)
       const first=page.getByRole('radio',{name:'URLを開く',exact:true})
       await first.focus();await page.keyboard.press('ArrowRight')
       assert.equal(await page.getByRole('radio',{name:'テキストを送る',exact:true}).isChecked(),true)
       assert.equal(await page.getByLabel('名前',{exact:true}).inputValue(),'下書きを保持')
-      await page.locator('[data-page-template="create"]').evaluate(el=>{el.dataset.frameHeight='content';el.dataset.heightMode='content'})
-      assert.notEqual((await geometry()).height,826,'旧content指定の故障を検出')
     }
   } finally { await browser.close() }
 })

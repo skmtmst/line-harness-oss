@@ -32,7 +32,7 @@ WebhookTabs,
 overviewBandCells
 } from './shell'
 import { useApiTokens } from './use-api-tokens'
-import McpConnectionsSection from '@/v8/mcp-connect/section'
+import { McpConnectionsSection } from '@/v8/mcp-connect/public/section/index'
 
 
 function SkeletonCells({ height, width }: { height: number; width: string }) {

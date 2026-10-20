@@ -104,7 +104,7 @@ async function change(id: string, value: string) {
   await act(async () => { fireEvent.change(document.querySelector('#' + id)!, { target: { value } }) })
 }
 
-/** 日付の選択（★V7）で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
+/** 日付の選択（★管理画面）で YYYY-MM-DD を選ぶ。値は今までどおりの文字列。 */
 async function pickDate(id: string, iso: string) {
   const [y, mo, d] = iso.split('-').map(Number)
   const week = '日月火水木金土'[new Date(y, mo - 1, d).getDay()]
@@ -127,7 +127,7 @@ async function pickDate(id: string, iso: string) {
   await act(async () => { fireEvent.click(day) })
 }
 
-/** 時刻の選択（★V7）で HH:mm を選ぶ。 */
+/** 時刻の選択（★管理画面）で HH:mm を選ぶ。 */
 async function pickTime(id: string, hhmm: string) {
   const field = document.getElementById(id) ?? document.querySelector(`[aria-label="${id}"]`)!
   if (field instanceof HTMLInputElement) {

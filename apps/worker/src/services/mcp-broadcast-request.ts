@@ -1,5 +1,5 @@
 import {GapError} from './gap-common.js';
-import {assertChanged,clearAssertions} from './booking-series.js';
+import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 import {canAccessAllLineAccounts} from './account-access.js';
 import {sha256Hex} from '../middleware/auth.js';
 export async function requestMcpBroadcast(db:D1Database,input:{connectionId:string;account:string;actor:string;args:Record<string,unknown>;now:string}){

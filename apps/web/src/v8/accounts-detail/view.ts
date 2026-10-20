@@ -2,7 +2,7 @@ import type { LineAccount } from '@line-crm/shared'
 import { formatNumber, formatListDateTime, formatListDay } from '@/lib/format'
 
 /*
- * LINEアカウントの詳細（★V8 ihjfd）の言葉。画面から切り離し、描かずに確かめられるようにする。
+ * LINEアカウントの詳細（V8）の言葉。画面から切り離し、描かずに確かめられるようにする。
  * 今の画面（app/accounts/detail）の決まりを写した。src/v8 からは @/app を読めないため。
  */
 

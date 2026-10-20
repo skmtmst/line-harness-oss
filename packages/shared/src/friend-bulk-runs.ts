@@ -1,4 +1,4 @@
-import type { SavedSearchConditions } from './types';
+import type { SavedSearchConditions } from './types/saved-searches';
 
 /** 一括操作の対象。作成時にサーバで再計算し、実行前にIDを固定する。 */
 export type FriendBulkSelection =

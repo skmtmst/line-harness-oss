@@ -12,7 +12,7 @@ import {
 import {
   getFriendProfileCandidates,
   resolveProfileCandidateSelections,
-} from './friend-profile-candidates.js';
+} from '../features/friends/friend-profile-candidates.js';
 
 const actor = { id: 'owner-a', name: '担当者', tenantId: DEFAULT_TENANT_ID };
 

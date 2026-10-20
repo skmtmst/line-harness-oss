@@ -110,7 +110,7 @@ describe('#634 運用者タブ件数の取得失敗から読み直せる', () =>
     await waitFor(() => expect(screen.getByText('運用者へのお知らせ 取得失敗')).toBeTruthy())
     await waitFor(() => expect(screen.getByText(/運用者へのお知らせの件数を読み込めませんでした/)).toBeTruthy())
 
-    // ★V7 `x63W5x`：黄色の帯ではなく、その場所の小さな1行から読み直す。
+    // ★管理画面 `x63W5x`：黄色の帯ではなく、その場所の小さな1行から読み直す。
     const notice = screen.getByText(/運用者へのお知らせの件数を読み込めませんでした/).closest('[role="alert"]') as HTMLElement
     fireEvent.click(within(notice).getByRole('button', { name: 'もう一度読み込む' }))
 

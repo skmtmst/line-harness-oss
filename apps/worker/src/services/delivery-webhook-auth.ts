@@ -8,16 +8,15 @@
  * - 出前館・ロケットナウは自社の方式（`x-nen-timestamp` と `x-nen-signature`）を変えない。
  * - DBも fetch も触らない。設定（env）と文字列だけを見る。
  */
-import { computeHmacSha256Hex, safeEqualHex } from '../lib/hmac.js';
+import { NEN_SIGNATURE_HEADER, NEN_TIMESTAMP_HEADER, verifyNenWebhook } from '../lib/hmac.js';
 import { deliveryWebhookSecret } from './delivery-webhook-ip.js';
-import { WEBHOOK_SKEW_SECONDS } from './delivery-webhook-payload.js';
 import { uberWebhookSecret } from './restaurant-delivery.js';
-import type { DeliveryEnv, DeliveryService } from './restaurant-delivery.js';
+import type { DeliveryEnv } from './restaurant-delivery.js';
+import type { DeliveryService } from './delivery-service-types.js';
 import { UBER_SIGNATURE_HEADER, verifyWebhookSignature } from './uber-eats.js';
 
 /** 自社方式の見出しの名前。Uber 以外のサービスはこの2つを使う。 */
-export const NEN_TIMESTAMP_HEADER = 'x-nen-timestamp';
-export const NEN_SIGNATURE_HEADER = 'x-nen-signature';
+export { NEN_TIMESTAMP_HEADER, NEN_SIGNATURE_HEADER } from '../lib/hmac.js';
 
 /** 受け取った要求の見出しを1つ読む関数。受け口は `c.req.header` をそのまま渡す。 */
 export type WebhookHeaderReader = (name: string) => string | null | undefined;
@@ -56,24 +55,16 @@ async function verifyUberWebhook(
 }
 
 /** 自社の方式。時刻のずれを見てから `${通算秒}.${本文}` の署名を確かめる。 */
-async function verifyNenWebhook(
+async function verifyNenDeliveryWebhook(
   secret: string,
   rawBody: string,
   header: WebhookHeaderReader,
   nowSeconds: number,
 ): Promise<DeliveryWebhookAuthResult> {
-  const timestamp = header(NEN_TIMESTAMP_HEADER) || '';
-  const timestampSeconds = Number(timestamp);
-  if (
-    !Number.isInteger(timestampSeconds) ||
-    Math.abs(nowSeconds - timestampSeconds) > WEBHOOK_SKEW_SECONDS
-  ) {
-    return { ok: false, error: 'Expired request' };
-  }
-  const signature = (header(NEN_SIGNATURE_HEADER) || '').replace(/^sha256=/i, '').toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(signature)) return { ok: false, error: 'Invalid signature' };
-  const expected = await computeHmacSha256Hex(secret, `${timestamp}.${rawBody}`);
-  return safeEqualHex(signature, expected) ? { ok: true } : { ok: false, error: 'Invalid signature' };
+  return verifyNenWebhook({
+    profile: 'delivery', secret, rawBody, nowSeconds,
+    timestamp: header(NEN_TIMESTAMP_HEADER), signature: header(NEN_SIGNATURE_HEADER),
+  });
 }
 
 /** サービスごとの方式で、受け取った通知の署名を確かめる。 */
@@ -86,5 +77,5 @@ export async function verifyDeliveryWebhook(input: {
 }): Promise<DeliveryWebhookAuthResult> {
   return input.service === 'ubereats'
     ? verifyUberWebhook(input.secret, input.rawBody, input.header)
-    : verifyNenWebhook(input.secret, input.rawBody, input.header, input.nowSeconds);
+    : verifyNenDeliveryWebhook(input.secret, input.rawBody, input.header, input.nowSeconds);
 }

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from '../services/db-router.js';
 import { readHqFormTest } from '../services/hq-templates/form-test.js';
 import { HqTemplateError } from '../services/hq-templates/distribution.js';

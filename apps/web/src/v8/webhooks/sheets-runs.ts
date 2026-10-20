@@ -5,7 +5,7 @@ export const RUN_KIND_LABEL: Record<GoogleSheetsSyncRun['kind'], string> = { man
 const RUN_DATA_LABEL: Record<GoogleSheetsSyncRun['dataType'], string> = { friends: '友だち', form_answers: 'フォーム回答' }
 export const RUN_STATUS_LABEL: Record<GoogleSheetsSyncRun['status'], string> = { running: '実行中', ok: '完了', partial: '一部だけ完了', error: '失敗' }
 
-/** 30分以上「実行中」のままの記録は止まったものとみなす（v7 と同じ）。 */
+/** 30分以上「実行中」のままの記録は止まったものとみなす（管理画面 と同じ）。 */
 export const STALE_RUN_MS = 30 * 60 * 1000
 
 type RunGroup = { key: string; startedAt: string; kind: GoogleSheetsSyncRun['kind']; parts: string[]; status: GoogleSheetsSyncRun['status'] }

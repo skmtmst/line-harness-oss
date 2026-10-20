@@ -65,7 +65,7 @@ export function sourceEvidence(file, source, offset, length = 1) {
     }
     inspect(initializer)
   }
-  const functionNode = parents.findLast(node => ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) ?? (initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) ? initializer : null)
+  const functionNode = initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)) ? initializer : parents.findLast(node => ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node))
   let returnsJsx = false
   const returnTags = []
   const rootTag = node => {
@@ -83,13 +83,24 @@ export function sourceEvidence(file, source, offset, length = 1) {
     returns(functionNode)
     if (ts.isArrowFunction(functionNode)) { const tag = rootTag(functionNode.body); if (tag) returnTags.push(tag) }
   }
-  // 小さな定数やroleだけの一致は移動の証拠にしない。中身を含む単位で照合する。
-  const units = parents.filter(node => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node))
-    .map(node => (ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) && node.body ? node.body : node)
+  // 分割された宣言・JSX全体を一対一で照合する。候補だけの短い語は証拠にしない。
+  const unitParents = [...parents, ...(functionNode ? [functionNode] : []), ...(parents.findLast(ts.isVariableStatement)?.declarationList.declarations ?? [])]
+  const units = unitParents.filter(node => ts.isVariableDeclaration(node) || ts.isJsxFragment(node) || ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node))
     .map(node => {
-      if (!entry.hashes.has(node)) { const text = print(node); entry.hashes.set(node, text.length >= 80 ? digest(text) : null) }
+      if ((ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) && node.body) {
+        node = node.body
+        if (ts.isBlock(node) && node.statements.length === 1 && ts.isReturnStatement(node.statements[0])) node = node.statements[0].expression ?? node
+        while (ts.isParenthesizedExpression(node)) node = node.expression
+      }
+      return node
+    })
+    .map(node => {
+      if (!entry.hashes.has(node)) { const text = print(node); entry.hashes.set(node, (ts.isVariableDeclaration(node) || text.length >= 80) ? digest(text) : null) }
       return entry.hashes.get(node)
     }).filter(Boolean)
+  // 名前付きの同じ外枠は、中の共通部品を交換しても移動元と一対一で照合する。
+  // class/style/属性を含めて比べるので、新しい枠・上書き・複製は候補に残る。
+  if (opening && accessibleName) units.push(`opening:${digest(print(opening))}`)
   // 動きのpropsを追加しただけの同じ形も、ファイル分割の前後で照合する。
   // 見た目のpropsと本文・子の構造は残す。CSSの値は別のidentityで必ず比較する。
   for (const node of parents.filter(node => ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node))) {

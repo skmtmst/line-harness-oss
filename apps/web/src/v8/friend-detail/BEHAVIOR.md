@@ -1,9 +1,11 @@
+> 文書：友だち詳細の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 友だち詳細の動き（BEHAVIOR.md）
 
-対象：`app/friends/detail/page.tsx` の `FriendDetailInner`（約1,840行の1部品）。その動きを写して、`src/v8/friend-detail/` にタブごとのファイルで一から書いた。見た目は Pencil「★P1-4 友だち詳細」`Q5F2QE`（概要は `JCDRm`）。
+対象：`detail.tsx` とタブごとのファイル。入口・公開名・API・試験の案内は [README](README.md)。見た目は Pencil「★P1-4 友だち詳細」`Q5F2QE`（概要は `JCDRm`）。
 
 ## 入口
-- `app/friends/detail/page.tsx` の `FriendDetailPage`：`useAdminTheme() === 'v8'` のときだけ `@/v8/friend-detail/detail` を出す。v7（`FriendDetailInner`）と v7 の試験は触らない。
+- `app/friends/detail/page.tsx` の `FriendDetailPage`：`@/v8/friend-detail/detail` を直接表示する。管理画面はV8に固定。
 
 ## ファイル
 | ファイル | 中身 |
@@ -15,7 +17,7 @@
 | `history-tab.tsx` | 履歴（全件・受信・送信・システム通知、日ごとの区切り、さらに読み込む） |
 | `info-tab.tsx` | 情報欄（分類の札、2列の欄、変えた欄の左に緑の線、最後に1回保存） |
 | `forms-tab.tsx` | 回答フォーム（1回答＝1枚、さらに読み込む） |
-| `empty-tab.tsx` と `scenario-tab.tsx`・`bookings-tab.tsx`・`reminders-tab.tsx`・`actions-tab.tsx`・`miles-tab.tsx`・`rich-menu-tab.tsx` | まだ中身が無い6つのタブ（`oLls9` の見せ方を共通に） |
+| `scenario-tab.tsx`・`bookings-tab.tsx`・`reminders-tab.tsx`・`actions-tab.tsx`・`miles-tab.tsx`・`rich-menu-tab.tsx` | タブごとの表示・操作（データなし・未取得・失敗を区別） |
 | `dialogs.tsx` | 対応状況を編集・シナリオに登録する の窓 |
 | `timeline.ts`・`support.ts` | 履歴の言葉と行き先、対応状況の言葉と札の色 |
 
@@ -36,7 +38,7 @@
 - シナリオ登録：`api.scenarios.list({ accountId })` の有効なものから選び `api.scenarios.enroll(scenarioId, friendId)`。履歴を読み済みなら読み直す。
 
 ## 権限
-- 役割はサーバ（`useStaffRole`＝`/api/staff/me`）。読めるまでは手元の保存値。項目別の鍵は `lh_staff_permissions` から読む（サーバが staff と言ったら、手元の役割の値では通さない）。
+- 役割はサーバ（`useStaffRole`＝`/api/staff/me`）。確認中・取得失敗は変更操作を隠す。項目別の可否は共通の `staff-capability` で判定し、手元の役割を許可の根拠にしない。
 - 対応状況・タグ・メモの「編集」（受信箱へ）・「＋ 追加」：オーナー・管理者、または `/chats` の鍵。
 - 情報欄の保存：オーナー・管理者、または `attribute.personal_info.edit` の鍵（個人情報の項目だけ書ける）。顧客情報の「編集」は情報欄タブへ（同じ権限）。
 - 項目を作る・シナリオに登録する・リッチメニューの「変更」：オーナー・管理者だけ。

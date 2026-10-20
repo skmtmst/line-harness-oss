@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import React, { useCallback, useState } from 'react'
 import { api, ApiError, type StepUpPurpose } from '@/lib/api'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
@@ -35,7 +36,7 @@ export function stepUpFailureMessage(error: unknown): string {
       return `入力回数の上限に達しました。約${minutes}分待ってからやり直してください。正しい内容でも待ち時間中は通りません。`
     }
   }
-  return error instanceof Error ? error.message : '確認できませんでした。もう一度お試しください。'
+  return describeApiFailure(error, '読み込み')
 }
 
 type PendingStepUp = { purpose: StepUpPurpose; action: string; resolve: (token: string | null) => void }
@@ -43,7 +44,7 @@ type PendingStepUp = { purpose: StepUpPurpose; action: string; resolve: (token: 
 /**
  * onSave のような「async関数の途中で待つ」画面向けの窓。
  *
- * `gate()` が呼ばれると V-1 ダイアログを開き、本人確認が済むか窓を閉じるまで
+ * `gate` が呼ばれると V-1 ダイアログを開き、本人確認が済むか窓を閉じるまで
  * Promise で待つ。戻り値は発行された grant token（閉じられたら null）。
  * フォームシェルが onSave を呼ぶ形でも、その場で待ってやり直せる。
  */

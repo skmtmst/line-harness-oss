@@ -108,7 +108,7 @@ function igCard() {
   return within(screen.getByRole('region', { name: 'Instagram' }))
 }
 
-/* 解除は見出しの右の「…」の中（絵 y3GGTs）。 */
+/* 解除は見出しの右の「…」の中。 */
 async function openIgMenu() {
   fireEvent.click(await igCard().findByRole('button', { name: 'Instagram の連携のその他操作' }))
 }
@@ -124,9 +124,9 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   it('未接続では注記と［Instagram にログインして接続］を出し、ページを選ぶ段は出さない', async () => {
     setup('disconnected')
 
-    expect(await igCard().findByText('まだつないでいません')).toBeTruthy()
+    expect(await igCard().findByText('未接続')).toBeTruthy()
     expect(screen.getByText('Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Instagram にログインして接続' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Instagram にログインして接続する' })).toBeTruthy()
     // ページを選ぶ段（利用者の決めで出さない）
     expect(screen.queryByText(/ページを選/)).toBeNull()
     // 未接続では解除・確認のボタンは出ない。
@@ -136,7 +136,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   it('接続済みではアカウント名とできることを出し、確かめる・解除のボタンを出す', async () => {
     setup('connected', CONNECTED)
 
-    expect(await screen.findByText('つながっている')).toBeTruthy()
+    expect(await screen.findByText('接続済み')).toBeTruthy()
     expect(screen.getByText('接続しているアカウント')).toBeTruthy()
     expect(screen.getByText('@nen_cafe（ビジネス）')).toBeTruthy()
     expect(screen.getByText('できること')).toBeTruthy()
@@ -151,8 +151,8 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   it('認可が切れているときはログインのボタンと解除のボタンを並べる', async () => {
     setup('expired', CONNECTED)
 
-    expect((await screen.findAllByText('認可が切れています')).length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: 'Instagram にログインして接続' })).toBeTruthy()
+    expect((await screen.findAllByText('接続の異常')).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Instagram にログインして接続する' })).toBeTruthy()
     await openIgMenu()
     expect(screen.getAllByRole('menuitem', { name: '接続を解除する' }).length).toBeGreaterThan(0)
   })
@@ -160,20 +160,21 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   it('「設定がありません」のときは注記だけで、押せるボタンを置かない', async () => {
     setup('unconfigured')
 
-    expect((await screen.findAllByText('設定がありません')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('未設定')).length).toBeGreaterThan(0)
     expect(screen.getByText('この環境には Instagram 接続の設定がありません。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Instagram にログインして接続' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Instagram にログインして接続する' })).toBeNull()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
   })
 
-  it('閲覧のみには接続・解除・確認のボタンを置かない', async () => {
+  it('閲覧のみには閲覧のみの帯を出し、接続・解除・確認のボタンを置かない', async () => {
     fixture.role.value = 'staff'
     setup('connected', CONNECTED)
 
-    expect(await screen.findByText('つながっている')).toBeTruthy()
+    expect(await screen.findByText(/閲覧のみで見ています/)).toBeTruthy()
+    expect(await screen.findByText('接続済み')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /その他操作/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Instagram にログインして接続' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Instagram にログインして接続する' })).toBeNull()
   })
 
   it('［接続を確かめる］で確かめの口を呼び、読み直す', async () => {
@@ -193,6 +194,29 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     expect(await screen.findByText('Instagram の接続を解除しますか？')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '解除する' }))
     await waitFor(() => expect(fixture.igDisconnect).toHaveBeenCalledWith('acc-1', 3))
+  })
+})
+
+describe('Google のカード', () => {
+  it('接続・解除は Google ビジネスの［設定］タブ 1 か所に置き、カードは行き先のリンクだけを出す', async () => {
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'connected', locationTitle: '然カフェ 本店' } })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    render(<SnsSettingsPage />)
+
+    const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
+    expect(await card.findByText('接続済み')).toBeTruthy()
+    expect(card.queryByRole('button', { name: /その他操作/ })).toBeNull()
+    expect(card.getByRole('link', { name: /接続の設定へ/ }).getAttribute('href')).toBe('/restaurant-test/google?tab=settings')
+  })
+})
+
+describe('Instagram の返事の形が違うとき', () => {
+  it('成功でも状態が無ければ読み込み中のまま止めず、失敗の表示を出す', async () => {
+    fixture.googleConnection.mockResolvedValue(googleData())
+    fixture.igConnection.mockResolvedValue({ success: true, data: {} })
+    render(<SnsSettingsPage />)
+
+    await waitFor(() => expect(igCard().queryByRole('button', { name: /もう一度/ })).toBeTruthy())
   })
 })
 

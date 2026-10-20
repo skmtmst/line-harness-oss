@@ -6,9 +6,9 @@ import {
   isExclusionSavable,
   readConversionExclusion,
 } from './conversion-exclusions.js';
-import { previewConversionDefinition } from './conversion-definitions.js';
+import { previewConversionDefinition } from './conversion-definitions/index.js';
 import { recordConversionSourceEvent } from './conversion-event-sources.js';
-import { trackConversion } from './conversions.js';
+import { trackConversion } from './conversions/index.js';
 
 /*
  * R40「数えない条件」・R42「注文金額と金額なし」の回帰試験。

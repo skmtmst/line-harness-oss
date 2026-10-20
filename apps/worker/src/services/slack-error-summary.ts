@@ -1,5 +1,6 @@
 export type HarnessErrorReport = {
   source: 'worker' | 'admin';
+  incidentId?: string;
   message: string;
   path?: string;
   stack?: string;
@@ -34,4 +35,11 @@ export function harnessErrorCode(report: HarnessErrorReport): string {
 export function harnessErrorIncidentKey(report: HarnessErrorReport): string {
   const path = normalizedHarnessErrorPath(report.path);
   return `${report.source === 'worker' ? 'worker' : 'admin'}:${path}:${harnessErrorCode(report)}`;
+}
+
+/** S01の契約を保持。Workerが作ったUUID以外の自由な値は通知へ渡さない。 */
+export function safeWorkerIncidentId(report: HarnessErrorReport): string | undefined {
+  return report.source === 'worker' && typeof report.incidentId === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(report.incidentId)
+    ? report.incidentId : undefined;
 }

@@ -1,3 +1,5 @@
+import { fail } from '../lib/fail.js';
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -7,15 +9,15 @@ import {
   ManualLinkVersionConflictError,
   upsertManualLink,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { checkAllManualLinks, isSafePublicHttpsUrl } from '../services/manual-link-check.js';
 
 /**
- * マニュアルの正本表。設計 ★V6 34-4（`f9oUm`）。台帳 #134。
+ * マニュアルの正本表。設計 ★34-4（`f9oUm`）。台帳 #134。
  *
  * **直せるのは運営（owner）だけ。** お客さまの組織ごとには変えない
- * （要件 v6-34 §8-2）。
+ * （要件 -34 §8-2）。
  */
 const manualLinks = new Hono<Env>();
 type AppContext = Context<Env>;
@@ -26,7 +28,7 @@ function canOperate(c: AppContext): boolean {
 }
 
 function forbidden(c: AppContext) {
-  return c.json({ success: false, error: 'この操作には運営権限が必要です', code: 'FORBIDDEN' }, 403);
+  return fail(c, 403, 'FORBIDDEN', { error: 'この操作には運営権限が必要です' });
 }
 
 function serialize(row: Awaited<ReturnType<typeof getManualLink>>) {
@@ -69,7 +71,7 @@ manualLinks.get('/api/manual-links/lookup', async (c) => {
   try {
     return lookup(c, c.req.query('screen') ?? c.req.query('key'));
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_manual_links_failed","route":"GET /api/manual-links/lookup"}));
+    logger.error("routes_manual_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -91,7 +93,7 @@ manualLinks.get('/api/manual-links', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_manual_links_failed","route":"GET /api/manual-links"}));
+    logger.error("routes_manual_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -145,7 +147,7 @@ async function update(c: AppContext, pathKey?: string) {
         code: 'VERSION_CONFLICT',
       }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_manual_links_failed","route":"PUT /api/manual-links/:key"}));
+    logger.error("routes_manual_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 }
@@ -178,7 +180,7 @@ manualLinks.post('/api/manual-links/check', requireRole('owner', 'admin', 'staff
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_manual_links_failed","route":"POST /api/manual-links/check"}));
+    logger.error("routes_manual_links_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

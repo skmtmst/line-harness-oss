@@ -1,7 +1,7 @@
 'use client'
-import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { useStaffRole } from '@/lib/staff-role';
 import { jstDate } from '@/lib/jst-datetime';
-import { formatDate as polishFormatDate, formatNumber } from '@/lib/format';
+import { formatNumber } from '@/lib/format';
 import { notifySaved } from '@/components/shared/toast';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useEffect, useRef, useState } from 'react';
@@ -43,23 +43,23 @@ import { useAccount } from '@/contexts/account-context';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { restoreFirstStep, scheduleToPayload } from './first-step-form';
 import styles from './first-step.module.css'
-import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
-import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft';
+import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
-import { permissionDeniedMessage } from '@/components/shared/api-error-message';
+
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 シナリオを作る②：1通目を設定（Pencil `V6xAo`・1152 `U5rxyH`）。
+ * ★V8 シナリオを作る②：1通目を設定（Pencil ・1152 ）。
  *
  * 型（CreatePage）に、戻る・題・手順の輪・説明・左の段（だれに送るか・1通目の内容）と、
  * 右の列（LINEでの見え方）・下の帯（キャンセル・1通目はあとで書く・作って編集へ）を渡す。
  * 1152 の板では右の列に「LINEでの見え方を見る」だけを置き、スマホは窓で開く。
  *
- * 動き（読み込み・保存・失敗時・1通目の復元）は v7（app/scenarios/first-step）と同じ。
+ * 動き（読み込み・保存・失敗時・1通目の復元）は 管理画面（app/scenarios/first-step）と同じ。
  * 1通目は飛ばせる。書かせないと進めない形にすると、あとで考えたい人が
  * 適当な本文を入れて先へ進む。
  */
@@ -589,7 +589,7 @@ export default function ScenarioFirstStepV8() {
             <Button
               variant="primary"
               type="button"
-              onClick={() => void submit()}
+              onClick={() => submit()}
               disabled={saving || bodyOverLimit}
               busy={saving}
               busyLabel="保存中…"

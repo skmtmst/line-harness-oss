@@ -5,7 +5,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hqTemplates } from './hq-templates.js';
 import { hqBroadcasts } from './hq-broadcasts.js';
 import { friendAddRules } from './friend-add-rules.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 let fixture: SqliteD1, app: Hono<Env>, staff: any;
 beforeEach(() => {
   fixture = createTestD1({ foreignKeys: true });

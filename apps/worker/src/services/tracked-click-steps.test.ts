@@ -1,12 +1,12 @@
 vi.mock('./feature-enforcement.js',()=>({featureJobCanRun:async()=>true}));
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {createTestD1,insertFriend,type SqliteD1} from '../test-utils/d1-sqlite.js';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 const fault=vi.hoisted(()=>({tag:true}));
 vi.mock('./activity-mileage.js',()=>({awardActivityMileage:async(db:D1Database)=>db.prepare("UPDATE effects SET n=n+1 WHERE id='mileage'").run()}));
 vi.mock('./action-score-events.js',()=>({applyActionScoreEvent:async(db:D1Database)=>db.prepare("UPDATE effects SET n=n+1 WHERE id='score'").run()}));
-vi.mock('./automation-triggers.js',()=>({dispatchAutomationEventWithLogging:async(db:D1Database)=>{await db.prepare("UPDATE effects SET n=n+1 WHERE id='automation'").run();return []}}));
-vi.mock('./friend-tag-attach.js',()=>({attachTagAndFireSideEffects:async(db:D1Database)=>{
+vi.mock('../features/automations/automation-triggers.js',()=>({dispatchAutomationEventWithLogging:async(db:D1Database)=>{await db.prepare("UPDATE effects SET n=n+1 WHERE id='automation'").run();return []}}));
+vi.mock('../features/friends/friend-tag-attach.js',()=>({attachTagAndFireSideEffects:async(db:D1Database)=>{
  await db.prepare("UPDATE effects SET n=n+1 WHERE id='tag'").run();if(fault.tag)throw new Error('tag after write failed');
 }}));
 import {recordTrackedClick,processTrackedClick,processDueTrackedClicks} from './tracked-click-steps.js';
@@ -17,7 +17,7 @@ beforeEach(()=>{item=createTestD1();fault.tag=true;insertFriend(item.raw,'f',{li
 afterEach(()=>item.raw.close());
 describe('PKG68 durable click stages',()=>{
  it('persists the queue before redirect work and resumes only the unfinished effects',async()=>{
-  const saved=await recordTrackedClick(item.db,{linkId:'l',friendId:'f',accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  const saved=await recordTrackedClick(item.db,{linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
   const env={DB:item.db} as Env['Bindings'];
   await expect(processTrackedClick(env,saved.id,saved.plan)).rejects.toThrow();
   expect(item.raw.prepare("SELECT status FROM workflow_steps WHERE step_key='__run'").get()).toEqual({status:'failed'});
@@ -32,4 +32,47 @@ describe('PKG68 durable click stages',()=>{
   expect(item.raw.prepare('SELECT count(*) AS n FROM link_clicks').get()).toEqual({n:0});
   expect(item.raw.prepare('SELECT click_count FROM tracked_links').get()).toEqual({click_count:0});
  });
+});
+
+
+it.each(['b', null])('rejects a foreign or null account before persisting an identified click: %s', async accountId => {
+  await expect(recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId,tagId:null,scenarioId:null,linkName:'link',conversionPointIds:[]}))
+    .rejects.toThrow('tracked_click_account_changed');
+  expect(item.raw.prepare('SELECT COUNT(*) AS n FROM link_clicks').get()).toEqual({n:0});
+  expect(item.raw.prepare('SELECT COUNT(*) AS n FROM workflow_steps').get()).toEqual({n:0});
+});
+it('refuses a queued friend moved to NULL before any effects run', async () => {
+  const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  item.raw.exec("UPDATE friends SET line_account_id=NULL WHERE id='f'");
+  await expect(processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,saved.plan)).rejects.toThrow('tracked_click_account_changed');
+  expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:0},{n:0},{n:0},{n:0}]);
+});
+
+it('refuses old persisted identified plans without verified identity provenance', async () => {
+  const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  const legacy = {...saved.plan};
+  delete legacy.identityVerified;
+  item.raw.prepare("UPDATE workflow_steps SET input_json=? WHERE step_key='__run'").run(JSON.stringify(legacy));
+  await expect(processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,legacy)).rejects.toThrow('tracked_click_identity_unverified');
+  expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:0},{n:0},{n:0},{n:0}]);
+  await expect(recordTrackedClick(item.db, {linkId:'l',friendId:'f',accountId:'a',tagId:null,scenarioId:null,linkName:'link',conversionPointIds:[]}))
+    .rejects.toThrow('tracked_click_identity_unverified');
+});
+
+
+it('records and continues a verified default-tenant NULL friend', async () => {
+  item.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret)VALUES('a','a','A','token','secret'); UPDATE friends SET line_account_id=NULL WHERE id='f'");
+  fault.tag = false;
+  const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  expect(item.raw.prepare('SELECT friend_id FROM link_clicks').get()).toEqual({friend_id:'f'});
+  await processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,saved.plan);
+  expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:1},{n:1},{n:1},{n:1}]);
+});
+it('refuses a queued NULL friend reassigned to another account', async () => {
+  item.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret)VALUES('a','a','A','token','secret'); UPDATE friends SET line_account_id=NULL WHERE id='f'");
+  const saved = await recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:'tag',scenarioId:null,linkName:'link',conversionPointIds:[]});
+  item.raw.exec("UPDATE friends SET line_account_id='b' WHERE id='f'");
+  await expect(processTrackedClick({DB:item.db} as Env['Bindings'],saved.id,saved.plan)).rejects.toThrow('tracked_click_account_changed');
+  await expect(recordTrackedClick(item.db, {linkId:'l',friendId:'f',identityVerified:true,accountId:'a',tagId:null,scenarioId:null,linkName:'link',conversionPointIds:[]})).rejects.toThrow('tracked_click_account_changed');
+  expect(item.raw.prepare('SELECT n FROM effects ORDER BY id').all()).toEqual([{n:0},{n:0},{n:0},{n:0}]);
 });

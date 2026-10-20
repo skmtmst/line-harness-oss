@@ -27,7 +27,7 @@ import { unappliedSettlementDebits } from '../src/affiliate-payouts.js';
 async function unappliedDebits() {
   return unappliedSettlementDebits(db, { tenantId: TENANT_ID, lineAccountId: 'account-1' });
 }
-import { syncAffiliateConversionMileage } from '../src/mileage.js';
+import { syncAffiliateConversionMileage } from '../src/mileage/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const TENANT_ID = '00000000-0000-4000-8000-000000000001';

@@ -4,6 +4,7 @@ import type { LiffLookApiSettings } from './liff-look.js';
 
 
 export interface MenuItem {
+  photo_url?: string | null;
   id: string;
   name: string;
   category_label: string | null;
@@ -13,6 +14,8 @@ export interface MenuItem {
   base_price: number;
   price_mode?: 'fixed' | 'free' | 'inquiry';
   payment_mode?: 'none' | 'onsite' | 'online';
+  /** 同じメニューの公開設定。未取得を対面と推測しない。 */
+  meeting_mode?: 'online' | 'in_person' | 'customer_choice';
   sort_order: number;
   /** キャンセル期限 (開始の何時間前まで)。null は店の既定を使う。 */
   cancel_deadline_hours_before?: number | null;
@@ -21,12 +24,13 @@ export interface MenuItem {
   max_party_size?: number;
   /** 追加メニュー（オプション）。メニューを選んだあと addons の口で読み足す。 */
   addons?: MenuAddon[];
-  /** お客さまの繰り返し予約（B4。初期オフ）。オンのメニューだけ確認に「毎週この時間で続ける」を出す。口が出来るまでの形（B-314）。 */
+  /** お客さまの繰り返し予約（B4。初期オフ）。オンのメニューだけ確認に「毎週この時間で続ける」を出す。口が出来るまでの形。 */
   recurring?: { enabled: boolean; max_count: number };
 }
 
 
 export interface StaffItem {
+  photo_url?: string | null;
   id: string;
   display_name: string;
   role: string | null;
@@ -313,6 +317,8 @@ export interface FormSubmitResponse {
   retryable?: boolean;
   error?: string;
   code?: string;
+  requestId?: string;
+  fields?: Record<string, string>;
   idempotencyKey?: string;
 }
 

@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const access = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(async (_db: unknown, _staff: unknown, ids: string[]) => (
@@ -23,12 +23,12 @@ const access = vi.hoisted(() => ({
 }));
 vi.mock('../services/account-access.js', () => access);
 
-vi.mock('../services/booking-notifier.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/booking-notifier.js')>();
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../features/booking/booking-notifier.js')>();
   return { ...actual, sendBookingNotification: vi.fn(async () => {}) };
 });
-vi.mock('../services/booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>true)}));
-import { sendAutomaticBookingLine } from '../services/booking-automatic-line.js';
+vi.mock('../features/booking/booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>true)}));
+import { sendAutomaticBookingLine } from '../features/booking/booking-automatic-line.js';
 
 const cardSender = vi.mocked(sendAutomaticBookingLine);
 

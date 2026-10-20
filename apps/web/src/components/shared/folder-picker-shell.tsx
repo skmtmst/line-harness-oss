@@ -4,7 +4,7 @@ import Dialog from './dialog'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import styles from './folder-picker-shell.module.css'
 
-/** B-165：受信箱とタグ選びが同じ640pxの窓を使う。 */
+/** ：受信箱とタグ選びが同じ640pxの窓を使う。 */
 export default function FolderPickerShell({ title, onClose, rows, activeId, onFolder, search, children, footer, beforeFooter, sideNote, busy = false }: {
   title: string; onClose: () => void; rows: FolderPanelRow[]; activeId: string; onFolder: (id: string) => void
   search: ReactNode; children: ReactNode; footer: ReactNode; beforeFooter?: ReactNode; sideNote?: ReactNode; busy?: boolean

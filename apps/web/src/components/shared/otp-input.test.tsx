@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 共通 認証コード入力（xHzFK）の動き。
+ * ★管理画面 共通 認証コード入力（xHzFK）の動き。
  * 旧ログイン画面では、自動入力の6桁が1マス目にまとめて入り、最後の1桁しか残らなかった。
  */
 import React, { useState } from 'react'
@@ -23,7 +23,7 @@ function Harness({ onComplete, initial = '' }: { onComplete?: (value: string) =>
 const slot = (n: number) => screen.getByLabelText(`${n}桁目`) as HTMLInputElement
 const value = () => screen.getByTestId('value').textContent
 
-describe('認証コード入力（★V7 xHzFK）', () => {
+describe('認証コード入力（★管理画面 xHzFK）', () => {
   it('数字を打つと入って次のマスへ移る。数字以外は入らない', () => {
     render(<Harness />)
     slot(1).focus()

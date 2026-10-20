@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const bookingCustomerMocks = vi.hoisted(() => ({
   createBookingCustomer: vi.fn(),
@@ -42,8 +42,8 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
 
 const notifierMocks = { sendBookingNotification: vi.fn() };
 // 送る側だけ差し替える。文面の組み立て（時刻・残り時間）は本物を使う。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   ...notifierMocks,
 }));
 
@@ -753,7 +753,7 @@ describe('jstDayWindowUtc', () => {
 });
 
 describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
-  test('取消ずみへの再送は409にせずV6だけ止める', async () => {
+  test('取消ずみへの再送は409にせずだけ止める', async () => {
     const sqlite = new Database(':memory:');
     try {
       sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
@@ -809,7 +809,7 @@ describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
         env,
         execCtx,
       );
-      // 業務は取消ずみだが V6 が残っている (部分失敗の残り)。再送で V6 を止める。
+      // 業務は取消ずみだが が残っている (部分失敗の残り)。再送で を止める。
       const res = await send();
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toEqual({ status: 'cancelled' });
@@ -827,7 +827,7 @@ describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
     }
   });
 
-  test('却下でもV6の未送信予定を止める (N-065)', async () => {
+  test('却下でもの未送信予定を止める (N-065)', async () => {
     const sqlite = new Database(':memory:');
     try {
       sqlite.exec(readFileSync(join(process.cwd(), '../../packages/db/bootstrap.sql'), 'utf8'));
@@ -874,7 +874,7 @@ describe('PATCH /api/booking/admin/requests/:id の再試行 (N-065)', () => {
         env,
         execCtx,
       );
-      // 却下ずみになり、V6 の未送信予定が止まる (通知だけでは残る不具合の修正)。
+      // 却下ずみになり、の未送信予定が止まる (通知だけでは残る不具合の修正)。
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toEqual({ status: 'rejected' });
       expect(sqlite.prepare(`SELECT status FROM friend_reminders WHERE id = 'FR2'`).get()).toEqual({

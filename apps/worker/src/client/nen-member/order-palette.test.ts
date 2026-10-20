@@ -1,0 +1,23 @@
+// @vitest-environment happy-dom
+import { act } from 'react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, expect, test, vi } from 'vitest';
+afterEach(()=>{vi.unstubAllGlobals();vi.resetModules();document.head.innerHTML='';document.documentElement.removeAttribute('style');window.history.replaceState(null,'','/');});
+test('購入履歴とECへの操作は共通の配色の変更に追従する',async()=>{
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);
+  window.history.replaceState(null,'','/?tab=orders');
+  const member={owner:{displayName:'利用者'},pets:[],commerce:{orders:[],subscription:{id:'subscription',manage_url:'https://example.invalid/manage'},purchaseAmount:0,points:0,rank:'レギュラー'}};
+  vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({data:member}))));
+  const style=document.createElement('style');
+  style.textContent=readFileSync(join(__dirname,'styles.css'),'utf8').replace(/^@import[^;]+;$/gm,'');document.head.append(style);
+  document.body.innerHTML='<div id="app"></div>';
+  const {mountNenMember}=await import('./main.js');
+  await act(async()=>mountNenMember(document.getElementById('app')!,{liffId:'fixture',lineUserId:'friend',idToken:'fixture'}));
+  const page=document.querySelector('.nm-portal-orders-page'),link=document.querySelector('.nm-order-primary-link');
+  expect(page).not.toBeNull();expect(link).not.toBeNull();
+  document.documentElement.style.setProperty('--photo-ink','rgb(1, 2, 3)');
+  document.documentElement.style.setProperty('--photo-accent','rgb(4, 5, 6)');
+  expect(getComputedStyle(page!).color).toBe('rgb(1, 2, 3)');
+  expect(getComputedStyle(link!).backgroundColor).toBe('rgb(4, 5, 6)');
+});

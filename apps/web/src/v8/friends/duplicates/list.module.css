@@ -1,4 +1,4 @@
-/* ★V8 重複検出（Pencil hn6Y8・1152 は G9C4Uw）。値は globals.css の --tpl-fr-*。 */
+/* ★V8 重複検出（Pencil ・1152 は ）。値は globals.css の --tpl-fr-*。 */
 .body { display: flex; flex-direction: column; gap: var(--tpl-fr-area-gap); padding: var(--tpl-fr-area-pad); min-width: 0; }
 
 .notice { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
@@ -80,9 +80,9 @@
   white-space: nowrap;
 }
 
-.pill_ok { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.pill_warn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-.pill_muted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
+.pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.pillWarn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
+.pillMuted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 
 .rateHigh { color: var(--color-status-warn-deep); font-weight: 700; }
 .faint { color: var(--color-ink-disabled); }
@@ -93,7 +93,7 @@
 .pager { min-height: var(--tpl-fr-dup-pager-h); display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); padding-left: var(--tpl-fr-panel-pad); }
 .pagerCount { color: var(--color-ink-secondary); font-size: var(--text-label); line-height: var(--tpl-fr-pager-lh); }
 
-/* 1152 の板（G9C4Uw）：白い板が 1000 未満のときの列と探す欄。 */
+/* 1152 の板：白い板が 1000 未満のときの列と探す欄。 */
 @container v8-page (max-width: 1000px) {
   .search { width: var(--tpl-fr-search-xs); }
   .colEvidence { width: var(--tpl-fr-dup-n-col-evidence); }

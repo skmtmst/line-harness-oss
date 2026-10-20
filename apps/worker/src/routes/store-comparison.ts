@@ -1,7 +1,7 @@
 import {comparisonData,checkExportAccess} from '../services/store-comparison-export.js';
 import {gapBody,gapKey} from '../services/gap-common.js';
 import {Hono,type Context,type Handler} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError} from '../services/gap-common.js';
 import {getVisibleLineAccountScope} from '../services/account-access.js';
 import {comparisonKeys,comparisonUnits,comparisonPeriod,storeNumbers,type ComparisonKey} from '../services/store-comparison.js';

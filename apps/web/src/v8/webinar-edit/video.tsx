@@ -1,4 +1,6 @@
 'use client'
+
+import { jstDate as japanDate } from '@/lib/jst-datetime'
 import { localJst, toJstIso } from './video-time'
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
@@ -6,7 +8,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import Card from '@/components/shared/card'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   from: requiredText("始まりの日付を入れてください。"),
   to: requiredText("終わりの日付を入れてください。"),
 }
@@ -43,7 +45,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド VWNaA・日時指定と開催回 LPOe7）。
+ * ★V8 ウェビナーの ②動画と公開期間（Pencil：オンデマンド ・日時指定と開催回 ）。
  * 動画（差し替える・準備の段）→ 公開期間（オンデマンド）／開催回（日時指定）→ 配信枠 → 視聴の数え方。
  * 右は公開ページでの見え方。
  * 口・保存の決まりは BEHAVIOR.md に記録。
@@ -97,7 +99,7 @@ const STAGES = [
   { key: 'thumbnail', label: '表紙' },
   { key: 'ready', label: '準備完了' },
 ] as const
-/* 段の順番はサーバーの順（配信の形 → 表紙）。絵（LPOe7）は表紙を先に描いているが、済んでいない段に ✓ を付けない。 */
+/* 段の順番はサーバーの順（配信の形 → 表紙）。絵は表紙を先に描いているが、済んでいない段に ✓ を付けない。 */
 const STAGE_ORDER: WebinarVideoAsset['stage'][] = ['uploaded', 'inspecting', 'converting', 'packaging', 'thumbnail', 'ready']
 const NEXT_STAGE: Record<string, WebinarVideoAsset['stage'][]> = {
   uploaded: ['inspecting', 'failed'], inspecting: ['converting', 'failed'], converting: ['packaging', 'failed'],
@@ -436,7 +438,7 @@ function SessionRow({ webinarId, at, readOnly, editing, onEdit, menu }: {
   const save = async () => {
     if (readOnly || lock.current) return
     const capacity = input.trim() === '' ? null : Number(input)
-    /* 定員の誤りは、その欄を赤くして移る（B-139）。 */
+    /* 定員の誤りは、その欄を赤くして移る。 */
     if (capacity !== null && (!Number.isSafeInteger(capacity) || capacity < 1)) { setCapError('定員は1人以上の整数で入れてください。空にすると無制限です。'); setError(''); focusFieldById(capId); return }
     setCapError('')
     lock.current = true
@@ -491,7 +493,7 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [localError, setLocalError] = useState('')
-  /* 日付の誤りは、その欄の真下に出して移る（B-139）。 */
+  /* 日付の誤りは、その欄の真下に出して移る。 */
   const [dateErrors, setDateErrors] = useState<{ date?: string; from?: string; to?: string }>({})
   const failDate = (key: 'date' | 'from' | 'to', message: string) => {
     setDateErrors({ [key]: message })
@@ -501,14 +503,14 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
     setLocalError('')
     setDateErrors({})
     if (mode === 'bulk') {
-      if ((b244Requirements.from.check(from) !== null)) { failDate('from', '始まりの日付を入れてください。'); return }
-      if ((b244Requirements.to.check(to) !== null)) { failDate('to', '終わりの日付を入れてください。'); return }
+      if ((FIELD_REQUIREMENTS.from.check(from) !== null)) { failDate('from', '始まりの日付を入れてください。'); return }
+      if ((FIELD_REQUIREMENTS.to.check(to) !== null)) { failDate('to', '終わりの日付を入れてください。'); return }
       if (from > to) { failDate('to', '終わりは始まりと同じか後の日付にしてください。'); return }
       const rules: WebinarScheduleRule[] = []
       const cursor = new Date(`${from}T00:00:00+09:00`)
       const end = new Date(`${to}T00:00:00+09:00`)
       while (cursor <= end && rules.length < 31) {
-        const day = new Date(cursor.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        const day = japanDate(cursor)
         rules.push({ type: 'once', at: toJstIso(`${day}T${time}`) })
         cursor.setTime(cursor.getTime() + 24 * 60 * 60 * 1000)
       }
@@ -537,8 +539,8 @@ function AddRuleDialog({ mode, busy, error, onCancel, onAdd }: { mode: 'one' | '
         {mode === 'one' && kind === 'once' ? <div className={form.field}><Field label="日付" htmlFor="wd-rule-date"><SaveErrorField names={["date"]}><DateField id="wd-rule-date" value={date} invalid={Boolean(dateErrors.date)} aria-describedby={dateErrors.date ? 'wd-rule-date-error' : undefined} onChange={(value) => { setDate(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-date-error">{dateErrors.date}</FieldError></Field></div> : null}
         {mode === 'bulk' ? (
           <SettingsFormRow layout="columns">
-            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from" requirement={b244Requirements.from}><SaveErrorField names={["from"]}><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
-            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to" requirement={b244Requirements.to}><SaveErrorField names={["to"]}><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
+            <div className={form.field}><Field label="始まり" htmlFor="wd-rule-from" requirement={FIELD_REQUIREMENTS.from}><SaveErrorField names={["from"]}><DateField id="wd-rule-from" value={from} invalid={Boolean(dateErrors.from)} aria-describedby={dateErrors.from ? 'wd-rule-from-error' : undefined} onChange={(value) => { setFrom(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-from-error">{dateErrors.from}</FieldError></Field></div>
+            <div className={form.field}><Field label="終わり" htmlFor="wd-rule-to" requirement={FIELD_REQUIREMENTS.to}><SaveErrorField names={["to"]}><DateField id="wd-rule-to" value={to} invalid={Boolean(dateErrors.to)} aria-describedby={dateErrors.to ? 'wd-rule-to-error' : undefined} onChange={(value) => { setTo(value); setDateErrors({}) }} /></SaveErrorField><FieldError id="wd-rule-to-error">{dateErrors.to}</FieldError></Field></div>
           </SettingsFormRow>
         ) : null}
         <div className={form.field}><span className={form.labelSmall} id="webinar-schedule-time-label">時刻</span><SaveErrorField names={["time"]}><TimeField aria-labelledby="webinar-schedule-time-label" value={time} onChange={setTime} /></SaveErrorField></div>

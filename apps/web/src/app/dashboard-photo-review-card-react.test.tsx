@@ -2,7 +2,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import DashboardPage from './page'
+// 共通ダッシュボード本体の境界/既存カードを検査する。業種の入口分岐はhome.test.tsxが検査する。
+import DashboardPage from '@/v8/dashboard/dashboard'
 
 /*
  * #666 N-002/N-004: ダッシュボードの「写真審査」カードを本物のReactで固定する。

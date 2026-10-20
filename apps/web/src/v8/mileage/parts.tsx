@@ -99,7 +99,7 @@ export function mileageStatusTone(tone: 'active' | 'warn' | 'danger' | 'neutral'
   return tone === 'active' ? 'success' : tone === 'warn' ? 'warning' : tone
 }
 
-/** 空・絞り込みで0件・失敗の1枚（見本帳 zaqP9）。 */
+/** 空・絞り込みで0件・失敗の1枚（見本帳 ）。 */
 export function StateCard({
   tone = 'empty',
   title,

@@ -30,9 +30,9 @@ type View = 'chart' | 'table'
 const LEGEND: BarChartLegendItem[] = [{ label: '登録', tone: 'added' }, { label: 'ブロック', tone: 'removed' }]
 
 /**
- * 友だち数の推移のグラフ（WQmep 段A）。
+ * 友だち数の推移のグラフ（ 段A）。
  * 1日に「登録」と「ブロック」の2本の棒。いちばん新しい日だけ濃い緑と太字。
- * 表に切り替えると、v7 と同じ日ごとの表（前日比・有効友だちつき）を出す。
+ * 表に切り替えると、管理画面 と同じ日ごとの表（前日比・有効友だちつき）を出す。
  */
 export function FriendTrend({ trend, loading }: { trend: DashboardFriendTrendPoint[]; loading: boolean }) {
   const [view, setView] = useState<View>('chart')

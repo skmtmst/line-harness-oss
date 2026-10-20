@@ -162,7 +162,7 @@ function section(): HTMLElement | null {
   return container.querySelector('section[aria-label="要対応の交換"]')
 }
 
-/* 行の右端は「…」1つ（B-253）。もう一度届けるはその中にある。 */
+/* 行の右端は「…」1つ。もう一度届けるはその中にある。 */
 function retryTriggers(): HTMLButtonElement[] {
   return [...(section()?.querySelectorAll('button[aria-label$="の交換の操作"]') ?? [])] as HTMLButtonElement[]
 }

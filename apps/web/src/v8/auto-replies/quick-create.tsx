@@ -4,7 +4,7 @@ import Link from '@/components/shared/list-navigation'
 import { HelpCircle, ListOrdered, Send, X } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
-import { api, describeSaveFailure } from '@/lib/api'
+import { api } from '@/lib/api'
 import type { AutoReplyConflict, AutoReplyDraftInput } from '@line-crm/shared'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -12,12 +12,12 @@ import { requiredText } from '@/lib/form-requirement'
 import { isImeComposing } from '@/components/shared/ime'
 import styles from './quick-create.module.css'
 import { Field } from '@/components/shared/form-controls'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 自動応答 かんたんに作る（板 `G4GejG`、小窓 560）。
+ * ★V8 自動応答 かんたんに作る（板 、小窓 560）。
  *
  * 言葉（どれか1つを含む）と返す文だけ聞いて、その場で有効にする。
  * 重なりは作った下書きで確かめ、あるときは相手の名前を帯に出してから
@@ -65,7 +65,7 @@ export default function QuickCreateV8({
   const draftIdRef = useRef<string | null>(null)
   const savedInputRef = useRef('')
   const draftVersionRef = useRef<number | null>(null)
-  const savingRef = useRef(false)
+
   const acknowledgedRef = useRef<string[]>([])
   const draftKeyRef = useRef<string>(crypto.randomUUID())
   const publishKeyRef = useRef<string>(crypto.randomUUID())
@@ -143,7 +143,7 @@ export default function QuickCreateV8({
   }
 
   const save = async () => {
-    if (savingRef.current) return
+
     const keywordMessage = validateKeywords(keywords)
     const replyMessage = validateReply(reply)
     setKeywordError(keywordMessage ?? '')
@@ -153,7 +153,6 @@ export default function QuickCreateV8({
       setSaveError('上のバーでLINE公式アカウントを選んでください')
       return
     }
-    savingRef.current = true
     setPhase('saving')
     setSaveError('')
     try {
@@ -198,10 +197,8 @@ export default function QuickCreateV8({
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
-      setSaveError(cause instanceof Error ? cause.message : withPermissionFailure(cause, describeSaveFailure(cause), 'store')) }
+      setSaveError(describeApiFailure(cause, '保存')) }
       setPhase(draftIdRef.current ? 'confirming' : 'editing')
-    } finally {
-      savingRef.current = false
     }
   }
 
@@ -232,7 +229,7 @@ export default function QuickCreateV8({
             disabled={saving}
             busy={saving}
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}
-            onClick={() => void save()}
+            onClick={() => save()}
           >
             <Send size={15} aria-hidden="true" />
             有効にして保存

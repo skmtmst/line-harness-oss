@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
- * ★V7 仕上げ「読み込みと初回表示の動き」の契約（`z97zZN` §1・§3 / `sTJsh` §2）。
+ * ★管理画面 仕上げ「読み込みと初回表示の動き」の契約（`z97zZN` §1・§3 / `sTJsh` §2）。
  *
  * - §3 骨組み：0.3 秒以内に来たら出さない・出したら最低 0.4 秒。
  *   明滅は不透明度 1↔0.55・1.2 秒、光が流れる演出は無し。
@@ -25,7 +25,7 @@ const GLOBALS = readFileSync(join(HERE, '../../app/globals.css'), 'utf8')
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
 const FRIENDS_PAGE = readFileSync(join(HERE, '../../app/friends/page.tsx'), 'utf8')
 const FRIENDS_TABLE = readFileSync(join(HERE, '../friends/friend-list-table.tsx'), 'utf8')
-/* 完全切り替え：v7 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+/* 完全切り替え：管理画面 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
 // シナリオの入口は src/v8/scenarios/list.tsx（古い app/scenarios/list-v8.tsx はもう描かれない）。
 const SCENARIOS_PAGE = readFileSync(join(HERE, '../../v8/scenarios/list.tsx'), 'utf8')
 const SERVER_LIST = readFileSync(join(HERE, '../../lib/use-server-list.ts'), 'utf8')
@@ -55,7 +55,7 @@ const tick = async (ms: number) => {
   await act(async () => { vi.advanceTimersByTime(ms) })
 }
 
-describe('Skeleton（★V7 `z97zZN` §3）', () => {
+describe("Skeleton", () => {
   it('骨組みは印（data-skeleton）を持ち、読み上げには出さない', () => {
     const html = renderToStaticMarkup(<Skeleton className="h-5 w-20" />)
     expect(html).toContain('data-skeleton')
@@ -102,7 +102,7 @@ describe('Skeleton（★V7 `z97zZN` §3）', () => {
   })
 })
 
-describe('RefreshCover（★V7 `sTJsh` §2 前の表示を残す）', () => {
+describe("RefreshCover", () => {
   it('0.3 秒より早い応答では薄めない', async () => {
     function Probe({ refreshing }: { refreshing: boolean }) {
       return <RefreshCover refreshing={refreshing}><div>行</div></RefreshCover>
@@ -150,7 +150,7 @@ describe('globals.css の現役の動き規定', () => {
   })
 })
 
-describe('前の表示を残したまま読む（★V7 `sTJsh` §2）', () => {
+describe("前の表示を残したまま読む", () => {
   it('一覧の読み直しでは行を消さず refreshing を画面へ渡す', () => {
     // 友だち一覧: 行があるときは消さず、refreshing で薄め＋線を出す。
     expect(FRIENDS_PAGE).toContain('setRefreshing(true)')
@@ -194,7 +194,7 @@ describe('形の決まった骨組みの組み合わせ（V8「サクサク感�
 })
 
 
-describe('B-152 一覧の読み込み', () => {
+describe("一覧の読み込み", () => {
   it('V8 は300msまで場所だけ確保し、その後4行の骨格を出す', async () => {
     document.documentElement.dataset.theme = 'v8'
     try {

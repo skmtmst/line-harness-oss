@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { CircleCheck, Circle, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
@@ -12,7 +13,7 @@ import type { StyleSetupData } from './use-style-setup'
 import styles from './setup-card.module.css'
 
 /*
- * ダッシュボードの警告の帯と「はじめにやること」（★V8 修正案 Bdfxm。決まり B-313 追記）。
+ * ダッシュボードの警告の帯と「はじめにやること」（★V8 修正案 Bdfxm。決まり  追記）。
  * - 中身が決まっていないのにリッチメニューにボタンがある物は、上の帯で知らせる（押すとその設定の画面へ）。
  * - はじめにやること：済んだ数／全部・進みの線・［質問の続きを開く］。あとで設定した質問・止めている
  *   自動の送信・見本の画像のまま、を 1 行ずつ。最後に済んだ物の 1 行。
@@ -36,7 +37,7 @@ export function SetupWarningBands({ data }: { data: StyleSetupData }) {
       {warnings.map((warning) => {
         const button = tiles.find((tile) => tile.feature === warning.feature)?.label ?? featureName(warning.feature)
         return (
-          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button onClick={() => preparing.open(FEATURES[warning.feature]!.preparing!)}>決まりを入れる</Button> : <Button href={featureHref(warning.feature, warning.href)}>決まりを入れる</Button>}>
+          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button onClick={() => preparing.open(FEATURES[warning.feature]!.preparing!)}>決まりを入れる</Button> : <Button href={featureHref(warning.feature, warning.href, data.state.style)}>決まりを入れる</Button>}>
             {`リッチメニューに「${button}」のボタンがありますが、${featureName(warning.feature)}の決まりがまだです。お客さまには「${PREPARING_WORD}」と出ています。`}
           </Notice>
         )
@@ -54,15 +55,15 @@ export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOp
     return `済み ${summary.done}件（${names}${summary.doneNames.length > 3 ? ' ほか' : ''}）`
   }, [summary])
   return (
-    <section className={styles.card} aria-labelledby="setup-card-title" data-design-node="Bdfxm">
+    <Card layout="vertical" contentPadding="var(--sc-pad)" gap="var(--sc-gap)" className={styles.card} aria-labelledby="setup-card-title" data-design-node="Bdfxm">
       <div className={styles.head}>
-        <h2 id="setup-card-title" className={styles.title}>はじめにやること</h2>
-        <HelpTip label="はじめにやることの説明">はじめの質問で「あとで設定する」にした物と、動かす前に確かめる物が残ります。済むと消えます。</HelpTip>
+        <h2 id="setup-card-title" className={styles.title}>使い方の設定</h2>
+        <HelpTip label="使い方の設定の説明">選んだ機能だけの設定です。「はじめの設定」の完了条件とは別に、あとで設定する物や動かす前の確認を表示します。</HelpTip>
         <span className={styles.spacer} />
         <span className={styles.count}>{`${summary.done} / ${summary.total} 済み`}</span>
         <Button onClick={() => onOpenStep(summary.nextStep)}>質問の続きを開く</Button>
       </div>
-      <span className={styles.track} role="progressbar" aria-label="はじめにやることの進み" aria-valuemin={0} aria-valuemax={summary.total} aria-valuenow={summary.done}>
+      <span className={styles.track} role="progressbar" aria-label="使い方の設定の進み" aria-valuemin={0} aria-valuemax={summary.total} aria-valuenow={summary.done}>
         <span className={styles.fill} style={{ width: `${rate}%` }} />
       </span>
       <ul className={styles.rows}>
@@ -77,7 +78,7 @@ export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOp
         </p>
       ) : null}
       {preparing.dialog}
-    </section>
+    </Card>
   )
 }
 

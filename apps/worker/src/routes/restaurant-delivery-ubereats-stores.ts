@@ -7,9 +7,10 @@
  * 親（`restaurant-delivery.ts`）からは読み込まない。店舗の引き当て・接続の読み取り・
  * 時刻の整え方だけを引数（`deps`）で受け取る。親と行き違いにならないようにするため。
  */
+import { logger } from '@line-crm/shared/server';
 import type { Context, Hono } from 'hono';
 import { decryptCredential } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
@@ -23,6 +24,7 @@ import {
 import { uberOAuthClient } from '../services/restaurant-delivery.js';
 import { fail } from './restaurant-google.js';
 import type { StoreContext } from './restaurant-google.js';
+import { claimPosActivation, failPosActivation, finishPosActivation, posActivationUnresolved, POS_ACTIVATION_UNKNOWN } from '../services/uber-pos-activation.js';
 
 /** 接続の状態。`rt_delivery_uber_connections.status` と同じ並び。 */
 type UberConnectionStatus = 'pending_store' | 'connected' | 'expired' | 'no_permission' | 'disconnected';
@@ -45,18 +47,21 @@ export interface UberStoreRoutesDeps {
 }
 
 /** 保存した加盟店トークンの読み戻しに失敗したときの理由。画面にはこの符号だけを渡す。 */
-type UberTokenFailure = 'not_connected' | 'auth_expired' | 'encryption_key_missing';
+type UberTokenFailure = 'not_connected' | 'auth_expired' | 'encryption_key_missing' | 'pos_activation_unknown';
 
 const UBER_TOKEN_FAILURE_MESSAGES: Record<UberTokenFailure, string> = {
   not_connected: 'まだ Uber Eats にログインしていません',
   auth_expired: 'Uber Eats のログインの有効期限が切れました。もう一度つないでください',
   encryption_key_missing: 'Uber Eats 接続の設定がこの環境にありません',
+  pos_activation_unknown: 'お店をつないだ結果を確認する必要があります。送り直さず musubo へお知らせください',
 };
 
 interface UberTokenRow {
   access_token_enc: string | null;
   access_token_expires_at: number | null;
   status: UberConnectionStatus;
+  last_error: string | null;
+  version: number;
 }
 
 /** 失敗の理由を分類済みの符号だけで残す。必要なときは状態も進める。 */
@@ -73,14 +78,14 @@ async function uberMarkConnectionError(
       .prepare(
         `UPDATE rt_delivery_uber_connections
             SET last_error = ?, status = ?, version = version + 1, updated_at = ?
-          WHERE store_id = ?`,
+          WHERE store_id = ? AND COALESCE(last_error, '') NOT IN ('pos_activation_started', 'pos_activation_unknown')`,
       )
       .bind(code, status, now, storeId)
       .run();
     return;
   }
   await db
-    .prepare('UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ?')
+    .prepare("UPDATE rt_delivery_uber_connections SET last_error = ?, updated_at = ? WHERE store_id = ? AND COALESCE(last_error, '') NOT IN ('pos_activation_started', 'pos_activation_unknown')")
     .bind(code, now, storeId)
     .run();
 }
@@ -95,14 +100,15 @@ async function uberMarkConnectionError(
 async function uberMerchantToken(
   c: Context<Env>,
   storeId: string,
-): Promise<{ ok: true; token: string } | { ok: false; code: UberTokenFailure }> {
+): Promise<{ ok: true; token: string; version: number } | { ok: false; code: UberTokenFailure }> {
   const row = await dbFor(c.env, storeId)
     .prepare(
-      `SELECT access_token_enc, access_token_expires_at, status
+      `SELECT access_token_enc, access_token_expires_at, status, last_error, version
          FROM rt_delivery_uber_connections WHERE store_id = ? LIMIT 1`,
     )
     .bind(storeId)
     .first<UberTokenRow>();
+  if (posActivationUnresolved(row?.last_error)) return { ok: false, code: POS_ACTIVATION_UNKNOWN };
   if (!row?.access_token_enc || row.status === 'disconnected') {
     return { ok: false, code: 'not_connected' };
   }
@@ -114,6 +120,7 @@ async function uberMerchantToken(
     return {
       ok: true,
       token: await decryptCredential(row.access_token_enc, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY),
+      version: row.version,
     };
   } catch {
     // 鍵が無い・変わった。復号できない事実だけを残し、鍵も本文も出さない。
@@ -178,12 +185,13 @@ export function registerUberStoreRoutes(app: Hono<Env>, deps: UberStoreRoutesDep
           fetch: fetchFn,
           accessToken: token.token,
           hosts: client.hosts,
+          singleAttempt: true,
         });
       } catch (error) {
         // 残すのは分類済みの符号だけ。Uber から返った自由文・本文・例外は保存も表示もしない。
         const code = error instanceof UberEatsError ? error.kind : 'store_list_failed';
         await uberMarkConnectionError(c, store.id, code, uberStatusForError(error));
-        console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
+        logger.error('routes_restaurant_delivery_failed');
         return fail(c, 502, 'Uber Eats からお店の一覧を取れませんでした', { code });
       }
 
@@ -242,7 +250,7 @@ export function registerUberStoreRoutes(app: Hono<Env>, deps: UberStoreRoutesDep
 
       const body = await c.req.json<{ storeId?: unknown }>().catch(() => ({}) as { storeId?: unknown });
       const uberStoreId = typeof body.storeId === 'string' ? body.storeId.trim() : '';
-      if (!uberStoreId) return fail(c, 400, 'つなぐお店を選んでください', { code: 'store_id_required' });
+      if (!uberStoreId) return fail(c, 400, 'つなぐお店を選んでください', { code: 'store_id_required' }, ['storeId']);
 
       const db = dbFor(c.env, store.id);
       const candidate = await db
@@ -265,9 +273,14 @@ export function registerUberStoreRoutes(app: Hono<Env>, deps: UberStoreRoutesDep
       }
 
       const fetchFn = fetch;
+      const claimed = await claimPosActivation(db, {
+        storeId: store.id, accountId: store.lineAccountId!, uberStoreId: candidate.uber_store_id,
+        name: candidate.uber_store_name, externalId: candidate.external_store_id, version: token.version,
+      });
+      if (!claimed) return fail(c, 409, '接続の状態が変わりました。画面を開き直して確認してください', { code: 'connection_changed' });
       try {
         await activateUberPosIntegration(
-          { fetch: fetchFn, accessToken: token.token, hosts: client.hosts },
+          { fetch: fetchFn, accessToken: token.token, hosts: client.hosts, singleAttempt: true },
           candidate.uber_store_id,
           {
             // musubo 側の店舗ID。届いた注文をどの店舗のものとして扱うかの手掛かりになる。
@@ -278,31 +291,18 @@ export function registerUberStoreRoutes(app: Hono<Env>, deps: UberStoreRoutesDep
         );
       } catch (error) {
         const code = error instanceof UberEatsError ? error.kind : 'provisioning_failed';
-        await uberMarkConnectionError(c, store.id, code, uberStatusForError(error));
-        console.error(JSON.stringify({"code":"routes_restaurant_delivery_failed"}));
-        return fail(c, 502, 'Uber Eats でお店をつなげませんでした', { code });
+        const unknown = !(error instanceof UberEatsError) || error.status === null || error.status === 408 || (error.status ?? 0) >= 500 || error.kind === 'unknown';
+        await failPosActivation(db, store.id, unknown ? POS_ACTIVATION_UNKNOWN : code, unknown ? undefined : uberStatusForError(error));
+        logger.error('routes_restaurant_delivery_failed');
+        return fail(c, 502, unknown ? UBER_TOKEN_FAILURE_MESSAGES.pos_activation_unknown : 'Uber Eats でお店をつなげませんでした', { code: unknown ? POS_ACTIVATION_UNKNOWN : code });
       }
 
-      const now = Date.now();
-      await db
-        .prepare(
-          `UPDATE rt_delivery_uber_connections
-              SET uber_store_id = ?, uber_store_name = ?, external_store_id = ?,
-                  status = 'connected', connected_at = COALESCE(connected_at, ?),
-                  provisioned_at = ?, last_error = NULL,
-                  version = version + 1, updated_at = ?
-            WHERE store_id = ?`,
-        )
-        .bind(
-          candidate.uber_store_id,
-          candidate.uber_store_name,
-          candidate.external_store_id,
-          now,
-          now,
-          now,
-          store.id,
-        )
-        .run();
+      try {
+        if (!await finishPosActivation(db, store.id, candidate.uber_store_id)) throw new Error('activation_save_conflict');
+      } catch {
+        // Keep the started fence even when D1 cannot record the unknown result.
+        return fail(c, 502, UBER_TOKEN_FAILURE_MESSAGES.pos_activation_unknown, { code: POS_ACTIVATION_UNKNOWN });
+      }
       // 選び終わったら候補は残さない（移行 636 の注記）。
       await db.prepare('DELETE FROM rt_delivery_uber_store_candidates WHERE store_id = ?').bind(store.id).run();
 

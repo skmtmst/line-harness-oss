@@ -1,8 +1,10 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { reconcileRestaurantInventory } from './restaurant-inventory-rules.js';
 import PostalMime from 'postal-mime';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
-import { parserFor, type ParsedReservationEmail } from './parsers/index.js';
+import { parserFor } from './parsers/index.js';
+import { type ParsedReservationEmail } from './parsers/types.js';
 
 const MAX_PARSE_BYTES = 2 * 1024 * 1024;
 export const DEFAULT_STAY_MINUTES = 120;
@@ -85,7 +87,7 @@ function holdEndHour(env: Env['Bindings']): number {
 
 export function nextBusinessDayHoldExpiry(startsFrom: string, endHour = DEFAULT_HOLD_END_HOUR): string {
   const source = new Date(startsFrom);
-  const jstDate = new Date(source.getTime() + 9 * 60 * 60 * 1000);
+  const jstDate = japanCalendar(source);
   let year = jstDate.getUTCFullYear();
   let month = jstDate.getUTCMonth();
   let day = jstDate.getUTCDate();

@@ -104,7 +104,7 @@ function installFetch() {
   })
 }
 
-/** 非GETの送信は `getCsrfToken()` が localStorage を読む。無いと送る前に落ちる。 */
+/** 非GETの送信は `getCsrfToken` が localStorage を読む。無いと送る前に落ちる。 */
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>()
   get length() { return this.values.size }

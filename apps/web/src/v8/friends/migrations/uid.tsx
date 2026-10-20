@@ -1,5 +1,7 @@
 'use client'
 
+import { canManageRole, isOwnerRole } from '@/lib/staff-role'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { shortUid, historyBadge } from './uid-labels'
 
 import { useState } from 'react'
@@ -32,7 +34,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8 UID移行（Pencil `Z0jHp` 要確認の判断・`L48eY` 本移行と照合の完了）。/friends/migrations?tab=uid（`&run=` で履歴を選ぶ）。
+ * ★V8 UID移行（Pencil  要確認の判断・ 本移行と照合の完了）。/friends/migrations?tab=uid（`&run=` で履歴を選ぶ）。
  *
  * 判断・実行・切り戻しの口は今と同じ（use-uid-migration：行ごとの判断・実行と切り戻しは確認窓の確定だけ・
  * owner と作成者の決まり・結果不明のときの読み直し）。今の入口 /accounts?tab=migration はそのまま。
@@ -51,14 +53,14 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
   const active = m.active
 
   const executeBlockedReason = m.me
-    ? m.me.role !== 'owner'
+    ? !isOwnerRole(m.me.role)
       ? '本移行の実行はownerの権限が必要です。'
       : m.me.id === active?.createdBy
         ? 'この移行はあなたが作成したため、別のownerが実行してください。'
         : null
-    : null
-  const rollbackBlockedReason = m.me && m.me.role !== 'owner' ? '切り戻しはownerの権限が必要です。' : null
-  const canDecideItems = !m.me || ['owner', 'admin'].includes(m.me.role)
+    : '権限を確認できません。読み直してください。'
+  const rollbackBlockedReason = m.canRunRollback ? null : '切り戻しはownerの権限が必要です。'
+  const canDecideItems = canManageRole(m.me?.role)
   const currentStep = !active
     ? 0
     : active.status === 'completed' || active.status === 'rolled_back'
@@ -147,9 +149,10 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
           }))}
         />
 
+        {!canDecideItems ? <ReadOnlyNotice /> : null}
         {m.message ? <p role="status" className={styles.message}>{m.message}</p> : null}
 
-        {!active ? register : null}
+        {!active && canDecideItems ? register : null}
 
         {active && reviewing ? (
           <>
@@ -287,7 +290,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
         <section className={styles.card} aria-labelledby="uid-history">
           <div className={styles.cardHeadRow}>
             <h3 id="uid-history" className={styles.cardTitle}>移行の履歴</h3>
-            {active ? (
+            {active && canDecideItems ? (
               <button type="button" className={styles.textButton} aria-expanded={registerOpen} onClick={() => setRegisterOpen((open) => !open)}>
                 <Plus size={16} aria-hidden="true" />
                 新しい移行を登録
@@ -342,7 +345,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
           )}
         </section>
 
-        {active && registerOpen ? register : null}
+        {active && registerOpen && canDecideItems ? register : null}
 
         {active && reviewing ? (
           <div className={styles.footer}>
@@ -373,7 +376,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
   }
 
   return (
-    /* 要確認の判断（Z0jHp）は板を画面の高さまで伸ばし、キャンセルの帯を画面の下に追従させる。 */
+    /* 要確認の判断は板を画面の高さまで伸ばし、キャンセルの帯を画面の下に追従させる。 */
     <PageFrame kind="list" boardId={active && !reviewing ? 'L48eY' : 'Z0jHp'} heightMode={active && reviewing ? 'viewport' : undefined}>
       <FriendsSectionHead
         current="uid-migration"
@@ -388,10 +391,10 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       <div className={styles.body} data-fill={active && reviewing ? '' : undefined}>{body}</div>
 
       <MigrationItemDialog detailItem={m.detailItem} active={active} me={m.me} busy={m.busy} detailError={m.detailError} onClose={() => { m.setDetailItem(null); m.setDetailError(null) }} decide={(item, decision) => void m.decide(item, decision)} />
-      <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy} open={m.confirmExecute} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />
-      <RollbackConfirmDialog active={active} me={m.me} busy={m.busy} open={m.confirmRollback} error={m.rollbackError} conflicts={m.rollbackConflicts} canRun={m.canRunRollback} onConfirm={() => m.rollback()} onCancel={() => { if (!m.busy) { m.setConfirmRollback(false); m.setRollbackConflicts([]) } }} />
+      <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy} open={m.confirmExecute && isOwnerRole(m.me?.role)} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />
+      <RollbackConfirmDialog active={active} me={m.me} busy={m.busy} open={m.confirmRollback && m.canRunRollback} error={m.rollbackError} conflicts={m.rollbackConflicts} canRun={m.canRunRollback} onConfirm={() => m.rollback()} onCancel={() => { if (!m.busy) { m.setConfirmRollback(false); m.setRollbackConflicts([]) } }} />
       <ConfirmDialog
-        open={bulkOpen}
+        open={bulkOpen && canDecideItems}
         title="要確認をまとめて結び付けます"
         description={`このページの要確認・未判断で移行先のある ${formatNumber(bulkTargets.length)} 行を「結び付ける」にします。1行ずつ保存します。本移行まで実データは変わりません。`}
         confirmLabel="結び付ける"

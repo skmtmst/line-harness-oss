@@ -1,14 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
-import type { Env } from '../index.js';
-import {
-  commitStatusesBlockReason,
-  isCodexAutoMergeEnabled,
-  parseCodexAuditApproval,
-  prohibitedPullRequestChange,
-  processCodexAutoMerge,
-  requiredChecksBlockReason,
-  type CodexAutoMergeMessage,
-} from './codex-auto-merge.js';
+import type { Env } from '../worker-env.js';
+import { commitStatusesBlockReason, isCodexAutoMergeEnabled, parseCodexAuditApproval, prohibitedPullRequestChange, processCodexAutoMerge, requiredChecksBlockReason } from './codex-auto-merge.js';
+import { type CodexAutoMergeMessage } from './codex-auto-merge-types.js';
 
 const message: CodexAutoMergeMessage = {
   kind: 'auto_merge',
@@ -216,19 +209,6 @@ describe('Codex自動マージ処理', () => {
     expect(postedText(fetcher)).toContain('検知のみ');
   });
 
-  test('親メッセージのPR宣言と合図が一致すれば処理を続ける', async () => {
-    const fetcher = vi.fn()
-      .mockResolvedValueOnce(parentResponse())
-      .mockResolvedValueOnce(json({ ok: true }));
-    await processCodexAutoMerge(
-      env({ CODEX_AUTO_MERGE_ENABLED: undefined }),
-      message,
-      fetcher as typeof fetch,
-    );
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    expect(postedText(fetcher)).toContain('検知のみ');
-  });
-
   test('スレッドのPR番号と合図が違えばGitHubを呼ばず理由を報告する', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(parentResponse(343))
@@ -253,7 +233,7 @@ describe('Codex自動マージ処理', () => {
     error.mockRestore();
   });
 
-  test('スイッチが未設定なら検知だけを報告しGitHubを呼ばない', async () => {
+  test('親メッセージのPR宣言が一致してもスイッチ未設定なら検知だけを報告しGitHubを呼ばない', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(parentResponse())
       .mockResolvedValueOnce(json({ ok: true }));

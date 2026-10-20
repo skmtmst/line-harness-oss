@@ -53,7 +53,7 @@ function event(
   return { id, friendId, eventType, occurredAt, dimensions };
 }
 
-describe('V6時系列ファネルの判定', () => {
+describe('時系列ファネルの判定', () => {
   it('前段より後のイベントだけを数え、購入段も実行する', () => {
     const result = evaluateChronologicalFunnel({
       steps: STEPS,
@@ -132,7 +132,7 @@ describe('V6時系列ファネルの判定', () => {
   });
 });
 
-describe('V6ファネルの版・結果・一時対象者', () => {
+describe('ファネルの版・結果・一時対象者', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -161,7 +161,7 @@ describe('V6ファネルの版・結果・一時対象者', () => {
 
   afterEach(() => sqlite.close());
 
-  it('V6の版付き定義を現行画面の一覧へ混ぜない', async () => {
+  it('の版付き定義を現行画面の一覧へ混ぜない', async () => {
     sqlite.prepare(
       `INSERT INTO funnels (id, line_account_id, name, segment_json, window_days, created_at)
        VALUES ('legacy-1', 'account-a', '現行ファネル', NULL, 30, '2026-08-01T00:00:00.000Z')`,
@@ -386,7 +386,7 @@ describe('V6ファネルの版・結果・一時対象者', () => {
   });
 });
 
-describe('V6ファネルの運用状態（停止・保管・編集）', () => {
+describe('ファネルの運用状態（停止・保管・編集）', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

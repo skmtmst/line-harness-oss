@@ -32,7 +32,7 @@ export type TimeFieldV8Props = {
   allowEndOfDay?: boolean
   /**
    * 欄の高さ。既定 36（絵 YCOoR）。`field` は 40＝日付の欄と横に並ぶとき・日時の欄の中
-   * （絵 FU2aU・BBRDb・ZU4Ae）。`compact` は 32＝表の中の細い欄（予約の受付枠）。
+   * （絵のZU4Ae）。`compact` は 32＝表の中の細い欄（予約の受付枠）。
    */
   size?: TimeFieldSize
   pickerTrigger?: 'clock' | 'field'
@@ -353,7 +353,7 @@ export default function TimeFieldV8({
             aria-label="時刻を選ぶ"
             className={styles.panel}
             style={{ position: 'static' }}
-            // 包んだ `<label>` への再送達を防ぐ（v7 の時刻の選択と同じ）。
+            // 包んだ `<label>` への再送達を防ぐ（管理画面 の時刻の選択と同じ）。
             onClick={(event) => event.stopPropagation()}
           >
             <div className={styles.columns}>

@@ -1,12 +1,12 @@
 import {getStoreCapacitySnapshot} from '../services/availability.js';
-import {STORE_CAPACITY_GUARD_EXCLUDE_SQL,STORE_SETTINGS_VERSION_GUARD_SQL} from '../services/booking-store-capacity.js';
-import {BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL,bookingResourceGuardExcludeBindings} from '../services/booking-resource-capacity.js';
+import {STORE_CAPACITY_GUARD_EXCLUDE_SQL,STORE_SETTINGS_VERSION_GUARD_SQL} from '../features/booking/booking-store-capacity/index.js';
+import {BOOKING_RESOURCE_CAPACITY_GUARD_EXCLUDE_SQL,bookingResourceGuardExcludeBindings} from '../features/booking/booking-resource-capacity/index.js';
 import {Hono,type Context} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import type {SeriesInput,SeriesOccurrence} from '@line-crm/shared';
 import {GapError,gapAccount,gapBody,gapKey,gapVersion,gapWrite} from '../services/gap-common.js';
-import {previewSeries,seriesInsert,assertChanged,clearAssertions} from '../services/booking-series.js';
-import {bookingCancellationQuote} from '../services/booking-cancellation.js';
+import {previewSeries,seriesInsert,assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
+import {bookingCancellationQuote} from '../features/booking/booking-cancellation/index.js';
 export const bookingSeries=new Hono<Env>();
 bookingSeries.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'series_unavailable'},e instanceof GapError?e.status:503));
 async function seriesPermission(c:Context<Env>,next:()=>Promise<void>){

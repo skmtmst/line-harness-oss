@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from './audit-log.js';
 
 /**
@@ -30,7 +30,7 @@ afterEach(() => vi.restoreAllMocks());
 describe('auditLog', () => {
   it('誰が・何を・いつ を残す', async () => {
     const { entry, ledger } = await emit({ id: 'staff-9', role: 'admin' });
-    expect(entry).toEqual({ code: 'audit.recorded', route: '/x' });
+    expect(entry).toEqual({ code: 'audit.recorded', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
     expect(ledger[8]).toBe('mileage.rule.update');
     expect(ledger[6]).toBe('staff-9');
     expect(ledger[7]).toBe('admin');
@@ -43,7 +43,7 @@ describe('auditLog', () => {
     const { entry } = await emit({ id: 'staff-9', role: 'admin' });
     // 記録するキーを固定しておく。増やすときは意識的に増やす。
     expect(Object.keys(entry).sort()).toEqual(
-      ['code', 'route'].sort(),
+      ['code', 'timestamp', 'level', 'requestId', 'invocationId', 'source'].sort(),
     );
     // 名前は入れない（個人情報をログへ流さない）
     expect(JSON.stringify(entry)).not.toContain('N');
@@ -51,7 +51,7 @@ describe('auditLog', () => {
 
   it('認証情報が無くても落ちない', async () => {
     const { entry, ledger } = await emit(null);
-    expect(entry).toEqual({ code: 'audit.recorded', route: '/x' });
+    expect(entry).toEqual({ code: 'audit.recorded', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
     expect(ledger[6]).toBeNull();
     expect(ledger[7]).toBe('unknown');
   });

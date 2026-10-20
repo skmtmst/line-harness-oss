@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { formatBookingDatetime } from './reminder-date-format.js';
 export { formatBookingDatetime } from './reminder-date-format.js';
 import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
@@ -45,6 +46,9 @@ import { resolveSendInterpolationExtra, resolveInterpolationExtra } from './inte
 import { resolveReminderSendAt } from '@line-crm/shared';
 import {
   classifyExternalDeliveryError,
+  externalDeliveryStatus,
+  externalDeliveryNotBefore,
+  EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES,
   externalDeliveryRetryAt,
   type SafeExternalDeliveryError,
 } from './external-delivery-retry.js';
@@ -377,7 +381,7 @@ export async function processReminderDeliveries(
       continue;
     }
     /*
-     * アカウント停止中（X-1、v6-33 §10-1）。期限の来た通は skipped の
+     * アカウント停止中（X-1、-33 §10-1）。期限の来た通は skipped の
      * 実行行として残すので、再開しても自動では送り直さない。
      */
     if (accountId && activeByAccount.get(accountId) === false) {
@@ -489,7 +493,7 @@ export async function processReminderDeliveries(
         continue enrollmentLoop;
       }
 
-      // Meet個別相談のV6行は、結び付き予約の版・日時・本人・状態が
+      // Meet個別相談の行は、結び付き予約の版・日時・本人・状態が
       // 一致するときだけ送る。古い版の予定はここで止める (版なし旧行は通す)。
       // 取消後に残った実行行は送らず止める。
       // 本文解決の前に送信候補の写しを読み、最終送信権と突き合わせる。
@@ -546,6 +550,8 @@ export async function processReminderDeliveries(
         continue;
       }
 
+      let sendStarted=false,accepted=false;
+      let lineRequestId:string|null=null;
       try {
         const deliveryClient = await (options.resolveClient
           ? options.resolveClient(accountId, lineClient)
@@ -587,7 +593,7 @@ export async function processReminderDeliveries(
           result.skipped++;
           continue;
         }
-        // Meet個別相談のV6行は、認証・本文の解決awaitの後の早期選別でも
+        // Meet個別相談の行は、認証・本文の解決awaitの後の早期選別でも
         // 送信候補の写しと結び付き関係を確かめる。最終判断は停止確認の後の
         // 最終送信権UPDATEで行う。古ければ実行行だけ取り消す
         // (勝者の新版通知には触れない)。
@@ -643,12 +649,18 @@ export async function processReminderDeliveries(
             continue enrollmentLoop;
           }
         }
+        const marker=await db.prepare(`UPDATE reminder_delivery_runs SET last_error_code='delivery_started',updated_at=?
+          WHERE id=? AND status='claimed' AND lease_expires_at IN (${ownedLeases.map(()=>'?').join(',')})`)
+          .bind(nowIso,run.id,...ownedLeases).run();
+        if(marker.meta.changes!==1)continue;
+        sendStarted=true;
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,
           [built.message],
           run.line_retry_key,
         );
 
+        accepted=true;lineRequestId=response.requestId;
         const deliveredId = crypto.randomUUID();
         const logId = crypto.randomUUID();
         const completed = await db.batch([
@@ -684,33 +696,45 @@ export async function processReminderDeliveries(
         // push と確定の間に取消が確定すると成功にできない (0 件)。
         // 外部送信の有無が曖昧なため送り直さず、運用の追跡用に記録する。
         if (Number(completed[2]?.meta?.changes ?? 0) !== 1) {
-          console.error(JSON.stringify({"code":"reminder_delivery_completed_after_cancel"}));
+          logger.error("reminder_delivery_completed_after_cancel");
         }
       } catch (error) {
-        const safe = classifyReminderDeliveryError(error);
+        const status=externalDeliveryStatus(error);
+        const rejected=!accepted&&status>=400&&status<500&&status!==408;
+        const unknown=sendStarted&&!rejected;
+        const safe = unknown?{code:'delivery_unknown',message:'送信結果を確認できません。LINEの送信履歴を照合するまで再送しません。',retryable:false}:classifyReminderDeliveryError(error);
+        // The relative provider wait starts when its response arrives, rather
+        // than at the beginning of a potentially long cron sweep.
+        const failureNow = options.now ?? new Date();
         const retryAt = externalDeliveryRetryAt(
           error,
           run.retry_cycle_attempt_count,
-          now,
+          failureNow,
           safe.retryable,
         )?.toISOString() ?? null;
+        const notBefore=unknown?undefined:externalDeliveryNotBefore(error,failureNow);
+        const providerDate=new Date(notBefore ?? Number.NaN);
+        const notBeforeAt=Number.isFinite(providerDate.getTime())?providerDate.toISOString():null;
+        const overWait=notBefore!==undefined&&notBefore-failureNow.getTime()>EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES*60_000;
         const exhausted = safe.retryable && !retryAt;
         // R340: 持ち主が移っているときは書けず false になる。
         // 新しい持ち主が結果を記録するため、ここでは数えない。
         const recorded = await failReminderDeliveryRun(db, {
           id: run.id,
-          code: exhausted ? 'retry_exhausted' : safe.code,
-          message: exhausted
+          lineRequestId,
+          code: !sendStarted && safe.retryable ? 'delivery_not_started' : overWait ? 'retry_after_exceeds_budget' : exhausted && status===429 ? 'line_rate_limited_exhausted' : exhausted ? 'retry_exhausted' : safe.code,
+          message: overWait?'連携先の待機期限が再試行の予算を超えたため、自動・手動の再送を止めています。連携先の状態を確認してください。':exhausted
             ? '自動再試行の上限に達しました。LINE連携を確認し、必要なら手動で再試行してください。'
             : safe.message,
           retryAt,
+          notBeforeAt,
           now: nowIso,
           expectedLeaseExpiresAt: ownedLeases,
         });
         if (!recorded) continue;
         if (retryAt) result.retrying++;
         else result.failed++;
-        console.error(JSON.stringify({"code":"reminder_delivery_failed"}));
+        logger.error("reminder_delivery_failed");
       }
     }
 

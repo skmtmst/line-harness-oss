@@ -25,7 +25,7 @@ import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import StyleEntry from '@/v8/onboarding/style-entry'
+import { StyleEntry } from '@/v8/onboarding/public/style-entry/index'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import {
   ACCOUNT_FILTERS,
@@ -48,7 +48,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 LINEアカウント（Pencil `V7vn3`）。
+ * ★V8 LINEアカウント（Pencil ）。
  *
  * 白い板の頭（題・説明・右に「並び順と親子を変える」「LINEアカウントを登録」）→
  * 左に「設定の中のメニュー」→ 右に数の4枚・探す欄と絞り込みの札・表・下の案内。

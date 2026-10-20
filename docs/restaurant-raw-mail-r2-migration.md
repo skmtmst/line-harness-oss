@@ -1,3 +1,5 @@
+> 文書：予約メール原文の専用R2への移行｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 予約メール原文の専用R2への移行
 
 ## 対象
@@ -30,15 +32,15 @@
 1. 必ずdry-runで対象プレフィックを確認する。
 
    ```bash
-   scripts/migrate-restaurant-raw-mail-r2.sh staging --dry-run
-   scripts/migrate-restaurant-raw-mail-r2.sh production --dry-run
+   scripts/db/migrate-restaurant-raw-mail-r2.sh staging --dry-run
+   scripts/db/migrate-restaurant-raw-mail-r2.sh production --dry-run
    ```
 
 2. Masatoの環境別承認後だけコピーする。
 
    ```bash
-   scripts/migrate-restaurant-raw-mail-r2.sh staging --copy
-   scripts/migrate-restaurant-raw-mail-r2.sh production --copy
+   scripts/db/migrate-restaurant-raw-mail-r2.sh staging --copy
+   scripts/db/migrate-restaurant-raw-mail-r2.sh production --copy
    ```
 
 3. 移行元と移行先の件数・サイズをプレフィック別に比較し、複数オブジェクトの
@@ -50,7 +52,7 @@
 
    ```bash
    CONFIRM_RAW_MAIL_COPY_VERIFIED=1 \
-     scripts/migrate-restaurant-raw-mail-r2.sh staging --delete-source
+     scripts/db/migrate-restaurant-raw-mail-r2.sh staging --delete-source
    ```
 
 本番も同じ手順だが、検証の結果と本番用バックアップを確認してから実行する。

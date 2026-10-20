@@ -1,11 +1,11 @@
-import { isGroupResponse } from './new/create-draft'
+import { isGroupResponse } from '../../v8/rich-menus/new/create-draft'
 import { ApiError } from '@/lib/api'
 import { readFileSync } from 'node:fs'
 import { describe,expect,it } from 'vitest'
-import { SIZE_LABEL } from './new/create-options'
-import { imageUploadErrorText } from './new/image-upload-error'
+import { SIZE_LABEL } from '../../v8/rich-menus/new/create-options'
+import { imageUploadErrorText } from '../../v8/rich-menus/new/image-upload-error'
 
-const EDIT = readFileSync(new URL('./new/create-v8.tsx', import.meta.url), 'utf8')
+const EDIT = readFileSync(new URL('../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
 const UNPUBLISH = readFileSync(new URL('../../v8/rich-menu-edit/detail.tsx', import.meta.url), 'utf8')
   + readFileSync(new URL('../../v8/rich-menus/errors.ts', import.meta.url), 'utf8')
 const CONNECTIONS = readFileSync(new URL('../../v8/rich-menus/connections.tsx', import.meta.url), 'utf8')

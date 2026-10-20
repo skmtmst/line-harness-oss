@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import EntitySelect from '@/components/shared/entity-select'
 
 import { useEffect, useRef, useState } from 'react'
@@ -7,8 +8,9 @@ import { parseHqMessageCard, type HqMessageCard, type HqMessageReference } from 
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import { decodeImageSize } from './image-size'
 import { freshDefinition, withUploadedImage, withMessageCard } from '@/lib/hq-template-authoring'
-import RichMenuCreateForm, { freshRichMenuCreateValue, type RichMenuOption } from '@/components/rich-menus/rich-menu-create-form'
-import HqTagEditorV8 from '@/v8/hq-templates/tag-editor'
+import RichMenuCreateForm from '@/components/rich-menus/rich-menu-create-form'
+import { freshRichMenuCreateValue, type RichMenuOption } from '../../../components/rich-menus/rich-menu-create-model'
+import { HqTagEditorV8 } from '@/v8/hq-templates/public/tag-editor/index'
 import HqFormDefinitionEditor from '@/components/forms/hq-form-definition-editor'
 import type { FormRefs } from '@/components/forms/form-refs'
 import {
@@ -17,10 +19,8 @@ import {
   richMenuCreateValueToHqDefinition,
 } from '@/lib/hq-rich-menu-create'
 export { freshDefinition } from '@/lib/hq-template-authoring'
-import {
-  EMPTY_TEMPLATE_REFERENCES,
-  MessageTemplateEditor,
-} from '@/components/templates/message-template-editor'
+import { MessageTemplateEditor } from '@/components/templates/message-template-editor'
+import { EMPTY_TEMPLATE_REFERENCES } from '../../../components/templates/template-preview-model'
 import type {
   FormDefinition,
   MessageTemplateDefinition,
@@ -109,7 +109,7 @@ export function ImageUpload({ purpose, disabled, expectedSize, onUploaded, onBus
       // R568: 受け取りの記録を先に残す。採用に失敗しても、取り消しの後片付けが拾える。
       if (alive.current) { onReceipt?.(media); onUploaded(media) }
     }
-    catch (e) { if (alive.current) setError(e instanceof Error ? e.message : '画像を登録できませんでした。') }
+    catch (e) { if (alive.current) setError(describeApiFailure(e, '画像の登録', { scope: 'hq' })) }
     finally { locked.current = false; if (alive.current) { setUploading(false); onBusyChange?.(false) } }
   }
   return <div className={styles.field}><span>画像を登録</span><input aria-label={purpose === 'message' ? 'メッセージ画像を選ぶ' : 'リッチメニュー画像を選ぶ'} type="file" accept="image/png,image/jpeg" disabled={disabled || uploading} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; void upload(file) }} /><small className={styles.muted}>{purpose === 'message' ? 'PNG・JPEG、1件8 MiB以下。画像形式では本文に自動設定します。' : 'PNG・JPEG、1 MiB以下。幅2500px、高さ1686pxまたは843px。'}</small>{uploading && <p role="status">画像を登録しています…</p>}{error && <p role="alert">{error}</p>}</div>

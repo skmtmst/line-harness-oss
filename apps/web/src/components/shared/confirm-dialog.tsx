@@ -19,12 +19,12 @@ interface ConfirmDialogProps {
   cancelLabel?: string
   destructive?: boolean
   /**
-   * 説明文を琥珀帯で囲む（CFAyf 送受信を止める）。
+   * 説明文を琥珀帯で囲む（ 送受信を止める）。
    * destructive（赤い題・ボタン）とは独立に使える。
    */
   warning?: boolean
   /**
-   * 説明文を桃箱で囲む（YZ57z 解除。題は箱の外・説明だけ箱の中）。
+   * 説明文を桃箱で囲む（ 解除。題は箱の外・説明だけ箱の中）。
    * destructive（赤い題・ボタン）とは独立に使える。
    */
   dangerBand?: boolean
@@ -121,7 +121,7 @@ export default function ConfirmDialog({
   const [executing, setExecuting] = useState(false)
   const [executionError, setExecutionError] = useState('')
   const lock = useRef(false)
-  const runConfirm = onConfirm ? async () => {
+  const runConfirm = onConfirm ? () => {
     if (lock.current || busy) return
     lock.current = true
     setExecutionError('')
@@ -129,14 +129,17 @@ export default function ConfirmDialog({
       const pending = onConfirm() as unknown
       if (pending && typeof (pending as PromiseLike<unknown>).then === 'function') {
         setExecuting(true)
-        await pending
+        return Promise.resolve(pending).catch(() => {
+          setExecutionError('実行できませんでした。もう一度お試しください。')
+        }).finally(() => {
+          lock.current = false
+          setExecuting(false)
+        })
       }
     } catch {
       setExecutionError('実行できませんでした。もう一度お試しください。')
-    } finally {
-      lock.current = false
-      setExecuting(false)
     }
+    lock.current = false
   } : undefined
 
   /*

@@ -7,7 +7,7 @@ import { setDocumentTitle } from '@/lib/document-title'
 /**
  * 画面の枠（トップバーと本文の幅）に、ページから値を渡すための口。
  *
- * **なぜ要るか。** ★V6 260枚を数えたところ、画面名はルートから機械的に
+ * **なぜ要るか。** ★管理画面 260枚を数えたところ、画面名はルートから機械的に
  * 決められなかった。約40枚が「Kenta Kawano(Obama)」「夏の定番セット.jpg」
  * 「ももちゃん ／ トリミング」のようにデータの中身そのもので、約100枚が
  * 「タグを作る」「1通目を設定」のようにその画面固有の名前だった。
@@ -21,7 +21,7 @@ import { setDocumentTitle } from '@/lib/document-title'
  * `ホーム › 一斉配信`・`一斉配信 › 新商品発売のお知らせ` のように、
  * 画面名の前に「どこから来たか」を1段だけ置く。先頭の「ホーム」は
  * 帯が自分で出すので渡さない。渡さない画面はアカウント名を出さず
- * 題だけにする（絵の指示）。v7 では描かない。
+ * 題だけにする（指示）。互換経路では描かない。
  */
 export interface PageCrumb {
   label: string
@@ -123,12 +123,12 @@ export function useFullWidthPage(enabled = true) {
 /**
  * ページがパンくずの手前の段を渡す（★V8）。
  *
- * ```tsx
+ * `tsx
  * usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
- * ```
+ * `
  *
  * 一覧からの詳細画面で「一斉配信 › 配信名」と出すためのもの。
- * v7 では描かれないので、渡しても v7 の見た目は変わらない。
+ * 互換経路では描かれないので、渡しても 管理画面 の見た目は変わらない。
  * 画面を離れたら既定（アカウント名）へ戻す。
  */
 export function usePageCrumbs(crumbs: PageCrumb[] | null, enabled = true) {
@@ -165,7 +165,7 @@ export function useSettingsNavInline(enabled = true) {
 }
 
 /**
- * ★V8：設定の住所の画面でも、絵に「設定の中のメニュー」が無い画面だけ外のメニューを出さない（SNS 連携 y3GGTs）。
+ * ★V8：設定の住所の画面でも、絵に「設定の中のメニュー」が無い画面だけ外のメニューを出さない（SNS 連携 ）。
  * 枠への知らせ方は useSettingsNavInline と同じ（外に出さない印）。板の中にもメニューは置かない。
  */
 export function useHideSettingsNav() {

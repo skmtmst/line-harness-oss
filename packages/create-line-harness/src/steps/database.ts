@@ -1,5 +1,6 @@
 import * as p from "@clack/prompts";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { wrangler, WranglerError } from "../lib/wrangler.js";
 
@@ -11,6 +12,27 @@ interface DatabaseResult {
 interface BootstrapMeta {
   includedMigrations: string[];
   migrationCount: number;
+}
+
+const MIGRATION_NAME = /^\d{3,}_[A-Za-z0-9_-]+\.sql$/;
+
+// Only call after successful application on a database created by this run.
+// A file avoids command-line length limits when recording the whole baseline.
+async function recordMigrations(databaseName: string, names: string[]): Promise<void> {
+  if (!names.every(name => MIGRATION_NAME.test(name))) {
+    throw new Error("適用記録のファイル名が不正です");
+  }
+  const dir = mkdtempSync(join(tmpdir(), "line-harness-migration-ledger-"));
+  try {
+    const file = join(dir, "ledger.sql");
+    writeFileSync(file, [
+      "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);",
+      ...names.map(name => `INSERT OR IGNORE INTO _migrations (name, applied_at) VALUES ('${name}', datetime('now'));`),
+    ].join("\n"));
+    await runD1WithRetry(["d1", "execute", databaseName, "--remote", "--file", file], "適用記録の保存");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 const TRANSIENT_D1_ERROR = /code[:\s]*10043|cloudflarestatus|temporarily unavailable|internal error|timed out|timeout|fetch failed|network|connection reset/i;
@@ -84,9 +106,11 @@ function loadBootstrapMeta(repoDir: string): BootstrapMeta | null {
   try {
     const parsed = JSON.parse(readFileSync(metaPath, "utf8")) as BootstrapMeta;
     if (
-      typeof parsed.migrationCount !== "number" ||
+      !Number.isSafeInteger(parsed.migrationCount) ||
       !Array.isArray(parsed.includedMigrations) ||
-      !parsed.includedMigrations.every((value) => typeof value === "string")
+      !parsed.includedMigrations.every((value) => typeof value === "string" && MIGRATION_NAME.test(value)) ||
+      parsed.migrationCount !== parsed.includedMigrations.length ||
+      new Set(parsed.includedMigrations).size !== parsed.includedMigrations.length
     ) {
       return null;
     }
@@ -154,7 +178,7 @@ export async function createDatabase(
   const migrationsDir = join(repoDir, "packages/db/migrations");
   const migrationFiles = readdirSync(migrationsDir)
     .filter((f) => f.endsWith(".sql"))
-    .sort();
+    .sort((a, b) => Number(a.split('_')[0]) - Number(b.split('_')[0]) || a.localeCompare(b));
   const bootstrapMeta = loadBootstrapMeta(repoDir);
   const includedMigrations = new Set(bootstrapMeta?.includedMigrations ?? []);
   const canUseBootstrap =
@@ -185,11 +209,12 @@ export async function createDatabase(
         "bootstrap 適用",
       );
     } catch (err) {
-      if (!isBenignSchemaError(err)) {
-        s.stop("bootstrap 適用に失敗");
-        throw err;
-      }
+      // A new DB must accept the complete baseline. Even a duplicate error
+      // can mean partial application, so it cannot justify ledger entries.
+      s.stop("bootstrap 適用に失敗");
+      throw err;
     }
+    await recordMigrations(databaseName, bootstrapMeta.includedMigrations);
 
     for (const file of pendingMigrations) {
       try {
@@ -205,11 +230,10 @@ export async function createDatabase(
           `bootstrap 後 migration 適用: ${file}`,
         );
       } catch (err) {
-        if (!isBenignSchemaError(err)) {
-          s.stop(`migration 失敗: ${file}`);
-          throw err;
-        }
+        s.stop(`migration 失敗: ${file}`);
+        throw err;
       }
+      await recordMigrations(databaseName, [file]);
     }
   } else {
     const totalFiles = 1 + migrationFiles.length;
@@ -235,6 +259,7 @@ export async function createDatabase(
     }
 
     for (const file of migrationFiles) {
+      let applied = false;
       try {
         await runD1WithRetry(
           [
@@ -247,12 +272,16 @@ export async function createDatabase(
           ],
           `migration 適用: ${file}`,
         );
+        applied = true;
       } catch (err) {
         if (!isBenignSchemaError(err)) {
           s.stop(`migration 失敗: ${file}`);
           throw err;
         }
       }
+      // A tolerated duplicate can leave later statements unapplied. Preserve
+      // the fallback behaviour, but never certify that file as fully applied.
+      if (createdNow && applied) await recordMigrations(databaseName, [file]);
     }
   }
 

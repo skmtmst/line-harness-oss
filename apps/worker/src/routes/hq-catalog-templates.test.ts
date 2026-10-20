@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { beforeEach,afterEach,expect,test,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hqTemplates } from './hq-templates.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type { HqCatalogTemplateType } from '@line-crm/shared';
 let f:SqliteD1,app:Hono<Env>,staff:Env['Variables']['staff'];
 const defs={booking_menu:{schemaVersion:1,settings:{name:'初回相談',duration_minutes:60,base_price:3000}},mileage_reward:{schemaVersion:1,settings:{name:'お礼',rewardKind:'coupon',requiredMiles:100}}};

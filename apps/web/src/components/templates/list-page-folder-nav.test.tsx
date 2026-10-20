@@ -5,7 +5,7 @@ import { join, relative, resolve } from 'node:path'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ts from 'typescript'
-import { ListPage, ListPageBody } from './index'
+import { ListPage, ListPageBody } from '.'
 import { FolderDotName } from '@/components/shared/folder-dot'
 
 afterEach(cleanup)
@@ -65,7 +65,7 @@ describe('一覧の型：板が狭いときに畳む左の列（folderNav）', (
     expect(screen.queryByRole('button', { name: 'フォルダ' })).toBeNull()
   })
 
-  it('B-244：画面が狭い幅で左の列を外しても、渡されたフォルダの操作を失わない', () => {
+  it("画面が狭い幅で左の列を外しても、渡されたフォルダの操作を失わない", () => {
     const { container } = render(<ListPageBody folderNav={{ rows, activeId: '', onSelect: () => {} }}>本文</ListPageBody>)
     expect(collapsedRegion(container)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'フォルダ' })).toBeTruthy()

@@ -1,9 +1,10 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
-import { purgeUnsafeFormDocuments } from '../services/form-documents.js';
+import { purgeUnsafeFormDocuments } from '../features/forms/form-documents/index.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { allowedFileScanEndpoint, isFileScanSecretRef } from '../lib/file-scan-policy.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditEventStatement, recordAuditEvent } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -69,12 +70,18 @@ function serializeScan(row: FileScanRow) {
 async function findR2Key(
   db: D1Database,
   scan: FileScanRow,
-): Promise<{ key: string; width: number | null; height: number | null } | null> {
-  if (scan.subject_kind === 'upload_session' || scan.subject_kind === 'media_version') {
+): Promise<{ key: string; width: number | null; height: number | null; etag?: string } | null> {
+  if (scan.subject_kind === 'media_version') {
+    const version = await db.prepare(
+      `SELECT r2_key, width, height, etag FROM media_versions WHERE id = ? AND media_id = ?`,
+    ).bind(scan.subject_id, scan.media_id).first<{ r2_key: string; width: number | null; height: number | null; etag: string | null }>();
+    return version ? { key: version.r2_key, width: version.width, height: version.height, ...(version.etag ? { etag: version.etag.replace(/^"|"$/g, '') } : {}) } : null;
+  }
+  if (scan.subject_kind === 'upload_session') {
     const session = await db.prepare(
       `SELECT r2_key, width, height FROM media_upload_sessions WHERE id = ?`,
     ).bind(scan.subject_id).first<{ r2_key: string; width: number | null; height: number | null }>();
-    if (session) return { key: session.r2_key, width: session.width, height: session.height };
+    return session ? { key: session.r2_key, width: session.width, height: session.height } : null;
   }
   if (scan.subject_kind === 'media' || scan.media_id) {
     const media = await db.prepare(
@@ -126,7 +133,8 @@ export async function processDueFileScans(
       );
       if (external) {
         // 外の検査は設定があれば使う。鍵は設定の secret_ref が指す環境値から。
-        const head = await env.IMAGES.get(target.key, target.key.startsWith('private/form-documents/') ? undefined : { range: { offset: 0, length: 256 * 1024 } });
+        const head = await env.IMAGES.get(target.key, { ...(target.key.startsWith('private/form-documents/') ? {} : { range: { offset: 0, length: 256 * 1024 } }), ...(target.etag ? { onlyIf: { etagMatches: target.etag } } : {}) });
+        if ((target.etag && !head) || (head && !('body' in head))) throw new ScanRetryableError('object_changed');
         if (isPrivateFormDocumentScan(scan) && !head) throw new ScanRetryableError('document_missing');
         const bytes = head ? new Uint8Array(await head.arrayBuffer()) : new Uint8Array();
         try {
@@ -153,10 +161,10 @@ export async function processDueFileScans(
       }, {
         maxBytes: config?.max_bytes_override ?? null,
         maxPixels: config?.max_pixels_override ?? null,
-      });
+      }, target.etag);
       if (next.status === 'pending') stillPending += 1;
     } catch (err) {
-      console.error(JSON.stringify({"code":"routes_file_scan_failed"}));
+      logger.error("routes_file_scan_failed");
       if (await markFileScanPendingRetry(env.DB, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined) === 'pending') stillPending += 1;
     }
   }
@@ -179,7 +187,7 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
     return c.json({ success: false, error: 'Not found' }, 404);
   }
   const allowed: FileScanStatus[] = ['pending', 'clean', 'rejected', 'quarantined'];
-  // 板 `PfA4o` の「戻した」札。戻したものだけを見る口。`clean` には一度も
+  // 板 `` の「戻した」札。戻したものだけを見る口。`clean` には一度も
   // 止められていないものも混ざるため、`released_at` で絞る。
   const releasedOnly = status === 'released';
   const conditions = releasedOnly
@@ -273,7 +281,7 @@ fileScan.get('/api/file-scans/for-media', requireRole('owner', 'admin', 'staff')
   return c.json({ success: true, data: { scan: serializeScan(scan) } });
 });
 
-/** 止まっている時の表示（B-3）。staff も見られる。赤は使わない。 */
+/** 止まっている時の表示。staff も見られる。赤は使わない。 */
 fileScan.get('/api/file-scans/health', requireRole('owner', 'admin', 'staff'), async (c) => {
   const accountId = (c.req.query('accountId') ?? '').trim();
   if (!accountId) return c.json({ success: false, error: 'accountId が必要です' }, 400);
@@ -481,7 +489,7 @@ fileScan.put('/api/file-scans/config', requireRole('owner', 'admin'), inputJsonB
   // 共通監査は長い文字列を秘密値として伏せる。ホストだけを短い断片で
   // 保存すれば、その保護を緩めず長い正式ホストも正確に復元できる。
   // 3文字の断片は電話番号の伏せ字にも該当しない。1配列50項目の上限を
-  // 守って二段に分け、最大253文字をすべて保存する。flat().join('')で復元。
+  // 守って二段に分け、最大253文字をすべて保存する。flat.join('')で復元。
   const auditHost = endpointHost && (endpointHost.length > 200 || /[A-Za-z0-9_-]{32,}|[0-9-]{6,}/.test(endpointHost))
     ? { endpointHostParts: [endpointHost.slice(0, 150).match(/.{1,3}/g)!, ...(endpointHost.length > 150 ? [endpointHost.slice(150).match(/.{1,3}/g)!] : [])] }
     : { endpointHost };

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /*
  * N-432(#668)。招待メールが伝える有効期限を、実際に送る本文で確かめる。

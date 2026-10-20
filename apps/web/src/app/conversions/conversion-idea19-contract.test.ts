@@ -1,12 +1,13 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(join(import.meta.dirname, 'page.tsx'), 'utf8')
-/* 詳細の窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
+/* 詳細の窓は 管理画面 共用の `_components/conversion-dialogs.tsx` にある。 */
 const DIALOGS = readFileSync(join(import.meta.dirname, '../../v8/conversions', 'dialogs.tsx'), 'utf8')
-const API = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 /**
  * #1037 IDEA-19「19 コンバージョン」の契約。

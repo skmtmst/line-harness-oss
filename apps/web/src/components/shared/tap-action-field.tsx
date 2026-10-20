@@ -1,7 +1,9 @@
 'use client'
+import type { TapActionSourceItem, TapActionSources } from './tap-action-source-types'
+export type { TapActionSourceItem, TapActionSources } from './tap-action-source-types'
 
 /*
- * 「押したら」の共通の欄（オーナー採用 B-129・Pen YPzmo・2026-10-09）。
+ * 「押したら」の共通の欄（オーナー採用 ・Pen YPzmo・2026-10-09）。
  *
  * 左に「押したら」（6つ＋画面が足す種類。開いた一覧は印＋名前＋1行の説明）、右に「中身」
  * （種類ごとに変わる）。カルーセル・リッチメッセージ・リッチメニュー・統括のひな形などが同じ部品を使う。
@@ -20,11 +22,8 @@
  */
 import { useId, useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { CalendarCheck, ChevronRight, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
-import {
-  TAP_ACTION_DEFS, TAP_ACTION_KINDS, tapActionDef,
-  type TapActionKind, type TapActionValue,
-} from '@/lib/tap-actions'
+import { CalendarCheck, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
+import { TAP_ACTION_DEFS, TAP_ACTION_KINDS, tapActionDef, type TapActionKind, type TapActionValue } from '@/lib/tap-actions'
 import TapExtrasField from './tap-extras-field'
 import { EntityPickerSummary, EntityPickerDialog, type EntityPickerItem } from './entity-picker'
 import { ENTITY_KINDS, EntityKindDialog, type EntityKind } from './entity-picker-sources'
@@ -49,22 +48,6 @@ export interface TapActionExtraKind {
   description?: string
   icon: LucideIcon
 }
-
-/** 作ってあるもの（回答フォーム・予約メニュー・スタンプカード）1つ。 */
-export interface TapActionSourceItem {
-  id: string
-  name: string
-  /** 名前の横の小さな補足（「10個で1杯サービス」など）。 */
-  note?: string
-  /** 新しくは選べない（受け付けを止めた回答フォームなど）。選んであるときは名前と補足を出す。 */
-  disabled?: boolean
-  /** フォルダ（回答フォーム）。undefined＝フォルダの無い種類。 */
-  folderId?: string | null
-  /** 最後に直した日時（選ぶ窓の行の補足）。 */
-  updatedAt?: string | null
-}
-
-export type TapActionSources = Partial<Record<'form' | 'booking' | 'visit_stamp', TapActionSourceItem[]>>
 
 export interface TapActionFieldProps {
   id?: string
@@ -240,7 +223,7 @@ const NONE_ID = '__tap_none__'
 
 /**
  * 作ってあるもの（回答フォーム・予約メニュー・スタンプカード）を選ぶ窓。共通の「作ってあるものを選ぶ窓」
- * （EntityPicker・Pen dJZ7Q・B-131）を使う。窓の中は仮選択で、［選ぶ］でだけ値を変える（キャンセル・Esc では変えない）。
+ * （EntityPicker・Pen dJZ7Q・）を使う。窓の中は仮選択で、［選ぶ］でだけ値を変える（キャンセル・Esc では変えない）。
  * - 回答フォーム（必ず選ぶ）は EntityKindDialog（フォルダの列・見え方のスマホつき）
  * - 予約メニュー・スタンプカード（任意）は先頭に「選ばない」の行を置いた EntityPickerDialog
  * - 候補を読めなかったときは一覧の代わりに理由を出す

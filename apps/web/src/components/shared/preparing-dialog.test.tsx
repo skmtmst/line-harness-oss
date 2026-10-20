@@ -7,7 +7,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 
 afterEach(cleanup)
 
-test('機能の名前を入れて「現在準備中です」を出し、閉じるで閉じる（B-314・fuQxi）', () => {
+test('機能の名前を入れて「現在準備中です」を出し、閉じるで閉じる（・fuQxi）', () => {
   const close = vi.fn()
   render(<PreparingDialog open feature="お支払い" onClose={close} />)
   expect(screen.getByRole('dialog', { name: PREPARING_TITLE })).toBeTruthy()

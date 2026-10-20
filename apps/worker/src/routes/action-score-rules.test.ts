@@ -89,7 +89,7 @@ beforeEach(() => {
   });
 });
 
-describe('V6 action score rule API', () => {
+describe('action score rule API', () => {
   it('requires a selected authorized account for reads', async () => {
     expect((await call('/api/action-scores/rules')).status).toBe(400);
     expect((await call('/api/action-scores/rules?accountId=hidden')).status).toBe(404);

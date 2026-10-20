@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ESLint } from 'eslint';
 
-describe('S26 unpatched braces development-tool exposure', () => {
+describe('unpatched braces development-tool exposure', () => {
   it('the actual resolved Next lint config bypasses the glob parser', async () => {
     const eslint = new ESLint({ overrideConfigFile: resolve('eslint.config.mjs') });
     const config = await eslint.calculateConfigForFile(resolve('apps/web/src/app/page.tsx'));

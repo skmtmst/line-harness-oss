@@ -19,16 +19,16 @@ export const ATTRIBUTION_WINDOW_DAYS = 90;
 /**
  * Resolve the last-touch affiliate attribution for a friend.
  *
- * @param at Reference timestamp (JST ISO). Defaults to jstNow().
+ * @param at Reference timestamp (JST ISO). Defaults to jstNow.
  *           Touches must fall within [at - 90 days, at].
  * @returns The winning affiliate + ref_code, or null if none is eligible.
  *
  * Timestamp comparison note:
  *  ref_tracking.created_at is stored as a JST ISO string with a +09:00 offset
- *  (e.g. "2026-07-07T12:00:00.000+09:00"). SQLite's datetime() emits a
+ *  (e.g. "2026-07-07T12:00:00.000+09:00"). SQLite's datetime emits a
  *  space-separated UTC-normalized string, so a raw string comparison against
  *  datetime(?, '-90 days') mixes formats and produces boundary errors. We use
- *  julianday(), which parses the offset into a true instant, so the window and
+ *  julianday, which parses the offset into a true instant, so the window and
  *  ordering compare real points in time regardless of textual format.
  */
 export async function resolveAffiliateAttribution(

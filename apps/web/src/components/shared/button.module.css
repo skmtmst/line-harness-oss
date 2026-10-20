@@ -15,7 +15,7 @@
 }
 
 /*
- * 押したら少し沈む（★V7 仕上げ §2「押した」: 0.98倍・motion-instant 80ms）。
+ * 押したら少し沈む（★管理画面 仕上げ §2「押した」: 0.98倍・motion-instant 80ms）。
  * 動きを減らす設定では大きさを変えない（色の変化だけ残る）。
  */
 
@@ -26,7 +26,7 @@
  */
 
 /*
- * 行内用は32px（★V7：行内の操作は32）。アイコン操作（32×32）と
+ * 行内用は32px（★管理画面：行内の操作は32）。アイコン操作（32×32）と
  * 同じ高さにそろえる。文字サイズ・余白は共通のまま変えない。
  */
 .compact {
@@ -107,7 +107,7 @@
 }
 
 /*
- * ★V7 仕上げ §2「保存中」の回る印。文字の切り替えと幅の固定は
+ * ★管理画面 仕上げ §2「保存中」の回る印。文字の切り替えと幅の固定は
  * 部品側（button.tsx）が持つ——DOM に出す文字は今のラベル1つだけで、
  * 平常時の幅を min-width に留めてぶれを防ぐ。
  * 減らす設定では globals.css が動きを止める。
@@ -125,7 +125,7 @@
 
 /*
  * ★V8「ボタン」（doYdE・u101P・LrB2L）。
- * 高さ36・余白 0 16・文字13px。主は B-151 の墨色の影、副は白地に
+ * 高さ36・余白 0 16・文字13px。主は  の墨色の影、副は白地に
  * 細い枠と薄い影。compact（行内の操作）はV8に別寸法が無いので32のまま。
  */
 :root .button {
@@ -148,7 +148,7 @@
 
 /*
  * ★V8 仕上げ（M10）：押した沈みは 120ms（乗せた色変化と同じ速さ）。
- * v7 は 80ms のまま。キーボードの印は action の 2px の輪
+ * 互換経路は 80ms のまま。キーボードの印は action の 2px の輪
  * （文字ボタン text-action と同じ色にそろえる）。
  */
 :root .button {
@@ -190,7 +190,7 @@
   outline-offset: 2px;
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .button { border: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 :root .primary { border: 0; outline: 1px solid var(--color-primary-border); outline-offset: -1px; border-radius: var(--radius-primary-action); box-shadow: var(--shadow-primary-action); }
 :root .secondary { outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
@@ -252,123 +252,23 @@
 :root .button.composer { height: var(--tpl-button-h); min-height: var(--tpl-button-h); padding: 0 var(--tpl-button-pad-side); font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
 
 :root .button.composer-small { min-height: var(--tpl-msg-composer-small-button-h); height: var(--tpl-msg-composer-small-button-h); padding: 0 8px; font-size: var(--text-caption); line-height: var(--tpl-msg-composer-tab-lh); }
-/* eovoG：返信する前の道具。共通Buttonが寸法を持ち、画面で上書きしない。 */
+/* ：返信する前の道具。共通Buttonが寸法を持ち、画面で上書きしない。 */
 :root .button.inbox-tool { min-height: var(--tpl-inbox-composer-btn-h); height: var(--tpl-inbox-composer-btn-h); padding: 0 var(--tpl-inbox-composer-input-pad); gap: var(--tpl-inbox-composer-gap); font-size: var(--polish-text-body); line-height: var(--tpl-inbox-row-preview-lh); }
 
-/* B-152②：ボタン文字は太字の例外。文字だけの操作は本文の太さを保つ。 */
+/* ②：ボタン文字は太字の例外。文字だけの操作は本文の太さを保つ。 */
 :root .button { font-weight: var(--tpl-button-weight); }
 :root .button.inline.text { font-weight: var(--font-weight-bold); }
 
-/* B-152・仕上げ7 */
+/* ・仕上げ7 */
 :root .button:disabled { opacity: var(--polish-disabled-opacity); }
 :root .button:is(:hover, :active):not(:disabled) { filter: none; }
-/* O2Z8u・GcyTr の電話予約。標準の高さを保ち、印と文字の間を絵へ合わせる。 */
+/* ・ の電話予約。標準の高さを保ち、印と文字の間を絵へ合わせる。 */
 :root .button.booking { height: var(--tpl-chip-h); padding-inline: var(--tpl-booking-button-pad); gap: var(--tpl-body-gap); }
-
-/*
- * ★V8 デリバリー受注の行の中の操作（kDQHr の `HYOW5` 受け付ける・`AuCyJ` 拒否・
- * `WvPd6` 準備完了）。`size="delivery-row"` を渡したボタンだけに効き、
- * 他の画面と既定のボタンは変えない。
- *
- * 絵の実寸は 高さ28・左右の余白10・字12の太字・角丸8。行内用の既定（`compact`）は
- * 字14・左右の余白16・高さ32で、行が 12+32+12＝56 になり絵の 53・50・47 と合わない
- * （2026-10-10 実測）。
- *
- * 高さは `height` だけでは下がらない。globals.css の全ボタン共通の下限
- * `@layer base { button:not([role="switch"]) { min-height: 32px } }` が
- * `height` より強いので、こちらも `min-height` で下限を28へ下げる。
- */
-:root .button.delivery-row {
-  height: var(--tpl-rt-dlv-act-h);
-  min-height: var(--tpl-rt-dlv-act-h);
-  padding: var(--tpl-rt-dlv-act-pad);
-  border-radius: var(--tpl-rt-dlv-act-radius);
-  font-size: var(--tpl-rt-dlv-act-size);
-  line-height: var(--tpl-rt-dlv-act-lh);
-}
-
-/*
- * 指で押す端末の当たり判定44px（#976 U083）。上の規定で下限を28へ下げたので、
- * `compact` などと同じ扱いをこの大きさにも明示して戻す。
- */
-@media (pointer: coarse) {
-  :root .button.delivery-row {
-    min-height: 44px;
-  }
-}
-
-/*
- * ★V8 デリバリー受注の板の頭の操作（絵 kDQHr の「品切れ設定ボタン」`lmSlb`＋`gcVZx`・
- * 「一括停止ボタン」`bX6bH`＋`aqR6A`）と、注文詳細の窓の足（絵 hjdqV の
- * 「キャンセル・拒否する・受け付ける」）。`size="delivery-head"` を渡したボタンだけに効く。
- *
- * 絵は 高さ36・角丸10・字13の太字。角丸と字は共通の既定と同じなので触らない。
- * 違うのは左右の余白14（既定16）と印15角（既定16）・印と字の間6（既定8）の3つだけ。
- * 幅がちょうど 140（14＋15＋6＋字91＋14）になり、右端 1404 に合わせたときの字の位置が
- * 絵と合う。既定のままだと 144 になって字が 19 右へずれる（2026-10-11 実測）。
- *
- * 高さ36は `.standard`・`.field` だけが持っていて、別の大きさを渡すと外れる。
- * 外れると globals.css の全ボタン共通の下限 32 だけが残り、絵より 4 低い（2026-10-11 実測）。
- * `height` だけでは下限 32 に勝てないので `min-height` も同じ 36 にする。
- *
- * 印の大きさは `@layer components` の中の `.button > svg`（16角）が持っているので、
- * この規定は層の外に置いて上書きする。
- *
- * hjdqV の足も同じ 3 つ（余白14・印15・間6）だけが違う。既定のままだと 1 つあたり
- * 5〜6 太くなり、右端 976 に寄せた並びが左へ積もって「キャンセル」＋5・「拒否する」−11
- * ずれていた（2026-10-11 実測）。同じ値なので新しい大きさは増やさずこれを渡す。
- */
-:root .button.delivery-head {
-  height: var(--tpl-button-h);
-  min-height: var(--tpl-button-h);
-  padding-inline: var(--tpl-rt-dlv-head-pad);
-  gap: var(--tpl-rt-dlv-act-gap);
-}
-
-:root .button.delivery-head > svg {
-  width: var(--tpl-rt-dlv-head-icon);
-  height: var(--tpl-rt-dlv-head-icon);
-}
-
-/*
- * ★V8 デリバリー受注の「まとめて」の帯の中の操作（絵 h7OeT の `auy4o` 品切れ・
- * `Y0xFE` 再開）。`size="delivery-bulk"` を渡したボタンだけに効く。
- *
- * 絵の実寸は 高さ28・左右の余白10・角丸8・字12の太字で、ここまでは行の中
- * （`delivery-row`）と同じ値。違うのは印13角と印と字の間5の2つだけなので、
- * 同じ値を使い回して差分だけ書く（2026-10-11 実測）。
- * 画面CSSから共通ボタンを削る書き方（★V8 §24で禁止）の代わりに、
- * 渡したときだけ効くこの大きさを部品側に置く。
- *
- * 印の大きさは `@layer components` の中の `.button > svg`（16角）が持っているので、
- * delivery-head と同じようにこの規定も層の外に置いて上書きする。
- */
-:root .button.delivery-bulk {
-  height: var(--tpl-rt-dlv-act-h);
-  min-height: var(--tpl-rt-dlv-act-h);
-  padding: var(--tpl-rt-dlv-act-pad);
-  border-radius: var(--tpl-rt-dlv-act-radius);
-  font-size: var(--tpl-rt-dlv-act-size);
-  line-height: var(--tpl-rt-dlv-act-lh);
-  gap: var(--tpl-rt-dlv-bulk-act-gap);
-}
-
-:root .button.delivery-bulk > svg {
-  width: var(--tpl-rt-dlv-bulk-act-icon);
-  height: var(--tpl-rt-dlv-bulk-act-icon);
-}
-
-/* 指で押す端末の当たり判定44px（#976 U083）。`delivery-row` と同じ扱いに戻す。 */
-@media (pointer: coarse) {
-  :root .button.delivery-bulk {
-    min-height: 44px;
-  }
-}
 
 @layer components {
 :root .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:600;padding-inline:16px;}
 }
-/* B-211：共通ボタンを選ぶ札として使う画面も同じ形。 */
+/* ：共通ボタンを選ぶ札として使う画面も同じ形。 */
 html:root .button:not([data-part='row-name']):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='funnel-row'])[aria-pressed='true'] { background: var(--color-selection-bg); color: var(--color-selection-border); border-color: var(--color-selection-border); box-shadow: var(--choice-selected-shadow); }
 
 :root .button[data-full-width] { width: 100%; justify-content: center; text-align: center; }

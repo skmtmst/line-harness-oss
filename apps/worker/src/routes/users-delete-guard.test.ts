@@ -9,7 +9,7 @@ import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = vi.hoisted(() => ({ scope: vi.fn() }));
 vi.mock('../services/account-access.js', () => ({

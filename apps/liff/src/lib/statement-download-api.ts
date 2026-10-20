@@ -1,5 +1,5 @@
 import liff from '@line/liff';
-import { FileDownloadError } from './file-download-api.js';
+import { FileDownloadError, tracedFileFailure } from './file-download-api.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -34,12 +34,12 @@ export async function issueStatement(id: string): Promise<IssuedStatement> {
   url.searchParams.set('issue', '1');
   let response: Response;
   try {
-    response = await fetch(url, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer' });
+    response = await fetch(url, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
   } catch (err) {
     if (err instanceof FileDownloadError) throw err;
     throw new FileDownloadError('retry');
   }
-  if (!response.ok) throw failureOf(response.status, response.headers.get('Retry-After'), 'issue');
+  if (!response.ok) throw await tracedFileFailure(response, failureOf(response.status, response.headers.get('Retry-After'), 'issue'));
   const body = (await response.json()) as { success?: boolean; data?: IssuedStatement };
   if (body.success === false || !body.data?.url) throw new FileDownloadError('retry');
   return body.data;
@@ -54,11 +54,11 @@ export async function fetchStatementBlob(id: string, issued: IssuedStatement): P
   }
   let response: Response;
   try {
-    response = await fetch(signed, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer' });
+    response = await fetch(signed, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
   } catch (err) {
     if (err instanceof FileDownloadError) throw err;
     throw new FileDownloadError('retry');
   }
-  if (!response.ok) throw failureOf(response.status, response.headers.get('Retry-After'), 'fetch');
+  if (!response.ok) throw await tracedFileFailure(response, failureOf(response.status, response.headers.get('Retry-After'), 'fetch'));
   return response.blob();
 }

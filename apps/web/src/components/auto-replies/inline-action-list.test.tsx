@@ -81,7 +81,7 @@ it.each([['send_template','テンプレート','案内'],['reminder','リマイ�
   expect(screen.getByRole('button',{name:label+'：変える'})).toBeTruthy()
 })
 
-it('B-179：イベントの取り消しを選んでもイベントと指定回を保つ', async () => {
+it('イベントの取り消しを選んでもイベントと指定回を保つ', async () => {
   const changed = vi.fn()
   const { fireEvent } = await import('@testing-library/react')
   render(<InlineActionList actions={[{ key: 'event', actionType: 'event_booking', config: { eventId: 'e', slotId: 'slot', op: 'register' }, onFailure: 'continue' }]} onChange={changed} {...EMPTY_OPTIONS} events={[{ id: 'e', name: '相談会' }]} />)

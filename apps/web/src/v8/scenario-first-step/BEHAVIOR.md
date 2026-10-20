@@ -1,6 +1,8 @@
+> 文書：シナリオを作る②：1通目を設定（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # シナリオを作る②：1通目を設定（V8）の動き
 
-入口：`app/scenarios/first-step/page.tsx`（V8 のときだけ `src/v8/scenario-first-step/first-step.tsx`、それ以外は今の v7 の画面）。
+入口：`app/scenarios/first-step/page.tsx`（V8専用で `src/v8/scenario-first-step/first-step.tsx`）。
 絵：`V6xAo`（1440）・`U5rxyH`（1152）。
 
 ## 受け付ける URL と指定（今と同じ）
@@ -9,7 +11,7 @@
 
 ## 呼ぶ口（今と同じ）
 - 読む：`scenarioReferenceData.scenario(id)`・`tags(accountId)`・`templates(accountId)`（候補はシナリオのアカウントだけ）
-- 保存：1通目があれば `api.scenarios.updateStep(id, stepId, …)`、無ければ `addStep(id, …)`。送る形は v7 と同じ（`first-step-form.ts` を写した）
+- 保存：1通目があれば `api.scenarios.updateStep(id, stepId, …)`、無ければ `addStep(id, …)`。送る形は既存のAPI契約を保つ
 - 保存できたら知らせを出して `/scenarios/detail?id=…` へ。「1通目はあとで書く」は保存せずに同じ行き先へ
 
 ## 今の V8 画面（app/scenarios/first-step-v8.tsx）と違うところ

@@ -1,3 +1,5 @@
+> 文書：B-244〜B-247 適用の点検表（2026-10-12）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # B-244〜B-247 適用の点検表（2026-10-12）
 
 対象は現在のV8と、入口から使用する app のV8。残るコピー元もソースの見張りで確認する。入力欄の件数は定義箇所で数え、繰り返し行は1箇所。条件付きの必須も1箇所。共通の包み自体は数えない。
@@ -10,8 +12,8 @@
 
 | 分類 | 画面の実装 | 欄 |
 | --- | --- | --- |
-| ① | `apps/web/src/app/rich-menus/new/create-v8.tsx` | メニュー名（友だちには見えません） |
-| ① | `apps/web/src/app/rich-menus/new/create-v8.tsx` | トーク画面の下の文言（14文字まで） |
+| ① | `apps/web/src/v8/rich-menus/new/create.tsx` | メニュー名（友だちには見えません） |
+| ① | `apps/web/src/v8/rich-menus/new/create.tsx` | トーク画面の下の文言（14文字まで） |
 | ① | `apps/web/src/v8/affiliate-offer-new/create.tsx` | 案件名 |
 | ① | `apps/web/src/v8/affiliate-offer-new/create.tsx` | 報酬額（円） |
 | ① | `apps/web/src/v8/affiliates/create.tsx` | 名前（表示名） |
@@ -135,7 +137,7 @@ CTA の「押したら」は既存の欄下エラーを残し、枠と読み上�
 
 | 画面 | 前 | 後 |
 | --- | --- | --- |
-| `apps/web/src/app/reminders/list-v8.tsx` | 詳細を見る | リマインダの詳細を見る |
+| `apps/web/src/v8/reminders/list.tsx` | 詳細を見る | リマインダの詳細を見る |
 | `apps/web/src/v8/automations/runs.tsx` | 中身を見る | 実行の記録を見る |
 | `apps/web/src/v8/broadcasts/list.tsx` | 見る | 配信の詳細を見る |
 | `apps/web/src/v8/conversions/list.tsx` | 中身を見る | 成果地点の詳細を見る |

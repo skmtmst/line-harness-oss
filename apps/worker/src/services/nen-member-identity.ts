@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getFriendByLineUserIdForAccount, activeTenantLineAccountSql } from '@line-crm/db';
 import { verifyCallerLineIdentity } from './liff-auth.js';
 

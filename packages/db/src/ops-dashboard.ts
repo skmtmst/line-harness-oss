@@ -1,5 +1,5 @@
 /**
- * 運営ダッシュボード（★V6 37-2）の集計。
+ * 運営ダッシュボード（★37-2）の集計。
  *
  * 金額は「契約中プランの定価」で数える（決定 2026-09-17: Stripe の実売上は後で差し替え）。
  * 定価そのものは worker の billing-plans にあるので、ここは件数と期間の切り分けだけを持ち、
@@ -110,7 +110,7 @@ export async function dashboardTickets(db: D1Database, input: { from: string; to
   };
 }
 
-/** 契約先の権限者のうち契約者専用LINE（★V6 37-7）に登録した人数。`staff_members.notice_friend_id` で数える。 */
+/** 契約先の権限者のうち契約者専用LINE（★37-7）に登録した人数。`staff_members.notice_friend_id` で数える。 */
 export async function dashboardLineRegistration(
   db: D1Database,
   excludeTenantId: string,

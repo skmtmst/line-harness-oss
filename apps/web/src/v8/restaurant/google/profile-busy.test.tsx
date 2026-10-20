@@ -73,8 +73,8 @@ describe('Googleプロフィールの再取得（実Googleへ送らず保留API�
     mocks.role = 'viewer'
     render(<ProfileBoard accountId="busy-test" go={() => {}} />)
     await screen.findByText('試験用店舗')
-    expect(screen.queryByRole('button', { name: 'プロフィールを編集' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '営業時間を変更' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'プロフィールを編集する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '営業時間を変える' })).toBeNull()
     expect(screen.getByText(/閲覧のみです/)).toBeTruthy()
   })
 })

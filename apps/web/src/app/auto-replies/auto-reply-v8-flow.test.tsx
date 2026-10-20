@@ -163,7 +163,7 @@ function openRowMenu() {
   act(() => { menuButton.click() })
   const menu = document.querySelector('[role="menu"]')
   expect(menu, '操作メニューが開きません').toBeTruthy()
-  // 板 IIesG：行の「…」を開いた印
+  // 板 ：行の「…」を開いた印
   expect(host.querySelector('[data-design-node="IIesG"]'), 'IIesG の印がありません').toBeTruthy()
   return menu as HTMLElement
 }
@@ -273,7 +273,7 @@ describe('V8 自動応答の通し：作る→止める→再開する', () => {
     await flush()
     const creates = screen.getAllByRole('button', { name: '＋ ルールを作る' })
     expect(creates.length).toBeGreaterThan(0)
-    // 絵 uE9gf の「＋ ルールを作る ▾」は、くわしく作る／かんたんに作るを選ぶ窓を開く。
+    // 絵  の「＋ ルールを作る ▾」は、くわしく作る／かんたんに作るを選ぶ窓を開く。
     act(() => { creates[0].click() })
     expect(pushMock).not.toHaveBeenCalled()
     fireEvent.click(within(document.querySelector('[role="menu"]') as HTMLElement).getByText('くわしく作る'))
@@ -288,7 +288,7 @@ describe('V8 自動応答の通し：作る→止める→再開する', () => {
     openRowMenu()
     fireEvent.click(within(document.querySelector('[role="menu"]') as HTMLElement).getByText('止める'))
     const stopDialog = await screen.findByRole('dialog')
-    // 絵 i8F12 の題は「「〇〇」を止める」。
+    // 絵  の題は「「〇〇」を止める」。
     expect(stopDialog.textContent).toMatch(/^「.+」を止める/)
     fireEvent.click(within(stopDialog).getByRole('button', { name: 'キャンセル' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

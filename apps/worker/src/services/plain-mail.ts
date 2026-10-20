@@ -1,4 +1,4 @@
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { mailFromName } from './mail-from-name.js';
 
 /**

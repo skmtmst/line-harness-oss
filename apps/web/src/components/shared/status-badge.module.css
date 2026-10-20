@@ -7,8 +7,8 @@
 }
 
 .compact {
-  padding: 2px 8px;
-  /* ★V7：10px は表の中で読みにくかった（better-typography：12px を大きく下回らない）。 */
+  padding: var(--polish-status-pad);
+  /* ★管理画面：10px は表の中で読みにくかった（better-typography：12px を大きく下回らない）。 */
   font-size: var(--text-caption);
 }
 
@@ -40,29 +40,29 @@
  */
 :root .badge {
   gap: var(--polish-status-gap);
-  padding: 2px 8px;
+  padding: var(--polish-status-pad);
   font-size: var(--text-caption);
   font-weight: 600;
   line-height: var(--text-lh, 1.5); /* 12×1.5＋上下2 → 高さ22（mpVfY） */
 }
 
 :root .badge::before {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 6px;
+  width: var(--polish-status-dot-size);
+  height: var(--polish-status-dot-size);
+  flex: 0 0 var(--polish-status-dot-size);
   border-radius: var(--radius-pill);
   background: currentColor;
   content: '';
 }
 
-/* Exported V8 states: exact geometry and palette; v7 stays above. */
+/* Exported V8 states: exact geometry and palette; 管理画面 stays above. */
 :root .badge {
   flex-shrink: 0;
   justify-content: flex-start;
   border-radius: var(--radius-pill);
   font-family: var(--font-noto-sans-jp), system-ui, sans-serif;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: var(--text-caption);
+  line-height: calc(var(--text-caption) * var(--text-lh));
 }
 :root .badge::before { border-radius: 50%; }
 /* 点なしの札（dot={false}）。 */
@@ -81,7 +81,7 @@
 :root .annotation { padding: 0 var(--tpl-tag-name-gap); background: var(--color-canvas-sunken); color: var(--color-ink-faint); font-size: var(--tpl-tag-note-size); font-weight: 500; line-height: var(--tpl-row-sub-lh); }
 :root .annotation.warning { color: var(--color-warning); }
 
-/* B-152・仕上げ4 */
+/* ・仕上げ4 */
 :root .badge:not(.annotation) {
   gap: var(--polish-status-gap); padding: var(--badge-padding, var(--polish-status-pad));
   border: 0; border-radius: var(--radius-pill);
@@ -101,15 +101,15 @@
 :root .badge:not(.annotation)[data-tone='neutral']::before { background: var(--polish-status-neutral-dot); }
 :root .badge:not(.annotation)::before { background: var(--polish-status-neutral-dot); width: var(--polish-status-dot-size); height: var(--polish-status-dot-size); flex-basis: var(--polish-status-dot-size); }
 
-/* B-159 / B-180：小さい注記も状態なら同じ22px・12/600。 */
+/*  / ：小さい注記も状態なら同じ22px・12/600。 */
 :root .badge {
   box-sizing: border-box;
   width: fit-content;
   height: var(--tpl-badge-h);
-  font-size: var(--text-caption); font-weight: 600; line-height: 18px;
+  font-size: var(--text-caption); font-weight: 600; line-height: calc(var(--text-caption) * var(--text-lh));
 }
 :root .badge.micro {
-  font-size: var(--text-caption); font-weight: 600; line-height: 18px;
+  font-size: var(--text-caption); font-weight: 600; line-height: calc(var(--text-caption) * var(--text-lh));
 }
 :root .neutral { background: var(--color-badge-neutral-bg); color: var(--color-badge-neutral); }
 :root .success { background: var(--color-badge-success-bg); color: var(--color-badge-success); }

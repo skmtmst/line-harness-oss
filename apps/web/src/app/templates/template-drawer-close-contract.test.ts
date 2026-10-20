@@ -1,10 +1,11 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 const PANEL = readFileSync(join(HERE, '../../components/shared/detail-panel.tsx'), 'utf8')
 
 /*

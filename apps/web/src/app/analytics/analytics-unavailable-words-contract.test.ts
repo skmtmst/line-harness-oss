@@ -6,7 +6,7 @@ const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
 
 /**
  * 分析の未取得表記を共通契約へ揃える(Issue #606)。
- * 共通基盤(v6-shared-platform-requirements.md §9)の決めごと:
+ * 共通基盤(管理画面-shared-platform-requirements.md §9)の決めごと:
  * 理由不明の未取得は値「—」・ラベル「未取得」。
  * 「取得できません」「取得不可」「unavailable」を画面文言に使わない。
  */

@@ -1,0 +1,831 @@
+import { sweepOutgoingWebhookDeliveries } from '../../services/outgoing-webhook-delivery.js';
+import type Database from 'better-sqlite3';
+import { encryptCredential } from '@line-crm/db';
+import type { Message } from '@line-crm/line-sdk';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite';
+import { publishScenarioVersion } from '@line-crm/db';
+import { createAutomationActionExecutors } from './automation-action-executors';
+import { processAutomationRun, startAutomationRun, type ActionDefinition } from './automation-engine';
+
+const NOW = '2026-08-26T05:00:00.000Z';
+const AUTO_KEY = Buffer.from(Array.from({ length: 32 }, (_, i) => (i * 7 + 1) % 256)).toString('base64url');
+
+async function hmacHex(secret: string, body: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
+  return Array.from(new Uint8Array(signature))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function addAccount(raw: Database.Database, id: string): void {
+  raw.prepare(`INSERT OR IGNORE INTO tenants (id, name) VALUES ('tenant-1', '本部')`).run();
+  raw.prepare(
+    `INSERT INTO line_accounts
+       (id, channel_id, name, channel_access_token, channel_secret, is_active, tenant_id)
+     VALUES (?, ?, ?, '', '', 1, 'tenant-1')`,
+  ).run(id, `channel-${id}`, id);
+}
+
+function addFriend(raw: Database.Database, id: string, accountId: string): void {
+  raw.prepare(
+    `INSERT INTO friends
+       (id, line_user_id, display_name, line_account_id, metadata, created_at, updated_at)
+     VALUES (?, ?, ?, ?, '{}', ?, ?)`,
+  ).run(id, `U-${id}`, id, accountId, NOW, NOW);
+}
+
+function addAutomation(
+  raw: Database.Database,
+  accountId: string,
+  action: ActionDefinition | ActionDefinition[],
+): { automationId: string } {
+  const automationId = crypto.randomUUID();
+  const versionId = crypto.randomUUID();
+  raw.prepare(
+    `INSERT INTO automation_definitions
+       (id, line_account_id, name, status) VALUES (?, ?, '接続テスト', 'active')`,
+  ).run(automationId, accountId);
+  raw.prepare(
+    `INSERT INTO automation_versions
+       (id, automation_id, version_number, status, trigger_type, action_config, published_at)
+     VALUES (?, ?, 1, 'published', 'friend_add', ?, ?)`,
+  ).run(versionId, automationId, JSON.stringify(Array.isArray(action) ? action : [action]), NOW);
+  raw.prepare(
+    `UPDATE automation_definitions SET current_published_version_id = ? WHERE id = ?`,
+  ).run(versionId, automationId);
+  return { automationId };
+}
+
+async function execute(
+  testDb: SqliteD1,
+  input: {
+    accountId: string;
+    friendId: string;
+    action: ActionDefinition;
+    executors?: ReturnType<typeof createAutomationActionExecutors>;
+  },
+) {
+  const setup = addAutomation(testDb.raw, input.accountId, input.action);
+  const started = await startAutomationRun(testDb.db, {
+    lineAccountId: input.accountId,
+    automationId: setup.automationId,
+    friendId: input.friendId,
+    sourceEventId: crypto.randomUUID(),
+    idempotencyKey: crypto.randomUUID(),
+    inputEvent: { type: 'friend_add' },
+    conditionMatched: true,
+    now: NOW,
+  });
+  const status = await processAutomationRun(testDb.db, started.runId!, {
+    now: NOW,
+    executors: input.executors ?? createAutomationActionExecutors(),
+  });
+  return { ...started, status };
+}
+
+describe('オートメーションの既存処理接続', () => {
+  let testDb: SqliteD1;
+
+  beforeEach(() => {
+    testDb = createTestD1();
+    addAccount(testDb.raw, 'account-1');
+    addAccount(testDb.raw, 'account-2');
+    addFriend(testDb.raw, 'friend-1', 'account-1');
+    addFriend(testDb.raw, 'friend-2', 'account-2');
+  });
+
+  it('同じアカウントのタグだけを付け、繰り返しても重複しない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`,
+    ).run();
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'tag', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' },
+    });
+
+    expect(result.status).toBe('success');
+    expect(testDb.raw.prepare(`SELECT friend_id, tag_id FROM friend_tags`).all())
+      .toEqual([{ friend_id: 'friend-1', tag_id: 'tag-1' }]);
+  });
+
+  it('別アカウントのタグを指定すると更新せず失敗する', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO tags (id, name, line_account_id) VALUES ('tag-2', '他店', 'account-2')`,
+    ).run();
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'tag', type: 'add_tag', params: { tagId: 'tag-2' }, onFailure: 'stop' },
+    });
+
+    expect(result.status).toBe('failed');
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_tags`).get()).toEqual({ count: 0 });
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'tag'`,
+    ).get(result.runId)).toEqual({ error_code: 'tag_not_found' });
+  });
+
+  it('タグを保存した後、同じ店舗と安定キーでイベントを渡し、深さ3では再発火しない', async () => {
+    testDb.raw.prepare(`INSERT INTO tags (id, name, line_account_id) VALUES ('tag-1', '会員', 'account-1')`).run();
+    const emitEvent = vi.fn(async () => undefined);
+    const executors = createAutomationActionExecutors({ emitEvent });
+    const action = { id: 'tag', type: 'add_tag', params: { tagId: 'tag-1' }, onFailure: 'stop' as const };
+    const result = await execute(testDb, { accountId: 'account-1', friendId: 'friend-1', action, executors });
+    expect(result.status).toBe('success');
+    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(emitEvent).toHaveBeenCalledWith(testDb.db, 'tag_change', expect.objectContaining({
+      friendId: 'friend-1', sourceEventId: expect.stringMatching(/^automation-tag:/), sourceKind: 'automation',
+      eventData: { tagId: 'tag-1', action: 'add', automationDepth: 1 },
+    }), undefined, 'account-1');
+    const context = {
+      db: testDb.db, runId: 'run', lineAccountId: 'account-1', automationId: 'automation', automationVersionId: 'version',
+      friendId: 'friend-1', sourceEventId: 'source', inputEvent: { automationDepth: 3 }, action,
+      stepExecutionId: 'step', idempotencyKey: 'stable-key', attemptNumber: 1, commonActionVersionId: null, isTest: false,
+    };
+    await executors.add_tag(context);
+    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare('SELECT friend_id, tag_id FROM friend_tags').all()).toEqual([{ friend_id: 'friend-1', tag_id: 'tag-1' }]);
+  });
+
+  it('対応マークを変更し、変更前後と自動変更の根拠を監査へ残す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO support_marks (id, name, color) VALUES ('mark-working', '対応中', '#3B82F6')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at)
+       VALUES ('mark-working', 'tenant-1', 'account-1', datetime('now'))`,
+    ).run();
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'mark', type: 'set_support_mark',
+        params: { markId: 'mark-working', manualProtectionMinutes: 0 }, onFailure: 'stop',
+      },
+    });
+
+    expect(result.status).toBe('success');
+    expect(testDb.raw.prepare(`SELECT support_mark_id FROM friends WHERE id = 'friend-1'`).get())
+      .toEqual({ support_mark_id: 'mark-working' });
+    const audit = testDb.raw.prepare(
+      `SELECT actor_id, detail_json FROM operation_audit WHERE friend_id = 'friend-1'`,
+    ).get() as { actor_id: string | null; detail_json: string };
+    expect(audit.actor_id).toBeNull();
+    expect(JSON.parse(audit.detail_json)).toMatchObject({
+      beforeMarkId: null,
+      afterMarkId: 'mark-working',
+      source: 'automation',
+    });
+  });
+
+  it('手で変更した直後は保護時間が切れるまで自動変更で上書きしない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO support_marks (id, name, color) VALUES ('mark-protected', '確認中', '#F59E0B')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at)
+       VALUES ('mark-protected', 'tenant-1', 'account-1', datetime('now'))`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_audit
+         (id, target_kind, target_id, action, actor_id, friend_id, created_at)
+       VALUES ('audit-manual', 'support_mark', NULL, 'changed', 'staff-1', 'friend-1', ?)`,
+    ).run(NOW);
+
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'mark', type: 'set_support_mark',
+        params: { markId: 'mark-protected', manualProtectionMinutes: 60 }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({ now: () => NOW }),
+    });
+
+    expect(result.status).toBe('success');
+    expect(testDb.raw.prepare(`SELECT support_mark_id FROM friends WHERE id = 'friend-1'`).get())
+      .toEqual({ support_mark_id: null });
+  });
+
+  it('手動変更の保護時間が切れた後は自動変更を再開する', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO support_marks (id, name, color) VALUES ('mark-resumed', '対応再開', '#10B981')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO support_mark_scopes (mark_id, tenant_id, line_account_id, created_at)
+       VALUES ('mark-resumed', 'tenant-1', 'account-1', datetime('now'))`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_audit
+         (id, target_kind, target_id, action, actor_id, friend_id, created_at)
+       VALUES ('audit-manual-expired', 'support_mark', NULL, 'changed', 'staff-1', 'friend-1', ?)`,
+    ).run(NOW);
+
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'mark', type: 'set_support_mark',
+        params: { markId: 'mark-resumed', manualProtectionMinutes: 60 }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({
+        now: () => '2026-08-26T06:01:00.000Z',
+      }),
+    });
+
+    expect(result.status).toBe('success');
+    expect(testDb.raw.prepare(`SELECT support_mark_id FROM friends WHERE id = 'friend-1'`).get())
+      .toEqual({ support_mark_id: 'mark-resumed' });
+  });
+
+  it('友だち情報を同じアカウントの対象だけ更新する', async () => {
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'metadata', type: 'set_metadata',
+        params: { values: { plan: 'premium', visits: 3 } }, onFailure: 'stop',
+      },
+    });
+
+    expect(result.status).toBe('success');
+    expect(JSON.parse((testDb.raw.prepare(`SELECT metadata FROM friends WHERE id = 'friend-1'`).get() as { metadata: string }).metadata))
+      .toEqual({ plan: 'premium', visits: 3 });
+    expect(JSON.parse((testDb.raw.prepare(`SELECT metadata FROM friends WHERE id = 'friend-2'`).get() as { metadata: string }).metadata))
+      .toEqual({});
+  });
+
+  it('友だち情報の{{message}}を発生イベントの本文に置き換える', async () => {
+    const setup = addAutomation(testDb.raw, 'account-1', {
+      id: 'metadata-message', type: 'set_metadata',
+      params: { data: '{"last_message":"{{message}}"}' }, onFailure: 'stop',
+    });
+    const started = await startAutomationRun(testDb.db, {
+      lineAccountId: 'account-1', automationId: setup.automationId, friendId: 'friend-1',
+      sourceEventId: 'message-event', idempotencyKey: crypto.randomUUID(),
+      inputEvent: { text: '予約を変更したいです' }, conditionMatched: true, now: NOW,
+    });
+    expect(await processAutomationRun(testDb.db, started.runId!, {
+      now: NOW, executors: createAutomationActionExecutors(),
+    })).toBe('success');
+    const row = testDb.raw.prepare(`SELECT metadata FROM friends WHERE id = 'friend-1'`)
+      .get() as { metadata: string };
+    expect(JSON.parse(row.metadata)).toEqual({ last_message: '予約を変更したいです' });
+  });
+
+  it('同じアカウントで動作中のシナリオだけを開始する', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO scenarios
+         (id, name, trigger_type, is_active, delivery_mode, line_account_id, allow_concurrent)
+       VALUES ('scenario-1', '案内', 'manual', 1, 'relative', 'account-1', 1)`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO scenario_steps
+         (id, scenario_id, step_order, delay_minutes, message_type, message_content)
+       VALUES ('scenario-step-1', 'scenario-1', 1, 0, 'text', '案内です')`,
+    ).run();
+    // 参加には明示公開が要る（351）。
+    await publishScenarioVersion(testDb.db, 'scenario-1', { staffId: null, idempotencyKey: 'exec-s1' });
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'scenario', type: 'start_scenario',
+        params: { scenarioId: 'scenario-1' }, onFailure: 'stop',
+      },
+    });
+
+    expect(result.status).toBe('success');
+    expect(testDb.raw.prepare(
+      `SELECT friend_id, scenario_id, status FROM friend_scenarios`,
+    ).all()).toEqual([{ friend_id: 'friend-1', scenario_id: 'scenario-1', status: 'active' }]);
+  });
+
+  it('配信ステップがないシナリオは開始しない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO scenarios
+         (id, name, trigger_type, is_active, delivery_mode, line_account_id, allow_concurrent)
+       VALUES ('scenario-empty', '空の案内', 'manual', 1, 'relative', 'account-1', 1)`,
+    ).run();
+
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'scenario-empty', type: 'start_scenario',
+        params: { scenarioId: 'scenario-empty' }, onFailure: 'stop',
+      },
+    });
+
+    expect(result.status).toBe('failed');
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM friend_scenarios`).get())
+      .toEqual({ count: 0 });
+  });
+
+  it('LINE送信へ処理実行IDを冪等キーとして渡し、送信記録と予約を同時に完了する', async () => {
+    const pushMessage = vi.fn(async (
+      _to: string,
+      _messages: Message[],
+      _retryKey?: string,
+    ) => ({ requestId: 'line-request-1' }));
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'message', type: 'send_message',
+        params: { messageType: 'text', content: 'こんにちは' }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({
+          pushMessage,
+          linkRichMenuToUser: vi.fn(),
+          unlinkRichMenuFromUser: vi.fn(),
+        }),
+        now: () => NOW,
+      }),
+    });
+
+    expect(result.status).toBe('success');
+    expect(pushMessage).toHaveBeenCalledTimes(1);
+    const retryKey = pushMessage.mock.calls[0]?.[2];
+    const step = testDb.raw.prepare(
+      `SELECT id FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'message'`,
+    ).get(result.runId) as { id: string };
+    expect(retryKey).toBe(step.id);
+    expect(testDb.raw.prepare(
+      `SELECT status, response_id FROM outbound_send_requests WHERE idempotency_key = ?`,
+    ).get(step.id)).toEqual({ status: 'succeeded', response_id: 'line-request-1' });
+    expect(testDb.raw.prepare(
+      `SELECT content, source, line_account_id FROM messages_log WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ content: 'こんにちは', source: 'automation_v6', line_account_id: 'account-1' });
+  });
+
+  // N-189: send_message/send_template の本文に {{var.*}} を書ける。
+  // 消えた共通情報は生のまま・空文字でも送らず、fail-closed で止める。
+  it('共通情報を本文の値へ置き換えて送り、送信記録にも解決後の本文が残る', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+       VALUES ('cv-1', 'account-1', '営業時間', 'hours', 'text', '10時から18時')`,
+    ).run();
+    const pushMessage = vi.fn(async () => ({ requestId: 'line-request-1' }));
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'message', type: 'send_message',
+        params: { messageType: 'text', content: '営業時間は{{var.hours}}です' }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({
+          pushMessage,
+          linkRichMenuToUser: vi.fn(),
+          unlinkRichMenuFromUser: vi.fn(),
+        }),
+        now: () => NOW,
+      }),
+    });
+
+    expect(result.status).toBe('success');
+    const [, messages] = pushMessage.mock.calls[0] as unknown as [string, Array<{ text: string }>];
+    expect(messages[0].text).toBe('営業時間は10時から18時です');
+    expect(testDb.raw.prepare(
+      `SELECT content FROM messages_log WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ content: '営業時間は10時から18時です' });
+  });
+
+  it('W43 引用符・改行を含む共通情報のFlexを送信し実行と履歴を完了する', async () => {
+    const value = '引用"\n改行\\日本語 {{var.unknown}}';
+    testDb.raw.prepare(`INSERT INTO common_vars (id, line_account_id, name, var_key, type, value)
+      VALUES ('cv-json', 'account-1', '案内', 'hours', 'long_text', ?)`).run(value);
+    const pushMessage = vi.fn(async (_to: string, _messages: Message[], _retryKey?: string) => ({ requestId: 'accepted-json' }));
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'json-message', type: 'send_message', params: { messageType: 'flex',
+        content: JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'text', text: '{{var.hours}}' }] } }),
+      }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({ pushMessage, linkRichMenuToUser: vi.fn(), unlinkRichMenuFromUser: vi.fn() }),
+        now: () => NOW,
+      }),
+    });
+    expect(result.status).toBe('success');
+    const message = pushMessage.mock.calls[0]?.[1][0];
+    expect(message).toMatchObject({ type: 'flex', contents: { body: { contents: [{ text: value }] } } });
+    const log = testDb.raw.prepare(`SELECT content FROM messages_log WHERE friend_id = 'friend-1'`).get() as { content: string };
+    expect(JSON.parse(log.content)).toMatchObject({ body: { contents: [{ text: value }] } });
+    expect(testDb.raw.prepare(`SELECT status, response_id FROM outbound_send_requests WHERE idempotency_key = ?`)
+      .get(pushMessage.mock.calls[0]?.[2])).toEqual({ status: 'succeeded', response_id: 'accepted-json' });
+  });
+
+  it('消えた共通情報はLINEを呼ばずアクションを失敗にし、台帳へ出所を残す', async () => {
+    const pushMessage = vi.fn(async () => ({ requestId: 'line-request-1' }));
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'message', type: 'send_message',
+        params: { messageType: 'text', content: '前{{var.deleted_key}}後' }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({
+          pushMessage,
+          linkRichMenuToUser: vi.fn(),
+          unlinkRichMenuFromUser: vi.fn(),
+        }),
+        now: () => NOW,
+      }),
+    });
+
+    expect(result.status).toBe('failed');
+    expect(pushMessage).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS n FROM messages_log WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ n: 0 });
+    expect(testDb.raw.prepare(
+      `SELECT source_kind, source_id, var_key, reason FROM common_var_resolution_failures`,
+    ).get()).toEqual({
+      source_kind: 'automation', source_id: 'message',
+      var_key: 'deleted_key', reason: 'missing',
+    });
+  });
+
+  it('LINEの5xxは再試行、認証エラーは即時失敗に分ける', async () => {
+    const lineClient = (message: string) => ({
+      pushMessage: vi.fn(async () => { throw new Error(message); }),
+      linkRichMenuToUser: vi.fn(),
+      unlinkRichMenuFromUser: vi.fn(),
+    });
+    const temporary = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'temporary', type: 'send_message', params: { content: 'A' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => lineClient('LINE API error: 500 Internal Server Error'),
+      }),
+    });
+    const rejected = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'rejected', type: 'send_message', params: { content: 'B' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => lineClient('LINE API error: 401 Unauthorized'),
+      }),
+    });
+
+    // R363: 5xxは受理した可能性があるため照合待ち（再試行は続ける）。
+    expect(temporary.status).toBe('waiting');
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'temporary'`,
+    ).get(temporary.runId)).toEqual({ error_code: 'delivery_unconfirmed' });
+    expect(rejected.status).toBe('failed');
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'rejected'`,
+    ).get(rejected.runId)).toEqual({ error_code: 'line_request_rejected' });
+  });
+
+  /*
+   * R363: LINEが受理した後の履歴保存だけ失敗したら、未送信として
+   * 返却・再送しない。送達不明として照合待ちに残す。
+   * （直す前は line_temporary_failure になり未送信扱い＝赤）
+   */
+  it('受理後の履歴保存失敗は未送信にせず照合待ちにする', async () => {
+    const pushMessage = vi.fn(async () => ({ requestId: 'line-request-9' }));
+    // 履歴保存（messages_log への書き込みを含む batch）だけ1回落とす。受理は成功している。
+    const realBatch = (testDb.db.batch as (statements: D1PreparedStatement[]) => Promise<unknown[]>)
+      .bind(testDb.db);
+    let armed = true;
+    const faultyDb = {
+      ...testDb.db,
+      batch: async (statements: D1PreparedStatement[]) => {
+        const writesLog = statements.some((statement) =>
+          ((statement as unknown as { sql?: string }).sql ?? '').includes('INTO messages_log'));
+        if (armed && writesLog) {
+          armed = false;
+          throw new Error('injected message log failure');
+        }
+        return realBatch(statements);
+      },
+    } as unknown as typeof testDb.db;
+    const faultyTestDb = { raw: testDb.raw, db: faultyDb };
+    const setup = addAutomation(testDb.raw, 'account-1', {
+      id: 'accepted-log-fault', type: 'send_message',
+      params: { messageType: 'text', content: '届いているはず' }, onFailure: 'stop',
+    });
+    const started = await startAutomationRun(faultyTestDb.db, {
+      lineAccountId: 'account-1',
+      automationId: setup.automationId,
+      friendId: 'friend-1',
+      sourceEventId: crypto.randomUUID(),
+      idempotencyKey: crypto.randomUUID(),
+      inputEvent: { type: 'friend_add' },
+      conditionMatched: true,
+      now: NOW,
+    });
+    const status = await processAutomationRun(faultyTestDb.db, started.runId!, {
+      now: NOW,
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({
+          pushMessage,
+          linkRichMenuToUser: vi.fn(),
+          unlinkRichMenuFromUser: vi.fn(),
+        }),
+        now: () => NOW,
+      }),
+    });
+    // 受理は1回。履歴が無いのに成功にも失敗にもしない。
+    expect(pushMessage).toHaveBeenCalledTimes(1);
+    expect(status).toBe('waiting');
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ?`,
+    ).get(started.runId)).toEqual({ error_code: 'delivery_unconfirmed' });
+    expect(testDb.raw.prepare(
+      `SELECT COUNT(*) AS n FROM messages_log WHERE friend_id = 'friend-1'`,
+    ).get()).toEqual({ n: 0 });
+  });
+
+  /*
+   * R363の追加: 応答が返らない（タイムアウト）・受理後の5xx（status付き）・
+   * 200のJSON読取失敗は、どれも受理不明として照合待ちにする。
+   * 未受理が確定した拒否（4xx）だけが即時失敗のまま。
+   */
+  it('応答なし・受理後5xx・JSON読取失敗は照合待ちにし、再送の目安を残す', async () => {
+    const failure = (error: unknown) => ({
+      pushMessage: vi.fn(async () => { throw error; }),
+      linkRichMenuToUser: vi.fn(),
+      unlinkRichMenuFromUser: vi.fn(),
+    });
+    const withStatus = (status: number, message: string): Error => {
+      const error = new Error(message) as Error & { status: number };
+      error.status = status;
+      return error;
+    };
+    const cases = [
+      { key: 'timeout', error: new TypeError('fetch failed') },
+      { key: 'accepted-5xx', error: withStatus(503, 'LINE API error: 503 Service Unavailable') },
+      { key: 'invalid-json', error: new SyntaxError('Unexpected token < in JSON') },
+    ] as const;
+    for (const item of cases) {
+      const result = await execute(testDb, {
+        accountId: 'account-1', friendId: 'friend-1',
+        action: { id: item.key, type: 'send_message', params: { content: item.key }, onFailure: 'stop' },
+        executors: createAutomationActionExecutors({
+          resolveLineAccessToken: async () => 'token-1',
+          createLineClient: () => failure(item.error),
+        }),
+      });
+      expect(result.status).toBe('waiting');
+      expect(testDb.raw.prepare(
+        `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = ?`,
+      ).get(result.runId, item.key)).toEqual({ error_code: 'delivery_unconfirmed' });
+    }
+  });
+
+  it('Webhookは登録済みのHTTPSだけへ冪等キー付きで送り、5xxを再試行にする', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, name, url, event_types, is_active, line_account_id)
+       VALUES ('webhook-1', 'CRM', 'https://hooks.example.com/events', '[]', 1, 'account-1')`,
+    ).run();
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ) => new Response('', { status: 503 }));
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'webhook', type: 'send_webhook', params: { webhookId: 'webhook-1' }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
+    });
+
+    expect(result.status).toBe('waiting');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,lookupHost:async()=>['93.184.216.34']});
+    expect(testDb.raw.prepare('SELECT status,max_attempts FROM outgoing_webhook_deliveries').get()).toEqual({status:'retry_wait',max_attempts:8});
+    const init = fetchMock.mock.calls[0]?.[1] as { headers: Record<string, string>; body: string };
+    const headers = init.headers;
+    const step = testDb.raw.prepare(
+      `SELECT id FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
+    ).get(result.runId) as { id: string };
+    // N-371/N-372: 冪等キーは共通契約の X-Harness-Event-Id で渡し、
+    // 本文は共通封筒 {id,type,occurred_at,account_id,data,attempt}。
+    expect(headers['X-Harness-Event-Id']).toBe(step.id);
+    expect(headers['X-Harness-Timestamp']).toMatch(/^\d{10}$/);
+    const envelope = JSON.parse(init.body) as Record<string, unknown>;
+    expect(envelope).toMatchObject({
+      id: step.id,
+      type: 'friend_add',
+      account_id: 'account-1',
+      attempt: 1,
+    });
+    expect(typeof envelope.occurred_at).toBe('string');
+  });
+
+  it('Webhookの配送待ちは後続を実行せず、8回の配送予算を通常処理の4回で打ち切らない', async () => {
+    testDb.raw.prepare(`INSERT INTO outgoing_webhooks
+      (id,name,url,event_types,is_active,line_account_id)
+      VALUES ('wait-hook','CRM','https://hooks.example.com/events','[]',1,'account-1')`).run();
+    const setup = addAutomation(testDb.raw, 'account-1', [
+      {id:'webhook',type:'send_webhook',params:{webhookId:'wait-hook'},onFailure:'stop'},
+      {id:'next',type:'notify_staff',params:{},onFailure:'stop'},
+    ]);
+    const started=await startAutomationRun(testDb.db,{
+      lineAccountId:'account-1',automationId:setup.automationId,friendId:'friend-1',
+      sourceEventId:crypto.randomUUID(),idempotencyKey:crypto.randomUUID(),inputEvent:{type:'friend_add'},conditionMatched:true,now:NOW,
+    });
+    const next=vi.fn(async()=>({output:{done:true}}));
+    const executors={...createAutomationActionExecutors(),notify_staff:next};
+    for(let i=0;i<10;i++) {
+      expect(await processAutomationRun(testDb.db,started.runId!,{
+        now:new Date(Date.parse(NOW)+i*6*60_000).toISOString(),executors,
+      })).toBe('waiting');
+      expect(next).not.toHaveBeenCalled();
+    }
+    expect(testDb.raw.prepare(`SELECT attempt_number FROM automation_run_steps WHERE step_key='webhook'`).get()).toEqual({attempt_number:1});
+    expect(testDb.raw.prepare(`SELECT COUNT(*) count FROM outgoing_webhook_deliveries`).get()).toEqual({count:1});
+    await sweepOutgoingWebhookDeliveries(testDb.db,{
+      now:new Date(Date.now()+6*60_000),fetchImpl:vi.fn(async()=>new Response('',{status:200})) as typeof fetch,
+      lookupHost:async()=>['93.184.216.34'],
+    });
+    expect(await processAutomationRun(testDb.db,started.runId!,{
+      now:'2026-08-26T06:10:00.000Z',executors,
+    })).toBe('success');
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it('暗号化された送り先は復号して署名し、鍵なしでは送らず止める(#650)', async () => {
+    const secret = 'e'.repeat(32);
+    const encrypted = await encryptCredential(secret, AUTO_KEY);
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, name, url, event_types, secret, secret_encrypted, is_active, line_account_id)
+       VALUES ('enc-hook', '暗号', 'https://hooks.example.com/events', '[]', NULL, ?, 1, 'account-1')`,
+    ).run(encrypted);
+    const fetchMock = vi.fn(async (
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ) => new Response('', { status: 200 }));
+    const ok = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'webhook', type: 'send_webhook', params: { webhookId: 'enc-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        credentialEncryptionKey: AUTO_KEY,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
+    });
+    expect(ok.status).toBe('waiting');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,credentialKeys:AUTO_KEY,lookupHost:async()=>['93.184.216.34']});
+    expect(await processAutomationRun(testDb.db, ok.runId!, {
+      now: '2026-08-26T05:10:00.000Z',
+      executors: createAutomationActionExecutors({ credentialEncryptionKey: AUTO_KEY }),
+    })).toBe('success');
+    const sent = fetchMock.mock.calls[0]?.[1] as { headers: Record<string, string>; body: string };
+    const okStep = testDb.raw.prepare(
+      `SELECT id FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
+    ).get(ok.runId) as { id: string };
+    // N-372: 署名入力は「時刻.イベントID.生の本文」、名前は v1=<hex>。
+    expect(sent.headers['X-Harness-Event-Id']).toBe(okStep.id);
+    expect(sent.headers['X-Harness-Signature']).toBe(
+      `v1=${await hmacHex(secret, `${sent.headers['X-Harness-Timestamp']}.${okStep.id}.${sent.body}`)}`,
+    );
+
+    const fetchBlocked = vi.fn();
+    const ng = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'webhook', type: 'send_webhook', params: { webhookId: 'enc-hook' }, onFailure: 'stop' },
+      // 送り先は安全。止まる理由をsecretが読めないことだけに絞る。
+      executors: createAutomationActionExecutors({
+        fetch: fetchBlocked as typeof fetch,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
+    });
+    expect(ng.status).toBe('failed');
+    expect(fetchBlocked).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare(
+      `SELECT error_code FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
+    ).get(ng.runId)).toEqual({ error_code: 'webhook_secret_unavailable' });
+  });
+
+  it('別アカウントのWebhookと安全でないURLを送らない', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, name, url, event_types, is_active, line_account_id)
+       VALUES ('other-hook', '他店', 'https://hooks.example.com/events', '[]', 1, 'account-2'),
+              ('local-hook', '内部', 'https://[::1]/private', '[]', 1, 'account-1')`,
+    ).run();
+    const fetchMock = vi.fn();
+    const deps = {
+      fetch: fetchMock as typeof fetch,
+      lookupHost: async () => ['93.184.216.34'],
+    };
+    const other = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'other', type: 'send_webhook', params: { webhookId: 'other-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors(deps),
+    });
+    const local = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'local', type: 'send_webhook', params: { webhookId: 'local-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors(deps),
+    });
+
+    expect(other.status).toBe('failed');
+    expect(local.status).toBe('waiting');
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,lookupHost:async()=>['93.184.216.34']});
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await processAutomationRun(testDb.db, local.runId!, {now:'2026-08-26T05:10:00.000Z',executors:createAutomationActionExecutors(deps)})).toBe('failed');
+    // 止めた送り先は秘密値を残さず失敗台帳だけに数える。
+    expect(testDb.raw.prepare(
+      `SELECT consecutive_failures FROM outgoing_webhooks WHERE id = 'local-hook'`,
+    ).get()).toEqual({ consecutive_failures: 1 });
+  });
+
+  it('DNS切替・転送先の内部向きも送らず失敗台帳へ残す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, name, url, event_types, is_active, line_account_id)
+       VALUES ('rebind-hook', '差替', 'https://hooks.example.com/events', '[]', 1, 'account-1'),
+              ('redirect-hook', '転送', 'https://hooks.example.com/start', '[]', 1, 'account-1')`,
+    ).run();
+    const fetchMock = vi.fn(async (
+      input: RequestInfo | URL,
+    ) => {
+      if (String(input) === 'https://hooks.example.com/start') {
+        return new Response('', { status: 302, headers: { location: 'https://10.9.9.9/inside' } });
+      }
+      throw new Error(`送ってはいけない先: ${String(input)}`);
+    });
+    const rebind = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'rebind', type: 'send_webhook', params: { webhookId: 'rebind-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        lookupHost: async () => ['10.9.9.9'],
+      }),
+    });
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,lookupHost:async()=>['10.9.9.9']});
+    const redirect = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: { id: 'redirect', type: 'send_webhook', params: { webhookId: 'redirect-hook' }, onFailure: 'stop' },
+      executors: createAutomationActionExecutors({
+        fetch: fetchMock as typeof fetch,
+        lookupHost: async () => ['93.184.216.34'],
+      }),
+    });
+
+    expect(rebind.status).toBe('waiting');
+    expect(redirect.status).toBe('waiting');
+    await sweepOutgoingWebhookDeliveries(testDb.db,{now:new Date(Date.now()+6*60_000),fetchImpl:fetchMock as typeof fetch,lookupHost:async()=>['93.184.216.34']});
+    // 転送先へは送らないので転送元の1回だけ。
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(testDb.raw.prepare(
+      `SELECT consecutive_failures FROM outgoing_webhooks WHERE id IN ('rebind-hook', 'redirect-hook') ORDER BY id`,
+    ).all()).toEqual([{ consecutive_failures: 1 }, { consecutive_failures: 1 }]);
+  });
+
+  it('同じアカウントで公開済みのリッチメニューだけを切り替える', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO rich_menu_groups
+         (id, account_id, name, chat_bar_text, size, status)
+       VALUES ('menu-group', 'account-1', '会員', 'メニュー', 'large', 'published')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO rich_menu_pages
+         (id, group_id, order_index, name, alias_id, line_richmenu_id)
+       VALUES ('menu-page', 'menu-group', 0, 'トップ', 'alias-1', 'line-menu-1')`,
+    ).run();
+    const link = vi.fn(async () => undefined);
+    const result = await execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'menu', type: 'switch_rich_menu', params: { richMenuPageId: 'menu-page' }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({
+        resolveLineAccessToken: async () => 'token-1',
+        createLineClient: () => ({
+          pushMessage: vi.fn(), linkRichMenuToUser: link, unlinkRichMenuFromUser: vi.fn(),
+        }),
+      }),
+    });
+
+    expect(result.status).toBe('success');
+    expect(link).toHaveBeenCalledWith('U-friend-1', 'line-menu-1');
+  });
+});
+
+it('send_messageは同じ実行キーで回復し、期限切れの不明送信を再送しない',async()=>{
+ const f=createTestD1();addAccount(f.raw,'a');addFriend(f.raw,'f','a');
+ const {reserveOutboundSend,hashOutboundPayload}=await import('../../services/outbound-idempotency.js');
+ const key='aaaaaaaa-2222-4333-8444-555555555555';
+ await reserveOutboundSend(f.db,{key,channel:'line',resourceId:'send_message:a:f',payloadHash:await hashOutboundPayload(JSON.stringify({to:'U-f',messages:[{type:'text',text:'案内'}]})),retryInProgress:true,now:'2020-01-01T00:00:00Z'});
+ const pushMessage=vi.fn();
+ const executors=createAutomationActionExecutors({resolveLineAccessToken:async()=> 'fake',createLineClient:()=>({pushMessage,linkRichMenuToUser:vi.fn(),unlinkRichMenuFromUser:vi.fn()})});
+ const context={db:f.db,runId:'run',lineAccountId:'a',automationId:'a',automationVersionId:'v',friendId:'f',sourceEventId:'event',inputEvent:{},action:{id:'send',type:'send_message' as const,onFailure:'stop' as const,params:{content:'案内'}},stepExecutionId:key,idempotencyKey:key,attemptNumber:2,commonActionVersionId:null,isTest:false};
+ await expect(executors.send_message(context)).rejects.toMatchObject({code:'delivery_unconfirmed'});
+ expect(pushMessage).not.toHaveBeenCalled();f.raw.close();
+});

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 /**
  * 稼働確認（operations-health）の「外部連携」の行だけを切り出した層。
  *
@@ -8,7 +9,7 @@
 
 /**
  * `rt_delivery_*` の台帳と比べるための境界を秒で返す。
- * これらの受信・依頼の時刻は `nowSec()` の通算秒（INTEGER）で入るため、
+ * これらの受信・依頼の時刻は `nowSec` の通算秒（INTEGER）で入るため、
  * JST 文字列を返す jstCutoff とは混ぜられない。
  */
 function epochCutoff(nowIso: string, backMs: number): number {
@@ -32,7 +33,7 @@ export type IntegrationFailureTotals = {
  * 出前館QA#3「各APIでエラーの発生を監視する仕組み」をこの確認で受け持つ。
  * 板の9行を増やさないため、外部連携の確認へ畳んで数える。
  *
- * `rt_delivery_*` の時刻は `nowSec()` の通算秒なので epochCutoff で境界を作る。
+ * `rt_delivery_*` の時刻は `nowSec` の通算秒なので epochCutoff で境界を作る。
  * 台帳がまだ無い配備では 0 件として返す。ここで投げると isolate が
  * 外部連携の確認ごと「確認できず」に落とし、Webhook や Sheets の失敗も見えなくなる。
  */
@@ -80,7 +81,7 @@ export async function deliveryIntegrationFailures(
     };
   } catch {
     // 符号だけ残す。例外の本文・相手の注文の中身は記録に出さない。
-    console.error(JSON.stringify({"code":"services_operations_health_delivery_failed"}));
+    logger.error("services_operations_health_delivery_failed");
     return { activeCount: 0, failingCount: 0, maxFailures: 0 };
   }
 }

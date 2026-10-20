@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * OpenAI の文章生成（Chat Completions）を呼ぶ共通処理。
  * 画像生成（openai-images.ts）と同じ OPENAI_API_KEY を使う。

@@ -1,3 +1,5 @@
+> 文書：04 友だちの属性 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 04 友だちの属性 操作と挙動（受け入れ）
 
 要件の正本：[4 友だち属性](../../v6-requirements/v6-04-friend-attributes-requirements-draft.md)・[友だちの決まった欄と表示項目](../friend-fixed-fields.md)・[共通基盤 §3・§6-2・§9・§11・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[30 ログインユーザー §7〜§8](../../v6-requirements/v6-30-login-users-requirements-draft.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
@@ -116,8 +118,8 @@
 
 | # | 要件 | 今の作り | 根拠 |
 |---|---|---|---|
-| 1 | §6-3 タグの連動アクションは共通アクションの公開版を、タグが付いたときに実行する | 連動は共通アクションの**下書き**として保存し、タグに束ねるだけ。タグが付いたときに束ねた連動を読み出して実行する処理が見つからない（実行の仕組みは自動処理に束ねた物だけを読む） | packages/db/src/tag-definitions.ts:214-250（status 'draft'）／apps/worker/src/services/automation-engine.ts:301-310（consumer_type = 'automation' だけ）／apps/worker/src/services/friend-tag-attach.ts（束ねの参照なし） |
-| 2 | §3「アーカイブ＝新規利用を止める」 | 手でタグを付ける口が、タグの保管状態を見ていない。保管したタグも API で付けられる | apps/worker/src/routes/friends.ts:1363-1394／packages/db/src/tags.ts:1118-1125 |
+| 1 | §6-3 タグの連動アクションは共通アクションの公開版を、タグが付いたときに実行する | 連動は共通アクションの**下書き**として保存し、タグに束ねるだけ。タグが付いたときに束ねた連動を読み出して実行する処理が見つからない（実行の仕組みは自動処理に束ねた物だけを読む） | packages/db/src/tag-definitions.ts:214-250（status 'draft'）／apps/worker/src/features/automations/automation-engine.ts:301-310（consumer_type = 'automation' だけ）／apps/worker/src/features/friends/friend-tag-attach.ts（束ねの参照なし） |
+| 2 | §3「アーカイブ＝新規利用を止める」 | 手でタグを付ける口が、タグの保管状態を見ていない。保管したタグも API で付けられる | apps/worker/src/routes/friends.ts:1363-1394／packages/db/src/tags/index.ts:1118-1125 |
 | 3 | §6-2 付与・解除の追記型の履歴（付与元・実行者・冪等キー）と §11-1 `GET /api/tags/{id}/history` | 付与は「今付いているか」と付けた時刻だけ。付与元・解除の履歴の表も、履歴を返す口も無い。外すときの出来事には所属アカウントを付けていない | packages/db/schema.sql:50-55／apps/worker/src/routes/tags.ts（口の一覧に history なし）／apps/worker/src/routes/friends.ts:1446-1449 |
 | 4 | §11-2 実行系は冪等キー必須 | タグの保管は Idempotency-Key を必須にしているが、保存も照合もしていない（コードの注記にも「冪等ではない」） | apps/worker/src/routes/tags.ts:1326-1336 |
 | 5 | §6-6 タグ CSV は冪等キー付きのジョブで実行し、結果を後から取り直せる | その場で同期して登録し、冪等キーも実行番号も無い（`GET /api/tag-imports/{runId}` が無い）。二度押しは「同じ名前で見送り」になるだけ | apps/worker/src/routes/tags.ts:737-806 |

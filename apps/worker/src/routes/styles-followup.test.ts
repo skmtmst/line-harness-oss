@@ -22,9 +22,9 @@ import {
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { styles } from './styles.js';
 import { hqTemplates } from './hq-templates.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { permissionForApiPath } from '../middleware/auth.js';
-import * as googleCalendar from '../services/booking-calendar-sync.js';
+import * as googleCalendar from '../features/booking/booking-calendar-sync.js';
 import { readWindow, instant } from '../services/style-analytics.js';
 import {
   initializeAccountStyle,
@@ -156,7 +156,7 @@ function restaurant() {
  INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,allergy_note) VALUES('r','store','line','花子','Uf',2,'2026-10-15T04:00:00Z','2026-10-15T06:00:00Z','table','卵');`);
 }
 
-describe('B-335 safety regressions', () => {
+describe('safety regressions', () => {
   test('unchanged answers never overwrite booking settings; only changed answers are proposed', async () => {
     const first = await setup({
       expectedVersion: 1,
@@ -246,7 +246,7 @@ describe('B-335 safety regressions', () => {
     await setup({ expectedVersion: 1, style: 'restaurant' });
     await setup({ expectedVersion: 2, style: 'salon' });
     expect(sql.raw.prepare('SELECT COUNT(*) n FROM templates').get()).toEqual({
-      n: before.n + 5,
+      n: before.n + 16,
     });
     expect(
       sql.raw
@@ -320,9 +320,7 @@ describe('B-335 safety regressions', () => {
       },
     });
     const set = await request(base + '/starter-set?account_id=a&style=consult');
-    const declared = set.body.data.definition.items.find(
-      (i: any) => i.kind === 'rich_menu',
-    ).buttons;
+    const declared = set.body.data.preview.find((i: any) => i.key === 'menu').buttons;
     const actual = sql.raw
       .prepare(
         `SELECT a.label FROM rich_menu_areas a JOIN rich_menu_pages p ON p.id=a.page_id JOIN rich_menu_groups g ON g.id=p.group_id WHERE g.account_id='a' ORDER BY a.bounds_y,a.bounds_x`,
@@ -336,6 +334,10 @@ describe('B-335 safety regressions', () => {
 
 describe('HQ distribution and provenance', () => {
   test('preflight detects local edits, untouched resources update, edits wait for shop consent', async () => {
+    restaurant();
+    sql.raw.exec(`INSERT INTO rt_store_feature_flags(store_id,feature,enabled,version,created_at,updated_at)
+      VALUES('store','reservation',0,7,1,2),('store','coupon',1,3,1,2)`);
+    const storeFlags = sql.raw.prepare('SELECT * FROM rt_store_feature_flags ORDER BY feature').all();
     await setDefinition([
       template(),
       { ...template('初版'), key: 'hq-second' },
@@ -366,6 +368,7 @@ describe('HQ distribution and provenance', () => {
         })
       ).status,
     ).toBe(200);
+    expect(sql.raw.prepare('SELECT * FROM rt_store_feature_flags ORDER BY feature').all()).toEqual(storeFlags);
     expect(
       sql.raw
         .prepare('SELECT name FROM templates WHERE id=?')

@@ -58,7 +58,7 @@ async function publishDefaults(db: D1Database, accountId = 'account-1') {
   });
 }
 
-describe('V6 action score rule versions', () => {
+describe('action score rule versions', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -170,7 +170,7 @@ describe('V6 action score rule versions', () => {
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM friend_scores`).get()).toEqual({ count: 2 });
   });
 
-  it('does not fall back to legacy behavior after a V6 set is stopped', async () => {
+  it('does not fall back to legacy behavior after a set is stopped', async () => {
     await publishDefaults(db);
     const stopped = await stopActionScoreRules(db, 'account-1');
     expect(stopped.status).toBe('stopped');

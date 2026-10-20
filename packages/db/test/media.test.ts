@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { countMedia, createMedia, getMedia } from '../src/media.js'
+import { countMedia, createMedia, getMedia } from '../src/media/index.js'
 
 describe('登録メディア一覧', () => {
   it('統括所有のメディアも版履歴を作り、NULLの所有範囲から取得する', async () => {

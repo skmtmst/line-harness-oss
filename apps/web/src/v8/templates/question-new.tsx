@@ -40,15 +40,15 @@ import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError } from '@/components/shared/form-controls'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { TemplateEditFrame } from '../template-edit/frame'
-import type { TemplateEditHost } from '../template-edit/host'
+import { TemplateEditFrame } from '@/v8/template-edit/public/frame/index'
+import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
 import te from '../template-edit/edit.module.css'
 import styles from './question-new.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveErrorReveal, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 テンプレート「質問を作る・編集」（Pencil `l87p1J`）。
+ * ★V8 テンプレート「質問を作る・編集」（Pencil ）。
  *
  * 外枠はテンプレートの作る画面と同じ（src/v8/template-edit/frame）。左に段「名前とフォルダ」「質問」「選択肢」、
  * 右の列に「この質問を使う場所」と「届き方」（本物のスマホ）。下の帯はキャンセル・下書きを保存・保存して公開。
@@ -148,7 +148,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   }, [id, selectedAccountId])
 
   const dirty = snapshotOf({ name, category, folderId, question }) !== savedSnapshot
-  /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る（B-139）。 */
+  /* 保存で落ちた欄は、その欄を赤くして真下に理由を出し、1つ目の欄へ移る。 */
   const fields = useFormErrors()
   fields.define('name', 'テンプレート名', () => (name.trim() ? null : 'テンプレート名を入力してください。'), { required: true })
   fields.define('text', '質問文', () => (question.text.trim() ? null : '質問文を入力してください。'), { required: true })
@@ -198,7 +198,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   }
   const leaveToList = () => { disarm(); router.push('/templates') }
   const onSaveDraft = async () => { if (await save('draft')) leaveToList() }
-  /* 使われている質問を公開すると利用先へ新しい内容が届くので、使用先があれば確認の窓を挟む（cuR8I）。 */
+  /* 使われている質問を公開すると利用先へ新しい内容が届くので、使用先があれば確認の窓を挟む。 */
   const onPublish = async () => {
     if (id && usageCount > 0) { setPublishConfirm(true); return }
     setPublishing(true)
@@ -383,7 +383,7 @@ export default function QuestionNewV8({ host }: { host?: TemplateEditHost } = {}
   )
 }
 
-/* 閉じた「押されたら」の欄に保存エラーが返ったら、その選択肢の窓を開いて理由を見せる（B-139）。 */
+/* 閉じた「押されたら」の欄に保存エラーが返ったら、その選択肢の窓を開いて理由を見せる。 */
 const CHOICE_ACTION_FIELDS = ['behavior', 'url', 'tel', 'mail', 'userMessage', 'user_message', 'hideUserMessage', 'hide_user_message', 'repeatReply', 'repeat_reply']
 function ChoiceActionErrorReveal({ index, onReveal }: { index: number; onReveal: (index: number) => void }) {
   useSaveErrorReveal(CHOICE_ACTION_FIELDS.map((name) => `choices.${index}.${name}`), useCallback(() => onReveal(index), [index, onReveal]))

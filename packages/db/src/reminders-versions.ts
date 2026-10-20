@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { createReminderStep, createReminderWithDraftVersion, deleteReminderStep, ensureReminderPublishedVersion, getReminderDraftVersion, getReminderPublishedVersion, getReminderSteps, getReminderVersionById, getReminderVersionSteps, parseReminderVersionSettings, publishReminderDraftVersion, recordReminderDraftTest, reminderVersionStepStatements, saveReminderDraftVersion } from './reminders/versions.js';

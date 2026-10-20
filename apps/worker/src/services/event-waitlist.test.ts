@@ -14,7 +14,7 @@ import {
   promoteEventWaitlist,
   reorderEventWaitlist,
 } from './event-waitlist.js';
-import type { EventWaitlistOfferSender } from './event-waitlist.js';
+import type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
 
 function asD1(sqlite: Database.Database, beforeRun?: (query: string) => Promise<void>): D1Database {
   function prepare(query: string): D1PreparedStatement {
@@ -46,7 +46,7 @@ function asD1(sqlite: Database.Database, beforeRun?: (query: string) => Promise<
   } as unknown as D1Database;
 }
 
-describe('V6 event waitlist and applicants', () => {
+describe('event waitlist and applicants', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -250,6 +250,8 @@ describe('V6 event waitlist and applicants', () => {
     });
     expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM event_bookings`).get())
       .toEqual({ count: 1 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM workflow_steps WHERE process_kind='booking_line_delivery'
+      AND subject_id='event-waitlist-accept:event-waitlist:wait-a'`).get()).toEqual({count:1});
   });
 
   test('移行済み待機者はイベントと枠の編集後に繰り上げても旧snapshotで案内・予約する', async () => {

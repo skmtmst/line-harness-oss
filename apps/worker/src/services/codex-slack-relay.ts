@@ -1,4 +1,6 @@
-import { normalizedHarnessErrorPath, harnessErrorCode, harnessErrorIncidentKey, type HarnessErrorReport } from './slack-error-summary.js';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
+import { safeWorkerIncidentId, normalizedHarnessErrorPath, harnessErrorCode, harnessErrorIncidentKey, type HarnessErrorReport } from './slack-error-summary.js';
 export type CodexSlackCategory = 'error' | 'idea' | 'fix' | 'decision';
 export type SlackTaskStatus = 'working' | 'review' | 'done';
 
@@ -104,6 +106,8 @@ export function sanitizeSlackContent(value: string): string {
     .replace(/\b(?:sk-[A-Za-z0-9_-]{12,}|xox[baprs]-[A-Za-z0-9-]{12,}|gh[pousr]_[A-Za-z0-9_]{12,})\b/g, '[REDACTED_TOKEN]')
     .replace(/(authorization\s*[:=]\s*(?:bearer\s+)?)[^\s,;]+/gi, '$1[REDACTED]')
     .replace(/((?:api[_-]?key|token|secret|password)\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/`/g, 'ˋ')
     .slice(0, MAX_SLACK_CONTENT_LENGTH)
     .trim();
 }
@@ -253,7 +257,7 @@ function buildParentText(config: CodexSlackRelayConfig, event: CodexSlackEvent, 
       ? `\nPR：<${event.prUrl}|#${event.prNumber}>`
       : `\nPR：#${event.prNumber}`
     : '';
-  const branch = event.branch ? `\nブランチ：\`${event.branch}\`` : '';
+  const branch = event.branch ? `\nブランチ：\`${sanitizeSlackContent(event.branch)}\`` : '';
   const status = category === 'error' || event.prNumber
     ? `\n状態：${errorParentStatusLabel(isCodexTaskCompletion(event) ? 'done' : taskStatusForEvent(event))}`
     : '';
@@ -439,7 +443,7 @@ async function ensureSlackChannelMembers(
       // channel from being used or block invitations for the remaining
       // operators. Keep the failure visible in Worker logs and retry it on
       // the next PR event.
-      console.warn(JSON.stringify({"code":"slack_pr_channel_member_invite_failed"}));
+      logger.warn("slack_pr_channel_member_invite_failed");
     }
   }
 }
@@ -524,7 +528,7 @@ async function ensureUpcomingPrRangeChannelWithoutBlocking(
     // Preparing the next 100-PR channel is preventive maintenance. A missing
     // Slack scope or a temporary API failure must never suppress the current
     // PR report. Every event from #x90 through #x00 retries the preparation.
-    console.warn(JSON.stringify({"code":"slack_upcoming_pr_range_prepare_failed"}));
+    logger.warn("slack_upcoming_pr_range_prepare_failed");
   }
 }
 
@@ -591,7 +595,7 @@ async function updateTrackedParentStatus(
       },
     }, fetcher);
   } catch (error) {
-    console.warn(JSON.stringify({"code":"slack_parent_status_update_failed"}));
+    logger.warn("slack_parent_status_update_failed");
     if (strict) throw error;
   }
 }
@@ -624,7 +628,7 @@ async function findThreadTs(
 async function findTaskMessage(
   token: string,
   channel: string,
-  selector: { key?: string; taskId?: string; sessionId?: string },
+  selector: { key?: string; taskId?: string; sessionId?: string; branchKey?: string; prNumber?: number; prUrl?: string },
   fetcher: typeof fetch,
 ): Promise<SlackMessage | null> {
   let cursor = '';
@@ -640,7 +644,10 @@ async function findTaskMessage(
       const metadata = message.metadata.event_payload;
       return (selector.key && metadata?.work_key === selector.key) ||
         (selector.taskId && metadata?.task_id === selector.taskId) ||
-        (selector.sessionId && metadata?.session_id === selector.sessionId);
+        (selector.sessionId && metadata?.session_id === selector.sessionId) ||
+        (selector.branchKey && metadata?.work_key === selector.branchKey) ||
+        (selector.prNumber && selector.prUrl && metadata?.pr_number === String(selector.prNumber)
+          && metadata.pr_url === selector.prUrl);
     });
     if (match?.ts) return match;
     cursor = result.response_metadata?.next_cursor || '';
@@ -740,7 +747,7 @@ function commandCenterTask(message: SlackMessage): SlackCommandCenterTask | null
 function prOwner(pr: CodexSlackPrSnapshot): string {
   if (/(?:^|\/)masato(?:-|\/|$)/i.test(pr.headRefName)) return 'マサト';
   if (/(?:^|\/)kenta(?:-|\/|$)/i.test(pr.headRefName)) return 'ケンタ';
-  return pr.author || '未設定';
+  return sanitizeSlackContent(pr.author || '未設定');
 }
 
 function checkLabel(checks: CodexSlackPrSnapshot['checks']): string {
@@ -963,7 +970,7 @@ async function refreshSlackCommandCenter(
       }, fetcher);
     }
   } catch (error) {
-    console.warn(JSON.stringify({"code":"slack_command_center_refresh_failed"}));
+    logger.warn("slack_command_center_refresh_failed");
     if (strict) throw error;
   }
 }
@@ -1069,7 +1076,7 @@ async function ensureOpenTask(
     }, fetcher);
     permalink = permalinkResult.permalink || permalink;
   } catch (error) {
-    console.warn(JSON.stringify({"code":"slack_permalink_fallback"}));
+    logger.warn("slack_permalink_fallback");
   }
   await slackApi(token, 'chat.postMessage', {
     channel: taskChannel,
@@ -1223,6 +1230,7 @@ export async function reportHarnessErrorToSlack(
     path ? `場所：${path}` : '',
     `内容：${message}`,
     `エラーID：ERR-${fingerprint}`,
+    safeWorkerIncidentId(report) ? `追跡番号：${safeWorkerIncidentId(report)}` : '',
     `TASK-ID：${taskId}`,
   ].filter(Boolean).join('\n');
   await relayCodexSlackEvent(config, {
@@ -1273,9 +1281,14 @@ export async function relayCodexSlackEvent(
   let createdParent = false;
   let linkedTask: SlackMessage | null = null;
 
-  const requestedTaskId = taskIdFromContent(event.content);
+  const requestedTaskId = event.eventSource === 'github' ? null : taskIdFromContent(event.content);
+  // GitHub may open or finish a task whose original key belongs to a Codex session or
+  // dedicated branch. Use its saved relationship, never a TASK-ID in the title.
+  const relatedBranchKey = event.eventSource === 'github' && event.repository
+    ? workKey({ ...event, prNumber: undefined }) : '';
   if (
-    (requestedTaskId || event.eventType === 'turn_completed' || event.syncMode === 'reconcile') &&
+    (requestedTaskId || event.eventType === 'turn_completed' || event.syncMode === 'reconcile'
+      || event.eventSource === 'github' && (event.prNumber || relatedBranchKey.startsWith('branch:'))) &&
     config.SLACK_TASK_CHANNEL_ID
   ) {
     linkedTask = await findTaskMessage(
@@ -1283,7 +1296,12 @@ export async function relayCodexSlackEvent(
       config.SLACK_TASK_CHANNEL_ID,
       requestedTaskId
         ? { taskId: requestedTaskId }
-        : { sessionId: event.sessionId, key },
+        : event.eventSource === 'github' ? {
+          key,
+          branchKey: relatedBranchKey.startsWith('branch:') ? relatedBranchKey : undefined,
+          prNumber: event.prNumber,
+          prUrl: event.prUrl,
+        } : { sessionId: event.sessionId, key },
       fetcher,
     );
     const metadata = linkedTask?.metadata?.event_payload;

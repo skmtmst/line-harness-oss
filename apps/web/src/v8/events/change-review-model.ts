@@ -1,7 +1,9 @@
 'use client'
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { getApiErrorCode } from '@/lib/api'
 
 /*
- * U-1 変更の確認（v6-29 §10）の処理の核。
+ * U-1 変更の確認（管理画面-29 §10）の処理の核。
  * 入力を変えたら少し待って影響を自動で確かめる（autoPreview）。
  *
  * 公開後の名前・会場・日時・定員・条件の変更は、影響する申込・待ち・
@@ -19,13 +21,12 @@ import {
 } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 
-const JST_OFFSET_MS = 9 * 3600_000
 
 /** UTC ISO → datetime-local（日本時間の壁時計）。 */
 export function isoToLocalInput(iso: string): string {
   const time = Date.parse(iso)
   if (!Number.isFinite(time)) return ''
-  const jst = new Date(time + JST_OFFSET_MS).toISOString()
+  const jst = japanCalendar(new Date(time)).toISOString()
   return jst.slice(0, 16)
 }
 
@@ -264,7 +265,7 @@ export function useChangeReview(eventId: string) {
       const detail = await eventsApi.getEvent(selectedAccountId, eventId)
       setEvent(detail)
     } catch (error) {
-      const code = (error as { body?: { error?: string } }).body?.error ?? null
+      const code = getApiErrorCode(error) ?? null
       setApplyError(applyErrorMessage(code))
     } finally {
       setApplyBusy(false)
@@ -272,7 +273,7 @@ export function useChangeReview(eventId: string) {
   }, [selectedAccountId, applyBusy, preview, buildChanges, eventId, event, reason])
 
   /*
-   * ★V8：絵（hmr2P）は「影響を確かめる」ボタンを持たず、変えたらすぐ右に影響が出る。
+   * ★V8：絵は「影響を確かめる」ボタンを持たず、変えたらすぐ右に影響が出る。
    * 入力が止まって 600ms たったら確かめる。変える内容が無ければ何も出さない。
    */
   const changeKey = JSON.stringify(buildChanges())

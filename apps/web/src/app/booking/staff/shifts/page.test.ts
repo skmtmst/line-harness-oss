@@ -19,11 +19,11 @@ describe('受付枠と休業日のV8の動作契約', () => {
     // 週は5日の並び＋3列時刻ボタン、カレンダーは月の表（プレビュー部品だけが持つ）。
     // 「空き枠の内訳」は実画面に無いので残さない。
     expect(PREVIEW).toContain('日時を選んでください')
-    // ★V8（板 ADutg）：空きなしは「この週は空きがありません」。
+    // ★V8（板 ）：空きなしは「この週は空きがありません」。
     expect(PREVIEW).toContain('この期間に空きはありません。')
     expect(PREVIEW).toContain('className={styles.slots}')
     expect(PREVIEW).not.toContain('grid-cols-4')
-    // 失敗は実LIFFの LoadErrorView と同じ題＋本文（★V7）。
+    // 失敗は実LIFFの LoadErrorView と同じ題＋本文（★管理画面）。
     expect(PREVIEW).toContain('読み込めませんでした')
     expect(PREVIEW).toContain('onClick={onRetry}')
     expect(PREVIEW).not.toContain('時間をおいて、もう一度お試しください。')

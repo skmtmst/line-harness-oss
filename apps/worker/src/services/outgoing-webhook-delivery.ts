@@ -1,3 +1,6 @@
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
+import { parseRetryAfter } from '../lib/external-call/policy.js';
 /**
  * 送信Webhookの配送。
  *
@@ -20,6 +23,8 @@ import {
   type WebhookInteractionFailureReason,
   type WebhookKeyInput,
 } from '@line-crm/db';
+
+
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES } from './external-delivery-retry.js';
 import { signHarnessEvent } from './operations-signature.js';
@@ -163,17 +168,8 @@ export function webhookFetchTimeoutMs(value: unknown): number {
  * （リクエスト内で待つなら秒、台帳へ積む再送なら分まで許せる）。
  */
 function parseRetryAfterDelayMs(header: string | null, nowMs: number): number | null {
-  if (header == null) return null;
-  const text = header.trim();
-  if (!text) return null;
-  if (/^\d+(\.\d+)?$/.test(text)) {
-    const ms = Number(text) * 1000;
-    return Number.isFinite(ms) && ms >= 0 ? ms : null;
-  }
-  const at = Date.parse(text);
-  if (!Number.isFinite(at)) return null;
-  const ms = at - nowMs;
-  return ms < 0 ? null : ms;
+  const at = parseRetryAfter(header, nowMs);
+  return at === undefined ? null : at - nowMs;
 }
 
 /**
@@ -216,8 +212,6 @@ export interface WebhookRow {
   secret_encrypted?: string | null;
   max_retries: number | null;
 }
-
-
 
 /**
  * 送信直前の SSRF 再検査 (N-366)。
@@ -671,7 +665,7 @@ export interface DeliveryResult {
  *
  * | 応答 | 扱い | 次までの待ち |
  * | 2xx | 成功 | 待たない |
- * | 429 | 送り直す。Retry-After があれば上限8秒へクランプして待つ | Retry-After／指数待ち |
+ * | 429 | 送り直す。Retry-After があれば8秒以内なら待つ。超過は次回の台帳へ返す | Retry-After／指数待ち |
  * | 5xx | 送り直す | 指数待ち（0.5→1→2→4→8秒） |
  * | タイムアウト（既定10秒）・接続失敗 | 送り直す。lastStatus=null で失敗台帳に残る | 指数待ち |
  * | その他の 4xx | 恒久失敗。残りの回数を使わずに諦める | — |
@@ -713,7 +707,7 @@ export async function deliverWebhook(
       sendSecret = null;
     }
     if (!sendSecret) {
-      console.error(JSON.stringify({"code":"outgoing_webhook_secret_unavailable"}));
+      logger.error("outgoing_webhook_secret_unavailable");
       return { ok: false, attempts: 0, lastStatus: null, secretUnavailable: true };
     }
   }
@@ -736,7 +730,7 @@ export async function deliverWebhook(
       // 接続そのものの失敗と、打ち切り（タイムアウト）は同じ扱い。
       // 相手が落ちている可能性が高いので送り直す。再試行可能な失敗として
       // lastStatus=null のまま残し、呼び出し側が失敗台帳へ記録する。
-      console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+      logger.error("services_outgoing_webhook_delivery_failed");
       lastStatus = null;
       waitMs = retryDelayMs(attempt);
       continue;
@@ -760,6 +754,9 @@ export async function deliverWebhook(
     lastRetryAfterMs = retryAfterHeader === null
       ? null
       : parseRetryAfterDelayMs(retryAfterHeader, Date.now());
+    if (lastRetryAfterMs !== null && lastRetryAfterMs > WEBHOOK_RETRY_AFTER_MAX_MS) {
+      return { ok: false, attempts: attempt + 1, lastStatus, retryAfterMs: lastRetryAfterMs };
+    }
     waitMs = retryAfterHeader === null
       ? retryDelayMs(attempt)
       : retryAfterDelayMs(retryAfterHeader, retryDelayMs(attempt));
@@ -864,7 +861,7 @@ export async function recordDeliveryOutcome(
     });
   } catch (error) {
     // 通知の書き込みだけが落ちても、自動停止そのものは巻き戻さない。
-    console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+    logger.error("services_outgoing_webhook_delivery_failed");
   }
 }
 
@@ -944,7 +941,7 @@ function deliveryJitterRatio(key: string): number {
  * 次の再送時刻を決める。上限・24時間の窓を超えるなら null（=諦める）。
  *
  * 429 で Retry-After をもらったときは、その指定を30分上限で尊重する。
- * 上限を超える指定は30分へ丸める（既定間隔へ戻すと混雑中に早めてしまう）。
+ * 上限を超える指定では自動再送を止め、相手の指定より早く送らない。
  * それ以外は指数バックオフ＋配送ID由来の jitter。
  */
 export function outgoingDeliveryNextRetryAt(input: {
@@ -961,7 +958,8 @@ export function outgoingDeliveryNextRetryAt(input: {
   const deadline = Date.parse(input.queuedAt) + OUTGOING_WEBHOOK_RETRY_WINDOW_MS;
   let waitMs: number;
   if (input.responseStatus === 429 && typeof input.retryAfterMs === 'number' && input.retryAfterMs >= 0) {
-    waitMs = Math.min(input.retryAfterMs, EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000);
+    if (input.retryAfterMs > EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES * 60_000) return null;
+    waitMs = input.retryAfterMs;
   } else {
     const index = Math.min(
       Math.max(0, input.attemptsDone - 1),
@@ -1047,9 +1045,11 @@ export async function claimOutgoingDelivery(
       `UPDATE outgoing_webhook_deliveries
           SET status = 'sending', lease_token = ?, lease_until = ?, updated_at = ?
         WHERE id = ? AND status = ? AND attempts = ? AND updated_at = ?
-          AND (lease_until IS NULL OR lease_until <= ?)`,
+          AND (lease_until IS NULL OR lease_until <= ?)
+          AND (next_retry_at IS NULL OR julianday(next_retry_at) <= julianday(?))
+          AND NOT (COALESCE(error_code,'')='retry_after_exceeds_budget' AND next_retry_at IS NULL)`,
     )
-    .bind(leaseToken, leaseUntil, nowIso, delivery.id, delivery.status, delivery.attempts, delivery.updated_at, nowIso)
+    .bind(leaseToken, leaseUntil, nowIso, delivery.id, delivery.status, delivery.attempts, delivery.updated_at, nowIso, nowIso)
     .run();
   return Number(result.meta?.changes ?? 1) === 1 ? leaseToken : null;
 }
@@ -1097,6 +1097,7 @@ const OUTGOING_DELIVERY_FAILURE_TEXT: Record<string, string> = {
   secret_unavailable: '署名に使うsecretを確認できませんでした。設定を保存し直してください。',
   rejected_4xx: '送り先が内容を受け取りませんでした。URLと受け手の設定を確認してください。',
   retry_exhausted: '自動での送り直しが上限に達しました。連携先を確認して、必要なら管理画面から再送してください。',
+  retry_after_exceeds_budget: '連携先の待ち時間が自動再送の上限を超えました。連携先を確認して、必要なら管理画面から再送してください。',
   retry_window_expired: '24時間の再送期間を過ぎました。連携先を確認して、必要なら管理画面から再送してください。',
   webhook_not_found: '送信Webhookが削除されたため送りませんでした。',
   webhook_inactive: '送信Webhookが停止中のため送りませんでした。',
@@ -1183,7 +1184,13 @@ export async function finishOutgoingDelivery(
     responseStatus = attempt.responseStatus;
     if (retryAt === null) {
       status = 'failed';
-      errorCode = attemptsDone >= delivery.max_attempts ? 'retry_exhausted' : 'retry_window_expired';
+      const overWait=attempt.responseStatus===429&&typeof attempt.retryAfterMs==='number'
+        &&attempt.retryAfterMs>EXTERNAL_DELIVERY_RETRY_AFTER_MAX_MINUTES*60_000;
+      errorCode = overWait?'retry_after_exceeds_budget':attemptsDone>=delivery.max_attempts?'retry_exhausted':'retry_window_expired';
+      if(attempt.responseStatus===429&&typeof attempt.retryAfterMs==='number'&&attempt.retryAfterMs>=0){
+        const notBefore=new Date(now.getTime()+attempt.retryAfterMs);
+        if(Number.isFinite(notBefore.getTime()))nextRetryAt=notBefore.toISOString();
+      }
       errorMessage = outgoingDeliverySafeMessage(errorCode);
     } else {
       status = 'retry_wait';
@@ -1289,7 +1296,7 @@ async function logSweptDeliveryAttempt(
       failureReason: sendResult.ok ? null : failureReasonForDelivery(sendResult),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+    logger.error("services_outgoing_webhook_delivery_failed");
   }
 }
 
@@ -1407,13 +1414,14 @@ export async function sweepOutgoingWebhookDeliveries(
       attempt = outgoingAttemptOf(sendResult);
       await logSweptDeliveryAttempt(db, row, webhook.name, sendResult, Date.now() - started);
     }
-    const outcome = await finishOutgoingDelivery(db, row, lease, attempt, now);
+    // Retry-After delta seconds begin at the response, not sweep start.
+    const outcome = await finishOutgoingDelivery(db, row, lease, attempt, input.now ?? new Date());
     if (outcome === 'delivered') {
       result.delivered += 1;
       try {
         await recordDeliveryOutcome(db, row.webhook_id, true);
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+        logger.error("services_outgoing_webhook_delivery_failed");
       }
       // d23b R412: 届いた通知と同じ失敗記録が残っていれば畳む。
       // 「やり直せる」のまま残すと届いた分をもう一度送らせてしまう。
@@ -1422,14 +1430,14 @@ export async function sweepOutgoingWebhookDeliveries(
           db, row.line_account_id, row.webhook_id, row.idempotency_key,
         );
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+        logger.error("services_outgoing_webhook_delivery_failed");
       }
     } else if (outcome === 'failed') {
       result.failed += 1;
       try {
         await recordDeliveryOutcome(db, row.webhook_id, false);
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_outgoing_webhook_delivery_failed"}));
+        logger.error("services_outgoing_webhook_delivery_failed");
       }
     } else if (outcome === 'retry_wait') {
       result.retryWait += 1;

@@ -24,7 +24,7 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const dispatchOperatorEvent = vi.hoisted(() => vi.fn());
 vi.mock('../services/operator-notification-dispatch.js', () => ({ dispatchOperatorEvent }));
@@ -35,8 +35,8 @@ vi.mock('../services/event-bus.js', async (importOriginal) => ({
   fireOutgoingWebhooks,
 }));
 // 送る側(顧客への LINE 通知)は対象外。予約の成否と運用者通知だけを見る。
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
 }));
 vi.mock('../services/account-access.js', () => ({
@@ -88,7 +88,7 @@ function asD1(sqlite: Database.Database): D1Database {
 /**
  * waitUntil に渡された Promise を集めて、明示的に待てるようにする。
  *
- * 拒否は握り潰さず `settle()` の戻りで返す。allSettled で飲み込むと
+ * 拒否は握り潰さず `settle` の戻りで返す。allSettled で飲み込むと
  * 「副作用が自分で後始末しているか」を見張れなくなり、.catch を外しても
  * 緑のままになる。本番の Worker では waitUntil の中の未処理拒否が
  * そのまま実行の失敗として残るので、ここでも表に出す。

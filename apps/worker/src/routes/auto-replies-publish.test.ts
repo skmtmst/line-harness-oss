@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type { AutoReply, AutoReplyDraftSettings, AutoReplyVersionRow } from '@line-crm/db';
+
 
 const mocks = vi.hoisted(() => ({
   getAutoReplies: vi.fn(),
@@ -141,7 +142,7 @@ vi.mock('@line-crm/db', () => ({
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: mocks.canAccessAllLineAccounts,
 }));
-vi.mock('../services/auto-reply.js', () => ({
+vi.mock('../features/auto-replies/auto-reply.js', () => ({
   compareAutoReplyCandidates: (a: AutoReply, b: AutoReply) => Number(a.line_account_id === null)
     - Number(b.line_account_id === null)
     || a.priority - b.priority
@@ -153,7 +154,7 @@ vi.mock('../services/auto-reply.js', () => ({
   previewAutoReplyContent: mocks.previewAutoReplyContent,
   resolveKeywordRules: (item: AutoReply) => [{ keyword: item.keyword, matchType: item.match_type }],
 }));
-vi.mock('../services/auto-reply-conditions.js', () => ({
+vi.mock('../features/auto-replies/auto-reply-conditions.js', () => ({
   isOperatorHandling: mocks.isOperatorHandling,
 }));
 

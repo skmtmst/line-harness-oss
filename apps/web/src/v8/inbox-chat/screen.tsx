@@ -1,365 +1,64 @@
 'use client'
 
-import { inboxRoutingApi } from '@/lib/api-gap1';
-import { SlaBadge, assigneeLabel, type ChatSlaFields } from './sla';
-import { jstDate, jstCalendar } from '@/lib/jst-datetime';
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
-import { PageTitle } from '@/components/templates/page-frame';
-import FilterChip from '@/components/shared/filter-chip';
-import ListState from '@/components/shared/list-state';
-import { InboxMessage, InboxMessageDay, InboxQuotedMessage } from '@/components/shared/inbox-thread';
-import { InboxListHeader, InboxListHeadline, InboxListSearch, InboxFilterControls, InboxHistoryButton } from '@/components/shared/inbox-list';
-import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
-import Avatar from '@/components/shared/avatar';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { api, ApiError, fetchApi, type ChatDetail as ApiChatDetail, type ChatDetailMessage, type ChatListItem, type InboxStats, type ScheduledChatSend } from '@/lib/api';
-import { buildSupportEmailInboxQuery } from './support-email-query';
-import { clampSearchQuery, SEARCH_QUERY_MAX_LENGTH } from '@/lib/search-query';
-import { withRequestTimeout } from '@/lib/request-timeout';
-import { INBOX_INFO_PANEL_MIN_WIDTH } from './inbox-layout';
-import styles from './list-parts.module.css';
-import { InboxPage, InboxListPane, InboxConversationPane, InboxMessages, InboxComposer, InboxSummaryPane } from '@/components/templates/inbox-page';
-import { InboxComposerTools, InboxToolButton, InboxInputBox, InboxDraftArea, InboxDraftCount, InboxComposerBottom, InboxComposerActions } from '@/components/shared/inbox-composer';
-import SearchField from '@/components/shared/search-field';
-import { buildOperatorRows, type ChatStatus } from '@/components/chats/inbox-dropdown';
-import { unreadLookup } from '@/components/chats/assignee-unread';
-import InboxFilterPanel from '@/components/chats/inbox-filter-panel';
-import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
-import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
-import { startVisiblePoll } from '@/lib/visible-polling';
-import { UNANSWERED_REFRESH_EVENT } from '@/lib/events';
-import { runOptimistic } from '@/lib/undoable';
-import SenderSelect from '@/components/shared/sender-select';
-import { useStaffRole } from '@/lib/staff-role';
-import { useAccount } from '@/contexts/account-context';
-import TemplatePicker from '@/components/chats/template-picker';
-import FlexPreviewComponent from '@/components/flex-preview';
-import FriendInfoSidebar from '@/components/chats/friend-info-sidebar';
-import ChatThreadWindow from '@/components/chats/chat-thread-window';
-import ChatSearchBar from '@/v8/inbox-search/chat-search-bar';
-import { useChatSearch } from '@/v8/inbox-search/use-chat-search';
-import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
-import ScheduleSendDialog from '@/v8/inbox-chat/schedule-dialog';
-import chatStyles from '@/v8/inbox-chat/inbox-chat.module.css';
-import ConversationHead from '@/v8/inbox-chat/conversation-head';
-import { InboxAiDraft, InboxAiHeadMenu, InboxAiSummary, useInboxAi } from '@/v8/ai-reply/inbox-ai';
-import { formatInboxListTime } from '@/v8/inbox-chat/list-time';
-import AttachMenu from '@/v8/inbox-chat/attach-menu';
-import AttachmentChip, { type PendingAttachmentView } from '@/v8/inbox-chat/attachment-chip';
-import AttachmentMessage from '@/v8/inbox-chat/attachment-message';
-import { ATTACH_NOTE, ATTACH_NOTE_TITLE, attachmentPreviewLabel, attachmentSendInput, checkAttachment, describeUploadFailure, scheduledContentLabel, type AttachSlot } from '@/v8/inbox-chat/attachments';
-import type { ChatAttachment } from '@line-crm/shared';
-import SegmentedControl from '@/components/shared/segmented';
-import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
-import { type ImageUploaderValue } from '@/components/shared/image-uploader';
-import { Suspense } from 'react';
-import EmailThread from '@/components/support/email-thread';
-import Button from '@/components/shared/button';
-import ConfirmDialog from '@/components/shared/confirm-dialog';
-import Dialog from '@/components/shared/dialog';
-import Notice from '@/components/shared/notice';
-import { useOverlayFocus } from '@/components/shared/overlay-utils';
-import { RowMenu } from '@/components/shared/row-actions';
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { japaneseDetailOf } from '@/components/shared/api-error-message';
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
+import type { SavedViewDraft, SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
+import FriendInfoSidebarBoundary from '@/components/chats/friend-info-sidebar-boundary';
+import FriendInfoSidebar from '@/components/chats/friend-info-sidebar';
+import Notice from '@/components/shared/notice';
+import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { InboxPage } from '@/components/templates/inbox-page';
+import { useAccount } from '@/contexts/account-context';
+import { api,type ChatDetailMessage } from '@/lib/api';
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
+import { useStaffRole } from '@/lib/staff-role';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
-import { InboxMedia, InboxFlexContent, InboxFloatingPanel, InboxInfoBackdrop, InboxEmailHeading } from '@/components/shared/inbox-content';
-import { Bookmark, Clock3, ListFilter, Reply, FileText, Link2, NotebookPen, Send, Settings2, X } from 'lucide-react';
-import { normalizeSavedViewConditions, type InboxSavedViewConditions } from './saved-view-types';
+import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
+import { useRouter,useSearchParams } from 'next/navigation';
+import { Suspense,useEffect,useRef,useState } from 'react';
+import { jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,statusFilters,statusFiltersV8 } from './inbox-model';
+
+import InboxConversation from './inbox-conversation-view';
+import InboxCustomerPanel from './inbox-customer-panel';
+import InboxList from './inbox-list-view';
 import { savedViewFailureMessage } from './saved-view-failure';
-import { savedViewSummary } from './saved-view-summary';
-import { buildOutgoingMessage, refreshChatListAfterSend } from './send-optimistic';
-import { describeSendFailure } from './send-failure';
-import { formatDateTime, formatNumber, formatTime } from '@/lib/format';
-import { StickerMessageImage, ChatImageMessage } from "./screen-gap-parts"
-type Chat = ChatListItem
+import { useInboxActions } from './use-inbox-actions';
+import { useInboxConversation } from './use-inbox-conversation';
+import { useInboxDraft } from './use-inbox-draft';
+import { useInboxLists } from './use-inbox-lists';
+import { useInboxSavedViews } from './use-inbox-saved-views';
+import { useInboxSchedule } from './use-inbox-schedule';
+import { useInboxScroll } from './use-inbox-scroll';
+import { useInboxSearch } from './use-inbox-search';
+import { useInboxSend } from './use-inbox-send';
+import { useInboxStats } from './use-inbox-stats';
+import { useInboxSubscription } from './use-inbox-subscription';
 
-/**
- * 会話のメッセージ1件。形は `api.ts` の `ChatDetailMessage`
- *（`GET /api/chats/:id` の実応答）に寄せる。画面が独自の型を持つと
- * 口の形が変わっても型検査が黙るため、ここでは別名にするだけ。
- */
-type ChatDetail = ApiChatDetail
+import { useInboxDeepLink } from './use-inbox-deep-link';
+import { useInboxPanel } from './use-inbox-panel';
 
-type StatusFilter = 'all' | 'unread' | 'in_progress' | 'on_hold' | 'resolved'
-
-/** 受信箱に混ぜるメールの1件（/api/support/inbox の email ぶん）。 */
-interface EmailInboxItem {
-  id: string
-  threadId: string
-  customerName: string
-  /** 相手のメールアドレス。友だちを手で探すときの手がかりになる。 */
-  customerIdentifier?: string
-  subject: string
-  preview: string
-  status: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
-  revision: number
-  assignedStaffId?: string | null
-  assignedStaffName?: string | null
-  /** 受信・送信のうち新しい方の時刻。口はこの順で返す。無い口は受信時刻に倒す。 */
-  lastMessageAt?: string | null
-  lastIncomingAt: string
-  isUnread: boolean
-}
-
-/** 受信箱一覧の続きを読む位置。口の並び（未読が先・新しい順）と同じ3点。 */
-type ListCursor = { at: string; id: string; unread: 0 | 1 }
-
-const statusFilters: { key: StatusFilter; label: string }[] = [
-  { key: 'all', label: 'すべて' },
-  { key: 'unread', label: '未対応' },
-  { key: 'in_progress', label: '対応中' },
-  { key: 'on_hold', label: '保留' },
-  { key: 'resolved', label: '対応済み' },
-]
-
-/*
- * ★V8（M0393 XqSvX「状態」）：絵の切り替えは 未対応・対応中・保留・対応済み の4つで、件数つき。
- * 「すべて」は無い。選んでいる所をもう一度押すと絞り込みを外す（すべてに戻る）。
- */
-const statusFiltersV8 = statusFilters.filter((f) => f.key !== 'all')
-
-type InboxSavedView = {
-  id: string
-  name: string
-  conditions: InboxSavedViewConditions
-  createdBy: string | null
-  isShared: boolean
-  isFavorite?: boolean
-  /** 保存条件を現在の受信箱へ当てた件数。未接続は null。 */
-  matchCount?: number | null
-}
-
-function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
-  return channel === 'line' ? (
-    <span className={`bg-accent-deep text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-mini px-1.5 text-micro font-medium ${styles.channelBadge}`}>
-      LINE
-    </span>
-  ) : (
-    <span className={`bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-mini border px-1.5 text-micro font-medium ${styles.channelBadge}`}>
-      メール
-    </span>
-  )
-}
-
-// 一覧の1ページ件数。worker 側の上限(MAX_LIST_LIMIT=200)と揃える。
-// 300 のままだと API が200件に丸めるのに画面は300件で「続き」を判定し、
-// 201件目以降に「さらに読み込む」が出ず開けなくなる。
 const CHAT_PAGE_SIZE = 200
-/** 会話の中を探す：昔の当たりまで読み足す1回の件数（会話詳細の口の上限）と回数の上限。 */
-const CHAT_SEARCH_FILL_PAGE = 1000
-const CHAT_SEARCH_FILL_MAX_ROUNDS = 20
-
-/** 一覧の末尾から「続きを読む」位置を作る。口の並び（未読が先・新しい順）と同じ3点。 */
-function toListCursor(
-  last: Pick<ChatListItem, 'id' | 'lastMessageAt' | 'isUnread'> | undefined,
-): ListCursor | null {
-  if (!last?.lastMessageAt) return null
-  return { at: last.lastMessageAt, id: last.id, unread: last.isUnread ? 1 : 0 }
-}
-
-function formatInboxDatetime(iso: string | null): string {
-  if (!iso) return '—'
-  return formatDateTime(iso)
-}
-
-/*
- * 予約時刻は「日本時間」が約束(INBOX-21)。入力欄も一覧も端末の
- * 時間帯ではなく Asia/Tokyo で読み書きする。JST は夏時間がないので
- * オフセットは常に +09:00。
- */
-const INBOX_TIME_ZONE = 'Asia/Tokyo'
-
-function formatJstScheduledAt(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return formatDateTime(d)
-}
-
-/**
- * datetime-local の値(日本時間の約束)をオフセット付きのISOへ変える(INBOX-21)。
- * 'YYYY-MM-DDTHH:MM' のまま送ると、サーバー側の Date.parse がその実行環境の
- * 時間帯(UTC)で読み、選んだ時刻から9時間ずれた予約になる。JSTは夏時間が
- * ないので +09:00 で固定する。すでにオフセット付きの値はそのまま通す。
- */
-function jstDatetimeLocalToIso(local: string): string {
-  if (!local) return local
-  if (/[zZ]$|[+-]\d{2}:\d{2}$/.test(local)) return local
-  return `${local}+09:00`
-}
-
-/** UTCのISOを datetime-local の値へ戻す(日本時間で見せる)。 */
-function isoToJstDatetimeLocal(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const parts = new Intl.DateTimeFormat('ja-JP', {
-    timeZone: INBOX_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(d)
-  const pick = (type: string) => parts.find((part) => part.type === type)?.value ?? ''
-  // '24' 表記の深夜0時は datetime-local が読めないので '00' に直す。
-  const hour = pick('hour') === '24' ? '00' : pick('hour')
-  return `${pick('year')}-${pick('month')}-${pick('day')}T${hour}:${pick('minute')}`
-}
-
-function formatByteSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return ''
-  if (bytes < 1024) return `${bytes}B`
-  return `${Math.round(bytes / 1024)}KB`
-}
-
-/** サーバーと同じ数え方(JSの .length)。差し込みは解決後の長さでサーバーが最終判定する。 */
-const MESSAGE_MAX_LENGTH = 5000
-
-/** 入力欄の自動拡張の上限。text-sm(行の高さ約20px)の8行＋上下余白。 */
-const TEXTAREA_MAX_HEIGHT_PX = 168
-
-/**
- * 設計 `xGLVe` は、返信を待たせている行だけ日付ではなく待ち時間を出す
- * （`1時間12分`）。上の帯の「最長 ◯◯待ち」と同じ物差し。
- * **最終受信からの差なので、新しい口は要らない。**
- */
-function formatWaitingDuration(iso: string | null, nowMs: number): string | null {
-  if (!iso) return null
-  const at = new Date(iso).getTime()
-  if (!Number.isFinite(at)) return null
-  const minutes = Math.floor((nowMs - at) / 60000)
-  if (minutes < 0) return null
-  if (minutes < 1) return '1分未満'
-  if (minutes < 60) return `${minutes}分`
-  const hours = Math.floor(minutes / 60)
-  return `${hours}時間${minutes % 60}分`
-}
-
-function sameYmd(aIso: string, bIso: string): boolean {
-  return jstDate(new Date(aIso)) === jstDate(new Date(bIso))
-}
-
-/** ★V8 やりとりの日付の区切り（8月19日（火））。 */
-function formatDayJa(iso: string): string {
-  const d = jstCalendar(new Date(iso))
-  return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${'日月火水木金土'[d.getUTCDay()]}）`
-}
-
-/** ★V8 担当者の名前が無いこちらの吹き出しの「自動：…」。口の source をそのまま言葉にする。 */
-const AUTO_SOURCE_LABEL: Record<string, string> = {
-  auto_reply: '自動応答',
-  'auto-reply': '自動応答',
-  broadcast: '一斉配信',
-  reminder: 'リマインダ',
-  scenario: 'シナリオ配信',
-  automation: 'オートメーション',
-  booking: '予約の通知',
-}
-
-function formatYmdSlash(iso: string): string {
-  const d = jstCalendar(new Date(iso))
-  return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`
-}
-
-/**
- * URL状態の友だちIDが口へ渡せる形か。
- *
- * `api.chats.get` はIDを素のまま path へ入れるため、`/ ? #`
- * 空白を含む値はここで弾く。弾いた値は口を呼ばず、別人も開かない(#673)。
- */
-function isSafeFriendIdForInbox(value: string): boolean {
-  if (!value || value.length > 128) return false
-  return /^[A-Za-z0-9_-]+$/.test(value)
-}
-
-/**
- * URLで会話を開けなかった理由ごとの案内文。
- *
- * どれも「別人を開かない」で揃える。理由を混ぜると、権限が無いのか
- * 選んでいるアカウントが違うのかが読み手に伝わらない(#673)。
- */
-const DEEP_LINK_NOTICE = {
-  /** IDの形が壊れている。口は呼ばない。 */
-  malformed: '指定の会話を開けませんでした。URLの指定が正しくありません。友だち詳細の「受信箱で開く」から開き直してください。',
-  /** 存在しない、または見る権限が無い。 */
-  unavailable: '指定の会話を開けませんでした。存在しないか、見る権限がありません。URLを確かめるか、友だち詳細の「受信箱で開く」から開き直してください。',
-  /** 見る権限はあるが、いま選んでいるアカウントの相手ではない。 */
-  otherAccount: '指定の会話は、いま選んでいるLINEアカウントの相手ではありません。返信の送信元が変わって別のアカウントから送ってしまうため、開きません。上のアカウント切替で相手のアカウントに変えてから開き直してください。',
-} as const
-
-/** URLに残す保存検索IDの名前。再読込・共有で同じ条件を復元する足場(N-021)。 */
-const SAVED_VIEW_URL_KEY = 'savedView'
-
-/**
- * 受信箱のURLを組み立てる。
- *
- * 保存検索を選んだあとは `savedView=<id>` を channel と一緒に残す。
- * URLが条件を持たないと、再読込・共有のたびに絞り込みが消える(N-021)。
- */
-function buildInboxUrl(channel: 'all' | 'line' | 'email', savedViewId: string | null): string {
-  const query = new URLSearchParams()
-  if (channel !== 'all') query.set('channel', channel)
-  if (savedViewId) query.set(SAVED_VIEW_URL_KEY, savedViewId)
-  const text = query.toString()
-  return text ? `/chats?${text}` : '/chats'
-}
-
-/*
- * 下書きの保管キー(#962 F06)。同じ会話IDが別アカウントにもあり得るので、
- * アカウントと会話の両方で区切る。`\u001f` はIDに出ない区切り。
- */
-function draftKeyOf(accountId: string | null | undefined, chatId: string | null | undefined): string {
-  return `${accountId ?? ''}\u001f${chatId ?? ''}`
-}
+const EMAIL_PAGE_SIZE = 200
+const CHAT_MESSAGE_PAGE_SIZE = 100
 
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
+
   const saveErrors = useSaveFormErrors()
+
   const router = useRouter()
+
   const params = useSearchParams()
+
   // URLが指す保存検索のID。再読込・URL共有からの復元元(N-021)。
   const savedViewParam = (params.get(SAVED_VIEW_URL_KEY) ?? '').trim()
-  const { selectedAccountId, selectedAccount, loading: accountsLoading } = useAccount()
-  const [chats, setChats] = useState<Chat[]>([])
-  /**
-   * URLで指定された会話が開けなかったときの案内。
-   *
-   * 不正・存在しない・別アカウント・選択中と違うアカウントのIDでも
-   * 別人を開かず、空のまま理由と戻り先を出す(#673)。
-   */
-  const [deepLinkNotice, setDeepLinkNotice] = useState('')
-  /** URL由来で開こうとしているID。手選びと区別するための目印。 */
-  const deepLinkIdRef = useRef<string | null>(null)
-  /**
-   * URL指定の解決の世代。遅い友だち照会が、新しいURLやアカウント切替で
-   * 始まった解決を上書きしないようにする(#673)。
-   */
-  const deepLinkRequestIdRef = useRef(0)
-  /**
-   * メールの問い合わせ。LINEのトークと同じ一覧に混ぜる。
-   *
-   * 設計 `V2 2-1 受信箱` の一覧は「✉ 定期便の解約について」のように
-   * メールも同じ並びに入っている。出どころで場所を分けると、
-   * 返信を待っている人を2か所で探すことになる。
-   */
-  const [emailItems, setEmailItems] = useState<EmailInboxItem[]>([])
-  /*
-   * メール一覧だけの失敗表示。LINE側の `error` とは別にする。
-   * 以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
-   * 成功したら消す。ふだんは何も出ない。
-   */
-  const [emailError, setEmailError] = useState('')
-  // 初回・条件変更時の取得中。追加読み込みとは分け、0件表示を先走らせない。
-  const [emailLoading, setEmailLoading] = useState(true)
+
+  const { selectedAccountId, loading: accountsLoading } = useAccount()
+
   // 中央ペインで開いているメール。LINEのトークと排他。
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
+
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
-  const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null)
-  /* G2：会話の要約と返信案（l1i3v）。AI を使っていない店では何も出さない。 */
-  const inboxAi = useInboxAi(chatDetail?.id ?? null, selectedAccountId, chatDetail?.messages)
+
   /*
    * URLの `?status=` で絞り込み済みの受信箱を開けるようにする（IDEA-01）。
    * ダッシュボードの「対応が必要な受信」は `?status=unread` でここへ来る。
@@ -371,264 +70,28 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (params.get('unanswered') === '1' || params.get('unanswered') === 'true') return 'unread'
     return 'all'
   })
+
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
+
   const [assigneeFilter, setAssigneeFilter] = useState('all')
+
   const [filterOpen, setFilterOpen] = useState(false)
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+
   const [unreadOnly, setUnreadOnly] = useState(false)
+
   // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
   // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
   const [nameQuery, setNameQuery] = useState('')
-  const [debouncedNameQuery, setDebouncedNameQuery] = useState('')
-  const [savedViews, setSavedViews] = useState<InboxSavedView[]>([])
-  const [savedViewsOpen, setSavedViewsOpen] = useState(false)
-  const [savedViewMenuId, setSavedViewMenuId] = useState<string | null>(null)
-  const [savedViewName, setSavedViewName] = useState('')
-  const [savedViewError, setSavedViewError] = useState('')
-  const [savingView, setSavingView] = useState(false)
-  const [savedViewSuccess, setSavedViewSuccess] = useState(false)
-  /*
-   * savedViews が「どのアカウント分」か。アカウント切替で一覧が
-   * 取り直される間、前のアカウントの一覧でURLのIDを誤適用しない(N-021)。
-   */
-  const [savedViewsAccountId, setSavedViewsAccountId] = useState<string | null>(null)
-  // URLの保存検索IDが見つからなかったときの案内。適用せず既定条件へ戻したことを伝える。
-  const [savedViewNotice, setSavedViewNotice] = useState('')
-  // 担当の選択肢（設計 `TalkPane` の「担当」）。
-  const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
-  /*
-    保存した検索の要約で、担当者IDを名前にするための対応表。
-    **引けないときは名前を作らない**——`savedViewSummary` が人数で言う。
-  */
-  const operatorNames = useMemo(
-    () => new Map(operators.map((operator) => [operator.id, operator.name])),
-    [operators],
-  )
 
-  /*
-    担当者ごとの未読数（設計 `YZaDK`）。**画面に見えている行から数えない**——
-    一覧はページ送りされるので、2ページ目の未読が落ちる。
-    `null` は「まだ読めていない」。**実値0とは別。**
-  */
-  const [assigneeUnread, setAssigneeUnread] = useState<InboxStats['assigneeUnread'] | null>(null)
-  /*
-   * INBOX-09: 札の件数。「どの条件に対する応答か」を key で結び付け、
-   * 条件を変えた直後に古い条件の件数が出ないようにする。
-   */
-  const [quickCounts, setQuickCounts] = useState<{
-    key: string
-    counts: { all: number; reply: number; overdue: number }
-  } | null>(null)
-  const quickCountsRequestRef = useRef(0)
-  const [assigneeUnreadStatus, setAssigneeUnreadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  /*
-   * 顧客情報の開閉(#982 LAY-01/LAY-02)。
-   *
-   * 3列に収まる幅（`INBOX_INFO_PANEL_MIN_VIEWPORT`＝1536px〜）では右列と
-   * して常設し、既定は開く。それより狭い幅ではトークの上に重ねる
-   * ドロワーにし、既定は閉じる——開きっぱなしだと返信の本文が隠れる。
-   * 以前は `hidden xl:block` で1280px未満は常に非表示で、開閉ボタンを
-   * 押しても何も出なかった。
-   *
-   * `friendInfoChoice` は運用者が明示的に開閉したときだけ値を持つ。
-   * 未操作のあいだは `wideInfoPanel`（現在の画面幅）に従うので、
-   * 幅を変えても入力中の文章や選択中の相手を失わない。
-   */
-  const [wideInfoPanel, setWideInfoPanel] = useState(false)
-  const [friendInfoChoice, setFriendInfoChoice] = useState<boolean | null>(null)
-  const panesRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const panel = panesRef.current
-    if (panel && typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver(([entry]) => setWideInfoPanel(entry.contentRect.width >= INBOX_INFO_PANEL_MIN_WIDTH))
-      observer.observe(panel)
-      return () => observer.disconnect()
-    }
-    const media = window.matchMedia('(min-width: 1440px)')
-    const sync = () => setWideInfoPanel(media.matches)
-    sync()
-    media.addEventListener('change', sync)
-    return () => media.removeEventListener('change', sync)
-  }, [])
-  const showFriendInfo = friendInfoChoice ?? wideInfoPanel
-  const setShowFriendInfo = (next: boolean | ((current: boolean) => boolean)) => {
-    setFriendInfoChoice((current) => (typeof next === 'function' ? next(current ?? wideInfoPanel) : next))
-  }
-  /*
-   * ドロワーで開いているあいだは Escape で閉じられるようにし、
-   * 開いた時点でフォーカスをパネルへ移す。常設の列（広い幅）では
-   * 開閉ボタンがいつも見えているので、この扱いはドロワーだけにする。
-   */
-  const customerPanelRef = useRef<HTMLElement | null>(null)
-  useEffect(() => {
-    if (!showFriendInfo || wideInfoPanel) return
-    customerPanelRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setFriendInfoChoice(false)
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [showFriendInfo, wideInfoPanel])
   // 送信の細かい設定。既定は畳む。出しっぱなしだと入力欄が縦に伸びて
   // トークが読めなくなる。
   const [showComposerOptions, setShowComposerOptions] = useState(false)
-  const [showMemoEditor, setShowMemoEditor] = useState(false)
-  const [memoDraft, setMemoDraft] = useState('')
-  const [memoSaving, setMemoSaving] = useState(false)
-  const [memoError, setMemoError] = useState('')
+
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+
   // G-4: ピッカーで「まとめて選ぶ」で選んだ本文たち。送る前に確認する。
   const [pendingPack, setPendingPack] = useState<{ texts: string[]; chatId: string; accountId: string | null; revision?: number } | null>(null)
-  useEffect(() => { setPendingPack(null); setImagePreviewOpen(false) }, [selectedChatId, selectedAccountId])
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const [imageError, setImageError] = useState('')
-  /*
-   * INBOX-23: 画像の準備(アップロード)結果は「選んだ会話」にだけ返す。
-   * 完了を待つ間に別の会話・アカウントへ切り替わっても、今開いている
-   * 入力欄へ書かない。進行中・失敗・添付済みも会話ごとに預かる。
-   * 同一会話での選び直し・「外す」は世代を進めて古い結果を捨てる。
-   */
-  const imageJobGenRef = useRef(new Map<string, number>())
-  const imageErrorDraftsRef = useRef(new Map<string, string>())
-  const imageMetaDraftsRef = useRef(new Map<string, { name: string; size: number }>())
-  const [imageBusyKeys, setImageBusyKeys] = useState<ReadonlySet<string>>(new Set())
-  const [pendingImageMeta, setPendingImageMeta] = useState<{ name: string; size: number } | null>(null)
-  const pendingImageMetaRef = useRef(pendingImageMeta)
-  pendingImageMetaRef.current = pendingImageMeta
-  const imageErrorRef = useRef(imageError)
-  imageErrorRef.current = imageError
-  const [imagePreviewOpen, setImagePreviewOpen] = useState(false)
 
-  /**
-   * 画像を1枚選ぶ。
-   *
-   * **1MB まで。** LINE はプレビュー用の画像が1MBまでで、ここは元画像と
-   * プレビューに同じURLを渡している。10MB と書いてあった案内は、
-   * 実際には1MBで弾かれるので直した。
-   */
-  const handlePickImage = async (file: File) => {
-    // 選んだ時点のアカウント＋会話を固定する(INBOX-23)。完了時に
-    // どこへ出すかはこの鍵で決め、今開いている会話へは直接書かない。
-    const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
-    const reportError = (message: string) => {
-      imageErrorDraftsRef.current.set(ownerKey, message)
-      if (draftOwnerKeyRef.current === ownerKey) setImageError(message)
-    }
-    if (!['image/jpeg', 'image/png'].includes(file.type)) {
-      reportError('JPEG か PNG を選んでください')
-      return
-    }
-    if (file.size > 1024 * 1024) {
-      reportError('1MB 以下にしてください')
-      return
-    }
-    const generation = (imageJobGenRef.current.get(ownerKey) ?? 0) + 1
-    imageJobGenRef.current.set(ownerKey, generation)
-    imageErrorDraftsRef.current.delete(ownerKey)
-    if (draftOwnerKeyRef.current === ownerKey) setImageError('')
-    setImageBusyKeys((prev) => new Set(prev).add(ownerKey))
-    try {
-      const res = await api.uploads.image(file)
-      // 取消・別の画像への選び直しが済んでいれば、この結果は捨てる。
-      if (imageJobGenRef.current.get(ownerKey) !== generation) return
-      if (!res.success) {
-        // 準備(アップロード)の失敗であり、相手への送信は始まっていない
-        // (INBOX-31)。「送れなかった」とは言わない。
-        reportError('画像を添付できませんでした。選び直してください')
-        return
-      }
-      const value: ImageUploaderValue = {
-        mode: 'line-image',
-        originalContentUrl: res.data.url,
-        previewImageUrl: res.data.url,
-      }
-      imageDraftsRef.current.set(ownerKey, value)
-      imageMetaDraftsRef.current.set(ownerKey, { name: file.name, size: file.size })
-      if (draftOwnerKeyRef.current === ownerKey) {
-        setPendingImage(value)
-        setPendingImageMeta({ name: file.name, size: file.size })
-      }
-    } catch {
-      if (imageJobGenRef.current.get(ownerKey) !== generation) return
-      reportError('画像を添付できませんでした。選び直してください')
-    } finally {
-      setImageBusyKeys((prev) => {
-        const next = new Set(prev)
-        next.delete(ownerKey)
-        return next
-      })
-    }
-  }
-
-  /*
-   * ★V8 B-6（M0393「7. 添付」I7Skn）：クリップ・ドラッグで選んだもの。
-   * 画像は今までの画像の準備へ渡す（1MB・送り方も同じ）。動画・ファイルは受信箱の添付の口
-   * （API-15）へ先にアップロードし、書く欄の上の札で 準備中・済み・失敗（理由＋もう一度試す）を見せる。
-   * 画像と同じく「アカウント＋会話」ごとに預かり、切り替えても前の会話の結果を今の欄へ書かない。
-   */
-  type PendingAttachment = PendingAttachmentView & { file: File; job: number; attachment?: ChatAttachment }
-  const attachDraftsRef = useRef(new Map<string, PendingAttachment>())
-  const attachJobRef = useRef(0)
-  const [pendingAttachment, setPendingAttachment] = useState<PendingAttachment | null>(null)
-  const pendingAttachmentRef = useRef(pendingAttachment)
-  pendingAttachmentRef.current = pendingAttachment
-  const putAttachment = (ownerKey: string, value: PendingAttachment | null) => {
-    if (value) attachDraftsRef.current.set(ownerKey, value)
-    else attachDraftsRef.current.delete(ownerKey)
-    if (draftOwnerKeyRef.current === ownerKey) setPendingAttachment(value)
-  }
-  const uploadAttachment = async (ownerKey: string, chatId: string, file: File, kind: 'video' | 'file') => {
-    attachJobRef.current += 1
-    const job = attachJobRef.current
-    const base = { kind, name: file.name, size: file.size, file, job }
-    putAttachment(ownerKey, { ...base, status: 'uploading' })
-    try {
-      const res = await api.chats.attachments.upload(chatId, file)
-      if (attachDraftsRef.current.get(ownerKey)?.job !== job) return
-      if (!res.success) throw new ApiError(400, res.error ?? '')
-      putAttachment(ownerKey, { ...base, status: 'ready', attachment: res.data })
-    } catch (uploadError) {
-      if (attachDraftsRef.current.get(ownerKey)?.job !== job) return
-      putAttachment(ownerKey, { ...base, status: 'failed', error: describeUploadFailure(uploadError) })
-    }
-  }
-  const handlePickAttachment = async (file: File, slot?: AttachSlot) => {
-    const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
-    const check = checkAttachment(file, slot)
-    if (!check.ok) {
-      // 大きすぎる・送れない形式はその場で理由を出す（アップロードしない）。
-      imageErrorDraftsRef.current.set(ownerKey, check.reason)
-      if (draftOwnerKeyRef.current === ownerKey) setImageError(check.reason)
-      return
-    }
-    if (check.kind === 'image') return handlePickImage(file)
-    if (!selectedChatId) return
-    imageErrorDraftsRef.current.delete(ownerKey)
-    if (draftOwnerKeyRef.current === ownerKey) setImageError('')
-    await uploadAttachment(ownerKey, selectedChatId, file, check.kind)
-  }
-  const retryAttachment = () => {
-    const current = pendingAttachmentRef.current
-    if (!current || !selectedChatId) return
-    void uploadAttachment(draftKeyOf(selectedAccountId, selectedChatId), selectedChatId, current.file, current.kind)
-  }
-  const clearPendingAttachment = () => {
-    putAttachment(draftKeyOf(selectedAccountId, selectedChatId), null)
-  }
-  const [dropOver, setDropOver] = useState(false)
-
-  /** 添付を外す。読み込み中の結果が遅れて届いても復活しないよう世代を進める。 */
-  const clearPendingImage = () => {
-    const ownerKey = draftKeyOf(selectedAccountId, selectedChatId)
-    imageJobGenRef.current.set(ownerKey, (imageJobGenRef.current.get(ownerKey) ?? 0) + 1)
-    imageDraftsRef.current.delete(ownerKey)
-    imageMetaDraftsRef.current.delete(ownerKey)
-    imageErrorDraftsRef.current.delete(ownerKey)
-    setPendingImage(null)
-    setPendingImageMeta(null)
-    setImageError('')
-  }
-  const statusFilterRef = useRef<StatusFilter>('all')
   // Send mode: 'enter' = Enter sends, Shift+Enter = newline; 'shift-enter' = reverse
   /*
    * 送信キーの初期値は Shift + Enter。**選び直せる。**
@@ -639,76 +102,37 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * メール側（email-thread.tsx）も同じ置き場・同じ既定。
    */
   const [sendMode, setSendMode] = useState<'enter' | 'shift-enter'>('shift-enter')
-  const [loading, setLoading] = useState(true)
-  // 送信や詳細取得の error と混ぜず、一覧0件と一覧障害を判別する。
-  const [chatListFailed, setChatListFailed] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMoreChats, setHasMoreChats] = useState(false)
-  const [detailLoading, setDetailLoading] = useState(false)
-  const [attentionSaving, setAttentionSaving] = useState(false)
+
   const [error, setError] = useState('')
-  const [messageContent, setMessageContent] = useState('')
-  const [pendingImage, setPendingImage] = useState<ImageUploaderValue | null>(null)
+
   const [sending, setSending] = useState(false)
+
   // N-025: 引用返信。会話の中の1件を引用して返す。
   const [quotedMessage, setQuotedMessage] = useState<ChatDetailMessage | null>(null)
+
   /* 訂正：送ったあとは取り消せない。間違えた吹き出しの［訂正を送る］から、見本の文と引用を入れて人が送る。 */
   const [correctingId, setCorrectingId] = useState<string | null>(null)
+
   const staffRole = useStaffRole()
+
   /* 送り手（G8）：選ぶと、お客さまの LINE でメッセージの上に出る名前と顔が変わる。空は店の名前。 */
   const [senderId, setSenderId] = useState('')
-  // N-025: 送信予約。JSTの datetime-local 値をそのまま口へ渡し、
-  // 保存はサーバー側でUTCへ正規化される。
-  const [scheduledSends, setScheduledSends] = useState<ScheduledChatSend[]>([])
-  // 予約一覧の取得失敗は「予約なし」と分けて持つ。0件のまま黙ると、
-  // 消えたわけではない予約を送り忘れる(#962 F07)。
-  const [scheduledSendsFailed, setScheduledSendsFailed] = useState(false)
-  const [scheduleInput, setScheduleInput] = useState('')
-  const [showSchedulePanel, setShowSchedulePanel] = useState(false)
-  const [scheduling, setScheduling] = useState(false)
-  const sendLockRef = useRef(false)
-  const sendKeysRef = useRef(new IdempotencyKeyStore())
-  // 予約送信の多重実行ロック。state の scheduling は描画を待つため、
-  // 同じ tick の二度押しを止めるには ref が要る(sendLockRef と同じ型・#965)。
-  const scheduleLockRef = useRef(false)
-  const [isMessageInputFocused, setIsMessageInputFocused] = useState(false)
-  const isComposingRef = useRef(false)
-  const messagesScrollRef = useRef<HTMLDivElement | null>(null)
-  const listScrollRef = useRef<HTMLDivElement | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  /*
-   * INBOX-27: スクロール位置の決め方を分けるための記録。
-   * - stickToBottomRef: いま下端にいるか。下端にいる間だけ新着へ追従する。
-   * - prevMessageWindowRef: 前回描いた会話・最後尾・件数。追加か切替かを判別する。
-   * - unseenIncoming: 読んでいる途中に下へ届いた相手からの新着件数。
-   */
-  const stickToBottomRef = useRef(true)
-  const prevMessageWindowRef = useRef<{ chatId: string; lastId: string | null; count: number } | null>(null)
-  const [unseenIncoming, setUnseenIncoming] = useState(0)
-  // U008: 狭い幅で切れた宛先名を、その場で全文に広げるための状態。
-  const [headerNameExpanded, setHeaderNameExpanded] = useState(false)
-  // 会話を変えたら広げた表示も元へ戻す。
-  useEffect(() => {
-    setHeaderNameExpanded(false)
-    setUnseenIncoming(0)
-    stickToBottomRef.current = true
-  }, [selectedChatId])
 
-  // ページング用カーソル。表示リストは楽観更新で並び替わるため、
-  // 「サーバから最後に受け取った行」を ref で保持して次ページの起点にする
-  // (offset 方式だと新着で行が押し下げられた分が欠落する)。
-  const nextCursorRef = useRef<ListCursor | null>(null)
-  /*
-   * 「さらに読み込む」で足したページがあるか。定期の取り直しは1ページ目だけを
-   * 取るので、足したあとにカーソルを1ページ目の末尾へ戻すと、次の「さらに
-   * 読み込む」が読み済みの2ページ目を取り直して何も増えない（2026-10-07 測って
-   * 見つけた。10,000 件の見本で、5秒ごとに押しても 400 件から先へ進まなかった）。
-   */
-  const extraPagesLoadedRef = useRef(false)
+  const sendLockRef = useRef(false)
+
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
+
+
+  const isComposingRef = useRef(false)
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
   // 会話を素早く切り替えたとき、前の会話の遅い応答で現在の詳細を
   // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
   const detailRequestIdRef = useRef(0)
+
   const detailAccountRef = useRef(selectedAccountId)
+
   /*
    * いま画面で開いている会話ID。通信の応答が「どの会話へ向けたものか」を
    * 照合するために描画のたびに同期する（listFilterKeyRef と同じ型）。
@@ -716,244 +140,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 止める(#962 F03/F06/F07)。
    */
   const selectedChatIdRef = useRef<string | null>(selectedChatId)
+
   selectedChatIdRef.current = selectedChatId
-  /*
-   * 入力中の下書き(本文・添付画像)は「アカウント＋会話」ごとに預かる
-   * (#962 F06)。切替のたびに消すと、送信応答を待つ間に別の会話を
-   * 開いただけで書きかけが消える。預かった下書きは送信した版だけを
-   * 破棄し、追記・差し替えされた版は残す(dropSentDraft)。
-   */
-  const messageContentRef = useRef(messageContent)
-  messageContentRef.current = messageContent
-  const pendingImageRef = useRef(pendingImage)
-  pendingImageRef.current = pendingImage
-  const messageDraftsRef = useRef(new Map<string, string>())
-  const imageDraftsRef = useRef(new Map<string, ImageUploaderValue>())
-  const draftOwnerKeyRef = useRef(draftKeyOf(selectedAccountId, selectedChatId))
-  // 保存検索一覧の取得がどのアカウントに向けたものか。切替中に遅れて届いた
-  // 旧アカウントの応答で、新しいアカウントの一覧を上書きしない(N-021)。
-  const savedViewsRequestAccountRef = useRef<string | null>(null)
-  /*
-   * 処理済みのURL savedView値。router.replace の反映より描画が先に走る
-   * 隙間に、復元効果が同じIDをもう一度適用して手動の条件変更を
-   * 上書きするのを防ぐ(N-021)。
-   */
-  const savedViewConsumedRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    /*
-     * #625: サーバーへ送る検索語は上限へ切り詰める。入力欄の maxLength に
-     * 頼るだけだと、保存した検索の復元など欄を通らない経路で長い語が
-     * そのまま出ていく。
-     */
-    const timer = window.setTimeout(() => setDebouncedNameQuery(clampSearchQuery(nameQuery.trim())), 250)
-    return () => window.clearTimeout(timer)
-  }, [nameQuery])
-
-  /* 返事の期限（G3）。店が期限を使っているときだけ、札・期限超過の数・期限が近い順の並びを出す。読めなければ今までの形のまま。 */
-  const [slaEnabled, setSlaEnabled] = useState(false)
-  const [overdueTotal, setOverdueTotal] = useState<number | null>(null)
-  const [slaReload, setSlaReload] = useState(0)
-  useEffect(() => {
-    setSlaEnabled(false); setOverdueTotal(null)
-    if (!selectedAccountId) return
-    let live = true
-    void inboxRoutingApi.get(selectedAccountId).then((res) => { if (live) setSlaEnabled(Boolean(res.data.enabled)) }, () => {})
-    return () => { live = false }
-  }, [selectedAccountId, slaReload])
-
-  const buildListParams = useCallback((cursor: ListCursor | null) => {
-    const params: {
-      status?: string; accountId?: string; q?: string;
-      operatorId?: string; unreadOnly?: boolean; quickFilter?: 'reply' | 'overdue';
-      limit?: number; beforeUnread?: 0 | 1; beforeAt?: string; beforeId?: string;
-    } = {}
-    if (statusFilter !== 'all') params.status = statusFilter
-    if (selectedAccountId) params.accountId = selectedAccountId
-    if (debouncedNameQuery) params.q = debouncedNameQuery
-    if (assigneeFilter !== 'all') params.operatorId = assigneeFilter
-    if (unreadOnly) params.unreadOnly = true
-    if (quickFilter !== 'all') params.quickFilter = quickFilter
-    /* 返事の期限を使う店：「期限超過」は旧い「1時間以上待ち」の絞りを使わない。期限の絞り・並びは読んだ行の slaState・slaDueAt で行う。 */
-    if (slaEnabled && quickFilter === 'overdue') delete params.quickFilter
-    params.limit = CHAT_PAGE_SIZE
-    if (cursor) {
-      params.beforeUnread = cursor.unread
-      params.beforeAt = cursor.at
-      params.beforeId = cursor.id
-    }
-    return params
-  }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled])
-
-  // Compare at render time too: an old request can finish before the next effect runs.
-  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled])
-  const listFilterKeyRef = useRef(listFilterKey)
-  listFilterKeyRef.current = listFilterKey
-  const chatListRequestRef = useRef(0)
-  const emailListRequestRef = useRef(0)
-  const emailMoreLockRef = useRef(false)
-  // 描画中の条件と、各一覧が最後まで取得できた条件を結び付ける。
-  // useEffect が loading を立てる前の1描画でも、旧条件の0件を新条件の0件と誤認しない。
-  const [chatListCompletedKey, setChatListCompletedKey] = useState<string | null>(null)
-  /* 上の「期限超過 N」。一覧と同じ口（期限超過の絞り込み）の総数を使う。行数とは別に数えさせる。 */
-  useEffect(() => {
-    if (!slaEnabled || !selectedAccountId) { setOverdueTotal(null); return }
-    let live = true
-    void inboxRoutingApi.listByDeadline(selectedAccountId, { overdue: true, limit: 1 }).then((res) => { if (live) setOverdueTotal(res.total) }, () => { if (live) setOverdueTotal(null) })
-    return () => { live = false }
-  }, [slaEnabled, selectedAccountId, chatListCompletedKey])
-  const [emailListCompletedKey, setEmailListCompletedKey] = useState<string | null>(null)
-
-  // メール一覧の1ページ件数。上限200切りっぱなしだった offset なし取得を、
-  // LINE側と同じく「さらに読み込む」で遡れるようにする。
-  const EMAIL_PAGE_SIZE = 200
-  const [loadingMoreEmails, setLoadingMoreEmails] = useState(false)
-  const [hasMoreEmails, setHasMoreEmails] = useState(false)
-
-  /** メールの問い合わせを取る。LINEと同じ一覧に混ぜるため。 */
-  const loadEmails = useCallback(async (offset = 0, append = false) => {
-    const requestId = append ? emailListRequestRef.current : ++emailListRequestRef.current
-    if (append) {
-      if (emailMoreLockRef.current) return
-      emailMoreLockRef.current = true
-      setLoadingMoreEmails(true)
-    } else {
-      setEmailItems([])
-      setHasMoreEmails(false)
-      emailMoreLockRef.current = false
-      setLoadingMoreEmails(false)
-      setEmailLoading(true)
-      setEmailError('')
-    }
-    try {
-      // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
-      const res = await withRequestTimeout(fetchApi<{
-        success: boolean
-        data: { items: EmailInboxItem[]; summary?: { total: number } }
-      }>(
-        `/api/support/inbox?${buildSupportEmailInboxQuery({
-          status: statusFilter,
-          query: debouncedNameQuery,
-          limit: EMAIL_PAGE_SIZE,
-          offset,
-          assignee: assigneeFilter,
-          unreadOnly,
-          quickFilter: quickFilter === 'all' ? undefined : quickFilter,
-        })}`,
-      ))
-      if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
-      if (res.success && res.data && Array.isArray(res.data.items)) {
-        setEmailError('')
-        if (append) {
-          const rows = res.data.items
-          setEmailItems((prev) => {
-            const seen = new Set(prev.map((e) => e.id))
-            return [...prev, ...rows.filter((r) => !seen.has(r.id))]
-          })
-          setHasMoreEmails(offset + rows.length < (res.data.summary?.total ?? offset + rows.length))
-        } else {
-          setEmailItems(res.data.items)
-          setHasMoreEmails(res.data.items.length >= EMAIL_PAGE_SIZE
-            && res.data.items.length < (res.data.summary?.total ?? res.data.items.length + 1))
-        }
-      } else {
-        // 口が success:false を返したときも、0件と区別できるよう失敗を出す。
-        setEmailError('メールの読み込みに失敗しました。')
-        }
-    } catch {
-      if (listFilterKeyRef.current !== listFilterKey || emailListRequestRef.current !== requestId) return
-      // メールが出ないだけ。LINEのトークは使えるが、0件と区別できるよう失敗を出す。
-      setEmailError('メールの読み込みに失敗しました。')
-    } finally {
-      if (append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
-        emailMoreLockRef.current = false
-        setLoadingMoreEmails(false)
-      }
-      if (!append && listFilterKeyRef.current === listFilterKey && emailListRequestRef.current === requestId) {
-        setEmailListCompletedKey(listFilterKey)
-        setEmailLoading(false)
-      }
-    }
-  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey])
-
-  useEffect(() => {
-    void loadEmails()
-  }, [loadEmails])
-
-  const loadChats = useCallback(async () => {
-    const requestId = ++chatListRequestRef.current
-    setChats([])
-    nextCursorRef.current = null
-    extraPagesLoadedRef.current = false
-    setHasMoreChats(false)
-    setLoadingMore(false)
-    setLoading(true)
-    setChatListFailed(false)
-    setError('')
-    try {
-      // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
-      const chatRes = await withRequestTimeout(api.chats.list(buildListParams(null)))
-      if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
-      if (chatRes.success) {
-        setChatListFailed(false)
-        const rows = chatRes.data
-        setChats(rows)
-        const last = rows[rows.length - 1]
-        nextCursorRef.current = toListCursor(last)
-        // ページ丁度いっぱい返ってきた = 続きがある可能性が高い
-        setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
-      } else {
-        // 一覧の失敗は一覧の中の失敗行(再読み込みボタンつき)が伝える。
-        // 上部の汎用 error は送信・詳細など別の操作の失敗に使う(N-030)。
-        setChatListFailed(true)
-      }
-    } catch {
-      if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
-      setChatListFailed(true)
-    } finally {
-      if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) {
-        setChatListCompletedKey(listFilterKey)
-        setLoading(false)
-      }
-    }
-  }, [buildListParams, listFilterKey])
-
-  // 「さらに読み込む」— サーバ由来カーソルの続きを取得して末尾に追加する。
-  // 楽観更新との競合に備えて既存 id は除外し、重複表示を防ぐ。
-  const loadMoreChats = useCallback(async () => {
-    if (loadingMore) return
-    const cursor = nextCursorRef.current
-    if (!cursor) {
-      setHasMoreChats(false)
-      return
-    }
-    setLoadingMore(true)
-    const requestId = chatListRequestRef.current
-    try {
-      // #625: 応答なしの要求は時間切れの失敗にし、読み込み中を残さない。
-      const chatRes = await withRequestTimeout(api.chats.list(buildListParams(cursor)))
-      if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
-      if (chatRes.success) {
-        const rows = chatRes.data
-        setChats((prev) => {
-          const seen = new Set(prev.map((c) => c.id))
-          return [...prev, ...rows.filter((r) => !seen.has(r.id))]
-        })
-        const last = rows[rows.length - 1]
-        nextCursorRef.current = toListCursor(last)
-        extraPagesLoadedRef.current = true
-        setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
-      }
-    } catch {
-      if (listFilterKeyRef.current !== listFilterKey || chatListRequestRef.current !== requestId) return
-      setError('チャットの追加読み込みに失敗しました。')
-    } finally {
-      if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoadingMore(false)
-    }
-  }, [loadingMore, buildListParams, listFilterKey])
-
-  // Keep refs in sync so setChats updater can read the latest filter without stale closure
-  useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
 
   // Load/save sendMode preference (guarded — privacy-restricted browsers throw)
   useEffect(() => {
@@ -963,150 +151,221 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     } catch { /* localStorage unavailable */ }
   }, [])
 
-  /*
-    保存検索の条件を画面の絞り込みへ写す。戻り値は条件が指す channel。
-    ドロップダウンからの適用と、URLからの復元の両方が同じ手順を使う(N-021)。
+  useEffect(() => {
+    try { localStorage.setItem('chat.sendMode', sendMode) } catch { /* ignore */ }
+  }, [sendMode])
 
-    **形を確かめてから読む。** 受信箱より前に作られた行は
-    `{ all: [], any: [] }` の形で入っていて、`conditions.statuses.length` を
-    そのまま読むと受信箱ごと真っ白になる。
-  */
-  const applySavedViewConditions = useCallback((view: InboxSavedView): 'all' | 'line' | 'email' => {
-    const conditions = normalizeSavedViewConditions(view.conditions)
-    setNameQuery(clampSearchQuery(conditions.query ?? ''))
-    setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
-    setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
-    /*
-      N-020: 保存時の絞り込みをそのまま戻す。以前は due だけを見て
-      「要返信」が「すべて」へ潰れ、未読だけ表示も落ちていた。
-      古い行の quickFilter は normalizeSavedViewConditions が due から復元済み。
-    */
-    setQuickFilter(conditions.quickFilter)
-    setUnreadOnly(conditions.unread === 'mine')
-    return conditions.channels.length === 1 ? conditions.channels[0] : 'all'
-  }, [])
+  // 状態の切り替えの5つの押し場所。選んでいる所だけ Tab で止まる
+  // （ラジオの決まり）。左右・先頭・末尾のキーで選ぶ。
+  const statusFilterButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
 
-  /*
-    手で条件を変えたら、URLの savedView は現在の条件を指さなくなる。
-    残すと再読込・URL共有で古い条件が復活するので外す(N-021)。
-    channel・friend・thread など他の指定はそのまま残す。
-  */
-  const dropSavedViewParam = useCallback(() => {
-    const current = params.get(SAVED_VIEW_URL_KEY)
-    if (!current) return
-    // URLの更新が届くまでの間に復元効果が同じIDを再適用しないよう、
-    // 外す時点で処理済みにする(N-021)。
-    savedViewConsumedRef.current = current
-    const next = new URLSearchParams(params.toString())
-    next.delete(SAVED_VIEW_URL_KEY)
-    const text = next.toString()
-    router.replace(text ? `/chats?${text}` : '/chats')
-  }, [params, router])
+  const hasInboxFilters = Boolean(
+    nameQuery.trim()
+    || statusFilter !== 'all'
+    || quickFilter !== 'all'
+    || assigneeFilter !== 'all'
+    || unreadOnly,
+  )
 
-  const loadSavedViews = useCallback(async () => {
-    const accountId = selectedAccountId
-    // 切替中に前のアカウントの応答が遅れて届いても、新しい一覧を上書きしない。
-    savedViewsRequestAccountRef.current = accountId
-    if (!accountId) {
-      setSavedViews([])
-      setSavedViewsAccountId(null)
-      return
-    }
+  const {
+    imageInputRef,
+    imageError,
+    pendingImageMeta,
+    setPendingImageMeta,
+    imagePreviewOpen,
+    setImagePreviewOpen,
+    attachDraftsRef,
+    pendingAttachment,
+    putAttachment,
+    handlePickAttachment,
+    retryAttachment,
+    clearPendingAttachment,
+    dropOver,
+    setDropOver,
+    clearPendingImage,
+    messageContent,
+    setMessageContent,
+    pendingImage,
+    setPendingImage,
+    pendingImageRef,
+    dropSentDraft,
+    imageUploading,
+  } = useInboxDraft({
+    selectedAccountId,
+    selectedChatId,
+  })
+
+  useEffect(() => { setPendingPack(null); setImagePreviewOpen(false) }, [selectedChatId, selectedAccountId, setImagePreviewOpen])
+
+  // INBOX-29: 上限を超えた本文は送らせない(下書きは消さない)。
+  const messageLength = messageContent.length
+
+  const messageOverLimit = messageLength > MESSAGE_MAX_LENGTH
+
+  const {
+    chats,
+    setChats,
+    emailItems,
+    setEmailItems,
+    emailError,
+    emailLoading,
+    debouncedNameQuery,
+    setDebouncedNameQuery,
+    statusFilterRef,
+    loading,
+    chatListFailed,
+    loadingMore,
+    hasMoreChats,
+    listScrollRef,
+    slaEnabled,
+    overdueTotal,
+    setSlaReload,
+    listFilterKey,
+    chatListCompletedKey,
+    emailListCompletedKey,
+    loadingMoreEmails,
+    hasMoreEmails,
+    loadEmails,
+    loadChats,
+    loadMoreChats,
+    loadChatsQuietly,
+  } = useInboxLists({
+    CHAT_PAGE_SIZE,
+    EMAIL_PAGE_SIZE,
+    nameQuery,
+    selectedAccountId,
+    statusFilter,
+    assigneeFilter,
+    unreadOnly,
+    quickFilter,
+    setError,
+  })
+
+  // 入力からdebounce反映までを「0件」と断定しない。古い条件の結果が一瞬見えるため。
+  const nameQueryPending = nameQuery.trim() !== debouncedNameQuery
+
+  const currentFilterNotLoaded = (channel !== 'email' && chatListCompletedKey !== listFilterKey)
+    || (channel !== 'line' && emailListCompletedKey !== listFilterKey)
+
+  const inboxListLoading = nameQueryPending
+    || currentFilterNotLoaded
+    || (channel !== 'email' && loading)
+    || (channel !== 'line' && emailLoading)
+
+  const inboxListFailed = (channel !== 'email' && chatListFailed)
+    || (channel !== 'line' && Boolean(emailError))
+
+  const {
+    scheduledSends,
+    scheduledSendsFailed,
+    scheduleInput,
+    setScheduleInput,
+    showSchedulePanel,
+    setShowSchedulePanel,
+    scheduling,
+    loadScheduledSends,
+    handleScheduleSend,
+    handleCancelScheduled,
+  } = useInboxSchedule({
+    detailAccountRef,
+    selectedChatIdRef,
+    selectedChatId,
+    messageContent,
+    pendingImage,
+    pendingAttachment,
+    setError,
+    selectedAccountId,
+    dropSentDraft,
+    pendingImageRef,
+    setPendingImage,
+    setPendingImageMeta,
+    attachDraftsRef,
+    putAttachment,
+    setMessageContent,
+    quotedMessage,
+    sendKeysRef,
+    setQuotedMessage,
+  })
+
+  /** 予約時刻の変更。datetime-local の JST 値はオフセットを付けて口へ渡す(INBOX-21)。 */
+  const handleReschedule = async (scheduleId: string, nextAt: string) => {
+    if (!selectedChatId || !nextAt) return
     try {
-      const response = await api.chats.savedViews.list(accountId)
-      if (savedViewsRequestAccountRef.current !== accountId) return
-      if (response.success) {
-        setSavedViews(response.data.map((view) => ({
-          ...view,
-          conditions: normalizeSavedViewConditions(view.conditions),
-        })))
-        setSavedViewsAccountId(accountId)
-      }
-    } catch {
-      if (savedViewsRequestAccountRef.current !== accountId) return
-      setSavedViewError('保存した検索を読み込めませんでした')
-    }
-  }, [selectedAccountId])
-
-  useEffect(() => {
-    void loadSavedViews()
-  }, [loadSavedViews])
-
-  /*
-    URLの `savedView=<id>` を、いま選んでいるアカウントの保存検索へ照合して復元する(N-021)。
-
-    - 一覧はアカウントごとに取り直す。現在のアカウント分が届くまでは
-      何もしない。届く前に前のアカウントの一覧で探すと、別アカウントの
-      IDを誤って適用する。
-    - IDが見つからない（削除済み・別アカウント・不正）ときは適用せず、
-      既定条件へ戻して案内し、URLからも外す。残すと再読込のたびに
-      同じ案内が出る。
-    - 見つかったときは条件を写す。保存された channel が今と違えば
-      URL側をそろえる（channel はURLが正本）。
-    - 手で条件を変えたときは dropSavedViewParam が先にIDを外すので、
-      ここで古い条件が再上書きされることはない。
-  */
-  useEffect(() => {
-    if (!savedViewParam) {
-      // URLから外れたら処理済み印も戻す。同じ検索を選び直せるようにする。
-      savedViewConsumedRef.current = null
-      return
-    }
-    // 同じ値は一度だけ処理する。手動変更で外した直後の再適用を防ぐ。
-    if (savedViewConsumedRef.current === savedViewParam) return
-    if (accountsLoading) return
-    if (selectedAccountId && savedViewsAccountId !== selectedAccountId) return
-    savedViewConsumedRef.current = savedViewParam
-    const view = savedViews.find((item) => item.id === savedViewParam)
-    if (!view) {
-      setNameQuery('')
-      setDebouncedNameQuery('')
-      setStatusFilter('all')
-      setQuickFilter('all')
-      setAssigneeFilter('all')
-      setUnreadOnly(false)
-      setSavedViewNotice('URLの保存した検索は見つかりませんでした。削除されたか、別のLINEアカウントの検索の可能性があります。既定の条件で表示しています。')
-      dropSavedViewParam()
-      return
-    }
-    const nextChannel = applySavedViewConditions(view)
-    setSavedViewNotice('')
-    if (nextChannel !== channel) {
-      const next = new URLSearchParams(params.toString())
-      if (nextChannel === 'all') next.delete('channel')
-      else next.set('channel', nextChannel)
-      const text = next.toString()
-      router.replace(text ? `/chats?${text}` : '/chats')
-    }
-  }, [savedViewParam, savedViews, savedViewsAccountId, selectedAccountId, accountsLoading, channel, params, router, applySavedViewConditions, dropSavedViewParam])
-
-  const currentSavedViewConditions = (draft?: Omit<SavedViewDraft, 'name' | 'favorite'>): InboxSavedViewConditions => {
-    /*
-      N-020: 「未読だけ表示」とクイック絞り込み（要返信／期限超過）も保存する。
-      quickFilter の overdue は旧軸 due にも写して、古いWorkerの件数計算が
-      同じ条件で数えられるようにする。
-    */
-    const savedQuickFilter = draft?.quickFilter ?? quickFilter
-    return {
-      version: 1,
-      // #625: 保存する検索語も画面と同じ上限へそろえる。
-      query: clampSearchQuery(nameQuery.trim()),
-      channels: (draft?.channel ?? channel) === 'all'
-        ? ['line', 'email']
-        : [(draft?.channel ?? channel) as 'line' | 'email'],
-      statuses: (draft?.status ?? statusFilter) === 'all'
-        ? ['unread', 'in_progress', 'on_hold', 'resolved']
-        : [(draft?.status ?? statusFilter) as Exclude<StatusFilter, 'all'>],
-      assignees: (draft?.assignee ?? assigneeFilter) === 'all' ? [] : [draft?.assignee ?? assigneeFilter],
-      unread: (draft?.unreadOnly ?? unreadOnly) ? 'mine' : 'all',
-      quickFilter: savedQuickFilter,
-      messageTypes: [],
-      receivedFrom: null,
-      receivedTo: null,
-      sort: 'newest',
-      due: savedQuickFilter === 'overdue' ? 'overdue' : 'all',
+      const res = await api.chats.updateScheduled(selectedChatId, scheduleId, { scheduledAt: jstDatetimeLocalToIso(nextAt) })
+      if (res.success) await loadScheduledSends(selectedChatId)
+    } catch (reason) {
+      saveErrors.capture(reason)
+      setError('予約時刻の変更に失敗しました。一覧を読み込み直してください。')
+      void loadScheduledSends(selectedChatId)
     }
   }
+  // 会話を切り替えたら引用中の選択と予約パネルは閉じる。
+  // 前の会話のメッセージを引用したまま別の会話へ送ると、別friendの
+  // メッセージ指定で口が404を返すため、ここで必ず外す。
+  useEffect(() => {
+    setQuotedMessage(null)
+    setCorrectingId(null)
+    setShowSchedulePanel(false)
+    setScheduleInput('')
+  }, [selectedChatId, setScheduleInput, setShowSchedulePanel])
+
+  const {
+    operators,
+    assigneeUnread,
+    assigneeUnreadStatus,
+    statusCountsNow,
+    quickCountsNow,
+  } = useInboxStats({
+    selectedAccountId,
+    statusFilter,
+    debouncedNameQuery,
+    assigneeFilter,
+    unreadOnly,
+    channel,
+  })
+
+  const {
+    saveDialogOpen,
+    setSaveDialogOpen,
+    savedViews,
+    savedViewsOpen,
+    setSavedViewsOpen,
+    savedViewMenuId,
+    setSavedViewMenuId,
+    setSavedViewName,
+    savedViewError,
+    setSavedViewError,
+    savingView,
+    savedViewSuccess,
+    setSavedViewSuccess,
+    savedViewNotice,
+    operatorNames,
+    dropSavedViewParam,
+    loadSavedViews,
+    currentSavedViewConditions,
+    savedViewName,
+    setSavingView,
+    applySavedView,
+  } = useInboxSavedViews({
+    operators,
+    setNameQuery,
+    setStatusFilter,
+    setAssigneeFilter,
+    setQuickFilter,
+    setUnreadOnly,
+    params,
+    router,
+    selectedAccountId,
+    savedViewParam,
+    accountsLoading,
+    setDebouncedNameQuery,
+    channel,
+    quickFilter,
+    nameQuery,
+    statusFilter,
+    assigneeFilter,
+    unreadOnly,
+  })
 
   const createSavedView = async (draft?: SavedViewDraft): Promise<SavedViewSaveResult> => {
     if (savingView) return { success: false, error: '保存処理が終わるまでお待ちください' }
@@ -1158,615 +417,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
-  const applySavedView = (view: InboxSavedView) => {
-    const nextChannel = applySavedViewConditions(view)
-    setSavedViewNotice('')
-    // savedView=<id> をURLへ残す。残さないと再読込・共有で条件が消える(N-021)。
-    savedViewConsumedRef.current = view.id
-    router.push(buildInboxUrl(nextChannel, view.id))
-    setSavedViewsOpen(false)
-  }
-  useEffect(() => {
-    try { localStorage.setItem('chat.sendMode', sendMode) } catch { /* ignore */ }
-  }, [sendMode])
-
-  // 会話詳細は直近100件ずつ。全文一括(1000件)だと長期の会話で応答が重い。
-  // 古い分は「前のメッセージ」で遡る。
-  const CHAT_MESSAGE_PAGE_SIZE = 100
-  const [messagesHasMore, setMessagesHasMore] = useState(false)
-  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false)
-
-  const loadChatDetail = useCallback(async (chatId: string) => {
-    /*
-     * 呼び出しの時点で開いている会話と違う相手への要求は丸ごと捨てる
-     * (A02-01)。更新操作の完了後に遅れて走る再読込が、切替先の会話の
-     * 応答を無効化して前の会話を表示し直すのを防ぐ。世代のカウントも
-     * 進めないので、いま走っている新しい会話の取得はそのまま生きる。
-     */
-    if (selectedChatIdRef.current !== chatId) return
-    const requestedAccountId = detailAccountRef.current
-    const requestId = ++detailRequestIdRef.current
-    setDetailLoading(true)
-    setError('')
-    try {
-      const res = await api.chats.get(chatId, { limit: CHAT_MESSAGE_PAGE_SIZE })
-      if (requestId !== detailRequestIdRef.current) return
-      // 取得の途中で別の会話・アカウントへ切り替わっていたら適用しない。
-      if (selectedChatIdRef.current !== chatId || detailAccountRef.current !== requestedAccountId) return
-      if (res.success) {
-        const detail = res.data
-        setChatDetail(detail)
-        setMessagesHasMore(detail.hasMoreMessages === true)
-        // URL指定の会話が開けた。案内は消す(#673)。
-        if (deepLinkIdRef.current === chatId) setDeepLinkNotice('')
-      } else {
-        setChatDetail(null)
-        setMessagesHasMore(false)
-        setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
-        // 存在しない・別アカウントのIDでも別人を開かず、案内を出す(#673)。
-        // 口は存在の有無を404に倒すので、ここでは区別しない。
-        if (deepLinkIdRef.current === chatId) setDeepLinkNotice(DEEP_LINK_NOTICE.unavailable)
-      }
-    } catch {
-      if (requestId !== detailRequestIdRef.current) return
-      setChatDetail(null)
-      setMessagesHasMore(false)
-      setError('会話を読み込めませんでした。時間を置いてもう一度お試しください。')
-      if (deepLinkIdRef.current === chatId) setDeepLinkNotice(DEEP_LINK_NOTICE.unavailable)
-    } finally {
-      if (requestId === detailRequestIdRef.current) setDetailLoading(false)
-    }
-  }, [])
-
-  // 「前のメッセージ」— 表示中の最古の1件より古い分を先頭に足す。
-  const loadOlderMessages = useCallback(async () => {
-    if (loadingOlderMessages || !selectedChatId) return
-    const oldest = chatDetail?.messages?.[0]
-    if (!oldest) {
-      setMessagesHasMore(false)
-      return
-    }
-    /*
-     * 取得の起点となった会話とアカウントを固定する(#962 F03)。
-     * 応答が遅れて別の会話・アカウントへ切り替わったあとに届いても、
-     * そこへ前の会話の履歴を混ぜない。
-     */
-    const requestedChatId = selectedChatId
-    const requestedAccountId = selectedAccountId
-    setLoadingOlderMessages(true)
-    try {
-      const res = await api.chats.get(requestedChatId, {
-        limit: CHAT_MESSAGE_PAGE_SIZE,
-        beforeAt: oldest.eventAt ?? oldest.createdAt,
-        beforeId: oldest.id,
-      })
-      if (selectedChatIdRef.current !== requestedChatId || detailAccountRef.current !== requestedAccountId) return
-      if (res.success) {
-        const detail = res.data
-        const rows = detail.messages ?? []
-        /*
-         * INBOX-27: 上へ足す追加なので、いま読んでいる位置を保持する。
-         * 2026-10-07：位置は窓分け（ChatThreadWindow）が「いちばん上に見えている
-         * 吹き出し」を目印に守る。高さの差で足す方式は、まだ測っていない
-         * 吹き出しの見込みの高さが入るので使わない。
-         */
-        setChatDetail((prev) => {
-          if (!prev || prev.id !== requestedChatId) return prev
-          const seen = new Set((prev.messages ?? []).map((m) => m.id))
-          return { ...prev, messages: [...rows.filter((m) => !seen.has(m.id)), ...(prev.messages ?? [])] }
-        })
-        setMessagesHasMore(detail.hasMoreMessages === true)
-      }
-    } catch {
-      if (selectedChatIdRef.current !== requestedChatId || detailAccountRef.current !== requestedAccountId) return
-      setError('前のメッセージを読み込めませんでした。')
-    } finally {
-      setLoadingOlderMessages(false)
-    }
-  }, [loadingOlderMessages, selectedChatId, selectedAccountId, chatDetail?.messages])
-
-  /*
-   * 会話の中を探す（V8.pen M0393 段13・枠 v7GV2、2026-10-07 オーナー採用）。V8 の画面だけ。
-   * 🔍 か ⌘F で頭の下に帯を出し、当たった吹き出しへ移る。
-   * 当たりがまだ読み込んでいない昔の吹き出しなら、いま読んでいる最古の1件から
-   * その当たりまでを会話詳細の口で続けて読み足してから移る。読んだ分は新しい方から
-   * 途切れずにつながったまま（定期の取り直し・下に付ける・窓分けの目印をそのまま使える）。
-   * 位置の口（messagesAt）の around は、送った人・引用・シナリオ名を持たない形で、
-   * 間が空いた並びになるので使わない（BEHAVIOR.md）。
-   */
-  const chatSearch = useChatSearch((chatDetail?.friendId ?? null))
-  const [chatSearchFocusSeq, setChatSearchFocusSeq] = useState(0)
-  const [chatSearchFilling, setChatSearchFilling] = useState(false)
-  const [chatSearchTarget, setChatSearchTarget] = useState<{ id: string; seq: number } | null>(null)
-  const chatMessagesRef = useRef<ChatDetailMessage[]>([])
-  chatMessagesRef.current = chatDetail?.messages ?? []
-  const messagesHasMoreRef = useRef(false)
-  messagesHasMoreRef.current = messagesHasMore
-  const searchRevealSeqRef = useRef(0)
-  const openChatSearchBar = chatSearch.openBar
-  const openChatSearch = useCallback(() => {
-    openChatSearchBar()
-    setChatSearchFocusSeq((n) => n + 1)
-  }, [openChatSearchBar])
-  useEffect(() => {
-    if (!chatSearch.open) setChatSearchTarget(null)
-  }, [chatSearch.open])
-  useEffect(() => {
-    const hit = chatSearch.current
-    if (!hit) return
-    const chatId = selectedChatIdRef.current
-    const accountId = detailAccountRef.current
-    if (!chatId) return
-    const seq = ++searchRevealSeqRef.current
-    const stale = () => seq !== searchRevealSeqRef.current
-      || selectedChatIdRef.current !== chatId || detailAccountRef.current !== accountId
-    void (async () => {
-      let list = chatMessagesRef.current
-      // 1回 1,000 件（口の上限）。1万件の会話でも 10 回まで。
-      for (let round = 0; round < CHAT_SEARCH_FILL_MAX_ROUNDS && !list.some((m) => m.id === hit.id); round += 1) {
-        const oldest = list[0]
-        if (!oldest || !messagesHasMoreRef.current) break
-        setChatSearchFilling(true)
-        try {
-          const res = await api.chats.get(chatId, {
-            limit: CHAT_SEARCH_FILL_PAGE,
-            beforeAt: oldest.eventAt ?? oldest.createdAt,
-            beforeId: oldest.id,
-          })
-          if (stale()) return
-          if (!res.success) break
-          const rows = res.data.messages ?? []
-          const seen = new Set(list.map((m) => m.id))
-          list = [...rows.filter((m) => !seen.has(m.id)), ...list]
-          chatMessagesRef.current = list
-          messagesHasMoreRef.current = res.data.hasMoreMessages === true
-          // 上へ足すだけ（loadOlderMessages と同じ）。見ている位置は窓分けが守る。
-          setChatDetail((prev) => {
-            if (!prev || prev.id !== chatId) return prev
-            const had = new Set((prev.messages ?? []).map((m) => m.id))
-            return { ...prev, messages: [...rows.filter((m) => !had.has(m.id)), ...(prev.messages ?? [])] }
-          })
-          setMessagesHasMore(res.data.hasMoreMessages === true)
-        } catch {
-          if (stale()) return
-          break
-        }
-      }
-      if (stale()) return
-      setChatSearchFilling(false)
-      if (list.some((m) => m.id === hit.id)) setChatSearchTarget({ id: hit.id, seq })
-      else setError('当たったメッセージまで読み込めませんでした。もう一度お試しください。')
-    })()
-    return () => { searchRevealSeqRef.current += 1; setChatSearchFilling(false) }
-  }, [chatSearch.current, chatSearch.moveSeq]) // eslint-disable-line react-hooks/exhaustive-deps
-  // ⌘F / Ctrl+F：会話を開いている間は、ブラウザのページ内検索の代わりに会話の中を探す。
-  useEffect(() => {
-    if ((!chatDetail)) return
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'f') {
-        event.preventDefault()
-        openChatSearch()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [chatDetail, openChatSearch])
-
-  /*
-   * INBOX-12: 開いている会話を静かに取り直す。
-   * 会話ID・アカウント・定期取得の世代の照合を通った応答だけを適用する
-   * ので、切替前に出した遅い応答は別の会話へ混ざらない。世代は初回
-   * 読み込み(loadChatDetail)が使う detailRequestIdRef とは別にする。
-   * 共有すると定期取得が初回読み込みを「古い応答」にして読み込み中の
-   * まま止まる。
-   * 「前のメッセージ」で遡って読み込んだ古い分は消さずに残す。
-   */
-  const detailPollSeqRef = useRef(0)
-  const refreshChatDetailQuietly = useCallback(async (): Promise<boolean> => {
-    const chatId = selectedChatIdRef.current
-    if (!chatId) return true
-    const requestId = ++detailPollSeqRef.current
-    const accountId = detailAccountRef.current
-    try {
-      const res = await api.chats.get(chatId, { limit: CHAT_MESSAGE_PAGE_SIZE })
-      if (requestId !== detailPollSeqRef.current) return true
-      if (selectedChatIdRef.current !== chatId || detailAccountRef.current !== accountId) return true
-      if (!res.success) return false
-      const detail = res.data
-      let keptOlder = false
-      setChatDetail((prev) => {
-        if (!prev || prev.id !== detail.id) return detail
-        const latest = detail.messages ?? []
-        const prevMsgs = prev.messages ?? []
-        const latestIds = new Set(latest.map((m) => m.id))
-        const windowStart = latest[0]?.createdAt ?? ''
-        const older = prevMsgs.filter(
-          (m) => !latestIds.has(m.id) && (!windowStart || m.createdAt < windowStart),
-        )
-        keptOlder = older.length > 0
-        return { ...detail, messages: [...older, ...latest] }
-      })
-      if (keptOlder) {
-        // 遡った分を残している間は「さらに古い分があるか」は前の値を守る。
-      } else {
-        setMessagesHasMore(detail.hasMoreMessages === true)
-      }
-      return true
-    } catch {
-      return false
-    }
-  }, [])
-
-  // 一覧も静かに取り直す。全画面の読み込み(loadChats)は一覧を空にして
-  // 操作を止めるので、定期更新では既存の並びを崩さずに差し替える。
-  const listPollRequestRef = useRef(0)
-  const loadChatsQuietly = useCallback(async (): Promise<boolean> => {
-    const requestId = ++listPollRequestRef.current
-    try {
-      const res = await api.chats.list(buildListParams(null))
-      if (listPollRequestRef.current !== requestId) return true
-      if (listFilterKeyRef.current !== listFilterKey) return true
-      if (!res.success) return false
-      const rows = res.data
-      setChats((prev) => {
-        const freshIds = new Set(rows.map((row) => row.id))
-        const merged = rows.slice()
-        // 「さらに読み込む」で足した分は一覧の下に残す。
-        for (const chat of prev) if (!freshIds.has(chat.id)) merged.push(chat)
-        return merged
-      })
-      // 足したページがある間は、続きの起点（カーソル）と「続きがあるか」を守る。
-      if (!extraPagesLoadedRef.current) {
-        const last = rows[rows.length - 1]
-        nextCursorRef.current = toListCursor(last)
-        setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
-      }
-      setChatListFailed(false)
-      return true
-    } catch {
-      return false
-    }
-  }, [buildListParams, listFilterKey])
-
-  /*
-   * INBOX-12: 会話の定期更新。
-   * 画面が見えている間だけ5秒起点で取り直す(タブを隠すと止まり、
-   * 戻ると再開する)。失敗は待ちを延ばし、5回続いたら止まって理由と
-   * 再試行を出す。応答を適用するのは照合を通った時だけ。
-   */
-  const [chatPollStalled, setChatPollStalled] = useState(false)
-  const [chatPollRetryKey, setChatPollRetryKey] = useState(0)
-  useEffect(() => {
-    setChatPollStalled(false)
-    const poll = startVisiblePoll({
-      work: async () => {
-        const detailOk = await refreshChatDetailQuietly()
-        const listOk = channel === 'email' ? true : await loadChatsQuietly()
-        if (!detailOk || !listOk) throw new Error('inbox poll failed')
-      },
-      onGiveUp: () => setChatPollStalled(true),
-      onRecovered: () => setChatPollStalled(false),
-    })
-    return () => poll.stop()
-  }, [refreshChatDetailQuietly, loadChatsQuietly, channel, chatPollRetryKey])
-
-  // 同じ会話IDが別アカウントにも存在していても、切替前の遅い応答を表示しない。
-  // 初回表示では深いリンクを消さず、実際にアカウントが変わったときだけ外す。
-  useEffect(() => {
-    if (detailAccountRef.current === selectedAccountId) return
-    detailAccountRef.current = selectedAccountId
-    detailRequestIdRef.current += 1
-    setSelectedChatId(null)
-    setChatDetail(null)
-    setDetailLoading(false)
-    setAttentionSaving(false)
-  }, [selectedAccountId])
-
-  useEffect(() => {
-    loadChats()
-  }, [loadChats])
-
-  useEffect(() => {
-    const refresh = () => {
-      void loadChats()
-      void loadEmails()
-    }
-    window.addEventListener(UNANSWERED_REFRESH_EVENT, refresh)
-    return () => window.removeEventListener(UNANSWERED_REFRESH_EVENT, refresh)
-  }, [loadChats, loadEmails])
-
-  // Deep-link from other pages. LINE is ?friend=<friendId> (?friendId= is
-  // the old form kept for shared URLs), email is ?thread=<threadId>.
-  // Selecting one side always clears the other so the center panel has
-  // exactly one conversation to show. Re-runs on URL change so back/forward
-  // and shared URLs keep the target; reload works because the target lives
-  // in the URL (#673). Manual selection never rewrites the URL, so a
-  // state-only change never triggers this.
-  //
-  // 会話を開く前に、対象の友だちが「いま選んでいるLINEアカウント」の相手か
-  // を必ず確かめる。`GET /api/chats/:id` は見る権限だけを見ており、画面で
-  // 選んでいるアカウントは見ない(apps/worker の requireVisibleChat)。
-  // A社とB社の両方を見られる担当者がB選択中にA社の友だちのURLを開くと、
-  // 会話はA社なのに送信元の表示はB社になり、そのまま返信すると別アカウント
-  // から送ってしまう。だからここで選択中アカウントへ固定する(#673)。
-  useEffect(() => {
-    const threadId = (params.get('thread') ?? '').trim()
-    const rawFriend = (params.get('friend') ?? params.get('friendId') ?? '').trim()
-    if (threadId) {
-      deepLinkRequestIdRef.current += 1
-      deepLinkIdRef.current = null
-      setDeepLinkNotice('')
-      setSelectedChatId(null)
-      setSelectedThreadId(threadId)
-      return
-    }
-    // URLに対象が無いときは何もしない。手で選んだ会話を消さない。
-    if (!rawFriend) return
-    const requestId = deepLinkRequestIdRef.current + 1
-    deepLinkRequestIdRef.current = requestId
-    if (!isSafeFriendIdForInbox(rawFriend)) {
-      // 不正なIDは口へ渡さず、別人も開かない。案内だけ出す。
-      deepLinkIdRef.current = rawFriend
-      setSelectedThreadId(null)
-      setSelectedChatId(null)
-      setDeepLinkNotice(DEEP_LINK_NOTICE.malformed)
-      return
-    }
-    // アカウント一覧が届くまでは判定できない。届いてから同じ効果が
-    // もう一度動くので、ここでは開かずに待つ。先に開くと、照合前の
-    // 会話が一瞬見えてしまう。
-    if (accountsLoading) return
-
-    deepLinkIdRef.current = rawFriend
-    setSelectedThreadId(null)
-    // 照合できるまでは会話を選ばない。ここで選ぶと `api.chats.get` が
-    // 走り、別アカウントの会話が表示されてしまう。
-    setSelectedChatId(null)
-    setDeepLinkNotice('')
-
-    let cancelled = false
-    void (async () => {
-      let friendAccountId: string | null = null
-      try {
-        const res = await api.friends.get(rawFriend)
-        if (!res.success) {
-          if (!cancelled && deepLinkRequestIdRef.current === requestId) {
-            setDeepLinkNotice(DEEP_LINK_NOTICE.unavailable)
-          }
-          return
-        }
-        // `lineAccountId` は `GET /api/friends/:id` の実応答にあるが、
-        // 共有の型にはまだ無い。ここだけで読む。
-        friendAccountId = (res.data as { lineAccountId?: string | null }).lineAccountId ?? null
-      } catch {
-        if (!cancelled && deepLinkRequestIdRef.current === requestId) {
-          setDeepLinkNotice(DEEP_LINK_NOTICE.unavailable)
-        }
-        return
-      }
-      if (cancelled || deepLinkRequestIdRef.current !== requestId) return
-      // アカウントを選んでいないときは送信元も出ないので、取り違えは
-      // 起きない。一覧も全アカウント分を出しているので、ここは通す。
-      if (selectedAccountId && friendAccountId !== selectedAccountId) {
-        setDeepLinkNotice(DEEP_LINK_NOTICE.otherAccount)
-        return
-      }
-      setDeepLinkNotice('')
-      setSelectedChatId(rawFriend)
-    })()
-    return () => { cancelled = true }
-  }, [params, selectedAccountId, accountsLoading])
-
-  useEffect(() => {
-    if (selectedChatId) {
-      loadChatDetail(selectedChatId)
-    } else {
-      detailRequestIdRef.current += 1
-      setChatDetail(null)
-      setDetailLoading(false)
-    }
-  }, [selectedChatId, loadChatDetail])
-
-  // N-025: 会話を開いた/変えたとき、その会話の送信予約を読む。
-  // 予約はfriend単位なので会話IDはそのまま使える。失敗しても画面は止めない。
-  const loadScheduledSends = useCallback(async (chatId: string) => {
-    // 取得の起点となったアカウントを固定する。切替後に届いた応答は捨てる。
-    const requestedAccountId = detailAccountRef.current
-    try {
-      const res = await api.chats.scheduled(chatId)
-      if (selectedChatIdRef.current !== chatId || detailAccountRef.current !== requestedAccountId) return
-      // 口の形が変わったり古い環境の応答でも、一覧は必ず配列を保つ。
-      if (res.success) {
-        setScheduledSendsFailed(false)
-        setScheduledSends(Array.isArray(res.data?.scheduled) ? res.data.scheduled : [])
-      } else {
-        setScheduledSendsFailed(true)
-      }
-    } catch {
-      if (selectedChatIdRef.current !== chatId || detailAccountRef.current !== requestedAccountId) return
-      // 失敗を「予約なし」にしない。一覧は空に戻さず、失敗だけを知らせる(#962)。
-      setScheduledSendsFailed(true)
-    }
-  }, [])
-
-  useEffect(() => {
-    // 会話を切り替えたら前の会話の予約を残さない。応答が遅れても
-    // その間に前の会話の行が見える事故を防ぐ(#962 F07)。
-    setScheduledSends([])
-    setScheduledSendsFailed(false)
-    if (selectedChatId) {
-      void loadScheduledSends(selectedChatId)
-    }
-  }, [selectedChatId, loadScheduledSends])
-
-  useEffect(() => {
-    setMemoDraft(chatDetail?.notes ?? '')
-    setMemoError('')
-    setShowMemoEditor(false)
-  }, [chatDetail?.id, chatDetail?.notes])
-
-  // 会話を切り替えたら引用中の選択と予約パネルは閉じる。
-  // 前の会話のメッセージを引用したまま別の会話へ送ると、別friendの
-  // メッセージ指定で口が404を返すため、ここで必ず外す。
-  useEffect(() => {
-    setQuotedMessage(null)
-    setCorrectingId(null)
-    setShowSchedulePanel(false)
-    setScheduleInput('')
-  }, [selectedChatId])
-
-  /*
-   * 会話・アカウントを切り替えたら、いまの下書きを前の会話の鍵で預け、
-   * 次の会話に預けてあった下書きを戻す(#962 F06)。切り替えただけで
-   * 書きかけの文面や添付が消えないようにする。
-   */
-  useEffect(() => {
-    const nextKey = draftKeyOf(selectedAccountId, selectedChatId)
-    const prevKey = draftOwnerKeyRef.current
-    if (prevKey === nextKey) return
-    draftOwnerKeyRef.current = nextKey
-    const stashedText = messageContentRef.current
-    if (stashedText) messageDraftsRef.current.set(prevKey, stashedText)
-    else messageDraftsRef.current.delete(prevKey)
-    setMessageContent(messageDraftsRef.current.get(nextKey) ?? '')
-    const stashedImage = pendingImageRef.current
-    if (stashedImage) imageDraftsRef.current.set(prevKey, stashedImage)
-    else imageDraftsRef.current.delete(prevKey)
-    setPendingImage(imageDraftsRef.current.get(nextKey) ?? null)
-    // 添付のファイル名・準備の失敗も会話ごとに預かる(INBOX-23/32)。
-    const stashedMeta = pendingImageMetaRef.current
-    if (stashedMeta) imageMetaDraftsRef.current.set(prevKey, stashedMeta)
-    else imageMetaDraftsRef.current.delete(prevKey)
-    setPendingImageMeta(imageMetaDraftsRef.current.get(nextKey) ?? null)
-    const stashedImageError = imageErrorRef.current
-    if (stashedImageError) imageErrorDraftsRef.current.set(prevKey, stashedImageError)
-    else imageErrorDraftsRef.current.delete(prevKey)
-    setImageError(imageErrorDraftsRef.current.get(nextKey) ?? '')
-    setImagePreviewOpen(false)
-    // B-6：動画・ファイルの添付は預かりの表に常に書いているので、開いた会話の分を戻すだけ。
-    setPendingAttachment(attachDraftsRef.current.get(nextKey) ?? null)
-  }, [selectedAccountId, selectedChatId])
-
-  // Surface deep-linked chats in the sidebar even when the current account
-  // filter or status filter would exclude them — otherwise the user replies
-  // and the conversation stays invisible until they refresh.
-  // Re-runs when `chats` changes (e.g. after loadChats refetches on filter
-  // change) so the synthetic entry is re-injected if the next API result
-  // does not include it. Returning `prev` unchanged when already present
-  // avoids any update loop.
-  useEffect(() => {
-    if (!chatDetail) return
-    setChats((prev) => {
-      if (prev.some((c) => c.id === chatDetail.id)) return prev
-      // /api/chats/:id may not populate the lastMessage* fields; derive
-      // from the messages array as a fallback so the sidebar preview is
-      // not stuck on "(まだメッセージなし)".
-      const lastMsg = chatDetail.messages?.[chatDetail.messages.length - 1]
-      const entry: Chat = {
-        id: chatDetail.id,
-        friendId: chatDetail.friendId,
-        friendName: chatDetail.friendName,
-        friendPictureUrl: chatDetail.friendPictureUrl,
-        operatorId: chatDetail.operatorId ?? null,
-        status: chatDetail.status,
-        notes: chatDetail.notes ?? null,
-        revision: chatDetail.revision,
-        lastMessageAt: chatDetail.lastMessageAt ?? lastMsg?.createdAt ?? null,
-        lastMessageContent: chatDetail.lastMessageContent ?? lastMsg?.content ?? null,
-        lastMessageDirection: chatDetail.lastMessageDirection ?? lastMsg?.direction ?? null,
-        lastMessageType: chatDetail.lastMessageType ?? (lastMsg?.isUnsent ? 'unsent' : lastMsg?.messageType) ?? null,
-        isUnread: false,
-        createdAt: chatDetail.createdAt,
-        updatedAt: chatDetail.updatedAt ?? chatDetail.createdAt,
-      }
-      return [entry, ...prev]
-    })
-  }, [chatDetail, chats])
-
-  /*
-   * INBOX-27: メッセージの描画後にスクロール位置を決める。
-   *
-   * - 最初の表示・会話の切替 … 新しい方(下端)から見せる。
-   * - 「前のメッセージ」で上へ足した … 高さの増分だけ scrollTop を足して、
-   *   読んでいたメッセージが同じ画面位置に残るようにする。
-   * - 下への新着(自分の送信・相手の返信・定期更新) … 下端にいる時だけ
-   *   追従。読み返している途中なら動かさず、新着件数の目印を出す。
-   */
-  useLayoutEffect(() => {
-    const el = messagesScrollRef.current
-    const list = chatDetail?.messages
-    if (!el || !list || list.length === 0) {
-      if (!list || list.length === 0) prevMessageWindowRef.current = null
-      return
-    }
-    const lastId = list[list.length - 1]?.id ?? null
-    const prev = prevMessageWindowRef.current
-    prevMessageWindowRef.current = { chatId: chatDetail.id, lastId, count: list.length }
-
-    const sameChat = prev?.chatId === chatDetail.id
-    if (!sameChat) {
-      el.scrollTop = el.scrollHeight
-      return
-    }
-    const appended = prev.lastId !== lastId
-    if (appended && !stickToBottomRef.current) {
-      // 読み返し中に届いた分は動かさず、実際に増えた相手からの件数だけ出す。
-      const prevIndex = list.findIndex((m) => m.id === prev.lastId)
-      const fresh = prevIndex >= 0 ? list.slice(prevIndex + 1) : list
-      const incomingCount = fresh.filter((m) => m.direction === 'incoming').length
-      if (incomingCount > 0) setUnseenIncoming((count) => count + incomingCount)
-      return
-    }
-    // 上へ足しただけ（前のメッセージ）・取り直しで中身が同じ … 位置は窓分けが守る。
-    if (appended) el.scrollTop = el.scrollHeight
-  }, [chatDetail?.messages, chatDetail?.id])
-
-  // 画像などの遅れての読み込みで高さが伸びても、読み返し中の位置を崩さない。
-  // 2026-10-07：窓分け（ChatThreadWindow）が行の高さの変化を見張って直す。
-  // 下端にいる時だけ下端へ寄せ直す。失敗→代替表示で高さが縮む場合も同じ。
-
-  // スクロール位置を追い続ける。下端にいる間だけ新着へ追従する(INBOX-27)。
-  useEffect(() => {
-    const el = messagesScrollRef.current
-    if (!el) return
-    const onScroll = () => {
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 40
-      stickToBottomRef.current = atBottom
-      if (atBottom) setUnseenIncoming(0)
-    }
-    el.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => el.removeEventListener('scroll', onScroll)
-    /*
-     * 会話を選んだ直後は読み込み中でスクロール欄がまだ無い。選んだ時だけ
-     * 付けると見張りが付かず「いつも下にいる」扱いになり、読み返している
-     * 途中でも新着で下へ飛んでいた（2026-10-07 測って見つけた）。欄が出来た
-     * 時（会話の中身が届いた時）にも付け直す。
-     */
-  }, [selectedChatId, chatDetail?.id])
-
-  // Auto-resize textarea as messageContent grows (INBOX-20: 3行〜8行で伸ばす)
-  useEffect(() => {
-    const el = textareaRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, TEXTAREA_MAX_HEIGHT_PX)}px`
-  }, [messageContent])
-
-  // 案内付きの空状態から一覧へ戻る。URLの指定も外す。
-  // 外さないと再読込で同じ指定が復活する(#673)。
-  const clearDeepLink = () => {
-    deepLinkRequestIdRef.current += 1
-    deepLinkIdRef.current = null
-    setDeepLinkNotice('')
-    setSelectedChatId(null)
-    // 会話の指定だけ外す。保存検索は一覧の条件なので残す(N-021)。
-    router.replace(buildInboxUrl(channel, savedViewParam || null))
-  }
-
-  // 状態の切り替えの5つの押し場所。選んでいる所だけ Tab で止まる
-  // （ラジオの決まり）。左右・先頭・末尾のキーで選ぶ。
-  const statusFilterButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
   const handleStatusFilterKeyDown = (event: React.KeyboardEvent) => {
     const list = statusFiltersV8
     const current = Math.max(0, list.findIndex((f) => f.key === statusFilter))
@@ -1782,6 +432,34 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     dropSavedViewParam()
     statusFilterButtonRefs.current[next]?.focus()
   }
+
+  const clearInboxFilters = () => {
+    setNameQuery('')
+    setDebouncedNameQuery('')
+    setStatusFilter('all')
+    setQuickFilter('all')
+    setAssigneeFilter('all')
+    setUnreadOnly(false)
+    // 手動で解除したので、URLの保存検索IDも外す(N-021)。
+    dropSavedViewParam()
+  }
+  const { wideInfoPanel, panesRef, showFriendInfo, setShowFriendInfo, customerPanelRef } = useInboxPanel()
+  const {
+    deepLinkNotice,
+    setDeepLinkNotice,
+    deepLinkIdRef,
+    deepLinkRequestIdRef,
+    clearDeepLink,
+  } = useInboxDeepLink({
+    params,
+    setSelectedChatId,
+    setSelectedThreadId,
+    accountsLoading,
+    selectedAccountId,
+    router,
+    channel,
+    savedViewParam,
+  })
 
   const handleSelectChat = (chatId: string) => {
     // 手選びはURL指定を上書きする。古い案内とURL状態を残さない。
@@ -1814,486 +492,126 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     // 切り替えただけで書きかけが消える。預け・戻しは上の効果が担う。
   }
 
-  /*
-   * 送信・予約に使った版の下書きだけを預かりから外す(#962 F06)。
-   * 応答を待つ間に文面へ追記したり画像を付け替えたりしていれば、
-   * それは別の版なので残す。
-   */
-  const dropSentDraft = (
-    chatId: string,
-    accountId: string | null,
-    sent: { content?: string; image?: ImageUploaderValue | null },
-  ) => {
-    const key = draftKeyOf(accountId, chatId)
-    if (sent.content !== undefined && messageDraftsRef.current.get(key)?.trim() === sent.content) {
-      messageDraftsRef.current.delete(key)
-    }
-    if (sent.image && imageDraftsRef.current.get(key) === sent.image) {
-      imageDraftsRef.current.delete(key)
-      imageMetaDraftsRef.current.delete(key)
-    }
-  }
+  const {
+    chatDetail,
+    setChatDetail,
+    detailLoading,
+    setDetailLoading,
+    messagesHasMore,
+    setMessagesHasMore,
+    loadingOlderMessages,
+    loadChatDetail,
+    loadOlderMessages,
+    refreshChatDetailQuietly,
+  } = useInboxConversation({
+    CHAT_MESSAGE_PAGE_SIZE,
+    selectedChatIdRef,
+    detailAccountRef,
+    detailRequestIdRef,
+    setError,
+    deepLinkIdRef,
+    setDeepLinkNotice,
+    selectedChatId,
+    selectedAccountId,
+    setChats,
+    chats,
+  })
 
-  const handleSendMessage = async () => {
-    if (!selectedChatId || sending || sendLockRef.current) return
-    // B-6：動画・ファイルは準備が済んだものだけ送る。準備中・失敗のまま送らない（本文も止める）。
-    const sendingAttachment = pendingAttachment
-    if (sendingAttachment && sendingAttachment.status !== 'ready') {
-      setError(sendingAttachment.status === 'uploading'
-        ? `「${sendingAttachment.name}」の準備が終わってから送れます。`
-        : `「${sendingAttachment.name}」を準備できていません。もう一度試すか、外してから送ってください。`)
-      return
-    }
-    if (!messageContent.trim() && !pendingImage && !sendingAttachment) return
-    // INBOX-29: 上限を超えた本文は送らない(下書きは消さない)。
-    if (messageContent.length > MESSAGE_MAX_LENGTH) {
-      setError(`メッセージは${formatNumber(MESSAGE_MAX_LENGTH)}文字までです。`)
-      return
-    }
-    const sendingChatId = selectedChatId  // capture the chat id for this send
-    const sendingAccountId = selectedAccountId  // 送信開始時のアカウントを固定する
-    sendLockRef.current = true
-    setSending(true)
-    try {
-      const now = new Date().toISOString()
-      let currentRevision = chatDetail?.revision
-      // N-022: 画像と本文が両方あるときは1回の結合送信にする。
-      // 2回に分けると画像だけ届く部分送信になる。
-      const useCombined = Boolean(pendingImage && pendingImage.mode === 'line-image' && messageContent.trim())
-      if (useCombined && pendingImage && pendingImage.mode === 'line-image') {
-        const content = messageContent.trim()
-        const imgPayload = JSON.stringify({
-          originalContentUrl: pendingImage.originalContentUrl,
-          previewImageUrl: pendingImage.previewImageUrl,
-        })
-        const signature = JSON.stringify({ chatId: sendingChatId, combined: true, image: imgPayload, content, quotedMessageId: quotedMessage?.id ?? null })
-        const sendResult = await api.chats.sendCombined(sendingChatId,
-          {
-            image: {
-              originalContentUrl: pendingImage.originalContentUrl,
-              previewImageUrl: pendingImage.previewImageUrl,
-            },
-            text: content,
-            revision: currentRevision,
-            quotedMessageId: quotedMessage?.id,
-            ...(senderId ? { senderId } : {}),
-          } as Parameters<typeof api.chats.sendCombined>[1],
-          sendKeysRef.current.get(signature),
-        )
-        if (sendResult.success) currentRevision = sendResult.data.revision
-        sendKeysRef.current.clear(signature)
-        /*
-         * 送信した版だけを消す(#962 F06)。応答を待つ間に別の会話・別
-         * アカウントへ切り替わっていたり、同じ会話でも送信中に追記・
-         * 付け替えされていれば、その下書きと添付は残す。
-         */
-        dropSentDraft(sendingChatId, sendingAccountId, { content, image: pendingImage })
-        if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
-          if (pendingImageRef.current === pendingImage) {
-            setPendingImage(null)
-            setPendingImageMeta(null)
-          }
-          setMessageContent((prev) => (prev.trim() === content ? '' : prev))
-        }
-        const staffName = sendResult.success ? sendResult.data.sentByStaffName : '自分'
-        const combinedMessages = [
-          buildOutgoingMessage({ messageType: 'image', content: imgPayload, sentByStaffName: staffName, sentAt: now }),
-          buildOutgoingMessage({ messageType: 'text', content, sentByStaffName: staffName, sentAt: now }),
-        ]
-        setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
-          ...prev,
-          lastMessageAt: now,
-          status: 'in_progress',
-          revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [...(prev.messages ?? []), ...combinedMessages],
-        } : prev)
-        setChats((prev) => {
-          const exists = prev.some((c) => c.id === sendingChatId)
-          if (!exists) return prev
-          return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
-            ...c,
-            lastMessageAt: now,
-            status: 'in_progress' as const,
-            lastMessageContent: content,
-            lastMessageDirection: 'outgoing' as const,
-            lastMessageType: 'text' as const,
-          } : c))
-        })
-      }
-      // --- Image send path (runs first when image is present) ---
-      if (!useCombined && pendingImage && pendingImage.mode === 'line-image') {
-        const imgPayload = JSON.stringify({
-          originalContentUrl: pendingImage.originalContentUrl,
-          previewImageUrl: pendingImage.previewImageUrl,
-        })
-        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'image', content: imgPayload, quotedMessageId: quotedMessage?.id ?? null })
-        const sendResult = await api.chats.send(sendingChatId,
-          { messageType: 'image', content: imgPayload, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
-          sendKeysRef.current.get(signature),
-        )
-        if (sendResult.success) currentRevision = sendResult.data.revision
-        sendKeysRef.current.clear(signature)
-        dropSentDraft(sendingChatId, sendingAccountId, { image: pendingImage })
-        // 送信した会話が開かれたまま、かつ添付が送った版のままのときだけ外す(#962 F06)。
-        if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
-          if (pendingImageRef.current === pendingImage) {
-            setPendingImage(null)
-            setPendingImageMeta(null)
-          }
-        }
-        // Optimistic update for image
-        const imageMessage = buildOutgoingMessage({
-          messageType: 'image',
-          content: imgPayload,
-          sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
-          sentAt: now,
-        })
-        setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
-          ...prev,
-          lastMessageAt: now,
-          status: 'in_progress',
-          revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [...(prev.messages ?? []), imageMessage],
-        } : prev)
-        setChats((prev) => {
-          const exists = prev.some((c) => c.id === sendingChatId)
-          if (!exists) return prev
-          // 返信すると対応中に変わるので、別の絞り込みを見ているときは一覧から外れる
-          return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
-            ...c,
-            lastMessageAt: now,
-            status: 'in_progress' as const,
-            lastMessageContent: '[画像]',
-            lastMessageDirection: 'outgoing' as const,
-            lastMessageType: 'image' as const,
-          } : c))
-        })
-      }
-      // --- B-6 動画・ファイル（準備済みの添付を1通で送る。ファイルはリンクの文で届く） ---
-      if (sendingAttachment?.attachment && (sendingAttachment.kind === 'video' || sendingAttachment.kind === 'file')) {
-        const input = attachmentSendInput(sendingAttachment.attachment)
-        const signature = JSON.stringify({ chatId: sendingChatId, ...input, quotedMessageId: useCombined ? null : quotedMessage?.id ?? null })
-        const sendResult = await api.chats.send(sendingChatId,
-          { ...input, revision: currentRevision, quotedMessageId: useCombined ? undefined : quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
-          sendKeysRef.current.get(signature),
-        )
-        if (sendResult.success) currentRevision = sendResult.data.revision
-        sendKeysRef.current.clear(signature)
-        const sentKey = draftKeyOf(sendingAccountId, sendingChatId)
-        if (attachDraftsRef.current.get(sentKey)?.job === sendingAttachment.job) putAttachment(sentKey, null)
-        const savedContent = sendingAttachment.kind === 'file'
-          ? JSON.stringify({ attachmentId: sendingAttachment.attachment.id, ...sendingAttachment.attachment })
-          : input.content
-        const attachmentMessage = buildOutgoingMessage({
-          messageType: sendingAttachment.kind,
-          content: savedContent,
-          sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
-          sentAt: now,
-        })
-        setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
-          ...prev,
-          lastMessageAt: now,
-          status: 'in_progress',
-          revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [...(prev.messages ?? []), attachmentMessage],
-        } : prev)
-        setChats((prev) => {
-          if (!prev.some((c) => c.id === sendingChatId)) return prev
-          return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
-            ...c,
-            lastMessageAt: now,
-            status: 'in_progress' as const,
-            lastMessageContent: attachmentPreviewLabel(sendingAttachment.kind),
-            lastMessageDirection: 'outgoing' as const,
-            lastMessageType: sendingAttachment.kind,
-          } : c))
-        })
-      }
-      // --- Text send path (runs independently — both paths execute when both image and text are present) ---
-      if (!useCombined && messageContent.trim()) {
-        const content = messageContent.trim()
-        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content, quotedMessageId: quotedMessage?.id ?? null })
-        const sendResult = await api.chats.send(sendingChatId,
-          { content, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(correctingId ? { correctionOfMessageId: correctingId } : {}), ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
-          sendKeysRef.current.get(signature),
-        )
-        if (sendResult.success) currentRevision = sendResult.data.revision
-        sendKeysRef.current.clear(signature)
-        /*
-         * 送信した版だけを消す(#962 F06)。応答を待つ間に別の会話・別
-         * アカウントへ切り替わっていたり、送信中に追記されていれば、
-         * その下書きは残す。
-         */
-        dropSentDraft(sendingChatId, sendingAccountId, { content })
-        if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
-          setMessageContent((prev) => (prev.trim() === content ? '' : prev))
-        }
-        // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
-        // Only mutate chatDetail if it still corresponds to the chat we just sent to
-        setCorrectingId(null)
-        const textMessage = buildOutgoingMessage({
-          messageType: 'text',
-          content,
-          sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
-          sentAt: now,
-        })
-        setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
-          ...prev,
-          lastMessageAt: now,
-          status: 'in_progress',
-          revision: sendResult.success ? sendResult.data.revision : prev.revision,
-          messages: [...(prev.messages ?? []), textMessage],
-        } : prev)
-        setChats((prev) => {
-          // Skip reconciliation if the list no longer contains this chat (e.g. tab changed mid-send)
-          const exists = prev.some((c) => c.id === sendingChatId)
-          if (!exists) return prev
-          // 返信すると対応中に変わるので、別の絞り込みを見ているときは一覧から外れる
-          return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
-            ...c,
-            lastMessageAt: now,
-            status: 'in_progress' as const,
-            // 一覧の preview も即時更新する。incoming 優先ロジックで上書きされ得るが、
-            // 楽観 UI では「operator が今送った文面」が一瞬見えるのが期待動作。
-            // 次回 loadChats() で server 側の真の最新 (incoming 優先) に reconcile される。
-            lastMessageContent: content,
-            lastMessageDirection: 'outgoing' as const,
-            lastMessageType: 'text' as const,
-          } : c))
-        })
-      }
-      // 手動返信で未対応が 1 件減るので、サイドバーのバッジを即時更新させる
-      window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-      // 引用は1回の送信で使い切る。残すと次の返信にも同じ引用が付く。
-      // 送信した会話が開かれたまま、かつ引用が送った版のままのときだけ外す(#962 F06)。
-      if (selectedChatIdRef.current === sendingChatId && detailAccountRef.current === sendingAccountId) {
-        setQuotedMessage((prev) => (prev === quotedMessage ? null : prev))
-      }
-    } catch (sendError) {
-      // 別の会話・アカウントへ切り替えたあとの古い失敗は、
-      // 新しい画面へ出さない(A02-04)。
-      if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-        setError(describeSendFailure(sendError))
-      }
-    } finally {
-      setSending(false)
-      sendLockRef.current = false
-    }
-  }
+  /* G2：会話の要約と返信案（l1i3v）。AI を使っていない店では何も出さない。 */
+  const inboxAi = useInboxAi(chatDetail?.id ?? null, selectedAccountId, chatDetail?.messages)
 
-  /**
-   * G-4: テンプレートのパック送信。選んだ順の本文を1回のpushにまとめて送る。
-   * 入力欄・添付・引用とは別系統で、パック自身が完結した送信単位になる。
-   * （LINEのpushは1回あたり5通まで。）
-   */
-  const handleSendPack = async (pack: NonNullable<typeof pendingPack>) => {
-    if (pack.chatId !== selectedChatId || pack.accountId !== selectedAccountId) { setPendingPack(null); return }
-    const texts = pack.texts
-    if (!selectedChatId || texts.length === 0 || sendLockRef.current) return
-    const sendingChatId = selectedChatId
-    const sendingAccountId = selectedAccountId
-    sendLockRef.current = true
-    setSending(true)
-    try {
-      const now = new Date().toISOString()
-      const signature = JSON.stringify({ chatId: sendingChatId, combined: true, texts })
-      const sendResult = await api.chats.sendCombined(sendingChatId,
-        { texts, revision: pack.revision, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.sendCombined>[1],
-        sendKeysRef.current.get(signature),
-      )
-      sendKeysRef.current.clear(signature)
-      if (!sendResult.success) {
-        if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-          setError(sendResult.error || '送信できませんでした。')
-        }
-        return
-      }
-      const staffName = sendResult.data.sentByStaffName
-      const packMessages = texts.map((content) =>
-        buildOutgoingMessage({ messageType: 'text', content, sentByStaffName: staffName, sentAt: now }),
-      )
-      setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
-        ...prev,
-        lastMessageAt: now,
-        status: 'in_progress',
-        revision: sendResult.data.revision,
-        messages: [...(prev.messages ?? []), ...packMessages],
-      } : prev)
-      setChats((prev) => {
-        const exists = prev.some((c) => c.id === sendingChatId)
-        if (!exists) return prev
-        return refreshChatListAfterSend(prev, statusFilterRef.current, (c) => (c.id === sendingChatId ? {
-          ...c,
-          lastMessageAt: now,
-          status: 'in_progress' as const,
-          // 一覧のpreviewはパックの最後の1通を見せる（相手に届く並びの末尾）。
-          lastMessageContent: texts[texts.length - 1],
-          lastMessageDirection: 'outgoing' as const,
-          lastMessageType: 'text' as const,
-        } : c))
-      })
-      // 手動返信で未対応が減るので、サイドバーのバッジを即時更新させる
-      window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-    } catch (sendError) {
-      if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-        setError(describeSendFailure(sendError))
-      }
-    } finally {
-      setSending(false)
-      sendLockRef.current = false
-      setPendingPack(null)
-    }
-  }
+  const activeFriendId = (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
+    ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
+    ?? null
 
-  /**
-   * N-025: 本文を予約送信する。画像つきは予約口がまだ持たないため止める。
-   * 成功したら入力と引用をクリアし、予約一覧を読み直す。
-   */
-  const handleScheduleSend = async () => {
-    if (!selectedChatId || scheduling || scheduleLockRef.current) return
-    const content = messageContent.trim()
-    /*
-     * B-6（API-15）：予約でも画像・動画・ファイルを使える。添付は1通ずつ、本文は最後に予約する
-     * （同じ日時なので届く順は 添付 → 本文）。準備中・失敗の添付は予約しない。
-     */
-    const schedulingImage = pendingImage && pendingImage.mode === 'line-image' ? pendingImage : null
-    const schedulingAttachment = pendingAttachment
-    if (schedulingAttachment && schedulingAttachment.status !== 'ready') {
-      setError(schedulingAttachment.status === 'uploading'
-        ? `「${schedulingAttachment.name}」の準備が終わってから予約できます。`
-        : `「${schedulingAttachment.name}」を準備できていません。もう一度試すか、外してから予約してください。`)
-      return
-    }
-    if (!content && (!schedulingImage && !schedulingAttachment)) return
-    // INBOX-29: 上限を超えた本文は予約もさせない。
-    if (messageContent.length > MESSAGE_MAX_LENGTH) {
-      setError(`メッセージは${formatNumber(MESSAGE_MAX_LENGTH)}文字までです。`)
-      return
-    }
-    if (!scheduleInput) {
-      setError('予約する日時を選んでください')
-      return
-    }
+  const {
+    chatSearch,
+    chatSearchFocusSeq,
+    chatSearchFilling,
+    chatSearchTarget,
+    openChatSearch,
+  } = useInboxSearch({
+    chatDetail,
+    messagesHasMore,
+    selectedChatIdRef,
+    detailAccountRef,
+    setChatDetail,
+    setMessagesHasMore,
+    setError,
+  })
 
-    const schedulingChatId = selectedChatId
-    const schedulingAccountId = selectedAccountId
-    setScheduling(true)
-    scheduleLockRef.current = true
-    try {
-      const scheduledAt = jstDatetimeLocalToIso(scheduleInput)
-      const items: Array<{ messageType?: 'image' | 'video' | 'file'; content: string; done: () => void }> = []
-      if (schedulingImage) {
-        items.push({
-          messageType: 'image',
-          content: JSON.stringify({ originalContentUrl: schedulingImage.originalContentUrl, previewImageUrl: schedulingImage.previewImageUrl }),
-          done: () => {
-            dropSentDraft(schedulingChatId, schedulingAccountId, { image: schedulingImage })
-            if (selectedChatIdRef.current === schedulingChatId && detailAccountRef.current === schedulingAccountId && pendingImageRef.current === schedulingImage) {
-              setPendingImage(null)
-              setPendingImageMeta(null)
-            }
-          },
-        })
-      }
-      if (schedulingAttachment?.attachment) {
-        const input = attachmentSendInput(schedulingAttachment.attachment)
-        items.push({
-          messageType: input.messageType as 'video' | 'file',
-          content: input.content,
-          done: () => {
-            const key = draftKeyOf(schedulingAccountId, schedulingChatId)
-            if (attachDraftsRef.current.get(key)?.job === schedulingAttachment.job) putAttachment(key, null)
-          },
-        })
-      }
-      if (content) {
-        items.push({
-          content,
-          done: () => {
-            dropSentDraft(schedulingChatId, schedulingAccountId, { content })
-            if (selectedChatIdRef.current === schedulingChatId && detailAccountRef.current === schedulingAccountId) {
-              setMessageContent((prev) => (prev.trim() === content ? '' : prev))
-            }
-          },
-        })
-      }
-      let allScheduled = true
-      for (const item of items) {
-        /*
-         * 同じ送信版には同じ操作キーを使い回す(#965)。通信中の二度押しや
-         * 失敗後の再試行で毎回新しいキーを生やすと、処理待ちの予約行が
-         * 二重に登録される。成功した版は消して、次の予約を別操作にする。
-         */
-        const signature = JSON.stringify({
-          kind: 'schedule',
-          chatId: schedulingChatId,
-          messageType: item.messageType ?? 'text',
-          content: item.content,
-          scheduledAt: scheduleInput,
-          quotedMessageId: quotedMessage?.id ?? null,
-        })
-        const res = await api.chats.schedule(schedulingChatId, {
-          content: item.content,
-          ...(item.messageType ? { messageType: item.messageType } : {}),
-          // 入力欄は日本時間の約束(INBOX-21)。オフセットを付けて送り、
-          // サーバー側の時間帯に左右されない同じ瞬間を保存する。
-          scheduledAt,
-          quotedMessageId: quotedMessage?.id,
-        }, sendKeysRef.current.get(signature))
-        if (!res.success) {
-          allScheduled = false
-          break
-        }
-        sendKeysRef.current.clear(signature)
-        // 予約した版だけを消す。切替先の下書きや開いたパネルは触らない(#962 F06)。
-        item.done()
-      }
-      if (allScheduled && selectedChatIdRef.current === schedulingChatId && detailAccountRef.current === schedulingAccountId) {
-        setQuotedMessage((prev) => (prev === quotedMessage ? null : prev))
-        setScheduleInput((prev) => (prev === scheduleInput ? '' : prev))
-        setShowSchedulePanel(false)
-      }
-      await loadScheduledSends(schedulingChatId)
-    } catch (scheduleError) {
-      // 別の会話・アカウントへ切り替えたあとの古い失敗は、
-      // 新しい画面へ出さない(A02-04)。
-      if (detailAccountRef.current === schedulingAccountId && selectedChatIdRef.current === schedulingChatId) {
-        setError(describeSendFailure(scheduleError))
-      }
-    } finally {
-      setScheduling(false)
-      scheduleLockRef.current = false
-    }
-  }
+  const {
+    chatPollStalled,
+    setChatPollRetryKey,
+  } = useInboxSubscription({
+    refreshChatDetailQuietly,
+    channel,
+    loadChatsQuietly,
+  })
 
-  /** 予約の取消。送信中・送信済みは口が409で拒否し、一覧を読み直す。 */
-  const handleCancelScheduled = async (scheduleId: string) => {
-    if (!selectedChatId) return
-    try {
-      const res = await api.chats.cancelScheduled(selectedChatId, scheduleId)
-      if (res.success) {
-        setScheduledSends((prev) => prev.filter((row) => row.id !== scheduleId))
-      }
-    } catch (caught) {
-      setError((caught as { code?: string })?.code === 'SCHEDULE_TOO_LATE'
-        ? 'まもなく送ります。取り消せません。'
-        : '予約の取消に失敗しました。一覧を読み込み直してください。')
-      void loadScheduledSends(selectedChatId)
-    }
-  }
+  const {
+    handleSendMessage,
+    handleSendPack,
+    handleKeyDown,
+  } = useInboxSend({
+    selectedChatId,
+    sending,
+    sendLockRef,
+    pendingAttachment,
+    setError,
+    messageContent,
+    pendingImage,
+    selectedAccountId,
+    setSending,
+    chatDetail,
+    quotedMessage,
+    senderId,
+    sendKeysRef,
+    dropSentDraft,
+    selectedChatIdRef,
+    detailAccountRef,
+    pendingImageRef,
+    setPendingImage,
+    setPendingImageMeta,
+    setMessageContent,
+    setChatDetail,
+    setChats,
+    statusFilterRef,
+    attachDraftsRef,
+    putAttachment,
+    correctingId,
+    setCorrectingId,
+    setQuotedMessage,
+    pendingPack,
+    setPendingPack,
+    isComposingRef,
+    sendMode,
+  })
 
-  /** 予約時刻の変更。datetime-local の JST 値はオフセットを付けて口へ渡す(INBOX-21)。 */
-  const handleReschedule = async (scheduleId: string, nextAt: string) => {
-    if (!selectedChatId || !nextAt) return
-    try {
-      const res = await api.chats.updateScheduled(selectedChatId, scheduleId, { scheduledAt: jstDatetimeLocalToIso(nextAt) })
-      if (res.success) await loadScheduledSends(selectedChatId)
-    } catch (reason) {
-      saveErrors.capture(reason)
-      setError('予約時刻の変更に失敗しました。一覧を読み込み直してください。')
-      void loadScheduledSends(selectedChatId)
-    }
-  }
+  const {
+    showMemoEditor,
+    setShowMemoEditor,
+    memoDraft,
+    setMemoDraft,
+    memoSaving,
+    setMemoSaving,
+    memoError,
+    setMemoError,
+    attentionSaving,
+    setAttentionSaving,
+    handleStatusUpdate,
+    handleAttentionUpdate,
+    closeMemoEditor,
+    memoPopoverRef,
+  } = useInboxActions({
+    chatDetail,
+    selectedChatId,
+    loadChatDetail,
+    loadChats,
+    setError,
+    setChatDetail,
+    setChats,
+  })
 
   /** 担当を付け替える（設計 `TalkPane` の「担当」）。 */
   const handleOperatorUpdate = async (operatorId: string | null) => {
@@ -2307,199 +625,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setError('担当の更新に失敗しました。')
     }
   }
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
-          '/api/operators',
-        )
-        if (!cancelled && res.success) setOperators(res.data)
-      } catch {
-        // 担当を選べないだけ。返信そのものは続けられる。
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    /*
-      **アカウントを切り替えたら、前の集計をその場で捨てる。**
-      読み終わるまで残すと、別のアカウントの未読数を見たまま担当者を選ぶ。
-    */
-    setAssigneeUnread(null)
-    setAssigneeUnreadStatus('loading')
-    ;(async () => {
-      try {
-        /*
-          この口はアカウント引数を取らない（担当者の見える範囲で絞る作り）。
-          **新しい契約は足さない。** 切り替えのたびに読み直して、
-          前のアカウントの数を残さないことだけを守る。
-        */
-        const res = await api.chatStats.get()
-        if (cancelled) return
-        /* 失敗の返事を成功として読まない。`—` のままにする。 */
-        if (!res.success) throw new Error('failed')
-        setAssigneeUnread(res.data.assigneeUnread)
-        setAssigneeUnreadStatus('ready')
-      } catch {
-        /*
-          **集計の失敗を0件と扱わない。** `null` のままにして数だけ `—` にする。
-          担当者一覧そのものは `/api/operators` の結果を保つ。
-        */
-        if (!cancelled) {
-          setAssigneeUnread(null)
-          setAssigneeUnreadStatus('error')
-        }
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [selectedAccountId])
-
-  /*
-   * INBOX-09: 「すべて／要返信／1時間以上待ち」の件数は、一覧と同じ条件で
-   * サーバーに数えさせる。quickFilter 自体は条件に含めない（各札は
-   * 「その札を押したときの件数」を表す）。応答が着順違れで戻っても
-   * requestId で新しい方だけを採用する。
-   */
-  const quickCountsKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
-  useEffect(() => {
-    const requestId = ++quickCountsRequestRef.current
-    const key = quickCountsKey
-    // #625: 応答なしの要求は時間切れの失敗にする。件数は「—」へ戻り、0化しない。
-    void withRequestTimeout(api.chats.quickCounts({
-      status: statusFilter === 'all' ? undefined : statusFilter,
-      operatorId: assigneeFilter === 'all' ? undefined : assigneeFilter,
-      accountId: selectedAccountId || undefined,
-      q: debouncedNameQuery || undefined,
-      unreadOnly,
-      channel,
-    })).then((res) => {
-      if (quickCountsRequestRef.current !== requestId) return
-      /* 失敗や変な形の応答を0件と読まない。`—` のままにする。 */
-      setQuickCounts(
-        res.success && res.data && typeof res.data.all === 'number'
-          ? { key, counts: { all: res.data.all, reply: res.data.reply, overdue: res.data.overdue } }
-          : null,
-      )
-    }).catch(() => {
-      if (quickCountsRequestRef.current === requestId) setQuickCounts(null)
-    })
-  }, [quickCountsKey, statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
-
-  /*
-   * ★V8 状態の切り替えの件数（未対応 5・対応中 2…）。一覧と同じ条件（アカウント・担当・名前・
-   * 未読だけ・経路）で、状態ごとに件数の口へ聞く。失敗は0件にせず数を出さない。v7 では聞かない。
-   */
-  const statusCountsKey = JSON.stringify([selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
-  const [statusCounts, setStatusCounts] = useState<{ key: string; counts: Record<Exclude<StatusFilter, 'all'>, number> } | null>(null)
-  const statusCountsRequestRef = useRef(0)
-  useEffect(() => {
-
-    const requestId = ++statusCountsRequestRef.current
-    const key = statusCountsKey
-    const keys = ['unread', 'in_progress', 'on_hold', 'resolved'] as const
-    void Promise.all(keys.map((status) => withRequestTimeout(api.chats.quickCounts({
-      status,
-      operatorId: assigneeFilter === 'all' ? undefined : assigneeFilter,
-      accountId: selectedAccountId || undefined,
-      q: debouncedNameQuery || undefined,
-      unreadOnly,
-      channel,
-    })))).then((results) => {
-      if (statusCountsRequestRef.current !== requestId) return
-      const alls = results.map((res) => (res.success && res.data && typeof res.data.all === 'number' ? res.data.all : null))
-      if (alls.some((n) => n === null)) {
-        setStatusCounts(null)
-        return
-      }
-      const counts = Object.fromEntries(keys.map((status, i) => [status, alls[i]])) as Record<Exclude<StatusFilter, 'all'>, number>
-      setStatusCounts({ key, counts })
-    }).catch(() => {
-      if (statusCountsRequestRef.current === requestId) setStatusCounts(null)
-    })
-  }, [statusCountsKey, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
-  const statusCountsNow = statusCounts?.key === statusCountsKey ? statusCounts.counts : null
-
-  /*
-   * 対応状況の切替は取り消せる軽い操作。押した瞬間に画面へ反映して
-   * 裏で保存する（★V7 sTJsh §1）。失敗したら元の状況へ戻す。
-   */
-  const handleStatusUpdate = (newStatus: Chat['status']) => {
-    if (!selectedChatId || !chatDetail) return
-    const chatId = selectedChatId
-    const previous = chatDetail.status
-    const revision = chatDetail.revision
-    const apply = (status: Chat['status']) => {
-      setChatDetail((current) => (current?.id === chatId ? { ...current, status } : current))
-      setChats((prev) => prev.map((chat) => (chat.id === chatId ? { ...chat, status } : chat)))
-    }
-    apply(newStatus)
-    runOptimistic({
-      request: () => api.chats.update(chatId, { status: newStatus, revision }),
-      revert: () => apply(previous),
-      failureMessage: '対応状況を変えられませんでした。',
-      retry: () => handleStatusUpdate(newStatus),
-      onSuccess: () => {
-        loadChatDetail(chatId)
-        loadChats()
-        // 対応済み/未読の切替は未対応バッジに影響するので即時更新させる
-        window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-      },
-    })
-  }
-
-  /** 友だち一覧と同じ「注目」を受信箱の★から切り替える。 */
-  const handleAttentionUpdate = async () => {
-    if (!chatDetail || attentionSaving) return
-    const updatingChatId = chatDetail.id
-    const next = !chatDetail.isAttention
-    setAttentionSaving(true)
-    setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: next } : current)
-    try {
-      // N-040(#808): 友だちの現行改訂値を読んでから送り、競合は上書きしない。
-      const detail = await fetchApi<{ success: boolean; data: { updatedAt: string } }>(
-        `/api/friends/${chatDetail.friendId}`,
-      )
-      await fetchApi<{ success: boolean; data: unknown }>(
-        `/api/friends/${chatDetail.friendId}/metadata?expectedUpdatedAt=${encodeURIComponent(detail.data.updatedAt)}`,
-        { method: 'PUT', body: JSON.stringify({ __attention: next ? '1' : null }) },
-      )
-    } catch (error) {
-      setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: !next } : current)
-      if (error instanceof ApiError && error.status === 409) {
-        setError('ほかの変更が先に保存されました。最新の状態で確認してもう一度お試しください。')
-      } else {
-        setError('注目の変更に失敗しました。')
-      }
-    } finally {
-      setAttentionSaving(false)
-    }
-  }
-
-  /*
-   * 内部メモの紙を閉じる。Escape・キャンセル・フォーカス戻しで
-   * 共通なので1か所にする(N-031)。
-   */
-  const closeMemoEditor = useCallback(() => {
-    setMemoDraft(chatDetail?.notes ?? '')
-    setMemoError('')
-    setShowMemoEditor(false)
-  }, [chatDetail?.notes])
-
-  /*
-   * role="dialog" の紙なのに Tab が裏の送信欄へ抜け、閉じても
-   * フォーカスがボタンへ戻らなかった(N-031)。共通部品と同じ
-   * useOverlayFocus で、Tabを紙の中に留め・Escapeで閉じ・
-   * 閉じたら開いたボタンへフォーカスを戻す。
-   */
-  const memoPopoverRef = useOverlayFocus(showMemoEditor, closeMemoEditor, memoSaving)
 
   const handleSaveMemo = async () => {
     if (!selectedChatId || memoSaving) return
@@ -2540,70 +665,60 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    // IME変換確定のEnterでは送信しない
-    if (e.nativeEvent.isComposing || isComposingRef.current || e.keyCode === 229) return
-    if (e.key !== 'Enter') return
-    // sendMode 'enter': Enter単体で送信、Shift+Enterは改行
-    // sendMode 'shift-enter': Shift+Enterで送信、Enter単体は改行
-    const shouldSend = sendMode === 'enter' ? !e.shiftKey : e.shiftKey
-    if (shouldSend) {
-      e.preventDefault()
-      handleSendMessage()
-    }
-  }
-
-
-  // INBOX-29: 上限を超えた本文は送らせない(下書きは消さない)。
-  const messageLength = messageContent.length
-  const messageOverLimit = messageLength > MESSAGE_MAX_LENGTH
-  // この会話で画像の準備(アップロード)が進行中か(INBOX-23/31)。
-  const imageUploading = imageBusyKeys.has(draftKeyOf(selectedAccountId, selectedChatId))
-  /*
-   * INBOX-09: 札の件数は一覧と同じ条件（アカウント・検索・担当・経路・
-   * 未読）をサーバーで数えたものだけを出す。以前は「すべて」に画面へ
-   * 読み込んだ行数（最大200件）を出し、「要返信」にはフィルタを
-   * 通さない別集計を出していたため、押した結果と件数が一致しなかった。
-   * 条件に対応した応答が届くまでは `—` を出し、部分件数を全件数の
-   * ように見せない。
-   */
-  const quickCountsNow = quickCounts?.key === quickCountsKey ? quickCounts.counts : null
-  const hasInboxFilters = Boolean(
-    nameQuery.trim()
-      || statusFilter !== 'all'
-      || quickFilter !== 'all'
-      || assigneeFilter !== 'all'
-      || unreadOnly,
-  )
-  // 入力からdebounce反映までを「0件」と断定しない。古い条件の結果が一瞬見えるため。
-  const nameQueryPending = nameQuery.trim() !== debouncedNameQuery
-  const currentFilterNotLoaded = (channel !== 'email' && chatListCompletedKey !== listFilterKey)
-    || (channel !== 'line' && emailListCompletedKey !== listFilterKey)
-  const inboxListLoading = nameQueryPending
-    || currentFilterNotLoaded
-    || (channel !== 'email' && loading)
-    || (channel !== 'line' && emailLoading)
-  const inboxListFailed = (channel !== 'email' && chatListFailed)
-    || (channel !== 'line' && Boolean(emailError))
-  const clearInboxFilters = () => {
-    setNameQuery('')
-    setDebouncedNameQuery('')
-    setStatusFilter('all')
-    setQuickFilter('all')
-    setAssigneeFilter('all')
-    setUnreadOnly(false)
-    // 手動で解除したので、URLの保存検索IDも外す(N-021)。
-    dropSavedViewParam()
-  }
-  const activeFriendId = (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
-    ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
-    ?? null
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
     dirty: showMemoEditor && memoDraft !== (chatDetail?.notes ?? ''),
     busy: memoSaving,
     samePage: (destination) => destination.pathname === '/chats',
     onDiscard: () => { setShowMemoEditor(false); setMemoDraft(chatDetail?.notes ?? '') },
   })
+
+  // 同じ会話IDが別アカウントにも存在していても、切替前の遅い応答を表示しない。
+  // 初回表示では深いリンクを消さず、実際にアカウントが変わったときだけ外す。
+  useEffect(() => {
+    if (detailAccountRef.current === selectedAccountId) return
+    detailAccountRef.current = selectedAccountId
+    detailRequestIdRef.current += 1
+    setSelectedChatId(null)
+    setChatDetail(null)
+    setDetailLoading(false)
+    setAttentionSaving(false)
+  }, [selectedAccountId, setAttentionSaving, setChatDetail, setDetailLoading])
+
+  const {
+    messagesScrollRef,
+    unseenIncoming,
+    setUnseenIncoming,
+  } = useInboxScroll({
+    selectedChatId,
+    chatDetail,
+    textareaRef,
+    messageContent,
+  })
+
+  const lineContent = (<FriendInfoSidebarBoundary resetKey={`${selectedAccountId ?? ''}:${activeFriendId ?? ''}`}><FriendInfoSidebar
+            lastContactAt={chatDetail && chatDetail.id === selectedChatId ? chatDetail.lastMessageAt : null}
+            friendId={activeFriendId}
+            accountId={selectedAccountId ?? undefined}
+            chatId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.id : null}
+            revision={chatDetail && chatDetail.id === selectedChatId ? chatDetail.revision : undefined}
+            operators={operators}
+            operatorId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.operatorId : null}
+            onChatChanged={() => {
+              if (selectedChatId) void loadChatDetail(selectedChatId)
+              void loadChats()
+            }}
+            operatorName={
+              chatDetail?.operatorId
+                ? operators.find((operator) => operator.id === chatDetail.operatorId)?.name ?? null
+                : null
+            }
+            chatStatus={
+              chatDetail && chatDetail.id === selectedChatId
+                ? { status: chatDetail.status, notes: chatDetail.notes }
+                : undefined
+            }
+          /></FriendInfoSidebarBoundary>)
+
   return (
     <SaveErrorScope errors={saveErrors}><div className="space-y-3">
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した内部メモ" onConfirm={confirmLeave} onCancel={cancelLeave} />
@@ -2623,632 +738,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         {/* 狭い画面では、開いている間は一覧を隠して中央を広く使う。
             メールを開いたときも同じ。ここが LINE だけを見ていたので、
             メールを開いても一覧が残って中央が半分のままだった。 */}
-        <InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
-          {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
-
-                <InboxListHeader
-        data-design="Filters"
-        data-inbox-v4="quick-filters"
-        aria-label="受信箱のクイック絞り込み"
-      >
-        <InboxListHeadline><PageTitle>受信箱</PageTitle>
-        {/*
-          設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
-          右から420pxのパネルが出る（`bXyEA`）。
-
-          以前は `<details>` の小さな箱（208px）で、中身は対応状況だけだった。
-          設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
-          6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
-        */}
-        <Button type="button" size="compact" className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
-          <ListFilter aria-hidden size={16} />
-        </Button>
-        {/*
-          INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
-          この行（section.relative）を基準に右端を合わせる。ボタン基準の
-          right-0 だと、狭い画面でボタンが左に折り返されたときパネルの
-          左側が画面外へ出た。幅も画面の左右16px以内に収める。
-        */}
-        <div>
-          {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
-          <Button
-            type="button"
-            size="compact"
-            className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="保存した検索" title="保存した検索"
-            onClick={() => {
-              setSavedViewsOpen((open) => !open)
-              setSavedViewError('')
-            }}
-            aria-expanded={savedViewsOpen}
-          >
-            <Bookmark aria-hidden size={16} />
-          </Button>
-          {savedViewsOpen && (
-            <InboxFloatingPanel placement="below">
-              <p className="text-ink text-sm font-bold">保存した検索</p>
-              <div className="mt-3 space-y-1">
-                {savedViews.length === 0 ? (
-                  <p className="bg-canvas-sunken text-ink-faint rounded-control px-3 py-3 text-xs">
-                    まだ保存した検索はありません。
-                  </p>
-                ) : savedViews.map((view) => (
-                  <div key={view.id} className="hover:bg-canvas-sunken flex items-center gap-2 rounded-control px-2 py-1.5">
-                    <button
-                      type="button"
-                      onClick={() => applySavedView(view)}
-                      className="text-ink min-w-0 flex-1 truncate text-left text-xs font-semibold"
-                      title={view.name}
-                    >
-                      {view.name}{view.isShared ? '（共有）' : ''}
-                      {/*
-                        **名前の下に、何で絞ったかを出す。**
-                        設計 `ASsb3` は「対応マーク：未対応／期限：超過」のように書く。
-                        名前だけだと、`未対応・期限超過` と `河野担当の未対応` の
-                        どちらを押せばいいのかが、名前の付け方頼みになる。
-                      */}
-                      <span className="text-ink-faint mt-0.5 block truncate text-micro font-normal">
-                        {savedViewSummary(normalizeSavedViewConditions(view.conditions), operatorNames)}
-                      </span>
-                    </button>
-                    <span className="text-ink-secondary shrink-0 text-xs tabular-nums">
-                      {typeof view.matchCount === 'number' ? `${view.matchCount}件` : '—件'}
-                    </span>
-                    <div className="relative shrink-0">
-                      <RowMenu
-                        label={`${view.name}の操作`}
-                        triggerProps={{ 'data-qa-open': view.id === savedViews[0]?.id ? 'ASsb3-menu' : undefined }}
-                        onOpenChange={(open) => setSavedViewMenuId(open ? view.id : null)}
-                        open={savedViewMenuId === view.id}
-                        items={[
-                          {
-                            id: `${view.id}-delete`,
-                            label: '保存した検索を削除',
-                            tone: 'danger',
-                            onSelect: () => {
-                              void (async () => {
-                                if (!selectedAccountId) return
-                                await api.chats.savedViews.delete(view.id, selectedAccountId)
-                                setSavedViewMenuId(null)
-                                await loadSavedViews()
-                              })()
-                            },
-                          },
-                        ]}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {savedViews.some((view) => typeof view.matchCount !== 'number') ? (
-                <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-                  該当件数は、保存した条件ごとの集計が接続されると表示されます。「—件」は0件ではありません。
-                </p>
-              ) : null}
-              {/*
-                前はここに名前の入力欄と保存ボタンが直接並んでいた。
-                **何を保存しようとしているのかが書いていない**ので、絞り込みを
-                変えたつもりで前の条件を保存してしまう。設計（`Ln4zS`）は
-                名前と「保存する条件」を並べて見せてから保存させる。
-              */}
-              <div className="border-hairline mt-3 border-t pt-3">
-                <Button variant="primary" type="button" onClick={() => {
-                  setSavedViewSuccess(false)
-                  setSaveDialogOpen(true)
-                }}>
-                  現在の条件を保存する
-                </Button>
-                {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
-              </div>
-            </InboxFloatingPanel>
-          )}
-        </div>
-        {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
-        {(
-          /*
-           * ★V8：絵（XqSvX）の「対応ルール」は settings-2 の印。押してもページを移らず、
-           * その場で小窓を開く（オーナー指摘：別のページへ飛ぶのはおかしい）。
-           */
-          <InboxRulesPopover accountId={selectedAccountId ?? null} onRoutingSaved={() => setSlaReload((n) => n + 1)} />
-        )}
-        </InboxListHeadline>
-        {[
-          { key: 'all' as const, label: 'すべて', title: undefined, icon: null },
-          { key: 'reply' as const, label: '要返信', title: '対応状況が「未対応」の会話', icon: Reply },
-          /*
-           * INBOX-10: ここで数えるのは対応期限ではなく、未対応のまま
-           * 最後のやり取りから1時間以上たった会話。「期限超過」と書くと
-           * 設定した期限の超過に読めるため、実態に合う名前にする。
-           *
-           * m22c: 右の操作（絞り込み・保存した検索・対応ルール）と同じ
-           * 高さ32にそろえる。行の中で高さが違うと、同じ1行でも上端が
-           * ずれて2行に見える（見た目の自動点検 k=5）。
-           */
-          slaEnabled
-            ? { key: 'overdue' as const, label: overdueTotal === null ? '期限超過' : `期限超過 ${overdueTotal}`, title: '最初の返事の期限を過ぎた会話', icon: Clock3 }
-            : { key: 'overdue' as const, label: '1時間以上待ち', title: '未対応のまま、最後のやり取りから1時間以上たった会話', icon: Clock3 },
-        ].sort((a, b) => (slaEnabled ? Number(b.key === 'overdue') - Number(a.key === 'overdue') : 0)).map((filter) => (
-          <FilterChip size="inbox" key={filter.key} selected={quickFilter === filter.key} onChange={() => { setQuickFilter(filter.key); dropSavedViewParam() }} title={filter.title} showCheck={false} icon={filter.icon ? <filter.icon aria-hidden size={14} /> : undefined}>
-            {filter.label}
-            {quickCountsNow && !(slaEnabled && filter.key === 'overdue') ? <span className="sr-only tabular-nums">{quickCountsNow[filter.key]}</span> : null}
-          </FilterChip>
-        ))}
-        <SavedViewDialog
-          open={saveDialogOpen}
-          initialValue={{
-            status: statusFilter,
-            quickFilter,
-            channel,
-            assignee: assigneeFilter,
-            unreadOnly,
-            favorite: true,
-          }}
-          operators={operators}
-          existingNames={savedViews.map((view) => view.name)}
-          saving={savingView}
-          onSave={async (draft) => {
-            setSavedViewName(draft.name)
-            return createSavedView(draft)
-          }}
-          onClose={() => setSaveDialogOpen(false)}
-        />
-        {filterOpen || showTemplatePicker ? (
-          <style>{`
-            [aria-label="テンプレートを選択"] {
-              background-color: var(--color-scrim) !important;
-            }
-            div:has(> section[aria-label="絞り込み"]) > div[aria-hidden="true"] {
-              background-color: transparent !important;
-            }
-          `}</style>
-        ) : null}
-        <InboxFilterPanel
-          open={filterOpen}
-          value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
-          operators={operators}
-          onChange={(next) => {
-            setStatusFilter(next.status as StatusFilter)
-            setAssigneeFilter(next.assignee)
-            setUnreadOnly(next.unreadOnly)
-            if (next.channel !== channel) {
-              // 手動の条件変更なので savedView は残さない(N-021)。
-              router.push(buildInboxUrl(next.channel, null))
-            } else {
-              dropSavedViewParam()
-            }
-          }}
-          onReset={() => {
-            setStatusFilter('all')
-            setAssigneeFilter('all')
-            setUnreadOnly(false)
-            router.push('/chats')
-          }}
-          onClose={() => setFilterOpen(false)}
-        />
-      </InboxListHeader>
-          {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
-          <InboxListSearch>
-            {(
-              /* ★V8：共通の検索欄（自作の入力欄をやめる）。 */
-              <SearchField
-                value={nameQuery}
-                onChange={(value) => { setNameQuery(clampSearchQuery(value)); dropSavedViewParam() }}
-                onClear={() => { setNameQuery(''); dropSavedViewParam() }}
-                maxLength={SEARCH_QUERY_MAX_LENGTH}
-                placeholder="名前・メールアドレス・内容で探す"
-                aria-label="名前・メールアドレス・内容で検索"
-              />
-            )}
-            {/*
-              #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
-              プルダウンが自分で名乗るため、外の字は置かない。
-            */}
-            <InboxFilterControls>
-            <>
-                {/*
-                  未読数は集計の口から渡す。**画面に見えている行から数えない**
-                  ——一覧はページ送りされるので、2ページ目の未読が落ちる。
-                  0件の担当者も選択肢に残す（契約上、0件は配列に載らないので実値0として描く）。
-                */}
-{(
-                  /* ★V8：共通の選ぶ欄（選んだ行は ✓ だけ）。担当者ごとの未読数は名前の後ろの（）に添える（未取得は「—」）。 */
-                  <EntitySelect
-                    aria-label="担当者で絞り込む"
-                    label="担当者"
-                    valuePrefix="担当者："
-                    width={138}
-                    size="full"
-                    value={assigneeFilter}
-                    onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
-                    options={buildOperatorRows(operators, true).map((row) => {
-                      if (row.id === 'all') return { ...entityOptionMetadata(row), value: row.id, label: row.name }
-                      const unread = assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(row.id)
-                      return { ...entityOptionMetadata(row), value: row.id, label: `${row.name}（${unread === null ? '—' : unread}）` }
-                    })}
-                  />
-                )}
-</>
-              <EntitySelect width={124} aria-label="受信経路で絞り込む" label="経路" valuePrefix="経路：" value={channel} onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))} options={CHANNELS.map((item) => ({value:item.key,label:item.label}))} />
-            </InboxFilterControls>
-          </InboxListSearch>
-
-          {/*
-            状態の絞り込みは5等分の切り替え。左の欄（開いている間は288px）でも
-            必ず1行に収まるよう、折り返さない・5つで幅いっぱいにする。
-            選んだ所は白地に濃い文字。読み上げはラジオの決まり。
-          */}
-          <div className={`border-b border-hairline px-3 py-2 ${styles.statusBlock}`}>
-            <div
-              role="radiogroup"
-              aria-label="対応状況で絞り込む"
-              onKeyDown={handleStatusFilterKeyDown}
-              className={`bg-shell flex h-8 flex-nowrap items-stretch rounded-control p-0.5 ${styles.statusSeg}`}
-            >
-              {statusFiltersV8.map((f, index) => {
-                const selected = statusFilter === f.key
-                // V8：「すべて」の所が無いので、何も選んでいない（すべて）ときは先頭に Tab で入れる。
-                const focusable = selected || ((statusFilter === 'all') && index === 0)
-                const count = statusCountsNow ? statusCountsNow[f.key as Exclude<StatusFilter, 'all'>] : null
-                return (
-                  <button
-                    key={f.key}
-                    ref={(el) => { statusFilterButtonRefs.current[index] = el }}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    tabIndex={focusable ? 0 : -1}
-                    title={selected ? `${f.label}（もう一度押すとすべて）` : f.label}
-                    onClick={() => { setStatusFilter(selected ? 'all' : f.key); dropSavedViewParam() }}
-                    // #639 の素のボタンの最小高さ32pxをここだけ外す。
-                    // 切り替え全体の高さ32pxの中に収めるため。
-                    style={{ minHeight: 0 }}
-                    className={`min-w-0 flex-1 truncate rounded-mini px-1 text-center text-xs whitespace-nowrap transition-colors ${styles.statusItem} ${
-                      selected
-                        ? 'bg-canvas font-semibold text-ink shadow-card'
-                        : 'text-ink-secondary hover:text-ink font-medium'
-                    }`}
-                  >
-                    {f.label}
-                    {count === null || count === undefined ? null : <span className={styles.statusCount}>{count}</span>}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <p data-inbox-sort="fixed" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>{slaEnabled ? '並び順：期限が近い順（過ぎた物が先）' : '並び順：未読が先・新しい順'}</p>
-          {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
-          <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
-            <>
-                {/*
-                  メール一覧の失敗行。LINEだけ見ているときは出さない。
-                  以前は失敗が無言で「メール0件」に見え、未対応の見落としになった。
-                  ふだん（成功時）は何も出ないので、一覧の見た目は変わらない。
-                */}
-                {channel !== 'line' && emailError && (
-                  <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
-                    <p className="text-sm text-danger">{emailError}</p>
-                    <button
-                      type="button"
-                      onClick={() => { void loadEmails() }}
-                      className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
-                    >
-                      メールを読み込み直す
-                    </button>
-                  </div>
-                )}
-                {/*
-                  LINE一覧の失敗行。メールだけ見ているときは出さない。
-                  「もう一度お試しください」とだけ書かれた帯では、直す手段が
-                  ページ全体の再読み込みしかない(N-030)。失敗した一覧の場所で
-                  同じ条件の再取得へ戻れるようにする。
-                */}
-                {channel !== 'email' && chatListFailed && (
-                  <div role="alert" className="border-b border-hairline bg-danger-bg px-4 py-3">
-                    <p className="text-sm text-danger">チャットの読み込みに失敗しました。</p>
-                    <button
-                      type="button"
-                      onClick={() => { void loadChats() }}
-                      className="mt-1.5 text-sm font-semibold text-danger underline underline-offset-2"
-                    >
-                      会話を読み込み直す
-                    </button>
-                  </div>
-                )}
-                {/*
-                  メールの問い合わせを同じ一覧の先頭に混ぜる。
-                  設計 `V2 2-1 受信箱` の一覧は「✉ 定期便の解約について」のように
-                  メールも同じ並びに入っている。出どころで場所を分けると、
-                  返信を待っている人を2か所で探すことになる。
-
-                  押したときの行き先だけは分ける。LINEはこの画面のトーク、
-                  メールはメールの往復で、中央に出すものの作りが違う。
-                */}
-                {/*
-                  LINE とメールを1本に混ぜる。どちらも口側で「未読が先・
-                  新しい順」に並んでいるので、画面では並べ替えない。
-                  受け取った順のまま、先頭同士を比べて混ぜるだけで全体が
-                  保たれる。ページ送りで足された分も、各出どころの続き
-                  として正しい場所に入る。
-
-                  行の中身の作りは出どころで違う（メールは件名、LINE は
-                  最後のメッセージと未対応の印）ので、描き方はそれぞれ
-                  残したまま、混ぜ方だけそろえる。
-                */}
-                {(() => {
-                  const mailRows = (channel === 'line' ? [] : emailItems)
-                  .filter((item) =>
-                    nameQuery.trim() === ''
-                      ? true
-                      : [item.customerName, item.customerIdentifier, item.subject, item.preview]
-                          .filter(Boolean)
-                          .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
-                  )
-                  .filter((item) => statusFilter === 'all' || item.status === statusFilter)
-                  .map((item) => ({
-                    at: item.lastMessageAt ?? item.lastIncomingAt,
-                    unread: item.isUnread,
-                    key: `email:${item.id}`,
-                    // 描くのは見えている行だけ（窓分け）。中身はその時に作る。
-                    render: () => (
-                    // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
-                    // 直書きボタンの借金に数えられる (design-debt)。
-                    <div key={item.id} className="border-b border-hairline">
-                    <button
-                      onClick={() => {
-                        // LINEの選択を外す。両方開いていると中央に何を
-                        // 出すのか決まらない。URL指定の案内とURL状態も外す。
-                        // friend を残すと、再読込で古いLINE会話へ戻る(#673)。
-                        deepLinkRequestIdRef.current += 1
-                        deepLinkIdRef.current = null
-                        setDeepLinkNotice('')
-                        setSelectedChatId(null)
-                        setSelectedThreadId(item.threadId)
-                        router.replace(buildInboxUrl(channel, savedViewParam || null))
-                        setEmailItems((prev) => prev.map((email) => (
-                          email.threadId === item.threadId ? { ...email, isUnread: false } : email
-                        )))
-                        void fetchApi(`/api/support/email/threads/${encodeURIComponent(item.threadId)}/read`, {
-                          method: 'POST',
-                        }).catch(() => undefined)
-                      }}
-                      className={`w-full px-3 py-3 text-left transition-colors ${
-                        selectedThreadId === item.threadId ? 'bg-accent-soft' : 'hover:bg-shell'
-                      } ${styles.row}`}
-                    >
-                      <div className={`flex items-start gap-3 ${styles.rowInner}`}>
-                        <div className="relative shrink-0">
-                          {/* メールの行も名前の頭文字（以前は全員「M」で、誰の会話か目で追えなかった）。 */}
-                          <Avatar name={item.customerName} size={34} />
-                          {item.isUnread && (
-                            <span className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            {/* 板 `M0393`：未対応は顔の赤い点＋名前の太字。行の地は塗らない。 */}
-                            <p className={`text-ink truncate text-sm ${item.isUnread ? 'font-semibold' : 'font-medium'}`}>{item.customerName}</p>
-                            {(
-                              <span className={styles.rowTime} data-unread={item.isUnread || undefined}>{formatInboxListTime(item.lastIncomingAt)}</span>
-                            )}
-                          </div>
-                          <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
-                            <p className={`text-ink-faint line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview}`}>
-                              {item.subject || item.preview}
-                            </p>
-                          </div>
-                          <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
-                            <ChannelBadge channel="email" />
-                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
-                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
-                                {(item.assignedStaffName ?? '未').charAt(0)}
-                              </span>
-                              <span className="truncate">{`担当：${item.assignedStaffName ?? '未割り当て'}`}</span>
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                    </div>
-                    ),
-                  }))
-                  const lineRows = (channel === 'email' ? [] : chats)
-                  .map((chat) => ({
-                  at: chat.lastMessageAt ?? '',
-                  unread: chat.isUnread,
-                  key: chat.id,
-                  // 描くのは見えている行だけ（窓分け）。中身はその時に作る。
-                  render: () => {
-                  const isSelected = selectedChatId === chat.id
-                  const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? null
-                  // 「真の自発（要対応）」= chat.status='unread'。webhook 側で auto_reply に
-                  // マッチしなかった incoming のみ unread に設定される。auto_reply trigger
-                  // (キーワード "コスト比較" 等) は matched 扱いで unread 化しない。
-                  // 太字と印の表示はこの status を使う。direction だけだと button 押下も
-                  // 強調してしまって S/N 比が悪化する。
-                  const needsAttention = chat.status === 'unread'
-                  /*
-                    設計 `xGLVe` は、今日届いてまだ返していない行だけ待ち時間を
-                    出す。古い行まで「◯◯時間待ち」にすると桁が伸びて読めない。
-                  */
-                  const waitingLabel = needsAttention
-                    && chat.lastMessageAt
-                    && sameYmd(chat.lastMessageAt, new Date().toISOString())
-                    ? formatWaitingDuration(chat.lastMessageAt, Date.now())
-                    : null
-                  // 最新メッセージの本文 preview。flex/image は文字列で見せても意味が薄いので type 表記に置換。
-                  const previewRaw = chat.lastMessageContent ?? ''
-                  const preview = (() => {
-                    // 絵文字は付けない。言葉だけで何かは分かる。
-                    if (chat.lastMessageType === 'image') return '画像'
-                    if (chat.lastMessageType === 'flex') return 'Flexメッセージ'
-                    if (chat.lastMessageType === 'sticker') return 'スタンプ'
-                    if (chat.lastMessageType === 'video') return '動画'
-                    if (chat.lastMessageType === 'audio') return '音声'
-                    if (chat.lastMessageType === 'file') return 'ファイル'
-                    if (chat.lastMessageType === 'location') return '位置情報'
-                    if (chat.lastMessageType === 'unsent') return '送信を取り消しました'
-                    return previewRaw.replace(/\n+/g, ' ').slice(0, 60)
-                  })()
-                  // 区切り線は外の箱が持つ。押し場所に border-hairline を書くと
-                  // 直書きボタンの借金に数えられる (design-debt)。
-                  const node = (
-                    <div key={chat.id} className="border-b border-hairline">
-                    <button
-                      onClick={() => handleSelectChat(chat.id)}
-                      /* 名前は相手の名前だけ、未読と本文は説明に回す（読み上げで名前から入れる）。 */
-                      aria-labelledby={(`chat-row-name-${chat.id}`)}
-                      aria-describedby={(`${chat.isUnread ? `chat-row-unread-${chat.id} ` : ''}chat-row-preview-${chat.id}`)}
-                      className={`w-full px-3 py-3 text-left transition-colors ${
-                        isSelected
-                          ? 'bg-shell'
-                          /* 板 `M0393`：未対応は顔の赤い点＋太字で、行の地は塗らない。 */
-                          : 'hover:bg-shell'
-                      } ${styles.row}`}
-                    >
-                      <div className={`flex items-start gap-3 ${styles.rowInner}`}>
-                        <div className="relative shrink-0">
-                          {/* ★V7 友だちの顔：画像が読めない時も色つきの頭文字。 */}
-                          <Avatar name={chat.friendName} src={chat.friendPictureUrl} size={34} />
-                          {chat.isUnread && (
-                            <span id={`chat-row-unread-${chat.id}`} className={`border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-pill border-2 ${styles.unreadDot}`} aria-label="未読" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
-                              <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
-                            </div>
-                            {(
-                              /* ★V8（XqSvX）：右上は「2時間前」「昨日」「8月16日」。未読は濃い字・太字。待ち時間の札は置かない。 */
-                              <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={waitingLabel ?? undefined}>{formatInboxListTime(chat.lastMessageAt)}</span>
-                            )}
-                          </div>
-                          {/* 板 `M0393`：行ごとの状態の札は置かない（赤い点＋太字と上の切り替えで足りる）。 */}
-                          <div className={`mt-1 flex items-start justify-between gap-2 ${styles.rowLine}`}>
-                            <p
-                              id={`chat-row-preview-${chat.id}`}
-                              className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${styles.rowPreview} ${
-                                needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
-                              }`}
-                              title={preview}
-                            >
-                              {chat.lastMessageDirection === 'outgoing' && (
-                                <span className="text-ink-faint mr-1">返信：</span>
-                              )}
-                              {preview || <span className="text-ink-faint italic">(まだメッセージなし)</span>}
-                            </p>
-                          </div>
-                          <div className={`mt-1 flex items-center gap-2 ${styles.rowLine} ${styles.rowMeta}`}>
-                            <ChannelBadge channel="line" />
-                            <span className={`text-ink-faint inline-flex min-w-0 items-center gap-1 text-xs ${styles.rowAssignee}`}>
-                              <span className={`bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-pill font-bold ${styles.rowAssigneeMark}`}>
-                                {(operatorName ?? '未').charAt(0)}
-                              </span>
-                              <span className="truncate">{`担当：${assigneeLabel(operatorName, chat as ChatSlaFields)}`}</span>
-                            </span>
-                            <span className="ml-auto shrink-0"><SlaBadge fields={chat as ChatSlaFields} now={Date.now()} /></span>
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                    </div>
-                  )
-                  return node
-                  },
-                }))
-                  // 両方とも口側で「未読が先・新しい順」。未読の有無が違う
-                  // 行同士は時刻に関わらず未読が先、同じ中では新しい順。
-                  const precedes = (
-                    a: { at: string; unread: boolean },
-                    b: { at: string; unread: boolean },
-                  ): number =>
-                    Number(b.unread) - Number(a.unread)
-                    || String(b.at).localeCompare(String(a.at))
-                  const rows: ChatListWindowItem[] = []
-                  if (slaEnabled) {
-                    // 期限が近い順（過ぎた物が先）。期限の無い行・メールは後ろへ。「期限超過」は期限を過ぎた行だけ。
-                    const dueOf = (chat: ChatSlaFields) => (chat.slaDueAt ? Date.parse(chat.slaDueAt) : Infinity)
-                    const linePicked = (quickFilter === 'overdue' ? chats.filter((chat) => (chat as ChatSlaFields).slaState === 'overdue') : chats)
-                    const keyed = new Set(linePicked.map((chat) => chat.id))
-                    const lineByDue = lineRows.filter((row) => keyed.has(row.key)).sort((a, b) => dueOf(chats.find((chat) => chat.id === a.key) as ChatSlaFields) - dueOf(chats.find((chat) => chat.id === b.key) as ChatSlaFields))
-                    rows.push(...lineByDue, ...(quickFilter === 'overdue' ? [] : mailRows))
-                  } else {
-                    let i = 0
-                    let j = 0
-                    while (i < mailRows.length && j < lineRows.length) {
-                      if (precedes(mailRows[i], lineRows[j]) <= 0) rows.push(mailRows[i++])
-                      else rows.push(lineRows[j++])
-                    }
-                    while (i < mailRows.length) rows.push(mailRows[i++])
-                    while (j < lineRows.length) rows.push(lineRows[j++])
-                  }
-                  if (inboxListLoading) {
-                    return (
-                      /*
-                       * 会話の行の形の骨組み（動きの点検 15 番）。0.3 秒以内に届けば出さない。
-                       * 読み上げには「読み込んでいます」を残す。
-                       */
-                      <div role="status" aria-busy="true" data-inbox-list-state="loading">
-                        <span className="sr-only">会話を読み込んでいます...</span>
-                        <DelayedSkeleton
-                          loading
-                          skeleton={
-                            <div aria-hidden="true">
-                              {[0, 1, 2, 3, 4, 5].map((row) => <SkeletonRow key={row} />)}
-                            </div>
-                          }
-                        />
-                      </div>
-                    )
-                  }
-                  if (rows.length > 0) {
-                    return <ChatListWindow items={rows} scrollerRef={listScrollRef} hasMore={hasMoreChats || hasMoreEmails} />
-                  }
-                  // 障害を0件と誤認させない。具体的な理由は各チャネルのエラー表示に任せる。
-                  if (inboxListFailed) return null
-                  return (
-                    <div
-                      data-inbox-list-state={hasInboxFilters ? 'filtered-empty' : 'empty'}
-                      className="text-ink-faint flex min-h-36 flex-col items-center justify-center px-4 py-8 text-center"
-                    >
-                      <p className="text-sm font-semibold text-ink-secondary">
-                        {hasInboxFilters ? '条件に一致する会話がありません' : 'まだ会話がありません'}
-                      </p>
-                      {hasInboxFilters && (
-                        <button
-                          type="button"
-                          onClick={clearInboxFilters}
-                          className="text-action mt-3 text-sm font-semibold underline underline-offset-2"
-                        >
-                          絞り込みを解除
-                        </button>
-                      )}
-                    </div>
-                  )
-                })()}
-
-                {hasMoreChats && (
-                  <InboxHistoryButton context="list" busy={loadingMore}
-                    onClick={() => { void loadMoreChats() }}
-                  >
-                    さらに読み込む
-                  </InboxHistoryButton>
-                )}
-                {/*
-                  メールの続き。メールは上限200件で切れていた分を offset で遡る。
-                  LINEの「さらに読み込む」とは別物なので文言を分ける。
-                */}
-                {hasMoreEmails && (
-                  <InboxHistoryButton context="list" busy={loadingMoreEmails}
-                    onClick={() => { void loadEmails(emailItems.length, true) }}
-                  >
-                    メールの続きを読み込む
-                  </InboxHistoryButton>
-                )}
-            </>
-          </div>
-        </InboxListPane>
+        <InboxList {...{
+          unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
+          setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId,
+          savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen,
+          savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter,
+          dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators,
+          savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter,
+          setAssigneeFilter, setUnreadOnly, channel, router, nameQuery, setNameQuery, assigneeUnreadStatus,
+          assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef,
+          emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef,
+          setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats,
+          handleSelectChat, inboxListLoading, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
+          clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails,
+        }} />
 
         {/* Right Panel: Chat Detail */}
         {/*
@@ -3257,648 +760,25 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           で右の顧客情報を画面外へ押し出していた(#982 LAY-01)。
           顧客情報は狭い幅では列ではなくドロワーで開く（下の aside 参照）。
         */}
-        <InboxConversationPane data-inbox-v4="talk-pane" selected={Boolean(selectedChatId || selectedThreadId)}>
-          {selectedThreadId ? (
-            /* メールの往復。LINEのトークと同じ場所に出す。 */
-            <EmailThread
-              threadId={selectedThreadId}
-              onBack={() => setSelectedThreadId(null)}
-              customerInfoOpen={showFriendInfo}
-              onOpenCustomerInfo={() => setShowFriendInfo(true)}
-              onCloseCustomerInfo={() => setShowFriendInfo(false)}
-              onChanged={() => {
-                void loadEmails()
-              }}
-            />
-          ) : deepLinkNotice ? (
-            // URL指定の会話が開けなかったときの空状態。別人は開かず、
-            // 理由と戻り先だけ出す(#673)。不正IDではselectedChatIdがnullに
-            // なるため、通常の「選択してください」より先に判定する。
-            <div className="flex flex-1 items-center justify-center p-8">
-              <div className="max-w-md text-center">
-                <p className="text-ink text-sm font-semibold">会話を開けませんでした</p>
-                <p className="text-ink-secondary mt-2 text-sm leading-relaxed">{deepLinkNotice}</p>
-                <Button onClick={clearDeepLink} className="mt-4">
-                  受信箱の一覧へ戻る
-                </Button>
-              </div>
-            </div>
-          ) : !selectedChatId ? (
-            <ListState kind="empty" emptyPreset="readonly" title="会話を選ぶと、ここに表示されます" description="左の一覧から選んでください。「要返信」で、まだ返していない会話だけに絞れます。" />
-          ) : detailLoading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-ink-faint text-sm">読み込み中...</p>
-            </div>
-          ) : chatDetail ? (
-            <>
-              {/* Chat Header */}
-              {/*
-                U008: 狭い幅では「戻る・顔・名前」を1行目いっぱいに取り、
-                操作（注目・担当・対応・顧客情報）は2行目へ折り返す。
-                操作が同じ行にいると 390px で宛先の名前が潰れて、
-                誰への返信か読めなかった。640px 以上では従来どおり1行。
-              */}
-              {(
-                /*
-                 * ★V8 会話の頭（XqSvX）：顔28・名前15・補足、右に ☆・担当・対応状況・探す・右の列の出し入れ。
-                 * メールの会話も同じ部品（ConversationHead）を使う。動き（注目・担当・対応・探す・開閉）は同じ処理を呼ぶ。
-                 */
-                <ConversationHead
-                  name={chatDetail.friendName}
-                  pictureUrl={chatDetail.friendPictureUrl}
-                  sub={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・${formatInboxListTime(chatDetail.lastMessageAt)}`}
-                  subTitle={`${chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 ${formatInboxDatetime(chatDetail.lastMessageAt)}`}
-                  onBack={() => setSelectedChatId(null)}
-                  attention={{ on: Boolean(chatDetail.isAttention), saving: attentionSaving, onToggle: () => void handleAttentionUpdate() }}
-                  operator={{
-                    value: chatDetail.operatorId ?? 'unassigned',
-                    operators,
-                    onChange: (next) => { void handleOperatorUpdate(next === 'unassigned' ? null : next) },
-                  }}
-                  status={{ value: chatDetail.status as ChatStatus, onChange: (next) => void handleStatusUpdate(next as Chat['status']) }}
-                  search={{ open: chatSearch.open, onToggle: () => (chatSearch.open ? chatSearch.close() : openChatSearch()) }}
-                  panel={{ open: showFriendInfo, onToggle: () => setShowFriendInfo((current) => !current) }}
-                  extra={<InboxAiHeadMenu inboxAi={inboxAi} accountId={selectedAccountId} />}
-                />
-              )}
-              <InboxAiSummary inboxAi={inboxAi} />
-
-              {chatSearch.open && (
-                <ChatSearchBar search={chatSearch} focusSeq={chatSearchFocusSeq} busy={chatSearchFilling} />
-              )}
-
-              {/* Messages — LINE-style chat bubbles */}
-              <div className="relative flex min-h-0 flex-1 flex-col">
-              {/* 板 `M0393`：会話の地は surface-pearl（LINE青の地は使わない）。 */}
-              {/*
-                2026-10-07 速さ：吹き出しは下から積む窓分け（ChatThreadWindow）。
-                見ている位置は窓分けの側で守るので、ブラウザの自動の位置合わせは切る
-                （二重に直すと飛ぶ）。行の間 8px は行の中に持つので space-y は付けない。
-              */}
-              <InboxMessages ref={messagesScrollRef} data-inbox-search-scope="">
-                {/*
-                  古い履歴の続き。直近100件だけ読んでいる会話で出す。
-                  押すと今見えている最古の1件より古い分を上に足す。
-                */}
-                {messagesHasMore && (chatDetail.messages?.length ?? 0) > 0 && (
-                  <div className="flex justify-center pb-1">
-                    <InboxHistoryButton context="thread" busy={loadingOlderMessages}
-                      onClick={() => { void loadOlderMessages() }}
-                    >
-                      前のメッセージ
-                    </InboxHistoryButton>
-                  </div>
-                )}
-                {(!chatDetail.messages || chatDetail.messages.length === 0) ? (
-                  <div className="text-center py-8">
-                    <p className="text-on-accent/60 text-sm">メッセージはまだありません。</p>
-                  </div>
-                ) : (
-                  <ChatThreadWindow
-                    key={chatDetail.id}
-                    messages={chatDetail.messages ?? []}
-                    scrollerRef={messagesScrollRef}
-                    hasMore={messagesHasMore}
-                    loadingOlder={loadingOlderMessages}
-                    onLoadOlder={() => { void loadOlderMessages() }}
-                    label={`${chatDetail.friendName}さんとのメッセージ`}
-                    total={chatDetail.total}
-                    scrollToId={chatSearchTarget?.id ?? null}
-                    scrollSeq={chatSearchTarget?.seq ?? 0}
-                    rowGap={'var(--tpl-inbox-thread-gap)'}
-                    renderMessage={(msg, idx, list) => {
-                    const prevMsg = idx > 0 ? list[idx - 1] : null
-                    const isLast = idx === list.length - 1
-                    const showDateSep = !prevMsg || !sameYmd(prevMsg.createdAt, msg.createdAt)
-                    const isOutgoing = msg.direction === 'outgoing'
-                    const searchHit = chatSearch.hitKind(msg)
-
-                    // メッセージ表示の分岐
-                    let bubbleContent: React.ReactNode
-                    if (msg.isUnsent) {
-                      bubbleContent = <span className="text-ink-faint">送信を取り消しました</span>
-                    } else if (msg.messageType === 'flex') {
-                      bubbleContent = (
-                        <InboxFlexContent>
-                          <FlexPreviewComponent content={msg.content} maxWidth={280} />
-                        </InboxFlexContent>
-                      )
-                    } else if (msg.messageType === 'image') {
-                      // INBOX-30: 404・期限切れ・回線断は空白にせず、
-                      // 理由の出る代替表示と読み込み直しに倒す。
-                      bubbleContent = <ChatImageMessage content={msg.content} />
-                    } else if (msg.messageType === 'sticker') {
-                      bubbleContent = <StickerMessageImage content={msg.content} />
-                    } else if ((msg.messageType === 'video' || msg.messageType === 'file') && msg.direction === 'outgoing') {
-                      // B-6：送った動画・ファイルは JSON のまま出さず、再生できる枠・名前と期限の札にする。
-                      bubbleContent = <AttachmentMessage messageType={msg.messageType} content={msg.content} />
-                    } else {
-                      bubbleContent = <span>{msg.content}</span>
-                    }
-
-                    if (msg.source === 'scenario') {
-                      const startedAt = formatDateTime(msg.createdAt)
-                      return (
-                        <>
-                          {showDateSep && (
-                            <div className="mb-3 flex justify-center" style={{ marginTop: idx === 0 ? 12 : 4 }}>
-                              <span className="bg-ink/20 text-on-accent/85 rounded-pill px-2.5 py-0.5 text-micro">
-                                {formatYmdSlash(msg.createdAt)}
-                              </span>
-                            </div>
-                          )}
-                          {/* 上下の 8px は窓分けの行が持つ（外の余白は測った高さに入らない）。 */}
-                          <div className="flex items-center justify-center gap-1.5" style={{ marginTop: !showDateSep && idx === 0 ? 8 : 0, marginBottom: isLast ? 8 : 0 }}>
-                            <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-micro font-semibold text-action shadow-card">
-                              <Link2 aria-hidden="true" size={13} />
-                              シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
-                            </span>
-                            <time className="text-micro text-ink-faint">{startedAt}</time>
-                          </div>
-                        </>
-                      )
-                    }
-
-                    {
-                      /*
-                       * ★V8 やりとり（XqSvX「やりとり」）：日付は真ん中の小さな字、相手の吹き出しは白・薄い枠で
-                       * 顔を置かない、時刻は吹き出しの横（相手は右・こちらは左）、こちらの吹き出しは薄い緑で
-                       * 下に「K Kenta が送信」／「自動：…」。引用・探すの印・取り消しの扱いは v7 と同じ。
-                       */
-                      const quotedNode = msg.quoted ? (
-                        <InboxQuotedMessage>
-                          {msg.quoted.isUnsent
-                            ? '取り消されたメッセージ'
-                            : msg.quoted.messageType === 'text'
-                              ? msg.quoted.content
-                              : `[${msg.quoted.messageType}]`}
-                        </InboxQuotedMessage>
-                      ) : null
-                      const autoLabel = AUTO_SOURCE_LABEL[msg.source ?? ''] ?? null
-                      return <>
-                        {showDateSep ? <InboxMessageDay first={idx === 0}>{formatDayJa(msg.createdAt)}</InboxMessageDay> : null}
-                        <InboxMessage outgoing={isOutgoing} last={isLast} time={formatTime(msg.createdAt)} searchHit={searchHit} senderName={msg.sentByStaffName} autoLabel={autoLabel}
-                          onQuote={msg.isUnsent ? undefined : () => { setQuotedMessage(msg); textareaRef.current?.focus() }}
-                          onCorrect={staffRole !== 'viewer' && isOutgoing && msg.messageType === 'text' && !msg.isUnsent && msg.source !== 'scenario'
-                            ? () => { setQuotedMessage(msg); setCorrectingId(msg.id); setMessageContent((prev) => prev.trim() ? prev : CORRECTION_TEMPLATE); textareaRef.current?.focus() }
-                            : undefined}>
-                          {quotedNode}{bubbleContent}
-                        </InboxMessage>
-                      </>
-                    }
-                  }}
-                  />
-                )}
-              </InboxMessages>
-              {/*
-                INBOX-27: 読み返している途中に下へ届いた新着は、位置を
-                動かさず件数の目印だけ出す。押すと新しい方へ移る。
-              */}
-              {unseenIncoming > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const el = messagesScrollRef.current
-                    if (el) el.scrollTop = el.scrollHeight
-                    setUnseenIncoming(0)
-                  }}
-                  className="bg-canvas/95 text-action absolute bottom-3 left-1/2 -translate-x-1/2 rounded-pill px-3 py-1.5 text-xs font-semibold shadow-card"
-                >
-                  新着 {unseenIncoming} 件
-                </button>
-              )}
-              </div>
-
-              {/*
-                入力欄（設計 `Reply`）。3段。
-
-                  上: テンプレート・送信設定・内部メモ
-                  中: メッセージを入力
-                  下: 改行案内、画像は JPEG / PNG、1枚 10MB まで …… 送信
-
-                以前は送信キーの設定・入力中ローディング・画像の投入枠が
-                すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
-                よく使うものだけ出し、設定は畳む。
-              */}
-              <InboxAiDraft inboxAi={inboxAi} onInsert={(text) => { setMessageContent(text); textareaRef.current?.focus() }} />
-              <InboxComposer
-data-inbox-v4="composer"
-data-drop-over={dropOver ? '' : undefined}
-onDragOver={((event) => {
-                  if (!Array.from(event.dataTransfer.types).includes('Files')) return
-                  event.preventDefault()
-                  event.dataTransfer.dropEffect = 'copy'
-                  if (!dropOver) setDropOver(true)
-                })}
-onDragLeave={((event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropOver(false)
-                })}
-onDrop={((event) => {
-                  if (!Array.from(event.dataTransfer.types).includes('Files')) return
-                  event.preventDefault()
-                  setDropOver(false)
-                  const file = event.dataTransfer.files?.[0]
-                  if (file) void handlePickAttachment(file)
-                })}>
-                {/* INBOX-12: 定期更新が連続失敗で止まったときの理由と再試行 */}
-                {chatPollStalled && (
-                  <p className="text-danger mb-2 text-xs">
-                    会話の更新を一時停止しています（接続できません）。
-                    <button
-                      type="button"
-                      onClick={() => setChatPollRetryKey((key) => key + 1)}
-                      className="font-bold underline"
-                    >
-                      再試行する
-                    </button>
-                  </p>
-                )}
-                {/* 上段 */}
-                {/*
-                  U010: テンプレート・送信の設定・内部メモは横に収まらなければ
-                  次の行へ折り返す。1行に固定したままだと 390px では右の
-                  「内部メモ」が画面外へ切れて、存在自体に気づけない。
-                */}
-                {/*
-                  ★V8（M0393 XqSvX「書く前の道具」）：4つとも白地・薄い枠・高さ32・墨の字13/600・印15。
-                  「送信の設定」は settings-2、開いている間は緑の地と枠（段2「2.」）。
-                  画像だけでなくファイル・動画も選ぶので「画像」は「添付」（paperclip）にする（オーナー指摘）。
-                */}
-                <InboxComposerTools
->
-                  <>
-                    {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
-                    <InboxToolButton
-variant="secondary"
-size={'compact'}
-type="button"
-onClick={() => setShowTemplatePicker(true)}>
-                      <FileText aria-hidden="true" size={14} />
-                      テンプレートを選択
-                    </InboxToolButton>
-                    <InboxToolButton
-variant="secondary"
-size={'compact'}
-data-active={showComposerOptions ? '' : undefined}
-aria-expanded={showComposerOptions}
-type="button"
-onClick={() => setShowComposerOptions((v) => !v)}>
-                      {(<Settings2 aria-hidden="true" size={14} />)}
-                      {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
-                    </InboxToolButton>
-
-                    {/*
-                      設計 `B7CER8` は、開いている間このボタン自体が
-                      琥珀色に変わる。窓が上に出るので、どのボタンから出た窓
-                      なのかが分かる印が要る。
-                    */}
-                    <InboxToolButton
-variant="secondary"
-size={'compact'}
-data-active={showMemoEditor ? '' : undefined}
-type="button"
-data-inbox-v6="internal-memo-toggle"
-onClick={() => setShowMemoEditor((current) => !current)}
-aria-expanded={showMemoEditor}>
-                      <NotebookPen aria-hidden="true" size={14} />
-                      内部メモ
-                    </InboxToolButton>
-                    {/* ★V8 B-6：［添付］の道具はやめ、入力欄の左下のクリップから選ぶ（M0393「7. 添付」）。v7 は今までの［画像］。 */}
-                    {(null)}
-                  </>
-                </InboxComposerTools>
-
-                {/* 送信の設定は送信キーだけ。入力中ローディングと画像の投入枠は
-                    ここから外した。画像は下の枠のアイコンから選ぶ。 */}
-                {showComposerOptions && (
-                  /*
-                   * ★V8（段2「2. 送信の設定（開いた）」）：見出し「送るキー」・切り替え（Enter／Shift+Enter）・
-                   * 説明1行の3段。前は選ぶカードの中で文字が切れ、丸が文字に重なっていた（オーナー指摘）。
-                   * 保存先（この端末の chat.sendMode）と動きは v7 と同じ。
-                   */
-                  <div className={chatStyles.sendKey} data-inbox-v8="send-key">
-                    <p className={chatStyles.sendKeyTitle}>送るキー</p>
-                    <SegmentedControl
-                      size="small"
-                      aria-label="送るキー"
-                      options={[{ value: 'enter', label: 'Enter' }, { value: 'shift-enter', label: 'Shift+Enter' }]}
-                      value={sendMode}
-                      onChange={setSendMode}
-                    />
-                    <p className={chatStyles.sendKeyNote}>
-                      {sendMode === 'enter' ? 'Enter で送る／Shift+Enter で改行' : 'Shift+Enter で送る／Enter で改行'}（この端末に覚える）
-                    </p>
-                  </div>
-                )}
-
-
-                {/*
-                  設計 `B7CER8` の内部メモは**画面を覆う窓ではなく、
-                  「内部メモ」ボタンの上に出る紙**。トークを隠さずに、
-                  直前のやり取りを見ながら書けるようにするため。
-                */}
-                {showMemoEditor && (
-                  <InboxFloatingPanel placement="above"
-                    role="dialog"
-                    aria-labelledby="chat-internal-memo-title"
-                    data-inbox-v6="internal-memo-popover"
-                    ref={memoPopoverRef}
-                    /*
-                      INBOX-19: 紙はボタンの上へ伸びるため、高さの上限を
-                      画面から差し引いておく。上限を超えた分は紙の中だけを
-                      スクロールさせ、見出しと操作が画面上部へ欠けない
-                      ようにする。
-                    */
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <h2 id="chat-internal-memo-title" className="text-ink flex items-center gap-2 text-sm font-bold">
-                        <NotebookPen aria-hidden="true" size={16} className="text-status-warn" />
-                        内部メモを追加
-                      </h2>
-                      <span className="rounded-pill bg-status-warn-soft text-status-warn-deep text-micro shrink-0 px-2 py-0.5 font-semibold">
-                        スタッフのみ
-                      </span>
-                    </div>
-                    <p className="text-ink-faint mt-2 text-xs">
-                      対応方針や引き継ぎ内容を入力してください。顧客には表示・送信されません。
-                    </p>
-                    <label htmlFor="chat-internal-memo" className="sr-only">内部メモの本文</label>
-                    <SaveErrorField names={["notes", "memo"]}><textarea
-                      id="chat-internal-memo"
-                      value={memoDraft}
-                      onChange={(event) => setMemoDraft(event.target.value)}
-                      rows={4}
-                      placeholder="例：次回返信時に配送先住所を確認する"
-                      className="border-hairline focus:border-accent focus:ring-accent/15 rounded-control mt-3 w-full resize-y border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
-                    />
-                    </SaveErrorField>
-                    {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
-                    {/*
-                      INBOX-19: 説明は独立した行へ。操作と同じ flex 行に置くと、
-                      狭い幅で説明が1文字ずつ縦に割れ、紙全体が上へ伸びて
-                      見出しが画面外へ出ていた。
-                    */}
-                    <p className="text-ink-faint mt-3 text-xs">この内容は社内メンバーだけが確認できます</p>
-                    <div className="mt-3 flex items-center justify-end gap-2">
-                      {/* 設計 `B7CER8` の2つは h36・角丸8・13px・600。共通ボタンと同値。 */}
-                      <Button
-                        onClick={closeMemoEditor}
-                      >
-                        キャンセル
-                      </Button>
-                      <Button
-                        variant="primary"
-                        onClick={() => void handleSaveMemo()}
-                        disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')} busy={memoSaving} busyLabel="保存中...">メモを保存する
-                      </Button>
-                    </div>
-                  </InboxFloatingPanel>
-                )}
-
-                {/* N-025: 引用中のメッセージ。×で外す。 */}
-                {quotedMessage && (
-                  <div
-                    data-inbox-v6="quote-preview"
-                    className="mb-2 flex items-center gap-2 rounded-control border border-accent/40 bg-accent-soft px-3 py-1.5 text-xs"
-                  >
-                    <span className="shrink-0 font-semibold text-ink-faint">引用:</span>
-                    <span className="min-w-0 flex-1 truncate text-ink-secondary">
-                      {quotedMessage.isUnsent
-                        ? '取り消されたメッセージ'
-                        : quotedMessage.messageType === 'text'
-                          ? quotedMessage.content
-                          : `[${quotedMessage.messageType}]`}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setQuotedMessage(null)}
-                      aria-label="引用を解除"
-                      className="shrink-0 text-ink-faint hover:text-danger"
-                    >
-                      <X aria-hidden="true" size={14} />
-                    </button>
-                  </div>
-                )}
-
-                {/* N-025: 送信予約パネル。日時はJSTのdatetime-localで入力する。 */}
-
-
-                {/*
-                  INBOX-32: 送る前に何を添付したかを見せる。
-                  小さい画像・ファイル名・大きさ・外す/変更/大きく見る。
-                  この添付は今開いている会話にだけ結びつく(INBOX-23)。
-                */}
-                {pendingImage && pendingImage.mode === 'line-image' && (
-                  <div
-                    data-inbox-v6="image-attachment-preview"
-                    className="mb-2 flex items-center gap-2 rounded-control border border-hairline bg-canvas-sunken px-3 py-2"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setImagePreviewOpen(true)}
-                      title="画像を大きく見る"
-                      aria-label="添付した画像を大きく見る"
-                      className="shrink-0"
-                    >
-                      <img
-                        src={pendingImage.previewImageUrl}
-                        alt={pendingImageMeta?.name ?? '添付した画像'}
-                        className="h-10 w-10 rounded-mini border border-hairline object-cover"
-                      />
-                    </button>
-                    <span className="min-w-0 flex-1 text-xs">
-                      <span className="text-ink block truncate font-semibold" title={pendingImageMeta?.name}>
-                        {pendingImageMeta?.name ?? '画像'}
-                      </span>
-                      <span className="text-ink-faint">
-                        {pendingImageMeta ? formatByteSize(pendingImageMeta.size) : ''}
-                        {pendingImageMeta ? ' ・ 添付済み' : '添付済み'}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => imageInputRef.current?.click()}
-                      disabled={imageUploading}
-                      className="text-action shrink-0 whitespace-nowrap text-xs font-semibold"
-                    >
-                      変更
-                    </button>
-                    <button
-                      type="button"
-                      onClick={clearPendingImage}
-                      className="text-ink-faint hover:text-danger shrink-0 whitespace-nowrap text-xs"
-                    >
-                      外す
-                    </button>
-                  </div>
-                )}
-
-                {/* ★V8 B-6：動画・ファイルの札（名前・大きさ・×）。準備中・失敗（理由＋もう一度試す）もここで見せる。 */}
-                {pendingAttachment ? (
-                  <div className={chatStyles.attachChips}>
-                    <AttachmentChip
-                      item={pendingAttachment}
-                      busy={sending || scheduling}
-                      onRemove={clearPendingAttachment}
-                      onRetry={retryAttachment}
-                    />
-                  </div>
-                ) : null}
-
-                <InboxInputBox
->
-                  {/* 中段 */}
-                  {/*
-                    INBOX-20: この入力欄に textareaRef を付ける。
-                    外れていると自動拡張と「引用を選んだら入力へ戻る」が
-                    動かなかった。
-                  */}
-                  <InboxDraftArea
-ref={textareaRef}
-value={messageContent}
-onChange={(e) => setMessageContent(e.target.value)}
-onKeyDown={handleKeyDown}
-onCompositionStart={() => { isComposingRef.current = true }}
-onCompositionEnd={() => { isComposingRef.current = false }}
-rows={2}
-placeholder="メッセージを入力"
-aria-label="メッセージを入力"
-aria-invalid={messageOverLimit} />
-
-                  <InboxDraftCount
->
-                    {/* INBOX-29: 残りを送る前に見せる。超えたら送らせない。 */}
-                    <span className={messageOverLimit ? 'text-danger font-semibold' : 'text-ink-faint'}>
-                      {formatNumber(messageLength)} / {formatNumber(MESSAGE_MAX_LENGTH)}
-                      {messageOverLimit ? ' ・ 文字数が上限を超えています' : ''}
-                    </span>
-                    <span className="text-ink-faint shrink-0">
-                      {sendMode === 'enter' ? 'Enter で送る・Shift + Enter で改行' : 'Shift+Enter で送る・Enter で改行'}
-                    </span>
-                  </InboxDraftCount>
-
-                  {/* 下段 */}
-                  {/*
-                    U009: 画像案内・予約・送信が同じ行に詰まると 390px で
-                    「送信」が送／信に割れていた。行自体を折り返せるようにし、
-                    長い画像エラーが出ても右の操作を圧迫しない。
-                  */}
-                  <InboxComposerBottom
->
-                  {/*
-                    画像はここから。以前は「送信の設定」の中に投入枠を出しっぱなし
-                    にしていて、入力欄が縦に伸びてトークが読めなかった。
-                    アイコンを押すとファイルを選ぶ窓が開く。
-                  */}
-                  {(
-                    /* ★V8 B-6：左下のクリップ（32角）＋「画像・動画・ファイルを添付」。選べない・大きすぎるはここに理由。 */
-                    <span className={chatStyles.attachLead}>
-                      <AttachMenu disabled={!selectedChatId} onPick={(file, slot) => void handlePickAttachment(file, slot)} />
-                      <span
-                        className={chatStyles.attachNote}
-                        data-error={imageError ? '' : undefined}
-                        role={imageError ? 'alert' : undefined}
-                        title={imageError || ATTACH_NOTE_TITLE}
-                      >
-                        {imageError ? imageError : imageUploading ? '画像を読み込み中…' : ATTACH_NOTE}
-                      </span>
-                    </span>
-                  )}
-                  <InboxComposerActions
->
-                    {staffRole !== 'viewer' ? <SenderSelect accountId={selectedAccountId} value={senderId} onChange={setSenderId} disabled={sending} /> : null}
-                    <InboxToolButton
-size={'compact'}
-data-inbox-v6="schedule-toggle"
-onClick={() => setShowSchedulePanel((v) => !v)}
-aria-expanded={showSchedulePanel}
-aria-haspopup={'dialog'}>
-                      {(<Clock3 aria-hidden="true" size={15} />)}
-                      予約{scheduledSends.length > 0 ? `(${scheduledSends.length})` : ''}
-                    </InboxToolButton>
-                    <Button variant="primary"
-size="standard"
-onClick={handleSendMessage}
-disabled={sending || messageOverLimit || ((pendingAttachment !== null) && pendingAttachment.status !== 'ready') || (!messageContent.trim() && !pendingImage && !(pendingAttachment?.status === 'ready'))}>
-                      {(!sending) ? <Send aria-hidden="true" size={15} /> : null}
-                      {sending ? '送っています…' : '送信する'}
-                    </Button>
-                  </InboxComposerActions>
-
-                  {(
-                    <ScheduleSendDialog
-                      open={showSchedulePanel}
-                      onClose={() => setShowSchedulePanel(false)}
-                      content={messageContent}
-                      hasImage={Boolean(pendingImage)}
-                      attachmentLabel={pendingAttachment?.status === 'ready' ? `${pendingAttachment.kind === 'video' ? '動画' : 'ファイル'}「${pendingAttachment.name}」` : undefined}
-                      value={scheduleInput}
-                      onChange={setScheduleInput}
-                      onConfirm={() => void handleScheduleSend()}
-                      busy={scheduling}
-                      error={showSchedulePanel && error ? error : undefined}
-                      rows={scheduledSends.map((row) => ({
-                        id: row.id,
-                        label: `${formatJstScheduledAt(row.scheduledAt)}${row.status === 'sending' ? '（送信中）' : ''}`,
-                        content: scheduledContentLabel(row.messageType, row.content),
-                        editable: row.status === 'scheduled',
-                        defaultValue: isoToJstDatetimeLocal(row.scheduledAt),
-                        tooLate: Date.parse(row.scheduledAt) - Date.now() < 60_000,
-                      }))}
-                      rowsFailed={scheduledSendsFailed}
-                      onRetryRows={() => { if (selectedChatId) void loadScheduledSends(selectedChatId) }}
-                      onReschedule={(id, next) => void handleReschedule(id, next)}
-                      onCancelRow={(id) => void handleCancelScheduled(id)}
-                    />
-                  )}
-                  <TemplatePicker
-                    open={showTemplatePicker}
-                    onClose={() => setShowTemplatePicker(false)}
-                    chatId={selectedChatId}
-                    onPick={(content) =>
-                      // 入力済みの文があれば消さずに続ける。書きかけを失わせない。
-                      setMessageContent((prev) => (prev.trim() ? `${prev}\n${content}` : content))
-                    }
-                    onPickPack={(texts) => { if (selectedChatId) setPendingPack({ texts, chatId: selectedChatId, accountId: selectedAccountId, revision: chatDetail?.revision }); setShowTemplatePicker(false) }}
-                  />
-                  {/*
-                    G-4: パック送信の最終確認。本文を全部読み合わせてから送る。
-                    入力欄を経由しないので、ここで「何が・何通」送られるかを示す。
-                  */}
-                  <ConfirmDialog
-                    open={pendingPack !== null}
-                    title="テンプレートをまとめて送る"
-                    description={pendingPack ? `${pendingPack.texts.length}通をこの順番で一度に送ります。送信すると取り消せません。` : ''}
-                    confirmLabel={pendingPack ? `まとめて送る（${pendingPack.texts.length}通）` : 'まとめて送る'}
-                    onConfirm={pendingPack ? () => void handleSendPack(pendingPack) : undefined}
-                    onCancel={() => setPendingPack(null)}
-                    busy={sending}
-                  >
-                    {pendingPack ? (
-                      <ol className="max-h-56 space-y-2 overflow-y-auto">
-                        {pendingPack.texts.map((text, index) => (
-                          <li key={index} className="rounded-control bg-canvas-sunken px-3 py-2 text-xs leading-relaxed text-ink-secondary">
-                            <span className="mr-1 font-semibold text-ink">{index + 1}.</span>
-                            <span className="whitespace-pre-wrap break-words">{text.length > 200 ? `${text.slice(0, 200)}…` : text}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    ) : null}
-                  </ConfirmDialog>
-                  </InboxComposerBottom>
-                </InboxInputBox>
-              </InboxComposer>
-
-              {/* INBOX-32: 添付画像を大きく確かめる窓。背景か Esc 相当の閉じるで戻る。 */}
-              {imagePreviewOpen && pendingImage && pendingImage.mode === 'line-image' ? (
-                <Dialog open title="添付した画像の確認" onCancel={() => setImagePreviewOpen(false)} designWidth={800}>
-                  <InboxMedia kind="preview" src={pendingImage.originalContentUrl} alt={pendingImageMeta?.name ?? '添付した画像'} />
-                  <p className="text-ink-faint mt-3 truncate text-xs" title={pendingImageMeta?.name}>{pendingImageMeta?.name ?? '画像'}{pendingImageMeta ? ` ・ ${formatByteSize(pendingImageMeta.size)}` : ''}</p>
-                </Dialog>
-              ) : null}
-            </>
-          ) : null}
-        </InboxConversationPane>
+        <InboxConversation {...{
+          operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
+          loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId,
+          attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch,
+          openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef,
+          messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage,
+          textareaRef, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming,
+          dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey,
+          setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor,
+          setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError,
+          closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen,
+          pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending,
+          scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef,
+          messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel,
+          showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput,
+          handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule,
+          handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
+          imagePreviewOpen,
+        }} />
 
         {/*
           友だち詳細。3列に収まる幅（1536px〜）では右列として常設し、
@@ -3919,119 +799,17 @@ disabled={sending || messageOverLimit || ((pendingAttachment !== null) && pendin
           いまはメールを開いているときは案内を出す。空の枠を出すより、
           なぜ出ないかが分かる方がよい。
         */}
-        {showFriendInfo && (selectedChatId || selectedThreadId) && (
-          <>
-            {/*
-              1536px 未満ではトークの上に重ねるドロワー。背景（暗幕）を
-              押しても閉じる。モバイルヘッダー(z-50)より上に置く。
-              1536px 以上では右列として常設するので暗幕は CSS で消す。
-            */}
-            <InboxInfoBackdrop wide={wideInfoPanel} onMouseDown={() => setShowFriendInfo(false)} />
-            <InboxSummaryPane wide={wideInfoPanel}
-ref={customerPanelRef}
-data-inbox-v4="customer-panel"
-role={wideInfoPanel ? undefined : 'dialog'}
-aria-modal={wideInfoPanel ? undefined : true}
-aria-label="顧客情報"
-tabIndex={-1}>
-            {/*
-              重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
-              重なりが上部を覆っている画面幅で閉じられなくなる。
-              実際そうなっていた。
-            */}
-            {/*
-              ★V8：右の列として出しているときは閉じる×を置かない。絵（M0393）の閉じる口は
-              会話の頭の「顧客情報を表示（右の列の出し入れ）」の1つだけ。重ねて出す幅では
-              頭が隠れるので、×を板の右上に残す。
-            */}
-            {wideInfoPanel ? null : (
-            <Button variant="secondary" className="absolute top-3 right-3 z-10 h-8 w-8 items-center justify-center text-ink-faint whitespace-normal" type="button" onClick={() => setShowFriendInfo(false)} aria-label="顧客情報を閉じる">
-              <X aria-hidden="true" className="h-4 w-4" />
-            </Button>
-            )}
-            {selectedThreadId ? (
-              /*
-                メールの相手は友だちに結びついていない。
-                以前は「紐づいていません」の1行だけで、なぜなのか・
-                どうすればよいのかが分からなかった。誰との話かと、
-                いま何ができるかを出す。
-              */
-              (() => {
-                const mail = emailItems.find((e) => e.threadId === selectedThreadId)
-                return (
-                  <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
-                    <InboxEmailHeading>
-                      <p className="text-ink text-sm font-bold">顧客情報</p>
-                      <p className="text-ink-faint mt-0.5 truncate text-micro">メールの相手を確認できます</p>
-                    </InboxEmailHeading>
+        <InboxCustomerPanel
+          lineContent={lineContent}
+          showFriendInfo={showFriendInfo}
+          selectedChatId={selectedChatId}
+          selectedThreadId={selectedThreadId}
+          wideInfoPanel={wideInfoPanel}
+          setShowFriendInfo={setShowFriendInfo}
+          customerPanelRef={customerPanelRef}
+          emailItems={emailItems}
 
-                    <div className="flex-1 overflow-y-auto divide-y divide-hairline">
-                      <section className="flex flex-col items-center px-5 py-5 text-center">
-                        <div className="bg-canvas-sunken border-hairline flex h-14 w-14 items-center justify-center rounded-pill border">
-                          <span className="text-ink-secondary text-micro font-bold">MAIL</span>
-                        </div>
-                        <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{mail?.customerName ?? '—'}</p>
-                        <p className="text-ink-faint mt-0.5 max-w-full break-all text-micro">
-                          {mail?.customerIdentifier ?? 'メールアドレス未登録'}
-                        </p>
-                      </section>
-
-                      <section className="px-5 py-4">
-                        <p className="text-ink text-xs font-medium">基本情報</p>
-                        <dl className="mt-2 space-y-2 text-xs">
-                          <div className="flex items-start justify-between gap-3">
-                            <dt className="text-ink-faint shrink-0">名前</dt>
-                            <dd className="text-ink-secondary min-w-0 truncate text-right">{mail?.customerName ?? '未登録'}</dd>
-                          </div>
-                          <div className="flex items-start justify-between gap-3">
-                            <dt className="text-ink-faint shrink-0">メール</dt>
-                            <dd className="text-ink-secondary min-w-0 break-all text-right">{mail?.customerIdentifier ?? '未登録'}</dd>
-                          </div>
-                        </dl>
-                      </section>
-
-                      <section className="px-5 py-4">
-                        <p className="text-ink text-xs font-medium">LINE友だちとの連携</p>
-                        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-                          このメールアドレスは、まだLINEの友だちと結びついていません。
-                        </p>
-                        <Link href="/friends" className="text-action mt-2 inline-flex text-xs font-semibold hover:underline">
-                          友だち一覧で確認する
-                        </Link>
-                      </section>
-
-                    </div>
-                  </div>
-                )
-              })()
-            ) : (
-            <FriendInfoSidebar
-              lastContactAt={chatDetail && chatDetail.id === selectedChatId ? chatDetail.lastMessageAt : null}
-              friendId={activeFriendId}
-              accountId={selectedAccountId ?? undefined}
-              chatId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.id : null}
-              revision={chatDetail && chatDetail.id === selectedChatId ? chatDetail.revision : undefined}
-              operators={operators}
-              operatorId={chatDetail && chatDetail.id === selectedChatId ? chatDetail.operatorId : null}
-              onChatChanged={() => {
-                if (selectedChatId) void loadChatDetail(selectedChatId)
-                void loadChats()
-              }}
-              operatorName={
-                chatDetail?.operatorId
-                  ? operators.find((operator) => operator.id === chatDetail.operatorId)?.name ?? null
-                  : null
-              }
-              chatStatus={
-                chatDetail && chatDetail.id === selectedChatId
-                  ? { status: chatDetail.status, notes: chatDetail.notes }
-                  : undefined
-              }
-            />
-            )}
-            </InboxSummaryPane>
-          </>
-        )}
+        />
       </InboxPage>
     </div></SaveErrorScope>
   )
@@ -4054,12 +832,6 @@ tabIndex={-1}>
 // /api/support/inbox は channel を 'all' | 'line' | 'email' で受け取り、
 // どちらの出どころも同じ形（id / channel / customerName / preview /
 // lastIncomingAt）で返す。つまり1つの一覧に混ぜられる。
-const CHANNELS = [
-  { key: 'all', label: 'すべて' },
-  { key: 'line', label: 'LINE' },
-  { key: 'email', label: 'メール' },
-] as const
-
 function ChatsPageHost() {
   const params = useSearchParams()
   // すべて / LINE / メール。既定はすべて。
@@ -4085,7 +857,6 @@ function ChatsPageHost() {
 }
 
 /** 訂正の見本の文（店ごとに直せる）。 */
-const CORRECTION_TEMPLATE = '先ほどのメッセージに誤りがありました。正しくは次のとおりです。\n'
 
 export default function ChatsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。

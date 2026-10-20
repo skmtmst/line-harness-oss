@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { waitlistFixture, futureSlot } from '../test-utils/waitlist-fixture.js';
 import type { SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { promoteBookingWaitlist } from '../services/booking-waitlist.js';
+import { promoteBookingWaitlist } from '../features/booking/booking-waitlist.js';
 import { promoteSeatWaitlist } from '../services/restaurant-seat-waitlist.js';
-vi.mock('../services/booking-automatic-line.js', () => ({ sendAutomaticBookingLine: vi.fn(async () => true) }));
+vi.mock('../features/booking/booking-automatic-line.js', () => ({ sendAutomaticBookingLine: vi.fn(async () => true) }));
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: vi.fn(async () => true) }));
-vi.mock('../services/booking-notifier.js', async () => ({ ...await vi.importActual<typeof import('../services/booking-notifier.js')>('../services/booking-notifier.js'), sendBookingNotification: vi.fn(async () => { }) }));
+vi.mock('../features/booking/booking-notifier.js', async () => ({ ...await vi.importActual<typeof import('../features/booking/booking-notifier.js')>('../features/booking/booking-notifier.js'), sendBookingNotification: vi.fn(async () => { }) }));
 import booking from './booking.js';
 let test: SqliteD1, slot: string, app: Hono<Env>, env: Env['Bindings'], user: string;
 beforeEach(() => { test = waitlistFixture(); slot = futureSlot(); user = 'test-user-0'; app = new Hono<Env>(); app.use('*', async (c, next) => { c.set('staff', { id: 'test-owner', name: '試験管理者', role: 'owner', readOnly: false, permissionKeys: [], viewPermissionKeys: [] }); await next(); }); app.route('/', booking); env = { DB: test.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', LIFF_URL: 'https://liff.example.test' } as Env['Bindings']; vi.stubGlobal('fetch', async (url: unknown) => { if (String(url).includes('oauth2/v2.1/verify')) return new Response(JSON.stringify({ sub: user }), { status: 200 }); throw new Error('試験では外部送信しない'); }); });

@@ -10,7 +10,7 @@ import type { StyleMonth, StyleWeek } from './model'
 import styles from './style-dashboard.module.css'
 
 /*
- * 1枚目のタブの「カレンダー」（B-318）。1週間＝週の形（UtmIg）、1か月＝月の形（R28Jqt）。
+ * 1枚目のタブの「カレンダー」。1週間＝週の形（UtmIg）、1か月＝月の形（R28Jqt）。
  * 予約を押すと詳細、空きを押すと予約を入れる、日を押すとその日の予約が右に出る。
  */
 

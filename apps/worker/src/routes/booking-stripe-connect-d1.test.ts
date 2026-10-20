@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import { Miniflare } from 'miniflare';
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: vi.fn(async () => true) }));
 import { bookingPaymentAdmin } from './booking-payment-admin.js';
 
@@ -26,6 +26,8 @@ beforeAll(async () => {
   db = await mf.getD1Database('DB') as unknown as D1Database;
   await db.prepare('CREATE TABLE line_accounts(id TEXT PRIMARY KEY)').run();
   await db.prepare("INSERT INTO line_accounts VALUES('a')").run();
+  const workflow=readFileSync(new URL('../../../../packages/db/migrations/615_workflow_steps.sql',import.meta.url),'utf8').split('-- Banner-specific')[0];
+  await db.prepare(workflow).run();
   for (const file of ['663_booking_payment_connections.sql', '682_booking_stripe_connect_states.sql']) {
     const sql = readFileSync(new URL('../../../../packages/db/migrations/' + file, import.meta.url), 'utf8')
       .split('\n').filter(line => !line.startsWith('--')).join('\n');
@@ -36,6 +38,7 @@ afterAll(async () => { await mf?.dispose(); });
 beforeEach(async () => {
   vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('外部通信は禁止'); }));
   await db.prepare('DROP TRIGGER IF EXISTS finish_crash').run();
+  await db.prepare('DELETE FROM workflow_steps').run();
   await db.prepare('DELETE FROM booking_stripe_connect_states').run();
   await db.prepare('DELETE FROM booking_payment_connections').run();
 });

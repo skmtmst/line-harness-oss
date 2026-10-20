@@ -141,3 +141,8 @@ describe('店舗選択から元の画面へ戻る', () => {
     expect(storeSelectionHref('https://example.com')).toBe('/hq')
   })
 })
+
+
+it.each(['/\\evil.example', '/%09/evil.example', '/%5cevil.example', '/%2f/evil.example', '/\t/evil.example'])('F21/F30: store return path rejects %s', value => {
+  expect(resolveStoreReturnPath(value)).toBeNull()
+})

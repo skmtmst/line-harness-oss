@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const mocks = {
   ANALYTICS_REPORT_SECTIONS: ['friends', 'reactions', 'routes', 'usage', 'mileage'],
@@ -273,7 +273,7 @@ describe('期間の指定', () => {
   });
 });
 
-describe('V6分析の概要API', () => {
+describe('分析の概要API', () => {
   it('既定はアカウントの現地日付で30日、夏時間の日境界も保つ', () => {
     const result = readAnalyticsOverviewRange(
       () => undefined,
@@ -437,7 +437,7 @@ describe('旧クロス集計', () => {
   });
 });
 
-describe('V6クロス分析API', () => {
+describe('クロス分析API', () => {
   const body = {
     rowAxis: { kind: 'route' },
     columnAxis: { kind: 'tag' },
@@ -526,7 +526,7 @@ describe('V6クロス分析API', () => {
   });
 });
 
-describe('V6保存した分析API', () => {
+describe('保存した分析API', () => {
   it('選択中アカウントの保存済み分析だけを返す', async () => {
     const res = await req(`/api/analytics/saved?${ACCOUNT}`);
     expect(res.status).toBe(200);
@@ -647,7 +647,7 @@ describe('ファネルの結果', () => {
 });
 
 describe('現行ファネルの削除', () => {
-  it('V6の版付き定義は現行APIから削除できない', async () => {
+  it('の版付き定義は現行APIから削除できない', async () => {
     const res = await req(`/api/funnels/fn-1?${ACCOUNT}`, 'DELETE');
     expect(res.status).toBe(404);
     expect(mocks.deleteFunnel).not.toHaveBeenCalled();
@@ -669,7 +669,7 @@ describe('現行ファネルの削除', () => {
   });
 });
 
-describe('V6ファネルAPI', () => {
+describe('ファネルAPI', () => {
   const body = {
     name: '購入まで',
     windowDays: 14,
@@ -942,7 +942,7 @@ describe('LINE公式アカウントの分離', () => {
   });
 });
 
-describe('V6 定期レポートAPI', () => {
+describe('定期レポートAPI', () => {
   const body = {
     name: '週次まとめ', sections: ['friends', 'reactions'], savedAnalysisIds: [],
     cadence: 'weekly', weekday: 1, monthDay: null, sendTime: '09:00',

@@ -11,10 +11,10 @@ const baseCtx = {
 describe('renderEventNotificationText', () => {
   test('受付（承認待ち）', () => {
     const text = renderEventNotificationText('received_pending', baseCtx);
-    expect(text).toContain('イベント申込みを受け付けました');
+    expect(text).toContain('イベントのお申し込みを受け付けました');
     expect(text).toContain('AAA説明会');
     expect(text).toContain('2026-06-01 10:00');
-    expect(text).toContain('運営の承認をお待ちください');
+    expect(text).toContain('お店の確認をお待ちください');
     expect(text).toContain('渋谷ベース');
   });
 
@@ -37,7 +37,7 @@ describe('renderEventNotificationText', () => {
 
   test('運営キャンセル', () => {
     const text = renderEventNotificationText('cancelled_by_admin', baseCtx);
-    expect(text).toContain('運営側でイベント予約をキャンセル');
+    expect(text).toContain('お店でイベント予約をキャンセル');
     expect(text).toContain('LINE にてご連絡');
   });
 
@@ -174,4 +174,17 @@ describe('renderEventNotificationText — custom extra append', () => {
     });
     expect(text).not.toContain(extraConf.trim());
   });
+});
+
+
+test('教室の受付はクラスと教室の確認を伝え、本人に承認操作を求めない',()=>{
+ const text=renderEventNotificationText('received_pending',{...baseCtx,style:'lesson'});
+ expect(text).toContain('クラス: AAA説明会');expect(text).toContain('教室の確認をお待ちください');expect(text).not.toContain('承認');
+});
+
+
+test('教室の確定・直前案内もクラスとして伝える',()=>{
+ const ctx={...baseCtx,style:'lesson' as const,hoursBefore:2};
+ expect(renderEventNotificationText('confirmed',ctx)).toContain('クラスのご予約が確定');
+ expect(renderEventNotificationText('reminder_hours_before',ctx)).toContain('クラス開始');
 });

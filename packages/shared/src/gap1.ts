@@ -1,4 +1,4 @@
-/** B-349 第1波。画面とWorkerの受け渡し。 */
+/** 第1波。画面とWorkerの受け渡し。 */
 export interface LineSenderSnapshot {name:string;iconUrl?:string}
 export interface LineSender {
  id:string;name:string;iconMediaId:string|null;iconUrl:string|null;visibility:'all'|'owner_only';ownerStaffId:string|null;

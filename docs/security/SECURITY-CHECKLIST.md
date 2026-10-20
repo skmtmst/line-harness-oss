@@ -1,3 +1,5 @@
+> 文書：公開前の安全点検表｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 公開前の安全点検表
 
 調査日：2026-10-16。対象：B-265・B-332。コードの基点：`cd63dd961f5dc2613a8b16c39a21d01e2cf7c8ba`（取得済みの `origin/codex/development` と一致）。開始時の作業ツリーはクリーン、`DOCTOR_LOCAL=1 bash scripts/codex/doctor.sh` は「合格」。
@@ -11,17 +13,9 @@
 
 **修正後の集計：49項目＝済21・未16・分からない12。未のうち危なさ「高」は15項目。** 件数はこの表の行数で、脆弱性の件数や事故件数ではない。
 
-初回調査ではコード・設定・既存試験を読み、追跡対象のファイル一覧、GitHubの公開状態、依存関係の警告を確認した。本番・検証環境へのログイン、Cloudflareのsecret一覧取得、DB照会、外部送信、既存の動作試験の再実行はしていない。秘密や顧客情報を抽出しない。
+この点検表の状態は最後に記録された確認範囲を保つ。S05では外部設定・本番・検証DBを確認しておらず、「未」「分からない」を済へ変更していない。コードの入口だけの確認と、実環境の動作確認を分ける。
 
-2026-10-16の修正では、`08c94923e3` を保持し、試験前に最新取得した開発枝 `5ace6976dc519607874959df2b9f6396868e27a2` をmergeした。続きでは開発枝 `765373beee065d1ef2e6f846cfc7d38f176f786c` を通常mergeした。担当：kenta / Codex。修正・残件・オーナーの手順・故障対照は[修正記録](SECURITY-FIXES-1016.md)。本番・検証DB、secret、配備先の設定は変更していない。
-
-B-343の追加では開発基点`b4adb688bd42c359d1539dbf802b5ad888a9e647`を通常mergeし、[気づき方](DETECTION.md)・[時間割と原因別の直し方](INCIDENT-RUNBOOK.md#漏えいの疑いから復旧までの時間割b-343)・[お客さまへの案内](CUSTOMER-NOTICE.md)・[監視APIの契約](SECURITY-MONITOR-CONTRACT.md)を用意。これはS39の2人の実地練習や配備先の安全確認を済にするものではない。[追加の検証記録](SECURITY-DETECTION-1016.md)を併せて読む。
-
-番号691への付け直し、競合3件の解消、本線取り込み後の結果は[再検証記録](SECURITY-MERGE-1016.md)。API一覧と共通境界の表は検証専用の手動実行1経路を含む最新の登録に更新した。追加の[負荷・費用・検証手順](DETECTION.md#5分ごとの処理の重さと費用b-34310月16日追加)はローカルD1の実測。配備先の検証D1の実測は未実施。
-
-B-351の追加は[公開入口](PUBLIC-ENTRYPOINTS.md)・[CSPの記録](CSP-REVIEW-1016.md)・[作業と検査](SECURITY-B351-1016.md)。本線 `af8e504d75` の取り込み済みを再確認し、公開リンクの回数制限と期限なし明細の拒否を追加。追加対応で静的配信のCSPを強制用へ変更し、添付・明細を最長15分の署名へ変更した。[追加対応](SECURITY-B351-CONTINUATION.md)と[URLの契約](SIGNED-DOWNLOADS.md)。LINE内の未検証操作・Worker HTML・本番実効値などを残し、S41〜S49を推測で済にしていない。
-
-B-361の残り5・8・11・12・13のコードと手元試験は[追加記録](SECURITY-B351-REMAINDER.md)。実地/設定/画面の残条件があるため、この5行を推測で「済」にしない。集計49項目（済21・未16・分からない12）は変わらない。
+本人確認・ログイン・保存期限の呼び出しは[実装説明](step-up-and-retention.md)、ブラウザの制限と未確認は[CSP](csp.md)、添付と明細の取得は[URLの契約](SIGNED-DOWNLOADS.md)を読む。過去の修正・検査・性能測定は[保管先](../document-archives.md#s05)へ移した。安全条件の未完了項目はこの表と末尾のオーナー作業に残す。
 
 表のパスはリポジトリのルートから。命令は原則として読むだけ。「検証で確認」は、別途用意した架空データの環境で担当者が行う次の作業。実際のお客さまへ試し送信しない。
 
@@ -32,10 +26,10 @@ B-361の残り5・8・11・12・13のコードと手元試験は[追加記録](S
 | S01 | ログインした本人と有効なセッションを確認する・高 | `rg -n 'state\|nonce\|authenticateAdminSession\|expires' apps/worker/src/routes/admin-auth.ts apps/worker/src/middleware/auth.ts`。発行・期限・失効の分岐を読む | 済：OAuthとセッションの確認処理を確認。配備先のログイン成功は別確認 | `apps/worker/src/routes/admin-auth.ts`、`apps/worker/src/middleware/auth.ts`、`apps/worker/src/routes/admin-auth-sessions.test.ts` |
 | S02 | Cookieと不正な外部操作への対策・高 | `auth.ts` のCookie属性と更新時のCSRF比較、`admin-auth-config.ts` の許可元を読む | 済：Secure・HttpOnlyのセッションCookie、CSRF比較、接続構成の検査がある | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/admin-auth-config.ts` |
 | S03 | 新しいAPIがスタッフへ無条件に開かない・高 | `permissionForApiPath` とスタッフの許可条件、網羅試験の分類を読む | 済：未分類の管理APIはスタッフを403で拒否する設計。全APIの安全の証明ではない | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/route-guard-coverage.test.ts` |
-| S04 | 統括・店・別アカウントの境界・高 | `tenant-scope.ts`、各APIの所属確認と境界試験を読む。画面の「統括／店」と内部のowner/admin/staffを同じ意味と考えない | 済：共通の所属範囲検査とAPI別の制限がある。全経路の実動作はS07 | `apps/worker/src/middleware/tenant-scope.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/calendar.security.test.ts` |
-| S05 | 閲覧のみでは変更・鍵取得ができない・高 | `auth.ts` の安全なHTTPメソッド以外の拒否、`denyReadOnly` を読む | 済：更新の一律拒否と、鍵情報などを読むこと自体の拒否がある。続きでCSV・export・downloadの拒否も追加し、機能ごとの閲覧権限からの書出しも止める | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/staff-api-key.security.test.ts` |
-| S06 | 代理ログインは範囲・理由・履歴で制限する・高 | `resolveImpersonation`、伏せ字、書き出し拒否、理由付き表示、禁止操作を読む | 済：セッションに結び付き、既定は閲覧のみ。個人情報は既定で伏せ、解約等を禁止する | `apps/worker/src/middleware/impersonation.ts`、`apps/worker/src/routes/ops.ts`、`apps/worker/src/middleware/train30-impersonation.test.ts` |
-| S07 | 全APIの権限の抜けを実際のリクエストで点検する・高 | 開発担当がOpenAPIと経路一覧を突合し、未ログイン・統括・店・閲覧のみ・代理ログインで別の店のIDを指定する。GET・書き出し・更新・削除を含め、401/403/情報を返さない404を確認 | 未：実登録と照合した[全1,764経路の一覧](API-ROUTE-INVENTORY-1016.tsv)と[管理1,582経路の共通境界](API-BOUNDARY-RESULTS-1016.tsv)。一覧・履歴・集計・Google連携・旧共通資源・閲覧のみのCSV書出しの抜けを修正し、実データ付きの拒否試験を追加（[修正と残条件](API-ROUTE-REVIEW-1016.md)）。他店資源ID単独・代理ログインの全組合せの個別証拠は未完。旧スコア5経路はbehaviorfixと同じ410停止を維持 | `apps/worker/src/middleware/route-guard-coverage.test.ts`、`routes/security-scope-inventory.test.ts`、`test-utils/route-security-inventory.ts` |
+| S04 | 統括・店・別アカウントの境界・高 | `tenant-scope.ts`、各APIの所属確認と境界試験を読む。画面の「統括／店」と内部のowner/admin/staffを同じ意味と考えない | 済：共通の所属範囲検査とAPI別の制限がある。全経路の実動作はS07 | `apps/worker/src/middleware/tenant-scope.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/calendar-security.test.ts` |
+| S05 | 閲覧のみでは変更・鍵取得ができない・高 | `auth.ts` の安全なHTTPメソッド以外の拒否、`denyReadOnly` を読む | 済：更新の一律拒否と、鍵情報などを読むこと自体の拒否がある。続きでCSV・export・downloadの拒否も追加し、機能ごとの閲覧権限からの書出しも止める | `apps/worker/src/middleware/auth.ts`、`apps/worker/src/middleware/role-guard.ts`、`apps/worker/src/routes/staff-api-key-security.test.ts` |
+| S06 | 代理ログインは範囲・理由・履歴で制限する・高 | `resolveImpersonation`、伏せ字、書き出し拒否、理由付き表示、禁止操作を読む | 済：セッションに結び付き、既定は閲覧のみ。個人情報は既定で伏せ、解約等を禁止する | `apps/worker/src/middleware/impersonation.ts`、`apps/worker/src/routes/ops.ts`、`apps/worker/src/middleware/impersonation.test.ts` |
+| S07 | 全APIの権限の抜けを実際のリクエストで点検する・高 | 開発担当がOpenAPIと経路一覧を突合し、未ログイン・統括・店・閲覧のみ・代理ログインで別の店のIDを指定する。GET・書き出し・更新・削除を含め、401/403/情報を返さない404を確認 | 未：実登録と照合した[全1,764経路の一覧](../document-archives.md#s05)と[管理1,582経路の共通境界](../document-archives.md#s05)。一覧・履歴・集計・Google連携・旧共通資源・閲覧のみのCSV書出しの抜けを修正し、実データ付きの拒否試験を追加（[修正と残条件](../document-archives.md#s05)）。他店資源ID単独・代理ログインの全組合せの個別証拠は未完。旧スコア5経路はbehaviorfixと同じ410停止を維持 | `apps/worker/src/middleware/route-guard-coverage.test.ts`、`routes/security-scope-inventory.test.ts`、`test-utils/route-security-inventory.ts` |
 | S08 | 2人と不要アカウントの実際の権限・高 | 各サービスのメンバー画面とmusuboのユーザー管理を2人で確認し、[権限表](TWO-FACTOR-SETUP.md#誰に何の権限があるか)へ名前・役割だけ記録 | 分からない：アカウントの実際の割り当ては取得していない | `docs/brain/Memory.md`、`apps/worker/src/routes/staff.ts` |
 | S09 | 二段階認証と回復手段・高 | [設定手順](TWO-FACTOR-SETUP.md)で各自の設定を確認。musubo側も二段階認証の設定と暗号化用secretの有無を担当者と確認 | 分からない：登録・必須化のコードはあるが、2人の設定と本番の鍵は未確認 | `apps/worker/src/routes/admin-auth.ts`、`apps/worker/src/lib/mfa-config.ts`、`apps/worker/src/routes/admin-auth-mfa-enforcement.test.ts` |
 
@@ -46,11 +40,11 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 | ID | 点検・危なさ | 確かめ方（命令・画面） | 今の状態 | 根拠のファイル |
 | --- | --- | --- | --- | --- |
 | S10 | LINE通知の署名・高 | `webhook.ts` の生の本文に対する署名検証と、失敗後に処理へ進まない分岐を読む | 済：JSONを読む前に検証。本文上限・署名の形式検査もある | `apps/worker/src/routes/webhook.ts`、`packages/line-sdk/src/`、`apps/worker/src/routes/webhook.test.ts` |
-| S11 | Stripe通知の署名・高 | 購入通知と統括課金の2入口、共通の `verifyStripeSignature` を読む | 済：生の本文・HMAC・前後5分の時刻・本文上限を検査。鍵なしは503、署名不正は401 | `apps/worker/src/routes/stripe.ts`、`apps/worker/src/routes/hq-billing.ts`、`apps/worker/src/services/stripe-signature.ts`、`apps/worker/src/routes/stripe.security.test.ts` |
+| S11 | Stripe通知の署名・高 | 購入通知と統括課金の2入口、共通の `verifyStripeSignature` を読む | 済：生の本文・HMAC・前後5分の時刻・本文上限を検査。鍵なしは503、署名不正は401 | `apps/worker/src/routes/stripe.ts`、`apps/worker/src/routes/hq-billing.ts`、`apps/worker/src/services/stripe-signature.ts`、`apps/worker/src/routes/stripe-security.test.ts` |
 | S12 | Googleの通知入口の有無・高 | `rg -n -i 'x-goog\|pubsub\|calendar.*watch\|google.*webhook' apps/worker/src --glob '!*.test.*'` とカレンダー経路を読む。Google Cloud・Apps Script等の外側の設定も担当者が確認する | 済：このコード内ではGoogle Calendarから直接受けるpush通知の入口は見当たらず、API呼出し方式。署名実装済みとは数えない。外側の設定はS35で確認 | `apps/worker/src/routes/calendar.ts`、`apps/worker/src/services/google-calendar.ts` |
 | S13 | Meet完了通知をGoogle通知と混同しない・高 | `/api/meet-callback` と共通の署名検証、受信済み記録を読む | 済：Meet Harness独自のHMACと前後5分の時刻を検証。Googleが付けた署名ではない | `apps/worker/src/routes/meet-callback.ts`、`apps/worker/src/services/support-relay.ts`、`docs/meet-callback-security.md` |
 | S14 | LIFFの本人確認・高 | `verifyCallerLineIdentity` のLINEへのIDトークン照会と対象チャネルの選択を読む。ブラウザが送った友だちIDだけでは本人としない | 済：LINEの検証APIへIDトークンとチャネルIDを送り、返された本人IDを使う共通処理がある | `apps/worker/src/services/liff-auth.ts`、`apps/worker/src/services/liff-auth.test.ts`、`apps/worker/src/routes/liff.ts` |
-| S15 | LIFF全入口で別人・別店・期限切れを拒否する・高 | 架空の本人Aで本人Bの予約・回答・添付を指定し拒否を確認。別チャネル・期限切れ・トークン欠落でも確認。公開閲覧の入口と本人操作を分けて一覧化する | 未：全入口は[経路一覧](API-ROUTE-INVENTORY-1016.tsv)へ収録。前回の予約14経路に加え、イベント8経路・待ち案内2経路・ウェビナー7経路の他店チャネルを拒否。未割当の他統括利用、停止統括の素材・案内・会員/ペット9経路、LIFFと店の指定不一致も修正。全入口×別人・別店・失効の実資源を使う検査は未完（[記録](API-ROUTE-REVIEW-1016.md)） | `routes/events-channel.security.test.ts`、`routes/webinars-channel.security.test.ts`、`services/liff-auth.test.ts`、`packages/db/test/friend-account-lookup.test.ts`、`packages/db/test/webinar-public-scope.test.ts` |
+| S15 | LIFF全入口で別人・別店・期限切れを拒否する・高 | 架空の本人Aで本人Bの予約・回答・添付を指定し拒否を確認。別チャネル・期限切れ・トークン欠落でも確認。公開閲覧の入口と本人操作を分けて一覧化する | 未：全入口は[経路一覧](../document-archives.md#s05)へ収録。前回の予約14経路に加え、イベント8経路・待ち案内2経路・ウェビナー7経路の他店チャネルを拒否。未割当の他統括利用、停止統括の素材・案内・会員/ペット9経路、LIFFと店の指定不一致も修正。全入口×別人・別店・失効の実資源を使う検査は未完（[記録](../document-archives.md#s05)） | `routes/events-channel.security.test.ts`、`routes/webinars-channel.security.test.ts`、`services/liff-auth.test.ts`、`packages/db/test/friend-account-lookup.test.ts`、`packages/db/test/webinar-public-scope.test.ts` |
 
 ## 秘密の値・個人情報
 
@@ -64,7 +58,7 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 | S21 | Google Calendarの認証情報の保存・高 | `createCalendarConnection` の保存直前と読込を確認し、担当者が暗号化・鍵管理・既存分の移行方法を検討する | 未：新規保存3種はAES-GCMへ修正済。鍵欠落・不正なら保存せず、平文・改ざんはGoogleへ渡さない（`calendar-credentials.security.test.ts`）。既存平文の処理と専用secret登録はオーナー作業が残る。実DBは未照会 | `apps/worker/src/routes/calendar.ts`、`packages/db/src/calendar.ts` |
 | S22 | アプリのログへ顧客本文・秘密を出さない・高 | `index.ts` の未処理エラーと固定コードのログ、ログの静的検査を読む | 済：未処理エラーは固定コードと経路の型を出す。秘密・生の例外を防ぐ検査がある。全ての実行ログを閲覧したわけではない | `apps/worker/src/index.ts`、`apps/worker/src/security-console-contract.test.ts`、`apps/worker/src/security-log.test.ts` |
 | S23 | Slackへ個人情報・URLのクエリを出さない・高 | `client-errors.ts` → `reportHarnessErrorToSlack` → `sanitizeSlackContent` を追う。架空の氏名・メール・クエリ入り経路を、外へ送らない試験で検証する | 済：2026-10-16 kenta。自動エラー報告を固定のエラー種別・許可した機能名・正規化した日時だけへ限定。自由文・スタック・動的ID・ホスト・クエリ・断片を通知と要対応metadataへ出さない。`codex-slack-relay.test.ts`のS23で全送信本文を検査し、旧実装では失敗することも確認。既存Slack履歴の点検はS25/S38 | `apps/worker/src/routes/client-errors.ts`、`apps/worker/src/services/codex-slack-relay.ts`、`apps/worker/src/services/codex-slack-relay.test.ts` |
-| S24 | 画面・書き出しの個人情報制限・高 | 代理ログイン時のJSON伏せ字、ファイル拒否、理由付き表示と監査を読む | 済：共通処理がある。通常ログインの閲覧権限や全画面の確認はS07・S25 | `apps/worker/src/middleware/impersonation.ts`、`apps/worker/src/middleware/output-audit.ts`、`apps/worker/src/middleware/train30-output-audit.test.ts` |
+| S24 | 画面・書き出しの個人情報制限・高 | 代理ログイン時のJSON伏せ字、ファイル拒否、理由付き表示と監査を読む | 済：共通処理がある。通常ログインの閲覧権限や全画面の確認はS07・S25 | `apps/worker/src/middleware/impersonation.ts`、`apps/worker/src/middleware/output-audit.ts`、`apps/worker/src/middleware/output-audit.test.ts` |
 | S25 | 配備先の画面・ログ・Slackの保管設定・高 | 架空データで画面と書き出しを確認。Cloudflareのログ閲覧権限・保持期間、Slackの参加者・保持期間、公開画像・添付の範囲を担当者が点検 | 分からない：本番画面や保存済みのログ・Slack履歴は閲覧していない | `apps/worker/src/middleware/impersonation.ts`、`apps/worker/src/routes/client-errors.ts`、`AGENTS.md` |
 
 ## 依存関係・回数の制限
@@ -110,40 +104,19 @@ Webhookは、外部サービスから届く通知の入口。署名は「正し�
 
 | ID | 点検・危なさ | 確かめ方（命令・画面） | 今の状態 | 根拠のファイル |
 | --- | --- | --- | --- | --- |
-| S41 | B-351/4 ログイン不要の入口・高 | [公開入口](PUBLIC-ENTRYPOINTS.md)を実登録と照合。別人・別店・期限切れ・連続取得を架空データで拒否する | 未：全入口を一覧化。短縮リンクの無制限取得を修正。添付画像/動画を含め署名は最長15分へ、明細は認証ヘッダー＋署名へ修正。本人用の取り直しAPI・古いリンクのLIFF案内・送信本文の入口を追加し、別人/別店/削除を拒否する試験を追加。取り直し画面の接続、LINE内表示用URLの期限内の転送、全入口の個別組合せ・公開素材の誤配置は残る（[契約と試験](SIGNED-DOWNLOADS.md)） | `apps/worker/src/middleware/public-referral-rate-limit.security.test.ts`、`routes/public-entrypoints.security.test.ts`、`services/image-access.ts` |
+| S41 | B-351/4 ログイン不要の入口・高 | [公開入口](PUBLIC-ENTRYPOINTS.md)を実登録と照合。別人・別店・期限切れ・連続取得を架空データで拒否する | 未：全入口を一覧化。短縮リンクの無制限取得を修正。添付画像/動画を含め署名は最長15分へ、明細は認証ヘッダー＋署名へ修正。本人用の取り直しAPI・古いリンクのLIFF案内・送信本文の入口を追加し、別人/別店/削除を拒否する試験を追加。取り直し画面の接続、LINE内表示用URLの期限内の転送、全入口の個別組合せ・公開素材の誤配置は残る（[契約と試験](SIGNED-DOWNLOADS.md)） | `apps/worker/src/middleware/public-referral-rate-limit-security.test.ts`、`routes/public-entrypoints.security.test.ts`、`services/image-access.ts` |
 | S42 | B-351/5 ログイン失敗・新しい端末・ロボット避け・高 | 同一メールへの失敗を別IPから繰り返す。架空の新端末で監査・通知を確認。全ログイン方法でロボット避けの適用を照合 | 未：コード対応は済。同一メールの10回/15分制限を維持し、パスワードログインにもTurnstile検証を追加。726の端末ハッシュでログアウト後も新端末を検知し、検証では模擬通知だけ。拒否と再通知の実SQLite試験・故障対照を実施。画面のTurnstile接続・実メール到達・実配備の確認は残る | `routes/auth-email.test.ts`、`services/login-device.security.test.ts`、`packages/db/migrations/726_auth_known_devices.sql` |
 | S43 | B-351/6 WAF・ボット対策・請求急増の知らせ・高 | オーナーがCloudflareのSecurityとNotifications/Billingで対象ホスト・通知先・条件・適用範囲を照合。架空の連続アクセスと通知の試験 | 分からない：配備先の設定・プラン・通知の到達は未確認。オーナー作業欄へ手順を追加 | `apps/worker/src/middleware/rate-limit.ts`、`docs/security/DETECTION.md`、この文書のオーナー手順 |
-| S44 | B-351/8 危ない操作の直前の本人確認・高 | 削除・権限・鍵再発行・停止・書き出しごとに確認票の欠落/期限切れ/別セッション/再使用を拒否。全危険操作の一覧を照合 | 未：コード対応は済。書き出し・配信/予約/再送・権限変更・代理ログインに共通の再確認を追加し、既存の鍵/MFA/承認の強い確認を維持。未確認/失効/別セッション/再使用と実アプリでの拒否・故障対照を実施。画面全体の再確認の接続と実地確認は残る | `middleware/sensitive-step-up.ts`、`middleware/sensitive-step-up.security.test.ts`、`lib/step-up.ts`、[今回の契約](SECURITY-B351-REMAINDER.md) |
-| S45 | B-351/10 本番のCSP・高 | web/LIFFを通常ビルドし、出力の_headersをHTTP応答へ付けてPlaywrightで実行。強制用ヘッダーで通常表示の違反0と、故意のinline/未知スクリプトの拒否を分けて確認する | 未：静的配信用の強制コードを実装。起動の外部化・動画Worker・実PDFの紙面と文字を実ブラウザで確認。[CSP記録](CSP-REVIEW-1016.md)のLINE内の追加窓・Worker HTML・既存のスタイル許可・本番実効値は残る。本番へは未配備 | `apps/web/public/_headers`、`apps/liff/public/_headers`、`scripts/security/csp-policy.test.ts`、`scripts/security/csp-browser.mjs` |
+| S44 | B-351/8 危ない操作の直前の本人確認・高 | 削除・権限・鍵再発行・停止・書き出しごとに確認票の欠落/期限切れ/別セッション/再使用を拒否。全危険操作の一覧を照合 | 未：コード対応は済。書き出し・配信/予約/再送・権限変更・代理ログインに共通の再確認を追加し、既存の鍵/MFA/承認の強い確認を維持。未確認/失効/別セッション/再使用と実アプリでの拒否・故障対照を実施。画面全体の再確認の接続と実地確認は残る | `middleware/sensitive-step-up.ts`、`middleware/sensitive-step-up.security.test.ts`、`lib/step-up.ts`、[今回の契約](step-up-and-retention.md) |
+| S45 | B-351/10 本番のCSP・高 | web/LIFFを通常ビルドし、出力の_headersをHTTP応答へ付けてPlaywrightで実行。強制用ヘッダーで通常表示の違反0と、故意のinline/未知スクリプトの拒否を分けて確認する | 未：静的配信用の強制コードを実装。起動の外部化・動画Worker・実PDFの紙面と文字を実ブラウザで確認。[CSP記録](csp.md)のLINE内の追加窓・Worker HTML・既存のスタイル許可・本番実効値は残る。本番へは未配備 | `apps/web/public/_headers`、`apps/liff/public/_headers`、`scripts/security/csp-policy.test.ts`、`scripts/security/csp-browser.mjs` |
 | S46 | B-351/9 不要アカウント・権限の毎月の見直し・高 | オーナー2人が毎月、実際のサービスのメンバーと担当表を照合。退職/不要/過大権限を止め、既存セッションと鍵も失効したことを確認 | 分からない：アプリの削除/失効の口はあるが、実際の全アカウント・毎月の実施記録は未確認。オーナー作業欄へ手順を追加 | `apps/worker/src/routes/staff.ts`、`docs/security/TWO-FACTOR-SETUP.md`、この文書のオーナー手順 |
 | S47 | B-351/11 配備のたびの本番設定の機械点検・高 | 配備前の設定と配備後の実効値を照合。試験用フラグ・公開接続先・secretの型/存在・CSP・署名検証を確認。故意の設定違いで配備判定が失敗すること | 未：配備前に試験用の旗・明示したCORS・全R2の公開設定・必須secretの名前/型を照合する台本をWorker/Admin/検証のworkflowへ追加。実際の検証用設定＋架空の応答で成功、不安全/不明/権限不足で失敗。実配備先の照会と、本番に残る試験用の旗の是正はオーナー作業として残る | `scripts/security/deployment-safety.ts`、`scripts/security/deployment-safety.test.ts`、`.github/workflows/deploy-cloudflare-{worker,admin,staging}.yml` |
-| S48 | B-351/12 個人情報の期限・自動削除・書き出しの印・高 | 情報の種類ごとに期限と例外を決め、期限前/後と失敗時の再実行を確認。書き出しの操作者・日時の印がファイルから分かるか確認 | 未：店ごとの期限/保留/版付き設定APIと6時間ごとの回答/ブロック済み顧客の削除を追加。既定は無効、日数は案。期限境界/別店/保留/失敗後の再試行と監査失敗の巻き戻しを試験。CSVファイル名・新規明細PDFへ操作者と日時の印。保護履歴の個人情報の残存範囲・端末ハッシュ履歴の期限削除・期限の決定・画面接続と有効化は残る | `routes/personal-data-retention.ts`、`services/personal-data-retention.ts`、`middleware/output-audit.ts`、[保存対象と期限案](SECURITY-B351-REMAINDER.md) |
+| S48 | B-351/12 個人情報の期限・自動削除・書き出しの印・高 | 情報の種類ごとに期限と例外を決め、期限前/後と失敗時の再実行を確認。書き出しの操作者・日時の印がファイルから分かるか確認 | 未：店ごとの期限/保留/版付き設定APIと6時間ごとの回答/ブロック済み顧客の削除を追加。既定は無効、日数は案。期限境界/別店/保留/失敗後の再試行と監査失敗の巻き戻しを試験。CSVファイル名・新規明細PDFへ操作者と日時の印。保護履歴の個人情報の残存範囲・端末ハッシュ履歴の期限削除・期限の決定・画面接続と有効化は残る | `routes/personal-data-retention.ts`、`services/personal-data-retention.ts`、`middleware/output-audit.ts`、[保存対象と期限案](step-up-and-retention.md) |
 | S49 | B-351/13 鍵の入れ替えの練習・高 | 検証の架空鍵を使い、旧鍵停止→新鍵登録→署名/暗号化と通知確認→旧鍵の拒否を練習。復号用の旧鍵を消す前に既存分の移行を確認 | 未：専用の[鍵交換と検証の練習手順](KEY-ROTATION.md)を作成。製品の署名URLとAES-GCMを使う架空鍵の練習で新鍵成功/旧鍵拒否/移行後の復号を確認。検証Workerへのsecret登録と実地練習は未実施 | `docs/security/KEY-ROTATION.md`、`services/key-rotation-drill.test.ts` |
 
-## 依存検査の記録
+## 依存の確認
 
-### 修正後（2026-10-16 kenta）
-
-前回の修正時点（続きの更新前）：`pnpm audit --json`：critical 2 / high 1 / moderate 9 / low 4、`--prod`：critical/high 0 / moderate 5 / low 1（どちらも警告で終了1）。`fast-uri`は3.1.7→3.1.8、`ip-address`は10.7.0→10.7.1。監査件数に出ないLINE公式の安全上の更新案内も確認し、`@line/liff`は2.31.0→2.31.1へ更新（[公式](https://developers.line.biz/en/docs/liff/release-notes/#liff-v2-31-1)）。全lockfileの該当部品を検査する `scripts/security/patched-dependencies.test.ts` は、古い版が1つ混ざっても失敗する。修正版の根拠：[fast-uriの警告](https://github.com/advisories/GHSA-hrr3-gc8f-f4qj)、[ip-addressの警告](https://github.com/advisories/GHSA-j6r3-76f7-8jcv)と[別の警告](https://github.com/advisories/GHSA-h3mg-xc3c-68pw)。本番に届く程度をこの件数だけでは判断しない。
-
-続きではVitest 4.1.11へ更新し、Critical 0 / High 1 / Moderate 5 / Low 4、製品用0 / 0 / 5 / 1。両方警告による終了1。Highの到達条件と回避策は[続きの記録](SECURITY-FIXES-1016.md#修正版がないhigh-1件)。
-
-前回止めた理由（司令塔が後に更新を承認）：Criticalの2件は同じtinypool 1.1.1。両方の修正版は2.1.2以上で、1→2系の更新になる。既存Vitest 3.2.7の依存範囲は1系で、強制overrideは互換性の試験が必要なため実施しない。braces 3.0.3のHighは監査上の修正版なし。S26は未のまま。[影響とオーナー判断](SECURITY-FIXES-1016.md#s26-依存の更新と止めた更新)。
-
-### 初回調査（修正前）
-
-`pnpm audit --json` と `pnpm audit --prod --json` を実行。どちらも警告ありで終了1。修正や依存の追加はしていない。現在の警告データベースに対する結果なので、公開前に再実行する。
-
-| 範囲 | critical | high | moderate | low |
-| --- | --- | --- | --- | --- |
-| 全体 | 2 | 1 | 12 | 4 |
-| 製品用依存だけ（`--prod`） | 0 | 0 | 8 | 1 |
-
-criticalの2件はtinypool、highの1件はbraces。表はpnpmが返したmetadataの集計であり、異なる部品や固有の警告番号の数ではない。lockfileにはtinypool 1.1.1とbraces 3.0.3があり、警告の対象版に含まれることを確認した。全体の監査応答では依存経路が空だったため、親パッケージや本番で攻撃が成立する条件は断定していない。[tinypoolの警告1](https://github.com/advisories/GHSA-5gmw-xhrv-c9v3)、[警告2](https://github.com/advisories/GHSA-85c8-ppgw-ccpr)、[bracesの警告](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)で利用条件と修正方法を確認する。
-
-S23は架空のメール形式・クエリ付きURLを既存の伏せ字関数へ渡すオフライン確認も実施し、両方が残ることを確認した。外部への送信や本物の顧客情報の使用はしていない。
-
-生の監査結果は調査端末の一時ファイル（`/tmp/lh-prelaunch-audit-1016.json` と `-audit-prod-1016.json`）にあり、リポジトリには入れない。上の集計と命令を再確認の入口にする。
+S26は未のまま。過去の監査結果を現在の依存の安全性の証明に使わず、公開する版で `pnpm audit` と製品の利用経路を再確認する。大きな版上げ・未修正版・回避策・担当と期限は司令塔が判断する。古い監査の数値と更新経緯は外部保管に残す。
 
 ## コード整理との分担・既存手順
 

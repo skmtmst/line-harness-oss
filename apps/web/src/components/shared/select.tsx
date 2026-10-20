@@ -56,7 +56,7 @@ export default function Select({
   const options = useMemo(() => isPageSizeControl
     ? suppliedOptions.map(option => /^\d+$/.test(option.value) ? { ...option, label: pageSizeLabel(Number(option.value)) } : option)
     : suppliedOptions, [suppliedOptions, isPageSizeControl])
-  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る（B-139）。
+  // Field の中に置くと、欄の誤り（赤）と説明の読み上げを受け取る。
   const field = useFieldContext()
   const invalid = Boolean(error) || invalidProp || Boolean(field?.invalid)
   const generatedId = useId()
@@ -82,7 +82,7 @@ export default function Select({
   }, [enabledOptions])
   const windowed = options.length > WINDOW_THRESHOLD
   /*
-   * ★V8 は開いた中身を共通部品 select-menu（StFE7）で描く（2026-10-08 B-45）。
+   * ★V8 は開いた中身を共通部品 select-menu（StFE7）で描く（2026-10-08 ）。
    * 選択肢の「並び：」などの頭は外して上の見出しにし、閉じたボタンは今のまま。
    */
 

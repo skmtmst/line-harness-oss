@@ -1,3 +1,4 @@
+import { withDisplayReadCache } from '@line-crm/db/src/display-read-cache.js';
 import { seatSchedule } from './style-seat-schedule.js';
 import type { StyleSchedule, StyleSnapshot } from '@line-crm/shared';
 import { addDate, civilDate, instant, styleRows, cancelled } from './style-analytics.js';
@@ -21,6 +22,8 @@ export async function styleSchedule(
   googleCredentials?: GoogleServiceAccountCredentials,
   access:{kinds?:import('@line-crm/shared').StyleBooking['kind'][];ownMeetStaffId?:string} = {},
 ): Promise<StyleSchedule> {
+  const liveDb = db;
+  return withDisplayReadCache(db, async db => {
   const { style, asOf, timeZone, range, from, to } = snapshot;
   const display = query.display ?? 'list';
   const calendarView =
@@ -167,7 +170,7 @@ export async function styleSchedule(
           date: civilDate(instant(slot.starts_at), timeZone),
           startsAt: slot.starts_at,
           endsAt: slot.ends_at,
-          remaining: await eventModeRemaining(db, slot.id, mode),
+          remaining: await eventModeRemaining(liveDb, slot.id, mode),
           mode,
           entryId: 'class:' + slot.id,
         });
@@ -233,7 +236,7 @@ export async function styleSchedule(
     }
     const closedByMenu: string[][] = [];
     for (const menu of menus) {
-      const result = await getAvailability(db, {
+      const result = await getAvailability(liveDb, {
         lineAccountId: account,
         menuId: menu.id,
         staffId,
@@ -288,7 +291,7 @@ export async function styleSchedule(
         ),
     );
   }
-  await seatSchedule(db,account,query,style,from,to,asOf,timeZone,days,closures,availability);
+  await seatSchedule(liveDb,account,query,style,from,to,asOf,timeZone,days,closures,availability);
   if (entries.some((e) => e.columnIds.includes('unassigned')))
     columns.push({ id: 'unassigned', kind: 'unassigned', name: '担当未定' });
   entries.sort((a, b) =>
@@ -333,4 +336,5 @@ export async function styleSchedule(
     closures,
     availability,
   };
+  });
 }

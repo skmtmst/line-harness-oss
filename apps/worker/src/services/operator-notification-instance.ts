@@ -1,4 +1,4 @@
-import type { OperatorRuleConditions } from './operator-notification-dispatch.js';
+import type { OperatorRuleConditions } from './operator-rule-types.js';
 
 
 export async function ensureOperatorInstance(

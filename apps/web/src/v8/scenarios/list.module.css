@@ -1,5 +1,5 @@
 /*
- * ★V8 シナリオ配信の一覧（Pencil `axFrW`・狭い板 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`、状態は `BxGhV`）。
+ * ★V8 シナリオ配信の一覧（Pencil ・狭い板 ・閲覧のみ ・複製の窓 、状態は ）。
  * 枠・見出し・帯・フォルダ列・道具の段の並びは型（ListPage・ListToolbar）が持つ。
  * 値は globals.css の `:root` の `--tpl-scn-*` と共通の `--tpl-*` だけを使う。
  */
@@ -39,7 +39,7 @@
   cursor: pointer;
 }
 
-/* 表。見出しと行の区切り線だけ（`axFrW`）。外側の枠は作らない。 */
+/* 表。見出しと行の区切り線だけ（）。外側の枠は作らない。 */
 .tableWrap {
   min-width: 0;
 }
@@ -51,7 +51,7 @@
 .colState { width: var(--tpl-scn-col-state); }
 .colMenu { width: var(--tpl-scn-col-menu); }
 
-/* 絵 axFrW の行は 61 ごと。札や長い説明があっても同じ高さに。 */
+/* 絵  の行は 61 ごと。札や長い説明があっても同じ高さに。 */
 .row > td {
   height: var(--tpl-scn-row-h);
 }
@@ -103,7 +103,7 @@
   display: block;
   margin-top: calc(var(--tpl-scn-sub-gap) - var(--tpl-row-sub-gap));
   overflow: hidden;
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 axFrW の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
   padding-inline-start: var(--tpl-folder-dot-indent);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -305,7 +305,7 @@
   font-size: var(--text-micro);
 }
 
-/* 複製の窓（`Al4Ek`）：名前の欄 → 引き継ぐもの → 引き継がないもの → 案内の帯。 */
+/* 複製の窓（）：名前の欄 → 引き継ぐもの → 引き継がないもの → 案内の帯。 */
 .dupBody {
   display: flex;
   flex-direction: column;
@@ -365,7 +365,7 @@
   color: var(--color-action);
 }
 
-/* 閲覧のみの帯（X0QrW0）。数の帯の上。薄い青の地・目の印・枠なし。 */
+/* 閲覧のみの帯。数の帯の上。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after); }
 
 /* 状態の札の並び。 */

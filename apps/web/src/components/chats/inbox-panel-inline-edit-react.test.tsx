@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 B-26（A-2 採用）受信箱の右の欄でその場で直す：本物の右の欄（FriendInfoSidebar）と
+ * ★V8 （A-2 採用）受信箱の右の欄でその場で直す：本物の右の欄（FriendInfoSidebar）と
  * 共通の知らせ（ToastHost）を描き、口（api）だけを差し替える。
  * - 対応状況：選んだ瞬間に変えて裏で保存（版を送らない＝その項目だけ変える）→［元に戻す］で前の状態を送る
  * - 失敗：画面を戻し、理由と［もう一度試す］
@@ -49,7 +49,7 @@ vi.mock('@/lib/api', async () => {
     },
   }
 })
-vi.mock('@/app/booking/prepay-badge-v8', () => ({ default: () => null }))
+vi.mock('@/v8/booking/prepay-badge', () => ({ default: () => null }))
 /* 選ぶ欄は共通 Select（listbox）。ここで見たいのは選んだ後の保存なので、素の select にする。 */
 vi.mock('@/components/shared/select', () => ({
   default: ({ 'aria-label': label, id, value, onChange, options }: {
@@ -131,7 +131,7 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-describe('B-26 右の欄でその場で直す', () => {
+describe('右の欄でその場で直す', () => {
   it('タグの追加は開いて選べ、Tキーでも開いて入力欄へ移動する', async () => {
     await renderPanel()
     const picker = () => document.getElementById('inbox-panel-tag-picker')!

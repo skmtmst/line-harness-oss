@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B 予約設定の予約経路の連携（ZyDd6）。
+ * ★V8-B 予約設定の予約経路の連携。
  * 絵のとおり、つながっている人は「予定を見る」（中身の窓からつなぎ直せる）、
  * つないでいない人は「つなぐ」、期限切れは「つなぎ直す」。閲覧のみは見るだけ。
  * 名前の下に担当スタッフの役割を出す。
@@ -21,6 +21,8 @@ vi.mock('./lib/booking-channels', () => ({ bookingChannelsApi: api }))
 vi.mock('@/components/shared/toast', () => ({ ...(() => { const notifyToast = vi.fn(); return { notifyToast, notifySaved: notifyToast } })() }))
 
 import ChannelsTabV8 from './channels-tab'
+import ChannelsSummaryBand from './channels-summary'
+import type { BookingChannelsData } from './lib/booking-channels'
 
 const channelsData = {
   timeZone: 'Asia/Tokyo',
@@ -110,4 +112,22 @@ it('取得済みのAからBへ切り替えても、Aの数をBの集計として
   view.rerender(<ChannelsTabV8 accountId="account-b" canEdit onSummaryChange={onSummaryChange} />)
   await screen.findByText('Bの担当')
   expect(onSummaryChange.mock.calls.some(([summary]) => summary.accountId === 'account-b' && summary.data?.staff.some((person: { displayName: string }) => person.displayName === 'Aの担当'))).toBe(false)
+})
+
+it('Google予約行が実データにあっても行・操作の入口を出さず、カレンダーは保つ', async () => {
+  api.channels.mockResolvedValue({ success: true, data: { ...channelsData, channels: [...channelsData.channels, { key: 'google_reserve', status: 'active', todayCount: 100 }] } })
+  render(<ChannelsTabV8 accountId="account-a" canEdit staff={staff} />)
+  await screen.findByText('高田誠')
+  expect(screen.queryByText('Google で予約')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Google で予約の操作' })).toBeNull()
+  expect(screen.getByRole('heading', { name: 'スタッフの Google カレンダー' })).toBeTruthy()
+})
+
+it('非表示のGoogle予約を経路数と今日の件数に含めない', () => {
+  const data = { ...channelsData, channels: [...channelsData.channels, { key: 'google_reserve', status: 'active', todayCount: 100 }] } as BookingChannelsData
+  render(<ChannelsSummaryBand summary={{ accountId: 'account-a', status: 'ready', data, conflicts: 0 }} />)
+  expect(screen.getByText('14')).toBeTruthy()
+  expect(screen.queryByText('114')).toBeNull()
+  expect(screen.getAllByText('1')).toHaveLength(2)
+  expect(screen.queryByText('2')).toBeNull()
 })

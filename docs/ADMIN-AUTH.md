@@ -1,3 +1,5 @@
+> 文書：Admin Authentication (cookie session + CSRF)｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # Admin Authentication (cookie session + CSRF)
 
 The admin dashboard authenticates against the Worker API with an **HttpOnly

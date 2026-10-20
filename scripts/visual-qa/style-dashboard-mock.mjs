@@ -1,9 +1,11 @@
 /*
- * 業種ダッシュボード（B-294・B-304・B-309・B-318。絵 XBkC2）の撮影の見本。
+ * 業種ダッシュボード（。絵 XBkC2）の撮影の見本。
  * 口は API 組4（/api/dashboard/style、apps/web/src/lib/api-styles.ts の styleApi・API-CONTRACT-4）。
  * 下の TODAY は絵の中身の控え。ここから口の生の形（summary・schedule・analytics・cards）を組み立てて返す。
  * 使い方のスタイルは PUT /api/dashboard/style { style } で変えられる（撮影で 4 業種を順に撮るため）。
  */
+
+import { STYLE_SETUP_STATE, STYLE_QUESTION_KEYS } from './style-setup-fixtures.mjs'
 
 let accountStyle = 'standard'
 
@@ -351,8 +353,13 @@ export function styleDashboardMock(method, pathname, query, body) {
   const root = '/api/dashboard/style'
   if (pathname === root) {
     if (method === 'PUT') { if (body?.style) accountStyle = body.style; qaEmpty = Boolean(body?.qaEmpty); styleVersion += 1 }
+    const selection = { style: accountStyle, styleSelected: accountStyle !== 'standard', version: styleVersion, styleMode: STYLE_SETUP_STATE.styleMode }
+    if (method === 'PUT') return { success: true, data: { ...selection, changedAnswers: {}, bookingSettingsChanges: [], inserted: [] } }
     const cards = (CARDS[accountStyle] ?? []).map((id) => ({ id, visible: true }))
-    return { success: true, data: { style: accountStyle, styleSelected: accountStyle !== 'standard', version: styleVersion, answers: {}, settings: {}, cards, questions: [] } }
+    return { success: true, data: {
+      ...selection, answers: {}, settings: {}, cards, metricIds: [], visibleTabs: [],
+      questions: STYLE_QUESTION_KEYS.map((key) => ({ key, canChangeLater: true, recommended: key !== 'payment', modes: ['configured', 'later', 'manual'] })),
+    } }
   }
   if (!pathname.startsWith(root + '/')) return null
   const style = query.get('style') || accountStyle

@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { CancelClassDialog,CancelReservationDialog,RefundDialog } from '@/components/shared/booking-confirm-dialogs'
 import Button from '@/components/shared/button'
@@ -21,14 +22,14 @@ import { Tabs } from '@/components/shared/tabs'
 import TestModeNote from '@/components/shared/test-mode-note'
 import { notifyToast } from '@/components/shared/toast'
 import { DashboardPage } from '@/components/templates/dashboard-page'
-import { styleApi } from '@/lib/api-styles'
+import { styleApi } from '@/lib/api/helpers/styles'
 import { formatDate } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { Armchair,BellRing,CalendarCheck,CalendarDays,CalendarX2,Check,CircleUserRound,ClipboardList,Clock3,Copy,CreditCard,Download,ExternalLink,Link2,Mail,MessageCircle,Plus,RefreshCw,Repeat2,SlidersHorizontal,Sparkles,UserPlus,UserRoundX,Users,Video } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useMemo,useState } from 'react'
-import PhoneReservationDrawer from '../restaurant/front-desk/phone-drawer'
-import WalkInDialog from '../restaurant/front-desk/walk-in-dialog'
+import { PhoneReservationDrawer } from '@/v8/restaurant/front-desk/public/phone-drawer/index'
+import { WalkInDialog } from '@/v8/restaurant/front-desk/public/walk-in-dialog/index'
 import { toLayout } from './adapter'
 import { StyleAnalyticsView } from './analytics'
 import { DayList,MonthCalendar,WeekCalendar } from './calendar'
@@ -49,7 +50,7 @@ import { useStyleDashboard } from './use-style-dashboard'
 
 
 /*
- * ★V8 業種ダッシュボード（B-294・B-304・B-309・B-318・B-319。絵 XBkC2）。
+ * ★V8 業種ダッシュボード（・・・・。絵 XBkC2）。
  * 4 業種（飲食・サロン・面談・教室）で同じ骨組み：
  *   頭（題＝業種の名前・日付と営業時間・すぐ使う操作）→ 日付の段（今日｜1週間｜1か月・日付・担当・比べる・読み直す）
  *   → 数の帯（5・「？」・前との比べ）→ 異常の帯 → タブ（1枚目・…・分析）＋表示の切り替え（盤｜一覧｜カレンダー）
@@ -246,14 +247,14 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       {preparing.dialog}
       {cancelRow ? (
         <CancelReservationDialog open title={`${cancelRow.name}さまの予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${cancelRow.people}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
-          facts={[{ label: 'お支払い', value: cancelRow.booking?.price ? `¥${(cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1)).toLocaleString('ja-JP')}（支払いの記録は決済の口から）` : 'お支払いなし' }]}
+          facts={[{ label: 'お支払い', value: cancelRow.booking?.price ? `${formatYen(cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1))}（支払いの記録は決済の口から）` : 'お支払いなし' }]}
           fullAmount={cancelRow.booking?.price ? cancelRow.booking.price * (style === 'restaurant' ? cancelRow.booking.partySize : 1) : null} testMode={testMode} busy={busy === 'cancel'}
           messageFor={(i) => `${cancelRow.name}さま　${i.reason ? `${i.reason}で` : 'お店の都合で'} ${cancelRow.time} のご予約を取り消しました。申し訳ありません。${i.refund === 'full' ? 'お支払いは全額を返金します。' : ''}`}
           onClose={() => setCancelRow(null)} onConfirm={(i) => void confirmCancel(cancelRow, i)} />
       ) : null}
       {refundRow ? (
         <RefundDialog open subtitle={`${refundRow.name}さま・${refundRow.time}${refundRow.course ? ` ${refundRow.course}` : ''}${refundRow.people ? ` ${refundRow.people}名` : ''}`}
-          facts={[{ label: '支払った額', value: refundRow.booking?.price ? `¥${(refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1)).toLocaleString('ja-JP')}` : '—' }, { label: 'これまでの返金', value: 'なし' }]}
+          facts={[{ label: '支払った額', value: refundRow.booking?.price ? `${formatYen(refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1))}` : '—' }, { label: 'これまでの返金', value: 'なし' }]}
           paidAmount={refundRow.booking?.price ? refundRow.booking.price * (style === 'restaurant' ? refundRow.booking.partySize : 1) : 0} testMode={testMode}
           onClose={() => setRefundRow(null)} onConfirm={() => { setRefundRow(null); openPayment() }} />
       ) : null}

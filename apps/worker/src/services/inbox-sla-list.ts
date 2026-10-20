@@ -1,5 +1,5 @@
 import type {Context} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {getVisibleLineAccountScope} from './account-access.js';
 import {inboxSlaSettings,refreshInboxSla,slaState,businessWindows} from './inbox-sla.js';
 /** 期限による絞り込みもページを確定する前に行う。 */

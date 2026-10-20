@@ -77,7 +77,7 @@ describe('たまる決めごとの編集（W156）', () => {
   })
 })
 
-describe('B-139 欄で知らせて移る', () => {
+describe('欄で知らせて移る', () => {
   it('ルール名を消し、付与マイルを0にして保存すると、口を呼ばず2つの欄が赤くなり、ルール名の欄へ移る', async () => {
     const { api } = await import('@/lib/api')
     const saveDraft = vi.spyOn(api.mileage, 'saveEarningRuleDraft')

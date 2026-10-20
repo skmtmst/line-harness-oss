@@ -1,7 +1,7 @@
 import { inputError } from '../lib/input-errors.js';
 import { type Context } from 'hono';
 import { TagDefinitionError } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { CommonActionValidationError } from '../services/common-actions.js';
 
 export function tagDefinitionError(c: Context<Env>, error: unknown): Response | null {

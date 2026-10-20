@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { updateScenario } from '../src/scenarios.js';
+import { updateScenario } from '../src/scenarios/index.js';
 
 /**
  * 配信方式を更新できるようにしたぶんの確かめ。

@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * パンくず。Pencil V6 の `R098Z`「共通 パンくず」。
+ * パンくず。Pencil 管理画面 の `R098Z`「共通 パンくず」。
  *
  * 途中の階層はリンク（`$status-info`）、いま開いている場所は
  * リンクではない（`$ink`）。区切りは `chevron-right` 13px。

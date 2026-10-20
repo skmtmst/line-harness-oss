@@ -1,56 +1,26 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+const get = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get } } }))
+import { loadFirstRunSteps } from '@/v8/onboarding/use-first-run'
+import { summarizeFirstSteps } from './first-steps'
+import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'
 
-/*
- * はじめにやること（修正案 D-3）の判定の口。
- * 今ある口の答えから6つの「済み」を決める。読めなかった口は null（＝カードを出さない）。
- */
-const api = vi.hoisted(() => ({
-  gettingStarted: { get: vi.fn() },
-  friendAddRules: { list: vi.fn() },
-  richMenuGroups: { listPage: vi.fn() },
-  broadcasts: { list: vi.fn() },
-  scenarios: { listPage: vi.fn() },
-  staff: { list: vi.fn() },
-}))
-vi.mock('@/lib/api', () => ({ api }))
+it('同じAPIの6段を使い、1人運用にも招待を必須にしない', async () => {
+  const steps = ['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map((key) => ({ key, state: 'done', href: '/', reason: null }))
+  get.mockResolvedValue({ success: true, data: { steps } })
+  const loaded = await loadFirstRunSteps('acc')
+  expect(get).toHaveBeenCalledWith('acc', 'v8')
+  expect(loaded).toEqual(buildStepsFromApi(steps as Parameters<typeof buildStepsFromApi>[0]))
+  expect(summarizeFirstSteps(loaded)).toMatchObject({ done: 6, total: 6 })
+})
 
-import { loadFirstStepFacts } from './first-steps'
-
-function allDone() {
-  api.gettingStarted.get.mockResolvedValue({ success: true, data: { steps: [{ key: 'accounts', state: 'done' }] } })
-  api.friendAddRules.list.mockResolvedValue({ success: true, data: { items: [{ status: 'published' }] } })
-  api.richMenuGroups.listPage.mockResolvedValue({ success: true, data: { items: [], facets: { published: 2 } } })
-  api.broadcasts.list.mockResolvedValue({ success: true, data: [{ status: 'sent' }] })
-  api.scenarios.listPage.mockResolvedValue({ success: true, data: { items: [{ isActive: true }] } })
-  api.staff.list.mockResolvedValue({ success: true, data: [{ id: 'a' }, { id: 'b' }] })
-}
-
-describe('はじめにやることの判定', () => {
-  beforeEach(() => { vi.clearAllMocks(); allDone() })
-
-  it('6つとも今ある口の答えで済みになる', async () => {
-    expect(await loadFirstStepFacts('acc')).toEqual({ connect: true, greeting: true, richMenu: true, broadcast: true, scenario: true, invite: true })
-    expect(api.friendAddRules.list).toHaveBeenCalledWith('acc', 'first_time', { status: 'published', limit: 1 })
-    expect(api.broadcasts.list).toHaveBeenCalledWith({ accountId: 'acc', displayStatus: 'sent', limit: 1 })
-    expect(api.scenarios.listPage).toHaveBeenCalledWith({ accountId: 'acc', active: 1, limit: 1 })
+describe('未取得を未設定にしない', () => {
+  it('通信失敗を呼出し側へ返す', async () => {
+    get.mockRejectedValue(new Error('offline'))
+    await expect(loadFirstRunSteps('acc')).rejects.toThrow('offline')
   })
-
-  it('まだのものは false', async () => {
-    api.gettingStarted.get.mockResolvedValue({ success: true, data: { steps: [{ key: 'accounts', state: 'stalled' }] } })
-    api.friendAddRules.list.mockResolvedValue({ success: true, data: { items: [] } })
-    api.richMenuGroups.listPage.mockResolvedValue({ success: true, data: { items: [], facets: { published: 0 } } })
-    api.broadcasts.list.mockResolvedValue({ success: true, data: [] })
-    api.scenarios.listPage.mockResolvedValue({ success: true, data: { items: [] } })
-    api.staff.list.mockResolvedValue({ success: true, data: [{ id: 'me' }] })
-    expect(await loadFirstStepFacts('acc')).toEqual({ connect: false, greeting: false, richMenu: false, broadcast: false, scenario: false, invite: false })
-  })
-
-  it('読めなかった口は null（判定できない）', async () => {
-    api.broadcasts.list.mockRejectedValue(new Error('network'))
-    api.staff.list.mockResolvedValue({ success: false, error: 'Forbidden' })
-    const facts = await loadFirstStepFacts('acc')
-    expect(facts.broadcast).toBeNull()
-    expect(facts.invite).toBeNull()
-    expect(facts.connect).toBe(true)
+  it('失敗の応答を空の進捗に置き換えない', async () => {
+    get.mockResolvedValue({ success: false, error: 'unavailable' })
+    await expect(loadFirstRunSteps('acc')).rejects.toThrow('unavailable')
   })
 })

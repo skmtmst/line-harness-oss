@@ -1,6 +1,6 @@
 /*
  * 店のテンプレートの作る画面を、ほかの入口（統括のテンプレート）から使うときの口（2026-10-08 オーナー
- * 「統括は店の同じ機能の画面と同じ部品を使い回し、統括のときだけ配る口を足す」・B-29・B-36）。
+ * 「統括は店の同じ機能の画面と同じ部品を使い回し、統括のときだけ配る口を足す」・・）。
  *
  * 渡さないときは今までどおり店の画面（店の口で保存・公開）。渡したときは：
  *   - 保存は呼ぶ側（統括の口）がする。画面は中身を組み立てて渡すだけ
@@ -18,14 +18,14 @@ export type TemplateHostContent =
   | { kind: 'question'; name: string; question: Record<string, unknown>; messageContent: string }
   /** カルーセル：店のカルーセルと同じ形の本文（LINE のカルーセルの列）。押したら動く選択肢は使わない。 */
   | { kind: 'carousel'; name: string; messageContent: string; tapLimitMode: 'none' | 'once'; tapLimitText: string | null; templateId?: string; carouselActions?: Record<string, Record<string, unknown[]>>; media?: MessageTemplateMediaDefinition[] }
-  /** リッチメッセージ（g8d6ai）：統括の口で作った5サイズの画像（media）と、店と同じ形の payload（面と URL）。 */
+  /** リッチメッセージ：統括の口で作った5サイズの画像（media）と、店と同じ形の payload（面と URL）。 */
   | { kind: 'rich_message'; name: string; payload: Record<string, unknown>; media: TemplateImagemapUpload['media'] }
   | { kind: 'rich_video'; name: string; messageContent: string; media: MessageTemplateMediaDefinition[] }
 
 export interface TemplateEditHost {
   /** G-9: テンプレートの同じ編集部品を吹き出しへ入れる引き出しで使う。 */
   composer?: { index: number; accountId: string | null; canSaveTemplate?: boolean }
-  /** 見え方のスマホの上に出す名前。1つのアカウントへ送る吹き出しの引き出しは、そのアカウント名（Z6Hx5o）。渡さなければ「公式アカウント」。 */
+  /** 見え方のスマホの上に出す名前。1つのアカウントへ送る吹き出しの引き出しは、そのアカウント名。渡さなければ「公式アカウント」。 */
   accountName?: string | null
 
   /** @deprecated 板の頭の「← テンプレートへ」は 2026-10-08 に無くした（戻るのは上の帯のパンくずと［キャンセル］）。使わない。 */

@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { RICH_MENU_DIMENSIONS } from '@line-crm/shared'
 import LinePreview from '@/components/shared/line-preview'
-import { MenuPreview } from './create-preview'
+import { MenuPreview } from '../../../v8/rich-menus/new/create-preview'
 
 const dims = RICH_MENU_DIMENSIONS.large
 const props = {

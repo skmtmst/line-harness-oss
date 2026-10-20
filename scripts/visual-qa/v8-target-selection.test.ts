@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error JS tool
 import { selectTargets } from './v8-parity-all.mjs'
-import map from './v8-design-map.json'
+const map = { boards: { list: { route: '/tags', url: '/tags?tab=fields', width: 1440 }, settings: { route: '/settings', url: '/settings?tab=profile', width: 1152 } } }
 
 describe('ROOT-05 query付きの板', () => {
-  it('存在する4入口を対象に含め、撮影URLのタブ指定を残す', () => {
-    const ids = ['AzrZq', 'IWnYX', 'q5gbcM', 'vKDj5']
+  it('実装のある入口を対象に含め、渡されたタブ指定を残す', () => {
+    const ids = ['list', 'settings']
     const { targets, skipped } = selectTargets(map, { onlyBoards: ids })
     expect(skipped).toEqual([])
     expect(targets.map((t: { board: string; route: string }) => [t.board, t.route])).toEqual(

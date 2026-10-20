@@ -1,5 +1,6 @@
+import { readApiError } from '@line-crm/shared'
 /**
- * 会員登録（★V6 36-4）・メール＋パスワードのログイン（0-1）・パスワード再設定（36-6）の、画面側の道具。
+ * 会員登録（★管理画面 36-4）・メール＋パスワードのログイン（0-1）・パスワード再設定（36-6）の、画面側の道具。
  *
  * API は `routes/auth-email.ts`。ログイン前の入口なので `fetchApi` は使わない
  * （401 を「セッション切れ」として扱われると困る。返事の言葉はすべて Worker が
@@ -16,6 +17,7 @@ export interface AuthResult<T> {
   error?: string
   code?: string
   errors?: Record<string, string>
+  requestId?: string
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? ''
@@ -35,15 +37,19 @@ export async function authRequest<T>(path: string, body?: unknown, method: 'GET'
       error?: string
       code?: string
       errors?: Record<string, string>
+      requestId?: string
     }
+    const detail = readApiError(json)
+    const requestId = detail.requestId ?? res.headers?.get('X-Request-ID') ?? undefined
     return {
       ok: res.ok && json.success === true,
       status: res.status,
       data: json.data,
       csrfToken: json.csrfToken,
-      error: json.error,
-      code: json.code,
-      errors: json.errors,
+      error: detail.message,
+      code: detail.code,
+      errors: json.errors ?? detail.fields,
+      ...(requestId ? { requestId } : {}),
     }
   } catch {
     return { ok: false, status: 0, error: '通信できませんでした。電波の状態を確かめて、もう一度お試しください' }

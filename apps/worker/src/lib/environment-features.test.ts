@@ -21,7 +21,7 @@ describe('環境限定機能', () => {
 });
 
 
-describe('B-368 Google ビジネスは飲食店の試験旗から独立', () => {
+describe('Google ビジネスは飲食店の試験旗から独立', () => {
   it.each([undefined, '', 'false', '0', 'yes'])('未設定・誤記では閉じる: %s', value => {
     expect(googleBusinessEnabled({ GOOGLE_BUSINESS_ENABLED: value })).toBe(false);
   });

@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -34,7 +36,9 @@ import {
   type SupportStage,
   type SupportTicketRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { requirePlatformAdmin, requirePlatformAdminWrite } from '../middleware/platform-admin.js';
 import { clientIp } from '../services/admin-session.js';
 import { dbFor } from '../services/db-router.js';
@@ -44,7 +48,7 @@ import { serializeKnowledge } from './ops-knowledge.js';
 import { knowledgeNames, redactKnowledgeText, KnowledgeAiTimeout } from '../services/platform-knowledge.js';
 
 /**
- * 運営コンソールのお問い合わせ（チケット）★V6 37-6 / 37-6-A / 37-6-B。
+ * 運営コンソールのお問い合わせ（チケット）★37-6 / 37-6-A / 37-6-B。
  *
  * 表は統括側 36-3 と同じ hq_support_requests。運営マスターだけが呼べる。
  * 返信は統括の登録メールへ送り、統括の画面（36-3 の履歴）にも載る。
@@ -76,7 +80,7 @@ function safeKeys(raw: string): string[] {
 }
 
 function jstMonthStarts(): { monthStart: string; prevMonthStart: string } {
-  const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const now = japanCalendar();
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   const fmt = (yy: number, mm: number) => `${yy}-${String(mm + 1).padStart(2, '0')}-01T00:00:00.000+09:00`;
@@ -193,7 +197,7 @@ opsSupport.get('/api/ops/support/tickets/:id', async (c) => {
   const base = workerUrl(c);
   // 閲覧の記録（統括には見せない）。失敗しても画面は出す。
   await audit(c, { action: 'ticket.view', ticket, visibleToTenant: false }).catch((error) => {
-    console.error(JSON.stringify({"code":"routes_ops_support_failed","route":"GET /api/ops/support/tickets/:id"}));
+    logger.error("routes_ops_support_failed");
   });
   return c.json({
     success: true,
@@ -293,7 +297,7 @@ opsSupport.post('/api/ops/support/tickets/:id/reply', requirePlatformAdminWrite(
       deliveredVia.push('email');
     } catch (error) {
       // メールが落ちても返信は記録する。画面には「メールは送れなかった」と返す。
-      console.error(JSON.stringify({"code":"routes_ops_support_failed","route":"POST /api/ops/support/tickets/:id/reply"}));
+      logger.error("routes_ops_support_failed");
     }
   }
   const message = await addSupportReply(db, {
@@ -352,7 +356,7 @@ function aiText(result: unknown): string {
   return typeof content === 'string' ? content.trim() : '';
 }
 
-/** AI に渡す材料（★V6 37-6-A）。個人のメールアドレスや LINE ID は渡さない。 */
+/** AI に渡す材料（★37-6-A）。個人のメールアドレスや LINE ID は渡さない。 */
 export function buildDraftPrompt(input: {
   ticket: { ticketLabel: string; subject: string; body: string; kindLabel: string; staffName: string; staffRole: string | null; tenantName: string; planLabel: string };
   messages: Array<{ authorKind: 'tenant' | 'ops'; authorName: string; body: string }>;
@@ -474,7 +478,7 @@ opsSupport.post('/api/ops/support/tickets/:id/draft/ai', requirePlatformAdminWri
       if (timer) clearTimeout(timer);
     }
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_ops_support_failed","route":"POST /api/ops/support/tickets/:id/draft/ai"}));
+    logger.error("routes_ops_support_failed");
     if (error instanceof KnowledgeAiTimeout) {
       return c.json({ success: false, error: 'AI の応答が 45 秒以内に返りませんでした。手で書くか、少し待ってからもう一度お試しください' }, 504);
     }

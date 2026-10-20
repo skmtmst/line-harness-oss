@@ -14,7 +14,7 @@ const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const floorApi = vi.hoisted(() => ({ floors: vi.fn() }))
 
 vi.mock('next/navigation',()=>({useRouter:()=>({push(){},replace(){},back(){}}),usePathname:()=>'/restaurant-test/tables',useSearchParams:()=>new URLSearchParams()}))
-vi.mock('@/lib/api-reservation-board',()=>({reservationBoardApi:floorApi}))
+vi.mock('@/lib/api/helpers/reservation-board',()=>({reservationBoardApi:floorApi}))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))

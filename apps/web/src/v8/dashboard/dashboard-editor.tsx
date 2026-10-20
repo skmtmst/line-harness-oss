@@ -45,17 +45,18 @@ import SegmentedControl from '@/components/shared/segmented'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ReorderHandle from '@/components/shared/reorder-handle'
 import styles from './dashboard-editor.module.css'
+import { dashboardCardForStyle } from './style-cards'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 ダッシュボード編集（Pencil `mcOqK`）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
+ * ★V8 ダッシュボード編集（Pencil ）。V8 の入口（v8/dashboard/dashboard.tsx）からだけ開く。
  *
  * 動き（並べ替え・表示の ON/OFF・「今日やること」は4枠まで・初期状態に戻す・
- * 保存の失敗と 409・読み上げ）は v7 と共有の `components/dashboard/dashboard-editor.tsx`
+ * 保存の失敗と 409・読み上げ）は 管理画面 と共有の `components/dashboard/dashboard-editor.tsx`
  * と同じ計算（reorder / move / toggle）をそのまま使い、見た目だけを絵どおりに組む。
- * v7 の部品は変えない。
+ * 管理画面 の部品は変えない。
  *
  * - 引き出し 540（共通の Drawer width="editor"）。頭に「カードと配置／プレビュー」の切り替えと説明1行。
  * - 行：持ち手・名前と置き場所・上下（24 の枠つき）・スイッチ。OFF の行は薄い地。
@@ -127,9 +128,9 @@ function CardRow({ item, definition, canMoveUp, canMoveDown, disabled, onMove, o
  * プレビュー（絵の 2）。実画面と同じ配置（3区分の並び）で、PC は「今日やること」4列＋
  * メインと右の左右、スマホは1列（390px の実画面は先頭2件＋「集計を見る」）。
  */
-function Preview({ draft }: { draft: DashboardPreferences }) {
+function Preview({ draft, usageStyle }: { draft: DashboardPreferences; usageStyle?: 'standard' | 'ec' }) {
   const [device, setDevice] = useState<'pc' | 'mobile'>('pc')
-  const visible = (group: DashboardGroup) => draft[group].filter((item) => item.visible)
+  const visible = (group: DashboardGroup) => draft[group].filter((item) => item.visible && dashboardCardForStyle(item.id, usageStyle))
   const today = visible('today')
   const total = GROUPS.reduce((count, group) => count + visible(group).length, 0)
   const mobileToday = today.slice(0, 2)
@@ -180,9 +181,10 @@ function Preview({ draft }: { draft: DashboardPreferences }) {
   )
 }
 
-export default function DashboardEditorV8({ open, preferences, saving = false, saveError, saveConflict, onComparePreferences, onReloadPreferences, onCancel, onApply, onReset }: {
+export default function DashboardEditorV8({ open, preferences, usageStyle, saving = false, saveError, saveConflict, onComparePreferences, onReloadPreferences, onCancel, onApply, onReset }: {
   open: boolean
   preferences: DashboardPreferences
+  usageStyle?: 'standard' | 'ec'
   saving?: boolean
   /** 保存・初期化の失敗。引き出しの下の帯に出す（DASH-05）。 */
   saveError?: string | null
@@ -372,7 +374,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
       >
         {/* 上下ボタンで動かした結果を読み上げる（見た目には出さない）。 */}
         <p role="status" className="sr-only">{announcement}</p>
-        {mode === 'preview' ? <Preview draft={draft} /> : (
+        {mode === 'preview' ? <Preview draft={draft} usageStyle={usageStyle} /> : (
           <div className={styles.groups}>
             {GROUPS.map((group) => (
               <section key={group} className={styles.group} aria-labelledby={`dashboard-editor-${group}`}>
@@ -397,6 +399,7 @@ export default function DashboardEditorV8({ open, preferences, saving = false, s
                   <SortableContext items={draft[group].map((item) => item.id)} strategy={verticalListSortingStrategy}>
                     <div className={styles.rows}>
                       {draft[group].map((item, index) => {
+                        if (!dashboardCardForStyle(item.id, usageStyle)) return null
                         const definition = CARD_DEFINITION_MAP.get(item.id)
                         if (!definition) return null
                         return (

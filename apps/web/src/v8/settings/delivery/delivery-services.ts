@@ -69,7 +69,7 @@ export const SERVICES: DeliveryService[] = [
   {
     id: 'uber',
     name: 'Uber Eats',
-    sub: 'Uber Eats に入った注文を、この画面へ取り込みます',
+    sub: 'Uber Eats への接続を設定します。注文の取り込みはまだ利用できません',
     connect: 'login',
     guide:
       'ボタンを押すと Uber Eats のログイン画面が開きます。ふだんお使いの Uber Eats のIDでログインし、「許可」を押してください。そのあと、つなぐお店を選ぶ画面に戻ります。',
@@ -130,7 +130,7 @@ export const UBER_STATE_NOTE: Partial<Record<UberConnectionStatus, StateNote>> =
     tone: 'danger',
   },
   no_permission: {
-    text: 'Uber Eats 側の許可が外れているため、注文を取り込めません。musubo が Uber Eats へ確認します。',
+    text: 'Uber Eats 側の接続の許可が外れています。musubo が Uber Eats へ確認します。',
     tone: 'danger',
   },
 }
@@ -163,6 +163,18 @@ function uberReturnNote(flash: string): StateNote | undefined {
 /** サーバから読んだ接続の状態を、画面の1段ぶんの書き換えへ直す。 */
 export function uberPatch(data: UberConnectionData, flash: string): Partial<DeliveryService> {
   const { connection } = data
+  if (connection.lastError === 'pos_activation_started' || connection.lastError === 'pos_activation_unknown') {
+    return {
+      ready: false,
+      status: 'error',
+      // The saved target is a request snapshot, not a confirmed connection.
+      storeName: undefined,
+      connectedAt: undefined,
+      checkedAt: connection.checkedAt ?? undefined,
+      stateNote: 'お店をつないだ結果を確認する必要があります。送り直さず musubo へお知らせください。',
+      stateNoteTone: 'danger',
+    }
+  }
   const note = uberReturnNote(flash) ?? UBER_STATE_NOTE[connection.status]
   return {
     // この環境に接続の設定が無ければ押させない。

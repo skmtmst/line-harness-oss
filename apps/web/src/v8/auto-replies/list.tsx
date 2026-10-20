@@ -1,197 +1,69 @@
 'use client'
 
-import { SORT_OPTIONS, type SortKey } from './list-options'
+import { duplicateAutoReply } from './list-duplicate-action'
+import { AutoReply,displayName,PAGE_SIZE_OPTIONS,PendingDelete,PendingToggle,SAVED_FILTER_OPTIONS,TemplateLite,UNFILED,VIEW_ONLY_MENU_IDS } from './list-model'
+import { renderAutoReplyList } from './list-table'
+import { toggleAutoReply } from './list-toggle-action'
+
+import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import FolderSelect from '@/components/shared/folder-select'
-import { Clock, Activity, Ban, ChevronDown, CircleCheck, CircleHelp, Copy, Folder as FolderIcon, Layers, MessageCircle, MessageSquare, Pause, Pencil, Square, Play, Trash2, TriangleAlert, Zap, Bookmark, Eye, Plus } from 'lucide-react';
-import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import { scheduleChipLabels, scheduleText, LOAD_STATE_WORDS, NO_WRITE_PERMISSION, actionShortWord, autoReplyMatchesQuery, conditionChips, responseTypeWord, stopNote, templateWord, triggerSummary, isCurrentAutoReplyLoad, visibleAutoReplyLoadState, type LoadState } from './words';
-import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
-import { canManageRole, useStaffRole } from '@/lib/staff-role';
-
-import { RowNameLink } from '@/components/shared/table';
+import ListToolbar,{ ListToolbarOptional,ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar'
+import { useStaffRole } from '@/lib/staff-role'
+import { Activity,Ban,Bookmark,ChevronDown,CircleCheck,CircleHelp,Copy,Folder as FolderIcon,Layers,MessageCircle,Pause,Pencil,Play,Plus,Trash2,TriangleAlert,Zap } from 'lucide-react'
+import { SORT_OPTIONS,type SortKey } from './list-options'
+import { autoReplyMatchesQuery,isCurrentAutoReplyLoad,LOAD_STATE_WORDS,NO_WRITE_PERMISSION,visibleAutoReplyLoadState,type LoadState } from './words'
 
 
 
 
-import SharedStatusPill from '@/components/shared/status-pill'
-import StatusBadge from '@/components/shared/status-badge'
-import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
-import { useListUrlValue, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state';
-import { useFeatureAccess } from '@/lib/use-feature-access';
-import { RovingTbody } from '@/components/shared/row-roving';
-import { ListPage, ListPagePagination } from '@/components/templates';
-import SearchField from '@/components/shared/search-field'
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+
+import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
+import { useListScrollMemory,useListUrlFlag,useListUrlParam,useListUrlValue } from '@/components/shared/list-url-state'
+import { ListPage,ListPagePagination } from '@/components/templates'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 
 
-import Link from '@/components/shared/list-navigation'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 
-import type { Folder } from '@line-crm/shared';
-import { api, ApiError } from '@/lib/api';
-import { clampSearchQuery } from '@/lib/search-query';
-import { useAccount } from '@/contexts/account-context';
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
-import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { formatNumber } from '@/lib/format';
-import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message';
-import { notifyToast } from '@/components/shared/toast';
-import { runUndoable } from '@/lib/undoable';
-import { useLiveReorder } from '@/lib/use-live-reorder';
-import { DelayedSkeleton } from '@/components/shared/skeleton';
-import { DataTable, TableHeadRow, Th, Tr, Td, NameCell } from '@/components/shared/table';
-import { FolderDotName, type FolderDotFolder } from '@/components/shared/folder-dot';
+import ActionMenu,{ type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
-import EmptyList from '@/components/shared/empty-list'
-import KpiCard from '@/components/shared/kpi-card'
-import Notice from '@/components/shared/notice'
-import KpiBand from '@/components/shared/kpi-band'
-import Checkbox from '@/components/shared/checkbox'
-import Select from '@/components/shared/select'
-import FilterChip from '@/components/shared/filter-chip'
-import TagOverflow from '@/components/shared/tag-overflow'
-import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog, { DialogActions } from '@/components/shared/dialog'
-import { Field } from '@/components/shared/form-controls';
-import { TextField } from '@/components/shared/text-field';
-import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
-import { RowMenu } from '@/components/shared/row-actions';
-import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
-import { withViewTransition } from '@/components/shared/view-transition';
+import { type ContextMenuItem } from '@/components/shared/context-menu'
+import Dialog,{ DialogActions } from '@/components/shared/dialog'
+import { emptyValue } from '@/components/shared/empty-value'
+import FilterChip from '@/components/shared/filter-chip'
+import { type FolderDotFolder } from '@/components/shared/folder-dot'
+import { Field } from '@/components/shared/form-controls'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
+import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
-import ReorderHandle from '@/components/shared/reorder-handle'
-import { compareEvaluationOrder, movePriorityUpdates } from './order';
-import QuickCreateV8 from './quick-create'
-import { AutoReplyTabs } from '@/v8/ai-reply/auto-reply-tabs'
-import { conversationAiUiEnabled } from '@/lib/environment-features'
-import styles from './list.module.css'
-import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value';
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
-import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import ListState from '@/components/shared/list-state'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Select from '@/components/shared/select'
+import { Th } from '@/components/shared/table'
+import { TextField } from '@/components/shared/text-field'
+import { notifyToast } from '@/components/shared/toast'
+import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback'
+import { withViewTransition } from '@/components/shared/view-transition'
+import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
+import { api,ApiError } from '@/lib/api'
+import { conversationAiUiEnabled } from '@/lib/environment-features'
+import { formatNumber } from '@/lib/format'
+import { clampSearchQuery } from '@/lib/search-query'
+import { runUndoable } from '@/lib/undoable'
+import { useLiveReorder } from '@/lib/use-live-reorder'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { AutoReplyTabs } from '@/v8/ai-reply/public/auto-reply-tabs/index'
+import type { Folder } from '@line-crm/shared'
+import styles from './list.module.css'
+import { compareEvaluationOrder,movePriorityUpdates } from './order'
+import QuickCreateV8 from './quick-create'
 
-const PAGE_SIZE_OPTIONS = [
-  { value: '20', label: '20件表示' },
-  { value: '50', label: '50件表示' },
-  { value: '100', label: '100件表示' },
-]
-
-
-/*
- * ★V8 自動応答の一覧（Pencil「★V8 画面の地図」の自動応答の行：
- * 一覧 `uE9gf`、行の「…」は `IIesG`、止めるは `i8F12`、削除は `u8sKN`、
- * 状態の板は `G8i4xP`）。
- *
- * v7 の一覧（app/auto-replies/page.tsx 内の AutoRepliesPageV7）とは
- * 別の部品として持つ。データの口は同じ。違いは置き場と見せ方だけ——
- * 「ルールを作る」は左のフォルダの列の上、行の右端は「…」（編集・実行結果・
- * 複製・止める/再開・フォルダへ移す・削除）、行の左の □ を選ぶと表の下に
- * まとめての帯（止める・再開・フォルダへ移す）。
- * v7 を直す必要が出たら page.tsx 側も同じ判断を入れる（V8 完成までの二重管理）。
- */
-
-/** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
-const UNFILED = '__unfiled__'
-
-interface AutoReply {
-  id: string
-  keyword: string
-  matchType: 'exact' | 'contains'
-  responseType: string
-  responseContent: string
-  templateId: string | null
-  lineAccountId: string | null
-  isActive: boolean
-  activeFrom: string | null
-  activeUntil: string | null
-  cooldownMinutes: number | null
-  skipWhenOperatorActive: boolean
-  priority: number
-  messageKinds: string[] | null
-  receiveSources: Array<'line' | 'email'>
-  actions: unknown[] | null
-  responseWeekdays: number[] | null
-  responseHolidayRule: string | null
-  oncePerFriend: boolean
-  keywords: unknown[] | null
-  friendConditions: unknown | null
-  respondToAll: boolean
-  name: string | null
-  keywordMatchMode: string
-  folderId: string | null
-  internalMemo: string | null
-  /** 'draft'（未公開）| 'published' | 'stopped'。再開の可否を分けるのに使う。 */
-  lifecycleStatus: string
-  stoppedAt: string | null
-  stoppedByStaffId: string | null
-  stoppedByStaffName: string | null
-  stopReason: string | null
-  hits?: { period: number; total: number }
-  actionExecutionCount?: number | null
-  /** 同じ受信に当たり得る、有効な別ルールの数。 */
-  conflictAttentionCount?: number | null
-  createdAt: string
-}
-
-interface TemplateLite {
-  id: string
-  name: string
-  messageType: string
-  messageContent: string
-}
-
-interface PendingDelete {
-  item: AutoReply
-  /** 削除対象を選んだ時点のアカウント。切替後に古い対象を消さないために固定する。 */
-  accountId: string | null
-}
-
-interface PendingToggle {
-  /** 単体なら1件、まとめてなら選んだ分。 */
-  ids: string[]
-  names: string[]
-  /** 'stop' は専用の停止口、'resume' は再開。 */
-  kind: 'stop' | 'resume'
-  /** 対象を選んだ時点のアカウント。切替後に古い対象へ作用しないために固定する。 */
-  accountId: string | null
-}
-
-
-/**
- * よく使う絞り込みの選ぶ欄（設計の札3つ＋選ぶ欄）。
- * 札は独立してON/OFFできる。選ぶ欄は「よく使う」1種だけ（数えられるものだけ）。
- */
-const SAVED_FILTER_OPTIONS = [
-  { value: '', label: 'よく使う絞り込み' },
-  { value: 'used', label: 'よく使う（今月1回以上当たった）' },
-]
-
-/**
- * 応答したときに行うことを、短い言葉で並べる（v7 page.tsx の actionSummary と同じ）。
- */
-function actionSummary(rule: { actions: unknown[] | null }): string[] {
-  if (!Array.isArray(rule.actions)) return []
-  return rule.actions.flatMap((item): string[] => {
-    if (!item || typeof item !== 'object') return []
-    const r = item as Record<string, unknown>
-    const type = r.actionType ?? r.action_type
-    if (typeof type !== 'string') return []
-    return [actionShortWord(type)]
-  })
-}
-
-/** 行の表示名。名前があればそれ、無ければキーワード。一律応答はキーワードが無い。 */
-function displayName(r: AutoReply): string {
-  return r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)
-}
-
-/** 閲覧のみでも出す行の「…」の項目（見るだけのもの）。 */
-const VIEW_ONLY_MENU_IDS = new Set(['runs'])
-
-/* 作るボタン（板 `uE9gf` の ▾）。窓は1つだけ置き、押したボタンの位置に出す。 */
+/* 作るボタン（板  の ▾）。窓は1つだけ置き、押したボタンの位置に出す。 */
 function CreateRuleButton({ full, compact, disabled, disabledTitle, menuOpen, onOpenMenu }: {
   full?: boolean
   /** 1152 の板：▾ なし・＋は印（絵どおり）。押すと同じ窓が開く。 */
@@ -226,7 +98,7 @@ export default function AutoRepliesListV8() {
   const staffRole = useStaffRole()
   const featureAccess = useFeatureAccess('autoReplies')
   const canEdit = featureAccess
-  // 1152の板（`WPrd5`）。折り畳みはCSSのコンテナ問い合わせが担い、
+  // 1152の板（）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
 
@@ -255,10 +127,10 @@ export default function AutoRepliesListV8() {
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  /* 板 `uE9gf`：作るボタンは ▾ で作り方を選ぶ。 */
+  /* 板 ：作るボタンは ▾ で作り方を選ぶ。 */
   const [createMenuOpen, setCreateMenuOpen] = useState(false)
   const createMenuAnchorRef = useRef<HTMLButtonElement | null>(null)
-  /* ★V8 かんたんに作る（板 `G4GejG`）。詳しい分け方（Xr6eu）は P6vbxn 待ち。 */
+  /* ★V8 かんたんに作る（板 ）。詳しい分け方は  待ち。 */
   const [quickOpen, setQuickOpen] = useState(false)
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
   const [panelId, setPanelId] = useDetailPanelUrl('reply')
@@ -487,88 +359,7 @@ export default function AutoRepliesListV8() {
    * 再開したなら止める。止め直すときは変える前の理由を使う）。
    * 送れなかったら戻して「もう一度」の知らせを出す。
    */
-  const runToggle = (target = pendingToggle) => {
-    if (!target) return
-    if (target.accountId !== selectedAccountId) {
-      setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')
-      return
-    }
-    const requestAccountId = target.accountId
-    const ids = target.ids
-    const kind = target.kind
-    const reason = toggleReason.trim() === '' ? null : toggleReason.trim()
-    const key = listContextKey
-    // 逆操作のために、変える前の止めた理由を覚えておく。
-    const beforeStopReason = new Map(
-      rules.filter((r) => ids.includes(r.id)).map((r) => [r.id, r.stopReason ?? null] as const),
-    )
-    const applyOptimistic = (active: boolean, stopReasonOf: (id: string) => string | null) => {
-      setOptimisticRows({
-        key,
-        rows: rules.map((r) =>
-          ids.includes(r.id)
-            ? { ...r, isActive: active, stopReason: active ? r.stopReason : stopReasonOf(r.id) }
-            : r,
-        ),
-      })
-    }
-    const doneMessage = (targetKind: 'stop' | 'resume') =>
-      ids.length === 1
-        ? targetKind === 'resume'
-          ? '自動応答を再開しました'
-          : '自動応答を停止しました'
-        : targetKind === 'resume'
-          ? `${ids.length} 件の自動応答を再開しました`
-          : `${ids.length} 件の自動応答を停止しました`
-    const failedMessage = (targetKind: 'stop' | 'resume', forbidden: boolean) =>
-      forbidden
-        ? permissionDeniedMessage('store')
-        : targetKind === 'stop'
-          ? '自動応答を停止できませんでした。状態を読み直してからお試しください。'
-          : '自動応答を再開できませんでした。状態を読み直してからお試しください。'
-    const reloadIfSameAccount = () => {
-      if (selectedAccountIdRef.current === requestAccountId) void load()
-    }
-    const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null, requestKeys = new Map<string, string>()) => {
-      applyOptimistic(targetKind === 'resume', targetReasonOf)
-      void (async () => {
-        let failed = 0
-        let forbidden = false
-        for (const id of ids) {
-          try {
-            if (!requestKeys.has(id)) requestKeys.set(id, crypto.randomUUID())
-            const result = targetKind === 'stop'
-              ? await api.autoReplies.stop(id, { reason: targetReasonOf(id) }, requestKeys.get(id)!)
-              : await api.autoReplies.update(id, { isActive: true })
-            if (!result.success) failed += 1
-          } catch (error) {
-            saveErrors.capture(error);
-
-            if (error instanceof ApiError && error.status === 403) forbidden = true
-            failed += 1
-          }
-        }
-        if (failed > 0) {
-          setOptimisticRows(null)
-          reloadIfSameAccount()
-          notifyToast(failedMessage(targetKind, forbidden), {
-            tone: 'error',
-            actionLabel: 'もう一度',
-            onAction: () => sendToggle(targetKind, targetReasonOf, requestKeys),
-          })
-          return
-        }
-        setOptimisticRows(null)
-        setSelectedIds(new Set())
-        reloadIfSameAccount()
-        notifyToast(doneMessage(targetKind))
-      })()
-    }
-    setPendingToggle(null)
-    setToggleReason('')
-    setToggleError('')
-    sendToggle(kind, () => reason)
-  }
+  const runToggle = (target = pendingToggle) => toggleAutoReply({ listContextKey, load, pendingToggle, rules, saveErrors, selectedAccountId, selectedAccountIdRef, setOptimisticRows, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, toggleReason }, target)
 
   const runDelete = async () => {
     if (!pendingDelete) return
@@ -670,69 +461,10 @@ export default function AutoRepliesListV8() {
   /*
    * 複製（行の「…」→「複製する」）。複製の口は無いので、同じ内容で新しく作る。
    * コピーは必ず「停止中」で作る（AUTOREPLY-08：動かすのは別の操作）。
-   * 名前や確認の窓は出さず、その場で作る（B-177）。
+   * 名前や確認の窓は出さず、その場で作る。
    */
   const duplicateKeysRef = useRef(new Map<string, string>())
-  const runDuplicate = async (duplicateTarget: AutoReply) => {
-    if (duplicateLock.current) return
-    if (!duplicateTarget || duplicating) return
-    duplicateLock.current = true
-    setDuplicating(true)
-    setDuplicateError('')
-    const operationId = `${selectedAccountId}:${duplicateTarget.id}`
-    if (!duplicateKeysRef.current.has(operationId)) duplicateKeysRef.current.set(operationId, crypto.randomUUID())
-    const source = duplicateTarget
-    try {
-      const result = await api.autoReplies.create({
-        keyword: source.keyword,
-        matchType: source.matchType,
-        responseType: source.responseType,
-        responseContent: source.responseContent,
-        templateId: source.templateId,
-        lineAccountId: source.lineAccountId,
-        isActive: false,
-        activeFrom: source.activeFrom,
-        activeUntil: source.activeUntil,
-        cooldownMinutes: source.cooldownMinutes,
-        skipWhenOperatorActive: source.skipWhenOperatorActive,
-        priority: nextPriority,
-        messageKinds: source.messageKinds,
-        receiveSources: source.receiveSources,
-        actions: source.actions,
-        responseWeekdays: source.responseWeekdays,
-        responseHolidayRule: source.responseHolidayRule,
-        oncePerFriend: source.oncePerFriend,
-        keywords: source.keywords,
-        friendConditions: source.friendConditions,
-        respondToAll: source.respondToAll,
-        name: `${displayName(source)}（コピー）`,
-        keywordMatchMode: source.keywordMatchMode === 'all' ? 'all' : 'any',
-        folderId: source.folderId,
-        internalMemo: source.internalMemo,
-      }, duplicateKeysRef.current.get(operationId)!)
-      if (!result.success) {
-        setDuplicateError('複製できませんでした。状態を読み直してからお試しください。')
-        return
-      }
-
-      duplicateKeysRef.current.delete(operationId)
-      duplicateFeedback.mark(source.id, result.data.id)
-      notifyToast('複製しました', { tone: 'success' })
-      await load()
-    } catch (reason) {
-      const fieldFailure = saveErrors.capture(reason)
-
-      { if (!fieldFailure)
-      setDuplicateError(
-        reason instanceof ApiError && reason.status === 403
-          ? `${NO_WRITE_PERMISSION.label}。${NO_WRITE_PERMISSION.note}`
-          : '複製できませんでした。状態を読み直してからお試しください。',
-      ) }
-    } finally {
-      duplicateLock.current = false
-      setDuplicating(false)
-    }
-  }
+  const runDuplicate = (duplicateTarget: AutoReply) => duplicateAutoReply({ duplicateFeedback, duplicateKeysRef, duplicateLock, duplicating, load, nextPriority, saveErrors, selectedAccountId, setDuplicateError, setDuplicating }, duplicateTarget)
 
   /*
    * R28: 順番は一覧で上下を入れ替えて決める。入れ替えは隣との数字の交換
@@ -819,7 +551,7 @@ export default function AutoRepliesListV8() {
     )
   }
 
-  /* ===== 行の「…」（Pencil `IIesG`） ===== */
+  /* ===== 行の「…」（Pencil ） ===== */
   const rowMenuItems = (r: AutoReply): ActionMenuItem[] => {
     const name = displayName(r)
     const readonly = !canEdit
@@ -1041,7 +773,7 @@ export default function AutoRepliesListV8() {
    * 選択の列だけは実表が箱（Checkbox）付き・骨組みが共通 `Th` の空見出し。
    */
   // 見出しは本文と同じ左揃え（絵どおり）。Th（.cell の左余白20）だと本文より20右へずれる。型の持ち主へ依頼済み。
-  // 狭い板（WPrd5）は回数の列だけ出さない（絵どおり。選ぶ・つまみ・操作は残す）。フォルダの列は型が畳む。
+  // 狭い板は回数の列だけ出さない（絵どおり。選ぶ・つまみ・操作は残す）。フォルダの列は型が畳む。
   const tableHeadCells = (
     <>
       {canEdit ? <Th aria-label="並び替え" /> : null}
@@ -1053,7 +785,7 @@ export default function AutoRepliesListV8() {
     </>
   )
 
-  /* 板 `G8i4xP`「読み込み中」：見出しなしの骨4行。 */
+  /* 板 「読み込み中」：見出しなしの骨4行。 */
   const loadingSkeleton = (
     <div className={styles.skeletonRows} aria-label="読み込み中">
       {[0, 1, 2, 3].map((n) => (
@@ -1068,305 +800,7 @@ export default function AutoRepliesListV8() {
     </div>
   )
 
-  const listBody = visibleLoadState === 'loading' ? (
-    <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
-      <DelayedSkeleton loading skeleton={loadingSkeleton} />
-    </div>
-  ) : visibleLoadState === 'error' || visibleLoadState === 'forbidden' ? (
-    <ListState kind="error" title={visibleLoadState === 'forbidden' ? LOAD_STATE_WORDS.forbidden.label : '自動応答を読み込めませんでした'} description={visibleLoadState === 'forbidden'
-          ? LOAD_STATE_WORDS.forbidden.note
-          : isForbiddenOrRateLimited(loadError)
-            ? LOAD_STATE_WORDS.error.note
-            : '登録したルールは消えていません。数の帯は「—」、道具はそのまま使えます（条件を変えてから試し直せる）。'} data-design-node="G8i4xP" action={<>{visibleLoadState === 'error' && (
-        <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
-      )}</>} />
-  ) : sortedItems.length === 0 ? (
-    /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない。 */
-    <EmptyList
-      data-design-node="G8i4xP"
-      icon={<MessageSquare aria-hidden="true" />}
-      title="まだ自動応答のルールはありません"
-      description="よく届く質問や営業時間外の連絡に、自動で返せます。ひな形からも作れます。"
-      create={{ label: 'ルールを作る', onClick: () => router.push('/auto-replies/edit') }}
-      canCreate={canEdit}
-      filtered={filterActive}
-      onClearFilters={clearFilters}
-      filteredTitle="条件に合うルールはありません"
-      filteredDescription="「停止中のみ」「時間帯あり」「今月0回」や検索を外すと、すべて出ます"
-    />
-  ) : (
-    <>
-      <span className="sr-only" role="status" aria-live="polite">
-        {moveNotice}
-      </span>
-      <div className={narrow ? `${styles.tableWrap} ${styles.narrowTable}` : styles.tableWrap} data-content-in="">
-        <DataTable>
-          <colgroup>
-            {/* ★V8 列の幅＝絵の中身の幅＋欄の間16。端の列は端の24も足す（uE9gf：選ぶ16・つまみ14・返すもの200・回数96・状態60・操作28） */}
-            {/* 閲覧のみは選ぶ・つまみの列を置かない（押せない物は隠す）。名前の列が表の左端から始まる（Q5lOCc）。 */}
-            {canEdit ? <col style={{ width: 16 + 24 + 8 }} /> : null}
-            {canEdit ? <col style={{ width: 14 + 16 }} /> : null}
-            {!narrow ? <col style={{ width: canEdit ? 426 : 426 + (16 + 24 + 8) + (14 + 16) }} /> : <col />}
-            <col style={{ width: 200 + 16 }} />
-            {!narrow && <col style={{ width: 96 + 16 }} />}
-            <col style={{ width: 80 + 16 }} />
-            <col style={{ width: 28 + 8 + 24 }} />
-          </colgroup>
-          <thead>
-            <TableHeadRow>
-                {canEdit ? <Th className={styles.selectCell} aria-label="選択">
-                  <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
-                    checked={allOnPageSelected}
-                    indeterminate={!allOnPageSelected && selectedCount > 0}
-                    onCheckedChange={() => toggleAllOnPage()}
-                    aria-label="このページのルールをすべて選択"
-                  /></SaveErrorField>
-                </Th> : null}
-              {tableHeadCells}
-            </TableHeadRow>
-          </thead>
-          <RovingTbody reorderKey={duplicateFeedback.order(liveOrder.shown, items).map((r) => r.id).join(',')}>
-            {duplicateFeedback.order(liveOrder.shown, items).map((r, saveFieldIndex) => {
-              const name = displayName(r)
-              const conflicts = r.conflictAttentionCount ?? 0
-              const actions = actionSummary(r)
-              const tpl = templateWord(
-                r.templateId,
-                templateById.get(r.templateId ?? '')?.name ?? null,
-                templateListAvailable,
-              )
-              return (
-                <Tr interactive
-                  key={r.id}
-                  data-reorder-id={r.id}
-                  onDragEnter={() => liveOrder.enter(r.id)}
-                  onDragOver={dragId ? (event) => event.preventDefault() : undefined}
-                  onDrop={dragId ? () => dropOn(liveOrder.dropTarget(r.id)) : undefined}
-                  className={styles.rowClick}
-                  tabIndex={0}
-                  detailKey="reply" onOpen={() => setPanelId(panelId === r.id ? null : r.id)}
-                   data-row-id={r.id}
-                >
-                    {canEdit ? <><Td className={styles.selectCell}>
-                      <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
-                        checked={selectedIds.has(r.id)}
-                        onCheckedChange={() => toggleOne(r.id)}
-                        aria-label={`${name}を選択`}
-                      /></SaveErrorField>
-                    </Td>
-                  <Td
-                    className={styles.gripCell}
-                    onClick={(event) => event.stopPropagation()}
-                    draggable={canEdit && sortKey === 'priority'}
-                    onDragStart={() => setDragId(r.id)}
-                    onDragEnd={() => setDragId(null)}
-                  >
-                    {canEdit && <ReorderHandle
-                      label={name}
-                      disabledReason={sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : null}
-                      onMove={(direction) => keyboardMove(r.id, direction)}
-                    >
-                      <span aria-hidden>⠿</span>
-                    </ReorderHandle>}
-                  </Td></> : null}
-                  <NameCell name={<div className={styles.nameRow}>
-                      <>
-                        {canEdit ? <RowNameLink
-                          href={`/auto-replies/edit?id=${r.id}`}
-
-                          className={styles.cellTitle}
-                          onClick={(event) => {
-                            event.stopPropagation()
-
-                          }}
-                        >
-                          <TruncatedText value={String(name ?? '')} />
-                        </RowNameLink> : <button type="button" className={styles.cellTitle} title={name} onClick={(event) => { event.stopPropagation(); setPanelId(r.id) }}>{name}</button>}
-                      </>
-
-                    </div>} folder={folderDotOf(r)}
-                  />
-                  <Td className={styles.middleCell}>
-                    {/* 絵 uE9gf：1行目「テキストで返す」／「テンプレート『〇〇』」、2行目「＋対応マーク・担当者へ通知」／「なし」。 */}
-                    <span className={styles.cellMain} title={tpl.linked ? tpl.note : responseTypeWord(r.responseType).note}>
-                      {r.responseType === 'silent'
-                        ? '返信しない'
-                        : tpl.linked
-                          ? `テンプレート「${tpl.label}」`
-                          : `${responseTypeWord(r.responseType).label}で返す`}
-                    </span>
-                    <span className={styles.cellSub} title={actions.join('・') || emptyValue('none')}>
-                      {actions.length > 0 ? `＋${actions.join('・')}` : emptyValue('none')}
-                    </span>
-                  </Td>
-                  {!narrow && (
-                    <Td
-                      className={styles.countCell}
-                      title={`今月 ${r.hits?.period ?? emptyValue('unknown')}回 ／ 累計 ${r.hits?.total ?? emptyValue('unknown')}回`}
-                    >
-                      {/* 数えられていないものを 0 と書かない。0 は「当たらなかった」の意味。 */}
-                      <div className={styles.countMain}>{r.hits?.period ?? emptyValue('unknown')}<span className={styles.kpiUnit}>回</span></div>
-                      <div className={styles.countSub}>{`累計 ${r.hits?.total == null ? emptyValue('unknown') : formatNumber(r.hits.total)}回`}</div>
-                    </Td>
-                  )}
-                  <Td>
-                    <SharedStatusPill tone={r.isActive ? 'success' : 'neutral'} title={stopNote(r) ?? undefined}>{r.isActive ? '有効' : '停止中'}</SharedStatusPill>
-                      {conflicts > 0 && (
-                        <button
-                          type="button"
-                          className={styles.miniBadgeWarn}
-                          title="同じ受信に先に当たるルールがあります。押すと重なりのあるルールだけを表示します"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setConflictOnly(true)
-                            setPage(1)
-                          }}
-                        >
-                          <StatusBadge tone="warning">{`重なり ${conflicts}`}</StatusBadge>
-                        </button>
-                      )}
-                    {!r.isActive && r.stopReason && (
-                      <p className={styles.stateSub} style={{ maxWidth: 140 }} title={stopNote(r) ?? ''}>
-                        {r.stopReason}
-                      </p>
-                    )}
-                  </Td>
-                    <Td className={styles.menuCell} data-design-node={openMenuId === r.id ? 'IIesG' : undefined}>
-                      {/* 横並びにして、メニューの位置の目印（空の span）が行を1段増やさないようにする。 */}
-                      <ContextMenu
-                        label={`自動応答「${name}」の操作`}
-                        items={rowContextItems(r)}
-                      >
-                        <div className={styles.menuBox}>
-                        <RowMenu
-                          label={`自動応答「${name}」の操作`}
-                          items={rowMenuItems(r)}
-                          open={openMenuId === r.id}
-                          onOpenChange={(next) => setOpenMenuId(next ? r.id : null)}
-                        />
-                        </div>
-                      </ContextMenu>
-                    </Td>
-                </Tr>
-              )
-            })}
-          </RovingTbody>
-        </DataTable>
-      </div>
-
-      {/* 行の詳細パネル（V8「サクサク感」C①・E）。一覧は左に見えたまま。 */}
-      {panelRow &&
-        (() => {
-          const name = displayName(panelRow)
-          const trigger = triggerSummary(panelRow)
-          const canToggle = panelRow.isActive || panelRow.lifecycleStatus !== 'draft'
-          return (
-            <DetailPanel
-              open
-              title={name}
-              description={trigger.text}
-              onClose={() => setPanelId(null)}
-              onPrev={panelIndex > 0 ? () => setPanelId(items[panelIndex - 1].id) : undefined}
-              onNext={
-                panelIndex < items.length - 1 ? () => setPanelId(items[panelIndex + 1].id) : undefined
-              }
-              hasPrev={panelIndex > 0}
-              hasNext={panelIndex < items.length - 1}
-              footer={
-                <>
-                  {canEdit && <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
-                    開く
-                  </Button>}
-                  <Button
-                    variant="secondary"
-                    onClick={() =>
-                      withViewTransition(() => {
-                        router.push(`/auto-replies/runs?id=${panelRow.id}`)
-                      })
-                    }
-                   busyLabel="移動中…">
-                    実行結果を見る
-                  </Button>
-                  {canEdit && <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setDuplicateError('')
-                      void runDuplicate(panelRow)
-                      setPanelId(null)
-                    }}
-                  >
-                    複製する
-                  </Button>}
-                  {canEdit && canToggle && (
-                    <Button
-                      variant="secondary"
-                      onClick={() => toggleFromPanel(panelRow)}
-                    >
-                      {panelRow.isActive ? '止める' : '再開する'}
-                    </Button>
-                  )}
-                  {canEdit && <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setPanelId(null)
-                      requestDelete(panelRow)
-                    }}
-                  >
-                    削除する
-                  </Button>}
-                </>
-              }
-            >
-              <p title={trigger.title}>{trigger.text}</p>
-              <TagOverflow label="すべての応答条件">{conditionChips(panelRow).map((label) => <span key={label} className={styles.condChip} title={label}>{label}</span>)}</TagOverflow>
-              <p>
-                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? emptyValue('unknown')}回 ／
-                累計 {panelRow.hits?.total ?? emptyValue('unknown')}回
-              </p>
-            </DetailPanel>
-          )
-        })()}
-
-      {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
-      {canEdit && selectedCount > 0 ? (
-        <BulkBar count={selectedCount} total={sortedItems.length} onSelectAll={() => setSelectedIds(new Set(sortedItems.map(item => item.id)))} onClear={clearSelection}><Button
-            type="button"
-            variant="secondary"
-            disabled={stoppableIds.length === 0}
-            title={stoppableIds.length === 0 ? '動いているルールが選ばれていません' : undefined}
-            onClick={() => {
-              setToggleError('')
-              setToggleReason('')
-              setPendingToggle({ ids: stoppableIds, names: [], kind: 'stop', accountId: selectedAccountId })
-            }}
-          >
-            <Square size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
-            まとめて止める
-          </Button><Button
-            type="button"
-            variant="secondary"
-            disabled={resumableIds.length === 0}
-            title={resumableIds.length === 0 ? '停止中のルールが選ばれていません' : undefined}
-            onClick={() => {
-              setToggleError('')
-              runToggle({ ids: resumableIds, names: [], kind: 'resume', accountId: selectedAccountId })
-            }}
-          >
-            <Play size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
-            まとめて再開
-          </Button><Button
-            type="button"
-            variant="secondary"
-            onClick={() => openMove([...selectedIds])}
-          >
-            <FolderIcon size={13} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
-            フォルダへ移す
-          </Button><Button type="button" variant="secondary" onClick={() => setSelectedIds(new Set())}>
-            選択を外す
-          </Button></BulkBar>
-      ) : null}
-    </>
-  )
+  const listBody = renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, loadingSkeleton, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState })
 
   /* ページ送りは型の pagination 枠へ（余白は型）。 */
   const listPager = ready ? (
@@ -1485,7 +919,7 @@ export default function AutoRepliesListV8() {
   )
 
   /*
-   * 1152 の板（WPrd5）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び・よく使う絞り込み（印だけ）」。
+   * 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び・よく使う絞り込み（印だけ）」。
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
 
@@ -1601,7 +1035,7 @@ export default function AutoRepliesListV8() {
               disabled={deleting || deleteTargetStale}
               busy={deleting}
               busyLabel="削除中…"
-              /* 絵 u8sKN：幅は「削除する」の文字で決める（結果の文字の分を控えない）。 */
+              /* 絵 ：幅は「削除する」の文字で決める（結果の文字の分を控えない）。 */
               widthReserve="idle"
               onClick={() => void runDelete()}
             >

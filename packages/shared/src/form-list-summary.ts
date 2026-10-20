@@ -5,7 +5,9 @@
  * 管理画面と Worker が**同じ規則**で絞り込み・並び替えをする必要がある。
  * ここを正本にして、画面（apps/web）とAPI（apps/worker）の両方から使う。
  */
-import { collectInputs, type FormAction, type FormInputBlock, type FormLayout } from "./form-layout";
+import { collectInputs } from './form-layout';
+import { type FormAction } from './form-choice-types';
+import { type FormInputBlock, type FormLayout } from './types/form-layout';
 
 // ---------------------------------------------------------------------------
 // 保存先（友だち情報欄・タグ）の数え上げ

@@ -2,7 +2,7 @@ import { fetchApi } from './api'
 import type { ApiResponse } from '@line-crm/shared'
 
 /**
- * 然-NEN- 会員（ランク・ライフタイム・マイル）。★V6 37-1／37-1-A／37-1-B。
+ * 然-NEN- 会員（ランク・ライフタイム・マイル）。★管理画面 37-1／37-1-A／37-1-B。
  * Worker `apps/worker/src/routes/nen-ranks.ts`。
  */
 

@@ -21,7 +21,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
 import Notice from '@/components/shared/notice';
 import { EXTENDED_PAGE_SIZES as PAGE_SIZES } from '@/components/shared/page-size-options';
-import type { useFieldsTab } from './fields-tab'
+import type { useFieldsTab } from './use-fields-tab'
 import { fieldTypeWord } from './fields-list-model'
 import FieldsTable from './fields-table'
 
@@ -30,7 +30,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
   const table = <FieldsTable {...model} />
   const operationHelp = canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'
   const typeNote = host ? '情報欄のひな形を各アカウントへ配れます。種類と差し込みの名前は作ったあと変えられません。別の種類は新しいひな形を作ってください。' : '項目の種類を変えると、入っている値が変わることがあります。種類を変えるときは「移行」で事前に確かめてから変えます。'
-  // いつも出す注意は「この画面の説明」の帯に入れる（絵 q5gbcM・統括の y0sapC も帯1本）。行の操作は「…」の中に見えるので帯に重ねない。
+  // いつも出す注意は「この画面の説明」の帯に入れる（絵の統括の  も帯1本）。行の操作は「…」の中に見えるので帯に重ねない。
   const typeNoteAsExplanation = Boolean(explanation)
   return (
     <>

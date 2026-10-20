@@ -1,10 +1,12 @@
+import { formatYen } from '@line-crm/shared';
+import { liffErrorMessage } from '../../../../liff/src/lib/api-error.js';
 // main.tsx — Affiliate self-serve React entry. Loaded via dynamic import from
 // the LIFF orchestrator (apps/worker/src/client/main.ts) on ?page=affiliate.
 // Caller passes an already-initialized LIFF context; the LINE access token
 // authenticates every /api/liff/affiliate/* call server-side.
 //
 // NOTE: this mirrors apps/liff/src/pages/Affiliate.tsx, but that page imports
-// `@line/liff` and calls liff.getAccessToken() itself. The worker client never
+// `@line/liff` and calls liff.getAccessToken itself. The worker client never
 // bundles @line/liff (the orchestrator uses a `declare const liff` global), so
 // we re-home the same UI here and take the access token via ctx instead.
 
@@ -24,7 +26,7 @@ export interface AffiliateContext {
   liffId: string;
   idToken?: string;
   lineUserId: string;
-  /** LINE access token (liff.getAccessToken()); auth for the affiliate API. */
+  /** LINE access token (liff.getAccessToken); auth for the affiliate API. */
   lineAccessToken: string;
 }
 
@@ -133,7 +135,7 @@ async function fetchMe(
   if (res.status === 404) return { registered: false };
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
   return { registered: true, affiliate: data.affiliate, links: data.links };
@@ -154,7 +156,7 @@ async function fetchMileage(
   const res = await fetch(url);
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   return (await res.json()) as MileageWalletData;
 }
@@ -167,7 +169,7 @@ async function postEnrollOffer(token: string, offerId: string): Promise<Affiliat
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;
@@ -183,7 +185,7 @@ async function postRegister(
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   return (await res.json()) as { affiliate: AffiliateData; links: AffiliateLinkData[] };
 }
@@ -200,7 +202,7 @@ async function postAddLink(
   });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `API ${res.status}`);
+    throw new Error(liffErrorMessage(body));
   }
   const data = (await res.json()) as { link: AffiliateLinkData };
   return data.link;
@@ -298,7 +300,7 @@ function CopyButton({ url, urlRef }: { url: string; urlRef: React.RefObject<HTML
 }
 
 const rewardText = (amount: number) =>
-  amount > 0 ? `1件 ¥${amount.toLocaleString()}` : '報酬未設定';
+  amount > 0 ? `1件 ${formatYen(amount)}` : '報酬未設定';
 
 function formatMileageDate(value: string): string {
   const parsed = new Date(value.includes('T') ? value : value.replace(' ', 'T'));

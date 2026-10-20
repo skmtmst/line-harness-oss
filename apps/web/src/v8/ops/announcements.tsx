@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
 import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -36,9 +36,9 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import Notice from '@/components/shared/notice'
 
 /**
- * 運営のお知らせ配信 V8（絵 `tQ2MJ`・送る前の確認 `TJUUl`）。
+ * 運営のお知らせ配信 V8（絵の送る前の確認 ）。
  *
- * 動きは v7（app/ops/announcements）と同じ口：一覧・宛先の見込み（preview）・作る・直す・消す。
+ * 動きは 管理画面（app/ops/announcements）と同じ口：一覧・宛先の見込み（preview）・作る・直す・消す。
  * 左で作り、右に配信済み・予約・下書き。送る（今すぐ・予約）ときは必ず「送る前の確認」を挟む。
  * 下書き・予約は「直す」で左に読み込み、直している間だけ「削除する」を出す。
  * 送ったものの「直す」は中身を写して新しいお知らせを作る（送ったものは変えない）。
@@ -115,8 +115,7 @@ function confirmChannels(form: Form, preview: OpsAudiencePreview | null): string
 function loadDescription(err: unknown): string | undefined {
   if (isForbiddenOrRateLimited(err)) return undefined
   if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
-  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
-  return undefined
+  return describeApiFailure(err, '読み込み', { scope: 'hq' })
 }
 
 export default function OpsAnnouncementsV8() {
@@ -178,7 +177,7 @@ export default function OpsAnnouncementsV8() {
 
   const toggle = <T extends string>(list: T[], key: T): T[] => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key])
 
-  /* 欄に結び付く誤りは欄で知らせて1つ目へ移る（B-139）。上の帯は LINE の設定だけ。 */
+  /* 欄に結び付く誤りは欄で知らせて1つ目へ移る。上の帯は LINE の設定だけ。 */
   const fields = useFormErrors()
   fields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入力してください'), { required: true })
   fields.define('body', '本文', () => (form.body.trim() ? null : '本文を入力してください'), { required: true })

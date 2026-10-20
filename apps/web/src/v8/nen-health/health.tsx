@@ -33,7 +33,7 @@ import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size
 
 /*
  * ★V8-B 健康日記（Pencil「★V8-B 画面の地図」専用機能の組：
- * 一覧 `mIwA4`・30日のまとめ（引き出し）`BVuYh`・記録の項目 `z2tvtX`）。
+ * 一覧 ・30日のまとめ（引き出し）・記録の項目 ）。
  *
  * 外枠（見出し・獣医師向け PDF・タブ・数の帯）は3つのタブで同じ。型は ListPage。
  * データの口（health・healthSummary・印刷）は今の画面と同じ。
@@ -111,7 +111,7 @@ export default function HealthV8({
     void loadSummary()
   }, [loadSummary])
 
-  // 記録の項目のタブでも数の帯は出す（絵 z2tvtX）。1件だけ取って数を読む。
+  // 記録の項目のタブでも数の帯は出す。1件だけ取って数を読む。
   useEffect(() => {
     if (!accountId || tab !== 'items') return
     let active = true
@@ -214,7 +214,7 @@ export default function HealthV8({
 }
 
 /**
- * 記録のあるペット／気になる変化（mIwA4）。
+ * 記録のあるペット／気になる変化。
  * 案内の帯 → 道具の段（探す・よく使う札3つ・よく使う絞り込み・件数）→ 表 → 件数 → ヒント。
  */
 function HealthListV8({

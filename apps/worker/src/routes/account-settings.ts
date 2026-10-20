@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { personalDataRetention } from './personal-data-retention.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -8,7 +9,7 @@ import {
   getTrackedLinkBaseUrl,
   setTrackedLinkBaseUrl,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -182,7 +183,7 @@ accountSettings.put('/api/account-settings/test-recipients', requireRole('owner'
   }
 
   const id = crypto.randomUUID();
-  const now = new Date(Date.now() + 9 * 60 * 60_000).toISOString().replace('Z', '+09:00');
+  const now = japanCalendar().toISOString().replace('Z', '+09:00');
 
   await c.env.DB.prepare(
     `INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)

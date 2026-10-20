@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
-import type { Area } from '@/components/rich-menus/canvas-editor'
+import type { Area } from '../../../components/rich-menus/area-types'
 import HqMenuReferences from './hq-references'
 
 afterEach(cleanup)

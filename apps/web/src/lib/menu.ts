@@ -1,4 +1,4 @@
-import type { FeatureKey } from './feature-settings'
+import type { FeatureKey } from './feature-key'
 
 /**
  * サイドメニューの項目。**ここが正本。**
@@ -56,7 +56,7 @@ export interface MenuSection {
 /** 統括の外側（左メニュー・上の帯）を出す住所（/hq の下と、統括から開く LINEアカウントの登録）。 */
 export function isHqShellPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false
-  // 統括の「アカウント」から開く登録の画面（LINEアカウントを登録・飲食店の店舗を追加とその利用規約）も統括の外側（絵 xj3zz・faGn4・VdKOK）。
+  // 統括の「アカウント」から開く登録の画面（LINEアカウントを登録・飲食店の店舗を追加とその利用規約）も統括の外側。
   return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new' || pathname === '/restaurant-test/stores/new' || pathname === '/restaurant-test/terms'
 }
 
@@ -66,7 +66,7 @@ export const HQ_MENU_SECTIONS: MenuSection[] = [
     label: null,
     title: '統括コンソール',
     items: [
-      /* B-312・B-322（2026-10-16 司令塔）：統括の一番上に「対応が要るもの」（Kyf8U）。札は全アカウントの件数の合計。印は lucide の circle-alert。 */
+      /* ・（2026-10-16 司令塔）：統括の一番上に「対応が要るもの」（Kyf8U）。札は全アカウントの件数の合計。印は lucide の circle-alert。 */
       { href: '/hq/attention', label: '対応が要るもの', icon: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 8v4M12 16h.01', badge: 'hq-attention', id: 'hq-attention', note: '各アカウントの未対応のトーク・承認待ちの予約などをまとめて見ます', required: true },
       { href: '/hq', label: 'アカウント', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', iconV8: 'M10 12h4M10 8h4M14 21v-3a2 2 0 0 0-4 0v3M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
       /* 店の比較（G7-1 W4fI7A）。アカウントの下・統括で唯一の新しい左メニュー。V8 の印は lucide の chart-column。 */
@@ -166,9 +166,9 @@ export const MENU_SECTIONS: MenuSection[] = [
     label: '専用機能',
     title: '専用機能',
     items: [
-      // ★V6 37-1。会員（ランク・ライフタイム・マイル）。写真審査は「投稿」に改名（2026-09-16、Masato の決定）。
+      // ★管理画面 37-1。会員（ランク・ライフタイム・マイル）。写真審査は「投稿」に改名（2026-09-16、Masato の決定）。
       { href: '/nen/members', label: '会員', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', id: 'nen-members', note: '会員ランク（通年・ライフタイム）とマイルの一覧・設定', featureKey: 'ec_commerce' },
-      // ★V6 37-3／37-4（2026-09-16 採用）。ペットの正本は LINE 側（お客様がマイページで登録）。
+      // ★管理画面 37-3／37-4（2026-09-16 採用）。ペットの正本は LINE 側（お客様がマイページで登録）。
       { href: '/nen/pets', label: 'マイペット', icon: 'M12 21c-4.97 0-9-3.582-9-8 0-2.5 1.5-4 3-4 1 0 1.5.5 2 1 .5-1.5 2-2.5 4-2.5s3.5 1 4 2.5c.5-.5 1-1 2-1 1.5 0 3 1.5 3 4 0 4.418-4.03 8-9 8z M8 5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z M16 5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z', id: 'nen-pets', note: 'お客様が登録したペットの一覧と「今日の目安」。主食のカロリー表もここ', featureKey: 'photo_review' },
       { href: '/nen/health', label: '健康日記', icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z M9 12h2l1-2 1.5 4 1-2H16', id: 'nen-health', note: 'お客様が付けた健康日記から、気になる変化と「30日のまとめ」を見る', featureKey: 'photo_review' },
       // /health は「BAN検知ダッシュボード」で写真審査ではない。写真審査の画面は
@@ -184,7 +184,7 @@ export const MENU_SECTIONS: MenuSection[] = [
     title: '設定',
     items: [
       { href: '/getting-started', label: 'はじめの設定', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', id: 'getting-started', note: '最初にやることの順路と、いまどこまで終わったか', required: true },
-      // 「設定」区分の先頭。要件 `v6-33-account-settings` §5-3。
+      // 「設定」区分の先頭。要件 `管理画面-33-account-settings` §5-3。
       // **統括の店舗管理（/hq）とは別のもの。** こちらは送受信に使う
       // LINE公式アカウントそのものの設定。
       { href: '/accounts', label: 'LINEアカウント', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4-.8L3 21l1.9-3.8A7.9 7.9 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' , id: 'line-accounts', note: '送受信に使うLINE公式アカウントと接続の状態', required: true },
@@ -245,13 +245,13 @@ export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [sectio
  * 管理者には「予約設定」の一部として見せたいため、2つの候補を持つ。
  */
 export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
-  // LINEアカウントの登録は統括の「アカウント」から開く（左メニューは統括のまま・絵 xj3zz）。
+  // LINEアカウントの登録は統括の「アカウント」から開く（左メニューは統括のまま・絵 ）。
   '/accounts/new': 'hq-stores',
-  // 飲食店の店舗を追加（ao15G・faGn4）も統括の「アカウント」から開く。左メニューは「アカウント」を選んだ形。
+  // 飲食店の店舗を追加（・）も統括の「アカウント」から開く。左メニューは「アカウント」を選んだ形。
   '/restaurant-test/stores/new': 'hq-stores',
-  // 店舗を追加の「利用規約を別画面で読む」（VdKOK）も統括の「アカウント」の中。
+  // 店舗を追加の「利用規約を別画面で読む」も統括の「アカウント」の中。
   '/restaurant-test/terms': 'hq-stores',
-  // 共通アクション（一覧・作る・編集・版と使われている場所 ziSgL）はオートメーションの中。左メニューは自動化の組を開いて「オートメーション」を選んだ形。
+  // 共通アクション（一覧・作る・編集・版と使われている場所 ）はオートメーションの中。左メニューは自動化の組を開いて「オートメーション」を選んだ形。
   '/common-actions': 'automations',
   '/common-actions/new': 'automations',
   '/common-actions/edit': 'automations',
@@ -278,7 +278,7 @@ export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
    */
   '/booking/staff/shifts': ['booking-own-shifts', 'booking-menus'],
   /*
-   * 左メニューの項目と別の URL に置いた画面（2026-10-15 判定役 Eo56k・YMVFD）。
+   * 左メニューの項目と別の URL に置いた画面（2026-10-15 判定役 ・）。
    * 宣言が無いと、どの項目も選ばれず、属する組も閉じたままになっていた。
    * 成果とアフィリエイトの各タブ（/affiliates?tab=…）は「成果とアフィリエイト」、
    * 担当スタッフの一覧・追加は「予約設定」の担当スタッフタブ、

@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 import type DatabaseType from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 
-import { trackConversion } from '../src/conversions.js';
+import { trackConversion } from '../src/conversions/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 /*

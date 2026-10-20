@@ -1,21 +1,28 @@
+import { responseLiffError } from '../../../../liff/src/lib/api-error.js';
+import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
+import { createClientLogger } from '@line-crm/shared';
 import { jstDate } from '@line-crm/shared';
-// main.tsx — Auto-webinar (疑似ライブ) LIFF entry. Loaded via dynamic import
-// from apps/worker/src/client/main.ts (?page=webinar&slug=<slug>).
-// Worker の入口と apps/liff の入口が共用する、申込・視聴・回答の本体。
-//
-// 時刻の権威はサーバー:
-//   期待位置 = offsetSeconds + (performance.now() - t0) / 1000
-// 動画側がバッファ等で 5 秒以上ズレたら期待位置へ強制シーク。
-// シークバー・一時停止 UI は出さない (controls なし)。
-
-import { StrictMode, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
 import {
   buildFormSubmitHeaders,
   newFormIdempotencyKey,
   toFormIdempotencyKey,
   type FormIdempotencyKey,
 } from '@line-crm/shared';
+
+
+// main.tsx — Auto-webinar (疑似ライブ) LIFF entry. Loaded via dynamic import
+// from apps/worker/src/client/main.ts (?page=webinar&slug=<slug>).
+// Worker の入口と apps/liff の入口が共用する、申込・視聴・回答の本体。
+//
+// 時刻の権威はサーバー:
+//   期待位置 = offsetSeconds + (performance.now - t0) / 1000
+// 動画側がバッファ等で 5 秒以上ズレたら期待位置へ強制シーク。
+// シークバー・一時停止 UI は出さない (controls なし)。
+
+import { StrictMode, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+
+
 import { buildMeetingDateOptions } from './date-options.js';
 import './styles.css';
 import '../../../../liff/src/index.css';
@@ -27,6 +34,8 @@ import StatusView from '../../../../liff/src/components/ui/StatusView.js';
 import Button from '../../../../liff/src/components/ui/Button.js';
 import { TextInput, FieldCount } from '../../../../liff/src/components/forms/controls.js';
 import { setLiffContext } from '../../../../liff/src/lib/liff-auth.js';
+const clientLogger = createClientLogger('embedded');
+
 
 // LIFF SDK は index.html の script タグでグローバル注入される
 declare const liff: {
@@ -153,11 +162,7 @@ async function apiGet<T>(path: string, ctx: WebinarContext): Promise<T> {
   const url = new URL(path, ctx.apiBase || window.location.origin);
   url.searchParams.set('liffId', ctx.liffId);
   const r = await fetch(url.toString(), { headers: buildAuthHeaders(ctx) });
-  if (!r.ok) {
-    const err = new Error(`API ${r.status}`) as Error & { status: number };
-    err.status = r.status;
-    throw err;
-  }
+  if (!r.ok) throw await responseLiffError(r);
   return r.json() as Promise<T>;
 }
 
@@ -169,11 +174,7 @@ async function apiPost<T>(path: string, body: unknown, ctx: WebinarContext): Pro
     headers: buildAuthHeaders(ctx, { 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
   });
-  if (!r.ok) {
-    const err = new Error(`API ${r.status}`) as Error & { status: number };
-    err.status = r.status;
-    throw err;
-  }
+  if (!r.ok) throw await responseLiffError(r);
   return r.json() as Promise<T>;
 }
 
@@ -215,8 +216,8 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
   rateRef.current = rate;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const t0Ref = useRef(0);            // state 受信時の performance.now()
-  const waitT0Ref = useRef(0);        // 待機ルーム受信時の Date.now()
+  const t0Ref = useRef(0);            // state 受信時の performance.now
+  const waitT0Ref = useRef(0);        // 待機ルーム受信時の Date.now
   const baseOffsetRef = useRef(0);    // state.offsetSeconds
   const commentIdxRef = useRef(0);    // 次に表示するサクラコメント index
   const ctaIdxRef = useRef(0);        // 次に表示する CTA カード index
@@ -282,7 +283,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
       if (status === 403) setError('この配信は友だち追加後にご覧いただけます。');
       else if (status === 404) setError('この配信は見つかりませんでした。');
       else setError('読み込みに失敗しました。開き直してください。');
-      console.error(JSON.stringify({"code":"webinar_main_failed"}));
+      clientLogger.error("webinar_main_failed");
     } finally {
       loadingRef.current = false;
     }
@@ -575,7 +576,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
         body: text,
       }, ctx);
     } catch (err) {
-      console.warn(JSON.stringify({"code":"webinar_main_warn"}));
+      clientLogger.warn("webinar_main_warn");
       setChat(prev => prev.map(item => item.key === key ? { ...item, failed: true } : item));
       setInput(current => current === '' ? text : current);
     } finally {
@@ -673,7 +674,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
       // 再生画面へ切り替える。未来回なら予約済み表示／待機ルームへ更新される。
       await load();
     } catch (err) {
-      console.warn(JSON.stringify({"code":"webinar_main_warn"}));
+      clientLogger.warn("webinar_main_warn");
     } finally {
       setRegistering(false);
     }
@@ -881,7 +882,7 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
     );
   }
 
-  // ---- ライブ中 (★V8 RpW2h) / 終了画面 ----
+  // ---- ライブ中 (★V8 ) / 終了画面 ----
   // PC の横長ウィンドウで video (w-full) が画面高を食い尽くしてチャット欄が
   // 潰れないよう、全体をスマホ幅カラム (max-w-md) に閉じ込めて中央寄せする。
   // スマホでは max-w-md は効かないので挙動不変。
@@ -1120,7 +1121,8 @@ export function FormSheet({
         headers: buildAuthHeaders(ctx, buildFormSubmitHeaders(key)),
         body: JSON.stringify({ data: values }),
       });
-      const json = (await r.json().catch(() => null)) as {
+      const payload: unknown = await r.json().catch(() => null);
+      const json = (r.ok || payload === null ? payload : { ...legacyApiErrorBody(payload) as object, error: readApiError(payload).message }) as {
         success: boolean;
         error?: string;
         code?: string;

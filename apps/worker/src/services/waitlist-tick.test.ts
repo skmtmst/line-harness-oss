@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { waitlistFixture, futureSlot } from '../test-utils/waitlist-fixture.js';
 import type { SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { processBookingWaitlists } from './waitlist-tick.js';
-vi.mock('./booking-automatic-line.js', () => ({ sendAutomaticBookingLine: vi.fn(async () => true) }));
+vi.mock('../features/booking/booking-automatic-line.js', () => ({ sendAutomaticBookingLine: vi.fn(async () => true) }));
 let test: SqliteD1, slot: string; beforeEach(() => { test = waitlistFixture(); slot = futureSlot(); }); afterEach(() => test.raw.close());
 function env() { return { DB: test.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true', LIFF_URL: 'https://liff.example.test' } as Env['Bindings']; }
 function addPerson(id: string, friend: string) { test.raw.prepare(`INSERT INTO booking_waitlist(id,line_account_id,staff_id,menu_id,starts_at,friend_id,identity_key) VALUES(?,'a','s','m',?,?,?)`).run(id, slot, friend, 'friend:' + friend); }

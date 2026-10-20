@@ -2,7 +2,7 @@ import { daysUntil } from './nen-date-window.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import * as dbPackage from '@line-crm/db';
 import type { NenRankSetting } from '@line-crm/db';
-import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { attachTagAndFireSideEffects, detachTagAndFireSideEffects } from '../features/friends/friend-tag-attach/index.js';
 import { createFeatureJobGate } from './feature-enforcement.js';
 
 export const NEN_TAG = {

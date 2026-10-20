@@ -1,5 +1,6 @@
 'use client'
 
+import { canManageRole, isOwnerRole, useStaffRole } from '@/lib/staff-role'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { UserX, CircleX, Mail, RotateCcw, RotateCw } from 'lucide-react'
@@ -37,9 +38,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 LINE通知 送れなかったもの（板 DrwMm）・記録（板 PZBVb）。
+ * ★V8 LINE通知 送れなかったもの（板 ）・記録（板 ）。
  *
- * 並び（絵）：送れなかったものだけ数のマス4つ → 探す・対象・期間（記録は「クリック記録あり」）・右に再読み込み →
+ * 並び：送れなかったものだけ数のマス4つ → 探す・対象・期間（記録は「クリック記録あり」）・右に再読み込み →
  * 表（日時・お知らせ・対象者・状態・理由・対応・試行・クリック。1行 53）→ 下の1行（送れなかったものは帯）。
  * 試行の履歴・受信箱で連絡・再試行・対応済みは、お知らせの名前を押して開く「記録の詳細」に置く（行は1段のまま）。
  * 読み込み・再試行・対応済みの口と世代の守りは今の部品（components/line-notifications/notification-run-list）の関数を使う。
@@ -101,8 +102,9 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   const [notice, setNotice] = useState<ScopedNotice>({ generation: -1, notice: null })
   const [detailId, setDetailId] = useState<string | null>(null)
   /* 再試行は店長だけ、対応済みは店長・管理者だけ。押せない人には出さない。 */
-  const [canRetry, setCanRetry] = useState(false)
-  const [canResolve, setCanResolve] = useState(false)
+  const staffRole = useStaffRole()
+  const canRetry = isOwnerRole(staffRole)
+  const canResolve = canManageRole(staffRole)
   const requestRef = useRef(0)
   const mutationRef = useRef<{ generation: number; id: string } | null>(null)
   const env = useMemo<NotificationRunEnv>(() => ({
@@ -123,16 +125,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
     setRetrying,
   }), [])
 
-  useEffect(() => {
-    let active = true
-    void api.staff.me().then((response) => {
-      if (active && response.success) {
-        setCanRetry(response.data.role === 'owner')
-        setCanResolve(response.data.role === 'owner' || response.data.role === 'admin')
-      }
-    }).catch(() => {})
-    return () => { active = false }
-  }, [])
+
 
   useEffect(() => {
     setPage(1); setQuery(''); setFilter('all'); setRecipientFilter('all'); setPeriodFilter('all'); setDetailId(null)
@@ -149,7 +142,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   const retryingId = retrying.generation === generation ? retrying.id : null
   const items = useMemo(() => (result?.items ?? []) as RunItem[], [result])
   const summary = result?.summary ?? null
-  /* 数のマス（DrwMm）。口の集計に内訳が無いので、読み込んだ記録から数える。送れなかった件数だけは口の合計。 */
+  /* 数のマス。口の集計に内訳が無いので、読み込んだ記録から数える。送れなかった件数だけは口の合計。 */
   const breakdown = useMemo(() => {
     const blocked = items.filter((item) => item.reason?.includes('ブロック')).length
     const planned = items.filter((item) => item.nextRetryAt !== null)

@@ -5,7 +5,7 @@ import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { lineAccountFolders } from './line-account-folders.js';
 import { lineAccountTags } from './line-account-tags.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 let sql:ReturnType<typeof createTestD1>,staff:any;
 async function call(path:string,method='GET',body?:unknown) {

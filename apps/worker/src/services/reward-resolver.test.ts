@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { resolveRewardTemplate } from './reward-resolver.js';
 import type { MessageTemplate, TrackedLink, Friend } from '@line-crm/db';
 
+
+
 const tplA: MessageTemplate = {
   id: 'tpl-a',
   name: 'reward A',
@@ -49,10 +51,12 @@ const linkNoReward: TrackedLink = {
 
 function makeDeps(opts: {
   friend?: Partial<Friend> | null;
+  eligible?: boolean;
   trackedLinks?: Record<string, TrackedLink>;
   templates?: Record<string, MessageTemplate>;
 }) {
   return {
+    trackedLinkReferralMatchesAccount: vi.fn(async () => opts.eligible ?? true),
     getFriendById: vi.fn(async () => (opts.friend === undefined ? null : (opts.friend as Friend | null))),
     getTrackedLinkById: vi.fn(async (_db: unknown, id: string) => opts.trackedLinks?.[id] ?? null),
     getMessageTemplateById: vi.fn(async (_db: unknown, id: string) => opts.templates?.[id] ?? null),
@@ -134,4 +138,24 @@ describe('resolveRewardTemplate', () => {
     }, deps);
     expect(result).toEqual(tplA);
   });
+});
+
+
+it('known ineligible requested links remain authoritative without falling back to first-touch', async () => {
+  const deps = makeDeps({ eligible: false,
+    friend: { id: 'f1', first_tracked_link_id: 'link-a' },
+    trackedLinks: { 'link-a': linkA, 'link-b': linkB }, templates: { 'tpl-a': tplA, 'tpl-b': tplB },
+  });
+  expect(await resolveRewardTemplate(fakeDb, { friendId: 'f1', requestedTrackedLinkId: 'link-b', expectedLineAccountId: 'account-a' }, deps)).toBeNull();
+  expect(deps.trackedLinkReferralMatchesAccount).toHaveBeenCalledWith(fakeDb, linkB, 'account-a');
+  expect(deps.getFriendById).not.toHaveBeenCalled();
+  expect(deps.getMessageTemplateById).not.toHaveBeenCalled();
+});
+it('ineligible persisted first-touch links cannot choose a template', async () => {
+  const deps = makeDeps({ eligible: false,
+    friend: { id: 'f1', first_tracked_link_id: 'link-a' },
+    trackedLinks: { 'link-a': linkA }, templates: { 'tpl-a': tplA },
+  });
+  expect(await resolveRewardTemplate(fakeDb, { friendId: 'f1', requestedTrackedLinkId: null, expectedLineAccountId: 'account-a' }, deps)).toBeNull();
+  expect(deps.getMessageTemplateById).not.toHaveBeenCalled();
 });

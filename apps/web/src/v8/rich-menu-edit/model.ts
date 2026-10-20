@@ -1,5 +1,5 @@
 /*
- * ★V8 リッチメニューの詳細（hKr8f）で使う小さな計算。画面から切り出して試験で確かめる。
+ * ★V8 リッチメニューの詳細で使う小さな計算。画面から切り出して試験で確かめる。
  */
 import type { RichMenuPublishRun } from '@/lib/api'
 import { formatDate as polishFormatDate } from '@/lib/format'

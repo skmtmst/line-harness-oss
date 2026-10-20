@@ -100,7 +100,7 @@ describe('R287 締め後に開き直しても明細・CSVを再開できる', ()
     });
   });
 
-  it('B-351: 明細は本人・店・統括と有効期限が揃うときだけ取得でき、期限のない旧行は返さない', async () => {
+  it('明細は本人・店・統括と有効期限が揃うときだけ取得でき、期限のない旧行は返さない', async () => {
     const closed = await closeSeptember();
     const snapshot = await prepareAffiliateStatement(db, { tenantId: TENANT_ID, lineAccountId: 'account-1', settlementId: closed.settlementId, affiliateId: 'affiliate-1' });
     const statement = await createAffiliateStatement(db, {

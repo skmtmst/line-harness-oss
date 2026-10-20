@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getTrackedLinkByIdOrShortCode } from '@line-crm/db';
 import { stripTapExtras, validateImagemapMessage } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { trackedLinks } from '../routes/tracked-links.js';
-import { autoTrackContent, decorateForFriendPush } from './auto-track.js';
+import { appendFriendToTrackedLinks, autoTrackContent, decorateForFriendPush } from './auto-track.js';
 import { processTrackedClick } from './tracked-click-steps.js';
 import { decorateTapExtras, handleExtraPostback } from './tap-extras.js';
 import { validateTemplateMessage } from './template-message-validation.js';
@@ -49,6 +49,10 @@ async function prepare(broadcastId = 'b1', message = payload) {
   return { url: action.linkUri as string, link };
 }
 
+async function identifiedUrl(url: string, friendId = 'friend') {
+  return appendFriendToTrackedLinks(sql.db, url, workerUrl, friendId);
+}
+
 async function click(url: string, userAgent = 'Safari') {
   const pending: Promise<unknown>[] = [];
   const ctx = { waitUntil: (promise: Promise<unknown>) => pending.push(promise), passThroughOnException() {} } as unknown as ExecutionContext;
@@ -66,7 +70,7 @@ describe('リッチメッセージのテキストと追加処理（実SQL）', (
   it('計測を1回通り、文を欠かさずLINE入力欄へ転送し、押された数・タグ・合計点を記録する', async () => {
     expect(validateTemplateMessage('rich_message', JSON.stringify(payload))).toEqual({ ok: true });
     const { url, link } = await prepare();
-    const response = await click(`${url}?f=friend`, 'Line/15.0');
+    const response = await click(await identifiedUrl(url), 'Line/15.0');
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(destination);
     expect((await getTrackedLinkByIdOrShortCode(sql.db, link.id))!.click_count).toBe(1);
@@ -79,13 +83,21 @@ describe('リッチメッセージのテキストと追加処理（実SQL）', (
     expect(sql.raw.prepare('SELECT COUNT(*) n FROM friend_scores').get()).toEqual({ n: 1 });
   });
 
+  it('既定統括の未割当の友だちも署名を確認して追加処理を再開する', async () => {
+    sql.raw.exec("UPDATE line_accounts SET tenant_id=NULL WHERE id='account'; UPDATE friends SET line_account_id=NULL WHERE id='friend'");
+    const {url} = await prepare();
+    expect((await click(await identifiedUrl(url))).headers.get('location')).toBe(destination);
+    assertEffects();
+    expect(sql.raw.prepare('SELECT friend_id FROM link_clicks').get()).toEqual({friend_id:'friend'});
+    expect(sql.raw.prepare("SELECT status FROM workflow_steps WHERE process_kind='tracked_click' AND step_key='__run'").get()).toEqual({status:'succeeded'});
+  });
   it('一斉配信では自店LIFFで友だちを特定した後にだけ1回数える', async () => {
     const { url, link } = await prepare();
     const identify = await click(url, 'Line/15.0');
     expect(identify.headers.get('location')).toBe(`https://liff.line.me/shop-liff?redirect=${encodeURIComponent(url)}`);
     expect((await getTrackedLinkByIdOrShortCode(sql.db, link.id))!.click_count).toBe(0);
     expect(sql.raw.prepare("SELECT score FROM friends WHERE id='friend'").get()).toEqual({ score: 5 });
-    const response = await click(`${url}?lu=U1`, 'Line/15.0');
+    const response = await click(await identifiedUrl(url), 'Line/15.0');
     expect(response.headers.get('location')).toBe(destination);
     expect((await getTrackedLinkByIdOrShortCode(sql.db, link.id))!.click_count).toBe(1);
     assertEffects();
@@ -94,7 +106,8 @@ describe('リッチメッセージのテキストと追加処理（実SQL）', (
   it('1人への送信は友だちの目印を付け、LIFFを挟まず入力欄へ戻る', async () => {
     const result = await decorateForFriendPush(sql.db, 'rich_message', JSON.stringify(payload), workerUrl, { lineAccountId: 'account', friendId: 'friend' });
     const url = JSON.parse(result.content).actions[0].linkUri;
-    expect(new URL(url).searchParams.get('f')).toBe('friend');
+    expect(new URL(url).searchParams.get('identity')).toBeTruthy();
+    expect(new URL(url).searchParams.has('f')).toBe(false);
     expect((await click(url, 'Line/15.0')).headers.get('location')).toBe(destination);
     assertEffects();
   });
@@ -107,8 +120,8 @@ describe('リッチメッセージのテキストと追加処理（実SQL）', (
       const result = await autoTrackContent(sql.db, 'rich_message', JSON.stringify({ ...payload, tapAreas: [{ ...payload.tapAreas[0], ...patch }] }), workerUrl, { lineAccountId: 'account', broadcastId: 'b1' });
       expect(JSON.parse(result.content).actions[0].linkUri).not.toBe(first.url);
     }
-    await click(`${first.url}?f=friend`);
-    await click(`${first.url}?f=friend`);
+    await click(await identifiedUrl(first.url));
+    await click(await identifiedUrl(first.url));
     expect((await getTrackedLinkByIdOrShortCode(sql.db, first.link.id))!.click_count).toBe(2);
     assertEffects(25);
   });
@@ -121,7 +134,7 @@ describe('リッチメッセージのテキストと追加処理（実SQL）', (
     expect(action).not.toHaveProperty('text');
     const key = new URL(action.linkUri).pathname.split('/').pop()!;
     await expect(handleExtraPostback(sql.db, 'friend', 'account', `tx=${key}`, 'forged')).rejects.toThrow('invalid_tap_extra_snapshot');
-    expect((await click(`${action.linkUri}?f=friend`)).headers.get('location')).toBe(destination);
+    expect((await click(await identifiedUrl(action.linkUri))).headers.get('location')).toBe(destination);
     assertEffects();
   });
 
@@ -146,21 +159,21 @@ describe('リッチメッセージのテキストと追加処理（実SQL）', (
     const longText = 'あ'.repeat(400);
     const node = { type: 'message', text: longText, tapExtras: { scoreChange: 3 }, area: { x: 0, y: 0, width: 1040, height: 520 } };
     const action = await decorateTapExtras(sql.db, node, workerUrl, 'other') as { linkUri: string };
-    expect(action.linkUri.length).toBeLessThan(1000);
-    expect((await click(`${action.linkUri}?f=other-friend`)).headers.get('location')).toBe(`https://line.me/R/oaMessage/%40other/?${encodeURIComponent(longText)}`);
+    expect((await identifiedUrl(action.linkUri, 'other-friend')).length).toBeLessThan(1000);
+    expect((await click(await identifiedUrl(action.linkUri, 'other-friend'))).headers.get('location')).toBe(`https://line.me/R/oaMessage/%40other/?${encodeURIComponent(longText)}`);
     expect(sql.raw.prepare("SELECT score FROM friends WHERE id='other-friend'").get()).toEqual({ score: 3 });
     for (const invalid of ['', 'あ'.repeat(401)]) await expect(decorateTapExtras(sql.db, { ...node, text: invalid }, workerUrl, 'other')).rejects.toThrow('1〜400文字');
   });
 
   it('プレビュー・テスト送信・無効なリンクは数えず、タグ・点数も付けない', async () => {
     const { url, link } = await prepare();
-    expect((await click(`${url}?f=friend`, 'facebookexternalhit/1.1')).status).toBe(200);
+    expect((await click(await identifiedUrl(url), 'facebookexternalhit/1.1')).status).toBe(200);
     expect((await getTrackedLinkByIdOrShortCode(sql.db, link.id))!.click_count).toBe(0);
     const testSend = await autoTrackContent(sql.db, 'rich_message', JSON.stringify(stripTapExtras(payload)), workerUrl, { lineAccountId: 'account' });
     expect(testSend.content).not.toContain('/t/');
     expect(sql.raw.prepare('SELECT COUNT(*) n FROM tracked_links').get()).toEqual({ n: 1 });
     sql.raw.prepare('UPDATE tracked_links SET is_active=0 WHERE id=?').run(link.id);
-    expect((await click(`${url}?f=friend`)).status).toBe(404);
+    expect((await click(await identifiedUrl(url))).status).toBe(404);
     expect(sql.raw.prepare('SELECT COUNT(*) n FROM friend_tags').get()).toEqual({ n: 0 });
     expect(sql.raw.prepare("SELECT score FROM friends WHERE id='friend'").get()).toEqual({ score: 5 });
   });

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * V8 NEN配信「配信を直す」（src/v8/nen-campaigns/edit.tsx：w5pwG）と
- * 「コラムを書く」（column-new.tsx：yRDwW）の動きの試験。BEHAVIOR.md の主な動きを守る。
+ * V8 NEN配信「配信を直す」（src/v8/nen-campaigns/edit.tsx：）と
+ * 「コラムを書く」（column-new.tsx：）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * V8 のテーマで出す・選んだ値が保存に乗る・閲覧のみの人には押せない保存を置かない・
  * コラムは配信対象を1つの欄で選び、足りないと保存せずに理由を出す。
  */
@@ -153,7 +153,7 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
     expect(host.textContent).toContain('配信内容を保存しました')
   })
 
-  it('B-139：本文が空のまま保存すると、口を呼ばず本文の欄が赤くなり、真下に理由が出て、本文へ移る', async () => {
+  it('本文が空のまま保存すると、口を呼ばず本文の欄が赤くなり、真下に理由が出て、本文へ移る', async () => {
     calls.settings.mockResolvedValue({ success: true, data: [{ ...REVIEW, bodyText: '' }] })
     await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()

@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -14,7 +15,7 @@ import { describe, expect, it } from 'vitest'
  */
 const page = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/screen.tsx'), 'utf8')
 const drawer = readFileSync(join(import.meta.dirname, '../../v8/settings/ec-commerce/order-drawer.tsx'), 'utf8')
-const api = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
+const api = readApiSource(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('IDEA-23 注文の状況パネルの配線', () => {
   it('新しいページやタブを増やさず、行からDrawerを開く', () => {

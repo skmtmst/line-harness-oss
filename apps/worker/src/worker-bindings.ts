@@ -1,4 +1,4 @@
-import type { CodexMentionQueueMessage } from './services/codex-cloud-monitor.js';
+import type { CodexMentionQueueMessage } from './services/codex-cloud-types.js';
 
 export type WorkerBindings = {
     OPERATOR_PUSH_VAPID_PUBLIC_KEY?:string;
@@ -30,6 +30,9 @@ export type WorkerBindings = {
     RESTAURANT_TEST_ENABLED?: string;
     GOOGLE_BUSINESS_ENABLED?: string;
     DEPLOY_ENV?: string;
+    /** Q-75: staging only, with a mandatory outbound stop and resource identity checks. */
+    STAGING_QA_ENABLED?: string;
+    STAGING_QA_OUTBOUND_DISABLED?: string;
     /** Positive integer overrides by fixed security rule key (JSON). Invalid values use safe defaults. */
     SECURITY_MONITOR_THRESHOLDS?: string;
     /** Dedicated AES-GCM key held as a Worker secret, never a normal var. */
@@ -90,7 +93,7 @@ export type WorkerBindings = {
     BOOKING_STRIPE_CONNECT_REDIRECT_URI?: string;
     /** 統括のバナー生成（OpenAI 画像生成）。未設定時は生成だけ503で断る。 */
     OPENAI_API_KEY?: string;
-    /** B-355: operations-only deployment flag; production is always closed. */
+    /** operations-only deployment flag; production is always closed. */
     G2_OPENAI_ENABLED?: string;
     /** 画像生成モデル名。未設定時は gpt-image-1。 */
     OPENAI_IMAGE_MODEL?: string;

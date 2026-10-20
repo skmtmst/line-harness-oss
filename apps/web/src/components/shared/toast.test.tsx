@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 保存の知らせ（Toast）。★V7 共通部品その2 §2。右下・4秒。
+ * 保存の知らせ（Toast）。★管理画面 共通部品その2 §2。右下・4秒。
  * 読み上げは置き場所の入れ物（role=status「知らせ」）が最初から受け持ち、
  * 1件ずつは role を持たない（動きの点検 14 番）。知らせは文で探す。
  */
@@ -92,7 +92,7 @@ describe('保存の知らせ（Toast）', () => {
   })
 })
 
-describe('元に戻す（★V7 sTJsh §4）', () => {
+describe('元に戻す（★管理画面 sTJsh §4）', () => {
   it('「元に戻す」付きは5秒残る（通常の4秒より長い）', () => {
     vi.useFakeTimers()
     render(<ToastHost />)

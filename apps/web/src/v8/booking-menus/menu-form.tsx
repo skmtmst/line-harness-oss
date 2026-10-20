@@ -16,8 +16,8 @@ import PreviewLauncher from '@/components/templates/preview-launcher'
 import { Pencil, Smartphone, Upload } from 'lucide-react'
 import { SettingCheckbox } from '@/components/shared/checkbox'
 import CheckCard from '@/components/shared/check-card'
-import { useMenuPayment } from '../booking-payments/menu-payment'
-import { BookingMenuPaymentCard, useMenuDeposit } from '../booking-payments/menu-deposit'
+import { useMenuPayment } from '@/v8/booking-payments/public/menu-payment/index'
+import { BookingMenuPaymentCard, useMenuDeposit } from '@/v8/booking-payments/public/menu-deposit/index'
 import { MeetingModeCard, useMenuMeeting, type MeetingMode } from './meeting-mode'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
@@ -27,7 +27,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useAccount } from '@/contexts/account-context'
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useBookingEdit } from './lib/edit-permission'
-import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { classifyApiFailure, describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
 import { api, ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
@@ -56,17 +56,17 @@ import HelpTip from '@/components/shared/help-tip'
 import { isSaveConflict } from '@/components/shared/api-error-message'
 
 /**
- * ★V8「予約メニューを作る」（板 QqER7・競合時 v5L19Z）。
+ * ★V8「予約メニューを作る」（板 ・競合時 ）。
  *
  * 左に5つの段（中身・担当・きまり・受け方・受けたとき・設備・支払い）、
  * 右に本物そっくりのお客さまの予約画面。作っているメニューが写しの
  * 先頭に選ばれた状態で出るので、入力しながら見え方を確かめられる。
  *
- * `?menu=<id>` が付いていると編集になる。保存は v7 と同じ契約：
+ * `?menu=<id>` が付いていると編集になる。保存は 管理画面 と同じ契約：
  *   作る … createMenu（何度押しても増えないよう試行ごとの一意キー）
  *        → 担当ごとに staff_menus を PUT → 設備を PUT
  *   直す … updateMenu（版つき PUT）→ 変わった担当だけ PUT → 設備を PUT
- * 409 は板 v5L19Z の帯を出し、「違いを比べる」「最新を読み込んで続ける」
+ * 409 は板  の帯を出し、「違いを比べる」「最新を読み込んで続ける」
  * 「比べてから保存」で扱う（いきなり上書きしない）。
  */
 
@@ -856,7 +856,7 @@ export default function MenuFormV8() {
       }
       } else {
         { if (!fieldFailure)
-        setSaveError(e instanceof Error ? e.message : bookingErrorText(e, '保存')) }
+        setSaveError(describeApiFailure(e, '予約メニューの保存')) }
       }
     } finally {
       setSaving(null)
@@ -982,7 +982,7 @@ export default function MenuFormV8() {
         previewToggle={<PreviewLauncher title="お客さまの予約画面" label="お客さまの予約画面を見る">{previewContent}</PreviewLauncher>}
        title={editTarget ? '予約メニューを直す' : '予約メニューを作る'}
         help={<>{editTarget ? '保存すると、お客さまの画面にすぐ出ます' : 'まだお客さまの画面には出ていません'}</>}
-        /* 競合の帯は本文と右の欄をまたいで上に出す（絵 v5L19Z）。 */
+        /* 競合の帯は本文と右の欄をまたいで上に出す。 */
         notice={conflict ? (
           <div ref={conflictRef} className={styles.conflictRow} data-design="Bar" data-design-node="v5L19Z">
             <SaveConflictBand title={`${conflict.author ? `${conflict.author}さんが` : 'ほかの人が'}${conflict.at ? ` ${conflictTime(conflict.at)} に` : ''}メニュー「${conflict.name}」を保存しました`} onCompare={() => setComparing(true)} onReload={() => void reloadLatest()} />
@@ -1123,7 +1123,7 @@ export default function MenuFormV8() {
                 <SettingsFormRow layout="columns" columns={3} keepColumns role="group" aria-label="担当スタッフ" aria-invalid={!!fieldErrors.staff && assigned.size === 0} tabIndex={-1}>
                   {staff.filter((person) => person.is_active).map((person) => {
                     const on = assigned.has(person.id)
-                    // 絵 QqER7：トリマーは名前だけ、それ以外は（役割）を付ける。
+                    // 絵 ：トリマーは名前だけ、それ以外は（役割）を付ける。
                     const label = `${person.display_name || person.name}${person.role && person.role !== 'トリマー' ? `（${person.role}）` : ''}`
                     return (
                       <CheckCard key={person.id} size="row" checked={on}
@@ -1286,7 +1286,7 @@ export default function MenuFormV8() {
               ) : resourceChoices.length === 0 ? (
                 <p className="text-ink-faint text-sm">使える設備はまだありません。受付枠の設備から登録できます。</p>
               ) : (
-                /* 絵 v5L19Z：選んだ設備を札で並べ、［変える］で選ぶ窓を開く。 */
+                /* 絵 ：選んだ設備を札で並べ、［変える］で選ぶ窓を開く。 */
                 <EntityPickerField multiple label="使う設備" noun="設備" unit="件"
                   items={resourceChoices.map((item) => ({ id: item.id, name: `${item.name}${!item.isActive ? '（停止中）' : ''}`, disabled: !item.isActive && !resourceIds.has(item.id) }))}
                   value={[...resourceIds]} allowEmpty

@@ -8,8 +8,5 @@ export function retryEffectsFailureText(error: unknown): string {
       scope: 'store',
     })
   }
-  if (error instanceof Error && error.message && error.message !== 'retry_failed' && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) {
-    return error.message
-  }
   return describeApiFailure(error, '後処理の再実行')
 }

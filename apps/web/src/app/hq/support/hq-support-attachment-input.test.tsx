@@ -56,7 +56,7 @@ describe('問い合わせの添付 input は出さない（m22a）', () => {
     await settle()
     const input = host.querySelector('input[type="file"]') as HTMLInputElement | null
     if (!input) throw new Error('file input がありません')
-    // 画像を添える所は共通の MediaSlot（B-128）。裏の input は display:none の .input。
+    // 画像を添える所は共通の MediaSlot。裏の input は display:none の .input。
     expect(input.className).toMatch(/hiddenInput|input/)
     expect(input.getAttribute('aria-hidden')).toBe('true')
     expect(

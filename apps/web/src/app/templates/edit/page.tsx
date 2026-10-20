@@ -4,7 +4,8 @@ import ListState from '@/components/shared/list-state'
 import TemplateEditV8New from '@/v8/template-edit/edit'
 import { ACCOUNT_MISMATCH_MESSAGE, TEMPLATE_LOAD_FAILED_MESSAGE, TEMPLATE_LOADING_MESSAGE, isTemplateDetailData, loadTemplateReferences, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, templateAccountMismatch, templateSaveGuard, templateUsageEntries, validateTemplateSave } from '@/v8/template-edit/core'
 import { TemplateAccountNotice, UsageCard as TemplateUsageNotice } from '@/v8/template-edit/message'
-import { TemplateInsertControls, buildTemplatePreview, extractMessageUrls, previewDateValue } from '@/components/templates/message-template-editor'
+import { TemplateInsertControls } from '@/components/templates/message-template-editor'
+import { buildTemplatePreview, extractMessageUrls, previewDateValue } from '../../../components/templates/template-preview-model'
 
 
 

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -5,7 +6,7 @@ import {
   listLineWebhookEvents,
 } from '@line-crm/db';
 import type { LineWebhookEventStatus } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
@@ -54,7 +55,7 @@ lineWebhookEvents.get(
       }
       return c.json({ success: true, data: visible });
     } catch {
-      console.error(JSON.stringify({"code":"line_webhook_events_list_failed","route":"GET /api/line-webhook-events"}));
+      logger.error("line_webhook_events_list_failed");
       return c.json({ success: false, error: 'Webhook台帳を取得できませんでした' }, 500);
     }
   },
@@ -84,7 +85,7 @@ lineWebhookEvents.post(
         error: result.status === 'needs_review' ? `要確認：${result.reason}` : result.status === 'busy' ? '処理中です。時間をおいて確認してください' : '再処理に失敗しました。保存済みの工程からもう一度再開できます',
       }, result.status === 'failed' ? 503 : 409);
     } catch {
-      console.error(JSON.stringify({"code":"line_webhook_event_retry_check_failed","route":"POST /api/line-webhook-events/:id/retry"}));
+      logger.error("line_webhook_event_retry_check_failed");
       return c.json({ success: false, error: 'Webhookイベントを確認できませんでした' }, 500);
     }
   },

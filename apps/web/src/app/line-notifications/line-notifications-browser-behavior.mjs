@@ -12,7 +12,7 @@
  *      消えないこと（競合3）
  *
  * 【競合3について、確かめたことと確かめていないこと】
- * loadGeneration は load() の useEffect の中でしか進まない、という
+ * loadGeneration は load の useEffect の中でしか進まない、という
  * コードの作りそのものは、実装の詳細（Reactの副作用が「いつ」実行される
  * かはAPIとして保証されていない）に頼っている点で脆い。そこで、選択中
  * accountを描画の境界で同期反映する ref（selectedAccountRef）を作り、
@@ -20,10 +20,10 @@
  *
  * account照合の必要性そのものは、実物の LineNotificationsPage を
  * mountした試験（line-notifications-n678-contract.test.tsx の「実物の
- * LineNotificationsPageをmountし、layout境界（Bへコミット直後・load()の
+ * LineNotificationsPageをmountし、layout境界（Bへコミット直後・loadの
  * useEffect発火前）で…」）で確定的に固定している。account context の
- * 切替を act() を経由しない生の setState として起こし、同じ木に置いた
- * useLayoutEffect の探針で「Bへコミットした・load()の useEffect はまだ
+ * 切替を act を経由しない生の setState として起こし、同じ木に置いた
+ * useLayoutEffect の探針で「Bへコミットした・loadの useEffect はまだ
  * 一度も発火していない」瞬間を検出して、そこで旧Aの保存応答を解放する。
  * レイアウトeffectは同じコミット内の受動effectより必ず先に走るという
  * Reactの保証に基づくため、タイミングの偶然に頼っていない。
@@ -453,7 +453,7 @@ try {
     /*
      * 4. 競合3（司令塔の独立再審査REJECT、2026-09-09）。
      *
-     * loadGeneration は load() の useEffect の中でしか進まない。従来の
+     * loadGeneration は load の useEffect の中でしか進まない。従来の
      * 実ブラウザ試験（競合2）は、Bの読み込みが終わり、さらにAへ戻って
      * 再読み込みも終わったあとで旧Aの応答を解放していた——「Bを選んだ
      * 直後・Bの一覧がまだ何も出ていない」窓を一度も通していなかった。

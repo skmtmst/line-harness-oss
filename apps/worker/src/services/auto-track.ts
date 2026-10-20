@@ -1,6 +1,7 @@
+import { issueTrackedLinkIdentity } from './tracked-link-identity.js';
 import { convertBroadcastAsset, isBroadcastAssetKind } from '@line-crm/shared';
-import { decorateTapExtras } from './tap-extras.js';
-import { getOrCreateAutoTrackedLink } from '@line-crm/db';
+import { decorateTapExtras } from './tap-extra-links.js';
+import { getOrCreateAutoTrackedLink, getTrackedLinkByIdOrShortCode } from '@line-crm/db';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 
 // Domains where Universal Links / App Links should be used
@@ -189,19 +190,10 @@ export interface AutoTrackOptions {
   templateId?: string | null;
   /** 配信別に短縮URLとクリック数を分ける。 */
   broadcastId?: string | null;
+  sourceContent?: string;
 }
 
-/**
- * Append `f=<friendId>` to every /t/ tracked-link URL in per-friend message
- * content. With f= present, /t skips the LIFF identification hop entirely
- * (no consent screen, no extra tap) and still attributes the click — the
- * friend is already known because the message was pushed 1:1.
- *
- * Only valid for per-friend sends (scenario step delivery, manual DM,
- * OAuth immediate push). NEVER use for multicast/broadcast content: the same
- * body goes to many users, so a baked f= would attribute everyone's clicks
- * to one friend.
- */
+/** 個別送信のリンクへ期限付きの本人資格を付ける。複数人へ同じ本文を送る配信では使わない。 */
 export async function appendFriendToTrackedLinks(
   db: D1Database,
   content: string,
@@ -218,22 +210,28 @@ export async function appendFriendToTrackedLinks(
   const workerBase = workerUrl.replace(/\/$/, '');
   const linkBase = await resolveTrackedLinkBaseUrl(db, workerUrl);
   const bases = [...new Set([workerBase, linkBase])];
-  return content.replace(URL_REGEX, (match) => {
-    // URL_REGEX greedily captures trailing sentence punctuation and even
-    // full-width Japanese text glued to the URL (「…/t/abc。続き」等)。
-    // URL は ASCII のみなので、まず ASCII 境界で切り、さらに extractUrls と
-    // 同じ末尾記号を URL の外として扱う。f= はその手前に挿す。
+  const replacements = await Promise.all([...content.matchAll(URL_REGEX)].map(async ([match]) => {
     const ascii = match.match(/^[\x21-\x7E]+/)?.[0] ?? '';
     const punct = ascii.match(/[.,;:!?)]+$/)?.[0] ?? '';
     const url = punct ? ascii.slice(0, -punct.length) : ascii;
     const trailing = match.slice(url.length);
-    const isTrackedLink = bases.some((b) => url.startsWith(`${b}/t/`));
-    if (!isTrackedLink) return match;
-    if (/[?&]f=/.test(url)) return match;
-    // /t links never carry fragments, so appending at the end is safe.
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}f=${encodeURIComponent(friendId)}${trailing}`;
-  });
+    if (!bases.some((base) => url.startsWith(`${base}/t/`))) return [match, match] as const;
+    let parsed: URL;
+    let identifier: string;
+    try {
+      parsed = new URL(url);
+      identifier = decodeURIComponent(parsed.pathname.slice(3));
+    } catch { return [match, match] as const; }
+    const link = await getTrackedLinkByIdOrShortCode(db, identifier);
+    const token = link ? await issueTrackedLinkIdentity(db, link, friendId) : null;
+    parsed.searchParams.delete('f');
+    parsed.searchParams.delete('lu');
+    parsed.searchParams.delete('identity');
+    if (token) parsed.searchParams.set('identity', token);
+    return [match, `${parsed.toString()}${trailing}`] as const;
+  }));
+  const byMatch = new Map(replacements);
+  return content.replace(URL_REGEX, (match) => byMatch.get(match) ?? match);
 }
 
 /**
@@ -249,6 +247,9 @@ export async function autoTrackContent(
   options?: AutoTrackOptions,
 ): Promise<AutoTrackResult> {
   if (messageType === 'image') return { messageType, content };
+  const workerBase = workerUrl.replace(/\/$/, '');
+  const authored = options?.sourceContent === undefined ? null : extractUrls(options.sourceContent, [workerBase]);
+  const isAuthored = (url: string) => !authored || authored.has(url) && !/[{}]/.test(url);
   if (messageType !== 'text' && content.includes('\"tapExtras\"')) {
     let tree = JSON.parse(content);
     if (isBroadcastAssetKind(messageType)) {
@@ -257,13 +258,13 @@ export async function autoTrackContent(
       messageType = converted.message.messageType;
       tree = JSON.parse(converted.message.messageContent);
     }
-    content = JSON.stringify(await decorateTapExtras(db, tree, workerUrl, options?.lineAccountId ?? null, options?.templateId, options?.broadcastId));
+    content = JSON.stringify(await decorateTapExtras(db, tree, workerUrl, options?.lineAccountId ?? null, options?.templateId, options?.broadcastId, isAuthored));
   }
 
   // Extract first so URL-free messages (the common case in per-friend
   // delivery loops) skip the settings lookup entirely.
-  const workerBase = workerUrl.replace(/\/$/, '');
-  let urls = extractUrls(content, [workerBase]);
+
+  let urls = new Set([...extractUrls(content, [workerBase])].filter(isAuthored));
   if (urls.size === 0) return { messageType, content };
 
   // Branded short domain (tracked_link_base_url) when configured, else workerUrl.
@@ -318,10 +319,10 @@ export async function autoTrackContent(
   collectActionUris(tree, actionUris);
   // Only valid http(s) URIs are trackable (uri actions also allow tel:,
   // line://, etc., and hand-written JSON can hold malformed URLs like a bare
-  // "https://" — createTrackingMap calls `new URL()`, so an invalid URI here
+  // "https://" — createTrackingMap calls `new URL`, so an invalid URI here
   // would throw and fail the whole delivery instead of one link).
   const trackableUris = new Set(
-    [...actionUris].filter((u) => isTrackableHttpUrl(u) && !shouldSkip(u, skipPrefixes)),
+    [...actionUris].filter((u) => isTrackableHttpUrl(u) && !shouldSkip(u, skipPrefixes) && isAuthored(u)),
   );
   if (trackableUris.size === 0) return { messageType, content };
   const uriMap = await createTrackingMap(db, trackableUris, linkBase, options?.lineAccountId, options?.templateId, options?.broadcastId);
@@ -335,7 +336,7 @@ export async function autoTrackContent(
   return { messageType, content: JSON.stringify(tree) };
 }
 
-/** Valid, parseable http(s) URL — safe to hand to `new URL()` downstream */
+/** Valid, parseable http(s) URL — safe to hand to `new URL` downstream */
 function isTrackableHttpUrl(u: string): boolean {
   try {
     const parsed = new URL(u);
@@ -377,7 +378,7 @@ function rewriteActionUris(node: unknown, fn: (u: string) => string): void {
 
 /**
  * Full per-friend outgoing decoration pipeline: wrap raw URLs into tracked
- * links (autoTrackContent), then bake f=<friendId> into /t links
+ * links (autoTrackContent), then attach signed customer identity to /t links
  * (appendFriendToTrackedLinks) so clicks attribute without the LIFF
  * identification hop.
  *
@@ -396,11 +397,12 @@ export async function decorateForFriendPush(
   messageType: string,
   content: string,
   workerUrl: string | undefined,
-  opts: { lineAccountId: string | null; friendId: string },
+  opts: { lineAccountId: string | null; friendId: string; sourceContent?: string },
 ): Promise<AutoTrackResult> {
   if (!workerUrl) return { messageType, content };
   const tracked = await autoTrackContent(db, messageType, content, workerUrl, {
     lineAccountId: opts.lineAccountId,
+    sourceContent: opts.sourceContent ?? '',
   });
   const decorated = await appendFriendToTrackedLinks(db, tracked.content, workerUrl, opts.friendId);
   return { messageType: tracked.messageType, content: decorated };

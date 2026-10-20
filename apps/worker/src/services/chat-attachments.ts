@@ -4,9 +4,10 @@ import {
   CHAT_FILE_MAX_BYTES, CHAT_FILE_TYPES, CHAT_IMAGE_MAX_BYTES, CHAT_PREVIEW_MAX_BYTES,
   CHAT_VIDEO_MAX_BYTES, type ChatAttachment,
 } from '@line-crm/shared';
+
 import type { Message, FlexContainer } from '@line-crm/line-sdk';
 import { builtinFileScan } from './file-scan.js';
-import { imageDimensions } from './media-metadata.js';
+import { imageDimensions } from '../features/media/media-metadata/index.js';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 
 export const CHAT_ATTACHMENT_PREFIX = 'private/chat-attachments/';

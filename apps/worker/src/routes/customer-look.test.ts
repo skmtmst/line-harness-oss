@@ -5,7 +5,7 @@ import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite';
 import {authMiddleware} from '../middleware/auth';
 import {accountSettings} from './account-settings';
 import {liffRoutes} from './liff';
-import type {Env} from '../index';
+import type { Env } from '../worker-env';
 let f:SqliteD1,app:Hono<Env>;
 beforeEach(()=>{
  f=createTestD1({ loginPolicy: 'off',foreignKeys:true});for(const id of ['a','b'])f.raw.prepare('INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id,liff_id) VALUES(?,?,?,\'t\',\'s\',?,?)').run(id,id,id,DEFAULT_TENANT_ID,'liff-'+id);

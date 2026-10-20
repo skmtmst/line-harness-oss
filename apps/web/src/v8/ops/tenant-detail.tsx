@@ -1,7 +1,7 @@
 'use client'
 import { useUrlTab } from '@/lib/use-url-tab'
 import type { FormRequirement } from '@/lib/form-requirement'
-import { LogIn, Wallet, Store, Users, Inbox } from 'lucide-react'
+import { LogIn } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useSearchParams } from 'next/navigation'
@@ -37,9 +37,9 @@ import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/compo
 import TenantOverviewStats from './tenant-overview-stats'
 
 /**
- * 運営の契約先の詳細 V8（絵 `Oub6x`・停止の窓 `okXoi`）。
+ * 運営の契約先の詳細 V8（絵の停止の窓 ）。
  *
- * 動きは v7（app/ops/tenants/detail）と同じ口：`?id=` で /api/ops/tenants/:id を読む。
+ * 動きは 管理画面（app/ops/tenants/detail）と同じ口：`?id=` で /api/ops/tenants/:id を読む。
  * 代理ログイン（閲覧のみ・確認つき）・停止・アーカイブ・再開（名前と理由の確認つき）・
  * 飲食店機能の入り切り。閲覧のみの運営メンバーには、状態を変えるボタンとスイッチを出さない。
  */
@@ -320,7 +320,7 @@ function Kv({ k, v }: { k: string; v: ReactNode }) {
   )
 }
 
-/** 停止・アーカイブ・再開（絵 `okXoi`）。名前の打ち直しと4文字以上の理由がそろうまで押せない。 */
+/** 停止・アーカイブ・再開。名前の打ち直しと4文字以上の理由がそろうまで押せない。 */
 function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenantId: string; target: StatusTarget; tenantName: string; onClose: () => void; onDone: () => void }) {
   const [reason, setReason] = useState('')
   const [confirmName, setConfirmName] = useState('')
@@ -333,7 +333,7 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
   const problem = nameRequirement.check(confirmName) ?? reasonRequirement.check(reason)
 
   const submit = async () => {
-    if (busy) return
+
     if (problem) {
       setError(problem)
       return

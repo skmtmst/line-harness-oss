@@ -1,7 +1,9 @@
+> 文書：機能設定の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 機能設定の動き（BEHAVIOR.md）
 
 対象：`screen.tsx`（★V8 `ywFJT`・1152 `bKipf`・競合 `ziYCN`・状態の見本帳 `bR6a1`）。
-写し元：`app/settings/feature-settings-v8.tsx`・`use-feature-settings.ts`・`feature-settings-view.ts`・`account-request-guard.ts`。
+写し元：[現役の入口・本体](../README.md)・`use-feature-settings.ts`・`feature-settings-view.ts`・`account-request-guard.ts`。
 
 ## 入口
 - `app/settings/page.tsx` がこの画面だけを出す（このルートは前から V8 だけ）。

@@ -1,3 +1,5 @@
+> 文書：③-2 ライバルに対抗する機能：要件と「操作と挙動」の一覧（B-340）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # ③-2 ライバルに対抗する機能：要件と「操作と挙動」の一覧（B-340）
 
 - 正本の順：オーナーの決定（`~/lh-work/design/v8/V8-INTRO-CHECKLIST.md`。後の決定を優先）→ 共通の契約（`docs/v6-requirements/v6-requirements-master-index.md` §5・`v6-shared-platform-requirements.md`・[整理の段2](../cleanup-stage2-contract.md)）→ 各ファイル。決まっていない所は B-337（おすすめで決定）、法律が絡む物は「⚖ 仮・専門家に確かめる」。

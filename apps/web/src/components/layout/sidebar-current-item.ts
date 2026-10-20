@@ -10,7 +10,7 @@ export function revealInScroller(scroller: HTMLElement, item: HTMLElement, margi
     scroller.scrollTop -= box.top + margin - rect.top
   } else if (rect.bottom > box.bottom - margin) {
     /*
-     * 下へ巻くとき、項目の下端だけで合わせると上の端で見出しや行が半分に切れる（ziSgL の「メイン」）。
+     * 下へ巻くとき、項目の下端だけで合わせると上の端で見出しや行が半分に切れる（ の「メイン」）。
      * 項目の組（anchor）の頭を上端に置いても項目が見えるなら、組の頭で止める。
      */
     const anchorTop = anchor?.getBoundingClientRect().top

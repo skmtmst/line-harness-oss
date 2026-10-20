@@ -13,7 +13,7 @@ function mockHttp(overrides: Partial<HttpClient> = {}): HttpClient {
 }
 
 describe('FriendsResource', () => {
-  it('list() no params calls GET /api/friends', async () => {
+  it('list no params calls GET /api/friends', async () => {
     const paginatedData = {
       items: [{ id: '1', lineUserId: 'U123', displayName: 'Alice', pictureUrl: null, statusMessage: null, isFollowing: true, tags: [], createdAt: '2026-03-21', updatedAt: '2026-03-21' }],
       total: 1,
@@ -28,7 +28,7 @@ describe('FriendsResource', () => {
     expect(result).toEqual(paginatedData)
   })
 
-  it('list() with params calls GET /api/friends?limit=10&offset=20&tagId=x', async () => {
+  it('list with params calls GET /api/friends?limit=10&offset=20&tagId=x', async () => {
     const paginatedData = {
       items: [],
       total: 0,
@@ -43,7 +43,7 @@ describe('FriendsResource', () => {
     expect(result).toEqual(paginatedData)
   })
 
-  it('get() calls GET /api/friends/:id', async () => {
+  it('get calls GET /api/friends/:id', async () => {
     const friend = { id: '1', lineUserId: 'U123', displayName: 'Alice', pictureUrl: null, statusMessage: null, isFollowing: true, tags: [], createdAt: '2026-03-21', updatedAt: '2026-03-21' }
     const http = mockHttp({ get: vi.fn().mockResolvedValue({ success: true, data: friend }) })
     const resource = new FriendsResource(http)
@@ -52,7 +52,7 @@ describe('FriendsResource', () => {
     expect(result).toEqual(friend)
   })
 
-  it('count() calls GET /api/friends/count and returns plain number', async () => {
+  it('count calls GET /api/friends/count and returns plain number', async () => {
     const http = mockHttp({ get: vi.fn().mockResolvedValue({ success: true, data: { count: 42 } }) })
     const resource = new FriendsResource(http)
     const result = await resource.count()
@@ -60,14 +60,14 @@ describe('FriendsResource', () => {
     expect(result).toEqual(42)
   })
 
-  it('addTag() calls POST /api/friends/:id/tags with { tagId }', async () => {
+  it('addTag calls POST /api/friends/:id/tags with { tagId }', async () => {
     const http = mockHttp({ post: vi.fn().mockResolvedValue({ success: true, data: null }) })
     const resource = new FriendsResource(http)
     await resource.addTag('friend-1', 'tag-1')
     expect(http.post).toHaveBeenCalledWith('/api/friends/friend-1/tags', { tagId: 'tag-1' })
   })
 
-  it('removeTag() calls DELETE /api/friends/:id/tags/:tagId', async () => {
+  it('removeTag calls DELETE /api/friends/:id/tags/:tagId', async () => {
     const http = mockHttp({ delete: vi.fn().mockResolvedValue({ success: true, data: null }) })
     const resource = new FriendsResource(http)
     await resource.removeTag('friend-1', 'tag-1')

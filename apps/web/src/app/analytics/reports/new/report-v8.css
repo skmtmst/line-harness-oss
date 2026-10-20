@@ -2,7 +2,7 @@
 .report-v8-page { min-width: 0; }
 
 /*
- * 分析レポート作成・送信設定の V8（板 H5UoIu・競合 G83vi）。
+ * 分析レポート作成・送信設定の V8（板 ・競合 ）。
  * V8専用。名前をこの画面の中で分けて共通の殻へ影響させない。
  */
 
@@ -12,7 +12,7 @@
   color: var(--color-danger);
 }
 
-/* 競合の帯（G83vi）。板の頭の下（余白 12/24）。左に印と2行、右に操作。 */
+/* 競合の帯。板の頭の下（余白 12/24）。左に印と2行、右に操作。 */
 /* 本文：左は段の列（余白 24・段の間 16）、右は幅 380 の列（線で区切る）。 */
 .report-v8-field { display: flex; flex-direction: column; gap: var(--tpl-an-rp-field-gap); min-width: 0; color: var(--color-ink); font-size: var(--tpl-an-rp-sub-size); font-weight: 600; line-height: normal; }
 .report-v8-inputField { font-size: var(--tpl-an-rp-label-size); font-weight: 500; line-height: var(--tpl-an-rp-label-lh); }
@@ -54,4 +54,4 @@
   .report-v8-scheduleGrid, .report-v8-alertGrid { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* B-187：列を縦に畳んだ時も段間と下端の余白を重ねない。 */
+/* ：列を縦に畳んだ時も段間と下端の余白を重ねない。 */

@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,7 +14,7 @@ import { describe, expect, it } from 'vitest'
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const FORM = readFileSync(join(HERE, 'broadcast-form.tsx'), 'utf8')
+const FORM = readUiSource(join(HERE, 'broadcast-form.tsx'), 'utf8')
 const STEPS = readFileSync(join(HERE, 'broadcast-steps.ts'), 'utf8')
 
 /** `start` から、対応する `)` までを切り出す。 */
@@ -107,7 +108,7 @@ describe('画面ごとの段の番号', () => {
    *
    * 以前は 1・3・2 と振ってあり、画面には「1. 送る相手 → 3. 送る内容 →
    * 2. 送る時間」の順に出ていた。**番号が飛んで見えるので、間の節を
-   * 見落としたと読まれる。** 段の名前は ★V8 板 `FU2aU` どおり
+   * 見落としたと読まれる。** 段の名前は ★V8 板  どおり
    * （基本設定 → 配信対象 → メッセージを作成 → 送信設定 → 最終確認）。
    */
   it('5段の定義は、画面に並ぶ順と同じ', () => {

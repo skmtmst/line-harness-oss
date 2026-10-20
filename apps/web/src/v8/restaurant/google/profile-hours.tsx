@@ -19,7 +19,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { restaurantGoogleApi, type GoogleDayHours, type GoogleHoursPeriod, type GoogleHoursProposal, type GoogleProfileData, type GoogleWeekday, type GoogleWeeklyHours } from '@/lib/restaurant-google-api'
 import { errorMessage, formatPeriods, formatYmdShort, weekdayOf, TIME_OPTIONS, WEEKDAYS, WEEKDAY_JA } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -132,7 +132,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
   }
 
   if (loading) return <ListState kind="loading" title="営業時間を読み込んでいます" />
-  if (loadError || !data || !weekly) return <ListState kind="error" title="営業時間を表示できませんでした" description={loadError} onRetry={() => go({ tab: 'profile', view: 'hours', mode })} action={<Button onClick={() => go({ tab: 'profile' })}>プロフィールへ戻る</Button>} />
+  if (loadError || !data || !weekly) return <ListState kind="error" title="営業時間を表示できませんでした" description={loadError} onRetry={() => go({ tab: 'profile', view: 'hours', mode })} />
 
   const { profile, today, timeZone } = data
   const storeName = profile.title ?? data.store.name
@@ -153,7 +153,6 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <div className={styles.buttonRow}><Button onClick={() => guarded(() => go({ tab: 'profile' }))}>プロフィールへ戻る</Button></div>
       <SectionHeader title="営業時間を変更" description={`対象店舗：${storeName} / 基準日：${formatYmdShort(today.date)} / ${timeZone}`} />
       <Tabs size="compact" label="営業時間の変更方式" items={([
         ['text', 'かんたん入力'], ['calendar', 'カレンダーで指定'], ['weekly', '毎週の営業時間'],
@@ -205,7 +204,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
             <Button disabled={busy} onClick={() => undoDay(date)}>この日の変更を取り消す</Button>
           </div>)}
         </Card> : null}
-        <Notice tone="info">ここで決めた内容は、その日だけの特別営業時間になります。「変更案を確認」を押すまでGoogleの営業時間は変わりません。</Notice>
+        <Notice tone="info">ここで決めた内容は、その日だけの特別営業時間になります。「変更案を確認する」を押すまでGoogleの営業時間は変わりません。</Notice>
       </> : <>
         <SectionHeader size="small" title="毎週の営業時間（通常の営業時間）を決めます" />
         {WEEKDAYS.map((day) => {
@@ -223,10 +222,10 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
           {weeklyChanged.length ? weeklyChanged.map((day) => { const [before, after] = periodDiff(profile.regularHours[day] ?? [], weekly[day] ?? []); return <p key={day} className={styles.muted}>{WEEKDAY_JA[day]}曜：{before} → {after}</p> }) : <p className={styles.muted}>まだ変更はありません。</p>}
           <p className={styles.muted}>変えていない曜日はそのままです。特定の日だけ変えたい場合は「カレンダーで指定」から設定してください。</p>
         </Card>
-        <Notice tone="info">ここで変えた曜日は、毎週その時間になります。「変更案を確認」を押すまでGoogleの営業時間は変わりません。特別営業時間が設定されている日は、そちらが優先されます。</Notice>
+        <Notice tone="info">ここで変えた曜日は、毎週その時間になります。「変更案を確認する」を押すまでGoogleの営業時間は変わりません。特別営業時間が設定されている日は、そちらが優先されます。</Notice>
       </>}
       {mode !== 'text' ? <p className={styles.muted}>15分刻みで選べます。翌日にまたぐ時間（例：18:00–02:00）はそのまま入力できます。</p> : null}
-      {canEdit ? <StickyBar actions={<><Button onClick={clear} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={!canSubmit} busy={busy} busyLabel="確認中…">変更案を確認</Button></>} /> : null}
+      {canEdit ? <StickyBar actions={<><Button onClick={clear} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={!canSubmit} busy={busy} busyLabel="確認中…">変更案を確認する</Button></>} /> : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した営業時間の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </></SaveErrorScope>
   )
@@ -239,7 +238,7 @@ function HoursPeriods({ periods, label, disabled, readOnly = false, removeLastOn
       {(['open', 'close'] as const).map((kind) => <Field key={kind} label={`${label}枠${index + 1}の${kind === 'open' ? '開始' : '終了'}`}>
         <Select size="full" aria-label={`${label}枠${index + 1}の${kind === 'open' ? '開始' : '終了'}`} value={period[kind]} disabled={disabled} options={TIME_OPTIONS.map((time) => ({ value: time, label: kind === 'close' && time === '00:00' ? '24:00' : time }))} onChange={(value) => onChange(periods.map((item, at) => at === index ? { ...item, [kind]: value } : item))} />
       </Field>)}
-      {!readOnly && (!removeLastOnly || (periods.length > 1 && index === periods.length - 1)) ? <Button disabled={disabled} onClick={() => onChange(periods.filter((_, at) => at !== index))} aria-label={`${label}枠${index + 1}を削除`}>枠を削除</Button> : null}
+      {!readOnly && (!removeLastOnly || (periods.length > 1 && index === periods.length - 1)) ? <Button disabled={disabled} onClick={() => onChange(periods.filter((_, at) => at !== index))} aria-label={`${label}枠${index + 1}を削除`}>枠を削除する</Button> : null}
     </Card>)}
     {problem ? <Notice tone="warn">{problem}</Notice> : null}
     {!readOnly ? <Button disabled={disabled || periods.length >= 3} onClick={() => onChange([...periods, { open: periods[periods.length - 1]?.close ?? '11:00', close: '22:00' }])}>枠を追加（1日3枠まで）</Button> : null}

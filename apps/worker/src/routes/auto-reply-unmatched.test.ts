@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type { LineClient } from '@line-crm/line-sdk';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 const mocks = vi.hoisted(() => ({
   finish: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('@line-crm/db', async (o) => ({
 }));
 vi.mock('../services/event-bus.js', () => ({ logOutgoingMessage: mocks.log }));
 import { autoReplyUnmatched } from './auto-reply-unmatched.js';
-import { replyToUnmatchedLine } from '../services/auto-reply-unmatched.js';
+import { replyToUnmatchedLine } from '../features/auto-replies/auto-reply-unmatched.js';
 let db: SqliteD1;
 const admin: AuthenticatedStaff = {
   id: 'staff',

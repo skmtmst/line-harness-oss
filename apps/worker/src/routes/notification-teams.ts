@@ -1,7 +1,7 @@
 import { inputError } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { listOperatorNotificationTeams,getOperatorNotificationTeam,saveOperatorNotificationTeam,archiveOperatorNotificationTeam } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 export const notificationTeams=new Hono<Env>();

@@ -1,8 +1,11 @@
+import { fail } from '../lib/fail.js';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 import {requireAccountAi} from '../services/account-ai-features.js';
 import {GapError} from '../services/gap-common.js';
 import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 export { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第1段：設定（Google接続）と口コミ。
  *
@@ -16,7 +19,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context, MiddlewareHandler } from 'hono';
 import { CredentialEncryptionKeyError, decryptCredential, encryptCredential } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { googleBusinessEnabled } from '../lib/environment-features.js';
@@ -190,9 +193,7 @@ export function staffTenantId(c: Context<Env>): string {
   return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
 }
 
-export function fail(c: Context<Env>, status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503 | 504, error: string, extra: Record<string, unknown> = {}, fieldKeys: readonly string[] = []) {
-  return inputError(c, { success: false, error, ...extra }, status, fieldKeys);
-}
+export { fail } from '../lib/fail.js';
 
 function readCookie(header: string | undefined, name: string): string | null {
   if (!header) return null;
@@ -460,7 +461,7 @@ export function googleErrorResponse(c: Context<Env>, error: unknown) {
         return fail(c, 502, 'Googleとの通信に失敗しました', { code: error.kind });
     }
   }
-  console.error(JSON.stringify({"code":"routes_restaurant_google_failed"}));
+  logger.error("routes_restaurant_google_failed");
   return fail(c, 500, '予期しないエラーが発生しました');
 }
 
@@ -790,7 +791,7 @@ restaurantGoogle.get('/api/restaurant-test/google/oauth/callback', requireConnec
     return c.redirect(adminReturnUrl(c, lineAccountId, 'connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
-    console.error(JSON.stringify({"code":"routes_restaurant_google_failed","route":"GET /api/restaurant-test/google/oauth/callback"}));
+    logger.error("routes_restaurant_google_failed");
     await writeLog(c, store.id, { kind: stateRow.mode, result: 'failed', error: code });
     return c.redirect(adminReturnUrl(c, lineAccountId, `error:${code}`));
   }
@@ -1049,7 +1050,7 @@ export async function runReplyDraftAi(c: Context<Env>, prompt: { system: string;
       });
     } catch (error) {
       // 鍵やモデルの設定ちがい・混雑・時間切れで画面が止まらないよう、Workers AI で作り直す。
-      console.error(JSON.stringify({"code":"routes_restaurant_google_failed"}));
+      logger.error("routes_restaurant_google_failed");
       if (!c.env.AI) throw error instanceof OpenAITextError && error.kind === 'timeout' ? new GoogleAiTimeout() : error;
     }
   }
@@ -1090,7 +1091,7 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
     text = await runReplyDraftAi(c, prompt);
   } catch (error) {
     const timedOut = error instanceof GoogleAiTimeout || (error instanceof OpenAITextError && error.kind === 'timeout');
-    console.error(JSON.stringify({"code":"routes_restaurant_google_failed","route":"POST /api/restaurant-test/google/reviews/:id/draft/generate"}));
+    logger.error("routes_restaurant_google_failed");
     return fail(c, timedOut ? 504 : 502, 'AIの下書き作成に失敗しました。もう一度お試しください', { code: timedOut ? 'ai_timeout' : 'ai_failed' });
   }
   const validated = validateReplyText(text);

@@ -4,7 +4,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import ScoreValue from './score-value'
 import { mileageStatusTone } from './parts'
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   reason: requiredText("理由を入力してください。"),
 }
 
@@ -66,14 +66,14 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 マイル「行動スコア」（板 `IRPw8`、点数を手で直す `Nv7An`、
- * 点数の変化の明細 `R8NNi`、状態は見本帳 `zaqP9`）。
+ * ★V8 マイル「行動スコア」（板 、点数を手で直す 、
+ * 点数の変化の明細 、状態は見本帳 ）。
  *
  * app/mileage/v8-score-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
- * 絵 IRPw8 の並び：数の帯 → 案内 → 道具（探す・札 … 何人入るか・件数・送る・作る）→
+ * 絵  の並び：数の帯 → 案内 → 道具（探す・札 … 何人入るか・件数・送る・作る）→
  * 友だちの表（友だち・いまの点数・帯・30日間の変化・最後の反応・操作）。
  * できごとの決めごと（探す・足す点／引く点・止める・外す・足す）は表の下に
- * 開け閉めの段で残す（絵の表の下の案内どおり、操作を落とさない）。
+ * 開け閉めの段で残す（表の下の案内どおり、操作を落とさない）。
  * 決めごとの編集の器（試す・保存・公開の手順）は /mileage/score-rules の画面。
  */
 
@@ -855,7 +855,7 @@ export default function ScoreTab() {
 }
 
 /*
- * 点数を手で直す（板 `Nv7An`）。
+ * 点数を手で直す（板 ）。
  * 口と約束（理由必須・追記だけ・再送しても二重反映しない）は今と同じ。見せ方だけ V8。
  * 窓の幅・位置は絵どおり（designWidth 560・designTop 184）。
  */
@@ -894,10 +894,10 @@ export function ScoreAdjustDialog({
   const scoreAfter = validAmount ? currentScore + delta : currentScore
   const bandAfter = bandOf(scoreAfter, highMin, normalMin)
   const bandChanges = validAmount && bandAfter !== band
-  /* 確定で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  /* 確定で落ちた欄は、その欄の真下に理由を出して移る。 */
   const fields = useFormErrors()
   fields.define('amount', '点数', () => (validAmount ? null : '1以上1000000以下の整数で点数を入力してください'), { required: true })
-  fields.define('reason', '理由', () => ((b244Requirements.reason.check(reason) !== null) ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null), { required: true })
+  fields.define('reason', '理由', () => ((FIELD_REQUIREMENTS.reason.check(reason) !== null) ? '理由を入力してください。' : reason.trim().length > 500 ? '理由は500文字以内で入力してください' : null), { required: true })
 
   const submit = async () => {
     if (fields.submit().length > 0) {
@@ -987,7 +987,7 @@ export function ScoreAdjustDialog({
           /></SaveErrorField>
 <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></DialogFormRow>
 
-        <DialogFormRow><Field label="理由" htmlFor="ml-score-reason" requirement={b244Requirements.reason}><SaveErrorField names={["reason"]}><textarea
+        <DialogFormRow><Field label="理由" htmlFor="ml-score-reason" requirement={FIELD_REQUIREMENTS.reason}><SaveErrorField names={["reason"]}><textarea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}
@@ -1032,7 +1032,7 @@ function formatScoreHistoryTime(value: string): string {
 }
 
 /*
- * 点数の変化の明細（板 `R8NNi`）。
+ * 点数の変化の明細（板 ）。
  * いつ・できごと・点・合計（新しい順。合計は上から足し引きが合う）。
  */
 function ScoreHistoryDialog({

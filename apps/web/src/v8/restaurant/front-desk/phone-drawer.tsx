@@ -1,5 +1,7 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
+import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { useEffect, useMemo, useState } from 'react'
@@ -106,11 +108,11 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   /* 電話番号で LINE の友だちを探す（4桁から・打つのが止まってから）。 */
   useEffect(() => {
     let current = true
-    const digits = phone.replace(/\D/g, '')
+    const digits = normalizePhone(phone)
     setFriends([])
     if (!open || !accountId || !storeId || digits.length < 4) return
     const timer = setTimeout(() => {
-      void restaurantTestApi.customerSearch(accountId, storeId, phone.trim())
+      void restaurantTestApi.customerSearch(accountId, storeId, digits)
         .then((res) => {
           if (!current) return
           setFriends(res.data.filter((c) => c.lineUid).map((c) => ({ name: c.name, phone: c.phone || '', lineUid: c.lineUid || '' })))
@@ -138,8 +140,9 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
     if (item) setName(item.name)
   }
 
-  /* 予約を入れるときに落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  /* 予約を入れるときに落ちた欄は、その欄の真下に理由を出して移る。 */
   const fields = useFormErrors()
+  fields.define('phone', '電話番号', () => phoneProblem(phone) || null)
   fields.define('name', 'お名前', () => (name.trim() ? null : 'お名前を入れてください。'), { required: true })
   fields.define('date', '日付', () => (date ? null : '日付を選んでください。'), { required: true })
   fields.define('time', '時刻', () => (!date ? null : !time ? '時刻を選んでください。' : chosenTable ? null : 'この時刻に人数が入る卓がありません。時刻か人数を変えてください。'), { required: true })
@@ -156,7 +159,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
         storeId,
         source: 'phone',
         customerName: name.trim(),
-        customerPhone: phone.trim() || null,
+        customerPhone: normalizePhone(phone) || null,
         lineUid: friend?.lineUid || null,
         guestCount: guests,
         startsAt: startsAt.toISOString(),
@@ -172,7 +175,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
       { if (!fieldFailure)
 
 
-      setError(caught instanceof Error && caught.message ? caught.message : '予約を入れられませんでした。もう一度お試しください。') }
+      setError(describeApiFailure(caught, '保存')) }
     } finally {
       setBusy(false)
     }
@@ -190,7 +193,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   return (
     <SaveErrorScope errors={saveErrors}><Drawer open={open} width="narrow" heightMode="viewport" title="電話予約を入れる" dirty={dirty} showDirtyIndicator={false} busy={busy} error={error || undefined} onClose={onClose} footer={footer}>
       <div className={styles.form} data-design-node="wEzuG">
-        <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField type="tel" inputMode="tel" autoComplete="off" value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></SaveErrorField></Field>
+        <Field label="電話番号"><SaveErrorField names={["phone","customerPhone"]}><TextField {...fields.bind('phone')} type="tel" inputMode="tel" autoComplete="off" invalid={fields.invalid('phone')} aria-describedby={describedBy('phone')} value={phone} onChange={(event) => { setPhone(event.target.value); if (friend) choose(null) }} placeholder="090-1234-5678" /></SaveErrorField><FieldError id="e2-phone-error">{fields.error('phone')}</FieldError></Field>
         {friends.length > 0 ? (
           <div className={styles.friendBox} role="group" aria-label="LINE の友だちの候補">
             <p className={styles.friendTitle}>LINE の友だちが見つかりました</p>

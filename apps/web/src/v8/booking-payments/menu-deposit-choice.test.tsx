@@ -11,14 +11,14 @@ vi.mock('@/lib/api', async (load) => {
     saveMenuPayment: (...args: unknown[]) => net.save(...args),
   } }
 })
-vi.mock('@/lib/api-booking-payment-admin', async (load) => {
-  const actual = await load<typeof import('@/lib/api-booking-payment-admin')>()
+vi.mock('@/lib/api/helpers/booking-payment-admin', async (load) => {
+  const actual = await load<typeof import('@/lib/api/helpers/booking-payment-admin')>()
   return { ...actual, bookingPaymentAdminApi: { ...actual.bookingPaymentAdminApi,
     connection: async () => ({ success: true, data: { connected: true, testMode: true } }),
     menuOverrides: async () => ({ success: true, data: { menus: [{ menuId: 'm1', mode: net.mode }] } }),
   } }
 })
-vi.mock('@/lib/api-gap-draft', () => ({ gapDraftApi: {
+vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: {
   menuDeposit: async () => ({ data: { kind: 'none', value: null, inherit: true, conditions: { always: true, minPeople: null, weekdays: null, timeBand: null }, version: 1 } }),
 } }))
 const { BookingMenuPaymentCard, useMenuDeposit } = await import('./menu-deposit')

@@ -97,7 +97,7 @@ describe('公開受信口の防衛', () => {
     const body = JSON.stringify({ order: 2 });
     const res = await receive(body);
     expect(res.status).toBe(403);
-    expect(await res.json()).toMatchObject({ success: false, code: 'TENANT_SUSPENDED' });
+    expect(await res.json()).toMatchObject({ success: false, error: { code: 'TENANT_SUSPENDED' } });
     expect(receiptCount(db)).toBe(0);
     expect(fireEvent).not.toHaveBeenCalled();
   });

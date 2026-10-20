@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import { adminSessionHandoffPath, isOpsTwoFactorReturn } from './admin-session'
 
@@ -17,9 +18,11 @@ describe('二段階認証後の戻り先', () => {
   })
 
   it('クロスサイト用sessionを遷移先のfragmentにも引き渡す', () => {
-    expect(adminSessionHandoffPath('/ops', 'opaque+/token=', 'csrf token')).toBe(
-      '/ops#lh_session=opaque%2B%2Ftoken%3D&lh_csrf=csrf+token',
-    )
+    const url = new URL(adminSessionHandoffPath('/ops', 'opaque+/token=', 'csrf token'), 'https://test.invalid')
+    const params = new URLSearchParams(url.hash.slice(1))
+    expect(params.get('lh_session')).toBe('opaque+/token=')
+    expect(params.get('lh_csrf')).toBe('csrf token')
+    expect(params.get('lh_nonce')).toMatch(/^[0-9a-f-]{36}$/)
     expect(adminSessionHandoffPath('/ops', undefined, 'csrf')).toBe('/ops')
   })
 })

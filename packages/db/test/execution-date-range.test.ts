@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { asD1 } from './d1-test-helper.js';
-import { getBroadcasts } from '../src/broadcasts.js';
+import { getBroadcasts } from '../src/broadcasts/index.js';
 import { listAutoReplyEvaluationRuns, getAutoReplyEvaluationSummary, getAutoReplyTriggerBreakdown } from '../src/auto-reply-runs.js';
 
 const range = { from: '2026-09-30T00:00:00+09:00', until: '2026-10-01T00:00:00+09:00' };

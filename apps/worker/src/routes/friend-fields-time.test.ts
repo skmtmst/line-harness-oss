@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { friendMigrations } from './friend-migrations.js';
 import { friendFields } from './friend-fields.js';
-import { previewFriendBulkRun } from '../services/friend-bulk-runs.js';
+import { previewFriendBulkRun } from '../features/friends/friend-bulk-runs.js';
 
 let sqlite: SqliteD1;
 let app: Hono<Env>;

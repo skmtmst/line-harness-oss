@@ -1,6 +1,6 @@
 
 /*
- * ★V8 リマインダの一覧（Pencil `apLqS`、状態は `RrYYJ`）。
+ * ★V8 リマインダの一覧（Pencil 、状態は ）。
  *
  * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
  * 板が 1100px を切ったらフォルダの列を道具の段へ畳む
@@ -45,9 +45,9 @@
   line-height: normal;
 }
 
-/* 板 `a5C1p`：閲覧のみの帯。頭のすぐ下。 */
+/* 板 ：閲覧のみの帯。頭のすぐ下。 */
 /* 数の帯：4つのマス。アイコンつき。 */
-/* 数の帯：区切り線で並べる1本の帯（`apLqS`）。カードを離して並べない。 */
+/* 数の帯：区切り線で並べる1本の帯（）。カードを離して並べない。 */
 /* 両端の縦位置をそろえるため、2つ目からは左に区切り線を引く。 */
 /* 「失敗を見る →」。送れなかった数の帯の中の導線。 */
 /* 本体：左にフォルダの列 200px、右に一覧。 */
@@ -139,7 +139,7 @@
 }
 
 /* 表。 */
-/* 表。見出しと行の区切り線だけ（`apLqS`）。外側の枠は作らない。 */
+/* 表。見出しと行の区切り線だけ（）。外側の枠は作らない。 */
 .tableWrap {
   min-width: 0;
 }
@@ -161,7 +161,7 @@
   display: block;
   max-width: 100%;
   overflow: hidden;
-  /* 板 apLqS：行の名はリンク色（#0b63ce）。太さと字の大きさは型に任せる。 */
+  /* 板 ：行の名はリンク色（#0b63ce）。太さと字の大きさは型に任せる。 */
   color: var(--color-action);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -185,7 +185,7 @@
 }
 
 .dotIndent {
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 apLqS の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
   padding-inline-start: var(--tpl-folder-dot-indent);
 }
 
@@ -212,7 +212,7 @@
   white-space: nowrap;
 }
 
-/* 「失敗 N」の札（板 apLqS：#fef0f0 地・#b3261e・6px の点）。押すと失敗ありの絞り込みへ。 */
+/* 「失敗 N」の札（板 ：#fef0f0 地・#b3261e・6px の点）。押すと失敗ありの絞り込みへ。 */
 .miniBadgeDanger {
   display: inline-flex;
   align-items: center;
@@ -532,16 +532,16 @@
 /* 中間幅でも操作の文字を保ち、検索の器だけで幅を調整する。 */
 .toolbar > :not(.searchWrap) { flex-shrink: 0; }
 
-/* 小さい画面では操作の段を分け、個々の操作の文字は保つ（板 `Iffil`：探す 200・フォルダ 150）。 */
+/* 小さい画面では操作の段を分け、個々の操作の文字は保つ（板 ：探す 200・フォルダ 150）。 */
 @container (max-width: 1099px) {
   .toolbar { flex-wrap: wrap; padding-bottom: 12px; }
   .searchWrap { flex-basis: 200px; }
   .folderSelectWrap { width: 150px; }
 }
-/* ★V8 行の名前の横の「失敗 n」は札の高さ22（apLqS 行の「名と注意」）。押せるボタンでも行を押し広げない */
+/* ★V8 行の名前の横の「失敗 n」は札の高さ22（ 行の「名と注意」）。押せるボタンでも行を押し広げない */
 :global(:root) .miniBadgeDanger { min-height: 0; height: 22px; }
 
-/* 1152 の板（Iffil）の道具の段：1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び」。 */
+/* 1152 の板の道具の段：1段目「作る・フォルダ・探す … 件数」→ 2段目「札・並び」。 */
 .narrowTools { display: flex; flex-basis: 100%; flex-direction: column; gap: var(--tpl-toolbar-gap); }
 .narrowRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 .narrowRow > div[role='group'] { display: flex; gap: var(--tpl-toolbar-gap); }
@@ -551,7 +551,7 @@
 .narrowSearch { width: var(--tpl-kw-input-w); }
 .narrowSpacer { flex: 1 1 0; }
 
-/* 閲覧のみの帯（a5C1p）：頭の下・数の帯の上。左右24・下8の中に、青い地の帯（余白10/14・間10）。 */
+/* 閲覧のみの帯：頭の下・数の帯の上。左右24・下8の中に、青い地の帯（余白10/14・間10）。 */
 .viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after); }
 /* 閲覧のみ：作るボタンを隠したあとも、その高さだけ空けてフォルダの列の並びを保つ。 */
 .viewerCreateSpace { display: block; height: var(--tpl-rm-viewer-create-h); }

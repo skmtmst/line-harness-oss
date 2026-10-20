@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * LINEアカウントの乗り換え（引き継ぎ）。設計 ★V6 33-4（`nx3XW`）。台帳 #133。
+ * LINEアカウントの乗り換え（引き継ぎ）。設計 ★33-4（`nx3XW`）。台帳 #133。
  *
  * ここで守りたいのは 3 点。
  *   **合計が合わない数を通さない**（合わないと、どこかの人が消えたように見える）
@@ -121,6 +121,8 @@ const HANDOVER = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  run.mockResolvedValue({ meta: { changes: 1 } });
+  bind.mockImplementation((..._values: unknown[]) => ({ run, first: vi.fn().mockResolvedValue({ id: 'owned-friend' }), all: vi.fn(async () => ({ results: [] })) }));
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
   db.getHandoverById.mockResolvedValue(HANDOVER);
   db.listDecisions.mockResolvedValue([]);
@@ -489,4 +491,21 @@ describe('見るだけの担当者の変更拒否（R522）', () => {
     );
     expect(res.status).not.toBe(403);
   });
+});
+
+
+it('F13: foreign source/target friends cannot be saved as handover decisions', async () => {
+  bind.mockImplementation((..._values: unknown[]) => ({ run, first: vi.fn().mockResolvedValue(null), all: vi.fn(async () => ({ results: [] })) }));
+  const res = await makeApp().fetch(put('/api/account-handovers/ho-1/decisions', { decisions: [{ fromFriendId: 'foreign', toFriendId: 'foreign-target', decision: 'link', bucket: 'auto' }] }), env);
+  expect(res.status).toBe(404);
+  expect(db.saveDecision).not.toHaveBeenCalled();
+});
+it('F13: execution counts a stale/moved source as failure and never claims a move', async () => {
+  db.getHandoverById.mockResolvedValue({ ...HANDOVER, source_friend_total: 1, review_count: 0 });
+  db.listDecisions.mockResolvedValue([{ from_friend_id: 'foreign', to_friend_id: null, decision: 'new' }]);
+  run.mockResolvedValue({ meta: { changes: 0 } });
+  const res = await makeApp().fetch(stepUpPost('/api/account-handovers/ho-1/execute', {}), env);
+  expect(res.status).toBe(200);
+  expect(db.completeHandover).toHaveBeenCalledWith(expect.anything(), 'ho-1', expect.objectContaining({ movedCount: 0, failedCount: 1 }));
+  expect(prepare.mock.calls.some(([sql]) => sql.includes('AND line_account_id = ?'))).toBe(true);
 });

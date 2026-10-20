@@ -13,7 +13,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import Toggle from '@/components/shared/toggle'
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
-import { ecAutoLineApi } from '@/lib/api-gap3'
+import { ecAutoLineApi } from '@/lib/api/helpers/gap3'
 import { formatNumber } from '@/lib/format'
 import EditDrawer from './edit-drawer'
 import { KIND_LABEL, KIND_ORDER, KIND_WHEN, KIND_WHO, failureText, waitLabel } from './words'
@@ -23,7 +23,7 @@ import styles from './auto-line.module.css'
 /*
  * ★V8 EC連携「自動の LINE」（G6-1 `TSRlY`）。カゴ落ち・閲覧落ち・再入荷の3行の表。
  * 受け口は試験運転だけ（testMode）：オンにしても LINE へは送らず、送る予定を記録する。
- * クリック・購入・金額は計測がまだつながっていないので「—」。計測の入れ方は、口ができるまで共通の「まだ使えない」窓で知らせる（B-314）。
+ * クリック・購入・金額は計測がまだつながっていないので「—」。計測の入れ方は、口ができるまで共通の「まだ使えない」窓で知らせる。
  * 閲覧のみの人には、オン・オフのスイッチも「…」も置かない（状態は札で見せる）。
  */
 

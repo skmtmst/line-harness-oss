@@ -1,5 +1,7 @@
 import type { MessageTemplate, TrackedLink, Friend } from '@line-crm/db';
 
+
+
 /**
  * Per-campaign reward template resolver.
  *
@@ -20,6 +22,7 @@ import type { MessageTemplate, TrackedLink, Friend } from '@line-crm/db';
 export interface RewardResolverDeps {
   getFriendById: (db: D1Database, id: string) => Promise<Friend | null>;
   getTrackedLinkById: (db: D1Database, id: string) => Promise<TrackedLink | null>;
+  trackedLinkReferralMatchesAccount: (db: D1Database, link: TrackedLink, accountId: string | null) => Promise<boolean>;
   getMessageTemplateById: (db: D1Database, id: string) => Promise<MessageTemplate | null>;
 }
 
@@ -42,7 +45,7 @@ export async function resolveRewardTemplate(
     if (link) {
       // Known links remain authoritative, including links from another account:
       // they must not redirect the request to a different first-touch reward.
-      if (link.line_account_id != null && link.line_account_id !== args.expectedLineAccountId) return null;
+      if (!await deps.trackedLinkReferralMatchesAccount(db, link, args.expectedLineAccountId)) return null;
       if (!link.reward_template_id) return null;
       return await deps.getMessageTemplateById(db, link.reward_template_id);
     }
@@ -53,7 +56,7 @@ export async function resolveRewardTemplate(
   if (friend?.first_tracked_link_id) {
     const link = await deps.getTrackedLinkById(db, friend.first_tracked_link_id);
     if (link?.reward_template_id
-      && (link.line_account_id == null || link.line_account_id === args.expectedLineAccountId)) {
+      && await deps.trackedLinkReferralMatchesAccount(db, link, args.expectedLineAccountId)) {
       const tpl = await deps.getMessageTemplateById(db, link.reward_template_id);
       if (tpl) return tpl;
     }

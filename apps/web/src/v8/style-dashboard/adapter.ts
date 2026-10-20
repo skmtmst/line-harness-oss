@@ -1,3 +1,5 @@
+import { formatYen as yen } from '@line-crm/shared';
+import { styleTerm, term } from '@/lib/terms'
 import type { StyleBooking, StyleCard, StyleMetric, StyleSchedule, StyleScheduleEntry, StyleSnapshot } from '@line-crm/shared'
 import type {
   DashboardRange, IndustryStyle, StyleAnalytics, StyleBadge, StyleBoard, StyleKpi, StyleLayout, StyleMonth, StyleMonthDay, StyleRow, StyleSideCard, StyleToday, StyleWeek,
@@ -21,7 +23,6 @@ function parts(iso: string, tz: string) {
 export const hm = (iso: string, tz: string) => parts(iso, tz).time
 const md = (iso: string, tz: string) => { const p = parts(iso, tz); return `${p.month}/${String(p.day).padStart(2, '0')}（${p.week}）` }
 const dayLabel = (date: string) => { const d = new Date(`${date}T00:00:00Z`); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEK[d.getUTCDay()]}）` }
-const yen = (n: number) => `¥${Math.round(n).toLocaleString('ja-JP')}`
 
 const isRate = (m?: StyleMetric) => Boolean(m && (m.unit === '' || m.unit === 'ratio' || m.unit === '%' || m.unit === '率') && m.denominator !== undefined)
 const isYen = (m?: StyleMetric) => m?.unit === '円'
@@ -71,7 +72,7 @@ function newKpi(s: StyleSnapshot, href: string, range: DashboardRange): StyleKpi
 
 /** 支払いの数は決済の口（API 組3）から。まだ無いので値を作らず、押すと準備中の窓（画面側で開く）。 */
 function paymentKpi(range: DashboardRange): StyleKpi {
-  return { id: 'income', title: `${RANGE_WORD[range]}の入金`, value: null, unit: '', delta: null, detail: '決済の口待ち', link: { label: 'くわしく', href: '#preparing-payment' }, help: 'オンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。' }
+  return { id: 'income', title: `${RANGE_WORD[range]}の入金`, value: null, unit: '', delta: null, detail: `カードの請求は${term('S24')}`, link: { label: 'くわしく', href: '#preparing-payment' }, help: 'オンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。' }
 }
 
 export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: DashboardRange): StyleKpi[] {
@@ -94,7 +95,7 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
     kpi({ id: 'meetings', key: 'bookings', title: `${r}の面談`, detail: (x) => `実施 ${num(x, 'visits') ?? '—'}`, link: { label: '一覧', href: '/booking/bookings' }, help: '取消を除く面談です。面談日で数えます。' }, s),
     kpi({ id: 'results', key: 'resultPending', title: '結果待ち', detail: () => '結果を付ける面談', link: { label: '付ける', href: '/booking/bookings' }, help: '面談が終わって、結果（検討中・成約・見送り）をまだ付けていない数です。' }, s),
     kpi({ id: 'week', key: 'weekBookings', title: '今週の面談', detail: () => '月曜〜日曜・面談日', link: { label: '一覧', href: '/booking/bookings' }, help: '今週（月〜日）の面談です。面談日で数えます。' }, s),
-    kpi({ id: 'noshow', key: 'noShowRate', title: '無断欠席率', lower: true, detail: () => '期間の面談で数えます', link: { label: '人を見る', href: '/friends' }, help: '無断欠席の割合です。' }, s),
+    kpi({ id: 'noshow', key: 'noShowRate', title: styleTerm('consult', 'V21'), lower: true, detail: () => '期間の面談で数えます', link: { label: '人を見る', href: '/friends' }, help: `${styleTerm('consult', 'V17')}の割合です。` }, s),
     newKpi(s, '/booking/bookings', range),
   ]
   return [
@@ -107,12 +108,18 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
 }
 
 const STATE: Record<string, StyleBadge> = {
-  confirmed: { label: '予約中', tone: 'info' }, booked: { label: '予約中', tone: 'info' }, requested: { label: '承認待ち', tone: 'warning' }, pending: { label: '承認待ち', tone: 'warning' },
+  confirmed: { label: term('S11'), tone: 'info' }, booked: { label: term('S11'), tone: 'info' }, requested: { label: term('S10'), tone: 'warning' }, pending: { label: term('S10'), tone: 'warning' },
   seated: { label: '着席中', tone: 'success' }, visited: { label: '来店済み', tone: 'neutral' }, completed: { label: '済み', tone: 'neutral' }, attended: { label: '出席', tone: 'success' },
-  cancelled: { label: '取消', tone: 'neutral' }, rejected: { label: '取消', tone: 'neutral' }, expired: { label: '期限切れ', tone: 'warning' }, no_show: { label: '無断', tone: 'danger' }, held: { label: '押さえ', tone: 'neutral' },
+  cancelled: { label: term('S15'), tone: 'neutral' }, rejected: { label: term('S16'), tone: 'neutral' }, expired: { label: '期限切れ', tone: 'warning' }, no_show: { label: '無断', tone: 'danger' }, held: { label: '押さえ', tone: 'neutral' },
 }
-const ACTIVE: Record<IndustryStyle, string> = { restaurant: '着席中', salon: '施術中', consult: '実施中', lesson: '受講中' }
-export const bookingStatus = (b: StyleBooking, style: IndustryStyle = 'restaurant'): StyleBadge => b.status === 'seated' || (b.attendance === 'visited' && !b.visited) ? { label: ACTIVE[style], tone: 'success' } : b.visited && b.status !== 'completed' ? STATE.visited : style === 'consult' && b.status === 'confirmed' ? { label: '確定', tone: 'info' } : STATE[b.status] ?? { label: b.status, tone: 'neutral' }
+const ACTIVE: Record<IndustryStyle, string> = { restaurant: styleTerm('restaurant', 'V15'), salon: styleTerm('salon', 'V15'), consult: styleTerm('consult', 'V15'), lesson: styleTerm('lesson', 'V15') }
+export function bookingStatus(b: StyleBooking, style: IndustryStyle = 'restaurant'): StyleBadge {
+  if (b.status === 'seated' || (b.attendance === 'visited' && !b.visited)) return { label: ACTIVE[style], tone: 'success' }
+  if (b.status === 'no_show') return { label: styleTerm(style, 'V17'), tone: 'danger' }
+  if (b.visited || b.status === 'completed' || b.status === 'attended') return { label: styleTerm(style, 'V16'), tone: b.status === 'attended' ? 'success' : 'neutral' }
+  return STATE[b.status] ?? { label: b.status, tone: 'neutral' }
+}
+
 const MEET: Record<string, StyleBadge> = { online: { label: 'オンライン', tone: 'info' }, in_person: { label: '対面', tone: 'neutral' }, customer_choice: { label: 'お客さまが選ぶ', tone: 'neutral' } }
 const SOURCE: Record<string, string> = { line: 'LINE', liff: 'LINE', phone: '電話', manual: '電話', walk_in: 'ウォークイン', web: 'Web', hotpepper: 'ホットペッパー', tabelog: '食べログ', restaurant_board: 'レストランボード' }
 
@@ -264,7 +271,7 @@ type Funnel = { route: string; friends?: number; bookings: number; performed: nu
 
 const TABS: Record<IndustryStyle, [string, string][]> = {
   restaurant: [['reservations', '予約'], ['seats', '来店と席'], ['lost', '取りこぼし'], ['customers', 'お客さま'], ['line', 'LINE の効果'], ['payments', 'お支払い']],
-  salon: [['overview', '概要'], ['customers', 'お客さま'], ['staff', 'スタッフ'], ['menu', 'メニュー'], ['route', '経路と LINE'], ['cancel', 'キャンセル'], ['payments', 'お支払い']],
+  salon: [['overview', '概要'], ['customers', 'お客さま'], ['staff', styleTerm('salon', 'V29')], ['menu', 'メニュー'], ['route', '経路と LINE'], ['cancel', 'キャンセル'], ['payments', 'お支払い']],
   consult: [['overview', '概要'], ['staff', '担当者'], ['kinds', '面談の種類'], ['funnel', '流入と成果'], ['time', '時間帯'], ['cancel', '取消と無断'], ['payments', 'お支払い']],
   lesson: [['overview', '概要'], ['classes', '出席とクラス'], ['retention', '継続と退会'], ['trial', '体験と入会'], ['teachers', '講師'], ['line', 'LINE の効果'], ['payments', 'お支払い']],
 }
@@ -284,9 +291,9 @@ export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics
     return { id, title, valueText: v.value === null ? '—' : v.valueText ?? v.value.toLocaleString('ja-JP'), unit: v.valueText ? '' : v.unit, delta: metricDelta(pm[key], s.previous[key], lower) as { text: string; tone: 'up' | 'down' } | null, help: pm[key]?.formula || v.reason || title }
   }
   const cards = style === 'consult'
-    ? [card('bookings', 'bookings', '予約'), card('visits', 'visits', '実施'), card('conversion', 'conversionRate', '成約率（90日）'), card('noshow', 'noShowRate', '無断欠席率', true), card('cancel', 'cancelRate', '取消率', true), card('return', 'returnRate', '再来率')]
+    ? [card('bookings', 'bookings', '予約'), card('visits', 'visits', '実施'), card('conversion', 'conversionRate', '成約率（90日）'), card('noshow', 'noShowRate', styleTerm(style, 'V21'), true), card('cancel', 'cancelRate', '取消率', true), card('return', 'returnRate', '再来率')]
     : style === 'lesson'
-      ? [card('classes', 'classes', 'クラス'), card('visits', 'visits', '出席'), card('fill', 'classroomOccupancy', '教室の埋まり'), card('online', 'onlineOccupancy', 'オンラインの埋まり'), card('trial', 'trialConversion', '体験→入会'), card('noshow', 'noShowRate', '無断欠席率', true)]
+      ? [card('classes', 'classes', 'クラス'), card('visits', 'visits', '出席'), card('fill', 'classroomOccupancy', '教室の埋まり'), card('online', 'onlineOccupancy', 'オンラインの埋まり'), card('trial', 'trialConversion', '体験→入会'), card('noshow', 'noShowRate', styleTerm(style, 'V21'), true)]
       : [card('bookings', 'bookings', '予約数'), card('visits', 'visits', '来店数'), style === 'salon' ? card('revenue', 'estimatedRevenue', '見込み売上') : card('guests', 'guests', '人数'), card('rebook', 'nextBookingRate', '次回予約率'), card('return', 'returnRate', '再来率'), card('noshow', 'noShowRate', '無断キャンセル率', true)]
   const daily = (a.daily as Daily[] | undefined) ?? []
   const series = daily.map((d) => ({ label: d.date, now: style === 'consult' || style === 'lesson' ? d.visits : d.bookings, prev: 0 }))
@@ -299,7 +306,7 @@ export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics
     table = { title: '流入と成果（友だち→予約→実施→成約）', help: '流入経路ごとの数です。', link: { label: '人を見る', href: '/friends' }, columns: [{ label: '流入経路' }, { label: '友だち', align: 'right' }, { label: '予約', align: 'right' }, { label: '実施', align: 'right' }, { label: '成約', align: 'right' }], rows: f.map((r) => ({ id: r.route, name: r.route === 'unknown' ? '経路が分からない' : r.route, sub: '', cells: [cell(r.friends ?? null), cell(r.bookings), cell(r.performed), cell(r.won)] })) }
   } else if (style === 'salon' || style === 'lesson') {
     const st = (a.staff as Staff[] | undefined) ?? []
-    table = { title: style === 'lesson' ? '講師' : 'スタッフ', help: 'スタッフごとの数です。率は標本が少ないときは出しません（0% とは違います）。', columns: [{ label: style === 'lesson' ? '講師' : 'スタッフ' }, { label: '予約', align: 'right' }, { label: '稼働率', align: 'right' }, { label: '指名率', align: 'right' }, { label: '次回予約率', align: 'right' }, { label: '再来率', align: 'right' }], rows: st.map((r) => ({ id: r.staffId, name: names[r.staffId] ?? r.staffId, sub: '', cells: [cell(r.bookings), cell(r.utilization), cell(r.designationRate), cell(r.nextBookingRate), cell(r.returnRate)] })) }
+    table = { title: styleTerm(style, 'V29'), help: `${styleTerm(style, 'V29')}ごとの数です。率は標本が少ないときは出しません（0% とは違います）。`, columns: [{ label: styleTerm(style, 'V29') }, { label: '予約', align: 'right' }, { label: '稼働率', align: 'right' }, { label: '指名率', align: 'right' }, { label: '次回予約率', align: 'right' }, { label: '再来率', align: 'right' }], rows: st.map((r) => ({ id: r.staffId, name: names[r.staffId] ?? r.staffId, sub: '', cells: [cell(r.bookings), cell(r.utilization), cell(r.designationRate), cell(r.nextBookingRate), cell(r.returnRate)] })) }
   } else {
     const mn = (a.menus as Menu[] | undefined) ?? []
     table = { title: 'コースごとの予約', help: 'コース（メニュー）ごとの数です。', columns: [{ label: 'コース' }, { label: '予約', align: 'right' }, { label: '来店', align: 'right' }, { label: '取消', align: 'right' }, { label: '無断率', align: 'right' }], rows: mn.map((r) => ({ id: r.menuId, name: names[r.menuId] ?? (r.menuId === 'null' || !r.menuId ? '席のみ' : r.menuId), sub: '', cells: [cell(r.bookings), cell(r.visits), cell(r.cancellations), cell(r.noShowRate)] })) }

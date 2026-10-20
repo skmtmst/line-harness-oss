@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createHqSupportRequest, addSupportTenantMessage, statusForStage } from '@line-crm/db';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const mail = vi.hoisted(() => ({
@@ -14,7 +14,7 @@ const { opsSupport, buildDraftPrompt } = await import('./ops-support.js');
 const { hqSupport } = await import('./hq-support.js');
 
 /**
- * ★V6 37-6 / 37-6-A / 37-6-B 運営コンソールのお問い合わせ（チケット）。
+ * ★37-6 / 37-6-A / 37-6-B 運営コンソールのお問い合わせ（チケット）。
  * 統括の 36-3 と同じ表を使い、返信が統括の履歴にも載ることまで確かめる。
  */
 

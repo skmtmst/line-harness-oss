@@ -1,6 +1,7 @@
 import { getLineAccountById } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
-import { FOLLOWER_IMPORT_STATE_KEY, processFollowerImportStep, type FollowerImportClient } from './follower-import.js';
+import { FOLLOWER_IMPORT_STATE_KEY, processFollowerImportStep } from './follower-import.js';
+import { type FollowerImportClient } from './follower-import-state.js';
 
 // 以下の 3 つはレーン 1 回の実行で使い切ってよい量。
 // 1 invocation で出せるサブリクエストは 10,000 回までで、D1 の呼び出しも

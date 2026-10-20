@@ -139,7 +139,7 @@ describe('GET /api/tags', () => {
 
     const res = await app().request('/api/tags?withCounts=1');
     expect(res.status).toBe(200);
-    expect(dbMocks.getTagsWithUsage).toHaveBeenCalledWith(expect.anything());
+    expect(dbMocks.getTagsWithUsage).toHaveBeenCalledWith(expect.anything(), { allowedAccountIds: ['account-1'], canSeeUnassigned: true });
     expect(dbMocks.getTags).not.toHaveBeenCalled();
     await expect(res.json()).resolves.toMatchObject({
       success: true,
@@ -212,11 +212,20 @@ describe('GET /api/tags', () => {
     expect(body.data[0]).toHaveProperty('cleanupReasons', []);
   });
 
+  test('店を指定した一覧は未所属を含めずDBの取得時点で絞る', async () => {
+    dbMocks.getTagsWithUsage.mockResolvedValue([]);
+    const res = await app().request('/api/tags?withCounts=1&lineAccountId=account-1');
+    expect(res.status).toBe(200);
+    expect(dbMocks.getTagsWithUsage).toHaveBeenCalledWith(expect.anything(), {
+      allowedAccountIds: ['account-1'], canSeeUnassigned: false,
+    });
+  });
+
   test('選択部品向けの通常取得は軽い一覧のまま', async () => {
     dbMocks.getTags.mockResolvedValue([TAG_ROW]);
     const res = await app().request('/api/tags');
     expect(res.status).toBe(200);
-    expect(dbMocks.getTags).toHaveBeenCalledWith(expect.anything());
+    expect(dbMocks.getTags).toHaveBeenCalledWith(expect.anything(), { allowedAccountIds: ['account-1'], canSeeUnassigned: true });
     expect(dbMocks.getTagsWithUsage).not.toHaveBeenCalled();
     const body = await res.json() as { data: Array<Record<string, unknown>> };
     expect(body.data[0]).not.toHaveProperty('cleanupReasons');

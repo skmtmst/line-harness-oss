@@ -14,13 +14,11 @@ const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('V5 B4 オーバーレイ共通部品', () => {
-  it('標準・重要操作ダイアログがPencil Node IDと状態を持つ', () => {
+  it('標準・重要操作ダイアログが確認中と失敗の状態を持つ', () => {
     const html = renderToStaticMarkup(<div>
       <Dialog open modal={false} title="保存しますか？" description="次回から反映します" onCancel={vi.fn()} onConfirm={vi.fn()} />
       <Dialog open modal={false} tone="destructive" title="統合しますか？" description="元に戻せません" busy error="確認できません" onCancel={vi.fn()} onConfirm={vi.fn()} />
     </div>)
-    expect(html).toContain('data-design-node="J6x4Q"')
-    expect(html).toContain('data-design-node="H2S1T4"')
     expect(html).toContain('role="alertdialog"')
     expect(html).toContain('aria-busy="true"')
     expect(html).toContain('確認できません')
@@ -33,7 +31,6 @@ describe('V5 B4 オーバーレイ共通部品', () => {
       items={[{ id: '1', title: '送信失敗', meta: '昨日 10:04', unread: true }]}
       onFilterChange={vi.fn()} onMarkAllRead={vi.fn()}
     />)
-    expect(html).toContain('data-design-node="z6TmF"')
     expect(html).toContain('aria-selected="true"')
     expect(html).toContain('未読')
     expect(html).toContain('送信失敗')

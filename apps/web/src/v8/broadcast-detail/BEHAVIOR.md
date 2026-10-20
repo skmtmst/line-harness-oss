@@ -1,3 +1,5 @@
+> 文書：一斉配信の詳細・予約したあと（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 一斉配信の詳細・予約したあと（V8）の動き
 
 入口：`app/broadcasts/detail/page.tsx`（`src/v8/broadcast-detail/detail.tsx` に固定）・

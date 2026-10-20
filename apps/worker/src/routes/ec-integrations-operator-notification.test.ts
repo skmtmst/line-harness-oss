@@ -1,9 +1,10 @@
+import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
 // N-327 (#663): EC受注から運用者通知を自動発火する接続の実挙動。
 //
 // 受注は「起きたこと」なので、LINEの友だち照合や取引通知の設定より先に
 // 運用者へ出す。EC側の再送で通知が増えないこと、通知が落ちても受注の
 // 取り込みが止まらないことをここで確かめる。
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
 const mocks = vi.hoisted(() => ({
@@ -20,7 +21,8 @@ const mocks = vi.hoisted(() => ({
   enqueueFollowUps: vi.fn(),
   syncPetProfiles: vi.fn(),
 }));
-vi.mock('@line-crm/db', () => ({
+vi.mock('@line-crm/db', async importOriginal => ({
+  ...await importOriginal<typeof import('@line-crm/db')>(),
   attachEcOrderFriend: mocks.attachOrderFriend,
   getCustomerNotificationSource: mocks.getCustomerSource,
   getLineAccountById: mocks.getAccount,
@@ -56,12 +58,18 @@ const { ecIntegrations } = await import('./ec-integrations.js');
 
 type EcRow = { id: string; status: string };
 
+const workflowStores:SqliteD1[]=[];
+afterEach(()=>{for(const item of workflowStores)item.raw.close();workflowStores.length=0;vi.useRealTimers()});
+
 function harness() {
   const events = new Map<string, EcRow>();
   const app = new Hono<any>();
   app.route('/', ecIntegrations);
+  const workflow=createTestD1();workflowStores.push(workflow);
   const db = {
+    batch:workflow.db.batch.bind(workflow.db),
     prepare(query: string) {
+      if(query.includes('workflow_steps'))return workflow.db.prepare(query);
       const entry = { query, bindings: [] as unknown[] };
       const statement = {
         bind(...bindings: unknown[]) { entry.bindings = bindings; return statement; },
@@ -244,8 +252,9 @@ describe('EC受注から運用者通知を自動発火する (N-327 #663)', () =
   });
 });
 
-vi.mock('../services/workflow-execution.js',async()=>{
+vi.mock('../services/workflow-execution.js',async importOriginal=>{
+ const actual=await importOriginal<typeof import('../services/workflow-execution.js')>();
  const {unitWorkflow}=await import('../test-utils/workflow-unit.js');
- return {acquireWorkflow:async(db:D1Database,ref:any)=>unitWorkflow(db,ref),
+ return {...actual,acquireWorkflow:async(db:D1Database,ref:any)=>unitWorkflow(db,ref),
   runWorkflowStep:async(_db:any,_ref:any,work:Function,options:any)=>work({input_json:JSON.stringify(options.input),retry_key:options.retryKey,attempt_count:1,first_attempt_at:Date.now()})};
 });

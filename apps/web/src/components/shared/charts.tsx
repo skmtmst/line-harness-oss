@@ -51,7 +51,7 @@ export function LineChart({ points, label, unit = '', maxX, maxY, marker }: { po
 }
 
 /**
- * 幅いっぱいの推移の線（絵 BVuYh 健康日記の体重）。描く面の実寸を測って座標を取るので、
+ * 幅いっぱいの推移の線（絵  健康日記の体重）。描く面の実寸を測って座標を取るので、
  * 狭い欄でも文字や線が縮まない。縦は 0 から maxY を3本の目盛り、横は軸の名前を
  * axisLabels（位置 x と文字）で置く。値の無い位置は点を置かず、ある点どうしを線でつなぐ。
  */
@@ -82,7 +82,7 @@ export function TrendLineChart({ points, label, unit = '', maxX, maxY, axisLabel
 }
 
 /**
- * 横棒（絵 v0SbYR「集まった回答」）：名前120・細い棒（全体に占める割合）・数と割合。
+ * 横棒（絵 「集まった回答」）：名前120・細い棒（全体に占める割合）・数と割合。
  * 行は押せない読み物なので、枠の付いた箱にしない。total を渡さなければ並べた数の合計を全体にする。
  */
 export function HorizontalBarChart({ items, label, unit = '件', total }: { items: ChartPoint[]; label: string; unit?: string; total?: number }) {

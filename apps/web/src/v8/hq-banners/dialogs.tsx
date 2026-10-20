@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
 const projectNameRequirement = requiredText('プロジェクト名を入力してください')
 
@@ -19,9 +20,9 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 
 /*
  * ★V8 バナー生成の小さな窓。共通の窓（Dialog）に絵の幅・上からの位置を渡し、中身だけを絵どおりに組む。
- * - `W7Z57` プロジェクトを作る（名前は必須・100文字まで、説明は任意・500文字まで）
- * - `AnwtH` 画像を取り込む（入れるプロジェクトを選び、PNG・JPEG・WebP、10MB まで）
- * - `I0w2e` アーカイブの確認・`B24oNg` 一覧から外す確認（プロジェクトの中で使う）
+ * -  プロジェクトを作る（名前は必須・100文字まで、説明は任意・500文字まで）
+ * -  画像を取り込む（入れるプロジェクトを選び、PNG・JPEG・WebP、10MB まで）
+ * -  アーカイブの確認・ 一覧から外す確認（プロジェクトの中で使う）
  */
 
 /** 取り込める画像（API と同じ）。 */
@@ -114,7 +115,7 @@ export function CreateProjectDialogV8({ open, project = null, busy, error, onSub
 }
 
 /**
- * 画像を取り込む（AnwtH）。画像はプロジェクトに属するので、先に入れる先を選ぶ。
+ * 画像を取り込む。画像はプロジェクトに属するので、先に入れる先を選ぶ。
  * `projectId` を渡すとそのプロジェクトを最初に選んでおく（プロジェクトの中から開くとき）。
  * 取り込めたら、そのプロジェクトの ID を返す。
  */
@@ -178,7 +179,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
       if (!res.success) throw new Error(res.error)
       onDone(projectId)
     } catch (caught) {
-      setError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした')
+      setError(describeApiFailure(caught, '取り込み', { scope: 'hq' }))
     } finally {
       setUploading(false)
     }
@@ -226,7 +227,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
               value={filePreview}
               fit="contain"
               accept={BANNER_UPLOAD_ACCEPT.join(',')}
-              /* 絵 AnwtH：大きさの上限も形式と同じ行に書く（「？」に隠さない）。 */
+              /* 絵 ：大きさの上限も形式と同じ行に書く（「？」に隠さない）。 */
               maxBytes={BANNER_UPLOAD_MAX_BYTES}
               busy={uploading}
               onFile={(next) => pickFile(next)}
@@ -240,7 +241,7 @@ export function UploadDialogV8({ open, onClose, onDone, projectId: initialProjec
 }
 
 /**
- * 確かめる窓（I0w2e アーカイブ・B24oNg 一覧から外す）。見出し・説明・区切り線・真ん中にボタン2つ。
+ * 確かめる窓（ アーカイブ・ 一覧から外す）。見出し・説明・区切り線・真ん中にボタン2つ。
  * 危ない操作（一覧から外す）は赤いボタン。
  */
 export function BannerConfirmDialogV8({ open, title, description, confirmLabel, tone, busy, error, onConfirm, onCancel, designNode }: {

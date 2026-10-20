@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { getTenantBilling } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { resolveEntitlements, type Entitlements } from './billing-plans.js';
@@ -50,7 +51,7 @@ export async function getSendPermissionForTenant(
     const entitlements = resolveEntitlements(billing);
     result = { allowed: entitlements.canSend, reason: entitlements.blockedReason, tenantId, state: entitlements.state };
   } catch (error) {
-    console.warn(JSON.stringify({"code":"services_send_entitlements_warn"}));
+    logger.warn("services_send_entitlements_warn");
     result = { ...ALLOW_UNKNOWN, tenantId };
   }
   cache?.set(tenantId, result);

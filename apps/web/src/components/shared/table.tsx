@@ -22,7 +22,7 @@ import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
 import PageLink, { RowNavigation, useListNavigationHref } from './list-navigation'
 import { isRowControl } from './destination-policy'
-/** Pencil V5/V6の `tPTMp` を正本にした表見出しセル。 */
+/** Pencil V5/管理画面の `tPTMp` を正本にした表見出しセル。 */
 export function Th({
   children,
   align = 'left',
@@ -90,7 +90,7 @@ export function TableHeadRow({
 }
 
 /**
- * Pencil V6 `RwC76` を正本にした一覧表の外枠。
+ * Pencil 管理画面 `RwC76` を正本にした一覧表の外枠。
  * 設計の節の印は表へ写す（data-design 受け口）。共通化で印を落とすと、
  * 画面の骨格の契約試験が節を見失う。
  */
@@ -114,9 +114,9 @@ export function DataTable({
   /** 列の幅の割合（1,2.2,…）。均等割りにせず、条件のような長い列に幅を取る。列の数と同じだけ渡す。 */
   columnWeights?: readonly number[]
   'data-design'?: string
-  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表、デリバリー受注の行。指定した表だけに適用する。 */
+  /** 時間×卓と予約一覧の寸法、飲食店のカード内の密度、アカウントのカード内の表。指定した表だけに適用する。 */
   cellPresentation?: 'friends'
-  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'delivery' | 'template-list'
+  presentation?: 'ledger' | 'calendar' | 'inventory' | 'channels' | 'columns' | 'account-list' | 'account-handover' | 'connection-check' | 'event-list' | 'template-list'
   /** 連携画面の3種類の行（reviews・media・sample）と設定内の詰めた一覧（compact・records）。指定のない表の見た目は変えない。 */
   density?: 'reviews' | 'media' | 'sample' | 'compact' | 'records'
   /** 列の幅を持つ設定一覧。共通の枠・セル・行で描く。 */
@@ -165,16 +165,16 @@ export function DataTable({
 export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
   children: ReactNode
   className?: string
-  /** ★V7：選んでいる行を薄い緑の地で示す。渡さなければ何も付けない。 */
+  /** ★管理画面：選んでいる行を薄い緑の地で示す。渡さなければ何も付けない。 */
   selected?: boolean
-  /** ★V7：指を乗せた行に薄い地を敷く。押せる行・選べる行だけに付ける。 */
+  /** ★管理画面：指を乗せた行に薄い地を敷く。押せる行・選べる行だけに付ける。 */
   interactive?: boolean
   /** 行の余白からも開く。名前は通常の Link のままにする。 */
   href?: string
   onOpen?: () => void
   /** パネルのURLの鍵。名前から移るときも対象を戻り先へ残す。 */
   detailKey?: string
-  /** ★V7：行の高さ。`comfortable` は64px。未指定は58pxのまま。 */
+  /** ★管理画面：行の高さ。`comfortable` は64px。未指定は58pxのまま。 */
   density?: 'standard' | 'comfortable' | 'template'
   /**
    * ★V8 仕上げ3回目（M10）④：消える行。渡すと 150ms で薄くなってから
@@ -282,12 +282,12 @@ export function PersonCell({ name, avatarName, avatarSrc, avatarSize = 24, gap, 
   </span></Td>
 }
 
-/** B-194: states belong to their column; stacked badges keep the 60px row. */
+/** : states belong to their column; stacked badges keep the 60px row. */
 export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'className'> & { primary?: ReactNode }) {
   return <Td {...cellProps} className={shell.statusCell} data-list-status-cell><div className={shell.statusStack}>{primary ? <span className={shell.statusPrimary}>{primary}</span> : null}{children}</div></Td>
 }
 
-/** B-194: 名前のセルはフォルダの丸と名前1行だけ。 */
+/** : 名前のセルはフォルダの丸と名前1行だけ。 */
 export function NameCell({ name, folder, nameCarriesDot, annotation, selection, className, grow }: {
   name: ReactNode
   /** 名前が色の丸を持つ札（タグの札）のとき、フォルダの丸を置かない。 */
@@ -329,7 +329,7 @@ export type SortThProps = ThProps & {
 }
 
 /**
- * ★V7：押して並べ替える見出しセル。
+ * ★管理画面：押して並べ替える見出しセル。
  *
  * 並び順は `aria-sort` と ▲▼ の印の両方で伝える（印だけ・読み上げだけにしない）。
  * 押せない見出しは今までどおり `Th` を使う。
@@ -371,7 +371,7 @@ const TABLE_STATE_TEXT: Record<TableStateKind, { title: string; description: str
 }
 
 /**
- * ★V7：表の中に1行で出す状態（空・読み込み中・失敗）。
+ * ★管理画面：表の中に1行で出す状態（空・読み込み中・失敗）。
  *
  * 「0件」と「読めなかった」を同じ顔にしない。失敗のときだけ、やり直す
  * ボタンを出す（`onRetry` が無いときは飾りボタンを置かない）。

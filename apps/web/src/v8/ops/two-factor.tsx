@@ -1,11 +1,11 @@
 'use client'
 import { Check, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
+import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
 import OpsShell from '@/components/ops/ops-shell'
 import { OpsHead } from '@/v8/ops/shell'
-import SelfMfa from '@/v8/settings/staff/self-mfa'
-import MfaPolicy from '@/v8/settings/staff/mfa-policy'
+import { SelfMfa } from '@/v8/settings/public/staff-self-mfa/index'
+import { MfaPolicy } from '@/v8/settings/public/staff-mfa-policy/index'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -27,9 +27,9 @@ import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null; stepUpMethod?: string }
 
 /**
- * 運営コンソールの 2要素認証の設定 V8（絵 `qod6X`）。
+ * 運営コンソールの 2要素認証の設定 V8。
  *
- * 動きは v7（app/ops/two-factor）と同じ。招待を受けた人（awaiting_totp）と、
+ * 動きは 管理画面（app/ops/two-factor）と同じ。招待を受けた人（awaiting_totp）と、
  * 登録済みで未設定の運営メンバーだけが開ける。確認が通るとサーバーが
  * ログインを解除するので、ログインし直しを案内する。
  */
@@ -155,7 +155,7 @@ export default function OpsTwoFactorV8() {
         ) : state === 'done' && recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => void logoutAndGoToLogin('/ops/login')} /> : state === 'done' ? (
           <>
             <NoteBar tone="info">2要素認証を登録しました。安全のため一度ログアウトしています。メールとパスワード、次に6桁の数字でログインし直してください。</NoteBar>
-            <Button fullWidth variant="primary" onClick={() => void logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>
+            <Button fullWidth variant="primary" onClick={() => logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>
           </>
         ) : (
           <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>

@@ -1,3 +1,5 @@
+> 文書：飲食店の予約・休業API｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 飲食店の予約・休業API
 
 管理の口は `/api/restaurant-test`。飲食店機能・店舗・LINEアカウント・担当範囲を確認します。読取と予約入力はowner/admin/staff、設定・承認はowner/admin、閲覧のみは書込不可です。呼び出しは `restaurantTestApi`、共有型は `packages/shared`、口の一覧はWorkerのOpenAPIを使います。

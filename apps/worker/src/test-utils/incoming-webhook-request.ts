@@ -1,4 +1,4 @@
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { processIncomingWebhookQueue } from '../routes/webhooks.js';
 const signed = new Map<string,{timestamp:string;eventId:string}>();
 const encoder=new TextEncoder();

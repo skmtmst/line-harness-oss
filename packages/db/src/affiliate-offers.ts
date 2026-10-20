@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from './id-queries.js';
 import { readFolderAssignment } from './folder-assignment.js';
 import { dbTableExists, jstNow } from './utils.js';
@@ -10,7 +12,7 @@ import {
 } from './affiliate-settlements.js';
 import { createAffiliateLink } from './affiliate-links.js';
 import type { AffiliateLink } from './affiliate-links.js';
-import { ensureDefaultMileageProgram } from './mileage.js';
+import { ensureDefaultMileageProgram } from './mileage/index.js';
 // =============================================================================
 // Affiliate Offers (案件) — ASP Phase 2
 // =============================================================================
@@ -528,7 +530,7 @@ export async function freezeConversionApproval(
       inputs.fixedReward, inputs.rewardMiles, eventId,
     ).run();
   } catch (error) {
-    console.error(JSON.stringify({"code":"src_affiliate_offers_failed"}));
+    logger.error("src_affiliate_offers_failed");
   }
 }
 
@@ -1024,12 +1026,12 @@ export async function createOfferVersion(
 // ── 上限の使用状況 ─────────────────────────────────────────────────────────
 
 /**
- * 日本時間の月の区切りを ISO 文字列で返す。SQLite 側は julianday() で
+ * 日本時間の月の区切りを ISO 文字列で返す。SQLite 側は julianday で
  * 時刻として比べる(文字列の形に依存しないため。affiliate-attribution 参照)。
  */
 export function jstMonthRange(at?: string): { start: string; end: string } {
   const base = at ? new Date(at) : new Date();
-  const jst = new Date(base.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(base);
   const year = jst.getUTCFullYear();
   const month = jst.getUTCMonth();
   const pad = (n: number) => String(n).padStart(2, '0');

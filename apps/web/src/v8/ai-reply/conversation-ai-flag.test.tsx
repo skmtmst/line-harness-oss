@@ -11,7 +11,7 @@ afterEach(() => { cleanup(); vi.unstubAllEnvs() })
 /** 会話の AI が止まっている状態（要約の場所に「AI が使えません」の帯が出る形）。 */
 const suspended = { ai: { mode: 'suspended', permissions: { seeSummary: true, useDraft: true } }, active: false, summary: { kind: 'idle' }, draft: { kind: 'idle' }, isDismissed: false } as unknown as InboxAi
 
-describe('会話の AI の入口の旗（B-355）', () => {
+describe('会話の AI の入口の旗', () => {
   it('明示的な true の時だけオン。未設定・false・空はオフ', () => {
     expect(conversationAiUiEnabled(undefined)).toBe(false)
     expect(conversationAiUiEnabled('')).toBe(false)

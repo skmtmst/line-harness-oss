@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 const access=vi.hoisted(()=>({allow:true}));
 vi.mock('../services/account-access.js',()=>({canAccessAllLineAccounts:vi.fn(async()=>access.allow)}));
-vi.mock('../services/booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>false)}));
+vi.mock('../features/booking/booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>false)}));
 import booking from './booking.js';
 let db:SqliteD1;
 let role:'owner'|'staff'='owner';

@@ -32,7 +32,7 @@ async function settle() {
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
 }
 
-describe('停止中のお問い合わせ本文（V6 IwfA0）', () => {
+describe('停止中のお問い合わせ本文（管理画面 IwfA0）', () => {
   beforeEach(() => {
     calls.context.mockClear()
     calls.list.mockClear()

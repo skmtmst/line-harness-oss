@@ -6,7 +6,7 @@ const PAGE = readFileSync(new URL('../../../v8/inflow-links/new/create.tsx', imp
 /**
  * #975 U065: 未入力でも「/r/summer-ig」のURLとQRが出て発行済みに見えた。
  * 未入力は例示、入力中は未発行の見本、と分ける。
- * 板 KMaMk の URL カードに QR は無い。見本の QR を出さないことで、
+ * 板  の URL カードに QR は無い。見本の QR を出さないことで、
  * 保存前の QR を配る事故自体を無くす。
  */
 describe('流入URLの保存前表示（#975 U065）', () => {

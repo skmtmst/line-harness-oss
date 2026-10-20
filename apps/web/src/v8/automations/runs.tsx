@@ -34,19 +34,19 @@ import {
 } from './shell'
 import styles from './runs.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 オートメーションの動いた記録（Pencil `g98F9`）。
+ * ★V8 オートメーションの動いた記録（Pencil ）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
  * （app/automations/runs-v8.tsx）と同じ（一覧・検索・結果の絞り込み・テスト実行の出し分け・CSV・
  * 中身・もう一度やる・取りやめ・?run= の直リンク）。違いは見せ方だけ——
- * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（絵の列の並び）を渡す。
+ * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（列の並び）を渡す。
  * 中身は右の詳細パネルで開く。
  */
 
@@ -314,7 +314,7 @@ export default function AutomationRunsV8() {
       await load()
     } catch (caught) {
       if (selectedAccountRef.current !== accountAtStart) return
-      setNotice(caught instanceof Error ? caught.message : '実行を取りやめられませんでした')
+      setNotice(describeApiFailure(caught, '取りやめ'))
     } finally {
       setCancellingId(null)
     }
@@ -338,7 +338,7 @@ export default function AutomationRunsV8() {
       await load()
     } catch (caught) {
       if (selectedAccountRef.current !== accountAtStart) return
-      const failureMessage = caught instanceof Error ? caught.message : '再実行できませんでした'
+      const failureMessage = describeApiFailure(caught, '再実行')
       await load()
       try {
         const detail = await api.automations.getRun(run.id)

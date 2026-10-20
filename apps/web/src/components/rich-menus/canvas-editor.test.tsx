@@ -2,7 +2,8 @@
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { CanvasEditor, areaDisplayName, type Area } from './canvas-editor'
+import { CanvasEditor, areaDisplayName } from './canvas-editor'
+import { type Area } from './area-types'
 
 /*
  * R233: リッチメニューのエリアは画像の上をマウスで掴むだけでは選べず、

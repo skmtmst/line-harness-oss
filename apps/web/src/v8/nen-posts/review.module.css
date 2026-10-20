@@ -1,5 +1,5 @@
 /*
- * ★V8-B 投稿（写真の審査 TkA4D・閲覧のみ Jn95h・採用 cniyw・見送る窓 ujcar・版の履歴 N1br7）。
+ * ★V8-B 投稿（写真の審査 ・閲覧のみ ・採用 ・見送る窓 ・版の履歴 ）。
  * 枠・見出し・タブの段・帯の段は型（ListPage）が持つ。ここは段の中身だけ。
  * 寸法は app/globals.css の [data-theme="v8"] の --tpl-nm-* に置く（数字を直書きしない）。
  */
@@ -14,7 +14,7 @@
   line-height: var(--tpl-tabs-text-lh);
 }
 
-/* 閲覧のみの帯（Jn95h：タブの下に上下12・左右24の段、薄い青の帯）。 */
+/* 閲覧のみの帯（：タブの下に上下12・左右24の段、薄い青の帯）。 */
 .viewerRow {
   padding: var(--tpl-nm-ro-row-pad);
 }
@@ -281,7 +281,7 @@
   line-height: var(--tpl-nm-small-lh);
 }
 .listHint {
-  /* 表の下の件数の文は表から 12 離す（絵 SyQA1。表とこの文は型の段の外の包みに入っているので、型の間が効かない）。 */
+  /* 表の下の件数の文は表から 12 離す（絵 。表とこの文は型の段の外の包みに入っているので、型の間が効かない）。 */
   margin: var(--polish-space-field) 0 0;
   color: var(--color-ink-faint);
   font-size: var(--tpl-nm-small-size);
@@ -372,7 +372,7 @@
 }
 
 /*
- * 見送る窓（ujcar：幅620・上から90）と版の履歴（N1br7：幅640・上から220）。
+ * 見送る窓（：幅620・上から90）と版の履歴（：幅640・上から220）。
  * 絵の窓は四方24の1枚の箱（題 18/26・説明 12/19・中の間14・下の線の上14）。
  * 共通の窓は題の段・中身・下の帯で余白が違うので、この2枚の窓だけ寄せる（共通部品は変えない）。
  */
@@ -510,7 +510,7 @@
   -webkit-line-clamp: 2;
 }
 
-/* 版の履歴（N1br7：幅640・上から220・中の間14）。 */
+/* 版の履歴（：幅640・上から220・中の間14）。 */
 .historyTable {
   overflow: hidden;
   border-radius: var(--tpl-nm-photo-radius);
@@ -635,7 +635,7 @@
 }
 
 
-/* 公式サイト掲載（SyQA1）：写真の表＋右に幅190の決めごと。 */
+/* 公式サイト掲載：写真の表＋右に幅190の決めごと。 */
 .publicationsGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--tpl-nm-pub-rail-w);

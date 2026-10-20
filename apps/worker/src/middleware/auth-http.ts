@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * decodeURIComponent throws on malformed percent escapes (e.g. `%`). Cookie
@@ -29,4 +29,16 @@ export function bearerToken(c: Context<Env>): string | null {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
   return authHeader.slice('Bearer '.length);
+}
+
+/** OAuth/signup cookies reject malformed escapes and use the first matching cookie. */
+export function readCookie(header: string | undefined, name: string): string | null {
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const [key, ...value] = part.trim().split('=');
+    if (key === name) {
+      try { return decodeURIComponent(value.join('=')); } catch { return null; }
+    }
+  }
+  return null;
 }

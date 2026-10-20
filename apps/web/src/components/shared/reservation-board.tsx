@@ -1,5 +1,8 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { jstDate as japanDate } from '@/lib/jst-datetime'
+
 import { jstDate } from '@/lib/jst-datetime'
 import {useEffect,useMemo,useRef,useState,type ReactNode,type DragEvent} from 'react'
 import {Printer} from 'lucide-react'
@@ -21,8 +24,8 @@ import ReservationMonth from './reservation-month'
 import ReservationPeopleGrid from './reservation-people-grid'
 import styles from './reservation-board.module.css'
 const hm=(iso:string)=>formatDate(iso,{style:'time'})
-const civil=(iso:string)=>new Date(Date.parse(iso)+9*3600000)
-const dayKey=(iso:string)=>civil(iso).toISOString().slice(0,10)
+const civil=(iso:string)=>japanCalendar(new Date(Date.parse(iso)))
+const dayKey=(iso:string)=>japanDate(new Date(iso))
 const minutes=(iso:string)=>civil(iso).getUTCHours()*60+civil(iso).getUTCMinutes()
 const source=(s:string)=>({line:'LINE',restaurant_board:'レストランボード',tabelog:'食べログ',hotpepper:'ホットペッパー',ikyu:'一休',phone:'電話',manual:'電話',walk_in:'ウォークイン'}[s]??s)
 const state=(s:string)=>({confirmed:'予約あり',requested:'承認待ち',pending:'承認待ち',visited:'来店済み',seated:'着席中',cancelled:'取消',no_show:'無断取消'}[s]??s)
@@ -30,7 +33,7 @@ const axisName={resource:'時間',floor:'座席表',list:'一覧',month:'月'}
 /** 経路の札。label を渡すと、その名前で出す（予約経路の連携の表のように、口が媒体の名前を持つとき）。 */
 export function ReservationSource({value,note,label}:{value:string;note?:string|null;label?:string}){return <span className={styles.source} data-source={value} title={label}>{label??(value==='manual'&&note?.startsWith('ウォークイン')?'ウォークイン':source(value))}</span>}
 export function ReservationDetailsActions({children}:{children:ReactNode}){return <div className={styles.detailActions}>{children}</div>}
-/** 盤の色の見本（予約元ごとの箱の色）。道具の段に1行で置く（GcyTr）。 */
+/** 盤の色の見本（予約元ごとの箱の色）。道具の段に1行で置く。 */
 export function ReservationLegend({items,label='予約の色'}:{items:Array<{label:string;tone:'info'|'warning'|'success'|'neutral'|'danger'}>;label?:string}){return <span className={styles.legendInline} role="list" aria-label={label}>{items.map(item=><span key={item.label} role="listitem" data-state={item.tone}>{item.label}</span>)}</span>}
 export function ReservationFacts({items}:{items:Array<{label:string;value:ReactNode}>}){return <dl className={styles.facts}>{items.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>}
 export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEntry;dense?:boolean}) {

@@ -68,7 +68,7 @@ const { default: InflowLinkDetailPage } = await import('./page')
 
 async function mountAndOpen() {
   render(<InflowLinkDetailPage />)
-  // 板 Q5le3 では青い帯の「止める」から削除の窓を開く。
+  // 板  では青い帯の「止める」から削除の窓を開く。
   const opener = await screen.findByRole('button', { name: '止める' })
   opener.focus()
   await act(async () => { fireEvent.click(opener) })
@@ -184,7 +184,7 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
     render(<InflowLinkDetailPage />)
 
     expect(await screen.findByRole('button', { name: 'リンクを編集' })).toBeTruthy()
-    // 板 Q5le3 では青い帯の「止める」から削除の窓を開く。
+    // 板  では青い帯の「止める」から削除の窓を開く。
     const opener = await screen.findByRole('button', { name: '止める' })
     await act(async () => { fireEvent.click(opener) })
     const dialog = await screen.findByRole('alertdialog')

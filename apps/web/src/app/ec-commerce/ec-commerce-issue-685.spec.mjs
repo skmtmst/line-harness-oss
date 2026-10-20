@@ -107,7 +107,7 @@ async function stubUnrelatedApis(page) {
  * 完全に静まらないことがあり、Playwright公式でも非推奨とされている。
  * 実際にこの試験でも、共通レイアウトの未対象APIを個別モックしてもなお
  * `networkidle` へ到達しないことを確認済み(#685実装ノードで原因特定済み)。
- * 各テストはこの後 `expect(...).toBeVisible()` で実データの出現を待つので、
+ * 各テストはこの後 `expect(...).toBeVisible` で実データの出現を待つので、
  * `domcontentloaded` で十分。
  */
 async function openEc(page, waitFor = 'domcontentloaded') {
@@ -348,7 +348,7 @@ test('切替後に届いた前のアカウントの遅い返事を、新しい�
 
 /*
  * 差し戻し(2026-09-09 2回目): Aで再試行を始め、応答が返る前にBへ切り替えると、
- * retry()が抱えたA向けのloadRecords(false)が共有listLoadSeqを進め、Bの正常な
+ * retryが抱えたA向けのloadRecords(false)が共有listLoadSeqを進め、Bの正常な
  * 一覧応答をseq不一致で捨てていた。Bは読み込み中のまま固まる。
  * accountIdRefで古いクロージャの呼び出しを共有seqへ触れる前に止めることを見る。
  */
@@ -390,7 +390,7 @@ test('Aで再試行の応答を待つ間にBへ切り替えても、Bの一覧�
   await page.getByRole('button', { name: 'この行のその他操作' }).click()
   await page.getByRole('menuitem', { name: 'もう一度やる' }).click()
   await expect.poll(() => retryRequested).toBe(true)
-  /* B-157: 操作名はそのまま、処理中は押せないことを確かめる。 */
+  /* : 操作名はそのまま、処理中は押せないことを確かめる。 */
   await expect(page.getByRole('menu')).toBeHidden()
   await page.getByRole('button', { name: 'この行のその他操作' }).click()
   await expect(page.getByRole('menuitem', { name: 'もう一度やる' })).toBeVisible()

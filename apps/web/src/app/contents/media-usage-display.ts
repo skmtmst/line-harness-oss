@@ -4,7 +4,7 @@
  * **表に無い種別を、内部の記号のまま出さない。**
  *
  * 画面は `REF_KIND_LABELS[u.refKind] ?? u.refKind` と書いていた。表に載って
- * いる7種類は日本語になるが、載っていない種別は `card_message` のまま並ぶ。
+ * いる種類は日本語になるが、載っていない種別は `card_message` のまま並ぶ。
  * 一斉配信から引用する素材（リッチメッセージ・カードタイプ・クーポン・
  * リサーチ）がまさにそれで、運用者の画面にDBの語が出ていた。
  *
@@ -13,7 +13,7 @@
  */
 
 const USAGE_KIND_LABELS: Record<string, string> = {
-  // メディア走査が記録する7種類（`packages/db` の `MEDIA_REF_KINDS`）。
+  // メディア走査が記録する種類（`packages/db` の `MEDIA_REF_KINDS`）。
   template: 'テンプレート',
   broadcast: '一斉配信',
   rich_menu: 'リッチメニュー',
@@ -21,6 +21,9 @@ const USAGE_KIND_LABELS: Record<string, string> = {
   nen_column: 'NENコラム',
   event: 'イベント',
   webinar: 'ウェビナー',
+  booking_menu: '予約メニューの写真',
+  booking_staff: '予約スタッフの写真',
+  booking_settings: 'お店の写真',
   // 一斉配信から引用する素材。言い方は作る画面（一斉配信）に合わせる。
   rich_message: 'リッチメッセージ',
   card_message: 'カードタイプ',

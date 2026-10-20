@@ -1,3 +1,5 @@
+import { formatYen, jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import { currentOrderState, orderNumberFromPayload } from './nen-order-state.js';
 import { EXTERNAL_DELIVERY_MAX_ATTEMPTS as MAX_DELIVERY_ATTEMPTS } from './external-delivery-retry.js';
 import {
@@ -10,8 +12,9 @@ import {
 } from '@line-crm/db';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { NEN_CAMPAIGN_BODY_MAX_LENGTH, effectiveAnniversaryMonthDay, type LeapYearPolicy } from '@line-crm/shared';
+
 import type { Message } from '@line-crm/line-sdk';
-import type { EcEvent } from '../routes/ec-integrations.js';
+import type { EcEvent } from '../features/ec-commerce/member-snapshot/index.js';
 import { createFeatureJobGate, featureJobCanRun } from './feature-enforcement.js';
 import { createEccubeCoupon } from './eccube-coupon.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
@@ -27,10 +30,10 @@ const MAX_JOBS_PER_TICK = 30;
 // status='failed' のまま残る（last_error に理由が入る）。
 const DELIVERY_LEASE_MS = 5 * 60_000;
 const RETRY_DELAYS_MS = [60_000, 300_000, 1_800_000];
-// 要件 v6-21 §8: 1アカウントが1回の実行で送る上限。一斉配信の batch と同じく、
+// 要件 -21 §8: 1アカウントが1回の実行で送る上限。一斉配信の batch と同じく、
 // 1つのアカウントが上限ぶん先頭を占めて他のアカウントを止めないようにする。
 const MAX_JOBS_PER_ACCOUNT_PER_TICK = 10;
-// 要件 v6-21 §5・§8: 深夜に送らない時間帯（JST）。この時間帯の予約は claim せず
+// 要件 -21 §5・§8: 深夜に送らない時間帯（JST）。この時間帯の予約は claim せず
 // pending のまま残し、朝8時を過ぎた tick が送る。時刻の既定は司令塔の確認待ち。
 export const NEN_QUIET_HOURS_START_JST = 21;
 export const NEN_QUIET_HOURS_END_JST = 8;
@@ -195,7 +198,7 @@ function sqliteDate(date: Date): string {
 
 function scheduledAfter(occurredAt: string, days: number, deliveryTime: string): string {
   const base = new Date(occurredAt);
-  const jst = new Date(base.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(base);
   const [hour, minute] = deliveryTime.split(':').map(Number);
   jst.setUTCDate(jst.getUTCDate() + days);
   jst.setUTCHours(Number.isFinite(hour) ? hour : 10, Number.isFinite(minute) ? minute : 0, 0, 0);
@@ -227,7 +230,7 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
  */
 function truncateForSend(value: string, maxLength: number, context: { campaignKey: string; field: string }): string {
   if (value.length <= maxLength) return value;
-  console.error(JSON.stringify({"code":"nen_body_truncated_at_send"}));
+  logger.error("nen_body_truncated_at_send");
   return value.slice(0, maxLength);
 }
 
@@ -487,7 +490,7 @@ const NEN_COLUMN_INTRO_MAX_LENGTH = 1500;
  */
 function truncateColumnIntro(value: string, maxLength: number, context: { title: string }): string {
   if (value.length <= maxLength) return value;
-  console.error(JSON.stringify({"code":"nen_column_intro_truncated"}));
+  logger.error("nen_column_intro_truncated");
   return value.slice(0, maxLength);
 }
 
@@ -528,7 +531,7 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
   const items = event ? orderSummary(event) : '';
   if (items) details.push({ type: 'text', text: items, size: 'sm', color: '#64748B', wrap: true });
   if (typeof event?.order?.total === 'number') {
-    details.push({ type: 'text', text: `合計：¥${Math.round(event.order.total).toLocaleString('ja-JP')}`, size: 'sm', color: '#64748B', wrap: true });
+    details.push({ type: 'text', text: `合計：${formatYen(event.order.total)}`, size: 'sm', color: '#64748B', wrap: true });
   }
   if (event?.order?.delivery_date) {
     details.push({
@@ -825,7 +828,7 @@ export function birthdayDeliveryTarget(now: Date): {
   monthDay: string;
   deliveryAt: Date;
 } {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(now);
   const targetBirthday = new Date(Date.UTC(
     jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() + 3,
   ));
@@ -886,11 +889,11 @@ export async function enqueueBirthdayCoupons(
   let queued = 0;
   let failed = 0;
   const report = async (failure: NenCouponIssueFailure) => {
-    console.error(JSON.stringify({"code":"nen_birthday_coupon_issue_failed"}));
+    logger.error("nen_birthday_coupon_issue_failed");
     try {
       await onIssueFailed?.(failure);
     } catch (notifyError) {
-      console.error(JSON.stringify({"code":"services_nen_engagement_failed"}));
+      logger.error("services_nen_engagement_failed");
     }
   };
   for (const pet of pets.results) {
@@ -1244,7 +1247,7 @@ export async function processNenDeliveries(
       await db.prepare(
         `UPDATE nen_delivery_jobs SET status = 'failed', last_error = ?, next_attempt_at = ?, updated_at = ? WHERE id = ? AND claim_token = ?`,
       ).bind(message, new Date(now.getTime() + RETRY_DELAYS_MS[Math.min(Number(job.attempts ?? 0), 2)]).toISOString(), now.toISOString(), job.id, claimToken).run();
-      console.error(JSON.stringify({"code":"nen_delivery_failed"}));
+      logger.error("nen_delivery_failed");
       failed++;
     }
   }

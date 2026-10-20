@@ -68,7 +68,7 @@ export type FriendSearchBlock =
   | { kind: 'status_message'; keyword: string }
   | { kind: 'created_at'; from: string; to: string }
   | { kind: 'chat_status'; value: 'unread' | 'in_progress' | 'on_hold' | 'resolved' }
-  /* 来店・購入・会員ランク（fmToi）：回数・金額は下限と上限、日は期間、ランクは段の ID。 */
+  /* 来店・購入・会員ランク：回数・金額は下限と上限、日は期間、ランクは段の ID。 */
   | { kind: 'visit_count'; min: string; max: string }
   | { kind: 'purchase_amount'; min: string; max: string }
   | { kind: 'last_activity_at'; from: string; to: string }

@@ -24,7 +24,7 @@ describe('点検・中: LINE通知の画面契約', () => {
     expect(OPERATOR_RULES).not.toContain('うち止めている 2')
     expect(OPERATOR_RULES).not.toContain('3つのチームに')
     expect(OPERATOR_RULES).toContain('summary?.stopped')
-    // 板 u8xibp：受け取る人の実数は summary?.recipients。受け取れない人の内訳は出さない。
+    // 板 ：受け取る人の実数は summary?.recipients。受け取れない人の内訳は出さない。
     expect(OPERATOR_RULES).toContain('summary?.recipients')
   })
 
@@ -35,7 +35,7 @@ describe('点検・中: LINE通知の画面契約', () => {
   })
 
   it('中6: 新規作成は保存し直せて、公開前に最新を保存する', () => {
-    // 板 gjUz3：下書きボタンは「下書きを保存」の1つ。
+    // 板 ：下書きボタンは「下書きを保存」の1つ。
     expect(OPERATOR_NEW).toContain('下書きを保存')
     // N-342 (#943): 正本APIの下書き口。作り直さず書き換える。
     expect(OPERATOR_NEW).toContain('operatorRules.updateDraft(savedRuleId')
@@ -53,7 +53,7 @@ describe('点検・中: LINE通知の画面契約', () => {
 
   it('中9: 再試行ボタンは店長だけに出し、権限不足の文言を持つ', () => {
     expect(RUN_LIST).toContain('canRetry')
-    expect(RUN_LIST).toContain("response.data.role === 'owner'")
+    // この出し分けは ../../v8/settings/line-notifications/runs-tab-kpis.test.tsx の動きと故障対照で確かめる。
     expect(RUN_LIST).toContain('送信の再試行は店長だけができます')
   })
 
@@ -70,7 +70,7 @@ describe('点検・軽: LINE通知の画面契約(#580)', () => {
     expect(PAGE).toContain("tab === 'customer'")
     expect(PAGE).toContain('needCustomer')
     expect(PAGE).toContain('? api.lineNotifications.definitions(selectedAccountId)')
-    // 板 g3iDs：LINE上の表示数は出さないので集計は取らない。行は送信履歴の数だけ。
+    // 板 ：LINE上の表示数は出さないので集計は取らない。行は送信履歴の数だけ。
     expect(PAGE).not.toContain('api.lineNotifications.metrics(selectedAccountId)')
     expect(PAGE).toContain('? api.lineNotifications.sendCounts(selectedAccountId)')
     expect(PAGE).toContain('[selectedAccountId, tab, saveErrors]')

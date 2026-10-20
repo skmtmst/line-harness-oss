@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { app } from '../index.js';
 import { routeClassification } from '../middleware/feature-enforcement.js';
@@ -137,7 +136,7 @@ function formatKeys(keys: string[]): string {
  * 後続票で記載済みにした分はここから消す（残っているとテストが落とす）。
  */
 /** 未記載負債はこの件数より増やせない。 */
-const ALLOWLIST_MAX = 770;
+const ALLOWLIST_MAX = 769;
 
 /**
  * 記載済み operation の完全な基準一覧。
@@ -148,6 +147,21 @@ const ALLOWLIST_MAX = 770;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'POST /api/liff/tracked-link-identity',
+  'GET /api/booking/admin/menus/photos',
+  'GET /api/liff/booking/store-photos',
+  'PUT /api/booking/admin/menus/{id}/photo',
+  'PUT /api/booking/admin/staff/{id}/photo',
+  'PUT /api/booking/admin/store-photos',
+  "GET /api/booking/admin/bookings/{id}",
+  'GET /api/ops/staging-qa/safety',
+  'GET /api/ops/staging-qa/runs',
+  'POST /api/ops/staging-qa/runs',
+  'GET /api/ops/staging-qa/runs/{id}',
+  'DELETE /api/ops/staging-qa/runs/{id}',
+  'POST /api/ops/staging-qa/runs/{id}/friends',
+  'POST /api/ops/staging-qa/runs/{id}/session',
+  'POST /api/ops/staging-qa/runs/{id}/cron',
   "GET /api/ai-answer-logs",
   "GET /api/ai-answer-logs/{id}",
   "GET /api/ai-features",
@@ -320,6 +334,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/dashboard/style/bookings',
   'GET /api/dashboard/style/bookings/{id}',
   'GET /api/dashboard/style/classes/{id}',
+  'GET /api/dashboard/style/ec-summary',
   'GET /api/dashboard/style/members',
   'GET /api/dashboard/style/menus/{id}',
   'GET /api/dashboard/style/people',
@@ -1199,7 +1214,6 @@ const ALLOWLIST = new Set<string>([
   'DELETE /api/meet-consultations/{externalEventId}',
   'GET /api/booking/admin/alternatives',
   'GET /api/booking/admin/availability',
-  'GET /api/booking/admin/bookings/{id}',
   'GET /api/booking/admin/customer-context',
   'GET /api/booking/admin/customers',
   'GET /api/booking/admin/customers/{id}',

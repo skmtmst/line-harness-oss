@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 差し込みを札で見せる本文の欄（絵 OVCot ①）。v8 のときだけ描く（v7 は今の textarea）。
+ * 差し込みを札で見せる本文の欄（絵 OVCot ①）。v8 のときだけ描く（互換経路は今の textarea）。
  * 箱の大きさ・余白・枠は呼び出し側の className（今の textarea と同じもの）が決める。
  * ここは「textarea と同じに見える」ための最小限と、札の見た目だけ。
  */

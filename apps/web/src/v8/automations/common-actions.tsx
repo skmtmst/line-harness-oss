@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import StatusBadge from '@/components/shared/status-badge'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -60,12 +61,12 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 オートメーションの共通アクション（Pencil `LnGNw`）。
+ * ★V8 オートメーションの共通アクション（Pencil ）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
  * （共通アクションの既存API）と同じ（一覧・検索・状態の絞り込み・複製・保管・CSV）。
  * 違いは見せ方だけ——型（ListPage）に、タブ・数の帯・左のフォルダの列（上に「共通アクションを作る」）・
- * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「中身を見る」と「…」。
+ * 案内の帯・道具の段・表（列の並び）を渡す。行の右端は「中身を見る」と「…」。
  */
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused' | 'archived'
@@ -202,7 +203,7 @@ export default function CommonActionsV8() {
       if (!response.success) throw new Error(response.error)
       router.push(`/common-actions/edit?id=${encodeURIComponent(response.data.id)}`)
     } catch (caught) {
-      setActionError(caught instanceof Error ? caught.message : '共通アクションを複製できませんでした')
+      setActionError(describeApiFailure(caught, '複製'))
       setDuplicatingId(null)
     }
   }
@@ -224,7 +225,7 @@ export default function CommonActionsV8() {
       setArchiving(null)
       await load()
     } catch (caught) {
-      setArchiveError(caught instanceof Error ? caught.message : '操作を完了できませんでした')
+      setArchiveError(describeApiFailure(caught, '保存'))
     } finally {
       setArchivingBusy(false)
     }

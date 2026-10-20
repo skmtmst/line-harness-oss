@@ -1,5 +1,5 @@
 import type { HqMediaUploadSession, MessageTemplateMediaDefinition } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createR2PresignedPutUrl } from './r2-presigned-upload.js';
 import { copyHqMediaStream, hashHqMedia, HQ_MEDIA_MAX_BYTES } from './hq-media-stream.js';
 import { readHqMp4Metadata } from './hq-mp4-metadata.js';

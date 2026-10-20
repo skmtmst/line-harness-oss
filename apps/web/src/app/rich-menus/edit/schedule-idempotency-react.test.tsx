@@ -4,9 +4,9 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import RichMenuCreateV8 from '../new/create-v8'
+import RichMenuCreateV8 from '../../../v8/rich-menus/new/create'
 import { pickDateTime } from '@/test-utils/rich-menu-editor'
-import { SCHEDULE_SAVED_MESSAGE, SCHEDULE_FAILED_MESSAGE } from './schedule-submit'
+import { SCHEDULE_SAVED_MESSAGE, SCHEDULE_FAILED_MESSAGE } from '../../../v8/rich-menus/edit/schedule-submit'
 
 const net = vi.hoisted(() => ({
   scheduleCalls: [] as Array<{ key: string; input: Record<string, unknown> }>,

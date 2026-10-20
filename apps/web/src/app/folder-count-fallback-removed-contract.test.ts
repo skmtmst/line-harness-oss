@@ -7,9 +7,9 @@ import ts from 'typescript'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
 
-/* 完全切り替え：v7 page は捨て、V8 を見る。シナリオの入口は src/v8/scenarios/list.tsx（古い list-v8 はもう描かれない）。 */
+/* 完全切り替え：管理画面 page は捨て、V8 を見る。シナリオの入口は src/v8/scenarios/list.tsx（古い list-v8 はもう描かれない）。 */
 const SCENARIOS = read('..', 'v8', 'scenarios', 'list.tsx')
-const REMINDERS = read('reminders', 'list-v8.tsx')
+const REMINDERS = read("../v8/reminders/list.tsx")
 const BROADCASTS = read('broadcasts', 'page.tsx')
 const AUTO_REPLIES = read('auto-replies', 'page.tsx')
 const TEMPLATES = read('templates', 'page.tsx')
@@ -48,7 +48,7 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
 
   it('reminders: reminders.filter(...).length でフォルダ件数を数えていない', () => {
     expect(REMINDERS).not.toMatch(/reminders\.filter\(.*folderId.*\)\.length/)
-    // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す（B-136）。
+    // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す。
     const panel = managedPanel(REMINDERS)
     expect(panel).toContain('kind="reminder"')
     expect(panel).not.toContain('countOf=')
@@ -70,7 +70,7 @@ describe('フォルダ件数フォールバックの削除(#631)', () => {
     expect(AUTO_REPLIES).not.toMatch(/items\.filter\(\(r\) => r\.folderId === f\.id\)\.length/)
     expect(AUTO_REPLIES).not.toMatch(/items\.filter\(\(r\) => !r\.folderId\)\.length/)
     // フォルダの件数は共通のフォルダの列（ManagedFolderPanel）が既定でサーバーの itemCount を出す。
-    // 画面で数え直す countOf を渡していないことを見る（B-136）。
+    // 画面で数え直す countOf を渡していないことを見る。
     const panel = managedPanel(AUTO_REPLIES)
     expect(panel).toContain('kind="auto_reply"')
     expect(panel).not.toContain('countOf=')

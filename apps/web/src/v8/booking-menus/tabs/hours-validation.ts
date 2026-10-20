@@ -9,8 +9,8 @@ export function initialBusinessHours(settings: BookingSettings): BusinessHoursDa
   }))
 }
 
-// v7 /booking/staff/shifts の BusinessHoursEditor と同じ検査。
-/** 営業時間の誤りと、その欄（曜日・何区間目・どの欄）。欄が無い誤りは場所なし（B-139）。 */
+// 管理画面 /booking/staff/shifts の BusinessHoursEditor と同じ検査。
+/** 営業時間の誤りと、その欄（曜日・何区間目・どの欄）。欄が無い誤りは場所なし。 */
 export type HoursProblem = { message: string; at?: { weekday: number; index: number; parts: Array<'start' | 'end' | 'capacity'> } }
 
 export function validateBusinessHours(days: BusinessHoursDay[]): HoursProblem | null {

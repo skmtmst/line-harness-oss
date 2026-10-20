@@ -1,5 +1,5 @@
 'use client'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
@@ -8,7 +8,7 @@ import { useListNavigationRouter as useRouter } from '@/components/shared/list-n
 import { Play } from 'lucide-react'
 import { validateImagemapMessage, type Folder, type MessageTemplateMediaDefinition } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import { japaneseDetailOf, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
@@ -153,7 +153,7 @@ if(current===generation.current)setNeedsImage(true)}
       const fieldFailure = saveErrors.capture(cause);
 if(current===generation.current){ if (!fieldFailure)
 
-setError(cause instanceof Error?cause.message:'アップロードできませんでした。選び直してください。') }}
+setError(describeApiFailure(cause, '画像の登録')) }}
     finally{if(current===generation.current)setBusy(false)}
   }
   const mismatch = Boolean(id && binding !== selectedAccountId)
@@ -223,7 +223,7 @@ setError('この吹き出しに入れられませんでした。もう一度お�
       const fieldFailure = saveErrors.capture(cause);
 if(current===generation.current){ if (!fieldFailure)
 
-setError(cause instanceof Error?cause.message:'保存できませんでした。もう一度お試しください。') }}
+setError(describeApiFailure(cause, '保存')) }}
     finally{saveLock.current=false;if(current===generation.current)setBusy(false)}
   }
   const fieldError=(field:RichVideoIssue['field'])=>issue?.field===field?<p id={`rv-${field}-error`} className={styles.error}>{issue.message}</p>:null

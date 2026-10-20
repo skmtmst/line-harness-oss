@@ -6,8 +6,8 @@ import { reminderAudienceCounts } from '../../v8/reminders/edit'
 
 const FLOW = readFileSync(join(process.cwd(), 'src/v8/reminders/edit.tsx'), 'utf8')
 const ISSUE_469 = readFileSync(join(process.cwd(), 'src/v8/reminders/edit.tsx'), 'utf8')
-/* 完全切り替え：v7 page は捨て、V8 の list-v8 を見る。 */
-const LIST_PAGE = readFileSync(join(process.cwd(), 'src/app/reminders/list-v8.tsx'), 'utf8')
+/* 完全切り替え：管理画面 page は捨て、V8 の list-v8 を見る。 */
+const LIST_PAGE = readFileSync(join(process.cwd(), 'src/v8/reminders/list.tsx'), 'utf8')
 
 describe('リマインダ公開フローの実データ表示', () => {
   it('TargetStage は validate 応答の対象人数を表示へ渡す', () => {

@@ -2,12 +2,12 @@
 
 /*
  * ★V8 外部連携の外枠（Pencil「★V8 画面の地図」の外部連携の行）。
- * 板：送る `ZSbFY`・1152 `AsfFB`・閲覧のみ `l5SRfT`・受け取る `gW0F2`・
- * Google Sheets `DxAAA`・やり取りの記録 `Uv9AA`・見本 `SAUCs`。
+ * 板：送る ・1152 ・閲覧のみ ・受け取る ・
+ * Google Sheets ・やり取りの記録 ・見本 。
  *
  * どのタブも「題・説明・右上の操作 → タブ（件数つき）→ 数の帯」が同じ。
  * 枠と見出しは型（ListPage）が持つ。ここはタブと帯の中身と、帯の数を読む口だけ。
- * v7 の画面（app/webhooks/page.tsx ほか）は触らない。データの口は同じ。
+ * 管理画面 の画面（app/webhooks/page.tsx ほか）は触らない。データの口は同じ。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Inbox, ListChecks, Send, TriangleAlert } from 'lucide-react'
@@ -32,7 +32,7 @@ export const SAMPLE_COUNT = 9
 /** 外部連携の説明（全タブ共通の題の下）。 */
 export const WEBHOOKS_DESCRIPTION = 'ほかのシステムと、友だちの動きをやり取りします。送る・受け取る・API・Google Sheets をここで決めます。'
 
-/** 変更は統括だけ（v7 と同じ R32）。見るだけの人への一言。 */
+/** 変更は統括だけ（管理画面 と同じ R32）。見るだけの人への一言。 */
 export const MANAGE_REASON = permissionDeniedMessage('store')
 
 /*
@@ -149,7 +149,7 @@ export interface BandCell {
 }
 
 /*
- * 送る・受け取る・Sheets・見本タブの帯（絵 ZSbFY）。
+ * 送る・受け取る・Sheets・見本タブの帯。
  * 「先月より」は先月の集計の口が無いので、直近30日 送ったの下は成功の回数を出す。
  */
 export function overviewBandCells(args: {
@@ -213,7 +213,7 @@ export function WebhookBand({ cells }: { cells: BandCell[] }) {
   )
 }
 
-/** 閲覧のみの帯（絵 l5SRfT：タブの下・数の帯の上）。 */
+/** 閲覧のみの帯（絵 ：タブの下・数の帯の上）。 */
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>

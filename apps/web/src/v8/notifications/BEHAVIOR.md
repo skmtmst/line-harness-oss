@@ -1,6 +1,8 @@
+> 文書：通知（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 通知（V8）の動き
 
-入口：`app/notifications/page.tsx`（V8 のときだけ `src/v8/notifications/list.tsx`、それ以外は今の画面）。
+入口：`app/notifications/page.tsx`（V8専用で `src/v8/notifications/list.tsx`）。
 絵：`y8QQV`（通知 V8）。
 
 ## 受け付ける URL と指定（今の画面と同じ名前・同じ意味）

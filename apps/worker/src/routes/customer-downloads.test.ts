@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { app as worker } from '../index.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { customerDownloads } from './customer-downloads.js';
@@ -54,6 +54,9 @@ afterEach(() => { db.raw.close(); vi.unstubAllGlobals(); vi.restoreAllMocks(); }
 
 describe('本人向けファイルの取り直し', () => {
   it('本人だけに新しい15分URLを返し、取得時にも本人を確かめる', async () => {
+    // 発行と検査を同じ時計にする。署名の秒丸めと実行時間を混同しない。
+    const issuedNow = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(issuedNow);
     const response = await issue();
     expect(response.status).toBe(200);
     const { data } = await response.json<{ data: { url: string; expiresAt: string; filename: string } }>();
@@ -68,12 +71,12 @@ describe('本人向けファイルの取り直し', () => {
     expect((await request(data.url, 'other-shop-id')).status).toBe(403);
     const got = await request(data.url, 'alice-id');
     expect(got.status).toBe(200); expect(await got.text()).toBe(new TextDecoder().decode(PDF_BYTES));
-    const expired = vi.spyOn(Date, 'now').mockReturnValue(Date.parse(data.expiresAt));
+    clock.mockReturnValue(Date.parse(data.expiresAt));
     expect((await request(data.url, 'alice-id')).status).toBe(403);
     const fresh = await issue(); expect(fresh.status).toBe(200);
     const newer = (await fresh.json<{ data: { url: string } }>()).data.url;
     expect(newer).not.toBe(data.url); expect((await request(newer, 'alice-id')).status).toBe(200);
-    expired.mockRestore();
+    clock.mockRestore();
   });
   it.each(['bob-id', 'other-shop-id', 'invalid', 'test-a'])('%sから発行できず、中身も所有者も返さない', async token => {
     const res = await issue(token); expect(res.status).toBe(404);

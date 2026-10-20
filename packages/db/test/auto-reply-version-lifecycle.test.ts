@@ -3,17 +3,8 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  createAutoReplyWithDraftVersion,
-  ensureAutoReplyPublishedVersion,
-  getAutoReplyDraftVersion,
-  getAutoReplyPublishedVersion,
-  parseAutoReplyVersionSettings,
-  publishAutoReplyDraftVersion,
-  recordAutoReplyDraftTest,
-  saveAutoReplyDraftVersion,
-  type AutoReplyDraftSettings,
-} from '../src/auto-reply-runs.js';
+import { createAutoReplyWithDraftVersion, ensureAutoReplyPublishedVersion, getAutoReplyDraftVersion, getAutoReplyPublishedVersion, parseAutoReplyVersionSettings, publishAutoReplyDraftVersion, recordAutoReplyDraftTest, saveAutoReplyDraftVersion } from '../src/auto-reply-runs.js';
+import { type AutoReplyDraftSettings } from '../src/auto-reply-runs-types.js';
 import { getAutoReplyById } from '../src/auto-replies.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');

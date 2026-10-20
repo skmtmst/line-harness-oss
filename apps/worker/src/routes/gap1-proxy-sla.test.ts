@@ -1,7 +1,7 @@
 import {beforeEach,afterEach,expect,test,vi} from 'vitest';
 import {Hono} from 'hono';
 import {lineProxy} from './line-proxy.js';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {gapFixture} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 import {upsertChatOnMessage} from '@line-crm/db';

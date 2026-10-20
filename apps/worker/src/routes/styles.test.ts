@@ -4,7 +4,7 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest';
 import { asD1 } from '@line-crm/db/test/d1-test-helper.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { styles } from './styles.js';
 import {
   styleSnapshot,
@@ -141,7 +141,7 @@ describe('style setup', () => {
       raw
         .prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'")
         .get(),
-    ).toEqual({ n: 16 });
+    ).toEqual({ n: 5 });
     expect(
       raw
         .prepare(
@@ -405,7 +405,7 @@ describe('style setup', () => {
     const state = (await value(await get())).data;
     expect(
       state.questions.find((q: any) => q.key === 'payment'),
-    ).not.toHaveProperty('changeAt');
+    ).toHaveProperty('changeAt', '/booking/menus?tab=payments');
     expect(
       state.questions.find((q: any) => q.key === 'cancelDeadline').changeAt,
     ).toBe('/booking/menus?tab=rules');
@@ -415,7 +415,7 @@ describe('style setup', () => {
     ).not.toHaveProperty('href');
     expect(
       warnings.manual.find((q: any) => q.key === 'payment'),
-    ).not.toHaveProperty('href');
+    ).toHaveProperty('href','/booking/menus?tab=payments');
     raw.exec(
       "INSERT INTO rich_menu_groups(id,account_id,name,chat_bar_text,size) VALUES('coupon-menu','a','メニュー','メニュー','large'); INSERT INTO rich_menu_pages(id,group_id,order_index,name,alias_id) VALUES('coupon-page','coupon-menu',0,'ページ','alias'); INSERT INTO rich_menu_areas(id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,label,intent,action_data) VALUES('coupon-area','coupon-page',0,0,100,100,'postback','クーポン','postback','{}')",
     );
@@ -1213,5 +1213,5 @@ test('deferring content does not add new templates or rich menus for the selecte
     raw
       .prepare("SELECT COUNT(*) n FROM templates WHERE line_account_id='a'")
       .get(),
-  ).toEqual({ n: 16 });
+  ).toEqual({ n: 5 });
 });

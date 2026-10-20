@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /*
- * ★V8 自動応答 かんたんに作る（板 `G4GejG`、小窓 560）の配線の確認。
+ * ★V8 自動応答 かんたんに作る（板 、小窓 560）の配線の確認。
  *
  * 言葉（どれか1つを含む）と返す文だけ聞いて、その場で有効にする。
  * 重なりは作った下書きで確かめて帯に出し、確かめた分だけ承認する。

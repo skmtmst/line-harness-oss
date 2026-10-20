@@ -10,7 +10,7 @@
  * 保存した側が画面を離れたあと初めて検索が壊れる。ここに無い op は
  * 保存の時点で理由を付けて断る。
  */
-import type { SavedSearchConditionKind } from './types';
+import type { SavedSearchConditionKind } from './types/saved-searches';
 
 /**
  * kind ごとに実行側が解釈できる op。

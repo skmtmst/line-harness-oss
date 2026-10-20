@@ -8,7 +8,7 @@ import { CreatePage } from '@/components/templates/create-page'
 import { CreatePreviewNote, CreateSummaryCard } from '@/components/templates/create-parts'
 import { AccountIcon, StateCard } from './tabs/shared'
 import { MenusTabV8, V8_TABS } from './settings-parts'
-import type { useBookingSettings } from './settings'
+import type { useBookingSettings } from './use-booking-settings'
 
 type MenuPageProps = Pick<ReturnType<typeof useBookingSettings>,
   'accountId' | 'tabNode' | 'canEditMenus' | 'menus' | 'menusStatus' | 'menusError' |

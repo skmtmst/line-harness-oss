@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getMediaDeleteImpactSnapshot, getMediaReplacementPlan } from '@line-crm/db';
-import { scanSingleMediaUsage, scanMediaUsage } from '../services/media-usage-scan.js';
+import { scanSingleMediaUsage, scanMediaUsage } from '../features/media/media-usage-scan.js';
 import { images } from './images.js';
 import { hqTemplates } from './hq-templates.js';
 // The real pure Web authoring functions feed the real HTTP + SQLite executor.

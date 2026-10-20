@@ -1,3 +1,5 @@
+> 文書：32 運用状態 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 32 運用状態 操作と挙動（受け入れ）
 
 要件の正本：[32 運用状態](../../v6-requirements/v6-32-operations-status-requirements-draft.md)・[共通基盤 §3・§6-2・§9・§11・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[30 §7〜§8 権限と大事な操作の再確認](../../v6-requirements/v6-30-login-users-requirements-draft.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
@@ -84,10 +86,10 @@
 
 1. 復旧で「再開対象を選ぶ」（§10-4）ができない。復旧の要求は確認の言葉と版だけで、再開できる物は全部まとめて戻る。根拠：apps/web/src/lib/api.ts:14006（restore の入力は confirmation・expectedVersion だけ）、packages/db/src/operations.ts:484-486。
 2. 停止中に時刻を過ぎた予約の一斉配信は「止めていたので送らなかった」（§10・`skipped_due_to_emergency`）として残すのではなく、下書きへ戻す。根拠：packages/db/src/operations.ts:470-482（holdExpiredBroadcasts）。apps/worker/src・packages/db/src に skipped_due_to_emergency が無い。
-3. 画面で選べる止める物は 4 つ（一斉配信・シナリオ・リマインダ・自動処理＝オートメーションと自動応答）だけ。要件 §7 の「送り先 Webhook」「広告の成果通知」は口では止められるが画面に選ぶ所が無い。根拠：apps/web/src/app/emergency/control-v8.tsx:41-59、packages/db/src/operations.ts:9-17。
-4. 最終確認に「止める前に送信を始めた N 件は止められない」（§8-2）の実数が出ない。影響の数は予約と送信中を合わせて数えている。根拠：apps/worker/src/services/operation-impact-preview.ts:76・97（status IN ('scheduled','sending')）、apps/web/src/app/emergency/control-v8.tsx に送信中の件数の表示が無い。
+3. 画面で選べる止める物は 4 つ（一斉配信・シナリオ・リマインダ・自動処理＝オートメーションと自動応答）だけ。要件 §7 の「送り先 Webhook」「広告の成果通知」は口では止められるが画面に選ぶ所が無い。根拠：apps/web/src/v8/emergency/control.tsx:41-59、packages/db/src/operations.ts:9-17。
+4. 最終確認に「止める前に送信を始めた N 件は止められない」（§8-2）の実数が出ない。影響の数は予約と送信中を合わせて数えている。根拠：apps/worker/src/services/operation-impact-preview.ts:76・97（status IN ('scheduled','sending')）、apps/web/src/v8/emergency/control.tsx に送信中の件数の表示が無い。
 5. 全アカウントの停止は要件 §14 で「オーナー・管理者の専用権限」だが、今はオーナーだけ（専用権限を持つ管理者も全体は止められない）。根拠：apps/worker/src/routes/operations.ts:73-75。
-6. 本人確認：要件 §8・§10 は二段階認証（step-up MFA）。今は 2 段階認証を使っていない人はパスワードで通る。根拠：apps/web/src/app/emergency/control-v8.tsx:164-165、apps/web/src/lib/api.ts:13960-13961。
+6. 本人確認：要件 §8・§10 は二段階認証（step-up MFA）。今は 2 段階認証を使っていない人はパスワードで通る。根拠：apps/web/src/v8/emergency/control.tsx:164-165、apps/web/src/lib/api.ts:13960-13961。
 7. データの置き場の確認（§5-3）：知らせは 3 回続いた時だけ（§5-3 の確定分は「旧案の 3 回続いた時だけ知らせるは採らない」）。また KV は実際には読み書きせず常に「正常」、Queue は束縛の有無だけ。根拠：apps/worker/src/services/operations-health.ts:33-35・413-415・445-458。
 8. 「いますぐ確かめる」は役割に関係なく出るが、口はオーナー・管理者だけ（担当・閲覧のみは押すと 403）。決まり「押せないボタンは隠す」とも合わない。根拠：apps/web/src/v8/settings/emergency/screen.tsx:84-87、apps/worker/src/routes/operations.ts:331。
 9. 配備の記録の「かかった時間」が常に `—`。要件 §11-2 は開始・完了・停止時間を残す（口は downtimeSeconds を受け取って保存している）。根拠：apps/web/src/v8/settings/emergency/history.tsx:159、apps/worker/src/routes/operations.ts:924-925。

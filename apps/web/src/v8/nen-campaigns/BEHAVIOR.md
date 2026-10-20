@@ -1,3 +1,5 @@
+> 文書：NEN配信の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # NEN配信の動き（BEHAVIOR.md）
 
 対象：`list.tsx`（一覧：自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・誕生日クーポンの決めごと `oqSJP`）、
@@ -17,7 +19,7 @@
 
 ## 読み込み（API）— page.tsx
 - 自動配信・停止中・コラム：`settings`・`columns`・`metrics/flows`・`metrics/columns`・今月と先月の `deliveries`（件数だけ）・`birthday-coupon`。
-- 送った履歴：`deliveries?limit=20`。**数の帯がまだ無ければ、共通の分も一緒に読む**（URL で履歴を直接開いても帯とタブの件数が出る。2026-10-06 に page.tsx で直した。v7 にも効く）。
+- 送った履歴：`deliveries?limit=20`。**数の帯がまだ無ければ、共通の分も一緒に読む**（URLで履歴を直接開いても帯とタブの件数が出る）。
 - テスト送信先：`account-settings/test-recipients`（登録した人だけ）。
 - 取れないタブの件数は出さない（0 にしない）。読めないときは表の場所に「読み込めませんでした」と読み直し。
 

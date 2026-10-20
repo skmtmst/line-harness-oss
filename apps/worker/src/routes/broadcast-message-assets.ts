@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateTapExtraReferences } from '../services/tap-extras.js';
@@ -22,10 +23,11 @@ import {
   type BroadcastMessageAssetKind,
   type BroadcastMessageAssetStatus,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { validateAssetPayload } from '@line-crm/shared';
 import { requireRole } from '../middleware/role-guard.js';
-import { storeBroadcastMedia } from '../services/broadcast-media-storage.js';
+import { storeBroadcastMedia } from '../features/broadcasts/broadcast-media-storage/index.js';
 import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
 import { ensureFileScanForUpload } from './file-scan.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -561,7 +563,7 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole(
     });
   } catch (err) {
     // 途中で切れた・申告の大きさと中身が違う・保存先の失敗。どれも選び直しで直る。
-    console.error(JSON.stringify({"code":"routes_broadcast_message_assets_failed","route":"POST /api/broadcast-message-assets/upload"}));
+    logger.error("routes_broadcast_message_assets_failed");
     return c.json({ success: false, error: 'ファイルを保存できませんでした。通信を確かめて、もう一度選び直してください' }, 502);
   }
   // 全体の検査は保存の直後に回す。clean になるまで配信には出さない。
@@ -574,7 +576,7 @@ broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole(
     filename: validation.filename,
     mimeType: validation.mimeType,
     sizeBytes: stored.size,
-  }).catch((err) => console.error(JSON.stringify({"code":"routes_broadcast_message_assets_failed","route":"POST /api/broadcast-message-assets/upload"})));
+  }).catch((err) => logger.error("routes_broadcast_message_assets_failed"));
   return c.json({
     success: true,
     data: stored,

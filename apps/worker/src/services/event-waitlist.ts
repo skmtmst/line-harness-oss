@@ -1,3 +1,6 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+export type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
+import type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
 import type { EventOccurrenceApplicants } from './event-waitlist-types.js';
 export type { EventOccurrenceApplicants } from './event-waitlist-types.js';
 import { eventModeRemaining } from './event-mode-capacity.js';
@@ -5,25 +8,15 @@ import { activeTenantLineAccountSql, resolveLineCredential, isOperationCapabilit
 import { sha256 } from './event-waitlist-owner.js';
 import { stoppedTenantLineAccountSql } from './tenant-runtime-status.js';
 import { sendEventBookingNotification } from './event-booking-notifier.js';
+import { prepareEventNotification } from './event-notification-plan.js';
+import { prepareEventReminders } from './event-reminder-plan.js';
+import { computeRemindersForBooking } from './event-reminder-schedule.js';
 import { dispatchPendingEventWaitlistOffers, eventWaitlistDeliveryStatements } from './event-waitlist-delivery.js';
 import { featureJobCanRun } from './feature-enforcement.js';
 import type { EventWaitlistOfferDetail, EventWaitlistMine } from '@line-crm/shared';
 
 const DEFAULT_OFFER_HOURS = 24;
 const JOB_RETRY_MAX_MINUTES = 60;
-
-export type EventWaitlistOfferSender = (offer: {
-  waitlistId: string;
-  retryKey?: string;
-  lineAccountId: string;
-  friendId: string;
-  eventName: string;
-  startsAt: string;
-  venueName: string | null;
-  venueUrl: string | null;
-  token: string;
-  expiresAt: string;
-}) => Promise<void>;
 
 interface OccurrenceRow {
   classroom_capacity:number|null;online_capacity:number|null;
@@ -627,6 +620,13 @@ export async function acceptEventWaitlistOffer(
     return { kind: 'unavailable' };
   }
 
+  const notificationPlan=await prepareEventNotification(db,{accountId:offer.line_account_id,
+    operationId:`event-waitlist-accept:${bookingId}`,to:offer.line_user_id,kind:'received_confirmed',
+    ctx:{eventName:offer.event_name,startsAtJst:formatJst(offer.starts_at),venueName:offer.venue_name,
+      venueUrl:offer.venue_url,confirmationExtra:offer.confirmation_message_extra},
+    subject:{bookingId,slotId:offer.slot_id,status:'confirmed',startsAt:offer.starts_at},now});
+  const reminderPlans=prepareEventReminders(db,bookingId,computeRemindersForBooking({starts_at_utc:offer.starts_at,
+    reminder_day_before_enabled:offer.reminder_day_before_enabled===1,reminder_hours_before:offer.reminder_hours_before,now}),true);
   const results = await db.batch([
     db.prepare(
       `UPDATE event_waitlist
@@ -710,6 +710,7 @@ export async function acceptEventWaitlistOffer(
         WHERE id = ? AND status = 'accepted' AND offer_token_hash = ?
           AND EXISTS (SELECT 1 FROM event_bookings b WHERE b.id = ?)`,
     ).bind(nowIso, offer.id, tokenHash, bookingId),
+    notificationPlan,...reminderPlans,
   ]);
 
   const converted = await db
@@ -1108,7 +1109,7 @@ export async function processEventWaitlistPromotionJobs(
 }
 
 function formatJst(utcIso: string): string {
-  const jst = new Date(new Date(utcIso).getTime() + 9 * 3600_000).toISOString();
+  const jst = japanCalendar(new Date(utcIso)).toISOString();
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
 }
 
@@ -1303,6 +1304,8 @@ export function createEventWaitlistOfferSender(
       ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}eventWaitlistToken=${encodeURIComponent(offer.token)}`
       : null;
     await sendEventBookingNotification({
+      delivery: { db, accountId: offer.lineAccountId, operationId: `event-offer:${offer.waitlistId}:${offer.retryKey}`,
+        deadlineAt: Date.parse(offer.expiresAt) },
       channelAccessToken: accessToken,
       toLineUserId: row.line_user_id,
       kind: 'waitlist_offer',

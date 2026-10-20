@@ -7,11 +7,15 @@ import type { BillingPlanView, BillingSummary } from '@/lib/hq-billing'
 import HqBillingPage from './page'
 
 const calls = vi.hoisted(() => ({ summary: vi.fn(), invoices: vi.fn(), checkout: vi.fn(), portal: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))
+vi.mock('@/lib/api', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  const mocked = await (() => ({ api: { hqBilling: calls }, ApiError: class extends Error {} }))()
+  return { ...actual, ...mocked }
+})
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(), usePathname: () => '/hq/billing', useRouter: () => ({push: vi.fn()}) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined, usePageChrome: () => ({ title: null, fullWidth: false, crumbs: null }) }))
 
-vi.mock('@/lib/staff-role', () => ({useStaffRole: () => 'owner'}))
+vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(),useStaffRole: () => 'owner'}))
 
 const plans: BillingPlanView[] = [
   { key: 'light', name: 'ライト', monthlyYen: 9800, yearlyYen: 99000 },
@@ -66,7 +70,7 @@ const page = read('../../../v8/hq/billing.tsx')
 const menu = read('../../../components/hq/account-menu.tsx')
 const limit = read('../../../components/hq/banners/limit-state.tsx')
 
-/** ★V6 36-2 / 36-2-A 課金プランの構造と実際の切り替え。 */
+/** ★管理画面 36-2 / 36-2-A 課金プランの構造と実際の切り替え。 */
 describe('課金プラン（36-2）', () => {
   it('帯 → プラン3枚 → 注記 → 支払い履歴の順で、画面名はトップバーだけ', () => {
     const order = ['data-design="Status"', 'data-design="Interval"', 'data-design="Plans"', 'data-design="History"']

@@ -140,6 +140,10 @@ describe('N-426: 二段階認証の初回設定へ進む', () => {
     const params = new URLSearchParams(window.location.hash.slice(1))
     expect(params.get('lh_2fa')).toBe('verify-tok-1')
     expect(params.get('lh_method')).toBe('password')
+    expect(params.get('lh_nonce')).toMatch(/^[0-9a-f-]{36}$/)
+    expect(JSON.parse(sessionStorage.getItem('lh_login_handoff')!)).toMatchObject({
+      nonce: params.get('lh_nonce'), kind: 'challenge', path: '/login/two-factor',
+    })
   })
 
   it('twoFactorSetup 応答なら /login/two-factor/setup へ合言葉付きで進む', async () => {
@@ -165,7 +169,10 @@ describe('N-426: 二段階認証の初回設定へ進む', () => {
     const buttons = [...host.querySelectorAll('button')] as HTMLButtonElement[]
     const lineButton = buttons.find((b) => b.textContent?.includes('LINE'))!
     await act(async () => { lineButton.click() })
-    expect(window.location.href).toBe('https://api.example.test/api/auth/line?remember=1')
+    const url = new URL(window.location.href)
+    expect(url.origin + url.pathname).toBe('https://api.example.test/api/auth/line')
+    expect(url.searchParams.get('remember')).toBe('1')
+    expect(url.searchParams.get('handoff')).toMatch(/^[0-9a-f-]{36}$/)
   })
 
   it('LINEログインで未選択なら remember は付かない', async () => {
@@ -173,6 +180,9 @@ describe('N-426: 二段階認証の初回設定へ進む', () => {
     const buttons = [...host.querySelectorAll('button')] as HTMLButtonElement[]
     const lineButton = buttons.find((b) => b.textContent?.includes('LINE'))!
     await act(async () => { lineButton.click() })
-    expect(window.location.href).toBe('https://api.example.test/api/auth/line')
+    const url = new URL(window.location.href)
+    expect(url.origin + url.pathname).toBe('https://api.example.test/api/auth/line')
+    expect(url.searchParams.has('remember')).toBe(false)
+    expect(url.searchParams.get('handoff')).toMatch(/^[0-9a-f-]{36}$/)
   })
 })

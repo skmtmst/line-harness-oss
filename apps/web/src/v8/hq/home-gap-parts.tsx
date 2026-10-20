@@ -7,7 +7,7 @@ import { CircleDot, Star } from 'lucide-react';
 import { type AccountWithStats } from '@/contexts/account-context';
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 
-/* ★V8 統括のアカウント（JKjsE）。読み書き・権限は既存の口を保つ。 */
+/* ★V8 統括のアカウント。読み書き・権限は既存の口を保つ。 */
 type StatusFilter = 'all' | 'ok' | 'warn' | 'archived'
 
 type View = 'cards' | 'table'

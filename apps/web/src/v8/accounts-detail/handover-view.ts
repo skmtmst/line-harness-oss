@@ -1,7 +1,7 @@
 import type { AccountHandover } from '@/lib/api'
 
 /*
- * 乗り換え（★V8 x2dSNv）の言葉。今の画面（app/accounts/handover/handover-view.ts）の決まりを写した。
+ * 乗り換え（V8）の言葉。今の画面（app/accounts/handover/handover-view.ts）の決まりを写した。
  * src/v8 からは @/app を読めないため。
  */
 

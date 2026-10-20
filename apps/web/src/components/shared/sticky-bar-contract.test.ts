@@ -124,7 +124,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
     expect(wizard).toContain('V8_STEPS')
     expect(wizard).toContain('type="submit"')
     /* 接続確認の保存制限は v06 で手動チェックから5行の確認へ変わった。
-       文字で見張らず、描いた画面で見張る（B-273）：
+       文字で見張らず、描いた画面で見張る：
        register-v8.react.test.tsx「5行が通ってから登録でき、登録すると③Step2へ進む」。 */
     expect(wizard).toContain('api.lineAccounts.connect(')
   })
@@ -169,7 +169,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
   it('操作の手前の一言を渡した画面は、ボタンを右端に置く', () => {
     expect(BAR).toMatch(/info\?:\s*ReactNode/)
     expect(BAR).toMatch(/info \? </)
-    // 列の数・幅の文字は固定しない（B-342）。右端に並ぶことは、4列へ戻していないこと（下）と右そろえで守る。
+    // 列の数・幅の文字は固定しない。右端に並ぶことは、4列へ戻していないこと（下）と右そろえで守る。
     expect(CSS).toMatch(/\.withInfo \.actions\s*\{[^}]*justify-content:\s*flex-end/s)
     // 右端に空き列を作る4列へ戻していないこと。
     expect(CSS).not.toMatch(/1fr auto auto 1fr/)
@@ -251,7 +251,7 @@ describe('下部追従バーの並びを部品で固定する', () => {
   })
 
   it('バナーのプロジェクト（V8）が札を渡している', () => {
-    // v7 の入口（app/hq/banners/project/page.tsx）は 2026-10-09 の V7 削除で V8 を出すだけになったので、V8 だけを見る。
+    // 管理画面 の入口（app/hq/banners/project/page.tsx）は 2026-10-09 の 管理画面 削除で V8 を出すだけになったので、V8 だけを見る。
     const v8Page = fs.readFileSync(path.join(SRC, 'v8/hq-banners/project.tsx'), 'utf8')
     for (const [name, source] of [
       ['V8', v8Page],

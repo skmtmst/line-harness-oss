@@ -16,7 +16,7 @@ import ListRange from '@/components/ui/list-range'
 import { ApiError, bookingApi, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
 import { EMPTY_STAFF, StaffEditModal } from '../staff-edit-dialog'
-import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '../../booking-payments/assignment'
+import { AssignmentConflict, AssignmentRowDialog, AssignmentSection, PRIORITY, useAssignment } from '@/v8/booking-payments/public/assignment/index'
 import StatusBadge from '@/components/shared/status-badge'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
@@ -34,7 +34,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
-/* ⑤ 担当スタッフ（VLEaj）（settings-v8.tsx から分割。見た目・動きは変えない） */
+/* ⑤ 担当スタッフ（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 const STAFF_PAGE_SIZE = 4
 
@@ -66,7 +66,7 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
   const [pausing, setPausing] = useState(false)
   const [pauseError, setPauseError] = useState<string | null>(null)
   const [page, setPage] = useListUrlValue('page', 1)
-  /* 指名なしの予約の割り当て方（B-306・絵 QJMoY）。保存は下の帯。 */
+  /* 指名なしの予約の割り当て方（・絵 QJMoY）。保存は下の帯。 */
   const assignment = useAssignment({ kind: 'staff', accountId })
   const preparing = usePreparingDialog()
   const [assignTarget, setAssignTarget] = useState<BookingStaff | null>(null)

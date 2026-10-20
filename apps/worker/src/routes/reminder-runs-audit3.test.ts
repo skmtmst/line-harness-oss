@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { listReminderDeliveryRuns, getReminderDeliveryRunSummary } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: async () => true,
   getVisibleLineAccountScope: async () => ({ allowedAccountIds: ['a'], canSeeUnassigned: false }),

@@ -1,5 +1,5 @@
 /*
- * ★V8 ウェビナーの一覧（Pencil `UyUMw`・1152 `uBMuB`・閲覧のみ `jiNg0`）。
+ * ★V8 ウェビナーの一覧（Pencil ・1152 ・閲覧のみ ）。
  * 枠・見出し・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  */
 
@@ -82,7 +82,7 @@
 .slug {
   display: block;
   margin-top: var(--tpl-row-sub-gap);
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 UyUMw の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
   padding-inline-start: var(--tpl-folder-dot-indent);
   overflow: hidden;
   color: var(--color-ink-secondary);
@@ -190,7 +190,7 @@
   pointer-events: none;
 }
 
-/* 1152 の板（uBMuB）：案内の帯 → 1段目 → 2段目。 */
+/* 1152 の板：案内の帯 → 1段目 → 2段目。 */
 .narrowTools {
   display: flex;
   flex-basis: 100%;
@@ -229,8 +229,8 @@
   padding: 0 var(--tpl-head-pad-side) var(--tpl-wb-ro-gap);
 }
 
-/* アーカイブの確かめ（VXZ6T）：対象の箱と、アーカイブしたあとの3点。 */
-/* アーカイブの確かめ（VXZ6T）の本文。説明は題の下 4、×の左の幅まで。段の間は 14。共通の中身の余白（上下24）を詰める。 */
+/* アーカイブの確かめ：対象の箱と、アーカイブしたあとの3点。 */
+/* アーカイブの確かめの本文。説明は題の下 4、×の左の幅まで。段の間は 14。共通の中身の余白（上下24）を詰める。 */
 .archiveBody {
   display: flex;
   flex-direction: column;

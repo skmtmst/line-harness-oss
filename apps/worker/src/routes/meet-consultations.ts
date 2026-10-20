@@ -1,13 +1,10 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
-import {
-  cancelMeetConsultation,
-  registerMeetConsultation,
-  type RegisterMeetConsultationInput,
-} from '../services/meet-consultation-reminders.js';
+import { cancelMeetConsultation, registerMeetConsultation } from '../services/meet-consultation-reminders.js';
+import { type RegisterMeetConsultationInput } from '../services/meet-reminder-types.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const meetConsultations = new Hono<Env>();
@@ -33,7 +30,7 @@ meetConsultations.get('/api/meet-consultations', requireRole('owner', 'admin', '
               SUM(CASE WHEN r.status='failed' THEN 1 ELSE 0 END) AS failed_reminders
          FROM meet_consultations c
          INNER JOIN friends f ON f.id = c.friend_id
-         LEFT JOIN meet_consultation_reminders r ON r.consultation_id = c.id
+         LEFT JOIN meet_consultation_notification_runs r ON r.consultation_id = c.id
         WHERE (? = 'all' OR c.status = ?)
           ${accountWhere}
         GROUP BY c.id

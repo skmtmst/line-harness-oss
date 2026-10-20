@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第3段：投稿（最新情報・イベント・特典）。
@@ -17,7 +18,7 @@ import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-er
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { getMediaById } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';

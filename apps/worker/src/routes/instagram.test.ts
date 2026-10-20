@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { instagram } from './instagram.js';
 import {
@@ -626,7 +626,7 @@ it('Metaのエラー説明文は、秘密値がどんな形で混ざっていて
     line.includes('instagram_oauth_callback_failed'),
   );
   expect(record).toBeDefined();
-  expect(JSON.parse(record!)).toEqual({ code: 'instagram_oauth_callback_failed', route: 'GET /api/instagram/oauth/callback' });
+  expect(JSON.parse(record!)).toEqual({ code: 'instagram_oauth_callback_failed', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
   // 説明文（message）自体を記録に出さないため、どの表現も残らない。
   expect(record).not.toContain('message=');
   for (const secret of [

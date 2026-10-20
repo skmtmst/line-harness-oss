@@ -1,9 +1,15 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+export { messageToLogPayload } from './message-log-payload.js';
+import { messageToLogPayload } from './message-log-payload.js';
+export { expandVariables } from './message-interpolation.js';
+import { expandVariables } from './message-interpolation.js';
+import { logger } from '@line-crm/shared/server';
 import { resolveMetadata } from './step-metadata.js';
 export { resolveMetadata } from './step-metadata.js';
 import { isFriendDeliverySuppressed } from '@line-crm/db/src/friend-delivery-consents.js';
-import { createBroadcastRetryKey } from './broadcast-retry-key.js';
+import { createBroadcastRetryKey } from '../features/broadcasts/broadcast-retry-key/index.js';
 import { reserveOutboundSend, hashOutboundPayload, completeOutboundSendStatement } from './outbound-idempotency.js';
-import { decorateTapExtras } from './tap-extras.js';
+import { decorateTapExtras } from './tap-extra-links.js';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 // メッセージの組み立ては一斉配信と共有する。ここからも取れるようにしておく（呼び出し側が多い）。
 import { buildMessage } from './line-message.js';
@@ -28,144 +34,20 @@ import {
   listLineAccountsWithTenantStatus,
   recordSkippedDelivery,
 } from '@line-crm/db';
+import { isOperationCapabilityStopped } from '@line-crm/db';
+
+
 import type { LineClient } from '@line-crm/line-sdk';
 import { isStoppedTenantStatus } from './tenant-runtime-status.js';
 import type { Message } from '@line-crm/line-sdk';
 import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
 import { getSendPermissionForAccount, type SendPermissionCache } from './send-entitlements.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
-import { runScenarioActions, resumePreviousScenario, runScenarioOp, type RunActionRowsOptions } from './scenario-actions.js';
+import { runScenarioActions, resumePreviousScenario, runScenarioOp, type RunActionRowsOptions } from '../features/scenarios/scenario-actions/index.js';
 import { featureJobCanRun } from './feature-enforcement.js';
-import { isOperationCapabilityStopped } from '@line-crm/db';
-import { parseQuestion, buildQuestionMessages } from './scenario-question.js';
+
+import { parseQuestion, buildQuestionMessages } from '../features/scenarios/scenario-question/index.js';
 import { expandDateVariables } from './interpolation-date.js';
-
-/**
- * Replace template variables in message content.
- *
- * Supported variables:
- * - {{name}}                → friend's display name
- * - {{uid}}                 → friend's user UUID
- * - {{friend_id}}           → friend's internal ID
- * - {{auth_url:CHANNEL_ID}} → full /auth/line URL with uid for cross-account linking
- * - {{metadata.KEY}}       → friend's metadata value (from form responses etc.)
- */
-/**
- * 差し込みの記法について。
- *
- * 友だち情報欄は {{field.pet_name}}、共通情報は {{var.shop_hours}} で書く。
- * 要件定義書は {pet_name} という単一の波括弧を想定していたが、それは採れない。
- * Flex メッセージの本文は JSON で、{ が至るところに出てくる。単一の波括弧で
- * 置換すると、差し込みのつもりが無い箇所まで書き換えて本文を壊す。
- *
- * 既存の {{metadata.KEY}} と同じ形にそろえたので、書き方も1つで済む。
- */
-/** 中身を JSON で持つ種類。差し込みの値を JSON の文字列として安全な形にする。 */
-const JSON_CONTENT_TYPES = new Set(['flex', 'carousel', 'location', 'image', 'video', 'audio', 'sticker']);
-
-export function expandVariables(
-  content: string,
-  friend: { id: string; display_name: string | null; user_id: string | null; ref_code?: string | null; metadata?: Record<string, unknown> | string | null },
-  apiOrigin?: string,
-  messageType?: string,
-  extra?: {
-    /** 友だち情報欄。field_key => 値 */
-    fields?: Record<string, string>;
-    /** 共通情報。var_key => 値 */
-    vars?: Record<string, string>;
-    /**
-     * この通が届く日時。{{date}} や {{days_until:…}} の起点。
-     * 省略したら「いま」。テスト送信やプレビューはそれでよい。
-     */
-    deliveredAt?: Date;
-  },
-): string {
-  let result = content;
-
-  /*
-   * 日付の差し込みを先に処理する。
-   *
-   * 後にすると、{{field.x}} に入っていた文字列が偶然 {{date}} の形を
-   * していた場合に二重に置き換わる。差し込みの値は利用者が入れたもので、
-   * それが差し込みとして解釈されるのは事故のもと。
-   */
-  result = expandDateVariables(result, extra?.deliveredAt ?? new Date());
-  /*
-   * カード（Flex・カルーセル）や位置情報などの中身は JSON。名前や友だち情報に
-   * " や \ や改行が入っていると、そのまま埋めると JSON が壊れ、送る形にできずに
-   * 中身の JSON が文字のままお客さまへ届く（2026-10-07 点検）。JSON の文字列の
-   * 中で安全な形にしてから入れる。置き換えは関数で渡し、値の中の $& などを
-   * 置き換えの記号として読ませない。
-   */
-  const put = (value: string): string =>
-    messageType && JSON_CONTENT_TYPES.has(messageType) ? JSON.stringify(value).slice(1, -1) : value;
-  result = result.replace(/\{\{name\}\}/g, () => put(friend.display_name || ''));
-  result = result.replace(/\{\{uid\}\}/g, () => put(friend.user_id || ''));
-  result = result.replace(/\{\{friend_id\}\}/g, () => put(friend.id));
-  result = result.replace(/\{\{ref\}\}/g, () => put(friend.ref_code || ''));
-  // Conditional block: {{#if_ref}}...{{/if_ref}} — only shown if ref_code exists
-  if (friend.ref_code) {
-    result = result.replace(/\{\{#if_ref\}\}([\s\S]*?)\{\{\/if_ref\}\}/g, '$1');
-  } else {
-    result = result.replace(/\{\{#if_ref\}\}[\s\S]*?\{\{\/if_ref\}\}/g, '');
-  }
-  // Metadata variables: {{metadata.KEY}} → value from friend's metadata
-  const meta = friend.metadata
-    ? (typeof friend.metadata === 'string' ? JSON.parse(friend.metadata) as Record<string, unknown> : friend.metadata)
-    : {};
-  // Conditional block: {{#if_metadata.KEY}}...{{/if_metadata.KEY}} — only shown if metadata key has a value
-  // When inside JSON arrays, removes the element and fixes trailing/leading commas
-  result = result.replace(/\{\{#if_metadata\.([^}]+)\}\}([\s\S]*?)\{\{\/if_metadata\.\1\}\}/g, (_match, key, inner) => {
-    const val = meta[key];
-    if (val == null || val === '') return '';
-    return inner;
-  });
-  // Clean up broken JSON commas from removed conditional blocks (e.g. ",," or "[," or ",]").
-  // Flex only: this is JSON repair — running it on plain text silently rewrote
-  // user-authored bodies containing ",," / "[," / ",]" (bug present since initial release).
-  if (messageType === 'flex') {
-    result = result.replace(/,\s*,/g, ',');
-    result = result.replace(/\[\s*,/g, '[');
-    result = result.replace(/,\s*\]/g, ']');
-  }
-  result = result.replace(/\{\{metadata\.([^}]+)\}\}/g, (_match, key) => {
-    const val = meta[key];
-    if (val == null) return '';
-    return put(Array.isArray(val) ? val.join(', ') : String(val));
-  });
-
-  // 友だち情報欄。{{#if_field.KEY}}...{{/if_field.KEY}} で「値があるときだけ」も書ける。
-  // 条件ブロックを先に処理するのは、中の {{field.KEY}} を消してからでは
-  // 判定できないため。
-  const fields = extra?.fields ?? {};
-  result = result.replace(
-    /\{\{#if_field\.([a-z][a-z0-9_]*)\}\}([\s\S]*?)\{\{\/if_field\.\1\}\}/g,
-    (_match, key: string, inner: string) => {
-      const val = fields[key];
-      return val == null || val === '' ? '' : inner;
-    },
-  );
-  result = result.replace(/\{\{field\.([a-z][a-z0-9_]*)\}\}/g, (_match, key: string) => {
-    // 未設定の項目は空文字にする。「未設定」と書くと、そのまま送られて
-    // お客様に見えてしまう。空にしておけば文として不自然でも意味は壊れない。
-    return put(fields[key] ?? '');
-  });
-
-  // 共通情報。営業時間や電話番号のように、全テンプレートで同じ値を使うもの。
-  // スキャン側（commonVarKeysInContent）と同じ空白許容の表記で拾う。
-  const vars = extra?.vars ?? {};
-  result = result.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g, (_match, key: string) => {
-    return put(vars[key] ?? '');
-  });
-  if (apiOrigin) {
-    result = result.replace(/\{\{auth_url:([^}]+)\}\}/g, (_match, channelId) => {
-      const params = new URLSearchParams({ account: channelId, ref: 'cross-link' });
-      if (friend.user_id) params.set('uid', friend.user_id);
-      return `${apiOrigin}/auth/line?${params.toString()}`;
-    });
-  }
-  return result;
-}
 
 const MAX_SENDS_PER_CRON = 40; // CF Free plan: 50 subrequests limit (margin for other jobs)
 const MAX_ATTEMPTS_PER_CRON = 40; // condition skips/errors also consume CPU and D1 work
@@ -203,7 +85,7 @@ export async function processStepDeliveries(
   // an uncertain attempt older than 24 hours is held for operator review.
   const recovered = await recoverStuckDeliveries(db);
   if (recovered > 0) {
-    console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+    logger.warn("services_step_delivery_warn");
   }
 
   const now = jstNow();
@@ -241,7 +123,7 @@ export async function processStepDeliveries(
             title: `friend_scenario:${fs.scenario_id}`,
           });
         } catch (skipError) {
-          console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+          logger.error("services_step_delivery_failed");
         }
         await db.prepare(
           `UPDATE friend_scenarios
@@ -278,13 +160,13 @@ export async function processStepDeliveries(
       const sent = await processSingleDelivery(db, lineClient, fs, workerUrl, sendPermissions, credentialKey);
       if (sent) sendCount++;
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+      logger.error("services_step_delivery_failed");
       // A permanent LINE 4xx (invalid/unreachable recipient, invalid payload,
       // unauthorized channel, etc.) must not be recovered and retried forever.
       // 408/409/429 are transient and retain the existing 5-minute recovery.
       if (isPermanentLineDeliveryError(err)) {
         await pauseFriendScenarioDelivery(db, fs.id);
-        console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+        logger.warn("services_step_delivery_warn");
       }
       // Continue with next one.
     }
@@ -393,7 +275,7 @@ async function processSingleDelivery(
   );
   if (!friend) {
     await pauseFriendScenarioDelivery(db, fs.id);
-    console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+    logger.warn("services_step_delivery_warn");
     return false;
   }
   if (await isFriendDeliverySuppressed(db, friend.id)) {
@@ -417,7 +299,7 @@ async function processSingleDelivery(
   const source = await getStepsForDelivery(db, fs.scenario_id, fs.published_version_id ?? null);
   if (!source) {
     await pauseFriendScenarioDelivery(db, fs.id);
-    console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+    logger.warn("services_step_delivery_warn");
     return false;
   }
   const steps = source.steps.filter((s) => (s.is_draft ?? 0) === 0);
@@ -435,7 +317,7 @@ async function processSingleDelivery(
    */
   const audience = parseCondition(source.audienceConditionJson);
   if (source.audienceConditionJson && !audience) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
     await pauseFriendScenarioDelivery(db, fs.id);
     return false;
   }
@@ -448,8 +330,8 @@ async function processSingleDelivery(
   // (setHours/getDate が JST clock 通りに動くようにオフセット済みの Date)。
   // fs.started_at は "+09:00" 付き ISO で本物の UTC instant として parse されるため、
   // +9h ずらして JST clock-time 表現に揃える必要がある。
-  const enrolledAtDate = new Date(new Date(fs.started_at).getTime() + 9 * 60 * 60_000);
-  const nowJstDate = new Date(Date.now() + 9 * 60 * 60_000);
+  const enrolledAtDate = japanCalendar(new Date(new Date(fs.started_at).getTime()));
+  const nowJstDate = japanCalendar();
   const nextDeliveryFor = (step: { delay_minutes: number; offset_days: number | null; offset_minutes: number | null; delivery_time: string | null }): Date =>
     computeNextDeliveryAt(
       { delivery_mode: source.deliveryMode },
@@ -508,7 +390,7 @@ async function processSingleDelivery(
    */
   const stepTarget = parseCondition(currentStep.target_condition_json);
   if (currentStep.target_condition_json && !stepTarget) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
   }
   const stepTargeted = currentStep.target_condition_json
     ? stepTarget
@@ -550,7 +432,7 @@ async function processSingleDelivery(
   };
 
   // Expand template variables ({{name}}, {{uid}}, {{auth_url:CHANNEL_ID}}, {{metadata.KEY}}, etc.)
-  const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
+  const resolvedMeta = await resolveMetadata(db, friend);
   const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
   // 質問の前文・選択肢文にも expandVariables が効くので、共通情報の
   // 厳格スキャンは本文と質問JSONを合わせた全体で行う。
@@ -580,6 +462,7 @@ async function processSingleDelivery(
   const tracked = await decorateForFriendPush(db, resolved.messageType, expandedContent, workerUrl, {
     lineAccountId: deliveryAccountId ?? null,
     friendId: friend.id,
+    sourceContent: resolved.messageContent,
   });
   /*
    * 質問メッセージなら、本文の代わりに選択肢つきのメッセージを組み立てる。
@@ -629,7 +512,7 @@ async function processSingleDelivery(
     const account = await getLineAccountById(db, deliveryAccountId, credentialKey);
     if (!account) {
       await pauseFriendScenarioDelivery(db, fs.id);
-      console.warn(JSON.stringify({"code":"services_step_delivery_warn"}));
+      logger.warn("services_step_delivery_warn");
       return false;
     }
     const { LineClient: LC } = await import('@line-crm/line-sdk');
@@ -706,7 +589,7 @@ async function processSingleDelivery(
     try {
       await addTagToFriend(db, friend.id, currentStep.on_reach_tag_id);
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+      logger.error("services_step_delivery_failed");
     }
   }
 
@@ -766,7 +649,7 @@ export async function finishScenario(
       });
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
   }
 
   await runScenarioActions(db, {
@@ -812,12 +695,12 @@ export async function evaluateCondition(
   if (!step.condition_type) return true;
 
   if (!isSupportedConditionType(step.condition_type)) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
     return false;
   }
 
   if (!step.condition_value) {
-    console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+    logger.error("services_step_delivery_failed");
     return false;
   }
 
@@ -864,7 +747,7 @@ export async function evaluateCondition(
       try {
         raw = JSON.parse(step.condition_value);
       } catch {
-        console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+        logger.error("services_step_delivery_failed");
         return false;
       }
       if (
@@ -877,17 +760,18 @@ export async function evaluateCondition(
         // 既存行や直接 INSERT された行で {"key":"x"} のように value が欠落しているケースは
         // friend.metadata[x] === undefined と比較されて「key 不在の全友だち」に一致する
         // (= 同じ OSS issue #120 の over-delivery を再現する) ので明示的にスキップする。
-        console.error(JSON.stringify({"code":"services_step_delivery_failed"}));
+        logger.error("services_step_delivery_failed");
         return false;
       }
       const parsed = raw as { key: string; value: unknown };
       const friend = await db
-        .prepare('SELECT user_id, metadata FROM friends WHERE id = ?')
+        .prepare('SELECT user_id, metadata, line_account_id FROM friends WHERE id = ?')
         .bind(friendId)
-        .first<{ user_id: string | null; metadata: string | null }>();
+        .first<{ user_id: string | null; metadata: string | null; line_account_id: string | null }>();
       const metadata = await resolveMetadata(db, {
         user_id: friend?.user_id ?? null,
         metadata: friend?.metadata ?? null,
+        line_account_id: friend?.line_account_id ?? null,
       });
       const actual = metadata[parsed.key];
       return step.condition_type === 'metadata_equals'
@@ -895,26 +779,4 @@ export async function evaluateCondition(
         : actual !== parsed.value;
     }
   }
-}
-
-
-/**
- * Derive (messageType, content) from a built `Message` object so that what
- * lands in messages_log mirrors what was actually pushed to LINE — including
- * cleanEmptyNodes() mutations and any parse-failure text fallback inside
- * buildMessage(). Use this whenever you log a message you just pushed.
- */
-export function messageToLogPayload(message: Message): { messageType: string; content: string } {
-  if (message.type === 'text') return { messageType: 'text', content: message.text };
-  if (message.type === 'flex') return { messageType: 'flex', content: JSON.stringify(message.contents) };
-  if (message.type === 'image') {
-    return {
-      messageType: 'image',
-      content: JSON.stringify({
-        originalContentUrl: message.originalContentUrl,
-        previewImageUrl: message.previewImageUrl,
-      }),
-    };
-  }
-  return { messageType: message.type, content: JSON.stringify(message) };
 }

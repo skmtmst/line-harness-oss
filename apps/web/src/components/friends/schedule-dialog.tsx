@@ -1,7 +1,8 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
- * ★V8 `MyJP7` 予約して送るの小窓。友だち一覧の行の「…」から開き、受信箱を開かずに予約できる。
+ * ★V8  予約して送るの小窓。友だち一覧の行の「…」から開き、受信箱を開かずに予約できる。
  * 文と日時を `POST /api/chats/:id/schedule` で予約する（友だちIDで引ける・二重押し防止の鍵つき）。
  * 画像と文は受信箱と同じ順で予約し、成功した分だけ入力から外す。
  * 絵：幅 520・余白 20・間 12。送るもの（テンプレートから入れる）→ 送る日時の札 → 注意 → 真ん中にキャンセル・予約。
@@ -21,17 +22,16 @@ import MediaSlot, { mediaLimitLabel } from '@/components/shared/media-slot'
 import styles from './schedule-dialog.module.css'
 
 /* 日本時間の時計。サーバも端末も日本時間のつもりで扱う。 */
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000
 
 /* 日本時間での「日付+時刻」を作る（`Date.UTC` でずらして持つ）。 */
 function jstDateTime(offsetDays: number, hour: number, minute: number): Date {
-  const jstNow = new Date(Date.now() + JST_OFFSET_MS)
+  const jstNow = japanCalendar()
   return new Date(Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate() + offsetDays, hour, minute))
 }
 
 /* 次の月曜10時。今日が月曜で10時前なら今日。 */
 function nextMonday10(): Date {
-  const jstNow = new Date(Date.now() + JST_OFFSET_MS)
+  const jstNow = japanCalendar()
   const day = jstNow.getUTCDay()
   const pastTen = jstNow.getUTCHours() * 60 + jstNow.getUTCMinutes() >= 10 * 60
   let offset = (8 - day) % 7

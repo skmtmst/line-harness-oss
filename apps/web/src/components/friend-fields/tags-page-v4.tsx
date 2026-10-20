@@ -1,5 +1,6 @@
 'use client'
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
@@ -135,7 +136,7 @@ export function hasLinkedActions(tag: Tag): boolean {
 export function isThisMonth(value: string): boolean {
   const month = (d: Date) => {
     if (Number.isNaN(d.getTime())) return null
-    const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000)
+    const jst = japanCalendar(d)
     return `${jst.getUTCFullYear()}-${jst.getUTCMonth()}`
   }
   return month(new Date(value)) === month(new Date())
@@ -233,7 +234,7 @@ function manualRefSummary(refs: TagDeleteImpactReferences): string {
 }
 
 /**
- * 設計 `★ V6 4-1-F タグ削除の確認ダイアログ`（`dKlkz`）の影響5行。
+ * 設計 `★ 管理画面 4-1-F タグ削除の確認ダイアログ`（`dKlkz`）の影響5行。
  *
  * 「名前・値・結果」の3列。**取れていないときは `—`。0とは書かない。**
  * 何が起きるか（結果）は設定によらず決まっているので、値が取れなくても出す。

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 /*
  * 2026-10-06 点検：V8 シナリオ一覧（src/v8/scenarios/list.tsx）の表示件数が、決まりの部品
  * PageSizeSelect（監査 #668）を使わず素の Select で組まれていた。部品へ寄せたことを見張る。
- * 選択肢は共通の10・20・50（B-172）。
+ * 選択肢は共通の10・20・50。
  */
 const source = readFileSync(new URL('./list.tsx', import.meta.url), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '')

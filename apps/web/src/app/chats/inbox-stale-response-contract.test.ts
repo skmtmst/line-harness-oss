@@ -22,7 +22,7 @@ describe('受信箱の応答対象照合(#962)', () => {
   })
 
   it('予約一覧の応答は要求時の会話・アカウントと一致するときだけ反映する', () => {
-    const loader = PAGE.match(/const loadScheduledSends = useCallback[\s\S]*?\}, \[\]\)/)
+    const loader = PAGE.match(/const loadScheduledSends = useCallback[\s\S]*?\}, \[[^\]]*\]\)/)
     expect(loader).not.toBeNull()
     const body = loader![0]
     expect(body).toContain('const requestedAccountId = detailAccountRef.current')

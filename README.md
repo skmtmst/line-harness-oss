@@ -1,3 +1,5 @@
+> 文書：LINE Harness｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 🌐 **日本語** | [English](README.en.md) | [简体中文](README.zh-CN.md) | [한국어](README.ko.md) | [Español](README.es.md)
 
 # LINE Harness
@@ -92,7 +94,7 @@ Google Calendar・Meet の同期と、Google マップ/検索の「Google で予
 - **時系列トラッキング** — クリック → 友だち追加 → CV を時系列で記録、last-touch 帰属で成果紐づけ
 - **成果承認フロー** — 帰属 CV を承認/却下して報酬を確定、重複アカウント検知フラグで水増しを可視化
 - **LINE push 通知** — 成果確定時にアフィリエイターへ自動プッシュ通知
-- 詳細: [docs/wiki/27-Affiliate-ASP.md](docs/wiki/27-Affiliate-ASP.md)
+- 詳細: [docs/v6-requirements/v6-16-affiliate-requirements-draft.md](docs/v6-requirements/v6-16-affiliate-requirements-draft.md)
 
 ### 自動化
 - **IF-THEN ルール** — 7 種のトリガー × 6 種のアクション

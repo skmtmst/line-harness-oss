@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { countWebinarHeartbeatRejects, countWebinarStartedViewers, getWebinarRetention, getWebinarViewSegmentCoverage, getWebinarWatchedSeconds, insertWebinarHeartbeatReject, mergeWebinarWatchedSeconds, parseWebinarHeartbeatPlayerState, recordWebinarHeartbeat, recordWebinarViewSegment, WEBINAR_HEARTBEAT_PLAYER_STATES, WEBINAR_HEARTBEAT_WINDOW_SECONDS, WEBINAR_RETENTION_BUCKET_SECONDS, WEBINAR_VIEW_START_SECONDS } from './webinars/playback.js';

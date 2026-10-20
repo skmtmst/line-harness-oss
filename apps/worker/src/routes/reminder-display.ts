@@ -34,7 +34,7 @@ export function publicReminder(row: ReminderListRow, stepCount?: number, hasFail
     timingSummary: timingSummary ?? null,
     hasFailure: hasFailure ?? Number(row.has_failure ?? 0) > 0,
     /*
-     * ★V8 一覧（`apLqS`）の「これから送る」「次に送る」「失敗 N」。
+     * ★V8 一覧（``）の「これから送る」「次に送る」「失敗 N」。
      * ページ切替の経路でだけ数える（旧配列応答は null のまま）。
      * 数え方は「失敗あり」の絞り込みと同じ retry_wait/permanent_failed、
      * 予定は queued/retry_wait の先に送るもの。

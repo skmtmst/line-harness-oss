@@ -1,4 +1,5 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { fail } from '../lib/fail.js';
+import { inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * TikTok利益計算の自動化: 状態確認と手動同期のAPI。
  *
@@ -8,7 +9,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
  */
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
@@ -20,16 +21,6 @@ import {
 } from '../services/tiktok-pnl.js';
 
 export const tiktokPnl = new Hono<Env>();
-
-function fail(
-  c: Context<Env>,
-  status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503,
-  error: string,
-  extra: Record<string, unknown> = {},
-  fieldKeys: readonly string[] = [],
-) {
-  return inputError(c, { success: false, error, ...extra }, status, fieldKeys);
-}
 
 /**
  * 利益計算に使えるGoogle連携を1件返す。

@@ -1,3 +1,5 @@
+import { jstDate as japanDate } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 /**
  * #838 第1段: 定期CSV書き出しの実行役。
  *
@@ -12,10 +14,10 @@
  * 手動分と区別して出る。
  */
 import { getLineAccounts } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 function jstDate(iso: string): string {
-  return new Date(Date.parse(iso) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate(new Date(iso));
 }
 
 const EXPORT_TTL_MS = 7 * 86_400_000;
@@ -58,7 +60,7 @@ export async function processDueScheduledExports(
       generated += 1;
     } catch (error) {
       failed += 1;
-      console.error(JSON.stringify({"code":"scheduled_export_failed"}));
+      logger.error("scheduled_export_failed");
     }
   }
   return { generated, skipped, failed };

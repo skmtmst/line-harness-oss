@@ -18,7 +18,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8「友だち情報欄を編集」（Pencil `w9zY5` の編集の形）の入口。
+ * ★V8「友だち情報欄を編集」（Pencil  の編集の形）の入口。
  *
  * 読み込み・版の衝突（R517）・共通項目の保護・保存の動きは今の入口（app/tags/src/v8/tags/field-edit.tsx）と同じ。
  * 中身は src/v8 の FieldEditor。受け付ける URL：`/tags/fields/edit?id=<項目>`。
@@ -268,7 +268,7 @@ export default function FieldEdit() {
       foldersReloading={foldersReloading}
       onRetryFolders={() => void loadFolders()}
       onCreateFolder={canCreateFolder
-        ? folderCreator((name, color) => api.folders.create({ kind: 'friend_field', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+        ? folderCreator((name, color) => api.folders.create({ kind: 'friend_field', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
         : undefined}
       siblings={siblings}
       siblingsReady

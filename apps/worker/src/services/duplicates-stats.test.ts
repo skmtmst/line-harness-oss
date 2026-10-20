@@ -12,7 +12,7 @@ function stubDB(canned: {
     prepare(sql: string) {
       // The pairwise raw-row query is the only one that filters via `dup_keys`;
       // route the stub by spotting that fingerprint. Everything else with
-      // `.all()` is the per-account breakdown.
+      // `.all` is the per-account breakdown.
       const isPairwise = sql.includes('dup_keys');
       return {
         first: async () => canned.totals,

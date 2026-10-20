@@ -16,7 +16,7 @@ beforeAll(() => {
  * 司令塔差し戻し: account切替のレンダーからuseEffect(load)が動くまでの窓で、
  * 前アカウントの再試行応答がnotice・retrying・reload(読み直し)をあとの
  * アカウントへ反映できていた。ここでは実コンポーネントをmountし、Promiseの
- * resolve()とレンダーの前後関係を直接組み立てて、その窓を固定する。
+ * resolveとレンダーの前後関係を直接組み立てて、その窓を固定する。
  */
 
 type DeliveriesResult = Awaited<ReturnType<typeof api.lineNotifications.deliveries>>
@@ -107,8 +107,8 @@ async function drainMicrotasks(): Promise<void> {
 }
 
 /*
- * `root.render()` をactで包まずに生で呼ぶと、Reactはcommit(DOMへの反映)と
- * passive effectのflush(load()を呼ぶuseEffect)を別のタスクとして積む。
+ * `root.render` をactで包まずに生で呼ぶと、Reactはcommit(DOMへの反映)と
+ * passive effectのflush(loadを呼ぶuseEffect)を別のタスクとして積む。
  * MutationObserverのコールバックはDOM変異の直後にマイクロタスクとして
  * 呼ばれる。passive effectはさらに後のマクロタスクでしか動かないため
  * （固定回数のtick待ちは実行環境の負荷でcommitとeffect-flushが同じtickへ
@@ -265,8 +265,8 @@ describe('LINE通知一覧のReact実mount試験', () => {
     expect(retryDeferreds).toHaveLength(1)
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain('再試行中')
 
-    // actで包まない生のrender()。commit直後にMutationObserverで止めると、
-    // 「Bのレンダーはcommit済み・load()を呼ぶuseEffectはまだ未実行」という
+    // actで包まない生のrender。commit直後にMutationObserverで止めると、
+    // 「Bのレンダーはcommit済み・loadを呼ぶuseEffectはまだ未実行」という
     // 司令塔差し戻しの窓に正確に止まる。
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const committed = waitForCommit(container)
@@ -289,7 +289,7 @@ describe('LINE通知一覧のReact実mount試験', () => {
 
     // Aの再試行は処理されたが、Bの画面には知らせが出ない。
     expect(noticeText(container)).toBeNull()
-    // Aの読み直しは始めない。Bのload()もまだ始まっていない。
+    // Aの読み直しは始めない。Bのloadもまだ始まっていない。
     expect(deliveryCalls).toHaveLength(1)
     if (failureText) expect(container.textContent).not.toContain(failureText)
 

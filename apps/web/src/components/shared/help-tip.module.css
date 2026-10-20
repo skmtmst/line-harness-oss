@@ -1,12 +1,12 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 見出し・ラベル横の「？」（共通ルール 2-1b・★V7 `LYs5d`「？ 補足の印」）。
+ * 見出し・ラベル横の「？」（共通ルール 2-1b・★管理画面 `LYs5d`「？ 補足の印」）。
  *
  * 印は 18px の正円（枠 1px `ink-faint`・地 `canvas`）の
  * 中に「?」11px 太字 `ink-secondary`。角丸の正方形・楕円・枠なしは使わない。
  * 押せる範囲は 28px（指では 44px）。吹き出しは最大幅 300px。
- * 色は `var()` だけを使う。
+ * 色は `var` だけを使う。
  */
 
 .wrap {
@@ -33,7 +33,7 @@
   flex: none; /* 押し潰されて楕円・縦長にならない */
   min-height: 0; /* globals の 32px を上書き。題の行を伸ばさない */
   aspect-ratio: 1 / 1; /* 縦横は必ず同じ */ /* border: $ink-faint */
-  border-radius: var(--radius-pill); /* ★V7 `LYs5d` 18px 正円 */ /* fill: $canvas */
+  border-radius: var(--radius-pill); /* ★管理画面 `LYs5d` 18px 正円 */ /* fill: $canvas */
   color: var(--color-ink-secondary); /* color: $ink-secondary */
   cursor: pointer;
 }
@@ -55,7 +55,7 @@
   outline: 2px solid var(--color-status-info); /* keyboard focus */
 }
 
-/* 箱の中の「?」。★V7 `LYs5d`：11px 太字 `ink-secondary`。 */
+/* 箱の中の「?」。★管理画面 `LYs5d`：11px 太字 `ink-secondary`。 */
 .mark { /* fontSize: 11 */
 }
 
@@ -98,14 +98,14 @@
 
 /*
  * ★V8 `KjC1z`：印は 16px の正円（枠 1.2px）・「?」10px/600。
- * v7 は 18px・11px/500・枠 1px のまま。
+ * 互換経路は 18px・11px/500・枠 1px のまま。
  *
  * ★V8 G3 はみ出し直し（parity 1004-0513：？印 181 件）。
  * 28px の当たりを位置を持たない ::before で広げていたが、見えない
  * はみ出しが表のセルの外側判定に載る（#1367 のチェックと同じ構図：
  * 枠16＞中21）。V8 では正円を中の「?」の箱（.mark）が持ち、札自体を
  * 透明な 28px の当たりにする（外側の配置は戻し余白で 16 に保つ）。
- * 見た目の円・28px の当たり・読み上げは変わらない。v7 は今までどおり。
+ * 見た目の円・28px の当たり・読み上げは変わらない。互換経路は今までどおり。
  */
 :root .button {
   width: 28px;
@@ -192,7 +192,7 @@
   font-size: 12px; line-height: 18px; font-weight: 400;
 }
 
-/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 :root .tip { -webkit-font-smoothing: auto; }
 
 @layer components {
@@ -222,7 +222,7 @@
 }
 }
 
-/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+/* ・・：10-10 に採用した共通の形。 */
 html:root .tip { background: var(--color-canvas); color: var(--color-ink); border: 1px solid var(--color-code-border); box-shadow: var(--shadow-float); padding: var(--space-12); }
 html:root .tip a { color: var(--color-action); }
 

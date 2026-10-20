@@ -10,7 +10,7 @@ import Notice from '@/components/shared/notice'
 import Dialog from '@/components/shared/dialog'
 import OtpInput from '@/components/shared/otp-input'
 import TotpQr from '@/components/shared/totp-qr'
-import { RecoveryCodePanel } from '@/v8/login/recovery-codes'
+import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
 import { qrToDataURL } from '@/lib/qr-image'
 import { readSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { forgetAuthCheck } from '@/lib/auth-check-marker'
@@ -81,7 +81,7 @@ export default function SelfMfa({ loginPath = '/login' }: { loginPath?: '/login'
     <Dialog open={codes.length > 0} title="回復コードを控えてください" description="認証アプリが使えない時に、1つにつき1回だけ使えます。" onCancel={() => { setCodes([]); if (relogin) void logoutAndGoToLogin(loginPath); else void load() }} cancelLabel="閉じる">
       <RecoveryCodePanel codes={codes} continueLabel="控えました" onContinue={() => { setCodes([]); if (relogin) void logoutAndGoToLogin(loginPath); else void load() }} />
     </Dialog>
-    <Dialog open={Boolean(setup)} title="二段階認証を設定" onCancel={() => setSetup(null)} confirmLabel="登録する" onConfirm={() => void confirmSetup()} confirmDisabled={code.length !== 6} busy={busy} error={error}>
+    <Dialog open={Boolean(setup)} title="二段階認証を設定" onCancel={() => setSetup(null)} confirmLabel="登録する" onConfirm={() => confirmSetup()} confirmDisabled={code.length !== 6} busy={busy} error={error}>
       {setup ? <><TotpQr {...setup} /><OtpInput visualLabel="認証コード（6桁）" label="認証コード（6桁）" value={code} onChange={setCode} busy={busy} /></> : null}
     </Dialog>
     {stepUp.prompt}

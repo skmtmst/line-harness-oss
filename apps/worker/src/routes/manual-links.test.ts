@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * マニュアルの正本表。設計 ★V6 34-4。台帳 #134。
+ * マニュアルの正本表。設計 ★34-4。台帳 #134。
  *
  * 守りたいのは 2 点。
  *   **確かめていない URL を「開けます」と言わない**
@@ -263,4 +263,11 @@ describe('いま全部を確かめる', () => {
     expect(await res.json()).toMatchObject({ data: { checked: 0, unsafe: 1 } });
     expect(fetch).not.toHaveBeenCalled();
   });
+});
+
+// Resolve synthetic public DNS while keeping the real URL policy and HEAD call.
+vi.mock('../services/manual-link-check.js', async original => {
+  const actual = await original<typeof import('../services/manual-link-check.js')>();
+  return { ...actual, checkAllManualLinks: (...[db, options]: Parameters<typeof actual.checkAllManualLinks>) =>
+    actual.checkAllManualLinks(db, { ...options, lookupHost: async () => ['93.184.216.34'] }) };
 });

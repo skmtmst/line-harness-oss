@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import worker from './index.js';
-import type { Env } from './index.js';
+import type { Env } from './worker-env.js';
 
 it('S14 unhandled errors log a code and route template without request identifiers or exception details', async () => {
   const marker='SYNTHETIC_PRIVATE_MARKER';

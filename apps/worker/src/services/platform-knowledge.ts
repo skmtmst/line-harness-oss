@@ -1,9 +1,12 @@
+import { logger } from '@line-crm/shared/server';
 import {
   claimKnowledgeJob, failKnowledgeJob, finishKnowledgeJob, getSupportTicket,
   listSupportMessages, recordPlatformAiCall,
   type KnowledgeArticleInput, type KnowledgeEvidence, type SupportMessage, type SupportTicketRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
 
 export const KNOWLEDGE_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
@@ -228,7 +231,7 @@ export async function processKnowledgeJob(env: Env['Bindings'], requestId?: stri
     await finishKnowledgeJob(db, job, parseKnowledgeSuggestion(raw, ticket, messages));
   } catch (error) {
     // Provider error messages may echo the prompt. Persist only this fixed code.
-    console.error(JSON.stringify({"code":"services_platform_knowledge_failed"}));
+    logger.error("services_platform_knowledge_failed");
     await failKnowledgeJob(db, job, 'generation_failed');
   } finally {
     if (attempted) await recordPlatformAiCall(db, { id: callId, purpose: 'article', requestId: job.request_id, model, ok, durationMs: Date.now() - started });

@@ -2,7 +2,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { createLineAccountTag, deleteLineAccountTag, getLineAccountTag, getLineAccountById,
   listLineAccountFolders, updateLineAccountTag, replaceLineAccountTags, serializeLineAccountTag } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope, canAccessAllLineAccounts } from '../services/account-access.js';

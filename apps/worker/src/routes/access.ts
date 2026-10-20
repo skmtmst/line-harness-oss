@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono, type Context, type Next } from 'hono';
 import {
   ACCESS_ROLE_BUNDLES,
@@ -9,7 +10,8 @@ import {
   type AuditEventGroup,
   type AuditResult,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -125,7 +127,7 @@ access.get(
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_access_failed","route":"GET /api/access/users"}));
+      logger.error("routes_access_failed");
       return c.json({ success: false, error: 'ログインユーザーを取得できませんでした' }, 500);
     }
   },
@@ -157,7 +159,7 @@ access.get(
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_access_failed","route":"GET /api/access/roles"}));
+      logger.error("routes_access_failed");
       return c.json({ success: false, error: '権限のかたまりを取得できませんでした' }, 500);
     }
   },
@@ -213,7 +215,7 @@ access.get(
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_access_failed","route":"GET /api/audit/events"}));
+      logger.error("routes_access_failed");
       return c.json({ success: false, error: '操作記録を取得できませんでした' }, 500);
     }
   },

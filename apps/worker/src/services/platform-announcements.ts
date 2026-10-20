@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import { LineClient } from '@line-crm/line-sdk';
 import {
   consumeStaffLineLinkCode,
@@ -13,12 +15,13 @@ import {
   type AudienceStaffRow,
   type PlatformAnnouncement,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { sendPlainMail } from './plain-mail.js';
 
 /**
- * 運営からのお知らせ配信 ★V6 37-7。
+ * 運営からのお知らせ配信 ★37-7。
  *
  * 送り方は line（契約者専用LINE）／screen（統括の管理画面）／email（登録メール）。
  * LINE は契約者専用LINEの友だちとして紐づいた権限者にだけ push する（誰に届いたかを数えるため）。
@@ -134,7 +137,7 @@ export async function deliverAnnouncement(env: Env['Bindings'], a: PlatformAnnou
 }
 
 function nowJst(): string {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+  return japanCalendar().toISOString().replace('Z', '+09:00');
 }
 
 /** cron: 公開日時を過ぎた予約を 1 回の実行で 1 件ずつ送る。 */
@@ -148,7 +151,7 @@ export async function processDueAnnouncements(env: Env['Bindings'], input: { now
       await deliverAnnouncement(env, a);
       sent += 1;
     } catch (error) {
-      console.error(JSON.stringify({"code":"services_platform_announcements_failed"}));
+      logger.error("services_platform_announcements_failed");
       await finishAnnouncement(env.DB, a.id, { recipientsTotal: 0, lineSent: 0, lineFailed: 0, mailSent: 0, mailFailed: 0, lastError: error instanceof Error ? error.message.slice(0, 200) : 'failed', failed: true });
     }
   }
@@ -173,7 +176,7 @@ export async function tryLinkStaffByCode(
     await input.reply('確認コードが見つからないか、期限が切れています。管理画面でもう一度コードを表示して、その 6 桁を送ってください。').catch(() => {});
     return true;
   }
-  await input.reply(`${linked.staffName} さんの管理画面と紐づきました。今後の大事なお知らせはここに届きます。`).catch(() => {});
+  await input.reply(`管理画面と紐づきました。今後の大事なお知らせはここに届きます。`).catch(() => {});
   return true;
 }
 

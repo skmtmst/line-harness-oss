@@ -18,8 +18,8 @@ import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError, type FriendAddRule } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { useStaffRole } from '@/lib/staff-role'
-import { resendSuppressionText } from '@/v8/friend-add/text'
+import { useStaffRole, loadStaffIdentity } from '@/lib/staff-role'
+import { resendSuppressionText } from '@/v8/friend-add/public/text/index'
 import { actionSummaryText, blockedReason, canPublish, firstSendText, idempotencyKeyFor, PUBLISH_STEPS, editStepHref } from './flow'
 import FriendAddDoneV8 from './done'
 import styles from './publish.module.css'
@@ -29,9 +29,9 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 友だち追加時の配信 作る⑤ 確認（Pencil `U8Xm3X`）と、有効にしたあとの完了（`e0FD1J`）。
+ * ★V8 友だち追加時の配信 作る⑤ 確認（Pencil ）と、有効にしたあとの完了（）。
  *
- * 入口は /friend-add-settings/publish?id=<設定>。v7（app/friend-add-settings/publish）と
+ * 入口は /friend-add-settings/publish?id=<設定>。管理画面（app/friend-add-settings/publish）と
  * 同じ口を同じ順に呼ぶ：設定を読む → 確認（validate）と重なり（conflicts）を読む →
  * 「有効にする」で公開（publish・二重公開を防ぐ鍵つき）→ 完了の面へ差し替える。
  * 画面を開くだけではテストを走らせない（走らせると記録だけ付いて「テスト済み」になる）。
@@ -88,13 +88,13 @@ function FriendAddPublish() {
   const [reloadKey, setReloadKey] = useState(0)
   /*
    * どのアカウントの、何回目の読み込みかを持つ。切り替え・読み直しのあとに
-   * 前の要求の返事が遅れて届いても、別の設定の数を映さない（v7 と同じ番兵）。
+   * 前の要求の返事が遅れて届いても、別の設定の数を映さない（管理画面 と同じ番兵）。
    */
   const requestRef = useRef<{ accountId: string | null; generation: number }>({ accountId: null, generation: 0 })
 
   useEffect(() => {
     let alive = true
-    void api.staff.me().then((res) => { if (alive && res.success) setMe(res.data.name ?? null) }).catch(() => {})
+    void loadStaffIdentity().then((res) => { if (alive && res.success) setMe(res.data.name ?? null) }).catch(() => {})
     return () => { alive = false }
   }, [])
 
@@ -265,7 +265,7 @@ function FriendAddPublish() {
     )
   }
 
-  /* 有効にしたあと（e0FD1J）。`?done=1` は作る⑤から有効にして来たとき（読み込んだ設定で出す）。 */
+  /* 有効にしたあと。`?done=1` は作る⑤から有効にして来たとき（読み込んだ設定で出す）。 */
   if (published) return <SaveErrorScope errors={saveErrors}><FriendAddDoneV8 {...published} ruleId={ruleId} /></SaveErrorScope>
   if (searchParams.get('done') === '1' && detail.rule.status === 'published') {
     return <SaveErrorScope errors={saveErrors}><FriendAddDoneV8 ruleId={ruleId} ruleName={detail.rule.name} routeNames={detail.rule.routeNames} priority={detail.rule.priority} slackConnected={slackOf(detail)} /></SaveErrorScope>

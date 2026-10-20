@@ -1,8 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
-import Booking from './pages/Booking.js';
-import BookingHistory from './pages/BookingHistory.js';
+import Booking from './pages/booking.js';
+import BookingHistory from './pages/booking-history.js';
 import { setLiffContext } from './lib/liff-auth.js';
 import { setCustomerLiffRuntime, type CustomerLiffRuntime } from './lib/liff-runtime.js';
 import { readUrlState } from './lib/salon-url-state.js';

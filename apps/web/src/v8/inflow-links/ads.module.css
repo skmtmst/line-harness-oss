@@ -1,6 +1,6 @@
 /*
- * ★V8 広告連携（Pencil qSTVR・広告費を手で入れる ZxKL5）。
- * 頭はサイトスクリプト（XjOte）と同じ形。本文（間14）：数の4枚 → 媒体の4枚 → 流入元ごとの費用の表 → 注 → 手で入れた費用。
+ * ★V8 広告連携（Pencil ・広告費を手で入れる ）。
+ * 頭はサイトスクリプトと同じ形。本文（間14）：数の4枚 → 媒体の4枚 → 流入元ごとの費用の表 → 注 → 手で入れた費用。
  */
 .board { display: flex; flex-direction: column; min-width: 0; }
 .head {
@@ -71,7 +71,7 @@
 .entryWho { width: var(--tpl-rsa-ad-entry-who); flex-shrink: 0; overflow: hidden; color: var(--color-ink-secondary); text-overflow: ellipsis; white-space: nowrap; }
 .entryMenu { display: flex; width: var(--tpl-rsa-ss-col-menu); flex-shrink: 0; }
 
-/* 広告費を手で入れる（ZxKL5）：説明 → 名前 → 計測リンク → 日付と費用（横並び・間12）。段の間14。 */
+/* 広告費を手で入れる：説明 → 名前 → 計測リンク → 日付と費用（横並び・間12）。段の間14。 */
 .dialogBody { display: flex; flex-direction: column; gap: var(--tpl-cn-card-gap); width: 100%; }
 .dialogLead { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
 .field { display: flex; flex: 1 1 0; flex-direction: column; gap: var(--tpl-cn-field-gap); min-width: 0; }

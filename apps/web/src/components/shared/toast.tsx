@@ -40,7 +40,7 @@ export type NotifyToastOptions = {
 
 const DEFAULT_DURATION = 4000
 /*
- * ★V7 sTJsh §4:「元に戻す」は5秒。乗せている間は時間を止める。
+ * ★管理画面 sTJsh §4:「元に戻す」は5秒。乗せている間は時間を止める。
  * ⌘Z でも戻せる（ToastHost が受け持つ）。
  */
 const UNDO_DURATION = 5000
@@ -117,7 +117,7 @@ export function dismissToast(id: number): void {
   if (items.length !== before) emit()
 }
 
-/** 乗せている間・触れている間は消えるまでの時間を止める（★V7 sTJsh §4）。 */
+/** 乗せている間・触れている間は消えるまでの時間を止める（★管理画面 sTJsh §4）。 */
 function pauseToast(id: number, reason: ToastPauseReason = 'pointer'): void {
   const entry = countdowns.get(id)
   if (!entry || entry.holds.has(reason)) return
@@ -155,7 +155,7 @@ export function notifyToast(message: string, options?: NotifyToastOptions): () =
   const id = nextId
   nextId += 1
   /*
-   * 「元に戻す」付きの知らせは5秒（★V7 sTJsh §4）。押す間が要るので
+   * 「元に戻す」付きの知らせは5秒（★管理画面 sTJsh §4）。押す間が要るので
    * 通常の4秒より長い。duration を明示したらそちらが勝つ。
    */
   const duration = options?.duration ?? (options?.actionLabel ? UNDO_DURATION : DEFAULT_DURATION)
@@ -301,7 +301,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 /**
  * 右下の置き場所。外枠（`app/layout.tsx`）に1つだけ置く。
  * 画面側は置かない。`notifyToast` で送られた分だけ出す。
- * ⌘Z で直前の「元に戻す」を実行する（★V7 sTJsh §4）。
+ * ⌘Z で直前の「元に戻す」を実行する（★管理画面 sTJsh §4）。
  */
 export default function ToastHost() {
   const live = useSyncExternalStore(subscribe, snapshot, snapshot)

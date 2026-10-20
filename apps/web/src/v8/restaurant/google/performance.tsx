@@ -3,7 +3,7 @@
 import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
 
 /*
- * ★V8 Googleビジネス パフォーマンス（`SrmVs`）。
+ * ★V8 Googleビジネス パフォーマンス（）。
  * 数4（共通の KpiCard）→ 飲食店向け指標 → 注。期間は 7／28／90 日（今の画面と同じ口・既定28日）。
  * 表示数の推移は、飲食店向け指標の題の右の操作から開閉する。
  */
@@ -12,9 +12,8 @@ import { Eye, MapPin, MousePointerClick, Phone } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
+import ListToolbar from '@/components/shared/list-toolbar'
 import KpiBand from '@/components/shared/kpi-band'
-import SegmentedControl from '@/components/shared/segmented'
-import { RowMenu } from '@/components/shared/row-actions'
 import PeriodPicker from '@/components/shared/period-picker'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -29,8 +28,6 @@ import { errorMessage } from './format'
 import styles from './google.module.css'
 import { formatDate as polishFormatDate, formatNumber as polishFormatNumber } from '@/lib/format'
 
-
-const DAYS: GooglePerformanceDays[] = [7, 28, 90]
 
 const METRICS: Array<{ key: keyof GooglePerformanceTotals; title: string; icon: typeof Eye }> = [
   { key: 'impressions', title: 'プロフィール表示', icon: Eye },
@@ -62,6 +59,13 @@ export function bucketDaily(daily: Array<{ date: string; impressions: number | n
   return buckets
 }
 
+/** 期間の言い方。Google の集計が 28 日区切りなので 30 日にはせず、「過去 28 日（Google の集計）」と書く。 */
+const PERIOD_CHOICES: Array<{ days: GooglePerformanceDays; label: string }> = [
+  { days: 7, label: '過去7日' },
+  { days: 28, label: '過去28日（Google の集計）' },
+  { days: 90, label: '過去90日' },
+]
+
 const BUCKET_LABELS: Record<GooglePerformanceDays, string> = { 7: '1日ごと', 28: '2日ごと', 90: '7日ごと' }
 
 function shortDate(isoDate: string): string {
@@ -70,7 +74,6 @@ function shortDate(isoDate: string): string {
 
 function ImpressionsChart({ data }: { data: GooglePerformanceData }) {
   const buckets = useMemo(() => bucketDaily(data.daily, data.days), [data])
-  const max = Math.max(...buckets.map((bucket) => bucket.total ?? 0), 1)
   if (!buckets.some((bucket) => bucket.total !== null)) {
     return <ListState kind="empty" title="表示数のデータがまだありません" description="夜間の自動取得のあとに表示されます。" />
   }
@@ -103,10 +106,7 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
 
   return (
     <>
-      <div className={styles.toolbar}>
-        <p className={styles.toolbarText} title={range ? `集計期間 ${range}（日本時間）` : undefined}>Google の検索・地図でどれだけ見られたか</p>
-        <PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} supportedDays={DAYS} />
-      </div>
+      <ListToolbar filters={<PeriodPicker days={days} onChange={(value) => setDays(value as GooglePerformanceDays)} choices={PERIOD_CHOICES} />} />
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="パフォーマンスを読み込んでいます" /></div> : null}
       {loadError ? <ListState kind="error" title="パフォーマンスを表示できませんでした" description={loadError} onRetry={() => void load()} /> : null}
       {data ? (
@@ -131,9 +131,8 @@ export default function PerformanceBoard({ accountId }: { accountId: string }) {
             <dl className={styles.facts}>
               <div className={styles.factRow}><dt className={styles.factKey}>予約ボタンのクリック</dt><dd className={styles.factValue}>{data.food.bookings === null ? '—（連携サービス未対応）' : `${polishFormatNumber(data.food.bookings)} 回`}</dd></div>
               <div className={styles.factRow}><dt className={styles.factKey}>メニューの閲覧</dt><dd className={styles.factValue}>{data.food.menuClicks === null ? '—（対象機能を使っている店舗のみ）' : `${polishFormatNumber(data.food.menuClicks)} 回`}</dd></div>
-              <div className={styles.factRow}><dt className={styles.factKey}>料理の写真の閲覧</dt><dd className={styles.factValue}>—（未取得）</dd></div>
+              <div className={styles.factRow}><dt className={styles.factKey}>料理の写真の閲覧</dt><dd className={styles.factValue}>—</dd></div>
             </dl>
-            <p className={styles.grayNote}>数字は Google ビジネス プロフィールの集計です（前日までの分。2〜3日遅れることがあります）。</p>
           </Card>
           {showTrend ? (
             <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="プロフィール表示の推移">

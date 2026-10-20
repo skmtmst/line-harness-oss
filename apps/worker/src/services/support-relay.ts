@@ -1,16 +1,9 @@
-const MAX_CLOCK_SKEW_SECONDS = 5 * 60;
+import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { verifyNenWebhook } from '../lib/hmac.js';
+export { SUPPORT_EMAIL_RAW_MAX_CHARACTERS } from '../lib/webhook-body.js';
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function hexToBytes(value: string): Uint8Array | null {
-  if (!/^[0-9a-f]{64}$/i.test(value)) return null;
-  const result = new Uint8Array(value.length / 2);
-  for (let index = 0; index < value.length; index += 2) {
-    result[index / 2] = Number.parseInt(value.slice(index, index + 2), 16);
-  }
-  return result;
 }
 
 async function hmacKey(secret: string): Promise<CryptoKey> {
@@ -38,17 +31,9 @@ export async function verifySupportRelay(
   signature: string | undefined,
   body: string,
 ): Promise<boolean> {
-  if (!timestamp || !signature || !/^\d{10}$/.test(timestamp)) return false;
-  const signatureBytes = hexToBytes(signature);
-  if (!signatureBytes) return false;
-  const age = Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp));
-  if (!Number.isFinite(age) || age > MAX_CLOCK_SKEW_SECONDS) return false;
-  return crypto.subtle.verify(
-    'HMAC',
-    await hmacKey(secret),
-    signatureBytes,
-    new TextEncoder().encode(`${timestamp}.${body}`),
-  );
+  return (await verifyNenWebhook({
+    profile: 'support-relay', secret, timestamp, signature, rawBody: body,
+  })).ok;
 }
 
 export async function sendViaXServerRelay(
@@ -62,6 +47,8 @@ export async function sendViaXServerRelay(
   const timestamp = String(Math.floor(Date.now() / 1000));
   const response = await fetch(relayUrl, {
     method: 'POST',
+    // メール本文と署名を、設定した中継先以外へ転送しない。
+    redirect: 'manual',
     headers: {
       'content-type': 'application/json',
       'x-nen-timestamp': timestamp,
@@ -69,6 +56,11 @@ export async function sendViaXServerRelay(
     },
     body,
   });
+  if ((response.status >= 300 && response.status < 400)
+    || String(response.type) === 'opaqueredirect' || response.redirected) {
+    void response.body?.cancel().catch(() => {});
+    throw new Error(`XSERVER_RELAY_FAILED:${response.status}:redirect`);
+  }
   const result: { success?: boolean; messageId?: string; error?: string } = await response
     .json<{ success?: boolean; messageId?: string; error?: string }>()
     .catch(() => ({}));

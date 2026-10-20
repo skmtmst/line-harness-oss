@@ -54,7 +54,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-const { default: MediaPickerDialog } = await import('./media-picker-dialog')
+const { default: MediaPickerDialog } = await import('../../v8/contents/media-picker-dialog')
 
 let host: HTMLDivElement
 let root: Root

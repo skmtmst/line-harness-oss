@@ -17,13 +17,13 @@ import { MediaLimitNote } from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import { AreaProperties } from '@/components/rich-menus/area-properties'
-import type { Area } from '@/components/rich-menus/canvas-editor'
+import type { Area } from '../../components/rich-menus/area-types'
 import { createAreaDrafts, isAreaActionConfigured, saveAreaDraft, unsetAreaLabels } from '@/components/rich-menus/action-drafts'
 import { SIZE_DIMENSIONS, TEMPLATES, type RichMenuTemplate } from '@/lib/rich-menu-templates'
 import type { RichMenuAreaIntent } from '@line-crm/shared'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { STORE_NEW_MENU_INTENTS, RichMenuTemplatePreview, type RichMenuOption, type RichMenuFolderOption, type RichMenuCreateValue } from '@/components/rich-menus/rich-menu-create-form'
+import { STORE_NEW_MENU_INTENTS, RichMenuTemplatePreview, type RichMenuOption, type RichMenuFolderOption, type RichMenuCreateValue } from '../../components/rich-menus/rich-menu-create-model'
 
 const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint: string }[] = [
   { value: 'large', label: '大きい', dims: `${SIZE_DIMENSIONS.large.width} × ${SIZE_DIMENSIONS.large.height}px`, hint: '画面をしっかり使う。ボタンを6つまで置ける' },

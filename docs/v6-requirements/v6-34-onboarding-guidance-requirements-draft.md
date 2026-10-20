@@ -1,3 +1,5 @@
+> 文書：V6 34 はじめの設定と案内 要件定義（実装照合版・下書き）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # V6 34 はじめの設定と案内 要件定義（実装照合版・下書き）
 
 > この文書は機能（動き）の正本。見た目は ★V8（[docs/v8-design-rules.md](../v8-design-rules.md)）が正本で、この文書の見た目・ノードID・V6 の絵の指定は使わない。
@@ -212,7 +214,7 @@ Lステップ最大の弱点は、初期設定が LINE Developers、LINE公式�
 
 ### 8-2. 正本表
 
-- キーは画面 ID（`scripts/visual-qa/screens.mjs` の対象画面一覧と同じ ID）
+- キーは画面 ID（現在のV8画面対応表（`docs/v8-board-to-code.md`） の対象画面一覧と同じ ID）
 - 列: 画面 ID、画面名、公式記事 URL、最終確認日時、状態（`ok | broken | unset`）
 - 現行 `manual-links.ts` の 4 キー（`createOfficialAccount`、`enableMessagingApi`、`findChannelCredentials`、`createLiffApp`）は画面 ID ではなく作業 ID。正本表に「作業 ID」の列を足して吸収し、新規画面 A の各段から参照する
 - 正本表は運営側が編集し、組織ごとに変えない。組織独自のマニュアルは初版で扱わない
@@ -409,7 +411,7 @@ Lステップ最大の弱点は、初期設定が LINE Developers、LINE公式�
 
 - V6 4 画面すべてで、空・読み込み中・失敗・権限不足の 4 状態が共通部品 `ListState` で描画され、契約テストが通る
 - 主操作ごとに、成功・失敗・権限不足（`view` と `none`）の 3 経路を自動テストで確認する
-- 画面遷移は `scripts/visual-qa/screens.mjs` の対象画面一覧と過不足なく一致する
+- 画面遷移は 現在のV8画面対応表（`docs/v8-board-to-code.md`） の対象画面一覧と過不足なく一致する
 - 設計との画像比較は共通工程ゲート（`v6-shared-platform-requirements.md` §10「工程ゲート」）に従う。要件の完了条件には含めない
 - 順路 5 段それぞれについて、完了条件を満たす前後で `GET /api/getting-started` の判定が変わることを自動テストで確認する
 - 「最初の 1 通」がテスト受信者への送信と実友だちへの送信の両方で `done` になる

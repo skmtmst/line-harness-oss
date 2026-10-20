@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { CfApiCreds } from '../types.js';
-import { authHeader, pagesProjectApiBase, throwHttpError } from './_shared.js';
+import { authHeader, pagesProjectApiBase, throwHttpError } from './shared.js';
 
 /**
  * Cloudflare Pages Direct Upload API.

@@ -1,6 +1,7 @@
+import { logger } from '@line-crm/shared/server';
 import type { EventPayload } from './event-payload.js';
 export type { EventPayload } from './event-payload.js';
-import { patchFriendMetadata } from './friend-metadata.js';
+import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
 
@@ -52,13 +53,13 @@ import {
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
-import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
-import { applyActionScoreEvent } from './action-score-events.js';
+import { dispatchAutomationEventWithLogging } from '../features/automations/automation-trigger-handlers/index.js';
+import { applyActionScoreEvent } from './action-score-handlers.js';
 
 import {
   applyRichMenuTargeting,
   isTargetingTrigger,
-} from './rich-menu-targeting.js';
+} from '../features/rich-menus/rich-menu-targeting/index.js';
 
 function toAdConversionAmount(value: unknown): number | undefined {
   const amount = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
@@ -190,14 +191,14 @@ export async function fireEvent(
         numericValue: enrichedPayload.conversionValue,
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"analytics_event_record_failed"}));
+      logger.error("analytics_event_record_failed");
     }
   }
 
   // Phase 2: evaluate automations.
   await replayStep(execution, 'event:legacy-automations', () => processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId, execution));
 
-  // V6は発生元の不変IDとアカウントが分かるイベントだけを受け付ける。
+  // は発生元の不変IDとアカウントが分かるイベントだけを受け付ける。
   // 旧イベントの時刻などからIDを推測すると再配達で二重実行になるため、
   // 接続元が明示していないイベントは移行PRで接続するまで実行しない。
   if (lineAccountId && enrichedPayload.sourceEventId) {
@@ -208,7 +209,7 @@ export async function fireEvent(
       friendId: enrichedPayload.friendId,
       eventData: enrichedPayload.eventData,
       lineAccessToken,
-    }));
+    }, { emitEvent: fireEvent }));
   }
 
   // Phase 3: リッチメニューの出し分けを見直す。
@@ -240,7 +241,7 @@ async function reevaluateRichMenuTargeting(
     if (await isOperationCapabilityStopped(db, lineAccountId, 'automation_actions')) return;
     await applyRichMenuTargeting(db, payload.friendId, lineAccountId, lineAccessToken);
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+    logger.error("services_event_bus_failed");
   }
 }
 
@@ -257,7 +258,7 @@ export async function fireOutgoingWebhooks(
 ): Promise<void> {
   try {
     if (lineAccountId == null) {
-      console.log(JSON.stringify({"code":"outgoing_webhook_line_account_unknown"}));
+      logger.log("outgoing_webhook_line_account_unknown");
     }
     const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType, lineAccountId);
     for (const wh of webhooks) {
@@ -294,7 +295,7 @@ export async function fireOutgoingWebhooks(
           try {
             await recordDeliveryOutcome(db, wh.id, result.ok);
           } catch (outcomeError) {
-            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+            logger.error("services_event_bus_failed");
           }
           if (execution && !result.ok) throw new Error('incoming_outgoing_delivery_failed');
           return;
@@ -338,13 +339,13 @@ export async function fireOutgoingWebhooks(
             interactionId = interaction.id;
           } catch (logError) {
             // 記録の一時障害で、本体の外部通知まで止めない。
-            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+            logger.error("services_event_bus_failed");
           }
         }
         const result = await deliverOnce(wh, body, { idempotencyKey });
         const outcome = await finishOutgoingDelivery(db, queued, lease, outgoingAttemptOf(result));
         if (outcome !== 'delivered') {
-          console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+          logger.error("services_event_bus_failed");
         }
         if (interactionId && lineAccountId) {
           try {
@@ -357,7 +358,7 @@ export async function fireOutgoingWebhooks(
             });
           } catch (logError) {
             // 届いた通知を、台帳更新の失敗だけで「送信失敗」とは扱わない。
-            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+            logger.error("services_event_bus_failed");
           }
         }
         // 連続失敗は配送単位で数える。再送待ち(retry_wait)は未確定なので
@@ -367,7 +368,7 @@ export async function fireOutgoingWebhooks(
             await recordDeliveryOutcome(db, wh.id, outcome === 'delivered');
           } catch (outcomeError) {
             // 連続失敗数の更新は補助情報。配送結果そのものを巻き戻さない。
-            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+            logger.error("services_event_bus_failed");
           }
         }
       } catch (err) {
@@ -381,16 +382,16 @@ export async function fireOutgoingWebhooks(
               failureReason: 'unknown',
             });
           } catch (logError) {
-            console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+            logger.error("services_event_bus_failed");
           }
         }
-        console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+        logger.error("services_event_bus_failed");
         if (execution) throw err;
       }
       });
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+    logger.error("services_event_bus_failed");
     if (execution) throw err;
   }
 }
@@ -418,7 +419,7 @@ export async function processScoring(
           : null,
         occurredAt: payload.occurredAt,
         lineAccessToken,
-      });
+      }, fireEvent);
       // 公開後または明示停止後は旧ルールへ戻さず、二重加点を防ぐ。
       if (v6.configured) return;
     }
@@ -431,7 +432,7 @@ export async function processScoring(
     if (scoreSourceEventId) await applyScoring(db, payload.friendId, eventType, scoreSourceEventId);
     else await applyScoring(db, payload.friendId, eventType);
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+    logger.error("services_event_bus_failed");
     if (execution) throw err;
   }
 }
@@ -501,7 +502,7 @@ async function processAutomations(
       });
     }
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+    logger.error("services_event_bus_failed");
     if (execution) throw err;
   }
 }
@@ -763,7 +764,7 @@ async function executeAction(
     }
 
     default:
-      console.warn(JSON.stringify({"code":"services_event_bus_warn"}));
+      logger.warn("services_event_bus_warn");
   }
 }
 
@@ -799,7 +800,7 @@ export async function logOutgoingMessage(
       .run();
     return id;
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_event_bus_failed"}));
+    logger.error("services_event_bus_failed");
     return null;
   }
 }

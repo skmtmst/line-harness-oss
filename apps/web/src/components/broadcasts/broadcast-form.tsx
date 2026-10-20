@@ -1,393 +1,79 @@
 'use client'
 
-import { LinePreviewFlex } from '@/components/shared/line-preview'
-import BroadcastTextBubble from './broadcast-text-bubble'
-import { ComposerCarouselPreview } from '@/components/shared/message-composer'
+import { jstCalendar as japanCalendar, jstDate as japanDate } from '@/lib/jst-datetime'
+
+import { copyBroadcastDraft,copyRecentBroadcast } from './broadcast-copy-draft'
+
+import { applyBroadcastTemplate } from './broadcast-apply-template'
+import { confirmBroadcastMessage } from './broadcast-confirm-action'
+import { openBroadcastTest } from './broadcast-open-test'
+import { saveBroadcastTemplate } from './broadcast-save-template'
+
+import { renderBroadcastConfirmDialogs } from './broadcast-confirm-dialogs'
+import { renderBroadcastEditorDialogs } from './broadcast-editor-dialogs'
+import { persistBroadcastFormDraft } from './broadcast-persist-draft'
+import { BubblePreview } from './broadcast-preview-model'
+export { MediaUpload,mediaTooLargeMessage } from "./broadcast-form-gap-parts"
+export { moveMessageTypeTabFocus,typeLabel,videoPreviewProblem } from './broadcast-form-model'
+export { BubblePreview } from './broadcast-preview-model'
+
+import { BroadcastAudienceStep } from './broadcast-audience-step'
+import { BroadcastBasicStep } from './broadcast-basic-step'
+import { buildBroadcastDraft,saveBroadcastDraft } from './broadcast-draft-actions'
+import { MessageButtonsSection,TITLE_MAX,VALIDATION_STEP_LABEL,bubblesError,emptyBubble,formatScheduleTime,typeLabel } from './broadcast-form-model'
+import { BroadcastMessageStep } from './broadcast-message-step'
+import { runBroadcastPreflight } from './broadcast-preflight'
+import { BroadcastPreviewRail } from './broadcast-preview-rail'
+import { BroadcastScheduleStep } from './broadcast-schedule-step'
+import { saveBroadcast } from './broadcast-send-actions'
+import { testBroadcast } from './broadcast-test-actions'
 
 
+
+import { broadcastSteps,type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
+import { createLoadGeneration,filterSendableTemplates } from '@/components/scenarios/carousel-picker'
+import ActionList,{ ActionAddButton } from '@/components/shared/action-list'
+import Button from '@/components/shared/button'
+import Checkbox from '@/components/shared/checkbox'
 import Disclosure from '@/components/shared/disclosure'
-import SegmentedControl from '@/components/shared/segmented';
-import type { BroadcastFormProps } from './broadcast-form-props';
-import { EntityPickerDialog } from '@/components/shared/entity-picker';
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
-import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave';
-import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import type { Folder } from '@line-crm/shared';
-import { AlertTriangle, ArrowRight, CheckCircle2, Eye, FileText, Save, Send, Trash2 } from 'lucide-react';
-import { ApiError, api, describeSaveFailure, type ApiBroadcast, type BroadcastBubble, type BroadcastBubbleType, type BroadcastMessageAsset, type BroadcastMessageButton, type BroadcastPreflight } from '@/lib/api';
-import { useAccount } from '@/contexts/account-context';
-import HelpTip from '@/components/shared/help-tip';
-import styles from './broadcast-form-v8.module.css';
-import StickyBar from '@/components/shared/sticky-bar';
-import { CreateColumns } from '@/components/templates/create-page';
-import { useFormErrors } from '@/lib/use-form-errors';
-import LinePreview from '@/components/shared/line-preview';
-import TapActionField from '@/components/shared/tap-action-field';
-import { useTapActionSources } from '@/components/shared/use-tap-action-sources';
-import { TextField } from '@/components/shared/text-field';
-import { tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, type TapActionKind, type TapActionValue } from '@/lib/tap-actions';
-import { MAX_BUBBLES, messageLengthNotice } from './message-limits';
-import { assetBubbleError, bubbleLegacyMessage, bubblesForSave, contentTemplateToBubble, isContentTemplateType, messageButtonsError, messageTemplateToBubble, type BroadcastTemplateOption } from '@/lib/broadcast-template';
-import { TARGET_MODES, audienceError, buildAudienceCondition, conditionHasAnalyticsAudience, type TargetMode } from '@/lib/broadcast-audience';
-import type { SegmentCondition } from '@/lib/segment-condition';
-import { carouselColumnsProblem, flexContentProblem } from '@/components/broadcasts/bubble-content-check';
-import { newBroadcastDraftSession, persistBroadcastDraft, type BroadcastDraftSession } from '@/lib/broadcast-draft';
-import ConditionBuilder from '@/components/shared/condition-builder';
-import DateField from '@/components/shared/date-field';
-import { TimeField } from '@/components/shared/date-time-field';
-import SegmentPresetControls from '@/components/broadcasts/segment-preset-controls';
-import { audienceSummary } from '@/lib/broadcast-summary';
-import { emptyMessageKindState, messageKindProblem, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields';
-import { createLoadGeneration, filterSendableTemplates } from '@/components/scenarios/carousel-picker';
-import ConfirmDialog from '@/components/shared/confirm-dialog';
-import { useFeatureAccess } from '@/lib/use-feature-access';
-import SendConfirmDialog, { describeExclusion, shiftedShort, shiftedWhen } from '@/components/shared/send-confirm-dialog';
-import { chatSafetyApi } from '@/lib/api-gap1';
-import type { SendConfirmationPreview } from '@line-crm/shared';
-import { useBroadcastAb } from '@/v8/broadcast-ab/use-ab';
-import { broadcastAbApi } from '@/v8/broadcast-ab/api';
-import BroadcastAbTabs from '@/v8/broadcast-ab/tabs';
-import BroadcastAbSettings, { abConfirmLine } from '@/v8/broadcast-ab/settings';
-import Notice from '@/components/shared/notice';
-import { notifyToast } from '@/components/shared/toast';
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
-import Checkbox from '@/components/shared/checkbox';
-import Button from '@/components/shared/button';
-import { RequiredBadge } from '@/components/shared/form-controls';
-import { useStaffRole } from '@/lib/staff-role';
-import { canEditFeature } from '@/lib/staff-capability';
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
-import { Steps } from '@/components/templates';
-import { broadcastSteps, type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps';
-import { testSendFailure, testSendResult, type TestSendView } from './test-send-view';
-import MessageComposer, { MessageComposerPage } from '@/components/shared/message-composer';
-import CarouselV8, { panelsFromContent } from '@/v8/templates/carousel';
-import { saveCarousel } from '@/v8/templates/carousel-core';
-import TemplateRichEditor from '@/v8/template-edit/rich';
-import TemplateRichVideoEditor from '@/v8/template-edit/rich-video';
-import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/host';
-import Dialog from '@/components/shared/dialog';
-import { usePageTitle } from '@/components/shell/page-chrome';
-import { ApprovalRequestFields, SingleOperatorFields } from '@/components/broadcasts/broadcast-approval';
-import type { BroadcastApprovalCandidate } from '@/lib/api';
-import { formatDateTime, formatDay, formatListDay, formatNumber, formatTime } from '@/lib/format';
-import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime';
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
-import ActionList, { ActionAddButton } from '@/components/shared/action-list';
-import { EntityPickerField } from '@/components/shared/entity-picker';
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
-export { mediaTooLargeMessage, MediaUpload } from "./broadcast-form-gap-parts"
-/** 知らない種類でも内部の語を出さない。 */
-export function typeLabel(type: string): string {
-  return TYPE_LABELS[type as BroadcastBubbleType] ?? 'その他'
-}
-
-/*
- * 直接は選べない種別と、その理由。
- *
- * ここに無い種別は、シナリオと同じ組み立て（`line-message.ts`）を通って
- * そのまま LINE へ渡る。ここに載っているものは手書きの中身が無いので、
- * 種別の選択肢からは選ばせない。送って初めて分かる壊れ方にしない。
- *
- * リッチメッセージ・カードタイプ・クーポン・リサーチは、コンテンツの素材
- * からのみ引用する。引用時は画面の保存と Worker の解析が同じ変換
- *（`@line-crm/shared` の素材変換）で LINE の種別に直すので、中身の JSON が
- * そのまま相手のトークに届かない（監査 R144）。
- */
-const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
-  rich_message: 'リッチメッセージには未対応です。いまは写真かFlexで作れます',
-  card_message: 'カードタイプには未対応です。いまはカルーセルで作れます',
-  coupon: 'クーポンには未対応です',
-}
-
-/*
- * メッセージ形式タブの矢印キー操作（N-063）。
- *
- * タブの作法（WAI-ARIA tabs, 手動起動）に揃える。
- * ←→↑↓ はフォーカスだけを動かし、Home/End は端へ飛ぶ。
- * **選ぶのは Enter・スペース・クリック。** 矢印を押しただけで切り替えると、
- * 書きかけの中身が移るたびに空へ戻ってしまう（切替は bubble の中身を
- * 作り直す）ので、フォーカスと選択は分ける。
- */
-/**
- * R580: 保存の検査で止まった不備を直す欄がある段。
- *
- * 段の名前は `broadcast-steps.ts` の5段と同じにする。確認の段は入力を
- * 持たないので、ここには出ない（不備は必ず基本・対象者・メッセージの
- * どれかにある）。
- */
-const VALIDATION_STEP_LABEL: Record<'basic' | 'audience' | 'message', string> = {
-  basic: '基本設定',
-  audience: '対象者',
-  message: 'メッセージ',
-}
-
-export function moveMessageTypeTabFocus(
-  event: { key: string; currentTarget: HTMLElement; preventDefault: () => void },
-  activeElement: Element | null,
-): void {
-  const keys = ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End']
-  if (!keys.includes(event.key)) return
-  const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'))
-  const current = tabs.findIndex((tab) => tab === activeElement)
-  if (current < 0) return
-  event.preventDefault()
-  const next = event.key === 'Home' ? 0
-    : event.key === 'End' ? tabs.length - 1
-      : (current + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1) + tabs.length) % tabs.length
-  tabs[next]?.focus()
-}
-
-function formatScheduleTime(iso: string): string {
-  return formatTime(iso)
-}
-
-/**
- * 配信名の上限。設計 `zZ9fA` の「14 / 60文字」。
- *
- * 保存の口には上限が無いので、ここで止めなければいくらでも入る。
- * 一覧（`q76C35`）の1列目に出る名前なので、長いと表がその1件で崩れる。
- */
-const TITLE_MAX = 60
-
-const STANDARD_CONDITION_AXES = [
-  '名前', 'メモ', 'ステータスメッセージ', '友だち登録日', 'タグ',
-  '友だち情報', 'シナリオ', 'イベント予約', 'カレンダー予約', '共通情報',
-  'リマインダ', '回答フォーム', '最終反応日', 'その他', '対応マーク',
-] as const
-
-const BROADCAST_ONLY_CONDITION_AXES = [
-  '担当者', '流入経路', '配信状況', '予約状況', '購入履歴', 'ブロック状態',
-] as const
-
-/** 位置情報・音声・スタンプは、シナリオと同じ入力欄をそのまま使う。 */
-const KIND_FIELD_TYPES = new Set<BroadcastBubbleType>(['location', 'audio', 'sticker'])
-
-function emptyBubble(type: BroadcastBubbleType = 'text'): BroadcastBubble {
-  const content: Record<string, unknown> = type === 'text' ? { text: '' }
-    : type === 'image' ? { originalContentUrl: '', previewImageUrl: '' }
-    : type === 'flex' ? { flexJson: '' }
-    : type === 'video' ? { originalContentUrl: '', previewImageUrl: '' }
-    : type === 'carousel' ? { templateId: '', templateName: '', columnsJson: '' }
-    : KIND_FIELD_TYPES.has(type) ? { state: emptyMessageKindState() }
-    : type === 'rich_video' ? {}
-    : { assetId: '', assetName: '' }
-  return { id: crypto.randomUUID(), type, content }
-}
-
-/**
- * 動画のプレビュー画像。LINE は動画と一緒に必ず受け取り（https・JPEG/PNG・1MBまで）、
- * 無いと保存の時点でサーバーが断る。以前は「任意」と書いていて、保存で英語の文が出ていた。
- */
-export function videoPreviewProblem(value: unknown): string | null {
-  const url = typeof value === 'string' ? value.trim() : ''
-  if (!url) return '動画のプレビュー画像のURLを入れてください（JPEG・PNG、1MBまで）'
-  if (!url.toLowerCase().startsWith('https://')) return '動画のプレビュー画像のURLは https:// から始めてください'
-  return null
-}
-
-/*
- * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。送る形（label・type: url/pdf・value）は今のまま。
- * 予約・回答フォーム・予約履歴・来店スタンプは type 'url' のまま、value にアカウントの LIFF の URL を入れる
- * （LIFF ID がまだ分からないときは一斉配信で置き換わる {{liff_id}}）。テキストを送るは、このボタンの形
- * （URL・PDF）が持てないので出さない。
- */
-const BROADCAST_TAP_KINDS: readonly TapActionKind[] = ['uri', 'booking', 'form', 'booking_history', 'visit_stamp']
-const PDF_KIND = [{ value: 'pdf', label: 'PDFを開く', description: 'https:// で始まる PDF のアドレスを開く', icon: FileText }] as const
-
-function buttonTapValue(button: BroadcastMessageButton): TapActionValue {
-  if (button.type === 'pdf') return { kind: 'pdf', uri: button.value, text: '', refId: '' }
-  return tapActionFromSavedUri(button.value)
-}
-
-function MessageButtonsSection({ buttons, error, onChange, liffId, accountId }: {
-  buttons: BroadcastMessageButton[]
-  error: string
-  onChange: (buttons: BroadcastMessageButton[]) => void
-  liffId: string | null
-  accountId: string | null
-}) {
-  const sources = useTapActionSources(accountId)
-  const patchButton = (index: number, patch: Partial<TapActionValue>) => onChange(buttons.map((item, i) => {
-    if (i !== index) return item
-    const current = buttonTapValue(item)
-    const kind = patch.kind ?? current.kind
-    if (kind === 'pdf') return { ...item, type: 'pdf' as const, value: patch.uri ?? item.value }
-    if (kind === 'uri') return { ...item, type: 'url' as const, value: patch.uri ?? (patch.kind !== undefined && current.kind !== 'pdf' ? '' : item.value) }
-    if (tapActionNeedsLiff(kind)) return { ...item, type: 'url' as const, value: tapActionLiffUrl(liffId || '{{liff_id}}', kind, patch.refId ?? (patch.kind !== undefined ? '' : current.refId)) }
-    return item
-  }))
-  return (
-    <section className="border-hairline mt-4 rounded-card border bg-canvas p-5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-bold text-ink">ボタン</h3>
-          <p className="mt-1 text-xs text-ink-faint">配信全体で1組です。1通目のメッセージの下に付きます。最大4つまで。</p>
-        </div>
-        <Button type="button" onClick={() => onChange([...buttons, { label: '', type: 'url' as const, value: '' }])} disabled={buttons.length >= 4}>＋ ボタンを追加する</Button>
-      </div>
-      <p className="mt-2 text-xs text-ink-faint">URL・PDFは https:// から始まるアドレスを入れてください。</p>
-      {error && <p role="alert" className="mt-2 text-xs text-danger">{error}</p>}
-      <div className="mt-3 space-y-2">
-        {buttons.map((button, buttonIndex) => (
-          <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
-            <SaveErrorField names={[`buttons.${buttonIndex}.label`,"label","button.label"]}><input aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" /></SaveErrorField>
-            <SaveErrorField names={["button"]}><TapActionField
-              name={`ボタン${buttonIndex + 1}`}
-              kindLabel={`ボタン${buttonIndex + 1}の種類`}
-              value={buttonTapValue(button)}
-              onChange={(patch) => patchButton(buttonIndex, patch)}
-              kinds={BROADCAST_TAP_KINDS}
-              extraKinds={PDF_KIND}
-              hasLiff={Boolean(liffId)}
-              liffSettingsHref={accountId ? `/accounts/detail?id=${encodeURIComponent(accountId)}` : '/accounts'}
-              sources={sources}
-              renderBody={(kind) => kind !== 'pdf' ? undefined : (
-                <SaveErrorField names={[`buttons.${buttonIndex}.value`,"value","button.value"]}><TextField type="url" aria-label={`ボタン${buttonIndex + 1}のURL`} value={button.value} placeholder="https://example.com/guide.pdf" onChange={(event) => patchButton(buttonIndex, { uri: event.target.value })} /></SaveErrorField>
-              )}
-            /></SaveErrorField>
-            <button type="button" aria-label={`ボタン${buttonIndex + 1}を削除`} onClick={() => onChange(buttons.filter((_, i) => i !== buttonIndex))} className="flex justify-center text-danger"><Trash2 size={16} aria-hidden /></button>
-          </div>
-        ))}
-        {buttons.length === 0 && <p className="rounded-control bg-canvas-sunken p-3 text-xs text-ink-faint">ボタンはまだありません。</p>}
-      </div>
-    </section>
-  )
-}
-
-/**
- * 送る内容がそのまま送れる形になっているか。空文字なら問題なし。
- *
- * **保存の検査と、上の5段の帯が同じ関数を見る。** 別々に書いていると、
- * 帯は「メッセージ 済み」なのに保存で断られる、という一番困る形になる。
- */
-function bubblesError(bubbles: BroadcastBubble[]): string {
-  for (const [index, bubble] of bubbles.entries()) {
-    if (bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) return `吹き出し${index + 1}のテキストを入力してください`
-    if (['image','video'].includes(bubble.type) && !bubble.content.originalContentUrl) return `吹き出し${index + 1}のファイルをアップロードしてください`
-    if (bubble.type === 'video') {
-      const problem = videoPreviewProblem(bubble.content.previewImageUrl)
-      if (problem) return `吹き出し${index + 1}：${problem}`
-    }
-    /*
-      位置情報・音声・スタンプは、足りない項目があると送る形にできない。
-      空のまま保存すると、本文が空文字の配信になって、相手には**何も
-      書かれていないメッセージ**が届く。
-    */
-    if (KIND_FIELD_TYPES.has(bubble.type)) {
-      const state = bubble.content.state as MessageKindState | undefined
-      /*
-       * R234: 空だけでなく「入っているが送れない」（http の音声URL・
-       * 文字のスタンプ番号）も未完成にする。理由は入力欄の検査と同じ文にし、
-       * 5段の帯と保存の検査で食い違わせない。
-       * R210: 範囲外の緯度・経度も messageKindProblem が直し方まで言う
-       * （「未入力」とは言わない）。分岐を分けると文言がずれるので1本化する。
-       */
-      const problem = !state
-        ? `${TYPE_LABELS[bubble.type]}を入力してください`
-        : messageKindProblem(bubble.type as MessageKind, state)
-      if (problem) {
-        return `吹き出し${index + 1}の${problem}`
-      }
-    }
-    if (bubble.type === 'carousel') {
-      const columnsProblem = carouselColumnsProblem(bubble.content.columnsJson)
-      if (columnsProblem) {
-        return `吹き出し${index + 1}の${columnsProblem}`
-      }
-    }
-    if (bubble.type === 'flex') {
-      const flexProblem = flexContentProblem(bubble.content.flexJson)
-      if (flexProblem) {
-        return `吹き出し${index + 1}の${flexProblem}`
-      }
-    }
-    /*
-     * 素材の引用は、選んでいないときも選んだ中身が送れる形に直せないときも
-     * ここで止める。保存の検査と Worker の解析が同じ変換を見るので、
-     * 画面では通るのに送信で断られる形にならない（監査 R144）。
-     */
-    if (bubble.type === 'rich_video' || isContentTemplateType(bubble.type)) {
-      const problem = assetBubbleError(bubble)
-      if (problem) return `吹き出し${index + 1}の${problem}`
-    }
-  }
-  return ''
-}
-
-
-
-
-
-/*
- * 右側のプレビューの枠は、LINEのトーク画面に近い共通部品
- * `LinePreview`（`components/shared/line-preview`）を使う。
- * 画面ごとに枠の色を作らない（B-6）。
- */
-
-/**
- * 種類の名前。**内部の語をそのまま画面へ出さない。**
- *
- * ここに無い種類が来たときに元の値へ落とすと、テンプレートの札に
- * `text` や `carousel` が出る（設計 `p97Tf` で見つかった）。
- * 知らない種類は「その他」にして、内部の語は出さない。
- */
-const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
-  text: 'テキスト', sticker: 'スタンプ', image: '写真', flex: 'Flex', location: '位置情報',
-  audio: '音声', carousel: 'カルーセル', video: '動画', rich_message: 'リッチメッセージ',
-  rich_video: 'リッチビデオ', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
-}
-
-
-
-/** LINE の見え方の吹き出し1つ。統括の一括配信（v8/hq-broadcasts）も使う。 */
-export function BubblePreview({ bubble, buttons = [], accountName, composer = false }: { bubble: BroadcastBubble; buttons?: BroadcastMessageButton[]; accountName?: string; composer?: boolean }) {
-  const text = String(bubble.content.text ?? '')
-  const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
-  if (bubble.type === 'text') return <BroadcastTextBubble text={text} buttons={buttons} accountName={accountName} />
-  if (bubble.type === 'sticker') {
-    const st = (bubble.content.state as MessageKindState | undefined)?.sticker
-    return st?.packageId && st?.stickerId
-      ? <img src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${st.stickerId}/android/sticker.png`} alt="スタンプ" className="h-24 w-24 object-contain" />
-      : <div className="bg-canvas-sunken text-ink-faint flex h-24 w-24 items-center justify-center rounded-card text-xs">スタンプ</div>
-  }
-  if (bubble.type === 'location') {
-    const loc = (bubble.content.state as MessageKindState | undefined)?.location
-    return <div className="bg-canvas w-[82%] rounded-card p-3 text-label shadow-card">
-      <p className="text-ink font-bold">{loc?.title || '場所'}</p>
-      <p className="text-ink-faint mt-0.5 text-micro">{loc?.address || '住所を入れると出ます'}</p>
-    </div>
-  }
-  if (bubble.type === 'audio') {
-    const au = (bubble.content.state as MessageKindState | undefined)?.audio
-    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-label shadow-card">
-      <span className="text-lg">▶</span>
-      <span className="text-ink-faint text-micro">{au?.duration ? `${au.duration} 秒` : '音声'}</span>
-    </div>
-  }
-  if (bubble.type === 'carousel') {
-    if (composer) return <ComposerCarouselPreview bubble={bubble} />
-    const name = String(bubble.content.templateName ?? '')
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">
-      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow-card">
-        <div className="bg-canvas-sunken h-20 rounded-control" />
-        <p className="text-ink mt-2 truncate text-xs font-medium">{i === 0 ? (name || 'カルーセル') : '…'}</p>
-      </div>)}
-    </div>
-  }
-  if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
-  if (bubble.type === 'flex') return <LinePreviewFlex content={typeof bubble.content.flexJson === 'string' ? bubble.content.flexJson : JSON.stringify(bubble.content)} />
-  if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
-  if (bubble.type === 'card_message') {
-    const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow-card">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-semibold">{String(card.title ?? 'カード')}</p><Button variant="primary" className="mt-2 w-full rounded-mini px-0 py-1 text-nano border-0 h-auto whitespace-normal">{String(card.actionLabel ?? '詳しく見る')}</Button></div>)}</div>
-  }
-  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-card">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-medium">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-micro text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
-}
+import { EntityPickerDialog,EntityPickerField } from '@/components/shared/entity-picker'
+import { folderById,folderCreator } from '@/components/shared/folder-select'
+import LinePreview from '@/components/shared/line-preview'
+import { MessageComposerPage } from '@/components/shared/message-composer'
+import Notice from '@/components/shared/notice'
+import { SaveConflictBand,SaveConflictCompareDialog,useSaveConflict } from '@/components/shared/save-conflict'
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import StickyBar from '@/components/shared/sticky-bar'
+import { usePageTitle } from '@/components/shell/page-chrome'
+import { Steps } from '@/components/templates'
+import { CreateColumns } from '@/components/templates/create-page'
+import { useAccount } from '@/contexts/account-context'
+import type { BroadcastApprovalCandidate } from '@/lib/api'
+import { api,type ApiBroadcast,type BroadcastBubble,type BroadcastMessageAsset,type BroadcastMessageButton,type BroadcastPreflight } from '@/lib/api'
+import { chatSafetyApi } from '@/lib/api/helpers/gap1'
+import { TARGET_MODES,audienceError,buildAudienceCondition,type TargetMode } from '@/lib/broadcast-audience'
+import { newBroadcastDraftSession,type BroadcastDraftSession } from '@/lib/broadcast-draft'
+import { audienceSummary } from '@/lib/broadcast-summary'
+import { contentTemplateToBubble,isContentTemplateType,messageButtonsError,messageTemplateToBubble,type BroadcastTemplateOption } from '@/lib/broadcast-template'
+import { formatDateTime,formatListDay,formatNumber } from '@/lib/format'
+import { datetimeLocalJstToUtcIso } from '@/lib/jst-datetime'
+import type { SegmentCondition } from '@/lib/segment-condition'
+import { canEditFeature } from '@/lib/staff-capability'
+import { useStaffRole } from '@/lib/staff-role'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useFormErrors } from '@/lib/use-form-errors'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
+import { useBroadcastAb } from '@/v8/broadcast-ab/public/use-ab/index'
+import type { TemplateEditHost, TemplateHostContent } from '@/v8/template-edit/public/host/index'
+import type { Folder,SendConfirmationPreview } from '@line-crm/shared'
+import { AlertTriangle,ArrowRight,CheckCircle2,Eye,Save } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
+import type { BroadcastFormProps } from './broadcast-form-props'
+import styles from './broadcast-form-v8.module.css'
+import { MAX_BUBBLES,messageLengthNotice } from './message-limits'
+import { type TestSendView } from './test-send-view'
 export default function BroadcastForm({
   tags,
   tagsStatus = 'ready',
@@ -463,6 +149,9 @@ export default function BroadcastForm({
   const [internalMemo, setInternalMemo] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState<'new' | 'template' | 'duplicate'>('new')
   const [recentBroadcasts, setRecentBroadcasts] = useState<ApiBroadcast[]>([])
+  const [recentState, setRecentState] = useState<'unselected' | 'loading' | 'error' | 'ready'>('unselected')
+  const [recentRetry, setRecentRetry] = useState(0)
+  const retryRecent = () => setRecentRetry((value) => value + 1)
   const [inlineComposer, setInlineComposer] = useState<{ index: number; kind: 'carousel' | 'rich_message' | 'rich_video' } | null>(null)
   const [composerBusy, setComposerBusy] = useState(false)
   /** 吹き出しの［テンプレートから選ぶ］で開いたときだけ何通目か。作り方の「テンプレート」から開いたときは null（末尾へ足す・WEB256）。 */
@@ -549,7 +238,7 @@ export default function BroadcastForm({
   const staffRoleForFolders = useStaffRole()
   const canCreateFolder = canEditFeature('broadcast.definition.edit', staffRoleForFolders)
   const createFolder = folderCreator(
-    (name, color) => api.folders.create({ kind: 'broadcast', name, color }),
+    (name, color) => api.folders.create({ kind: 'broadcast', name, color, accountId: selectedAccountId }),
     folderById,
     (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]),
   )
@@ -568,7 +257,7 @@ export default function BroadcastForm({
    *
    * **条件が変わった時点で古い確認は解除する（IDEA-06）。**
    * `preflightResult` は最後に返ってきた応答、`preflightKey` はその応答を
-   * 取ったときの入力の指紋（下の `preflightRequestBody()` のJSON）。
+   * 取ったときの入力の指紋（下の `preflightRequestBody` のJSON）。
    * 画面に出す・確定に使うのは、今の入力の指紋と一致する応答だけ。
    */
   const [preflightResult, setPreflightResult] = useState<BroadcastPreflight | null>(null)
@@ -585,7 +274,7 @@ export default function BroadcastForm({
   const submittingRef = useRef(false)
   /*
     最終確認（設計 `FpgxH`）。**「配信を予約する」で直に送らない。**
-    ここまでは、押した瞬間に `save()` が走って 1,000人以上へ予約が入り、
+    ここまでは、押した瞬間に `save` が走って 1,000人以上へ予約が入り、
     何人に何をいつ送るのかを読み合わせる場所が無かった。
   */
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -630,9 +319,9 @@ export default function BroadcastForm({
     schedule: '一斉配信を作成・送信設定',
     confirm: '一斉配信を作成・最終確認',
   }
-  /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（v7 はこれまでの帯）。
-     ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。 */
-  /* ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。v7 は今までどおり。手順は V8 だけ題と説明の下（Steps）。 */
+  /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（互換経路はこれまでの帯）。
+     ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。互換経路は今までどおり。 */
+  /* ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。互換経路は今までどおり。手順は V8 だけ題と説明の下（Steps）。 */
 
   usePageTitle(
     preflightDialogOpen
@@ -687,7 +376,7 @@ export default function BroadcastForm({
   /*
    * 下書きの再開（BROADCAST-17）。
    *
-   * V6 の作成5段は「同じ下書きIDを使う」作りなので、詳細画面の
+   * 管理画面 の作成5段は「同じ下書きIDを使う」作りなので、詳細画面の
    * 「本文を編集」から来たときは同じ下書きをここで続けられる。
    * 保存はいつもの persistDraft へ流し、下書きIDと版を draftSession へ
    * 載せるので、新しい配信が増えることはない。
@@ -784,9 +473,9 @@ export default function BroadcastForm({
 
       // 予約日時。保存値はUTC、入力は一覧と同じ日本時間（EVENT-05と同じ決めごと）。
       if (draft.scheduledAt) {
-        const jst = new Date(new Date(draft.scheduledAt).getTime() + 9 * 60 * 60 * 1000)
+        const jst = japanCalendar(new Date(draft.scheduledAt))
         setSendMode('scheduled')
-        setScheduledDate(jst.toISOString().slice(0, 10))
+        setScheduledDate(japanDate(new Date(draft.scheduledAt)))
         setScheduledTime(jst.toISOString().slice(11, 16))
       }
 
@@ -803,7 +492,7 @@ export default function BroadcastForm({
       draftSessionsByAccount.current.set(draftSession.current.accountId, draftSession.current)
       setEditingDraft(draft)
       saveConflict.clear()
-      // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★V7 §5 未保存判定）。
+      // 読み込んだ下書きの形を「保存ずみ」の基準にし直す（★管理画面 §5 未保存判定）。
       cleanFingerprintRef.current = null
     }).catch(() => {
       if (generation !== accountGenerationRef.current) return
@@ -828,11 +517,18 @@ export default function BroadcastForm({
     // 以前は一覧を全件取って先頭3件に絞っていた。
     let cancelled = false
     setRecentBroadcasts([])
+    if (accountLoading || !selectedAccountId) { setRecentState('unselected'); return }
+    setRecentState('loading')
     api.broadcasts.list({ accountId: selectedAccountId || undefined, limit: 3 })
-      .then((res) => { if (!cancelled && res.success) setRecentBroadcasts(res.data.slice(0, 3)) })
-      .catch(() => undefined)
+      .then((res) => {
+        if (cancelled) return
+        if (!res.success) throw new Error('recent_broadcasts_failed')
+        setRecentBroadcasts(res.data.slice(0, 3))
+        setRecentState('ready')
+      })
+      .catch(() => { if (!cancelled) setRecentState('error') })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [selectedAccountId, accountLoading, recentRetry])
 
   /*
    * 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
@@ -1083,59 +779,16 @@ export default function BroadcastForm({
     setBubbles((items) => empty ? [bubble] : [...items, bubble])
   }
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
-  const applyTemplate = async (template: BroadcastTemplateOption) => {
-    const accountId = selectedAccountId
-    if (templateApplyLock.current) return
-    setTemplateApplyError('')
-    let source = template
-    if (template.messageType === 'carousel') {
-      templateApplyLock.current = true; setComposerBusy(true)
-      try {
-        const detail = await api.templates.get(template.id)
-        if (selectedAccountIdRef.current !== accountId) return
-        if (!detail.success || (detail.data.accountId && detail.data.accountId !== accountId)) { setTemplateApplyError('このアカウントで使えるテンプレートを読み込めませんでした。'); return }
-        source = { ...template, carouselActions: detail.data.carouselActions, carouselTapLimitMode: detail.data.carouselTapLimitMode, carouselTapLimitText: detail.data.carouselTapLimitText }
-      } catch (saveFailure) {
-        const fieldFailure = saveErrors.capture(saveFailure);
- if (selectedAccountIdRef.current === accountId) { if (!fieldFailure) setTemplateApplyError('テンプレートを読み込めませんでした。もう一度選んでください。'); } return }
-      finally { templateApplyLock.current = false; if (selectedAccountIdRef.current === accountId) setComposerBusy(false) }
-    }
-    const bubble = messageTemplateToBubble(source)
-    if (!bubble) {
-      setTemplateApplyError('このテンプレートの内容を読み込めませんでした')
-      return
-    }
-    placeTemplateBubble(bubble)
-    setShowTemplatePicker(false)
-  }
+  const applyTemplate = (template: BroadcastTemplateOption) => applyBroadcastTemplate({ placeTemplateBubble, saveErrors, selectedAccountId, selectedAccountIdRef, setComposerBusy, setShowTemplatePicker, setTemplateApplyError, templateApplyLock }, template)
 
   /*
    * 複製で引き継ぐのは題名と本文だけ。宛先・予約日時・配信元アカウントは
    * 引き継がない（送る前に選ばせる）。秘密値を持たない配信設定なので、
    * ここに来るのは本文だけでよい（#605）。
    */
-  const duplicateCopy = (broadcast: ApiBroadcast) => {
-    const copied = broadcast.messageBubbles?.filter((bubble): bubble is BroadcastBubble => (
-      Boolean(bubble)
-      && typeof bubble === 'object'
-      && typeof bubble.id === 'string'
-      && typeof bubble.type === 'string'
-      && Boolean(bubble.content)
-    ))
-    return {
-      title: `${broadcast.title}（複製）`.slice(0, TITLE_MAX),
-      bubbles: copied?.length ? copied.map((bubble) => ({ ...bubble, id: crypto.randomUUID() })) : [
-        { id: crypto.randomUUID(), type: broadcast.messageType, content: { text: broadcast.messageContent } },
-      ],
-    }
-  }
+  const duplicateCopy = (broadcast: ApiBroadcast) => copyBroadcastDraft(broadcast)
 
-  const duplicateRecent = (broadcast: ApiBroadcast) => {
-    const copy = duplicateCopy(broadcast)
-    setTitle(copy.title)
-    setBubbles(copy.bubbles)
-    setDeliveryMethod('duplicate')
-  }
+  const duplicateRecent = (broadcast: ApiBroadcast) => copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMethod, setTitle }, broadcast)
 
   const openConditionDialog = () => {
     setTargetMode('advanced')
@@ -1143,7 +796,7 @@ export default function BroadcastForm({
     setConditionDialogOpen(true)
   }
   /*
-   * 保存・確認・テストで落ちた吹き出し（B-139）。帯ではなく吹き出しの中身の下に理由を出し、
+   * 保存・確認・テストで落ちた吹き出し。帯ではなく吹き出しの中身の下に理由を出し、
    * 吹き出しの頭に赤い丸、メッセージの段を開いて1つ目の吹き出しへ移る。ボタンは「ほかの設定」を開いて移る。
    * 配信名・対象者は段の帯（［〇〇へ移動］）のまま。
    */
@@ -1183,7 +836,7 @@ export default function BroadcastForm({
   /**
    * R580: いまの入力に対する検査結果が、どの段の不備か。
    *
-   * `validate()` と同じ順序・同じ関数で判定する。別々に書くと、帯は
+   * `validate` と同じ順序・同じ関数で判定する。別々に書くと、帯は
    * 「対象者 済み」なのに保存で断られる、という一番困る形になる
    * （段の帯と保存の検査を同じ関数に寄せる契約と同じ考え）。
    * 送信設定の段は入力の不備を持たない（日時は保存の検査対象外）。
@@ -1227,37 +880,7 @@ export default function BroadcastForm({
    * @param silent 自動で走るとき。確認中の表示もエラーも出さない。打っている
    *   最中に「確認中…」が点いたり、書きかけを直せと言われたりすると邪魔になる。
    */
-  const runPreflight = async (silent = false) => {
-    if (!silent) setError('')
-    setPreflightStatus('loading')
-    setPreflightResult(null)
-    setPreflightKey(null)
-    const seq = ++preflightSeq.current
-    try {
-      const requestBody = preflightRequestBody()
-      const requestKey = JSON.stringify(requestBody)
-      const res = await api.broadcasts.preflight(requestBody)
-      // 遅れて届いた古い要求の応答で、新しい確認を上書きしない。
-      if (seq !== preflightSeq.current) return
-      if (res.success) {
-        setPreflightResult(res.data)
-        setPreflightKey(requestKey)
-        setPreflightStatus('ready')
-      } else {
-        setPreflightStatus('error')
-        if (!silent) setError(res.error)
-      }
-    } catch (saveFailure) {
-      if (seq !== preflightSeq.current) return
-      const fieldFailure = saveErrors.capture(saveFailure)
-      setPreflightStatus('error');
-
-      if (!silent) { if (!fieldFailure)
-
-
- setError('確認できませんでした') }
-    }
-  }
+  const runPreflight = (silent = false) => runBroadcastPreflight({ preflightRequestBody, preflightSeq, saveErrors, setError, setPreflightKey, setPreflightResult, setPreflightStatus }, silent)
 
   /*
    * 文字数は**いちばん長い通**と**合計**の両方を見る。
@@ -1285,154 +908,17 @@ export default function BroadcastForm({
     return datetimeLocalJstToUtcIso(`${scheduledDate}T${scheduledTime}`)
   }
 
-  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => {
-    const first = bubbles[0]
-    const legacy = bubbleLegacyMessage(first)
-    return {
-      title: title.trim() || '（テスト送信）',
-      messageType: legacy.messageType,
-      messageContent: legacy.messageContent,
-      messageBubbles: bubblesForSave(bubbles),
-      ...targetPayload(),
-      lineAccountId: selectedAccountId || null,
-      scheduledAt,
-      // 1人運用のとき、送る人が確認で入れた人数。予約の口が突き合わせる。
-      ...(confirmedCount !== undefined ? { confirmedRecipientCount: confirmedCount } : {}),
-      trackLinks,
-      folderId: folderId || null,
-      measureOpens,
-      stealthSpreadMinutes: Number(spreadMinutes) || 0,
-      internalMemo: internalMemo.trim() || null,
-      messageOptions: messageButtons.length > 0 ? { buttons: messageButtons } : null,
-      afterActionVersionId: afterActionVersionId || null,
-      ...(saveAsDraft ? {
-        saveAsDraft: true,
-        draftStep: currentStep ?? 'basic',
-      } : {}),
-    }
-  }
+  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, selectedAccountId, spreadMinutes, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount)
 
   /**
    * テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。
    * #772: 更新は保持している版をその場で付けて送り、成功応答の版へ進める。
    * 版を閉じ込めた古い関数は作らない。409時は送り直さず、最新版を読み直して案内する。
    */
-  const persistDraft = async (
-    scheduledAt: string | null,
-    saveAsDraft = false,
-    confirmedCount?: number,
-    autosaveStep?: typeof currentStep,
-  ): Promise<ApiBroadcast | null> => {
-    const accountId = selectedAccountIdRef.current || null
-    /*
-     * 編集中にアカウントが切り替わったまま保存すると、下書きが別アカウントの
-     * 新規配信として増える（セッションのアカウントと合わないため）。
-     * 開いたときの配信元と違うなら送らず、理由を出す（BROADCAST-17）。
-     */
-    if (editingDraft?.lineAccountId && editingDraft.lineAccountId !== accountId) {
-      setError('別のLINEアカウントへ切り替わっています。元のアカウントへ戻してから保存してください。')
-      return null
-    }
-    /*
-     * R627: 同じアカウントの保存が重なったら最新の先行を待ち直す。
-     * 待たずに2つ投げると初回作成が2回・冪等キー2種になり、
-     * 下書きが2件・保持IDの競合になる。1つだけ待つと3つ目以降が
-     * 並ぶので、輪の中で読み直す。待った後は最新の入力で送り直すので、
-     * 段移動（draftStepの違い）も更新で追いつく。
-     */
-    for (;;) {
-      const latest = saveInFlightRef.current
-      if (!latest || latest.accountId !== accountId) break
-      try {
-        await latest.promise
-      } catch (saveFailure) {
-        saveErrors.capture(saveFailure)
-        /* 先行の失敗はこの保存の判断に混ぜない。下で最新を送る。 */
-      }
-      if ((selectedAccountIdRef.current || null) !== accountId)
-
-
- return null
-    }
-    const payload = draftPayload(scheduledAt, saveAsDraft, confirmedCount)
-    if (saveAsDraft && autosaveStep) payload.draftStep = autosaveStep
-    /*
-     * R627: 作りかけの冪等キーはアカウントごとに1つ。
-     * 初期セッション（accountId=null）のまま毎回新しい鍵を作ると、
-     * 並んだ2つの初回作成が別物になる。ここで束ねて同じ鍵を使い回す。
-     */
-    const sessionForAccount = (() => {
-      const stored = draftSessionsByAccount.current.get(accountId)
-      if (stored) return stored
-      if (draftSession.current.accountId === accountId) {
-        draftSessionsByAccount.current.set(accountId, draftSession.current)
-        return draftSession.current
-      }
-      const stableKey = createKeyByAccount.current.get(accountId)
-        ?? (() => {
-          const next = crypto.randomUUID()
-          createKeyByAccount.current.set(accountId, next)
-          return next
-        })()
-      const fresh = newBroadcastDraftSession(accountId, stableKey)
-      draftSessionsByAccount.current.set(accountId, fresh)
-      return fresh
-    })()
-    let settleInFlight: (value: ApiBroadcast | null) => void = () => undefined
-    const ourPromise = new Promise<ApiBroadcast | null>((resolve) => {
-      settleInFlight = resolve
-    })
-    saveInFlightRef.current = { accountId, promise: ourPromise }
-    try {
-      const result = await persistBroadcastDraft(
-        sessionForAccount,
-        accountId,
-        payload,
-        {
-          create: api.broadcasts.create,
-          update: (id, draftPayload, expectedVersion) =>
-            api.broadcasts.update(id, { ...draftPayload, expectedVersion }),
-        },
-      )
-      /*
-       * R626: 待っている間にアカウントが変わっていたら、今の画面の
-       * 保存表示・版・下書きIDへ混ぜない。古い方のセッションだけ残し、
-       * 今のアカウントは未保存のままにする。
-       */
-      draftSessionsByAccount.current.set(accountId, result.session)
-      if ((selectedAccountIdRef.current || null) !== accountId) {
-        settleInFlight(null)
-        return null
-      }
-      draftSession.current = result.session
-      settleInFlight(result.broadcast)
-      return result.broadcast
-    } catch (e) {
-      const fieldFailure = saveErrors.capture(e);
-
-      if (e instanceof ApiError && e.status === 409 && sessionForAccount.draftId) {
-        /*
-         * R626: 古いアカウントの409を今の画面の文言へ混ぜない。
-         * 取得も表示も今のアカウントのときだけにする。
-         */
-        if ((selectedAccountIdRef.current || null) !== accountId) {
-          settleInFlight(null)
-          return null
-        }
-        saveConflict.mark()
-        setError('')
-        settleInFlight(null)
-        return null
-      }
-      settleInFlight(null)
-      throw e
-    } finally {
-      if (saveInFlightRef.current?.promise === ourPromise) saveInFlightRef.current = null
-    }
-  }
+  const persistDraft = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number, autosaveStep?: typeof currentStep) => persistBroadcastFormDraft({ createKeyByAccount, currentStep, draftPayload, draftSession, draftSessionsByAccount, editingDraft, saveConflict, saveErrors, saveInFlightRef, selectedAccountIdRef, setError }, scheduledAt, saveAsDraft, confirmedCount, autosaveStep)
 
   /*
-   * ★V7 sTJsh §5: 書きかけを守る。
+   * ★管理画面 sTJsh §5: 書きかけを守る。
    * 保存に送るのと同じ組み立て（draftPayload）を指紋にして、
    * 「最後に保存した形」と違う間だけ未保存とする。開いた直後や
    * 下書き読み込み直後は指紋が基準になるので、何もしていないのに
@@ -1471,53 +957,7 @@ export default function BroadcastForm({
   })
   const draftStatusLabel = draftAutosave.label
 
-  const saveDraftNow = async (): Promise<boolean> => {
-    /*
-     * 監査 R206: 下書き保存も確認・テスト送信と同じ検査を通す。
-     * 通さないと、ボタンの不備が Worker で断られて「保存できませんでした」
-     * だけになり、どこを直すべきか分からない。
-     */
-    const validationError = validate()
-    if (validationError) {
-      rejectValidation(validationError)
-      return false
-    }
-    setSaving(true)
-    setError('')
-    const requestAccountId = selectedAccountIdRef.current || null
-    const fingerprintAtSave = formFingerprint
-    try {
-      // #772: 409時は persistDraft が案内ずみで null を返すため、保存ずみにはしない。
-      const saved = await persistDraft(scheduledAtIso(), true)
-      // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
-      if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
-      if (saved) {
-        cleanFingerprintRef.current = fingerprintAtSave
-        draftAutosave.markSaved()
-        notifyToast('下書きを保存しました。')
-        // BROADCAST-16: フォームは閉じない保存なので、背後の一覧と
-        // フォルダ件数の読み直しは呼び側に任せる。失敗時は呼ばない。
-        onDraftSaved?.(saved)
-        return true
-      }
-      return false
-    } catch (error) {
-      /*
-       * R234: 保存側で弾いた理由（音声URL・スタンプ番号・Flexの形など）を
-       * そのまま出す。「保存できませんでした」だけだと、どこを直すか分からない。
-       * 400 の本文は運用者へ出してよい安全な文だけが来る（api.ts の約束）。
-       * R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
-       */
-      if ((selectedAccountIdRef.current || null) !== requestAccountId) return false
-      const fieldFailure = saveErrors.capture(error)
-      { if (!fieldFailure)
-
-      setError(describeSaveFailure(error)) }
-      return false
-    } finally {
-      setSaving(false)
-    }
-  }
+  const saveDraftNow = () => saveBroadcastDraft({ cleanFingerprintRef, draftAutosave, formFingerprint, onDraftSaved, persistDraft, rejectValidation, saveErrors, scheduledAtIso, selectedAccountIdRef, setError, setSaving, validate })
 
   /**
    * テスト送信。下書きを作って、そこから自分宛に送る。
@@ -1525,46 +965,7 @@ export default function BroadcastForm({
    * 最初だけ下書きを作り、2回目以降と本番予約は同じ行を更新する。
    * 確かめた内容と本番で送る内容を同じ実体にし、テスト回数ぶん下書きを増やさない。
    */
-  const handleTestSend = async () => {
-    const validationError = validate()
-    if (validationError) {
-      rejectValidation(validationError)
-      return
-    }
-    setTestSending(true)
-    setError('')
-    setTestResult(null)
-    const at = formatTime(new Date())
-    try {
-      const draft = await persistDraft(null, true)
-      if (!draft) return
-      // BROADCAST-16: テスト送信でも下書きが増えるので、一覧と
-      // フォルダ件数を読み直してもらう。
-      onDraftSaved?.(draft)
-      const res = await api.broadcasts.testSend(draft.id)
-      /*
-       * **HTTPの成功と配信の成功は分ける。** 全員に失敗しても
-       * `success: true` で `sent/failed` が返るので、共通の分類
-       * （全員失敗=エラー、一部失敗=要対応、全員成功=成功）を通す。
-       */
-      const view = res.success
-        ? testSendResult(res.sent ?? 0, res.failed ?? 0, at)
-        : res.error
-          ? { kind: 'error' as const, message: `${at} ${res.error}` }
-          : testSendFailure(at)
-      setTestResult(view)
-      setTestHistory((history) => [view, ...history])
-    } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure);
-
-      const view = testSendFailure(at)
-      { if (!fieldFailure)
-      setTestResult(view) }
-      setTestHistory((history) => [view, ...history])
-    } finally {
-      setTestSending(false)
-    }
-  }
+  const handleTestSend = () => testBroadcast({ onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, validate })
 
   /**
    * テスト送信の前に、実際に登録されている送信先を読み合わせる。
@@ -1576,31 +977,12 @@ export default function BroadcastForm({
     title: '公開済みの共通アクションを選ぶ', items: publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_: string, ids: string[]) => ids[0],
   } }]
   const testBlockReason = bubblesError(bubbles) || messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })
-  const openTestDialog = async () => {
-    const generation = ++testRecipientsGeneration.current
-    const validationError = validate()
-    if (validationError) { rejectValidation(validationError); return }
-    setTestDialogOpen(true)
-    setTestRecipientState('loading')
-    setTestRecipients([])
-    try {
-      if (!selectedAccountId) throw new Error('account is not selected')
-      const res = await api.accountSettings.getTestRecipients(selectedAccountId)
-      if (generation !== testRecipientsGeneration.current) return
-      const recipients = res.success && Array.isArray(res.data) ? res.data : []
-      setTestRecipients(recipients)
-      setTestRecipientState(res.success ? 'ready' : 'error')
-    } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure);
-
-      if (generation === testRecipientsGeneration.current) { if (!fieldFailure) setTestRecipientState('error') }
-    }
-  }
+  const openTestDialog = () => openBroadcastTest({ rejectValidation, saveErrors, selectedAccountId, setTestDialogOpen, setTestRecipients, setTestRecipientState, testRecipientsGeneration, validate })
 
   /*
     最終確認に並べる値。**どれも固定値で作らない。**
 
-    人数は `runPreflight()` が数えたものだけを使う（`preflight.audienceCount`）。
+    人数は `runPreflight` が数えたものだけを使う（`preflight.audienceCount`）。
     数えられていないときは `null` のままにして、下の `canConfirm` で
     送らせない。「たぶんこのくらい」を書くと、その数を根拠に押される。
   */
@@ -1694,7 +1076,7 @@ export default function BroadcastForm({
    * 確認の窓を開く。
    *
    * **入り口で止める。** 窓の中で初めて弾くと、読み合わせたのに送れない
-   * 形になる。`validate()` は保存のときと同じものを使う。
+   * 形になる。`validate` は保存のときと同じものを使う。
    */
   const openConfirm = () => {
     const validationError = validate()
@@ -1818,30 +1200,7 @@ export default function BroadcastForm({
     },
     notice: templateSaveError ? <Notice tone="danger">{templateSaveError}</Notice> : undefined,
   } : undefined
-  const saveComposerTemplate = async () => {
-    if (templateSaveIndex === null || !selectedAccountId || composerBusy) return
-    if (!templateSaveName.trim()) { setTemplateSaveError('テンプレート名を入力してください。'); return }
-    const bubble = bubbles[templateSaveIndex]
-    const problem = bubblesError([bubble])
-    if (problem) { setTemplateSaveError(problem); return }
-    setComposerBusy(true); setTemplateSaveError('')
-    try {
-      const legacy = bubbleLegacyMessage(bubble)
-      if (bubble.type === 'carousel') {
-        const saved = await saveCarousel({ templateId: templateSaveCreatedId, selectedAccountId, name: templateSaveName.trim(), panels: panelsFromContent(String(bubble.content.columnsJson ?? '[]'), bubble.content.carouselActions as Record<string, Record<string, unknown[]>> | null), folderId: null, tapLimitMode: bubble.content.tapLimitMode === 'once' ? 'once' : 'none', tapLimitText: String(bubble.content.tapLimitText ?? ''), liffId: selectedAccount?.liffId ?? null })
-        if (selectedAccountIdRef.current !== selectedAccountId) return
-        if (!saved.ok) { if (saved.createdId) setTemplateSaveCreatedId(saved.createdId); throw new Error(saved.error) }
-        setTemplateSaveIndex(null); notifyToast('テンプレートに保存しました'); return
-      }
-      const result = isContentTemplateType(bubble.type) ? await api.broadcastMessageAssets.create({ lineAccountId: selectedAccountId, name: templateSaveName.trim(), kind: bubble.type as BroadcastMessageAsset['kind'], payload: bubble.content }) : await api.templates.create({ accountId: selectedAccountId, name: templateSaveName.trim(), category: 'general', messageType: legacy.messageType, messageContent: legacy.messageContent })
-      if (selectedAccountIdRef.current !== selectedAccountId) return
-      if (!result.success) throw new Error(result.error)
-      setTemplateSaveIndex(null); notifyToast('テンプレートに保存しました')
-    } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure);
- if (selectedAccountIdRef.current === selectedAccountId) { if (!fieldFailure) setTemplateSaveError('テンプレートに保存できませんでした。もう一度お試しください。') } }
-    finally { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(false) }
-  }
+  const saveComposerTemplate = () => saveBroadcastTemplate({ bubbles, composerBusy, saveErrors, selectedAccount, selectedAccountId, selectedAccountIdRef, setComposerBusy, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, templateSaveCreatedId, templateSaveIndex, templateSaveName })
   const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
   const goToStep = (step: BroadcastStepKey) => onStepChange?.(step)
   /*
@@ -1920,95 +1279,9 @@ export default function BroadcastForm({
     return () => { alive = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [confirmOpen, previewSeq])
-  const confirmMessage = async () => {
-    const { data, broadcast } = sendPreview
-    if (!data || !broadcast) return
-    setError('')
-    try {
-      const at = scheduledAtIso()
-      await chatSafetyApi.confirmBroadcast(broadcast.id, { expectedVersion: Number(data.expectedVersion), confirmedRecipientCount: data.recipients, ...(at ? { scheduledAt: at } : {}) })
-      setConfirmOpen(false)
-      /* 送ったあとの状態を読み直す。読めなくても、確定は済んでいるので先へ進む。 */
-      const latest = await api.broadcasts.get(broadcast.id).catch(() => null)
-      onSuccess(latest?.success ? latest.data : broadcast)
-    } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 409) {
-        setError('送る相手や内容が変わりました。数え直しました。もう一度確かめてください。')
-        setPreviewSeq((value) => value + 1)
-        return
-      }
-      setError(describeSaveFailure(caught))
-    }
-  }
+  const confirmMessage = () => confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendPreview, setConfirmOpen, setError, setPreviewSeq })
 
-  const save = async () => {
-    if (saving || submittingRef.current) return
-    if (currentStep && approvalConfigState !== 'ready') { setError('承認の設定を確認できません。確認画面を開き直してください'); return }
-    const validationError = validate(); if (validationError) { rejectValidation(validationError); return }
-    if (needsApproval && !needsApprovalSingle && approverId === '') {
-      setError('承認をお願いする人を選んでください')
-      return
-    }
-    if (needsApprovalSingle && !approvalCountMatched) {
-      setError('人数を入れて一致させてください')
-      return
-    }
-    submittingRef.current = true
-    setSaving(true); setError('')
-    const requestAccountId = selectedAccountIdRef.current || null
-    try {
-      const saved = await persistDraft(
-        scheduledAtIso(),
-        false,
-        needsApprovalSingle ? Number(approvalCountInput) : undefined,
-      )
-      // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
-      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-      if (!saved) return
-      /* G1：A・B 案と A/B の設定を送る（送る・承認の依頼の前に）。版は配信の lock_version。 */
-      const abVersion = await ab.persist(saved.id, Number((saved as { version?: number }).version ?? 0), bubbles)
-      // 承認が要るときは、保存のあと承認の依頼まで続ける。依頼までが1つの操作。
-      if (needsApproval && !needsApprovalSingle) {
-        const requested = await api.broadcasts.approval.request(saved.id, {
-          approverStaffId: approverId,
-          note: approvalNote.trim() || undefined,
-        })
-        if (!requested.success) {
-          setError(requested.error)
-          return
-        }
-      }
-      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-      if (currentStep && sendMode === 'now' && (!needsApproval || needsApprovalSingle)) {
-        /* G1：A/B の配信は組2 の今の段では模擬送信だけ（testMode。本物の LINE には送らない）。 */
-        if (ab.enabled && audienceCount !== null) {
-          const started = await broadcastAbApi.startMock(saved.id, abVersion, audienceCount, typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `ab-${Date.now()}`)
-          if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-          if (!started.success) { setError('A/B の試しを始められませんでした'); return }
-          setConfirmOpen(false)
-          onSuccess(saved)
-          return
-        }
-        const sent = await api.broadcasts.send(saved.id, needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
-        if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-        if (!sent.success) { setError(sent.error); return }
-        setConfirmOpen(false)
-        onSuccess(sent.data)
-        return
-      }
-      setConfirmOpen(false)
-      // 単頁の保存でも知らせを出す。予約の申込みは遷移先が状態を出すので出さない。
-      if (!scheduledAtIso()) notifyToast('下書きを保存しました。')
-      onSuccess(saved)
-    } catch (caught) {
-      // R626: 古いアカウントの失敗を今の画面の文言へ混ぜない。
-      if ((selectedAccountIdRef.current || null) !== requestAccountId) return
-      const fieldFailure = saveErrors.capture(caught)
-      { if (!fieldFailure)
-
-      setError(describeSaveFailure(caught)) }
-    } finally { submittingRef.current = false; setSaving(false) }
-  }
+  const save = () => saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, setConfirmOpen, setError, setSaving, submittingRef, validate })
 
   /*
    * BROADCAST-17: `?draft=` で開いたとき、読み込み・照合が終わるまで
@@ -2100,219 +1373,10 @@ export default function BroadcastForm({
             </section>
           </section>
         ) : null}
-        <section id="broadcast-step-basic" className={shows('basic') ? styles.section : 'hidden'}>
-          <h3>配信方法</h3>
-              <SaveErrorField names={["broadcast-delivery-method","value","deliveryMethod"]}><RadioCardGroup legend="配信方法" className={styles.methodCards}>
-                {([
-                  ['new', '新しいメッセージを作成', 'テキスト・画像・ボタンを組み合わせて一から作ります。'],
-                  ['template', 'テンプレートを選択', '保存済みテンプレートを呼び出して手直しします。'],
-                  ['duplicate', '過去の配信を複製', '送信済みの配信をそのまま写して作り直します。'],
-                ] as const).map(([value, label, description]) => (
-                  <RadioCard
-                    key={value}
-                    name="broadcast-delivery-method"
-                    value={value}
-                    checked={deliveryMethod === value}
-                    title={label}
-                    note={description}
-                    onChange={(next) => {
-                      setDeliveryMethod(next as typeof deliveryMethod)
-                      if (next === 'template') {
-                        setComposerTemplateIndex(null); setComposerTemplateKind(undefined)
-                        setShowTemplatePicker(true)
-                        goToStep('message')
-                      }
-                    }}
-                    /* 選択済みの「テンプレートを選択」をもう一度押すと、
-                       一覧を開き直せる（radio の change は発火しないため）。 */
-                    onClick={value === 'template' && deliveryMethod === 'template'
-                      ? () => { setComposerTemplateIndex(null); setComposerTemplateKind(undefined); setShowTemplatePicker(true); goToStep('message') }
-                      : undefined}
-                  />
-                ))}
-              </RadioCardGroup></SaveErrorField>
-          <label className={styles.nameField}>
-            <span className={styles.labelRow}><span className="text-ink text-sm font-bold">配信名<RequiredBadge /></span><span className="text-xs text-ink-faint">{title.trim().length} / {TITLE_MAX}文字</span></span>
-            <SaveErrorField names={["title"]}><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className={styles.textInput} /></SaveErrorField>
-            <small>友だちには表示されません。一覧で見分けるための名前です</small>
-          </label>
-          <div className={styles.basicFields}>
-            <label><span className={styles.labelRow}>フォルダ</span><SaveErrorField names={["folderId","folder_id"]}><FolderSelect aria-label="フォルダ" value={folderId} onChange={setFolderId} folders={folders.map(folderById)} onCreate={canCreateFolder ? createFolder : undefined} size="full" /></SaveErrorField></label>
-            <label><span className={styles.labelRow}>社内メモ <span className="text-ink-faint text-xs font-normal">任意</span><HelpTip label="社内メモの説明">友だちには表示されません</HelpTip></span><SaveErrorField names={["internalMemo","internal_memo"]}><textarea aria-label="社内メモ" value={internalMemo} onChange={(event) => setInternalMemo(event.target.value)} rows={1} className={styles.textInput} placeholder="配信の目的や運用メモ" /></SaveErrorField></label>
-          </div>
-          <div className={styles.recentHeader}><h3>最近の配信</h3><Link href="/broadcasts">一斉配信の一覧を見る →</Link></div>
-          <div className={styles.recentList}>
-            {recentBroadcasts.length ? recentBroadcasts.map((broadcast) => (
-              <div key={broadcast.id} className={styles.recentRow}>
-                <Send size={14} aria-hidden /><span className={styles.recentName} title={broadcast.title}>{broadcast.title}</span>
-                <span className="text-ink-faint">{broadcast.sentAt || broadcast.scheduledAt ? formatDateTime(broadcast.sentAt ?? broadcast.scheduledAt ?? '') : '下書き'} ・ {broadcast.totalCount == null ? '—' : `${formatNumber(broadcast.totalCount)}人`}</span>
-                <Button size="compact" onClick={() => duplicateRecent(broadcast)}>複製する</Button>
-              </div>
-            )) : <p className="text-xs text-ink-faint">最近の配信はまだありません。</p>}
-          </div>
-        </section>
-        <section id="broadcast-step-audience" className={shows('audience') ? styles.section : 'hidden'}>
-          <h3>配信対象</h3>
-          <SaveErrorField names={["broadcast-target-mode","value","mode.value","targetMode"]}><RadioCardGroup legend="配信対象" className={styles.audienceCards}>
-            {TARGET_MODES.map((mode) => (
-              <RadioCard
-                key={mode.value}
-                name="broadcast-target-mode"
-                value={mode.value}
-                checked={targetMode === mode.value}
-                onChange={() => {
-                  if (mode.value === 'advanced') openConditionDialog()
-                  else setTargetMode(mode.value)
-                }}
-                title={mode.label}
-                note={mode.description}
-              />
-            ))}
-          </RadioCardGroup></SaveErrorField>
-          {audienceNotice && targetMode === 'advanced' && conditionHasAnalyticsAudience(condition) && (
-            <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center justify-between gap-2 p-3">
-              <p className="text-ink text-sm">
-                分析で作った対象者
-                {audienceNotice.label && <span className="ml-1 text-ink-secondary text-xs">{audienceNotice.label}</span>}
-                <span className="ml-2 font-bold">{formatNumber(audienceNotice.memberCount)}人</span>
-              </p>
-              <p className="text-ink-faint text-xs">
-                {formatDateTime(audienceNotice.expiresAt)}まで有効・送る直前にもう一度確かめます
-              </p>
-            </div>
-          )}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {/* ブロック中の人は countRules の is_following=true で外れている。
-                外していることを書かないと、人数が合わないように見える。 */}
-            <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
-            <Button variant="secondary" className="text-ink-secondary px-3 py-1 text-xs h-auto whitespace-normal" href="/friends">
-              対象を一覧で見る
-            </Button>
-            <SegmentPresetControls
-              accountId={selectedAccountId}
-              value={targetMode === 'advanced' ? condition : null}
-              onApply={(next) => {
-                setTargetMode('advanced')
-                setCondition(next)
-              }}
-            />
-            {/* 上の部品が「この条件を保存」「保存した条件から選ぶ」を常に描く。
-                画面の骨格検査はimportを1段だけ読むため、消してはいけない語を
-                呼び出し元にも残す。 */}
-          </div>
-          {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
-            <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
-            <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect clearable size="full" kind="scenario"
-              aria-label="どのシナリオ"
-              placeholder="すべてのシナリオ（どれか1つでも購読中）"
-              value={scenarioId}
-              onChange={setScenarioId}
-              options={scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))}
-              loading={scenariosStatus === 'loading'}
-              className="mt-1 w-full sm:max-w-sm"
-            /></SaveErrorField>
-            {scenariosStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">シナリオを読み込んでいます…</p>}
-            {scenariosStatus === 'error' && <p className="mt-1 text-xs text-warning">シナリオを読み込めませんでした。別の絞り方を選んで戻ると再取得します。</p>}
-          </div>}
-          {targetMode === 'tag' && <div className="border-hairline mt-4 border-t pt-4">
-            <label className="text-ink-secondary block text-xs font-semibold">どのタグ</label>
-            {/*
-              「すべて」は置かない。タグを選ばないままだと絞り込みが消えて
-              全員に届く。全員に送るなら上の「友だち全員に配信する」を選ぶ。
-            */}
-            <SaveErrorField names={["tagId","targetTagId","tag_id"]}><EntitySelect clearable size="full" kind="tag"
-              aria-label="どのタグ"
-              placeholder="タグを選んでください"
-              value={tagId}
-              onChange={setTagId}
-              options={tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))}
-              loading={tagsStatus === 'loading'}
-              /*
-               * R581: 候補が取れていない間は開かせない。空のまま開くと
-               * 「候補はありません」と出て、通信失敗が「タグが無い」と
-               * 誤って伝わる。読み込み中も同じ。
-               */
-              disabled={tagsStatus !== 'ready'}
-              className="mt-1 w-full sm:max-w-sm"
-            /></SaveErrorField>
-            {/*
-              R581: 通信失敗と真の0件を分ける。失敗は赤を使わず注意色で出し、
-              同じ画面で再試行できるようにする（失敗・直し方は「？」に入れない）。
-              真の0件は作り先を案内する。入力はフォームが持つので、
-              再試行で書きかけは消えない。
-            */}
-            {tagsStatus === 'loading' && <p className="mt-1 text-xs text-ink-faint">タグを読み込んでいます…</p>}
-            {tagsStatus === 'error' && (
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <p className="text-xs text-warning">タグを読み込めませんでした。通信を確かめて、もう一度お試しください。</p>
-                {onRetryTags && <Button variant="secondary" size="compact" onClick={onRetryTags}>もう一度読み込む</Button>}
-              </div>
-            )}
-            {tagsStatus === 'ready' && tags.length === 0 && (
-              <p className="mt-1 text-xs text-ink-faint">
-                タグはまだありません。先に
-                <Link href="/tags" className="font-semibold text-action hover:underline">タグ</Link>
-                で作成してください。
-              </p>
-            )}
-          </div>}
-          {targetMode === 'advanced' && <div className="border-hairline mt-4 border-t pt-4">
-            {/*
-              シナリオ・1通ごとの配信対象・アクションの実行条件と同じ部品。
-              一斉配信だけ別の項目にしていたときは、性別・年代・エリアなどを
-              `friends.metadata` から読んでいたが、そこへ値を書く経路が
-              どこにも無く、**選んでも常に0人**だった。
-              人数はこの節の右上（送信対象）に出るので、部品側の件数は出さない。
-            */}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-bold text-ink">配信対象の条件</p>
-                <p className="mt-1 text-xs text-ink-faint">
-                  {condition ? '設定した詳細条件で絞り込みます。' : '条件を1つ以上設定してください。'}
-                </p>
-              </div>
-              <Button type="button" onClick={openConditionDialog}>条件を編集</Button>
-            </div>
-          </div>}
-          <div className={styles.exclusion}>
-            <Checkbox checked onCheckedChange={() => {}} disabled>ブロック中の人を除く</Checkbox>
-            <small>ブロック中・非表示・宛先不明の友だちには送りません</small>
-          </div>
-          <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTagId","exclude_tag_id"]}><EntitySelect kind="tag" aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]} size="full" /></SaveErrorField></label>
-          <div className={styles.exclusion}>
-            <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
-            <small>最近送った人を除く機能は、まだ使えません</small>
-          </div>
-          <div className={styles.audienceCount} aria-live="polite"><span><Send size={14} aria-hidden /> この条件で送る人数</span><strong className={audienceDisplayCount === 0 ? 'text-danger' : preflightStatus === 'error' ? 'text-warning' : ''}>{audienceDisplayCount !== null ? `${formatNumber(audienceDisplayCount)}人` : preflightStatus === 'loading' ? '数えています…' : '—人'}</strong></div>
-          {audienceDisplayCount === 0 ? <Notice tone="danger">この条件に当てはまる友だちがいません。条件を変えてください</Notice> : preflightStatus === 'error' ? <Notice tone="warn" action={<Button size="compact" onClick={() => void runPreflight()}>もう一度数える</Button>}>人数を数えられませんでした。送る前にもう一度数えてください</Notice> : preflightStatus === 'idle' ? <p className="text-xs text-ink-faint">対象とメッセージを入力すると人数を数えます</p> : null}
-          <Notice tone="info"><strong>対象の確認ポイント</strong><br />人数は送る直前にもう一度数え直します。ブロック中の人には送りません</Notice>
-          {preflight?.audience && <details className={styles.details}><summary>対象プレビュー・除外の内訳</summary><p className="text-xs text-ink-secondary">条件一致 {formatNumber(preflight.audience.matched)}人 ・ 送信可能 {formatNumber(preflight.audience.sendable)}人 ・ {exclusionNote ?? '除外 —'}</p>{preflight.audience.representatives.map((friend) => <Link key={friend.friendId} href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`} className="block text-xs text-action">{friend.displayName ?? '名前未登録'}　{friend.summary}</Link>)}</details>}
-        </section>
+        <BroadcastBasicStep {...{ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }} />
+        <BroadcastAudienceStep {...{ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }} />
         <div className={shows('message') ? 'contents' : 'hidden'}>
-        <section id="broadcast-step-message" className={ styles.section}>
-          {targetMode !== 'all' ? <BroadcastAbTabs ab={ab} aBubbles={bubbles} canEdit /> : null}
-          {ab.tab === 'B' && ab.b ? (
-            <MessageComposer bubbles={ab.b} accountId={selectedAccountId} busy={composerBusy}
-              unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
-              onChange={(index, bubble) => ab.setB((items) => (items ?? []).map((item, i) => (i === index ? bubble : item)))}
-              onMove={(index, direction) => ab.setB((items) => { const next = [...(items ?? [])]; const to = index + direction; if (to < 0 || to >= next.length) return next; [next[index], next[to]] = [next[to], next[index]]; return next })}
-              onDelete={(index) => ab.setB((items) => (items ?? []).filter((_, i) => i !== index))}
-              onAdd={() => ab.setB((items) => [...(items ?? []), emptyBubble()])}
-              onPickTemplate={() => undefined} onSaveTemplate={() => undefined} onCompose={() => undefined}
-            />
-          ) : null}
-          <div className={ab.tab === 'B' && ab.b !== null ? 'hidden' : 'contents'}>
-          <MessageComposer bubbleErrors={bubbles.map((_, index) => fields.error(`bubble-${index}`))} bubbleFieldProps={(index) => fields.bind(`bubble-${index}`)} bubbles={bubbles} accountId={selectedAccountId} busy={composerBusy} onBusyChange={(value) => { if (selectedAccountIdRef.current === selectedAccountId) setComposerBusy(value) }}
-            unavailable={{ intro: '紹介メッセージは現在利用できません。' }}
-            onChange={updateBubble} onMove={moveBubble} onDelete={(index) => setBubbles((items) => items.filter((_, i) => i !== index))}
-            onAdd={() => setBubbles((items) => [...items, emptyBubble()])}
-            onPickTemplate={(index, kind) => { setComposerTemplateKind(kind); setComposerTemplateIndex(index); setShowTemplatePicker(true) }}
-            onSaveTemplate={(index) => { setTemplateSaveCreatedId(null); setTemplateSaveIndex(index); setTemplateSaveName(String(bubbles[index].content.templateName ?? bubbles[index].content.assetName ?? title)); setTemplateSaveError('') }}
-            onCompose={(index, kind) => { setTemplateSaveError(''); setInlineComposer({ index, kind }) }}
-            extraFields={(index, bubble) => bubble.type === 'text' ? null : isContentTemplateType(bubble.type) ? <SaveErrorField names={["assetId","bubble.content.assetId","content.assetId","asset_id","bubble.content.asset_id","content.asset_id"]}><EntitySelect clearable size="full" aria-label="コンテンツで作成したテンプレートから選択" placeholder="テンプレートを選択してください" value={String(bubble.content.assetId ?? '')} onChange={(id) => { const asset = assets.find((item) => item.id === id); updateBubble(index, { ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : {} }) }} options={assets.filter((item) => item.kind === bubble.type).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name }))} /></SaveErrorField> : null}
-          />
-          </div>
-        </section>
+        <BroadcastMessageStep {...{ ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }} />
         {showTemplatePicker && (
           <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ" searchPlaceholder="テンプレート名・本文で探す"
             folders={templateFolders} busy={composerBusy} error={templateApplyError}
@@ -2348,104 +1412,7 @@ export default function BroadcastForm({
         {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <Disclosure size="compact" title="ほかの設定" hint="クリックを数える・ボタン" detailsRef={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></Disclosure> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </div>
-        <section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
-          <h3>配信日</h3>
-          <SaveErrorField names={["broadcast-send-mode","sendMode","spreadMinutes"]}><RadioCardGroup legend="配信日" className={styles.methodCards}>
-            <RadioCard name="broadcast-send-mode" value="now" checked={sendMode === 'now' && Number(spreadMinutes) === 0} onChange={() => { setSendMode('now'); setSpreadMinutes('0') }} title="今すぐ配信" note="最終確認で送ると、すぐに届きます" />
-            <RadioCard name="broadcast-send-mode" value="scheduled" checked={sendMode === 'scheduled'} onChange={() => setSendMode('scheduled')} title="日時を指定して予約" note="決めた日時に送ります" />
-            <RadioCard name="broadcast-send-mode" value="spread" checked={sendMode === 'now' && Number(spreadMinutes) > 0} onChange={() => { setSendMode('now'); setSpreadMinutes(Number(spreadMinutes) > 0 ? spreadMinutes : '30') }} title="時間を分散して送る" note="少しずつ送り、集中を避けます" />
-          </RadioCardGroup></SaveErrorField>
-          {sendMode === 'scheduled' && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  配信日（日本時間）
-                </label>
-                <SaveErrorField names={["scheduledDate","scheduled_date"]}><DateField
-                  id="bc-date"
-                  value={scheduledDate}
-                  onChange={setScheduledDate}
-                  aria-label="配信日（日本時間）"
-                /></SaveErrorField>
-              </div>
-              <div>
-                <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  時刻（日本時間）
-                </label>
-                <SaveErrorField names={["scheduledTime","scheduled_time"]}><TimeField
-                  id="bc-time"
-                  size="field"
-                  value={scheduledTime}
-                  onChange={setScheduledTime}
-                  aria-label="時刻（日本時間）"
-                /></SaveErrorField>
-              </div>
-              {/*
-                設計 `Bw0zt` の注意書き。予約は条件を保存するだけで、実際の
-                宛先は**予約の時刻に条件をもう一度あてて**決まる
-                （`services/broadcast.ts` の cron が `buildSegmentQuery` を
-                その場で組み直す）。いま出ている人数のまま固定されると
-                思われると、増減したときに「数が合わない」と読まれる。
-
-                **送信枠には触れない。** 残り通数を読む口がこの画面には無く、
-                「送信枠も再確認します」と書くと出せない数を約束することになる。
-              */}
-              <Notice tone="warn" className="sm:col-span-2">
-                予約した時刻に、そのときの条件でもう一度対象を数え直してから送ります。
-                いま出ている人数から増減することがあります。
-              </Notice>
-            </div>
-          )}
-
-          <div className="border-hairline mt-4 border-t pt-4">
-      <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-medium">
-        時間を分散して送る
-        <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-micro font-normal">
-          推奨
-        </span>
-      </label>
-      <div className="flex items-center gap-1.5">
-        <SaveErrorField names={["spreadMinutes","spread_minutes"]}><input
-          id="bc-spread"
-          type="number"
-          min={0}
-          max={720}
-          value={spreadMinutes}
-          onChange={(e) => setSpreadMinutes(e.target.value)}
-          className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
-        /></SaveErrorField>
-        <span className="text-ink-faint text-xs">分かけて</span>
-      </div>
-      <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-        指定した時刻から、その分数をかけて少しずつ送ります。同時刻に大量送信するとLINE側で制限を受けることがあるため、通常はオンのままにしてください。
-        0 なら一気に送ります。途中で止まっても、続きから送り直します（同じ人に二度は届きません）。
-      </p>
-          </div>
-          <div className={styles.quota}>
-            <div className={styles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。テスト送信も枠を使用します</HelpTip><span>今月 残り {quota?.remaining == null ? '—' : formatNumber(quota.remaining)}通</span></div>
-            <div className={styles.quotaTrack}><div style={{ width: quota?.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div>
-            <p>{quota?.monthlyUsed == null || quota.monthlyLimit == null ? '送信枠は配信前チェックで確認します' : `使った ${formatNumber(quota.monthlyUsed)} + 今回 ${formatNumber(quota.planned)} / 上限 ${formatNumber(quota.monthlyLimit)}通`}</p>
-            {quotaInsufficient && <p className="text-danger">送信枠が不足しています。配信する人数を減らしてください</p>}
-          </div>
-          <SaveErrorField names={["measureOpens","measure_opens"]}><Checkbox checked={measureOpens} onCheckedChange={setMeasureOpens}>開封数の集計を取る</Checkbox></SaveErrorField>
-          {sendMode === 'scheduled' && (
-            <section className="mt-4 rounded-control border border-hairline p-4">
-              <h4 className="text-sm font-bold text-ink">配信スケジュール</h4>
-              <p className="mt-1 text-xs text-ink-faint">前後の配信と重ならないかを確認します。</p>
-              <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                {[-1, 0, 1, 2].map((offset) => {
-                  const base = scheduledDate ? new Date(`${scheduledDate}T00:00:00+09:00`) : null
-                  if (base) base.setDate(base.getDate() + offset)
-                  const ymd = base ? formatDay(base) : '日付未設定'
-                  const concurrent = offset === 0 ? concurrentBroadcasts : []
-                  return <div key={offset} className={`rounded-control border p-3 text-xs ${offset === 0 ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><p className="font-semibold text-ink">{ymd}{offset === 0 ? ' 今回' : ''}</p>{concurrent.length ? concurrent.map((item) => <p key={item.id} className="mt-2 truncate text-ink-secondary" title={item.title}>{formatScheduleTime(item.scheduledAt)}　{item.title}</p>) : <p className="mt-2 text-ink-faint">予定なし</p>}</div>
-                })}
-              </div>
-              {concurrentBroadcasts.length > 0 && <p className="mt-3 rounded-control bg-warning-bg p-3 text-xs text-warning">同じ時刻の前後1時間に別の配信があります。対象が重なる場合は、間隔を空けてください。</p>}
-            </section>
-          )}
-          <BroadcastAbSettings ab={ab} total={audienceCount} targetAll={targetMode === 'all'} start={new Date(scheduledAtIso() ?? Date.now())} approvalThreshold={approvalConfig?.threshold ?? null} ecConnected canEdit onNarrow={() => goToStep('audience')} />
-        </section>
+        <BroadcastScheduleStep {...{ ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSendMode, setSpreadMinutes, shows, spreadMinutes, targetMode }} />
 
     <div id="broadcast-step-confirm" className={shows('confirm') ? styles.section : 'hidden'}>
       <h3>配信前チェック</h3>
@@ -2494,25 +1461,7 @@ export default function BroadcastForm({
       </Notice>
     )}
       </div>
-      <aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label="LINEの見え方">
-        <div className={styles.previewHead}><h3>LINE の見え方</h3><div className={styles.deviceSwitch} role="group" aria-label="プレビューの端末"><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button><Button variant="secondary" className={styles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button></div><Button ref={previewCloseRef} className={styles.previewClose} size="compact" onClick={() => { setPreviewOpen(false); previewToggleRef.current?.focus() }}>閉じる</Button></div>
-        {ab.hasB ? <SegmentedControl aria-label="見本の案" size="compact" value={ab.tab} options={[{ value: 'A', label: 'A 案の見本' }, { value: 'B', label: 'B 案の見本' }]} onChange={ab.setTab} /> : null}
-        <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
-          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={scheduledLabel ? `${scheduledLabel} に届きます` : '配信日時は STEP 4 で設定します'} empty={ Boolean(bubblesError(bubbles)) && bubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) ? 'メッセージは手順3で作成します' : false}>
-            <div className="flex flex-col gap-3 text-ink">{ (ab.tab === 'B' && ab.b ? ab.b : bubbles).map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
-          </LinePreview>
-        </div>
-        <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>
-        <div className={styles.previewSummary}><h3>設定内容</h3><dl>{[
-          ['送る相手', `${confirmAudienceLabel}${audienceDisplayCount === null ? '' : `（${formatNumber(audienceDisplayCount)}人）`}`],
-          ...(currentStep === 'message' ? [] : [['除くタグ', tags.find((tag) => tag.id === excludeTagId)?.name ?? 'なし']]),
-          ['送る日時', sendWhenLabel ?? '未設定'],
-          ['配信後のアクション', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'],
-        ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
-        <div className={styles.previewActions}><Button type="button" disabled={Boolean(testBlockReason) || saving} title={testBlockReason || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={14} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={14} aria-hidden /> 配信イメージを見る</Button></div>
-        {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
-        <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
-      </aside>
+      <BroadcastPreviewRail {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
 
     <StickyBar className={styles.footer} actions={(
@@ -2520,7 +1469,7 @@ export default function BroadcastForm({
       {currentStep ? (
         <>
           {currentStep === 'confirm' ? <Button type="button" onClick={() => goToStep('schedule')}>戻って修正</Button> : null}
-          <Button variant="secondary" type="button" disabled={saving || composerBusy} onClick={() => void saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
+          <Button variant="secondary" type="button" disabled={saving || composerBusy} onClick={() => saveDraftNow()} busy={saving}>{currentStep === 'message' && <Save size={15} aria-hidden />}{'下書きを保存する'}</Button>
           {currentStep !== 'confirm' ? (
             <Button variant="primary" disabled={composerBusy} onClick={() => goToStep(stepOrder[Math.min(currentStepIndex + 1, stepOrder.length - 1)])}>
               {currentStep === 'basic' ? '対象設定へ'
@@ -2537,8 +1486,8 @@ export default function BroadcastForm({
       ) : (
         <>
           <Button variant="secondary" className="rounded-card px-5 py-3 font-bold h-auto whitespace-normal" onClick={() => guarded(onCancel)}>キャンセル</Button>
-          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => void openTestDialog()}>{testSending ? '送信中…' : 'テストを送る'}</Button>}
-          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())}>{saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
+          {(shows('message') || shows('confirm')) && <Button variant="secondary" className="rounded-card px-5 py-3 font-bold disabled:opacity-50 h-auto whitespace-normal" disabled={testSending || saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => openTestDialog()} busy={testSending} busyLabel="送信中…" widthReserve="idle">{'テストを送る'}</Button>}
+          <Button variant="primary" className="rounded-card px-7 py-3 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving || lengthNotice.tone === 'error'} title={lengthNotice.tone === 'error' ? lengthNotice.description : undefined}  onClick={() => (sendMode === 'scheduled' ? openConfirm() : void save())} busy={saving} busyLabel="保存中…" widthReserve="idle">{sendMode === 'scheduled' ? '配信を予約する' : '下書きを保存する'}</Button>
         </>
       )}
       </>
@@ -2549,350 +1498,7 @@ export default function BroadcastForm({
       「保存して移る」は下書きへ保存できたらそのまま移動し、
       保存できないときはこの画面へ戻って直す。
     */}
-    <UnsavedLeaveDialog
-      open={leaveTarget !== null}
-      subject="配信の変更"
-      busy={saving}
-      onSave={saveDraftNow}
-      onConfirm={confirmLeave}
-      onCancel={cancelLeave}
-    />
-
-    {/*
-      最終確認（設計 `FpgxH` 6-1-H）。
-
-      **押した瞬間に予約が確定しないようにする。** 出す値はどれも
-      いま画面が持っているものだけで、固定値は使わない。人数は
-      `runPreflight()` が数えたぶん（`preflight.audienceCount`）。
-    */}
-
-    <ConfirmDialog
-      open={conditionDialogOpen}
-      title="配信対象の条件を設定"
-      description="条件を組み合わせて、この配信を届ける友だちを決めます。"
-      confirmLabel="この条件を反映"
-      cancelLabel="キャンセル"
-      designNode="sqFXf"
-      onCancel={() => setConditionDialogOpen(false)}
-      onConfirm={() => {
-        setCondition(conditionDraft)
-        setConditionDialogOpen(false)
-      }}
-    >
-      <div className="space-y-4">
-        <section className="rounded-control border border-hairline bg-canvas-sunken p-4">
-          <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-bold text-ink">現在の条件</h3><button type="button" className="text-xs font-semibold text-action" onClick={() => setConditionDraft(null)}>条件を初期化</button></div>
-          <p className="mt-2 text-xs text-ink-secondary">{conditionDraft ? '設定中の詳細条件を編集しています。' : '条件はまだ設定されていません。'}</p>
-        </section>
-        <section className="rounded-control border border-hairline p-4">
-          <h3 className="mb-3 text-sm font-bold text-ink">条件 1</h3>
-          <ConditionBuilder value={conditionDraft} onChange={setConditionDraft} showCount={false} />
-        </section>
-        <section>
-          <h3 className="text-sm font-bold text-ink">利用できる条件軸</h3>
-          <p className="mt-2 text-xs font-medium text-ink-secondary">標準互換（15軸）</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">{STANDARD_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-secondary">{axis}</span>)}</div>
-          <p className="mt-3 text-xs font-medium text-ink-secondary">この画面だけの軸（6軸）</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">{BROADCAST_ONLY_CONDITION_AXES.map((axis) => <span key={axis} className="rounded-pill border border-hairline px-2 py-1 text-xs text-ink-faint">{axis}</span>)}</div>
-          <Notice tone="info" className="mt-3">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。未接続の軸は選択肢に出ません。</Notice>
-        </section>
-      </div>
-    </ConfirmDialog>
-
-    <ConfirmDialog
-      open={preflightDialogOpen}
-      title={quotaInsufficient ? '配信枠が不足しています' : '配信前チェック'}
-      description={quotaInsufficient
-        ? `現在の送信枠では${formatNumber(quota?.planned)}通を送信できません。対象を絞るか、配信設定を確認してください。`
-        : '対象・メッセージ・日時・送信枠を確認しました。'}
-      confirmLabel="対象を見直す"
-      cancelLabel="キャンセル"
-      designNode="vW4Es"
-      titleIcon={quotaInsufficient ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}
-      onCancel={() => setPreflightDialogOpen(false)}
-      onConfirm={() => {
-        setPreflightDialogOpen(false)
-        goToStep('audience')
-      }}
-    >
-      <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
-        <li className={audienceCount === null ? "text-warning" : "text-success"}>{audienceCount === null ? "対象人数をまだ取得できていません" : `対象人数 ${formatNumber(audienceCount)}人を確認してください`}</li>
-        <li className={previewConfirmed ? 'text-success' : 'text-warning'}>{previewConfirmed ? '✓' : '!'} メッセージ表示を確認しました</li>
-        <li className={scheduledLabel ? 'text-success' : 'text-ink-faint'}>{scheduledLabel ? '✓' : '○'} 配信日時を確認しました</li>
-      </ul>
-    </ConfirmDialog>
-
-    {/* 共通の「送る前の確かめ」（U1・板 F94nep／RxxfO）。承認が要るときは、承認者を選ぶ下の窓を使う。 */}
-    <SendConfirmDialog
-      open={confirmOpen && !needsApprovalSingle}
-      subtitle={`${title.trim() || '新しい一斉配信'} ・ ${confirmAudienceLabel}`}
-      scheduled={sendMode === 'scheduled'}
-      state={currentStep ? sendPreview.state : audienceCount === null ? 'error' : 'ready'}
-      block={(broadcastRole === 'viewer' || broadcastRole === 'staff') && !canSendBroadcast ? 'no-permission' : null}
-      hidePrimary={Boolean(currentStep) && approvalConfigState !== 'ready'}
-      unavailableNote={currentStep && approvalConfigState === 'loading' ? '承認の設定を確認しています…' : currentStep && approvalConfigState === 'error' ? '承認の設定を確認できません。確認画面を開き直してください' : undefined}
-      onRetry={() => (currentStep ? setPreviewSeq((value) => value + 1) : void runPreflight())}
-      recipients={currentStep ? (sendPreview.data?.recipients ?? null) : audienceCount}
-      recipientsNote={currentStep && sendPreview.data ? describeExclusion(sendPreview.data.recipients, sendPreview.data.excluded) : exclusionNote ?? undefined}
-      purpose="marketing"
-      whenLabel={currentStep && sendPreview.data?.quietHoursShiftTo
-        ? `${shiftedWhen(sendPreview.data.quietHoursShiftTo)} に送る`
-        : sendMode === 'scheduled' && scheduledLabel ? `${scheduledLabel} に送る（予約）` : '今すぐ送る'}
-      whenNote={currentStep && sendPreview.data?.quietHoursShiftTo
-        ? '夜の静かな時間（21〜8 時）のため、次の 8:00 に送ります'
-        : concurrentBroadcasts.length > 0
-          ? '同じ時刻の前後 1 時間に別の予約配信があります'
-          : sendMode === 'scheduled' ? '予約は送る時刻の 1 分前まで［予約を取り消す］で止められます' : undefined}
-      sender={currentStep ? sendPreview.data?.sender ?? null : null}
-      bodyHead={(currentStep && sendPreview.data?.firstText) || String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${TYPE_LABELS[bubbles[0]?.type ?? 'text'] ?? 'メッセージ'}を送ります`}
-      bubbleCount={bubbles.length}
-      allRecipients={targetMode === 'all'}
-      extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
-      approval={needsApproval && approvalConfig ? { note: `${formatNumber(approvalConfig.threshold)} 人以上は承認が要る店です。承認されたら${sendMode === 'scheduled' && scheduledDate ? ` ${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime} に` : ''}送ります` } : null}
-      approvalFields={needsApproval && approvalConfig && audienceCount !== null ? (
-        <ApprovalRequestFields
-          bare
-          recipientCount={audienceCount}
-          threshold={approvalConfig.threshold}
-          candidates={approvalCandidates}
-          candidatesState={approvalCandidatesState}
-          approverId={approverId}
-          onApproverChange={setApproverId}
-          note={approvalNote}
-          onNoteChange={setApprovalNote}
-        />
-      ) : undefined}
-      primaryDisabled={needsApproval && approverId === ''}
-      primaryLabel={needsApproval ? '承認を依頼する' : (() => {
-        const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
-        const shifted = currentStep ? sendPreview.data?.quietHoursShiftTo : null
-        if (n !== null && shifted) return `${shiftedShort(shifted)} に ${formatNumber(n)} 人へ送る`
-        const shortAt = sendMode === 'scheduled' && scheduledDate ? `${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime}` : null
-        return n === null ? '送る' : sendMode === 'scheduled' ? `${formatNumber(n)} 人に${shortAt ? ` ${shortAt} で` : ''}予約する` : `${formatNumber(n)} 人に送る`
-      })()}
-      onConfirm={() => (currentStep && !needsApproval ? confirmMessage() : save())}
-      onBack={() => { if (!saving) setConfirmOpen(false) }}
-      error={error || undefined}
-    />
-    <div data-design-node="FpgxH">
-      <ConfirmDialog
-        open={confirmOpen && needsApprovalSingle}
-        title={sendMode === 'scheduled' ? 'この内容で予約しますか？' : 'この内容で送りますか？'}
-        description={
-          needsApproval && !needsApprovalSingle
-            ? '送る相手・日時・内容を確認し、承認をお願いする人を選んでください。承認されるまで送られません。'
-            : sendMode === 'scheduled' ? '送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。' : '送ると友だちに届きます。送信は取り消せません。対象と内容を確認してください。'
-        }
-        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
-        cancelLabel="戻って修正"
-        busy={saving}
-        error={error || undefined}
-        onCancel={() => { if (!saving) setConfirmOpen(false) }}
-        onConfirm={canConfirm && (!currentStep || approvalConfigState === 'ready') ? () => void save() : undefined}
-      >
-        {abConfirmLine(ab, audienceCount, new Date(scheduledAtIso() ?? Date.now())) ? <Notice tone="info" data-design-node="a5r5Wg">{abConfirmLine(ab, audienceCount, new Date(scheduledAtIso() ?? Date.now()))}</Notice> : null}
-        {currentStep && approvalConfigState === 'loading' ? <p role="status" className="text-xs text-ink-faint">承認の設定を確認しています…</p> : currentStep && approvalConfigState === 'error' ? <Notice tone="danger">承認の設定を確認できません。戻ってから確認画面を開き直してください</Notice> : null}
-        <dl className="border-hairline divide-hairline divide-y rounded-control border text-sm">
-          <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ink-faint">管理名</dt>
-            <dd className="text-ink text-right font-medium">{title.trim() || '（未入力）'}</dd>
-          </div>
-          <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ink-faint">配信対象</dt>
-            <dd className="text-ink text-right font-medium">
-              {confirmAudienceLabel}
-              <span className="ml-2 tabular-nums">
-                {audienceCount === null ? '—' : `${formatNumber(audienceCount)}人`}
-              </span>
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ink-faint">除外</dt>
-            <dd className="text-ink-secondary text-right">
-              {/* **0人と書かない。** 数としての口がまだ無い。 */}
-              {exclusionNote ?? <span className="text-ink-faint">—<span className="ml-2 text-xs">除外した人数はまだ取れません</span></span>}
-            </dd>
-          </div>
-          {/* 送信枠・計算時刻・把握できる重複配信もここへまとめる（IDEA-06）。 */}
-          <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ink-faint">送信枠</dt>
-            <dd className={`text-right ${quotaInsufficient ? 'font-medium text-danger' : 'text-ink-secondary'}`}>
-              {quotaNote ?? '—'}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ink-faint">計算時刻</dt>
-            <dd className="text-ink-secondary text-right tabular-nums">{evaluatedAtLabel ?? '—'}</dd>
-          </div>
-          <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ink-faint">配信日時</dt>
-            <dd className="text-ink text-right font-medium tabular-nums">{sendWhenLabel ?? '—'}</dd>
-          </div>
-          <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ink-faint">送る中身</dt>
-            <dd className="text-ink text-right font-medium">
-              {bubbles.length}通（{bubbles.map((b) => TYPE_LABELS[b.type] ?? b.type).join('・')}）
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ink-faint">開封の集計</dt>
-            <dd className="text-ink-secondary text-right">
-              {measureOpens
-                ? audienceCount === null
-                  ? '有効（対象人数が分かってから判定します）'
-                  : audienceCount >= 20 ? '有効' : '有効（20人未満のため集計されません）'
-                : '取らない'}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ink-faint">URLの短縮</dt>
-            <dd className="text-ink-secondary text-right">{trackLinks ? 'する（クリックを数えます）' : 'しない'}</dd>
-          </div>
-        </dl>
-
-        {/*
-          把握できる重複配信（IDEA-06）。同じ時刻の前後1時間に入っている
-          別の予約をここでも出す。送信設定の節でだけ出すと、確認の窓で
-          読み合わせるときに見落とす。
-        */}
-        {concurrentBroadcasts.length > 0 && (
-          <Notice tone="warn" className="mt-3">
-            <p className="font-semibold">同じ時刻の前後1時間に別の予約配信があります</p>
-            <ul className="mt-1 list-disc pl-4">
-              {concurrentBroadcasts.map((item) => (
-                <li key={item.id}>{formatScheduleTime(item.scheduledAt)}　{item.title}</li>
-              ))}
-            </ul>
-          </Notice>
-        )}
-
-        {/*
-          **未確認のまま送らせないのではなく、数えて見せる。**
-          「テスト送信がまだ」は止める理由にならないが、押す前に
-          目に入っていないと、あとから気づけない。
-        */}
-        {unconfirmedCount !== null && unconfirmedCount > 0 ? (
-          <Notice tone="warn" className="mt-3">
-            <p className="font-semibold">配信前チェックに {unconfirmedCount}件 の未確認があります</p>
-            <ul className="mt-1 list-disc pl-4">
-              {(preflight?.warnings ?? []).filter((w) => w.level === 'warning').map((w) => (
-                <li key={w.message}>{w.message}</li>
-              ))}
-              {testResult?.kind === 'success' ? null : testResult ? <li>テスト送信で届かなかった宛先があります</li> : <li>テスト送信がまだです</li>}
-              {previewConfirmed ? null : <li>LINEプレビューが未確認です</li>}
-            </ul>
-          </Notice>
-        ) : null}
-
-        {/*
-          二者承認（設計 A-1・A-4）。承認が要る人数のときだけ出す。
-          境目が読めているときだけ判定し、取得失敗中は確定させない。
-        */}
-        {needsApprovalSingle && audienceCount !== null ? (
-          <SingleOperatorFields
-            recipientCount={audienceCount}
-            value={approvalCountInput}
-            onChange={setApprovalCountInput}
-          />
-        ) : null}
-
-        {/* 人数が無いなら送らせない。上で確認のボタン自体を出していない。 */}
-        {audienceCount === null ? (
-          <Notice tone="danger" className="mt-3">
-            対象の人数を数えられていないため、送信・予約できません。
-            宛先と本文を確かめてから、もう一度お試しください。
-          </Notice>
-        ) : audienceCount === 0 ? (
-          <Notice tone="danger" className="mt-3">
-            いま届く人が0人です。宛先の条件を見直してください。
-          </Notice>
-        ) : null}
-      </ConfirmDialog>
-    </div>
-
-    <ConfirmDialog
-      open={testDialogOpen}
-      title="テストを送る"
-      description="登録済みのテスト送信先全員のLINEへ、表示確認用のメッセージを送ります。"
-      confirmLabel={testSending ? '送信中…' : 'テストを送る'}
-      cancelLabel="キャンセル"
-      busy={testSending}
-      designNode="h0kahp"
-      titleIcon={<Send size={22} />}
-      confirmIcon={<Send size={16} />}
-      onCancel={() => { if (!testSending) setTestDialogOpen(false) }}
-      onConfirm={testRecipientState === 'ready' && testRecipients.length > 0 ? () => void handleTestSend() : undefined}
-    >
-      <div className="space-y-3">
-        {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
-        {testRecipientState === 'error' && <Notice tone="danger">テスト送信先を読み込めませんでした。</Notice>}
-        {testRecipientState === 'ready' && testRecipients.length === 0 && (
-          <p className="rounded-control bg-canvas-sunken p-3 text-sm text-ink-faint">
-            テスト送信先が登録されていません。アカウント設定で、LINE連携済みの担当者を登録してください。
-          </p>
-        )}
-        {testRecipientState === 'ready' && testRecipients.length > 0 && (
-          <>
-            {/*
-              **宛先は選ばない。** 送信APIは宛先を受け取らず、Workerは
-              登録済みのテスト送信先全員へ送る。先頭だけ緑の丸を付けると
-              1人を選んだように見えるので、全員を同じ見た目で並べる。
-              役職はAPIが返さないので、名前から推定して表示しない。
-            */}
-            <p className="rounded-control bg-canvas-sunken p-3 text-sm text-ink-secondary">
-              登録済みのテスト送信先 {testRecipients.length}名全員へ送信します。
-            </p>
-            <ul className="space-y-2">
-              {testRecipients.map((recipient) => (
-                <li key={recipient.id} className="flex items-center gap-3 rounded-control border border-hairline p-3">
-                  {recipient.pictureUrl ? <img src={recipient.pictureUrl} alt="" className="h-9 w-9 rounded-pill object-cover" /> : (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-pill bg-ink-secondary text-sm font-bold text-on-accent">{recipient.displayName.slice(0, 1)}</span>
-                  )}
-                  <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink">{recipient.displayName}</span>
-                </li>
-              ))}
-            </ul>
-            {/*
-              テスト送信も通常の pushMessage を通すので、LINE公式アカウントの
-              送信枠を使う。「消費しません」と書くと実装と食い違う。
-            */}
-            <Notice tone="info">
-              テスト送信もLINE公式アカウントの送信枠を使用します（見込み {formatNumber((testRecipients.length * bubbles.length))}通）。
-            </Notice>
-          </>
-        )}
-        {testResult && (
-          <p className={
-            testResult.kind === 'success'
-              ? 'rounded-control bg-success-bg p-3 text-sm text-success'
-              : testResult.kind === 'partial'
-                ? 'rounded-control bg-warning-bg p-3 text-sm text-warning'
-                : 'rounded-control bg-danger-bg p-3 text-sm text-danger'
-          }>{testResult.message}</p>
-        )}
-        {testHistory.length > 1 && (
-          <section>
-            <h4 className="text-xs font-bold text-ink-faint">これ以前の実行履歴</h4>
-            <ul className="mt-1 space-y-1">
-              {testHistory.slice(1).map((entry, index) => (
-                <li
-                  key={index}
-                  className={
-                    entry.kind === 'success'
-                      ? 'rounded-control bg-success-bg p-2 text-xs text-success'
-                      : entry.kind === 'partial'
-                        ? 'rounded-control bg-warning-bg p-2 text-xs text-warning'
-                        : 'rounded-control bg-danger-bg p-2 text-xs text-danger'
-                  }
-                >{entry.message}</li>
-              ))}
-            </ul>
-          </section>
-        )}
-      </div>
-    </ConfirmDialog>
-
-  {inlineComposer && inlineHost ? inlineComposer.kind === 'carousel' ? <CarouselV8 key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : inlineComposer.kind === 'rich_message' ? <TemplateRichEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : <TemplateRichVideoEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : null}
-  <Dialog open={templateSaveIndex !== null} title="テンプレートにする" description={`${(templateSaveIndex ?? 0) + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。`} onCancel={() => setTemplateSaveIndex(null)} confirmLabel="保存する" onConfirm={() => void saveComposerTemplate()} busy={composerBusy} error={templateSaveError || undefined}><label>テンプレートの名前<SaveErrorField names={["templateSaveName","name","template_save_name"]}><input aria-label="テンプレートの名前" value={templateSaveName} onChange={(event) => setTemplateSaveName(event.target.value)} className={styles.textInput} /></SaveErrorField></label></Dialog>
+    {renderBroadcastConfirmDialogs({ approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, previewConfirmed, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title })}
+    {renderBroadcastEditorDialogs({ ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, preflight, previewConfirmed, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, title, trackLinks, unconfirmedCount })}
   </div></MessageComposerPage></SaveErrorScope>
 }

@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // the inactive-offer 404 without a real D1 binding.
 const dbMocks = {
   listLineAccountsWithTenantStatus: vi.fn().mockResolvedValue([
-    { id: 'account-main', login_channel_id: '2000000000', tenant_status: 'active' },
+    { id: 'account-main', login_channel_id: '2000000000', tenant_status: 'active', is_active: 1, archived_at: null },
   ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
@@ -41,6 +41,13 @@ const env = {
 } as unknown as import('../index.js').Env['Bindings'];
 
 function call(path: string, init?: RequestInit) {
+  const target = new URL(`https://worker.example.com${path}`);
+  const token = target.searchParams.get('lineAccessToken');
+  if (token && !target.pathname.includes('/statements/')) {
+    target.searchParams.delete('lineAccessToken');
+    const headers = new Headers(init?.headers); headers.set('Authorization', `Bearer ${token}`);
+    init = { ...init, headers }; path = target.pathname + target.search;
+  }
   return worker.fetch(
     new Request(`https://worker.example.com${path}`, init),
     env,
@@ -120,7 +127,7 @@ beforeEach(() => {
   links = [];
 
   dbMocks.listLineAccountsWithTenantStatus.mockResolvedValue([
-    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID, tenant_status: 'active' },
+    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID, tenant_status: 'active', is_active: 1, archived_at: null },
   ]);
   dbMocks.getFriendByLineUserIdForAccount.mockImplementation(async (_db: unknown, uid: string) => FRIENDS[uid] ?? null);
   dbMocks.getAffiliateByFriendId.mockImplementation(async (_db: unknown, fid: string) =>
@@ -367,8 +374,8 @@ describe('POST /api/liff/affiliate/links — offer-scoped issuance', () => {
       body: JSON.stringify({ lineAccessToken: 'tok-alice', offerId: 'off-active' }),
     });
     expect(res.status).toBe(400);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toBe('先に案件に参加してください');
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.message).toBe('先に案件に参加してください');
     expect(dbMocks.createAffiliateLink).not.toHaveBeenCalled();
   });
 

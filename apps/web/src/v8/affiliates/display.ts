@@ -1,3 +1,5 @@
+import { formatYen } from '@line-crm/shared';
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
  * ★V8 成果とアフィリエイトの表示の言い換えと、読み込みの小さな手助け。
  *
@@ -106,9 +108,7 @@ export function asReportV2(raw: unknown): ReportV2 | null {
   return value as ReportV2
 }
 
-export function formatYen(n: number): string {
-  return `¥${formatNumber(Math.round(n))}`
-}
+export { formatYen };
 
 export function formatYenNullable(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—'
@@ -263,7 +263,7 @@ export function currentSettlementPeriod(now = new Date()): { periodFrom: string;
 /** 締めの月の1つ前の期間。 */
 export function previousSettlementPeriod(periodFrom: string): { periodFrom: string; periodTo: string } {
   const JST_MS = 9 * 60 * 60 * 1000
-  const wall = new Date(new Date(periodFrom).getTime() + JST_MS)
+  const wall = japanCalendar(new Date(periodFrom))
   const year = wall.getUTCFullYear()
   const month = wall.getUTCMonth()
   return {
@@ -281,13 +281,13 @@ export function periodText(period: { periodFrom: string; periodTo: string }): st
 export function jstMonthKey(at: string | number = Date.now()): string {
   const ms = typeof at === 'number' ? at : new Date(at).getTime()
   if (!Number.isFinite(ms)) return ''
-  return new Date(ms + 9 * 3600_000).toISOString().slice(0, 7)
+  return japanCalendar(new Date(ms)).toISOString().slice(0, 7)
 }
 
 export type ReportPeriod = 'this_month' | 'last_month' | 'all'
 
 export function reportMonthKey(shift: number, now = Date.now()): string {
-  const jst = new Date(now + 9 * 3600_000)
+  const jst = japanCalendar(new Date(now))
   return new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth() + shift, 1)).toISOString().slice(0, 7)
 }
 

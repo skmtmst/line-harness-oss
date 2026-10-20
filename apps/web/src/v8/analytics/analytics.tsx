@@ -1,10 +1,10 @@
 'use client'
 
 /*
- * ★V8 分析（Pencil：友だちの増減 `ws9wt`・1152 `eEhYU`・閲覧のみ `L4Uov`・
- * 配信の反応 `yvOtn`・経路と成果 `PFe9c`・URLクリック `iK4cQ`・成果地点ごとの
- * レポート `AzrZq`・ファネル `DkRDE`・クロス分析 `u5CuB8`・使われ方 `N8ZrUl`・
- * 保存した分析 `bglah`）。
+ * ★V8 分析（Pencil：友だちの増減 ・1152 ・閲覧のみ ・
+ * 配信の反応 ・経路と成果 ・URLクリック ・成果地点ごとの
+ * レポート ・ファネル ・クロス分析 ・使われ方 ・
+ * 保存した分析 ）。
  *
  * 型（ListPage）に、板の頭・二段の切り替え（組／見かた）・閲覧のみの帯・
  * 見かたごとの数の帯と本文を渡す。ファネルの作る・編集フォームと結果の保存欄だけは、
@@ -46,7 +46,7 @@ const GROUPS: Array<{ label: string; tabs: Array<{ key: string; label: string }>
   { label: '深く見る', tabs: [{ key: 'funnel', label: 'ファネル' }, { key: 'cross', label: 'クロス分析' }, { key: 'segments', label: 'お客さまの分け方' }] },
   { label: '見直す', tabs: [{ key: 'usage', label: '使われ方' }, { key: 'saved', label: '保存した分析' }] },
 ]
-/** 成果地点ごとのレポートは「経路と成果」の中の1つの見かた（AzrZq はタブが経路と成果）。 */
+/** 成果地点ごとのレポートは「経路と成果」の中の1つの見かた（ はタブが経路と成果）。 */
 const tabOwner = (tab: string) => tab === 'conversion-report' ? 'routes' : tab
 const hrefOf = (key: string) => `/analytics?tab=${key}`
 
@@ -74,7 +74,7 @@ function readTab(params: URLSearchParams): AnalyticsTabV8 {
 function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount: number | null }) {
   const owner = tabOwner(active)
   const group = GROUPS.find((item) => item.tabs.some((tab) => tab.key === owner)) ?? GROUPS[0]
-  /* 上の段（組）も下の段（その組の見かた）も共通の下線のタブ（司令塔の判断・絵 iK4cQ・AzrZq・PFe9c・N8ZrUl）。 */
+  /* 上の段（組）も下の段（その組の見かた）も共通の下線のタブ（司令塔の判断・絵の）。 */
   return <div className={styles.navigation}>
     <Tabs label="分析の組" items={GROUPS.map((item) => ({ label: item.label, href: hrefOf(item.tabs[0].key), current: item.label === group.label }))} />
     <Tabs label="分析の見かた" items={group.tabs.map(item => ({label:item.label,href:hrefOf(item.key),current:item.key===owner,count:item.key==='saved' ? savedCount ?? undefined : undefined}))} />

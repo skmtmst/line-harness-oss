@@ -1,11 +1,12 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
-import { DAY_MS, definitionRange } from './list-export'
+import { definitionRange } from './list-export'
 
 import { downloadCsvBlob } from './list-export'
 
-import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarOptional, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
+import { useStaffRole } from '@/lib/staff-role';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
 import { useListUrlValue, useListUrlParam } from '@/components/shared/list-url-state';
 import TruncatedText from '@/components/shared/truncated-text'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
@@ -17,7 +18,7 @@ import { useFolderMove } from '@/components/shared/use-folder-move';
 import { moveConversionToFolder } from '@/lib/move-to-folder';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation';
-import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug, Eye } from 'lucide-react'
+import { Banknote, Bookmark, CircleOff, CirclePause, Download, FilePen, KeyRound, Pause, Play, Plus, Target, TriangleAlert, Trophy, Unplug } from 'lucide-react'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { ListPage } from '@/components/templates';
@@ -60,7 +61,7 @@ import { ConversionDetailDialog, ConversionEditDialog, ConversionReversalDialog,
 import { notifyToast } from '@/components/shared/toast';
 import { focusConversionField, type ConversionFieldIssue } from './field-issue';
 import styles from './list.module.css'
-import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { describeApiFailure, withPermissionFailure } from '@/components/shared/api-error-message';
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
@@ -68,11 +69,11 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 コンバージョンの一覧（Pencil：一覧 `r6dJFy`・1152 `BygrU`・閲覧のみ `WSGvo`・
- * 状態の見本帳 `E2l8cw`）。
+ * ★V8 コンバージョンの一覧（Pencil：一覧 ・1152 ・閲覧のみ ・
+ * 状態の見本帳 ）。
  *
  * 型（ListPage）に、数の帯・左のフォルダの列（上に「成果地点を作る」）・
- * 案内の帯・道具の段・表（絵の列の並び）を渡す。行の右端は「…」（使う場所を足す操作も中に残す）。
+ * 案内の帯・道具の段・表（列の並び）を渡す。行の右端は「…」（使う場所を足す操作も中に残す）。
  * 行はURLに残る右の詳細パネル、「止める」は3択と理由を持つ確認画面。
  *
  * データの口・保存の口・権限・失敗の扱いは app/conversions/page.tsx と同じ
@@ -98,7 +99,7 @@ const SORT_TO_API: Record<PointSort, 'count_desc' | 'value_desc' | 'name_asc'> =
   name: 'name_asc',
 }
 
-/* 状態の札（絵 r6dJFy の並び）。件数は口の stateCounts。 */
+/* 状態の札（並び）。件数は口の stateCounts。 */
 const CHIPS: Array<{ value: ConversionDefinitionFilter; label: string; icon: ReactNode }> = [
   { value: 'active', label: '有効', icon: <Play size={13} aria-hidden="true" /> },
   { value: 'stopped', label: '停止中', icon: <Pause size={13} aria-hidden="true" /> },
@@ -150,7 +151,7 @@ function shortDate(iso: string): string {
 function rowSub(point: ConversionDefinitionListItem): string {
   const parts = [deduplicationLabel(point.deduplicationMode, point.deduplicationWindowDays).replace(/だけ$/, '').replace('何回でも数える', '1回ごと')]
   if (point.status === 'stopped' && point.stoppedAt) parts.push(`止めた日 ${shortDate(point.stoppedAt)}`)
-  else if (point.valueMode === 'fixed') parts.push(point.value == null ? '金額なし' : `決まった金額 ¥${formatNumber(point.value)}`)
+  else if (point.valueMode === 'fixed') parts.push(point.value == null ? '金額なし' : `決まった金額 ${formatYen(point.value)}`)
   else if (point.valueMode === 'none') parts.push('金額なし')
   else if (point.reversalPolicy === 'source_cancelled') parts.push('取り消しは引く')
   return parts.join('・')
@@ -526,7 +527,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
-      setReversalError(err instanceof Error ? err.message : '記録できませんでした') }
+      setReversalError(describeApiFailure(err, '保存')) }
     } finally {
       setReversalBusy(false)
     }
@@ -819,7 +820,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   const createInRow = canEdit ? createLink : <span className={styles.createSpaceRow} aria-hidden="true" />
 
   /* ===== 道具の段 ===== */
-  /* 1152 の板（BygrU）は札を2つ（動いている・止めている）だけ。ほかの状態は「よく使う絞り込み」から選ぶ。 */
+  /* 1152 の板は札を2つ（動いている・止めている）だけ。ほかの状態は「よく使う絞り込み」から選ぶ。 */
   const chipList = narrow || (role !== null && !canEdit) ? CHIPS.slice(0, 2) : CHIPS
   const filterChips = (
     <div role="group" aria-label="状態で絞り込む">
@@ -868,7 +869,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
   const searchBox = (
     <SearchField value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="成果地点の名前で探す" aria-label="成果地点の名前で探す" />
   )
-  /* 1152 の板（BygrU）：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
+  /* 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す」→ 2段目「札 … よく使う絞り込み・件数」。 */
 
   const wideToolbar = (
     <div className={styles.wideTools} data-viewer={role !== null && !canEdit || undefined}>
@@ -914,7 +915,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       </div>
       <div className={styles.panelFact}>
         <p className={styles.panelLabel}>今月の成果</p>
-        <p className={styles.panelText}>{`${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・¥${formatNumber(panelPoint.metrics.netValue)}`}`}</p>
+        <p className={styles.panelText}>{`${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・${formatYen(panelPoint.metrics.netValue)}`}`}</p>
       </div>
       <div className={styles.panelFact}>
         <p className={styles.panelLabel}>使われている場所</p>
@@ -934,11 +935,11 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       {ingestError ? <Notice tone="danger" >{ingestError}</Notice> : null}
       <div className={styles.panelButtons}>
         {canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
-          <Button onClick={() => void issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={15} aria-hidden="true" />鍵を発行する</Button>
+          <Button onClick={() => issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={15} aria-hidden="true" />鍵を発行する</Button>
         ) : null}
         {canEdit && panelPoint.status !== 'stopped' ? <Button onClick={() => openEdit(panelPoint)}>編集する</Button> : null}
         {canEdit && panelPoint.state === 'draft' ? (
-          <Button onClick={() => void publishDraft(panelPoint)} disabled={publishing} busy={publishing} busyLabel="公開しています">公開する</Button>
+          <Button onClick={() => publishDraft(panelPoint)} disabled={publishing} busy={publishing} busyLabel="公開しています">公開する</Button>
         ) : null}
       </div>
       {canEdit && panelPoint.status !== 'stopped' && panelPoint.state !== 'draft' ? (
@@ -960,7 +961,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
           variant={stopAction === 'delete' ? 'danger' : 'primary'}
           disabled={stopping || stopImpactLoading || !stopReason.trim() || (stopAction === 'replace' && !replacementId)}
           disabledReason={stopping ? '止めています。' : stopImpactLoading ? '利用先と影響を確認しています。' : !stopReason.trim() ? '止める理由を入力してください。' : stopAction === 'replace' && !replacementId ? '差し替え先を選んでください。' : undefined}
-          onClick={() => void runStop()}
+          onClick={() => runStop()}
           busy={stopping || stopImpactLoading}
           busyLabel="止めています" widthReserve="idle"
         >
@@ -1102,7 +1103,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
                     </Td>
                     <Td className={styles.colCount} align="right"><span className={styles.num}>{`${formatNumber(point.metrics.netCount)} 件`}</span></Td>
                     <Td className={styles.colValue} align="right">
-                      <span className={styles.num}>{point.metrics.netValue > 0 ? `¥${formatNumber(point.metrics.netValue)}` : emptyValue('unknown')}</span>
+                      <span className={styles.num}>{point.metrics.netValue > 0 ? `${formatYen(point.metrics.netValue)}` : emptyValue('unknown')}</span>
                     </Td>
                     <Td className={styles.colUsage} collapseAt="narrow">
                       <span className={styles.usageMain} title={usageLabel(point)}><TruncatedText value={usage.main} /></span>
@@ -1180,7 +1181,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       headingSize="regular"
       title="コンバージョン"
       actions={
-        <Button onClick={() => void exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
+        <Button onClick={() => exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
           <Download size={15} aria-hidden="true" />CSV で書き出す
         </Button>
       }
@@ -1222,7 +1223,7 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
             icon={<Banknote size={13} aria-hidden="true" />}
             help="この30日に数えた成果の金額の合計です。"
             value={reportUnavailable ? null : kpi.currentValue}
-            valueText={reportUnavailable ? undefined : `¥${formatNumber(kpi.currentValue)}`}
+            valueText={reportUnavailable ? undefined : `${formatYen(kpi.currentValue)}`}
             unit=""
             detail={<span title={listUnavailable ? '金額の内訳を読み込めませんでした' : `${formatNumber(points.filter(point => point.value != null).length)}個の成果地点で金額を記録`}>{listTruncated ? '直近5000件までの合計です' : '注文の金額で数えるもの'}</span>}
           />

@@ -1,8 +1,10 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient, type Message } from '@line-crm/line-sdk';
+
 import {
   LineNotificationError,
   createCustomerNotificationDefinition,
@@ -33,14 +35,15 @@ import {
   type NotificationDeliveryListRow,
   type NotificationDeliveryAttemptRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import {
   releaseQuotaSlot,
   tryReserveQuotaSlot,
-} from '../services/broadcast-quota-guard.js';
+} from '../features/broadcasts/broadcast-quota-guard/index.js';
 
 const lineNotifications = new Hono<Env>();
 
@@ -783,7 +786,7 @@ function bodyFriendIds(value: unknown): string[] | null {
 }
 
 /**
- * 要件 v6-24 §6 `GET deliveries/:id`。一覧と同じ1件の形で返す。
+ * 要件 -24 §6 `GET deliveries/:id`。一覧と同じ1件の形で返す。
  * アカウント境界の外側は 404 に倒して存在を明かさない。
  */
 lineNotifications.get(
@@ -804,7 +807,7 @@ lineNotifications.get(
 );
 
 /**
- * 要件 v6-24 §6 `GET quota`。一覧の `includeQuota=1` と同じ送信枠を単体で返す。
+ * 要件 -24 §6 `GET quota`。一覧の `includeQuota=1` と同じ送信枠を単体で返す。
  */
 lineNotifications.get(
   '/api/line-notifications/quota',
@@ -822,7 +825,7 @@ lineNotifications.get(
 );
 
 /**
- * 要件 v6-24 §6 `POST deliveries/:id/resend`。
+ * 要件 -24 §6 `POST deliveries/:id/resend`。
  * retry（未完了の試行を続ける）と分け、新規通知として送り直す。
  * 元の行は残し、新しい送達行・新しい冪等キーで送る。理由は必須で監査に残す。
  * 除外（送信対象外）の記録は送り直さない。対象外の判定を覆す操作だからだ。
@@ -975,7 +978,7 @@ const CUSTOMER_TEST_SEND_NOTICE =
   '【テスト送信】公開前の確認用です。実際の注文情報は含みません。';
 
 /**
- * 要件 v6-24 §6 `POST customer-definitions/:id/test`。
+ * 要件 -24 §6 `POST customer-definitions/:id/test`。
  * いま編集中の下書き文面を、指定した友だちだけに試し送りする。
  * 実注文・住所・クーポンは使わず、先頭に確認用の断りを付けて送る。
  * 記録は `test` 扱いで、再試行の対象にしない。

@@ -11,7 +11,7 @@ vi.mock('@line-crm/line-sdk', () => ({
 vi.mock('./support-relay.js', () => ({ sendViaXServerRelay }));
 
 import { enqueueOperationNotifications, stopOperationCapabilities } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { processOperationNotificationOutbox } from './operation-notifications.js';
 
@@ -81,7 +81,7 @@ it.each(['line','email'] as const)('SEND-S05: %s の途中失敗後も成功済�
  f.raw.close();
 });
 
-it('B-241/SEND-S05: 通知の完了保存が0件なら成功を返さず、補完でも二度送らない', async () => {
+it('/SEND-S05: 通知の完了保存が0件なら成功を返さず、補完でも二度送らない', async () => {
   const f = createTestD1();
   try {
     pushMessage.mockReset().mockResolvedValue({});
@@ -101,7 +101,7 @@ it('B-241/SEND-S05: 通知の完了保存が0件なら成功を返さず、補�
   }
 });
 
-it('B-241/SEND-S05: 宛先の固定を保存できなければ送信を始めない', async () => {
+it('/SEND-S05: 宛先の固定を保存できなければ送信を始めない', async () => {
   const f = createTestD1();
   try {
     pushMessage.mockReset().mockResolvedValue({});

@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("共通アクション名を入力してください"),
 }
 
@@ -17,7 +17,7 @@ import { Check } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { api, describeSaveFailure, type CommonActionResources, type CommonActionStep } from '@/lib/api'
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
-import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -34,7 +34,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8-B 共通アクションを作る（Pencil `j2hfkS`）。
+ * ★V8-B 共通アクションを作る（Pencil ）。
  *
  * 型（CreatePage）の左に段「どんなアクションか」「処理を上から順に並べる」「失敗したとき」、右の列に
  * 「版のこと」「つながる先」「気をつけること」。下の帯はキャンセル・下書きを保存を真ん中に。
@@ -108,7 +108,7 @@ export function CommonActionNew() {
           setResourcesError(loadFailureNotice(caught, '選択肢'))
           return
         }
-        const message = caught instanceof Error ? caught.message : ''
+        const message = describeApiFailure(caught, '読み込み')
         setResourcesError(message && !/^API error: /.test(message) ? message : '選択肢を読み込めませんでした。通信の状態を確認して、もう一度読み込んでください。')
       })
       .finally(() => {
@@ -118,10 +118,10 @@ export function CommonActionNew() {
   }, [accountLoading, canManage, selectedAccountId, resourcesReloadKey])
 
   const save = async () => {
-    if (saving) return
+
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     setError('')
-    if ((b244Requirements.name.check(name) !== null)) return setInputError({ target: 'ca-name', message: '共通アクション名を入力してください' })
+    if ((FIELD_REQUIREMENTS.name.check(name) !== null)) return setInputError({ target: 'ca-name', message: '共通アクション名を入力してください' })
     if (actions.length === 0) return setInputError({ target: 'ca-add-step', message: '処理を1つ以上追加してください' })
     setInputError(null)
     setSaving(true)
@@ -202,7 +202,7 @@ export function CommonActionNew() {
         <Button href="/common-actions">キャンセル</Button>
         <Button
           variant="primary"
-          onClick={() => void save()}
+          onClick={() => save()}
           disabled={saving || resourcesLoading || resourcesFailed}
           title={resourcesFailed ? '選択肢を読み込めていないため保存できません' : undefined}
           busy={saving}
@@ -216,7 +216,7 @@ export function CommonActionNew() {
 
       <section className={styles.card} aria-labelledby="ca-what">
         <div className={styles.cardHead}><h2 className={styles.cardTitle} id="ca-what">どんなアクションか</h2></div>
-        <Field label="名前" htmlFor="ca-name" error={inputError?.target === 'ca-name' ? inputError.message : undefined} requirement={b244Requirements.name}>
+        <Field label="名前" htmlFor="ca-name" error={inputError?.target === 'ca-name' ? inputError.message : undefined} requirement={FIELD_REQUIREMENTS.name}>
           <SaveErrorField names={["name"]}><TextField id="ca-name" value={name} maxLength={120} placeholder="例：購入のお礼" onChange={(event) => { setName(event.target.value); if (inputError?.target === 'ca-name') setInputError(null) }} /></SaveErrorField>
         </Field>
         <Field label="説明"><SaveErrorField names={["description"]}><TextField value={description} maxLength={200} placeholder="使う場面や目的を書きます" onChange={(event) => setDescription(event.target.value)} /></SaveErrorField></Field>

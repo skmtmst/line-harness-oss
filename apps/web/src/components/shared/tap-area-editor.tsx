@@ -5,7 +5,7 @@ import { ErrorCountBadge } from './error-count-badge'
 import styles from './tap-area-editor.module.css'
 
 /*
- * 画像の上で面を選ぶ（Pencil ★V8 採用案 `Wmch0`：リッチメニュー作る② 店 Z0uO6・統括 egdGx／リッチメッセージ EFV8l）。
+ * 画像の上で面を選ぶ（Pencil ★V8 採用案 `Wmch0`：リッチメニュー作る② 店 ・統括 egdGx／リッチメッセージ ）。
  *
  * 画像（幅 320・縦横比そのまま）を左、面の一覧（記号 A〜F・名前・動きの要約・未設定）を右に並べ、
  * その下に選んだ面の動きの欄（detail）を置く。画像の上の面を押しても、一覧の行を押しても同じ面を選べる。
@@ -22,7 +22,7 @@ export interface TapAreaItem {
   name: string
   /** 動きの要約。空・null は「未設定」。 */
   summary?: string | null
-  /** 保存で落ちた、この面の直す欄の数（B-139）。1 以上で行の右に赤い丸。 */
+  /** 保存で落ちた、この面の直す欄の数。1 以上で行の右に赤い丸。 */
   errorCount?: number
   /** 画像の上の位置（％・左上が 0）。`canvas` を渡すときは使わない。 */
   x?: number

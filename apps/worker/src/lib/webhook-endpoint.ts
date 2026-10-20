@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * LINE に登録されている Webhook の宛先を読み、こちらの受け口と突き合わせる。
  *

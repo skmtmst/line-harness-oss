@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 板 `aINnz` 支払いタブの絵合わせ。
+ * 板  支払いタブの絵合わせ。
  * - 数の帯：今回 払う額（合計・人数・件数）、次の締め（月日・あと何日）
  * - 行：確定できる／振込先待ちの札、未登録の札、行末の「…」（中に明細を見る）だけ
  * - 頭：銀行用 CSV…・支払明細をまとめて出す
@@ -91,7 +91,7 @@ describe('aINnz 支払いタブの絵合わせ', () => {
     })
     expect(screen.getByText('振込先待ち')).toBeTruthy()
     expect(screen.getByText('未登録')).toBeTruthy()
-    // 行の右端は「…」1つ（B-253）。明細はその中にある。
+    // 行の右端は「…」1つ。明細はその中にある。
     expect(screen.queryByRole('button', { name: '明細を見る' })).toBeNull()
     const menus = screen.getAllByRole('button', { name: /の支払いの操作/ })
     expect(menus.length).toBe(2)

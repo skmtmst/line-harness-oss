@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 import { hasStaffPermission } from '../middleware/role-guard.js';
 import { StyleError } from '../services/style-setup.js';
@@ -49,7 +49,7 @@ styles.patch(base + '/bookings/:id', async (c) => {
     new URL(String(url)).hostname === 'meet.google.com'
   ) {
     const registered = await c.env.DB.prepare(
-      `SELECT m.id FROM meet_consultations m WHERE m.booking_id=? AND m.friend_id=? AND m.meet_url=? AND m.status='confirmed' AND julianday(m.starts_at)=julianday(?) AND julianday(m.ends_at)=julianday(?) AND EXISTS(SELECT 1 FROM meet_consultation_reminders r WHERE r.consultation_id=m.id AND r.kind='day_before') AND EXISTS(SELECT 1 FROM meet_consultation_reminders r WHERE r.consultation_id=m.id AND r.kind='hour_before')`,
+      `SELECT m.id FROM meet_consultations m WHERE m.booking_id=? AND m.friend_id=? AND m.meet_url=? AND m.status='confirmed' AND julianday(m.starts_at)=julianday(?) AND julianday(m.ends_at)=julianday(?) AND EXISTS(SELECT 1 FROM meet_consultation_notification_runs r WHERE r.consultation_id=m.id AND r.schedule_revision=m.schedule_revision AND r.kind='day_before') AND EXISTS(SELECT 1 FROM meet_consultation_notification_runs r WHERE r.consultation_id=m.id AND r.schedule_revision=m.schedule_revision AND r.kind='hour_before')`,
     )
       .bind(id, r.friend_id, url, r.starts_at, r.ends_at)
       .first();

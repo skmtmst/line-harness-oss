@@ -48,7 +48,7 @@ import Notice from '@/components/shared/notice'
 import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
 
 /*
- * ★V8 自動応答の実行結果（Pencil `nWmLg`）。
+ * ★V8 自動応答の実行結果（Pencil ）。
  *
  * 型は詳細（DetailPage）：頭（戻る・題・説明・右に3つの操作）→ 数の帯（4つ）→
  * 失敗の帯 → 実行の記録（道具の段・表・ページ送り）→ 言葉ごとの数と引き継ぎ。

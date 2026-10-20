@@ -1,9 +1,10 @@
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {formRouting} from './form-routing.js';
-import {loadRoutingLayout,validateLayoutRouting,resolveRouting,issueRoutingToken,verifyRoutingToken} from '../services/form-routing.js';
+import {loadRoutingLayout,validateLayoutRouting,resolveRouting,issueRoutingToken,verifyRoutingToken} from '../features/forms/form-routing.js';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 import {normalizeLayout,type FormLayout} from '@line-crm/shared';
+
 let d:SqliteD1;
 const target={menuId:'menu',staffId:'bs'};
 const layout=()=>normalizeLayout({sections:[{id:'s1',name:'相談',blocks:[{id:'q',kind:'input',type:'radio',name:'subject',label:'内容',choices:[{id:'job',label:'転職'}]},{id:'book',kind:'input',type:'booking',name:'book',label:'予約',booking:{menuId:'menu',routing:{enabled:true,rules:[{conditions:[{questionId:'q',op:'is',value:'転職'}],target}],fallback:{menuId:'menu'}}}}]}]})!;

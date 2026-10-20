@@ -141,7 +141,7 @@ async function renderAt(url: string) {
 
 /** いま開いている札の見出し。開いている印が付いている1つだけ。 */
 function currentTab(): string {
-  // ★V7: ボタン切り替えの札は aria-selected で開いているものを示すため、そちらで探す。
+  // ★管理画面: ボタン切り替えの札は aria-selected で開いているものを示すため、そちらで探す。
   const current = Array.from(host.querySelectorAll('[aria-selected="true"]'))
     .map((node) => node.textContent?.trim() ?? '')
   expect(current).toHaveLength(1)

@@ -1,10 +1,10 @@
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
 import { queueKnowledgeStatement } from './platform-knowledge.js';
-import type { HqSupportKind, HqSupportRequest, HqSupportStatus } from './hq-support-requests.js';
+import type { HqSupportKind, HqSupportRequest, HqSupportStatus } from './hq-support-types.js';
 
 /**
- * 運営コンソールのお問い合わせ（チケット）★V6 37-6。
+ * 運営コンソールのお問い合わせ（チケット）★37-6。
  *
  * 表は統括側の 36-3 と同じ hq_support_requests。運営はここに stage（進み具合）・
  * priority（優先度）・返信（hq_support_messages）・下書き（hq_support_reply_drafts）を足す。
@@ -140,7 +140,7 @@ export async function countSupportTicketsByStage(db: D1Database): Promise<Record
   return out;
 }
 
-/** 数値カード帯（★V6 37-6）の元になる集計。期間は月初からの JST 文字列で渡す。 */
+/** 数値カード帯（★37-6）の元になる集計。期間は月初からの JST 文字列で渡す。 */
 export async function supportTicketKpis(
   db: D1Database,
   input: { monthStart: string; prevMonthStart: string },
@@ -250,7 +250,7 @@ export async function addSupportReply(
   return (await db.prepare('SELECT * FROM hq_support_messages WHERE id = ?').bind(id).first<SupportMessage>())!;
 }
 
-/** 統括側からの続き（★V6 36-3-A）。待ち・解決済み・クローズは対応中へ戻す。 */
+/** 統括側からの続き（★36-3-A）。待ち・解決済み・クローズは対応中へ戻す。 */
 export async function addSupportTenantMessage(
   db: D1Database,
   input: { requestId: string; staffId: string | null; staffName: string; body: string; attachmentKeys: string[] },
@@ -306,7 +306,7 @@ export async function updateSupportTicket(
   return getSupportTicket(db, id);
 }
 
-/** 運営が代わりに起票する（★V6 37-6「＋ チケットを作る」）。 */
+/** 運営が代わりに起票する（★37-6「＋ チケットを作る」）。 */
 export async function createSupportTicketByOps(
   db: D1Database,
   input: {
@@ -363,7 +363,7 @@ export async function deleteSupportReplyDraft(db: D1Database, requestId: string)
   await db.prepare('DELETE FROM hq_support_reply_drafts WHERE request_id = ?').bind(requestId).run();
 }
 
-/** 契約先の状況（★V6 37-6「問い合わせ元」）。店舗数・LINE登録・過去のチケット。 */
+/** 契約先の状況（★37-6「問い合わせ元」）。店舗数・LINE登録・過去のチケット。 */
 export async function supportTenantContext(
   db: D1Database,
   tenantId: string,

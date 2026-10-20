@@ -327,7 +327,7 @@ describe('NEXT-08 「個別操作」「…」が操作メニューにつなが�
     })
     expect(host.innerHTML).not.toBe(before)
     const labels = menuItems().map((b) => b.textContent)
-    // ★V7（m13g）：「受信箱で開く」は画面右上のボタンにあるので、メニューには重ねない。
+    // ★管理画面（m13g）：「受信箱で開く」は画面右上のボタンにあるので、メニューには重ねない。
     expect(labels.some((text) => text === '受信箱で開く')).toBe(false)
     expect(labels.some((text) => text?.includes('テンプレートを送る'))).toBe(true)
     expect(labels).toContain('シナリオに登録する')
@@ -411,7 +411,7 @@ describe('NEXT-09 対象の友だちを引き継ぐ操作', () => {
     await eventually(() => expect(document.body.textContent).toContain('に登録しました'))
   })
 
-  // ★V7（2026-09-24）：この友だちに関係の無い「〜一覧を見る」は操作節に置かない（左のメニューから行ける）。
+  // ★管理画面（2026-09-24）：この友だちに関係の無い「〜一覧を見る」は操作節に置かない（左のメニューから行ける）。
   it('操作節に汎用一覧へ行くだけの入口を置かず、対象を引き継がない「送信」「設定」も名乗らない', async () => {
     await render()
     const hrefs = Array.from(document.querySelectorAll('a')).map((a) => ({

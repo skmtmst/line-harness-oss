@@ -7,9 +7,9 @@ import {
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { styles } from './styles.js';
 import { hqTemplates } from './hq-templates.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { permissionForApiPath } from '../middleware/auth.js';
-import * as googleCalendar from '../services/booking-calendar-sync.js';
+import * as googleCalendar from '../features/booking/booking-calendar-sync.js';
 import { readWindow, instant } from '../services/style-analytics.js';
 import {
   initializeAccountStyle,
@@ -83,7 +83,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('B-311 template samples', () => {
+describe('template samples', () => {
   test.each(ACCOUNT_STYLES)(
     '%s returns supported placeholders and its exact starter samples',
     async (style) => {
@@ -95,7 +95,7 @@ describe('B-311 template samples', () => {
         15 +
           {
             standard: 0,
-            ec: 0,
+            ec: 2,
             restaurant: 3,
             salon: 2,
             consult: 3,
@@ -113,11 +113,12 @@ describe('B-311 template samples', () => {
             },
           ]),
         );
-        expect(standardStarter(style).items).toContainEqual(item.starterItem);
+        if (!['standard', 'ec'].includes(style)) expect(standardStarter(style).items).toContainEqual(item.starterItem);
         expect(item.hqDefinition.template.messageContent).toBe(
           JSON.stringify({ text: item.text }),
         );
       }
+      for (const item of standardStarter(style).items.filter(i => i.key.startsWith('sample-'))) expect(result.body.data.items.map((s: {starterItem: unknown}) => s.starterItem)).toContainEqual(item);
       expect(
         result.body.data.items.every(
           (s: any) => s.category === 'common' || s.category === style,
@@ -184,7 +185,7 @@ describe('B-311 template samples', () => {
     expect(r.status).toBe(200);
     expect(
       r.body.data.inserted.filter((i: any) => i.kind === 'template'),
-    ).toHaveLength(3);
+    ).toHaveLength(13);
     expect(r.body.data.inserted.find((i: any) => i.key === key)).toMatchObject({
       id: existing.id,
       isSample: false,
@@ -291,7 +292,7 @@ function book(id: string, start: string, end: string, staff = 's') {
     )
     .run(id, staff, start, end, end);
 }
-describe('B-318 range and schedule', () => {
+describe('range and schedule', () => {
   test('Google busy times block availability and connection failure is unavailable rather than zero', async () => {
     const busy = vi
       .spyOn(googleCalendar, 'getStaffGoogleBusy')

@@ -1,6 +1,9 @@
+import { exportedResponseHeaders } from '../services/output-response.js';
+import { isOutputRequest } from './output-request.js';
+export { isOutputRequest } from './output-request.js';
 import type { MiddlewareHandler } from 'hono';
 import { auditEventStatement } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /** Records CSV records correctly even when a quoted cell contains a newline. */
 export function csvRecordCount(csv: string): number {
@@ -17,10 +20,6 @@ export function csvRecordCount(csv: string): number {
     }
   }
   return Math.max(0, records - 1);
-}
-
-export function isOutputRequest(path: string, format?: string, method = 'GET'): boolean {
-  return format === 'csv' || /\.(csv|zip)$|\/(export|download)(\/|$)|\/form-files\/[^/]+\/content$/.test(path) || (method === 'POST' && path.endsWith('/exports'));
 }
 
 // Also applied directly by booking/doc routers, so isolated router use inherits
@@ -60,21 +59,8 @@ export const outputAuditMiddleware: MiddlewareHandler<Env> = async (c, next) => 
       })));
       if (csv || document) c.header('Cache-Control', 'private, no-store');
       if (status < 300 && (csv || requested) && !c.res.headers.has('X-Exported-At')) {
-        const actor = staff.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 100);
-        const at = new Date().toISOString();
-        c.header('X-Exported-By', actor); c.header('X-Exported-At', at);
-        const disposition = c.res.headers.get('Content-Disposition');
-        if (disposition) c.header('Content-Disposition', disposition.replace(/filename="([^"]+)"/, (_, name: string) => {
-          const dot = name.lastIndexOf('.');
-          const suffix = `-by-${actor}-${at.replace(/[^0-9TZ]/g, '')}`;
-          return `filename="${dot < 0 ? name + suffix : name.slice(0,dot) + suffix + name.slice(dot)}"`;
-        }));
-        const named = c.res.headers.get('Content-Disposition');
-        if (named) c.header('Content-Disposition', named.replace(/filename\*=UTF-8''([^;]+)/i, (_: string, encoded: string) => {
-          let name: string; try { name = decodeURIComponent(encoded); } catch { name = 'download'; }
-          const dot = name.lastIndexOf('.'), suffix = `-by-${actor}-${at.replace(/[^0-9TZ]/g, '')}`;
-          return `filename*=UTF-8''${encodeURIComponent(dot < 0 ? name + suffix : name.slice(0,dot) + suffix + name.slice(dot))}`;
-        }));
+        const headers = exportedResponseHeaders(staff.id, c.res.headers.get('Content-Disposition'));
+        for (const [name, value] of Object.entries(headers)) c.header(name, value);
         // Keep the bytes unchanged: CSV imports have no comment-row syntax.
       }
     }

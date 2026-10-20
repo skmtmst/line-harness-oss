@@ -1,5 +1,5 @@
 /*
- * ★V8 受信箱の右の列「その人の要点」（M0393 XqSvX）：顔52・名前15/600・追加日12、
+ * ★V8 受信箱の右の列「その人の要点」（ XqSvX）：顔52・名前15/600・追加日12、
  * 要点の行（鍵12 薄い字・値13/500）、その下に「顧客情報」の節。値は --tpl-inbox-*。
  */
 .person {
@@ -43,7 +43,7 @@
   white-space: nowrap;
 }
 .empty { color: var(--color-ink-faint); font-weight: 400; }
-/* 右の欄の中身：顔・要点・顧客情報の枠を縦に並べる（v7 の線の区切りは使わない）。 */
+/* 右の欄の中身：顔・要点・顧客情報の枠を縦に並べる（管理画面 の線の区切りは使わない）。 */
 .body { display: flex; flex-direction: column; padding-bottom: var(--tpl-inbox-summary-pad); }
 /* 顧客情報の枠（XqSvX：角丸12・薄い枠・内側16）。中の節は線で区切る。 */
 .infoCard {
@@ -74,7 +74,7 @@
   box-shadow: var(--tpl-inbox-line-top);
 }
 .infoSections > div:empty { display: none; }
-/* その場で直す欄（B-26）：見出しとの間を空け、共通部品の幅は欄いっぱい。 */
+/* その場で直す欄：見出しとの間を空け、共通部品の幅は欄いっぱい。 */
 .editField { margin-top: var(--tpl-inbox-head-tools-gap); }
 .editField :global(*) { max-width: 100%; }
 

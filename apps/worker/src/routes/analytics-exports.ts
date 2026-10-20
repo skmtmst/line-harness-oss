@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { csvRecordCount } from '../middleware/output-audit.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -30,7 +31,8 @@ import {
   type AnalyticsExportParams,
   type AnalyticsExportTarget,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -113,7 +115,7 @@ export async function runAnalyticsExportJob(db: D1Database, jobId: string): Prom
       finishedAt: finishedAt(),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"analytics_export_failed"}));
+    logger.error("analytics_export_failed");
     const message = error instanceof Error && error.message === 'analytics_export_not_ready'
       ? '集計がまだ終わっていません。集計が終わってから書き出してください'
       : error instanceof Error && error.message === 'analytics_export_not_found'
@@ -234,7 +236,7 @@ analyticsExports.post(
       c.set('outputAudit', { count: (fresh ?? job).row_count, accountId: account.accountId, targetId: job.id, phase: 'requested' });
     return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 202);
     } catch (error) {
-      console.error(JSON.stringify({"code":"analytics_export_create_failed","route":"POST /api/analytics/exports"}));
+      logger.error("analytics_export_create_failed");
       return c.json({ success: false, error: '書き出しを始められませんでした' }, 500);
     }
   },
@@ -256,7 +258,7 @@ analyticsExports.get(
       }
       return c.json({ success: true, data: exportJobJson(job) });
     } catch (error) {
-      console.error(JSON.stringify({"code":"analytics_export_status_failed","route":"GET /api/analytics/exports/:id"}));
+      logger.error("analytics_export_status_failed");
       return c.json({ success: false, error: '書き出しの状態を確認できませんでした' }, 500);
     }
   },
@@ -296,7 +298,7 @@ analyticsExports.get(
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"analytics_export_download_failed","route":"GET /api/analytics/exports/:id/download"}));
+      logger.error("analytics_export_download_failed");
       return c.json({ success: false, error: 'ダウンロードできませんでした' }, 500);
     }
   },

@@ -146,7 +146,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { fireEvent } from '../services/event-bus.js';
 import { executeIncomingWebhookActions, previewIncomingWebhook } from '../services/incoming-webhook-actions.js';
 import { deliverWebhook, deliverOnce } from '../services/outgoing-webhook-delivery.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { webhooks } from './webhooks.js';
 
 const VALID_SECRET = 'a'.repeat(32);
@@ -1261,7 +1261,7 @@ describe('S: 合言葉の併用期間・受け取りの試し・複数一致の�
     expect(json.data.actions[0]!.ok).toBe(true);
     // 試しは実行しない。行動の実行と受領の予約は呼ばれない。
     expect(executeIncomingWebhookActions).not.toHaveBeenCalled();
-    // 結果はやり取り台帳へ test 種別で分けて残る(v6-26 §9)。
+    // 結果はやり取り台帳へ test 種別で分けて残る(-26 §9)。
     // d23d R407: 試算の結果（照合できた）を記録へ残す。試しなので
     // 相手への応答番号は残さない（実際の受信とは分ける）。
     expect(createWebhookInteraction).toHaveBeenCalledWith(
@@ -1477,6 +1477,15 @@ describe('Webhookやり取り記録', () => {
     expect(res.status).toBe(200);
     expect(getWebhookInteractionById).toHaveBeenCalledWith(baseEnv.DB, 'run-a', ACCOUNT_ID);
     expect(retryWebhookInteraction).toHaveBeenCalledWith(baseEnv.DB, failedRow, { current: undefined, previous: undefined });
+  });
+
+  test('provider待機中の手動再送は409で理由を返す', async () => {
+    vi.mocked(getWebhookInteractionById).mockResolvedValue(failedRow);
+    vi.mocked(retryWebhookInteraction).mockRejectedValueOnce(new Error('retry_after_pending'));
+    const res=await receiveAndDrain(setupApp(),`/api/webhooks/interactions/run-a/retry?lineAccountId=${ACCOUNT_ID}`,
+      {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'},baseEnv);
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({error:expect.stringContaining('待機期限')});
   });
 
   test('secretを読めない送り直しは503にし、秘密値を出さない(#650)', async () => {

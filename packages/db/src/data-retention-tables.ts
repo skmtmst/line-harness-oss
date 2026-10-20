@@ -1,7 +1,7 @@
 import manifest from './data-retention-tables.json';
 
 /**
- * 退会後の顧客データ削除（★V6 36-2）で、bootstrap.sql の表を1つずつ分類した表。
+ * 退会後の顧客データ削除（★36-2）で、bootstrap.sql の表を1つずつ分類した表。
  *
  * 分類は3つだけにする。
  *   purge  … その統括の顧客データ。保存期限が切れたら消す。
@@ -155,6 +155,8 @@ export const RETENTION_R2_KEY_COLUMNS: ReadonlyArray<{ table: string; column: st
   { table: 'nen_pet_profiles', column: 'image_r2_key' },
   { table: 'nen_photo_derivatives', column: 'r2_key' },
   { table: 'nen_photo_submissions', column: 'r2_key' },
+  { table: 'nen_photo_submissions', column: 'review_r2_key' },
+  { table: 'nen_photo_submissions', column: 'public_r2_key' },
   { table: 'rich_menu_pages', column: 'image_r2_key' },
   { table: 'rt_inbound_emails', column: 'r2_key' },
 ];

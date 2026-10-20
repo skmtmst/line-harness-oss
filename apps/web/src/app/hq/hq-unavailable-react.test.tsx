@@ -11,9 +11,6 @@ vi.mock('next/link', () => ({
     <a href={typeof href === 'string' ? href : ''}>{children}</a>
   ),
 }))
-vi.mock('@/lib/hq-template-availability', () => ({
-  HQ_TEMPLATE_DISTRIBUTION_ENABLED: false,
-}))
 vi.mock('@/v8/hq-templates/console', () => ({
   default: ({ type }: { type: string }) => <div data-testid="v8-console">{type}</div>,
 }))

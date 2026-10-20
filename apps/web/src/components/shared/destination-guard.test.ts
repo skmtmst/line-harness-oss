@@ -10,7 +10,7 @@ function files(directory: string): string[] {
     return entry.isDirectory() ? files(path) : path.endsWith('.tsx') && !path.includes('.test.') ? [path] : []
   })
 }
-const legacyEntries = ['app/auto-replies/edit/wizard-v8.tsx', 'app/reminders/list-v8.tsx', 'app/reminders/new/new-v8.tsx', 'app/rich-menus/new/create-v8.tsx']
+const legacyEntries = ['v8/auto-replies/edit/wizard.tsx', 'v8/reminders/list.tsx', 'v8/reminders/new/new.tsx', 'v8/rich-menus/new/create.tsx']
 const targets = [...files(join(root, 'v8')), ...legacyEntries.map(path => join(root, path))]
 
 function violations(path: string, source: string): string[] {
@@ -35,7 +35,7 @@ function violations(path: string, source: string): string[] {
   return errors
 }
 
-describe('B-177: 全V8画面の行き先の見張り', () => {
+describe("全V8画面の行き先の見張り", () => {
   it('↗はhrefで開き、複製の窓を再導入しない', () => {
     expect(targets.flatMap(path => violations(path, readFileSync(path, 'utf8')))).toEqual([])
   })
@@ -58,6 +58,6 @@ describe('B-177: 全V8画面の行き先の見張り', () => {
     for (const feature of ['broadcasts', 'auto-replies', 'scenarios', 'webinars', 'forms']) {
       expect(readFileSync(join(root, 'v8', feature, 'list.tsx'), 'utf8')).toContain('useDetailPanelUrl(')
     }
-    expect(readFileSync(join(root, 'app/reminders/list-v8.tsx'), 'utf8')).toContain('useDetailPanelUrl(')
+    expect(readFileSync(new URL('../../v8/reminders/list.tsx', import.meta.url), 'utf8')).toContain('useDetailPanelUrl(')
   })
 })

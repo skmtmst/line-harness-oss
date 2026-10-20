@@ -72,7 +72,7 @@ export type DashboardDefaultVisibility = Partial<Record<DashboardCardId, boolean
 
 /**
  * V8 の既定。絵（d8X09）は「友だち追加リンク」の右に「友だちの状態」を置く。
- * v7 の既定（OFF）は変えない。
+ * 管理画面 の既定（OFF）は変えない。
  */
 export const V8_DASHBOARD_DEFAULT_VISIBILITY: DashboardDefaultVisibility = { 'friend-status': true }
 

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { acquireWorkflow, type WorkflowExecution } from './workflow-execution.js';
 import type { WebhookEvent } from '@line-crm/line-sdk';
 import {
@@ -57,7 +58,7 @@ function safeLog(
     : value.event === 'line_webhook_ledger_reserve_failed' ? 'line_webhook_ledger_reserve_failed'
     : value.event === 'line_webhook_duplicate_skipped' ? 'line_webhook_duplicate_skipped'
     : 'line_webhook_event';
-  console[level](JSON.stringify({ code }));
+  logger[level](code);
 }
 
 /**

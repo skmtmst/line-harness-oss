@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Check, LogIn, Plug, Send, X } from 'lucide-react'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import { PageFooter } from '@/components/templates/page-footer'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
+import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -59,7 +61,7 @@ import styles from './delivery.module.css'
  *
  * 承認案と作りが食い違うところ（`docs/v8-design-rules.md` §1 正本の順位で決めた。詳しくは同じ場所の `BEHAVIOR.md`）：
  *  - 社名のうしろの半角の空き … 絵のとおり直した（`withParticle`）。
- *  - 窓の左のボタン … 絵は「やめる」だが、オーナーの決まり B-146（入力をやめる＝「キャンセル」、
+ *  - 窓の左のボタン … 絵は「やめる」だが、オーナーの決まり （入力をやめる＝「キャンセル」、
  *    「やめる」は使わない）が絵より上なので「キャンセル」のまま。
  *  - 右上の×と窓の高さ … ×は共通部品が必ず出す（UI-25、`dialog-close-ui25.test.tsx` の見張り）。
  *    絵には×がないが「見張りに反する絵は、今の作りに合わせて絵を直す」ため、×は消さない。
@@ -75,16 +77,6 @@ import styles from './delivery.module.css'
 /** 3社の並び・文章・状態の読み替えは `delivery-services` にある（ここから出し直す）。 */
 export { SERVICES } from './delivery-services'
 export type { DeliveryService, DeliveryStore } from './delivery-services'
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className={styles.row}>
-      <span className={styles.rowLabel}>{label}</span>
-      <span className={styles.rowSpacer} />
-      <span className={styles.rowValue}>{value}</span>
-    </div>
-  )
-}
 
 export default function DeliverySettingsPage({ services: initialServices = SERVICES }: { services?: DeliveryService[] } = {}) {
   usePageTitle('デリバリー連携')
@@ -103,8 +95,9 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   /** 解除を確かめる窓（`kJLks`）で外そうとしている会社 */
   const [disconnecting, setDisconnecting] = useState<DeliveryService | null>(null)
   /** つなぐお店を選ぶ窓（`X5d8UF`）。各社のログインから戻ったときに開く。 */
-  const [picking, setPicking] = useState<{ service: DeliveryService; stores: DeliveryStore[] } | null>(null)
+  const [picking, setPicking] = useState<{ service: DeliveryService; stores: DeliveryStore[]; accountId: string } | null>(null)
   const [pickedStoreId, setPickedStoreId] = useState('')
+  const preparing = usePreparingDialog()
   /**
    * Uber のログインは済んでいて、つなぐお店だけ未選択（サーバの `pending_store`）。
    * 承認済みの札は4つのままなので、この続きがあることは画面の状態では持たず別に覚える。
@@ -146,7 +139,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
    * ログインから戻った直後と、お店がボタンを押したときだけ通る。
    */
   const openStorePicker = useCallback(async (service: DeliveryService) => {
-    if (!selectedAccountId) return
+    if (!canManage || !selectedAccountId) return
     setBusy(service.id)
     try {
       const { stores } = await restaurantDeliveryApi.ubereatsStores(selectedAccountId)
@@ -159,7 +152,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       }
       patch(service.id, { stores })
       setPickedStoreId('')
-      setPicking({ service, stores })
+      setPicking({ service, stores, accountId: selectedAccountId })
     } catch {
       // 失敗の符号はサーバに残る。画面には符号を出さず、次にできることだけ伝える。
       patch(service.id, {
@@ -169,7 +162,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
     } finally {
       setBusy(null)
     }
-  }, [patch, selectedAccountId])
+  }, [canManage, patch, selectedAccountId])
 
   /**
    * ログインから戻った直後（`?ubereats=pending_store`）だけ、続きの選び口を自動で開く。
@@ -177,13 +170,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
    */
   const autoPickedRef = useRef(false)
   useEffect(() => {
-    if (autoPickedRef.current) return
+    if (!canManage || autoPickedRef.current) return
     if (uberReturn !== 'pending_store' || !uberPendingStore) return
     const uber = services.find((service) => service.id === 'uber')
     if (!uber?.ready) return
     autoPickedRef.current = true
     void openStorePicker(uber)
-  }, [openStorePicker, services, uberPendingStore, uberReturn])
+  }, [canManage, openStorePicker, services, uberPendingStore, uberReturn])
 
   /**
    * つなぐボタン。
@@ -192,6 +185,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
    * apply の会社は musubo が申し込みを代行するため、受付中の状態にする。
    */
   const connect = useCallback(async (service: DeliveryService) => {
+    if (!canManage) return
     if (service.connect === 'login') {
       if (service.id === 'uber' && uberPendingStore) {
         await openStorePicker(service)
@@ -212,13 +206,8 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       }
       return
     }
-    patch(service.id, {
-      status: 'applying',
-      appliedAt: new Date().toISOString(),
-      stateNote: `musubo が${withParticle(service.name, 'へ')}連携の申し込みを行いました。手続きが終わるまでお待ちください。`,
-      stateNoteTone: undefined,
-    })
-  }, [openStorePicker, patch, selectedAccountId, uberPendingStore])
+    preparing.open(`${service.name}の連携の申し込み`)
+  }, [canManage, openStorePicker, patch, preparing, selectedAccountId, uberPendingStore])
 
   /**
    * 選んだお店でつなぐ（`X5d8UF` の確定）。ここで Uber 側の連携が有効になる。
@@ -226,7 +215,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
    * 押し直しは、窓をもう一度開いてもらう人の操作として扱う。
    */
   const pickStore = useCallback(async () => {
-    if (!picking || !pickedStoreId || !selectedAccountId) return
+    if (!canManage || !picking || !pickedStoreId || !selectedAccountId || picking.accountId !== selectedAccountId || busy !== null) return
     const service = picking.service
     setBusy(service.id)
     try {
@@ -244,7 +233,8 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       setUberPendingStore(connection.status === 'pending_store')
     } catch {
       patch(service.id, {
-        stateNote: `${withParticle(service.name, 'で')}お店をつなげませんでした。少し待ってから、もう一度お店を選んでください。`,
+        ready: false,
+        stateNote: `${withParticle(service.name, 'で')}お店をつなげませんでした。結果を確認する必要があります。送り直さず musubo へお知らせください。`,
         stateNoteTone: 'danger',
       })
     } finally {
@@ -252,55 +242,50 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
       setPicking(null)
       setPickedStoreId('')
     }
-  }, [patch, picking, pickedStoreId, selectedAccountId])
+  }, [busy, canManage, patch, picking, pickedStoreId, selectedAccountId])
 
-  /** 連携を解除する（`kJLks` の確定）。 */
+  /** 実際の解除の口ができるまでは、接続を変えず準備中の案内を出す。 */
   const disconnect = useCallback(() => {
-    if (!disconnecting) return
-    patch(disconnecting.id, {
-      status: 'disconnected',
-      storeName: undefined,
-      connectedAt: undefined,
-      checkedAt: undefined,
-      appliedAt: undefined,
-      stateNote: undefined,
-      stateNoteTone: undefined,
-    })
+    if (!disconnecting || !canManage) return
+    const name = disconnecting.name
     setDisconnecting(null)
-  }, [disconnecting, patch])
+    preparing.open(`${name}の連携の解除`)
+  }, [canManage, disconnecting, preparing])
 
   return (
     <>
-      <PageFrame kind="settings" boardId="dF4Ov" hasFooter={canManage}>
+      <PageFrame kind="settings" boardId="dF4Ov">
         {/* 板の頭は型の PageHeading だけ。頭の下に説明の行を置かず、説明は題の横の「？」へ入れる
             （docs/v8-design-rules.md:66・§6.12-2／B-158・B-172 page-head）。承認案 v03 の説明文は
             つながっている会社があるかどうかで書き分け、そのまま「？」の中身にする。 */}
         <PageHeading
           headingSize="compact"
           title="デリバリー連携"
-          help={`Uber Eats・出前館・ロケットナウに入った注文を、musubo の「デリバリー受注」画面にまとめて取り込みます。${
+          help={`デリバリーサービスへの接続を設定します。Uber Eats の接続が完了しても、注文の取り込み・受注操作・営業状態の変更・メニューの同期はまだ利用できません。${
             anyConnected
               ? 'つながっているサービスの状態をここに出します。お店での入力はありません。うまくいっていない時は musubo が原因を確認し、必要な手続きを行います。'
               : 'お店での入力はありません。Uber Eats は「ログインしてつなぐ」を押して Uber Eats の画面で許可するだけ、出前館とロケットナウは「連携を申し込む」を押すだけです。鍵・接続先アドレス・通知の設定は、すべて musubo 側で行います。'
           }`}
         />
         <div className={styles.body}>
+          {role !== null && !canManage ? <ReadOnlyNotice /> : null}
           {services.map((service) => {
             const state = STATUS[service.status]
-            const usable = service.ready && canManage
+            const connectable = service.connect !== 'login' || service.ready
             return (
-              /* 角丸・線・影は共通の Card に任せる（B-168）。中の間と余白だけ承認案 v03 の寸法で足す。 */
+              /* 角丸・線・影は共通の Card に任せる。中の間と余白だけ承認案 v03 の寸法で足す。 */
               <Card key={service.id} appearance="outlined" layout="vertical" className={styles.card} aria-labelledby={`delivery-${service.id}-title`}>
                 <div className={styles.cardHead}>
                   <h2 id={`delivery-${service.id}-title`} className={styles.cardTitle}>{service.name}</h2>
                   <p className={styles.cardSub}>{service.sub}</p>
                 </div>
 
-                <div className={`${styles.row} ${styles.rowCenter}`}>
-                  <span className={styles.rowLabel}>いまの状態</span>
-                  <span className={styles.rowSpacer} />
-                  <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge>
-                </div>
+                <CustomerInfoRows rows={[
+                  { label: '接続の状態', value: <StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge> },
+                  ...(service.id === 'uber' ? [{ label: '注文の連携', value: (
+                    <StatusBadge tone="neutral" size="compact">{PREPARING_WORD}</StatusBadge>
+                  ) }] : []),
+                ]} />
 
                 {/* 状態の注記は自作の色分け（`.note[data-tone]`）をやめ、共通の帯（Notice）に任せる
                     （B-172 status-badge）。つなぐ手順の案内は色の意味を持たないので真珠色の囲みのまま。 */}
@@ -313,13 +298,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                 ) : null}
 
                 {service.status === 'applying' ? (
-                  <Row label="申し込んだ日" value={formatDate(service.appliedAt, { style: 'detail', fallback: '—' })} />
+                  <CustomerInfoRows rows={[{ label: '申し込んだ日', value: formatDate(service.appliedAt, { style: 'detail', fallback: '—' }) }]} />
                 ) : service.status === 'disconnected' ? null : (
-                  <>
-                    {service.storeName ? <Row label="つないだお店" value={service.storeName} /> : null}
-                    <Row label="つないだ日" value={formatDate(service.connectedAt, { style: 'detail', fallback: '—' })} />
-                    <Row label="最後に確かめた時刻" value={formatDate(service.checkedAt, { style: 'detail', fallback: '—' })} />
-                  </>
+                  <CustomerInfoRows rows={[
+                    ...(service.storeName ? [{ label: 'つないだお店', value: service.storeName }] : []),
+                    { label: 'つないだ日', value: formatDate(service.connectedAt, { style: 'detail', fallback: '—' }) },
+                    { label: '最後に確かめた時刻', value: formatDate(service.checkedAt, { style: 'detail', fallback: '—' }) },
+                  ]} />
                 )}
 
                 {canManage ? (
@@ -327,8 +312,8 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                     {service.status === 'disconnected' ? (
                       <Button
                         variant="primary"
-                        disabled={!usable}
-                        title={usable ? undefined : WAITING}
+                        disabled={!connectable}
+                        title={connectable ? undefined : WAITING}
                         busy={busy === service.id}
                         busyLabel="開いています…"
                         onClick={() => void connect(service)}
@@ -341,9 +326,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                         <span className={styles.rowSpacer} />
                         <Button
                           variant="secondary"
-                          disabled={!usable}
-                          title={usable ? undefined : WAITING}
-                          onClick={() => patch(service.id, { status: 'disconnected', appliedAt: undefined, stateNote: undefined })}
+                          onClick={() => preparing.open(`${service.name}の申し込みの取り消し`)}
                         >
                           <X size={15} aria-hidden="true" />
                           申し込みを取り消す
@@ -353,15 +336,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                       <>
                         <Button
                           variant="secondary"
-                          disabled={!usable}
-                          title={usable ? undefined : WAITING}
-                          onClick={() => patch(service.id, { checkedAt: new Date().toISOString() })}
+                          onClick={() => preparing.open(`${service.name}の接続の確認`)}
                         >
                           <Plug size={15} aria-hidden="true" />
                           接続を確かめる
                         </Button>
                         <span className={styles.rowSpacer} />
-                        <Button variant="danger" disabled={!usable} title={usable ? undefined : WAITING} onClick={() => setDisconnecting(service)}>
+                        <Button variant="danger" onClick={() => setDisconnecting(service)}>
                           連携を解除する
                         </Button>
                       </>
@@ -373,19 +354,6 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           })}
         </div>
 
-        {canManage ? (
-          <PageFooter
-            actions={(
-              <>
-                <Button disabled>キャンセル</Button>
-                <Button variant="primary" disabled title="この画面はボタンを押すとすぐ反映されます。保存する内容はまだありません。">
-                  <Check size={15} aria-hidden="true" />
-                  保存する
-                </Button>
-              </>
-            )}
-          />
-        ) : null}
       </PageFrame>
 
       {/* 解除を確かめる窓（`kJLks`）。幅480は共通の small。 */}
@@ -396,7 +364,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
         footerDivider
         tone="destructive"
         title={`${withParticle(disconnecting?.name ?? '', 'の')}連携を解除しますか`}
-        description={`${withParticle(disconnecting?.name ?? '', 'との')}つなぎを外します。これから入る注文は「デリバリー受注」に届かなくなります。すでに届いている注文はそのまま残ります。`}
+        description={`${withParticle(disconnecting?.name ?? '', 'との')}つなぎを外します。保存済みの注文や過去の履歴はそのまま残ります。`}
         confirmLabel="解除する"
         onConfirm={disconnect}
         onCancel={() => setDisconnecting(null)}
@@ -438,9 +406,10 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           ))}
         </RadioCardGroup>
         <p className={styles.note}>
-          選んだお店の注文が「デリバリー受注」に届きます。あとから変えるときは、この画面で一度解除してからもう一度ログインしてください。
+          選んだお店への接続を設定します。注文の連携はまだ利用できません。あとから変えるときは、この画面で一度解除してからもう一度ログインしてください。
         </p>
       </Dialog>
+      {preparing.dialog}
     </>
   )
 }

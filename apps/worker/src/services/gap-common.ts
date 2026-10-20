@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from './account-access.js';
 export class GapError extends Error {
   constructor(public code:string, public status:400|401|403|404|409|410|429|503=400) {super(code);}

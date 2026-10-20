@@ -1,6 +1,7 @@
 import { effectiveAnniversaryMonthDay, parseMonthDay } from '@line-crm/shared';
 import { activeTenantLineAccountSql, parseScenarioVersionSteps, type ScenarioVersion } from '@line-crm/db';
-import type { ScenarioSourceJob } from './scenario-source-jobs.js';
+
+import type { ScenarioSourceJob } from '../features/scenarios/source-job-types/index.js';
 
 type Candidate=ScenarioVersion & {store_id:string;line_account_id:string;friend_id:string;line_uid:string;timezone:string;store_name:string;value:string;template_version:number;approved_version_id:string;live_step_id:string;offset_minutes:number};
 const anniversarySql=()=>`SELECT v.*,s.id store_id,s.line_account_id,s.name store_name,s.timezone,f.id friend_id,f.line_user_id line_uid,

@@ -135,7 +135,7 @@ describe('NOTIFY-04 一覧の名前から編集画面へ戻る', () => {
     const second = await screen.findByRole('link', { name: 'レビューが届きました' })
     expect(new URL(second.getAttribute('href')!, window.location.origin).searchParams.get('id')).toBe('rule-2')
 
-    // 板 u8xibp：絞り込みタブは無い。検索は行を絞るだけで、リンクの形は変わらない。
+    // 板 ：絞り込みタブは無い。検索は行を絞るだけで、リンクの形は変わらない。
     fireEvent.change(screen.getByPlaceholderText('お知らせ名・きっかけで探す'), { target: { value: 'レビュー' } })
     await waitFor(() => expect(screen.queryByRole('link', { name: '新しい予約が入りました' })).toBeNull())
     expect(new URL(screen.getByRole('link', { name: 'レビューが届きました' }).getAttribute('href')!, window.location.origin).searchParams.get('id')).toBe('rule-2')

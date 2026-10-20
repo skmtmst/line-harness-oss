@@ -1,44 +1,21 @@
+import { getCookie, setCookie } from 'hono/cookie';
+import { logger } from '@line-crm/shared/server';
 import { resolveFriendFromLineToken, unresolvedResponse } from '../services/affiliate-self-auth.js';
 import { customerDownloadEntry } from '../services/download-entrypoints.js';
 import { signDownload, validDownload } from '../services/download-capability.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { Hono } from 'hono';
-import {
-  getAffiliateByFriendId,
-  createAffiliate,
-  createAffiliateLink,
-  listAffiliateLinks,
-  countAffiliateLinks,
-  generateRefSlug,
-  getAffiliateLinkStats,
-  listAffiliateOffers,
-  getCurrentOfferVersion,
-  getOfferCapStatus,
-  enrollAffiliateInOffer,
-  getMileageSummaryForFriend,
-  getMileageHistoryForFriend,
-  getMileageSelfInsights,
-  getMileageEarningOpportunitiesForFriend,
-  listMileageRewards,
-  getMileageRewardRedemptionCounts,
-  reserveMileageRewardRedemption,
-  MileageRewardError,
-  encryptCredential,
-  getAffiliateBankProfile,
-  saveAffiliateBankProfile,
-  listAffiliateStatementsForSelf,
-  getAffiliateStatementDownload,
-  type Affiliate,
-  type AffiliateLink,
-  type AffiliateLinkStat,
-} from '@line-crm/db';
+import { Hono, type MiddlewareHandler } from 'hono';
+import { getAffiliateByFriendId, createAffiliate, createAffiliateLink, listAffiliateLinks, countAffiliateLinks, generateRefSlug, getAffiliateLinkStats, listAffiliateOffers, getCurrentOfferVersion, getOfferCapStatus, enrollAffiliateInOffer, getMileageSummaryForFriend, getMileageHistoryForFriend, getMileageSelfInsights, getMileageEarningOpportunitiesForFriend, listMileageRewards, getMileageRewardRedemptionCounts, reserveMileageRewardRedemption, MileageRewardError, encryptCredential, getAffiliateBankProfile, saveAffiliateBankProfile, listAffiliateStatementsForSelf, getAffiliateStatementDownload, type Affiliate, type AffiliateLink, type AffiliateLinkStat } from '@line-crm/db';
+
+
+
 import { affiliateBankFields } from '@line-crm/shared';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import { signCrossAccountToken } from '../lib/cross-account-token.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
-import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
+import { deliverMileageReward } from '../features/mileage/mileage-reward-delivery/index.js';
 
 /**
  * Self-serve affiliate API for LIFF clients.
@@ -53,6 +30,20 @@ import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
  * authMiddleware skips `/api/liff/*` (staff auth), so verification lives here.
  */
 const affiliateSelfRoutes = new Hono<Env>();
+
+// URL credentials must never enter access logs, caches, or referrers.
+const privateSelfAccess: MiddlewareHandler<Env> = async (c, next) => {
+  c.header('Cache-Control', 'private, no-store');
+  c.header('Referrer-Policy', 'no-referrer');
+  if (new URL(c.req.url).searchParams.has('lineAccessToken')
+    && !(/^\/api\/liff\/affiliate\/statements\/[^/]+\/download$/.test(c.req.path)
+      && !c.req.header('Authorization') && !c.req.query('signature') && !c.req.query('expires') && c.req.query('issue') !== '1')) {
+    return c.json({ success: false, error: 'Use Authorization Bearer' }, 400);
+  }
+  await next();
+};
+affiliateSelfRoutes.use('/api/liff/mileage/*', privateSelfAccess);
+affiliateSelfRoutes.use('/api/liff/affiliate/*', privateSelfAccess);
 
 /** Max self-issued links per affiliate. The 21st issuance is a 400. */
 const MAX_SELF_LINKS = 20;
@@ -119,7 +110,7 @@ function serializeAffiliate(aff: Affiliate) {
  */
 affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) {
       return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     }
@@ -137,6 +128,8 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       getMileageSelfInsights(c.env.DB, resolved.friend.id),
       getMileageEarningOpportunitiesForFriend(c.env.DB, resolved.friend.id),
     ]);
+    const browserNonce = getCookie(c, '__Host-lh_cross_account') || crypto.randomUUID();
+    setCookie(c, '__Host-lh_cross_account', browserNonce, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/', maxAge: 15 * 60 });
     const opportunities = await Promise.all(rawOpportunities.map(async (opportunity) => {
       if (opportunity.type !== 'friend_add'
           || opportunity.completed
@@ -147,13 +140,14 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
       const token = await signCrossAccountToken(c.env.LINE_CHANNEL_SECRET, {
         userId: resolved.friend.user_id,
         targetAccountId: opportunity.targetAccountId,
+        browserNonce,
       });
       const separator = opportunity.url.includes('?') ? '&' : '?';
       return { ...opportunity, url: `${opportunity.url}${separator}crossAccountToken=${encodeURIComponent(token)}` };
     }));
     return c.json({ success: true, mileage, history, insights, opportunities });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"GET /api/liff/mileage/me"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -161,7 +155,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
 /** Published mileage uses for the verified friend. Unknown numbers stay null. */
 affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -215,7 +209,7 @@ affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
       }),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"GET /api/liff/mileage/rewards"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: '使い道を読み込めませんでした' }, 500);
   }
 });
@@ -259,7 +253,7 @@ affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', inputJsonBounda
     if (error instanceof MileageRewardError) {
       return inputError(c, { success: false, error: error.message, code: error.code }, error.status as 400, []);
     }
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"POST /api/liff/mileage/rewards/:id/redeem"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: '交換を受け付けられませんでした' }, 500);
   }
 });
@@ -342,18 +336,18 @@ affiliateSelfRoutes.post('/api/liff/affiliate/register', inputJsonBoundary(), as
       links: [serializeLink(firstLink, baseUrl)],
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"POST /api/liff/affiliate/register"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
 /**
- * GET /api/liff/affiliate/me?lineAccessToken= — return the caller's affiliate
+ * GET /api/liff/affiliate/me — return the caller's affiliate
  * profile + links. 404 if the caller is a friend but not yet registered.
  */
 affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) {
       return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     }
@@ -384,7 +378,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
       links: links.map((l) => serializeLink(l, baseUrl, stats, offerNames)),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"GET /api/liff/affiliate/me"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -392,7 +386,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/me', async (c) => {
 /** 本人の振込先。口座番号は復号せず、末尾4桁だけを返す。 */
 affiliateSelfRoutes.get('/api/liff/affiliate/bank', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     const resolved = await resolveFriendFromLineToken(c.env, token);
     if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
@@ -406,7 +400,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/bank', async (c) => {
     });
     return c.json({ success: true, data });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"GET /api/liff/affiliate/bank"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: '振込先を確認できませんでした' }, 500);
   }
 });
@@ -460,10 +454,10 @@ affiliateSelfRoutes.put('/api/liff/affiliate/bank', inputJsonBoundary(), async (
     if (result.kind === 'idempotency_conflict') {
       return c.json({ success: false, error: '同じ再実行キーが別の入力に使われています', code: 'IDEMPOTENCY_CONFLICT' }, 409);
     }
-    console.log(JSON.stringify({"code":"routes_affiliate_self_log","route":"PUT /api/liff/affiliate/bank"}));
+    logger.log("routes_affiliate_self_log");
     return c.json({ success: true, data: result.profile }, result.kind === 'created' ? 201 : 200);
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"PUT /api/liff/affiliate/bank"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: '振込先を保存できませんでした' }, 500);
   }
 });
@@ -489,7 +483,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements', async (c) => {
       renewalUrl: customerDownloadEntry(c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin, 'statements', statement.id),
     })) });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"GET /api/liff/affiliate/statements"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: '支払明細を確認できませんでした' }, 500);
   }
 });
@@ -530,7 +524,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
     }
     const object = await c.env.IMAGES.get(file.objectKey);
     if (!object) return c.json({ success: false, error: '支払明細が見つかりません' }, 404);
-    console.log(JSON.stringify({"code":"routes_affiliate_self_log","route":"GET /api/liff/affiliate/statements/:id/download"}));
+    logger.log("routes_affiliate_self_log");
     return new Response(object.body, {
       headers: {
         'Content-Type': 'application/pdf',
@@ -540,7 +534,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/statements/:id/download', async (c)
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"GET /api/liff/affiliate/statements/:id/download"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: '支払明細を取得できませんでした' }, 500);
   }
 });
@@ -626,13 +620,13 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async
       : undefined;
     return c.json({ link: serializeLink(link, baseUrl, undefined, offerNames) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"POST /api/liff/affiliate/links"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
 /**
- * GET /api/liff/affiliate/offers?lineAccessToken= — list active offers with the
+ * GET /api/liff/affiliate/offers — list active offers with the
  * caller's participation state. For enrolled offers, the caller's offer-scoped
  * refCode + url are returned so the LIFF page can show "あなたの◯◯案件用リンク".
  *
@@ -641,7 +635,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/links', inputJsonBoundary(), async
  */
 affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
   try {
-    const token = c.req.query('lineAccessToken');
+    const token = (/^Bearer (.+)$/.exec(c.req.header('Authorization') ?? '')?.[1]);
     if (!token) {
       return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
     }
@@ -706,7 +700,7 @@ affiliateSelfRoutes.get('/api/liff/affiliate/offers', async (c) => {
 
     return c.json({ offers: data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"GET /api/liff/affiliate/offers"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -772,7 +766,7 @@ affiliateSelfRoutes.post('/api/liff/affiliate/offers/:id/enroll', inputJsonBound
       link: serializeLink(link, baseUrl, undefined, offerNames),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_self_failed","route":"POST /api/liff/affiliate/offers/:id/enroll"}));
+    logger.error("routes_affiliate_self_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

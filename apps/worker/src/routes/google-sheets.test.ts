@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
 const ENCRYPTION_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 const NOW = '2026-09-27T06:00:00Z';
@@ -35,7 +35,7 @@ const { googleSheets } = await import('./google-sheets.js');
 /** SQLの内容で振り分ける簡易D1。INSERTのbind値は記録する。 */
 const statements: Array<{ sql: string; args: unknown[] }> = [];
 const firstQueue: Array<unknown> = [];
-/** run() の changes を個別に仕込むためのキュー（未設定は1）。 */
+/** run の changes を個別に仕込むためのキュー（未設定は1）。 */
 const runChangesQueue: Array<number> = [];
 function firstFor(sql: string) {
   return firstQueue.shift() ?? null;

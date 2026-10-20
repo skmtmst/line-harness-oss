@@ -1,6 +1,6 @@
 import { useLayoutEffect, type RefObject } from 'react'
 import { fitSelectContent } from './select-content-size.mjs'
-import type { SelectProps } from './select'
+import type { SelectProps } from './select-types'
 
 type ContentWidthOptions = Pick<SelectProps, 'size' | 'label' | 'treatment' | 'showChevron' | 'iconOnly' | 'icon'> & { selectedLabel?: string }
 

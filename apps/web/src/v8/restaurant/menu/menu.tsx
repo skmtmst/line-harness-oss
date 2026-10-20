@@ -14,15 +14,15 @@ import { formatYen } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantMenuItem } from '@/lib/restaurant-test-api'
-import RestaurantShell, { Panel, StatRow, Status, type RestaurantV8Context } from '../booking-kit/shell'
-import { DialogNote, RowMore, RsDialog } from '../booking-kit/parts'
+import { RestaurantShell, Panel, StatRow, Status, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { DialogNote, RowMore, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import styles from './menu.module.css'
 import { formatDateTime as polishFormatDateTime } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 
 /*
- * ★V8 メニュー管理（板 `MJoJR`・停止の確認 `MV5Os`・追加と変更 `NkmwU`）。
+ * ★V8 メニュー管理（板 ・停止の確認 ・追加と変更 ）。
  *
  * 数5（全メニュー・コース・単品・要承認・アレルギー登録）→ メニュー一覧の枠
  * （頭に追加ボタン・「…」の決まりの帯・表）。行末は「…」、アーカイブだけ「再開」。
@@ -55,7 +55,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const [deleteId, setDeleteId] = useState('')
   const stopping = rows.find((row) => row.id === stopId)
   const deleting = rows.find((row) => row.id === deleteId)
-  /* 追加・変更は 1 枚の編集ページ（mauOC）。前の窓（NkmwU）は消した（B-319）。 */
+  /* 追加・変更は 1 枚の編集ページ（mauOC）。前の窓は消した。 */
   const router = useRouter()
   const openNew = () => router.push(`/restaurant-test/menu/edit${store ? `?store=${encodeURIComponent(store.id)}` : ''}`)
   const openEdit = (item: RestaurantMenuItem) => router.push(`/restaurant-test/menu/edit?id=${encodeURIComponent(item.id)}`)

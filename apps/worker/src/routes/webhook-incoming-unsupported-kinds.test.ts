@@ -10,7 +10,7 @@
  */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { webhooks } from './webhooks.js';
 import {
   getIncomingWebhookById,

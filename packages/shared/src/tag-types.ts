@@ -24,7 +24,7 @@ export interface Tag {
   displayOrder?: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
-  /** 選択中のLINE公式アカウント。V6の定義詳細で返る。 */
+  /** 選択中のLINE公式アカウント。の定義詳細で返る。 */
   lineAccountId?: string | null;
   description?: string | null;
   manualAssignmentAllowed?: boolean;

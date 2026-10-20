@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export type { AccountScopedResource, ActionReferenceCheck, CreateScenarioInput, CreateScenarioStepInput, DeliveryMode, FriendScenarioStatus, MoveReferrer, PinnedScenarioAction, PinnedScenarioStep, Scenario, ScenarioActionReferenceIssue, ScenarioActionSourceRow, ScenarioDeliverySource, ScenarioPublishKey, ScenarioReferenceMismatch, ScenarioTriggerType, ScenarioVersion, ScenarioWithStepCount, ScenarioWithSteps, UpdateScenarioInput, UpdateScenarioStepInput } from './scenarios/types.js';

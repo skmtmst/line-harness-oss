@@ -11,7 +11,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
-import { bookingCalendarApi } from '@/lib/api-gap1'
+import { bookingCalendarApi } from '@/lib/api/helpers/gap1'
 import { fetchApi } from '@/lib/api'
 import styles from './meeting-mode.module.css'
 

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { emptyLayout, newBlockId, type FormLayout } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 
 /**
  * 送信の入口が、レイアウトの判定に**本当につながっているか**を見る。
@@ -109,7 +110,7 @@ vi.mock('../services/liff-auth.js', () => ({
   verifyCallerLineIdentity: mocks.verifyCallerLineIdentity,
 }));
 
-vi.mock('../services/friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: mocks.attachTag,
 }));
 

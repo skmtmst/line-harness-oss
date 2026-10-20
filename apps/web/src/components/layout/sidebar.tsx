@@ -11,6 +11,8 @@ import Notice from '@/components/shared/notice'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
+import { styleMenuItemVisible, styleMenuLabel } from './style-menu'
 import { allowFeatureNavigation, featureGateVisibility, usePreparingDialog } from './sidebar-feature-gate'
 import { SIDEBAR_TOGGLE_EVENT,UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import {
@@ -19,7 +21,7 @@ SIDEBAR_FEATURE_BY_HREF,
 SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
 import { HQ_MENU_SECTIONS,isHqShellPath,menuOwnerForScreen,orderedMenuSections,type MenuItem,type MenuSection } from '@/lib/menu'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useBrand } from '@/lib/use-brand'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -45,7 +47,7 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
 /** ★V8（夕44-A）：はじめから開く4組。ほかは見出しだけで畳む。 */
 const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['basic', 'delivery', 'contents', 'booking', 'hq'])
 
-/** ★V8 統括の左メニューの組の見出し（絵 `V8-B/JKjsE`）。v7 の統括は見出しの無い組のまま。 */
+/** 統括の左メニューの組の見出し。 */
 const HQ_V8_SECTION_LABEL = '統括'
 
 /** ★V8 統括の左下「統括の設定」が選ばれた形になる画面（統括の設定の中のメニューの4つ）。 */
@@ -89,10 +91,11 @@ export default function Sidebar({
   const pathname = usePathname()
   /*
    * 統括の左メニューは住所が /hq のときに出す。LINEアカウントの登録（/accounts/new）は
-   * 統括の「アカウント」から開く統括の画面なので、統括のメニューのままにする（絵 xj3zz・JYfda）。
+   * 統括の「アカウント」から開く統括の画面なので、統括のメニューのままにする。
    */
   const isHq = isHqShellPath(pathname)
   const { selectedAccountId, loading: accountLoading } = useAccount()
+  const accountStyle = useAccountStyle(isHq ? null : selectedAccountId)
   const brand = useBrand()
   /*
    * モバイルの固定ヘッダーに出す現在地（U037）。
@@ -103,11 +106,7 @@ export default function Sidebar({
   const mobileTitle = chromeTitle ?? defaultTitleForPath(pathname ?? '')
   const [isOpen, setIsOpen] = useState(false)
   const preparing = usePreparingDialog()
-  /*
-   * ★V8（夕44-A・部品 T7XSI6）：組の開閉と V2 モードの扱いにテーマが要る。
-   * SSR・最初の描画は v7 の形（hydration を一致させるため）で、
-   * レイアウト効果の中で本当のテーマへ揃える。
-   */
+  /* 保存済みの組の開閉は、サーバーと最初の描画をそろえてから適用する。 */
 
   /*
    * V2 のタグモード（移行中だけの特別な形）で組を丸ごと隠すのは
@@ -152,8 +151,7 @@ export default function Sidebar({
    * ★V8 外側：左メニューの畳み（幅 64・アイコンだけ）。
    * 上の帯のボタンと ⌘\ が SIDEBAR_TOGGLE_EVENT を投げ、ここで受ける。
    * 状態はブラウザに覚える（lh-sidebar-collapsed）。保存がなければ
-   * 1152px 未満では畳んだ形で開く（1152 の絵 35 枚はどれも開いたまま）。v7 では見た目を変えないので、
-   * data-collapsed が立っていても v7 の見た目は動かない。
+   * 1152px 未満では畳んだ形で開く。保存済みの状態があればそちらを優先する。
    */
   const [collapsed, setCollapsed] = useState(false)
   const collapsedInitRef = useRef(false)
@@ -173,7 +171,7 @@ export default function Sidebar({
   }, [])
   useEffect(() => {
     const toggle = () => {
-      /* v7 では畳み機能を出さない。テーマが v7 のときは無視する。 */
+      /* 上の帯とショートカットの同じ操作で開閉する。 */
       setCollapsed((current) => {
         const next = !current
         try {
@@ -233,6 +231,7 @@ export default function Sidebar({
   const [visibilityStatus, setVisibilityStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [visibilityRetry, setVisibilityRetry] = useState(0)
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
+  const [explicitSettings, setExplicitSettings] = useState<{ accountId: string; value: boolean | null } | null>(null)
   const [currentSearch, setCurrentSearch] = useState('')
 
   // 同じ画面の別タブをメニューへ出す項目（コンバージョン、データ移行）が
@@ -281,8 +280,9 @@ export default function Sidebar({
     }
     let cancelled = false
     const accountId = selectedAccountId
-    const canManageFeatureSettings = staffRole === 'owner' || staffRole === 'admin'
+    const canManageFeatureSettings = canManageRole(staffRole)
     setFeatureVisibility(null)
+    setExplicitSettings(null)
     setVisibilityAccountId(null)
     setVisibilityStatus('loading')
     const loadSettings = () => {
@@ -298,6 +298,7 @@ export default function Sidebar({
             setVisibilityAccountId(accountId)
             setVisibilityStatus('ready')
             setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
+            if (visibility.success && 'version' in visibility.data && typeof visibility.data.version === 'number') setExplicitSettings({ accountId, value: visibility.data.version > 0 })
           } else if (!cancelled) {
             setVisibilityStatus('error')
           }
@@ -306,11 +307,13 @@ export default function Sidebar({
             // 機能設定画面と同じ答えを共有する。保存の合図で捨てられる。
             const settings = await loadFeatureSettings(accountId)
             if (!cancelled && settings.success) {
+              setExplicitSettings({ accountId, value: settings.data.version > 0 })
               setSectionOrder(settings.data.sidebarOrder)
               setItemOrder(settings.data.sidebarItemOrder)
-            }
+            } else if (!cancelled) { setExplicitSettings({ accountId, value: null }) }
           } catch {
             // 権限降格後など管理GETが拒否されても、最小read-modelの表示可否は残す。
+            if (!cancelled) setExplicitSettings({ accountId, value: null })
           }
         })
         .catch(() => {
@@ -347,18 +350,20 @@ export default function Sidebar({
       ...section,
       items: section.items.filter((item) => {
         /*
-         * ★V7 C6: 統括のひな形配布（4画面）は Worker の受け口が無いあいだ
+         * ★管理画面 C6: 統括のひな形配布（4画面）は Worker の受け口が無いあいだ
          * 「利用できません」だけのページになるため、サイドバーには出さない。
          * ページ自体は残し、配布が有効になれば再表示する。
          * ★V8 は4画面とも中身を出す（app/hq/hq-template-page.tsx と同じ条件）ので、
-         * 左メニューにも出す（絵 `V8-B/JKjsE`・`LRc93` の6項目）。v7 は今までどおり。
+         * 左メニューにも出す（統括の6項目）。互換経路は今までどおり。
          */
 
         if (isHq) return true
+        const savedSettings = explicitSettings?.accountId === selectedAccountId ? explicitSettings.value : canManageRole(staffRole) ? false : null
+        if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, savedSettings)) return false
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 
-        if (item.href === '/staff' && staffReadRole !== 'owner' && staffReadRole !== 'admin') return false
+        if (item.href === '/staff' && !canManageRole(staffReadRole)) return false
         if (item.href === '/accounts' && staffReadRole === 'staff') return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
         if (item.staffOnly && staffReadRole !== 'staff') return false
@@ -372,7 +377,7 @@ export default function Sidebar({
         if (!currentVisibility || currentVisibility[featureKey] !== true) return false
         if (SPECIALIZED_FEATURE_KEYS.includes(featureKey) && !specializedFeatureKeys.includes(featureKey)) return false
         return true
-      }),
+      }).map(item => isHq ? item : { ...item, label: styleMenuLabel(item, accountStyle.data?.style ?? null) }),
     }))
     .filter((section) => section.items.length > 0)
     /*
@@ -395,14 +400,14 @@ export default function Sidebar({
    * アカウントごとの直近値をモジュールに共有しておき、表示はそれで
    * 即復帰させてから裏で取り直す。
    */
-  /* 統括の「対応が要るもの」の札（B-322）。全アカウントの件数の合計。読めないときは出さない。 */
+  /* 統括の「対応が要るもの」の札。全アカウントの件数の合計。読めないときは出さない。 */
   const [hqAttentionCount, setHqAttentionCount] = useState(0)
   useEffect(() => {
     if (!isHq) return
     let cancelled = false
     const load = async () => {
       try {
-        const { hqStyleApi } = await import('@/lib/api-styles')
+        const { hqStyleApi } = await import('@/lib/api/helpers/styles')
         const res = await hqStyleApi.attention()
         if (cancelled || !res.success) return
         setHqAttentionCount(res.data.items.reduce((sum, item) => sum + Object.values(item.counts as Record<string, number>).reduce<number>((a, b) => a + (b ?? 0), 0), 0))
@@ -513,7 +518,7 @@ export default function Sidebar({
   }, [isOpen])
 
   /*
-   * スマホのメニューの焦点（★V7 修正方針 §2）。
+   * スマホのメニューの焦点（★管理画面 修正方針 §2）。
    * 開いたら中の先頭へ、Esc で閉じ、閉じたら焦点をハンバーガーへ戻す。
    * 閉じている間は aside に inert を付け、画面外の項目へ Tab が行かないようにする
    * （以前は閉じても11項目が Tab で選べ、焦点が見えない所へ行っていた）。
@@ -580,7 +585,7 @@ export default function Sidebar({
         // 統括の「店舗管理」(/hq) も完全一致にする。/hq/banners や /hq/members を
         // 開いたときに店舗管理が光ってしまうため。
         if (item.href === '/hq') {
-          // 統括から開く LINEアカウントの登録（/accounts/new）も「アカウント」の中（絵 `xj3zz` のパンくず）。
+          // 統括から開く LINEアカウントの登録（/accounts/new）も「アカウント」の中（パンくず）。
           if (activePathname === '/hq' || activePathname === '/accounts/new') best = '/hq'
           continue
         }
@@ -719,21 +724,21 @@ export default function Sidebar({
           失敗の1枚が使う言葉なので、ここは短い「もう一度」にして
           1画面に同じ読み直しボタンを2つ出さない。
         */}
-        {visibilityStatus === 'error' && selectedAccountId && (
+        {(visibilityStatus === 'error' || accountStyle.error) && selectedAccountId && (
           <Notice
             tone="warn"
             className="mx-3 mb-2"
             action={(
               <button
                 type="button"
-                onClick={() => setVisibilityRetry((current) => current + 1)}
+                onClick={() => { setVisibilityRetry((current) => current + 1); accountStyle.reload() }}
                 className="cursor-pointer font-bold text-action underline"
               >
                 もう一度
               </button>
             )}
           >
-            機能設定を読み込めませんでした。
+            {accountStyle.error ? '使い方のスタイルを読み込めませんでした。' : '機能設定を読み込めませんでした。'}
           </Notice>
         )}
         {/* B-261: 設定の入口は下の歯車。定義と現在地の判定は残す。 */}
@@ -850,7 +855,7 @@ export default function Sidebar({
         設定の画面ではここが選ばれた形にする。
         nav は中身が多いときだけ縦に送り、この入口と版は下端に固定される。
       */}
-      {!isHq && !preview && (staffReadRole === 'owner' || staffReadRole === 'admin') && (
+      {!isHq && !preview && (canManageRole(staffReadRole)) && (
         <div className={styles.settingsEntry}>
           <Link
             href="/settings"

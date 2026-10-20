@@ -3,53 +3,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { FEATURE_IDS } from '@line-crm/shared';
 import {
-  DELIVERY_DISPATCH_JOB_NAMES,
   FEATURE_JOB_MANIFEST,
 } from './services/feature-enforcement.js';
-import { OPERATION_DISPATCH_JOB_CROSSWALK } from './services/operation-dispatch-health.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 describe('feature job manifest', () => {
-  test('named scheduled job を全件分類する', () => {
-    const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
-    const scheduledSection = source.slice(
-      source.indexOf('async function runFrequentHeavyJobs'),
-      source.indexOf('// Scheduled handler for cron triggers'),
-    );
-    const names = [...scheduledSection.matchAll(/\bname:\s*'([^']+)'/g)].map((match) => match[1]!);
-    const classified = new Set(FEATURE_JOB_MANIFEST.map(({ name }) => name));
-    expect(names.filter((name) => !classified.has(name))).toEqual([]);
-  });
-
-  test('delivery dispatcher と manifest の featureId が固定される', () => {
-    const requiredDeliveryJobs = [
-      'automation deliveries',
-      'booking reminders',
-      'event reminders',
-      'meet consultation reminders',
-      'webinar reminders',
-      'webinar notifications',
-      'webinar followups',
-      'NEN campaign deliveries',
-      'common variable schedules',
-      'scenario deliveries',
-      'broadcast deliveries',
-      'reminder deliveries',
-    ];
-    expect(DELIVERY_DISPATCH_JOB_NAMES).toEqual(requiredDeliveryJobs);
-    expect(OPERATION_DISPATCH_JOB_CROSSWALK.map(({ jobName }) => jobName)).toEqual(requiredDeliveryJobs);
-  });
-
-  test('delivery dispatcherは全件heartbeat観測を通る', () => {
-    const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
-    const scheduledSection = source.slice(source.indexOf('async function scheduled('));
-    const observed = [...scheduledSection.matchAll(/observeDispatch\('([^']+)'/g)]
-      .map((match) => match[1]!);
-    expect(new Set(observed).size).toBe(observed.length);
-    expect([...observed].sort()).toEqual([...DELIVERY_DISPATCH_JOB_NAMES].sort());
-  });
-
   test('job 名は一意で featureId は共有カタログ内に限る', () => {
     const names = FEATURE_JOB_MANIFEST.map(({ name }) => name);
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);

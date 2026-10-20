@@ -1,7 +1,7 @@
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import booking from './booking.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
-import {menuAudience} from '../services/booking-audience.js';
+import {menuAudience} from '../features/booking/booking-audience.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 let d:SqliteD1;
 const body={name:'相談',duration_minutes:60,base_price:5500,expectedVersion:1,audienceMode:'include_tags',audienceTagIds:['tag']};
@@ -31,7 +31,7 @@ test('B9-11 B9-12 B9-13: 指名料の控えと担当変更の除去、取消計�
  d.raw.exec("UPDATE bookings SET staff_id='bs2' WHERE id='bk'");expect(d.raw.prepare("SELECT nominated,nomination_fee_at_booking,price_at_booking FROM bookings WHERE id='bk'").get()).toEqual({nominated:0,nomination_fee_at_booking:0,price_at_booking:5500});
 });
 test('B9-08 B9-09 B9-10: 実予約口でも指名だけ500円、指名なしは加算0',async()=>{
- const {saveBookingAutoAssign}=await import('../services/booking-channels.js');await saveBookingAutoAssign(d.db,'a',true);
+ const {saveBookingAutoAssign}=await import('../features/booking/booking-channels.js');await saveBookingAutoAssign(d.db,'a',true);
  d.raw.exec("UPDATE staff SET nomination_fee=500 WHERE id='bs';UPDATE booking_settings SET approval_mode='automatic',cutoff_minutes_before=0,max_active_bookings_per_friend=52;INSERT INTO staff_shifts(id,staff_id,work_date,start_time,end_time) VALUES('shift','bs','2026-11-20','09:00','18:00')");
  const a=gapApp(d,[booking]),context={waitUntil:()=>{},passThroughOnException:()=>{}} as any;
  const request=(staff:string,start:string,key:string)=>a.request('/api/liff/booking/requests?liffId=liff-a',{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json','Idempotency-Key':key},body:JSON.stringify({menu_id:'menu',staff_id:staff,starts_at:start})},undefined,context);

@@ -2,7 +2,6 @@ import React, { type HTMLAttributes, type ReactNode } from 'react'
 import { statusLabel, type StandardStatus } from '@/lib/status-labels'
 import HelpTip from './help-tip'
 import TruncatedText from './truncated-text'
-import { normalizeStatusWord } from './status-words'
 import styles from './status-badge.module.css'
 
 export type StatusBadgeTone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
@@ -32,13 +31,13 @@ export default function StatusBadge({
    * の代わりに、渡したときだけ効くこの大きさを部品側に置く。
    */
   size?: 'default' | 'compact' | 'micro' | 'annotation' | 'dining' | 'delivery'
-  /** 選んだ顧客の連携情報（rm92Y）だけ白地にする。 */
+  /** 選んだ顧客の連携情報だけ白地にする。 */
   surface?: 'tinted' | 'white'
   /** 同じ状態を既に表示しているとき、指定した札だけを省く。 */
   distinctFrom?: string
   /**
    * 札の意味（例：審査中・保留・期限切れの違い）。札のすぐ右の「？」へ入れる
-   * （★V7・§2-1b）。札の列が並ぶ表では、見出しの「？」にまとめるのも可。
+   * （★管理画面・§2-1b）。札の列が並ぶ表では、見出しの「？」にまとめるのも可。
    */
   help?: ReactNode
   /** 「？」の見出し。省略時は札の文字。読み上げ名は「{見出し}の説明」。 */
@@ -47,19 +46,18 @@ export default function StatusBadge({
   helpHref?: string
   /**
    * ★V8 の色の点。既定は出す。「変わる」のように状態ではなく変化の印として使う札は false
-   * （絵 `M4jS9` の「変わる」は点なしの札）。
+   * （「変わる」は点なしの札）。
    */
   dot?: boolean
 }) {
-  const baseLabel = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
-  const label = typeof baseLabel === 'string' ? normalizeStatusWord(baseLabel) : baseLabel
+  const label = status ? statusLabel(status) : typeof children === 'string' ? statusLabel(children) : children
   if (typeof label === 'string' && distinctFrom !== undefined
-    && normalizeStatusWord(statusLabel(label.trim())) === normalizeStatusWord(statusLabel(distinctFrom.trim()))) return null
+    && statusLabel(label.trim()) === statusLabel(distinctFrom.trim())) return null
   const classes = [styles.badge, styles[tone], size === 'compact' || size === 'delivery' ? styles.compact : size === 'micro' ? styles.micro : size === 'annotation' ? styles.annotation : null, dot ? null : styles.noDot, className]
     .filter(Boolean)
     .join(' ')
   const hasHelp = help !== undefined && help !== null
-  const heading = helpLabel ? normalizeStatusWord(helpLabel) : (typeof label === 'string' ? label : 'この状態')
+  const heading = helpLabel ? statusLabel(helpLabel) : (typeof label === 'string' ? label : 'この状態')
   return (
     <span className={classes} data-size={size} data-tone={tone} data-design-node="xRvDB" data-surface={surface} {...props}>
       {typeof label === 'string' ? <TruncatedText value={label} /> : label}

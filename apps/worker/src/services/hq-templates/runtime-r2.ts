@@ -5,8 +5,11 @@ import { captureDistributionName } from './distribution-display.js';
 import { withTextOverride } from './text-overrides.js';
 import { HQ_AUTHORED_MESSAGE_ID, isRegisteredHqMedia } from './authoring-media.js';
 import { beginHqTemplateDistributionRun, beginHqTemplateStoreResult, recordHqTemplateOwnedR2Key, setHqTemplateOwnedR2KeyState, normalizeScopedTagName, type HqTemplateDistributionResult, type HqTemplatePreflight, type HqTemplatePreflightResolution, type HqTemplateStatement } from '@line-crm/db';
+
 import { requireHqTemplateAuthority, VERSION_CONFLICT_MESSAGE, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAdapterResult, type HqTemplateAuthority, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
-import { createTemplateHqTemplateAdapter, parseMessageTemplateDefinition, inspectMessageTemplateDefinition, readMessageTemplateSourceBytes, type MessageTemplateTargetSnapshot, type MessageTemplateSourceMediaBinding, type MessageTemplateAdapterDependencies } from './template.js';
+import { createTemplateHqTemplateAdapter, parseMessageTemplateDefinition, inspectMessageTemplateDefinition, readMessageTemplateSourceBytes, type MessageTemplateAdapterDependencies } from './template.js';
+import { type MessageTemplateTargetSnapshot } from './message-target-snapshot.js';
+import { type MessageTemplateSourceMediaBinding } from './message-media-binding.js';
 import { messageCardReferences } from './message-card-references.js';
 import { HqTemplateError } from './tag.js';
 import { createRichMenuHqTemplateAdapter, parseRichMenuTemplateDefinition, richMenuReferences, type RichMenuHqDefinition } from './rich-menu.js';

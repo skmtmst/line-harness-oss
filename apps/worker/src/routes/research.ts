@@ -1,6 +1,7 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import { getLineAccounts, getFriendByLineUserIdForAccount, isLineAccountTenantActive } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { ensureResearchForm } from '../services/research-forms.js';
 
@@ -18,7 +19,7 @@ research.get('/api/liff/research/:id/form', async c => {
     return c.json({ success: true, data: { formId } });
   } catch (error) {
     if (error instanceof Error && error.message === 'RESEARCH_NOT_FOUND') return c.json({ success: false, error: 'リサーチが見つかりませんでした' }, 404);
-    console.error(JSON.stringify({"code":"routes_research_failed","route":"GET /api/liff/research/:id/form"}));
+    logger.error("routes_research_failed");
     return c.json({ success: false, error: '回答画面を準備できませんでした。もう一度読み込んでください' }, 422);
   }
 });

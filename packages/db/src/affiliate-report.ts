@@ -16,7 +16,7 @@ import { boundedListLimit, nonNegativeListOffset } from './utils.js';
 //   ref_tracking.created_at / friends.created_at can be JST ISO (+09:00) or a
 //   SQLite datetime('now') space-separated UTC string. Raw string comparison
 //   mixes formats and produces boundary errors. Every window / ordering check
-//   below uses julianday() so it compares real instants regardless of format.
+//   below uses julianday so it compares real instants regardless of format.
 
 // ── friendAdds: attributed-at-add-time last-touch ────────────────────────────
 //
@@ -561,7 +561,7 @@ export interface JourneyEvent {
 /**
  * Time-ordered (ascending) journey for one friend: ref_tracking touches,
  * the friend_add moment, form submissions, and conversions. A single UNION ALL
- * over the four sources ordered by julianday() so mixed timestamp formats sort
+ * over the four sources ordered by julianday so mixed timestamp formats sort
  * by true instant.
  */
 export async function getFriendJourney(

@@ -1,32 +1,33 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
-import { RotateCcw, ShieldCheck, SlidersHorizontal, Trash2 } from 'lucide-react'
-import Button from '@/components/shared/button'
-import FormDocumentRetention from '@/components/shared/form-document-retention'
-import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
+
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
-import { RowMenu } from '@/components/shared/row-actions'
-import ListToolbar from '@/components/shared/list-toolbar'
-import Card, { CardHeader } from '@/components/shared/card'
-import FilterChip from '@/components/shared/filter-chip'
-import Notice from '@/components/shared/notice'
-import { Field } from '@/components/shared/form-controls'
+import Button from '@/components/shared/button'
+import Card,{ CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ListState from '@/components/shared/list-state'
-import Pagination from '@/components/shared/pagination'
-import { TextField, TextArea } from '@/components/shared/text-field'
-import ListRange from '@/components/ui/list-range'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import type { FileScanItem } from '@/lib/api'
-import { SbSettingsScreen } from '../sb-frame/settings-screen'
-import { FILE_SCAN_PAGE_SIZE, useFileScan } from './use-file-scan'
-import styles from './screen.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
+import FilterChip from '@/components/shared/filter-chip'
+import { Field } from '@/components/shared/form-controls'
+import { GridCell,GridHeadRow,GridRow,GridTable } from '@/components/shared/grid-table'
+import ListState from '@/components/shared/list-state'
+import ListToolbar from '@/components/shared/list-toolbar'
+import Notice from '@/components/shared/notice'
+import Pagination from '@/components/shared/pagination'
+import { RowMenu } from '@/components/shared/row-actions'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextArea,TextField } from '@/components/shared/text-field'
+import ListRange from '@/components/ui/list-range'
+import type { FileScanItem } from '@/lib/api'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { RotateCcw,ShieldCheck,SlidersHorizontal,Trash2 } from 'lucide-react'
+import { useEffect,useRef,useState } from 'react'
+import { SbSettingsScreen } from '../sb-frame/settings-screen'
+import styles from './screen.module.css'
+import { FILE_SCAN_PAGE_SIZE,useFileScan } from './use-file-scan'
 
 
 /*
- * ★V8 ファイルの検査（Pencil `PfA4o`、状態は `bR6a1`）。
+ * ★V8 ファイルの検査（Pencil 、状態は ）。
  *
  * 動き（権限・一覧・札の絞り込み・探す・ページ送り・使えるように戻す・消す・外の検査の設定）は
  * 今までの V8（app/settings/file-scan/file-scan-v8.tsx）と同じ。処理は同じ場所の use-file-scan.ts（写し）。
@@ -37,7 +38,7 @@ const TITLE = 'ファイルの検査'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
 const SAFETY_NOTICE = <Notice tone="info" icon={<ShieldCheck aria-hidden="true" />}>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
-/* 板の札。`使えません`・`使えます` の絞り込みは v7 の画面に残す。 */
+/* 板の札。`使えません`・`使えます` の絞り込みは 管理画面 の画面に残す。 */
 const STATUS_CHIPS = [
   { value: 'quarantined', label: 'しまったファイル' },
   { value: 'pending', label: '確かめ中' },
@@ -54,6 +55,7 @@ export default function FileScanScreen() {
   const {
     selectedAccountId,
     phase,
+    canEdit,
     items,
     total,
     counts,
@@ -211,7 +213,7 @@ export default function FileScanScreen() {
         ) : (
           <ListState kind="empty" title="LINEアカウントを選んでください" description="ファイルの検査はLINEアカウントごとに管理します。" />
         )}
-        {dialogs}
+        {canEdit ? dialogs : null}
       </SbSettingsScreen>
     )
   }
@@ -268,13 +270,13 @@ export default function FileScanScreen() {
                   {item.reasonLabel ?? '確認が必要です'}
                 </GridCell>
                 <GridCell role="cell" className={styles.actions}>
-                  {item.status === 'quarantined' ? (
+                  {canEdit && item.status === 'quarantined' ? (
                     <Button variant="text" onClick={() => openRelease(item)}>
                       <RotateCcw className={styles.btnIcon} aria-hidden="true" />
                       使えるように戻す
                     </Button>
                   ) : null}
-                  {item.status === 'quarantined' || item.status === 'rejected' ? (
+                  {canEdit && (item.status === 'quarantined' || item.status === 'rejected') ? (
                     <span className={styles.menuBox}>
                       <RowMenu
                         label={`${item.filename}のその他操作`}
@@ -304,18 +306,19 @@ export default function FileScanScreen() {
         </div>
       ) : null}
 
+      {!canEdit ? <ReadOnlyNotice /> : null}
       <Card variant="form" aria-label="外の検査サービス">
         <CardHeader title="外の検査サービス" size="content" meta={externalOn
                 ? '外の検査への送信は有効です。接続先の稼働状況を確認した表示ではありません。'
                 : externalConfigured && config?.externalEnabled === undefined
                   ? '外の検査への送信状態を確認できません。読み直してください。'
-                  : '外の検査への送信は停止中です。いまは内蔵の簡易検査だけです。'} action={<>
+                  : '外の検査への送信は停止中です。いまは内蔵の簡易検査だけです。'} action={canEdit ? <>
           {externalConfigured ? <Button variant="secondary" type="button" disabled={configBusy} onClick={() => { setStopExternal(true); setStopError('') }}>外の検査を止める</Button> : null}
           <Button variant="secondary" type="button" actionWording onClick={toggleConfigOpen}><SlidersHorizontal aria-hidden="true" />{configOpen ? '設定を閉じる' : '設定を編集'}</Button>
-        </>} />
+        </> : undefined} />
         {legacySecret ? <Notice tone="warn">古い鍵の名前は使えません。運営が用意した検査専用の鍵の名前へ変更してください。</Notice> : null}
         {externalConfigured && !externalOn && config?.externalEnabled === false && !legacySecret ? <Notice tone="warn">現在の設定では外の検査へ送信できません。送り先と鍵の名前の組を運営に確認してください。</Notice> : null}
-        {configOpen ? (
+        {canEdit && configOpen ? (
           <div className={styles.form}>
             <Field label="提供元" htmlFor="file-scan-provider" requirement={configFields.requirement('externalProvider')} error={configFields.error('externalProvider')}>
               <SaveErrorField names={["externalProvider","provider"]}><TextField {...configFields.bind('externalProvider')} id="file-scan-provider" value={provider} onChange={(event) => setProvider(event.target.value)} placeholder="例：example-scan" /></SaveErrorField>
@@ -335,8 +338,7 @@ export default function FileScanScreen() {
         ) : null}
       </Card>
 
-      {selectedAccountId ? <FormDocumentRetention key={selectedAccountId} accountId={selectedAccountId} /> : null}
-      {dialogs}
+      {canEdit ? dialogs : null}
     </SbSettingsScreen>
   )
 }

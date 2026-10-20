@@ -162,7 +162,7 @@ describe('2列から選ぶ', () => {
     expect(input().value).toBe('14 : 30')
   })
 
-  it('空のとき分だけ先に押すと 10時で入る（v7 と同じ既定）', () => {
+  it('空のとき分だけ先に押すと 10時で入る（管理画面 と同じ既定）', () => {
     render(<Harness />)
     fireEvent.click(screen.getByRole('button', { name: '時刻の一覧を開く' }))
     fireEvent.click(within(screen.getByRole('listbox', { name: '分' })).getByRole('option', { name: '45' }))
@@ -283,7 +283,7 @@ describe('日時の欄の時刻の部分も同じ部品', () => {
     expect(within(dialog).queryByRole('button', { name: '時' })).toBeNull()
     const time = within(dialog).getByRole('combobox', { name: '時刻' }) as HTMLInputElement
     expect(time.value).toBe('10 : 00')
-    // 日付の欄（36）と並ぶので高さは field（絵 FU2aU・BBRDb・ZU4Ae）。
+    // 日付の欄（36）と並ぶので高さは field（絵のZU4Ae）。
     expect((time.parentElement as HTMLElement).dataset.size).toBe('field')
     fireEvent.focus(time)
     fireEvent.change(time, { target: { value: '1430' } })

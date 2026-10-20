@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildSegmentQuery, type SegmentCondition } from './segment-query.js';
+import { buildSegmentQuery } from './segment-query.js';
+import { type SegmentCondition } from '@line-crm/shared';
 
 describe('シナリオ購読で絞る', () => {
   it('シナリオを選ばなければ、どれか1つでも購読している人', () => {

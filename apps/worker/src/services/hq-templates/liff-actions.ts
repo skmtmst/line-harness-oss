@@ -1,9 +1,13 @@
 import { liffActionUrl, type LiffAction, type MessageTemplateDefinition } from '@line-crm/shared';
 import { collectLiffActionLocators, isLiffActionKind } from '@line-crm/shared';
+
+
+
 import { normalizeScopedTagName } from '@line-crm/db';
 import { messageCardReferences } from './message-card-references.js';
 import { HqTemplateError } from './tag.js';
-import type { HqTemplateAuthority, HqTemplateStatement } from './contract.js';
+import type { HqTemplateAuthority } from './contract.js';
+import type { HqTemplateStatement } from '@line-crm/db';
 
 type Row = Record<string, string | number | null>;
 const unavailable = (): never => { throw new HqTemplateError('REFERENCE_UNAVAILABLE', 409); };

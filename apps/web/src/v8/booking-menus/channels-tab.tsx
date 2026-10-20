@@ -122,7 +122,7 @@ function ConnectDialog({
   )
 }
 
-/** 予約が重なったときの知らせ（DFl3Q）。移す先を選び、移して知らせる。 */
+/** 予約が重なったときの知らせ。移す先を選び、移して知らせる。 */
 export function ConflictDialog({
   canEdit = true,
   accountId,
@@ -157,7 +157,7 @@ export function ConflictDialog({
       notifyToast(notify ? `${targetName}へ移して知らせました。` : `${targetName}へ移しました。`)
       onDone()
     } catch (e) {
-      setError(describeApiFailure(e, '移せませんでした。空きを確かめてやり直してください。'))
+      setError(`${describeApiFailure(e, '予約の移動')} 空きを確かめてやり直してください。`)
     } finally {
       setBusy(false)
     }
@@ -211,7 +211,7 @@ export function ConflictDialog({
   )
 }
 
-/** 予約経路の連携タブ（ZyDd6）。スタッフの Google カレンダーと予約経路の一覧。 */
+/** 予約経路の連携タブ。スタッフの Google カレンダーと予約経路の一覧。 */
 export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummaryChange }: { accountId: string; canEdit: boolean; staff?: BookingStaff[]; onSummaryChange?: (summary: ChannelsSummary) => void }) {
   const saveErrors = useSaveFormErrors()
 

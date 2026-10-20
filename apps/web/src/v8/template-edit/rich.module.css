@@ -1,5 +1,5 @@
 /*
- * ★V8 リッチメッセージを作る（EFV8l）。寸法は globals.css の --tpl-wa-rich-*（と作る型の --tpl-*）だけを読む。
+ * ★V8 リッチメッセージを作る。寸法は globals.css の --tpl-wa-rich-*（と作る型の --tpl-*）だけを読む。
  * 外枠・箱・名前とフォルダ・右の列は edit.module.css（クーポン・リサーチと同じ）。
  */
 

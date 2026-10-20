@@ -1,18 +1,10 @@
 import { tapExtrasError, type TapExtras } from './tap-extras.js';
-import { emptyLayout, type FormAction, type FormInputBlock, type FormLayout } from './form-layout.js';
+import { emptyLayout } from './form-layout.js';
+import { type FormAction } from './form-choice-types.js';
+import { type FormInputBlock, type FormLayout } from './types/form-layout.js';
 
-export interface ResearchAnswerAction {
-  actionType: 'tag' | 'friend_field' | 'support_mark' | 'scenario' | 'common_var' | 'send_message' | 'send_template' | 'reminder' | 'event_booking' | 'notify_staff';
-  config: Record<string, unknown>;
-  onFailure: 'stop' | 'continue';
-}
-export interface ResearchGate {
-  assetId: string;
-  version: number;
-  startsAt: string | null;
-  endsAt: string | null;
-  targetTagId: string | null;
-}
+import type { ResearchAnswerAction } from './types/research.js';
+export type { ResearchAnswerAction, ResearchGate } from './types/research.js';
 
 /** 公開したリサーチを、既存の回答フォームの入力と後処理へ写す。 */
 export function researchFormLayout(assetId: string, version: number, name: string, payload: Record<string, unknown>): FormLayout {

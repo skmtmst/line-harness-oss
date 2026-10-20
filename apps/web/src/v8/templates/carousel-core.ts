@@ -1,7 +1,8 @@
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { TapExtras } from '@line-crm/shared'
 /*
  * 現役の画面と動作試験で使う組み立て/保存の正本。
- * 見本（?visual=1）は絵 J60utH の3枚。ボタンの「押したら」（絵 JkLOF・2026-10-08 オーナー）：
+ * 見本（?visual=1）は絵  の3枚。ボタンの「押したら」（絵 JkLOF・2026-10-08 オーナー）：
  * URL を開く・動きを実行するに、テキストを送る・回答フォーム・予約ページ・予約履歴を開くを足した。
  */
 import { api } from '@/lib/api'
@@ -294,6 +295,6 @@ export async function saveCarousel(
     }
     return { ok: true, id: createdId }
   } catch (e) {
-    return { ...fail(e instanceof Error ? e.message : '保存に失敗しました。通信を確かめて、もう一度お試しください。'), ...(tapExtraSaveError(e) ? { tapExtraError: tapExtraSaveError(e)! } : {}) }
+    return { ...fail(describeApiFailure(e, '保存')), ...(tapExtraSaveError(e) ? { tapExtraError: tapExtraSaveError(e)! } : {}) }
   }
 }

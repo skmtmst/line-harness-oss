@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 export type WebhookEndpointState = {
   expectedUrl: string;
   actualUrl: string | null;

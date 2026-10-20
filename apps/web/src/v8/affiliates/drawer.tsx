@@ -1,6 +1,7 @@
 'use client'
 
-import { type DrawerTab, DRAWER_TABS } from './drawer-tabs'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { DRAWER_TABS } from './drawer-tabs'
 import { Tabs } from '@/components/shared/tabs'
 import { useUrlTab } from '@/lib/use-url-tab'
 import { notifySaved } from '@/components/shared/toast'
@@ -43,7 +44,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 アフィリエイターの詳細の引き出し（板 `tnTn9`。右から出る 620px）。
+ * ★V8 アフィリエイターの詳細の引き出し（板 。右から出る 620px）。
  * 「成果を見る」・名前・`?affiliate=` で開く。上のタブで 概要・内訳・友だち・支払い。
  *
  * 動きは app/affiliates/v8-drawer.tsx から写した（集計・紹介リンク・紹介で増えた友だち・
@@ -574,7 +575,7 @@ function SettlementEditor({
 
       { if (!fieldFailure)
 
-      setError(e instanceof Error ? e.message : '保存できませんでした。通信を確かめて、もう一度お試しください。') }
+      setError(describeApiFailure(e, '保存')) }
     } finally {
       setSaving(false)
     }

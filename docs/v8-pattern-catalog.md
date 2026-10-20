@@ -1,3 +1,5 @@
+> 文書：V8 型の対応表（パターン台帳）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # V8 型の対応表（パターン台帳）
 
 ## people-day-grid 人の当日予約盤（L28）
@@ -333,7 +335,7 @@
 ## detail-panel 詳細のパネル・引き出し
 
 - **役目**：行の詳細は右の DetailPanel 360、編集は Drawer 480/540
-- **持ち主（コード）**：`apps/web/src/components/shared/detail-panel.tsx`・`apps/web/src/components/shared/detail-panel.module.css`・`apps/web/src/components/shared/drawer.tsx`・`apps/web/src/components/shared/drawer.module.css`・`apps/web/src/components/shared/slide-panel.tsx`（部品 `DetailPanel`・`Drawer`）
+- **持ち主（コード）**：`apps/web/src/components/shared/detail-panel.tsx`・`apps/web/src/components/shared/detail-panel.module.css`・`apps/web/src/components/shared/drawer.tsx`・`apps/web/src/components/shared/drawer.module.css`（部品 `DetailPanel`・`Drawer`）
   - 読む変数：`--radius-panel`・`--shadow-float`
 - **持ち主（Pen）**：**未定**
   - 注：Pen の部品 ID が対応表に無い（ZBjxY の「引き出し」は板の中の名前だけ）
@@ -383,7 +385,7 @@
 ## picker-dialog 選ぶ窓
 
 - **役目**：作ってある物を、フォルダ・探す・見本付きの窓で選ぶ（受信箱の「テンプレートを選ぶ」の形1つ）
-- **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`・`apps/web/src/components/shared/entity-picker-window.tsx`・`apps/web/src/components/shared/entity-picker.module.css`・`apps/web/src/components/shared/entity-picker-sources.tsx`・`apps/web/src/components/shared/hq-account-picker.tsx`（部品 `EntityPickerDialog`・`EntityPickerWindow`・`EntityMultiPickerDialog`・`HqAccountPickerDialog`）
+- **持ち主（コード）**：`apps/web/src/components/shared/entity-picker.tsx`・`apps/web/src/components/shared/entity-picker.module.css`・`apps/web/src/components/shared/entity-picker-sources.tsx`・`apps/web/src/components/shared/hq-account-picker.tsx`（部品 `EntityPickerDialog`・`EntityPickerWindow`・`EntityMultiPickerDialog`・`HqAccountPickerDialog`）
 - **持ち主（Pen）**：`S2Vgi`「選ぶ窓（正の形・B-165）」・`A1eZS`「選ぶ窓（V8-B の写し）」
   - 部品の板の html に書き出されていない ID：`S2Vgi`・`A1eZS`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
 - **見つけ方（コード）**：
@@ -1053,7 +1055,7 @@
 
 - **持ち主**：`shared/form-controls`のField・RequiredBadge、`lib/form-requirement`と`use-form-errors`の検査定義。行の組は`shared/action-menu`（RowMenuも同じ順を使う）、道具は`shared/list-toolbar`とListPageBodyが渡す先頭の口。
 - **決まり**：§6.43・B-244。必須と検査を共有、欄下の理由と読み上げ、見る→整理→停止・削除と線・5項目から見出し、狭い白い板の2段と右端の件数。
-- **見張り**：`b244-behavior.test.tsx`、`action-menu-v7-contract.test.tsx`（V8へ更新）、`list-toolbar-contract.test.tsx`、`scripts/v8-guard/b244-rules-browser.mjs`。既存の頭・道具・表の値はmatch2が持ち、新しい口だけを追加する。
+- **見張り**：`b244-behavior.test.tsx`、`action-menu-v7-contract.test.tsx`（V8へ更新）、`list-toolbar-contract.test.tsx`、`apps/web/scripts/v8-guard/rules-browser.mjs`。既存の頭・道具・表の値はmatch2が持ち、新しい口だけを追加する。
 
 <a id="screen-explanation"></a>
 ## screen-explanation この画面の説明（B-245）
@@ -1115,7 +1117,7 @@
 
 - 持ち主は`shared/bar-chart.tsx`・CSS。`distribution="diverging"`で同じ人数の単位を基準線の上（増加）と下（減少）へ。指定のない形は保つ。
 - `BarChartLegend`の`layout="analytics"`とtoneの`broadcast`/`scenario`、`BarChartEventMark`は出来事の青/紫を共有する。`toBarChartItems`へ渡すcampaignsのkindから日付の印を出す。人数の緑/灰と分け、名前は読み上げに残す。
-- 寸法の見張りは`scripts/v8-guard/bar-chart-layout-browser.mjs`、数と日選択の描画は`shared/bar-chart.test.tsx`。画面接続前の部品検査を板の合格へ数えない。
+- 寸法の見張りは`apps/web/scripts/v8-guard/bar-chart-layout-browser.mjs`、数と日選択の描画は`shared/bar-chart.test.tsx`。画面接続前の部品検査を板の合格へ数えない。
 
 <a id="verification-list"></a>
 ## verification-list 接続のチェックの行

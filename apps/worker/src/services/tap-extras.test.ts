@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { applyTapExtras, decorateTapExtras, extrasFromTrackedLink, handleExtraPostback, validateTapExtraReferences } from './tap-extras.js';
-import { autoTrackContent } from './auto-track.js';
+import { appendFriendToTrackedLinks, autoTrackContent } from './auto-track.js';
 import { getTrackedLinkByIdOrShortCode, getFriendById } from '@line-crm/db';
 import { trackedLinks } from '../routes/tracked-links.js';
 import { redeemCoupon } from './coupon-redemption.js';
@@ -38,6 +38,19 @@ describe('ボタンの追加処理（実SQL）', () => {
     await expect(applyTapExtras(sql.db, 'friend', 'account', { scoreChange: 1.5 }, 'e')).rejects.toThrow();
     expect(sql.raw.prepare('SELECT COUNT(*) n FROM friend_tags').get()).toEqual({ n: 0 });
   });
+  it('既定統括の未割当の友だちにだけ追加処理を引き継ぐ', async () => {
+    sql.raw.exec("UPDATE line_accounts SET tenant_id=NULL WHERE id='account'; UPDATE friends SET line_account_id=NULL WHERE id='friend'");
+    await applyTapExtras(sql.db,'friend','account',extras,'legacy-event');
+    assertEffects();
+  });
+  it('別統括の未割当と所属先を変えた友だちには追加処理を付けない', async () => {
+    sql.raw.exec("UPDATE friends SET line_account_id=NULL WHERE id='friend'");
+    await expect(applyTapExtras(sql.db,'friend','account',extras,'legacy-event')).rejects.toThrow('tap_extra_account_mismatch');
+    sql.raw.exec("UPDATE line_accounts SET tenant_id=NULL WHERE id='account'; UPDATE friends SET line_account_id='other' WHERE id='friend'");
+    await expect(applyTapExtras(sql.db,'friend','account',extras,'reassigned-event')).rejects.toThrow('tap_extra_account_mismatch');
+    expect(sql.raw.prepare('SELECT COUNT(*) n FROM friend_tags').get()).toEqual({n:0});
+    expect(sql.raw.prepare("SELECT score FROM friends WHERE id='friend'").get()).toEqual({score:5});
+  });
   it('postbackは保存した処理を使い、元の動きへ渡す。本文やアカウントの改ざんを拒否する', async () => {
     const action = await decorateTapExtras(sql.db, { type: 'postback', label: '予約', data: 'keyword:予約', tapExtras: extras }, 'https://worker.test', 'account') as { data: string };
     expect(await handleExtraPostback(sql.db, 'friend', 'account', action.data, 'e')).toBe('keyword:予約');
@@ -55,7 +68,7 @@ describe('ボタンの追加処理（実SQL）', () => {
     expect(extrasFromTrackedLink(link)).toEqual(extras);
     const pending: Promise<unknown>[] = [];
     const ctx = { waitUntil: (p: Promise<unknown>) => pending.push(p), passThroughOnException() {} } as unknown as ExecutionContext;
-    const response = await trackedLinks.request(action.uri + '?f=friend', { headers: { 'user-agent': 'Safari' }, redirect: 'manual' }, { DB: sql.db, WORKER_URL: 'https://worker.test' }, ctx);
+    const response = await trackedLinks.request(await appendFriendToTrackedLinks(sql.db, action.uri, 'https://worker.test', 'friend'), { headers: { 'user-agent': 'Safari' }, redirect: 'manual' }, { DB: sql.db, WORKER_URL: 'https://worker.test' }, ctx);
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(original);
     await Promise.all(pending);
@@ -125,4 +138,17 @@ describe('追加処理付きURLの配信別集計', () => {
     expect(first.content).not.toBe(second.content);
     expect(sql.raw.prepare('SELECT broadcast_id FROM broadcast_tracked_links ORDER BY broadcast_id').all()).toEqual([{broadcast_id:'b1'},{broadcast_id:'b2'}]);
   });
+});
+
+
+it('F27: tap extras cannot wrap a customer-inserted URL; authored destinations still track', async () => {
+  const target = 'https://evil.example/customer';
+  const body = (uri: string) => JSON.stringify({ type: 'bubble', body: { type: 'box', layout: 'vertical', contents: [{ type: 'button', action: { type: 'uri', label: 'Open', uri, tapExtras: extras } }] } });
+  const result = await autoTrackContent(sql.db, 'flex', body(target), 'https://worker.test', { lineAccountId: 'account', sourceContent: body('{{metadata.url}}') });
+  expect(JSON.parse(result.content).body.contents[0].action).toEqual({ type: 'uri', label: 'Open', uri: target });
+  expect(sql.raw.prepare('SELECT count(*) n FROM tracked_links').get()).toEqual({ n: 0 });
+  const authored = body('https://business.example/offer');
+  const normal = await autoTrackContent(sql.db, 'flex', authored, 'https://worker.test', { lineAccountId: 'account', sourceContent: authored });
+  expect(JSON.parse(normal.content).body.contents[0].action.uri).toMatch(/^https:\/\/worker.test\/t\//);
+  expect(sql.raw.prepare('SELECT count(*) n FROM tracked_links').get()).toEqual({ n: 1 });
 });

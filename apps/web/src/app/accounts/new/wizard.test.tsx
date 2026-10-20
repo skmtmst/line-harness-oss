@@ -14,9 +14,11 @@ const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), followerImportState: vi.fn(), stepFollowerImport: vi.fn(), list: vi.fn(), followerInsight: vi.fn(), registrationReceipt: vi.fn(),
 }))
 const friends = vi.hoisted(() => ({ list: vi.fn() }))
-// 登録完了直後の契約者専用LINEの登録案内（★V6 37-7）。既定は「運営側で未設定」なので何も出ない
+// 登録完了直後の契約者専用LINEの登録案内（★管理画面 37-7）。既定は「運営側で未設定」なので何も出ない
 const accountTags = vi.hoisted(() => ({ list: vi.fn(async () => ({success:true,data:[{id:'tag-own',name:'店舗',color:null}]})) }))
 const notices = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })), save: vi.fn(async () => ({ success: true, data: { version: 1 } })) } }))
+vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('@/lib/api', () => ({ api: { lineAccounts: calls, lineAccountTags: accountTags, hqNotices: notices, friends, staff: { list: async () => ({ success: true, data: [] }) } } }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/accounts/new', useRouter: () => ({ push: vi.fn() }) }))
@@ -44,6 +46,7 @@ const checked = {
 
 afterEach(() => { cleanup(); window.localStorage?.clear(); delete document.documentElement.dataset.theme })
 beforeEach(() => {
+  sessionStorage.clear()
   vi.clearAllMocks(); document.documentElement.dataset.theme='v8'
   calls.list.mockResolvedValue({success:true,data:[]}); calls.followerInsight.mockResolvedValue({success:true,data:{total:null}});
   calls.connectCheck.mockResolvedValue(checked)
@@ -110,7 +113,8 @@ async function saveAndFinish() {
   await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
   await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
   next()
-  fireEvent.click(await screen.findByRole('radio', { name: /飲食店向け/ }))
+  fireEvent.click(await screen.findByRole('radio', { name: /飲食店/ }))
+  await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
   next()
 }
 
@@ -228,6 +232,8 @@ describe('LINEアカウント作成ウィザード', () => {
   })
 
   it('5つの確認が通ってから登録し、完了画面まで進む', async () => {
+    let finishNotice!: (response: { success: boolean; data: { available: boolean } }) => void
+    notices.lineRegistration.mockReturnValueOnce(new Promise((resolve) => { finishNotice = resolve }))
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
@@ -243,7 +249,9 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByRole('link', { name: '統括コンソールへ戻る' }).getAttribute('href')).toBe('/hq')
     expect(document.body.textContent).not.toContain('synthetic-secret')
     await waitFor(() => expect(notices.lineRegistration).toHaveBeenCalled())
-    expect(document.body.textContent).not.toContain('musubo 運営（契約者専用）')
+    expect(screen.getByText('読み込んでいます…')).toBeTruthy()
+    finishNotice({ success: true, data: { available: false } })
+    await waitFor(() => expect(document.body.textContent).not.toContain('musubo 運営（契約者専用）'))
   })
 
   it('登録完了の直後に、契約者専用LINEの登録案内を一度だけ出す（案内だけで、閉じられる）', async () => {
@@ -256,7 +264,7 @@ describe('LINEアカウント作成ウィザード', () => {
     await saveAndFinish()
     await screen.findByText('準備ができました')
     await screen.findByText('musubo 運営（契約者専用）の LINE を登録してください')
-    expect(document.body.textContent).toContain('123456')
+    await screen.findByText('123456')
     fireEvent.click(screen.getByRole('button', { name: 'あとで確認する' }))
     await waitFor(() => expect(screen.queryByText('musubo 運営（契約者専用）の LINE を登録してください')).toBeNull())
     expect(notices.lineRegistration).toHaveBeenCalledTimes(1)

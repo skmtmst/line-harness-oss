@@ -316,7 +316,7 @@ test('受理後に処理が消え、鍵の有効時間を越えた予約は自�
 });
 
 
-test('B-333 予約後にブロックされた相手は送らず理由を残し、再送しない', async () => {
+test('予約後にブロックされた相手は送らず理由を残し、再送しない', async () => {
   await schedule({ id: 'blocked', key: '11111111-2222-4333-8444-555555555555', at: NOW });
   sqlite.raw.prepare("UPDATE friends SET is_following = 0 WHERE id = 'fr-1'").run();
   await processDueScheduledChatSends(env(), { now: NOW });

@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@line/liff', () => ({ default: { closeWindow: () => {} } }));
 vi.mock('../../lib/api.js', () => ({ api: { liffConfig: () => Promise.resolve({ data: null }) } }));
 
-import { liffDocumentTitle } from './LiffHeader.js';
+import { liffDocumentTitle } from './liff-header.js';
 
 /**
  * タブ（LINE の上）の題は「<画面名> | musubo」（リリース前点検 2026-10-07）。
@@ -21,7 +21,7 @@ describe('LIFF のタブの題', () => {
   });
 
   it('上の帯が題を付ける', () => {
-    const header = readFileSync(fileURLToPath(new URL('./LiffHeader.tsx', import.meta.url)), 'utf8');
+    const header = readFileSync(fileURLToPath(new URL('./liff-header.tsx', import.meta.url)), 'utf8');
     expect(header).toMatch(/document\.title = liffDocumentTitle\(title\)/);
   });
 

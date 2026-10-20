@@ -1,7 +1,8 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   button_label: requiredText("ボタンの文字を入力してください"),
 }
 
@@ -12,7 +13,8 @@ import { tapExtrasError } from '@line-crm/shared'
 import type { HqMessageCard, HqMessageReference, HqTemplateFolder } from '@line-crm/shared'
 import { hqTemplatesApi, type MessageTemplateDefinition } from '@/lib/hq-templates-api'
 import { withMessageCard, withUploadedImage } from '@/lib/hq-template-authoring'
-import { EMPTY_TEMPLATE_REFERENCES, LEGACY_MESSAGE_NOTICE, MessageTemplateEditor } from '@/components/templates/message-template-editor'
+import { LEGACY_MESSAGE_NOTICE, MessageTemplateEditor } from '@/components/templates/message-template-editor'
+import { EMPTY_TEMPLATE_REFERENCES } from '../../components/templates/template-preview-model'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
@@ -32,7 +34,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 統括 テンプレート「メッセージのひな形を作る」（板 X4JcOf）。
+ * ★V8 統括 テンプレート「メッセージのひな形を作る」（板 ）。
  * 左に「ひな形の中身」（名前・分類・画像・タイトル・本文・ボタン）、右に LINE での見え方。
  * 保存する中身（HqMessageCard と template 本体）・画像の受け取り・ボタンの参照先は今の画面
  * （app/hq/templates/template-definition-editor.tsx の CardEditor・template-message-v8.tsx）と同じ。
@@ -40,7 +42,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  */
 
 /*
- * ボタンの押したら（共通の欄 TapActionField・YPzmo・B-129）。保存の形（HqMessageCard の action・value）は今のまま。
+ * ボタンの押したら（共通の欄 TapActionField・YPzmo・）。保存の形（HqMessageCard の action・value）は今のまま。
  * 予約・予約履歴・来店スタンプは、統括カードの型（shared/hq-message-card.ts）と配る口が持てないので出さない
  * （要る API：action に booking・booking_history・visit_stamp を足し、配るときに各店の LIFF の URL に置き換える）。
  */
@@ -80,7 +82,7 @@ export interface MessageFormProps {
   onReceipt?: (media: TemplateMedia) => void
   /** 下に出す「前回の保存を再確認」などの知らせ。 */
   notice?: ReactNode
-  /** 保存で落ちた欄（B-139）。呼ぶ側の useFormErrors を渡すと、名前・本文・ボタンを欄ごとに検査して知らせる。 */
+  /** 保存で落ちた欄。呼ぶ側の useFormErrors を渡すと、名前・本文・ボタンを欄ごとに検査して知らせる。 */
   fields?: FormErrors
 }
 
@@ -88,7 +90,7 @@ export interface MessageFormProps {
 function cardButtonProblem(button: HqMessageCard['buttons'][number]): string | null {
   const extrasError = tapExtrasError(button.tapExtras)
   if (extrasError) return extrasError
-  if ((b244Requirements.button_label.check(button.label) !== null)) return 'ボタンの文字を入力してください'
+  if ((FIELD_REQUIREMENTS.button_label.check(button.label) !== null)) return 'ボタンの文字を入力してください'
   if (!button.value.trim()) return button.action === 'form' ? '回答フォームを選んでください' : button.action === 'scenario' ? 'シナリオを選んでください' : button.action === 'message' ? '送る文を入力してください' : 'URLを入力してください'
   if (button.action === 'url') {
     try {
@@ -174,7 +176,7 @@ export default function MessageForm({
               {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => loadReferences()} busyLabel="処理中…">参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
                 <div key={button.id} className={styles.buttonEdit} {...(fields ? fields.bind(`button-${button.id}`) : {})} aria-describedby={fields?.invalid(`button-${button.id}`) ? `hq-msg-button-${button.id}-error` : undefined}>
-                  <Field label="ボタンの文字" requirement={b244Requirements.button_label}><SaveErrorField names={[`buttons.${index}.label`,"label","button.label"]}><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></SaveErrorField></Field>
+                  <Field label="ボタンの文字" requirement={FIELD_REQUIREMENTS.button_label}><SaveErrorField names={[`buttons.${index}.label`,"label","button.label"]}><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></SaveErrorField></Field>
                   <div className={styles.field}>
                     <span className={styles.smallLabel}>押したとき</span>
                     <SaveErrorField names={["button"]}><TapActionField allowExtras accountId={null} extrasError={fields?.error(`button-${button.id}`)}
@@ -283,7 +285,7 @@ function ImagePick({ value = null, disabled, onUploaded, onBusyChange, onReceipt
       const media = await hqTemplatesApi.uploadImage(file, 'message')
       if (alive.current) { onReceipt?.(media); onUploaded(media) }
     } catch (e) {
-      if (alive.current) setError(e instanceof Error ? e.message : '画像を登録できませんでした。')
+      if (alive.current) setError(describeApiFailure(e, '登録', { scope: 'hq' }))
     } finally {
       locked.current = false
       if (alive.current) { setUploading(false); onBusyChange?.(false) }

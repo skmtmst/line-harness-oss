@@ -10,7 +10,7 @@ import {
 import { updateTenantBilling } from './tenant-billing.js';
 
 /*
- * ★V6 36-2 退会後の顧客データ削除の「起点」。
+ * ★36-2 退会後の顧客データ削除の「起点」。
  *
  * 保存期限を数え始める時刻(retention_anchor_at)がずれると、削除が
  * 早すぎるか、いつまでも始まらないかのどちらかになる。解約の後にも

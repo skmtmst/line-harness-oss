@@ -1,12 +1,15 @@
+import { getPinnedMediaObject } from '../services/media-upload-storage.js';
+import { logger } from '@line-crm/shared/server';
+import { photoImageScanAllowed } from '../services/photo-image-gate.js';
 import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { builtinFileScan, checkKeyGate } from '../services/file-scan.js';
+import { builtinFileScan, checkKeyGate, checkMediaGate } from '../services/file-scan.js';
 import { isWebinarSource, privateImageKey, privateImageSignatureValid, publicDeliveryContentType, publicImageKey } from '../services/image-access.js';
-import { imageDimensions } from '../services/media-metadata.js';
+import { imageDimensions } from '../features/media/media-metadata/index.js';
 
 const images = new Hono<Env>();
 
@@ -123,7 +126,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c, nex
       data: { id, key, url, mimeType, size: data.byteLength },
     }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_images_failed","route":"POST /api/images"}));
+    logger.error("routes_images_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -157,15 +160,31 @@ images.get('/images/*', async (c) => {
     return c.json({ success: false, error: 'Image not found' }, 404);
   }
   if (key.startsWith('nen-photo-review/') || key.startsWith('nen-photo-public/')) {
-    const photo = await c.env.DB.prepare(`SELECT ps.id FROM nen_photo_submissions ps
-      JOIN media_file_scans scan ON scan.subject_kind='photo' AND scan.subject_id=ps.id
-        AND scan.line_account_id=ps.line_account_id AND scan.status='clean'
-      WHERE substr(ps.review_image_url,-length(?))=? OR substr(ps.public_image_url,-length(?))=?`).bind(`/images/${key}`, `/images/${key}`, `/images/${key}`, `/images/${key}`).first();
-    if (!photo) return c.json({ success: false, error: 'ファイルの安全性を確かめています' }, 409);
+    if (!await photoImageScanAllowed(c.env.DB,key)) return c.json({ success: false, error: 'ファイルの安全性を確かめています' }, 409);
   }
   // Webinar originals use the existing enrollment-gated playback API.
   // A webinar may refer to a media key, so namespace checks alone are insufficient.
   if (!isPrivate && await isWebinarSource(c.env.DB, key)) return c.json({ success: false, error: 'Image not found' }, 404);
+  let mediaEtag: string | undefined;
+  if (key.startsWith('media/')) {
+    // Only the exact current or published historical object is a public asset.
+    const published = await c.env.DB.prepare(`
+      SELECT m.id, m.line_account_id, m.filename,
+        COALESCE(v.mime_type, m.mime_type) AS mime_type,
+        COALESCE(v.size_bytes, m.size_bytes) AS size_bytes,
+        COALESCE(v.width, m.width) AS width, COALESCE(v.height, m.height) AS height
+      FROM media m LEFT JOIN media_versions v ON v.media_id = m.id AND v.r2_key = ? AND v.published_at IS NOT NULL
+      WHERE m.r2_key = ? OR v.id IS NOT NULL LIMIT 1
+    `).bind(key, key).first<{ id: string; line_account_id: string; filename: string; mime_type: string; size_bytes: number; width: number | null; height: number | null }>();
+    if (!published) return c.json({ success: false, error: 'Image not found' }, 404);
+    const gate = await checkMediaGate(c.env.DB, c.env.IMAGES, {
+      id: published.id, lineAccountId: published.line_account_id, r2Key: key,
+      filename: published.filename, mimeType: published.mime_type, sizeBytes: published.size_bytes,
+      width: published.width, height: published.height,
+    });
+    if (!gate.allowed) return c.json({ success: false, code: gate.code, error: gate.message }, 409);
+    mediaEtag = gate.etag;
+  }
   // 検査が終わるまで出さない。記録が無い古いファイルは通す。
   const gateKind = key.startsWith('form-uploads/')
     ? 'form_file'
@@ -181,7 +200,7 @@ images.get('/images/*', async (c) => {
       return c.json({ success: false, code: gate.code, error: gate.message }, 409);
     }
   }
-  const object = await c.env.IMAGES.get(key);
+  const object = await getPinnedMediaObject(c.env.IMAGES, key, mediaEtag);
 
   if (!object) {
     return c.json({ success: false, error: 'Image not found' }, 404);
@@ -193,7 +212,8 @@ images.get('/images/*', async (c) => {
   headers.set('Content-Type', contentType);
   headers.set('Cache-Control', isPrivate ? 'private, no-store' : 'public, max-age=300');
   headers.set('Referrer-Policy', 'no-referrer');
-  headers.set('ETag', object.etag);
+  const etag = object.httpEtag ?? `"${object.etag.replace(/^"|"$/g, '')}"`;
+  headers.set('ETag', etag);
   // 判別不能なまま開かせない。画像以外はそのまま表示せず添付で渡す。
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set(
@@ -201,6 +221,13 @@ images.get('/images/*', async (c) => {
     contentType.toLowerCase().startsWith('image/') ? 'inline' : 'attachment',
   );
 
+  // Authorization, publishing and scan gates above run before cache validation.
+  // Signed private content keeps no-store and is never represented by a cached 304.
+  const validators = c.req.header('If-None-Match')?.split(',').map(value => value.trim().replace(/^W\//, '')) ?? [];
+  if (!isPrivate && (validators.includes('*') || validators.includes(etag))) {
+    if (typeof object.body?.cancel === 'function') void object.body.cancel().catch(() => {});
+    return new Response(null, { status: 304, headers });
+  }
   return new Response(object.body, { headers });
 });
 
@@ -213,7 +240,7 @@ images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async 
     await c.env.IMAGES.delete(key);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_images_failed","route":"DELETE /api/images/:key"}));
+    logger.error("routes_images_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

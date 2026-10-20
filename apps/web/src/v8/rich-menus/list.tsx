@@ -67,7 +67,7 @@ import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 リッチメニューの一覧（Pencil「★V8 画面の地図」のリッチメニューの行：
- * 一覧 `rZEGN`、1152 `Y9ASp`、閲覧のみ `ZoKow`、削除できない理由の窓 `yOyCg`）。
+ * 一覧 、1152 、閲覧のみ 、削除できない理由の窓 ）。
  *
  * 2026-10-06 オーナー決定により、古い V8 一覧（app/rich-menus/list-v8.tsx）を
  * 直さず、型（ListPage）と共通部品で一から書いた。データの口・権限・失敗時の
@@ -88,7 +88,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 
 const PAGE_SIZE_OPTIONS = PAGE_SIZE_SELECT_OPTIONS
 
-/* 道具の段の札（絵 `rZEGN`：公開中・予約・下書き・出し分け）。もう一度押すと外れる（排他）。 */
+/* 道具の段の札（絵 ：公開中・予約・下書き・出し分け）。もう一度押すと外れる（排他）。 */
 const FILTER_CHIPS = [
   { key: 'published', label: '公開中', note: 'いまLINEで公開しているメニュー', icon: CircleCheck },
   { key: 'scheduled', label: '予約', note: '公開日時を予約したメニュー', icon: CalendarClock },
@@ -151,7 +151,7 @@ const shortDay = (value: string): string => {
   return polishFormatDate(value, { style: 'list-day' })
 }
 
-/** 消せない理由の短い言い方（yOyCg：「何になっているか」だけ。外し方は右の操作）。 */
+/** 消せない理由の短い言い方（：「何になっているか」だけ。外し方は右の操作）。 */
 function blockerLabel(key: string, impact: RichMenuDeleteImpact): string {
   switch (key) {
     case 'default_for_all': return 'すべての友だちの既定になっている'
@@ -264,7 +264,7 @@ export default function RichMenusListV8() {
   const deferredQuery = useDeferredValue(query.trim())
 
   /*
-   * 消せない理由があるとき（板 `yOyCg`）。見出しを「まだ消せません」にし、
+   * 消せない理由があるとき（板 ）。見出しを「まだ消せません」にし、
    * 理由を外す順に並べ、実行は「LINEから取り下げる」（公開中のとき）だけにする。
    */
   const blockedDelete = deleteTarget?.kind === 'managed'
@@ -906,7 +906,7 @@ export default function RichMenusListV8() {
     null
   )
 
-  /* 1152 の板（Y9ASp）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札」。 */
+  /* 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札」。 */
 
 
   const wideToolbar = (
@@ -1129,17 +1129,17 @@ export default function RichMenusListV8() {
     </>
   )
 
-  /* B-231：1ページでも件数とページ送りを共通部品で出す。 */
+  /* ：1ページでも件数とページ送りを共通部品で出す。 */
   const listPager = selectedAccount && !listLoading && !error && groups.length > 0 ? (
     <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage}
       ariaLabel="リッチメニューのページ送り"
       range={{ total: groupTotal, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, groupTotal) }} />
   ) : null
 
-  /* ===== 削除の窓（yOyCg：消せない理由を外す順に。読めないときは消させない） ===== */
+  /* ===== 削除の窓（：消せない理由を外す順に。読めないときは消させない） ===== */
   const managedDelete = deleteTarget?.kind === 'managed' ? deleteTarget.group : null
   /*
-   * 理由は「何になっているか」を短く1行ずつ、外す操作を右に（yOyCg）。
+   * 理由は「何になっているか」を短く1行ずつ、外す操作を右に。
    * 「LINEに登録中」と「LINE上に残っている」はどちらも取り下げで外れるので1行にまとめる。
    */
   const blockerRows: BlockedRow[] = []

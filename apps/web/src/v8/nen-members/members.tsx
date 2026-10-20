@@ -2,8 +2,8 @@
 
 /*
  * ★V8-B 会員（Pencil「★V8-B 画面の地図」専用機能の組：
- * 会員一覧 `AOWoJ`、ランク設定 `fb9NJ`、ランクを消す（確認）`dEv6G`、
- * ランク設定の競合 `e5yBLx`、ライフタイム `zQ5vY`）。
+ * 会員一覧 、ランク設定 、ランクを消す（確認）、
+ * ランク設定の競合 、ライフタイム ）。
  *
  * 外枠（見出し・CSV・タブ・数の帯）は全部のタブで同じ。型は ListPage。
  * データの口（settings・members・saveRanks・saveMilestones・deleteRank・resync）は今の画面と同じ。
@@ -66,7 +66,7 @@ export default function MembersV8({
 
   const kpis = settings?.kpis ?? null
   const ranks = settings?.ranks ?? []
-  /** ランク設定の競合の帯（e5yBLx）。タブの下・数の帯の上に出す。 */
+  /** ランク設定の競合の帯。タブの下・数の帯の上に出す。 */
   const [topBand, setTopBand] = useState<ReactNode>(null)
 
   const tabs = <>

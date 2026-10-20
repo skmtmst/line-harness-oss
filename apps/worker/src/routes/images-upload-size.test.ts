@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { images } from './images.js';
 vi.mock('../services/account-access.js', () => ({ getVisibleLineAccountScope: async () => ({ ids: ['synthetic-account'] }), canAccessAllLineAccounts: async () => true }));
 vi.mock('../services/file-scan.js', () => ({ builtinFileScan: () => ({ verdict: 'clean' }), checkKeyGate: () => ({ allowed: true }) }));

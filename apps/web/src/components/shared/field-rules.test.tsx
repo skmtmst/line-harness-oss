@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { Field, TextInput } from './form-controls'
 afterEach(cleanup)
-it('B-158 決まり4：任意が二重にならず、上限のある入力は自動で文字数と読み上げ説明を出す', () => {
+it('決まり4：任意が二重にならず、上限のある入力は自動で文字数と読み上げ説明を出す', () => {
   render(<Field label="メモ（任意）"><TextInput defaultValue="あいう" maxLength={20} /></Field>)
   expect(screen.getAllByText('任意')).toHaveLength(1)
   expect(screen.queryByText('メモ（任意）')).toBeNull()

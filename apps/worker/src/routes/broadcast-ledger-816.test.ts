@@ -10,8 +10,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index';
-import type { AuthenticatedStaff } from '../middleware/auth';
+import type { Env } from '../worker-env';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { settleBroadcastRecipients, markBroadcastRecipientsDispatched } from '@line-crm/db';
 import { broadcasts } from './broadcasts';

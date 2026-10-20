@@ -1,8 +1,9 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { formatNumber } from '@/lib/format'
 
 /**
- * 運営ダッシュボード（★V6 37-2）の絵。棒グラフ `月ごとの売上` とドーナツ `プラン別の契約`。
+ * 運営ダッシュボード（★管理画面 37-2）の絵。棒グラフ `月ごとの売上` とドーナツ `プラン別の契約`。
  *
  * 色は CSS の色トークンだけを使う（Pencil のトークン表に無い色は作らない）。
  * - 今月の棒: accent-deep ／ 過去の棒: surface-pearl
@@ -10,11 +11,7 @@ import { formatNumber } from '@/lib/format'
  * プランの分類色に緑は使わない（緑は「正常」の意味だけ）。
  */
 
-export function formatYen(yen: number): string {
-  // 数字でない値が来ても「¥NaN」を出さない。未取得は「—」が決まり。
-  if (typeof yen !== 'number' || !Number.isFinite(yen)) return '—'
-  return `¥${formatNumber(Math.round(yen))}`
-}
+export { formatYen };
 
 /** 軸の目盛り。¥450万 のように「万」で丸める。 */
 export function formatYenShort(yen: number): string {

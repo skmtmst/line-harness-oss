@@ -20,7 +20,7 @@ export default function FriendRowMenu({ friendId, friendName, attention, canEdit
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
-  /* ★V8 `MyJP7`：「予約して送る」はこの行から小窓を直接開く（受信箱を開かずに予約）。
+  /* ★V8 ：「予約して送る」はこの行から小窓を直接開く（受信箱を開かずに予約）。
      送る権限はテンプレートを送ると同じ（会話に送る操作）。 */
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const canSchedule = allowedActions ? allowedActions.includes('template') : canEdit

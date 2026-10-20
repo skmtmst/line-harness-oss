@@ -1,7 +1,7 @@
 import type { LineAccount } from '@line-crm/shared'
 
 /*
- * ★V8 LINEアカウント一覧（V7vn3）の言葉と判定。
+ * ★V8 LINEアカウント一覧の言葉と判定。
  * app/accounts/account-list-view.ts から写した（src/v8 は @/app を読めない）。
  * 直すときは両方を直す（V8 に切り替える日に古い方を消す）。
  */
@@ -24,7 +24,7 @@ export function webhookLabel(account: LineAccount): { label: string; tone: 'succ
 
 export type AccountFilter = 'all' | 'active' | 'inactive' | 'archived' | 'problem'
 
-/** 絞り込みの札。絵 V7vn3 の並び（すべて・稼働中・停止中・接続に問題・アーカイブ）。 */
+/** 絞り込みの札。絵  の並び（すべて・稼働中・停止中・接続に問題・アーカイブ）。 */
 export const ACCOUNT_FILTERS: ReadonlyArray<{ value: AccountFilter; label: string }> = [
   { value: 'all', label: 'すべて' },
   { value: 'active', label: '稼働中' },

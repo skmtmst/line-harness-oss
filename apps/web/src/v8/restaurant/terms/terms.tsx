@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 飲食店向け 利用規約（Pencil `VdKOK`）。
+ * ★V8 飲食店向け 利用規約（Pencil ）。
  * 左に本文（今と同じ TERMS_DOCUMENT）、右に目次（幅260）。
  * 目次は条の数が多いので、絵の5行ぶんの高さで中だけ流す。
  * 「店舗追加へ戻る」は 2026-10-08 に無くした（戻るのは上の帯のパンくず「店舗を追加」）。
@@ -9,7 +9,7 @@
 import { TERMS_DOCUMENT } from '@/content/terms/musubo-terms'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
-import TermsBody, { termsSectionId } from '../store-new/terms-body'
+import { TermsBody, termsSectionId } from '@/v8/restaurant/store-new/public/terms-body/index'
 import styles from './terms.module.css'
 
 /** 「2026-08-23」→「2026/08/23」。 */

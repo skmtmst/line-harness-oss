@@ -19,7 +19,7 @@ import { DelayedSkeleton, ListSkeleton } from './skeleton'
  * 直し方が画面ごとにばらばらだった）。ここに寄せる。
  *
  * 設計: `BDOJu` データがありません ／ `sZE9Q` 読み込んでいます ／
- *       `OLMp0` 表示できませんでした（★V6 4-2-C `yKEdO` で3つ並べてある）
+ *       `OLMp0` 表示できませんでした（★管理画面 4-2-C `yKEdO` で3つ並べてある）
  *
  * **`forbidden` に対応する設計の部品は無い。** 設計は「権限不足とエラーは
  * 今までどおり」としか決めていない。
@@ -42,7 +42,7 @@ export type EmptyListPreset = 'createable' | 'readonly' | 'filtered'
 /**
  * 設計 `hqTfD` / `u2ArlH`。24px の線画。
  *
- * `error` はここに無い。★V7 `x63W5x` の決まりで、失敗の1枚は
+ * `error` はここに無い。★管理画面 `x63W5x` の決まりで、失敗の1枚は
  * TargetMissing の error と同じ中立の見た目（canvas-sunken の丸＋
  * cloud-off、見出し ink 15px 太字、副ボタン「もう一度読み込む」1つ）に
  * する。赤い三角・赤い見出しはやめた（利用者の失敗ではないため）。
@@ -126,7 +126,7 @@ export default function ListState({
 
   const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
 
-  // 失敗の1枚は TargetMissing の error と同じ中身を使う（★V7 `x63W5x`）。
+  // 失敗の1枚は TargetMissing の error と同じ中身を使う（★管理画面 `x63W5x`）。
   // 見た目が2か所でずれないように、ここで組み立て直さない。
   // className は付けない（見た目は TargetMissing が持つ。余白は親で付ける）。
   if (kind === 'error') {

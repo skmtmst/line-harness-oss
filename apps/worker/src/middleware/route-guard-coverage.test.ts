@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import {requireRole} from './role-guard.js';
 import { isOutputRequest } from './output-audit.js';
+import { QA_STAGING_DATABASE } from '../services/staging-qa-safety.js';
 
 const authState = vi.hoisted(() => ({ readOnly: false, role: 'staff' as 'owner' | 'admin' | 'staff', permissionKeys: [] as string[], viewKeys: [] as string[] }));
 vi.mock('@line-crm/db', async (original) => ({
@@ -25,25 +26,38 @@ vi.mock('@line-crm/db', async (original) => ({
 }));
 import { app } from '../index.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import { collectSecurityRoutes } from '../test-utils/route-security-inventory.js';
+import { collectSecurityRoutes, routeSourceFiles } from '../test-utils/route-security-inventory.js';
 import { isLegacyGlobalApi } from './tenant-scope.js';
+
+// Exercise authorization with the staging-only routes actually enabled. Their
+// disabled/production 404 boundary is covered by the real QA entrypoint tests.
+const stagingEnvironment = {
+  DEPLOY_ENV: 'staging', WORKER_NAME: 'nen-line-stg', D1_DATABASE_ID: QA_STAGING_DATABASE,
+  WORKER_PUBLIC_URL: 'https://stg-api.musubo.jp', STAGING_QA_ENABLED: 'true', STAGING_QA_OUTBOUND_DISABLED: 'true',
+};
 
 beforeEach(() => { authState.role = 'staff'; authState.readOnly = false; authState.permissionKeys = []; authState.viewKeys = []; });
 
 
 import {
   authMiddleware,
+  gap2ReadOperation,
   isPublicApiBoundary,
   isStaffExplicitAllow,
   isStaffSelfRouteTemplate,
   permissionForApiPath,
 } from './auth.js';
+import { gap2SelfPreference } from './auth/permissions/auth.js';
 
 /** 更新ルートごとのmiddleware引数と、登録済みの親のガードを確認する。 */
 const ROUTES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'routes');
 type Finding = { file: string; method: string; path: string };
 
 function collectUnguarded(fixtures?: Record<string, string>): Finding[] {
+  if (!fixtures) return collectSecurityRoutes(join(ROUTES_DIR, '..'))
+    .filter(route => ['POST', 'PUT', 'PATCH', 'DELETE', 'ALL'].includes(route.method)
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path) && !route.guarded)
+    .map(route => ({ file: route.file.replace(/\.ts$/, ''), method: route.method.toLowerCase(), path: route.path }));
   const sources = fixtures ?? Object.fromEntries(readdirSync(ROUTES_DIR)
     .filter((entry) => entry.endsWith('.ts') && !entry.includes('.test.'))
     .map((entry) => [entry, readFileSync(join(ROUTES_DIR, entry), 'utf8')]));
@@ -98,7 +112,7 @@ describe('更新系の権限ガードの網羅', () => {
         const response = await (aggregateCsv?aggregate:app).request(`${path}?format=csv`, { headers: {
           Authorization: `Bearer ${String(++index).padStart(16, '0')}`,
           'CF-Connecting-IP': `s07-output-${index}`,
-        } }, { DB: {} } as never);
+        } }, { ...stagingEnvironment, DB: {} } as never);
         expect(response.status, `${role} GET ${route.path}: read-only export`).toBe(aggregateCsv&&role!=='staff'?200:403);
       }
     }
@@ -177,7 +191,7 @@ describe('更新系の権限ガードの網羅', () => {
     try {
     for (const route of routes) {
       const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
-      const env = { DB: matrixDb.db };
+      const env = { ...stagingEnvironment, DB: matrixDb.db };
       const unauthenticated = await app.request(path, { method: route.method,
         headers: { 'CF-Connecting-IP': `s07-unauth-${++index}` } }, env as never);
       expect(unauthenticated.status, `${route.method} ${route.path}: unauthenticated`).toBe(401);
@@ -237,11 +251,12 @@ describe('更新系の権限ガードの網羅', () => {
       && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
     ).map(route => [`${route.method} ${route.path}`, route])).values()];
     expect(routes.length).toBeGreaterThan(100);
+    const report: Array<{ method: string; path: string; unauthenticated: number; readOnly: number; withoutPermission: number | string }> = [];
     let requestIndex = 0;
     for (const route of routes) {
       const authorization = `Bearer ${String(++requestIndex).padStart(16, '0')}`;
       const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
-      const env = { DB: {} as D1Database };
+      const env = { ...stagingEnvironment, DB: {} as D1Database };
       const unauth = await app.request(path, { method: route.method,
         headers: { 'CF-Connecting-IP': `unauth-${route.method}-${path}` } }, env as never);
       expect(unauth.status, `${route.method} ${route.path}: unauthenticated`).toBe(401);
@@ -250,13 +265,78 @@ describe('更新系の権限ガードの網羅', () => {
         headers: { Authorization: authorization, 'CF-Connecting-IP': `readonly-${path}` } }, env as never);
       expect(readOnly.status, `${route.method} ${route.path}: readonly`).toBe(403);
       authState.readOnly = false;
+      const result = { method: route.method, path: route.path, unauthenticated: unauth.status,
+        readOnly: readOnly.status, withoutPermission: 'self_or_explicit_or_platform' as number | string };
+      report.push(result);
       // 本人系と明示許可は正当な契約。運営用は専用の登録・権限試験が守る。
       if (isStaffSelfRouteTemplate(route.method, route.path)
         || isStaffExplicitAllow(route.method, route.path) || path.startsWith('/api/ops/')) continue;
       const denied = await app.request(path, { method: route.method,
         headers: { Authorization: authorization, 'CF-Connecting-IP': `staff-${path}` } }, env as never);
       expect(denied.status, `${route.method} ${route.path}: no permission`).toBe(403);
+      result.withoutPermission = denied.status;
     }
+    if (process.env.WRITE_AUTHORIZATION_REPORT) writeFileSync(process.env.WRITE_AUTHORIZATION_REPORT,
+      JSON.stringify(report, null, 2) + '\n');
+  });
+
+  it('編集権限が付いていても全役割の閲覧のみは業務の更新に到達しない', async () => {
+    const routes = [...new Map(app.routes.filter(route =>
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method)
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
+      // Preview and personal notification preferences intentionally have a
+      // separate read-only contract; they are not business write operations.
+      && !gap2ReadOperation(route.method, route.path)
+      && !gap2SelfPreference(route.method, route.path)
+    ).map(route => [`${route.method} ${route.path}`, route])).values()];
+    const report: string[] = [];
+    authState.readOnly = true;
+    let requestIndex = 100_000;
+    for (const role of ['owner', 'admin', 'staff'] as const) {
+      authState.role = role;
+      for (const route of routes) {
+        const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
+        const permission = permissionForApiPath(path);
+        authState.permissionKeys = permission ? [permission] : [];
+        const response = await app.request(path, { method: route.method, headers: {
+          Authorization: `Bearer ${String(++requestIndex).padStart(16, '0')}`,
+          'CF-Connecting-IP': `readonly-edit-${requestIndex}`,
+        } }, { ...stagingEnvironment, DB: {} } as never);
+        expect(response.status, `${role} ${route.method} ${route.path}: readonly with edit permission`).toBe(403);
+        report.push(`${role}\t${route.method}\t${route.path}\t${permission ?? '-'}\t${response.status}`);
+      }
+    }
+    expect(routes.length).toBeGreaterThan(0);
+    if (process.env.READONLY_WRITE_REPORT) writeFileSync(process.env.READONLY_WRITE_REPORT,
+      'role\tmethod\tpath\tedit_permission\tstatus\n' + report.join('\n') + '\n');
+  });
+
+  it('機能の閲覧キーだけでは同じ機能の業務を更新できない', async () => {
+    const routes = [...new Map(app.routes.filter(route =>
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(route.method)
+      && route.path.startsWith('/api/') && !isPublicApiBoundary(route.method, route.path)
+      && !isStaffSelfRouteTemplate(route.method, route.path)
+      && !isStaffExplicitAllow(route.method, route.path)
+      && !route.path.startsWith('/api/ops/') && route.path !== '/api/auth/two-factor/policy'
+      && !gap2ReadOperation(route.method, route.path)
+      && permissionForApiPath(route.path) !== null
+    ).map(route => [`${route.method} ${route.path}`, route])).values()];
+    const report: string[] = [];
+    let requestIndex = 110_000;
+    for (const route of routes) {
+      const path = route.path.replace(/:[^/]+/g, 'coverage-target').replace(/\*/g, 'coverage-target');
+      const permission = permissionForApiPath(path)!;
+      authState.viewKeys = [permission];
+      const response = await app.request(path, { method: route.method, headers: {
+        Authorization: `Bearer ${String(++requestIndex).padStart(16, '0')}`,
+        'CF-Connecting-IP': `view-write-${requestIndex}`,
+      } }, { ...stagingEnvironment, DB: {} } as never);
+      expect(response.status, `${route.method} ${route.path}: view permission cannot write`).toBe(403);
+      report.push(`${route.method}\t${route.path}\t${permission}\t${response.status}`);
+    }
+    expect(routes.length).toBeGreaterThan(0);
+    if (process.env.VIEW_ONLY_WRITE_REPORT) writeFileSync(process.env.VIEW_ONLY_WRITE_REPORT,
+      'method\tpath\tview_permission\tstatus\n' + report.join('\n') + '\n');
   });
 
   it('すべての管理更新APIはルート単位で保護されている', () => {
@@ -290,9 +370,7 @@ function isStaffApiFailClosed(entry: string): boolean {
 
 function collectStaffApiClassification(extraRoutes: string[] = []): { all: string[]; failClosed: string[] } {
   const srcDir = join(dirname(fileURLToPath(import.meta.url)), '..');
-  const files = readdirSync(join(srcDir, 'routes'))
-    .filter((entry) => entry.endsWith('.ts') && !entry.includes('.test.'))
-    .map((entry) => join(srcDir, 'routes', entry));
+  const files = routeSourceFiles(join(srcDir, 'routes'));
   files.push(join(srcDir, 'index.ts'));
   const seen = new Set<string>();
   for (const file of files) {

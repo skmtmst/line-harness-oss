@@ -1,7 +1,8 @@
+import { logger } from '@line-crm/shared/server';
 import { parseCookieHeader } from '../middleware/auth-http.js';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
-import { adminSessionCookie, csrfCookie, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, sha256Hex } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import { adminSessionCookie, csrfCookie, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, sha256Hex } from '../middleware/auth/credentials/auth.js';
 import {
   adminSessionFamiliarity,
   createAdminSession,
@@ -14,6 +15,7 @@ import {
   type StaffMember,
   type TwoFactorChallengePurpose,
 } from '@line-crm/db';
+
 import { sendPlainMail } from './plain-mail.js';
 
 /**
@@ -80,7 +82,7 @@ export function deviceHashFromUserAgent(userAgent: string | null): Promise<strin
 }
 
 /**
- * いつもと違う端末・場所からのログインを本人へ知らせる（v6-30 §14、V-2）。
+ * いつもと違う端末・場所からのログインを本人へ知らせる（-30 §14、V-2）。
  *
  * 管理画面の帯は session の unfamiliar_at が担う。ここでは監査（要確認の行）と
  * メールを出す。通知の失敗でログイン自体を止めない。
@@ -109,7 +111,7 @@ async function notifyUnfamiliarLogin(
       after: { note: 'いつもと違う端末・場所からのログイン' },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
+    logger.error("services_admin_session_failed");
   }
   try {
     if (c.env.DEPLOY_ENV === 'staging' || c.env.DEPLOY_ENV === 'test') {
@@ -139,7 +141,7 @@ async function notifyUnfamiliarLogin(
       ].join('\n'),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
+    logger.error("services_admin_session_failed");
   }
 }
 
@@ -167,7 +169,7 @@ export async function issueSession(c: Context<Env>, staffId: string, sameSite: '
     }
   } catch (error) {
     unfamiliarAt = new Date().toISOString();
-    console.error(JSON.stringify({"code":"services_admin_session_failed"}));
+    logger.error("services_admin_session_failed");
   }
   await c.env.DB.prepare(`INSERT INTO auth_known_devices(staff_id, device_hash, first_seen_at, last_seen_at) VALUES (?, ?, ?, ?)
     ON CONFLICT(staff_id, device_hash) DO UPDATE SET last_seen_at=excluded.last_seen_at`).bind(staffId, knownDeviceHash, new Date().toISOString(), new Date().toISOString()).run();
@@ -217,7 +219,7 @@ export function twoFactorLoginUrl(c: Context<Env>, challengeToken: string, next?
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
   const url = new URL(`${base}/login/two-factor`);
   if (next === 'ops') url.searchParams.set('next', 'ops');
-  url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
+  url.hash = new URLSearchParams({ lh_2fa: challengeToken, lh_nonce: c.get('adminHandoffNonce') || '' }).toString();
   return url.toString();
 }
 
@@ -227,11 +229,11 @@ export function twoFactorSetupUrl(c: Context<Env>, challengeToken: string, next?
   if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
   const url = new URL(`${base}/login/two-factor/setup`);
   if (next === 'ops') url.searchParams.set('next', 'ops');
-  url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
+  url.hash = new URLSearchParams({ lh_2fa: challengeToken, lh_nonce: c.get('adminHandoffNonce') || '' }).toString();
   return url.toString();
 }
 
-export async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: string): Promise<void> {
+export async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: string, onFailure?: () => void): Promise<void> {
   try {
     await recordLoginAudit(c.env.DB, {
       adminUserId: staffId,
@@ -240,6 +242,7 @@ export async function recordSuccessfulLoginAudit(c: Context<Env>, staffId: strin
       userAgent: c.req.header('user-agent') ?? null,
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_auth_email_failed"}));
+    if (onFailure) onFailure();
+    else logger.error("routes_auth_email_failed");
   }
 }

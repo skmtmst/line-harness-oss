@@ -1,11 +1,12 @@
+import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '../../..')
-const css = readFileSync(join(SRC, 'v8/common-vars/list.module.css'), 'utf8')
-const tsx = readFileSync(join(SRC, 'v8/common-vars/list.tsx'), 'utf8')
+const css = readUiSource(join(SRC, 'v8/common-vars/list.module.css'), 'utf8')
+const tsx = readUiSource(join(SRC, 'v8/common-vars/list.tsx'), 'utf8')
 const tokens = readFileSync(join(SRC, 'app/globals.css'), 'utf8')
 const kpi = readFileSync(join(SRC, 'components/shared/kpi-card.module.css'), 'utf8')
 

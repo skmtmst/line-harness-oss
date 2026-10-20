@@ -4,7 +4,7 @@ import {
   getUrlReachConversionPoints,
   matchesUrlReachTarget,
   normalizeUrlReachUrl,
-} from './conversions.js';
+} from './conversions/index.js';
 
 /*
  * R282: ページ到達のURL判定を、説明（パラメータ無視・文字どおりの

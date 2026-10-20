@@ -59,7 +59,7 @@ import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size
 
 /*
  * ★V8-B NEN配信の一覧（Pencil「★V8-B 画面の地図」専用機能の組）。
- * 自動配信 `MuhWR`・コラム `Jxmqh`・送った履歴 `Tj7n4`・誕生日クーポンの決めごと（引き出し）`oqSJP`。
+ * 自動配信 ・コラム ・送った履歴 ・誕生日クーポンの決めごと（引き出し）。
  *
  * 取得・保存は今の入口（app/nen-campaigns/page.tsx）が持ったまま。ここは見せ方だけ。
  * 外側（見出し・タブ・数の帯・案内・道具の段）は4つのタブで同じ形にし、
@@ -69,7 +69,7 @@ import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size
 
 export type { NenTab } from './display'
 
-/** 入口（page.tsx）から受け取るもの。今の画面（v7）に渡しているものと同じ形。 */
+/** 入口（page.tsx）から受け取るもの。今の画面（管理画面）に渡しているものと同じ形。 */
 export type NenCampaignsListProps = {
   tab: NenTab
   topAction?: ReactNode
@@ -276,7 +276,7 @@ export default function NenCampaignsList(props: NenCampaignsListProps) {
   )
 }
 
-/* ───────────── 自動配信・停止中（MuhWR） ───────────── */
+/* ───────────── 自動配信・停止中 ───────────── */
 
 type AutoFilter = '' | 'follow_up' | 'birthday' | 'off'
 
@@ -485,7 +485,7 @@ function TestRecipientPicker({ friends, value, onChange, accountId }: { friends:
   return <SaveErrorField names={["value"]}><EntitySelect aria-label="テスト送信先" width={220} valuePrefix="送り先：" value={value} onChange={onChange} options={friends.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName || '名前未取得' }))} /></SaveErrorField>
 }
 
-/* ───────────── 誕生日クーポンの決めごと（oqSJP） ───────────── */
+/* ───────────── 誕生日クーポンの決めごと ───────────── */
 
 function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave }: {
   open: boolean
@@ -580,7 +580,7 @@ function CouponDrawer({ open, coupon, saving, canEdit, onClose, onChange, onSave
   )
 }
 
-/* ───────────── コラム（Jxmqh） ───────────── */
+/* ───────────── コラム ───────────── */
 
 type ColumnFilter = '' | 'published' | 'draft' | 'category'
 
@@ -847,7 +847,7 @@ function SelectedColumn(props: NenCampaignsListProps & { canEdit: boolean }) {
   )
 }
 
-/* ───────────── 送った履歴（Tj7n4） ───────────── */
+/* ───────────── 送った履歴 ───────────── */
 
 type HistoryFilter = 'all' | 'sent' | 'pending' | 'failed' | 'skipped'
 

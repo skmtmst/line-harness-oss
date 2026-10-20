@@ -10,20 +10,20 @@ import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { restaurantTestApi, type RestaurantLineFlow } from '@/lib/restaurant-test-api'
-import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
+import { RestaurantFrame, type RestaurantContext } from '@/v8/restaurant/common-a/public/frame/index'
 import styles from './line-followup.module.css'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import { FlowEditor, FlowPreview, type FlowDraft } from './flow-editor'
 
 /*
- * ★V8 LINE来店フォロー（融合 B-186・絵 n9vvGx）。
+ * ★V8 LINE来店フォロー（融合 ・絵 ）。
  * フローを行で並べ、押した行の下に中身（題と吹き出し）を開く。右は LINE での見え方。
  * 吹き出しの枠はシナリオ・一斉配信と同じ共通の MessageComposer。
  */
 
 type FlowKind = { name: string; note: string; icon: ComponentType<{ size?: number; 'aria-hidden'?: boolean }> }
 
-/** 本物の flow_type ごとの名前・説明・印（絵 n9vvGx の行）。 */
+/** 本物の flow_type ごとの名前・説明・印（行）。 */
 const FLOW_KINDS: Record<string, FlowKind> = {
   reservation_24h: { name: '予約 24時間前', note: '前日の確かめ・変更と取り消しの案内', icon: Bell },
   reservation_2h: { name: '予約 2時間前', note: '当日のご案内', icon: Bell },

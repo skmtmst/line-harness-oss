@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B 健康日記（mIwA4・BVuYh・z2tvtX）の骨格。
- * データの口は v7 と同じ（nenPetsApi.health・healthSummary）。
+ * ★V8-B 健康日記（・・）の骨格。
+ * データの口は 管理画面 と同じ（nenPetsApi.health・healthSummary）。
  * 板の印・8列・札・項目の表・まとめの引き出しを見る。
  */
 import React from 'react'

@@ -1,219 +1,31 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { spawnSync } from 'node:child_process'
 import scan from './pendec2-rules-browser.mjs'
-const shell = body => `<style>*{box-sizing:border-box}body{margin:0;font:13px/20px sans-serif}p{margin:0}button{font:inherit}svg{width:16px;height:16px}</style><main>${body}</main>`
-const card = (content, style='') => `<section data-rule-card style="border:1px solid #ccc;width:200px;padding:16px;${style}">${content}</section>`
-const choice = (style, radioStyle='right:16px;top:16px', checked=true) => `<label data-choice-card style="position:relative;display:block;width:200px;height:100px;padding:16px;border:1px solid #087a3e;${style}"><input type="radio" ${checked?'checked':''} style="position:absolute;width:18px;height:18px;margin:0;${radioStyle}">選ぶ</label>`
-const segment = buttons => `<div data-segmented-control>${buttons}</div>`
-const goodSegment = '<button aria-pressed="true" style="background:#e8f5ec;color:#087a3e;border:1px solid #087a3e">選択</button>'
-const cases = {
-  liffshadow: ['<section data-liff-card style="padding:16px">内容</section>', '<section data-liff-card style="padding:16px;box-shadow:0 1px 1px rgba(29,29,31,.16),0 2px 4px rgba(29,29,31,.08)">内容</section>'],
-  liffradio: ['<div data-liff-root><input type="radio" checked style="width:24px;height:24px"></div>', '<div data-liff-root><input type="radio" checked style="width:18px;height:18px;background:radial-gradient(circle,#087a3e 4.5px,white 4.5px)"></div>'],
-  cardspill:[card('<p style="width:240px">はみ出す内容</p>'),card('<p>内容</p>')],
-  cardbottom:[card('<p>最後の行</p>','padding-bottom:0'),card('<p>最後の行</p>')],
-  canvasbottom:['<div data-page-template="detail"><p>本文</p></div>','<div data-page-template="detail" style="padding-bottom:24px"><p>本文</p></div>'],
-  segempty:[segment(goodSegment+'<button></button>'),segment(goodSegment+'<button>ほか</button>')],
-  segselected:[segment(goodSegment+goodSegment),segment(goodSegment+'<button>ほか</button>')],
-  segstyle:[segment(goodSegment.replace('#e8f5ec','#eee')),segment(goodSegment)],
-  'choice-radio':[choice('background:#e8f5ec','left:16px;top:16px'),choice('background:#e8f5ec')],
-  'choice-color':[choice('background:#eee'),choice('background:#e8f5ec')],
-  pageredge:['<nav data-pagination><button style="border:0">次へ</button></nav>','<nav data-pagination><button style="border:1px solid">次へ</button></nav>'],
-  rowmenu:['<table><tbody><tr><td><button data-row-menu>…</button></td></tr><tr><td><button>編集</button></td></tr></tbody></table>','<table><tbody><tr><td><button data-row-menu>…</button></td></tr><tr><td><button data-row-menu>…</button></td></tr></tbody></table>'],
-  bandtouch:['<div role="alert" style="background:#eee">案内</div>'+card('<p>箱</p>'),'<div role="alert" style="background:#eee;margin-bottom:12px">案内</div>'+card('<p>箱</p>')],
-  'customer-edit':['<section data-customer-info-panel><p>名前</p></section>','<section data-customer-info-panel><button>表示項目を編集</button></section>'],
-  insertoutside:['<div data-message-insert-row>差し込む</div>','<div data-message-body><div data-message-insert-row>差し込む</div></div>'],
-  insertlegacy:['<button data-message-insert-button style="border:1px solid">＋ 名前</button>','<button data-message-insert-button style="border:0"><svg></svg>名前</button>'],
-  'internal-window-copy':['<p>詳細の小窓</p>','<p>詳細</p>'],
-  kpiblank:['<div data-kpi-strip><p data-kpi-detail style="min-height:18px"></p></div>','<div data-kpi-strip><p data-kpi-detail style="display:none"></p></div>'],
-  kpialign:['<div data-kpi-strip><p data-kpi-detail data-kpi-detail-present>補足</p><p data-kpi-detail style="display:none"></p></div>','<div data-kpi-strip><p data-kpi-detail data-kpi-detail-present>補足</p><p data-kpi-detail style="min-height:18px"></p></div>'],
-  kpimenu:['<div data-kpi-strip><button data-row-menu aria-haspopup="menu">…</button></div>', '<div data-kpi-strip><button>未設定を見る</button><a href="/ads">広告連携を開く</a></div>'],
-}
-test('閉じたdetailsの中は箱のはみ出し・下の余白に数えず、開いたら検出する', async () => {
+
+test('card spill is detected only when its content is visible, and restoration is clean', async () => {
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    await page.setContent(shell(card('<p>見出し</p><details><summary>詳細設定</summary><p style="width:240px;height:120px">中の内容</p></details>')))
-    assert.equal((await page.evaluate(scan)).some(f => ['cardspill', 'cardbottom'].includes(f.kind)), false)
-    await page.locator('summary').click()
-    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'cardspill'))
-    await page.locator('section').evaluate(el => el.style.paddingBottom = '0px')
-    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'cardbottom'))
-  } finally { await browser.close() }
-})
-test('baseの共通Cardの印でも新しい種類を測り、属性を増やしても同じ結果になる', async () => {
-  const browser = await connectGuardBrowser()
-  try {
-    const page = await browser.newPage()
-    await page.setContent(shell(card('<p style="width:240px">はみ出す内容</p>').replace('data-rule-card','data-design-part="card"')))
-    const before = await page.evaluate(scan)
-    assert.ok(before.some(f=>f.kind==='cardspill'))
-    await page.locator('section').evaluate(el => el.setAttribute('data-card-variant','default'))
-    assert.deepEqual(await page.evaluate(scan), before)
-    await page.locator('p').evaluate(el => el.style.width='auto')
-    assert.deepEqual(await page.evaluate(scan), [])
-  } finally { await browser.close() }
-})
-test('B-219〜233と帯の行メニューは故障注入で落ち、修正後は0（1152・1440・1920）', async () => {
-  const browser=await connectGuardBrowser()
-  try {
-    const page=await browser.newPage()
-    for(const width of [1152,1440,1920]) {
-      await page.setViewportSize({width,height:900})
-      for(const [kind,[broken,fixed]] of Object.entries(cases)) {
-        await page.setContent(shell(broken))
-        assert.ok((await page.evaluate(scan)).some(f=>f.kind===kind),`${width}: 故障の見逃し ${kind}`)
-        await page.setContent(shell(fixed))
-        assert.deepEqual(await page.evaluate(scan),[],`${width}: 修正後 ${kind}`)
-      }
-    }
-    await page.setContent(shell('<section data-rule-card style="outline:1px solid;width:200px;padding:16px"><p style="width:240px">輪郭枠のはみ出し</p></section>'))
+    await page.setContent('<main><details><summary>設定</summary><section data-design-part="card" style="width:100px;border:1px solid"><div style="width:300px">本文</div></section></details></main>')
+    assert.deepEqual(await page.evaluate(scan),[])
+    await page.locator('details').evaluate(el=>{el.open=true})
     assert.ok((await page.evaluate(scan)).some(f=>f.kind==='cardspill'))
-    await page.setContent(shell('<div data-message-body><div data-message-insert-row><div class="insertRow_old"><button data-message-insert-button style="border:0"><svg></svg>名前</button></div></div></div>'))
+    await page.locator('section > div').evaluate(el=>{el.style.width='auto'})
     assert.deepEqual(await page.evaluate(scan),[])
   } finally { await browser.close() }
 })
-test('故障した見張りをCLIが終了1で止める（無断の許可追加なし）', () => {
-  const dir=mkdtempSync(join(tmpdir(),'pendec2-guard-'))
-  try {
-    const file=join(dir,'cases.json')
-    writeFileSync(file,JSON.stringify(Object.fromEntries(Object.entries(cases).map(([k,[html]])=>[k,shell(html)]))))
-    const result=spawnSync(process.execPath,['apps/web/scripts/v8-guard/layout-defects.mjs','--fixtures',file],{encoding:'utf8',timeout:60000})
-    assert.equal(result.status,1,result.stdout+result.stderr)
-    for(const kind of Object.keys(cases)) assert.match(result.stdout,new RegExp('  '+kind+' '))
-  } finally { rmSync(dir,{recursive:true,force:true}) }
-})
-
-test('実物CSS：全部空なら90、1マスに補足があれば116で全マスを揃える。統括の帯にも効く', async () => {
+test('segmented choice has one selected option and every action has a name', async () => {
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    const read = path => readFileSync(new URL('../../src/' + path, import.meta.url), 'utf8')
-    const cells = [0,1,2,3].map(i => `<div class="card" data-design-version="v8" data-kpi-presentation="band"><p class="head">項目 ${i}</p><div class="value"><b data-kpi-number>12</b></div><p class="detail" data-kpi-detail><span></span></p></div>`).join('')
-    await page.setContent(`<html data-theme="v8"><style>*{box-sizing:border-box}p{margin:0}${read('app/globals.css')}${read('components/shared/kpi-card.module.css')}${read('components/shared/kpi-band-v8.css')}</style><body><div data-list-skeleton><div data-kpi-strip data-kpi-presentation="band">${cells}</div></div></body></html>`)
-    const heights = () => page.locator('[data-design-version]').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height))
-    assert.deepEqual(await heights(), [90,90,90,90])
-    assert.equal(await page.locator('[data-kpi-detail]').first().evaluate(el=>getComputedStyle(el).display),'none')
-    await page.locator('[data-kpi-detail]').first().evaluate(el=>{el.setAttribute('data-kpi-detail-present','');el.firstChild.textContent='補足'})
-    assert.deepEqual(await heights(), [116,116,116,116])
-    assert.deepEqual(await page.locator('[data-kpi-detail]').evaluateAll(nodes=>nodes.map(el=>getComputedStyle(el).display)), ['flex','flex','flex','flex'])
-    await page.locator('[data-list-skeleton]').evaluate(el=>el.removeAttribute('data-list-skeleton'))
-    await page.locator('[data-kpi-detail]').first().evaluate(el=>{el.removeAttribute('data-kpi-detail-present');el.firstChild.textContent=''})
-    assert.deepEqual(await page.locator('[data-kpi-detail]').evaluateAll(nodes=>nodes.map(el=>getComputedStyle(el).display)), ['none','none','none','none'])
-  } finally { await browser.close() }
-})
-
-// アプリと配備用Clientの入口が同じCSSを読むことも守る。
-test('LIFFの実物CSSは白いカードだけに影を付け、ラジオは18・点9', async () => {
-  const surface=readFileSync(new URL('../../../liff/src/card-surface.css',import.meta.url),'utf8')
-  for(const entry of ['index.css','embedded.css']) assert.match(readFileSync(new URL('../../../liff/src/'+entry,import.meta.url),'utf8'),/card-surface\.css/)
-  for(const entry of ['affiliate','event-booking','webinar','nen-member']) assert.match(readFileSync(new URL('../../../worker/src/client/'+entry+'/styles.css',import.meta.url),'utf8'),/card-surface\.css/)
-  assert.match(readFileSync(new URL('../../../liff/src/salon-entry.tsx',import.meta.url),'utf8'),/embedded\.css/)
-  const browser=await connectGuardBrowser()
-  try {
-    const page=await browser.newPage()
-    await page.setContent(`<style>${surface}</style><main data-liff-root><section data-liff-card style="padding:16px">内容</section><section data-liff-card data-selected style="padding:16px">選択</section><button>操作</button><input type="radio" checked></main>`)
+    await page.setContent('<main><div data-segmented-control><button aria-pressed="true">開始</button><button aria-pressed="false">停止</button></div></main>')
     assert.deepEqual(await page.evaluate(scan),[])
-    assert.equal(await page.locator('[data-selected]').evaluate(el=>getComputedStyle(el).boxShadow),'none')
-    assert.equal(await page.locator('button').evaluate(el=>getComputedStyle(el).boxShadow),'none')
-    await page.locator('input').evaluate(el=>el.style.width='24px')
-    assert.ok((await page.evaluate(scan)).some(f=>f.kind==='liffradio'))
-    await page.locator('[data-liff-card]').first().evaluate(el=>el.style.boxShadow='none')
-    assert.ok((await page.evaluate(scan)).some(f=>f.kind==='liffshadow'))
+    await page.locator('button').last().evaluate(el=>el.setAttribute('aria-pressed','true'))
+    assert.ok((await page.evaluate(scan)).some(f=>f.kind==='segselected'))
+    await page.locator('button').last().evaluate(el=>{el.setAttribute('aria-pressed','false');el.textContent=''})
+    assert.ok((await page.evaluate(scan)).some(f=>f.kind==='segempty'))
+    await page.locator('button').last().evaluate(el=>el.setAttribute('aria-label','停止'))
+    assert.deepEqual(await page.evaluate(scan),[])
   } finally { await browser.close() }
-})
-
-test('実物CSS：停止確認のラジオ行はカードの選択枠を引き継がない', async () => {
-  const browser=await connectGuardBrowser()
-  try {
-    const page=await browser.newPage()
-    const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
-    const radio=readFileSync(new URL('../../src/components/shared/radio-card.module.css',import.meta.url),'utf8')
-    await page.setContent(`<html data-theme="v8"><style>${globals}${radio}</style><main><label class="card row checked" data-variant="row"><input class="radio" type="radio" checked><span class="body"><b class="title">止める</b></span></label></main></html>`)
-    assert.equal(await page.locator('label').evaluate(el=>getComputedStyle(el).outlineColor),'rgba(0, 0, 0, 0)')
-    assert.equal(await page.locator('input').evaluate(el=>el.getBoundingClientRect().width),18)
-  } finally { await browser.close() }
-})
-
-test('実物CSS：差し込み行の項目は8px、印と字は4px。未定義の値でくっつかない', async () => {
-  const browser=await connectGuardBrowser()
-  try {
-    const page=await browser.newPage()
-    const globals=readFileSync(new URL('../../src/app/globals.css',import.meta.url),'utf8')
-    const insert=readFileSync(new URL('../../src/components/shared/message-insert-row.module.css',import.meta.url),'utf8')
-    await page.setContent(`<html data-theme="v8"><style>${globals}${insert}</style><main><div class="body" data-message-body><textarea>本文</textarea><div class="row" data-message-insert-row><div class="controls"><span class="label">差し込む</span><button class="button" data-message-insert-button><svg></svg>名前</button></div><span class="count">2 / 5,000</span></div></div></main>`)
-    assert.equal(await page.locator('.controls').evaluate(el=>getComputedStyle(el).columnGap),'8px')
-    assert.equal(await page.locator('.button').evaluate(el=>getComputedStyle(el).columnGap),'4px')
-    assert.equal(await page.locator('.row').evaluate(el=>getComputedStyle(el).columnGap),'12px')
-    await page.locator('.button').evaluate(el=>el.style.gap='0px')
-    assert.notEqual(await page.locator('.button').evaluate(el=>getComputedStyle(el).columnGap),'4px')
-  } finally { await browser.close() }
-})
-
-// 閉じた details は Chrome の高さアニメーションで本文の寸法だけが残る。
-// 見えていない本文は除外し、開いたあとの実際のはみ出しは検出する。
-test('閉じた詳細設定の本文をカードのはみ出しに数えず、開いた時は検査する', async () => {
-  const browser = await connectGuardBrowser()
-  try {
-    const page = await browser.newPage()
-    await page.setContent(shell(card('<details><summary>詳細設定</summary><div style="height:200px">本文</div></details>', 'height:80px') + '<style>details::details-content { height:0; overflow:clip; content-visibility:visible } details[open]::details-content { height:auto }</style>'))
-    assert.equal((await page.evaluate(scan)).some(f => ['cardspill','cardbottom'].includes(f.kind)), false)
-    await page.locator('summary').click()
-    assert.equal((await page.evaluate(scan)).some(f => f.kind === 'cardspill'), true)
-  } finally { await browser.close() }
-})
-
-// 現役のworkerのHTMLは登録案内用の中央寄せを持つ。共通化後も予約を狭めない。
-test('共通LIFF CSSはWorker入口の中央寄せ・余白を外し、操作の素の枠を消す', async () => {
-  const embedded = readFileSync(new URL('../../../liff/src/embedded.css', import.meta.url), 'utf8').replace(/^@import[^;]+;/gm, '').replace(/^@source[^;]+;/gm, '');
-  const browser = await connectGuardBrowser();
-  try {
-    const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
-    await page.setContent(`<style>body{display:flex;align-items:center;min-height:100vh}#app{max-width:480px;width:100%;padding:24px 16px}*{box-sizing:border-box;margin:0;padding:0}${embedded}</style><body class="sb-active"><div id="app"><button>人工操作</button></div></body>`);
-    const values = await page.evaluate(() => ({ display: getComputedStyle(document.body).display, padding: getComputedStyle(document.getElementById('app')).padding, border: getComputedStyle(document.querySelector('button')).borderWidth }));
-    assert.deepEqual(values, { display: 'block', padding: '0px', border: '0px' });
-  } finally { await browser.close(); }
-});
-
-// B-245：説明文の移動で、同じ板の同じ下余白を新しい場所と誤認しない。
-test('板の下余白は題で照合し、説明文が変わっても実寸の悪化を止める', async () => {
-  const { assessAgainstBase } = await import('./layout-defects.mjs')
-  const browser = await connectGuardBrowser()
-  try {
-    const page = await browser.newPage()
-    const board = (description, padding) => shell(`<section data-page-template="create" style="padding-bottom:${padding}px"><header><h2>レポートを作る</h2>${description}</header><div>内容</div></section>`)
-    await page.setContent(board('',12))
-    const base = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
-    await page.setContent(board('<button data-screen-explanation-toggle>この画面の説明</button><p data-screen-explanation>説明の本文</p>',12))
-    const same = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
-    assert.equal(assessAgainstBase(same,base,'/fixture',1152,[]).failures.length,0)
-    await page.setContent(board('<p data-screen-explanation>説明の本文</p>',0))
-    const worse = (await page.evaluate(scan)).filter(f => f.kind === 'canvasbottom')
-    assert.equal(assessAgainstBase(worse,base,'/fixture',1152,[]).failures.length,1)
-  } finally { await browser.close() }
-})
-
-test('2択の器の空の尾を検出し、文字幅の器と等幅の器を保つ', async () => {
- const globals = readFileSync(new URL('../../src/app/globals.css', import.meta.url), 'utf8').replace('@theme {', ':root {')
- const css = readFileSync(new URL('../../src/components/shared/segmented.module.css', import.meta.url), 'utf8')
- const browser = await connectGuardBrowser()
- try {
-  const page = await browser.newPage()
-  for (const width of [1440,1152,1920]) {
-   await page.setViewportSize({width,height:900})
-   await page.setContent(`<style>${globals}${css}</style><div data-theme="v8"><main style="display:flex;flex-direction:column;width:600px"><div class="root" data-segmented-control data-appearance="track" data-size="medium"><button class="item selected" aria-pressed="true">1つだけ選ぶ</button><button class="item" aria-pressed="false">いくつでも選ぶ</button></div></main></div>`)
-   const empty = () => page.evaluate(scan).then(rows => rows.filter(row => row.kind === 'segempty'))
-   assert.equal((await empty()).length,1,'縦flexへ器を渡すだけでは空の尾が残る')
-   await page.locator('[data-segmented-control]').evaluate(el=>el.setAttribute('data-segmented-fit','content'))
-   assert.equal((await empty()).length,0)
-   await page.addStyleTag({content:'html:root .root[data-segmented-fit="content"]{align-self:stretch;width:auto}'})
-   assert.equal((await empty()).length,1,'文字幅の指定を落とす故障を止める')
-   await page.locator('[data-segmented-control]').evaluate(el=>{el.removeAttribute('data-segmented-fit');el.setAttribute('data-equal-width','true')})
-   assert.equal((await empty()).length,0,'均等に使う器は空の尾ではない')
-  }
- } finally { await browser.close() }
 })

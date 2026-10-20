@@ -19,7 +19,7 @@ import {
   saveVersionedAccountSetting,
 } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { processPendingCalendarDeleteOperations } from './booking-calendar-sync.js';
+import { processPendingCalendarDeleteOperations } from '../features/booking/booking-calendar-sync.js';
 import { processStepDeliveries } from './step-delivery.js';
 
 const BUNDLE_KEY = 'feature.settings_bundle_v1';

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test as vitestTest, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { AsyncTestScope } from '../test-utils/async-test-scope.js';
 
 /**
@@ -212,8 +212,17 @@ afterEach(async () => {
 
 describe('W12 特典の参照先（実DB・回答API）', () => {
   for (const source of ['ref', 'first-touch'] as const) {
-    for (const account of ['account-a', 'account-b', null]) {
-      test(`${source}: 所属 ${account ?? '共有'} の特典を回答アカウントと照合する`, async () => {
+    for (const ownership of [
+      { name: '同じ店', account: 'account-a', allowed: true },
+      { name: '既定統括の未割当の友だち', account: 'account-a', nullFriend: true, defaultTenant: true, allowed: true },
+      { name: '別の店', account: 'account-b', allowed: false },
+      { name: '未割当・別の統括', account: null, allowed: false },
+      { name: '未割当・既定統括', account: null, defaultTenant: true, allowed: true },
+      { name: '同じ店のシナリオ', account: null, scenarioAccount: 'account-a', allowed: true },
+      { name: '別の店のシナリオ', account: null, scenarioAccount: 'account-b', allowed: false },
+      { name: '停止中', account: 'account-a', inactive: true, allowed: false },
+    ]) {
+      test(`${source}: ${ownership.name}の特典を回答アカウントと照合する`, async () => {
         sqlite.exec(`
           INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
           VALUES ('account-b', 'ch-b', 'B', 'tok-b', 'sec-b', 'tenant-1');
@@ -224,7 +233,14 @@ describe('W12 特典の参照先（実DB・回答API）', () => {
           INSERT INTO form_accounts (form_id, line_account_id) VALUES ('form-reward', 'account-a');
         `);
         sqlite.prepare(`INSERT INTO tracked_links (id, name, original_url, reward_template_id, line_account_id)
-          VALUES ('reward-link', '入口', 'https://example.test', 'reward', ?)` ).run(account);
+          VALUES ('reward-link', '入口', 'https://example.test', 'reward', ?)` ).run(ownership.account);
+        if (ownership.defaultTenant) sqlite.exec("UPDATE line_accounts SET tenant_id=NULL WHERE id='account-a'");
+        if (ownership.nullFriend) sqlite.exec("UPDATE friends SET line_account_id=NULL WHERE id='friend-1'");
+        if (ownership.inactive) sqlite.exec("UPDATE tracked_links SET is_active=0 WHERE id='reward-link'");
+        if (ownership.scenarioAccount) {
+          sqlite.prepare("INSERT INTO scenarios(id,name,trigger_type,line_account_id)VALUES('reward-scenario','Reward','manual',?)").run(ownership.scenarioAccount);
+          sqlite.exec("UPDATE tracked_links SET scenario_id='reward-scenario' WHERE id='reward-link'");
+        }
         if (source === 'first-touch') {
           sqlite.exec(`UPDATE friends SET first_tracked_link_id = 'reward-link' WHERE id = 'friend-1'`);
         }
@@ -234,7 +250,7 @@ describe('W12 特典の参照先（実DB・回答API）', () => {
             ...(source === 'ref' ? { trackedLinkId: 'reward-link' } : {}) }),
         }), env());
         expect(response.status).toBe(201);
-        expect(pushCalls[0]?.messages).toEqual([{ type: 'text', text: account === 'account-b' ? 'フォーム返信' : 'リンク特典' }]);
+        expect(pushCalls[0]?.messages).toEqual([{ type: 'text', text: ownership.allowed ? 'リンク特典' : 'フォーム返信' }]);
         expect(count('form_submissions')).toBe(1);
         expect(claimStatus(KEY, 'friend-1')).toBe('completed');
         const repeat = await app().fetch(new Request(`https://worker.example.test/api/forms/form-reward/submit`, {
@@ -460,7 +476,7 @@ describe('フォーム回答の冪等化(実DB)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'form-2conn-'));
     const file = join(dir, 'test.sqlite');
     const primary = new Database(file);
-    // #743: 起動SQLの素の再生は文ごとに確定・fsyncし、列車274では並行
+    // #743: 起動SQLの素の再生は文ごとに確定・fsyncし、では並行
     // 480ファイルの確定待ちで行列して準備だけで15秒を超えた。1つの確定に
     // まとめる(判定内容・待ち時間は変えない。WAL化は確定の後)。
     primary.exec('BEGIN;');
@@ -660,4 +676,12 @@ describe('N-042 型検証の接続(#702) F1旧項目対応表', () => {
     expect(body.data.destinationWrite).toMatchObject({ attempted: 1, succeeded: 1, failed: 0 });
     expect(fieldValue('ff-multi')).toBe(JSON.stringify(['犬', '猫']));
   });
+});
+
+// Keep the real URL/private-IP policy and webhook fetch. Only DNS is synthetic,
+// so concurrency/event-id assertions still count actual webhook attempts.
+vi.mock('../features/forms/form-webhook.js', async original => {
+  const actual = await original<typeof import('../features/forms/form-webhook.js')>();
+  return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
+    actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
 });

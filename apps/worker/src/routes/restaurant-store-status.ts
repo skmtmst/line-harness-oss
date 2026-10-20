@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { getLineAccounts, type LineAccount } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { dbFor } from '../services/db-router.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 

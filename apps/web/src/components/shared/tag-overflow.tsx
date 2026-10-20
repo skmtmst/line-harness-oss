@@ -22,7 +22,7 @@ function scheduleMeasurement(key: object, read: () => () => void) {
   })
 }
 
-/** B-190: 横1行に入る数。+N の幅も先に確保する。 */
+/** : 横1行に入る数。+N の幅も先に確保する。 */
 export function fittingTagCount(widths: number[], available: number, gap: number, moreWidth: (rest: number) => number): number {
   const total = widths.reduce((sum, width) => sum + width, 0) + Math.max(0, widths.length - 1) * gap
   if (total <= available) return widths.length
@@ -58,7 +58,7 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
       const widths = Array.from(samples.children).map((child) => child.getBoundingClientRect().width)
       const gap = parseFloat(getComputedStyle(host).columnGap) || 0
       const count = fittingTagCount(widths, host.clientWidth, gap, () => more.current?.getBoundingClientRect().width ?? 0)
-      // 1つも入らない狭い列でも、最初の札は省略して出す（+N だけにしない。絵 y2n1z）。
+      // 1つも入らない狭い列でも、最初の札は省略して出す（+N だけにしない。絵 ）。
       return () => { if (active) setFit(Math.min(Math.max(count, widths.length ? 1 : 0), maxVisible ?? items.length)) }
     }
     const update = () => { if (active) scheduleMeasurement(key, read) }

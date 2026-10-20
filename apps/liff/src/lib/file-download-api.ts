@@ -1,3 +1,4 @@
+import { responseLiffError } from './api-error.js';
 import { getIdToken } from './liff-auth.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -22,6 +23,7 @@ export interface IssuedFile {
 export type FileFailureKind = 'login' | 'unavailable' | 'retry' | 'unconfigured' | 'wait' | 'expired' | 'deleted';
 
 export class FileDownloadError extends Error {
+  code?: string; requestId?: string; fields: Record<string, string> = {}; status?: number;
   constructor(public kind: FileFailureKind, public retryAfterSeconds?: number) {
     super(kind);
   }
@@ -50,12 +52,12 @@ export async function issueFile(id: string): Promise<IssuedFile> {
   let response: Response;
   try {
     response = await fetch(new URL(`${BASE}${path}`, window.location.origin), {
-      headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer',
+      headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error',
     });
   } catch {
     throw new FileDownloadError('retry');
   }
-  if (!response.ok) throw failureOf(response.status, response.headers.get('Retry-After'), 'issue');
+  if (!response.ok) throw await tracedFileFailure(response, failureOf(response.status, response.headers.get('Retry-After'), 'issue'));
   const body = (await response.json()) as { success?: boolean; data?: IssuedFile };
   if (body.success !== true || !body.data) throw new FileDownloadError('retry');
   return body.data;
@@ -69,15 +71,22 @@ export async function issueFile(id: string): Promise<IssuedFile> {
 export async function fetchFileBlob(issued: IssuedFile): Promise<Blob> {
   const expected = new URL(`${BASE}/images/chat-attachments/${encodeURIComponent(issued.id)}`, window.location.origin);
   const signed = new URL(issued.url, window.location.origin);
-  if (signed.origin !== expected.origin || signed.pathname !== expected.pathname) {
+  if (signed.origin !== expected.origin || signed.pathname !== expected.pathname || signed.searchParams.has('lineAccessToken')) {
     throw new FileDownloadError('retry');
   }
   let response: Response;
   try {
-    response = await fetch(signed, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer' });
+    response = await fetch(signed, { headers: headers(), cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' });
   } catch {
     throw new FileDownloadError('retry');
   }
-  if (!response.ok) throw failureOf(response.status, response.headers.get('Retry-After'), 'fetch');
+  if (!response.ok) throw await tracedFileFailure(response, failureOf(response.status, response.headers.get('Retry-After'), 'fetch'));
   return response.blob();
+}
+
+/** ダウンロードの状態分類を保って共通の追跡情報を付ける。 */
+export async function tracedFileFailure(response: Response, error: FileDownloadError): Promise<FileDownloadError> {
+  const detail = await responseLiffError(response);
+  error.code = detail.code; error.requestId = detail.requestId; error.fields = detail.fields; error.status = detail.status;
+  return error;
 }

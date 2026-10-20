@@ -49,7 +49,7 @@ function asD1(sqlite: Database.Database, queries?: string[]): D1Database {
   } as unknown as D1Database;
 }
 
-describe('V6分析イベントと日別投影', () => {
+describe('分析イベントと日別投影', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

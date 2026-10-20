@@ -50,7 +50,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 マイル「使い道」（板 `S35pO`、状態は見本帳 `zaqP9`）。
+ * ★V8 マイル「使い道」（板 、状態は見本帳 ）。
  *
  * app/mileage/v8-rewards-tab.tsx から動きを写し、見た目を一覧の型で組み直した。
  * 表は「使い道・必要なマイル・交換すると渡るもの・今月交換された・状態・
@@ -80,7 +80,7 @@ const KIND_FOLDER: Record<MileageRewardKind, 'クーポン' | 'タグ・メッ�
 
 /*
  * 使い道の種類で分けた見え方（保存しない）。作ったフォルダではないので、左のフォルダの列ではなく
- * 上の絞り込み（「種類」の選ぶ欄）に置く（B-136 2026-10-09）。
+ * 上の絞り込み（「種類」の選ぶ欄）に置く（ 2026-10-09）。
  */
 const FOLDERS = ['すべて', 'クーポン', 'タグ・メッセージ', 'シナリオ', '先行・ランク', '未分類'] as const
 type Folder = (typeof FOLDERS)[number]
@@ -562,7 +562,7 @@ export default function RewardsTab() {
         presentation="band"
         title="いちばん人気"
         icon={<Star size={14} aria-hidden="true" />}
-        /* 大きい数字の場所には今月の交換の件数、名前は下の段（B-195：数の場所に名前を入れない）。 */
+        /* 大きい数字の場所には今月の交換の件数、名前は下の段（：数の場所に名前を入れない）。 */
         value={ready && popularName && popularCount != null ? popularCount : null}
         unit="件"
         detail={ready ? (popularCount == null ? '交換の回数は未取得' : popularCount === 0 ? 'まだ交換されていません' : popularName ? `今月いちばん：${popularName}` : '使い道の名前は未取得') : emptyValue('unknown')}
@@ -888,7 +888,7 @@ export default function RewardsTab() {
   return (
     <SaveErrorScope errors={saveErrors}><MileageFrame
       help="行の「…」から 編集・自分で交換をテスト・出すのを止める・フォルダへ移す・複製。"
-      /* 案内は「この画面の説明」の帯（題の右の口で開け閉めする。S35pO・B-245）。 */
+      /* 案内は「この画面の説明」の帯（題の右の口で開け閉めする。・）。 */
       explanation="交換は、お客さまの LINE（マイルの画面）から。渡せなかったときは、決めておいた方法（マイルを戻す など）で処理します"
       actions={
         <Button variant="secondary" onClick={exportCsv} disabled={!canExport}>

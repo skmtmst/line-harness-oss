@@ -3,7 +3,7 @@
 /*
  * テンプレートの作る・編集の外枠。作る型（CreatePage）と同じ板の頭・左右の列・
  * 下の帯を、型の部品（PageFrame・PageHeading）と型の CSS で組む。
- * 型に無いのは1つだけ：頭のすぐ下の「帯の段」（絵 NCbYn の競合の帯）。
+ * 型に無いのは1つだけ：頭のすぐ下の「帯の段」（競合の帯）。
  */
 import { useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'

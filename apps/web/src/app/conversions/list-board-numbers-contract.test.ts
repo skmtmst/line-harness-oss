@@ -1,7 +1,7 @@
 /**
- * コンバージョン一覧 (板 r6dJFy) と実装の数字突き合わせ契約。
+ * コンバージョン一覧 (板 ) と実装の数字突き合わせ契約。
  * 板: 行 padding 上下9・左右20・gap16・区切り #eceef1 / 見出し 13/20 (見出し行は共通部品 TableHeadRow のため M10へ)。
- * 一覧の td だけを直す。詳細ダイアログの表 (cXqlS)・警告箱は別板のため対象外。
+ * 一覧の td だけを直す。詳細ダイアログの表 ・警告箱は別板のため対象外。
  */
 import { readUiSource, readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs';
 import { resolve } from "node:path";
@@ -12,7 +12,7 @@ const CSS = readFileSync(resolve(__dirname, "../../v8/conversions/list.module.cs
 const TOKENS = readFileSync(resolve(__dirname, "../globals.css"), "utf-8");
 
 describe("conversions 一覧の板の数字", () => {
-  it("B-217 の平らな表は共通部品に寸法を渡し、画面からセルを上書きしない", () => {
+  it("共通部品の平らな表は共通部品に寸法を渡し、画面からセルを上書きしない", () => {
     const listCells = PAGE.split("<tbody").at(-1)!.split("</tbody>")[0];
     expect(listCells).toContain('<Td');
     expect(PAGE).toContain("padding: '0 var(--tpl-list-inset)'");

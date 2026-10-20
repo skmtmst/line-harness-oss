@@ -1,4 +1,6 @@
 import { LineApiError, type LineTransport } from '@line-crm/line-sdk';
+
+import { tracedFetch as fetch, traceRequestInit } from '@line-crm/shared/server';
 import { parseRetryAfter } from './policy.js';
 import type { CallIdentity, Outcome } from './types.js';
 
@@ -6,7 +8,7 @@ import type { CallIdentity, Outcome } from './types.js';
 export function lineTransport(signal: AbortSignal, transport: typeof fetch = fetch): LineTransport {
   return (url, init) => {
     signal.throwIfAborted();
-    return transport(url, { ...init, signal, redirect: 'manual' });
+    return transport(url, traceRequestInit(url, { ...init, signal, redirect: 'manual' }));
   };
 }
 export function lineFailure(error: unknown, identity: Readonly<CallIdentity>, now: number): Exclude<Outcome<never>, { kind: 'success' }> {

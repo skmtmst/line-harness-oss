@@ -1,3 +1,5 @@
+> 文書：予約台帳 予約の詳細の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 予約台帳 予約の詳細の動き（BEHAVIOR.md）
 
 対象：`detail-dialog.tsx`（板 AjZhH「予約台帳 予約の詳細 V8」・V8-B）。台帳の本体は `../restaurant/reservations/`。

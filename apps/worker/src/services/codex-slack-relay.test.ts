@@ -1150,3 +1150,93 @@ describe('Codex Slack relay', () => {
     expect(errorParent.text).toContain('状態：:eyes: 確認待ち');
   });
 });
+
+test('Worker trace UUID reaches notification while free-form incident fields are excluded',async()=>{
+ const fetcher=vi.fn<typeof fetch>(async input=>{
+  if(String(input).includes('getPermalink'))return slackResponse({permalink:'https://slack.example/error'});
+  if(String(input).includes('history')||String(input).includes('replies'))return slackResponse({messages:[]});
+  return slackResponse({ts:'1787327000.000001'});
+ });
+ const config={SLACK_BOT_TOKEN:'fixture-bot',SLACK_ERROR_CHANNEL_ID:'C-ERROR',SLACK_TASK_CHANNEL_ID:'C-TASK'};
+ const incidentId='9bc3b7b4-0e5b-4b76-b9b8-51e385ba64ce';
+ await reportHarnessErrorToSlack(config,{source:'worker',message:'unhandled_worker_error',incidentId},fetcher);
+ expect(fetcher.mock.calls.map(([,init])=>String(init?.body)).join('\n')).toContain(incidentId);
+ fetcher.mockClear();
+ await reportHarnessErrorToSlack(config,{source:'worker',message:'unhandled_worker_error',incidentId:'private-customer secret-token'},fetcher);
+ expect(fetcher.mock.calls.map(([,init])=>String(init?.body)).join('\n')).not.toMatch(/private-customer|secret-token/);
+});
+
+
+test('F17: untrusted Slack text cannot mention channels or forge links', () => {
+  expect(sanitizeSlackContent('<!channel> <https://evil.test|trusted> & `escape`')).toBe('&lt;!channel&gt; &lt;https://evil.test|trusted&gt; &amp; ˋescapeˋ');
+});
+
+test('F18: a GitHub title TASK-ID cannot redirect completion to another task', async () => {
+  const target = { ts: '300.001', metadata: { event_type: 'line_harness_task', event_payload: {
+    work_key: 'pr:999', task_id: taskIdForKey('pr:999'), source_channel: 'CFOREIGN123', source_thread_ts: '1787326497.583159', session_id: 'foreign',
+  } } };
+  const writes: Array<Record<string, unknown>> = [];
+  const fetcher = vi.fn<typeof fetch>().mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (url.includes('conversations.history')) return slackResponse({ messages: [target] });
+    if (url.includes('chat.')) writes.push(JSON.parse(String(init?.body)));
+    return slackResponse({ ts: '1787334034.300149', messages: [], permalink: 'https://slack.test/thread' });
+  });
+  await relayCodexSlackEvent({ SLACK_BOT_TOKEN: 'test', SLACK_DEFAULT_PR_CHANNEL_ID: 'COWN123', SLACK_TASK_CHANNEL_ID: 'CTASK123' }, event({ eventSource: 'github', eventType: 'turn_completed', prNumber: 220, content: `fix ${taskIdForKey('pr:999')}`, refreshCommandCenter: false }), fetcher);
+  expect(writes.length).toBeGreaterThan(0);
+  expect(writes.every(write => write.channel !== 'CFOREIGN123')).toBe(true);
+  expect(writes.filter(write => write.ts === '300.001')).toEqual([]);
+});
+
+test.each([
+  ['saved PR binding', 'session:original', { pr_number: '220', pr_url: 'https://github.com/owner/repo/pull/220' }, 'codex/current', true, 'turn_completed'],
+  ['same dedicated branch', 'branch:owner/repo:codex/current', {}, 'codex/current', true, 'turn_completed'],
+  ['another PR repository', 'session:original', { pr_number: '220', pr_url: 'https://github.com/other/repo/pull/220' }, 'codex/current', false, 'turn_completed'],
+  ['another PR number', 'session:original', { pr_number: '221', pr_url: 'https://github.com/owner/repo/pull/220' }, 'codex/current', false, 'turn_completed'],
+  ['another branch repository', 'branch:other/repo:codex/current', {}, 'codex/current', false, 'turn_completed'],
+  ['shared base branch', 'branch:owner/repo:main', {}, 'main', false, 'turn_completed'],
+  ['saved PR when opening', 'session:original', { pr_number: '220', pr_url: 'https://github.com/owner/repo/pull/220' }, 'codex/current', true, 'prompt_submitted'],
+  ['dedicated branch when opening', 'branch:owner/repo:codex/current', {}, 'codex/current', true, 'prompt_submitted'],
+  ['foreign PR when opening', 'session:original', { pr_number: '220', pr_url: 'https://github.com/other/repo/pull/220' }, 'codex/current', false, 'prompt_submitted'],
+  ['foreign branch when opening', 'branch:other/repo:codex/current', {}, 'codex/current', false, 'prompt_submitted'],
+] as const)('F18: GitHub inherits only a verified task relationship (%s)', async (_name, key, binding, branch, inherited, eventType) => {
+  const sourceChannel = 'C0ERROR123', sourceThread = '1787326497.583159';
+  const target = { ts: '300.001', metadata: { event_type: 'line_harness_task', event_payload: {
+    work_key: key, task_id: taskIdForKey(key), source_channel: sourceChannel,
+    source_thread_ts: sourceThread, session_id: 'old-session', ...binding,
+  } } };
+  const parent = { ts: sourceThread, text: '状態：確認待ち', metadata: {
+    event_type: 'line_harness_codex', event_payload: { work_key: key, category: 'error' },
+  } };
+  const writes: Array<{ method: string; body: Record<string, unknown> }> = [];
+  const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+    const method = String(input).split('/').at(-1)!;
+    const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+    if (method === 'conversations.history') {
+      return slackResponse({ messages: body.channel === 'CTASK123' ? [target] : body.channel === sourceChannel ? [parent] : [] });
+    }
+    if (method.startsWith('chat.')) writes.push({ method, body });
+    return slackResponse({ ts: '1787334034.300149', messages: [], permalink: 'https://slack.test/thread' });
+  });
+  const result = await relayCodexSlackEvent({
+    SLACK_BOT_TOKEN: 'fixture', SLACK_DEFAULT_PR_CHANNEL_ID: 'COWN123',
+    SLACK_ERROR_CHANNEL_ID: sourceChannel, SLACK_TASK_CHANNEL_ID: 'CTASK123',
+  }, event({ eventSource: 'github', eventType, prNumber: 220,
+    prUrl: 'https://github.com/owner/repo/pull/220', repository: 'owner/repo', branch,
+    content: `fix ${taskIdForKey(key)}`, refreshCommandCenter: false }), fetcher);
+  if (inherited) {
+    expect(result).toMatchObject({ channelId: sourceChannel, threadTs: sourceThread });
+    if (eventType === 'turn_completed') {
+      expect(writes).toContainEqual({ method: 'chat.delete', body: { channel: 'CTASK123', ts: target.ts } });
+    } else {
+      expect(writes).toContainEqual({ method: 'chat.update', body: expect.objectContaining({
+        channel: 'CTASK123', ts: target.ts, metadata: expect.objectContaining({ event_payload: expect.objectContaining({
+          work_key: key, pr_number: '220', pr_url: 'https://github.com/owner/repo/pull/220',
+        }) }),
+      }) });
+    }
+  } else {
+    expect(result.channelId).toBe('COWN123');
+    expect(writes.some(write => write.body.channel === sourceChannel || write.body.ts === target.ts)).toBe(false);
+  }
+});

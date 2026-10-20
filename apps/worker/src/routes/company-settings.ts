@@ -2,7 +2,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { getCompanySettings, getStaffById, isCompanyLogo, saveCompanySettings } from '@line-crm/db';
 import type { CompanySettingsInput } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { dbFor } from '../services/db-router.js';
 

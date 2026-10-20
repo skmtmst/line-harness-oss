@@ -2,7 +2,7 @@ import type { BroadcastListKpis, BroadcastStats } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 
 /**
- * 一斉配信の一覧に出す帯の 4 枚（設計 `q76C35` ★V6 6-1）。
+ * 一斉配信の一覧に出す帯の 4 枚（設計 `q76C35` ★管理画面 6-1）。
  *
  * **画面から切り離してあるのは、未取得と実測 0 の区別を直に試せるようにするため。**
  * 部品の中で組み立てていたころは、文字列の一致を見る契約テストでしか

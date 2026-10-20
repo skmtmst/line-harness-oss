@@ -4,7 +4,7 @@ import { afterEach, expect, it } from 'vitest'
 import { PageHeading } from './page-frame'
 import { ListPage } from './list-page'
 afterEach(cleanup)
-it('B-245：画面の説明は初めに開き、同じ場所で開閉する', () => {
+it('画面の説明は初めに開き、同じ場所で開閉する', () => {
   const { container } = render(<PageHeading title="配信" explanation="送る相手と日時を決めます。" />)
   const toggle = screen.getByRole('button', { name: 'この画面の説明' })
   const panel = container.querySelector<HTMLElement>('[data-screen-explanation]')!

@@ -1,10 +1,12 @@
+> 文書：運営 ログイン 2段目の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 運営 ログイン 2段目の動き（BEHAVIOR.md）
 
-対象：`app/login/two-factor/page.tsx`（v7 の2段目）。運営から来たときの動きを写して `two-factor-ops.tsx` を一から書いた。絵は `tOPeY`「6桁の確認」。
+対象：`app/login/two-factor/page.tsx` から開く `two-factor-ops.tsx`。絵は `tOPeY`「6桁の確認」。
 
 ## 入口
-- `app/login/two-factor/page.tsx`：`theme === 'v8'` かつ運営のログインから来たとき（`isOpsTwoFactorReturn`：`?next=ops`・hash の `lh_next=ops`・sessionStorage の `lh_2fa_next=ops`）だけ `@/v8/login/two-factor-ops` を出す。
-- 管理画面のログインの2段目（next が無いとき）と v7 は今のまま（`TwoFactorLoginPageV7`）。v7 の試験は触らない。
+- `app/login/two-factor/page.tsx`：運営のログインから来たとき（`isOpsTwoFactorReturn`：`?next=ops`・hash の `lh_next=ops`・sessionStorage の `lh_2fa_next=ops`）だけ `@/v8/login/two-factor-ops` を出す。
+- 管理画面のログインの2段目は `two-factor-admin.tsx`。戻り先の判定が終わるまでどちらも表示しない。
 
 ## 受け付ける URL と指定
 - `/login/two-factor?next=ops#lh_2fa=<合言葉>&lh_method=password`（今と同じ）。合言葉は sessionStorage `lh_two_factor_challenge` に移し、hash は消す（`captureTwoFactorChallenge`）。

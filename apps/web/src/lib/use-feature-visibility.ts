@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { loadFeatureVisibility } from './feature-visibility-cache'
-import type { FeatureKey } from './feature-settings'
+import type { FeatureKey } from './feature-key'
 
 export type FeatureVisibilityStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -10,7 +10,7 @@ export type FeatureVisibilityStatus = 'idle' | 'loading' | 'ready' | 'error'
  * 担当accountの機能オン／オフを staff 向け read-model から読む。
  *
  * サイドバーと同じ fail-closed: 読み込み中・失敗・account 未選択では
- * `enabled()` は false を返す。機能の本体画面ではない場所（友だち一覧の
+ * `enabled` は false を返す。機能の本体画面ではない場所（友だち一覧の
  * 保存済み検索など）から任意機能のAPIを呼ぶとき、その機能がオフだと
  * 403 が画面全体を共通ゲートへ切り替えるので、**呼ぶ前にここで絞る**。
  */

@@ -1,8 +1,8 @@
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sendPlainMail } from './plain-mail.js';
 
 /**
- * 会員登録・パスワード再設定で送るメール（★V6 36-4／36-6）。
+ * 会員登録・パスワード再設定で送るメール（★36-4／36-6）。
  *
  * 件名の呼び名は「musubo」（決定 2026-09-13）。本文には URL と有効期限だけを書き、
  * パスワードやトークン以外の秘密は入れない。

@@ -1,5 +1,5 @@
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
-import type { Choice,Question } from './model'
+import type { Choice, Question } from './question-types'
 
 
 export const RULES = '/booking/menus?tab=rules'
@@ -31,16 +31,15 @@ export const Q: Record<string, Question> = {
   payment: {
     key: 'payment', short: 'お支払い', title: '予約のときのお支払いはどうしますか？', description: 'コース・メニューごとにあとで変えられます。',
     choices: [
-      { value: 'store', icon: 'store', label: 'お店で払う', note: '来店したときにお店で払います。今までどおりです' },
-      { value: 'online', icon: 'card', label: 'オンラインで先払い', note: '予約のときにカードで払います。Stripe をつなぐと使えます' },
+      { value: 'store', icon: 'store', label: 'お店で払う', note: '当日にお店で払います。今までどおりです' },
+      { value: 'online', icon: 'card', label: 'オンラインで先払い', note: `試験の支払いを確認します。本当のカード請求は${PREPARING_WORD}です` },
       { value: 'customer_choice', icon: 'split', label: 'お客さまが選ぶ', note: '先払いか、お店で払うかをお客さまが選びます' },
     ],
-    where: '予約設定 › お支払い', manualHref: '/booking/menus', manualNote: 'お支払いの画面を開きます',
-    info: 'オンラインで払うには Stripe をつなぎます。つなぐまではお店で払うだけで動き、つないだ後も最初は試験モード（本当の請求は起きません）です。',
+    where: '予約設定 › お支払い', manualHref: '/booking/menus?tab=payments', manualNote: 'お支払いの画面を開きます',
+    info: `予約はLINEの予約と管理に対応します。カードの請求は${PREPARING_WORD}です。試験の支払いで本当の請求は起きません。`,
     todo: { title: 'Stripe をつなぐ', note: 'オンライン先払いを使うときに必要です', action: 'つなぐ' },
-    skipped: 'Stripe をつなぐまではお店で払うだけです。つなぐと最初は試験モードです',
+    skipped: `カードの請求は${PREPARING_WORD}です。試験の支払いで本当の請求は起きません`,
     skippedTitle: 'お支払い（オンライン）',
-    preparing: 'お支払い',
   },
   reminders: {
     key: 'reminders', short: '前日のお知らせ', title: '予約の前日にお知らせを送りますか？', description: '予約の確定・前日のお知らせを自動で送ります。最初は止めた状態で入り、最後に確かめてから動かします。',
@@ -79,9 +78,8 @@ export const Q: Record<string, Question> = {
       { icon: 'ticket', label: '使う', note: 'リッチメニューから残りを見られます' },
       { icon: 'ban', label: '使わない', note: '回数券は入れません' },
     ),
-    where: '予約設定 › 回数券', manualHref: '/booking/menus', manualNote: '回数券の画面を開きます',
+    where: '予約設定 › 回数券・月謝', manualHref: '/booking/menus?tab=passes', manualNote: '回数券の画面を開きます',
     todo: { title: '回数券を決める', note: '回数券や月謝の残りを見せます', action: '決める' },
-    preparing: '回数券',
   },
   outcome: {
     key: 'outcome', short: '面談の結果', title: '面談の結果を記録しますか？', description: '面談のあとに「検討中・成約・見送り」を残して、成約率を数えます。',

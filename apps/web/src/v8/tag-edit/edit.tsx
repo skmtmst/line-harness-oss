@@ -1,5 +1,5 @@
 'use client'
-import { notifySaved, notifyToast } from '@/components/shared/toast'
+import { notifySaved } from '@/components/shared/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -18,14 +18,14 @@ import { definitionsForSave, linkedActionFromDefinition, type TagEditorValues } 
 import { describeTagDiff } from './conflict-diff'
 import styles from './edit.module.css'
 import { TagEditForm } from './edit-form'
-import { withPermissionFailure } from '@/components/shared/api-error-message'
+import { describeApiFailure, withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
- * Pencil：タグの編集 `Qat9s`、競合 `xn95q`、閲覧のみ `fkGUR`。
+ * Pencil：タグの編集 、競合 、閲覧のみ 。
  *
  * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
  * 右に「使っている所」、下の帯（削除は左端・キャンセル／複製して作る／保存は中央）。
@@ -61,10 +61,10 @@ export default function TagEditV8() {
   const [error, setError] = useState('')
   const [tagMissing, setTagMissing] = useState(false)
   usePageTitle(tag?.name ?? 'タグを編集')
-  /* 閲覧のみ（fkGUR）：役割が取れるまでは押せる形（最後の守りはサーバの 403）。 */
+  /* 閲覧のみ：役割が取れるまでは押せる形（最後の守りはサーバの 403）。 */
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)
-  /* 競合（xn95q）：入力は捨てず、比べる・読み込むを選んでもらう。 */
+  /* 競合：入力は捨てず、比べる・読み込むを選んでもらう。 */
   const [conflictValues, setConflictValues] = useState<TagEditorValues | null>(null)
   const [compareTarget, setCompareTarget] = useState<TagDefinition | null>(null)
   const [compareBusy, setCompareBusy] = useState(false)
@@ -215,7 +215,7 @@ export default function TagEditV8() {
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
 
-      setError(reason instanceof Error ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
+      setError(describeApiFailure(reason, '削除')) }
       setDeleteOpen(false)
     } finally {
       if (stillHere()) setDeleting(false)

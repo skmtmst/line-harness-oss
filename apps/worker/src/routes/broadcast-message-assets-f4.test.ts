@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getBroadcastMessageAsset } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
@@ -12,7 +12,7 @@ vi.mock('../services/account-access.js', () => ({
   }),
 }));
 
-vi.mock('../services/broadcast-media-storage.js', () => ({
+vi.mock('../features/broadcasts/broadcast-media-storage.js', () => ({
   storeBroadcastMedia: vi.fn(),
 }));
 // 保存・公開の実SQLを検査する。画像変換の外部サービスは別の試験で守る。

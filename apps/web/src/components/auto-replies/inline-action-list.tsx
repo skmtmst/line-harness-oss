@@ -1,44 +1,16 @@
 'use client'
-import type { ActionTargetOption } from '@/components/scenarios/action-editor';
+
+import type { ActionOptions } from './action-options'
+export type { ActionOptions } from './action-options'
 
 import { useEffect, useState } from 'react'
 import { api, eventsApi } from '@/lib/api'
-import type { ScenarioActionType } from '@/lib/api'
-import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
-import Select from '@/components/shared/select'
-import { actionIncompleteReason } from './action-completeness'
-import { newActionKey, type InlineAction } from './draft-fields'
+
+import { type InlineAction } from './draft-fields'
 import { useAccount } from '@/contexts/account-context'
-import { useFeatureVisibility } from '@/lib/use-feature-visibility'
-import Button from '@/components/shared/button'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+
 import InlineActionRowsV8 from './inline-action-rows-v8'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
-
-/**
- * 応答したときに行うことの並び。
- *
- * シナリオのアクション（`scenario_actions` の行）と違い、自動応答は1つの列に
- * JSON で持つ。**中身の編集はシナリオと同じ部品（ActionConfigEditor）を使う。**
- * 種別を足したときに片方だけ増えるのを避けるため。
- */
-
-type Option = { id: string; name: string }
-
-export interface ActionOptions {
-  templates?: ActionTargetOption[]
-  reminders?: ActionTargetOption[]
-  events?: ActionTargetOption[]
-  targetsLoading?: boolean
-  targetsError?: string
-  retryTargets?: () => void
-  notificationRules?: Array<Option & {version:number}>
-  tags: Option[]
-  fields: Option[]
-  marks: Option[]
-  scenarios: Option[]
-  vars: { varKey: string; name: string }[]
-}
 
 /**
  * アクションで選ぶものを読む。
@@ -123,7 +95,7 @@ type Props = {
   onChange: (next: InlineAction[]) => void
 } & ActionOptions
 
-/** 既存の呼び出し口も、B-169 の共通の行で描く。 */
+/** 既存の呼び出し口も、 の共通の行で描く。 */
 
 export default function InlineActionList(props: Props) {
   return <InlineActionRowsV8 { ...props}

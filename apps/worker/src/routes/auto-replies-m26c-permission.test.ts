@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { autoReplies } from './auto-replies.js';
 
@@ -177,8 +178,8 @@ describe('m26c R562: 限定担当 admin は全アカウント共通ルールを�
     expect(rule.response_content).toBe('承りました');
   });
 
-  it('owner の共通ルール操作は成功する', async () => {
-    const target = buildApp(testDb.db, owner);
+  it('運営 owner の共通ルール操作は成功する', async () => {
+    const target = buildApp(testDb.db, { ...owner, id: 'env-owner', tenantId: DEFAULT_TENANT_ID });
     const created = await target.instance.request(
       '/api/auto-replies?lineAccountId=account-a',
       jsonRequest('POST', { ...NULL_RULE_BODY, isActive: false }),
@@ -187,7 +188,8 @@ describe('m26c R562: 限定担当 admin は全アカウント共通ルールを�
     expect(created.status).toBe(201);
 
     // 個別ルールの内容更新も owner は通る（NULL 行の可視性は別 middleware の扱い）。
-    const owned = await target.instance.request(
+    const individualTarget = buildApp(testDb.db, owner);
+    const owned = await individualTarget.instance.request(
       '/api/auto-replies',
       jsonRequest('POST', {
         keyword: '予約',
@@ -201,7 +203,7 @@ describe('m26c R562: 限定担当 admin は全アカウント共通ルールを�
     );
     expect(owned.status).toBe(201);
     const ownedId = ((await owned.json()) as { data: { id: string } }).data.id;
-    const updated = await target.instance.request(
+    const updated = await individualTarget.instance.request(
       `/api/auto-replies/${ownedId}`,
       jsonRequest('PUT', { responseContent: '統括が更新' }),
       target.bindings,

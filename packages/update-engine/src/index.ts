@@ -76,7 +76,7 @@ export interface RunUpdateOpts {
  *   - `done`     — resolves with the same `updateId` on success, rejects
  *                  with the original phase error on failure. Errors are
  *                  ALREADY captured into the snapshot row by the engine;
- *                  attach `.catch(() => undefined)` if you only need
+ *                  attach `.catch( => undefined)` if you only need
  *                  durability and don't want an unhandled rejection.
  */
 export interface UpdateHandle {
@@ -172,7 +172,7 @@ export async function runUpdate(opts: RunUpdateOpts): Promise<UpdateHandle> {
   // Step 4-8: run the long-running phases in the background. We do NOT
   // await this here — that's the whole point of returning a handle.
   // Callers who care about the terminal state await `handle.done`;
-  // callers who only need durability attach `.catch(() => undefined)`
+  // callers who only need durability attach `.catch( => undefined)`
   // and rely on the snapshot row.
   const done = (async (): Promise<string> => {
     try {

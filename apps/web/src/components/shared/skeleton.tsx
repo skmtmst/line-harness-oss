@@ -6,12 +6,12 @@ import styles from './skeleton.module.css'
 import { motionMs } from './overlay-utils'
 
 /*
- * 骨組み（★V7 仕上げ `z97zZN` §3）。
+ * 骨組み（★管理画面 仕上げ `z97zZN` §3）。
  *
  * - 出来上がりと同じ大きさの灰色の面（`canvas-sunken`）。ずれがないので
  *   本物と入れ替わってもガタつかない（CLS 0）
  * - 明滅は不透明度 1↔0.55・1.2秒（globals.css で `.animate-pulse` を
- *   V7 の速さに揃えてある）。光が流れる演出は使わない
+ *   管理画面 の速さに揃えてある）。光が流れる演出は使わない
  * - 「0.3秒以内に来たら出さない・出したら最低0.4秒」は `DelayedSkeleton` が
  *   面倒を見る。瞬き防止のため骨組みを描く側は必ずこの判定を通す
  *   （`loading && <Skeleton/>` を直接書かない）
@@ -140,7 +140,7 @@ export function DelayedSkeleton({
 
 /**
  * 表の骨組み。見出しは画面の表に残し、tbody の場所へ置く。
- * 行の高さは出来上がりと同じ（V8 56・v7 は 58 を渡す）。
+ * 行の高さは出来上がりと同じ（V8 56・互換経路は 58 を渡す）。
  * 列の骨の幅は出来上がりの列幅と同じ値を渡す。
  */
 export function TableSkeleton({

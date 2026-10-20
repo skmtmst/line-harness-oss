@@ -1,6 +1,7 @@
 'use client'
 
-import { ValueBarChart, LineChart, FunnelChart } from '@/components/shared/charts'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { FunnelChart } from '@/components/shared/charts'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { ArrowDownRight, CalendarClock, Flag, LogIn, Plus, RefreshCw, Send, Users } from 'lucide-react'
@@ -28,7 +29,7 @@ import Notice from '@/components/shared/notice'
 import AggregationStatus from '@/components/shared/aggregation-status'
 
 /*
- * ★V8 分析「ファネル」（Pencil `DkRDE`）。
+ * ★V8 分析「ファネル」（Pencil ）。
  * 数の帯 → 選ぶ段（ファネル・何日以内・比較する条件・作る・読み直す）→ 左に全体の流れ、
  * 右に選んだ段（到達・止まった・進行中 → 対象者を開く／この対象者へ配信を作成）と比較 → 注。
  * その下に、定義の操作（期間・再集計・編集・停止・保管）・結果の保存・停止中のファネル。
@@ -174,7 +175,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
 
       const code = error instanceof Error ? error.message : ''
       { if (!fieldFailure)
-      setRunError(explainStartError(code, code || '再集計できませんでした')) }
+      setRunError(explainStartError(code, describeApiFailure(error, '再集計'))) }
     } finally {
       runningScopes.current.delete(scope)
       if (generation === viewGeneration.current) setRunning(false)
@@ -293,7 +294,7 @@ export default function FunnelV8({ accountId, canManage, presetConversion, rende
       if (generation !== viewGeneration.current) return
       const fieldFailure = saveErrors.capture(error)
       { if (!fieldFailure)
-      setRunError(explainStartError(error instanceof Error ? error.message : '', '対象者を準備できませんでした')) }
+      setRunError(explainStartError(error instanceof Error ? error.message : '', describeApiFailure(error, '対象者の準備'))) }
     } finally { setAudienceBusy(false) }
   }
 

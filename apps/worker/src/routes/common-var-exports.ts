@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { csvRecordCount } from '../middleware/output-audit.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -22,7 +23,8 @@ import {
   updateCommonVarExportProgress,
   type CommonVarExportJobMeta,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -147,7 +149,7 @@ export async function runCommonVarExportJob(db: D1Database, jobId: string): Prom
       finishedAt: finishedAt(),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"common_var_export_failed"}));
+    logger.error("common_var_export_failed");
     await failCommonVarExport(db, jobId, '書き出しの途中で失敗しました', finishedAt());
   }
 }
@@ -172,7 +174,7 @@ commonVarExports.get('/api/common-vars/exports', requireRole('owner', 'admin', '
     const jobs = await listCommonVarExportJobs(c.env.DB, accountId, EXPORT_JOBS_LIST_LIMIT);
     return c.json({ success: true, data: jobs.map((job) => exportJobJson(job)) });
   } catch (error) {
-    console.error(JSON.stringify({"code":"common_var_exports_list_failed","route":"GET /api/common-vars/exports"}));
+    logger.error("common_var_exports_list_failed");
     return c.json({ success: false, error: '書き出しの履歴を読み込めませんでした' }, 500);
   }
 });
@@ -221,7 +223,7 @@ commonVarExports.post('/api/common-vars/exports', requireDeliveryAccess('commonV
     c.set('outputAudit', { count: (fresh ?? job).row_count, accountId: accountId, targetId: job.id, phase: 'requested' });
     return c.json({ success: true, data: exportJobJson(fresh ?? job) }, 201);
   } catch (error) {
-    console.error(JSON.stringify({"code":"common_var_export_create_failed","route":"POST /api/common-vars/exports"}));
+    logger.error("common_var_export_create_failed");
     return c.json({ success: false, error: '書き出しを作れませんでした' }, 500);
   }
 });
@@ -237,7 +239,7 @@ commonVarExports.get('/api/common-vars/exports/:id', requireRole('owner', 'admin
     }
     return c.json({ success: true, data: exportJobJson(job) });
   } catch (error) {
-    console.error(JSON.stringify({"code":"common_var_export_status_failed","route":"GET /api/common-vars/exports/:id"}));
+    logger.error("common_var_export_status_failed");
     return c.json({ success: false, error: '書き出しの状態を確認できませんでした' }, 500);
   }
 });
@@ -300,7 +302,7 @@ commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireDelivery
     const fresh = await getCommonVarExportJob(c.env.DB, next.id);
     return c.json({ success: true, data: exportJobJson(fresh ?? next) }, 201);
   } catch (error) {
-    console.error(JSON.stringify({"code":"common_var_export_regenerate_failed","route":"POST /api/common-vars/exports/:id/regenerate"}));
+    logger.error("common_var_export_regenerate_failed");
     return c.json({ success: false, error: 'もう一度書き出せませんでした' }, 500);
   }
 });

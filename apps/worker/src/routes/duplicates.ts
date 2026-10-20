@@ -1,5 +1,6 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
@@ -88,7 +89,7 @@ duplicates.get('/api/duplicates/stats', requireRole('owner', 'admin', 'staff'), 
     });
     return c.json({ success: true, data: serializeDuplicatesStats(stats) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_duplicates_failed","route":"GET /api/duplicates/stats"}));
+    logger.error("routes_duplicates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

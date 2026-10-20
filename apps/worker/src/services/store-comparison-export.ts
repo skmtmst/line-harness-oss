@@ -1,8 +1,10 @@
+import { withDisplayReadCache } from '@line-crm/db/src/display-read-cache.js';
 import {GapError} from './gap-common.js';
 import {comparisonKeys,comparisonUnits,comparisonPeriod,storeNumbers,type ComparisonKey} from './store-comparison.js';
 import {getVisibleLineAccountScope} from './account-access.js';
-import type {AuthenticatedStaff} from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 export async function comparisonData(db:D1Database,visible:Array<{id:string}>,tenant:string,filters:Record<string,string>,allRows=false){
+ return withDisplayReadCache(db, async db => {
  const q=(key:string)=>filters[key];
  let accounts=[...visible];const period=comparisonPeriod(q('from'),q('to')),compare=q('compare')??'previous',sort=(q('sort')??'bookings')as ComparisonKey,page=Number(q('page')??1),size=Number(q('pageSize')??20);
  if(!['average','previous'].includes(compare)||!comparisonKeys.includes(sort)||!Number.isSafeInteger(page)||page<1||![10,20,50].includes(size))throw new GapError('invalid_filter');
@@ -20,6 +22,7 @@ export async function comparisonData(db:D1Database,visible:Array<{id:string}>,te
  const rows=await Promise.all(values.map(async v=>{const baseline=compare==='average'?average:(await storeNumbers(db,v.a.id,previous)).values;return {accountId:v.a.id,name:(await db.prepare('SELECT name FROM line_accounts WHERE id=?').bind(v.a.id).first<{name:string}>())?.name??'',style:v.style,computedAt:v.computedAt,metrics:Object.fromEntries(comparisonKeys.map(k=>[k,{value:v.values[k],diff:v.values[k]!==null&&baseline[k]!==null?v.values[k]!-baseline[k]!:null,unit:comparisonUnits[k],available:v.values[k]!==null}]))};}));
  const direction=q('order')==='desc'?-1:1;rows.sort((a,b)=>{const x=a.metrics[sort].value,y=b.metrics[sort].value;return x===null?(y===null?a.accountId.localeCompare(b.accountId):1):y===null?-1:direction*(x-y)||a.accountId.localeCompare(b.accountId);});
  return {rows:allRows?rows:rows.slice((page-1)*size,page*size),average,total:rows.length,computedAt:values.every(v=>v.computedAt)?values.map(v=>v.computedAt!).sort()[0]??null:null};
+ });
 }
 
 export async function checkExportAccess(db:D1Database,job:Record<string,unknown>){

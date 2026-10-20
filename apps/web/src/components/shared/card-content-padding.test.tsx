@@ -8,7 +8,7 @@ import Card from './card'
  * Card の `contentPadding` は「左右別々の余白か」を渡された文字列の見た目で決めている
  * （card.tsx の hasSides：括弧を外して空白が残るかを見る）。左右別々のときだけ
  * `data-card-spacing-sides` が付き、共通の下限 16 を外して指定どおりの余白になる
- * （card.module.css の B-208）。
+ * （card.module.css の ）。
  *
  * ここが食い違うと画面が壊れる。`contentPadding="var(--x)"` の 1 語で、その変数の
  * 中身が `8px 10px` のように 2 値だと、hasSides は空白を見つけられず下限側の規則に

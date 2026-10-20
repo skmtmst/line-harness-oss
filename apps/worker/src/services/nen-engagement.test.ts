@@ -25,6 +25,11 @@ const campaign = {
 };
 
 describe('buildNenFlexMessage', () => {
+  it('通知の円表示も請求と同じ切り捨てにし、1円を上乗せしない', () => {
+    const messages = buildNenDeliveryMessages(campaign, { event: { order: { total: 1000.99 } } });
+    expect(JSON.stringify(messages)).toContain('合計：¥1,000');
+    expect(JSON.stringify(messages)).not.toContain('¥1,001');
+  });
   it('keeps only supported NEN editor actions', () => {
     expect(parseNenCampaignAfterActions([
       { kind: 'open_form', formId: 'form-review', formName: ' 口コミ ', buttonLabel: '感想を書く' },
@@ -174,7 +179,7 @@ describe('buildNenFlexMessage', () => {
       // 発動したら不具合が起きているということなので、黙って切らず記録する。
       expect(errorSpy).toHaveBeenCalledTimes(1);
       const logged = JSON.parse(errorSpy.mock.calls[0][0] as string);
-      expect(logged).toEqual({ code: 'nen_body_truncated_at_send' });
+      expect(logged).toEqual({ code: 'nen_body_truncated_at_send', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
     });
 
     it('差し込み後に上限内に収まる本文はそのまま切られず、記録も残さない', () => {
@@ -200,9 +205,8 @@ describe('buildNenFlexMessage', () => {
 
       expect(errorSpy).toHaveBeenCalledTimes(1);
       const logged = JSON.parse(errorSpy.mock.calls[0][0] as string);
-      expect(logged).toEqual({ code: 'nen_column_intro_truncated' });
+      expect(logged).toEqual({ code: 'nen_column_intro_truncated', timestamp: expect.any(String), level: 'error', requestId: null, invocationId: null, source: 'background' });
       expect(JSON.stringify(logged)).not.toContain(title);
-      expect(Object.keys(logged)).toEqual(['code']);
     });
 
     it('1500字に収まる入力はそのまま切られず、記録も残さない', () => {

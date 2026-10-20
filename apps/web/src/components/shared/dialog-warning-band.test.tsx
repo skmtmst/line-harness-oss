@@ -10,7 +10,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'dialog.module.css'), 'utf8')
 
 /**
- * 確認窓の説明文の琥珀帯（CFAyf 送受信を止める）。
+ * 確認窓の説明文の琥珀帯（ 送受信を止める）。
  * 渡さなければ帯なし（今までどおり）。
  */
 describe('ダイアログの琥珀帯', () => {
@@ -45,7 +45,7 @@ describe('ダイアログの琥珀帯', () => {
     expect(html).not.toContain('data-qa-dialog-callout')
   })
 
-  it('琥珀帯は v8 だけで琥珀色（v7 は変えない）', () => {
+  it("琥珀帯は v8 だけで琥珀色（既存の見た目は変えない）", () => {
     expect(css).toMatch(/:root \.calloutWarning\s*\{[^}]*background:\s*var\(--color-status-warn-soft\)/s)
     expect(css).toMatch(/:root \.calloutWarning \.description \{[^}]*color:\s*var\(--color-warning\)/s)
   })

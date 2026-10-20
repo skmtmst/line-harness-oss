@@ -1,7 +1,7 @@
 'use client'
 
 /*
- * ★V8 統括のタグの上のタブ（絵 DzdC3・y0sapC・Qgjmc。店のタグ src/v8/tags/list.tsx と同じ4つ）。
+ * ★V8 統括のタグの上のタブ（絵の。店のタグ src/v8/tags/list.tsx と同じ4つ）。
  *   タグ（統括のタグのひな形の一覧）・友だち情報欄・対応マーク・保存した検索。
  * 受け付ける URL は店と同じ `?tab=fields|marks|searches`（無い・違う値はタグ）。切り替えは履歴を積まない（replace）。
  *
@@ -94,7 +94,7 @@ export function OtherTabPanel({ tab, title, description, onSelect }: {
   )
 }
 
-/* ───── タグの数の帯（絵 DzdC3：未使用・付けている友だち・今月付けた回数・整理の候補）───── */
+/* ───── タグの数の帯（絵 ：未使用・付けている友だち・今月付けた回数・整理の候補）───── */
 
 /** 名前の重なりを見るための形（全角半角・大小・前後の空白をそろえる）。 */
 function nameKey(name: string): string {

@@ -83,7 +83,7 @@ it('the shared end orders sort before page size while preserving selection', () 
   expect(change).toHaveBeenCalledWith(50)
 })
 
-describe('B-178 共通の道具の段の操作', () => {
+describe('共通の道具の段の操作', () => {
   it('検索の変更と消す操作を元の受け口へ返す', async () => {
     const onChange = vi.fn()
     render(<ListToolbar search={{ placeholder: '名前を探す', label: '一覧を検索', value: '来店', onChange }} />)

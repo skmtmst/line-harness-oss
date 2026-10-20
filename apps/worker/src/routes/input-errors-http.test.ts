@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { DEFAULT_TENANT_ID, BUNDLE_PRESETS, scopeLevelsToKeys } from '@line-crm/shared';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { templates } from './templates.js';
 import { tags } from './tags.js';
 import { broadcasts } from './broadcasts.js';
@@ -46,7 +46,7 @@ const request = (path: string, body: unknown, method = 'POST') => app.request(pa
   method, headers: { 'Content-Type': 'application/json', ...(path.startsWith('/api/booking/') ? { 'Idempotency-Key': crypto.randomUUID() } : {}) }, body: JSON.stringify(body),
 }, { DB: fixture.db, IMAGES: {} } as Env['Bindings']);
 
-describe('B-154 欄ごとの入力エラーを実HTTPで返す', () => {
+describe('欄ごとの入力エラーを実HTTPで返す', () => {
   it.each([
     ['/api/templates', { accountId: 'shop' }, 'name'],
     ['/api/broadcasts', {}, 'title'],

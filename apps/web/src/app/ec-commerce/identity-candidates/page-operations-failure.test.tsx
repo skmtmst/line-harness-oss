@@ -128,11 +128,11 @@ describe('R600 運用集計の失敗でも会員候補を残す', () => {
     render(<EcIdentityCandidatesPage />)
     expect(await screen.findByText('山田 太郎')).toBeTruthy()
     // 判定入口（1行ごとの操作）は候補と一緒に見える。
-    // 行の右端は「…」1つ（B-253）。判定入口はその中。
+    // 行の右端は「…」1つ。判定入口はその中。
     fireEvent.click(screen.getAllByRole('button', { name: /の候補の操作/ })[0])
     expect(await screen.findByRole('menuitem', { name: '決める' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '候補を見る' })).toBeTruthy()
-    // 集計の数はサーバが数えた値を出す（w1W8h：絵の言葉）。
+    // 集計の数はサーバが数えた値を出す（：絵の言葉）。
     expect(screen.getByText('人が決める（5 件のうち）')).toBeTruthy()
     expect(screen.getByText('¥50,000')).toBeTruthy()
   })

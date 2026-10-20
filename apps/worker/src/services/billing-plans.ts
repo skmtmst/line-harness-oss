@@ -2,7 +2,7 @@ import type { TenantBilling } from '@line-crm/db';
 import type { FeatureEntitlementKey } from '@line-crm/shared';
 
 /**
- * 料金プランと、いま何ができるか（権利）の判定。★V6 36-2。
+ * 料金プランと、いま何ができるか（権利）の判定。★36-2。
  *
  * 金額は Stripe の価格が正本。ここに書いた金額は画面に出す「仮の表示」で、
  * Stripe から取れたときはそちらを出す（`docs/hq-banner-generation.md`、

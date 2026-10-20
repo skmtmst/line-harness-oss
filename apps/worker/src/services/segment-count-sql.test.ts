@@ -12,7 +12,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Database from 'better-sqlite3'
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
-import { buildSegmentQuery, type SegmentCondition } from './segment-query.js'
+import { buildSegmentQuery } from './segment-query.js';
+import { type SegmentCondition } from '@line-crm/shared';
 
 let db: D1Database
 let raw: Database.Database

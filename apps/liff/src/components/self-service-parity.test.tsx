@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import MileageRewards from './MileageRewards.js';
-import Affiliate from '../pages/Affiliate.js';
-import AffiliatePayments from './AffiliatePayments.js';
+import MileageRewards from './mileage-rewards.js';
+import Affiliate from '../pages/affiliate.js';
+import AffiliatePayments from './affiliate-payments.js';
 import { affiliateSelfApi, SelfApiError } from '../lib/affiliate-self-api.js';
 
 vi.mock('../lib/liff-auth.js', () => ({ getLiffId: () => 'test-liff', getIdToken: () => 'test-token' }));

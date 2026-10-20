@@ -1,4 +1,4 @@
-/* ★V8 統合ユーザーの詳細（Pencil Hn9eE）。値は globals.css の --tpl-fr-*。 */
+/* ★V8 統合ユーザーの詳細（Pencil ）。値は globals.css の --tpl-fr-*。 */
 .head { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-fr-head-gap); padding: var(--tpl-fr-head-pad); border-bottom: 1px solid var(--color-hairline); }
 .back { min-height: 0; padding: 0; color: var(--color-action); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-fr-back-lh); }
 .back:hover { text-decoration: underline; }

@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import ExportSizeChip from '@/components/hq/banners/export-size-chip'
 import GenerationPanel from '@/components/hq/banners/generation-panel'
 import ReferencePickerDialog from '@/components/hq/banners/reference-picker-dialog'
@@ -44,8 +45,8 @@ import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import { Archive,ArchiveRestore,Copy,Hourglass,LoaderCircle,Pencil,Send,Sparkles,Star,Upload,X } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense,useCallback,useEffect,useId,useMemo,useRef,useState } from 'react'
-import { useDistributionFolders } from '../hq-templates/distribution-accounts'
-import SavedDistributionDialog from '../hq-templates/saved-distribution-dialog'
+import { useDistributionFolders } from '@/v8/hq-templates/public/distribution-accounts/index'
+import { SavedDistributionDialog } from '@/v8/hq-templates/public/saved-distribution-dialog/index'
 import { BANNER_UPLOAD_ACCEPT,BannerConfirmDialogV8,CreateProjectDialogV8,uploadRefusal } from './dialogs'
 import { BannerImageDetailV8 } from './image-detail'
 import { bannerLimitKind } from './limit-notice'
@@ -57,14 +58,14 @@ import { bannerFailureMessage,tileLabel } from './words'
 
 
 /*
- * ★V8 バナー生成・プロジェクトの中（Pencil `iMnph`・生成中 `p03ImY`・上限 `zOpMG`）。
- * 窓：画像の詳細 `rI5uh`・一覧から外す `B24oNg`・アーカイブ `I0w2e`・名前と説明を変える。
+ * ★V8 バナー生成・プロジェクトの中（Pencil ・生成中 ・上限 ）。
+ * 窓：画像の詳細 ・一覧から外す ・アーカイブ ・名前と説明を変える。
  *
- * v7 の画面（app/hq/banners/project/page.tsx）と、読み書きの口・1枚ずつ作る繰り返し・
+ * 管理画面 の画面（app/hq/banners/project/page.tsx）と、読み書きの口・1枚ずつ作る繰り返し・
  * 戻ったら続きから動く・失敗時の扱い・`?id=` `?from=` は同じ。見た目だけを絵どおりに一から組んだ：
  * 頭（型 ListPage：題・説明／来た道の案内・操作5つ）→ 左に札と画像のます、右に生成パネル。
  *
- * 右の生成パネルは共通の GenerationPanel をそのまま使う。絵（iMnph）は「用途の選ぶ欄・切り抜きの位置・
+ * 右の生成パネルは共通の GenerationPanel をそのまま使う。絵は「用途の選ぶ欄・切り抜きの位置・
  * 色2つ・参照画像1枚」の古い形で、2026-10-06 のオーナーの決定（切り替えと切り抜きを置かない・出力サイズの小箱・
  * 色4つ・参照画像3枚・強調）と食い違うため、決定どおりの今のパネルを残した。参照画像を選ぶ窓（承認済み ★BG-C）も同じ。
  */
@@ -141,7 +142,7 @@ function ProjectInner() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   usePageTitle(project?.name ?? null)
-  // ★V8 パンくずは「ホーム › バナー生成 › プロジェクト名」（絵 `V8-B/iMnph`）。
+  // ★V8 パンくずは「ホーム › バナー生成 › プロジェクト名」。
   usePageCrumbs([{ label: 'バナー生成', href: '/hq/banners' }])
 
   const loadUsage = useCallback(async () => {
@@ -231,7 +232,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を作れませんでした。もう一度お試しください。') }
+      setGenerationError(describeApiFailure(caught, '生成状態の確認', { scope: 'hq' })) }
       void loadUsage()
     } finally {
       // 先に最新の状態を読み直してから止める（順を逆にすると、古い「生成中」を見た再開がもう一度状態確認を始める）。
@@ -254,7 +255,7 @@ function ProjectInner() {
   }, [status, generations, running, runLoop])
 
   const validation = validateGenerationInput(input, maxCount)
-  // 左に［配る］の帯が出ている間は、札を寸法だけの短い形にして左の帯へ重ねない（絵 tSgl6「1040 × 1040」）。
+  // 左に［配る］の帯が出ている間は、札を寸法だけの短い形にして左の帯へ重ねない（絵 「1040 × 1040」）。
   const sizePreset = presets.find((preset) => preset.key === input.presetKey)
   const sizeChipText = selectedImages.length > 0 && sizePreset ? presetSizeLabel(sizePreset) : exportSizeText(presets, input.presetKey)
   const refusal = usageRefusal(usage, input.count)
@@ -291,7 +292,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setGenerationError(caught instanceof Error && caught.message ? caught.message : '生成を始められませんでした。') }
+      setGenerationError(describeApiFailure(caught, '生成の開始', { scope: 'hq' })) }
       void loadUsage()
     } finally {
       startingRef.current = false
@@ -324,7 +325,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setActionError(caught instanceof Error && caught.message ? caught.message : `${label}できませんでした。もう一度お試しください。`) }
+      setActionError(describeApiFailure(caught, '保存', { scope: 'hq' })) }
       return null
     } finally {
       setBusyAction(null)
@@ -473,7 +474,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setActionError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした') }
+      setActionError(describeApiFailure(caught, '取り込み', { scope: 'hq' })) }
     } finally {
       setUploading(false)
     }
@@ -511,7 +512,7 @@ function ProjectInner() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setGenerationError(caught instanceof Error && caught.message ? caught.message : '画像を取り込めませんでした') }
+      setGenerationError(describeApiFailure(caught, '取り込み', { scope: 'hq' })) }
     } finally {
       setReferenceBusy(false)
     }
@@ -681,7 +682,7 @@ function ProjectInner() {
               <StickyBar
                 outlined
                 className={styles.footer}
-                /* 1つの帯（zOpMG）：左に選んだ画像の操作か残りの枚数、右に書き出しの大きさと生成の操作。上限の枚数は右の欄の知らせと title にあるので、帯では1行に収まる短い形。入らない幅では文の切れ目で2行に折る。 */
+                /* 1つの帯：左に選んだ画像の操作か残りの枚数、右に書き出しの大きさと生成の操作。上限の枚数は右の欄の知らせと title にあるので、帯では1行に収まる短い形。入らない幅では文の切れ目で2行に折る。 */
                 destructive={selectedImages.length > 0 ? <>
                   <span className={styles.selectionCount} aria-live="polite">{`${selectedImages.length} 枚を選んでいます`}</span>
                   <Button variant="text" disabled={distributionBusy} onClick={() => setSelectedImages([])}><X aria-hidden="true" className={styles.icon} />選ぶのをやめる</Button>
@@ -831,7 +832,7 @@ function ProjectInner() {
         selected={input.references}
         onClose={() => setPickerOpen(false)}
         onPick={applyReferences}
-        /* UcBQ5：押したその場で参照に入る。窓は×で閉じる。 */
+        /* ：押したその場で参照に入る。窓は×で閉じる。 */
         onLivePick={(references, picked) => {
           setReferencePool((prev) => [...picked, ...prev.filter((candidate) => !picked.some((image) => image.id === candidate.id))])
           setInput((cur) => ({ ...cur, references }))

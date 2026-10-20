@@ -274,7 +274,7 @@ export function isMileageFriendsV6Overview(value: unknown): value is MileageFrie
 /**
  * たまる決めごとの見せ方（設計 `N46cQ`）。
  *
- * 絞り込み・並び替え・CSV書き出しは各画面が V6 の口に合わせて持つ。
+ * 絞り込み・並び替え・CSV書き出しは各画面が 管理画面 の口に合わせて持つ。
  * ここに残すのは、画面をまたいで使う表示の言い換えだけ。
  */
 

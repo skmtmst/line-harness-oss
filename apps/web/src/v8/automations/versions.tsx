@@ -3,7 +3,7 @@
 import { CONSUMER_LABELS } from './version-consumer-labels'
 
 /*
- * ★V8 共通アクションの版と使われている場所（Pencil `ziSgL`）。
+ * ★V8 共通アクションの版と使われている場所（Pencil ）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・動きは今までの V8
  * （共通アクションの既存API）と同じ（版の履歴・公開・前の版から新版・
@@ -33,7 +33,7 @@ import { useAutomationManage } from './shell'
 import { describeVersionChanges } from './version-diff'
 import styles from './versions.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
 import { useManualHref } from '@/lib/use-manual-href'
@@ -158,9 +158,7 @@ function VersionsInner() {
         setError(permissionDeniedMessage('store'))
         setLoadFailure('forbidden')
       } else {
-        setError(caught instanceof Error && caught.message && !caught.message.startsWith('API error:')
-          ? caught.message
-          : '版と利用先を読み込めませんでした。通信の状態を確認してください。')
+        setError(describeApiFailure(caught, '読み込み'))
         setLoadFailure('error')
       }
     }
@@ -190,7 +188,7 @@ function VersionsInner() {
       await load()
       return true
     } catch (caught) {
-      const message = caught instanceof ApiError || caught instanceof Error ? caught.message : '操作を完了できませんでした'
+      const message = describeApiFailure(caught, '保存')
       setError(message)
       return message
     } finally {

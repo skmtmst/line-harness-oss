@@ -1,5 +1,5 @@
 /*
- * ★V8 マイル（Pencil `OC0gy`・`ZJIyl`・`E2Any`・`S35pO`・`CJlf4`・`oRbJi`・`IRPw8`）。
+ * ★V8 マイル（Pencil ・・・・・・）。
  * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  * 寸法は globals.css の --tpl-ml-*。
  */
@@ -25,24 +25,24 @@
 .colMiles { width: calc(var(--tpl-ml-col-miles) + var(--tpl-ml-num-pad-end)); }
 .colValidity { width: var(--tpl-ml-col-validity); min-width: 0; }
 .colRecent { width: calc(var(--tpl-ml-col-recent) + var(--tpl-ml-num-pad-end)); }
-/* 使い道（S35pO）：必要なマイル 88・渡るもの 150・今月 92・状態 96・操作 160。 */
+/* 使い道：必要なマイル 88・渡るもの 150・今月 92・状態 96・操作 160。 */
 .colNeed { width: calc(var(--tpl-ml-col-need) + var(--tpl-ml-num-pad-end)); }
 .colGives { width: var(--tpl-ml-col-gives); min-width: 0; }
 .colMonth { width: calc(var(--tpl-ml-col-month) + var(--tpl-ml-num-pad-end)); }
 .colStateWide { width: var(--tpl-ml-col-state-wide); }
-/* 友だちの残高（CJlf4）：ランク 72・残高 76・増減 72・消える予定 76・最終行動 140・操作 150。 */
+/* 友だちの残高：ランク 72・残高 76・増減 72・消える予定 76・最終行動 140・操作 150。 */
 .colRank { width: var(--tpl-ml-col-rank); min-width: 0; }
 .colBalance { width: calc(var(--tpl-ml-col-balance) + var(--tpl-ml-num-pad-end)); }
 .colChange { width: calc(var(--tpl-ml-col-change) + var(--tpl-ml-num-pad-end)); }
 .colLast { width: var(--tpl-ml-col-last); min-width: 0; }
 .colOpsBalance { width: calc(var(--tpl-ml-col-ops-balance) + var(--tpl-ml-col-gap)); }
-/* 履歴（oRbJi）：増減 56・なぜ 180・残高 62・だれが 90・操作 140。 */
+/* 履歴：増減 56・なぜ 180・残高 62・だれが 90・操作 140。 */
 .colDelta { width: calc(var(--tpl-ml-col-delta) + var(--tpl-ml-num-pad-end)); }
 .colWhy { width: var(--tpl-ml-col-why); min-width: 0; }
 .colAfter { width: calc(var(--tpl-ml-col-after) + var(--tpl-ml-num-pad-end)); }
 .colWho { width: var(--tpl-ml-col-who); min-width: 0; }
 .colOpsHistory { width: calc(var(--tpl-ml-col-ops-history) + var(--tpl-ml-col-gap) + var(--tpl-ml-ops-gap)); }
-/* 行動スコア（IRPw8）：いまの点数 80・帯 80・30日間の変化 100・最後の反応 130・操作 150。行 54。 */
+/* 行動スコア：いまの点数 80・帯 80・30日間の変化 100・最後の反応 130・操作 150。行 54。 */
 .colScore { width: var(--tpl-ml-col-score); }
 .colBand { width: var(--tpl-ml-col-band); }
 .colTrend { width: var(--tpl-ml-col-trend); }
@@ -54,13 +54,13 @@
 .colOps { width: calc(var(--tpl-ml-col-ops) + var(--tpl-ml-col-gap)); }
 
 .rowNameLine {
-  /* 名前の前のフォルダの丸と名前を1行に（絵 OC0gy の「名の行」：丸 8・間 8）。 */
+  /* 名前の前のフォルダの丸と名前を1行に（「名の行」：丸 8・間 8）。 */
   display: flex;
   min-width: 0;
   align-items: center;
 }
 .dotIndent {
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 OC0gy の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
   padding-inline-start: var(--tpl-folder-dot-indent);
 }
 .rowSub,
@@ -96,7 +96,7 @@
   display: flex;
   align-items: center;
 }
-/* 状態の文字と「？」：間 4・行の真ん中（S35pO）。 */
+/* 状態の文字と「？」：間 4・行の真ん中。 */
 .stateWithHelp {
   display: inline-flex;
   align-items: center;
@@ -279,7 +279,7 @@
   justify-content: space-between;
   gap: var(--tpl-toolbar-gap);
 }
-/* ページ送りの段と、その下の案内を縦に積む（絵 oRbJi）。 */
+/* ページ送りの段と、その下の案内を縦に積む。 */
 .pagerStack {
   display: flex;
   flex: 1;
@@ -310,7 +310,7 @@
   margin-bottom: var(--tpl-toolbar-gap);
 }
 
-/* 窓の中身（点数を手で直す Nv7An・点数の変化の明細 R8NNi）。縦に間 14 の1列。
+/* 窓の中身（点数を手で直す ・点数の変化の明細 ）。縦に間 14 の1列。
    共通の窓の見出しの下の余白（8＋24）を絵の 14 に寄せるため、上へ引き寄せる。 */
 .dlgBody {
   display: flex;
@@ -433,7 +433,7 @@
   color: var(--color-ink);
   font-size: var(--text-label);
 }
-/* 保存で落ちた欄（B-139）。枠を危険の色にする。 */
+/* 保存で落ちた欄。枠を危険の色にする。 */
 .dlgInput[aria-invalid='true'],
 .dlgTextarea[aria-invalid='true'] {
   border-color: var(--color-danger);
@@ -549,7 +549,7 @@
   gap: var(--tpl-rule-row-gap);
 }
 
-/* 手で増やす・減らす（M8zhjL）の中身。 */
+/* 手で増やす・減らすの中身。 */
 .dlgSpaced { margin-top: var(--tpl-rule-row-gap); }
 .deltaValueSmall {
   margin: 0;
@@ -577,7 +577,7 @@
 .dlgPersonName { margin: 0; }
 .dlgPersonSub { margin: 0; }
 
-/* 友だちのマイル詳細（R6kIG）。 */
+/* 友だちのマイル詳細。 */
 .backLink {
   display: inline-flex;
   align-items: center;
@@ -675,7 +675,7 @@
 
 /* 閲覧のみで隠した作るボタン（フォルダの列の上）の場所だけ空ける。 */
 
-/* 手で増やす・減らす（M8zhjL）の「友だちに知らせる」：スイッチと題・説明の2行。 */
+/* 手で増やす・減らすの「友だちに知らせる」：スイッチと題・説明の2行。 */
 .notifyRow {
   display: flex;
   align-items: center;
@@ -694,6 +694,6 @@
 .historyDelta[data-score-delta='positive'] { color: var(--color-accent-deep); }
 .historyDelta[data-score-delta='negative'] { color: var(--color-warning); }
 
-/* 使い道（S35pO）：操作は行末の「…」だけ。状態の列で右の余りを持つ。 */
+/* 使い道：操作は行末の「…」だけ。状態の列で右の余りを持つ。 */
 .colRewardState { width: var(--tpl-ml-col-state-reward); }
 .colRewardOps { width: var(--tpl-icon-btn-row-hit); }

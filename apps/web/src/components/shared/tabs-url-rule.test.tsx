@@ -8,7 +8,7 @@ const { replace } = vi.hoisted(() => ({ replace: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }))
 vi.mock('next/link', () => ({ default: ({ replace: replaceFlag, children, ...p }: AnchorHTMLAttributes<HTMLAnchorElement> & { replace?: boolean }) => <a {...p} data-replace={String(replaceFlag)}>{children}</a> }))
 afterEach(() => { cleanup(); replace.mockClear(); window.history.replaceState(null, '', '/') })
-it('B-158 決まり3：クリック・再読込・戻るでタブとURLを保ち、履歴を積む変更を検出する', () => {
+it('決まり3：クリック・再読込・戻るでタブとURLを保ち、履歴を積む変更を検出する', () => {
   window.history.replaceState(null, '', '/ops/members?tab=info&q=abc#table')
   function Example() { const [tab, select] = useUrlTab(['members', 'info'] as const, 'members'); return <Tabs items={[{ label: 'メンバー', current: tab === 'members', onClick: () => select('members') }, { label: '情報', current: tab === 'info', onClick: () => select('info') }]} /> }
   const historyLength = window.history.length

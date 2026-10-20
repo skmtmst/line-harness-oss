@@ -15,6 +15,7 @@ import { AlertTriangle, Ban, Check, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
+import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import {
@@ -24,7 +25,7 @@ import {
   type DeliveryOrderStatus,
   type DeliveryUrgency,
 } from '@/lib/restaurant-delivery-api'
-import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
+import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import {
   CANCEL_REASON_OPTIONS,
   DASH,
@@ -61,7 +62,6 @@ const URGENCY_NOTICE_TONES: Record<DeliveryUrgency, NoticeTone | null> = {
  */
 const DETAIL_WIDTH = 560
 const DETAIL_TOP = 100
-const DETAIL_HEAD_H = 77
 /*
  * 中身の余白。共通の中身（RsDialog の .dialogBody）は上に -14 引いてから 14 の間で並べるので、
  * 1つめの段は「題の段のあと＋この上の余白－14」に来る。
@@ -75,8 +75,8 @@ const DETAIL_FOOT_GAP = 14
 /*
  * キャンセルの確認（dgeTy）。上からの位置は絵のとおり 330。
  * 幅は絵が 460 だが、窓の幅は正本で 480／560／720／960 の4段に決まっている
- * （docs/v8-design-rules.md §8・B-177 の `DIALOG_WIDTHS`）。460 は4段に無いので
- * 共通部品の `dialogWidth()` が 480 へ寄せる。暗に寄せられるのに任せず、
+ * （docs/v8-design-rules.md §8・ の `DIALOG_WIDTHS`）。460 は4段に無いので
+ * 共通部品の `dialogWidth` が 480 へ寄せる。暗に寄せられるのに任せず、
  * 実際に出る 480 をここに書く。中身は真ん中に並ぶので絵より左右 10 内へ入る
  * （この差は「絵と正本の食い違いを正本で解いた分」として記録する）。
  */
@@ -89,8 +89,6 @@ const CANCEL_TOP = 330
  */
 const CANCEL_BODY_GAP = 12
 const CANCEL_FOOT_GAP = 10
-/** 絵（dgeTy `i3pvl`→選ぶ欄）の題と中身の間は 6。共通の欄の `contentGap` で渡す。 */
-const CANCEL_FIELD_GAP = 6
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -133,6 +131,7 @@ export function OrderDetailDialog({
   onCancelOrder,
 }: OrderDetailDialogProps) {
   const order = detail?.order ?? null
+  const preparing = order?.service === 'ubereats'
   const items = detail?.items ?? []
   const serviceLabel = order
     ? order.serviceLabel || DELIVERY_SERVICE_LABELS[order.service]
@@ -158,26 +157,25 @@ export function OrderDetailDialog({
    * 調理中は「閉じる・注文をキャンセル・準備完了」。
    * それ以外（受け渡し済み・キャンセル・拒否）は閉じるだけにする。
    *
-   * 足のボタンは絵（hjdqV）の余白14・印15・間6に合わせる。板の頭（kDQHr）と同じ値なので
-   * 共通のボタンの `size="delivery-head"` を渡す（画面CSSから共通部品を上書きしない）。
+   * 足のボタンは共通のボタンの既定の大きさ・印16のまま使う。
    */
   const actions = (() => {
     if (!order || !canManage) {
-      return <Button size="delivery-head" onClick={onClose}>閉じる</Button>
+      return <Button onClick={onClose}>閉じる</Button>
     }
     if (order.status === 'new') {
       return (
         <>
-          <Button size="delivery-head" variant="danger-outline" disabled={busy} onClick={onCancelOrder}>
-            <Ban size={15} aria-hidden="true" />キャンセル
+          <Button variant={preparing ? 'secondary' : 'danger-outline'} disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onCancelOrder}>
+            <Ban size={16} aria-hidden="true" />注文をキャンセルする
           </Button>
           <span className={styles.spacer} />
-          <Button size="delivery-head" disabled={busy} onClick={onReject}>
-            <X size={15} aria-hidden="true" />拒否する
+          <Button disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onReject}>
+            <X size={16} aria-hidden="true" />断る
           </Button>
           {/* 絵（hjdqV）の足は幅114。結果の文字の分は控えないよう共通の任意引数で頼む。 */}
-          <Button size="delivery-head" variant="primary" busy={busy} busyLabel="受付中…" widthReserve="idle" onClick={onAccept}>
-            <Check size={15} aria-hidden="true" />受け付ける
+          <Button variant={preparing ? 'secondary' : 'primary'} busy={busy} busyLabel="受付中…" widthReserve="idle" disabled={preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onAccept}>
+            <Check size={16} aria-hidden="true" />受け付ける
           </Button>
         </>
       )
@@ -185,18 +183,18 @@ export function OrderDetailDialog({
     if (order.status === 'cooking') {
       return (
         <>
-          <Button size="delivery-head" variant="danger-outline" disabled={busy} onClick={onCancelOrder}>
-            <Ban size={15} aria-hidden="true" />注文をキャンセル
+          <Button variant={preparing ? 'secondary' : 'danger-outline'} disabled={busy || preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onCancelOrder}>
+            <Ban size={16} aria-hidden="true" />注文をキャンセルする
           </Button>
           <span className={styles.spacer} />
-          <Button size="delivery-head" onClick={onClose} disabled={busy}>閉じる</Button>
-          <Button size="delivery-head" variant="primary" busy={busy} busyLabel="変更中…" widthReserve="idle" onClick={onReady}>
-            準備完了
+          <Button onClick={onClose} disabled={busy}>閉じる</Button>
+          <Button variant={preparing ? 'secondary' : 'primary'} busy={busy} busyLabel="変更中…" widthReserve="idle" disabled={preparing} title={preparing ? PREPARING_WORD : undefined} onClick={onReady}>
+            準備完了にする
           </Button>
         </>
       )
     }
-    return <Button size="delivery-head" onClick={onClose}>閉じる</Button>
+    return <Button onClick={onClose}>閉じる</Button>
   })()
 
   return (
@@ -207,7 +205,6 @@ export function OrderDetailDialog({
       titleNote={summaryLine}
       width={DETAIL_WIDTH}
       top={DETAIL_TOP}
-      headerHeight={DETAIL_HEAD_H}
       contentPadding={DETAIL_CONTENT_PAD}
       footerPlain
       footerGap={DETAIL_FOOT_GAP}
@@ -229,6 +226,7 @@ export function OrderDetailDialog({
       ) : null}
       {order ? (
         <>
+          {preparing ? <Notice tone="info" density="compact">{`Uber Eats の注文の連携は${PREPARING_WORD}です。受け付け・拒否・キャンセル・準備完了の操作はまだ利用できません。注文内容と履歴は確認できます。`}</Notice> : null}
           <div className={styles.detailHead}>
             <span className={styles.orderNumber}>{formatOrderNumber(order.orderNumber)}</span>
             {/*
@@ -252,13 +250,8 @@ export function OrderDetailDialog({
             </Notice>
           ) : null}
 
-          {/* 絵の「注文内容」「受け取り情報」の題は 12/600（共通の窓の選ぶ欄の題と同じ形）。
-            * 絵には「任意」の札がない（読むだけの見出しで入力欄ではない）。共通の欄の任意の引数
-            * optional={false} で消す。画面CSSで隠さない。
-            *
-            * 題と中身の間は絵のとおり（題の行 20 を引いて「注文内容」8・「受け取り情報」5）。
-            * 共通の 14 とは違うので共通の欄の任意の引数 contentGap で渡す。画面CSSで足さない。 */}
-          <DialogField label="注文内容" kind="select" optional={false} contentGap={8}>
+          {/* 「注文内容」「受け取り情報」は読むだけの見出し。入力欄ではないので「任意」の札は出さない（optional={false}）。 */}
+          <DialogField label="注文内容" kind="select" optional={false}>
             <ul className={styles.itemList}>
               {items.length === 0 ? (
                 <li className={styles.itemRow}>
@@ -283,7 +276,7 @@ export function OrderDetailDialog({
             </div>
           </DialogField>
 
-          <DialogField label="受け取り情報" kind="select" optional={false} contentGap={5}>
+          <DialogField label="受け取り情報" kind="select" optional={false}>
             <dl className={styles.detailFacts}>
               <Fact label="受け取り方法">{order.pickupMethod || DASH}</Fact>
               {/* 絵（hjdqV）は同じ日の受け取りなので時刻だけを出す。 */}
@@ -357,7 +350,7 @@ export function CancelOrderDialog({
       /* 絵の頭は白地＋注意三角。帯で囲まず、題の左に丸い印を置く。 */
       titleIcon={(
         <span className={styles.warnMark}>
-          <AlertTriangle size={18} aria-hidden="true" />
+          <AlertTriangle size={20} aria-hidden="true" />
         </span>
       )}
       titleRow="mark"
@@ -370,9 +363,9 @@ export function CancelOrderDialog({
       onCancel={onClose}
       actions={(
         <>
-          <Button onClick={onClose} disabled={busy}>← 戻る</Button>
+          <Button onClick={onClose} disabled={busy}>閉じる</Button>
           <Button variant="danger" busy={busy} busyLabel="送信中…" onClick={onSubmit}>
-            <Ban size={15} aria-hidden="true" />キャンセルする
+            <Ban size={16} aria-hidden="true" />キャンセルする
           </Button>
         </>
       )}
@@ -382,7 +375,7 @@ export function CancelOrderDialog({
       </p>
       {/* 絵（dgeTy）の題に「任意」の札はない。理由は必ず選ばれている（既定あり）ので共通の
         * 欄の任意の引数で消す。 */}
-      <DialogField label="キャンセルの理由" kind="select" optional={false} contentGap={CANCEL_FIELD_GAP}>
+      <DialogField label="キャンセルの理由" kind="select" optional={false}>
         <Select
           aria-label="キャンセルの理由"
           size="full"

@@ -78,7 +78,7 @@ vi.mock('../services/event-bus.js', () => ({
   logOutgoingMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../services/friend-add-routing.js', () => ({
+vi.mock('../features/friends/friend-add-routing.js', () => ({
   applyFriendAddRouting: vi.fn().mockResolvedValue({ routed: false, suppressed: false, enrollments: [] }),
 }));
 
@@ -127,7 +127,7 @@ import {
 } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
 import { handleCarouselTap } from '../services/carousel-tap.js';
-import { applyFriendAddRouting } from '../services/friend-add-routing.js';
+import { applyFriendAddRouting } from '../features/friends/friend-add-routing.js';
 import { webhook } from './webhook.js';
 
 function setupApp() {
@@ -163,7 +163,7 @@ beforeEach(() => {
   vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{id:'account-main',channel_secret:'env-default-secret',channel_access_token:'account-token',is_active:1,tenant_status:'active'} as never]);
 });
 
-describe('POST /webhook — V6 friend-add ledger', () => {
+describe('POST /webhook — friend-add ledger', () => {
   test('再追加と今回リンクをWebhookイベント単位で記録する', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
@@ -210,7 +210,7 @@ describe('POST /webhook — V6 friend-add ledger', () => {
   });
 });
 
-describe('POST /webhook — V6分析イベント', () => {
+describe('POST /webhook — 分析イベント', () => {
   test('友だち解除をWebhookの発生時刻とIDで記録する', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{

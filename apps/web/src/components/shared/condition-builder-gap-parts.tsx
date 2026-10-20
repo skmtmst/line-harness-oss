@@ -8,7 +8,7 @@ import Select from './select';
 import { type SegmentRule } from '@/lib/segment-condition';
 import Button from '@/components/shared/button';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
-import { memberRanksApi } from '@/lib/api-gap3';
+import { memberRanksApi } from '@/lib/api/helpers/gap3';
 
 
 /**
@@ -30,7 +30,7 @@ interface Option {
 
 
 /**
- * 条件の足し口（1つ選ぶ）。共通の選ぶ窓（B-163/B-165）を使う。
+ * 条件の足し口（1つ選ぶ）。共通の選ぶ窓（/）を使う。
  *
  * 確定したときだけ追加し、窓を閉じる。取消では条件を変えない。
  */

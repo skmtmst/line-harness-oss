@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { inputError } from '../lib/input-errors.js';
 
 export function bad(c: Context<Env>, code: string, status = 422, fieldKeys: readonly string[] = []): Response {

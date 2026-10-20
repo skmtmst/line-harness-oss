@@ -8,7 +8,7 @@ const LIST = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 const CSS = readFileSync(join(HERE, '../../v8/templates/list.module.css'), 'utf8')
 
 /*
- * parity 1003-2106（L7zA7C・hEDTK・v19Ivv・susGP）:
+ * parity 1003-2106（・・・）:
  * 更新列の中身（`10月2日（木）`で約95px）が 84px の列からはみ出し、
  * 隣の操作列へこぼれていた。列幅を戻したら落とす。
  */

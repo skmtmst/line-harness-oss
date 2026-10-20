@@ -3,7 +3,7 @@
  * 印なしの帯（presentation の印がない data-kpi-strip）も v8 では横一列：
  * 4マスなら4列・隙間0。呼び出し側の列数指定は生きる（列の型は決めない）。
  * 先頭に置く：印つきの帯（下の強い指定）が勝ち、狭幅の
- * 畳み方（下の決まり）も効く。v7 には効かない。
+ * 畳み方（下の決まり）も効く。管理画面 には効かない。
  */
 :root [data-kpi-strip] {
   display: grid;
@@ -93,18 +93,18 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail] > spa
   display: block; flex: none; width: 100%; white-space: normal;
   overflow: visible; text-overflow: clip; overflow-wrap: break-word; word-break: auto-phrase; /* 語の途中（「離／れています」）で折らない。文節に入らない幅だけ字で折る */
 }
-/* detailLayout='single'：1行＋省略（全文は title）。最後の1字だけ次の行に落ちる補足に使う（aINnz・t2SMXX）。 */
+/* detailLayout='single'：1行＋省略（全文は title）。最後の1字だけ次の行に落ちる補足に使う（・）。 */
 html:root [data-kpi-strip][data-kpi-presentation='band'] [data-kpi-detail-layout='single'] [data-kpi-detail] > span:first-child {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* B-178：一覧は116の帯。マスのcompact指定を残しても段の寸法は共通。 */
+/* ：一覧は116の帯。マスのcompact指定を残しても段の寸法は共通。 */
 :root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']) > [data-design-version] {
   min-height: var(--tpl-list-band-h); box-sizing: border-box;
   padding: var(--tpl-list-band-pad); gap: var(--tpl-list-gap);
 }
 
-/* B-220：補足はマスでなく帯全体で有無を決める。1つでもあれば全マスをそろえる。 */
+/* ：補足はマスでなく帯全体で有無を決める。1つでもあれば全マスをそろえる。 */
 html:root [data-kpi-strip][data-kpi-presentation='band']:not(:has([data-kpi-detail-present])) [data-kpi-detail] { display: none; }
 html:root [data-kpi-strip][data-kpi-presentation='band']:has([data-kpi-detail-present]) [data-kpi-detail] { display: flex; min-height: var(--tpl-band-detail-h); }
 html:root [data-list-skeleton] [data-kpi-strip][data-kpi-presentation='band']:not([data-kpi-density='compact']):not(:has([data-kpi-detail-present])) > [data-design-version] { min-height: var(--tpl-list-band-no-detail-h); }

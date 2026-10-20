@@ -18,7 +18,7 @@ vi.mock('@/lib/admin-session', () => ({ adminSessionHeaders: () => ({}), capture
 afterEach(() => { vi.unstubAllGlobals(); document.body.style.overflow = '' })
 
 /*
- * ★V7: 外枠は全画面で同じ形。ナレッジ・お問い合わせだけの帯
+ * ★管理画面: 外枠は全画面で同じ形。ナレッジ・お問い合わせだけの帯
  * （運営 TopBar・data-knowledge-shell）は出さない。画面名は各画面の
  * OpsPageHeader が出す。開閉メニューの振る舞いは変えない。
  */

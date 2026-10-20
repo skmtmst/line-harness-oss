@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B 会員一覧 AOWoJ の数の帯：F-19 の数（ペット登録あり・今月の購入）を
+ * ★V8-B 会員一覧  の数の帯：F-19 の数（ペット登録あり・今月の購入）を
  * API の実データで出す。絵の例示の数は書かない。単位「人」は数と分ける。
  */
 import React from 'react'

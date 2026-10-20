@@ -1,3 +1,5 @@
+> 文書：予約スタッフの画面の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 予約スタッフの画面の動き（BEHAVIOR.md）
 
 対象：
@@ -5,8 +7,8 @@
 - `shifts.tsx` … 勤務とシフト（管理者 `d5fmnM`）・自分の勤務（本人 `E3YDK`）・ひも付けなし（`wvGke`）。入口 `app/booking/staff/shifts/page.tsx`
 - `phone.tsx` … 右の列の「お客さまの予約画面」の見本（LIFF ②担当・③日時）
 
-今までの V8（`app/booking/staff/new/staff-new-v8.tsx`・`app/booking/staff/shifts/staff-detail-v8.tsx`・`app/booking/menus/liff-phone-v8.tsx`）から動きを写し、見た目だけを絵どおりに組み直した。
-v7 の画面（`theme !== 'v8'`）は今までどおり。
+現役の入口と試験の場所は [README](README.md) から追う。
+管理画面はV8固定で、見た目による分岐はない。
 
 ## 受け付ける URL と指定
 - `/booking/staff/new`：指定なし。

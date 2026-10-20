@@ -191,12 +191,12 @@ describe('N-374: Retry-After を再送スケジュールでも尊重する', () 
     });
     expect(respected!.getTime() - NOW.getTime()).toBe(20 * 60_000);
 
-    // 上限のない指定は30分へクランプする。
+    // 30分を超える指定は短縮せず、自動再送を止める。
     const clamped = outgoingDeliveryNextRetryAt({
       attemptsDone: 1, maxAttempts: 8, queuedAt, now: NOW,
       responseStatus: 429, retryAfterMs: 6 * 60 * 60_000, jitterKey: 'd:1',
     });
-    expect(clamped!.getTime() - NOW.getTime()).toBe(30 * 60_000);
+    expect(clamped).toBeNull();
   });
 
   it('自動再送は 425・429・5xx・接続失敗だけ。408/409/その他4xxは恒久失敗', () => {
@@ -380,4 +380,41 @@ describe('N-375: 連続失敗で自動停止して運用者へ通知する', () 
     expect(webhook.is_active).toBe(1);
     expect(webhook.auto_stopped_at).toBeNull();
   });
+});
+
+it('stops an over-budget provider wait without claiming that the 24-hour window expired', async () => {
+  const testDb = createTestD1(); seed(testDb);
+  try {
+    const queued = (await enqueueOutgoingWebhookDelivery(testDb.db, {
+      lineAccountId: ACCOUNT, webhookId: 'wh-1', eventType: 'friend_add', body: '{}',
+      idempotencyKey: 'retry-after-over-budget', maxAttempts: 4, now: NOW,
+    }))!;
+    const lease = (await claimOutgoingDelivery(testDb.db, queued, NOW))!;
+    expect(await finishOutgoingDelivery(testDb.db, queued, lease, {
+      kind: 'retry', responseStatus: 429, retryAfterMs: 3600000,
+      errorCode: 'response_429', errorMessage: 'busy',
+    }, NOW)).toBe('failed');
+    expect(deliveryRow(testDb, queued.id)).toMatchObject({
+      status: 'failed', attempts: 1, next_retry_at: '2026-11-02T04:00:00.000Z', error_code: 'retry_after_exceeds_budget',
+      error_message_safe: expect.stringContaining('待ち時間'),
+    });
+    const held = deliveryRow(testDb, queued.id);
+    expect(await claimOutgoingDelivery(testDb.db, held, new Date('2026-11-02T03:59:59Z'))).toBeNull();
+    expect(deliveryRow(testDb, queued.id)).toMatchObject({
+      status: 'failed', attempts: 1, idempotency_key: 'retry-after-over-budget',
+    });
+    expect(await claimOutgoingDelivery(testDb.db, held, new Date('2026-11-02T04:00:00Z'))).toBeTruthy();
+  } finally { testDb.raw.close(); }
+});
+
+it('starts cron Retry-After at the response instead of the sweep snapshot',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date(NOW.getTime()+10*60_000));
+ const testDb=createTestD1();seed(testDb);
+ try {
+  const queued=(await enqueueOutgoingWebhookDelivery(testDb.db,{lineAccountId:ACCOUNT,webhookId:'wh-1',eventType:'friend_add',body:'{}',idempotencyKey:'response-clock',maxAttempts:4,now:NOW}))!;
+  const fetchImpl=vi.fn<typeof fetch>(async()=>{vi.advanceTimersByTime(100);return new Response('',{status:429,headers:{'Retry-After':'120'}});});
+  await sweepOutgoingWebhookDeliveries(testDb.db,{fetchImpl,lookupHost:publicOnlyLookup});
+  expect(fetchImpl).toHaveBeenCalledOnce();
+  expect(deliveryRow(testDb,queued.id)).toMatchObject({status:'retry_wait',next_retry_at:'2026-11-02T03:12:00.100Z'});
+ }finally{testDb.raw.close();vi.useRealTimers();}
 });

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 たまる決めごとを作る（src/v8/mileage/earning-rule-new/create.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
- * 足りない入力は保存しない・保存は 作る→下書き の順・下書きが 409 で返ると競合の帯（BnrQp）・保存して動かすで一覧へ戻る。
+ * 足りない入力は保存しない・保存は 作る→下書き の順・下書きが 409 で返ると競合の帯・保存して動かすで一覧へ戻る。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -42,7 +42,7 @@ import EarningRuleCreateV8 from './create'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
-const calls: Array<{ method: string; path: string; body: Record<string, unknown> | null }> = []
+const calls: Array<{ method: string; path: string; body: Record<string, unknown> | null; key: string | null }> = []
 let draftStatus = 200
 
 let root: Root
@@ -82,7 +82,7 @@ beforeEach(() => {
     const url = new URL(String(input))
     const method = init?.method ?? 'GET'
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) as Record<string, unknown> : null
-    calls.push({ method, path: url.pathname, body })
+    calls.push({ method, path: url.pathname, body, key: new Headers(init?.headers).get('Idempotency-Key') })
     if (url.pathname === '/api/tags') return json({ success: true, data: [] })
     if (method === 'POST' && url.pathname === '/api/mileage/rules') return json({ success: true, data: { id: 'rule-new' } })
     if (method === 'PATCH' && url.pathname === '/api/mileage/earning-rules/rule-new/draft') {
@@ -167,4 +167,34 @@ it.each([null, 'staff', 'viewer'])('役割%sでは作成・試算を出さずAPI
   expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
   expect(host.textContent).toContain('閲覧のみ')
   expect(calls.filter(call => call.method !== 'GET')).toEqual([])
+})
+
+it('続けて作ると入力と要求キーを作り直し、名前に焦点を戻す', async () => {
+  await mount()
+  type('名前', '同じ名前で二つ作る')
+  type('マイル', '10')
+  await clickButton('保存して続けて作る')
+  expect(push).not.toHaveBeenCalled()
+  expect((screen.getByLabelText('名前') as HTMLInputElement).value).toBe('')
+  expect((screen.getByLabelText('マイル') as HTMLInputElement).value).toBe('')
+  expect(document.activeElement).toBe(screen.getByLabelText('名前'))
+  type('名前', '同じ名前で二つ作る')
+  type('マイル', '10')
+  await clickButton('保存して続けて作る')
+  const creates = calls.filter(call => call.method === 'POST' && call.path === '/api/mileage/rules')
+  expect(creates).toHaveLength(2)
+  expect(creates[0].key).toBeTruthy()
+  expect(creates[1].key).toBeTruthy()
+  expect(creates[0].key).not.toBe(creates[1].key)
+})
+
+it('追加保存が失敗したときは続けて作るでも入力を消さない', async () => {
+  draftStatus = 409
+  await mount()
+  type('名前', '残す名前')
+  type('マイル', '10')
+  await clickButton('保存して続けて作る')
+  expect((screen.getByLabelText('名前') as HTMLInputElement).value).toBe('残す名前')
+  expect((screen.getByLabelText('マイル') as HTMLInputElement).value).toBe('10')
+  expect(push).not.toHaveBeenCalled()
 })

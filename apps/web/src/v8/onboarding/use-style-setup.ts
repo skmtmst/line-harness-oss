@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { styleApi } from '@/lib/api-styles'
+import { styleApi } from '@/lib/api/helpers/styles'
 import type { StarterItemState, StyleState, StyleWarning } from './model'
 import { canManageRole } from '@/lib/staff-role'
 
@@ -11,27 +11,24 @@ export type StyleSetupData = {
   items: StarterItemState[]
 }
 
-/**
- * ダッシュボードの「はじめにやること」と警告の帯の元（スタイル・答え・警告・入った物の状態）。
- * オーナー・管理者だけ読む。1つでも読めないときは null（はじめにやることは今までのカードのまま、
- * 警告の帯も出さない。分からない物を「未設定」と言って急かさない）。
- */
+/** 取得不能と未設定を分ける。アカウント切替直後も前の店の状態を返さない。 */
 export function useStyleSetup(accountId: string | null, role: string | null) {
-  const [data, setData] = useState<StyleSetupData | null>(null)
+  const [snapshot, setSnapshot] = useState<{ accountId: string; data: StyleSetupData | null; error: unknown; status: 'ready' | 'error' } | null>(null)
   const [tick, setTick] = useState(0)
   const enabled = canManageRole(role)
   useEffect(() => {
-    setData(null)
+    setSnapshot(null)
     if (!accountId || !enabled) return
     let cancelled = false
     void Promise.all([styleApi.get(accountId), styleApi.warnings(accountId), styleApi.starterItems(accountId)])
       .then(([state, warnings, items]) => {
-        if (cancelled || !state.success || !warnings.success || !items.success) return
-        setData({ state: state.data, warnings: warnings.data.items ?? [], items: items.data.items ?? [] })
+        if (!state.success || !warnings.success || !items.success) throw new Error('初期設定の状態を読み込めませんでした')
+        if (!cancelled) setSnapshot({ accountId, data: { state: state.data, warnings: warnings.data.items ?? [], items: items.data.items ?? [] }, error: null, status: 'ready' })
       })
-      .catch(() => { /* 口がまだ無い・読めない：出さない */ })
+      .catch((error: unknown) => { if (!cancelled) setSnapshot({ accountId, data: null, error, status: 'error' }) })
     return () => { cancelled = true }
   }, [accountId, enabled, tick])
   const reload = useCallback(() => setTick((value) => value + 1), [])
-  return { data, reload }
+  const current = enabled && snapshot?.accountId === accountId ? snapshot : null
+  return { data: current?.data ?? null, error: current?.error ?? null, status: !enabled || !accountId ? 'idle' as const : current?.status ?? 'loading' as const, reload }
 }

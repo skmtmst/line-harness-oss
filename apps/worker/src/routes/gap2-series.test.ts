@@ -2,7 +2,7 @@ import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {bookingSeries} from './booking-series.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
-import {recurrenceDates} from '../services/booking-series.js';
+import {recurrenceDates} from '../features/booking/booking-series.js';
 import {deleteCustomerData} from '../services/customer-data-deletion.js';
 import {purgeTablesChildFirst,tenantScopeCondition} from '@line-crm/db';
 let d:SqliteD1;const url='/api/booking/admin/series?account_id=a';

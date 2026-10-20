@@ -2,9 +2,20 @@ import {beforeEach,afterEach,expect,test,vi} from 'vitest';
 import {bookingCancellation} from './booking-cancellation.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
-import {cancellationQuote,cancellationPolicy} from '../services/booking-cancellation.js';
+import {cancellationQuote,cancellationPolicy} from '../features/booking/booking-cancellation.js';
 let d:SqliteD1;
 const policy={enabled:true,tiers:[{beforeHours:24,percent:0},{beforeHours:0,percent:50}],noShowPercent:100,expectedVersion:0};
+
+test('端数の取消料は見積もりと実際に作る請求行が一致する', async () => {
+ connect();await save();seedGapBooking(d);
+ d.raw.exec("UPDATE bookings SET price_at_booking=1001 WHERE id='bk'");cancel();
+ const snapshot=JSON.parse((d.raw.prepare('SELECT policy_snapshot_json FROM bookings WHERE id=?').get('bk') as {policy_snapshot_json:string}).policy_snapshot_json);
+ const quote=cancellationQuote(snapshot,'2026-11-20T05:00:00Z',1001,new Date('2026-11-20T04:00:00Z'));
+ expect(quote.feeNow).toBe(500);
+ expect(quote.text).toContain('50%（¥500）');
+ expect(d.raw.prepare('SELECT amount FROM booking_charges WHERE booking_id=?').get('bk')).toEqual({amount:quote.feeNow});
+ expect(fetch).not.toHaveBeenCalled();
+});
 const app=()=>gapApp(d,[bookingCancellation]);
 const path='/api/booking/admin/cancellation-policy?account_id=a';
 async function save(){return gapCall(app(),path,'PUT',policy);}
@@ -107,7 +118,7 @@ test('B1-13 B7-24 GAP3-INTEGRATION-02: 本人の予約履歴に取消前の額�
  }finally{vi.useRealTimers();}
 });
 test('B7-14 B7-15: カレンダーが切れた知らせは1回、つなぎ直すと解決にする',async()=>{
- const {evaluateBookingSyncNotices}=await import('../services/booking-sync-rules.js');
+ const {evaluateBookingSyncNotices}=await import('../features/booking/booking-sync-rules.js');
  d.raw.exec("INSERT INTO booking_calendar_switches(line_account_id,scope_id,read_enabled,updated_by,updated_at) VALUES('a','',1,'o',datetime('now')),('a','bs',1,'o',datetime('now'));INSERT INTO booking_calendar_read_health(line_account_id,staff_id,failed_since,error_code) VALUES('a','bs',datetime('now'),'calendar_disconnected')");
  const env={DB:d.db} as import('../index.js').Env['Bindings'];await evaluateBookingSyncNotices(env,'a');await evaluateBookingSyncNotices(env,'a');
  expect(d.raw.prepare("SELECT status,generation FROM booking_sync_notices WHERE notice_key='calendar-read:bs'").get()).toEqual({status:'open',generation:1});expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_sync_notice_outbox').get()).toEqual({n:1});

@@ -1,6 +1,8 @@
+> 文書：イベント予約（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # イベント予約（V8）の動き
 
-入口：`app/events/page.tsx`・`app/events/new/page.tsx`・`app/events/change-review/page.tsx`・`app/events/bookings/page.tsx`（V8 のときだけ `src/v8/events/*.tsx`）。v7 の画面・試験は触らない。
+入口：`app/events/page.tsx`・`app/events/new/page.tsx`・`app/events/change-review/page.tsx`・`app/events/bookings/page.tsx`（V8専用で `src/v8/events/*.tsx`）。動き・権限・入力保持の試験は維持する。
 
 | 画面 | ファイル | 絵 |
 |---|---|---|

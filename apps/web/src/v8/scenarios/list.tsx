@@ -1,8 +1,8 @@
 'use client'
 import FolderSelect from '@/components/shared/folder-select'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
-import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
+import { useStaffRole } from '@/lib/staff-role';
+import ListToolbar from '@/components/shared/list-toolbar';
 
 import { RowNameLink } from '@/components/shared/table';
 
@@ -16,12 +16,12 @@ import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag,
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Bookmark, CalendarPlus, CheckCheck, Copy, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, ShieldCheck, Square, Users, Workflow } from 'lucide-react';
+import { Bookmark, CalendarPlus, CheckCheck, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, Square, Users, Workflow } from 'lucide-react';
 
 
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Eye, TriangleAlert } from 'lucide-react';
+
 import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared';
 import { api, type ListStats } from '@/lib/api';
 import { useOffsetServerList } from '@/lib/use-server-list';
@@ -30,8 +30,8 @@ import { completeReorder } from '@/lib/complete-reorder';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { ROLE_LABELS } from '@/lib/hq-members';
-import { isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
-import NoPermissionBoard from '@/v8/no-permission/no-permission'
+import { describeApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { NoPermissionBoard } from '@/v8/no-permission/index'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';
 import { runUndoable, runOptimistic } from '@/lib/undoable';
@@ -50,14 +50,14 @@ import PageSizeSelect from '@/components/shared/page-size-select'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
-import { FolderDotName } from '@/components/shared/folder-dot';
+
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import type { ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
 import InlineEdit from '@/components/shared/inline-edit'
-import { TextField } from '@/components/shared/text-field';
+
 import { withViewTransition } from '@/components/shared/view-transition';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import Pagination from '@/components/shared/pagination'
@@ -66,7 +66,7 @@ import { MoveReferrersNotice } from '@/components/scenarios/scenario-dialogs';
 import { duplicateScenario, DuplicateAborted } from '@/components/scenarios/duplicate-scenario';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls';
+
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors';
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
@@ -76,7 +76,7 @@ import ListState from '@/components/shared/list-state'
 
 /*
  * ★V8 シナリオ配信の一覧（Pencil「★V8 画面の地図」のシナリオ配信の行：
- * 一覧 `axFrW`・狭い板 `wjfLe`・閲覧のみ `X0QrW0`・複製の窓 `Al4Ek`、状態の板は `BxGhV`）。
+ * 一覧 ・狭い板 ・閲覧のみ ・複製の窓 、状態の板は ）。
  *
  * 2026-10-06 オーナー決定で src/v8 に一から書いた。データの口・保存・権限・
  * 失敗時の扱いは今までの一覧（app/scenarios/list-v8.tsx）と同じ。違いは見せ方だけ——
@@ -103,14 +103,14 @@ type ScenarioRow = Scenario & {
   completedCount?: number
 }
 
-/* 板 `axFrW` の行の補足に出る送り方の言い方。relative は 028 以前の作り方で、いまは新しく作れない。 */
+/* 板  の行の補足に出る送り方の言い方。relative は 028 以前の作り方で、いまは新しく作れない。 */
 const deliveryModeLabels: Record<DeliveryMode, string> = {
   relative: 'Legacy',
   elapsed: '経過時間で指定',
   absolute_time: '時刻で指定',
 }
 
-/** 読み終えた人の補足行（板 `axFrW`：「登録した 1,756 人の 41%」）。 */
+/** 読み終えた人の補足行（板 ：「登録した 1,756 人の 41%」）。 */
 function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
   if (enrolled === 0) return '—'
@@ -136,7 +136,7 @@ export default function ScenariosListV8() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const router = useRouter()
-  // 1152 の板（`wjfLe`）。板IDと道具の段の並びだけを切り替える。
+  // 1152 の板（）。板IDと道具の段の並びだけを切り替える。
   const narrow = useNarrowViewport()
 
   /*
@@ -179,7 +179,7 @@ export default function ScenariosListV8() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
-  /* 複製の窓（★V8 `Al4Ek`）。 */
+  /* 複製の窓（★V8 ）。 */
   const duplicateLock = useRef(false)
   const [duplicating, setDuplicating] = useState(false)
   const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
@@ -297,7 +297,7 @@ export default function ScenariosListV8() {
     return res.data
   }, [accountLoading, activeParam, createdThisMonthOnly, folderFilter, selectedAccountId, serverQuery])
 
-  /* 板 `axFrW`：右端は「20件表示」。 */
+  /* 板 ：右端は「20件表示」。 */
   const [perPage, setPerPage] = useListUrlValue('perPage', 20)
   const scenarioList = useOffsetServerList<ScenarioRow>({
     requestKey: JSON.stringify({
@@ -550,7 +550,7 @@ export default function ScenariosListV8() {
     }
   }
 
-  /* ===== 複製（★V8 `Al4Ek`） ===== */
+  /* ===== 複製（★V8 ） ===== */
 
   const openDuplicate = (s: ScenarioRow) => { void runDuplicate(s)
   }
@@ -574,7 +574,7 @@ export default function ScenariosListV8() {
       if (e instanceof DuplicateAborted) {
         setDuplicateError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが一覧に残っています。`)
       } else {
-        setDuplicateError(e instanceof Error && e.message ? e.message : '複製に失敗しました。通信を確かめて、もう一度お試しください。')
+        setDuplicateError(describeApiFailure(e, '複製'))
       }
       void loadScenarios()
     } finally {
@@ -687,7 +687,7 @@ export default function ScenariosListV8() {
 
   /* ===== 数の帯（4つ） ===== */
 
-  /* 板 `axFrW`：1つ目の補足は「有効 3・停止中 2」。止めた数は合計から出す。 */
+  /* 板 ：1つ目の補足は「有効 3・停止中 2」。止めた数は合計から出す。 */
   const scenarioStopped = stats ? Math.max(0, stats.scenarios.total - stats.scenarios.active) : null
   const kpis = [
     {
@@ -777,8 +777,8 @@ export default function ScenariosListV8() {
   /* ===== 表 ===== */
 
   /*
-   * 列の幅（絵 axFrW：シナリオ 608・購読中 / 読み終えた 146・状態 96。
-   * 狭い板 wjfLe はシナリオが残りの幅を取る）。値は変数、ここは class だけ。
+   * 列の幅（絵 ：シナリオ 608・購読中 / 読み終えた 146・状態 96。
+   * 狭い板  はシナリオが残りの幅を取る）。値は変数、ここは class だけ。
    */
   const colgroup = (
     <colgroup>
@@ -844,7 +844,7 @@ export default function ScenariosListV8() {
         <DelayedSkeleton loading skeleton={loadingSkeleton} />
       </div>
     ) : scenarioList.error ? (
-      /* 板 `BxGhV`「読み込めなかった」。数の帯は「—」のまま。 */
+      /* 板 「読み込めなかった」。数の帯は「—」のまま。 */
       <ListState kind="error" title="シナリオを読み込めませんでした" description="作ったシナリオは消えていません。通信を確かめて、もう一度試してください。" data-design-node="BxGhV" action={<><Button type="button" onClick={() => void loadScenarios()}>もう一度読み込む</Button></>} />
     ) : scenarios.length === 0 ? (
       /* 修正案 D-2（2026-10-07 採用）：空の一覧は次の一歩へ導く。 */
@@ -1088,7 +1088,7 @@ export default function ScenariosListV8() {
     ) : null
 
   /*
-   * 1152 の板（wjfLe）：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・よく使う絞り込み（印だけ）」。
+   * 1152 の板：案内の帯 → 1段目「作る・フォルダ・探す … 件数」→ 2段目「札・よく使う絞り込み（印だけ）」。
    * 部品は広い板と同じもの（動きは同じ）。並びと段だけを変える。
    */
 
@@ -1113,7 +1113,7 @@ export default function ScenariosListV8() {
     </>
   )
 
-  /* 板 `O5tUeE`：一覧の口が 403（この役割では開けない）なら、画面ごと権限なしの板にする。 */
+  /* 板 ：一覧の口が 403（この役割では開けない）なら、画面ごと権限なしの板にする。 */
   if (scenarioList.error && isForbidden(scenarioList.error)) {
     return (
       <SaveErrorScope errors={saveErrors}><NoPermissionBoard

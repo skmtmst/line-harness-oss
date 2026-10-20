@@ -4,7 +4,7 @@ import { createForm } from '@line-crm/db';
 import { emptyLayout, normalizeFormTheme } from '@line-crm/shared';
 import { forms } from './forms.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 let t: SqliteD1;
 function app(role: 'owner' | 'staff' = 'owner', readOnly = false, keys = ['/form-submissions']) {
   const app = new Hono<Env>();
@@ -13,7 +13,7 @@ function app(role: 'owner' | 'staff' = 'owner', readOnly = false, keys = ['/form
 }
 beforeEach(() => { t = createTestD1(); t.raw.prepare("INSERT INTO line_accounts (id,channel_id,name,channel_access_token,channel_secret) VALUES ('a','ch','店','token','secret')").run(); });
 afterEach(() => t.raw.close());
-describe('B-333 フォームの警告とCSV', () => {
+describe('フォームの警告とCSV', () => {
   test('読みにくい色も作成・更新・公開でき、警告を返す', async () => {
     const layout = emptyLayout(); layout.options.theme = normalizeFormTheme({ main: '#ffffff', sub: '#ffffff', text: '#ffffff' });
     const created = await app().request('/api/forms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: '試験', accountId: 'a', layout }) });

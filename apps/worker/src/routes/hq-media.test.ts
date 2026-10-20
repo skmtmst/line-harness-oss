@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { installHqStreamPrimitives } from '../test-utils/hq-media-stream.js';
 import { hqTemplates } from './hq-templates.js';
 import { images } from './images.js';
-import { resolveHqBroadcastMaterials } from '../services/hq-broadcast-materials.js';
-import { parseBroadcastMessageParts, buildMessages } from '../services/broadcast-message-set.js';
+import { resolveHqBroadcastMaterials } from '../features/hq-broadcasts/hq-broadcast-materials.js';
+import { parseBroadcastMessageParts, buildMessages } from '../features/broadcasts/broadcast-message-set.js';
 import { readHqMp4Metadata } from '../services/hq-mp4-metadata.js';
 import type { HqBroadcastInput } from '@line-crm/shared';
 import { hqBroadcasts } from './hq-broadcasts.js';

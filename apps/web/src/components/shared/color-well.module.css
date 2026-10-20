@@ -142,7 +142,7 @@
 .tabOn {
   border-color: var(--color-board-line);
   background: var(--color-canvas);
-  /* V8 は切り替えのつまみと同じ影。V7 は近い値の既存トークンで代える。 */
+  /* V8 は切り替えのつまみと同じ影。互換経路は近い値の既存トークンで代える。 */
   box-shadow: var(--shadow-segment-thumb, var(--shadow-nav-active));
   color: var(--color-ink);
   font-weight: 600;

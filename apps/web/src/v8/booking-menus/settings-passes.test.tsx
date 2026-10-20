@@ -8,7 +8,7 @@ vi.mock('@/lib/use-same-page-url', () => ({ useSamePageUrl: () => ({ replace: st
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccount: null }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('./lib/edit-permission', () => ({ useBookingEdit: () => true }))
-vi.mock('@/lib/api-gap3', () => ({ bookingPassPlansApi: { list: state.list, holders: async () => ({ success: true, data: { total: 0, items: [] } }) } }))
+vi.mock('@/lib/api/helpers/gap3', () => ({ bookingPassPlansApi: { list: state.list, holders: async () => ({ success: true, data: { total: 0, items: [] } }) } }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, staff: { ...actual.api.staff, list: async () => ({ success: true, data: [] }) } }, bookingApi: { ...actual.bookingApi, listMenus: async () => ({ menus: [] }), getSettings: async () => ({ settings: null }), listStaff: async () => ({ staff: [] }) } }

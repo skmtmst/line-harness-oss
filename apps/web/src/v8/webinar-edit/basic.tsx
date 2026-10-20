@@ -15,7 +15,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 ウェビナーの編集 ①基本設定（並びは作る j7PP04 と同じ）。
+ * ★V8 ウェビナーの編集 ①基本設定（並びは作る  と同じ）。
  * 版のある設定を先に保存し、競合したら基本情報は書き換えない。
  */
 

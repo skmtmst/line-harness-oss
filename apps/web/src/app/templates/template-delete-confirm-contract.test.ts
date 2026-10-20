@@ -1,9 +1,9 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 // @vitest-environment happy-dom
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import TemplateDeleteDialog from '@/v8/templates/delete-dialog'
 import { DELETE_UNUSED_DESCRIPTION } from '@/v8/templates/words'
-import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { templateDeleteDescription } from '@/v8/template-detail/model'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 
 /**
  * 名前で見つけた関数の本体だけを切り出す。

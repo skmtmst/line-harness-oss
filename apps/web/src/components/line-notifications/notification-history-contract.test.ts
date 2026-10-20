@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -8,9 +9,9 @@ const PAGE = readUiSource(
 )
 const LIST = readFileSync(new URL('../../v8/settings/line-notifications/runs-tab.tsx', import.meta.url), 'utf8')
 const STATE = readFileSync(new URL('./notification-run-state.ts', import.meta.url), 'utf8')
-const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 
-describe('V6 LINE notification history contract', () => {
+describe("管理画面 LINE notification history contract", () => {
   it('keeps the page title in the shared top bar and places history in the tab row', () => {
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).toContain('<Tabs')
@@ -29,7 +30,7 @@ describe('V6 LINE notification history contract', () => {
     expect(LIST).toContain('kind="loading"')
     expect(LIST).toContain('kind="empty"')
     expect(LIST).toContain('kind="error"')
-    // 板 DrwMm：送れなかった件数は口の合計。未取得のとき0にしない。
+    // 板 ：送れなかった件数は口の合計。未取得のとき0にしない。
     expect(LIST).toContain("kpiValue(summary?.failed ?? null)")
     expect(LIST).toContain("items.length === 0")
     expect(LIST).toContain('data-list-state={listState}')

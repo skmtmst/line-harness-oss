@@ -138,7 +138,7 @@ describe('送る・止める前に確かめる', () => {
   it('お知らせ：今すぐ送るを押すと確認の窓が開き、まだ送らない', async () => {
     await act(async () => { root.render(<OpsAnnouncementsV8 />) })
     await settle()
-    // 件名と本文を入れてから押す（足りない欄があるうちは確認の窓を開かない。B-139）。
+    // 件名と本文を入れてから押す（足りない欄があるうちは確認の窓を開かない。）。
     fireEvent.change(document.querySelector('#ann-subject')!, { target: { value: 'メンテナンスのお知らせ' } })
     fireEvent.change(document.querySelector('#ann-body')!, { target: { value: '深夜に止まります。' } })
     const send = buttons('今すぐ送る')[0] as HTMLButtonElement
@@ -149,7 +149,7 @@ describe('送る・止める前に確かめる', () => {
     expect(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/api/ops/announcements'))).toHaveLength(0)
   })
 
-  it('B-139 お知らせ：件名と本文が空なら確認の窓を開かず、欄が赤くなり理由が出て、件名の欄へ移る', async () => {
+  it('お知らせ：件名と本文が空なら確認の窓を開かず、欄が赤くなり理由が出て、件名の欄へ移る', async () => {
     await act(async () => { root.render(<OpsAnnouncementsV8 />) })
     await settle()
     await act(async () => { (buttons('今すぐ送る')[0] as HTMLButtonElement).click() })
@@ -184,7 +184,7 @@ describe('送る・止める前に確かめる', () => {
   })
 })
 
-describe('B-139 欄で知らせて移る', () => {
+describe('欄で知らせて移る', () => {
   it('ナレッジの記事：題名を消して保存すると、口を呼ばず題名の欄が赤くなり理由が出て、その欄へ移る', async () => {
     const article = {
       id: 'k1', version: 1, sourceRequestId: 'r1', ticketNo: 12, sourceCurrent: true, articleKind: 'verified', reviewState: 'approved', status: 'active',

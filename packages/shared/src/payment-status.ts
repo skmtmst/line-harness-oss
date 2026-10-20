@@ -1,5 +1,5 @@
 /**
- * 支払いの札の言葉と色（B-338・2026-10-16 オーナー「言葉を 4 つにそろえ、管理画面と LIFF を同じに」）。
+ * 支払いの札の言葉と色（2026-10-16 オーナー「言葉を 4 つにそろえ、管理画面と LIFF を同じに」）。
  * 管理画面（apps/web/src/components/shared/payment-status.ts が読み直して使う）と LIFF の両方がここを読む。
  * 状態は 4 つ（未払い・支払い済み・返金済み・期限切れ）だけ。お店で払うは状態ではなく払い方の札。
  * 口の値（paid・pending・unpaid・failed・refunded・expired・onsite）もここで読み替える。

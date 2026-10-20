@@ -10,7 +10,7 @@ import { forgetAuthCheck } from './auth-check-marker'
  * サーバーのセッションを消し、手元に残した名前・権限・CSRF も消してから
  * ログイン画面へ移る。通信に失敗しても手元の後始末は必ず行う。
  */
-/** `loginPath` は行き先。運営コンソール（★V6 37）からは '/ops/login' を渡す。 */
+/** `loginPath` は行き先。運営コンソール（★管理画面 37）からは '/ops/login' を渡す。 */
 export async function logoutAndGoToLogin(loginPath: string = '/login'): Promise<void> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL

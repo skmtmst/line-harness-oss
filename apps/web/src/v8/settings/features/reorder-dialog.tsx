@@ -9,7 +9,7 @@ import type { FeatureGroup, MenuItemOrder } from '@/lib/feature-settings'
 import { applyItemOrder } from './feature-settings-view'
 import styles from './screen.module.css'
 
-/** 並び替えの窓（★V8-B `ztgRD`）。下書きの並びを動かし、確定で反映する。 */
+/** 並び替えの窓（★V8-B ）。下書きの並びを動かし、確定で反映する。 */
 export function ReorderDialog({ groups, initialOrder, onCancel, onApply }: {
   groups: FeatureGroup[]
   initialOrder: MenuItemOrder

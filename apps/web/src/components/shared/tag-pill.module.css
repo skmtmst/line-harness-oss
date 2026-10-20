@@ -27,7 +27,7 @@
   --tag-pill-pad: 4px 10px;
   --tag-pill-gap: 6px;
 }
-/* 要点の欄（JCDRm・eovoG）の小さい札。通常と表用の寸法は保つ。 */
+/* 要点の欄（・）の小さい札。通常と表用の寸法は保つ。 */
 .pill[data-size='xs'] {
   --tag-pill-font: var(--tpl-tag-compact-font);
   --tag-pill-dot: var(--tpl-tag-compact-dot);
@@ -86,7 +86,7 @@
 .toggle[data-selected='false'] { background: var(--color-shell); color: var(--color-ink-secondary); }
 }
 
-/* B-180：表・要点の欄・編集の札はすべて同じ24px。 */
+/* ：表・要点の欄・編集の札はすべて同じ24px。 */
 :root .pill,
 :root .pill[data-size] {
   box-sizing: border-box;
@@ -97,7 +97,7 @@
   --tag-pill-gap: 6px;
 }
 
-/* 固定した札の通常寸法。高さ24はB-180、小さい札の寸法は保つ。 */
+/* 固定した札の通常寸法。高さ24は、小さい札の寸法は保つ。 */
 :root .pill[data-size='md'] {
   --tag-pill-font: var(--polish-text-body);
   --tag-pill-dot: 8px;

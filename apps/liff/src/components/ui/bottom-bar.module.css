@@ -1,0 +1,5 @@
+.bar { position: fixed; inset-inline: 0; bottom: 0; background: var(--color-canvas); box-shadow: inset 0 1px 0 var(--color-liff-line); padding-bottom: max(var(--liff-safe-bottom, 30px), env(safe-area-inset-bottom)); }
+.content { display: flex; flex-direction: column; gap: var(--liff-space-2, 8px); width: 100%; max-width: var(--liff-content-max, 448px); margin-inline: auto; padding: var(--liff-space-3, 12px) var(--liff-space-4, 16px) 0; }
+.restaurant { padding-bottom: max(28px, env(safe-area-inset-bottom)); box-shadow: none; }
+.stamp { padding-bottom: max(10px, env(safe-area-inset-bottom)); box-shadow: none; }
+.stamp .content { padding-inline: 20px; gap: 10px; }

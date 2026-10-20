@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { CreatePage } from './create-page'
 
 /*
- * ★V8 の作る画面の競合（pvimJ）は、同時編集の知らせを板の頭のすぐ下に、
+ * ★V8 の作る画面の競合は、同時編集の知らせを板の頭のすぐ下に、
  * 入力欄と右の列の両方にまたがる幅（左右 24・上下 12）で置く。型にその置き場を用意する（2026-10-07）。
  */
 const here = dirname(fileURLToPath(import.meta.url))

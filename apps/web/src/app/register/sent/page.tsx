@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import { recallSignupEmail } from '@/lib/auth-email'
 
 /**
- * 確認メールを送りました。★V6 36-4-A（`q32Ao`、カード `r7JPOa`）。
+ * 確認メールを送りました。★管理画面 36-4-A（`q32Ao`、カード `r7JPOa`）。
  *
  * 入れたメールは同じタブの中だけで持ち回す（URL には載せない）。直接開かれて
  * 何も無いときは「入力したメールアドレス」と出す。

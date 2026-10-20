@@ -1,11 +1,12 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ArrowLeft, Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X , Trash2 } from 'lucide-react'
+import { Check, Copy, Plus, RefreshCw, TriangleAlert, Users, X, Trash2 } from 'lucide-react'
 import { isSavedSearchOpAllowed, isSavedSearchValueOptionalOp } from '@line-crm/shared'
 import type { FriendField, SavedSearch, SavedSearchCondition, SavedSearchConditionKind, SavedSearchConditions, Scenario, SupportMark, Tag } from '@line-crm/shared'
 import { api, ApiError, type SavedSearchDetail, type SavedSearchMatchPreview } from '@/lib/api'
@@ -41,7 +42,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 タグ：保存した検索の編集（一から書いた画面・2026-10-07）。Pencil `AqDWN`。
+ * ★V8 タグ：保存した検索の編集（一から書いた画面・2026-10-07）。Pencil 。
  *
  * 型は「作る」（CreatePage）：頭（戻る・条件名・人数と共有と使っている所）→ 左に「名前と共有」「条件」
  * 「友だち一覧での見せ方」、右に「当てはまる人」「使っている所」、下の帯（削除は左端・中央にキャンセル／複製して保存する／保存する）。
@@ -748,7 +749,7 @@ export default function SavedSearchEditV8() {
 
       { if (!fieldFailure)
 
-      setError(saveError instanceof Error ? saveError.message : '変更を保存できませんでした') }
+      setError(describeApiFailure(saveError, '保存')) }
     } finally {
       setSaving(false)
     }
@@ -773,7 +774,7 @@ export default function SavedSearchEditV8() {
 
       { if (!fieldFailure)
 
-      setError(duplicateError instanceof Error ? duplicateError.message : '複製できませんでした') }
+      setError(describeApiFailure(duplicateError, '複製')) }
     } finally {
       setSaving(false)
     }

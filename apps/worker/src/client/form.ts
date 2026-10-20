@@ -1,3 +1,16 @@
+import { escapeHtml } from '../lib/html-escape.js';
+import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
+import { createClientLogger } from '@line-crm/shared';
+import {
+  buildFormSubmitHeaders,
+  newFormIdempotencyKey,
+  toFormIdempotencyKey,
+  type FormIdempotencyKey,
+  type FormAvailability,
+  type FormLayout,
+  collectInputs,
+} from '@line-crm/shared';
+
 import '../../../liff/src/card-surface.css';
 import { choiceReceptionLabel } from '../../../liff/src/lib/form-reception.js';
 import {applyCustomerFormTheme} from './customer-look.js';
@@ -17,16 +30,13 @@ import {applyCustomerFormTheme} from './customer-look.js';
  * 送信ヘッダの組み立ては共有部品に寄せる(#729)。Idempotency-Key の
  * 付け忘れは型で落ちる形にする。fetch・認証取得・再送フローはここに残す。
  */
-import {
-  buildFormSubmitHeaders,
-  newFormIdempotencyKey,
-  toFormIdempotencyKey,
-  type FormIdempotencyKey,
-  type FormAvailability,
-  type FormLayout,
-  collectInputs,
-} from '@line-crm/shared';
+
+
+
+
 import { customerMessage } from './customer-message.js';
+const clientLogger = createClientLogger('embedded');
+
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -111,11 +121,7 @@ const state: FormState = {
 // Replier pool loading state (shared between renderFormPage and attachXAutocomplete)
 let _replierPoolReady = false;
 
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+
 
 function apiCall(path: string, options?: RequestInit): Promise<Response> {
   const idToken = liff.getIDToken();
@@ -153,7 +159,7 @@ function receptionOption(field: FormField, label: string): string {
   return escapeHtml(label + choiceReceptionLabel(choiceCapacity(field, label)));
 }
 
-function renderField(field: FormField): string {
+export function renderField(field: FormField): string {
   const required = field.required ? ' required' : '';
   const placeholder = field.placeholder ? ` placeholder="${escapeHtml(field.placeholder)}"` : '';
   const requiredMark = field.required ? '<span class="required-mark">*</span>' : '';
@@ -805,7 +811,8 @@ export async function postFormSubmit(
     headers: buildFormSubmitHeaders(key),
     body: JSON.stringify(body),
   });
-  const json = await res.clone().json().catch(() => null) as FormSubmitPayload['json'];
+  const payload: unknown = await res.clone().json().catch(() => null);
+  const json = (res.ok || payload === null ? payload : { ...legacyApiErrorBody(payload) as object, error: readApiError(payload).message }) as FormSubmitPayload['json'];
   return { status: res.status, json };
 }
 
@@ -886,7 +893,7 @@ async function submitForm(): Promise<void> {
 
   try {
     const data = collectFormData();
-    console.log(JSON.stringify({"code":"client_form_log"}));
+    clientLogger.log("client_form_log");
 
     // Webhook gate — pre-verified by /repliers endpoint
     if (state.formDef.hasSubmitWebhook) {
@@ -942,14 +949,14 @@ async function submitForm(): Promise<void> {
 
     const body: Record<string, unknown> = { data };
     if (state.refTrackedLinkId) body.trackedLinkId = state.refTrackedLinkId;
-    console.log(JSON.stringify({"code":"client_form_log"}));
+    clientLogger.log("client_form_log");
 
     const { payload } = await postFormSubmitWithResume(
       `/api/forms/${state.formDef.id}/submit`,
       body,
       idemKey,
     );
-    console.log(JSON.stringify({"code":"client_form_log"}));
+    clientLogger.log("client_form_log");
     throwOnFormSubmitError(payload, '送信に失敗しました');
 
     renderSuccess();
@@ -1289,7 +1296,7 @@ function attachFormEvents(): void {
 
 // ========== Init ==========
 
-export async function initForm(formId: string | null): Promise<void> {
+export async function initForm(formId: string | null, openBookingForm?: () => Promise<void>): Promise<void> {
   if (!formId) {
     renderFormError('フォームIDが指定されていません');
     return;
@@ -1358,8 +1365,8 @@ export async function initForm(formId: string | null): Promise<void> {
 
     // 予約ブロックは共通の画面へ。通常のフォームの既存受付・再送は保つ。
     if (json.data.layout && collectInputs(json.data.layout).some(block => block.type === 'booking')) {
-      const { initRestaurantForm } = await import('./main.js');
-      await initRestaurantForm();
+      if (!openBookingForm) throw new Error('booking_form_opener_missing');
+      await openBookingForm();
       return;
     }
 
@@ -1394,7 +1401,7 @@ export async function initForm(formId: string | null): Promise<void> {
     }).catch(() => { /* silent */ });
   } catch (err) {
     // 内部の英語の文（通信の失敗など）はお客さまに出さない。
-    console.error(JSON.stringify({"code":"client_form_failed"}));
+    clientLogger.error("client_form_failed");
     renderFormError('フォームを読み込めませんでした。時間をおいて、もう一度開いてください。');
   }
 }

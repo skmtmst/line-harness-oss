@@ -5,8 +5,8 @@ import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 /**
  * 予約スタッフの画面の右の列に出す「お客さまの予約画面」の写し（押せない見本）。
  * 実 LIFF（apps/liff）の並び「①メニュー → ②担当 → ③日時 → ④確認」の②と③。
- *   ② 担当を選ぶ … 予約スタッフを登録（CcA4k）
- *   ③ 日時を選ぶ … 勤務とシフト（d5fmnM）・自分の勤務（E3YDK）
+ *   ② 担当を選ぶ … 予約スタッフを登録
+ *   ③ 日時を選ぶ … 勤務とシフト・自分の勤務
  * 中身は実データ（作り物の名前は置かない）。今までの app/booking/menus/liff-phone-v8.tsx から写した。
  */
 import { formatDate as polishFormatDate } from '@/lib/format'
@@ -31,7 +31,7 @@ export function formatJpDay(date: string): string {
   return polishFormatDate(date, { style: 'day' })
 }
 
-/** LINE の予約画面の時刻は先頭の0を落とす（09:00 → 9:00。絵 d5fmnM・E3YDK）。 */
+/** LINE の予約画面の時刻は先頭の0を落とす（09:00 → 9:00。絵の）。 */
 export function phoneTime(time: string): string {
   return time.replace(/^0(\d:)/, '$1')
 }

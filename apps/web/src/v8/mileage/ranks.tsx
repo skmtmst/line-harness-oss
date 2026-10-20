@@ -22,7 +22,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { notifySaved } from '@/components/shared/toast'
 import { ApiError } from '@/lib/api'
 import { useAccount as useAccountContext } from '@/contexts/account-context'
-import { memberRanksApi } from '@/lib/api-gap3'
+import { memberRanksApi } from '@/lib/api/helpers/gap3'
 import { formatNumber } from '@/lib/format'
 import { ListPageSection } from '@/components/templates/list-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
@@ -32,7 +32,7 @@ import styles from './ranks.module.css'
 /*
  * ★V8 マイル「会員ランク」（G5-2 `QpgfW`）。段の表（名前・上がる条件・下がる条件・特典・今の人数）と、
  * 右の LINE の見本（上がったとき／下がる前）。動かす前は「止めている」の札と［動かす］（確かめの窓に段ごとの人数）。
- * 通知・倍率を実際のマイルへ掛ける処理はまだ無いので、見本と「準備中」の注記で見せる（B-314）。
+ * 通知・倍率を実際のマイルへ掛ける処理はまだ無いので、見本と「準備中」の注記で見せる。
  * 段を保存するといったん止まる（Worker の決まり）。閲覧のみの人には変える操作を置かない。
  */
 

@@ -43,8 +43,26 @@ describe('presentation helpers', () => {
   it('日時の欠落と不正値を推測しない', () => {
     expect(formatJstDateTime(null)).toBe('—')
     expect(formatJstDateTime('invalid')).toBe('—')
+    expect(formatJstDateTime('invalid', '未設定')).toBe('未設定')
     expect(localDateTime('invalid')).toBe('')
     expect(utcDateTime('invalid')).toBeNull()
+  })
+
+  it('UTC保存値はオフセットの有無にかかわらず、日本時間の同じ日付に表示する', () => {
+    const original = process.env.TZ
+    try {
+      for (const timeZone of ['UTC', 'America/Los_Angeles', 'Asia/Tokyo']) {
+        process.env.TZ = timeZone
+        const expected = formatJstDateTime('2026-10-17T15:30:00Z')
+        expect(expected).toContain('10月18日（日）00:30')
+        expect(formatJstDateTime('2026-10-17 15:30:00')).toBe(expected)
+        expect(formatJstDateTime('2026-10-17T15:30:00')).toBe(expected)
+        expect(formatJstDateTime('2026-10-18T00:30:00+09:00')).toBe(expected)
+      }
+    } finally {
+      if (original === undefined) delete process.env.TZ
+      else process.env.TZ = original
+    }
   })
 
   it('タグの文字色は札の下地で 4.5:1 以上になる濃さ', () => {

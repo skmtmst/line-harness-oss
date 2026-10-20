@@ -1,11 +1,13 @@
 /*
- * ★V8 利用規約の本文（店舗を追加 ①の枠 `ao15G`・利用規約 `VdKOK` で使う）。
+ * ★V8 利用規約の本文（店舗を追加 ①の枠 ・利用規約  で使う）。
  * 中身は今と同じ TERMS_DOCUMENT。表と番号付きの行の読み方は components/legal/terms-document と同じ。
  * 見た目だけ V8 の絵（見出し・本文の大きさ）に合わせる。size="compact" は ①の枠の小さい字。
  */
 import type { ReactNode } from 'react'
+import { LEGAL_LINKS } from '@/lib/auth-email'
 import { TERMS_DOCUMENT, TERMS_IS_DRAFT, type TermsSection } from '@/content/terms/musubo-terms'
 import { Th } from '@/components/shared/table'
+import TextLink from '@/components/shared/text-link'
 import styles from './terms-body.module.css'
 
 function inlineText(value: string): ReactNode[] {
@@ -60,6 +62,7 @@ export default function TermsBody({ size = 'regular' }: { size?: 'regular' | 'co
     <div className={`${styles.body} ${size === 'compact' ? styles.compact : ''}`}>
       <p className={styles.meta}>{`${TERMS_DOCUMENT.title}（${TERMS_DOCUMENT.version} / ${TERMS_DOCUMENT.displayDate}）・提供者 ${TERMS_DOCUMENT.provider}`}</p>
       {TERMS_IS_DRAFT ? <p className={styles.draft}>これは開発中の仮の利用規約です。正式版の公開時に、あらためて同意をお願いします。</p> : null}
+      <p className={styles.meta}>契約の正本は{LEGAL_LINKS.terms ? <TextLink href={LEGAL_LINKS.terms} external>正式サイトの利用規約</TextLink> : '正式サイトの利用規約'}です。以下は飲食の追加設定の草案です。</p>
       {TERMS_DOCUMENT.sections.map((section, index) => (
         <section key={section.heading} id={termsSectionId(index)} className={styles.section} aria-label={section.heading}>
           <h2 className={styles.heading}>{section.heading}</h2>

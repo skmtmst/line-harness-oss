@@ -4,7 +4,7 @@ import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { friendAttributes } from './friend-attributes.js';
 import { templates } from './templates.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /*
  * N-147: テンプレートのフォルダは選択中のLINE公式アカウント単位。

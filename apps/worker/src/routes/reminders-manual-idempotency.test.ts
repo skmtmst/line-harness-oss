@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 function asD1(sqlite: Database.Database): D1Database {

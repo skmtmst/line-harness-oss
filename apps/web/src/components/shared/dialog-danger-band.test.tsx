@@ -12,9 +12,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'dialog.module.css'), 'utf8')
 
 /**
- * 解除窓の説明文の桃箱（YZ57z Google Sheets の接続を解除）。
+ * 解除窓の説明文の桃箱（ Google Sheets の接続を解除）。
  * 板どおり「題は箱の外・説明だけ箱の中」。
- * 渡さなければ帯なし（今までどおり）。VsSyu 式（箱なし）の既定の
+ * 渡さなければ帯なし（今までどおり）。 式（箱なし）の既定の
  * 破壊的トーンは変えない。
  */
 describe('ダイアログの桃箱', () => {
@@ -87,7 +87,7 @@ describe('ダイアログの桃箱', () => {
     expect(html.indexOf('書き出しが止まります。')).toBeGreaterThan(html.indexOf('data-qa-dialog-callout'))
   })
 
-  it('桃箱は v8 だけで桃色（v7 は変えない）', () => {
+  it("桃箱は v8 だけで桃色（既存の見た目は変えない）", () => {
     expect(css).toMatch(/:root \.calloutDanger\s*\{[^}]*background:\s*var\(--color-danger-bg\)/s)
     expect(css).toMatch(/:root \.calloutDanger \.description\s*\{[^}]*color:\s*var\(--color-danger\)/s)
   })

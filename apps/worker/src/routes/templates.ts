@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { readCarouselOptions } from './template-carousel-input.js';
 import { publishedInfoOf, versionInfoOf } from './../services/template-display.js';
@@ -8,12 +9,12 @@ import { Hono } from 'hono';
 import { prepareRichVideoTemplate } from '../services/rich-video-template.js';
 import { getTemplatesWithUsageCount, getTemplateSendCounts, getTemplateFolderCounts, getTemplateById, getTemplateUsage, createTemplate, updateTemplate, saveTemplateDraft, publishTemplate, hasTemplateDraft, deleteTemplate, getCarouselTapTotals, getFolderById, listTemplateVersions, revertTemplateToVersion, listBroadcastReferences, listTemplateReferences, getBroadcastDeleteBlockers, getPinnedReminderDeleteBlockers, MediaReferenceAccountError } from '@line-crm/db';
 import type { TemplateRow } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireDeliveryAccess } from '../middleware/role-guard.js';
 import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import { validateCarousel } from '../services/carousel-validation.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { parseQuestion, type ScenarioQuestion } from '../services/scenario-question.js';
+import { parseQuestion, type ScenarioQuestion } from '../features/scenarios/scenario-question/index.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { validateFlexContent } from '@line-crm/shared';
 
@@ -259,14 +260,14 @@ templates.get('/api/templates', async (c) => {
       taps = await getCarouselTapTotals(c.env.DB);
     } catch (err) {
       // 数が出ないだけ。一覧そのものは出す。
-      console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates"}));
+      logger.error("routes_templates_failed");
     }
     let sends = new Map<string, { thisMonth: number; total: number }>();
     try {
       sends = await getTemplateSendCounts(c.env.DB, items.map((item) => item.id));
     } catch (err) {
       // 集計だけ取れないときも、テンプレートそのものは操作できるようにする。
-      console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates"}));
+      logger.error("routes_templates_failed");
     }
     /*
      * 差し戻し対応(要件1): 一覧の主 messageType/messageContent は公開版だけを返す。
@@ -326,7 +327,7 @@ templates.get('/api/templates', async (c) => {
     }
     return c.json({ success: true, data: withSamples });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates"}));
+    logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -408,7 +409,7 @@ templates.get('/api/templates/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates/:id"}));
+    logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -464,7 +465,7 @@ templates.get('/api/templates/:id/usages', async (c) => {
     );
     return c.json({ success: true, data: { ...usage, broadcasts, reminderEnrollments } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates/:id/usages"}));
+    logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -555,7 +556,7 @@ templates.post('/api/templates', requireDeliveryAccess('templates'), inputJsonBo
     if (err instanceof MediaReferenceAccountError) {
       return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
-    console.error(JSON.stringify({"code":"routes_templates_failed","route":"POST /api/templates"}));
+    logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -708,7 +709,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
     if (err instanceof Error && err.message === 'TEMPLATE_DRAFT_CONFLICT') {
       return c.json({ success: false, error: '編集中に公開状態が変わりました。読み直してください' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_templates_failed","route":"PUT /api/templates/:id"}));
+    logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -818,7 +819,7 @@ templates.post('/api/templates/:id/publish', requireDeliveryAccess('templates'),
     if (err instanceof MediaReferenceAccountError) {
       return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
-    console.error(JSON.stringify({"code":"routes_templates_failed","route":"POST /api/templates/:id/publish"}));
+    logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -853,7 +854,7 @@ templates.get('/api/templates/:id/versions', async (c) => {
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_templates_failed","route":"GET /api/templates/:id/versions"}));
+    logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -920,7 +921,7 @@ templates.post('/api/templates/:id/revert', requireDeliveryAccess('templates'), 
     if (code === 'TEMPLATE_PUBLISH_KEY_CONFLICT') {
       return c.json({ success: false, error: '同じ確認キーが別の公開操作で使われています' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_templates_failed","route":"POST /api/templates/:id/revert"}));
+    logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -975,7 +976,7 @@ templates.delete('/api/templates/:id', requireDeliveryAccess('templates'), async
     await deleteTemplate(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_templates_failed","route":"DELETE /api/templates/:id"}));
+    logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

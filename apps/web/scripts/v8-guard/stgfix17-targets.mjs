@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { SpeedLimitError, runSpeedAssertion } from './speed-outcome.mjs'
 import { median } from './speed-budget.mjs'
 
-/** 列車17の未達4項目。時間倍率を掛けず、元の絶対目標で比較する。 */
+/** 作業の未達4項目。時間倍率を掛けず、元の絶対目標で比較する。 */
 export function assertStgfix17Targets(result) {
   if (!result.complete || result.error) throw new Error('速度測定が未完了です')
   const exceedances = []

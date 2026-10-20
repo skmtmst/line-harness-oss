@@ -1,3 +1,7 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { API_RETRY_WAIT, createCallState, createExternalCall } from '../lib/external-call/index.js';
+import { type CallScope, type CircuitStore } from '../lib/external-call/types.js';
+import { boundedHttpRequest } from '../lib/external-call/bounded-http.js';
 // Google Calendar API client
 
 const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
@@ -6,6 +10,8 @@ const TIMEZONE = 'Asia/Tokyo';
 export interface GoogleCalendarConfig {
   calendarId: string;
   accessToken: string;
+  transport?: typeof fetch;
+  external?: {scope:CallScope;circuits:CircuitStore};
 }
 
 export interface BusyInterval {
@@ -15,6 +21,14 @@ export interface BusyInterval {
 
 export class GoogleCalendarReadError extends Error {
   constructor(readonly status: number) { super('calendar_read_failed'); }
+}
+
+export class GoogleCalendarWriteError extends Error {
+  constructor(readonly status: number) { super('calendar_write_failed'); this.name = 'GoogleCalendarWriteError'; }
+}
+export interface CalendarEventEvidence {
+  id: string; summary?: string; description?: string;
+  start?: { dateTime?: string }; end?: { dateTime?: string };
 }
 
 export interface CreateEventInput {
@@ -30,6 +44,49 @@ export interface CreateEventInput {
 export class GoogleCalendarClient {
   constructor(private config: GoogleCalendarConfig) {}
 
+  /** 単発の通信。本文の読取りまで同じ期限とsignalを使い、SDK内では再試行しない。 */
+  private async request<T>(url: string, init: RequestInit, read: (response: Response) => Promise<T>, signal?: AbortSignal, effect: 'read'|'write' = 'read'): Promise<T> {
+    const perform=async(deadlineSignal?:AbortSignal)=>{
+      const response=await boundedHttpRequest(url,{...init,signal:deadlineSignal},
+        {timeoutMs:10_000,maxResponseBytes:1024*1024,fetch:this.config.transport??fetch});
+      return await read(response);
+    };
+    if(effect==='write'||!this.config.external)return perform(signal);
+    // 読取りだけの単発予算。業務の書込みは呼出し側の永続journalを通す。
+    const now=Date.now(),id=crypto.randomUUID(),context=this.config.external;
+    let state=createCallState({scope:context.scope,operationId:id,idempotencyKey:id,snapshotId:id,effect:'read'},
+      {category:'api',maxAttempts:1,timeoutMs:10_000,deadlineAt:now+10_000,wait:API_RETRY_WAIT},now);
+    const outcome=await createExternalCall({circuits:context.circuits})<T>({state,signal,
+      journal:{compareAndSwap:async(previous,next)=>{if(previous.revision!==state.revision)return false;state=structuredClone(next);return true;}},
+      authorize:async()=>true,
+      execute:async deadlineSignal=>{
+        try{return {kind:'success',value:await perform(deadlineSignal)};}
+        catch(error){return error instanceof GoogleCalendarReadError
+          ? {kind:error.status===408||error.status===429||error.status>=500?'transient':'permanent',reason:'http',status:error.status}
+          : {kind:'transient',reason:'network'};}
+      },
+    });
+    if(outcome.kind==='success')return outcome.value;
+    throw new GoogleCalendarReadError(outcome.state.status??503);
+  }
+
+  private json<T>(url: string, init: RequestInit): Promise<T> {
+    return this.request(url,init,async response=>{
+      if(!response.ok){void response.body?.cancel().catch(()=>{});throw new GoogleCalendarReadError(response.status);}
+      return await response.json().catch(()=>{throw new GoogleCalendarReadError(502);}) as T;
+    });
+  }
+
+  /** 不明な書込みを同じIDの読取りで照合する。予定は増やさない。 */
+  async getEvent(eventId: string): Promise<CalendarEventEvidence | null> {
+    return this.request(`${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events/${encodeURIComponent(eventId)}`,
+      { headers: { Authorization: `Bearer ${this.config.accessToken}` } }, async res => {
+        if (res.status === 404 || res.status === 410) return null;
+        if (!res.ok) throw new GoogleCalendarReadError(res.status);
+        return await res.json() as CalendarEventEvidence;
+      });
+  }
+
   /** 件数は FreeBusy の結合された区間数ではなく、個々の予定から数える。 */
   async listEventIds(timeMin: string, timeMax: string): Promise<string[]> {
     const ids: string[] = [];
@@ -37,11 +94,9 @@ export class GoogleCalendarClient {
     for (let page = 0; page < 100; page++) {
       const query = new URLSearchParams({ timeMin, timeMax, singleEvents: 'true', showDeleted: 'false', maxResults: '2500', fields: 'items(id,status),nextPageToken' });
       if (pageToken) query.set('pageToken', pageToken);
-      const res = await fetch(`${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events?${query}`, {
-        headers: { Authorization: `Bearer ${this.config.accessToken}` },
-      });
-      if (!res.ok) throw new GoogleCalendarReadError(res.status);
-      const data = await res.json() as { items?: Array<{ id: string; status?: string }>; nextPageToken?: string };
+      const data = await this.json<{ items?: Array<{ id: string; status?: string }>; nextPageToken?: string }>(
+        `${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events?${query}`,
+        {headers:{Authorization:`Bearer ${this.config.accessToken}`}});
       ids.push(...(data.items ?? []).filter((event) => event.status !== 'cancelled').map((event) => event.id));
       pageToken = data.nextPageToken;
       if (!pageToken) return [...new Set(ids)];
@@ -55,9 +110,9 @@ export class GoogleCalendarClient {
     for(let page=0;page<100;page++) {
       const query=new URLSearchParams({timeMin,timeMax,singleEvents:'true',maxResults:'2500',fields:'items(id,status,transparency,start(dateTime),end(dateTime)),nextPageToken'});
       if(token)query.set('pageToken',token);
-      const response=await fetch(`${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events?${query}`,{headers:{Authorization:`Bearer ${this.config.accessToken}`}});
-      if(!response.ok)throw new GoogleCalendarReadError(response.status);
-      const data=await response.json() as {items?:Array<{id:string;status?:string;transparency?:string;start?:{dateTime?:string};end?:{dateTime?:string}}>;nextPageToken?:string};
+      const data=await this.json<{items?:Array<{id:string;status?:string;transparency?:string;start?:{dateTime?:string};end?:{dateTime?:string}}>;nextPageToken?:string}>(
+        `${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events?${query}`,
+        {headers:{Authorization:`Bearer ${this.config.accessToken}`}});
       if(!Array.isArray(data.items))throw new GoogleCalendarReadError(502);
       for(const e of data.items){if(e.status==='cancelled'||e.transparency==='transparent'||!e.start?.dateTime||!e.end?.dateTime)continue;
         if(!e.id||!Number.isFinite(Date.parse(e.start.dateTime))||!Number.isFinite(Date.parse(e.end.dateTime))||Date.parse(e.end.dateTime)<=Date.parse(e.start.dateTime))throw new GoogleCalendarReadError(502);
@@ -79,19 +134,9 @@ export class GoogleCalendarClient {
       items: [{ id: this.config.calendarId }],
     };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.config.accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+    const data=await this.json<{calendars?:Record<string,{errors?:unknown;busy?:unknown}>}|null>(url,{
+      method:'POST',headers:{Authorization:`Bearer ${this.config.accessToken}`,'Content-Type':'application/json'},body:JSON.stringify(body),
     });
-
-    if (!res.ok) throw new GoogleCalendarReadError(res.status);
-    const data = await res.json().catch(() => { throw new GoogleCalendarReadError(502); }) as {
-      calendars?: Record<string, { errors?: unknown; busy?: unknown }>;
-    } | null;
     const calendar = data?.calendars?.[this.config.calendarId];
     // HTTP200でもカレンダー単位の失敗がある。未取得を「予定なし」にしない。
     if (!calendar || (calendar.errors !== undefined
@@ -111,7 +156,7 @@ export class GoogleCalendarClient {
    * Create an event on Google Calendar.
    * Returns the created event's ID.
    */
-  async createEvent(event: CreateEventInput): Promise<{ eventId: string }> {
+  async createEvent(event: CreateEventInput, signal?: AbortSignal): Promise<{ eventId: string }> {
     const url = `${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events`;
 
     const body = {
@@ -122,49 +167,29 @@ export class GoogleCalendarClient {
       ...(event.id ? { id: event.id } : {}),
     };
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.config.accessToken}`,
-        'Content-Type': 'application/json',
-      },
+    return this.request(url, {
+      method: 'POST', headers: { Authorization: `Bearer ${this.config.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-    });
-
-    // 呼び出し側が固定IDを指定した再試行は、受理済みの重複を成功として回収する。
-    if (res.status === 409 && event.id) return { eventId: event.id };
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`Google Calendar createEvent error ${res.status}: ${text}`);
-    }
-
-    const data = (await res.json()) as { id?: string };
-    if (!data.id) {
-      throw new Error('Google Calendar createEvent: response missing event id');
-    }
-
-    return { eventId: data.id };
+    }, async res => {
+      // 409だけで元の予定と断定しない。呼出し元がGETで固定IDと内容を照合する。
+      if (!res.ok) { void res.body?.cancel().catch(() => {}); throw new GoogleCalendarWriteError(res.status); }
+      const data = await res.json() as { id?: string };
+      if (!data.id) throw new GoogleCalendarWriteError(502);
+      return { eventId: data.id };
+    }, signal, 'write');
   }
 
   /**
    * Delete an event from Google Calendar.
    */
-  async deleteEvent(eventId: string): Promise<void> {
+  async deleteEvent(eventId: string, signal?: AbortSignal): Promise<void> {
     const url = `${GCAL_BASE}/calendars/${encodeURIComponent(this.config.calendarId)}/events/${encodeURIComponent(eventId)}`;
 
-    const res = await fetch(url, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${this.config.accessToken}`,
-      },
-    });
-
-    // 204 = success, 404/410 = already gone — all acceptable for idempotent delete.
-    // 変更の delete+create では、前回作成が失敗していた予約や相手側で消えた
-    // 予定が 404 を返す。それを失敗と数えると再試行が永久に通らない。
-    if (!res.ok && res.status !== 410 && res.status !== 404) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`Google Calendar deleteEvent error ${res.status}: ${text}`);
-    }
+    return this.request(url, { method: 'DELETE', headers: { Authorization: `Bearer ${this.config.accessToken}` } }, async res => {
+      if (!res.ok && res.status !== 410 && res.status !== 404) {
+        void res.body?.cancel().catch(() => {});
+        throw new GoogleCalendarWriteError(res.status);
+      }
+    }, signal, 'write');
   }
 }

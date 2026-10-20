@@ -7,6 +7,8 @@ import {
   type StyleCard,
 } from '@line-crm/shared';
 
+
+
 export class StyleError extends Error {
   constructor(
     public code: string,
@@ -44,11 +46,11 @@ export const features: Record<string, string | null> = {
   style: '/getting-started',
   booking: '/booking/menus',
   approval: '/booking/menus?tab=rules',
-  payment: null,
+  payment: '/booking/menus?tab=payments',
   reminders: '/reminders',
   stamps: '/visit-stamps',
   coupons: null,
-  tickets: null,
+  tickets: '/booking/menus?tab=passes',
   image: '/rich-menus',
   outcome: '/booking/menus',
   content: '/templates',

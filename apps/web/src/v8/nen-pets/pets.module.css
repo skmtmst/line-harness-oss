@@ -1,5 +1,5 @@
 /*
- * ★V8-B マイペット（wTIej・t2SMXX・eLjeQ・h7A2F）。
+ * ★V8-B マイペット（・・・）。
  * 枠・見出し・タブの段・数の帯の並びは型（ListPage）が持つ。ここは板の中の寸法だけ。
  * 数字は app/globals.css の [data-theme="v8"] の --tpl-nph-* に置く。
  */
@@ -236,7 +236,7 @@
   line-height: normal;
 }
 
-/* ペットの情報を直す（eLjeQ・窓の中身。段の間 14）。 */
+/* ペットの情報を直す（・窓の中身。段の間 14）。 */
 .editor {
   display: flex;
   align-self: stretch;
@@ -301,7 +301,7 @@
   line-height: var(--tpl-nph-hint-lh);
 }
 
-/* ごはんの目安（h7A2F）。中身の余白 上16・左右24・下24、カードの間 12、右のカード 380。 */
+/* ごはんの目安。中身の余白 上16・左右24・下24、カードの間 12、右のカード 380。 */
 .feeding {
   display: flex;
   flex-direction: column;

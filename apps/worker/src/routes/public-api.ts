@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -12,7 +13,8 @@ import {
   type IntegrationApiScope,
   type IntegrationApiTokenRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { fireEvent } from '../services/event-bus.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
@@ -83,7 +85,7 @@ publicApi.get('/api/public/v1/tags', async (c) => {
       data: (result.results ?? []).map((tag) => ({ id: tag.id, name: tag.name, color: tag.color })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_public_api_failed","route":"GET /api/public/v1/tags"}));
+    logger.error("routes_public_api_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -161,7 +163,7 @@ publicApi.post('/api/public/v1/friends/:friendId/tags', inputJsonBoundary(), asy
     }
     return c.json({ success: true, data: { friendId, tagId, added } }, added ? 201 : 200);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_public_api_failed","route":"POST /api/public/v1/friends/:friendId/tags"}));
+    logger.error("routes_public_api_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -205,7 +207,7 @@ async function readTagAssignedAt(db: D1Database, friendId: string, tagId: string
 /**
  * タグ変化を業務の受け口へ渡す（R436）。
  *
- * V6公開版は発生元の不変IDと所属が分かる出来事だけを受け付ける。
+ * 公開版は発生元の不変IDと所属が分かる出来事だけを受け付ける。
  * IDは「公開の付与:友だち:タグ:確定時刻」で、再送でも同じになる。
  * 旧自動化・加点も同じ1回に乗るので、呼び出し側は重複して呼ばない。
  */

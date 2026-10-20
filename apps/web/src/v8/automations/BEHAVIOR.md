@@ -1,6 +1,8 @@
+> 文書：オートメーション（V8）の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # オートメーション（V8）の動き（BEHAVIOR.md）
 
-対象：src/v8/automations の画面。今までの V8（`app/automations/list-v8.tsx`・`runs-v8.tsx`・
+対象：src/v8/automations の画面。今までの V8（[現役の入口・本体](README.md)・`runs-v8.tsx`・
 共通アクションの一覧・版の既存API）から動きを写し、
 見た目だけを型（ListPage・DetailPage）で絵どおりに組み直した。一覧と見本の入口はV8へ固定し、旧一覧の本体を除去した。確認/取得/権限/失敗の契約は現役の一覧を検査する。
 
@@ -13,7 +15,7 @@
 | 見本 | `templates.tsx` | `c7dxp` | `app/automations/page.tsx`（`?tab=templates`） |
 | 共通（頭・タブ・数の帯・閲覧のみの帯・権限） | `shell.tsx` | 上のすべて | — |
 
-ルールを作る（`/automations/new`・`M4torY`・`tJqST`）は `create/create.tsx`。見本（`c7dxp`）は 2026-10-07 にここへ一から書いた（今までの V8 は `app/automations/templates-v8.tsx`）。
+ルールを作る（`/automations/new`・`M4torY`・`tJqST`）は `create/create.tsx`。見本（`c7dxp`）は 2026-10-07 にここへ一から書いた（今までの V8 は [現役の入口・本体](README.md)）。
 
 ## 受け付ける URL と指定（今と同じ）
 - `/automations`（ルール）、`/automations?tab=templates`（見本）。

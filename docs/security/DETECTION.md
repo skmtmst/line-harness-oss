@@ -1,3 +1,5 @@
+> 文書：漏れたかもしれない、と気づくために｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 漏れたかもしれない、と気づくために
 
 2026-10-16 / B-343。目的は「絶対に漏れない」と思うことではなく、変化に気づいて被害を止めること。警告は事故の確定ではない。警告がないことも安全の証明ではない。
@@ -71,7 +73,7 @@ zsh ~/lh-work/tools/hq/heavy.sh pnpm --dir apps/worker exec tsx scripts/security
 zsh ~/lh-work/tools/hq/heavy.sh pnpm --dir apps/worker exec tsx scripts/security-monitor-benchmark.ts --negative-control
 ```
 
-2本目は索引をわざと外す対照。10万行で読み取りが201,804行に増え、AssertionError・終了1になるのが正しい。正常な索引・時差・既存行の補完は`security-monitor-index.test.ts`でも確認する。生の数表と実行計画は[測定結果](SECURITY-MONITOR-COST-1016.json)。
+2本目は索引をわざと外す対照。10万行で読み取りが201,804行に増え、AssertionError・終了1になるのが正しい。正常な索引・時差・既存行の補完は`security-monitor-index.test.ts`でも確認する。生の数表と実行計画は[測定結果](../document-archives.md#s05)。
 
 ### CPUの目安と月の見積もり
 

@@ -1,0 +1,23 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+/* 項目と値を直接並べ、顧客パネルの基本欄の固定幅とは独立させる。 */
+.rows {
+  display: grid;
+  grid-template-columns: minmax(var(--tpl-customer-label), max-content) minmax(0, 1fr);
+  gap: var(--tpl-fdt-group-gap);
+  margin: 0;
+  font-size: var(--polish-text-body);
+  line-height: var(--tpl-inbox-row-preview-lh);
+}
+.rows > dt {
+  color: var(--color-ink-secondary);
+  white-space: nowrap;
+}
+.rows > dd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  min-width: 0;
+}
+}

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 // N-062: 即時送信の直前に送信枠と後続アクション版を見直す。
@@ -235,7 +235,7 @@ describe('N-062 即時送信の直前再確認', () => {
 });
 
 
-describe('B-333 過去日時からの確認なし送信を防ぐ', () => {
+describe('過去日時からの確認なし送信を防ぐ', () => {
   test.each(['2000-01-01T00:00:00Z', 'not-a-date', ''])('作成・更新は不正な予約日時 %s を保存しない', async (scheduledAt) => {
     const db = createTestD1(); seedBase(db.raw);
     const app = setupApp(db);

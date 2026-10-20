@@ -1,5 +1,5 @@
 /**
- * N-065 契約テスト: 予約・イベント・Meet の取消/日程変更を V6 へ同期する。
+ * N-065 契約テスト: 予約・イベント・Meet の取消/日程変更を へ同期する。
  *
  * 本物の SQLite (createTestD1) に当て、SQL そのものが約束を守るか確かめる。
  * 外部 LINE・顧客・Calendar へは送らない。対象は enroll / cancel / reschedule
@@ -362,7 +362,7 @@ function meetInput(externalEventId: string, startsAt: string, endsAt: string, fr
 }
 
 describe('個別相談の取消・日程変更', () => {
-  it('登録で V6 へ連動し、日程変更で未来予定だけ移す (二重登録なし)', async () => {
+  it('登録で へ連動し、日程変更で未来予定だけ移す (二重登録なし)', async () => {
     const { db, raw } = createTestD1();
     seedAccount(raw, ACCOUNT_1);
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
@@ -564,13 +564,13 @@ describe('取消と配信の競合', () => {
 });
 
 describe('部分失敗後の再試行', () => {
-  it('業務ずみでも V6 取消を再実行できる (booking)', async () => {
+  it('業務ずみでも 取消を再実行できる (booking)', async () => {
     const { db, raw } = createTestD1();
     seedAccount(raw, ACCOUNT_1);
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
     seedTriggerRule(raw, 'rule-booking-1', 'booking');
 
-    // 1回目で業務だけ終わり V6 が残った想定。2回目の取消は V6 を止める。
+    // 1回目で業務だけ終わり が残った想定。2回目の取消は を止める。
     await enrollByTrigger(db, {
       triggerType: 'booking',
       friendId: 'friend-1',
@@ -594,7 +594,7 @@ describe('部分失敗後の再試行', () => {
     expect(raw.prepare(`SELECT COUNT(*) AS c FROM friend_reminders`).get()).toEqual({ c: 1 });
   });
 
-  it('業務ずみでも V6 取消を再実行できる (event)', async () => {
+  it('業務ずみでも 取消を再実行できる (event)', async () => {
     const { db, raw } = createTestD1();
     seedAccount(raw, ACCOUNT_1);
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
@@ -673,7 +673,7 @@ describe('Meet の友だち変更', () => {
       meetInput('google-event-a', at(0), at(30 * MINUTE_MS), 'friend-1'),
       now,
     );
-    // 途中失敗を再現: 業務だけ新 friend へ進み、V6 が旧 friend のまま残る。
+    // 途中失敗を再現: 業務だけ新 friend へ進み、が旧 friend のまま残る。
     raw.prepare(`UPDATE meet_consultations SET friend_id = 'friend-2' WHERE external_event_id = ?`)
       .run('google-event-a');
 
@@ -693,7 +693,7 @@ describe('Meet の友だち変更', () => {
 });
 
 describe('日程変更の途中失敗', () => {
-  it('再送で V6 が新起点へ直る (Meet)', async () => {
+  it('再送で が新起点へ直る (Meet)', async () => {
     const { db, raw } = createTestD1();
     seedAccount(raw, ACCOUNT_1);
     insertFriend(raw, 'friend-1', { line_account_id: ACCOUNT_1 });
@@ -707,7 +707,7 @@ describe('日程変更の途中失敗', () => {
     );
     const enrollment = enrollmentId(raw, 'friend-1');
     seedRun(raw, 'run-old', enrollment, 'friend-1', 'rule-booking-1', 'queued', at(-HOUR_MS));
-    // 途中失敗を再現: 業務だけ新日へ進み、V6 が旧日のまま残る。
+    // 途中失敗を再現: 業務だけ新日へ進み、が旧日のまま残る。
     raw.prepare(`UPDATE meet_consultations SET starts_at = ?, ends_at = ? WHERE external_event_id = ?`)
       .run(at(7 * DAY_MS), at(7 * DAY_MS + 30 * MINUTE_MS), 'google-event-a');
 
@@ -742,7 +742,7 @@ describe('日程変更の途中失敗', () => {
     );
     // 前日通知は送りずみ (履歴)、1時間前はまだ未来。
     raw.prepare(
-      `UPDATE meet_consultation_reminders
+      `UPDATE meet_consultation_notification_runs
           SET status = 'sent', sent_at = ?, updated_at = ?
         WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
           AND kind = 'day_before'`,
@@ -757,12 +757,14 @@ describe('日程変更の途中失敗', () => {
     // 送りずみは pending に戻さず sent_at も消さない (二重送信・履歴欠け防止)。
     expect(
       raw.prepare(
-        `SELECT status, sent_at, scheduled_at FROM meet_consultation_reminders
+        `SELECT status, sent_at, scheduled_at FROM meet_consultation_notification_runs
           WHERE consultation_id = (SELECT id FROM meet_consultations WHERE external_event_id = ?)
-          ORDER BY kind`,
+          ORDER BY kind,schedule_revision`,
       ).all('google-event-a'),
     ).toEqual([
       { status: 'sent', sent_at: at(-DAY_MS), scheduled_at: at(-DAY_MS) },
+      {status:'pending',sent_at:null,scheduled_at:at(6*DAY_MS)},
+      {status:'cancelled',sent_at:null,scheduled_at:at(-HOUR_MS)},
       { status: 'pending', sent_at: null, scheduled_at: at(7 * DAY_MS - HOUR_MS) },
     ]);
   });
@@ -1024,7 +1026,7 @@ describe('Meet の友だち変更の失敗時', () => {
     );
     const oldEnrollment = enrollmentId(raw, 'friend-1');
 
-    // V6 登録だけ落とす失敗注入 (相談の保存は通る)。
+    // 登録だけ落とす失敗注入 (相談の保存は通る)。
     raw.exec(
       `CREATE TRIGGER v6_enroll_fail BEFORE INSERT ON friend_reminders
        BEGIN SELECT RAISE(ABORT, 'injected-enroll-failure'); END;`,
@@ -1075,7 +1077,7 @@ describe('Meet の友だち変更の失敗時', () => {
     );
     const oldEnrollment = enrollmentId(raw, 'friend-1');
 
-    // V6 登録の失敗が続く想定 (初回・再送とも INSERT が落ちる)。
+    // 登録の失敗が続く想定 (初回・再送とも INSERT が落ちる)。
     raw.exec(
       `CREATE TRIGGER v6_enroll_fail BEFORE INSERT ON friend_reminders
        BEGIN SELECT RAISE(ABORT, 'injected-enroll-failure'); END;`,

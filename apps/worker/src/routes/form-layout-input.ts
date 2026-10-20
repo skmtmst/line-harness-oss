@@ -1,4 +1,4 @@
-import { layoutToFields, normalizeLayout, formBlockTypeError, validateFormDefinition } from '@line-crm/shared';
+import { collectInputs, formFileKinds, layoutToFields, normalizeLayout, formBlockTypeError, validateFormDefinition } from '@line-crm/shared';
 
 /**
  * 受け取った layout を、保存できる形にそろえる。
@@ -12,6 +12,9 @@ export function normalizeLayoutInput(raw: unknown): { layout: string; fields: st
   if (typeError) return { error: typeError };
   const layout = normalizeLayout(raw);
   if (!layout) return null;
+  if (collectInputs(layout).some(block => block.type === 'file' && formFileKinds(block).includes('identity'))) {
+    return { error: '本人確認書類は受け取れません。画像・PDFの質問を使ってください' };
+  }
   // 保存できる定義かをここで止める。画面側と同じ `validateFormDefinition`
   // を使うので、「画面では通ったのに保存で弾かれる」にならない。
   // 分岐の循環や設定途中の動作は下書きとして残せるため、ここでは見ず

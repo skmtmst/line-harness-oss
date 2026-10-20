@@ -1,4 +1,4 @@
-import type { WebinarActionInput } from './webinars.js';
+import type { WebinarActionInput } from './webinars/types/index.js';
 
 
 export async function webinarActionReferenceValid(

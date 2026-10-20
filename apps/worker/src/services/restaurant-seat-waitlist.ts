@@ -1,8 +1,8 @@
 import { openSeatTables } from './restaurant-closures.js';
-import { assignRestaurantTable } from './booking-assignment.js';
-import { d1AssignmentSettingsStore } from './booking-assignment-settings.js';
-import type { Env } from '../index.js';
-import { dispatchWaitlistInvites, finishExpiredWaitlists, waitlistHoldMinutes } from './booking-waitlist.js';
+import { assignRestaurantTable } from '../features/booking/booking-assignment/index.js';
+import { d1AssignmentSettingsStore } from '../features/booking/booking-assignment-settings/index.js';
+import type { Env } from '../worker-env.js';
+import { dispatchWaitlistInvites, finishExpiredWaitlists, waitlistHoldMinutes } from '../features/booking/booking-waitlist/index.js';
 export const DEFAULT_SEAT_WAITLIST_HOLD_MINUTES = 30;
 export interface SeatWaitlistSlot { storeId: string; startsAt: string; tableId: string; }
 export interface SeatWaitlistEntry { id: string; store_id: string; starts_at: string; ends_at: string | null; guest_count: number; customer_name: string; customer_phone: string | null; line_uid: string | null; identity_key: string; status: string; hold_minutes: number; table_id: string | null; invited_at: string | null; hold_expires_at: string | null; notified_at: string | null; created_at: string; }

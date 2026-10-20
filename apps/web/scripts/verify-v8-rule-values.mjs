@@ -1,4 +1,4 @@
-/** B-159/161/180 の採用済みの値を、CSS の上書き・変数参照まで解いて照合する。 */
+/** /161/180 の採用済みの値を、CSS の上書き・変数参照まで解いて照合する。 */
 import { readFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import postcss from 'postcss'
@@ -107,11 +107,4 @@ export function verifyRuleBindings(readCss) {
   })
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const errors = [
-    ...verifyRuleValues(readFileSync(new URL('../src/app/globals.css', import.meta.url), 'utf8')),
-    ...verifyRuleBindings(file => readFileSync(new URL(`../src/components/shared/${file}.module.css`, import.meta.url), 'utf8')),
-  ]
-  if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1 }
-  else console.log(`V8 の決まりの値: ${Object.keys(RULE_VALUES).length} 件・部品の参照 ${RULE_BINDINGS.length} 件一致（B-159/161/180）`)
-}
+if (process.argv[1] && process.argv[1].endsWith('verify-v8-rule-values.mjs')) throw new Error('固定の見た目の値の実行検査は廃止しました')

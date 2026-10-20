@@ -1,5 +1,5 @@
 /*
- * ★V8 統括のテンプレート（LRc93・X4JcOf・meBRB）の、画面に依らない小さな計算。
+ * ★V8 統括のテンプレート（・・）の、画面に依らない小さな計算。
  * src/v8 からは @/app を読めないので、今の画面（app/hq/templates/template-console.tsx・
  * template-definition-editor.tsx・image-size.ts）から写した。中身・判定は同じ。
  * 片方を直したらもう片方も同じに直す。

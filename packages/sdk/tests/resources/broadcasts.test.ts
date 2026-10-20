@@ -13,7 +13,7 @@ function mockHttp(overrides: Partial<HttpClient> = {}): HttpClient {
 }
 
 describe('BroadcastsResource', () => {
-  it('list() calls GET /api/broadcasts and returns Broadcast[]', async () => {
+  it('list calls GET /api/broadcasts and returns Broadcast[]', async () => {
     const broadcasts = [
       {
         id: 'bc-1',

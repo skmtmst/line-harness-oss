@@ -84,7 +84,7 @@ describe('一覧の取得失敗からその場で読み直せる契約', () => {
 
     expect(markEdit).toContain('編集する対応マークが指定されていません')
     expect(markEdit).toContain('if (!id)')
-    // 対象未指定は ★V7 TargetMissing の unspecified（一覧へ戻るだけ）。
+    // 対象未指定は ★管理画面 TargetMissing の unspecified（一覧へ戻るだけ）。
     expect(connections).toContain('kind="unspecified"')
     expect(connections).toContain('つながりを見るメニューが指定されていません')
     expect(connections).toContain('backHref="/rich-menus"')

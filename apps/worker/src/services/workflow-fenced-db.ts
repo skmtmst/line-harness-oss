@@ -1,4 +1,5 @@
 import { workflowFence, type WorkflowStepRef } from '@line-crm/db';
+
 import { classifySingleStatement } from './incoming-webhook-fenced-db.js';
 /** All receipt-owned writes share an atomic D1 transaction with their lease fence. */
 export function workflowFencedDb(

@@ -36,24 +36,24 @@
 .cell { min-width: 0; }
 }
 
-/* B-152・仕上げ3 */
+/* ・仕上げ3 */
 :root .row { height: var(--polish-table-row); min-height: var(--polish-table-row); font-size: var(--polish-text-body); padding-block: 0; }
 :root .row[data-head] { min-height: var(--polish-table-head); height: var(--polish-table-head); padding-block: 0; background: var(--polish-table-head-bg); font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); }
 :root .row:not([data-head]):hover { background: var(--polish-table-hover); }
 :root .cell[data-align='right'] { text-align: right; font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
 :root .cell[data-align='right'] + .cell { padding-inline-start: var(--polish-table-number-gap); }
 
-/* B-178：格子の表も一覧の型で同じ行高にする。 */
+/* ：格子の表も一覧の型で同じ行高にする。 */
 :root [data-list-skeleton] .row { height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h)); padding-block: 0; padding-inline: var(--tpl-list-cell-pad); }
 :root [data-list-skeleton] .row[data-head] { height: var(--tpl-list-head-h); min-height: var(--tpl-list-head-h); }
 
-/* B-217・B-209：枠と影なし、色と線を端まで。 */
+/* ・：枠と影なし、色と線を端まで。 */
 html:root .table { padding: 0; gap: 0; border-radius: var(--radius-flat); outline-color: transparent; box-shadow: none; }
 html:root .table .row { padding-inline: var(--tpl-list-inset); }
 html:root .table [data-list-name-cell] { color: var(--color-ink); font-weight: 700; white-space: nowrap; }
 html:root .row[data-broken]:hover { background: var(--color-status-danger-soft); }
 
-/* B-254: one rendered line is 52; two or three are 60. The table sets the count. */
+/* : one rendered line is 52; two or three are 60. The table sets the count. */
 html:root .table .row[data-list-content-lines] {
   --list-content-row-h: var(--tpl-list-row-h);
   height: var(--list-content-row-h); min-height: var(--list-content-row-h);
@@ -67,8 +67,8 @@ html:root .table[data-list-density-scope='general'] .row:not([data-head]) {
 }
 
 /*
- * 設定の板（SettingsPage）の中の表は、絵（PfA4o・cIdA2・I2V65v・DrwMm）どおり影のカードで囲む
- * （§6.2・§6.18。2026-10-15 判定役）。一覧の型の平らな表（B-217）は外側の白い板の端まで
+ * 設定の板（SettingsPage）の中の表は、絵（・・・）どおり影のカードで囲む
+ * （§6.2・§6.18。2026-10-15 判定役）。一覧の型の平らな表は外側の白い板の端まで
  * 伸びるが、設定の板では中のメニューの右に置く本文の1段なので、外枠が無いと区切りが見えない。
  * 枠を外したい表は framed={false} を渡す（はじめの設定・健全性チェック）。
  */

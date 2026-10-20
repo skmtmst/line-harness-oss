@@ -26,7 +26,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 機能設定（Pencil `ywFJT`・1152 `bKipf`・競合 `ziYCN`・状態の見本帳 `bR6a1`）。
+ * ★V8 機能設定（Pencil ・1152 ・競合 ・状態の見本帳 ）。
  *
  * 動き（読み込み・保存・競合・オフ前の影響確認・離脱の番兵・初期値に戻す・並びを変える）は
  * 今までの V8（app/settings/feature-settings-v8.tsx）と同じ。処理は同じ場所の
@@ -131,7 +131,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
 }
 
 /** 既定で開く区分（絵では「メイン」「配信」「設定」が開いている）。 */
-/* 絵（ywFJT・bKipf）では、最初に開いているのはメインと配信だけ。 */
+/* 絵（・）では、最初に開いているのはメインと配信だけ。 */
 const DEFAULT_OPEN = new Set(['basic', 'delivery'])
 /** 絵の並び：「設定」の区分はいちばん下（飲食店向けのあと）。ほかは今までの並びのまま。 */
 const LAST_GROUP_IDS = ['settings']
@@ -320,7 +320,7 @@ export default function FeatureSettingsScreen() {
   const ready = Boolean(selectedAccountId) && !loading && !loadFailed
 
   /*
-   * ★V8 `ziYCN`：ほかの人が先に保存した。題の下に帯を出し、編集中身は残す。
+   * ★V8 ：ほかの人が先に保存した。題の下に帯を出し、編集中身は残す。
    * 保存は下の帯から押すので、そのままだと帯が画面の外に出る。帯が出たら板のいちばん上へ戻して見せる。
    */
   const conflictRef = useRef<HTMLDivElement>(null)

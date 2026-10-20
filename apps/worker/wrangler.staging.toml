@@ -65,6 +65,9 @@ retry_delay = 60
 
 [vars]
 DEPLOY_ENV = "staging"
+# Q-75 is opened deliberately by the staging operator; enabling it forces the outbound stop.
+STAGING_QA_ENABLED = "false"
+STAGING_QA_OUTBOUND_DISABLED = "false"
 RESTAURANT_TEST_ENABLED = "true"
 GOOGLE_BUSINESS_ENABLED = "true"
 RT_DELIVERY_UBEREATS_ENVIRONMENT = "sandbox"

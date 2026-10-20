@@ -25,7 +25,7 @@ async function apiState(value) {
 async function visibleText(text) { await page.getByText(text, { exact: true }).waitFor(); }
 try {
   assert.ok((await fetch(`${api}/__qa/reset`, { method: 'POST' })).ok);
-  await page.goto(`${base}/affiliate`);
+  await page.goto(`${base}/affiliate?liffId=qa`);
   await page.getByRole('button', { name: '使い道を選ぶ' }).click();
   await visibleText('QA 割引券');
   await page.getByRole('button', { name: 'これを選ぶ' }).click();

@@ -1,7 +1,7 @@
 'use client'
 
 import { useFeatureAccess } from '@/lib/use-feature-access';
-import { useStaffRole } from '@/lib/staff-role';
+import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Circle, CircleCheck, CircleX, GitBranch, Pencil, RefreshCw, ShieldCheck } from 'lucide-react';
@@ -18,7 +18,7 @@ import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
-import { richMenuError, richMenuErrorAll, unpublishWarningText } from '@/v8/rich-menus/errors';
+import { richMenuError, richMenuErrorAll, unpublishWarningText } from '@/v8/rich-menus/public/errors/index'
 import { audienceOf, progressStatusText, runAudienceText, runStamp, type ProgressStep, type ReconcileDiff } from './model';
 import styles from './detail.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
@@ -52,7 +52,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
 
   const role = useStaffRole()
   const canOperate = useFeatureAccess('richMenus')
-  const canInspectOperations = role === 'owner' || role === 'admin'
+  const canInspectOperations = canManageRole(role)
   const aggregateOnly = role === 'staff' || role === 'viewer'
 
   const [progress, setProgress] = useState<{ steps: ProgressStep[]; message: string | null; failed: boolean; completed: boolean } | null>(null)

@@ -1,3 +1,4 @@
+import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // friend_add auto-enroll gating on GET /auth/callback (LIFF/OAuth path).
@@ -45,7 +46,7 @@ const dbMocks = {
   getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   createUser: vi.fn().mockResolvedValue({ id: 'U-uuid' }),
-  getUserByEmail: vi.fn().mockResolvedValue(null),
+  getUserByEmailForAccess: vi.fn().mockResolvedValue(null),
   linkFriendToUser: vi.fn().mockResolvedValue(undefined),
   getEntryRouteByRefCode: vi.fn().mockResolvedValue(null),
   recordRefTracking: vi.fn().mockResolvedValue(undefined),
@@ -57,7 +58,7 @@ const dbMocks = {
   getAffiliateById: vi.fn().mockResolvedValue(null),
   addTagToFriend: vi.fn().mockResolvedValue(undefined),
   getLineAccountByChannelId: vi.fn().mockResolvedValue(null),
-  getLineAccountById: vi.fn().mockResolvedValue(null),
+  getLineAccountById: vi.fn().mockResolvedValue({ id: 'account-main', login_channel_id: '2000000000', tenant_id: null }),
   isLineAccountTenantActive: vi.fn().mockResolvedValue(true),
   getScenarios: vi.fn().mockResolvedValue([]),
   enrollFriendInScenario: vi.fn().mockResolvedValue(null),
@@ -97,6 +98,7 @@ const env = {
   WORKER_URL: 'https://worker.example.com',
   LINE_LOGIN_CHANNEL_ID: '2000000000',
   LINE_LOGIN_CHANNEL_SECRET: 'secret',
+  LINE_CHANNEL_SECRET: 'test-oauth-secret',
   LINE_CHANNEL_ACCESS_TOKEN: 'env-token',
 } as unknown as import('../index.js').Env['Bindings'];
 
@@ -127,11 +129,13 @@ function installFetchMock() {
   );
 }
 
-function callback() {
-  const state = btoa(JSON.stringify({}));
+async function callback() {
+  const signed = await signedLiffState(env.LINE_CHANNEL_SECRET, {});
+  const state = signed.state;
   return worker.fetch(
     new Request(
       `https://worker.example.com/auth/callback?code=abc&state=${encodeURIComponent(state)}`,
+      { headers: { Cookie: signed.cookie } },
     ),
     env,
     { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,

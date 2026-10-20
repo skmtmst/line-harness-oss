@@ -11,7 +11,7 @@ import { TextField } from '@/components/shared/text-field'
 import { authRequest, emailError, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 
 /**
- * パスワードを忘れた。★V6 36-6-A（`fmDeV`、カード `dVI5v`）。
+ * パスワードを忘れた。★管理画面 36-6-A（`fmDeV`、カード `dVI5v`）。
  *
  * 登録済みかどうかは返事で分からない（本人にだけメールが届く）。
  * LINE だけの権限者もここからパスワードを持てる。

@@ -1,9 +1,10 @@
+import { logger } from '@line-crm/shared/server';
 import { accountScopeWhere, accountScopeBindings, adminAccountScope, visibleAccountNames } from '../services/profile-refresh-scope.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getBroadcastById, resolveLineCredential } from '@line-crm/db';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -20,7 +21,7 @@ const profileRefresh = new Hono<Env>();
  * cross-account dedup が壊れて同一人物が別人カウントされる。
  *
  * 動作: ?offset & ?limit でバッチ処理。 ?accountId で単一アカウントに絞れる。
- * 内部で account ごとに channel_access_token を選んで getProfile() を呼ぶ。
+ * 内部で account ごとに channel_access_token を選んで getProfile を呼ぶ。
  *
  * Caller (cron / curl) は hasMore=false まで offset を進めて再 POST する想定。
  */
@@ -122,7 +123,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), inputJs
           notFound += 1;
         } else {
           otherErrors += 1;
-          console.error(JSON.stringify({"code":"routes_profile_refresh_failed","route":"POST /api/admin/refresh-profiles"}));
+          logger.error("routes_profile_refresh_failed");
         }
       } finally {
         processed += 1;

@@ -1,3 +1,5 @@
+> 文書：18 流入と計測 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 18 流入と計測 操作と挙動（受け入れ）
 
 要件の正本：[18 流入と計測](../../v6-requirements/v6-18-inflow-measurement-requirements-draft.md)・[V8 で足した機能 F-21・F-22](../v8-feature-additions.md)・[共通基盤 §2〜§3・§6-2・§8・§9・§11](../../v6-requirements/v6-shared-platform-requirements.md)・[索引 §5 横断契約](../../v6-requirements/v6-requirements-master-index.md)。オーナーの決定は `~/lh-work/design/v8/V8-INTRO-CHECKLIST.md` の B-174（流入経路に「クーポン付き」）・B-193〜B-201（一覧の行の操作は「…」へ・QR の小窓は1つの形）・B-314（実装前は共通の「現在準備中です」）。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。

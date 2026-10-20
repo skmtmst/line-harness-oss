@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { expectedWebhookUrl } from '../lib/webhook-endpoint.js';
 import { issueLineAccessToken, LineTokenIssueError } from './token-refresh.js';
 

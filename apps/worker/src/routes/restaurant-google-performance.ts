@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第4段：パフォーマンス表示（GB-9 Zq8DN）。
@@ -8,7 +9,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
  * - 「未取得」と「0件」を区別する。期間内が全部未取得の指標は null（画面は「—」）。
  */
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from '../services/db-router.js';
 import { processGoogleBusinessDailyMetrics } from '../services/google-business-resync.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -34,7 +35,7 @@ interface MetricsRow {
 }
 
 function jstToday(): string {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate();
 }
 
 function daysBefore(isoDate: string, days: number): string {

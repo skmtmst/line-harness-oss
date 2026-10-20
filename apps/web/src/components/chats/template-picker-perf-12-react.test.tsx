@@ -67,7 +67,7 @@ afterEach(() => {
 
 /*
  * 検索のデバウンス(250ms)を越える。偽の時計で進める（本物の時間を待たない）。
- * デバウンスは打った瞬間から数えるので、打つ前に fakeClock() で替えておき、越えたら本物の時計へ戻す。
+ * デバウンスは打った瞬間から数えるので、打つ前に fakeClock で替えておき、越えたら本物の時計へ戻す。
  */
 const fakeClock = () => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
 const debounce = async () => {

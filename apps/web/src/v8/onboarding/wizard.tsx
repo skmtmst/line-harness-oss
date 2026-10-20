@@ -1,69 +1,45 @@
 'use client'
+import type { WizardStep, Props, Pair, SummaryData } from './wizard-types'
+export type { WizardStep, Props, Pair, SummaryData } from './wizard-types'
 
 import { Steps } from '@/components/templates/steps'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog,{ DialogActions } from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Link from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
-import RadioCard,{ RadioCardGroup } from '@/components/shared/radio-card'
+import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import EntitySelect from '@/components/shared/entity-select'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
-import { type StarterSetItem } from '@/lib/api-styles'
-import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
-import { ArrowRight,Hourglass,Info,Play } from 'lucide-react'
+
+import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
+import { ArrowRight, Hourglass, Info, Play } from 'lucide-react'
 import { SetupIcon } from './icons'
-import {
-LOOK_CHOICES,
-STYLE_CHOICES,
-choiceLabel,
-styleLabel,
-type StarterItemState,type StyleState
-} from './model'
+import { LOOK_CHOICES, STYLE_CHOICES, choiceLabel, styleLabel } from './model'
 import { SampleMenuTiles } from './sample-menu'
 import { useWizard } from './use-wizard'
 import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
-
-
-
-/*
- * はじめの質問（★V8 修正案の列 VHp7p：xxpM9 スタイル選び・RZW83 見た目・lS1Gh/rJ36f 1問の画面・
- * oKSsG 最後の［まとめて動かす］。決まり B-311・B-313）。動きは BEHAVIOR.md。
- *
- * 窓の幅は V8 の 4 段の 960（xxpM9 の絵は 880 → 絵を直す）。
- */
-
-export type WizardStep = number | 'summary'
-
-export type Props = {
-  accountId: string
-  state: StyleState
-  /** 開く手順（0＝スタイル、1＝見た目、2〜＝質問、'summary'＝最後の一覧）。 */
-  initialStep?: WizardStep
-  onClose: (changed: boolean) => void
-}
-
-export type Pair = { item: StarterSetItem; state: StarterItemState }
-export type SummaryData = { inserted: Pair[]; activation: Pair[] }
+import { useStarterMenu } from './use-starter-menu'
+import SetupLinks from './setup-links'
 
 /*
- * B-335 (1)：スタイルを変えると、ダッシュボードが数える予約が変わる（前の予約は消えないが、出なくなる）。
+ *  (1)：スタイルを変えると、ダッシュボードが数える予約が変わる（前の予約は消えないが、出なくなる）。
  * 「データはそのまま使えます」は、前の予約も見えることを口が保証してから出す。今は前のスタイルの予約の行き先を出す。
  */
 const BOOKING_PLACE: Record<AccountStyle, string> = {
   restaurant: '予約台帳', salon: '予約管理', consult: '予約管理', lesson: 'イベント予約', ec: '予約管理', standard: '予約管理',
 }
 
-
 export default function StyleSetupWizard({ accountId, state, initialStep = 0, onClose }: Props) {
   const { style, answers, step, setStep, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, close, activate } = useWizard({ accountId, state, initialStep, onClose })
 
   const label = styleLabel(style)
+  const menu = useStarterMenu(accountId, style)
   const head = step === 0
     ? { title: 'はじめに、使い方を教えてください', description: '答えに合わせて、メニュー・見本・設定をまとめて入れます。1 分ほどで終わります。' }
     : step === 1
@@ -136,7 +112,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
           </RadioCardGroup>
           <Card surface="muted" layout="vertical" contentPadding="var(--polish-space-card)" gap="var(--ob-panel-gap)" role="complementary" aria-label="入る見本">
             <div className={styles.panelHead}><span className={styles.panelTitle}>入る見本</span><StatusBadge tone="neutral" dot>見本</StatusBadge></div>
-            <SampleMenuTiles style={style} />
+            {menu.error ? <ListState kind="error" title="見本を読み込めませんでした" error={menu.error} onRetry={menu.reload} /> : menu.loading ? <ListState kind="loading" title="見本を確認しています" /> : <SampleMenuTiles style={style} buttons={menu.buttons} />}
             <p className={styles.panelNote}>{`中身が決まっていないボタンは、お客さまには「${PREPARING_WORD}」と出します。`}</p>
           </Card>
         </div>
@@ -163,6 +139,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
             </div>
           </RadioCardGroup>
           {where(`あとから変えられます（${question.where}）。`)}
+          {!question.preparing ? <Link href={question.manualHref} className={styles.link}>設定の画面を開く</Link> : null}
         </div>
       </div>
     )
@@ -199,6 +176,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
             <p className={styles.cardFoot}>自動で送る物は全部止めて入れています。オンにした物だけ、［まとめて動かす］で動き始めます。</p>
           </section>
         </div>
+        <SetupLinks style={style} />
         {skipped.length > 0 ? (
           <section className={styles.skipped} aria-labelledby="setup-skipped">
             <div className={styles.cardHead}><h3 id="setup-skipped" className={styles.cardTitle}>入れなかった物（あとで設定する）</h3><span className={styles.cardMetaEnd}>はじめにやることに残ります</span></div>

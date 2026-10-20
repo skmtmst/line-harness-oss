@@ -25,7 +25,7 @@ type Phase = 'loading' | 'ready' | 'empty' | 'error'
  * 登録メディアを別の機能から選ぶ共通の窓（N-193 / N-205）。
  *
  * 今まで app/contents・v8/template-edit・v8/form-edit に3つの写しがあったのを、
- * ここ1つにまとめた（B-128）。画像を入れる所（media-slot）の「登録メディアから選ぶ」から開く。
+ * ここ1つにまとめた。画像を入れる所（media-slot）の「登録メディアから選ぶ」から開く。
  *
  * - 名前検索とページ送りを併用できる（検索すると1ページ目へ戻る）。
  * - 読込中・0件・失敗を分けて出す。失敗は「読み直す」でやり直せる。
@@ -39,6 +39,7 @@ export default function MediaPickerDialog({
   kind,
   title = '登録メディアから選ぶ',
   description,
+  accountOnly = false,
   onClose,
   onSelect,
 }: {
@@ -48,6 +49,8 @@ export default function MediaPickerDialog({
   kind?: MediaItem['kind']
   title?: string
   description?: string
+  /** 写真など、共有メディアを認めない保存先では選択肢も同じ境界へ絞る。 */
+  accountOnly?: boolean
   onClose: () => void
   onSelect: (item: MediaItem) => void
 }) {
@@ -100,7 +103,7 @@ export default function MediaPickerDialog({
         }
         // 別アカウントの候補は出さない。共有（null）はどのアカウントでも使える。
         const scoped = response.data.items.filter(
-          (item) => item.lineAccountId == null || item.lineAccountId === requestedAccount,
+          (item) => item.lineAccountId === requestedAccount || (!accountOnly && item.lineAccountId == null),
         )
         setItems(scoped)
         setTotal(response.data.total)
@@ -110,7 +113,7 @@ export default function MediaPickerDialog({
         if (requestRef.current !== request) return
         setPhase('error')
       })
-  }, [open, accountId, kind, query, page, reloadKey])
+  }, [open, accountId, accountOnly, kind, query, page, reloadKey])
 
   const search = () => {
     setPage(1)

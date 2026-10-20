@@ -5,7 +5,7 @@ export interface SelectOption {
   value: string
   label: string
   disabled?: boolean
-  /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。v7 では出さない。 */
+  /** ★V8 の開いた中身で行の先頭に出す印（対応状況の色の点など）。互換経路では出さない。 */
   leading?: ReactNode
   /** ★V8 の開いた中身で名前の下に出す1行の説明（「押したら」YPzmo）。候補が多く間引く一覧では出さない。 */
   description?: string
@@ -47,16 +47,16 @@ export interface SelectProps {
   value: string
   /**
    * 箱の幅（px）。渡すと size の幅を上書きする
-   * （x6QsVz の絞り込み欄 122〜136 など板ごとの絵幅）。
+   * （ の絞り込み欄 122〜136 など板ごとの絵幅）。
    */
   width?: number
   /**
    * 見せ方。既定 'box' は枠の箱。'text' は枠なし文字＋上下矢印
-   * （x6QsVz の並び替えどおり）。'pill' は対応状況の丸い札。V8 にだけ適用する。
+   * （ の並び替えどおり）。'pill' は対応状況の丸い札。V8 にだけ適用する。
    */
   treatment?: 'box' | 'text' | 'pill'
   /**
-   * 箱の先頭の図柄（v19Ivv のよく使う絞り込みの栞どおり）。
+   * 箱の先頭の図柄（ のよく使う絞り込みの栞どおり）。
    * 渡さなければ出ない。
    */
   icon?: ReactNode

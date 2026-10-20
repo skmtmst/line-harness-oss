@@ -1,5 +1,7 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import type { ReactNode } from 'react'
 import { CalendarDays, CalendarPlus, CalendarX, CircleAlert, Clock, Info, MessageSquare, User } from 'lucide-react'
 import { BookingPage, BookingSidebarLinks, BookingSidebarNotes, BookingSidebarSection } from '@/components/templates/booking-page'
@@ -13,9 +15,11 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { ReservationFacts, ReservationSource } from '@/components/shared/reservation-board'
 import StatusBadge from '@/components/shared/status-badge'
 import styles from './next-booking.module.css'
-import { formatDay, formatNumber, formatTime } from '@/lib/format'
+import { formatDay, formatTime } from '@/lib/format'
 import { jstDate } from '@/lib/jst-datetime'
 import type { BookingRequest } from '@/lib/api'
+import type { AccountStyle } from '@line-crm/shared'
+import { bookingWords } from './words'
 
 type Availability = { status: 'loading' | 'ready' | 'error' | 'unconfigured'; slots: { staffId: string; date: string; start: string; remaining: number; state: string }[] }
 export function dayBookingSummary(rows: BookingRequest[], date: string, availability: Availability) {
@@ -30,19 +34,21 @@ export function dayBookingSummary(rows: BookingRequest[], date: string, availabi
     next: active.filter(row => ['requested', 'confirmed'].includes(row.status) && Date.parse(row.ends_at) > Date.now()).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))[0] }
 }
 
-export default function PeopleDayFrame({ view, date, rows, ready, availability, actions, canWrite, onOpen, children }: {
+export default function PeopleDayFrame({ view, date, rows, ready, availability, actions, canWrite, onOpen, children, usageStyle }: {
+  usageStyle?: AccountStyle
   view: 'day' | 'week'; date: string; rows: BookingRequest[]; ready: boolean; availability: Availability
   actions: ReactNode; canWrite: boolean; onOpen: (id: string) => void; children: ReactNode
 }) {
+  const words = bookingWords(usageStyle)
   if (view === 'week') return <BookingPage title="予約管理" actions={actions}>{children}</BookingPage>
   const summary = dayBookingSummary(rows, date, availability)
   const value = (count: number) => ready ? count : null
   const next = ready ? summary.next : undefined
   const day = formatDay(`${date}T00:00:00+09:00`)
-  const formatMonthDay = (iso: string) => { const d = new Date(Date.parse(iso) + 9 * 3600000); return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}` }
+  const formatMonthDay = (iso: string) => { const d = japanCalendar(new Date(Date.parse(iso))); return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}` }
   const period = date === jstDate() ? '今日' : day
   const stats = <KpiBand layout="booking">
-    <KpiCard presentation="band" icon={<CalendarDays size={16} aria-hidden />} title={`${period}の予約`} value={value(summary.active)} unit="件" detail={ready ? `LINE ${summary.line}・電話 ${summary.phone}${summary.other ? `・その他 ${summary.other}` : ''}` : '読み込んでいます'} />
+    <KpiCard presentation="band" icon={<CalendarDays size={16} aria-hidden />} title={`${period}の${words.noun}`} value={value(summary.active)} unit="件" detail={ready ? `LINE ${summary.line}・電話 ${summary.phone}${summary.other ? `・その他 ${summary.other}` : ''}` : '読み込んでいます'} />
     <KpiCard presentation="band" icon={<CalendarPlus size={16} aria-hidden />} title="まだ空いている枠" value={ready ? summary.available : null} unit="枠" detail={availability.status === 'ready' ? 'この日の残り' : availability.status === 'error' ? '読み込めませんでした' : availability.status === 'unconfigured' ? '受付枠が未設定' : '読み込んでいます'} help="空き枠から担当と開始時刻の重複を除いて数えています。メニュー違いの同じ枠は1枠です。" helpDisplay="question" />
     <KpiCard presentation="band" icon={<CircleAlert size={16} aria-hidden />} title="未承認・要対応" value={value(summary.requested)} unit="件" detail="承認待ちの予約" />
     <KpiCard presentation="band" icon={<CalendarX size={16} aria-hidden />} title="キャンセル" value={value(summary.cancelled)} unit="件" detail="この日" />
@@ -60,13 +66,13 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
             </div>
           </div>
           <div className={styles.state}>
-            <StatusBadge tone={next.status === 'requested' ? 'warning' : 'info'}>{next.status === 'requested' ? '承認待ち' : Date.parse(next.starts_at) > Date.now() ? 'このあと' : '来店中'}</StatusBadge>
+            <StatusBadge tone={next.status === 'requested' ? 'warning' : 'info'}>{next.status === 'requested' ? '承認待ち' : Date.parse(next.starts_at) > Date.now() ? 'このあと' : words.active}</StatusBadge>
             <ReservationSource value={next.source === 'liff' || (!next.source && next.friend_id) ? 'line' : next.source === 'phone' ? 'phone' : next.source ?? 'line'} />
           </div>
           <ul className={styles.rows}>
             <li className={styles.row}><CalendarDays size={16} aria-hidden /><span className={styles.rowText}>{formatMonthDay(next.starts_at)}</span></li>
             <li className={styles.row}><Clock size={16} aria-hidden /><span className={styles.rowText}>{`${formatTime(next.starts_at)} – ${formatTime(next.ends_at)}（${Math.round((Date.parse(next.ends_at) - Date.parse(next.starts_at)) / 60000)}分）`}</span></li>
-            <li className={styles.row}><User size={16} aria-hidden /><span className={styles.rowText}>{`担当：${next.staff_name || '未設定'}`}</span></li>
+            <li className={styles.row}><User size={16} aria-hidden /><span className={styles.rowText}>{`${words.staff}：${next.staff_name || '未設定'}`}</span></li>
             {next.customer_note ? <li className={styles.row}><MessageSquare size={16} aria-hidden /><span className={styles.rowText} title={next.customer_note}>{`要望：${next.customer_note}`}</span></li> : null}
           </ul>
           <div className={styles.actions}>
@@ -84,12 +90,12 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
       { label: '予約', value: ready ? `${summary.active}件` : '—' }, { label: 'うちLINEから', value: ready ? `${summary.line}件` : '—' },
       { label: 'うち電話', value: ready ? `${summary.phone}件` : '—' },
       ...(ready && summary.other > 0 ? [{ label: 'その他の受付', value: `${summary.other}件` }] : []),
-      { label: '売上見込み', value: ready ? `¥${formatNumber(summary.sales)}` : '—' },
+      { label: '売上見込み', value: ready ? formatYen(summary.sales) : '—' },
     ]} /></BookingSidebarSection>
     <BookingSidebarSection title="つながる先"><BookingSidebarLinks links={[
       { href: '/booking/menus', label: '予約設定', note: 'メニューと受付枠' },
       { href: '/reminders', label: 'リマインダ', note: '前日・当日のお知らせ' },
-      { href: '/friends', label: '友だち', note: '来店の記録' },
+      { href: '/friends', label: '友だち', note: words.history },
       { href: '/conversions', label: 'コンバージョン', note: '予約が入った' },
     ]} /></BookingSidebarSection>
   </>

@@ -1,5 +1,6 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { computeUsersGrouped, type UsersGroupedOptions } from '../services/users-grouped.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -32,7 +33,7 @@ usersGrouped.get('/api/users-grouped', requireRole('owner', 'admin', 'staff'), a
     const result = await computeUsersGrouped(c.env.DB, opts);
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_users_grouped_failed","route":"GET /api/users-grouped"}));
+    logger.error("routes_users_grouped_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

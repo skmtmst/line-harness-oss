@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V7 仕上げ §2「一括バー」。表で1件でも選ぶと下端から出る帯。
+ * ★管理画面 仕上げ §2「一括バー」。表で1件でも選ぶと下端から出る帯。
  * 0件では出さない・件数は濃い緑の太字・操作は白地ボタン。
  */
 import React from 'react'
@@ -14,7 +14,7 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('一括バー（★V7 z97zZN §2）', () => {
+describe('一括バー（★管理画面 z97zZN §2）', () => {
   it('0件では出さない', () => {
     const { container } = render(<BulkBar count={0} />)
     expect(container.firstChild).toBeNull()

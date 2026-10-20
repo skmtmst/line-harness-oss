@@ -3,7 +3,7 @@ import { storeAt } from './qa-clock.mjs'
 /**
  * 画面確認のための、固定の中身。
  *
- * **Pencil ★V6 の画面に描いてある値をそのまま写している。**
+ * **画面の通常・空・失敗を再現する合成データ。実在の顧客情報は使わない。**
  * これが無いと、実装は空の表しか描けず、設計と画像で比べられない。
  * 「空の状態」だけを見て「一致した」と言えてしまうのが、いちばん危ない。
  *
@@ -12,7 +12,7 @@ import { storeAt } from './qa-clock.mjs'
  * - **乱数と時刻を使わない。** 毎回まったく同じ絵になる
  * - **設計を変えたらここも変える。** 合わなくなったら、どちらが正かを決める
  *
- * 出どころ: Pencil `★ V6 4-1 友だち属性・タグ（1920）` `hqrOv`
+ * 対象: 友だち属性・タグの一覧と編集。
  */
 
 /**
@@ -398,7 +398,7 @@ export const LIST_STATS = {
   reminders: { total: 9, active: 7, waiting: 124, sentThisMonth: 386, failed: 2 },
 }
 
-/** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
+/** 友だち一覧の件数と状態。実在の顧客データは使わない。 */
 export const FRIEND_STATS = {
   active: 214,
   total: 231,
@@ -416,7 +416,7 @@ export const OPERATORS = [
 ]
 
 /**
- * シナリオ配信の一覧。設計 `★ V6 5-1` `TC1b1` の5行そのまま。
+ * シナリオ配信の一覧。状態の異なる5行を用意する。
  *
  * 1件だけで返していたころは、**配信方式も終了後の動きも1通りしか出ず**、
  * 設計の5行（時刻／経過時間、一時停止／別シナリオへ／1つ前を再開、
@@ -1205,7 +1205,7 @@ export const FORM_VISIT_SUBMISSIONS = {
 }
 
 /**
- * V6 `ymXJK` NENコラム下書き作成。Workerの公開契約と同じ6項目だけを持つ。
+ * NENコラム下書き作成。Workerの公開契約と同じ6項目だけを持つ。
  * 画面側は通常・入力エラー・重複・保存失敗を、このstatus/bodyで描き分ける。
  */
 export const NEN_COLUMN_CREATE = {
@@ -1250,7 +1250,7 @@ export const NEN_COLUMN_OPERATIONS = {
 }
 
 /**
- * 機能21 NEN配信。★V6 `VLMGH` / `DEX0k` / `q4lajm` / `WeXbL` の通常データ。
+ * NEN配信の一覧・詳細・編集に使う通常データ。
  * 一覧の件数・状態を画面コードへ埋め込まず、この固定結果だけで再現する。
  */
 const nenCampaignSetting = (campaignKey, label, category, triggerEvent, delayDays, deliveryTime, isEnabled, title, bodyText, buttonLabel = null) => ({
@@ -2464,7 +2464,7 @@ export const RICH_MENU_TAP_STATS = {
 }
 
 /**
- * 受信箱のLINEの会話。設計 `★ V6 2-1 受信箱` `xGLVe` の一覧のうちLINE 5件。
+ * 受信箱のLINEの会話。LINE側の一覧には5件を返す。
  * `/api/support/inbox?channel=email` のメール2件と混ぜ、一覧は合計7件になる。
  *
  * **メールはここに入れない。** 画面は `/api/chats`（LINE）と
@@ -3149,7 +3149,7 @@ export const REMINDER_RUNS = {
   pagination: { total: 5, limit: 20, offset: 0 },
 }
 
-// V6 3-1-D `IAf7j`（友だち一括操作）。画面側はこの契約をそのまま使う。
+// 友だち一括操作。画面側はこの応答契約を使う。
 // 0件と未取得を混ぜないため、通常・空・失敗は同じ配列の増減ではなく
 // API状態として切り替える。ここには「取得できた通常値」だけを置く。
 export const FRIEND_BULK_RUN = {
@@ -3625,7 +3625,7 @@ export const SCENARIO_PREVIEW = {
   ],
 }
 
-/** `hz9ti` を開き直したときに読み返すV6下書き。 */
+/** シナリオ編集を開き直したときに読み返す下書き。 */
 export const SCENARIO_DRAFT = {
   scenarioId: 'scenario-0', lineAccountId: 'visual-qa-account', version: 3,
   afterActions: [
@@ -3654,7 +3654,7 @@ export const SCENARIO_STATS = {
   })),
 }
 
-/** 機能5 V6の試算・開始記録。送信は行わず、契約で定めた数だけ返す。 */
+/** シナリオ配信の試算・開始記録。送信は行わず、契約で定めた数だけ返す。 */
 export const SCENARIO_SIMULATION = {
   scenarioId: 'scenario-0', lineAccountId: 'visual-qa-account',
   computedAt: '2026-09-07T00:00:00.000Z', sideEffects: false,
@@ -4854,7 +4854,7 @@ export const INCOMING_WEBHOOK_UNMATCHED = [
   流入経路。設計 `Q4bkTg` の6本そのまま。
 
   **`refCode` は運用者が決めてURLに出す符号**なので、値は設計の `summer-ig` などを使う。
-  出してはいけないのは列名のほう（`v6-no-internal-ids.test.ts` が見張っている）。
+  内部の列名は画面へ出さない。URLに出す運用者の符号とは区別する。
 */
 /* 板 `xbHxg`（流入と計測一覧）の6行。フォルダは広告1・SNS1・店頭1・
  * 未分類3（紹介と紙の分類は絵に無いので `genre: null`）。メール署名は
@@ -5421,7 +5421,7 @@ export const CONVERSION_REPORT_PREVIOUS = [
 ]
 
 /*
-  機能19のV6一覧契約。代表6件は旧画面と同じ成果地点を使い、設計にある
+  成果地点の一覧契約。代表6件と、
   全体件数（12件／動作中10件／停止2件）と利用先・期間集計を一緒に返す。
   取消イベント台帳はまだ無いため、本番契約と同じく純件数は記録件数と同値。
 */
@@ -6206,7 +6206,7 @@ export const BOOKING_AVAILABILITY_STORE_VIEW = {
   絵は 10/2（金）始まり：最初の空きが金曜で 9:00〜16:00 の6枠（10:00 と 16:00 は満）、
   10/3（土）空き・10/4（日）満・10/5（月）休み・10/6（火）空き。
   「トリミング（小型犬）」の90分＋間隔15分で 105 分の枠。
-  上の BOOKING_AVAILABILITY（9/3 始まり）は v6 の撮影と代理予約の手順が日付で選ぶので残し、
+  上の BOOKING_AVAILABILITY（9/3 始まり）は代理予約の手順が日付で選ぶので残し、
   見本の API は「10/1 以降の範囲」を聞かれたときだけこちらを返す（V8 の画面は今日から聞く）。
 */
 const OCT_SLOT = (date, start, remaining) => {

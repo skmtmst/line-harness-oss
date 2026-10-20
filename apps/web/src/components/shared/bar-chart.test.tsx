@@ -1,7 +1,7 @@
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 // @vitest-environment happy-dom
 /*
- * ★V7 グラフ（ノード `h99Gb`）。
+ * ★管理画面 グラフ（ノード `h99Gb`）。
  * 増えた = `accent-deep`、減った = `ink-faint` の2色まで。
  * 数字は棒の色だけでなく文字でも読める。
  */

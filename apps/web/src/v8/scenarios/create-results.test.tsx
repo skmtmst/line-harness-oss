@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 シナリオを作る①（create.tsx・dnzqC）と配信結果（results.tsx・X4STXS）の動きの試験。
+ * ★V8 シナリオを作る①（create.tsx・）と配信結果（results.tsx・）の動きの試験。
  * BEHAVIOR.md の主な動きを守る：
  * - 作る①：はじめは「時刻で指定」を選び、2方式の図を要約で読める。既存の下書きは保存済みの方式。
  *   閲覧のみには保存の操作を置かず帯を出す。「この方式で保存する」で作って1通目へ進む。
@@ -170,7 +170,7 @@ describe('作る①（dnzqC）', () => {
     expect((screen.getByRole('radio', { name: /経過時間で指定/ }) as HTMLInputElement).checked).toBe(true)
     expect(diagrams[0].getAttribute('data-selected')).toBe('false')
     expect(diagrams[1].getAttribute('data-selected')).toBe('true')
-    // 下の見本の表は置かない（図に入ったため・絵 R83uvQ）。
+    // 下の見本の表は置かない（図に入ったため・絵 ）。
     expect(screen.queryByRole('table', { name: '選んだ配信方式の見本' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '配信方式の説明' }))
     expect(screen.getByText('作ったあとは変えられません')).toBeTruthy()
@@ -316,7 +316,7 @@ describe('配信結果（X4STXS）', () => {
     } finally { stats.enrolledTotal = previous.total; runs.summary = previous.summary }
   })
 
-  test('B-248: 送達不明は要確認と確認方法を出し、再開・再送・移動を出さない', async () => {
+  test('送達不明は要確認と確認方法を出し、再開・再送・移動を出さない', async () => {
     const uncertain = sub('unknown', '確認対象', 'paused', 1, 'delivery_unconfirmed')
     runs.subscriptions.push(uncertain)
     try {

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -9,7 +10,7 @@ import {
 } from '@line-crm/db';
 import type { MessageTemplate } from '@line-crm/db';
 import { listResponse } from '../lib/list-etag.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 
 const messageTemplates = new Hono<Env>();
@@ -32,7 +33,7 @@ messageTemplates.get('/api/message-templates', async (c) => {
     // 同じ中身なら304（list-etag）。
     return listResponse(c, { success: true, data: templates.map(serialize) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_message_templates_failed","route":"GET /api/message-templates"}));
+    logger.error("routes_message_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -44,7 +45,7 @@ messageTemplates.get('/api/message-templates/:id', async (c) => {
     if (!t) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(t) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_message_templates_failed","route":"GET /api/message-templates/:id"}));
+    logger.error("routes_message_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -82,7 +83,7 @@ messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), i
     });
     return c.json({ success: true, data: serialize(t) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_message_templates_failed","route":"POST /api/message-templates"}));
+    logger.error("routes_message_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -122,7 +123,7 @@ messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin')
     if (!t) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(t) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_message_templates_failed","route":"PUT /api/message-templates/:id"}));
+    logger.error("routes_message_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -134,7 +135,7 @@ messageTemplates.delete('/api/message-templates/:id', requireRole('owner', 'admi
     if (!deleted) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_message_templates_failed","route":"DELETE /api/message-templates/:id"}));
+    logger.error("routes_message_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

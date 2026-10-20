@@ -21,7 +21,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 分析「URLクリック」（Pencil `iK4cQ`）。
+ * ★V8 分析「URLクリック」（Pencil ）。
  * 数の帯 → 道具の段（探す・状態・期間・CSV）→ URLごとの表 → 数え方の注。
  * 呼ぶ口（検索語は API へ・200件まで）・状態の絞り込み・ページ送り・CSV は今の画面（UrlClicksOverviewTab）と同じ。
  */

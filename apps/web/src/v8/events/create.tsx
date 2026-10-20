@@ -8,7 +8,7 @@ import { Globe, User, Users, X } from 'lucide-react'
 import { ApiError, eventsApi, type EventDetail, type EventQuestion } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
@@ -25,7 +25,7 @@ import ApplicationPreview from './application-preview'
 import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst } from './shared'
 import styles from './create.module.css'
 import { Field, OptionalBadge, RequiredBadge } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { permissionDeniedMessage} from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { saveInitialSlot, type InitialSlotCache } from './save-initial-slot'
 import SaveFeedback, { useSaveFeedback } from '@/components/shared/save-feedback'
@@ -43,7 +43,7 @@ import { EVENT_NAME_MAX_LENGTH, EVENT_DESCRIPTION_MAX_LENGTH, resolveEventMultiA
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 イベント予約「イベントを作る」（Pencil `d4adD4`）。
+ * ★V8 イベント予約「イベントを作る」（Pencil ）。
  *
  * 型（CreatePage）に、中身・公開対象・最初の予約枠・申し込みのきまり・聞くこと・
  * 申し込んだ人にすること のカードと、右の列（お客さまの申込ページ・保存すると起きること）、
@@ -95,7 +95,7 @@ function EventsCreateV8Inner() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canEdit = role === 'owner' || role === 'admin'
+  const canEdit = canManageRole(role)
 
   /*
    * 今の作りは ①を保存すると /events/new?id=…&step=2 で続きを開く。

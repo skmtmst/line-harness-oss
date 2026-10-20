@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const personMocks = vi.hoisted(() => {
   class TestMergedPersonError extends Error {
@@ -35,7 +35,7 @@ const profileMocks = vi.hoisted(() => ({
 
 vi.mock('../services/merged-people.js', () => personMocks);
 vi.mock('../services/account-access.js', () => accessMocks);
-vi.mock('../services/friend-profile-candidates.js', () => profileMocks);
+vi.mock('../features/friends/friend-profile-candidates.js', () => profileMocks);
 
 const { mergedPeople } = await import('./merged-people.js');
 

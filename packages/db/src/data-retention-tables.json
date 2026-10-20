@@ -5113,5 +5113,8 @@
   "hq_store_comparison_export_jobs": {"category":"purge","scope":{"by":"tenant","column":"tenant_id"}},
   "booking_pass_billing_events": {"category":"purge","scope":{"by":"parent","column":"purchase_id","parent":"booking_pass_purchases","parentColumn":"id"}}
 ,
-  "account_ai_features":{"category":"purge","scope":{"by":"lineAccount","column":"account_id"}}
+  "account_ai_features":{"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "meet_consultation_notification_runs": {"category": "purge", "scope": {"by": "lineAccount", "column": "line_account_id"}},
+  "event_booking_transition_runs": {"category": "purge", "scope": {"by": "lineAccount", "column": "line_account_id"}},
+  "event_booking_entitlement_uses": {"category": "retain", "scope": {"by": "parent", "column": "entitlement_id", "parent": "booking_entitlements", "parentColumn": "id"}}
 }

@@ -75,7 +75,7 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
   it('専門設計カタログにある項目だけを専用機能に出す', () => {
     const groups = visibleFeatureGroups({ specializedFeatureKeys: ['photo_review'] })
     const specialized = groups.find((group) => group.id === 'specialized')!
-    // 2026-09-16 採用: マイペット（★V6 37-3）と健康日記（★V6 37-4）は「投稿」と同じ photo_review の受け口。
+    // 2026-09-16 採用: マイペット（★管理画面 37-3）と健康日記（★管理画面 37-4）は「投稿」と同じ photo_review の受け口。
     expect(specialized.items.map((item) => item.id)).toEqual(['nen-pets', 'nen-health', 'photo-review'])
 
     const withoutDesign = visibleFeatureGroups({ specializedFeatureKeys: [] })

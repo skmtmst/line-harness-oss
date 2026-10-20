@@ -1,9 +1,9 @@
 import { isOperationCapabilityStopped } from '@line-crm/db';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
 import { processRestaurantEvents } from './restaurant-events.js';
-import { processScenarioSourceJobs } from './scenario-source-jobs.js';
+import { processScenarioSourceJobs } from '../features/scenarios/scenario-source-jobs/index.js';
 export type RestaurantLineNotice = {sent:boolean;reason:null|'not_requested'|'not_friend'|'blocked'|'sending_disabled'|'account_unavailable'|'not_confirmed'|'send_failed'|'approval_required'|'queued'};
 /** 固定文は送らず「予約が入ったとき」の共通の行へ渡す。予約の保存結果とは別。 */
 export async function sendRestaurantLineConfirmation(c:Context<Env>,input:{reservationId:string;storeId:string;tenantId:string;lineUid:string|null;startsAt:string;endsAt:string;guestCount:number;courseId:string|null;status:string}):Promise<RestaurantLineNotice> {

@@ -47,7 +47,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 マイル「使い道を作る・編集する」（板 `L2Bzp`）。
+ * ★V8 マイル「使い道を作る・編集する」（板 ）。
  *
  * app/mileage/rewards/edit/v8-reward-edit.tsx から動きを写し、作る型（CreatePage）で組み直した。
  * 左に「基本・渡すもの・だれが交換できるか・出す数と期間」の段、右にお客さまの画面での

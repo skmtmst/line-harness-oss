@@ -1,6 +1,7 @@
 type Operation = {tags:string[]; summary:string; description:string; parameters:unknown[]; responses:Record<string,{description:string}>; security?:unknown[]; requestBody?:unknown};
 const paths:Record<string,Record<string,Operation>> = {};
 const definitions: Array<[string,string,string]> = [
+  ["get", "/api/dashboard/style/ec-summary", "ECの注文と再購入の集計"],
   ["get", "/api/dashboard/style", "業種と設定"],
   ["put", "/api/dashboard/style", "業種と設定"],
   ["get", "/api/dashboard/style/warnings", "未設定の案内"],

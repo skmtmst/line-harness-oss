@@ -3,7 +3,7 @@ import { parseJstDateTime } from './hq-banners'
 import { formatRelative } from '@/lib/format'
 
 /**
- * 統括のメンバー管理（★V6 36-5）の小さな計算。通信は持たない。
+ * 統括のメンバー管理（★管理画面 36-5）の小さな計算。通信は持たない。
  */
 
 export type MemberStatus = 'active' | 'invited' | 'expired' | 'inactive'
@@ -82,7 +82,7 @@ export function sortMembers(members: StaffMember[], meId: string | null): StaffM
 }
 
 /**
- * ★V8 の表の「最終ログイン」（絵 `r4ARpV`：「9/30 10:12」）。日本時間の 月/日 時:分。
+ * ★V8 の表の「最終ログイン」（絵 ：「9/30 10:12」）。日本時間の 月/日 時:分。
  * 今年でないときは年を前に付ける（「2025/8/31 12:00」）。取れないときは「—」。
  */
 export function lastLoginShort(iso: string | undefined, now = new Date()): string {
@@ -102,9 +102,9 @@ const ROLE_ORDER: Record<StaffMember['role'], number> = { owner: 0, admin: 1, st
 const STATUS_ORDER: Record<MemberStatus, number> = { active: 0, invited: 1, expired: 2, inactive: 3 }
 
 /**
- * ★V8 の表の並び（絵 `r4ARpV`：高田（オーナー）→中川（管理者）→佐野（閲覧のみ）→外部デザイン（招待中）→森（停止中））。
+ * ★V8 の表の並び（絵 ：高田（オーナー）→中川（管理者）→佐野（閲覧のみ）→外部デザイン（招待中）→森（停止中））。
  * 状態（有効→招待中→期限切れ→停止中）、同じ状態の中は役割（オーナー→管理者→担当者→閲覧のみ）、そのあと名前順。
- * v7 の表は `sortMembers`（自分を先頭）のまま。
+ * 管理画面 の表は `sortMembers`（自分を先頭）のまま。
  */
 export function sortMembersByRole(members: StaffMember[]): StaffMember[] {
   return [...members].sort((a, b) =>

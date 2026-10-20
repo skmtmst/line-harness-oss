@@ -1,5 +1,5 @@
 import type { Webinar, WebinarEditor } from '@/lib/api'
-import type { DetailChrome, EditContext, WizardChrome } from '@/v8/webinar-edit/types'
+import type { DetailChrome, EditContext, WizardChrome } from '@/v8/webinar-edit/public/types/index'
 import { vi } from 'vitest'
 
 /** 単独の段も、製品の編集画面と同じ受け口で描く。記録したい口は呼ぶ側で上書きする。 */

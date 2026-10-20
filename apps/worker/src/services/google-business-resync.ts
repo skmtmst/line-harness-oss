@@ -1,3 +1,6 @@
+import { jstDate as japanDate } from '@line-crm/shared';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 /**
  * 飲食店向け「Googleビジネス」第4段：定期再同期。
  *
@@ -10,7 +13,7 @@
  * - 機能「restaurant_test」がオフのアカウントは gate で止める（google-sheets と同じ作法）。
  * - ログは種別名（error.kind / error.name）だけ。応答本文・トークンは出さない。
  */
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { dbFor } from './db-router.js';
 import { GoogleBusinessError, listAllReviews, type FetchLike } from './google-business.js';
 import { listLocalPosts } from './google-business-posts.js';
@@ -46,7 +49,7 @@ type ResyncConnectionRow = ConnectionRow & {
 };
 
 function jstDate(iso: string): string {
-  return new Date(Date.parse(iso) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate(new Date(iso));
 }
 
 function daysBefore(isoDate: string, days: number): string {
@@ -116,7 +119,7 @@ export async function processGoogleBusinessTokenKeepalive(
       refreshed += 1;
     } catch (error) {
       failed += 1;
-      console.error(JSON.stringify({"code":"google_business_token_keepalive_failed"}));
+      logger.error("google_business_token_keepalive_failed");
     }
   }
   return { refreshed, failed };
@@ -173,7 +176,7 @@ export async function processGoogleBusinessHourlyResync(
         // auth_expired は accessTokenForConnection 内で expired へ落とし済み。
         await setConnectionStatusForEnv(env, connection.store_id, connection.status, error.kind);
       }
-      console.error(JSON.stringify({"code":"google_business_resync_failed"}));
+      logger.error("google_business_resync_failed");
     }
   }
   return { reviewsSynced, postsSynced, skipped, failed };
@@ -250,7 +253,7 @@ export async function processGoogleBusinessDailyMetrics(
       if (error instanceof GoogleBusinessError && error.kind === 'no_permission') {
         await setConnectionStatusForEnv(env, connection.store_id, 'no_permission', 'no_permission');
       }
-      console.error(JSON.stringify({"code":"google_business_metrics_failed"}));
+      logger.error("google_business_metrics_failed");
     }
   }
   return { synced, skipped, failed };

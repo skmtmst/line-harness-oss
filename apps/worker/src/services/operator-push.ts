@@ -1,4 +1,4 @@
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {toAuthenticatedStaff} from '../middleware/auth.js';
 import {canAccessAllLineAccounts} from './account-access.js';
 import {sendWebPush} from './web-push.js';

@@ -1,5 +1,6 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getFriendByLineUserIdForAccount, listLineAccountsWithTenantStatus } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
@@ -66,12 +67,13 @@ export async function resolveFriendFromLineToken(
   const lineAccount = dbAccounts.find(
     (account) => account.login_channel_id === tokenClientId,
   );
-  if (lineAccount && lineAccount.tenant_status !== 'active') {
+  if (lineAccount && (lineAccount.tenant_status !== 'active' || !lineAccount.is_active || lineAccount.archived_at != null)) {
     return { status: 'tenant_suspended' };
   }
   const lineAccountId = lineAccount?.id ?? null;
   const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
-  if (!friend) return { status: 'no_friend' };
+  if (!friend || friend.line_account_id !== lineAccountId) return { status: 'no_friend' };
+  if (!lineAccount && tokenClientId !== env.LINE_LOGIN_CHANNEL_ID) return { status: 'invalid_token' };
   return {
     status: 'ok',
     friend: friend as unknown as ResolvedFriend,

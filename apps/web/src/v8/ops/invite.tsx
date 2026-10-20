@@ -1,4 +1,6 @@
 'use client'
+
+import { twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 import { ArrowRight } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import PasswordField from '@/components/auth/password-field'
@@ -20,9 +22,9 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 type Check = { email: string; name: string; needsPassword: boolean }
 
 /**
- * 運営メンバーの招待を受ける V8（絵 `tVaUh`）。
+ * 運営メンバーの招待を受ける V8。
  *
- * 動きは v7（app/ops/invite）と同じ。メールの URL の `#invite=…` を読み、
+ * 動きは 管理画面（app/ops/invite）と同じ。メールの URL の `#invite=…` を読み、
  * パスワードが無い人は名前とパスワードを決める。進んだ先は 2要素認証の設定。
  */
 export default function OpsInviteV8() {
@@ -92,7 +94,7 @@ export default function OpsInviteV8() {
     resetAuthSelectionCleared(localStorage, sessionStorage)
     if (res.data.challengeToken) {
       const path = res.data.twoFactorSetup ? '/login/two-factor/setup' : '/login/two-factor';
-      window.location.assign(`${path}?next=ops#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      window.location.assign(twoFactorChallengeHandoffPath(`${path}?next=ops`, res.data.challengeToken))
       return
     }
 

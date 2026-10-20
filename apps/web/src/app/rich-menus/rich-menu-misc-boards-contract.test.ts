@@ -6,18 +6,18 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 /* 一覧の入口は V8 のとき src/v8/rich-menus/list.tsx（2026-10-06〜。古い list-v8.tsx・list-v8.module.css はもう描かれない）。 */
 const LIST = readFileSync(join(HERE, '..', '..', 'v8', 'rich-menus', 'list.tsx'), 'utf8')
-const CREATE = readFileSync(join(HERE, 'new', 'create-v8.tsx'), 'utf8')
-const CREATE_CSS = readFileSync(join(HERE, 'new', 'create-v8.module.css'), 'utf8')
+const CREATE = readFileSync(new URL('../../v8/rich-menus/new/create.tsx', import.meta.url), 'utf8')
+const CREATE_CSS = readFileSync(new URL('./new/create-v8.module.css', import.meta.url), 'utf8')
 
 /*
  * V8 リッチメニューの細かい板（一覧・作る手順・1152）。
- * 一覧は板IDを付け（閲覧のみは `ZoKow`）、作る4手順は手順ごとに付ける。
- * 1152 の `Y9ASp`・`kmTab` は同じ画面の幅違いで、板IDは親のものを
- * 使う。畳み CSS があることをここで押さえる。v7 は変えない。
+ * 一覧は板IDを付け（閲覧のみは ）、作る4手順は手順ごとに付ける。
+ * 1152 の ・ は同じ画面の幅違いで、板IDは親のものを
+ * 使う。畳み CSS があることをここで押さえる。互換経路は変えない。
  */
 describe('リッチメニューの細かい板', () => {
   it('一覧は板IDを付ける（閲覧のみは ZoKow）', () => {
-    // 新しい一覧は型（ListPage）の boardId で板IDを付ける。1152 は Y9ASp。
+    // 新しい一覧は型（ListPage）の boardId で板IDを付ける。1152 は 。
     expect(LIST).toContain("boardId={!canEdit ? 'ZoKow' : narrow ? 'Y9ASp' : 'rZEGN'}")
   })
 

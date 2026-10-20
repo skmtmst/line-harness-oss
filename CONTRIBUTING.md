@@ -1,3 +1,5 @@
+> 文書：Contributing to LINE Harness｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # Contributing to LINE Harness
 
 LINE Harness is a public OSS LINE CRM. The project welcomes issues and pull
@@ -6,6 +8,10 @@ customer data. This document is the maintainer rulebook for keeping the public
 queue useful and safe.
 
 日本語での Issue / PR も歓迎です。英語で書く必要はありません。
+
+Before changing code, read [the code structure and purpose-based examples](docs/code-structure.md).
+Follow its comment rules: explain why a constraint exists; keep work history in Git and PRs.
+Run `pnpm quality:check --base <PR-base-SHA>` and reduce the measured baseline when violations decrease.
 
 ## Repository Model
 

@@ -1,5 +1,6 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { relayAiLoopReport, type AiLoopReport } from '../services/ai-loop-slack-report.js';
 import { verifySupportRelay } from '../services/support-relay.js';
 
@@ -64,7 +65,7 @@ aiLoopSlackReports.post('/api/integrations/ai-loop/reports', async (c) => {
     const result = await relayAiLoopReport(c.env, report);
     return c.json({ success: true, ...result });
   } catch (error) {
-    console.error(JSON.stringify({"code":"ai_loop_slack_report_failed","route":"POST /api/integrations/ai-loop/reports"}));
+    logger.error("ai_loop_slack_report_failed");
     return c.json({ success: false, error: 'Slack report failed' }, 502);
   }
 });

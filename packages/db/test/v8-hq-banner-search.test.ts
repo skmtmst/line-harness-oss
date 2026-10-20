@@ -3,7 +3,7 @@ import Database from 'better-sqlite3'
 import { readFileSync } from 'node:fs'
 import { asD1 } from './d1-test-helper'
 import { countBannerImages, createBannerProject, createBannerImage, listBannerImages } from '../src/banner-generation'
-import { createMedia } from '../src/media'
+import { createMedia } from '../src/media/index'
 
 it('全件検索の総数はページ位置で変わらず、配布先が複数でも画像は一件になる', async () => {
   const raw = new Database(':memory:')

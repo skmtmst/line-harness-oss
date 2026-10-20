@@ -1,7 +1,8 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Ban, Check, CircleCheck, CircleHelp, Download, Hourglass, ListChecks, ShieldAlert, X } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
@@ -52,13 +53,13 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 成果とアフィリエイト「成果承認」（板 `OylSV`、まとめて操作は `hadfk`）。
+ * ★V8 成果とアフィリエイト「成果承認」（板 、まとめて操作は ）。
  *
  * app/affiliates/v8-approvals-tab.tsx から動きを写し、見た目を一覧の型（ListPage）で
  * 組み直した。データの口・操作は今と同じ（承認の全件読み・続きの読み込み・認める・
  * 却下・まとめて判断・付帯動作のやり直し・成果の詳細と成果の付け方・CSV）。
  * 行の右端は「認める」と「…」（認める・認めない・付帯動作をやり直す・詳細を見る）。
- * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」（hadfk）→ 確かめる → 結果。
+ * 左のチェックで選ぶと下から一括バー →「操作を選ぶ」→ 確かめる → 結果。
  */
 
 type ApprovalStatus = 'pending' | 'approved' | 'rejected'
@@ -189,7 +190,7 @@ export default function ApprovalsTab() {
         setActionError(res.error ?? `${action === 'approved' ? '承認' : '却下'}できませんでした。通信を確かめて、もう一度お試しください。`)
       }
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : `${action === 'approved' ? '承認' : '却下'}できませんでした。通信を確かめて、もう一度お試しください。`)
+      setActionError(describeApiFailure(e, '承認・却下'))
     }
     setActioning(null)
   }, [actioning, loadItems])
@@ -216,7 +217,7 @@ export default function ApprovalsTab() {
       }
     } catch (e) {
       await loadItems({ fresh: true })
-      setActionError(e instanceof Error ? e.message : 'まとめて処理できませんでした')
+      setActionError(describeApiFailure(e, '保存'))
     } finally {
       setBulkConfirm(null)
       setActioning(null)

@@ -931,7 +931,7 @@ export async function createStepUpGrant(
           SET totp_last_used_step = ?, updated_at = ?
         WHERE id = ? AND (totp_last_used_step IS NULL OR totp_last_used_step < ?)`,
     ).bind(input.totpStep, now, input.staffId, input.totpStep),
-    // D1 batchは同じtransaction・接続で順に実行される。changes()が直前の
+    // D1 batchは同じtransaction・接続で順に実行される。changesが直前の
     // claim成功を示すときだけgrantを保存し、並列の同一コードを増殖させない。
     db.prepare(
       `INSERT INTO auth_step_up_grants

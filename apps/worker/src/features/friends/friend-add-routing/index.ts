@@ -1,0 +1,2 @@
+// Public entry for this operation; importing it does not initialize unrelated operations.
+export { applyFriendAddRouting, areFriendAddConditionsOverlapping, collectFriendAddReferences, doFriendAddTimeWindowsOverlap, doFriendAddWeekdaySetsOverlap, evaluateFriendAddRuleConditions, evaluateFriendAddSchedule, findFriendAddUnusableReferences, friendAddJstHhmm, hasInvalidFriendAddTimeWindows, isValidFriendAddHhmm, parseFriendAddConditionAst, retryFailedFriendAddActions } from '../friend-add-routing.js';

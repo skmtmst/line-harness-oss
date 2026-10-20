@@ -87,11 +87,6 @@
   outline-color: var(--tpl-rs-occupied-line);
 }
 
-.stoppedOccupancy {
-  background: var(--color-surface-pearl);
-  opacity: 0.6;
-}
-
 .name {
   color: var(--color-ink);
   font-size: var(--text-caption);

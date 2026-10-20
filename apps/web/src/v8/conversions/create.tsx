@@ -1,7 +1,8 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("成果地点の名前を入力してください"),
   targetUrl: requiredText("指定ページへの到達で数えるときは、対象のURLが要ります"),
 }
@@ -48,7 +49,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 成果地点を作る（Pencil：作る `j8p3yj`・競合 `cXqlS`）。
+ * ★V8 成果地点を作る（Pencil：作る ・競合 ）。
  *
  * 型（CreatePage）に、4つの段（何が起きたら・何回まで・金額・数えない条件）と
  * 下書き・詳細設定の段、右の列（この30日にあてはめると・使う場所）、下の帯を渡す。
@@ -56,7 +57,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
  * 聞く項目・保存の口・送る形は今の作る画面（app/conversions/new/conversion-create-v8.tsx）と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ：
  * - 使う場所は種類ごとの1行（チェック＝その種類を全部使う／外す）。1つずつ選ぶのは「使う場所を足す」の窓で
- * - 競合（cXqlS）：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
+ * - 競合：同じ名前の成果地点がすでにある（入力中に見つかった／保存したら先に作られていた 409）とき、
  *   板の頭の下に帯を出し、主ボタンは「比べてから保存」になる
  */
 
@@ -337,8 +338,8 @@ function ConversionCreate() {
 
   /* 入力の点検（今の作る画面と同じ）。 */
   const validate = (): ConversionFieldIssue | null => {
-    if ((b244Requirements.name.check(name) !== null)) return { field: 'cv-name', message: '成果地点の名前を入力してください' }
-    if (measureMethod === 'url_reach' && (b244Requirements.targetUrl.check(targetUrl) !== null)) return { field: 'cv-url', message: '指定ページへの到達で数えるときは、対象のURLが要ります' }
+    if ((FIELD_REQUIREMENTS.name.check(name) !== null)) return { field: 'cv-name', message: '成果地点の名前を入力してください' }
+    if (measureMethod === 'url_reach' && (FIELD_REQUIREMENTS.targetUrl.check(targetUrl) !== null)) return { field: 'cv-url', message: '指定ページへの到達で数えるときは、対象のURLが要ります' }
     if (exclusionMemo.trim().length > 500) return { field: 'cv-memo', message: '数えない条件のメモは500文字以内で入力してください' }
     const exclusionIssue = findConditionDraftIssue(exclusion)
     if (exclusionIssue) return { field: 'cv-exclusion-fields', message: exclusionIssue }
@@ -466,7 +467,7 @@ function ConversionCreate() {
         </div>
         <dl className={styles.previewRows}>
           <div className={styles.previewRow}><dt>成果</dt><dd>{preview ? `${formatNumber(preview.estimatedCount)}件` : emptyValue('unknown')}</dd></div>
-          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `¥${formatNumber(preview.estimatedValue)}` : emptyValue('unknown')}</dd></div>
+          <div className={styles.previewRow}><dt>金額</dt><dd>{preview ? `${formatYen(preview.estimatedValue)}` : emptyValue('unknown')}</dd></div>
           <div className={styles.previewRow}><dt>人数</dt><dd>{preview && typeof preview.uniqueFriendCount === 'number' ? `${formatNumber(preview.uniqueFriendCount)}人` : emptyValue('unknown')}</dd></div>
           <div className={styles.previewRow}><dt>除いた注文</dt><dd>{excluded == null ? emptyValue('unknown') : `${formatNumber(excluded)}件`}</dd></div>
         </dl>
@@ -574,7 +575,7 @@ function ConversionCreate() {
 
       <Card variant="form" aria-labelledby="cv-new-what">
         <CardHeader size="stacked" titleId="cv-new-what" title="何が起きたら数えますか" meta="名前は一覧で見分けるため。お客さまには見えません" />
-        <Field requirement={b244Requirements.name} density="input" label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
+        <Field requirement={FIELD_REQUIREMENTS.name} density="input" label="名前" htmlFor="cv-name" error={fieldIssue?.field === 'cv-name' ? fieldIssue.message : undefined}>
           <SaveErrorField names={["name","fieldIssue","field_issue"]}><TextField
             aria-label="成果地点の名前"
             value={name}
@@ -602,7 +603,7 @@ function ConversionCreate() {
           </div>
         </div>
         {measureMethod === 'url_reach' ? (
-          <Field density="input" label="数えてよいページ" htmlFor="cv-url" error={fieldIssue?.field === 'cv-url' ? fieldIssue.message : undefined} requirement={b244Requirements.targetUrl}>
+          <Field density="input" label="数えてよいページ" htmlFor="cv-url" error={fieldIssue?.field === 'cv-url' ? fieldIssue.message : undefined} requirement={FIELD_REQUIREMENTS.targetUrl}>
             <SaveErrorField names={["targetUrl","fieldIssue","target_url","field_issue"]}><TextField
               aria-label="数えてよいページ"
               inputMode="url"

@@ -1,5 +1,19 @@
-import type { RestaurantInventoryRules, RestaurantInventoryRulesInput, RestaurantChannelCloseTask } from '@line-crm/shared';
+import type { RestaurantInventoryRules, RestaurantInventoryRulesInput, RestaurantChannelCloseTask, RestaurantInventoryRuleState } from '@line-crm/shared';
 type RuleRow = {store_id:string;threshold:number;stop_line:number;stop_same_day:number;notify:number;version:number};
+/** 呼出し側で店舗の時間帯に変換した日付境界を渡す。既存記録の読取りのみ。 */
+export async function getRestaurantInventoryRuleState(db:D1Database,storeId:string,from:string,to:string):Promise<RestaurantInventoryRuleState> {
+ const stoppedWhere=`store_id=? AND datetime(starts_at)>=datetime(?) AND datetime(starts_at)<datetime(?) AND (auto_line_original IS NOT NULL OR auto_same_day_original IS NOT NULL)`;
+ const historyWhere=`store_id=? AND datetime(starts_at)>=datetime(?) AND datetime(starts_at)<datetime(?)`;
+ const rows=await db.prepare(`SELECT id AS slotId,starts_at AS startsAt,auto_line_original AS lineOriginal,auto_same_day_original AS sameDayOriginal,
+ total_capacity-occupied_seats-unassigned_guests AS remainingSeats,(SELECT threshold FROM rt_inventory_rules WHERE store_id=?) AS threshold
+ FROM rt_inventory_occupancy WHERE ${stoppedWhere} ORDER BY starts_at,id LIMIT 100`).bind(storeId,storeId,from,to).all<RestaurantInventoryRuleState['stopped'][number]>();
+ const history=await db.prepare(`SELECT id,starts_at AS startsAt,before_line AS beforeLine,after_line AS afterLine,before_same_day AS beforeSameDay,after_same_day AS afterSameDay,
+ CASE WHEN cause LIKE 'rt_reservations:%' THEN 'reservation' WHEN cause LIKE 'rt_tables:%' THEN 'tables' WHEN cause='rules_saved' THEN 'rules' ELSE 'inventory' END AS cause,
+ strftime('%Y-%m-%dT%H:%M:%fZ',created_at) AS createdAt FROM rt_inventory_rule_log WHERE ${historyWhere} ORDER BY id DESC LIMIT 100`).bind(storeId,from,to).all<RestaurantInventoryRuleState['history'][number]>();
+ const stoppedTotal=await db.prepare(`SELECT COUNT(*) AS n FROM rt_inventory_slots WHERE ${stoppedWhere}`).bind(storeId,from,to).first<{n:number}>();
+ const historyTotal=await db.prepare(`SELECT COUNT(*) AS n FROM rt_inventory_rule_log WHERE ${historyWhere}`).bind(storeId,from,to).first<{n:number}>();
+ return {stopped:rows.results,stoppedTotal:stoppedTotal!.n,history:history.results,historyTotal:historyTotal!.n};
+}
 export async function getRestaurantInventoryRules(db:D1Database,storeId:string):Promise<RestaurantInventoryRules> {
  const r=await db.prepare('SELECT * FROM rt_inventory_rules WHERE store_id=?').bind(storeId).first<RuleRow>();
  return {storeId,threshold:r?.threshold??2,stopLine:r?!!r.stop_line:false,stopSameDay:r?!!r.stop_same_day:false,notify:r?!!r.notify:true,version:r?.version??0};

@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { emptyLayout } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 const observed = vi.hoisted(()=>vi.fn());
-vi.mock('../services/automation-triggers.js',()=>({dispatchAutomationEventWithLogging:observed}));
+vi.mock('../features/automations/automation-triggers.js',()=>({dispatchAutomationEventWithLogging:observed}));
 vi.mock('../services/liff-auth.js',()=>({verifyCallerLineIdentity:vi.fn(async()=>({lineUserId:'Uf',lineAccountId:'a'}))}));
 vi.mock('../services/line-proxy-send.js',()=>({pushViaHarnessProxy:vi.fn(async()=>{})}));
 vi.mock('../services/operator-notification-dispatch.js',()=>({dispatchOperatorEvent:vi.fn(async()=>{})}));

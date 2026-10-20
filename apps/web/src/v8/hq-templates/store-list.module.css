@@ -5,7 +5,7 @@
 .colFormState { width: var(--tpl-hql-form-state-w); }
 .colFormDest { width: var(--tpl-hql-form-dest-w); }
 .colFormActions { width: var(--tpl-hql-form-actions-w); }
-/* タグ（DzdC3）の「よく使う絞り込み」：メニューの置き場と、選んでいるときの輪（店のタグと同じ）。 */
+/* タグの「よく使う絞り込み」：メニューの置き場と、選んでいるときの輪（店のタグと同じ）。 */
 .menuAnchor { position: relative; display: inline-flex; }
 .checkSpace { display: inline-block; width: var(--tpl-tag-grip); }
 /* タグの札を包む名前のリンク：札の形のまま押せる（下線・地を足さない）。 */

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const read = (p: string) => readFileSync(join(SRC, p), 'utf8')
 
-const PUBLISH = read('app/auto-replies/edit/wizard-v8.tsx')
+const PUBLISH = read('v8/auto-replies/edit/wizard.tsx')
 const RUN_DETAIL = read('v8/friend-add-runs/detail.tsx')
 const PUBLISHED = read('app/webinars/published/page.tsx')
 const FRIEND_DETAIL = read('v8/mileage/friend-detail.tsx')

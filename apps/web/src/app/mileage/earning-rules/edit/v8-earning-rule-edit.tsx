@@ -1,15 +1,16 @@
 'use client'
 
 /*
- * ★V8-B マイル「たまる決めごとを編集」（作るの板 `ctLwT` と同じ器、
- * 競合 `BnrQp`）。
+ * ★V8-B マイル「たまる決めごとを編集」（作るの板  と同じ器、
+ * 競合 ）。
  *
- * 直せるのは下書きの項目だけ（v7 の edit と同じ）。動いている内容は
+ * 直せるのは下書きの項目だけ（管理画面 の edit と同じ）。動いている内容は
  * ここを保存しても変わらず、一覧の「公開して反映」でだけ変わる。
  * 保存時に版がずれていたら（409）、競合の帯を板の頭の下に出し、
  * 「最新の内容を読み込んで続ける」と「比べてから保存」を出す。
  */
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
@@ -65,7 +66,7 @@ function EditInner() {
   const [originalDraft, setOriginalDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
-  /* BnrQp：保存時に版がずれていたら競合の帯を出す。 */
+  /* ：保存時に版がずれていたら競合の帯を出す。 */
   const [conflict, setConflict] = useState(false)
 
   /* W156：対象（ルール・アカウント）が変わったら、前の読み込みの応答を捨てる。 */
@@ -163,7 +164,7 @@ function EditInner() {
   const dirty = state === 'ready' && JSON.stringify(draftPayload) !== originalDraft
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
-  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る。 */
   const fields = useFormErrors()
   fields.define('name', 'ルール名', () => (name.trim() ? null : 'ルール名を入力してください'))
   fields.define('amount', '付与マイル', () => (validAmount ? null : '付与マイルは1以上の整数で入力してください'))
@@ -192,7 +193,7 @@ function EditInner() {
       if (error instanceof ApiError && error.status === 409) {
         setConflict(true)
       } else {
-        setSaveError(error instanceof Error ? error.message : '保存できませんでした。もう一度お試しください。')
+        setSaveError(describeApiFailure(error, '保存'))
       }
     } finally {
       setSaving(false)

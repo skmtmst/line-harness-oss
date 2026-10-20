@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import VisitStamps from './pages/VisitStamps.js';
+import VisitStamps from './pages/visit-stamps.js';
 import { setLiffContext } from './lib/liff-auth.js';
 import './index.css';
 

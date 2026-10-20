@@ -2,7 +2,7 @@ import CodeBlock from './code-block'
 import { Skeleton } from './skeleton'
 import styles from './totp-qr.module.css'
 
-/** BOj1a: QR on the left, app instructions and manual key on the right. */
+/** : QR on the left, app instructions and manual key on the right. */
 export default function TotpQr({ qr, manualKey }: { qr: string; manualKey: string }) {
   return <div className={styles.row}>
     {qr ? (

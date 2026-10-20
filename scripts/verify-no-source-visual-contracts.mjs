@@ -27,12 +27,13 @@ const union = values => values.length === 1 ? values[0] : value({
   helper: [...new Set(values.map(v => v?.helper).filter(Boolean))].sort().join(','),
   functions: values.flatMap(v => v?.fn ? [v] : v?.functions ?? []),
 })
-const fingerprint = node => {
+const fingerprint = (node, readers) => {
   if (!node) return ''
+  if(readers?.has(node))return ['source-reader',readers.get(node)]
   if (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isIdentifier(node) || ts.isNumericLiteral(node)) return [node.kind, node.text]
-  return [node.kind, ...node.getChildren().map(fingerprint)]
+  return [node.kind, ...node.getChildren().map(child=>fingerprint(child,readers))]
 }
-const canonical = node => JSON.stringify(fingerprint(node))
+const canonical = (node, readers) => JSON.stringify(fingerprint(node,readers))
 const target = path => /\.(?:[cm]?[jt]sx?|css|html|svg)(?:$|[?#])/.test(path)
 const data = path => /\.(?:jsonc?|sql|csv|tsv|md|ya?ml|toml|snap|png|jpe?g|webp|gif|ico|woff2?|pdf)(?:$|[?#])/.test(path)
 const harness = /^(?:describe|it|test)$/
@@ -41,13 +42,15 @@ const execution = new Set(['render','renderToString','renderToStaticMarkup','set
 
 class Scope {
   constructor(parent = null) { this.parent = parent; this.bindings = new Map(); this.hooks=[]; this.hookNodes=new Set() }
-  get(name) { return this.bindings.get(name) ?? this.parent?.get(name) ?? (['Map','Set','Object','Math'].includes(name) ? value({intrinsic:name}) : value()) }
+  get(name) { return this.bindings.get(name) ?? this.parent?.get(name) ?? (['Map','Set','Object','Math','JSON'].includes(name) ? value({intrinsic:name}) : value()) }
   set(name, result) { this.bindings.set(name, result) }
   assign(name, result) { if(this.bindings.has(name)||!this.parent)this.set(name,result);else this.parent.assign(name,result) }
 }
 
-export function analyzeSourceTests(files, entries = [...files.keys()].filter(isTest)) {
+export function analyzeSourceTests(files, entries = [...files.keys()].filter(isTest), statementBudget = 500000) {
+  if (!Number.isSafeInteger(statementBudget) || statementBudget < 1 || statementBudget > 500000) throw Error('Invalid AST statement budget')
   const modules = new Map(), findings = [], active = new Set()
+  const sourceCalls = new WeakMap(), fixtureWrites = new Map(), mockedReaders = new Map()
   const readers=new Set(),imports=new Map()
   let steps = 0
   const bind = (name, result, scope) => {
@@ -67,19 +70,20 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
   let added=true
   while(added){added=false;for(const [file,dependencies]of imports)if(!readers.has(file)&&dependencies.some(path=>readers.has(path))){readers.add(file);added=true}}
   const fsModule = () => {
-    const reader = value({ reader: true })
-    return value({ props: new Map([['readFileSync',reader],['readFile',reader],...['existsSync','accessSync','statSync','lstatSync','access','stat','lstat'].map(name=>[name,value({fileInfo:true})]),['promises',value({props:new Map([['readFile',reader]])})]]) })
+    const reader = name => value({ reader: true, readerName: name })
+    return value({ props: new Map([['readFileSync',reader('readFileSync')],['readFile',reader('readFile')],['realpathSync',value({pathIdentity:true})],...['existsSync','accessSync','statSync','lstatSync','access','stat','lstat'].map(name=>[name,value({fileInfo:true})]),['promises',value({props:new Map([['readFile',reader('readFile')]])})]]) })
   }
   const emit = (ctx, node, actual, expected, reason) => {
     if (!actual.reads.length) return
     const position = ctx.sf.getLineAndCharacterOfPosition(node.getStart(ctx.sf))
     const hit = { file: ctx.file, entry: ctx.entry ?? ctx.file, line: position.line+1, test: ctx.test || '(module)', reads: [...actual.reads].sort(), expression: node.getText(ctx.sf), expected: [...expected.strings].sort(), reason }
-    hit.key = JSON.stringify([hit.entry,hit.file,hit.test,hit.reads,canonical(node),hit.expected,reason])
+    hit.key = JSON.stringify([hit.entry,hit.file,hit.test,hit.reads,canonical(node,sourceCalls),hit.expected,reason])
     findings.push(hit)
   }
   const read = (path, ctx, node, helper = '') => {
-    const paths = path.strings.filter(p => target(p) || !data(p))
-    return value({ reads: paths.length ? paths.map(p => `${posix.normalize(p)}${helper ? '|helper:'+helper : ''}`) : path.strings.length ? [] : [`unknown:${ctx.file}:${canonical(node)}${helper ? '|helper:'+helper : ''}`] })
+    const paths = path.strings.filter(p => !p.startsWith('__fixture__/') && (target(p) || !data(p)))
+    const fixtures=path.strings.filter(path=>path.startsWith('__fixture__/')).map(path=>fixtureWrites.get(path)??value())
+    return union([value({ reads: paths.length ? paths.map(p => `${posix.normalize(p)}${helper ? '|helper:'+helper : ''}`) : path.strings.length ? [] : [`unknown:${ctx.file}:${canonical(node)}${helper ? '|helper:'+helper : ''}`] }),...fixtures])
   }
   const matcher = (name, negated, actual, expected, ctx, node) => {
     if (!actual.reads.length) return
@@ -100,7 +104,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
   const statements = (nodes, scope, ctx, depth) => {
     const returns = []
     for (const node of nodes) {
-      if (++steps > 500000) throw Error(`AST analysis exceeded its bound: ${ctx.file}`)
+      if (++steps > statementBudget) throw Error(`AST analysis exceeded its bound: ${ctx.file}`)
       if (ts.isVariableStatement(node)) for (const decl of node.declarationList.declarations) bind(decl.name, evaluate(decl.initializer,scope,ctx,depth),scope)
       else if (ts.isFunctionDeclaration(node) && node.name) scope.set(node.name.text,value({ fn: node, scope, ctx }))
       else if (ts.isClassDeclaration(node) && node.name) scope.set(node.name.text,value({classNode:node,scope,ctx}))
@@ -140,29 +144,31 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     if (!fn.fn || depth > 12 || active.has(fn.fn)) return union(args)
     active.add(fn.fn)
     const scope = new Scope(fn.scope), ctx = {...fn.ctx, entry:caller.entry??caller.file, test:caller.test}
-    fn.fn.parameters?.forEach((param,i) => bind(param.name,args[i] ?? evaluate(param.initializer,scope,ctx,depth+1),scope))
+    fn.fn.parameters?.forEach((param,i) => bind(param.name,param.dotDotDotToken?value({items:args.slice(i),collection:true}):(!args[i]||args[i].undefined)?evaluate(param.initializer,scope,ctx,depth+1):args[i],scope))
     const result = ts.isBlock(fn.fn.body) ? statements(fn.fn.body.statements,scope,ctx,depth+1) : evaluate(fn.fn.body,scope,ctx,depth+1)
     active.delete(fn.fn)
     return result
   }
   const evaluate = (node,scope,ctx,depth=0) => {
-    if (!node) return value()
+    if (!node) return value({undefined:true})
     if (ts.isStringLiteralLike(node) || ts.isNumericLiteral(node) || ts.isRegularExpressionLiteral(node)) return value({strings:atoms([node.text])})
     if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) return value({bool:node.kind===ts.SyntaxKind.TrueKeyword})
-    if (ts.isIdentifier(node)) return scope.get(node.text)
+    if (ts.isIdentifier(node)) return node.text==='undefined'?value({undefined:true}):scope.get(node.text)
     if(node.kind===ts.SyntaxKind.ThisKeyword)return scope.get('this')
     if (ts.isParenthesizedExpression(node) || ts.isAwaitExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node) || ts.isTypeAssertionExpression(node)) return evaluate(node.expression,scope,ctx,depth)
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return value({fn:node,scope,ctx})
-    if (ts.isArrayLiteralExpression(node)) {const items=node.elements.map(el=>evaluate(ts.isSpreadElement(el)?el.expression:el,scope,ctx,depth));return {...union(items),items,collection:true}}
+    if (ts.isArrayLiteralExpression(node)) {const items=node.elements.flatMap(el=>{const item=evaluate(ts.isSpreadElement(el)?el.expression:el,scope,ctx,depth);return ts.isSpreadElement(el)?item.items??[item]:[item]});return {...union(items),items,collection:true}}
     if (ts.isObjectLiteralExpression(node)) {const props=new Map();for(const property of node.properties){if(ts.isPropertyAssignment(property))props.set(property.name.text,evaluate(property.initializer,scope,ctx,depth));else if(ts.isShorthandPropertyAssignment(property))props.set(property.name.text,scope.get(property.name.text));}return value({props})}
     if (ts.isPropertyAccessExpression(node)) {
       const receiver=evaluate(node.expression,scope,ctx,depth)
       if (receiver.props) {
-        const member=receiver.props.get(node.name.text)??value()
+        const member=receiver.props.get(node.name.text)??value({undefined:true})
         return member.getter?invoke(member,[],ctx,node,depth):member
       }
       if(receiver.localModule)return value({localModule:receiver.localModule,exportName:node.name.text})
-      if(receiver.astReads?.length)return node.name.text==='text'?value({reads:receiver.astReads}):value({astReads:receiver.astReads})
+      if(receiver.astReads?.length)return node.name.text==='text'&&receiver.astRoot?value({reads:receiver.astReads}):value({astReads:receiver.astReads})
+      if(ts.isMetaProperty(node.expression)&&node.name.text==='url')return value({strings:[ctx.file]})
+      if(ts.isMetaProperty(node.expression)&&node.name.text==='dirname')return value({strings:[posix.dirname(ctx.file)]})
       if (node.name.text==='length') return value({strings:receiver.items?[String(receiver.items.length)]:[],reads:receiver.reads,readLength:receiver.collection})
       return receiver
     }
@@ -170,7 +176,12 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       const receiver=evaluate(node.expression,scope,ctx,depth), key=evaluate(node.argumentExpression,scope,ctx,depth)
       return receiver.props?.get(key.strings[0]) ?? receiver.items?.[Number(key.strings[0])] ?? receiver
     }
-    if (ts.isConditionalExpression(node)) return union([evaluate(node.whenTrue,scope,ctx,depth),evaluate(node.whenFalse,scope,ctx,depth)])
+    if (ts.isConditionalExpression(node)) {
+      const condition=evaluate(node.condition,scope,ctx,depth)
+      if(condition.undefined||condition.bool===false)return evaluate(node.whenFalse,scope,ctx,depth)
+      if(condition.bool===true)return evaluate(node.whenTrue,scope,ctx,depth)
+      return union([evaluate(node.whenTrue,scope,ctx,depth),evaluate(node.whenFalse,scope,ctx,depth)])
+    }
     if (ts.isPrefixUnaryExpression(node)) {
       const operand=evaluate(node.operand,scope,ctx,depth)
       if(node.operator===ts.SyntaxKind.ExclamationToken)return {...operand,predicate:operand.predicate?{sign:-operand.predicate.sign}:{sign:-1}}
@@ -184,6 +195,8 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     if (ts.isBinaryExpression(node)) {
       const left=evaluate(node.left,scope,ctx,depth),right=evaluate(node.right,scope,ctx,depth),op=node.operatorToken.kind
+      if(left.undefined&&op===ts.SyntaxKind.AmpersandAmpersandToken)return left
+      if(left.undefined&&[ts.SyntaxKind.QuestionQuestionToken,ts.SyntaxKind.BarBarToken].includes(op))return right
       if(op===ts.SyntaxKind.EqualsToken){if(ts.isIdentifier(node.left))scope.assign(node.left.text,right);else if(ts.isPropertyAccessExpression(node.left))evaluate(node.left.expression,scope,ctx,depth).props?.set(node.left.name.text,right);else bind(node.left,right,scope);return right}
       if(op===ts.SyntaxKind.PlusToken)return {...union([left,right]),strings:combine(left.strings,right.strings)}
       const result=union([left,right])
@@ -192,8 +205,14 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       return result
     }
     if (!ts.isCallExpression(node) && !ts.isNewExpression(node)) return value()
-    const call=node.expression,name=ts.isPropertyAccessExpression(call)?call.name.text:ts.isIdentifier(call)?call.text:''
-    const args=(node.arguments??[]).map(arg=>evaluate(arg,scope,ctx,depth))
+    const call=node.expression,syntacticName=ts.isPropertyAccessExpression(call)?call.name.text:ts.isIdentifier(call)?call.text:''
+    // import() executes a module; it does not return its source text.
+    if(call.kind===ts.SyntaxKind.ImportKeyword){
+      const specifier=evaluate(node.arguments?.[0],scope,ctx,depth)
+      return specifier.strings.some(path=>path.includes('?raw'))?value({props:new Map([['default',read(specifier,ctx,node)]])}):value()
+    }
+    const name=(ts.isIdentifier(call)?scope.get(call.text).pathOp:undefined)??syntacticName
+    const args=(node.arguments??[]).flatMap(arg=>ts.isSpreadElement(arg)?evaluate(arg.expression,scope,ctx,depth).items??[evaluate(arg.expression,scope,ctx,depth)]:[evaluate(arg,scope,ctx,depth)])
     if(['beforeEach','beforeAll'].includes(name)){
       for(const fn of args.filter(arg=>arg.fn))if(!scope.hookNodes.has(fn.fn)){scope.hookNodes.add(fn.fn);scope.hooks.push(fn)}
       return value()
@@ -221,9 +240,17 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     }
     const receiver=ts.isPropertyAccessExpression(call)?evaluate(call.expression,scope,ctx,depth):value()
     const callable=evaluate(call,scope,ctx,depth)
+    if(receiver.moduleLoader&&name==='resolve')return value({reads:union(args).reads})
+    if(receiver.vitest&&name==='hoisted'&&args[0]?.fn)return invoke(args[0],[],ctx,node,depth)
+    if(receiver.vitest&&name==='mock'&&args[0]?.strings.some(path=>/^(?:node:)?fs$/.test(path))&&args[1]?.fn){
+      const mock=invoke(args[1],[],ctx,node,depth).props?.get('readFileSync')
+      if(mock?.fn)mockedReaders.set(ctx.entry??ctx.file,mock)
+      return value()
+    }
     if(ts.isNewExpression(node)&&['Map','Set'].includes(callable.intrinsic))return value({container:callable.intrinsic,items:args[0]?.items??[],reads:union(args).reads})
     if(receiver.container&&name==='get')return union((receiver.items??[]).filter(row=>row.items?.[0]?.strings.some(key=>args[0]?.strings.includes(key))).map(row=>row.items[1]))
-    if(receiver.container&&['has','set','add','delete','clear','keys','values','entries'].includes(name))return value({reads:union([receiver,...args]).reads})
+    if(receiver.container&&name==='add'){receiver.items.push(...args);receiver.reads=union(receiver.items).reads;return receiver}
+    if(receiver.container&&['has','set','delete','clear','keys','values','entries'].includes(name))return value({reads:union([receiver,...args]).reads})
     if(['Object','Math'].includes(receiver.intrinsic))return union(args)
     if(ts.isNewExpression(node)&&callable.classNode){
       const instance=value({props:new Map()}),instanceScope=new Scope(callable.scope)
@@ -239,30 +266,92 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
       }
       return instance
     }
-    if(callable.reader)return read(args[0]??value(),ctx,node,callable.helper)
+    if(callable.reader){
+      const mock=callable.readerName==='readFileSync'?mockedReaders.get(ctx.entry??ctx.file):null
+      if(mock?.fn&&!active.has(mock.fn))return invoke(mock,args,ctx,node,depth)
+      sourceCalls.set(node,'file');return read(args[0]??value(),ctx,node,callable.helper)
+    }
     if(callable.fileInfo)return value()
+    if(callable.pathIdentity)return args[0]??value()
+    if(callable.hashFactory)return value({hash:true})
+    if(receiver.hash&&name==='update')return {...union([receiver,...args]),hash:true}
+    if(receiver.hash&&name==='digest')return value({reads:receiver.reads})
+    if(receiver.intrinsic==='JSON'&&['parse','stringify'].includes(name)){
+      const seen=new Set(),parts=[]
+      const collect=part=>{if(!part||seen.has(part))return;seen.add(part);parts.push(part);for(const child of part.props?.values()??[])collect(child);for(const child of part.items??[])collect(child)}
+      args.forEach(collect)
+      return union(parts)
+    }
     if(name==='require'&&args[0]?.strings.some(s=>/^(?:node:)?fs$/.test(s)))return fsModule()
     if(name==='require'&&args[0]?.strings.some(s=>/^(?:node:)?assert(?:\/strict)?$/.test(s)))return value({assert:true})
     if(callable.assertMatcher){matcher(callable.assertMatcher,/^doesNot|^not/.test(callable.assertMatcher),args[0]??value(),args[1]??value(),ctx,node);return value()}
-    if(['join','resolve'].includes(name)&&!receiver.reads.length&&!callable.fn)return value({strings:atoms([args.flatMap(a=>a.strings).join('/').replace(/\/+/g,'/')])})
+    if(name==='join'&&receiver.items)return union(receiver.items)
+    if(['join','resolve'].includes(name)&&!receiver.reads.length&&!callable.fn){
+      let paths=['']
+      for(const arg of args)if(arg.strings.length)paths=combine(paths,arg.strings.map(path=>'/'+path))
+      return value({strings:atoms(paths.map(path=>posix.normalize(path.replace(/^\//,''))))})
+    }
+    if(['dirname','basename','extname','relative'].includes(name)&&!callable.fn&&!receiver.reads.length){
+      if(!args[0]?.strings.length)return value()
+      const strings=name==='relative'?args[0].strings.flatMap(from=>(args[1]?.strings??[]).map(to=>posix.relative(from,to))):args[0].strings.map(path=>posix[name](path))
+      return value({strings:atoms(strings),reads:union(args).reads})
+    }
+    if(callable.moduleFactory)return value({moduleLoader:true})
+    if(callable.moduleLoader&&args[0]?.strings.some(path=>/^(?:node:)?fs$/.test(path)))return fsModule()
     if(name==='fileURLToPath')return args[0]??value()
-    if(name==='URL')return args[0]??value()
-    if(['execFileSync','execSync'].includes(name)){
+    if(name==='URL')return args[0]?.strings.length&&args[1]?.strings.length?value({strings:atoms(args[0].strings.flatMap(path=>args[1].strings.map(base=>posix.normalize(posix.join(posix.dirname(base),path)))))}) : args[0]??value()
+    if(name==='mkdtempSync')return value({strings:['__fixture__/'+digest(ctx.file+ctx.test+canonical(node))]})
+    if(name==='cwd'&&ts.isPropertyAccessExpression(call)&&ts.isIdentifier(call.expression)&&call.expression.text==='process')return value({strings:[/^apps\/[^/]+/.exec(ctx.file)?.[0]??'']})
+    if(['execFileSync','execSync'].includes(name)||['spawnSync','spawn','execFile'].includes(name)&&!callable.fn){
       const command=args.flatMap(a=>a.strings).join(' ')
-      if(/\b(?:show|cat|rg|grep)\b/.test(command))return read(value({strings:[command]}),ctx,node)
+      if(/\b(?:show|cat|rg|grep)\b/.test(command)){
+        const fixtureRoots=args.flatMap(arg=>arg.props?.get('cwd')?.strings??[]).filter(path=>path.startsWith('__fixture__/'))
+        if(fixtureRoots.length)return union([...fixtureWrites].filter(([path])=>fixtureRoots.some(root=>path.startsWith(root+'/'))).map(([,content])=>content))
+        return read(value({strings:[command]}),ctx,node)
+      }
       return value()
     }
-    if(['includes','test','indexOf'].includes(name))return {...union([receiver,...args]),...(name==='indexOf'?{index:true}:{predicate:{sign:1}})}
-    if(transforms.has(name))return {...union([receiver,...args]),collection:['split','match','matchAll'].includes(name)}
+    if(['includes','startsWith','endsWith','test','indexOf'].includes(name))return {...union([receiver,...args]),...(name==='indexOf'?{index:true}:{predicate:{sign:1}})}
+    if(['replace','replaceAll'].includes(name)&&receiver.strings.length&&!receiver.reads.length&&args[1]?.strings.length===1){
+      const pattern=node.arguments[0]
+      let search
+      if(ts.isRegularExpressionLiteral(pattern)){const end=pattern.text.lastIndexOf('/');search=new RegExp(pattern.text.slice(1,end),pattern.text.slice(end+1))}
+      else if(args[0]?.strings.length===1)search=args[0].strings[0]
+      if(search!==undefined)return value({strings:atoms(receiver.strings.map(text=>text[name](search,args[1].strings[0])))})
+    }
+    if(transforms.has(name)){
+      // Offsets and replacement patterns are arguments, not the text returned
+      // by a string operation. Their provenance still flows into the result.
+      let strings=receiver.strings
+      if(['slice','substring','substr'].includes(name)&&args.every(arg=>arg.strings.length===1&&/^-?\d+$/.test(arg.strings[0])))strings=strings.map(text=>text[name](...args.map(arg=>Number(arg.strings[0]))))
+      else if(['trim','trimStart','trimEnd','toLowerCase','toUpperCase'].includes(name))strings=strings.map(text=>text[name]())
+      return {...union([receiver,...args]),strings,collection:['split','match','matchAll'].includes(name)}
+    }
     if(['map','flatMap','filter','forEach','some','every'].includes(name)){
+      if(['map','flatMap'].includes(name)&&receiver.items){
+        const fn=args.find(arg=>arg.fn),items=fn?receiver.items.map((input,index)=>invoke(fn,[input,value({strings:[String(index)]})],ctx,node,depth)):[]
+        return {...union(items),items,collection:true}
+      }
       const fn=args.find(arg=>arg.fn),input=union(receiver.items??[receiver]),result=fn?invoke(fn,[input,value()],ctx,node,depth):value()
       return name==='forEach'?value():{...result,collection:true}
     }
-    if(name==='createSourceFile')return value({astReads:union(args).reads})
+    if(name==='createSourceFile')return value({astReads:union(args).reads,astRoot:true})
     if(['getText','getFullText'].includes(name)&&receiver.astReads?.length)return value({reads:receiver.astReads})
+    if(name==='sort'&&receiver.collection)return receiver
     if(name==='push'&&receiver.items){receiver.items.push(...args);return value()}
+    if(['writeFileSync','writeFile'].includes(name)){
+      for(const path of args[0]?.strings??[])if(path.startsWith('__fixture__/'))fixtureWrites.set(path,union([fixtureWrites.get(path)??value(),args[1]??value()]))
+      return value()
+    }
     if(execution.has(name))return value()
-    if(callable.fn)return invoke(callable,args,ctx,node,depth)
+    if(receiver.typescript)return value({typescript:true,astReads:union(args).astReads})
+    if(callable.fn){
+      const result=invoke(callable,args,ctx,node,depth)
+      const body=callable.fn.body
+      const returned=ts.isBlock(body)&&body.statements.length===1&&ts.isReturnStatement(body.statements[0])?body.statements[0].expression:body
+      if(result.reads.length&&!args.some(arg=>arg.reads.length)&&sourceCalls.has(returned))sourceCalls.set(node,'file')
+      return result
+    }
     if(callable.functions?.length)return union(callable.functions.map(fn=>invoke(fn,args,ctx,node,depth)))
     if(callable.localModule&&args.some(arg=>arg.reads.length)){
       const fn=load(callable.localModule).exports.get(callable.exportName??'default')
@@ -277,6 +366,8 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
   const load = file => {
     if(modules.has(file))return modules.get(file)
     const source=files.get(file)??'',sf=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX),scope=new Scope(),exports=new Map(),ctx={file,sf,test:''}
+    scope.set('__dirname',value({strings:[posix.dirname(file)]}))
+    scope.set('__filename',value({strings:[file]}))
     const mod={scope,exports};modules.set(file,mod)
     for(const statement of sf.statements){
       if(ts.isFunctionDeclaration(statement)&&statement.name)scope.set(statement.name.text,value({fn:statement,scope,ctx}))
@@ -285,7 +376,8 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     for(const statement of sf.statements){
       if(!ts.isImportDeclaration(statement))continue
       const specifier=statement.moduleSpecifier.text,local=modulePath(file,specifier)
-      const imported=specifier.includes('?raw')?read(value({strings:[specifier]}),ctx,statement):/^(?:node:)?fs(?:\/promises)?$/.test(specifier)?fsModule():/^(?:node:)?assert(?:\/strict)?$/.test(specifier)?value({assert:true}):local?readers.has(local)?value({props:load(local).exports}):value({localModule:local}):value()
+      const pathModule=/^(?:node:)?path$/.test(specifier)?value({props:new Map(['join','resolve','dirname','basename','extname','relative'].map(pathOp=>[pathOp,value({pathOp})]))}):null
+      const imported=pathModule??(/^(?:node:)?module$/.test(specifier)?value({props:new Map([['createRequire',value({moduleFactory:true})]])}):specifier==='vitest'?value({props:new Map([['vi',value({vitest:true})]])}):specifier==='typescript'?value({typescript:true}):specifier.includes('?raw')?read(value({strings:[specifier]}),ctx,statement):/^(?:node:)?fs(?:\/promises)?$/.test(specifier)?fsModule():/^(?:node:)?crypto$/.test(specifier)?value({props:new Map([['createHash',value({hashFactory:true})]])}):/^(?:node:)?assert(?:\/strict)?$/.test(specifier)?value({assert:true}):local?readers.has(local)?value({props:load(local).exports}):value({localModule:local}):value())
       const clause=statement.importClause
       if(clause?.name)scope.set(clause.name.text,imported.assert?imported:imported.localModule?value({localModule:local,exportName:'default'}):imported.props?.get('default')??imported)
       if(clause?.namedBindings&&ts.isNamespaceImport(clause.namedBindings))scope.set(clause.namedBindings.name.text,imported)
@@ -302,19 +394,165 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
         if(ts.isClassDeclaration(statement)&&statement.name)exports.set(statement.modifiers.some(m=>m.kind===ts.SyntaxKind.DefaultKeyword)?'default':statement.name.text,scope.get(statement.name.text))
         if(ts.isVariableStatement(statement))for(const decl of statement.declarationList.declarations)if(ts.isIdentifier(decl.name))exports.set(decl.name.text,scope.get(decl.name.text))
       }
-      if(ts.isExportDeclaration(statement)&&statement.exportClause&&ts.isNamedExports(statement.exportClause))for(const binding of statement.exportClause.elements)exports.set(binding.name.text,scope.get(binding.propertyName?.text??binding.name.text))
+      if(ts.isExportDeclaration(statement)&&statement.exportClause&&ts.isNamedExports(statement.exportClause)){
+        const target=statement.moduleSpecifier&&ts.isStringLiteral(statement.moduleSpecifier)?modulePath(file,statement.moduleSpecifier.text):null
+        for(const binding of statement.exportClause.elements){
+          const name=binding.propertyName?.text??binding.name.text
+          exports.set(binding.name.text,target?load(target).exports.get(name)??value():scope.get(name))
+        }
+      }
     }
     return mod
   }
-  for(const entry of entries)load(entry)
+  // The bound protects one root analysis; adding independent test files must
+  // not consume another root's budget. A costly root still fails closed.
+  for(const entry of entries){steps=0;load(entry)}
   return findings
 }
 
-export const isTest = path => /^apps\/web\/(?:src\/.*\.test\.tsx?|scripts\/.*\.test\.mjs)$/.test(path)
-export function newSourceAssertions(before, after) {
-  const remaining=new Map()
-  for(const hit of before)remaining.set(hit.key,(remaining.get(hit.key)??0)+1)
-  return after.filter(hit=>{const count=remaining.get(hit.key)??0;if(count){remaining.set(hit.key,count-1);return false}return true})
+export const isTest = path => /^(?:apps\/(?:web|worker|liff)\/|scripts\/).*\.(?:test|spec)\.[cm]?[jt]sx?$/.test(path)
+
+/** Git cannot pair a split module once its wrapper drops below rename similarity.
+ * A unique, named default implementation retains its identity across the split.
+ * Re-exports and generic anonymous defaults are deliberately not candidates.
+ */
+export function splitModuleMoves(before, after, moves = new Map()) {
+  const primary = (file, source) => {
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
+    for (const node of ast.statements) {
+      if ((ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) && node.name && node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword) && node.modifiers.some(m => m.kind === ts.SyntaxKind.DefaultKeyword)) return node.name.text
+    }
+  }
+  const candidates = new Map(), result = new Map(moves)
+  // A retained compatibility entry may forward all exports to its renamed
+  // implementation. Require a pure, single-target re-export, never imports or
+  // a wrapper with executable statements.
+  for(const [file,source]of before){
+    if(isTest(file)||result.has(file)||!after.has(file))continue
+    const ast=ts.createSourceFile(file,after.get(file),ts.ScriptTarget.Latest,true)
+    if(!ast.statements.length||!ast.statements.every(node=>ts.isExportDeclaration(node)&&node.moduleSpecifier&&ts.isStringLiteral(node.moduleSpecifier)&&node.exportClause&&ts.isNamedExports(node.exportClause)))continue
+    if(!ast.statements.some(node=>node.exportClause.elements.some(binding=>binding.name.text==='default'&&(binding.propertyName?.text??binding.name.text)==='default')))continue
+    const specifiers=[...new Set(ast.statements.map(node=>node.moduleSpecifier.text))]
+    if(specifiers.length!==1||!specifiers[0].startsWith('.'))continue
+    const stem=posix.normalize(posix.join(posix.dirname(file),specifiers[0]))
+    const target=[stem,stem+'.ts',stem+'.tsx',stem.replace(/\.js$/,'.ts'),stem.replace(/\.js$/,'.tsx')].find(path=>after.has(path)&&path!==file)
+    if(target&&primary(file,source)&&primary(target,after.get(target))===primary(file,source))result.set(file,target)
+  }
+  for (const [file, source] of after) {
+    if (isTest(file)) continue
+    const name = primary(file, source)
+    if (name) candidates.set(name, [...(candidates.get(name) ?? []), file])
+  }
+  for (const [file, source] of before) {
+    if (after.has(file) || result.has(file) || isTest(file)) continue
+    const name = primary(file, source), matches = candidates.get(name) ?? []
+    if (matches.length === 1) result.set(file, matches[0])
+  }
+  return result
+}
+export function newSourceAssertions(before, after, moves = new Map(), sourceFiles = new Map()) {
+  const pathIndexes = new Map()
+  const pathsFor = file => {
+    if (pathIndexes.has(file)) return pathIndexes.get(file)
+    const paths = new Map(), movedFile = moves.get(file) ?? file
+    for (const [from, to] of moves) {
+      const styles = [[from, to], [posix.relative(posix.dirname(file), from), posix.relative(posix.dirname(movedFile), to)]]
+      if (from.startsWith('apps/web/') && to.startsWith('apps/web/')) styles.push([from.slice(9), to.slice(9)])
+      for (const [old, next] of styles) {
+        if (!paths.has(old)) paths.set(old, next)
+        if (!paths.has('./' + old)) paths.set('./' + old, './' + next)
+      }
+    }
+    pathIndexes.set(file, paths)
+    return paths
+  }
+  const identity = (hit, plainReader = false, remap = true, remapReads = true) => {
+    const parts = JSON.parse(hit.key)
+    if (remap) {
+      const rewrite=item=>Array.isArray(item)?item.map(rewrite):typeof item==='string'?(pathsFor(hit.file).get(item)??item):item
+      parts[0] = moves.get(parts[0]) ?? parts[0]
+      parts[1] = moves.get(parts[1]) ?? parts[1]
+      if(remapReads){parts[4] = JSON.stringify(rewrite(JSON.parse(parts[4])));parts[5] = rewrite(parts[5])}
+      if(remapReads)parts[3] = parts[3].map(read => {
+        const [path, helper] = read.split('|helper:')
+        const unknownPrefix='unknown:'+hit.file+':'
+        if(path.startsWith(unknownPrefix)) {
+          const node=JSON.parse(path.slice(unknownPrefix.length))
+          return 'unknown:'+parts[1]+':'+JSON.stringify(rewrite(node))+(helper?'|helper:'+helper:'')
+        }
+        const next = pathsFor(hit.file).get(path)
+        if (next !== undefined) return next + (helper ? '|helper:' + helper : '')
+        return read
+      }).sort()
+    }
+    if (plainReader) parts[3] = [...new Set(parts[3].map(path => path.replace(/\|helper:[a-f0-9]+$/, '')))].sort()
+    return JSON.stringify(parts)
+  }
+  const remaining = new Map()
+  const baselineReaders = new Set(before.flatMap(hit => hit.reads.flatMap(path => path.match(/\|helper:([a-f0-9]+)$/)?.slice(1) ?? [])))
+  for (const hit of before) {
+    const key = identity(hit)
+    const list = remaining.get(key) ?? []
+    list.push(hit)
+    remaining.set(key, list)
+  }
+  const unmatched = after.filter(hit => {
+    // after already uses the new paths; only remap the base side.
+    const list = remaining.get(hit.key)
+    if (!list?.length) return true
+    list.pop()
+    return false
+  })
+  const dependencies = new Map()
+  const importedFiles = file => {
+    if(dependencies.has(file))return dependencies.get(file)
+    const reachable=new Set(),pending=[file]
+    while(pending.length){
+      const next=pending.pop()
+      if(reachable.has(next))continue
+      reachable.add(next)
+      for(const {fileName}of ts.preProcessFile(sourceFiles.get(next)??'',true,true).importedFiles){
+        const stem=fileName.startsWith('@/')?'apps/web/src/'+fileName.slice(2):fileName.startsWith('.')?posix.normalize(posix.join(posix.dirname(next),fileName)):''
+        const target=[stem,stem+'.ts',stem+'.tsx',stem+'/index.ts'].find(path=>sourceFiles.has(path))
+        if(target)pending.push(target)
+      }
+    }
+    dependencies.set(file,reachable)
+    return reachable
+  }
+  return unmatched.filter(hit => {
+    if (hit.reads.some(path => /\|helper:/.test(path) && !baselineReaders.has(path.match(/\|helper:([a-f0-9]+)$/)?.[1]))) return true
+    // readUiSource preserves the requested root while following its split files.
+    // Only a reader already observed in the base qualifies. A new or changed
+    // helper, a read root, a test or an assertion still fails.
+    const plain = identity(hit, true, false)
+    for (const list of remaining.values()) {
+      const index = list.findIndex(old => {
+        const newParts=JSON.parse(plain)
+        for(const remapReads of [true,false]){
+          const oldParts=JSON.parse(identity(old,true,true,remapReads))
+          // A human-readable case title is not an assertion. The file, source
+          // provenance, expression and expected values still match one-to-one.
+          oldParts[2]=newParts[2]
+          if(JSON.stringify(oldParts)===plain)return true
+          const oldRoots=oldParts[3],newRoots=newParts[3]
+          if(newRoots.length&&newRoots.every(root=>oldRoots.includes(root))){
+            const subset=[...oldParts];subset[3]=newRoots
+            if(JSON.stringify(subset)===plain)return true
+          }
+          // Extracted code may be read explicitly alongside its old root. Only
+          // actual imports of that retained root qualify; unrelated new roots fail.
+          if(!oldRoots.length||!oldRoots.every(path=>newRoots.includes(path)))continue
+          if(!newRoots.every(path=>oldRoots.includes(path)||oldRoots.some(root=>importedFiles(root).has(path))))continue
+          oldParts[3]=newRoots
+          if(JSON.stringify(oldParts)===plain)return true
+        }
+        return false
+      })
+      if (index >= 0) { list.splice(index, 1); return false }
+    }
+    return true
+  })
 }
 
 export function checkRepository(root, base) {
@@ -323,7 +561,7 @@ export function checkRepository(root, base) {
   const untracked=git('ls-files','--others','--exclude-standard','-z').split('\0').filter(Boolean)
   const baseNames=git('ls-tree','-r','--name-only','-z',base).split('\0').filter(Boolean)
   const load=(paths,ref)=>{
-    const selected=paths.filter(path=>/^(?:apps\/web\/|scripts\/)/.test(path)&&/\.(?:[cm]?[jt]sx?)$/.test(path))
+    const selected=paths.filter(path=>/^(?:apps\/(?:web|worker|liff)\/|scripts\/)/.test(path)&&/\.(?:[cm]?[jt]sx?)$/.test(path))
     if(!ref)return new Map(selected.map(path=>[path,existsSync(resolve(root,path))?readFileSync(resolve(root,path),'utf8'):'']))
     if(selected.some(path=>/[\r\n]/.test(path)))throw Error('Unsupported newline in source path')
     const bytes=execFileSync('git',['cat-file','--batch'],{cwd:root,input:selected.map(path=>ref+':'+path).join('\n')+'\n',maxBuffer:128*1024*1024})
@@ -335,8 +573,12 @@ export function checkRepository(root, base) {
     }
     return result
   }
-  const before=analyzeSourceTests(load(baseNames,base)),after=analyzeSourceTests(load([...new Set([...names,...untracked])]))
-  return {base,examined:after.length,findings:newSourceAssertions(before,after)}
+  const baseSources=load(baseNames,base),currentSources=load([...new Set([...names,...untracked])])
+  const before=analyzeSourceTests(baseSources),after=analyzeSourceTests(currentSources)
+  const changes=git('-c','diff.renameLimit=0','diff','--name-status','-z','-M50%',base).split('\0'),moves=new Map()
+  for(let i=0;i<changes.length;){const status=changes[i++];if(!status)break;const from=changes[i++];if(status.startsWith('R'))moves.set(from,changes[i++])}
+  const lineage=splitModuleMoves(baseSources,currentSources,moves)
+  return {base,examined:after.length,moves:Object.fromEntries(lineage),findings:newSourceAssertions(before,after,lineage,currentSources)}
 }
 
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){

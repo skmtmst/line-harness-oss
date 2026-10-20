@@ -1,4 +1,4 @@
-/** Reusable B-267 evidence; default routes are the shared list registry.
+/** Reusable  evidence; default routes are the shared list registry.
  * node fix-patterns-audit.mjs <base> <output.json> [cases.json]
  * Cases may supply {board,route,session,sessionStorage,api}; only reads are sent. */
 import { chromium } from '@playwright/test'

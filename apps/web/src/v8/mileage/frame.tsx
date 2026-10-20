@@ -2,8 +2,8 @@
 
 /*
  * ★V8 マイルの外枠（Pencil「★V8-B 画面の地図」のマイルの行）。
- * たまる決めごと `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`・使い道 `S35pO`・
- * 友だちの残高 `CJlf4`・履歴 `oRbJi`・行動スコア `IRPw8`。
+ * たまる決めごと ・1152 ・閲覧のみ ・使い道 ・
+ * 友だちの残高 ・履歴 ・行動スコア 。
  *
  * 板の頭（題・説明・右の操作）とタブの段・閲覧のみの帯は5つのタブで同じ。
  * 数の帯・フォルダの列・道具の段・表は各タブが一覧の型（ListPage）の枠へ渡す。
@@ -42,7 +42,7 @@ export function mileageTabHref(key: MileageTabKey): string {
   return key === 'earning-rules' ? '/mileage' : `/mileage?tab=${key}`
 }
 
-/** タブの名の横の件数（OC0gy：たまる決めごと 6・使い道 5・友だちの残高 1,284）。 */
+/** タブの名の横の件数（：たまる決めごと 6・使い道 5・友だちの残高 1,284）。 */
 export type MileageTabCounts = Partial<Record<MileageTabKey, string>>
 
 export interface MileageShellContext {
@@ -66,7 +66,7 @@ export function useMileageShell(): MileageShellContext {
   return useContext(MileageShell)
 }
 
-/** 閲覧のみの帯（E2Any）。数の帯の上。 */
+/** 閲覧のみの帯。数の帯の上。 */
 export function ViewerBand() {
   return (
     <div className={styles.viewerBand}><ReadOnlyNotice role="note"></ReadOnlyNotice></div>
@@ -75,7 +75,7 @@ export function ViewerBand() {
 
 /**
  * 作るボタン。閲覧のみの人には出さない（2026-10-06 オーナー：押せない形で
- * 残さず隠す。絵 E2Any は押せない形で描いているが、決定を優先する）。
+ * 残さず隠す。絵  は押せない形で描いているが、決定を優先する）。
  */
 export function CreateButton({
   href,

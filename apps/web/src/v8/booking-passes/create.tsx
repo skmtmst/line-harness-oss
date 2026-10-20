@@ -27,7 +27,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
-import { bookingPassPlansApi } from '@/lib/api-gap3'
+import { bookingPassPlansApi } from '@/lib/api/helpers/gap3'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { KIND_LABEL, VALID_CHOICES, failureText, periodLabel, countLabel, validLabel, yen } from './words'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -36,7 +36,7 @@ import styles from './passes.module.css'
 /*
  * ★V8 回数券・月謝を作る・直す（B2-2 `nrtRJ`）。手順は 4 つ：① 種類と値段 ② 使える予約 ③ 期限と券が無い人の予約 ④ LINE で売る。
  * 今の手順は開き、済んだ手順は 1 行に畳んで［変える］で戻れる。作ると下書きで入り、［作る］で販売を始める。
- * ④ LINE での販売（オンライン決済）はまだ口が無いので、押すと「現在準備中です」を出す（B-314）。
+ * ④ LINE での販売（オンライン決済）はまだ口が無いので、押すと「現在準備中です」を出す。
  * 入口 `/booking/passes/new`（直すときは `?id=`。下書きだけ直せる）。
  */
 

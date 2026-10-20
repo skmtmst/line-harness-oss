@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /**
  * ISO日時を datetime-local 入力の文字（日本時間）へ直す。
  *
@@ -9,5 +10,5 @@
 export function isoToJstDatetimeLocal(value: string): string {
   const time = Date.parse(value)
   if (!Number.isFinite(time)) return ''
-  return new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16)
+  return japanCalendar(new Date(time)).toISOString().slice(0, 16)
 }

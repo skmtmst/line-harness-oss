@@ -1,5 +1,6 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { reportHarnessErrorToSlack } from '../services/codex-slack-relay.js';
 
@@ -33,7 +34,7 @@ clientErrors.post('/api/client-errors', requireRole('owner', 'admin', 'staff'), 
         : undefined,
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"client_error_slack_report_failed","route":"POST /api/client-errors"}));
+    logger.error("client_error_slack_report_failed");
   }
   return c.json({ success: true }, 202);
 });

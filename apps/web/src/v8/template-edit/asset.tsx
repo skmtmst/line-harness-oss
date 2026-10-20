@@ -41,7 +41,7 @@ import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
 import { TemplateEditFrame } from './frame'
 import ChoiceExtrasRows from './choice-extras'
-import { FormPhone } from '../form-edit/phone'
+import { FormPhone } from '@/v8/form-edit/public/phone/index'
 import type { TemplateEditHost } from './host'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
@@ -56,7 +56,7 @@ import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * ★V8「クーポンを作る」（絵 S6FEuB）・「リサーチを作る」（絵 EsYo4）。
+ * ★V8「クーポンを作る」・「リサーチを作る」。
  *
  * 保存は今の画面（app/templates/asset-editor-v8.tsx・template-asset-editor.tsx）と
  * 同じ口（POST /api/broadcast-message-assets）・同じ形の payload。違いは置き場と
@@ -194,7 +194,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   })
 
   /*
-   * 保存で落ちた欄（B-139）：帯ではなく欄を赤くし、真下に理由を出して1つ目へ移る。
+   * 保存で落ちた欄：帯ではなく欄を赤くし、真下に理由を出して1つ目へ移る。
    * 組み立て（buildPayload）の決まりと同じ中身を欄ごとに持つ。
    */
   const fields = useFormErrors()
@@ -357,7 +357,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     </section>
   )
 
-  /* リサーチはお客さまが答える画面（LIFF）で見せる。回答フォームの LIFF と同じ形（絵 EsYo4・B-173）。 */
+  /* リサーチはお客さまが答える画面（LIFF）で見せる。回答フォームの LIFF と同じ形。 */
   const researchLayout: FormLayout = {
     version: 2,
     header: [],

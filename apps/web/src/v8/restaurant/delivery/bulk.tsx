@@ -13,16 +13,22 @@
  */
 
 import { Ban, Pause, RotateCcw } from 'lucide-react'
+import BulkBar from '@/components/shared/bulk-bar'
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
-import { ListToolbarRow } from '@/components/shared/list-toolbar'
-import SearchField from '@/components/shared/search-field'
+import ListToolbar from '@/components/shared/list-toolbar'
+import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
+import Pagination from '@/components/shared/pagination'
+import PageSizeSelect from '@/components/shared/page-size-select'
+import CheckCard from '@/components/shared/check-card'
 import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
 import { DataTable, TableHeadRow, TableStateRow, Td, Th, Tr } from '@/components/shared/table'
 import Toggle from '@/components/shared/toggle'
+import TruncatedText from '@/components/shared/truncated-text'
 import {
   DELIVERY_SERVICE_LABELS,
   type DeliveryIntakeStopPreset,
@@ -30,15 +36,15 @@ import {
   type DeliveryService,
   type DeliveryServiceState,
 } from '@/lib/restaurant-delivery-api'
-import { DialogField, DialogNote, RsDialog } from '../booking-kit/parts'
+import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { DASH, INTAKE_STOP_PRESET_OPTIONS, SERVICE_TONES, formatYen } from './format'
 import styles from './delivery.module.css'
 
 /*
  * 受付停止の確認（XCVGd）。上からの位置は絵のとおり 230。
  * 幅は絵が 500 だが、窓の幅は正本で 480／560／720／960 の4段に決まっている
- * （docs/v8-design-rules.md §6.12 の項目8・B-177 の `DIALOG_WIDTHS`）。500 は4段に無いので
- * 共通部品の `dialogWidth()` が 480 へ寄せる。暗に寄せられるのに任せず、
+ * （docs/v8-design-rules.md §6.12 の項目8・ の `DIALOG_WIDTHS`）。500 は4段に無いので
+ * 共通部品の `dialogWidth` が 480 へ寄せる。暗に寄せられるのに任せず、
  * 実際に出る 480 をここに書く。中身は真ん中に並ぶので絵より左右 10 外へ出る
  * （この差は「絵と正本の食い違いを正本で解いた分」として記録する）。
  */
@@ -46,13 +52,10 @@ const STOP_WIDTH = 480
 const STOP_TOP = 230
 /*
  * 絵（XCVGd）の段の間。絵は段ごとに下の余白を持ち、一文の下が 10・欄の下が 12。
- * 段の間は1つの値しか持てないので小さい方の 10 に合わせる（下の欄が 2 上がるが
- * ±4 の内）。欄の題と中身の間は 8（絵 `nYJz5`・時間選択の `gap: 8px`）で、
- * これは共通の欄の `contentGap` で渡す。窓の引数では共通の欄まで届かない。
+ * 段の間は1つの値しか持てないので小さい方の 10 に合わせる。
  * ボタンの段の上の間は 14（絵の y598→612）。
  */
 const STOP_BODY_GAP = 10
-const STOP_FIELD_GAP = 8
 const STOP_FOOT_GAP = 14
 
 const SOLD_OUT_COLUMN_COUNT = 6
@@ -60,53 +63,6 @@ const SOLD_OUT_COLUMN_COUNT = 6
 const SOLD_OUT_COLUMN_COUNT_VIEW_ONLY = SOLD_OUT_COLUMN_COUNT - 2
 
 /* ── D-5 `h7OeT` 品切れ一括設定 ───────────────────────────────── */
-
-export interface SoldOutHeaderActionsProps {
-  query: string
-  soldOutOnly: boolean
-  /** 品切れ中の品数。取れていないときは出さない。 */
-  soldOutCount: number | undefined
-  disabled?: boolean
-  onQueryChange: (value: string) => void
-  onSoldOutOnlyChange: (value: boolean) => void
-}
-
-/**
- * 板の頭の右（探す欄と「品切れ中のみ」）。親が RestaurantPage の picker へ置く。
- *
- * 段の形は画面に持たせず共通の道具の段（`ListToolbarRow`）に任せる（B-172）。
- * 絵 `h7OeT` の間 8 は共通の `--tpl-list-gap` と同じ。探す欄は絵のとおり
- * 中身なりの幅にしたいので、幅 240 に決める `ListToolbarSearchSlot` は使わない。
- */
-export function SoldOutHeaderActions({
-  query,
-  soldOutOnly,
-  soldOutCount,
-  disabled = false,
-  onQueryChange,
-  onSoldOutOnlyChange,
-}: SoldOutHeaderActionsProps) {
-  return (
-    <ListToolbarRow>
-      <SearchField
-        aria-label="商品名で探す"
-        placeholder="商品名で探す"
-        value={query}
-        disabled={disabled}
-        onChange={onQueryChange}
-        onClear={() => onQueryChange('')}
-      />
-      <FilterChip
-        selected={soldOutOnly}
-        disabled={disabled}
-        count={soldOutCount}
-        onChange={onSoldOutOnlyChange}
-      >
-        品切れ中のみ
-      </FilterChip>
-    </ListToolbarRow>
-  )
-}
 
 export interface SoldOutBoardProps {
   loading: boolean
@@ -118,7 +74,15 @@ export interface SoldOutBoardProps {
   total: number
   /** 選んだ品の id。 */
   selected: string[]
-  shown: number
+  page: number
+  perPage: number
+  /** 探す欄と「品切れ中のみ」。道具の段（ListToolbar）に置く。 */
+  query: string
+  soldOutOnly: boolean
+  /** 品切れ中の品数。取れていないときは出さない。 */
+  soldOutCount: number | undefined
+  onQueryChange: (value: string) => void
+  onSoldOutOnlyChange: (value: boolean) => void
   /** まとめて送っている間。 */
   busy: boolean
   /** 1品だけ切り替えている間の id。 */
@@ -131,17 +95,24 @@ export interface SoldOutBoardProps {
   /** `true` で品切れ・`false` で販売再開。 */
   onSubmit: (soldOut: boolean) => void
   onRetry: () => void
-  onShowMore: () => void
+  onPage: (page: number) => void
+  onPerPage: (perPage: number) => void
 }
 
-/** D-5 `h7OeT`。品切れにした品は3つのサービスすべてで注文できなくなる。 */
+/** D-5 `h7OeT`。保存済みの商品を確認する。Uberを含む商品は同期しない。 */
 export default function SoldOutBoard({
   loading,
   error,
   items,
   total,
   selected,
-  shown,
+  page,
+  perPage,
+  query,
+  soldOutOnly,
+  soldOutCount,
+  onQueryChange,
+  onSoldOutOnlyChange,
   busy,
   busyItemId,
   canManage,
@@ -150,22 +121,36 @@ export default function SoldOutBoard({
   onToggleOne,
   onSubmit,
   onRetry,
-  onShowMore,
+  onPage,
+  onPerPage,
 }: SoldOutBoardProps) {
-  const visible = items.slice(0, shown)
+  const pageCount = Math.max(1, Math.ceil(items.length / perPage))
+  const currentPage = Math.min(page, pageCount)
+  const firstIndex = (currentPage - 1) * perPage
+  const visible = items.slice(firstIndex, firstIndex + perPage)
   const selectedSet = new Set(selected)
-  const checkedCount = visible.filter((item) => selectedSet.has(item.id)).length
-  const allChecked = visible.length > 0 && checkedCount === visible.length
+  const canSync = (item: DeliveryMenuItem) => !item.services.some(({ service }) => service === 'ubereats')
+  const checkedCount = visible.filter((item) => canSync(item) && selectedSet.has(item.id)).length
+  const selectableCount = visible.filter(canSync).length
+  const allChecked = selectableCount > 0 && checkedCount === selectableCount
   const someChecked = checkedCount > 0 && !allChecked
   // 権限の有無は帯ごと出す・出さないで分ける。ここは「選んでいないので押せない」だけ。
   const canSubmit = checkedCount > 0 && !busy
 
   return (
     <>
+      {/* 探す欄と「品切れ中のみ」は道具の段に置く（板の頭の右には置かない）。 */}
+      <ListToolbar
+        search={{ placeholder: '商品名で探す', label: '商品名で探す', value: query, onChange: onQueryChange }}
+        filters={(
+          <FilterChip selected={soldOutOnly} disabled={loading && items.length === 0} count={soldOutCount} onChange={onSoldOutOnlyChange}>
+            品切れ中のみ
+          </FilterChip>
+        )}
+        trailing={<PageSizeSelect value={perPage} onChange={onPerPage} />}
+      />
       {loading && items.length === 0 && !error ? (
-        <div className={styles.stateBox}>
-          <ListState kind="loading" title="メニューを読み込んでいます" />
-        </div>
+        <ListState kind="loading" title="メニューを読み込んでいます" />
       ) : null}
       {error && items.length === 0 ? (
         <ListState
@@ -178,58 +163,31 @@ export default function SoldOutBoard({
 
       {items.length > 0 ? (
         <>
-          {/* 閲覧のみの人は選べないので、選んだ数の帯もまとめての札も出さない（★V8 2026-10-06）。 */}
-          {canManage ? (
-          <div className={styles.selectBar}>
-            <span className={styles.selectCount}>選択中 {checkedCount}品</span>
-            <span className={styles.spacer} />
-            <Button
-              variant="danger-outline"
-              size="delivery-bulk"
-              widthReserve="idle"
-              disabled={!canSubmit}
-              busy={busy}
-              busyLabel="送信中…"
-              onClick={() => onSubmit(true)}
-            >
-              <Ban size={13} aria-hidden="true" />選んだ商品を品切れにする
-            </Button>
-            <Button
-              variant="secondary"
-              size="delivery-bulk"
-              widthReserve="idle"
-              disabled={!canSubmit}
-              onClick={() => onSubmit(false)}
-            >
-              <RotateCcw size={13} aria-hidden="true" />販売を再開する
-            </Button>
-          </div>
-          ) : null}
-
           {error ? <p className={styles.muted}>{error}</p> : null}
 
-          <DataTable className={styles.table} data-design="h7OeT" presentation="delivery" label="メニューの品切れ設定"><thead>
-            <TableHeadRow>
+          <Card overflow="hidden"><DataTable density="reviews" columnSizing="content" data-design="h7OeT" label="メニューの品切れ設定"><thead>
+            <TableHeadRow data-table-layout="columns">
               {canManage ? (
-                <Th className={styles.th}>
+                <Th>
                   <Checkbox
                     aria-label="表示中をすべて選ぶ"
                     checked={allChecked}
                     indeterminate={someChecked}
+                    disabled={selectableCount === 0 || busy}
                     onCheckedChange={onToggleAll}
                   />
                 </Th>
               ) : null}
-              <Th className={styles.th}>商品名</Th>
-              <Th className={styles.th}>分類</Th>
+              <Th grow>商品名</Th>
+              <Th>分類</Th>
               {/*
                 * 絵（h7OeT）の「価格」は左。見出し `X4NEtR` も中の欄 `hwhgs`・`IRs4m` も
                 * 左寄せで、右へ寄せる詰め物を持っていない。注文履歴（OzHLO）の「金額」は
                 * 逆に詰め物を持っていて右寄せなので、3つの表をまとめて同じにしない。
                 */}
-              <Th className={styles.th}>価格</Th>
-              <Th className={styles.th}>状態</Th>
-              {canManage ? <Th className={styles.th}>切替</Th> : null}
+              <Th align="right">価格</Th>
+              <Th>状態</Th>
+              {canManage ? <Th>切替</Th> : null}
             </TableHeadRow></thead><tbody>
             {visible.length === 0 ? (
               <TableStateRow
@@ -238,23 +196,22 @@ export default function SoldOutBoard({
               />
             ) : (
               visible.map((item) => (
-                <Tr key={item.id}>
+                <Tr key={item.id} data-table-layout="columns">
                   {canManage ? (
                     <Td>
                       <Checkbox
                         aria-label={`${item.name || '商品'}を選ぶ`}
-                        checked={selectedSet.has(item.id)}
+                        checked={canSync(item) && selectedSet.has(item.id)}
+                        disabled={!canSync(item) || busy}
                         onCheckedChange={(checked) => onToggle(item.id, checked)}
                       />
                     </Td>
                   ) : null}
-                  <Td>
-                    <span className={styles.menuName} title={item.name || undefined}>
-                      {item.name || DASH}
-                    </span>
+                  <Td grow>
+                    <TruncatedText value={item.name || DASH} />
                   </Td>
-                  <Td>{item.category || DASH}</Td>
-                  <Td>
+                  <Td data-list-number>{item.category || DASH}</Td>
+                  <Td align="right" data-list-number>
                     <span className={styles.amount}>{formatYen(item.price)}</span>
                   </Td>
                   <Td>
@@ -266,10 +223,11 @@ export default function SoldOutBoard({
                   </Td>
                   {canManage ? (
                     <Td>
+                      {!canSync(item) ? <StatusBadge tone="neutral" size="compact">{PREPARING_WORD}</StatusBadge> : null}
                       <Toggle
                         label={`${item.name || '商品'}の販売`}
                         checked={!item.soldOut}
-                        disabled={busy || busyItemId === item.id}
+                        disabled={!canSync(item) || busy || busyItemId === item.id}
                         onChange={(next) => onToggleOne(item.id, !next)}
                       />
                     </Td>
@@ -277,16 +235,25 @@ export default function SoldOutBoard({
                 </Tr>
               ))
             )}
-          </tbody></DataTable>
+          </tbody></DataTable></Card>
 
-          <div className={styles.tableFoot}>
-            <p className={styles.muted}>
-              全{total}品中 1〜{visible.length}品を表示
-            </p>
-            {visible.length < items.length ? (
-              <Button variant="text" size="compact" onClick={onShowMore}>さらに表示</Button>
-            ) : null}
-          </div>
+          {canManage ? (
+            <BulkBar count={checkedCount} unit="品">
+              <Button variant="danger-outline" disabled={!canSubmit} busy={busy} busyLabel="送信中…" onClick={() => onSubmit(true)}>
+                <Ban size={16} aria-hidden="true" />選んだ商品を品切れにする
+              </Button>
+              <Button variant="secondary" disabled={!canSubmit} onClick={() => onSubmit(false)}>
+                <RotateCcw size={16} aria-hidden="true" />販売を再開する
+              </Button>
+            </BulkBar>
+          ) : null}
+
+          <Pagination
+            page={currentPage}
+            pageCount={pageCount}
+            onPageChange={onPage}
+            summary={`全${total}品中 ${firstIndex + 1}〜${firstIndex + visible.length}品を表示`}
+          />
         </>
       ) : null}
 
@@ -329,7 +296,7 @@ export function IntakeStopDialog({
   onSubmit,
 }: IntakeStopDialogProps) {
   const selectedSet = new Set(selected)
-  const stoppable = services.filter((state) => state.intakeStatus === 'open')
+  const stoppable = services.filter((state) => state.intakeStatus === 'open' && state.service !== 'ubereats')
   const canSubmit = !busy && stoppable.some((state) => selectedSet.has(state.service))
 
   return (
@@ -344,7 +311,7 @@ export function IntakeStopDialog({
       /* 絵（`lSfGT`）の頭は白地。帯で囲まず、題の左の丸い印の中は一時停止の印。 */
       titleIcon={(
         <span className={styles.warnMark}>
-          <Pause size={18} aria-hidden="true" />
+          <Pause size={20} aria-hidden="true" />
         </span>
       )}
       titleRow="mark"
@@ -356,7 +323,7 @@ export function IntakeStopDialog({
       onCancel={onClose}
       actions={(
         <>
-          <Button onClick={onClose} disabled={busy}>← 戻る</Button>
+          <Button onClick={onClose} disabled={busy}>閉じる</Button>
           <Button
             variant="danger"
             busy={busy}
@@ -364,7 +331,7 @@ export function IntakeStopDialog({
             disabled={!canSubmit}
             onClick={onSubmit}
           >
-            <Pause size={15} aria-hidden="true" />受付を停止する
+            <Pause size={16} aria-hidden="true" />止める
           </Button>
         </>
       )}
@@ -373,37 +340,32 @@ export function IntakeStopDialog({
         選んだサービスで新しい注文の受け付けを止めます。すでに受け付けた注文の調理・受け渡しはそのまま続きます。
       </p>
 
-      <DialogField label="停止するサービス" kind="select" contentGap={STOP_FIELD_GAP}>
+      <DialogField label="停止するサービス" kind="select" optional={false}>
         <div className={styles.stopList}>
           {services.length === 0 ? (
             <p className={styles.muted}>{DASH}</p>
           ) : (
             services.map((state) => {
               const label = state.label || DELIVERY_SERVICE_LABELS[state.service]
+              const preparing = state.service === 'ubereats'
               const stopped = state.intakeStatus === 'stopped'
-              const picked = !stopped && selectedSet.has(state.service)
+              const picked = !preparing && !stopped && selectedSet.has(state.service)
               return (
-                <div
+                <CheckCard
                   key={state.service}
-                  className={`${styles.stopCard} ${picked ? styles.stopCardOn : ''} ${stopped ? styles.stopCardOff : ''}`}
-                >
-                  {/* サービス名は色の付いた札で見せるので、印には読み上げ名を渡す。 */}
-                  <Checkbox
-                    aria-label={`${label}の受付を停止する`}
-                    checked={picked}
-                    disabled={stopped || busy}
-                    onCheckedChange={(checked) => onToggleService(state.service, checked)}
-                  />
-                  {/* 絵（XCVGd `Iv4Dr`/`Cxo9i`/`XK0ja`）のサービス札は点なしの丸い札。 */}
-                  <StatusBadge tone={SERVICE_TONES[state.service]} size="compact" dot={false}>{label}</StatusBadge>
-                  <span className={`${styles.stopState} ${stopped ? styles.stopStateOff : ''}`}>
-                    {stopped ? 'すでに停止中' : `現在 受付中・${state.todayCount}件対応中`}
-                  </span>
-                  {/* 絵（XCVGd）の札には細い横線が無いので、線は置かず右へ寄せるだけにする。 */}
-                  <span className={`${styles.stopMark} ${stopped ? styles.stopMarkOff : ''}`}>
-                    {stopped ? '対象外' : '停止する'}
-                  </span>
-                </div>
+                  size="row"
+                  checked={picked}
+                  disabled={preparing || stopped || busy}
+                  onChange={(checked) => onToggleService(state.service, checked)}
+                  title={(
+                    <>
+                      <span className="sr-only">{`${label}の受付を止める`}</span>
+                      {/* サービス札は点なしの丸い札。 */}
+                      <StatusBadge tone={SERVICE_TONES[state.service]} size="compact" dot={false}>{label}</StatusBadge>
+                    </>
+                  )}
+                  note={preparing ? `営業状態の連携は${PREPARING_WORD}` : stopped ? 'すでに停止中・対象外' : `現在 受付中・${state.todayCount}件対応中`}
+                />
               )
             })
           )}
@@ -415,7 +377,7 @@ export function IntakeStopDialog({
         * 4つの排他的な選択なので共通の切り替え部品に任せ、この見た目は部品側の
         * `appearance="intake-stop"` が持つ（B-172：見た目は持ち主の部品に置く）。
         */}
-      <DialogField label="停止する時間（過ぎると自動で再開します）" kind="select" contentGap={STOP_FIELD_GAP}>
+      <DialogField label="停止する時間（過ぎると自動で再開します）" kind="select" optional={false}>
         <SegmentedControl
           aria-label="停止する時間"
           appearance="intake-stop"

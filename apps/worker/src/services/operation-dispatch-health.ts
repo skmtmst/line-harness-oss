@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   finishOperationDispatcherHeartbeat,
   listOperationDispatcherHeartbeats,
@@ -5,6 +6,7 @@ import {
   type OperationHealthResultInput,
   type OperationHealthStatus,
 } from '@line-crm/db';
+
 
 import { DELIVERY_DISPATCH_JOB_NAMES } from './feature-enforcement.js';
 
@@ -105,7 +107,7 @@ export const OPERATION_DISPATCH_JOB_CROSSWALK: readonly DispatchJobCrosswalk[] =
     jobName: 'meet consultation reminders',
     sources: [
       {
-        table: 'meet_consultation_reminders',
+        table: 'meet_consultation_notification_runs',
         requiredColumns: ['consultation_id', 'status', 'retry_count', 'scheduled_at'],
       },
       { table: 'meet_consultations', requiredColumns: ['id', 'friend_id'] },
@@ -118,7 +120,7 @@ export const OPERATION_DISPATCH_JOB_CROSSWALK: readonly DispatchJobCrosswalk[] =
                WHEN mcr.status = 'failed' THEN 'dead'
              END AS state,
              COUNT(*) AS item_count, MIN(mcr.scheduled_at) AS oldest_at
-        FROM meet_consultation_reminders mcr
+        FROM meet_consultation_notification_runs mcr
         JOIN meet_consultations mc ON mc.id = mcr.consultation_id
         JOIN friends f ON f.id = mc.friend_id
        WHERE f.line_account_id = ? AND mcr.status IN ('pending', 'failed')
@@ -499,7 +501,7 @@ async function safeHeartbeat(write: () => Promise<void>, jobName: string, phase:
   try {
     await write();
   } catch (error) {
-    console.error(JSON.stringify({"code":"operation_dispatcher_heartbeat_write_failed"}));
+    logger.error("operation_dispatcher_heartbeat_write_failed");
   }
 }
 

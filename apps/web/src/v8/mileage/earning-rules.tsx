@@ -1,4 +1,6 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { responseApiError } from '@/lib/api'
 
 import StatusBadge from '@/components/shared/status-badge'
 import { mileageStatusTone } from './parts'
@@ -43,8 +45,8 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 
 /*
- * ★V8 マイル「たまる決めごと」（板 `OC0gy`・1152 `ZJIyl`・閲覧のみ `E2Any`、
- * 状態は見本帳 `zaqP9`）。
+ * ★V8 マイル「たまる決めごと」（板 ・1152 ・閲覧のみ 、
+ * 状態は見本帳 ）。
  *
  * app/mileage/v8-earning-rules-tab.tsx から動きを写し、見た目を一覧の型
  * （ListPage）で組み直した。データの口・操作は今と同じ（編集・テスト・
@@ -104,7 +106,7 @@ function folderOf(rule: MileageEarningRuleV6): Exclude<FolderKey, 'all'> {
 
 /*
  * きっかけの分け方（購入・配信の反応・紹介・そのほか）。決めごとの種類から決まる固定の分け方で、
- * 作ったフォルダではないので、左のフォルダの列ではなく上の絞り込みに置く（B-136 2026-10-09）。
+ * 作ったフォルダではないので、左のフォルダの列ではなく上の絞り込みに置く（ 2026-10-09）。
  */
 const FOLDERS: Array<{ key: FolderKey; label: string }> = [
   { key: 'all', label: 'きっかけ：すべて' },
@@ -302,7 +304,7 @@ export default function EarningRulesTab() {
       )
       if (!res.ok) {
         exportStatus = res.status
-        throw new Error('export_failed')
+        throw responseApiError(res, await res.text())
       }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -436,9 +438,7 @@ export default function EarningRulesTab() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setDeleteError(caught instanceof Error && caught.message && !/^API error/.test(caught.message)
-        ? caught.message
-        : '削除できませんでした。もう一度お試しください。') }
+      setDeleteError(describeApiFailure(caught, '削除')) }
     } finally {
       setSavingId(null)
     }
@@ -520,7 +520,7 @@ export default function EarningRulesTab() {
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
-      setTestError(caught instanceof Error ? caught.message : 'テストできませんでした。もう一度お試しください。') }
+      setTestError(describeApiFailure(caught, '送信')) }
     } finally {
       setTestBusy(false)
     }

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { recordAuditEvent } from './access-audit.js';
 
 /**
@@ -62,7 +63,7 @@ export async function recordOperation(
       )
       .run();
   } catch (err) {
-    console.error(JSON.stringify({"code":"src_operation_audit_failed"}));
+    logger.error("src_operation_audit_failed");
   }
   try {
     const actor = input.actorId
@@ -92,7 +93,7 @@ export async function recordOperation(
       retentionClass: input.friendId ? 'personal_data' : 'general',
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"src_operation_audit_failed"}));
+    logger.error("src_operation_audit_failed");
   }
 }
 

@@ -8,7 +8,7 @@ import styles from './project.module.css'
 
 
 
-/** 作っている途中の1枚（絵 p03ImY の「作っています…」「待っています」）。 */
+/** 作っている途中の1枚（「作っています…」「待っています」）。 */
 export function PendingTile({ running, label }: { running: boolean; label: string }) {
   return (
     <article className={styles.tile} role="status" aria-live="polite">

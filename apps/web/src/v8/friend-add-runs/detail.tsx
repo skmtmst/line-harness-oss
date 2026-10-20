@@ -4,7 +4,7 @@ import { ActivityTime } from '@/components/shared/activity-item'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 
 /*
- * ★V8 友だち追加時の配信の実行の詳細（Pencil `N43uVX`・失敗あり）。
+ * ★V8 友だち追加時の配信の実行の詳細（Pencil ・失敗あり）。
  *
  * 型の頭（戻る・題・説明）→ 線 → 左（失敗の帯・行ったこと）と右の欄（この追加について・トーク・設定）。
  * 白い板が 1100px を切ったら右の欄を左の下へ畳む。
@@ -26,8 +26,8 @@ import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import { api, type FriendAddRunDetail } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
-import { describeFriendAddFailure } from '@/v8/friend-add/failure'
-import { MESSAGE_TYPE_LABEL } from '@/v8/friend-add/flow'
+import { describeFriendAddFailure } from '@/v8/friend-add/public/failure/index'
+import { MESSAGE_TYPE_LABEL } from '@/v8/friend-add/public/flow/index'
 import { DELIVERY_UNKNOWN_CODE, jstClock, jstShortDateTime, jstTitleDate, routingAction } from './status'
 import styles from './detail.module.css'
 import { emptyValue } from '@/components/shared/empty-value'

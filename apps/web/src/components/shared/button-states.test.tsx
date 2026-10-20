@@ -1,0 +1,137 @@
+// @vitest-environment happy-dom
+/*
+ * ★管理画面 仕上げ §2「ボタンは6つの状態を持つ。幅は変えない」。
+ * 平常・乗せた・押したは CSS、保存中・完了・失敗は busy/done の
+ * 見た目としてここで契約化する。
+ * DOM に出す文字は常に今のラベル1つだけ（`textContent === 'ラベル'`
+ * で探す呼び出し側が迷子にならない）。幅は平常時の実測値を
+ * min-width に留める。
+ */
+import React from 'react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import Button from './button'
+
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
+
+describe('ボタンの6状態（★管理画面 z97zZN §2）', () => {
+  it('busy の間は回る印＋「保存しています…」に見た目を切り替え、押せなくする', () => {
+    render(<Button variant="primary" busy>保存する</Button>)
+    const button = screen.getByRole('button')
+    expect(button).toHaveProperty('disabled', true)
+    expect(button.getAttribute('aria-busy')).toBe('true')
+    /* DOM の文字は今のラベルだけ。隠した文字は残さない。 */
+    expect(button.textContent).toBe('保存しています…')
+    expect(button.querySelector('svg')).not.toBeNull()
+  })
+
+  it('busyLabel は上書きできる', () => {
+    render(<Button busy busyLabel="送信中…">送る</Button>)
+    const button = screen.getByRole('button')
+    expect(button.textContent).toBe('送信中…')
+  })
+
+  it('busy でないときは平常の字だけが出る', () => {
+    render(<Button variant="primary" busy={false}>保存する</Button>)
+    const button = screen.getByRole('button')
+    expect(button).toHaveProperty('disabled', false)
+    expect(button.getAttribute('aria-busy')).toBeNull()
+    expect(button.textContent).toBe('保存する')
+  })
+
+  it('done は ✓＋「保存しました」を1.2秒だけ出して元の文字へ戻る', () => {
+    vi.useFakeTimers()
+    const { rerender } = render(<Button variant="primary" busy={false} done={false}>保存する</Button>)
+    const button = screen.getByRole('button')
+    expect(button.textContent).toBe('保存する')
+
+    rerender(<Button variant="primary" busy={false} done>保存する</Button>)
+    expect(button.textContent).toBe('保存しました')
+
+    act(() => {
+      vi.advanceTimersByTime(1300)
+    })
+    expect(button.textContent).toBe('保存する')
+  })
+
+  it('doneLabel は上書きできる', () => {
+    vi.useFakeTimers()
+    render(<Button busy={false} done doneLabel="送信しました">送る</Button>)
+    const button = screen.getByRole('button')
+    expect(button.textContent).toBe('送信しました')
+  })
+
+  it('busy 中に done が来ても保存中を優先し、busy が終わってから完了を出す', () => {
+    vi.useFakeTimers()
+    const { rerender } = render(<Button busy done={false}>保存する</Button>)
+    const button = screen.getByRole('button')
+    rerender(<Button busy done>保存する</Button>)
+    expect(button.textContent).toBe('保存しています…')
+    rerender(<Button busy={false} done>保存する</Button>)
+    expect(button.textContent).toBe('保存しました')
+  })
+
+  it('リンクボタンは busy/done を持たない（常に平常の字）', () => {
+    render(<Button href="/settings">設定へ戻る</Button>)
+    const link = screen.getByRole('link')
+    expect(link.textContent).toBe('設定へ戻る')
+  })
+})
+
+it('busyを省略した非同期ボタンも処理中は二重実行せず、失敗後に押し直せる', async () => {
+  let reject!: (reason: Error) => void
+  const save = vi.fn(() => new Promise<void>((_resolve, fail) => { reject = fail }))
+  render(<Button onClick={save}>保存する</Button>)
+  const button = screen.getByRole('button') as HTMLButtonElement
+  fireEvent.click(button)
+  expect(button.disabled).toBe(true)
+  expect(button.getAttribute('aria-busy')).toBe('true')
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(1)
+  await act(async () => { reject(new Error('offline')); await Promise.resolve() })
+  expect(button.disabled).toBe(false)
+  expect(screen.getByRole('alert').textContent).toContain('処理できませんでした')
+})
+
+
+it.each([false, null, undefined])('busy=%s でも同じ保存を描画前に二重実行しない', async (busy) => {
+  let finish!: () => void
+  const save = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+  render(<Button busy={busy} onClick={save}>保存する</Button>)
+  const button = screen.getByRole('button') as HTMLButtonElement
+  act(() => { button.click(); button.click() })
+  expect(save).toHaveBeenCalledTimes(1)
+  expect(button.disabled).toBe(true)
+  await act(async () => { finish() })
+  expect(button.disabled).toBe(false)
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(2)
+  await act(async () => { finish() })
+})
+
+it('処理開始中の再入を1回に抑え、同期の処理後はもう一度押せる', () => {
+  const save = vi.fn(() => { if (save.mock.calls.length === 1) (screen.getByRole('button') as HTMLButtonElement).click() })
+  render(<Button onClick={save}>送る</Button>)
+  const button = screen.getByRole('button') as HTMLButtonElement
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(1)
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(2)
+})
+
+
+it('同期の例外でも内部の本文を出さず、次の操作のロックを解除する', () => {
+  const save = vi.fn().mockImplementationOnce(() => { throw new Error('private fixture detail') }).mockImplementation(() => undefined)
+  render(<Button onClick={save}>保存する</Button>)
+  const button = screen.getByRole('button') as HTMLButtonElement
+  fireEvent.click(button)
+  expect(screen.getByRole('alert').textContent).toBe('処理できませんでした。もう一度お試しください。')
+  expect(document.body.textContent).not.toContain('private fixture detail')
+  expect(button.disabled).toBe(false)
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(2)
+  expect(screen.queryByRole('alert')).toBeNull()
+})

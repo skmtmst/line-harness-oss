@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Bookmark, Download, FilePen, History, Mail, Plus } from 'lucide-react'
@@ -27,7 +28,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { ActionCell, DataTable, RowNameButton, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 /*
- * ★V8 分析「保存した分析」（Pencil `bglah`）。
+ * ★V8 分析「保存した分析」（Pencil ）。
  * 数の帯 → 道具の段（探す・説明）→ 左に保存した分析の表、右に選んだ分析の履歴（結果を見る・CSV・内容を変える）
  * → 定期レポート（作る・止める・また送る・しまう）→ 1回だけ送った結果。
  * 呼ぶ口・世代の守り・失敗の言い分け・CSV は今の画面（SavedAnalyticsTab）と同じ。
@@ -84,7 +85,7 @@ function latestPill(item: SavedAnalyticsSummary) {
 }
 
 /**
- * 定期レポートの行の「…」（行の右端は「…」1つ・B-253）：内容を変える・止める／また送る・しまう。
+ * 定期レポートの行の「…」（行の右端は「…」1つ・）：内容を変える・止める／また送る・しまう。
  * 止める・また送る・しまうの動きは一覧の側が持ち、ここは項目に並べるだけ。
  */
 function ScheduleMenu({ schedule, busy, onPause, onResume, onArchive }: { schedule: AnalyticsReportSchedule; busy: boolean; onPause: () => void; onResume: () => void; onArchive: () => void }) {
@@ -131,7 +132,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       onCountChange?.(response.data.length)
     }).catch((caught: unknown) => {
       if (!active) return
-      setError(caught instanceof Error ? caught.message : '保存した分析を確認できませんでした')
+      setError(describeApiFailure(caught, '読み込み'))
       onCountChange?.(null)
     }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -146,7 +147,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   }, [])
   // 再読込の応答も「どのアカウントへ向けた取得か」の世代で比べる（切替後の遅い旧応答を捨てる）。
   const schedulesGen = useRef(0)
-  const scheduleErrorText = (caught: unknown) => caught instanceof TypeError ? '定期レポートを確認できませんでした' : caught instanceof Error ? caught.message : '定期レポートを確認できませんでした'
+  const scheduleErrorText = (caught: unknown) => caught instanceof TypeError ? '定期レポートを確認できませんでした' : describeApiFailure(caught, '読み込み')
   const reloadSchedules = useCallback(() => {
     const gen = (schedulesGen.current += 1)
     setSchedulesLoading(true)
@@ -194,7 +195,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
 
 
       if (!fieldFailure) {
-      setSchedulesError(caught instanceof Error ? caught.message : '定期レポートを更新できませんでした') }
+      setSchedulesError(describeApiFailure(caught, '更新')) }
     } finally {
       setScheduleBusyId('')
     }
@@ -209,7 +210,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       if (!response.success) throw new Error(response.error)
       setSnapshots(response.data)
       setSnapshotError('')
-    }).catch((caught: unknown) => { if (active) setSnapshotError(caught instanceof Error ? caught.message : '結果の履歴を確認できませんでした') })
+    }).catch((caught: unknown) => { if (active) setSnapshotError(describeApiFailure(caught, '読み込み')) })
       .finally(() => { if (active) setSnapshotLoading(false) })
     return () => { active = false }
   }, [accountId, selectedId, snapshotReload])

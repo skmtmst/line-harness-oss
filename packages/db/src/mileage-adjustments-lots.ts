@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { adjustmentLotSpendOrderSql, adjustmentResult, buildAdjustmentFingerprint, findCommittedMileageAdjustment, lotRepairLiveExcessGateSql, MileageAdjustmentError, parseAdjustmentMetadata, readLotConsumed, recordLotConsumed, repairAdjustmentLotShortfall, tryParseMetadata } from './mileage/adjustments-lots.js';

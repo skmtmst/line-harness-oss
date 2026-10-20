@@ -1,3 +1,5 @@
+> 文書：反映履歴（アップデート履歴）の設計｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 反映履歴（アップデート履歴）の設計
 
 状態: **決定済み・実装済み。**
@@ -126,7 +128,7 @@ released: 2026-08-20
 |---|---|
 | `docs/release-log/unreleased/*.md`・`<version>.md` ほか | 履歴の実体 |
 | `apps/web/scripts/build-release-log.mjs` | Markdown → JSON。`prebuild` で走らせる |
-| `apps/web/src/app/settings/changelog/page.tsx` | 画面 |
+| `apps/web/src/app/updates/page.tsx` | 画面 |
 | `apps/web/src/components/layout/sidebar.tsx` | 行き先の変更（1行） |
 | `.github/workflows/*` | 記載漏れの警告（必須にはしない） |
 

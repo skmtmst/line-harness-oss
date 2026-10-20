@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 // 権限の検証は meet-consultations.security.test.ts が持つ。ここで見たいのは
 // 本番ルートの取消・再送の挙動なので、認証は通った状態にしてから渡す。
@@ -76,7 +76,7 @@ function seedBase(sqlite: Database.Database) {
       (id, external_event_id, friend_id, title, starts_at, ends_at, meet_url, status)
     VALUES ('MC1','EV1','f1','個別相談','${S1}','${S1_END}',
       'https://meet.google.com/abc-defg-hij','confirmed');
-    INSERT INTO meet_consultation_reminders
+    INSERT INTO meet_consultation_notification_runs
       (id, consultation_id, kind, scheduled_at, status, sent_at, retry_count, created_at, updated_at)
     VALUES ('MR-day','MC1','day_before','${S1_DAY_BEFORE}','sent',
         '2026-09-19T01:00:05.000Z',0,'2026-09-01T00:00:00.000Z','2026-09-19T01:00:05.000Z'),
@@ -103,7 +103,7 @@ const postBody = {
   meetUrl: 'https://meet.google.com/abc-defg-hij',
 };
 
-describe('Meet V6連動 (実ルート)', () => {
+describe('Meet 連動 (実ルート)', () => {
   test('日程変更で送信ずみ前日通知は履歴のまま、未来分だけ再設定する', async () => {
     const sqlite = new Database(':memory:');
     try {
@@ -117,17 +117,18 @@ describe('Meet V6連動 (実ルート)', () => {
       expect(res.status).toBe(201);
       // 送信ずみは pending に戻さず、sent_at も消さない (履歴保持)。
       expect(sqlite.prepare(
-        `SELECT status, sent_at, scheduled_at FROM meet_consultation_reminders WHERE id = 'MR-day'`,
+        `SELECT status, sent_at, scheduled_at FROM meet_consultation_notification_runs WHERE id = 'MR-day'`,
       ).get()).toEqual({
         status: 'sent',
         sent_at: '2026-09-19T01:00:05.000Z',
         scheduled_at: S1_DAY_BEFORE,
       });
-      // 未来分だけ新しい日時に直る。
+      expect(sqlite.prepare("SELECT status, scheduled_at FROM meet_consultation_notification_runs WHERE id='MR-hour'").get()).toEqual({status:'cancelled',scheduled_at:S1_HOUR_BEFORE});
+      // 未来分は新しい世代へ追加し、古い予定を保持する。
       expect(sqlite.prepare(
-        `SELECT status, scheduled_at FROM meet_consultation_reminders WHERE id = 'MR-hour'`,
+        `SELECT status, scheduled_at FROM meet_consultation_notification_runs WHERE kind='hour_before' ORDER BY schedule_revision DESC LIMIT 1`,
       ).get()).toEqual({ status: 'pending', scheduled_at: S2_HOUR_BEFORE });
-      // V6 も新しい起点へ直る。
+      // も新しい起点へ直る。
       expect(sqlite.prepare(
         `SELECT target_date, status FROM friend_reminders WHERE id = 'FR-meet'`,
       ).get()).toEqual({ target_date: S2, status: 'active' });

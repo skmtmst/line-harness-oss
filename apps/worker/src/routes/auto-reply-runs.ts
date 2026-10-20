@@ -1,5 +1,8 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { parseExecutionDateRange } from '@line-crm/shared';
+import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
+
 import { Hono } from 'hono';
 import {
   getAutoReplies,
@@ -9,24 +12,16 @@ import {
   type AutoReplyEvaluationStatus,
   type AutoReplyRunListRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   AutoReplyActionRetryError,
   retryAutoReplyActionRuns,
-} from '../services/auto-reply.js';
+} from '../features/auto-replies/auto-reply/index.js';
 
 const autoReplyRuns = new Hono<Env>();
-
-type ExecutionRunStatus =
-  | 'queued'
-  | 'claimed'
-  | 'succeeded'
-  | 'skipped'
-  | 'retry_wait'
-  | 'permanent_failed'
-  | 'cancelled';
 
 interface AutoReplyRun {
   id: string;
@@ -222,7 +217,7 @@ async function normalizedSearchHash(value: string): Promise<string> {
 
 /** UTCで保存した受信時刻を、日本の月境界に合わせて集計する。 */
 function currentJstMonthUtcRange(now: Date): { from: string; to: string } {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(now);
   const year = jst.getUTCFullYear();
   const month = jst.getUTCMonth();
   const from = new Date(Date.UTC(year, month, 1) - 9 * 60 * 60 * 1000).toISOString();
@@ -326,7 +321,7 @@ autoReplyRuns.get(
       };
       return c.json({ success: true, data });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_auto_reply_runs_failed","route":"GET /api/auto-reply-runs"}));
+      logger.error("routes_auto_reply_runs_failed");
       return c.json({ success: false, error: '自動応答の実行結果を表示できませんでした' }, 500);
     }
   },
@@ -355,7 +350,7 @@ autoReplyRuns.post(
         const status = error.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, error: error.message, code: error.code }, status);
       }
-      console.error(JSON.stringify({"code":"routes_auto_reply_runs_failed","route":"POST /api/auto-reply-runs/:id/retry"}));
+      logger.error("routes_auto_reply_runs_failed");
       return c.json({ success: false, error: '失敗した処理をもう一度実行できませんでした' }, 500);
     }
   },

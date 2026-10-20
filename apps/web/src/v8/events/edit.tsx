@@ -1,4 +1,5 @@
 'use client'
+import { getApiErrorCode } from '@/lib/api'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -20,7 +21,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import EventForm from '@/v8/events/edit-form'
 import { useBookingRequests } from './booking-requests'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { PaymentSideCard } from '../booking-payments/menu-payment'
+import { PaymentSideCard } from '@/v8/booking-payments/public/menu-payment/index'
 import styles from './edit.module.css'
 
 
@@ -117,7 +118,7 @@ function LifecycleSection({ accountId, eventId, onChanged }: { accountId: string
     } catch (failure) {
       if (!request.isCurrent()) return
       saveErrors.capture(failure)
-      const code = (failure as { body?: { error?: string } }).body?.error
+      const code = getApiErrorCode(failure)
       setError(code === 'lifecycle_transition_invalid'
         ? 'いまの状態からは変えられません。開き直して最新の状態で、もう一度お試しください。'
         : '変えられませんでした。時間をおいて、もう一度お試しください。')

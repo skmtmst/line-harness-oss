@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { refFromOutboxSnapshot } from './ad-conversion-snapshot.js';
 class AdConversionHttpError extends Error {
   constructor(public readonly status: number, message: string) { super(message); }
@@ -35,6 +37,8 @@ import {
   type AdPlatformConfig,
   type RefTracking,
 } from '@line-crm/db';
+
+
 
 const SUPPORTED_AD_PLATFORMS = ['meta', 'x', 'google', 'tiktok'] as const;
 type SupportedAdPlatform = typeof SUPPORTED_AD_PLATFORMS[number];
@@ -521,7 +525,7 @@ export const GOOGLE_ADS_API_VERSION = 'v25';
 
 /** Googleの発生時刻形式(yyyy-MM-dd HH:mm:ss+09:00)。日本時間の壁時計で送る。 */
 export function googleConversionDateTime(now: Date = new Date()): string {
-  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const jst = japanCalendar(now);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${jst.getUTCFullYear()}-${pad(jst.getUTCMonth() + 1)}-${pad(jst.getUTCDate())}`
     + ` ${pad(jst.getUTCHours())}:${pad(jst.getUTCMinutes())}:${pad(jst.getUTCSeconds())}+09:00`;

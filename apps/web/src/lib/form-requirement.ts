@@ -1,4 +1,4 @@
-/** B-244：必須の札と保存時の検査が共有する定義。 */
+/** ：必須の札と保存時の検査が共有する定義。 */
 export type FormRequirement<T = string> = {
   required: boolean
   check: (value: T) => string | null

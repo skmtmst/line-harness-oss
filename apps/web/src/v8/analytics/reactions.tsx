@@ -3,7 +3,7 @@
 import { ValueBarChart } from '@/components/shared/charts'
 
 /*
- * ★V8 分析「配信の反応」（Pencil `yvOtn`）。
+ * ★V8 分析「配信の反応」（Pencil ）。
  * 数の帯（配信・届いた人・押された割合・取得できない配信）→ 道具の段（期間・データの範囲・CSV）
  * → 説明 → 配信ごとの表 → 押された時間帯ごとの回数。
  * 呼ぶ口・数の出し方・CSV は今の画面（ReactionsOverviewTab）と同じ。

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * 対応表の `/scenarios/new`。
- * - ★V8：送らずに、この URL で作る①（src/v8/scenarios/create.tsx・dnzqC）をそのまま出す。
+ * - ★V8：送らずに、この URL で作る①（src/v8/scenarios/create.tsx・）をそのまま出す。
  */
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
@@ -27,7 +27,7 @@ afterEach(() => {
   delete document.documentElement.dataset.theme
 })
 
-describe('/scenarios/new', () => {
+describe('scenarios/new', () => {
 
   test('★V8：送らずに作る①をこの URL で出す', async () => {
     document.documentElement.dataset.theme = 'v8'

@@ -20,7 +20,7 @@ export type MemberDialogValue = {
 }
 
 /**
- * 板 `yLKwV`：招待メールは送った日から7日（実装 `staff-invite.ts` が7日で送る）。
+ * 板 ：招待メールは送った日から7日（実装 `staff-invite.ts` が7日で送る）。
  * 「10/9（金）18:40」の形で出す。
  */
 export function inviteExpiryLabel(now: Date = new Date()): string {
@@ -34,7 +34,7 @@ export function inviteExpiryLabel(now: Date = new Date()): string {
 }
 
 /**
- * 権限者を招待する／変更する。★V6 36-5 の「＋ 権限者を招待」と「変更」。
+ * 権限者を招待する／変更する。★管理画面 36-5 の「＋ 権限者を招待」と「変更」。
  *
  * 招待では名前・メール・役割・最初に表示するアカウント・担当範囲を聞く。
  * 変更では役割・担当範囲・状態（有効／無効）だけ。名前とメールは本人が持つ。
@@ -102,7 +102,7 @@ export default function MemberDialog({
           ? member.email ? `${member.name}（${member.email}）` : member.name
           : `招待メールは送った日から7日（${inviteExpiryLabel()}まで）有効です。メールの確認とLINEの連携が済むとログインできます。`
       }
-      /* 板 `ukPgd`：招待の入力の間違いは同じ窓の状態として印を付ける。 */
+      /* 板 ：招待の入力の間違いは同じ窓の状態として印を付ける。 */
       designNode={member ? 'BHEl9' : localError ? 'ukPgd' : 'yLKwV'}
       confirmLabel={member ? '変更を保存' : '招待メールを送る'}
       busy={busy}

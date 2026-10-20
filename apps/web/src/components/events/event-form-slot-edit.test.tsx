@@ -158,7 +158,7 @@ function dialogInput(kind: string, index = 0): HTMLInputElement {
   return inputs[index]
 }
 
-/** 窓の中の日付・時刻の選択（★V7）。欄は押し口で、値は日本語で読む。 */
+/** 窓の中の日付・時刻の選択（★管理画面）。欄は押し口で、値は日本語で読む。 */
 function dialogDateTrigger(): HTMLButtonElement {
   const found = dialog()?.querySelector('button[aria-label="日付（JST）"]')
   expect(found, '日付の選択がある').toBeTruthy()

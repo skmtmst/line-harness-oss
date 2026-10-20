@@ -3,16 +3,19 @@ import { customerDeletionPending } from '../services/customer-data-deletion.js';
 import { Hono, type Context } from 'hono';
 import { setAccountSetting } from '@line-crm/db';
 import { formFileKinds, type FormInputBlock } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { builtinFileScan, getFileScanConfig, resolveExternalScanner, markFileScanClean, markFileScanQuarantined, markFileScanPendingRetry, FORM_FILE_SCAN_MAX_ATTEMPTS } from '../services/file-scan.js';
 import { ensureFileScanForUpload } from './file-scan.js';
-import { imageDimensions } from '../services/media-metadata.js';
-import { documentAnswer, documentExpired, uploadedDocumentKind, purgeUnsafeFormDocuments, identityRetentionDays, IDENTITY_RETENTION_KEY, type FormDocumentRow } from '../services/form-documents.js';
+import { imageDimensions } from '../features/media/media-metadata/index.js';
+import { documentAnswer, documentExpired, uploadedDocumentKind, purgeUnsafeFormDocuments, identityRetentionDays, IDENTITY_RETENTION_KEY, type FormDocumentRow } from '../features/forms/form-documents/index.js';
 
 const TYPES: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' };
 export async function uploadFormDocument(c: Context<Env>, block: FormInputBlock, scope: { accountId: string; formId: string; friendId: string; versionId: string | null }) {
+  // reject legacy and mixed identity fields before reading or storing bytes.
+  if (formFileKinds(block).includes('identity')) return c.json({ success: false, code: 'IDENTITY_DOCUMENT_DISABLED', error: '本人確認書類は受け取れません。画像・PDFの質問を使ってください' }, 400);
   if (await customerDeletionPending(c.env.DB, scope.friendId)) return c.json({ success: false, error: 'この友だちのデータは削除中です' }, 409);
   const mime = (c.req.header('Content-Type') ?? '').split(';')[0].trim().toLowerCase();
   const kind = uploadedDocumentKind(block, mime);

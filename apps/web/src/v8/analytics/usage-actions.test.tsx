@@ -37,7 +37,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme })
 
-it.each(['回答フォーム', '一斉配信'])('未使用がない・未取得の%sは「…」の中に中身を見るだけを置き、片づけるは出さない（行の右端は「…」1つ・B-253）', async label => {
+it.each(['回答フォーム', '一斉配信'])('未使用がない・未取得の%sは「…」の中に中身を見るだけを置き、片づけるは出さない（行の右端は「…」1つ・）', async label => {
   render(<UsageV8 accountId="account-1" />)
   const cell = await screen.findByText(label, { selector: 'td span' })
   const row = cell.closest('tr')!

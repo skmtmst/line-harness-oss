@@ -1,7 +1,8 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 
 /*
- * 成果をまとめて操作（★V8-B `hadfk`：手順1/3「操作を選ぶ」・640幅）。
+ * 成果をまとめて操作（★V8-B ：手順1/3「操作を選ぶ」・640幅）。
  * 写し元：app/affiliates/bulk-op-wizard.tsx。手順2「確かめる」・手順3「結果」は、
  * 呼び出し側の確かめ窓・結果の知らせを使う（今と同じ）。
  *
@@ -71,7 +72,7 @@ export default function BulkOpWizard({
       <div className={styles.bulkTargets}>
         <ListChecks size={15} aria-hidden="true" />
         <span className={styles.bulkTargetsText}>
-          {`選択した成果 ${formatNumber(targets.length)} 件：${shownNames}${restCount > 0 ? `ほか${formatNumber(restCount)} 件` : ''}（報酬 ¥${formatNumber(totalYen)}）`}
+          {`選択した成果 ${formatNumber(targets.length)} 件：${shownNames}${restCount > 0 ? `ほか${formatNumber(restCount)} 件` : ''}（報酬 ${formatYen(totalYen)}）`}
         </span>
         <button type="button" className={styles.linkButton} onClick={onReselect}>選び直す</button>
       </div>

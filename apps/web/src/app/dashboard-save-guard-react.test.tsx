@@ -3,7 +3,8 @@ import { act } from 'react'
 import { waitFor } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import DashboardPage from './page'
+// 共通ダッシュボード本体の境界/既存カードを検査する。業種の入口分岐はhome.test.tsxが検査する。
+import DashboardPage from '@/v8/dashboard/dashboard'
 
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -38,6 +39,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('fetch', (input: string | URL | Request, init?: RequestInit) => {
     const path = String(input)
+    if (path.includes('/api/staff/me')) return Promise.resolve(json({ success: true, data: { id: 'test-owner', role: 'owner' } }))
     if (path.includes('/api/dashboard/preferences?')) {
       if (init?.method === 'PUT') {
         return new Promise<Response>(resolve => pending.push({ body: JSON.parse(String(init.body)), resolve }))

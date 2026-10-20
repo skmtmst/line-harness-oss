@@ -1,18 +1,19 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { readImplementationSource } from '../../../../worker/src/test-utils/implementation-source'
 
 const ROOT = import.meta.dirname
 const PAGE = readFileSync(join(ROOT, '../../v8/inflow-links/list.tsx'), 'utf8')
 const ADS = ['ads.tsx', 'ad-connections.tsx', 'ad-history.tsx', 'ad-shared.ts'].map(file => readFileSync(join(ROOT, '../../v8/inflow-links', file), 'utf8')).join('\n')
 const CREATE = readFileSync(join(ROOT, '../../v8/inflow-links/new/create.tsx'), 'utf8')
 const DETAIL = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
-// 削除の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
+// 削除の窓は 管理画面・V8 の両方で使う共用部品へ移した（中身は同じ）。
 // 削除の窓は詳細の画面（detail/page.tsx）の中にある。古い _components/inflow-delete-dialog.tsx はどこからも描かれないので 2026-10-07 に消した。
 const DELETE_DIALOG = readFileSync(join(ROOT, '../../v8/inflow-links/detail.tsx'), 'utf8')
 const MODAL = readFileSync(join(ROOT, '../../v8/inflow-links/edit-route-dialog.tsx'), 'utf8')
 const SITE = readFileSync(join(ROOT, '../../v8/inflow-links/site-script.tsx'), 'utf8')
-const LIFF = readFileSync(join(ROOT, '..', '..', '..', '..', 'worker', 'src', 'routes', 'liff.ts'), 'utf8')
+const LIFF = readImplementationSource(join(ROOT, '..', '..', '..', '..', 'worker', 'src', 'routes', 'liff.ts'))
 const MOCK = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(ROOT, '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'), 'utf8')
 

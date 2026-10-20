@@ -1,5 +1,5 @@
 /*
- * ★V8 バナー生成・プロジェクトの中（iMnph・p03ImY・zOpMG）。頭は型（ListPage）。
+ * ★V8 バナー生成・プロジェクトの中（・・）。頭は型（ListPage）。
  * 左に札と画像のます（3列・間12）、右に生成パネル（390）と「画像を生成」。値は globals.css の `--tpl-hb-*`。
  */
 .body { display: flex; flex-direction: column; gap: var(--tpl-hb-body-gap); padding: var(--tpl-hb-project-pad); min-width: 0; }

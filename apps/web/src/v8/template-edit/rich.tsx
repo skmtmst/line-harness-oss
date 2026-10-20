@@ -42,7 +42,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8「リッチメッセージを作る」（絵 EFV8l・機能追加 F-4）。
+ * ★V8「リッチメッセージを作る」（絵の機能追加 F-4）。
  *
  * 1枚の画像を面に分けて、押した面ごとに動く。形（面の分け方）・画像・面ごとの動きを決める。
  * 保存は今の画面（app/templates/asset-editor-v8.tsx・template-asset-editor.tsx）と同じ口
@@ -106,7 +106,7 @@ const AREA_NONE_KIND = [{ value: 'none', label: '未設定', description: '押�
 /** リッチメッセージで送れる文の長さ（packages/shared richMessageActions と同じ）。 */
 export const RICH_MESSAGE_TEXT_MAX = 400
 
-/** 見本の中身（?visual=1）。絵 EFV8l：上下2面・上は URL・下はテキスト。 */
+/** 見本の中身（?visual=1）。絵 ：上下2面・上は URL・下はテキスト。 */
 function visualAreas(): Record<string, AreaDraft> {
   return {
     A: { kind: 'uri', uri: 'https://nen.example/summer', text: '', refId: '' },
@@ -183,7 +183,7 @@ function richInitial(host: TemplateEditHost | undefined) {
 }
 
 /**
- * `host` を渡すと、統括のテンプレート（g8d6ai）から同じ画面を使う（host.ts）。保存は呼ぶ側、主ボタンは［保存して配る］。
+ * `host` を渡すと、統括のテンプレートから同じ画面を使う（host.ts）。保存は呼ぶ側、主ボタンは［保存して配る］。
  * 画像は統括の置き場へ送って LINE の5サイズを作る（host.uploadRichImage）。登録メディア・画像の URL・動きを実行するは出さない。
  */
 export default function TemplateRichEditor({ visual = false, host }: { visual?: boolean; host?: TemplateEditHost }) {
@@ -282,7 +282,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   }
 
   /*
-   * 保存で落ちた欄（B-139）：名前・画像・面ごとの押したら。帯ではなく欄を赤くして真下に理由を出し、
+   * 保存で落ちた欄：名前・画像・面ごとの押したら。帯ではなく欄を赤くして真下に理由を出し、
    * 別の面なら その面を選んでから移る。面の一覧には直す欄の数の赤い丸。
    */
   const fields = useFormErrors()

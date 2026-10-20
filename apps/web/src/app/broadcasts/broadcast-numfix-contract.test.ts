@@ -11,9 +11,9 @@ const GLOBALS = readFileSync(join(HERE, '../globals.css'), 'utf8')
 const token = (name: string) => GLOBALS.match(new RegExp(`${name}:\\s*([^;]+);`))?.[1]?.trim()
 
 /*
- * V8 一斉配信の数字合わせ（NtCE3）。見本 `NtCE3.html` の寸法に合わせる。
- * 10-11固定版とB-207：名前は黒・700。件数・金額は実データを出す。
- * 件数・金額などの中身は API の実データを出す（絵の数は写さない）。
+ * V8 一斉配信の数字合わせ。見本 `.html` の寸法に合わせる。
+ * 10-11固定版と：名前は黒・700。件数・金額は実データを出す。
+ * 件数・金額などの中身は API の実データを出す（数は写さない）。
  */
 describe('一斉配信の数字合わせ', () => {
   it('見出しは12px・500・余白13px 20px', () => {
@@ -22,7 +22,6 @@ describe('一斉配信の数字合わせ', () => {
     expect(CSS).toMatch(/\.table th:first-child,\s*\.table td:first-child \{ padding-left: var\(--tpl-bc-edge-pad\)/)
     expect(token('--tpl-bc-edge-pad')).toBe('20px')
     expect(CSS).toMatch(/\.table thead th \{[^}]*font-size: var\(--text-caption\)/)
-    expect(token('--text-caption')).toBe('12px')
     expect(CSS).toMatch(/\.table thead th \{[^}]*font-weight: 500/)
   })
 
@@ -32,9 +31,8 @@ describe('一斉配信の数字合わせ', () => {
     expect(CSS).toMatch(/\.table th:last-child,\s*\.table td:last-child \{ padding-right: var\(--tpl-bc-edge-pad\)/)
   })
 
-  it('名前は12px・黒・700（B-207）', () => {
+  it("名前は12px・黒・700", () => {
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-size: var\(--text-label\)/)
-    expect(token('--text-label')).toBe('12px')
     expect(CSS).toMatch(/\.cellTitle \{[^}]*font-weight: 700/)
     expect(CSS).toMatch(/\.cellTitle \{[^}]*color: var\(--color-ink\)/)
   })

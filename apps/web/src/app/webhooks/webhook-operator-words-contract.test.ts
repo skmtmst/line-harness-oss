@@ -9,7 +9,7 @@ const PAGE = readUiSource(join(HERE, 'page.tsx'), 'utf8')
 const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.meta.dirname, '../../v8/webhooks', `${name}.tsx`), 'utf8')).join('\n')
 const SCREEN = `${PAGE}\n${OVERVIEWS}`
 
-describe('V6 外部連携の運用者向け文言', () => {
+describe("管理画面 外部連携の運用者向け文言", () => {
   it('受信・送信の意味を日本語で判別できる', () => {
     expect(PAGE).toContain('こちらで受け取る')
     expect(PAGE).toContain('こちらから送る')
@@ -18,7 +18,7 @@ describe('V6 外部連携の運用者向け文言', () => {
   })
 
   it('作成画面と空状態から同じ操作名へ進める', () => {
-    // 板 `H031gC`：作る操作は小窓（Dialog）で出す。操作名は変えない。
+    // 板 ：作る操作は小窓（Dialog）で出す。操作名は変えない。
     expect(PAGE).toContain('title="受け取る設定を追加"')
     expect(PAGE).toContain('受け取り口を作る')
     expect(PAGE).toContain('href="/webhooks/new"')

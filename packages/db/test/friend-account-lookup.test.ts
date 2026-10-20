@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { getFriendByLineUserIdForAccount, upsertFriend } from '../src/friends.js';
+import { getFriendByLineUserIdForAccount, upsertFriend } from '../src/friends/index.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({

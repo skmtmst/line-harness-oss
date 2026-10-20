@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { gapAccount,gapBody,gapKey,gapVersion,gapWrite,GapError } from '../services/gap-common.js';
 import { senderIcon,senderResponse,validSenderName,type SenderRow } from '../services/line-senders.js';
 export const lineSenders=new Hono<Env>();

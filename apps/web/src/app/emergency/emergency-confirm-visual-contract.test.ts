@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const page = readFileSync(join(import.meta.dirname, 'control-v8.tsx'), 'utf8')
+const page = readFileSync(new URL('../../v8/emergency/control.tsx', import.meta.url), 'utf8')
 
 describe('V8 緊急停止の最終確認 EA8rM', () => {
   it('現役の共通Dialogで対象・理由・止まらないものを確認し、低い画面でも閉じ込めない', () => {

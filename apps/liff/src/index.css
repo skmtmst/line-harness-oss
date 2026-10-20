@@ -1,8 +1,8 @@
 @import "./card-surface.css";
 @import "tailwindcss";
-/* ─── LIFF ★V7 デザイントークン ─────────────────────────────
- * 値は Pencil「★V7 LIFF 主要画面」の決まり (0-rules.png) から。
- * 画面・部品はここの var() から生まれるクラス (text-ink など) だけを使い、
+/* ─── LIFF ★V8 デザイントークン ─────────────────────────────
+ * 値は Pencil ★V8 LIFF の絵と、型ごとの色見本 から。
+ * 画面・部品はここの var から生まれるクラス (text-ink など) だけを使い、
  * 素の Tailwind 色・16進数は書かない。主ボタンの濃い緑は
  * --color-accent-deep (#087a3e)。LINE の明るい緑はボタンの地に使わない。
  */

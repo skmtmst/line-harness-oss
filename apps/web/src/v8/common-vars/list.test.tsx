@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 /*
  * V8 共通情報の一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
- * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 Hhl9M・xxKtW）・
+ * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 ・）・
  * 閲覧のみでは帯が出て作るボタンを出さない・空のまま使われている帯の「編集する」で絞れる。
  */
+import styles from './list.module.css'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -199,7 +200,9 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
   it('行の「…」から止める窓（Hhl9M）が開き、予約中の配信を知らせる', async () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
-    act(() => { buttonByLabel('共通情報「会社名」の操作').click() })
+    const menu = buttonByLabel('共通情報「会社名」の操作')
+    expect(menu.parentElement?.classList.contains(styles.menuBox)).toBe(true)
+    act(() => { menu.click() })
     await flush()
     act(() => { buttonByText('止める').click() })
     await flush()

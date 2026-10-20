@@ -42,3 +42,21 @@ it('only expired blocked profiles are removed; an active profile and a recently 
   const result=await processPersonalDataRetention({DB:db.db},now);expect(result).toEqual({deleted:1,failed:0,held:0});
   expect(db.raw.prepare('SELECT id FROM friends ORDER BY id').all()).toEqual([{id:'active'},{id:'fb'},{id:'recent-block'}]);
 });
+
+it('rechecks the policy before every deletion and honors a hold enabled during the run', async () => {
+  policy();
+  db.raw.exec("UPDATE form_submissions SET created_at='2025-01-02T00:00:00Z' WHERE id='recent'; CREATE TRIGGER fixture_hold AFTER DELETE ON form_submissions BEGIN UPDATE account_settings SET value=json_set(value,'$.hold',json('true')) WHERE line_account_id='a'; END;");
+  expect(await processPersonalDataRetention({ DB: db.db }, now)).toEqual({ deleted: 1, failed: 0, held: 1 });
+  expect(db.raw.prepare("SELECT id FROM form_submissions WHERE id='recent'").get()).toEqual({ id: 'recent' });
+  expect(db.raw.prepare("SELECT id FROM form_submissions WHERE id='other'").get()).toEqual({ id: 'other' });
+});
+
+it('keeps the existing twenty-deletion budget and leaves the remainder for the next run', async () => {
+  policy();
+  const insert = db.raw.prepare("INSERT INTO form_submissions(id,form_id,friend_id,data,created_at) VALUES (?,'form','fa','{}','2025-01-02T00:00:00Z')");
+  for (let i = 0; i < 25; i++) insert.run(`old-${i}`);
+  expect(await processPersonalDataRetention({ DB: db.db }, now)).toEqual({ deleted: 20, failed: 0, held: 0 });
+  expect(db.raw.prepare("SELECT COUNT(*) n FROM form_submissions WHERE friend_id='fa' AND created_at<'2026-01-01'").get()).toEqual({ n: 6 });
+  expect((await processPersonalDataRetention({ DB: db.db }, now)).deleted).toBe(6);
+  expect(db.raw.prepare("SELECT id FROM form_submissions WHERE id='other'").get()).toEqual({ id: 'other' });
+});

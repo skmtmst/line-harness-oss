@@ -12,10 +12,6 @@ const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
 // 受信箱の指標カード（inbox-kpis.tsx）はどの画面からも描かれないので 2026-10-07 に消した。それを見ていた行も外した。
 const EMAIL_THREAD = readFileSync(join(HERE, '..', 'support', 'email-thread.tsx'), 'utf8')
-const WORKER_CHATS = readFileSync(
-  join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'chats.ts'),
-  'utf8',
-)
 const WORKER_EMAIL = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'support-inbox.ts'),
   'utf8',
@@ -37,7 +33,6 @@ describe('受信箱V4で既存機能を失わない', () => {
   it('担当者別既読をLINEとメールの両方に残す', () => {
     expect(PAGE).toContain('api.chats.markRead(chatId)')
     expect(PAGE).toContain('/api/support/email/threads/${encodeURIComponent(item.threadId)}/read')
-    expect(WORKER_CHATS).toContain("'/api/chats/:id/read'")
     expect(WORKER_EMAIL).toContain("'/api/support/email/threads/:id/read'")
   })
 
@@ -116,24 +111,14 @@ describe('受信箱V4の画面契約', () => {
   })
 
   it('担当・未割当・未読・待ち時間はサーバーでLIMIT前に適用する', () => {
-    expect(WORKER_CHATS).toContain("conditions.push('c.operator_id = ?')")
-    expect(WORKER_CHATS).toContain("conditions.push('c.operator_id IS NULL')")
-    expect(WORKER_CHATS).toContain("reads.staff_id = ?")
-    expect(WORKER_CHATS).toContain("reads.last_read_at IS NULL OR incoming.created_at > reads.last_read_at")
-    const linePage = region(WORKER_CHATS, 'page AS MATERIALIZED (', 'LIMIT ?')
     // 最新chatを1行選ぶlookupのLIMIT 1は許可するが、候補全体の先行LIMITは禁止。
-    expect(linePage).toContain('FROM deduped d')
-    expect(linePage).toContain("conditions.join(' AND ')")
     expect(WORKER_EMAIL).toContain("searchSql += ' AND t.assigned_staff_id = ?'")
     expect(WORKER_EMAIL).toContain("searchSql += ' AND t.assigned_staff_id IS NULL'")
     expect(WORKER_EMAIL).toContain('sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at')
     expect(WORKER_EMAIL).toContain("searchSql += ' AND julianday(t.last_incoming_at) <= julianday(?)'")
     const emailPage = region(WORKER_EMAIL, 'FROM support_email_threads t', 'LIMIT')
     expect(emailPage).toContain('WHERE ${statusSql} ${searchSql}')
-    for (const source of [WORKER_CHATS, WORKER_EMAIL]) {
-      expect(source).toContain("quickFilter === 'overdue'")
-      expect(source).toContain('Date.now() - 60 * 60 * 1000')
-    }
+    // 両経路の担当・未読・60分境界・201件目は Worker inbox-server-filters.test.ts の実HTTP試験で守る。
   })
 
   it('取得済みの200件を担当・未読・待ち時間で再び絞り込まない', () => {
@@ -150,8 +135,6 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain('chatDetail.isAttention')
     expect(PAGE).toContain('handleAttentionUpdate')
     expect(PAGE).toContain("__attention: next ? '1' : null")
-    expect(WORKER_CHATS).toContain('friendRealName: friend?.real_name || null')
-    expect(WORKER_CHATS).toContain("isAttention: friendMetadata.__attention === '1'")
     expect(VISUAL_QA_MOCK).toContain('friendRealName: friend?.realName ?? null')
     expect(VISUAL_QA_MOCK).toContain("isAttention: friend?.metadata?.__attention === '1'")
   })

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import type { CreateTrafficPoolRequest } from '@line-crm/shared';
@@ -16,7 +17,7 @@ import {
   togglePoolAccount,
 } from '@line-crm/db';
 import type { TrafficPoolWithAccount, PoolAccountWithDetails } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
@@ -74,7 +75,7 @@ trafficPools.get('/api/traffic-pools', async (c) => {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     return c.json({ success: true, data: pools.filter(pool => scope.allowedAccountIds.includes(pool.active_account_id)).map(serialize) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"GET /api/traffic-pools"}));
+    logger.error("routes_traffic_pools_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -126,7 +127,7 @@ trafficPools.get('/api/traffic-pools/accounts', async (c) => {
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"GET /api/traffic-pools/accounts"}));
+    logger.error("routes_traffic_pools_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -165,7 +166,7 @@ trafficPools.post('/api/traffic-pools', requireRole('owner'), inputJsonBoundary(
     if (String(err).includes('UNIQUE constraint failed: traffic_pools.slug')) {
       return c.json({ success: false, error: 'このURL名はすでに使われています' }, 409);
     }
-    console.error('POST /api/traffic-pools failed');
+    logger.error("POST_api_traffic_pools_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -217,7 +218,7 @@ trafficPools.put('/api/traffic-pools/:id', requireRole('owner'), inputJsonBounda
     if (err instanceof TrafficPoolSaveConflict) {
       return c.json({ success: false, code: 'save_conflict', error: 'ほかの人が先に保存しました。入力は残っています。', updatedAt: err.updatedAt, data: { updatedAt: err.updatedAt } }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"PUT /api/traffic-pools/:id"}));
+    logger.error("routes_traffic_pools_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -239,7 +240,7 @@ trafficPools.delete('/api/traffic-pools/:id', requireRole('owner'), async (c) =>
     await deleteTrafficPool(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"DELETE /api/traffic-pools/:id"}));
+    logger.error("routes_traffic_pools_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -262,7 +263,7 @@ trafficPools.get('/api/traffic-pools/:id/accounts', async (c) => {
     const accounts = await getPoolAccounts(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: accounts.map(serializePoolAccount) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"GET /api/traffic-pools/:id/accounts"}));
+    logger.error("routes_traffic_pools_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -283,7 +284,7 @@ trafficPools.post('/api/traffic-pools/:id/accounts', requireRole('owner'), input
     if (err?.message?.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: 'Account already in this pool' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"POST /api/traffic-pools/:id/accounts"}));
+    logger.error("routes_traffic_pools_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -296,7 +297,7 @@ trafficPools.put('/api/traffic-pools/:id/accounts/:accountId', requireRole('owne
     if (!result) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"PUT /api/traffic-pools/:id/accounts/:accountId"}));
+    logger.error("routes_traffic_pools_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -308,7 +309,7 @@ trafficPools.delete('/api/traffic-pools/:id/accounts/:accountId', requireRole('o
     if (!deleted) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_traffic_pools_failed","route":"DELETE /api/traffic-pools/:id/accounts/:accountId"}));
+    logger.error("routes_traffic_pools_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -59,13 +59,18 @@ export class HttpClient {
 
     if (!res.ok) {
       let errorMessage = `HTTP ${res.status}`
+      let detail: { code?: string; requestId?: string; fieldErrors?: Array<{ field: string; message: string }> } = { requestId: res.headers?.get('X-Request-ID') ?? undefined }
       try {
-        const errorBody = (await res.json()) as { error?: string }
-        if (errorBody.error) errorMessage = errorBody.error
+        const errorBody = (await res.json()) as { error?: string | { code?: string; message?: string; requestId?: string; fieldErrors?: Array<{ field: string; message: string }> } }
+        if (typeof errorBody.error === 'string') errorMessage = errorBody.error
+        else if (errorBody.error && typeof errorBody.error === 'object') {
+          if (typeof errorBody.error.message === 'string') errorMessage = errorBody.error.message
+          detail = { ...detail, code: typeof errorBody.error.code === 'string' ? errorBody.error.code : undefined, requestId: typeof errorBody.error.requestId === 'string' ? errorBody.error.requestId : detail.requestId, fieldErrors: errorBody.error.fieldErrors }
+        }
       } catch {
         // ignore parse errors
       }
-      throw new LineHarnessError(errorMessage, res.status, `${method} ${path}`)
+      throw new LineHarnessError(errorMessage, res.status, `${method} ${path}`, detail)
     }
 
     return res.json() as Promise<T>

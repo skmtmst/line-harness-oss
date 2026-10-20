@@ -16,9 +16,9 @@ import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
-import { browserDraftKey } from '@/v8/autosave/use-browser-draft';
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/browser-draft-notice';
-import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/use-scenario-draft';
+import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
+import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import { TextField } from '@/components/shared/text-field';
 import { Field } from '@/components/shared/form-controls';
@@ -35,13 +35,13 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil `dnzqC`）。
+ * ★V8 シナリオを作る①：シナリオ情報・配信方式（Pencil ）。
  *
  * 型（CreatePage）に、戻る・題・手順の輪と、左の段（シナリオ情報・配信方式）、
  * 下の帯（キャンセル・あとで決める・この方式で保存する）を渡す。右の列は無い。
  *
  * 動き（読み込み・保存・失敗時）は今までの V8（app/scenarios/mode-v8.tsx）と
- * v7（app/scenarios/mode/page.tsx）と同じ。写して型に載せ直した。
+ * 管理画面（app/scenarios/mode/page.tsx）と同じ。写して型に載せ直した。
  * `id` なしで開いたときはまだ行を作らない。方式の確定か
  * 「あとで決める」ではじめて作成する（N-055）。
  */
@@ -224,7 +224,7 @@ export default function ScenarioCreateV8() {
   }
 
   const choose = async (mode: DeliveryMode) => {
-    if (saving) return
+
     if (id && !scenario) return
     if (detailsSavePromise.current) {
       const saved = await detailsSavePromise.current
@@ -277,7 +277,7 @@ export default function ScenarioCreateV8() {
   }
 
   const continueAsDraft = async () => {
-    if (saving || detailsSaving) return
+    if (detailsSaving) return
     if (id && !scenario) return
     if (!id) {
       // 新規で「あとで決める」も行を作る確定操作。方式は暫定で「時刻で指定」。
@@ -397,13 +397,13 @@ export default function ScenarioCreateV8() {
           <Button type="button" onClick={cancel}>キャンセル</Button>
           {canEdit ? (
             <>
-              <Button disabled={locked} onClick={() => void continueAsDraft()} busy={Boolean(detailsSaving)} busyLabel="処理中…">
+              <Button disabled={locked} onClick={() => continueAsDraft()} busy={Boolean(detailsSaving)} busyLabel="処理中…">
                 あとで決める（下書きとして保存）
               </Button>
               <Button
                 variant="primary"
                 disabled={locked}
-                onClick={() => void choose(selectedMode)}
+                onClick={() => choose(selectedMode)}
                 busy={saving !== null}
                 busyLabel="作成中…"
               >
@@ -481,7 +481,7 @@ export default function ScenarioCreateV8() {
                 ]}
                 // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
                 onCreate={canEdit && !locked
-                  ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color }), folderById, (created) => setFolders((current) => [...current, created]))
+                  ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
                   : undefined}
               /></SaveErrorField>
             </span>

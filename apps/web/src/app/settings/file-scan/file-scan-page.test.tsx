@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 設定の中の「ファイルの検査」（B-2）を本物の React で動かす試験。
+ * 設定の中の「ファイルの検査」を本物の React で動かす試験。
  * 見るのは主な状態の言い分けだけ:
  *   - 空 … 当てはまるファイルがありません
  *   - 読み込み中 … 待っている表示
@@ -194,7 +194,7 @@ describe('ファイルの検査の設定画面', () => {
     })
     expect(screen.getByText('川野')).toBeTruthy()
     expect(screen.getByText('危険な仕掛けが見つかりました')).toBeTruthy()
-    // ★V8 PfA4o：件数は札「しまったファイル N」に出す。
+    // ★V8 ：件数は札「しまったファイル N」に出す。
     expect(screen.getByRole('button', { name: /^しまったファイル \d+$/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: '使えるように戻す' })).toBeTruthy()
     // 消すは「…」の中の危ない操作として入る。
@@ -208,7 +208,7 @@ describe('ファイルの検査の設定画面', () => {
     mocks.list.mockResolvedValue({ success: true, data: { items: [], total: 0, limit: 50, offset: 0 } })
     render(<FileScanSettingsPage />)
     await waitFor(() => {
-      // ★V8 bR6a1：しまったファイルが無いときの言い方。
+      // ★V8 ：しまったファイルが無いときの言い方。
       expect(screen.getByText('しまったファイルはありません')).toBeTruthy()
     })
   })
@@ -423,4 +423,19 @@ describe('ファイルの検査の設定画面', () => {
     // 窓は開いたまま。
     expect(screen.getByLabelText(/理由/)).toBeTruthy()
   })
+})
+
+test.each([{ role: 'admin', readOnly: true }, { role: 'owner', roleBundle: 'view_only' }])('閲覧のみの管理者は検査結果を読めるが変更操作はない: %j', async identity => {
+  ready()
+  mocks.me.mockResolvedValue({ success: true, data: identity })
+  mocks.list.mockResolvedValue({ success: true, data: { items: [scanOf()], total: 1 } })
+  render(<FileScanSettingsPage />)
+  await screen.findByText('invoice.pdf')
+  expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+  for (const name of ['使えるように戻す', 'invoice.pdfのその他操作', '設定を編集', '外の検査を止める']) {
+    expect(screen.queryByRole('button', { name })).toBeNull()
+  }
+  expect(mocks.release).not.toHaveBeenCalled()
+  expect(mocks.remove).not.toHaveBeenCalled()
+  expect(mocks.saveConfig).not.toHaveBeenCalled()
 })

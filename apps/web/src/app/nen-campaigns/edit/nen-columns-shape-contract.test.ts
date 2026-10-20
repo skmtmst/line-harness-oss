@@ -5,14 +5,14 @@ import { describe, expect, it } from 'vitest'
 const PAGE = readFileSync(join(import.meta.dirname, '../../../v8/nen-campaigns/column-intros.tsx'), 'utf8')
 
 /**
- * V6 NENコラム編集の型の契約（#512 重大1）。
+ * 管理画面 NENコラム編集の型の契約（#512 重大1）。
  *
  * 実API（`routes/nen-campaigns.ts` の columns 口）もモックもラクダ語
  * （`introText`・`publishedAt`）で返す。ここだけヘビ語の別型で読んでいた
  * ため、下書きが常に空になり保存ボタンがずっと押せないままだった。
  * `api.nenCampaigns.columns`（`NenColumn`）に統一して見張る。
  */
-describe('V6 NENコラム編集の型の契約', () => {
+describe("管理画面 NENコラム編集の型の契約", () => {
   it('一覧は NenColumn（ラクダ語）の口から読む', () => {
     expect(PAGE).toContain('api.nenCampaigns.columns(selectedAccountId)')
     expect(PAGE).toContain('c.introText')

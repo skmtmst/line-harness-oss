@@ -16,7 +16,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 
 /*
- * ★V8 ウェビナーの①基本設定の中身（Pencil j7PP04）。作る（/webinars/new）と編集の①の両方で使う。
+ * ★V8 ウェビナーの①基本設定の中身（Pencil ）。作る（/webinars/new）と編集の①の両方で使う。
  * カード3枚：基本設定（名前・公開ページの URL・フォルダ・案内文）／開催形式／だれに案内するか。
  */
 

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 // Security floors from the advisories recorded in SECURITY-CHECKLIST.md.
 // Scan every resolved lock entry, so an old transitive copy also fails the check.
 function assertPatched(lock: string) {
-  for (const [name, minimum] of [['fast-uri', [3, 1, 8]], ['ip-address', [10, 7, 1]], ['@line/liff', [2, 31, 1]], ['vitest', [4, 1, 11]]] as const) {
+  for (const [name, minimum] of [['fast-uri', [3, 1, 8]], ['ip-address', [10, 7, 1]], ['@line/liff', [2, 31, 1]], ['vitest', [4, 1, 11]], ['@hono/node-server', [1, 19, 15]], ['qs', [6, 16, 0]], ['body-parser', [2, 3, 0]], ['@babel/core', [7, 29, 6]]] as const) {
     const versions = [...lock.matchAll(new RegExp(`^  [\'"]?${name}@(\\d+)\\.(\\d+)\\.(\\d+)([^:\\r\\n]*)?:`, 'gm'))];
     expect(versions.length, `${name} must be found`).toBeGreaterThan(0);
     for (const match of versions) {
@@ -23,12 +23,12 @@ function assertPatched(lock: string) {
   }
 }
 
-describe('S26 patched dependency floors', () => {
+describe('patched dependency floors', () => {
   it('the real lockfile contains no vulnerable copies of the patched packages', () => {
     assertPatched(readFileSync(new URL('../../pnpm-lock.yaml', import.meta.url), 'utf8'));
   });
-  it.each(['fast-uri@3.1.7', 'ip-address@10.7.0', "'@line/liff@2.31.0'", 'vitest@3.2.7', 'tinypool@1.1.1', 'tinypool@2.1.1'])('detects deliberately reintroduced vulnerable entry %s', entry => {
-    const lock = `  '@line/liff@2.31.1':\n  fast-uri@3.1.8:\n  ip-address@10.7.1:\n  vitest@4.1.11:\n  ${entry}:\n`;
+  it.each(['fast-uri@3.1.7', 'ip-address@10.7.0', "'@line/liff@2.31.0'", 'vitest@3.2.7', 'tinypool@1.1.1', 'tinypool@2.1.1', "'@hono/node-server@1.19.14'", 'qs@6.15.3', 'body-parser@2.2.2', "'@babel/core@7.29.0'"])('detects deliberately reintroduced vulnerable entry %s', entry => {
+    const lock = `  '@line/liff@2.31.1':\n  fast-uri@3.1.8:\n  ip-address@10.7.1:\n  vitest@4.1.11:\n  '@hono/node-server@1.19.17':\n  qs@6.16.1:\n  body-parser@2.3.0:\n  '@babel/core@7.29.7':\n  ${entry}:\n`;
     expect(() => assertPatched(lock)).toThrow();
   });
 });

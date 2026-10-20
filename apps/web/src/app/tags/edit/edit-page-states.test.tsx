@@ -133,7 +133,7 @@ const values = {
   applyToExisting: false,
 } as unknown as TagEditorValues
 
-describe('/tags/edit の主な状態', () => {
+describe('tags/edit の主な状態', () => {
   it('読み込み中は読み込み中と出す', async () => {
     apiCalls.definition.mockReturnValue(new Promise(() => {}))
     apiCalls.dependencies.mockReturnValue(new Promise(() => {}))

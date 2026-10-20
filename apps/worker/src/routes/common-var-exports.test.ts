@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const accountAccess = vi.hoisted(() => ({ canAccessAllLineAccounts: vi.fn() }));
@@ -97,7 +97,7 @@ describe('共通情報CSVの監査付き非同期出力', () => {
     expect(download.status).toBe(200);
     expect(download.headers.get('content-type')).toContain('text/csv');
     const bytes = new Uint8Array(await download.arrayBuffer());
-    // UTF-8 BOM(EF BB BF)が先頭に付く。text() だとデコード時に消えるため byte で見る。
+    // UTF-8 BOM(EF BB BF)が先頭に付く。text だとデコード時に消えるため byte で見る。
     expect([...bytes.slice(0, 3)]).toEqual([0xEF, 0xBB, 0xBF]);
     const csv = new TextDecoder().decode(bytes);
     expect(csv).toContain('共通情報,差し込みキー,中身,使われている場所,更新,次の変更日時,次の中身');

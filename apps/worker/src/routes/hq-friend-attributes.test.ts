@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { afterEach,beforeEach,expect,test } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { hqTemplates } from './hq-templates.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 let sql:ReturnType<typeof createTestD1>,app:Hono<Env>,staff:any;
 export const fieldDefinition={schemaVersion:1,field:{name:'ペット名',fieldKey:'pet_name',type:'text'},folders:[]};
 export const markDefinition={schemaVersion:1,mark:{name:'相談中',color:'#123456',isDefault:false,autoOnInbound:true,displayOrder:2}};

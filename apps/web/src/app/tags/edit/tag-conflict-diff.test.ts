@@ -5,7 +5,7 @@ import type { TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 import type { Tag } from '@line-crm/shared'
 
 /*
- * タグの編集競合（`xn95q`）「違いを比べる」の差分取り出し。
+ * タグの編集競合（）「違いを比べる」の差分取り出し。
  * 自分の入力と相手の最新の版を比べ、変わった所だけ文にする。
  */
 

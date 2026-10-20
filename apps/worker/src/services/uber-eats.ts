@@ -14,6 +14,7 @@
 
 // 接続先（Sandbox／本番）と権限の組は uber-eats-hosts.ts が持つ。この層は渡された側へ出す。
 import { UBER_OPERATION_SCOPES, UBER_PROVISIONING_SCOPES, type UberHosts } from './uber-eats-hosts.js';
+import { boundedHttpRequest } from '../lib/external-call/bounded-http.js';
 
 /** 公式仕様の既定の有効期間（30日）。応答に expires_in が無いときの控え。 */
 const DEFAULT_TOKEN_LIFETIME_SECONDS = 2_592_000;
@@ -220,6 +221,8 @@ export interface RequestOptions {
   /** 呼ぶ先。トークンを取った側と必ず同じ側にする。 */
   hosts: UberHosts;
   sleep?: (ms: number) => Promise<void>;
+  /** Interactive store selection owns the operation; never add SDK retries. */
+  singleAttempt?: boolean;
 }
 
 function errorFromStatus(status: number): UberEatsError {
@@ -242,7 +245,7 @@ async function authorizedRequest(
   url: string,
   init: { method?: string; body?: unknown; retry?: boolean } = {},
 ): Promise<Response> {
-  const maxAttempts = init.retry === false ? 0 : RETRY_DELAYS_MS.length;
+  const maxAttempts = init.retry === false || options.singleAttempt ? 0 : RETRY_DELAYS_MS.length;
   const sleep = options.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
   // Workers の組み込み fetch はメソッドとして呼ぶと this が変わるので、先に取り出す。
   const fetchFn = options.fetch;
@@ -250,7 +253,7 @@ async function authorizedRequest(
   for (let attempt = 0; attempt <= maxAttempts; attempt += 1) {
     let response: Response;
     try {
-      response = await fetchFn(url, {
+      const request: RequestInit = {
         method: init.method ?? 'GET',
         headers: {
           authorization: `Bearer ${options.accessToken}`,
@@ -258,7 +261,10 @@ async function authorizedRequest(
           ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}),
         },
         body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-      });
+      };
+      response = options.singleAttempt
+        ? await boundedHttpRequest(url, request, { timeoutMs: 10_000, maxResponseBytes: 1024 * 1024, fetch: (input, init) => fetchFn(String(input), init) })
+        : await fetchFn(url, request);
     } catch {
       lastError = new UberEatsError('unavailable', null, 'uber_network_error');
       if (attempt < maxAttempts) {

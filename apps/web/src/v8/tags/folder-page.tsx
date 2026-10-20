@@ -19,7 +19,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 タグ「フォルダを追加」（Pencil `IjVpM`）。タグの一覧（src/v8/tags/list）の上に窓を重ねる。
+ * ★V8 タグ「フォルダを追加」（Pencil ）。タグの一覧（src/v8/tags/list）の上に窓を重ねる。
  *
  * 読み込み・保存・削除・クエリの切り替え（古い応答を捨てる）は今の画面（app/tags/folders/new/page.tsx）と同じ。
  * 受け付ける URL：`/tags/folders/new`（タグのフォルダを追加）・`?id=<フォルダ>`（直す・削除）・
@@ -135,7 +135,7 @@ function TagFolderPage() {
           : await api.tagGroups.create({ name: name.trim(), color, accountId: selectedAccountId })
         if (!result.success) throw new Error('save_failed')
       } else {
-        const result = await api.folders.create({ kind: 'friend_field', name: name.trim(), color })
+        const result = await api.folders.create({ kind: 'friend_field', name: name.trim(), color, accountId: selectedAccountId })
         if (!result.success) throw new Error('save_failed')
       }
       if (!sameRequest(activeRef.current, request)) return
@@ -206,7 +206,7 @@ function TagFolderPage() {
             ) : null}
             <span className={styles.dialogFooterEnd}>
               <Button type="button" disabled={saving} onClick={close}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined}  onClick={() => void save()} busy={saving}>
+              <Button type="button" variant="primary" disabled={saving || blockedReason !== null} title={blockedReason ?? undefined}  onClick={() => save()} busy={saving}>
                 {editId ? <FolderCheck size={15} aria-hidden="true" /> : <FolderPlus size={15} aria-hidden="true" />}
                 {editId ? 'フォルダを保存する' : 'フォルダを作る'}
               </Button>

@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { LineApiError, LineClient } from '@line-crm/line-sdk';
-import { createCallState, API_RETRY_WAIT, createExternalCall, MemoryCircuitStore, type CallIdentity, type CallState } from './index.js';
+import { createCallState, API_RETRY_WAIT, createExternalCall, MemoryCircuitStore } from './index.js';
+import { type CallIdentity, type CallState } from './types.js';
 import { lineFailure, lineTransport } from './line.js';
 
 const identity: CallIdentity = { scope: { accountId: 'a', storeId: 's', destination: 'line', connectionId: 'c' },

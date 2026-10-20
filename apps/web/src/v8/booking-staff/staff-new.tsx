@@ -15,7 +15,7 @@ import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
@@ -28,7 +28,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8「予約スタッフを登録」（板 CcA4k）。
+ * ★V8「予約スタッフを登録」（板 ）。
  *
  * 白い板1枚：頭（← 担当スタッフへ・題・説明）→ 中身（左＝4つのカード
  * 「お客さまに見える情報」「予約を受けられるメニュー」「受付と表示」
@@ -36,7 +36,7 @@ import Notice from '@/components/shared/notice'
  *
  * 動き（登録→担当メニューの割当、割当だけ失敗したときの「割当をやり直す」、
  * 未保存の離脱確認、権限が無いときの案内、読み込み失敗の言い分け）は
- * 今までの app/booking/staff/new（v7・staff-new-v8）から写した。BEHAVIOR.md を参照。
+ * 今までの app/booking/staff/new（管理画面・staff-new-v8）から写した。BEHAVIOR.md を参照。
  */
 
 export default function StaffNewV8() {
@@ -210,7 +210,7 @@ export default function StaffNewV8() {
 
 
   async function save() {
-    if (saving) return
+
     const validationError = validate()
     if (validationError) {
       focusInvalid.current = true
@@ -266,9 +266,7 @@ export default function StaffNewV8() {
       if (!current()) return
       const fieldFailure = saveErrors.capture(e)
       { if (!fieldFailure)
-      setSaveError(e instanceof Error && e.message && !/^API error: /.test(e.message)
-        ? e.message
-        : 'スタッフを登録できませんでした。入力は残っています。もう一度お試しください。') }
+      setSaveError(describeApiFailure(e, '登録')) }
     } finally {
       if (current()) setSaving(false)
     }
@@ -326,7 +324,7 @@ export default function StaffNewV8() {
           </>}
           footerActions={<>
             <Button href="/booking/menus?tab=staff">キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={saving} busy={saving} busyLabel="登録しています…">
+            <Button variant="primary" onClick={() => save()} disabled={saving} busy={saving} busyLabel="登録しています…">
               {createdStaffId ? '割当をやり直す' : 'スタッフを登録する'}
             </Button>
           </>}

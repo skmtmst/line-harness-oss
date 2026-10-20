@@ -6,13 +6,13 @@ export { orderPools } from './pool-order'
 import { useSaveConflict, SaveConflictBand, SaveConflictCompareDialog, saveConflictTitle } from '@/components/shared/save-conflict'
 
 /*
- * ★V8 プール管理（Pencil `u3iab3`）。
+ * ★V8 プール管理（Pencil ）。
  *
  * 白い板の頭（題・説明・右に「新規プール」）→ 左に「設定の中のメニュー」→
  * 右にプールのカードを2列、その下に「外す」の案内の帯。
  * データの口は今の画面（app/pools/page.tsx）と同じ：
  * プール一覧・LINEアカウント一覧・プールごとの所属アカウント・追加・外す・削除。
- * 「新規プール」は V8 の作る画面（/pools/new・`D0AOyx`）へ移る。
+ * 「新規プール」は V8 の作る画面（/pools/new・）へ移る。
  */
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CopyTextButton from '@/components/shared/copy-text-button'

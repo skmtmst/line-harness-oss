@@ -5,8 +5,8 @@
  *
  * 作る手順の5段（基本設定 → 動画 → CTA・フォーム → 通知 → 確認）は作る型（CreatePage）、
  * 公開後に見る3つ（参加者・分析・コメント演出）は詳細の頭＋タブで出す。
- * 絵：②動画 VWNaA・LPOe7／③CTA Q0Jrk・pvimJ／④通知 E7iAYs／⑤確認 XCUNf／
- *     参加者 uNsEy／分析 z2dgw／コメント演出 Omqd4。
+ * 絵：②動画 ・／③CTA ・／④通知 ／⑤確認 ／
+ *     参加者 ／分析 ／コメント演出 。
  *
  * 読み込み・失敗の分け方・段の行き来（URL の pane）・離れる前の確かめ・
  * 1本の保存の帯は app/webinars/edit/page.tsx と同じ（BEHAVIOR.md）。
@@ -37,7 +37,7 @@ import {
   type WebinarCtaCard,
   type WebinarEditor,
 } from '@/lib/api'
-import { webinarLoadFailure, type WebinarLoadFailure } from '@/v8/webinars/helpers'
+import { webinarLoadFailure, type WebinarLoadFailure } from '@/v8/webinars/public/helpers/index'
 import { BackLink, WizardSteps } from './chrome'
 import {
   PANE_KEYS,
@@ -63,7 +63,7 @@ import { japaneseDetailOf } from '@/components/shared/api-error-message'
 const STEP_KEYS = STEPS.map((step) => step.key) as readonly string[]
 const DETAIL_KEYS = ['participants', 'analytics', 'comments'] as const
 
-/* 段の題（作る型の題）。絵：VWNaA「動画と公開期間」・Q0Jrk「CTA・フォーム」・E7iAYs「通知と視聴後のこと」・XCUNf「公開の前に確かめる」。 */
+/* 段の題（作る型の題）。絵：「動画と公開期間」・「CTA・フォーム」・「通知と視聴後のこと」・「公開の前に確かめる」。 */
 const STEP_TITLE: Record<StepKey, string> = {
   basic: 'ウェビナーを編集',
   video: '動画と公開期間',
@@ -104,7 +104,15 @@ function EditInner() {
   const loadRequestId = useRef(0)
   const [analytics, setAnalytics] = useState<WebinarAnalytics | null>(null)
   const [analyticsState, setAnalyticsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
-  const [analyticsId, setAnalyticsId] = useState<string | null>(null)
+  const analyticsRequest = useRef<string | null>(null)
+  const analyticsGeneration = useRef(0)
+  const retryAnalytics = useCallback(() => {
+    analyticsGeneration.current += 1
+    analyticsRequest.current = null
+    setAnalytics(null)
+    setAnalyticsState('idle')
+  }, [])
+  useEffect(() => () => { analyticsGeneration.current += 1; analyticsRequest.current = null }, [])
 
   const webinar = loaded && loaded.id === id ? loaded.webinar : null
   const editor = loaded && loaded.id === id ? loaded.editor : null
@@ -203,9 +211,7 @@ function EditInner() {
   useEffect(() => {
     if (!id) return
     const requestId = ++loadRequestId.current
-    setAnalytics(null)
-    setAnalyticsId(null)
-    setAnalyticsState('idle')
+    retryAnalytics()
     Promise.all([webinarApi.get(id), webinarApi.editor(id)])
       .then(([webinarResponse, editorResponse]) => {
         if (requestId !== loadRequestId.current) return
@@ -224,7 +230,7 @@ function EditInner() {
         }
       })
     return () => { loadRequestId.current += 1 }
-  }, [id, reloadKey])
+  }, [id, reloadKey, retryAnalytics])
 
   /*
     集計は重い口。公開後に見る3つ（参加者・分析・コメント演出：タブの「参加者 124」）を開いたときだけ取り、
@@ -235,30 +241,26 @@ function EditInner() {
     if (!id) return
     if (!isDetailPane) {
       if (analyticsState === 'error') {
-        setAnalytics(null)
-        setAnalyticsId(null)
-        setAnalyticsState('idle')
+        retryAnalytics()
       }
       return
     }
-    if (analyticsId === id && analyticsState !== 'idle') return
-    let cancelled = false
+    if (analyticsRequest.current === id) return
+    const generation = analyticsGeneration.current
+    analyticsRequest.current = id
     setAnalyticsState('loading')
     webinarApi.analytics(id)
       .then((response) => {
-        if (cancelled) return
+        if (generation !== analyticsGeneration.current) return
         setAnalytics(response.data)
-        setAnalyticsId(id)
         setAnalyticsState('ready')
       })
       .catch(() => {
-        if (cancelled) return
+        if (generation !== analyticsGeneration.current) return
         setAnalytics(null)
-        setAnalyticsId(id)
         setAnalyticsState('error')
       })
-    return () => { cancelled = true }
-  }, [id, isDetailPane, analyticsId, analyticsState])
+  }, [id, isDetailPane, analyticsState, reloadKey, retryAnalytics])
 
   if (!id) {
     return <>
@@ -315,13 +317,13 @@ function EditInner() {
     onCtasReport: handleCtasReport,
     onPublished: disarm,
     goStep,
-    retryAnalytics: () => { setAnalytics(null); setAnalyticsId(null); setAnalyticsState('idle') },
+    retryAnalytics,
   }
 
   const stepPane: StepKey = (STEP_KEYS.includes(pane) ? pane : 'basic') as StepKey
   const stateOf = (key: StepKey) => {
     const state = stepStateOf(key, stepPane, webinar, ctaCount)
-    /* 通知は、後ろの段（確認）にいるときは通った印にする（絵 XCUNf）。 */
+    /* 通知は、後ろの段（確認）にいるときは通った印にする。 */
     if (state === 'todo' && key === 'notifications' && stepPane === 'review') return 'done' as const
     return state
   }

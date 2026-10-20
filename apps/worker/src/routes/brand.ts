@@ -1,7 +1,8 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import { getLineAccounts } from '@line-crm/db';
 import { fetchBotProfile } from '../lib/bot-profile.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 export const brand = new Hono<Env>();
 
@@ -47,7 +48,7 @@ brand.get('/api/public/brand', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_brand_failed","route":"GET /api/public/brand"}));
+    logger.error("routes_brand_failed");
     return c.json({ success: true, data: empty });
   }
 });

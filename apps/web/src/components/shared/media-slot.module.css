@@ -1,7 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 /*
- * 画像・動画・ファイルを入れる所。Pencil ★V8 採用案 Z7vd2（B-128）。
+ * 画像・動画・ファイルを入れる所。Pencil ★V8 採用案 Z7vd2。
  *
  *   空        地 #f7f8fa（--color-slot-bg）、線 1px $hairline、角丸 12。印・題・説明・制限は真ん中
  *   ドラッグ中  線と印が青（$action）、地は薄い青（$action-soft）

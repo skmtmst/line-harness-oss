@@ -1,3 +1,4 @@
+import { escapeHtml } from '../lib/html-escape.js';
 /**
  * LINE Harness LIFF — The single entry point
  *
@@ -21,7 +22,7 @@
 import { initBooking } from './booking.js';
 import {applyCustomerLook} from './customer-look.js';
 import { initForm } from './form.js';
-import { safeRedirectTarget } from '../lib/safe-redirect.js';
+import { safeRedirectTarget, attributedRedirectTarget } from '../lib/safe-redirect.js';
 import { restoreLiffStateInCurrentUrl } from './liff-query.js';
 import { customerMessage } from './customer-message.js';
 
@@ -54,8 +55,9 @@ if (!LIFF_ID) {
   throw new Error('LIFF ID not found. Set ?liffId= in LIFF endpoint URL or VITE_LIFF_ID env.');
 }
 const UUID_STORAGE_KEY = 'lh_uuid';
-// Bot basic ID — resolved dynamically from API after liff.init()
+// Bot basic ID — resolved dynamically from API after liff.init
 let BOT_BASIC_ID = '';
+let signedRedirectTarget: string | null = null;
 
 function apiCall(path: string, options?: RequestInit): Promise<Response> {
   return fetch(path, {
@@ -82,7 +84,7 @@ function getRedirectUrl(): string | null {
   // open-redirect / javascript: abuse, mirroring the server-side /auth/callback
   // guard. A directly-crafted LIFF URL never reaches the server route, so the
   // client must validate too.
-  return safeRedirectTarget(params.get('redirect'));
+  return safeRedirectTarget(params.get('redirect'), window.location.origin) || signedRedirectTarget;
 }
 
 function getRef(): string | null {
@@ -106,11 +108,7 @@ function saveUuid(uuid: string): void {
   }
 }
 
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+
 
 // ─── UI States ──────────────────────────────────────────
 
@@ -309,13 +307,18 @@ async function linkAndAddFlow() {
         linkPromise,
         new Promise((r) => setTimeout(r, 500)),
       ]);
-      // Append LINE userId to tracking links so clicks are attributed
-      if (redirectUrl.includes('/t/')) {
-        const sep = redirectUrl.includes('?') ? '&' : '?';
-        window.location.href = `${redirectUrl}${sep}lu=${encodeURIComponent(profile.userId)}`;
-      } else {
-        window.location.href = redirectUrl;
+      let identityToken = '';
+      const target = new URL(redirectUrl, window.location.origin);
+      if (target.origin === window.location.origin && target.pathname.startsWith('/t/') && rawIdToken) {
+        try {
+          const response = await apiCall('/api/liff/tracked-link-identity', {
+            method: 'POST', body: JSON.stringify({ linkId: decodeURIComponent(target.pathname.slice(3)), idToken: rawIdToken }),
+          });
+          const result = await response.json() as { data?: { token?: string } };
+          if (response.ok) identityToken = result.data?.token || '';
+        } catch { /* 本人を確認できなくても匿名でリンク先を開く。 */ }
       }
+      window.location.href = attributedRedirectTarget(redirectUrl, window.location.origin, identityToken);
       return;
     }
 
@@ -617,7 +620,7 @@ async function initAffiliate(): Promise<void> {
   // 取得し、未友達なら friend-add gate、友達なら React mount。
   //
   // booking 系は id_token で verify するが、affiliate API は LINE access token
-  // (liff.getAccessToken()) を /oauth2/v2.1/verify + /v2/profile で検証するため
+  // (liff.getAccessToken) を /oauth2/v2.1/verify + /v2/profile で検証するため
   // ここでは accessToken を取り出して mount context に渡す。
   const [profile, accessToken, friendship] = await Promise.all([
     liff.getProfile(),
@@ -633,6 +636,12 @@ async function initAffiliate(): Promise<void> {
   const ref = getRef();
   const affParams = new URLSearchParams(window.location.search);
 
+  const crossAccountToken = affParams.get('crossAccountToken');
+  let confirmedCrossAccount = false;
+  if (crossAccountToken && friendship.friendFlag) {
+    try { confirmedCrossAccount = window.confirm('この公式アカウントと、先ほど開いたアカウントのお客さま情報・マイルを結び付けますか？'); } catch { /* Confirmation unavailable: keep identities separate. */ }
+  }
+
   // Wallet取得より先にUUID連携を確定する。初回表示でここを待たないと、
   // 未登録アカウント用の署名付きリンクを生成できず、別財布になる余地がある。
   try {
@@ -646,7 +655,8 @@ async function initAffiliate(): Promise<void> {
         ig: affParams.get('ig') || undefined,
         iga: affParams.get('iga') || undefined,
         igan: affParams.get('igan') || undefined,
-        crossAccountToken: affParams.get('crossAccountToken') || undefined,
+        crossAccountToken: confirmedCrossAccount ? crossAccountToken : undefined,
+        confirmCrossAccountLink: confirmedCrossAccount || undefined,
       }),
     });
     if (res.ok) {
@@ -766,7 +776,7 @@ async function openPage(): Promise<void> {
     } else if (page === 'nen-member') {
       await initNenMember();
     } else if (page === 'form') {
-      await initForm(new URLSearchParams(window.location.search).get('id'));
+      await initForm(new URLSearchParams(window.location.search).get('id'), initRestaurantForm);
     } else if (!page) {
       await linkAndAddFlow();
     } else {
@@ -788,9 +798,12 @@ async function main() {
     // Resolve bot basic ID from API (multi-account support)
     applyCustomerLook(undefined);
     try {
-      const configRes = await fetch(`/api/liff/config?liffId=${encodeURIComponent(LIFF_ID)}`);
-      const configJson = await configRes.json() as { success: boolean; data?: { botBasicId?: string; customerLook?: unknown } };
+      const redirectParams = new URLSearchParams(window.location.search);
+      const configQuery = new URLSearchParams({ liffId: LIFF_ID, redirect: redirectParams.get('redirect') || '', redirectProof: redirectParams.get('redirectProof') || '' });
+      const configRes = await fetch(`/api/liff/config?${configQuery}`);
+      const configJson = await configRes.json() as { success: boolean; data?: { botBasicId?: string; customerLook?: unknown; redirectTarget?: string | null } };
       if (configJson.success && configJson.data?.customerLook) applyCustomerLook(configJson.data.customerLook);
+      if (configJson.success) signedRedirectTarget = configJson.data?.redirectTarget || null;
       if (configJson.success && configJson.data?.botBasicId) {
         BOT_BASIC_ID = configJson.data.botBasicId;
       }

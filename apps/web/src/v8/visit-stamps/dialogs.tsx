@@ -1,5 +1,7 @@
 'use client'
 
+import { jstDateOffset as japanDateOffset } from '@/lib/jst-datetime'
+
 import { Field as SharedField } from '@/components/shared/form-controls'
 import DateField from '@/components/shared/date-field'
 import { useEffect, useState } from 'react'
@@ -30,7 +32,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /*
- * 誤りを出す欄（B-139）。決めるを押したら、落ちた欄が赤くなり真下に理由が出て、1つ目へ移る。
+ * 誤りを出す欄。決めるを押したら、落ちた欄が赤くなり真下に理由が出て、1つ目へ移る。
  * 打っている途中には出さない（窓の下の帯にも出さない）。
  */
 function CheckedField({ id, label, fields, name, children }: { id: string; label: string; fields: FormErrors; name: string; children: React.ReactNode }) {
@@ -71,8 +73,7 @@ const toIso = (date: string, nextDay = false) => {
 }
 const toDate = (iso: string | undefined, prevDay = false) => {
   if (!iso) return ''
-  const d = new Date(Date.parse(iso) + 9 * 3_600_000 - (prevDay ? 86_400_000 : 0))
-  return d.toISOString().slice(0, 10)
+  return japanDateOffset(prevDay ? -1 : 0, new Date(iso))
 }
 
 export function MultiplierDialog({ open, multiplier, onClose, onSave }: {

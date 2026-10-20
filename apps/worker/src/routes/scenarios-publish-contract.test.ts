@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const accountAccessMocks = vi.hoisted(() => ({
   canAccessAllLineAccounts: vi.fn(),
@@ -26,7 +26,7 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
-vi.mock('../services/scenario-stats.js', () => ({
+vi.mock('../features/scenarios/scenario-stats.js', () => ({
   computeScenarioStats: vi.fn(),
 }));
 

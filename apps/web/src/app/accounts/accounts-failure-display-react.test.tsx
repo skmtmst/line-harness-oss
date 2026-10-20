@@ -133,7 +133,7 @@ describe('R520 アカウント一覧の取得失敗中の集計（本物のReact
     await flush()
 
     const text = kpis()?.textContent ?? ''
-    // 稼働中 1・停止中 1・アーカイブ 0（板 V7vn3 の3枚だけ）。
+    // 稼働中 1・停止中 1・アーカイブ 0（板  の3枚だけ）。
     for (const label of ['つないでいる','有効','接続に問題','友だちの合計']) expect(text).toContain(label)
     const cards=kpis()?.children;
     expect(cards?.[0]?.textContent).toContain('2');

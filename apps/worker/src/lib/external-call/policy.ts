@@ -1,4 +1,5 @@
 import type { CallIdentity, CallPolicy, CallState, WaitPolicy } from './types.js';
+import { currentRequestId } from '@line-crm/shared/server';
 
 export const API_RETRY_WAIT: WaitPolicy = Object.freeze({
   kind: 'fixed', delaysMs: Object.freeze([60_000, 300_000, 1_800_000]),
@@ -34,7 +35,7 @@ export function createCallState(identity: CallIdentity, policy: CallPolicy, now:
   if (![identity.operationId, identity.idempotencyKey, identity.snapshotId].every(v => typeof v === 'string' && !!v.trim())
     || !['read', 'write'].includes(identity.effect)) throw new TypeError('Missing external call identity');
   validatePolicy(policy, now);
-  return structuredClone({ identity, policy, createdAt: now, revision: 0, attempts: 0, phase: 'ready', nextAt: now });
+  return structuredClone({ requestId: currentRequestId() ?? crypto.randomUUID(), identity, policy, createdAt: now, revision: 0, attempts: 0, phase: 'ready', nextAt: now });
 }
 export function validateState(state: Readonly<CallState>): void {
   validatePolicy(state.policy, state.createdAt);

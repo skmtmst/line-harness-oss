@@ -1,5 +1,5 @@
 /*
- * ★V8 友だち一覧（Pencil x6QsVz）。枠・見出し・タブ枠・数の帯の地・道具の枠は型（ListPage）。
+ * ★V8 友だち一覧（Pencil ）。枠・見出し・タブ枠・数の帯の地・道具の枠は型（ListPage）。
  * 値は globals.css の [data-theme="v8"] の --tpl-fr-*。
  */
 
@@ -24,7 +24,7 @@
 .deltaUp { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .deltaWarn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
 
-/* 道具の2段（x6QsVz「道具」：段の間10）。 */
+/* 道具の2段（「道具」：段の間10）。 */
 .tools {
   display: flex;
   flex-direction: column;
@@ -131,14 +131,14 @@
 
 .optionsFailed { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 
-/* ── 表（x6QsVz：行の左右20・欄の間16・上下9） ── */
+/* ── 表（：行の左右20・欄の間16・上下9） ── */
 .tableWrap { min-width: 0; transition: opacity var(--motion-fast) var(--motion-ease-out); }
 .refreshing { opacity: var(--tpl-fr-refresh-opacity); }
 
 .colCheck { width: var(--tpl-fr-col-check); }
 .colStar { width: var(--tpl-fr-col-star); }
 .colStar:first-child { width: calc(var(--tpl-fr-col-star) + var(--tpl-fr-row-side)); }
-/* 名前の列は顔の丸＋名前（「Kyohei Yamamoto」が切れない幅）を最低限とる（nF4ts）。 */
+/* 名前の列は顔の丸＋名前（「Kyohei Yamamoto」が切れない幅）を最低限とる。 */
 .colName { width: calc(var(--tpl-fr-avatar) + var(--tpl-fr-avatar-gap) + var(--tpl-fr-name-content-min)); }
 .colSupport { width: var(--tpl-fr-col-support); }
 /* 1152：名前は顔の丸なし、対応・シナリオは中身の幅まで。残りをタグ・最新の列へ回す。 */
@@ -225,7 +225,7 @@ button.star:hover { background: var(--color-status-warn-soft); color: var(--colo
   white-space: nowrap;
 }
 
-/* 友だちの表のタグは名前を全部読ませたい（y2n1z「LINEログイン」）。札1枚の上限だけこの表で広げる。 */
+/* 友だちの表のタグは名前を全部読ませたい（「LINEログイン」）。札1枚の上限だけこの表で広げる。 */
 .tags { --tpl-tag-overflow-max: min(176px, 100%); display: flex; align-items: center; gap: var(--tpl-fr-tag-gap); min-width: 0; overflow: hidden; }
 
 .tag {
@@ -263,7 +263,7 @@ button.star:hover { background: var(--color-status-warn-soft); color: var(--colo
 .skelName { width: var(--tpl-fr-skel-name); height: var(--tpl-fr-skel-h); }
 .skelCell { width: var(--tpl-fr-skel-cell); height: var(--tpl-fr-skel-h); }
 
-/* ページ送り（x6QsVz：左右20・高さ52）。 */
+/* ページ送り（：左右20・高さ52）。 */
 .pager {
   display: flex;
   align-items: center;

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const PAGE = ['page.tsx', 'control-v8.tsx', '../../v8/settings/emergency/history-details.tsx', '../../v8/settings/emergency/screen.tsx'].map((file) => readFileSync(join(import.meta.dirname, file), 'utf8')).join('\n')
+const PAGE = ['page.tsx', '../../v8/emergency/control.tsx', '../../v8/settings/emergency/history-details.tsx', '../../v8/settings/emergency/screen.tsx'].map((file) => readFileSync(join(import.meta.dirname, file), 'utf8')).join('\n')
 
 describe('点検・軽 第7便運用状態(#585)', () => {
   it('最終確認は低い画面でも閉じ込めない(#518 8)', () => {

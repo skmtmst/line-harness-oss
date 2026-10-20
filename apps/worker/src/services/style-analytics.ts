@@ -1,3 +1,4 @@
+import { withDisplayReadCache } from '@line-crm/db/src/display-read-cache.js';
 import { restaurantCivilTime } from './restaurant-booking.js';
 import { styleDashboardSidebar } from './style-dashboard-sidebar.js';
 import { StyleError } from './style-setup.js';
@@ -61,20 +62,24 @@ export async function styleSnapshot(
     analytics: Record<string, unknown>;
   }
 > {
+  // Audience snapshots retain live inputs. Only the display-only calculations
+  // below receive the memoized DB; creating a result never reuses an audience.
+  const liveDb = db;
+  return withDisplayReadCache(db, async db => {
   if (
     query.compare &&
     !['previous', 'last_week', 'last_year'].includes(query.compare)
   )
     throw new StyleError('invalid_comparison');
-  const window = await styleWindow(db, account, query, now),
+  const window = await styleWindow(liveDb, account, query, now),
     timeZone = window.timeZone,
     from = instant(window.from),
     to = instant(window.to);
-  const raw = await styleRows(db, account, style, access.kinds);
+  const raw = await styleRows(liveDb, account, style, access.kinds);
   if (query.holidays && !['all', 'exclude', 'only'].includes(query.holidays))
     throw new StyleError('invalid_holiday_filter');
   const holidays = (
-    await db
+    await liveDb
       .prepare('SELECT date,name FROM style_holidays WHERE line_account_id=?')
       .bind(account)
       .all<{ date: string; name: string }>()
@@ -94,7 +99,7 @@ export async function styleSnapshot(
             (h) => h.date === civilDate(instant(r.startsAt), timeZone),
           )),
   );
-  const config = await db
+  const config = await liveDb
     .prepare(
       'SELECT settings_json,answers_json FROM account_styles WHERE line_account_id=?',
     )
@@ -176,7 +181,7 @@ export async function styleSnapshot(
   const selected = await activityMetrics(context);
   if (style === 'lesson')
     await lessonMetrics(
-      db,
+      liveDb,
       account,
       rows,
       from,
@@ -334,4 +339,5 @@ export async function styleSnapshot(
     people: personMetrics(rows, from, to, now, settings).people,
     analytics,
   };
+  });
 }

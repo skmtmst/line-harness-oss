@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const actions = vi.hoisted(() => ({ setStatus: vi.fn() }))
+const actions = vi.hoisted(() => ({ setStatus: vi.fn(), clearFilters: vi.fn(), loadCandidates: vi.fn(), filtering: false, failure: '' }))
 
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({ id: 'staff-test' }) }))
@@ -11,15 +11,17 @@ vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
 vi.mock('./use-duplicates-data', () => ({
   CANDIDATE_PAGE_SIZE: 50,
   useDuplicatesData: () => ({
-    candidateTotal: 0, unfilteredCandidates: true, statusCounts: null,
+    candidateTotal: 0, unfilteredCandidates: !actions.filtering, statusCounts: null,
     duplicateTotalText: '—', duplicateDetail: '読み込めませんでした', lowConfidenceCount: null,
     candidates: [], data: null, query: '', status: '', page: 1,
-    statsFailure: null, error: '', candidateError: '', candidatesLoading: false,
-    setQuery: vi.fn(), setStatus: actions.setStatus, setPage: vi.fn(), clearFilters: vi.fn(), load: vi.fn(), detect: vi.fn(),
+    statsFailure: null, error: '', candidateError: actions.failure, candidatesLoading: false,
+    setQuery: vi.fn(), setStatus: actions.setStatus, setPage: vi.fn(), clearFilters: actions.clearFilters, loadCandidates: actions.loadCandidates, load: vi.fn(), detect: vi.fn(),
   }),
 }))
 
 import DuplicatesList from './list'
+
+beforeEach(() => { actions.filtering = false; actions.failure = '' })
 
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
@@ -49,4 +51,20 @@ it('状態の札は元の絞り込みの値を送る', () => {
     fireEvent.click(screen.getByRole('button', { name: label, exact: true }))
     expect(actions.setStatus).toHaveBeenLastCalledWith(value)
   }
+})
+
+it('候補0件を1〜0組と表示せず、検索の0件は条件を外せる', () => {
+  actions.filtering = true
+  render(<DuplicatesList />)
+  expect(screen.getByText('条件に合う候補はありません')).toBeTruthy()
+  expect(document.body.textContent).not.toContain('1〜0')
+  fireEvent.click(screen.getByRole('button', { name: '条件を外す', exact: true }))
+  expect(actions.clearFilters).toHaveBeenCalledOnce()
+})
+it('候補の取得失敗を0件にせず、候補だけ読み直す', () => {
+  actions.failure = 'offline'
+  render(<DuplicatesList />)
+  expect(screen.queryByText('重複の候補はありません')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+  expect(actions.loadCandidates).toHaveBeenCalledOnce()
 })

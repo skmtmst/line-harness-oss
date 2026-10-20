@@ -1,3 +1,5 @@
+import { legacyApiErrorBody, readApiError } from '@line-crm/shared';
+import { responseLiffError } from './api-error.js';
 import type { BookingCancellationPreview, MenuAddon, RoutedTarget, MakeupCredit, MakeupOption } from './api-types.js';
 export type { BookingCancellationPreview, MenuAddon, RoutedTarget, MakeupCredit, MakeupOption, EventBookingMakeup } from './api-types.js';
 import type { AcceptBookingWaitlistInput,BookingHistoryResponse,CustomerBookingWaitlist,CustomerSeatWaitlist,EntryRouteCouponReceived,EventWaitlistMine,EventWaitlistOfferDetail,LiffBookingChangeResponse,RegisterSeatWaitlistInput,WebinarAudience } from '@line-crm/shared';
@@ -25,15 +27,7 @@ async function get<T>(path: string): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
   url.searchParams.set('liffId', getLiffId());
   const res = await fetch(url.toString(), { headers: authHeaders() });
-  if (!res.ok) {
-    const text = await res.text();
-    let parsed: unknown = null;
-    try { parsed = JSON.parse(text); } catch { /* keep raw */ }
-    const err = new Error(`API ${res.status}: ${text}`) as Error & { status: number; body: unknown };
-    err.status = res.status;
-    err.body = parsed ?? text;
-    throw err;
-  }
+  if (!res.ok) throw await responseLiffError(res);
   return res.json();
 }
 
@@ -95,7 +89,7 @@ async function getLatestFormAnswer(path: string): Promise<{ answers: Record<stri
 
 async function remove<T>(path:string):Promise<T>{
  const url=new URL(`${BASE}${path}`,window.location.origin);url.searchParams.set('liffId',getLiffId());
- const res=await fetch(url,{method:'DELETE',headers:authHeaders()});if(!res.ok)throw new Error(`API ${res.status}`);return res.json();
+ const res=await fetch(url,{method:'DELETE',headers:authHeaders()});if(!res.ok)throw await responseLiffError(res);return res.json();
 }
 async function post<T>(path: string, body: unknown, headers: Record<string, string> = {}, method: 'POST' | 'PUT' = 'POST'): Promise<T> {
   const url = new URL(`${BASE}${path}`, window.location.origin);
@@ -105,15 +99,7 @@ async function post<T>(path: string, body: unknown, headers: Record<string, stri
     headers: authHeaders({ 'Content-Type': 'application/json', ...headers }),
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    const text = await res.text();
-    let parsed: unknown = null;
-    try { parsed = JSON.parse(text); } catch { /* keep raw */ }
-    const err = new Error(`API ${res.status}`) as Error & { status: number; body: unknown };
-    err.status = res.status;
-    err.body = parsed ?? text;
-    throw err;
-  }
+  if (!res.ok) throw await responseLiffError(res);
   return res.json();
 }
 
@@ -127,15 +113,7 @@ async function postBinary<T>(path: string, file: Blob): Promise<T> {
     headers: authHeaders({ 'Content-Type': file.type || 'application/octet-stream' }),
     body: file,
   });
-  if (!res.ok) {
-    const text = await res.text();
-    let parsed: unknown = null;
-    try { parsed = JSON.parse(text); } catch { /* keep raw */ }
-    const err = new Error(`API ${res.status}`) as Error & { status: number; body: unknown };
-    err.status = res.status;
-    err.body = parsed ?? text;
-    throw err;
-  }
+  if (!res.ok) throw await responseLiffError(res);
   return res.json();
 }
 
@@ -148,10 +126,11 @@ export const api = {
   },
   /** 上の帯に出す店名など。liffId から店を決める公開口 (Worker は {success,data} で返す)。 */
   liffConfig: () =>
-    get<{ success: boolean; data: { botBasicId: string; accountName: string; accountId: string } }>(
+    get<{ success: boolean; data: { botBasicId: string; accountName: string; accountId: string; style?: unknown } }>(
       '/api/liff/config',
     ),
   menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus'),
+  storePhotos: () => getData<Array<{ slot: 'exterior' | 'interior' | 'waiting'; url: string }>>('/api/liff/booking/store-photos'),
   staffOf: (menuId: string) =>
     get<{ staff: StaffItem[] }>(`/api/liff/booking/menus/${menuId}/staff`),
   availability: (menuId: string, staffId: string | undefined, from: string, to: string) => {
@@ -209,7 +188,7 @@ export const api = {
       { bookingId },
     ),
   bookingPaymentStatus: (bookingId: string) =>
-    get<{ payment: BookingPayment | null }>(
+    get<{ payment: BookingPayment | null; operation_status?: 'unknown'; action_required?: boolean }>(
       `/api/liff/booking/payments/by-booking?bookingId=${encodeURIComponent(bookingId)}`,
     ),
   me: () => get<BookingHistoryResponse>('/api/liff/booking/me'),
@@ -260,11 +239,7 @@ export const api = {
       method: 'DELETE',
       headers: authHeaders(),
     }).then(async (res) => {
-      if (!res.ok) {
-        const err = new Error(`API ${res.status}`) as Error & { status: number };
-        err.status = res.status;
-        throw err;
-      }
+      if (!res.ok) throw await responseLiffError(res);
       return res.json() as Promise<{ status: string }>;
     }),
 
@@ -389,7 +364,8 @@ export const api = {
     });
     let parsed: FormSubmitResponse | null = null;
     try {
-      parsed = (await res.json()) as FormSubmitResponse;
+      const payload: unknown = await res.json();
+      parsed = (res.ok ? payload : { ...(legacyApiErrorBody(payload) as object), error: readApiError(payload).message }) as FormSubmitResponse;
     } catch {
       parsed = null;
     }
@@ -452,11 +428,11 @@ export const visitStampsApi = {
   uploadPaperPhoto:async(accountId:string,id:string,file:File)=>{
     const body=new FormData();body.append('file',file);
     const response=await fetch(`${BASE}/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/paper-photos?${new URLSearchParams({accountId})}`,{method:'POST',headers:{Authorization:`Bearer ${getIdToken()}`},body});
-    if(!response.ok)throw new Error('写真を預けられませんでした');return response.json() as Promise<{success:true;data:import('@line-crm/shared').VisitStampPhoto}>;
+    if(!response.ok)throw await responseLiffError(response);return response.json() as Promise<{success:true;data:import('@line-crm/shared').VisitStampPhoto}>;
   },
   paperPhoto:async(accountId:string,id:string)=>{
     const response=await fetch(`${BASE}/api/liff/visit-stamps/paper-photos/${encodeURIComponent(id)}?${new URLSearchParams({accountId})}`,{headers:{Authorization:`Bearer ${getIdToken()}`}});
-    if(!response.ok)throw new Error('写真を読み込めませんでした');return response.blob();
+    if(!response.ok)throw await responseLiffError(response);return response.blob();
   },
   requestPaper: (accountId:string,id:string,body:import('@line-crm/shared').VisitStampPaperInput) => post<{success:true;data:{id:string;status:'pending'}}>(`/api/liff/visit-stamps/cards/${encodeURIComponent(id)}/paper-requests?${new URLSearchParams({accountId})}`,body),
 };

@@ -4,7 +4,7 @@
  */
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index';
+import type { Env } from '../worker-env';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { saveBookingPaymentConfig } from '@line-crm/db';
 

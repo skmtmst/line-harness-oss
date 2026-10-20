@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useState } from 'react'
 import { CircleHelp, Download, Lock } from 'lucide-react'
 import {
@@ -20,10 +21,10 @@ import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/
 
 /*
  * 支払いのタブの窓。
- * - 期間を締める（確かめ）：★V8-B `usDpO`（520幅）。締めの口・合言葉（冪等キー）・0円で外れた成果の
+ * - 期間を締める（確かめ）：★V8-B （520幅）。締めの口・合言葉（冪等キー）・0円で外れた成果の
  *   知らせは app/affiliates/payment-tab.tsx の SettlementCloseDialog と同じ。見た目だけ絵どおりに
  *   （対象・合計・振込先が未登録の人の知らせ・やめる／締める）。払う相手ごとの内訳は表のタブに出ている。
- * - 銀行用 CSV の本人確認：PayoutStepUpDialog を写した（`CVz5d`。この担当の板ではない）。
+ * - 銀行用 CSV の本人確認：PayoutStepUpDialog を写した（。この担当の板ではない）。
  */
 
 export function SettlementCloseDialog({
@@ -70,7 +71,7 @@ export function SettlementCloseDialog({
 
 
       if (!fieldFailure) {
-      setError(cause instanceof Error ? cause.message : '締め処理を完了できませんでした') }
+      setError(describeApiFailure(cause, '締め処理')) }
     } finally {
       setBusy(false)
     }
@@ -159,7 +160,7 @@ export function PayoutStepUpDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [exportKey, setExportKey] = useState('')
-  /* 2段階認証を使っている人は6桁、無い人はパスワードで確認する。6桁の人も「パスワードで本人確認」に切り替えられる（絵 CVz5d）。 */
+  /* 2段階認証を使っている人は6桁、無い人はパスワードで確認する。6桁の人も「パスワードで本人確認」に切り替えられる。 */
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
   const [preferPassword, setPreferPassword] = useState(false)
   const usePassword = stepUpMethod === 'password' || (stepUpMethod === 'totp' && preferPassword)
@@ -185,7 +186,7 @@ export function PayoutStepUpDialog({
       onExported(exported.data.downloadUrl)
       onClose()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '銀行用CSVを出力できませんでした')
+      setError(describeApiFailure(cause, 'CSVの出力'))
     } finally {
       setBusy(false)
     }

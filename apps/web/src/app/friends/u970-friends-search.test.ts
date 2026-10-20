@@ -9,8 +9,8 @@ const DIALOG = readFileSync(
   'utf8',
 )
 /* #984 LAY-14: 主タブの定義は friends-tabs.ts が正本（UID移行側も同じ一覧を使う）。 */
-const NAV = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'friends-nav-v8.tsx'), 'utf8')
-const TABS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'friends-tabs.ts'), 'utf8')
+const NAV = readFileSync(new URL('./friends-nav.tsx', import.meta.url), 'utf8')
+const TABS = readFileSync(new URL('../../v8/friends/friends-tabs.ts', import.meta.url), 'utf8')
 
 /*
  * U011-U013: 詳細検索（絞り込み条件を設定）が狭い幅で潰れていた。

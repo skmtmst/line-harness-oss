@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 リマインダの詳細（src/v8/reminders/detail.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
- * 一時停止は確かめの窓（RwVo5）を通す・最近の実行は送った物だけ・閲覧のみには押せない操作を置かない。
+ * 一時停止は確かめの窓を通す・最近の実行は送った物だけ・閲覧のみには押せない操作を置かない。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -171,7 +171,7 @@ describe('V8 リマインダの詳細', () => {
     state.tab = 'registrants'
     await render()
     expect(host.querySelector('[data-design-node="loVfW"]')).toBeTruthy()
-    // 行の操作は「…」1つの中（B-253）。開くと取り消す・再開するが出る。
+    // 行の操作は「…」1つの中。開くと取り消す・再開するが出る。
     const rowMenu = (name: string) => document.querySelector(`button[aria-label="${name}の操作"]`) as HTMLButtonElement | null
     expect(rowMenu('山田 太郎')).toBeTruthy()
     await act(async () => { rowMenu('山田 太郎')!.click() })

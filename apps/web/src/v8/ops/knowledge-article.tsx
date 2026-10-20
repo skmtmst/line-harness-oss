@@ -1,6 +1,6 @@
 'use client'
 import Link from '@/components/shared/list-navigation'
-import { ArrowLeft, Check } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
@@ -26,9 +26,9 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
 
 /**
- * ナレッジの記事 V8（絵 `R5ckwJ`）。一覧の「開く」から出す。
+ * ナレッジの記事 V8。一覧の「開く」から出す。
  *
- * 動きは v7（components/ops/knowledge-editor の全画面）と同じ：
+ * 動きは 管理画面（components/ops/knowledge-editor の全画面）と同じ：
  * - 承認待ち・要確認：見送る・下書きを保存・保存して承認（承認の前に「記事を承認する前に」で確かめる）
  * - 承認済み：保存すると承認待ちに戻る。一覧から行っていた「無効にする」もここに置く
  * 保存してから承認する（承認に失敗しても、勝手に有効にはならない）。
@@ -80,7 +80,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
     setForm((f) => ({ ...f, [key]: value })); setReadChecked(false)
   }
 
-  /* 保存で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  /* 保存で落ちた欄は、その欄の真下に理由を出して移る。 */
   const fields = useFormErrors()
   fields.define('title', '題名', () => (form.title.trim() ? null : '題名を入力してください'), { required: true })
   fields.define('question', '質問', () => (eligible && !form.question.trim() ? '質問を入力してください' : null), { required: eligible })
@@ -118,7 +118,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty: fullPage && dirty, busy })
   const close = () => { if (busy) return; if (fullPage && dirty) setClosing(true); else onClose() }
-  // 全画面のときは、上の帯のパンくずの最後に保存済みの題名を出す（R5ckwJ）。
+  // 全画面のときは、上の帯のパンくずの最後に保存済みの題名を出す。
   usePageTitle(fullPage ? initial.title : null, fullPage)
   const ticketLabel = article.ticketNo == null ? '番号未取得' : `#${article.ticketNo}`
 
@@ -128,7 +128,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
         {/* 全画面の戻り道はパンくずと左のメニュー（R5ckwJ は頭に主ボタンだけ）。窓のときは閉じる口として残す。 */}
         {!fullPage ? <Button onClick={close} disabled={busy}>キャンセル</Button> : null}
         {editing ? (
-          <Button variant="primary" onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
+          <Button variant="primary" onClick={() => save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
         ) : (
           <Button variant="primary" disabled={busy || !canApprove} onClick={() => { setError(''); setApproving(true) }}><Check aria-hidden="true" />保存して承認</Button>
         )}
@@ -170,12 +170,12 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
             {editing ? (
               <>
                 <Button onClick={close} disabled={busy}>保存せず閉じる</Button>
-                <Button variant="danger" onClick={() => void review('disable')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">無効にする</Button>
+                <Button variant="danger" onClick={() => review('disable')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">無効にする</Button>
               </>
             ) : (
               <>
-                {article.reviewState !== 'dismissed' ? <Button onClick={() => void review('dismiss')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">見送る</Button> : null}
-                <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
+                {article.reviewState !== 'dismissed' ? <Button onClick={() => review('dismiss')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">見送る</Button> : null}
+                <Button onClick={() => save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
               </>
             )}
           </div>
@@ -207,8 +207,8 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
           onCancel={() => { if (!busy) setApproving(false) }}
           footer={(
             <DialogActions>
-              <Button onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
-              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? ticketError || (sourceTicket ? '元の問い合わせを解決にしてから承認してください' : '元の問い合わせの状態を確認しています') : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => void save(true)}><Check aria-hidden="true" />保存して承認</Button>
+              <Button onClick={() => save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
+              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? ticketError || (sourceTicket ? '元の問い合わせを解決にしてから承認してください' : '元の問い合わせの状態を確認しています') : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => save(true)}><Check aria-hidden="true" />保存して承認</Button>
             </DialogActions>
           )}
         >

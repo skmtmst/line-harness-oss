@@ -1,8 +1,5 @@
 import { sqlIdSet } from './id-queries.js';
-import type {
-  OperationCapability,
-  OperationIncident,
-} from './operations.js';
+import type { OperationCapability, OperationIncident } from './operation-types.js';
 
 /*
  * N-451: 緊急停止の「復旧前検査」。

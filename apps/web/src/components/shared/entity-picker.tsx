@@ -283,7 +283,7 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
   ariaLabel?: string
   valuePrefix?: string
   compact?: boolean
-  /** true＝「変える ›」を出さない。'label'＝文字だけ外して › は残す（狭い列で名前を残す。絵 ijxur のメニュー）。 */
+  /** true＝「変える ›」を出さない。'label'＝文字だけ外して › は残す（狭い列で名前を残す。絵  のメニュー）。 */
   actionHidden?: boolean | 'label'
 }) {
   const field = useFieldContext()

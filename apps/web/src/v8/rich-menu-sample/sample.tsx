@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { Image as ImageIcon, Info } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
@@ -13,72 +12,70 @@ import { usePreparingDialog, PREPARING_TITLE, PREPARING_WORD } from '@/component
 import HelpTip from '@/components/shared/help-tip'
 import { DetailPage, DetailColumns } from '@/components/templates'
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
+import ListState from '@/components/shared/list-state'
+import { useStarterMenu } from '@/v8/onboarding/public/use-starter-menu/index'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared'
-import { styleApi } from '@/lib/api-styles'
-import { FEATURES, featureHref, featureName, sampleMenuFor, styleLabel, type StyleWarning } from '@/v8/onboarding/model'
-import { SampleMenuTiles } from '@/v8/onboarding/sample-menu'
+import { styleApi } from '@/lib/api/helpers/styles'
+import { FEATURES, featureHref, featureName, sampleMenuFor, styleLabel, type StyleWarning } from '@/v8/onboarding/public/model/index'
+import { SampleMenuTiles } from '@/v8/onboarding/public/sample-menu/index'
 import styles from './sample.module.css'
 
 /*
- * 見本のリッチメニュー（★V8 修正案の列 VHp7p `cAaGY`。決まり B-311・B-313 追記）。
+ * 見本のリッチメニュー（★V8 修正案の列 VHp7p `cAaGY`。決まり ・ 追記）。
  *
  * スタイルを選んだときに入った見本のリッチメニューを、ボタンごとに「押したら何が開くか・使えるか」で見せる。
  * 中身が決まっていない機能のボタンは、上の帯・表の札「中身が未設定」・右のお客さまの見え方
  * （押したときは準備中の案内）で知らせ、［決まりを入れる］でその設定の画面へ案内する。
- * 画像を変える・保存・押したときの変更は、組4の口ができるまで準備中の窓（B-314）。
+ * 画像を変える・保存・押したときの変更は、組4の口ができるまで準備中の窓。
  */
 
 const AREAS = ['A', 'B', 'C', 'D', 'E', 'F']
 
 export default function RichMenuSampleV8() {
-  const params = useSearchParams()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  const canEdit = role === null || canManageRole(role)
+  const canEdit = canManageRole(role)
   const preparing = usePreparingDialog()
-  const wanted = params.get('style')
-  const [style, setStyle] = useState<AccountStyle | null>(ACCOUNT_STYLES.includes(wanted as AccountStyle) ? wanted as AccountStyle : null)
-  const [name, setName] = useState<string | null>(null)
+  const profile = useAccountStyle(selectedAccountId)
+  const style = profile.data?.style ?? null
+  const resolvedMenu = useStarterMenu(selectedAccountId, style ?? 'standard')
+  const [savedMenu, setSavedMenu] = useState<{ accountId: string; style: string; name: string | null; targetId: string | null } | null>(null)
   const [warnings, setWarnings] = useState<StyleWarning[]>([])
   const [selected, setSelected] = useState<number | null>(null)
   const [asideOpen, setAsideOpen] = useState(false)
 
-  /* スタイルが URL に無ければ、今のアカウントのスタイルを読む。 */
   useEffect(() => {
-    if (!selectedAccountId || style) return
-    let cancelled = false
-    void styleApi.get(selectedAccountId).then((res) => { if (!cancelled && res.success) setStyle(res.data.style) }).catch(() => { if (!cancelled) setStyle('restaurant') })
-    return () => { cancelled = true }
-  }, [selectedAccountId, style])
-
-  useEffect(() => {
+    setSavedMenu(null); setWarnings([])
     if (!selectedAccountId || !style) return
     let cancelled = false
-    void styleApi.starterSet(selectedAccountId, style).then((res) => {
-      if (cancelled || !res.success) return
-      setName(res.data.definition.items.find((item) => item.kind === 'rich_menu')?.name ?? null)
-    }).catch(() => { /* 名前が読めなくても見本の形で出す */ })
+    void Promise.all([styleApi.starterSet(selectedAccountId, style), styleApi.starterItems(selectedAccountId)]).then(([res, items]) => {
+      if (cancelled || !res.success || !items.success) return
+      setSavedMenu({ accountId: selectedAccountId, style, name: res.data.definition.items.find(item => item.kind === 'rich_menu')?.name ?? null, targetId: items.data.items.find(item => item.kind === 'rich_menu')?.target_id ?? null })
+    }).catch(() => { /* 編集先が読めなければ操作を出さない。 */ })
     void styleApi.warnings(selectedAccountId).then((res) => { if (!cancelled && res.success) setWarnings(res.data.items ?? []) }).catch(() => { /* 帯を出さない */ })
     return () => { cancelled = true }
   }, [selectedAccountId, style])
 
-  const menu = sampleMenuFor(style ?? 'restaurant')
+  const sample = sampleMenuFor(style ?? 'standard')
+  const menu = { ...sample, tiles: resolvedMenu.buttons.map(button => ({ ...button, icon: sample.tiles.find(tile => tile.feature === button.feature)?.icon ?? 'file' })) }
   const warned = useMemo(() => new Set(warnings.map((warning) => warning.feature)), [warnings])
   const firstWarned = menu.tiles.findIndex((tile) => warned.has(tile.feature))
   const shown = selected ?? (firstWarned >= 0 ? firstWarned : 0)
   const shownTile = menu.tiles[shown]
-  const hrefOf = (feature: string) => featureHref(feature, warnings.find((warning) => warning.feature === feature)?.href ?? '/rich-menus')
-  /* 設定の画面がまだ無い機能（クーポン・回数券）は、［決まりを入れる］で準備中の窓（B-314）。 */
+  const hrefOf = (feature: string) => featureHref(feature, warnings.find((warning) => warning.feature === feature)?.href ?? '/rich-menus', style ?? undefined)
+  /* 設定の画面がまだ無い機能（クーポン・回数券）は、［決まりを入れる］で準備中の窓。 */
   const configure = (feature: string) => FEATURES[feature]?.preparing
     ? <Button onClick={() => preparing.open(FEATURES[feature]!.preparing!)}>決まりを入れる</Button>
     : <Button href={hrefOf(feature)}>決まりを入れる</Button>
-  const title = name ?? `${styleLabel(style ?? 'restaurant')}の見本`
+  const currentMenu = savedMenu?.accountId === selectedAccountId && savedMenu.style === style ? savedMenu : null
+  const editHref = currentMenu?.targetId ? `/rich-menus/edit?id=${encodeURIComponent(currentMenu.targetId)}` : null
+  const title = currentMenu?.name ?? (style ? `${styleLabel(style)}の見本` : 'リッチメニューの見本')
 
   const aside = (
     <div className={styles.aside}>
       <div className={styles.asideHead}><h3 className={styles.asideTitle}>お客さまの見え方</h3><StatusBadge tone="neutral" dot>見本</StatusBadge></div>
-      <SampleMenuTiles style={style ?? 'restaurant'} size="preview" selected={shown} warned={[...warned]} onSelect={setSelected} label="お客さまの見え方（押すと、押したときの見え方を出します）" />
+      {profile.error ? <ListState kind="error" title="使い方を読み込めませんでした" error={profile.error} onRetry={profile.reload} /> : resolvedMenu.error ? <ListState kind="error" title="見本を読み込めませんでした" error={resolvedMenu.error} onRetry={resolvedMenu.reload} /> : style ? <SampleMenuTiles style={style} buttons={resolvedMenu.buttons} size="preview" selected={shown} warned={[...warned]} onSelect={setSelected} label="お客さまの見え方（押すと、押したときの見え方を出します）" /> : <ListState kind="loading" title="使い方を確認しています" />}
       {shownTile ? (
         <section className={styles.tap} aria-live="polite">
           <p className={styles.tapLabel}>{`押したとき（${AREAS[shown]} ${shownTile.label}）`}</p>
@@ -104,9 +101,9 @@ export default function RichMenuSampleV8() {
       title={title}
       leading={<Link href="/rich-menus" className={styles.parent}>リッチメニュー ›</Link>}
       help="スタイルを選んだときに入った見本のリッチメニューです。見本のまま使えます。"
-      actions={canEdit ? <>
-        <Button onClick={() => preparing.open('画像を変える')}><ImageIcon aria-hidden="true" className={styles.buttonIcon} />画像を変える</Button>
-        <Button variant="primary" onClick={() => preparing.open('見本のリッチメニューの保存')}>保存する</Button>
+      actions={canEdit && editHref ? <>
+        <Button href={editHref}><ImageIcon aria-hidden="true" className={styles.buttonIcon} />画像を変える</Button>
+        <Button variant="primary" href={editHref}>見本を編集する</Button>
       </> : null}
     >
       <DetailColumns presentation="card" aside={aside} asideLabel="お客さまの見え方" expanded={asideOpen} onExpandedChange={setAsideOpen}>
@@ -137,8 +134,8 @@ export default function RichMenuSampleV8() {
                   </GridCell>
                   <GridCell><StatusBadge tone={open ? 'warning' : 'success'} dot>{open ? '中身が未設定' : '使える'}</StatusBadge></GridCell>
                   <GridCell>
-                    {canEdit ? <RowMenu appearance="box" size="row" label={`${tile.label}の操作`} items={[
-                      { id: 'change', label: '押したときを変える', onSelect: () => preparing.open('押したときの変更') },
+                    {canEdit && (editHref || open) ? <RowMenu appearance="box" size="row" label={`${tile.label}の操作`} items={[
+                      ...(editHref ? [{ id: 'change', label: '押したときを変える', href: editHref }] : []),
                       ...(open ? [FEATURES[tile.feature]?.preparing ? { id: 'configure', label: '決まりを入れる', onSelect: () => preparing.open(FEATURES[tile.feature]!.preparing!) } : { id: 'configure', label: '決まりを入れる', href: hrefOf(tile.feature) }] : []),
                     ]} /> : null}
                   </GridCell>

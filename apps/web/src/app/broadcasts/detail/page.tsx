@@ -42,7 +42,7 @@ function BroadcastDetailInner() {
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
   /*
    * ★V8：上の帯のパンくずは「一斉配信 › 配信名」、画面名は配信名だけ。
-   * v7 ではパンくずが描かれないので、渡しても見た目は変わらない。
+   * 互換経路ではパンくずが描かれないので、渡しても見た目は変わらない。
    */
   usePageCrumbs([{ label: '一斉配信', href: '/broadcasts' }])
   usePageTitle(
@@ -58,7 +58,7 @@ function BroadcastDetailInner() {
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
   const [reloadToken, setReloadToken] = useState(0)
   /*
-   * ★V8 `Q28Gb`：ほかの人の更新に気づいたら帯で知らせる。
+   * ★V8 ：ほかの人の更新に気づいたら帯で知らせる。
    * この画面は書き換えない（読み直すまで古い内容のまま）。
    */
   const [conflict, setConflict] = useState(false)
@@ -265,9 +265,9 @@ function BroadcastDetailInner() {
   }, [id, broadcast?.status])
 
   /*
-   * ★V8 `Q28Gb`：別のタブから戻ってきたら版だけ確かめる。
+   * ★V8 ：別のタブから戻ってきたら版だけ確かめる。
    * ずれていたら帯を出すだけで、画面は書き換えない。
-   * v7 では付けない（通信も増やさない）。
+   * 互換経路では付けない（通信も増やさない）。
    */
   useEffect(() => {
     if (!id || loadState !== 'ready') return

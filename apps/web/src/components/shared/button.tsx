@@ -15,18 +15,10 @@ type CommonProps = {
   variant?: 'primary' | 'secondary' | 'danger' | 'danger-outline' | 'text'
   /**
    * `compact` は一覧の行内・絞り込み行など、32px級の操作と高さを
-   * そろえるときだけ使う（★V7：行内の操作は32）。本文の操作は
+   * そろえるときだけ使う（★管理画面：行内の操作は32）。本文の操作は
    * `standard` のままにする。
-   *
-   * `delivery-head` は★V8 デリバリー受注の板の頭の操作（絵 kDQHr・OzHLO）と
-   * 注文詳細の窓の足（絵 hjdqV）だけ。どの絵も余白 14・印 15・間 6 で同じ値。
-   * 高さ・角丸・字は既定と同じで、左右の余白と印の大きさだけ絵へ合わせる。
-   * 渡さないボタンは変わらない。
-   *
-   * `delivery-bulk` は★V8 デリバリー受注の「まとめて」の帯の中の操作（絵 h7OeT）だけ。
-   * 高さ28・左右10・角丸8・字12は `delivery-row` と同じで、印13角・印と字の間5が違う。
    */
-  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'inbox-tool' | 'booking' | 'delivery-row' | 'delivery-bulk' | 'delivery-head'
+  size?: 'standard' | 'field' | 'compact' | 'inline' | 'slot' | 'thumbnail' | 'composer' | 'composer-small' | 'inbox-tool' | 'booking'
   fullWidth?: boolean
   align?: 'start'
   /**
@@ -58,7 +50,7 @@ type NativeButtonProps = CommonProps &
     /** 開いた直後に標的を寄せたいときだけ渡す（未保存の離脱確認の主ボタン）。 */
     ref?: React.Ref<HTMLButtonElement>
     /**
-     * ★V7 仕上げ §2「保存中」。true の間は回る印＋`busyLabel`（規定
+     * ★管理画面 仕上げ §2「保存中」。true の間は回る印＋`busyLabel`（規定
      * 「保存中…」）に見た目を切り替え、押せなくする（二重送信を防ぐ）。
      * 文字が変わっても幅はぶれない。呼び出し側はいままでの
      * `{saving ? '保存中…' : '…'}` の代わりに `busy={saving}` を渡す。
@@ -67,7 +59,7 @@ type NativeButtonProps = CommonProps &
     /** `busy` の間に出す文字。規定は「保存中…」。 */
     busyLabel?: string
     /**
-     * ★V7 仕上げ §2「完了」。true に切り替わったら ✓＋`doneLabel`
+     * ★管理画面 仕上げ §2「完了」。true に切り替わったら ✓＋`doneLabel`
      * （規定「保存しました」）を1.2秒だけ出してから元の文字へ戻る。
      * 失敗したときは渡さない——ボタンは元に戻り、理由は知らせ
      * （Toast）と欄の下に出す。
@@ -97,12 +89,12 @@ type LinkButtonProps = CommonProps &
 
 export type ButtonProps = NativeButtonProps | LinkButtonProps
 
-/** 「完了」の見せ時間（★V7 仕上げ §2: 1.2秒）。 */
+/** 「完了」の見せ時間（★管理画面 仕上げ §2: 1.2秒）。 */
 const DONE_FLASH_MS = 1200
 
 /**
  * Pencil V5 の `nBRKk`（主要）と `uzNEC`（副次）を正本にした共通ボタン。
- * V6専用のボタン部品は存在しないため、V6画面でもこの寸法を使う。
+ * 管理画面専用のボタン部品は存在しないため、管理画面画面でもこの寸法を使う。
  *
  * 見た目は部品が固定し、呼び出し側は幅と外側余白だけを `className` で決める。
  * 表示制御にはTailwindのdisplayクラスではなくHTMLの `hidden` 属性を使う。
@@ -180,7 +172,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const children = props.actionWording ? normalizeActionNode(rawChildren) : rawChildren
 
   /*
-   * ★V7 仕上げ §2「保存中・完了」。DOM に出す文字は常に今のラベル1つだけ
+   * ★管理画面 仕上げ §2「保存中・完了」。DOM に出す文字は常に今のラベル1つだけ
    * （読み上げ・検索が迷子にならないよう、隠した文字は残さない）。
    * 幅はぶれないよう、平常時に測った幅を `min-width` に留めておき、
    * 「保存中…」「保存しました」の間もその幅を下回らない。
@@ -189,7 +181,7 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
   const [automaticError, setAutomaticError] = useState('')
   const automaticLock = useRef(false)
   const stateful = busy !== undefined || done !== undefined || props.busyLabel !== undefined || automaticBusy
-  const busyNow = busy === true || (busy === undefined && automaticBusy)
+  const busyNow = busy === true || automaticBusy
 
   /* done が true になったら 1.2 秒だけ ✓ を出して元の文字へ戻す。 */
   const [doneFlashing, setDoneFlashing] = useState(false)
@@ -252,10 +244,21 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (busyNow || disabled || automaticLock.current) return
-    setAutomaticError('')
-    const pending = onClick?.(event) as unknown
-    if (busy !== undefined || !pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
+    // Reactがbusyを描き直す前と、onClick内からの再入も共通の門で止める。
     automaticLock.current = true
+    setAutomaticError('')
+    let pending: unknown
+    try {
+      pending = onClick?.(event)
+      if (!pending || typeof (pending as PromiseLike<unknown>).then !== 'function') {
+        automaticLock.current = false
+        return
+      }
+    } catch {
+      automaticLock.current = false
+      setAutomaticError('処理できませんでした。もう一度お試しください。')
+      return
+    }
     setAutomaticBusy(true)
     void Promise.resolve(pending).catch(() => {
       setAutomaticError('処理できませんでした。もう一度お試しください。')

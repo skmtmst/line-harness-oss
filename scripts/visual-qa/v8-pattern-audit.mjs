@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
  * 型の対応表（docs/v8-pattern-catalog.md）の機械の表 v8-pattern-catalog.json を読み、
- * 型ごとに「持ち主（正の部品）以外で同じ形を作っている所」を探す（B-143・B-168・B-172）。
+ * 型ごとに「持ち主（正の部品）以外で同じ形を作っている所」を探す。
  *
  *   node scripts/visual-qa/v8-pattern-audit.mjs \
- *     --code ~/lh-work/lh-train-12 --pen ~/lh-work/design/v8/html \
+ *     --code /path/to/line-harness --pen ~/lh-work/design/v8/html \
  *     --out ~/lh-work/design/v8/review/pattern-audit-run [--only card,kpi-band] [--top 15]
  *
- * 型ごとに4つを数える（B-172）。
+ * 型ごとに4つを数える。
  *   (a) 手書き：持ち主以外で同じ形を作っている所（コードの目印。file:line）
  *   (b) 上書き：画面が部品の見た目を上書きしている所
  *       - 部品に className / style を渡している（JSX）
@@ -28,7 +28,6 @@ import { homedir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { checkTemporaryAllowances, patternFindingKey } from './temporary-allowances.mjs'
 import { cssConsumerIndex, selectorTargetsNative, selectorIsCoordinateOverlay } from './pattern-css-evidence.mjs'
 import { clearSourceEvidence, sourceEvidence } from './pattern-source-evidence.mjs'
 
@@ -993,7 +992,7 @@ function main() {
   console.log(`→ ${join(out, 'pattern-audit.md')}`)
   if (args.base) {
     const gate = checkBase(args, report)
-    gate.temporary = checkTemporaryAllowances('pattern', gate.findings, patternFindingKey)
+    gate.temporary = { allowed: [], unexpected: gate.findings }
     writeFileSync(join(out, 'pattern-new-findings.json'), `${JSON.stringify(gate, null, 2)}\n`)
     for (const hit of gate.findings.slice(0, 50)) console.error(`(${hit.category}) ${hit.pattern} ${hit.file}:${hit.line} ${hit.text}`)
     console.log(`持ち主の見張り: base ${gate.sha} / 新しい候補 ${gate.findings.length}`)

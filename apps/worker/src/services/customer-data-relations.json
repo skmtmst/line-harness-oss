@@ -177,5 +177,7 @@
   "ec_auto_line_attribution_events": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]},{"parent":"ec_auto_line_sends","columns":[{"column":"send_id","parentColumn":"id"}]}]},
   "booking_entitlement_notices": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
   "booking_pass_purchases": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"friends","columns":[{"column":"friend_id","parentColumn":"id"}]}]},
-  "booking_pass_billing_events": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"booking_pass_purchases","columns":[{"column":"purchase_id","parentColumn":"id"}]}]}
+  "booking_pass_billing_events": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"booking_pass_purchases","columns":[{"column":"purchase_id","parentColumn":"id"}]}]},
+  "meet_consultation_notification_runs": {"friendColumns":["friend_id"],"lineUserColumn":false,"references":[{"parent":"meet_consultations","columns":[{"column":"consultation_id","parentColumn":"id"}]}]},
+  "event_booking_transition_runs": {"friendColumns":[],"lineUserColumn":false,"references":[{"parent":"event_bookings","columns":[{"column":"booking_id","parentColumn":"id"}]}]}
 }

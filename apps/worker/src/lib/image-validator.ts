@@ -8,6 +8,7 @@
 
 import { RICH_MENU_DIMENSIONS, type RichMenuSize } from '@line-crm/shared';
 
+
 export type ImageMeta = {
   format: 'png' | 'jpeg';
   width: number;

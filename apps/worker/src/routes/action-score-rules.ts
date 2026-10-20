@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -13,7 +14,7 @@ import {
   stopActionScoreRules,
   testActionScoreRuleBundle,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -52,7 +53,7 @@ async function endpoint<T>(c: Context<Env>, run: () => Promise<T>, status = 200)
     return c.json({ success: true, data: await run() }, status as 200);
   } catch (error) {
     if (error instanceof ActionScoreRuleValidationError) return validationResponse(c, error);
-    console.error(JSON.stringify({"code":"action_score_rule_api_failed"}));
+    logger.error("action_score_rule_api_failed");
     return c.json({ success: false, error: 'スコアのルールを処理できませんでした' }, 500);
   }
 }
@@ -111,7 +112,7 @@ actionScoreRules.patch('/api/action-scores/rules/draft', requireRole('owner', 'a
       }
     }
     if (error instanceof ActionScoreRuleValidationError) return validationResponse(c, error);
-    console.error(JSON.stringify({"code":"action_score_rule_api_failed","route":"PATCH /api/action-scores/rules/draft"}));
+    logger.error("action_score_rule_api_failed");
     return c.json({ success: false, error: 'スコアのルールを処理できませんでした' }, 500);
   }
 });
@@ -229,7 +230,7 @@ actionScoreRules.post(
       return c.json({ success: true, data }, data.replayed ? 200 : 201);
     } catch (error) {
       if (error instanceof ActionScoreRuleValidationError) return validationResponse(c, error);
-      console.error(JSON.stringify({"code":"action_score_adjustment_failed","route":"POST /api/action-scores/adjustments"}));
+      logger.error("action_score_adjustment_failed");
       return c.json({ success: false, error: '点数を変更できませんでした' }, 500);
     }
   },

@@ -74,7 +74,7 @@ export default function SingleFriendActions({
   /** その友だちに今付いているタグ（楽観的更新の起点）。 */
   friendTags?: Tag[]
   /**
-   * タグの付け外しを先に画面へ反映する（★V7 sTJsh §1）。返す関数を
+   * タグの付け外しを先に画面へ反映する（★管理画面 sTJsh §1）。返す関数を
    * 呼ぶと変更前へ戻る。省略したらタグ操作は従来どおり返事を待つ。
    */
   onFriendTagsChange?: (next: Tag[]) => () => void
@@ -280,7 +280,7 @@ function ScenarioPanel({ friendId, accountId, busy, run }: { friendId: string; a
 }
 
 /*
- * タグの付け外しは取り消せる軽い操作（★V7 sTJsh §1・§4）。
+ * タグの付け外しは取り消せる軽い操作（★管理画面 sTJsh §1・§4）。
  * 付ける: 押した瞬間に一覧へ反映して裏で保存し、失敗したら元に戻す。
  * 外す: 先に外した形にして、サーバーへは5秒後に送る。
  *       知らせの「元に戻す」で止めたら送らず、付いたままに戻す。

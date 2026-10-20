@@ -139,7 +139,7 @@ async function render() {
   await act(async () => { root.render(<AnalyticsPage />) })
 }
 
-/** 定期レポートの行の「…」を開き、中の項目を返す（行の右端は「…」1つ・B-253）。 */
+/** 定期レポートの行の「…」を開き、中の項目を返す（行の右端は「…」1つ・）。 */
 async function scheduleMenuItem(label: string): Promise<HTMLElement> {
   const trigger = Array.from(host.querySelectorAll('button')).find((item) => item.getAttribute('aria-label')?.startsWith('定期レポート「'))
   if (!trigger) throw new Error('定期レポートの「…」が見つからない')
@@ -167,7 +167,7 @@ function dialogButton(label: string): HTMLButtonElement {
   return found as HTMLButtonElement
 }
 
-describe('V6 保存タブの定期レポート', () => {
+describe('管理画面 保存タブの定期レポート', () => {
   it('実データの一覧(名前・間隔・次回・状態)を出し、「なし」の決め打ちを残さない', async () => {
     await render()
     expect(host.textContent).toContain('週次まとめ')

@@ -27,7 +27,7 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
    */
   it('テンプレートはテンプレート総件数（フォルダ数ではない）', () => {
     const src = read('../v8/templates/list.tsx')
-    // ★V7 `x63W5x`：取れていない間は「—」。読めたときはテンプレート総件数。
+    // ★管理画面 `x63W5x`：取れていない間は「—」。読めたときはテンプレート総件数。
     expect(src).toContain("id: 'all', label: 'すべて'")
     expect(src).toContain('? tabItems.length : null')
     expect(src).not.toContain('`${templates.length} 件`')
@@ -46,7 +46,7 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
     /*
      * m18s: 見出しの総数は「すべて」の行と同じ数なので出さない（回答フォーム
      * #m18k と同じ形）。総件数の置き場所は「すべて」の行。絞り込み後の件数は
-     * 一覧側の ListRange。旧 assertion（見出しに total）は ★V7 に書き換えた。
+     * 一覧側の ListRange。旧 assertion（見出しに total）は ★管理画面 に書き換えた。
      * m26m/R587: 一覧が読めていない間（初回・失敗・別アカウント切替直後）は
      * 総数が不明なので出さない（null は数を出さない約束。偽ゼロにしない）。
      * 出どころは絞り込み前の総数（overallTotal ?? total）のまま変えない。
@@ -69,8 +69,8 @@ describe('Issue #709: フォルダ帯の見出し件数は行が表す項目の�
   })
 
   it('R12: リマインダは見出しの総数を「すべて」の行と重ねて出さない', () => {
-    const src = read('reminders/list-v8.tsx')
-    // 「すべて」の行は共通のフォルダの列（ManagedFolderPanel）が作る。件数は行が表す総数（B-136）。
+    const src = read("../v8/reminders/list.tsx")
+    // 「すべて」の行は共通のフォルダの列（ManagedFolderPanel）が作る。件数は行が表す総数。
     expect(src).toMatch(/<ManagedFolderPanel[\s\S]*?allId=""[\s\S]*?allCount=\{reminderList\.total \?\? null\}/)
     const panel = src.match(/<ManagedFolderPanel[\s\S]*?>/)?.[0] ?? ''
     expect(panel).not.toMatch(/\stotal=/)

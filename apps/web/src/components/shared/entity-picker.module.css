@@ -25,7 +25,7 @@
 .multiRow { display: flex; flex: none; align-items: center; gap: var(--tpl-picker-gap); min-height: var(--tpl-picker-row-h); padding: var(--tpl-picker-row-pad); border-radius: var(--radius-control); box-shadow: var(--tpl-bd-ring); }
 .multiRow[data-selected] { background: var(--color-accent-soft); box-shadow: var(--tpl-bd-ring-accent); }
 /* 窓の中身の高さは「テンプレートを選ぶ」と同じ。候補が多くても下の帯を画面の外へ押し出さない。 */
-/* 1つ選ぶ窓も高さを決め、候補が多いときは一覧の中を送る（f63Jza：候補29件で下の段が画面の外へ出ていた）。 */
+/* 1つ選ぶ窓も高さを決め、候補が多いときは一覧の中を送る（：候補29件で下の段が画面の外へ出ていた）。 */
 .singleBody { height: var(--tpl-inbox-tp-body-h); max-height: var(--tpl-inbox-tp-body-max); }
 :root .singleBody .tpList > * { flex-shrink: 0; }
 :root .singleBody .tpCard { padding: var(--tpl-picker-single-card-pad); }
@@ -42,7 +42,6 @@
 .multiSub { display: flex; align-items: center; min-width: 0; font-size: var(--text-micro, var(--text-caption)); line-height: var(--tpl-picker-stack-sub-lh); color: var(--color-ink-secondary); }
 .multiSubText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .multiMeta { flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-micro, var(--text-caption)); color: var(--color-ink-secondary); }
-.multiCount { display: inline-flex; align-items: center; }
 .textButton { padding: 0; border: 0; background: none; font: inherit; color: var(--color-action); cursor: pointer; }
 .textButton:hover { text-decoration: underline; }
 }
@@ -62,7 +61,7 @@
 }
 :root .tpBody { flex: none; }
 :root .tpBody .tpList > * { flex-shrink: 0; }
-/* 統括の「テンプレートを選ぶ」窓（EpTBB）：行は1つ選ぶ窓と同じ52、窓の高さは候補4件が見える分。 */
+/* 統括の「テンプレートを選ぶ」窓：行は1つ選ぶ窓と同じ52、窓の高さは候補4件が見える分。 */
 :root .tpBody { height: var(--tpl-source-picker-body-h); }
 :root .tpBody .tpCard { padding: var(--tpl-picker-single-card-pad); }
 /* 1つ選ぶ窓：送るのは候補の一覧だけ。検索欄・「N件中」・下の帯は窓の中で動かない。
@@ -177,7 +176,7 @@
 }
 
 @layer components {
-/* B-175案A：枠のどこからでも開く。外すボタンは開くボタンと兄弟にする。 */
+/* 案A：枠のどこからでも開く。外すボタンは開くボタンと兄弟にする。 */
 .field { position: relative; min-height: var(--tpl-picker-field-h); height: auto; padding: var(--tpl-picker-field-pad); }
 .fieldTrigger { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: var(--radius-control); background: transparent; cursor: pointer; }
 .fieldTrigger:focus-visible { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: var(--tpl-bcpick-focus); }
@@ -185,7 +184,7 @@
 .fieldValue, .fieldIcon, .fieldAction { pointer-events: none; }
 .fieldValue { align-items: center; }
 .fieldName { max-width: 100%; flex-shrink: 1; }
-/* eovoGの絞り込み：項目名と値を1行の本文として見せる。 */
+/* の絞り込み：項目名と値を1行の本文として見せる。 */
 .field[data-value-prefix] .fieldName { font-size: var(--polish-text-body); font-weight: 400; line-height: var(--tpl-inbox-row-preview-lh); }
 .fieldAction { display: inline-flex; align-items: center; gap: var(--tpl-picker-tiny-gap); flex-shrink: 0; font-size: var(--text-body); font-weight: 600; color: var(--color-accent-deep); }
 .fieldClear { position: relative; border: 0; background: none; color: var(--color-ink-secondary); font-size: var(--text-caption); cursor: pointer; }
@@ -200,7 +199,7 @@
 .tpCard:has(.cardRadio:focus-visible) { outline: var(--tpl-bcpick-focus) solid var(--color-action); outline-offset: var(--tpl-bcpick-focus); }
 }
 
-/* B-203：候補のカードも同じ選択の枠・輪・点。 */
+/* ：候補のカードも同じ選択の枠・輪・点。 */
 html:root .tpCard { position: relative; padding-right: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
 html:root .tpCard[data-selected] { background: var(--color-choice-selected); outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; }
 html:root .cardRadio { appearance: none; opacity: 1; width: var(--choice-size); height: var(--choice-size); right: var(--space-16); top: var(--space-16); margin: 0; border-radius: var(--radius-pill); border: var(--choice-ring) solid var(--color-choice-border); background: var(--color-canvas); }

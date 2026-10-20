@@ -1,5 +1,5 @@
 /*
- * ★V8 リッチメニューの一覧（Pencil `rZEGN`・1152 `Y9ASp`・閲覧のみ `ZoKow`・窓 `yOyCg`）。
+ * ★V8 リッチメニューの一覧（Pencil ・1152 ・閲覧のみ ・窓 ）。
  * 枠・見出し・数の帯・フォルダの列・道具の段の余白は型（ListPage）が持つ。
  * 寸法は globals.css の `--tpl-rml-*`。
  */
@@ -10,7 +10,7 @@
 /* 数の帯の数字は字の幅どおり（絵どおり。全体の既定は等幅）。 */
 .kpis [data-kpi-number] { font-variant-numeric: proportional-nums; }
 
-/* 見るだけの人への帯（ZoKow）。数の帯の上。薄い青の地・目の印・枠なし。 */
+/* 見るだけの人への帯。数の帯の上。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-rml-ro-after); }
 
 /* 道具の段：案内の帯は1行を取る。 */
@@ -22,7 +22,7 @@
 
 .perPageBox { flex-shrink: 0; }
 
-/* 1152 の板（Y9ASp）：案内の帯 → 1段目 → 2段目。 */
+/* 1152 の板：案内の帯 → 1段目 → 2段目。 */
 .narrowTools {
   display: flex;
   flex-basis: 100%;
@@ -97,7 +97,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 rZEGN の説明の行）。 */
+/* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
 .nameSub { padding-inline-start: var(--tpl-folder-dot-indent); }
 .audienceMain {
   display: block;

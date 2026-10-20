@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { createTag, createTagsBulk } from '@line-crm/db';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { tags } from './tags.js';
 
 let sql: Database.Database, db: D1Database, app: Hono<Env>;
@@ -13,8 +13,8 @@ beforeEach(() => {
   sql = fixture.raw;
   db = fixture.db;
   beforeBulkInsert = undefined;
-  // D1 run() returns rows for INSERT RETURNING; the generic fixture only models
-  // run() changes. Use real SQLite RETURNING here, never simulate uniqueness.
+  // D1 run returns rows for INSERT RETURNING; the generic fixture only models
+  // run changes. Use real SQLite RETURNING here, never simulate uniqueness.
   const prepare = db.prepare.bind(db);
   db.prepare = ((query: string) => {
     if (!/^INSERT OR IGNORE INTO tags/.test(query)) return prepare(query);

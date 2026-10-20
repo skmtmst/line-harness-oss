@@ -10,7 +10,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8「予約して送る」（M0393 段2「6. 予約して送る（書く欄から・テンプレートと画像も）」）。
+ * ★V8「予約して送る」（ 段2「6. 予約して送る（書く欄から・テンプレートと画像も）」）。
  *
  * 前は書く欄の上に「送る日時 ［日時を選ぶ］［この日時で予約する］」の段が出ていた
  * （オーナー指摘：嫌）。書く欄の下の［予約］から窓で開く。送るもの・すぐ選ぶ・
@@ -54,7 +54,7 @@ export default function ScheduleSendDialog({
   /** 書く欄の本文（送るもの） */
   content: string
   hasImage: boolean
-  /** B-6：準備済みの動画・ファイル（例：動画「説明.mp4」）。無いときは出さない。 */
+  /** ：準備済みの動画・ファイル（例：動画「説明.mp4」）。無いときは出さない。 */
   attachmentLabel?: string
   /** 日本時間の datetime-local */
   value: string

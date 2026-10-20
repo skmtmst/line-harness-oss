@@ -1,5 +1,5 @@
 /*
- * ★V8 統括のメンバー（Pencil `r4ARpV`）。頭・左の列は型（ListPage）。
+ * ★V8 統括のメンバー（Pencil ）。頭・左の列は型（ListPage）。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
  */
 .buttonIcon {
@@ -48,7 +48,7 @@
 .head,
 .row {
   display: grid;
-  /* 名前は 160 で守り、メールアドレスだけ伸び縮み（はみ出しは …＋title）。絵 r4ARpV（2026-10-08） */
+  /* 名前は 160 で守り、メールアドレスだけ伸び縮み（はみ出しは …＋title）。絵 （2026-10-08） */
   grid-template-columns: var(--tpl-hq-col-name) minmax(0, 1fr) var(--tpl-hq-col-role) var(--tpl-hq-col-scope) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action);
   align-items: center;
   column-gap: var(--tpl-hq-col-gap);

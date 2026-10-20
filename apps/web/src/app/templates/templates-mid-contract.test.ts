@@ -48,7 +48,7 @@ describe('点検・中: テンプレートの画面契約', () => {
   })
 
   it('中6: 素材の保存は成功を表示し、二度押しさせない', () => {
-    // 成功は共通 Notice のうまくいった帯（一覧へ戻る操作つき）で出す（★V7 共通部品その2 §1）。
+    // 成功は共通 Notice のうまくいった帯（一覧へ戻る操作つき）で出す（★管理画面 共通部品その2 §1）。
     expect(ASSET_EDITOR).toContain('保存しました')
     expect(ASSET_EDITOR).toContain('setSaved(true)')
     expect(ASSET_EDITOR).toContain('disabled={busy || Boolean(blocked)}')

@@ -8,7 +8,7 @@ const push = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 const preview = vi.fn()
 const create = vi.fn()
-vi.mock('@/lib/api-gap2', () => ({ bookingSeriesApi: { preview: (...a: unknown[]) => preview(...a), create: (...a: unknown[]) => create(...a) } }))
+vi.mock('@/lib/api/helpers/gap2', () => ({ bookingSeriesApi: { preview: (...a: unknown[]) => preview(...a), create: (...a: unknown[]) => create(...a) } }))
 vi.mock('@/components/shared/toast', () => ({ notifySaved: vi.fn(), notifyToast: vi.fn() }))
 const { default: SeriesBookingDrawer } = await import('./series-drawer')
 

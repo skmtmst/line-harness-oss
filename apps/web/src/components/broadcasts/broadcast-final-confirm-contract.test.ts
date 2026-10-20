@@ -1,16 +1,17 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const FORM = readFileSync(join(HERE, 'broadcast-form.tsx'), 'utf8')
+const FORM = readUiSource(join(HERE, 'broadcast-form.tsx'), 'utf8')
 const CONFIRM = readFileSync(join(HERE, '..', 'shared', 'confirm-dialog.tsx'), 'utf8')
 
 /**
  * 一斉配信の最終確認（設計 `FpgxH` 6-1-H）。
  *
- * ここまでは「配信を予約する」が `save()` を直に呼び、**押した瞬間に
+ * ここまでは「配信を予約する」が `save` を直に呼び、**押した瞬間に
  * 1,000人以上へ予約が入っていました。** 何人に・いつ・何を送るのかを
  * 読み合わせる場所がありませんでした。
  */

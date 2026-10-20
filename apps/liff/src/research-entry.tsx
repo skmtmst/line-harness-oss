@@ -1,8 +1,8 @@
 import liff from '@line/liff';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import Research from './pages/Research.js';
-import Form from './pages/Form.js';
+import Research from './pages/research.js';
+import Form from './pages/form.js';
 import { setLiffContext } from './lib/liff-auth.js';
 import './index.css';
 import './research-entry.css';

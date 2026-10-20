@@ -21,7 +21,7 @@ const banners = [listPage, projectPage, panel, modal, projects, library, shell]
 /**
  * 統括のバナー生成の画面が、設計と共通ルールから外れていないかを見張る。
  * 動きの正本は `docs/hq-banner-generation.md`、見た目の正本は Pencil ★V8（`docs/v8-design-rules.md`）。
- * 当時の下書き v6-35 は本線に入らなかった（原本なし）。
+ * 当時の下書き 管理画面-35 は本線に入らなかった（原本なし）。
  */
 describe('統括 バナー生成', () => {
   it('統括メニューに「バナー生成」があり、行き先は /hq/banners', () => {
@@ -57,7 +57,7 @@ describe('統括 バナー生成', () => {
     expect(projectPage).toContain('api.hqBanners.projects.createGeneration(')
     expect(projectPage).toContain('api.hqBanners.generations.get(current.id)')
     expect(projectPage).toContain("if (!['queued', 'running'].includes(current.status)) break")
-    expect(projectPage).toContain('setGenerationError(caught instanceof Error')
+
     expect(projectPage).toContain('api.hqBanners.generations.cancel(running.id)')
     // 画面を離れて戻ったとき、途中の生成があれば続きから動かす
     expect(projectPage).toContain('activeGeneration(generations)')
@@ -82,7 +82,7 @@ describe('統括 バナー生成', () => {
   /*
    * 承認済み ★BG-B `qIp42` にあって実装に無かった2つ（2026-10-08 に足した）。
    * `ta8eS`「利用量」＝パネルの棒の上の見出し。共通部品の既定は変えず、名前（`usageHeading`）を1つ足して
-   * 板がそう描いている V8 だけが渡す。`b1So7a`「生成する（2枚）」＝下の帯のボタンで、v7 と同じ言葉。
+   * 板がそう描いている V8 だけが渡す。`b1So7a`「生成する（2枚）」＝下の帯のボタンで、管理画面 と同じ言葉。
    * パネルの見出し `S0ay0i`「画像を生成」とは別なので、パネル側に「生成する」は入れない（上の it が見張る）。
    */
   it('V8 は板 qIp42 の「利用量」と「生成する（N枚）」を持ち、既存の生成処理を使う', () => {
@@ -172,7 +172,7 @@ describe('統括 バナー生成', () => {
 
   it('参照画像を選ぶ（★BG-C `cOgWE`）: 複数選択して使い方つきで返す', () => {
     const picker = read('../../../components/hq/banners/reference-picker-dialog.tsx')
-    // 板IDは承認時に ★V8 `UcBQ5` から ★BG-C `cOgWE` へ改名した（同じダイアログ）
+    // 板IDは承認時に ★V8  から ★BG-C `cOgWE` へ改名した（同じダイアログ）
     expect(picker).toContain('designNode="cOgWE"')
     // 複数選択・選択順・使い方の受渡しはreference-picker-v8.test.tsxが実DOMで検証する。
     expect(picker).toContain('data-design-node="JOi8G"')

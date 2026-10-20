@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
- * レシピ。設計 ★V6 34-2 / 34-3。台帳 #134。
+ * レシピ。設計 ★34-2 / 34-3。台帳 #134。
  *
  * 守りたいのは 2 点。
  *   **部分的に作らない**（半分だけ残ると、何を消せばよいか分からない）

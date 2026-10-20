@@ -1,3 +1,5 @@
+> 文書：流入リンクを作る（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 流入リンクを作る（V8）の動き
 
 入口：`app/inflow-links/new/page.tsx`（`src/v8/inflow-links/new/create.tsx` に固定）。

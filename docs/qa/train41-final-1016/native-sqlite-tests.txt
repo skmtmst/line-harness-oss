@@ -1,9 +1,0 @@
-元の全ログ（変更せず保存）: /tmp/train41-resume-1016/native-sqlite-tests.log
-
- RUN  v3.2.7 /Users/kentakenta/lh-work/lh-train-41/apps/web
- ✓ src/app/mileage/earning-rules-order-react.test.tsx (3 tests) 2296ms
- ✓ src/app/automations/new/automation-create-draft-safety.test.tsx (10 tests) 4603ms
- Test Files  2 passed (2)
-      Tests  13 passed (13)
-   Start at  18:50:11
-   Duration  5.82s (transform 1.86s, setup 35ms, collect 1.75s, tests 6.90s, environment 409ms, prepare 73ms)

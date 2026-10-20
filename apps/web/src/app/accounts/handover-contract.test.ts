@@ -7,12 +7,12 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '../../v8/accounts-detail/handover.tsx'), 'utf8')
 
 /**
- * 乗り換え・引き継ぎ（設計 ★V6 33-4 `nx3XW`）。点検 #496 の項目3・10。
+ * 乗り換え・引き継ぎ（設計 ★管理画面 33-4 `nx3XW`）。点検 #496 の項目3・10。
  *
  * **「本実行へ進む」は確認窓つきで本実行の口へつながる**こと。
  * 決め残しがある間は押せない。
  */
-describe('V6 33-4 乗り換えの本実行', () => {
+describe("管理画面 33-4 乗り換えの本実行", () => {
   it('本実行の口へ確認窓つきでつなぐ', () => {
     expect(PAGE).toContain('api.accountHandovers.execute')
     expect(PAGE).toContain('ConfirmDialog')
@@ -33,7 +33,7 @@ describe('V6 33-4 乗り換えの本実行', () => {
   })
 
   it('実行の結果と失敗をはっきり言う', () => {
-    // 終わった知らせは Toast（右下・4秒）へ。失敗は危険の帯に残す（★V7 共通部品その2 §1・§2）。
+    // 終わった知らせは Toast（右下・4秒）へ。失敗は危険の帯に残す（★管理画面 共通部品その2 §1・§2）。
     expect(PAGE).toContain('本実行が終わりました')
     expect(PAGE).toContain('notifyToast(')
     expect(PAGE).toContain('<Notice tone="danger"')

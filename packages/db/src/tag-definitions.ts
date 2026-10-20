@@ -1,10 +1,5 @@
-import {
-  assertTagNameAvailable,
-  getTagDeleteImpact,
-  tagRetroactiveEnqueueStatements,
-  type Tag,
-  type TagDeleteImpactReferences,
-} from './tags.js';
+import { assertTagNameAvailable, getTagDeleteImpact, tagRetroactiveEnqueueStatements } from './tags/index.js';
+import { type Tag, type TagDeleteImpactReferences } from './tags/types/index.js';
 import { jstNow } from './utils.js';
 
 export type TagLinkedAction = {

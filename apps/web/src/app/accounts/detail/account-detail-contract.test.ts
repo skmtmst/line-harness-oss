@@ -27,7 +27,7 @@ const account = (over: Partial<LineAccount> = {}): LineAccount => ({
   ...over,
 })
 
-/** LINEアカウントの詳細・編集（設計 ★V6 33-3 `T9rA9`）。 */
+/** LINEアカウントの詳細・編集（設計 ★管理画面 33-3 `T9rA9`）。 */
 describe('V8 LINEアカウントの詳細・編集', () => {
   it('設計の4タブを持つ', () => {
     expect(DETAIL_TABS).toEqual(['overview', 'connection', 'credentials', 'handover'])
@@ -49,7 +49,7 @@ describe('V8 LINEアカウントの詳細・編集', () => {
 
   it('?id= なしで開いたとき、無限ローディングにせず一覧へ戻す', () => {
     /*
-      `load()` は `!id` で何もせず帰るので、ガードがないと
+      `load` は `!id` で何もせず帰るので、ガードがないと
       「読み込んでいます」が消えない（監査 Issue #1058）。
       対象未指定は失敗ではないので、再読み込みではなく一覧への口を出す。
     */

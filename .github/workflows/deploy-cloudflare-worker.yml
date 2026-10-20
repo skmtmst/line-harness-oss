@@ -1,255 +1,91 @@
 name: Deploy Cloudflare Worker
 
 on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/worker/**'
-      - 'apps/liff/**'
-      - 'packages/db/**'
-      - 'packages/shared/**'
-      - 'packages/line-sdk/**'
-      - 'packages/update-engine/**'
-      - 'scripts/deploy/apply-d1-migrations.sh'
-      - '.github/workflows/deploy-cloudflare-worker.yml'
+  workflow_call:
+    inputs:
+      operations_paused:
+        type: boolean
+        required: true
+      release_sha:
+        type: string
+        required: true
+      staging_run_id:
+        type: string
+        required: true
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   deploy:
-    if: github.repository != 'Shudesu/line-harness-oss' && vars.LINE_HARNESS_CLOUDFLARE_DEPLOY == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.workflow_ref == format('{0}/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main', github.repository)
+    environment: production
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PAGES_PROJECT_NAME: ${{ vars.PAGES_PROJECT_NAME }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ vars.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      OPERATIONS_PAUSED: ${{ inputs.operations_paused }}
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      STAGING_RUN_ID: ${{ inputs.staging_run_id }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
+      D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
+      D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+      SECURITY_WORKER_NAME: ${{ vars.WORKER_NAME }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify immutable release checkout before dependency installation
+        shell: bash
+        run: |
+          [[ "$RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_REF" = refs/heads/main
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_WORKFLOW_REF" = "$GITHUB_REPOSITORY/.github/workflows/deploy-cloudflare-production.yml@refs/heads/main"
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git fetch --no-tags origin main >/dev/null 2>&1
+          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          git merge-base --is-ancestor "$RELEASE_SHA" FETCH_HEAD
+          test "$(git rev-parse HEAD^{tree})" = "$(git rev-parse FETCH_HEAD^{tree})"
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
-
       - run: pnpm install --frozen-lockfile
-
-      - name: Check source deployment security settings before DB work (read only)
+      - name: Verify release authorization
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SECURITY_WORKER_NAME: ${{ vars.WORKER_NAME || 'your-worker-name' }}
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm exec tsx scripts/deploy/production/run.ts preflight
+      - name: Check source deployment security settings (read only)
         run: pnpm exec tsx scripts/security/run-deployment-safety.ts production apps/worker/wrangler.toml
-      - run: pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-crm/db --filter @line-harness/update-engine build
-
-      # 当てる前の復元点を取っておく。
-      #
-      # 追加のみのポリシー（CONTRIBUTING.md §Migration Policy）で down
-      # マイグレーションを書けないので、戻る手段は Time Travel しかない。
-      # 事故ってから探すのでは遅いので、毎回ログとサマリーに残す。
-      #
-      # 未適用が無いときは取らない。取っても使い道が無く、
-      # 巻き戻し先として紛らわしいだけになる。
-      - name: Take a Time Travel bookmark before migrating
-        id: bookmark
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
-        run: |
-          test -n "$CLOUDFLARE_API_TOKEN"
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          test -n "$D1_DATABASE_NAME"
-
-          pending_file="$RUNNER_TEMP/d1-pending-migrations.txt"
-          : > "$pending_file"
-
-          npx wrangler d1 execute "$D1_DATABASE_NAME" --remote --command \
-            "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
-
-          applied=$(npx wrangler d1 execute "$D1_DATABASE_NAME" --remote \
-            --command "SELECT name FROM _migrations" --json \
-            | node -e "
-              const d = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
-              console.log((d[0]?.results ?? []).map((r) => r.name).join('\n'));
-            ")
-
-          count=0
-          for f in $(ls packages/db/migrations/*.sql | sort); do
-            name=$(basename "$f")
-            if ! printf '%s\n' "$applied" | grep -qxF "$name"; then
-              printf '%s\n' "$f" >> "$pending_file"
-              count=$((count + 1))
-            fi
-          done
-
-          {
-            echo "## D1 マイグレーション"
-            echo
-            echo "未適用: ${count} 件"
-            if [ "$count" -gt 0 ]; then
-              echo
-              echo '```'
-              sed 's#^packages/db/migrations/##' "$pending_file"
-              echo '```'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "$count" = "0" ]; then
-            echo "未適用のものはありません。復元点は取りません。"
-            exit 0
-          fi
-
-          raw=$(npx wrangler d1 time-travel info "$D1_DATABASE_NAME" --json)
-          echo "$raw"
-
-          bookmark=$(printf '%s' "$raw" | node -e "
-            const text = require('fs').readFileSync('/dev/stdin', 'utf8');
-            let found = '';
-            try {
-              const d = JSON.parse(text);
-              found = d.bookmark ?? d.result?.bookmark ?? '';
-            } catch {
-              // wrangler が JSON 以外を混ぜることがあるので、拾えなければ次へ
-            }
-            if (!found) {
-              const m = text.match(/[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}/i);
-              found = m ? m[0] : '';
-            }
-            process.stdout.write(found);
-          ")
-
-          if [ -z "$bookmark" ]; then
-            echo "::error::Time Travel のブックマークを取れませんでした。戻る先が無いので中止します。"
-            exit 1
-          fi
-
-          {
-            echo
-            echo "### 復元点"
-            echo
-            echo '```bash'
-            echo "npx wrangler d1 time-travel restore $D1_DATABASE_NAME --bookmark=$bookmark"
-            echo '```'
-            echo
-            echo "この時点まで巻き戻すので、当てたあとに入った友だち・"
-            echo "メッセージ・予約も一緒に消えます。"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Run pending D1 migrations
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
-        run: |
-          bash scripts/deploy/apply-d1-migrations.sh \
-            "$D1_DATABASE_NAME" "$RUNNER_TEMP/d1-pending-migrations.txt"
-
-      # 生成物の置き場所は build が決める。workflow 側で決め打ちしない。
-      #
-      # 正本は apps/worker/wrangler.toml の name。
-      # @cloudflare/vite-plugin は worker 名の - を _ に直した名前の
-      # Vite 環境を作り、その環境名のフォルダへ wrangler.json を出す。
-      # 改名してもここだけ読めば追従する。
-      - name: Resolve worker build artifact path
-        run: |
-          worker_name=$(sed -n 's/^name[[:space:]]*=[[:space:]]*"\(.*\)"$/\1/p' apps/worker/wrangler.toml | head -n 1)
-          if [ -z "$worker_name" ]; then
-            echo "::error::apps/worker/wrangler.toml から worker 名を読めませんでした。"
-            exit 1
-          fi
-          worker_env=$(printf '%s' "$worker_name" | tr '-' '_')
-          if [ -z "$worker_env" ]; then
-            echo "::error::worker の出力名を導出できませんでした(name=$worker_name)。"
-            exit 1
-          fi
-          echo "WORKER_DEPLOY_CONFIG=dist/${worker_env}/wrangler.json" >> "$GITHUB_ENV"
-          echo "配備設定の生成物: dist/${worker_env}/wrangler.json (正本のname=$worker_name)"
-
+      - name: Refuse Worker deployment while any D1 migration is pending (read only)
+        run: pnpm exec tsx scripts/deploy/production/run.ts no-pending
       - name: Build Worker and LIFF assets
         run: pnpm --filter worker build
         env:
           VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
-          VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
-
-      # build の直後に生成物の有無と中身を確かめる。
-      # 無いまま進むと patch や deploy が分かりにくい失敗になるので、
-      # ここで理由付きで止める。
-      - name: Verify worker build artifact
-        run: |
-          test -n "$WORKER_DEPLOY_CONFIG"
-          if [ ! -f "apps/worker/$WORKER_DEPLOY_CONFIG" ]; then
-            echo "::error::worker build の生成物がありません: apps/worker/$WORKER_DEPLOY_CONFIG"
-            echo "apps/worker/dist の中身:"
-            ls -R apps/worker/dist || true
-            exit 1
-          fi
-          node -e '
-            const fs = require("fs");
-            const target = `apps/worker/${process.env.WORKER_DEPLOY_CONFIG}`;
-            const config = JSON.parse(fs.readFileSync(target, "utf8"));
-            const flags = config.compatibility_flags ?? [];
-            const required = ["nodejs_compat", "global_fetch_strictly_public"];
-            const missing = required.filter((flag) => !flags.includes(flag));
-            if (missing.length > 0) {
-              console.error(`::error::${target} に ${missing.join(", ")} がありません: ${JSON.stringify(flags)}`);
-              process.exit(1);
-            }
-            console.log(`互換flag: ${JSON.stringify(flags)}`);
-          '
-
-      - name: Patch wrangler config
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
-          D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
-          WORKER_NAME: ${{ vars.WORKER_NAME || 'your-worker-name' }}
-          # Admin CORS config — set these as repo Variables when the admin panel
-          # and the Worker API are on different origins (e.g. *.pages.dev admin
-          # + *.workers.dev API). Baking them into the deployed config (vars)
-          # means every deploy carries them, so they can't be silently dropped
-          # the way a manually-set dashboard variable is on redeploy.
-          ADMIN_ORIGIN: ${{ vars.ADMIN_ORIGIN }}
-          ADMIN_ALLOW_CROSS_SITE: ${{ vars.ADMIN_ALLOW_CROSS_SITE }}
-          WORKER_URL: ${{ vars.WORKER_URL }}
-        run: |
-          test -n "$D1_DATABASE_ID"
-          test -n "$WORKER_DEPLOY_CONFIG"
-          cd apps/worker
-          if [ ! -f "$WORKER_DEPLOY_CONFIG" ]; then
-            echo "::error::配備設定の生成物がありません: apps/worker/$WORKER_DEPLOY_CONFIG"
-            exit 1
-          fi
-          sed -i \
-            -e "s|\"account_id\":\"[^\"]*\"|\"account_id\":\"${CLOUDFLARE_ACCOUNT_ID}\"|g" \
-            -e "s|\"database_name\":\"[^\"]*\"|\"database_name\":\"${D1_DATABASE_NAME}\"|g" \
-            -e "s|\"database_id\":\"[^\"]*\"|\"database_id\":\"${D1_DATABASE_ID}\"|g" \
-            "$WORKER_DEPLOY_CONFIG"
-          # Inject admin CORS vars into the deployed config when ADMIN_ORIGIN is
-          # set. ADMIN_ALLOW_CROSS_SITE defaults to "true" (SameSite=None; Secure
-          # cookies) since cross-origin admin/API is the case that needs it.
-          if [ -n "$ADMIN_ORIGIN" ]; then
-            tmp="$(mktemp)"
-            jq --arg o "$ADMIN_ORIGIN" --arg x "$ADMIN_ALLOW_CROSS_SITE" --arg w "$WORKER_URL" '
-              .vars.ADMIN_ORIGIN = $o
-              | .vars.ADMIN_ALLOW_CROSS_SITE = (if $x == "" then "true" else $x end)
-              | (if $w != "" then .vars.WORKER_URL = $w else . end)
-            ' "$WORKER_DEPLOY_CONFIG" > "$tmp" && mv "$tmp" "$WORKER_DEPLOY_CONFIG"
-            echo "Patched admin CORS vars: ADMIN_ORIGIN=$ADMIN_ORIGIN ADMIN_ALLOW_CROSS_SITE=${ADMIN_ALLOW_CROSS_SITE:-true}"
-          fi
-
-
-      - name: Check deployment security settings (read only)
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SECURITY_WORKER_NAME: ${{ vars.WORKER_NAME || 'your-worker-name' }}
+      - name: Verify worker build artifact and static security headers
+        # Resolve dist/<environment>/wrangler.json from the canonical TOML name.
+        # Verify compatibility_flags: nodejs_compat and global_fetch_strictly_public.
+        run: pnpm exec tsx scripts/deploy/production/run.ts worker-artifact
+      - name: Check generated deployment security settings (read only)
         run: pnpm exec tsx scripts/security/run-deployment-safety.ts production "apps/worker/$WORKER_DEPLOY_CONFIG"
-
+      - name: Recheck release authorization immediately before publishing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pnpm exec tsx scripts/deploy/production/run.ts preflight
+      - name: Recheck D1 is fully applied (read only)
+        run: pnpm exec tsx scripts/deploy/production/run.ts no-pending
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: apps/worker
-          command: deploy --config ${{ env.WORKER_DEPLOY_CONFIG }} --name ${{ vars.WORKER_NAME || 'your-worker-name' }}
+        run: pnpm exec tsx scripts/deploy/production/run.ts deploy-worker
+      - name: Verify public Worker revision
+        run: node scripts/deploy/verify-public-build.mjs https://api.musubo.jp "$RELEASE_SHA" - -
+      - name: Verify HTML, static assets, JSON and error security headers
+        run: pnpm exec tsx scripts/deploy/production/run.ts worker-responses

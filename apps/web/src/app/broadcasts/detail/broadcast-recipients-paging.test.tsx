@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({ recipients: vi.fn(), retryFailed: vi.fn() }))
-vi.mock('@/lib/api', () => ({ api: { broadcasts: { recipients: fixture.recipients, retryFailed: fixture.retryFailed } } }))
+vi.mock('@/lib/api', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/api')>()), api: { broadcasts: { recipients: fixture.recipients, retryFailed: fixture.retryFailed } } } ))
 
 import BroadcastRecipients, { RECIPIENT_CSV_MAX_PAGES } from './broadcast-recipients'
 

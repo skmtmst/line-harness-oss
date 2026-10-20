@@ -1,15 +1,15 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 /*
- * ★V8「予約して送る」（M0393 段2「6. 予約して送る」）の「すぐ選ぶ」。
+ * ★V8「予約して送る」（ 段2「6. 予約して送る」）の「すぐ選ぶ」。
  * 入力欄は日本時間の datetime-local（YYYY-MM-DDTHH:mm）の約束（INBOX-21）なので、
  * 端末の時間帯ではなく日本時間で数える。
  */
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
 /** 日本時間の年・月・日・時・分を、UTC の器に入れた Date で返す（getUTC* で読む）。 */
 function jstClock(now: Date): Date {
-  return new Date(now.getTime() + JST_OFFSET_MS)
+  return japanCalendar(now)
 }
 
 /** 日本時間の暦の上の日時（器は UTC）を datetime-local の文字にする。 */

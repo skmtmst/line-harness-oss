@@ -1,12 +1,14 @@
+> 文書：シナリオ配信の編集の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # シナリオ配信の編集の動き（BEHAVIOR.md）
 
 対象：`detail.tsx`（★V8 稼働中 `PMLkX`・始めた直後 `nMSiE`・停止中 `ARuZ4`・競合 `kz2B6`、窓：止める確認 `OPGU2`・複製 `Al4Ek`・開始の確認 `F1LK4e`）。
-今までの V8 `app/scenarios/detail/detail-v8.tsx` から動きを写し、見た目だけを絵の寸法（`--tpl-sd-*`）で組み直した。
+今までの V8 [現役の入口・本体](README.md) から動きを写し、見た目だけを絵の寸法（`--tpl-sd-*`）で組み直した。
 `start-checklist.ts`・`scenario-reach-display.ts`・`scenario-step-audience.ts`・`scenario-simulation-refresh.ts` は `app/scenarios` からの写し（src/v8 は @/app を読めない）。
 
 ## 入口
 - `app/scenarios/detail/page.tsx` はこの画面に固定。
-- 古いV8の写し・旧V7詳細は2026-10-11に削除。旧詳細の動作試験は現役へ移した。記録は `docs/v7-removal-1011.md`。
+- 動作試験は現役の本体を検査する。過去の記録の保管先は `docs/document-archives.md`。
 
 ## 受け付ける URL と指定
 - `?id=<シナリオ>`（無ければ入口が「見るシナリオが指定されていません」）。

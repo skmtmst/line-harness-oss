@@ -1,4 +1,4 @@
-import {createBroadcastRetryKey} from './broadcast-retry-key.js';
+import {createBroadcastRetryKey} from '../features/broadcasts/broadcast-retry-key/index.js';
 import {hashOutboundPayload,reserveOutboundSend,completeOutboundSendStatement,failOutboundSend,classifyLineOutboundFailure,type OutboundChannel} from './outbound-idempotency.js';
 
 export class NotificationDeliveryIncomplete extends Error {

@@ -1,11 +1,12 @@
 'use client'
 
+import { useStaffIdentity, useStaffRole, isOwnerRole, canManageRole } from '@/lib/staff-role'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
 import { splitCsvRecords } from './friend-csv'
 import { formatNumber } from '@/lib/format'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 
 /*
  * ★V8 の写し（app/accounts/use-uid-migration.ts から。src/v8 は @/app を読めない）。
@@ -86,8 +87,8 @@ export const decisionLabel = { pending: '未判断', link: '結び付ける', cr
 /** 失敗応答の日本語だけを画面へ出す。内部文言・HTML は ApiError が捨てている。 */
 function apiErrorMessage(error: unknown, fallback: string): string {
   // 「API error: 500」のような内部の文は出さない。画面で作った日本語の文はそのまま出す。
-  if (error instanceof ApiError) return japaneseDetailOf(error) || fallback
-  if (error instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(error.message)) return error.message
+  if (error instanceof ApiError && !japaneseDetailOf(error)) return fallback
+  if (error instanceof Error) return describeApiFailure(error, 'UID移行')
   return fallback
 }
 
@@ -95,7 +96,7 @@ export type UidMigrationDecision = 'link' | 'create' | 'exclude'
 
 /**
  * UID移行（/accounts?tab=migration）の状態と操作をまとめたフック。
- * v7 の表示（migration.tsx）と V8 の表示（uid-migration-v8.tsx）の
+ * 管理画面 の表示（migration.tsx）と V8 の表示（uid-migration-v8.tsx）の
  * 両方がこの口を使う。判断・実行・切り戻しの権限と失敗時の
  * 扱い（TECH-07/FRIEND-14/33/36）はここで一元管理する。
  */
@@ -121,7 +122,9 @@ export function useUidMigration(initialRunId: string | null = null) {
   const detailTicket = useRef(0)
   const [detailBusy, setDetailBusy] = useState(false)
   /* FRIEND-33/36: 実行・切り戻しの権限と作成者判定に使う自分自身の情報。 */
-  const [me, setMe] = useState<{ id: string; role: string } | null>(null)
+  const identity = useStaffIdentity()
+  const staffRole = useStaffRole()
+  const me = identity && staffRole ? { id: identity.id, role: staffRole } : null
   /* FRIEND-14: 「詳細を見る」は読み取り専用。判断はダイアログ内の明示操作だけ。 */
   const [detailItem, setDetailItem] = useState<UidMigrationItem | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
@@ -186,18 +189,7 @@ export function useUidMigration(initialRunId: string | null = null) {
     } catch {
       setStatus('error')
     }
-    /*
-      実行権限の案内用に自分のid/roleだけ取る。失敗しても画面は出す
-      （実行可否はサーバーが最終判断する）。
-    */
-    try {
-      const meResponse = await api.staff.me()
-      if (meResponse.success && meResponse.data) {
-        setMe({ id: meResponse.data.id, role: meResponse.data.role })
-      }
-    } catch {
-      /* 権限が読めなくても操作自体はサーバーが止める */
-    }
+
   }, [loadDetail, initialRunId])
 
   useEffect(() => { void load() }, [load])
@@ -220,6 +212,7 @@ export function useUidMigration(initialRunId: string | null = null) {
   }
 
   const createDryRun = async () => {
+    if (!canManageRole(me?.role) || busy) return
     if (!file || mappings.length === 0 || !fromAccountId || !toAccountId || !purpose.trim()) {
       setMessage('移行元・移行先・利用目的と、old_uid / new_uid 列を持つCSVを選んでください。')
       return
@@ -248,7 +241,7 @@ export function useUidMigration(initialRunId: string | null = null) {
   }
 
   const decide = async (item: UidMigrationItem, decision: UidMigrationDecision) => {
-    if (!active || busy || detailBusy) return
+    if (!canManageRole(me?.role) || !active || busy || detailBusy) return
     setBusy(true)
     setMessage(null)
     setDetailError(null)
@@ -290,11 +283,11 @@ export function useUidMigration(initialRunId: string | null = null) {
     作成者本人・owner以外はここで理由を示し、確定ボタンを出さない
     （サーバー側でも 409/403 で拒否する）。
   */
-  const canRunExecute = me ? me.role === 'owner' && me.id !== active?.createdBy : true
-  const canRunRollback = me ? me.role === 'owner' : true
+  const canRunExecute = Boolean(me && isOwnerRole(me.role) && me.id !== active?.createdBy)
+  const canRunRollback = Boolean(me && isOwnerRole(me.role))
 
   const execute = async () => {
-    if (!active || busy) return
+    if (!canRunExecute || !active || busy) return
     setBusy(true)
     setExecuteError(null)
     try {
@@ -349,7 +342,7 @@ export function useUidMigration(initialRunId: string | null = null) {
     対象件数・制約・権限を示し、競合があればサーバーの409をそのまま表示する。
   */
   const rollback = async () => {
-    if (!active || busy) return
+    if (!canRunRollback || !active || busy) return
     setBusy(true)
     setRollbackError(null)
     setRollbackConflicts([])

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { choiceOf, funnelMatchFor, funnelStepPrimaryKey, kindNeedsValue } from './funnel-form'
 
 /*
- * ★V8「ファネルを作る」（VDPz5）：何をしたらの選ぶ欄は種類と相手を1つにまとめる。
+ * ★V8「ファネルを作る」：何をしたらの選ぶ欄は種類と相手を1つにまとめる。
  * 保存の形（match）は今の画面と同じであること・一覧に無い相手は「ほかの条件」へ回ることを見張る。
  */
 const targets = [

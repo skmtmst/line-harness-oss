@@ -1,7 +1,9 @@
+> 文書：運用者へのお知らせを作る・なおす（★V8 gjUz3・hiBO8・公開前の確認 sDXNy）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 運用者へのお知らせを作る・なおす（★V8 gjUz3・hiBO8・公開前の確認 sDXNy）
 
-画面：`operator-edit.tsx`。入口：`app/line-notifications/operator/new/page.tsx`（V8 だけ。v7 の作成画面は 2026-10-04 に捨てた）。
-今まで動いていた画面 `app/line-notifications/operator/new/operator-new-v8.tsx` から、データの口と動きを写した。
+画面：`operator-edit.tsx`。入口：`app/line-notifications/operator/new/page.tsx`（V8を直接表示）。
+今まで動いていた画面 [現役の入口・本体](README.md) から、データの口と動きを写した。
 
 ## 受け付ける URL と指定
 - `/line-notifications/operator/new`：作る（題「運用者へのお知らせを作る」、板 gjUz3）

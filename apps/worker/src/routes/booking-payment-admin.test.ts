@@ -1,9 +1,10 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
-import { paymentPeriod, paymentSummary } from '../services/booking-payment-admin.js';
+import { useSqliteClock } from '../test-utils/sqlite-clock.js';
+import { paymentPeriod, paymentSummary } from '../features/booking/booking-payment-admin.js';
 const access=vi.hoisted(()=>({allow:true}));
 vi.mock('../services/account-access.js',()=>({
   canAccessAllLineAccounts:vi.fn(async()=>access.allow),canAccessLineAccount:vi.fn(async()=>access.allow),
@@ -31,14 +32,13 @@ function booking(id:string,account='a',status='requested',starts='2026-10-15T03:
 }
 function payment(id:string,status='paid',account='a',created='2026-10-10T04:00:00Z',paid:string|null='2026-10-10T04:00:00Z',updated='2026-10-10T04:00:00Z') {
   booking(id+'b',account);
-  // The route compares hold_until with SQLite's real clock, not Vitest's frozen JS clock.
-  // Keep the default fixture unexpired; expiration tests set their own past deadline.
+  // Keep the default fixture unexpired; expiration and clock-skew tests set their own deadline.
   f.raw.prepare(`INSERT INTO booking_payments(id,line_account_id,booking_id,amount,status,provider,provider_payment_id,idempotency_key,created_at,updated_at,paid_at,hold_until)
     VALUES(?,?,?,1000,?,'stripe',?,?,?,?,?,?)`).run(id,account,id+'b',status,`pi_test_${id}b`,id+'b',created,updated,paid,'2099-12-31T00:00:00Z');
 }
 beforeEach(()=>{
   vi.useFakeTimers();vi.setSystemTime(now);vi.stubGlobal('fetch',vi.fn(async()=>{throw new Error('外部通信は禁止');}));
-  f=createTestD1();seedAssignmentFixture(f);access.allow=true;role='owner';readOnly=false;sequence=0;
+  f=createTestD1({now:()=>new Date()});seedAssignmentFixture(f);access.allow=true;role='owner';readOnly=false;sequence=0;
   f.raw.exec(`INSERT INTO friends(id,line_user_id,display_name,line_account_id) VALUES('f','Utest','山田','a'),('fb','Uother','別店の秘密','b');
     INSERT INTO menus(id,line_account_id,name,duration_minutes,base_price) VALUES('mb','b','別店のメニュー',30,1000);
     INSERT INTO events(id,line_account_id,name) VALUES('ev','a','試験クラス'),('evb','b','別クラス');
@@ -219,6 +219,24 @@ describe('範囲・未準備・模擬リンク',()=>{
     payment('other','pending','b');payment('old','pending');payment('paid');
     f.raw.exec("UPDATE booking_payments SET hold_until='2026-10-01T00:00:00Z' WHERE id='old'");
     for(const id of ['other','old','paid'])expect((await request(path(`payments/${id}/send-link`),'POST',{dryRun:true})).status).toBe(404);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it.each(['unpaid','pending'])('SQLの時計がずれていても%sのリンク期限を開始処理と同じ時計で守る',async status=>{
+    f.raw.exec(`INSERT INTO booking_payment_configs VALUES('a','online','stripe',30,'2026-10-01','2026-10-01')`);
+    let databaseNow=new Date(now.getTime()+86400000);
+    useSqliteClock(f.raw,()=>databaseNow);
+    for (const [id,offset,expected] of [['future',1,200],['boundary',0,404],['past',-1,404],['unlimited',null,200]] as const) {
+      payment(id,status);
+      // SQLが進んでいても期限内なら利用可能。SQLが遅れていても期限と同時から拒否する。
+      databaseNow=new Date(now.getTime()+(expected===200?86400000:-86400000));
+      f.raw.prepare('UPDATE booking_payments SET hold_until=? WHERE id=?')
+        .run(offset===null?null:new Date(now.getTime()+offset).toISOString(),id);
+      const response=await request(path(`payments/${id}/send-link`),'POST',{dryRun:true});
+      expect(response.status).toBe(expected);
+      if(expected===200)expect(await response.json()).toMatchObject({data:{paymentId:id,sent:false,simulation:true}});
+      else expect(await response.json()).toMatchObject({error:'payment_not_available'});
+    }
+    expect(f.raw.prepare('SELECT COUNT(*) n FROM booking_payments').get()).toEqual({n:4});
     expect(fetch).not.toHaveBeenCalled();
   });
 });

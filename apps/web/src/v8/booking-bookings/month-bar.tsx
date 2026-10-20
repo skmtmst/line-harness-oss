@@ -7,7 +7,7 @@ import IconButton from '@/components/shared/icon-button'
 import styles from './month-bar.module.css'
 
 /*
- * 予約管理「今月」（R8tlbw）の数の帯の下の1段。
+ * 予約管理「今月」の数の帯の下の1段。
  * 左＝月送り（‹ › 年月 ［今日］）、右＝友だち予約URL・予約履歴URLをコピーする。
  * 下に「今月（2026年10月）の予約を「全件」で表示しています。」の1行。
  * 一覧（view=list）は月送りを出さず、URLの2つだけを右に置く。

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { ecTextMessage, type EcEvent } from './ec-integrations.js';
+import { ecTextMessage } from './ec-integrations.js';
+import { type EcEvent } from '../features/ec-commerce/member-snapshot.js';
 
 function event(eventType: string): EcEvent {
   return {

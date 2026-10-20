@@ -1,3 +1,5 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+import { cloneScenarioQuestion, isSelectableScenarioTemplate } from '../../v8/scenario-detail/question-template-model'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -5,9 +7,8 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const page = readFileSync(join(HERE, '../../v8/templates/question-new.tsx'), 'utf8')
-const templates = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
+const templates = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 const css = readFileSync(join(HERE, '../../v8/templates/question-new.module.css'), 'utf8')
-const scenarios = readFileSync(join(HERE, '..', '..', 'v8', 'scenario-detail', 'detail.tsx'), 'utf8')
 const editor = readFileSync(join(HERE, '..', '..', 'components', 'scenarios', 'question-editor.tsx'), 'utf8')
 
 describe('V8 質問テンプレート', () => {
@@ -22,7 +23,7 @@ describe('V8 質問テンプレート', () => {
   it('既存の質問エンジンを再利用し、プレビューと利用先を同じ画面で確認できる', () => {
     expect(page).toContain('<QuestionEditor')
     expect(page).toContain('choiceColumns')
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    // : 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(page).toContain('<LinePreview')
     expect(page).toContain('答えをどこに残すか')
     expect(page).toContain('この質問を使う場所')
@@ -44,8 +45,18 @@ describe('V8 質問テンプレート', () => {
     expect(page).toContain("save('draft')")
     expect(page).toContain("save('published')")
     expect(page).toContain('下書きを保存')
-    expect(scenarios).toContain("t.questionStatus === 'published'")
-    expect(scenarios).toContain('structuredClone(template.question)')
+    const question = { text: '選んでください', tapMode: 'single' as const, choices: [{ key: 'a', label: 'はい', behavior: 'none' as const }] }
+    const templates = [
+      { id: 'plain', question: null },
+      { id: 'ready', question, questionStatus: 'published' },
+      { id: 'draft', question, questionStatus: 'draft' },
+      { id: 'unknown', question },
+    ]
+    expect(templates.filter(isSelectableScenarioTemplate).map(template => template.id)).toEqual(['plain', 'ready'])
+    const editable = cloneScenarioQuestion(question)
+    editable.choices[0].label = '入力した内容'
+    expect(question.choices[0].label).toBe('はい')
+    expect(editable.choices[0].key).toBe('a')
   })
 })
 

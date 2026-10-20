@@ -1,3 +1,5 @@
+import { jstDate as japanDate, jstDateOffset as japanDateOffset } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import { serializeFunnel, funnelErrorStatus } from './analytics-funnel-display.js';
 import { bookingAudience } from './styles.js';
 
@@ -5,7 +7,10 @@ import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { getDailyMessageCounts, getLinkClickSummary, getTrackedLinkStats, getBroadcastSummary, buildFunnelResult, getFunnelsWithCurrentVersions, getLegacyFunnels, getFunnelById, getFunnelSteps, createFunnel, deleteFunnel, countFunnelStep, createVersionedFunnel, createFunnelVersion, getFunnelWithCurrentVersion, setFunnelStatus, runChronologicalFunnel, getLatestFunnelRun, createFunnelResultAudience, createAnalyticsCrossRun, getAnalyticsCrossRun, addConversionDefinitionUsage, createAnalyticsCrossAudience, getCurrentFunnelVersion, getAnalyticsFriendsOverview, getAnalyticsReactionsOverview, getAnalyticsRoutesOverview, getAnalyticsUrlClicksOverview, getAnalyticsUsageOverview, createSavedAnalyticsFromResult, getSavedAnalytics, getSavedAnalyticsSnapshots, ANALYTICS_REPORT_SECTIONS, createAnalyticsReportSchedule, getAnalyticsReportRuns, getAnalyticsReportSchedule, getRecentOneTimeAnalyticsReportRuns, getAnalyticsReportScheduleIncludingArchived, getAnalyticsReportSchedules, requeueOneTimeAnalyticsReportSchedule, setAnalyticsReportScheduleStatus, updateAnalyticsReportSchedule, getStaffMembers, getStaffAccountScopeIds, getLineAccountById, DEFAULT_TENANT_ID, FUNNEL_STEP_KINDS, type FunnelStepKind, type AnalyticsOverviewContext, type AnalyticsReportAlertRule, type AnalyticsReportChannel, type AnalyticsReportRecipient, type AnalyticsReportSection } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
@@ -48,11 +53,11 @@ const MAX_RANGE_DAYS = 366;
 function readRange(
   c: { req: { query: (k: string) => string | undefined } },
 ): { ok: true; value: { from: string; to: string } } | { ok: false; error: string; field?: string } {
-  const jstNow = new Date(Date.now() + 9 * 3600_000);
-  const toRaw = c.req.query('to') ?? jstNow.toISOString().slice(0, 10);
+  const now = new Date();
+  const toRaw = c.req.query('to') ?? japanDate(now);
   const fromRaw =
     c.req.query('from') ??
-    new Date(jstNow.getTime() - 30 * 24 * 3600_000).toISOString().slice(0, 10);
+    japanDateOffset(-30, now);
 
   if (!isExistingCalendarDate(fromRaw) || !isExistingCalendarDate(toRaw)) {
     return { ok: false, error: '期間は 2026-08-01 の形で指定してください' };
@@ -301,7 +306,7 @@ analytics.get('/api/analytics/friends', async (c) => {
     if (!context.ok) return context.response;
     return c.json({ success: true, data: await getAnalyticsFriendsOverview(c.env.DB, context.value) });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/friends"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -314,7 +319,7 @@ analytics.get('/api/analytics/reactions', async (c) => {
     if (!context.ok) return context.response;
     return c.json({ success: true, data: await getAnalyticsReactionsOverview(c.env.DB, context.value) });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/reactions"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -327,7 +332,7 @@ analytics.get('/api/analytics/routes', async (c) => {
     if (!context.ok) return context.response;
     return c.json({ success: true, data: await getAnalyticsRoutesOverview(c.env.DB, context.value) });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/routes"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -351,7 +356,7 @@ analytics.get('/api/analytics/url-clicks', async (c) => {
       data: await getAnalyticsUrlClicksOverview(c.env.DB, context.value, limit, query),
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/url-clicks"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -364,7 +369,7 @@ analytics.get('/api/analytics/usage', async (c) => {
     if (!context.ok) return context.response;
     return c.json({ success: true, data: await getAnalyticsUsageOverview(c.env.DB, context.value) });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/usage"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -379,7 +384,7 @@ analytics.get('/api/analytics/messages', async (c) => {
     const items = await getDailyMessageCounts(c.env.DB, account.accountId, range.value);
     return c.json({ success: true, data: items });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/messages"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -395,7 +400,7 @@ analytics.get('/api/analytics/tracked-links', async (c) => {
     const items = await getTrackedLinkStats(c.env.DB, account.accountId, range.value);
     return c.json({ success: true, data: items });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/tracked-links"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -410,7 +415,7 @@ analytics.get('/api/analytics/link-clicks', async (c) => {
     const items = await getLinkClickSummary(c.env.DB, account.accountId, range.value);
     return c.json({ success: true, data: items });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/link-clicks"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -425,12 +430,12 @@ analytics.get('/api/analytics/broadcasts', async (c) => {
     const items = await getBroadcastSummary(c.env.DB, account.accountId, range.value);
     return c.json({ success: true, data: items });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/broadcasts"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
-// V6: クロス分析はCronで非同期実行し、HTTPの処理時間とD1負荷を固定する。
+// クロス分析はCronで非同期実行し、HTTPの処理時間とD1負荷を固定する。
 analytics.post('/api/analytics/cross/query', inputJsonBoundary(), async (c) => {
   try {
     const account = await resolveAccount(c);
@@ -459,7 +464,7 @@ analytics.post('/api/analytics/cross/query', inputJsonBoundary(), async (c) => {
     return c.json({ success: true, data: result }, 202);
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) console.error(JSON.stringify({"code":"routes_analytics_failed","route":"POST /api/analytics/cross/query"}));
+    if (status === 500) logger.error("routes_analytics_failed");
     return inputError(c, {
       success: false,
       error: status === 500 ? 'Internal server error' : (error as Error).message,
@@ -475,7 +480,7 @@ analytics.get('/api/analytics/cross/results/:id', async (c) => {
     if (!result) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: result });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/cross/results/:id"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -488,7 +493,7 @@ analytics.get('/api/analytics/saved', async (c) => {
     if (!account.ok) return account.response;
     return c.json({ success: true, data: await getSavedAnalytics(c.env.DB, account.accountId) });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/saved"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -521,7 +526,7 @@ analytics.post('/api/analytics/saved', requireRole('owner', 'admin'), inputJsonB
     return c.json({ success: true, data: result }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) console.error(JSON.stringify({"code":"routes_analytics_failed","route":"POST /api/analytics/saved"}));
+    if (status === 500) logger.error("routes_analytics_failed");
     return inputError(c, {
       success: false,
       error: status === 500 ? 'Internal server error' : (error as Error).message,
@@ -537,7 +542,7 @@ analytics.get('/api/analytics/saved/:id/snapshots', async (c) => {
     if (!items) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: items });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/saved/:id/snapshots"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -589,7 +594,7 @@ analytics.get('/api/analytics/report-schedules', async (c) => {
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/report-schedules"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -747,7 +752,7 @@ analytics.post('/api/analytics/report-schedules', requireRole('owner', 'admin'),
       return c.json({ success: true, data: raced, replayed: true }, 200);
     }
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"POST /api/analytics/report-schedules"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -792,7 +797,7 @@ analytics.put('/api/analytics/report-schedules/:id', requireRole('owner', 'admin
     const item = await getAnalyticsReportSchedule(c.env.DB, existing.id, account.accountId);
     return c.json({ success: true, data: item });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"PUT /api/analytics/report-schedules/:id"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -837,7 +842,7 @@ analytics.put('/api/analytics/report-schedules/:id/status', requireRole('owner',
     const item = await getAnalyticsReportSchedule(c.env.DB, existing.id, account.accountId);
     return c.json({ success: true, data: item });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"PUT /api/analytics/report-schedules/:id/status"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -858,7 +863,7 @@ analytics.get('/api/analytics/report-schedules/:id/runs', async (c) => {
     });
     return c.json({ success: true, data: { schedule, runs } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/report-schedules/:id/runs"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -897,7 +902,7 @@ analytics.post('/api/analytics/report-schedules/:id/retry', requireRole('owner',
     const item = await getAnalyticsReportSchedule(c.env.DB, schedule.id, account.accountId);
     return c.json({ success: true, data: item });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"POST /api/analytics/report-schedules/:id/retry"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -911,12 +916,12 @@ analytics.get('/api/funnels', async (c) => {
     const items = await getLegacyFunnels(c.env.DB, account.accountId);
     return c.json({ success: true, data: items.map(serializeFunnel) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/funnels"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
-// V6: 作成時点の段・期間・比較条件を第1版として固定する。
+// 作成時点の段・期間・比較条件を第1版として固定する。
 /**
  * N-256/N-258: 段に「成果」が入ったファネルを保存したら、成果地点側の
  * 「使う場所」台帳へこのファネルを実IDで記す。
@@ -977,7 +982,7 @@ async function registerFunnelConversionUsages(
         if (code === 'version_conflict' && attempt === 0) {
           continue;
         }
-        console.error(JSON.stringify({"code":"routes_analytics_failed"}));
+        logger.error("routes_analytics_failed");
       }
     }
     if (!registered) failed.push(pointName);
@@ -1013,7 +1018,7 @@ analytics.get('/api/analytics/funnels', async (c) => {
       pagination: { page: result.page, pageSize: result.pageSize, total: result.total },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/funnels"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1047,7 +1052,7 @@ analytics.post('/api/analytics/funnels', requireRole('owner', 'admin'), inputJso
     return c.json({ success: true, data: { ...created, usageWarnings } }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) console.error(JSON.stringify({"code":"routes_analytics_failed","route":"POST /api/analytics/funnels"}));
+    if (status === 500) logger.error("routes_analytics_failed");
     return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
@@ -1071,7 +1076,7 @@ analytics.get('/api/analytics/funnels/:id', async (c) => {
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/funnels/:id"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1109,7 +1114,7 @@ analytics.post('/api/analytics/funnels/:id/versions', requireRole('owner', 'admi
     return c.json({ success: true, data: { ...version, usageWarnings } }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) console.error(JSON.stringify({"code":"routes_analytics_failed","route":"POST /api/analytics/funnels/:id/versions"}));
+    if (status === 500) logger.error("routes_analytics_failed");
     return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
@@ -1135,7 +1140,7 @@ analytics.put('/api/analytics/funnels/:id/status', requireRole('owner', 'admin')
     return c.json({ success: true, data: serializeFunnel(funnel) });
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) console.error(JSON.stringify({"code":"routes_analytics_failed","route":"PUT /api/analytics/funnels/:id/status"}));
+    if (status === 500) logger.error("routes_analytics_failed");
     return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
@@ -1175,7 +1180,7 @@ analytics.post('/api/analytics/funnels/:id/run', inputJsonBoundary(), async (c) 
     return c.json({ success: true, data: result }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) console.error(JSON.stringify({"code":"routes_analytics_failed","route":"POST /api/analytics/funnels/:id/run"}));
+    if (status === 500) logger.error("routes_analytics_failed");
     return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
@@ -1190,7 +1195,7 @@ analytics.get('/api/analytics/funnels/:id/runs/latest', async (c) => {
     return c.json({ success: true, data: result });
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/funnels/:id/runs/latest"}));
+    if (status === 500) logger.error("routes_analytics_failed");
     return inputError(c, {
       success: false,
       error: status === 500 ? 'Internal server error' : (error as Error).message,
@@ -1235,7 +1240,7 @@ analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'adm
     return c.json({ success: true, data: result }, 201);
   } catch (error) {
     const status = funnelErrorStatus(error);
-    if (status === 500) console.error(JSON.stringify({"code":"routes_analytics_failed","route":"POST /api/analytics/results/:id/audiences"}));
+    if (status === 500) logger.error("routes_analytics_failed");
     return inputError(c, { success: false, error: status === 500 ? 'Internal server error' : (error as Error).message }, status, []);
   }
 });
@@ -1273,7 +1278,7 @@ analytics.get('/api/analytics/audiences/:id', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/analytics/audiences/:id"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1322,7 +1327,7 @@ analytics.post('/api/funnels', requireRole('owner', 'admin'), inputJsonBoundary(
     });
     return c.json({ success: true, data: serializeFunnel(funnel) }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"POST /api/funnels"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1341,7 +1346,7 @@ analytics.delete('/api/funnels/:id', requireRole('owner', 'admin'), async (c) =>
     await deleteFunnel(c.env.DB, account.accountId, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"DELETE /api/funnels/:id"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -1362,8 +1367,8 @@ analytics.get('/api/funnels/:id/result', async (c) => {
     if (!range.ok) return c.json({ success: false, error: range.error }, 400);
 
     // 現行画面は過去の業務台帳を読む互換APIを維持する。
-    // V6の時系列結果は POST /api/analytics/funnels/:id/run で作り、
-    // 取得不可・部分データを表示できるV6画面と同時に切り替える。
+    // の時系列結果は POST /api/analytics/funnels/:id/run で作り、
+    // 取得不可・部分データを表示できる画面と同時に切り替える。
     const steps = await getFunnelSteps(c.env.DB, funnel.id);
     const reachedPerStep: string[][] = [];
     let scope: string[] | undefined;
@@ -1390,7 +1395,7 @@ analytics.get('/api/funnels/:id/result', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_analytics_failed","route":"GET /api/funnels/:id/result"}));
+    logger.error("routes_analytics_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

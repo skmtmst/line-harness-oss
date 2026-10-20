@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ program: vi.fn(), preview: vi.fn(), save: vi.fn(), tiers: vi.fn(), activate: vi.fn(), stop: vi.fn() }))
 const shell = vi.hoisted(() => ({ readonly: false }))
-vi.mock('@/lib/api-gap3', () => ({ memberRanksApi: api }))
+vi.mock('@/lib/api/helpers/gap3', () => ({ memberRanksApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/mileage', useSearchParams: () => new URLSearchParams('tab=ranks') }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))

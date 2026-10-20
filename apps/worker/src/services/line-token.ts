@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 export interface ResolveLineTokenInput {
   accountToken: string | null | undefined;
   defaultToken: string;
@@ -9,7 +10,7 @@ export function recordLineTokenDefaultFallback(input: {
   accountId: string | null;
   context: string;
 }): void {
-  console.log(JSON.stringify({"code":"line_token_default_fallback"}));
+  logger.log("line_token_default_fallback");
 }
 
 /**

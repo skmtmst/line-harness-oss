@@ -1,3 +1,5 @@
+> 文書：LINE Harness｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 > **v0.13.2 시점에서 동결(2026-09-03).** 일본어 `README.md`가 정본이며, 최신 상태로 유지되는 유일한 버전입니다.
 
 🌐 [日本語](README.md) | [English](README.en.md) | [简体中文](README.zh-CN.md) | **한국어** | [Español](README.es.md)
@@ -92,7 +94,7 @@ CLI 가 다음을 모두 처리합니다:
 - **시계열 추적** — 클릭 → 친구 추가 → CV를 순서대로 기록, last-touch 귀속으로 성과 연결
 - **승인 플로우** — 귀속된 성과를 승인/거절하여 보수를 확정, 중복 계정 플래그로 부정 의심 성과를 가시화
 - **LINE 푸시 알림** — 성과 확정 시 제휴 파트너에게 자동 푸시 알림
-- 상세: [docs/wiki/27-Affiliate-ASP.md](docs/wiki/27-Affiliate-ASP.md)
+- 상세: [docs/v6-requirements/v6-16-affiliate-requirements-draft.md](docs/v6-requirements/v6-16-affiliate-requirements-draft.md)
 
 ### 자동화
 - **IF-THEN 규칙** — 트리거 7종 × 액션 6종

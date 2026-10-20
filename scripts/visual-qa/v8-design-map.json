@@ -5,8 +5,7 @@
     "html/*.html",
     "pencil-texts/*.tsv",
     "review/BOARDS-1011.tsv",
-    "review/PEN-ID-CHANGES-1011.tsv",
-    "scripts/visual-qa/frozen-v8-1011-routes.json"
+    "review/PEN-ID-CHANGES-1011.tsv"
   ],
   "designDir": "/Users/kentakenta/lh-work/design/v8",
   "boardCount": 612,

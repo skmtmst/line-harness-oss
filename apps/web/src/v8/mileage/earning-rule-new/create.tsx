@@ -1,9 +1,10 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Card, { CardHeader } from '@/components/shared/card'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("ルール名を入力してください"),
 }
 
@@ -12,7 +13,7 @@ import { createPageReturnHref } from '@/components/shared/create-page'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftRight, Check, Hourglass, RefreshCw, Share2, TriangleAlert, User, Zap } from 'lucide-react'
+import { Check, Hourglass, Share2, User, Zap } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -46,7 +47,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 
 /*
- * ★V8-B マイル「たまる決めごとを作る」（Pencil：作る `ctLwT`・競合 `BnrQp`）。
+ * ★V8-B マイル「たまる決めごとを作る」（Pencil：作る ・競合 ）。
  *
  * 型（CreatePage）に、4つの段（どのルールか・何マイル付けるか・受け取る人・使えるまで・付けすぎを防ぐ）と、
  * 右の列（この設定だとこう貯まります・気をつけること）、下の帯（キャンセル・保存して続けて作る・保存して動かす）を渡す。
@@ -93,6 +94,13 @@ export default function EarningRuleCreateV8() {
 }
 
 function EarningRuleCreateBody() {
+  const [formNumber, setFormNumber] = useState(0)
+  return <EarningRuleForm key={formNumber} focusName={formNumber > 0} onContinue={() => setFormNumber((number) => number + 1)} />
+}
+
+function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onContinue: () => void }) {
+  const nameRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (focusName) nameRef.current?.focus() }, [focusName])
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -117,7 +125,7 @@ function EarningRuleCreateBody() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [touched, setTouched] = useState(false)
-  /** BnrQp：保存が 409 で返ったとき。口が返した「だれが・いつ」を持つ。 */
+  /** ：保存が 409 で返ったとき。口が返した「だれが・いつ」を持つ。 */
   const [conflict, setConflict] = useState<{ who: string | null; at: string | null } | null>(null)
   const [trialBusy, setTrialBusy] = useState(false)
   const [trialError, setTrialError] = useState('')
@@ -155,7 +163,7 @@ function EarningRuleCreateBody() {
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving })
 
   const fieldErrors: Record<string, string> = {}
-  if ((b244Requirements.name.check(name) !== null)) fieldErrors['er-name'] = 'ルール名を入力してください'
+  if ((FIELD_REQUIREMENTS.name.check(name) !== null)) fieldErrors['er-name'] = 'ルール名を入力してください'
   if (!validAmount) fieldErrors['er-amount'] = '付与マイルは1以上の整数で入力してください'
   if (validFrom && validUntil && validFrom > validUntil) fieldErrors['er-until'] = '終了日は開始日より後にしてください'
   if (expiryDays !== null && (!Number.isInteger(expiryDays) || expiryDays < 1 || expiryDays > 3650)) {
@@ -238,10 +246,11 @@ function EarningRuleCreateBody() {
         }
         throw new Error(draftResponse.error)
       }
-      router.push(continueAfter ? '/mileage/earning-rules/new' : createPageReturnHref(LIST_HREF, res.data.id))
+      if (continueAfter) onContinue()
+      else router.push(createPageReturnHref(LIST_HREF, res.data.id))
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
-      /* BnrQp：同時に作られた・版がずれたときは競合の帯で知らせる。 */
+      /* ：同時に作られた・版がずれたときは競合の帯で知らせる。 */
       if (caught instanceof ApiError && caught.status === 409) {
         setConflict(conflictWho(caught.data))
         { if (!fieldFailure)
@@ -249,7 +258,7 @@ function EarningRuleCreateBody() {
       }
       } else {
         { if (!fieldFailure)
-        setSaveError(caught instanceof Error ? caught.message : '保存できませんでした。もう一度お試しください。') }
+        setSaveError(describeApiFailure(caught, '保存')) }
       }
     } finally {
       setSaving(false)
@@ -269,7 +278,7 @@ function EarningRuleCreateBody() {
       const fieldFailure = saveErrors.capture(caught)
       setTrial(null)
       { if (!fieldFailure)
-      setTrialError(caught instanceof Error ? caught.message : '試算できませんでした。もう一度お試しください。') }
+      setTrialError(describeApiFailure(caught, '試算')) }
     } finally {
       setTrialBusy(false)
     }
@@ -352,8 +361,8 @@ function EarningRuleCreateBody() {
 
       <Card variant="form" aria-labelledby="er-new-rule">
         <CardHeader size="stacked" titleId="er-new-rule" title="どのルールか" meta="きっかけになる行動を選びます" />
-        <Field requirement={b244Requirements.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
-          <SaveErrorField names={["name"]}><TextField id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
+        <Field requirement={FIELD_REQUIREMENTS.name} label="名前" htmlFor="er-name" error={errorOf('er-name')}>
+          <SaveErrorField names={["name"]}><TextField ref={nameRef} id="er-name" aria-label="名前" value={name} onChange={(e) => setName(e.target.value)} placeholder="例：リンクをクリック" /></SaveErrorField>
         </Field>
         <SettingsFormRow layout="columns">
           <div className={styles.field}>

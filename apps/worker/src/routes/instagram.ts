@@ -1,6 +1,7 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type {
   InstagramConnectionStatus,
   InstagramProfile,
@@ -370,7 +371,7 @@ instagram.get(
         detail: e instanceof InstagramError ? (e.detail ?? null) : null,
         grantedScopes,
       });
-      console.error(JSON.stringify({"code":"instagram_oauth_callback_failed","route":"GET /api/instagram/oauth/callback"}));
+      logger.error("instagram_oauth_callback_failed");
       // 使い切りの state は必ず捨てて、やり直せる状態に戻す。
       if (hash)
         await c.env.DB.prepare(

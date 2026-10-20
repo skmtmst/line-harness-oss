@@ -1,6 +1,8 @@
+> 文書：友だち追加時の配信 作る⑤ 確認・完了（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 友だち追加時の配信 作る⑤ 確認・完了（V8）の動き
 
-入口：`app/friend-add-settings/publish/page.tsx`（V8 のときだけ `src/v8/friend-add-publish/publish.tsx`、それ以外は今の v7 の画面）。
+入口：`app/friend-add-settings/publish/page.tsx`（V8専用で `src/v8/friend-add-publish/publish.tsx`）。
 絵：確認 `U8Xm3X`・有効にした完了 `e0FD1J`。
 
 ## 受け付ける URL と指定（今と同じ）
@@ -10,10 +12,10 @@
 
 ## 呼ぶ口（今と同じ）
 - 読む：`api.friendAddRules.get` → `validate`（画面を開くだけではテストを走らせない）・`conflicts`
-- 有効にする：`publish(accountId, ruleId, 鍵)`（鍵は v7 と同じ `friend-add-publish-<アカウント>-<版>`）。押した時点のアカウント・読み込み回数と違えば返事を映さない
-- 有効にできるのは、サーバの確認が通り・最後のテストが成功しているときだけ（v7 の `canPublish` と同じ）
+- 有効にする：`publish(accountId, ruleId, 鍵)`（鍵は既存の公開名を保つ `friend-add-publish-<アカウント>-<版>`）。押した時点のアカウント・読み込み回数と違えば返事を映さない
+- 有効にできるのは、サーバの確認が通り・最後のテストが成功しているときだけ（現在の `canPublish` で判定）
 
-## 今の V7 画面と違うところ
+## 現在の表示
 - 「テストする（送らずに判定）」を置いた（`test(accountId, ruleId, { friendId: null })`）。押したときだけ走り、終わったら設定と確認を読み直して「有効にする」の可否に映す
 - 「有効にする前の確認」は4行（重なり・二重送信・テスト・Slack）。「変える」「見直す」は編集画面の該当の手順へ。4行に入らないサーバの確認の失敗は帯で出す
 - 「下書きのまま保存」：この画面では何も書き換えないので、下書きはすでに保存済み。知らせを出して一覧へ戻る

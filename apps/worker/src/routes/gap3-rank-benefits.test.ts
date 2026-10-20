@@ -50,7 +50,7 @@ test('RANK-07: マイル倍率は同じ出来事に一度だけ、別店の同�
 });
 
 test('RANK-07: 一括操作でもランクタグを手で付け外しできない',async()=>{
- await start();const {previewFriendBulkRun}=await import('../services/friend-bulk-runs.js');const tag=(d.raw.prepare("SELECT tag_id FROM member_rank_tiers WHERE id='base'").get() as any).tag_id;
+ await start();const {previewFriendBulkRun}=await import('../features/friends/friend-bulk-runs.js');const tag=(d.raw.prepare("SELECT tag_id FROM member_rank_tiers WHERE id='base'").get() as any).tag_id;
  for(const kind of ['add_tag','remove_tag'] as const)await expect(previewFriendBulkRun(d.db,gapOwner,{kind:'explicit',friendIds:['f']},{kind,tagId:tag})).rejects.toMatchObject({code:'rank_tag_managed'});
 });
 

@@ -1,5 +1,5 @@
 /*
- * ★V8 回答フォームの一覧（Pencil `I3L41O`・1152 `GrnO4`・閲覧のみ `JV2oR`・アーカイブ・削除 `GVizd`）。
+ * ★V8 回答フォームの一覧（Pencil ・1152 ・閲覧のみ ・アーカイブ・削除 ）。
  * 枠・見出し・数の帯・フォルダの列・道具の段の外枠は型（ListPage）が持つ。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-fm-*`。
  */
@@ -26,7 +26,7 @@
   cursor: pointer;
 }
 
-/* 閲覧のみの帯（JV2oR）。見出しの下。薄い青の地・目の印・枠なし。 */
+/* 閲覧のみの帯。見出しの下。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin-bottom: var(--tpl-fm-band-after); }
 
 /* 道具の段（広い板）：探す・札3つ … 並び・件数を1本に。 */
@@ -65,7 +65,7 @@
   width: 100%;
 }
 
-/* 1152 の板（GrnO4）：1段目と2段目。 */
+/* 1152 の板：1段目と2段目。 */
 .narrowTools {
   display: flex;
   flex-basis: 100%;
@@ -113,7 +113,7 @@
 
 
 
-/* 数の帯の説明：狭い板（GrnO4）では行き先の左で2行に折る（絵どおり）。 */
+/* 数の帯の説明：狭い板では行き先の左で2行に折る（絵どおり）。 */
 .kpiDetailWrap {
   display: block;
   white-space: normal;
@@ -174,7 +174,7 @@
   display: block;
   min-width: 0;
   overflow: hidden;
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 I3L41O の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
   padding-inline-start: var(--tpl-folder-dot-indent);
   color: var(--color-ink-faint);
   text-overflow: ellipsis;
@@ -486,7 +486,7 @@ a.answerCount:hover {
   gap: var(--tpl-fm-radio-gap);
 }
 
-/* アーカイブ・削除の窓（GVizd）。 */
+/* アーカイブ・削除の窓。 */
 .dialogNote {
   margin: 0;
   color: var(--color-ink-faint);

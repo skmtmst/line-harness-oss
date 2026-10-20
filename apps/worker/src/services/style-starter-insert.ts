@@ -8,13 +8,9 @@ import {
 } from './style-starter-resource.js';
 import { type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 
-import {
-  profile,
-  starter,
-  StyleError,
-  readCards,
-  defaultCards,
-} from './style-setup.js';
+import { profile } from './style-profile.js';
+import type { starter } from './style-starter-set.js';
+import { StyleError, readCards, defaultCards } from './style-setup-core.js';
 export async function insertStyleStarterItems(
   db: D1Database,
   account: string,
@@ -50,7 +46,7 @@ export async function insertStyleStarterItems(
           old.is_sample &&
           old.source_snapshot &&
           ['template', 'rich_menu'].includes(item.kind) &&
-          (!answers.content || answers.content.mode === 'configured')
+          (!answers.content || (answers.content.mode === 'configured' && answers.content.value !== false))
         ) {
           const snapshot = await resourceSnapshot(
             db,
@@ -105,7 +101,7 @@ export async function insertStyleStarterItems(
     if (
       ['template', 'rich_menu'].includes(item.kind) &&
       answers.content &&
-      answers.content.mode !== 'configured'
+      (answers.content.mode !== 'configured' || answers.content.value === false)
     )
       continue;
     const intrinsicFeature =

@@ -1,6 +1,7 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { formatDateTime, formatDay } from '@/lib/format'
 /**
- * NEN配信の「今月・先月」と、日本時間の短い日付表記。★V6 37-6（`z4q1K`）。
+ * NEN配信の「今月・先月」と、日本時間の短い日付表記。★管理画面 37-6（`z4q1K`）。
  *
  * 数値カードは「今月 送った数（先月 N通）」のように月で区切る。実口は from/to を
  * 受けるので、ここで日本時間の月初〜翌月初を UTC の ISO 文字列にして渡す。
@@ -13,12 +14,12 @@ export type MonthRange = { from: string; to: string; label: string; year: number
 
 /** `offset` が 0 なら今月、-1 なら先月。境界は日本時間の月初 0:00。 */
 export function jstMonthRange(now: Date, offset = 0): MonthRange {
-  const jst = new Date(now.getTime() + JST_OFFSET_MS)
+  const jst = japanCalendar(now)
   const year = jst.getUTCFullYear()
   const monthIndex = jst.getUTCMonth() + offset
   const from = new Date(Date.UTC(year, monthIndex, 1) - JST_OFFSET_MS)
   const to = new Date(Date.UTC(year, monthIndex + 1, 1) - JST_OFFSET_MS)
-  const start = new Date(from.getTime() + JST_OFFSET_MS)
+  const start = japanCalendar(from)
   return {
     from: from.toISOString(),
     to: to.toISOString(),
@@ -57,7 +58,7 @@ export function jstLongDateTime(value: string | null | undefined): string {
 
 /** `datetime-local` の初期値。日本時間の「翌日 10:00」を `YYYY-MM-DDTHH:mm` で返す。 */
 export function defaultScheduleLocal(now: Date): string {
-  const jst = new Date(now.getTime() + JST_OFFSET_MS)
+  const jst = japanCalendar(now)
   const next = new Date(Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() + 1, 10, 0))
   return next.toISOString().slice(0, 16)
 }

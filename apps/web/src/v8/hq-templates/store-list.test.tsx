@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 統括のひな形の一覧（店と同じ形＋配る口・B-27〜B-29・B-36）の動き。
+ * 統括のひな形の一覧（店と同じ形＋配る口・〜・）の動き。
  * 6種類のタブで種類を替える・配布先の列・全種類の行の［配る］（「…」の左。オーナー 2026-10-08）・閲覧のみには配る／作る口を置かない・フォルダで絞る。
  */
 import { waitFor } from '@testing-library/react'
@@ -107,7 +107,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     it(`タグ一覧はタグ名から始まり、星・注目の操作と絞り込みを出さない（編集=${canEdit}）`, async () => {
       await render({ type: 'tag', kind: undefined, canEdit })
       const heads = [...host.querySelectorAll('thead th')].map((th) => th.textContent?.trim())
-      // ［配る］は「…」の中（B-253）なので、編集できる人も見出しの空の列は「…」の1つだけ。
+      // ［配る］は「…」の中なので、編集できる人も見出しの空の列は「…」の1つだけ。
       expect(heads).toEqual(['タグ', '人数', '付け方', '配布先', ''])
       expect(host.querySelector('tbody tr td')?.textContent).toContain(ROWS[0].name)
       expect(host.querySelector('svg.lucide-star')).toBeNull()
@@ -147,7 +147,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('まだ配っていない')
   })
 
-  /* B-253（オーナー決定）：行の右端は「…」1つ。［配る］は「…」の中にあり、押すとその行を配る。 */
+  /* （オーナー決定）：行の右端は「…」1つ。［配る］は「…」の中にあり、押すとその行を配る。 */
   const rowMenuButton = (name: string) => {
     const tr = [...document.querySelectorAll('tr')].find((row) => row.querySelector('[data-list-name]')?.textContent?.includes(name))
     return tr?.querySelector('[aria-haspopup="menu"]') as HTMLButtonElement | null
@@ -189,7 +189,7 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('0通')
     expect(host.textContent).toContain('新しい版を未配布')
     const menu = buttons().find((b) => b.getAttribute('aria-label') === 'テンプレート「秋の新商品」の操作')
-    // 統括の一覧の行の「…」は絵（i0Ao0R・noVq4・DzdC3・wZPua）どおり 28角。
+    // 統括の一覧の行の「…」は絵（・・・）どおり 28角。
     expect(menu!.getAttribute('data-size')).toBe('row')
     await act(async () => { menu!.click() })
     await act(async () => { distributeItem()!.click() })

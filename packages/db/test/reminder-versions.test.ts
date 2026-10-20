@@ -5,20 +5,8 @@ import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import {
-  createReminderStep,
-  createReminderWithDraftVersion,
-  enrollFriendInReminder,
-  enrollFriendsInReminderOnce,
-  getPendingReminderDeliveries,
-  getReminderDraftVersion,
-  getReminderPublishedVersion,
-  parseReminderVersionSettings,
-  publishReminderDraftVersion,
-  recordReminderDraftTest,
-  saveReminderDraftVersion,
-  type ReminderDraftSettings,
-} from '../src/reminders.js'
+import { createReminderStep, createReminderWithDraftVersion, enrollFriendInReminder, enrollFriendsInReminderOnce, getPendingReminderDeliveries, getReminderDraftVersion, getReminderPublishedVersion, parseReminderVersionSettings, publishReminderDraftVersion, recordReminderDraftTest, saveReminderDraftVersion } from '../src/reminders/index.js';
+import { type ReminderDraftSettings } from '../src/reminders/types.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -78,7 +66,7 @@ function settings(content: string): ReminderDraftSettings {
   }
 }
 
-describe('V6 リマインダの公開版', () => {
+describe('リマインダの公開版', () => {
   let sqlite: Database.Database
   let db: D1Database
 

@@ -5,7 +5,7 @@ import {
   isSavedSearchOpAllowed,
   isSavedSearchValueOptionalOp,
 } from './saved-search-conditions.js';
-import type { SavedSearchConditionKind } from './types.js';
+import type { SavedSearchConditionKind } from './types/saved-searches.js';
 
 /*
  * ATTR-13: 画面・DB検証・Worker実行の3か所が同じ表を見るための契約。

@@ -37,7 +37,7 @@ export function photoPolicyKeyForVersion(versionNumber: number): string {
 }
 
 /*
- * 版がまだ無いDBで第1版（B-337：100pt）を確保。
+ * 版がまだ無いDBで第1版（100pt）を確保。
  *
  * 移行済みのDBには migration 460 の種行があるが、新しいDB
  * （bootstrap は表の形だけを持ち、種行を持たない）には無い。
@@ -106,7 +106,7 @@ export async function getPhotoRewardPolicy(
 
 /**
  * いま使っている版。表が空のとき（移行前の古いDB）は
- * B-337の100ptを使う。付与済みの履歴は付け直さない。
+ * の100ptを使う。付与済みの履歴は付け直さない。
  */
 export async function getEffectivePhotoRewardPolicy(
   db: D1Database,
@@ -207,7 +207,7 @@ export async function createPhotoRewardPolicy(
   // 同じ確認キーの再送は、版が進んでいても保存済みの結果を返す。
   const replay = await db.prepare('SELECT * FROM photo_reward_policies WHERE idempotency_key = ?')
     .bind(input.idempotencyKey).first<PhotoRewardPolicyRow>();
-  // V7など掲載点数を送らない呼び出しは、最新の設定を保つ。
+  // など掲載点数を送らない呼び出しは、最新の設定を保つ。
   const previousPoints = input.publicationPoints === undefined && !replay
     ? await db.prepare('SELECT publication_points FROM photo_reward_policies ORDER BY version_number DESC LIMIT 1').first<{publication_points: number}>()
     : null;

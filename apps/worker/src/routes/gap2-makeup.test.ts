@@ -1,6 +1,6 @@
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import {bookingMakeup} from './booking-makeup.js';
-import {absence,makeupOptions,useMakeup,expireMakeup} from '../services/booking-makeup.js';
+import {absence,makeupOptions,useMakeup,expireMakeup} from '../features/booking/booking-makeup.js';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 import {deleteCustomerData} from '../services/customer-data-deletion.js';

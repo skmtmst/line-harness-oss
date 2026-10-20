@@ -53,7 +53,7 @@ export function GridCell({ children, className, align, ...props }: HTMLAttribute
   return <span role="cell" data-align={align} className={[styles.cell, className].filter(Boolean).join(' ')} {...props}>{children}</span>
 }
 
-/** B-194: grid で描く一覧にも表と同じ名前のセルを使う。 */
+/** : grid で描く一覧にも表と同じ名前のセルを使う。 */
 export function GridNameCell({ name, folder, className }: {
   name: ReactNode
   /** フォルダ分けの無い名簿は false。未分類の一覧は null/省略。 */

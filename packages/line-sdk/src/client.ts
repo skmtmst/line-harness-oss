@@ -8,6 +8,7 @@ import type {
   RichMenuObject,
   UserProfile,
 } from './types.js';
+import { logger, traceRequestInit, tracedFetch } from '@line-crm/shared/server';
 
 const LINE_API_BASE = 'https://api.line.me';
 
@@ -44,13 +45,21 @@ export interface FollowerIdsPage {
 export class LineClient {
   private readonly transport: LineTransport;
   constructor(private readonly channelAccessToken: string, options: LineClientOptions = {}) {
-    this.transport = options.transport ?? ((url, init) => fetch(url, init));
+    this.transport = options.transport ?? ((url, init) => tracedFetch(url, init));
   }
 
   private async fetch(url: string, init: RequestInit): Promise<Response> {
     const transport = this.transport;
-    try { return await transport(url, { ...init, redirect: 'manual' }); }
-    catch { throw new Error('LINE API network error'); }
+    const started = Date.now();
+    logger.info('line.request.started');
+    try {
+      const response = await transport(url, traceRequestInit(url, { ...init, redirect: 'manual' })!);
+      logger.info('line.request.finished', { status: response.status, durationMs: Date.now() - started });
+      return response;
+    } catch {
+      logger.warn('line.request.failed', { durationMs: Date.now() - started });
+      throw new Error('LINE API network error');
+    }
   }
 
   private fail(response: Response): never {

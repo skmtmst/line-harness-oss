@@ -1,12 +1,14 @@
+> 文書：友だち（V8）の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 友だち（V8）の動き（BEHAVIOR.md）
 
-対象：src/v8/friends の画面一式。v7 の画面（app/friends・app/duplicates・app/users・app/friends/migrations・app/accounts の UID移行）から動きを写し、見た目だけを Pencil ★V8 の絵どおりに一から書いた。
+対象：src/v8/friends の一覧・重複検出・統合ユーザー・移行。公開URLと動きを保ち、見た目はPencil ★V8と型・共通部品に従う。
 
-## 入口（V8 のときだけ。v7 は触らない）
+## 入口（V8専用）
 - `/friends`（app/friends/page.tsx）→ `host.tsx`：`?tab=` で一覧・重複検出・統合ユーザーを出し分ける
 - `/friends/identity-candidates`（page.tsx）→ `compare/compare.tsx`
 - `/friends/migrations`（page.tsx）→ `migrations/page.tsx`：`?tab=uid` は UID移行、それ以外は CSV
-- `/friends/detail` は今のまま（V8 の作り直しは未着手）
+- `/friends/detail` → `src/v8/friend-detail/detail.tsx`（V8専用）
 
 ## 受け付ける URL と指定（今と同じ名前・同じ意味）
 - `/friends`：`?tab=list|duplicates|merged`、`?q=`（探す言葉）、`?tag=`、`?savedSearch=`、`?audienceId=`、`?scoreMin=`・`?scoreMax=`・`?scoredOnly=1`
@@ -18,7 +20,7 @@
 ## 保存先（今と同じ）
 - sessionStorage `lh_friends_list_state_v1:<アカウント>`：一覧の絞り込み・ページ（IDEA-03）
 - localStorage `friends.visibleColumns`：表示項目
-- 変えられるかの判定：役割はサーバ（`api.staff.me()`）、担当者の項目キーは `lh_staff_permissions`。手元の役割の保存値（`lh_staff_role`）は使わない
+- 変えられるかの判定：役割はサーバ（`本人情報の共通読取（useStaffRole / loadStaffIdentity）`）、担当者の項目キーは `lh_staff_permissions`。手元の役割の保存値（`lh_staff_role`）は使わない
 
 ## 友だち一覧（list/、x6QsVz）
 - API：`friends.list`（今と同じ引数）・`friendStats.get`・`tags.list`・`loadOperators`・`scenarios.list`・`supportMarks.list`（任意機能がオンのときだけ）・`savedSearches.detail`

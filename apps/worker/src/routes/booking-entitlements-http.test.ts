@@ -1,9 +1,9 @@
 import {deleteCustomerData} from '../services/customer-data-deletion.js';
 import {Hono} from 'hono';
 import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
-import {entitlementUseStatement,entitlementMonth} from '../services/booking-entitlements.js';
+import {entitlementUseStatement,entitlementMonth} from '../features/booking/booking-entitlements.js';
 vi.mock('../services/account-access.js',()=>({canAccessAllLineAccounts:vi.fn(async(_db,_staff,ids:string[])=>ids.every(id=>id==='a'))}));
 import {bookingEntitlements} from './booking-entitlements.js';
 let f:SqliteD1,readOnly=false,role:'staff'|'owner'='owner',edit=true;

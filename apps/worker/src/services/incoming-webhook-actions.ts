@@ -1,14 +1,16 @@
+import { logger } from '@line-crm/shared/server';
 import {
   recordIncomingWebhookUnmatched,
   type IncomingWebhookActionRef,
   type IncomingWebhookIdentityMatch,
 } from '@line-crm/db';
-import type { ActionDefinition, AutomationActionContext } from './automation-engine.js';
+
+import type { ActionDefinition, AutomationActionContext } from '../features/automations/automation-engine/index.js';
 import { stableWebhookStepId, type IncomingWebhookExecution } from './incoming-webhook-receipts.js';
 import {
   createAutomationActionExecutors,
   type AutomationActionExecutorDependencies,
-} from './automation-action-executors.js';
+} from '../features/automations/automation-action-executors/index.js';
 
 type ActionRunResult = {
   matchedFriendId: string | null;
@@ -337,7 +339,7 @@ export async function executeIncomingWebhookActions(
       plan = input.execution ? await input.execution.step(`plan:${refIndex}`, makePlan) : await makePlan();
       if (plan.length === 0) throw new Error(`未対応の受信Webhook処理です: ${ref.refKind}`);
     } catch (error) {
-      console.error(JSON.stringify({"code":"services_incoming_webhook_actions_failed"}));
+      logger.error("services_incoming_webhook_actions_failed");
       // 再送する受信は完了済みの先頭部分だけを省略する。途中を飛ばすと、
       // 復旧後に先の処理が再実行されて後の処理の結果を上書きしてしまう。
       if (input.execution) throw error;
@@ -387,7 +389,7 @@ export async function executeIncomingWebhookActions(
         }
         executed++;
       } catch (error) {
-        console.error(JSON.stringify({"code":"services_incoming_webhook_actions_failed"}));
+        logger.error("services_incoming_webhook_actions_failed");
         // 副作用の成功後でも、checkpointが保存できなければ後続へ進まない。
         // actionのonFailureに関係なく受信全体を再試行し、順序を維持する。
         if (input.execution) throw error;

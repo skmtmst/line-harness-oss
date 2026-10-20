@@ -1,5 +1,5 @@
 /*
- * ★V8 自動応答の一覧（Pencil `uE9gf`、状態は `G8i4xP`）。
+ * ★V8 自動応答の一覧（Pencil 、状態は ）。
  *
  * 折り畳みの基準は白い板の幅（= .board の幅）で、画面の幅ではない。
  * 板が 1100px を切ったらフォルダの列を道具の段へ畳む
@@ -21,7 +21,7 @@
   cursor: pointer;
 }
 
-/* 表。見出しと行の区切り線だけ（`uE9gf`）。外側の枠は作らない。 */
+/* 表。見出しと行の区切り線だけ（）。外側の枠は作らない。 */
 .tableWrap {
   min-width: 0;
 }
@@ -95,7 +95,7 @@
 
 /* 条件の行の中の時計の絵（絵どおり・色だけ）。 */
 .dotIndent {
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 uE9gf の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（説明の行）。 */
   display: block;
   padding-inline-start: var(--tpl-folder-dot-indent);
 }
@@ -335,19 +335,19 @@
 
 
 
-/* 絵 uE9gf「返すもの」1行目：13px・行19。 */
+/* 絵 「返すもの」1行目：13px・行19。 */
 .cellMain { display: block; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); text-overflow: ellipsis; white-space: nowrap; }
 
-/* 絵 uE9gf 道具の段の右：並び 124・よく使う絞り込み 151（左に印）。 */
+/* 絵  道具の段の右：並び 124・よく使う絞り込み 151（左に印）。 */
 .sortBox { width: var(--tpl-ar-sort-w); }
 .sortBox :global(*) { max-width: 100%; }
 .middleCell { vertical-align: middle; }
-.rowClick > td { height: var(--tpl-ar-row-h); } /* 絵 uE9gf の行は 63〜66。札の無い行も同じ高さに */
+.rowClick > td { height: var(--tpl-ar-row-h); } /* 絵  の行は 63〜66。札の無い行も同じ高さに */
 
-/* 閲覧のみの帯（Q5lOCc）。数の帯の上。薄い青の地・目の印・枠なし。 */
+/* 閲覧のみの帯。数の帯の上。薄い青の地・目の印・枠なし。 */
 .viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after); }
 
-/* 1152 の板（WPrd5）の道具の段：案内の帯 → 1段目 → 2段目。 */
+/* 1152 の板の道具の段：案内の帯 → 1段目 → 2段目。 */
 .narrowTools {
   display: flex;
   flex-basis: 100%;

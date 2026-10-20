@@ -47,7 +47,7 @@ export type SidebarAccountMenuProps = {
 /** 店の画面で、どの行を出すか。統括の画面は `hq` で決める。 */
 export function sidebarAccountRows({ hq, role, canReturnToHq }: { hq: boolean; role: string; canReturnToHq: boolean }): Array<'hq' | 'members' | 'billing' | 'support' | 'logout'> {
   if (hq) {
-    // 担当者には請求を出さない（権限表: 課金プランは担当者 不可。v7 の統括と同じ）。
+    // 担当者には請求を出さない（権限表: 課金プランは担当者 不可。管理画面 の統括と同じ）。
     return role === 'staff' ? ['members', 'support', 'logout'] : ['members', 'billing', 'support', 'logout']
   }
   if (role === 'owner' || role === 'admin') {

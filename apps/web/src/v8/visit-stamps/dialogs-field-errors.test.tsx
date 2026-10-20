@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-/* B-139：来店スタンプの小窓。決めるで落ちた欄は、その欄が赤くなり真下に理由が出て、1つ目の欄へ移る。打つ途中は出さない。 */
+/* ：来店スタンプの小窓。決めるで落ちた欄は、その欄が赤くなり真下に理由が出て、1つ目の欄へ移る。打つ途中は出さない。 */
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'

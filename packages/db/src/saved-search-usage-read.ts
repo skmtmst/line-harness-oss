@@ -1,6 +1,6 @@
 import { sqlIdSet } from './id-queries.js';
 import { jstNow } from './utils.js';
-import type {SavedSearchUsageCount,SavedSearchReferenceUsageCount} from './saved-searches.js';
+import type { SavedSearchUsageCount, SavedSearchReferenceUsageCount } from './saved-search-usage-types.js';
 
 export function savedSearchMonth(now = jstNow()): string {
   return now.slice(0, 7);

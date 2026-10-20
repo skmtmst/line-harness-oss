@@ -3,9 +3,9 @@
 import { PageContent } from '@/components/templates/page-frame'
 
 /*
- * ★V8 統括の請求（Pencil `JB8V1`）。
+ * ★V8 統括の請求（Pencil ）。
  *
- * v7 の画面（app/hq/billing/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
+ * 管理画面 の画面（app/hq/billing/page.tsx）と読み書きの口・権限・失敗時の扱いは同じ。
  * 見た目だけを絵どおりに一から組んだ：頭（型 ListPage）・左の「統括の設定」の列
  * （型のフォルダの列）・契約の帯・周期の切り替えと「支払い方法を管理」・プラン3枚・
  * 支払い履歴の表。
@@ -16,6 +16,7 @@ import { PageContent } from '@/components/templates/page-frame'
  * お金が動く操作は新しく作らない：変えるときは確認の窓から、今ある口（支払いの管理＝Stripe の画面）
  * へ渡す。課金の対象外・支払いの管理画面が無いときは、運営へのお問い合わせへ渡す。
  */
+import { PRODUCT_SCOPE, planFeatureLabel } from '@/lib/product-scope'
 import { Check, CreditCard, Download } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -31,7 +32,7 @@ import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api, ApiError } from '@/lib/api'
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import {
   INVOICE_STATUS_LABELS,
   billingBanner,
@@ -69,7 +70,7 @@ export function currentPlanKey(summary: BillingSummary): BillingSummary['planKey
 const INVOICE_WORDS: Record<string, string> = { ...INVOICE_STATUS_LABELS, open: '請求中' }
 
 const TITLE = '請求'
-const DESCRIPTION = 'プランと支払いの記録です。プランの申込はオーナーだけ、支払い方法の管理はオーナーか管理者ができます。'
+const DESCRIPTION = `プランと支払いの記録です。プランの申込はオーナーだけ、支払い方法の管理はオーナーか管理者ができます。${PRODUCT_SCOPE.estimates} ${PRODUCT_SCOPE.boundaries}`
 
 export default function HqBillingV8() {
   return (
@@ -85,7 +86,7 @@ function invoiceDate(iso: string): string {
 }
 
 function BillingInner() {
-  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」（絵 `V8-B/JB8V1`）。
+  // ★V8 上の帯のパンくずは「ホーム › 統括の設定 › 画面名」。
   usePageTitle('請求')
   usePageCrumbs([{ label: '統括の設定', href: '/hq/settings' }])
   const settingsNav = useHqSettingsFolderNav('billing')
@@ -191,7 +192,7 @@ function BillingInner() {
 
   const banner = billingBanner(summary)
   const isOwner = role === 'owner'
-  const canManagePayment = role === 'owner' || role === 'admin'
+  const canManagePayment = canManageRole(role)
   const canChoose = isOwner && summary.state !== 'exempt' && summary.state !== 'active' && summary.state !== 'past_due'
   const currentKey = currentPlanKey(summary)
   /* 契約中の変更は支払いの管理（Stripe の画面）で。管理画面が無い・課金の対象外は運営へ頼む。 */
@@ -270,7 +271,7 @@ function BillingInner() {
                 {plan.features.map((feature) => (
                   <li key={feature} className={styles.feature}>
                     <Check aria-hidden="true" className={styles.check} />
-                    {feature}
+                    {planFeatureLabel(feature)}
                   </li>
                 ))}
               </ul>

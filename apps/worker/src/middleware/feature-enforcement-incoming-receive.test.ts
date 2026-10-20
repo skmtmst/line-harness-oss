@@ -14,7 +14,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { featureEnforcementMiddleware } from './feature-enforcement.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 

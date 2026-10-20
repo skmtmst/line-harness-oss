@@ -74,7 +74,7 @@ it('クーポンとリッチ素材を店側と同じ吹き出しで予約し、�
  {id:'rich',type:'rich_message',content:{assetId:'rich-1',assetName:'お知らせ',baseUrl:'https://example.test/map',baseSize:{width:1040,height:520},tapAreas:[{x:0,y:0,width:100,height:100,actionType:'uri',uri:'https://example.test/book'}]}}];
  const b={...input,accountIds:['shop1'],messageBubblesJson:JSON.stringify(bubbles)};const run=await prepareHqBroadcast(f.db,tenant,'owner',b);await dispatchHqBroadcast(f.db,run,'owner',1);
  const child=f.raw.prepare('SELECT message_type,message_content,message_bubbles_json FROM broadcasts').get() as any;
- const {parseBroadcastMessageParts,buildMessages}=await import('./broadcast-message-set.js');
+ const {parseBroadcastMessageParts,buildMessages}=await import('../features/broadcasts/broadcast-message-set.js');
  expect(buildMessages(parseBroadcastMessageParts({messageType:child.message_type,messageContent:child.message_content,messageBubblesJson:child.message_bubbles_json})).map(m=>m.type)).toEqual(['flex','imagemap']);
 });
 it('人数0・LINE応答なし・失敗の分類を返し、生のエラー本文を返さない',async()=>{
@@ -110,7 +110,7 @@ it('店舗名・LIFFは構造を壊さず吹き出しと実際の子配信へ固
  const values=JSON.parse(stored.message_bubbles_json);
  expect(values[0].content.text).toBe('店"\nA https://liff.line.me/liff-shop1');
  expect(JSON.parse(values[3].content.columnsJson)[0].text).toBe('店"\nA');
- const {parseBroadcastMessageParts,buildMessages}=await import('./broadcast-message-set.js');
+ const {parseBroadcastMessageParts,buildMessages}=await import('../features/broadcasts/broadcast-message-set.js');
  expect(buildMessages(parseBroadcastMessageParts({messageType:stored.message_type,messageContent:stored.message_content,messageBubblesJson:stored.message_bubbles_json})).map(m=>m.type)).toEqual(['text','image','video','template']);
  expect(stored.message_bubbles_json).not.toContain('{{liff_id}}');
 });

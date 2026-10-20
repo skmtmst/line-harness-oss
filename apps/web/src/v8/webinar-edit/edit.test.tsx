@@ -79,11 +79,18 @@ const conflictState = vi.hoisted(() => ({ ctas: false, actions: false }))
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
+const notificationSettings = { webinarId: 'webinar-1', version: 1, registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '19:00', hourBeforeEnabled: false, hourBeforeMinutes: 15, startEnabled: true, missedEnabled: false, missedTime: '10:00', missedWindowDays: 3, completedEnabled: true, updatedAt: '' }
+let notificationReads = 0
+
+const analyticsNet = { hold: false, pending: [] as Array<(value: Response) => void> }
 let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
   clearToastsForTest()
+  notificationReads = 0
+  analyticsNet.hold = false
+  analyticsNet.pending.length = 0
   routerPush.mockReset()
   document.documentElement.dataset.theme = 'v8'
   roleState.role = 'owner'
@@ -106,6 +113,7 @@ beforeEach(() => {
     if (method === 'PUT') {
       puts.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null })
       if (conflictState.ctas && path.endsWith('/ctas')) return json({ success: false, error: 'ほかの人が保存しました', code: 'version_conflict' }, 409)
+      if (path.endsWith('/notifications')) return json({ data: { settings: { ...notificationSettings, ...JSON.parse(String(init?.body)), version: 2 }, queued: 2, cancelled: 1 } })
       if (path.endsWith('/actions')) {
         if (conflictState.actions) return json({ success: false, error: '保存できませんでした' }, 503)
         return json({ data: JSON.parse(String(init?.body)).actions })
@@ -114,12 +122,16 @@ beforeEach(() => {
       return json({ data: { count: 0 } })
     }
     if (path === '/api/webinars/webinar-1') return json({ data: webinar })
+    if (path === '/api/webinars/webinar-2') return json({ data: { ...webinar, id: 'webinar-2', title: '次のウェビナー' } })
     if (path.endsWith('/editor')) return json({ data: editor })
-    if (path.endsWith('/analytics')) return json({ data: analytics })
+    if (path.endsWith('/analytics')) {
+      if (analyticsNet.hold) return new Promise<Response>(done => analyticsNet.pending.push(done))
+      return json({ data: analytics })
+    }
     if (path.endsWith('/participants')) return json({ data: participants })
     if (path.endsWith('/user-comments')) return json({ data: [] })
     if (path.endsWith('/comments')) return json({ data: comments })
-    if (path.endsWith('/notifications')) return json({ data: { settings: { webinarId: 'webinar-1', version: 1, registrationEnabled: true, dayBeforeEnabled: true, dayBeforeTime: '19:00', hourBeforeEnabled: false, hourBeforeMinutes: 15, startEnabled: true, missedEnabled: false, missedTime: '10:00', missedWindowDays: 3, completedEnabled: true, updatedAt: '' }, overview: { total: 10, pending: 0, sent: 9, failed: 1, skipped: 0, cancelled: 0, skippedReasons: [], audience: { people: 10, bookings: 10, definition: 'active_registrations' } } } })
+    if (path.endsWith('/notifications')) { notificationReads += 1; return json({ data: { settings: notificationSettings, overview: { total: 10, pending: 0, sent: 9, failed: 1, skipped: 0, cancelled: 0, skippedReasons: [], audience: { people: 10, bookings: 10, definition: 'active_registrations' } } } }) }
     if (path.endsWith('/actions')) return json({ data: [] })
     if (path.endsWith('/ctas')) return json({ data: [{ atSeconds: 300, kind: 'url', title: '資料', body: null, buttonLabel: '受け取る', autoOpen: false, formId: null, url: 'https://example.com' }] })
     if (path.endsWith('/video-asset')) return json({ data: { asset: null } })
@@ -235,7 +247,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.textContent).toContain('動画と公開期間')
   })
 
-  it('B-169：対象を選んだ後に行を追加し、下書きの帯から視聴後の動きを保存する', async () => {
+  it('対象を選んだ後に行を追加し、下書きの帯から視聴後の動きを保存する', async () => {
     nav.search = 'id=webinar-1&pane=notifications'
     await render(<WebinarEditV8 />)
     await act(async () => fireEvent.click(screen.getAllByRole('button', { name: '行うことを足す' })[0]))
@@ -249,7 +261,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(screen.getByRole('button', { name: '完了のタグ' })).toBeTruthy()
   })
 
-  it('B-169：保存に失敗しても行を残し、もう一度保存できる', async () => {
+  it('保存に失敗しても行を残し、もう一度保存できる', async () => {
     nav.search = 'id=webinar-1&pane=notifications'
     await render(<WebinarEditV8 />)
     await act(async () => fireEvent.click(screen.getAllByRole('button', { name: '行うことを足す' })[0]))
@@ -298,7 +310,7 @@ describe('V8 ウェビナーの編集', () => {
     ] })
     expect(document.body.textContent).toContain('2件保存しました')
   })
-  it('B-139 CTA：別のカードに足りない欄があると、そのカードを開いて見出しの欄へ移り、カードの行に赤い印を付ける', async () => {
+  it('CTA：別のカードに足りない欄があると、そのカードを開いて見出しの欄へ移り、カードの行に赤い印を付ける', async () => {
     nav.search = 'id=webinar-1&pane=cta'
     await render(<WebinarEditV8 />)
     await act(async () => { buttonText('CTA カードを足す')!.click() })
@@ -324,7 +336,7 @@ describe('V8 ウェビナーの編集', () => {
     expect(host.querySelector('#cta-title')?.getAttribute('aria-invalid')).toBeNull()
   })
 
-  it('B-139 動画：差し替えの長さが空なら保存せず、長さの欄に理由を出して移る', async () => {
+  it('動画：差し替えの長さが空なら保存せず、長さの欄に理由を出して移る', async () => {
     nav.search = 'id=webinar-1&pane=video'
     await render(<WebinarEditV8 />)
     const before = puts.length
@@ -415,3 +427,52 @@ it('編集の複製は保存済みの版を送り、一覧で下書きを光ら�
   expect(routerPush).toHaveBeenCalledWith('/webinars?status=draft&highlight=copied-webinar')
   expect(document.querySelector('[role="dialog"]')).toBeNull()
 });
+
+it('集計の通信中に段を移っても重複せず、相手切替前の遅い応答を捨てる', async () => {
+  analyticsNet.hold = true
+  nav.search = 'id=webinar-1&pane=participants'
+  await render(<WebinarEditV8 />)
+  expect(analyticsNet.pending).toHaveLength(1)
+  nav.search = 'id=webinar-1&pane=analytics'
+  await render(<WebinarEditV8 />)
+  expect(analyticsNet.pending).toHaveLength(1)
+  nav.search = 'id=webinar-2&pane=analytics'
+  await render(<WebinarEditV8 />)
+  expect(analyticsNet.pending).toHaveLength(2)
+  await act(async () => { analyticsNet.pending[1](json({ data: { ...analytics, summary: { ...analytics.summary, reservations: 222 } } })) })
+  expect(host.textContent).toContain('222')
+  await act(async () => { analyticsNet.pending[0](json({ data: { ...analytics, summary: { ...analytics.summary, reservations: 111 } } })) })
+  expect(host.textContent).toContain('222')
+  expect(host.textContent).not.toContain('111')
+})
+
+// webinar-notifications-contractのソース文字固定を、実際の親と子の動きへ移す。
+it('通知の段は初回だけ取得し、段を移ってブラウザで戻っても入力と未保存の印を保ち、親から保存できる', async () => {
+  nav.search = 'id=webinar-1&pane=notifications'
+  await render(<WebinarEditV8 />)
+  expect(notificationReads).toBe(1)
+  expect(host.textContent).not.toContain('保存していない変更があります')
+  const toggle = screen.getByRole('checkbox', { name: '申込のお礼', exact: true }) as HTMLInputElement
+  expect(toggle.checked).toBe(true)
+  await act(async () => { fireEvent.click(toggle) })
+  expect(toggle.checked).toBe(false)
+  expect(host.textContent).toContain('保存していない変更があります')
+  expect(puts.filter(row => row.path.endsWith('/notifications'))).toHaveLength(0)
+  await act(async () => { screen.getByRole('button', { name: '基本設定に戻る', exact: true }).click() })
+  await act(async () => {
+    window.history.replaceState(null, '', '?id=webinar-1&pane=notifications')
+    window.dispatchEvent(new Event('popstate'))
+  })
+  expect(notificationReads).toBe(1)
+  const returned = screen.getByRole('checkbox', { name: '申込のお礼', exact: true }) as HTMLInputElement
+  expect(returned).toBe(toggle)
+  expect(returned.checked).toBe(false)
+  const save = screen.getByRole('button', { name: '下書きを保存', exact: true }) as HTMLButtonElement
+  expect(save.disabled).toBe(false)
+  await act(async () => { save.click() })
+  const writes = puts.filter(row => row.path.endsWith('/notifications'))
+  expect(writes).toHaveLength(1)
+  expect(writes[0].body).toMatchObject({ registrationEnabled: false })
+  expect(returned.checked).toBe(false)
+  expect(host.textContent).not.toContain('保存していない変更があります')
+})

@@ -12,7 +12,7 @@ const MERGED = readFileSync(join(HERE, 'merged-tabs.tsx'), 'utf8')
 const SRC = join(HERE, '..', '..')
 const NEN_MEMBERS = readFileSync(join(SRC, 'app', 'nen', 'members', 'page.tsx'), 'utf8')
 const NEN_HEALTH = readFileSync(join(SRC, 'app', 'nen', 'health', 'page.tsx'), 'utf8')
-// 入口は V8 の画面を出すだけになった（2026-10-09 V7 削除）。V8 の本体を見る。
+// 入口は V8 の画面を出すだけになった（2026-10-09 管理画面 削除）。V8 の本体を見る。
 // 統括の設定の中のメニューは、店の設定と同じ共通の形（SettingsMenu）を使う（2026-10-15）。
 
 /*

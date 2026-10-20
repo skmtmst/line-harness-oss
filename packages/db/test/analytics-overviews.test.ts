@@ -6,14 +6,8 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FEATURE_IDS } from '@line-crm/shared';
 
-import {
-  getAnalyticsFriendsOverview,
-  getAnalyticsReactionsOverview,
-  getAnalyticsRoutesOverview,
-  getAnalyticsUrlClicksOverview,
-  getAnalyticsUsageOverview,
-  type AnalyticsOverviewContext,
-} from '../src/analytics-overviews.js';
+import { getAnalyticsFriendsOverview, getAnalyticsReactionsOverview, getAnalyticsRoutesOverview, getAnalyticsUrlClicksOverview, getAnalyticsUsageOverview } from '../src/analytics-overviews.js';
+import { type AnalyticsOverviewContext } from '../src/analytics-overviews-types.js';
 import { setFriendSupportMarkBulk } from '../src/support-marks.js';
 import { analyticsWindow, analyticsWindowWhere } from '../src/utils.js';
 import { asD1 } from './d1-test-helper.js';
@@ -30,7 +24,7 @@ const CONTEXT: AnalyticsOverviewContext = {
   dataCutoffAt: '2026-08-30T16:00:00.000Z',
 };
 
-describe('V6分析の概要4画面', () => {
+describe('分析の概要4画面', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 

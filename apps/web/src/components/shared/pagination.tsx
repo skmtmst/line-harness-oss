@@ -12,7 +12,7 @@ export type PaginationProps = {
   disabled?: boolean
   className?: string
   /**
-   * ★V8（jX2Uw）：帯の左端に出す件数の文。v7 では帯の外に従来の件数
+   * ★V8（jX2Uw）：帯の左端に出す件数の文。互換経路では帯の外に従来の件数
    * 表示があるので、この中身は v8 のときだけ出る。
    */
   summary?: React.ReactNode
@@ -59,7 +59,7 @@ function Ellipsis() {
   )
 }
 
-/** B-231・固定版jX2Uw。1ページでも現在地と前・次を残す。 */
+/** ・固定版jX2Uw。1ページでも現在地と前・次を残す。 */
 export default function Pagination({
   page,
   pageCount,

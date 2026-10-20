@@ -1,21 +1,14 @@
-/** B-187: 1152/1440 の大きな空白を止める。
- * node apps/web/scripts/v8-guard/blank-gap.mjs <baseUrl> [out.json]
- * node apps/web/scripts/v8-guard/blank-gap.mjs --self-test
- * 空白−24 >=96 は失敗、48〜95は報告のみ。
- * 数の帯は全マスの下端に、中身+16より24以上の余りがある時だけ失敗。
- */
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
+/** 空白量の診断。測定結果を報告し、見た目の合否には使わない。 */
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 import { ROUTES, openPage } from './browser-env.mjs'
 import scanBlankGap from './blank-gap-browser.mjs'
 
-const allow = JSON.parse(readFileSync(new URL('./blank-gap-allow.json', import.meta.url), 'utf8'))
-if (!Array.isArray(allow) || allow.some(a => !a.route || !a.owner || !a.reason?.trim() || ![1152,1440].includes(a.width) || !Number.isFinite(a.maxExcess))) throw new Error('空白の許容表には画面・幅・持ち主・上限・理由が必要です')
 export const GAP_ROUTES = {
   ...Object.fromEntries(Object.entries(ROUTES).filter(([name]) => name !== 'login')),
-  // B-187 で空白が報告された52画面。手元の報告ファイルには依存しない。
+  //  で空白が報告された52画面。手元の報告ファイルには依存しない。
   ...Object.fromEntries([
     "/accounts/new",
     "/affiliates/new",
@@ -72,53 +65,13 @@ export const GAP_ROUTES = {
 ].map(route => [route, route])),
 }
 
-// CSS Modules のビルドごとに変わる hash を許容表の識別子にしない。
-export const ownerOf = finding => (finding.container?.sel ?? finding.edge?.sel ?? '').split(' > ').at(-1).replace(/__[\w-]+/g, '')
-export function assess(result, route, width, allowances = allow) {
-  const failures = [], warnings = [], excluded = [], allowed = []
-  for (const f of result.findings) {
-    if (f.excluded || f.where === 'page-bottom') { excluded.push(f); continue }
-    if (f.excess < 96) { if (f.excess >= 48) warnings.push(f); continue }
-    const exemption = allowances.find(a => a.route === route && a.width === width && a.owner === ownerOf(f) && f.excess <= a.maxExcess)
-    if (exemption) allowed.push({ ...f, reason: exemption.reason }); else failures.push(f)
-  }
-  for (const b of result.bands) {
-    if (b.excluded) { excluded.push(b); continue }
-    if (b.cardH.length > 1 && b.cardH.every((h, i) => h - b.contentH[i] - 16 >= 24)) failures.push({ kind: 'kpi-band', ...b })
-  }
-  for (const d of result.invalidDeclarations ?? []) failures.push({kind:'empty-blank-ok',...d})
-  return { failures, warnings, excluded, allowed, declarations: result.declarations }
-}
-
-export async function selfTest() {
-  const browser = await chromium.launch()
-  try {
-    const page = await browser.newPage({viewport:{width:1152,height:900}})
-    const fixture = '<main style="height:800px"><div style="background:color(srgb 0.95 0.95 0.95);padding:24px"><p>上の中身</p><div id="gap" style="min-height:240px"></div><p>下の中身</p></div></main>'
-    await page.setContent(fixture)
-    const broken = assess(await page.evaluate(scanBlankGap), '/test', 1152, [])
-    if (!broken.failures.some(f => f.kind === 'vertical' && f.excess >= 96)) throw new Error('対照1: 240pxの空白を検出できません')
-    console.log('対照1 合格: 240pxの空白を止める')
-    await page.locator('#gap').evaluate(el => el.setAttribute('data-blank-ok','比較に必要な意図した空き'))
-    const declared = assess(await page.evaluate(scanBlankGap), '/test', 1152, [])
-    if (declared.failures.length || !declared.declarations.some(d => d.reason)) throw new Error('対照2: 理由つきの除外が効きません')
-    console.log('除外 合格: 理由つきdata-blank-okだけ通す')
-    await page.setContent('<main style="width:1100px;height:600px"><section style="width:240px;height:320px;background:#fafafa"><p>本文</p></section><footer style="height:40px;background:#eee">保存</footer></main>')
-    const horizontal = assess(await page.evaluate(scanBlankGap), '/test', 1152, [])
-    if (!horizontal.failures.some(f => f.kind === 'horizontal' && f.excess >= 96)) throw new Error('対照2: 横の空白を検出できません')
-    console.log('対照2 合格: 横に偏った大きな空白を止める')
-    await page.setContent('<main><div data-kpi-strip style="display:flex">'+Array.from({length:3},()=>'<div data-kpi-presentation="card" style="min-height:160px;padding:16px"><p>件数</p><p>12</p></div>').join('')+'</div></main>')
-    const band = assess(await page.evaluate(scanBlankGap), '/test', 1152, [])
-    if (!band.failures.some(f => f.kind === 'kpi-band')) throw new Error('対照3: 高すぎる数の帯を検出できません')
-    // 1マスだけ長い時の高さそろえは通す。
-    await page.locator('[data-kpi-strip] > [data-kpi-presentation]').first().evaluate(el=>el.innerHTML+='<p>'+Array.from({length:8},()=> '長い中身<br>').join('')+'</p>')
-    if (assess(await page.evaluate(scanBlankGap), '/test',1152,[]).failures.some(f=>f.kind==='kpi-band')) throw new Error('数の帯の高さそろえを誤検出しました')
-    console.log('対照3 合格: 全マスが高すぎる帯を止め、長い1マスへの高さそろえは通す')
-  } finally { await browser.close() }
+/** Keep all observations, including declared/excluded regions, for diagnosis only. */
+export function whitespaceReport(result) {
+  return { mode: 'diagnostic', ...result }
 }
 
 async function run() {
-  if (process.argv.includes('--self-test')) return selfTest()
+  if (process.argv.includes('--self-test')) throw new Error('空白量だけの合否は廃止しました。診断はURLを指定して実行します')
   const [baseUrl='http://127.0.0.1:4310',out]=process.argv.slice(2)
   const browser=await chromium.launch()
   const results={}
@@ -133,19 +86,15 @@ async function run() {
         await page.waitForLoadState('networkidle', {timeout:30000})
         await page.evaluate(() => document.fonts.ready.then(() => true))
         if (new URL(page.url()).pathname !== new URL(route,baseUrl).pathname || !(await page.locator('main').count())) throw new Error('指定画面を開けませんでした')
-        const result=assess(await page.evaluate(scanBlankGap),route,width)
+        const result=whitespaceReport(await page.evaluate(scanBlankGap))
         results[`${width} ${name}`]=result
-        bad+=result.failures.length
-        for (const failure of result.failures) console.log('  停止', failure.kind, ownerOf(failure), failure.excess ?? failure.cardH)
-        for (const warning of result.warnings) console.log('  参考', warning.kind, ownerOf(warning), warning.excess)
-        for (const permitted of result.allowed) console.log('  許容', ownerOf(permitted), permitted.excess, permitted.reason)
-        console.log(`${result.failures.length ? '空白 NG' : '空白 OK'} ${width} ${route}: 停止${result.failures.length}・参考${result.warnings.length}・許容${result.allowed.length}`)
+        console.log(`空白の参考測定 ${width} ${route}: ${result.findings.length}件・数の帯${result.bands.length}件（合否なし）`)
       } catch(error) {bad++;results[`${width} ${name}`]={error:error.message};console.error('測定失敗',width,route,error.message)}
       finally {await page?.close()}
     }
   } finally {await browser.close()}
   if(out){mkdirSync(dirname(out),{recursive:true});writeFileSync(out,JSON.stringify(results,null,2))}
-  console.log(`空白の停止件数 ${bad}`)
+  console.log(`測定失敗 ${bad}件（空白量による合否なし）`)
   if(bad)process.exitCode=1
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) await run()

@@ -13,23 +13,23 @@ import { parseUidCsv, splitUidCsvLine } from './migration'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = [
-  'migration.tsx',
-  'use-uid-migration.ts',
-  'uid-migration-v8.tsx',
+  './migration.tsx',
+  './use-uid-migration.ts',
+  './uid-migration.tsx',
 ].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 /* #984 LAY-14: 友だち配下の主タブの正本。 */
-const TABS = readFileSync(join(HERE, '..', 'friends', 'friends-tabs.ts'), 'utf8')
-const NAV = readOwnFile(join(HERE, '../friends/friends-nav-v8.tsx'), 'utf8')
-const CSS = readFileSync(join(HERE, '../friends/friends-v8.module.css'), 'utf8')
+const TABS = readFileSync(new URL('../../v8/friends/friends-tabs.ts', import.meta.url), 'utf8')
+const NAV = readOwnFile(join(HERE, '../friends/friends-nav.tsx'), 'utf8')
+const CSS = readFileSync(new URL('../friends/friends-v8.module.css', import.meta.url), 'utf8')
 
 /**
- * UID移行の対応表（設計 ★V6 機能3 `vtBCu`）。点検 #496 の項目2・6・9。
+ * UID移行の対応表（設計 ★管理画面 機能3 `vtBCu`）。点検 #496 の項目2・6・9。
  *
  * **21件目以降も判断できる**こと（ページ送り＋未判断のみ）、
  * **引用符・列ずれの行を結び付けない**こと、**一致先なしに
  * 新規作成を選ばせない**ことを守る。
  */
-describe('V6 機能3 UID移行の対応表', () => {
+describe("管理画面 機能3 UID移行の対応表", () => {
   it('引用符の中のカンマで列をずらさない', () => {
     expect(splitUidCsvLine('U1,"山田,太郎",x')).toEqual(['U1', '山田,太郎', 'x'])
   })
@@ -147,7 +147,7 @@ describe('UID移行のタブと段組み（#984 LAY-13/14）', () => {
 
   /*
    * 右端の「移行履歴」は下の履歴節へ飛ぶだけの補助リンクで、同じ節が
-   * 画面内に常に見えるため置かない（重複を出さない・V7判断 2026-09-26）。
+   * 画面内に常に見えるため置かない（重複を出さない・管理画面判断 2026-09-26）。
    * 以前この補助リンクの存在を固定していたが、使いやすさの直しを優先し
    * 存在固定をやめる。「CSVで書き出す・取り込む」は別画面への導線なので残す。
    */
@@ -200,11 +200,11 @@ describe('UID移行の5段階表示（#1015 CHK-06）', () => {
 })
 
 /**
- * カード同士の縦の間隔そろえ（★V7 16px・2026-09-26）。
+ * カード同士の縦の間隔そろえ（★管理画面 16px・2026-09-26）。
  * 親を縦並び＋gap-4 にし、子ごとの mb/mt で間隔を作らない。
  * 空の案内も白地・枠・角丸のカードの中に出す（灰色の地だけにしない）。
  */
-describe('UID移行のカード間隔（★V7 gap-4）', () => {
+describe("UID移行のカード間隔", () => {
   it('画面の親は縦並び＋gap-4 で、カード間の mb/mt を持たない', () => {
     expect(PAGE).toContain('className={styles.board} data-design-node="Z0jHp"')
     expect(CSS).toMatch(/\.board\s*\{[^}]*gap: 16px/s)

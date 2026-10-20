@@ -10,9 +10,9 @@ const DETAIL = readFileSync(join(HERE, 'detail-v8.tsx'), 'utf8')
 const RESERVED = readFileSync(join(HERE, 'reserved-v8.tsx'), 'utf8')
 
 /*
- * V8 一斉配信の細かい板（P6vbxn・NtCE3・BeNtj）。
- * 一覧の閲覧のみと予約の取り消しは同じ画面の状態として板IDを付ける。v7 は変えない。
- * かんたんに送る（P6vbxn）の小窓は今の V8 一覧に無い（古い list-v8.tsx だけが出していた）ので見張りを外した。
+ * V8 一斉配信の細かい板（・・）。
+ * 一覧の閲覧のみと予約の取り消しは同じ画面の状態として板IDを付ける。互換経路は変えない。
+ * かんたんに送るの小窓は今の V8 一覧に無い（古い list-v8.tsx だけが出していた）ので見張りを外した。
  */
 describe('一斉配信の細かい板', () => {
   it('一覧の閲覧のみに板IDを付ける（NtCE3）', () => {

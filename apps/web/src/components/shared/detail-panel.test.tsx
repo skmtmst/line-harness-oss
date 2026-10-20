@@ -93,7 +93,7 @@ describe('useDetailPanelUrl（URL に今の行を残す）', () => {
   })
 })
 
-it('詳細は一覧の下へ挿入せず外側に重ね、開いた焦点で一覧をスクロールしない（B-38）', () => {
+it('詳細は一覧の下へ挿入せず外側に重ね、開いた焦点で一覧をスクロールしない', () => {
   const focus=vi.spyOn(HTMLElement.prototype,'focus')
   const { container }=renderPanel()
   const dialog=screen.getByRole('dialog',{ name:'配信A' })

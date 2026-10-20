@@ -1,6 +1,6 @@
 
 import { formatNumber as polishFormatNumber } from '@/lib/format'
-/* app/line-notifications/customer-kpis.ts から写した。題「今日 送った」と送信枠の数の書き方（「1,041 / 5,000」）だけ ★V8 g3iDs に合わせた。 */
+/* app/line-notifications/customer-kpis.ts から写した。題「今日 送った」と送信枠の数の書き方（「1,041 / 5,000」）だけ ★V8  に合わせた。 */
 export type CustomerNotificationKpi = {
   label: string
   value: number | '上限なし' | null
@@ -16,7 +16,7 @@ export type LineNotificationQuota =
   | { state: 'unlimited'; total: null; used: number; remaining: null; asOf: string }
   | { state: 'unavailable'; total: null; used: null; remaining: null; asOf: null; reason: string }
 
-/** 板 g3iDs の4枚。数は実データだけ。見本の数字は書かない。 */
+/** 板  の4枚。数は実データだけ。見本の数字は書かない。 */
 export function customerNotificationKpis(input: {
   ready: boolean
   sentToday: number | null

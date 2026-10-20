@@ -1,6 +1,6 @@
 
 /*
- * ★V8 運用者へのお知らせを作る・なおす（板 gjUz3・hiBO8）。
+ * ★V8 運用者へのお知らせを作る・なおす（板 ・）。
  * 値は globals.css の [data-theme="v8"] の --tpl-hb2-op-* と共通の --tpl-* から。
  */
 
@@ -129,7 +129,7 @@
   font-size: var(--text-label);
 }
 
-/* 公開前の確認の窓（板 sDXNy）：要約の帯（題150・値）→ 宛先の行（名前200・役割・札）→ 注記 → 線の下に右寄せのボタン。 */
+/* 公開前の確認の窓（板 ）：要約の帯（題150・値）→ 宛先の行（名前200・役割・札）→ 注記 → 線の下に右寄せのボタン。 */
 .confirmBody {
   display: flex;
   flex-direction: column;
@@ -181,7 +181,7 @@
   border-top: 1px solid var(--color-hairline);
 }
 
-/* 保存で落ちた欄（B-139）。枠を危険の色にする。 */
+/* 保存で落ちた欄。枠を危険の色にする。 */
 .input[aria-invalid='true'] {
   border-color: var(--color-danger);
   outline-color: var(--color-danger);

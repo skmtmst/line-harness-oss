@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 複数選択（★V7 `WUVcz` §2）。
+ * 複数選択（★管理画面 `WUVcz` §2）。
  * 札・+N・選んでも閉じない・Backspace で最後の札を外す、までを見る。
  */
 import React, { useState } from 'react'
@@ -29,7 +29,7 @@ function Harness({ initial = ['nen', 'regular'], ...rest }: Partial<React.Compon
   )
 }
 
-describe('複数選択（★V7 WUVcz）', () => {
+describe('複数選択（★管理画面 WUVcz）', () => {
   it('札で並べ、入り切らない分は「+N」', () => {
     render(<Harness initial={['nen', 'regular', 'proposal', 'cancel', 'gift']} maxChips={2} />)
     expect(screen.getByText('NEN会員')).toBeTruthy()

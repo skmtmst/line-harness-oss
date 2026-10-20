@@ -2,7 +2,8 @@ import {
   claimWorkflowStep,ensureWorkflowStep,failWorkflowStep,getWorkflowStep,finishWorkflowStep,
   workflowFence,workflowJson,type WorkflowStepRef,
 } from '@line-crm/db';
-import { WorkflowDeferred } from './workflow-execution.js';
+
+import { WorkflowDeferred } from './workflow-error.js';
 import { classifySingleStatement } from './incoming-webhook-fenced-db.js';
 
 const aliasesForDb=new WeakMap<D1Database,Map<string,string>>();

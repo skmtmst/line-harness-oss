@@ -12,7 +12,7 @@ import styles from './folder-dot.module.css'
  * フォルダの見せる色。色が空のフォルダ（色の仕組みより前に作ったもの）は、名前から9色の1つを決まった形で選ぶ
  * （2026-10-09 オーナー「フォルダで色がつくように」）。左の列と表の丸が同じ色になるよう、どちらもこれを使う。
  */
-/* 同じ名前はいつも同じ色（B-136：色の無いフォルダが灰色の丸ばかりで、列と行の丸で見分けがつかなかった）。 */
+/* 同じ名前はいつも同じ色（：色の無いフォルダが灰色の丸ばかりで、列と行の丸で見分けがつかなかった）。 */
 export function folderDisplayColor(folder: { name: string; color?: string | null }): string {
   if (folder.color) return folder.color
   let hash = 0
@@ -62,7 +62,7 @@ function nameText(node: ReactNode): string {
  * フォルダを使う一覧は畳んだ幅でも丸を出す。機能の無い一覧は型が丸を外す。
  */
 export function FolderDotName({ folder, nameCarriesDot, children, annotation, selection }: { folder?: FolderDotFolder | null; dot?: boolean; nameCarriesDot?: boolean; children: ReactNode; annotation?: ReactNode; selection?: ReactNode }) {
-  /* nameCarriesDot：名前そのものが色の丸を持つ札（統括のタグ DzdC3）。丸を二重に置かない（古い dot={false} は B-194 で効かないまま）。 */
+  /* nameCarriesDot：名前そのものが色の丸を持つ札（統括のタグ ）。丸を二重に置かない（古い dot={false} は  で効かないまま）。 */
   const listHasFolders = useContext(ListFolderContext)
   const hasFolders = nameCarriesDot ? false : listHasFolders ?? (folder !== undefined)
   const parts = Children.toArray(children)

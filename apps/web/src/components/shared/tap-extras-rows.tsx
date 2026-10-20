@@ -8,7 +8,7 @@ import { TextField } from '@/components/shared/text-field'
 import { FieldError } from '@/components/shared/form-controls'
 
 /*
- * ★V8 リサーチの選択肢が選ばれたら行うこと（絵 EsYo4「行うことを足す（B-169）」）。
+ * ★V8 リサーチの選択肢が選ばれたら行うこと（絵 「行うことを足す」）。
  * 保存の形は今までどおり TapExtras（タグを付ける・スコアを足す）。見せ方だけ共通の「行うこと」の行にする。
  */
 type Kind = 'tag' | 'score'

@@ -24,9 +24,9 @@ import Notice from '@/components/shared/notice'
 import Card from '@/components/shared/card'
 
 /**
- * 運営の監査ログ V8（絵 `e7ljE`）。
+ * 運営の監査ログ V8。
  *
- * 動きは v7（app/ops/audit）と同じ口：種類（代理ログイン・個人情報の表示・
+ * 動きは 管理画面（app/ops/audit）と同じ口：種類（代理ログイン・個人情報の表示・
  * 契約先の停止・運営メンバー）と期間で /api/ops/audit を読み、50件ずつ送る。
  * CSV はいまの条件で全部（上限 2万件）を書き出す。記録は消せない。
  */

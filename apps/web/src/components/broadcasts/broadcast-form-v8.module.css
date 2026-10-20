@@ -1,4 +1,4 @@
-/* ★P3 FU2aU.html: 頭 16×24、入力 24、右の欄380、下の操作帯。 */
+/* ★P3 .html: 頭 16×24、入力 24、右の欄380、下の操作帯。 */
 .root {
   container: broadcast-create / inline-size;
   min-width: 0;
@@ -67,9 +67,6 @@
 .preview { min-width: 0; padding: var(--space-24) var(--space-24); background: var(--color-surface-pearl); border-left: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--space-14); align-items: center; }
 .previewHead { display: flex; align-items: center; gap: var(--space-8); width: 100%; }
 .previewHead h3 { flex: 1; white-space: nowrap; }
-.deviceSwitch { display: flex; align-items: center; border-radius: var(--radius-control); background: var(--color-canvas-sunken); }
-.deviceSwitch button { font-size: 12px; padding: var(--space-4) var(--space-8); height: 28px; }
-.deviceSwitch button[aria-pressed='true'] { background: var(--color-canvas); color: var(--color-ink); }
 .phonePreview { width: 100%; }
 .phonePreview :global(section > p:first-child), .pcPreview :global(section > p:first-child) { display: none; }
 .pcPreview { width: 100%; }
@@ -150,6 +147,5 @@
 .root[data-step='message'] .previewSummary { padding-top: 17px; }
 .root[data-step='message'] .previewSummary h3 { line-height: 18px; }
 .root[data-step='message'] .previewActions { margin-top: -7px; }
-.root[data-step='message'] .deviceSwitch button { padding-left: 14px; padding-right: 14px; }
 /* 動画の枠とプレビュー画像の小さい枠を横に並べる（MediaSlot・Z7vd2）。 */
 .mediaRow { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-slot-w-compact); gap: var(--tpl-slot-row-gap); align-items: start; }

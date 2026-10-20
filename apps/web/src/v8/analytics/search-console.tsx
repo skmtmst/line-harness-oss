@@ -26,7 +26,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { TextField } from '@/components/shared/text-field'
 
 /*
- * ★V8 Search Console（Pencil `h1G4d`・`/search-console`）。
+ * ★V8 Search Console（Pencil ・`/search-console`）。
  * 板の頭（CSV）→ 数の帯（合計クリック数・合計表示回数・平均CTR・平均掲載順位）→ 道具の段
  * （対象プロパティ・連携中・期間・連携を設定）→ 検索クリックの推移 → キーワード・ページ上位・デバイス別 → 見かたの注意。
  * つないでいないとき・閲覧権限が無いときは設定の案内。

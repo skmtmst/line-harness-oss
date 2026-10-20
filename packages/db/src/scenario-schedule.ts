@@ -1,4 +1,4 @@
-import type { DeliveryMode } from './scenarios.js';
+import type { DeliveryMode } from './scenarios/types/index.js';
 
 export interface ScenarioRow {
   delivery_mode: DeliveryMode;

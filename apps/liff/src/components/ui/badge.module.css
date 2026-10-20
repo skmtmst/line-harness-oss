@@ -1,0 +1,2 @@
+.pending { display: inline-flex; align-items: center; gap: var(--liff-space-2, 8px); padding: 2px var(--liff-space-2, 8px); border-radius: 999px; background: var(--liff-pending-bg); color: var(--liff-pending-ink); font-size: 12px; line-height: 18px; font-weight: 600; white-space: nowrap; }
+.dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--liff-pending-dot); }

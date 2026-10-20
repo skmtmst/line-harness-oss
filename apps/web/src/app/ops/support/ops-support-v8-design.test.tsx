@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 /*
- * 板 `P0jhqO` 運営お問い合わせの絵合わせ（V8）。
+ * 板  運営お問い合わせの絵合わせ（V8）。
  * - 頭：説明＋代わりに起票する
- * - 左：チケットを探す、状態・優先度・並びの選ぶ欄（B-205）、
+ * - 左：チケットを探す、状態・優先度・並びの選ぶ欄、
  *   優先度：すべて、並び替え：優先度、行に契約先・優先度
  * - 右：契約先を開く・代理ログイン、1行の契約先情報、
  *   足元に解決済みにする・クローズする・下書きを保存する・返信する
@@ -97,7 +97,7 @@ describe('P0jhqO お問い合わせの絵合わせ', () => {
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
     expect(help.getAttribute('aria-expanded')).toBe('false')
     expect(body).toContain('代わりに起票する')
-    // B-205：細い列に札を並べず、状態の選択で同じ取得口へ届く。
+    // ：細い列に札を並べず、状態の選択で同じ取得口へ届く。
     expect(host.querySelector('.v6-filter-chip')).toBeNull()
     const state = host.querySelector<HTMLButtonElement>('button[aria-label="状態で絞る"]')!
     expect(state.textContent).toContain('状態：すべて')

@@ -1,19 +1,22 @@
+import { trackedLinkFriendMatches } from './tracked-link-identity.js';
 import { applyTapExtras } from './tap-extras.js';
 import type { TapExtras } from '@line-crm/shared';
 import {featureJobCanRun} from './feature-enforcement.js';
 import { ensureWorkflowStep,prepareWorkflowStep,getWorkflowStep,recordLinkClick,jstNow,enrollFriendInScenario,trackConversion } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { acquireWorkflow } from './workflow-execution.js';
 import { awardActivityMileage } from './activity-mileage.js';
 import { applyActionScoreEvent } from './action-score-events.js';
-import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
-import { attachTagAndFireSideEffects } from './friend-tag-attach.js';
+import { dispatchAutomationEventWithLogging } from '../features/automations/automation-triggers/index.js';
+import { attachTagAndFireSideEffects } from '../features/friends/friend-tag-attach/index.js';
 
 export interface TrackedClickPlan {
   linkId:string;friendId:string|null;accountId:string|null;tagId:string|null;scenarioId:string|null;
-  clickedAt:string;linkName:string;conversionPointIds:string[];tapExtras?:TapExtras;
+  clickedAt:string;linkName:string;conversionPointIds:string[];tapExtras?:TapExtras;identityVerified?:true;
 }
 export async function recordTrackedClick(db:D1Database,plan:Omit<TrackedClickPlan,'clickedAt'>){
+  if(plan.friendId && plan.identityVerified !== true) throw new Error('tracked_click_identity_unverified');
+  if(plan.friendId && !await trackedLinkFriendMatches(db,plan.friendId,plan.accountId)) throw new Error('tracked_click_account_changed');
   const id=crypto.randomUUID(),now=jstNow(),saved={...plan,clickedAt:now};
   const ref={scopeId:`line:${plan.accountId ?? 'default'}`,processKind:'tracked_click',subjectId:id,stepKey:'__run'};
   await recordLinkClick(db,plan.linkId,plan.friendId,{id,now,statements:[prepareWorkflowStep(db,ref,{input:saved,maxAttempts:5})]});
@@ -29,11 +32,9 @@ export async function processTrackedClick(env:Env['Bindings'],clickId:string,pla
   if(!execution)return;
   plan=JSON.parse((await getWorkflowStep(env.DB,execution.ref))!.input_json!);
   try {
+    if(plan.friendId && plan.identityVerified !== true) throw new Error('tracked_click_identity_unverified');
     if(plan.accountId && !await featureJobCanRun(env.DB,{accountId:plan.accountId,featureId:'inflow_tracking',job:'durable tracked click continuation'})){await execution.release();return}
-    if(plan.friendId && plan.accountId){
-      const current=await env.DB.prepare('SELECT line_account_id FROM friends WHERE id=?').bind(plan.friendId).first<{line_account_id:string|null}>();
-      if(current?.line_account_id!==plan.accountId)throw new Error('tracked_click_account_changed');
-    }
+    if(plan.friendId && !await trackedLinkFriendMatches(env.DB,plan.friendId,plan.accountId)) throw new Error('tracked_click_account_changed');
     const step=<T>(key:string,work:(db:D1Database)=>Promise<T>)=>execution.step(key,()=>work(execution.mutationDb(key)));
     if(plan.friendId){
       const friendId=plan.friendId;

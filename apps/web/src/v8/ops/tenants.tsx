@@ -6,7 +6,7 @@ import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus } from 'lucid
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import { formatDate, formatDateTime, PLAN_STATUS_LABEL, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
-import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
@@ -28,9 +28,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /**
- * 運営の契約先アカウント V8（絵 `XWtYC`・作る窓 `i0FTN`）。
+ * 運営の契約先アカウント V8（絵の作る窓 ）。
  *
- * 動きは v7（app/ops/tenants）と同じ口：/api/ops/tenants を検索語で読み、状態の札で絞る。
+ * 動きは 管理画面（app/ops/tenants）と同じ口：/api/ops/tenants を検索語で読み、状態の札で絞る。
  * `?status=` で絞り込みを受け取る（ダッシュボードの要対応から来る）。
  * 契約先の名前から詳細へ。代理ログインは詳細の画面から行う。
  * 「契約先を作る」は書ける運営メンバーにだけ出す（閲覧のみの人には出さない）。
@@ -39,8 +39,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 function loadDescription(err: unknown): string | undefined {
   if (isForbiddenOrRateLimited(err)) return undefined
   if (err instanceof TypeError) return '通信できませんでした。ネットワークを確認してもう一度お試しください'
-  if (err instanceof Error && err.message && !/^API error: /.test(err.message)) return err.message
-  return undefined
+  return describeApiFailure(err, '読み込み', { scope: 'hq' })
 }
 
 const STATUS_FILTERS: Array<{ key: string; label: string }> = [
@@ -123,7 +122,7 @@ export default function OpsTenantsV8() {
   }
 
   const create = async () => {
-    if (createBusy) return
+
     if (!newName.trim()) { setCreateError('統括名を入力してください'); return }
     setCreateBusy(true)
     setCreateError('')

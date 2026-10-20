@@ -1,5 +1,6 @@
+import { logger, traceQueueMessage } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { verifySupportRelay } from '../services/support-relay.js';
 import {
   handleSlackTaskAction,
@@ -10,19 +11,8 @@ import {
 } from '../services/codex-slack-relay.js';
 import { verifySlackRequest } from '../services/slack-signature.js';
 import { parseCodexAuditApproval } from '../services/codex-auto-merge.js';
-import {
-  hasClaudeToCodexMarker,
-  hasActualSlackMention,
-  isAllowedRelayChannel,
-  isAllowedRelaySource,
-  isAutomaticCodexRelay,
-  isCodexRelayEnabled,
-  markCodexMentionFailed,
-  observeOfficialCodexReply,
-  parseSlackEventEnvelope,
-  recordSlackMention,
-  type CodexMentionQueueMessage,
-} from '../services/codex-cloud-monitor.js';
+import { hasClaudeToCodexMarker, hasActualSlackMention, isAllowedRelayChannel, isAllowedRelaySource, isAutomaticCodexRelay, isCodexRelayEnabled, markCodexMentionFailed, observeOfficialCodexReply, parseSlackEventEnvelope, recordSlackMention } from '../services/codex-cloud-monitor.js';
+import { type CodexMentionQueueMessage } from '../services/codex-cloud-types.js';
 
 const MAX_BODY_BYTES = 32 * 1024;
 const ALLOWED_EVENT_TYPES = new Set(['prompt_submitted', 'turn_completed', 'approval_required']);
@@ -160,7 +150,7 @@ codexSlackEvents.post('/api/integrations/codex-slack/events', async (c) => {
     const result = await relayCodexSlackEvent(c.env, event);
     return c.json({ success: true, ...result });
   } catch (error) {
-    console.error(JSON.stringify({"code":"codex_slack_relay_failed","route":"POST /api/integrations/codex-slack/events"}));
+    logger.error("codex_slack_relay_failed");
     return c.json({ success: false, error: 'Slack relay failed' }, 502);
   }
 });
@@ -201,7 +191,7 @@ codexSlackEvents.post('/api/integrations/slack/actions', async (c) => {
     if (message.includes('INVALID_')) {
       return c.json({ success: false, error: 'Invalid Slack task action' }, 400);
     }
-    console.error(JSON.stringify({"code":"slack_task_action_failed","route":"POST /api/integrations/slack/actions"}));
+    logger.error("slack_task_action_failed");
     return c.json({ success: false, error: 'Slack task action failed' }, 502);
   }
 });
@@ -254,13 +244,13 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
   if (event.user === c.env.CODEX_SLACK_USER_ID && event.thread_ts) {
     const observed = await observeOfficialCodexReply(c.env, event.channel, threadTs, event.text);
     if (observed.duplicateRisk) {
-      await c.env.CODEX_MENTION_QUEUE.send({
+      await c.env.CODEX_MENTION_QUEUE.send(traceQueueMessage({
         kind: 'notify_duplicate',
         slackEventId: envelope.event_id,
         channelId: event.channel,
         threadTs,
         officialTaskUrl: observed.taskUrl,
-      });
+      }));
     }
     return c.json({ success: true, observed: observed.tracked });
   }
@@ -277,7 +267,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     autoMergeApproval !== null &&
     isAllowedRelaySource(c.env.CODEX_RELAY_SOURCE_USER_IDS, event.user)
   ) {
-    await c.env.CODEX_MENTION_QUEUE.send({
+    await c.env.CODEX_MENTION_QUEUE.send(traceQueueMessage({
       kind: 'auto_merge',
       slackEventId: envelope.event_id,
       channelId: event.channel,
@@ -285,7 +275,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
       requesterUserId: event.user,
       prNumber: autoMergeApproval.prNumber,
       approvedHeadSha: autoMergeApproval.headSha,
-    });
+    }));
     autoMergeQueued = true;
   }
 
@@ -316,7 +306,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     const delaySeconds = Number.isFinite(configuredGrace)
       ? Math.min(300, Math.max(10, configuredGrace))
       : 30;
-    await c.env.CODEX_MENTION_QUEUE.send(message, { delaySeconds });
+    await c.env.CODEX_MENTION_QUEUE.send(traceQueueMessage(message), { delaySeconds });
   }
   return c.json({ success: true, queued: inserted, autoMergeQueued });
 });

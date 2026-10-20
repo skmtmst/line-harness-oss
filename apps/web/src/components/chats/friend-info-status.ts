@@ -1,5 +1,5 @@
 import type { ChatStatusInfo } from './friend-info-types'
-/** B-26 知らせの文に使う対応状況の名前（受信箱の状態の切り替えと同じ言葉）。 */
+/**  知らせの文に使う対応状況の名前（受信箱の状態の切り替えと同じ言葉）。 */
 export const STATUS_WORD: Record<NonNullable<ChatStatusInfo['status']>, string> = {
   unread: '未対応',
   in_progress: '対応中',

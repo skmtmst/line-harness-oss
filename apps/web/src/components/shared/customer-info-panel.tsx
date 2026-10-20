@@ -33,7 +33,7 @@ export default function CustomerInfoPanel({
   extraSections?: CustomerInfoSection[]
   actionWording?: boolean
   hiddenPersonalCount?: number
-  /** 見出しの幅。'wide'（84）は受信箱の右の列（絵 eovoG）。「次の自動配信」まで1行で値と離して置く。 */
+  /** 見出しの幅。'wide'（84）は受信箱の右の列。「次の自動配信」まで1行で値と離して置く。 */
   labelWidth?: 'standard' | 'wide'
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -90,7 +90,7 @@ export default function CustomerInfoPanel({
           {[...FIXED_FRIEND_FIELDS].sort((a,b) => (order.indexOf(`fixed:${a.key}`) < 0 ? 999 : order.indexOf(`fixed:${a.key}`)) - (order.indexOf(`fixed:${b.key}`) < 0 ? 999 : order.indexOf(`fixed:${b.key}`))).filter(spec => (spec.key !== 'age' || !birthdayVisible) && !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
             const { value, source, derived } = fixedFieldValue(shownFields, spec.key)
             const age = spec.key === 'birthday' && !hidden.includes('fixed:age') ? fixedFieldValue(shownFields, 'age').value : null
-            // 生年月日は日付の欄と同じ「1988年4月12日」の書き方で出す（狭い欄なので曜日は省き、年齢を添える・vX3wQ）。
+            // 生年月日は日付の欄と同じ「1988年4月12日」の書き方で出す（狭い欄なので曜日は省き、年齢を添える・）。
             const ymd = spec.key === 'birthday' && value ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null
             const shownValue = ymd ? `${Number(ymd[1])}年${Number(ymd[2])}月${Number(ymd[3])}日` : value
             const display = shownValue && age ? `${shownValue}（${age}歳）` : shownValue
@@ -141,7 +141,7 @@ export default function CustomerInfoPanel({
   </div>
 }
 
-/** B-212：狭い板では顧客の欄を畳み、同じ中身を小窓で開く。 */
+/** ：狭い板では顧客の欄を畳み、同じ中身を小窓で開く。 */
 export function CustomerInfoRail({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const [compact, setCompact] = useState(false)

@@ -70,7 +70,7 @@ export default function ScrollableTabs({
   useEffect(() => {
     const el = scrollerRef.current
     /*
-     * ★V7: 開いているタブの印が2種類ある。リンク移動のタブは
+     * ★管理画面: 開いているタブの印が2種類ある。リンク移動のタブは
      * aria-current="page"、ボタン切り替えのタブは aria-selected="true"。
      */
     const current = el?.querySelector<HTMLElement>('[aria-current="page"], [aria-selected="true"]')

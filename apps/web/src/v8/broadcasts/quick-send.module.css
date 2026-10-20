@@ -1,7 +1,7 @@
 /*
- * ★V8 一斉配信 かんたんに送る（板 `P6vbxn`・小窓 640）。窓の枠・題・× は共通の Dialog。
+ * ★V8 一斉配信 かんたんに送る（板 ・小窓 640）。窓の枠・題・× は共通の Dialog。
  * この窓は「余白24・題18太字・欄の間14・選ぶ札は緑の地に青の字・見込みは灰の箱・承認は琥珀の箱・
- * キャンセルと送るは真ん中」。× は題の行に重ねる（かんたんに作る G4GejG と同じ）。値は globals.css の --tpl-ms-*。
+ * キャンセルと送るは真ん中」。× は題の行に重ねる（かんたんに作る  と同じ）。値は globals.css の --tpl-ms-*。
  */
 :global(:root [data-design-part='dialog']):has(.body) > :global(div:first-child) {
   position: relative;
@@ -39,7 +39,7 @@
   line-height: var(--tpl-ms-key-cell-lh);
 }
 
-/* 枠・角・地は本文の枠（MessageBody）が持つ。入力欄に2つ目の枠と伸ばす角を出さない（P6vbxn）。 */
+/* 枠・角・地は本文の枠（MessageBody）が持つ。入力欄に2つ目の枠と伸ばす角を出さない。 */
 .textarea {
   width: 100%;
   height: var(--tpl-ms-qs-textarea-h);
@@ -165,7 +165,7 @@
 
 .approval {
   display: flex;
-  /* 選んだ人の名前が長くても欄の幅（266）を広げない（絵 P6vbxn）。 */
+  /* 選んだ人の名前が長くても欄の幅（266）を広げない。 */
   min-width: 0;
   flex: 0 0 var(--tpl-ms-qs-approval-w);
   flex-direction: column;

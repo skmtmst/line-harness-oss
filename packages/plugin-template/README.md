@@ -1,3 +1,5 @@
+> 文書：LINE Harness Plugin Template｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # LINE Harness Plugin Template
 
 A template for building integrations that connect external services to LINE Harness.
@@ -14,6 +16,14 @@ Use this as a starting point when building a plugin for services like MedicalFor
 | `src/external-api.ts` | External API client stub |
 | `mcp-server/index.ts` | MCP server for AI agent integration |
 | `mcp-server/tools/example-tool.ts` | Example MCP tools combining external API + LINE Harness |
+
+## Webhook implementation status
+
+`POST /webhook` returns **501 Not Implemented** until the provider's signature
+verification and event processing are implemented. It does not read or log the
+request body, acknowledge delivery, or call external services. Implement and test
+the provider contract before enabling webhook delivery; the health endpoint alone
+does not mean webhook processing is ready.
 
 ## Getting Started
 

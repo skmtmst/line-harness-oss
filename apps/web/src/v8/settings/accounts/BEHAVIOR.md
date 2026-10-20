@@ -1,3 +1,5 @@
+> 文書：LINEアカウント一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # LINEアカウント一覧の動き（BEHAVIOR.md）
 
 対象：`app/accounts/page.tsx`（今の画面）から写して `accounts.tsx` を一から書いた。板 `V7vn3`。
@@ -10,7 +12,7 @@
 
 ## 読み込み（API）
 - `api.lineAccounts.list()`。「接続をもう一度確かめる」は `list(true)`（live）で一覧ごと取り直す。
-- 判定・言葉は `view.ts`（`app/accounts/account-list-view.ts` の写し＋数の4枚・並び）。直すときは両方。
+- 判定・言葉は `view.ts`（[現役の入口・本体](../README.md) の写し＋数の4枚・並び）。直すときは両方。
 
 ## 見せ方
 - 数の4枚：つないでいる（全部）・稼働中・接続に問題・友だちの合計（アーカイブは数えない）。未取得は「—」（0 と出さない）。

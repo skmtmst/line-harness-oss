@@ -40,7 +40,7 @@ async function applyMigrationReplay(db: Database.Database): Promise<void> {
   db.exec(readFileSync(join(PKG_ROOT, 'schema.sql'), 'utf8'));
   const migrationFiles = readdirSync(MIGRATIONS_DIR)
     .filter((file) => file.endsWith('.sql'))
-    .sort();
+    .sort((a, b) => Number(a.split('_')[0]) - Number(b.split('_')[0]) || a.localeCompare(b));
 
   let statementsSinceYield = 0;
   for (const file of migrationFiles) {

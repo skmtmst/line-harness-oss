@@ -7,9 +7,9 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(HERE, 'page-header.module.css'), 'utf8')
 
 /*
- * 板の頭は 379 板の多数派（JKjsE）が既定。値は --tpl-* で読む。
+ * 板の頭は 379 板の多数派が既定。値は --tpl-* で読む。
  * 部品 EnlYo どおりの小さい形は data-header-size="compact" に残す。
- * v7 は変えない。
+ * 互換経路は変えない。
  */
 describe('板の頭（v8・JKjsE既定＋EnlYo compact）', () => {
   it('既定は題 22/700/32・間 4・説明 13/19・余白 20/24/12・枠なし', () => {

@@ -31,7 +31,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useSearchParams: () => new URLSearchParams(''),
 }))
 
-import NewRichMenuPage from './create-v8'
+import NewRichMenuPage from '../../../v8/rich-menus/new/create'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 

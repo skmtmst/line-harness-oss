@@ -1,3 +1,5 @@
+import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * 広告費の毎日取り込み (#818)。
  *
@@ -19,6 +21,7 @@ import {
   type AdPlatform,
   type AdPlatformConfig,
 } from '@line-crm/db';
+
 import { buildXOAuth1Header } from './ad-conversion.js';
 import { GOOGLE_ADS_API_VERSION } from './ad-conversion.js';
 
@@ -284,7 +287,7 @@ export async function verifyAdPlatformReadAccess(platform: AdPlatform, credentia
   if (!config || missingConfigKey(platform, config)) throw new Error('AD_READ_CONFIG_MISSING');
   const required: Record<string, string[]> = {meta:['pixel_id'],google:['conversion_action_id'],tiktok:['pixel_code'],x:['conversion_id','x_oauth_token','x_oauth_token_secret']};
   if (!required[platform.name] || required[platform.name].some(key => typeof (config as Record<string, unknown>)[key] !== 'string' || !(config as Record<string, unknown>)[key])) throw new Error('AD_SEND_CONFIG_MISSING');
-  const day = new Date(Date.now() - 24 * 3600_000 + 9 * 3600_000).toISOString().slice(0,10);
+  const day = japanDateOffset(-1);
   const cost = await FETCHERS[platform.name](config, day);
   if (!Number.isSafeInteger(cost.amountMinor) || cost.amountMinor < 0) throw new Error('AD_READ_INVALID_RESPONSE');
 }

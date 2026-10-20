@@ -1,6 +1,7 @@
-import { formatNumber } from '@/lib/format'
+import { formatYen as yen } from '@line-crm/shared';
+import { PRODUCT_SCOPE } from '@/lib/product-scope'
 /**
- * 統括の課金（★V6 36-2）の型と小さな計算。API の形は `apps/worker/src/routes/hq-billing.ts` が正本。
+ * 統括の課金（★管理画面 36-2）の型と小さな計算。API の形は `apps/worker/src/routes/hq-billing.ts` が正本。
  */
 
 export type BillingState = 'exempt' | 'trialing' | 'active' | 'past_due' | 'trial_expired' | 'canceled'
@@ -95,7 +96,7 @@ export function billingBanner(summary: BillingSummary): { tone: 'info' | 'warn' 
       return {
         tone: 'warn',
         title: `無料トライアル中（${summary.trialEndsLabel ?? '—'} まで・残り${summary.trialDaysLeft ?? '—'}日）`,
-        body: `トライアル中はすべての機能を使えます。期限までにプランを選ぶと、そのまま使い続けられます。選ばなかった場合は配信と生成が止まり、${keep}`,
+        body: `${PRODUCT_SCOPE.trial} ${PRODUCT_SCOPE.boundaries} 期限までにプランを選ぶと、そのまま使い続けられます。選ばなかった場合は配信と生成が止まり、${keep}`,
       }
     case 'active':
       return {
@@ -116,9 +117,7 @@ export function billingBanner(summary: BillingSummary): { tone: 'info' | 'warn' 
   }
 }
 
-export function yen(amount: number): string {
-  return `¥${formatNumber(amount)}`
-}
+export { yen };
 
 /** 表示も申込み可否も、選んだ周期だけを見る。月払いへの暗黙の代替はしない。 */
 export function billingPlanPrice(plan: BillingPlanView, interval: BillingInterval) {

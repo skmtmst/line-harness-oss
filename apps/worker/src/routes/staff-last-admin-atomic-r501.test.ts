@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
-import type { Env } from '../index.js'
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js'
 import { updateStaffMember, DEFAULT_TENANT_ID } from '@line-crm/db'
 import { createTestD1 } from '../test-utils/d1-sqlite.js'

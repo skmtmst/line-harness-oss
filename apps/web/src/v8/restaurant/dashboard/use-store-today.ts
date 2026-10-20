@@ -24,7 +24,7 @@ import {
   type RestaurantSnapshot,
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
-import { toYmd } from '../front-desk/slots'
+import { toYmd } from '@/v8/restaurant/front-desk/public/slots/index'
 
 /** 予約サイト・グルメ媒体の1行。リンク（店舗ページ・管理画面）は「予約サイト・グルメ媒体」の設定（media-links）で保存したもの。 */
 export type StoreMedium = {

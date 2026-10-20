@@ -119,7 +119,7 @@ describe('スタッフの店舗権限範囲', () => {
   it('担当範囲を省略すると400で拒否する', async () => {
     const res = await send('/api/staff', 'POST', { name: '新しい担当者', email: 'scope@example.test', role: 'staff', assignedLineAccountId: 'line-1' });
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: '担当範囲を選んでください' });
+    expect(await res.json()).toMatchObject({ error: { message: '担当範囲を選んでください' } });
   });
 
   it('全店舗では紐付けを空にして保存する', async () => {
@@ -356,7 +356,7 @@ describe('最後の管理者を締め出さない', () => {
     const res = await send('/api/staff/only-admin', 'PATCH', { isActive: false });
 
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toContain('管理者が一人もいなくなります');
+    expect((await res.json() as { error: { message: string } }).error.message).toContain('管理者が一人もいなくなります');
     expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
   });
 
@@ -403,7 +403,7 @@ describe('最後の管理者を締め出さない', () => {
     const res = await send('/api/staff/env-owner', 'DELETE');
 
     expect(res.status).toBe(400);
-    expect((await res.json() as { error: string }).error).toContain('自分自身は利用停止できません');
+    expect((await res.json() as { error: { message: string } }).error.message).toContain('自分自身は利用停止できません');
     expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
   });
 
@@ -555,7 +555,7 @@ describe('個人情報と二段階認証の本人境界', () => {
     );
 
     expect(response.status).toBe(503);
-    expect((await response.json() as { error: string }).error).toContain('暗号鍵');
+    expect((await response.json() as { error: { message: string } }).error.message).toContain('暗号鍵');
   });
 
   it('一般スタッフは他人の個別情報を取得できない', async () => {

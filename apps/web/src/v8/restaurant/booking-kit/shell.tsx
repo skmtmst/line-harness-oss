@@ -1,9 +1,10 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { notifySaved } from '@/components/shared/toast'
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
-import { ApiError } from '@/lib/api'
+
 import {
   restaurantTestApi,
   type ReservationQuery,
@@ -17,7 +18,7 @@ import Notice from '@/components/shared/notice'
 import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import StoreTabs, { type StoreTabKey } from '../store-tabs/store-tabs'
+import { StoreTabs, type StoreTabKey } from '@/v8/restaurant/store-tabs/index'
 import styles from './shell.module.css'
 import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -27,7 +28,7 @@ import EntitySelect from '@/components/shared/entity-select'
  * ★V8 飲食店向け（テスト）の器 — 在庫・予約台帳・座席・メニューの4画面用。
  *
  * 板の頭（題・説明・右上に店舗を選ぶ欄）→ 検証環境の帯 → 中身。
- * 寸法は Pencil の板（メニュー管理 MJoJR ほか）の書き出しから読む。
+ * 寸法は Pencil の板（メニュー管理  ほか）の書き出しから読む。
  * データの口は今の画面（app/restaurant-test/v8/shell.tsx）と同じ
  * restaurantTestApi.snapshot。src/v8 は古い画面を import できないので写した。
  */
@@ -126,7 +127,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
    * 並べる場所は画面が決める（予約台帳は狭い幅で欄ごと2行目へ折り返す）。
    */
   headAfter?: (ctx: RestaurantV8Context | null, storePicker: ReactNode) => ReactNode
-  /** 板の頭と検証環境の帯を出さない（電話の予約を入れる rm92Y のように画面が自分の頭を持つとき）。 */
+  /** 板の頭と検証環境の帯を出さない（電話の予約を入れる  のように画面が自分の頭を持つとき）。 */
   bare?: boolean
   /**
    * 画面ごとの寸法の違い。ledger＝予約台帳（頭が狭い幅で2行に折り返す・店舗の欄が 180）、
@@ -137,7 +138,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
   storeTab?: StoreTabKey
   /**
    * 検証環境の帯を出すか（既定 true）。false のときは中身を段の間なしで置く（中身が自分で余白を持つ。
-   * 予約枠・在庫の「休業日・貸切」タブ UVnvR は帯が無く、タブ・知らせ・本文が板の幅で続く）。
+   * 予約枠・在庫の「休業日・貸切」タブ  は帯が無く、タブ・知らせ・本文が板の幅で続く）。
    */
   boundary?: boolean
   /** 板の頭の大きさ。compact は E 系の板（題 20・説明の行 20）。 */
@@ -145,7 +146,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
   /** 既存の頭の内側余白。頭を持つ器の中では none を渡す。 */
   headingInset?: 'none'
   headSize?: 'compact'
-  /** 題の下の説明の行を出さず「？」へ入れる（絵に説明の行が無い板。休業日・貸切 UVnvR）。 */
+  /** 題の下の説明の行を出さず「？」へ入れる（絵に説明の行が無い板。休業日・貸切 ）。 */
   hideSubtitle?: boolean
   children: (ctx: RestaurantV8Context) => ReactNode
 }) {
@@ -199,7 +200,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
       if (error instanceof QuietError) { setNotice(null); return false }
       setNotice({
         tone: 'error',
-        text: error instanceof ApiError || error instanceof Error ? error.message : '保存できませんでした。',
+        text: describeApiFailure(error, '保存'),
       })
       return false
     } finally {
@@ -243,10 +244,10 @@ export default function RestaurantShell({ boardId, title, description, explanati
       {templateHeading ? <PageHeading
         inset="none"
         title={title}
-        /* 題の下の店名は出さない（店舗は右の欄で分かる・qf3ky）。店舗で変わる説明の行（関数）だけ出す。 */
+        /* 題の下の店名は出さない（店舗は右の欄で分かる・）。店舗で変わる説明の行（関数）だけ出す。 */
         subtitle={hideSubtitle || typeof description !== 'function' ? undefined : description(ctx)}
         help={typeof description === 'function' ? hideSubtitle ? description(ctx) : '日付や店舗を選んで、予約と卓の状態を確認できます。' : description}
-        /* いつも出る説明は「この画面の説明」の帯へ（B-245）。「？」に混ぜない。 */
+        /* いつも出る説明は「この画面の説明」の帯へ。「？」に混ぜない。 */
         explanation={explanation}
         actions={headAfter ? headAfter(ctx, storePicker) : storePicker}
       /> : (

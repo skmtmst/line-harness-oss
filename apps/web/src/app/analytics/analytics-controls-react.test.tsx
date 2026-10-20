@@ -402,7 +402,7 @@ function funnelHandler(funnels: unknown[], detail: unknown = FUNNEL_DETAIL) {
 }
 
 function type(id: string, value: string) {
-  // 板 `VDPz5`：作る・直すは小窓（document.body の portal）で出す。
+  // 板 ：作る・直すは小窓（document.body の portal）で出す。
   const input = document.body.querySelector(`#${id}`) as HTMLInputElement | null
   if (!input) throw new Error(`input #${id} が見つかりません`)
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!

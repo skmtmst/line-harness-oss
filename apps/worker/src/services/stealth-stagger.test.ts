@@ -8,7 +8,7 @@
  * それが実際に起きるのは `dedup-broadcast.ts`（複アカ重複除外）で差し込みを
  * 使ったとき。`broadcast.ts` の差し込み経路はこの関数まで到達しない。
  *
- * `dedup-broadcast.test.ts` はこの関数を `() => 0` に差し替えているので、
+ * `dedup-broadcast.test.ts` はこの関数を ` => 0` に差し替えているので、
  * そちらでは映らない。ここで関数そのものを見る。
  */
 import { describe, it, expect } from 'vitest';

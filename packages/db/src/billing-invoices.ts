@@ -1,3 +1,4 @@
+import type { BillingWriteCondition } from './tenant-billing.js';
 import { jstNow } from './utils.js';
 
 export const BILLING_INVOICES_LAST_SYNCED_KEY = 'billing_invoices_last_synced_at';
@@ -46,16 +47,20 @@ export interface BillingInvoiceInput {
 
 /** Webhook と同期の両方から同じ請求書を安全に更新する。 */
 export async function upsertBillingInvoice(db: D1Database, input: BillingInvoiceInput): Promise<void> {
+  await prepareBillingInvoice(db, input).run();
+}
+
+export function prepareBillingInvoice(db: D1Database, input: BillingInvoiceInput, condition?: BillingWriteCondition): D1PreparedStatement {
   const now = input.syncedAt ?? jstNow();
   const createdAt = input.createdAt ?? now;
   const refunded = input.amountRefunded;
-  await db.prepare(
+  return db.prepare(
     `INSERT INTO billing_invoices (
        id, tenant_id, stripe_customer_id, subscription_id, status,
        amount_paid, amount_due, amount_refunded, currency, interval,
        period_start, period_end, paid_at, hosted_invoice_url, raw_updated_at,
        synced_at, created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${condition?.sql ?? '1'}
      ON CONFLICT(id) DO UPDATE SET
        tenant_id = excluded.tenant_id,
        stripe_customer_id = COALESCE(excluded.stripe_customer_id, billing_invoices.stripe_customer_id),
@@ -90,8 +95,9 @@ export async function upsertBillingInvoice(db: D1Database, input: BillingInvoice
     input.rawUpdatedAt ?? null,
     now,
     createdAt,
+    ...(condition?.values ?? []),
     refunded === undefined ? 0 : 1,
-  ).run();
+  );
 }
 
 export async function updateBillingInvoiceRefund(

@@ -4,11 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * LIFF ★V7 その3 (回答フォーム・マイル・ウェビナー) の契約。
+ * LIFF ★管理画面 その3 (回答フォーム・マイル・ウェビナー) の契約。
  *
  * 流儀は ui-contract.test.ts と同じ (描画試験はしない。文面を読む)。
  * 動き (送信・二重押し防止・時刻の同期・計測) の本体は変えず、
- * 見た目だけ ★V7 (4-form・6-mile・7-webinar) に寄せたことを見る。
+ * 見た目だけ ★管理画面 (4-form・6-mile・7-webinar) に寄せたことを見る。
  */
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
@@ -17,8 +17,8 @@ function page(name: string): string {
   return readFileSync(join(ROOT, name), 'utf8');
 }
 
-const form = () => page('Form.tsx');
-const affiliate = () => page('Affiliate.tsx');
+const form = () => page('form.tsx');
+const affiliate = () => page('affiliate.tsx');
 const webinar = () => readFileSync(join(ROOT, '../../../worker/src/client/webinar/main.tsx'), 'utf8');
 
 /**
@@ -80,9 +80,9 @@ describe('回答フォームの動きは変えない', () => {
 
 describe('マイル・紹介は中身を全部残し、★V8 S3uBl の順に並べる', () => {
   it('並びは「貯まった → お友だちを紹介する → マイルの履歴 → 増やす → 案件」', () => {
-    // 紹介者に登録済みの画面 (S3uBl) の並びを見る。
+    // 紹介者に登録済みの画面  の並びを見る。
     const all = affiliate();
-    const src = all.slice(all.indexOf('並びは ★V8 S3uBl'));
+    const src = all.slice(all.indexOf('// 並びは ★V8'));
     const order = [
       '<MileageSummaryCard',
       '<ReferralCard',
@@ -102,7 +102,7 @@ describe('マイル・紹介は中身を全部残し、★V8 S3uBl の順に並�
     expect(src).toContain('これまでに得た');
     expect(src).toContain('使った');
     expect(src).toContain('合算しています');
-    // ★V8 S3uBl：深い緑の箱。確定待ちは紹介の箱の中の一行。
+    // ★V8 ：深い緑の箱。確定待ちは紹介の箱の中の一行。
     expect(src).toContain('bg-liff-deep');
     expect(src).toContain('（成果の確認後に入ります）');
     expect(src).toContain('紹介のリンクを送る');
@@ -159,7 +159,7 @@ describe('マイル・紹介は中身を全部残し、★V8 S3uBl の順に並�
 describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・送信する)', () => {
   it('必須は欄名の横の小さな赤い札。入力の失敗の赤とは分ける', () => {
     const src = formSrc();
-    // 必須の印は ★V8 (B8rCt・g9osGN) の赤い札 (地 #fdecec・文字 liff-sun)
+    // 必須の印は ★V8 (・) の赤い札 (地 #fdecec・文字 liff-sun)
     const controls = readFileSync(join(ROOT, '..', 'components', 'forms', 'controls.tsx'), 'utf8');
     const styles = readFileSync(join(ROOT, '..', 'components', 'forms', 'controls.module.css'), 'utf8');
     expect(src).toContain('<FieldLabel');
@@ -174,7 +174,7 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
   it('題名は本文の題 (20) に、その下に説明を出す', () => {
     const src = formSrc();
     expect(src).toContain('options.pageTitle');
-    // ★V8 (B8rCt): 白い帯は作らず、LIFF の上の帯の下に題と説明を直接出す
+    // ★V8 : 白い帯は作らず、LIFF の上の帯の下に題と説明を直接出す
     expect(src).toContain('<LiffHeader');
     expect(src).toContain('text-xl font-bold');
     // 題の下の説明 (例「3分ほどで終わります」)
@@ -201,7 +201,7 @@ describe('回答フォーム3点 (m11c: 必須は琥珀・白い帯と説明・�
 
 describe('ウェビナーは申込もできる本体を共用する', () => {
   it('旧URLの入口からWorkerと同じ画面へ認証情報とslugを渡す', () => {
-    const src = page('Webinar.tsx');
+    const src = page('webinar.tsx');
     expect(src).toContain("worker/src/client/webinar/main");
     expect(src).toContain('<WebinarApp ctx={ctx} slug={slug} />');
     const shared = webinar();
@@ -209,17 +209,6 @@ describe('ウェビナーは申込もできる本体を共用する', () => {
     expect(shared).toContain('DRIFT_TOLERANCE');
     expect(shared).toContain('HEARTBEAT_MS');
     expect(src).toContain('getIdToken()');
-  });
-
-  it('配信中は暗い地・16:9 の動画・途中のボタンは LINE の緑・送信は主の緑', () => {
-    const src = webinar();
-    const live = src.slice(src.indexOf('ライブ中 (★V8 RpW2h)'));
-    expect(live).toContain('bg-night-deep');
-    expect(live).toContain('aspect-video');
-    expect(live).toContain('variant="nightAction"');
-    expect(live).toContain('variant="nightSend"');
-    // 待機・終了などは白い殻のまま
-    expect(src).toContain('bg-canvas');
   });
 
   it('残り時間は箱で大きく出す (分・秒)', () => {
@@ -237,7 +226,7 @@ describe('ウェビナーは申込もできる本体を共用する', () => {
     expect(src).toContain('友だち追加すると見られます');
     expect(src).toContain('この端末では再生できません');
     expect(src).toContain('<LoadErrorView');
-    expect(readFileSync(join(ROOT, '..', 'components', 'LoadErrorView.tsx'), 'utf8')).toContain('読み込めませんでした');
+    expect(readFileSync(new URL('../components/load-error-view.tsx', import.meta.url), 'utf8')).toContain('読み込めませんでした');
   });
 
   it('会話は「名前　本文」の1行。自分の名前だけ色を変える', () => {

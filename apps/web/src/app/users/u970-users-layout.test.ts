@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, 'users-v8.tsx'), 'utf8')
-const CSS = readFileSync(join(HERE, '../friends/friends-v8.module.css'), 'utf8')
+const PAGE = readFileSync(new URL('./users-screen.tsx', import.meta.url), 'utf8')
+const CSS = readFileSync(new URL('../friends/friends-v8.module.css', import.meta.url), 'utf8')
 
 describe('統合ユーザーの現役の配置', () => {
   it('主要操作と検索・絞り込みを別の行に置く', () => {

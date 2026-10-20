@@ -1,5 +1,5 @@
 import {expect,it} from 'vitest';
-import {STARTER_TEMPLATES, type WizardForm} from './wizard-v8';
+import {STARTER_TEMPLATES, type WizardForm} from '../../../v8/auto-replies/edit/wizard';
 import {toActionPayload} from '@/components/auto-replies/draft-fields';
 it('ひな形の通知・タグ付けが保存対象の後続処理になる',()=>{
  const form={responseContent:''} as WizardForm;

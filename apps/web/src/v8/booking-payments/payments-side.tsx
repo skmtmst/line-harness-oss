@@ -9,7 +9,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { formatYen } from '@/lib/format'
 import { bookingApi, type BookingMenu } from '@/lib/api'
-import { bookingPaymentAdminApi, type BookingPaymentMode, type MenuPaymentOverride, type PaymentSummary } from '@/lib/api-booking-payment-admin'
+import { bookingPaymentAdminApi, type BookingPaymentMode, type MenuPaymentOverride, type PaymentSummary } from '@/lib/api/helpers/booking-payment-admin'
 import { MODE_SHORT, MODE_TONE } from './labels'
 import styles from './payments.module.css'
 

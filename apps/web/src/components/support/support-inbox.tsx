@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Avatar from '@/components/shared/avatar'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -421,7 +421,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-card border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-micro text-ink-faint">From: contact-shed@nen-petfood.com</p>
-                  <Button variant="primary" className="rounded-card px-6 py-2.5 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" onClick={() => void sendReply()} disabled={!reply.trim() || sending}>{sending ? '送信中…' : 'メールで返信'}</Button>
+                  <Button variant="primary" className="rounded-card px-6 py-2.5 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" onClick={() => sendReply()} disabled={!reply.trim() || sending} busy={sending} busyLabel="送信中…" widthReserve="idle">{'メールで返信'}</Button>
                 </div>
               </div>
             </>

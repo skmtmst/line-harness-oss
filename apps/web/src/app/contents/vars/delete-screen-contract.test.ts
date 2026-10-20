@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
@@ -5,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
-const API = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 
 /** 共通情報の削除確認（設計 `yPkWe` 14-1-C ／ 契約 #611）。 */
 describe('共通情報の削除確認', () => {

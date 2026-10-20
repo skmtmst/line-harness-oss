@@ -26,7 +26,7 @@ const removeTrigger = vi.hoisted(() => vi.fn())
 const simulate = vi.hoisted(() => vi.fn())
 const fetchTags = vi.hoisted(() => vi.fn())
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
     tags: { list: fetchTags },
     tagGroups: { list: vi.fn(async () => ({ success: true, data: [] })) },
@@ -35,7 +35,7 @@ vi.mock('@/lib/api', () => ({
       simulate,
     },
   },
-}))
+} ))
 
 vi.mock('@/components/scenarios/scenario-reference-data', () => ({
   scenarioReferenceData: { tags: fetchTags },
@@ -205,7 +205,7 @@ describe('U006: 開始回数は固定仕様の説明にする', () => {
     expect(screen.queryByText('同じ友だちは初回のみ開始')).toBeNull()
     expect(screen.queryByText('条件を満たすたびに開始')).toBeNull()
     // 実挙動: status != 'completed' の重複だけを弾くので、読了後は再開する。
-    expect(SOURCE).toContain('最後まで読み終えた人が条件を満たすと、もう一度最初から始まります')
+    expect(screen.getByText('最後まで読み終えた人が条件を満たすと、もう一度最初から始まります。', { exact: false })).toBeTruthy()
   })
 })
 
@@ -256,7 +256,7 @@ it('WEB268: 保存の通信例外から入力を残して再試行できる', as
   const { onClose } = await renderEditor()
   fireEvent.click(screen.getAllByText('外す')[0])
   await act(async () => fireEvent.click(screen.getByText('開始条件を保存する')))
-  expect(document.body.textContent).toContain('保存できませんでした')
+  expect(document.body.textContent).toContain('保存に失敗しました')
   expect(onClose).not.toHaveBeenCalled()
   expect(screen.getByText('開始条件を保存する').closest('button')!.disabled).toBe(false)
   await act(async () => fireEvent.click(screen.getByText('開始条件を保存する')))

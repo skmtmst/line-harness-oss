@@ -1,5 +1,5 @@
 /*
- * ★V8 分析（ws9wt・eEhYU・L4Uov ほか）。枠・板の頭は型（ListPage）が持つ。
+ * ★V8 分析（・・ ほか）。枠・板の頭は型（ListPage）が持つ。
  * ここは二段の切り替え・閲覧のみの帯・数の帯の線・本文（棒と右の列）だけ。
  * 寸法は app/globals.css の --tpl-an-*。
  */
@@ -387,7 +387,7 @@
   }
 }
 
-/* ── 見かたの本文（yvOtn ほか）：道具の段・説明・表・時間帯。 ── */
+/* ── 見かたの本文（ ほか）：道具の段・説明・表・時間帯。 ── */
 .body[data-gap='tab'] {
   gap: var(--tpl-an-tab-gap);
   padding: var(--tpl-an-tab-pad);
@@ -557,7 +557,7 @@
   text-align: center;
 }
 
-/* 経路と成果（PFe9c）：左に全体の流れ（300）、右に表と注。 */
+/* 経路と成果：左に全体の流れ（300）、右に表と注。 */
 .textLink {
   display: inline-flex;
   align-items: center;
@@ -609,7 +609,7 @@
   min-width: 0;
 }
 
-/* URLクリック（iK4cQ）：探す 300・状態 150、どこから 170・状態 80、注は薄い地の箱。 */
+/* URLクリック：探す 300・状態 150、どこから 170・状態 80、注は薄い地の箱。 */
 .searchBox {
   width: var(--tpl-an-search-w);
   flex-shrink: 0;
@@ -693,7 +693,7 @@
   color: var(--color-status-warn-deep);
 }
 
-/* 成果地点ごとのレポート（AzrZq）：日ごとの棒（140）と成果地点の表（見出し 13/20・行 9/20・間12）。 */
+/* 成果地点ごとのレポート：日ごとの棒（140）と成果地点の表（見出し 13/20・行 9/20・間12）。 */
 .reportStack {
   display: flex;
   flex-direction: column;
@@ -795,7 +795,7 @@
   white-space: nowrap;
 }
 
-/* 使われ方（N8ZrUl）：行の中の「中身を見る」＋「…」、右の気づいたこと。 */
+/* 使われ方：行の中の「中身を見る」＋「…」、右の気づいたこと。 */
 .colType[data-w='110'] { width: var(--tpl-an-col-110); }
 .colType[data-w='150'] { width: var(--tpl-an-col-150); }
 .rowActions {
@@ -817,7 +817,7 @@
   font-size: var(--text-caption);
 }
 
-/* 保存した分析（bglah）：探す 280、右に履歴 460、定期レポートの見出しの段。 */
+/* 保存した分析：探す 280、右に履歴 460、定期レポートの見出しの段。 */
 .searchBox[data-w='saved'] { width: var(--tpl-an-saved-search-w); }
 .colType[data-w='60'] { width: var(--tpl-an-col-60); }
 .colType[data-w='80'] { width: var(--tpl-an-col-80); }
@@ -873,7 +873,7 @@
   color: var(--color-ink);
 }
 
-/* ファネル（DkRDE）：選ぶ段（280・180・260）、全体の流れ（段 8/10・番号22・帯22）、右の選んだ段（320）。 */
+/* ファネル：選ぶ段（280・180・260）、全体の流れ（段 8/10・番号22・帯22）、右の選んだ段（320）。 */
 .controls {
   display: flex;
   align-items: flex-end;
@@ -1056,7 +1056,7 @@
   width: auto;
 }
 
-/* クロス分析（u5CuB8）：選ぶ欄 220・200・200・140、掛け合わせの表（行の名前 110・マス 40・間 6）。 */
+/* クロス分析：選ぶ欄 220・200・200・140、掛け合わせの表（行の名前 110・マス 40・間 6）。 */
 .field[data-w='measure'] { width: var(--tpl-an-field-measure-w); }
 .field[data-w='axis'] { width: var(--tpl-an-field-axis-w); }
 .field[data-w='period'] { width: var(--tpl-an-field-period-w); }
@@ -1138,7 +1138,7 @@
 .legend[data-size='grid'] { margin-top: var(--tpl-an-grid-legend-gap); }
 .legend[data-size='grid'] > span::before { width: var(--tpl-an-grid-swatch-w); }
 
-/* Search Console（h1G4d）：表は 9/14・間10、プロパティ 300、デバイス別 200。 */
+/* Search Console：表は 9/14・間10、プロパティ 300、デバイス別 200。 */
 .thead[data-size='compact'],
 .trow[data-size='compact'] {
   gap: var(--tpl-an-sc-col-gap);

@@ -1,3 +1,5 @@
+> 文書：添付・支払明細の取得と取り直し（B-351/4）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 添付・支払明細の取得と取り直し（B-351/4）
 
 2026-10-16 / kenta・Codex。DBの追加・変更、鍵の登録、配備はしていない。
@@ -12,7 +14,7 @@ LINEで受け取る**本文中のリンクは、期限のない本人確認の�
 - Workerの入口は、保存物の所属する店の `liff_id` だけを使って `https://liff.line.me/<LIFF ID>/files/?id=<UUID>&liffId=<LIFF ID>` または `/statements/?id=<明細ID>&liffId=<LIFF ID>` へ303で案内する。外から渡された遷移先・認証情報・署名・URLのクエリは引き継がない。停止した店/統括・削除済み・LIFF未設定は、中身を返さず410の問い合わせ案内。
 - 入口は取得権限ではない。他の人へ転送しても新しいURLを作れない。
 
-**本線へ入れる前の残件：Claude担当のLIFF `/files/`・`/statements/` の画面接続と確認。今回、画面は作っていない。** 本人確認の入口を送るコードとAPIは用意したが、画面がない状態で顧客向け配備をしない。
+LIFFの取得画面は `apps/liff/src/pages/file-open.tsx` と `StatementOpen.tsx` に接続されている。本人用の認証付きfetchとBlob表示を使い、期限切れ・別人・削除済みは取得成功にしない。実際のLINE内での操作、配備先の鍵・保存物・期限の確認は[点検表](SECURITY-CHECKLIST.md)に残す。
 
 ## 画面に渡すAPI
 
@@ -66,4 +68,4 @@ secretの存在/型はオーナーが値を出さず確認する。LINE/LIFFの�
 - `routes/affiliate-self.test.ts` / `affiliate-payouts.test.ts`：明細発行通知のLIFF入口、古いquery認証の拒否と案内、本人結合・削除した明細の発行拒否・明細間署名流用の拒否。
 - `middleware/rate-limit.test.ts` / `routes/openapi-coverage.test.ts`：IP枠・API契約。
 
-この続きの検査結果は [SECURITY-DOWNLOAD-RENEWAL.md](SECURITY-DOWNLOAD-RENEWAL.md)。前回のCSP/短命署名の検査は [SECURITY-B351-CONTINUATION.md](SECURITY-B351-CONTINUATION.md) に別の版として残す。
+この続きの検査結果は [SECURITY-DOWNLOAD-RENEWAL.md](../document-archives.md#s05)。前回のCSP/短命署名の検査は [SECURITY-B351-CONTINUATION.md](../document-archives.md#s05) に別の版として残す。

@@ -114,7 +114,7 @@ export async function sendPendingNenDeliveriesNow(
     `UPDATE nen_delivery_jobs SET scheduled_at = ?, updated_at = ?
       WHERE line_account_id = ? AND status = 'pending' AND datetime(scheduled_at) > datetime('now')`,
   ).bind(now, now, input.lineAccountId).run();
-  // 要件 v6-21 §8: 深夜帯の「今すぐ送る」は止めないが、送り先が朝になることを返す。
+  // 要件 -21 §8: 深夜帯の「今すぐ送る」は止めないが、送り先が朝になることを返す。
   // 画面はこの文面で「すぐには届かない」を伝えられる。
   const at = input.now ?? new Date();
   const quiet = isNenQuietHours(at);

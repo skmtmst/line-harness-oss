@@ -1,0 +1,32 @@
+import {afterEach,beforeEach,expect,it} from 'vitest';
+import {Hono} from 'hono';
+import {claimReminderDeliveryRun,failReminderDeliveryRun} from '@line-crm/db';
+import {DEFAULT_TENANT_ID} from '@line-crm/shared';
+import {createTestD1,insertFriend,type SqliteD1} from '../test-utils/d1-sqlite.js';
+import type { Env } from '../worker-env.js';
+import {reminders} from './reminders.js';
+let item:SqliteD1;
+beforeEach(()=>{
+ item=createTestD1();
+ item.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a','c','account','token','secret',?)").run(DEFAULT_TENANT_ID);
+ item.raw.prepare("INSERT INTO staff_members(id,name,role,api_key,tenant_id,account_scope) VALUES('owner','owner','owner','key',?,'all')").run(DEFAULT_TENANT_ID);
+ insertFriend(item.raw,'f',{line_account_id:'a'});
+ item.raw.exec(`INSERT INTO reminders(id,name,line_account_id,trigger_type) VALUES('r','reminder','a','manual');
+ INSERT INTO reminder_steps(id,reminder_id,offset_minutes,message_type,message_content) VALUES('s','r',0,'text','text');
+ INSERT INTO friend_reminders(id,friend_id,reminder_id,target_date,status,created_at,updated_at) VALUES('en','f','r','2026-10-18T00:00:00Z','active','2026-10-01','2026-10-01');`);
+});
+afterEach(()=>item.raw.close());
+it.each(['delivery_unknown','line_temporary_failure','retry_key_expired','retry_exhausted','missing_classification','missing_classification_queued'])('hides retry capability for %s and rejects a direct retry with a useful reason',async code=>{
+ const run=await claimReminderDeliveryRun(item.db,{lineAccountId:'a',reminderId:'r',friendReminderId:'en',friendId:'f',reminderStepId:'s',scheduledAt:'2026-10-18T00:00:00Z',now:'2026-10-18T00:00:00Z',leaseExpiresAt:'2026-10-18T00:05:00Z'});
+ expect(run).toBeTruthy();
+ await failReminderDeliveryRun(item.db,{id:run!.id,code,message:'送信結果の照合が必要です',retryAt:null,now:'2026-10-18T00:00:01Z',expectedLeaseExpiresAt:run!.lease_expires_at!});
+ item.raw.prepare("UPDATE reminder_delivery_runs SET sent_message_content='frozen message' WHERE id=?").run(run!.id);
+ if(code.startsWith('missing_classification'))item.raw.prepare('UPDATE reminder_delivery_runs SET last_error_code=NULL WHERE id=?').run(run!.id);
+ if(code==='missing_classification_queued')item.raw.prepare("UPDATE reminder_delivery_runs SET status='queued',next_retry_at=NULL WHERE id=?").run(run!.id);
+ const app=new Hono<Env>();app.use('*',async(c,next)=>{c.set('staff',{id:'owner',name:'owner',role:'owner',readOnly:false,tenantId:DEFAULT_TENANT_ID});await next()});app.route('/',reminders);
+ const env={DB:item.db} as Env['Bindings'];
+ const list=await app.request('/api/reminders/r/runs',{},env);expect(list.status).toBe(200);
+ expect((await list.json<{data:{items:Array<{canRetry:boolean,lastErrorCode:string}>}}>()).data.items[0]).toMatchObject({canRetry:false,lastErrorCode:code.startsWith('missing_classification')?null:code});
+ const response=await app.request(`/api/reminder-runs/${run!.id}/retry`,{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':crypto.randomUUID()},body:'{}'},env);
+ expect(response.status).toBe(409);expect(await response.json()).toMatchObject({code:'delivery_unknown'});
+});

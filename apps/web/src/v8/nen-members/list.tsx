@@ -30,7 +30,7 @@ import { ListPager } from '@/components/templates/list-page'
 import { ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 
 /*
- * ★V8-B 会員一覧（AOWoJ）。今の V8 の会員一覧（app/nen/members/members-v8.tsx の MembersTabV8）を
+ * ★V8-B 会員一覧。今の V8 の会員一覧（app/nen/members/members-v8.tsx の MembersTabV8）を
  * 写した。検索・よく使う札・並び・件数・ページ送り・行の「…」は今と同じ口・同じ指定。
  */
 

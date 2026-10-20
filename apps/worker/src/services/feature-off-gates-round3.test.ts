@@ -11,12 +11,12 @@ import {
   saveVersionedAccountSetting,
 } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type { LineClient } from '@line-crm/line-sdk';
 
 const {
   deliverMileageReward: deliver,
-} = await import('./mileage-reward-delivery.js');
+} = await import('../features/mileage/mileage-reward-delivery.js');
 const { applyActionScoreEvent: applyScore } = await import('./action-score-events.js');
 const { processInsightFetch: fetchInsights } = await import('./insight-fetcher.js');
 const { refreshRecentAnalyticsProjections: refreshProjection } = await import('./analytics-projection.js');

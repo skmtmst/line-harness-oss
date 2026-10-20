@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { postMileageAdjustment } from '../src/mileage.js';
+import { postMileageAdjustment } from '../src/mileage/index.js';
 import { linkFriendToUser } from '../src/users.js';
 import { asD1 } from './d1-test-helper.js';
 

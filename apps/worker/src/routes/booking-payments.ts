@@ -1,9 +1,12 @@
-import { safeReceiptUrl } from '../services/booking-payment-history.js';
+import { logger } from '@line-crm/shared/server';
+import { runBookingPaymentStart } from '../features/booking/booking-payment-start/index.js';
+import { safeReceiptUrl } from '../features/booking/booking-payment-history/index.js';
 import { expireBookingPaymentIfHeld } from './booking-payment-expiration.js';
 export { expireBookingPaymentIfHeld } from './booking-payment-expiration.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
+  getWorkflowStep,
   createBookingPayment,
   getBookingPaymentByBooking,
   getBookingPaymentConfig,
@@ -15,8 +18,9 @@ import {
   type BookingPaymentMode,
   type BookingPaymentProviderName,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
-import { PaymentActionError, linkPaymentBooking, parseRefundInput, refundHistory, simulatePaymentRefund } from '../services/booking-payment-refunds.js';
+
+import type { Env } from '../worker-env.js';
+import { PaymentActionError, linkPaymentBooking, parseRefundInput, refundHistory, simulatePaymentRefund } from '../features/booking/booking-payment-refunds/index.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import {
@@ -30,8 +34,8 @@ import {
   registerPaymentProvider,
   type PaymentProvider,
 } from '../services/payment-providers.js';
-import { reconcileExpiredBookingPayment, reconcilePaidBookingPayment } from '../services/booking-payment-recovery.js';
-import { receivePaymentEvent } from '../services/booking-payment-events.js';
+import { reconcileExpiredBookingPayment, reconcilePaidBookingPayment } from '../features/booking/booking-payment-recovery/index.js';
+import { receivePaymentEvent } from '../features/booking/booking-payment-events/index.js';
 
 /**
  * 予約の支払い（決済サービスを差し替えられる作り）。
@@ -154,16 +158,6 @@ bookingPayments.put(
   },
 );
 
-async function providerCheckout(
-  env: Env['Bindings'],
-  providerName: string,
-  input: { amount: number; currency: string; bookingId: string; idempotencyKey: string },
-): Promise<{ checkoutUrl: string | null; providerPaymentId: string | null }> {
-  const provider = providerFor(env, providerName);
-  if (!provider) throw new Error(`unknown provider: ${providerName}`);
-  return provider.startPayment(input);
-}
-
 interface StartBookingRow {
   id: string;
   line_account_id: string;
@@ -227,19 +221,14 @@ export async function startBookingPayment(
   if (record.status !== 'unpaid') {
     return { ok: true, created: false, paymentId: record.id, checkoutUrl: null };
   }
-  const started = await providerCheckout(env, config.provider, {
-    amount: record.amount,
-    currency: record.currency,
-    bookingId: booking.id,
-    idempotencyKey: record.idempotency_key,
-  });
-  if (started.providerPaymentId) {
-    await db.prepare(
-      `UPDATE booking_payments SET provider_payment_id = ?, status = 'pending', updated_at = ?
-        WHERE id = ? AND status = 'unpaid'`,
-    ).bind(started.providerPaymentId, new Date().toISOString(), record.id).run();
+  if(record.hold_until&&Date.parse(record.hold_until)<=Date.now())return {ok:false,error:'支払い期限が過ぎています。担当者にお問い合わせください',status:409};
+  const outcome = await runBookingPaymentStart(db, record, providerFor(env, record.provider)!);
+  if (outcome.kind !== 'success') {
+    return { ok: false, error: outcome.kind === 'unknown'
+      ? '支払いの結果を確認しています。開始し直さず担当者にお問い合わせください'
+      : '支払いを開始できません。担当者にお問い合わせください', status: 409 };
   }
-  return { ok: true, created: true, paymentId: record.id, checkoutUrl: started.checkoutUrl };
+  return { ok: true, created: true, paymentId: record.id, checkoutUrl: outcome.value.checkoutUrl };
 }
 
 async function bookingPaymentStatusPayload(
@@ -248,7 +237,8 @@ async function bookingPaymentStatusPayload(
   bookingId: string,
 ) {
   const record = await expireBookingPaymentIfHeld(db, lineAccountId, bookingId);
-  return { payment: customerPaymentRecord(record) };
+  const checkpoint=await getWorkflowStep(db,{scopeId:`line:${lineAccountId}`,processKind:'booking_payment_start',subjectId:bookingId,stepKey:'start'});
+  return { payment: customerPaymentRecord(record),...(checkpoint?.status==='unknown'?{operation_status:'unknown',action_required:true}:{}) };
 }
 
 function customerPaymentRecord(record: BookingPaymentRecord | null) {
@@ -357,8 +347,9 @@ async function accessiblePayment(c: import('hono').Context<Env>) {
 bookingPayments.onError((error,c) => {
   if (error instanceof PaymentActionError) return c.json({success:false,error:error.code,code:error.code},error.status);
   const missing = /no such (table|column).*?(booking_payment_refunds|booking_payment_booking_links|refunded_amount|actor_label)/.test(String(error));
-  const code = missing ? 'payment_refund_storage_not_ready' : 'payment_action_unavailable';
-  console.error(JSON.stringify({code}));
+  if (!missing) throw error;
+  const code = 'payment_refund_storage_not_ready';
+  logger.error(code);
   return c.json({success:false,error:code,code}, /\/(refund|refunds|booking)$/.test(c.req.path) ? 503 : 500);
 });
 bookingPayments.post('/api/booking/payments/:id/refund',requireRole('owner','admin'),denyReadOnly(),inputJsonBoundary(),async c => {

@@ -1,10 +1,11 @@
+import { logger } from '@line-crm/shared/server';
 import {
   getTemplateById,
   recordCarouselTap,
   hasCarouselTap,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
-import { runActionRows, type ScenarioActionRow } from './scenario-actions.js';
+import { runActionRows, type ScenarioActionRow } from '../features/scenarios/scenario-actions/index.js';
 import { pickCarouselActions, type CarouselTapPostback } from '../lib/carousel-tap.js';
 import { logOutgoingMessage } from './event-bus.js';
 
@@ -101,7 +102,7 @@ export async function handleCarouselTap(
             lineAccountId,
           });
         } catch (err) {
-          console.error(JSON.stringify({"code":"services_carousel_tap_failed"}));
+          logger.error("services_carousel_tap_failed");
         }
       }
       return { kind: 'blocked', replyTokenConsumed };
@@ -125,7 +126,7 @@ export async function handleCarouselTap(
       lineAccountId,
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_carousel_tap_failed"}));
+    logger.error("services_carousel_tap_failed");
   }
 
   if (rows.length === 0) return { kind: 'ran', executed: 0 };
@@ -134,7 +135,7 @@ export async function handleCarouselTap(
     const result = await runActionRows(db, rows, friend.id, {accountId:lineAccountId,sourceEventId:options.sourceEventId,executorDependencies:{resolveLineAccessToken:async()=> 'existing-client',createLineClient:()=>lineClient}});
     return { kind: 'ran', executed: result.executed };
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_carousel_tap_failed"}));
+    logger.error("services_carousel_tap_failed");
     return { kind: 'ran', executed: 0 };
   }
 }

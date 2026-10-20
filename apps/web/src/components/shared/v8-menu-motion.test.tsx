@@ -4,7 +4,7 @@
  *
  * ③ 層の外の旧い開く動き（globals の lh-surface-in）が「…」のメニューに当たり、
  *    部品の V8 の動き（押した角から 120ms・0.96→1。提案 F）に必ず勝っていた。
- *    → v7 だけに限る。v7 の動きは残す。
+ *    → 管理画面 だけに限る。管理画面 の動きは残す。
  * ④ 表の行の登場（animation … both）の保持値 opacity:1 が、消える行の
  *    opacity:0 に勝って行が薄くならなかった。また行の順番出しが更新のたびに走った。
  *    → 消える行には当てない・最初の1回だけ（tbody に data-rows-settled）。
@@ -32,7 +32,7 @@ function rules(css: string) {
 afterEach(() => cleanup())
 
 describe('③ 「…」のメニューの開き方', () => {
-  it('層の外の旧い開く動き（lh-surface-in）は v7 の「…」だけに当たる（V8 には当てない）', () => {
+  it("層の外の旧い開く動き（lh-surface-in）は 既存の見た目の「…」だけに当たる（V8 には当てない）", () => {
     const hits = rules(globals).filter((r) => /animation:\s*lh-surface-in/.test(r.body))
     const menuSelectors = hits
       .flatMap((r) => r.selector.split(','))

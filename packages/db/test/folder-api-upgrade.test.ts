@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { beforeEach,afterEach,describe,expect,it } from 'vitest';
 import { asD1 } from './d1-test-helper.js';
 import { createFolder,getFolderById,updateFolder,deleteFolder,swapFolderOrder,getFolderItemCounts } from '../src/folders.js';
-import { listMileageRewardFolders,createMileageRewardFolder,reorderMileageRewardFolders,moveMileageRewardToFolder } from '../src/mileage-reward-folders.js';
+import { listMileageRewardFolders,createMileageRewardFolder,reorderMileageRewardFolders,moveMileageRewardToFolder } from '../src/mileage/reward-folders.js';
 import { createAffiliate,createAffiliateWithRandomCode,updateAffiliate } from '../src/affiliates.js';
 import { createAffiliateOffer,updateAffiliateOffer } from '../src/affiliate-offers.js';
 let raw:Database.Database,db:D1Database;

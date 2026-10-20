@@ -1,6 +1,6 @@
 import { isCalendarDate as isExistingCalendarDate, scheduledJstIso } from '@line-crm/shared';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 export const RESERVATION_FILTER_STATUSES = ['pending', 'confirmed', 'seated', 'visited', 'cancelled', 'no_show'];
 

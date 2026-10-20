@@ -7,7 +7,7 @@ import { shortDateTime } from '@/lib/hq-banners'
 import Button from '@/components/shared/button'
 
 /**
- * 運営からのお知らせ（★V6 37-7「画面のお知らせ」）。統括の管理画面の上部に出し、「読みました」で消える。
+ * 運営からのお知らせ（★管理画面 37-7「画面のお知らせ」）。統括の管理画面の上部に出し、「読みました」で消える。
  */
 export default function PlatformNotices() {
   const [notices, setNotices] = useState<HqNotice[]>([])

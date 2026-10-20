@@ -4,9 +4,9 @@ import { describe, expect, it } from 'vitest'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-/* 完全切り替え：v7 の scenario-list.tsx は捨て、V8 を見る。入口は src/v8/scenarios/list.tsx（古い list-v8.tsx はもう描かれない）。 */
+/* 完全切り替え：管理画面 の scenario-list.tsx は捨て、V8 を見る。入口は src/v8/scenarios/list.tsx（古い list-v8.tsx はもう描かれない）。 */
 const SCENARIO_LIST = read('../v8/scenarios/list.tsx')
-const AUTO_REPLIES = read('../v8/auto-replies/list.tsx')
+const AUTO_REPLIES = readUiSource(new URL('../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
 const FRIEND_ADD = read('../v8/friend-add/list.tsx')
 const VARS = readUiSource(new URL('../app/contents/vars/page.tsx', import.meta.url), 'utf8')
 const NEN_OVERVIEW = read('../v8/nen-campaigns/list.tsx')
@@ -27,13 +27,13 @@ describe('#640 省略表示の全文確認（title）', () => {
 
   it('/auto-replies V8: 応答数・長い条件・連動内容に全文確認を残す', () => {
     expect(AUTO_REPLIES).toContain('title={`今月 ${r.hits?.period')
-    expect(AUTO_REPLIES).toContain('title={name}') // B-194: 条件の補足は名前の下に出さない
-    expect(AUTO_REPLIES).not.toContain('sub={') // B-194: 連動の補足は名前の下に出さない
+    expect(AUTO_REPLIES).toContain('title={name}') // : 条件の補足は名前の下に出さない
+    expect(AUTO_REPLIES).not.toContain('sub={') // : 連動の補足は名前の下に出さない
   })
 
   it('/friend-add-settings V8: 設定名・経路・送るものに全文確認を残す', () => {
     expect(FRIEND_ADD).toContain('title={rule.name}')
-    expect(FRIEND_ADD).not.toContain('styles.nameSub}') // B-194: 経路は詳細で見る
+    expect(FRIEND_ADD).not.toContain('styles.nameSub}') // : 経路は詳細で見る
     expect(FRIEND_ADD).toContain('title={line}')
   })
 

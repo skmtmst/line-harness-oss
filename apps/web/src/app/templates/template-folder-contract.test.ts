@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -5,17 +6,16 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
-const PAGE = read('../../v8/templates/list.tsx')
+const PAGE = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 /** 注釈を落とす。「テンプレートと書かない」の説明が自分の見張りに当たらないように。 */
 const withoutComments = (src: string) =>
   src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 const PANEL = read('../../components/shared/folder-panel.tsx')
 const PANEL_CODE = withoutComments(PANEL)
 const ROW_ACTIONS = read('../../components/shared/folder-row-actions.tsx')
-const DIALOG = read('../../components/shared/folder-add-dialog.tsx')
 
 /**
- * テンプレートのフォルダ操作（設計 `CzndJ` ★V6 11-1-H）。
+ * テンプレートのフォルダ操作（設計 `CzndJ` ★管理画面 11-1-H）。
  *
  * 設計は行の操作を 5 つ持つ——**名前を変更 / 色を変える / 並び順を上へ /
  * 並び順を下へ / フォルダを削除**——と、削除の下に
@@ -25,7 +25,7 @@ const DIALOG = read('../../components/shared/folder-add-dialog.tsx')
  * **空のフォルダを作れず、名前を直すと中身が散らばった。**
  * 本物のフォルダ（`folders.kind = 'template'`）へ寄せる。
  */
-describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
+describe("管理画面 テンプレートのフォルダ操作（CzndJ）", () => {
   it('文字列ではなく、本物のフォルダを読む', () => {
     expect(PAGE).toContain("api.folders.list('template', accountId)")
     // `category` から帯を組み立てる作りへ戻さない。
@@ -73,22 +73,15 @@ describe('V6 テンプレートのフォルダ操作（CzndJ）', () => {
 
   it('部品が操作を実際に描く', () => {
     // **型に生えているだけでは描かれない。** 描く行を見る。
-    // ★V7（m13g）：独自の見た目から共通 ActionMenu へ移した。描く項目は同じ。
+    // ★管理画面（m13g）：独自の見た目から共通 ActionMenu へ移した。描く項目は同じ。
     expect(PANEL).toContain('if (row.onMoveUp)')
     expect(PANEL).toContain('if (row.onDelete)')
-    // V8（nH0fZ）は吹き出しを出さず確認の窓で読ませる。v7 は今までどおり但し書きを出す。
+    // V8（nH0fZ）は吹き出しを出さず確認の窓で読ませる。互換経路は今までどおり但し書きを出す。
     expect(PANEL_CODE).not.toContain('note={row.deleteNote}')
     expect(ROW_ACTIONS).toContain('description={deleteFolderDescription(itemLabel, deletingCount)}')
   })
 
-  it('名前と色を直す窓は、追加と同じ窓を使う', () => {
-    // 窓を2つ作ると、文言や色の並びがまたずれる。
-    expect(DIALOG).toContain('folder?: Folder')
-    // N-147: 追加も更新もフォルダの持ち主アカウントをAPIへ渡す。
-    expect(DIALOG).toContain('api.folders.update(folder.id, folderUpdates, accountId ?? undefined)')
-    expect(DIALOG).toContain('api.folders.create({ kind, name: trimmed, color, accountId })')
-    expect(DIALOG).toContain("{folder ? 'フォルダを直す' : 'フォルダを追加'}")
-  })
+  // 名前・色・所属の作成/更新は folder-editor-dialog.react.test.tsx で実操作する。
 
   /*
     2026-09-04（台帳 #124）: 置き場を書く口ができたので、断りを消して

@@ -3,7 +3,7 @@ vi.mock('./feature-enforcement.js',()=>({featureJobCanRun:async()=>true}));
 import {processPendingMileageEvents,toJstString} from '@line-crm/db';
 import {createTestD1,insertFriend,type SqliteD1} from '../test-utils/d1-sqlite.js';
 import {recordTrackedClick,processTrackedClick,processDueTrackedClicks} from './tracked-click-steps.js';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 let item:SqliteD1;
 beforeEach(()=>{
  item=createTestD1();
@@ -17,7 +17,7 @@ beforeEach(()=>{
 });
 afterEach(()=>item.raw.close());
 it('PKG68 retries a real tag failure while preserving one real mileage event and grant',async()=>{
- const saved=await recordTrackedClick(item.db,{linkId:'click-link',friendId:'click-friend',accountId:'click-account',tagId:'click-tag',scenarioId:null,linkName:'test',conversionPointIds:[]});
+ const saved=await recordTrackedClick(item.db,{linkId:'click-link',friendId:'click-friend',identityVerified:true,accountId:'click-account',tagId:'click-tag',scenarioId:null,linkName:'test',conversionPointIds:[]});
  item.raw.exec("CREATE TRIGGER fail_tag BEFORE INSERT ON friend_tags BEGIN SELECT RAISE(ABORT,'temporary tag failure');END");
  const env={DB:item.db,LINE_CHANNEL_ACCESS_TOKEN:'test'} as Env['Bindings'];
  await expect(processTrackedClick(env,saved.id,saved.plan)).rejects.toThrow();

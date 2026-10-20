@@ -5,7 +5,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getConversionApprovalQueue } from '../src/affiliate-report.js';
-import { getConversionEvents } from '../src/conversions.js';
+import { getConversionEvents } from '../src/conversions/index.js';
 import { setConversionApproval } from '../src/affiliate-offers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

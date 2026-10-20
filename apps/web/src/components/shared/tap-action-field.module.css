@@ -5,12 +5,11 @@
  * 「押したら」の共通の欄（YPzmo）。値は globals.css の [data-theme="v8"] の --tap-action-*。
  * 画面側で上書きしない（幅は呼び出し側の箱で決める）。
  */
-.withExtras, .pickWrap { width: 100%; min-width: 0; }
+.withExtras { width: 100%; min-width: 0; }
 .withExtras { container: tap-action / inline-size; }
 .pickRow { text-align: left; cursor: pointer; }
 .pickRow:disabled { cursor: default; }
 .pickRow:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
-.pickChange { color: var(--color-action); font-size: var(--text-caption); white-space: nowrap; }
 .root {
   display: flex;
   min-width: 0;
@@ -123,29 +122,6 @@
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-}
-
-.pickName {
-  flex: none;
-  max-width: 100%;
-  overflow: hidden;
-  font-size: var(--text-body);
-  font-weight: 600;
-  text-overflow: ellipsis;
-}
-
-.pickNote,
-.pickEmpty {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  text-overflow: ellipsis;
-}
-
-.pickEmpty {
-  color: var(--color-ink-faint);
-  font-size: var(--text-body);
 }
 
 /* LIFF が無い店で LIFF の要る動きを選んだとき。 */

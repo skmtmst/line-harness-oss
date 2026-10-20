@@ -1,3 +1,5 @@
+import { fail } from '../lib/fail.js';
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -7,7 +9,7 @@ import type {
   IdentityCandidateStatus,
   UndoIdentityCandidateRequest,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
   candidateAccountIds,
@@ -16,10 +18,10 @@ import {
   IdentityCandidateError,
   listIdentityCandidates,
   undoIdentityCandidate,
-} from '../services/identity-candidates.js';
-import { detectFriendDuplicateCandidates } from '../services/friend-duplicate-candidates.js';
+} from '../features/identity/identity-candidates/index.js';
+import { detectFriendDuplicateCandidates } from '../features/friends/friend-duplicate-candidates/index.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
-import { getFriendProfileCandidates } from '../services/friend-profile-candidates.js';
+import { getFriendProfileCandidates } from '../features/friends/friend-profile-candidates/index.js';
 
 const KINDS = new Set<IdentityCandidateKind>(['friend_duplicate', 'ec_member']);
 const STATUSES = new Set<IdentityCandidateStatus>([
@@ -135,13 +137,10 @@ async function safeBody(c: { req: { json<T>(): Promise<T> } }): Promise<unknown>
 
 function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof IdentityCandidateError) {
-    return inputError(c, { success: false, error: error.message, code: error.code }, error.status, []);
+    return fail(c, error.status, error.code, { error: error.message }, []);
   }
-  console.error(JSON.stringify({"code":"routes_identity_candidates_failed"}));
-  return c.json(
-    { success: false, error: '本人照合の記録を処理できませんでした', code: 'INTERNAL_ERROR' },
-    500,
-  );
+  logger.error("routes_identity_candidates_failed");
+  return fail(c, 500, 'INTERNAL_ERROR', { error: '本人照合の記録を処理できませんでした' });
 }
 
 identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin', 'staff'), async (c) => {

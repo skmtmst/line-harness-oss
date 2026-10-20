@@ -6,7 +6,7 @@ import {processInboxSla,refreshInboxSla,slaState,businessWindows,slaDeadline} fr
 import {upsertChatOnMessage,updateChat} from '@line-crm/db';
 import {slaChatList} from '../services/inbox-sla-list.js';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 let d:SqliteD1;
 beforeEach(()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-16T01:00:00Z'));d=gapFixture();});
 afterEach(()=>{d.raw.close();vi.useRealTimers();});

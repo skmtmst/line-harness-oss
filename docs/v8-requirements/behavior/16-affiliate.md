@@ -1,3 +1,5 @@
+> 文書：16 アフィリエイト 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 16 アフィリエイト 操作と挙動（受け入れ）
 
 - 正本の要件：[v6-16 成果・アフィリエイト](../../v6-requirements/v6-16-affiliate-requirements-draft.md)（§20 の確定条件を含む）と [V8 の機能追加 F-23](../v8-feature-additions.md)。共通の動き・権限は [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限・§6-2 再試行・§8 秘密・個人情報・監査・§11 応答・§15 進みとトースト）と [30 ログインユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。

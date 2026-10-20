@@ -1,9 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 import type { AutomationTabCounts, MediaTabCounts, ConversionApprovalCounts } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { listAutomationTemplates } from '../services/automation-drafts.js';
+import { listAutomationTemplates } from '../features/automations/automation-drafts.js';
 
 const scope = vi.hoisted(() => ({ allowedAccountIds: ['a'], canSeeUnassigned: false }));
 vi.mock('../services/account-access.js', async original => ({
@@ -25,6 +28,7 @@ function application(role: 'admin' | 'staff' = 'admin', db?: D1Database, viewPer
     await next();
   });
   app.route('/', automations).route('/', contents).route('/', conversions);
+  app.onError(unhandledWorkerError);
   return { request: (path: string) => app.request(path, {}, { DB: db ?? sqlite.db } as Env['Bindings']) };
 }
 
@@ -104,7 +108,12 @@ describe('タブ件数 API', () => {
     for (const path of ['/api/automations/counts?account_id=a', '/api/media/counts?accountId=a', '/api/conversions/approvals/counts']) {
       const res = await application('admin', failing).request(path);
       expect(res.status, path).toBe(500);
-      expect((await res.json<{success:boolean}>()).success).toBe(false);
+      const body = await res.json<{ success: boolean; incidentId?: string }>();
+      expect(body.success).toBe(false);
+      if (path.startsWith('/api/media/')) {
+        expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+        expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
+      }
     }
   });
 });

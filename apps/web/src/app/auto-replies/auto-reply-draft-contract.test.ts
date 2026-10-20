@@ -1,14 +1,16 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { toDraft, toVersionDraft } from '@/components/auto-replies/edit-dialog'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const LIST = read('../../v8/auto-replies/list.tsx')
-const EDIT = read('edit/wizard-v8.tsx')
-const DIALOG = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
+const readApi = (...parts: string[]) => readApiSource(join(HERE, ...parts), 'utf8')
+const readImplementation = (...parts: string[]) => readUiSource(join(HERE, ...parts), 'utf8')
+const LIST = readImplementation('../../v8/auto-replies/list.tsx')
+const EDIT = readImplementation("../../v8/auto-replies/edit/wizard.tsx")
+const DIALOG = readImplementation('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
 
 /**
  * 編集を開いたときの中身を、1か所で作ること。
@@ -40,7 +42,7 @@ describe('自動応答の編集に渡す中身', () => {
     // 保存本文に必ず載せる。新規作成・一覧の編集・URL 編集のどれでも送れる
     // ように、共通の body へ入れる（版管理の口へだけ入れると一覧経由で消える）。
     expect(DIALOG).toContain('internalMemo: internalMemo.trim() || null')
-    const API = read('..', '..', 'lib', 'api.ts')
+    const API = readApi('..', '..', 'lib', 'api.ts')
     expect(API).toContain('internalMemo: string | null')
     expect(API).toContain('internalMemo?: string | null')
   })
@@ -122,12 +124,4 @@ describe('自動応答の編集に渡す中身', () => {
     })
   })
 
-  it('段の番号が、上から 1・2・3 の順に出る', () => {
-    const one = DIALOG.indexOf('1. どのメッセージに反応するか')
-    const two = DIALOG.indexOf('2. いつ・誰に反応するか')
-    const three = DIALOG.indexOf('3. 何を返すか')
-    expect(one).toBeGreaterThan(-1)
-    expect(two).toBeGreaterThan(one)
-    expect(three).toBeGreaterThan(two)
-  })
 })

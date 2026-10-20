@@ -1,10 +1,11 @@
+import { readUiSource } from '../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 /*
- * ★V7 監査の直し（m18c：スマホの一覧・はみ出し・隠れる×）。
+ * ★管理画面 監査の直し（m18c：スマホの一覧・はみ出し・隠れる×）。
  * 外部の監査（2026-09-27・検証環境）が指した4件の見張り。
  * 見た目の一致は司令塔の撮影で確かめるので、ここでは「部品・並び・
  * 重なり順」の約束だけを見る。直しを戻すと赤くなる。
@@ -12,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
-const TEMPLATES = read('../v8/templates/list.tsx')
+const TEMPLATES = readUiSource(join(HERE, '../v8/templates/list.tsx'), 'utf8')
 const TEMPLATES_CSS = read('../v8/templates/list.module.css')
 const CONVERSIONS = read('../v8/conversions/list.tsx')
 const HEALTH_TAB = read('../v8/nen-health/health.tsx')

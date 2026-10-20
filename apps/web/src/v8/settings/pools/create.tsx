@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("名前を入力してください"),
   slug: { required: true, check: (value: string) => SLUG_PATTERN.test(value) ? null : 'URLに使う名前は、半角英小文字・数字・ハイフンで2〜32文字にしてください' },
 }
@@ -31,7 +31,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8-B プール管理「プールを作る」（Pencil `D0AOyx`・/pools/new）。
+ * ★V8-B プール管理「プールを作る」（Pencil ・/pools/new）。
  *
  * 設定の板（中のメニューつき）の中に、左に「1. どのプールか」「2. いまの受け入れ先」の2枚、
  * 右に「プレビュー」。保存の帯は画面の下（キャンセル・保存してURLを発行）。
@@ -115,8 +115,8 @@ function PoolCreateBody() {
   }
 
   const validate = (): { target: string; message: string } | null => {
-    if ((b244Requirements.name.check(name) !== null)) return { target: 'pl-name', message: '名前を入力してください' }
-    const slugError = b244Requirements.slug.check(slug)
+    if ((FIELD_REQUIREMENTS.name.check(name) !== null)) return { target: 'pl-name', message: '名前を入力してください' }
+    const slugError = FIELD_REQUIREMENTS.slug.check(slug)
     if (slugError) return { target: 'pl-slug', message: slugError }
     if (accountIds.length === 0) return { target: 'pl-add-account', message: '受け入れ先のアカウントを選んでください' }
     return null
@@ -186,14 +186,14 @@ function PoolCreateBody() {
           {error ? <Notice tone="danger" >{error}</Notice> : null}
           <Card variant="form" aria-labelledby="pool-create-what">
             <CardHeader size="stacked" titleId="pool-create-what" title="1. どのプールか" />
-            <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined} requirement={b244Requirements.name}>
+            <Field label="プール名" htmlFor="pl-name" error={inputError?.target === 'pl-name' ? inputError.message : undefined} requirement={FIELD_REQUIREMENTS.name}>
               <SaveErrorField names={["name"]}><TextField id="pl-name" value={name} onChange={(event) => { setName(event.target.value); if (inputError?.target === 'pl-name') setInputError(null) }} placeholder="例：渋谷エリア" maxLength={100} /></SaveErrorField>
             </Field>
             <Field note={<>
               {slugValid
                 ? `保存すると、このURLが発行されます：${publicUrl}`
                 : '半角英小文字・数字・ハイフンで2〜32文字。配ったURLが使えなくなるため、あとから変えられません。'}
-            </>} label="URLに使う名前（あとから変えられません）" requirement={b244Requirements.slug} htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
+            </>} label="URLに使う名前（あとから変えられません）" requirement={FIELD_REQUIREMENTS.slug} htmlFor="pl-slug" error={inputError?.target === 'pl-slug' ? inputError.message : undefined}>
               <SaveErrorField names={["slug"]}><TextField id="pl-slug" value={slug} onChange={(event) => { setSlug(event.target.value); if (inputError?.target === 'pl-slug') setInputError(null) }} placeholder="shibuya" maxLength={32} /></SaveErrorField>
             </Field>
 

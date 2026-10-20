@@ -1,54 +1,85 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+// @vitest-environment happy-dom
+import React, { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { fireEvent, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import type { EntryRoute, Tag } from '@line-crm/shared'
+import { ApiError } from '@/lib/api'
+import EditRouteModal from '@/v8/inflow-links/edit-route-dialog'
 
-const HERE = dirname(fileURLToPath(import.meta.url))
-const MODAL = readFileSync(join(HERE, '../../v8/inflow-links/edit-route-dialog.tsx'), 'utf8')
-
-/** 名前で見つけた関数の本体だけを切り出す。ファイル全体を見ると素通しになる。 */
-function fnBody(src: string, decl: string): string {
-  const start = src.indexOf(decl)
-  if (start < 0) throw new Error(`${decl} が見つかりません`)
-  const open = src.indexOf('{', start)
-  let depth = 0
-  for (let i = open; i < src.length; i++) {
-    if (src[i] === '{') depth += 1
-    else if (src[i] === '}') {
-      depth -= 1
-      if (depth === 0) return src.slice(open, i + 1)
-    }
-  }
-  throw new Error(`${decl} の本体が閉じていません`)
+const net = vi.hoisted(() => ({ update: vi.fn(), create: vi.fn(), saved: vi.fn() }))
+vi.mock('@/lib/api', async original => {
+  const real = await original<typeof import('@/lib/api')>()
+  return { ...real, api: { ...real.api, entryRoutes: { ...real.api.entryRoutes, update: net.update, create: net.create } } }
+})
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+const route = { id: 'route-1', refCode: 'route1', name: '経路の名前', runAccountFriendAddScenarios: true, updatedAt: '2026-10-18T00:00:00Z' } as EntryRoute
+let root: Root
+let host: HTMLDivElement
+beforeEach(() => {
+  host = document.createElement('div'); document.body.append(host); root = createRoot(host)
+  net.update.mockReset(); net.create.mockReset(); net.saved.mockReset()
+})
+afterEach(async () => { await act(async () => root.unmount()); host.remove() })
+async function mount(editing: EntryRoute | null, tags: Tag[] = []) {
+  await act(async () => { root.render(React.createElement(EditRouteModal, { surface: 'inline', route: editing, pools: [], scenarios: [], templates: [], tags, existingGenres: [], poolMemberNames: {}, accountId: 'account-a', onClose: () => {}, onSaved: net.saved })) })
 }
+it.each([400, 403, 503])('編集のHTTP %sで入力を残し、保存中を解除して再試行できる', async status => {
+  net.update.mockRejectedValueOnce(new ApiError(status, status === 400 ? '紹介コードを確認してください' : undefined))
+  await mount(route)
+  await act(async () => { screen.getByRole('button', { name: '保存する' }).click() })
+  expect(net.saved).not.toHaveBeenCalled()
+  expect((document.getElementById('route-name') as HTMLInputElement).value).toBe('経路の名前')
+  expect((screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement).disabled).toBe(false)
+  expect(document.body.textContent).not.toContain('API error:')
+  expect(document.body.textContent).toContain(status === 400 ? '紹介コードを確認してください' : status === 403 ? '権限' : '保存できませんでした')
+  net.update.mockResolvedValue({ success: true, data: route })
+  await act(async () => { screen.getByRole('button', { name: '保存する' }).click() })
+  expect(net.saved).toHaveBeenCalledTimes(1)
+})
+it.each([409, 503])('新規作成のHTTP %sでも同時編集の帯へ閉じ込めず、同じ所属で再試行できる', async status => {
+  net.create.mockRejectedValueOnce(new ApiError(status, status === 409 ? 'この識別子は既に使われています' : undefined))
+  await mount(null)
+  const { fireEvent } = await import('@testing-library/react')
+  await act(async () => { fireEvent.change(document.getElementById('route-name')!, { target: { value: '作る経路' } }); fireEvent.change(document.getElementById('route-ref')!, { target: { value: 'route1' } }) })
+  await act(async () => { screen.getByRole('button', { name: '作る' }).click() })
+  expect(net.create).toHaveBeenCalledWith(expect.objectContaining({ name: '作る経路', lineAccountId: 'account-a' }))
+  expect(net.saved).not.toHaveBeenCalled()
+  expect(document.body.textContent).toContain(status === 409 ? 'この識別子は既に使われています' : '保存できませんでした')
+  expect(screen.queryByRole('button', { name: '違いを比べる' })).toBeNull()
+  expect((document.getElementById('route-ref') as HTMLInputElement).disabled).toBe(false)
+  expect((screen.getByRole('button', { name: '作る' }) as HTMLButtonElement).disabled).toBe(false)
+  net.create.mockResolvedValue({ success: true, data: route })
+  await act(async () => { screen.getByRole('button', { name: '作る' }).click() })
+  expect(net.saved).toHaveBeenCalledTimes(1)
+})
 
-describe('リファラルリンク編集窓の保存 (#1058)', () => {
-  it('APIが例外を投げても「保存中…」のまま固まらない', () => {
-    const body = fnBody(MODAL, 'const doSave = async ()')
-    expect(body, '保存をtryで囲んでいない').toMatch(/try\s*\{[\s\S]*await api\.entryRoutes\./)
-    expect(body, 'APIの例外を受けていない').toContain('} catch (err) {')
-    expect(body, '失敗の理由を窓に出していない').toContain("setError(withPermissionFailure(err, describeSaveFailure(err), 'store'))")
-    expect(body, '処理中の印を必ず戻していない').toMatch(/finally\s*\{[\s\S]*setSubmitting\(false\)/)
+// scripts/inflow-link-tag-ui.test.ts の文字固定を実際の選択・送信へ移す。
+it.each([false, true])('編集=%sでタグを選択・解除すると実際の作成/更新本文へIDとnullを送る', async editing => {
+  const tags = [{ id: 'tag-old', name: '今の自動タグ' }, { id: 'tag-new', name: '次の自動タグ' }] as Tag[]
+  net.create.mockResolvedValue({ success: true, data: route })
+  net.update.mockResolvedValue({ success: true, data: route })
+  await mount(editing ? { ...route, tagId: 'tag-old' } : null, tags)
+  const field = screen.getByRole('button', { name: '自動付与タグ（任意）', exact: true })
+  const fieldContainer = field.closest('[data-entity-picker-field]')!
+  expect(fieldContainer.textContent).toContain(editing ? '今の自動タグ' : '設定なし')
+  if (!editing) await act(async () => {
+    fireEvent.change(document.getElementById('route-name')!, { target: { value: '新しい経路' } })
+    fireEvent.change(document.getElementById('route-ref')!, { target: { value: 'new-route' } })
   })
-
-  it('400系の理由はAPIの言葉、403・5xxは運用の言葉で出す（WRITE-01）', () => {
-    expect(MODAL).toContain("import { api, describeSaveFailure } from '@/lib/api'")
-    const body = fnBody(MODAL, 'const doSave = async ()')
-    expect(body, '生の例外文をそのまま出している')
-      .not.toMatch(/setError\(\s*(err\.message|String\(err\)|err\s*\))/s)
-  })
-
-  it('新規と更新、どちらの口でも失敗を拾う', () => {
-    const body = fnBody(MODAL, 'const doSave = async ()')
-    // R39: 新規は選択中アカウントの所属を付けて作る。
-    expect(body).toContain('api.entryRoutes.create({ ...form, lineAccountId: accountId ?? null })')
-    expect(body).toContain('api.entryRoutes.update(route!.id, form)')
-    expect(body).toContain('if (res.success) onSaved(res.data, isNew)')
-    expect(body).toContain("else setError(res.error ?? '保存に失敗しました。通信を確かめて、もう一度お試しください。')")
-  })
-
-  it('失敗は現役の編集面の中に出る（共通のエラー表示へ）', () => {
-    expect(MODAL).toContain("import EditorSurface from '@/components/shared/editor-surface'")
-    expect(MODAL).toContain("error={error || fieldErrors['route-coupon'] || undefined}")
-  })
+  await act(async () => { field.click() })
+  const picker = screen.getByRole('dialog', { name: 'タグを選ぶ' })
+  await act(async () => { fireEvent.click(within(picker).getByRole('radio', { name: '次の自動タグ' })) })
+  expect(net.create).not.toHaveBeenCalled(); expect(net.update).not.toHaveBeenCalled()
+  await act(async () => { within(picker).getByRole('button', { name: '選ぶ', exact: true }).click() })
+  expect(fieldContainer.textContent).toContain('次の自動タグ')
+  const save = () => screen.getByRole('button', { name: editing ? '保存する' : '作る', exact: true }).click()
+  await act(async () => { save() })
+  const payload = editing ? net.update.mock.calls.at(-1)![1] : net.create.mock.calls.at(-1)![0]
+  expect(payload).toMatchObject(editing ? { tagId: 'tag-new', expectedUpdatedAt: route.updatedAt } : { tagId: 'tag-new', lineAccountId: 'account-a' })
+  await act(async () => { screen.getByRole('button', { name: '自動付与タグ（任意）を外す', exact: true }).click() })
+  expect(fieldContainer.textContent).toContain('設定なし')
+  await act(async () => { save() })
+  expect(editing ? net.update.mock.calls.at(-1)![1].tagId : net.create.mock.calls.at(-1)![0].tagId).toBeNull()
+  expect(net.saved).toHaveBeenCalledTimes(2)
 })

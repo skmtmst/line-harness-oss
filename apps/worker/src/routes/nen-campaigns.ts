@@ -1,3 +1,7 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
+import { verifyNenWebhook } from '../lib/hmac.js';
+import { WEBHOOK_BODY_BYTES, isWebhookBodyTooLarge } from '../lib/webhook-body.js';
 import { petWriteBody, petPatchBody } from './nen-pet-input.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -8,7 +12,7 @@ import {
   NEN_CAMPAIGN_BODY_MAX_LENGTH,
   NEN_PET_NAME_MAX_LENGTH,
 } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole, requireDeliveryAccess } from '../middleware/role-guard.js';
 import {
   type CampaignRow,
@@ -61,7 +65,7 @@ const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
   'arrival_check', 'review_request', 'cross_sell', 'column', 'birthday_coupon',
 ]);
-const MAX_BODY_BYTES = 256 * 1024;
+const MAX_BODY_BYTES = WEBHOOK_BODY_BYTES.ec;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
 
 async function getTestRecipient(c: Context<Env>, accountId: string, friendId: string) {
@@ -93,7 +97,7 @@ function metricsError(c: Context<Env>, error: unknown): Response {
       ...(error.field ? { field: error.field } : {}),
     }, error.status, []);
   }
-  console.error(JSON.stringify({"code":"nen_campaign_metrics_failed"}));
+  logger.error("nen_campaign_metrics_failed");
   return c.json({ success: false, error: 'NEN配信の情報を取得できませんでした' }, 500);
 }
 
@@ -101,7 +105,7 @@ function columnOperationError(c: Context<Env>, error: unknown): Response {
   if (error instanceof NenColumnOperationError) {
     return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
   }
-  console.error(JSON.stringify({"code":"routes_nen_campaigns_failed"}));
+  logger.error("routes_nen_campaigns_failed");
   return c.json({ success: false, error: 'NENコラムを操作できませんでした' }, 500);
 }
 
@@ -118,18 +122,7 @@ function isUrl(value: string): boolean {
 }
 
 async function verifyEccubeSignature(secret: string, timestamp: string, signature: string, body: string): Promise<boolean> {
-  const seconds = Number(timestamp);
-  if (!Number.isInteger(seconds) || Math.abs(Date.now() / 1000 - seconds) > 300) return false;
-  const key = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
-  );
-  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${body}`));
-  const expected = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-  const provided = signature.replace(/^sha256=/i, '').toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(provided)) return false;
-  let diff = 0;
-  for (let i = 0; i < 64; i++) diff |= expected.charCodeAt(i) ^ provided.charCodeAt(i);
-  return diff === 0;
+  return (await verifyNenWebhook({ profile: 'ec', secret, timestamp, signature, rawBody: body })).ok;
 }
 
 nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
@@ -534,7 +527,7 @@ nenCampaigns.get('/api/nen-campaigns/metrics/flows', requireRole('owner', 'admin
   const accountId = await requireAccount(c);
   if (typeof accountId !== 'string') return accountId;
   try {
-    // ★V6 37-6: 「今月」「先月」の数値カードは from/to で月の範囲を渡す（deliveries 口と同じ決めごと）。
+    // ★37-6: 「今月」「先月」の数値カードは from/to で月の範囲を渡す（deliveries 口と同じ決めごと）。
     const data = await getNenFlowMetrics(c.env.DB, accountId, nenDeliveryRange({
       from: c.req.query('from'), to: c.req.query('to'), days: c.req.query('days'),
     }));
@@ -718,7 +711,7 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireDeliveryAccess('nenCampai
     if (isNenColumnSlugConflict(error)) {
       return c.json({ success: false, error: 'column_already_exists' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_nen_campaigns_failed","route":"POST /api/nen-campaigns/columns"}));
+    logger.error("routes_nen_campaigns_failed");
     return c.json({ success: false, error: 'column_create_failed' }, 500);
   }
   auditLog(c, 'nen.column.create', {kind:'nen_column',id}, {lineAccountId:accountId});
@@ -1209,7 +1202,7 @@ async function resolveSoleActiveAccountId(db: D1Database): Promise<string | null
 
 /**
  * 未割り当て（line_account_id IS NULL）の EC コラムを、選択中の LINE アカウントへ割り当てる。
- * ★V6 37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届くが、
+ * ★37-6-A「ECのコラムを取り込む」。EC で保存されたコラムは Webhook で自動的に届くが、
  * 宛先が決められなかった分（アカウントが複数ある・古いコラム）がここに残る。
  */
 nenCampaigns.post('/api/nen-campaigns/columns/import', requireDeliveryAccess('nenCampaigns'), inputJsonBoundary(), async (c) => {
@@ -1229,7 +1222,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) return c.json({ success: false, error: 'Integration is not configured' }, 503);
   const raw = await c.req.text();
-  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return c.json({ success: false, error: 'Payload too large' }, 413);
+  if (isWebhookBodyTooLarge(raw, MAX_BODY_BYTES)) return c.json({ success: false, error: 'Payload too large' }, 413);
   const valid = await verifyEccubeSignature(
     secret, c.req.header('x-nen-timestamp') || '', c.req.header('x-nen-signature') || '', raw,
   );
@@ -1251,7 +1244,7 @@ nenCampaigns.post('/api/integrations/eccube/columns', inputJsonBoundary(), async
   // ではない。#711 の司令塔裁定で、経路ごとに違う上限を持たないことを優先し、
   // 管理画面と同じ120を採った。
   if (body.title.length > 120) {
-    console.error(JSON.stringify({"code":"nen_eccube_column_title_rejected","route":"POST /api/integrations/eccube/columns"}));
+    logger.error("nen_eccube_column_title_rejected");
     return inputError(c, { success: false, error: 'title_invalid' }, 400, ["title"]);
   }
   const requestedLineAccountId = typeof body.line_account_id === 'string' ? body.line_account_id : null;
@@ -1312,7 +1305,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', inputJsonBoundary(),
   const secret = c.env.ECCUBE_WEBHOOK_SECRET;
   if (!secret || secret.length < 32) return c.json({ success: false, error: 'Integration is not configured' }, 503);
   const raw = await c.req.text();
-  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return c.json({ success: false, error: 'Payload too large' }, 413);
+  if (isWebhookBodyTooLarge(raw, MAX_BODY_BYTES)) return c.json({ success: false, error: 'Payload too large' }, 413);
   const valid = await verifyEccubeSignature(
     secret, c.req.header('x-nen-timestamp') || '', c.req.header('x-nen-signature') || '', raw,
   );
@@ -1328,7 +1321,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', inputJsonBoundary(),
     ? null
     : typeof body.used_at === 'string' && Number.isFinite(Date.parse(body.used_at))
       // issued_at と同じく日本時間の壁時計で残す（台帳の日付列をそろえる）。
-      ? new Date(Date.parse(body.used_at) + 9 * 3600_000).toISOString().slice(0, 19).replace('T', ' ')
+      ? japanCalendar(new Date(Date.parse(body.used_at))).toISOString().slice(0, 19).replace('T', ' ')
       : 'invalid';
   const orderNumber = typeof body.order_number === 'string' && body.order_number.trim()
     ? body.order_number.trim().slice(0, 64) : null;
@@ -1365,7 +1358,7 @@ nenCampaigns.post('/api/integrations/eccube/coupon-usages', inputJsonBoundary(),
         metadata: { couponCode: code, orderNumber },
       });
     } catch (conversionError) {
-      console.error(JSON.stringify({"code":"nen_coupon_usage_conversion_failed","route":"POST /api/integrations/eccube/coupon-usages"}));
+      logger.error("nen_coupon_usage_conversion_failed");
     }
   }
   return c.json({ success: true, data: { couponCode: code, usedAt: when } });

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const mail = vi.hoisted(() => ({ send: vi.fn() }));
@@ -191,7 +191,7 @@ describe('統括からのお問い合わせ', () => {
   });
 });
 
-describe('お問い合わせの続き（★V6 36-3-A）', () => {
+describe('お問い合わせの続き（★36-3-A）', () => {
   async function seed() {
     const created = await call('POST', '/api/hq/support/requests', REQUEST);
     const body = await created.json<{ data: { id: string } }>();

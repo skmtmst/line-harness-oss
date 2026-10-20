@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   addDays,
   formatJp,
@@ -9,6 +9,7 @@ import {
   formatMd,
   formatWeekday,
   jstStartsAtIso,
+  jstToday,
   utcToJstDisplay,
   utcToJstHm,
   utcToJstMd,
@@ -71,4 +72,19 @@ describe('イベントの日時の見せ方', () => {
     expect(formatHoldLeft(23 * 3600 + 41 * 60 + 30)).toBe('23時間 41分');
     expect(formatHoldLeft(41 * 60 + 59)).toBe('41分');
   });
+});
+
+
+afterEach(() => vi.useRealTimers());
+it.each([
+  ['2026-09-30T15:00:00Z', '00:00'],
+  ['2026-09-30T23:59:59Z', '08:59'],
+  ['2026-10-01T00:00:00Z', '09:00'],
+])('LIFFも日本時間の朝は同じ日付・曜日を出す: %s', (at, time) => {
+  vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(at));
+  expect(jstToday()).toBe('2026-10-01');
+  expect(utcToJstMd(at)).toBe('10/1');
+  expect(utcToJstWeekday(at)).toBe('木');
+  expect(utcToJstHm(at)).toBe(time);
+  expect(jstStartsAtIso('2026-10-01', time)).toBe(`${at.slice(0, 16)}:00.000Z`);
 });

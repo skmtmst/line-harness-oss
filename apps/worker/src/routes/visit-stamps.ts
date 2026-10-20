@@ -1,10 +1,11 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { issueStampQr, storefrontQr, stampQrStatus, revokeStampQr, redeemStampQr } from '../services/visit-stamp-qr.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { bodyLimit } from 'hono/body-limit';
 import { featureJobCanRun } from '../services/feature-enforcement.js';
 import { Hono, type Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import type { VisitStampCardInput, VisitStampPaperInput, VisitStampQrInput } from '@line-crm/shared';
 import { dbFor } from '../services/db-router.js';
 import { requireRole } from '../middleware/role-guard.js';

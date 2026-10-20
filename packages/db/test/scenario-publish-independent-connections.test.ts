@@ -9,7 +9,7 @@ import {
   createScenarioStep,
   publishScenarioVersion,
   updateScenarioStep,
-} from '../src/scenarios.js';
+} from '../src/scenarios/index.js';
 import { openSharedD1, type SharedD1 } from './shared-d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

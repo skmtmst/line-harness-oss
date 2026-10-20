@@ -1,28 +1,6 @@
 import { describe, expect, test } from "vitest";
-import {
-  collectInputs,
-  emptyLayout,
-  fieldsToLayout,
-  formChoiceIsSelected,
-  formThemeButtonText,
-  FORM_THEME_DEFAULT,
-  formThemeContrastError,
-  isCalendarDateString,
-  isFormAnswerEmpty,
-  layoutToFields,
-  newBlockId,
-  nextSectionIndex,
-  normalizeLayout,
-  normalizeFormTheme,
-  parseLayout,
-  validateAnswer,
-  validateAnswers,
-  validateFormDefinition,
-  validateFormForPublish,
-  type FormBlock,
-  type FormInputBlock,
-  type FormLayout,
-} from "./form-layout";
+import { collectInputs, emptyLayout, fieldsToLayout, formChoiceIsSelected, formThemeButtonText, FORM_THEME_DEFAULT, formThemeContrastError, isCalendarDateString, isFormAnswerEmpty, layoutToFields, newBlockId, nextSectionIndex, normalizeLayout, normalizeFormTheme, parseLayout, validateAnswer, validateAnswers, validateFormDefinition, validateFormForPublish } from './form-layout';
+import { type FormBlock, type FormInputBlock, type FormLayout } from './types/form-layout';
 
 /** 入力ブロックを1つ作る。テストの見通しのため、必要な分だけ埋める。 */
 function input(partial: Partial<FormInputBlock> & { name: string }): FormInputBlock {

@@ -14,9 +14,9 @@ describe('一覧KPIの取得失敗時', () => {
   })
 
   it('V8 のリマインダ・シナリオは取れない数を「—」で出す', () => {
-    // 板 `apLqS`・`axFrW`：ListKpis は使わず、取れない値は「—」。
+    // 板 ・：ListKpis は使わず、取れない値は「—」。
     // シナリオの入口は src/v8/scenarios/list.tsx（古い app/scenarios/list-v8.tsx はもう描かれない）。
-    for (const path of ['app/reminders/list-v8.tsx', 'v8/scenarios/list.tsx']) {
+    for (const path of ['v8/reminders/list.tsx', 'v8/scenarios/list.tsx']) {
       expect(read(path), `${path} に「—」の欠け表示がありません`).toContain("? emptyValue('unknown')")
     }
   })

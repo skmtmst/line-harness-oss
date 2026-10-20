@@ -1,7 +1,9 @@
+> 文書：外部連携（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 外部連携（V8）の動き
 
-入口：`app/webhooks/page.tsx`（V8 のときだけ、タブごとに `src/v8/webhooks/*.tsx`）と `app/webhooks/new/page.tsx`（V8 のときだけ `src/v8/webhooks/create.tsx`）。
-API 接続のタブ（`ralAc`）も `src/v8/webhooks/api-tokens.tsx`（今までの V8 `app/webhooks/apitokens-v8.tsx` の動きを写して一から書いた。古いファイルは残す）。v7 の画面・試験は触らない。
+入口：`app/webhooks/page.tsx`（V8専用で、タブごとに `src/v8/webhooks/*.tsx`）と `app/webhooks/new/page.tsx`（V8専用で `src/v8/webhooks/create.tsx`）。
+API 接続のタブ（`ralAc`）も `src/v8/webhooks/api-tokens.tsx`（今までの V8 [現役の入口・本体](README.md) の入口・本体は機能READMEを参照）。動き・権限・入力保持の試験は維持する。
 
 | タブ・画面 | ファイル | 絵 |
 |---|---|---|

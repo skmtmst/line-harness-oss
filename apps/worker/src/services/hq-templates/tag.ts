@@ -1,4 +1,5 @@
 import { normalizeScopedTagName, type HqTemplateStatement } from '@line-crm/db';
+
 import { unsupportedHqTemplateAdapter, type HqTemplateResolution, type HqTemplateAdapter, type HqTemplateAuthority } from './contract.js';
 
 export class HqTemplateError extends Error {

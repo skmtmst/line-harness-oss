@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -7,7 +8,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
 const VIEW = readFileSync(join(HERE, '../../v8/inbox-chat/template-picker-view.tsx'), 'utf8')
 const PANEL = readFileSync(join(HERE, '../shared/folder-panel.tsx'), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 // PERF-12: フォルダの親子展開はサーバー側へ移った。画面は folder_id を
 // そのまま渡し、直下の子を含める判断は Worker が行う。
 const WORKER_TEMPLATES = readFileSync(

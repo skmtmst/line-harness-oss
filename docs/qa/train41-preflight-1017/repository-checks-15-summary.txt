@@ -1,6 +1,0 @@
- Test Files  34 passed (34)
-      Tests  385 passed (385)
-   Duration  2.13s (transform 808ms, setup 0ms, collect 1.75s, tests 173ms, environment 6ms, prepare 1.62s)
- Test Files  34 passed (34)
-      Tests  385 passed (385)
-   Duration  2.13s (transform 864ms, setup 0ms, collect 1.87s, tests 159ms, environment 5ms, prepare 1.60s)

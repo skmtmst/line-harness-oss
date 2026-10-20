@@ -12,7 +12,7 @@ import * as accountContext from '@/contexts/account-context'
 import { LinePreviewFlex as FlexPreview } from '@/components/shared/line-preview'
 import LinePreview, { LinePreviewMessage } from './line-preview'
 import ListState from './list-state'
-import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '@/components/templates/message-template-editor'
+import { buildTemplatePreview, EMPTY_TEMPLATE_REFERENCES } from '../templates/template-preview-model'
 import { EntityPickerDialog, EntityPickerField, type EntityPickerCategory, type EntityPickerFolder, type EntityPickerItem } from './entity-picker'
 import { ENTITY_KINDS, TEMPLATE_CATEGORIES, toPickerItems, useEntityFolders, useMaybeAccount, type EntityKind, type EntityLike } from './entity-picker-data'
 
@@ -25,7 +25,7 @@ import { ENTITY_KINDS, TEMPLATE_CATEGORIES, toPickerItems, useEntityFolders, use
  * データは今の画面が読んでいる行をそのまま渡す。窓を開いたときだけフォルダ・見本を読む。
  */
 
-const FormPhone = dynamic(() => import('@/v8/form-edit/phone').then((mod) => mod.FormPhone), { ssr: false, loading: () => <ListState kind="loading" /> })
+const FormPhone = dynamic(() => import('../../v8/form-edit/phone/index').then((mod) => mod.FormPhone), { ssr: false, loading: () => <ListState kind="loading" /> })
 
 export { ENTITY_KINDS, TEMPLATE_CATEGORIES, toPickerItems, useEntityFolders } from './entity-picker-data'
 export type { EntityKind,EntityLike

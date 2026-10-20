@@ -713,15 +713,15 @@ describe('Retry-After の読み取り(N-374)', () => {
     expect(waits[0]).toBeLessThanOrEqual(3000);
   });
 
-  it('429 の過大な指定は安全上限まで待つ（回数は増やさない）', async () => {
+  it('429 の過大な指定は実行中に待たず台帳へ返す（回数は増やさない）', async () => {
     respond429Then200('3600');
     const waits: number[] = [];
     const res = await deliverWebhook({ ...WEBHOOK, max_retries: 1 }, '{}', {
       sleep: (ms: number) => { waits.push(ms); return Promise.resolve(); },
       lookupHost: publicOnlyLookup,
     });
-    expect(res).toMatchObject({ ok: true, attempts: 2 });
-    expect(waits).toEqual([WEBHOOK_RETRY_AFTER_MAX_MS]);
+    expect(res).toMatchObject({ ok: false, attempts: 1, retryAfterMs: 3600000 });
+    expect(waits).toEqual([]);
   });
 
   it('429 で指定がなければ従来どおり指数待ち', async () => {

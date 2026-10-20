@@ -8,7 +8,7 @@ const TABS_CSS = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../
 const PAGE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'detail', 'page.tsx'), 'utf8')
 
 /*
- * ★V7差し戻し: 折らないタブ帯がグリッド右列の min-content を押し広げ、
+ * ★管理画面差し戻し: 折らないタブ帯がグリッド右列の min-content を押し広げ、
  * 右列が画面右端からはみ出して切れていた。幅の決定はグリッドに任せ、
  * タブ帯だけ中で横に流す。3点がそろっていないと静かに戻る。
  */

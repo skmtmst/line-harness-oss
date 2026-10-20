@@ -9,7 +9,7 @@ const read = (p: string) => readFileSync(join(SRC, p), 'utf8')
 /**
  * ログイン（0-1）・会員登録（36-4）・パスワード再設定（36-6）の見張り。
  * 動きの正本は `docs/hq-signup-and-password-login.md`、見た目の正本は Pencil ★V8（`docs/v8-design-rules.md`）。
- * 当時の下書き v6-36 は本線に入らなかった（原本なし）。
+ * 当時の下書き 管理画面-36 は本線に入らなかった（原本なし）。
  */
 describe('ログイン前の画面（0-1／36-4／36-6）', () => {
   it('ログイン前に開ける画面はすべて page.tsx があり、shell と guard の両方が同じ一覧を見る', () => {
@@ -28,8 +28,7 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
     expect(login).toContain('href="/register"')
     expect(login).toContain('href="/password/forgot"')
     expect(login).toContain('autoComplete="current-password"')
-    // 二段階認証の人は既存の 6 桁コードの画面へ
-    expect(login).toContain('/login/two-factor#')
+    // 認証後の画面とnonceの受け渡しは login-remember-setup-react.test.tsx で実操作する。
   })
 
   it('登録の 1 歩目はメールだけ。Turnstile と同意があり、印（deviceMarker）を送る', () => {

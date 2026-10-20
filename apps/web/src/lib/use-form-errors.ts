@@ -10,11 +10,11 @@ export type FormFieldProblem = {
 
 /** `define` の第4引数。隠れた所にある欄の開け方と、印を数える束。 */
 export type FormFieldOptions = {
-  /** B-244：保存の検査と必須の札の正本。 */
+  /** ：保存の検査と必須の札の正本。 */
   required?: boolean
   /**
    * 欄が隠れた所（別のカード・別のタブ・閉じた段・別の手順）にあるとき、
-   * そこを開く関数。「1つ目へ」・保存で落ちたときに、移る前に呼ぶ（B-139）。
+   * そこを開く関数。「1つ目へ」・保存で落ちたときに、移る前に呼ぶ。
    */
   reveal?: () => void
   /**
@@ -46,7 +46,7 @@ function afterPaint(run: () => void) {
 }
 
 /**
- * 欄の id へ移る（B-139）。閉じた段（details）の中なら開き、スクロールしてから
+ * 欄の id へ移る。閉じた段（details）の中なら開き、スクロールしてから
  * フォーカスする。自前の誤りの表（`Record<欄, 文>`）を持つ画面が、1つ目の欄へ移るときに使う。
  * 描き直しの後に呼べるよう、次のコマで動く。
  */
@@ -64,28 +64,28 @@ export function focusFieldById(id: string) {
 
 /**
  * 欄の検証を「離れた時点で1回・直せばすぐ消える・送るとき全部」に揃える
- * （★V7 sTJsh §6・B-139 欄で知らせて移る）。
+ * （★管理画面 sTJsh §6・ 欄で知らせて移る）。
  *
- * ```tsx
- * const fields = useFormErrors()
- * fields.define('name', '送信者の名前', () => name.trim() ? null : '入力してください')
+ * `tsx
+ * const fields = useFormErrors
+ * fields.define('name', '送信者の名前',  => name.trim ? null : '入力してください')
  * // 別のカード・タブにある欄は開き方と束を渡す
- * fields.define('card-1-body', 'カード2の本文', check, { reveal: () => setActive(1), group: 'card-1' })
+ * fields.define('card-1-body', 'カード2の本文', check, { reveal:  => setActive(1), group: 'card-1' })
  *
  * <Field label="送信者の名前" error={fields.error('name')}>
  *   <TextInput {...fields.bind('name')} value={name} onChange={...} />
  * </Field>
  *
  * // 保存ボタン:
- * if (fields.submit().length > 0) return  // 欄が赤くなり、1つ目の欄を開いてそこへ移る
+ * if (fields.submit.length > 0) return  // 欄が赤くなり、1つ目の欄を開いてそこへ移る
  * // サーバーが欄の誤りを返したら:
  * fields.setServerErrors({ name: 'この名前はもう使われています' })
- * ```
+ * `
  *
  * - `define` は描画のたびに呼ぶ。チェックはその時点の値を見る関数なので、
  *   直すと描画が走り、エラーはその場で消える。
  * - 触っていない欄には何も出さない（blur または送信で初めて出る）。
- * - `submit()` は全欄を検査し、落ちた1つ目の欄を開いてスクロールしフォーカスを移す。
+ * - `submit` は全欄を検査し、落ちた1つ目の欄を開いてスクロールしフォーカスを移す。
  * - 束（group）の誤りの数は `countIn(束)` で読める（タブ・カードの赤い印）。
  * - サーバーの欄の誤りは、その欄に打ち直す（input・change）か次の送信で消える。
  */
@@ -101,7 +101,7 @@ export function useFormErrors() {
    * 作り直さないと、消したカード・行の欄（card-2-text など）が古い値のまま残り、保存をずっと止める。
    */
   defsRef.current = new Map()
-  /** 共通の欄部品が登録した定義。画面の描画で消さない（B-154）。 */
+  /** 共通の欄部品が登録した定義。画面の描画で消さない。 */
   const registeredRef = useRef(new Map<string, Map<HTMLElement, string>>())
   const registrationOrder = useRef(new Map<string, number>())
   const rememberOrder = useCallback((key: string) => { if (!registrationOrder.current.has(key)) registrationOrder.current.set(key, registrationOrder.current.size) }, [])

@@ -18,8 +18,10 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { getTrackedLinkById } from '@line-crm/db';
+import { issueTrackedLinkIdentity } from './tracked-link-identity.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BOOTSTRAP = readFileSync(
@@ -63,8 +65,8 @@ vi.mock('../services/account-access.js', () => ({
   })),
 }));
 
-vi.mock('../services/booking-notifier.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-notifier.js')>()),
+vi.mock('../features/booking/booking-notifier.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-notifier.js')>()),
   sendBookingNotification: vi.fn(async () => ({ ok: true })),
   notifyForBooking: vi.fn(async () => undefined),
 }));
@@ -76,8 +78,8 @@ vi.mock('../services/availability.js', async (importOriginal) => ({
   ...availabilityMocks,
 }));
 
-vi.mock('../services/booking-calendar-sync.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../services/booking-calendar-sync.js')>()),
+vi.mock('../features/booking/booking-calendar-sync.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/booking/booking-calendar-sync.js')>()),
   syncConfirmedBookingToGoogle: vi.fn(async () => ({ synced: false })),
   removeBookingFromGoogle: vi.fn(async () => undefined),
 }));
@@ -87,10 +89,10 @@ const { forms } = await import('../routes/forms.js');
 const { webinarRoutes } = await import('../routes/webinars.js');
 const { trackedLinks } = await import('../routes/tracked-links.js');
 const { ecIntegrations } = await import('../routes/ec-integrations.js');
-const { attachTagAndFireSideEffects } = await import('./friend-tag-attach.js');
+const { attachTagAndFireSideEffects } = await import('../features/friends/friend-tag-attach.js');
 const { recordConversionSourceEvent } = await import('@line-crm/db');
 const { friends: friendsRoutes } = await import('../routes/friends.js');
-const { createAutomationActionExecutors } = await import('./automation-action-executors.js');
+const { createAutomationActionExecutors } = await import('../features/automations/automation-action-executors.js');
 
 // ---- 実 SQLite を D1 の形にかぶせる ----------------------------------------
 
@@ -248,8 +250,22 @@ describe('起点1: ページを見た (url_reach)', () => {
     const app = new Hono<Env>();
     app.route('/', trackedLinks);
     const exec = makeExecCtx();
-    const res = await app.fetch(
+    const anonymous = await app.fetch(
       new Request('https://worker.example.test/t/link-1?f=friend-1', {
+        headers: { 'user-agent': 'Mozilla/5.0' },
+      }),
+      env(),
+      exec.ctx,
+    );
+    await exec.drain();
+    expect(anonymous.status).toBe(302);
+    expect(countEvents('url_reach')).toBe(0);
+
+    const link = (await getTrackedLinkById(db, 'link-1'))!;
+    const identity = await issueTrackedLinkIdentity(db, link, 'friend-1');
+    expect(identity).toBeTypeOf('string');
+    const res = await app.fetch(
+      new Request(`https://worker.example.test/t/link-1?identity=${identity}`, {
         headers: { 'user-agent': 'Mozilla/5.0' },
       }),
       env(),

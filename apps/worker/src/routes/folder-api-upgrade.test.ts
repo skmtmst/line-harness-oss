@@ -6,7 +6,7 @@ import { friendAttributes } from './friend-attributes.js';
 import { hqBanners } from './hq-banners.js';
 import { hqTemplates } from './hq-templates.js';
 import { hqBroadcasts } from './hq-broadcasts.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 let f:SqliteD1,app:Hono<Env>;
 let actor:{id:string;name:string;role:'owner'|'admin'|'staff';tenantId:string;readOnly:boolean};
 beforeEach(()=>{

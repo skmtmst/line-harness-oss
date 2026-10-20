@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { getBroadcasts } from '../src/broadcasts.js';
+import { getBroadcasts } from '../src/broadcasts/index.js';
 import { getBroadcastStats } from '../src/dashboard.js';
 import { asD1 } from './d1-test-helper.js';
 test.each([51, 101, 201])('SCALE-02 %s店の配信一覧・集計も100変数以内', async size => {

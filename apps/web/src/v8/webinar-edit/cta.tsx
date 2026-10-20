@@ -40,7 +40,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 
 /*
- * ★V8 ウェビナーの ③CTA・フォーム（Pencil Q0Jrk・同時編集の帯 pvimJ）。
+ * ★V8 ウェビナーの ③CTA・フォーム（Pencil ・同時編集の帯 ）。
  * CTA カードの並び（時刻・見出し・種類・「…」）→ 選んでいるカードの中身 → 申込に使う回答フォーム。
  * 右はカードの見え方。
  * 口・保存前の確かめ・同時編集（409）の扱いは BEHAVIOR.md。
@@ -138,7 +138,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
   const update = (index: number, patch: Partial<WebinarCtaCard>) => setCtas((prev) => (prev ? prev.map((card, j) => (j === index ? { ...card, ...patch } : card)) : prev))
 
   /*
-   * 保存で落ちた欄（B-139）。カードは1枚ずつしか開いていないので、落ちた欄が別のカードなら
+   * 保存で落ちた欄。カードは1枚ずつしか開いていないので、落ちた欄が別のカードなら
    * そのカードを選んでから移る。カードの行には直す欄の数の赤い丸を付ける。
    */
   const fields = useFormErrors()
@@ -267,12 +267,12 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
       identity={chrome.identity}
       steps={chrome.steps}
       help="動画の途中や終わりに出すカードと、申込に使う回答フォームを決めます。"
-      /* 競合の間は「下書きを保存」を「比べてから保存」に替える（押すと違いを比べる窓。絵 pvimJ）。 */
+      /* 競合の間は「下書きを保存」を「比べてから保存」に替える（押すと違いを比べる窓。絵 ）。 */
       footerActions={conflict && chrome.footerWithDraft
         ? chrome.footerWithDraft(<Button disabled={busy} busy={reading} onClick={() => void readLatest()}>比べてから保存</Button>)
         : chrome.footerActions}
       status={chrome.status}
-      /* 競合の帯は左右の列の上に横いっぱい（絵 pvimJ）。 */
+      /* 競合の帯は左右の列の上に横いっぱい。 */
       notice={conflict ? (
         <SaveConflictBand designNode="pvimJ"
           title={latest?.editor.updatedAt ? `ほかの人が ${polishFormatTime(new Date(latest.editor.updatedAt))} にこのウェビナーを保存しました` : 'ほかの人がこのウェビナーを保存しました'}

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../worker-env.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 
 const dbMocks = {
   getBroadcasts: vi.fn(),
@@ -78,13 +82,13 @@ function setupApp({
   d1Prepare.mockImplementation(() => ({
     bind: vi.fn(() => ({ first:vi.fn(async()=>null),run: vi.fn(async () => ({ success: true, meta: { changes } })) })),
   }));
-  const app = new Hono<{ Bindings: { DB: D1Database } }>();
+  const app = new Hono<Env>();
   app.use('*', async (c, next) => {
     c.env = {
       DB: {
         prepare: d1Prepare,
       } as unknown as D1Database,
-    };
+    } as Env['Bindings'];
     // 更新系はオーナー／管理者限定になった。ここで見たいのは本体の挙動なので、
     // 認証は通った状態にしてから渡す。権限の検証は role-guard.test.ts が持つ。
     (c as unknown as { set: (k: string, v: unknown) => void }).set('staff', {
@@ -96,6 +100,7 @@ function setupApp({
     await next();
   });
   app.route('/', broadcasts);
+  app.onError(unhandledWorkerError);
   return app;
 }
 
@@ -382,7 +387,9 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     });
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toMatchObject({ success: false });
+    const body = await response.json<{ incidentId: string }>();
+    expect(body).toMatchObject({ success: false, incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
     expect(dbMocks.getBroadcastById).toHaveBeenCalledTimes(1);
   });
 
@@ -398,8 +405,10 @@ describe('POST /api/broadcasts/:id/cancel', () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       success: false,
-      error: 'Broadcast not found after cancellation',
+      error: 'Internal Server Error',
+      incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/),
     });
+    expect(report).toHaveBeenCalledTimes(1);
     expect(d1Prepare).toHaveBeenCalledTimes(1);
   });
 

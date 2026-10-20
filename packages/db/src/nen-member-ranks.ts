@@ -1,8 +1,9 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { sqlIdSet } from './id-queries.js';
 import { dbTableExists, jstNow } from './utils.js';
 
 /**
- * 然-NEN- 会員ランク（通年）・ライフタイム・マイル。★V6 37-1（`IqL2Z`）／37-1-A（`p7xHl`）／37-1-B（`Vt65m`）。
+ * 然-NEN- 会員ランク（通年）・ライフタイム・マイル。★37-1（`IqL2Z`）／37-1-A（`p7xHl`）／37-1-B（`Vt65m`）。
  *
  * - ランク：通年（1〜12月の購入額）で決まる。しきい値と還元率はここで持つ（設定の正本はLINE側）。
  * - ライフタイム：累計購入額。減らない。節目の特典は未設定のまま持てる。
@@ -476,7 +477,7 @@ export async function getNenMemberKpis(db: D1Database, accountIds: Array<string 
   if (await dbTableExists(db, 'ec_orders')) {
     const monthScope = accountWhere(accountIds, 'o.line_account_id');
     // JSTの月頭 00:00 をUTCの瞬間へ直す（JST 1日0時＝UTC 前月末日15時）。
-    const jstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const jstNow = japanCalendar();
     const monthStartUtc = new Date(Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), 1) - 9 * 60 * 60 * 1000).toISOString();
     const monthly = await db.prepare(
       `SELECT COALESCE(SUM(o.total_amount_minor), 0) AS yen,

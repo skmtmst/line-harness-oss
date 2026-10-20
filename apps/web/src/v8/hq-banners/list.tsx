@@ -50,10 +50,10 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { ListToolbarRow, ListToolbarSort } from '@/components/shared/list-toolbar'
 /*
- * ★V8 統括のバナー生成（Pencil `B9ZAr` プロジェクト一覧・`W5Wxr` 画像ライブラリ）。
- * 窓：`W7Z57` プロジェクトを作る・`AnwtH` 画像を取り込む・画像の詳細（`rI5uh` と同じ窓）。
+ * ★V8 統括のバナー生成（Pencil  プロジェクト一覧・ 画像ライブラリ）。
+ * 窓： プロジェクトを作る・ 画像を取り込む・画像の詳細（ と同じ窓）。
  *
- * v7 の画面（app/hq/banners/page.tsx と components/hq/banners/*）と、読み書きの口・
+ * 管理画面 の画面（app/hq/banners/page.tsx と components/hq/banners/*）と、読み書きの口・
  * 失敗時の扱い・`?tab=` は同じ。見た目だけを絵どおりに一から組んだ：
  * 頭（型 ListPage）・左の「見る」の列（型のフォルダの列＋共通 FolderPanel）・数のカード4枚・
  * 案内の帯・タブ・道具の段・カード（プロジェクト）／画像のます（ライブラリ）・件数と次へ。
@@ -71,7 +71,7 @@ const PROJECT_SORTS: Array<{ value: ProjectSort; label: string }> = [
   { value: 'name', label: '並び：名前順' },
 ]
 
-/** 画像ライブラリは 12 枚ずつ（絵 W5Wxr の「1–12 件 / 23 件」「次の 12 件」）。 */
+/** 画像ライブラリは 12 枚ずつ（「1–12 件 / 23 件」「次の 12 件」）。 */
 const LIBRARY_PAGE = 12
 
 function isCursorHistory(value: unknown): value is Array<string | null> {
@@ -127,7 +127,7 @@ function BannersInner() {
     })
   }, [loadSummary])
 
-  // タブの切り替えは `?tab=` で、履歴を積まない（v7 と同じ）。
+  // タブの切り替えは `?tab=` で、履歴を積まない（管理画面 と同じ）。
   const changeTab = (next: Tab) => samePageUrl.replace(next === 'library' ? '/hq/banners?tab=library' : '/hq/banners')
 
   const kpis = (
@@ -153,7 +153,7 @@ function BannersInner() {
     : <LibraryView head={head} canManage={canManage} presets={presets} accounts={accounts} onChanged={() => void loadSummary()} />
 }
 
-/* ───────── プロジェクト一覧（B9ZAr） ───────── */
+/* ───────── プロジェクト一覧 ───────── */
 
 type BannerHead = { stats: React.ReactNode; tabs: React.ReactNode; explanation: string }
 
@@ -266,7 +266,7 @@ function ProjectsView({ head, canManage, usage, archivedCount, onChanged }: {
 
   const ready = status === 'ready' && !archivedMode
   /*
-   * お気に入り・生成中・アーカイブは作ったフォルダではなく状態なので、左の列ではなく上の絞り込みの札に置く（B-136）。
+   * お気に入り・生成中・アーカイブは作ったフォルダではなく状態なので、左の列ではなく上の絞り込みの札に置く。
    * 左の列は共通の ManagedFolderPanel。プロジェクトのフォルダの口（API）がまだ無いので「すべて」だけ。
    */
   const viewChips: Array<{ key: ProjectView; label: string; count: number | null }> = [
@@ -444,7 +444,7 @@ function Thumb({ image }: { image: BannerImage | null }) {
   )
 }
 
-/* ───────── 画像ライブラリ（W5Wxr） ───────── */
+/* ───────── 画像ライブラリ ───────── */
 
 function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   head: BannerHead
@@ -586,7 +586,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
   }
 
   const ready = status === 'ready'
-  /* お気に入り・配布済み・未使用は状態なので上の絞り込みの札へ（B-136）。左の列は共通の ManagedFolderPanel（画像のフォルダの口が無いので「すべて」だけ）。 */
+  /* お気に入り・配布済み・未使用は状態なので上の絞り込みの札へ。左の列は共通の ManagedFolderPanel（画像のフォルダの口が無いので「すべて」だけ）。 */
   const viewChips: Array<{ key: LibraryView; label: string; count: number | null }> = [
     { key: 'favorite', label: 'お気に入り', count: ready ? counts?.favorite ?? null : null },
     { key: 'delivered', label: '配布済み', count: ready ? counts?.delivered ?? null : null },

@@ -49,6 +49,8 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
+// この試験は既存の権限・旗・並びを検査する。業種の対照はstyle-menu.testで行う。
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' }, status: 'ready', error: null, reload: vi.fn() }) }))
 import Sidebar from './sidebar'
 import SettingsInnerNav from './settings-inner-nav'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
@@ -96,7 +98,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     expect(fixture.get).not.toHaveBeenCalled()
   })
 
-  it('multi_store_hierarchy: 設定内でoffと応答欠落では「プール管理」を出さず、onで出す(#860・B-261)', async () => {
+  it('multi_store_hierarchy: 設定内でoffと応答欠落では「プール管理」を出さず、onで出す(#860・)', async () => {
     window.localStorage.setItem('lh_staff_role', 'staff')
     rememberStaffIdentity({ role: 'staff' } as StaffMember)
     window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/broadcasts', '/pools']))

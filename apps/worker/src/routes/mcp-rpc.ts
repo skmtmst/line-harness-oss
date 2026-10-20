@@ -2,7 +2,7 @@ import {requestMcpBroadcast} from '../services/mcp-broadcast-request.js';
 import {mcpBroadcastDraft} from '../services/mcp-broadcast-drafts.js';
 import {canAccessAllLineAccounts} from '../services/account-access.js';
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {sha256Hex} from '../middleware/auth.js';
 import {comparisonPeriod,storeNumbers} from '../services/store-comparison.js';
 export const mcpRpc=new Hono<Env>();

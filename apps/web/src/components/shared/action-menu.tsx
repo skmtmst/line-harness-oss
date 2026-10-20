@@ -11,7 +11,7 @@ import styles from './action-menu.module.css'
 export type ActionMenuGroup = 'view' | 'manage' | 'destructive'
 
 export type ActionMenuItem = {
-  /** B-244：見る／変える・整理する／止める・消す。権限と動きは項目側で保つ。 */
+  /** ：見る／変える・整理する／止める・消す。権限と動きは項目側で保つ。 */
   group?: ActionMenuGroup
   id: string
   label: string
@@ -21,13 +21,13 @@ export type ActionMenuItem = {
   /** 先頭の主な操作を太字で示す。既存の項目の見た目は変えない。 */
   emphasis?: boolean
   /**
-   * 補足（★V7）。渡すと項目が2行・高さ52pxになる。
+   * 補足（★管理画面）。渡すと項目が2行・高さ52pxになる。
    * 例：「テンプレートを送る」＋「受信箱で選んで送ります」。
    */
   description?: string
   tone?: 'default' | 'danger'
   /**
-   * 新しいタブで開くリンクだけに ↗ を出す（B-177）。href と組にする。
+   * 新しいタブで開くリンクだけに ↗ を出す。href と組にする。
    */
   external?: boolean
   href?: string
@@ -39,7 +39,7 @@ export type ActionMenuItem = {
   disabledReason?: string
   dividerBefore?: boolean
   /**
-   * 小さな見出し（★V7）。この項目の前に出す。
+   * 小さな見出し（★管理画面）。この項目の前に出す。
    * 同じ見出しを2回出さないのは呼ぶ側の責任。
    */
   sectionBefore?: string
@@ -51,7 +51,7 @@ export type ActionMenuItem = {
   onSelect?: () => void
 }
 
-/** B-244：旧い呼び口も同じ順で表示する。渡された配列と操作は変更しない。 */
+/** ：旧い呼び口も同じ順で表示する。渡された配列と操作は変更しない。 */
 export function actionMenuGroup(item: ActionMenuItem): ActionMenuGroup {
   if (item.tone === 'danger' || (!/再開|復元/.test(item.label) && /停止|止める|削除|消す|取り消|取消|取り下げ|保管する/.test(item.label))) return 'destructive'
   if (item.group) return item.group
@@ -90,7 +90,7 @@ export type ActionMenuProps = {
   /** 器（portal）の横の寄せ。既定は押した物の右端。「〜を足す」のように左から読む押し口は start。 */
   align?: MenuPortalAlign
   /**
-   * 操作ではなく「1つ選ぶ」一覧（差し込む欄など・絵 g3REI）。渡すと B-244 の組分け・印を付けず、
+   * 操作ではなく「1つ選ぶ」一覧（差し込む欄など・絵 ）。渡すと  の組分け・印を付けず、
    * 渡した順のまま、先頭にこの見出しを出す。
    */
   choiceHeading?: string
@@ -115,7 +115,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
   }
   /*
    * 戻す先は押せる要素。位置の基準が囲み（右クリックの ContextMenu など）の
-   * ときは、その中の開くボタンへ戻す。囲みへ focus() しても効かず BODY に落ちる。
+   * ときは、その中の開くボタンへ戻す。囲みへ focus しても効かず BODY に落ちる。
    */
   const getFocusTarget = (): HTMLElement | null => {
     const anchor = getAnchor()

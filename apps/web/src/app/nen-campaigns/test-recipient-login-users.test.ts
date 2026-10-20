@@ -43,7 +43,7 @@ describe('NEN配信のテスト送信先', () => {
     expect(overview).not.toContain('>{job.status}</span>');
   });
 
-  test('誕生日クーポンはV6どおり3日前10時と案内する', () => {
+  test("誕生日クーポンは管理画面どおり3日前10時と案内する", () => {
     expect(overview).toContain('誕生日は3日前の10:00に送ります');
     expect(overview).not.toContain('誕生日月の1日に自動送信');
     expect(overview).toContain('formatCampaignTiming(setting)');
@@ -58,7 +58,7 @@ describe('NEN配信のテスト送信先', () => {
 
   test('一覧の読込失敗を0件や空状態として表示しない', () => {
     // 1件の失敗で画面全体をエラーにしない(点検 #512 の中3)。
-    // ★V7 `x63W5x`：失敗はそのタブの一覧の場所の1枚で示す（帯は出さない）。
+    // ★管理画面 `x63W5x`：失敗はそのタブの一覧の場所の1枚で示す（帯は出さない）。
     expect(page).toContain('tabErrors');
     expect(page).toContain('tabError');
     expect(overview).toContain('tabError');

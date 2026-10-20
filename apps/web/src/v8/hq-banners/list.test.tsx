@@ -152,7 +152,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(updateProject).toHaveBeenCalledWith('p1', { isFavorite: false })
   })
 
-  it('お気に入り・生成中・アーカイブは上の絞り込みの札。選ぶ物のないフォルダ列を出さず、絞り込みを保つ（W2）（B-136）', async () => {
+  it('お気に入り・生成中・アーカイブは上の絞り込みの札。選ぶ物のないフォルダ列を出さず、絞り込みを保つ（W2）', async () => {
     act(() => { root.render(<HqBannersListV8 />) })
     await flush()
     expect(host.querySelector('[data-template-region="folders"]')).toBeNull()
@@ -211,7 +211,7 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
   })
 })
 
-it.each([false,true])('B-241：ライブラリの案件取得success:false（保管=%s）を空の案件と扱わない',async archived=>{
+it.each([false,true])('ライブラリの案件取得success:false（保管=%s）を空の案件と扱わない',async archived=>{
  nav.query='tab=library'
  listProjects.mockImplementation(async(params?:{archived?:boolean})=>Boolean(params?.archived)===archived?{success:false,error:'fixture failure'}:{success:true,data:[]})
  await act(async()=>{root.render(<HqBannersListV8/>)})

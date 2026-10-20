@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { getLineWebhookEvent } from '@line-crm/db';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { lineWebhookCanRetry, retryLineWebhookEvent, processDueLineWebhookRetries } from './line-webhook-recovery.js';
 
 const wire = vi.hoisted(() => ({replyMessage:vi.fn(),replyMessageWithRequestId:vi.fn(),pushMessage:vi.fn(),getProfile:vi.fn(),linkRichMenuToUser:vi.fn()}));

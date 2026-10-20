@@ -1,7 +1,6 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError, readFolderAssignment } from '@line-crm/db';
-import { Hono } from 'hono';
-import type { Context } from 'hono';
 import {
   createAffiliateOffer,
   createOfferVersion,
@@ -14,7 +13,11 @@ import {
   type AffiliateOffer,
   type AffiliateOfferVersion,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import { Hono } from 'hono';
+import type { Context } from 'hono';
+
+
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
@@ -127,7 +130,7 @@ affiliateOffers.get('/api/affiliate-offers', async (c) => {
     });
     return c.json({ success: true, data: items.map(serializeOffer) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_offers_failed","route":"GET /api/affiliate-offers"}));
+    logger.error("routes_affiliate_offers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -143,7 +146,7 @@ affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
     }
     return c.json({ success: true, data: serializeOffer(item) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_offers_failed","route":"GET /api/affiliate-offers/:id"}));
+    logger.error("routes_affiliate_offers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -248,7 +251,7 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), inp
     return c.json({ success: true, data: serializeOffer(offer) }, 201);
   } catch (err) {
     if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
-    console.error(JSON.stringify({"code":"routes_affiliate_offers_failed","route":"POST /api/affiliate-offers"}));
+    logger.error("routes_affiliate_offers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -360,7 +363,7 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
     return c.json({ success: true, data: serializeOffer(updated) });
   } catch (err) {
     if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
-    console.error(JSON.stringify({"code":"routes_affiliate_offers_failed","route":"PUT /api/affiliate-offers/:id"}));
+    logger.error("routes_affiliate_offers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -398,7 +401,7 @@ affiliateOffers.get('/api/affiliate-offers/:id/versions', async (c) => {
     const versions = await listOfferVersions(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: versions.map(serializeOfferVersion) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_offers_failed","route":"GET /api/affiliate-offers/:id/versions"}));
+    logger.error("routes_affiliate_offers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -425,7 +428,7 @@ affiliateOffers.get('/api/affiliate-offers/:id/cap-status', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliate_offers_failed","route":"GET /api/affiliate-offers/:id/cap-status"}));
+    logger.error("routes_affiliate_offers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -486,7 +489,7 @@ affiliateOffers.post('/api/affiliate-offers/:id/versions', requireRole('owner', 
     if (err instanceof Error && /windowDays|cap/.test(err.message)) {
       return inputError(c, { success: false, error: err.message }, 400, ["windowDays","cap"]);
     }
-    console.error(JSON.stringify({"code":"routes_affiliate_offers_failed","route":"POST /api/affiliate-offers/:id/versions"}));
+    logger.error("routes_affiliate_offers_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

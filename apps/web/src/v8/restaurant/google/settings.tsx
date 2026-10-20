@@ -9,6 +9,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
+import { GOOGLE_CONNECTION_STATUS } from '@/lib/status-labels'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { errorMessage, formatStampFull, formatYmd } from './format'
 import styles from './google.module.css'
@@ -17,7 +18,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 
 
 /*
- * ★V8 Googleビジネス 設定（`CuHXG`：接続済み）。未接続・店舗の選択待ちも同じ場所で出す（今の画面と同じ口）。
+ * ★V8 Googleビジネス 設定（：接続済み）。未接続・店舗の選択待ちも同じ場所で出す（今の画面と同じ口）。
  * 接続・再接続は Google の認可画面へ移る。解除・取り消し・切り替えは確認画面を経る。
  * 接続を管理できない人には、接続・解除のボタンを置かない。
  */
@@ -98,7 +99,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {canManage ? (
           <div className={styles.buttonRow}>
-            <Button variant="primary" onClick={() => void startConnect()} disabled={busy || !data.oauthConfigured} busy={Boolean(busy)} busyLabel="処理中…"><Link2 aria-hidden className={styles.icon15} />Googleアカウントを接続</Button>
+            <Button variant="primary" onClick={() => void startConnect()} disabled={busy || !data.oauthConfigured} busy={Boolean(busy)} busyLabel="処理中…"><Link2 aria-hidden className={styles.icon16} />接続する</Button>
           </div>
         ) : null}
         <p className={styles.grayNote}>初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。接続後は、このLINEアカウントの店舗だけを表示します。</p>
@@ -155,9 +156,8 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
     )
   }
 
-  const stateText = connection.status === 'connected'
-    ? `接続中${data.writeEnabled ? '' : '（外部への更新は止めています・検証環境）'}`
-    : connection.status === 'expired' ? '認可切れ（再接続してください）' : '権限なし（Google側の管理権限を確認してください）'
+  /* 状態は札で出す。理由と直し方は上の帯が書いている。検証環境で外へ送らない注記は検証環境の帯（google.tsx）へ。 */
+  const connectionState = GOOGLE_CONNECTION_STATUS[connection.status]
 
   return (
     <SaveErrorScope errors={saveErrors}><>
@@ -169,16 +169,15 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         <dl className={styles.facts}>
           <div className={styles.factRow}><dt className={styles.factKey}>つないでいるアカウント</dt><dd className={styles.factValue}>{connection.googleAccountEmail ?? emptyValue('unknown')}</dd></div>
           <div className={styles.factRow}><dt className={styles.factKey}>つないだ日</dt><dd className={styles.factValue}>{formatYmd(connection.connectedAt)}</dd></div>
-          <div className={styles.factRow}><dt className={styles.factKey}>状態</dt><dd className={styles.factValue}>{stateText}</dd></div>
+          <div className={styles.factRow}><dt className={styles.factKey}>状態</dt><dd className={styles.factValue}><StatusBadge tone={connectionState.tone} size="compact">{connectionState.label}</StatusBadge></dd></div>
         </dl>
         {canManage ? (
           <div className={styles.buttonRowEnd}>
-            <Button variant="danger" onClick={() => setConfirmDisconnect(true)} disabled={busy}>接続を解除</Button>
-            <Button onClick={() => void startConnect()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden className={styles.icon15} />Googleアカウントを再接続</Button>
+            <Button variant="danger-outline" onClick={() => setConfirmDisconnect(true)} disabled={busy}>接続を解除する</Button>
+            <Button onClick={() => void startConnect()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden className={styles.icon16} />つなぎ直す</Button>
           </div>
         ) : manageNote}
       </Card>
-      <p className={styles.grayNote}>接続を解除すると、口コミ・投稿・パフォーマンスの取り込みが止まります。解除の前に確認画面が出ます。</p>
       <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? emptyValue('unknown')}・最終同期：${formatStampFull(connection.lastSyncedAt)}`}</p>
       <ConfirmDialog
         open={confirmDisconnect}

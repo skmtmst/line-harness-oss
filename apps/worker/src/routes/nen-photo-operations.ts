@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
@@ -24,12 +25,13 @@ import {
   type BulkPhotoDecisionItem,
   type BulkPhotoDecisionResult,
 } from '@line-crm/db';
+
 import {
   deliverPhotoReviewNotification,
   loadPhotoReviewRecipient,
   type PhotoReviewReasonCode,
-} from './nen-members.js';
-import type { Env } from '../index.js';
+} from './nen-members-definition.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { getFileScanBySubject } from '../services/file-scan.js';
 import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
@@ -99,7 +101,7 @@ nenPhotoOperations.get(
     try {
       return c.json({ success: true, data: await getPhotoReviewMetrics(c.env.DB, accountId) });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"GET /api/nen-members/photos/review-metrics"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '写真審査の集計を取得できませんでした' }, 500);
     }
   },
@@ -132,7 +134,7 @@ nenPhotoOperations.get(
         })),
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"GET /api/nen-members/photo-reward-policy/versions"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '報酬の決まりの版を取得できませんでした' }, 500);
     }
   },
@@ -202,7 +204,7 @@ nenPhotoOperations.post(
       if (String(error).includes('PHOTO_REWARD_POLICY_VERSION_CONFLICT')) {
         return c.json({ success: false, error: 'ほかの担当者が先に保存しました。開き直して確認してください', code: 'VERSION_CONFLICT' }, 409);
       }
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"POST /api/nen-members/photo-reward-policy/versions"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '報酬の決まりを保存できませんでした' }, 500);
     }
   },
@@ -247,7 +249,7 @@ nenPhotoOperations.post(
       if (String(error).includes('PHOTO_REWARD_POLICY_VERSION_NOT_FOUND')) {
         return c.json({ success: false, error: '戻す版が見つかりません' }, 404);
       }
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"POST /api/nen-members/photo-reward-policy/revert"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '報酬の決まりを戻せませんでした' }, 500);
     }
   },
@@ -282,7 +284,7 @@ nenPhotoOperations.post(
       }
       return queueError(c, result.kind);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"POST /api/nen-members/photos/:id/assessments/re-evaluate"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '写真の再評価を受け付けられませんでした' }, 500);
     }
   },
@@ -320,7 +322,7 @@ nenPhotoOperations.post(
       }
       return queueError(c, result.kind);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"POST /api/nen-members/photos/:id/assets/process"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '派生画像処理を受け付けられませんでした' }, 500);
     }
   },
@@ -338,7 +340,7 @@ nenPhotoOperations.get(
       const data = await getPhotoAssetStatus(c.env.DB, { photoId, lineAccountId: accountId });
       return data ? c.json({ success: true, data }) : c.json({ success: false, error: '写真が見つかりません' }, 404);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"GET /api/nen-members/photos/:id/assets/status"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '派生画像の処理状況を取得できませんでした' }, 500);
     }
   },
@@ -356,7 +358,7 @@ nenPhotoOperations.get(
       const data = await getPhotoDerivatives(c.env.DB, { photoId, lineAccountId: accountId });
       return data ? c.json({ success: true, data }) : c.json({ success: false, error: '写真が見つかりません' }, 404);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"GET /api/nen-members/photos/:id/assets/derivatives"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '派生画像を取得できませんでした' }, 500);
     }
   },
@@ -400,7 +402,7 @@ nenPhotoOperations.post(
     }
     const lineAccountId = body.lineAccountId.trim();
     if (!await accountVisible(c, lineAccountId)) return c.json({ success: false, error: '写真が見つかりません' }, 404);
-    // 検査が終わっていない写真は一括採用の対象にできない（v6-22 §4）。
+    // 検査が終わっていない写真は一括採用の対象にできない（-22 §4）。
     const approveTargets = decisions.filter((decision) => decision.decision === 'approve');
     if (approveTargets.length > 0) {
       for (const target of approveTargets) {
@@ -453,7 +455,7 @@ nenPhotoOperations.post(
                 { now: new Date() },
               );
             } catch (error) {
-              console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"POST /api/nen-members/photos/decisions/bulk"}));
+              logger.error("routes_nen_photo_operations_failed");
             }
           }
         }
@@ -465,7 +467,7 @@ nenPhotoOperations.post(
       }
       return queueError(c, result.kind);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"POST /api/nen-members/photos/decisions/bulk"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '写真の一括審査を完了できませんでした' }, 500);
     }
   },
@@ -512,7 +514,7 @@ nenPhotoOperations.post(
         data: { downloadUrl, expiresAt: result.expiresAt, oneTime: true },
       }, result.kind === 'created' ? 201 : 200);
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"POST /api/nen-members/photos/:id/original-download"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '原本の取得URLを発行できませんでした' }, 500);
     }
   },
@@ -544,7 +546,7 @@ nenPhotoOperations.get(
         },
       });
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed","route":"GET /api/nen-members/photos/original-download/:token"}));
+      logger.error("routes_nen_photo_operations_failed");
       return c.json({ success: false, error: '原本を取得できませんでした' }, 500);
     }
   },
@@ -599,9 +601,9 @@ async function healBulkDecisionReceipt(
         onlyIfPending: true,
       })
       : false;
-    if (!recorded) console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed"}));
+    if (!recorded) logger.error("routes_nen_photo_operations_failed");
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed"}));
+    logger.error("routes_nen_photo_operations_failed");
   }
   return data;
 }
@@ -638,7 +640,7 @@ async function notifyOneBulkDecision(
         });
       }
     } catch (error) {
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed"}));
+      logger.error("routes_nen_photo_operations_failed");
     }
     return { ...item, notificationStatus: 'failed', notificationError };
   }
@@ -687,7 +689,7 @@ async function notifyBulkPhotoDecisions(
     } catch (error) {
       // 対象1件の想定外の失敗で、後続対象の通知まで止めない（対象単位の分離）。
       // 送達台帳は pending か sending のまま残るが、どちらも再送口の拾い上げ対象。
-      console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed"}));
+      logger.error("routes_nen_photo_operations_failed");
       outcome = {
         ...item, notificationStatus: 'failed',
         notificationError: '通知を実行できませんでした。再送してください。',
@@ -708,9 +710,9 @@ async function notifyBulkPhotoDecisions(
       actorId: c.get('staff')!.id, idempotencyKey: input.idempotencyKey, result: data,
     });
     // false も握りつぶさない。次の同じ再実行鍵で送達台帳から作り直す。
-    if (!recorded) console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed"}));
+    if (!recorded) logger.error("routes_nen_photo_operations_failed");
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_nen_photo_operations_failed"}));
+    logger.error("routes_nen_photo_operations_failed");
   }
   return data;
 }

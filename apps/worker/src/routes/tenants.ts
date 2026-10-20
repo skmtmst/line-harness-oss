@@ -1,8 +1,9 @@
+import { fail } from '../lib/fail.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { getTenantCompanyContact, saveTenantCompanyContact } from '@line-crm/db';
 import { parseTenantCompanyContact } from '@line-crm/shared';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { isPlatformAdmin } from '../middleware/platform-admin.js';
@@ -44,7 +45,7 @@ export function parseFeaturePacks(value: unknown): FeaturePack[] | null {
  * cannot protect these endpoints because they are intended to manage tenants.
  */
 async function canManageTenants(c: Context<Env>): Promise<boolean> {
-  // ★V6 37: 運営マスター（platform_admins）で判定する。既定の統括のオーナーを
+  // ★37: 運営マスター（platform_admins）で判定する。既定の統括のオーナーを
   // 運営とみなす旧判定は、platform_admins が空の間だけの互換として
   // middleware/platform-admin.ts に残している。
   const staff = c.get('staff');
@@ -53,7 +54,7 @@ async function canManageTenants(c: Context<Env>): Promise<boolean> {
 }
 
 function forbidden(c: Context<Env>) {
-  return c.json({ success: false, error: '統括を管理する権限がありません' }, 403);
+  return fail(c, 403, 'FORBIDDEN', { error: '統括を管理する権限がありません' });
 }
 
 /** Read-only migration diagnostics. This route never returns LINE credentials. */

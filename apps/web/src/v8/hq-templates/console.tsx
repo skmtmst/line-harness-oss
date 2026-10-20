@@ -8,7 +8,7 @@ export { formDistributedLine,formStatusLine } from './form-status-line'
 import type { ConsoleProps,DefinitionEditorProps } from './console-types'
 
 import { hqFormDefinitionToEditor,hqFormEditorToDefinition } from '@/components/forms/hq-form-definition-adapter'
-import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Checkbox from '@/components/shared/checkbox'
@@ -35,8 +35,8 @@ import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
 import { DistributionPage } from '@/components/templates/distribution-page'
 import { PageFrame,PageHeading } from '@/components/templates/page-frame'
 import { useAccount } from '@/contexts/account-context'
-import { fetchHqDistributionTargets } from '@/lib/api-hq-distribution-targets'
-import { hqMediaApi } from '@/lib/api-hq-media'
+import { fetchHqDistributionTargets } from '@/lib/api/helpers/hq-distribution-targets'
+import { hqMediaApi } from '@/lib/api/helpers/hq-media'
 import { formatNumber } from '@/lib/format'
 import { HqRichMenuCompatibilityError,hqRichMenuDefinitionFromSeed,hqRichMenuSeedFromDefinition } from '@/lib/hq-rich-menu-create'
 import { freshDefinition } from '@/lib/hq-template-authoring'
@@ -45,15 +45,15 @@ import { hqTemplatesApi,type DistributionMode,type DistributionResult,type FormD
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
 import { useStaffRole,useTenantWideAccess } from '@/lib/staff-role'
 import { useFormErrors } from '@/lib/use-form-errors'
-import FormEditV8 from '@/v8/form-edit/edit'
-import type { FormEditHost } from '@/v8/form-edit/host'
-import TemplateAssetEditor from '@/v8/template-edit/asset'
-import type { TemplateEditHost } from '@/v8/template-edit/host'
-import TemplateMessageEditor from '@/v8/template-edit/message'
-import TemplateRichEditor from '@/v8/template-edit/rich'
-import TemplateRichVideoEditor from '@/v8/template-edit/rich-video'
-import CarouselV8 from '@/v8/templates/carousel'
-import QuestionNewV8 from '@/v8/templates/question-new'
+import { FormEditV8 } from '@/v8/form-edit/public/edit/index'
+import type { FormEditHost } from '@/v8/form-edit/public/host/index'
+import { TemplateAssetEditor } from '@/v8/template-edit/public/asset/index'
+import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
+import { TemplateMessageEditor } from '@/v8/template-edit/public/message/index'
+import { TemplateRichEditor } from '@/v8/template-edit/public/rich/index'
+import { TemplateRichVideoEditor } from '@/v8/template-edit/public/rich-video/index'
+import { CarouselV8 } from '@/v8/templates/public/carousel/index'
+import { QuestionNewV8 } from '@/v8/templates/public/question-new/index'
 import { templateKind,type HqTemplateFolder,type HqTemplateListStats,type HqTemplateReceivedVersion,type HqTemplateVersionDisplay,type TemplateKind } from '@line-crm/shared'
 import { ArrowLeft,Check,Plus,Send } from 'lucide-react'
 import { useEffect,useRef,useState,type ComponentType } from 'react'
@@ -76,7 +76,7 @@ import HqTagEditorV8 from './tag-editor'
 
 
 /*
- * ★V8-B 統括のテンプレート（一覧 LRc93・メッセージのひな形を作る X4JcOf・アカウントへ配る meBRB）。
+ * ★V8-B 統括のテンプレート（一覧 ・メッセージのひな形を作る ・アカウントへ配る ）。
  *
  * 2026-10-07 src/v8 に一から書いた。読み書き・権限・失敗時の扱いは今の画面
  * （app/hq/templates/template-console.tsx）と同じ：一覧・分類（フォルダ）・複製・削除、
@@ -96,7 +96,7 @@ const EDIT_TITLES: Record<TemplateType, string> = { tag: 'タグのひな形', t
 const MODE_LABELS: Record<DistributionMode, string> = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る' }
 
 type Stage = 'saved' | 'list' | 'detail' | 'edit' | 'accounts' | 'duplicates' | 'result'
-const errorText = (error: unknown) => error instanceof Error ? error.message : '処理できませんでした。時間をおいて再確認してください。'
+const errorText = (error: unknown) => describeApiFailure(error, '読み込み', { scope: 'hq' })
 
 export default function HqTemplatesV8(props: ConsoleProps) {
   const attribute = useAttributeTab('/hq/friend-attributes')
@@ -146,7 +146,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const accountFolders = useDistributionFolders(stage === 'accounts' || stage === 'duplicates' || stage === 'result' || stage === 'saved' || folderDistribution !== null)
   /* テンプレートの7種類（店と同じ上のタブ・API-17）。タブを替えたらその種類だけ読む。 */
   const [kind, setKind] = useState<TemplateKind>('message')
-  /* 初期セットの画面のタブ（B-322）から `?kind=` で戻ったときは、その種類のタブを開く。 */
+  /* 初期セットの画面のタブから `?kind=` で戻ったときは、その種類のタブを開く。 */
   useEffect(() => {
     const wanted = new URLSearchParams(window.location.search).get('kind')
     if (KIND_TABS.some((tab) => tab.kind === wanted)) setKind(wanted as TemplateKind)
@@ -155,7 +155,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [kindCounts, setKindCounts] = useState<Partial<Record<TemplateKind, number>> | null>(null)
   /* 一覧の集計（API-18：今月送った数・新しい版を未配布）。取れなければ null（数の帯は「—」か行から数える）。 */
   const [listStats, setListStats] = useState<HqTemplateListStats | null>(null)
-  /* 詳細（pQ4fH）の版の履歴と配った先ごとの版（API-18）。null は読み込み中・読めなかった。 */
+  /* 詳細の版の履歴と配った先ごとの版（API-18）。null は読み込み中・読めなかった。 */
   const [versions, setVersions] = useState<HqTemplateVersionDisplay[] | null>(null)
   const [versionsFailed, setVersionsFailed] = useState(false)
   /** 確認の前に読む「配布先が今受け取っている版」（組1：distribution-targets）。同名の有無・上書き可否は決めない。 */
@@ -169,7 +169,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const [result, setResult] = useState<DistributionResult | null>(null)
   const [resultDialogFor, setResultDialogFor] = useState<string | null>(null)
   const [pendingRun, setPendingRun] = useState<string | null>(null)
-  /** 配った結果の窓（★V8-B dEvJM）。結果が出たら開く。閉じても同じ画面の進み具合と操作は残る。 */
+  /** 配った結果の窓（★V8-B ）。結果が出たら開く。閉じても同じ画面の進み具合と操作は残る。 */
   const [requestBusy, setBusy] = useState(false)
   const [uploadBusy, setUploadBusy] = useState(false)
   const busy = requestBusy || uploadBusy
@@ -209,9 +209,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }
 
   const editTitle = `${EDIT_TITLES[type]}を${detail ? '編集' : '作る'}`
-  /* 絵（meBRB の進み具合・dEvJM の窓の後ろ）：配っている間も結果のあとも題は「アカウントへ配る：名前」のまま。 */
+  /* 絵（ の進み具合・ の窓の後ろ）：配っている間も結果のあとも題は「アカウントへ配る：名前」のまま。 */
   const pageTitle = (stage === 'list' || stage === 'saved') ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : `アカウントへ配る：${detail?.template.name ?? ''}`
-  /* 絵（HfK0O・u5MM7）：店の作る・編集の画面を使うときは、上の帯は「ホーム › テンプレート／回答フォーム」だけ。 */
+  /* 絵（・）：店の作る・編集の画面を使うときは、上の帯は「ホーム › テンプレート／回答フォーム」だけ。 */
   /*
    * 一覧の段より先（詳細・作る・配る）は、上の帯のパンくずに一覧（テンプレートなど）を置き、押したら一覧の段へ戻す。
    * 同じ URL のまま段だけ替えるので、リンクではなく段の切り替えで戻す（板の頭の「← テンプレートへ」は
@@ -219,7 +219,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
    */
   const toListRef = useRef<() => void>(() => {})
   usePageTitle((stage === 'list' || stage === 'saved') ? PAGE_TITLES[type] : stage === 'edit' ? editTitle : stage === 'detail' ? (detail?.template.name ?? PAGE_TITLES[type]) : pageTitle)
-  /* 回答フォームの編集は、編集画面が上の帯の題を「回答フォーム」にする（絵 u5MM7・P90Vp0）。一覧の段を重ねると「回答フォーム › 回答フォーム」になるので足さない。 */
+  /* 回答フォームの編集は、編集画面が上の帯の題を「回答フォーム」にする。一覧の段を重ねると「回答フォーム › 回答フォーム」になるので足さない。 */
   usePageCrumbs(stage === 'list' || stage === 'saved' || (stage === 'edit' && type === 'form')
     ? [{ label: 'ホーム', href: '/' }]
     : [{ label: PAGE_TITLES[type], href: LIST_HREFS[type], onSelect: () => toListRef.current() }])
@@ -389,9 +389,9 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     editBaseline.current = JSON.stringify({ name: '', description: '', definition: fresh, folderId: nextFolder })
     setDetail(null); setFolderId(nextFolder); setName(''); setDescription(''); setDefinition(fresh); setStage('edit'); setError(''); setConflict(false)
   }
-  /* 店のひな形（テキスト・カード）の保存で落ちた欄（B-139）。MessageForm が欄ごとに検査し、1つ目へ移る。 */
+  /* 店のひな形（テキスト・カード）の保存で落ちた欄。MessageForm が欄ごとに検査し、1つ目へ移る。 */
   const messageFields = useFormErrors()
-  /** 今の画面（X4JcOf）の MessageForm で作っているか。店の作る画面（共通）のときは、その画面が欄を検査する。 */
+  /** 今の画面の MessageForm で作っているか。店の作る画面（共通）のときは、その画面が欄を検査する。 */
   const sharedEditorRef = useRef(false)
   const sharedEditorNow = () => sharedEditorRef.current
   const usesMessageForm = () => stage === 'edit' && type === 'template' && 'template' in definition && !sharedEditorNow()
@@ -703,7 +703,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     {message ? <Notice tone="success" message={message} onClose={() => setMessage('')} /> : null}
   </>
 
-  /* ───── 一覧（店の同じ機能の一覧と同じ形・i0Ao0R / wZPua / DzdC3 / noVq4。2026-10-08 オーナー） ───── */
+  /* ───── 一覧（店の同じ機能の一覧と同じ形・ /  /  / 。2026-10-08 オーナー） ───── */
   if (stage === 'list' || stage === 'saved') {
     const listRows = type === 'template' && kindRows ? kindRows : templates
     const duplicateRow = (row: HqTemplate) => void perform(async () => {
@@ -790,7 +790,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     )
   }
 
-  /* ───── 詳細（pQ4fH）：店のテンプレートの詳細と同じ形に「配った先」と［配る］ ───── */
+  /* ───── 詳細：店のテンプレートの詳細と同じ形に「配った先」と［配る］ ───── */
   if (stage === 'detail' && detail) {
     const listRow = [...(kindRows ?? []), ...templates].find((item) => item.id === detail.template.id) as HqTemplateListItem | undefined
     return (
@@ -851,13 +851,13 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
 
   /*
    * ───── 作る・編集：店のテンプレートの作る画面を使い、下の帯をキャンセル・下書きを保存・保存するにする（G-3）─────
-   * 絵：メッセージ HfK0O・クーポン C3qMCz・リサーチ Fkv3w。保存した中身は統括のひな形（同じ形の payload）にして、
-   * ［保存する］は保存成功のあと配るか尋ねる窓を開き、選んだ先を確かめる（meBRB）へ渡す。
+   * 絵：メッセージ ・クーポン ・リサーチ 。保存した中身は統括のひな形（同じ形の payload）にして、
+   * ［保存する］は保存成功のあと配るか尋ねる窓を開き、選んだ先を確かめるへ渡す。
    * 前回の保存が結果不明のときは、入力を固定した今の画面（下）で再確認する。
    */
   const editKind: TemplateKind = detail && 'template' in detail.definition ? templateKind(detail.definition) : kind
   const current = ('template' in definition ? definition : freshDefinition('template')) as MessageTemplateDefinition
-  /* 編集で中身を店の画面の形に戻せないもの（古い形のカード等）は、空で開いて上書きしないよう今の画面（X4JcOf）で直す。 */
+  /* 編集で中身を店の画面の形に戻せないもの（古い形のカード等）は、空で開いて上書きしないよう今の画面で直す。 */
   const editContent = detail && type === 'template' && editKind !== 'message' ? hostContentOf(editKind, name, current) : undefined
   const sharedEditor = type === 'template' && !createUncertain && ['message', 'coupon', 'research', 'carousel', 'question', 'rich_message', 'rich_video'].includes(editKind)
     && (!detail || editKind === 'message' || Boolean(editContent))
@@ -882,7 +882,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       },
       onCancel: toList,
       initialMessage: detail && editKind === 'message' ? { name, messageType: current.template.messageType, messageContent: current.template.messageContent } : undefined,
-      /* 編集（B-29）：カルーセル・質問・クーポン・リサーチ・リッチメッセージも店の作る画面で直す。 */
+      /* 編集：カルーセル・質問・クーポン・リサーチ・リッチメッセージも店の作る画面で直す。 */
       initialContent: editContent,
       readOnly: !canEdit,
       uploadCarouselImage: async (file) => {
@@ -915,7 +915,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           if (alive.current) setUploadBusy(false)
         }
       },
-      /* g8d6ai：画像は統括の置き場へ送り5サイズを作る（API-17）。保存されなかった画像は一覧へ戻るときに片付ける（R568）。 */
+      /* ：画像は統括の置き場へ送り5サイズを作る（API-17）。保存されなかった画像は一覧へ戻るときに片付ける（R568）。 */
       uploadRichImage: async (file) => {
         setUploadBusy(true)
         try {
@@ -937,7 +937,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   }
 
   /*
-   * ───── リッチメニュー：店のリッチメニューの作る画面（①〜④）を使い、④を「配る」（配るアカウント）にする（B-36）─────
+   * ───── リッチメニュー：店のリッチメニューの作る画面（①〜④）を使い、④を「配る」（配るアカウント）にする─────
    * 絵：① gobhu・② egdGx・③ K0gu1・④ gQabc。手順の間は画面の中に持ち、［下書きを保存］［保存する］で一度に保存する。
    * 自由に置いた面・シナリオの参照など、作る画面の形に戻せない古い中身は今の画面（下）で直す。
    */
@@ -1007,7 +1007,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
 
   /*
    * ───── 回答フォーム：店の回答フォームの編集画面を使い、右の列に「配った先」、主ボタンを［保存する］にする（G-3）─────
-   * 絵：中身 u5MM7・答え終わったあと scJcP・受付と見た目 xRPdo・予約ブロック N4T9mO。前回の保存が結果不明のときは下の今の画面で再確認する。
+   * 絵：中身 ・答え終わったあと ・受付と見た目 ・予約ブロック 。前回の保存が結果不明のときは下の今の画面で再確認する。
    */
   if (stage === 'edit' && type === 'form' && !createUncertain && 'form' in definition) {
     const value = hqFormDefinitionToEditor(definition)
@@ -1043,7 +1043,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     return <SaveErrorScope errors={saveErrors}><FormEditV8 key={`form-${detail?.template.id ?? 'new'}-${formKey}`} host={host} /></SaveErrorScope>
   }
 
-  /* ───── 作る・編集（X4JcOf：前回の保存の再確認・カード型・カルーセル・質問・リッチメッセージ） ───── */
+  /* ───── 作る・編集（：前回の保存の再確認・カード型・カルーセル・質問・リッチメッセージ） ───── */
   if (stage === 'edit' && type === 'tag' && 'tag' in definition && !createUncertain) {
     /* 所属フォルダは統括のフォルダ（左の列）から選ぶ。選んだフォルダに、一覧でもこのひな形を置く。 */
     const folderOf = (next: TagDefinition) => folders.some((folder) => folder.id === next.tag.folderId) ? next.tag.folderId ?? null : next.tag.folderId ? folderId : null
@@ -1138,7 +1138,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
     onBack={toList} onRefresh={() => void perform(() => executeFolder(folderBatch))}
     onRetry={() => retryFolder()} onRecheck={() => retryFolder(true)} /></SaveErrorScope>
 
-  /* ───── アカウントへ配る（meBRB）：選ぶ → 重複の配り方 → 配る（進み具合） ───── */
+  /* ───── アカウントへ配る：選ぶ → 重複の配り方 → 配る（進み具合） ───── */
   const storeOf = (accountId: string) => preflight?.stores.find((store) => store.accountId === accountId)
   const resultOf = (accountId: string) => result?.stores.find((store) => store.accountId === accountId)
   const storeMode = (accountId: string): DistributionMode | '' => {
@@ -1157,7 +1157,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       return target.version == null ? 'まだない' : `版 ${target.version}${target.status === 'latest' ? '（最新）' : ''}`
     }
     const main = store.items[0]
-    /* 絵（meBRB）：ひな形と同じ版が配布先にあれば「版 2（最新）」。 */
+    /* 絵：ひな形と同じ版が配布先にあれば「版 2（最新）」。 */
     return main?.duplicate ? (main.expectedRevision != null ? `版 ${main.expectedRevision}${detail && main.expectedRevision === detail.template.revision ? '（最新）' : ''}` : '配布済み') : '未配布'
   }
   const rowsForTable = shownAccounts
@@ -1200,7 +1200,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           </span>
           {accountFolderRows.length > 1 ? null : accountFolders.failed ? <Notice tone="warn" message="フォルダを読み込めませんでした。" /> : null}
         </DistributionToolbar>}
-      /* 絵 J7HNK：アカウントのフォルダは左の列（数とまとめて選ぶ印）。狭い板では選ぶ欄に畳む。 */
+      /* 絵 ：アカウントのフォルダは左の列（数とまとめて選ぶ印）。狭い板では選ぶ欄に畳む。 */
       folders={accountFolderRows.length > 1 ? <DistributionFolderPanel rows={accountFolderRows} activeId={accountFolder} onSelect={setAccountFolder} failed={Boolean(accountFolders.failed)} /> : undefined}
       collapsedFolders={accountFolderRows.length > 1 ? <Select aria-label="アカウントのフォルダ" label="フォルダ" value={accountFolder} onChange={setAccountFolder} options={accountFolderRows.map((row) => ({ value: row.id, label: row.label }))}/> : undefined}
       actions={<>

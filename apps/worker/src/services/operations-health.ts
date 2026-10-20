@@ -1,3 +1,5 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import {
   completeOperationHealthRun,
   enqueuePendingOperationAlertNotifications,
@@ -9,7 +11,8 @@ import {
   type OperationHealthStatus,
 } from '@line-crm/db';
 
-import { fetchQuota } from './broadcast-quota-guard.js';
+
+import { fetchQuota } from '../features/broadcasts/broadcast-quota-guard/index.js';
 import { findPlan } from './billing-plans.js';
 import { collectOperationDispatchHealth } from './operation-dispatch-health.js';
 import { externalIntegrationsSummary } from './operations-health-delivery.js';
@@ -31,7 +34,6 @@ export type OperationInfraDeps = {
   queue?: Queue<unknown>;
 };
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const CREDENTIAL_WARNING_DAYS = 14;
 const INFRA_SLOW_MS = 3_000;
 const INFRA_ALERT_AFTER = 3;
@@ -44,17 +46,17 @@ const FRIEND_DECREASE_MIN_ABSOLUTE = 10;
 /**
  * 台帳の JST 壁時計（オフセット無し）と比べるための境界を、保存と同じ書式で返す。
  * line_webhook_events.received_at は strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours') の
- * JST 文字列で入る。observedAt は UTC の ISO なので datetime() のまま比べると
+ * JST 文字列で入る。observedAt は UTC の ISO なので datetime のまま比べると
  * 9時間ぶん受信が新しく見え（区切りが T と空白で違うため大小も狂う）、
  * 26時間前の受信を「直近24時間にあった」と数えてしまう。
  */
 function jstCutoff(nowIso: string, backMs: number): string {
-  return new Date(Date.parse(nowIso) + JST_OFFSET_MS - backMs).toISOString().replace('Z', '');
+  return japanCalendar(new Date(Date.parse(nowIso) - backMs)).toISOString().replace('Z', '');
 }
 
 /** JST の月初・翌月初を、台帳の JST 壁時計（オフセット無し）と同じ形で返す。 */
 function jstMonthBounds(nowIso: string): { monthStart: string; monthEnd: string; resetAt: string } {
-  const jst = new Date(Date.parse(nowIso) + JST_OFFSET_MS);
+  const jst = japanCalendar(new Date(Date.parse(nowIso)));
   const y = jst.getUTCFullYear();
   const m = jst.getUTCMonth();
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -171,7 +173,7 @@ async function collectChecks(
     }),
     isolate('message_quota', observedAt, async () => {
       // LINE公式側とHarness契約側の両方を見る。送れる数は小さい方で、
-      // 予定済み配信の見込み通数を引いた forecast も返す（v6-32 §5-2）。
+      // 予定済み配信の見込み通数を引いた forecast も返す（-32 §5-2）。
       const { monthStart, monthEnd, resetAt } = jstMonthBounds(observedAt);
       const [quota, harnessUsedRow, tenantRow, scheduledRow] = await Promise.all([
         fetchQuota(account.channel_access_token),
@@ -303,7 +305,7 @@ async function collectChecks(
     isolate('friend_change', observedAt, async () => {
       // 前日比だけでなく、同曜日（7日前）と過去28日の最大を baseline にする。
       // 小規模アカウントの減少を%だけで拾わないよう、絶対人数の下限を併用する
-      // （v6-32 §5-6）。webhook取りこぼしの見せかけの減少は、同曜日baseline
+      // （-32 §5-6）。webhook取りこぼしの見せかけの減少は、同曜日baseline
       // より上なら異常としない。
       const rows = await db.prepare(
         `SELECT date, active, added, blocked
@@ -367,7 +369,7 @@ async function collectChecks(
     }),
     isolate('infra_canary', observedAt, async () => {
       // 実際に読み書きして試す。1回の失敗では知らせず、遅い・失敗が
-      // 3回続いたときだけ異常にする（v6-32 §5-3）。
+      // 3回続いたときだけ異常にする（-32 §5-3）。
       const targets: Array<{ kind: string; ok: boolean; ms: number; note?: string }> = [];
       const probe = async (kind: string, run: () => Promise<void>) => {
         const started = Date.now();
@@ -385,7 +387,7 @@ async function collectChecks(
             .bind(probeId, 'd1', probeId.slice(0, 8), observedAt),
           db.prepare('SELECT payload FROM operation_infra_probes WHERE id = ?').bind(probeId),
           db.prepare('DELETE FROM operation_infra_probes WHERE id = ?').bind(probeId),
-          // created_at は observedAt（UTCのISO・Z付き）で入れている。datetime() は
+          // created_at は observedAt（UTCのISO・Z付き）で入れている。datetime は
           // 'YYYY-MM-DD HH:MM:SS' を返して書式が違うため、同じ書式のまま引き算して比べる。
           db.prepare('DELETE FROM operation_infra_probes WHERE created_at < ?')
             .bind(new Date(Date.parse(observedAt) - 24 * 60 * 60_000).toISOString()),
@@ -531,7 +533,7 @@ export async function runScheduledOperationHealthChecks(
 ): Promise<void> {
   if (deps.security) {
     try { await runSecurityMonitor(deps.security); }
-    catch { console.error(JSON.stringify({ code: 'security_monitor_failed' })); }
+    catch { logger.error("security_monitor_failed"); }
   }
   const rows = await db.prepare('SELECT id FROM line_accounts WHERE is_active = 1 ORDER BY id')
     .all<{ id: string }>();

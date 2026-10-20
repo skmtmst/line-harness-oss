@@ -12,7 +12,7 @@ import {
  * 判定は日本時間で固定する。
  *
  * このファイルは `TZ=Asia/Bangkok` を付けて走らせても同じ結果になること。
- * ローカルの getDay() や getHours() を使うと、ここで落ちる。
+ * ローカルの getDay や getHours を使うと、ここで落ちる。
  */
 
 /** 日本時間の "YYYY-MM-DDTHH:MM" を Date にする（実行環境の時計に依らない）。 */

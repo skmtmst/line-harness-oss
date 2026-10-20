@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 const access = vi.hoisted(() => vi.fn(async () => true));
 vi.mock('../services/account-access.js', () => ({ canAccessAllLineAccounts: access }));
 import { trafficPools } from './traffic-pools.js';

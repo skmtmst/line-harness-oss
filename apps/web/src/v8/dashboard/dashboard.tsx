@@ -18,13 +18,14 @@ import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { SetupCard,SetupWarningBands,setupSummary } from '@/v8/onboarding/setup-card'
-import { useStyleSetup } from '@/v8/onboarding/use-style-setup'
+import { SetupCard, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import ListState from '@/components/shared/list-state'
+import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import type { DashboardCardId } from '@line-crm/shared'
 import { Calendar,Image as ImageIcon,Inbox,Package,Plus,SlidersHorizontal } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
-import { Fragment,useEffect,useState,type ReactNode } from 'react'
+import { Fragment,useEffect,useRef,useState,type ReactNode } from 'react'
 import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
 import { FirstStepsCard,useFirstSteps } from './first-steps'
@@ -34,18 +35,21 @@ import { InboxSection } from './inbox'
 import { ConnectionStatus,DeliveryFailures,FriendStatus,Loading,Metric,MonthlyDelivery,OperationalAlerts,RecentActivity,RecentResults,SendQuota,SupportStatus,Tag,Unavailable,Upcoming } from './sections'
 import { FriendTrend,trendRangeNote } from './trend'
 import { PERIODS,jstDay,useDashboard } from './use-dashboard'
+import { dashboardCardForStyle } from './style-cards'
 export { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 
 
-/* 編集の引き出し（mcOqK・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（v7 の部品は使わない）。 */
+/* 編集の引き出し（・dnd-kit を含む重い部品）は開くまで読まない。V8 だけの作り（管理画面 の部品は使わない）。 */
 /* はじめの質問の窓（xxpM9 ほか）も開くまで読まない。 */
-const StyleSetupWizard = dynamic(() => import('@/v8/onboarding/wizard').then((module) => module.default))
+const EcSummary = dynamic(() => import('./ec-summary'))
+
+const StyleSetupWizard = dynamic(() => import('../onboarding/wizard/index').then((module) => module.default))
 
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
 
-/* 右の列の組み合わせ（WQmep）：どの本文の段の右に、どの右の列のカードを置くか。 */
+/* 右の列の組み合わせ：どの本文の段の右に、どの右の列のカードを置くか。 */
 const ASIDE_OF: Partial<Record<DashboardCardId, DashboardCardId[]>> = {
   'friend-trend': ['send-quota', 'operational-alerts'],
   'pending-inbox': ['support-mark-status', 'connection-status'],
@@ -57,9 +61,9 @@ const ROW_VARIANT: Partial<Record<DashboardCardId, 'trend' | 'inbox' | 'link'>> 
   'friend-add': 'link',
 }
 
-export default function DashboardV8() {
+export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 'ec' } = {}) {
   const router = useRouter()
-  const d = useDashboard()
+  const d = useDashboard(usageStyle)
   const role = useStaffRole()
   const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
@@ -67,11 +71,13 @@ export default function DashboardV8() {
   const canEditLayout = canEditDashboardLayout(role)
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。 */
   const start = useFirstSteps(d.selectedAccountId, role)
-  /* B-311〜B-313：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
+  /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
   const setup = useStyleSetup(d.selectedAccountId, role)
   const setupRest = setupSummary(setup.data)
   const params = useSearchParams()
   const setupParam = params.get('setup')
+  const qrRequested = params.has('qr')
+  const closedWizardAccount = useRef<string | null>(null)
   const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
   useEffect(() => {
     if (setupParam === 'summary') setWizardStep('summary')
@@ -81,16 +87,18 @@ export default function DashboardV8() {
   useEffect(() => {
     const state = setup.data?.state
     /* 「あとで」「手動」は口の styleMode に残る（別の人・別の端末でも自動では開かない）。 */
-    if (!state || !canManage || state.styleSelected || !d.selectedAccountId) return
+    if (!state || !canManage || state.styleSelected || !d.selectedAccountId || qrRequested || closedWizardAccount.current === d.selectedAccountId) return
     if (state.styleMode === 'later' || state.styleMode === 'manual') return
     setWizardStep((current) => current ?? 0)
-  }, [setup.data, canManage, d.selectedAccountId])
+  }, [setup.data, canManage, d.selectedAccountId, qrRequested])
   const openSetupStep = (step: string | number) => {
     if (typeof step === 'number') { setWizardStep(step); return }
     const names = setup.data ? ['style', 'image'] : []
     setWizardStep(step === 'summary' ? 'summary' : Math.max(0, names.indexOf(step)))
   }
   const closeWizard = (changed: boolean) => {
+    // 読み直しても未選択の状態は変えず、この画面で閉じた窓を自動では開き直さない。
+    closedWizardAccount.current = d.selectedAccountId
     setWizardStep(null)
     if (setupParam !== null) router.replace('/')
     if (changed) setup.reload()
@@ -244,8 +252,10 @@ export default function DashboardV8() {
   const rows: ReactNode[] = []
   const looseMain: DashboardCardId[] = []
   for (const item of d.preferences.main) {
+    if (!dashboardCardForStyle(item.id, usageStyle, d.preferenceVersion > 0)) continue
     if (item.id === 'shipment') {
-      /* 件数は隠していても取り続ける（v7 と同じ）。出荷があるときだけ段として出す。 */
+      if (usageStyle === 'standard') continue
+      /* 件数は隠していても取り続ける（管理画面 と同じ）。出荷があるときだけ段として出す。 */
       const show = item.visible && (d.shipmentSummary?.soon ?? 0) > 0
       rows.push(
         <div key={item.id} className={show ? styles.shipmentRow : styles.hidden} aria-hidden={!show}>
@@ -331,13 +341,14 @@ export default function DashboardV8() {
   ])
   const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
   const setupBands = setup.data && canManage ? <SetupWarningBands data={setup.data} /> : null
-  const notice = start.summary || setupRest || setup.data?.warnings.length || viewer || d.error || looseFailures.length ? (
+  const notice = start.error || setup.error || start.summary || setupRest || setup.data?.warnings.length || viewer || d.error || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <ReadOnlyNotice />
       ) : null}
       {setupBands}
-      {setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
+      {start.error && canManage ? <ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={start.error} onRetry={start.reload} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} /> : null}
+      {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : null}
       {d.error ? (
         <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>
       ) : null}
@@ -356,7 +367,7 @@ export default function DashboardV8() {
     <DashboardPage
       boardId="WQmep"
       headingSize="compact"
-      title={greeting(d.staffName)}
+      title={usageStyle ? 'ダッシュボード' : greeting(d.staffName)}
       help={headline(data?.asOf, d.displayedHealthRisk)}
       actions={<>
         <PeriodPicker days={d.period === 'today' ? 1 : d.period === 'last7' ? 7 : 30} supportedDays={[1,7,30]} choices={PERIODS.map((item) => ({ days: item.key === 'today' ? 1 : item.key === 'last7' ? 7 : 30, label: item.label }))} onChange={(value) => d.selectPeriod(value === 1 ? 'today' : value === 7 ? 'last7' : 'last30')} />
@@ -367,6 +378,7 @@ export default function DashboardV8() {
       overlays={d.editorOpen && canEditLayout ? <DashboardEditor
         open={d.editorOpen}
         preferences={d.preferences}
+        usageStyle={usageStyle}
         saving={d.preferenceSaving}
         saveError={d.preferenceSaveError?.message ?? null}
         saveConflict={d.preferenceSaveError?.conflict ?? false}
@@ -389,6 +401,7 @@ export default function DashboardV8() {
       ) : null}
       {/* 本文の段が見えたら補足の口を叩く（速さ対応）。 */}
       <div ref={d.bodyRef} className={styles.body}>
+        {usageStyle === 'ec' && d.selectedAccountId ? <EcSummary key={d.selectedAccountId} accountId={d.selectedAccountId} period={d.period} /> : null}
         {rows}
         <RecentActivity items={d.notifications} failed={d.notificationFailed} />
       </div>

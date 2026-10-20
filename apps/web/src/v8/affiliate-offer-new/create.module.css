@@ -1,5 +1,5 @@
 /*
- * ★V8-B 案件を作る（Td4TN）。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
+ * ★V8-B 案件を作る。枠・頭・本文の余白・右の列・下の帯は型（CreatePage）が持つ。
  * 枠は共通Card（本文24/16・右16/8）へ渡す。ここは中身だけ。寸法は --tpl-wa-af-*。
  */
 .back { color: var(--color-action); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-wa-af-back-lh); text-decoration: none; }

@@ -5,6 +5,7 @@ import {
   type CommonVarResolutionFailureReason,
 } from '@line-crm/db';
 
+
 export interface BroadcastCommonVarSnapshot {
   executionAt: string;
   accounts: Record<string, {

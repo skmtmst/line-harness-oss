@@ -32,7 +32,7 @@
   cursor: pointer;
   /*
    * 押せる範囲は札（label）自体を 3px ずつ広げて 24×24（WCAG 2.5.8、
-   * ★V7 修正方針 §4）。透明な input をはみ出させる方式だと、見えない
+   * ★管理画面 修正方針 §4）。透明な input をはみ出させる方式だと、見えない
    * はみ出しが表のセルの外側判定に載る（M3 報告・parity 1003-2106）。
    * padding で広げ margin で戻すので、配置・見た目は変わらない。
    * 札の押下で input が切り替わるのは label の既定の動き。
@@ -142,7 +142,7 @@
 }
 
 /*
- * ★V8「チェック」（dQCCN・S9U7v）：箱・印・色は v7 と同じ。
+ * ★V8「チェック」（dQCCN・S9U7v）：箱・印・色は 管理画面 と同じ。
  * 違うのは文字（13px）と、オフの箱の枠色（choice-border）。
  * 選んだ・誤りの枠色は details 度が高い規則が勝つので変わらない。
  */
@@ -174,7 +174,7 @@
   scale: 0.92;
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .label { line-height: 20px; font-weight: 400; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 :root .box { border: 0; border-radius: var(--polish-radius-small); outline: 1.5px solid var(--color-toggle-off); outline-offset: -0.75px; }
 :root .input:checked + .box, :root .input:indeterminate + .box { outline-color: var(--color-accent-deep); }
@@ -186,7 +186,7 @@
 :root .box { gap: 0; }
 }
 
-/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+/* ・・：10-10 に採用した共通の形。 */
 html:root .control, html:root .input { width: var(--choice-size); height: var(--choice-size); }
-/* axFrW の差し戻し：16px のチェックは絵の四角（角4）へ。 */
+/*  の差し戻し：16px のチェックは絵の四角（角4）へ。 */
 html:root .box { border-radius: var(--choice-checkbox-radius); }

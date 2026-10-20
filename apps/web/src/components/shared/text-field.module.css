@@ -1,13 +1,6 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-/*
- * 入力欄。Pencil V5 の `ytG7l`「共通 入力欄」（102回）と
- * `keKe3`「共通 入力欄（複数行）」（22回）。
- *
- * 1行と複数行で、地・枠・角丸・文字は同じ。違うのは高さと余白だけ。
- *   1行   高さ40px  余白 [0,12]
- *   複数行 高さ120px 余白 14px  行間1.7
- */
+/* 共通の1行・複数行入力。寸法は globals.css の共通入力値から読む。 */
 
 .field {
   display: block;
@@ -34,7 +27,7 @@
   background: var(--color-canvas-sunken);
 }
 
-/* 計算で決まる読むだけの欄（年齢など）。絵 vX3wQ：灰色の地・薄い文字。 */
+/* 計算で決まる読むだけの欄（年齢など）。絵 ：灰色の地・薄い文字。 */
 .field[data-look='derived'] {
   background: var(--color-canvas-sunken);
   color: var(--color-ink-secondary);
@@ -51,9 +44,9 @@
 
 /* keKe3 共通 入力欄（複数行）／★V8 i5BW8b。最小の高さ120・縦にだけ広げられる（下の層の外の決まり）。 */
 .multi {
-  min-height: 120px; /* height: 120 */
-  padding: 14px; /* padding: 14 */
-  line-height: 1.7; /* lineHeight: 1.7 */
+  min-height: var(--tpl-textarea-min-h); /* height: 120 */
+  padding: var(--tpl-textarea-pad); /* padding: 14 */
+  line-height: var(--tpl-textarea-lh); /* lineHeight: 1.7 */
   resize: vertical;
 }
 .multi[data-density='compact'] {
@@ -94,8 +87,8 @@
   border-color: var(--color-status-danger);
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
-:root .single { height: 36px; border: 0; padding: 0 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); line-height: 21px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+/* V8の1行欄。高さ・左右の余白・行間は共通値。 */
+:root .single { height: var(--tpl-field-h); border: 0; padding: 0 var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); line-height: var(--tpl-field-lh); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 :root .single[aria-invalid='true'] { outline-color: var(--color-danger); }
 :root .single:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 /* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */
@@ -116,15 +109,15 @@
  * 複数行の入力欄の決まり（2026-10-08 共通部品の1本化）。
  * 縦にだけ手で広げられる・横は広げられない。層の外に置くのは、画面が
  * className で resize-none などを渡しても、この決まりを上書きさせないため。
- * v7 の TextArea（form-controls の包み）は form-controls.module.css が
- * v7 のときだけ元の resize: none に戻す（v7 の見た目は変えない）。
+ * 管理画面 の TextArea（form-controls の包み）は form-controls.module.css が
+ * 互換経路のときだけ元の resize: none に戻す（管理画面 の見た目は変えない）。
  */
 .multi {
   resize: vertical;
   max-width: 100%;
-  min-height: 120px;
-  padding: 14px;
-  line-height: 1.7;
+  min-height: var(--tpl-textarea-min-h);
+  padding: var(--tpl-textarea-pad);
+  line-height: var(--tpl-textarea-lh);
 }
 
 /* 2行の説明用。指定した欄だけを小さくする。 */
@@ -135,14 +128,14 @@
 :root .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
 :root .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }
 
-/* 見送りの補足2行（ujcar）。指定した欄だけを56pxにする。 */
+/* 見送りの補足2行。指定した欄だけを56pxにする。 */
 :root .multiShort { min-height: var(--tpl-nm-textarea-h); height: var(--tpl-nm-textarea-h); padding: var(--tpl-nm-textarea-pad); font-size: var(--tpl-nm-row-size); line-height: var(--tpl-nm-textarea-lh); }
 
 /* コラムの紹介文。改行を保ち、最初は1行分の高さで表示する。 */
-:root .multiSingleRow { min-height: 36px; height: 36px; border: 0; padding: 7.5px 12px; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: 21px; box-shadow: var(--control-shadow); }
+:root .multiSingleRow { min-height: var(--tpl-field-h); height: var(--tpl-field-h); border: 0; padding: var(--tpl-field-pad-y) var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: var(--tpl-field-lh); box-shadow: var(--control-shadow); }
 :root .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }
 
-/* B-152・仕上げ7 */
+/* ・仕上げ7 */
 :root .field:disabled { opacity: var(--polish-disabled-opacity); }
 html:root .field:is(.single, .multi)[aria-invalid='true']:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); box-shadow: var(--polish-error-ring); }
 

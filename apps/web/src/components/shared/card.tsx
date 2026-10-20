@@ -7,7 +7,8 @@ import { OptionalBadge } from './form-controls'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
   children: ReactNode
-  frame?: 'raised' | 'inset'
+  /** ring は寸法を取らない内側の1px線。手順の案内など、影を重ねない面。 */
+  frame?: 'raised' | 'inset' | 'ring'
   layout?: 'block' | 'vertical' | 'horizontal' | 'media'
   /**
    * 設定の箱。'settings' は16の余白・10の間（EC設定）。
@@ -34,8 +35,8 @@ export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'>
 }
 
 /*
- * 上下・左右を分けた余白（例 '8px 12px'）は max() に入らず、余白が 0 になっていた。
- * かっこの外に空白がある値だけ、最低16を掛けずにそのまま使う（a7lUk の階層の行）。
+ * 上下・左右を分けた余白（例 '8px 12px'）は max に入らず、余白が 0 になっていた。
+ * かっこの外に空白がある値だけ、最低16を掛けずにそのまま使う（ の階層の行）。
  */
 function hasSides(value: string): boolean {
   let flat = value
@@ -92,7 +93,7 @@ export default function Card({
 
   return (
     <section ref={cardRef} className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
-      data-card-selected={selected || undefined} data-card-padding={padding} data-card-variant={variant}
+      data-card-frame={frame === 'ring' ? frame : undefined} data-card-selected={selected || undefined} data-card-padding={padding} data-card-variant={variant}
       data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
       data-card-spacing-sides={contentPadding && hasSides(contentPadding) ? '' : undefined}

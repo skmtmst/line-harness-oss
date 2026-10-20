@@ -612,7 +612,9 @@ describe('M4torYの描画を本物のWorker/D1へつなぐ送信安全性', () =
     await switchAccount(view, ACCOUNT_B); expect(account.id).toBe(ACCOUNT_A)
     await act(async () => worker.releaseTest())
     if (outcome === '成功') await sentNotice()
-    else await screen.findByText(/テストする友だちが見つかりません/)
+    else await screen.findByText(/対象が見つかりませんでした。一覧から開き直してください/)
+    // 応答の文が先に出ても、送信中の解除を待ってから切り替える。
+    await waitFor(() => expect((screen.getByRole('button', { name: '1人で試す', exact: true }) as HTMLButtonElement).disabled).toBe(false))
     await switchAccount(view, ACCOUNT_B)
     expect(account.id).toBe(ACCOUNT_B)
     expect(screen.queryByRole('dialog', { name: '1人テストの確認' })).toBeNull()

@@ -1,10 +1,10 @@
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { consumeStepUpGrant, getAdminSessionByTokenHash } from '@line-crm/db';
-import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
+import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth/credentials/auth.js';
 
 /**
- * 大事な操作の直前再確認（V：v6-26 §16・v6-30 §14・v6-33 §16）。
+ * 大事な操作の直前再確認（V：-26 §16・-30 §14・-33 §16）。
  *
  * 対象：鍵・トークンの操作、権限の変更、LINE の接続の変更、一斉配信の承認、
  * アカウントの停止・削除。二者承認など後続の高危険操作もここへ乗せる。
@@ -108,12 +108,22 @@ export function stepUpRequiredResponse(c: Context<Env>, detail: string): Respons
   return c.json({ success: false, error: detail, code: 'STEP_UP_REQUIRED' }, 401);
 }
 
-// A request may pass the shared guard and a route guard. Consume its grant once.
-const verifiedInRequest = new WeakMap<object, Set<StepUpPurpose>>();
+// Shared and route guards share one in-flight verification for this request and purpose.
+// Separate requests must still compete for the one-use grant in D1.
+const verifiedInRequest = new WeakMap<Context<Env>, Map<StepUpPurpose, Promise<boolean>>>();
 export async function sensitiveStepUpSatisfied(c: Context<Env>, purpose: StepUpPurpose): Promise<boolean> {
-  if (verifiedInRequest.get(c)?.has(purpose)) return true;
-  if (!await checkSensitiveStepUp(c, purpose)) return false;
-  const purposes = verifiedInRequest.get(c) ?? new Set<StepUpPurpose>();
-  purposes.add(purpose); verifiedInRequest.set(c, purposes);
-  return true;
+  const purposes = verifiedInRequest.get(c) ?? new Map<StepUpPurpose, Promise<boolean>>();
+  const existing = purposes.get(purpose);
+  if (existing) return existing;
+  const verification = checkSensitiveStepUp(c, purpose);
+  purposes.set(purpose, verification);
+  verifiedInRequest.set(c, purposes);
+  let verified = false;
+  try {
+    verified = await verification;
+    return verified;
+  } finally {
+    // A failed check never authorizes a later guard, even within the same request.
+    if (!verified) purposes.delete(purpose);
+  }
 }

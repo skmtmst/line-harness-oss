@@ -132,7 +132,7 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
     await waitFor(() => expect(screen.getByText('顧客へのお知らせを読み込めませんでした')).toBeTruthy())
     // 上部の件数・送信枠は「取得中」のままではなく、取れなかったことを示す。
     await waitFor(() => expect(screen.getByText(/お知らせの件数は取得失敗です/)).toBeTruthy())
-    // 板 g3iDs の4枚のうち3枚（今日送った・この30日・今月の送信枠）が取得失敗を示す。
+    // 板  の4枚のうち3枚（今日送った・この30日・今月の送信枠）が取得失敗を示す。
     expect(screen.getAllByText('取得失敗').length).toBeGreaterThanOrEqual(3)
     expect(screen.queryByText(/取得中/)).toBeNull()
     // 一覧の再読み込みへ案内する（読み直しの口は一覧が持つのでボタンは足さない）。
@@ -149,7 +149,7 @@ describe('R611 一覧の取得失敗後は上部も「取得中」のままに�
 
     await waitFor(() => expect(fixture.settings).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByRole('button', { name: 'ご注文ありがとうございますの内容を編集' })).toBeTruthy())
-    // 板 g3iDs の4枚が戻る（数カードと表の見出し）。
+    // 板  の4枚が戻る（数カードと表の見出し）。
     expect(screen.getAllByText('この30日')).toHaveLength(2)
     expect(screen.queryByText(/から読み直してください/)).toBeNull()
     expect(screen.queryByText('取得失敗')).toBeNull()
@@ -165,7 +165,7 @@ describe('R611 customer-kpis の失敗注記（器の試験）', () => {
   it('loadFailed のときは値を「—」のまま注記だけ失敗の言葉へ変える', () => {
     const kpis = customerNotificationKpis({ ...base, loadFailed: true })
     expect(kpis.every((kpi) => kpi.value === null)).toBe(true)
-    // 板 g3iDs の4枚。
+    // 板  の4枚。
     expect(kpis.find((kpi) => kpi.label === '今日 送った')?.note).toBe('取得失敗')
     expect(kpis.find((kpi) => kpi.label === 'この30日')?.note).toBe('取得失敗')
     expect(kpis.find((kpi) => kpi.label === '今月の送信枠')?.note).toBe('取得失敗')

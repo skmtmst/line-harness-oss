@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Webinar, WebinarEditor } from '@/lib/api'
-import NotificationsPane from '@/v8/webinar-edit/notifications'
+import { NotificationsPane } from '@/v8/webinar-edit/public/notifications/index'
 import Button from '@/components/shared/button'
 import { webinarEditContext, webinarWizardChrome } from './webinar-edit'
 

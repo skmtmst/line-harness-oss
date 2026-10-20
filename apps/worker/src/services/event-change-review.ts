@@ -1,7 +1,7 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 // U: イベントの状態・変更確認・開催回変更の土台。
 //
-// v6-29 §10（開催変更・中止）・§11-2（イベント状態）と確定文書 U の決めごと。
+// -29 §10（開催変更・中止）・§11-2（イベント状態）と確定文書 U の決めごと。
 // 状態を変える操作は「誰が・いつ・何を・理由」を event_change_logs に残す。
 // 記録は消さない。取り消しは逆向きの記録を足す。
 //
@@ -13,13 +13,12 @@ import {
   computeRemindersForBooking,
   insertRemindersForBooking,
 } from './event-booking-reminders.js';
-import { getEventOccurrenceUsedSeats } from './event-waitlist.js';
 import {
   reconcileV6ToStartsAt,
   rescheduleByTrigger,
 } from './reminder-trigger.js';
 
-/** v6-29 §11-2 の保存する状態。「満席」「申込が少ない」は保存しない。 */
+/** -29 §11-2 の保存する状態。「満席」「申込が少ない」は保存しない。 */
 export type EventLifecycleStatus =
   | 'draft'
   | 'published'
@@ -100,13 +99,13 @@ export interface EventChangeLogEntry {
   nowIso?: string;
 }
 
-export async function writeEventChangeLog(
+export function prepareEventChangeLog(
   db: D1Database,
   entry: EventChangeLogEntry,
-): Promise<{ id: string; createdAt: string }> {
+) {
   const id = crypto.randomUUID();
   const createdAt = entry.nowIso ?? new Date().toISOString();
-  await db
+  const statement=db
     .prepare(
       `INSERT INTO event_change_logs
          (id, line_account_id, event_id, slot_id, actor_id, actor_role,
@@ -134,8 +133,12 @@ export async function writeEventChangeLog(
       entry.idempotencyKey ?? null,
       createdAt,
     )
-    .run();
-  return { id, createdAt };
+;
+  return { id, createdAt,statement };
+}
+
+export async function writeEventChangeLog(db:D1Database,entry:EventChangeLogEntry):Promise<{id:string;createdAt:string}> {
+  const log=prepareEventChangeLog(db,entry);await log.statement.run();return {id:log.id,createdAt:log.createdAt};
 }
 
 export async function findChangeLogByIdempotency(
@@ -215,35 +218,11 @@ interface SlotRow {
   is_active: number;
 }
 
-async function countPendingReminders(db: D1Database, slotId: string): Promise<number> {
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS c FROM event_booking_reminders
-        WHERE booking_id IN (
-          SELECT id FROM event_bookings
-           WHERE slot_id = ? AND status = 'confirmed'
-        ) AND sent_at IS NULL AND status = 'pending'`,
-    )
-    .bind(slotId)
-    .first<{ c: number }>();
-  return row?.c ?? 0;
-}
-
-async function countSeats(
-  db: D1Database,
-  slotId: string,
-): Promise<{ confirmed: number; waiting: number }> {
-  const row = await db
-    .prepare(
-      `SELECT
-         COALESCE((SELECT SUM(party_size) FROM event_bookings
-                    WHERE slot_id = ? AND status IN ('requested', 'confirmed')), 0) AS confirmed,
-         COALESCE((SELECT SUM(party_size) FROM event_waitlist
-                    WHERE slot_id = ? AND status IN ('waiting', 'offered', 'accepted')), 0) AS waiting`,
-    )
-    .bind(slotId, slotId)
-    .first<{ confirmed: number; waiting: number }>();
-  return { confirmed: row?.confirmed ?? 0, waiting: row?.waiting ?? 0 };
+interface SlotPreviewRow extends SlotRow {
+  confirmed_seats: number;
+  waiting_seats: number;
+  held_seats: number;
+  pending_reminders: number;
 }
 
 export async function previewEventChange(
@@ -268,15 +247,38 @@ export async function previewEventChange(
     .first<{ id: string }>();
   if (!event) return { kind: 'not_found' };
 
+  // Read slots and all impact counts in one statement, scoped to the already
+  // authorized event. JSON IDs keep the existing D1 binding budget unchanged.
+  const slots = new Map<string, SlotPreviewRow>();
+  if (params.slotChanges.length) {
+    const ids = sqlIdSet(params.slotChanges.map(change => change.slot_id));
+    const rows = await db.prepare(`WITH selected_slots AS (
+      SELECT id,starts_at,ends_at,capacity,is_active FROM event_slots
+      WHERE event_id=? AND deleted_at IS NULL AND id IN (${ids.sql})
+    ), booking_counts AS (
+      SELECT b.slot_id,SUM(b.party_size) confirmed_seats
+      FROM event_bookings b JOIN selected_slots s ON s.id=b.slot_id
+      WHERE b.status IN ('requested','confirmed') GROUP BY b.slot_id
+    ), waiting_counts AS (
+      SELECT w.slot_id,SUM(w.party_size) waiting_seats,
+        SUM(CASE WHEN w.status IN ('offered','accepted') THEN w.party_size ELSE 0 END) held_seats
+      FROM event_waitlist w JOIN selected_slots s ON s.id=w.slot_id
+      WHERE w.status IN ('waiting','offered','accepted') GROUP BY w.slot_id
+    ), reminder_counts AS (
+      SELECT b.slot_id,COUNT(*) pending_reminders
+      FROM event_booking_reminders r JOIN event_bookings b ON b.id=r.booking_id
+      JOIN selected_slots s ON s.id=b.slot_id
+      WHERE b.status='confirmed' AND r.sent_at IS NULL AND r.status='pending' GROUP BY b.slot_id
+    ) SELECT s.*,COALESCE(b.confirmed_seats,0) confirmed_seats,
+      COALESCE(w.waiting_seats,0) waiting_seats,COALESCE(w.held_seats,0) held_seats,
+      COALESCE(r.pending_reminders,0) pending_reminders FROM selected_slots s
+      LEFT JOIN booking_counts b ON b.slot_id=s.id LEFT JOIN waiting_counts w ON w.slot_id=s.id
+      LEFT JOIN reminder_counts r ON r.slot_id=s.id`).bind(params.eventId,...ids.binds).all<SlotPreviewRow>();
+    for (const row of rows.results ?? []) slots.set(row.id,row);
+  }
   const impacts: SlotChangeImpact[] = [];
   for (const change of params.slotChanges) {
-    const slot = await db
-      .prepare(
-        `SELECT id, starts_at, ends_at, capacity, is_active FROM event_slots
-          WHERE id = ? AND event_id = ? AND deleted_at IS NULL`,
-      )
-      .bind(change.slot_id, params.eventId)
-      .first<SlotRow>();
+    const slot = slots.get(change.slot_id);
     if (!slot) {
       impacts.push({
         slot_id: change.slot_id,
@@ -291,13 +293,13 @@ export async function previewEventChange(
       });
       continue;
     }
-    const seats = await countSeats(db, slot.id);
-    const pendingReminders = await countPendingReminders(db, slot.id);
+    const seats = { confirmed: slot.confirmed_seats, waiting: slot.waiting_seats };
+    const pendingReminders = slot.pending_reminders;
     const errors: string[] = [];
     const notices: string[] = [];
     const nextCapacity = change.capacity === undefined ? slot.capacity : change.capacity;
     if (nextCapacity != null) {
-      const used = await getEventOccurrenceUsedSeats(db, slot.id);
+      const used = slot.confirmed_seats + slot.held_seats;
       if (nextCapacity < used) errors.push('slot_capacity_below_bookings');
       else if (slot.capacity != null && nextCapacity < slot.capacity
         && seats.confirmed + seats.waiting > 0) {
@@ -362,6 +364,7 @@ export type ApplyEventChangeResult =
     /** LINE 通知の送り先（route 側が best-effort で送る）。 */
     notifyTargets: Array<{
       bookingId: string;
+      bookingVersion?:number;lineAccountId?:string;
       friendId: string;
       lineUserId: string;
       slotId: string;
@@ -483,6 +486,7 @@ export async function applyEventChange(
   });
 
   let affectedReminders = 0;
+  const writes:D1PreparedStatement[]=[];
   const movedSlots: Array<{ slotId: string; oldStartsAt: string; newStartsAt: string }> = [];
   for (const change of params.slotChanges) {
     const slot = await db
@@ -492,36 +496,7 @@ export async function applyEventChange(
     if (!slot) return { kind: 'invalid', error: 'slot_not_found' };
     const nextStarts = (change.starts_at ?? slot.starts_at) as string;
     const nextEnds = (change.ends_at ?? slot.ends_at) as string;
-    // 日時が動く回は、V6 の未送信予定を旧起点へ戻してから新起点へ移す
-    // （枠更新より前。失敗時は枠 untouched のまま 500 にし、再送で回復する）。
-    if (nextStarts !== slot.starts_at) {
-      const confirmed = await db
-        .prepare(`SELECT id, friend_id, line_account_id FROM event_bookings
-                   WHERE slot_id = ? AND status = 'confirmed'`)
-        .bind(change.slot_id)
-        .all<{ id: string; friend_id: string; line_account_id: string }>();
-      for (const bookingRow of confirmed.results ?? []) {
-        const base = {
-          triggerType: 'event' as const,
-          sourceId: bookingRow.id,
-          sourceEventId: bookingRow.id,
-          friendId: bookingRow.friend_id,
-          lineAccountId: bookingRow.line_account_id,
-        };
-        await reconcileV6ToStartsAt(db, { ...base, startsAtIso: slot.starts_at as string });
-        await rescheduleByTrigger(db, {
-          ...base,
-          oldStartsAtIso: slot.starts_at as string,
-          newStartsAtIso: nextStarts,
-        });
-        await reconcileV6ToStartsAt(db, { ...base, startsAtIso: nextStarts });
-      }
-      movedSlots.push({
-        slotId: change.slot_id,
-        oldStartsAt: slot.starts_at as string,
-        newStartsAt: nextStarts,
-      });
-    }
+    if(nextStarts!==slot.starts_at)movedSlots.push({slotId:change.slot_id,oldStartsAt:slot.starts_at as string,newStartsAt:nextStarts});
     const sets: string[] = [];
     const values: unknown[] = [];
     if (change.starts_at !== undefined) { sets.push('starts_at = ?'); values.push(change.starts_at); }
@@ -531,14 +506,9 @@ export async function applyEventChange(
     if (sets.length > 0) {
       sets.push(`updated_at = ?`);
       values.push(nowIso, change.slot_id);
-      await db
-        .prepare(`UPDATE event_slots SET ${sets.join(', ')} WHERE id = ?`)
-        .bind(...values)
-        .run();
+      writes.push(db.prepare(`UPDATE event_slots SET ${sets.join(', ')} WHERE id = ?`).bind(...values));
     }
-    if (nextStarts !== slot.starts_at || nextEnds !== (slot.ends_at as string)) {
-      affectedReminders += await rebuildSlotReminders(db, change.slot_id, nextStarts);
-    }
+
   }
 
   // イベント本体の会場だけをここで変える（名前・条件は編集画面の PUT の役目）。
@@ -556,11 +526,8 @@ export async function applyEventChange(
   eventSets.push('version = version + 1');
   eventSets.push(`updated_at = ?`);
   eventValues.push(nowIso, params.eventId, event.version);
-  const updated = await db
-    .prepare(`UPDATE events SET ${eventSets.join(', ')} WHERE id = ? AND version = ?`)
-    .bind(...eventValues)
-    .run();
-  if ((updated.meta?.changes ?? 0) === 0) return { kind: 'conflict' };
+  writes.push(db.prepare(`UPDATE events SET ${eventSets.join(', ')} WHERE id = ? AND version = ?`).bind(...eventValues));
+  writes.push(db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'event_change_conflict' END)"));
 
   const afterJson = JSON.stringify({
     venue_name: params.eventChanges?.venue_name ?? event.venue_name,
@@ -581,6 +548,7 @@ export async function applyEventChange(
     || params.eventChanges?.venue_url !== undefined;
   let notifyTargets: Array<{
     bookingId: string;
+    bookingVersion?:number;lineAccountId?:string;
     friendId: string;
     lineUserId: string;
     slotId: string;
@@ -627,7 +595,7 @@ export async function applyEventChange(
   }
   const changeSummary = summaryParts.join(' / ');
 
-  const log = await writeEventChangeLog(db, {
+  const log = prepareEventChangeLog(db, {
     lineAccountId: params.lineAccountId,
     eventId: params.eventId,
     actorId: params.actorId ?? null,
@@ -645,6 +613,16 @@ export async function applyEventChange(
     nowIso,
   });
 
+  try {await db.batch([...writes,log.statement]);}
+  catch(error){if(error instanceof Error&&/event_change_conflict|malformed JSON/.test(error.message))return {kind:'conflict'};throw error;}
+  for(const moved of movedSlots){
+    // The committed transition is recoverable even if a reminder fence is busy or this process stops.
+    try{affectedReminders+=await rebuildSlotReminders(db,moved.slotId,moved.newStartsAt);}catch{}
+  }
+  for(const target of notifyTargets){
+    const row=await db.prepare('SELECT lock_version,line_account_id FROM event_bookings WHERE id=?').bind(target.bookingId).first<{lock_version:number;line_account_id:string}>();
+    target.bookingVersion=row?.lock_version;target.lineAccountId=row?.line_account_id;
+  }
   return {
     kind: 'applied',
     version: nextVersion,

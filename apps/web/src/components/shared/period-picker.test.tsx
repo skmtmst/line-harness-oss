@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import PeriodPicker, { pastPeriod, validPeriod } from './period-picker'
 vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
 afterEach(cleanup)
-it('B-158 決まり5：3期間と指定期間を同じ部品で選び、日付は日本時間の暦日を含める', () => {
+it('決まり5：3期間と指定期間を同じ部品で選び、日付は日本時間の暦日を含める', () => {
  const onChange = vi.fn(), onRangeChange = vi.fn()
  render(<PeriodPicker days={30} onChange={onChange} onRangeChange={onRangeChange} />)
  for (const name of ['過去7日', '過去30日', '過去90日', '期間を指定']) expect(screen.getByRole('button', { name })).toBeTruthy()

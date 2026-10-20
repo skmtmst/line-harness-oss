@@ -47,7 +47,7 @@ afterEach(() => {
 })
 
 // 検証環境と同じ「既定が v8」の環境（最初の描画から v8）。
-it('V8 の見た目では v7 の画面の一覧・見本・共通アクションを取らない', async () => {
+it('V8 の見た目では 管理画面 の画面の一覧・見本・共通アクションを取らない', async () => {
   vi.stubEnv('NEXT_PUBLIC_ADMIN_THEME', 'v8')
   document.documentElement.dataset.theme = 'v8'
   const { container } = render(<AutomationsPage />)

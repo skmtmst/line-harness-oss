@@ -20,7 +20,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 
 
 /*
- * ★V8 ウェビナーの ⑤確認（Pencil XCUNf）。
+ * ★V8 ウェビナーの ⑤確認（Pencil ）。
  * 公開前の確認（検査の行：できた／まだ・右に中身）→ 公開できない理由 → ページをテスト・通知のテスト
  * → 設定のまとめ。右は公開ページでの見え方。下の帯の主ボタンは「この版を公開」。
  * 口・公開の決まりは BEHAVIOR.md。

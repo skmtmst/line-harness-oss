@@ -37,7 +37,7 @@ describe('LIFF の画像の alt', () => {
   });
 
   it('イベントの画像は中身なので、イベント名を alt にする', () => {
-    const event = readFileSync(join(SRC, 'pages/Event.tsx'), 'utf8');
+    const event = readFileSync(new URL('../pages/event.tsx', import.meta.url), 'utf8');
     expect(event).toMatch(/src=\{event\.image_url\}\s*alt=\{event\.name\}/);
   });
 });

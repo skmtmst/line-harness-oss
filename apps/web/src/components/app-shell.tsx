@@ -29,8 +29,8 @@ import { useEffect, useState } from 'react'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   /*
-   * LINEアカウントを登録（/accounts/new）。v7 は外枠の無い専用の全画面。
-   * ★V8 は絵（xj3zz〜TvXII）どおり、ほかの画面と同じ外枠（左メニュー・上の帯）で出す（2026-10-07 司令塔）。
+   * LINEアカウントを登録（/accounts/new）。互換経路は外枠の無い専用の全画面。
+   * ★V8 は絵（〜）どおり、ほかの画面と同じ外枠（左メニュー・上の帯）で出す（2026-10-07 司令塔）。
    */
 
 
@@ -38,12 +38,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
-  // 2要素認証の設定（★V6 37-10-B）は、まだ運営メンバーでない人も開く。外枠を付けない。
+  // 2要素認証の設定（★管理画面 37-10-B）は、まだ運営メンバーでない人も開く。外枠を付けない。
   if (pathname === '/ops/two-factor') {
     return <>{children}</>
   }
 
-  // 運営コンソール（★V6 37）。統括・店舗の共通メニューとは別の外枠を使う。
+  // 運営コンソール（★管理画面 37）。統括・店舗の共通メニューとは別の外枠を使う。
   if (pathname === '/ops' || pathname.startsWith('/ops/')) {
     return <OpsShell>{children}</OpsShell>
   }
@@ -114,7 +114,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   )
 }
 
-/** 停止中のお問い合わせ。V6 `IwfA0` の外枠だけを組み、通常の画面機能は再利用する。 */
+/** 停止中のお問い合わせ。管理画面 `IwfA0` の外枠だけを組み、通常の画面機能は再利用する。 */
 function SuspendedSupportWorkspace({ children }: { children: React.ReactNode }) {
   const { title } = usePageChrome()
   const [staffName, setStaffName] = useState('')
@@ -173,12 +173,12 @@ export function Workspace({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   /*
    * ★V8（夕41）：設定の画面は、白い板の中の左に「設定の中のメニュー」
-   * （幅208）を付ける。v7 では部品も枠組みも出さない（1画素も変えない）。
-   * SSR・最初の描画は v7 の形で、レイアウト効果の中で v8 に揃える。
+   * （幅208）を付ける。互換経路では部品も枠組みも出さない（1画素も変えない）。
+   * SSR・最初の描画は 管理画面 の形で、レイアウト効果の中で v8 に揃える。
    */
 
   // 画面がメニューを白い板の中に置いたら（settingsNavInline）、外には出さない。
-  // LINEアカウントを登録（/accounts/new）は統括の画面。設定の中のメニューは付けない（絵 xj3zz〜TvXII）。
+  // LINEアカウントを登録（/accounts/new）は統括の画面。設定の中のメニューは付けない（絵 〜）。
   const settingsArea = isSettingsAreaPath(pathname ?? '') && pathname !== '/accounts/new'
   const withSettingsNav = !fullWidth && !settingsNavInline && settingsArea
   return (

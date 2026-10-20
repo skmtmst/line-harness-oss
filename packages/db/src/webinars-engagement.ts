@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { countSessionUserComments, getWebinarComments, getWebinarDropoff, getWebinarFormFunnelStats, getWebinarSessionStats, getWebinarUserComments, insertWebinarUserComment, recordWebinarCtaClick, recordWebinarFunnelEvent, replaceWebinarComments, updateWebinarViewerPosition, upsertWebinarViewer } from './webinars/engagement.js';

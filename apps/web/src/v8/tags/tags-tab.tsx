@@ -5,11 +5,11 @@ import { useActionError } from '@/lib/use-action-error'
 import { FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
-import { Bookmark, Check, CircleDashed, Folder, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react';
+import { Bookmark, Check, CircleDashed, FolderOpen, GripVertical, Inbox, Plus, Sparkles, Tag as TagIcon, Users } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { RowNameLink } from '@/components/shared/table';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { AlertCircle } from 'lucide-react';
+
 import type { Tag, TagGroup } from '@line-crm/shared';
 import { api, ApiError, type ListStats } from '@/lib/api';
 import { useRowLeaving } from '@/lib/use-row-leaving';
@@ -56,8 +56,8 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 タグ「タグ」タブ（Pencil `I1E7Bt`・1152 `aPeD8`・閲覧のみ `fkGUR`、
- * フォルダ窓 `IjVpM`、状態の板 `U0aKD`）。
+ * ★V8 タグ「タグ」タブ（Pencil ・1152 ・閲覧のみ 、
+ * フォルダ窓 、状態の板 ）。
  *
  * 動き（読み込み・数の帯・絞り込み・並べ替え・フォルダへ移す・フォルダの
  * 追加/直す/並べ替え/削除・保管・CSV・行の詳細パネル・右クリック）は
@@ -65,7 +65,7 @@ import Notice from '@/components/shared/notice'
  * （components/friend-fields/tags-page-v4）を使う。見た目だけを型と絵に合わせた。
  */
 
-/** 付け方の呼び名（絵 I1E7Bt の「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。 */
+/** 付け方の呼び名（「EC 連携・LINE ログイン・EC 購入・誕生日のきまり」）。 */
 const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
   ec: 'EC 連携',
   line_login: 'LINE ログイン',
@@ -113,7 +113,7 @@ export function tagLinkText(tag: Tag): string {
 }
 
 /**
- * タグのフォルダ追加・編集（Pencil `IjVpM`）。タグの分類は `tag_groups` 表なので
+ * タグのフォルダ追加・編集（Pencil ）。タグの分類は `tag_groups` 表なので
  * 共通の FolderAddDialog（folders 表）ではなく、この画面の形を持つ。右のパネルで出す。
  */
 function TagFolderDialog({
@@ -325,7 +325,7 @@ export default function TagsTab({
   const activeTagIndex = visible.findIndex((tag) => tag.id === activeTagId)
   const activeGroup = activeTag ? groups.find((item) => item.id === activeTag.groupId) : undefined
 
-  /** アカウント切替直後の1フレームは「未取得」として扱う（v7 と同じ）。 */
+  /** アカウント切替直後の1フレームは「未取得」として扱う（管理画面 と同じ）。 */
   const staleAccount = !fixture && loadRequestRef.current.accountId !== accountId
   const ready = status === 'ready' && !staleAccount
 
@@ -445,7 +445,7 @@ export default function TagsTab({
       const fieldFailure = saveErrors.capture(reason)
       setGroups(previous);
 
-      const message = reason instanceof Error ? reason.message : '並び順を変更できませんでした'
+      const message = describeApiFailure(reason, '保存')
       { if (!fieldFailure)
       setFolderError(message) }
       notifyToast(message, {
@@ -473,7 +473,7 @@ export default function TagsTab({
       const fieldFailure = saveErrors.capture(reason)
 
       { if (!fieldFailure)
-      setFolderError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした') }
+      setFolderError(describeApiFailure(reason, '削除')) }
     } finally {
       setFolderBusy(false)
     }
@@ -675,7 +675,7 @@ export default function TagsTab({
   const table = status === 'forbidden' ? (
     <ListState kind="error" title="タグを見る権限がありません" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。"  />
   ) : status === 'error' ? (
-    <ListState kind="error" title="タグを読み込めませんでした" description="再読み込みしても直らない場合はエラー報告へ。" data-design-node="U0aKD" action={<><Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
+    <ListState kind="error" title="タグを読み込めませんでした" description="再読み込みしても直らない場合はエラー報告へ。" data-design-node="U0aKD" action={<><Button type="button" onClick={() => void load()} busyLabel="処理中…">もう一度読み込む</Button></>} />
   ) : ready && visible.length === 0 ? (
     /* 修正案 D-2：空の一覧。 */
     <EmptyList

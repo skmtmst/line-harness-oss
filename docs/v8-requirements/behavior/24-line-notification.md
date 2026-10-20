@@ -1,3 +1,5 @@
+> 文書：24 LINE通知 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 24 LINE通知 操作と挙動（受け入れ）
 
 要件の正本：[V6 24 LINE通知 要件定義](../../v6-requirements/v6-24-line-notification-requirements-draft.md)。共通の動き・権限は [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限、§6-2 再試行、§9 未取得の表示、§11 応答コード、§15 進み・トースト）と [30 ログインユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。EC の出来事の受け取りそのものは [23 EC連携 操作と挙動](./23-ec-integration.md)。
@@ -98,7 +100,7 @@
 4. 「同じ知らせを重ねない」は、時刻を時間の幅で区切った枠で数える。例えば10分なら 10:09 と 10:11 の2件は別の枠になり、2回届く（「10分のあいだは1回だけ」とずれる）。根拠：`apps/worker/src/services/operator-notification-dispatch.ts:203-205`。
 5. 送れなかったものの「再試行」が一時失敗で「5分後に再試行」になっても、顧客向けの記録を時刻で拾う定期の回収は無い（定期の回収は運用者向けだけ。EC の出来事のやり直しが残っている間だけ、そちら経由で送り直される）。根拠：`apps/worker/src/routes/line-notifications.ts:729`、`apps/worker/src/services/operator-notification-dispatch.ts:773`。
 6. 「新しくもう一度送る」（理由つきの新規再送）の口はあるが、画面に入口が無い。記録の詳細にあるのは「再試行」と「対応済みにする」だけ。根拠：`apps/worker/src/routes/line-notifications.ts:831`、`apps/web/src/v8/settings/line-notifications/runs-tab.tsx:44`・`282-286`。
-7. 自動の送信（EC の取引のお知らせ・運用者への LINE）は送信枠を確かめない。枠を確かめるのは手動の再試行・再送・テストだけ。運用者の低い重要度の LINE を枠が少ないときメールや管理画面へ切り替える仕組みも無い（要件 §7-3）。根拠：`apps/worker/src/services/ec-event-processing.ts:402-421`、`apps/worker/src/services/operator-notification-dispatch.ts`（送信枠を読む所が無い）、手動の確認 `apps/worker/src/routes/line-notifications.ts:702-713`。
+7. 自動の送信（EC の取引のお知らせ・運用者への LINE）は送信枠を確かめない。枠を確かめるのは手動の再試行・再送・テストだけ。運用者の低い重要度の LINE を枠が少ないときメールや管理画面へ切り替える仕組みも無い（要件 §7-3）。根拠：`apps/worker/src/features/ec-commerce/ec-event-processing.ts:402-421`、`apps/worker/src/services/operator-notification-dispatch.ts`（送信枠を読む所が無い）、手動の確認 `apps/worker/src/routes/line-notifications.ts:702-713`。
 8. 顧客へのお知らせで LINE に送れないときの取引メールは無い。画面も「送信台帳の接続後に設定できます」と書くだけ。根拠：`apps/web/src/v8/settings/line-notifications/screen.tsx:645-648`。
 9. 同じきっかけ（出来事の種類）に顧客へのお知らせを2つ作れて、公開中のうち最後に直したもの1つだけが使われる（要件 §4-2「同じイベントに対する重複定義」を公開前に止める）。根拠：`packages/db/src/line-notifications.ts:274-282`、一意の決まりは `key` だけ `packages/db/migrations/304_line_notification_delivery_ledger.sql:19`。
 10. 文面の URL は https かどうかだけを見て、許した行き先のドメインかは見ない（要件 §4-2）。根拠：`apps/worker/src/routes/line-notifications.ts:134-141`。

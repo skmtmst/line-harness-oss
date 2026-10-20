@@ -3,7 +3,7 @@
  * フォーム編集「答え終わったら行うこと」の並べ替え（オーナー点検 2026-10-08）。
  *
  * 直す前: 質問の行と同じ形のつまみなのに、ドラッグできず上下キーと「…」だけだった。
- * 決まり: ドラッグ・上下キー・「…」の上へ／下へは同じ結果。
+ * 決まり： ドラッグ・上下キー・「…」の上へ／下へは同じ結果。
  */
 import React, { useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'

@@ -1,4 +1,4 @@
-/* ★V8-B LINEアカウントを登録（xj3zz・JYfda・GwKE2・v2KMj・TvXII・qw80E）。
+/* ★V8-B LINEアカウントを登録（・・・・・）。
    寸法は app/globals.css の [data-theme="v8"] の --tpl-htn-* に1か所。ここには数字を書かない。 */
 
 .body {
@@ -75,7 +75,7 @@
 
 /* 下の帯：本文のすぐ下に置き、長いときは画面の下に追従する。ボタンは中央。 */
 
-/* 結果の窓（qw80E） */
+/* 結果の窓 */
 .result {
   align-self: stretch; display: flex; flex-direction: column; gap: var(--tpl-htn-result-gap);
   margin: var(--tpl-htn-result-pull-top) 0 var(--tpl-htn-result-pull-bottom);
@@ -290,9 +290,7 @@
 /* ② 左の細い列「AC左 操作ステップ」（正本 v07 Fqy29 の g48QV）。
    いまどこを触っているかと、musubo が自動でやることを、3つの段で見せる。 */
 .outlineCard {
-  flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs);
-  padding: var(--tpl-htn-aside-pad); border-radius: var(--tpl-htn6-ac-outline-radius);
-  background: var(--color-canvas); box-shadow: var(--tpl-htn-ring);
+  flex: 1 1 auto; display: flex; flex-direction: column;
 }
 .outlineTitle { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 700; color: var(--color-ink); }
 .outlineCount { font-size: var(--tpl-htn-text-11); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }

@@ -1,12 +1,14 @@
+> 文書：マニュアルの正本表の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # マニュアルの正本表の動き（BEHAVIOR.md）
 
-対象：`screen.tsx`（★V8 `cIdA2`）。写し元：`app/settings/manual-links/manual-links-v8.tsx`・`use-manual-links.ts`・`manual-link-view.ts`。
+対象：`screen.tsx`（★V8 `cIdA2`）。写し元：[現役の入口・本体](../README.md)・`use-manual-links.ts`・`manual-link-view.ts`。
 
 ## 入口・URL
 - `app/settings/manual-links/page.tsx`。`/settings/manual-links`（指定なし）。
 
 ## 読み込み（API）
-- `api.staff.me()` と `GET /api/manual-links` を一緒に読む。失敗は「正本表を読み込めませんでした」＋読み直し（U071）。
+- `本人情報の共通読取（useStaffRole / loadStaffIdentity）` と `GET /api/manual-links` を一緒に読む。失敗は「正本表を読み込めませんでした」＋読み直し（U071）。
 - 見られる人：運営の代表（env-owner）・`manual.link.edit` を持つ人・オーナー。ほかは「この表は運営だけが見られます」。
 
 ## 操作

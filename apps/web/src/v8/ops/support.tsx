@@ -4,14 +4,14 @@ import { PRIORITY_FILTER, SORT_OPTIONS } from './support-list-options'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { notifySaved } from '@/components/shared/toast'
-import { Building2, Check, Clock, Hourglass, Inbox, LogIn, Paperclip, Plus, RefreshCw, RotateCcw, Send, Sparkles } from 'lucide-react'
+import { Building2, Check, LogIn, Paperclip, Plus, RefreshCw, Send, Sparkles } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupportPriority, type OpsSupportStage, type OpsSupportSummary, type OpsSupportTicket, type OpsTenantRow } from '@/lib/api'
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
 import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL, ROLE_LABEL } from '@/components/ops/ops-ui'
-import { compareLabel, durationLabel, elapsedLabel } from '@/app/ops/support/format'
+import { compareLabel, durationLabel, elapsedLabel } from '@/v8/ops/support/format'
 import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
@@ -37,10 +37,10 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 
 /**
- * 運営のお問い合わせ V8（絵 `P0jhqO`・代わりに起票 `Izau1`）。
+ * 運営のお問い合わせ V8（絵の代わりに起票 ）。
  *
- * 動きは v7（app/ops/support）と同じ口：一覧（段階・優先度・並び・検索）、内容と返信、
- * AI の下書き（作る・作り直す・消す・待たずに手で書く）、下書きの保存、返信の前の確認（GgP2d）、
+ * 動きは 管理画面（app/ops/support）と同じ口：一覧（段階・優先度・並び・検索）、内容と返信、
+ * AI の下書き（作る・作り直す・消す・待たずに手で書く）、下書きの保存、返信の前の確認、
  * 解決済み・クローズ・対応中に戻す、代わりに起票、`?id=` で1件を開く。
  * 閲覧のみの運営メンバーには、起票・返信・段階の変更を出さない（読むだけ）。
  */
@@ -324,7 +324,7 @@ export default function OpsSupportV8() {
     await refreshAll()
   }
 
-  /* 起票の窓で落ちた欄は、その欄の真下に理由を出して移る（B-139）。 */
+  /* 起票の窓で落ちた欄は、その欄の真下に理由を出して移る。 */
   const createFields = useFormErrors()
   createFields.define('tenant', '契約先', () => (form.tenantId ? null : '契約先を選んでください'), { required: true })
   createFields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入れてください'), { required: true })
@@ -417,7 +417,7 @@ export default function OpsSupportV8() {
                   </span>
                 )}
                 <Button href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
-                {readOnly ? null : <Button disabled={busy} onClick={() => void impersonate(ticket.tenantId, setBusy, setError)} busy={Boolean(busy)} busyLabel="処理中…"><LogIn aria-hidden="true" />代理ログイン</Button>}
+                {readOnly ? null : <Button disabled={busy} onClick={() => impersonate(ticket.tenantId, setBusy, setError)} busy={Boolean(busy)} busyLabel="処理中…"><LogIn aria-hidden="true" />代理ログイン</Button>}
               </div>
               <div className={styles.detailMeta}>
                 <StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge>
@@ -450,11 +450,11 @@ export default function OpsSupportV8() {
                         <Button onClick={skipAi}>待たずに手で書く</Button>
                       ) : replyFromAi ? (
                         <>
-                          <Button onClick={() => void discardAi()} disabled={busy}>下書きを削除する</Button>
-                          <Button onClick={() => void generateAi()} disabled={busy || !detail?.ai.available} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden="true" />作り直す</Button>
+                          <Button onClick={() => discardAi()} disabled={busy}>下書きを削除する</Button>
+                          <Button onClick={() => generateAi()} disabled={busy || !detail?.ai.available} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden="true" />作り直す</Button>
                         </>
                       ) : (
-                        <Button onClick={() => void generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'} busy={Boolean(busy)} busyLabel="処理中…">
+                        <Button onClick={() => generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'} busy={Boolean(busy)} busyLabel="処理中…">
                           <Sparkles aria-hidden="true" />AIで下書きを作る
                         </Button>
                       )}
@@ -486,11 +486,11 @@ export default function OpsSupportV8() {
                   </div>
                   <div className={styles.actions}>
                     {ticket.stage === 'resolved' || ticket.stage === 'closed'
-                      ? <Button disabled={busy} onClick={() => void changeStage('in_progress')} busy={Boolean(busy)} busyLabel="処理中…">対応中に戻す</Button>
-                      : <Button disabled={busy} onClick={() => void changeStage('resolved')} busy={Boolean(busy)} busyLabel="処理中…"><Check aria-hidden="true" />解決済みにする</Button>}
-                    {closed ? null : <Button disabled={busy} onClick={() => void changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
+                      ? <Button disabled={busy} onClick={() => changeStage('in_progress')} busy={Boolean(busy)} busyLabel="処理中…">対応中に戻す</Button>
+                      : <Button disabled={busy} onClick={() => changeStage('resolved')} busy={Boolean(busy)} busyLabel="処理中…"><Check aria-hidden="true" />解決済みにする</Button>}
+                    {closed ? null : <Button disabled={busy} onClick={() => changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
                     <span className={styles.spacer} />
-                    <Button onClick={() => void saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
+                    <Button onClick={() => saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
                     <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" label="送ったあと" size="content" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} /></SaveErrorField>
                     <Button variant="primary" onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || closed || aiBusy || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
                   </div>
@@ -552,14 +552,14 @@ export default function OpsSupportV8() {
           busy={busy}
           error={error || undefined}
           designNode="GgP2d"
-          /* 絵 GgP2d：幅 600・窓の上 202（本文の長さで上下しない）。 */
+          /* 絵 ：幅 600・窓の上 202（本文の長さで上下しない）。 */
           designWidth={600}
           designTop={202}
           onCancel={() => { if (!busy) setConfirmReply(false) }}
           footer={(
-            <DialogActions leadingAction={<Button variant="danger" onClick={() => void clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>}>
+            <DialogActions leadingAction={<Button variant="danger" onClick={() => clearDraftFromConfirm()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを削除</Button>}>
               <Button onClick={() => { if (!busy) setConfirmReply(false) }} disabled={busy}>戻って直す</Button>
-              <Button variant="primary" onClick={() => void send()} disabled={busy} busy={busy} busyLabel="送信中…"><Send aria-hidden="true" />送信する</Button>
+              <Button variant="primary" onClick={() => send()} disabled={busy} busy={busy} busyLabel="送信中…"><Send aria-hidden="true" />送信する</Button>
             </DialogActions>
           )}
         >

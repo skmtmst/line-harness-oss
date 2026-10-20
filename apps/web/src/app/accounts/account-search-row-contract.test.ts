@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '../../v8/settings/accounts/accounts.tsx'), 'utf8')
 
 /**
- * 板 V7vn3：検索と絞り込みは同じ白い板に入れる。
+ * 板 ：検索と絞り込みは同じ白い板に入れる。
  * 検索欄は1つだけ。件数は絞り込みの行にまとめる。
  */
 const searchRowBlock = (): string => {

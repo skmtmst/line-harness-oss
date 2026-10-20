@@ -12,10 +12,12 @@ export async function redirectWorker(contents: string): Promise<Miniflare> {
   const bundle = await esbuild.build({
     stdin: { contents, resolveDir: resolve(process.cwd(), 'src'), sourcefile: 'redirect-fixture.ts', loader: 'ts' },
     bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022',
+    external: ['node:async_hooks'],
   });
   return new Miniflare({
     workers: [
-      { name: 'caller', modules: true, script: bundle.outputFiles[0].text, outboundService: 'destination' },
+      { name: 'caller', modules: true, script: bundle.outputFiles[0].text, outboundService: 'destination',
+        compatibilityDate: '2024-12-01', compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'] },
       { name: 'destination', modules: true, script: `
         let seen = [];
         export default { async fetch(request) {
@@ -26,6 +28,7 @@ export async function redirectWorker(contents: string): Promise<Miniflare> {
             authenticated: request.headers.get('authorization') === 'Bearer synthetic-scan-token',
             customAuthenticated: request.headers.get('x-api-key') === 'synthetic-webhook-token',
             body: await request.text() });
+          if (url.pathname === '/trace') return Response.json({ requestId: request.headers.get('X-Request-ID') });
           if (url.pathname === '/redirect') return new Response(null, { status: Number(url.searchParams.get('status') || 302),
             headers: { location: url.searchParams.get('target') || 'https://evil.example.com/stolen' } });
           return Response.json({ verdict: 'clean', eligible: true });

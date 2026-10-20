@@ -20,7 +20,8 @@ vi.mock('@line-crm/db', () => ({
   recoverStuckDeliveries: vi.fn(),
 }));
 
-import { notFoundHandler, type Env } from './index.js';
+import { notFoundHandler } from './index.js';
+import { type Env } from './worker-env.js';
 
 function makeApp(env: Partial<Env['Bindings']>) {
   const app = new Hono<Env>();

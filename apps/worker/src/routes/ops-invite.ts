@@ -12,14 +12,14 @@ import {
   toJstString,
   updateStaffMember,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import { clientIp } from '../services/admin-session.js';
 import { hashPassword, validatePasswordPolicy } from '../services/password-hash.js';
 
 /**
- * 運営メンバーの招待を受ける（★V6 37-10-A）。ログイン前に開く公開の口。
+ * 運営メンバーの招待を受ける（★37-10-A）。ログイン前に開く公開の口。
  *
  * 流れ: メールの URL（#invite=…）→ check で状態を見る → accept で
  *   - パスワード未設定の人: 名前とパスワードを設定してログイン

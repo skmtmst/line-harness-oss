@@ -77,11 +77,11 @@ export function messageTypeText(type: string): string {
   return MESSAGE_TYPE_LABELS[type] ?? 'その他'
 }
 
-/** 削除の確認窓（V6JFnd）の説明。使っていないものだけがここへ来る。 */
+/** 削除の確認窓の説明。使っていないものだけがここへ来る。 */
 export const DELETE_UNUSED_DESCRIPTION =
   'どこからも使われていないので、ほかの画面の動きは止まりません。すでに送ったメッセージは残ります。'
 
-/** 削除できない窓（Z0g3si）の説明。 */
+/** 削除できない窓の説明。 */
 export function blockedDeleteDescription(usageCount: number): string {
   return `${usageCount} か所で使われています。消すと、その配信や自動応答が送れなくなるためです。先に別のテンプレートへ差し替えてください。`
 }

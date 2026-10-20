@@ -1,3 +1,6 @@
+import { jstDate as japanDate } from '@line-crm/shared';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
 /**
  * #838 第2段: Google Sheets への直接書き出し。
  *
@@ -15,7 +18,8 @@ import {
   isAccountFeatureEnabled,
   type LineAccount,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import {
   GoogleBusinessError,
   authorizedJson,
@@ -445,7 +449,7 @@ export interface SyncOneResult {
 }
 
 function jstDate(iso: string): string {
-  return new Date(Date.parse(iso) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate(new Date(iso));
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -715,7 +719,7 @@ export async function processDueGoogleSheetsSyncs(
     } catch (error) {
       failed += 1;
       // 詳細メッセージは応答内容を含み得るので、種別名だけを記録する。
-      console.error(JSON.stringify({"code":"google_sheets_sync_failed"}));
+      logger.error("google_sheets_sync_failed");
     }
   }
   return { synced, skipped, failed };

@@ -1,4 +1,7 @@
-import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
+import { fail } from '../lib/fail.js';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
+
+import { inputJsonBoundary } from '../lib/input-errors.js';
 /**
  * #838 第2段: Google Sheets への直接書き出し（OAuth + Sheets API）。
  *
@@ -15,7 +18,7 @@ import {
   decryptCredential,
   encryptCredential,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -69,16 +72,6 @@ type ConnectionStatus = 'disconnected' | 'pending_target' | 'connected' | 'expir
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-function fail(
-  c: Context<Env>,
-  status: 400 | 401 | 403 | 404 | 409 | 500 | 502 | 503,
-  error: string,
-  extra: Record<string, unknown> = {},
-  fieldKeys: readonly string[] = [],
-) {
-  return inputError(c, { success: false, error, ...extra }, status, fieldKeys);
 }
 
 function staffTenantId(c: Context<Env>): string {
@@ -195,7 +188,7 @@ function sheetsErrorResponse(c: Context<Env>, error: unknown) {
         return fail(c, 502, 'Googleとの通信に失敗しました', { code: error.kind });
     }
   }
-  console.error(JSON.stringify({"code":"routes_google_sheets_failed"}));
+  logger.error("routes_google_sheets_failed");
   return fail(c, 500, '予期しないエラーが発生しました');
 }
 
@@ -423,7 +416,7 @@ googleSheets.get('/api/integrations/google-sheets/oauth/callback', requireIntegr
     return c.redirect(adminReturnUrl(c, lineAccountId, stateRow.mode === 'reconnect' ? 'reconnected' : 'connected'));
   } catch (error) {
     const code = error instanceof GoogleBusinessError ? error.kind : error instanceof CredentialEncryptionKeyError ? 'encryption_key_missing' : 'unknown';
-    console.error(JSON.stringify({"code":"routes_google_sheets_failed","route":"GET /api/integrations/google-sheets/oauth/callback"}));
+    logger.error("routes_google_sheets_failed");
     return c.redirect(adminReturnUrl(c, lineAccountId, `error:${code}`));
   }
 });

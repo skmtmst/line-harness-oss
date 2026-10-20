@@ -1,4 +1,5 @@
-import { buildSegmentWhere, type SegmentCondition } from '../services/segment-query.js';
+import { buildSegmentWhere } from '../services/segment-query.js';
+import { type SegmentCondition } from '@line-crm/shared';
 
 /**
  * 条件ビルダーの結果を保存してよいか見る。

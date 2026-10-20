@@ -1,6 +1,6 @@
 import type { Hono, MiddlewareHandler } from 'hono';
 import { listFriendDeliveryConsents } from '@line-crm/db/src/friend-delivery-consents.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole, denyReadOnly } from '../middleware/role-guard.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
 

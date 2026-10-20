@@ -22,7 +22,7 @@ export interface AccountSwitchMenuHq {
 /**
  * ★V8 上の帯の「LINEアカウントの切り替え」を開いたときの一覧（絵 V8 `DIHFx/Psg7n`・オーナー 2026-10-07）。
  * 統括の権限がある人には、いちばん上に「統括に戻る」の行を置く。その下に店の一覧（選んでいる店に ✓）。
- * 最上層の器（MenuPortal）に出すので、帯の幅や重なりに切られない。v7 はブラウザの選ぶ欄のまま。
+ * 最上層の器（MenuPortal）に出すので、帯の幅や重なりに切られない。互換経路はブラウザの選ぶ欄のまま。
  */
 export default function AccountSwitchMenu({
   open,

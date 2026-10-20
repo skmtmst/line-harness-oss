@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type PostalCodeCandidate } from '../lib/api.js';
-import Button from '../components/ui/Button.js';
-import { AddressControls } from '../components/forms/controls';
+import Button from './ui/button/index.js';
+import { AddressControls } from './forms/controls';
 
 
 /** 回答の住所の形。空欄は空文字に寄せる（未入力判定と一致させるため）。 */

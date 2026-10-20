@@ -4,12 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PICKER = readFileSync(join(HERE, '..', 'components', 'DateTimePicker.tsx'), 'utf8');
-const CONFIRM = readFileSync(join(HERE, '..', 'components', 'Confirm.tsx'), 'utf8');
-const FORM = readFileSync(join(HERE, 'Form.tsx'), 'utf8');
+const PICKER = readFileSync(new URL('../components/date-time-picker.tsx', import.meta.url), 'utf8');
+const CONFIRM = readFileSync(new URL('../components/confirm.tsx', import.meta.url), 'utf8');
+const FORM = readFileSync(new URL('./form.tsx', import.meta.url), 'utf8');
 
 /*
- * 414 幅の板（`xvtSz`・`uZqMA`・`wPfqW`）は `data-design-node` が無いと
+ * 414 幅の板（・・）は `data-design-node` が無いと
  * 進み具合に数えられない。中身は 375 幅と同じで、板 ID だけを替える。
  * ここでは板IDの結び付けだけを見る。
  */

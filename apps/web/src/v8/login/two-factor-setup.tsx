@@ -1,15 +1,16 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Link from 'next/link'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession, takeTwoFactorNextPath } from '@/lib/admin-session'
-import { ApiError, describeSaveFailure } from '@/lib/api'
+import { ApiError, describeSaveFailure, responseApiError } from '@/lib/api'
 import { qrToDataURL } from '@/lib/qr-image'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
-import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '@/app/login/two-factor/two-factor-error'
+import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '@/v8/login/two-factor/two-factor-error'
 
 import { Steps } from '@/components/templates/steps'
 import { AuthPage, AuthForm } from '@/components/templates/auth-page'
@@ -59,12 +60,10 @@ export default function TwoFactorSetupPage() {
       const body = await response.json().catch(() => ({})) as { success?: boolean; error?: string; data?: SetupData }
       if (!response.ok || !body.success || !body.data) {
         const retryAfter = Number(response.headers?.get('Retry-After'))
-        throw new ApiError(
-          response.status,
-          typeof body.error === 'string' && body.error ? body.error : '設定を始められませんでした',
-          undefined, undefined, undefined,
-          Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
-        )
+        throw responseApiError(response, JSON.stringify(body), undefined, undefined, {
+          preserveBodyMessage: true, fallbackMessage: '設定を始められませんでした',
+          retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+        })
       }
       setSetup(body.data)
     } catch (caught) {
@@ -75,7 +74,7 @@ export default function TwoFactorSetupPage() {
         // 合言葉の期限切れ。再試行は通らないので入力を終わらせる。
         setExpired(true)
         setSetup(null)
-        setError(failure.message || '設定を始められませんでした')
+        setError(describeApiFailure(failure, '設定の開始'))
       } else {
         setSetupError(failure)
       }
@@ -125,7 +124,7 @@ export default function TwoFactorSetupPage() {
           setSetup(null)
           setCode('')
         }
-        throw new ApiError(response.status, body.error || '登録を完了できませんでした', undefined, undefined, undefined, undefined, body.fields)
+        throw responseApiError(response, JSON.stringify(body), undefined, undefined, { preserveBodyMessage: true, fallbackMessage: '登録を完了できませんでした' })
       }
       if (body.data?.sessionToken) storeAdminSession(body.data.sessionToken, body.csrfToken)
       else if (body.csrfToken) {

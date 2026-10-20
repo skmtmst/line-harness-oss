@@ -29,18 +29,18 @@
 .row { /* 行 height: 58 */
 }
 
-/* ★V7のゆったりした行（高さ64px）。付けないときは58pxのまま。 */
+/* ★管理画面のゆったりした行（高さ64px）。付けないときは58pxのまま。 */
 
-/* ★V7：選んでいる行は薄い緑の地。色だけでなく aria-selected でも伝える。 */
+/* ★管理画面：選んでいる行は薄い緑の地。色だけでなく aria-selected でも伝える。 */
 
-/* ★V7：押せる行・選べる行だけ、指を乗せたときに一段沈んだ地を敷く。 */
+/* ★管理画面：押せる行・選べる行だけ、指を乗せたときに一段沈んだ地を敷く。 */
 .rowInteractive:hover {
   background: var(--color-canvas-sunken);
 }
 
 /*
  * ★V8 仕上げ（M10）：行に乗せたときの薄い背景の変化は 120ms。
- * v7 は今までどおり即時に変わる。
+ * 互換経路は今までどおり即時に変わる。
  */
 :root .rowInteractive {
   transition: background-color var(--motion-fast) var(--motion-ease-out);
@@ -101,7 +101,7 @@
 }
 
 /*
- * ★V8「表の行」（apLqS 計測の訂正：2行の行は 62px）。
+ * ★V8「表の行」（ 計測の訂正：2行の行は 62px）。
  * 行の高さは上下の余白12＋中身で決まる（下の bodyCell を見る）。
  * tr の高さは最小値。60/86 の切り替えは測り違いだったので使わない。
  */
@@ -113,7 +113,7 @@
   height: 56px;
 }
 
-/* 店と同じひな形の板 i0Ao0R・wZPua に渡す密度。既定の行は変えない。 */
+/* 店と同じひな形の板 ・ に渡す密度。既定の行は変えない。 */
 :root .rowTemplate { height: 61px; }
 :root .rowTemplate .bodyCell { padding-block: 11px; }
 
@@ -178,7 +178,7 @@
 :root .rowSelected { background: var(--color-accent-soft); }
 :root .rowInteractive:hover:not(.rowSelected) { background: var(--color-table-head); }
 }
-/* ★V8 一覧の行の「名前＋下の説明」（apLqS 行：名前 13/600 高さ19 → 間3 → 説明 11 高さ16、行 62）。説明の中の印で行を押し上げない（司令塔 2026-10-05） */
+/* ★V8 一覧の行の「名前＋下の説明」（ 行：名前 13/600 高さ19 → 間3 → 説明 11 高さ16、行 62）。説明の中の印で行を押し上げない（司令塔 2026-10-05） */
 :root .name { font-size: var(--tpl-row-name-size); font-weight: 600; line-height: var(--tpl-row-name-lh); }
 :root .sub { display: flex; align-items: center; gap: 6px; margin-top: var(--tpl-row-sub-gap); font-size: var(--tpl-row-sub-size); line-height: var(--tpl-row-sub-lh); min-height: 0; }
 :root .sub svg { flex: none; width: 12px; height: 12px; }
@@ -221,46 +221,6 @@
 
 :root .frame[data-density='reviews'] tr :is(th, td):is(:first-child, :last-child) { padding-inline: 0; }
 
-/*
- * ★V8 デリバリー受注の表（承認 v02 の kDQHr・OzHLO・h7OeT）。
- * presentation="delivery" を渡した表だけに効く。既定の表と他の画面は変えない。
- *
- * 1) 端の欄の外側の余白を0にする。板がすでに外側の余白を持っているので、端の欄で
- *    もう一度 24 を付けると左右で48の二重取りになる。使える幅が 264〜1404 から
- *    288〜1380 に縮み、前半の列が右へ・後半の列が左へずれていた（2026-10-10 実測）。
- *    その24は列の幅（globals.css の kc/oc/hc）へ戻している。欄の間（片側8）はそのまま。
- *    行が1つの欄だけのとき（読み込み中・0件の案内）は最初と最後が同じ欄なので両側残す。
- * 2) 行の高さを中身まかせ（auto）にして、絵の下の線1pxを下の余白へ足す。絵（kDQHr）の
- *    行の間は 53・53・53・53・50・47 と行ごとに違い、「上下の余白12＋中身＋下の線1」で
- *    決まる。既定の決め打ち（.row の 52px）ではどの行も合わない。画面の線は影で引いていて
- *    場所を取らないので、足さないと1px足りない。これで 行＝12＋中身＋13 になる。
- * 3) 欄の中身を上そろえにする。札は字の下そろえで置かれるため、欄の見えない字の下の分だけ
- *    中身が 22→23 にのびる。札そのものの高さではないので札や共通の帯は触らない。
- *    上そろえで22へ戻り、札だけの行＝12+22+13＝47 と絵に合う。
- *
- * 4) 右そろえの欄（金額）の次の欄の左の余白を、他と同じ片側8へ戻す。この下の B-152 に
- *    「右そろえの次の欄は左を24あける」決まりがあり、OzHLO の「状態」の欄だけ左が
- *    8→24 になっていた。そのぶん中の札が右へ16ずれる（絵 1313 に対し画面 1332 ＝
- *    ずれ19 のうち16がこれ。残り3は札の点と間）。見出しの「状態」は右そろえの指定が
- *    ないので8のままで、絵と合っていた（2026-10-11 実測）。
- *    絵（OzHLO）の欄の間は全部16（片側8）で、数字の列だけ広げる指定はない。
- *
- * 上下の余白は `.row` を挟んで書く。この下の B-152（`.frame .row .bodyCell` の
- * `padding-block: 0`）と強さが同じだと、あとに書いたそちらが勝って余白が0になり、
- * 行が 22 のまま潰れていた（2026-10-11 実測）。`.row` を1つ足して強くしてある。
- * 簡単に見えても外さない。
- */
-:root .frame[data-table-presentation='delivery'] tr :is(th, .bodyCell):first-child:not(:last-child) { padding-left: 0; }
-:root .frame[data-table-presentation='delivery'] tr :is(th, .bodyCell):last-child:not(:first-child) { padding-right: 0; }
-:root .frame[data-table-presentation='delivery'] .row { height: auto; }
-:root .frame[data-table-presentation='delivery'] .row .bodyCell {
-  padding-block: var(--tpl-row-pad-block) calc(var(--tpl-row-pad-block) + var(--tpl-rt-dlv-row-line));
-}
-:root .frame[data-table-presentation='delivery'] .row .bodyCell > * { vertical-align: top; }
-:root .frame[data-table-presentation='delivery'] tr :is(th, td)[data-align='right'] + :is(th, td) {
-  padding-inline-start: var(--tpl-cell-gap-half);
-}
-
 /* 飲食店のカード内の表（Y8SjT2・hQQlt）。既定の表は変えない。 */
 :root .frame[data-table-presentation='inventory'],
 :root .frame[data-table-presentation='channels'] {
@@ -302,7 +262,7 @@
 :root .frame[data-table-presentation='channels'] .bodyCell:first-child { padding-left: var(--tpl-rs-cell-side); }
 :root .frame[data-table-presentation='channels'] th:last-child,
 :root .frame[data-table-presentation='channels'] .bodyCell:last-child { padding-right: var(--tpl-rs-cell-side); }
-/* YMVFD の列の並び。共通の行メニューと同じ高さの行。 */
+/*  の列の並び。共通の行メニューと同じ高さの行。 */
 :root .frame[data-table-presentation='columns'] th,
 :root .frame[data-table-presentation='columns'] .bodyCell {
   height: auto; padding: 0; border: 0; box-shadow: none;
@@ -474,7 +434,7 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
 
 :root .table.table[data-table-presentation='account-list'] :is(th, td):nth-child(4) { padding-right: var(--tpl-sa-acc-friends-pad); }
 
-/* B-152・仕上げ3。列幅・権限・並べ替えは従来の口を保つ。 */
+/* ・仕上げ3。列幅・権限・並べ替えは従来の口を保つ。 */
 :root .frame .row { height: var(--polish-table-row); min-height: var(--polish-table-row); }
 :root .frame .row .bodyCell { padding-block: 0; font-size: var(--polish-text-body); }
 :root .frame .row:hover:not(.rowSelected) { background: var(--polish-table-hover); }
@@ -493,7 +453,7 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
 }
 
 
-/* B-178：一覧の型の中は表の持ち主が寸法を決める。状態行・窓内は除く。 */
+/* ：一覧の型の中は表の持ち主が寸法を決める。状態行・窓内は除く。 */
 :root :global([data-page-template='list'] [data-template-region='content']) .frame:not([data-table-presentation]):not([data-column-layout]):not([data-grid-table]) .row:not(:has([colspan])) {
   height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h));
 }
@@ -540,14 +500,14 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
 :root :global([data-list-skeleton]) .table.table > thead > tr { min-height: var(--tpl-list-head-h); }
 :root :global([data-list-skeleton]) .table.table > tbody > tr:not(:has([colspan])) { min-height: var(--list-content-row-h, var(--tpl-list-row-h)); }
 
-/* 列型の見出しは指定の口を保つ。一覧はB-254の中身52/60、一般表は指定の口。 */
+/* 列型の見出しは指定の口を保つ。一覧はの中身52/60、一般表は指定の口。 */
 :root :global([data-list-skeleton]) .frame[data-column-layout] .table > thead > tr[data-table-layout='columns'] { height: var(--table-head-height, var(--tpl-list-head-h)); min-height: var(--table-head-height, var(--tpl-list-head-h)); }
 :root :global([data-list-skeleton]) .frame[data-column-layout] .table > tbody > tr[data-table-layout='columns']:not(:has([colspan])) { height: var(--list-content-row-h, var(--tpl-list-row-h)); min-height: var(--list-content-row-h, var(--tpl-list-row-h)); }
 .row[data-highlighted] {
   background: var(--color-accent-soft);
 }
 
-/* e2ekFu：列の余白・行の高さは表の部品が持つ。 */
+/* ：列の余白・行の高さは表の部品が持つ。 */
 :root .frame[data-table-presentation='event-list'] .table thead th:first-child,
 :root .frame[data-table-presentation='event-list'] .bodyCell:first-child {
   padding-left: var(--tpl-ev-ls-first-pad);
@@ -561,7 +521,7 @@ html:root .frame[data-grid-table] .table.table > thead > tr > th:nth-child(n) { 
   padding-block: 0;
 }
 
-/* B-217：一覧は平ら。見出しと線は全幅、中身だけ左右24。 */
+/* ：一覧は平ら。見出しと線は全幅、中身だけ左右24。 */
 html:root .frame:not([data-table-presentation='calendar']) {
   border: 0; border-radius: var(--radius-flat); outline-color: transparent; box-shadow: none;
 }
@@ -576,7 +536,7 @@ html:root .actionCell > :is(button, a):not([data-row-menu]) { min-width: var(--r
 html:root .frame:not([data-table-presentation='calendar']) { width: 100%; min-width: 0; container-type: inline-size; container-name: v8-list-table; }
 @container v8-list-table (max-width: 1100px) { html:root .frame[data-shared-part='list-table']:not([data-collapse-scope='page']) .table > :is(thead, tbody) > tr > :is(th, td)[data-cell-collapse='narrow'] { display: none; } }
 html:root .actionCell { flex: none; min-width: max-content; }
-/* 行末の操作は文字のボタンと「…」（字なし）を同じ高さの真ん中にそろえる。既定の baseline だと「…」が約5px 上に浮く（oRbJi）。 */
+/* 行末の操作は文字のボタンと「…」（字なし）を同じ高さの真ん中にそろえる。既定の baseline だと「…」が約5px 上に浮く。 */
 html:root .actionCell > * { vertical-align: middle; }
 html:root .actionCell :is(button, a):not([data-row-menu]) { min-width: var(--row-action-width, max-content); }
 
@@ -586,7 +546,7 @@ html:root .frame[data-grid-table] { container-name: v8-list-table shared-grid-ta
 /* 固定V8：名前の横に置く札を同じ1行にそろえる。 */
 html:root [data-list-name-cell] .name { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
 
-/* B-254: one rendered line is 52; two or three are 60. The table sets the count. */
+/* : one rendered line is 52; two or three are 60. The table sets the count. */
 html:root .table.table > tbody > tr[data-list-content-lines] {
   --list-content-row-h: var(--tpl-list-row-h);
   height: var(--list-content-row-h); min-height: var(--list-content-row-h);

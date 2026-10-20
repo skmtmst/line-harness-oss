@@ -41,7 +41,7 @@ export async function activityMetrics(context:StyleAnalyticsContext) {
       .prepare(
         `SELECT DISTINCT r.booking_id id,'booking' kind FROM booking_reminders r JOIN bookings b ON b.id=r.booking_id WHERE b.line_account_id=? AND r.status='sent'
     UNION SELECT DISTINCT r.booking_id id,'event' kind FROM event_booking_reminders r JOIN event_bookings b ON b.id=r.booking_id WHERE b.line_account_id=? AND r.status='sent'
-    UNION SELECT DISTINCT m.id,'meet' kind FROM meet_consultation_reminders r JOIN meet_consultations m ON m.id=r.consultation_id JOIN friends f ON f.id=m.friend_id WHERE f.line_account_id=? AND r.status='sent'`,
+    UNION SELECT DISTINCT m.id,'meet' kind FROM meet_consultation_notification_runs r JOIN meet_consultations m ON m.id=r.consultation_id JOIN friends f ON f.id=m.friend_id WHERE f.line_account_id=? AND r.status='sent'`,
       )
       .bind(account, account, account)
       .all<{ id: string; kind: string }>()

@@ -377,7 +377,7 @@ function makeEventDb(state: {
             ).length;
             return { c } as T;
           }
-          // POST の sameIdentityActive 検出 (window 関数 COUNT(*) OVER () で total を返す)
+          // POST の sameIdentityActive 検出 (window 関数 COUNT(*) OVER  で total を返す)
           if (sql.includes('FROM event_bookings b') && sql.includes('identity_key') && sql.includes('COUNT(*) OVER')) {
             const [event_id, idKey] = bound as [string, string];
             const matches = (state.bookings ?? [])
@@ -1132,6 +1132,7 @@ function makeEventDb(state: {
 function setupApp(
   state: Parameters<typeof makeEventDb>[0],
   staffRole: 'owner' | 'admin' | 'staff' = 'owner',
+  inspectDb?: (db:D1Database) => void,
 ) {
   state.accounts ??= [];
   for (const account of state.accounts) {
@@ -1147,6 +1148,7 @@ function setupApp(
   }
   const app = new Hono<TestEnv>();
   const db = makeEventDb(state);
+  inspectDb?.(db);
   waitlistMocks.getEventOccurrenceUsedSeats.mockImplementation(
     async (_db: D1Database, slotId: string) => {
       const bookingSeats = (state.bookings ?? [])
@@ -2681,7 +2683,7 @@ describe('LIFF GET /api/liff/events/me/:bookingId', () => {
 });
 
 describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
-  test('cancels confirmed booking when within deadline', async () => {
+  test('R83: 本人取消は期限内に予約を止め、自動案内の仕事を1件積む', async () => {
     const futureMs = Date.now() + 7 * 24 * 3600_000;
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1', is_published: 1, cancel_deadline_hours_before: 24 })],
@@ -2699,6 +2701,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
     expect(res.status).toBe(200);
     expect(state.bookings[0].status).toBe('cancelled');
     expect(reminderMocks.cancelPendingRemindersFor).toHaveBeenCalledWith(expect.anything(), 'b1');
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledTimes(1);
     expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
@@ -2744,7 +2747,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
     expect(res.status).toBe(409);
   });
 
-  test('200 retry for already-cancelled booking repairs V6 instead of 409 (N-065)', async () => {
+  test('200 retry for already-cancelled booking repairs instead of 409 (N-065)', async () => {
     const futureMs = Date.now() + 7 * 24 * 3600_000;
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1', is_published: 1, cancel_deadline_hours_before: 24 })],
@@ -2759,7 +2762,7 @@ describe('LIFF POST /api/liff/events/me/:bookingId/cancel', () => {
       method: 'POST',
       headers: { 'Authorization': 'Bearer t' },
     });
-    // N-065: V6 取消が投げた直後の再送は、業務が済みでも V6 だけ直して 200 を返す。
+    // N-065: 取消が投げた直後の再送は、業務が済みでも だけ直して 200 を返す。
     expect(res.status).toBe(200);
   });
 
@@ -2894,7 +2897,20 @@ describe('admin bookings management', () => {
         { id: 'r9', booking_id: 'bx', kind: 'day_before', scheduled_at: '2099-05-30T09:00:00Z', sent_at: null, status: 'pending' },
       ],
     };
-    const app = setupApp(state);
+    const reminderReads: unknown[][] = [];
+    const app = setupApp(state,'owner',db=>{
+      const prepare=db.prepare.bind(db);
+      db.prepare=(sql:string)=>{
+        const statement=prepare(sql);
+        if(!/FROM event_booking_reminders\b/.test(sql))return statement;
+        const bind=statement.bind.bind(statement);
+        statement.bind=(...args:unknown[])=>{
+          reminderReads.push(args.flatMap(value=>typeof value==='string'&&value.startsWith('[')?JSON.parse(value) as unknown[]:[value]));
+          return bind(...args);
+        };
+        return statement;
+      };
+    });
     const res = await app.request('/api/events/admin/events/e1/bookings?account_id=la1');
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
@@ -2903,6 +2919,8 @@ describe('admin bookings management', () => {
         reminders: Array<{ kind: string; status: string; scheduled_at: string }>;
       }>;
     };
+    expect(reminderReads).toHaveLength(1);
+    expect([...reminderReads[0]].sort()).toEqual(body.items.map(item=>item.id).sort());
     const b1 = body.items.find((item) => item.id === 'b1');
     const b2 = body.items.find((item) => item.id === 'b2');
     expect(b1?.reminders.map((reminder) => reminder.kind)).toEqual(['day_before', 'hours_before']);
@@ -2910,6 +2928,11 @@ describe('admin bookings management', () => {
     expect(b2?.reminders).toEqual([
       expect.objectContaining({ kind: 'day_before', status: 'cancelled' }),
     ]);
+    const page=await app.request('/api/events/admin/events/e1/bookings?account_id=la1&page=2&limit=1');
+    const pageBody=await page.json<{items:Array<{id:string;reminders:unknown[]}>}>();
+    expect(pageBody.items).toHaveLength(1);
+    expect(reminderReads).toHaveLength(2); // 2回のHTTPにつき各1問。行ごとの取得にしない。
+    expect(reminderReads[1]).toEqual([pageBody.items[0].id]);
   });
 
   test('GET /:id/bookings/summary returns all-status counts and capacity without list rows', async () => {
@@ -3069,7 +3092,7 @@ describe('admin bookings management', () => {
     expect(state.bookings[0].status).toBe('confirmed');
   });
 
-  test('POST admin cancel transitions to cancelled by admin', async () => {
+  test('R83: 管理者取消は予約を止め、自動案内の仕事を1件積む', async () => {
     const state = {
       events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
       slots: [{ id: 's1', event_id: 'e1', starts_at: '2099-06-01T10:00:00Z', ends_at: '2099-06-01T12:00:00Z', capacity: null, is_active: 1, sort_order: 0, deleted_at: null }],
@@ -3085,6 +3108,7 @@ describe('admin bookings management', () => {
     expect(state.bookings[0].status).toBe('cancelled');
     expect((state.bookings[0] as Record<string, unknown>).cancelled_by).toBe('admin');
     expect(reminderMocks.cancelPendingRemindersFor).toHaveBeenCalled();
+    expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledTimes(1);
     expect(waitlistMocks.enqueueEventWaitlistPromotion).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ sourceKey: 'booking:b1:cancelled', occurrenceId: 's1' }),
@@ -3163,7 +3187,7 @@ describe('admin bookings management', () => {
   });
 });
 
-describe('V6 occurrence applicants / waitlist promotion routes', () => {
+describe('occurrence applicants / waitlist promotion routes', () => {
   const state = {
     events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
     accounts: [{ id: 'la1', liff_id: 'L1', is_active: 1 }],

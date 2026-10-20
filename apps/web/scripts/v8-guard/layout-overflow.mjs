@@ -3,7 +3,7 @@
  *
  *   node apps/web/scripts/v8-guard/layout-overflow.mjs <baseUrl> [out.json]
  *
- * 数えるもの（V6 で崩れたのは 1152 付近。絵の幅の数字をそのまま写したため）
+ * 数えるもの（管理画面 で崩れたのは 1152 付近。絵の幅の数字をそのまま写したため）
  *   page-x     : ページ全体が横に送れる（AGENTS.md：PC は原則横スクロールなし）
  *   overflow   : 中身が枠からはみ出している（… でも横送りでもない）
  *   out-of-main: 白い板（main）の右端より外へ出た部品
@@ -16,14 +16,15 @@
  * STRESS=1 を付けると、開いたあと main の中の短い文字を長く・数を大きくしてから測る（報告だけ。終了コードは変えない）
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
 import { ROUTES, WIDTHS, openPage } from './browser-env.mjs'
 
 const [baseUrl = 'http://127.0.0.1:4310', out] = process.argv.slice(2)
 const STRESS = process.env.STRESS === '1'
 
-const scan = () => {
+export const scanLayoutOverflow = () => {
   const main = document.querySelector('main') || document.body
   const mr = main.getBoundingClientRect()
   const label = (e) => {
@@ -77,6 +78,7 @@ const stress = () => {
   }
 }
 
+async function run() {
 const browser = await chromium.launch()
 const res = {}
 let bad = 0
@@ -85,7 +87,7 @@ for (const theme of ['v8']) {
     for (const [name, route] of Object.entries(ROUTES)) {
       const page = await openPage(browser, { baseUrl, route, width, theme })
       if (STRESS) { await page.evaluate(stress); await page.waitForTimeout(300) }
-      const r = await page.evaluate(scan)
+      const r = await page.evaluate(scanLayoutOverflow)
       await page.close()
       res[`${theme} ${width} ${name}`] = r
       const n = (r.pageX ? 1 : 0) + r.overflow.length + r.outOfMain.length + r.noTitle.length
@@ -100,3 +102,6 @@ await browser.close()
 if (out) { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, JSON.stringify(res, null, 1)) }
 console.log(`${STRESS ? '長いデータで ' : ''}崩れの合計 ${bad}`)
 if (bad && !STRESS) process.exit(1)
+
+}
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await run()

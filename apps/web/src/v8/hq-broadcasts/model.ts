@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { HQ_FRIEND_INSERTS } from '@/components/shared/hq-message-inserts'
 import { scheduledJstIso } from '@/lib/jst-datetime'
 /*
@@ -179,7 +180,7 @@ const WEEK = ['日', '月', '火', '水', '木', '金', '土']
 /** 「1月15日（木）11:00」。 */
 export function jpDateTime(iso: string | null | undefined): string {
   if (!iso) return '—'
-  const d = new Date(new Date(iso).getTime() + 9 * 3_600_000)
+  const d = japanCalendar(new Date(iso))
   if (Number.isNaN(d.getTime())) return '—'
   return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日（${WEEK[d.getUTCDay()]}）${d.getUTCHours()}:${String(d.getUTCMinutes()).padStart(2, '0')}`
 }

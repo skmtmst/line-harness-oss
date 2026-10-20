@@ -15,7 +15,7 @@ import { createServer } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 import { chromium } from '@playwright/test'
-import { waitForOverlayLayout } from '../../../../../scripts/codex/overlay-ready.mjs'
+import { waitForOverlayLayout } from '../../../../../scripts/browser/overlay-ready.mjs'
 
 /*
  * #1060: 一覧の絞り込み・並び替えは Worker が済ませて1ページ分だけ返す。
@@ -395,7 +395,7 @@ async function openHarness(browser, {
 /**
  * この画面が「出し終えた」と言える条件。
  *
- * 認証の確認が済んで本体（`I3L41O`）が現れ、一覧が読み込み中でなくなり、
+ * 認証の確認が済んで本体（）が現れ、一覧が読み込み中でなくなり、
  * 表の行か「1件も無い／読み込めなかった」のどれかが立っている状態。
  * V8の一覧本体が出す `data-list-state` をそのまま使う。
  */

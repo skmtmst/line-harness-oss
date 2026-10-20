@@ -110,7 +110,7 @@ export default function LinePreview({
 }
 
 /**
- * 本文の URL は途中で折らず1行にし、入らないときは末尾を「…」にする（全文は title・UTbi1）。
+ * 本文の URL は途中で折らず1行にし、入らないときは末尾を「…」にする（全文は title・）。
  */
 function withUrlLines(text: string): ReactNode {
   const parts = text.split(/(https?:\/\/[^\s]+)/g)
@@ -123,7 +123,7 @@ function withUrlLines(text: string): ReactNode {
 /** cfVyj の受信メッセージ。日時・送り主・本文をそのまま渡す。 */
 export function LinePreviewMessage({ accountName, avatar, time, children, direction = 'incoming', density, bare = false }: {
   accountName: string; avatar: ReactNode; time: string; children: ReactNode; direction?: 'incoming' | 'outgoing'; density?: 'compact'
-  /** 写真など、それ自体が角丸の札になる中身。白い吹き出しとしっぽを付けず、そのまま置く（絵 pNiUk）。 */
+  /** 写真など、それ自体が角丸の札になる中身。白い吹き出しとしっぽを付けず、そのまま置く。 */
   bare?: boolean
 }) {
   if (direction === 'outgoing') return <div className={styles.outgoingRow}>
@@ -165,7 +165,7 @@ export function LinePreviewCard({ imageUrl, title, description, price, time, act
 }
 
 /**
- * カルーセル（絵 F3X1Mo）：写真・題・短い文・押す所のカードを横に並べ、はみ出した分は横へ送る。
+ * カルーセル：写真・題・短い文・押す所のカードを横に並べ、はみ出した分は横へ送る。
  * 見本なので押す所は押せない文字にする。写真が無いカードは灰の地。
  */
 export function LinePreviewCarousel({ columns, time }: {

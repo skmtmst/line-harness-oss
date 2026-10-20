@@ -1,7 +1,7 @@
 /*
- * 共通情報の一覧で使う計算（v7 の app/contents/vars/list-model.ts と delete-impact.ts の写し）。
+ * 共通情報の一覧で使う計算（管理画面 の app/contents/vars/list-model.ts と delete-impact.ts の写し）。
  * src/v8 からは古い画面ファイルを import できないため、同じ中身をここに持つ。
- * 動きを変えるときは v7 側と両方を直す（V8 完成までの二重管理）。
+ * 動きを変えるときは 管理画面 側と両方を直す（V8 完成までの二重管理）。
  */
 import type { CommonVar, CommonVarDeleteImpact, CommonVarDeleteImpactItem } from '@line-crm/shared'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -28,7 +28,7 @@ export function filterAndSortCommonVars(
       if (input.filter === 'empty' && item.value !== '') return false
       /*
        * 「期限つき」は有効期間（validFrom/validUntil）のこと（VAR-04、
-       * 要件 v6-14 §8-1）。値の切替予約（nextSchedule）も期限のある
+       * 要件 管理画面-14 §8-1）。値の切替予約（nextSchedule）も期限のある
        * 動きなので拾い続ける。両方ないものだけを外す。
        */
       if (input.filter === 'scheduled'

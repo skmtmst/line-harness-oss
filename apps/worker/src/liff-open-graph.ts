@@ -1,3 +1,4 @@
+import { getFormById, formBelongsToLineAccount, isLineAccountTenantActive } from '@line-crm/db';
 import { resolveOgForEvent, resolveOgForForm, resolveOgForAccount } from './lib/og-resolver.js';
 import { buildOgHtml } from './lib/og-html.js';
 
@@ -87,14 +88,14 @@ export async function buildOgForLiffPath(db: D1Database, url: URL): Promise<stri
 
   // form: クエリ `?page=form&id=`
   if (pageFromQuery === 'form' && idFromQuery) {
-    const form = await db
-      .prepare(`SELECT * FROM forms WHERE id = ?`)
-      .bind(idFromQuery)
-      .first<any>();
-    if (form) {
-      const account = await lookupAccountByLiff(liffIdFromQuery);
-      const og = resolveOgForForm(form, account, absoluteUrl);
-      return buildOgHtml(og);
+    const form = await getFormById(db, idFromQuery, { published: true });
+    const account = liffIdFromQuery ? await lookupAccountByLiff(liffIdFromQuery) : await db.prepare(
+      'SELECT a.* FROM line_accounts a JOIN form_accounts fa ON fa.line_account_id=a.id WHERE fa.form_id=? ORDER BY a.id LIMIT 1'
+    ).bind(idFromQuery).first<any>();
+    if (form?.is_active && account && account.is_active && !account.archived_at
+      && await formBelongsToLineAccount(db, idFromQuery, account.id)
+      && await isLineAccountTenantActive(db, account.id)) {
+      return buildOgHtml(resolveOgForForm(form, account, absoluteUrl));
     }
   }
 

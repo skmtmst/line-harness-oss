@@ -1,5 +1,7 @@
+import type { AccountStyle } from '@line-crm/shared'
+import { styleTerm } from '@/lib/terms'
 import type { LineAccountConnectData } from '@/lib/api'
-import { allV8RowsPassed, toV8CheckRows, type V8CheckRow } from './logic'
+import { allV8RowsPassed, toV8CheckRows, type V8CheckRow } from './connection-check'
 
 /*
  * ★LINE新規追加_v07.pen（2026-10-18承認）③接続確認 Lwxyh・④使い方 X0pGdw・⑤完了 Plmq1 の、
@@ -143,20 +145,20 @@ export function checkErrorText(stage: CheckStage, rows: V06CheckRow[]): CheckNot
   }
 }
 
-export interface TemplateOption { key: string; node: string; label: string; note: string; enabled: boolean }
+export interface TemplateOption { key: AccountStyle; node: string; label: string; note: string; enabled: boolean }
 
 /**
- * ④の業種ひな型。初回のローンチは飲食店だけ選べる（利用者の指定）。
- * ほかは「順次公開」の札を出して押せないままにする。公開するときは enabled を true にする。
+ * ④の業種ひな型。登録する6業種は共通の正式キーで保存する。
+ * 表示名は共通の辞書と合わせる。
  */
 export function templateOptions(): TemplateOption[] {
   return [
-    { key: 'restaurant', node: 'MELvy', label: '飲食店向け', note: '今日の来店（時刻・席・人数）を先頭に出します。席の予約が始めから使えます', enabled: true },
-    { key: 'salon', node: 'J1tGCr', label: 'サロン', note: '担当者ごとの今日の予約を先頭に出します。担当者を選ぶ予約が始めから使えます', enabled: false },
-    { key: 'meeting', node: 'U74H4', label: '面談・相談', note: '今日の面談を先頭に出します。オンラインは［面談を開く］、対面は場所が出ます', enabled: false },
-    { key: 'ec', node: 'Y0ldyt', label: 'ECサイト', note: '未発送の注文を先頭に出します。注文と発送の連絡が始めから使えます', enabled: false },
-    { key: 'lesson', node: 'd0vdd', label: '教室・レッスン', note: '今日のクラスと残り枠を先頭に出します。教室とオンラインの枠は別々に数えます', enabled: false },
-    { key: 'standard', node: 'H2d2y', label: '標準', note: '今のダッシュボードのままです。カードは、あとから自分で足し引きできます', enabled: false },
+    { key: 'restaurant', node: 'MELvy', label: styleTerm('restaurant', 'V01'), note: '今日の来店（時刻・席・人数）を先頭に出します。席の予約が始めから使えます', enabled: true },
+    { key: 'salon', node: 'J1tGCr', label: styleTerm('salon', 'V01'), note: '担当者ごとの今日の予約を先頭に出します。担当者を選ぶ予約が始めから使えます', enabled: true },
+    { key: 'consult', node: 'U74H4', label: styleTerm('consult', 'V01'), note: '今日の面談を先頭に出します。オンラインは［面談を開く］、対面は場所が出ます', enabled: true },
+    { key: 'ec', node: 'Y0ldyt', label: styleTerm('ec', 'V01'), note: '未発送の注文を先頭に出します。注文と発送の連絡が始めから使えます', enabled: true },
+    { key: 'lesson', node: 'd0vdd', label: styleTerm('lesson', 'V01'), note: '今日のクラスと残り枠を先頭に出します。教室とオンラインの枠は別々に数えます', enabled: true },
+    { key: 'standard', node: 'H2d2y', label: styleTerm('standard', 'V01'), note: '今のダッシュボードのままです。カードは、あとから自分で足し引きできます', enabled: true },
   ]
 }
 

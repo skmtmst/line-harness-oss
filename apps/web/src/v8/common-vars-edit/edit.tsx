@@ -1,94 +1,55 @@
 'use client'
 
-import { scheduleStamp, changeText } from './edit-text'
-export { scheduleStamp, changeText } from './edit-text'
+import { ImpactRows,readOnlyDate,ReadOnlyValue } from './edit-impact'
+import { loadCommonVar } from './edit-load'
+import { b244Requirements,formatHourMinute,historyStamp,jstNowLocalInput,utcToJstLocalInput } from './edit-model'
+import { saveCommonVar } from './edit-save'
+import { renderScheduleCard } from './edit-schedule-card'
+import { renderValueFields } from './edit-value-fields'
+export { historyStamp } from './edit-model'
+export { changeText,scheduleStamp } from './edit-text'
 
-import { TextField } from '@/components/shared/text-field'
-import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
-  changeReason: requiredText("変える理由を入力してください"),
-  draft_date: requiredText("開始日を入れてください"),
-}
+import { changeText,scheduleStamp } from './edit-text'
 
-import { jstDate } from '@/lib/jst-datetime';
-import { useFeatureAccess } from '@/lib/use-feature-access';
-import { notifySaved } from '@/components/shared/toast';
-import { SaveConflictBand } from '@/components/shared/save-conflict';
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, CircleCheck, Download, GitCompare, Pause, Play, Plus, Smartphone, Trash2, X } from 'lucide-react';
-import type { CommonVar, CommonVarChangeImpact, CommonVarDeleteImpact, CommonVarSchedule, Folder } from '@line-crm/shared';
-import Link from '@/components/shared/list-navigation'
 
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { Eye } from 'lucide-react';
+import { SaveConflictBand } from '@/components/shared/save-conflict'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import type { CommonVar,CommonVarChangeImpact,CommonVarDeleteImpact,CommonVarSchedule,Folder } from '@line-crm/shared'
+import { ArrowRight,Check,GitCompare,Pause,Play,Smartphone,Trash2 } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Suspense,useCallback,useEffect,useRef,useState } from 'react'
 
-import { CreatePage } from '@/components/templates';
-import DateField from '@/components/shared/date-field'
-import DateTimeField, { TimeField } from '@/components/shared/date-time-field';
-import Select from '@/components/shared/select'
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
-import { api, ApiError, type CommonVarDetail } from '@/lib/api';
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
-import { useAccount } from '@/contexts/account-context';
-import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+
 import Button from '@/components/shared/button'
-import { StickyBarAction } from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import DateField from '@/components/shared/date-field'
+import DateTimeField,{ TimeField } from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
+import { emptyValue } from '@/components/shared/empty-value'
+import { Field } from '@/components/shared/form-controls'
 import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
+import { NOT_AVAILABLE,STATE_TEXT } from '@/components/shared/not-connected'
 import Notice from '@/components/shared/notice'
-import TargetMissing from '@/components/shared/target-missing'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
-import { NOT_AVAILABLE, STATE_TEXT } from '@/components/shared/not-connected';
-import { VAR_TYPE_LABELS, commonVarValueError, isSecretLikeVarValue, COMMON_VAR_STATE_LABELS } from '@/lib/common-vars';
-import { blockingErrors, checkedAtText, historicalText, isChangeItem, placeholderText, reflectionScopeText, reflectionTimingText, reviewWarnings, hiddenText, immediateItems, impactCsv, impactStateFromError, impactStateText, saveErrorText, scheduleErrorText, type ChangeImpactState } from './impact';
-import { formatNumber, formatDate as polishFormatDate } from '@/lib/format';
-import styles from './edit.module.css'
-import { characterCountText, impactBreakdown, urgentImpactCount, overLimitCount } from './impact'
-import { focusFieldById } from '@/lib/use-form-errors';
-import TruncatedText from '@/components/shared/truncated-text'
-import { Field } from '@/components/shared/form-controls';
-import { csvFileName } from '@/lib/csv-file-name';
-import { emptyValue } from '@/components/shared/empty-value';
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-
-/** 履歴の日時（ISO）を日本時間の「9/01 10:00」の形にする。 */
-export function historyStamp(value: string): string {
-  return polishFormatDate(value, { style: 'list', fallback: '—' })
-}
-
-/** 「いま」より前は予約できない。入れた瞬間に当たって、予約に見えない。 */
-function jstNowLocalInput(): { date: string; time: string } {
-  const now = new Date()
-  const jst = new Date(now.getTime() + 9 * 3600_000).toISOString()
-  return { date: jstDate(now), time: jst.slice(11, 16) }
-}
-
-function utcToJstLocalInput(value: string | null): string {
-  if (!value) return ''
-  const parsed = new Date(value)
-  if (!Number.isFinite(parsed.getTime())) return ''
-  return new Date(parsed.getTime() + 9 * 3600_000).toISOString().slice(0, 16)
-}
-
-/** 競合の帯の時刻。「14:02」の形（板 `piWhz`）。 */
-function formatHourMinute(value: string): string | null {
-  const parsed = new Date(value)
-  if (!Number.isFinite(parsed.getTime())) return null
-  const jst = new Date(parsed.getTime() + 9 * 3600_000)
-  return `${String(jst.getUTCHours()).padStart(2, '0')}:${String(jst.getUTCMinutes()).padStart(2, '0')}`
-}
-
-/** 札の色。配信予約中は金、止めた・下書きは灰、期限切れは黄。 */
-function usageTone(status: string): 'warning' | 'neutral' | 'info' {
-  if (/配信予約中|配信中/.test(status)) return 'warning'
-  if (/停止中|止めた|下書き/.test(status)) return 'neutral'
-  return 'info'
-}
+import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Select from '@/components/shared/select'
+import { StickyBarAction } from '@/components/shared/sticky-bar'
+import TargetMissing from '@/components/shared/target-missing'
+import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
+import { CreatePage } from '@/components/templates'
+import { useAccount } from '@/contexts/account-context'
+import { api,ApiError,type CommonVarDetail } from '@/lib/api'
+import { COMMON_VAR_STATE_LABELS,commonVarValueError,VAR_TYPE_LABELS } from '@/lib/common-vars'
+import { csvFileName } from '@/lib/csv-file-name'
+import { formatNumber } from '@/lib/format'
+import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
+import { focusFieldById } from '@/lib/use-form-errors'
+import { useNarrowViewport } from '@/lib/use-narrow-viewport'
+import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
+import styles from './edit.module.css'
+import { blockingErrors,historicalText,impactBreakdown,impactCsv,impactStateFromError,impactStateText,overLimitCount,placeholderText,reflectionScopeText,reflectionTimingText,scheduleErrorText,urgentImpactCount,type ChangeImpactState } from './impact'
 
 function EditCommonVarV8Inner() {
   const saveErrors = useSaveFormErrors()
@@ -103,7 +64,7 @@ function EditCommonVarV8Inner() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  // 1152 の板（C67dE）：右の列の上に「LINEでの見え方を見る」を置き、スマホは窓で開く。
+  // 1152 の板：右の列の上に「LINEでの見え方を見る」を置き、スマホは窓で開く。
   const narrow = useNarrowViewport()
 
   /*
@@ -136,7 +97,7 @@ function EditCommonVarV8Inner() {
   const [valueFieldError, setValueFieldError] = useState('')
   const [fallbackFieldError, setFallbackFieldError] = useState('')
   const [scheduleFieldError, setScheduleFieldError] = useState('')
-  /* 欄の誤りは帯ではなく欄の真下に出して移る（B-139）。 */
+  /* 欄の誤りは帯ではなく欄の真下に出して移る。 */
   const [nameFieldError, setNameFieldError] = useState('')
   const [periodFieldError, setPeriodFieldError] = useState('')
   const [scheduleDateError, setScheduleDateError] = useState('')
@@ -153,7 +114,7 @@ function EditCommonVarV8Inner() {
 
   const [impact, setImpact] = useState<CommonVarDeleteImpact | CommonVarChangeImpact | null>(null)
   const [impactState, setImpactState] = useState<ChangeImpactState>('loading')
-  /** 狭い板ではスマホの見え方を窓で見る（板 `C67dE`）。 */
+  /** 狭い板ではスマホの見え方を窓で見る（板 ）。 */
   const [previewOpen, setPreviewOpen] = useState(false)
 
   const loadImpact = useCallback(async (
@@ -250,91 +211,14 @@ function EditCommonVarV8Inner() {
     setFallbackValue(found.fallbackValue ?? '')
   }, [])
 
-  const load = useCallback(async () => {
-    if (!id) {
-      setLoading(false)
-      setError('')
-      setLoadFailure(null)
-      return
-    }
-    const accountAtRequest = selectedAccountId
-    if (!accountAtRequest) {
-      setItem(null)
-      setLoading(false)
-      setError(accountLoading ? '' : 'LINEアカウントを選択してください')
-      setLoadFailure(null)
-      return
-    }
-    setLoading(true)
-    setError('')
-    setLoadFailure(null)
-    setFoldersError(false)
-    setSchedulesError(false)
-    try {
-      const [detailResult, folderResult, scheduleResult] = await Promise.all([
-        api.commonVars.detail(id, accountAtRequest).then(
-          (data) => ({ ok: true as const, data }),
-          (caught: unknown) => ({ ok: false as const, caught }),
-        ),
-        api.folders.list('common_var').then(
-          (data) => ({ ok: true as const, data }),
-          (caught: unknown) => ({ ok: false as const, caught }),
-        ),
-        api.commonVars.schedules(id, accountAtRequest).then(
-          (data) => ({ ok: true as const, data }),
-          (caught: unknown) => ({ ok: false as const, caught }),
-        ),
-      ])
-      if (accountAtRequest !== latestAccountRef.current) return
-      if (folderResult.ok && folderResult.data.success) {
-        setFolders(folderResult.data.data)
-        setFoldersError(false)
-      } else {
-        setFoldersError(true)
-      }
-      if (scheduleResult.ok && scheduleResult.data.success) {
-        setSchedules(scheduleResult.data.data)
-        setSchedulesError(false)
-      } else {
-        setSchedulesError(true)
-      }
-      if (!detailResult.ok) {
-        if (detailResult.caught instanceof ApiError && detailResult.caught.status === 404) {
-          setError('この共通情報は見つかりませんでした')
-          setLoadFailure('missing')
-        } else {
-          setError('読み込みに失敗しました。もう一度読み込んでください。')
-          setLoadFailure('error')
-        }
-        return
-      }
-      const found = detailResult.data.success ? detailResult.data.data : undefined
-      if (!found) {
-        setError('この共通情報は見つかりませんでした')
-        setLoadFailure('missing')
-        return
-      }
-      applyDetail(found)
-      setConflict(null)
-    } catch (saveFailure) {
-      if (accountAtRequest !== latestAccountRef.current) return
-      const fieldFailure = saveErrors.capture(saveFailure)
-      { if (!fieldFailure)
-
-      setError('読み込みに失敗しました。もう一度読み込んでください。') }
-      { if (!fieldFailure)
-      setLoadFailure('error') }
-    } finally {
-      if (accountAtRequest === latestAccountRef.current) setLoading(false)
-    }
-  }, [accountLoading, applyDetail, id, selectedAccountId, saveErrors])
+  const load = useCallback(() => loadCommonVar({ accountLoading, applyDetail, id, latestAccountRef, saveErrors, selectedAccountId, setConflict, setError, setFolders, setFoldersError, setItem, setLoadFailure, setLoading, setSchedules, setSchedulesError }), [accountLoading, applyDetail, id, selectedAccountId, saveErrors])
 
   useEffect(() => {
     void load()
   }, [load])
 
   /*
-   * 競合の帯（板 `piWhz`）。保存が409で止まったとき、入力を残したまま
+   * 競合の帯（板 ）。保存が409で止まったとき、入力を残したまま
    * いま保存されている版へ合わせ、誰がいつ保存したかを見せる。
    */
   const [conflict, setConflict] = useState<{
@@ -366,120 +250,7 @@ function EditCommonVarV8Inner() {
     }
   }
 
-  const save = async () => {
-    if (!item || saving || !selectedAccountId)
- return
-    const accountAtRequest = selectedAccountId
-    const nameProblem = name.trim() ? '' : '共通情報名を入力してください'
-    const valueProblem = commonVarValueError(item.type, value) ?? ''
-    const periodProblem = validFrom && validUntil && validFrom >= validUntil ? '有効終了は有効開始より後にしてください' : ''
-    const fallbackProblem = expiryBehavior !== 'fallback' ? ''
-      : !fallbackValue ? '期限切れ時に使う代替値を入力してください'
-        : commonVarValueError(item.type, fallbackValue, '代替値') ?? ''
-    setNameFieldError(nameProblem)
-    setValueFieldError(valueProblem)
-    setPeriodFieldError(periodProblem)
-    setFallbackFieldError(fallbackProblem)
-    const firstProblem = nameProblem ? 'cv-name' : valueProblem ? 'cv-value' : periodProblem ? 'cv-valid-from' : fallbackProblem ? 'cv-fallback-value' : null
-    if (firstProblem) {
-      setError('')
-      focusFieldById(firstProblem)
-      return
-    }
-    if (isSecretLikeVarValue(value)) {
-      const message = '鍵やトークンのような秘密の値は共通情報に保存できません'
-      if (!saveErrors.fail("value", message))
-      setError(message)
-      setValueFieldError(message)
-      document.getElementById('cv-value')?.focus()
-      return
-    }
-    if (expiryBehavior === 'fallback' && isSecretLikeVarValue(fallbackValue)) {
-      const message = '鍵やトークンのような秘密の値は代替値にも保存できません'
-      if (!saveErrors.fail("expiryBehavior", message))
-      setError(message)
-      setFallbackFieldError(message)
-      document.getElementById('cv-fallback-value')?.focus()
-      return
-    }
-    if ((b244Requirements.changeReason.check(changeReason) !== null)) {
-      const message = '変える理由を入力してください'
-      if (!saveErrors.fail("changeReason", message))
-      setError(message)
-      setReasonFieldError(message)
-      document.getElementById('cv-change-reason')?.focus()
-      return
-    }
-    setSaving(true)
-    setError('')
-    setSaved(false)
-    try {
-      let preview: Awaited<ReturnType<typeof api.commonVars.impactPreview>> | null = null
-      try {
-        preview = await api.commonVars.impactPreview(item.id, accountAtRequest, value, item.version)
-      } catch (saveFailure) {
-        saveErrors.capture(saveFailure)
-        preview = null
-      }
-      if (accountAtRequest !== latestAccountRef.current)
- return
-      if (!preview || !preview.success) {
-        setError('影響を確認できませんでした。しばらく待って保存し直してください')
-        return
-      }
-      const res = await api.commonVars.update(item.id, accountAtRequest, {
-        name: name.trim(),
-        value,
-        memo,
-        folderId: folderId || null,
-        expectedVersion: item.version,
-        changeReason: changeReason.trim(),
-        impactProof: preview.data.impactProof,
-        validFrom: validFrom || null,
-        validUntil: validUntil || null,
-        expiryBehavior,
-        fallbackValue: expiryBehavior === 'fallback' ? fallbackValue : null,
-      })
-      if (accountAtRequest !== latestAccountRef.current) return
-      if (!res.success) {
-        setError(res.error)
-        if (res.error.includes('代替値')) setFallbackFieldError(res.error)
-        else if (res.error.includes('値')) setValueFieldError(res.error)
-        return
-      }
-      setSaved(true); notifySaved()
-      setChangeReason('')
-      setConflict(null)
-      setCompareOpen(false)
-      void load()
-    } catch (e) {
-      const fieldFailure = saveErrors.capture(e);
-
-      if (e instanceof ApiError && (e.status === 428 || e.status === 409)) {
-        if (accountAtRequest !== latestAccountRef.current)
- return
-        // 409 は頭の下の帯（piWhz）が知らせるので、本文の上に同じ知らせを重ねない。
-        if (e.status === 428) { if (!fieldFailure) setError(saveErrorText(e)) }
-        const fresh = await refreshBaseline(item.id, accountAtRequest, e)
-        /*
-         * 409は誰かが先に保存した。入力は残したまま、帯で誰の保存かを見せる
-         * （板 `piWhz`）。428（確認切れ）は文だけで、帯は出さない。
-         */
-        if (e.status === 409) {
-          const latest = fresh?.history[0]
-          setConflict({
-            actorName: latest?.actorName ?? null,
-            savedAt: latest?.createdAt ?? null,
-          })
-        }
-        return
-      }
-      { if (!fieldFailure)
-      setError(saveErrorText(e)) }
-    } finally {
-      setSaving(false)
-    }
-  }
+  const save = () => saveCommonVar({ changeReason, expiryBehavior, fallbackValue, folderId, item, latestAccountRef, load, memo, name, refreshBaseline, saveErrors, saving, selectedAccountId, setChangeReason, setCompareOpen, setConflict, setError, setFallbackFieldError, setNameFieldError, setPeriodFieldError, setReasonFieldError, setSaved, setSaving, setValueFieldError, validFrom, validUntil, value })
 
   /** 最新を読み込んで続ける。打ち込んだ内容は捨て、いまの版から直し直す。 */
   const adoptLatest = () => {
@@ -794,195 +565,9 @@ function EditCommonVarV8Inner() {
     </LinePreview>
   )
 
-  const fieldsGroup = item ? (
-    <div className={styles.sideGroup}>
-      <section className={styles.sideCard} aria-labelledby="cv-edit-name-heading">
-        <h2 id="cv-edit-name-heading" className={styles.sideTitle}>名前とフォルダ</h2>
-        <div className={styles.sideFields}>
-          <div className={styles.field}><Field label="名前" htmlFor="cv-name"><SaveErrorField names={["name","saved"]}><input
-              id="cv-name"
-              type="text"
-              maxLength={200}
-              value={name}
-              onChange={(e) => { setSaved(false); setName(e.target.value); setNameFieldError('') }}
-              className={styles.fieldInput}
-              readOnly={!canWrite}
-              aria-invalid={nameFieldError ? true : undefined}
-              aria-describedby={nameFieldError ? 'cv-name-error' : undefined}
-            /></SaveErrorField>
-{nameFieldError ? <p id="cv-name-error" className={styles.fieldError} role="alert">{nameFieldError}</p> : null}</Field></div>
-          {canWrite ? (
-            <SaveErrorField names={["folderId","saved","folder_id"]}><FolderSelect
-              aria-label="フォルダ"
-              label="フォルダ"
-              id="cv-folder"
-              // 右の列の幅いっぱい（絵 AYc6O）。固定 240 は列（約206）より広く、縮んで字が真ん中に寄っていた。
-              size="full"
-              value={folderId}
-              onChange={(next) => { setSaved(false); setFolderId(next) }}
-              // 絵は「フォルダ：お店の情報」を1つの文で見せる（閉じたボタンの頭は label）。
-              folders={folders.map(folderById)}
-              onCreate={canWrite && selectedAccountId
-                ? folderCreator((name, color) => api.folders.create({ kind: 'common_var', name, color, accountId: selectedAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
-                : undefined}
-            /></SaveErrorField>
-          ) : (
-            // 閲覧のみ：選ぶ部品は置かず、選んでいるフォルダを文字で見せる。
-            <ReadOnlyValue id="cv-folder" label="フォルダ" value={`フォルダ：${folders.find((folder) => folder.id === folderId)?.name ?? '未分類'}`} />
-          )}
-          {foldersError ? (
-            <div className={styles.inlineError} data-folders-state="error">
-              <p className={styles.fieldHint}>フォルダの一覧を読み込めませんでした。いまの設定のまま保存できます。</p>
-              <Button
-                type="button"
-                onClick={() => {
-                  if (item && selectedAccountId) return loadFolders(selectedAccountId)
-                }}
-               busyLabel="処理中…">
-                再読み込み
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </section>
+  const fieldsGroup = renderValueFields({ canWrite, expiryBehavior, fallbackFieldError, fallbackValue, folderId, folders, foldersError, item, loadFolders, memo, name, nameFieldError, periodFieldError, selectedAccountId, setExpiryBehavior, setFallbackValue, setFolderId, setFolders, setMemo, setName, setNameFieldError, setPeriodFieldError, setSaved, setValidFrom, setValidUntil, validFrom, validUntil })
 
-      <section className={`${styles.sideCard} ${styles.periodCard}`} aria-labelledby="cv-edit-period-heading">
-        <h2 id="cv-edit-period-heading" className={styles.sideTitle}>使える期間</h2>
-        <div className={styles.sideFields}>
-          <div className={styles.field}><Field label="始まり" htmlFor="cv-valid-from">{canWrite
-              ? <SaveErrorField names={["validFrom","saved","valid_from"]}><DateTimeField id="cv-valid-from" value={validFrom} placeholder="未設定" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidFrom(v); setPeriodFieldError('') }} /></SaveErrorField>
-              : <ReadOnlyValue id="cv-valid-from" value={readOnlyDate(validFrom)} />}</Field></div>
-          <div className={styles.field}><Field label="終わり" htmlFor="cv-valid-until">{canWrite
-              ? <SaveErrorField names={["validUntil","saved","valid_until"]}><DateTimeField id="cv-valid-until" value={validUntil} placeholder="未設定" invalid={Boolean(periodFieldError)} onChange={(v) => { setSaved(false); setValidUntil(v); setPeriodFieldError('') }} /></SaveErrorField>
-              : <ReadOnlyValue id="cv-valid-until" value={readOnlyDate(validUntil)} />}
-{periodFieldError ? <p className={styles.fieldError} role="alert">{periodFieldError}</p> : null}</Field></div>
-        </div>
-        <div className={styles.sideFields}>
-          {canWrite ? (
-            <SaveErrorField names={["expiryBehavior","saved","expiry_behavior"]}><Select
-              size="full"
-              aria-label="期間外の動き"
-              id="cv-expiry-behavior"
-              value={expiryBehavior}
-              onChange={(next) => { setSaved(false); setExpiryBehavior(next as 'stop' | 'fallback') }}
-              options={[{ value: 'stop', label: '期間外の動き：配信を止める' }, { value: 'fallback', label: '期間外の動き：代わりの値を出す' }]}
-            /></SaveErrorField>
-          ) : (
-            <ReadOnlyValue id="cv-expiry-behavior" label="期間外の動き" value={expiryBehavior === 'fallback' ? '期間外の動き：代わりの値を出す' : '期間外の動き：配信を止める'} />
-          )}
-          {expiryBehavior === 'fallback' && (
-            <div className={styles.field}><Field label="代わりの値" htmlFor="cv-fallback-value">{!canWrite && (item.type === 'boolean' || (item.type as string) === 'date' || (item.type as string) === 'datetime') ? (
-                <ReadOnlyValue id="cv-fallback-value" label="代わりの値" value={(item.type as string) === 'boolean' ? (fallbackValue || '未選択') : readOnlyDate(fallbackValue)} />
-              ) : item.type === 'boolean' ? (
-                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><Select
-                  aria-label="代わりの値"
-                  id="cv-fallback-value"
-                  value={fallbackValue}
-                  onChange={(next) => { setSaved(false); setFallbackValue(next) }}
-                  options={[{ value: '', label: '選んでください' }, { value: 'true', label: 'true' }, { value: 'false', label: 'false' }]}
-                /></SaveErrorField>
-              ) : (item.type as string) === 'date' ? (
-                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><DateField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} /></SaveErrorField>
-              ) : (item.type as string) === 'datetime' ? (
-                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} /></SaveErrorField>
-              ) : (
-                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><input
-                  id="cv-fallback-value"
-                  type={item.type === 'number' ? 'number' : 'text'}
-                  value={fallbackValue}
-                  onChange={(e) => { setSaved(false); setFallbackValue(e.target.value) }}
-                  placeholder="お問い合わせください"
-                  className={styles.fieldInput}
-                  readOnly={!canWrite}
-                /></SaveErrorField>
-              )}
-{fallbackFieldError ? <p className={styles.fieldError} role="alert">{fallbackFieldError}</p> : null}</Field></div>
-          )}
-        </div>
-      </section>
-
-      <section className={styles.sideCard} aria-labelledby="cv-edit-memo-heading">
-        <h2 id="cv-edit-memo-heading" className={styles.sideTitle}>社内メモ</h2>
-        <div className={styles.field}><Field label="メモ（お客さまには出ません）" htmlFor="cv-memo"><SaveErrorField names={["memo","saved"]}><TextField
-            id="cv-memo"
-            value={memo}
-            onChange={(e) => { setSaved(false); setMemo(e.target.value) }}
-            maxLength={1000}
-            placeholder="店舗ごとに違うときは店舗の共通情報へ"
-            title="店舗ごとに違うときは店舗の共通情報へ"
-            readOnly={!canWrite}
-          /></SaveErrorField></Field></div>
-      </section>
-    </div>
-  ) : null
-
-  const scheduleCard = item ? (
-    <section className={styles.schedCard} aria-labelledby="cv-edit-schedule-heading">
-      <h2 id="cv-edit-schedule-heading" className={styles.schedTitle}>決めた日に変える</h2>
-      <p className={styles.schedNote}>今すぐではなく、決めた日から新しい中身にできます。</p>
-      {schedulesError ? (
-        <div className={styles.inlineError} data-schedules-state="error">
-          <p className={styles.fieldHint}>更新の予定を読み込めませんでした。いまの値のまま保存できます。</p>
-          <Button
-            type="button"
-            onClick={() => {
-              if (item && selectedAccountId) return loadSchedules(item.id, selectedAccountId)
-            }}
-           busyLabel="処理中…">
-            再読み込み
-          </Button>
-        </div>
-      ) : (
-        <>
-          {schedules.length > 0 ? (
-            <dl className={styles.kv}>
-              {schedules.map((schedule) => (
-                <div key={schedule.id} className={styles.kvRow}>
-                  <dt>{`${scheduleStamp(schedule.effectiveFrom)} から`}</dt>
-                  <dd title={schedule.value || '（空）'}>{schedule.value || '（空）'}</dd>
-                  {canWrite && schedules.length > 1 ? (
-                    <button type="button" className={styles.kvRemove} onClick={() => void removeSchedule(schedule.id)} aria-label={`${scheduleStamp(schedule.effectiveFrom)} からの予定を消す`}>
-                      <X size={14} aria-hidden="true" />
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-            </dl>
-          ) : null}
-          {canWrite ? (
-            <div className={styles.schedActions}>
-              <Button
-                variant="text"
-                size="slot"
-                type="button"
-                onClick={() => {
-                  const now = jstNowLocalInput()
-                  setDraft({ date: now.date, time: '00:00', value })
-                }}
-              >
-                <Plus size={14} aria-hidden="true" />
-                予定を足す
-              </Button>
-              {/* 予定が1つなら行に×を置かず（絵の行は日時と値だけ）、ここから消す。 */}
-              {schedules.length > 0 ? (
-                <Button
-                  variant="text"
-                  size="slot"
-                  type="button"
-                  onClick={() => {
-                    setClearSchedulesError('')
-                    setClearSchedulesOpen(true)
-                  }}
-                >
-                  {schedules.length > 1 ? '予定をすべて消す' : '予定を消す'}
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-        </>
-      )}
-    </section>
-  ) : null
+  const scheduleCard = renderScheduleCard({ canWrite, item, loadSchedules, removeSchedule, schedules, schedulesError, selectedAccountId, setClearSchedulesError, setClearSchedulesOpen, setDraft, value })
 
   const historyCard = item ? (
     <section className={styles.sideCard} aria-labelledby="cv-edit-history-heading">
@@ -1023,7 +608,7 @@ function EditCommonVarV8Inner() {
         {historyCard}
       </>
     ) : conflict ? (
-      /* 競合のとき（piWhz）：決めた日と見え方を上に。名前・期間・メモ・履歴は下へ回す（消さない）。 */
+      /* 競合のとき：決めた日と見え方を上に。名前・期間・メモ・履歴は下へ回す（消さない）。 */
       <>
         {scheduleCard}
         {previewTalk}
@@ -1068,7 +653,7 @@ function EditCommonVarV8Inner() {
       noticeSpacing="band"
       identity={<></>}
       preview={preview}
-      /* 1152（C67dE）は右の列を畳まず、スマホだけをボタンにして「決めた日に変える」を右に残す（畳むと予定の欄が見えなくなっていた）。 */
+      /* 1152は右の列を畳まず、スマホだけをボタンにして「決めた日に変える」を右に残す（畳むと予定の欄が見えなくなっていた）。 */
       hidePreviewWhenNarrow={!narrow}
       previewCompactWhenNarrow
       destructive={canWrite && item ? (
@@ -1447,125 +1032,10 @@ function EditCommonVarV8Inner() {
   )
 }
 
-/*
- * 変える前に影響を見る、の行。いまの文と保存したあとの文を
- * 赤・緑の箱で並べる（板 `AYc6O`）。3件まで出し、残りは畳む。
- */
-function ImpactRows({
-  impact,
-  onExportCsv,
-}: {
-  impact: CommonVarDeleteImpact | CommonVarChangeImpact
-  onExportCsv: () => void
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const rows = immediateItems(impact)
-  const visible = expanded ? rows : rows.slice(0, 3)
-  const rest = rows.length - visible.length
-  const changeable = 'canSave' in impact
-  const csvRows = changeable ? impact.items.filter((item) => item.changesOnSave) : []
-
-  return (
-    <>
-      {rows.length === 0 ? (
-        <p className={styles.cardNote}>{impact.total === 0 ? '使われている場所がないため、確かめる文はありません。' : 'すぐ変わる使用先の文はありません。'}</p>
-      ) : (
-        <div className={styles.impactList}>
-          {visible.map((row, index) => (
-            <div key={`${row.kind}-${row.name}-${index}`} className={styles.impactRow}>
-              <div className={styles.impactHead}>
-                <span className={styles.impactKind}>{row.kindLabel}</span>
-                <span className={styles.impactName} ><TruncatedText value={String(row.name ?? '')} /></span>
-                <span className={styles.impactSpacer} aria-hidden="true" />
-                <span className={usageTone(row.status) === 'warning' ? styles.impactStatusWarn : styles.impactStatus}>{row.status}</span>
-              </div>
-              <div className={styles.impactPair}>
-                <p className={styles.impactBefore} title={row.currentPreview}>{`…${row.currentPreview}`}</p>
-                <p className={styles.impactAfter} title={isChangeItem(row) ? characterCountText(row) : undefined} data-over-limit={isChangeItem(row) && row.exceedsCharacterLimit || undefined}>
-                  {isChangeItem(row)
-                    ? `…${row.nextPreview ?? `${NOT_AVAILABLE}（使用先を開いて確認してください）`}`
-                    : '値を変えると、ここに保存後の文が出ます。'}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className={styles.impactFoot}>
-        {rest > 0 ? (
-          <Button variant="text" type="button" onClick={() => setExpanded(true)}>
-            <ChevronDown size={14} aria-hidden="true" />
-            {`ほか ${formatNumber(rest)} か所を見る`}
-          </Button>
-        ) : rows.length > 3 ? (
-          <Button variant="text" type="button" onClick={() => setExpanded(false)}>
-            <ChevronUp size={14} aria-hidden="true" />
-            畳む
-          </Button>
-        ) : null}
-        <span className={styles.impactSpacer} aria-hidden="true" />
-        {changeable ? (
-          <Button variant="text" type="button" onClick={onExportCsv} disabled={csvRows.length === 0}>
-            <Download size={14} aria-hidden="true" />
-            この一覧をCSVで
-          </Button>
-        ) : null}
-      </div>
-      {changeable ? (
-        <>
-          {blockingErrors(impact).length > 0 ? (
-            <ul className={styles.blockList}>
-              {blockingErrors(impact).map((message) => <li key={message}>{message}</li>)}
-            </ul>
-          ) : (
-            <p className={styles.validNote} role="status">
-              <CircleCheck size={14} aria-hidden="true" />
-              <span>文字数の上限をこえる文はありません。保存を止める問題は見つかりませんでした。</span>
-            </p>
-          )}
-          {reviewWarnings(impact).map((message) => (
-            <p key={message} className={styles.cardNote}>{message}</p>
-          ))}
-        </>
-      ) : (
-        <>
-          {reflectionScopeText(impact) ? <p className={styles.cardNote}>{reflectionScopeText(impact)}</p> : null}
-          {reflectionTimingText(impact) ? <p className={styles.cardNote}>{reflectionTimingText(impact)}</p> : null}
-          {historicalText(impact) ? <p className={styles.cardNote}>{historicalText(impact)}</p> : null}
-        </>
-      )}
-      {hiddenText(impact) ? (
-        <p className={styles.cardNote}>名前を確認できない使用先：{hiddenText(impact)}</p>
-      ) : null}
-      <p className={styles.cardNote}>{`${checkedAtText(impact.checkedAt)} 時点で確認`}</p>
-    </>
-  )
-}
-
 export default function EditCommonVarV8() {
   return (
     <Suspense fallback={<ListState kind="loading" title="共通情報を読み込んでいます" />}>
       <EditCommonVarV8Inner />
     </Suspense>
-  )
-}
-
-/** 閲覧のみで、日時の欄に入っている値を文字で見せる（空なら「指定なし」）。 */
-function readOnlyDate(value: string): string {
-  return value ? value.replace('T', ' ') : emptyValue('unconfigured')
-}
-
-/** 閲覧のみ：選ぶ部品・日付の部品の代わりに、選んでいる値を読み取りだけの欄で見せる。 */
-function ReadOnlyValue({ id, label, value }: { id: string; label?: string; value: string }) {
-  return (
-    <SaveErrorField names={["value"]}><input
-      id={id}
-      type="text"
-      value={value}
-      readOnly
-      aria-readonly="true"
-      aria-label={label}
-      className={styles.fieldInput}
-    /></SaveErrorField>
   )
 }

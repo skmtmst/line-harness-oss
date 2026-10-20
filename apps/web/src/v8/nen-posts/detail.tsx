@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -344,7 +345,7 @@ export function PhotoReviewDetail({
         setDownloadError('')
         return onDownloadOriginal(downloadCode)
           .then(() => setDownloadOpen(false))
-          .catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : '原本を保存できませんでした。'))
+          .catch((error: unknown) => setDownloadError(describeApiFailure(error, '保存')))
           .finally(() => setDownloadBusy(false))
       }}
     >

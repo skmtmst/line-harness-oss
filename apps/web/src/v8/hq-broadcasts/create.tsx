@@ -24,7 +24,7 @@ import Button from '@/components/shared/button';
 import Checkbox from '@/components/shared/checkbox';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
 import SendConfirmDialog, { describeExclusion } from '@/components/shared/send-confirm-dialog';
-import { chatSafetyApi } from '@/lib/api-gap1';
+import { chatSafetyApi } from '@/lib/api/helpers/gap1';
 import type { SendConfirmationPreview } from '@line-crm/shared';
 import DateField from '@/components/shared/date-field';
 import { TimeField } from '@/components/shared/date-time-field';
@@ -59,10 +59,10 @@ import { HQ_KIND_LABEL, bubbleFromTemplate, emptyContent, fromApiBubble, hqBubbl
 import HqTemplatePicker from './template-picker';
 import HqBroadcastSourcePicker, { broadcastPickerItem } from './source-picker';
 import { SourcePickerSelection, type SourcePickerItem, type SourcePickerFolder } from '@/components/shared/source-picker-dialog';
-import CarouselV8 from '@/v8/templates/carousel';
-import TemplateRichEditor from '@/v8/template-edit/rich';
-import type { TemplateEditHost } from '@/v8/template-edit/host';
-import { hostDefinition } from '@/v8/hq-templates/console';
+import { CarouselV8 } from '@/v8/templates/public/carousel/index'
+import { TemplateRichEditor } from '@/v8/template-edit/public/rich/index'
+import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
+import { hostDefinition } from '@/v8/hq-templates/public/console/index'
 import { freshDefinition } from '@/lib/hq-template-authoring';
 import styles from './create.module.css';
 import MessageComposer from '@/components/shared/message-composer';
@@ -75,7 +75,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import { type Audience, type Bubble, newBubble, errorText, jstIso, splitJst, assetContent, bubblesFromInput, audienceFromInput } from "./create-gap-parts"
 /*
- * ★V8 統括 一括配信を作る（B-37・絵 V8.pen の BBRDb：① lmWCZ・② AL5vR・③ lLyFR・④ ZU4Ae・⑤ H9eG3n）。
+ * ★V8 統括 一括配信を作る（・絵 V8.pen の ：① lmWCZ・② AL5vR・③ lLyFR・④ ZU4Ae・⑤ H9eG3n）。
  *
  * オーナー 10-08：「店の一斉配信とほぼ同じ画面にする。違いは送るアカウントを選ぶだけ」。
  * 店の一斉配信を作る画面（components/broadcasts/broadcast-form.tsx）と同じ5段・同じ部品（段の帯・選ぶカード・
@@ -420,7 +420,7 @@ export default function HqBroadcastCreate() {
   }
 
   /*
-   * 吹き出しの不備（B-139・店の一斉配信と同じ）：帯ではなく吹き出しの中身の下に理由、頭に赤い丸、
+   * 吹き出しの不備（・店の一斉配信と同じ）：帯ではなく吹き出しの中身の下に理由、頭に赤い丸、
    * メッセージの段を開いて1つ目の吹き出しへ移る。配信名・送り先・日時は段の帯（［〇〇へ移動］つき）のまま。
    */
   const fields = useFormErrors()

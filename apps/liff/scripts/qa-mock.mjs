@@ -32,7 +32,7 @@ const qaPrefs = [
 ];
 const qaBankSaves = new Map();
 
-// 見本の言葉・日付は ★V8 の絵 (gVjiC・EscPA・y1bs9A など) に合わせる。
+// 見本の言葉・日付は ★V8 の絵 (・・ など) に合わせる。
 const QA_EVENT = {
   id: 'qa-event-1',
   name: '秋のわんこ撮影会',
@@ -84,7 +84,7 @@ const QA_EVENT_BOOKING = {
   slot_ends_at: '2026-10-11T11:00:00+09:00',
 };
 
-/** キャンセル待ちの2番目 (y1bs9A の2行目)。 */
+/** キャンセル待ちの2番目 ( の2行目)。 */
 const QA_EVENT_WAITLIST = {
   ...QA_EVENT_BOOKING,
   id: 'qa-event-booking-2',
@@ -116,7 +116,7 @@ const QA_EVENT_WAITLIST_MINE = {
   queue_position: 2,
 };
 
-// 紹介のリンク・案件は ★V8 S3uBl の言葉に合わせる (秋の定期便キャンペーン・鹿肉ふりかけ)。
+// 紹介のリンク・案件は ★V8  の言葉に合わせる (秋の定期便キャンペーン・鹿肉ふりかけ)。
 const QA_LINK = {
   refCode: 'QA1234',
   label: 'ブログ用',
@@ -263,12 +263,12 @@ function webinarLive() {
   };
 }
 
-/** 表紙の画像 (B8rCt の「画像」：地 #e9e2d4・店名)。外へ取りに行かないよう data URL で持つ。 */
+/** 表紙の画像 ( の「画像」：地 #e9e2d4・店名)。外へ取りに行かないよう data URL で持つ。 */
 const QA_FORM_COVER = `data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="343" height="96" viewBox="0 0 343 96"><rect width="343" height="96" fill="#e9e2d4"/><text x="171.5" y="54" text-anchor="middle" font-family="Noto Sans JP, sans-serif" font-size="16" font-weight="700" fill="#6b5b3e">然 - NEN -</text></svg>',
 )}`;
 
-/** 来店アンケート (★V8 の B8rCt・g9osGN・aNZKe)。2ページ目に予約の欄。 */
+/** 来店アンケート (★V8 の ・・)。2ページ目に予約の欄。 */
 function qaForm() {
   const routed = state.features.includes('routed') || state.features.includes('routed-empty');
   return {
@@ -283,7 +283,7 @@ function qaForm() {
           id: 'qa-section-1',
           name: '今日のご来店',
           blocks: [
-            // ページ先頭の画像は題の上の表紙になる (B8rCt の「画像」)。
+            // ページ先頭の画像は題の上の表紙になる ( の「画像」)。
             {
               id: 'qa-b0',
               kind: 'image',
@@ -328,7 +328,7 @@ function qaForm() {
               name: '次回の予約',
               label: '次回のご希望の日時を選んでください',
               required: true,
-              // g9osGN は 10/14(水)〜18(日) の5日。16日は満席。
+              //  は 10/14(水)〜18(日) の5日。16日は満席。
               booking: { menuId: 'qa-menu-1', staffId: 'qa-staff-form', daysAhead: 5, ...(routed ? { routing: { enabled: true, rules: [], fallback: { menuId: 'qa-menu-4' } } } : {}) },
             },
             {
@@ -434,7 +434,7 @@ const server = createServer(async (req, res) => {
     return;
   }
 
-  // ---- 来店スタンプ (★V8 jQRsr・V2HU7・xe8ga・h2HKh・etLd8) ----
+  // ---- 来店スタンプ (★V8 ・・・・) ----
   // カード1枚・6個たまった本人。特典を見せる→店員の暗証番号で使用済み→残り 1個（サーバは特典の個数だけ減らす）。
   {
     const card = {
@@ -459,11 +459,11 @@ const server = createServer(async (req, res) => {
       return;
     }
     if (method === 'POST' && pathname === '/api/liff/visit-stamps/redemptions/vs-redeem-1/use') {
-      // 暗証番号だけで店員を当てる（API-10）。使った店員の名前を返す（xe8ga の「担当」）。
+      // 暗証番号だけで店員を当てる（API-10）。使った店員の名前を返す（ の「担当」）。
       json(res, 200, { success: true, data: { id: 'vs-redeem-1', status: 'used', staffId: 'staff-tamura', staffName: '田村' } });
       return;
     }
-    // 自分の紙のカードの申請（確認待ち etLd8 は map の api で確認待ちを1件返す）。ふだんは無し。
+    // 自分の紙のカードの申請（確認待ち  は map の api で確認待ちを1件返す）。ふだんは無し。
     if (method === 'GET' && pathname === '/api/liff/visit-stamps/cards/vs-card-1/paper-requests') {
       json(res, 200, { success: true, data: [] });
       return;
@@ -623,6 +623,23 @@ const server = createServer(async (req, res) => {
       return;
     }
   }
+  // 現行の確認画面は、費用見積もりの正常応答が読めるまで送信しない。
+  if (method === 'GET' && pathname === '/api/liff/booking/cost-estimate') {
+    const menuId = url.searchParams.get('menu_id');
+    const base = menuId === 'qa-menu-2' ? 12600 : menuId === 'qa-menu-3' ? 4200 : menuId === 'qa-menu-4' ? 0 : 8400;
+    const price = base + (url.searchParams.get('staff_id') === 'qa-staff-1' ? 500 : 0);
+    const enabled = state.features.includes('cancellation');
+    const startsAt = Date.parse(url.searchParams.get('starts_at') ?? '');
+    if (!Number.isFinite(startsAt)) { json(res, 400, { error: 'invalid_starts_at' }); return; }
+    json(res, 200, { success: true, data: {
+      cancellation: { enabled, version: 1, price, cardRequired: true,
+        tiers: [{ beforeHours: 24, percent: 0 }, { beforeHours: 0, percent: 50 }], noShowPercent: 100,
+        freeUntil: enabled ? new Date(startsAt - 86400000).toISOString() : null,
+        feeNow: enabled ? Math.floor(price / 2) : 0, feeNoShow: enabled ? price : 0, policyAcceptedRequired: enabled },
+      deposit: { amount: 0, testMode: true, paymentCollectionAvailable: false },
+    } });
+    return;
+  }
   if (method === 'GET' && pathname === '/api/liff/booking/settings') {
     json(res, 200, { liff_date_view: 'list', booking_window_days: 60 });
     return;
@@ -630,12 +647,12 @@ const server = createServer(async (req, res) => {
   if (method === 'GET' && pathname === '/api/liff/booking/availability') {
     const staffId = url.searchParams.get('staff_id') ?? 'qa-staff-1';
     if (staffId === 'qa-staff-empty') { json(res, 200, { by_staff: [{ staff_id: staffId, display_name: 'QA スタッフ', slots: [] }], closed_dates: [] }); return; }
-    // ★V8 の絵 (M2p63S・k3aJKU) に合わせた日付で決める。月曜はお休み、
+    // ★V8 の絵 (・) に合わせた日付で決める。月曜はお休み、
     // 4・10・15・20・25・30 日は満席 (枠はあって残り0)。時刻は 9:00〜16:00 の6つで、
     // 10:00 と 16:00 は埋まっている。
     const from = url.searchParams.get('from') ?? '2026-10-01';
     const to = url.searchParams.get('to') ?? '2026-10-01';
-    // フォームの「予約を入れる」(担当 qa-staff-form・g9osGN) は、絵どおり
+    // フォームの「予約を入れる」(担当 qa-staff-form・) は、絵どおり
     // 16日だけ満席・時刻は 10:00 (埋まり)・13:00・15:00 の3つ。
     const formBlock = staffId === 'qa-staff-form';
     const FULL_DAYS = formBlock ? [16] : [4, 10, 15, 20, 25, 30];
@@ -833,7 +850,7 @@ const server = createServer(async (req, res) => {
   }
   if (method === 'POST' && /^\/api\/liff\/events\/makeup-credits\/[^/]+\/use$/.test(pathname)) { json(res, 200, { success: true, data: { bookingId: 'qa-event-booking-new', replayed: false } }); return; }
   if (method === 'POST' && /^\/api\/liff\/events\/bookings\/[^/]+\/absence$/.test(pathname)) { json(res, 200, { success: true, data: { eventBooking: { id: 'qa-lesson-1', status: 'absent' }, makeupCredit: { id: 'qa-credit-1', status: 'open', expires_at: '2026-12-14T14:59:59.000Z', source_event_booking_id: 'qa-lesson-1', source_event_id: 'qa-event-1', used_event_booking_id: null, version: 1 }, reasonIfNone: null } }); return; }
-  // 自分のキャンセル待ち (qVdiX の「順番 2 番目」「キャンセル待ちをやめる」)。
+  // 自分のキャンセル待ち ( の「順番 2 番目」「キャンセル待ちをやめる」)。
   if (method === 'GET' && pathname === '/api/liff/events/me/waitlist') {
     json(res, 200, { items: [QA_EVENT_WAITLIST_MINE] });
     return;
@@ -853,7 +870,7 @@ const server = createServer(async (req, res) => {
       return;
     }
   }
-  // 空きが出た案内の中身 (BjcuB「10月11日（日）11:00〜 に 1 席」「あと 23時間 41分」)。
+  // 空きが出た案内の中身 (「10月11日（日）11:00〜 に 1 席」「あと 23時間 41分」)。
   {
     const m = pathname.match(/^\/api\/liff\/events\/waitlist\/([^/]+)$/);
     if (method === 'GET' && m) {
@@ -1043,6 +1060,13 @@ const server = createServer(async (req, res) => {
     return;
   }
   if (method === 'GET' && pathname === '/api/liff/affiliate/statements/qa-statement-1/download') {
+    if (url.searchParams.get('issue') === '1') {
+      const issued = new URL(pathname, `http://${req.headers.host}`);
+      issued.searchParams.set('expires', String(Math.floor(Date.now() / 1000) + 900));
+      issued.searchParams.set('signature', 'qa-fixture-only');
+      json(res, 200, { success: true, data: { url: issued.href, expiresAt: new Date(Date.now() + 900000).toISOString() } });
+      return;
+    }
     const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
       '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>', '<< /Length 0 >>\nstream\n\nendstream'];
     let pdf = '%PDF-1.4\n'; const offsets = [0];

@@ -47,10 +47,10 @@ vi.mock('next/navigation', () => ({
 
 /*
  * account切替を「実物のReact再レンダー」として起こすための、購読可能な口。
- * `commitAccountSwitch` は React のイベント・act() を経由しない生の
- * setState呼び出しで、レンダー（layout境界）と受動effect（load()の発火）を
+ * `commitAccountSwitch` は React のイベント・act を経由しない生の
+ * setState呼び出しで、レンダー（layout境界）と受動effect（loadの発火）を
  * 別のタスクへ切り離す——本番のブラウザで account切替の描画コミットと
- * load() の useEffect 発火が別々に起きるのと同じ非同期境界を保つ。
+ * load の useEffect 発火が別々に起きるのと同じ非同期境界を保つ。
  */
 const accountSetters = new Set<(id: string | null) => void>()
 function useControllableAccount(): string | null {
@@ -152,7 +152,7 @@ type MutationGuard = Parameters<typeof saveCustomerNotification>[0]['guard']
 
 /**
  * 画面が持つ「いまのアカウント世代」「いま向いているアカウント」「いまの文面の
- * 指紋」を、試験から動かせる形にする。保存を投げたあとに `type()` すれば、
+ * 指紋」を、試験から動かせる形にする。保存を投げたあとに `type` すれば、
  * 保存中の追加入力をそのまま再現できる。
  */
 function editorState(initial: EcNotificationSetting, accountId = 'account-a') {
@@ -529,14 +529,14 @@ describe('#678 保存中の追加入力を、古い応答で消さない', () =>
 /*
  * 司令塔の独立再審査REJECT（2026-09-09）。
  *
- * loadGeneration は load() の useEffect の中でしか進まない。Aの保存中に
+ * loadGeneration は load の useEffect の中でしか進まない。Aの保存中に
  * Bを選ぶと、選択中accountを映す描画そのものは同期的に済むが、Bの
- * load()（useEffect）が実際に発火して loadGeneration を進めるのは、
+ * load（useEffect）が実際に発火して loadGeneration を進めるのは、
  * それより後になる——その隙間で古いAの応答が返ると、旧来の実装は
  * isStale=false のまま A の localStorage の下書きを消し、dirty も
  * 解除してしまっていた。
  *
- * ここでは、Bの load() がまだ一度も発火していない（世代は据え置き）状態を
+ * ここでは、Bの load がまだ一度も発火していない（世代は据え置き）状態を
  * `moveRenderToAccountBeforeReload` で明示的に作り、そこへ旧Aの応答を
  * 返して固定する。
  */
@@ -601,14 +601,14 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
    *
    * ここでは実物の LineNotificationsPage をmountし、account context を
    * 実物のReact再レンダーとしてA→Bへ動かす。`commitAccountSwitch` は
-   * act()・React由来イベントを経由しない生のsetState呼び出しで、
-   * レンダー（layout境界）と load() の受動effect（useEffect）の発火を
+   * act・React由来イベントを経由しない生のsetState呼び出しで、
+   * レンダー（layout境界）と load の受動effect（useEffect）の発火を
    * 別のタスクへ切り離す。同じ木に置いた層効果（useLayoutEffect）の探針が
-   * 「Bへコミットした」瞬間を検出し、そこ——load()のuseEffectがまだ
+   * 「Bへコミットした」瞬間を検出し、そこ——loadのuseEffectがまだ
    * 一度も発火していない・loadGenerationが据え置きのままの
    * layout境界——で旧Aの保存応答を解放する。
    */
-  it('実物のLineNotificationsPageをmountし、layout境界（Bへコミット直後・load()のuseEffect発火前）で旧Aの応答を返しても、Aの控え・dirtyは保持されBへ漏れない', async () => {
+  it("実物のLineNotificationsPageをmountし、layout境界（Bへコミット直後・loadのuseEffect発火前）で旧Aの応答を返しても、Aの控え・dirtyは保持されBへ漏れない", async () => {
     fixture.settings.mockImplementation((accountId: string) => Promise.resolve({
       success: true,
       data: [setting({
@@ -638,7 +638,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
         if (seen.current === account || account !== 'account-b') return
         seen.current = account
         committedToB = true
-        // ここが本題。layout effect は「同じコミット内の受動effect（load()の
+        // ここが本題。layout effect は「同じコミット内の受動effect（loadの
         // useEffect）より必ず先に」実行される——React が保証する順序であり、
         // タイミングの偶然に頼っていない。
         releaseA({ success: true })
@@ -661,20 +661,20 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     fireEvent.click(screen.getByRole('button', { name: 'お知らせを保存する' }))
     expect(committedToB).toBe(false)
 
-    // act() を経由しない生の setState。レンダーと load() の受動effectが
+    // act を経由しない生の setState。レンダーと load の受動effectが
     // 別タスクへ分かれることを、この境界試験そのものが要求している。
     commitAccountSwitch('account-b')
 
     await layoutCommitted
     expect(committedToB).toBe(true)
 
-    // load()（受動effect）はこの時点でまだ一度も発火していない。
+    // load（受動effect）はこの時点でまだ一度も発火していない。
     // レイアウトeffectは同じコミット内の受動effectより必ず先に走るという
     // Reactの保証により、ここでは待ち合わせではなく確定した事実として言える。
     expect(fixture.operatorList).not.toHaveBeenCalledWith('account-b')
     expect(fixture.settings).not.toHaveBeenCalledWith('account-b')
 
-    // まさにこの窓――load()のuseEffectがまだ発火していない――のうちに
+    // まさにこの窓――loadのuseEffectがまだ発火していない――のうちに
     // 解放された旧Aの応答では、Aの控えは消えていない。
     const stored = window.localStorage.getItem(customerDraftKey('account-a', 'order.confirmed'))
     expect(stored).not.toBeNull()
@@ -708,18 +708,18 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
    * （isStale＝世代とアカウントの両方）を通すよう直した。
    *
    * 【この試験がどう空振りしていたか（Issue #695 T1）】
-   * 前の版は「Bへ描画コミット済み・Bのload()未発火」の隙間で旧Aの応答を
+   * 前の版は「Bへ描画コミット済み・Bのload未発火」の隙間で旧Aの応答を
    * 解放し、`テスト受信者 3名へ送信しました` が出ないことを見ていた。
    * これは保護を全部外しても緑のままだった。理由は2つ:
-   *   1. `flushSync(() => {})` は空コールバックなので、default lane の
+   *   1. `flushSync( => {})` は空コールバックなので、default lane の
    *      setNotice を流しきれず DOM に出ない
-   *   2. 次に load() が走ると冒頭で setNotice(null) を呼ぶので、
+   *   2. 次に load が走ると冒頭で setNotice(null) を呼ぶので、
    *      仮に入っていたお知らせも消える
    * つまり判定は保護の有無にかかわらず必ず null だった。
    *
    * 【直し方】
-   * 隙間を狙うのをやめ、B の load() を最後まで終わらせてから旧Aの応答を
-   * 解放する。これなら後から notice を消す load() が無いので、漏れたお知らせは
+   * 隙間を狙うのをやめ、B の load を最後まで終わらせてから旧Aの応答を
+   * 解放する。これなら後から notice を消す load が無いので、漏れたお知らせは
    * 画面に残り続ける——競合のタイミングに頼らず決定的に観測できる。
    *
    * 観測は文字列ではなく「お知らせ枠が出ているか」で行う。保護
@@ -760,7 +760,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
     expect(fixture.testSend.mock.calls[0][0]).toMatchObject({ accountId: 'account-a' })
 
     // B へ切り替え、B の読み直しを最後まで終わらせる。
-    // ここまで来ると、あとから notice を消す load() はもう走らない。
+    // ここまで来ると、あとから notice を消す load はもう走らない。
     commitAccountSwitch('account-b')
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
     await waitFor(() => {
@@ -789,7 +789,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
 
   /*
    * 逆変異で赤になる証拠はここ。isStale から account 照合だけを外すと、
-   * 世代が動いていない（Bのload()未発火）この状況で `applied` が返り、
+   * 世代が動いていない（Bのload未発火）この状況で `applied` が返り、
    * 旧Aのテスト送信結果が画面へ入る側に回る。
    */
   it('テスト送信: アカウントが替わっていれば、世代が据え置き（Bのload未発火）でも結果を画面へ入れない', async () => {
@@ -802,7 +802,7 @@ describe('#678 Bを選んだ直後・Bのload未発火でも、旧Aの応答か�
       setting: sent,
       accountId: 'account-a',
       guard: {
-        // Bのload()はまだ発火していない。世代は据え置きのまま。
+        // Bのloadはまだ発火していない。世代は据え置きのまま。
         generation: 1,
         currentGeneration: () => 1,
         forAccountId: 'account-a',
@@ -1005,7 +1005,7 @@ describe('#678 「保存済み」にしてよい条件', () => {
 
   /*
    * 司令塔の再審査（独立審査REJECT）で指摘された、まさにその隙間。
-   * loadGeneration は load() の useEffect の中でしか進まない。Bを選んだ
+   * loadGeneration は load の useEffect の中でしか進まない。Bを選んだ
    * 直後・Bの useEffect がまだ発火していない（＝世代はまだ古いまま）状態でも、
    * 選択中accountはもう新しいアカウントを指している。世代だけを見る guard
    * では、この状態は「stale ではない」と誤判定する。account を独立して
@@ -1207,7 +1207,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     render(<LineNotificationsPage />)
 
     await waitFor(() => expect(screen.getByRole('button', { name: '注文を受け付けましたの内容を編集' })).toBeTruthy())
-    // 板 g3iDs：行は「この30日」だけ（送信履歴の7通）。「今日」の列は置かない。
+    // 板 ：行は「この30日」だけ（送信履歴の7通）。「今日」の列は置かない。
     // 数カード「この30日」も同じ7通。
     // V8は数字と単位を別要素へ出す。表と数カードの両方の実データを守る。
     expect(screen.getByRole('table', { name: '顧客へのお知らせ' }).textContent).toContain('7')
@@ -1250,7 +1250,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(fixture.settings).toHaveBeenCalledTimes(1)
 
     // 2回目からは成功する応答へ差し替えてから、実物のボタンを押す。
-    // ★V7 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
+    // ★管理画面 `x63W5x`：失敗の1枚の副ボタンは「もう一度読み込む」1つ。
     fixture.settings.mockResolvedValueOnce({ success: true, data: [setting()] })
     fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
 
@@ -1481,7 +1481,7 @@ describe('#988 条件説明と表示例は実際の意味に合わせる', () =>
   })
 })
 
-it('B-154：通知の共通保存関数は422の欄の理由を呼び出した画面へ残す', async () => {
+it("通知の共通保存関数は422の欄の理由を呼び出した画面へ残す", async () => {
   const { saveCustomerNotification: saveV8 } = await import('@/v8/settings/line-notifications/screen')
   const sent = setting()
   fixture.updateDraft.mockRejectedValueOnce({ status: 422, fields: { introText: 'ご案内文を短くしてください' } })

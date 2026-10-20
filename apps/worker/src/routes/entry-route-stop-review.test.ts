@@ -1,3 +1,4 @@
+import { signedLiffState } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // N-244 独立レビュー差し戻し: 同じPRで直す4点の直接テスト。
@@ -18,7 +19,7 @@ const dbMocks = {
   getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   createUser: vi.fn().mockResolvedValue({ id: 'U-uuid' }),
-  getUserByEmail: vi.fn().mockResolvedValue(null),
+  getUserByEmailForAccess: vi.fn().mockResolvedValue(null),
   linkFriendToUser: vi.fn().mockResolvedValue(undefined),
   getEntryRouteByRefCode: vi.fn().mockResolvedValue(null),
   getEntryRouteByRefCodeAny: vi.fn().mockResolvedValue(null),
@@ -32,7 +33,7 @@ const dbMocks = {
   getAffiliateById: vi.fn().mockResolvedValue(null),
   addTagToFriend: vi.fn().mockResolvedValue(undefined),
   getLineAccountByChannelId: vi.fn().mockResolvedValue(null),
-  getLineAccountById: vi.fn().mockResolvedValue(null),
+  getLineAccountById: vi.fn().mockResolvedValue({ id: 'account-main', login_channel_id: '2000000000', tenant_id: null }),
   isLineAccountTenantActive: vi.fn().mockResolvedValue(true),
   getScenarios: vi.fn().mockResolvedValue([]),
   getFriendAddScenarioIds: vi.fn().mockResolvedValue([]),
@@ -46,7 +47,7 @@ const dbMocks = {
 vi.mock('@line-crm/db', () => dbMocks);
 
 const attachTagAndFireSideEffects = vi.fn().mockResolvedValue({ added: true });
-vi.mock('../services/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects }));
+vi.mock('../features/friends/friend-tag-attach.js', () => ({ attachTagAndFireSideEffects }));
 
 const notifyAffiliateFriendAdd = vi.fn().mockResolvedValue(undefined);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateFriendAdd }));
@@ -79,6 +80,7 @@ const env = {
   WORKER_URL: 'https://worker.example.com',
   LINE_LOGIN_CHANNEL_ID: '2000000000',
   LINE_LOGIN_CHANNEL_SECRET: 'secret',
+  LINE_CHANNEL_SECRET: 'test-oauth-secret',
   LINE_CHANNEL_ACCESS_TOKEN: 'env-token',
 } as unknown as import('../index.js').Env['Bindings'];
 
@@ -155,9 +157,10 @@ function lineStart(ref: string, ua?: string) {
   );
 }
 
-function callback(ref: string) {
-  const state = btoa(JSON.stringify({ ref }));
-  return call(`/auth/callback?code=abc&state=${encodeURIComponent(state)}`);
+async function callback(ref: string) {
+  const signed = await signedLiffState(env.LINE_CHANNEL_SECRET, { ref });
+  const state = signed.state;
+  return call(`/auth/callback?code=abc&state=${encodeURIComponent(state)}`, { headers: { Cookie: signed.cookie } });
 }
 
 function sendFormLink(body: Record<string, unknown>) {

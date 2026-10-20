@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1 } from '../../test-utils/d1-sqlite.js';
 import { createRichMenuHqTemplateAdapter, executeRichMenuHqPlan, richMenuReferences, type RichMenuHqDefinition } from './rich-menu.js';
 import { createRichMenuShells, type GroupInput, type LineRichMenuClient } from '../../lib/rich-menu-publisher.js';
-import type { HqTemplateAdapterContext, HqTemplateStatement, HqTemplateStoreAtomicCommitPlan } from './contract.js';
+import type { HqTemplateAdapterContext, HqTemplateStoreAtomicCommitPlan } from './contract.js';
+import type { HqTemplateStatement } from '@line-crm/db';
 
 const resources: ReturnType<typeof createTestD1>[] = [];
 afterEach(() => { for (const r of resources.splice(0)) r.raw.close(); });

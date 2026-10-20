@@ -57,7 +57,7 @@ type Props = FolderNameColorFieldsProps & Pick<ComponentProps<typeof Dialog>, 'o
   confirmTitle?: string
 }
 
-/** IjVpM の低い窓。保存先やエラー処理は画面が持ち、形はここに集約する。 */
+/**  の低い窓。保存先やエラー処理は画面が持ち、形はここに集約する。 */
 export default function FolderEditorDialog({ name, nameError, nameRef, onNameChange, color, onColorChange, colors = FOLDER_SELECT_COLORS, allowClear, disabled, nameId, nameLabel, placeholder, maxLength, children, footer, confirmIcon, confirmTitle, confirmLabel = '追加する', cancelLabel = 'キャンセル', onConfirm, busy, confirmDisabled, error, ...dialog }: Props) {
   /*
    * 失敗の知らせは窓の本文の中（名前と色の下）に置く。窓の下の帯（やめる・保存する）とは本文の余白で離れ、

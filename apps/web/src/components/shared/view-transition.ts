@@ -10,7 +10,7 @@ type StartViewTransition = (callback: () => Promise<void>) => { updateCallbackDo
  * 素通り（そのまま変えるだけ）にするので、どこでも安心して呼べる。
  *
  * ブラウザは「渡した callback が返した Promise が終わった時点」の画面を新しい絵として撮る。
- * 以前は callback が何も返さず（`void update()`）、React の setState は後のコマで
+ * 以前は callback が何も返さず（`void update`）、React の setState は後のコマで
  * DOM へ反映されるので、古い画面どうしで移り変わっていた（切り替えが動きの後に飛ぶ）。
  * いまは callback の中で React の反映を flushSync で済ませ、update が Promise を返すときは
  * その終わりまで待ってから返す。

@@ -1,8 +1,8 @@
 import {beforeEach,afterEach,expect,test,vi} from 'vitest';
 import {Hono} from 'hono';
 import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';
-import type {Env} from '../index.js';
-import type {AuthenticatedStaff} from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import {lineSenders} from './line-senders.js';
 import {broadcastSendPreview} from '../services/gap-send-preview.js';
 import {getBroadcastById} from '@line-crm/db';

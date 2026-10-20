@@ -92,7 +92,7 @@ vi.mock('../services/event-bus.js', () => ({
   logOutgoingMessage: vi.fn().mockResolvedValue('outgoing-log-1'),
 }));
 
-vi.mock('../services/friend-add-routing.js', () => ({
+vi.mock('../features/friends/friend-add-routing.js', () => ({
   applyFriendAddRouting: vi.fn().mockResolvedValue({ routed: false, suppressed: false, enrollments: [] }),
 }));
 

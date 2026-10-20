@@ -125,7 +125,7 @@ export function useOffsetServerList<T>({
       setNavigation({ requestKey, page: keep ?? 1 })
       if (pageUrlKey && keep === null) writeListUrlParam(pageUrlKey, '')
       /*
-       * ★V7 sTJsh §2: 条件の切り替えでも前の一覧を消さない。
+       * ★管理画面 sTJsh §2: 条件の切り替えでも前の一覧を消さない。
        * 新しい答えが来るまで、いま出ている行・件数・ページ番号を
        * 残したまま読み直す（画面側は薄め＋上の線で伝える）。
        */
@@ -135,7 +135,7 @@ export function useOffsetServerList<T>({
 
     const controller = new AbortController()
     /*
-     * 前の一覧を残したまま読み直す（★V7 sTJsh §2）。行が出ているときは
+     * 前の一覧を残したまま読み直す（★管理画面 sTJsh §2）。行が出ているときは
      * 消さず、画面側が `refreshing` で薄め＋線の帯を出す。行が無いときは
      * ListState の読み込み表示が従来どおり出る。
      */
@@ -196,7 +196,7 @@ export function useOffsetServerList<T>({
     setPage,
     retry,
     /*
-     * 前の表示を残した読み直し中（★V7 sTJsh §2）。一覧を薄めて
+     * 前の表示を残した読み直し中（★管理画面 sTJsh §2）。一覧を薄めて
      * 上に線の帯を出す合図。初回・0件からの読み込みでは立たない。
      */
     refreshing: state.loading && state.items.length > 0,

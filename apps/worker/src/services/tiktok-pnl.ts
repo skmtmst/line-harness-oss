@@ -1,3 +1,5 @@
+import { jstDate as japanDate, jstDateTimeLocal as japanDateTimeLocal, jstCalendar as japanCalendar } from '@line-crm/shared';
+import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 /**
  * TikTok利益計算の自動化（第2段＝API連携）。
  *
@@ -12,7 +14,7 @@
  * worker が書くのは A〜L 列の生データだけ（M列以降は数式なので触らない）。
  * 秘密値（トークン・署名鍵）は応答・ログに出さない。
  */
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import {
   GoogleBusinessError,
   authorizedJson,
@@ -139,18 +141,18 @@ function jstDateOf(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const time = Date.parse(iso);
   if (Number.isNaN(time)) return null;
-  return new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return japanDate(new Date(time));
 }
 
 function jstDateTimeOf(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const time = Date.parse(iso);
   if (Number.isNaN(time)) return null;
-  return new Date(time + 9 * 60 * 60 * 1000).toISOString().slice(0, 16).replace('T', ' ');
+  return japanDateTimeLocal(new Date(time)).replace('T', ' ');
 }
 
 function jstMonthOf(nowIso: string, offsetMonths: number): string {
-  const base = new Date(Date.parse(nowIso) + 9 * 60 * 60 * 1000);
+  const base = japanCalendar(new Date(nowIso));
   const month = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + offsetMonths, 1));
   return month.toISOString().slice(0, 7);
 }
@@ -909,7 +911,7 @@ export async function processTiktokPnlTick(
       if (one.status === 'error') result.failed += 1;
     } catch (error) {
       result.failed += 1;
-      console.error(JSON.stringify({"code":"tiktok_pnl_sync_failed"}));
+      logger.error("tiktok_pnl_sync_failed");
     }
   }
   return result;

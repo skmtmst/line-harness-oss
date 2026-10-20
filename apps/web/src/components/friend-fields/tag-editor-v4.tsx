@@ -55,7 +55,7 @@ export const ACTION_TYPES = [
 export type TagEditorActionLabel = (typeof ACTION_TYPES)[number][0]
 
 /**
- * 画面に出す言葉（2026-10-15 司令塔・絵 gSsPR）。「〜を送る」「〜を付ける」の形にそろえる。
+ * 画面に出す言葉（2026-10-15 司令塔・絵 ）。「〜を送る」「〜を付ける」の形にそろえる。
  * 上の表の名前（「テキスト送信」など）は保存・権限・統括の絞り込みが読む内部の名前なので変えない。
  */
 export const ACTION_DISPLAY: Record<TagEditorActionLabel, string> = {

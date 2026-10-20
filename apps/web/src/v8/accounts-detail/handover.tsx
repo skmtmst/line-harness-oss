@@ -36,7 +36,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 LINEアカウントの乗り換え（Pencil `x2dSNv`）。
+ * ★V8 LINEアカウントの乗り換え（Pencil ）。
  *
  * 白い板の頭（乗り換え（元 → 先）・説明・右に「アカウントの詳細へ戻る」）→ 左に設定の中のメニュー →
  * 4つの段の札 → どこからどこへ／事前確認の結果 → 要確認の判断の表 → 保存していない書き換えの帯 →

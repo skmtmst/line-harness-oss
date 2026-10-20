@@ -8,7 +8,7 @@
   cursor: pointer;
 }
 
-/* 押したら少し沈む（★V7 修正方針 §4）。動きを減らす設定では変えない。 */
+/* 押したら少し沈む（★管理画面 修正方針 §4）。動きを減らす設定では変えない。 */
 
 .button:hover {
   color: var(--color-ink);
@@ -29,7 +29,7 @@
 
 /*
  * ★V8「アイコンボタン」（KspUx）：36×36・白地・細い枠・角丸 control。
- * v7 の透明な32pxから、操作だと分かる小さな箱へ変える。
+ * 管理画面 の透明な32pxから、操作だと分かる小さな箱へ変える。
  */
 :root .button {
   width: 36px;
@@ -81,11 +81,11 @@
   outline-offset: 2px;
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .button { border: 0; padding: 0; gap: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); }
 :root .button > :is(svg, img) { width: 16px; height: 16px; }
 
-/* 行の中の小さい形（size="small"・mcOqK の上下 24×24・印 12）。既定の 36 は変えない。 */
+/* 行の中の小さい形（size="small"・ の上下 24×24・印 12）。既定の 36 は変えない。 */
 :root .button[data-size='small'] {
   width: var(--tpl-icon-btn-sm);
   height: var(--tpl-icon-btn-sm);
@@ -99,7 +99,7 @@
 }
 
 /*
- * 行の右端の「…」（size="row"・★V8 i0Ao0R・noVq4・DzdC3・wZPua の「その他の操作」）：28×28・角丸 control・印 14。
+ * 行の右端の「…」（size="row"・★V8 ・・・ の「その他の操作」）：28×28・角丸 control・印 14。
  * 見た目は 28 のまま、押せる所だけ周りへ 36 まで広げる（::before は透明・行の高さは変えない）。
  */
 :root .button[data-size='row'] {
@@ -119,7 +119,7 @@
 :root .button[data-variant='plain']:hover:not(:disabled) { background: var(--polish-hover); }
 }
 
-/* B-152・仕上げ7 */
+/* ・仕上げ7 */
 :root .button[data-size='compact'] { width: var(--select-menu-field-h); height: var(--select-menu-field-h); min-height: var(--select-menu-field-h); flex-basis: var(--select-menu-field-h); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); }
 :root .button:disabled { opacity: var(--polish-disabled-opacity); }
 :root .button:is(:hover, :active):not(:disabled) { filter: none; }

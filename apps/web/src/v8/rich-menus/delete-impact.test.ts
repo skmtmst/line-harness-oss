@@ -1,6 +1,6 @@
 /*
  * src/v8/rich-menus/delete-impact.ts の試験。元の app/rich-menus/delete-impact.test.ts と同じ中身
- * （2026-10-06 に写した。元の試験は切り替えの日まで残す）。切り替えの日に v7 の試験を消しても、
+ * （2026-10-06 に写した。元の試験は切り替えの日まで残す）。切り替えの日に 管理画面 の試験を消しても、
  * この計算の見張りが残るようにする。中身を変えるときは両方を直す。
  */
 import { describe, expect, it } from 'vitest'

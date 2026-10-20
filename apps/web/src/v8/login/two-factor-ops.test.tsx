@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { trustedChallengeUrl } from '@/test-utils/trusted-auth-handoff'
 import React, { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,7 +9,7 @@ import TwoFactorLoginPage from '@/app/login/two-factor/page'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 /*
- * ★V8-B 運営 ログイン 2段目（tOPeY）。入口の分け方を見張る：
+ * ★V8-B 運営 ログイン 2段目。入口の分け方を見張る：
  * 運営も管理画面もV8の6桁入力に固定し、運営の戻り先と権限確認は区別する。
  */
 vi.mock('next/link', () => ({
@@ -25,7 +26,7 @@ let host: HTMLDivElement
 let root: Root
 
 async function open(url: string, theme: 'v7' | 'v8') {
-  window.history.replaceState(null, '', url)
+  window.history.replaceState(null, '', trustedChallengeUrl(url))
   document.documentElement.dataset.theme = theme
   await act(async () => { root.render(<TwoFactorLoginPage />) })
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })

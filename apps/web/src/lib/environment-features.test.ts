@@ -20,7 +20,7 @@ describe('管理画面の環境限定機能', () => {
 })
 
 
-describe('B-368 Google ビジネスの旗', () => {
+describe('Google ビジネスの旗', () => {
   afterEach(() => vi.unstubAllEnvs())
   it.each(['', 'false', 'yes'])('明示的なtrue以外では閉じる: %s', value => expect(googleBusinessUiEnabled(value)).toBe(false))
   it('2つの旗を独立して読む', () => {

@@ -1,3 +1,5 @@
+> 文書：PULL_REQUEST_TEMPLATE.md｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 ## Summary
 
 <!-- Describe the problem and fix in 2-5 bullets. -->

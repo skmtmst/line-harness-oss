@@ -11,12 +11,12 @@ import MileagePage from './page'
 
 /*
  * ★V8-B マイル（Pencil「★V8-B 画面の地図」の行：
- * たまる決めごと `OC0gy`・使い道 `S35pO`・友だちの残高 `CJlf4`・
- * 履歴 `oRbJi`・行動スコア `IRPw8`・状態 `zaqP9`・1152 `ZJIyl`・
- * 閲覧のみ `E2Any`）の契約。
+ * たまる決めごと ・使い道 ・友だちの残高 ・
+ * 履歴 ・行動スコア ・状態 ・1152 ・
+ * 閲覧のみ ）の契約。
  * `<html data-theme="v8">` の下でだけ新しい器に切り替わり、
  * タブごとの板 ID・数の帯・表・操作が出ることを実DOMで固定する。
- * v7 では従来の器が出ることも固定する。
+ * 互換経路では従来の器が出ることも固定する。
  */
 let query = ''
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
@@ -30,7 +30,7 @@ vi.mock('@/contexts/account-context', () => ({
   }),
 }))
 
-/* 1152 の板（ZJIyl）に切り替えないよう、広い画面として描く。 */
+/* 1152 の板に切り替えないよう、広い画面として描く。 */
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
 
 let staffRole = 'admin'
@@ -287,7 +287,7 @@ test('v8 のたまる決めごとは板 OC0gy に切り替わる', async () => {
   expect(host.textContent).toContain('たまる決めごと')
   expect(host.textContent).toContain('決めごとを作る')
   expect(host.textContent).toContain('動いています')
-  // v7 の器は出ない
+  // 管理画面 の器は出ない
   expect(host.querySelector('[data-mileage-design="v6"]')).toBeNull()
   // 準備中は置かない
   expect(host.textContent).not.toContain('準備中')

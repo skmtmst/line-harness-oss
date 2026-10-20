@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), friends: vi.fn(), saveSearch: vi.fn(), rename: vi.fn() }))
 const nav = vi.hoisted(() => ({ push: vi.fn() }))
-vi.mock('@/lib/api-gap3', () => ({ customerSegmentsApi: api }))
+vi.mock('@/lib/api/helpers/gap3', () => ({ customerSegmentsApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: nav.push, replace: vi.fn() }), usePathname: () => '/analytics', useSearchParams: () => new URLSearchParams() }))
 
 const { default: SegmentsV8 } = await import('./segments')

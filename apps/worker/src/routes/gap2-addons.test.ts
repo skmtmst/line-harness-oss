@@ -1,6 +1,6 @@
 import {beforeEach,afterEach,test,expect,vi} from 'vitest';
 import booking from './booking.js';
-import {bookingAddons} from '../services/booking-addons.js';
+import {bookingAddons} from '../features/booking/booking-addons.js';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
 let d:SqliteD1;

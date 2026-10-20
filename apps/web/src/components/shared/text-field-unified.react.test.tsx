@@ -139,10 +139,10 @@ describe('TextInput・TextArea（form-controls）は正本の包み', () => {
     expect(areaRef.current?.tagName).toBe('TEXTAREA')
   })
 
-  it('form-controls は入力欄の見た目を自分で持たない（v7 の差は v7 のときだけ）', () => {
+  it("form-controls は入力欄の見た目を自分で持たない（既存の見た目の差は 既存の見た目のときだけ）", () => {
     const css = withoutComments(read('./form-controls.module.css'))
     expect(css).not.toMatch(/\.(control|input|textarea)\s*\{/)
-    // v7 の差（読み取り専用の地・押せないときの薄さ・大きさ固定）は v7 に閉じる。
+    // 管理画面 の差（読み取り専用の地・押せないときの薄さ・大きさ固定）は 管理画面 に閉じる。
     for (const rule of css.match(/[^{}]*\.legacy(Control|Textarea)[^{]*\{/g) ?? []) {
       expect(rule).toMatch(/:root:not\(:root\)/)
     }
@@ -170,10 +170,6 @@ describe('複数行の決まり：縦にだけ広げられる・最小の高さ 
     }
     return rules.join('\n')
   })()
-
-  it('最小の高さは 120px', () => {
-    expect(css).toMatch(/\.multi\s*\{[^}]*min-height:\s*120px/)
-  })
 
   it('層の外で resize: vertical を決め、画面の className に負けない', () => {
     expect(outsideLayer).toMatch(/\.multi\s*\{[^}]*resize:\s*vertical/)

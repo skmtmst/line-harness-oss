@@ -8,6 +8,7 @@ import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import ListToolbar from '@/components/shared/list-toolbar'
+import PageSizeSelect from '@/components/shared/page-size-select'
 import Select from '@/components/shared/select'
 import SectionHeader from '@/components/shared/section-header'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -16,7 +17,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
 import { restaurantGoogleApi, type GoogleChangeStatus, type GoogleHistoryData, type GoogleHistoryKind, type GoogleHistoryResult } from '@/lib/restaurant-google-api'
 import { errorMessage, formatStampFull } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 
 const STATUS_LABEL: Record<GoogleChangeStatus, { label: string; tone: StatusBadgeTone }> = {
@@ -46,6 +47,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
   const [search, setSearch] = useState('')
   const [applied, setApplied] = useState('')
   const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(20)
   const [data, setData] = useState<GoogleHistoryData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -56,14 +58,14 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
     setLoading(true)
     setError('')
     try {
-      const response = await restaurantGoogleApi.history(accountId, { kind, result, days: Number.parseInt(days, 10), q: applied || undefined, page, perPage: 20 })
+      const response = await restaurantGoogleApi.history(accountId, { kind, result, days: Number.parseInt(days, 10), q: applied || undefined, page, perPage })
       if (version === requestVersion.current) setData(response)
     } catch (err) {
       if (version === requestVersion.current) setError(errorMessage(err, '変更履歴を読み込めませんでした。'))
     } finally {
       if (version === requestVersion.current) setLoading(false)
     }
-  }, [accountId, applied, days, kind, page, result])
+  }, [accountId, applied, days, kind, page, perPage, result])
 
   useEffect(() => { void load(); return () => { requestVersion.current += 1 } }, [load])
   useEffect(() => {
@@ -97,14 +99,13 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
 
   return (
     <>
-      <div className={styles.buttonRow}><Button onClick={() => go({ tab: 'profile' })}>プロフィールへ戻る</Button></div>
       <SectionHeader title="変更履歴" description="このLINEアカウントの店舗に対して、Googleへ送った変更の記録です。Google側で直接行われた変更は含みません。"
         actions={<Button onClick={() => void exportCsv()} disabled={exporting || !data || data.total === 0} busy={exporting} busyLabel="書き出し中…">CSVで書き出す</Button>} />
       <Tabs size="compact" label="変更の種類" items={HISTORY_KINDS.map((k) => ({ label: k.label, count: data?.counts[k.key], current: kind === k.key, onClick: () => { setKind(k.key); setPage(1) } }))} />
       <ListToolbar search={{ placeholder: '内容で検索', label: '内容で検索', value: search, onChange: setSearch }} filters={<>
         <Select aria-label="結果で絞り込み" value={result} onChange={(value) => { setResult(value as GoogleHistoryResult); setPage(1) }} options={[{ value: 'all', label: '結果：すべて' }, { value: 'applied', label: '反映済み' }, { value: 'pending', label: '反映確認中' }, { value: 'failed', label: '失敗・取り消し' }]} />
         <Select size="page-size" aria-label="期間" value={days} onChange={(value) => { setDays(value); setPage(1) }} options={[{ value: '7', label: '期間：7日' }, { value: '30', label: '期間：30日' }, { value: '90', label: '期間：90日' }, { value: '365', label: '期間：1年' }]} />
-      </>} />
+      </>} trailing={<PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); setPage(1) }} />} />
       {loading && !data ? <ListState kind="loading" title="変更履歴を読み込んでいます" /> : null}
       {error ? <ListState kind="error" title="変更履歴を表示できませんでした" description={error} onRetry={() => void load()} /> : null}
       {data && data.total === 0 && !loading ? <ListState kind="empty" title="この期間の記録はありません" description="Googleへ送った変更（営業時間・プロフィール・口コミ返信）がここに残ります。" emptyPreset="readonly" /> : null}

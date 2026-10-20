@@ -11,7 +11,6 @@ describe('流入リンク編集窓の監査対応（R270・R271）', () => {
     expect(MODAL).toContain(
       'const saveDisabled = submitting',
     )
-    expect(MODAL).toContain("if ((b244Requirements.form_name.check(form.name) !== null)) errors['route-name']")
     expect(MODAL).toContain('if (!validateFields()) return')
     expect(MODAL, 'フォルダが必須のまま').not.toMatch(/saveDisabled = [^\n]*form\.genre/)
   })

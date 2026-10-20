@@ -1,7 +1,9 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import ts from 'typescript'
 import {
   EFFECTIVE_LEGEND,
   LOAD_STATE_WORDS,
@@ -17,12 +19,17 @@ import {
   responseTypeWord,
   templateWord,
   visibleAutoReplyLoadState,
-} from '@/app/auto-replies/auto-reply-words'
+} from '@/v8/auto-replies/auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (...parts: string[]) => readFileSync(join(HERE, ...parts), 'utf8')
-const PAGE = read('../../v8/auto-replies/list.tsx')
-const WORDS = read('auto-reply-words.ts')
+const readImplementation = (...parts: string[]) => readUiSource(join(HERE, ...parts), 'utf8')
+const PAGE = readImplementation('../../v8/auto-replies/list.tsx')
+// コメントは運用者に表示されない。分割先の説明文を画面の内部語と誤認しない。
+const PAGE_WITHOUT_COMMENTS = ts.createPrinter({ removeComments: true }).printFile(
+  ts.createSourceFile('list.tsx', PAGE, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX),
+)
+const WORDS = read("../../v8/auto-replies/auto-reply-words.ts")
 const DIALOG = read('..', '..', 'components', 'shared', 'dialog.tsx')
 const CONFIRM = read('..', '..', 'components', 'shared', 'confirm-dialog.tsx')
 
@@ -193,7 +200,7 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
    * のずれが起きる。**独自表が復活したらここで落とす。**
    */
   it('編集画面のメッセージ種別と、一覧の言い換えがずれない', () => {
-    const EDIT = read('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
+    const EDIT = readImplementation('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
     expect(EDIT, '編集画面に独自の種別表が復活している').not.toContain('const MESSAGE_KIND_LABELS')
     expect(EDIT, '編集画面が共通の表を使っていない').toContain("auto-reply-words'")
     expect(EDIT).toContain('MESSAGE_KIND_WORDS')
@@ -264,7 +271,7 @@ describe('一覧の画面が置き換え表を通す', () => {
       '>template<',
       '包含',
     ]) {
-      expect(PAGE, `画面に「${banned}」が残っています`).not.toContain(banned)
+      expect(PAGE_WITHOUT_COMMENTS, `画面に「${banned}」が残っています`).not.toContain(banned)
     }
   })
 

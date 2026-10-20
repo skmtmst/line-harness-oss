@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import ts from 'typescript'
-const root = fileURLToPath(new URL('../../', import.meta.url))
+const root = fileURLToPath(new URL('../..', import.meta.url))
 const args = process.argv.slice(2)
 const base = args.includes('--base') ? args[args.indexOf('--base') + 1] : null
 const files = execFileSync('rg', ['--files', 'apps/web/src/v8', '-g', '*.tsx', '-g', '!*.test.tsx'], { cwd: root, encoding: 'utf8' }).trim().split('\n')

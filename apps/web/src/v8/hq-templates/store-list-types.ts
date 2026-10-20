@@ -26,7 +26,7 @@ export interface HqStoreListProps {
   onReloadFolders?: () => Promise<void>
   onCreate: () => void
   onEdit: (row: HqTemplate) => void
-  /** 名前を押したとき（詳細 pQ4fH）。無ければ編集を開く。 */
+  /** 名前を押したとき（詳細 ）。無ければ編集を開く。 */
   onOpen?: (row: HqTemplate) => void
   itemHref?: (row: HqTemplate) => string
   onDistributeFolder?: (id: string, name: string) => void

@@ -1,4 +1,4 @@
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError} from './gap-common.js';
 export type AccountAiFeature='banner'|'google_review';
 export const AI_DISCLOSURE_VERSION='2026-10-16';

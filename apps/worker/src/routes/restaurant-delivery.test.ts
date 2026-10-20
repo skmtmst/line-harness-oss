@@ -16,6 +16,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import { currentInvocation, withInvocation } from '@line-crm/shared/server';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 type MockStaff = {
@@ -1242,7 +1243,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
 
   /**
    * 戻り先の受け口は統括の指定を付けずに呼ぶ。
-   * call() は必ず account_id を足してしまうので、ここでは直接組み立てる。
+   * call は必ず account_id を足してしまうので、ここでは直接組み立てる。
    */
   async function callback(
     query: Record<string, string>,
@@ -1830,7 +1831,13 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       // 401は再試行しない相手の拒否。権限切れとして扱う。
       stubUberApi({ listStatus: 401 });
 
-      const res = await call(STORES_PATH);
+      const { res, trace } = await withInvocation('http', async () => ({
+        res: await call(STORES_PATH), trace: currentInvocation()!,
+      }));
+      expect(errorSpy.mock.calls.map((args: unknown[]) => JSON.parse(String(args[0])))).toContainEqual(expect.objectContaining({
+        code: 'routes_restaurant_delivery_failed', level: 'error', source: 'http',
+        requestId: trace.requestId, invocationId: trace.invocationId,
+      }));
       expect(res.status).toBe(502);
       const body = (await res.json()) as Record<string, unknown>;
       expect(body).toMatchObject({ code: 'auth_expired' });
@@ -1922,7 +1929,7 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
         connected_at: connectedAt,
         provisioned_at: NOW.getTime(),
         last_error: null,
-        version: 2,
+        version: 3,
       });
       // 選び終わった候補は残さない。
       expect(candidateRows()).toHaveLength(0);
@@ -1934,10 +1941,16 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       const calls = stubUberApi({ posStatus: 503 });
       await call(STORES_PATH);
 
-      const res = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      const { res, trace } = await withInvocation('http', async () => ({
+        res: await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } }), trace: currentInvocation()!,
+      }));
+      expect(errorSpy.mock.calls.map((args: unknown[]) => JSON.parse(String(args[0])))).toContainEqual(expect.objectContaining({
+        code: 'routes_restaurant_delivery_failed', level: 'error', source: 'http',
+        requestId: trace.requestId, invocationId: trace.invocationId,
+      }));
       expect(res.status).toBe(502);
       const body = (await res.json()) as Record<string, unknown>;
-      expect(body).toMatchObject({ code: 'unavailable' });
+      expect(body).toMatchObject({ code: 'pos_activation_unknown' });
       expect(JSON.stringify(body)).not.toContain(PROVIDER_FREE_TEXT);
 
       // 二重に送ると連携が重なるので、失敗しても自動で送り直さない。
@@ -1947,13 +1960,91 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       expect(rows[0]).toMatchObject({
         status: 'pending_store',
         provisioned_at: null,
-        last_error: 'unavailable',
+        last_error: 'pos_activation_unknown',
       });
       expect(JSON.stringify(rows)).not.toContain(PROVIDER_FREE_TEXT);
       expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
       // 取り直さずに選び直せるよう、候補は残す。
       expect(candidateRows()).toHaveLength(1);
     });
+    it('外部が503なら再表示・候補再取得・再認可でも送信開始を消さない', async () => {
+      await seedLoggedIn();
+      const calls = stubUberApi({ posStatus: 503 });
+      await call(STORES_PATH);
+      const first = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(first.status).toBe(502);
+      expect(await first.json()).toMatchObject({ code: 'pos_activation_unknown' });
+      for (const path of [SELECT_PATH, STORES_PATH, '/api/restaurant-test/delivery/ubereats/connect/start']) {
+        const res = await call(path, path === STORES_PATH ? {} : { body: { storeId: UBER_STORE_ID } });
+        expect(res.status).toBe(409);
+        expect(await res.json()).toMatchObject({ code: 'pos_activation_unknown' });
+      }
+      expect(calls.filter((entry) => entry.url.endsWith('/pos_data'))).toHaveLength(1);
+      expect(connectionRows()[0]).toMatchObject({ status: 'pending_store', last_error: 'pos_activation_unknown', uber_store_id: UBER_STORE_ID });
+    });
+
+    it('外部受理後にD1保存が失敗してもstartedを残し、再送しない', async () => {
+      await seedLoggedIn();
+      const calls = stubUberApi();
+      await call(STORES_PATH);
+      testDb.raw.exec(`CREATE TRIGGER stop_activation_save BEFORE UPDATE OF status ON rt_delivery_uber_connections
+        WHEN NEW.status = 'connected' BEGIN SELECT RAISE(ABORT, 'test storage failure'); END;`);
+      const first = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(first.status).toBe(502);
+      expect(await first.json()).toMatchObject({ code: 'pos_activation_unknown' });
+      expect(connectionRows()[0]).toMatchObject({ status: 'pending_store', last_error: 'pos_activation_started' });
+      testDb.raw.exec('DROP TRIGGER stop_activation_save');
+      const second = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(second.status).toBe(409);
+      expect(calls.filter((entry) => entry.url.endsWith('/pos_data'))).toHaveLength(1);
+    });
+
+    it('通信断は不明として止め、外部の自由文や秘密値を残さない', async () => {
+      await seedLoggedIn();
+      seedCandidate({ uber_store_id: UBER_STORE_ID });
+      const external = vi.fn(async () => { throw new Error(PROVIDER_FREE_TEXT); });
+      vi.stubGlobal('fetch', external);
+      const first = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(first.status).toBe(502);
+      expect(await first.json()).toMatchObject({ code: 'pos_activation_unknown' });
+      const second = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(second.status).toBe(409);
+      expect(external).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(connectionRows()) + JSON.stringify(errorSpy.mock.calls)).not.toContain(PROVIDER_FREE_TEXT);
+    });
+
+    it('同じ店舗を並行して確定しても外部へは1回しか送らない', async () => {
+      await seedLoggedIn();
+      seedCandidate({ uber_store_id: UBER_STORE_ID });
+      const calls = stubUberApi();
+      const results = await Promise.all([
+        call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } }),
+        call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } }),
+      ]);
+      expect(results.map((res) => res.status).sort()).toEqual([200, 409]);
+      expect(calls.filter((entry) => entry.url.endsWith('/pos_data'))).toHaveLength(1);
+      expect(connectionRows()[0]).toMatchObject({ status: 'connected', last_error: null });
+    });
+
+    it('POSの確定拒否401は期限切れと分かる形で止め、再送しない', async () => {
+      await seedLoggedIn();
+      seedCandidate({ uber_store_id: UBER_STORE_ID });
+      const calls = stubUberApi({ posStatus: 401 });
+      const res = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(res.status).toBe(502);
+      expect(await res.json()).toMatchObject({ code: 'auth_expired' });
+      expect(connectionRows()[0]).toMatchObject({ status: 'expired', last_error: 'auth_expired' });
+      expect(calls).toHaveLength(1);
+    });
+
+    it('入力の誤りは項目を返し、外部へ送らない', async () => {
+      const calls = stubUberApi();
+      const res = await call(SELECT_PATH, { body: {} });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: 'store_id_required', fields: { storeId: 'つなぐお店を選んでください' } });
+      expect(calls).toHaveLength(0);
+    });
+
   });
 });
 

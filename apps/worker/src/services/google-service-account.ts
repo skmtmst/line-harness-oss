@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
 
@@ -77,7 +78,7 @@ export async function getGoogleServiceAccountToken(
   const assertion = `${unsigned}.${base64Url(new Uint8Array(signature))}`;
 
   const response = await fetch(TOKEN_URL, {
-    method: 'POST',
+    method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(10_000),
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',

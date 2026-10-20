@@ -25,7 +25,7 @@ const ALLOWED_SAME_VALUE = [
   // §6: 主操作と成功、危険の札と危険操作は役割別に名前を残す。
   '--color-accent-deep / --color-success',
   '--color-danger / --color-status-danger',
-  // §6 B-149: 区切り線と枠線は同じ黒7%。
+  // §6 : 区切り線と枠線は同じ黒7%。
   '--color-hairline / --color-divider',
   // V8の薄い面と表見出しは現在同じ背景。役割ごとの入口を残す。
   '--color-surface-pearl / --color-table-head',
@@ -33,13 +33,9 @@ const ALLOWED_SAME_VALUE = [
   '--color-on-accent / --color-on-action / --color-canvas',
   // 既存の字重の別名。大きな数以外は600。
   '--font-weight-bold / --font-weight-extrabold',
-  // §6: 入力・操作10、印の小型6。役割別の入口を維持。
-  '--radius-control / --radius-tile / --radius-segment',
-  '--radius-icon / --radius-tile-sm',
-  // §6: 補足とラベル12、大きな数28。
-  '--text-caption / --text-label',
+  // §6: 大きな数。
   '--text-hero / --text-metric',
-  // B-152: 補足・本文・小さい文字は現在1.5。サイズに対応する入口を維持する。
+  // : 補足・本文・小さい文字は現在1.5。サイズに対応する入口を維持する。
   '--text-caption--line-height / --text-body--line-height / --text-micro--line-height',
   '--text-lead--line-height / --text-heading--line-height / --text-title--line-height',
 ]
@@ -79,8 +75,8 @@ describe('設計の実測値に合わせる', () => {
     expect(token('radius-pill')).toBe('999px')
   })
 
-  it('V6の18pxをTailwind既定の rounded-lg へ流し込まない', () => {
-    // `--radius-lg` をここで定義すると、V6専用の2箇所だけでなく
+  it("管理画面の18pxをTailwind既定の rounded-lg へ流し込まない", () => {
+    // `--radius-lg` をここで定義すると、管理画面専用の2箇所だけでなく
     // 既存の `rounded-lg` 利用先85ファイルが8pxから18pxへ変わる。
     expect(CSS).not.toMatch(/--radius-lg:\s*18px/)
     expect(token('radius-large')).toBe('16px')
@@ -108,8 +104,8 @@ describe('設計の実測値に合わせる', () => {
     )
   })
 
-  it('V6 の別系統トークンを残さない', () => {
-    // `--color-v6-*` `--radius-v6-*` `--shadow-v6-*` は 1 系統へ畳んだ。
+  it("管理画面 の別系統トークンを残さない", () => {
+    // `--color-管理画面-*` `--radius-管理画面-*` `--shadow-管理画面-*` は 1 系統へ畳んだ。
     const theme = CSS.slice(CSS.indexOf('@theme {'), CSS.indexOf('\n}\n', CSS.indexOf('@theme {')))
     const left = [...theme.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/^\s*(--[a-z0-9-]*-v6-[a-z0-9-]+):/gm)].map((m) => m[1])
     expect(left, 'V6 専用の別名トークンが戻っている').toEqual([])
@@ -145,7 +141,7 @@ describe('設計の実測値に合わせる', () => {
     expect(BUTTON).toMatch(/font-size:\s*var\(--text-body\)/)
     expect(BUTTON).toMatch(/:root \.button\s*{[^}]*font-weight:\s*var\(--tpl-button-weight\)/s)
     expect(token('tpl-button-weight')).toBe('600')
-    // B-152：文字だけの操作もボタンの太さ600。本文400へ戻さない。
+    // ：文字だけの操作もボタンの太さ600。本文400へ戻さない。
     expect(BUTTON).toMatch(/:root \.button\.inline\.text\s*{[^}]*font-weight:\s*var\(--font-weight-bold\)/s)
     expect(token('font-weight-bold')).toBe('600')
     // タッチ端末（pointer: coarse）は44pxの当たり判定を確保する

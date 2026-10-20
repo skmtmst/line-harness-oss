@@ -1,3 +1,5 @@
+> 文書：21 NEN配信 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 21 NEN配信 操作と挙動（受け入れ）
 
 要件の正本：[V6 21 NEN配信 要件定義](../../v6-requirements/v6-21-nen-delivery-requirements-draft.md)。共通の動き・権限は [共通基盤](../../v6-requirements/v6-shared-platform-requirements.md)（§3 権限・§6-2 再試行・§6-3 実行直前の判定・§9 未取得・§11 応答コード・§15 進みと知らせ）、権限モデルは [30 ログインユーザー](../../v6-requirements/v6-30-login-users-requirements-draft.md) §7〜§8。見た目は ★V8 と [V8 デザインの決まり](../../v8-design-rules.md)。
@@ -91,7 +93,7 @@
 | 1 | 再試行は共通基盤 §6-2（1分・5分・30分の最大3回） | 最大5回。待ち時間を持たず、次の5分ごとの回で拾い直す（次に試す時刻の欄が無い） | apps/worker/src/services/nen-engagement.ts:26, 1099-1100, 1268-1271 |
 | 2 | §8 claim の期限と時間切れからの回復 | 「送信中」にした行は、途中で処理が落ちると拾い直す仕組みが無い（拾うのは待ち・失敗だけ） | apps/worker/src/services/nen-engagement.ts:1099, 1165-1168 |
 | 3 | §3 到着は到着の出来事、無ければ「予定」と表示 | 到着の出来事を使わず、発送日＋日数で予約する。画面は「発送から N日後」と出す | apps/worker/src/services/nen-engagement.ts:740-745、apps/web/src/v8/nen-campaigns/display.ts:48 |
-| 4 | §3 注文ありがとう・発送案内も NEN の流れ | この2つは EC 通知（23）の設定で送り、NEN配信の画面では直せない（NEN の設定キーに無い）。NEN 側の組み立て関数は呼ばれていない | apps/worker/src/routes/nen-campaigns.ts:60-62、apps/worker/src/services/ec-event-processing.ts:313-338、apps/worker/src/services/nen-engagement.ts:711 |
+| 4 | §3 注文ありがとう・発送案内も NEN の流れ | この2つは EC 通知（23）の設定で送り、NEN配信の画面では直せない（NEN の設定キーに無い）。NEN 側の組み立て関数は呼ばれていない | apps/worker/src/routes/nen-campaigns.ts:60-62、apps/worker/src/features/ec-commerce/ec-event-processing.ts:313-338、apps/worker/src/services/nen-engagement.ts:711 |
 | 5 | §7 2月29日の既定は 2/28 | 決めごとを保存していない店・保存が古い店は「その年は送らない」になる（共通の既定の行に方針が無い） | apps/worker/src/routes/nen-campaigns.ts:1231-1233、apps/worker/src/services/nen-engagement.ts:658-660, 953、packages/db/migrations/071_nen_engagement.sql:105 |
 | 6 | §4 公開版と下書き、版ごとの公開 | 版は無く、保存がそのまま動いている設定になる（待っている分は写しで守る） | apps/worker/src/routes/nen-campaigns.ts:243 |
 | 7 | §4 止めるときは「新規だけ」か「待ちも止める」を選ぶ（既定は新規停止＋待ちの確認） | 選べない。止めると待っている分は送る直前に「止めた配信」で送らない。止める・動かすに版の確かめが無い | apps/worker/src/routes/nen-campaigns.ts:407-437、apps/worker/src/services/nen-engagement.ts:1180-1190 |

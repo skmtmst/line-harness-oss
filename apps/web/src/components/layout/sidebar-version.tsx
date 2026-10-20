@@ -8,7 +8,7 @@ import TextLink from '@/components/shared/text-link'
 
 /**
  * 共通メニューのいちばん下。いま動いている版・commit・配備日時と環境。
- * 設計 ★V7 監査の直し E（`PjoNp`）。
+ * 設計 ★管理画面 監査の直し E（`PjoNp`）。
  *
  * 取れない・仮の値のときは「版の情報なし」。穴埋めの数字は出さない。
  * 押せない飾りなので button や link にしない。

@@ -59,7 +59,7 @@ const sampleCtx = (overrides: Partial<UpdateContext> = {}): UpdateContext => ({
 /**
  * Build a fetch mock that routes by URL substring. Each entry returns a
  * Response-shaped object (only the fields preflight inspects: ok + status,
- * plus a json() callback for completeness).
+ * plus a json callback for completeness).
  */
 function makeRouter(
   routes: Record<string, { ok: boolean; status: number; body?: unknown }>,

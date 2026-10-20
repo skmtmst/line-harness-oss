@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { webMeasurement } from './web-measurement.js';
 import { conversions } from './conversions.js';
@@ -109,7 +109,7 @@ async function req(handler: Hono<Env>, db: SqliteD1, path: string, init?: Reques
 }
 
 function eventCount(db: SqliteD1): number {
-  // `.get() as T` の直後に `.n` を書くとトランスパイルでプロパティ参照が落ちるため、一度変数に置く。
+  // `.get as T` の直後に `.n` を書くとトランスパイルでプロパティ参照が落ちるため、一度変数に置く。
   const row = db.raw.prepare('SELECT COUNT(*) AS n FROM conversion_events').get() as { n: number } | undefined;
   return Number(row?.n ?? 0);
 }

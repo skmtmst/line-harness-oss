@@ -5,14 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsSupportPage from './page'
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
-import { compareLabel, durationLabel, elapsedLabel } from './format'
+import { compareLabel, durationLabel, elapsedLabel } from '../../../v8/ops/support/format'
 import type { OpsKnowledgeReference, OpsSupportDetail } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 vi.mock('next/link', () => ({ default: ({ children }: { children: React.ReactNode }) => <a>{children}</a> }))
 
-/** ★V6 37-6 お問い合わせ。一覧・内容・返信・AI下書きの3状態が API の形どおりに出ること。 */
+/** ★管理画面 37-6 お問い合わせ。一覧・内容・返信・AI下書きの3状態が API の形どおりに出ること。 */
 
 const ticket = {
   id: 't1', ticketNo: 312, ticketLabel: '#MB-0312', tenantId: 'tenant-a', tenantName: '株式会社サンプル',
@@ -259,7 +259,7 @@ describe('画面', () => {
     const send = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '返信する')
     await act(async () => { send!.click() })
     await flush()
-    // 板 `GgP2d`「この返事を送りますか？」を見てから送る。
+    // 板 「この返事を送りますか？」を見てから送る。
     const confirm = document.body.querySelector('[data-design-node="GgP2d"]')
     expect(confirm, '返事の確認の窓が出ない').not.toBeNull()
     for (const row of ['この返事を送りますか？', '宛先', '状態', '優先度', '下書きを削除', '戻って直す', '送信する']) {

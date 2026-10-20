@@ -8,7 +8,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 
 
 /*
- * ★V8 会話の頭の「担当」「対応状況」（M0393 XqSvX の頭・段2「5. 会話の頭のメニュー」）。
+ * ★V8 会話の頭の「担当」「対応状況」（ XqSvX の頭・段2「5. 会話の頭のメニュー」）。
  *
  * どちらも1つだけ選ぶもの。共通の選ぶ欄（shared/select）を使う。V8 の選ぶ欄は
  * 四角い箱を出さず、選んでいる行は ✓ だけ（オーナー指摘：複数選べないのにチェックボックス）。

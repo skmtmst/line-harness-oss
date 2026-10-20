@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = readFileSync(join(import.meta.dirname, '../../../v8/inflow-links/detail.tsx'), 'utf8')
-// 削除の窓は v7・V8 の両方で使う共用部品へ移した（中身は同じ）。
+// 削除の窓は 管理画面・V8 の両方で使う共用部品へ移した（中身は同じ）。
 // 削除の窓は詳細の画面（detail/page.tsx）の中にある。古い _components/inflow-delete-dialog.tsx はどこからも描かれないので 2026-10-07 に消した。
 const DIALOG = readFileSync(join(import.meta.dirname, '../../../v8/inflow-links/detail.tsx'), 'utf8')
 

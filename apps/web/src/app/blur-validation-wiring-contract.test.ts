@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /*
- * ★V7 sTJsh §6「欄から離れた時点で教える」の配線を機械的に確認する。
+ * ★管理画面 sTJsh §6「欄から離れた時点で教える」の配線を機械的に確認する。
  *
  * 共有の `useFormErrors` で欄を登録し、`CreatePage` の `fields` へ渡すと
  * 「離れた欄だけ出す・送信でまとめ＋1つ目へ移る」がそろう。新しい入力画面を
@@ -16,7 +16,7 @@ const WIRED = [
   'v8/settings/staff/create.tsx',
 ]
 
-describe('blur検証の配線（★V7 sTJsh §6）', () => {
+describe("blur検証の配線", () => {
   for (const file of WIRED) {
     it(`${file} は useFormErrors を CreatePage へ渡している`, () => {
       const source = readFileSync(join(SRC, file.replace(/^app\//, 'app/')), 'utf8')

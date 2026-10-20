@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * B-139：保存で落ちた欄は、テキスト以外（プルダウン・選ぶ欄・日付）も赤くなり、
+ * ：保存で落ちた欄は、テキスト以外（プルダウン・選ぶ欄・日付）も赤くなり、
  * タブの札に直す欄の数の赤い丸が付く。
  */
 import React, { act } from 'react'
@@ -29,7 +29,7 @@ afterEach(async () => {
 
 const noop = () => {}
 
-describe('欄の誤りをテキスト以外の欄でも出す（B-139）', () => {
+describe('欄の誤りをテキスト以外の欄でも出す', () => {
   it('Field に誤りがあると、プルダウン・選ぶ欄・日付が aria-invalid になり、理由を読み上げにつなぐ', async () => {
     await act(async () => {
       root.render(

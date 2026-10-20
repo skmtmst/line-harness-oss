@@ -52,7 +52,7 @@ describe('LIFF caller identity', () => {
   });
 });
 
-test('B-173: LIFFで指定したアカウントのチャンネルだけで本人確認する', async () => {
+test('LIFFで指定したアカウントのチャンネルだけで本人確認する', async () => {
  dbMocks.getLineAccounts.mockResolvedValue([{id:'a',login_channel_id:'login-a'},{id:'b',login_channel_id:'login-b'}]);
  const verify=vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({sub:'U1'}),{status:200}));vi.stubGlobal('fetch',verify);
  expect(await verifyCallerLineIdentity('Bearer token',{DB,LINE_LOGIN_CHANNEL_ID:'login-a'},'b')).toEqual({lineUserId:'U1',lineAccountId:'b'});

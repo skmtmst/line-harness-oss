@@ -1,6 +1,0 @@
-板ID	URL	開き方	今回の確認	正式判定
-svUTk	/restaurant-test/dashboard	電話予約 → fill:電話番号=090-1111-2222 → 山田 花子 LINE の友だち・090-1111-2222	未保存の印なし・確認/入力保持	撮影係/司令塔待ち
-nVvXy	/restaurant-test/inventory?tab=closures	臨時休業・貸切を足す	上147・末尾操作/Googleへ到達	撮影係/司令塔待ち
-u8sKN	/auto-replies	の操作 → 削除する	既定の幅/上位置/操作の比較	撮影係/司令塔待ち
-VsSyu	/reminders	の操作 → 削除	既定の幅/上位置/操作の比較	撮影係/司令塔待ち
-RwVo5	/reminders/detail?id=reminder-1	一時停止する	既定の幅/上位置/操作の比較	撮影係/司令塔待ち

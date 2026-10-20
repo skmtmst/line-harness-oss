@@ -200,7 +200,7 @@ describe('PERF-07 AuthGuard のセッション確認再利用', () => {
     expect(host.querySelector('[data-child]')).toBeNull()
   })
 
-  it.each(['suspended', 'archived'] as const)('%s の通常画面をV6の停止案内に差し替える', async (status) => {
+  it.each(['suspended', 'archived'] as const)('%s の通常画面を管理画面の停止案内に差し替える', async (status) => {
     fetchSpy.mockImplementation(async () => sessionOk(status))
     currentPath = '/friends'
     await render()

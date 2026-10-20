@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest'
  * 方式選択画面へ送るだけで、行を作るのは方式を確定したとき。
  */
 const HERE = dirname(fileURLToPath(import.meta.url))
-/* 完全切り替え：v7 の page.tsx は捨て、V8 の一覧（src/v8/scenarios/list.tsx・page.tsx が描く本体）を見る。 */
+/* 完全切り替え：管理画面 の page.tsx は捨て、V8 の一覧（src/v8/scenarios/list.tsx・page.tsx が描く本体）を見る。 */
 const PAGE = readFileSync(join(HERE, '../../v8/scenarios/list.tsx'), 'utf8')
 
 describe('シナリオ作成ボタンは行を作らない（#949 N-055）', () => {

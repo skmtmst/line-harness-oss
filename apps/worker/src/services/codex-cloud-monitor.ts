@@ -1,9 +1,9 @@
-import type { Env } from '../index.js';
-import {
-  githubFailureDetails,
-  processCodexAutoMerge,
-  type CodexAutoMergeMessage,
-} from './codex-auto-merge.js';
+export type { CodexMentionQueueMessage } from './codex-cloud-types.js';
+import type { CodexMentionQueueMessage } from './codex-cloud-types.js';
+import { tracedFetch as fetch, logger, traceQueueMessage } from '@line-crm/shared/server';
+import type { Env } from '../worker-env.js';
+import { githubFailureDetails, processCodexAutoMerge } from './codex-auto-merge.js';
+import { type CodexAutoMergeMessage } from './codex-auto-merge-types.js';
 import { decodeSlackTextEntities } from './slack-text.js';
 
 const AUTO_RELAY_MARKER = '【Claude依頼の自動中継】';
@@ -19,32 +19,6 @@ export type CodexMonitorStatus =
   | 'duplicate_risk'
   | 'completed'
   | 'failed';
-
-export type CodexMentionQueueMessage =
-  | CodexAutoMergeMessage
-  | {
-      kind: 'inspect_official';
-      slackEventId: string;
-      teamId: string;
-      channelId: string;
-      messageTs: string;
-      threadTs: string;
-      requesterUserId: string;
-      prompt: string;
-    }
-  | {
-      kind: 'inspect_relay';
-      slackEventId: string;
-      channelId: string;
-      threadTs: string;
-    }
-  | {
-      kind: 'notify_duplicate';
-      slackEventId: string;
-      channelId: string;
-      threadTs: string;
-      officialTaskUrl?: string;
-    };
 
 export type SlackEventEnvelope = {
   type?: string;
@@ -518,12 +492,12 @@ async function processOfficialInspection(
     // If the producer response was lost after the user relay succeeded, the
     // original message may be retried. Recreate only the idempotent receipt
     // inspection; never post the user relay a second time.
-    await env.CODEX_MENTION_QUEUE?.send({
+    await env.CODEX_MENTION_QUEUE?.send(traceQueueMessage({
       kind: 'inspect_relay',
       slackEventId: message.slackEventId,
       channelId: message.channelId,
       threadTs: message.threadTs,
-    }, { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
+    }), { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
     return;
   }
   if (
@@ -643,16 +617,16 @@ async function processOfficialInspection(
       message.threadTs,
       '【中継失敗】Slack User OAuthによる公式Codexへの自動中継に失敗しました。重複防止のため再送せず停止しています。',
     );
-    console.error(JSON.stringify({"code":"codex_user_relay_failed"}));
+    logger.error("codex_user_relay_failed");
     return;
   }
 
-  await env.CODEX_MENTION_QUEUE?.send({
+  await env.CODEX_MENTION_QUEUE?.send(traceQueueMessage({
     kind: 'inspect_relay',
     slackEventId: message.slackEventId,
     channelId: message.channelId,
     threadTs: message.threadTs,
-  }, { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
+  }), { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
 }
 
 async function processRelayInspection(

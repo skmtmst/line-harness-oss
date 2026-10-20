@@ -29,7 +29,7 @@ const sampleLink = {
 }
 
 describe('TrackedLinksResource', () => {
-  it('create() が introTemplateId をボディに含めて POST する', async () => {
+  it('create が introTemplateId をボディに含めて POST する', async () => {
     const http = mockHttp({
       post: vi.fn().mockResolvedValue({ success: true, data: sampleLink }),
     })
@@ -49,7 +49,7 @@ describe('TrackedLinksResource', () => {
     expect(result.introTemplateId).toBe('tpl-1')
   })
 
-  it('update() が PATCH /api/tracked-links/:id を呼び出す', async () => {
+  it('update が PATCH /api/tracked-links/:id を呼び出す', async () => {
     const updated = { ...sampleLink, introTemplateId: 'tpl-2', clickCount: 5 }
     const http = mockHttp({
       patch: vi.fn().mockResolvedValue({ success: true, data: updated }),
@@ -85,7 +85,7 @@ describe('TrackedLinksResource', () => {
     expect(result.rewardTemplateId).toBe('tpl-reward')
   })
 
-  it('list() calls GET /api/tracked-links', async () => {
+  it('list calls GET /api/tracked-links', async () => {
     const http = mockHttp({
       get: vi.fn().mockResolvedValue({ success: true, data: [sampleLink] }),
     })

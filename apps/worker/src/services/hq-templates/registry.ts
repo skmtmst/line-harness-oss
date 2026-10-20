@@ -1,6 +1,7 @@
 import {createBookingMenuHqAdapter} from './catalog.js';
 import { unsupportedHqTemplateAdapter } from './contract.js';
-import type { HqTemplateAdapter, HqTemplateType, HqTemplateAuthority } from './contract.js';
+import type { HqTemplateAdapter, HqTemplateAuthority } from './contract.js';
+import type { HqTemplateType } from '@line-crm/db';
 import { formHqTemplateAdapter } from './form.js';
 import { richMenuHqTemplateAdapter } from './rich-menu.js';
 import { tagHqTemplateAdapter, createTagHqTemplateAdapter } from './tag.js';

@@ -18,8 +18,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from './auth/principal/auth.js';
 import { featureEnforcementMiddleware } from '../middleware/feature-enforcement.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 

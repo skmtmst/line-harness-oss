@@ -1,3 +1,4 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,7 +8,7 @@ import { conditionFromSegmentPreset } from './segment-preset'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const controls = readFileSync(join(here, 'segment-preset-controls.tsx'), 'utf8')
-const form = readFileSync(join(here, 'broadcast-form.tsx'), 'utf8')
+const form = readUiSource(join(here, 'broadcast-form.tsx'), 'utf8')
 
 describe('一斉配信で保存した対象条件を再利用する', () => {
   it('keeps the saved condition independent from later edits', () => {

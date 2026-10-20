@@ -197,8 +197,8 @@ async function render(el: HTMLDivElement, r: Root) {
 }
 
 /**
- * `root.render()` をactで包まずに生で呼ぶと、Reactはcommit(DOM反映)と
- * passive effect(useEffectで走るload())のflushを別タスクとして積む。
+ * `root.render` をactで包まずに生で呼ぶと、Reactはcommit(DOM反映)と
+ * passive effect(useEffectで走るload)のflushを別タスクとして積む。
  * MutationObserverはDOM変異の直後にマイクロタスクとして呼ばれるので、
  * commit直後・useEffect未実行の瞬間をこの1点で捕まえられる。
  */
@@ -234,6 +234,27 @@ function nextPageButton(el: HTMLDivElement): HTMLButtonElement {
   if (!button) throw new Error('「次のページ」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
+
+describe('EC注文の実際の金額表示', () => {
+  it.each([
+    { status: 'current', totalAmount: 1234.9, refundedAmount: null, expected: '商品amount × 1・¥1,234' },
+    { status: 'refunded', totalAmount: 1234.9, refundedAmount: 50.9, expected: '商品amount × 1・−¥50' },
+    { status: 'current', totalAmount: null, refundedAmount: null, expected: '商品amount × 1' },
+  ])('注文$status/$totalAmount/$refundedAmountを$expectedと表示する', async ({ expected, ...amounts }) => {
+    const { container: el, root: r } = mount()
+    await render(el, r)
+    await act(async () => { await drainMicrotasks() })
+    const row = action('amount')
+    await act(async () => {
+      overviewFor('account-a').resolve(ok(overview(1)))
+      eventsDeferreds[0].resolve(ok(recordsList([action('amount', { order: { ...row.order, ...amounts } })])))
+      await drainMicrotasks()
+    })
+    const renderedRow = el.querySelector('[data-row-id="action-amount"]')
+    expect(renderedRow).toBeTruthy()
+    expect(renderedRow!.querySelector('span[title^="商品amount"]')?.textContent).toBe(expected)
+  })
+})
 
 describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
   it('M3: アカウント切替の直後(commit直後・useEffect未実行)は前アカウントの一覧を表示し続けない', async () => {
@@ -353,7 +374,7 @@ describe('EC取込一覧(#685) 逆変異で赤になる実mount試験', () => {
   })
 
   /*
-   * 司令塔切り分け(2026-09-10、列車229のartifactで実証): 検索欄debounceの
+   * 司令塔切り分け(2026-09-10、作業のartifactで実証): 検索欄debounceの
    * useEffect([query, setPage])は、マウント直後のqueryの初期値('')でも
    * 必ず1回実行され、300ms後に無条件でsetPage(1)を呼んでいた。一覧が
    * 表示された直後(300ms以内)に「次のページ」を押した利用者が、その後

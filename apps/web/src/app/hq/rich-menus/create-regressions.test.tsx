@@ -5,7 +5,7 @@ import { forgetStaffIdentity,rememberStaffIdentity } from '@/lib/staff-identity-
 import type { StaffMember } from '@line-crm/shared'
 import { cleanup,fireEvent,render,screen,waitFor,within } from '@testing-library/react'
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest'
-import RichMenuCreateV8 from '../../rich-menus/new/create-v8'
+import RichMenuCreateV8 from '../../../v8/rich-menus/new/create'
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccount: null, loading: false }) }))
 vi.mock('next/navigation', () => ({
@@ -229,7 +229,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(saved().pages).toHaveLength(2)
     expect(fetch).not.toHaveBeenCalled()
   })
-  /* B-139：保存で落ちた欄は帯ではなく欄で知らせ、別の手順・タブ・面ならそこを開いて移る。 */
+  /* ：保存で落ちた欄は帯ではなく欄で知らせ、別の手順・タブ・面ならそこを開いて移る。 */
   it('名前と文言が空なら次へ進まず、2つの欄を赤くして真下に理由を出し、名前へ移る', async () => {
     render(<RichMenuCreateV8 host={host} />)
     fireEvent.change(screen.getByLabelText('トーク画面の下の文言（14文字まで）'), { target: { value: '' } })
@@ -253,7 +253,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     expect(host.onSave).not.toHaveBeenCalled()
   })
 
-  /* UgZPJ・BVSbe：③は配る先（全員／決めない）、④は確かめて配る（足りないもの・配ったときの扱い）。 */
+  /* ・：③は配る先（全員／決めない）、④は確かめて配る（足りないもの・配ったときの扱い）。 */
   it('③で「決めない」を選ぶと各アカウントで決める形で保存し、④の「配ったときの扱い」を配る前の確認へ渡す', async () => {
     await start()
     selectArea('A'); pickIntent('テキストを送る')

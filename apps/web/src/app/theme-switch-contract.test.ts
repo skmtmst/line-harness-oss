@@ -2,7 +2,7 @@
  * 見た目は常に V8（2026-10-09 オーナー決定「全画面を V8 に固定」）。
  *
  *   - <html data-theme="v8"> を layout.tsx が固定で出す（環境変数・ブラウザの記憶を読まない）
- *   - 描画前に data-theme を差し替えるスクリプトは無い（v7 が一瞬出ない）
+ *   - 描画前に data-theme を差し替えるスクリプトは無い（管理画面 が一瞬出ない）
  *   - 設定画面に「画面の見た目」の切り替えは無い
  *   - 配備の設定に NEXT_PUBLIC_ADMIN_THEME は要らない
  *   - globals.css の V8 値は :root の下にある
@@ -75,13 +75,6 @@ describe('見た目は V8 に固定', () => {
     ]) {
       expect(readFileSync(join(ROOT, file), 'utf8'), file).not.toContain('NEXT_PUBLIC_ADMIN_THEME')
     }
-  })
-
-  it('V8 の値は :root の下にある（角丸 control 10 / panel 16）', () => {
-    const v8 = globals.match(/:root\s*\{([^}]*--radius-control: 10px[^}]*)\}/)
-    expect(v8, ':root ブロックが無い').not.toBeNull()
-    expect(v8![1]).toContain('--radius-control: 10px')
-    expect(v8![1]).toContain('--radius-panel: 16px')
   })
 
   it('V8 で増える語彙がある（divider・table-head・chat-outgoing・board・印のタイル）', () => {

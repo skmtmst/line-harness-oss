@@ -1,4 +1,5 @@
 import {floorBoxInside,floorBoxesOverlap,type RestaurantFloorWrite } from '@line-crm/shared';
+
 export function validRestaurantFloor(value: unknown): value is RestaurantFloorWrite {
  if(!value||typeof value!=='object')return false;
  const f=value as RestaurantFloorWrite;

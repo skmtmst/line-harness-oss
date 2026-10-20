@@ -498,7 +498,7 @@ describe('sendAdConversions のアカウント境界(#638)', () => {
 });
 
 
-describe('B-333 広告送信の再試行', () => {
+describe('広告送信の再試行', () => {
   it.each([400,401,403])('HTTP %s は自動で送り直さない', async status => {
     const t = seedTwoAccounts();
     const fetchMock = vi.fn(async () => ({ ok:false, status, text:async()=> 'rejected' }));

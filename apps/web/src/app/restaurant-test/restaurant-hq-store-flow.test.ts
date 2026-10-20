@@ -21,7 +21,7 @@ describe('飲食店向けHQと店舗追加動線', () => {
       2026-09-04: `/accounts` と `/accounts/new` の転送はどちらもやめた。
       **統括の店舗管理と、LINE公式アカウントの設定は別のもの。**
       **店舗を作ることと、アカウントを登録することも別**（要件 §5-3）。
-      店舗の入口はここで見張るが、`/accounts` は設計 ★V6 33-1 の一覧、
+      店舗の入口はここで見張るが、`/accounts` は設計 ★管理画面 33-1 の一覧、
       `/accounts/new` は 33-2 の登録になった。
     */
     expect(accountsPage).not.toContain("redirect('/hq')")

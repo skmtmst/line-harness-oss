@@ -9,7 +9,7 @@
 import { describe, expect, test } from 'vitest';
 import { Hono } from 'hono';
 import { rateLimitMiddleware } from './rate-limit.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 function app() {
   const a = new Hono<Env>();

@@ -1,7 +1,8 @@
+import { styleTerm } from '@/lib/terms'
 import type { DashboardRange, IndustryStyle } from './model'
 
 /*
- * 4 業種のダッシュボードの違い（B-309・B-318。絵 XBkC2：NqAvL 飲食・mOAX5 サロン・R0FFqz 面談・k2MBw 教室）。
+ * 4 業種のダッシュボードの違い（・。絵 XBkC2：NqAvL 飲食・mOAX5 サロン・R0FFqz 面談・k2MBw 教室）。
  * 骨組みは同じ。違うのは題・タブ・表示の切り替え・担当の呼び方・主ボタン・表の列・行の「…」だけ。
  */
 
@@ -33,17 +34,17 @@ export const RANGES: { value: DashboardRange; label: string }[] = [
 
 export const STYLE_CONFIG: Record<IndustryStyle, StyleConfig> = {
   restaurant: {
-    title: 'お店',
+    title: styleTerm('restaurant', 'V02'),
     help: 'お店の予約と、今日やることをまとめて見る画面です。数える日は来店日です。予約が入った日で数えるのは「新着予約」だけです。',
-    tabs: { main: '席', bookings: '予約', people: 'お客さま', analytics: '分析' },
+    tabs: { main: styleTerm('restaurant', 'V03'), bookings: styleTerm('restaurant', 'V06'), people: styleTerm('restaurant', 'V11'), analytics: '分析' },
     views: [
       { value: 'board', label: '盤（時間×卓）' },
       { value: 'floor', label: '座席表' },
       { value: 'list', label: '一覧' },
       { value: 'calendar', label: 'カレンダー' },
     ],
-    staffNoun: '席',
-    primary: '予約を入れる',
+    staffNoun: styleTerm('restaurant', 'V08'),
+    primary: styleTerm('restaurant', 'V20'),
     walkIn: true,
     search: '名前・タグ・メモで探す',
     defaultView: 'list',
@@ -51,16 +52,16 @@ export const STYLE_CONFIG: Record<IndustryStyle, StyleConfig> = {
     analyticsDefault: 'payments',
   },
   salon: {
-    title: 'サロン',
+    title: styleTerm('salon', 'V02'),
     help: 'サロンの台帳と、今日やることをまとめて見る画面です。数える日は来店日です。予約が入った日で数えるのは「新着予約」だけです。',
-    tabs: { main: '台帳', bookings: '予約', people: 'お客さま', analytics: '分析' },
+    tabs: { main: styleTerm('salon', 'V03'), bookings: styleTerm('salon', 'V06'), people: styleTerm('salon', 'V11'), analytics: '分析' },
     views: [
       { value: 'board', label: '盤（時間×担当）' },
       { value: 'list', label: '一覧' },
       { value: 'calendar', label: 'カレンダー' },
     ],
-    staffNoun: '担当',
-    primary: '予約を入れる',
+    staffNoun: styleTerm('salon', 'V08'),
+    primary: styleTerm('salon', 'V20'),
     walkIn: false,
     search: '名前・電話で探す',
     defaultView: 'board',
@@ -68,16 +69,16 @@ export const STYLE_CONFIG: Record<IndustryStyle, StyleConfig> = {
     analyticsDefault: 'overview',
   },
   consult: {
-    title: '面談',
+    title: styleTerm('consult', 'V02'),
     help: '面談・相談の予定と、今日やることをまとめて見る画面です。数える日は面談日です。予約が入った日で数えるのは「新着予約」だけです。',
-    tabs: { main: '面談', bookings: '結果待ち', people: '相談者', analytics: '分析' },
+    tabs: { main: styleTerm('consult', 'V03'), bookings: styleTerm('consult', 'V06'), people: styleTerm('consult', 'V11'), analytics: '分析' },
     views: [
       { value: 'board', label: '盤（時間×担当）' },
       { value: 'list', label: '一覧' },
       { value: 'calendar', label: 'カレンダー' },
     ],
-    staffNoun: '担当',
-    primary: '面談を入れる',
+    staffNoun: styleTerm('consult', 'V08'),
+    primary: styleTerm('consult', 'V20'),
     walkIn: false,
     search: '名前・タグ・メモで探す',
     defaultView: 'list',
@@ -85,16 +86,16 @@ export const STYLE_CONFIG: Record<IndustryStyle, StyleConfig> = {
     analyticsDefault: 'overview',
   },
   lesson: {
-    title: '教室',
+    title: styleTerm('lesson', 'V02'),
     help: '教室・レッスンのクラスと、今日やることをまとめて見る画面です。数える日はクラスの日です。予約が入った日で数えるのは「新着予約」だけです。',
-    tabs: { main: 'クラス', bookings: '会員', people: '体験', analytics: '分析' },
+    tabs: { main: styleTerm('lesson', 'V03'), bookings: styleTerm('lesson', 'V06'), people: styleTerm('lesson', 'V11'), analytics: '分析' },
     views: [
       { value: 'board', label: '盤（時間×講師）' },
       { value: 'list', label: '一覧' },
       { value: 'calendar', label: 'カレンダー' },
     ],
-    staffNoun: '講師',
-    primary: '会員を予約する',
+    staffNoun: styleTerm('lesson', 'V08'),
+    primary: styleTerm('lesson', 'V20'),
     walkIn: false,
     search: '名前・クラスで探す',
     defaultView: 'list',

@@ -1,3 +1,6 @@
+import { createClientLogger } from '@line-crm/shared';
+
+const clientLogger = createClientLogger('liff');
 /**
  * お客さん向け画面 (LIFF) の失敗・読み込み中の文言。
  *
@@ -8,7 +11,7 @@
 
 /**
  * 読み込みの失敗を画面に出すときの1文。題の「読み込めませんでした」と
- * 重ねない (★V7)。画面ごとの一言は LoadErrorView の note に足す。
+ * 重ねない (★管理画面)。画面ごとの一言は LoadErrorView の note に足す。
  */
 export const LOAD_FAILED_MESSAGE = '電波のよいところで、もう一度お試しください。';
 
@@ -29,5 +32,5 @@ export const SUBMIT_FAILED_MESSAGE =
  * 失敗のくわしい中身を console にだけ残す。画面には出さない。
  */
 export function logFailure(scope: string, err: unknown): void {
-  console.error(JSON.stringify({"code":"lib_user_message_failed"}));
+  clientLogger.error("lib_user_message_failed", err);
 }

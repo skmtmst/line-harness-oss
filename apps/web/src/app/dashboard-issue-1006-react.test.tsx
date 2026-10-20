@@ -20,7 +20,8 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import DashboardPage from './page'
+// 共通ダッシュボード本体の境界/既存カードを検査する。業種の入口分岐はhome.test.tsxが検査する。
+import DashboardPage from '@/v8/dashboard/dashboard'
 
 const fixture = vi.hoisted(() => ({
   accountId: 'account-a' as string | null,
@@ -92,6 +93,7 @@ function installFetch() {
     const raw = typeof input === 'string' ? input : String(input)
     const path = raw.startsWith('http') ? raw.slice(new URL(raw).origin.length) : raw
     net.calls.push(`${init?.method ?? 'GET'} ${path}`)
+    if (path.startsWith('/api/staff/me')) return jsonResponse({ status: 200, body: { success: true, data: { id: 'test-owner', role: 'owner' } } })
     if (path.startsWith('/api/dashboard/overview')) {
       return jsonResponse(await net.overview(path))
     }
@@ -305,7 +307,7 @@ describe('DASH-03 新アカウントの読込中に前の予約・運用状態�
     const card = todayCard('今日の予約')
     /*
      * #673 で読込中の件数は「—」ではなく骨組み（スケルトン）に替わった。
-     * ★V7 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
+     * ★管理画面 仕上げ §3 で骨組みは 0.3 秒待ってから出るので、待ってから確かめる。
      */
     await act(async () => { await vi.advanceTimersByTimeAsync(350) })
     expect(card.getAttribute('aria-busy')).toBe('true')

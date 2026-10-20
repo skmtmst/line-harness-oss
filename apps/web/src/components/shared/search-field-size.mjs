@@ -1,4 +1,4 @@
-/** B-191: reserve the actual placeholder and the control's existing padding/icon. */
+/** : reserve the actual placeholder and the control's existing padding/icon. */
 export function fitListSearchPlaceholder(input) {
   const slot = input?.closest('[data-toolbar-search]')
   const control = input?.parentElement

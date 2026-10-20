@@ -1,7 +1,9 @@
+import { logger } from '@line-crm/shared/server';
+import { readCookie } from '../middleware/auth-http.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import {
@@ -26,6 +28,7 @@ import {
   updateStaffMember,
   type AuthEmailToken,
 } from '@line-crm/db';
+
 import { clientIp, issueSession, randomToken, recordSuccessfulLoginAudit } from '../services/admin-session.js';
 import { hashPassword, validatePasswordPolicy, verifyPassword } from '../services/password-hash.js';
 import { turnstileErrorMessage, verifyTurnstile } from '../services/turnstile.js';
@@ -40,7 +43,7 @@ import {
 import { TRIAL_DAYS } from '../services/billing-plans.js';
 
 /**
- * 会員登録（★V6 36-4）・メール＋パスワードのログイン・パスワード再設定（36-6）。
+ * 会員登録（★36-4）・メール＋パスワードのログイン・パスワード再設定（36-6）。
  *
  * 流れ（決定 2026-09-13）:
  *   1. メールアドレスだけ入れる → 本登録 URL をメールで送る（誤入力のメールでは進まない）
@@ -99,21 +102,6 @@ export function normalizeEmail(value: unknown): string | null {
 function adminBase(c: Context<Env>): string | null {
   const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
   return base || null;
-}
-
-function readCookie(header: string | undefined, name: string): string | null {
-  if (!header) return null;
-  for (const part of header.split(';')) {
-    const [key, ...value] = part.trim().split('=');
-    if (key === name) {
-      try {
-        return decodeURIComponent(value.join('='));
-      } catch {
-        return null;
-      }
-    }
-  }
-  return null;
 }
 
 function markerCookie(value: string, sameSite: 'Strict' | 'Lax' | 'None'): string {
@@ -208,7 +196,7 @@ authEmail.post('/api/auth/register/request', inputJsonBoundary(), async (c) => {
     await sendSignupVerifyMail(c.env, { email, completeUrl: `${base}/register/complete?token=${encodeURIComponent(token)}` });
     return c.json({ success: true, data: { sent: true } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_auth_email_failed","route":"POST /api/auth/register/request"}));
+    logger.error("routes_auth_email_failed");
     return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });
@@ -434,7 +422,7 @@ authEmail.post('/api/auth/password/forgot', inputJsonBoundary(), async (c) => {
     }
     return c.json({ success: true, data: { sent: true } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_auth_email_failed","route":"POST /api/auth/password/forgot"}));
+    logger.error("routes_auth_email_failed");
     return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });

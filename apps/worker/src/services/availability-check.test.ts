@@ -1,4 +1,8 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+
+const circuitFixtures = new Set<SqliteD1>();
+afterEach(() => { for (const fixture of circuitFixtures) fixture.raw.close(); circuitFixtures.clear(); });
 import { explainBookingSlot, getAvailability, type SlotBlockReason } from './availability.js';
 
 // ----------------------------------------------------------------
@@ -61,8 +65,12 @@ interface StubData {
 }
 
 function stubDB(data: StubData): D1Database {
+  // Exercise the real persisted circuit SQL while retaining the focused availability fixture.
+  const circuit = data.calendarConnection ? createTestD1() : undefined;
+  if (circuit) circuitFixtures.add(circuit);
   return {
     prepare(sql: string) {
+      if (circuit && sql.includes('workflow_steps')) return circuit.db.prepare(sql);
       return {
         bind() {
           return this;
@@ -398,7 +406,7 @@ describe('explainBookingSlot', () => {
         starts_at: '2026-05-09T01:00:00Z', block_ends_at: '2026-05-09T02:00:00Z',
       }],
     };
-    // 店舗営業時間は businessHours 行が要る。stub では all() が空を返すため
+    // 店舗営業時間は businessHours 行が要る。stub では all が空を返すため
     // 店舗定員は無制限 → store_full にはならず other_booking になる。
     // （店舗定員の単体条件は availability.test.ts 側で担保済み）
     const result = await check(data, '10:00');

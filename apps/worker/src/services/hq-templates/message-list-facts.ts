@@ -1,5 +1,6 @@
-import { parseBroadcastMessageParts } from '../broadcast-message-set.js';
+import { parseBroadcastMessageParts } from '../../features/broadcasts/broadcast-message-set/index.js';
 import { listInterpolations, type HqTemplateListDisplay } from '@line-crm/shared';
+
 import { parseMessageTemplateDefinition } from './template.js';
 
 type MessageFacts = Pick<HqTemplateListDisplay, 'message_count' | 'has_interpolations'>;

@@ -1,7 +1,7 @@
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapWrite,gapVersion} from '../services/gap-common.js';
-import {loadRoutingLayout,resolveRouting,issueRoutingToken} from '../services/form-routing.js';
+import {loadRoutingLayout,resolveRouting,issueRoutingToken} from '../features/forms/form-routing/index.js';
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
 import {requireDeliveryAccess,requirePermission} from '../middleware/role-guard.js';
 export const formRouting=new Hono<Env>();

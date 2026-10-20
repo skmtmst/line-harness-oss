@@ -38,6 +38,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { initializeCapture } from './capture-screens.mjs'
 import { QA_TIMEZONE, captureClockFor } from './qa-clock.mjs'
 import { annotate, decodePng, diffImages, encodePng, scaleDown, sideBySide } from './v8-png.mjs'
 
@@ -124,8 +125,8 @@ export const MEASURE_SCRIPT = `() => {
   const seen = new Set()
   const isCounted = (el) => {
     if (!el || el === document.body) return true
-    // 見えない・v7だけ・読み飛ばしは数えない。
-    if (el.closest('.v7-only, [class*="skipLink"], a[href^="#"]')) return false
+    // 見えない要素・読み飛ばしは数えない。古い世代名だけでは除外しない。
+    if (el.closest('[class*="skipLink"], a[href^="#"]')) return false
     return getComputedStyle(el).display !== 'none'
   }
   while (walker.nextNode()) {
@@ -253,9 +254,7 @@ export function assertV8Theme(theme) {
  */
 export async function shootUrl(browser, base, route, width) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, timezoneId: QA_TIMEZONE, locale: 'ja-JP' })
-  await context.addInitScript(([entries]) => {
-    for (const [key, value] of entries) localStorage.setItem(key, value)
-  }, [Object.entries(PARITY_INIT)])
+  await context.addInitScript(initializeCapture, [Object.entries(PARITY_INIT)])
   const page = await context.newPage()
   const clock = captureClockFor(route)
   if (clock) await page.clock.setFixedTime(new Date(clock))

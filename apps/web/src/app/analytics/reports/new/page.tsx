@@ -1,4 +1,6 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import EntitySelect from '@/components/shared/entity-select'
@@ -11,6 +13,7 @@ import { CreatePage } from '@/components/templates'
 import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
 import Dialog from '@/components/shared/dialog'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import PageHeader from '@/components/shared/page-header'
@@ -111,7 +114,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   line: 'LINE',
 }
 
-/** 右の見本の行の名前（絵 H5UoIu：友だち・配信を開いた・成果）。 */
+/** 右の見本の行の名前（絵 ：友だち・配信を開いた・成果）。 */
 const PREVIEW_LABEL: Partial<Record<string, string>> = { friends: '友だち', reactions: '配信を開いた', routes: '成果', mileage: 'マイル' }
 
 function sectionTitleOf(id: string): string {
@@ -119,7 +122,7 @@ function sectionTitleOf(id: string): string {
 }
 
 /*
- * G83vi「違いを比べる」の比べる文。版の本文ではなく設定の要約。
+ * 「違いを比べる」の比べる文。版の本文ではなく設定の要約。
  * 最新と入力中の2つを作り、VersionCompare（行ごとの比べる）へ渡す。
  */
 type ReportSummaryInput = {
@@ -139,7 +142,7 @@ type ReportSummaryInput = {
   savedName: (id: string) => string
 }
 
-function describeReportSummary(input: ReportSummaryInput): string {
+function describeReportSummary(input: ReportSummaryInput, oneTime = false): string {
   const sections = input.sections.map(sectionTitleOf)
   const saved = input.savedAnalysisIds.map(input.savedName)
   const recipients = [
@@ -159,7 +162,7 @@ function describeReportSummary(input: ReportSummaryInput): string {
     `入れるもの: ${sections.length > 0 ? sections.join('、') : '（なし）'}`,
     `保存した分析: ${saved.length > 0 ? saved.join('、') : 'なし'}`,
     `宛先: ${recipients.length > 0 ? recipients.join('、') : '（なし）'}`,
-    `送る間かく: ${schedule}`,
+    ...(oneTime ? [] : [`送る間かく: ${schedule}`]),
     `集計する期間: 前の${input.periodDays}日間`,
     `通知方法: ${channels.length > 0 ? channels.join('、') : '（なし）'}`,
     `知らせる条件: ${alerts.length > 0 ? alerts.join('、') : 'なし'}`,
@@ -209,7 +212,7 @@ function OneTimeResultView({ accountId, schedule, runs, canManage, onRetryDone }
       notifyToast('送り直しを受け付けました。結果はこの画面で確認できます。')
       onRetryDone()
     } catch (caught) {
-      setRetryError(caught instanceof Error ? caught.message : '送り直しを受け付けられませんでした')
+      setRetryError(describeApiFailure(caught, '保存'))
     } finally {
       setRetrying(false)
     }
@@ -274,7 +277,7 @@ function AnalyticsReportFormPage() {
   const [editMissing, setEditMissing] = useState(false)
   /* WEB308：履歴の口が読めなかったことを「見つかりません」と分ける。 */
   const [editLoadFailed, setEditLoadFailed] = useState(false)
-  const [canManage, setCanManage] = useState(false)
+  const canManage = canManageRole(useStaffRole())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -319,13 +322,7 @@ function AnalyticsReportFormPage() {
     setBaseline(editId ? null : NEW_BASELINE)
   }, [selectedAccountId, editId])
 
-  useEffect(() => {
-    let active = true
-    void api.staff.me().then((response) => {
-      if (active && response.success) setCanManage(response.data.role === 'owner' || response.data.role === 'admin')
-    })
-    return () => { active = false }
-  }, [])
+
 
   // 読み直し用の数え直し。入力の状態には触らない(点検#508軽8)。
   const [reloadSeq, setReloadSeq] = useState(0)
@@ -511,7 +508,7 @@ function AnalyticsReportFormPage() {
    */
   const [conflictId, setConflictId] = useState<string | null>(null)
   /*
-   * G83vi: なおし中にほかの人が先に保存した（409）。
+   * : なおし中にほかの人が先に保存した（409）。
    * 入力は残したまま、板の頭の下に琥珀色の帯を出す。
    * 最新の取り直しができたら比べる文に使い、できなくても帯は出す。
    */
@@ -553,7 +550,7 @@ function AnalyticsReportFormPage() {
 
   /*
    * 保存する中身の検査と組み立て。submit（つくる・なおす）と
-   * saveOverLatest（G83vi「この内容で保存する」）の両方から使う。
+   * saveOverLatest（「この内容で保存する」）の両方から使う。
    * 文言・順番はそのまま。画面への表示は呼ぶ側が行う。
    */
   type ReportPayload = {
@@ -643,7 +640,12 @@ function AnalyticsReportFormPage() {
     }
   }
 
+  const submitLock = useRef<{ target: string } | null>(null)
+  const [sendOnceOpen, setSendOnceOpen] = useState(false)
+  useEffect(() => { setSendOnceOpen(false) }, [selectedAccountId, editId, canManage])
   const submit = async (sendOnce: boolean) => {
+    const target = `${selectedAccountId}:${editId}:${switchSeqRef.current}`
+    if (submitLock.current?.target === target) return
     if (!selectedAccountId || !options || !canManage || !hasRecipient) return
     const built = buildReportPayload(options)
     if (!built.ok) {
@@ -651,6 +653,9 @@ function AnalyticsReportFormPage() {
       return
     }
     const { payload } = built
+    const lock = { target }
+    submitLock.current = lock
+    setSendOnceOpen(false)
     const submittedSignature = signature
     setSaving(true)
     setError('')
@@ -695,7 +700,7 @@ function AnalyticsReportFormPage() {
           })
         } catch (caught) {
           /*
-           * G83vi: ほかの人が先に保存した（409）。入力は残したまま、
+           * : ほかの人が先に保存した（409）。入力は残したまま、
            * 板の頭の下に注意の帯を出す。
            * 最新を取り直せたら「違いを比べる」の比べる文に使う。
            */
@@ -780,12 +785,13 @@ function AnalyticsReportFormPage() {
       if (!isFresh()) return
       setError(describeSaveFailure(caught))
     } finally {
+      if (submitLock.current === lock) submitLock.current = null
       if (isFresh()) setSaving(false)
     }
   }
 
   /*
-   * G83vi「最新を読み込んで続ける」。取り直せた最新があればそのまま
+   * 「最新を読み込んで続ける」。取り直せた最新があればそのまま
    * 画面へ戻し、なければ読み直す。どちらも入力中の内容は最新で置き換わる。
    */
   const applySchedule = (schedule: AnalyticsReportSchedule) => {
@@ -860,7 +866,7 @@ function AnalyticsReportFormPage() {
   }
 
   /*
-   * G83vi「比べてから保存」→比べる窓の「この内容で保存する」。
+   * 「比べてから保存」→比べる窓の「この内容で保存する」。
    * 比べたうえで、取り直した最新の版つきで保存し直す（相手の変更のうえに
    * 重ねる危ない操作なので、比べる窓の中からだけ押せる）。入力は残す。
    * 失敗したら窓は閉じず、その場で理由を出してもう一度押せる。
@@ -930,7 +936,7 @@ function AnalyticsReportFormPage() {
   }
 
   /*
-   * G83vi「違いを比べる」の2つの文。最新が取れていないときは比べる窓を出さない。
+   * 「違いを比べる」の2つの文。最新が取れていないときは比べる窓を出さない。
    */
   const staffNameOf = (id: string) => options?.recipients.find((item) => item.id === id)?.name ?? id
   const savedNameOf = (id: string) => options?.savedAnalyses.find((item) => item.id === id)?.name ?? id
@@ -965,7 +971,7 @@ function AnalyticsReportFormPage() {
     }
     return rules
   }
-  const draftSummary = describeReportSummary({
+  const draftSummaryInput: ReportSummaryInput = {
     name, sections, savedAnalysisIds, cadence, weekday, monthDay, sendTime, periodDays,
     staffIds, emails: emails.map((item) => item.trim()).filter(Boolean),
     channels: [
@@ -976,7 +982,9 @@ function AnalyticsReportFormPage() {
     alertRules: parsedDraftAlerts(),
     staffName: staffNameOf,
     savedName: savedNameOf,
-  })
+  }
+  const draftSummary = describeReportSummary(draftSummaryInput)
+  const oneTimeSummary = describeReportSummary(draftSummaryInput, true)
 
   /*
    * つくる・なおし途中の離脱確認。基準（初期値または読み直した値）から
@@ -1014,7 +1022,7 @@ function AnalyticsReportFormPage() {
   if (editLoadFailed) return <ListState kind="error" title="定期レポートを表示できませんでした" description="通信が切れたか、サーバーが応えませんでした。もう一度読み込んでください。" onRetry={() => setReloadSeq((n) => n + 1)} />
   if (editMissing || (editing === null && editId)) return <ListState kind="error" title="定期レポートが見つかりませんでした" description="一覧から選び直してください。" />
   if (editing?.isOneTime) return <ListState kind="empty" title="1回だけ送る依頼は変更できません" description="同じ内容が必要なときは、新しく作ってください。" />
-  if (!options || options.recipients.length === 0) return (
+  if (!options) return (
     <ListState
       kind="empty"
       title="受け取るログインユーザーがいません"
@@ -1054,7 +1062,7 @@ function AnalyticsReportFormPage() {
         footerActions={<>
         <Button href="/analytics">キャンセル</Button>
         {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
-        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => void submit(true)}>今すぐ1回だけ送る</Button>}
+        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; setSendOnceOpen(true) }}>今すぐ1回だけ送る</Button>}
         {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={15} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
       </>}
       >
@@ -1157,6 +1165,9 @@ function AnalyticsReportFormPage() {
       <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy || latestBusy}>
         <VersionCompare before={latestSummary} after={draftSummary} />
       </Dialog>
+      <ConfirmDialog open={sendOnceOpen && canManage} title="レポートを今すぐ1回だけ送りますか？" description="次の宛先と通知方法で送る依頼を作ります。" confirmLabel="この宛先へ1回だけ送る" busy={saving} onCancel={() => { if (!saving) setSendOnceOpen(false) }} onConfirm={() => void submit(true)}>
+        <p className="whitespace-pre-wrap break-words">{oneTimeSummary}</p>
+      </ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した定期レポート" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div>
   )

@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
 import { beforeEach, afterEach, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { promoteEventWaitlist } from '../services/event-waitlist.js';
+import { verifyCallerLineUserId } from '../services/liff-auth.js';
 vi.mock('../services/liff-auth.js', () => ({
   verifyCallerLineUserId: vi.fn(async () => 'U1'),
   verifyCallerLineIdentity: vi.fn(async () => ({
@@ -49,6 +50,27 @@ test('online reservation uses the online pool even when the classroom is full', 
       )
       .get(),
   ).toEqual({ participation_mode: 'online' });
+});
+test('保存後に送信処理が走らなくても、予約・通知・リマインダの予定が同時に残る',async()=>{
+  f.raw.exec('UPDATE events SET reminder_day_before_enabled=1,reminder_hours_before=1');
+  const response=await book('online');expect(response.status).toBe(201);
+  const body=await response.json<{id:string}>();
+  expect(f.raw.prepare("SELECT status FROM workflow_steps WHERE process_kind='booking_line_delivery'").all()).toEqual([{status:'pending'}]);
+  expect(f.raw.prepare('SELECT kind,status FROM event_booking_reminders WHERE booking_id=? ORDER BY kind').all(body.id))
+    .toEqual([{kind:'day_before',status:'pending'},{kind:'hours_before',status:'pending'}]);
+});
+test('通知予定の保存障害では予約も戻し、片側だけ成立させない',async()=>{
+  f.raw.exec(`CREATE TRIGGER stop_plan BEFORE INSERT ON workflow_steps WHEN NEW.process_kind='booking_line_delivery'
+    BEGIN SELECT RAISE(ABORT,'fixture'); END`);
+  expect((await book('online')).status).toBe(500);
+  expect(f.raw.prepare("SELECT COUNT(*) n FROM event_bookings WHERE friend_id='f1'").get()).toEqual({n:0});
+});
+test('並行する2人でも最後の1席は1予約・1通知だけ。落選側は待ちへ進む',async()=>{
+  vi.mocked(verifyCallerLineUserId).mockResolvedValueOnce('U1').mockResolvedValueOnce('U3');
+  const responses=await Promise.all([book('online','parallel-1'),book('online','parallel-2')]);
+  expect(responses.map(r=>r.status).sort()).toEqual([200,201]);
+  expect(f.raw.prepare("SELECT COUNT(*) n FROM event_bookings WHERE participation_mode='online'").get()).toEqual({n:1});
+  expect(f.raw.prepare("SELECT COUNT(*) n FROM workflow_steps WHERE process_kind='booking_line_delivery'").get()).toEqual({n:1});
 });
 test('full classroom goes into the classroom queue and preserves the mode', async () => {
   const r = await book('classroom');

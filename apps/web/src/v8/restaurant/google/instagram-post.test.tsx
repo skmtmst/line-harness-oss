@@ -118,10 +118,10 @@ describe('投稿一覧の Instagram の札（★V8-B `HEEN9`）', () => {
     render(<PostsBoard accountId="acc-1" go={go} />)
 
     expect(await screen.findByText('Instagram 済み')).toBeTruthy()
-    expect(screen.getByText('Instagram 失敗・再試行')).toBeTruthy()
+    expect(screen.getByText('Instagram 失敗・もう一度送る')).toBeTruthy()
     expect(screen.getByText('Instagram なし')).toBeTruthy()
     // 送る前（p-before）と未対応（p-unsupported）の分は増えない。
-    expect(screen.queryAllByText(/^Instagram (済み|失敗・再試行|なし)$/)).toHaveLength(3)
+    expect(screen.queryAllByText(/^Instagram (済み|失敗・もう一度送る|なし)$/)).toHaveLength(3)
   })
 
   it('失敗した投稿の「…」にだけ「Instagram へ再送」が出て、押すと再送の口を呼ぶ', async () => {

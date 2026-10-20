@@ -139,7 +139,7 @@ describe('createTestD1 の出来上がり', () => {
 
 // 受け取りボーナスの同時作成を、実D1と同じbatchの境界で検証できること。
 describe('createTestD1 のbatch', () => {
-  test('同時batchは割り込まず、SELECT・RETURNINGとchanges()の結果を返す', async () => {
+  test('同時batchは割り込まず、SELECT・RETURNINGとchangesの結果を返す', async () => {
     const { raw, db } = createTestD1();
     try {
       raw.exec('CREATE TABLE batch_probe(id TEXT PRIMARY KEY, n INTEGER)');

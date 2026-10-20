@@ -146,9 +146,9 @@ describe('runEventBookingExpirer', () => {
   });
 });
 
-// N-065: 期限切れも通常取消と同じく V6 の未送信予定だけを止める。
+// N-065: 期限切れも通常取消と同じく の未送信予定だけを止める。
 // 本物の SQLite に当て、別予約・別アカウントへ触れないことと再実行の冪等を見る。
-describe('runEventBookingExpirer の V6 連動', () => {
+describe('runEventBookingExpirer の 連動', () => {
   const ACCOUNT_1 = 'v6ev-account-1';
   const ACCOUNT_2 = 'v6ev-account-2';
   const NOW_V6 = new Date('2026-09-10T00:00:00.000Z');
@@ -309,7 +309,7 @@ describe('runEventBookingExpirer の V6 連動', () => {
     expect(raw.prepare(`SELECT status FROM event_bookings WHERE id = 'v6ev-fresh'`).get()).toEqual({
       status: 'requested',
     });
-    // V6 の未送信だけ止まり、送信済みが残る。
+    // の未送信だけ止まり、送信済みが残る。
     expect(enrollmentBySource(raw, 'v6ev-stale')).toEqual({
       id: staleEnrollment.id, status: 'cancelled', cancel_reason: 'event_expired:v6ev-stale:by:system',
     });
@@ -371,14 +371,14 @@ describe('runEventBookingExpirer の V6 連動', () => {
     expect(enrollmentBySource(raw, 'v6ev-confirmed').status).toBe('active');
   });
 
-  test('V6 連動の失敗では期限切れ自体を止めない', async () => {
+  test('連動の失敗では期限切れ自体を止めない', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);
     seedEventBooking(raw, 'v6ev-stale', {
       accountId: ACCOUNT_1, eventId: 'v6ev-event-1', slotId: 'v6ev-slot-a',
       friendId: 'v6ev-f1', requestedAt: STALE_AT, status: 'requested',
     });
-    // friend_reminders を壊して V6 取消だけを失敗させる。
+    // friend_reminders を壊して 取消だけを失敗させる。
     raw.exec('DROP TABLE friend_reminders');
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
@@ -396,7 +396,7 @@ describe('runEventBookingExpirer の V6 連動', () => {
   test('期限切れ・取消ずみの取りこぼしは修復走査で止める', async () => {
     const { db, raw } = createTestD1();
     seedBase(raw);
-    // 業務は終わっているのに V6 が active のまま (部分失敗・手動取消の残り)。
+    // 業務は終わっているのに が active のまま (部分失敗・手動取消の残り)。
     seedEventBooking(raw, 'v6ev-leftover', {
       accountId: ACCOUNT_1, eventId: 'v6ev-event-1', slotId: 'v6ev-slot-a',
       friendId: 'v6ev-f1', requestedAt: STALE_AT, status: 'expired',

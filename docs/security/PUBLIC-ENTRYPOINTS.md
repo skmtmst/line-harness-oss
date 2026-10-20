@@ -1,10 +1,12 @@
+> 文書：ログイン不要の入口（B-351/4）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # ログイン不要の入口（B-351/4）
 
 2026-10-16 / kenta・Codex。本線 `af8e504d75` を通常mergeして点検。ここで「ログイン不要」は**管理画面のログインを通らない**意味。LINEの本人確認、Webhook署名、専用鍵が必要な入口も含める。公開URLを知っているだけで、その人の本人確認を済ませたとは考えない。
 
 ## 数え方と限界
 
-WorkerのHono実登録にある管理認証の外の入口は **202経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。10-19にチャネル別LINE Webhookを追加（201＋1）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。
+WorkerのHono実登録にある管理認証の外の入口は **204経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。 10-19 P02で店の写真の公開取得1経路を追記（201＋1）。認証の許可範囲は変更しない。 10-19にチャネル別LINE Webhookを追加（202＋1）。10-21に本人確認済みのクリック遷移資格発行を追加（203＋1）。
 
 「全経路を列挙」と「すべての入力で安全を確認」は別。表の本人確認・期限はコードの方式で、実配備の設定や全資源ID×本人の組合せはS07/S15の未完を維持する。URLの実値・query・顧客情報は記録しない。
 
@@ -21,7 +23,7 @@ WorkerのHono実登録にある管理認証の外の入口は **202経路**（�
 
 共通の回数制限：`middleware/rate-limit.ts`。認証・upload等には `sensitive-rate-limit.ts` の共有D1枠もある。下のIPの上限は単一実行環境の1分窓（特記を除く）。IPを分散した取得を止めるものではなく、本番WAFの確認はS43。
 
-## 全201経路
+## 全204経路
 
 | メソッド・経路 | IDの形・推測への耐性 | 回数の制限 | 返す個人情報/確認する人 | 期限 | 根拠のファイル |
 | --- | --- | --- | --- | --- | --- |
@@ -93,10 +95,12 @@ WorkerのHono実登録にある管理認証の外の入口は **202経路**（�
 | `DELETE /api/liff/booking/seat-waitlist/:id` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `POST /api/liff/booking/seat-waitlist/:id/accept` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `GET /api/liff/booking/settings` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 公開の空き枠/メニュー/表示設定。利用者一覧や秘密を含めないことを個別確認 | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
+| `GET /api/liff/booking/store-photos` | 公開LIFF ID。秘密ではない。有効な店の公開写真だけを返す | IP 3,000/分（単一実行環境） | 登録済み写真の用途・公開画像URLを保存順で返す。顧客情報・管理用の版・秘密値を含めない | LIFF IDから有効な店を固定。写真の保存順・未登録・別店は実HTTP試験で確認 | `apps/worker/src/routes/booking/register-photos.ts` |
 | `GET /api/liff/booking/waitlist` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `POST /api/liff/booking/waitlist` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `DELETE /api/liff/booking/waitlist/:id` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `GET /api/liff/booking/waitlist/mine` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
+| `POST /api/liff/tracked-link-identity` | 公開のリンクID。資格ではない | IP 3,000/分（単一実行環境） | リンクの店のLINE ID token・店の稼働・本人の所属を照合し、本人用の遷移資格だけを返す。no-store | 5分。リンク・本人・店に署名で束縛 | `apps/worker/src/routes/tracked-links.ts` |
 | `GET /api/liff/config` | 公開LIFF ID。秘密ではない | IP 3,000/分 | 公開のbotBasicId・accountName・accountId・customerLook。LINE本人確認は不要。友だち/鍵は返さない | 有効な店/統括を確認。既定店へのfallbackあり、個別の入力差はS15 | `apps/worker/src/routes/liff.ts` |
 | `GET /api/liff/customer-look` | 公開LIFF ID。秘密ではない | IP 3,000/分 | 公開の見た目と表示設定だけ。LINE本人確認は不要 | 有効な店/統括を確認。期限なし、no-store | `apps/worker/src/routes/liff.ts` |
 | `POST /api/liff/entry-route-coupon` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/liff.ts` |
@@ -225,13 +229,13 @@ WorkerのHono実登録にある管理認証の外の入口は **202経路**（�
 
 ログイン前でも、有効な確認票を持つ人へメールや名前を返す口がある。票は一時的な取得権限なので、URLの流出を無害と考えない。登録は24時間、再設定は1時間（`services/auth-mail.ts`）。他の招待・OAuth・MFAは保存した期限と目的を照合する。外部のログへquery/票を写さず、票なし・期限切れ・使用済みの検査を維持する。GETの移動だけの口と、本人確認後に処理するPOSTを混同しない。
 
-## Static asset・SPA（上の201とは別）
+## Static asset・SPA（上の204とは別）
 
 | 面 | ID/回数制限 | 個人情報・期限・残る条件 |
 | --- | --- | --- |
-| 管理画面の `apps/web/out` のHTML・JS・CSS・公開画像・version.json | 固定パスとビルドのhash。静的配信の回数制限はCloudflare側、未確認 | ログイン画面の骨組みは公開。顧客データは管理APIの本人確認後。CSPは[CSP記録](CSP-REVIEW-1016.md)。ビルドへ秘密を埋めない |
+| 管理画面の `apps/web/out` のHTML・JS・CSS・公開画像・version.json | 固定パスとビルドのhash。静的配信の回数制限はCloudflare側、未確認 | ログイン画面の骨組みは公開。顧客データは管理APIの本人確認後。CSPは[CSP記録](csp.md)。ビルドへ秘密を埋めない |
 | LIFFの `apps/liff/dist` とWorkerの `dist/client`、未知の非APIパスのSPA fallback | 画面のパス、ID/slugは秘密ではない。Worker経由は共通IP枠、Pages直配信は別確認 | 予約確認/フォーム/本人履歴の骨組みは公開。個人情報の取得は表のAPIで検証。外部ログインの実試験は今回は行わない |
-| 管理専用の添付 `/api/form-files/:id/content` | 管理認証の外ではないため201に含めない。本人確認書類はowner/admin、所属と期限・検査状態を照合 | `routes/form-documents.ts`。`private/form-documents/` のR2原本は公開画像口では404。期限付きURLへ切り替えたという意味ではない |
+| 管理専用の添付 `/api/form-files/:id/content` | 管理認証の外ではないため204に含めない。本人確認書類はowner/admin、所属と期限・検査状態を照合 | `routes/form-documents.ts`。`private/form-documents/` のR2原本は公開画像口では404。期限付きURLへ切り替えたという意味ではない |
 
 ## API列車で加わった入口（全一覧の再生成ではない）
 
@@ -249,6 +253,6 @@ WorkerのHono実登録にある管理認証の外の入口は **202経路**（�
 
 ## 再確認
 
-`SECURITY_INVENTORY_REPORT=docs/security/API-ROUTE-INVENTORY-1016.tsv pnpm --filter worker exec vitest run src/middleware/route-guard-coverage.test.ts` をリポジトリルートから使うと出力先がWorker基準になるため、実行時はレポート先を絶対パスで指定する。次に `pnpm --filter worker exec vitest run src/routes/public-entrypoints.security.test.ts src/middleware/public-referral-rate-limit.security.test.ts`。重い検査はheavy経由で行う。
+`SECURITY_INVENTORY_REPORT=docs/security/API-ROUTE-INVENTORY-1016.tsv pnpm --filter worker exec vitest run src/middleware/route-guard-coverage.test.ts` をリポジトリルートから使うと出力先がWorker基準になるため、実行時はレポート先を絶対パスで指定する。次に `pnpm --filter worker exec vitest run src/routes/public-entrypoints-security.test.ts src/middleware/public-referral-rate-limit-security.test.ts`。重い検査はheavy経由で行う。
 
 既存の画像・書類・LINE本人/所属・Webhook署名の試験も合わせる。本番の顧客データや本物の送信を確認用に使わない。配備の設定を読んだ証拠がなければ「分からない」のまま残す。

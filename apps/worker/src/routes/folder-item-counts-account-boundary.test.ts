@@ -4,7 +4,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 /**
  * `GET /api/folders` の件数（#631）を、本物の `@line-crm/db`（`getFolderItemCounts`
@@ -81,6 +81,7 @@ beforeEach(() => {
   sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
     VALUES ('folder-1', 'reminder', 'フォルダ1', 0, '2026-01-01', '2026-01-01')`).run();
 
+  sqlite.exec("UPDATE folders SET account_id='account-a' WHERE id='folder-1'");
   const insertReminder = sqlite.prepare(
     `INSERT INTO reminders (id, name, trigger_type, folder_id, line_account_id, created_at, updated_at)
      VALUES (?, ?, 'manual', ?, ?, '2026-01-01', '2026-01-01')`,
@@ -122,8 +123,8 @@ describe('GET /api/folders の件数(#631) — 実DB結合', () => {
     accountAccess.getVisibleLineAccountScope.mockResolvedValue({
       accounts: [], allowedAccountIds: ['account-a'], canSeeUnassigned: false, ids: ['account-a'], isAccountScoped: true,
     });
-    sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
-      VALUES ('folder-event', 'event', 'イベント用', 0, '2026-01-01', '2026-01-01')`).run();
+    sqlite.prepare(`INSERT INTO folders (id, kind, name, display_order, created_at, updated_at, account_id)
+      VALUES ('folder-event', 'event', 'イベント用', 0, '2026-01-01', '2026-01-01', 'account-a')`).run();
 
     const res = await req('/api/folders?kind=event');
     const body = await res.json() as { data: Array<Record<string, unknown>>; unfiledCount?: number };

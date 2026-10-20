@@ -10,7 +10,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 export { countText }
 
 /**
- * 一斉配信の一覧に出す数（設計 `q76C35` ★V6 6-1 一斉配信の帯）。
+ * 一斉配信の一覧に出す数（設計 `q76C35` ★管理画面 6-1 一斉配信の帯）。
  *
  * 設計の4枚は **予約中 / 下書き / 今月の配信 / 平均開封率** で、この順。
  * 前は「今月の配信 / 到達 / 平均開封率 / 失敗」で、枚数は合っていても

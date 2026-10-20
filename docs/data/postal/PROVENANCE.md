@@ -1,3 +1,5 @@
+> 文書：郵便番号データの出どころ（F11）｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 郵便番号データの出どころ（F11）
 
 - 取得元（公式）: https://www.post.japanpost.jp/service/search/zipcode/download/utf-zip.html
@@ -14,7 +16,7 @@
 - 利用時の検索は取り込んだ `postal_codes` 表だけを読み、外部通信はしない。顧客情報を外へ送らない。
 - 7桁は文字列で持つ（先頭0保持）。同じ番号の複数候補は1つに潰さない。該当なし・無効入力・手入力保持をAPIで返す。
 - 全量の生CSV・zip・取込SQLはソースへ入れない（.gitignoreのdata/postal*。manifest.jsonだけ残す）。
-- 更新手順: `node scripts/fetch-jp-postal-data.mjs --fetch --url <配布ページで確認した直URL>`（または環境変数 `JP_POSTAL_ZIP_URL`。直URLなしの `--fetch` 単体はRC2で止まる。配布ページの自動解析はしない）→SHA256・件数を控える→検証DBへ取り込み→件数と readiness を確かめる→ここへ取得日・入力SHA・件数・生成物を追記する。
+- 更新手順: `node scripts/db/fetch-jp-postal-data.mjs --fetch --url <配布ページで確認した直URL>`（または環境変数 `JP_POSTAL_ZIP_URL`。直URLなしの `--fetch` 単体はRC2で止まる。配布ページの自動解析はしない）→SHA256・件数を控える→検証DBへ取り込み→件数と readiness を確かめる→ここへ取得日・入力SHA・件数・生成物を追記する。
 
 ## 取込SQLの分割適用の設計（D1の文長上限・途中ready対応）
 

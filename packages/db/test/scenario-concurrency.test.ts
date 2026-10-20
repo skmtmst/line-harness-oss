@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { createScenario, enrollFriendInScenario, publishScenarioVersion, updateScenario } from '../src/scenarios.js';
+import { createScenario, enrollFriendInScenario, publishScenarioVersion, updateScenario } from '../src/scenarios/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

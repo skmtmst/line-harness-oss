@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 import { readStaffIdentity, subscribeStaffIdentity } from '@/lib/staff-identity-state'
 import styles from './screen-explanation.module.css'
 
-/** B-245：画面全体の説明。保存するのは人のID・画面・開閉だけ。 */
+/** ：画面全体の説明。保存するのは人のID・画面・開閉だけ。 */
 export default function ScreenExplanation({ title, children, screenKey, titleClassName, panelClassName }: { title: ReactNode; children?: ReactNode; screenKey?: string; titleClassName?: string; panelClassName?: string }) {
   const pathname = typeof window === 'undefined' ? '' : window.location.pathname
   const identity = useSyncExternalStore(subscribeStaffIdentity, readStaffIdentity, () => null)

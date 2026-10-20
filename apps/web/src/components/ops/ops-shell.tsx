@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import {
@@ -16,11 +17,11 @@ import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-ses
 import { logoutAndGoToLogin } from '@/lib/logout'
 import ImpersonationBar from './impersonation-bar'
 import RecoveryCodeNotice from '@/components/recovery-code-notice'
-import OpsShellV8 from '@/v8/ops/shell'
+import { OpsShellV8 } from '@/v8/ops/public/shell/index'
 import { setDocumentTitle } from '@/lib/document-title'
 
 /**
- * 運営コンソールの外枠。★V6 37 系。
+ * 運営コンソールの外枠。★管理画面 37 系。
  *
  * 統括・店舗の共通メニュー（`J33xq`）は使わない。運営専用のサイドメニュー
  * （`jIZP0`）と環境帯（`OGkIw`）を持つ。メンバー管理はサイドメニューに置かず、
@@ -43,9 +44,9 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const [remaining, setRemaining] = useState<number | null>(null)
   const [checked, setChecked] = useState(false)
   const [loadError, setLoadError] = useState('')
-  // ★V7：担当者の取得だけ落ちても外枠は落とさない。本文は普通に出す。
+  // ★管理画面：担当者の取得だけ落ちても外枠は落とさない。本文は普通に出す。
   const [meError, setMeError] = useState('')
-  // ★V8：外枠は src/v8/ops/shell.tsx（統括・店舗と同じ外側に運営のメニュー）。v7 は下のまま。
+  // ★V8：外枠は src/v8/ops/shell.tsx（統括・店舗と同じ外側に運営のメニュー）。互換経路は下のまま。
 
 
   /*
@@ -74,7 +75,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Bearer session remains usable */ }
       }
       if (!body.data.platformAdmin) {
-        // 招待を受けて 2要素認証待ちの人は、設定画面へ（★V6 37-10-B）
+        // 招待を受けて 2要素認証待ちの人は、設定画面へ（★管理画面 37-10-B）
         router.replace(body.data.platformAdminState === 'awaiting_totp' ? '/ops/two-factor' : '/ops/login?error=not_platform_admin')
         return
       }
@@ -87,9 +88,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       setLoadError(
         caught instanceof TypeError
           ? '通信できませんでした。ネットワークを確認してもう一度お試しください'
-          : caught instanceof Error && caught.message
-            ? caught.message
-            : '運営コンソールを読み込めませんでした',
+          : describeApiFailure(caught, '読み込み', { scope: 'hq' }),
       )
       setChecked(true)
       return
@@ -104,9 +103,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
       setMeError(
         caught instanceof TypeError
           ? '通信できませんでした。ネットワークを確認してもう一度お試しください'
-          : caught instanceof Error && caught.message
-            ? caught.message
-            : '担当者の情報を読み込めませんでした',
+          : describeApiFailure(caught, '読み込み', { scope: 'hq' }),
       )
     }
     setChecked(true)
@@ -122,7 +119,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
     )
   }
 
-  // ★V7：セッション以外の失敗（担当者の取得）で外枠ごと落とさない。
+  // ★管理画面：セッション以外の失敗（担当者の取得）で外枠ごと落とさない。
   // 担当者が読めていない間は、外枠と本文を出したまま左下に1行出す。
   if (loadError) {
     return (

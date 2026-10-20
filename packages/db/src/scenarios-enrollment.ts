@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { advanceFriendScenario, claimFriendScenarioForDelivery, completeFriendScenario, enrollFriendInScenario, getFriendScenarioById, getFriendScenariosDueForDelivery, getStepsForDelivery, moveFriendScenarioTo, pauseFriendScenario, pauseFriendScenarioDelivery, pauseFriendScenarioManual, recoverStuckDeliveries, resumeExistingFriendScenario, resumeFriendScenario, resumeFriendScenarioById, retryFailedFriendScenario, scenarioStepExists } from './scenarios/enrollment.js';

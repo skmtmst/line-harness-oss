@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   getEntryRouteByRefCodeAny,
   recordEntryRouteStopSuppression,
@@ -7,6 +8,8 @@ import type {
   EntryRouteStopSuppression,
   FriendAddCandidateSource,
 } from '@line-crm/db';
+
+
 
 // N-244: 停止した流入経路の判定を各入口 (/r/:ref、/auth/line、/auth/oauth、
 // /auth/callback、/api/liff/*、follow webhook) で共通化する。
@@ -108,7 +111,7 @@ export async function getActiveStopSuppressionSafe(
   try {
     return await lookup(db, { lineAccountId, lineUserId });
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_entry_route_stop_failed"}));
+    logger.error("services_entry_route_stop_failed");
     return 'unknown';
   }
 }

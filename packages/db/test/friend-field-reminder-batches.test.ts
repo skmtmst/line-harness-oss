@@ -10,7 +10,7 @@ import {
   getFriendFieldReminders,
   getFriendsWithFieldValuePage,
   setFriendFieldReminderScanCursor,
-} from '../src/reminders.js';
+} from '../src/reminders/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');

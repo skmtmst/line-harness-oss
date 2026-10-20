@@ -3,7 +3,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-/* コース・クラスのお支払い（B-305）：版つきで保存し、古い版（409）は共通の帯と比べる窓で選んでもらう。 */
+/* コース・クラスのお支払い：版つきで保存し、古い版（409）は共通の帯と比べる窓で選んでもらう。 */
 
 const net = vi.hoisted(() => ({
   courseMode: vi.fn(), saveCourseMode: vi.fn(), eventMode: vi.fn(), saveEventMode: vi.fn(), eventPrice: vi.fn(), saveEventPrice: vi.fn(),
@@ -12,8 +12,8 @@ vi.mock('@/lib/api', async (load) => {
   const actual = await load<typeof import('@/lib/api')>()
   return { ...actual, bookingApi: { ...actual.bookingApi, getPaymentConfig: async () => ({ success: true, data: { mode: 'onsite', provider: 'onsite', holdMinutes: 10, keyConfigured: true, testMode: true } }) } }
 })
-vi.mock('@/lib/api-booking-payment-admin', async (load) => {
-  const actual = await load<typeof import('@/lib/api-booking-payment-admin')>()
+vi.mock('@/lib/api/helpers/booking-payment-admin', async (load) => {
+  const actual = await load<typeof import('@/lib/api/helpers/booking-payment-admin')>()
   return {
     ...actual,
     bookingPaymentAdminApi: {

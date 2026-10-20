@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -8,11 +9,11 @@ import {
   keywordRules,
   stopNote,
   triggerSummary,
-} from './auto-reply-words'
+} from '../../v8/auto-replies/auto-reply-words'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
+const PAGE = readUiSource(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 const baseRule = {
   keyword: '予約',
@@ -109,7 +110,7 @@ describe('機能08 点検: 一覧検索（N-087）', () => {
 })
 
 describe('機能08 点検: どんなときに動くか列（N-088）', () => {
-  it('B-194：名前は1行にし、実情報の要約と全条件は詳細パネルに残す', () => {
+  it("名前は1行にし、実情報の要約と全条件は詳細パネルに残す", () => {
     expect(PAGE).toContain('triggerSummary(panelRow)')
     expect(PAGE).toContain('conditionChips(panelRow)')
   })

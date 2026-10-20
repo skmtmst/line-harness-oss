@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B NEN配信（MuhWR・Jxmqh・Tj7n4・oqSJP）の骨格。
- * データの持ち方は v7（page.tsx）と同じ。ここでは見せ方だけを見る。
+ * ★V8-B NEN配信（・・・）の骨格。
+ * データの持ち方は 管理画面（page.tsx）と同じ。ここでは見せ方だけを見る。
  */
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'

@@ -1,4 +1,5 @@
-import {assertChanged,clearAssertions} from './booking-series.js';
+import { jstDate as japanDate } from '@line-crm/shared';
+import {assertChanged,clearAssertions} from '../features/booking/booking-series/index.js';
 import {GapError} from './gap-common.js';
 export type RankTier={id:string;name:string;threshold:number;mileMultiplier:number;tagId?:string;benefitDescriptions?:string[];couponCode?:string|null;upgradeMessages?:Array<{type:"text";text:string}>;downgradeMessages?:Array<{type:"text";text:string}>};
 export async function rankProgram(db:D1Database,a:string){
@@ -48,7 +49,7 @@ export async function evaluateRanks(db:D1Database,a:string,initial:boolean,now=n
 function rankNotice(db:D1Database,a:string,f:string,t:RankTier,kind:'upgrade'|'downgrade_warning',key:string,now:Date){
  const base=kind==='upgrade'?(t.upgradeMessages?.length?t.upgradeMessages:[{type:'text',text:`会員ランクが${t.name}になりました`}]) : (t.downgradeMessages?.length?t.downgradeMessages:[{type:'text',text:`${t.name}の条件まで、14日間の猶予があります`}]);
  const messages=t.couponCode?[...base,{type:'text',text:`特典クーポン：${t.couponCode}`}]:base;
- const day=new Date(now.getTime()+9*3600000).toISOString().slice(0,10);
+ const day=japanDate(now);
  const scheduled=new Date(`${day}T10:00:00+09:00`);
  return db.prepare('INSERT OR IGNORE INTO member_rank_notices(id,account_id,friend_id,change_key,kind,tier_id,purpose,messages_json,base_messages_json,scheduled_at) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),a,f,key,kind,t.id,t.couponCode?'marketing':'notice',JSON.stringify(messages),JSON.stringify(base),scheduled.toISOString());
 }

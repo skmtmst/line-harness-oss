@@ -1,9 +1,9 @@
 import type { Context } from 'hono';
 import { bumpAuthThrottle, toJstString } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { readBoundedBytes } from '../lib/input-errors.js';
-import { isOutputRequest } from './output-audit.js';
-import { isPublicApiBoundary } from './auth.js';
+import { isOutputRequest } from './output-request.js';
+import { isPublicApiBoundary } from './public-api-boundary.js';
 
 const MINUTE = 60_000;
 async function digest(value: string): Promise<string> {

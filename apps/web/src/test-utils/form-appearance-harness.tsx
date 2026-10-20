@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { FORM_THEME_DEFAULT, type FormOptions, type FormTheme } from '@line-crm/shared'
-import { AppearanceTab } from '@/v8/form-edit/appearance-tab'
+import { AppearanceTab } from '@/v8/form-edit/public/appearance-tab/index'
 
 /** 現役の設定を、編集ページと同じ親の状態へ接続して操作する。 */
 export default function FormAppearanceHarness(props: {

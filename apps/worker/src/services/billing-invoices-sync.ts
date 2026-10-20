@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   BILLING_INVOICES_LAST_SYNCED_KEY,
   getPlatformSetting,
@@ -8,6 +9,7 @@ import {
   type BillingInvoiceInput,
   type BillingInvoiceInterval,
 } from '@line-crm/db';
+
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { stripeApi, type StripeEnv, type StripeInvoice } from './stripe-api.js';
 
@@ -121,7 +123,7 @@ export async function syncBillingInvoices(
       } while (startingAfter);
     } catch (error) {
       failed += 1;
-      console.warn(JSON.stringify({"code":"billing_invoice_sync_failed"}));
+      logger.warn("billing_invoice_sync_failed");
     }
   }
 

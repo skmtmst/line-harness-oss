@@ -10,7 +10,7 @@ import EntitySelect from '@/components/shared/entity-select'
  */
 import { useEffect, useState } from 'react'
 import type { LineSender } from '@line-crm/shared'
-import { lineSenderApi } from '@/lib/api-gap1'
+import { lineSenderApi } from '@/lib/api/helpers/gap1'
 import Select from './select'
 
 export default function SenderSelect({ accountId, value, onChange, disabled }: {

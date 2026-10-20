@@ -1,4 +1,5 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -36,9 +37,9 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8-B `w1W8h`：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
+ * ★V8-B ：EC連携 会員のつき合わせ（/ec-commerce/identity-candidates）。
  *
- * 外側は取り込みの記録（GmVR5）と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
+ * 外側は取り込みの記録と同じ設定の板（narrow-nav）と中の切り替え。中身は絵の順：
  * 数の帯（自動で結びついた・候補が見つかった・結びついていない・結びついていない注文の金額）→
  * 自動で結びつく条件の帯 → 並び（と絞り込み）・注意 → 候補の表（「候補を見る」「決める」、候補なしは「友だちを探す」）。
  * 動きは今の画面（app/ec-commerce/identity-candidates/page.tsx）と同じ：候補は本人照合の口、
@@ -187,7 +188,7 @@ export default function EcIdentityCandidatesScreen() {
             title="結びついていない注文の金額"
             value={null}
             unit=""
-            valueText={operationsReady && operations?.summary.potentialRevenue != null ? `¥${formatNumber(operations.summary.potentialRevenue)}` : undefined}
+            valueText={operationsReady && operations?.summary.potentialRevenue != null ? `${formatYen(operations.summary.potentialRevenue)}` : undefined}
             detail={operationsReady ? `候補 ${formatNumber(candidateCount)} 人の注文` : operationsDetail('分析にも入ります')}
             loading={operationsState === 'loading'}
           />
@@ -207,7 +208,7 @@ export default function EcIdentityCandidatesScreen() {
             /></SaveErrorField>
           </span>
           <span className={shared.spacer} />
-          <span className={styles.note}>結び付けても元の注文と LINE の友だちは残り、過去の LINE 送信は再送しません。</span>
+          <span className={styles.note} title="結び付けても元の注文と LINE の友だちは残り、過去の LINE 送信は再送しません。">結び付けても元の注文と LINE の友だちは残り、過去の LINE 送信は再送しません。</span>
         </div>
 
         <DataTable density="compact" columns="var(--tpl-ecc-identity-columns)" label="会員のつき合わせの候補">

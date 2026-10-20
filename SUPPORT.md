@@ -1,3 +1,5 @@
+> 文書：Support｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # Support
 
 For bugs and feature requests, use GitHub Issues in this repository.

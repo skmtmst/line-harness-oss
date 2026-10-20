@@ -34,9 +34,9 @@ const MAINB_V8_SCREENS = [
   ['/broadcasts', '@/v8/broadcasts/list', 'v8/broadcasts/list.tsx', '<ListPage'],
   ['/broadcasts/detail', '@/v8/broadcast-detail/detail', 'v8/broadcast-detail/detail.tsx', '<PageFrame'],
   ['/scenarios/detail', '@/v8/scenario-detail/detail', 'v8/scenario-detail/detail.tsx', '<PageFrame'],
-  ['/reminders/new', './new-v8', 'app/reminders/new/new-v8.tsx', '<CreatePage'],
+  ['/reminders/new', '@/v8/reminders/new/new', 'v8/reminders/new/new.tsx', '<CreatePage'],
   ['/auto-replies', '@/v8/auto-replies/list', 'v8/auto-replies/list.tsx', '<ListPage'],
-  ['/auto-replies/edit', './wizard-v8', 'app/auto-replies/edit/wizard-v8.tsx', '<CreatePage'],
+  ['/auto-replies/edit', '@/v8/auto-replies/edit/wizard', 'v8/auto-replies/edit/wizard.tsx', '<CreatePage'],
   ['/friend-add-settings', '@/v8/friend-add/list', 'v8/friend-add/list.tsx', '<ListPage'],
   ['/scenarios/mode', '@/v8/scenarios/create', 'v8/scenarios/create.tsx', '<CreatePage'],
   ['/scenarios/first-step', '@/v8/scenario-first-step/first-step', 'v8/scenario-first-step/first-step.tsx', '<CreatePage'],
@@ -98,7 +98,7 @@ describe('current page entries and V8 components', () => {
 
   it.each(MAINB_V8_SCREENS)('%s のV8本体は共通の型を使う', async (route, _module, file, template) => {
     if (route === '/booking/menus' || route === '/booking/menus/new' || route === '/booking/menus/staff') {
-      // B-273: the old heading's source spelling cannot prove the page frame exists.
+      // : the old heading's source spelling cannot prove the page frame exists.
       const screenModule = route === '/booking/menus' ? await import('@/v8/booking-menus/settings')
         : route === '/booking/menus/new' ? await import('@/v8/booking-menus/menu-form')
           : await import('@/v8/booking-menus/assign')

@@ -72,7 +72,7 @@ describe('EC subscriptions and connector', () => {
    * 「定期便の中身と集計を返す」の表明は、#731 で
    * `ec-commerce-subscriptions-pagination.test.ts` へ移した。
    *
-   * ここの DB は `all()` が常に同じ行を返す作りで、契約を SQL で展開・集計する
+   * ここの DB は `all` が常に同じ行を返す作りで、契約を SQL で展開・集計する
    * ようになった実装には答えられない。移した先は**本物の bootstrap.sql を流した
    * SQLite に本物のルータを通す**ので、同じ表明(契約番号・状態・金額・商品名・
    * 危険の理由・集計・monthlyStats・risk)をそのまま、しかも SQL ごと見張れる。

@@ -21,7 +21,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
- * 「答え終わったあと」のタブ（XXFT4）。お礼の画面と、答え終わったら行うこと。
+ * 「答え終わったあと」のタブ。お礼の画面と、答え終わったら行うこと。
  * 行うことは上から順に動く。行の「…」で直す・並べ替える・消す。
  */
 

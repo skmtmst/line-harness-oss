@@ -7,7 +7,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
 
 /**
- * U015 → ★V7 `Xn1Mz`（2026-09-27 オーナー指摘）。
+ * U015 → ★管理画面 `Xn1Mz`（2026-09-27 オーナー指摘）。
  *
  * U015（外部UI監査 ab9d80b07）の旧処方は「検索を独立した全幅の行に」
  * だったが、正本を「検索は幅320で1行目、2行目は左に絞り込み・右端に
@@ -17,7 +17,7 @@ const PAGE = readFileSync(join(HERE, '../../v8/rich-menus/list.tsx'), 'utf8')
  */
 const barBlock = PAGE.slice(PAGE.indexOf('const wideToolbar'), PAGE.indexOf('/* ===== 一覧の中身'))
 
-describe('リッチメニューの検索行（U015 → ★V7 Xn1Mz）', () => {
+describe("リッチメニューの検索行（U015 → ★既存の見た目 Xn1Mz）", () => {
   it('検索は共通 ListToolbar の1行目に置く', () => {
     expect(PAGE).toContain("from '@/components/shared/list-toolbar'")
     expect(barBlock).toContain('<ListToolbar')
@@ -36,7 +36,7 @@ describe('リッチメニューの検索行（U015 → ★V7 Xn1Mz）', () => {
   })
 
   it('作成操作→検索→絞り込み→並び順・表示件数の順に並べる', () => {
-    // 既存契約（rich-menus-v6-contract.test.ts）の道具列順を保ったまま、
+    // 既存契約（rich-menus-管理画面-contract.test.ts）の道具列順を保ったまま、
     // 検索は作成操作の次、絞り込み・並び順の前に置く。
     expect(PAGE).toContain('folderNav={{ rows: folderRows')
     expect(PAGE).toContain('createButton')

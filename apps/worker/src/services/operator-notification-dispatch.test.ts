@@ -486,7 +486,7 @@ describe('運用者通知の自動発火と登録簿', () => {
   });
 });
 
-describe('B-333 運用者通知の送る条件',()=>{
+describe('運用者通知の送る条件',()=>{
   it('3件になるまで台帳で待ち、再送を数えず、3件後の回収で送る',async()=>{
     const t=createTestD1();seedBase(t);
     try {
@@ -533,7 +533,7 @@ describe('B-333 運用者通知の送る条件',()=>{
   });
 });
 
-it('B-333 営業時間は予約の受付枠とその時刻帯で決める',async()=>{
+it('営業時間は予約の受付枠とその時刻帯で決める',async()=>{
   vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-16T01:00:00Z'));
   const t=createTestD1();seedBase(t);
   try {

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 テンプレートの作る・編集（src/v8/template-edit）の動きの試験。V8 のテーマで描いて確かめる。
- * 保存の口・断り方・保存の 409 の帯（NCbYn）・差し込み・閲覧のみ（押せない操作を置かない）・クーポン／リサーチの保存。
+ * 保存の口・断り方・保存の 409 の帯・差し込み・閲覧のみ（押せない操作を置かない）・クーポン／リサーチの保存。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -190,12 +190,12 @@ describe('V8 メッセージを作る・編集', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
     expect(templatesApi.create).not.toHaveBeenCalled()
-    // 理由は上の帯ではなく、名前の欄の真下に出る（B-139）。
+    // 理由は上の帯ではなく、名前の欄の真下に出る。
     expect(screen.getByRole('alert').textContent).toContain('テンプレート名を入力してください')
     expect(screen.getByLabelText('テンプレート名').getAttribute('aria-invalid')).toBe('true')
   })
 
-  it('B-139：名前と本文が空で保存すると、両方の欄が赤くなり真下に理由が出て、1つ目の欄へ移る。直すとその欄の赤は消える', async () => {
+  it('名前と本文が空で保存すると、両方の欄が赤くなり真下に理由が出て、1つ目の欄へ移る。直すとその欄の赤は消える', async () => {
     await mount()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     for (let i = 0; i < 3; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
@@ -327,7 +327,7 @@ describe('V8 クーポン・リサーチを作る', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
     expect(assetsCreate).not.toHaveBeenCalled()
-    /* B-139：帯ではなく、開始・終了の欄の真下に理由を出し、開始の欄へ移る。 */
+    /* ：帯ではなく、開始・終了の欄の真下に理由を出し、開始の欄へ移る。 */
     expect(document.getElementById('te-coupon-start-error')?.textContent).toBe('開始を入力してください')
     expect(document.getElementById('te-coupon-end-error')?.textContent).toBe('終了を入力してください')
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
@@ -362,7 +362,7 @@ describe('V8 クーポン・リサーチを作る', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
     expect(assetsCreate).not.toHaveBeenCalled()
-    /* B-139：選択肢の欄の真下に理由を出し、選択肢の1つ目へ移る。 */
+    /* ：選択肢の欄の真下に理由を出し、選択肢の1つ目へ移る。 */
     const choices = screen.getByRole('group', { name: '問 1 の選択肢' })
     expect(choices.nextElementSibling?.textContent).toBe('選択肢を1つ以上入力してください')
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })

@@ -1,15 +1,16 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import Pagination from '@/components/shared/pagination'
 import { ListPagePagination } from '@/components/templates'
 
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import { jstDate } from '@/lib/jst-datetime'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useListItemHref, useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Banknote, Calculator, CalendarDays, Download, ListOrdered, ShoppingBag, Trophy, Users } from 'lucide-react'
+import { Banknote, Calculator, Download, ListOrdered, ShoppingBag, Trophy, Users } from 'lucide-react'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
@@ -19,19 +20,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Select from '@/components/shared/select'
 import { RowNameLink, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import {
-  downloadCsv,
-  pageCountOf,
-  pageOf,
-  formatYen,
-  jstMonthKey,
-  listAllConversionApprovals,
-  reportMonthKey,
-  reportPeriodLabel,
-  type AffiliateItem,
-  type AffiliateListRow,
-  type ReportPeriod,
-} from './display'
+import { downloadCsv, pageCountOf, pageOf, formatYen, listAllConversionApprovals, reportMonthKey, type AffiliateItem, type AffiliateListRow, type ReportPeriod } from './display'
 import AffiliateDrawer from './drawer'
 import { rewardText, type Agg } from './report-values'
 import { AffiliateArchiveDialog } from './dialogs'
@@ -42,7 +31,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import PeriodPicker, { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+
 
 type ViewKey = 'affiliate' | 'offer'
 
@@ -98,7 +87,7 @@ export default function ReportTab() {
     } catch (caught) {
       if (seq !== requestSeq.current) return
       setState('error')
-      setLoadError(caught instanceof Error ? caught.message : 'レポートを読み込めませんでした。')
+      setLoadError(describeApiFailure(caught, '読み込み'))
     }
   }, [accountId])
 

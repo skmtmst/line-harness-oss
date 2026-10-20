@@ -1,9 +1,10 @@
+import { lineTransport } from '../lib/external-call/line.js';
 import { acquireWorkflow } from '../services/workflow-execution.js';
 import { sendRecordedNotification,NotificationDeliveryIncomplete } from '../services/recorded-notification-send.js';
 import { prepareWorkflowStep, getWorkflowStep,ensureWorkflowStep,claimWorkflowStep,finishWorkflowStep,failWorkflowStep } from '@line-crm/db';
-import { patchFriendMetadata,friendMetadataPatchStatement } from '../services/friend-metadata.js';
+import { patchFriendMetadata,friendMetadataPatchStatement } from '../features/friends/friend-metadata/index.js';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { getFriendByLineUserIdForAccount, getScenarioById } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
@@ -129,7 +130,7 @@ app.post('/api/meet-callback', async (c) => {
     accountId,
     context: 'meet-callback.confirmation',
   });
-  const lineClient = new LineClient(accessToken);
+  const lineClient = new LineClient(accessToken,{transport:lineTransport(AbortSignal.timeout(10_000))});
 
   // Build Flex message with requirements doc
   const transcriptRows = body.transcripts.map((t) => ({

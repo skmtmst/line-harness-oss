@@ -1,3 +1,6 @@
+import { jstDate as japanDate } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
+import { fetchQuota } from '../services/dashboard-quota.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -21,7 +24,8 @@ import {
   summarizeDashboardFreshness,
   type DashboardPeriod,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
@@ -47,7 +51,7 @@ dashboard.get('/api/dashboard/activity', requireRole('owner', 'admin', 'staff'),
     const items = await getDashboardActivity(c.env.DB, access.accountId, limit);
     return c.json({ success: true, data: { items } });
   } catch {
-    console.error('最近の動きを取得できませんでした');
+    logger.error("dashboard_ts_log_51");
     return c.json({ success: false, error: '最近の動きを取得できませんでした' }, 500);
   }
 });
@@ -164,51 +168,6 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-interface QuotaResult {
-  limit: number | null;
-  used: number | null;
-  /** LINE 側が type=none を返した「上限なし」の契約。limit=null と取得失敗を分ける（DASH-08）。 */
-  unlimited: boolean;
-  failed: boolean;
-  reason: 'not_connected' | 'fetch_failed' | null;
-  asOf: string | null;
-}
-
-async function fetchQuota(
-  token: string | undefined,
-  timeoutMs = 10_000,
-): Promise<QuotaResult> {
-  if (!token) {
-    return { limit: null, used: null, unlimited: false, failed: false, reason: 'not_connected', asOf: null };
-  }
-  try {
-    const [quota, consumption] = await Promise.all([
-      fetch('https://api.line.me/v2/bot/message/quota', {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(timeoutMs),
-      }),
-      fetch('https://api.line.me/v2/bot/message/quota/consumption', {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(timeoutMs),
-      }),
-    ]);
-    if (!quota.ok || !consumption.ok) {
-      return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
-    }
-    // type が 'none' のときは上限なし。数字が入らないので null のままにする。
-    const q = (await quota.json()) as { type?: string; value?: number };
-    const c = (await consumption.json()) as { totalUsage?: number };
-    const limit = q.type === 'limited' && typeof q.value === 'number' ? q.value : null;
-    const used = typeof c.totalUsage === 'number' ? c.totalUsage : null;
-    if ((q.type !== 'limited' && q.type !== 'none') || used === null || (q.type === 'limited' && limit === null)) {
-      return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
-    }
-    return { limit, used, unlimited: q.type === 'none', failed: false, reason: null, asOf: new Date().toISOString() };
-  } catch {
-    return { limit: null, used: null, unlimited: false, failed: true, reason: 'fetch_failed', asOf: null };
-  }
-}
-
 dashboard.get('/api/dashboard/overview', async (c) => {
   try {
     const period = readPeriod(c.req.query('period'));
@@ -285,7 +244,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/overview"}));
+    logger.error("routes_dashboard_failed");
     return c.json({ success: false as const, error: 'ダッシュボードの数を取得できませんでした' }, 500);
   }
 });
@@ -377,7 +336,7 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/organization-overview"}));
+    logger.error("routes_dashboard_failed");
     return c.json({ success: false as const, error: '全体の運用数を取得できませんでした' }, 500);
   }
 });
@@ -401,7 +360,7 @@ dashboard.get('/api/dashboard/preferences', async (c) => {
     }
     return c.json({ success: true as const, data: { source: 'builtin' as const, version: 0, cards: null, updatedAt: null } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/preferences"}));
+    logger.error("routes_dashboard_failed");
     return c.json({ success: false as const, error: 'ダッシュボードの配置を取得できませんでした' }, 500);
   }
 });
@@ -427,7 +386,7 @@ dashboard.put('/api/dashboard/preferences', inputJsonBoundary(), async (c) => {
     auditLog(c, 'dashboard.preference.update', { kind: 'line_account', id: access.accountId });
     return c.json({ success: true as const, data: { source: 'personal' as const, version: saved.row.version, cards, updatedAt: saved.row.updated_at } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"PUT /api/dashboard/preferences"}));
+    logger.error("routes_dashboard_failed");
     return c.json({ success: false as const, error: 'ダッシュボードの配置を保存できませんでした' }, 500);
   }
 });
@@ -440,7 +399,7 @@ dashboard.delete('/api/dashboard/preferences', async (c) => {
     auditLog(c, 'dashboard.preference.reset', { kind: 'line_account', id: access.accountId });
     return c.json({ success: true as const, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"DELETE /api/dashboard/preferences"}));
+    logger.error("routes_dashboard_failed");
     return c.json({ success: false as const, error: 'ダッシュボードの配置を初期化できませんでした' }, 500);
   }
 });
@@ -460,7 +419,7 @@ dashboard.put('/api/dashboard/preferences/default', requireRole('owner'), inputJ
     auditLog(c, 'dashboard.preference.default.update', { kind: 'line_account', id: access.accountId });
     return c.json({ success: true as const, data: { version: saved.version, cards, updatedAt: saved.updated_at } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"PUT /api/dashboard/preferences/default"}));
+    logger.error("routes_dashboard_failed");
     return c.json({ success: false as const, error: '会社の既定配置を保存できませんでした' }, 500);
   }
 });
@@ -484,14 +443,14 @@ dashboard.get('/api/dashboard/upcoming', async (c) => {
     });
     return c.json({ success: true as const, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/upcoming"}));
+    logger.error("routes_dashboard_failed");
     return c.json({ success: false as const, error: '今後の予定を取得できませんでした' }, 500);
   }
 });
 
 /** 日本時間の今日 0:00。失敗の「今日ぶん」の既定の境目。 */
 function jstDayStart(now: Date): string {
-  return `${new Date(now.getTime() + 9 * 3_600_000).toISOString().slice(0, 10)}T00:00:00+09:00`;
+  return `${japanDate(now)}T00:00:00+09:00`;
 }
 
 /**
@@ -515,7 +474,7 @@ dashboard.get('/api/dashboard/delivery-failure-origins', async (c) => {
     });
     return c.json({ success: true as const, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/dashboard/delivery-failure-origins"}));
+    logger.error("routes_dashboard_failed");
     return c.json({ success: false as const, error: '失敗の出どころを取得できませんでした' }, 500);
   }
 });
@@ -541,7 +500,7 @@ dashboard.get('/api/list-stats', async (c) => {
         };
     return c.json({ success: true as const, data: await getListStats(c.env.DB, scope) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_dashboard_failed","route":"GET /api/list-stats"}));
+    logger.error("routes_dashboard_failed");
     return c.json({ success: false as const, error: '集計を取得できませんでした' }, 500);
   }
 });

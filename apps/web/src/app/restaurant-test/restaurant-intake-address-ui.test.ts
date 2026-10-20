@@ -88,7 +88,7 @@ describe('飲食店向け店舗とLINE公式アカウントの紐づけ画面', 
     const accounts = [{ id: 'used', name: '使用中公式' }, { id: 'free', name: '空いている公式' }] as AccountWithStats[]
     const submit = vi.fn()
     const view = render(React.createElement(StoreForm, { accounts, stores: [store], busy: false, onSubmit: submit, onCancel: () => {} }))
-    // B-163：作ってあるアカウントは選ぶ窓で選ぶ。他店舗で使用中の候補は押せない。
+    // ：作ってあるアカウントは選ぶ窓で選ぶ。他店舗で使用中の候補は押せない。
     fireEvent.click(screen.getByRole('button', { name: 'LINE公式アカウント：選ぶ' }))
     const dialog = screen.getByRole('dialog', { name: 'LINE公式アカウントを選ぶ' })
     const usedRadio = within(dialog).getByRole('radio', { name: '使用中公式' }) as HTMLInputElement

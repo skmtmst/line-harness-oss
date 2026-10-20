@@ -9,7 +9,7 @@ import ChatsPage from './page'
  *
  * `inbox-673-account-switch-react.test.tsx` と同じく本物のReactで
  * `ChatsPage` を mount し、通信(fetch)だけを差し替える。会話の切替は
- * `useSearchParams()` が返す `?friend=` を試験の途中で書き換えることで
+ * `useSearchParams` が返す `?friend=` を試験の途中で書き換えることで
  * 実際の効果再実行を通す。
  *
  * 見るもの:
@@ -307,7 +307,7 @@ async function typeMessage(text: string) {
 }
 
 async function typeDatetime(text: string) {
-  // 日時の選択（★V7）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm（日本時間）。
+  // 日時の選択（★管理画面）で選ぶ。値は今までどおり YYYY-MM-DDTHH:mm（日本時間）。
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(text)
   if (!match) throw new Error('日時が読めない')
   const year = Number(match[1])

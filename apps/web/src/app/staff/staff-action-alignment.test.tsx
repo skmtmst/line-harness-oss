@@ -68,9 +68,9 @@ const state = {
   ],
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async importOriginal => {
   class ApiError extends Error {}
-  return {
+  return { ...(await importOriginal<typeof import('@/lib/api')>()),
     ApiError,
     fetchApi: vi.fn(),
     // R497-SAVE-WORDING: page が保存catchで使う。本物（api.ts）の

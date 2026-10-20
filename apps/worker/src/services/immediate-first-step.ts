@@ -1,4 +1,6 @@
-import { decorateTapExtras } from './tap-extras.js';
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
+import { decorateTapExtras } from './tap-extra-links.js';
 import {
   getScenarioById,
   getScenarioPublishedVersion,
@@ -18,15 +20,14 @@ import {
 } from '@line-crm/db';
 import type { PinnedScenarioStep, ScenarioDeliverySource } from '@line-crm/db';
 import { LineClient, type Message } from '@line-crm/line-sdk';
-import {
-  buildMessage,
-  expandVariables,
-  resolveMetadata,
-  messageToLogPayload,
-} from './step-delivery.js';
+
+import { buildMessage } from './line-message.js';
+import { expandVariables } from './message-interpolation.js';
+import { resolveMetadata } from './step-metadata.js';
+import { messageToLogPayload } from './message-log-payload.js';
 import { decorateForFriendPush } from './auto-track.js';
 import { resolveSendInterpolationExtra } from './interpolation-context.js';
-import { buildQuestionMessages, parseQuestion } from './scenario-question.js';
+import { buildQuestionMessages, parseQuestion } from '../features/scenarios/scenario-question/index.js';
 
 export interface ImmediatePushContext {
   defaultAccessToken: string;
@@ -258,7 +259,7 @@ export async function pushImmediateFirstStep(
           { enrolledAt: enrolledAtJst, previousDeliveredAt: enrolledAtJst, now: enrolledAtJst },
         );
         // `next` is already in the shifted-JST frame (its inputs were
-        // Date.now()+9h), so serialize by relabeling — NOT toJstString(),
+        // Date.now+9h), so serialize by relabeling — NOT toJstString,
         // which would add the offset a second time and schedule step 2
         // nine hours late. Matches enrollFriendInScenario / the cron.
         await advanceFriendScenario(
@@ -277,7 +278,7 @@ export async function pushImmediateFirstStep(
       try {
         await addTagToFriend(db, friendId, firstStep.on_reach_tag_id);
       } catch (err) {
-        console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+        logger.error("services_immediate_first_step_failed");
       }
     };
 
@@ -285,7 +286,7 @@ export async function pushImmediateFirstStep(
     // elapsed/absolute_time modes have offset/clock-time semantics — cron
     // owns those. Checked BEFORE claiming/enrolling so non-immediate
     // enrollments are left untouched.
-    const enrolledAtJst = new Date(Date.now() + 9 * 60 * 60_000);
+    const enrolledAtJst = japanCalendar();
     const isImmediate = (source: ScenarioDeliverySource, firstStep: PinnedScenarioStep) => {
       const firstScheduledAt = computeNextDeliveryAt(
         { delivery_mode: source.deliveryMode },
@@ -398,7 +399,7 @@ export async function pushImmediateFirstStep(
       questionJson: firstStep.question_json ?? null,
     };
     const [resolvedMeta, ctxAccount] = await Promise.all([
-      resolveMetadata(db, { user_id: friend.user_id, metadata: friend.metadata }),
+      resolveMetadata(db, friend),
       ctx.accountChannelId ? getLineAccountByChannelId(db, ctx.accountChannelId) : null,
     ]);
     const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
@@ -447,7 +448,7 @@ export async function pushImmediateFirstStep(
         resolved.messageType,
         expanded,
         ctx.workerUrl,
-        { lineAccountId: friend.line_account_id ?? ctxAccount?.id ?? null, friendId },
+        { lineAccountId: friend.line_account_id ?? ctxAccount?.id ?? null, friendId, sourceContent: resolved.messageContent },
       );
       messages = [buildMessage(decorated.messageType, decorated.content)];
     }
@@ -495,7 +496,7 @@ export async function pushImmediateFirstStep(
          * 扱いにして先へ進める。到達タグは付けない（届いた確証がない）。
          * 呼ぶ側は台帳へ送達不明を残し、人が確かめる。
          */
-        console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+        logger.error("services_immediate_first_step_failed");
         // 進める先は、この購読が固定している版の通で決める（351）。live の
         // 下書きを見ると、公開後に順序を変えたぶんだけ飛ばし先がずれる。
         await advancePastFirstStep(advanceTargetId, source, firstStep);
@@ -503,7 +504,7 @@ export async function pushImmediateFirstStep(
         return false;
       }
       // 届いていない（4xx）・従来どおりの呼び出しは claim を返して cron へ。
-      console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+      logger.error("services_immediate_first_step_failed");
       await releaseClaim();
       return false;
     }
@@ -549,7 +550,7 @@ export async function pushImmediateFirstStep(
     settleAfterSend = null;
     return true;
   } catch (err) {
-    console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+    logger.error("services_immediate_first_step_failed");
     try {
       if (sent && settleAfterSend) {
         // The message went out but logging/advancing threw — advance anyway
@@ -561,7 +562,7 @@ export async function pushImmediateFirstStep(
         await releaseClaimById(db, claimedEnrollmentId);
       }
     } catch (settleErr) {
-      console.error(JSON.stringify({"code":"services_immediate_first_step_failed"}));
+      logger.error("services_immediate_first_step_failed");
     }
     return sent;
   }

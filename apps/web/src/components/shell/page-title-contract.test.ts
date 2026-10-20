@@ -32,7 +32,7 @@ function walk(dir: string, out: string[] = []): string[] {
 /*
  * `restaurant-test/terms` はサーバー側で描くので `usePageTitle`
  * （クライアントの hook）を呼べない。ビルドが
- * 「Attempted to call usePageTitle() from the server」で落ちる。
+ * 「Attempted to call usePageTitle from the server」で落ちる。
  * サーバー側の画面は別の渡し方が要るので、ここに残してある。
  */
 const NOT_YET_MIGRATED = [
@@ -96,10 +96,10 @@ describe('画面名は上部バーだけが持つ', () => {
       'templates/detail/page.tsx',
       '../v8/scenario-detail/detail.tsx',
       'events/edit/page.tsx',
-      // events/new/page.tsx は V8（v8/events/create.tsx が usePageTitle('イベントを作る') を持つ）を出すだけになった（2026-10-09 V7 削除）。
+      // events/new/page.tsx は V8（v8/events/create.tsx が usePageTitle('イベントを作る') を持つ）を出すだけになった（2026-10-09 管理画面 削除）。
       'form-submissions/edit/page.tsx',
       'pools/page.tsx',
-      // hq/settings/page.tsx は V8（v8/hq/settings.tsx が usePageTitle を持つ）を出すだけになった（2026-10-09 V7 削除）。
+      // hq/settings/page.tsx は V8（v8/hq/settings.tsx が usePageTitle を持つ）を出すだけになった（2026-10-09 管理画面 削除）。
       'rich-menus/edit/page.tsx',
       'rich-menus/new/page.tsx',
       'search-console/page.tsx',

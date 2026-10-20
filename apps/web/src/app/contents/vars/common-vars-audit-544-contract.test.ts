@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../../scripts/test-api-source.mjs'
 import { readFileSync } from 'node:fs'
 import { readUiSource } from '../../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
@@ -11,7 +12,7 @@ const EXPORT_PANEL = readUiSource(join(HERE, '../../../v8/common-vars/export-pan
 const IMPACT_REVIEW = readUiSource(join(HERE, '../../../v8/common-vars-edit/edit.tsx'), 'utf8')
 const WORKER_EXPORT = readFileSync(join(HERE, '..', '..', '..', '..', '..', 'worker', 'src', 'routes', 'common-var-exports.ts'), 'utf8')
 const EDIT_PAGE = readUiSource(join(HERE, 'edit', 'page.tsx'), 'utf8')
-const API = readFileSync(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(HERE, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const MOCK_API = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'mock-api.mjs'), 'utf8')
 const FIXTURES = readFileSync(join(HERE, '..', '..', '..', '..', '..', '..', 'scripts', 'visual-qa', 'fixtures.mjs'), 'utf8')
 

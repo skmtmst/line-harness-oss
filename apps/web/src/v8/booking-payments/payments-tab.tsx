@@ -14,8 +14,8 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { notifySaved } from '@/components/shared/toast'
 import { formatListTimestamp } from '@/lib/format'
 import { ApiError, bookingApi, type BookingPaymentAdminConfig } from '@/lib/api'
-import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode, type StripeConnection } from '@/lib/api-booking-payment-admin'
-import { AccountIcon, SkeletonRows, StateCard, useV8TabEdit } from '../booking-menus/tabs/shared'
+import { bookingPaymentAdminApi, isNotReadyError, type BookingPaymentMode, type StripeConnection } from '@/lib/api/helpers/booking-payment-admin'
+import { AccountIcon, SkeletonRows, StateCard, useV8TabEdit } from '@/v8/booking-menus/public/tab-parts/index'
 import settings from '../booking-menus/settings.module.css'
 import { providerFor } from './labels'
 import { CancellationSection, ConnectionCard, DepositSection, cancellationSaveError, useCancellationSettings } from './cancellation'
@@ -26,9 +26,9 @@ import PaymentEvents from './events'
 import styles from './payments.module.css'
 
 /*
- * 予約設定 › お支払い（B-305・B-308 追記 3 の案A：お支払いの設定はこのタブ 1 つ）。
+ * 予約設定 › お支払い（・ 追記 3 の案A：お支払いの設定はこのタブ 1 つ）。
  * 絵：T91bV（つないだ後・試験モード）・UteeA（つなぐ前の状態と Stripe から届いた知らせ）・FY8HC（お支払いの記録）。
- * 読む：今ある口 getPaymentConfig／savePaymentConfig。つなぎの状態・記録・知らせは口待ち（無ければ共通の案内の窓）。
+ * 読む：getPaymentConfig／savePaymentConfig。つなぎの状態・記録・知らせも実APIで読み、未適用は準備中へ分ける。
  * 受け付ける指定：?tab=payments&view=records|events。
  */
 
@@ -38,7 +38,7 @@ const METHOD_CHOICES: Array<{ value: BookingPaymentMode; title: string; note: st
   { value: 'onsite', title: 'お店で払う', note: '来店したときに払う', icon: <Store size={16} aria-hidden="true" /> },
   { value: 'online', title: 'オンラインで先払い', note: '予約のときにカードで払う', icon: <CreditCard size={16} aria-hidden="true" /> },
 ]
-/* 「お客さまが選ぶ」は絵（T91bV・B-338）のいつもの方法には置かない。すでに選んでいる店だけ 3 つ目に出す。 */
+/* 「お客さまが選ぶ」は絵（T91bV・）のいつもの方法には置かない。すでに選んでいる店だけ 3 つ目に出す。 */
 const CHOICE_CUSTOMER = { value: 'customer_choice' as BookingPaymentMode, title: 'お客さまが選ぶ', note: '先払いか、お店で払うか', icon: <Split size={16} aria-hidden="true" /> }
 const METHOD_NOTE = '店のいつもはお店で払う。コースなど先に払ってほしい物だけ、メニューの「お支払い」で先払いにします。'
 

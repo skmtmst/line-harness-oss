@@ -1,76 +1,21 @@
-import type { StarterSetItem } from '@/lib/api-styles'
-import type { AccountStyle,SetupAnswer } from '@line-crm/shared'
+import type { IconKey, Choice, Question } from './question-types'
+export type { IconKey, Choice, Question } from './question-types'
+import type { StarterSetItem } from '@/lib/api/helpers/styles'
+import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
+import { bookingHost, styleTerm } from '@/lib/terms'
 import { Q } from './setup-questions'
 
-
-/*
- * はじめの質問（B-313）と初期セット（B-311）の決まりを画面から切り離した表。
- * 絵：修正案 DIHFx の列 VHp7p（xxpM9・RZW83・lS1Gh・rJ36f・oKSsG・Bdfxm）。
- * 口：組4（`lib/api-styles.ts` の styleApi）。質問のキーは口の `questionKeys`
- * （image/booking/approval/payment/reminders/stamps/coupons/tickets/outcome/content）だけ。口に無い質問は置かない（未定は入れない）。
- *
- * - どの質問にも「あとで設定する」「手動で設定する」がある（B-313 追記）。あとで＝何も入れない・
- *   はじめにやることに残る。手動＝その設定の画面へ案内する。
- * - おすすめの答えは業種ごとに先に選んでおく（飛ばしても困らない）。
- * - どの質問にも「あとから変えられます（どこで）」を出す。
- */
-
-export type IconKey =
-  | 'utensils' | 'scissors' | 'messages' | 'graduation' | 'bag' | 'grid'
-  | 'sparkles' | 'image' | 'folder' | 'download' | 'hourglass' | 'settings'
-  | 'circleCheck' | 'userCheck' | 'store' | 'card' | 'split' | 'calendarCheck' | 'clock' | 'bell' | 'bellOff'
-  | 'stamp' | 'ticket' | 'ban' | 'users' | 'user' | 'file'
-
 export const STYLE_CHOICES: ReadonlyArray<{ value: AccountStyle; icon: IconKey; label: string; note: string }> = [
-  { value: 'restaurant', icon: 'utensils', label: '飲食店向け', note: '席・コースの予約、前日のお知らせ、来店スタンプ' },
-  { value: 'salon', icon: 'scissors', label: 'サロン', note: '担当者の指名・空き枠、回数券、次回予約' },
-  { value: 'consult', icon: 'messages', label: '面談・相談', note: '担当を自動で割り当て、オンライン／対面、資料' },
-  { value: 'lesson', icon: 'graduation', label: '教室・レッスン', note: 'クラスの定員、回数券・月謝、振替' },
-  { value: 'ec', icon: 'bag', label: 'ECサイト', note: '商品のお知らせ、カゴ落ち、再入荷' },
-  { value: 'standard', icon: 'grid', label: '標準', note: '配信と受信箱だけで始める（あとで足せます）' },
+  { value: 'restaurant', icon: 'utensils', label: styleTerm('restaurant', 'V01'), note: '席・コースの予約、前日のお知らせ、来店スタンプ' },
+  { value: 'salon', icon: 'scissors', label: styleTerm('salon', 'V01'), note: '担当者の指名・空き枠、回数券、次回予約' },
+  { value: 'consult', icon: 'messages', label: styleTerm('consult', 'V01'), note: '担当を自動で割り当て、オンライン／対面、資料' },
+  { value: 'lesson', icon: 'graduation', label: styleTerm('lesson', 'V01'), note: 'クラスの定員、回数券・月謝、振替' },
+  { value: 'ec', icon: 'bag', label: styleTerm('ec', 'V01'), note: '商品のお知らせ、カゴ落ち、再入荷' },
+  { value: 'standard', icon: 'grid', label: styleTerm('standard', 'V01'), note: '配信と受信箱だけで始める（あとで足せます）' },
 ]
 
 export function styleLabel(style: AccountStyle): string {
   return STYLE_CHOICES.find((choice) => choice.value === style)?.label ?? '標準'
-}
-
-/** 1問の選択肢。value は画面の値（'true'/'false' は口へ真偽で送る）。 */
-export type Choice = {
-  value: string; icon: IconKey; label: string; note: string
-  /** 口へ送る値が画面の値と違うとき（承認の「manual」は「手動で設定する」と同じ値になるので画面では分ける）。 */
-  apiValue?: string
-}
-
-export type Question = {
-  /** 口の質問キー。 */
-  key: string
-  /** 左の一覧と進みの右に出す短い名前。 */
-  short: string
-  title: string
-  description: string
-  choices: Choice[]
-  /** スタイルごとのおすすめ（無ければ最初の選択肢）。 */
-  recommended?: Partial<Record<AccountStyle, string>>
-  /** 「あとから変えられます（ここ）。」の（）の中。 */
-  where: string
-  /** 手動で設定するときに開く画面と、そのカードの説明。 */
-  manualHref: string
-  manualNote: string
-  /** 選んだ答えに付ける帯（お支払いの Stripe の案内など）。 */
-  info?: string
-  /** あとで設定したとき、はじめにやること・最後の一覧に出す文。 */
-  todo: { title: string; note: string; action: string }
-  /** 最後の一覧「入れなかった物」の説明。無ければ todo.note。 */
-  skipped?: string
-  /** 最後の一覧「入れなかった物」の題。無ければ short。 */
-  skippedTitle?: string
-  /** 設定の画面がまだ無いときの機能の名前。押すと準備中の窓（B-314）。 */
-  preparing?: string
-  /**
-   * 口（組4）がまだこの質問のキーを受け付けない。答えは画面の中だけで持ち、保存しない（札「準備中」）。
-   * 口が受け付けたら、ここを外して API_QUESTION_KEYS に足すだけでつながる。
-   */
-  pendingApi?: boolean
 }
 
 /** 口が受け付ける質問のキー（組4 `questionKeys`）。保存はこのキーだけ送る。 */
@@ -83,7 +28,7 @@ export function answersForApi(answers: Record<string, SetupAnswer>): Record<stri
   return out
 }
 
-/* B-313（オーナー）が正：飲食は 11 問（lS1Gh の左の一覧の並び）。予約を使うかは「予約の確定の仕方」の答えから送る。 */
+/* （オーナー）が正：飲食は 11 問（lS1Gh の左の一覧の並び）。予約を使うかは「予約の確定の仕方」の答えから送る。 */
 const BY_STYLE: Record<AccountStyle, string[]> = {
   restaurant: ['approval', 'payment', 'cancelDeadline', 'reminders', 'stamps', 'coupons', 'seats', 'hours', 'partySize'],
   salon: ['approval', 'payment', 'cancelDeadline', 'reminders', 'tickets', 'stamps', 'coupons', 'nomination', 'hours'],
@@ -106,7 +51,13 @@ export const LOOK_CHOICES: ReadonlyArray<{ value: 'keep' | 'change' | 'existing'
 ]
 
 export function questionsFor(style: AccountStyle): Question[] {
-  return BY_STYLE[style].map((key) => Q[key])
+  const host = bookingHost(style)
+  const words = (value: string) => value.split('お店で払う').map(part => part.replaceAll('お店', host).replaceAll('お客さま', styleTerm(style, 'V12').split('（')[0])).join(styleTerm(style, 'V25'))
+  return BY_STYLE[style].map((key) => {
+    const question = Q[key]
+    if (key === 'content' && (style === 'standard' || style === 'ec')) return { ...question, description: style === 'ec' ? 'ごあいさつ・商品のお知らせ・購入へのお礼・再入荷の見本を入れます。自動のLINEは止めた状態です。' : 'ごあいさつ・ご案内・お問い合わせの見本を入れます。' }
+    return { ...question, title: words(question.title), description: words(question.description), info: question.info ? words(question.info) : undefined, manualNote: words(question.manualNote), todo: { ...question.todo, title: words(question.todo.title), note: words(question.todo.note) }, choices: question.choices.map((choice) => ({ ...choice, label: words(choice.label), note: key === 'payment' && choice.value === 'store' && style === 'consult' ? '面談の当日に払います。' : words(choice.note) })) }
+  })
 }
 
 /** 左の一覧の並び（スタイル・見た目・質問…）。 */
@@ -140,7 +91,7 @@ export function selectedValue(answer: SetupAnswer | undefined, question?: Questi
   return answer.mode === 'configured' ? String(answer.value ?? (answer.resourceId ? 'existing' : '')) : answer.mode
 }
 
-/* ── 開き直したときの保存（B-335 (2)） ─────────────────────────── */
+/* ── 開き直したときの保存（ (2)） ─────────────────────────── */
 
 /** 予約設定に書く答え（口は approval を予約設定の承認の仕方へ書く）。 */
 export const SETTINGS_KEYS = ['approval']
@@ -166,7 +117,7 @@ export function settingsChanges(saved: Record<string, SetupAnswer>, next: Record
   return lines
 }
 
-/** 予約確定のご案内の見本（いつもの確定の知らせと重なる。B-335 (3)・点検 1-3）。 */
+/** 予約確定のご案内の見本（いつもの確定の知らせと重なる。 (3)・点検 1-3）。 */
 export function isBookingConfirmSample(item: StarterSetItem): boolean {
   return item.kind === 'automation' && (item.key === 'reminder' || item.name.includes('予約確定'))
 }
@@ -180,7 +131,11 @@ export const FEATURES: Record<string, { name: string; opens: string; settingHref
   coupons: { name: 'クーポン', opens: 'クーポンの一覧を開く', settingHref: '/templates', preparing: 'クーポン' },
   menu: { name: 'メニュー', opens: 'メニューのページを開く', settingHref: '/restaurant-test/menu' },
   stamps: { name: '来店スタンプ', opens: '来店スタンプを開く', settingHref: '/visit-stamps' },
-  tickets: { name: '回数券', opens: '回数券を開く', settingHref: '/booking/menus', preparing: '回数券' },
+  tickets: { name: '回数券・月謝', opens: '回数券・月謝の残りを開く', settingHref: '/booking/menus?tab=passes' },
+  forms: { name: 'お申し込み', opens: '設定した回答フォームを開く', settingHref: '/form-submissions' },
+  mypage: { name: 'マイページ', opens: '本人のマイページを開く', settingHref: '/rich-menus' },
+  news: { name: 'お知らせ', opens: '設定したお知らせを見る', settingHref: '/templates' },
+  shop: { name: '商品', opens: '設定したECサイトを開く', settingHref: '/ec-commerce?tab=connector' },
   contact: { name: 'お問い合わせ', opens: 'トークを開く', settingHref: '/chats' },
   photos: { name: 'スタイル写真', opens: '写真のページを開く', settingHref: '/rich-menus' },
   faq: { name: 'よくある質問', opens: 'よくある質問を開く', settingHref: '/auto-replies' },
@@ -195,7 +150,10 @@ export function featureName(feature: string): string {
 }
 
 /** 機能の設定の画面。口の href は今の画面に無い道（/booking/settings 等）があるので、画面の表を先に使う。 */
-export function featureHref(feature: string, fallback?: string): string {
+export function featureHref(feature: string, fallback?: string, style?: AccountStyle): string {
+  if (style === 'lesson' && (feature === 'booking' || feature === 'history')) return '/events'
+  if (feature === 'meeting') return '/booking/menus?tab=staff'
+  if (feature === 'auto_line') return '/ec-commerce?tab=auto-line'
   return FEATURES[feature]?.settingHref ?? fallback ?? '/'
 }
 
@@ -205,6 +163,14 @@ export type SampleTile = { label: string; icon: string; feature: string }
 export type SampleMenu = { account: string; greeting: string; tone: { bg: string; ink: string }; tiles: SampleTile[] }
 
 export const SAMPLE_MENUS: Partial<Record<AccountStyle, SampleMenu>> = {
+  standard: {
+    account: 'ご案内', greeting: '友だち追加ありがとうございます。ご案内やお申し込みは、下のメニューからご確認いただけます。', tone: { bg: 'var(--sample-consult-bg)', ink: 'var(--sample-consult-ink)' },
+    tiles: [{ label: 'ご案内', icon: 'file', feature: 'docs' }, { label: 'お申し込み', icon: 'file', feature: 'forms' }, { label: 'よくある質問', icon: 'bulb', feature: 'faq' }, { label: 'マイページ', icon: 'user', feature: 'mypage' }, { label: 'お知らせ', icon: 'bell', feature: 'news' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' }],
+  },
+  ec: {
+    account: 'オンラインストア', greeting: '友だち追加ありがとうございます。商品やご利用ガイドは、下のメニューからご覧いただけます。', tone: { bg: 'var(--sample-salon-bg)', ink: 'var(--sample-salon-ink)' },
+    tiles: [{ label: '商品を見る', icon: 'bag', feature: 'shop' }, { label: 'お買い物を続ける', icon: 'bag', feature: 'shop' }, { label: 'マイページ', icon: 'user', feature: 'mypage' }, { label: 'クーポン', icon: 'ticket', feature: 'coupons' }, { label: 'ご利用ガイド', icon: 'file', feature: 'docs' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' }],
+  },
   restaurant: {
     account: '然 - 和食 -', greeting: '友だち追加ありがとうございます。ご予約・クーポンは下のメニューからどうぞ。', tone: { bg: 'var(--sample-restaurant-bg)', ink: 'var(--sample-restaurant-ink)' },
     tiles: [
@@ -235,7 +201,7 @@ export const SAMPLE_MENUS: Partial<Record<AccountStyle, SampleMenu>> = {
   },
 }
 
-export const SAMPLE_STYLES: AccountStyle[] = ['restaurant', 'salon', 'consult', 'lesson']
+export const SAMPLE_STYLES: AccountStyle[] = ['restaurant', 'salon', 'consult', 'lesson', 'standard', 'ec']
 
 export function sampleMenuFor(style: AccountStyle): SampleMenu {
   return SAMPLE_MENUS[style] ?? SAMPLE_MENUS.restaurant!
@@ -243,10 +209,10 @@ export function sampleMenuFor(style: AccountStyle): SampleMenu {
 
 /* ── 入った物（starter-items）と初期セットの中身（definition）の突き合わせ ────────── */
 
-export type StarterItemState = { target_id: string; kind: string; is_sample: number; status: string | null; draftRevision: string | null }
+export type StarterItemState = { target_id: string; kind: string; is_sample: number; status: string | null; draftRevision: string | null; key?: string; name?: string | null; activationAllowed?: boolean; requiresActivation?: boolean }
 
 /**
- * 口の starter-items は item_key を返さない（API-CONTRACT-4 §10）。種類ごとに、初期セットの中身の並びと
+ * 口の starter-items が返す key で初期セットの中身と対応させる。旧応答にkeyが無い場合だけ、種類ごとに
  * 入った物の並びを前から対応させて名前を付ける。入った物より中身が多い（未定で入れなかった）ときは名前だけ余る。
  */
 export function pairStarterItems(definition: StarterSetItem[], items: StarterItemState[]): Array<{ item: StarterSetItem; state: StarterItemState }> {
@@ -254,7 +220,9 @@ export function pairStarterItems(definition: StarterSetItem[], items: StarterIte
   for (const kind of [...new Set(items.map((state) => state.kind))]) {
     const defs = definition.filter((item) => item.kind === kind)
     items.filter((state) => state.kind === kind).forEach((state, index) => {
-      out.push({ item: defs[index] ?? { key: state.target_id, kind: kind as StarterSetItem['kind'], name: kind }, state })
+      const matched = state.key ? defs.find(item => item.key === state.key) : defs[index]
+      if (state.key && !matched) return
+      out.push({ item: matched ?? { key: state.target_id, kind: kind as StarterSetItem['kind'], name: state.name ?? kind }, state })
     })
   }
   return out
@@ -263,7 +231,7 @@ export function pairStarterItems(definition: StarterSetItem[], items: StarterIte
 /** 動かす前に確かめる物（オートメーションの下書き・止めた予約メニュー）。 */
 export function needsActivation(state: StarterItemState): boolean {
   /* 予約確定の見本は名前で判定するので、一覧側（isBookingConfirmSample）で外す。 */
-  return (state.kind === 'automation' || state.kind === 'booking_menu') && state.status !== 'active'
+  return state.activationAllowed !== false && state.requiresActivation !== false && (state.kind === 'automation' || state.kind === 'booking_menu') && state.status !== 'active'
 }
 
 /* ── はじめにやること（Bdfxm） ─────────────────────────────────── */
@@ -307,7 +275,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
       note: 'リッチメニューにボタンがあるのに中身が未設定です',
       badge: { tone: 'warning', label: '未設定' },
       alert: true,
-      action: preparing ? { label: '決まりを入れる', preparing } : { label: '決まりを入れる', href: featureHref(warning.feature, warning.href) },
+      action: preparing ? { label: '決まりを入れる', preparing } : { label: '決まりを入れる', href: featureHref(warning.feature, warning.href, state.style) },
     })
   }
   if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '選ぶ', step: 'style' } })

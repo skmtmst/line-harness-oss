@@ -73,9 +73,9 @@ import { lastContactOf,messageWord,monthDay,monthDayTime,splitTags,statusOf } fr
 
 
 /*
- * ★V8 友だち一覧（Pencil `x6QsVz`：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
+ * ★V8 友だち一覧（Pencil ：閲覧のみ。いつもの形は同じ板からボタンを出したもの）。
  *
- * v7 の一覧（app/friends/page.tsx の FriendsPageInner）とは別の部品として持つ。
+ * 管理画面 の一覧（app/friends/page.tsx の FriendsPageInner）とは別の部品として持つ。
  * 呼ぶ API・送る形・保存先（sessionStorage・localStorage）は今と同じ。
  * 違いは見せ方だけ：頭（題・CSV・取り込む）→ 閲覧のみの帯 → タブ → 数の帯 →
  * 道具2段（探す・絞り込み4つ・詳細条件・保存した検索／未対応・注目のみ・件数・
@@ -753,7 +753,7 @@ export default function FriendsListV8() {
     </>
   )
 
-  // 閲覧のみは選んでできる操作が無いので、選ぶチェックの列を出さない（絵 x6QsVz）。
+  // 閲覧のみは選んでできる操作が無いので、選ぶチェックの列を出さない。
   const selectable = !readOnly
   const colCount = (selectable ? 4 : 3) + displayColumns.length
   const table = (

@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import {
   listTenantsDueForPurge,
   markExpiredTrialRetentionAnchors,
@@ -10,8 +11,9 @@ import {
   type TenantRetention,
 } from '@line-crm/db';
 
+
 /**
- * 退会・無料体験切れから保存期限が過ぎた統括(テナント)の顧客データを消す（★V6 36-2）。
+ * 退会・無料体験切れから保存期限が過ぎた統括(テナント)の顧客データを消す（★36-2）。
  *
  * 6時間毎のcronから呼ばれる。1回で全部を消し切る前提は置かない。
  * 消した行数が上限に届いたらそこで止め、次の回が同じ統括をもう一度拾って
@@ -229,7 +231,7 @@ async function deleteR2Objects(
     return { deleted: keys.length, failed: 0 };
   } catch (error) {
     // 画像が消せなくても行の削除は進める。顧客データを残し続ける方が重い。
-    console.error(JSON.stringify({"code":"services_tenant_data_purge_failed"}));
+    logger.error("services_tenant_data_purge_failed");
     return { deleted: 0, failed: keys.length };
   }
 }

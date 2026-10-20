@@ -1,5 +1,6 @@
 import { beginHqTemplateDistributionRun, normalizeScopedTagName, type HqTemplatePreflight, type HqTemplateStatement } from '@line-crm/db';
-import type { HqFriendAttributeType, HqFriendAttributeMode, HqFriendFieldDefinition, HqMarkDefinition } from '@line-crm/shared';
+
+import type { HqFriendAttributeType, HqFriendAttributeMode, HqFriendFieldDefinition, HqMarkDefinition, HqFriendFieldOption } from '@line-crm/shared';
 import type { HqTemplateAuthority } from './contract.js';
 import { digest, requireTargetAccounts, templateDetail } from './distribution.js';
 import { parseFriendFieldDefinition, parseMarkDefinition } from './friend-attributes.js';
@@ -9,7 +10,7 @@ const LEGACY_TENANT='00000000-0000-4000-8000-000000000001';
 export const isFriendAttributeType=(type:string):type is HqFriendAttributeType=>type==='friend_field'||type==='mark';
 type Selection={accountId:string;sourceId:string;mode:HqFriendAttributeMode};
 type Item={sourceId:string;itemKind:string;name:string;targetId:string|null;expectedRevision:string|null;duplicate:boolean;allowedModes:HqFriendAttributeMode[];reason?:string|null;code?:string|null};
-type ScopedRow=Record<string,any> & {id:string;name:string;line_account_id:string|null};
+type ScopedRow={field_key?:string;type?:string;options_json?:string|null;default_value?:string|null;source?:string;ec_field_path?:string|null;ec_is_master?:number;is_personal?:number;is_starred?:number;display_order?:number;folder_id?:string|null;parent_id?:string|null;status?:string;version?:number;updated_at:string;archived_at?:string|null} & {id:string;name:string;line_account_id:string|null};
 type State={fields:ScopedRow[];marks:ScopedRow[];folders:ScopedRow[];keys:{field_key:string}[]};
 // Include complete definitions and global key occupancy, never customer values.
 // The identical projection is fenced inside the atomic write batch.
@@ -35,7 +36,7 @@ async function snapshotDigest(value:string){
  return digest(JSON.stringify(definitions));
 }
 function state(value:string):State{
- const raw=JSON.parse(value);return {fields:raw.fields.map((v:any)=>v.row),marks:raw.marks.map((v:any)=>v.row),folders:raw.folders.map((v:any)=>v.row),keys:raw.keys};
+ const raw=JSON.parse(value) as {fields:{row:ScopedRow}[];marks:{row:ScopedRow}[];folders:{row:ScopedRow}[];keys:State['keys']};return {fields:raw.fields.map(v=>v.row),marks:raw.marks.map(v=>v.row),folders:raw.folders.map(v=>v.row),keys:raw.keys};
 }
 function inspect(type:HqFriendAttributeType,definition:HqFriendFieldDefinition|HqMarkDefinition,value:string):Item[]{
  const s=state(value),items:Item[]=[];
@@ -107,10 +108,10 @@ function plan(type:HqFriendAttributeType,definition:HqFriendFieldDefinition|HqMa
    const field=def.field,folderId=field.folderId?ids.get(`folder:${field.folderId}`)??null:null;
    // Stable IDs of existing options survive relabeling and removal (archived).
    const existing=mode==='overwrite'?s.fields.find(r=>r.id===id):undefined;
-   const oldOptions=(existing?.options_json?JSON.parse(existing.options_json):[]).map((v:any,i:number)=>typeof v==='string'?{id:`legacy_${i+1}`,label:v,color:null,status:'active',displayOrder:i}:v);
+   const oldOptions:HqFriendFieldOption[]=((existing?.options_json?JSON.parse(existing.options_json):[]) as (string|HqFriendFieldOption)[]).map((v,i:number)=>typeof v==='string'?{id:`legacy_${i+1}`,label:v,color:null,status:'active' as const,displayOrder:i}:v);
    const options=(field.options??[]).map((v,i)=>typeof v==='string'?{id:`option_${i+1}`,label:v}:v);
    const mapping=new Map<string,string>();
-   const merged=options.map(o=>{const old=oldOptions.find((p:any)=>typeof p!=='string'&&(p.id===o.id||p.label===o.label));const optionId=old?.id??o.id;mapping.set(o.id,optionId);return {...o,id:optionId}});
+   const merged:HqFriendFieldOption[]=options.map(o=>{const old=oldOptions.find(p=>typeof p!=='string'&&(p.id===o.id||p.label===o.label));const optionId=old?.id??o.id;mapping.set(o.id,optionId);return {...o,id:optionId}});
    for(const old of oldOptions)if(typeof old!=='string'&&!merged.some(o=>o.id===old.id))merged.push({...old,status:'archived'});
    let defaultValue=field.defaultValue??null;
    if(defaultValue&&field.type==='select')defaultValue=mapping.get(defaultValue)??defaultValue;

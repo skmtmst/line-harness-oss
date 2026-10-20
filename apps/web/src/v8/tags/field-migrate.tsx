@@ -35,7 +35,7 @@ import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 
 /*
- * ★V8 友だち情報欄の移行（種類を変える。Pencil `GobMd`）。
+ * ★V8 友だち情報欄の移行（種類を変える。Pencil ）。
  *
  * 読み込み・移行先の作成（R519）・事前確認・実行・結果の見守り（R547・R548）・アカウント切替の扱いは
  * 今の画面（src/v8/tags/field-migrate.tsx）から写した。見せ方を絵に合わせた：
@@ -152,7 +152,7 @@ function FieldMigrate() {
         if (source) {
           setTargetName(`${source.name}（新）`)
           setTargetKey(`${source.fieldKey}_new`.slice(0, 32))
-          // 絵（GobMd）は「1つ選ぶ」を選んだ状態。同じ種類への移行は意味が無いので、今と違う種類から始める。
+          // 絵は「1つ選ぶ」を選んだ状態。同じ種類への移行は意味が無いので、今と違う種類から始める。
           setTargetType(source.type === 'select' ? 'text' : 'select')
         }
       })

@@ -1,17 +1,5 @@
-import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source.mjs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const V8 = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'manual-links-v8.tsx'), 'utf8')
-
-describe('板 cIdA2 開けないの札', () => {
-  it('すべてと開けない（件数つき）の札を出す', () => {
-    expect(V8).toContain('すべて')
-    expect(V8).toContain('開けない')
-    expect(V8).toContain("row.status === 'broken'")
-  })
-})
 import {
   LINK_STATUS_LABEL,
   MISSING_SCREENS_NOTE,
@@ -31,7 +19,7 @@ import {
 } from './manual-link-view'
 
 /**
- * 設計 ★V6 34-4「マニュアルの正本表」（`f9oUm`）。
+ * マニュアルの正本表の状態・絞り込み・権限。
  *
  * 守りたいのは 2 点——**出せない行を 0 件と書かない**ことと、
  * **「決めていない」と「開けない」を混ぜない**こと。
@@ -174,28 +162,5 @@ describe('触れる人', () => {
     expect(canEditTable({ id: 'other', role: 'staff', permissionKeys: [] })).toBe(false)
     expect(canEditTable({ id: 'other', role: 'admin', permissionKeys: [] })).toBe(false)
     expect(canEditTable(null)).toBe(false)
-  })
-})
-
-describe('失敗の表示', () => {
-  // 描画は page.tsx、動き（確かめる・保存・競合の扱い）は use-manual-links.ts にある。
-  const dir = dirname(fileURLToPath(import.meta.url))
-  const page = [
-    readFileSync(join(dir, 'manual-links-v8.tsx'), 'utf8'),
-    readFileSync(join(dir, 'use-manual-links.ts'), 'utf8'),
-  ].join('\n')
-
-  it('「確かめる」と「保存」の失敗を無言にしない', () => {
-    expect(page).toContain('actionError')
-    expect(page).toContain('<Notice tone="danger"')
-    expect(page).toContain('確かめられませんでした')
-    expect(page).toContain('保存できませんでした')
-  })
-
-  it('競合は読み直し、権限不足は依頼先を出す', () => {
-    expect(page).toContain('ほかの人が先に変更しました')
-    expect(page).toContain('運営に依頼してください')
-    expect(page).toContain('error.status === 409')
-    expect(page).toContain('error.status === 403')
   })
 })

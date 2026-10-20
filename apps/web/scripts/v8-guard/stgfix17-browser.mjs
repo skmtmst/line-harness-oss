@@ -1,4 +1,4 @@
-/** 列車17の外部追試を移植。実ビルド＋既存見本APIで取消失敗とマウス操作を確認する。 */
+/** 作業の外部追試を移植。実ビルド＋既存見本APIで取消失敗とマウス操作を確認する。 */
 import { chromium, expect } from '@playwright/test'
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync } from 'node:fs'

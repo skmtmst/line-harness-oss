@@ -1,14 +1,16 @@
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 /* 種類の呼び方は `./template-message-type` に一本化した（#497 軽2）。 */
 const MESSAGE_TYPE = readFileSync(join(HERE, '../../v8/templates/words.ts'), 'utf8')
 const EDIT_PAGE = readFileSync(join(HERE, '../../v8/template-edit/message.tsx'), 'utf8')
 const MESSAGE_EDITOR = readFileSync(join(HERE, '../../components/templates/message-template-editor.tsx'), 'utf8')
+  + readFileSync(join(HERE, '../../components/templates/template-preview-model.ts'), 'utf8')
 const CAROUSEL_PAGE = readFileSync(join(HERE, '../../v8/templates/carousel.tsx'), 'utf8')
 // 組み立て・保存の正本は core へ出した（page.tsx は自由な export を持てない）。
 // 契約は「画面が使う全体」を見るため、ページ＋共有モジュールをつなげて読む。
@@ -76,7 +78,7 @@ describe('V8の作成画面', () => {
     expect(EDIT_PAGE).toContain('extractMessageUrls(messageContent)')
     expect(EDIT_PAGE).toContain('buildTemplatePreview(messageContent, references)')
     expect(MESSAGE_EDITOR).toContain('本文に入れたURLの扱い')
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    // : 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(MESSAGE_EDITOR).toContain('<LinePreview')
     expect(MESSAGE_EDITOR).toContain("if (name === 'name') return '山田 太郎'")
     expect(MESSAGE_EDITOR).toContain('preview.unresolved.length > 0')
@@ -89,7 +91,7 @@ describe('V8の作成画面', () => {
     expect(CAROUSEL_PAGE).toContain('ボタン（最大 ${MAX_ACTIONS} つ）')
     expect(CAROUSEL_PAGE).toContain('disabled={panel.actions.length >= MAX_ACTIONS}')
     expect(CAROUSEL_PAGE).toContain('画像は横1024 × 縦678pxを推奨')
-    // B-6: 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
+    // : 題「LINEプレビュー」は共通部品が出す。画面側は使うだけ。
     expect(CAROUSEL_PAGE).toContain('<LinePreview')
   })
 

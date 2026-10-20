@@ -14,7 +14,7 @@ vi.mock('../services/account-access.js', () => ({
   canAccessAllLineAccounts: mocks.canAccess,
   getVisibleLineAccountScope: mocks.getScope,
 }));
-vi.mock('../services/broadcast-media-storage.js', () => ({ storeBroadcastMedia: vi.fn() }));
+vi.mock('../features/broadcasts/broadcast-media-storage.js', () => ({ storeBroadcastMedia: vi.fn() }));
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateApproval: vi.fn() }));
 vi.mock('@line-crm/db', () => ({
   createBroadcastMessageAsset: mocks.createAsset,

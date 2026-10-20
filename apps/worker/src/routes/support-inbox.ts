@@ -1,11 +1,12 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-inbox.js';
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
-import { verifySupportRelay } from '../services/support-relay.js';
+import { SUPPORT_EMAIL_RAW_MAX_CHARACTERS, verifySupportRelay } from '../services/support-relay.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { markInboxConversationRead } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -71,7 +72,7 @@ supportInbox.post('/webhooks/xserver/support-email', inputJsonBoundary(), async 
   } catch {
     return inputError(c, { success: false, error: 'Invalid JSON' }, 400, []);
   }
-  if (!payload.raw || payload.raw.length > 14 * 1024 * 1024) {
+  if (!payload.raw || payload.raw.length > SUPPORT_EMAIL_RAW_MAX_CHARACTERS) {
     return inputError(c, { success: false, error: 'Invalid email payload' }, 400, ["raw"]);
   }
   const binary = atob(payload.raw);
@@ -166,7 +167,7 @@ supportInbox.get('/api/support/summary', async (c) => {
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"support_summary_failed","route":"GET /api/support/summary"}));
+    logger.error("support_summary_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -214,7 +215,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
-        // #625: LIKE ではなく instr()。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
+        // #625: LIKE ではなく instr。D1 の LIKE 50バイト制限で長い検索語が500になっていた。
         searchSql = `AND (
           instr(lower(t.customer_email), lower(?)) > 0
           OR instr(lower(t.customer_name), lower(?)) > 0
@@ -353,7 +354,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       },
     });
   } catch (error) {
-    console.error(JSON.stringify({"code":"support_inbox_failed","route":"GET /api/support/inbox"}));
+    logger.error("support_inbox_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -768,7 +769,7 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     if (error instanceof Error && error.message === 'IDEMPOTENCY_IN_PROGRESS') {
       return c.json({ success: false, error: '前回の送信結果を確認中です。再送せず受信履歴を確認してください' }, 409);
     }
-    console.error(JSON.stringify({"code":"support_email_reply_failed","route":"POST /api/support/email/threads/:id/reply"}));
+    logger.error("support_email_reply_failed");
     return c.json({ success: false, error: 'メール送信に失敗しました' }, 502);
   } finally {
     if (leaseAcquired) {

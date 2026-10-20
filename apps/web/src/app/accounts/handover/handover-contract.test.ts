@@ -14,11 +14,11 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, '../../../v8/accounts-detail/handover.tsx'), 'utf8')
 
 /**
- * LINEアカウントの乗り換え・引き継ぎ（設計 ★V6 33-4 `nx3XW`）。
+ * LINEアカウントの乗り換え・引き継ぎ（設計 ★管理画面 33-4 `nx3XW`）。
  *
  * 実 API の事前確認結果を読み、合計が一致した値だけを表示する。
  */
-describe('V6 33-4 乗り換え・引き継ぎ', () => {
+describe("管理画面 33-4 乗り換え・引き継ぎ", () => {
   it('設計の5段を持つ', () => {
     expect(HANDOVER_PILLS).toEqual([
       '引き継ぎコード', '事前確認', '要確認を決める', '本実行',
@@ -75,7 +75,7 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
 
   it('?id= なしで開いたとき、無限ローディングにせず一覧へ戻す', () => {
     /*
-      `load()` は `!id` で何もせず帰るので、ガードがないと
+      `load` は `!id` で何もせず帰るので、ガードがないと
       「読み込んでいます」が消えない（監査 Issue #1058）。
       対象未指定は失敗ではないので、再読み込みではなく一覧への口を出す。
     */
@@ -92,7 +92,7 @@ describe('V6 33-4 乗り換え・引き継ぎ', () => {
   it('変更の可否は共通の出し分けで決め、手元の保存値で決めない（R522）', () => {
     // サーバの requireRole('owner', 'admin') と同じ境目を使う。
     // 直しを戻すと赤くなること: staff.me を読まない・canManage の分岐を外す。
-    // `api.staff.me()` の呼び出し本体は共通の出し分け側にあり、ここでは読む。
+    // `api.staff.me` の呼び出し本体は共通の出し分け側にあり、ここでは読む。
     const HELPER = readFileSync(join(HERE, '..', '..', '..', 'lib', 'staff-role.ts'), 'utf8')
     expect(PAGE).toContain("from '@/lib/staff-role'")
     expect(PAGE).toContain('useStaffRole')

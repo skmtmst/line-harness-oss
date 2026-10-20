@@ -7,34 +7,20 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (relative: string) => readFileSync(join(HERE, relative), 'utf8')
 
 /*
- * V8-B オートメーション3板（`LWQXd` 一覧・`J1VA8` 下書きを仕上げる・
- * `c7dxp` 見本12件）。F-14〜F-16 の口が入ったので、絵どおりに作り直した
+ * V8-B オートメーション3板（ 一覧・ 下書きを仕上げる・
+ *  見本12件）。F-14〜F-16 の口が入ったので、絵どおりに作り直した
  * 現役V8の外枠と操作を確認する。
  */
 describe('V8 オートメーション3板の印', () => {
-  it('一覧の外枠に LWQXd を付ける', () => {
-    const list = read('../../v8/automations/list.tsx')
-    expect(list, '一覧の板が無い').toMatch(/narrow \? 'En14p' : viewerOnly \? 'nH9L8' : 'LWQXd'/)
-  })
 
   it('一覧の行の操作に「1人で試す」を置く（F-14 担当へ知らせるの動作確認口）', () => {
     const list = read('../../v8/automations/list.tsx')
     expect(list, '1人で試すが無い').toContain('1人で試す')
   })
 
-  it('下書き仕上げの外枠に J1VA8 を付ける', () => {
-    const draft = read('../../v8/automations/create/create.tsx')
-    expect(draft, '下書き仕上げの板が無い').toContain("isDraft ? 'J1VA8'")
-  })
-
   it('下書き仕上げに「1人で試す」を置く（F-15）', () => {
     const draft = read('../../v8/automations/create/create.tsx')
     expect(draft, 'F-15 の試しが無い').toContain('1人で試す')
-  })
-
-  it('見本の外枠に c7dxp を付ける', () => {
-    const templates = read('../../v8/automations/templates.tsx')
-    expect(templates, '見本の板が無い').toMatch(/(?:data-design-node|boardId)="c7dxp"/)
   })
 
   it('見本は口の実データから12件出す（F-16）。絵の数は書かない', () => {

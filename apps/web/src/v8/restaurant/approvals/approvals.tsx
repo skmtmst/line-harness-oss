@@ -16,8 +16,8 @@ import { TextArea } from '@/components/shared/text-field'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantTestApi, type RestaurantApproval, type RestaurantSnapshot, type RestaurantStore } from '@/lib/restaurant-test-api'
-import RestaurantFrame, { type RestaurantContext } from '../common-a/frame'
-import { formatStamp, StatRow, Status } from '../common-a/parts'
+import { RestaurantFrame, type RestaurantContext } from '@/v8/restaurant/common-a/public/frame/index'
+import { formatStamp, StatRow, Status } from '@/v8/restaurant/common-a/public/parts/index'
 import styles from './approvals.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
@@ -25,7 +25,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 /*
- * ★V8 承認ワークフロー（Pencil `t8WgD8`、閲覧のみ `n4DT7`、差し戻す理由の小窓 `n4j0Rm`）。
+ * ★V8 承認ワークフロー（Pencil 、閲覧のみ 、差し戻す理由の小窓 ）。
  *
  * 数4 → 承認カード（種類・状態・店舗・申請者・変更内容・差戻しコメント・差戻し／承認する）→ 公開境界。
  * 閲覧のみ（変える権限が無い人）には案内の帯を出し、差戻し・承認するのボタンは置かない
@@ -46,7 +46,7 @@ function approvalPayload(item: RestaurantApproval): Record<string, unknown> {
   } catch { return {} }
 }
 
-/** 小窓の太字の行：改定は「前 → 後」、ほかは件名（n4j0Rm）。 */
+/** 小窓の太字の行：改定は「前 → 後」、ほかは件名。 */
 function approvalSummary(item: RestaurantApproval): string {
   const payload = approvalPayload(item)
   const before = typeof payload.before === 'string' ? payload.before : null
@@ -140,7 +140,7 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
   )
 }
 
-/** n4j0Rm：対象の要約＋理由（必須）＋注意＋「差し戻す」。 */
+/** ：対象の要約＋理由（必須）＋注意＋「差し戻す」。 */
 function ReturnDialog({ item, store, busy, onCancel, onSubmit }: {
   item: RestaurantApproval | null
   store: RestaurantStore | undefined

@@ -1,6 +1,8 @@
+> 文書：分析（V8）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # 分析（V8）の動き
 
-入口：`app/analytics/page.tsx`（V8 のときだけ `src/v8/analytics/analytics.tsx`、それ以外は今の画面 `AnalyticsInner`）。
+入口：`app/analytics/page.tsx`（V8専用で `src/v8/analytics/analytics.tsx`）。
 ファネルの作る・直すの窓は `funnel-form.tsx`（絵 `VDPz5`。今の `FunnelForm` の動きを写して一から書いた。入口の page.tsx が `slots.renderFunnelForm` で渡す）。結果の保存欄（`SaveAnalysisAction`）だけは、入口が今の部品を `slots` で渡す（src/v8 から @/app を読めないため）。
 
 ### ファネルを作る・直す（`funnel-form.tsx`）
@@ -29,7 +31,7 @@
 - `?tab=funnel&conversionPointId=…&conversionPointName=…` はファネル作成へ成果地点を渡す
 
 ## 呼ぶ口（今の画面と同じ）
-- 役割：`api.staff.me()`（owner・admin だけ変える操作を出す）
+- 役割：`本人情報の共通読取（useStaffRole / loadStaffIdentity）`（owner・admin だけ変える操作を出す）
 - 友だちの増減：`api.analytics.friendsOverview(account, {from,to})`、右の列は `routesOverview`（概要の後に読む）
 - 配信の反応：`reactionsOverview`、経路と成果：`routesOverview`、URLクリック：`urlClicksOverview(account, {from,to,limit:200,query})`（検索語は300ms待って API へ）
 - 成果地点ごとのレポート：`api.conversions.definitionReport({from,to,lineAccountId})`、CSV は `api.conversions.exportDefinitions`

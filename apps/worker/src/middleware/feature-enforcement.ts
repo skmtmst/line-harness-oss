@@ -1,9 +1,10 @@
+import { logger } from '@line-crm/shared/server';
 import {appendFeatureScopeMeta} from './feature-scope-response.js';
 import { ACCOUNT_KEYS, bodyAccountIds } from './feature-body-accounts.js';
 import type { Context, MiddlewareHandler } from 'hono';
 import type { FeatureId } from '@line-crm/shared';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from './auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from './auth/principal/auth.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import { accountFeatureAvailability, createFeatureAvailabilityRequestContext, type FeatureAvailability } from '../services/feature-enforcement.js';
@@ -193,7 +194,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/internal', 'system', '内部サービス間経路'),
   exempt('/api/operations', 'system', '運用状態と監視'),
   exempt('/api/tenants', 'core', '統括管理'),
-  exempt('/api/ops', 'core', '運営コンソール（★V6 37）。ルート内で platform_admins を検証し、統括をまたいで読む'),
+  exempt('/api/ops', 'core', '運営コンソール。ルート内で platform_admins を検証し、統括をまたいで読む'),
   exempt('/api/hq/style-starter-sets','core','統括の初期セット配布。各口で統括の役割と可視店を検証'),
   exempt('/api/hq/store-comparison','core','統括の現在の可視店だけの集計とCSV。各口で統括の役割・代理・取得時の店権限を確認'),
   exempt('/api/hq/operator-history', 'core', '契約先から見える運営の操作履歴。ルート内で staff.tenantId に絞る'),
@@ -202,7 +203,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   exempt('/api/hq/banners', 'core', '統括バナー生成。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/hq/billing', 'core', '統括の契約・課金基盤。管理APIはtenant境界と役割、WebhookはStripe署名を検証'),
   exempt('/api/hq/support', 'core', '統括利用者から運営への問い合わせ。ルート内でtenant境界と役割を検証'),
-  exempt('/api/hq/notices', 'core', '運営からのお知らせと契約者専用LINEの登録案内（★V6 37-7）。ルート内で staff.tenantId に絞る'),
+  exempt('/api/hq/notices', 'core', '運営からのお知らせと契約者専用LINEの登録案内。ルート内で staff.tenantId に絞る'),
   exempt('/api/hq/broadcasts', 'core', '統括全体のowner/adminだけ。店舗の配信停止は通常配信でも検証'),
   exempt('/api/hq/templates', 'core', '統括ひな形。ルート内でtenantと統括編集権限を検証'),
   exempt('/api/recipes', 'core', '設定テンプレート'),
@@ -277,7 +278,7 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'public', reason: 'ログイン中の合言葉で本人確認する二段階認証の入口' },
   },
   {
-    // 運営メンバーの招待を受ける口（★V6 37-10-A）。メールの URL のトークンだけで守る
+    // 運営メンバーの招待を受ける口（★37-10-A）。メールの URL のトークンだけで守る
     pattern: /^\/api\/auth\/ops-invite\//,
     methods: ['GET', 'POST'],
     accountResolver: 'none',
@@ -407,8 +408,8 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/media\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM media WHERE id = ?' },
   { pattern: /^\/api\/common-vars\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_vars WHERE id = ?' },
   { pattern: /^\/api\/common-actions\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_actions WHERE id = ?' },
-  // #942: 一覧が返すidは V6 の automation_definitions。旧 automations 表だけを
-  // 見ると V6 ルールの稼働切替・改訂下書きが全部 LINE_ACCOUNT_REQUIRED で止まる。
+  // #942: 一覧が返すidは の automation_definitions。旧 automations 表だけを
+  // 見ると ルールの稼働切替・改訂下書きが全部 LINE_ACCOUNT_REQUIRED で止まる。
   { pattern: /^\/api\/automations\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM automation_definitions WHERE id = ?', fallbackSql: 'SELECT line_account_id AS account_id FROM automations WHERE id = ?' },
   { pattern: /^\/api\/tracked-links\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM tracked_links WHERE id = ?' },
   { pattern: /^\/api\/entry-routes\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM entry_routes WHERE id = ?' },
@@ -788,7 +789,7 @@ export const featureEnforcementMiddleware: MiddlewareHandler<Env> = async (c, ne
     classification = { kind: 'feature', featureId: 'forms' };
   }
   if (!classification) {
-    console.error(JSON.stringify({"code":"route.feature.unclassified"}));
+    logger.error("route.feature.unclassified");
     return c.json({
       success: false,
       error: 'APIの機能分類が未設定です',

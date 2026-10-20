@@ -1,7 +1,7 @@
+import { logger } from '@line-crm/shared/server';
 import { serializeAffiliate } from './affiliate-serialization.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
-import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getAffiliates,
   getAffiliateById,
@@ -26,10 +26,13 @@ import {
   listAffiliateOffers,
   type AffiliateScope,
 } from '@line-crm/db';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
+
+
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -152,7 +155,7 @@ affiliates.get('/api/affiliates', async (c) => {
     });
     return c.json({ success: true, data: items.map(serializeAffiliate) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliates"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -181,7 +184,7 @@ affiliates.get('/api/affiliate-payments', requireRole('owner', 'admin'), async (
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliate-payments"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: '支払い情報を取得できませんでした' }, 500);
   }
 });
@@ -202,7 +205,7 @@ affiliates.get('/api/affiliates/:id/archive-impact', requireRole('owner', 'admin
     if (!impact) return c.json({ success: false, error: '紹介者が見つかりません' }, 404);
     return c.json({ success: true, data: impact });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliates/:id/archive-impact"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: '影響を確認できませんでした' }, 500);
   }
 });
@@ -242,7 +245,7 @@ affiliates.post('/api/affiliates/:id/archive', requireRole('owner', 'admin'), in
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"POST /api/affiliates/:id/archive"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: '紹介を止められませんでした' }, 500);
   }
 });
@@ -271,7 +274,7 @@ affiliates.get('/api/affiliate-payments/:id/preview', requireRole('owner', 'admi
     const { entries: _entries, ...data } = preview;
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliate-payments/:id/preview"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: '確定内容を確認できませんでした' }, 500);
   }
 });
@@ -329,7 +332,7 @@ affiliates.post('/api/affiliate-payments/:id/confirm', requireRole('owner', 'adm
     if (/UNIQUE constraint failed/i.test(message)) {
       return c.json({ success: false, code: 'SETTLEMENT_CHANGED', error: '別の操作で確定済みです。内容を読み直してください' }, 409);
     }
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"POST /api/affiliate-payments/:id/confirm"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: '支払いを確定できませんでした' }, 500);
   }
 });
@@ -344,7 +347,7 @@ affiliates.get('/api/affiliates/:id', async (c) => {
     }
     return c.json({ success: true, data: serializeAffiliate(item) });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliates/:id"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -532,7 +535,7 @@ affiliates.post('/api/affiliates', requireRole('owner', 'admin'), inputJsonBound
     );
   } catch (err) {
     if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"POST /api/affiliates"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -577,7 +580,7 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), inputJsonBo
       return c.json({ success: false, code: err.message, error: '過去の承認額を確かめられないため、報酬方式を変更できません。過去の記録を照合してください。' }, 409);
     }
     if(err instanceof FolderAssignmentError)return inputError(c, {success:false,error:err.message},422,['folderId']);
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"PUT /api/affiliates/:id"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -620,7 +623,7 @@ affiliates.get('/api/affiliates/:id/report', affiliateReportPermission(), async 
     }
     return c.json({ success: true, data: report });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliates/:id/report"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -642,7 +645,7 @@ affiliates.get('/api/affiliates/:id/journeys', affiliateReportPermission(), asyn
     });
     return c.json({ success: true, data: page.items, nextCursor: page.nextCursor });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliates/:id/journeys"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -672,7 +675,7 @@ affiliates.get('/api/affiliates/:id/links', affiliateReportPermission(), async (
     }));
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliates/:id/links"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -688,7 +691,7 @@ affiliates.get('/api/friends/:id/journey', async (c) => {
     const events = await getFriendJourney(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: { events } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/friends/:id/journey"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -714,7 +717,7 @@ affiliates.post('/api/affiliates/click', inputJsonBoundary({"code":["string"],"u
     await recordAffiliateClick(c.env.DB, affiliate.id, body.url, ipAddress);
     return c.json({ success: true, data: null }, 201);
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"POST /api/affiliates/click"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -730,7 +733,7 @@ affiliates.get('/api/affiliates-report', requireRole('owner', 'admin'), async (c
     });
     return c.json({ success: true, data: report });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_affiliates_failed","route":"GET /api/affiliates-report"}));
+    logger.error("routes_affiliates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

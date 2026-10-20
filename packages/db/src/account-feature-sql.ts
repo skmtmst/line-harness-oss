@@ -7,6 +7,7 @@
  */
 import { featureCatalogEntry, type FeatureId } from '@line-crm/shared';
 
+
 /**
  * 機能オフ中のアカウントかをSQL内で判定する条件式。
  *

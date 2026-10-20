@@ -1,7 +1,8 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
@@ -91,7 +92,7 @@ async function endpoint<T>(
     return c.json({ success: true, data }, successStatus as 200);
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
-    console.error(JSON.stringify({"code":"common_action_api_failed"}));
+    logger.error("common_action_api_failed");
     return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
   }
 }
@@ -141,7 +142,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
     });
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
-    console.error(JSON.stringify({"code":"common_action_api_failed","route":"GET /api/common-actions"}));
+    logger.error("common_action_api_failed");
     return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
   }
 });

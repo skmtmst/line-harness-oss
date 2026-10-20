@@ -3,10 +3,12 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const DIALOG = readFileSync(join(__dirname, 'bulk-run-dialog.tsx'), 'utf8')
+// 役割の読込は共通フックが持つ。画面の押し口と、その読込口を両方確かめる。
 const PAGE = readFileSync(join(__dirname, '..', '..', 'app', 'friends', 'page.tsx'), 'utf8')
+  + readFileSync(join(__dirname, '..', '..', 'lib', 'staff-role.ts'), 'utf8')
 
 /** 画面側の配線。**考え方が正しくても、繋いでいなければ効かない。** */
-describe('V6 友だち一括操作（IAf7j）の配線', () => {
+describe("管理画面 友だち一括操作（IAf7j）の配線", () => {
   it('既存の /friends の中に作り、別ルートを増やさない', () => {
     expect(PAGE).toContain('<BulkRunDialog')
     expect(DIALOG).toContain('data-design-node="IAf7j"')
@@ -18,7 +20,7 @@ describe('V6 友だち一括操作（IAf7j）の配線', () => {
       **押し口を出す条件そのものを見る。** `canRunBulk` がファイルの
       どこかにあるだけでは、押し口の分岐から外されても気づけない
       （実際に、条件から外しても落ちない試験になっていた）。
-      R115: 判定は本人の役割（`api.staff.me()`）で見る。選んでいる
+      R115: 判定は本人の役割（`api.staff.me`）で見る。選んでいる
       LINEアカウントの「役割メモ」（`selectedAccount.role`）は自由記述で、
       ログイン担当者の権限ではないので使わない。
     */

@@ -162,7 +162,7 @@
   justify-content: flex-end;
 }
 
-/* 窓の中のフォーム（vCEKM・ou60i）。 */
+/* 窓の中のフォーム（・）。 */
 .form {
   display: flex;
   width: 100%;
@@ -189,7 +189,7 @@
   font-weight: 600;
 }
 
-/* 窓の中で2列をまたぐ欄（vCEKM の LINE公式アカウント）。 */
+/* 窓の中で2列をまたぐ欄（ の LINE公式アカウント）。 */
 .fieldWide {
   grid-column: 1 / -1;
   min-width: 0;
@@ -216,7 +216,7 @@
   gap: var(--tpl-rt-chip-row-gap);
 }
 
-/* 停止の確認（bMpC5）：名前の行と、薄い地の注意。 */
+/* 停止の確認：名前の行と、薄い地の注意。 */
 .stopBody {
   display: flex;
   width: 100%;
@@ -241,7 +241,7 @@
   line-height: var(--tpl-st2-stop-note-lh);
 }
 
-/* ユーザーの追加・変更の窓（ou60i）：段の間は絵の値、ボタンの段は上に線。 */
+/* ユーザーの追加・変更の窓：段の間は絵の値、ボタンの段は上に線。 */
 .memberGrid {
   row-gap: var(--tpl-st2-member-row-gap);
 }

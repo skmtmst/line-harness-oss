@@ -1,5 +1,6 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getGoogleServiceAccountToken } from '../services/google-service-account.js';
 import {
   getSearchConsolePerformance,
@@ -34,7 +35,7 @@ searchConsole.get('/api/search-console/performance', async (c) => {
     const performance = await getSearchConsolePerformance({ accessToken, siteUrl, rangeDays });
     return c.json({ success: true, data: { status: 'connected' as const, ...performance } });
   } catch (error) {
-    console.error(JSON.stringify({"code":"routes_search_console_failed","route":"GET /api/search-console/performance"}));
+    logger.error("routes_search_console_failed");
     const accessDenied = error instanceof SearchConsoleApiError && [401, 403].includes(error.status);
     return c.json({
       success: false,

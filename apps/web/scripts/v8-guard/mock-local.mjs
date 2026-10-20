@@ -7,6 +7,7 @@
  * `--local-stub` が、ブラウザの通信差し替えからこれを呼ぶ。
  */
 import { register } from 'node:module'
+import { Readable } from 'node:stream'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -28,7 +29,9 @@ export function mockFetch(method, path) {
         resolve(value)
       }
     }
-    const req = { url: path, method, headers: {} }
+    // IncomingMessage is a stream even when a GET request has no body.
+    // The shared mock reads data/end before routing setup requests.
+    const req = Object.assign(Readable.from([]), { url: path, method, headers: {} })
     const res = {
       statusCode: 200,
       headers: {},

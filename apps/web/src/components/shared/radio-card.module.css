@@ -111,7 +111,7 @@
 /*
  * ★V8「選ぶカード」（fNPdg/r3xz1W）：余白 14・高さ 98・選ぶと枠 1.5px の
  * 濃い緑＋地 accent-soft。題は 13/600・1.5、説明は 12・1行で「…」
- * （オーナー決定）。形と動き（120ms ease-out）は v7 のまま。
+ * （オーナー決定）。形と動き（120ms ease-out）は 管理画面 のまま。
  */
 :root .card {
   min-height: 98px;
@@ -154,7 +154,7 @@
 
 }
 
-/* 正本 fNPdg / r3xz1W。v7 の行配置はそのまま。 */
+/* 正本 fNPdg / r3xz1W。管理画面 の行配置はそのまま。 */
 :root .card {
   position: relative;
   display: flex;
@@ -194,7 +194,7 @@
 
 /*
  * V8 の小さい箱（compact・バナー生成の脇のパネル）は装飾の丸を出さない。
- * 普通の箱（card）は絵（A0pDt・VE1u5・選ぶカード fNPdg/r3xz1W）どおり右上に丸を出す（2026-10-06 オーナー）。
+ * 普通の箱（card）は絵（・・選ぶカード fNPdg/r3xz1W）どおり右上に丸を出す（2026-10-06 オーナー）。
  * 小さい箱では、選んだことは枠と面の色で
  * 分かる（:root .checked）。読み上げ・矢印キー・Space のために
  * 本物の input は残し、見えない大きさで同じ位置に置く。キーボードで来たことは
@@ -244,7 +244,7 @@
 :root .compact[data-compact-typography='banner'] .note { font-size: var(--text-micro); line-height: var(--tpl-hq-small-lh); }
 
 /*
- * 高さ 90 の箱（height="short"・★V8 E-3 PUWyq の卓のカード）。
+ * 高さ 90 の箱（height="short"・★V8 E-3  の卓のカード）。
  * 絵は高さ 90 の固定で、中身（印 16＋題 20＋説明 18＋間 8×2）が下の余白へはみ出す形。
  * 上・左右の余白 14 はそのまま、下だけ 6 にして 90 に収める。既定の箱（98）は変えない。
  */
@@ -256,17 +256,17 @@
 /*
  * 中身なりの高さの箱（height="fit"・LINE新規追加 v06 ①事前確認の選ぶカード GLA3C・f7UGE）。
  * 絵は題だけなら 52（16＋題 20＋16）、説明付きなら 78（16＋題 20＋間 8＋説明 18＋16）。
- * 余白 16・中の間 8 は共通（B-152①）のままで、最低高さだけ外す。既定の箱（98）は変えない。
+ * 余白 16・中の間 8 は共通（①）のままで、最低高さだけ外す。既定の箱（98）は変えない。
  */
 :root .fit {
   min-height: 0;
 }
 
-/* 正本HTMLと同じ文字の描画。v7 の描画には触れない。 */
+/* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
 :root .card { -webkit-font-smoothing: auto; }
 
 /*
- * 変わり形：行（BHEl9 の素のラジオ行）。箱・選んだ面・上段の印なし。
+ * 変わり形：行（ の素のラジオ行）。箱・選んだ面・上段の印なし。
  * 丸 18・文字 13/400・間 8・縦は中身の高さ（fit-content）。
  * 丸の輪郭（1.5px・選ぶと 5px の濃い緑）は v8 の .radio のまま。
  * 箱（fNPdg/r3xz1W）の合格は変えない。
@@ -293,7 +293,7 @@
 :root .row:active { filter: none; }
 :root .row { -webkit-font-smoothing: auto; }
 
-/* フォームの小さい選択肢（RaMf3・hadfk）。装飾の丸を出さず、印と題を同じ行に置く。 */
+/* フォームの小さい選択肢（・）。装飾の丸を出さず、印と題を同じ行に置く。 */
 :root .form { min-height: 0; padding: 12px 10px; gap: 4px; border-radius: var(--radius-control); }
 :root .form:has(.inlineIcon) { padding-inline: 14px; }
 :root .form .body { gap: 4px; }
@@ -304,7 +304,7 @@
 .inlineIcon { display: inline-flex; color: var(--color-ink-secondary); }
 :root .form.checked .inlineIcon { color: var(--color-accent-deep); }
 .inlineIcon svg { width: 14px; height: 14px; }
-/* 横並びの小さい箱（j8p3yj）。指定した箱だけ、内容に合わせた高さで描く。 */
+/* 横並びの小さい箱。指定した箱だけ、内容に合わせた高さで描く。 */
 :root .small {
   min-height: 0;
   padding: var(--tpl-cn-choice-pad);
@@ -314,18 +314,18 @@
 :root .small .title { font-weight: 700; line-height: var(--tpl-cn-name-lh); }
 :root .small .note { font-size: var(--text-micro); line-height: var(--tpl-cn-sub-lh); }
 
-/* B-152①：選ぶカードも内側16・カードの中の間8・欄の間12。 */
+/* ①：選ぶカードも内側16・カードの中の間8・欄の間12。 */
 :root .card { padding: var(--polish-space-card); gap: var(--polish-space-row); }
 :root .body { gap: var(--polish-space-row); }
 :root .items { gap: var(--polish-space-field); }
 
-/* B-152②：選択肢の題はラベル、説明は補足。 */
+/* ②：選択肢の題はラベル、説明は補足。 */
 :root .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
 :root .legend, html:root .card:is(.compact, .row) .title { font-size: var(--polish-text-support); font-weight: var(--polish-weight-label); line-height: var(--text-lh); }
 :root .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }
 html:root .card:is(.compact, .row, .form, .small) .note { font-size: var(--polish-text-support); font-weight: var(--polish-weight-body); line-height: var(--text-lh); color: var(--color-ink-secondary); }
 
-/* B-152⑦：箱も120msの地・青い輪・押せない濃さを使う。 */
+/* ⑦：箱も120msの地・青い輪・押せない濃さを使う。 */
 :root .card, :root .card.row {
   --polish-overlay-strength: var(--polish-overlay-idle);
   background-image: linear-gradient(color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent), color-mix(in srgb, var(--polish-overlay-ink) calc(var(--polish-overlay-strength) * var(--polish-overlay-range)), transparent));
@@ -340,10 +340,10 @@ html:root .card:is(.compact, .row, .form, .small) .note { font-size: var(--polis
 :root .disabled { opacity: var(--polish-disabled-opacity); }
 html:root .disabled:not(.compact):not(.form) .radio:disabled { opacity: var(--polish-enabled-opacity); }
 
-/* B-152⑩：説明文は省略せず、必要な行数で読む。 */
+/* ⑩：説明文は省略せず、必要な行数で読む。 */
 :root .note, html:root .card:is(.compact, .row) .note { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 
-/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+/* ・・：10-10 に採用した共通の形。 */
 html:root .card:not(.row) { outline: 1px solid var(--color-choice-border); outline-offset: -1px; }
 html:root .checked:not(.row), html:root .checked:not(.row):hover { outline: var(--choice-card-ring) solid var(--color-selection-border); outline-offset: -2px; background: var(--color-choice-selected); }
 html:root .radio { width: var(--choice-size); height: var(--choice-size); border: var(--choice-ring) solid var(--color-choice-border); outline-color: transparent; background: var(--color-canvas); box-shadow: none; }
@@ -357,17 +357,17 @@ html:root .card:is(.compact, .form) > .radio:checked { background: radial-gradie
 html:root .card:not(.row) .body { padding-right: calc(var(--choice-size) + var(--space-8)); }
 /* 印の行がある標準カードは、本文が右上の丸より下に来る。横の余白を重ねない。 */
 html:root .card:not(.compact):not(.form):has(> .topIcon) .body { padding-right: 0; }
-/* B-203/229：図と本文が丸より下にある箱は、丸の場所を上で確保する。 */
+/* ：図と本文が丸より下にある箱は、丸の場所を上で確保する。 */
 html:root .card:not(.row)[data-content-placement='below-indicator'] { padding-top: calc(var(--space-16) + var(--choice-size) + var(--space-8)); }
 html:root .card:not(.row)[data-content-placement='below-indicator'] .body { padding-right: 0; }
 html:root .title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* B-229：カードのラジオは例外なく右上。行型は左のまま。 */
+/* ：カードのラジオは例外なく右上。行型は左のまま。 */
 html:root .card:not(.row) { position: relative; display: flex; flex-direction: column; }
 html:root .card:not(.row) > .radio { position: absolute; top: var(--space-16); right: var(--space-16); margin: 0; opacity: 1; pointer-events: auto; }
 /* 行型の選択は丸だけで示す。カードの選択枠を引き継がない。 */
 html:root .card.row { outline-color: transparent; box-shadow: none; background: transparent; }
-/* 行型の部品は .card を持たないので、選んだ行にも同じく枠を出さない（絵 pUT4L・E1CeT：選んだ文の周りに細い緑の四角が出ていた）。 */
+/* 行型の部品は .card を持たないので、選んだ行にも同じく枠を出さない（絵の：選んだ文の周りに細い緑の四角が出ていた）。 */
 html:root .row.checked, html:root .row.checked:hover { outline-color: transparent; box-shadow: none; background: transparent; }
 html:root .row, html:root .row.checked, html:root .row.checked:hover { outline-color: transparent; box-shadow: none; background: transparent; }
 
@@ -376,9 +376,9 @@ html:root .card[data-choice-indicator='check'] .body { padding-right: 0; }
 html:root .card[data-choice-indicator='check'] .title { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
 .check { width: var(--space-16); height: var(--space-16); flex-shrink: 0; color: var(--color-accent-deep); }
 
-/* バナー生成の出力サイズ（★BG-B 出力サイズ・絵 iMnph）：1列に並べる小さい箱。B-152 の内側16・欄の間12 ではなく、余白 8/10・箱の間 8 で描く。 */
+/* バナー生成の出力サイズ（★BG-B 出力サイズ・絵 ）：1列に並べる小さい箱。 の内側16・欄の間12 ではなく、余白 8/10・箱の間 8 で描く。 */
 :root .compact[data-compact-typography='banner'] { padding: 8px 10px; gap: 3px; }
 :root .items:has(> .compact[data-compact-typography='banner']) { gap: 8px; }
-/* バナー生成の出力サイズ（V8・1列）：絵（p03ImY・tSgl6）の小さい箱は上下8・左右12。共通の板の余白16を当てると1枚が高くなり、脇のパネルが画面の下の帯にかぶった。 */
+/* バナー生成の出力サイズ（V8・1列）：絵（・）の小さい箱は上下8・左右12。共通の板の余白16を当てると1枚が高くなり、脇のパネルが画面の下の帯にかぶった。 */
 html:root .card.compact[data-compact-typography='banner'] { padding: var(--space-8) var(--space-12); }
 html:root .card.compact[data-compact-typography='banner'] > .radio { top: var(--space-12); right: var(--space-12); }

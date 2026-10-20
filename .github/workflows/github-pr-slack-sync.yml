@@ -84,7 +84,7 @@ jobs:
           --disable-warning=ExperimentalWarning
           --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
           --experimental-strip-types
-          scripts/github-slack-pr-sync.ts
+          scripts/slack/github-slack-pr-sync.ts
 
       - name: Report an advisory Slack synchronization failure
         if: steps.slack_sync.outcome == 'failure'

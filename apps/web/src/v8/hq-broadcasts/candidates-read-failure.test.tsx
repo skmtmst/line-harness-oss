@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 統括 一括配信を作る（B-37・BBRDb：店の一斉配信と同じ5段＋送るアカウント）・詳細（xOXuY）の動きの試験。
+ * 統括 一括配信を作る（・：店の一斉配信と同じ5段＋送るアカウント）・詳細（xOXuY）の動きの試験。
  * ① 配信名 → ② 送るアカウント（窓で選ぶ）→ ③ 本文 → ④ 時刻 → ⑤ 確かめる（作る → preflight → 問題のある店を外す）→ 送る（確かめの窓 → send）。
  * 詳細は失敗した店へのやり直し。閲覧のみ（担当者）には作る画面を出さない。
  */
@@ -126,7 +126,7 @@ it('反証: タグ取得失敗は実画面でエラーと再試行を出す',asy
  fireEvent.click(screen.getByRole('button',{name:'もう一度読み込む'}));await waitFor(()=>expect(screen.queryByRole('button',{name:'もう一度読み込む'})).toBeNull());expect(tagList).toHaveBeenCalledTimes(2);
 });
 
-it('B-241 HQ coupon read failure shows retry instead of no coupons',async()=>{
+it('HQ coupon read failure shows retry instead of no coupons',async()=>{
  scenarioList.mockResolvedValue({success:true,data:[]});presetList.mockResolvedValue({success:true,data:[]})
  assets.mockRejectedValueOnce(new Error('人工取得失敗'))
  render(<HqBroadcastCreate/>);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'人工配信'}})
@@ -137,7 +137,7 @@ it('B-241 HQ coupon read failure shows retry instead of no coupons',async()=>{
  fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
  await waitFor(()=>expect(screen.queryByText('クーポンを読み込めませんでした')).toBeNull())
 })
-it('B-241 HQ carousel choices use the shared picker without an unused background request',async()=>{
+it('HQ carousel choices use the shared picker without an unused background request',async()=>{
  tpl.listByKind.mockClear();scenarioList.mockResolvedValue({success:true,data:[]});presetList.mockResolvedValue({success:true,data:[]})
  render(<HqBroadcastCreate/>);fireEvent.change(screen.getByLabelText('配信名'),{target:{value:'人工配信'}})
  fireEvent.click(screen.getByRole('button',{name:'対象設定へ'}));await selectAccounts('銀座店')

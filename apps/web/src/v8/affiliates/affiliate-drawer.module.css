@@ -1,5 +1,5 @@
 /*
- * ★V8 アフィリエイターの詳細の引き出し（Pencil `tnTn9`）。右から 620・余白 24・段の間 16。
+ * ★V8 アフィリエイターの詳細の引き出し（Pencil ）。右から 620・余白 24・段の間 16。
  * 寸法は globals.css の --tpl-af-dr-*。
  * ファイル名を drawer.module.css にしない。ビルド後の組の名前が共通の右面（drawer_*）と同じになり、
  * 設計値の照合（verify-design-values）がこちらの値を共通部品の値として読んでしまう。
@@ -109,7 +109,7 @@
   overflow-y: auto;
 }
 
-/* 概要の段どうしの間（絵 tnTn9：数の帯・リンク・待っている成果・付け方の間は 16）。 */
+/* 概要の段どうしの間（絵 ：数の帯・リンク・待っている成果・付け方の間は 16）。 */
 .stack { display: flex; flex-direction: column; gap: var(--tpl-af-dr-gap); min-width: 0; }
 .section {
   display: flex;
@@ -255,5 +255,5 @@
 }
 .stop:disabled { color: var(--color-ink-faint); cursor: default; }
 .spacer { flex: 1 1 0; }
-/* 絵 tnTn9：下の帯は「紹介を止める」を左端、［編集する］［支払いを確定する］を右端に。 */
+/* 絵 ：下の帯は「紹介を止める」を左端、［編集する］［支払いを確定する］を右端に。 */
 .footerRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); width: 100%; }

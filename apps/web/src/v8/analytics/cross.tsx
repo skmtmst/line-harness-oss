@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -24,7 +25,7 @@ import Notice from '@/components/shared/notice'
 import AggregationStatus from '@/components/shared/aggregation-status'
 
 /*
- * ★V8 分析「クロス分析」（Pencil `u5CuB8`）。
+ * ★V8 分析「クロス分析」（Pencil ）。
  * 数の帯 → 選ぶ段（数えるもの・たての軸・よこの軸・期間・集計する・この分析を保存）
  * → 左に掛け合わせの表（濃さはその表の最大が基準・マスを押して選ぶ・凡例）、
  *   右に選んだマス（対象者を開く・この対象者へ配信を作成）とこの表から読めること → 見かたの注意。
@@ -271,7 +272,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       { if (!fieldFailure)
 
 
-      setError(explainStartError(code, code || 'クロス分析を開始できませんでした')) }
+      setError(explainStartError(code, describeApiFailure(caught, 'クロス分析の開始'))) }
       setLoading(false)
     } finally {
       crossStartInFlight.current = false
@@ -344,7 +345,7 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
       { if (!fieldFailure)
 
 
-      setError(caught instanceof Error ? caught.message : '対象者を準備できませんでした') }
+      setError(describeApiFailure(caught, '対象者の準備')) }
     } finally { setAudienceBusy(false) }
   }
 

@@ -14,7 +14,7 @@ const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
  * #985 LAY-18: 一覧の操作をアプリ全体で同じルールにする。
  *
  * - 「詳細」は操作欄の先頭の補助ボタン。文字は1行。
- * - 編集・複製・停止・アーカイブなどは「⋯」メニューへ集約する（B-193）。
+ * - 編集・複製・停止・アーカイブなどは「⋯」メニューへ集約する。
  * - 削除など元に戻せない操作は区切りの後・赤で必ず最後。
  * - 押せない操作は無効状態と具体的な理由を示す。
  * - タッチ端末では操作領域44px以上を確保する。
@@ -101,14 +101,14 @@ describe('RowActions 一覧の操作の共通ルール（#985 LAY-18）', () => 
     expect(css).toMatch(/\.rowActions\s*{[^}]*position:\s*relative/s)
   })
 
-  it('行の文字ボタンは32px級でアイコン操作と高さをそろえる（★V7行内32）', () => {
+  it("行の文字ボタンは32px級でアイコン操作と高さをそろえる", () => {
     const src = read('row-actions.tsx')
     expect(src).toContain('size="compact"')
     const buttonCss = read('button.module.css')
     expect(buttonCss).toMatch(/\.compact\s*{[^}]*height:\s*32px/s)
   })
 
-  it('B-199：項目がない行も同じその他操作の入口を持つ', () => {
+  it("項目がない行も同じその他操作の入口を持つ", () => {
     const without = renderToStaticMarkup(<RowActions subjectName="送信済み" detail={{ href: '/broadcasts/detail?id=s1' }} />)
     const withMenu = renderToStaticMarkup(<RowActions detail={{ href: '/broadcasts/detail?id=d1' }} menuItems={[{ id: 'copy', label: '複製する', onSelect: vi.fn() }]} />)
     for (const html of [without, withMenu]) {

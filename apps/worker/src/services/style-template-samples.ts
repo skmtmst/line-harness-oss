@@ -4,6 +4,7 @@ import {
   type IndustryStyle,
   type StyleTemplateSample,
 } from '@line-crm/shared';
+
 import { HQ_AUTHORED_MESSAGE_ID } from './hq-templates/authoring-media.js';
 
 type Sample = [key: string, name: string, text: string];
@@ -149,6 +150,10 @@ const industry: Record<IndustryStyle, Sample[]> = {
     ],
   ],
 };
+const ecSamples: Sample[] = [
+  ['purchase-thanks', '購入へのお礼', 'ご購入ありがとうございます。ご注文の内容はこちらからご確認いただけます。\n{{var.order_url}}\n{{account.name}}'],
+  ['restock', '再入荷のお知らせ', '入荷のお知らせを希望された{{var.product_name}}が再入荷しました。数に限りがあります。\n{{var.product_url}}\n{{account.name}}'],
+];
 const labels: Record<string, string> = {
   name: 'お客さまの名前',
   'account.name': '店名',
@@ -176,10 +181,16 @@ const labels: Record<string, string> = {
 /** Catalog reads and template creation never schedule a delivery. */
 export function templateSamples(style: AccountStyle): StyleTemplateSample[] {
   const specific = industry[style as IndustryStyle] ?? [];
+  const catalog = style === 'ec' ? [...common, ...ecSamples] : common;
   return [
-    ...common.map((s) => ({ sample: s, category: 'common' as const })),
+    ...catalog.map((s) => ({ sample: s, category: 'common' as const })),
     ...specific.map((s) => ({ sample: s, category: style as IndustryStyle })),
-  ].map(({ sample: [key, name, text], category }) => ({
+  ].map(({ sample: [key, originalName, originalText], category }) => {
+    const name = style === 'consult' ? originalName.replaceAll('来店', '面談') : style === 'lesson' ? originalName.replaceAll('来店', '参加') : originalName;
+    let text = originalText;
+    if (style === 'consult') text = text.replaceAll('ご来店', '面談へのご参加').replaceAll('ご予約', '面談のご予約').replaceAll('お気をつけてお越しください。', '会い方・場所は予約の内容をご確認ください。').replaceAll('またご都合のよいときにお越しください。', 'またご都合のよい日時にお申し込みください。');
+    if (style === 'lesson') text = text.replaceAll('ご予約', 'クラスのお申し込み').replaceAll('お気をつけてお越しください。', '参加方法は申込内容をご確認ください。');
+    return ({
     key,
     name,
     category,
@@ -213,5 +224,5 @@ export function templateSamples(style: AccountStyle): StyleTemplateSample[] {
       },
       media: [],
     },
-  }));
+  }); });
 }

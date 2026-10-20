@@ -1,3 +1,5 @@
+> 文書：LINE Harness｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 > **冻结于 v0.13.2(2026-09-03)。** 日文版 `README.md` 为正本,也是唯一持续更新的版本。
 
 🌐 [日本語](README.md) | [English](README.en.md) | **简体中文** | [한국어](README.ko.md) | [Español](README.es.md)
@@ -92,7 +94,7 @@ CLI 自动完成以下全部步骤：
 - **时序追踪** — 依次记录点击 → 添加好友 → 转化，以 last-touch 归因关联成果
 - **审核流程** — 审批/驳回归因转化以确认奖励，并通过重复账号标记提示可疑成果
 - **LINE 推送通知** — 转化确认时自动向联盟伙伴发送 push 通知
-- 详情: [docs/wiki/27-Affiliate-ASP.md](docs/wiki/27-Affiliate-ASP.md)
+- 详情: [docs/v6-requirements/v6-16-affiliate-requirements-draft.md](docs/v6-requirements/v6-16-affiliate-requirements-draft.md)
 
 ### 自动化
 - **IF-THEN 规则** — 7 种触发器 × 6 种动作

@@ -1,5 +1,5 @@
 /**
- * B-157：実際のV8入口で、保留APIによる処理中・失敗・成功と3幅を見張る。
+ * 実際のV8入口で、保留APIによる処理中・失敗・成功と3幅を見張る。
  * 実Googleへは送らない。VISUAL_QA_BASEはローカルでビルドした画面だけを指定する。
  */
 import { test, expect } from '@playwright/test'

@@ -1,33 +1,6 @@
-/**
- * URL schemes that can execute script / load attacker content when handed to
- * `c.redirect()` (Location) or `window.location.href`. These are the only
- * schemes this guard blocks.
- */
+/** A stored or signed destination may use the existing non-script schemes. */
 const DANGEROUS_SCHEMES = new Set(['javascript:', 'data:', 'vbscript:', 'file:']);
-
-/**
- * Validate a user-supplied post-OAuth redirect target.
- *
- * The `?redirect=` param on /auth/line (and the /api/links/wrap proxy) is an
- * intentional feature: businesses send users to their own marketing/LP
- * destinations — and app/deep-link schemes like `line://`, `tel:`, `mailto:` —
- * after the friend-add funnel. To avoid breaking those funnels this guard is a
- * *denylist*, not an allowlist: it accepts http(s), root-relative paths, and
- * any non-dangerous scheme, and only rejects the things that are never a
- * legitimate redirect target:
- *   - script/content schemes (javascript:, data:, vbscript:, file:) — XSS,
- *   - protocol-relative `//host` (incl. the `/\host` / `\\host` backslash
- *     variants browsers normalize to `//`) — scheme confusion,
- *   - control characters — header-splitting / bypass tricks,
- *   - and anything that is neither an absolute URL nor a root-relative path.
- *
- * Used on both redirect sinks: the server-side /auth/callback redirect and the
- * client-side LIFF navigation (apps/worker/src/client/main.ts).
- *
- * @returns the trimmed redirect string when safe, or null when the caller
- *          should fall back to the default completion screen.
- */
-export function safeRedirectTarget(raw: string | null | undefined): string | null {
+export function storedRedirectTarget(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const value = raw.trim();
   if (!value) return null;
@@ -57,4 +30,31 @@ export function safeRedirectTarget(raw: string | null | undefined): string | nul
     return null;
   }
   return DANGEROUS_SCHEMES.has(url.protocol.toLowerCase()) ? null : value;
+}
+
+/** Untrusted URL/query inputs can navigate only within the current origin. */
+export function safeRedirectTarget(raw: string | null | undefined, origin?: string): string | null {
+  const value = storedRedirectTarget(raw);
+  if (!value || /[\\\u0000-\u0020\u007f]/.test(value)) return null;
+  try {
+    const decodedPath = decodeURIComponent(value.split(/[?#]/)[0]);
+    if (/[\\\u0000-\u0020\u007f]/.test(decodedPath) || decodedPath.startsWith('//')) return null;
+  } catch { return null; }
+  try {
+    const base = origin || 'https://same-origin.invalid';
+    const parsed = new URL(value, base);
+    if (parsed.origin !== new URL(base).origin || !/^https?:$/.test(parsed.protocol)) return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch { return null; }
+}
+
+/** Customer identity belongs only on this Worker's own tracking endpoint. */
+export function attributedRedirectTarget(target: string, origin: string, identityToken: string): string {
+  const parsed = new URL(target, origin);
+  if (parsed.origin !== new URL(origin).origin || !parsed.pathname.startsWith('/t/')) return target;
+  parsed.searchParams.delete('lu');
+  parsed.searchParams.delete('f');
+  parsed.searchParams.delete('identity');
+  parsed.searchParams.set('identity', identityToken);
+  return parsed.toString();
 }

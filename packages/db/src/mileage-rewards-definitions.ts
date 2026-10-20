@@ -1,0 +1,2 @@
+// Compatibility entry for existing consumers; implementation lives with its feature.
+export { createMileageRewardDraft, createMileageRewardDraftFromPublished, getMileageReward, getMileageRewardAdminOverview, getMileageRewardRedemptionCounts, importMileageRewardCodes, listMileageRewards, publishMileageReward, reorderMileageRewards, requirePublishedActionVersion, setMileageRewardStatus, updateMileageRewardDraft } from './mileage/rewards-definitions.js';

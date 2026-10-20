@@ -17,3 +17,20 @@ it('binds the URL to purpose, resource, owner, key and a strict 15 minute deadli
   expect(await validDownload(new URL('https://worker.example/download'), 'fixture-key', 'statement', 'id', 'owner')).toBe(false);
   await expect(signDownload(url, undefined, 'statement', 'id', 'owner')).rejects.toThrow('unconfigured');
 });
+
+it('caps a signed capability at the original file deadline and rejects malformed encodings', async () => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-16T00:00:00Z'));
+  const deadline = Date.now() + 60000;
+  const url = new URL(await signDownload(new URL('https://worker.example/download'), 'fixture-key', 'statement', 'id', 'owner', deadline));
+  expect(Number(url.searchParams.get('expires')) * 1000).toBe(deadline);
+  expect(await validDownload(url, 'fixture-key', 'statement', 'id', 'owner')).toBe(true);
+  for (const signature of ['z'.repeat(64), 'a'.repeat(63), 'A'.repeat(64), 'a'.repeat(66)]) {
+    const bad = new URL(url); bad.searchParams.set('signature', signature);
+    expect(await validDownload(bad, 'fixture-key', 'statement', 'id', 'owner')).toBe(false);
+  }
+  vi.setSystemTime(deadline);
+  expect(await validDownload(url, 'fixture-key', 'statement', 'id', 'owner')).toBe(false);
+  for (const badDeadline of [deadline, deadline - 1, NaN, Infinity]) {
+    await expect(signDownload(new URL(url), 'fixture-key', 'statement', 'id', 'owner', badDeadline)).rejects.toThrow('download_expired');
+  }
+});

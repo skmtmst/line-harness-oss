@@ -1,5 +1,6 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 /**
- * Cloudflare Turnstile（ロボット対策）の検証。★V6 36-4 会員登録・パスワード再設定。
+ * Cloudflare Turnstile（ロボット対策）の検証。★36-4 会員登録・パスワード再設定。
  *
  * 画面の部品が出したトークンを Cloudflare に送って本物か確かめる。
  * 秘密の鍵 `TURNSTILE_SECRET_KEY` が無いときは「未設定」として断る（安全側）。

@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createBroadcast, updateBroadcast } from '../src/broadcasts.js';
+import { createBroadcast, updateBroadcast } from '../src/broadcasts/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -85,7 +85,7 @@ describe('createBroadcast', () => {
     expect(sqlite.prepare('SELECT COUNT(*) AS count FROM broadcasts').get()).toEqual({ count: 1 });
   });
 
-  test('stores V6 draft fields and rejects a stale expected version', async () => {
+  test('stores draft fields and rejects a stale expected version', async () => {
     const created = await createBroadcast(db, {
       title: '途中の配信',
       messageType: 'text',

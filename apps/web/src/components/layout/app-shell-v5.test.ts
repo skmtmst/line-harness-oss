@@ -24,7 +24,7 @@ const ALL_ESTIMATED_SAMPLE = [
   { date: '2026-09-20', added: 3, blocked: 0, active: 95, estimated: true },
 ]
 
-describe('Pen.dev V6を共通レイアウトの正本にする', () => {
+describe("Pen.dev 管理画面を共通レイアウトの正本にする", () => {
   const pendingInbox = readFileSync(PENDING_INBOX, 'utf8')
   const friendTrend = readFileSync(FRIEND_TREND, 'utf8')
   const chats = readFileSync(CHATS, 'utf8')
@@ -50,7 +50,7 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
 
   it('推定の説明は表の下ではなく見出しの日付のヘルプに表示する', () => {
     /*
-      ★V7（2026-09-27 オーナー決定）: 「推定」の「？」は7行に繰り返さず、
+      ★管理画面（2026-09-27 オーナー決定）: 「推定」の「？」は7行に繰り返さず、
       見出しの日付の横の共通部品に1つだけ置く。行ごとの開閉はやめたので
       行内の `aria-expanded` は無い。表の下の注釈に戻さない。
       DASH-17（ホバー専用の吹き出しに戻さない）は共通部品側が守る。
@@ -82,11 +82,11 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
   it('推移表の見出しは狭い画面でも折り返さない（DASH-27）', () => {
     const body = friendTrend.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     /*
-      ★V7（2026-09-27 オーナー決定）: 日付の見出しに共通部品の「？」が
+      ★管理画面（2026-09-27 オーナー決定）: 日付の見出しに共通部品の「？」が
       入ったため、文言直前の `">` では見出しを特定できない。見出し5つ
       全てに `whitespace-nowrap` があることと、表が横にスクロールできる
       こと（`overflow-x-auto`）で同じ意図を守る。案内文と流入元列
-      （「すべて表示」）は ★V7 で外れた。
+      （「すべて表示」）は ★管理画面 で外れた。
     */
     // 見出しは共通 Th（大文字）で書く。素の th も同じ形とみなす。
     const headers = body.match(/<[tT]h[\s>][^>]*>/g) ?? []

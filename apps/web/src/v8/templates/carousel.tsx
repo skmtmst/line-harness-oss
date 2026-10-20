@@ -2,7 +2,7 @@
 
 import Card, { CardHeader } from '@/components/shared/card'
 import { CreatePage } from '@/components/templates/create-page'
-import { isOwnerOrAdmin } from '@/lib/staff-capability';
+
 import { notifySaved } from '@/components/shared/toast'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { tapExtrasError, type TapExtras } from '@line-crm/shared'
@@ -11,7 +11,7 @@ import { Suspense, useEffect, useRef, useState, type DragEvent, type KeyboardEve
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { ChevronDown, Copy, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucide-react'
+import { Copy, Plus, Send, Trash2, TriangleAlert, Zap } from 'lucide-react'
 import type { Folder, MediaItem, MessageTemplateMediaDefinition } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message'
@@ -33,11 +33,11 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { TemplateEditFrame } from '../template-edit/frame'
-import type { TemplateEditHost } from '../template-edit/host'
+import { TemplateEditFrame } from '@/v8/template-edit/public/frame/index'
+import type { TemplateEditHost } from '@/v8/template-edit/public/host/index'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
-import CarouselImage from '../template-edit/carousel-image'
-import { uploadCarouselImage } from '../template-edit/carousel-image-upload'
+import { CarouselImage } from '@/v8/template-edit/public/carousel-image/index'
+import { uploadCarouselImage } from '@/v8/template-edit/public/carousel-image-upload/index'
 import te from '../template-edit/edit.module.css'
 import {
   MAX_ACTIONS, MAX_COLUMNS, TEXT_MAX_WITH_IMAGE, TEXT_MAX_WITHOUT_IMAGE, TITLE_MAX,
@@ -56,12 +56,12 @@ import CarouselButtons from './carousel-buttons'
 export { inlineActionsText } from './carousel-button-options'
 
 /*
- * ★V8 テンプレート「カルーセルを作る・編集」（Pencil `J60utH`）。
+ * ★V8 テンプレート「カルーセルを作る・編集」（Pencil ）。
  *
  * 外枠はテンプレートの作る画面と同じ（src/v8/template-edit/frame）。左に段「名前とフォルダ」「カード」（札で選ぶ・つまんで並べ替え）
  * 「カード N の中身」（画像・タイトル・本文・ボタン最大3つ）と案内の帯、絵に無い「押せる回数」は下に。
  * 右の列に「気をつけること」と「届き方」。下の帯はキャンセル・下書きを保存・保存して公開。
- * 読み込み・保存（作成だけ済んだあとのやり直しは作り直さない）・公開（使用先があれば確認の窓 cuR8I）・離れる確認は
+ * 読み込み・保存（作成だけ済んだあとのやり直しは作り直さない）・公開（使用先があれば確認の窓 ）・離れる確認は
  * 現役の組み立てと保存の正本は carousel-core。
  * ボタンの「動きを実行する」は要約からその場の設定を開く。保存する処理は InlineActionList で編集する。
  * ボタンの「押したら」（絵 JkLOF・2026-10-08）：URLを開く／テキストを送る／回答フォームを開く／予約ページを開く／予約履歴を開く／
@@ -70,7 +70,7 @@ export { inlineActionsText } from './carousel-button-options'
  * 受け付ける URL：`/templates/carousel`・`?id=<テンプレート>`・`?visual=1`（見本の3枚で開く。撮影用）。
  */
 
-/** 札の名前：タイトルの（）書きを外した短い名前（絵：「夏の定番セット（送料込み）」→「夏の定番セット」）。 */
+/** 札の名前：タイトルの書きを外した短い名前（絵：「夏の定番セット（送料込み）」→「夏の定番セット」）。 */
 export function chipName(title: string): string {
   return title.replace(/[（(][^）)]*[）)]\s*$/, '').trim() || title.trim()
 }
@@ -134,7 +134,7 @@ const ACTION_EXTRA_KIND = [{ value: 'action', label: '動きを実行する', de
 /** 統括で保存できない「押したら」。 */
 const HOST_ALLOWED: readonly ChoiceKind[] = HOST_CHOICE_KINDS
 
-/** 1つのボタンの誤り（文字のあるボタンだけ見る）。欄の真下に出すので「カード〇のボタン〇」は付けない（B-139）。 */
+/** 1つのボタンの誤り（文字のあるボタンだけ見る）。欄の真下に出すので「カード〇のボタン〇」は付けない。 */
 function buttonProblem(a: Panel['actions'][number], liffId: string | null, hqHost: boolean): string | null {
   if (!a.label.trim()) return null
   const extrasError = tapExtrasError(a.tapExtras)
@@ -265,7 +265,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const textMaxFor = (panel: Panel) => (panel.title.trim() || panel.thumbnailImageUrl.trim() ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE)
 
   /*
-   * 保存で落ちた欄（B-139・オーナーの写真の指摘：「すべてのカードに本文を入力してください」の帯だけだった）。
+   * 保存で落ちた欄（・オーナーの写真の指摘：「すべてのカードに本文を入力してください」の帯だけだった）。
    * 欄の真下に理由を出して赤くし、別のカードの欄ならそのカードを選んでから移る。カードの札には直す欄の数の赤い丸。
    */
   const fields = useFormErrors()
@@ -328,7 +328,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     }
     return true
   }
-  /* 保存して公開。使用先があるときは確認の窓を出してから公開する（cuR8I）。 */
+  /* 保存して公開。使用先があるときは確認の窓を出してから公開する。 */
   const publishSaved = async (templateId: string) => {
     setPublishing(true)
     setPublishError('')
@@ -438,8 +438,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
         footerActions={(
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
-            <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || loadFailed} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={15} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" onClick={() => onSaveDraft()} disabled={busy || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
+            <Button type="button" variant="primary" onClick={() => onPublish()} disabled={busy || loadFailed} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={15} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >

@@ -7,9 +7,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
-vi.mock('../services/friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: vi.fn(),
 }));
 vi.mock('../services/event-bus.js', () => ({
@@ -241,7 +241,7 @@ describe('W15 フォルダと内容の複合保存（実SQL）', () => {
   });
 });
 
-test('J1pdB: 保存した人と時刻を同じ編集版の監査から返し、過去の未記録はnull',async()=>{
+test(': 保存した人と時刻を同じ編集版の監査から返し、過去の未記録はnull',async()=>{
  sqlite.raw.exec("INSERT INTO staff_members(id,name,role,api_key) VALUES('staff-1','保存した担当者','owner','fixture')");
  const initial=await app().request('/api/forms/form-1?account_id=acc-1',{},env());
  expect((await initial.json() as {data:{latestEdit:unknown}}).data.latestEdit).toBeNull();
@@ -257,7 +257,7 @@ test('J1pdB: 保存した人と時刻を同じ編集版の監査から返し、�
  expect((await loaded.json() as {data:{latestEdit:unknown}}).data.latestEdit).toEqual(editor);
 });
 
-test('J1pdB: 保存者の監査を書けなければフォームの編集も戻す',async()=>{
+test(': 保存者の監査を書けなければフォームの編集も戻す',async()=>{
  sqlite.raw.exec("INSERT INTO staff_members(id,name,role,api_key) VALUES('staff-1','担当者','owner','fixture'); CREATE TRIGGER fail_editor_audit BEFORE INSERT ON audit_events WHEN NEW.action='form.draft_saved' BEGIN SELECT RAISE(ABORT,'fixture'); END;");
  const before=formRow();expect((await put({name:'残ってはいけない',expectedContentRevision:before.content_revision})).status).toBe(500);
  expect(formRow()).toEqual(before);

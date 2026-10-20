@@ -1,5 +1,5 @@
 /*
- * ★V8 統括のバナー生成（B9ZAr・W5Wxr）。頭・左の列の枠は型（ListPage）。
+ * ★V8 統括のバナー生成（・）。頭・左の列の枠は型（ListPage）。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-hb-*`。
  */
 .folderInset { margin-left: var(--tpl-hb-folder-inset); min-width: 0; }

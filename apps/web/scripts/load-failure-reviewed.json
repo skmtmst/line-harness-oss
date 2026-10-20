@@ -14,14 +14,14 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/app/auto-replies/edit/wizard-v8.tsx",
+    "filename": "src/v8/auto-replies/edit/wizard.tsx",
     "fingerprint": "d44b55cb60360671",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/app/booking/bookings/detail/page.tsx",
+    "filename": "src/app/booking/bookings/detail/use-booking-detail.ts",
     "fingerprint": "412d5b4d0670d471",
     "disposition": "error-visible",
     "count": 1,
@@ -35,7 +35,7 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/app/booking/bookings/page.tsx",
+    "filename": "src/app/booking/bookings/use-booking-ledger.ts",
     "fingerprint": "a595976790b05d33",
     "disposition": "error-visible",
     "count": 1,
@@ -44,20 +44,6 @@
   {
     "filename": "src/app/booking/staff/page.tsx",
     "fingerprint": "057253e9c2455109",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
-    "filename": "src/app/duplicates/use-duplicates-data.ts",
-    "fingerprint": "88fde07726bec066",
-    "disposition": "error-visible",
-    "count": 1,
-    "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
-  },
-  {
-    "filename": "src/app/friends/migrations/use-friend-migrations.ts",
-    "fingerprint": "e302697ad92dbc79",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
@@ -91,14 +77,7 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/app/tags/fields/default-labels.ts",
-    "fingerprint": "b135da5aff5f52e7",
-    "disposition": "local-parser",
-    "count": 1,
-    "reason": "ローカル保存の解析。取得APIの失敗ではない。"
-  },
-  {
-    "filename": "src/app/users/use-merged-users.ts",
+    "filename": "src/v8/users/use-merged-users.ts",
     "fingerprint": "d1edbd84da78d3bf",
     "disposition": "error-visible",
     "count": 1,
@@ -147,7 +126,7 @@
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"
   },
   {
-    "filename": "src/v8/booking-menus/settings.tsx",
+    "filename": "src/v8/booking-menus/use-booking-settings.ts",
     "fingerprint": "3f092aaea634be9b",
     "disposition": "error-visible",
     "count": 1,
@@ -392,7 +371,7 @@
     "reason": "ローカル保存の解析。取得APIの失敗ではない。"
   },
   {
-    "filename": "src/v8/tags/fields-tab.tsx",
+    "filename": "src/v8/tags/use-fields-tab.tsx",
     "fingerprint": "fc2f7c2c98d9b5d2",
     "disposition": "error-visible",
     "count": 1,

@@ -1,6 +1,8 @@
+> 文書：ファイルの検査の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # ファイルの検査の動き（BEHAVIOR.md）
 
-対象：`screen.tsx`（★V8 `PfA4o`、空の状態は `bR6a1`）。写し元：`app/settings/file-scan/file-scan-v8.tsx`・`use-file-scan.ts`。
+対象：`screen.tsx`（★V8 `PfA4o`、空の状態は `bR6a1`）。写し元：[現役の入口・本体](../README.md)・`use-file-scan.ts`。
 
 ## 入口・URL
 - `app/settings/file-scan/page.tsx`。`/settings/file-scan`（指定なし）。

@@ -1,4 +1,6 @@
 'use client'
+import { yenPercent } from '@line-crm/shared';
+import { formatYen as yen } from '@line-crm/shared';
 
 import { useCallback, useEffect, useState } from 'react'
 import { ArrowRight, CreditCard } from 'lucide-react'
@@ -11,14 +13,15 @@ import SegmentedControl from '@/components/shared/segmented'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope } from '@/components/shared/save-form-errors'
 import TextLink from '@/components/shared/text-link'
-import { gapDraftApi, type DepositRule } from '@/lib/api-gap-draft'
+import { bookingAdvancedApi } from '@/lib/api/helpers/booking-advanced'
+import type { DepositRule } from '@line-crm/shared'
 import type { MenuPaymentState } from './menu-payment'
 import { MODE_LABEL } from './labels'
 import styles from './payments.module.css'
 
 /*
  * 予約メニューの「お支払い」の段（B1・絵 CnV1I）：いつもの方法／先払い／お店で払う／デポジット（一部）の 4 つ。
- * 先払い・お店で払うは今ある口（saveMenuPayment）、デポジットは口の案（api-gap-draft のメニューのデポジット：口が要る）。
+ * 先払い・お店で払うは今ある口（saveMenuPayment）、デポジットも版付きの実APIで読み書きする。
  * デポジットを選ぶと支払い方法は先払い（残りはお店で）として送る。
  */
 
@@ -34,7 +37,7 @@ export function useMenuDeposit(accountId: string | null, menuId: string | null) 
     /* 作る画面（まだメニューが無い）：いつもの方法から始め、保存でメニューができてから同じ口へ送る（版 0）。 */
     if (!menuId) { setSaved(NEW_MENU_DEPOSIT); setDraft(NEW_MENU_DEPOSIT); setReady(true); return }
     let alive = true
-    void Promise.resolve().then(() => gapDraftApi.menuDeposit(accountId, menuId))
+    void Promise.resolve().then(() => bookingAdvancedApi.menuDeposit(accountId, menuId))
       .then((response) => { if (alive) { setSaved(response.data); setDraft(response.data); setReady(true) } })
       .catch(() => { if (alive) { setSaved(null); setDraft(null); setReady(false) } })
     return () => { alive = false }
@@ -44,14 +47,13 @@ export function useMenuDeposit(accountId: string | null, menuId: string | null) 
     const id = targetId ?? menuId
     if (!accountId || !id || !draft || !dirty) return
     const { version, ...body } = draft
-    const response = await gapDraftApi.saveMenuDeposit(accountId, id, { ...body, expectedVersion: version })
+    const response = await bookingAdvancedApi.saveMenuDeposit(accountId, id, { ...body, expectedVersion: version })
     setSaved(response.data); setDraft(response.data)
   }, [accountId, menuId, draft, dirty])
   return { ready, draft, setDraft, dirty, save }
 }
 export type MenuDepositState = ReturnType<typeof useMenuDeposit>
 
-const yen = (value: number) => `¥${Math.floor(value).toLocaleString('ja-JP')}`
 
 export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { payment: MenuPaymentState; deposit: MenuDepositState; price: number | null; readOnly: boolean }) {
   const depositOn = Boolean(deposit.draft && !deposit.draft.inherit && deposit.draft.kind !== 'none')
@@ -62,7 +64,7 @@ export function BookingMenuPaymentCard({ payment, deposit, price, readOnly }: { 
     if (deposit.draft) deposit.setDraft({ ...deposit.draft, inherit: next !== 'deposit', kind: next === 'deposit' ? (deposit.draft.kind === 'none' ? 'percent' : deposit.draft.kind) : 'none', value: next === 'deposit' ? deposit.draft.value ?? 30 : deposit.draft.value })
   }
   const rule = deposit.draft
-  const amount = rule && price !== null && rule.value ? (rule.kind === 'percent' ? Math.floor(price * rule.value / 100) : Math.min(rule.value, price)) : null
+  const amount = rule && price !== null && rule.value ? (rule.kind === 'percent' ? yenPercent(price, rule.value) : Math.min(rule.value, price)) : null
   const header = <CardHeader size="stacked" title="お支払い" help={<HelpTip label="お支払いの説明">いつもの方法は予約設定 › お支払いのとおりです。デポジットは予約のときに一部を先に払ってもらい、残りはお店で払います。</HelpTip>} />
   if (payment.status === 'loading') return <Card variant="form" gap="normal">{header}<p className={styles.minor}>お支払いの設定を読み込んでいます…</p></Card>
   if (!payment.connected) return <Card variant="form" gap="normal">{header}<p className={styles.sideCardLink}><CreditCard size={15} aria-hidden="true" />先払い・デポジットを受けるには<TextLink href="/booking/menus?tab=payments">お支払いをつなぐ<ArrowRight size={14} aria-hidden="true" /></TextLink></p></Card>

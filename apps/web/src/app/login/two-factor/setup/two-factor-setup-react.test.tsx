@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { trustedChallengeUrl } from '@/test-utils/trusted-auth-handoff'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -96,6 +97,8 @@ afterEach(() => {
 })
 
 async function render() {
+  const url = trustedChallengeUrl('/login/two-factor/setup' + window.location.search + window.location.hash)
+  window.history.replaceState(null, '', url)
   await act(async () => { root.render(<TwoFactorSetupPage />) })
   await flush()
 }
@@ -174,7 +177,7 @@ describe('N-426: 初回設定画面', () => {
   })
 
   it('R508: 確認で期限切れ401なら入力を終わらせてログインへ戻る導線を出す', async () => {
-    fixture.confirmResponse = { success: false, error: '設定の有効時間が切れました。ログインからやり直してください' }
+    fixture.confirmResponse = { success: false, error: { code: 'challenge_expired', message: '設定の有効時間が切れました。ログインからやり直してください', requestId: 'ab9daa00-9761-40a9-a9ee-a2c21bbe62c0', fieldErrors: [] } }
     fixture.confirmStatus = 401
     await render()
     expect(host.querySelector('form')).not.toBeNull()

@@ -1,5 +1,5 @@
 /*
- * ★V8 予約設定（owaS3・yRPxl・KRgTQ・x1OZS6・VLEaj・xCoDe・P6EdLW・VFxWU）。
+ * ★V8 予約設定（・・・・・・・）。
  *
  * 白い板1枚：頭（戻る・題・説明・タブ）→ 中身（左＝タブの中身、右＝LIFFの見本）→
  * 下の帯（保存）。折り畳みの基準は板の幅（container）で、画面幅ではない。
@@ -18,7 +18,7 @@
   /* 頭の下線・右欄の区切り・下の帯を板の端まで届かせるため、
      .content の余白（20px 24px 28px）を打ち消して中で持ち直す。 */
   margin: calc(var(--tpl-bm-20) * -1) calc(var(--tpl-bm-24) * -1) calc(var(--tpl-bm-28) * -1);
-  /* 中身が短いタブでも下の帯を板の下へ（絵 x1OZS6：帯は画面の下に追従）。 */
+  /* 中身が短いタブでも下の帯を板の下へ（絵 ：帯は画面の下に追従）。 */
   min-height: var(--tpl-bk2-shell-min-h);
 }
 
@@ -67,10 +67,10 @@
   margin-bottom: calc(var(--tpl-bm-1) * -1);
 }
 
-/* 休業日：休みにした日に予約がある人への注意（絵 KRgTQ は帯ではなく字だけ）。 */
+/* 休業日：休みにした日に予約がある人への注意（絵  は帯ではなく字だけ）。 */
 .closedNote {
   margin: 0;
-  /* 注意の色（橙の字・絵 KRgTQ #94600a）。赤（取り消せない操作）ではない。 */
+  /* 注意の色（橙の字・絵  #94600a）。赤（取り消せない操作）ではない。 */
   color: var(--color-warning);
   font-size: var(--tpl-bm-12);
   line-height: var(--tpl-bm-17);
@@ -131,7 +131,7 @@
   padding: var(--tpl-bm-24);
 }
 
-/* 予約経路の連携（絵 ZyDd6）は右の列が無い全幅。帯が頭の線のすぐ下から始まり、左右は 24。 */
+/* 予約経路の連携は右の列が無い全幅。帯が頭の線のすぐ下から始まり、左右は 24。 */
 .mainChannels {
   padding: 0 var(--tpl-bm-24) var(--tpl-bm-24);
 }
@@ -153,7 +153,7 @@
   gap: var(--tpl-bm-10);
 }
 
-/* 板 VFxWU（1152）：畳んだスマホの代わりの「見え方」ボタン。
+/* 板 （1152）：畳んだスマホの代わりの「見え方」ボタン。
    スマホが見えている広い板では出さない。 */
 .sidePhoneButton {
   display: flex;
@@ -182,7 +182,7 @@
     padding: var(--tpl-bm-16);
   }
 
-  /* 板 P6EdLW（1152）：メニューの表は「担当」「30日」を畳み、
+  /* 板 （1152）：メニューの表は「担当」「30日」を畳み、
      メニュー・時間・金額・状態だけにする。 */
   .colStaff,
   .colCount {
@@ -336,7 +336,7 @@
 }
 
 /*
- * 一覧の行の高さは中身の行数で決まる（§6.5 の 3・B-254：2行・3行は 60）。
+ * 一覧の行の高さは中身の行数で決まる（§6.5 の 3・：2行・3行は 60）。
  * 名前・分類の札・説明の3段は 60 に入りきらないので、60 を下限に中身の高さ＋上下 8 で伸ばす。
  */
 .menuRow {
@@ -414,7 +414,7 @@
   padding: 0;
   line-height: var(--tpl-bm-19);
   overflow: hidden;
-  /* 一覧の名前は黒の太字（§6.5 の 2・絵 owaS3）。押せることは下線で示す。 */
+  /* 一覧の名前は黒の太字（§6.5 の 2・絵 ）。押せることは下線で示す。 */
   color: var(--color-ink);
   font-size: var(--tpl-bm-13);
   font-weight: 700;
@@ -631,7 +631,7 @@
 
 /* ===== 受付枠（曜日の行） ===== */
 
-/* 見本：左に「トグル＋曜日」、右に縦に並ぶ時間帯の行（yRPxl）。 */
+/* 見本：左に「トグル＋曜日」、右に縦に並ぶ時間帯の行。 */
 .dayRow {
   display: flex;
   align-items: flex-start;
@@ -718,7 +718,7 @@
   background: var(--color-canvas-sunken);
   color: var(--color-ink-faint);
 }
-/* 保存で落ちた同時受付数（B-139）。枠を危険の色にする。 */
+/* 保存で落ちた同時受付数。枠を危険の色にする。 */
 .numInput[aria-invalid='true'] { border-color: var(--color-danger); outline-color: var(--color-danger); }
 
 .iconRemove {
@@ -909,7 +909,7 @@
   box-shadow: var(--shadow-row-line);
 }
 
-/* 行の中の文字ボタンは全体のボタンの最低の高さ（32）を受けない（絵 KRgTQ の行は 17 の文字1行）。 */
+/* 行の中の文字ボタンは全体のボタンの最低の高さ（32）を受けない（行は 17 の文字1行）。 */
 .exceptionRow > button {
   min-height: var(--tpl-bm-17);
   line-height: var(--tpl-bm-17);
@@ -1040,7 +1040,7 @@
   box-shadow: none;
 }
 
-/* 表は余白なしの枠（絵 VLEaj：角丸12・線だけ・中は端まで）。 */
+/* 表は余白なしの枠（絵 ：角丸12・線だけ・中は端まで）。 */
 .staffTable {
   display: flex;
   flex-direction: column;
@@ -1130,12 +1130,12 @@
   margin-top: 0;
 }
 
-/* 絵 VLEaj：小さい字は 16 の行、0 の行は 17（行の高さ 60・二行の警告の行 69）。 */
+/* 絵 ：小さい字は 16 の行、0 の行は 17（行の高さ 60・二行の警告の行 69）。 */
 .staffRow .staffCellSub {
   line-height: var(--tpl-bm-16);
 }
 
-/* 絵 VLEaj：数の「0」は黒、下の注意文だけオレンジ。 */
+/* 絵 ：数の「0」は黒、下の注意文だけオレンジ。 */
 .staffRow .cellWarn {
   display: flex;
   flex-direction: column;
@@ -1144,7 +1144,7 @@
   line-height: var(--tpl-bm-17);
 }
 
-/* 絵 VLEaj：「予約画面に出ません」は1行。狭いときは省略し、全文は title で見せる。 */
+/* 絵 ：「予約画面に出ません」は1行。狭いときは省略し、全文は title で見せる。 */
 .staffRow .cellWarn .staffCellSub {
   overflow: hidden;
   color: var(--color-warning);
@@ -1206,7 +1206,7 @@
 
 /* ===== 設備 ===== */
 
-/* 絵 yRPxl：開ける時間の板の中に、設備と空きの確かめを入れ子の箱で置く（曜日の行の下から20・箱の間12）。 */
+/* 絵 ：開ける時間の板の中に、設備と空きの確かめを入れ子の箱で置く（曜日の行の下から20・箱の間12）。 */
 .innerStack {
   display: flex;
   flex-direction: column;
@@ -1257,7 +1257,7 @@
   font-weight: 600;
 }
 
-/* 行：63。中身の高さ32の中心が行の上から37（絵 yRPxl）なので上21・下9。線は行の下。字14。 */
+/* 行：63。中身の高さ32の中心が行の上から37なので上21・下9。線は行の下。字14。 */
 .equipRow {
   display: flex;
   flex-wrap: wrap;
@@ -1292,7 +1292,7 @@
 
 /* ===== 空きを確かめる ===== */
 
-/* 欄の間は絵 yRPxl で8。日付・時刻の欄が絵より4高い（共通部品の40）ので、間を6にして下の段の位置を合わせる。 */
+/* 欄の間は絵  で8。日付・時刻の欄が絵より4高い（共通部品の40）ので、間を6にして下の段の位置を合わせる。 */
 .checkGrid {
   display: flex;
   flex-direction: column;
@@ -1700,7 +1700,7 @@
   line-height: var(--tpl-bm-13);
 }
 
-/* 休み＝地も数字も薄く。満＝地は白のまま、札だけ薄く（絵 KRgTQ）。 */
+/* 休み＝地も数字も薄く。満＝地は白のまま、札だけ薄く。 */
 .phoneDayOff .phoneDayState,
 .phoneDayFull .phoneDayState {
   color: var(--v8-liff-idle);
@@ -1823,7 +1823,7 @@
 
 .warnBand, .warnBandNoticePlacement { margin: 0; flex-shrink: 0; }
 
-/* 畳んだ右欄の2つのボタン（VFxWU）。 */
+/* 畳んだ右欄の2つのボタン。 */
 .narrowActions {
   display: flex;
   flex-wrap: wrap;

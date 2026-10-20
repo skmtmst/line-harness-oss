@@ -1,6 +1,7 @@
+import { logger } from '@line-crm/shared/server';
 import type { MiddlewareHandler } from 'hono';
 import { auditDeviceFamily, maskAuditIp, recordAuditEvent } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { canonicalDenyAuditFor } from '../lib/audit-log.js';
 import { dbFor } from '../services/db-router.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -51,7 +52,7 @@ export const tenantScopeMiddleware: MiddlewareHandler<Env> = async (c, next) => 
   }
   for (const id of candidates) {
     if (!scope.ids.includes(id)) {
-      console.warn(JSON.stringify({"code":"tenant_boundary_denied"}));
+      logger.warn("tenant_boundary_denied");
       recordBoundaryDenial(c, id);
       return c.json({
         success: false,
@@ -98,7 +99,7 @@ function recordBoundaryDenial(
     ipPrefix: maskAuditIp(c.req.header('cf-connecting-ip')),
     deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
   }).catch((error: unknown) => {
-    console.error(JSON.stringify({"code":"middleware_tenant_scope_failed"}));
+    logger.error("middleware_tenant_scope_failed");
   });
   try {
     c.executionCtx.waitUntil(task);

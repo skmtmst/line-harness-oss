@@ -3,10 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const createDraft = vi.hoisted(() => vi.fn())
+const permission = vi.hoisted(() => ({ value: true }))
 const listExisting = vi.hoisted(()=>vi.fn().mockResolvedValue({success:true,data:[]}))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account' }) }))
-vi.mock('@/components/automations/use-common-action-permission', () => ({ useCanManageCommonActions: () => true }))
+vi.mock('@/components/automations/use-common-action-permission', () => ({ useCanManageCommonActions: () => permission.value }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
@@ -21,6 +22,7 @@ vi.mock('@/lib/api', async importOriginal => {
 import { NewAutomationV8 } from './create'
 
 beforeEach(() => {
+  permission.value = true
   window.sessionStorage.clear()
   window.history.replaceState(null, '', '/automations/new')
   vi.stubGlobal('sessionStorage', window.sessionStorage)
@@ -62,11 +64,20 @@ it('WEB-120: 何も変えていないキャンセルは未保存の確認を出�
   expect(screen.queryByRole('alertdialog')).toBeNull()
 })
 
-it('B-241：既存ルールの取得失敗を重複なしとして隠さず、再取得する',async()=>{
+it('既存ルールの取得失敗を重複なしとして隠さず、再取得する',async()=>{
  listExisting.mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({success:true,data:[{id:'existing',eventType:'friend_added'}]})
  render(<NewAutomationV8/>)
  const error=await screen.findByText('既存のルールを読み込めませんでした')
  fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
  await waitFor(()=>expect(screen.queryByText('既存のルールを読み込めませんでした')).toBeNull())
  expect(listExisting).toHaveBeenCalledTimes(2)
+})
+
+
+it('閲覧のみの人には保存と公開を出さず、入力した内容も送らない', async () => {
+  permission.value = false
+  render(<NewAutomationV8 />)
+  expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'つくって動かす' })).toBeNull()
+  expect(createDraft).not.toHaveBeenCalled()
 })

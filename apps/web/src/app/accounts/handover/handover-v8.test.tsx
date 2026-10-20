@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B LINEアカウントの乗り換え（板 `x2dSNv`）。
- * v7 と同じ口・同じ守りで、未判断が残る間は本実行を押せず、
+ * ★V8-B LINEアカウントの乗り換え（板 ）。
+ * 管理画面 と同じ口・同じ守りで、未判断が残る間は本実行を押せず、
  * 判断の保存・本人確認の小窓が動くこと。
  */
 import React, { act } from 'react'
@@ -177,7 +177,7 @@ describe('V8-B 乗り換え（x2dSNv）', () => {
     expect(v8tsx).toContain('<DataTable presentation="account-handover"')
     expect(v8tsx).toContain('<StickyBar presentation="account-handover"')
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
-    // 影は共通のカードの影だけ（2026-10-09 オーナー採用 B-137）。ほかの影は直書きしない。
+    // 影は共通のカードの影だけ（2026-10-09 オーナー採用 ）。ほかの影は直書きしない。
     expect(v8css.replace(/box-shadow:\s*var\(--card-shadow\)/g, '')).not.toMatch(/box-shadow\s*:/)
     expect(v8tsx).toMatch(/(?:data-design-node|boardId)="x2dSNv"/)
     expect(v8tsx).not.toContain('準備中')

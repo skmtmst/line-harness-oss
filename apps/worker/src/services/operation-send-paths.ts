@@ -22,6 +22,7 @@ import {
   type OperationCapability,
 } from '@line-crm/db';
 
+
 export type OperationSendPathKind =
   /** 担当者が相手を見て送る手動送信。 */
   | 'manual'
@@ -90,7 +91,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     kind: 'scheduled',
     capability: 'broadcast_dispatch',
     enforcement: [
-      { file: 'apps/worker/src/services/broadcast.ts', marker: "isOperationCapabilityStopped(db, ownerAccountId, 'broadcast_dispatch')" },
+      { file: 'apps/worker/src/features/broadcasts/broadcast.ts', marker: "isOperationCapabilityStopped(db, ownerAccountId, 'broadcast_dispatch')" },
       { file: 'apps/worker/src/services/dedup-broadcast.ts', marker: "'broadcast_dispatch'" },
       { file: 'apps/worker/src/routes/broadcasts.ts', marker: "'broadcast_dispatch'" },
     ],
@@ -195,7 +196,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     kind: 'scheduled',
     capability: 'reminder_dispatch',
     enforcement: [
-      { file: 'apps/worker/src/services/booking-reminders.ts', marker: "'reminder_dispatch'" },
+      { file: 'apps/worker/src/features/booking/booking-reminders.ts', marker: "'reminder_dispatch'" },
     ],
     note: '停止中は通知を待機させます。送信前に停止へ変わった通知も待機へ戻します。',
   },
@@ -225,7 +226,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     kind: 'scheduled',
     capability: 'reminder_dispatch',
     enforcement: [
-      { file: 'apps/worker/src/services/webinar-reminders.ts', marker: "'reminder_dispatch'" },
+      { file: 'apps/worker/src/features/webinars/webinar-reminders.ts', marker: "'reminder_dispatch'" },
     ],
     note: '停止中は送らず、通知済みにもしません。再開後の定期確認で配信します。',
   },
@@ -235,7 +236,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     kind: 'scheduled',
     capability: 'reminder_dispatch',
     enforcement: [
-      { file: 'apps/worker/src/services/webinar-notifications.ts', marker: "'reminder_dispatch'" },
+      { file: 'apps/worker/src/features/webinars/webinar-notifications.ts', marker: "'reminder_dispatch'" },
     ],
     note: '停止中は案内を待機させ、新しい配信を始めません。',
   },
@@ -245,7 +246,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     kind: 'auto',
     capability: 'reminder_dispatch',
     enforcement: [
-      { file: 'apps/worker/src/services/webinar-followups.ts', marker: "'reminder_dispatch'" },
+      { file: 'apps/worker/src/features/webinars/webinar-followups.ts', marker: "'reminder_dispatch'" },
     ],
     note: '停止中は視聴後の案内を登録せず、送信もしません。',
   },
@@ -265,7 +266,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     kind: 'auto',
     capability: 'reminder_dispatch',
     enforcement: [
-      { file: 'apps/worker/src/services/booking-expirer.ts', marker: "'reminder_dispatch'" },
+      { file: 'apps/worker/src/features/booking/booking-expirer.ts', marker: "'reminder_dispatch'" },
     ],
     note: '停止中は受付待ちの予約を期限切れにせず、そのまま残します。',
   },
@@ -279,7 +280,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     kind: 'auto',
     capability: 'automation_actions',
     enforcement: [
-      { file: 'apps/worker/src/services/automation-engine.ts', marker: "'automation_actions'" },
+      { file: 'apps/worker/src/features/automations/automation-engine.ts', marker: "'automation_actions'" },
     ],
     note: '停止中は処理を始めず、待機したまま残します。',
   },
@@ -313,7 +314,7 @@ export const OPERATION_SEND_PATHS: readonly OperationSendPath[] = [
     kind: 'auto',
     capability: 'auto_reply_dispatch',
     enforcement: [
-      { file: 'apps/worker/src/services/auto-reply.ts', marker: "'auto_reply_dispatch'" },
+      { file: 'apps/worker/src/features/auto-replies/auto-reply.ts', marker: "'auto_reply_dispatch'" },
     ],
     note: '停止中に届いたメッセージには返信せず、送らなかった記録を残します。再開後のまとめ送りはしません。',
   },

@@ -128,7 +128,7 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
     }
   })
 
-  it('B-203の選択の枠と、題・説明の文字を保つ', () => {
+  it("共通部品の選択の枠と、題・説明の文字を保つ", () => {
     const c = css()
     expect(c).toMatch(/html:root\s*\.checked[^{]*\{[^}]*outline:\s*var\(--choice-card-ring\) solid var\(--color-selection-border\)/s)
     const titles = [...c.matchAll(/:root\s*\.title\s*\{[^}]*\}/gs)].map((m) => m[0])
@@ -143,7 +143,7 @@ describe('選ぶカードの箱（fNPdg オン・r3xz1W オフ）の数値', () 
     const note = notes[notes.length - 1]
     expect(note).toMatch(/font-size:\s*var\(--polish-text-support\)/)
     expect(note).toMatch(/line-height:\s*var\(--text-lh\)/)
-    // 印は選択中も文字の色を継ぐ（B-152⑤）。
+    // 印は選択中も文字の色を継ぐ（⑤）。
     expect(c).toMatch(/:root\s*\.checked \.topIcon\s*\{[^}]*color:\s*inherit/s)
   })
 

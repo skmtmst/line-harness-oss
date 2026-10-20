@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 import { chats } from './chats.js';
@@ -78,5 +78,18 @@ describe('#548-7 会話詳細のメッセージは実応答の形で返る', () 
     for (const message of body.data.messages) {
       expect(message).not.toHaveProperty('senderType');
     }
+  });
+
+  it('本名と注目印を実際の友だち情報から返し、未設定と区別する', async () => {
+    testDb.raw.prepare('UPDATE friends SET real_name = ?, metadata = ? WHERE id = ?')
+      .run('実名の見本', JSON.stringify({ __attention: '1' }), 'friend-shape');
+    const getDetail = async () => {
+      const response = await chatsApp(testDb.db).request('/api/chats/friend-shape', {}, { DB: testDb.db } as Env['Bindings']);
+      expect(response.status).toBe(200);
+      return (await response.json() as { data: Record<string, unknown> }).data;
+    };
+    expect(await getDetail()).toMatchObject({ friendRealName: '実名の見本', isAttention: true });
+    testDb.raw.prepare("UPDATE friends SET real_name = NULL, metadata = '{}' WHERE id = ?").run('friend-shape');
+    expect(await getDetail()).toMatchObject({ friendRealName: null, isAttention: false });
   });
 });

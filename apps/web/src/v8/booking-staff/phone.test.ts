@@ -1,4 +1,4 @@
-/* LINE の予約画面の時刻は先頭の0を落とす（絵 d5fmnM・E3YDK）。 */
+/* LINE の予約画面の時刻は先頭の0を落とす。 */
 import { describe, expect, it } from 'vitest'
 import { phoneTime } from './phone'
 

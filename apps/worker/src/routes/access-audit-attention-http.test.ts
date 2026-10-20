@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { Miniflare } from 'miniflare';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 const accountAccess = vi.hoisted(() => ({
   getVisibleLineAccountScope: vi.fn(async () => ({

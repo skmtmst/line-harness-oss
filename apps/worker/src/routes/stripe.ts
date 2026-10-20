@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import {
   getStripeEvents,
@@ -5,7 +6,7 @@ import {
   createStripeEvent,
   addTagToFriend,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { applyActionScoreEvent } from '../services/action-score-events.js';
 import { listLimit } from './list-pagination.js';
@@ -53,7 +54,7 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
       })),
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_stripe_failed","route":"GET /api/integrations/stripe/events"}));
+    logger.error("routes_stripe_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -64,7 +65,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
   try {
     const stripeSecret = c.env.STRIPE_WEBHOOK_SECRET?.trim();
     if (!stripeSecret) {
-      console.error('[stripe-webhook] STRIPE_WEBHOOK_SECRET is not configured');
+      logger.error("stripe_webhook_STRIPE_WEBHOOK_SECRET_is_not_configured");
       return c.json({ success: false, error: 'Stripe webhook is not configured' }, 503);
     }
 
@@ -151,7 +152,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
           occurredAt: event.processed_at,
         }).catch((error) => {
           // Stripeイベントは記録済み。派生スコアの失敗で再送を誘発しない。
-          console.error(JSON.stringify({"code":"routes_stripe_failed","route":"POST /api/integrations/stripe/webhook"}));
+          logger.error("routes_stripe_failed");
         });
       }
 
@@ -181,7 +182,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
       data: { id: event.id, stripeEventId: event.stripe_event_id, eventType: event.event_type, processedAt: event.processed_at },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_stripe_failed","route":"POST /api/integrations/stripe/webhook"}));
+    logger.error("routes_stripe_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

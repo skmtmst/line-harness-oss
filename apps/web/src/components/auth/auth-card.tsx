@@ -7,7 +7,7 @@ import authStyles from '@/components/templates/auth-page.module.css'
 import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
 
 /**
- * ログイン前の画面の入れ物。★V6 0-1／36-4／36-6 の「登録カード」（幅 520）。
+ * ログイン前の画面の入れ物。★管理画面 0-1／36-4／36-6 の「登録カード」（幅 520）。
  *
  * 地は `$canvas-parchment`（= `bg-shell` #f5f5f7）で、白いカード（角丸 18 = `rounded-large`）を真ん中に置く。
  * ロゴ「m musubo」→ 見出し → 説明 → 中身。フッターに規約などのリンク。

@@ -1,4 +1,5 @@
 import {customerPalette,resolveCustomerLook,normalizeFormTheme,formThemeButtonText,type FormTheme} from '@line-crm/shared';
+
 const FONT_STACKS={mincho:'"Shippori Mincho", "Yu Mincho", serif',marugothic:'"Zen Maru Gothic", sans-serif',sans:'"Inter", "Noto Sans JP", sans-serif',default:'inherit'};
 /** 配備用の入口で、旧HTML画面もReact画面も同じ店の設定を読む。 */
 export function applyCustomerLook(raw: unknown) {

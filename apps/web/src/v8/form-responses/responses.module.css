@@ -1,5 +1,5 @@
 /*
- * ★V8 集まった回答（v0SbYR・MKQyJ）。頭とタブは型（DetailPage）が持つ。
+ * ★V8 集まった回答（・）。頭とタブは型（DetailPage）が持つ。
  * ここは左の本文（カード：枠1・角12・余白20）と右の列（線の右・カード余白16）だけ。
  */
 .backLink {
@@ -174,7 +174,7 @@
   gap: var(--tpl-toolbar-gap);
   min-width: 0;
 }
-/* 題の行に「…」を並べるので、行の高さは「…」に合わせて詰めない（MKQyJ）。 */
+/* 題の行に「…」を並べるので、行の高さは「…」に合わせて詰めない。 */
 .railHead > :last-child:not(:first-child) { flex: none; margin-block: -6px; }
 .railTitle {
   min-width: 0;
@@ -248,7 +248,7 @@
   gap: var(--tpl-toolbar-gap);
   margin-top: var(--tpl-wh-ops-gap);
 }
-/* 絵 MKQyJ：2つを同じ幅の候補で並べ、文字より狭くはしない（等分の列に押し込むとボタン同士が重なった）。 */
+/* 絵 ：2つを同じ幅の候補で並べ、文字より狭くはしない（等分の列に押し込むとボタン同士が重なった）。 */
 .railButtons > * {
   flex: 1 1 0;
   min-width: max-content;
@@ -282,7 +282,7 @@
 .colAnswer { width: var(--tpl-ev-fr-col-answer); }
 .colActions { width: var(--tpl-ev-fr-col-actions); }
 
-/* 絵 v0SbYR：ご意見の段の「1件ずつ見る」は下の右端。 */
+/* 絵 ：ご意見の段の「1件ずつ見る」は下の右端。 */
 .cardFootEnd { display: flex; justify-content: flex-end; }
 
 .periodChips { display: flex; flex-wrap: wrap; gap: var(--space-8); }

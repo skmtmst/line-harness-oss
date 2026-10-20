@@ -131,7 +131,7 @@ async function render() {
   await act(async () => { root.render(<AnalyticsPage />) })
 }
 
-/** 定期レポートの行の「…」を開き、中の項目を返す（行の右端は「…」1つ・B-253）。 */
+/** 定期レポートの行の「…」を開き、中の項目を返す（行の右端は「…」1つ・）。 */
 async function scheduleMenuItem(label: string): Promise<HTMLElement> {
   const trigger = Array.from(host.querySelectorAll('button')).find((item) => item.getAttribute('aria-label')?.startsWith('定期レポート「'))
   if (!trigger) throw new Error('定期レポートの「…」が見つからない')

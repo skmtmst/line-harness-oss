@@ -5,9 +5,6 @@ import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PART = readFileSync(join(HERE, '../../v8/webinar-edit/notifications.tsx'), 'utf8')
-const EDIT = readFileSync(join(HERE, '..', '..', 'app', 'webinars', 'edit', 'page.tsx'), 'utf8')
-const SCREEN = PART
-const STEPS = readFileSync(join(HERE, '..', '..', 'v8', 'webinar-edit', 'helpers.ts'), 'utf8')
 
 /**
  * ウェビナーの通知・リマインド（設計 `Ho8z4` 10-1-D）。
@@ -90,17 +87,4 @@ describe('読めなかったとき', () => {
   })
 })
 
-describe('編集画面の STEP 4', () => {
-  it('段の中身が「まだ繋がっていません」から実物へ変わった', () => {
-    /* 段は畳まず隠すので、未保存の印と保存操作を親の固定バーへ渡す口がある。 */
-    expect(EDIT).toContain("keep('notifications', <NotificationsPane ctx={ctx}")
-    expect(EDIT).toContain('onDirtyChange={dirtyReporterFor')
-    expect(EDIT).toContain('registerSave={saveRegistrarFor')
-    /* 取得は子の編集タブに一本化し、親は報告を受ける。同じ口を2回叩かない。 */
-    expect(SCREEN).toContain('const load = useCallback(async () =>')
-    expect(SCREEN).toContain('webinarApi.notifications(webinarId)')
-    expect(SCREEN).toContain('onDirtyChange')
-    expect(SCREEN).toContain('registerSave')
-    expect(STEPS, '未接続の印が残っている').not.toContain("notConnected: '通知・リマインドの設定'")
-  })
-})
+// STEP 4の取得/段移動/未保存/親の保存は v8/webinar-edit/edit.test.tsx の実操作へ移した。

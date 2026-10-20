@@ -1,3 +1,5 @@
+> 文書：10 ウェビナー 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 10 ウェビナー 操作と挙動（受け入れ）
 
 要件の正本：[10 ウェビナー](../../v6-requirements/v6-10-webinar-requirements-draft.md)（§18 の確定条件を含む）・[共通基盤 §4・§6-2・§9・§11](../../v6-requirements/v6-shared-platform-requirements.md)・[索引 §5 横断契約](../../v6-requirements/v6-requirements-master-index.md)。オーナーの決定は `~/lh-work/design/v8/V8-INTRO-CHECKLIST.md` の B-158・B-160（状態の言葉）・B-232（行の「…」）・B-129（CTA の押したとき）。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
@@ -82,9 +84,9 @@
 
 ## 要件と今の作りの食い違い
 
-1. 公開期間が終わったあとの見直し（見逃し配信）に期限も「する／しない」の確かめも無い。申込済みの本人は専用リンクで何日でも見られる。要件 §7・§18-2 は「する」を選んだ時だけ期限つき。期限を確かめる関数はあるが、どこからも呼ばれていない。確かめ方：`apps/worker/src/routes/webinars.ts:222-233`・`:297-305`（「入場リンク自体に期限を持たせない」）、`packages/db/src/webinars.ts:2224`（`isWebinarMissedInWindow` は呼び出し 0 件）。
-2. 位置を飛ばしただけで「視聴完了」になる。心拍の状態が「位置の移動中」だと位置をそのまま受け、受けた位置が動画の 90% 以上なら完了の通知・成果の記録・行うことを動かす。要件 §6 は「実際に見た時間の合計で 90%」。確かめ方：`packages/db/src/webinars.ts:836`（seeking は moved で返す）、`apps/worker/src/routes/webinars.ts:556`。
-3. 基本設定の保存（名前・URL・動画・開催回・公開期間・CTA の旧欄）は、版の番号を確かめず、公開中でもその場で書き換える。要件 §5・§9（公開中の版は編集しない・`expected_version` で 409）と違う。確かめ方：`apps/worker/src/routes/webinars.ts:2011-2050`（`expectedVersion` を受けるが比べない。コメント「公開中のまま他項目を直す保存は通す」）、`packages/db/src/webinars.ts` の `updateWebinar`。
+1. 公開期間が終わったあとの見直し（見逃し配信）に期限も「する／しない」の確かめも無い。申込済みの本人は専用リンクで何日でも見られる。要件 §7・§18-2 は「する」を選んだ時だけ期限つき。期限を確かめる関数はあるが、どこからも呼ばれていない。確かめ方：`apps/worker/src/routes/webinars.ts:222-233`・`:297-305`（「入場リンク自体に期限を持たせない」）、`packages/db/src/webinars/index.ts:2224`（`isWebinarMissedInWindow` は呼び出し 0 件）。
+2. 位置を飛ばしただけで「視聴完了」になる。心拍の状態が「位置の移動中」だと位置をそのまま受け、受けた位置が動画の 90% 以上なら完了の通知・成果の記録・行うことを動かす。要件 §6 は「実際に見た時間の合計で 90%」。確かめ方：`packages/db/src/webinars/index.ts:836`（seeking は moved で返す）、`apps/worker/src/routes/webinars.ts:556`。
+3. 基本設定の保存（名前・URL・動画・開催回・公開期間・CTA の旧欄）は、版の番号を確かめず、公開中でもその場で書き換える。要件 §5・§9（公開中の版は編集しない・`expected_version` で 409）と違う。確かめ方：`apps/worker/src/routes/webinars.ts:2011-2050`（`expectedVersion` を受けるが比べない。コメント「公開中のまま他項目を直す保存は通す」）、`packages/db/src/webinars/index.ts` の `updateWebinar`。
 4. 公開・止める・アーカイブ・複製が「ウェビナーの編集」の権限と同じ鍵。編集の権限を持つスタッフが公開できる。要件 §10 の重要操作の鍵（`webinar.definition.publish` など 6 つ）はコードに無い。確かめ方：`apps/worker/src/routes/webinars.ts:1650`・`:1820`・`:2102`（`requireDeliveryAccess('webinars')`）、`packages/shared/src/staff-permissions.ts:79`。
 5. 参加者の CSV はその場で最大 1 万行を返す。要件 §11 は「非同期で作る・期限つきの URL・項目を伏せる」。また書き出しの鍵が「管理者」固定なので、スタッフに個別に許す（要件 §10「個別権限」）ことができない。確かめ方：`apps/worker/src/routes/webinars.ts:2502`、`packages/shared/src/staff-permissions.ts:79`（`export: 'administrator'`）。
 6. 状態の言葉が古い。一覧の札は「公開中・公開予定・非公開」、絞り込みは「公開中」。要件 §13（B-158・B-160）は「下書き・予定・開催中・終了・アーカイブ」で、旧「公開予定・公開中」は使わない。確かめ方：`apps/web/src/v8/webinars/helpers.ts:78-86`、`apps/web/src/v8/webinars/list.tsx:770`・`:791`。

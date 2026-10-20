@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 const NEW_PAGE = readUiSource(new URL('./new/page.tsx', import.meta.url), 'utf8')
 const LIST_PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-/* 詳細・編集の窓は v7/V8 共用の `_components/conversion-dialogs.tsx` にある。 */
+/* 詳細・編集の窓は 管理画面 共用の `_components/conversion-dialogs.tsx` にある。 */
 const DIALOGS = readFileSync(new URL('../../v8/conversions/dialogs.tsx', import.meta.url), 'utf8')
 
 /**

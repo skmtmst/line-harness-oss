@@ -1,10 +1,10 @@
 'use client'
 
 /*
- * ★V8 外部連携「見本」タブ（Pencil `SAUCs`）。
+ * ★V8 外部連携「見本」タブ（Pencil ）。
  *
  * 受け取る見本5つ（どこから来るか）と送る見本4つ（いつ・何を送るか）を
- * カードで並べ、「この見本で作る」で作る画面へ進む。見本データは v7 と同じ。
+ * カードで並べ、「この見本で作る」で作る画面へ進む。見本データは 管理画面 と同じ。
  * 見本からの作成は統括だけ（R32）。閲覧のみの人には押せないボタンを置かない。
  */
 import { CalendarDays, ClipboardList, CreditCard, LayoutTemplate, MessageCircle, ShoppingCart } from 'lucide-react'

@@ -7,12 +7,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import Avatar, { avatarInitials, avatarToneIndex } from './avatar'
 // @vitest-environment happy-dom
 /*
- * 友だちの顔（★V7 `KXDhj`）。画像が読み込めない時も空白にしない。
+ * 友だちの顔（★管理画面 `KXDhj`）。画像が読み込めない時も空白にしない。
  */
 
 afterEach(() => cleanup())
 
-describe('友だちの顔（★V7）', () => {
+describe("友だちの顔", () => {
   it('画像の読み込みに失敗したら頭文字に替わる', () => {
     const { container } = render(<Avatar name="Kyohei Yamamoto" src="https://example.invalid/a.jpg" />)
     const root = container.firstElementChild as HTMLElement

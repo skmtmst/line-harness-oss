@@ -45,7 +45,7 @@ import { EntityPickerField } from '@/components/shared/entity-picker'
 import EntityRemoteField, { type RemoteEntityKind } from '@/components/shared/entity-remote-field'
 
 /*
- * ★V8 ウェビナーの ④通知（Pencil E7iAYs）。
+ * ★V8 ウェビナーの ④通知（Pencil ）。
  * 通知とリマインド（送った数・6つの通知の入／切と時刻）→ 視聴後にすること（3つの場合・本文・取れないとき）。
  * 右は LINE での見え方（選んだ通知の本文）。
  * 口・保存の順（通知の設定 → 版のある設定）・テスト送信は BEHAVIOR.md。
@@ -105,21 +105,23 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   const [overview, setOverview] = useState<WebinarNotificationOverview | null>(null)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const generation = useRef(0)
-  const load = useCallback(async () => {
+  const load = useCallback(async (overviewOnly = false) => {
     const request = ++generation.current
-    setLoadState('loading')
+    if (!overviewOnly) setLoadState('loading')
     try {
       const res = await webinarApi.notifications(webinarId)
       if (!res.data || typeof res.data !== 'object') throw new Error('shape')
       if (request !== generation.current) return
-      setSettings(res.data.settings)
-      setBaseline(res.data.settings)
+      if (!overviewOnly) {
+        setSettings(res.data.settings)
+        setBaseline(res.data.settings)
+        setLoadState('ready')
+      }
       setOverview(res.data.overview ?? null)
-      setLoadState('ready')
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure);
 
-      if (request === generation.current) { if (!fieldFailure) setLoadState('error')
+      if (request === generation.current) { if (overviewOnly) setOverview(null); else if (!fieldFailure) setLoadState('error')
     }
   }
   }, [webinarId, saveErrors])
@@ -166,7 +168,11 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   }, [editor.actionPolicy?.templateBody, editor.actionPolicy?.missingResultPolicy])
 
   const actionsDirty = actions !== null && actionsBase !== null && JSON.stringify(actions) !== JSON.stringify(actionsBase)
-  const dirty = notificationDirty || policyDirty || actionsDirty
+  const [editorRefreshPending, setEditorRefreshPending] = useState(false)
+  const refreshPending = useRef(false)
+  const editorVersion = useRef(editor.version)
+  useEffect(() => { editorVersion.current = editor.version }, [editor.version])
+  const dirty = notificationDirty || policyDirty || actionsDirty || editorRefreshPending
   useEffect(() => { onDirtyChange(dirty) }, [dirty, onDirtyChange])
   useEffect(() => () => onDirtyChange(false), [onDirtyChange])
 
@@ -179,7 +185,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
     setSaving(true)
     setError('')
     try {
-      let version = editor.version
+      let version = editorVersion.current
       if (notificationDirty && settings) {
         const input: WebinarNotificationSettingsInput = {
           registrationEnabled: settings.registrationEnabled,
@@ -197,6 +203,8 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           const res = await webinarApi.saveNotifications(webinarId, input)
           setSettings(res.data.settings)
           setBaseline(res.data.settings)
+          refreshPending.current = true
+          setEditorRefreshPending(true)
           notifySaved(`保存しました。${res.data.queued}件を予定に入れ、${res.data.cancelled}件を取り消しました。`)
         } catch (saveFailure) {
           const fieldFailure = saveErrors.capture(saveFailure)
@@ -206,15 +214,21 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           setError('通知の設定を保存できませんでした。入力を残しました。もう一度お試しください。') }
           return false
         }
-        void load();
-
+        // 件数は読み直す。保存後に入力した内容や保存済みの基準は上書きしない。
+        void load(true)
+      }
+      if (refreshPending.current) {
         const refreshed = await webinarApi.editor(webinarId)
         version = refreshed.data.version
+        editorVersion.current = version
         ctx.onEditorChange(refreshed.data)
+        refreshPending.current = false
+        setEditorRefreshPending(false)
       }
       if (policyDirty) {
         const res = await webinarApi.saveEditor(webinarId, { expectedVersion: version, actionTemplateBody: templateBody, missingResultPolicy: policy })
         setPolicyBase({ templateBody, policy })
+        editorVersion.current = res.data.version
         ctx.onEditorChange(res.data)
       }
       if (actionsDirty && actions) {
@@ -247,8 +261,23 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
   const [testing, setTesting] = useState(false)
   const testLock = useRef(false)
   const [testResult, setTestResult] = useState('')
+  const [testRefreshError, setTestRefreshError] = useState(false)
+  const refreshTestResult = async () => {
+    try {
+      const refreshed = await webinarApi.editor(webinarId)
+      ctx.onEditorChange(refreshed.data)
+      setTestRefreshError(false)
+    } catch { setTestRefreshError(true) }
+  }
+  const retryTestResult = async () => {
+    if (testLock.current || readOnly) return
+    testLock.current = true
+    setTesting(true)
+    try { await refreshTestResult() }
+    finally { testLock.current = false; setTesting(false) }
+  }
   const runTest = async () => {
-    if (testLock.current) return
+    if (testLock.current || testRefreshError || readOnly || !settings) return
     testLock.current = true
     setTesting(true)
     setTestResult('')
@@ -257,8 +286,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       setTestOpen(false)
       const res = await webinarApi.testNotifications(webinarId)
       setTestResult(`テスト送信しました。成功 ${res.data.sent} 件・失敗 ${res.data.failed} 件`)
-      const refreshed = await webinarApi.editor(webinarId)
-      ctx.onEditorChange(refreshed.data)
+      await refreshTestResult()
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)
 
@@ -329,7 +357,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         </ul>
       ) : null}
       {readOnly ? null : (
-        <div><Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone} title={testDone ? 'テスト済みです' : undefined}  busy={testing} busyLabel="送信中…"><Send size={15} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
+        <div><Button onClick={() => setTestOpen(true)} disabled={testRefreshError || testing || saving || testDone} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : undefined}  busy={testing} busyLabel="送信中…"><Send size={15} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
       )}
     </>
   }
@@ -352,7 +380,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
             : <p className={styles.previewEmpty}>{`「${previewRow?.label ?? '通知'}」の本文はまだありません。送るときに決まった文面を使います。`}</p>}
         </LinePreview>
         <div className={form.previewActions}>
-          {readOnly ? null : <Button onClick={() => setTestOpen(true)} disabled={testing || saving || testDone || !settings} title={testDone ? 'テスト済みです' : saving ? '保存しています' : !settings ? '通知の設定を読み込んでください' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</Button>}
+          {readOnly ? null : <Button onClick={() => setTestOpen(true)} disabled={testRefreshError || testing || saving || testDone || !settings} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : saving ? '保存しています' : !settings ? '通知の設定を読み込んでください' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</Button>}
           {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
@@ -405,6 +433,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
           </div></div>
       </Card>
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {testRefreshError ? <Notice tone="info" action={readOnly ? undefined : <Button onClick={() => void retryTestResult()} disabled={testing} busy={testing}>送信結果を読み直す</Button>}>テスト送信の結果は受け取りましたが、確認状態を読み込めませんでした。再送せずに結果を読み直してください。</Notice> : null}
       {testResult ? <p role="status" className={form.previewNote}>{testResult}</p> : null}
 
       <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} onConfirm={() => void runTest()}>

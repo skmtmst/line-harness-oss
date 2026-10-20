@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 const auth = vi.hoisted(() => ({ verifyCallerLineUserId: vi.fn<() => Promise<string | null>>() }));
 vi.mock('../services/liff-auth.js', () => auth);

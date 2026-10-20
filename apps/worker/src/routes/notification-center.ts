@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -6,7 +7,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
@@ -79,7 +80,7 @@ notificationCenter.get('/api/notifications/center', async (c) => {
       },
     });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notification_center_failed","route":"GET /api/notifications/center"}));
+    logger.error("routes_notification_center_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -103,7 +104,7 @@ notificationCenter.post(
     });
     return c.json({ success: true, data: { updated } });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notification_center_failed","route":"POST /api/notifications/center/read-all"}));
+    logger.error("routes_notification_center_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
   },
@@ -127,7 +128,7 @@ notificationCenter.post(
     if (!updated) return c.json({ success: false, error: '通知が見つかりません' }, 404);
     return c.json({ success: true, data: null });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_notification_center_failed","route":"POST /api/notifications/center/:id/read"}));
+    logger.error("routes_notification_center_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
   },

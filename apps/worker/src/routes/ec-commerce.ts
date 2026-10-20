@@ -1,15 +1,17 @@
+import { jstDate } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import { classifyEcErrorCode, encryptCredential, getLineAccountById, jstDateString, jstNow, nextDateString } from '@line-crm/db';
 import { EC_EVENT_TYPES, ecEventLabel, addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { requireEcPermission } from './ec-operations.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
-import type { EcEvent } from './ec-integrations.js';
-import { ecFlexMessage } from '../services/ec-notification-message.js';
+import type { EcEvent } from '../features/ec-commerce/member-snapshot/index.js';
+import { ecFlexMessage } from '../features/ec-commerce/ec-notification-message/index.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { auditLog } from '../lib/audit-log.js';
 import { notificationDeliveriesResponse } from './line-notifications.js';
@@ -66,7 +68,7 @@ export type SubscriptionState = 'active' | 'paused' | 'at_risk' | 'cancelled';
  *
  * 判定語はすべて小文字・記号なしにすること。SQL 側は `lower(...) LIKE '%語%'`
  * へ展開するので、`%` や `_` を含む語を足すと LIKE のワイルドカードとして
- * 解釈される。日本語は `lower()` で変わらないのでそのまま比べられる。
+ * 解釈される。日本語は `lower` で変わらないのでそのまま比べられる。
  */
 export const SUBSCRIPTION_STATE_RULES: ReadonlyArray<{
   readonly state: SubscriptionState;
@@ -91,8 +93,8 @@ export function subscriptionState(value: unknown): SubscriptionState {
 /**
  * 上の表から SQL の `CASE` を組み立てる。`expr` は状態の文字列を返す SQL 式。
  *
- * `LIKE` は SQLite では ASCII の大小を区別しないが、JS 側が `toLowerCase()`
- * してから比べているので、ここでも `lower()` を掛けて条件を揃える。
+ * `LIKE` は SQLite では ASCII の大小を区別しないが、JS 側が `toLowerCase`
+ * してから比べているので、ここでも `lower` を掛けて条件を揃える。
  */
 export function subscriptionStateSql(expr: string): string {
   const whens = SUBSCRIPTION_STATE_RULES.map((rule) => {
@@ -533,16 +535,16 @@ const SUBSCRIPTIONS_NON_PAGINATED_MAX = 100;
 const SUBSCRIPTION_STATUS_EXPR = `coalesce(nullif(json_extract(c.value, '$.status_code'), ''), nullif(json_extract(c.value, '$.status'), ''), '')`;
 
 /**
- * `monthKey()` と同じ月キーを SQL で作る。`2026-9-01` のような1桁月も
+ * `monthKey` と同じ月キーを SQL で作る。`2026-9-01` のような1桁月も
  * `2026-09` に揃える。文字列でない値は NULL(集計から外れる)。
  */
 function monthKeySql(expr: string): string {
   return `CASE
     WHEN json_type(${expr}) != 'text' THEN NULL
-    WHEN json_extract(${expr}, '$') GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]*'
-      THEN substr(json_extract(${expr}, '$'), 1, 7)
-    WHEN json_extract(${expr}, '$') GLOB '[0-9][0-9][0-9][0-9]-[0-9]*'
-      THEN substr(json_extract(${expr}, '$'), 1, 5) || '0' || substr(json_extract(${expr}, '$'), 6, 1)
+    WHEN json_extract(${expr}) GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]*'
+      THEN substr(json_extract(${expr}), 1, 7)
+    WHEN json_extract(${expr}) GLOB '[0-9][0-9][0-9][0-9]-[0-9]*'
+      THEN substr(json_extract(${expr}), 1, 5) || '0' || substr(json_extract(${expr}), 6, 1)
     ELSE NULL END`;
 }
 
@@ -589,6 +591,7 @@ ecCommerce.get(
    * `try/catch` と `Array.isArray` で守っていたので、SQL へ移すとその守りが
    * 消える。弾いた行の数は下で別に数えて、応答と記録に残す。
    */
+  const currentMonth = jstDate().slice(0, 7);
   const contractsCte = `
     WITH contracts AS (
       SELECT s.friend_id AS friend_id,
@@ -650,7 +653,7 @@ ecCommerce.get(
     ).bind(lineAccountId).all<{ month: string; count: number; amount: number }>(),
     c.env.DB.prepare(
       `${contractsCte} SELECT COUNT(*) AS count FROM contracts WHERE cancelled_month = ?`,
-    ).bind(lineAccountId, new Date().toISOString().slice(0, 7)).first<{ count: number }>(),
+    ).bind(lineAccountId, currentMonth).first<{ count: number }>(),
     c.env.DB.prepare(
       `${contractsCte}
        SELECT cancellation_reason AS reason, COUNT(*) AS count FROM contracts
@@ -674,7 +677,7 @@ ecCommerce.get(
   const malformedSnapshots = Number(malformedRow?.count ?? 0);
   if (malformedSnapshots > 0) {
     // 運用者が「なぜ数が合わないのか」を後から追えるようにする。
-    console.warn(JSON.stringify({"code":"ec_subscriptions_malformed_snapshots_skipped","route":"GET /api/ec-commerce/subscriptions"}));
+    logger.warn("ec_subscriptions_malformed_snapshots_skipped");
   }
 
   const items = rows.results.map((row) => {
@@ -735,7 +738,7 @@ ecCommerce.get(
         // 元の実装と同じく、**全件に金額があるときだけ**合計を出す。
         monthlyAmount: total > 0 && withAmount === total ? Number(amountRow?.sum_amount ?? 0) : null,
         startedThisMonth: Number(
-          monthRows.results.find((row) => row.month === new Date().toISOString().slice(0, 7))?.count ?? 0,
+          monthRows.results.find((row) => row.month === currentMonth)?.count ?? 0,
         ),
         cancelledThisMonth: Number(cancelRow?.count ?? 0),
         cancellationTopReason: reasonRow?.reason ?? null,
@@ -944,7 +947,7 @@ ecCommerce.put('/api/ec-commerce/connector', requireRole('owner', 'admin'), inpu
   return c.json({ success: true, data: { version: nextVersion } });
 });
 
-/** V6の共通送信台帳を、既存画面の互換URLでも返す。 */
+/** の共通送信台帳を、既存画面の互換URLでも返す。 */
 ecCommerce.get(
   '/api/ec-commerce/notification-runs',
   requireRole('owner', 'admin', 'staff'),

@@ -5,7 +5,7 @@ import { ValueBarChart } from '@/components/shared/charts'
 import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 
 /*
- * ★V8 分析「成果地点ごとのレポート」（Pencil `AzrZq`・`/analytics?view=conversion-report`）。
+ * ★V8 分析「成果地点ごとのレポート」（Pencil ・`/analytics?view=conversion-report`）。
  * 経路と成果の数の帯・道具の段（RoutesFrame）の下に、日ごとの成果の棒と成果地点ごとの表。
  * 行の「…」から 成果地点を開く・日ごとの表を見る（棒をその地点だけにする）。
  * 呼ぶ口（成果レポート・CSV）は今の画面（成果地点の既存API）と同じ。

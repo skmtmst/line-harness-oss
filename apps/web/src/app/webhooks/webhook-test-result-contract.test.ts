@@ -10,7 +10,7 @@ const OVERVIEWS = ['outgoing', 'incoming'].map(name => readUiSource(join(import.
 /**
  * #506「中」W1 の契約(試し送信の結果表示)。
  *
- * 以前は `api.webhooks.outgoing.test()` の戻り値を読まず、成功も失敗も
+ * 以前は `api.webhooks.outgoing.test` の戻り値を読まず、成功も失敗も
  * 画面に何も出なかった。成功は届いた旨、失敗は「やり取りの記録」タブへの
  * 案内を共通 Notice で出す。
  */
@@ -28,7 +28,7 @@ describe('試し送信の結果表示(#506 中 W1)', () => {
 
   it('結果は共通の知らせで出し、閉じられる', () => {
     // うまくいった知らせは Toast（右下・4秒）へ。できなかった知らせは
-    // 共通 Notice の危険の帯に残し、閉じられる（★V7 共通部品その2 §1・§2）。
+    // 共通 Notice の危険の帯に残し、閉じられる（★管理画面 共通部品その2 §1・§2）。
     expect(OVERVIEWS).toContain("import Notice from '@/components/shared/notice'")
     expect(OVERVIEWS).toContain("import { notifyToast } from '@/components/shared/toast'")
     expect(OVERVIEWS).toContain('notifyToast(`「${item.name}」への試し送信が届きました')

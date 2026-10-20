@@ -5,9 +5,9 @@ import { PageExplanationBody, PageExplanationProvider, PageExplanationToggle } f
 
 /*
  * ★V8 友だちの段の頭。
- * - FriendsTabs：タブの並び（x6QsVz の「タブの段」・下に細い線）
+ * - FriendsTabs：タブの並び（ の「タブの段」・下に細い線）
  * - FriendsSectionHead：管理の画面（重複検出・統合ユーザー・UID移行・CSV）の頭
- *   （ADjK8・hn6Y8・T9gblG・L48eY の「板の頭」：題／説明／タブ／タブの説明。
+ *   （・・・ の「板の頭」：題／説明／タブ／タブの説明。
  *   板の頭の「← 友だちへ」は 2026-10-08 に無くした。戻るのは上の帯のパンくず）
  */
 import Link from '@/components/shared/list-navigation'

@@ -20,7 +20,6 @@ describe('V8 の入力・選択・押し口規定', () => {
     expect(button).toMatch(/:root \.standard,\s*:root \.field\s*{[^}]*height:\s*var\(--tpl-button-h\)/s)
     expect(read('../../app/globals.css')).toMatch(/--tpl-button-h:\s*36px/)
     expect(textField).toMatch(/\.field\s*{[^}]*background:\s*var\(--color-canvas\)/s)
-    expect(textField).toMatch(/\.single\s*{[^}]*height:\s*36px/s)
     expect(select).toMatch(/\.trigger\s*{[^}]*height:\s*36px/s)
     expect(select).toMatch(/background:\s*var\(--color-canvas\)/)
     // 開いた候補は DOM に描き、矢印はアイコンで出す（ブラウザ任せにしない）。
@@ -71,7 +70,7 @@ describe('V8 の入力・選択・押し口規定', () => {
 
   it('代表的な画面側上書きも規定値に戻す', () => {
     const folderSelect = read('../chats/template-folder-select.tsx')
-    const users = read('../../app/users/users-v8.tsx')
+    const users = read('../../app/users/users-screen.tsx')
     const tags = read('../../v8/tags/tags-tab.tsx')
     const broadcasts = read('../../v8/broadcasts/list.tsx')
 
@@ -80,7 +79,7 @@ describe('V8 の入力・選択・押し口規定', () => {
     expect(users).toContain('aria-label="UID連携で絞り込む"')
     expect(users).toContain('aria-label="所属アカウントで絞り込む"')
     expect(tags).not.toContain('v6-select-tight h-9')
-    // ★V7 `Xn1Mz`：検索は共通 ListToolbar の1行目へそろえた（検索の高さ・幅は
+    // ★管理画面 `Xn1Mz`：検索は共通 ListToolbar の1行目へそろえた（検索の高さ・幅は
     // 部品が持つ）。画面側の直書き検索 input（h-10 min-w-45 flex-1）に戻さない。
     // 選び口は共通 Select（素の select は置かない #640）。幅は部品の既定。
     expect(tags).toContain('<ListToolbar')

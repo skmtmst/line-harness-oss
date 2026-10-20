@@ -1,4 +1,4 @@
-import type { CommonVar } from './common-vars.js';
+import type { CommonVar } from './common-vars/record-types/index.js';
 
 /**
  * 共通情報の監査付きCSV出力（N-192）。

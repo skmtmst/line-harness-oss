@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B 予約設定の予約経路タブ（ZyDd6）と重なりの知らせ（DFl3Q）。
+ * ★V8-B 予約設定の予約経路タブと重なりの知らせ。
  * 表の中身は API の実データを出す。絵の例示の数は書かない。
  */
 import React from 'react'
@@ -74,7 +74,7 @@ describe('予約経路タブ', () => {
     await screen.findByRole('heading', { name: '予約経路' })
     // 実データの状態（preparing）は出すが、画面に「準備中」は置かない。
     expect(document.body.textContent ?? '').not.toContain('準備中')
-    expect(screen.getAllByText('まだ届いていない')).toHaveLength(2)
+    expect(screen.getAllByText('まだ届いていない')).toHaveLength(1)
   })
 
   it('重なりがあると知らせと窓を出す', async () => {

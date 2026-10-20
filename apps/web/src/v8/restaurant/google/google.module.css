@@ -1,5 +1,5 @@
 /*
- * ★V8 Googleビジネス（j0Wcg・x9HIR・Cfed0・T1j2Sw・SrmVs・JUTGz・CuHXG）。
+ * ★V8 Googleビジネス（・・・・・・）。
  * 値は globals.css の `[data-theme="v8"]` の `--tpl-rt-*`。
  */
 
@@ -43,31 +43,6 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
   line-height: normal;
-}
-
-/* 道具の段：間8・中央そろえ。 */
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-rt-chip-row-gap);
-  min-width: 0;
-}
-
-.toolbarText {
-  flex: 1 1 0;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: normal;
-  white-space: nowrap;
-}
-
-.search {
-  flex: 0 0 var(--tpl-rt-search-w);
-  min-width: 0;
 }
 
 /* 白い箱：余白16・段の間12・角12。 */
@@ -135,7 +110,7 @@
   line-height: var(--tpl-rt-rich-body-lh);
 }
 
-/* 口コミの一覧の下の注（j0Wcg）：上下10・左右14。 */
+/* 口コミの一覧の下の注：上下10・左右14。 */
 .footNote {
   margin: 0;
   padding: var(--tpl-rt-notice-pad);
@@ -202,7 +177,7 @@
   font-size: var(--text-caption);
 }
 
-/* 返信を作る（x9HIR）：左は残り・右は340、間16。 */
+/* 返信を作る：左は残り・右は340、間16。 */
 .split {
   display: flex;
   align-items: flex-start;
@@ -293,7 +268,7 @@
   white-space: pre-line;
 }
 
-/* 投稿の一覧（Cfed0）：行は上下8・間12、行の間に細い線。 */
+/* 投稿の一覧：行は上下8・間12、行の間に細い線。 */
 .postList {
   display: flex;
   flex-direction: column;
@@ -343,7 +318,7 @@
   flex: 0 0 auto;
 }
 
-/* 投稿を作る（T1j2Sw）。 */
+/* 投稿を作る。 */
 
 .fieldLabel {
   color: var(--color-ink);
@@ -372,7 +347,7 @@
   width: var(--tpl-slot-w-compact);
 }
 
-/* 絵 T1j2Sw：投稿の画像は本文の下に幅320（4:3）。 */
+/* 絵 ：投稿の画像は本文の下に幅320（4:3）。 */
 .postImageSlot {
   display: flex;
   flex-direction: column;
@@ -452,7 +427,7 @@
   gap: var(--tpl-rt-chip-row-gap);
 }
 
-/* パフォーマンス（SrmVs）：期間の切り替え（灰の地に選んだ所だけ白）。 */
+/* パフォーマンス：期間の切り替え（灰の地に選んだ所だけ白）。 */
 
 /* 数のマス：角なし（絵の「数のマス」）。単位は 13/20。 */
 
@@ -466,7 +441,7 @@
   fill: var(--color-accent);
 }
 
-/* プロフィール（JUTGz）。 */
+/* プロフィール。 */
 .todayHours {
   margin: 0;
   color: var(--color-ink);
@@ -537,7 +512,7 @@
   gap: var(--tpl-rt-chip-row-gap);
 }
 
-/* 絵 T1j2Sw：本文は横いっぱい、画像はその下に左寄せで置く。 */
+/* 絵 ：本文は横いっぱい、画像はその下に左寄せで置く。 */
 .postCompose { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; align-items: start; gap: var(--tpl-rt-half-gap); min-width: 0; }
 .postCompose > :first-child { justify-self: stretch; }
 /* 投稿の画像の右に「投稿の詳細」（ボタン・リンク先・公開方法）。広い幅だけ 2 列、狭い幅は縦に並べる。 */

@@ -2,9 +2,9 @@ import { afterEach,beforeEach,expect,test,vi } from 'vitest';
 import { emptyLayout } from '@line-crm/shared';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { runResearchAnswerAction } from './research-forms.js';
-import { processFriendFieldReminders } from './friend-field-reminders.js';
+import { processFriendFieldReminders } from '../features/friends/friend-field-reminders.js';
 import { runEventBookingAction } from './event-booking-action.js';
-import { applyFormLayoutEffects } from './form-layout-effects.js';
+import { applyFormLayoutEffects } from '../features/forms/form-layout-effects.js';
 vi.mock('./event-bus.js',()=>({fireEvent:vi.fn()}));
 let f:SqliteD1;
 beforeEach(()=>{

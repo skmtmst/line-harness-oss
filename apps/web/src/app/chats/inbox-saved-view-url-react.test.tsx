@@ -8,13 +8,13 @@ import ChatsPage from './page'
  * 受信箱の保存検索をURLへ残し、再読込・URL共有で復元する試験(N-021)。
  *
  * 本物のReact(react-dom/client)で本物の `ChatsPage` を mount し、
- * `useSearchParams()` が返すURLを試験側で書き換えて再レンダリングする。
+ * `useSearchParams` が返すURLを試験側で書き換えて再レンダリングする。
  * 差し替えるのは通信(fetch)・アカウント文脈・ルーティングだけで、
  * 画面本体・`api.ts` は実物を通す。
  *
  * URLの書き換えは「ブラウザのアドレス欄が変わる」の相当として、
  * router.push/replace の呼び出しを `nav` に記録し、試験が明示的に
- * `applyNavigation()` で `fixture.params` へ反映して再レンダリングする。
+ * `applyNavigation` で `fixture.params` へ反映して再レンダリングする。
  * unmount/remount は再読込の相当になる。
  */
 

@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs'
+import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PAGE = readFileSync(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
+const PAGE = readUiSource(join(HERE, '../../v8/templates/list.tsx'), 'utf8')
 
 /**
  * テンプレート一覧（設計 `W7LBc` 11-1）の、状態と押し口。
@@ -32,7 +32,7 @@ describe('テンプレート一覧の状態と押し口', () => {
   })
 
   it('取得失敗は読み直せる形で出す', () => {
-    // ★V7 `x63W5x`：古い個別ボタン（`action`）ではなく、共通の再読み込み口（`onRetry`）。
+    // ★管理画面 `x63W5x`：古い個別ボタン（`action`）ではなく、共通の再読み込み口（`onRetry`）。
     // ボタンの文言は共通部品（ListState）が持つ。ここでは口があることだけ見る。
     expect(PAGE).toContain('onClick={() => load()}')
     expect(PAGE).toContain("failure?.title ?? '見る権限がありません'")

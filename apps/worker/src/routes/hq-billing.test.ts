@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const stripe = vi.hoisted(() => ({
@@ -260,6 +260,66 @@ describe('課金 Webhook', () => {
     stripe.retrieveSubscription.mockResolvedValue({ id: 'sub_1', status: 'active', customer: 'cus_1', current_period_end: 1_760_000_000, items: { data: [{ price: { id: 'price_standard' } }] } });
   });
 
+  it('業務更新が止まった受信は未完了で残り、同じIDで再開する', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'past_due' });
+    const event = { id: 'evt_retry_atomic', type: 'invoice.paid', created: 200,
+      data: { object: { id: 'in_atomic', customer: 'cus_1', status: 'paid', amount_paid: 9800 } } };
+    testDb.raw.exec("CREATE TRIGGER fail_billing_update BEFORE UPDATE ON tenants BEGIN SELECT RAISE(ABORT, 'injected'); END");
+    expect((await webhook(event)).status).toBe(500);
+    expect(testDb.raw.prepare("SELECT id FROM billing_invoices WHERE id='in_atomic'").get()).toBeUndefined();
+    testDb.raw.exec('DROP TRIGGER fail_billing_update');
+    expect((await webhook(event)).status).toBe(200);
+    expect(tenantRow().plan_status).toBe('active');
+    expect(testDb.raw.prepare("SELECT amount_paid FROM billing_invoices WHERE id='in_atomic'").get()).toMatchObject({ amount_paid: 9800 });
+    expect((await (await webhook(event)).json<{data:{duplicate:boolean}}>()).data.duplicate).toBe(true);
+  });
+
+  it('完了印の保存失敗でも業務更新を巻き戻し、再通知で一度だけ保存する', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', plan_status: 'past_due' });
+    const event = { id: 'evt_commit_failure', type: 'invoice.paid', data: { object: { id: 'in_commit', customer: 'cus_1' } } };
+    testDb.raw.exec("CREATE TRIGGER fail_completed_event BEFORE UPDATE ON billing_events BEGIN SELECT RAISE(ABORT, 'injected'); END");
+    expect((await webhook(event)).status).toBe(500);
+    expect(tenantRow().plan_status).toBe('past_due');
+    expect(testDb.raw.prepare("SELECT id FROM billing_invoices WHERE id='in_commit'").get()).toBeUndefined();
+    testDb.raw.exec('DROP TRIGGER fail_completed_event');
+    const results = await Promise.all([webhook(event), webhook(event)]);
+    expect(results.map(r=>r.status)).toEqual([200,200]);
+    expect(testDb.raw.prepare("SELECT count(*) AS n FROM billing_events WHERE id='evt_commit_failure'").get()).toEqual({n:1});
+    expect(tenantRow().plan_status).toBe('active');
+  });
+
+  it('新契約の後に旧契約の取消が来ても契約と削除期限を変えない', async () => {
+    setTenant({ stripe_customer_id: 'cus_1', stripe_subscription_id: 'sub_new', plan_status: 'active' });
+    const before = testDb.raw.prepare('SELECT * FROM tenants WHERE id=?').get(DEFAULT_TENANT_ID);
+    expect((await webhook({ id:'evt_old_cancel', type:'customer.subscription.deleted', created:300,
+      data:{object:{id:'sub_old',customer:'cus_1',status:'canceled',items:{data:[]}}} })).status).toBe(200);
+    expect(testDb.raw.prepare('SELECT * FROM tenants WHERE id=?').get(DEFAULT_TENANT_ID)).toEqual(before);
+  });
+
+  it('同じ契約の古い更新と取消を新しい版に適用しない', async () => {
+    setTenant({ stripe_customer_id:'cus_1', stripe_subscription_id:'sub_1', plan_status:'active' });
+    stripe.retrieveSubscription.mockRejectedValue(new Error('offline'));
+    const object={id:'sub_1',customer:'cus_1',status:'active',items:{data:[{price:{id:'price_pro'}}]}};
+    expect((await webhook({id:'evt_newer',type:'customer.subscription.updated',created:300,data:{object}})).status).toBe(200);
+    expect((await webhook({id:'evt_older',type:'customer.subscription.deleted',created:200,data:{object}})).status).toBe(200);
+    expect(tenantRow()).toMatchObject({plan_status:'active',plan_key:'pro'});
+    expect((await webhook({id:'evt_canceled',type:'customer.subscription.deleted',created:400,data:{object}})).status).toBe(200);
+    expect((await webhook({id:'evt_late_active',type:'customer.subscription.updated',created:350,data:{object}})).status).toBe(200);
+    expect(tenantRow().plan_status).toBe('canceled');
+  });
+
+  it('古い契約作成通知で取消後の契約を復活させず、新しい再契約だけ受け入れる',async()=>{
+    setTenant({stripe_customer_id:'cus_1',stripe_subscription_id:'sub_1',plan_status:'active'});
+    const object={id:'sub_1',customer:'cus_1',status:'canceled',items:{data:[]}};
+    await webhook({id:'evt_terminal',type:'customer.subscription.deleted',created:500,data:{object}});
+    stripe.retrieveSubscription.mockRejectedValue(new Error('offline'));
+    await webhook({id:'evt_stale_creation',type:'customer.subscription.created',created:100,data:{object:{...object,id:'sub_older',status:'active'}}});
+    expect(tenantRow()).toMatchObject({plan_status:'canceled',stripe_subscription_id:'sub_1'});
+    await webhook({id:'evt_recontract',type:'customer.subscription.created',created:600,data:{object:{...object,id:'sub_new',status:'active'}}});
+    expect(tenantRow()).toMatchObject({plan_status:'active',stripe_subscription_id:'sub_new'});
+    expect(testDb.raw.prepare('SELECT retention_anchor_at FROM tenants WHERE id=?').get(DEFAULT_TENANT_ID)).toEqual({retention_anchor_at:null});
+  });
+
   it('署名が違えば 400、設定が無ければ 503', async () => {
     expect((await webhook(completed(), { secret: 'wrong' })).status).toBe(400);
     expect((await webhook(completed(), { env: { STRIPE_BILLING_WEBHOOK_SECRET: undefined } })).status).toBe(503);
@@ -413,7 +473,7 @@ describe('課金 Webhook', () => {
     expect(res.status).toBe(200);
     expect(await res.json<{ data: { matched: boolean } }>()).toMatchObject({ data: { matched: false } });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM billing_invoices').get()).toMatchObject({ n: 0 });
-    expect(info).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_info', route: 'POST /api/hq/billing/webhook' }));
+    expect(info.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'routes_hq_billing_info', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
   });
 
   it('invoiceが無くpayment_intentのみのEC-CUBE返金でも、Billing請求書のPaymentIntentならStripeに問い合わせて反映する', async () => {
@@ -435,6 +495,17 @@ describe('課金 Webhook', () => {
     expect(testDb.raw.prepare(`SELECT amount_refunded FROM billing_invoices WHERE id = 'in_pi_test'`).get()).toMatchObject({ amount_refunded: 4_000 });
   });
 
+  it('返金の請求書照合に失敗した通知を完了にせず、同じIDで再開する',async()=>{
+    setTenant({stripe_customer_id:'cus_1'});
+    testDb.raw.prepare("INSERT INTO billing_invoices(id,tenant_id,status,amount_paid,amount_due,amount_refunded,currency,synced_at,created_at) VALUES('in_lookup',?,'paid',4000,4000,0,'jpy','2026-10-01','2026-10-01')").run(DEFAULT_TENANT_ID);
+    const event={id:'evt_lookup_failure',type:'charge.refunded',data:{object:{id:'ch_lookup',customer:'cus_1',payment_intent:'pi_lookup',amount_refunded:4000}}};
+    stripe.retrievePaymentIntent.mockRejectedValueOnce(new Error('offline'));
+    expect((await webhook(event)).status).toBe(500);
+    stripe.retrievePaymentIntent.mockResolvedValueOnce({id:'pi_lookup',invoice:'in_lookup'});
+    expect((await webhook(event)).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT amount_refunded FROM billing_invoices WHERE id='in_lookup'").get()).toEqual({amount_refunded:4000});
+  });
+
   it('payment_intentがあっても請求書に紐付かなければ対象外として記録する（Stripe未設定時は問い合わせない）', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const res = await webhook({
@@ -445,7 +516,7 @@ describe('課金 Webhook', () => {
 
     expect(res.status).toBe(200);
     expect(stripe.retrievePaymentIntent).not.toHaveBeenCalled();
-    expect(info).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_info', route: 'POST /api/hq/billing/webhook' }));
+    expect(info.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'routes_hq_billing_info', timestamp: expect.any(String), level: 'info', requestId: null, invocationId: null, source: 'background' });
   });
 
   it('請求書IDがあっても更新対象がなければ警告する', async () => {
@@ -458,7 +529,7 @@ describe('課金 Webhook', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(warn).toHaveBeenCalledWith(JSON.stringify({ code: 'routes_hq_billing_warn', route: 'POST /api/hq/billing/webhook' }));
+    expect(warn.mock.calls.map(([raw]) => JSON.parse(String(raw)))).toContainEqual({ code: 'routes_hq_billing_warn', timestamp: expect.any(String), level: 'warn', requestId: null, invocationId: null, source: 'background' });
   });
 
   it('知らない顧客の請求書はイベントだけ記録し、請求書行は作らない', async () => {
@@ -537,7 +608,7 @@ describe('即時変更の日割り見積り', () => {
   });
 });
 
-type StoredBillingMetrics = NonNullable<Awaited<ReturnType<typeof import('../services/hq-billing-metrics.js').hqBillingMetrics>>>;
+type StoredBillingMetrics = NonNullable<Awaited<ReturnType<typeof import('../features/hq-billing/hq-billing-metrics.js').hqBillingMetrics>>>;
 describe('統括の請求の数の帯（保存済み請求のみ）',()=>{
   it('今月の額・未払いと組織単位の契約を、他組織と分けて返す',async()=>{
     vi.useFakeTimers();vi.setSystemTime(new Date('2026-09-30T15:00:00Z'));

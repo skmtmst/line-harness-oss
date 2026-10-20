@@ -16,7 +16,7 @@ import {
   getReminderDeliveryRunSummary,
   listReminderDeliveryRuns,
   retryReminderDeliveryRun,
-} from '../src/reminders.js'
+} from '../src/reminders/index.js'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 

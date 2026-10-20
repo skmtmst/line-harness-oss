@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { Hono } from 'hono';
 import {
   billingRevenueTotals,
@@ -15,14 +16,15 @@ import {
   knowledgeMetrics,
   type TenantPlanRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { requirePlatformAdmin } from '../middleware/platform-admin.js';
 import { BILLING_PLANS, findPlan, type PlanKey } from '../services/billing-plans.js';
 import { dbFor } from '../services/db-router.js';
 
 /**
- * 運営ダッシュボード（★V6 37-2 `Xvofy`）。
+ * 運営ダッシュボード（★37-2 `Xvofy`）。
  *
  * 売上は Stripe の入金済み請求書から数え、返金を差し引く。
  * Stripe 未設定または請求書がまだ無い環境だけ、契約中プランの定価へ戻す。
@@ -34,10 +36,8 @@ opsDashboard.use('/api/ops/dashboard', requirePlatformAdmin());
 
 export type DashboardPeriod = 'month' | 'prev_month' | 'year';
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
-
 function jstParts(at = Date.now()): { y: number; m: number; d: number } {
-  const t = new Date(at + JST_OFFSET_MS);
+  const t = japanCalendar(new Date(at));
   return { y: t.getUTCFullYear(), m: t.getUTCMonth(), d: t.getUTCDate() };
 }
 
@@ -49,7 +49,7 @@ export function jstMonthStart(y: number, m: number): string {
 }
 
 export function jstIso(at: number): string {
-  const t = new Date(at + JST_OFFSET_MS);
+  const t = japanCalendar(new Date(at));
   const pad = (n: number, w = 2) => String(n).padStart(w, '0');
   return `${t.getUTCFullYear()}-${pad(t.getUTCMonth() + 1)}-${pad(t.getUTCDate())}T${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:${pad(t.getUTCSeconds())}.${pad(t.getUTCMilliseconds(), 3)}+09:00`;
 }
@@ -249,7 +249,7 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
   });
 });
 
-/** 「未登録の N 人へ案内」の一覧（★V6 37-2）。名前と契約先だけ返す。メールアドレスは返さない。 */
+/** 「未登録の N 人へ案内」の一覧（★37-2）。名前と契約先だけ返す。メールアドレスは返さない。 */
 opsDashboard.get('/api/ops/dashboard/line-unregistered', async (c) => {
   const db = dbFor(c.env);
   const line = await dashboardLineRegistration(db, DEFAULT_TENANT_ID);

@@ -8,7 +8,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 
-/** Pencil ★V8（`ywJ5H`）の上部カード。数え方は既存APIのままにする。 */
+/** Pencil ★V8（）の上部カード。数え方は既存APIのままにする。 */
 export default function FriendKpis() {
 
   const { selectedAccountId } = useAccount()
@@ -53,7 +53,7 @@ export default function FriendKpis() {
 
   const diff = stats ? stats.addedThisMonth - stats.addedLastMonth : 0
 
-  /* 板 `x6QsVz`：増減の札は前月との差（+12）。割合の札は置かない。 */
+  /* 板 ：増減の札は前月との差（+12）。割合の札は置かない。 */
   const diffLabel = `${diff >= 0 ? '+' : ''}${diff}`
   const cards = [
     {

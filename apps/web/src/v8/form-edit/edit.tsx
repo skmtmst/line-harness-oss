@@ -27,7 +27,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import { useStaffRole } from '@/lib/staff-role';
-import { useDraftAutosave } from '@/v8/autosave/use-draft-autosave';
+import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import { requestUnsavedAction } from '@/lib/unsaved-action';
 import { hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter';
 import type { FormEditHost } from './host';
@@ -69,7 +69,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* 統括から使うときは、最初の描画から読み込んだ中身で出す（空の一瞬に保存を押させない）。 */
   const [name, setName] = useState(() => host?.initial.name ?? '')
   const [nameError, setNameError] = useState<string | null>(null)
-  /* 統括から使うときは上の帯を「回答フォーム」だけにする（絵 u5MM7。呼ぶ側の題と同じ）。 */
+  /* 統括から使うときは上の帯を「回答フォーム」だけにする（絵 。呼ぶ側の題と同じ）。 */
   usePageTitle(host ? '回答フォーム' : name || '回答フォーム編集')
   const [description, setDescription] = useState(() => host?.initial.description ?? '')
   const [isActive, setIsActive] = useState(!host)
@@ -81,7 +81,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [layout, setLayoutState] = useState<FormLayout>(() => host?.initial.layout ?? emptyLayout())
   const [page, setPage] = useState(0)
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
-  /* 保存を押したか（B-139）。押したあとだけ、欄の赤とタブの赤い印を出す。 */
+  /* 保存を押したか。押したあとだけ、欄の赤とタブの赤い印を出す。 */
   const [attempted, setAttempted] = useState(false)
   const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
   const [loading, setLoading] = useState(!host)
@@ -106,7 +106,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [testError, setTestError] = useState('')
   const [showPublish, setShowPublish] = useState(false)
   /*
-   * 公開の確かめ（Z9wXm）の「変わること」は、いま公開中の版との違い。
+   * 公開の確かめの「変わること」は、いま公開中の版との違い。
    * 公開中の版は、account_id を付けない取得（お客さまに見えている形）で読む。
    * 読めないとき（未公開・受付停止・通信失敗）は、保存した下書きとの違いに戻す。
    */
@@ -336,7 +336,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* ---------------- ページとブロック ---------------- */
 
   const blocks = useMemo(() => layout.sections[page]?.blocks ?? [], [layout, page])
-  /* タブの札の赤い印（B-139）。保存を押したあとだけ、そのタブの直す欄の数を出す。 */
+  /* タブの札の赤い印。保存を押したあとだけ、そのタブの直す欄の数を出す。 */
   const tabErrors: Record<EditTab, number> = attempted ? {
     content: layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0),
     after: 0,
@@ -489,7 +489,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   /** 保存を断る理由（無ければ null）。自動保存の「通せる形か」にも同じものを使う。 */
   /*
-   * 保存を断る理由と、直す欄の場所（B-139）。tab と target があれば、そのタブを開いて欄へ移り、
+   * 保存を断る理由と、直す欄の場所。tab と target があれば、そのタブを開いて欄へ移り、
    * 欄の真下に理由を出す（inline）。欄に結び付かないものだけ上の帯に出す。
    */
   type SaveProblem = { message: string; name?: boolean; tab?: EditTab; target?: string; page?: number; blockId?: string; inline?: boolean }
@@ -552,7 +552,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       if (silent) return false
       setAttempted(true)
       setNameError(problem.name ? problem.message : null)
-      /* 欄に結び付く誤りは、そのタブ・ページ・ブロックを開いて欄へ移り、欄の真下に出す（B-139）。 */
+      /* 欄に結び付く誤りは、そのタブ・ページ・ブロックを開いて欄へ移り、欄の真下に出す。 */
       setError(problem.inline ? '' : problem.message)
       if (problem.tab) {
         if (problem.tab !== editTab) changeTab(problem.tab)
@@ -780,7 +780,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         LINEでの見え方を見る
       </Button>
       {host ? (
-        /* 統括（u5MM7）：回答用URLは配った先のアカウントごとに出る。ここは配った先だけ。 */
+        /* 統括：回答用URLは配った先のアカウントごとに出る。ここは配った先だけ。 */
         <section className={styles.urlBox} aria-label="配った先">
           <h2 className={styles.urlTitle}>配った先</h2>
           <p className={styles.urlNote}>{host.distributedLine}</p>
@@ -857,7 +857,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     </>
   )
 
-  /* 競合の帯（J1pdB）。左右の列の上に横いっぱいで出す。型の「狭い板の切り替え」の置き場を借りる。 */
+  /* 競合の帯。左右の列の上に横いっぱいで出す。型の「狭い板の切り替え」の置き場を借りる。 */
   const conflictBand = canEdit && conflict ? (
     <div className={styles.bandSlot} data-fe-band>
       <SaveConflictBand

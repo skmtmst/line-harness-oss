@@ -3,11 +3,11 @@
  * 今までの画面（app/form-submissions/edit）の処理を写したもの。src/v8 からは
  * 古い画面ファイルを import できないので、同じ中身をここに持つ（動きは同じ）。
  */
-import { FIXED_FRIEND_FIELDS, DEFAULT_ALLERGY_OPTIONS, fixedFieldForBlock } from '@line-crm/shared'
-import type { FormAction, FormBlock, FormInputBlock, FormInputType, FormLayout } from '@line-crm/shared'
 import { makeFormBlock } from '@/components/forms/form-definition-operations'
 import type { FormRefs } from '@/components/forms/form-refs'
 import { formatDateTime } from '@/lib/format'
+import type { FormAction,FormBlock,FormInputBlock,FormInputType,FormLayout } from '@line-crm/shared'
+import { DEFAULT_ALLERGY_OPTIONS,FIXED_FRIEND_FIELDS,fixedFieldForBlock } from '@line-crm/shared'
 
 /* ---------------- 競合（409）の言い方：form-conflict-message.ts と同じ ---------------- */
 
@@ -26,7 +26,7 @@ export function conflictMessage(updatedAt: string): string {
     : 'ほかの人が先に保存しました。最新の内容を読み込んでから、もう一度お試しください。'
 }
 
-/** 帯の題（J1pdB）。だれが保存したかは返事に無いので「ほかの人」と言う。 */
+/** 帯の題。だれが保存したかは返事に無いので「ほかの人」と言う。 */
 export function conflictTitle(updatedAt: string, formName: string): string {
   const when = formatSavedAt(updatedAt)
   const name = formName.trim() ? `フォーム「${formName.trim()}」` : 'このフォーム'
@@ -86,7 +86,7 @@ const KIND_WORD: Record<FormBlock['kind'], string> = { input: '質問', button: 
 
 /**
  * 2つの中身の違いを、運用者が読める文にする。競合の「違いを比べる」と、
- * 公開の確かめ（Z9wXm）の「変わること」で使う。
+ * 公開の確かめの「変わること」で使う。
  */
 export function describeConflictDiff(mine: ConflictSide, incoming: ConflictSide, maxLines = 20): { lines: ConflictDiffLine[]; omitted: number } {
   const lines: ConflictDiffLine[] = []
@@ -134,7 +134,7 @@ export function describeConflictDiff(mine: ConflictSide, incoming: ConflictSide,
 }
 
 /**
- * 公開の確かめ（Z9wXm）の「変わること」。いま保存されている下書きから、
+ * 公開の確かめの「変わること」。いま保存されている下書きから、
  * 画面で直したところを「＋ 足した／－ 消した／・ 変えた」で言う。
  */
 export function describePublishChanges(saved: ConflictSide | null, current: ConflictSide): ConflictDiffLine[] {
@@ -200,7 +200,7 @@ const input = (type: FormInputType, patch: Partial<FormInputBlock> = {}) => (cou
 }
 
 /**
- * 足す欄の4組（J1pdB・ijxur・ITBAB）。
+ * 足す欄の4組（・・）。
  * メール・電話・住所・日付・時刻・ファイルは、足したときに質問文へその名前を入れておく（オーナー 2026-10-08：空のままだと何の欄か分からない）。
  */
 export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
@@ -229,8 +229,6 @@ export const ADD_GROUPS: { title: string; cards: AddCard[] }[] = [
     { key: 'time', label: '時刻', hint: '時計で選ぶ', make: input('text', { label: '時刻', limit: { format: 'time' } }) },
     { key: 'booking', label: '予約を入れる', hint: '空いている枠から選ぶ', fresh: true, make: input('booking', { booking: null }) },
     { key: 'file', label: 'ファイル', hint: '写真・書類を送る', make: input('file', { label: 'ファイル' }) },
-    // 絵 m1cWEy：本人確認書類は表と裏の2枚を受けるファイルの欄として足す。
-    { key: 'identity', label: '本人確認書類', hint: '免許証などの表と裏', make: input('file', { label: '本人確認書類', fileKinds: ['identity'], fileBothSides: true }) },
   ] },
   { title: '飾り', cards: [
     { key: 'image', label: '画像', hint: 'ロゴ・写真', make: () => makeFormBlock('image') },
@@ -256,7 +254,7 @@ export function emptyAction(kind: Exclude<FormAction['kind'], 'research_action'>
   }
 }
 
-/** 足すボタン（XXFT4 の下の列）。 */
+/** 足すボタン（ の下の列）。 */
 export const ACTION_ADDERS: { kind: Exclude<FormAction['kind'], 'research_action'>; label: string }[] = [
   { kind: 'send_text', label: 'テキスト' },
   { kind: 'send_template', label: 'テンプレート' },
@@ -266,7 +264,7 @@ export const ACTION_ADDERS: { kind: Exclude<FormAction['kind'], 'research_action
   { kind: 'reminder', label: 'リマインダ' },
 ]
 
-/** 行の文（XXFT4）。「テキストを送る「〇〇」」のように、何をするかを1行で。 */
+/** 行の文。「テキストを送る「〇〇」」のように、何をするかを1行で。 */
 export function describeAfterAction(action: FormAction, refs: FormRefs): string {
   const nameOf = (list: { id: string; name: string }[], id: string, missing: string) => list.find((x) => x.id === id)?.name ?? missing
   switch (action.kind) {

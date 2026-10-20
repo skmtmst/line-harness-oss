@@ -1,4 +1,4 @@
-/* 友だち詳細（Q5F2QE の 1〜7・JCDRm）。寸法は globals.css の --tpl-fdt-*。 */
+/* 友だち詳細（ の 1〜7・）。寸法は globals.css の --tpl-fdt-*。 */
 
 /* ---- 板の頭 ---- */
 .head { display: flex; align-items: center; gap: var(--tpl-fdt-head-gap); padding: var(--tpl-fdt-head-pad-compact); min-width: 0; }
@@ -175,6 +175,6 @@ a.recentTitle:hover { text-decoration: underline; }
 .danger, .dangerNoticePlacement { margin: 0; }
 
 .warnText, .warnTextNoticePlacement { margin: 0; }
-/* B-212：狭い幅の要点は共通の欄で開く。本文の上に長い列を積まない。 */
+/* ：狭い幅の要点は共通の欄で開く。本文の上に長い列を積まない。 */
 .overview:has(:global([data-customer-rail][data-collapsed])) { flex-direction: column; }
 .summary { padding: var(--tpl-customer-rail-pad); }

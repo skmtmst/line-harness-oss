@@ -17,7 +17,7 @@ import { ActionCell, DataTable, RowNameLink, TableHeadRow, Td, Th, Tr } from '@/
 import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { emptyValue } from '@/components/shared/empty-value'
 import { formatListTimestamp, formatYen } from '@/lib/format'
-import { bookingPaymentAdminApi, isNotReadyError, type PaymentEvent } from '@/lib/api-booking-payment-admin'
+import { bookingPaymentAdminApi, isNotReadyError, type PaymentEvent } from '@/lib/api/helpers/booking-payment-admin'
 import { EVENT_KIND, EVENT_RESULT } from './labels'
 import styles from './payments.module.css'
 
@@ -104,7 +104,7 @@ export default function PaymentEvents({ accountId, canEdit }: { accountId: strin
                     <Tr key={event.id} data-table-layout="columns">
                       <Td><TruncatedText value={formatListTimestamp(event.receivedAt)} /></Td>
                       <Td grow><span className={styles.eventKind}><span className={styles.cellStack}><TruncatedText value={`${EVENT_KIND[event.kind]}${event.repeat ? '（2回目）' : ''}`} />{sub ? <span className={styles.cellSub}>{sub}</span> : null}</span>
-                        {/* 払ったのに予約が見つからない行の手当て（UteeA・B-338）。結び付け・返金の口はまだ無い（口が要る）。 */}
+                        {/* 結び付け・返金APIは支払いIDが必要。この通知の契約に支払いIDが無い間は推測して実行しない。 */}
                         {canEdit && event.result === 'failed' && !event.bookingId && event.kind === 'paid' ? <span className={styles.eventFix}>
                           <Button size="compact" onClick={() => preparing.open('予約に結び付ける')}><Link2 size={14} aria-hidden="true" />予約に結び付ける</Button>
                           <Button size="compact" onClick={() => preparing.open('予約の無い支払いの返金')}>返金する</Button>

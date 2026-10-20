@@ -23,7 +23,7 @@ export type RichMenuAreaIntent =
   | "datetime"
   | "clipboard";
 
-/** 1つのメニューが持てるページの上限（要件 v6-12 §5-2）。 */
+/** 1つのメニューが持てるページの上限（要件 -12 §5-2）。 */
 export const RICH_MENU_MAX_PAGES = 10;
 
 /** LINEへ登録できるリッチメニュー画像の寸法。 */

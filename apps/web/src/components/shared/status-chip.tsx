@@ -1,7 +1,7 @@
 import React from 'react'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
 
-/** 設計 B（★V7「監査の直し」）の6つの状態。画面ごとの言い方はやめ、これに寄せる。 */
+/** 設計 B（★管理画面「監査の直し」）の6つの状態。画面ごとの言い方はやめ、これに寄せる。 */
 export type StatusChipStatus = 'draft' | 'ready' | 'reserved' | 'running' | 'paused' | 'ended'
 
 const LABEL: Record<StatusChipStatus, string> = {
@@ -36,7 +36,7 @@ export const STATUS_CHIP_HELP: Record<StatusChipStatus, string> = {
 }
 
 /**
- * 状態の札（★V7 共通部品。設計 B の6つ）。
+ * 状態の札（★管理画面 共通部品。設計 B の6つ）。
  * 色だけにしない（札の文字で分かる）。緑は「正常・うまくいっている」だけに使う。
  */
 export default function StatusChip({

@@ -17,32 +17,32 @@ import { dialogWidth } from './destination-policy'
 export type DialogProps = {
   open: boolean
   contentLayout?: 'form'
-  /** V8 の幅。v7 の寸法は維持する。 */
+  /** V8 の幅。管理画面 の寸法は維持する。 */
   size?: 'small' | 'medium' | 'large' | 'wide'
   /**
    * ★V8：480・560・720・960の4段。旧指定は共通部品で段へそろえる。
-   * 渡さなければ size の幅のまま。v7 では効かない。
+   * 渡さなければ size の幅のまま。互換経路では効かない。
    */
-  /** 頭・説明・本文・操作を同じ余白で積む小窓（i8F12 等）。 */
+  /** 頭・説明・本文・操作を同じ余白で積む小窓（ 等）。 */
   designLayout?: 'stacked'
   /** 確認のボタンを先に置く板だけで指定する。 */
   confirmFirst?: boolean
   designWidth?: number
-  /** B-165の共通選択窓だけ640pxの幅を使う。 */
+  /** の共通選択窓だけ640pxの幅を使う。 */
   widthPreset?: 'picker'
-  /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。v7 では効かない。 */
+  /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。互換経路では効かない。 */
   designTop?: number
   /** 指定した上位置を含めて窓を画面内に収め、本文だけをスクロールする。 */
   fitViewport?: boolean
   /**
    * ★V8：絵の窓の頭（題と×の行）の余白。CSS の padding と同じ書き方（例 `'20px 20px 0'`）。
-   * 小窓だけの絵（MyJP7・F1LK4e・CVz5d など）は頭が今の共通の値（上20・左右24・下8）より
-   * 詰まっているので、絵の値を画面から渡す。渡さなければ今までどおり。v7 では効かない。
+   * 小窓だけの絵（・・ など）は頭が今の共通の値（上20・左右24・下8）より
+   * 詰まっているので、絵の値を画面から渡す。渡さなければ今までどおり。互換経路では効かない。
    * 読み方：~/lh-work/design/v8/html/<板>.html の窓（角丸16px の箱）の padding が上と左右、
    * 窓の gap が頭と次の段の間。
    */
   designHeaderPadding?: string
-  /** ★V8：絵の窓の頭の高さ（px）。渡すと頭の行をこの高さに固定する。渡さなければ中身なり。v7 では効かない。 */
+  /** ★V8：絵の窓の頭の高さ（px）。渡すと頭の行をこの高さに固定する。渡さなければ中身なり。互換経路では効かない。 */
   designHeaderHeight?: number
   /** 頭の×の左に置く操作（選ぶ窓の「＋タグを作る」など）。 */
   headerAction?: ReactNode
@@ -64,7 +64,7 @@ export type DialogProps = {
    * 間を 12 にして題を 18/700 にする。
    */
   designTitleRow?: 'mark'
-  /** 段の帯を使わず続ける窓（hadfk）、またはアカウントの窓の余白。既定の窓は変えない。 */
+  /** 段の帯を使わず続ける窓、またはアカウントの窓の余白。既定の窓は変えない。 */
   layout?: 'continuous' | 'account-inset' | 'inset'
   /** 手順の帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
@@ -76,8 +76,8 @@ export type DialogProps = {
   description?: string
   tone?: 'default' | 'destructive'
   /**
-   * 説明文を帯で囲む。'warning' は琥珀帯（CFAyf 送受信を止める）。
-   * 'danger' は桃箱（YZ57z 解除。題は箱の外・説明だけ箱の中）。
+   * 説明文を帯で囲む。'warning' は琥珀帯（ 送受信を止める）。
+   * 'danger' は桃箱（ 解除。題は箱の外・説明だけ箱の中）。
    * tone（題・ボタンの色）とは独立。渡さなければ帯なし。
    */
   descriptionBand?: 'warning' | 'danger'
@@ -122,13 +122,13 @@ export type DialogProps = {
    * `'cancel'` を渡す。×と背景は取消と同じ動きのまま変えない。
    */
   primaryAction?: 'confirm' | 'cancel'
-  /** ★V8：下のボタンの並び。省くと今までどおり右寄せ。'center' は中央（E-3 ウォークイン PUWyq）。v7 では効かない。 */
+  /** ★V8：下のボタンの並び。省くと今までどおり右寄せ。'center' は中央（E-3 ウォークイン ）。互換経路では効かない。 */
   footerAlign?: 'center' | 'start'
   /** 絵で操作の間隔が指定されている窓だけに使う。 */
   designFooterGap?: number
 }
 
-/** Pencil V6 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
+/** Pencil 管理画面 `J6x4Q` と重要操作 `H2S1T4` を1つにした共通ダイアログ。 */
 export default function Dialog({
   open,
   contentLayout,
@@ -194,16 +194,16 @@ export default function Dialog({
     setAutomaticBusy(false)
     setAutomaticError('')
   }, [open])
-  const busy = providedBusy ?? automaticBusy
+  const busy = providedBusy === true || automaticBusy
   const runConfirm = onConfirm ? () => {
     if (busy || automaticLock.current) return
     const pending = onConfirm() as unknown
-    if (providedBusy !== undefined || !pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
+    if (!pending || typeof (pending as PromiseLike<unknown>).then !== 'function') return
     const generation = automaticGeneration.current
     automaticLock.current = true
     setAutomaticBusy(true)
     setAutomaticError('')
-    void Promise.resolve(pending).catch(() => {
+    return Promise.resolve(pending).catch(() => {
       if (generation === automaticGeneration.current) setAutomaticError('実行できませんでした。もう一度お試しください。')
     }).finally(() => {
       if (generation !== automaticGeneration.current) return
@@ -246,7 +246,7 @@ export default function Dialog({
   const titleNode = (
     <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`}>{typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}</h2>
   )
-  /* YZ57z 解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。
+  /*  解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。
      かけらは描画に出ない（囲み要素なし）。渡さないときは h2 そのまま。 */
   const titlePart = (<>{titleIcon ? (
     <div className={styles.titleRow}>

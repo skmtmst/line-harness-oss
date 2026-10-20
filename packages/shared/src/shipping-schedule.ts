@@ -1,3 +1,4 @@
+import { jstCalendar as japanCalendar } from './jst-datetime.js';
 /**
  * 出荷予定日の算出。
  *
@@ -15,7 +16,6 @@
 
 import { isJapaneseHoliday } from './japanese-holidays';
 
-const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 /** 午前・午後の境目（JSTの時）。この時刻以降は翌営業日扱い。 */
 export const SAME_DAY_CUTOFF_HOUR = 12;
 
@@ -30,7 +30,7 @@ export type JstMoment = { date: string; hour: number };
 export function toJstMoment(iso: string): JstMoment | null {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return null;
-  const shifted = new Date(ms + JST_OFFSET_MS);
+  const shifted = japanCalendar(new Date(ms));
   const y = shifted.getUTCFullYear();
   const m = String(shifted.getUTCMonth() + 1).padStart(2, '0');
   const d = String(shifted.getUTCDate()).padStart(2, '0');

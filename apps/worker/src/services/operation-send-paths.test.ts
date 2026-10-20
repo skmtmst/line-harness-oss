@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readImplementationSource } from '../test-utils/implementation-source.js';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,7 +47,7 @@ describe('送信経路の台帳 (#1050)', () => {
       for (const enforcement of path.enforcement) {
         const fullPath = join(REPO_ROOT, enforcement.file);
         expect(existsSync(fullPath), `${path.id}: ${enforcement.file} が無い`).toBe(true);
-        const source = readFileSync(fullPath, 'utf8');
+        const source = readImplementationSource(fullPath);
         expect(
           source.includes(enforcement.marker),
           `${path.id}: ${enforcement.file} に ${enforcement.marker} が無い`,

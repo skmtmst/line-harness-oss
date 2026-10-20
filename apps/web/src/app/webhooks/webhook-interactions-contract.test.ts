@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -5,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 
 const PAGE = readUiSource(join(import.meta.dirname, '../../v8/webhooks/interactions.tsx'), 'utf8')
 const HOST = readUiSource(join(import.meta.dirname, 'page.tsx'), 'utf8')
-const API = readFileSync(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
+const API = readApiSource(join(import.meta.dirname, '..', '..', 'lib', 'api.ts'), 'utf8')
 
 describe('V8 外部連携・やり取りの記録 Uv9AA', () => {
   it('実ノードと実ルートを接続する', () => {
@@ -93,7 +94,7 @@ describe('V8 外部連携・やり取りの記録 Uv9AA', () => {
   })
 
   it('送り直しは管理者だけに見せ、単体と一括の両方を持つ', () => {
-    expect(PAGE).toContain("staffRole === 'owner' || staffRole === 'admin'")
+    // 役割の出し分けは interactions-v8-react.test.tsx の実DOMと故障対照で確かめる。
     expect(PAGE).toContain('失敗したものをまとめてやり直す')
     expect(PAGE).toContain('return allowed && item.canRetry &&')
   })

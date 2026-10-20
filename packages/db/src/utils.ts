@@ -1,7 +1,5 @@
+import { jstTimestamp, jstDateOffset as japanDateOffset, jstMonthStart as japanMonthStart } from '@line-crm/shared';
 import type { D1Database } from '@cloudflare/workers-types';
-
-/** JST offset: UTC+9 in milliseconds */
-const JST_OFFSET_MS = 9 * 60 * 60_000;
 
 export const MAX_LIST_LIMIT = 200;
 
@@ -20,7 +18,7 @@ export function nonNegativeListOffset(value: number | undefined): number {
  * Format: YYYY-MM-DDTHH:mm:ss.sss+09:00
  *
  * All timestamps in this project are standardized to JST.
- * The +09:00 suffix ensures new Date() parses correctly for epoch comparisons.
+ * The +09:00 suffix ensures new Date parses correctly for epoch comparisons.
  */
 export function jstNow(): string {
   return toJstString(new Date());
@@ -31,8 +29,7 @@ export function jstNow(): string {
  * Format: YYYY-MM-DDTHH:mm:ss.sss+09:00
  */
 export function toJstString(date: Date): string {
-  const jst = new Date(date.getTime() + JST_OFFSET_MS);
-  return jst.toISOString().slice(0, -1) + '+09:00';
+  return jstTimestamp(date);
 }
 
 /**
@@ -65,8 +62,7 @@ export function nextVersionToken(current: string | null | undefined, now: string
  * 9時間ずれるため、「今日」の境目の集計には使わない。
  */
 export function jstDateString(offsetDays = 0, nowMs = Date.now()): string {
-  const jst = new Date(nowMs + JST_OFFSET_MS + offsetDays * 86_400_000);
-  return jst.toISOString().slice(0, 10);
+  return japanDateOffset(offsetDays, new Date(nowMs));
 }
 
 /** 暦日の翌日（YYYY-MM-DD）。`col >= day AND col < next` の半開区間に使う。 */
@@ -81,10 +77,7 @@ export function nextDateString(day: string): string {
  * `occurred_at` など JST 文字列入りの列と文字列比較できる形に揃える。
  */
 export function jstMonthStartString(nowMs = Date.now()): string {
-  const jst = new Date(nowMs + JST_OFFSET_MS);
-  const year = jst.getUTCFullYear();
-  const month = String(jst.getUTCMonth() + 1).padStart(2, '0');
-  return `${year}-${month}-01T00:00:00.000+09:00`;
+  return `${japanMonthStart(new Date(nowMs))}T00:00:00.000+09:00`;
 }
 
 /*

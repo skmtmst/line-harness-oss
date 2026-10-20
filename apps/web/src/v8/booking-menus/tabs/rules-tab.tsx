@@ -26,9 +26,9 @@ import SaveFeedback, { useSaveFeedback } from '@/components/shared/save-feedback
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 
-/* ④ 予約のルール（x1OZS6）。絵に無い設定は「ほかの設定」で開く。 */
+/* ④ 予約のルール。絵に無い設定は「ほかの設定」で開く。 */
 
-/* 候補は v7（/booking/menus の BookingRulesEditor）と同じ。 */
+/* 候補は 管理画面（/booking/menus の BookingRulesEditor）と同じ。 */
 const TIME_ZONE_CHOICES = [
   'Asia/Tokyo',
   'Asia/Seoul',

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 流入と計測の一覧（src/v8）の動きの試験。BEHAVIOR.md の主な動きを守る。
- * 行の「…」から QR コードの小窓（GtI4Y）が開く・停止中の行は URL を出さない・
+ * 行の「…」から QR コードの小窓が開く・停止中の行は URL を出さない・
  * 閲覧のみは作る／編集を出さない・未登録 ref は「登録する」・数の帯の未設定の数。
  */
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
@@ -152,7 +152,7 @@ describe('V8 流入と計測の一覧', () => {
     expect(dialog?.textContent).toContain('PDFで印刷')
   })
 
-  it('B-201：停止の札と再開操作を保ち、正本QR窓でQR保存を止める', async () => {
+  it('停止の札と再開操作を保ち、正本QR窓でQR保存を止める', async () => {
     await render()
     const row = rowOf('flyer-26s')
     expect(row?.textContent).toContain('停止中')
@@ -264,7 +264,7 @@ describe('V8 流入と計測の一覧', () => {
   })
 })
 
-it.each(['/api/entry-route-genres','/api/scenarios','/api/message-templates','/api/tags'])('B-241：%sの拒否は空の候補として隠さず読み直す',async(path)=>{
+it.each(['/api/entry-route-genres','/api/scenarios','/api/message-templates','/api/tags'])('%sの拒否は空の候補として隠さず読み直す',async(path)=>{
  const fixtureFetch=globalThis.fetch
  let failed=true,reads=0
  vi.stubGlobal('fetch',async(input:RequestInfo|URL,init?:RequestInit)=>{

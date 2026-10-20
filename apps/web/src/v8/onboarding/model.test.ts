@@ -11,8 +11,8 @@ const state = {
   },
 }
 
-describe('はじめの質問の決まり（B-313・組4の質問キー）', () => {
-  it('飲食は 11 問（B-313 が正）。質問のキーはどれも口が受け付ける', () => {
+describe('はじめの質問の決まり（・組4の質問キー）', () => {
+  it('飲食は 11 問（ が正）。質問のキーはどれも口が受け付ける', () => {
     const keys = ['image', 'booking', 'approval', 'payment', 'reminders', 'stamps', 'coupons', 'tickets', 'outcome', 'content']
     expect(stepNames('restaurant').map((step) => step.short)).toEqual(['使い方のスタイル', '見た目', '予約の確定の仕方', 'お支払い', 'キャンセルの期限', '前日のお知らせ', '来店スタンプ', 'クーポン', '席・卓', '営業時間', '受け付ける人数'])
     for (const style of ['restaurant', 'salon', 'consult', 'lesson', 'ec', 'standard'] as const) {
@@ -35,7 +35,7 @@ describe('はじめの質問の決まり（B-313・組4の質問キー）', () =
     expect(recommendedValue(approval, 'consult')).toBe('require_approval')
     expect(answerOf('require_approval', approval)).toEqual({ mode: 'configured', value: 'manual' })
     expect(answerOf('manual', approval)).toEqual({ mode: 'manual' })
-    expect(choiceLabel(approval, approval.choices[1], 'consult')).toBe('お店が承認してから確定する（おすすめ）')
+    expect(choiceLabel(approval, approval.choices[1], 'consult')).toBe('担当が承認してから確定する（おすすめ）')
   })
 })
 
@@ -59,7 +59,7 @@ describe('はじめにやること（Bdfxm）', () => {
     )
     expect(summary.rows.map((row) => row.title)).toEqual(['来店スタンプの決まりを入れる', 'Stripe をつなぐ', '入った予約メニュー・お知らせを動かす', 'お店の写真とロゴを入れる'])
     expect(summary.rows[0].action.href).toBe('/visit-stamps')
-    expect(summary.rows[1].action.preparing).toBe('お支払い')
+    expect(summary.rows[1].action.href).toBe('/booking/menus?tab=payments')
     expect(summary.done).toBe(3)
     expect(summary.total).toBe(11)
   })
@@ -71,7 +71,7 @@ describe('はじめにやること（Bdfxm）', () => {
   })
 })
 
-describe('開き直したときの保存（B-335）', () => {
+describe('開き直したときの保存', () => {
   it('変えた答えだけを送り、予約設定が変わる答えは確かめの文を作る', async () => {
     const { changedAnswers, settingsChanges, isBookingConfirmSample } = await import('./model')
     const saved = { approval: { mode: 'configured' as const, value: 'automatic' }, reminders: { mode: 'configured' as const, value: true } }

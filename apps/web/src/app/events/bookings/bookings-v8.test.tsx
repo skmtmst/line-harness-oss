@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B イベント予約の「申込者」（板 `Mu8qW`）。
+ * ★V8-B イベント予約の「申込者」（板 ）。
  * 開催回ごとの見せ方で、承認・拒否・キャンセル・受付・待ち・CSV・
  * お知らせの口が同じように動くこと。
  */
@@ -424,7 +424,7 @@ describe('V8-B 申込者（Mu8qW）', () => {
   it('V8 の型・色直書きなし・準備中なしを守る', () => {
     expect(v8tsx).toContain("import { DetailPage } from '@/components/templates'")
     expect(v8css).not.toMatch(/#[0-9a-fA-F]{3,8}/)
-    // 影は共通のカードの影だけ（2026-10-09 オーナー採用 B-137）。ほかの影は直書きしない。
+    // 影は共通のカードの影だけ（2026-10-09 オーナー採用 ）。ほかの影は直書きしない。
     expect(v8css.replace(/box-shadow:\s*var\(--card-shadow\)/g, '')).not.toMatch(/box-shadow\s*:/)
     expect(v8tsx).toContain('boardId="Mu8qW"')
     expect(v8tsx).not.toContain('準備中')

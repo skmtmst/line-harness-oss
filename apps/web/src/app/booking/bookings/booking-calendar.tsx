@@ -1,4 +1,8 @@
 'use client'
+import { formatYen } from '@line-crm/shared';
+
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { jstDate as japanDate } from '@/lib/jst-datetime'
 
 import KpiBand from '@/components/shared/kpi-band'
 import { BookingPageStats, BookingPageContent } from '@/components/templates/booking-page'
@@ -9,7 +13,7 @@ import Link from 'next/link'
 import type { BookingRequest } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import { formatDay, formatNumber, formatRange, formatTime } from '@/lib/format'
+import { formatDay, formatRange, formatTime } from '@/lib/format'
 
 // BOOKING-01: 9〜18時の固定10マスは「空き枠」ではなく、空き枠APIの実績が
 // まだ届いていないときの表示レンジ。実際に受け付けられる枠が届いたら、
@@ -44,7 +48,7 @@ export interface CalendarAvailability {
 }
 
 function jstDay(iso: string): string {
-  return new Date(new Date(iso).getTime() + 9 * 3_600_000).toISOString().slice(0, 10)
+  return japanDate(new Date(iso))
 }
 
 function todayKey(): string {
@@ -69,7 +73,7 @@ function dateLabel(day: string): string {
 const sep = '\u0000'
 
 function bookingHour(booking: BookingRequest): number {
-  return new Date(new Date(booking.starts_at).getTime() + 9 * 3_600_000).getUTCHours()
+  return japanCalendar(new Date(new Date(booking.starts_at).getTime())).getUTCHours()
 }
 
 function bookingTime(booking: BookingRequest): string {
@@ -105,7 +109,7 @@ const CARD_STATUS_LABEL: Record<string, string> = {
 }
 
 function money(value: number): string {
-  return `¥${formatNumber(value)}`
+  return `${formatYen(value)}`
 }
 
 function BookingCard({ booking, compact = false, onOpen }: {
@@ -161,7 +165,7 @@ function EmptyCell({ href, label }: { href?: string; label?: string }) {
   // 受け付けられる枠だけが入口になり、取れないマス（営業時間外・休み・
   // 満席・まだ読み込み中）は「—」で示す。
   if (!href) {
-    // ★V7：受け付けていないマスは空のまま（読み上げだけ伝える）。全マスに「—」が並ぶと、表が記号で埋まって
+    // ★管理画面：受け付けていないマスは空のまま（読み上げだけ伝える）。全マスに「—」が並ぶと、表が記号で埋まって
     // 「あき ＋」の入口が目立たなかった。
     return <span className="sr-only">受け付けていない時間</span>
   }
@@ -455,7 +459,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
   items: BookingRequest[]
   onOpen: (id: string) => void
   /**
-   * ★V7：一覧の読み込み状態。取れていない間、カレンダー内の件数に 0 を
+   * ★管理画面：一覧の読み込み状態。取れていない間、カレンダー内の件数に 0 を
    * 出さない。「—」と出し、読み込み中と失敗を言い分ける。
    */
   dataState?: 'loading' | 'error' | 'ready'
@@ -617,7 +621,7 @@ export default function BookingCalendar({ mode, items, onOpen, staffNames, canCr
         ? `受付${hoursText(capacity.acceptableMs)}のうち${hoursText(capacity.bookedMs)}を使用中`
         : '受付可能な時間がありません'
 
-  // ★V7：一覧が取れていない間、カレンダー内の件数に 0 を出さない。
+  // ★管理画面：一覧が取れていない間、カレンダー内の件数に 0 を出さない。
   const listMissing = dataState !== 'ready'
   const listMissingDetail = dataState === 'error' ? '読み込めませんでした' : '読み込んでいます'
 

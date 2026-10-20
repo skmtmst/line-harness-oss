@@ -8,7 +8,7 @@
  *   つまみ（選択中）：canvas の白・角丸 8・薄い影・中の文字 13/600 ink
  *   未選択：文字 13/500 ink-secondary（地は器の track が透ける）
  *   つまみは前の位置から 120ms で滑って着く。
- *   V8 で新たに生えた部品のため v7 側の規定は持たない。
+ *   V8 で新たに生えた部品のため 管理画面 側の規定は持たない。
  */
 
 .root {
@@ -74,7 +74,7 @@
   outline-offset: 2px;
 }
 
-/* ★V8 仕上げ3回目（M10）②：つまみの滑り・文字の色を --motion-* にそろえる（120ms）。V8 にだけ生えた部品のため v7 の規定は持たない。 */
+/* ★V8 仕上げ3回目（M10）②：つまみの滑り・文字の色を --motion-* にそろえる（120ms）。V8 にだけ生えた部品のため 管理画面 の規定は持たない。 */
 :root .thumb {
   transition:
     transform var(--motion-fast) var(--motion-ease-out),
@@ -85,7 +85,7 @@
   transition: color var(--motion-fast) var(--motion-ease-out);
 }
 
-/* V8 正本HTMLの実寸。v7には適用しない。 */
+/* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .root { background: var(--color-shell); box-shadow: none; }
 :root .item { font-size: var(--text-body); line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
 
@@ -112,7 +112,7 @@
 :root .root[data-size='panel'] .item { padding: 5px 12px; font-size: var(--text-caption); line-height: 17px; }
 :root .root[data-size='panel'] .selected { font-weight: 700; }
 :root .root[data-size='panel'] .thumb { top: 3px; bottom: 3px; border-radius: var(--radius-mini); }
-/* 連動タイミング（gSsPR）。この寸法を頼んだ場所だけに効く。 */
+/* 連動タイミング。この寸法を頼んだ場所だけに効く。 */
 :root .root[data-size='timing'] {
   width: var(--seg-timing-w);
   max-width: 100%;
@@ -131,7 +131,7 @@
   bottom: var(--seg-timing-pad);
   box-shadow: var(--shadow-segment-ring);
 }
-/* rm92Y の探し方。既定の切り替えの寸法・動きは変えない。 */
+/*  の探し方。既定の切り替えの寸法・動きは変えない。 */
 :root .root:is([data-appearance='choices'],[data-appearance='reservation']) { padding: 0; gap: 8px; background: transparent; }
 :root .root:is([data-appearance='choices'],[data-appearance='reservation']) .item { min-height: 0; padding: 6px 12px; border-radius: var(--radius-pill); outline: 1px solid var(--color-hairline); outline-offset: -0.5px; font-size: var(--text-caption); font-weight: 400; line-height: 17px; }
 :root .root:is([data-appearance='choices'],[data-appearance='reservation']) .selected { outline-color: transparent; background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 600; }
@@ -139,7 +139,7 @@
 /*
  * デリバリー受注の受付一括停止（★V8 `XCVGd` の時間行 `To5Y0`）。
  * 離れた枠付きの札4つ。選んだ札だけ薄い緑の面と緑の枠にする。
- * 文字の太さと角丸は B-152 の共通の段（下の2行）に従う。
+ * 文字の太さと角丸は  の共通の段（下の2行）に従う。
  */
 :root .root[data-appearance='intake-stop'] { padding: 0; gap: 8px; background: transparent; }
 :root .root[data-appearance='intake-stop'] .item { min-height: var(--tpl-rt-dlv-time-h); padding: var(--tpl-rt-dlv-time-pad); border-radius: var(--radius-segment); background: var(--color-canvas); outline: 1px solid var(--color-choice-border); outline-offset: -1px; color: var(--color-ink-secondary); font-size: var(--text-caption); }
@@ -151,11 +151,11 @@
 :root .root[data-size='sticker'] { height: var(--seg-timing-h); max-width: 100%; gap: 0; }
 :root .root[data-size='sticker'] .item { padding: var(--tpl-msg-composer-sticker-switch-pad); font-size: var(--text-body); line-height: var(--tpl-msg-composer-text-lh); white-space: nowrap; }
 
-/* B-211：通常500・選択600。大きさを変えても選択の太さを保つ。 */
+/* ：通常500・選択600。大きさを変えても選択の太さを保つ。 */
 :root .item { font-weight: var(--polish-weight-label); }
 :root .selected, :root .root[data-size] .selected { font-weight: 600; }
 
-/* B-152⑨：切り替える各ボタンの角丸。 */
+/* ⑨：切り替える各ボタンの角丸。 */
 html:root .root .item, html:root .root .thumb, html:root .root[data-size] .thumb { border-radius: var(--polish-radius-control); }
 
 /* 予約の表示切替。数は別の文字として添え、4つの項目を絵の幅へそろえる。 */
@@ -165,7 +165,7 @@ html:root .root .item, html:root .root .thumb, html:root .root[data-size] .thumb
 :root .root[data-size='booking'] .count { font-size: var(--text-caption); }
 @layer components { html:root .root[data-appearance='reservation'] .item{padding:6px 13px;min-height:36px;border-radius:var(--radius-pill);} html:root .root[data-appearance='reservation'] .selected{outline-color:var(--color-accent);font-weight:600;} }
 
-/* B-203・B-207・B-211：10-10 に採用した共通の形。 */
+/* ・・：10-10 に採用した共通の形。 */
 :root .thumb { background: var(--color-selection-bg); box-shadow: var(--choice-selected-shadow); }
 :root .selected, :root .root[data-appearance] .selected { background: var(--color-selection-bg); color: var(--color-selection-border); outline: 1px solid var(--color-selection-border); outline-offset: -1px; }
 html:root .item { white-space: nowrap; flex-shrink: 0; }

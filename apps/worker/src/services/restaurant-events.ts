@@ -1,5 +1,7 @@
+export type { RestaurantEvent } from './restaurant-event-types.js';
+import type { RestaurantEvent } from './restaurant-event-types.js';
 import { scheduleRestaurantFollowup } from './restaurant-followup.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { getLineAccountById, applyMileageRulesForEvent, getWorkflowStep } from '@line-crm/db';
 import { fireEvent } from './event-bus.js';
 import type { IncomingWebhookExecution } from './incoming-webhook-receipts.js';
@@ -8,10 +10,6 @@ import { processVisitStampQueue } from './visit-stamps.js';
 import { dbFor } from './db-router.js';
 import {featureJobCanRun} from './feature-enforcement.js';
 import { restaurantTestEnabled } from '../lib/environment-features.js';
-export interface RestaurantEvent {
- id:string; reservation_id:string|null;store_id:string;event_type:string;reservation_version:number;
- occurred_at:string;request_id:string;line_account_id:string|null;friend_id:string|null;payload_json:string;
-}
 export type RestaurantEventConsumer = (db:D1Database,event:RestaurantEvent,execution:IncomingWebhookExecution)=>Promise<void>;
 /** 消費者と各工程の記録を別々に持つ。SQL効果も共通workflowの柵と記録で再実行を防ぐ。 */
 export async function deliverRestaurantEvent(db:D1Database,event:RestaurantEvent,consumerKey:string,consume:RestaurantEventConsumer):Promise<boolean> {

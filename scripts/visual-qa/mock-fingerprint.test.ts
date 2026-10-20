@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -22,4 +22,21 @@ describe('ROOT-12 モックの依存を含む指紋', () => {
     writeFileSync(join(root, 'nested.mjs'), "import './fixtures.mjs'\n// changed nested behavior")
     expect(mockFingerprint(entry)).not.toBe(current)
   })
+})
+
+
+it('APIの実装を分割先で変えたら、起動済みモックの指紋と区別できる', () => {
+  const root = mkdtempSync(join(tmpdir(), 'qa-api-fingerprint-'))
+  const api = join(root, 'api.ts')
+  const module = join(root, 'api', 'messages.ts')
+  mkdirSync(join(root, 'api'))
+  writeFileSync(join(root, 'mock.mjs'), 'export const mock = true')
+  writeFileSync(api, "export * from './api/messages'\n")
+  writeFileSync(module, 'export const message = 1')
+  const entry = pathToFileURL(join(root, 'mock.mjs'))
+  const inputs = [pathToFileURL(api)]
+  const running = mockFingerprint(entry, inputs)
+  expect(mockFingerprint(entry, inputs)).toBe(running)
+  writeFileSync(module, 'export const message = 2')
+  expect(mockFingerprint(entry, inputs)).not.toBe(running)
 })

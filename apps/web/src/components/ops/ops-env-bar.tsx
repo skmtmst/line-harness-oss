@@ -3,7 +3,7 @@
 import { ShieldCheck } from 'lucide-react'
 
 /**
- * 環境帯（★V6 37 共通 `OGkIw`）。本番は墨色（ink）、検証は橙（status-warn-deep）。
+ * 環境帯（★管理画面 37 共通 `OGkIw`）。本番は墨色（ink）、検証は橙（status-warn-deep）。
  * 統括・店舗の画面と一目で見分けるためのもの。判定は API の URL で行う。
  */
 export function opsEnvironmentLabel(apiUrl: string | undefined): 'production' | 'staging' {

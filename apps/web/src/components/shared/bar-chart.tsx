@@ -4,7 +4,7 @@ import { Th } from './table'
 import styles from './bar-chart.module.css'
 
 /**
- * ★V7 グラフ（ノード `h99Gb`）の日ごとの増減を描く棒グラフ。
+ * ★管理画面 グラフ（ノード `h99Gb`）の日ごとの増減を描く棒グラフ。
  *
  * - 色は2つまで。増えた = `accent-deep`（正常・増えたの緑）、
  *   減った = `ink-faint` の灰色。赤は使わない。

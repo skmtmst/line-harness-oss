@@ -31,13 +31,13 @@
   --color-liff-photo: #e9e2d4;
   --color-liff-photo-ink: #6b5b3e;
   --color-liff-note: #f2f6fe;
-  /* 必須の札の地 (B8rCt・g9osGN。文字は --color-liff-sun)。 */
+  /* 必須の札の地 (・。文字は --color-liff-sun)。 */
   --color-liff-required-bg: #fdecec;
-  /* 5段階評価の塗った星 (F-11・m1cWEy のスマホ見本の星色)。 */
+  /* 5段階評価の塗った星 (F-11・ のスマホ見本の星色)。 */
   --color-liff-star: #f5a623;
-  /* マイルの貯まった箱の深い緑 (S3uBl)。主の緑より濃い。 */
+  /* マイルの貯まった箱の深い緑 。主の緑より濃い。 */
   --color-liff-deep: #0f3d24;
-  /* 深い緑の箱の上の小さな字 (S3uBl の「使えるマイル」「マイル」)。 */
+  /* 深い緑の箱の上の小さな字 ( の「使えるマイル」「マイル」)。 */
   --color-liff-deep-sub: #d7dbe0;
   /* 会員証のカード（I2pkdP）の紺の地と、次の段までの進みの棒。 */
   --color-liff-member-card: #2f3a4a;
@@ -48,7 +48,7 @@
   --color-liff-ok-ink: #0a7a3e;
   --color-liff-sun: #e5484d;
   --color-liff-sat: #2f6fde;
-  /* ── ウェビナーの暗い地 (7-webinar。値は liff-v7.html の書き出しから) ── */
+  /* ── ウェビナーの暗い地 (7-webinar。値は liff-管理画面.html の書き出しから) ── */
   --color-night: #15181d;
   --color-night-soft: #23272e;
   --color-night-line: #2c3038;
@@ -56,10 +56,10 @@
   /* 暗い地での会話の名前。ほか・自分を文字色で分ける */
   --color-night-name: #8fb8ff;
   --color-night-mine: #7ee2a8;
-  /* ── ウェビナー配信中 (RpW2h。値は板の書き出しから) ── */
+  /* ── ウェビナー配信中 (。値は板の書き出しから) ── */
   --color-night-body: #e6e8eb;
   --color-night-dim: #8a9098;
-  /* ── ウェビナー配信中 ★V8 (RpW2h) の地・動画の枠・副の字・途中のボタン。
+  /* ── ウェビナー配信中 ★V8  の地・動画の枠・副の字・途中のボタン。
    * 主の操作は LIFF の主の色を読む。 ── */
   --color-night-deep: #111214;
   --color-night-panel: #2a2c30;
@@ -117,8 +117,23 @@
   --liff-on-primary: #ffffff;
 }
 
-/* B-148・B-214：白いカードの共通の影。お店の色を影へ混ぜない。 */
+/* ・：白いカードの共通の影。お店の色を影へ混ぜない。 */
 :root { --liff-card-shadow: 0 1px 1px rgba(29,29,31,.16), 0 2px 4px rgba(29,29,31,.08); }
 .liff-card { box-shadow: var(--liff-card-shadow); }
 
 :root { --liff-control-shadow: 0 1px 2px rgb(29 29 31 / 0.06); }
+
+/* 共通部品の既定値。テーマによる上書きは liff-skin.css に置く。 */
+:root { --upload-slot-height: 140px; --upload-slot-padding: 16px; --choice-size: 16px; --choice-ring: 1.5px; --choice-dot: 8px; --color-choice-border: #c9ced6; --color-status-info: #2563eb; --choice-card-ring: 2px; --color-selection-border: var(--color-liff-primary); --color-choice-selected: var(--color-liff-soft); }
+
+/* LIFF の共通寸法。管理画面へ部品を埋める場合は利用側の fallback を保つ。 */
+:root {
+  --liff-space-2: 8px;
+  --liff-space-3: 12px;
+  --liff-space-label: 14px;
+  --liff-space-4: 16px;
+  --liff-touch-size: 44px;
+  --liff-action-height: 48px;
+  --liff-content-max: 448px;
+  --liff-safe-bottom: 30px;
+}

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 増やす・減らす（板 `oRbJi`）。絵の骨組み（`design/v8/html/oRbJi.html`）にそろえる。
+ * 増やす・減らす（板 ）。絵の骨組み（`design/v8/html/.html`）にそろえる。
  * 頭の CSV の空け・日時の短さ（9/30 14:12）・付けたの帯に補足を付けない
  * ことをここで留める。
  */

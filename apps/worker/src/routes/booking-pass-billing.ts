@@ -1,9 +1,9 @@
 import {Hono} from 'hono';
-import type {Env} from '../index.js';
+import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite} from '../services/gap-common.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {resolveAccountIdFromLiff,verifyCallerLineUserId,resolveFriendId} from './booking.js';
-import {passCheckout,passBillingEvent,purchaseView,type PassBillingEvent} from '../services/booking-pass-billing.js';
+import {passCheckout,passBillingEvent,purchaseView,type PassBillingEvent} from '../features/booking/booking-pass-billing/index.js';
 import {readBodyWithinLimit,verifyStripeSignature} from '../services/stripe-signature.js';
 export const bookingPassBilling=new Hono<Env>();
 bookingPassBilling.onError((e,c)=>c.json({success:false,error:e instanceof GapError?e.code:'pass_billing_unavailable'},e instanceof GapError?e.status:503));

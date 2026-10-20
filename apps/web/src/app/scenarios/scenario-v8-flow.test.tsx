@@ -220,7 +220,7 @@ describe('V8 シナリオの通し：作る→1通目→詳細', () => {
     renderNode(<ScenariosPage />)
     await flush()
     await screen.findByText('流れのシナリオ')
-    // 絵（axFrW）では「＋」は文字ではなく印。読み上げ名は「シナリオを作る」。
+    // 絵では「＋」は文字ではなく印。読み上げ名は「シナリオを作る」。
     const creates = screen.getAllByRole('button', { name: 'シナリオを作る' })
     expect(creates.length).toBeGreaterThan(0)
     fireEvent.click(creates[0])
@@ -240,7 +240,7 @@ describe('V8 シナリオの通し：作る→1通目→詳細', () => {
     expect(timeMode, '時刻指定の選択が見つかりません').toBeTruthy()
     fireEvent.click(timeMode)
 
-    // ★V8 作る①（src/v8/scenarios/create.tsx・dnzqC）の主ボタンは絵どおり「この方式で保存する」。
+    // ★V8 作る①（src/v8/scenarios/create.tsx・）の主ボタンは絵どおり「この方式で保存する」。
     fireEvent.click(screen.getByRole('button', { name: 'この方式で保存する' }))
     await waitFor(() => expect(createScenario).toHaveBeenCalledTimes(1))
     await screen.findByText('シナリオを作りました')
@@ -314,7 +314,7 @@ describe('V8 シナリオの通し：配信を始める→止める', () => {
     renderNode(<ScenarioDetailPage />)
     await flush()
 
-    // ★V8（PMLkX・OPGU2）：③の箱のボタンは「一時停止する」、確認の窓は「配信を止めますか」。
+    // ★V8（・）：③の箱のボタンは「一時停止する」、確認の窓は「配信を止めますか」。
     fireEvent.click(await screen.findByRole('button', { name: '一時停止する' }))
     // 止める窓は destructive のため role は alertdialog。
     const dialog = await screen.findByRole('alertdialog')

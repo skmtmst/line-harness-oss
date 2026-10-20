@@ -1,7 +1,9 @@
+> 文書：LINEアカウントの詳細・乗り換え（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # LINEアカウントの詳細・乗り換え（V8）の動き
 
-入口：`app/accounts/detail/page.tsx`（V8 のときだけ `src/v8/accounts-detail/detail.tsx`）と `app/accounts/handover/page.tsx`（V8 のときだけ `src/v8/accounts-detail/handover.tsx`）。
-v7 の画面・試験は触らない。古い V8（`app/accounts/handover/handover-v8.tsx`）は入口から外れた（ファイルと試験は残す）。
+入口：`app/accounts/detail/page.tsx`（V8専用で `src/v8/accounts-detail/detail.tsx`）と `app/accounts/handover/page.tsx`（V8専用で `src/v8/accounts-detail/handover.tsx`）。
+動き・権限・入力保持の試験は維持する。古い V8（[現役の入口・本体](README.md)）は入口から外れた（ファイルと試験は残す）。
 
 | 画面・窓 | ファイル | 絵 |
 |---|---|---|

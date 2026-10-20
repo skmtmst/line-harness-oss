@@ -1,5 +1,5 @@
 /*
- * ★V8 成果とアフィリエイト（Pencil `nJlxX`・`KdFRI`・`v9JWQ`・`h7dmB`・`OylSV`・`aINnz`・`Eo56k`・`tnTn9`）。
+ * ★V8 成果とアフィリエイト（Pencil ・・・・・・・）。
  * 枠・見出し・タブ・数の帯・フォルダの列は型（ListPage）が持つ。ここは表と道具の中身だけ。
  * 寸法は globals.css の --tpl-af-*。
  */
@@ -23,7 +23,7 @@
 }
 .colState { width: var(--tpl-af-col-state); }
 .colCheck { width: var(--tpl-af-col-check); }
-/* アフィリエイター（nJlxX）：紹介リンク 76・友だち追加 84・成果 60・報酬 84・操作 140。 */
+/* アフィリエイター：紹介リンク 76・友だち追加 84・成果 60・報酬 84・操作 140。 */
 .colLinks { width: var(--tpl-af-col-links); }
 .colFriends { width: var(--tpl-af-col-friends); }
 .colConv { width: var(--tpl-af-col-conv); }
@@ -96,7 +96,7 @@
   min-width: 0;
 }
 .dotStack > * + * {
-  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵 h7dmB・v9JWQ の説明の行）。 */
+  /* 名前の前のフォルダの丸の分だけ下げて、名前の頭にそろえる（絵の の説明の行）。 */
   margin-inline-start: var(--tpl-folder-dot-indent);
 }
 .stackEnd {
@@ -192,7 +192,7 @@
 .viewerBand { margin: var(--tpl-af-ro-before) var(--tpl-head-pad-side) var(--tpl-af-ro-after); }
 /* 閲覧のみで隠した作るボタン（＋下の間）の場所だけ空ける。 */
 
-/* タブの段（絵 nJlxX：タブの高さ 28）。共通のタブは変えず、この板の下の余白だけ詰める。 */
+/* タブの段（絵 ：タブの高さ 28）。共通のタブは変えず、この板の下の余白だけ詰める。 */
 .tabsBox :global([role='tab']) { min-height: 0; padding-bottom: var(--tpl-af-tab-pad-bottom); }
 
 /* 1行で切る（長い名前で行が伸びないように。全文は title）。 */
@@ -209,7 +209,7 @@
   gap: var(--tpl-toolbar-gap);
 }
 
-/* 案件（h7dmB）：報酬 110・動き 150・紹介している人 96・成果 100・操作 170。行 56。 */
+/* 案件：報酬 110・動き 150・紹介している人 96・成果 100・操作 170。行 56。 */
 .colOfferReward { width: var(--tpl-af-col-offer-reward); min-width: 0; }
 .colOfferAction { width: var(--tpl-af-col-offer-action); min-width: 0; }
 .colOfferAction .cellNum { overflow: hidden; text-overflow: ellipsis; }
@@ -218,7 +218,7 @@
 .colOfferState { width: calc(var(--tpl-af-col-offer-ops) - var(--tpl-icon-btn-row-hit) - var(--tpl-af-col-gap)); }
 .colOfferOps { width: var(--tpl-icon-btn-row-hit); }
 
-/* 成果承認（OylSV）：紹介した人 96・アカウント 92・案件 150・報酬 72・確認 72・決める 124。行 56。 */
+/* 成果承認：紹介した人 96・アカウント 92・案件 150・報酬 72・確認 72・決める 124。行 56。 */
 .colApAffiliate { width: var(--tpl-af-col-ap-affiliate); min-width: 0; }
 .colApAccount { width: var(--tpl-af-col-ap-account); min-width: 0; }
 .colApOffer { width: var(--tpl-af-col-ap-offer); min-width: 0; }
@@ -261,7 +261,7 @@
 .detailList dt { flex-shrink: 0; width: var(--tpl-af-detail-key-w); color: var(--color-ink-faint); }
 .detailList dd { margin: 0; color: var(--color-ink-secondary); }
 
-/* まとめて操作の窓（hadfk）。 */
+/* まとめて操作の窓。 */
 .dialogStep { color: var(--color-ink-faint); font-size: var(--text-micro); }
 .bulkTargets {
   display: flex;
@@ -299,7 +299,7 @@
   margin-top: var(--tpl-af-cr-card-gap);
 }
 
-/* 期間を締める（usDpO）。対象・合計の行は線で区切る。 */
+/* 期間を締める。対象・合計の行は線で区切る。 */
 .closeBody {
   display: flex;
   flex-direction: column;
@@ -402,13 +402,13 @@
   font-weight: 400;
 }
 
-/* 支払い（aINnz）：払う額 150・中身 70・振込先 170・状態 130・操作 170。行 59。 */
+/* 支払い：払う額 150・中身 70・振込先 170・状態 130・操作 170。行 59。 */
 .colPayAmount { width: var(--tpl-af-col-pay-amount); }
 .colPayCount { width: var(--tpl-af-col-pay-count); }
 .colPayBank { width: var(--tpl-af-col-pay-bank); min-width: 0; }
 .colPayState { width: var(--tpl-af-col-pay-state); min-width: 0; }
 .colPayOps { width: var(--tpl-af-col-pay-ops); }
-/* 「…」1つだけの操作の列は右端に寄せる（絵 aINnz）。 */
+/* 「…」1つだけの操作の列は右端に寄せる。 */
 .colPayOps .menuBox { justify-content: flex-end; }
 
 /* 今回の締め（案内の帯のすぐ下・枠の中に 期間・対象・合計・締める）。 */
@@ -476,7 +476,7 @@
   text-align: right;
 }
 
-/* レポート（Eo56k）：見出し 12/24・行 61・成果と売上 130・報酬 160・操作 28。 */
+/* レポート：見出し 12/24・行 61・成果と売上 130・報酬 160・操作 28。 */
 .colRepConv { width: var(--tpl-af-col-rep-conv); }
 .colRepReward { width: var(--tpl-af-col-rep-reward); }
 .colRepOps { width: var(--tpl-af-col-rep-ops); }

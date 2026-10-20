@@ -1,11 +1,13 @@
+> 文書：統括のテンプレートの動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 統括のテンプレートの動き（BEHAVIOR.md）
 
 対象：`console.tsx`（★V8-B 一覧 `LRc93`・メッセージのひな形を作る `X4JcOf`・アカウントへ配る `meBRB`）と `message-form.tsx`（`X4JcOf` の中身）。
-今までの画面 `app/hq/templates/template-console.tsx` から動きを写し、見た目だけを絵どおりに組み直した。小さな計算は `definition.ts`。
+今までの画面 [現役の入口・本体](README.md) から動きを写し、見た目だけを絵どおりに組み直した。小さな計算は `definition.ts`。
 配る結果の板 `dEvJM` は API 待ち（Codex）。今は同じ画面の進み具合の段で結果を出す。
 
 ## 入口
-- `app/hq/templates/page.tsx` が V8 のときだけこの画面を出す（v7 は今までの `HqTemplatePage`）。
+- `app/hq/templates/page.tsx` が V8専用でこの画面を出す。
 - タグ・リッチメニュー・回答フォーム・シナリオのひな形の中身は、入口が今の編集部品（`TemplateDefinitionEditor`）を `DefinitionEditor` として渡す（src/v8 は @/app を読まない）。
 
 ## 受け付ける URL と指定
@@ -62,7 +64,7 @@
 - ［配る］（2026-10-08 オーナー「見つからない」「『配る』でいい」）：5つの一覧（テンプレート・タグ・リッチメニュー・回答フォーム・シナリオ）のどの行にも「…」の左に置く（共通部品 `RowQuickAction`・幅60・高さ28・角丸8・薄い枠、「…」との間 16）。見出しは空の列。押すと「アカウントへ配る」（meBRB）。「…」の中の同じ項目も「配る」。閲覧のみ（owner/admin 以外）には列ごと出さない。ページの題「アカウントへ配る：名前」・説明文・［この内容でNアカウントへ配る］はそのまま。
 
 ## リッチメニューの作る①〜④（2026-10-08・gobhu・egdGx・K0gu1・gQabc）
-- 入口（`app/hq/rich-menus/page.tsx`）が店の作る画面（`app/rich-menus/new/create-v8.tsx`）を `RichMenuCreate` として渡し、`host`（`lib/rich-menu-create-host.ts`）付きで使う。
+- 入口（`app/hq/rich-menus/page.tsx`）が店の作る画面（[現役の入口・本体](README.md)）を `RichMenuCreate` として渡し、`host`（`lib/rich-menu-create-host.ts`）付きで使う。
 - 店は手順ごとにサーバーへ下書きを保存するが、統括は手順の間は画面の中に持ち（画像だけ `uploadImage(file,'rich_menu',寸法)` で先に置き場へ）、［下書きを保存］［保存する］で一度だけ統括のひな形を保存する（`lib/hq-rich-menu-create.ts` の `hqRichMenuDefinitionFromSeed`）。
 - ③ 出す相手は「すべての友だち」（displayAudience all）／「条件に当てはまる友だちだけ」（store：条件は配った先で決める）と出す順番（displayOrder）。④ は配るアカウント（フォルダの札・カードにチェック）。［保存する］は保存成功後にG-3の窓を開く。④で選んだ先は窓に引き継ぎ、窓の［N アカウントへ配る］で配る前の確認（preflight）まで進む。
 - 出さないもの：登録メディア・計測リンク・スコア・日時を選ぶ・文字のコピー（配った先の ID に直せない）、トークを開いたとき、出す相手の条件、いつ配るか（予約）、配る前の確認（自前の検査・LINE の検査・スマホで見た）（統括の口に無い）。

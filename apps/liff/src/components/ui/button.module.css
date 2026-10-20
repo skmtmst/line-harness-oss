@@ -1,0 +1,4 @@
+.skin { font-size: revert-layer; font-weight: revert-layer; line-height: revert-layer; color: revert-layer; margin: revert-layer; padding: revert-layer; background-color: revert-layer; background-image: revert-layer; border: revert-layer; }
+
+/* Worker の utility が後から読まれても、全幅+左右余白にはしない。 */
+.skin.nightAction { width: auto; align-self: stretch; border-radius: var(--liff-radius-night-action); }

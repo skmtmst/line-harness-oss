@@ -14,7 +14,7 @@ vi.mock('@/lib/api',async original=>{
 })
 import SearchEdit from './search-edit'
 afterEach(cleanup)
-it('B-241：保存済み検索一覧success:falseを重複名なしと見なさず読み直しへ',async()=>{
+it('保存済み検索一覧success:falseを重複名なしと見なさず読み直しへ',async()=>{
  f.list.mockResolvedValue({success:false,error:'fixture failure',items:[],summary:{total:0}})
  render(<SearchEdit/>)
  expect(await screen.findByText(/読み込めませんでした/)).toBeTruthy()

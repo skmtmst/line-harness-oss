@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { clientErrors } from './client-errors.js';
 
 function app() {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { chats } from './chats.js';
 import { supportInbox } from './support-inbox.js';
@@ -86,6 +86,17 @@ describe.each(['line', 'email'] as const)('N-016 %s の実SQLite・実ルート'
     expect((await rows(channel, { unreadOnly: '1' }, 'reader-b')).map(bareId).sort())
       .toEqual(['read-unanswered', 'unread-resolved']);
     expect((await rows(channel, { quickFilter: 'reply' })).map(bareId)).toEqual(['read-unanswered']);
+  });
+
+  test('既読APIは操作した担当者だけを更新する', async () => {
+    seed(channel, 'mark-read');
+    const path = channel === 'line' ? '/api/chats/mark-read/read' : '/api/support/email/threads/mark-read/read';
+    const response = await app().request(path, { method: 'POST' }, { DB: db.db });
+    expect(response.status).toBe(200);
+    expect((await rows(channel, { unreadOnly: '1' })).map(bareId)).toEqual([]);
+    expect((await rows(channel, { unreadOnly: '1' }, 'reader-b')).map(bareId)).toEqual(['mark-read']);
+    expect(db.raw.prepare('SELECT staff_id, channel, conversation_id FROM inbox_staff_reads').all())
+      .toEqual([{ staff_id: 'reader-a', channel, conversation_id: 'mark-read' }]);
   });
 
   test('1時間境界は59分59秒を除外し60分を含み、対応済みは除外', async () => {

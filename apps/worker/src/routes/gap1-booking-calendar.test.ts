@@ -2,10 +2,10 @@ import {beforeEach,afterEach,expect,test,vi} from 'vitest';
 import {bookingCalendarSettings} from './booking-calendar-settings.js';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
 import type {SqliteD1} from '../test-utils/d1-sqlite.js';
-import {readCalendarBusy,calendarDirectionEnabled,processCalendarSwitchJobs,refreshCalendarBusyCaches} from '../services/booking-calendar-settings.js';
+import {readCalendarBusy,calendarDirectionEnabled,processCalendarSwitchJobs,refreshCalendarBusyCaches} from '../features/booking/booking-calendar-settings.js';
 import {GoogleCalendarClient,GoogleCalendarReadError} from '../services/google-calendar.js';
-import {syncConfirmedBookingToGoogle} from '../services/booking-calendar-sync.js';
-import {renderNotificationText} from '../services/booking-notifier.js';
+import {syncConfirmedBookingToGoogle} from '../features/booking/booking-calendar-sync.js';
+import {renderNotificationText} from '../features/booking/booking-notifier.js';
 let d:SqliteD1;
 const accountPath='/api/booking/admin/calendar-sync?account_id=a',staffPath='/api/booking/admin/staff/bs/calendar-sync?account_id=a';
 const on={readEnabled:true,writeEnabled:true,expectedVersion:0};
@@ -63,7 +63,7 @@ test('B7-45 B7-46 B7-54: オフの既定は予定を保持、明示した未来�
  await gapCall(app(),staffPath,'PUT',{...on,expectedVersion:2});await gapCall(app(),staffPath,'PUT',{readEnabled:false,writeEnabled:false,expectedVersion:3,confirmed:true,removeFutureEvents:true});
  expect(d.raw.prepare('SELECT COUNT(*) n FROM booking_calendar_switch_jobs').get()).toEqual({n:1});
  await gapCall(app(),staffPath,'PUT',{...on,expectedVersion:4});await processCalendarSwitchJobs(d.db,{});expect(del).not.toHaveBeenCalled();
- await gapCall(app(),staffPath,'PUT',{readEnabled:false,writeEnabled:false,expectedVersion:5,confirmed:true,removeFutureEvents:true});await processCalendarSwitchJobs(d.db,{});expect(del).toHaveBeenCalledWith('event');expect((d.raw.prepare('SELECT status FROM bookings WHERE id=?').get('bk') as any).status).toBe('confirmed');
+ await gapCall(app(),staffPath,'PUT',{readEnabled:false,writeEnabled:false,expectedVersion:5,confirmed:true,removeFutureEvents:true});await processCalendarSwitchJobs(d.db,{});expect(del).toHaveBeenCalledWith('event',expect.any(AbortSignal));expect((d.raw.prepare('SELECT status FROM bookings WHERE id=?').get('bk') as any).status).toBe('confirmed');
 });
 test('B7-47 B7-48 B7-49 B7-56 B7-57 B7-58: 自分だけの権限、読み書き独立、古い版と代理・閲覧を拒否',async()=>{
  connect();const self={...gapOwner,id:'s',role:'staff' as const,permissionKeys:['booking.staff.own']};

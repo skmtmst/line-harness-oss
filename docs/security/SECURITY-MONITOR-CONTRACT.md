@@ -1,10 +1,12 @@
+> 文書：安全監視：画面とAPIの契約（B-343）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 安全監視：画面とAPIの契約（B-343）
 
 2026-10-16 / kenta・Codex。追加依頼を動きの仕様とする。画面・Pencilは変更しない。**691は予約番号の利用を明示されたため作成のみ。DB適用・本番/検証の設定・配備・実Slack送信はしていない。** 本組の承認番号はB-344の691〜695。689・690はbehaviorfixが使用する。
 
 ## API
 
-すべて既存の管理者ログイン・CSRF・所属検査の対象。画面側は `apps/web/src/lib/api-security-monitor.ts` の `securityMonitorApi` を使う（共通 `fetchApi` 経由）。共有の型は `packages/shared/src/security-monitor.ts`。
+すべて既存の管理者ログイン・CSRF・所属検査の対象。画面側は `apps/web/src/lib/api/helpers/security-monitor.ts` の `securityMonitorApi` を使う（共通 `fetchApi` 経由）。共有の型は `packages/shared/src/security-monitor.ts`。
 
 一覧・受領・解消の6経路と検証専用の1経路は`GET /openapi.json`にも掲載。入力・返却値・エラーの記載は`apps/worker/src/routes/security-monitor-openapi.ts`。既存の仕様と同じ確認表で、記載の欠落を検査する。
 
@@ -72,6 +74,6 @@ Slackへ出すのは固定名・整数の件数・サーバーで作った事故
 
 ## 試験と引き継ぎ
 
-`services/security-monitor.test.ts`は実SQLiteでしきい値、時差、出力量、機密情報除外、再送・同時実行・再発・監視故障・定期確認からの接続を確認。`routes/security-alerts.test.ts`は実SQLの店/統括・担当の境界、運営権限、閲覧のみ、代理ログイン、古い版、未適用を確認。終了値と故障対照の最終結果は[作業記録](SECURITY-DETECTION-1016.md)に記す。
+`services/security-monitor.test.ts`は実SQLiteでしきい値、時差、出力量、機密情報除外、再送・同時実行・再発・監視故障・定期確認からの接続を確認。`routes/security-alerts.test.ts`は実SQLの店/統括・担当の境界、運営権限、閲覧のみ、代理ログイン、古い版、未適用を確認。終了値と故障対照の最終結果は[作業記録](../document-archives.md#s05)に記す。
 
 PR番号は司令塔の採番後に反映履歴へ追加する。運用者向けの文案：`不審な操作の増加を知らせる仕組みと、情報漏えいの疑いに対応する手順を用意した`。番号の先取り、push・PR作成はしない。

@@ -1,3 +1,4 @@
+import { jstDate as japanDate } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 
 /**
@@ -208,7 +209,7 @@ async function incrementConsentCounter(
   lineAccountId: string,
   field: 'suppressed' | 'granted' | 'declined',
 ): Promise<void> {
-  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const today = japanDate();
   await db
     .prepare(
       `INSERT INTO site_consent_days (line_account_id, day, ${field})
@@ -396,7 +397,7 @@ export async function getSiteTrackingSummary(
   db: D1Database,
   lineAccountId: string,
 ): Promise<SiteTrackingSummary> {
-  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const today = japanDate();
   const row = await db
     .prepare(
       `SELECT

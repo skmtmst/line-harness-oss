@@ -5,8 +5,8 @@ import { forms } from './forms.js';
 import { friends } from './friends.js';
 import { formDocuments } from './form-documents.js';
 import { deleteCustomerData, deletionJournalId, friendDeletionCondition } from '../services/customer-data-deletion.js';
-import type { Env } from '../index.js';
-import type { AuthenticatedStaff } from '../middleware/auth.js';
+import type { Env } from '../worker-env.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import protectedRelations from '../services/customer-data-protected-relations.json';
 import relations from '../services/customer-data-relations.json';
 import { RETENTION_TABLES } from '@line-crm/db';
@@ -48,7 +48,7 @@ beforeEach(() => {
 });
 afterEach(() => { sqlite.raw.close(); vi.restoreAllMocks(); });
 
-describe('B-215 private data deletion', () => {
+describe('private data deletion', () => {
   it.each(['staff', 'viewer', 'anonymous', 'readOnlyOwner', 'readOnlyAdmin'])('rejects %s through both direct APIs', async role => {
     staff = role === 'anonymous' ? undefined : { ...staff!, role: role === 'readOnlyOwner' ? 'owner' : role === 'readOnlyAdmin' ? 'admin' : role, readOnly: role.startsWith('readOnly') } as AuthenticatedStaff;
     expect((await app().request(answerUrl, { method: 'DELETE', headers: headers() }, env())).status).toBe(403);

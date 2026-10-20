@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import './filter-chip.css'
 
 /**
- * 一覧の絞り込み札（★V7・全画面で1つだけ使う形）。
+ * 一覧の絞り込み札（★管理画面・全画面で1つだけ使う形）。
  *
  * 丸い札・高さ32・選んだら濃い緑の地に白文字＋✓（#669: 選んだ状態は
  * 「有効状態」なのでアクセントを使う）。件数は文字の後ろに小さく出す。

@@ -11,7 +11,7 @@ import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { restaurantGoogleApi, type GoogleHoursProposal, type GoogleProfileAddress, type GoogleProfileData } from '@/lib/restaurant-google-api'
 import { errorMessage, formatPeriods, formatStampFull, formatYmdShort, summarizeWeekly, TIME_OPTIONS } from './format'
-import type { GoogleNav } from './google'
+import type { GoogleNav } from './navigation-types'
 import styles from './google.module.css'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -19,7 +19,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 /*
- * ★V8 Googleビジネス プロフィール（`JUTGz`）。
+ * ★V8 Googleビジネス プロフィール（）。
  * 本日の営業時間（変更・今日を休みにする・祝日の確認・早く閉める）→ 店舗情報 → Google側の変更を確認。
  * 口は今の画面と同じ。営業時間の変更・変更の確認・変更履歴・プロフィールの編集は
  * ?tab=profile&view=hours|confirm|history|edit へ移り、共通の V8 部品で出す。
@@ -85,7 +85,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
 
   if (loading && !data) return <div className={styles.stateBox}><ListState kind="loading" title="プロフィールを読み込んでいます" /></div>
   if (!data) {
-    return <ListState kind="error" title="プロフィールを表示できませんでした" description={error} onRetry={() => void load()} action={<Button onClick={() => go({ tab: 'settings' })}>設定で接続を確認</Button>} />
+    return <ListState kind="error" title="プロフィールを表示できませんでした" description={error} onRetry={() => void load()} action={<Button onClick={() => go({ tab: 'settings' })}>設定で接続を確認する</Button>} />
   }
 
   const { profile, today } = data
@@ -101,7 +101,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
     ['住所', addressText(profile.address)],
     ['電話', profile.phone ?? emptyValue('unconfigured')],
     ['サイト', profile.websiteUri ?? emptyValue('unconfigured')],
-    ['カテゴリ', '—（未取得）'],
+    ['カテゴリ', '—'],
   ]
   const moreRows: Array<[string, string]> = [
     ['通常の営業時間', summarizeWeekly(profile.regularHours)],
@@ -114,16 +114,16 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
       {role !== null && !canManageRole(role) ? <ReadOnlyNotice>閲覧のみです。営業時間と店舗情報を確認できます。</ReadOnlyNotice> : null}
       {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
       {!data.stale && data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
-      {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${data.pendingChangeCount} 件）。`}</Notice> : null}
+      {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認する</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${data.pendingChangeCount} 件）。`}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-today-title">
         <SectionHeader size="small" title={<span id="gb-today-title">本日の営業時間</span>} />
         <p className={styles.todayHours}>{`${formatYmdShort(today.date)}${today.holidayName ? `・${today.holidayName} ` : ''}${todayText}${today.special ? '（特別営業時間）' : ''}`}</p>
         <div className={styles.buttonRow}>
-          {canChange ? <Button onClick={() => go({ tab: 'profile', view: 'hours', mode: 'text' })}><Clock aria-hidden className={styles.icon15} />営業時間を変更</Button> : null}
+          {canChange ? <Button onClick={() => go({ tab: 'profile', view: 'hours', mode: 'text' })}><Clock aria-hidden className={styles.icon15} />営業時間を変える</Button> : null}
           {canChange ? <Button onClick={() => void quick({ source: 'shortcut', shortcut: 'close_today' })} disabled={today.closed} busy={Boolean(busy)} busyLabel="処理中…"><CalendarX aria-hidden className={styles.icon15} />今日を休みにする</Button> : null}
-          <Button onClick={() => setShowHolidays((v) => !v)} aria-expanded={showHolidays}><CalendarDays aria-hidden className={styles.icon15} />祝日の営業時間を確認</Button>
+          <Button onClick={() => setShowHolidays((v) => !v)} aria-expanded={showHolidays}><CalendarDays aria-hidden className={styles.icon15} />祝日の営業時間を確認する</Button>
           {canChange ? <Button onClick={() => { setEarlyClose(closeOptions[closeOptions.length - 1]?.value ?? null); setActionError('') }} disabled={today.closed || closeOptions.length === 0}><Timer aria-hidden className={styles.icon15} />今日は早く閉める</Button> : null}
         </div>
         {earlyClose !== null ? (
@@ -133,7 +133,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
             <span className={styles.muted}>{`現在 ${formatPeriods(today.periods)}`}</span>
             <span className={styles.spacer} aria-hidden="true" />
             <Button onClick={() => setEarlyClose(null)} disabled={busy}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void quick({ source: 'shortcut', shortcut: 'early_close_today', closeTime: earlyClose })} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">変更案を確認</Button>
+            <Button variant="primary" onClick={() => void quick({ source: 'shortcut', shortcut: 'early_close_today', closeTime: earlyClose })} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">変更案を確認する</Button>
           </div>
         ) : null}
         {showHolidays ? (
@@ -165,8 +165,8 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         <div className={styles.buttonRowEnd}>
           <Button variant="text" onClick={() => setShowMore((v) => !v)} aria-expanded={showMore}>{showMore ? 'ほかの項目を閉じる' : 'ほかの項目（特別営業時間・写真）'}</Button>
           <span className={styles.spacer} aria-hidden="true" />
-          <Button onClick={() => go({ tab: 'profile', view: 'history' })}><History aria-hidden className={styles.icon15} />変更履歴</Button>
-          {canChange ? <Button variant="primary" onClick={() => go({ tab: 'profile', view: 'edit' })}><Pencil aria-hidden className={styles.icon15} />プロフィールを編集</Button> : null}
+          <Button onClick={() => go({ tab: 'profile', view: 'history' })}><History aria-hidden className={styles.icon15} />変更履歴を見る</Button>
+          {canChange ? <Button variant="primary" onClick={() => go({ tab: 'profile', view: 'edit' })}><Pencil aria-hidden className={styles.icon15} />プロフィールを編集する</Button> : null}
         </div>
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-google-updates-title">

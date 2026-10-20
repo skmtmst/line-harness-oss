@@ -40,7 +40,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8-B 配信を直す（`w5pwG`、例：口コミのお願い）。
+ * ★V8-B 配信を直す（、例：口コミのお願い）。
  *
  * 取得・保存・版つき競合・テスト送信の決めごとを保持する現役の編集。
  * ・節は 配信フロー・いつ送りますか・送るもの・押されたあとにすること。

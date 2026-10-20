@@ -1,10 +1,10 @@
 import styles from './error-count-badge.module.css'
 
 /**
- * 隠れた所の誤りの数（B-139）。カード・タブ・閉じた段の札の右に置き、
+ * 隠れた所の誤りの数。カード・タブ・閉じた段の札の右に置き、
  * 「この中に直す欄がある」ことを赤い丸で知らせる。0 のときは描かない。
  *
- * 数は `useFormErrors().countIn(束)` から渡す（保存を押すまでは 0）。
+ * 数は `useFormErrors.countIn(束)` から渡す（保存を押すまでは 0）。
  */
 export function ErrorCountBadge({ count, label }: { count: number; label?: string }) {
   if (count <= 0) return null

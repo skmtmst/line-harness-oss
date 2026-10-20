@@ -1,3 +1,4 @@
+import { logger } from '@line-crm/shared/server';
 export type ScheduledJob = {
   name: string;
   run: () => Promise<void>;
@@ -26,7 +27,7 @@ export function scheduledLane(cron: string): ScheduledLane {
 export async function runIsolatedScheduledJobs(
   jobs: ScheduledJob[],
   onFailure: (failure: ScheduledJobFailure) => void = ({ name, reason }) => {
-    console.error(JSON.stringify({"code":"services_scheduled_job_isolation_failed"}));
+    logger.error("services_scheduled_job_isolation_failed");
   },
 ): Promise<{ succeeded: number; failed: number }> {
   const results = await Promise.allSettled(jobs.map((job) => job.run()));

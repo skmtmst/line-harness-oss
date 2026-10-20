@@ -70,7 +70,7 @@ const BASE_QUERY = {
   periodTo: '2026-08-07T23:59:59.999Z',
 };
 
-describe('V6クロス分析', () => {
+describe('クロス分析', () => {
   let sqlite: Database.Database;
   let db: D1Database;
 
@@ -671,7 +671,7 @@ describe('V6クロス分析', () => {
  * 動かす。1つの接続を使い回すと「同じ処理系の中の順番」しか見えないため、
  * 旧実行が生き返って書き込む場面を取りこぼす。
  */
-describe('V6クロス分析の世代別staging(2接続)', () => {
+describe('クロス分析の世代別staging(2接続)', () => {
   let directory: string;
   let file: string;
   let sqliteA: Database.Database;

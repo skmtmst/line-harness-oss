@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { PageTitle } from '@/components/templates/page-frame'
 
 import { useEffect, useState } from 'react'
@@ -56,7 +57,7 @@ export default function UpdatesPage() {
         // 運用者を驚かせる赤エラーではなく状況の説明を出す。
         const msg = e instanceof Error ? e.message : String(e)
         if (/ 40[13]$/.test(msg)) setState({ kind: 'unconfigured' })
-        else setState({ kind: 'error', message: msg })
+        else setState({ kind: 'error', message: describeApiFailure(e, '更新履歴の読み込み') })
       })
   }, [])
 
@@ -81,7 +82,7 @@ export default function UpdatesPage() {
       )}
       {state.kind === 'error' && (
         <Notice tone="warn" className="mb-4">
-          履歴を取得できませんでした（{state.message}）。時間をおいて再読み込みしてください。
+          {state.message}
         </Notice>
       )}
       {state.kind === 'ready' && rows.length === 0 && (
@@ -119,7 +120,7 @@ export default function UpdatesPage() {
                     Date.now() < r.rollback_expires_at ? (
                       /*
                         **押しても何も起きない口を置かない**（`docs/v8-design-rules.md` §5「出す＝使える」）。戻す仕組みは画面から使えないので、
-                        押し口ではなく文で理由を出す。以前はブラウザの `alert()` で
+                        押し口ではなく文で理由を出す。以前はブラウザの `alert` で
                         「rollback not implemented in MVP — use CLI」と内部語を出していた。
                       */
                       <span className="text-ink-faint text-xs">

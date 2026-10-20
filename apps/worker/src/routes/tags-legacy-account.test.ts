@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { tags } from './tags.js';
@@ -51,7 +51,7 @@ describe('N-048 旧タグ作成・CSV一括の所属確定 (#803)', () => {
     const fixture = createTestD1({ loginPolicy: 'off' });
     testDb = fixture;
     seed(testDb);
-    // D1 run()はINSERT RETURNINGの行を返す。汎用fixtureはchangesだけなので、
+    // D1 runはINSERT RETURNINGの行を返す。汎用fixtureはchangesだけなので、
     // 一括作成の成否判定には実SQLiteのRETURNINGを使う(一意性は模擬しない)。
     const prepare = testDb.db.prepare.bind(testDb.db);
     testDb.db.prepare = ((query: string) => {

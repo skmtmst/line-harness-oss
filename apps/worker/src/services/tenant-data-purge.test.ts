@@ -3,7 +3,7 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { processTenantDataPurge } from './tenant-data-purge.js';
 
 /*
- * 退会後の顧客データ削除（★V6 36-2）。
+ * 退会後の顧客データ削除（★36-2）。
  *
  * 「消える」だけでなく「消えてはいけないものが残る」ことまで確かめる。
  * 条件は SQL そのものが仕様なので、手書きのモックではなく本物のSQLiteに当てる。

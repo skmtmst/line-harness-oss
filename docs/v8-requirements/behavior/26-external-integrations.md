@@ -1,3 +1,5 @@
+> 文書：26 外部連携 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 26 外部連携 操作と挙動（受け入れ）
 
 要件の正本：[26 外部連携](../../v6-requirements/v6-26-external-integrations-requirements-draft.md)・[25 共通アクション接続契約 §6・§7](../../v6-requirements/v6-25-automation-action-contract.md)・[共通基盤 §3・§6-2（送信 Webhook は最大 8 回・24 時間）・§9・§11・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[30 §7〜§8 権限・§22 大事な操作の再確認](../../v6-requirements/v6-30-login-users-requirements-draft.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
@@ -86,7 +88,7 @@
 2. 受け取りの処理：要件 §7-2 は記録したらすぐ 202 を返し、照合と処理はキューで行う。今は受け取りの要求の中で照合・処理・出来事の発火まで済ませてから返す。根拠：apps/worker/src/routes/webhooks.ts:1857-1960（executeIncomingWebhookActions・fireEvent を await）。
 3. 送信の初回：要件 §6-4 は業務の処理では送り出し待ちに積むだけで、送るのは別の受け手。今は出来事を起こした処理の中で初回を同期に送り、落ちた物だけを 5 分 cron が拾う。根拠：apps/worker/src/index.ts:2148-2153（コメント）・apps/worker/src/services/event-bus.ts:154。
 4. 手動の送り直しが Worker の中で待つ：要件 §6-4 は「retry は Worker 内 sleep で待たない」。記録からの送り直しは送り先の max_retries（最大 5 回）まで 0.5〜8 秒ずつ待って続けて送る。根拠：apps/worker/src/services/webhook-interactions.ts:190-193、apps/worker/src/services/outgoing-webhook-delivery.ts:123-128・700。
-5. オートメーションからの送信 Webhook は配送台帳を通らず直接送り、再試行も 26 の 8 回・24 時間ではなく 1・5・30 分の最大 4 回。根拠：apps/worker/src/services/automation-action-executors.ts:599-605、apps/worker/src/services/automation-engine.ts:14-15。
+5. オートメーションからの送信 Webhook は配送台帳を通らず直接送り、再試行も 26 の 8 回・24 時間ではなく 1・5・30 分の最大 4 回。根拠：apps/worker/src/features/automations/automation-action-executors.ts:599-605、apps/worker/src/features/automations/automation-engine.ts:14-15。
 6. 旧オートメーションの任意 URL への送信が残る（要件 §11・§17-8 は直接 fetch を廃止して登録済みの接続 ID だけ）。署名も付かない。根拠：apps/worker/src/services/event-bus.ts:689-711。
 7. 合言葉はブラウザで 24 バイト（192 ビット）作り、送り手の値をそのまま保存する。要件 §6-3 は最低 256 ビット、§10 はサーバー側で作るのが既定。根拠：apps/web/src/v8/webhooks/secret.ts:12-15、apps/worker/src/routes/webhooks.ts:345-349・1101-1104（body.secret を検査して保存）。
 8. 送った・届いた本文を保存している：要件 §8-1 は本文を既定で保存しない（debug を期限付きで有効にした時だけ）。今はやり取りの記録に送った本文を残し、送り直しにも使う。根拠：apps/worker/src/services/webhook-interactions.ts:153-159（requestBodyJson）、apps/worker/src/routes/webhooks.ts:1530（payload の口）。

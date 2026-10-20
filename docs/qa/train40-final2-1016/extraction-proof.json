@@ -1,8 +1,0 @@
-{
-  "baseline": "74b95f47ca",
-  "starsAndReplyBadgeBodyByteIdentical": true,
-  "beforeLines": 447,
-  "afterLines": 430,
-  "unchangedCeiling": 446,
-  "normalization": "ファイル末尾の空行だけ除き、関数・コメントの本体を比較"
-}

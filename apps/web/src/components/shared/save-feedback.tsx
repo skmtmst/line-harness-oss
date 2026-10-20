@@ -10,7 +10,7 @@ export type SaveFeedbackState =
   | { kind: 'success'; subject: string }
   | { kind: 'failed' | 'partial'; reason: string; completed: string[]; remaining: string[] }
 
-/** B-246 D1：失敗後も入力を保つ。再試行の保存処理は完了した工程を再送しない。 */
+/**  D1：失敗後も入力を保つ。再試行の保存処理は完了した工程を再送しない。 */
 export function useSaveFeedback() {
   const [state, setState] = useState<SaveFeedbackState>({ kind: 'idle' })
   const inFlight = useRef(false)

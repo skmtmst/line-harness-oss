@@ -12,7 +12,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import { notifyToast } from '@/components/shared/toast'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
+
 import Pagination from '@/components/shared/pagination'
 import { RowMenu } from '@/components/shared/row-actions'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
@@ -22,14 +22,14 @@ import { bookingApi, type BookingMenu } from '@/lib/api'
 import { menuPriceLabel } from '../lib/menu-price'
 import { bookingErrorMessage } from '../lib/menu-validation'
 import MenuVersionHistory from '../menu-version-history'
-import { AccountIcon, Band, MENU_PAGE_SIZE, StateCard, SkeletonRows, sortedMenus, type LoadStatus } from './shared'
+import { AccountIcon, Band, MENU_PAGE_SIZE, StateCard, SkeletonRows, sortedMenus } from './shared'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 import styles from '../settings.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 
-/* ① メニュー（owaS3）（settings-v8.tsx から分割。見た目・動きは変えない） */
+/* ① メニュー（settings-v8.tsx から分割。見た目・動きは変えない） */
 
 export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit, onReload }: MenusTabProps) {
   const saveErrors = useSaveFormErrors()
@@ -82,7 +82,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   const pageCount = Math.max(1, Math.ceil(shown.length / MENU_PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
 
-  /* 中身の直しはメニュー作成ページ（?menu=<id>、node QqER7）に集約する。 */
+  /* 中身の直しはメニュー作成ページ（?menu=<id>、node ）に集約する。 */
   function openMenuForm(menu: BookingMenu) {
     router.push(`/booking/menus/new?menu=${menu.id}`)
   }
@@ -232,7 +232,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
   return (
     <SaveErrorScope errors={saveErrors}>
     <div className={styles.tabStack} data-design="Table">
-      <ConfirmDialog open={deleteTarget !== null} title={`「${deleteTarget?.name ?? ''}」を削除しますか？`} description="予約が付いているメニューは削除できません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => void deleteMenu()} onCancel={() => { if (!deleting) setDeleteTarget(null) }} />
+      <ConfirmDialog open={deleteTarget !== null} title={`「${deleteTarget?.name ?? ''}」を削除しますか？`} description="予約が付いているメニューは削除できません。" confirmLabel="削除する" destructive busy={deleting} error={deleteError} onConfirm={() => deleteMenu()} onCancel={() => { if (!deleting) setDeleteTarget(null) }} />
       <Band tone="hint">上から並んだ順に、お客さまの画面に出ます。つまみで並べ替えます。</Band>
 
       <div className={styles.toolbar}>

@@ -1,3 +1,4 @@
+import { readApiSource } from '../../../scripts/test-api-source.mjs'
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
@@ -11,13 +12,9 @@ import { describe, expect, it } from 'vitest'
  * - 成果地点への利用先記録の失敗を静かに成功に見せない
  */
 const PAGE = readUiSource(new URL('./page.tsx', import.meta.url), 'utf8')
-const API = readFileSync(new URL('../../lib/api.ts', import.meta.url), 'utf8')
+const API = readApiSource(new URL('../../lib/api.ts', import.meta.url), 'utf8')
 const WORKER = readFileSync(
   new URL('../../../../worker/src/routes/analytics.ts', import.meta.url),
-  'utf8',
-)
-const CONVERSION_DB = readFileSync(
-  new URL('../../../../../packages/db/src/conversion-definitions.ts', import.meta.url),
   'utf8',
 )
 const SAVED_DB = readFileSync(
@@ -100,9 +97,7 @@ describe('ANALYTICS-06: いまの定義版と集計結果の版を分けて出�
 describe('CONVERSION-05: 段の成果地点への利用先記録は確実に行い、失敗を知らせる', () => {
   it('下書き・停止中の地点にも利用関係を記す', () => {
     expect(WORKER).toContain('allowInactive: true')
-    expect(CONVERSION_DB).toContain('allowInactive?: boolean')
-    // 手追加の口は止めたまま
-    expect(CONVERSION_DB).toContain("point.status !== 'active' && !input.allowInactive")
+    // DBでの停止中拒否と明示許可は packages/db/test/319_conversion_definition_read_contract.test.ts の実SQL試験で守る。
   })
 
   it('記録に失敗した地点は応答へ載せ、画面が断りを出す', () => {

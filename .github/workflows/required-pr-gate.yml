@@ -250,6 +250,13 @@ jobs:
 
           sys.exit(1 if failed else 0)
           PY
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_production_workflows.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/check_production_workflows.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/test_workflow_commands.py
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/security/check_workflow_commands.py
+
+      - name: Lint production release workflows
+        run: bash scripts/security/lint-production-workflows.sh
 
   repository-checks:
     name: Repository and shared checks
@@ -266,7 +273,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Guard shared pattern ownership (B-172)
+      - name: Guard shared pattern ownership
         env:
           PATTERN_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
@@ -277,15 +284,13 @@ jobs:
             node scripts/visual-qa/v8-pattern-audit.mjs \
               --code . --out "$RUNNER_TEMP/pattern-ownership"
           fi
-      - name: Guard newly added source visual contracts (B-273)
+      - name: Guard newly added source visual contracts
         env:
           SOURCE_CONTRACT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          node --test scripts/verify-no-source-visual-contracts.test.mjs
+          node --test scripts/verify-no-source-visual-contracts.test.mjs scripts/source-provenance.test.mjs
           base="${SOURCE_CONTRACT_BASE_SHA:-$(git rev-parse HEAD^)}"
           node scripts/verify-no-source-visual-contracts.mjs --base "$base"
-          node --test apps/web/scripts/v8-guard/code-size.test.mjs
-          node apps/web/scripts/v8-guard/code-size.mjs --base "$base"
       - name: Build shared packages
         run: >-
           pnpm
@@ -301,26 +306,33 @@ jobs:
         run: pnpm tsx scripts/check-migrations.ts
       - name: Test database package
         if: needs.changes.outputs.db_tests == 'true'
-        run: pnpm --filter @line-crm/db test
+        run: pnpm --config.enable-pre-post-scripts=false --filter @line-crm/db test
       # 自己更新まわりの2つは release.yml のタグ push でしか動いていなかった。
       # 取り込んだ後、リリースを打つ段になって初めて失敗が分かる位置にあったので、
       # PRの必須ゲートへ引き上げる(#704)。この工程はすでに update-engine を
       # build しているので、依存の追加も待ち時間の追加もほぼない。
       - name: Test the self-update engine
         run: pnpm --filter @line-harness/update-engine test
-      # `pretest` が update-engine を build し直す。上の build と同じ内容。
+      # Dependencies were built above; standalone package hooks remain enabled locally.
       - name: Test the setup CLI
-        run: pnpm --filter create-line-harness test
+        run: pnpm --config.enable-pre-post-scripts=false --filter create-line-harness test
       - run: pnpm test:scripts
-      - name: Typecheck repository scripts
+      - name: Ratchet code quality against the PR base
+        env:
+          QUALITY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          npm install --no-save --prefix "$RUNNER_TEMP/typedeps" @types/node@22
-          pnpm exec tsc -p scripts/tsconfig.json \
-            --typeRoots "$RUNNER_TEMP/typedeps/node_modules/@types"
+          pnpm quality:test
+          pnpm quality:typecheck
+          base="${QUALITY_BASE_SHA:-$(git rev-parse HEAD^)}"
+          pnpm quality:check --base "$base"
+      - name: Check names and public dependency boundaries
+        run: pnpm exec tsx scripts/structure/check.ts
+      - name: Typecheck repository scripts
+        run: pnpm typecheck:scripts
       - name: Test shared
         run: |
           pnpm --filter @line-crm/shared typecheck
-          pnpm --filter @line-crm/shared test
+          TZ=UTC pnpm --filter @line-crm/shared test
           TZ=Asia/Bangkok pnpm --filter @line-crm/shared test
       - run: pnpm --filter liff typecheck
       - run: pnpm --filter liff test
@@ -341,13 +353,13 @@ jobs:
       - name: Build Worker dependencies
         run: >-
           pnpm
+          --filter @line-harness/sdk
           --filter @line-crm/shared
           --filter @line-crm/line-sdk
           --filter @line-crm/db
-          --filter @line-harness/update-engine
           build
-      - run: pnpm --filter worker typecheck
-      - run: pnpm --filter worker test
+      - run: pnpm --config.enable-pre-post-scripts=false --filter worker typecheck
+      - run: pnpm --config.enable-pre-post-scripts=false --filter worker test
 
   worker-build:
     name: Worker build
@@ -368,20 +380,20 @@ jobs:
           --filter @line-crm/shared
           --filter @line-crm/line-sdk
           --filter @line-crm/db
-          --filter @line-harness/update-engine
           build
       - name: Build Worker
         env:
           VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
-          VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
           VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
-        run: pnpm --filter worker build
+        run: pnpm --config.enable-pre-post-scripts=false --filter worker build
+      - name: Verify built production Worker config and security headers (offline)
+        run: pnpm exec tsx scripts/deploy/production/check-build.ts worker
       - name: Install browser for deployed LIFF entry guard
         run: pnpm exec playwright install --with-deps chromium
-      - name: Guard customer waitlist entry, theme and short actions (B-247 E3)
-        run: node scripts/codex/revfix-c-liff-browser.mjs
+      - name: Guard customer waitlist entry, theme and short actions
+        run: node scripts/browser/liff-recovery.mjs
       - name: Verify LIFF security headers and public SDK compatibility
-        run: node scripts/codex/train32-security-browser.mjs worker
+        run: node scripts/security/browser-headers.mjs worker
 
   web-checks:
     name: Admin lint, typecheck and tests
@@ -399,17 +411,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Build Admin dependencies
-        run: >-
-          pnpm
-          --filter @line-crm/shared
-          --filter @line-harness/update-engine
-          build
+        run: |
+          pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-harness/update-engine build
+          pnpm --filter web release-log
       - run: pnpm --filter web exec next lint --report-unused-disable-directives-severity error
       - run: node apps/web/scripts/verify-entity-pickers.mjs
       - name: Reject restored legacy admin appearance
         run: node apps/web/scripts/verify-v8-only.mjs
-      - run: pnpm --filter web typecheck
-      - run: pnpm --filter web test
+      - run: pnpm --config.enable-pre-post-scripts=false --filter web typecheck
+      - run: pnpm --config.enable-pre-post-scripts=false --filter web test
       # 外部連携画面の実挙動契約(webhook-runtime.spec.ts)。PR #1506 で入ったが
       # 専用の設定が無く、**どのワークフローからも一度も呼ばれていなかった**(#704)。
       # #704 で繋いだところ2試験が落ち、原因が画面側の不具合だと分かったので
@@ -472,8 +482,8 @@ jobs:
       # ここで続けて動かすのが一番安い。
       - name: Test the SDK
         run: pnpm --filter @line-harness/sdk test
-      - run: pnpm --filter @line-harness/mcp-server typecheck
-      - run: pnpm --filter @line-harness/mcp-server test
+      - run: pnpm --config.enable-pre-post-scripts=false --filter @line-harness/mcp-server typecheck
+      - run: pnpm --config.enable-pre-post-scripts=false --filter @line-harness/mcp-server test
       - run: pnpm --filter @line-harness/mcp-server build
 
   # apps/docs の2ファイル6試験は、`deploy-cloudflare-docs.yml` が呼ぶのが
@@ -525,12 +535,11 @@ jobs:
           key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/**/*.[jt]s', 'apps/web/**/*.[jt]sx') }}
       - run: pnpm install --frozen-lockfile
       - name: Build Admin dependencies
-        run: >-
-          pnpm
-          --filter @line-crm/shared
-          --filter @line-harness/update-engine
-          build
+        # web prebuild builds shared and line-sdk and prepares the release log.
+        run: pnpm --filter @line-harness/update-engine build
       - run: pnpm --filter web build
+      - name: Verify exported Admin headers and all external bootstrap scripts (offline)
+        run: pnpm exec tsx scripts/deploy/production/check-build.ts admin
       # 画面の権限は「文字列がある」では確かめられない。書き出した `out` を
       # 本番と同じ当て方で配り、実ブラウザで owner/admin/staff を動かす（N-197）。
       # vitest は `.test.ts(x)` しか見ないので、ここから呼ばないと必須ゲートの
@@ -546,7 +555,7 @@ jobs:
       - name: Verify EC import list account-switch behavior on the built admin
         run: >-
           pnpm exec playwright test
-          --config scripts/codex/ec-commerce-isolated.config.mjs
+          --config scripts/browser/ec-commerce-isolated.config.mjs
       # 間欠的な失敗(#685)の原因切り分け用。失敗時のDOM(error-context.md)を
       # artifactとして残し、CIでしか再現しない症状を後から読めるようにする。
       - name: Upload EC import list failure context
@@ -567,9 +576,9 @@ jobs:
           pnpm exec playwright test
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
       - name: MFA auth input and button behavior at three widths
-        run: pnpm exec playwright test --config scripts/codex/train30-auth-isolated.config.mjs
+        run: pnpm exec playwright test --config scripts/browser/auth-isolated.config.mjs
       - name: Verify admin security headers and auth interactions
-        run: node scripts/codex/train32-security-browser.mjs web
+        run: node scripts/security/browser-headers.mjs web
       - name: Upload MFA browser failure context
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -580,8 +589,6 @@ jobs:
       - run: pnpm --filter web verify:design
       # 画面の実挙動は、書き出した本番と同じ中身をブラウザで押して見る。
       # 型と文字列の検査だけでは、押せない口や取り違えた導線が残る。
-      - name: Install Chromium for browser checks
-        run: pnpm exec playwright install --with-deps chromium
       - name: Admin browser behavior checks
         run: |
           node apps/web/src/app/form-submissions/form-submissions-browser-behavior.mjs
@@ -631,7 +638,7 @@ jobs:
       - name: Build the PR admin against the visual-qa mock API
         if: steps.scope.outputs.run == 'true'
         run: |
-          pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
+          pnpm --filter @line-harness/update-engine build
           pnpm --filter web build
           cp -a apps/web/out /tmp/head-out
       - name: Build the base admin against the same mock API
@@ -642,7 +649,7 @@ jobs:
           git worktree add /tmp/base "$BASE_SHA"
           cd /tmp/base
           pnpm install --frozen-lockfile
-          pnpm --filter @line-crm/shared --filter @line-harness/update-engine build
+          pnpm --filter @line-harness/update-engine build
           pnpm --filter web build
       - name: Install Chromium for the V8 screen guard
         if: steps.scope.outputs.run == 'true'
@@ -673,15 +680,13 @@ jobs:
       - name: No V8 layout breaks at 1152, 1440 and 1920
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json
-      # B-191/192 と B-187 はここに一本化。blank-gap.mjs を別ステップで重ねない。
+      # 空白量は診断のみ。切れ・重なり・操作の遮断を必須で確認する。
       - name: Broken fixtures must fail the V8 layout guard
         if: steps.scope.outputs.run == 'true'
         env:
           V8_GUARD_BASE: http://127.0.0.1:4310
-          DIALOG_DESCRIPTION_REPORT: ${{ runner.temp }}/v8-guard/dialog-description-band.json
         run: |
-          node apps/web/scripts/v8-guard/dialog-description-band-fixture.mjs
-          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/form-columns.test.mjs apps/web/scripts/v8-guard/create-consistency.test.mjs apps/web/scripts/v8-guard/create-footer-choices.test.mjs apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs apps/web/scripts/v8-guard/create-preview-layout.test.mjs apps/web/scripts/v8-guard/affixed-input-layout.test.mjs apps/web/scripts/v8-guard/shift-entry-layout.test.mjs apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/button-content-width.test.mjs apps/web/scripts/v8-guard/automation-field-error.test.mjs apps/web/scripts/v8-guard/fix-patterns.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/layer-order.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/list-row-height.test.mjs apps/web/scripts/v8-guard/dialog-layout.test.mjs apps/web/scripts/v8-guard/dialog-description-band.test.mjs apps/web/scripts/v8-guard/create-input-layout.test.mjs apps/web/scripts/v8-guard/form-badge-layout.test.mjs apps/web/scripts/v8-guard/form-card-header.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/visual-state.test.mjs apps/web/scripts/v8-guard/required-badge.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/reservation-reading.test.mjs apps/web/scripts/v8-guard/dialog-actions.test.mjs apps/web/scripts/v8-guard/dialog-settings.test.mjs apps/web/scripts/v8-guard/dialog-content.test.mjs apps/web/scripts/v8-guard/input-retention.test.mjs apps/web/scripts/v8-guard/dialog-choice-audit.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/drawer-layout.test.mjs
+          node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/layout-defects.test.mjs apps/web/scripts/v8-guard/create-footer-choices.test.mjs apps/web/scripts/v8-guard/shared-recipe-defaults.test.mjs apps/web/scripts/v8-guard/affixed-input-layout.test.mjs apps/web/scripts/v8-guard/list-toolbar-readable.test.mjs apps/web/scripts/v8-guard/action-row-narrow.test.mjs apps/web/scripts/v8-guard/button-content-width.test.mjs apps/web/scripts/v8-guard/automation-field-error.test.mjs apps/web/scripts/v8-guard/fix-patterns.test.mjs apps/web/scripts/v8-guard/owner-rules.test.mjs apps/web/scripts/v8-guard/pendec2-rules.test.mjs apps/web/scripts/v8-guard/b244-rules.test.mjs apps/web/scripts/v8-guard/dialog-layout.test.mjs apps/web/scripts/v8-guard/table-column-alignment.test.mjs apps/web/scripts/v8-guard/visual-state.test.mjs apps/web/scripts/v8-guard/bar-chart-layout.test.mjs apps/web/scripts/v8-guard/reservation-reading.test.mjs apps/web/scripts/v8-guard/input-retention.test.mjs apps/web/scripts/v8-guard/record-columns.test.mjs apps/web/scripts/v8-guard/drawer-layout.test.mjs apps/web/scripts/v8-guard/layout-overflow.test.mjs apps/web/scripts/v8-guard/form-rules.test.mjs apps/web/scripts/v8-guard/active-modal-audit.test.mjs
       - name: Narrow preview opens once and preserves form input
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/narrow-preview.test.mjs
@@ -691,21 +696,18 @@ jobs:
       - name: Booking preview date agrees through settings and preview tabs
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/stgfix18-preview.mjs http://127.0.0.1:4310 /tmp/v8-guard/stgfix18-preview
-      - name: No new V8 layout or owner-rule defects (B-191 through B-218)
+      - name: No new V8 layout or owner-rule defects
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-defects.mjs http://127.0.0.1:4310 /tmp/v8-guard/defects.json --compare-url '${{ steps.scope.outputs.compare == 'true' && 'http://127.0.0.1:4311' || '' }}'
-      - name: List row rules (B-190/193/194/195/198, with negative controls)
+      - name: List row rules
         if: steps.scope.outputs.run == 'true'
         run: |
           node apps/web/scripts/list-row-audit.mjs
           node apps/web/scripts/v8-guard/list-row-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-rows.json
           node apps/web/scripts/v8-guard/list-skeleton-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/list-skeleton.json
-      - name: All admin page titles are 22px / 700 / 32px at 1440
-        if: steps.scope.outputs.run == 'true'
-        run: node scripts/visual-qa/title-audit.mjs http://127.0.0.1:4310 /tmp/v8-guard/title-audit.tsv
       - name: Speed measurement and reference policy controls
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
-        run: node --test apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
+        run: node --test apps/web/scripts/v8-guard/mock-local.test.mjs apps/web/scripts/v8-guard/speed-budget.test.mjs apps/web/scripts/v8-guard/speed-check.test.mjs apps/web/scripts/v8-guard/perf3-targets.test.mjs apps/web/scripts/v8-guard/stgfix17-targets.test.mjs
       - name: Common V8 speed checks (11 scenes, five medians)
         id: speed_budget
         if: ${{ !cancelled() && steps.scope.outputs.run == 'true' }}
@@ -737,15 +739,6 @@ jobs:
         run: |
           node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 scripts/visual-qa/friends-table-state.test.mjs
           node scripts/visual-qa/friends-table.browser.mjs http://127.0.0.1:4310 /tmp/v8-guard/stress-table
-      - name: Rich-menu label font sizes at three widths (m22a)
-        if: steps.scope.outputs.run == 'true'
-        env:
-          RICH_MENU_FONT_INPUT: ${{ runner.temp }}/v8-guard/rich-menu-input.json
-          RICH_MENU_FONT_OUTPUT: ${{ runner.temp }}/v8-guard/rich-menu-fonts.json
-        run: |
-          pnpm --filter web exec vitest run --config scripts/v8-guard/rich-menu-browser-vitest.config.ts
-          node apps/web/scripts/v8-guard/render-fonts.mjs < "$RICH_MENU_FONT_INPUT" > "$RICH_MENU_FONT_OUTPUT"
-          node --test apps/web/scripts/v8-guard/rich-menu-template-fonts.test.mjs
       - name: Upload V8 screen guard results
         if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

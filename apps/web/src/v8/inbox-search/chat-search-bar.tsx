@@ -10,7 +10,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 
 /*
- * 会話の頭の下に差す「会話の中を探す」帯（V8.pen 枠 v7GV2 の f64Ok）。
+ * 会話の頭の下に差す「会話の中を探す」帯（V8.pen 枠  の f64Ok）。
  * 探す欄（緑の枠）・「n件中 m件目」・↑・↓・×。
  * Enter＝古い方（↑）、Shift+Enter＝新しい方（↓）、Esc＝閉じる。
  */

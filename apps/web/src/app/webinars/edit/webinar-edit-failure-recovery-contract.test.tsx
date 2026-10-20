@@ -357,7 +357,7 @@ describe('Issue #674 ウェビナー編集の実挙動', () => {
       : Promise.resolve({ data: { ...webinar, id, title: '後のウェビナーB' } })))
 
     const view = await mount(<EditWebinarPage />)
-    // 404 は ★V7 TargetMissing の not-found で出す。
+    // 404 は ★管理画面 TargetMissing の not-found で出す。
     expect(view.container.textContent).toContain('このウェビナーは見つかりません')
 
     navigationMocks.query = 'id=webinar-b&pane=review'

@@ -1,9 +1,11 @@
+> 文書：リマインダの作る②〜⑤・完了・詳細（V8）の動き｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # リマインダの作る②〜⑤・完了・詳細（V8）の動き
 
 入口：
 - `app/reminders/edit/page.tsx`：`src/v8/reminders/edit.tsx` に固定。
 - `app/reminders/detail/page.tsx`：`src/v8/reminders/detail.tsx` に固定。
-- 作る①（`/reminders/new`・絵 `VE1u5`）は合格済みの `app/reminders/new/new-v8.tsx` のまま。
+- 作る①（`/reminders/new`・絵 `VE1u5`）は合格済みの [現役の入口・本体](README.md) のまま。
 
 絵：手順1の直し・競合 `k32cn` / 対象者と止める条件 `YChR6` / 通知の中身 `p5YuP`（1152 は `r1l0bT`）/
 配信予定 `T0nis` / 確認 `ltAaq` / 有効にした `hjNpJ` / 詳細の概要 `rbAig` / 登録者 `loVfW` / 一時停止の窓 `RwVo5`。

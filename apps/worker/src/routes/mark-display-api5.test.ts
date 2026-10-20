@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { beforeEach,afterEach,it,expect } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { hqTemplates } from './hq-templates.js';
 import { friendAttributes } from './friend-attributes.js';
 let sql:ReturnType<typeof createTestD1>,app:Hono<Env>;

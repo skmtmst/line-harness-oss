@@ -1,5 +1,6 @@
+import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import {
   computeUnansweredInbox,
   countUnanswered,
@@ -34,7 +35,7 @@ inbox.get('/api/inbox/activity-digest', async (c) => {
     });
     return c.json({ success: true, data });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_inbox_failed","route":"GET /api/inbox/activity-digest"}));
+    logger.error("routes_inbox_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -61,7 +62,7 @@ inbox.get('/api/inbox/unanswered', async (c) => {
     const result = await computeUnansweredInbox(c.env.DB, opts);
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_inbox_failed","route":"GET /api/inbox/unanswered"}));
+    logger.error("routes_inbox_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -75,7 +76,7 @@ inbox.get('/api/inbox/unanswered/count', async (c) => {
     });
     return c.json({ success: true, data: result });
   } catch (err) {
-    console.error(JSON.stringify({"code":"routes_inbox_failed","route":"GET /api/inbox/unanswered/count"}));
+    logger.error("routes_inbox_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

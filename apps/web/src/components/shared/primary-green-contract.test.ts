@@ -79,7 +79,7 @@ describe('白文字を載せる緑', () => {
     const CLASS_STRINGS = /["'`]([^"'`\n]*)["'`]/g
     const WHITE_TEXT = /\btext-on-accent\b|\btext-white\b/
     // `bg-accent-deep` や `bg-accent-soft` に当てないよう、語の切れ目で見る。
-    // `bg-v6-accent`(#07c653) も薄い緑。白文字だと 2.3:1 で、`bg-accent` と同じ。
+    // `bg-管理画面-accent`(#07c653) も薄い緑。白文字だと 2.3:1 で、`bg-accent` と同じ。
     const THIN_GREEN = /(?:^|\s)(?:hover:|focus:|active:|group-hover:)?bg-(?:v6-)?accent(?:-hover)?(?=\s|$)/
     const hits: string[] = []
     for (const { p, s } of FILES) {

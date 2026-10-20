@@ -2,11 +2,11 @@
 
 /*
  * ★V8 オートメーションの外枠（Pencil「★V8 画面の地図」のオートメーションの行）。
- * 板：ルール `LWQXd`・1152 `En14p`・閲覧のみ `nH9L8`・共通アクション `LnGNw`・動いた記録 `g98F9`。
+ * 板：ルール ・1152 ・閲覧のみ ・共通アクション ・動いた記録 。
  *
  * どのタブも「題・説明・右上の操作 → タブ（件数つき）→ 数の帯」が同じ。
  * 枠と見出しは型（ListPage）が持つ。ここはタブ・閲覧のみの帯・タブの件数を読む口だけ。
- * v7 の画面（app/automations/page.tsx の v7 の枝）は触らない。データの口は同じ。
+ * 管理画面 の画面（app/automations/page.tsx の 管理画面 の枝）は触らない。データの口は同じ。
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
@@ -70,7 +70,7 @@ export function useAutomationRunManage(): { canOperate: boolean; canExport: bool
   return { canOperate: canOperateAutomationRun(role, keys), canExport: canExportAutomationRuns(role, keys) }
 }
 
-/** タブの行き先（今の V8・v7 と同じ URL。動いた記録・共通アクションは今の道のまま）。 */
+/** タブの行き先（今の V8・管理画面 と同じ URL。動いた記録・共通アクションは今の道のまま）。 */
 export function automationTabHref(key: AutomationTabKey): string {
   if (key === 'common-actions') return '/common-actions'
   if (key === 'runs') return '/automations/runs'
@@ -100,7 +100,7 @@ export function AutomationTabs({ active, counts }: { active: AutomationTabKey; c
   )
 }
 
-/** 閲覧のみの帯（`nH9L8`：タブの下・数の帯の上。薄い青の地・目の印）。 */
+/** 閲覧のみの帯（：タブの下・数の帯の上。薄い青の地・目の印）。 */
 export function ViewerBand() {
   return (
     <div className={styles.viewerRow}>

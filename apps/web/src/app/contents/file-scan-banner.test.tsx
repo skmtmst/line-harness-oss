@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 検査が止まっている時の帯（B-3）を本物の React で動かす試験。
+ * 検査が止まっている時の帯を本物の React で動かす試験。
  * 止まっている時だけ帯が出る。止まっていなければ何も出さない。
  */
 import React from 'react'

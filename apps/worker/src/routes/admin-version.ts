@@ -1,9 +1,10 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import {
   WORKER_HASH,
   ADMIN_HASH,
   LIFF_HASH,
-} from '../_version.js';
+} from '../release-version.js';
 import { buildMetadata, type BuildBindings } from '../lib/build-metadata.js';
 
 const DEFAULT_MANIFEST_URL =

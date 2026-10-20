@@ -5,7 +5,7 @@ import type { TagEditorValues } from '@/components/friend-fields/tag-editor-v4'
 
 /*
  * ★V8 タグ：タグの編集（一から書いた画面・2026-10-07）。
- * Pencil：タグの編集 `Qat9s`、競合 `xn95q`、閲覧のみ `fkGUR`。
+ * Pencil：タグの編集 、競合 、閲覧のみ 。
  *
  * 型は「作る」（CreatePage）：頭（戻る・タグ名・フォルダと人数）→ 左に「基本」「タグ連動」「マイル」、
  * 右に「使っている所」、下の帯（削除は左端・キャンセル／複製して作る／保存は中央）。

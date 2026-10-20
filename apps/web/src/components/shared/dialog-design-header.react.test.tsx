@@ -9,7 +9,7 @@ import ConfirmDialog from './confirm-dialog'
 // @vitest-environment happy-dom
 
 /*
- * 司令塔 2026-10-07：小窓だけの絵（MyJP7・F1LK4e・CVz5d など）は窓の頭が共通の値より
+ * 司令塔 2026-10-07：小窓だけの絵（・・ など）は窓の頭が共通の値より
  * 約 33px 低い。絵の頭の余白・高さを画面から渡せる口（渡さなければ今までどおり）。
  */
 afterEach(() => cleanup())

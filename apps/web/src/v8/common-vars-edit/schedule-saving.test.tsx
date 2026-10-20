@@ -32,7 +32,7 @@ it('共通情報の予定登録中は×・キャンセル・Escを止める', as
   await act(async () => resolve({ success: true, data: {} }))
 })
 
-it('B-139：名前を消して保存すると、口を呼ばず名前の欄が赤くなり、真下に理由が出て、そこへ移る', async () => {
+it('名前を消して保存すると、口を呼ばず名前の欄が赤くなり、真下に理由が出て、そこへ移る', async () => {
   const { api } = await import('@/lib/api')
   const update = vi.spyOn(api.commonVars, 'update')
   render(<Editor />)
@@ -46,7 +46,7 @@ it('B-139：名前を消して保存すると、口を呼ばず名前の欄が�
   expect(document.activeElement).toBe(name)
 })
 
-it('B-139：予定の開始日が空なら登録せず、開始日の欄に理由を出す', async () => {
+it('予定の開始日が空なら登録せず、開始日の欄に理由を出す', async () => {
   add.mockReset()
   render(<Editor />)
   fireEvent.click(await screen.findByRole('button', { name: '予定を足す' }))

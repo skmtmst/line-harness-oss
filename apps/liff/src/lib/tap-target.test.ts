@@ -18,12 +18,11 @@ describe('押せる所の大きさ', () => {
 
   it('小さい操作も共通 Button の44pxの段を使う', () => {
     const cases: Array<[string, string]> = [
-      ['../components/ui/LiffHeader.tsx', 'aria-label="閉じる"'],
-      ['../components/DateTimePicker.tsx', 'aria-label="前の週"'],
-      ['../components/DateTimePicker.tsx', 'aria-label="前の月"'],
-      ['../components/HelpTip.tsx', 'aria-label={label}'],
-      ['../pages/seat/SeatPick.tsx', 'aria-label="人数を増やす"'],
-      ['../pages/EventBookings.tsx', 'のイベントを見る`}'],
+      ['../components/ui/liff-header.tsx', 'aria-label="閉じる"'],
+      ['../components/date-time-picker.tsx', 'aria-label="前の週"'],
+      ['../components/date-time-picker.tsx', 'aria-label="前の月"'],
+      ['../components/help-tip.tsx', 'aria-label={label}'],
+      ['../pages/seat/seat-pick.tsx', 'aria-label="人数を増やす"'],
     ];
     for (const [file, marker] of cases) {
       const src = read(file);

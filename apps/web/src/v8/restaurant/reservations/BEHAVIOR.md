@@ -1,6 +1,8 @@
+> 文書：予約台帳の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 予約台帳の動き（BEHAVIOR.md）
 
-対象：`app/restaurant-test/v8/reservations.tsx`・`reservation-phone.tsx`（今の V8）から写して一から書いた。板 l9NlC0（今日）・xzCK6（今日 1152）・Z3FoM（一覧）・rm92Y（電話の予約を入れる）。
+対象：[現役の入口・本体](../README.md)・`reservation-phone.tsx`（今の V8）から写して一から書いた。板 l9NlC0（今日）・xzCK6（今日 1152）・Z3FoM（一覧）・rm92Y（電話の予約を入れる）。
 
 ## 入口・受け付ける URL
 - `app/restaurant-test/reservations/page.tsx`：V8 の予約台帳だけを描く（2026-10-09 オーナー決定で旧画面の分岐を削除）。

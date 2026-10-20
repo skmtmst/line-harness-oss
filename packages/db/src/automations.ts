@@ -87,7 +87,7 @@ export interface AutomationExecutionRunsQuery {
   search?: string;
   /**
    * 既定では本番実行だけを出し、テスト実行は明示したときだけ含める
-   * （V6 25-1-B「既定の一覧では本番だけを出し、切替で含める」）。
+   * （25-1-B「既定の一覧では本番だけを出し、切替で含める」）。
    */
   includeTest?: boolean;
   limit: number;
@@ -120,7 +120,7 @@ function automationRunWhere(input: AutomationExecutionRunsQuery, includeFilters:
 }
 
 /**
- * V6 25-1-B: 新しい横断台帳を作らず、既存automation_runsを読み取り用に整える。
+ * 25-1-B: 新しい横断台帳を作らず、既存automation_runsを読み取り用に整える。
  * 書込時の詳細状態はそのまま保存し、共通状態への読み替えはAPI境界で行う。
  */
 export async function getAutomationExecutionRuns(

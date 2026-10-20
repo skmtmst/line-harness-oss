@@ -1,6 +1,7 @@
+import { logger } from '@line-crm/shared/server';
 import { jstNow } from './utils.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { trackConversion } from './conversions.js';
+import { trackConversion } from './conversions/index.js';
 
 /**
  * コンバージョン起点 → 実イベントの接続口。
@@ -99,7 +100,7 @@ export async function recordConversionSourceEvent(
 
   if (!isConversionSourceType(event.sourceType)) {
     // 未対応イベントは捨てず、運用者が後で辿れる形で残す(#648 完了条件)。
-    console.log(JSON.stringify({"code":"conversion_source_unmatched"}));
+    logger.log("conversion_source_unmatched");
     return { ...empty, skipped: 'unknown_source' };
   }
   if (!event.friendId?.trim() || !event.sourceEventId?.trim()) {
@@ -175,7 +176,7 @@ export async function recordConversionSourceEvent(
         continue;
       }
       failed += 1;
-      console.error(JSON.stringify({"code":"src_conversion_event_sources_failed"}));
+      logger.error("src_conversion_event_sources_failed");
     }
   }
   return { matched: points.length, recorded, failed, excluded, skipped: null };

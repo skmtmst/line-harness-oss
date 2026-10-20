@@ -7,10 +7,10 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import type Database from 'better-sqlite3';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { createTestD1, insertFriend, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { publishScenarioVersion } from '@line-crm/db';
-import { isFriendAddResendSuppressed } from '../services/friend-add-routing.js';
+import { isFriendAddResendSuppressed } from '../features/friends/friend-add-routing.js';
 
 const lineClientMocks = vi.hoisted(() => ({
   getProfile: vi.fn(),
@@ -171,7 +171,7 @@ beforeEach(async () => {
   await seedBase();
   vi.mocked(verifySignature).mockResolvedValue(true);
   /*
-   * `vi.clearAllMocks()` は呼び出し記録しか消さないので、`...Once` の
+   * `vi.clearAllMocks` は呼び出し記録しか消さないので、`...Once` の
    * 待ち行列が残ると次の試験へ漏れる（送れたはずの試験が送達不明になる）。
    * 送信の口だけは毎回まっさらにしてから既定を敷き直す。
    */

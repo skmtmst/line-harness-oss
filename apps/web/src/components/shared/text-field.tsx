@@ -9,7 +9,7 @@ import styles from './text-field.module.css'
  * 入力欄の正本（★V8 共通部品 Ume2U「入力欄」・i5BW8b「入力欄/複数行」・fDAyI「入力欄/エラー」）。
  *
  * 入力欄はこのファイルの2つだけ。form-controls.tsx の TextInput・TextArea は
- * ここを呼ぶだけの薄い包み（v7 の見た目の差だけを足す）。
+ * ここを呼ぶだけの薄い包み（管理画面 の見た目の差だけを足す）。
  *
  * `Field`（form-controls.tsx）の中に置くと、説明・誤りの文・文字数の id を
  * aria-describedby に、誤りの有無を aria-invalid に、必須を aria-required に

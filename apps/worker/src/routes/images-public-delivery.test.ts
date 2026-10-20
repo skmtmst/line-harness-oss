@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { signPrivateImageUrl } from '../services/image-access.js';
 
 vi.mock('../middleware/role-guard.js', async (importOriginal) => ({
@@ -51,7 +51,7 @@ it('来店スタンプの紙写真は公開画像口から読めず、R2にも�
 });
 
 
-it.each(['delivery.jpg', 'rich-menus/account/group/page/image.png', 'media/account/form-layout.png', 'banner/b/image.jpg', 'imagemaps/asset/1040', 'hq-templates/tenant/uploads/image.png'])('S11 keeps existing published image location %s visible', async key => {
+it.each(['delivery.jpg', 'rich-menus/account/group/page/image.png', 'banner/b/image.jpg', 'imagemaps/asset/1040', 'hq-templates/tenant/uploads/image.png'])('S11 keeps existing published image location %s visible', async key => {
  get.mockReset(); get.mockResolvedValue({ body: 'synthetic-image', etag: 'test', httpMetadata: { contentType: 'image/png' } });
  const res=await app().request(`/images/${key}`); expect(res.status).toBe(200); expect(get).toHaveBeenCalledWith(key);
 });
@@ -72,5 +72,30 @@ it('S11 serves a signed private image without caching and refuses a changed sign
 it('S11 refuses webinar originals even under a published media location', async () => {
  webinarSource.mockResolvedValueOnce({ id: 'synthetic-webinar' }); get.mockClear();
  expect((await app().request('/images/media/webinar/frame.jpg')).status).toBe(404);
+ expect(get).not.toHaveBeenCalled();
+});
+
+it.each(['"etag-conditional"','W/"etag-conditional"','"other", "etag-conditional"','*'])('public conditional request %s returns 304 without a body',async tag=>{
+ get.mockReset();get.mockResolvedValue({body:'synthetic-image',etag:'etag-conditional',httpEtag:'"etag-conditional"',httpMetadata:{contentType:'image/png'}});
+ const response=await app().request('/images/conditional.png',{headers:{'If-None-Match':tag}});
+ expect(response.status).toBe(304);expect(await response.text()).toBe('');
+ expect(response.headers.get('ETag')).toBe('"etag-conditional"');
+});
+it('nonmatching validators retain the image and return a quoted ETag',async()=>{
+ get.mockReset();get.mockResolvedValue({body:'synthetic-image',etag:'etag-current',httpMetadata:{contentType:'image/png'}});
+ const response=await app().request('/images/conditional.png',{headers:{'If-None-Match':'"other"'}});
+ expect(response.status).toBe(200);expect(await response.text()).toBe('synthetic-image');expect(response.headers.get('ETag')).toBe('"etag-current"');
+});
+it('private delivery rechecks signatures and retains no-store even with a matching validator',async()=>{
+ get.mockReset();get.mockResolvedValue({body:'private-image',etag:'etag-private',httpMetadata:{contentType:'image/png'}});
+ const url=await signPrivateImageUrl(new URL('http://localhost/images/form-uploads/form/friend/photo.jpg'),'synthetic-signing-key');
+ const response=await app().request(url,{headers:{'If-None-Match':'*'}});
+ expect(response.status).toBe(200);expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+ get.mockClear();expect((await app().request(url.replace('photo.jpg','other.jpg'),{headers:{'If-None-Match':'*'}})).status).toBe(404);expect(get).not.toHaveBeenCalled();
+});
+
+it('requires a published media record even for an existing R2 object and a cache validator', async () => {
+ get.mockReset(); get.mockResolvedValue({ body: 'synthetic-image', etag: 'test', httpMetadata: { contentType: 'image/png' } });
+ expect((await app().request('/images/media/account/unpublished.png', { headers: { 'If-None-Match': '*' } })).status).toBe(404);
  expect(get).not.toHaveBeenCalled();
 });

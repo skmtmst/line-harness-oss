@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B LINEアカウントの乗り換え（板 `x2dSNv`）。
- * v7 と同じ口・同じ守りで、未判断が残る間は本実行を押せず、
+ * ★V8-B LINEアカウントの乗り換え（板 ）。
+ * 管理画面 と同じ口・同じ守りで、未判断が残る間は本実行を押せず、
  * 判断の保存・本人確認の小窓が動くこと。
  */
 import React, { act } from 'react'

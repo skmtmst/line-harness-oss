@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8-B EC連携の「つなぎ先」（板 `iLJmw`）。
+ * ★V8-B EC連携の「つなぎ先」（板 ）。
  * V8 の枠（題・説明・設定の中の案内・入口のタブ）で今の板を包み、
  * 見るだけの担当者には保存の入口を出さないこと。
  * 板の目印（data-design-node）は板側（connector-panel）が持つため、

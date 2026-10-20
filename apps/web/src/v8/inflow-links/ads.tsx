@@ -1,7 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   manualLabel: requiredText("流入元の名前を入れてください"),
   manualAmount: requiredText("費用を入力してください"),
 }
@@ -41,7 +41,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 
 /*
- * ★V8 広告連携（Pencil：画面 `qSTVR`・広告費を手で入れる `ZxKL5`）。
+ * ★V8 広告連携（Pencil：画面 ・広告費を手で入れる ）。
  *
  * 頭（戻る・題・説明・右下に「費用を手で入れる」）→ 数の4枚 → 媒体の4枚 → 流入元ごとの費用 → 注 → 手で入れた費用。
  *
@@ -49,7 +49,7 @@ import Notice from '@/components/shared/notice'
  * （BEHAVIOR.md の「広告連携」）。違うのは見せ方と、次の3つ：
  * - 送信履歴の口（/api/ad-platforms/logs）はこの画面に出す所が無いので呼ばない（履歴の画面は今のまま）
  * - 成果1件あたりは口（/api/ad-costs の conversionCost）が返す値を出す（今は「—」固定）
- * - 未接続の媒体の「つなぐ」は、今の広告とのつなぎ（v7）と同じ接続の窓を開く
+ * - 未接続の媒体の「つなぐ」は、今の広告とのつなぎ（管理画面）と同じ接続の窓を開く
  * 閲覧のみ（owner・admin 以外）には、費用を手で入れる・つなぐ・再読み込み・行の「…」・操作の行を出さない。
  */
 
@@ -149,7 +149,7 @@ export default function AdsV8() {
   const [costFailed, setCostFailed] = useState(false)
   const [manualEntries, setManualEntries] = useState<ManualCostEntry[]>([])
   const [entryRoutes, setEntryRoutes] = useState<EntryRoute[]>([])
-  const [canManage, setCanManage] = useState(false)
+  const canManage = canManageRole(role)
   const [importingId, setImportingId] = useState<string | null>(null)
   const [importError, setImportError] = useState('')
   const [connectionTarget, setConnectionTarget] = useState<{ key: string; label: string } | null>(null)
@@ -225,19 +225,7 @@ export default function AdsV8() {
     }
   }, [load])
 
-  useEffect(() => {
-    if (!selectedAccountId) {
-      setCanManage(false)
-      return
-    }
-    let active = true
-    void api.staff.me().then((response) => {
-      if (active) setCanManage(response.success && (response.data.role === 'owner' || response.data.role === 'admin'))
-    }).catch(() => undefined)
-    return () => {
-      active = false
-    }
-  }, [selectedAccountId])
+
 
   const [manualFieldErrors, setManualFieldErrors] = useState<Record<string, string>>({})
 
@@ -252,9 +240,9 @@ export default function AdsV8() {
     setManualError('')
     const amount = Number(manualAmount.replaceAll(',', ''))
     const errors: Record<string, string> = {}
-    if ((b244Requirements.manualLabel.check(manualLabel) !== null)) errors['ad-cost-name'] = '流入元の名前を入れてください'
+    if ((FIELD_REQUIREMENTS.manualLabel.check(manualLabel) !== null)) errors['ad-cost-name'] = '流入元の名前を入れてください'
     if (!manualDay) errors['ad-cost-day'] = '費用の日付を選んでください'
-    if ((b244Requirements.manualAmount.check(manualAmount) !== null)) errors['ad-cost-amount'] = '費用を入力してください'
+    if ((FIELD_REQUIREMENTS.manualAmount.check(manualAmount) !== null)) errors['ad-cost-amount'] = '費用を入力してください'
     else if (!Number.isInteger(amount) || amount < 0) errors['ad-cost-amount'] = '費用は0以上の整数(円)で入れてください'
     setManualFieldErrors(errors)
     if (Object.keys(errors).length) { focusField(Object.keys(errors)[0]); return }
@@ -549,7 +537,7 @@ export default function AdsV8() {
         onCancel={() => { if (!manualBusy) setManualOpen(false) }}
       >
         <div className={styles.dialogBody}>
-          <Field label="流入元の名前" requirement={b244Requirements.manualLabel}><SaveErrorField names={["manualLabel","sourceLabel","manual_label"]}><TextField id="ad-cost-name" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} aria-describedby={manualFieldErrors['ad-cost-name'] ? 'ad-cost-name-error' : undefined} value={manualLabel} onChange={(event) => { setManualLabel(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-name': '' })) }} placeholder="例：駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" /></SaveErrorField>
+          <Field label="流入元の名前" requirement={FIELD_REQUIREMENTS.manualLabel}><SaveErrorField names={["manualLabel","sourceLabel","manual_label"]}><TextField id="ad-cost-name" aria-invalid={Boolean(manualFieldErrors['ad-cost-name'])} aria-describedby={manualFieldErrors['ad-cost-name'] ? 'ad-cost-name-error' : undefined} value={manualLabel} onChange={(event) => { setManualLabel(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-name': '' })) }} placeholder="例：駅前の看板" maxLength={100} title="同じ流入元・同じ日に入れ直すと上書きになります" /></SaveErrorField>
 {manualFieldErrors['ad-cost-name'] ? <span id="ad-cost-name-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-name']}</span> : null}</Field>
           <div className={styles.field}>
             <span className={styles.pickLabel}>計測リンク（分かれば）</span>
@@ -560,7 +548,7 @@ export default function AdsV8() {
               onChange={(value) => {
                 setManualRouteId(value)
                 const route = entryRoutes.find((item) => item.id === value)
-                if (route && (b244Requirements.manualLabel.check(manualLabel) !== null)) setManualLabel(route.name)
+                if (route && (FIELD_REQUIREMENTS.manualLabel.check(manualLabel) !== null)) setManualLabel(route.name)
               }}
               options={[{ value: '', label: '結びつけない' }, ...entryRoutes.map((route) => ({ ...entityOptionMetadata(route), value: route.id, label: route.name }))]}
             /></SaveErrorField>
@@ -571,7 +559,7 @@ export default function AdsV8() {
               <SaveErrorField names={["manualDay","day","manual_day"]}><DateField id="ad-cost-day" invalid={Boolean(manualFieldErrors['ad-cost-day'])} aria-describedby={manualFieldErrors['ad-cost-day'] ? 'ad-cost-day-error' : undefined} value={manualDay} onChange={(value) => { setManualDay(value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-day': '' })) }} aria-label="費用の日付" /></SaveErrorField>
               {manualFieldErrors['ad-cost-day'] ? <span id="ad-cost-day-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-day']}</span> : null}
             </div>
-            <Field label="費用（円）" requirement={b244Requirements.manualAmount}><SaveErrorField names={["manualAmount","manual_amount"]}><NumberInput numericText unit="円" id="ad-cost-amount" aria-invalid={Boolean(manualFieldErrors['ad-cost-amount'])} aria-describedby={manualFieldErrors['ad-cost-amount'] ? 'ad-cost-amount-error' : undefined} inputMode="numeric" value={manualAmount} onChange={(event) => { setManualAmount(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-amount': '' })) }} placeholder="例：30000" /></SaveErrorField>
+            <Field label="費用（円）" requirement={FIELD_REQUIREMENTS.manualAmount}><SaveErrorField names={["manualAmount","manual_amount"]}><NumberInput numericText unit="円" id="ad-cost-amount" aria-invalid={Boolean(manualFieldErrors['ad-cost-amount'])} aria-describedby={manualFieldErrors['ad-cost-amount'] ? 'ad-cost-amount-error' : undefined} inputMode="numeric" value={manualAmount} onChange={(event) => { setManualAmount(event.target.value); setManualFieldErrors((old) => ({ ...old, 'ad-cost-amount': '' })) }} placeholder="例：30000" /></SaveErrorField>
 {manualFieldErrors['ad-cost-amount'] ? <span id="ad-cost-amount-error" className={styles.error} role="alert">{manualFieldErrors['ad-cost-amount']}</span> : null}</Field>
           </div>
         </div>

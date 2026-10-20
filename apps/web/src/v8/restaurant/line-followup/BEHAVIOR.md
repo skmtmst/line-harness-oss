@@ -1,3 +1,5 @@
+> 文書：LINE来店フォロー（V8・融合 B-186）の動き｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+
 # LINE来店フォロー（V8・融合 B-186）の動き
 
 入口：`app/restaurant-test/line-followup/page.tsx`（V8 だけで出す）。絵：`n9vvGx`（LINE来店フォロー 融合）。

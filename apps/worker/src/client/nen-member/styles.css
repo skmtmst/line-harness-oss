@@ -283,8 +283,8 @@ button, input, select, textarea { font: inherit; }
 .nm-ai-saved { margin: -5px 3px 2px; color: #84948c; font-size: 8px; text-align: center; }
 .nm-empty-text { margin: 17px 0 3px; color: #718178; font-size: 12px; }
 
-/* ★V6正本 sBTL8: V6 37-2-D 然・注文・定期（LIFF・390）。色指定はこの画面の変数だけを使う。 */
-.nm-orders-page-v6 { color: var(--order-ink); }
+/* 注文と定期契約。色は画面の変数から読む。 */
+.nm-portal-orders-page { color: var(--order-ink); }
 .nm-order-intro, .nm-order-section, .nm-subscription-card, .nm-order-card, .nm-order-empty { border: 1px solid var(--order-line); border-radius: 10px; background: var(--order-surface); }
 .nm-order-intro { display: grid; grid-template-columns: 38px 1fr; gap: 4px 12px; padding: 16px; }
 .nm-order-intro > span { display: grid; width: 38px; height: 38px; grid-row: 1 / 3; place-items: center; border-radius: 50%; background: var(--order-accent-soft); color: var(--order-accent-ink); font-size: 19px; }
@@ -328,8 +328,8 @@ button, input, select, textarea { font: inherit; }
 .nm-order-empty b { color: var(--order-ink); font-size: 12px; }
 .nm-order-empty p { margin: 0; color: var(--order-muted); font-size: 10px; line-height: 1.6; }
 
-/* ★V6正本 pNuzE: V6 37-2-C 然・投稿（LIFF・390）。色指定はこの画面の変数だけを使う。 */
-.nm-photo-page-v6 { color: var(--photo-ink); }
+/* 投稿写真。色は画面の変数から読む。 */
+.nm-portal-photo-page { color: var(--photo-ink); }
 .nm-photo-intro, .nm-photo-form-card, .nm-photo-entry, .nm-photo-empty { border: 1px solid var(--photo-line); border-radius: 10px; background: var(--photo-surface); }
 .nm-photo-intro { display: grid; grid-template-columns: 38px 1fr; gap: 4px 12px; padding: 16px; }
 .nm-photo-intro > span { display: grid; width: 38px; height: 38px; grid-row: 1 / 3; place-items: center; border-radius: 50%; background: var(--photo-accent-soft); color: var(--photo-accent-ink); font-size: 19px; }
@@ -348,11 +348,11 @@ button, input, select, textarea { font: inherit; }
 .nm-photo-field select { height: 48px; padding: 0 14px; font-size: 13px; font-weight: 700; }
 .nm-photo-field textarea { min-height: 78px; padding: 12px; resize: vertical; font-size: 12px; line-height: 1.6; }
 .nm-photo-field > em { justify-self: end; color: var(--photo-muted); font-size: 10px; font-style: normal; }
-.nm-photo-picker-v6 { display: grid; min-height: 150px; place-items: center; align-content: center; gap: 5px; border: 1px dashed var(--photo-line); border-radius: 8px; background: var(--photo-canvas); color: var(--photo-subtle); cursor: pointer; }
-.nm-photo-picker-v6 input, .nm-photo-selected-actions input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.nm-photo-picker-v6 strong { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 50%; background: var(--photo-accent-soft); color: var(--photo-accent-ink); font-size: 22px; font-weight: 400; }
-.nm-photo-picker-v6 span { color: var(--photo-accent-ink); font-size: 12px; font-weight: 700; }
-.nm-photo-picker-v6 small { color: var(--photo-muted); font-size: 10px; }
+.nm-portal-photo-picker { display: grid; min-height: 150px; place-items: center; align-content: center; gap: 5px; border: 1px dashed var(--photo-line); border-radius: 8px; background: var(--photo-canvas); color: var(--photo-subtle); cursor: pointer; }
+.nm-portal-photo-picker input, .nm-photo-selected-actions input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.nm-portal-photo-picker strong { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 50%; background: var(--photo-accent-soft); color: var(--photo-accent-ink); font-size: 22px; font-weight: 400; }
+.nm-portal-photo-picker span { color: var(--photo-accent-ink); font-size: 12px; font-weight: 700; }
+.nm-portal-photo-picker small { color: var(--photo-muted); font-size: 10px; }
 .nm-photo-selected { display: grid; gap: 8px; }
 .nm-photo-preview-frame { display: grid; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; place-items: center; border-radius: 8px; background: var(--photo-canvas); }
 .nm-photo-preview-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
@@ -420,7 +420,7 @@ button, input, select, textarea { font: inherit; }
   .nm-health-period button { flex: 1; }
 }
 
-/* ★V6正本 lCs4n: V6 37-2 然・マイページ（LIFF・390） */
+/* マイページ。 */
 .nm-home-stack { gap: 14px; padding: 14px 16px 96px; }
 .nm-home-stack > .nm-card { margin: 0; padding: 16px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); box-shadow: none; }
 .nm-home-stack > .nm-lifetime { padding: 14px 16px; }
@@ -455,151 +455,151 @@ button, input, select, textarea { font: inherit; }
   .nm-home-stack > .nm-lifetime { padding: 14px 16px; }
 }
 
-/* ★V6 37-2-A / 37-2-A-1 然・マイペット（白カード・10px・#dadde2。トークンはマイページと同じ） */
-.nm-v6-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.nm-v6-heading { display: grid; gap: 2px; }
-.nm-v6-heading span { color: #068a3c; font-size: 10px; font-weight: 700; letter-spacing: .06em; }
-.nm-v6-heading h2 { margin: 0; color: #1d1d1f; font-size: 18px; font-weight: 700; }
-.nm-v6-heading p { margin: 4px 0 0; color: #4a5565; font-size: 12px; line-height: 1.6; }
-.nm-v6-add { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; border-radius: 9999px; background: var(--nen); color: #fff; font-size: 12px; font-weight: 700; }
-.nm-stack > .nm-v6-pet, .nm-stack > .nm-v6-form { margin: 0; padding: 16px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); box-shadow: none; }
-.nm-v6-pet { display: grid; gap: 14px; }
-.nm-v6-pet-top { display: flex; align-items: center; gap: 14px; }
-.nm-v6-pet-photo { position: relative; display: grid; width: 72px; height: 72px; flex: none; place-items: center; overflow: hidden; border-radius: 50%; background: #e8f8ee; color: #068a3c; }
-.nm-v6-pet-photo input { display: none; }
-.nm-v6-pet-photo img { width: 100%; height: 100%; object-fit: cover; }
-.nm-v6-pet-photo i { position: absolute; right: 2px; bottom: 2px; display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; background: var(--nen); color: #fff; font-size: 13px; font-style: normal; font-weight: 700; }
-.nm-v6-pet-name { display: grid; min-width: 0; gap: 3px; }
-.nm-v6-pet-name h2 { margin: 0; color: #1d1d1f; font-size: 18px; font-weight: 700; }
-.nm-v6-pet-name p { margin: 0; color: #4a5565; font-size: 12px; }
-.nm-v6-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.nm-v6-chip { padding: 3px 8px; border-radius: 9999px; background: #e8f8ee; color: #068a3c; font-size: 10px; font-weight: 700; }
-.nm-v6-chip-info { background: #eef4ff; color: #2563eb; }
-.nm-v6-guide { display: grid; gap: 6px; padding: 14px; border-radius: 10px; background: #e8f8ee; }
-.nm-stack > .nm-v6-guide { margin: 0; }
-.nm-v6-guide-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
-.nm-v6-guide-row span { display: block; color: #068a3c; font-size: 10px; font-weight: 700; }
-.nm-v6-guide-row b { display: block; color: #1d1d1f; font-size: 30px; font-weight: 700; line-height: 1.1; }
-.nm-v6-guide-row b small { margin-left: 4px; color: #4a5565; font-size: 13px; font-weight: 700; }
-.nm-v6-guide-row em { color: #4a5565; font-size: 12px; font-style: normal; font-weight: 600; }
-.nm-v6-guide p { margin: 0; color: #4a5565; font-size: 10px; line-height: 1.6; }
-.nm-v6-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.nm-v6-facts > div { padding: 10px; border-radius: 8px; background: #f5f5f7; }
-.nm-v6-facts span { display: block; color: #6e7781; font-size: 10px; }
-.nm-v6-facts b { display: block; overflow: hidden; margin-top: 3px; color: #1d1d1f; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.nm-v6-concerns { margin: 0; color: #4a5565; font-size: 12px; }
-.nm-v6-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.nm-v6-btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 10px; border: 1px solid #dadde2; border-radius: 9999px; background: var(--customer-ground, #fff); color: #4a5565; font-size: 12px; font-weight: 700; }
-.nm-v6-btn-accent { border-color: var(--nen); color: #068a3c; }
-.nm-v6-form { display: grid; gap: 14px; }
-.nm-v6-form .nm-field, .nm-v6-form .nm-seg-field { margin-top: 0; }
+/*  37-2-A / 37-2-A-1 然・マイペット（白カード・10px・#dadde2。トークンはマイページと同じ） */
+.nm-portal-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nm-portal-heading { display: grid; gap: 2px; }
+.nm-portal-heading span { color: #068a3c; font-size: 10px; font-weight: 700; letter-spacing: .06em; }
+.nm-portal-heading h2 { margin: 0; color: #1d1d1f; font-size: 18px; font-weight: 700; }
+.nm-portal-heading p { margin: 4px 0 0; color: #4a5565; font-size: 12px; line-height: 1.6; }
+.nm-portal-add { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 0; border-radius: 9999px; background: var(--nen); color: #fff; font-size: 12px; font-weight: 700; }
+.nm-stack > .nm-portal-pet, .nm-stack > .nm-portal-form { margin: 0; padding: 16px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); box-shadow: none; }
+.nm-portal-pet { display: grid; gap: 14px; }
+.nm-portal-pet-top { display: flex; align-items: center; gap: 14px; }
+.nm-portal-pet-photo { position: relative; display: grid; width: 72px; height: 72px; flex: none; place-items: center; overflow: hidden; border-radius: 50%; background: #e8f8ee; color: #068a3c; }
+.nm-portal-pet-photo input { display: none; }
+.nm-portal-pet-photo img { width: 100%; height: 100%; object-fit: cover; }
+.nm-portal-pet-photo i { position: absolute; right: 2px; bottom: 2px; display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; background: var(--nen); color: #fff; font-size: 13px; font-style: normal; font-weight: 700; }
+.nm-portal-pet-name { display: grid; min-width: 0; gap: 3px; }
+.nm-portal-pet-name h2 { margin: 0; color: #1d1d1f; font-size: 18px; font-weight: 700; }
+.nm-portal-pet-name p { margin: 0; color: #4a5565; font-size: 12px; }
+.nm-portal-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.nm-portal-chip { padding: 3px 8px; border-radius: 9999px; background: #e8f8ee; color: #068a3c; font-size: 10px; font-weight: 700; }
+.nm-portal-chip-info { background: #eef4ff; color: #2563eb; }
+.nm-portal-guide { display: grid; gap: 6px; padding: 14px; border-radius: 10px; background: #e8f8ee; }
+.nm-stack > .nm-portal-guide { margin: 0; }
+.nm-portal-guide-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.nm-portal-guide-row span { display: block; color: #068a3c; font-size: 10px; font-weight: 700; }
+.nm-portal-guide-row b { display: block; color: #1d1d1f; font-size: 30px; font-weight: 700; line-height: 1.1; }
+.nm-portal-guide-row b small { margin-left: 4px; color: #4a5565; font-size: 13px; font-weight: 700; }
+.nm-portal-guide-row em { color: #4a5565; font-size: 12px; font-style: normal; font-weight: 600; }
+.nm-portal-guide p { margin: 0; color: #4a5565; font-size: 10px; line-height: 1.6; }
+.nm-portal-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.nm-portal-facts > div { padding: 10px; border-radius: 8px; background: #f5f5f7; }
+.nm-portal-facts span { display: block; color: #6e7781; font-size: 10px; }
+.nm-portal-facts b { display: block; overflow: hidden; margin-top: 3px; color: #1d1d1f; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.nm-portal-concerns { margin: 0; color: #4a5565; font-size: 12px; }
+.nm-portal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.nm-portal-btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 10px; border: 1px solid #dadde2; border-radius: 9999px; background: var(--customer-ground, #fff); color: #4a5565; font-size: 12px; font-weight: 700; }
+.nm-portal-btn-accent { border-color: var(--nen); color: #068a3c; }
+.nm-portal-form { display: grid; gap: 14px; }
+.nm-portal-form .nm-field, .nm-portal-form .nm-seg-field { margin-top: 0; }
 .nm-seg-field > span { display: block; margin-bottom: 6px; color: #1d1d1f; font-size: 12px; font-weight: 700; }
 .nm-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .nm-seg button { height: 38px; border: 1px solid #dadde2; border-radius: 9999px; background: #f5f5f7; color: #4a5565; font-size: 12px; font-weight: 700; }
 .nm-seg button.active { border-color: var(--nen); background: var(--nen); color: #fff; }
-.nm-v6-primary { margin-top: 0; height: 48px; padding: 0; border-radius: 9999px; font-size: 13px; }
-.nm-v6-edit .nm-back { margin: 0; }
+.nm-portal-primary { margin-top: 0; height: 48px; padding: 0; border-radius: 9999px; font-size: 13px; }
+.nm-portal-edit .nm-back { margin: 0; }
 
-/* ---- 健康日記（★V6 37-2-B `CkgoD`）。マイペット（37-2-A）と同じ V6 の部品で組む ---- */
-.nm-v6-pet-switch { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
-.nm-v6-pet-switch button { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 7px; border: 1px solid #dadde2; border-radius: 9999px; background: var(--customer-ground, #fff); color: #4a5565; font-size: 12px; font-weight: 700; }
-.nm-v6-pet-switch button.active { border-color: var(--nen); background: #e8f8ee; color: #068a3c; }
-.nm-v6-pet-switch i { display: block; width: 18px; height: 18px; overflow: hidden; border-radius: 50%; background: #d9efe1; }
-.nm-v6-pet-switch img { width: 100%; height: 100%; object-fit: cover; }
-.nm-v6-vitals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.nm-v6-vitals > div { display: grid; gap: 4px; padding: 12px 10px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
-.nm-v6-vitals span { color: #6e7781; font-size: 10px; font-weight: 700; }
-.nm-v6-vitals b { color: #1d1d1f; font-size: 26px; font-weight: 700; line-height: 1.1; }
-.nm-v6-vitals b small { margin-left: 3px; color: #4a5565; font-size: 11px; font-weight: 700; }
-.nm-v6-vitals em { color: #068a3c; font-size: 10px; font-style: normal; font-weight: 700; }
-.nm-v6-trend { display: grid; gap: 12px; padding: 16px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
-.nm-v6-trend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.nm-v6-trend-head h2 { font-size: 16px; }
-.nm-v6-period { display: inline-flex; padding: 2px; border-radius: 9999px; background: #f5f5f7; }
-.nm-v6-period button { width: 30px; height: 22px; border: 0; border-radius: 9999px; background: transparent; color: #6e7781; font-size: 11px; font-weight: 700; }
-.nm-v6-period button.active { background: var(--customer-ground, #fff); color: #1d1d1f; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
-.nm-v6-keys { display: flex; gap: 6px; overflow-x: auto; }
-.nm-v6-keys button { flex: none; height: 24px; padding: 0 10px; border: 1px solid #dadde2; border-radius: 9999px; background: var(--customer-ground, #fff); color: #4a5565; font-size: 11px; font-weight: 700; }
-.nm-v6-keys button.active { border-color: var(--nen); background: #e8f8ee; color: #068a3c; }
-.nm-v6-bars { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; height: 120px; }
-.nm-v6-bar-col { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 4px; min-width: 0; }
-.nm-v6-bar { position: relative; display: block; min-height: 4px; border-radius: 6px 6px 2px 2px; background: var(--nen); }
-.nm-v6-bar b { position: absolute; top: -14px; left: 0; right: 0; color: #4a5565; font-size: 9px; font-weight: 700; text-align: center; }
-.nm-v6-bar-empty { height: 4px; background: #dadde2; }
-.nm-v6-bar-warn { background: #d97706; }
-.nm-v6-bar-col span { color: #6e7781; font-size: 9px; text-align: center; white-space: nowrap; }
-.nm-v6-bars-empty { display: grid; place-items: center; gap: 4px; height: 120px; border-radius: 8px; background: #f5f5f7; text-align: center; }
-.nm-v6-bars-empty b { color: #1d1d1f; font-size: 12px; }
-.nm-v6-bars-empty p { margin: 0; color: #6e7781; font-size: 11px; }
-.nm-v6-trend > p { margin: 0; color: #4a5565; font-size: 10px; line-height: 1.6; }
-.nm-v6-btn-wide { width: 100%; height: 44px; font-size: 13px; }
-.nm-v6-recent { display: grid; gap: 0; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
-.nm-v6-recent-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #dadde2; }
-.nm-v6-recent-head b { color: #1d1d1f; font-size: 14px; font-weight: 700; }
-.nm-v6-recent-row { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #f0f1f3; }
-.nm-v6-recent-row:last-child { border-bottom: 0; }
-.nm-v6-recent-row time { color: #068a3c; font-size: 12px; font-weight: 700; }
-.nm-v6-recent-row b { display: block; color: #1d1d1f; font-size: 12px; font-weight: 700; }
-.nm-v6-recent-row p { margin: 3px 0 0; color: #4a5565; font-size: 11px; line-height: 1.5; }
-.nm-v6-recent-empty { margin: 0; padding: 14px 16px; color: #6e7781; font-size: 12px; }
-.nm-v6-summary-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.nm-v6-summary-list { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
-.nm-v6-summary-list > div { display: grid; grid-template-columns: 56px 1fr; gap: 8px; }
-.nm-v6-summary-list span { color: #6e7781; font-size: 11px; font-weight: 700; }
-.nm-v6-summary-list b { color: #1d1d1f; font-size: 12px; font-weight: 600; }
-.nm-v6-summary-table { overflow: hidden; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
-.nm-v6-summary-row { display: grid; grid-template-columns: 44px 40px 36px 36px 1fr 1fr; gap: 4px; padding: 7px 10px; border-bottom: 1px solid #f0f1f3; color: #1d1d1f; font-size: 11px; }
-.nm-v6-summary-row:last-child { border-bottom: 0; }
-.nm-v6-summary-head { background: #f5f5f7; color: #6e7781; font-weight: 700; }
-.nm-v6-summary-notes { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
-.nm-v6-summary-notes b { color: #1d1d1f; font-size: 12px; }
-.nm-v6-summary-notes p { margin: 0; color: #4a5565; font-size: 11px; line-height: 1.5; }
-.nm-v6-summary-notes p span { margin-right: 6px; color: #068a3c; font-weight: 700; }
+/* ---- 健康日記（ 37-2-B）。マイペット（37-2-A）と同じ  の部品で組む ---- */
+.nm-portal-pet-switch { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.nm-portal-pet-switch button { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 7px; border: 1px solid #dadde2; border-radius: 9999px; background: var(--customer-ground, #fff); color: #4a5565; font-size: 12px; font-weight: 700; }
+.nm-portal-pet-switch button.active { border-color: var(--nen); background: #e8f8ee; color: #068a3c; }
+.nm-portal-pet-switch i { display: block; width: 18px; height: 18px; overflow: hidden; border-radius: 50%; background: #d9efe1; }
+.nm-portal-pet-switch img { width: 100%; height: 100%; object-fit: cover; }
+.nm-portal-vitals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.nm-portal-vitals > div { display: grid; gap: 4px; padding: 12px 10px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
+.nm-portal-vitals span { color: #6e7781; font-size: 10px; font-weight: 700; }
+.nm-portal-vitals b { color: #1d1d1f; font-size: 26px; font-weight: 700; line-height: 1.1; }
+.nm-portal-vitals b small { margin-left: 3px; color: #4a5565; font-size: 11px; font-weight: 700; }
+.nm-portal-vitals em { color: #068a3c; font-size: 10px; font-style: normal; font-weight: 700; }
+.nm-portal-trend { display: grid; gap: 12px; padding: 16px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
+.nm-portal-trend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.nm-portal-trend-head h2 { font-size: 16px; }
+.nm-portal-period { display: inline-flex; padding: 2px; border-radius: 9999px; background: #f5f5f7; }
+.nm-portal-period button { width: 30px; height: 22px; border: 0; border-radius: 9999px; background: transparent; color: #6e7781; font-size: 11px; font-weight: 700; }
+.nm-portal-period button.active { background: var(--customer-ground, #fff); color: #1d1d1f; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
+.nm-portal-keys { display: flex; gap: 6px; overflow-x: auto; }
+.nm-portal-keys button { flex: none; height: 24px; padding: 0 10px; border: 1px solid #dadde2; border-radius: 9999px; background: var(--customer-ground, #fff); color: #4a5565; font-size: 11px; font-weight: 700; }
+.nm-portal-keys button.active { border-color: var(--nen); background: #e8f8ee; color: #068a3c; }
+.nm-portal-bars { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; height: 120px; }
+.nm-portal-bar-col { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 4px; min-width: 0; }
+.nm-portal-bar { position: relative; display: block; min-height: 4px; border-radius: 6px 6px 2px 2px; background: var(--nen); }
+.nm-portal-bar b { position: absolute; top: -14px; left: 0; right: 0; color: #4a5565; font-size: 9px; font-weight: 700; text-align: center; }
+.nm-portal-bar-empty { height: 4px; background: #dadde2; }
+.nm-portal-bar-warn { background: #d97706; }
+.nm-portal-bar-col span { color: #6e7781; font-size: 9px; text-align: center; white-space: nowrap; }
+.nm-portal-bars-empty { display: grid; place-items: center; gap: 4px; height: 120px; border-radius: 8px; background: #f5f5f7; text-align: center; }
+.nm-portal-bars-empty b { color: #1d1d1f; font-size: 12px; }
+.nm-portal-bars-empty p { margin: 0; color: #6e7781; font-size: 11px; }
+.nm-portal-trend > p { margin: 0; color: #4a5565; font-size: 10px; line-height: 1.6; }
+.nm-portal-btn-wide { width: 100%; height: 44px; font-size: 13px; }
+.nm-portal-recent { display: grid; gap: 0; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
+.nm-portal-recent-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #dadde2; }
+.nm-portal-recent-head b { color: #1d1d1f; font-size: 14px; font-weight: 700; }
+.nm-portal-recent-row { display: grid; grid-template-columns: 44px 1fr; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #f0f1f3; }
+.nm-portal-recent-row:last-child { border-bottom: 0; }
+.nm-portal-recent-row time { color: #068a3c; font-size: 12px; font-weight: 700; }
+.nm-portal-recent-row b { display: block; color: #1d1d1f; font-size: 12px; font-weight: 700; }
+.nm-portal-recent-row p { margin: 3px 0 0; color: #4a5565; font-size: 11px; line-height: 1.5; }
+.nm-portal-recent-empty { margin: 0; padding: 14px 16px; color: #6e7781; font-size: 12px; }
+.nm-portal-summary-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.nm-portal-summary-list { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
+.nm-portal-summary-list > div { display: grid; grid-template-columns: 56px 1fr; gap: 8px; }
+.nm-portal-summary-list span { color: #6e7781; font-size: 11px; font-weight: 700; }
+.nm-portal-summary-list b { color: #1d1d1f; font-size: 12px; font-weight: 600; }
+.nm-portal-summary-table { overflow: hidden; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
+.nm-portal-summary-row { display: grid; grid-template-columns: 44px 40px 36px 36px 1fr 1fr; gap: 4px; padding: 7px 10px; border-bottom: 1px solid #f0f1f3; color: #1d1d1f; font-size: 11px; }
+.nm-portal-summary-row:last-child { border-bottom: 0; }
+.nm-portal-summary-head { background: #f5f5f7; color: #6e7781; font-weight: 700; }
+.nm-portal-summary-notes { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
+.nm-portal-summary-notes b { color: #1d1d1f; font-size: 12px; }
+.nm-portal-summary-notes p { margin: 0; color: #4a5565; font-size: 11px; line-height: 1.5; }
+.nm-portal-summary-notes p span { margin-right: 6px; color: #068a3c; font-weight: 700; }
 
-/* ---- マイペット 登録（★V6 37-2-A-2）／今日を記録（★V6 37-2-B-1） ---- */
-.nm-v6-photo-pick { display: grid; justify-items: center; gap: 6px; }
-.nm-v6-photo-pick input { display: none; }
-.nm-v6-photo-circle { display: grid; width: 88px; height: 88px; place-items: center; overflow: hidden; border: 1.5px solid var(--nen); border-radius: 50%; background: #e8f8ee; color: #068a3c; }
-.nm-v6-photo-circle svg { width: 26px; height: 26px; }
-.nm-v6-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
-.nm-v6-photo-pick b { color: #068a3c; font-size: 12px; font-weight: 700; }
-.nm-v6-hint { display: block; margin-top: 6px; color: #6e7781; font-size: 10px; line-height: 1.5; }
-.nm-v6-breed { position: relative; }
-.nm-v6-suggest { position: absolute; z-index: 5; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 4px 0; list-style: none; border: 1px solid #dadde2; border-radius: 8px; background: var(--customer-ground, #fff); box-shadow: 0 8px 24px rgba(0, 0, 0, .1); }
-.nm-v6-suggest li { padding: 9px 14px; color: #1d1d1f; font-size: 14px; }
-.nm-v6-suggest li.active, .nm-v6-suggest li:hover { background: #e8f8ee; font-weight: 700; }
-.nm-v6-chip-select { display: flex; flex-wrap: wrap; gap: 6px; }
-.nm-v6-chip-select button { height: 32px; padding: 0 12px; border: 1px solid #dadde2; border-radius: 9999px; background: #f5f5f7; color: #4a5565; font-size: 12px; font-weight: 700; }
-.nm-v6-chip-select button.active { border-color: var(--nen); background: var(--nen); color: #fff; }
-.nm-v6-venison { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; }
-.nm-v6-venison span { color: #1d1d1f; font-size: 12px; font-weight: 700; }
-.nm-v6-venison b { color: #068a3c; font-size: 13px; font-weight: 700; }
-.nm-v6-lead { margin: 0; color: #4a5565; font-size: 12px; line-height: 1.6; }
-.nm-v6-pet-select { height: 32px; padding: 0 28px 0 12px; border: 1px solid #dadde2; border-radius: 9999px; background: var(--customer-ground, #fff); color: #1d1d1f; font-size: 12px; font-weight: 700; }
-.nm-v6-record .nm-field textarea { min-height: 88px; }
-.nm-v6-label-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
-.nm-v6-label-row span { margin: 0; color: #1d1d1f; font-size: 12px; font-weight: 700; }
-.nm-v6-label-row small { color: #6e7781; font-size: 10px; }
-.nm-v6-date { display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 6px; border: 1px solid #dadde2; border-radius: 8px; background: #f5f5f7; }
-.nm-v6-date > button { width: 32px; height: 32px; border: 0; background: none; color: #4a5565; font-size: 20px; line-height: 1; }
-.nm-v6-date > button:disabled { color: #dadde2; }
-.nm-v6-date > div { display: flex; align-items: center; gap: 8px; }
-.nm-v6-date b { color: #1d1d1f; font-size: 13px; font-weight: 700; }
-.nm-v6-date em { padding: 1px 7px; border-radius: 9999px; background: #e8f8ee; color: #068a3c; font-size: 10px; font-style: normal; font-weight: 700; }
-.nm-v6-vital-inputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.nm-v6-vital-inputs label { display: grid; gap: 2px; height: 64px; padding: 8px 12px; border: 1px solid #dadde2; border-radius: 8px; background: #f5f5f7; }
-.nm-v6-vital-inputs label > span { color: #6e7781; font-size: 10px; font-weight: 700; }
-.nm-v6-vital-inputs label > div { display: flex; align-items: flex-end; gap: 3px; }
-.nm-v6-vital-inputs input { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: #1d1d1f; font-size: 18px; font-weight: 700; outline: 0; }
-.nm-v6-vital-inputs input::placeholder { color: #a1a7b0; }
-.nm-v6-vital-inputs small { flex: none; padding-bottom: 3px; color: #6e7781; font-size: 10px; font-weight: 600; }
-.nm-v6-choice { display: grid; gap: 6px; }
-.nm-v6-choice button { height: 36px; border: 1px solid #dadde2; border-radius: 9999px; background: #f5f5f7; color: #4a5565; font-size: 12px; font-weight: 700; }
-.nm-v6-choice button.active { border-color: var(--nen); background: var(--nen); color: #fff; }
-.nm-v6-details { border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
-.nm-v6-details summary { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 16px; color: #1d1d1f; font-size: 12px; font-weight: 700; cursor: pointer; list-style: none; }
-.nm-v6-details summary::-webkit-details-marker { display: none; }
-.nm-v6-details summary::after { content: '⌄'; color: #6e7781; font-size: 16px; }
-.nm-v6-details[open] summary::after { content: '⌃'; }
-.nm-v6-measure { padding: 0 16px 8px; }
-.nm-v6-measure .nm-measure-item:last-child { border-bottom: 0; }
+/* ---- マイペット 登録（ 37-2-A-2）／今日を記録（ 37-2-B-1） ---- */
+.nm-portal-photo-pick { display: grid; justify-items: center; gap: 6px; }
+.nm-portal-photo-pick input { display: none; }
+.nm-portal-photo-circle { display: grid; width: 88px; height: 88px; place-items: center; overflow: hidden; border: 1.5px solid var(--nen); border-radius: 50%; background: #e8f8ee; color: #068a3c; }
+.nm-portal-photo-circle svg { width: 26px; height: 26px; }
+.nm-portal-photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+.nm-portal-photo-pick b { color: #068a3c; font-size: 12px; font-weight: 700; }
+.nm-portal-hint { display: block; margin-top: 6px; color: #6e7781; font-size: 10px; line-height: 1.5; }
+.nm-portal-breed { position: relative; }
+.nm-portal-suggest { position: absolute; z-index: 5; top: 100%; left: 0; right: 0; margin: 4px 0 0; padding: 4px 0; list-style: none; border: 1px solid #dadde2; border-radius: 8px; background: var(--customer-ground, #fff); box-shadow: 0 8px 24px rgba(0, 0, 0, .1); }
+.nm-portal-suggest li { padding: 9px 14px; color: #1d1d1f; font-size: 14px; }
+.nm-portal-suggest li.active, .nm-portal-suggest li:hover { background: #e8f8ee; font-weight: 700; }
+.nm-portal-chip-select { display: flex; flex-wrap: wrap; gap: 6px; }
+.nm-portal-chip-select button { height: 32px; padding: 0 12px; border: 1px solid #dadde2; border-radius: 9999px; background: #f5f5f7; color: #4a5565; font-size: 12px; font-weight: 700; }
+.nm-portal-chip-select button.active { border-color: var(--nen); background: var(--nen); color: #fff; }
+.nm-portal-venison { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; }
+.nm-portal-venison span { color: #1d1d1f; font-size: 12px; font-weight: 700; }
+.nm-portal-venison b { color: #068a3c; font-size: 13px; font-weight: 700; }
+.nm-portal-lead { margin: 0; color: #4a5565; font-size: 12px; line-height: 1.6; }
+.nm-portal-pet-select { height: 32px; padding: 0 28px 0 12px; border: 1px solid #dadde2; border-radius: 9999px; background: var(--customer-ground, #fff); color: #1d1d1f; font-size: 12px; font-weight: 700; }
+.nm-portal-record .nm-field textarea { min-height: 88px; }
+.nm-portal-label-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.nm-portal-label-row span { margin: 0; color: #1d1d1f; font-size: 12px; font-weight: 700; }
+.nm-portal-label-row small { color: #6e7781; font-size: 10px; }
+.nm-portal-date { display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 6px; border: 1px solid #dadde2; border-radius: 8px; background: #f5f5f7; }
+.nm-portal-date > button { width: 32px; height: 32px; border: 0; background: none; color: #4a5565; font-size: 20px; line-height: 1; }
+.nm-portal-date > button:disabled { color: #dadde2; }
+.nm-portal-date > div { display: flex; align-items: center; gap: 8px; }
+.nm-portal-date b { color: #1d1d1f; font-size: 13px; font-weight: 700; }
+.nm-portal-date em { padding: 1px 7px; border-radius: 9999px; background: #e8f8ee; color: #068a3c; font-size: 10px; font-style: normal; font-weight: 700; }
+.nm-portal-vital-inputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.nm-portal-vital-inputs label { display: grid; gap: 2px; height: 64px; padding: 8px 12px; border: 1px solid #dadde2; border-radius: 8px; background: #f5f5f7; }
+.nm-portal-vital-inputs label > span { color: #6e7781; font-size: 10px; font-weight: 700; }
+.nm-portal-vital-inputs label > div { display: flex; align-items: flex-end; gap: 3px; }
+.nm-portal-vital-inputs input { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: #1d1d1f; font-size: 18px; font-weight: 700; outline: 0; }
+.nm-portal-vital-inputs input::placeholder { color: #a1a7b0; }
+.nm-portal-vital-inputs small { flex: none; padding-bottom: 3px; color: #6e7781; font-size: 10px; font-weight: 600; }
+.nm-portal-choice { display: grid; gap: 6px; }
+.nm-portal-choice button { height: 36px; border: 1px solid #dadde2; border-radius: 9999px; background: #f5f5f7; color: #4a5565; font-size: 12px; font-weight: 700; }
+.nm-portal-choice button.active { border-color: var(--nen); background: var(--nen); color: #fff; }
+.nm-portal-details { border: 1px solid #dadde2; border-radius: 10px; background: var(--customer-ground, #fff); }
+.nm-portal-details summary { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 16px; color: #1d1d1f; font-size: 12px; font-weight: 700; cursor: pointer; list-style: none; }
+.nm-portal-details summary::-webkit-details-marker { display: none; }
+.nm-portal-details summary::after { content: '⌄'; color: #6e7781; font-size: 16px; }
+.nm-portal-details[open] summary::after { content: '⌃'; }
+.nm-portal-measure { padding: 0 16px 8px; }
+.nm-portal-measure .nm-measure-item:last-child { border-bottom: 0; }

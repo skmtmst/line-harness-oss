@@ -1,9 +1,11 @@
+> 文書：一斉配信一覧の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+
 # 一斉配信一覧の動き（BEHAVIOR.md）
 
-対象：`app/broadcasts/list-v8.tsx`（今までの V8 一覧）。このファイルの動きを写して `list.tsx` を一から書いた。見た目は型（ListPage）と共通部品（KpiBand・KpiCard・FolderPanel・FilterChip・DataTable）で組み直した。
+対象：現役の `list.tsx`。ファイルの案内は [README](README.md)。見た目は型（ListPage）と共通部品（KpiBand・KpiCard・FolderPanel・FilterChip・DataTable）で組み直した。
 
 ## 入口
-- `app/broadcasts/page.tsx`：`theme === 'v8'` のときだけ `@/v8/broadcasts/list` を出す。v7 の一覧（BroadcastsPageContent）と v7 の試験、古い `list-v8.tsx` は触らない。
+- `app/broadcasts/page.tsx`：`@/v8/broadcasts/list` を直接表示する。管理画面はV8に固定。
 
 ## 受け付ける URL と指定
 - 今までどおり URL の指定は読まない（絞り込み・フォルダ・件数・並びは画面の中だけ）。
@@ -20,7 +22,7 @@
 - 一覧の選択からまとめてフォルダへ移す。選ぶ窓で確定するまで送らず、各配信の版を照合する。失敗した配信だけ再試行し、閲覧のみ・統括からの配信は選べない。
 
 ## 権限
-- 役割はサーバ（`/api/staff/me`、`useStaffRole`）。読めるまでは今までどおり出す（最後の守りはサーバの 403）。
+- 役割はサーバ（`/api/staff/me`、`useStaffRole`）。確認中・取得失敗は変更操作を隠す（最後の守りはサーバの403）。
 - 変えられるのはオーナー・管理者と、配信の編集キー（`broadcast.definition.edit`）を持つ運用担当。手元の役割（`lh_staff_role`）は古いことがあるので見ない。
 - 変えられない人：数の帯の上に「閲覧のみで見ています。…」の帯（`NtCE3`）。作る・この条件を保存する（保存した検索の「＋ この条件を保存する」も）・フォルダを追加・行の「…」（中は変える項目だけなのでボタンごと）・詳細パネルの変えるボタンは置かずに隠す（2026-10-06 オーナー決定）。作るボタンの場所だけ空けてフォルダの列の並びを保つ。
 
@@ -50,7 +52,7 @@
 - 数の帯の各マスの「…」：絵に操作の中身が無いので置いていない。
 
 ## かんたんに送る（`quick-send.tsx`・絵 `P6vbxn`・小窓 640）
-- 入口：「配信を作る ▾」の先頭「かんたんに送る」（絵 `Xr6eu` の分け方。新しく作る・テンプレートから作るは今のまま）。今までは窓（`app/broadcasts/quick-send-dialog.tsx`）だけあって開く口が無かった。
+- 入口：「配信を作る ▾」の先頭「かんたんに送る」（絵 `Xr6eu` の分け方。新しく作る・テンプレートから作るは今のまま）。本体は `quick-send.tsx`。
 - 呼ぶ口（今の窓と同じ）：開いたら `tags.list`・`broadcasts.approval.candidates`。本文・相手が変わったら 0.5 秒待って `broadcasts.preflight`（見込みと今月の残り `quota.remaining`）。送るは `broadcasts.create` → 1,000人以上なら `approval.request`、予約なしなら `send`。送ったら一覧を1ページ目から読み直す。
 - 送る相手・いつは札（選んだ札は緑の地に青の字）。タグで絞る・日時を決めるを選ぶと、同じ段に選ぶ欄が出る。
 - 差し込む「名前」は今のカーソルの位置に `{名前}` を入れる（今までは末尾）。

@@ -1,6 +1,6 @@
 import type { FriendField, HqFriendFieldDefinition, HqFriendAttributeDetail, HqTemplateFolder } from '@line-crm/shared'
 import type { SupportMarkListItem } from '@/lib/api'
-import type { FieldEditorValues } from '@/v8/tags/field-editor'
+import type { FieldEditorValues } from '@/v8/tags/public/field-editor/index'
 
 export function fieldOf(detail: Extract<HqFriendAttributeDetail, { definition: HqFriendFieldDefinition }>, count?: number | null): FriendField {
   const field = detail.definition.field

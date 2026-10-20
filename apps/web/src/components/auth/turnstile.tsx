@@ -5,7 +5,7 @@ import { TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 import Notice from '@/components/shared/notice'
 
 /**
- * Cloudflare Turnstile（ロボット対策）の部品。★V6 36-4 の「ロボット対策」枠。
+ * Cloudflare Turnstile（ロボット対策）の部品。★管理画面 36-4 の「ロボット対策」枠。
  *
  * サイト用の鍵 `NEXT_PUBLIC_TURNSTILE_SITE_KEY` はビルド時に入る（公開してよい鍵）。
  * 秘密の鍵は Worker 側にだけある。鍵が無い環境では枠を出さず、親が送信を止める。

@@ -1,3 +1,4 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { jstNow } from '@line-crm/db';
 
 export type MemberRankSyncConfig = { enabled?: string; baseUrl?: string; secret?: string };

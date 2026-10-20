@@ -37,8 +37,8 @@ vi.mock('@line-crm/db', async () => {
   };
 });
 
-vi.mock('../services/booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>true)}));
-import { sendAutomaticBookingLine } from '../services/booking-automatic-line.js';
+vi.mock('../features/booking/booking-automatic-line.js',()=>({sendAutomaticBookingLine:vi.fn(async()=>true)}));
+import { sendAutomaticBookingLine } from '../features/booking/booking-automatic-line.js';
 
 const cardSender = vi.mocked(sendAutomaticBookingLine);
 

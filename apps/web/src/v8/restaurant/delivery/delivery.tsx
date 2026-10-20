@@ -21,8 +21,11 @@ import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
+import { DEFAULT_PAGE_SIZE } from '@/components/shared/page-size-select'
 import ListState from '@/components/shared/list-state'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice, { type NoticeTone } from '@/components/shared/notice'
+import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
 import EntitySelect from '@/components/shared/entity-select'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
@@ -41,12 +44,13 @@ import {
   type DeliveryOrdersData,
   type DeliveryService,
 } from '@/lib/restaurant-delivery-api'
-import { BoundaryBanner, RestaurantPage, STORE_PICKER_WIDTH } from '../common-a/frame'
+import { BoundaryBanner, RestaurantPage } from '@/v8/restaurant/common-a/public/frame/index'
 import OrdersBoard from './orders'
 import { CancelOrderDialog, OrderDetailDialog } from './order-detail'
-import HistoryBoard, { HistoryHeaderActions } from './history'
-import SoldOutBoard, { IntakeStopDialog, SoldOutHeaderActions } from './bulk'
+import HistoryBoard from './history'
+import SoldOutBoard, { IntakeStopDialog } from './bulk'
 import { DASH, errorMessage, formatClock, storeToday } from './format'
+import { useUberConnection } from './use-uber-connection'
 import styles from './delivery.module.css'
 
 /** 板の印（撮影と見張りの試験が読む）。 */
@@ -59,45 +63,16 @@ const VIEW_BOARDS = {
 type DeliveryView = keyof typeof VIEW_BOARDS
 
 /*
- * 絵ごとの「板の頭」と「中身の余白」（2026-10-11 実測し直し）。
- * 共通の器（CHz31）は 頭の上24・題と説明の間8・題22/700/32・説明を「?」の中、
- * 中身は上16・段の間16。デリバリーの3枚はどれもそれと違うので、器の既定は変えず
- * RestaurantPage の任意の引数で板ごとに渡す（画面CSSから器を上書きしない）。
- *
- *   絵の頭（1440・帯なし）           画面の頭（渡す値）
- *   kDQHr 上20 間4 題22/33 説明13/20  → padTop20 gap4 題そのまま 説明body → 塊56・頭88（絵89）
- *   OzHLO 上20 間4 題18/27 説明12/18  → padTop20 gap4 題sub     説明そのまま → 塊50・頭82（絵81）
- *   h7OeT 同じ                        → 同じ
- *
- * 中身の上の余白は「絵の最初の段の y − 頭の下（60+頭の高さ）」。
- *   kDQHr 絵161 − 148 = 13〜14 / OzHLO 絵145 − 142 = 3〜4 / h7OeT 絵141 − 142 = 0。
+ * 板の頭と中身の余白は共通の器（RestaurantPage）の既定に任せる（数字で渡さない）。
+ * 題の大きさだけ、注文履歴と品切れ一括設定は小さい題（絵 OzHLO・h7OeT）。
  */
-const VIEW_HEAD: Record<DeliveryView, { titleSize?: 'sub'; descriptionSize?: 'body' }> = {
-  orders: { descriptionSize: 'body' },
+const VIEW_HEAD: Record<DeliveryView, { titleSize?: 'sub' }> = {
+  orders: {},
   history: { titleSize: 'sub' },
   'sold-out': { titleSize: 'sub' },
 }
 
-/** 絵の頭はどの板も 上20・題と説明の間4。 */
-const HEAD_PAD_TOP = 20
-const HEAD_TEXT_GAP = 4
-
-/*
- * 中身の段どうしの間も絵の値で渡す（渡さない板は共通の16のまま）。
- * h7OeT は 帯の下(y189)→表の見出し(y201) が12なので12を渡す。器を上書きして
- * 帯を引き上げるのはやめた（2026-10-11 実測：帯 y130→y142＝絵の141、
- * 表 y206→y202＝絵の201）。
- */
-const VIEW_BODY: Record<DeliveryView, { padTop: number; gap?: number }> = {
-  orders: { padTop: 14, gap: 12 },
-  history: { padTop: 4 },
-  'sold-out': { padTop: 0, gap: 12 },
-}
-
 const TABS: DeliveryOrderTab[] = ['all', 'new', 'cooking', 'handed_over']
-
-/** 「さらに表示」で増やす数。 */
-const PAGE_STEP = 20
 
 /** 自動で読み直す間（絵の「30秒ごとに自動更新」）。予約一覧と同じ間にする。 */
 const REFRESH_MS = 30_000
@@ -106,7 +81,7 @@ const REFRESH_MS = 30_000
 const PAGE_META: Record<DeliveryView, { title: string; description: string }> = {
   orders: {
     title: 'デリバリー受注',
-    description: 'Uber Eats・出前館・ロケットナウの注文をこの画面でまとめて受け付けます',
+    description: '保存済みの注文を確認できます。Uber Eats の注文の取り込みと操作はまだ利用できません',
   },
   history: {
     title: '注文履歴・売上',
@@ -114,7 +89,7 @@ const PAGE_META: Record<DeliveryView, { title: string; description: string }> = 
   },
   'sold-out': {
     title: '品切れ一括設定',
-    description: '品切れにした商品は、Uber Eats・出前館・ロケットナウのすべてで注文できなくなります',
+    description: '保存済みの商品を確認できます。Uber Eats を含む商品の品切れ・販売再開・メニュー同期はまだ利用できません',
   },
 }
 
@@ -123,8 +98,11 @@ function DeliveryInner() {
   const samePageUrl = useSamePageUrl()
   const { selectedAccountId, setSelectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
-  /* 閲覧のみの人には送るボタンを置かない（Worker側の 403 が最後の守り）。 */
-  const canManage = role === null || canManageRole(role)
+  const preparing = usePreparingDialog({ note: '接続の完了とは別の機能です。注文の取り込み・受ける・断る・取消・準備完了・営業状態の変更・メニュー同期はまだ利用できません。保存済みの注文や商品、過去の履歴は確認できます。' })
+  /* 閲覧のみの人には送るボタンを置かず、閲覧のみの帯を出す（Worker側の 403 が最後の守り）。役割を読み込む前も置かない。 */
+  const canManage = role !== null && canManageRole(role)
+  // 接続情報の読み口も管理者専用。閲覧のみでは照会せず、接続未確認として扱う。
+  const uberConnectionStatus = useUberConnection(canManage ? selectedAccountId : null)
 
   /* ── URL から今の見た目を決める ───────────────────────────── */
   const requestedView = searchParams.get('view')
@@ -149,7 +127,8 @@ function DeliveryInner() {
   const [loadedAt, setLoadedAt] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [notice, setNotice] = useState<{ tone: NoticeTone; text: string } | null>(null)
-  const [shown, setShown] = useState(PAGE_STEP)
+  const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(DEFAULT_PAGE_SIZE)
   const [selected, setSelected] = useState<string[]>([])
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null)
   const [busyService, setBusyService] = useState<DeliveryService | null>(null)
@@ -171,7 +150,8 @@ function DeliveryInner() {
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [historyDate, setHistoryDate] = useState(() => storeToday())
   const [historyService, setHistoryService] = useState<DeliveryService | ''>('')
-  const [historyShown, setHistoryShown] = useState(PAGE_STEP)
+  const [historyPage, setHistoryPage] = useState(1)
+  const [historyPerPage, setHistoryPerPage] = useState(DEFAULT_PAGE_SIZE)
   const [csvBusy, setCsvBusy] = useState(false)
   const [csvNote, setCsvNote] = useState<string | null>(null)
 
@@ -182,7 +162,8 @@ function DeliveryInner() {
   const [query, setQuery] = useState('')
   const [soldOutOnly, setSoldOutOnly] = useState(false)
   const [selectedItems, setSelectedItems] = useState<string[]>([])
-  const [itemsShown, setItemsShown] = useState(PAGE_STEP)
+  const [itemsPage, setItemsPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_PAGE_SIZE)
   const [soldOutBusy, setSoldOutBusy] = useState(false)
   const [busyItemId, setBusyItemId] = useState<string | null>(null)
 
@@ -248,7 +229,7 @@ function DeliveryInner() {
 
   /* タブを変えたら見せる件数と選択を初めに戻す。 */
   useEffect(() => {
-    setShown(PAGE_STEP)
+    setPage(1)
     setSelected([])
   }, [tab])
 
@@ -292,7 +273,7 @@ function DeliveryInner() {
         ...(historyService ? { service: historyService } : {}),
       })
       setHistory(next)
-      setHistoryShown(PAGE_STEP)
+      setHistoryPage(1)
     } catch (err) {
       setHistory(null)
       setHistoryError(errorMessage(err, '注文履歴を読み込めませんでした。'))
@@ -358,7 +339,8 @@ function DeliveryInner() {
     successText: string,
     fallback: string,
   ) => {
-    if (!selectedAccountId) return
+    const order = data?.orders.find((item) => item.id === id) ?? (detail?.order.id === id ? detail.order : null)
+    if (!canManage || !selectedAccountId || !order || order.service === 'ubereats') return
     setBusyOrderId(id)
     setDetailBusy(true)
     setNotice(null)
@@ -373,7 +355,7 @@ function DeliveryInner() {
       setBusyOrderId(null)
       setDetailBusy(false)
     }
-  }, [selectedAccountId, loadOrders, loadDetail, orderId])
+  }, [canManage, data, detail, selectedAccountId, loadOrders, loadDetail, orderId])
 
   const acceptOrder = useCallback((order: DeliveryOrderSummary | { id: string }) => {
     void runOrderAction(
@@ -407,9 +389,9 @@ function DeliveryInner() {
    * 途中で失敗しても残りは続け、終わったあとに数で伝える。
    */
   const bulkAccept = useCallback(async () => {
-    if (!selectedAccountId || selected.length === 0) return
+    if (!canManage || !selectedAccountId || selected.length === 0) return
     const targets = (data?.orders ?? []).filter(
-      (order) => order.status === 'new' && selected.includes(order.id),
+      (order) => order.status === 'new' && order.service !== 'ubereats' && selected.includes(order.id),
     )
     if (targets.length === 0) return
     setBulkBusy(true)
@@ -435,11 +417,11 @@ function DeliveryInner() {
         text: `${done}件を受け付けました。${failed}件は受け付けられませんでした。もう一度お試しください。`,
       })
     }
-  }, [selectedAccountId, selected, data, loadOrders])
+  }, [canManage, selectedAccountId, selected, data, loadOrders])
 
   const submitCancel = useCallback(async () => {
     const order = detail?.order
-    if (!selectedAccountId || !order) return
+    if (!canManage || !selectedAccountId || !order || order.service === 'ubereats') return
     setCancelBusy(true)
     setCancelError(null)
     try {
@@ -453,21 +435,22 @@ function DeliveryInner() {
     } finally {
       setCancelBusy(false)
     }
-  }, [selectedAccountId, detail, cancelReason, loadOrders, closeDetail])
+  }, [canManage, selectedAccountId, detail, cancelReason, loadOrders, closeDetail])
 
   /* ── 受付の停止・再開 ───────────────────────────────────── */
   const openStop = useCallback((service?: DeliveryService) => {
-    const open = (data?.services ?? []).filter((state) => state.intakeStatus === 'open')
+    if (!canManage || service === 'ubereats') return
+    const open = (data?.services ?? []).filter((state) => state.intakeStatus === 'open' && state.service !== 'ubereats')
     setStopSelected(service
       ? [service]
       : open.map((state) => state.service))
     setStopPreset('60m')
     setStopError(null)
     setStopOpen(true)
-  }, [data])
+  }, [canManage, data])
 
   const submitStop = useCallback(async () => {
-    if (!selectedAccountId || stopSelected.length === 0) return
+    if (!canManage || !selectedAccountId || stopSelected.length === 0 || stopSelected.includes('ubereats')) return
     setStopBusy(true)
     setStopError(null)
     try {
@@ -487,10 +470,10 @@ function DeliveryInner() {
     } finally {
       setStopBusy(false)
     }
-  }, [selectedAccountId, stopSelected, stopPreset, loadOrders])
+  }, [canManage, selectedAccountId, stopSelected, stopPreset, loadOrders])
 
   const resumeService = useCallback(async (service: DeliveryService) => {
-    if (!selectedAccountId) return
+    if (!canManage || !selectedAccountId || service === 'ubereats') return
     setBusyService(service)
     setNotice(null)
     try {
@@ -504,11 +487,11 @@ function DeliveryInner() {
     } finally {
       setBusyService(null)
     }
-  }, [selectedAccountId, loadOrders])
+  }, [canManage, selectedAccountId, loadOrders])
 
   /* ── 品切れの送信 ───────────────────────────────────────── */
   const submitSoldOut = useCallback(async (soldOut: boolean) => {
-    if (!selectedAccountId || selectedItems.length === 0) return
+    if (!canManage || !selectedAccountId || selectedItems.length === 0 || selectedItems.some((id) => !items?.some((item) => item.id === id && !item.services.some(({ service }) => service === 'ubereats')))) return
     setSoldOutBusy(true)
     setNotice(null)
     try {
@@ -525,10 +508,10 @@ function DeliveryInner() {
     } finally {
       setSoldOutBusy(false)
     }
-  }, [selectedAccountId, selectedItems, loadItems])
+  }, [canManage, items, selectedAccountId, selectedItems, loadItems])
 
   const toggleOneSoldOut = useCallback(async (id: string, soldOut: boolean) => {
-    if (!selectedAccountId) return
+    if (!canManage || !selectedAccountId || !items?.some((item) => item.id === id && !item.services.some(({ service }) => service === 'ubereats'))) return
     setBusyItemId(id)
     setNotice(null)
     try {
@@ -542,7 +525,7 @@ function DeliveryInner() {
     } finally {
       setBusyItemId(null)
     }
-  }, [selectedAccountId, loadItems])
+  }, [canManage, items, selectedAccountId, loadItems])
 
   /* ── CSVで保存 ─────────────────────────────────────────── */
   const saveCsv = useCallback(async () => {
@@ -594,7 +577,6 @@ function DeliveryInner() {
     <EntitySelect
       aria-label="店舗"
       noun="店舗"
-      width={STORE_PICKER_WIDTH}
       value={currentStoreId}
       onChange={(value) => {
         const next = stores.find((item) => item.id === value)
@@ -610,26 +592,7 @@ function DeliveryInner() {
     />
   ) : null
 
-  const picker = view === 'history' ? (
-    <HistoryHeaderActions
-      date={historyDate}
-      service={historyService}
-      csvBusy={csvBusy}
-      csvDisabled={(history?.orders.length ?? 0) === 0}
-      onDateChange={setHistoryDate}
-      onServiceChange={setHistoryService}
-      onCsv={() => { void saveCsv() }}
-    />
-  ) : view === 'sold-out' ? (
-    <SoldOutHeaderActions
-      query={query}
-      soldOutOnly={soldOutOnly}
-      soldOutCount={soldOutCount}
-      disabled={itemsLoading && items === null}
-      onQueryChange={(value) => { setQuery(value); setItemsShown(PAGE_STEP) }}
-      onSoldOutOnlyChange={(value) => { setSoldOutOnly(value); setItemsShown(PAGE_STEP) }}
-    />
-  ) : (
+  const picker = view === 'sold-out' || view === 'history' ? undefined : (
     <div className={styles.headActions}>
       {/* 絵の板の頭は「題 → 間 → 更新（印＋名 nDOMR）→ 品切れ設定 → 一括停止」の並び。 */}
       <div className={styles.refreshRow}>
@@ -644,14 +607,13 @@ function DeliveryInner() {
       {storePicker}
       {canManage ? (
         <>
-          {/* 絵は2つとも印つき（`lmSlb` package-x・`bX6bH` pause）。大きさは共通部品が持つ。 */}
-          <Button size="delivery-head" onClick={() => go({ view: 'sold-out' })}>
-            <PackageX aria-hidden="true" />
+          <Button onClick={() => go({ view: 'sold-out' })}>
+            <PackageX size={16} aria-hidden="true" />
             品切れ一括設定
           </Button>
-          <Button size="delivery-head" variant="danger-outline" onClick={() => openStop()}>
-            <Pause aria-hidden="true" />
-            受付を一括停止
+          <Button variant="danger-outline" onClick={() => openStop()}>
+            <Pause size={16} aria-hidden="true" />
+            受付をまとめて止める
           </Button>
         </>
       ) : null}
@@ -662,35 +624,33 @@ function DeliveryInner() {
   const ordersBody = (() => {
     if (!selectedAccountId) {
       return (
-        <div className={styles.stateBox}>
-          <ListState
-            kind="empty"
-            title="LINEアカウントを選んでください"
-            description="画面の上でLINEアカウントを選ぶと、そのアカウントの店舗の注文を表示します。"
-          />
-        </div>
+        <ListState
+          kind="empty"
+          title="LINE公式アカウントを選んでください"
+          description="画面の上でLINE公式アカウントを選ぶと、そのアカウントの店舗の注文を表示します。"
+        />
       )
     }
     if ((loading || accountLoading) && !data) {
-      return <div className={styles.stateBox}><ListState kind="loading" title="注文を読み込んでいます" /></div>
+      return <ListState kind="loading" title="注文を読み込んでいます" />
     }
     if (error && !data) {
       return (
-        <div className={styles.stateBox}>
-          <ListState
-            kind="error"
-            title="注文を表示できませんでした"
-            description={error}
-            onRetry={() => { void loadOrders() }}
-          />
-        </div>
+        <ListState
+          kind="error"
+          title="注文を表示できませんでした"
+          description={error}
+          onRetry={() => { void loadOrders() }}
+        />
       )
     }
     if (!data) return null
     return (
       <OrdersBoard
         data={data}
-        shown={shown}
+        uberConnectionStatus={uberConnectionStatus}
+        page={page}
+        perPage={perPage}
         busyOrderId={busyOrderId}
         busyService={busyService}
         canManage={canManage}
@@ -701,7 +661,7 @@ function DeliveryInner() {
           checked ? [...new Set([...prev, id])] : prev.filter((item) => item !== id)
         ))}
         onToggleSelectAll={(checked) => setSelected(checked
-          ? data.orders.filter((order) => order.status === 'new').map((order) => order.id)
+          ? data.orders.filter((order) => order.status === 'new' && order.service !== 'ubereats').map((order) => order.id)
           : [])}
         onBulkAccept={() => { void bulkAccept() }}
         onTab={(next) => go({ tab: next === 'new' ? undefined : next })}
@@ -712,7 +672,8 @@ function DeliveryInner() {
         onReady={readyOrder}
         onStopService={(service) => openStop(service)}
         onResumeService={(service) => { void resumeService(service) }}
-        onShowMore={() => setShown((prev) => prev + PAGE_STEP)}
+        onPage={setPage}
+        onPerPage={(next) => { setPerPage(next); setPage(1) }}
       />
     )
   })()
@@ -723,11 +684,20 @@ function DeliveryInner() {
       loading={historyLoading}
       error={historyError}
       isToday={historyDate === storeToday(nowMs)}
-      shown={historyShown}
+      page={historyPage}
+      perPage={historyPerPage}
       csvNote={csvNote}
       onOpenOrder={openOrder}
       onRetry={() => { void loadHistory() }}
-      onShowMore={() => setHistoryShown((prev) => prev + PAGE_STEP)}
+      date={historyDate}
+      service={historyService}
+      csvBusy={csvBusy}
+      csvDisabled={(history?.orders.length ?? 0) === 0}
+      onDateChange={setHistoryDate}
+      onServiceChange={setHistoryService}
+      onCsv={() => { void saveCsv() }}
+      onPage={setHistoryPage}
+      onPerPage={(next) => { setHistoryPerPage(next); setHistoryPage(1) }}
     />
   ) : view === 'sold-out' ? (
     <SoldOutBoard
@@ -736,7 +706,13 @@ function DeliveryInner() {
       items={filteredItems}
       total={items?.length ?? 0}
       selected={selectedItems}
-      shown={itemsShown}
+      page={itemsPage}
+      perPage={itemsPerPage}
+      query={query}
+      soldOutOnly={soldOutOnly}
+      soldOutCount={soldOutCount}
+      onQueryChange={(value) => { setQuery(value); setItemsPage(1) }}
+      onSoldOutOnlyChange={(value) => { setSoldOutOnly(value); setItemsPage(1) }}
       busy={soldOutBusy}
       busyItemId={busyItemId}
       canManage={canManage}
@@ -744,12 +720,13 @@ function DeliveryInner() {
         checked ? [...new Set([...prev, id])] : prev.filter((item) => item !== id)
       ))}
       onToggleAll={(checked) => setSelectedItems(checked
-        ? filteredItems.slice(0, itemsShown).map((item) => item.id)
+        ? filteredItems.slice((itemsPage - 1) * itemsPerPage, itemsPage * itemsPerPage).filter((item) => !item.services.some(({ service }) => service === 'ubereats')).map((item) => item.id)
         : [])}
       onToggleOne={(id, soldOut) => { void toggleOneSoldOut(id, soldOut) }}
       onSubmit={(soldOut) => { void submitSoldOut(soldOut) }}
       onRetry={() => { void loadItems() }}
-      onShowMore={() => setItemsShown((prev) => prev + PAGE_STEP)}
+      onPage={setItemsPage}
+      onPerPage={(next) => { setItemsPerPage(next); setItemsPage(1) }}
     />
   ) : ordersBody
 
@@ -760,16 +737,13 @@ function DeliveryInner() {
       boardId={VIEW_BOARDS[view]}
       title={meta.title}
       description={meta.description}
-      descriptionAs="text"
-      descriptionSize={VIEW_HEAD[view].descriptionSize}
       titleSize={VIEW_HEAD[view].titleSize}
-      headPadTop={HEAD_PAD_TOP}
-      headTextGap={HEAD_TEXT_GAP}
       picker={picker}
-      bodyPadTop={VIEW_BODY[view].padTop}
-      bodyGap={VIEW_BODY[view].gap}
     >
+      {role !== null && !canManage ? <ReadOnlyNotice /> : null}
       <BoundaryBanner note="デリバリー3社とは検証用の接続・本番の注文は流れません" />
+
+      <Button onClick={() => preparing.open('Uber Eats の注文の連携')}>{`Uber Eats の注文の連携は${PREPARING_WORD}`}</Button>
 
       {notice ? (
         <Notice tone={notice.tone} density="compact" onClose={() => setNotice(null)}>
@@ -785,6 +759,7 @@ function DeliveryInner() {
        * 後ろの窓の文字が確認の窓に隠れて切れる（重なり）。
        * orderId は残すので、確認の「戻る」で詳細へそのまま戻れる。
        */}
+      {preparing.dialog}
       <OrderDetailDialog
         open={Boolean(orderId) && !cancelOpen}
         loading={detailLoading}

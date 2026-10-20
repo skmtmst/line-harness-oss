@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = [
   'page.tsx',
-  'use-merged-users.ts',
-  'users-v8.tsx',
+  '../../v8/users/use-merged-users.ts',
+  './users-screen.tsx',
 ].map((name) => readFileSync(join(HERE, name), 'utf8')).join('\n')
 const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const ROUTE = readFileSync(

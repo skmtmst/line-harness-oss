@@ -20,8 +20,8 @@ import {
   reserveMileageRewardRedemption,
 } from '@line-crm/db';
 
-import type { Env } from '../index';
-import type { AuthenticatedStaff } from '../middleware/auth';
+import type { Env } from '../worker-env';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { scoring } from './scoring';
 
@@ -169,7 +169,7 @@ describe('失敗直後のやり直し(実時計・実D1・実ルート)', () => 
       ? new Response('ng', { status: 500 })
       : new Response('{}', { status: 200 })));
 
-    const { deliverMileageReward } = await import('../services/mileage-reward-delivery.js');
+    const { deliverMileageReward } = await import('../features/mileage/mileage-reward-delivery.js');
     const reserved = await reserveMileageRewardRedemption(testDb.db, {
       lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
       idempotencyKey: 'realtime-ok', requestFingerprint: 'fp-realtime-ok',
@@ -223,7 +223,7 @@ describe('失敗直後のやり直し(実時計・実D1・実ルート)', () => 
     // 受け口はいつも断る。
     const net = stubGlobalFetch(() => new Response('ng', { status: 500 }));
 
-    const { deliverMileageReward } = await import('../services/mileage-reward-delivery.js');
+    const { deliverMileageReward } = await import('../features/mileage/mileage-reward-delivery.js');
     const reserved = await reserveMileageRewardRedemption(testDb.db, {
       lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
       idempotencyKey: 'realtime-ng', requestFingerprint: 'fp-realtime-ng',
@@ -267,7 +267,7 @@ describe('失敗直後のやり直し(実時計・実D1・実ルート)', () => 
     const rewardId = await seedReward(testDb.db);
     const net = stubGlobalFetch(() => new Response('ng', { status: 500 }));
 
-    const { deliverMileageReward } = await import('../services/mileage-reward-delivery.js');
+    const { deliverMileageReward } = await import('../features/mileage/mileage-reward-delivery.js');
     const reserved = await reserveMileageRewardRedemption(testDb.db, {
       lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
       idempotencyKey: 'realtime-burst', requestFingerprint: 'fp-realtime-burst',
@@ -301,7 +301,7 @@ describe('失敗直後のやり直し(実時計・実D1・実ルート)', () => 
     const rewardId = await seedReward(testDb.db);
     const net = stubGlobalFetch(() => new Response('ng', { status: 500 }));
 
-    const { deliverMileageReward } = await import('../services/mileage-reward-delivery.js');
+    const { deliverMileageReward } = await import('../features/mileage/mileage-reward-delivery.js');
     const reserved = await reserveMileageRewardRedemption(testDb.db, {
       lineAccountId: 'account-1', friendId: 'friend-1', rewardId,
       idempotencyKey: 'realtime-race', requestFingerprint: 'fp-realtime-race',
@@ -336,7 +336,7 @@ describe('失敗直後のやり直し(実時計・実D1・実ルート)', () => 
     const rewardId = await seedReward(testDb.db);
     const net = stubGlobalFetch(() => new Response('ng', { status: 500 }));
 
-    const { deliverMileageReward } = await import('../services/mileage-reward-delivery.js');
+    const { deliverMileageReward } = await import('../features/mileage/mileage-reward-delivery.js');
     const { claimRedemptionStep } = await import('@line-crm/db');
     const reserved = await reserveMileageRewardRedemption(testDb.db, {
       lineAccountId: 'account-1', friendId: 'friend-1', rewardId,

@@ -123,7 +123,7 @@ export function MonthlyDeliveryCard({ delivery, freshness }: { delivery: Dashboa
  * 「メッセージ受信時の自動変更」は、選択中のLINEアカウントの
  * 対応マーク一覧を読み、1件でも自動変更があれば「有効」とする。
  * **「対応マーク」は自由分類のほう。**このカードが並べる4状態は
- * 固定4状態の「対応状況」で、別物（要件書 `v6-02-inbox-requirements-draft.md:77`）。
+ * 固定4状態の「対応状況」で、別物（要件書 `管理画面-02-inbox-requirements-draft.md:77`）。
  * 一覧を取得できなかったときだけ `—`（未取得）にする。
  */
 export function SupportMarkStatusCard({
@@ -262,7 +262,7 @@ export function UpcomingCard({
   updatedAt?: Date | null
   /*
    * V8 速さ対応：右の列が見えるまで取得を待つとき false。
-   * 省略時は今までどおりすぐ取る（v7 は変えない）。
+   * 省略時は今までどおりすぐ取る（互換経路は変えない）。
    */
   startLoad?: boolean
 }) {
@@ -388,7 +388,7 @@ export function DeliveryFailuresCard({ accountId, startLoad = true }: {
   accountId?: string | null
   /*
    * V8 速さ対応：右の列が見えるまで取得を待つとき false。
-   * 省略時は今までどおりすぐ取る（v7 は変えない）。
+   * 省略時は今までどおりすぐ取る（互換経路は変えない）。
    */
   startLoad?: boolean
 }) {

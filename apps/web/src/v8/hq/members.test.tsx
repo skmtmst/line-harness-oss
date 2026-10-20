@@ -2,7 +2,7 @@
 /*
  * V8 統括のメンバー（src/v8/hq/members.tsx・member-dialog.tsx）の動きの試験。
  * 招待の始まり（閲覧のみ・指定したアカウントだけ・アーカイブは選ばせない）、
- * 変更→確認（M4jS9）の間は変更の窓を閉じる、確認をやめたら中身のまま戻る、
+ * 変更→確認の間は変更の窓を閉じる、確認をやめたら中身のまま戻る、
  * 役割を変えないときは役割を送らない（担当者が管理者に上がらない）。
  */
 import React, { act } from 'react'
@@ -116,7 +116,7 @@ describe('V8 統括のメンバーの窓', () => {
     expect(document.querySelector('[role="dialog"]')!.textContent).toContain('閲覧のみ（見るだけ）')
   })
 
-  it('B-139：招待で名前が空・担当するアカウントが0なら送らず、両方の欄に理由を出し、名前の欄へ移る', async () => {
+  it("招待で名前が空・担当するアカウントが0なら送らず、両方の欄に理由を出し、名前の欄へ移る", async () => {
     await act(async () => { buttonByText('権限者を招待')!.click() })
     await flush()
     const dialog = document.querySelector('[role="dialog"]')!

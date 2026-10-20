@@ -1,6 +1,7 @@
+import { BookingLineDeliveryIncomplete } from '../features/booking/booking-line-delivery/index.js';
 import { activeTenantLineAccountSql, isOperationCapabilityStopped } from '@line-crm/db';
 import { featureJobCanRun } from './feature-enforcement.js';
-import type { EventWaitlistOfferSender } from './event-waitlist.js';
+import type { EventWaitlistOfferSender } from './event-waitlist-sender.js';
 
 type Offer = Parameters<EventWaitlistOfferSender>[0];
 const SOURCE = 'event_waitlist_offer';
@@ -62,7 +63,18 @@ export async function dispatchPendingEventWaitlistOffers(
       .bind(nowIso, nowIso, row.id, row.source_event_id, payload.tokenHash, nowIso).run();
     if ((claimed.meta?.changes ?? 0) !== 1) continue;
     // 外部に渡す直前から応答保存までの中断は受理の有無が分からない。自動で二度送らない。
-    await params.sender(payload.offer);
+    try { await params.sender(payload.offer); }
+    catch(error) {
+      if(error instanceof BookingLineDeliveryIncomplete&&error.beforeSend) {
+        // 遮断/停止で0要求なら送信待ちへ戻す。unknownの要求は取り直さない。
+        await db.prepare(`UPDATE notification_deliveries SET status='pending',attempts=MAX(0,attempts-1),
+          error_code=NULL,error_message_safe=NULL,failed_at=NULL,updated_at=?,version=version+1
+          WHERE id=? AND status='failed' AND error_code='delivery_unknown'`)
+          .bind(nowIso,row.id).run();
+        continue;
+      }
+      throw error;
+    }
     await db.batch([
       db.prepare(`UPDATE notification_deliveries SET status = 'provider_accepted', accepted_at = ?,
         failed_at = NULL, error_code = NULL, error_message_safe = NULL, updated_at = ?, version = version + 1

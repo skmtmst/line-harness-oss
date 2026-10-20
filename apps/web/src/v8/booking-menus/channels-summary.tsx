@@ -14,7 +14,7 @@ export type ChannelsSummary = {
 
 export default function ChannelsSummaryBand({ summary }: { summary: ChannelsSummary }) {
   const data = summary.status === 'ready' ? summary.data : null
-  const activeChannels = data?.channels.filter(channel => channel.status === 'active')
+  const activeChannels = data?.channels.filter(channel => channel.status === 'active' && channel.key !== 'google_reserve')
   const knownCounts = activeChannels?.every(channel => Number.isFinite(channel.todayCount) && channel.todayCount !== null)
   const todayCount = knownCounts ? activeChannels?.reduce((sum, channel) => sum + channel.todayCount!, 0) : null
   const missing = summary.status === 'error' ? '読み込めませんでした' : '読み込んでいます'

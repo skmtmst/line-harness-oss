@@ -2,8 +2,8 @@
 @layer components {
 /*
  * 保存がぶつかったとき（409）の帯と、比べる窓の中身（共通）。
- * 見た目は回答フォームの編集（J1pdB）の帯をそのまま共通にしたもの。
- * リマインダの編集（k32cn）も同じ絵。値は globals.css の --save-conflict-*。
+ * 見た目は回答フォームの編集の帯をそのまま共通にしたもの。
+ * リマインダの編集も同じ絵。値は globals.css の --save-conflict-*。
  */
 .band {
   display: flex;

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { hqTemplates } from './hq-templates.js';
 import { liffActionFromUrl } from '@line-crm/shared';
 // The real pure Web authoring functions feed the real HTTP + SQLite executor.
@@ -429,8 +429,8 @@ test('組5: 複数通を作成→版へ固定→配布→同じ順で配信素�
  expect(locals).toHaveLength(3);expect(locals.every(r=>JSON.parse(r.message_bubbles_json).length===2)).toBe(true);
  expect(sql.raw.prepare('SELECT COUNT(*) n FROM template_versions WHERE json_array_length(message_bubbles_json)=2').get()).toEqual({n:3});
  const detail=(await request(`/${id}`)).body.data;
- const {resolveHqBroadcastMaterials}=await import('../services/hq-broadcast-materials.js');
- const {parseBroadcastMessageParts,buildMessages}=await import('../services/broadcast-message-set.js');
+ const {resolveHqBroadcastMaterials}=await import('../features/hq-broadcasts/hq-broadcast-materials.js');
+ const {parseBroadcastMessageParts,buildMessages}=await import('../features/broadcasts/broadcast-message-set.js');
  const input={messageType:'text',messageContent:'',messageBubbles:[{id:'chosen',type:'text',content:{text:'表示用',hqTemplateId:id,hqTemplateVersionId:detail.template.current_version_id}}]};
  const resolved=await resolveHqBroadcastMaterials(sql.db,'tenant','a',input as never);
  expect(buildMessages(parseBroadcastMessageParts(resolved))).toEqual([{type:'text',text:'最初 {{name}}'},{type:'text',text:'次のご案内'}]);

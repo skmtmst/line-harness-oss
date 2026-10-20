@@ -1,3 +1,5 @@
+> 文書：19 コンバージョン（成果地点） 操作と挙動（受け入れ）｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+
 # 19 コンバージョン（成果地点） 操作と挙動（受け入れ）
 
 要件の正本：[19 コンバージョン](../../v6-requirements/v6-19-conversion-requirements-draft.md)（§23 の Web 計測・取消の確定を含む）・[共通基盤 §6-2・§8・§9・§15](../../v6-requirements/v6-shared-platform-requirements.md)・[索引 §5 横断契約](../../v6-requirements/v6-requirements-master-index.md)。この文書は「操作したらどう動くか」を試験が書ける形にしたもの（2026-10-16 B-333）。食い違ったときは要件が勝つ。
@@ -6,7 +8,7 @@
 
 - 画面：`apps/web/src/v8/conversions/`（一覧・作る・窓）、入口 `apps/web/src/app/conversions/`（`page.tsx`・`new/`・`edit/`）
 - API：`apps/worker/src/routes/conversions.ts`・`apps/worker/src/routes/web-measurement.ts`
-- データ：`packages/db/src/conversion-definitions.ts`・`packages/db/src/conversions.ts`・`packages/db/src/web-measurement.ts`
+- データ：`packages/db/src/conversion-definitions/index.ts`・`packages/db/src/conversions/index.ts`・`packages/db/src/web-measurement.ts`
 - 権限：`packages/shared/src/staff-permissions.ts`、代理ログイン `apps/worker/src/middleware/impersonation.ts`
 
 試験はすべて検証環境の試験用アカウント・試験用の友だちで行う。外からの受信は検証の印（本文に `"test": true`）を付けると成果の表に書かず台帳だけに残るので、それを使う。本当の注文・決済はしない。

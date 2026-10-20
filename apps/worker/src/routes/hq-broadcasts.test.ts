@@ -1,7 +1,7 @@
-import type { AutomationActionContext } from '../services/automation-engine.js';
-import { processBroadcastAfterActions } from '../services/broadcast-after-actions.js';
+import type { AutomationActionContext } from '../features/automations/automation-engine.js';
+import { processBroadcastAfterActions } from '../features/broadcasts/broadcast-after-actions.js';
 import {Hono} from 'hono';import {describe,it,expect,beforeEach,afterEach,vi} from 'vitest';
-import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';import {hqBroadcasts} from './hq-broadcasts.js';import {broadcasts} from './broadcasts.js';import {broadcastApprovals} from './broadcast-approvals.js';import type {Env} from '../index.js';
+import {createTestD1,type SqliteD1} from '../test-utils/d1-sqlite.js';import {hqBroadcasts} from './hq-broadcasts.js';import {broadcasts} from './broadcasts.js';import {broadcastApprovals} from './broadcast-approvals.js';import type { Env } from '../worker-env.js';
 vi.mock('../lib/step-up.js',async()=>({...await vi.importActual('../lib/step-up.js'),sensitiveStepUpSatisfied:vi.fn(async()=>true)}));
 let f:SqliteD1,app:Hono<Env>;
 const tenant='00000000-0000-4000-8000-000000000001';
@@ -162,8 +162,8 @@ it('別人承認を全店の子配信へ残し、送信後に店側の承認か�
 
 type HqRunResponse = {data: import('@line-crm/shared').HqBroadcastRun & {sent:0;followupAudienceCount:number}};
 type HqListResponse = {data:Array<{id:string;selectable:boolean}>;pagination:{total:number;nextCursor:string|null};statusCounts:Record<string,number>};
-type ReactionResponse = {data:Awaited<ReturnType<typeof import('../services/hq-broadcast-reactions.js').hqBroadcastReactions>>};
-type QuotaResponse = {data:Awaited<ReturnType<typeof import('../services/hq-broadcast-list.js').hqBroadcastQuota>>};
+type ReactionResponse = {data:Awaited<ReturnType<typeof import('../features/hq-broadcasts/hq-broadcast-reactions.js').hqBroadcastReactions>>};
+type QuotaResponse = {data:Awaited<ReturnType<typeof import('../features/hq-broadcasts/hq-broadcast-list.js').hqBroadcastQuota>>};
 describe('統括の配信一覧・複製・追送',()=>{
  it('配信日・状態・名前でページ分け前に絞り、全件数と承認待ち数を返す',async()=>{
    const one=await made({title:'秋のお知らせ'}),two=await made({title:'冬のお知らせ'}),three=await made({title:'秋の承認'});
@@ -196,7 +196,7 @@ describe('統括の配信一覧・複製・追送',()=>{
    const r=await call(`/api/hq/broadcasts/${source.id}/followup`,'POST',{requestId:'followup-draft',expectedVersion:1});expect(r.status,await r.clone().text()).toBe(201);
    const b=(await r.json() as HqRunResponse).data;expect(globalThis.fetch).not.toHaveBeenCalled();expect(b).toMatchObject({status:'prepared',sent:0,followupAudienceCount:1,input:{followupOfRunId:source.id,targetType:'segment'}});
    // The normal send flow resolves the per-account source again, even after the draft is saved.
-   const {resolveHqBroadcastAudience,countHqAudience}=await import('../services/hq-broadcast-audience.js');
+   const {resolveHqBroadcastAudience,countHqAudience}=await import('../features/hq-broadcasts/hq-broadcast-audience.js');
    const condition=await resolveHqBroadcastAudience(f.db,tenant,'shop',b.input);expect(await countHqAudience(f.db,'shop',condition)).toEqual({count:1,consentExcluded:0});
    expect((f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get() as {n:number}).n).toBe(1);
    actor('owner',true);expect((await call(`/api/hq/broadcasts/${source.id}/followup`,'POST',{requestId:'forbidden',expectedVersion:1})).status).toBe(403);
@@ -208,7 +208,7 @@ describe('統括の配信一覧・複製・追送',()=>{
    expect(r.status,await r.clone().text()).toBe(201);
    const b=(await r.json() as HqRunResponse).data;
    expect(b).toMatchObject({followupAudienceCount:1,followupAudience:[{accountId:'shop',count:1}],sent:0});
-   const {resolveHqBroadcastAudience,countHqAudience}=await import('../services/hq-broadcast-audience.js');
+   const {resolveHqBroadcastAudience,countHqAudience}=await import('../features/hq-broadcasts/hq-broadcast-audience.js');
    expect(await countHqAudience(f.db,'shop',await resolveHqBroadcastAudience(f.db,tenant,'shop',b.input))).toEqual({count:1,consentExcluded:1});
    expect(globalThis.fetch).not.toHaveBeenCalled();
  });

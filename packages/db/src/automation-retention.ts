@@ -1,7 +1,8 @@
+import { jstCalendar } from '@line-crm/shared';
 import { accountFeatureOffExclusionSql } from './account-settings.js';
 
 /**
- * v6-25 §15: 実行履歴の保持期間。
+ * -25 §15: 実行履歴の保持期間。
  * 条件外を含む明細は90日。それ以前は日別件数だけを13か月残す。
  * 「待つ」の上限も明細保持期間（90日）までなので、waiting のまま残る行は
  * 運用の取りこぼしとして消さない。消すのは確定済みだけ。
@@ -19,7 +20,8 @@ const TERMINAL_RUN_STATUSES = ['success', 'partial', 'failed', 'cancelled', 'ski
 const PURGE_BATCH_SIZE = 1000;
 
 function monthCutoffDay(now: Date, months: number): string {
-  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - months, now.getUTCDate()));
+  const calendar = jstCalendar(now);
+  const date = new Date(Date.UTC(calendar.getUTCFullYear(), calendar.getUTCMonth() - months, calendar.getUTCDate()));
   return date.toISOString().slice(0, 10);
 }
 

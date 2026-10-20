@@ -17,6 +17,7 @@
  * 反映する。キャンセル・Esc・背景を押すと下書きは捨てられる。
  */
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type ScenarioTriggerItem } from '@/lib/api'
 import { pruneCondition, type SegmentCondition } from '@/lib/segment-condition'
@@ -95,7 +96,6 @@ export default function TriggerEditor({
     subjectRef.current = { key: subject, generation: subjectRef.current.generation + 1 }
   }
   const loadGeneration = useRef(0)
-  const savingRef = useRef(false)
   const [saved, setSaved] = useState<ScenarioTriggerItem[] | null>(null)
   /** 編集中の下書き。ここを見せて、保存のときだけサーバーへ送る。 */
   const [draft, setDraft] = useState<ScenarioTriggerItem[]>([])
@@ -177,7 +177,7 @@ export default function TriggerEditor({
   }, [scenarioId, lineAccountId, saveErrors])
 
   useEffect(() => {
-    setSaved(null); setDraft([]); setError(''); setSaving(false); savingRef.current = false
+    setSaved(null); setDraft([]); setError(''); setSaving(false)
     void load()
     return () => { loadGeneration.current += 1 }
   }, [load])
@@ -218,9 +218,8 @@ export default function TriggerEditor({
     (draft.length !== saved.length || draft.some((item) => !saved.some((s) => sameTrigger(s, item))))
 
   const save = async () => {
-    if (savingRef.current || saved === null) return
+    if (saved === null) return
     const at = subjectRef.current
-    savingRef.current = true
     setError('')
     setSaving(true)
     try {
@@ -242,9 +241,9 @@ export default function TriggerEditor({
       if (at !== subjectRef.current) return
       const fieldFailure = saveErrors.capture(error)
       await load(true)
-      { if (!fieldFailure) setError(error instanceof Error ? `保存できませんでした。変更は残しています。${error.message}` : '保存できませんでした。変更は残しています。もう一度保存してください。') }
+      { if (!fieldFailure) setError(`${describeApiFailure(error, '保存')}変更は残しています。`) }
     } finally {
-      if (at === subjectRef.current) { savingRef.current = false; setSaving(false) }
+      if (at === subjectRef.current) { setSaving(false) }
     }
   }
 
@@ -259,7 +258,7 @@ export default function TriggerEditor({
       title="シナリオの開始条件"
       description="どの出来事をきっかけに、どの友だちへ開始するかを設定します。変更は「開始条件を保存」を押すまで反映されません。"
       onCancel={onClose}
-      onConfirm={() => void save()}
+      onConfirm={() => save()}
       confirmLabel="開始条件を保存する"
       cancelLabel="キャンセル"
       busy={saving}

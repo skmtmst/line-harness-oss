@@ -77,10 +77,16 @@ vi.mock('@line-crm/line-sdk', () => ({
   LineClient: vi.fn().mockImplementation(function () { return lineClientMock; }),
 }));
 
-vi.mock('./step-delivery.js', () => ({
+vi.mock('./line-message.js', () => ({
   buildMessage: vi.fn((type: string, content: string) => ({ type, text: content })),
+}));
+vi.mock('./message-interpolation.js', () => ({
   expandVariables: vi.fn((content: string) => content),
+}));
+vi.mock('./step-metadata.js', () => ({
   resolveMetadata: vi.fn(async () => ({})),
+}));
+vi.mock('./message-log-payload.js', () => ({
   messageToLogPayload: vi.fn((msg: { type: string; text?: string; altText?: string }) => ({
     messageType: msg.type,
     content: msg.text ?? msg.altText ?? '',
@@ -336,7 +342,7 @@ describe("mode 'once' (default) — claim protocol with the cron", () => {
 
   it('schedules step 2 at JST wall time WITHOUT double-applying the +9h offset', async () => {
     // computeNextDeliveryAt operates in the shifted frame (inputs are
-    // Date.now()+9h), so serialization must relabel — not re-shift. A
+    // Date.now+9h), so serialization must relabel — not re-shift. A
     // double shift schedules step 2 nine hours late (regression guard).
     vi.useFakeTimers();
     try {
@@ -492,7 +498,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       'text',
       'welcome!',
       ctx.workerUrl,
-      { lineAccountId: null, friendId: 'friend-1' },
+      { lineAccountId: null, friendId: 'friend-1', sourceContent: 'welcome!' },
     );
     // What LINE receives AND what messages_log records is the decorated
     // message, mirroring the cron.
@@ -521,7 +527,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       'text',
       'welcome!',
       ctx.workerUrl,
-      { lineAccountId: 'acct-7', friendId: 'friend-1' },
+      { lineAccountId: 'acct-7', friendId: 'friend-1', sourceContent: 'welcome!' },
     );
   });
 
@@ -544,7 +550,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       'text',
       'welcome!',
       ctx.workerUrl,
-      { lineAccountId: 'acct-9', friendId: 'friend-1' },
+      { lineAccountId: 'acct-9', friendId: 'friend-1', sourceContent: 'welcome!' },
     );
   });
 
@@ -563,7 +569,7 @@ describe('decoration — cron parity via the shared decorateForFriendPush pipeli
       'text',
       'welcome!',
       undefined,
-      { lineAccountId: null, friendId: 'friend-1' },
+      { lineAccountId: null, friendId: 'friend-1', sourceContent: 'welcome!' },
     );
     expect(lineClientMock.pushMessage).toHaveBeenCalledWith('U-1', [{ type: 'text', text: 'welcome!' }], undefined);
   });

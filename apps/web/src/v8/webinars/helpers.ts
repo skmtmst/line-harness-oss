@@ -75,7 +75,7 @@ export async function webinarListCsv(args: {
 }
 
 /*
- * 状態の札。公開期間が終わったものは「非公開」（一覧の絵 UyUMw・uBMuB・jiNg0 の
+ * 状態の札。公開期間が終わったものは「非公開」（一覧の絵の の
  * 旧機能説明会の行。公開ページはもう開けない）。公開の予定は「公開予定」。
  */
 export function statusLabel(webinar: WebinarListItem): string {
@@ -110,7 +110,7 @@ export function beforeStart(webinar: WebinarListItem): boolean {
   return webinar.status === 'active' && webinar.publicationState === 'scheduled'
 }
 
-/** 公開ページの道（絵 UyUMw の「/webinar/〇〇」）。 */
+/** 公開ページの道（「/webinar/〇〇」）。 */
 export function publicPath(webinar: Pick<WebinarListItem, 'slug'>): string {
   return `/webinar/${webinar.slug}`
 }

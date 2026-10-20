@@ -4,8 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-/* 完全切り替え：v7 の page.tsx は捨て、V8 の list-v8.tsx を見る。 */
-const LIST = readFileSync(join(HERE, 'list-v8.tsx'), 'utf8')
+/* 完全切り替え：管理画面 の page.tsx は捨て、V8 の list-v8.tsx を見る。 */
+const LIST = readFileSync(new URL('../../v8/reminders/list.tsx', import.meta.url), 'utf8')
 const LIST_STATE = readFileSync(
   join(HERE, '..', '..', 'components', 'shared', 'list-state.tsx'),
   'utf8',
@@ -26,13 +26,13 @@ describe('リマインダ一覧の空と失敗', () => {
   it('一覧のフォルダ欄を共通パネルの統一幅で表示する', () => {
     expect(LIST).toMatch(/<ListPageBody\b[^>]*\bfolders=/s)
     expect(LIST).toContain('FolderPanel')
-    // 追加の窓は共通のフォルダの列（ManagedFolderPanel）が変えてよい人にだけ出す（B-136）。
+    // 追加の窓は共通のフォルダの列（ManagedFolderPanel）が変えてよい人にだけ出す。
     expect(LIST).toMatch(/<ManagedFolderPanel[\s\S]*?canManage=\{canEdit\}/)
     expect(LIST).not.toContain('lg:grid-cols-[13rem_minmax(0,1fr)]')
   })
 
   it('失敗の言い方は見本どおりの1枚にまとめる', () => {
-    // 板 `apLqS`：失敗は「リマインダを読み込めませんでした」の1枚。
+    // 板 ：失敗は「リマインダを読み込めませんでした」の1枚。
     expect(LIST).toContain('リマインダを読み込めませんでした')
     expect(LIST).not.toContain('リマインダの読み込みに失敗しました')
     expect(LIST).not.toContain('いまは読み込めていません')

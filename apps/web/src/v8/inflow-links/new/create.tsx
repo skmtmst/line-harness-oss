@@ -2,7 +2,7 @@
 import FolderSelect from '@/components/shared/folder-select'
 
 import { requiredText } from '@/lib/form-requirement'
-const b244Requirements = {
+const FIELD_REQUIREMENTS = {
   name: requiredText("リンク名を入力してください"),
 }
 
@@ -48,15 +48,15 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 /*
- * ★V8 流入リンクを作る（Pencil：作る `KMaMk`・競合 `vWJEm`・競合の比べ `E14GFm`）。
+ * ★V8 流入リンクを作る（Pencil：作る ・競合 ・競合の比べ ）。
  *
  * 型（CreatePage）に、4つの段（どこに置くか・どのアカウントか・友だちになったとき・発行される URL）と、
  * 右の列（お客さまの進む順・スマホの見え方）、下の帯を渡す。
  *
  * 聞く項目・保存の口・送る形・失敗の扱いは今の作る画面（app/inflow-links/new/page.tsx）と同じ
  * （BEHAVIOR.md）。違うのは見せ方だけ：
- * - 競合（vWJEm）：発行が 409（見分けるための文字が使用中）で返ったら、板の頭の下に帯を出す
- * - 違いを比べる（E14GFm）：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
+ * - 競合：発行が 409（見分けるための文字が使用中）で返ったら、板の頭の下に帯を出す
+ * - 違いを比べる：違う項目だけを並べた窓。「最新を取り込んで直す」で保存されている値を入力へ写す
  */
 
 /* ref は口（entry-routes.ts）と同じ `[A-Za-z0-9_-]{1,64}`。 */
@@ -193,7 +193,7 @@ function InflowCreate() {
     if(candidatesError || candidatesLoading)return
     setSaveError(null)
     const errors: Record<string, string> = {}
-    if ((b244Requirements.name.check(name) !== null)) errors['ir-name'] = 'リンク名を入力してください'
+    if ((FIELD_REQUIREMENTS.name.check(name) !== null)) errors['ir-name'] = 'リンク名を入力してください'
     if (!validRef) errors['ir-ref'] = '半角英数字・_・ハイフンで1〜64文字にしてください'
     if (redirectUrl.trim()) {
       try {
@@ -386,7 +386,7 @@ function InflowCreate() {
       boardId="KMaMk"
       title="流入リンクを作る"
       help="友だち追加の入口を作り、どこから来たかと、追加後に行うことを決めます。"
-      /* 競合の帯（vWJEm）は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
+      /* 競合の帯は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       notice={conflictBand}
       preview={preview}
       footerActions={(
@@ -409,7 +409,7 @@ function InflowCreate() {
       <Card variant="form" gap="normal" aria-labelledby="ir-new-where">
         <CardHeader size="stacked" titleId="ir-new-where" title={<>どこに置くリンクですか</>} meta={<>名前は一覧で見分けるため。お客さまには見えません</>} />
         <SettingsFormRow layout="name-folder">
-          <div className={styles.field}><Field label="名前" requirement={b244Requirements.name}><SaveErrorField names={["name","mine"]}><TextField
+          <div className={styles.field}><Field label="名前" requirement={FIELD_REQUIREMENTS.name}><SaveErrorField names={["name","mine"]}><TextField
               id="ir-name"
               type="text"
               value={name}

@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 import { health } from './health.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 
 vi.mock('@line-crm/db', () => ({
   getPlatformSetting: async () => 'false', // Explicit Off fixture for route authorization.

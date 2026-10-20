@@ -3,7 +3,9 @@ import {
   markLineWebhookEventFailed, markLineWebhookEventSucceeded, recordAnalyticsEvent,
   upsertChatOnMessage, ensureWorkflowStep, recordIncomingLineMessage, type LineWebhookEventRow, type WorkflowStepRow,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+
+
+import type { Env } from '../worker-env.js';
 import { acquireWorkflow } from './workflow-execution.js';
 import { awardActivityMileage } from './activity-mileage.js';
 import { fireEvent, processScoring } from './event-bus.js';

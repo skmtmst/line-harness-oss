@@ -1,4 +1,4 @@
-/* 会話の中を探す帯（V8.pen 枠 v7GV2・帯 f64Ok）。値は globals.css の --tpl-inbox-search-*。 */
+/* 会話の中を探す帯（V8.pen 枠 ・帯 f64Ok）。値は globals.css の --tpl-inbox-search-*。 */
 .band {
   display: flex;
   align-items: center;

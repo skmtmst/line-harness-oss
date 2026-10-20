@@ -2,14 +2,24 @@
  * 管理者認証より手前へ通す公開境界。authMiddleware の skip 判定と
  * 同じ意味で、method を区別する口もここで扱う。
  */
+export function isPublicFormDefinition(method: string, path: string): boolean {
+  return method.toUpperCase() === 'GET' && /^\/api\/forms\/[^/]+$/.test(path);
+}
+
+/** Includes the existing LIFF event compatibility URL, with its POST restriction. */
+export function isPublicLiffOperation(method: string, path: string): boolean {
+  return path.startsWith('/api/liff/')
+    || (method.toUpperCase() === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(path));
+}
+
 export function isPublicApiBoundary(method: string, path: string): boolean {
   const normalizedMethod = method.toUpperCase();
   if(normalizedMethod==='POST' && (path==='/api/ec/events'||path==='/api/booking/pass-payments/webhook'||path==='/mcp'))return true;
   // フォーム定義の GET は LIFF が認証なしで読む。PUT/DELETE は管理 API。
-  if (normalizedMethod === 'GET' && /^\/api\/forms\/[^/]+$/.test(path)) return true;
+  if (isPublicFormDefinition(normalizedMethod, path)) return true;
   // This compatibility URL is a LIFF operation and verifies the customer in
   // the event route. Only this method/path bypasses administrator login.
-  if (normalizedMethod === 'POST' && /^\/api\/events\/liff\/bookings\/[^/]+\/change$/.test(path)) return true;
+  if (isPublicLiffOperation(normalizedMethod, path)) return true;
   // LIFF の回答・開封・途中保存は route 側で LINE 署名を見る。
   if (
     normalizedMethod === 'POST' &&
@@ -39,7 +49,6 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path.startsWith('/pool/') ||
     path.startsWith('/images/') ||
     (normalizedMethod === 'GET' && /^\/liff\/(?:files|statements)\/[\w-]+$/.test(path)) ||
-    path.startsWith('/api/liff/') ||
     path === '/api/auth/login' ||
     path === '/api/auth/logout' ||
     path === '/api/auth/line' ||

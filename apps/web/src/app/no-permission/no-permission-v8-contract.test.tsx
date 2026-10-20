@@ -15,7 +15,7 @@ const BOARD = readFileSync('src/v8/no-permission/no-permission.tsx', 'utf8')
 const VARS_V8 = readFileSync('src/app/contents/vars/list-v8.tsx', 'utf8')
 
 /*
- * ★V8 権限なし（板 `O5tUeE`）の契約。
+ * ★V8 権限なし（板 ）の契約。
  * API が 403 を返したときに出す共通の板。V8 のときだけ呼ぶ。
  * 役割の仕組みは作らない——渡された表示名だけを出し、
  * 知らない欄は出さない。無い画面へ送る口は置かない。

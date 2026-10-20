@@ -1,9 +1,10 @@
+import { logger } from '@line-crm/shared/server';
 import { parseProgress } from './dedup-broadcast-progress.js';
 import type { DedupPreviewPerAccount, DedupPreviewResult, DedupProgress } from './dedup-broadcast-progress.js';
 export type { DedupPreviewPerAccount, DedupPreviewResult } from './dedup-broadcast-progress.js';
 import { recordSuppressedBroadcastRecipients, suppressedFriendIds } from '@line-crm/db/src/friend-delivery-consents.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
-import { holdMissingBroadcastAudience } from './broadcast-audience-snapshot.js';
+import { holdMissingBroadcastAudience } from '../features/broadcasts/broadcast-audience-snapshot/index.js';
 import { URL_TOKEN_SQL } from '../lib/url-token.js';
 
 interface RankedRow {
@@ -22,7 +23,7 @@ interface RankedRow {
  *
  * Single SQL with WITH/ROW_NUMBER OVER does the dedup in the DB layer; JS
  * only aggregates per-account. This relies on production D1 supporting
- * ROW_NUMBER() OVER PARTITION BY (SQLite 3.25+; D1 is 3.45+).
+ * ROW_NUMBER OVER PARTITION BY (SQLite 3.25+; D1 is 3.45+).
  *
  * Filters: is_following=1 AND line_account_id IS NOT NULL.
  * identity_key: COALESCE(URL_TOKEN_SQL, 'uid:'||user_id, 'solo:'||id).
@@ -182,9 +183,9 @@ import {
   isOperationCapabilityStopped,
 } from '@line-crm/db';
 import { calculateStaggerDelay, sleep } from './stealth.js';
-import { createBroadcastRetryKey } from './broadcast-retry-key.js';
-import { processBroadcastAfterActions } from './broadcast-after-actions.js';
-import { classifyDeliveryFailure, deliveryErrorCode } from './broadcast-delivery-outcome.js';
+import { createBroadcastRetryKey } from '../features/broadcasts/broadcast-retry-key/index.js';
+import { processBroadcastAfterActions } from '../features/broadcasts/broadcast-after-actions/index.js';
+import { classifyDeliveryFailure, deliveryErrorCode } from '../features/broadcasts/broadcast-delivery-outcome/index.js';
 import {
   assertMessagePartsResolved,
   buildMessages,
@@ -194,7 +195,7 @@ import {
   renderMessageParts,
   varyTextMessages,
   type BroadcastMessagePart,
-} from './broadcast-message-set.js';
+} from '../features/broadcasts/broadcast-message-set/index.js';
 import {
   commonVarValuesForAccount,
   parseBroadcastCommonVarSnapshot,
@@ -252,7 +253,7 @@ export async function processMultiAccountDedupBroadcast(
   opts: { maxRunMs?: number; now?: () => number } = {},
 ): Promise<ProcessMultiAccountDedupResult> {
   // 時間バジェット制御 (テストでは clock を注入して yield を決定的に再現できる)。
-  // 変数名は clock — batch ループ内の `const now = jstNow()` (timestamp 文字列) と
+  // 変数名は clock — batch ループ内の `const now = jstNow` (timestamp 文字列) と
   // 衝突させないため。
   const clock = opts.now ?? (() => Date.now());
   const maxRunMs = opts.maxRunMs ?? MAX_RUN_MS;
@@ -329,7 +330,7 @@ export async function processMultiAccountDedupBroadcast(
     if (stopRequested) break; // 停止済み — 新しいアカウントの送信を始めない
     const account = await getLineAccountById(db, accountResult.accountId);
     if (!account || !account.is_active) {
-      console.log(JSON.stringify({"code":"services_dedup_broadcast_log"}));
+      logger.log("services_dedup_broadcast_log");
       continue;
     }
     // 緊急停止 (#1050): broadcast_dispatch が止まっているアカウントの束は
@@ -384,7 +385,7 @@ export async function processMultiAccountDedupBroadcast(
           continue;
         }
       } catch (err) {
-        console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
+        logger.error("services_dedup_broadcast_failed");
         failedAccountIds.push(account.id);
         continue;
       }
@@ -401,7 +402,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
       if (missing.size > 0) {
-        console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
+        logger.error("services_dedup_broadcast_failed");
         failedAccountIds.push(account.id);
         continue;
       }
@@ -574,7 +575,7 @@ export async function processMultiAccountDedupBroadcast(
         try {
           await processBroadcastAfterActions(db, { broadcastId: broadcast.id, limit: 100 });
         } catch (afterError) {
-          console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
+          logger.error("services_dedup_broadcast_failed");
         }
         sentAnyBatch = true; // 1 batch 以上 durable に記録した → 前進保証 & yield 可
         if (batchDeliveryError) {
@@ -592,7 +593,7 @@ export async function processMultiAccountDedupBroadcast(
         }
       }
     } catch (err) {
-      console.error(JSON.stringify({"code":"services_dedup_broadcast_failed"}));
+      logger.error("services_dedup_broadcast_failed");
       failedAccountIds.push(account.id);
     }
   }

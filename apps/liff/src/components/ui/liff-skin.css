@@ -235,9 +235,8 @@
   --liff-radius-lg: 23px;
 }
 
-:root { --upload-slot-height: 140px; --upload-slot-padding: 16px; --choice-size: 16px; --choice-ring: 1.5px; --choice-dot: 8px; --color-choice-border: #c9ced6; --color-status-info: #2563eb; --choice-card-ring: 2px; --color-selection-border: var(--color-liff-primary); --color-choice-selected: var(--color-liff-soft); }
 
-/* B-203：フォーム以外の申込欄も16の輪・点・チェック。 */
+/* ：フォーム以外の申込欄も16の輪・点・チェック。 */
 :root input:is([type='radio'], [type='checkbox']) { appearance: none; flex-shrink: 0; width: var(--choice-size); height: var(--choice-size); margin: 0; border: var(--choice-ring) solid var(--color-choice-border); background-color: var(--color-canvas); vertical-align: middle; }
 :root input[type='radio'] { border-radius: 50%; }
 :root input[type='radio']:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }

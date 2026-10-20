@@ -3,11 +3,13 @@ import Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { emptyLayout, validateAnswer, type FormInputBlock } from '@line-crm/shared';
+
 import { insertFormSubmissionRecord } from '@line-crm/db';
 import { formDocuments, uploadFormDocument } from './form-documents.js';
-import { documentAnswer, hydrateDocumentAnswers, validateDocumentAnswers, purgeExpiredFormDocuments } from '../services/form-documents.js';
+import { documentAnswer, hydrateDocumentAnswers, validateDocumentAnswers, purgeExpiredFormDocuments, identityRetentionDays } from '../features/forms/form-documents.js';
 import { fileScan, processDueFileScans } from './file-scan.js';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
+
 vi.mock('../services/account-access.js', () => ({ getVisibleLineAccountScope: vi.fn(async () => ({ ids: ['a'] })), canAccessAllLineAccounts: vi.fn(async () => true) }));
 let sql: Database.Database;
 let db: D1Database;
@@ -33,7 +35,7 @@ function app() {
   const a = new Hono<Env>();
   a.use('*', async (c, next) => { c.set('staff', { role, id: 'staff', tenantId: 't' } as any); await next(); });
   a.route('/', formDocuments); a.route('/', fileScan);
-  a.post('/upload', c => uploadFormDocument(c, c.req.query('kind') === 'image-pdf' ? { ...block, fileKinds: ['image', 'pdf'], fileBothSides: false } : c.req.query('kind') === 'mixed' ? { ...block, fileKinds: ['image', 'pdf', 'identity'], fileBothSides: false } : c.req.query('kind') === 'pdf' ? { ...block, fileKind: 'pdf', fileBothSides: false } : block, { accountId: 'a', formId: 'f', friendId: 'u', versionId: null }));
+  a.post('/upload', c => uploadFormDocument(c, c.req.query('kind') === 'image' ? { ...block, fileKind: 'image', fileBothSides: false } : c.req.query('kind') === 'image-pdf' ? { ...block, fileKinds: ['image', 'pdf'], fileBothSides: false } : c.req.query('kind') === 'mixed' ? { ...block, fileKinds: ['image', 'pdf', 'identity'], fileBothSides: false } : c.req.query('kind') === 'pdf' ? { ...block, fileKind: 'pdf', fileBothSides: false } : block, { accountId: 'a', formId: 'f', friendId: 'u', versionId: null }));
   return a;
 }
 let secretReads: string[] = [];
@@ -45,9 +47,21 @@ function env() {
     },
   });
 }
-async function upload(side = 'front', bytes: Uint8Array = png, mime = 'image/png', kind = 'identity') {
+async function upload(side = 'single', bytes: Uint8Array = png, mime = 'image/png', kind = 'image') {
   const response = await app().fetch(new Request(`https://app.test/upload?side=${side}&kind=${kind}`, { method: 'POST', headers: { 'Content-Type': mime }, body: bytes as unknown as BodyInit }), env());
   return { response, body: await response.json() as any };
+}
+// Seed a historical identity row through a normal scanned image, then restore its stored legacy classification.
+// This is fixture setup, never an upload API compatibility bypass.
+async function legacyDocument(side = 'front') {
+  const result = await upload();
+  const id = result.body.data.file.fileId;
+  const now = new Date();
+  sql.prepare('UPDATE form_submission_files SET file_kind=?, side=?, expires_at=? WHERE id=?')
+    .run('identity', side, new Date(now.getTime() + await identityRetentionDays(db, 'a') * 86400000).toISOString(), id);
+  const row = sql.prepare('SELECT * FROM form_submission_files WHERE id=?').get(id) as any;
+  result.body.data.file = documentAnswer(row, 'owner');
+  return result;
 }
 beforeEach(() => {
   secretReads = [];
@@ -74,12 +88,12 @@ describe('private form documents', () => {
     await expect(insertFormSubmissionRecord(db, { formId: 'f', friendId: 'u', data: '{}', fileIds: ids })).rejects.toThrow('document_attachment_conflict');
     expect(sql.prepare('SELECT COUNT(*) AS n FROM form_submissions').get()).toEqual({ n: 1 });
   });
-  it('stores front/back privately, binds both to one answer, redacts staff, and serves owner/admin only', async () => {
-    const front = await upload(); const back = await upload('back');
+  it('retains historic front/back privately, rejects new attachment, redacts staff, and serves owner/admin only', async () => {
+    const front = await legacyDocument(); const back = await legacyDocument('back');
     expect(front.response.status).toBe(201); expect(back.response.status).toBe(201);
     const values = [front.body.data.file, back.body.data.file];
     const data = { doc: values };
-    expect(await validateDocumentAnswers(db, layout(), data, { accountId: 'a', formId: 'f', friendId: 'u', versionId: null })).toBeNull();
+    expect(await validateDocumentAnswers(db, layout(), data, { accountId: 'a', formId: 'f', friendId: 'u', versionId: null })).toContain('受け取れません');
     const record = await insertFormSubmissionRecord(db, { formId: 'f', friendId: 'u', data: JSON.stringify(data), fileIds: values.map(v => v.fileId) });
     const redacted = await hydrateDocumentAnswers(db, data, 'staff', record.id);
     expect((redacted.doc as any[])[0]).toEqual({ fileId: values[0].fileId, kind: 'identity', side: 'front', state: 'restricted' });
@@ -89,7 +103,7 @@ describe('private form documents', () => {
     expect(await validateDocumentAnswers(db, layout(), data, { accountId: 'other', formId: 'f', friendId: 'u', versionId: null })).not.toBeNull();
   });
   it('requires both sides and refuses foreign friend/version and reusing a submitted upload', async () => {
-    const front = (await upload()).body.data.file;
+    const front = (await legacyDocument()).body.data.file;
     expect(validateAnswer(block, [front])).toContain('表と裏');
     expect(await validateDocumentAnswers(db, layout(), { doc: [front] }, { accountId: 'a', formId: 'f', friendId: 'other', versionId: null })).not.toBeNull();
     expect(await validateDocumentAnswers(db, layout(), { doc: [front] }, { accountId: 'a', formId: 'f', friendId: 'u', versionId: 'other' })).not.toBeNull();
@@ -98,9 +112,9 @@ describe('private form documents', () => {
     expect(sql.prepare('SELECT COUNT(*) AS n FROM form_submissions').get()).toEqual({ n: 1 });
   });
   it('rejects wrong formats, forged files, invalid sides and over 10MB including undeclared streams', async () => {
-    expect((await upload('front', new TextEncoder().encode('not an image'))).response.status).toBe(422);
+    expect((await upload('single', new TextEncoder().encode('not an image'))).response.status).toBe(422);
     expect((await upload('front', png, 'application/zip')).response.status).toBe(400);
-    expect((await upload('single')).response.status).toBe(400);
+    expect((await upload('front')).response.status).toBe(400);
     expect((await upload('front', new Uint8Array(10485761))).response.status).toBe(400);
     expect(store.put).not.toHaveBeenCalled();
   });
@@ -122,10 +136,12 @@ describe('private form documents', () => {
     await processDueFileScans(env()); expect(fetchMock).toHaveBeenCalled();
     expect((await app().request(`/api/form-files/${result.body.data.file.fileId}/content`, {}, env())).status).toBe(200);
   });
-  it('protects PDF as identity when multiple kinds include identity and defaults to 90 days', async () => {
+  it('rejects mixed legacy identity settings and retains historical protection with 90-day default', async () => {
     const result = await upload('single', new TextEncoder().encode('%PDF-1.7\n%%EOF'), 'application/pdf', 'mixed');
-    expect(result.response.status).toBe(201);
-    const row = sql.prepare('SELECT * FROM form_submission_files WHERE id=?').get(result.body.data.file.fileId) as any;
+    expect(result.response.status).toBe(400);
+    expect(store.put).not.toHaveBeenCalled();
+    const historic = await legacyDocument();
+    const row = sql.prepare('SELECT * FROM form_submission_files WHERE id=?').get(historic.body.data.file.fileId) as any;
     expect(row.file_kind).toBe('identity');
     expect(Date.parse(row.expires_at) - Date.parse(row.created_at)).toBeCloseTo(90 * 86400000, -2);
     role = 'staff';
@@ -145,7 +161,7 @@ describe('private form documents', () => {
   });
   it('uses configurable retention, denies expired content before cron, removes R2, retains the tombstone, retries deletion failures', async () => {
     await app().request('/api/forms/document-settings/a', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ identityRetentionDays: 2 }) }, env());
-    const result = await upload(); const id = result.body.data.file.fileId;
+    const result = await legacyDocument(); const id = result.body.data.file.fileId;
     const row = sql.prepare('SELECT * FROM form_submission_files WHERE id=?').get(id) as any;
     expect(Date.parse(row.expires_at) - Date.now()).toBeGreaterThan(86400000);
     sql.prepare("UPDATE form_submission_files SET expires_at='2000-01-01T00:00:00Z' WHERE id=?").run(id);
@@ -157,7 +173,7 @@ describe('private form documents', () => {
   });
 });
 
-describe('B-213 document corrections', () => {
+describe('document corrections', () => {
   it('records PDF in an image/PDF field and validates its actual kind', async () => {
     const result = await upload('single', new TextEncoder().encode('%PDF-1.7\n%%EOF'), 'application/pdf', 'image-pdf');
     expect(result.response.status).toBe(201);
@@ -258,7 +274,6 @@ it('does not run a sixth check for an older pending row already at the limit', a
   expect(sql.prepare('SELECT status,next_retry_at FROM media_file_scans').get()).toEqual({ status: 'rejected', next_retry_at: null });
 });
 
-
 describe('S01 invalid legacy database configuration', () => {
   it.each([
     ['ADMIN_API_KEY', 'https://scan.example.com'],
@@ -277,4 +292,31 @@ describe('S01 invalid legacy database configuration', () => {
     expect(secretReads).toEqual([]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+});
+
+it.each(['identity', 'mixed'])('refuses new %s uploads before storing or scanning bytes', async kind => {
+  const result = await upload('front', png, 'image/png', kind);
+  expect(result.response.status).toBe(400);
+  expect(result.body.code).toBe('IDENTITY_DOCUMENT_DISABLED');
+  expect(store.put).not.toHaveBeenCalled();
+  expect(sql.prepare('SELECT COUNT(*) AS n FROM form_submission_files').get()).toEqual({ n: 0 });
+  expect(sql.prepare('SELECT COUNT(*) AS n FROM media_file_scans').get()).toEqual({ n: 0 });
+});
+
+it('still checks ordinary PDF ownership, version, block and reuse after identity intake is disabled', async () => {
+  const result = await upload('single', new TextEncoder().encode('%PDF-1.7\n%%EOF'), 'application/pdf', 'pdf');
+  const fileId = result.body.data.file.fileId;
+  const pdfLayout = layout();
+  pdfLayout.sections[0].blocks = [{ ...block, fileKind: 'pdf', fileBothSides: false }];
+  const data = () => ({ doc: [{ fileId }] });
+  const scope = { accountId: 'a', formId: 'f', friendId: 'u', versionId: null as string | null };
+  expect(await validateDocumentAnswers(db, pdfLayout, data(), scope)).toBeNull();
+  for (const other of [{ accountId: 'other' }, { formId: 'other' }, { friendId: 'other' }, { versionId: 'other' }]) {
+    expect(await validateDocumentAnswers(db, pdfLayout, data(), { ...scope, ...other })).not.toBeNull();
+  }
+  pdfLayout.sections[0].blocks[0].id = 'other-block';
+  expect(await validateDocumentAnswers(db, pdfLayout, data(), scope)).not.toBeNull();
+  pdfLayout.sections[0].blocks[0].id = block.id;
+  await insertFormSubmissionRecord(db, { formId: 'f', friendId: 'u', data: '{}', fileIds: [fileId] });
+  expect(await validateDocumentAnswers(db, pdfLayout, data(), scope)).toContain('すでに');
 });

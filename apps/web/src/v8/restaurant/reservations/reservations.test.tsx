@@ -10,7 +10,7 @@ const fixture = vi.hoisted(() => ({
 }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
-vi.mock('@/lib/api-reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api-reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:vi.fn().mockResolvedValue({success:true,data:[]})}}})
+vi.mock('@/lib/api/helpers/reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api/helpers/reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:vi.fn().mockResolvedValue({success:true,data:[]})}}})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
@@ -126,7 +126,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
     fireEvent.change(screen.getByLabelText('電話番号'), { target: { value: '090-0000-1111' } })
     fireEvent.click(screen.getByRole('button', { name: '17:00' }))
     fireEvent.click(await screen.findByRole('button', { name: /台帳に入れる/ }))
-    await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledWith('account-1', expect.objectContaining({ customerName: '鈴木 花子', customerPhone: '090-0000-1111', guestCount: 2, source: 'phone', kind: 'customer', startsAt: '2026-10-10T08:00:00.000Z', endsAt: '2026-10-10T10:00:00.000Z' })))
+    await waitFor(() => expect(fixture.createReservation).toHaveBeenCalledWith('account-1', expect.objectContaining({ customerName: '鈴木 花子', customerPhone: '09000001111', guestCount: 2, source: 'phone', kind: 'customer', startsAt: '2026-10-10T08:00:00.000Z', endsAt: '2026-10-10T10:00:00.000Z' })))
   })
 
   it('一覧の行メニューから直接変更し、詳細への入口と版つき保存を保つ', async () => {

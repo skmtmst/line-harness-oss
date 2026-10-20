@@ -17,7 +17,7 @@ afterEach(() => {
 })
 
 /**
- * LINEでの見え方共通部品（B-6、★V7）。
+ * LINEでの見え方共通部品（、★管理画面）。
  *
  * ばらばらだった枠（青い地・緑の枠・濃い緑・白）を1つにそろえる。
  * 中身は各画面の描き方のまま、枠だけが共通。
@@ -73,16 +73,16 @@ describe('LINEでの見え方共通部品', () => {
   })
 
   it('旧テーマの指定でも現在の枠1つだけを描く', () => {
-    // v7（未設定）ではパネルだけ。スマホの帯（9:41・メニュー）は出ない。
+    // 管理画面（未設定）ではパネルだけ。スマホの帯（9:41・メニュー）は出ない。
     document.documentElement.dataset.theme = 'v7'
-    const v7 = render(
+    const legacyPreview = render(
       <LinePreview>
         <p>こんにちは</p>
       </LinePreview>,
     )
-    expect(v7.container.querySelectorAll('section[aria-label="LINEでの見え方"]')).toHaveLength(1)
+    expect(legacyPreview.container.querySelectorAll('section[aria-label="LINEでの見え方"]')).toHaveLength(1)
     expect(screen.getByText('9:41')).toBeTruthy()
-    v7.unmount()
+    legacyPreview.unmount()
 
     // v8 ではスマホの枠だけ。中身はトークの中へ入る。
     document.documentElement.dataset.theme = 'v8'
@@ -134,7 +134,7 @@ describe('LINEでの見え方共通部品', () => {
     expect(tsx).not.toMatch(/#[0-9a-fA-F]{3,8}/)
     expect(tsx).not.toMatch(/bg-(white|black|gray|slate|blue|green|red)-/)
     // ★V8 の枠だけモジュール CSS に切り出した（`cfVyj` の板の決まり）。
-    // モジュール内も値はトークンだけ。生の #16進・rgb() を置かない。
+    // モジュール内も値はトークンだけ。生の #16進・rgb を置かない。
     const css = read('line-preview.module.css')
     expect(css).toContain(":root")
     expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}/)

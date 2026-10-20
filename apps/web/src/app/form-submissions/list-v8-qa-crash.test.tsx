@@ -9,14 +9,13 @@
  * 未割り当て口は配列で返す契約だが、配列でない応答が来ても
  * 一覧を空にして描く（`[...forms]` で落とさない）。
  */
-import React, { act } from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent } from '@testing-library/react';
+import React,{ act } from 'react';
+import { createRoot,type Root } from 'react-dom/client';
+import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
 
-import FormSubmissionsListV8 from '@/v8/forms/list'
-
-;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+import FormSubmissionsListV8 from '@/v8/forms/list';
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const FORM_PAGE = {
   items: [
@@ -39,6 +38,8 @@ const FORM_PAGE = {
 
 /* 試験ごとに差し替える未割り当て口の応答 */
 let unassignedData: unknown = []
+let rows = FORM_PAGE.items
+const currentRole = vi.hoisted(() => ({ value: 'owner' }))
 const formsDeleteImpact = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
 const formsDuplicate = vi.hoisted(() => vi.fn())
@@ -63,7 +64,7 @@ vi.mock('@/lib/api', async importOriginal => {
         throw new Error(`unexpected GET ${path}`)
       }
       if (path.startsWith('/api/forms/unassigned')) return { success: true, data: unassignedData }
-      if (path.startsWith('/api/forms?')) return { success: true, data: new URLSearchParams(path.split('?')[1]).has('q') && formsDuplicate.mock.calls.length ? { ...FORM_PAGE, items: [...FORM_PAGE.items, { ...FORM_PAGE.items[0], id: 'form-copy', name: '来店アンケートのコピー', isActive: false, status: 'draft' }] } : FORM_PAGE }
+      if (path.startsWith('/api/forms?')) return { success: true, data: new URLSearchParams(path.split('?')[1]).has('q') && formsDuplicate.mock.calls.length ? { ...FORM_PAGE, items: [...FORM_PAGE.items, { ...FORM_PAGE.items[0], id: 'form-copy', name: '来店アンケートのコピー', isActive: false, status: 'draft' }] } : { ...FORM_PAGE, items: rows } }
       throw new Error(`unexpected GET ${path}`)
     },
     api: {
@@ -94,7 +95,7 @@ vi.mock('next/navigation', async importOriginal => ({
  */
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => 'owner' }
+  return { ...actual, useStaffRole: () => currentRole.value }
 })
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
 
@@ -113,6 +114,8 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/form-submissions')
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
   unassignedData = []
+  rows = FORM_PAGE.items
+  currentRole.value = 'owner'
   formsDeleteImpact.mockReset()
   formsUpdate.mockReset()
   formsDuplicate.mockReset()
@@ -211,12 +214,7 @@ describe('行の詳細パネルと右クリック', () => {
     expect(errors.map(String).join('\n')).toBe('')
   })
 
-  /*
-   * 2026-10-06 対象から外す：新しい一覧は右クリックした行を state に入れてから項目を作るため、
-   * 最初の右クリックでは項目が空で開かない（ContextMenu の openAt が items 0 件で戻る）。
-   * 2回目は前に押した行の項目が出る。画面の直しが要る（報告済み）。直ったら skip を外す。
-   */
-  it.skip('行を右クリックすると「…」と同じ操作が出る', async () => {
+  it('行を右クリックすると「…」と同じ操作が出る', async () => {
     await act(async () => { root.render(<FormSubmissionsListV8 />) })
     await flush()
     await act(async () => {
@@ -227,7 +225,46 @@ describe('行の詳細パネルと右クリック', () => {
     expect(menu, '右クリックメニューが出る').toBeTruthy()
     expect(menu?.textContent).toContain('集まった回答')
     expect(menu?.textContent).toContain('フォルダへ移す')
+    const contextLabels = [...menu!.querySelectorAll('[role="menuitem"]')].map(item => item.textContent)
+    await act(async () => { fireEvent.keyDown(menu!, { key: 'Escape' }) })
+    await flush()
+    const rowMenu = host.querySelector('button[aria-label="「来店アンケート」のその他の操作"]')
+    expect(rowMenu).toBeTruthy()
+    await act(async () => { fireEvent.click(rowMenu!) })
+    await flush()
+    expect([...document.querySelectorAll('[role="menuitem"]')].map(item => item.textContent)).toEqual(contextLabels)
     expect(errors.map(String).join('\n')).toBe('')
+  })
+
+  it('別の行を右クリックしても前の行を複製しない', async () => {
+    rows = [...FORM_PAGE.items, { ...FORM_PAGE.items[0], id: 'form-2', name: '二つ目のフォーム' }]
+    await act(async () => { root.render(<FormSubmissionsListV8 />) })
+    await flush()
+    await act(async () => { fireEvent.contextMenu(detailButton(), { clientX: 60, clientY: 120 }) })
+    await flush()
+    await act(async () => { fireEvent.keyDown(document.querySelector('[data-context-menu]')!, { key: 'Escape' }) })
+    await flush()
+    await act(async () => { fireEvent.contextMenu(host.querySelector('[data-row-id="form-2"]')!, { clientX: 60, clientY: 180 }) })
+    await flush()
+    const duplicate = [...document.querySelectorAll('[data-context-menu] [role="menuitem"]')].find(item => item.textContent === '複製する')
+    expect(duplicate).toBeTruthy()
+    await act(async () => { fireEvent.click(duplicate!) })
+    await flush()
+    expect(formsDuplicate).toHaveBeenCalledTimes(1)
+    expect(formsDuplicate).toHaveBeenCalledWith('form-2', 'visual-qa-account', '二つ目のフォームのコピー')
+  })
+
+  it('閲覧のみの右クリックには変更する操作を出さない', async () => {
+    currentRole.value = 'viewer'
+    await act(async () => { root.render(<FormSubmissionsListV8 />) })
+    await flush()
+    await act(async () => { fireEvent.contextMenu(detailButton(), { clientX: 60, clientY: 120 }) })
+    await flush()
+    const menu = document.querySelector('[data-context-menu]')
+    expect(menu).toBeTruthy()
+    expect(menu?.textContent).not.toMatch(/複製する|フォルダへ移す|削除する|公開する/)
+    expect(formsDuplicate).not.toHaveBeenCalled()
+    expect(formsUpdate).not.toHaveBeenCalled()
   })
 
   it('詳細パネルの名前をその場で変えると版付きで更新口へ届く', async () => {

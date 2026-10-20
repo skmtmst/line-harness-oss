@@ -1,8 +1,10 @@
+import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { bumpAuthThrottle } from './auth-email.js';
 import { sqlIdSet } from './id-queries.js';
 import { jstNow, nextVersionToken } from './utils.js';
 
 /**
- * 運営からのお知らせ配信 ★V6 37-7 と契約者専用LINE（migration 429）。
+ * 運営からのお知らせ配信 ★37-7 と契約者専用LINE（migration 429）。
  */
 
 export const ANNOUNCEMENT_AUDIENCES = ['all', 'plan', 'tenants'] as const;
@@ -350,7 +352,7 @@ export async function issueStaffLineLinkCode(db: D1Database, staffId: string, tt
     .bind(staffId, now)
     .first<{ code: string; expires_at: string }>();
   if (existing) return { code: existing.code, expiresAt: existing.expires_at };
-  const expiresAt = new Date(Date.now() + ttlMs + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+  const expiresAt = japanCalendar(new Date(Date.now() + ttlMs)).toISOString().replace('Z', '+09:00');
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = randomCode();
     try {
@@ -371,6 +373,9 @@ export async function consumeStaffLineLinkCode(
   db: D1Database,
   input: { code: string; friendId: string },
 ): Promise<{ staffId: string; staffName: string } | null> {
+  const senderAttempts = await bumpAuthThrottle(db, `notice-link:friend:${input.friendId}`, 15 * 60_000);
+  const globalAttempts = await bumpAuthThrottle(db, 'notice-link:global', 15 * 60_000);
+  if (senderAttempts > 5 || globalAttempts > 25) return null;
   const now = jstNow();
   const row = await db
     .prepare(`SELECT c.code, c.staff_id, sm.name FROM staff_line_link_codes c JOIN staff_members sm ON sm.id = c.staff_id
@@ -378,11 +383,11 @@ export async function consumeStaffLineLinkCode(
     .bind(input.code, now)
     .first<{ code: string; staff_id: string; name: string }>();
   if (!row) return null;
-  await db.batch([
-    db.prepare(`UPDATE staff_line_link_codes SET used_at = ? WHERE code = ?`).bind(now, row.code),
-    db.prepare(`UPDATE staff_members SET notice_friend_id = ?, notice_linked_at = ? WHERE id = ?`).bind(input.friendId, now, row.staff_id),
+  const results = await db.batch([
+    db.prepare(`UPDATE staff_line_link_codes SET used_at = ? WHERE code = ? AND used_at IS NULL AND expires_at > ?`).bind(now, row.code, now),
+    db.prepare(`UPDATE staff_members SET notice_friend_id = ?, notice_linked_at = ? WHERE id = ? AND changes() = 1`).bind(input.friendId, now, row.staff_id),
   ]);
-  return { staffId: row.staff_id, staffName: row.name };
+  return results[0].meta.changes === 1 ? { staffId: row.staff_id, staffName: row.name } : null;
 }
 
 export async function countNoticeLinkedStaff(db: D1Database, excludeTenantId: string): Promise<{ linked: number; total: number }> {

@@ -1,4 +1,4 @@
-/* 正本: NbomF / x6BDY / d8X09 / I1E7Bt。外側の白い板は AppShell が持つ。
+/* 正本: NbomF / x6BDY / d8X09 / 。外側の白い板は AppShell が持つ。
    既存 AppShell の本文余白を型の入口で相殺し、各段が必要な余白を持つ。
    このファイルは V8 以外へ見た目を適用しない。 */
 
@@ -22,7 +22,7 @@
   padding: var(--tpl-head-pad-top) var(--tpl-head-pad-side) var(--tpl-head-pad-bottom); flex-shrink: 0;
 }
 :global(:root) .headingText { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-head-gap); }
-/* 「この画面の説明」（B-245）を開いても、右の操作（店舗の欄・主ボタン）を題の行に残す。説明の長い1行が幅を取り、操作が次の行へ落ちていた（qf3ky）。 */
+/* 「この画面の説明」を開いても、右の操作（店舗の欄・主ボタン）を題の行に残す。説明の長い1行が幅を取り、操作が次の行へ落ちていた。 */
 :global(:root) .headingText:has(> [data-screen-explanation]:not([hidden])) { flex-basis: 0; }
 :global(:root) .heading:has(> .headingText > [data-screen-explanation]:not([hidden])) > .actions { align-self: flex-start; }
 :global(:root) .titleRow { display: flex; align-items: center; gap: var(--polish-space-row); min-width: 0; }
@@ -47,7 +47,7 @@
 :global(:root) .section { padding: var(--tpl-section-pad); min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-section-gap); border-bottom: 1px solid var(--color-hairline); }
 :global(:root) .split { display: flex; flex: 1; min-width: 0; }
 :global(:root) .main { min-width: 0; flex: 1; }
-/* B-149：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
+/* ：境目の線はフォルダの列が持つ。中身は左線を重ねない。 */
 :global(:root) .folders + .main { border-left: 0; }
 :global(:root) .explanation { width: 100%; }
 :global(:root) .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); padding: var(--tpl-toolbar-pad-block) var(--tpl-toolbar-pad-side); }
@@ -64,16 +64,16 @@
 :global(:root) .pagination { padding: var(--tpl-page-pad-block) var(--tpl-page-pad-side); }
 :global(:root) .folders { box-sizing: content-box; width: var(--tpl-folder-width); flex-shrink: 0; padding: var(--tpl-folder-pad-block) var(--tpl-folder-pad-side); border-right: 1px solid var(--color-hairline); display: flex; flex-direction: column; gap: var(--polish-space-row); }
 /*
- * 統括（/hq）の列（絵 JKjsE・LRc93 ほか）：中身の幅 200 に左24・右12の余白と線を足した外寸（content-box）。
+ * 統括（/hq）の列（絵の ほか）：中身の幅 200 に左24・右12の余白と線を足した外寸（content-box）。
  * border-box のままだと中身が 164 に縮み、右の中身が 36px 左へずれていた（2026-10-08）。
- * 設定の列は中身200に左右12の余白と線を足す。通常の一覧は下の B-178 で余白込み200。
+ * 設定の列は中身200に左右12の余白と線を足す。通常の一覧は下の  で余白込み200。
  * 外寸指定（folderWidth）は渡された幅を守る。
  */
 :global(:root) .folders[data-folder-inset] { box-sizing: content-box; padding-left: var(--tpl-folder-inset-pad-start); }
 :global(:root) .collapsedFolders { display: none; }
-/* 中身の高さで止まる列（統括の設定の中のメニュー・絵 JB8V1・K7HYu・b8xBtZ）。縦の仕切り線も中身まで。 */
+/* 中身の高さで止まる列（統括の設定の中のメニュー・絵の）。縦の仕切り線も中身まで。 */
 :global(:root) .folders:has(> [data-folder-fit]) { align-self: flex-start; }
-/* 型が組む畳んだ段（folderNav）。作るボタンは列の幅いっぱいにせず中身の幅。選ぶ欄は 1152 の板（Iffil・L7zA7C）の幅。 */
+/* 型が組む畳んだ段（folderNav）。作るボタンは列の幅いっぱいにせず中身の幅。選ぶ欄は 1152 の板（・）の幅。 */
 :global(:root) .collapsedCreate { display: flex; flex-shrink: 0; }
 :global(:root) .collapsedCreate > * { width: fit-content; height: var(--tpl-folder-create-h); min-height: 0; padding: var(--tpl-folder-create-pad); }
 :global(:root) .collapsedSelect { display: block; flex-shrink: 0; width: max-content; min-width: max-content; }
@@ -115,7 +115,7 @@
 :global(:root) .footer { position: sticky; bottom: 12px; z-index: 20; margin: 12px var(--tpl-fx4-footer-inset); } /* 採用 A-1 浮いた下の帯（オーナー 2026-10-04）。左右は絵の下の帯（left 12）に合わせる */
 :global(:root) .detailSummary { width: 320px; padding: var(--polish-space-card) var(--polish-space-section); border-right: 1px solid var(--color-hairline); flex-shrink: 0; }
 :global(:root) .detailContent { padding: var(--polish-space-card) var(--polish-space-section); display: flex; flex-direction: column; gap: var(--tpl-detail-content-gap); flex: 1; min-width: 0; }
-/* 実行の記録（N43uVX）：本文と補助欄は型が組み、短い板は中身で終わる。 */
+/* 実行の記録：本文と補助欄は型が組み、短い板は中身で終わる。 */
 :global(:root) [data-template-layout='record-detail'] > .heading { padding-top: var(--polish-space-section); }
 :global(:root) [data-template-layout='record-detail'] > .split { border-top: 1px solid var(--color-hairline); }
 :global(:root) [data-template-layout='record-detail'] .detailContent { padding: var(--polish-space-section); padding-bottom: 0; gap: var(--polish-space-card); }
@@ -150,7 +150,7 @@
 :global(:root) .settingsNav { width: var(--tpl-settings-nav-width); flex-shrink: 0; display: flex; flex-direction: column; gap: var(--polish-space-row); padding: var(--tpl-settings-nav-pad-block) var(--tpl-settings-nav-pad-side); }
 :global(:root) .settingsNav:has(> [data-settings-nav='inline']) { width: auto; padding: 0; }
 :global(:root) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-settings-content-gap); padding: var(--tpl-settings-content-pad-block) var(--tpl-settings-content-pad-side); }
-/* 採用 B237-5a（VsZ25）：設定目次208、右380、各欄の内側24。 */
+/* 採用 B237-5a：設定目次208、右380、各欄の内側24。 */
 :global(:root) .frame[data-template-layout='customer-look'] { --tpl-settings-nav-width:calc(var(--tpl-setnav-w) + var(--tpl-settings-nav-pad-side) * 2); --tpl-settings-gap:0px; --customer-look-preview-width:380px; --customer-look-pane-padding:24px; }
 :global(:root) .frame[data-template-layout='customer-look'] .settingsContent { max-width:none; padding:0; }
 .customerLookSplit { display:flex; flex:1; min-width:0; }
@@ -232,9 +232,9 @@
 :global(:root) .frame[data-has-footer] > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
 :global(:root) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global(:root) .footer { flex-shrink: 0; }
-/* 本文末尾の余白へ浮かせる。カード内の下余白と本文の下余白を重ねて使う。 */
+/* 帯の位置は保ち、入力のスクロール領域は帯の上までに収める。 */
 :global(:root) .footer[data-footer-placement='floating'] {
-  margin-top: calc(-1 * (var(--polish-space-section) + var(--polish-space-row)));
+  margin-top: 0;
 }
 
 /* 入力と見え方は別々に送る。本文全体のスクロールバーで左右の列幅を削らない。 */
@@ -272,7 +272,7 @@
   /* 900 の板でも右の列は残す（幅 280）。消すのは狭い幅だけ。 */
   :global(:root) .preview { width: var(--tpl-preview-narrow-width); background: transparent; border-left: 0; }
   :global(:root) .previewContent { width: var(--tpl-preview-narrow-content-width); }
-  /* 画面が詰めた右の列を頼んだとき（CreatePage の previewCompactWhenNarrow・絵 kmTab）。 */
+  /* 画面が詰めた右の列を頼んだとき（CreatePage の previewCompactWhenNarrow・絵 ）。 */
   :global(:root) .preview[data-preview-narrow='compact'] { padding: var(--tpl-r2-rail-compact-pad); }
   :global(:root) .preview[data-preview-narrow='compact'] .previewContent { width: var(--tpl-r2-rail-compact-content-width); }
   :global(:root) .preview[data-preview-narrow='hidden'] { display: none; }
@@ -308,7 +308,7 @@
 :global(:root) .steps { min-width: 0; }
 /* どの型でも手順は頭の最後の行（題と説明の下）。作る型は下で並びを決め直す。 */
 :global(:root) .heading > .steps { flex-basis: 100%; order: 5; margin-top: var(--tpl-steps-head-gap); }
-/* B-151：列の先頭へ直接渡された作る操作も、FolderPanel と同じ形。 */
+/* ：列の先頭へ直接渡された作る操作も、FolderPanel と同じ形。 */
 :global(:root) .folders > :global(a):first-child,
 :global(:root) .folders > :global(button):first-child {
   width: fit-content; max-width: 100%; align-self: flex-start;
@@ -317,7 +317,7 @@
 :global(:root) .folders > :global([aria-hidden='true']):first-child {
   height: var(--tpl-folder-create-space-col-h);
 }
-/* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（apLqS フォルダの列：間2＋14＋2） */
+/* ★V8 フォルダの列：上の「作る」ボタンの下からフォルダの題まで18（ フォルダの列：間2＋14＋2） */
 :global(:root) .folders > :global(a) + * , :global(:root) .folders > :global(button) + * { margin-top: var(--polish-space-row); }
 /* ★V8 作る型の頭の並び（q1xNMz）：題（右に操作）→ 説明 → 手順。 */
 :global(:root) [data-page-template='create'] .heading > .headingText { display: contents; }
@@ -384,7 +384,7 @@
   :global(:root) .listBody[data-dialog-layout] .collapsedFolders { display: flex; }
 }
 :global(:root) .heading[data-heading-inset='none'] { padding: 0; }
-/* B-40: 設定の板の違いは SettingsPage.layout から選ぶ。 */
+/* : 設定の板の違いは SettingsPage.layout から選ぶ。 */
 :global(:root) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings { gap: 0; }
 :global(:root) .frame[data-template-layout='accounts'] .settingsContent { max-width: none; padding: var(--tpl-sa-content-pad); gap: var(--tpl-sa-gap); }
 :global(:root) .frame[data-template-layout='account-detail'] .settingsContent { max-width: none; padding: var(--tpl-acd-pad); gap: var(--tpl-acd-stack-gap); }
@@ -397,13 +397,13 @@
 :global(:root) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) > .footer { margin-inline: var(--tpl-sb-footer-side); }
 :global(:root) .frame[data-template-layout='narrow-nav'] { --tpl-setnav-w: var(--tpl-sb-nav-w-narrow); --tpl-settings-content-pad-block: var(--tpl-sb-narrow-pad-top) var(--tpl-sb-narrow-pad-bottom); --tpl-settings-content-pad-side: var(--tpl-sb-narrow-pad-side); --tpl-settings-content-gap: var(--tpl-sb-narrow-gap); }
 :global(:root) .frame:is([data-template-layout='wide-nav'], [data-template-layout='narrow-nav']) :global([data-settings-nav='inline'] li > ul) { --tpl-setnav-item-pad: var(--tpl-st2-setnav-child-pad); }
-/* 同じ畳み方を SettingsPage.layout のアカウント3板にも使う（x2dSNv は上24：アカウント担当の測り）。 */
+/* 同じ畳み方を SettingsPage.layout のアカウント3板にも使う（ は上24：アカウント担当の測り）。 */
 @container v8-page (max-width: 1099px) {
   :global(:root) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settings > .settingsNav { display: none; }
   :global(:root) .frame:is([data-template-layout='accounts'], [data-template-layout='account-detail'], [data-template-layout='account-handover']) .settingsContent { width: 100%; padding-left: var(--tpl-head-pad-side); align-self: stretch; }
 }
 
-/* O2Z8u・GcyTr：予約の主操作は題の行、数の帯はすぐ下。 */
+/* ・：予約の主操作は題の行、数の帯はすぐ下。 */
 :global(:root) .bookingHeading,
 :global(:root) .bookingStats { min-width: 0; width: calc(100% - var(--tpl-booking-aside-width)); }
 :global(:root) .bookingHeading .actions { gap: var(--tpl-booking-heading-gap); }
@@ -415,7 +415,7 @@
   :global(:root) .bookingHeading .heading { padding-block: var(--tpl-booking-narrow-head-pad); }
 }
 
-/* B-178：フォルダの列は余白込み200、ページ送りは右寄せ。 */
+/* ：フォルダの列は余白込み200、ページ送りは右寄せ。 */
 :global(:root) [data-page-template='list'] .listBody:not([data-dialog-layout]) .folders:not([data-folder-inset]) { box-sizing: border-box; }
 :global(:root) [data-list-skeleton] .folders { box-sizing: border-box; width: var(--tpl-folder-width); }
 :global(:root) [data-list-skeleton] .paginationRow { justify-content: flex-end; gap: var(--space-16); }
@@ -431,7 +431,7 @@
 :global(:root) .frame[data-template-layout='distribution'] { --tpl-toolbar-pad-block: var(--tpl-distribution-toolbar-pad); }
 :global(:root) .frame[data-template-layout='distribution'] .listBody { flex: none; }
 :global(:root) .frame[data-template-layout='distribution'] .listBody { margin-bottom: var(--tpl-toolbar-gap); }
-/* 下の帯は表の直後で浮かせず、白い板の下端に置く（Ft2Ey・J7HNK）。表が長いときは sticky で画面の下に追従する。 */
+/* 下の帯は表の直後で浮かせず、白い板の下端に置く（・）。表が長いときは sticky で画面の下に追従する。 */
 :global(:root) .frame[data-template-layout='distribution'] > .footer { margin: auto 0 0; }
 .subtitle{margin:0;color:var(--color-ink-secondary);font-size:var(--text-caption);line-height:var(--tpl-rs-lh-13);}
 
@@ -453,15 +453,15 @@
 
 :global(:root) [data-page-template='dashboard'][data-template-layout='restaurant'] .heading { padding-bottom: var(--polish-space-field); }
 
-/* B-217：表は領域いっぱい。道具・知らせ・件数の中身だけ24。 */
+/* ：表は領域いっぱい。道具・知らせ・件数の中身だけ24。 */
 :global(:root) .listBody .content[data-content-inset] { padding-inline: 0; }
 :global(:root) .listBody .toolbar { padding-inline: var(--tpl-list-inset); }
 /* 画面が道具の段を本文の直下に置いたとき（中身と一緒に読み込む一覧）も、型の道具の段と同じ余白にする。本文は表のために左右 0。 */
 :global(:root) .listBody .content > :global([data-shared-part='list-toolbar']) { box-sizing: border-box; padding: var(--tpl-toolbar-pad-block) var(--tpl-list-inset); }
 :global(:root) .listBody .pagination { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
-/* 表と同じ子の中に置いたページ送り（タグの4タブ）も、型のページ送りと同じ余白にする（絵 q5gbcM：左右24・上下12）。 */
+/* 表と同じ子の中に置いたページ送り（タグの4タブ）も、型のページ送りと同じ余白にする（絵 ：左右24・上下12）。 */
 :global(:root) .listBody .content [data-list-pager] { padding-inline: var(--tpl-list-inset); padding-block: var(--polish-space-field); }
-/* 表を道具の段と同じ内側に置く板（YMVFD）。表は左右24の内側、ページ送りの中身はその表の内側24。 */
+/* 表を道具の段と同じ内側に置く板。表は左右24の内側、ページ送りの中身はその表の内側24。 */
 :global(:root) .listBody[data-table-inset] .content { padding-inline: var(--tpl-list-inset); }
 :global(:root) .listBody[data-table-inset] .pagination { padding-inline: calc(var(--tpl-list-inset) * 2); }
 :global(:root) .listBody .paginationRow,
@@ -471,13 +471,13 @@
 /* 旧画面が表の外に足していた枠も、共通の型で平らにする。 */
 :global(:root) [data-list-skeleton] .content :global(div:not([data-template-region]):has(> [data-shared-part='list-table'])) { margin: 0; padding-inline: 0; border: 0; border-radius: var(--radius-flat); box-shadow: none; }
 
-/* B-233：白い板の下は24。操作の帯は専用の下端を持つ。 */
+/* ：白い板の下は24。操作の帯は専用の下端を持つ。 */
 :global(:root) .frame:not([data-page-template="inbox"]):not(:has([data-shared-part="sticky-bar"])) { padding-bottom: var(--polish-space-section); }
 
-/* B-237：PC では目次と型を横に置き、狭い白い板では見本だけを畳む。 */
+/* ：PC では目次と型を横に置き、狭い白い板では見本だけを畳む。 */
 :global(:root) .frame[data-template-layout='customer-look'] .settings { flex-direction: row; gap: var(--tpl-settings-gap); }
 :global(:root) .frame[data-template-layout='customer-look'] .settingsNav { width: var(--tpl-settings-nav-width); flex-direction: column; }
-/* 絵 VsZ25：設定の列の項目はほかの設定画面と同じ幅（--tpl-setnav-w）。列の中の右の余白・線は重ねない（「予約サイト・グルメ媒体」を全文で出す）。 */
+/* 絵 ：設定の列の項目はほかの設定画面と同じ幅（--tpl-setnav-w）。列の中の右の余白・線は重ねない（「予約サイト・グルメ媒体」を全文で出す）。 */
 :global(:root) .frame[data-template-layout='customer-look'] .settingsNav > nav { padding-right: 0; border-right: 0; }
 @media (max-width:1023px) {
   :global(:root) .frame[data-template-layout='customer-look'] .settingsNav { display: none; }
@@ -519,7 +519,7 @@
 .listSection { display: flex; flex-direction: column; min-width: 0; padding: var(--polish-space-card) var(--polish-space-section); gap: var(--polish-space-card); }
 .detailColumns[data-presentation='analysis'] { grid-template-columns: minmax(0, 1fr) var(--tpl-an-side-w); margin-right: 0; gap: var(--polish-space-card); }
 .detailColumns[data-presentation='analysis'] .detailColumnAside { display: flex; flex-direction: column; min-height: 0; padding-left: 0; border-left: 0; gap: var(--polish-space-card); }
-/* 保存した分析（bglah）：右の履歴は表と操作が入るので広い欄。 */
+/* 保存した分析：右の履歴は表と操作が入るので広い欄。 */
 .detailColumns[data-presentation='analysis'][data-detail-columns='analysis-history'] { grid-template-columns: minmax(0, 1fr) var(--tpl-an-history-w); }
 @container v8-page (max-width: 1099px) {
  .detailColumns[data-presentation='analysis'] { grid-template-columns: minmax(0, 1fr); }

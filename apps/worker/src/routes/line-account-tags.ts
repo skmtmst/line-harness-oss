@@ -5,7 +5,7 @@ import {
   getLineAccountTagsByAccountIds, listLineAccountTags, replaceLineAccountTags,
   serializeLineAccountTag, updateLineAccountTag,
 } from '@line-crm/db';
-import type { Env } from '../index.js';
+import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';

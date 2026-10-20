@@ -1,7 +1,8 @@
+import { tracedFetch as fetch } from '@line-crm/shared/server';
 import type { NenLifetimeMilestone, NenRankRules, NenRankSetting } from '@line-crm/db';
 
 /**
- * 会員ランクの設定を EC-CUBE へ署名付きで送る（★V6 37-1-A「保存してECへ同期」）。
+ * 会員ランクの設定を EC-CUBE へ署名付きで送る（★37-1-A「保存してECへ同期」）。
  *
  * 署名の作り方はクーポン送信（`eccube-coupon.ts`）と同じ：
  * `X-Nen-Timestamp` と `X-Nen-Signature: sha256=HMAC-SHA256(timestamp + '.' + body)`。

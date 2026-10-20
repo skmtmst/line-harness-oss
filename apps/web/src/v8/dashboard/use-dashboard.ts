@@ -1,4 +1,7 @@
 'use client'
+import { loadStaffIdentity } from '@/lib/staff-role'
+import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
+import { dashboardCardForStyle } from './style-cards'
 
 import { jstDate, jstDayStartIso } from '@/lib/jst-datetime'
 
@@ -23,9 +26,9 @@ import {
 } from '@/components/dashboard/dashboard-preference-defaults'
 
 /*
- * ★V8 ダッシュボード（WQmep）の読み書き。
+ * ★V8 ダッシュボードの読み書き。
  *
- * v7 の `app/page.tsx` の DashboardPageInner から、データの取り方・保存・
+ * 管理画面 の `app/page.tsx` の DashboardPageInner から、データの取り方・保存・
  * 失敗の扱いをそのまま写した（src/v8 からは @/app を読めないため）。
  * 変えたのは見た目に関わらない2点だけ：
  * - 稼働（health）は板の頭の「動きの状態」に使うので、右の列のカードを
@@ -43,7 +46,7 @@ export const PERIODS = [
 export type PeriodKey = (typeof PERIODS)[number]['key']
 export type HealthRisk = 'normal' | 'warning' | 'danger' | null
 
-/** 配置の手元の写し。v7 と同じ名前（切り替えの日に持ち越す）。 */
+/** 配置の手元の写し。管理画面 と同じ名前（切り替えの日に持ち越す）。 */
 export function dashboardStorageKey(accountId: string | null): string {
   return `lh_dashboard_v4:${accountId ?? 'default'}`
 }
@@ -55,12 +58,12 @@ export function jstDay(iso: string | number | Date): string {
 }
 
 function monthKey(offset: number): string {
-  const now = new Date(Date.now() + 9 * 3600_000)
+  const now = japanCalendar()
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1))
   return d.toISOString().slice(0, 7)
 }
 
-export function useDashboard() {
+export function useDashboard(usageStyle?: 'standard' | 'ec') {
   const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
@@ -152,9 +155,10 @@ export function useDashboard() {
     : null
   const supportMarksEnabled = useFeatureVisibility(selectedAccountId).enabled('support_marks')
   const visibleRight = preferences.right
+    .filter(item => dashboardCardForStyle(item.id, usageStyle, preferenceVersion > 0))
     .filter((item) => item.visible)
     .filter((item) => item.id !== 'support-mark-status' || supportMarksEnabled)
-  const visibleToday = preferences.today.filter((item) => item.visible)
+  const visibleToday = preferences.today.filter((item) => item.visible && dashboardCardForStyle(item.id, usageStyle, preferenceVersion > 0))
   const needsPhotos = visibleToday.some((item) => item.id === 'today-photo-review')
   const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
     || visibleRight.some((item) => item.id === 'upcoming')
@@ -168,7 +172,7 @@ export function useDashboard() {
   /* 本人の名前（あいさつ）。取れなくても画面は止めない。 */
   useEffect(() => {
     let cancelled = false
-    void api.staff.me()
+    void loadStaffIdentity()
       .then((response) => { if (!cancelled && response.success) setStaffName(response.data.name) })
       .catch(() => undefined)
     return () => { cancelled = true }
@@ -234,7 +238,7 @@ export function useDashboard() {
       if (selectedAccountIdRef.current !== accountId) return
       const conflict = caught instanceof Error && 'status' in caught && caught.status === 409
       setPreferenceSaveError({
-        /* 言葉は絵 mcOqK の 4（引き出しの下の帯）。 */
+        /* 言葉は絵  の 4（引き出しの下の帯）。 */
         message: conflict ? 'ほかの人が配置を変えました。最新の配置を読み込んでから直してください。' : '配置を保存できませんでした。通信を確かめてください。',
         conflict,
       })
@@ -522,7 +526,7 @@ export function useDashboard() {
   const activeFriends = data?.metrics === undefined
     ? sectionAvailable('friends') ? data?.friends.active ?? null : null
     : data.metrics.activeFriends.value
-  /* 「対応が必要な受信」の数え方は v7 と同じ（IDEA-01）。 */
+  /* 「対応が必要な受信」の数え方は 管理画面 と同じ（IDEA-01）。 */
   const inboxSectionOk = data !== null && sectionAvailable('inbox')
   const lineUnread = inboxSectionOk ? (data.inbox.line?.unanswered ?? data.inbox.unanswered) : null
   const mailUnread = inboxSectionOk && data.inbox.email
@@ -555,6 +559,7 @@ export function useDashboard() {
     error,
     load,
     preferences,
+    preferenceVersion,
     preferenceSaving,
     preferenceSaveError,
     applyPreferences,

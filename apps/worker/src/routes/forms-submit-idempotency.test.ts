@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { emptyLayout, newBlockId, type FormLayout } from '@line-crm/shared';
-import type { Env } from '../index.js';
+
+import type { Env } from '../worker-env.js';
 
 /**
  * フォーム回答の冪等化(N-165)の契約テスト。
@@ -164,7 +165,7 @@ vi.mock('../services/liff-auth.js', () => ({
   verifyCallerLineIdentity: mocks.verifyCallerLineIdentity,
 }));
 
-vi.mock('../services/friend-tag-attach.js', () => ({
+vi.mock('../features/friends/friend-tag-attach.js', () => ({
   attachTagAndFireSideEffects: mocks.attachTag,
 }));
 
@@ -176,8 +177,8 @@ vi.mock('../services/line-proxy-send.js', () => ({
   pushViaHarnessProxy: mocks.pushViaHarnessProxy,
 }));
 
-vi.mock('../services/form-layout-effects.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../services/form-layout-effects.js')>();
+vi.mock('../features/forms/form-layout-effects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../features/forms/form-layout-effects.js')>();
   mocks.realApplyLayout = actual.applyFormLayoutEffects as never;
   return { ...actual, applyFormLayoutEffects: mocks.applyLayout };
 });
@@ -1071,4 +1072,12 @@ test.each(['once','total'])('W14: 自分の保存済み回答を受付上限(%s)
   expect((await app().fetch(submitRequest({full_name:'山田'}),env())).status).toBe(200);
   expect(answerStore.size).toBe(1);
   expect(claimOf().status).toBe('completed');
+});
+
+// Keep the real URL/private-IP policy and webhook fetch. Only DNS is synthetic,
+// so concurrency/event-id assertions still count actual webhook attempts.
+vi.mock('../features/forms/form-webhook.js', async original => {
+  const actual = await original<typeof import('../features/forms/form-webhook.js')>();
+  return { ...actual, callFormWebhook: (...[form, answers, eventId]: Parameters<typeof actual.callFormWebhook>) =>
+    actual.callFormWebhook(form, answers, eventId, { lookupHost: async () => ['93.184.216.34'] }) };
 });

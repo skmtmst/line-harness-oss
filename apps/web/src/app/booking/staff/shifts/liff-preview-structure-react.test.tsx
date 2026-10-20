@@ -13,10 +13,10 @@ import type { BookingAvailabilitySlot } from '@/lib/api'
 
 /**
  * Issue #643: 予約設定の右パネルプレビューが、実際のLIFF
- * （apps/liff/src/components/DateTimePicker.tsx）と同じ構造かを
+ * （apps/liff/src/components/date-time-picker.tsx）と同じ構造かを
  * 実Reactで確かめる。
  *
- * 実LIFF（★V8・M2p63S/k3aJKU/ADutg）: 「日時を選んでください」の下に
+ * 実LIFF（★V8・//）: 「日時を選んでください」の下に
  * 「週で見る／カレンダー」の切り替え。週は5日の並び（空き・満・休み）、
  * カレンダーは月の表（●空きあり／灰色は満席・休み）。
  * どちらも選んだ日の時刻ボタンが3列（grid-cols-3）で並ぶ。
@@ -28,7 +28,7 @@ const DIR = dirname(fileURLToPath(import.meta.url))
 // shifts → staff → booking → app → src → web → apps → リポジトリ根
 const REPO_ROOT = join(DIR, '../../../../../../..')
 const LIFF_SOURCE = readFileSync(
-  join(REPO_ROOT, 'apps/liff/src/components/DateTimePicker.tsx'),
+  join(REPO_ROOT, 'apps/liff/src/components/date-time-picker.tsx'),
   'utf8',
 )
 const LIFF_USER_MESSAGE_SOURCE = readFileSync(
@@ -56,8 +56,8 @@ afterEach(cleanup)
 describe('前提: 実LIFFが「日時を選んでください」＋週／カレンダー切替＋3列時刻ボタンの構造', () => {
   it('LIFF側の文言と構造が変わっていない（変わったらプレビューも追随が必要）', () => {
     expect(LIFF_SOURCE).toContain('日時を選んでください')
-    // ★V8（板 ADutg・k3aJKU）：空きなしは週「この週は空きがありません」、
-    // 月「この月は空きがありません。」（V7 の「この期間に空きはありません。」は
+    // ★V8（板 ・）：空きなしは週「この週は空きがありません」、
+    // 月「この月は空きがありません。」（管理画面 の「この期間に空きはありません。」は
     // ★V8 で週・月の分かれた案内へ変わった。#1203 で契約を更新）。
     expect(LIFF_SOURCE).toContain('この週は空きがありません')
     expect(LIFF_SOURCE).toContain('この月は空きがありません。')

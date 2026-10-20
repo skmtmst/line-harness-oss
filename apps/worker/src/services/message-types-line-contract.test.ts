@@ -2,9 +2,9 @@ import { describe,it,expect } from 'vitest';
 import { convertBroadcastAsset,richMessageActions,splitBroadcastText,validateFlexMessage } from '@line-crm/shared';
 import { buildMessage } from './line-message.js';
 import { buildMessage as scenarioBuild } from './step-delivery.js';
-import { parseBroadcastMessageParts,buildMessages } from './broadcast-message-set.js';
+import { parseBroadcastMessageParts,buildMessages } from '../features/broadcasts/broadcast-message-set.js';
 import { validateTemplateMessage } from './template-message-validation.js';
-import { keywordMatches } from './auto-reply.js';
+import { keywordMatches } from '../features/auto-replies/auto-reply.js';
 
 // LINE公式のnojs版で確認: imagemap 1040px・50操作、Flex 12枚・30/50KB、送信5通。
 // https://developers.line.biz/ja/reference/messaging-api/nojs/

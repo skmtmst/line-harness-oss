@@ -28,6 +28,8 @@ const fixture = vi.hoisted(() => ({
   downloadLedgerCsv: vi.fn(),
 }))
 
+// 業種読取はこの試験の対象外。元の予約状態・権限・再読込の条件を保つ。
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'standard' }, error: null, reload: vi.fn() }) }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
@@ -122,7 +124,7 @@ describe('#634 予約管理の空き枠・一覧の再読み込み', () => {
 
     render(<BookingsPage />)
 
-    // ★V7 `x63W5x`：口の生文言は出さず、一覧の場所の失敗の1枚だけ出す。
+    // ★管理画面 `x63W5x`：口の生文言は出さず、一覧の場所の失敗の1枚だけ出す。
     await waitFor(() => expect(screen.getByText('予約を読み込めませんでした')).toBeTruthy())
     expect(screen.queryByText('一覧down')).toBeNull()
     expect(screen.queryByText('まだ予約はありません')).toBeNull()

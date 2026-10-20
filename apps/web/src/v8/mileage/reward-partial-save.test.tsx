@@ -31,7 +31,7 @@ it('OPS-C01 交換テスト後の保存は同じ下書きを継続する',async(
  expect(f.create).toHaveBeenCalledTimes(1);expect(f.test).toHaveBeenCalledWith('synthetic-1','synthetic-account');
  expect(host.textContent).toContain('交換テストに合格しました');
  await click('下書きを保存');
- expect(f.create).toHaveBeenCalledTimes(1);expect(f.save).not.toHaveBeenCalled(); // B-246：変えていない保存済みの下書きは再送しない。
+ expect(f.create).toHaveBeenCalledTimes(1);expect(f.save).not.toHaveBeenCalled(); // ：変えていない保存済みの下書きは再送しない。
  expect(f.push).toHaveBeenCalled();
 });
 
@@ -43,7 +43,7 @@ it.each([null,'staff','viewer'])('役割%sでは保存・公開・交換テス�
  expect([...host.querySelectorAll('button')].some(button=>/下書きを保存|保存して出す|自分で交換をテスト/.test(button.textContent??''))).toBe(false);
  expect(f.create).not.toHaveBeenCalled();expect(f.save).not.toHaveBeenCalled();expect(f.test).not.toHaveBeenCalled();
 });
-it('B-246：公開だけ失敗したら下書きを重ねず、入力変更後は新しい版で公開する',async()=>{
+it('公開だけ失敗したら下書きを重ねず、入力変更後は新しい版で公開する',async()=>{
  const { ApiError } = await import('@/lib/api')
  f.publish.mockReset().mockRejectedValueOnce(new ApiError(500,'人工の公開失敗')).mockResolvedValue({success:true,data:{id:'synthetic-1',status:'published'}})
  f.save.mockResolvedValue({success:true,data:{id:'synthetic-1',currentDraftVersionId:'v-2',currentVersion:{id:'v-2',revision:2}}})
