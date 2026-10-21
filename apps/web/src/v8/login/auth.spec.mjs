@@ -118,20 +118,23 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
     await page.goto(path)
     const notice = page.getByRole('note').filter({ hasText: '回復コードの残りが0個です' })
     await expect(notice).toBeVisible()
-    await expect(page.locator('[data-design-shell] [data-page-template]').first()).toBeVisible()
-    const layout = await notice.evaluate(el => {
+    const frame = page.locator('[data-design-shell] [data-page-template]').first()
+    await expect(frame).toBeVisible()
+    // Account/style loading can replace the first frame. Measure the attached
+    // frame itself; an empty content wrapper is not a page-layout measurement.
+    const layout = await frame.evaluate(next => {
+      const el = [...document.querySelectorAll('#main-content > [data-design-part="notice"]')].find(node => node.textContent.includes('回復コードの残りが0個です'))
+      if (!el) throw new Error('The low-code notice is missing from the main board')
       const rect = el.getBoundingClientRect()
-      const content = document.querySelector('[data-design-shell]')
-      const next = content.querySelector('[data-page-template]') ?? content
       const text = el.querySelector('span:last-child').getBoundingClientRect()
       const painted = document.elementFromPoint(rect.x + rect.width / 2, rect.bottom - 2)
       return { gap: next.getBoundingClientRect().top - rect.bottom, textBottom: text.bottom, noticeBottom: rect.bottom, covered: !el.contains(painted), overflow: document.documentElement.scrollWidth - innerWidth }
     })
+    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`notice-${path.replace(/\W/g, '-') || 'home'}-${width}.png`) })
     expect(layout.gap).toBeGreaterThanOrEqual(0)
     expect(layout.textBottom).toBeLessThan(layout.noticeBottom)
     expect(layout.covered).toBe(false)
     expect(layout.overflow).toBe(0)
-    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`notice-${path.replace(/\W/g, '-') || 'home'}-${width}.png`) })
   }
   remaining = 8
   await page.reload()
