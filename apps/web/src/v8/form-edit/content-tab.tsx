@@ -472,7 +472,7 @@ function BookingFields({ block, refs, set, portable = false }: { block: FormInpu
   const days = booking?.daysAhead ?? 14
   const menuOptions = useMemo(() => menus.map((menu) => ({ ...menu, name: `${menu.name}・${menu.durationMinutes}分` })), [menus])
   const setBooking = (next: Partial<NonNullable<FormInputBlock['booking']>>) =>
-    set({ booking: { menuId: booking?.menuId ?? '', staffId: booking?.staffId ?? null, daysAhead: days, ...next } })
+    set({ booking: { ...booking, menuId: booking?.menuId ?? '', staffId: booking?.staffId ?? null, daysAhead: days, ...next } })
   return (
     <>
       <div className={styles.bookingRow}>
