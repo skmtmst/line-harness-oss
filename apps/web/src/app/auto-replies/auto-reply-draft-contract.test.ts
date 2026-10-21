@@ -1,127 +1,38 @@
 import { readUiSource } from '../../../scripts/test-ui-source.mjs'
-import { readApiSource } from '../../../scripts/test-api-source.mjs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { toDraft, toVersionDraft } from '@/components/auto-replies/edit-dialog'
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-const readApi = (...parts: string[]) => readApiSource(join(HERE, ...parts), 'utf8')
-const readImplementation = (...parts: string[]) => readUiSource(join(HERE, ...parts), 'utf8')
-const LIST = readImplementation('../../v8/auto-replies/list.tsx')
-const EDIT = readImplementation("../../v8/auto-replies/edit/wizard.tsx")
-const DIALOG = readImplementation('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
-
-/**
- * 編集を開いたときの中身を、1か所で作ること。
- *
- * 一覧の「編集」と `/auto-replies/edit?id=` が、それぞれ項目を並べ直して
- * いました。URL から開いたほうは曜日・アクション・キーワードの複数行・
- * 友だち条件を落としており、**開いて保存した時点でその設定が消えます。**
- *
- * 編集の窓は1つに寄せてあったのに（`edit/page.tsx` の覚え書き）、
- * **窓へ渡す中身は2つ持ったまま**で、そこが食い違っていました。
- */
-describe('自動応答の編集に渡す中身', () => {
-  it('一覧と版管理APIのどちらも同じ作り手を通す', () => {
+import { formFromSettings } from '@/v8/auto-replies/edit/wizard-model'
+import { buildWizardInput } from '@/v8/auto-replies/edit/wizard-input'
+import type { AutoReplyDraftInput } from '@line-crm/shared'
+const EDIT = readUiSource(new URL('../../v8/auto-replies/edit/wizard.tsx', import.meta.url), 'utf8')
+const LIST = readUiSource(new URL('../../v8/auto-replies/list.tsx', import.meta.url), 'utf8')
+const settings: AutoReplyDraftInput = {
+  keyword:'予約',matchType:'contains',responseType:'text',responseContent:'承りました',templateId:null,lineAccountId:'account-a',
+  activeFrom:null,activeUntil:null,cooldownMinutes:null,skipWhenOperatorActive:false,priority:2,messageKinds:null,friendConditions:null,
+  actions:null,responseWeekdays:null,responseHolidayRule:null,oncePerFriend:false,keywords:null,respondToAll:false,name:'予約変更',
+  keywordMatchMode:'any',folderId:'folder-a',internalMemo:'一次対応',replyDelaySeconds:30,unmatchedAction:{type:'notify_operator'},
+}
+describe('自動応答の設定の復元と保存',()=>{
+  it('一覧は現行編集へ進み、版管理の設定を共通の変換で復元する',()=>{
     expect(LIST).toContain('/auto-replies/edit?id=')
     expect(EDIT).toContain('formFromSettings(version.settings)')
-    expect(DIALOG).toContain('export function toDraft(')
-    expect(DIALOG).toContain('...toDraft({')
   })
-
-  it('呼ぶ側が項目を並べ直さない（また食い違うため）', () => {
+  it('呼ぶ側が個別に項目を並べ直さない',()=>{
     expect(LIST).not.toContain('keywordMatchMode: r.keywordMatchMode')
     expect(EDIT).not.toContain('keywordMatchMode: res.data.keywordMatchMode')
   })
-
-  it('社内メモを復元し、作成・更新・下書きのどの保存口でも送る（AUTOREPLY-09）', () => {
-    // 一覧・詳細の応答から編集の中身へ戻す。
-    expect(DIALOG).toContain('internalMemo: rule.internalMemo ?? null')
-    expect(DIALOG).toContain("useState(draft.internalMemo ?? '')")
-    // 保存本文に必ず載せる。新規作成・一覧の編集・URL 編集のどれでも送れる
-    // ように、共通の body へ入れる（版管理の口へだけ入れると一覧経由で消える）。
-    expect(DIALOG).toContain('internalMemo: internalMemo.trim() || null')
-    const API = readApi('..', '..', 'lib', 'api.ts')
-    expect(API).toContain('internalMemo: string | null')
-    expect(API).toContain('internalMemo?: string | null')
+  it('メモ・所属・後続処理を実際の保存本文まで引き継ぐ',()=>{
+    const form=formFromSettings(settings)
+    const input=buildWizardInput({accounts:[],form,matchedAccountId:settings.lineAccountId,selectedAccountId:null,templates:[]})
+    expect(input).toMatchObject({folderId:'folder-a',internalMemo:'一次対応',replyDelaySeconds:30,unmatchedAction:{type:'notify_operator'}})
   })
-
-  it('曜日・アクション・キーワードの複数行も落とさない', () => {
-    expect(DIALOG).toContain('responseWeekdays: rule.responseWeekdays ?? null')
-    expect(DIALOG).toContain('actions: rule.actions ?? null')
-    expect(DIALOG).toContain('keywords: rule.keywords ?? null')
-    expect(DIALOG).toContain('friendConditions: rule.friendConditions ?? null')
-    expect(DIALOG).toContain('folderId: rule.folderId ?? null')
+  it('曜日・複数キーワード・友だち条件を復元する',()=>{
+    const form=formFromSettings({...settings,responseWeekdays:[5],keywords:[{keyword:'予約',matchType:'contains'},{keyword:'変更',matchType:'contains'}],friendConditions:{operator:'AND',rules:[{type:'tag_exists',value:'tag-a'}],groups:[]}})
+    expect(form.weekdays).toEqual([5])
+    expect(form.keywordRules.map(rule=>rule.keyword)).toEqual(['予約','変更'])
+    expect(form.friendTarget).toBe('filtered')
   })
-
-  it('フォルダ内のルールを開いても未分類へ移さない', () => {
-    expect(toDraft({
-      id: 'reply-1',
-      keyword: '予約',
-      matchType: 'contains',
-      responseType: 'text',
-      responseContent: '承りました',
-      templateId: null,
-      lineAccountId: 'account-1',
-      isActive: true,
-      priority: 10,
-      folderId: 'folder-1',
-    }).folderId).toBe('folder-1')
-  })
-
-  it('版管理APIの追加設定と実測値を編集画面へ渡す', () => {
-    const draft = toVersionDraft({
-      autoReplyId: 'reply-1',
-      versionId: 'version-3',
-      versionNumber: 3,
-      status: 'draft',
-      settings: {
-        keyword: '予約',
-        matchType: 'contains',
-        responseType: 'text',
-        responseContent: '承りました',
-        templateId: null,
-        lineAccountId: 'account-1',
-        activeFrom: null,
-        activeUntil: null,
-        cooldownMinutes: null,
-        skipWhenOperatorActive: false,
-        priority: 2,
-        messageKinds: null,
-        friendConditions: null,
-        actions: null,
-        responseWeekdays: null,
-        responseHolidayRule: null,
-        oncePerFriend: false,
-        keywords: null,
-        respondToAll: false,
-        name: '予約変更',
-        keywordMatchMode: 'any',
-        folderId: null,
-        internalMemo: '一次対応',
-        replyDelaySeconds: 30,
-        unmatchedAction: { type: 'notify_operator' },
-      },
-      lastTestStatus: null,
-      lastTestedAt: null,
-      publishedAt: null,
-      matchedLast28Days: 214,
-    }, {
-      isActive: true,
-      conflictAttentionCount: 2,
-      receiveSourceCounts: [{ source: 'text', count: 5842 }],
-    })
-
-    expect(draft).toMatchObject({
-      id: 'reply-1',
-      versionNumber: 3,
-      internalMemo: '一次対応',
-      replyDelaySeconds: 30,
-      unmatchedAction: { type: 'notify_operator' },
-      matchedLast28Days: 214,
-      conflictAttentionCount: 2,
-    })
+  it('フォルダ内のルールを開いても未分類へ移さない',()=>{
+    expect(formFromSettings(settings).folderId).toBe('folder-a')
   })
 
 })

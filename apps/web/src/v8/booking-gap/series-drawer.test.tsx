@@ -76,3 +76,15 @@ test('繰り返す予約の確認中はページを閉じる前に確かめ、�
   window.dispatchEvent(after)
   expect(after.defaultPrevented).toBe(false)
 })
+
+
+test('日本と日付が違う店舗でも、表示・プレビュー・保存の曜日をそろえる', async () => {
+  const local = { ...summary, startsAt: '2026-11-04T23:00:00Z', endsAt: '2026-11-05T00:45:00Z', timeZone: 'America/New_York' }
+  render(<SeriesBookingDrawer open accountId="a1" summary={local} onClose={() => {}} onCreated={() => {}} />)
+  await screen.findByText('取れない回 2 件')
+  expect(screen.getByText('11/04（水） 18:00〜19:45')).toBeTruthy()
+  expect(preview.mock.calls[0][1].rule.weekday).toBe(3)
+  fireEvent.click(screen.getByRole('button', { name: '2 件を入れる' }))
+  await waitFor(() => expect(create).toHaveBeenCalledTimes(1))
+  expect(create.mock.calls[0][1].rule.weekday).toBe(3)
+})

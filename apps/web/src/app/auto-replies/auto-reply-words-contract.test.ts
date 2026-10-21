@@ -194,20 +194,6 @@ describe('自動応答の一覧に出す言葉（内部語の置き換え表）'
     }
   })
 
-  /**
-   * 編集画面は `auto-reply-words` の表を使う（#494 軽13で一本化）。
-   * 独自の表を持っていたら、片方だけ増えて「一覧は英語・編集は日本語」
-   * のずれが起きる。**独自表が復活したらここで落とす。**
-   */
-  it('編集画面のメッセージ種別と、一覧の言い換えがずれない', () => {
-    const EDIT = readImplementation('..', '..', 'components', 'auto-replies', 'edit-dialog.tsx')
-    expect(EDIT, '編集画面に独自の種別表が復活している').not.toContain('const MESSAGE_KIND_LABELS')
-    expect(EDIT, '編集画面が共通の表を使っていない').toContain("auto-reply-words'")
-    expect(EDIT).toContain('MESSAGE_KIND_WORDS')
-    expect(EDIT).toContain('messageKindWord')
-    expect(EDIT, '古い言い換え関数が残っている').not.toContain('messageKindLabel')
-  })
-
   it('メッセージ種別も日本語で出し、知らない値は値のまま出さない', () => {
     expect(messageKindWord('text')).toBe('テキスト')
     expect(messageKindWord('postback')).toBe('ボタンのタップ')

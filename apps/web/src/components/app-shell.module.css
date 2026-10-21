@@ -71,7 +71,8 @@
  *   で拾う。`/accounts/new` の専用シェルにはヘッダー自体が無い。
  */
 @media (max-width: 1279.98px) {
-  .side {
+  .shell {
+    /* 警告も本文も固定ヘッダーの下に置く。本文だけを下げると警告が隠れる。 */
     padding-top: var(--mobile-header-height);
   }
 

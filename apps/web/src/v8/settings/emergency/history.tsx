@@ -1,4 +1,5 @@
 'use client'
+import { useRunningVersion } from '@/lib/use-running-version'
 
 /*
  * ★V8 運用状態 更新履歴（板 ）。
@@ -95,6 +96,7 @@ export function releaseResult(deployment: Deployment | null, historyState: 'load
 }
 
 export default function UpdateHistoryV8() {
+  const runningVersion = useRunningVersion()
   const [history, setHistory] = useState<OperationHistoryEntry[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
 
@@ -115,8 +117,8 @@ export default function UpdateHistoryV8() {
   const now = Date.now()
   const recent = deployments.filter((d) => now - toTime(d.occurredAt) <= 30 * DAY)
   const recentReleases = releases.filter((r) => now - toTime(r.released) <= 30 * DAY)
-  const current = deployments.find((d) => d.phase === 'succeeded' && d.version)?.version?.replace(/^v/, '') ?? releases[0]?.version ?? null
-  const currentAt = deployments.find((d) => d.phase === 'succeeded' && d.version)?.occurredAt ?? releases[0]?.released ?? null
+  const current = runningVersion.detail?.version.replace(/^v/, '')
+  const currentAt = runningVersion.detail?.released_at
   const auto = recent.filter(isAutomatic).length
   const failed = recent.filter((d) => d.phase === 'failed' || d.phase === 'rolled_back').length
   const ready = state === 'ready'
@@ -126,7 +128,7 @@ export default function UpdateHistoryV8() {
   return (
     <div className={styles.board}>
       <KpiBand aria-label="更新の集計">
-        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} valueText={current ? `v${current}` : '—'} unit="" detail={currentAt ? `${shortWhen(currentAt)} に更新` : '更新の記録なし'} />
+        <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} valueText={current ? `v${current}` : '—'} unit="" detail={currentAt ? `${shortWhen(currentAt)} に更新` : runningVersion.statusText} />
         <KpiCard title="この30日の更新" icon={<RefreshCw size={14} />} value={ready ? Math.max(recent.length, recentReleases.length) : null} unit="回" detail={ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'} />
         <KpiCard title="失敗した更新" icon={<CircleX size={16} aria-hidden="true" />} value={ready ? failed : null} unit="回" valueTone={failed > 0 ? 'danger' : 'default'} detail="この30日" />
       </KpiBand>

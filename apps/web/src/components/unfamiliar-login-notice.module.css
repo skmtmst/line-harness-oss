@@ -1,0 +1,14 @@
+/* 長いセキュリティ警告は、狭幅で本文の下に確認リンクを置く。 */
+@media (max-width: 639px) {
+  .notice {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .notice > span:last-child {
+    grid-column: 2;
+    justify-self: start;
+    margin-left: 0;
+  }
+}

@@ -19,6 +19,7 @@ import { useStoreToday } from '@/v8/restaurant/dashboard/public/use-store-today/
 import { analyticsWindow,toAnalytics,toLayout,toToday } from './adapter'
 import { STYLE_CONFIG,rangeFromParam,tabFromParam,viewFromParam } from './config'
 import { jstToday } from './date-range'
+import { attendanceTargets, lessonRosterMembers, loadLessonBookings } from './lesson-roster-data'
 import type { IndustryStyle,StyleAlertAction,StyleAnalytics,StyleClosureInput,StyleLayout,StyleRoster,StyleRow,StyleToday } from './model'
 import { rowMenuItems } from './parts'
 import { restaurantAlert,restaurantToday } from './restaurant-today'
@@ -132,23 +133,25 @@ export function useStyleDashboard(style: IndustryStyle) {
 
   // 教室の名簿は今のイベント予約の一覧から読む（API-CONTRACT-4 §9）。
   const [roster, setRoster] = useState<StyleRoster | null>(null)
+  const [rosterRevision, setRosterRevision] = useState(0)
   const rosterRow = style === 'lesson' && data ? (rosterId === undefined ? data.rows[0] : data.rows.find((r) => r.id === rosterId)) ?? null : null
   useEffect(() => {
     if (!rosterRow?.reservationId || !accountId) { setRoster(null); return }
     let active = true
+    const controller = new AbortController()
+    setRoster(null)
     const slotId = rosterRow.id.replace(/^class:/, '')
-    void eventsApi.listBookings(accountId, rosterRow.reservationId, { slot_id: slotId, limit: 50 }).then((res) => {
+    void loadLessonBookings(accountId, rosterRow.reservationId, slotId, controller.signal).then((items) => {
       if (!active) return
-      const items = res.items ?? []
       const live = items.filter((b) => !b.cancelled_at)
       setRoster({
         rowId: rosterRow.id, head: `${rosterRow.time}${rosterRow.endTime ?? ''}・${rosterRow.sub ?? ''}`, title: rosterRow.name, pay: { label: '払い方は決済をつないでから', tone: 'neutral' },
         meta: `予約 ${live.length}・待ち ${rosterRow.waiting ?? '—'}`, payLinkCount: 0, more: items.length > 7 ? `ほか ${items.length - 7}人` : '',
-        members: items.slice(0, 7).map((b) => ({ name: b.friend_display_name ?? b.friend_name ?? '名前なし', sub: b.is_first_time ? '初めて' : b.status === 'cancelled' ? '取消' : '会員', pay: { label: '—', tone: 'neutral' }, attend: b.cancelled_at ? 'cancel' : b.status === 'attended' ? 'done' : 'button', bookingId: b.id, eventId: b.event_id })),
+        members: lessonRosterMembers(items),
       })
     }).catch(() => { if (active) setRoster(null) })
-    return () => { active = false }
-  }, [accountId, rosterRow?.id, rosterRow?.reservationId]) // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { active = false; controller.abort() }
+  }, [accountId, rosterRow?.id, rosterRow?.reservationId, rosterRevision]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // 飲食の「座席表」は今の座席の図（店の 1 枚目の図）を出す。
   useEffect(() => {
@@ -269,8 +272,9 @@ export function useStyleDashboard(style: IndustryStyle) {
     if (action.href) router.push(action.href)
   }
 
-  const attend = async (r: StyleRoster, name: string | null, status: 'attended' | 'no_show' = 'attended') => {
-    const targets = r.members.filter((m) => m.attend === 'button' && (name === null || m.name === name) && m.bookingId && m.eventId)
+  const attend = async (r: StyleRoster, bookingId: string | null, status: 'attended' | 'no_show' = 'attended') => {
+    if (busy) return
+    const targets = attendanceTargets(r, bookingId)
     setBusy('attend')
     let failedCount = 0
     for (const m of targets) {
@@ -280,6 +284,7 @@ export function useStyleDashboard(style: IndustryStyle) {
     const word = status === 'attended' ? '出席' : '欠席'
     notifyToast(failedCount ? `${failedCount}人を${word}にできませんでした。` : `${word}にしました。`, failedCount ? { tone: 'error' } : undefined)
     setRosterId(r.rowId)
+    setRosterRevision(value => value + 1)
     void load()
   }
 

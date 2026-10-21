@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import NoteBar from '@/components/shared/note-bar'
+import styles from './unfamiliar-login-notice.module.css'
 
 /**
  * V-2: いつもと違う端末・場所からのログイン帯（管理画面-30 §14）。
@@ -41,6 +42,7 @@ export default function UnfamiliarLoginNotice() {
   return (
     <NoteBar
       tone="warn"
+      className={styles.notice}
       action={
         <Link href="/staff" className="text-action whitespace-nowrap text-xs font-medium underline underline-offset-2">
           ログイン中の端末を確認する

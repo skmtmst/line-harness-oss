@@ -102,7 +102,6 @@ vi.mock('@/lib/use-feature-visibility', () => ({
 
 import AutoReplyPublishPage from '../edit/page'
 import AutoReplyListPage from '../page'
-import EditDialog from '@/components/auto-replies/edit-dialog'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -342,90 +341,4 @@ describe('m26c R556-UI: 複製の再送は同じ確認キー', () => {
   });
 });
 
-describe('m26c R570-UI: 新規作成の再送は同じ確認キー', () => {
-  async function renderNewDialog(onSaved: () => void) {
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => {
-      root.render(
-        <EditDialog
-          draft={{
-            keyword: '予約',
-            matchType: 'contains',
-            responseType: 'text',
-            responseContent: '本文',
-            templateId: null,
-            lineAccountId: 'account-a',
-            isActive: false,
-          }}
-          templates={[]}
-          onClose={() => {}}
-          onSaved={onSaved}
-        />,
-      )
-    })
-    await flush()
-  }
-
-  it('応答消失からの送り直しでも同じキーで1件に収まる', async () => {
-    const onSaved = vi.fn()
-    mocks.create.mockRejectedValueOnce(new MockApiError(500, '応答消失'))
-    mocks.create.mockResolvedValueOnce({ success: true, data: { id: 'r-new' } })
-    await renderNewDialog(onSaved)
-    await click('保存')
-    // 応答消失の素の文言が出て、窓は閉じない。
-    expect(container.textContent).toMatch(/応答消失/)
-    expect(onSaved).not.toHaveBeenCalled()
-    await click('保存')
-    expect(mocks.create).toHaveBeenCalledTimes(2)
-    const firstKey = mocks.create.mock.calls[0][1]
-    const secondKey = mocks.create.mock.calls[1][1]
-    expect(typeof firstKey).toBe('string')
-    expect(secondKey).toBe(firstKey)
-    expect(onSaved).toHaveBeenCalledTimes(1)
-  });
-});
-
-describe('m26c R551-UI: 下書き保存の競合', () => {
-  async function renderDialog() {
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => {
-      root.render(
-        <EditDialog
-          draft={{
-            id: 'r1',
-            keyword: '予約',
-            matchType: 'contains',
-            responseType: 'text',
-            responseContent: 'Bの内容',
-            templateId: null,
-            lineAccountId: 'account-a',
-            isActive: false,
-            versionNumber: 1,
-          }}
-          templates={[]}
-          onClose={() => {}}
-          onSaved={() => {}}
-        />,
-      )
-    })
-    await flush()
-  }
-
-  it('409 で先行内容との比較と読み直しの導線を出す', async () => {
-    mocks.update.mockRejectedValueOnce(
-      new MockApiError(409, 'ほかの変更が先に保存されました。最新の状態を読み直してください', 'VERSION_CONFLICT', {
-        currentVersion: 2,
-        current: { keyword: '予約', responseContent: 'Aの内容' },
-      }),
-    )
-    await renderDialog()
-    await click('保存')
-    expect(container.textContent).toMatch(/先に保存されました/)
-    expect(buttonsIn(container, '最新の状態を読み直す')).toHaveLength(1)
-    expect(container.textContent).toMatch(/Aの内容/)
-  });
-});
+// 新規保存の再送キー・409の入力保持は v8/auto-replies/edit/wizard-save.test.tsx で現行入口を確かめる。
