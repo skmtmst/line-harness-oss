@@ -12,8 +12,11 @@ vi.hoisted(() => {
 const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createTable: vi.fn(), updateTable: vi.fn(), updateReservation: vi.fn(), saveTableLayout: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const floorApi = vi.hoisted(() => ({ floors: vi.fn() }))
+const assignmentApi = vi.hoisted(() => ({ getTables: vi.fn(), saveTables: vi.fn() }))
+const location = vi.hoisted(() => ({ query: '' }))
 
-vi.mock('next/navigation',()=>({useRouter:()=>({push(){},replace(){},back(){}}),usePathname:()=>'/restaurant-test/tables',useSearchParams:()=>new URLSearchParams()}))
+vi.mock('next/navigation',()=>({useRouter:()=>({push(){},replace(){},back(){}}),usePathname:()=>'/restaurant-test/tables',useSearchParams:()=>new URLSearchParams(location.query)}))
+vi.mock('@/lib/api/helpers/booking-assignment', () => ({ bookingAssignmentApi: assignmentApi }))
 vi.mock('@/lib/api/helpers/reservation-board',()=>({reservationBoardApi:floorApi}))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
@@ -36,6 +39,10 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = 'owner'
+  location.query = ''
+  const assignment = { method: 'balanced', balancePeriod: 'day', resources: [], version: 4, storageReady: true, effectiveMethod: 'balanced' }
+  assignmentApi.getTables.mockResolvedValue({ success: true, data: assignment })
+  assignmentApi.saveTables.mockImplementation(async (_account, _store, input) => ({ success: true, data: { ...assignment, ...input, version: 5 } }))
   floorApi.floors.mockResolvedValue({ success: true, data: [] })
   fixture.snapshot.mockResolvedValue({ data: snapshotOf({ reservations: upcoming }) })
   for (const fn of [fixture.createTable, fixture.updateTable, fixture.updateReservation, fixture.saveTableLayout]) fn.mockResolvedValue({ success: true })
@@ -43,6 +50,39 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('BERxg 座席・卓管理', () => {
+  it('割り当ての最終行は本文、保存操作は別の共通下部領域へ置き、版付き保存を保つ', async () => {
+    location.query = 'view=assign'
+    const { container } = render(<TablesPage />)
+    await waitFor(() => expect(screen.getByRole('radio', { name: /ランダム/ }).hasAttribute('disabled')).toBe(false))
+    const frame = container.querySelector('[data-design-node="jmVYJ"]')!
+    const body = frame.querySelector(':scope > [data-template-region="body"]')!
+    const footer = frame.querySelector(':scope > [data-template-region="footer"]')!
+    expect(body.querySelectorAll('tbody > tr')).toHaveLength(tables.filter(table => table.is_active).length)
+    expect(body.querySelector('[data-shared-part="sticky-bar"]')).toBeNull()
+    expect(footer.contains(screen.getByRole('button', { name: /保存する/ }))).toBe(true)
+    fireEvent.click(screen.getByRole('radio', { name: /ランダム/ }))
+    fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
+    await waitFor(() => expect(assignmentApi.saveTables).toHaveBeenCalledWith('account-1', 'store-1', expect.objectContaining({ method: 'random', expectedVersion: 4 })))
+  })
+
+  it('下部領域の分離後も競合時の入力を保持し、閲覧のみでは保存欄を隠す', async () => {
+    location.query = 'view=assign'
+    assignmentApi.saveTables.mockRejectedValue({ status: 409 })
+    const view = render(<TablesPage />)
+    await waitFor(() => expect(screen.getByRole('radio', { name: /ランダム/ }).hasAttribute('disabled')).toBe(false))
+    fireEvent.click(screen.getByRole('radio', { name: /ランダム/ }))
+    fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
+    await screen.findByRole('button', { name: '違いを比べる' })
+    expect((screen.getByRole('radio', { name: /ランダム/ }) as HTMLInputElement).checked).toBe(true)
+    view.unmount()
+    role.value = 'staff'
+    const readOnly = render(<TablesPage />)
+    await screen.findByText('卓の割り当て方')
+    expect(readOnly.container.querySelector('[data-template-region="footer"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: /保存する/ })).toBeNull()
+    expect(screen.queryByRole('radio')).toBeNull()
+  })
+
   it('最小・最大人数は必須として読み上げ、空欄なら卓を作らない', async () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
