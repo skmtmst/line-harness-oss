@@ -32,7 +32,7 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
   const more = useRef<HTMLButtonElement>(null)
   const measuredContent = useRef('')
   const refreshWidths = useRef<() => void>(() => {})
-  const [fit, setFit] = useState(0)
+  const [fit, setFit] = useState(() => Math.min(items.length, maxVisible ?? items.length, 1))
   const [open, setOpen] = useState(false)
   useLayoutEffect(() => {
     const host = root.current
@@ -51,7 +51,10 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
         widths = Array.from(samples.children).map((child) => child.getBoundingClientRect().width)
         sampleWidth = samples.getBoundingClientRect().width
       }
-      const gap = parseFloat(getComputedStyle(host).columnGap) || 0
+      const style = getComputedStyle(host)
+      // The one-tag layout uses a smaller display gap; fit against the shared natural gap.
+      const naturalGap = parseFloat(style.getPropertyValue('--tpl-tag-overflow-gap'))
+      const gap = Number.isFinite(naturalGap) ? naturalGap : parseFloat(style.columnGap) || 0
       const count = fittingTagCount(widths, host.clientWidth, gap, () => more.current?.getBoundingClientRect().width ?? 0)
       const fitted = Math.min(Math.max(count, widths.length ? 1 : 0), maxVisible ?? items.length)
       // 1つも入らない狭い列でも、最初の札は省略して出す（+N だけにしない。絵 ）。

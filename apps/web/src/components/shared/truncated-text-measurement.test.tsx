@@ -74,7 +74,7 @@ it('measures tag widths and clipped names in one read phase before either change
   })
   render(<><TagOverflow><span>VIP</span><span>member</span></TagOverflow><TruncatedText value="long standalone name" /></>)
   await act(async () => { await Promise.resolve() })
-  expect(snapshots).toEqual(Array.from({ length: 3 }, () => ({ tab: null, visibleTags: 0 })))
+  expect(snapshots).toEqual(Array.from({ length: 3 }, () => ({ tab: null, visibleTags: 1 })))
   expect(screen.getByText('long standalone name').tabIndex).toBe(0)
   expect(screen.queryByRole('button', { name: /すべてのタグ/ })).toBeNull()
   expect(document.querySelector('[data-tag-overflow]')?.querySelectorAll(':scope > span:not([aria-hidden])')).toHaveLength(2)

@@ -1,10 +1,64 @@
 // @vitest-environment happy-dom
 import { act, cleanup, render, screen } from '@testing-library/react'
+import { Profiler } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import TagOverflow from './tag-overflow'
 import TagPill from './tag-pill'
 
+// Isolate TagOverflow commits from the closed dialog's own lifecycle.
+// Opening the real dialog and its actions are covered in list-row-rules.test.tsx.
+vi.mock('./dialog', () => ({ default: () => null }))
+
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
+
+it('最初の札が縮む境界幅でも、通常の8px間隔で収まる1件と+2を保つ', async () => {
+  vi.stubGlobal('ResizeObserver', undefined)
+  let available = 215
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => available)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return { width: this.tagName === 'BUTTON' ? 40 : 80, height: 20, top: 0, bottom: 20 } as DOMRect
+  })
+  const originalComputed = window.getComputedStyle.bind(window)
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+    const style = originalComputed(element)
+    return element.hasAttribute('data-tag-overflow') ? {
+      columnGap: element.querySelector(':scope > [data-shrink]') ? '6px' : '8px',
+      getPropertyValue: (name: string) => name === '--tpl-tag-overflow-gap' ? '8px' : style.getPropertyValue(name),
+    } as CSSStyleDeclaration : style
+  })
+  const { container } = render(<TagOverflow><span>VIP</span><span>会員</span><span>常連</span></TagOverflow>)
+  await act(async () => { await Promise.resolve() })
+  expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか2件）' })).toBeTruthy()
+  for (const [width, expected] of [[216, 2], [215, 1], [215, 1]]) {
+    available = width
+    await act(async () => { window.dispatchEvent(new Event('resize')); await Promise.resolve() })
+    expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(expected)
+    expect(screen.getByRole('button', { name: `すべてのタグ（ほか${3 - expected}件）` })).toBeTruthy()
+  }
+})
+
+it('狭い列の最初の1札と+2は初回だけで描き、同じ実測値で再コミットしない', async () => {
+  vi.stubGlobal('ResizeObserver', undefined)
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return { width: this.tagName === 'BUTTON' ? 40 : 80, height: 20, top: 0, bottom: 20 } as DOMRect
+  })
+  const committed = vi.fn()
+  const { container } = render(<Profiler id="tags" onRender={committed}><TagOverflow><span>VIP</span><span>会員</span><span>常連</span></TagOverflow></Profiler>)
+  await act(async () => { await Promise.resolve() })
+  expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか2件）' })).toBeTruthy()
+  expect(committed).toHaveBeenCalledOnce()
+})
+
+it.each([{ count: 0 }, { count: 3, maxVisible: 0 }, { count: 3, maxVisible: 1 }])('空・上限を守って初回を描く（$count件、上限$maxVisible）', async ({ count, maxVisible }) => {
+  vi.stubGlobal('ResizeObserver', undefined)
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(500)
+  const { container } = render(<TagOverflow maxVisible={maxVisible}>{Array.from({ length: count }, (_, i) => <span key={i}>{`タグ${i}`}</span>)}</TagOverflow>)
+  await act(async () => { await Promise.resolve() })
+  expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(Math.min(count, maxVisible ?? count))
+})
 it('サイズ通知を使えない環境でも、列幅の変更後は全件と+Nを確認できる', async () => {
   vi.stubGlobal('ResizeObserver', undefined)
   let available = 220
