@@ -92,7 +92,7 @@ function put(body: Record<string, unknown>) {
   return app().request('/api/templates/tpl-1', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ expectedVersion: 1, expectedDraftRevision: 0, ...body }),
   }, bindings);
 }
 

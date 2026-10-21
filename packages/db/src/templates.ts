@@ -283,6 +283,12 @@ export async function deleteTemplate(db: D1Database, id: string): Promise<void> 
 }
 
 export interface TemplateDraftUpdates {
+  /** 編集画面を読み込んだ時点の版。保存直前の読み直しで置き換えない。 */
+  expectedVersion?: number;
+  expectedDraftRevision?: number;
+  name?: string;
+  category?: string;
+  folderId?: string | null;
   messageBubblesJson?: string | null;
   messageType?: string;
   messageContent?: string;
@@ -310,6 +316,15 @@ export async function saveTemplateDraft(
 ): Promise<TemplateRow> {
   const current = await getTemplateById(db, id);
   if (!current) throw new Error('TEMPLATE_NOT_FOUND');
+  const expectedVersion = updates.expectedVersion ?? Number(current.published_version ?? 0);
+  const expectedDraftRevision = updates.expectedDraftRevision ?? Number(current.draft_revision ?? 0);
+  if (expectedVersion !== Number(current.published_version ?? 0)
+    || expectedDraftRevision !== Number(current.draft_revision ?? 0)) throw new Error('TEMPLATE_DRAFT_CONFLICT');
+  const metadata: string[] = [];
+  const metadataValues: unknown[] = [];
+  for (const [column, value] of [['name', updates.name], ['category', updates.category], ['folder_id', updates.folderId]] as const) {
+    if (value !== undefined) { metadata.push(`${column} = ?`); metadataValues.push(value); }
+  }
   /*
    * 差し戻し対応(要件2): 下書きがある行の draft 列 NULL は「削除した」。
    * 下書きがない行の NULL は「下書きなし」。`??` で一列ずつ落とすと、
@@ -334,12 +349,11 @@ export async function saveTemplateDraft(
   const draftQuestionStatus = updates.questionStatus
     ?? current.draft_question_status
     ?? current.question_status;
-  const expectedVersion = Number(current.published_version ?? 0);
-  const expectedDraftRevision = Number(current.draft_revision ?? 0);
   const nextDraftRevision = expectedDraftRevision + 1;
+  const savedAt = jstNow();
   const mutation = db.prepare(
     `UPDATE templates
-        SET draft_message_type = ?,
+        SET ${metadata.length ? metadata.join(', ') + ',' : ''} draft_message_type = ?,
             draft_message_content = ?,
             draft_carousel_actions_json = ?,
             draft_carousel_tap_limit_mode = ?,
@@ -352,6 +366,7 @@ export async function saveTemplateDraft(
       WHERE id = ? AND published_version = ? AND draft_revision = ?
         AND message_content IS ?`,
   ).bind(
+    ...metadataValues,
     draftMessageType,
     draftMessageContent,
     draftCarouselActionsJson,
@@ -360,7 +375,7 @@ export async function saveTemplateDraft(
     draftQuestionJson,
     draftQuestionStatus,
     updates.messageBubblesJson === undefined ? (snapshot ? current.draft_message_bubbles_json ?? null : current.message_bubbles_json ?? null) : updates.messageBubblesJson,
-    jstNow(),
+    savedAt,
     id,
     expectedVersion,
     expectedDraftRevision,
@@ -384,7 +399,24 @@ export async function saveTemplateDraft(
     },
   });
   if ((updated?.meta?.changes ?? 0) === 0) throw new Error('TEMPLATE_DRAFT_CONFLICT');
-  return (await getTemplateById(db, id))!;
+  // Return this write's version, even if another editor saves before our reply.
+  return {
+    ...current,
+    name: updates.name ?? current.name,
+    category: updates.category ?? current.category,
+    folder_id: updates.folderId === undefined ? current.folder_id : updates.folderId,
+    draft_message_type: draftMessageType,
+    draft_message_content: draftMessageContent,
+    draft_carousel_actions_json: draftCarouselActionsJson,
+    draft_carousel_tap_limit_mode: draftCarouselTapLimitMode,
+    draft_carousel_tap_limit_text: draftCarouselTapLimitText,
+    draft_question_json: draftQuestionJson,
+    draft_question_status: draftQuestionStatus,
+    draft_message_bubbles_json: updates.messageBubblesJson === undefined
+      ? (snapshot ? current.draft_message_bubbles_json ?? null : current.message_bubbles_json ?? null) : updates.messageBubblesJson,
+    draft_revision: nextDraftRevision,
+    updated_at: savedAt,
+  };
 }
 
 export interface TemplatePublishResult {
