@@ -102,9 +102,8 @@
 .toolsNote {
   margin: 0;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   color: var(--color-ink-faint);
   font-size: var(--tpl-nm-small-size);
   line-height: var(--tpl-nm-small-lh);
