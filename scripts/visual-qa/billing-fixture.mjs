@@ -25,3 +25,10 @@ export const BILLING_INVOICES = [
   { id: 'in_visual_202609', number: 'VQ-202609', status: 'paid', amountYen: 29800, currency: 'jpy', createdAt: '2026-09-01T00:00:00+09:00', description: 'スタンダード 9月分', hostedUrl: 'https://example.com/invoices/202609', pdfUrl: null },
   { id: 'in_visual_202608', number: 'VQ-202608', status: 'paid', amountYen: 29800, currency: 'jpy', createdAt: '2026-08-01T00:00:00+09:00', description: 'スタンダード 8月分', hostedUrl: 'https://example.com/invoices/202608', pdfUrl: null },
 ]
+
+export const BILLING_METRICS = {
+  period: {}, unavailable: {}, thisMonthBilledYen: 29800, contractCount: 1, contractUnit: 'organization',
+  activeAccountCount: 5, contractAccountCount: null, trialCount: 0, unpaidInvoiceCount: 1,
+  paymentFailureCount: null, nextBillingAt: '2026-11-01T00:00:00+09:00', source: 'stored_invoices',
+  observedInvoiceCount: BILLING_INVOICES.length, lastSyncedAt: null,
+}
