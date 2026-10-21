@@ -5,7 +5,7 @@ import TagOverflow from './tag-overflow'
 import TagPill from './tag-pill'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
-it('同じ寸法通知をまとめて測り、幅・タグ変更後の全件と+Nを保つ', async () => {
+it('列幅の通知では自然幅を再利用し、タグ変更後の全件と+Nを保つ', async () => {
   let available = 220
   const observers: ResizeObserverCallback[] = []
   vi.stubGlobal('ResizeObserver', class {
@@ -24,16 +24,88 @@ it('同じ寸法通知をまとめて測り、幅・タグ変更後の全件と+
   measured.mockClear()
   available = 100
   await act(async () => {
-    for (let i = 0; i < 4; i++) observers[0]([], {} as ResizeObserver)
+    const host = container.querySelector('[data-tag-overflow]')!
+    for (let i = 0; i < 4; i++) observers[0]([{ target: host } as ResizeObserverEntry], {} as ResizeObserver)
     await Promise.resolve()
   })
-  expect(measured).toHaveBeenCalledTimes(2)
+  expect(measured).not.toHaveBeenCalled()
   // 1つも入らない幅でも最初の札は省略して出し、残りを +N にする（+N だけにしない）。
   expect(screen.getByRole('button', { name: 'すべてのタグ（ほか1件）' }).textContent).toBe('+1')
   expect(container.querySelector('[data-tag-overflow]')?.textContent).toContain('VIP')
   available = 300
   rerender(<TagOverflow><TagPill name="VIP" /><TagPill name="会員" /><TagPill name="常連" /></TagOverflow>)
   await act(async () => { await Promise.resolve() })
+  expect(measured).toHaveBeenCalledTimes(3)
   expect(screen.queryByRole('button', { name: /すべてのタグ/ })).toBeNull()
   expect([...container.querySelector('[data-tag-overflow]')!.children].filter(el => el.getAttribute('aria-hidden') !== 'true').map(el => el.textContent)).toEqual(['VIP', '会員', '常連'])
+})
+
+it('見本のサイズ・フォント適用・同数のタグ変更では自然幅を更新し、解除後は測らない', async () => {
+  const observers: ResizeObserverCallback[] = []
+  const fonts = new EventTarget()
+  let fontStatus = 'loading'
+  let ready: () => void = () => {}
+  const fontReady = new Promise<void>((resolve) => { ready = resolve })
+  Object.defineProperties(fonts, { status: { get: () => fontStatus }, ready: { value: fontReady } })
+  const originalFonts = Object.getOwnPropertyDescriptor(document, 'fonts')
+  Object.defineProperty(document, 'fonts', { configurable: true, value: fonts })
+  const removeFontListener = vi.spyOn(fonts, 'removeEventListener')
+  const watched: { targets: Element[]; disconnect: ReturnType<typeof vi.fn> }[] = []
+  vi.stubGlobal('ResizeObserver', class {
+    targets: Element[] = []
+    disconnect = vi.fn()
+    constructor(callback: ResizeObserverCallback) { observers.push(callback); watched.push(this) }
+    observe(target: Element) { this.targets.push(target) }
+  })
+  let naturalWidth = 60
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(180)
+  const measured = vi.fn()
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    if (this.parentElement?.hasAttribute('data-tag-overflow-measure')) measured()
+    return { width: this.tagName === 'BUTTON' ? 40 : naturalWidth, height: 20, top: 0, bottom: 20 } as DOMRect
+  })
+  try {
+    const { container, rerender, unmount } = render(<TagOverflow><TagPill name="VIP" /><TagPill name="会員" /></TagOverflow>)
+    const flush = () => act(async () => { await Promise.resolve() })
+    await flush()
+    expect(measured).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('button', { name: /すべてのタグ/ })).toBeNull()
+    measured.mockClear()
+    naturalWidth = 100
+    await act(async () => {
+      const sample = container.querySelector('[data-tag-overflow-measure]')!
+      observers[0]([{ target: sample } as ResizeObserverEntry], {} as ResizeObserver)
+      await Promise.resolve()
+    })
+    expect(measured).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'すべてのタグ（ほか1件）' }).textContent).toBe('+1')
+    measured.mockClear()
+    naturalWidth = 60
+    await act(async () => { fontStatus = 'loaded'; ready(); await fontReady })
+    expect(measured).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('button', { name: /すべてのタグ/ })).toBeNull()
+    measured.mockClear()
+    naturalWidth = 110
+    await act(async () => { fonts.dispatchEvent(new Event('loadingdone')); await Promise.resolve() })
+    expect(measured).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'すべてのタグ（ほか1件）' }).textContent).toBe('+1')
+    measured.mockClear()
+    naturalWidth = 50
+    rerender(<TagOverflow><TagPill name="新しいタグ" /><TagPill name="再訪" /></TagOverflow>)
+    await flush()
+    expect(measured).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('button', { name: /すべてのタグ/ })).toBeNull()
+    expect(container.querySelector('[data-tag-overflow]')?.textContent).toContain('新しいタグ')
+    measured.mockClear()
+    unmount()
+    await act(async () => { fonts.dispatchEvent(new Event('loadingdone')); observers.at(-1)!([], {} as ResizeObserver); await Promise.resolve() })
+    expect(measured).not.toHaveBeenCalled()
+    const tagObservers = watched.filter((observer) => observer.targets.some((target) => target.hasAttribute('data-tag-overflow-measure')))
+    expect(tagObservers).toHaveLength(2)
+    for (const observer of tagObservers) expect(observer.disconnect).toHaveBeenCalledOnce()
+    expect(removeFontListener).toHaveBeenCalledTimes(2)
+  } finally {
+    if (originalFonts) Object.defineProperty(document, 'fonts', originalFonts)
+    else Reflect.deleteProperty(document, 'fonts')
+  }
 })

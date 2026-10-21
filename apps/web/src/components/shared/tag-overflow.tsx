@@ -52,22 +52,32 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
     const samples = measure.current
     if (!host || !samples) return
     let active = true
+    let widths: number[] | null = null
     const key = {}
     const read = () => {
       if (!active) return () => {}
-      const widths = Array.from(samples.children).map((child) => child.getBoundingClientRect().width)
+      // Only the host's available width changes when a column is resized.
+      // Keep natural tag widths until their contents, sizing or fonts change.
+      widths ??= Array.from(samples.children).map((child) => child.getBoundingClientRect().width)
       const gap = parseFloat(getComputedStyle(host).columnGap) || 0
       const count = fittingTagCount(widths, host.clientWidth, gap, () => more.current?.getBoundingClientRect().width ?? 0)
+      const fitted = Math.min(Math.max(count, widths.length ? 1 : 0), maxVisible ?? items.length)
       // 1つも入らない狭い列でも、最初の札は省略して出す（+N だけにしない。絵 ）。
-      return () => { if (active) setFit(Math.min(Math.max(count, widths.length ? 1 : 0), maxVisible ?? items.length)) }
+      return () => { if (active) setFit(fitted) }
     }
     const update = () => { if (active) scheduleMeasurement(key, read) }
+    const invalidate = () => { widths = null; update() }
     update()
-    const observer = new ResizeObserver(update)
+    const observer = new ResizeObserver((entries) => {
+      if (entries.some((entry) => entry.target === samples)) widths = null
+      update()
+    })
     observer.observe(host)
     observer.observe(samples)
-    document.fonts?.ready.then(update)
-    return () => { active = false; pendingMeasurements.delete(key); observer.disconnect() }
+    const fonts = document.fonts
+    if (fonts?.status === 'loading') void fonts.ready.then(invalidate)
+    fonts?.addEventListener('loadingdone', invalidate)
+    return () => { active = false; pendingMeasurements.delete(key); observer.disconnect(); fonts?.removeEventListener('loadingdone', invalidate) }
   }, [children, maxVisible, items.length])
   const shown = Math.min(fit, maxVisible ?? items.length, items.length)
   const rest = items.length - shown
