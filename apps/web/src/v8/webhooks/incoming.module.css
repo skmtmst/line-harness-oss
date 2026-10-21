@@ -250,16 +250,6 @@
   line-height: var(--tpl-wh-cell-lh);
 }
 
-/* 人が見つからなかった届物の小さな表。 */
-.miniWhen { width: var(--tpl-wh-mini-when); }
-.miniValue {
-  width: var(--tpl-wh-mini-value);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.miniCandidate { width: var(--tpl-wh-mini-candidate); }
-.miniOps { width: var(--tpl-wh-mini-ops); }
 .moreRow {
   display: flex;
   align-items: center;
