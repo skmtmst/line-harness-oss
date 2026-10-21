@@ -85,7 +85,7 @@ const image = (n: number, extra: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   roleBox.role = 'owner'
-  getGeneration.mockReset();runGeneration.mockReset()
+  getGeneration.mockReset();runGeneration.mockReset();createGeneration.mockReset()
   presets.mockResolvedValue({ success: true, data: { presets: [PRESET], maxCount: 4, engineReady: true, usage: { month: { used: 40, limit: 150, remaining: 110 }, today: { used: 6, limit: 30, remaining: 24 }, paused: false, pausedReason: null } } })
   getProject.mockResolvedValue({
     success: true,
@@ -126,7 +126,7 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     await flush()
     expect(host.textContent).toContain('秋のキャンペーン')
     await act(async () => { (host.querySelector('button[aria-label$="の説明"]') as HTMLButtonElement)?.click() })
-    expect(host.textContent).toContain('一斉配信の上の写真・10月。右で用途とテキストを決めて生成し')
+    expect(host.textContent).toContain('一斉配信の上の写真・10月。生成パネルで用途とテキストを決めて生成し')
     expect(host.textContent).toContain('すべて 2')
     expect(host.textContent).toContain('お気に入り 1')
     expect(host.textContent).toContain('配布済み 1')
@@ -270,6 +270,8 @@ describe('V8 バナー生成・プロジェクトの中（src/v8/hq-banners）�
     expect(host.querySelector('[aria-label="プロジェクト「秋のキャンペーン」の操作"]')).toBeNull()
     expect(buttonNamed('アーカイブ')).toBeUndefined()
     expect(host.querySelector('[aria-label="画像を生成"]')).toBeNull()
+    expect(buttonNamed('用途とテキストを設定')).toBeUndefined()
+    expect(host.querySelector('[data-has-aside]')).toBeNull()
     expect(host.querySelector('input[type="checkbox"]')).toBeNull()
     expect(host.querySelector('[aria-label="お気に入りにする"]')).toBeNull()
     act(() => { (host.querySelector('[aria-label="画像 1 を開く"]') as HTMLButtonElement).click() })
@@ -325,4 +327,41 @@ it('生成の拒否で内部の失敗文を出さず、条件を残して再試�
   expect(host.textContent).not.toContain('SELECT * FROM customers')
   expect(line.value).toBe('秋の新商品')
   expect(start.disabled).toBe(false)
+})
+
+
+it('生成設定を畳んでも同じ入力を残し、生成に渡してから条件をクリアできる', async () => {
+  createGeneration.mockRejectedValue(new Error('not available'))
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  const toggle = buttonNamed('用途とテキストを設定')!
+  expect(host.querySelector('[data-shared-part="sticky-bar"]')!.closest('[data-has-aside]')).toBeNull()
+  const aside = document.getElementById(toggle.getAttribute('aria-controls')!)!
+  const line = aside.querySelector('[aria-label="テキスト 1行目"]') as HTMLInputElement
+  act(() => toggle.click())
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  expect(aside.dataset.expanded).toBe('true')
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(line), 'value')!.set!.call(line, '2周年のキャンペーン')
+    line.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  act(() => toggle.click()); expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  act(() => toggle.click()); expect(aside.querySelector('[aria-label="テキスト 1行目"]')).toBe(line)
+  expect(line.value).toBe('2周年のキャンペーン')
+  act(() => buttonNamed('生成する（1 枚）')!.click()); await flush()
+  expect(createGeneration).toHaveBeenCalledWith('p1', expect.objectContaining({ presetKey: PRESET.key, textLines: ['2周年のキャンペーン'], count: 1 }))
+  expect(line.value).toBe('2周年のキャンペーン')
+  act(() => buttonNamed('条件をクリア')!.click()); await flush()
+  expect(line.value).toBe('')
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+})
+
+it.each(['同じ設定でもう一度生成', '参照画像にする'])('画像の詳細から%sを選ぶと、設定を開いて対象を引き継ぐ', async action => {
+  act(() => root.render(<HqBannerProjectV8 />)); await flush()
+  expect(buttonNamed('用途とテキストを設定')!.getAttribute('aria-expanded')).toBe('false')
+  act(() => (host.querySelector('[aria-label="画像 1 を開く"]') as HTMLButtonElement).click()); await flush()
+  act(() => buttonNamed(action)!.click()); await flush()
+  expect(buttonNamed('用途とテキストを設定')!.getAttribute('aria-expanded')).toBe('true')
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+  if (action === '同じ設定でもう一度生成') expect((host.querySelector('[aria-label="テキスト 1行目"]') as HTMLInputElement).value).toBe(generation.textLines[0])
+  else expect(host.querySelector('[aria-label="1を外す"]')).toBeTruthy()
 })

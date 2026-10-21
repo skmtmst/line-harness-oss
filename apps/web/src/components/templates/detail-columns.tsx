@@ -18,7 +18,7 @@ export function DetailColumns({ children, aside, asideLabel, expanded, onExpande
   presentation?: 'card' | 'notification' | 'analysis'
 }) {
   const asideId = useId()
-  return <div className={styles.detailColumns} data-detail-columns={variant} data-presentation={presentation}>
+  return <div className={styles.detailColumns} data-detail-columns={variant} data-presentation={presentation} data-has-aside={aside ? true : undefined}>
     {aside && showToggle ? <div className={styles.detailColumnToggle}>
       <Button aria-expanded={expanded} aria-controls={asideId} onClick={() => onExpandedChange(!expanded)}>{toggleLabel ?? asideLabel}</Button>
     </div> : null}

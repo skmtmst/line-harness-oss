@@ -547,3 +547,5 @@
   .detailColumns[data-detail-columns='style-dashboard'] .detailColumnAside[data-expanded] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
   .detailColumns[data-detail-columns='style-roster'] .detailColumnAside[data-expanded] { display: flex; }
 }
+
+.detailColumns:not([data-has-aside]) { grid-template-columns: minmax(0, 1fr); margin-right: 0; }
