@@ -182,7 +182,7 @@
 /* v8 の帯は 1280px 未満でも出す（畳んだ左メニューと組む）。モバイルの
    固定ヘッダー分の上余白は 1024px から要らない。 */
 @media (min-width: 1024px) and (max-width: 1279.98px) {
-  :root .side {
+  :root .shell {
     padding-top: 0;
   }
 
