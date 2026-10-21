@@ -6,6 +6,7 @@ export type { BroadcastMessagePart } from './broadcast-message-set.js';
 export { abAudience, abSettings, abStats, decideAbTests, finishMockRemainder, splitAb, startAbMock } from './broadcast-ab.js';
 export { buildMessage, guardScheduledBroadcastQuota, processBroadcastSend, processQueuedBroadcasts, processScheduledBroadcasts } from './broadcast.js';
 export { createBroadcastRetryKey } from './broadcast-retry-key.js';
+export { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from './broadcast-definition-guard.js';
 export { processBroadcastSimulation, purposeAliases, saveSimulationDraft, scheduleSimulation, simulationContext, simulationPreview } from './broadcast-simulation.js';
 export type { BroadcastPurpose } from './broadcast-simulation.js';
 export { storeBroadcastMedia } from './broadcast-media-storage.js';

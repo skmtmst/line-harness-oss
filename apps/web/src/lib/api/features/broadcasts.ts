@@ -161,10 +161,11 @@ export const broadcastsMethods = {
         fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval'] }>>(
           `/api/broadcasts/${id}/approval-request`, { method: 'POST', body: JSON.stringify(data) },
         ),
-      approve: (id: string, stepUpToken?: string) =>
+      approve: (id: string, expectedVersion: number, stepUpToken?: string) =>
         fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval']; needsSend: boolean }>>(
           `/api/broadcasts/${id}/approval-approve`, {
             method: 'POST',
+            body: JSON.stringify({ expectedVersion }),
             headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
           },
         ),

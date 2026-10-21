@@ -46,7 +46,8 @@ test('MCP-08/G9-6: 作った人も人として再確認後に承認できる。M
  expect(await rpc(c.key,'approve_broadcast',{accountId:'a',broadcastId:b.broadcastId})).toEqual({error:true});
  const human=gapApp(d,[broadcastApprovals]);const path=`/api/broadcasts/${b.broadcastId}/approval-approve`;
  expect((await human.request(path,{method:'POST'})).status).toBe(401);
- const approved=await human.request(path,{method:'POST',headers:{Authorization:'Bearer lh_session:session'}});expect(approved.status,await approved.clone().text()).toBe(200);
+ const viewed=d.raw.prepare('SELECT lock_version FROM broadcasts WHERE id=?').get(b.broadcastId) as {lock_version:number};
+ const approved=await human.request(path,{method:'POST',headers:{Authorization:'Bearer lh_session:session','Content-Type':'application/json'},body:JSON.stringify({expectedVersion:viewed.lock_version})});expect(approved.status,await approved.clone().text()).toBe(200);
  expect(d.raw.prepare("SELECT approval_status,approval_decided_by_staff_id FROM broadcasts WHERE id=?").get(b.broadcastId)).toEqual({approval_status:'approved',approval_decided_by_staff_id:'o'});
  const p=await simulationPreview(d.db,b.broadcastId);await scheduleSimulation(d.db,b.broadcastId,{expectedVersion:p.version,confirmedRecipientCount:p.recipients,testMode:true},'human-run');
  await processBroadcastSimulation(d.db,b.broadcastId,new Date(Date.now()+86400000));expect(await simulationPreview(d.db,b.broadcastId)).toMatchObject({state:'completed',sent:0});

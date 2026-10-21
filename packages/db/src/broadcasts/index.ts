@@ -361,6 +361,11 @@ export type UpdateBroadcastInput = Partial<
 > & {
   /** 運用者がsnapshotの意味を変える編集・再予約をしたときだけtrue。 */
   resetCommonVarSnapshot?: boolean;
+  /** 本文・宛先と同じCAS更新で古い承認を無効にする。 */
+  resetApproval?: boolean;
+  /** 新しい予約で本人が確認した人数。古い人数を引き継がない。 */
+  approvalConfirmedCount?: number;
+  resetDeliveryAttempt?: boolean;
 };
 
 // #772: 版を必須にし、版なし迂回を残さない。呼び元は PUT 経路だけ。
@@ -447,16 +452,31 @@ export async function updateBroadcast(
   }
 
   if (fields.length > 0) {
+    if (updates.resetApproval) {
+      fields.push("approval_status = CASE WHEN approval_status IN ('pending','approved') THEN 'none' ELSE approval_status END",
+        'approval_decided_by_staff_id = NULL', 'approval_decided_at = NULL',
+        'approval_reject_reason = NULL');
+      if (updates.approvalConfirmedCount === undefined) fields.push('approval_confirmed_count = NULL');
+    }
+    if (updates.approvalConfirmedCount !== undefined) {
+      fields.push('approval_confirmed_count = ?');
+      values.push(updates.approvalConfirmedCount);
+    }
+    if (updates.resetDeliveryAttempt) {
+      fields.push('dedup_progress = NULL', 'batch_lock_at = NULL', 'success_count = 0',
+        'failed_account_ids = NULL', 'sent_at = NULL', 'aggregation_unit = NULL', 'line_request_id = NULL');
+    }
     if (updates.resetCommonVarSnapshot) {
       // 新しい試行だけ判定時刻・値を同じCAS更新内で捨てる。provider失敗後に
       // 日時だけ入れ直す同一試行はfalseとして、固定済みsnapshotを維持する。
       fields.push('common_var_snapshot = NULL', 'common_var_snapshot_at = NULL');
     }
     fields.push('lock_version = lock_version + 1');
-    const result = await db
-      .prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ? AND lock_version = ?`)
-      .bind(...values, id, expectedVersion)
-      .run();
+    const statement = db.prepare(`UPDATE broadcasts SET ${fields.join(', ')} WHERE id = ? AND lock_version = ? AND status IN ('draft','scheduled')`)
+      .bind(...values, id, expectedVersion);
+    const result = updates.resetDeliveryAttempt
+      ? (await db.batch([statement, db.prepare('DELETE FROM broadcast_insights WHERE broadcast_id = ? AND changes() > 0').bind(id)]))[0]
+      : await statement.run();
     if (!result.meta.changes) return null;
   } else {
     const current = await getBroadcastById(db, id);
