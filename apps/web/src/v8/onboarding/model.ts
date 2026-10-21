@@ -1,7 +1,7 @@
 import type { IconKey, Choice, Question } from './question-types'
 export type { IconKey, Choice, Question } from './question-types'
 import type { StarterSetItem } from '@/lib/api/helpers/styles'
-import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
+import type { AccountStyle, SetupAnswer, StyleSelectionStatus } from '@line-crm/shared'
 import { bookingHost, styleTerm } from '@/lib/terms'
 import { Q } from './setup-questions'
 
@@ -236,7 +236,7 @@ export function needsActivation(state: StarterItemState): boolean {
 
 /* ── はじめにやること（Bdfxm） ─────────────────────────────────── */
 
-export type StyleState = { style: AccountStyle; styleSelected: boolean; styleMode?: SetupAnswer['mode']; version: number; answers: Record<string, SetupAnswer> }
+export type StyleState = StyleSelectionStatus & { style: AccountStyle; version: number; answers: Record<string, SetupAnswer> }
 export type StyleWarning = { feature: string; areaId: string; groupId: string; href?: string; customerState: 'preparing' }
 
 export type TodoRow = {

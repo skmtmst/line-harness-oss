@@ -11,6 +11,7 @@ import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-featur
 import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
+import { hasPendingStyleSelection } from '../services/style-profile.js';
 
 import { hasStaffPermission, requireRole } from '../middleware/role-guard.js';
 import {
@@ -56,6 +57,7 @@ styles.get(base, async (c) => {
     data: {
       style,
       styleSelected: !!p?.selected_at && p.selection_mode === 'configured',
+      shouldPromptStyleSelection: hasPendingStyleSelection(p),
       styleMode: p?.selection_mode ?? 'later',
       version: p?.version ?? 0,
       answers: profileAnswers(p),

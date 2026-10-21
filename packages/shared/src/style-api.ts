@@ -31,6 +31,12 @@ export type SetupAnswer = {
   value?: string | boolean;
   resourceId?: string;
 };
+/** スタイル固有の初回案内。既存の後回しを未選択へ読み替えない。 */
+export type StyleSelectionStatus = {
+  styleSelected: boolean;
+  styleMode?: SetupAnswer['mode'];
+  shouldPromptStyleSelection?: boolean;
+};
 export type StyleCard = { id: string; visible: boolean };
 export type StyleMetric = {
   value: number | null;

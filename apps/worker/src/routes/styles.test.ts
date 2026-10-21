@@ -135,6 +135,7 @@ describe('style setup', () => {
     expect(p.data).toMatchObject({
       style: 'standard',
       styleSelected: false,
+      shouldPromptStyleSelection: true,
       version: 1,
     });
     expect(
@@ -149,6 +150,17 @@ describe('style setup', () => {
         )
         .get(),
     ).toEqual({ n: 0 });
+  });
+  test('unknown legacy later stays deferred, while other answers keep a new selection pending', async () => {
+    expect((await value(await get())).data.shouldPromptStyleSelection).toBe(true);
+    expect((await write('', { expectedVersion: 1, answers: { booking: { mode: 'later' } } })).status).toBe(200);
+    expect((await value(await get())).data.shouldPromptStyleSelection).toBe(true);
+    raw.prepare("UPDATE account_styles SET answers_json=json_remove(answers_json,'$.style.selectionPending') WHERE line_account_id='a'").run();
+    expect((await value(await get())).data).toMatchObject({ styleSelected: false, styleMode: 'later', shouldPromptStyleSelection: false });
+  });
+  test.each(['standard', 'restaurant', 'salon', 'consult', 'lesson', 'ec'])('explicit %s choice clears initial selection pending', async style => {
+    expect((await write('', { expectedVersion: 1, style })).status).toBe(200);
+    expect((await value(await get())).data).toMatchObject({ style, styleSelected: true, shouldPromptStyleSelection: false });
   });
   test('deferred and manual answers do not create resources; configured sample automations stay stopped', async () => {
     let r = await write('', {
@@ -273,6 +285,7 @@ describe('style setup', () => {
         style: 'restaurant',
         styleMode: mode,
         styleSelected: false,
+        shouldPromptStyleSelection: false,
         answers: { style: { mode } },
       });
       expect(

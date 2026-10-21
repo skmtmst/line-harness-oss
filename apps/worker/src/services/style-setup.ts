@@ -10,7 +10,7 @@ import { StyleError, checkStyle, readAnswers } from './style-setup-core.js';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
 export {profile,profileAnswers,type StyleProfile} from './style-profile.js';
-import {profile,profileAnswers} from './style-profile.js';
+import {profile,profileAnswers,hasPendingStyleSelection} from './style-profile.js';
 function assertVersion(expected: unknown, actual: number) {
   if (!Number.isInteger(expected) || expected !== actual)
     throw new StyleError('version_conflict', 409);
@@ -21,6 +21,7 @@ export async function saveProfile(
   tenant: string | null,
   actor: string,
   input: Record<string, unknown>,
+  options: { initialSelectionPending?: boolean } = {},
 ) {
   const current = await profile(db, account);
   assertVersion(input.expectedVersion, current?.version ?? 0);
@@ -43,7 +44,7 @@ export async function saveProfile(
     ...submittedAnswers,
   } as Record<string, SetupAnswer>;
   const styleMode =
-    input.styleMode ??
+    options.initialSelectionPending ? 'later' : input.styleMode ??
     submittedAnswers.style?.mode ??
     (input.style !== undefined
       ? 'configured'
@@ -51,6 +52,9 @@ export async function saveProfile(
   if (!['configured', 'later', 'manual'].includes(styleMode as string))
     throw new StyleError('invalid_style_mode');
   const selected = styleMode === 'configured';
+  const explicitSelection = input.style !== undefined || input.styleMode !== undefined || submittedAnswers.style !== undefined;
+  const selectionPending = options.initialSelectionPending === true
+    || (!explicitSelection && hasPendingStyleSelection(current));
   if (
     submittedAnswers.style &&
     input.styleMode !== undefined &&
@@ -60,6 +64,7 @@ export async function saveProfile(
   answers.style = {
     mode: styleMode as SetupAnswer['mode'],
     ...(selected ? { value: style } : {}),
+    ...(selectionPending ? { selectionPending: true } : {}),
   };
   const now = new Date().toISOString(),
     version = (current?.version ?? 0) + 1;
@@ -142,7 +147,7 @@ export async function saveProfile(
     tenant,
     actor,
     input,
-    selected,
+    selected || options.initialSelectionPending === true,
     style,
     answers,
     statements,
@@ -174,6 +179,7 @@ export async function saveProfile(
     style,
     styleMode,
     styleSelected: selected,
+    shouldPromptStyleSelection: selectionPending,
     answers,
     settings,
     changedAnswers,
@@ -194,15 +200,8 @@ export async function initializeAccountStyle(
   if (selectedStyle !== undefined) {
     return saveProfile(db, account, tenant, actor, { expectedVersion: 0, style: checkStyle(selectedStyle) });
   }
-  const saved = await saveProfile(db, account, tenant, actor, {
+  return saveProfile(db, account, tenant, actor, {
     expectedVersion: 0,
     style: 'standard',
-  });
-  await db
-    .prepare(
-      `UPDATE account_styles SET selected_at=NULL,selection_mode='later',answers_json=json_set(answers_json,'$.style',json('{"mode":"later"}')) WHERE line_account_id=? AND version=1`,
-    )
-    .bind(account)
-    .run();
-  return saved;
+  }, { initialSelectionPending: true });
 }
