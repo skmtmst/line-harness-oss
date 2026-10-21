@@ -23,6 +23,7 @@ import Button from './ui/button/index.js';
 import Icon from './ui/icon.js';
 import PrivacyNote from './ui/privacy-note.js';
 import MeetingModeChoices from './meeting-mode-choices.js';
+import { ChoiceInput, FormChoiceRow } from './forms/controls.js';
 
 /**
  * 1-d 内容の確認 (★V8・)。送った中身のカード＋ご要望＋案内の帯。
@@ -37,6 +38,7 @@ export default function Confirm({
   party,
   cancelDeadlineMinutesBefore = null,
   onPolicyChange,
+  onPaymentChange,
   onBack,
   onRegisterBack,
   onSubmitted,
@@ -51,6 +53,8 @@ export default function Confirm({
   cancelDeadlineMinutesBefore?: number | null;
   /** キャンセル料の決まりがオンか（手順の帯に「お支払い」を足す）。 */
   onPolicyChange?: (enabled: boolean) => void;
+  /** 本人が選んだ先払いだけ、既存の「お支払い」の手順を出す。 */
+  onPaymentChange?: (online: boolean) => void;
   /** 日時の段へ戻る。戻るボタンは頭の「‹」にだけある（この画面には置かない）。 */
   onBack?: () => void;
   /** 頭の「‹」から呼べるよう、戻る処理を親へ渡す。 */
@@ -82,16 +86,19 @@ export default function Confirm({
   const [policyState, setPolicyState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [policyRetry, setPolicyRetry] = useState(0);
   const [policyKey, setPolicyKey] = useState('');
+  const [paymentOptions, setPaymentOptions] = useState<BookingCancellationPreview['payment']>();
+  const [paymentChoice, setPaymentChoice] = useState<{ key: string; method: 'onsite' | 'online' } | null>(null);
   const [accepted, setAccepted] = useState(false);
   const startsAt = slotStartsAtIso(slot);
   const currentPolicyKey = JSON.stringify([menu.id, staff.id, startsAt]);
   const policyReady = policyState === 'ready' && policyKey === currentPolicyKey;
   useEffect(() => {
     let alive = true;
-    setPolicyState('loading'); setPolicy(null); setAccepted(false);
+    setPolicyState('loading'); setPolicy(null); setPaymentOptions(undefined); setAccepted(false);
     void Promise.resolve().then(() => api.cancellationPreview({ menuId: menu.id, staffId: staff.id, startsAt })).then((data) => {
       if (!alive) return;
       setPolicy(data && data.enabled ? data : null);
+      setPaymentOptions(data?.payment);
       setPolicyKey(currentPolicyKey); setPolicyState('ready');
       onPolicyChange?.(Boolean(data && data.enabled));
     }).catch((e) => {
@@ -124,7 +131,17 @@ export default function Confirm({
   }, [menu.id, slot]);
   const chosenEntitlement = Array.isArray(entitlements) ? entitlements.find((e) => e.id === entitlementId) ?? null : null;
 
-  const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start, meetingMode]));
+  const paymentMode = paymentOptions?.mode ?? menu.payment_mode ?? 'none';
+  const paymentMethod = chosenEntitlement ? null : paymentMode === 'customer_choice'
+    ? paymentChoice?.key === currentPolicyKey && paymentOptions?.allowedMethods.includes(paymentChoice.method) ? paymentChoice.method : null
+    : paymentMode === 'online' || paymentMode === 'onsite' ? paymentMode : null;
+  const missingPaymentOptions = paymentMode === 'customer_choice' && !paymentOptions;
+  const missingPaymentChoice = !chosenEntitlement && paymentMode === 'customer_choice' && (!paymentMethod || missingPaymentOptions);
+  const onlinePayment = paymentMethod === 'online' && (party ? totals(party, menu).price : staff.price) > 0;
+  const immediateConfirmation = autoConfirm && !onlinePayment && !missingPaymentChoice;
+  useEffect(() => { onPaymentChange?.(onlinePayment); }, [onlinePayment, onPaymentChange]);
+
+  const request = useRequestGeneration(JSON.stringify([menu.id, staff.id, slot.date, slot.start, meetingMode, paymentMethod, chosenEntitlement?.id]));
   /* 戻る（頭の「‹」から呼ぶ）：送りかけの返事は受け取らず、日時の段へ戻る。 */
   function back() {
     request.invalidate();
@@ -136,7 +153,7 @@ export default function Confirm({
   useEffect(() => { onRegisterBack?.(() => backRef.current()); return () => onRegisterBack?.(null); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleSubmit() {
-    if (submitting || !policyReady || missingMeetingMode || (policy !== null && !accepted)) return;
+    if (submitting || !policyReady || missingMeetingMode || missingPaymentChoice || (policy !== null && !accepted)) return;
     if (party && party.size > 1) { setPreparing('2 人以上でのご予約'); return; }
     if (recurrence) { setPreparing('毎週の続けての予約'); return; }
     const generation = request.begin();
@@ -168,6 +185,7 @@ export default function Confirm({
           ...(consent ?? {}),
           ...(party && party.members[0].addonIds.length ? { addonIds: party.members[0].addonIds } : {}),
           ...(chosenEntitlement ? { entitlement_id: chosenEntitlement.id } : {}),
+          ...(!chosenEntitlement && paymentMode === 'customer_choice' && paymentMethod ? { payment_method: paymentMethod } : {}),
         },
         idemKey,
       );
@@ -180,12 +198,13 @@ export default function Confirm({
         bookingId: created.booking_id,
         status: created.status,
         payment: created.payment ?? null,
-        prepayNotice: created.prepayNotice ?? null,
+        // 本人が方法を選ぶ受付では、前払い限定の理由を完了画面にも表示しない。
+        prepayNotice: paymentMode === 'customer_choice' ? null : created.prepayNotice ?? null,
       });
     } catch (e) {
       if (!request.isCurrent(generation)) return;
       logFailure('create-request', e);
-      const err = e as { status?: number; body?: { error?: string } };
+      const err = e as { status?: number; code?: string; body?: { error?: string; code?: string } };
       if (err.status === 409 && err.body?.error === 'policy_changed') {
         setAccepted(false);
         setPolicyState('loading');
@@ -198,6 +217,9 @@ export default function Confirm({
       } else if (err.status === 409 && err.body?.error === 'slot_conflict') {
 
         setError('この時間枠は他の方の予約と重なりました。日時を選び直してください。');
+      } else if (err.status === 400 && (err.code ?? err.body?.code ?? err.body?.error) === 'payment_method_not_allowed') {
+        setPolicyState('loading'); setPolicyRetry((n) => n + 1); setPaymentChoice(null);
+        setError('お支払い方法が変わりました。もう一度確かめてから予約してください。');
       } else {
         setError('予約できませんでした。もう一度お試しください');
       }
@@ -222,7 +244,7 @@ export default function Confirm({
         <Row
           alignEnd={policy !== null}
           label="料金"
-          value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : party ? `${yen(totals(party, menu).price)}（目安・当日払う）` : policy ? bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・当日払う）`}
+          value={chosenEntitlement ? `${chosenEntitlement.name}を使う` : party ? `${yen(totals(party, menu).price)}（目安）` : policy || paymentMode === 'online' || paymentMode === 'customer_choice' ? bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode) : `${bookingPriceText(staff.price, staff.price_mode ?? menu.price_mode)}（目安・当日払う）`}
         />
         {policy?.deposit ? (
           <>
@@ -231,6 +253,19 @@ export default function Confirm({
           </>
         ) : null}
       </dl>
+      {paymentMode === 'customer_choice' && !chosenEntitlement ? (
+        <fieldset className="space-y-2">
+          <legend className="mb-2 text-sm font-bold text-ink">お支払い方法</legend>
+          {policyReady && paymentOptions ? paymentOptions.allowedMethods.map(method => <FormChoiceRow key={method} selected={paymentMethod === method}>
+            <ChoiceInput type="radio" name="payment-method" value={method} checked={paymentMethod === method} required disabled={submitting}
+              onChange={() => setPaymentChoice({ key: currentPolicyKey, method })} />
+            {method === 'online' ? 'オンラインで先に払う' : 'お店で払う'}
+          </FormChoiceRow>) : null}
+          {policyReady && missingPaymentOptions ? <p role="alert" className="text-[13px] leading-6 text-danger">
+            お支払い方法を読み込めませんでした。<Button variant="link" onClick={() => { setPolicyState('loading'); setPolicyRetry(n => n + 1); }}>もう一度</Button>
+          </p> : null}
+        </fieldset>
+      ) : null}
       {menu.recurring?.enabled && !party ? <RecurringCard menu={menu} staff={staff} startsAt={slotStartsAtIso(slot)} onChange={setRecurrence} /> : null}
       {preparing ? <PreparingOverlay title="ご予約" feature={preparing} /> : null}
       {entitlementError ? <p role="status" className="text-[13px] leading-6 text-danger">{entitlementError}</p> : null}
@@ -277,22 +312,22 @@ export default function Confirm({
       <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-[18px] text-ink">
         <Icon name="info" tone="booking-info" className="h-4 w-4 shrink-0" />
         <p>
-          {autoConfirm
+          {immediateConfirmation
             ? '送るとその場で確定します。確定のお知らせをLINEで送ります。'
             : `まだ確定ではありません。${words.contact}が確かめたら、LINEでお知らせします。`}
           {deadline != null ? `キャンセルは開始の${deadline % 60 === 0 ? `${deadline / 60}時間` : `${deadline}分`}前まで。` : 'キャンセル期限は予約の履歴で確認してください。'}
         </p>
       </div>
       )}
-      {(policy && policy.cardRequired !== false) || menu.payment_mode === 'online' ? <PaymentPreparingNote /> : null}
+      {(policy && policy.cardRequired !== false) || onlinePayment ? <PaymentPreparingNote /> : null}
       <PrivacyNote />
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
-        <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || missingMeetingMode || (policy !== null && !accepted)}>
+        <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || missingMeetingMode || missingPaymentChoice || (policy !== null && !accepted)}>
           {submitting ? '送信中...'
             : policy?.deposit ? `${yen(policy.deposit.amount)}の試験で予約する`
               : policy && policy.cardRequired !== false ? '試験のカードを登録して予約する'
-                : recurrence ? `${recurrence.made} 回分を予約する` : autoConfirm ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
+                : recurrence ? `${recurrence.made} 回分を予約する` : immediateConfirmation ? 'この内容で予約を確定する' : 'この内容で予約をリクエストする'}
         </Button>
       </BottomBar>
     </div>
