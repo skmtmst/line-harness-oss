@@ -9,6 +9,8 @@
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
 - [最初に読む：開発・運用の引き継ぎ](START-HERE.md)
+- [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
+- [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
 ## 使う人の手引き
 
