@@ -220,7 +220,8 @@ html:root .slotsEnd :has(> [data-list-page-size]) { width: max-content; min-widt
   :root .toolbar .row1 > *,
   :root .toolbar .filters > *,
   :root .toolbar .trailing { order: 0; }
-  :root .toolbar .filters { display: flex; flex: 1 1 0; min-width: 0; }
+  /* 選ぶ欄や絞り込みの実際の幅で段を決め、隣の操作と重ねない。 */
+  :root .toolbar .filters { display: flex; flex: 1 1 auto; min-width: 0; }
   :root .toolbar .row2 .trailing { margin-left: auto; }
   :root .toolbar .leading { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-toolbar-gap); }
   :root .toolbar .row1 > .search { flex: 1 1 var(--tpl-list-search-min); min-width: 0; }
