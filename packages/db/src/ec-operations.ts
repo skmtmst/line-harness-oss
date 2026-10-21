@@ -940,8 +940,6 @@ export async function getEcOrderDetail(
   const eventIds = eventRows.results.map((row) => String(row.id));
   const externalIds = eventRows.results.map((row) => String(row.external_event_id));
 
-  const placeholders = (count: number) => Array.from({ length: count }, () => '?').join(',');
-
   const actionRows = eventIds.length
     ? await db.prepare(
       `SELECT a.*, e.event_type, e.received_at, e.friend_id,
@@ -950,18 +948,18 @@ export async function getEcOrderDetail(
          FROM ec_action_executions a
          JOIN ec_events e ON e.id = a.event_id
          LEFT JOIN friends f ON f.id = e.friend_id
-        WHERE a.event_id IN (${placeholders(eventIds.length)})
+        WHERE a.event_id IN (${sqlIdSet(eventIds).sql})
         ORDER BY a.created_at ASC`,
-    ).bind(...eventIds).all<Record<string, unknown>>()
+    ).bind(...sqlIdSet(eventIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
 
   const actionIds = actionRows.results.map((row) => String(row.id));
   const attemptRows = actionIds.length
     ? await db.prepare(
       `SELECT * FROM ec_action_execution_attempts
-        WHERE action_execution_id IN (${placeholders(actionIds.length)})
+        WHERE action_execution_id IN (${sqlIdSet(actionIds).sql})
         ORDER BY action_execution_id, attempt_number`,
-    ).bind(...actionIds).all<Record<string, unknown>>()
+    ).bind(...sqlIdSet(actionIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
   const attemptsByAction = new Map<string, EcOrderDetailAttempt[]>();
   for (const row of attemptRows.results) {
@@ -980,8 +978,8 @@ export async function getEcOrderDetail(
 
   const dispatchRows = eventIds.length
     ? await db.prepare(
-      `SELECT * FROM ec_v6_dispatches WHERE event_id IN (${placeholders(eventIds.length)})`,
-    ).bind(...eventIds).all<Record<string, unknown>>()
+      `SELECT * FROM ec_v6_dispatches WHERE event_id IN (${sqlIdSet(eventIds).sql})`,
+    ).bind(...sqlIdSet(eventIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
   const dispatchesByEvent = new Map<string, EcOrderDetailDispatch[]>();
   for (const row of dispatchRows.results) {
@@ -1016,11 +1014,11 @@ export async function getEcOrderDetail(
          JOIN notification_instances i ON i.id = d.instance_id
         WHERE i.line_account_id = ?
           AND (
-            (i.audience_type = 'customer' AND i.dedupe_key IN (${placeholders(ecDedupeKeys.length)}))
-            OR (i.audience_type = 'operator' AND i.source_event_id IN (${placeholders(eventIds.length)}))
+            (i.audience_type = 'customer' AND i.dedupe_key IN (${sqlIdSet(ecDedupeKeys).sql}))
+            OR (i.audience_type = 'operator' AND i.source_event_id IN (${sqlIdSet(eventIds).sql}))
           )
         ORDER BY d.queued_at ASC, d.id ASC`,
-    ).bind(input.lineAccountId, ...ecDedupeKeys, ...eventIds).all<Record<string, unknown>>();
+    ).bind(input.lineAccountId, ...sqlIdSet(ecDedupeKeys).binds, ...sqlIdSet(eventIds).binds).all<Record<string, unknown>>();
     const eventIdByExternal = new Map(eventRows.results.map((row) => [String(row.external_event_id), String(row.id)]));
     for (const row of deliveryRows.results) {
       const audience = row.audience_type === 'operator' ? 'operator' : 'customer';
@@ -1148,22 +1146,22 @@ export async function getEcOrderDetail(
         AND json_extract(ce.metadata, '$.sourceType') = 'ec_order_confirmed'
         AND (
           CAST(json_extract(ce.metadata, '$.orderNumber') AS TEXT) = ?
-          ${externalIds.length ? `OR json_extract(ce.metadata, '$.ecEventId') IN (${placeholders(externalIds.length)})` : ''}
+          ${externalIds.length ? `OR json_extract(ce.metadata, '$.ecEventId') IN (${sqlIdSet(externalIds).sql})` : ''}
         )
       ORDER BY ce.created_at ASC`,
-  ).bind(input.lineAccountId, order.orderNumber, ...externalIds).all<Record<string, unknown>>();
+  ).bind(input.lineAccountId, order.orderNumber, ...sqlIdSet(externalIds).binds).all<Record<string, unknown>>();
 
   const mileage = externalIds.length
     ? await db.prepare(
       `SELECT ml.id, ml.entry_type, ml.amount, ml.status, ml.reason, ml.occurred_at
          FROM mileage_ledger ml
-        WHERE ml.source_event_id IN (${placeholders(externalIds.length)})
+        WHERE ml.source_event_id IN (${sqlIdSet(externalIds).sql})
            OR ml.engagement_event_id IN (
              SELECT id FROM engagement_events
-              WHERE source = 'eccube' AND source_event_id IN (${placeholders(externalIds.length)})
+              WHERE source = 'eccube' AND source_event_id IN (${sqlIdSet(externalIds).sql})
            )
         ORDER BY ml.occurred_at ASC`,
-    ).bind(...externalIds, ...externalIds).all<Record<string, unknown>>()
+    ).bind(...sqlIdSet(externalIds).binds, ...sqlIdSet(externalIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
 
   const scores = externalIds.length
@@ -1171,9 +1169,9 @@ export async function getEcOrderDetail(
       `SELECT id, score_change, reason, COALESCE(occurred_at, created_at) AS happened_at
          FROM friend_scores
         WHERE line_account_id = ? AND source = 'eccube'
-          AND source_event_id IN (${placeholders(externalIds.length)})
+          AND source_event_id IN (${sqlIdSet(externalIds).sql})
         ORDER BY happened_at ASC`,
-    ).bind(input.lineAccountId, ...externalIds).all<Record<string, unknown>>()
+    ).bind(input.lineAccountId, ...sqlIdSet(externalIds).binds).all<Record<string, unknown>>()
     : { results: [] as Record<string, unknown>[] };
 
   /*
