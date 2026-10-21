@@ -157,14 +157,14 @@ describe('V8 リッチメニュー一覧', () => {
   test('行に順番・状態の札・今月の回数が出る（集計の無い行は「—」）', async () => {
     const view = render(<RichMenusListV8 />)
     const first = (await view.findByText('通常メニュー')).closest('tr') as HTMLElement
-    expect(first.textContent).toContain('公開中')
+    expect(within(first).getByText('公開中').closest('[aria-hidden="true"]')).toBeNull()
     expect(first.textContent).toContain('12回')
     expect(first.textContent).toContain('（既定）')
     const second = view.getByText('秋のキャンペーン').closest('tr') as HTMLElement
     expect(second.textContent).toContain('10/05 公開')
     expect(second.textContent).toContain('10/05 から既定')
     expect(second.textContent).toContain('—')
-    expect(second.querySelector('[data-design-node="xRvDB"]')?.textContent).toContain('2027/10/05 公開')
+    expect(within(second).getByText('2027/10/05 公開').closest('[aria-hidden="true"]')).toBeNull()
     expect(second.closest('[data-column-sizing]')?.getAttribute('data-column-sizing')).toBe('controls')
   })
 
