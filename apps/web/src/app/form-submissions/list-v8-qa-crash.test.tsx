@@ -97,7 +97,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => currentRole.value }
 })
-vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => <a {...props}>{children}</a> }))
+vi.mock('next/link', () => ({ default: ({ children, prefetch, ...props }: React.ComponentProps<'a'> & { prefetch?: boolean | null }) => { void prefetch; return <a {...props}>{children}</a> } }))
 
 let host: HTMLDivElement
 let root: Root
