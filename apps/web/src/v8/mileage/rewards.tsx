@@ -749,9 +749,7 @@ export default function RewardsTab() {
                   <span className={styles.cellMain}>{formatMileageNumber(reward.currentVersion?.requiredMiles)}</span>
                 </Td>
                 <Td collapseAt="narrow" className={styles.colGives}>
-                  <span className={styles.cellMain}>
-                    {reward.benefitName ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」` : KIND_LABEL[reward.rewardKind]}
-                  </span>
+                  <TruncatedText className={styles.cellMain} value={reward.benefitName ? `${KIND_LABEL[reward.rewardKind]}「${reward.benefitName}」` : KIND_LABEL[reward.rewardKind]} />
                   {sub ? <span className={styles.cellSub}>{sub}</span> : null}
                 </Td>
                 <Td align="right" collapseAt="narrow" className={styles.colMonth}>
@@ -815,7 +813,7 @@ export default function RewardsTab() {
                     <span className={styles.cellMain}>届いていない</span>
                   )}
                 </Td>
-                <Td collapseAt="narrow" className={styles.colGives}><span className={styles.cellMain}>{item.failureMessage || item.failureCode || '理由を確認できませんでした'}</span></Td>
+                <Td collapseAt="narrow" className={styles.colGives}><TruncatedText className={styles.cellMain} value={item.failureMessage || item.failureCode || '理由を確認できませんでした'} /></Td>
                 <Td align="right" collapseAt="narrow" className={styles.colMonth}><span className={styles.cellMain}>{`${formatNumber(item.attemptCount)} 回`}</span></Td>
                 <Td collapseAt="narrow" className={styles.colGives}><span className={styles.cellMain}>{formatMileageDate(item.updatedAt)}</span></Td>
                 <Td className={styles.colRewardOps}>

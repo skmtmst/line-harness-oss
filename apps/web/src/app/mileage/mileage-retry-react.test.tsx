@@ -205,6 +205,7 @@ describe('届かなかった交換の欄(本物のReact)', () => {
     const text = section()?.textContent ?? ''
     expect(text).toContain('500円引き')
     expect(text).toContain('特典を渡せませんでした')
+    expect(section()?.querySelector('[data-truncated-text][title="特典を渡せませんでした"]')?.textContent).toBe('特典を渡せませんでした')
     expect(text).toContain('3 回')
     // 最終日時は日本時間で出す。UTCの01:02は10:02。
     expect(text).toContain('9月9日（水）10:02')

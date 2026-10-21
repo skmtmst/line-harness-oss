@@ -200,8 +200,8 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     await render({ type: 'tag', kind: undefined, rows: [{ ...ROWS[0], template_type: 'tag', friend_count: 64, assignment_method: '手動・自動' }] })
     expect(host.textContent).toContain('64人')
     expect(host.textContent).toContain('手動・自動')
-    await render({ type: 'rich_menu', kind: undefined, rows: [{ ...ROWS[0], template_type: 'rich_menu', display_order: 0, display_audience: '全員', tap_count: 3210 }] })
-    expect(host.textContent).toContain('全員')
+    await render({ type: 'rich_menu', kind: undefined, rows: [{ ...ROWS[0], template_type: 'rich_menu', display_order: 0, display_audience: 'タグ「ゴールド会員」', tap_count: 3210 }] })
+    expect(host.querySelector('[data-truncated-text][title="タグ「ゴールド会員」"]')?.textContent).toBe('タグ「ゴールド会員」')
     expect(host.textContent).toContain('3,210回')
   })
 

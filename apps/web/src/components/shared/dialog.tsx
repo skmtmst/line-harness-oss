@@ -138,7 +138,7 @@ export default function Dialog({
   designLayout,
   confirmFirst,
   designTop,
-  fitViewport,
+  fitViewport = true,
   designHeaderPadding,
   designHeaderHeight,
   headerAction,

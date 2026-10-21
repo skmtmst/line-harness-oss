@@ -16,6 +16,7 @@ import ComposerMedia from './message-composer-media'
 import { ErrorCountBadge } from './error-count-badge'
 import { FieldError } from './form-controls'
 import styles from './message-composer.module.css'
+import TruncatedText from './truncated-text'
 import { PageFrame } from '@/components/templates/page-frame'
 
 export function MessageComposerPage({ active, children }: { active: boolean; children: ReactNode }) { return active ? <PageFrame kind="create">{children}</PageFrame> : <>{children}</> }
@@ -116,7 +117,7 @@ export default function MessageComposer(props: MessageComposerProps) {
             : ['image', 'video', 'audio'].includes(bubble.type) ? <ComposerMedia key={`${bubble.id}-${bubble.type}-${accountId}`} bubble={bubble} accountId={accountId} disabled={busy} onBusyChange={props.onBusyChange} onChange={(content) => onChange(index, { ...bubble, content })} />
             : bubble.type === 'sticker' || bubble.type === 'location' ? <MessageKindFields kind={bubble.type as MessageKind} value={(bubble.content.state as MessageKindState) ?? emptyMessageKindState()} onChange={(state) => onChange(index, { ...bubble, content: { ...bubble.content, state } })} composer />
             : composed ? name ? <div className={styles.made}>
-                <div className={styles.thumbnail}>{bubble.type === 'carousel' ? (() => { try { return (JSON.parse(String(bubble.content.columnsJson ?? '[]')) as Array<{ title?: string; thumbnailImageUrl?: string }>).slice(0, 3).map((column, i) => <div key={i}>{column.thumbnailImageUrl ? <img src={column.thumbnailImageUrl} alt="" /> : null}<span>{column.title}</span></div>) } catch { return null } })() : <img src={String(bubble.content.imageUrl ?? bubble.content.previewImageUrl ?? '')} alt="" />}</div>
+                <div className={styles.thumbnail}>{bubble.type === 'carousel' ? (() => { try { return (JSON.parse(String(bubble.content.columnsJson ?? '[]')) as Array<{ title?: string; thumbnailImageUrl?: string }>).slice(0, 3).map((column, i) => <div key={i}>{column.thumbnailImageUrl ? <img src={column.thumbnailImageUrl} alt="" /> : null}<TruncatedText value={column.title ?? ''} /></div>) } catch { return null } })() : <img src={String(bubble.content.imageUrl ?? bubble.content.previewImageUrl ?? '')} alt="" />}</div>
                 <div className={styles.madeText}><strong>{name}</strong><small>{bubble.content.inline ? 'ここで作った' : 'テンプレートから選んだ'}</small><p>{bubble.type === 'carousel' ? (() => { try { return `カード ${JSON.parse(String(bubble.content.columnsJson ?? '[]')).length} 枚・横にめくって見られます` } catch { return 'カードを横にめくって見られます' } })() : composerLabel(bubble.type)}</p><div className={styles.actions}><Button size="composer" disabled={busy} onClick={() => onCompose(index, bubble.type as 'carousel' | 'rich_message' | 'rich_video')}><Pencil size={14} aria-hidden />開いて直す</Button><Button size="composer" disabled={busy} onClick={() => onSaveTemplate(index)}><Bookmark size={14} aria-hidden />テンプレートにする</Button></div></div>
               </div> : <>
                 <p>{`${composerLabel(bubble.type)}の作り方を選んでください`}</p>
