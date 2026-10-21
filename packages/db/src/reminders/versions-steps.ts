@@ -64,7 +64,8 @@ export async function deleteReminderStep(
     .prepare(`DELETE FROM reminder_steps WHERE id = ? AND reminder_id = ?`)
     .bind(stepId, reminderId)
     .run();
-  return (result.meta?.changes ?? 0) === 1;
+  // D1 counts cascaded rows too; the primary-key predicate limits the parent to one.
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 // --- 友だちリマインダ ---

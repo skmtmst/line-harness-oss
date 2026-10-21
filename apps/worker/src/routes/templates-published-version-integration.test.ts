@@ -28,7 +28,13 @@ function app() {
   return hono;
 }
 
-function json(method: string, path: string, body: unknown, key?: string, db = store.db) {
+async function json(method: string, path: string, body: unknown, key?: string, db = store.db) {
+  // These integration cases exercise saving from a freshly loaded editor.
+  // Explicit versions in the body still take precedence for stale-edit cases.
+  if (method === 'PUT' && path.startsWith('/api/templates/')) {
+    const row = store.raw.prepare('SELECT published_version, draft_revision FROM templates WHERE id=?').get(path.split('/').at(-1)) as {published_version:number;draft_revision:number} | undefined;
+    if (row) body = { expectedVersion: row.published_version, expectedDraftRevision: row.draft_revision, ...body as Record<string, unknown> };
+  }
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (key) headers['Idempotency-Key'] = key;
   return app().request(path, {

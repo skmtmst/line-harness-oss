@@ -3,7 +3,7 @@ import AuthCard from '@/components/auth/auth-card'
 import styles from './auth-page.module.css'
 
 /** Login confirmation and enrollment share the login card and its spacing. */
-export function AuthPage({ title, help, titleId, boardId, steps, brandName, titleAlign = 'center', layout = 'admin', children }: { title: string; help?: ReactNode; titleId?: string; boardId?: string; steps?: ReactNode; brandName?: string; titleAlign?: 'center' | 'start'; layout?: 'admin' | 'ops'; children: ReactNode }) {
+export function AuthPage({ title, help, titleId, boardId, steps, brandName, titleAlign = 'start', layout = 'admin', children }: { title: string; help?: ReactNode; titleId?: string; boardId?: string; steps?: ReactNode; brandName?: string; titleAlign?: 'center' | 'start'; layout?: 'admin' | 'ops'; children: ReactNode }) {
   return <AuthCard variant="totp" title={title} titleId={titleId} description={help} cardNode={boardId} authLayout={layout} brandName={brandName} titleAlign={titleAlign} steps={steps}>{children}</AuthCard>
 }
 

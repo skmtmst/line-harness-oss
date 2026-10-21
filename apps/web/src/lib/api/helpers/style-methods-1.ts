@@ -1,5 +1,6 @@
 import type {
   AccountStyle,
+  StyleSelectionStatus,
   SetupAnswer,
   StyleCard,
   StyleSnapshot,
@@ -26,7 +27,7 @@ export const methods1 = {
     fetchApi<Result<import('@line-crm/shared').EcStyleSummary>>(url(root + '/ec-summary', accountId, query)),
   get: (accountId: string) =>
     fetchApi<
-      Result<{
+      Result<StyleSelectionStatus & {
         style: AccountStyle;
         styleSelected: boolean;
         styleMode: SetupAnswer['mode'];
@@ -48,7 +49,7 @@ export const methods1 = {
 
   save: (accountId: string, body: StyleSelection) =>
     fetchApi<
-      Result<{
+      Result<StyleSelectionStatus & {
         style: AccountStyle;
         styleMode: SetupAnswer['mode'];
         styleSelected: boolean;

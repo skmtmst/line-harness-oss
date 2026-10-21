@@ -134,6 +134,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   usePageTitle(host ? 'テンプレート' : title)
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
   /* 自動保存と手の保存が同時に新規作成へ流れて2件できないよう、送っている途中の保存を待ってから送る。 */
+  const editVersion = useRef<{ expectedVersion: number; expectedDraftRevision: number } | null>(null)
   const inFlightRef = useRef<Promise<unknown> | null>(null)
   const autoCreatedRef = useRef(autoCreated)
   autoCreatedRef.current = autoCreated
@@ -185,10 +186,12 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     }
     void api.templates.get(id)
       .then((res) => {
+        if (generation !== templateGeneration.current) return
         if (!res.success || !isTemplateDetailData(res.data)) {
           accept((prev) => ({ ...prev, status: 'failed' }))
           return
         }
+        editVersion.current = { expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision }
         const draft = draftFromDetail(res.data)
         accept(() => ({
           requestedId: id,
@@ -285,7 +288,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
     const target = !id && made
       ? { templateId: made.id, templateStatus: 'ready' as const, templateAccountId: made.accountId, selectedAccountId }
       : binding
-    const request = saveTemplateEdit({ ...target, ...sent })
+    const request = saveTemplateEdit({ ...target, ...sent, ...editVersion.current })
     inFlightRef.current = request
     try {
       const res = await request
@@ -296,6 +299,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
 
         return null
       }
+      editVersion.current = { expectedVersion: res.expectedVersion, expectedDraftRevision: res.expectedDraftRevision }
       if (!id && !target.templateId) {
         const created = { id: res.id, accountId: selectedAccountId }
         autoCreatedRef.current = created

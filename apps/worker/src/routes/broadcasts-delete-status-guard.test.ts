@@ -22,8 +22,11 @@ function asD1(sqlite: Database.Database): D1Database {
     first: async <T>() => (sqlite.prepare(sql).get(...params) as T | undefined) ?? null,
     all: async <T>() => ({ success: true, results: sqlite.prepare(sql).all(...params) as T[], meta: {} }),
     run: async <T>() => {
-      const info = sqlite.prepare(sql).run(...params);
-      return { success: true, results: [], meta: { changes: info.changes } } as T;
+      // D1 reports total changes, including rows deleted by foreign-key cascades.
+      const totalChanges = () => (sqlite.prepare('SELECT total_changes() AS n').get() as { n: number }).n;
+      const before = totalChanges();
+      sqlite.prepare(sql).run(...params);
+      return { success: true, results: [], meta: { changes: totalChanges() - before } } as T;
     },
     raw: async () => [],
   });
@@ -118,6 +121,23 @@ describe('D026 DELETE /api/broadcasts/:id は下書き・予約だけ消す', ()
     const res = await app.request('/api/broadcasts/bc-scheduled', { method: 'DELETE' }, env);
     expect(res.status).toBe(200);
     expect(rowCount('broadcasts', 'bc-scheduled')).toBe(0);
+  });
+
+  test.each(['draft', 'scheduled'])('関連する実行記録がある %s も削除成功と返す', async (status) => {
+    const id = `bc-${status}`;
+    sqlite.prepare(`INSERT INTO broadcast_execution_contexts
+      (broadcast_id,account_id,purpose,created_via,created_by,request_key,request_fingerprint)
+      VALUES (?,'acc-1','marketing','manual','env-owner',?,'fixture')`).run(id, id);
+    sqlite.exec("INSERT INTO templates(id,name,message_type,message_content,line_account_id) VALUES ('tpl-delete-check','削除確認','text','fixture','acc-1')");
+    sqlite.prepare(`INSERT INTO template_references(id,template_id,consumer_kind,consumer_id)
+      VALUES (?,'tpl-delete-check','broadcast',?)`).run(`ref-${id}`, id);
+    const { app, env } = makeApp(db);
+    const res = await app.request(`/api/broadcasts/${id}`, { method: 'DELETE' }, env);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true });
+    expect(rowCount('broadcasts', id)).toBe(0);
+    expect(rowCount('broadcast_execution_contexts', id)).toBe(0);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM template_references WHERE consumer_id = ?').get(id)).toEqual({ n: 0 });
   });
 
   test('送信中は 409 で、配信も請求行も残る（止めるには停止を使う）', async () => {

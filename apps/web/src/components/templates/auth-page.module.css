@@ -21,8 +21,9 @@
 .form { display: flex; flex-direction: column; gap: var(--tpl-ms-otp-card-gap); }
 .stack { display: flex; flex-direction: column; gap: var(--polish-space-field); min-width: 0; }
 
-.card[data-auth-layout='admin'] { max-width: 440px; gap: var(--space-16); }
-.card[data-auth-layout='admin'] h1 { text-align: center; width: 100%; }
+.page[data-auth-layout='admin'] { flex-direction: column; gap: var(--space-16); }
+.card[data-auth-layout='admin'] { max-width: 440px; padding: var(--tpl-auth-admin-card-pad); gap: var(--space-16); }
+.card[data-auth-layout='admin'] h1 { text-align: left; width: 100%; }
 .help { color: var(--color-ink-secondary); font-size: var(--polish-text-note); line-height: var(--tpl-ms-otp-desc-lh); margin: 0; }
 
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); }
@@ -32,6 +33,7 @@
 .brand small { display: block; color: var(--color-ink-secondary); font-size: var(--text-micro); }
 
 .card[data-title-align='start'] h1 { text-align: left; }
+.card[data-title-align='center'] h1 { text-align: center; }
 
 .detailRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); min-width: 0; }
 .detailValue { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-8); min-width: 0; }

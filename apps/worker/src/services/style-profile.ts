@@ -11,6 +11,11 @@ export type StyleProfile = {
   version: number;
   updated_at: string;
 };
+export function hasPendingStyleSelection(p: StyleProfile | null): boolean {
+  if (!p || p.selected_at || p.selection_mode !== 'later') return false;
+  const answers = JSON.parse(p.answers_json) as { style?: { selectionPending?: boolean } };
+  return answers.style?.selectionPending === true;
+}
 export function profileAnswers(
   p: StyleProfile | null,
 ): Record<string, SetupAnswer> {

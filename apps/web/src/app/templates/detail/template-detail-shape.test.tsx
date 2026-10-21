@@ -48,6 +48,8 @@ vi.mock('next/link', () => ({
 
 const calls = vi.hoisted(() => ({
   templatesGet: vi.fn(),
+  selectedAccountId: null as string | null,
+  accounts: [] as Array<{ id: string; name: string }>,
 }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -60,12 +62,14 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
         ...actual.api.templates,
         get: calls.templatesGet,
         versions: async () => ({ success: true, data: [] }),
+        list: async () => ({ success: true, data: [] }),
       },
+      folders: { ...actual.api.folders, list: async () => ({ success: true, data: [] }) },
     },
   }
 })
 
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null, accounts: [], loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: calls.selectedAccountId, accounts: calls.accounts, loading: false }) }))
 
 import TemplateDetailPage from './page'
 
@@ -135,6 +139,8 @@ beforeEach(() => {
   forgetStaffIdentity(); rememberStaffIdentity({ role: 'owner' } as StaffMember);
   routing.pushed = []
   calls.templatesGet.mockReset()
+  calls.selectedAccountId = null
+  calls.accounts = []
   const store = new Map<string, string>([['lh_staff_role', 'owner']])
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => store.get(key) ?? null,
@@ -171,5 +177,36 @@ describe('D008: 形の違う詳細応答', () => {
     expect(container.querySelector('[data-token="{{name}}"]')).not.toBeNull()
     expect(byText('a', '編集する')).not.toBeNull()
     expect(container.querySelector('button[aria-label="そのほかの操作"]')).not.toBeNull()
+  })
+})
+
+describe('詳細の届き方に出す送信元', () => {
+  it('テンプレートの所属先を使い、別の選択中アカウントの名前を混ぜない', async () => {
+    calls.selectedAccountId = 'account-b'
+    calls.accounts = [{ id: 'account-a', name: '青空カフェ' }, { id: 'account-b', name: '海辺サロン' }]
+    calls.templatesGet.mockResolvedValue({ success: true, data: validDetail })
+    await mountAt('?id=tmpl-1')
+    const preview = container.querySelector('[aria-label="LINEでの見え方"]')
+    expect(preview?.textContent).toContain('青空カフェ')
+    expect(preview?.textContent).not.toContain('海辺サロン')
+  })
+
+  it('所属先を取得できないときは、別店舗や固定の店舗名を出さない', async () => {
+    calls.selectedAccountId = 'account-b'
+    calls.accounts = [{ id: 'account-b', name: '海辺サロン' }]
+    calls.templatesGet.mockResolvedValue({ success: true, data: validDetail })
+    await mountAt('?id=tmpl-1')
+    const preview = container.querySelector('[aria-label="LINEでの見え方"]')
+    expect(preview?.textContent).toContain('公式アカウント')
+    expect(preview?.textContent).not.toContain('海辺サロン')
+    expect(preview?.textContent).not.toContain('然 - NEN -')
+  })
+
+  it('所属のない旧テンプレートは、選択中の送信元で見せる', async () => {
+    calls.selectedAccountId = 'account-b'
+    calls.accounts = [{ id: 'account-b', name: '海辺サロン' }]
+    calls.templatesGet.mockResolvedValue({ success: true, data: { ...validDetail, accountId: null } })
+    await mountAt('?id=tmpl-1')
+    expect(container.querySelector('[aria-label="LINEでの見え方"]')?.textContent).toContain('海辺サロン')
   })
 })

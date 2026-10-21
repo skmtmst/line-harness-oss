@@ -80,15 +80,19 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   const closedWizardAccount = useRef<string | null>(null)
   const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
   useEffect(() => {
+    setWizardStep(null)
+    closedWizardAccount.current = null
+  }, [d.selectedAccountId])
+  useEffect(() => {
     if (setupParam === 'summary') setWizardStep('summary')
     else if (setupParam !== null && /^\d+$/.test(setupParam)) setWizardStep(Number(setupParam))
-  }, [setupParam])
+  }, [setupParam, d.selectedAccountId])
   /* まだスタイルを選んでいない（あとでも選んでいない）アカウントは、最初に入ったとき 1 問目を開く。 */
   useEffect(() => {
     const state = setup.data?.state
-    /* 「あとで」「手動」は口の styleMode に残る（別の人・別の端末でも自動では開かない）。 */
+    /* 新規の印だけで案内する。過去の曖昧な「あとで」には表示しない。 */
     if (!state || !canManage || state.styleSelected || !d.selectedAccountId || qrRequested || closedWizardAccount.current === d.selectedAccountId) return
-    if (state.styleMode === 'later' || state.styleMode === 'manual') return
+    if (state.shouldPromptStyleSelection !== true) return
     setWizardStep((current) => current ?? 0)
   }, [setup.data, canManage, d.selectedAccountId, qrRequested])
   const openSetupStep = (step: string | number) => {

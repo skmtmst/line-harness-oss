@@ -126,7 +126,10 @@ export interface TemplateDraft {
   messageContent: string
 }
 
-export interface TemplateSaveInput extends TemplateAccountBinding, TemplateDraft {}
+export interface TemplateSaveInput extends TemplateAccountBinding, TemplateDraft {
+  expectedVersion?: number
+  expectedDraftRevision?: number
+}
 
 export function validateTemplateSave(input: TemplateSaveInput): string | null {
   const guard = templateSaveGuard(input)
@@ -140,7 +143,7 @@ export function validateTemplateSave(input: TemplateSaveInput): string | null {
 }
 
 export type TemplateSaveResult =
-  | { ok: true; id: string }
+  | { ok: true; id: string; expectedVersion: number; expectedDraftRevision: number }
   | { ok: false; error: string; conflict?: boolean; fields?: Record<string, string> }
 
 /** 保存する。断る条件に当たったら API を一度も呼ばない。409 は競合として返す。 */
@@ -156,9 +159,9 @@ export async function saveTemplateEdit(input: TemplateSaveInput): Promise<Templa
   }
   try {
     const res = input.templateId
-      ? await api.templates.update(input.templateId, payload)
+      ? await api.templates.update(input.templateId, { ...payload, expectedVersion: input.expectedVersion, expectedDraftRevision: input.expectedDraftRevision })
       : await api.templates.create({ accountId: input.selectedAccountId as string, ...payload })
-    return res.success ? { ok: true, id: res.data.id } : { ok: false, error: res.error }
+    return res.success ? { ok: true, id: res.data.id, expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision } : { ok: false, error: res.error }
   } catch (e) {
     if (e instanceof ApiError && e.status === 409) return { ok: false, error: describeSaveFailure(e), conflict: true }
     return { ok: false, error: describeSaveFailure(e), fields: readSaveFieldErrors(e) }

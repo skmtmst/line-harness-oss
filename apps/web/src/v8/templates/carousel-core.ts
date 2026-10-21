@@ -190,6 +190,8 @@ export function carouselSnapshot(state: CarouselDirtyState): string {
 }
 
 export interface CarouselSaveInput {
+  expectedVersion?: number
+  expectedDraftRevision?: number
   /**
    * 保存先のテンプレート id。URL の `?id=`、またはこの画面での保存が
    * 「作成」まで済んで「postback 埋め直し」で止まったときの作成済み id。
@@ -212,6 +214,8 @@ export type CarouselSaveResult =
       ok: true
       /** ★V8「保存して公開」が直後に公開口へ渡す保存先の id。 */
       id: string
+      expectedVersion: number
+      expectedDraftRevision: number
     }
   | {
       ok: false
@@ -221,6 +225,8 @@ export type CarouselSaveResult =
        * 画面はこれを覚えて、再試行を「作成し直し」ではなく「更新」にする。
        */
       createdId?: string
+      expectedVersion?: number
+      expectedDraftRevision?: number
       tapExtraError?: string
     }
 
@@ -255,21 +261,23 @@ export async function saveCarousel(
    * 回る。通信エラー（例外）でも同じ扱いにしないと、再試行で複製される。
    */
   let createdId: string | undefined
+  let version = { expectedVersion: input.expectedVersion, expectedDraftRevision: input.expectedDraftRevision }
   const fail = (error: string): CarouselSaveResult =>
-    createdId ? { ok: false, error, createdId } : { ok: false, error }
+    createdId ? { ok: false, error, createdId, ...version } : { ok: false, error }
 
   try {
     if (input.templateId) {
       // 更新、または「作成済みへのやり直し」。id が決まっているので
       // postback の data も最初から正しく入る。
       const res = await ops.update(input.templateId, {
+        ...version,
         name: input.name.trim(),
         messageType: 'carousel',
         messageContent: buildCarouselContent(input.panels, input.templateId, input.liffId ?? null),
         folderId: input.folderId,
         ...carouselOptions,
       })
-      return res.success ? { ok: true, id: input.templateId } : fail(res.error)
+      return res.success ? { ok: true, id: input.templateId, expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision } : fail(res.error)
     }
 
     const created = await ops.create({
@@ -283,17 +291,20 @@ export async function saveCarousel(
     })
     if (!created.success) return fail(created.error)
     createdId = created.data.id
+    version = { expectedVersion: created.data.publishedVersion, expectedDraftRevision: created.data.draftRevision }
 
     // id が決まったので、postback の data を埋め直す。
     // 「押されたときに何かする」選択肢が1つも無ければ、埋め直す必要はない。
     const hasPostback = input.panels.some((p) => p.actions.some((a) => a.kind === 'action'))
     if (hasPostback) {
       const fixed = await ops.update(createdId, {
+        ...version,
         messageContent: buildCarouselContent(input.panels, createdId, input.liffId ?? null),
       })
       if (!fixed.success) return fail(fixed.error)
+      version = { expectedVersion: fixed.data.publishedVersion, expectedDraftRevision: fixed.data.draftRevision }
     }
-    return { ok: true, id: createdId }
+    return { ok: true, id: createdId, expectedVersion: version.expectedVersion!, expectedDraftRevision: version.expectedDraftRevision! }
   } catch (e) {
     return { ...fail(describeApiFailure(e, '保存')), ...(tapExtraSaveError(e) ? { tapExtraError: tapExtraSaveError(e)! } : {}) }
   }

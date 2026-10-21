@@ -182,7 +182,7 @@ export const templatesMethods = {
       folderId?: string | null
     }) =>
       fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
-        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
+        messageBubbles?: BroadcastBubble[] | null; publishedVersion: number; draftRevision: number; folderId: string | null; createdAt: string; updatedAt: string }>>(
         '/api/templates',
         { method: 'POST', body: JSON.stringify(data) },
       ),
@@ -190,6 +190,8 @@ export const templatesMethods = {
       id: string,
       data: Partial<{ name: string; category: string; messageType: string; messageContent: string;
         messageBubbles?: BroadcastBubble[] | null; question: TemplateQuestion | null; questionStatus: 'draft' | 'published' }> & {
+        expectedVersion?: number
+        expectedDraftRevision?: number
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
@@ -201,7 +203,7 @@ export const templatesMethods = {
       },
     ) =>
       fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string;
-        messageBubbles?: BroadcastBubble[] | null; folderId: string | null; createdAt: string; updatedAt: string }>>(
+        messageBubbles?: BroadcastBubble[] | null; publishedVersion: number; draftRevision: number; folderId: string | null; createdAt: string; updatedAt: string }>>(
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),

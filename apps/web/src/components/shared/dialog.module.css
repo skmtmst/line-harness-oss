@@ -482,7 +482,7 @@ html:root .panel[data-layout='inset'] > .content { padding: 0; }
 html:root .panel[data-layout='inset'] .headerContent { gap: var(--tpl-hb-dialog-head-gap); }
 html:root .panel[data-layout='inset'] .content { align-items: stretch; }
 html:root .panel[data-layout='inset'] .actions { padding: var(--space-16) 0 0; }
-.actionLead { display: flex; margin-right: auto; }
+.actionLead { display: flex; flex-wrap: wrap; gap: var(--space-8); min-width: 0; margin-right: auto; }
 
 html:root .panel[data-confirm-placement='start'] .actions {
   display: grid;

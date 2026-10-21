@@ -208,32 +208,45 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
     // 親の再描画でラベルが変わらなければ、複製・挿入・幅取得を繰り返さない。
     const measurementKey = JSON.stringify([classes, el.innerHTML, busyLabel, doneLabel, widthReserve, presentation, buttonProps.style, buttonProps.hidden])
     if (measuredLabelRef.current === measurementKey) return
-    measuredLabelRef.current = measurementKey
-    if (widthReserve === 'dynamic') el.style.width = ''
-    el.style.minWidth = ''
-    idleWidthRef.current = el.offsetWidth
-    if (widthReserve === 'idle') {
-      /*
-       * 絵が幅を決めている並び。結果の文字の分を控えず、平常時の文字で幅を決める。
-       * `busy` の間は上の min-width がこの幅を守るので、やはり跳ねない。
-       */
-      el.style.width = ''
+    const measure = () => {
+      // Responsive toolbars mount both actions; the hidden copy has no measurable width.
+      // Wait for that copy to become visible instead of caching a 21px icon-only width.
+      if (el.offsetWidth === 0) return
+      measuredLabelRef.current = measurementKey
+      if (widthReserve === 'dynamic') el.style.width = ''
+      el.style.minWidth = ''
       idleWidthRef.current = el.offsetWidth
-      return
+      if (widthReserve === 'idle') {
+        /*
+         * 絵が幅を決めている並び。結果の文字の分を控えず、平常時の文字で幅を決める。
+         * `busy` の間は上の min-width がこの幅を守るので、やはり跳ねない。
+         */
+        el.style.width = ''
+        idleWidthRef.current = el.offsetWidth
+        return
+      }
+      // いちばん長い結果の文字も最初に測る。成功した瞬間に幅が跳ねない。
+      const sample = el.cloneNode(false) as HTMLButtonElement
+      sample.removeAttribute('id')
+      sample.setAttribute('aria-hidden', 'true')
+      sample.style.cssText = 'position:absolute;visibility:hidden;width:max-content;min-width:0;pointer-events:none'
+      el.parentElement?.appendChild(sample)
+      let widest = idleWidthRef.current
+      for (const label of [busyLabel, doneLabel]) {
+        sample.textContent = label
+        widest = Math.max(widest, sample.offsetWidth + 21)
+      }
+      sample.remove()
+      el.style.width = `${widest}px`
     }
-    // いちばん長い結果の文字も最初に測る。成功した瞬間に幅が跳ねない。
-    const sample = el.cloneNode(false) as HTMLButtonElement
-    sample.removeAttribute('id')
-    sample.setAttribute('aria-hidden', 'true')
-    sample.style.cssText = 'position:absolute;visibility:hidden;width:max-content;min-width:0;pointer-events:none'
-    el.parentElement?.appendChild(sample)
-    let widest = idleWidthRef.current
-    for (const label of [busyLabel, doneLabel]) {
-      sample.textContent = label
-      widest = Math.max(widest, sample.offsetWidth + 21)
-    }
-    sample.remove()
-    el.style.width = `${widest}px`
+    measure()
+    if (measuredLabelRef.current === measurementKey || !window.ResizeObserver) return
+    const observer = new ResizeObserver(() => {
+      measure()
+      if (measuredLabelRef.current === measurementKey) observer.disconnect()
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
   })
 
   const setRefs = (el: HTMLButtonElement | null) => {

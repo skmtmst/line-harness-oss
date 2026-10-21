@@ -579,11 +579,11 @@ jobs:
         run: pnpm exec playwright test --config scripts/browser/auth-isolated.config.mjs
       - name: Verify admin security headers and auth interactions
         run: node scripts/security/browser-headers.mjs web
-      - name: Upload MFA browser failure context
-        if: failure()
+      - name: Upload MFA browser layout evidence and failure context
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: train30-mfa-browser-failure
+          name: mfa-browser-results
           path: apps/web/test-results/train30-mfa/
           retention-days: 7
       - run: pnpm --filter web verify:design

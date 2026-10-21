@@ -481,7 +481,9 @@ export async function deleteBroadcast(db: D1Database, id: string): Promise<boole
     .prepare(`DELETE FROM broadcasts WHERE id = ? AND status IN ('draft', 'scheduled')`)
     .bind(id)
     .run();
-  if ((result.meta.changes ?? 0) !== 1) return false;
+  // D1 includes cascaded execution/insight rows in this count. The primary-key
+  // predicate still limits the deletion to this one draft or scheduled parent.
+  if ((result.meta.changes ?? 0) < 1) return false;
   // 467: 消えた配信の参照を消す。
   await removeConsumerReferences(db, 'broadcast', id);
   return true;
