@@ -30,6 +30,8 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
   const root = useRef<HTMLSpanElement>(null)
   const measure = useRef<HTMLSpanElement>(null)
   const more = useRef<HTMLButtonElement>(null)
+  const measuredContent = useRef('')
+  const refreshWidths = useRef<() => void>(() => {})
   const [fit, setFit] = useState(0)
   const [open, setOpen] = useState(false)
   useLayoutEffect(() => {
@@ -38,12 +40,17 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
     if (!host || !samples) return
     let active = true
     let widths: number[] | null = null
+    let sampleWidth: number | null = null
+    measuredContent.current = samples.innerHTML
     const key = {}
     const read = () => {
       if (!active) return () => {}
       // Only the host's available width changes when a column is resized.
       // Keep natural tag widths until their contents, sizing or fonts change.
-      widths ??= Array.from(samples.children).map((child) => child.getBoundingClientRect().width)
+      if (!widths) {
+        widths = Array.from(samples.children).map((child) => child.getBoundingClientRect().width)
+        sampleWidth = samples.getBoundingClientRect().width
+      }
       const gap = parseFloat(getComputedStyle(host).columnGap) || 0
       const count = fittingTagCount(widths, host.clientWidth, gap, () => more.current?.getBoundingClientRect().width ?? 0)
       const fitted = Math.min(Math.max(count, widths.length ? 1 : 0), maxVisible ?? items.length)
@@ -52,16 +59,25 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
     }
     const update = () => { if (active) scheduleMeasurement(key, read) }
     const invalidate = () => { widths = null; update() }
+    refreshWidths.current = invalidate
     update()
     const stopObserving = observeElementResize([host, samples], (entries) => {
-      if (!entries.length || entries.some((entry) => entry.target === samples)) widths = null
+      if (!entries.length || entries.some((entry) => {
+        if (entry.target !== samples) return false
+        const width = entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect?.width
+        return width === undefined || width !== sampleWidth
+      })) widths = null
       update()
     })
     const fonts = document.fonts
     if (fonts?.status === 'loading') void fonts.ready.then(invalidate)
     fonts?.addEventListener('loadingdone', invalidate)
-    return () => { active = false; cancelMeasurement(key); stopObserving(); fonts?.removeEventListener('loadingdone', invalidate) }
-  }, [children, maxVisible, items.length])
+    return () => { active = false; refreshWidths.current = () => {}; cancelMeasurement(key); stopObserving(); fonts?.removeEventListener('loadingdone', invalidate) }
+  }, [maxVisible, items.length])
+  useLayoutEffect(() => {
+    const content = measure.current?.innerHTML ?? ''
+    if (content !== measuredContent.current) { measuredContent.current = content; refreshWidths.current() }
+  }, [children])
   const shown = Math.min(fit, maxVisible ?? items.length, items.length)
   const rest = items.length - shown
   return <>
