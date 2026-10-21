@@ -5,6 +5,7 @@ import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import {
   paymentBadges,
   paymentSummary,
+  paymentSummaryInWindow,
 } from '../features/booking/booking-payment-admin/index.js';
 import { accountFeatureIsEnabled } from '../services/feature-enforcement.js';
 import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
@@ -351,7 +352,9 @@ for (const path of [
     const payments = hasStaffPermission(c, '/booking/bookings')
       ? {
           status: 'available',
-          ...(await paymentSummary(c.env.DB, id, new Date(), 'today', staffId)),
+          ...(path === '/analytics'
+            ? { ...(await paymentSummaryInWindow(c.env.DB, id, data, staffId)), period: { from: data.from, to: data.to, timeZone: data.timeZone, dateBasis: 'payment' } }
+            : await paymentSummary(c.env.DB, id, new Date(), 'today', staffId)),
           source: '/api/booking/admin/payments',
         }
       : { status: 'forbidden' };

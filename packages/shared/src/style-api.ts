@@ -239,6 +239,8 @@ export type StyleDashboardPayments =
       expiredCount: number;
       holdMinutes: number;
       source: string;
+      /** Present when the values use the selected analytics window rather than today. */
+      period?: { from: string; to: string; timeZone: string; dateBasis: 'payment' };
     }
   | { status: 'forbidden' | 'unavailable'; reason?: string };
 

@@ -65,7 +65,14 @@ export async function paymentRecords(db: D1Database, account: string, filter: Pa
 
 /** 集計は検索・ページ・一覧の期間と独立した店の今月。入金総額と返金額は別々に数える。 */
 export async function paymentSummary(db: D1Database, account: string, now = new Date(), period: 'month' | 'today' = 'month', staffId?: string) {
-  const { from, to } = await paymentPeriod(db, account, period, now);
+  return paymentSummaryInWindow(db, account, await paymentPeriod(db, account, period, now), staffId);
+}
+
+/** Aggregate transaction dates within a validated, half-open account window. */
+export async function paymentSummaryInWindow(db: D1Database, account: string, window: { from: string; to: string }, staffId?: string) {
+  const { from, to } = window;
+  const start = Date.parse(from), end = Date.parse(to);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) throw new Error('invalid_payment_window');
   const rows = await db.prepare(`SELECT p.id,EXISTS(SELECT 1 FROM booking_payment_refunds r WHERE r.payment_id=p.id) AS has_refunds,p.amount,p.status,p.paid_at,p.updated_at,COALESCE(p.refunded_at,p.updated_at) AS refunded_at,p.created_at,b.status AS booking_status
     FROM booking_payments p LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id
     WHERE p.line_account_id=? AND (? IS NULL OR b.staff_id=?) AND (
@@ -75,22 +82,22 @@ export async function paymentSummary(db: D1Database, account: string, now = new 
     .bind(account, staffId??null, staffId??null, from, to, from, to, from, to).all<{
       id:string; has_refunds:number; amount:number; status:string; paid_at:string|null; updated_at:string; refunded_at:string; created_at:string; booking_status:string|null;
     }>();
-  const inMonth = (at: string | null) => at !== null && Date.parse(at) >= Date.parse(from) && Date.parse(at) < Date.parse(to);
+  const inWindow = (at: string | null) => at !== null && Date.parse(at) >= start && Date.parse(at) < end;
   const summary = { paidAmount:0, paidCount:0, refundedAmount:0, refundedCount:0, expiredCount:0, pendingCount:0,
     holdMinutes:(await getBookingPaymentConfig(db, account)).holdMinutes };
   const ledger = await db.prepare(`SELECT r.payment_id,r.amount,r.created_at FROM booking_payment_refunds r LEFT JOIN booking_payments p ON p.id=r.payment_id LEFT JOIN bookings b ON b.id=p.booking_id AND b.line_account_id=p.line_account_id WHERE r.line_account_id=? AND (? IS NULL OR b.staff_id=?) AND julianday(r.created_at)>=julianday(?) AND julianday(r.created_at)<julianday(?)`)
     .bind(account,staffId??null,staffId??null,from,to).all<{payment_id:string;amount:number;created_at:string}>();
   const refundedPayments = new Set<string>();
-  for (const row of ledger.results) if (inMonth(row.created_at)) {
+  for (const row of ledger.results) if (inWindow(row.created_at)) {
     summary.refundedAmount+=row.amount; refundedPayments.add(row.payment_id);
   }
   summary.refundedCount=refundedPayments.size;
   for (const row of rows.results) {
-    if (['paid','refunded'].includes(row.status) && inMonth(row.paid_at)) { summary.paidAmount += row.amount; summary.paidCount++; }
+    if (['paid','refunded'].includes(row.status) && inWindow(row.paid_at)) { summary.paidAmount += row.amount; summary.paidCount++; }
     // 移行前の返金は元のupdated_atを使う。新規返金は固定した返金日時を使う。
-    if (row.status==='refunded' && !row.has_refunds && inMonth(row.refunded_at)) { summary.refundedAmount+=row.amount; summary.refundedCount++; }
-    if (row.status==='expired' && row.booking_status==='expired' && inMonth(row.updated_at)) summary.expiredCount++;
-    if (['unpaid','pending'].includes(row.status) && inMonth(row.created_at)) summary.pendingCount++;
+    if (row.status==='refunded' && !row.has_refunds && inWindow(row.refunded_at)) { summary.refundedAmount+=row.amount; summary.refundedCount++; }
+    if (row.status==='expired' && row.booking_status==='expired' && inWindow(row.updated_at)) summary.expiredCount++;
+    if (['unpaid','pending'].includes(row.status) && inWindow(row.created_at)) summary.pendingCount++;
   }
   return summary;
 }
