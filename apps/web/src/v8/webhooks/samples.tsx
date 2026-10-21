@@ -12,6 +12,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useStaffRole } from '@/lib/staff-role'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
+import TruncatedText from '@/components/shared/truncated-text'
 import {
   ViewerBand,
   WEBHOOKS_DESCRIPTION,
@@ -82,7 +83,7 @@ export default function WebhooksSamplesV8() {
               <li key={sample.value} className={styles.card}>
                 <div className={styles.cardHead}>
                   <sample.icon size={16} aria-hidden="true" />
-                  <span>{sample.label}</span>
+                  <TruncatedText value={sample.label} />
                 </div>
                 <p className={styles.cardDesc}>{sample.hint}</p>
                 <span className={styles.cardSpacer} aria-hidden="true" />
@@ -101,14 +102,14 @@ export default function WebhooksSamplesV8() {
           <ul className={styles.cards} data-cols="4">
             {OUTGOING_SAMPLES.map((sample) => (
               <li key={sample.event} className={styles.card}>
-                <div className={styles.cardHead}><span>{sample.when}</span></div>
+                <div className={styles.cardHead}><TruncatedText value={sample.when} /></div>
                 <dl className={styles.meta}>
                   <dt>送るもの</dt>
-                  <dd>{sample.payload}</dd>
+                  <dd><TruncatedText value={sample.payload} /></dd>
                 </dl>
                 <dl className={styles.meta}>
                   <dt>名前</dt>
-                  <dd className={styles.code}>{sample.event}</dd>
+                  <dd className={styles.code}><TruncatedText value={sample.event} /></dd>
                 </dl>
                 <span className={styles.cardSpacer} aria-hidden="true" />
                 {canManage
