@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { Profiler } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { TableBody } from './table-body'
 
@@ -24,6 +25,36 @@ const setup = () => {
   })
 }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
+
+it('見積もりと同じ初回実測では表を再コミットせず、後の先頭行変更でも測定済みの高さを保つ', async () => {
+  setup()
+  const committed = vi.fn()
+  const { container } = render(<table><Profiler id="table" onRender={committed}>
+    <TableBody items={items} itemKey={keys} colSpan={1} renderRow={row} />
+  </Profiler></table>)
+  await waitFor(() => expect(container.querySelectorAll('[data-table-index]').length).toBeLessThan(20))
+  const initial = [container.querySelector('[data-table-index="0"]')!, container.querySelector('[data-table-index="1"]')!]
+  const before = committed.mock.calls.length
+  act(() => callbacks[0]?.(initial.map(target => ({ target, borderBoxSize: [{ blockSize: 58, inlineSize: 100 }] })) as unknown as ResizeObserverEntry[], {} as ResizeObserver))
+  expect(committed).toHaveBeenCalledTimes(before)
+
+  // This row must stay at its real 58px when the first row changes the estimate.
+  const first = container.querySelector('[data-table-index="0"]')!
+  act(() => callbacks[0]?.([{ target: first, borderBoxSize: [{ blockSize: 83, inlineSize: 100 }] }] as unknown as ResizeObserverEntry[], {} as ResizeObserver))
+  await waitFor(() => {
+    const spacers = [...container.querySelectorAll<HTMLElement>('tr[aria-hidden="true"] td')].reduce((sum, cell) => sum + parseFloat(cell.style.height), 0)
+    const mounted = [...container.querySelectorAll<HTMLElement>('[data-table-index]')].reduce((sum, element) => sum + (element.dataset.tableIndex === '1' ? 58 : 83), 0)
+    expect(spacers + mounted).toBe(1999 * 83 + 58)
+  })
+  expect(committed.mock.calls.length).toBeGreaterThan(before)
+
+  // Once row 1 leaves the window its measured height still belongs in the spacer.
+  top = -1900 * 83
+  fireEvent.scroll(window)
+  await screen.findByText('行1900')
+  const spacers = [...container.querySelectorAll<HTMLElement>('tr[aria-hidden="true"] td')].reduce((sum, cell) => sum + parseFloat(cell.style.height), 0)
+  expect(spacers + container.querySelectorAll('[data-table-index]').length * 83).toBe(1999 * 83 + 58)
+})
 
 it('2,000件を保持し、見える行だけを呼び出す。最後へのスクロールと選択も動く', async () => {
   setup()
@@ -80,6 +111,21 @@ it('狭い幅で補助列を畳んだら、詰め物の列数も減らして名�
     <td>名前{item}</td><td style={{ display: 'none' }}>補助</td><td><button>操作</button></td>
   </tr>} /></table>)
   await waitFor(() => expect(container.querySelector<HTMLTableCellElement>('tr[aria-hidden="true"] td')?.colSpan).toBe(2))
+})
+
+it('高さが同じ幅だけの実測変更でも、畳まれた列を読み直す', async () => {
+  setup()
+  const { container } = render(<table><TableBody items={items} itemKey={keys} colSpan={2} estimatedRowHeight={59} renderRow={(item) => <tr>
+    <td>名前{item}</td><td>補助</td>
+  </tr>} /></table>)
+  await waitFor(() => expect(container.querySelectorAll('[data-table-index]').length).toBeLessThan(20))
+  const first = container.querySelector<HTMLTableRowElement>('[data-table-index]')!
+  const notify = (width: number) => act(() => callbacks[0]?.([{ target: first, borderBoxSize: [{ blockSize: 59, inlineSize: width }] }] as unknown as ResizeObserverEntry[], {} as ResizeObserver))
+  notify(100)
+  first.cells[1].style.display = 'none'
+  notify(60)
+  await waitFor(() => expect(container.querySelector<HTMLTableCellElement>('tr[aria-hidden="true"] td')?.colSpan).toBe(1))
+  expect(observers).toHaveLength(1)
 })
 
 it('高さや窓だけが変わっても残る行を作り直さず、データ・選択の更新は描く', async () => {

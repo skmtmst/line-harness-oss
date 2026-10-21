@@ -37,7 +37,7 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
   const virtual = items.length > threshold
   const keys = useMemo(() => items.map(itemKey), [items, itemKey])
   const offsets = useMemo(() => {
-    // ResizeObserver advances the revision when the measured-height cache changes.
+    // ResizeObserver advances the revision only when effective row offsets change.
     void revision
     const values = [0]
     for (const key of keys) values.push(values[values.length - 1] + (heights.current.get(key) ?? estimate.current))
@@ -136,6 +136,7 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
     document.addEventListener('focusout', schedule)
     const observer = new ResizeObserver((entries) => {
       let changed = false
+      let geometryChanged = false
       for (const entry of entries) {
         const row = entry.target as HTMLTableRowElement
         const index = Number(row.dataset.tableIndex)
@@ -149,14 +150,17 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
         if (previousWidth !== undefined && previousWidth !== width) structureDirty = true
         const key = model.current.keys[index]
         if (key !== undefined && height > 0 && heights.current.get(key) !== height) {
+          geometryChanged ||= (heights.current.get(key) ?? estimate.current) !== height
           heights.current.set(key, height)
           changed = true
         }
       }
       if (changed) {
         // Use the measured first row for unseen rows, while keeping measured variable heights.
-        estimate.current = heights.current.get(model.current.keys[0]) ?? estimate.current
-        setRevision((value) => value + 1)
+        const nextEstimate = heights.current.get(model.current.keys[0]) ?? estimate.current
+        geometryChanged ||= nextEstimate !== estimate.current
+        estimate.current = nextEstimate
+        if (geometryChanged) setRevision((value) => value + 1)
       }
       schedule()
     })
