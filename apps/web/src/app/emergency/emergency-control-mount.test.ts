@@ -11,7 +11,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-a' }) }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner', useStaffIdentity: () => ({ role: 'owner', readOnly: false }) }))
 vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))
 type PreviewPayload = {
   control: OperationControl

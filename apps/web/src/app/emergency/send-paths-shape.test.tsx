@@ -30,7 +30,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner', useStaffIdentity: () => ({ role: 'owner', readOnly: false }) }))
 vi.mock('@/components/shared/page-header', () => ({ default: () => null }))
 vi.mock('@/lib/api', () => ({
   ApiError: class extends Error {
