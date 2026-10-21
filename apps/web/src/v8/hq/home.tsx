@@ -554,7 +554,7 @@ export default function HqHomeV8() {
           })}
         </div>
       ) : (
-        <DataTable aria-label="アカウントの一覧">
+        <DataTable aria-label="アカウントの一覧" columnWeights={[3, 1.5, 1, 1, 1.25, 0.5]}>
           <thead><TableHeadRow>
             <Th>アカウント</Th>
             <Th>接続</Th>
@@ -568,7 +568,7 @@ export default function HqHomeV8() {
             const name = account.displayName || account.name
             return (
               <Tr key={account.id}>
-                <PersonCell avatarName={brandInitial(tenantName || name)} avatarSize={32} name={
+                <PersonCell avatarName={brandInitial(tenantName || name)} avatarSize={32} nameTitle={[name, state.label, accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))].filter(Boolean).join(' / ')} name={
                   <span className={styles.cardName}>
                     <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'}>{state.label}</StatusBadge>}>
                       <TruncatedText className={styles.name} value={String(name ?? '')} />
