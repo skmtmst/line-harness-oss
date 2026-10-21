@@ -13,8 +13,8 @@ export function paymentAnalytics(snapshot: StyleSnapshot, tabs: StyleAnalytics['
   const availability: StyleAnalytics['availability'] = payment?.status === 'forbidden'
     ? { kind: 'forbidden', description: '支払いの記録を表示する権限がありません。' }
     : payment?.status === 'unavailable'
-      ? { kind: 'unavailable', description: 'このアカウントの支払い集計は利用できません。0件としては扱いません。' }
-      : !matches ? { kind: 'unmeasured', description: '選択した期間の支払い集計はまだ取得できていません。0件としては扱いません。' } : undefined
+      ? { kind: 'unavailable', description: 'このアカウントの支払い集計は利用できません。' }
+      : !matches ? { kind: 'unmeasured', description: '選択した期間の支払い集計はまだ取得できていません。' } : undefined
   const definitions = [
     ['paidAmount', '入金額', '入金した日が期間内の金額です。返金額を差し引く前の金額です。', true],
     ['paidCount', '入金件数', '入金した日が期間内の支払いの件数です。', false],

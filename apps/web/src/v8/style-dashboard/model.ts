@@ -145,7 +145,7 @@ export interface StyleAnalytics {
   tabs: { id: string; label: string }[]
   tab: string
   cards: { id: string; title: string; valueText: string; unit?: string; delta?: { text: string; tone: 'up' | 'down' } | null; help: string }[]
-  chart: { title: string; help: string; ticks: string[]; axis: string[]; points: { label: string; now: number; prev: number }[]; max: number } | null
+  chart: { title: string; help: string; ticks: string[]; axis: string[]; points: { label: string; now: number | null; prev: number | null; previousLabel?: string }[]; max: number; emptyMessage?: string } | null
   table: { title: string; help: string; link?: { label: string; href: string } | null; columns: { label: string; align?: 'right' }[]; rows: { id: string; name: string; sub: string; cells: StyleAnalyticsCell[] }[]; note?: string } | null
   availability?: { kind: 'forbidden' | 'unavailable' | 'unmeasured'; description: string }
   side: (StyleSideCard & { bars?: { label: string; value: string; ratio: number }[]; split?: { ratio: number }; note?: string })[]

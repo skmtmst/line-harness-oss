@@ -1,7 +1,8 @@
 import { formatYen as yen } from '@line-crm/shared';
 import { styleTerm, term } from '@/lib/terms'
 import { paymentAnalytics } from './analytics-payments'
-import type { StyleBooking, StyleCard, StyleMetric, StyleSchedule, StyleScheduleEntry, StyleSnapshot } from '@line-crm/shared'
+import { dailyAnalyticsChart } from './analytics-daily'
+import type { StyleAnalyticsData, StyleBooking, StyleCard, StyleMetric, StyleSchedule, StyleScheduleEntry, StyleSnapshot } from '@line-crm/shared'
 import type {
   DashboardRange, IndustryStyle, StyleAnalytics, StyleBadge, StyleBoard, StyleKpi, StyleLayout, StyleMonth, StyleMonthDay, StyleRow, StyleSideCard, StyleToday, StyleWeek,
 } from './model'
@@ -265,7 +266,6 @@ export function toToday(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedu
 }
 
 /* ── 分析 ── */
-type Daily = { date: string; bookings: number; visits: number; estimatedRevenue: number | null }
 type Menu = { menuId: string; bookings: number; visits: number; cancellations: number; estimatedRevenue: number | null; noShowRate?: StyleMetric }
 type Staff = { staffId: string; bookings: number; utilization?: StyleMetric; designationRate?: StyleMetric; nextBookingRate?: StyleMetric; returnRate?: StyleMetric }
 type Funnel = { route: string; friends?: number; bookings: number; performed: number; won: number }
@@ -284,7 +284,7 @@ const cell = (m?: StyleMetric | number | null) => {
   return v.value === null ? { text: '—', note: !isRate(m) ? undefined : m.status === 'insufficient_sample' ? '出せない' : m.status === 'unconfigured' ? '未設定' : undefined } : { text: v.valueText ?? `${v.value}${v.unit === '%' ? '%' : ''}` }
 }
 
-export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics: Record<string, unknown> }, tab: string, names: Record<string, string>): StyleAnalytics {
+export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics: StyleAnalyticsData }, tab: string, names: Record<string, string>): StyleAnalytics {
   const tabs = TABS[style].map(([id, label]) => ({ id, label }))
   if (tab === 'payments') return paymentAnalytics(s, tabs)
   const a = s.analytics
@@ -298,11 +298,7 @@ export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics
     : style === 'lesson'
       ? [card('classes', 'classes', 'クラス'), card('visits', 'visits', '出席'), card('fill', 'classroomOccupancy', '教室の埋まり'), card('online', 'onlineOccupancy', 'オンラインの埋まり'), card('trial', 'trialConversion', '体験→入会'), card('noshow', 'noShowRate', styleTerm(style, 'V21'), true)]
       : [card('bookings', 'bookings', '予約数'), card('visits', 'visits', '来店数'), style === 'salon' ? card('revenue', 'estimatedRevenue', '見込み売上') : card('guests', 'guests', '人数'), card('rebook', 'nextBookingRate', '次回予約率'), card('return', 'returnRate', '再来率'), card('noshow', 'noShowRate', '無断キャンセル率', true)]
-  const daily = (a.daily as Daily[] | undefined) ?? []
-  const series = daily.map((d) => ({ label: d.date, now: style === 'consult' || style === 'lesson' ? d.visits : d.bookings, prev: 0 }))
-  const max = Math.max(1, ...series.map((p) => p.now))
-  const axisIdx = series.length ? [0, Math.floor(series.length / 4), Math.floor(series.length / 2), Math.floor((series.length * 3) / 4), series.length - 1] : []
-  const chart = { title: style === 'consult' ? '日ごとの実施した面談（面談日で数える）' : style === 'lesson' ? '日ごとの出席' : '日ごとの予約（来店日で数える）', help: '前の期間の日ごとの値は口から返らないので、この期間だけを出します。', ticks: [String(max), String(Math.round(max / 2)), '0'], axis: [...new Set(axisIdx)].map((i) => { const d = new Date(`${series[i].label}T00:00:00Z`); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}` }), points: series, max }
+  const chart = dailyAnalyticsChart(style, a.dailyComparison)
   let table: StyleAnalytics['table']
   if (style === 'consult') {
     const f = (a.funnel as Funnel[] | undefined) ?? []

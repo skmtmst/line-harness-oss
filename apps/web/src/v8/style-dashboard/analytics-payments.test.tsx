@@ -11,7 +11,7 @@ const payment: StyleDashboardPayments = { status: 'available', paidAmount: 12345
 function snapshot(payments: StyleDashboardPayments | undefined = payment): StyleSnapshot & { analytics: Record<string, unknown> } {
   return { style: 'restaurant', asOf: '2026-10-21T03:00:00Z', ...period, dateBasis: 'visit', range: 'month',
     metrics: { bookings: { value: 17, status: 'available', unit: '件', formula: '取消を除く予約' } }, previous: {}, items: [], newBookings: [], resultId: 'fixture', payments,
-    analytics: { daily: [{ date: '2026-10-15', bookings: 17, visits: 13 }], menus: [{ menuId: 'course', bookings: 17, visits: 13, cancellations: 2 }] } }
+    analytics: { dailyComparison: { current: [{ date: '2026-10-15', metrics: { bookings: { value: 17, status: 'available', unit: '件', formula: '開始日' } } }] }, menus: [{ menuId: 'course', bookings: 17, visits: 13, cancellations: 2 }] } }
 }
 function show(payments: StyleDashboardPayments | undefined = payment, error = false) {
   const onRetry = vi.fn()
@@ -64,12 +64,12 @@ describe('支払いの分析', () => {
   })
 
   it.each([
-    ['missing', undefined, '選択した期間の支払い集計はまだ取得できていません。0件としては扱いません。'],
-    ['unavailable', { status: 'unavailable' } as const, 'このアカウントの支払い集計は利用できません。0件としては扱いません。'],
+    ['missing', undefined, '選択した期間の支払い集計はまだ取得できていません。'],
+    ['unavailable', { status: 'unavailable' } as const, 'このアカウントの支払い集計は利用できません。'],
     ['forbidden', { status: 'forbidden' } as const, '支払いの記録を表示する権限がありません。'],
-    ['today-only', { ...payment, period: undefined }, '選択した期間の支払い集計はまだ取得できていません。0件としては扱いません。'],
-    ['other-period', { ...payment, period: { ...period, from: '2026-10-01T00:00:00Z' } }, '選択した期間の支払い集計はまだ取得できていません。0件としては扱いません。'],
-    ['other-zone', { ...payment, period: { ...period, timeZone: 'UTC' } }, '選択した期間の支払い集計はまだ取得できていません。0件としては扱いません。'],
+    ['today-only', { ...payment, period: undefined }, '選択した期間の支払い集計はまだ取得できていません。'],
+    ['other-period', { ...payment, period: { ...period, from: '2026-10-01T00:00:00Z' } }, '選択した期間の支払い集計はまだ取得できていません。'],
+    ['other-zone', { ...payment, period: { ...period, timeZone: 'UTC' } }, '選択した期間の支払い集計はまだ取得できていません。'],
   ])('%sでは0件や予約値で埋めず、切り替え入口を保つ', (_name, payments, message) => {
     const data = toAnalytics('restaurant', { ...snapshot(), payments }, 'payments', {})
     render(<StyleAnalyticsView data={data} error={false} onTab={() => {}} onRetry={() => {}} onRowOpen={() => {}} />)

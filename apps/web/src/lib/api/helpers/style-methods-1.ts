@@ -4,6 +4,7 @@ import type {
   SetupAnswer,
   StyleCard,
   StyleSnapshot,
+  StyleAnalyticsData,
   StyleDisplay,
   StyleCalendarView,
   StyleSchedule,
@@ -215,7 +216,7 @@ export const methods1 = {
     fetchApi<Result<StyleSchedule>>(url(root + '/schedule', accountId, query)),
 
   analytics: (accountId: string, query: StyleQuery) =>
-    fetchApi<Result<StyleSnapshot & { analytics: Record<string, unknown> }>>(
+    fetchApi<Result<StyleSnapshot & { analytics: StyleAnalyticsData }>>(
       url(root + '/analytics', accountId, query),
     ),
 

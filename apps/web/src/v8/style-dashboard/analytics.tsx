@@ -54,19 +54,19 @@ export function StyleAnalyticsView({ data, error, onTab, onRetry, onRowOpen }: {
         </div>}
         {!data.availability && (chart ? <Card className={styles.chartCard} contentPadding="var(--polish-space-card)" gap="var(--polish-space-field)" aria-label={chart.title}>
           <h3 className={styles.sectionTitle}>{chart.title}<HelpTip label={`${chart.title}の説明`}>{chart.help}</HelpTip></h3>
-          <span className={styles.calLegend}><i data-k="now" />この期間{chart.points.some((p) => p.prev > 0) ? <><i data-k="prev" />前の期間</> : null}</span>
-          <div className={styles.pairChart} role="img" aria-label={`${chart.title}のグラフ`}>
+          <span className={styles.calLegend}><i data-k="now" />この期間{chart.points.some((p) => p.prev !== null) ? <><i data-k="prev" />前の期間</> : null}</span>
+          {chart.emptyMessage ? <ListEmptyMessage>{chart.emptyMessage}</ListEmptyMessage> : <div className={styles.pairChart} role="img" aria-label={`${chart.title}のグラフ`}>
             <div className={styles.pairTicks}>{chart.ticks.map((t) => <span key={t}>{t}</span>)}</div>
             <div className={styles.pairPlot}>
               {chart.points.map((p) => (
-                <span key={p.label} className={styles.pairGroup} title={`${p.label}：この期間 ${p.now}・前の期間 ${p.prev}`}>
-                  <i data-k="prev" style={{ blockSize: `${Math.round((p.prev / chart.max) * 100)}%` }} />
-                  <i data-k="now" style={{ blockSize: `${Math.round((p.now / chart.max) * 100)}%` }} />
+                <span key={p.label} className={styles.pairGroup} title={`${p.label}：この期間 ${p.now ?? '未取得'}${p.previousLabel ? `・比較期間 ${p.previousLabel}：${p.prev ?? '未取得'}` : ''}`}>
+                  {p.prev !== null ? <i data-k="prev" style={{ blockSize: `${Math.round((p.prev / chart.max) * 100)}%` }} /> : null}
+                  {p.now !== null ? <i data-k="now" style={{ blockSize: `${Math.round((p.now / chart.max) * 100)}%` }} /> : null}
                 </span>
               ))}
             </div>
             <div className={styles.pairAxis}>{chart.axis.map((a) => <span key={a}>{a}</span>)}</div>
-          </div>
+          </div>}
         </Card> : <ListEmptyMessage>日別の支払いグラフは、この画面ではまだ取得していません。</ListEmptyMessage>)}
         {!data.availability && (table ? <Card className={styles.chartCard} contentPadding="var(--polish-space-card)" gap="var(--polish-space-field)" aria-label={table.title}>
           <h3 className={styles.sectionTitle}>{table.title}<HelpTip label={`${table.title}の説明`}>{table.help}</HelpTip><span className={styles.grow} />{table.link ? <Link className={styles.sideLink} href={table.link.href}>{table.link.label}<ArrowRight size={14} aria-hidden="true" /></Link> : null}</h3>

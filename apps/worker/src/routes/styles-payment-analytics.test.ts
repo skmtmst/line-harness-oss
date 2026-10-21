@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { StyleDashboardPayments, StyleSnapshot } from '@line-crm/shared';
+import type { StyleAnalyticsData, StyleDashboardPayments, StyleSnapshot } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { seedAssignmentFixture } from '../test-utils/assignment-fixture.js';
@@ -46,7 +46,7 @@ async function request(query = 'from=2026-09-16&to=2026-10-16&staff_id=s1', endp
   app.route('/', styles);
   const response = await app.request(`/api/dashboard/style/${endpoint}?account_id=${account}&style=${style}&${query}`, undefined,
     { DB: sql.db, DEPLOY_ENV: 'test', RESTAURANT_TEST_ENABLED: 'true' } as Env['Bindings']);
-  const body = await response.json<{ success: boolean; data: StyleSnapshot & { payments: StyleDashboardPayments } }>();
+  const body = await response.json<{ success: boolean; data: StyleSnapshot & { payments: StyleDashboardPayments; analytics: StyleAnalyticsData } }>();
   return { status: response.status, body };
 }
 function available(body: Awaited<ReturnType<typeof request>>['body']) {
@@ -126,6 +126,25 @@ describe('選択期間の支払い集計', () => {
     const noPayment = await request(undefined, 'analytics', 'a', 'lesson');
     expect(noPayment.status).toBe(200);
     expect(noPayment.body.data.payments).toEqual({ status: 'forbidden' });
+  });
+
+  it('日別比較は当期と前期の正規指標と0件の日を返し、担当者の範囲を保つ', async () => {
+    payment('current', 100, 'paid', window.from, undefined, undefined, 's1', 'a', 'completed');
+    payment('previous', 100, 'paid', window.from);
+    payment('other-staff', 100, 'paid', window.from, undefined, undefined, 's2');
+    sql.raw.exec("UPDATE bookings SET starts_at='2026-10-15T01:00:00Z' WHERE id IN('current','other-staff'); UPDATE bookings SET starts_at='2026-10-13T01:00:00Z' WHERE id='previous'");
+    const result = await request('from=2026-10-14&to=2026-10-16&staff_id=s1');
+    expect(result.status).toBe(200);
+    expect(result.body.data.analytics.dailyComparison).toMatchObject({
+      current: [
+        { date: '2026-10-14', metrics: { bookings: { value: 0, status: 'available' }, visits: { value: 0, status: 'available' } } },
+        { date: '2026-10-15', metrics: { bookings: { value: 1, status: 'available' }, visits: { value: 1, status: 'available' } } },
+      ],
+      previous: [
+        { date: '2026-10-12', metrics: { bookings: { value: 0, status: 'available' } } },
+        { date: '2026-10-13', metrics: { bookings: { value: 1, status: 'available' } } },
+      ],
+    });
   });
 
   it('集計を取得できないときは正常な0件へ変えず失敗を返す', async () => {
