@@ -21,6 +21,7 @@
 - 公開前チェック：`validateDraft(id)`（手順2・5・完了）、配信予定：`previewDraft(id)`（手順4・5・完了）
 - 対象者の数え直し・顔ぶれ：`audience(id, 条件)`、テスト送信：`useReminderTestRecipient` / `useReminderTestSend`、有効にする：`publishDraft(id)`
 - 差し込みの友だち情報：`friendFields.list(accountId)`、確認のフォルダ名：`folders.list('reminder')`
+- 一覧のフォルダ件数：`useManagedFolders('reminder', accountId)` で一覧と同じ店舗から読む。店舗切替時に前の件数を捨て、古い応答では上書きしない。
 - 詳細：`reminders.runs(id, { limit: 5 })`・`reminders.get(id)`・配信予定 `runs(id, { status: 'planned' })`・
   一時停止／再開 `reminders.update(id, { isActive })`・複製 `getDraft`→`createDraft`・削除 `reminders.delete(id)`・
   再試行 `retryRun(runId, 冪等キー)`・CSV（100件ずつ、5,000件まで）・

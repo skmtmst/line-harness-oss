@@ -37,7 +37,7 @@ import { type FolderDotFolder } from '@/components/shared/folder-dot'
 import { Field } from '@/components/shared/form-controls'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
+import ManagedFolderPanel, { useManagedFolders } from '@/components/shared/managed-folder-panel'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -58,7 +58,6 @@ import { runUndoable } from '@/lib/undoable'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { AutoReplyTabs } from '@/v8/ai-reply/public/auto-reply-tabs/index'
-import type { Folder } from '@line-crm/shared'
 import styles from './list.module.css'
 import { compareEvaluationOrder,movePriorityUpdates } from './order'
 import QuickCreateV8 from './quick-create'
@@ -110,8 +109,7 @@ export default function AutoRepliesListV8() {
   const [conflictCount, setConflictCount] = useState<number | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
-  const [folders, setFolders] = useState<Folder[]>([])
-  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
+  const { folders, unfiledCount, reload: loadFolders } = useManagedFolders('auto_reply', selectedAccountId)
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [sortKey, setSortKey] = useListUrlValue<SortKey>('sortKey', 'priority')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
@@ -210,21 +208,7 @@ export default function AutoRepliesListV8() {
   }
   }, [selectedAccountId, saveErrors])
 
-  const loadFolders = useCallback(async () => {
-    try {
-      const res = await api.folders.list('auto_reply')
-      if (res.success) {
-        setFolders(res.data)
-        setUnfiledCount(res.unfiledCount ?? null)
-      }
-    } catch (saveFailure) {
-      saveErrors.capture(saveFailure)
-      // 置き場が取れなくても一覧は出す。取れない失敗で画面を落とさない。
-    }
-  }, [saveErrors])
-
   useEffect(() => { load() }, [load])
-  useEffect(() => { void loadFolders() }, [loadFolders]);
 
 
   const templateById = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates])
@@ -681,6 +665,7 @@ export default function AutoRepliesListV8() {
         onOpenMenu={(anchor) => { createMenuAnchorRef.current = anchor; setCreateMenuOpen(true) }}
       /> : undefined}
       kind="auto_reply"
+      accountId={selectedAccountId}
       folders={folders}
       onChanged={loadFolders}
       canManage={canEdit}

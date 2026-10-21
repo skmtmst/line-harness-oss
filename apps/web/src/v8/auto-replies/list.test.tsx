@@ -229,3 +229,15 @@ it('取得済みのルールの実行回数は合計して表示する', async (
   expect(host.textContent).not.toContain('実行結果を読み込めませんでした')
   expect([...host.querySelectorAll('[data-kpi-number]')].map(node => node.textContent)).toEqual(['1', '10', '5', '0'])
 })
+
+it('未分類の件数は一覧と同じ選択中の店舗だけを数える', async () => {
+  const restore = stubWideViewport()
+  try {
+    listReplies.mockResolvedValue({ success: true, data: [] })
+    listFolders.mockImplementation(async (_kind, accountId) => ({ success: true, data: [], unfiledCount: accountId === 'account-a' ? 0 : 5 }))
+    act(() => { root.render(<AutoRepliesListV8 />) })
+    await flush()
+    expect(listFolders).toHaveBeenCalledWith('auto_reply', 'account-a')
+    expect(host.querySelector('button[title="未分類"]')?.textContent).toBe('未分類0')
+  } finally { restore() }
+})

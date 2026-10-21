@@ -152,6 +152,14 @@ function buttonByText(text: string): HTMLButtonElement | undefined {
 }
 
 describe('V8 一斉配信一覧（src/v8）の動き', () => {
+  it('未分類の件数を選択中の店舗に絞り、ほかの店舗の配信を足さない', async () => {
+    listFolders.mockImplementation(async (_kind, accountId) => ({ success: true, data: [], unfiledCount: accountId === 'account-a' ? 0 : 2 }))
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    expect(listFolders).toHaveBeenCalledWith('broadcast', 'account-a')
+    expect(host.querySelector('button[title="未分類"]')?.textContent).toBe('未分類0')
+  })
+
   it('狭い幅でも送信枠を保持し、下書きの絞り込みは使える', async () => {
     narrow.value = true
     try {
