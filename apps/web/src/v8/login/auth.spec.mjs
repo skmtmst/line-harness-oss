@@ -408,3 +408,51 @@ test('pass summary separates simulation failures and cancellation from unavailab
     await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`passes-${width}.png`) })
   }
 })
+
+for (const style of ['salon', 'ec']) test(`discarding unsaved ${style} setup never saves at three widths`, async ({ page }) => {
+  await useIndustryFixture(page, 'standard')
+  const writes = []
+  await page.route('**/api/**', async route => {
+    const request = route.request(), url = new URL(request.url())
+    if (url.pathname.startsWith('/api/dashboard/style') && !['GET', 'HEAD'].includes(request.method())) {
+      writes.push({ path: url.pathname, method: request.method() })
+      return route.fulfill({ status: 503, json: { success: false, error: 'Unexpected write during discard' } })
+    }
+    return route.fallback()
+  })
+  for (const [width, close] of [[1152, 'button'], [1440, 'escape'], [1920, 'backdrop']]) {
+    await page.setViewportSize({ width, height: 1000 })
+    await page.goto('/?setup=0')
+    const selection = page.getByRole('dialog', { name: 'はじめに、使い方を教えてください' })
+    await selection.locator(`input[name="setup-style"][value="${style}"]`).check()
+    await selection.getByRole('button', { name: '次へ', exact: true }).click()
+    const question = page.getByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
+    await expect(question.getByRole('button', { name: '途中保存して閉じる', exact: true })).toBeEnabled()
+    await expect.poll(() => question.evaluate(dialog => {
+      const bounds = dialog.getBoundingClientRect()
+      const buttons = [...dialog.querySelectorAll('[data-dialog-actions] button')].map(button => button.getBoundingClientRect()).filter(box => box.width > 0)
+      const clipped = buttons.filter(box => box.left < bounds.left || box.right > bounds.right).length
+      let overlap = 0
+      for (let a = 0; a < buttons.length; a++) for (let b = a + 1; b < buttons.length; b++) {
+        if (Math.min(buttons[a].right, buttons[b].right) > Math.max(buttons[a].left, buttons[b].left)
+          && Math.min(buttons[a].bottom, buttons[b].bottom) > Math.max(buttons[a].top, buttons[b].top)) overlap++
+      }
+      return { clipped, overlap, horizontal: document.documentElement.scrollWidth - innerWidth }
+    })).toEqual({ clipped: 0, overlap: 0, horizontal: 0 })
+    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`discard-${style}-${width}.png`) })
+    if (close === 'button') await question.getByRole('button', { name: '閉じる', exact: true }).click()
+    else if (close === 'escape') await page.keyboard.press('Escape')
+    else await question.locator('..').click({ position: { x: 2, y: 2 } })
+    await page.getByRole('button', { name: '破棄する', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/$/)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'ダッシュボード', exact: true, level: 2 })).toBeVisible()
+    await page.goto('/?setup=0')
+    const reopened = page.getByRole('dialog', { name: 'はじめに、使い方を教えてください' })
+    await expect(reopened.locator('input[name="setup-style"][value="standard"]')).toBeChecked()
+    await reopened.getByRole('button', { name: '閉じる', exact: true }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(writes).toEqual([])
+  }
+})
