@@ -12,6 +12,7 @@ import { downloadApiFile, ApiError, describeSaveFailure } from '@/lib/api'
 import { HqApprovalBlock, HqTestSendDialog, approvalGate, useHqApproval } from './approval'
 import type { HqBroadcastRun } from '@line-crm/shared'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import { ListPageSection } from '@/components/templates/list-page'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
@@ -551,6 +552,7 @@ export default function HqBroadcastDetail() {
         ) : null}
         <div className={detailStyles.split}>
           <div className={detailStyles.main}>
+            <ListPageSection>
             {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
             {run && tab === 'recipients' ? <RecipientsTab run={run} /> : null}
             {run && tab === 'activity' ? <ActivityTab run={run} names={names} /> : null}
@@ -585,6 +587,7 @@ export default function HqBroadcastDetail() {
                 {body}
               </section>
             ) : null}
+            </ListPageSection>
           </div>
           <aside className={detailStyles.side} aria-label="配信した設定とメッセージ">
             <h3 className={detailStyles.secTitle}>配信した設定</h3>
