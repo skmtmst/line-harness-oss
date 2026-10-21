@@ -34,6 +34,10 @@ vi.mock('../middleware/auth.js', () => ({
   authenticateApiToken: vi.fn(async () => null),
 }));
 
+vi.mock('../services/feature-enforcement.js', () => ({
+  accountFeatureAvailability: vi.fn(),
+}));
+
 vi.mock('@line-crm/line-sdk', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/line-sdk')>('@line-crm/line-sdk');
   return {
@@ -65,6 +69,7 @@ import {
   getStaffAccountScopeIds,
 } from '@line-crm/db';
 import { authenticateApiToken } from '../middleware/auth.js';
+import { accountFeatureAvailability } from '../services/feature-enforcement.js';
 import { lineProxy } from './line-proxy.js';
 
 type Exec = { sql: string; params: unknown[] };
@@ -205,6 +210,11 @@ beforeEach(() => {
   vi.mocked(authenticateApiToken).mockResolvedValue(null as never);
   // clearAllMocks は実装を戻さないので、停止状態は各テストで明示的に立てる。
   vi.mocked(isOperationCapabilityStopped).mockResolvedValue(false as never);
+  vi.mocked(accountFeatureAvailability).mockResolvedValue({
+    featureId: 'broadcasts', contractAvailable: true, companyEnabled: true,
+    dependenciesEnabled: true, effectiveEnabled: true, reason: null,
+    message: null, disabledDependencies: [],
+  });
 });
 
 afterEach(() => {
@@ -224,6 +234,54 @@ function pushRequest(
     body: JSON.stringify(body),
   });
 }
+
+describe('account feature availability', () => {
+  test.each(['broadcast', 'multicast', 'narrowcast'] as const)('disabled %s stops before upstream communication', async endpoint => {
+    const { db, executed } = fakeDb();
+    vi.mocked(accountFeatureAvailability).mockResolvedValue({
+      featureId: 'broadcasts', contractAvailable: true, companyEnabled: false,
+      dependenciesEnabled: true, effectiveEnabled: false, reason: 'company_disabled',
+      message: 'この機能は設定でオフになっています', disabledDependencies: [],
+    });
+    const res = await setupApp().request(`/line-api/v2/bot/message/${endpoint}`, {
+      method: 'POST', headers: { Authorization: 'Bearer acc-token', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: [USER_A], messages: [{ type: 'text', text: 'fixture message' }] }),
+    }, env(db));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'FEATURE_DISABLED', featureId: 'broadcasts' });
+    expect(accountFeatureAvailability).toHaveBeenCalledWith(db, 'acc-1', 'broadcasts');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+  });
+
+  test('staff permission does not replace the account feature switch', async () => {
+    const { db } = fakeDb();
+    vi.mocked(authenticateApiToken).mockResolvedValue({
+      id: 'operator', name: 'Fixture', role: 'staff', readOnly: false,
+      tenantId: DEFAULT_TENANT_ID, permissionKeys: ['/broadcasts'],
+    } as never);
+    vi.mocked(accountFeatureAvailability).mockResolvedValue({
+      featureId: 'broadcasts', contractAvailable: false, companyEnabled: true,
+      dependenciesEnabled: true, effectiveEnabled: false, reason: 'contract_unavailable',
+      message: 'ご契約ではこの機能を利用できません', disabledDependencies: [],
+    });
+    const res = await setupApp().request('/line-api/v2/bot/message/broadcast', {
+      method: 'POST', headers: { Authorization: 'Bearer harness-key', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ type: 'text', text: 'fixture message' }] }),
+    }, env(db));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'FEATURE_NOT_ENTITLED' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('core one-to-one push remains independent of the broadcast switch', async () => {
+    const { db } = fakeDb();
+    const res = await setupApp().request(pushRequest('acc-token'), {}, env(db));
+    expect(res.status).toBe(200);
+    expect(accountFeatureAvailability).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('auth', () => {
   test('no Authorization header → 401, upstream not called', async () => {

@@ -75,6 +75,11 @@ const TEXT_KEYS = new Set(['alttext', 'subject', 'caption', 'snippet', 'usercomm
 const OPAQUE_KEYS = new Set(['metadata', 'metadatajson', 'answers', 'answer', 'fieldvalues', 'customfields', 'formdata', 'profile', 'payload']);
 function fieldKey(key: string): string { return key.replace(/[_-]/g, '').toLowerCase(); }
 
+/** Conversation summaries carry the same private text as the full message. */
+function isPrivateTextField(key: string): boolean {
+  return TEXT_KEYS.has(key) || /(?:preview|snippet|(?:message|incoming|outgoing)(?:content|text))$/.test(key);
+}
+
 export function shouldMaskPii(path: string): boolean {
   return path.startsWith('/api/') && !path.startsWith('/api/auth/');
 }
@@ -115,7 +120,7 @@ export function maskPiiDeep(value: unknown, depth = 0): unknown {
       out[key] = maskOpaque(raw);
     } else if (CONTACT_KEYS.has(classified)) {
       out[key] = raw === null || raw === undefined ? raw : Array.isArray(raw) ? [] : typeof raw === 'object' ? {} : typeof raw === 'number' ? 0 : typeof raw === 'boolean' ? false : '';
-    } else if (TEXT_KEYS.has(classified) && typeof raw === 'string' && raw.length > 0) {
+    } else if (isPrivateTextField(classified) && typeof raw === 'string' && raw.length > 0) {
       out[key] = '（代理ログイン中は伏せています）';
     } else {
       out[key] = maskPiiDeep(raw, depth + 1);

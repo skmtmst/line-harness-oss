@@ -24,6 +24,7 @@ import type { Friend, LineAccount, OperationCapability } from '@line-crm/db';
 import { OPERATION_PROXY_CAPABILITY_HEADER } from '../services/operation-send-paths.js';
 import { authenticateApiToken } from '../middleware/auth.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { accountFeatureAvailability } from '../services/feature-enforcement.js';
 import { messageToLogPayload } from '../services/step-delivery.js';
 import type { Env } from '../worker-env.js';
 
@@ -499,6 +500,25 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
       }
     }
     const isMessageSend = logSends && method === 'POST' && MESSAGE_SEND_PATHS.has(path);
+
+    // The compatibility endpoint must respect the same account feature switch
+    // and subscription as the management API, for either accepted credential.
+    const featureId = method === 'POST' && BULK_DISPATCH_PATHS.has(path)
+      ? 'broadcasts'
+      : /^\/v2\/bot\/richmenu(?:\/|$)/.test(path) ? 'rich_menus' : null;
+    if (featureId && caller.lineAccountId) {
+      const availability = await accountFeatureAvailability(c.env.DB, caller.lineAccountId, featureId);
+      const retainedRead = ['GET', 'HEAD'].includes(method) && availability.reason === 'contract_unavailable';
+      if (!availability.effectiveEnabled && !retainedRead) {
+        return c.json({
+          message: availability.message,
+          code: availability.reason === 'contract_unavailable' ? 'FEATURE_NOT_ENTITLED'
+            : availability.reason === 'dependency_disabled' ? 'FEATURE_DEPENDENCY_DISABLED' : 'FEATURE_DISABLED',
+          featureId,
+          reason: availability.reason,
+        }, 403);
+      }
+    }
 
     // Proxy 経由の自動送信と、人間が行う個別返信を区別する。未指定は従来どおり
     // external。manual は 1:1 push だけに限定し、一斉配信で未対応をまとめて消す
