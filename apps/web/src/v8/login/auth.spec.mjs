@@ -360,7 +360,7 @@ test('salon keeps existing KPI slots and forwards real staff, time and booking i
   expect(url.searchParams.get('time')).toMatch(/^\d{2}:\d{2}$/)
   expect(url.searchParams.has('staffId')).toBe(false)
   await page.goto('/?view=calendar&range=week')
-  await week.getByRole('button', { name: 'カット 山田 花子', exact: true }).click()
+  await week.getByRole('button', { name: '10:00〜11:30 カット 山田 花子', exact: true }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'w1')
 })
 
@@ -388,7 +388,7 @@ test('consult forwards board and weekly booking identity, date, time and staff',
   expect(url.searchParams.get('time')).toMatch(/^\d{2}:\d{2}$/)
   expect(url.searchParams.has('staffId')).toBe(false)
   await page.goto('/?view=calendar&range=week')
-  await week.getByRole('button', { name: '転職の初回面談 原田 修', exact: true }).click()
+  await week.getByRole('button', { name: '10:00〜11:00 転職の初回面談 原田 修', exact: true }).click()
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'm1')
 })
 
