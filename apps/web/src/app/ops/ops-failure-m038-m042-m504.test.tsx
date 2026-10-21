@@ -19,6 +19,10 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: 'musubo' }) }))
+vi.mock('@/components/auth/turnstile', () => ({ default: ({ onToken }: { onToken: (token: string) => void }) => {
+  React.useEffect(() => { onToken('fixture-turnstile-token') }, [onToken])
+  return null
+} }))
 vi.mock('@/lib/qr-image', () => ({ qrToDataURL: vi.fn() }))
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
