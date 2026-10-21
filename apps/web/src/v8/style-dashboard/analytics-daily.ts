@@ -5,7 +5,7 @@ const count = (metric: StyleMetric | undefined): number | null => metric?.status
   && typeof metric.value === 'number' && Number.isFinite(metric.value) && metric.value >= 0 ? metric.value : null
 
 /** Pair the same ordinal day of the selected and comparison periods. */
-export function dailyAnalyticsChart(style: IndustryStyle, comparison: StyleAnalyticsData['dailyComparison']): NonNullable<StyleAnalytics['chart']> {
+export function dailyAnalyticsSeries(style: IndustryStyle, comparison: StyleAnalyticsData['dailyComparison']): NonNullable<StyleAnalytics['chart']> {
   const key = style === 'consult' || style === 'lesson' ? 'visits' : 'bookings'
   const points = (comparison?.current ?? []).map((day, index) => {
     const previous = comparison?.previous?.[index]

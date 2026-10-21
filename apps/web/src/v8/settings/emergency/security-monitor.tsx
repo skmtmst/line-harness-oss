@@ -11,9 +11,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import type { SecurityAlert, SecurityAlertsResponse } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import ListState from '@/components/shared/list-state'
+import ListState, { ListEmptyMessage } from '@/components/shared/list-state'
+import { isSaveConflict, SaveConflictBand } from '@/components/shared/save-conflict'
 import Notice from '@/components/shared/notice'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -68,6 +69,7 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
   const [busyId, setBusyId] = useState<string | null>(null)
   const [pending, setPending] = useState<Pending | null>(null)
   const [actionError, setActionError] = useState('')
+  const [actionConflict, setActionConflict] = useState(false)
   const generation = useRef(0)
   const active = useRef(true)
   const request = useRef<Promise<void> | null>(null)
@@ -118,7 +120,7 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
   const run = async () => {
     if (!pending || !canOperate || mutation.current) return
     mutation.current = true
-    setBusyId(pending.alert.id); setActionError('')
+    setBusyId(pending.alert.id); setActionError(''); setActionConflict(false)
     try {
       const call = pending.action === 'acknowledge' ? securityMonitorApi.acknowledge : securityMonitorApi.resolve
       await call(pending.alert.id, pending.alert.version, accountId)
@@ -130,7 +132,8 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
       if (!active.current) return
       // A stale confirmation must never retry its old version after refreshing.
       setPending(null)
-      setActionError(caught instanceof ApiError && caught.status === 409
+      setActionConflict(caught instanceof ApiError && isSaveConflict(caught))
+      setActionError(caught instanceof ApiError && isSaveConflict(caught)
         ? 'ほかの人が先に更新しました。最新の記録を確認してから、もう一度操作してください。'
         : caught instanceof ApiError && caught.status === 403
           ? 'この操作をする権限がありません。'
@@ -150,10 +153,7 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
     <div className={styles.panel}>
       <Card surface="muted" layout="horizontal" contentPadding="var(--tpl-sb-hc-banner-pad)" gap="var(--tpl-sb-ec-gap)" aria-label="見張りの状態">
         <ShieldCheck className={styles.monitorIcon} aria-hidden="true" />
-        <div className={styles.stack}>
-          <StatusBadge tone={view.tone}>{view.label}</StatusBadge>
-          <p className={styles.empty}>最後に完了した時刻（日本時間）：{data.monitor.lastCompletedAt ? formatOperationDate(data.monitor.lastCompletedAt) : '未取得'}。5分ごとに、直近 {formatNumber(data.windowMinutes)} 分の操作を数えています。</p>
-        </div>
+        <CardHeader title={<StatusBadge tone={view.tone}>{view.label}</StatusBadge>} meta={<>最後に完了した時刻（日本時間）：{data.monitor.lastCompletedAt ? formatOperationDate(data.monitor.lastCompletedAt) : '未取得'}。5分ごとに、直近 {formatNumber(data.windowMinutes)} 分の操作を数えています。</>} />
       </Card>
 
       {view.late ? (
@@ -164,14 +164,16 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
       {!data.configurationValid ? (
         <Notice tone="warn">基準の設定が正しくないため、初期の基準で見張っています。設定を確かめてください。</Notice>
       ) : null}
-      {actionError ? <Notice tone="danger" role="alert">{actionError}</Notice> : null}
+      {actionError ? actionConflict
+        ? <SaveConflictBand title={actionError} description="一覧を最新の記録へ読み直しました。対象の状態を確かめてから操作してください。" onReload={() => void load(true)} />
+        : <Notice tone="danger" role="alert">{actionError}</Notice> : null}
 
       <section aria-labelledby="security-alerts-heading" className={styles.listSection}>
         <h2 id="security-alerts-heading" className={styles.heading}>未対応の異常 <span className={styles.count}>{formatNumber(data.total)} 件</span></h2>
         {data.items.length === 0 ? (
-          <p className={styles.empty}>
+          <ListEmptyMessage>
             見張りの記録では、未対応の異常はありません。見張るのはログインの失敗・書き出し・権限の変更など、記録に残る操作だけです。位置の変化や外部サービスの鍵の操作は、別の手順で確かめます。
-          </p>
+          </ListEmptyMessage>
         ) : (
           <GridTable label="未対応の異常" framed={false} design={{ columns: 'minmax(0, 1fr) 64px 120px 120px 80px 44px', gap: 'var(--tpl-sb-ec-gap)', rowPadding: 'var(--tpl-sb-hc-row-pad)', headPadding: 'var(--tpl-sb-ec-head-pad)', fontSize: 'var(--tpl-sb-band-text)', headFontSize: 'var(--tpl-sb-row-sub)', headLineHeight: 'var(--tpl-sb-row-sub-lh)', headBackground: 'var(--color-surface-pearl)' }}>
             <div role="rowgroup">
@@ -192,8 +194,8 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
                     <span className={styles.sub}>初回：{formatOperationDate(item.firstDetectedAt)}</span>
                   </GridCell>
                   <GridCell role="cell" className={styles.num}>{formatNumber(item.count)}<span className={styles.sub}>基準 {formatNumber(item.threshold)}</span></GridCell>
-                  <GridCell role="cell" className={styles.time}>{formatOperationDate(item.lastDetectedAt)}</GridCell>
-                  <GridCell role="cell" className={styles.notice}>{NOTIFICATION_LABEL[item.notification]}</GridCell>
+                  <GridCell role="cell"><TruncatedText value={formatOperationDate(item.lastDetectedAt)} /></GridCell>
+                  <GridCell role="cell"><TruncatedText value={NOTIFICATION_LABEL[item.notification]} /></GridCell>
                   <GridCell role="cell"><StatusBadge tone={STATUS[item.status].tone}>{STATUS[item.status].label}</StatusBadge></GridCell>
                   <GridCell role="cell" className={styles.actions}>
                     {canOperate ? <>

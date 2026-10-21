@@ -1,7 +1,7 @@
 import { formatYen as yen } from '@line-crm/shared';
 import { styleTerm, term } from '@/lib/terms'
 import { paymentAnalytics } from './analytics-payments'
-import { dailyAnalyticsChart } from './analytics-daily'
+import { dailyAnalyticsSeries } from './analytics-daily'
 import type { StyleAnalyticsData, StyleBooking, StyleCard, StyleMetric, StyleSchedule, StyleScheduleEntry, StyleSnapshot } from '@line-crm/shared'
 import type {
   DashboardRange, IndustryStyle, StyleAnalytics, StyleBadge, StyleBoard, StyleKpi, StyleLayout, StyleMonth, StyleMonthDay, StyleRow, StyleSideCard, StyleToday, StyleWeek,
@@ -298,7 +298,7 @@ export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics
     : style === 'lesson'
       ? [card('classes', 'classes', 'クラス'), card('visits', 'visits', '出席'), card('fill', 'classroomOccupancy', '教室の埋まり'), card('online', 'onlineOccupancy', 'オンラインの埋まり'), card('trial', 'trialConversion', '体験→入会'), card('noshow', 'noShowRate', styleTerm(style, 'V21'), true)]
       : [card('bookings', 'bookings', '予約数'), card('visits', 'visits', '来店数'), style === 'salon' ? card('revenue', 'estimatedRevenue', '見込み売上') : card('guests', 'guests', '人数'), card('rebook', 'nextBookingRate', '次回予約率'), card('return', 'returnRate', '再来率'), card('noshow', 'noShowRate', '無断キャンセル率', true)]
-  const chart = dailyAnalyticsChart(style, a.dailyComparison)
+  const chart = dailyAnalyticsSeries(style, a.dailyComparison)
   let table: StyleAnalytics['table']
   if (style === 'consult') {
     const f = (a.funnel as Funnel[] | undefined) ?? []
