@@ -29,7 +29,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { argv, exit, stderr, stdout } from 'node:process';
+import { exit, stderr, stdout } from 'node:process';
 
 export interface VersionData {
   version: string;
@@ -230,17 +230,7 @@ function main(rawArgs: string[]): void {
   );
 }
 
-// Run when invoked as a script (works whether tsx/ts-node loaders rewrite
-// the URL or not).
-const isCliEntry = (() => {
-  if (!argv[1]) return false;
-  try {
-    return fileURLToPath(import.meta.url) === argv[1];
-  } catch {
-    return false;
-  }
-})();
-
-if (isCliEntry) {
-  main(argv.slice(2));
+// Keep the CLI entry explicit: importing the hashing library must not run it.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main(process.argv.slice(2));
 }

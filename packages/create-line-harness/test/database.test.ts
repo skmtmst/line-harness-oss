@@ -126,6 +126,7 @@ describe('新規DBの基準の形と適用記録（外部通信なし）', () =>
     failFile = join(repo, 'packages/db/migrations/002_data.sql');
     await expect(createDatabase(repo, 'fresh')).rejects.toThrow('apply failed');
     expect(ledgerNames()).toEqual(['001_label.sql']);
+    expect(db.prepare("SELECT state FROM _musubo_migration_history WHERE name='__lock__'").get()).toEqual({state:'applying'});
   });
 
   it('記録保存が失敗したら後続へ進まない', async () => {
@@ -136,13 +137,11 @@ describe('新規DBの基準の形と適用記録（外部通信なし）', () =>
     expect(files.filter(path => path.endsWith('/ledger.sql')).every(path => !existsSync(path))).toBe(true);
   });
 
-  it('metaなしの新規作成でも成功した履歴だけを記録する', async () => {
+  it('metaなしの導入は過去SQLを再実行せず停止する', async () => {
     rmSync(join(repo, 'packages/db/bootstrap-meta.json'));
-    writeFileSync(join(repo, 'packages/db/migrations/003_partial.sql'),
-      'ALTER TABLE line_accounts ADD COLUMN label TEXT; CREATE TABLE skipped (id TEXT);');
-    await createDatabase(repo, 'fresh');
-    expect(ledgerNames()).toEqual(['001_label.sql', '002_data.sql']);
-    expect(db.prepare("SELECT name FROM sqlite_master WHERE name='skipped'").get()).toBeUndefined();
+    await expect(createDatabase(repo, 'fresh')).rejects.toThrow('bootstrap');
+    expect(ledgerNames()).toEqual([]);
+    expect(commands).toEqual([]);
   });
 
   it('後続が一部だけ適用されて重複エラーになっても記録しない', async () => {
@@ -150,6 +149,7 @@ describe('新規DBの基準の形と適用記録（外部通信なし）', () =>
       'CREATE TABLE line_accounts (id TEXT); CREATE TABLE skipped (id TEXT);');
     await expect(createDatabase(repo, 'fresh')).rejects.toThrow('SQL failed');
     expect(ledgerNames()).toEqual(['001_label.sql']);
+    expect(db.prepare("SELECT state FROM _musubo_migration_history WHERE name='__lock__'").get()).toEqual({state:'applying'});
   });
 
   it.each([
@@ -159,11 +159,11 @@ describe('新規DBの基準の形と適用記録（外部通信なし）', () =>
     { names: ['001_missing.sql'], count: 1 },
   ])('不整合なmetaを適用済みの根拠にしない: $names / $count', async ({ names, count }) => {
     writeMeta(names, count);
-    await createDatabase(repo, 'fresh');
+    await expect(createDatabase(repo, 'fresh')).rejects.toThrow('bootstrap');
     expect(files).not.toContain(join(repo, 'packages/db/bootstrap.sql'));
     expect(ledgerNames()).not.toContain('001_missing.sql');
     expect(ledgerNames()).not.toContain('../escape.sql');
-    expect(db.prepare('SELECT * FROM line_accounts').all()).toEqual([{ id: 'one', label: 'label' }]);
+    expect(commands).toEqual([]);
   });
 
   it('既存DBではbootstrapも適用記録の追記も行わない', async () => {
@@ -172,7 +172,7 @@ describe('新規DBの基準の形と適用記録（外部通信なし）', () =>
       if (args[1] === 'create') throw new WranglerError('exists', 'already exists');
       return mock(args);
     });
-    await createDatabase(repo, 'fresh');
+    await expect(createDatabase(repo, 'fresh')).rejects.toThrow('既存D1');
     expect(files).not.toContain(join(repo, 'packages/db/bootstrap.sql'));
     expect(ledgerNames()).toEqual([]);
     expect(commands.some(sql => sql.includes('_migrations'))).toBe(false);

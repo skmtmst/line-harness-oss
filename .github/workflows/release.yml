@@ -52,7 +52,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version: '22.23.4'
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -141,6 +141,11 @@ jobs:
           compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
           TOML
 
+      - name: Build Worker client assets (separate from LIFF Pages)
+        env:
+          VITE_LIFF_ID: "__MUSUBO_LIFF_ID__"
+        run: pnpm --filter worker exec vite build
+
       - name: Build Worker artifact (first pass — for identity hashing)
         # `wrangler deploy --dry-run --outdir` emits EXACTLY the single-file
         # module wrangler would upload — the same build path every real
@@ -162,8 +167,10 @@ jobs:
           json=$(pnpm tsx apps/worker/scripts/inject-version.ts \
             --version "${{ steps.version.outputs.version }}" \
             --worker apps/worker/dist-release/index.js \
+            --worker-assets apps/worker/dist/client \
             --admin apps/web/out \
             --liff apps/liff/dist \
+            --migrations packages/db/migrations \
             --out apps/worker/src/release-version.ts)
 
           echo "json<<EOF" >> "$GITHUB_OUTPUT"
@@ -173,11 +180,15 @@ jobs:
           # Extract individual hashes for the manifest entry.
           worker_hash=$(node -e "console.log(JSON.parse(process.argv[1]).workerHash)" "$json")
           admin_hash=$(node -e "console.log(JSON.parse(process.argv[1]).adminHash)" "$json")
+          worker_assets_hash=$(node -e "console.log(JSON.parse(process.argv[1]).workerAssetsHash)" "$json")
+          migrations_hash=$(node -e "console.log(JSON.parse(process.argv[1]).migrationsHash)" "$json")
           liff_hash=$(node -e "console.log(JSON.parse(process.argv[1]).liffHash)" "$json")
           released_at=$(node -e "console.log(JSON.parse(process.argv[1]).releasedAt)" "$json")
 
           echo "worker_hash=${worker_hash}" >> "$GITHUB_OUTPUT"
           echo "admin_hash=${admin_hash}" >> "$GITHUB_OUTPUT"
+          echo "worker_assets_hash=${worker_assets_hash}" >> "$GITHUB_OUTPUT"
+          echo "migrations_hash=${migrations_hash}" >> "$GITHUB_OUTPUT"
           echo "liff_hash=${liff_hash}" >> "$GITHUB_OUTPUT"
           echo "released_at=${released_at}" >> "$GITHUB_OUTPUT"
 
@@ -199,11 +210,14 @@ jobs:
       - name: Build release bundle
         run: |
           mkdir -p dist
+          pnpm exec tsx scripts/release/third-party-notices.ts dist/notices
           pnpm tsx scripts/release/build-bundle.ts \
             --worker-js apps/worker/dist-release/index.js \
+            --worker-assets apps/worker/dist/client \
             --admin apps/web/out \
             --liff apps/liff/dist \
             --migrations packages/db/migrations \
+            --notices dist/notices \
             --out dist/bundle.tar.gz
 
       - name: Compute bundle size
@@ -242,6 +256,8 @@ jobs:
             "worker_hash": "${{ steps.hashes.outputs.worker_hash }}",
             "worker_bundle_hash": "${{ steps.bundlehash.outputs.worker_bundle_hash }}",
             "admin_hash": "${{ steps.hashes.outputs.admin_hash }}",
+            "worker_assets_hash": "${{ steps.hashes.outputs.worker_assets_hash }}",
+            "migrations_hash": "${{ steps.hashes.outputs.migrations_hash }}",
             "liff_hash": "${{ steps.hashes.outputs.liff_hash }}",
             "bundle_url": "${bundle_url}",
             "bundle_size_bytes": ${{ steps.bundle.outputs.size }},

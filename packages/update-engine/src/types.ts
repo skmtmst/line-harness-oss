@@ -18,6 +18,9 @@ export interface ReleaseEntry {
    * those bundles ship a broken worker stub and cannot be installed from.
    */
   worker_bundle_hash?: string;
+  /** Hash of worker-assets/ (distinct from the separate LIFF Pages application). */
+  worker_assets_hash?: string;
+  migrations_hash?: string;
   bundle_url: string;
   bundle_size_bytes: number;
   required_secrets: string[];
@@ -76,7 +79,7 @@ export interface UpdateContext {
   /**
    * LIFF Pages project name, or '' for CLI installs that serve the LIFF SPA
    * from Worker assets instead of a separate Pages project. When empty, the
-   * LIFF snapshot / deploy / verify / rollback steps are skipped.
+   * LIFF uses the Worker assets upload / content verification / version rollback.
    */
   liffPagesProject: string;
   d1DatabaseId: string;
@@ -92,4 +95,6 @@ export interface UpdateContext {
    * files ship with the placeholder still baked in (pre-fix behaviour).
    */
   workerPublicUrl?: string;
+  /** Optional install default; explicit LIFF endpoint ?liffId= remains authoritative. */
+  liffId?: string;
 }

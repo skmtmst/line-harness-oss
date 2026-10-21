@@ -1,3 +1,5 @@
+import { materializeWorkerAssets } from './cf-api/worker-assets.js';
+import { snapshotWorkerDeployment } from './cf-api/worker-deployments.js';
 import { Readable } from 'node:stream';
 import type { UpdateContext, UpdateEvent } from './types.js';
 import {
@@ -8,7 +10,6 @@ import {
 import { getLatestDeployment } from './cf-api/pages.js';
 import {
   createSnapshot,
-  getSnapshot,
   updateStatus,
   appendEvent,
   setError,
@@ -21,6 +22,7 @@ import { runVerify } from './phases/verify.js';
 import { runRollback } from './phases/rollback.js';
 
 export * from './compat-flags.js';
+export { applyTrackedMigrations, migrationBaselineSql, migrationRecordSql, migrationChecksum } from './migration-history.js';
 export * from './types.js';
 export * from './manifest.js';
 export * from './fork-detect.js';
@@ -28,6 +30,8 @@ export * from './bundle.js';
 export * from './materialize.js';
 export * from './snapshot.js';
 export * from './cf-api/workers.js';
+export { uploadWorkerAssets, verifyWorkerAssets, materializeWorkerAssets, workerAssetsConfig } from './cf-api/worker-assets.js';
+export { snapshotWorkerDeployment, restoreWorkerDeployment } from './cf-api/worker-deployments.js';
 export * from './cf-api/pages.js';
 export * from './cf-api/d1.js';
 export * from './cf-api/subdomain.js';
@@ -86,7 +90,7 @@ export interface UpdateHandle {
 
 /**
  * Top-level update orchestrator. Runs the four phases in order
- * (preflight → apply → verify) and on any failure runs rollback
+ * (preflight → apply → verify) and on deployment/verification failure runs rollback
  * + records the failure in the snapshot row.
  *
  * Returns an {@link UpdateHandle} so callers can split "snapshot row
@@ -108,12 +112,12 @@ export interface UpdateHandle {
  *      `update_events`. Caller's onEvent runs first (in-process subscribers)
  *      and persist runs second (durable timeline).
  *   4. runPreflight — read-only checks. Failures here mean no infra was
- *      touched but rollback still runs as a safety drill (it's cheap and
- *      gets us to a clean state on the snapshot row).
+ *      deployed; record a failure without redeploying old code.
  *   5. Bundle download + parse + hash check — tamper detection. Done
  *      before runApply because uploading a tampered bundle to CF is
  *      exactly what an attacker wants.
- *   6. runApply — destructive. From here a failure REQUIRES rollback.
+ *   6. runApply — tracked SQL first, then deployments. Only deployment
+ *      failures trigger code rollback; SQL never replays after an unknown result.
  *   7. runVerify — post-deploy health probes.
  *   8. On success: emit `complete`, status=success, `done` resolves with
  *      updateId.
@@ -137,8 +141,9 @@ export async function runUpdate(opts: RunUpdateOpts): Promise<UpdateHandle> {
   // Failures here reject the OUTER promise — no snapshot row exists yet,
   // so the caller's catch is the only place that learns about the error.
   // Worker-assets installs have no LIFF Pages project (empty string) —
-  // their LIFF is served by the Worker script, whose pre-update bytes are
-  // already captured via currentWorkerBundleUrl.
+  // their code and assets are captured together as Worker deployment versions.
+  const workerSnapshot = !ctx.liffPagesProject
+    ? await snapshotWorkerDeployment(ctx.creds, ctx.workerName) : currentWorkerBundleUrl;
   const [adminLatest, liffLatest] = await Promise.all([
     getLatestDeployment({ creds: ctx.creds, projectName: ctx.adminPagesProject }),
     ctx.liffPagesProject
@@ -152,7 +157,7 @@ export async function runUpdate(opts: RunUpdateOpts): Promise<UpdateHandle> {
   const updateId = await createSnapshot(d1, {
     from: ctx.current.version,
     to: ctx.target.version,
-    snapshotWorkerUrl: currentWorkerBundleUrl,
+    snapshotWorkerUrl: workerSnapshot,
     snapshotAdminDeployment: adminLatest.id,
     snapshotLiffDeployment: liffLatest.id,
   });
@@ -174,6 +179,7 @@ export async function runUpdate(opts: RunUpdateOpts): Promise<UpdateHandle> {
   // Callers who care about the terminal state await `handle.done`;
   // callers who only need durability attach `.catch( => undefined)`
   // and rely on the snapshot row.
+  let deploymentStarted = false;
   const done = (async (): Promise<string> => {
     try {
       // Step 4: preflight (read-only checks).
@@ -199,10 +205,15 @@ export async function runUpdate(opts: RunUpdateOpts): Promise<UpdateHandle> {
       verifyBundleIntegrity(computed, ctx.target);
 
       // Step 6: apply (destructive).
-      await runApply(ctx, bundle, ev);
+      const applyEvents = { ...ev, emit: async (event: UpdateEvent) => {
+        if (event.step === 'worker' && event.status === 'running') deploymentStarted = true;
+        await ev.emit(event);
+      } };
+      await runApply(ctx, bundle, applyEvents);
 
       // Step 7: verify (health probes).
-      await runVerify(ctx, { workerHealthUrl, adminUrl, liffUrl }, ev);
+      await runVerify(ctx, { workerHealthUrl, adminUrl, liffUrl }, ev,
+        ctx.liffPagesProject ? undefined : materializeWorkerAssets(bundle.workerAssetsFiles, ctx.liffId));
 
       // Step 8: success path.
       await ev.emit({
@@ -214,45 +225,34 @@ export async function runUpdate(opts: RunUpdateOpts): Promise<UpdateHandle> {
       return updateId;
     } catch (e) {
       const original = e instanceof Error ? e : new Error(String(e));
-      const originalStack = original.stack ?? String(original);
-      await setError(d1, updateId, originalStack);
-      await ev.emit({
-        step: 'rollback',
-        status: 'running',
-        error: original.message,
-      });
-      try {
-        const snap = await getSnapshot(d1, updateId);
-        // snapshot_liff_deployment is intentionally NOT required — it is
-        // empty for worker-assets installs, whose LIFF is restored by the
-        // Worker script rollback itself.
-        if (
-          snap?.snapshot_worker_url &&
-          snap.snapshot_admin_deployment
-        ) {
-          await runRollback(
-            ctx,
-            {
-              snapshotWorkerBundleUrl: snap.snapshot_worker_url,
-              snapshotAdminDeployment: snap.snapshot_admin_deployment,
-              snapshotLiffDeployment: snap.snapshot_liff_deployment ?? '',
-            },
-            ev,
-          );
-          await updateStatus(d1, updateId, 'rolled_back');
-        } else {
-          // No snapshot coordinates → cannot roll back safely.
-          await updateStatus(d1, updateId, 'failed');
-        }
-      } catch (rbErr) {
-        const rbMessage = rbErr instanceof Error ? rbErr.message : String(rbErr);
-        await setError(
-          d1,
-          updateId,
-          `original: ${original.message}\nrollback: ${rbMessage}`,
-        );
-        await updateStatus(d1, updateId, 'failed');
+      const recoveryErrors: unknown[] = [];
+      const persistBestEffort = async (operation: () => Promise<unknown>) => {
+        try { await operation(); } catch (error) { recoveryErrors.push(error); }
+      };
+      await persistBestEffort(() => setError(d1, updateId, original.stack ?? String(original)));
+      if (!deploymentStarted) {
+        await persistBestEffort(() => updateStatus(d1, updateId, 'failed'));
+        if (recoveryErrors.length) original.cause = new AggregateError(recoveryErrors, 'update_history_unavailable');
+        throw original;
       }
+      // D1 may be the component that failed. Recovery must not depend on reading
+      // snapshots back from it, writing history, or persisting progress events.
+      const recoveryEvents = { ...ev, emit: (event: UpdateEvent) => persistBestEffort(() => ev.emit(event)) };
+      await recoveryEvents.emit({step:'rollback',status:'running',error:original.message});
+      try {
+        await runRollback(ctx, {
+          snapshotWorkerBundleUrl: workerSnapshot,
+          snapshotAdminDeployment: adminLatest.id,
+          snapshotLiffDeployment: liffLatest.id,
+        }, recoveryEvents);
+        await persistBestEffort(() => updateStatus(d1, updateId, 'rolled_back'));
+      } catch (rbErr) {
+        recoveryErrors.push(rbErr);
+        const rbMessage = rbErr instanceof Error ? rbErr.message : String(rbErr);
+        await persistBestEffort(() => setError(d1, updateId, `original: ${original.message}\nrollback: ${rbMessage}`));
+        await persistBestEffort(() => updateStatus(d1, updateId, 'failed'));
+      }
+      if (recoveryErrors.length) original.cause = new AggregateError(recoveryErrors, 'update_recovery_diagnostics');
       // Rethrow original so callers learn the update failed.
       throw original;
     }
