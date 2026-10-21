@@ -282,3 +282,129 @@ test('new style selection opens once, explicit later and legacy later stay defer
   }
   expect(writes).toBe(1)
 })
+
+async function useIndustryFixture(page, style = 'salon', legacyMeet = false) {
+  await page.addInitScript(() => {
+    localStorage.setItem('lh_selected_account', 'visual-qa-account')
+    sessionStorage.setItem('lh_auth_selection_cleared', '1')
+  })
+  await page.route('**/api/**', async route => {
+    const url = new URL(route.request().url())
+    const response = await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` })
+    if (url.pathname === '/api/dashboard/style') {
+      expect(route.request().method()).toBe('GET')
+      const fixture = await response.json()
+      return route.fulfill({ json: { ...fixture, data: { ...fixture.data, style, styleSelected: true, styleMode: 'configured', shouldPromptStyleSelection: false } } })
+    }
+    if (legacyMeet && url.pathname === '/api/dashboard/style/schedule') {
+      const fixture = await response.json()
+      const entry = fixture.data.entries[0]
+      entry.id = 'meet:legacy-meet'
+      entry.kind = 'meet'
+      entry.booking = { ...entry.booking, id: 'legacy-meet', kind: 'meet', friendId: 'friend-1' }
+      return route.fulfill({ json: fixture })
+    }
+    return route.fulfill({ response })
+  })
+}
+
+for (const [style, heading] of [['standard', 'ダッシュボード'], ['ec', 'ダッシュボード'], ['restaurant', 'お店'], ['salon', 'サロン'], ['consult', '面談'], ['lesson', '教室']]) test(`${style} resumes shared setup and summary, then returns without changing the style`, async ({ page }) => {
+  await useIndustryFixture(page, style)
+  for (const [step, title] of [['0', 'はじめに、使い方を教えてください'], ['summary', '準備ができました']]) {
+    await page.goto(`/?setup=${step}`)
+    const dialog = page.getByRole('dialog', { name: title })
+    await expect(dialog).toBeVisible()
+    if (step === '0') await expect(dialog.locator('input[name="setup-style"]')).toHaveCount(8)
+    await dialog.getByRole('button', { name: '閉じる', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+    await expect(page).toHaveURL(/\/$/)
+    await expect(page.getByRole('heading', { name: heading, exact: true, level: 2 })).toBeVisible()
+  }
+})
+
+test('salon keeps existing KPI slots and forwards real staff, time and booking identity', async ({ page }) => {
+  await useIndustryFixture(page)
+  await page.goto('/')
+  const band = page.locator('[data-style-dashboard="salon"]')
+  await expect.poll(() => band.locator('[data-kpi-label]').evaluateAll(items => items.map(item => item.title))).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率'])
+  await expect(band).toContainText('8人')
+  for (const width of [1152, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 1000 })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0)
+    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`salon-${width}.png`) })
+  }
+  const board = page.getByRole('region', { name: '台帳の盤' })
+  await board.getByRole('button', { name: /入れる.*15:00/ }).first().click()
+  await expect(page).toHaveURL(/\/booking\/bookings\/new\?/)
+  let url = new URL(page.url())
+  expect(url.searchParams.get('staffId')).toBe('s1')
+  expect(url.searchParams.get('time')).toBe('15:00')
+  expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  await page.goto('/')
+  await board.getByRole('button', { name: /青木 真理さん/ }).click()
+  await page.getByRole('menuitem', { name: '詳細を開く' }).click()
+  await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'e1')
+
+  await page.goto('/?view=calendar&range=week')
+  const week = page.getByRole('region', { name: '1週間のカレンダー' })
+  await week.getByRole('button', { name: '予約を入れる', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/booking\/bookings\/new\?/)
+  url = new URL(page.url())
+  expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  expect(url.searchParams.get('time')).toMatch(/^\d{2}:\d{2}$/)
+  expect(url.searchParams.has('staffId')).toBe(false)
+  await page.goto('/?view=calendar&range=week')
+  await week.getByRole('button', { name: 'カット 山田 花子', exact: true }).click()
+  await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'w1')
+})
+
+
+test('consult forwards board and weekly booking identity, date, time and staff', async ({ page }) => {
+  await useIndustryFixture(page, 'consult')
+  await page.goto('/?view=board')
+  const board = page.getByRole('region', { name: '台帳の盤' })
+  await board.getByRole('button', { name: /入れる.*13:30/ }).first().click()
+  await expect(page).toHaveURL(/\/booking\/bookings\/new\?/)
+  let url = new URL(page.url())
+  expect(url.searchParams.get('staffId')).toBe('yamaguchi')
+  expect(url.searchParams.get('time')).toBe('13:30')
+  expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  await page.goto('/?view=board')
+  await board.getByRole('button', { name: /原田 修さん/ }).click()
+  await page.getByRole('menuitem', { name: '詳細を開く' }).click()
+  await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'm1')
+  await page.goto('/?view=calendar&range=week')
+  const week = page.getByRole('region', { name: '1週間のカレンダー' })
+  await week.getByRole('button', { name: '予約を入れる', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/booking\/bookings\/new\?/)
+  url = new URL(page.url())
+  expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  expect(url.searchParams.get('time')).toMatch(/^\d{2}:\d{2}$/)
+  expect(url.searchParams.has('staffId')).toBe(false)
+  await page.goto('/?view=calendar&range=week')
+  await week.getByRole('button', { name: '転職の初回面談 原田 修', exact: true }).click()
+  await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'm1')
+})
+
+test('legacy Meet consult opens the related friend without treating its ID as a booking', async ({ page }) => {
+  await useIndustryFixture(page, 'consult', true)
+  await page.goto('/?view=board')
+  await page.getByRole('region', { name: '台帳の盤' }).getByRole('button', { name: /原田 修さん/ }).click()
+  await page.getByRole('menuitem', { name: '詳細を開く' }).click()
+  await expect(page).toHaveURL(/\/friends\/detail\?id=friend-1$/)
+})
+
+test('pass summary separates simulation failures and cancellation from unavailable real billing', async ({ page }) => {
+  await useIndustryFixture(page, 'lesson')
+  await page.goto('/booking/menus?tab=passes')
+  const card = page.locator('[data-kpi-presentation="band"][data-kpi-density]').filter({ has: page.locator('[data-kpi-label][title="引き落としの失敗"]') })
+  await expect(card).toContainText('実課金は未接続')
+  await expect(card).toContainText('試験：失敗1・正常解約2')
+  await expect(card.locator('[data-kpi-number]')).toHaveText('—')
+  for (const width of [1152, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 1000 })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0)
+    await expect.poll(() => card.locator('[data-kpi-detail]').evaluate(el => ({ overflow: el.scrollWidth - el.clientWidth, height: el.clientHeight > 0 }))).toEqual({ overflow: 0, height: true })
+    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`passes-${width}.png`) })
+  }
+})
