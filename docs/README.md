@@ -474,6 +474,7 @@
 - [検証反映と独立点検前の引き継ぎ](release-log/unreleased/1786-kenta-staging-handoff.md)
 - [独立点検前の画面接続・承認・集計の修正](release-log/unreleased/1787-kenta-staging-review-fixes.md)
 - [はじめの質問の破棄と途中保存の修正](release-log/unreleased/1788-kenta-style-discard.md)
+- [独立点検からの安全性・予約・表示の修正](release-log/unreleased/1793-masato-independent-audit-fixes.md)
 - [独立点検後の計画と質問の保存・破棄の記録](release-log/unreleased/1790-kenta-after-review-plan.md)
 - [検証環境の最終確認と独立点検の開始準備](release-log/unreleased/1791-kenta-independent-review-ready.md)
 - [1781-kenta-cleanup-a01.md](release-log/unreleased/1781-kenta-cleanup-a01.md)
