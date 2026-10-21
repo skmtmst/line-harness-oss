@@ -120,7 +120,7 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
     }
     return route.fulfill({ response })
   })
-  for (const path of ['/', '/friends', '/broadcasts', '/templates/new', '/templates/detail?id=template-1', '/chats', '/hq', '/settings']) {
+  for (const path of ['/', '/friends', '/broadcasts', '/templates/edit', '/templates/detail?id=template-1', '/chats', '/hq', '/settings']) {
     await page.goto(path)
     const notice = page.getByRole('note').filter({ hasText: '回復コードの残りが0個です' })
     await expect(notice).toBeVisible()
