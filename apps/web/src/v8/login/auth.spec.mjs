@@ -284,27 +284,33 @@ test('new style selection opens once, explicit later and legacy later stay defer
 })
 
 async function useIndustryFixture(page, style = 'salon', legacyMeet = false) {
+  // Use the same mock responder without a second network request. Navigation can
+  // cancel a prefetch while route.fetch() is waiting, before its later fulfill.
+  const { mockFetch } = await import('../../../scripts/v8-guard/mock-local.mjs')
   await page.addInitScript(() => {
     localStorage.setItem('lh_selected_account', 'visual-qa-account')
     sessionStorage.setItem('lh_auth_selection_cleared', '1')
   })
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())
-    const response = await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` })
+    const response = await mockFetch(route.request().method(), `${url.pathname}${url.search}`)
     if (url.pathname === '/api/dashboard/style') {
       expect(route.request().method()).toBe('GET')
-      const fixture = await response.json()
+      const fixture = JSON.parse(response.body)
       return route.fulfill({ json: { ...fixture, data: { ...fixture.data, style, styleSelected: true, styleMode: 'configured', shouldPromptStyleSelection: false } } })
     }
     if (legacyMeet && url.pathname === '/api/dashboard/style/schedule') {
-      const fixture = await response.json()
+      const fixture = JSON.parse(response.body)
       const entry = fixture.data.entries[0]
       entry.id = 'meet:legacy-meet'
       entry.kind = 'meet'
       entry.booking = { ...entry.booking, id: 'legacy-meet', kind: 'meet', friendId: 'friend-1' }
       return route.fulfill({ json: fixture })
     }
-    return route.fulfill({ response })
+    return route.fulfill({ status: response.status, headers: {
+      ...response.headers,
+      'access-control-allow-origin': route.request().headers().origin ?? 'null',
+    }, body: response.body })
   })
 }
 
