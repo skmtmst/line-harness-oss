@@ -63,7 +63,10 @@ describe('店の比較の表', () => {
     for (const def of METRICS) expect(screen.getByRole('button', { name: `${def.label}で並べ替える` })).toBeTruthy()
     expect(screen.getByText('−25')).toBeTruthy()
     expect(screen.getAllByTitle('この数はまだ取れていません').length).toBe(2)
-    expect(screen.getByText('2 店の平均')).toBeTruthy()
+    const average = screen.getByText('2 店の平均')
+    const fullSummary = average.parentElement?.querySelector('[data-truncated-text]')
+    expect(fullSummary?.getAttribute('title')).toBe(fullSummary?.textContent)
+    for (const def of METRICS) expect(fullSummary?.getAttribute('title')).toContain(def.label)
     expect(screen.getByText(/札は前の期間との差（赤＝悪い・緑＝良い）/)).toBeTruthy()
   })
 

@@ -159,9 +159,7 @@ export default function StoreComparisonList() {
       </DataTable>
       <div className={styles.averageBand}>
         <span className={styles.averageTitle}>{`${total} 店の平均`}</span>
-        <span className={styles.averageText}>
-          {METRICS.map((def) => `${def.label} ${formatMetric(def.key, data.average[def.key] ?? null)}`).join('・')}
-        </span>
+        <TruncatedText className={styles.averageText} value={METRICS.map((def) => `${def.label} ${formatMetric(def.key, data.average[def.key] ?? null)}`).join('・')} />
         <span className={styles.averageNote}>{`札は${compare === 'average' ? '全店の平均' : '前の期間'}との差（赤＝悪い・緑＝良い）`}</span>
       </div>
     </>
