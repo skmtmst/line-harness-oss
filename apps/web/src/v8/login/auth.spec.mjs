@@ -99,7 +99,10 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
 })
 for (const width of [1152,1440,1920]) test(`low recovery-code banner is not covered by page content at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
-  await page.addInitScript(() => localStorage.setItem('lh_selected_account', 'visual-qa-account'))
+  await page.addInitScript(() => {
+    localStorage.setItem('lh_selected_account', 'visual-qa-account')
+    sessionStorage.setItem('lh_auth_selection_cleared', '1')
+  })
   let remaining = 0
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())

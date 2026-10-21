@@ -33,6 +33,7 @@
 .brand small { display: block; color: var(--color-ink-secondary); font-size: var(--text-micro); }
 
 .card[data-title-align='start'] h1 { text-align: left; }
+.card[data-title-align='center'] h1 { text-align: center; }
 
 .detailRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-8); min-width: 0; }
 .detailValue { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-8); min-width: 0; }
