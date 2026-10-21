@@ -30,6 +30,7 @@ import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { useManagedFolders } from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
@@ -219,14 +220,14 @@ export default function BroadcastListV8() {
   const [dateTo, setDateTo] = useListUrlValue('dateTo', '')
   const [datePopoverOpen, setDatePopoverOpen] = useState(false)
   const datePopoverRef = useRef<HTMLDivElement>(null)
-  const [folders, setFolders] = useState<Folder[]>([])
-  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
+  const { folders, unfiledCount, error: folderLoadError, reload: loadFolders } = useManagedFolders('broadcast', selectedAccountId)
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
   const [folderBusy, setFolderBusy] = useState(false)
-  const [folderError, setFolderError] = useState('')
+  const [folderActionError, setFolderError] = useState('')
+  const folderError = folderActionError || folderLoadError
   /* 行を選んでまとめてフォルダへ移す（左の選ぶ欄）。選ぶのはこのページの行だけ。 */
   const bulkAnchorRef = useRef<HTMLButtonElement | null>(null)
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
@@ -271,26 +272,6 @@ export default function BroadcastListV8() {
     })
   }, [broadcasts, insights])
 
-  const loadFolders = useCallback(async () => {
-    setFolderError('')
-    try {
-      const res = await api.folders.list('broadcast')
-      if (res.success) {
-        setFolders(res.data)
-        setUnfiledCount(res.unfiledCount ?? null)
-      } else {
-        setFolderError('フォルダを読み込めませんでした。')
-      }
-    } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-      setFolderError('フォルダを読み込めませんでした。')
-    }
-  }
-  }, [saveErrors])
-
-  useEffect(() => { void loadFolders() }, [loadFolders]);
 
 
   const moveFolderOrder = async (index: number, direction: -1 | 1) => {

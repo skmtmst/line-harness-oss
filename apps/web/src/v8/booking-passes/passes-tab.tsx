@@ -4,7 +4,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Gift } from 'lucide-react'
-import type { BookingPassPlan } from '@line-crm/shared'
+import type { BookingPassPlan, BookingPassPlanSummary } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -37,7 +37,7 @@ import styles from './passes.module.css'
  * 「今月の更新」の数はまだ取れないので、持っている人の数を出す。オンラインの購入・定期課金は後の段。
  */
 
-type Summary = { onSale: number; holders: number; expiringIn30d: number; billingFailed: number }
+type Summary = BookingPassPlanSummary
 type Status = 'loading' | 'ready' | 'error'
 type Kind = '' | 'ticket' | 'monthly'
 type Holder = { id: string; friend_id: string; display_name: string | null; remaining: number | null; expires_at: string | null; status: string }
@@ -81,7 +81,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
       const items = response.data.items.filter((plan) => !kind || plan.kind === kind)
       setPlans(items)
       setTotal(response.data.total)
-      setSummary(response.data.summary as Summary)
+      setSummary(response.data.summary)
       setStatus('ready')
       const counts = await Promise.allSettled(items.map((plan) => bookingPassPlansApi.holders(accountId, plan.id, 0, 10)))
       if (current.current !== accountId) return
@@ -160,7 +160,13 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
       <KpiCard presentation="band" title="販売中" value={summary?.onSale ?? null} unit="種類" detail="いま売っている券" />
       <KpiCard presentation="band" title="持っている人" value={summary?.holders ?? null} unit="人" detail="使える券がある人" />
       <KpiCard presentation="band" title="期限が近い" value={summary?.expiringIn30d ?? null} unit="枚" detail="30 日以内" />
-      <KpiCard presentation="band" title="引き落としの失敗" value={summary?.billingFailed ?? null} unit="件" detail="支払いが止まった券" />
+      <KpiCard
+        presentation="band" title="引き落としの失敗" value={summary?.billingFailed ?? null} unit="件"
+        detail={summary ? `実課金は未接続（試験：失敗${summary.billingSimulationFailed}・正常解約${summary.billingSimulationCancelled}）` : status === 'error' ? '読み込めませんでした' : '読み込んでいます'}
+        detailLayout="qualifier"
+        help="試験の内訳は券の件数で、復旧済みの請求失敗を除き、解約した券は正常解約として数えます。実課金は未接続なので「—」と表示し、試験の結果と正常解約を実際の引き落とし失敗に含めません。"
+        helpDisplay="question"
+      />
     </KpiBand>
   )
 

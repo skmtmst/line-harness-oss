@@ -23,7 +23,7 @@ const PLANS = [
 ]
 
 beforeEach(() => {
-  api.list.mockResolvedValue({ success: true, data: { items: PLANS, total: 2, summary: { onSale: 1, holders: 86, expiringIn30d: 9, billingFailed: 1 } } })
+  api.list.mockResolvedValue({ success: true, data: { items: PLANS, total: 2, summary: { onSale: 1, holders: 86, expiringIn30d: 9, billingFailed: null, billingStatus: 'unconfigured', billingSimulationFailed: 1, billingSimulationCancelled: 2 } } })
   api.holders.mockImplementation(async (_a: string, id: string) => ({ success: true, data: { items: [], total: id === 'p1' ? 42 : 0 } }))
   api.start.mockResolvedValue({ success: true, data: { status: 'on_sale', version: 2 } })
   api.stop.mockResolvedValue({ success: true, data: { status: 'stopped', version: 3 } })
@@ -36,6 +36,10 @@ describe('回数券・月謝の表', () => {
     render(<PassesTabV8 accountId="a" canEdit />)
     await screen.findByText('ヨガ 10 回券')
     expect(screen.getByText('86')).toBeTruthy()
+    const billingCard = screen.getByText(/実課金は未接続/).closest('[data-kpi-presentation]')!
+    expect(billingCard.textContent).toContain('—')
+    expect(billingCard.textContent).toContain('試験：失敗1・正常解約2')
+    expect(within(billingCard as HTMLElement).getByRole('button', { name: '引き落としの失敗の説明' })).toBeTruthy()
     expect(screen.getByText('10 回')).toBeTruthy()
     expect(screen.getByText('月 4 回')).toBeTruthy()
     expect(screen.getByText('買って 6 か月')).toBeTruthy()
@@ -45,6 +49,18 @@ describe('回数券・月謝の表', () => {
     await waitFor(() => expect(screen.getByText('42 人')).toBeTruthy())
     expect(within(screen.getByText('ヨガ 10 回券').closest('tr')!).getByText('販売中')).toBeTruthy()
     expect(screen.getByText('下書き')).toBeTruthy()
+  })
+
+  it('試験が0件でも未接続の実課金を0件にせず、説明から集計の境界を読める', async () => {
+    api.list.mockResolvedValueOnce({ success: true, data: { items: PLANS, total: 2, summary: { onSale: 1, holders: 86, expiringIn30d: 9, billingFailed: null, billingStatus: 'unconfigured', billingSimulationFailed: 0, billingSimulationCancelled: 0 } } })
+    render(<PassesTabV8 accountId="a" canEdit={false} />)
+    await screen.findByText('ヨガ 10 回券')
+    const billingCard = screen.getByText(/実課金は未接続/).closest('[data-kpi-presentation]') as HTMLElement
+    expect(billingCard.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+    expect(billingCard.textContent).toContain('試験：失敗0・正常解約0')
+    const trigger = within(billingCard).getByRole('button', { name: '引き落としの失敗の説明' })
+    fireEvent.click(trigger)
+    expect(document.getElementById(trigger.getAttribute('aria-describedby')!)?.textContent).toContain('実際の引き落とし失敗に含めません')
   })
 
   it('下書きの販売を始めるときは確かめの窓を出し、いまの版を添えて始める', async () => {
@@ -78,5 +94,9 @@ describe('回数券・月謝の表', () => {
     api.list.mockRejectedValueOnce(new Error('down'))
     render(<PassesTabV8 accountId="a" canEdit />)
     expect(await screen.findByRole('button', { name: /もう一度/ })).toBeTruthy()
+    const billingCard = screen.getByText('引き落としの失敗').closest('[data-kpi-presentation]') as HTMLElement
+    expect(billingCard.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+    expect(billingCard.textContent).toContain('読み込めませんでした')
+    expect(billingCard.textContent).not.toContain('試験：失敗0')
   })
 })

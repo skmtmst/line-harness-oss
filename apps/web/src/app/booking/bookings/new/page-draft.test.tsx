@@ -279,6 +279,27 @@ describe('代理予約: 下書き・空きセル・権限（実React）', () => 
     expect(valueOf(byLabel('空いている時間'))).toBe('')
   })
 
+  it('サロン台帳の担当IDを使い、改名後も日時と担当を引き継ぐ（URLを下書きより優先）', async () => {
+    seedDraft({ staffId: 'old-draft-staff', date: '2026-11-01', time: '15:00' })
+    window.history.replaceState(null, '', '/booking/bookings/new?date=2026-11-02&time=10:00&staffId=staff-ny&staff=old-name')
+    await mount()
+    await flush()
+    expect(valueOf(byLabel('スタッフ'))).toBe('staff-ny')
+    expect(valueOf(byLabel('空いている時間'))).toBe('10:00')
+    expect(valueOf(all('input').find((element) => element.getAttribute('name') === 'date')!)).toBe('2026-11-02')
+    expect(api.listMenuStaff).toHaveBeenCalledWith('account-ny', 'menu-ny')
+  })
+
+  it('台帳の担当IDがこの店舗のメニューに存在しなければ選択せず、空き枠を照会しない', async () => {
+    window.history.replaceState(null, '', '/booking/bookings/new?date=2026-11-02&time=10:00&staffId=other-account-staff')
+    await mount()
+    await flush()
+    await act(async () => { setValue(byLabel('予約メニュー'), 'menu-ny') })
+    await flush()
+    expect(valueOf(byLabel('スタッフ'))).toBe('')
+    expect(api.getAvailability).not.toHaveBeenCalled()
+  })
+
   it('N-401: 閲覧のみの人には確認・登録の操作ボタンを出さない', async () => {
     staffMe.mockResolvedValue({
       success: true,

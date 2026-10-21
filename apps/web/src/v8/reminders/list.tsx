@@ -28,7 +28,7 @@ import { Activity, AlertCircle, ArrowRight, Bell, Calendar, CalendarClock, FileP
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye, MoreHorizontal } from 'lucide-react';
-import type { ApiResponse, Folder, ReminderTriggerType } from '@line-crm/shared';
+import type { ApiResponse, ReminderTriggerType } from '@line-crm/shared';
 import { api, fetchApi, type ListStats } from '@/lib/api';
 import { useOffsetServerList, type ServerListResponse } from '@/lib/use-server-list';
 import { clampSearchQuery } from '@/lib/search-query';
@@ -42,7 +42,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import FilterChip from '@/components/shared/filter-chip'
-import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
+import ManagedFolderPanel, { useManagedFolders } from '@/components/shared/managed-folder-panel'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
@@ -178,9 +178,7 @@ export default function RemindersListV8() {
   // ここでは板IDだけを切り替える。
   const narrow = useNarrowViewport()
 
-  const [folders, setFolders] = useState<Folder[]>([])
-  /** 「未分類」の件数。`null` は数えていない。 */
-  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
+  const { folders, unfiledCount, error: foldersError, reload: loadFolders } = useManagedFolders('reminder', selectedAccountId)
   /* 絞り込み・検索語・並び順・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
   const [nameQuery, setNameQuery] = useListUrlParam('q')
   const [friendId] = useListUrlParam('friendId')
@@ -196,7 +194,6 @@ export default function RemindersListV8() {
   /* 行の詳細パネル（V8「サクサク感」C①・D・E）。開いている行のID。 */
   const [panelId, setPanelId] = useDetailPanelUrl('reminder')
   const [actionError, setActionError] = useState('')
-  const [foldersError, setFoldersError] = useState(false)
 
   /* 数の帯。 */
   const [stats, setStats] = useState<ListStats | null>(null)
@@ -215,25 +212,6 @@ export default function RemindersListV8() {
   const setDuplicateError =(message: string | null) => { if (message) notifyToast(message, { tone: 'error' }) }
   const [moveNotice, setMoveNotice] = useState('')
 
-  const loadFolders = useCallback(async () => {
-    setFoldersError(false)
-    try {
-      const res = await api.folders.list('reminder')
-      if (res.success) {
-        setFolders(res.data)
-        setUnfiledCount(res.unfiledCount ?? null)
-      } else {
-        setFoldersError(true)
-      }
-    } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      { if (!fieldFailure)
-      setFoldersError(true)
-    }
-  }
-  }, [saveErrors]);
-
 
   const loadStats = useCallback(async () => {
     setStatsFailed(false)
@@ -247,9 +225,6 @@ export default function RemindersListV8() {
     }
   }, [selectedAccountId, saveErrors])
 
-  useEffect(() => {
-    void loadFolders()
-  }, [loadFolders])
   useEffect(() => {
     void loadStats()
   }, [loadStats])
@@ -1272,6 +1247,7 @@ export default function RemindersListV8() {
               ＋ リマインダを作る
             </Button> : undefined}
             kind="reminder"
+            accountId={selectedAccountId}
             folders={folders}
             onChanged={loadFolders}
             canManage={canEdit}

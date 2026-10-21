@@ -84,7 +84,7 @@ export function stylePeriodMetrics(rows: StyleBooking[], style: IndustryStyle, f
   metrics.noShowRate = ratio(
     last30.filter((r) => r.status === 'no_show').length,
     last30.length,
-    '過去30日の無断 / （予約 − 取消 − 押さえ）',
+    `過去${noShowDays}日の無断 / （予約 − 取消 − 押さえ）`,
   );
   const comparisonOffset =
     query.compare === 'last_week'

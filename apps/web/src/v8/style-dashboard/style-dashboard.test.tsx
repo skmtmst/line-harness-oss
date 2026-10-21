@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { STYLE_CONFIG, rangeFromParam, tabFromParam, viewFromParam } from './config'
 import { rowMenuItems } from './parts'
 import { restaurantRow } from './restaurant-today'
-import { analyticsWindow, metricDelta, metricValue } from './adapter'
+import { analyticsWindow, kpisFor, metricDelta, metricValue } from './adapter'
 import type { RestaurantReservation } from '@/lib/restaurant-test-api'
+import type { StyleSnapshot } from '@line-crm/shared'
 
 const noop = { open: () => {}, visit: () => {}, line: () => {}, pay: () => {}, copy: () => {}, roster: () => {} }
 
@@ -61,5 +62,29 @@ describe('業種ダッシュボード（XBkC2）', () => {
 
   it('分析の 30日は選んだ日を最後の日にした [from, to)', () => {
     expect(analyticsWindow('2026-10-15', 30)).toEqual({ from: '2026-09-16', to: '2026-10-16' })
+  })
+
+  it('サロンは既存の5枠へ予約・対応待ち・次回予約率・呼び戻し待ち・無断率をつなぐ', () => {
+    const snapshot: StyleSnapshot = {
+      style: 'salon', asOf: '2026-10-21T01:00:00Z', timeZone: 'Asia/Tokyo',
+      from: '2026-10-21T00:00:00+09:00', to: '2026-10-22T00:00:00+09:00', dateBasis: 'visit', range: 'today',
+      metrics: {
+        bookings: { value: 12, unit: '件', status: 'available', formula: '取消を除く予約' },
+        estimatedRevenue: { value: 96800, unit: '円', status: 'available', formula: '料金×確定数' },
+        recall: { value: 4, unit: '人', status: 'available', formula: '来店間隔を過ぎ次の予約がない人' },
+        noShowRate: { value: 0.02, unit: '', numerator: 2, denominator: 100, status: 'available', formula: '過去30日の無断／対象予約' },
+      }, previous: {}, items: [], newBookings: [], resultId: 'test',
+    }
+    const kpis = kpisFor('salon', snapshot, 'today')
+    expect(kpis.map((item) => item.id)).toEqual(['today', 'waiting', 'rebook', 'recall', 'noshow'])
+    expect(kpis[0].detail).toContain('96,800')
+    expect(kpis[3]).toMatchObject({ value: 4, unit: '人', detail: '次の予約がない人' })
+    expect(kpis[3].help).toContain(snapshot.metrics.recall.formula)
+    expect(kpis[4]).toMatchObject({ value: 2, unit: '%' })
+    expect(kpis[4].help).toContain(snapshot.metrics.noShowRate.formula)
+
+    const unavailable = { ...snapshot, metrics: { ...snapshot.metrics, recall: { ...snapshot.metrics.recall, value: null, status: 'unconfigured' as const }, noShowRate: { ...snapshot.metrics.noShowRate, value: null, denominator: 0, status: 'insufficient_sample' as const } } }
+    expect(kpisFor('salon', unavailable, 'today')[3]).toMatchObject({ value: null, detail: '未設定です' })
+    expect(kpisFor('salon', unavailable, 'today')[4]).toMatchObject({ value: null, unit: '%', detail: '数が少ないため出せません' })
   })
 })

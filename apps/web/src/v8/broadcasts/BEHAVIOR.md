@@ -17,7 +17,7 @@
 - `api.dashboard.overview`：今月の送信枠（quotaLimit・quotaUsed）。
 - `api.broadcasts.savedViews.list / create`：保存した検索。保存の形（filters・sortKey `scheduled`・pageSize 20）は今までと同じ。
 - `api.broadcasts.getInsight(id)`：一覧に集計が同梱されていない送信済みだけ1回ずつ。
-- `api.folders.list('broadcast')`・`swapOrder`・`delete`：フォルダ。`api.broadcasts.update(id, { folderId, expectedVersion })`：フォルダへ移す（押した瞬間に移した形を見せ、失敗したら戻して「もう一度」）。
+- `useManagedFolders('broadcast', accountId)` から `api.folders.list('broadcast', accountId)`：一覧と同じ店舗のフォルダ件数。店舗切替時に前の件数を捨て、古い応答では上書きしない。`swapOrder`・`delete`：フォルダ。`api.broadcasts.update(id, { folderId, expectedVersion })`：フォルダへ移す（押した瞬間に移した形を見せ、失敗したら戻して「もう一度」）。
 - `api.broadcasts.delete(id)`：削除（確認の窓のあと）。
 - 一覧の選択からまとめてフォルダへ移す。選ぶ窓で確定するまで送らず、各配信の版を照合する。失敗した配信だけ再試行し、閲覧のみ・統括からの配信は選べない。
 

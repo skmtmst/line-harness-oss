@@ -88,8 +88,8 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
     kpi({ id: 'today', key: 'bookings', title: `${r}の予約`, detail: (x) => { const e = metricValue(x.metrics.estimatedRevenue); return e.valueText ? `見込み ${e.valueText}` : '見込み —' }, link: { label: '一覧', href: '/booking/bookings' }, help: '取消を除く予約です。来店日で数えます。' }, s),
     kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => '承認待ち・来店の印がまだ', link: { label: '内訳', href: '/booking/bookings' }, help: '承認待ち・来店の印が付いていない予約など、お店が何かする必要がある数です。' }, s),
     kpi({ id: 'rebook', key: 'nextBookingRate', title: '次回予約率', detail: () => '過去30日', link: { label: '人を見る', href: '/friends' }, help: '施術のあと24時間以内に次の予約を入れた人の割合です。' }, s),
-    paymentKpi(range),
-    newKpi(s, '/booking/bookings', range),
+    kpi({ id: 'recall', key: 'recall', title: '呼び戻し待ち', detail: () => '次の予約がない人', link: { label: '友だち一覧', href: '/friends' }, help: '来店間隔の目安を過ぎ、次の予約がない人の数です。' }, s),
+    kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '無断／対象の予約', link: { label: '友だち一覧', href: '/friends' }, help: '対象期間の予約に対する無断キャンセルの割合です。期間と除外条件は計算式で確認できます。' }, s),
   ]
   if (style === 'consult') return [
     kpi({ id: 'meetings', key: 'bookings', title: `${r}の面談`, detail: (x) => `実施 ${num(x, 'visits') ?? '—'}`, link: { label: '一覧', href: '/booking/bookings' }, help: '取消を除く面談です。面談日で数えます。' }, s),
@@ -136,7 +136,7 @@ function rowOf(style: IndustryStyle, e: StyleScheduleEntry, sch: StyleSchedule, 
   const state = bookingStatus(b, style)
   const live = !['cancelled', 'rejected', 'expired', 'no_show'].includes(b.status)
   const past = Date.parse(b.startsAt) <= now.getTime()
-  const extra = { past, live, booking: { id: b.id, kind: b.kind, version: b.version, updatedAt: b.updatedAt, price: b.price, partySize: b.partySize, startsAt: b.startsAt, meetingUrl: b.meetingUrl } }
+  const extra = { past, live, booking: { id: b.id, friendId: b.friendId, kind: b.kind, version: b.version, updatedAt: b.updatedAt, price: b.price, partySize: b.partySize, startsAt: b.startsAt, meetingUrl: b.meetingUrl } }
   if (style === 'restaurant') return { ...base, ...extra, reservationId: b.id, people: b.partySize, seat: columnNames || '—', course: e.title || '席のみ', courseNote: b.price ? `1人 ${yen(b.price)}` : '—', state, action: !live ? null : b.visited ? 'undo' : 'visit' }
   if (style === 'consult') return { ...base, ...extra, sub: e.title, meet: b.meetingMode ? MEET[b.meetingMode] : undefined, staff: columnNames || '—', state: b.visited && !b.outcome ? { label: '結果待ち', tone: 'warning' } : state, action: b.visited ? (b.outcome ? 'done' : 'result') : !live ? null : b.meetingUrl ? 'meet' : b.location ? 'place' : null, actionHref: b.meetingUrl ?? (b.location ? `https://maps.google.com/?q=${encodeURIComponent(b.location)}` : undefined) }
   return { ...base, ...extra, course: e.title, courseNote: b.price ? yen(b.price) : undefined, staff: columnNames || '—', state, action: b.visited ? 'done' : !live ? null : ['requested', 'pending'].includes(b.status) ? 'approve' : 'visit' }

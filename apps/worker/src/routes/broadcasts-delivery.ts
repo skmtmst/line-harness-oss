@@ -1,9 +1,11 @@
+import { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from '../features/broadcasts/index.js';
 import { logger } from '@line-crm/shared/server';
 import { simulationContext, scheduleSimulation, processBroadcastSimulation, simulationPreview } from '../features/broadcasts/broadcast-simulation/index.js';
 import { maybeStartAb, maybeReplayAbStart } from './broadcast-ab.js';
 import { GapError } from '../services/gap-common.js';
 import { broadcastSendPreview, broadcastQuietHoursShift } from '../services/gap-send-preview.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
+import { sameJsonMeaning } from './broadcast-json.js';
 import { parseJsonArray } from './broadcast-json.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -101,7 +103,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       const at=typeof sendBody.scheduledAt==='string'?sendBody.scheduledAt:new Date().toISOString();
       const shifted=await broadcastQuietHoursShift(c.env.DB,existing.line_account_id,at),scheduled=shifted??(sendBody.scheduledAt as string|undefined);
       if(scheduled){
-        const result=await c.env.DB.prepare("UPDATE broadcasts SET status='scheduled',scheduled_at=?,lock_version=lock_version+1 WHERE id=? AND status='draft' AND lock_version=?").bind(scheduled,id,sendBody.expectedVersion).run();
+        const result=await c.env.DB.prepare("UPDATE broadcasts SET status='scheduled',scheduled_at=?,lock_version=lock_version+1 WHERE id=? AND status='draft' AND lock_version=? AND COALESCE(approval_status,'none')=?").bind(scheduled,id,sendBody.expectedVersion,broadcastDefinitionGuardArgs(existing)[1]).run();
         if(!result.meta.changes)return c.json({success:false,error:'version_conflict'},409);
         return c.json({success:true,data:{scheduled:true,scheduledAt:scheduled,quietHoursShiftTo:shifted}});
       }
@@ -203,8 +205,8 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     const lockResult = await c.env.DB.prepare(
       `UPDATE broadcasts
             SET status = 'sending', batch_offset = 0, total_count = ?
-          WHERE id = ? AND status IN ('draft','scheduled')`,
-    ).bind(total, id).run();
+          WHERE id = ? AND status IN ('draft','scheduled') ${BROADCAST_DEFINITION_GUARD_SQL}`,
+    ).bind(total, id, ...broadcastDefinitionGuardArgs(existing)).run();
     if (!lockResult.meta.changes) {
       return c.json({ success: false, error: 'Broadcast is already sent or sending' }, 409);
     }
@@ -275,8 +277,8 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     const lockResult = await c.env.DB.prepare(
       `UPDATE broadcasts
             SET status = 'sending', batch_offset = 0, total_count = ?, segment_conditions = ?
-          WHERE id = ? AND status IN ('draft','scheduled')`,
-    ).bind(total, JSON.stringify(conditions), id).run();
+          WHERE id = ? AND status IN ('draft','scheduled') ${BROADCAST_DEFINITION_GUARD_SQL}`,
+    ).bind(total, JSON.stringify(conditions), id, ...broadcastDefinitionGuardArgs(existing)).run();
     if (!lockResult.meta.changes) {
       return c.json({ success: false, error: 'Broadcast is already sent or sending' }, 409);
     }
@@ -342,8 +344,8 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     }
 
     const lockResult = await c.env.DB.prepare(
-      `UPDATE broadcasts SET status = 'sending', batch_offset = 0, total_count = ? WHERE id = ? AND status IN ('draft','scheduled')`
-    ).bind(projectedTotal, id).run();
+      `UPDATE broadcasts SET status = 'sending', batch_offset = 0, total_count = ? WHERE id = ? AND status IN ('draft','scheduled') ${BROADCAST_DEFINITION_GUARD_SQL}`
+    ).bind(projectedTotal, id, ...broadcastDefinitionGuardArgs(existing)).run();
     if (!lockResult.meta.changes) {
       return c.json({ success: false, error: 'Broadcast is already sent or sending' }, 409);
     }
@@ -387,8 +389,8 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       // Atomic lock: status='draft'|'scheduled' のときだけ status='sending' に遷移
       const tagMarker = JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: existing.target_tag_id }] });
       const lockResult = await c.env.DB.prepare(
-        `UPDATE broadcasts SET status = 'sending', batch_offset = 0, segment_conditions = ? WHERE id = ? AND status IN ('draft','scheduled')`
-      ).bind(tagMarker, id).run();
+        `UPDATE broadcasts SET status = 'sending', batch_offset = 0, segment_conditions = ? WHERE id = ? AND status IN ('draft','scheduled') ${BROADCAST_DEFINITION_GUARD_SQL}`
+      ).bind(tagMarker, id, ...broadcastDefinitionGuardArgs(existing)).run();
       if (!lockResult.meta.changes) {
         return c.json({ success: false, error: 'Broadcast is already sent or sending' }, 409);
       }
@@ -451,14 +453,14 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   // 一意に確定する (rollback 時の status 復元に使用)。
   let claimedStatus: 'draft' | 'scheduled' | null = null;
   const draftClaim = await c.env.DB.prepare(
-    `UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'draft'`
-  ).bind(id).run();
+    `UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'draft' ${BROADCAST_DEFINITION_GUARD_SQL}`
+  ).bind(id, ...broadcastDefinitionGuardArgs(existing)).run();
   if (draftClaim.meta.changes) {
     claimedStatus = 'draft';
   } else {
     const schedClaim = await c.env.DB.prepare(
-      `UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'scheduled'`
-    ).bind(id).run();
+      `UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'scheduled' ${BROADCAST_DEFINITION_GUARD_SQL}`
+    ).bind(id, ...broadcastDefinitionGuardArgs(existing)).run();
     if (schedClaim.meta.changes) {
       claimedStatus = 'scheduled';
     }
@@ -520,6 +522,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
     return inputError(c, { success: false, error: 'conditions with operator and rules array is required' }, 400, ["conditions"]);
   }
 
+  const segmentAudienceChanged = existing.target_type !== 'segment' || !sameJsonMeaning(existing.segment_conditions, body.conditions);
   /*
    * 二者承認のゲート（m12a）。絞り込み送信も人数で判定する。
    * 送る条件は行に無いので、今回の条件を重ねた行で数える。
@@ -530,6 +533,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
       ...existing,
       target_type: 'segment',
       segment_conditions: JSON.stringify(body.conditions),
+      ...(segmentAudienceChanged ? { approval_status: 'none' } : {}),
     } as typeof existing;
     const segmentGate = await enforceBroadcastSendApproval(c.env.DB, mergedForGate, {
       confirmedRecipientCount: (body as { confirmedRecipientCount?: unknown }).confirmedRecipientCount,
@@ -605,8 +609,8 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
 
   // Atomic lock: status='draft'|'scheduled' のときだけ status='sending' に遷移
   const lockResult = await c.env.DB.prepare(
-    `UPDATE broadcasts SET status = 'sending', batch_offset = 0, segment_conditions = ? WHERE id = ? AND status IN ('draft','scheduled')`
-  ).bind(JSON.stringify(body.conditions), id).run();
+    `UPDATE broadcasts SET status = 'sending', batch_offset = 0, target_type = 'segment', segment_conditions = ?, approval_status = CASE WHEN ? THEN 'none' ELSE approval_status END, lock_version = lock_version + ? WHERE id = ? AND status IN ('draft','scheduled') ${BROADCAST_DEFINITION_GUARD_SQL}`
+  ).bind(JSON.stringify(body.conditions), segmentAudienceChanged ? 1 : 0, segmentAudienceChanged ? 1 : 0, id, ...broadcastDefinitionGuardArgs(existing)).run();
   if (!lockResult.meta.changes) {
     return c.json({ success: false, error: 'Broadcast is already sent or sending' }, 409);
   }

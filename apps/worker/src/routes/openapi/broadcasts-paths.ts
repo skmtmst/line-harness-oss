@@ -178,7 +178,15 @@ export const broadcastsPaths = {
       tags: ['Broadcasts'],
       summary: '承認（承認する人が押す）',
       parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-      responses: { '200': { description: '承認した（needsSend のときは送信へ進める）' }, '403': { description: '権限なし／自分の依頼' }, '409': { description: '依頼中でない' } },
+      requestBody: {
+        required: true,
+        content: { 'application/json': { schema: {
+          type: 'object',
+          properties: { expectedVersion: { type: 'integer', minimum: 1, description: '承認者が内容を確認した配信の版' } },
+          required: ['expectedVersion'],
+        } } },
+      },
+      responses: { '200': { description: '承認した（needsSend のときは送信へ進める）' }, '400': { description: '確認した版が未指定、または正の安全な整数でない' }, '403': { description: '権限なし／自分の依頼' }, '409': { description: '確認後に本文・宛先・承認依頼が変わった、または依頼中でない' } },
     },
   },
   '/api/broadcasts/{id}/approval-reject': {

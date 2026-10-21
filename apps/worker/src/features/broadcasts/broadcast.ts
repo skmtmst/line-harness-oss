@@ -1,3 +1,4 @@
+import { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from './broadcast-definition-guard.js';
 import { logger } from '@line-crm/shared/server';
 import {processBroadcastSimulation} from './broadcast-simulation.js';
 import { broadcastWideContext } from './broadcast-wide-context.js';
@@ -708,8 +709,8 @@ export async function processScheduledBroadcasts(
       }
       // Optimistic lock: claim this broadcast (scheduled → sending)
       const lockResult = await db
-        .prepare(`UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'scheduled'`)
-        .bind(broadcast.id)
+        .prepare(`UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'scheduled' ${BROADCAST_DEFINITION_GUARD_SQL}`)
+        .bind(broadcast.id, ...broadcastDefinitionGuardArgs(broadcast))
         .run();
       if (!lockResult.meta.changes || lockResult.meta.changes === 0) continue;
       // 予約の自動送信も記録に残す（#816）。誰の操作でもないので担当者は空＝「自動」。

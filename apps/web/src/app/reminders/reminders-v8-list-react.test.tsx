@@ -110,6 +110,24 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+test('フォルダの未分類件数も一覧と同じ店舗の範囲で読む', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  const folderScopes: Array<string | null> = []
+  handler = (url) => {
+    if (url.pathname === '/api/folders') {
+      const accountId = url.searchParams.get('account_id')
+      folderScopes.push(accountId)
+      return response({ success: true, data: [], unfiledCount: accountId === 'account-a' ? 0 : 7 })
+    }
+    return base(url)
+  }
+  await act(async () => root.render(<RemindersPage />))
+  await eventually(() => {
+    expect(folderScopes).toEqual(['account-a'])
+    expect(host.querySelector('button[title="未分類"]')?.textContent).toBe('未分類0')
+  })
+})
+
 test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async () => {
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<RemindersPage />))

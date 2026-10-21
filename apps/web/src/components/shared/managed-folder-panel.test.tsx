@@ -31,13 +31,13 @@ import ManagedFolderPanel, { useManagedFolders, type ManagedFolderControl } from
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-function Screen({ kind, canManage, onSelectSpy, controlRef }: { kind: string | null; canManage: boolean; onSelectSpy?: (id: string) => void; controlRef?: React.Ref<ManagedFolderControl> }) {
-  const state = useManagedFolders(kind, 'acc-1')
+function Screen({ kind, canManage, onSelectSpy, controlRef, accountId = 'acc-1' }: { kind: string | null; canManage: boolean; onSelectSpy?: (id: string) => void; controlRef?: React.Ref<ManagedFolderControl>; accountId?: string }) {
+  const state = useManagedFolders(kind, accountId)
   const [active, setActive] = useState('f-1')
   return (
     <ManagedFolderPanel
       kind={kind}
-      accountId="acc-1"
+      accountId={accountId}
       folders={state.folders}
       onChanged={state.reload}
       canManage={canManage}
@@ -80,6 +80,20 @@ const menuItems = () => [...document.querySelectorAll('[role="menuitem"]')].map(
 const click = async (el: Element | null | undefined) => { await act(async () => { (el as HTMLElement).click() }) }
 
 describe('一覧の左のフォルダの列（共通）', () => {
+  it('店舗を切り替えたあとは、前の店舗の遅い件数で上書きしない', async () => {
+    let resolveOld!: (value: unknown) => void
+    list.mockImplementation((_kind, accountId) => accountId === 'acc-1'
+      ? new Promise(resolve => { resolveOld = resolve })
+      : Promise.resolve({ success: true, data: [folder('new', '切替後のフォルダ', 0)], unfiledCount: 2 }))
+    await act(async () => { root.render(<Screen kind="scenario" canManage />) })
+    await act(async () => { root.render(<Screen kind="scenario" canManage accountId="acc-2" />) })
+    expect(host.querySelector('button[title="未分類"]')?.textContent).toBe('未分類2')
+    await act(async () => { resolveOld({ success: true, data: [folder('old', '前の店舗', 0)], unfiledCount: 9 }) })
+    expect(host.textContent).toContain('切替後のフォルダ')
+    expect(host.textContent).not.toContain('前の店舗')
+    expect(host.querySelector('button[title="未分類"]')?.textContent).toBe('未分類2')
+  })
+
   it('kind とアカウントで共通のフォルダを読み、作る→すべて→各フォルダ→未分類の順に並べる', async () => {
     await act(async () => { root.render(<Screen kind="scenario" canManage />) })
     expect(list).toHaveBeenCalledWith('scenario', 'acc-1')

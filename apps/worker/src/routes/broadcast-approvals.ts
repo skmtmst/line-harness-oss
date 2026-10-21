@@ -256,8 +256,8 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', inputJsonBoundar
               approval_reject_reason = NULL,
               approval_confirmed_count = NULL
         WHERE id = ? AND approval_status IN ('none', 'rejected', 'cancelled', 'expired')
-          AND status IN ('draft', 'scheduled')`,
-  ).bind(staff?.id ?? '', now, approverStaffId, note || null, broadcast.id).run();
+          AND status IN ('draft', 'scheduled') AND lock_version = ?`,
+  ).bind(staff?.id ?? '', now, approverStaffId, note || null, broadcast.id, broadcast.lock_version ?? 1).run();
   if (!claimed.meta.changes) {
     return c.json({ success: false, error: 'すでに承認の依頼中です。状態を読み直してください。', code: 'ALREADY_REQUESTED' }, 409);
   }
@@ -291,6 +291,13 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-approve', inputJsonBoundar
   if (!await sensitiveStepUpSatisfied(c, 'broadcast.approval')) {
     return stepUpRequiredResponse(c, '配信の承認には本人確認が必要です');
   }
+  const body = await c.req.json<{ expectedVersion?: unknown }>().catch(() => null);
+  if (!Number.isSafeInteger(body?.expectedVersion) || Number(body?.expectedVersion) < 1) {
+    return c.json({ success: false, error: '承認する本文の版が必要です。画面を読み直してから再承認してください。', code: 'EXPECTED_VERSION_REQUIRED' }, 400);
+  }
+  if (body!.expectedVersion !== (broadcast.lock_version ?? 1)) {
+    return c.json({ success: false, error: '本文または宛先が変わりました。画面を読み直してから再承認してください。', code: 'VERSION_CONFLICT' }, 409);
+  }
   const now = new Date().toISOString();
   // pending のときだけ承認済みにする。二重押し・取り消し後の承認を防ぐ。
   const claimed = await c.env.DB.prepare(
@@ -298,8 +305,11 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-approve', inputJsonBoundar
           SET approval_status = 'approved',
               approval_decided_by_staff_id = ?,
               approval_decided_at = ?
-        WHERE id = ? AND approval_status = 'pending' AND status IN ('draft', 'scheduled')`,
-  ).bind(staff?.id ?? '', now, broadcast.id).run();
+        WHERE id = ? AND approval_status = 'pending' AND status IN ('draft', 'scheduled') AND lock_version = ?
+          AND approval_requested_by_staff_id IS ? AND approval_requested_at IS ? AND approval_approver_staff_id IS ?`,
+  ).bind(staff?.id ?? '', now, broadcast.id, body!.expectedVersion, requestedBy,
+    (raw.approval_requested_at as string | null | undefined) ?? null,
+    (raw.approval_approver_staff_id as string | null | undefined) ?? null).run();
   if (!claimed.meta.changes) {
     return c.json({ success: false, error: '承認できる依頼がありません。状態を読み直してください。', code: 'NOT_PENDING' }, 409);
   }

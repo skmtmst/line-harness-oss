@@ -73,6 +73,7 @@ const row = {
   track_links: 1,
   line_account_id: requestBody.lineAccountId,
   alt_text: null,
+  lock_version: 3,
 };
 
 function setupApp({
@@ -221,6 +222,7 @@ describe('PUT /api/broadcasts/:id', () => {
     dbMocks.getBroadcastById.mockResolvedValueOnce(draft);
     dbMocks.updateBroadcast.mockResolvedValueOnce({
       ...draft,
+      lock_version: draft.lock_version + 1,
       message_bubbles_json: '[{"type":"text"}]',
       segment_conditions: '{"operator":"AND","rules":[]}',
       stealth_spread_minutes: 45,

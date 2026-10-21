@@ -72,6 +72,9 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
   if (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1) {
     return inputError(c, { success: false, error: 'expectedVersion must be a positive integer' }, 400, ["expectedVersion"]);
   }
+  if (body.expectedVersion !== (existing.lock_version ?? 1)) {
+    return c.json({ success: false, error: '本文または宛先が変わりました。画面を読み直してから保存してください。', code: 'VERSION_CONFLICT' }, 409);
+  }
   if (body.draftStep !== undefined && body.draftStep !== null
       && !BROADCAST_DRAFT_STEPS.has(body.draftStep)) {
     return inputError(c, { success: false, error: 'draftStep is invalid' }, 400, ["draftStep"]);
@@ -191,6 +194,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     || (body.messageContent !== undefined && body.messageContent !== existing.message_content)
     || (body.messageBubbles !== undefined
       && !sameJsonMeaning(existing.message_bubbles_json, body.messageBubbles))
+    || (body.messageOptions !== undefined && !sameJsonMeaning(existing.message_options_json, body.messageOptions))
     || (body.targetType !== undefined && body.targetType !== existing.target_type)
     || (body.targetTagId !== undefined && body.targetTagId !== existing.target_tag_id)
     || (segmentConditions !== undefined
@@ -205,6 +209,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
    * 人数の手入力との一致が要る。合わなければ予約を作らない。
    * 2人以上なら承認フロー（approval-request）へ進めるので、ここでは止めない。
    */
+  let approvalConfirmedCount: number | undefined;
   const makesNewReservation = statusUpdate === 'scheduled' && existing.status !== 'scheduled';
   if (makesNewReservation) {
     try {
@@ -240,8 +245,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
             409,
           );
         }
-        await c.env.DB.prepare(`UPDATE broadcasts SET approval_confirmed_count = ? WHERE id = ?`)
-          .bind(confirmed, id).run();
+        approvalConfirmedCount = confirmed;
       }
     } catch (gateError) {
       logger.error("routes_broadcasts_failed");
@@ -280,8 +284,17 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     // 画面は未変更項目もPUTへ含めるため、presenceだけで判定するとprovider再試行で
     // 固定snapshotを誤って捨ててしまう。
     resetCommonVarSnapshot: unresolvedAttemptRestarted || snapshotSemanticsChanged,
+    resetApproval: snapshotSemanticsChanged,
+    approvalConfirmedCount,
+    resetDeliveryAttempt: true,
   };
-  const updated = await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
+  let updated;
+  try {
+    updated = await updateBroadcast(c.env.DB, id, updates, body.expectedVersion);
+  } catch {
+    logger.error('broadcast_definition_approval_update_failed');
+    return c.json({ success: false, error: '本文と承認状態を保存できませんでした。画面を読み直し、内容を確かめてから保存し直してください。', code: 'BROADCAST_SAVE_FAILED' }, 503);
+  }
 
   if (!updated) {
     return c.json({ success: false, error: '別の画面で下書きが更新されました', code: 'VERSION_CONFLICT' }, 409);
@@ -296,51 +309,12 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
       const approval = await import('../features/broadcasts/broadcast-approval/index.js');
       if (approval.readApprovalStatus(existing) === 'pending'
         || approval.readApprovalStatus(existing) === 'approved') {
-        await c.env.DB.prepare(
-          `UPDATE broadcasts
-                SET approval_status = 'none',
-                    approval_decided_by_staff_id = NULL,
-                    approval_decided_at = NULL,
-                    approval_reject_reason = NULL,
-                    approval_confirmed_count = NULL
-              WHERE id = ? AND approval_status IN ('pending', 'approved')`,
-        ).bind(id).run();
         await approval.recordBroadcastApprovalEvent(c.env.DB, id, c.get('staff')?.id ?? '', 'cancelled', '内容の変更');
       }
     } catch (approvalError) {
       logger.error("routes_broadcasts_failed");
     }
   }
-
-  // 失敗 partial dedup broadcast を draft に戻して編集 → 再送するケースで、
-  // 残っていた resume 用 state を全部クリアして fresh campaign として送り直せる
-  // ようにする。
-  // - dedup_progress: 残すと過去 partial を skip して mixed delivery 事故
-  // - success_count: 残すと recover 経路の `success_count > 0 + dedup_progress=NULL`
-  //   排除条件にひっかかって永久に stuck になる (再 lock 後 crash で復旧不可)
-  // - failed_account_ids: 過去 attempt の失敗 mark を継承するのは misleading
-  // - batch_lock_at: stale lock 跡を残さない
-  // - sent_at: 念のため NULL に戻す。getQueuedBroadcasts / recoverStalledBroadcasts は
-  //   `sent_at IS NULL` を要求するので、過去 sent 値が残ると永久 stuck の元
-  // - aggregation_unit / line_request_id: 過去送信の insight 集計参照を残さない
-  await c.env.DB.prepare(
-    `UPDATE broadcasts SET
-         dedup_progress = NULL,
-         batch_lock_at = NULL,
-         success_count = 0,
-         failed_account_ids = NULL,
-         sent_at = NULL,
-         aggregation_unit = NULL,
-         line_request_id = NULL
-       WHERE id = ?`,
-  ).bind(id).run();
-
-  // 過去 send の insight 行を削除する。createBroadcastInsight は idempotent で
-  // 既存行があれば skip する設計のため、削除しないと再送時に新しい pending
-  // insight が作られず getPendingInsights / GET /insight が古い metrics を返し続ける。
-  await c.env.DB.prepare(
-    `DELETE FROM broadcast_insights WHERE broadcast_id = ?`,
-  ).bind(id).run();
 
   await recordLifecycle(
     c.env.DB, id, c.get('staff')?.id, makesNewReservation ? 'scheduled' : 'updated',

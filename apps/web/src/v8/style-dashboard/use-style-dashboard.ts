@@ -171,17 +171,28 @@ export function useStyleDashboard(style: IndustryStyle) {
   const hours = today?.hoursLabel ? `営業 ${today.hoursLabel}` : null
   const subtitle = [formatDate(`${date}T00:00:00+09:00`, { style: 'day' }), hours, asOf ? `${asOf} 時点` : null].filter(Boolean).join('・')
 
+  const bookingId = (row: StyleRow) => row.booking?.id ?? row.reservationId ?? row.id
+  // 旧Meet相談は通常予約に属さない。受信箱の「次の予定」と同じ友だち詳細へ渡す。
+  const detailHref = (row: StyleRow): string | null => {
+    if (row.booking?.kind === 'meet') return row.booking.friendId ? `/friends/detail?id=${encodeURIComponent(row.booking.friendId)}` : null
+    return style === 'salon' || style === 'consult'
+      ? `/booking/bookings?booking=${encodeURIComponent(bookingId(row))}`
+      : `/booking/bookings?id=${encodeURIComponent(row.id)}`
+  }
   const openRow = (row: StyleRow) => {
     if (style === 'restaurant') router.push(`/restaurant-test/reservations?id=${encodeURIComponent(row.reservationId ?? row.id)}`)
     else if (style === 'lesson') setRosterId(row.id)
-    else router.push(`/booking/bookings?id=${encodeURIComponent(row.id)}`)
+    else {
+      const href = detailHref(row)
+      if (href) router.push(href)
+      else notifyToast('相談者を確認できないため詳細を開けません。読み直してから、もう一度お試しください。', { tone: 'error' })
+    }
   }
   const version = (row: StyleRow) => row.booking?.version ?? store.today?.find((r) => r.id === row.reservationId)?.customer_version ?? 1
   const run = async (row: StyleRow, fn: () => Promise<unknown>, ok: string, fail: string) => {
     setBusy(row.id)
     try { await fn(); notifyToast(ok) } catch (caught) { notifyToast(japaneseDetailOf(caught) || fail, { tone: 'error' }) } finally { await reload(); setBusy('') }
   }
-  const bookingId = (row: StyleRow) => row.booking?.id ?? row.reservationId ?? row.id
   const markVisit = (row: StyleRow) => {
     if (style === 'restaurant' && row.reservationId) return run(row, () => restaurantTestApi.postSeatVisitMark(accountId, row.reservationId!, { kind: 'visited', expectedVersion: version(row), requestId: crypto.randomUUID() }), '来店にしました。', '来店にできませんでした。')
     if (row.booking?.kind === 'meet' && row.booking.updatedAt) return run(row, () => styleApi.saveMeetResult(accountId, row.booking!.id, { expectedUpdatedAt: row.booking!.updatedAt!, attendance: 'visited' }), '実施にしました。', '実施にできませんでした。')
@@ -209,7 +220,11 @@ export function useStyleDashboard(style: IndustryStyle) {
     visit: (r) => void markVisit(r),
     line: () => router.push('/chats'),
     pay: openPayment,
-    copy: (r) => { void navigator.clipboard?.writeText(`${window.location.origin}/booking/bookings?id=${encodeURIComponent(r.id)}`).then(() => notifyToast('予約 URL をコピーしました。')) },
+    copy: (r) => {
+      const href = detailHref(r)
+      if (!href) { openRow(r); return }
+      void navigator.clipboard?.writeText(`${window.location.origin}${href}`).then(() => notifyToast('予約 URL をコピーしました。'))
+    },
     roster: (r) => setRosterId(r.id),
     noShow: (r) => void markNoShow(r),
     cancel: (r) => setCancelRow(r),
@@ -295,9 +310,17 @@ export function useStyleDashboard(style: IndustryStyle) {
     } finally { setBusy('') }
   }
 
-  const addNew = () => {
+  const addNew = (slot?: { date?: string; time?: string; staffId?: string }) => {
+    if (!canWrite) return
     if (style === 'restaurant' && store.store) setPhoneOpen(true)
     else if (style === 'lesson') router.push('/events')
+    else if (style === 'salon' || style === 'consult') {
+      const query = new URLSearchParams({ date: slot?.date ?? date })
+      const selectedStaff = slot?.staffId ?? staffId
+      if (selectedStaff) query.set('staffId', selectedStaff)
+      if (slot?.time) query.set('time', slot.time)
+      router.push(`/booking/bookings/new?${query}`)
+    }
     else router.push('/booking/bookings?new=1')
   }
 

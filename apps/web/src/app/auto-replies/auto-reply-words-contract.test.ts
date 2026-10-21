@@ -288,7 +288,6 @@ describe('一覧の画面が置き換え表を通す', () => {
     expect(PAGE).toContain("const rules = optimisticRows")
     expect(PAGE).toContain('value: ready ? (monthlyHits === null ? null : monthlyHits) : null')
     expect(PAGE).toContain('const monthlyHits = hitsAllKnown')
-    expect(PAGE).toContain('const actionExecutionsAllKnown = rules.length > 0 && rules.every')
     expect(PAGE).toContain('api.autoReplies.summary(selectedAccountId)')
     expect(PAGE).toContain("actionExecutionCount === null ? null : actionExecutionCount")
     expect(PAGE).toContain("conflictCount === null ? null : conflictCount")

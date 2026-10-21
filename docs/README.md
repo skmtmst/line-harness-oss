@@ -470,6 +470,7 @@
 - [ログインのロボット確認と中断後の復帰](release-log/unreleased/1782-kenta-login-robot-check.md)
 - [二段階認証・回復コード案内・送信元表示の修正](release-log/unreleased/1784-kenta-staging-layout.md)
 - [検証反映と独立点検前の引き継ぎ](release-log/unreleased/1786-kenta-staging-handoff.md)
+- [独立点検前の画面接続・承認・集計の修正](release-log/unreleased/1787-kenta-staging-review-fixes.md)
 - [1781-kenta-cleanup-a01.md](release-log/unreleased/1781-kenta-cleanup-a01.md)
 - [1781-kenta-cleanup-a02.md](release-log/unreleased/1781-kenta-cleanup-a02.md)
 - [1781-kenta-cleanup-a03.md](release-log/unreleased/1781-kenta-cleanup-a03.md)

@@ -420,7 +420,7 @@ function BroadcastDetailInner() {
       setApprovalBusy(true)
       setApprovalMessage(null)
       try {
-        const approved = await api.broadcasts.approval.approve(id, stepUpToken)
+        const approved = await api.broadcasts.approval.approve(id, broadcast?.version ?? 1, stepUpToken)
         if (moved()) return
         if (!approved.success) {
           setApprovalMessage(approved.error)

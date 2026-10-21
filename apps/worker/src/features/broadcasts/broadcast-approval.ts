@@ -327,10 +327,9 @@ export async function enforceBroadcastSendApproval(
       };
     }
     // 確認した人数を残す。予約の時刻に数が変わっていたら送らず期限切れにする。
-    try {
-      await db.prepare(`UPDATE broadcasts SET approval_confirmed_count = ? WHERE id = ?`)
-        .bind(confirmed, broadcast.id).run();
-    } catch { /* 監査用の残し。送る・送らないの判定には使わない */ }
+    const saved = await db.prepare(`UPDATE broadcasts SET approval_confirmed_count = ? WHERE id = ? AND lock_version = ? AND status IN ('draft','scheduled')`)
+      .bind(confirmed, broadcast.id, broadcast.lock_version ?? 1).run();
+    if (!saved.meta.changes) return { allowed: false, status: 409, error: '本文または宛先が変わりました。もう一度確かめてください。', code: 'VERSION_CONFLICT' };
     return { allowed: true, gate };
   }
   if (readApprovalStatus(broadcast) !== 'approved') {
@@ -357,16 +356,17 @@ export async function checkScheduledBroadcastApproval(
   const gate = await evaluateApprovalGate(db, broadcast);
   if (!gate.required) return { sendable: true };
   const fresh = await db.prepare(
-    `SELECT approval_status, approval_confirmed_count FROM broadcasts WHERE id = ?`,
-  ).bind(broadcast.id).first<{ approval_status: string | null; approval_confirmed_count: number | null }>();
+    `SELECT approval_status, approval_confirmed_count, lock_version FROM broadcasts WHERE id = ?`,
+  ).bind(broadcast.id).first<{ approval_status: string | null; approval_confirmed_count: number | null; lock_version: number }>();
+  if (!fresh || fresh.lock_version !== (broadcast.lock_version ?? 1)) return { sendable: false };
   const status = (fresh?.approval_status ?? 'none') as ReturnType<typeof readApprovalStatus>;
   if (gate.singleOperator) {
     if (Number(fresh?.approval_confirmed_count) === gate.recipientCount) return { sendable: true };
     // 人数が変わったまま時刻が来た。送らず期限切れにし、依頼主に知らせる。
     const claimed = await db.prepare(
       `UPDATE broadcasts SET approval_status = 'expired'
-        WHERE id = ? AND status = 'scheduled' AND approval_status != 'approved'`,
-    ).bind(broadcast.id).run();
+        WHERE id = ? AND status = 'scheduled' AND approval_status != 'approved' AND lock_version = ?`,
+    ).bind(broadcast.id, broadcast.lock_version ?? 1).run();
     if (claimed.meta.changes) {
       await recordBroadcastApprovalEvent(db, broadcast.id, '', 'expired');
       const { getBroadcastById } = await import('@line-crm/db');

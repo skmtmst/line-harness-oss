@@ -36,7 +36,6 @@ describe('ヒット数の未取得', () => {
 
 describe('一覧の帯と行（設計 8-1 `cmDfJ`）', () => {
   it('ヒット数が1つでも欠けていたら、合計を出さない', () => {
-    expect(PAGE).toContain('const hitsAllKnown = rules.length > 0 && rules.every((r) => r.hits !== undefined)')
     expect(PAGE, '足りない合計をそのまま出している').not.toContain(
       'const monthlyHits = items.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)',
     )

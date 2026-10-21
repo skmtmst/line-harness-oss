@@ -1,6 +1,6 @@
 import { bookingAdvancedApi } from './booking-advanced'
 import { fetchApi, downloadApiFile } from '../../api'
-import type {MemberCard,AccountAiFeature,AccountAiSetting,SavedSearchConditions,CancellationOptions,InboxRoutingTarget,InboxStrategy,CustomerSegments,RankProgram,RankTier,StoreComparisonResult,AutoLineKind,AutoLineRule,BookingPassPlan,BookingPassPlanWrite,McpConnection,AiAnswerLog,QaEntry} from '@line-crm/shared';
+import type {MemberCard,AccountAiFeature,AccountAiSetting,SavedSearchConditions,CancellationOptions,InboxRoutingTarget,InboxStrategy,CustomerSegments,RankProgram,RankTier,StoreComparisonResult,AutoLineKind,AutoLineRule,BookingPassPlan,BookingPassPlanSummary,BookingPassPlanWrite,McpConnection,AiAnswerLog,QaEntry} from '@line-crm/shared';
 type Result<T>={success:true;data:T};
 type Page<T>={items:T[];total:number};
 const e=encodeURIComponent;
@@ -75,7 +75,7 @@ export const bookingPassPlansApi={
  purchase:(liffId:string,token:string,id:string)=>fetchApi<Result<unknown>>(query(`/api/liff/booking/pass-purchases/${e(id)}`,{liffId}),{headers:{Authorization:`Bearer ${token}`}}),
  purchases:(a:string)=>fetchApi<Result<{items:unknown[]}>>(account('/api/booking/admin/pass-purchases',a)),
  simulateBillingEvent:(a:string,event:Record<string,unknown>)=>fetchApi<Result<unknown>>(account('/api/booking/admin/pass-purchases/simulate-event',a),json('POST',{...event,testMode:true})),
- list:(a:string,q='',offset=0,limit:10|20|50=20)=>fetchApi<Result<Page<BookingPassPlan>&{summary:unknown}>>(query(account('/api/booking/admin/pass-plans',a),{q,offset,limit})),
+ list:(a:string,q='',offset=0,limit:10|20|50=20)=>fetchApi<Result<Page<BookingPassPlan>&{summary:BookingPassPlanSummary}>>(query(account('/api/booking/admin/pass-plans',a),{q,offset,limit})),
  create:(a:string,b:BookingPassPlanWrite,key:string)=>fetchApi<Result<BookingPassPlan>>(account('/api/booking/admin/pass-plans',a),json('POST',b,key)),
  save:(a:string,id:string,b:BookingPassPlanWrite&{expectedVersion:number})=>fetchApi<Result<BookingPassPlan>>(account(`/api/booking/admin/pass-plans/${e(id)}`,a),json('PUT',b)),
  start:(a:string,id:string,expectedVersion:number,eventIds?:string[]|null)=>fetchApi<Result<{status:'on_sale';version:number}>>(account(`/api/booking/admin/pass-plans/${e(id)}/start`,a),json('POST',{expectedVersion,...(eventIds===undefined?{}:{eventIds})})),

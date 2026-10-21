@@ -144,7 +144,7 @@ export function gap3Respond(method, pathname, body = {}, query = new URLSearchPa
   }
 
   if (method === 'GET' && pathname === '/api/booking/admin/pass-plans') {
-    return ok({ items: PLANS, total: PLANS.length, summary: { onSale: 3, holders: 86, expiringIn30d: 9, billingFailed: 1 } })
+    return ok({ items: PLANS, total: PLANS.length, summary: { onSale: 3, holders: 86, expiringIn30d: 9, billingFailed: null, billingStatus: 'unconfigured', billingSimulationFailed: 1, billingSimulationCancelled: 2 } })
   }
   const holders = /^\/api\/booking\/admin\/pass-plans\/([^/]+)\/holders$/.exec(pathname)
   if (method === 'GET' && holders) {

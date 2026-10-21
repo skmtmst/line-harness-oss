@@ -332,23 +332,32 @@ export default function NewProxyBookingPage() {
     const paramDate = params.get('date')
     const paramTime = params.get('time')
     const paramStaff = params.get('staff')
+    const paramStaffId = params.get('staffId')
     const paramMenu = params.get('menu') ?? params.get('menu_id')
     if (paramDate && /^\d{4}-\d{2}-\d{2}$/.test(paramDate)) {
       setDate(paramDate)
       pendingSelect.current.date = paramDate
     }
     if (paramMenu) setMenuId(paramMenu)
-    if (paramStaff) pendingSelect.current.staffName = paramStaff
+    if (paramStaffId) {
+      pendingSelect.current.staffId = paramStaffId
+      delete pendingSelect.current.staffName
+    } else if (paramStaff) {
+      pendingSelect.current.staffName = paramStaff
+      delete pendingSelect.current.staffId
+    }
     if (paramTime && /^\d{2}:\d{2}$/.test(paramTime)) pendingSelect.current.time = paramTime
   }, [selectedAccountId])
 
   // N-399/N-400: メニューを選ぶと担当者一覧が届く。下書き・URLの担当が
-  // 一覧にあれば選び直す。URLの担当は名前で来るので display_name で照合する。
+  // 一覧にあれば選び直す。台帳は担当ID、既存カレンダーは担当名で照合する。
   useEffect(() => {
     const pending = pendingSelect.current
     if (pending.staffId) {
       if (staff.some((item) => item.id === pending.staffId)) {
         setStaffId(pending.staffId)
+        delete pending.staffId
+      } else if (staff.length > 0) {
         delete pending.staffId
       }
     } else if (pending.staffName) {
