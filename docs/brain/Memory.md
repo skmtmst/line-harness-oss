@@ -14,8 +14,7 @@ tags: [memory, core]
 
 - LINE 公式アカウントの CRM（画面の名前は musubo。画面に LINE Harness は出さない）を、Lステップ / Liny の無料代替として作っている。Cloudflare Workers + D1 + Next.js 管理画面 + LIFF。MIT。
 - 最初の顧客は 然-NEN(ペットフード EC)。飲食店向けは本番では無効のテスト機能。
-- **ゴール：Pencil ★V8 の板（B-281の固定分母：管理画面501＋LIFF28＝529枚）をすべて合格させ、本番を V8 に切り替える。**切り替えの条件と手順は `docs/v8-requirements/v8-switch.md`。
-- **ゴール：Pencil ★V8 の板（管理画面 501＋LIFF 28＝529 枚）をすべて合格させ、本番を V8 に切り替える。**10-13の分母で固定（match2/CURRENT.md・B-284）。切り替えの条件と手順は `docs/v8-requirements/v8-switch.md`。
+- **ゴール：Pencil ★V8 の現行の対象をすべて照合し、本番を V8 に切り替える。**B-281・B-284時点の529枚を上限にせず、後日の追加承認・明示置換・機能待ちを根拠付きで整理する。切り替えの条件と手順は `docs/v8-requirements/v8-switch.md`。今回の作業は検証環境までで、本番配備は含まない。
 
 ## 体制・役割(2026-10-08 夜のオーナー決定で更新)
 
