@@ -297,10 +297,12 @@ html:root :is(.toolbar, .slots) :is([data-sort-select], [data-per-page-select]) 
 .optional > summary::-webkit-details-marker { display: none; }
 .optional > summary:focus-visible { outline: 2px solid var(--color-focus-ring); }
 .optional[data-collapsed] > [data-toolbar-optional-content] {
-  position: absolute; top: 100%; left: 0; z-index: 50; width: max-content;
+  position: absolute; top: 100%; left: var(--toolbar-optional-panel-left, 0px); z-index: 50; width: max-content;
+  max-width: var(--toolbar-optional-panel-width, 100vw); box-sizing: border-box; flex-wrap: wrap;
   padding: var(--tpl-toolbar-gap); background: var(--color-canvas);
   border: 1px solid var(--color-hairline); border-radius: var(--radius-control);
 }
+.optional[data-collapsed] > [data-toolbar-optional-content] > * { flex-shrink: 0; }
 .optional[data-collapsed]:not([open]) > [data-toolbar-optional-content] { display: none; }
 
 /* A list without folder choices keeps its create action in the shared tools at

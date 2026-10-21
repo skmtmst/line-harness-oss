@@ -8,7 +8,7 @@ import SearchField from './search-field'
 import FilterChip from './filter-chip'
 import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
-import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth } from './list-toolbar-fit.mjs'
+import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth, fitToolbarOverflowPanel } from './list-toolbar-fit.mjs'
 
 function useToolbarFit() {
   const ref = useRef<HTMLDivElement>(null)
@@ -250,6 +250,8 @@ function OverflowTools({ children, label }: { children: ReactNode; label: string
     const toolbar = flat ? owner : row ?? owner
     if (!item || !toolbar || !window.ResizeObserver) return
     const measure = () => {
+      if (!item.isConnected) return
+      if (item.hasAttribute('data-collapsed') && item.open) fitToolbarOverflowPanel(item, toolbar)
       if (!item.hasAttribute('data-collapsed')) expandedWidth.current = fitToolbarOptionalWidth(item)
       setCollapsed(!toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100)).fits)
     }
@@ -257,9 +259,10 @@ function OverflowTools({ children, label }: { children: ReactNode; label: string
     const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
     const observer = new ResizeObserver(queue)
     observer.observe(toolbar)
+    item.addEventListener('toggle', queue)
     for (const tool of toolbar.querySelectorAll('button,input')) observer.observe(tool)
     measure(); void document.fonts?.ready.then(measure)
-    return () => { cancelAnimationFrame(frame); observer.disconnect() }
+    return () => { item.removeEventListener('toggle', queue); cancelAnimationFrame(frame); observer.disconnect() }
   }, [children])
   return <details ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional data-toolbar-overflow-group data-collapsed={collapsed || undefined} open={collapsed ? undefined : true}
     onKeyDown={event => { if (event.key === 'Escape' && collapsed) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}>

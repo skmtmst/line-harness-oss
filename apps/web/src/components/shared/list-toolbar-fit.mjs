@@ -54,3 +54,21 @@ export function fitToolbarOptionalWidth(item) {
   item.style.setProperty('--toolbar-optional-width', `${width}px`)
   return width
 }
+
+/** Keep an expanded overflow panel inside its toolbar, including near the right edge.
+ * @param {HTMLElement} item
+ * @param {HTMLElement} toolbar
+ */
+export function fitToolbarOverflowPanel(item, toolbar) {
+  const content = item.querySelector('[data-toolbar-optional-content]')
+  if (!content) return
+  const bounds = toolbar.getBoundingClientRect(), anchor = item.getBoundingClientRect()
+  const css = getComputedStyle(toolbar)
+  const left = bounds.left + (parseFloat(css.paddingLeft) || 0)
+  const right = Math.min(bounds.right - (parseFloat(css.paddingRight) || 0), window.innerWidth)
+  const available = Math.max(0, Math.floor(right - left))
+  const width = Math.min(content.getBoundingClientRect().width, available)
+  const offset = Math.max(left - anchor.left, Math.min(0, right - anchor.left - width))
+  item.style.setProperty('--toolbar-optional-panel-width', `${available}px`)
+  item.style.setProperty('--toolbar-optional-panel-left', `${Math.floor(offset)}px`)
+}
