@@ -12,7 +12,8 @@ export function assertBackupPolicy(policy: BackupPolicy, managed: any, custom: a
   const rules = lifecycle?.rules;
   if (!Array.isArray(rules)) throw new Error('backup_retention_unknown');
   const applicable = rules.filter((rule: any) => rule.enabled === true && typeof rule.conditions?.prefix === 'string' && (policy.prefix.startsWith(rule.conditions.prefix) || rule.conditions.prefix.startsWith(policy.prefix)) && rule.deleteObjectsTransition);
-  if (!applicable.length || applicable.some((rule: any) => rule.deleteObjectsTransition.condition?.type !== 'Age' || rule.deleteObjectsTransition.condition.maxAge !== policy.retentionDays * 86400)) throw new Error('backup_retention');
+  const coversBackupPrefix = applicable.some((rule: any) => policy.prefix.startsWith(rule.conditions.prefix));
+  if (!coversBackupPrefix || applicable.some((rule: any) => rule.deleteObjectsTransition.condition?.type !== 'Age' || rule.deleteObjectsTransition.condition.maxAge !== policy.retentionDays * 86400)) throw new Error('backup_retention');
 }
 export function encryptBackup(plain: Buffer, key: Buffer): Buffer {
   if (key.length !== 32) throw new Error('backup_key');

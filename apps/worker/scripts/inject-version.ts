@@ -116,6 +116,8 @@ interface CliArgs {
   worker?: string;
   admin?: string;
   liff?: string;
+  workerAssets?: string;
+  migrations?: string;
   out?: string;
   releasedAt?: string;
   commit?: string;
@@ -142,6 +144,12 @@ function parseArgs(args: string[]): CliArgs {
         break;
       case 'admin':
         out.admin = value;
+        break;
+      case 'migrations':
+        out.migrations = value;
+        break;
+      case 'worker-assets':
+        out.workerAssets = value;
         break;
       case 'liff':
         out.liff = value;
@@ -212,11 +220,13 @@ function main(rawArgs: string[]): void {
   const workerHash = hashArtifact('worker', workerPath);
   const adminHash = hashArtifact('admin', adminPath);
   const liffHash = hashArtifact('liff', liffPath);
+  const migrationsHash = args.migrations ? hashArtifact('migrations', args.migrations) : undefined;
+  const workerAssetsHash = args.workerAssets ? hashArtifact('worker-assets', args.workerAssets) : undefined;
 
   write(outPath, { version, workerHash, adminHash, liffHash, releasedAt, commit });
 
   stdout.write(
-    JSON.stringify({ version, workerHash, adminHash, liffHash, releasedAt, commit }) + '\n',
+    JSON.stringify({ version, workerHash, adminHash, liffHash, workerAssetsHash, migrationsHash, releasedAt, commit }) + '\n',
   );
 }
 
