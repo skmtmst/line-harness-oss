@@ -50,9 +50,9 @@ export function GridRow({ children, className, ...props }: HTMLAttributes<HTMLDi
   return <div data-shared-part="list-row" role="row" className={[styles.row, className].filter(Boolean).join(' ')} {...props}>{children}</div>
 }
 
-export function GridCell({ children, className, align, role = 'cell', ...props }: HTMLAttributes<HTMLSpanElement> & { align?: 'left' | 'right' }) {
+export function GridCell({ children, className, align, tone, role = 'cell', ...props }: HTMLAttributes<HTMLSpanElement> & { align?: 'left' | 'right'; tone?: 'danger' }) {
   const hidden = props['aria-hidden'] === true || props['aria-hidden'] === 'true' || className?.split(/\s+/).includes('sr-only')
-  return <span role={role} data-align={align} className={[styles.cell, className].filter(Boolean).join(' ')} {...props}>{role === 'columnheader' && typeof children === 'string' && !hidden ? <TruncatedText value={children} /> : children}</span>
+  return <span role={role} data-align={align} data-tone={tone} className={[styles.cell, className].filter(Boolean).join(' ')} {...props}>{role === 'columnheader' && typeof children === 'string' && !hidden ? <TruncatedText value={children} /> : children}</span>
 }
 
 /** : grid で描く一覧にも表と同じ名前のセルを使う。 */

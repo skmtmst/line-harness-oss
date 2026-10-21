@@ -184,9 +184,28 @@ describe('V8 リマインダの詳細', () => {
     state.role = 'viewer'
     await render()
     expect(host.textContent).toContain('山田 太郎')
+    expect(document.querySelector('button[aria-label="山田 太郎の基準日"]')).toBeNull()
     expect(document.querySelector('button[aria-label="山田 太郎の操作"]')).toBeNull()
     expect(buttons()).not.toContain('取り消す')
     expect(buttons()).not.toContain('再開する')
+  })
+
+  it('状態欄を開閉しても登録者の日時入力を作り直さず、保存や名前の入口を保つ', async () => {
+    state.tab = 'registrants'
+    await render()
+    const toggle = buttonByText('いまの状態と操作')!
+    const date = host.querySelector('button[aria-label="山田 太郎の基準日"]')!
+    const friend = host.querySelector('a[href="/friends/f1"]')!
+    expect(friend.textContent).toBe('山田 太郎')
+    expect(friend.querySelector('[title="山田 太郎"]')).toBeTruthy()
+    await act(async () => toggle.click())
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(document.getElementById(toggle.getAttribute('aria-controls')!)?.getAttribute('data-expanded')).toBe('true')
+    await act(async () => toggle.click())
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(host.querySelector('button[aria-label="山田 太郎の基準日"]')).toBe(date)
+    expect(host.querySelector('a[href="/friends/f1"]')).toBe(friend)
+    expect(state.updates).toHaveLength(0)
   })
 
   it('WEB084：予定を読み切れていないとき、一時停止の窓で今後24時間の数を言い切らない', async () => {
