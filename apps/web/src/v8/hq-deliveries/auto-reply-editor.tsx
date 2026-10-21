@@ -3,10 +3,15 @@
 /*
  * 統括の自動応答のひな形を作る。店の自動応答と同じ手順の段（①基本設定 ②どんなときに動くか ③何を返すか ④優先順位 ⑤確認）。
  * ④優先順位は店ごとの並びで決まるため、統括では選べない（機能待ち：統括に優先順位の口が無い）。段は押せない形で出す。
- * 返すものは「この画面で書く」「返信しない」だけ。テンプレート・カード・画像・返したあとに行うことは、
- * 店ごとのテンプレート・タグを統括から名前で選ぶ口が無いので出さない（機能待ち）。
+ * 新しく選べる返し方は「この画面で書く」「返信しない」。保存済みの別種別は共通の見本で確認し、
+ * 後処理も保存済み件数を表示する。未接続の候補選択や編集口は増やさず、設定を引き継ぐ。
  */
 import { useState, type ReactNode } from 'react'
+import type { HqDeliveryTemplateDefinition } from '@line-crm/shared'
+import { readLineImageContent } from '@/components/auto-replies/edit-dialog-model'
+import ImageFrame from '@/components/shared/image-frame'
+import Notice from '@/components/shared/notice'
+import { responseTypeWord } from '@/v8/auto-replies/public/auto-reply-words/index'
 import { ArrowRight, PenLine, CircleSlash } from 'lucide-react'
 import { CreatePage } from '@/components/templates'
 import { Steps } from '@/components/templates/steps'
@@ -16,7 +21,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import SegmentedControl from '@/components/shared/segmented'
-import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import LinePreview, { LinePreviewFlex, LinePreviewMessage } from '@/components/shared/line-preview'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -33,9 +38,10 @@ const DELAYS = [{ value: '0', label: 'すぐ返す' }, { value: '30', label: '30
 const SAMPLE_TOKENS: Record<string, string> = { '{{name}}': 'Kenta', '{{account.name}}': '然 -NEN-', '{{var.store_phone}}': '03-1234-5678', '{{var.reservation_url}}': 'https://nen.example/booking' }
 const sample = (text: string) => text.replace(/\{\{[^}]+\}\}/g, (token) => SAMPLE_TOKENS[token] ?? '（友だち情報）')
 
-export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, name, description, settings, onName, onDescription, onSetting, onCancel, onSave }: {
+export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, name, description, settings, references, onName, onDescription, onSetting, onCancel, onSave }: {
   title: string; help: ReactNode; notice: ReactNode; canEdit: boolean; busy: boolean
   name: string; description: string; settings: Record<string, unknown> | undefined
+  references?: HqDeliveryTemplateDefinition['references']
   onName: (value: string) => void; onDescription: (value: string) => void; onSetting: (key: string, value: unknown) => void
   onCancel: () => void; onSave: () => void
 }) {
@@ -43,9 +49,18 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
   const s = settings ?? {}
   const text = String(s.responseContent ?? '')
   const silent = s.responseType === 'silent'
+  const templateId = typeof s.templateId === 'string' ? s.templateId : ''
+  const template = references?.find(ref => ref.kind === 'template' && ref.sourceId === templateId)
+  const responseType = typeof s.responseType === 'string' && s.responseType ? s.responseType : 'text'
+  const textReply = !silent && !templateId && responseType === 'text'
+  const preservedReply = !silent && !textReply
+  const replyLabel = silent ? '返信しない' : templateId ? `テンプレート${template ? `「${template.name}」` : '（名前を確認できません）'}` : textReply ? `テキスト ${text.length}字` : responseTypeWord(responseType).label
+  const actionCount = Array.isArray(s.actions) ? s.actions.length : s.actions == null ? 0 : null
+  const afterLabel = actionCount === null ? '確認できません' : actionCount ? `${actionCount}つ` : 'なし'
+  const image = !templateId && responseType === 'image' ? readLineImageContent(text) : null
   const keyword = String(s.keyword ?? '')
   const storeName = String(s.name ?? '')
-  const done = (key: StepKey) => key === 'basic' ? Boolean(name.trim() && storeName.trim()) : key === 'trigger' ? Boolean(keyword.trim()) : key === 'reply' ? silent || Boolean(text.trim()) : false
+  const done = (key: StepKey) => key === 'basic' ? Boolean(name.trim() && storeName.trim()) : key === 'trigger' ? Boolean(keyword.trim()) : key === 'reply' ? silent || Boolean(templateId) || Boolean(text.trim()) : false
   const index = ORDER.indexOf(step)
   const steps = ORDER.map((key, i) => ({
     key, label: STEP_LABELS[key],
@@ -59,14 +74,19 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
 
   const preview = <>
     <CreateSummaryCard title="送るものの確認" rows={[
-      { key: 'kind', label: '返すもの', value: silent ? '返信しない' : `テキスト ${text.length}字` },
-      { key: 'after', label: '後の処理', value: 'なし' },
-      ...(inserts.length && !silent ? [{ key: 'inserts', label: '差し込み', value: inserts.join('・') }] : []),
+      { key: 'kind', label: '返すもの', value: replyLabel },
+      { key: 'after', label: '後の処理', value: afterLabel },
+      ...(inserts.length && textReply ? [{ key: 'inserts', label: '差し込み', value: inserts.join('・') }] : []),
     ]} />
     <LinePreview accountName="然 -NEN-">
       <div className={styles.talk}>
         <LinePreviewMessage direction="outgoing" accountName="然 -NEN-" avatar={null} time="10:12">{keyword ? `${keyword}したいです` : '（キーワードを含むメッセージ）'}</LinePreviewMessage>
-        {silent ? null : <LinePreviewMessage density="compact" accountName="然 -NEN-" avatar="然" time="10:12">{text.trim() ? sample(text) : '（返す文を書くと、ここに出ます）'}</LinePreviewMessage>}
+        {silent ? null : <LinePreviewMessage density="compact" accountName="然 -NEN-" avatar="然" time="10:12" bare={preservedReply && !templateId}>
+          {templateId ? `${replyLabel}を使います。内容は配布先の同じ名前のテンプレートで確認してください。`
+            : responseType === 'flex' ? <LinePreviewFlex content={text} />
+            : responseType === 'image' && image ? <ImageFrame title="保存済みの返信画像" value={image.previewImageUrl} previewAlt="返信画像のプレビュー" readOnly />
+            : textReply ? text.trim() ? sample(text) : '（返す文を書くと、ここに出ます）' : '保存済みの返信内容の見本を表示できません。'}
+        </LinePreviewMessage>}
       </div>
     </LinePreview>
   </>
@@ -100,9 +120,9 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
     {step === 'reply' ? <>
       <Card variant="form" gap="normal">
         <CardHeader size="stacked" title="返すもの" />
-        {canEdit ? <SegmentedControl aria-label="返すもの" size="compact" value={silent ? 'silent' : 'text'} onChange={(value) => onSetting('responseType', value)}
+        {canEdit && !preservedReply ? <SegmentedControl aria-label="返すもの" size="compact" value={silent ? 'silent' : 'text'} onChange={(value) => onSetting('responseType', value)}
           options={[{ value: 'text', label: <span className={styles.choice}><PenLine size={14} aria-hidden="true" />この画面で書く</span> }, { value: 'silent', label: <span className={styles.choice}><CircleSlash size={14} aria-hidden="true" />返信しない（記録だけ）</span> }]} /> : null}
-        {silent ? <p className={styles.note}>返信はしません。キーワードに当たったことだけを店の記録に残します。</p>
+        {preservedReply ? <Notice tone="info">{`${replyLabel}を保存しています。この画面では返信内容を変更できません。ほかの設定を保存しても、その内容は引き継がれます。`}</Notice> : silent ? <p className={styles.note}>返信はしません。キーワードに当たったことだけを店の記録に残します。</p>
           : <SaveErrorField names={['responseContent', 'definition.settings.responseContent']}><HqMessageBody value={text} label="返信内容" onChange={(value) => onSetting('responseContent', value)} readOnly={!canEdit} disabled={busy} /></SaveErrorField>}
       </Card>
       <Card variant="form" gap="normal">
@@ -122,7 +142,8 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
         <dt>統括での名前</dt><dd>{name || '—'}</dd>
         <dt>店に届く名前</dt><dd>{storeName || '—'}</dd>
         <dt>キーワード</dt><dd>{keyword ? `「${keyword}」を${s.matchType === 'exact' ? '完全一致' : '含む'}` : '—'}</dd>
-        <dt>返すもの</dt><dd>{silent ? '返信しない' : `テキスト ${text.length}字`}</dd>
+        <dt>返すもの</dt><dd>{replyLabel}</dd>
+        <dt>後の処理</dt><dd>{afterLabel}</dd>
         <dt>優先順位</dt><dd>配った先の店で、ほかの自動応答との順番を決めます。</dd>
       </dl>
       <p className={styles.note}>保存すると、配るアカウントを選べます。店には下書きとして届きます。</p>

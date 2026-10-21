@@ -178,7 +178,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   /* 自動応答は店と同じ手順の段で作る。ほかの種類は今の1枚の画面。 */
   if (view === 'edit' && selected && type === 'auto_reply') return <SaveErrorScope errors={saveErrors}><HqAutoReplyEditor
     title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
-    canEdit={canEdit} busy={busy} name={selected.template.name} description={selected.template.description ?? ''} settings={settings}
+    canEdit={canEdit} busy={busy} name={selected.template.name} description={selected.template.description ?? ''} settings={settings} references={selected.definition.references}
     onName={(value) => setSelected({ ...selected, template: { ...selected.template, name: value } })}
     onDescription={(value) => setSelected({ ...selected, template: { ...selected.template, description: value } })}
     onSetting={updateSetting} onCancel={back} onSave={() => void save()} /></SaveErrorScope>

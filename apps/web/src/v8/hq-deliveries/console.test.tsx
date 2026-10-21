@@ -124,3 +124,20 @@ it('編集中の取消しは確認し、戻るを選ぶと本文を残す', asyn
   await waitFor(() => expect(screen.queryByRole('textbox', { name: '最初に送る内容' })).toBeNull())
   expect(calls.update).not.toHaveBeenCalled()
 })
+
+it('保存済みテンプレートと後処理を正しく案内し、他欄の保存でも参照・失敗時設定を保持する', async () => {
+  const definition = { schemaVersion: 1, references: [{ sourceId: 'template-source', kind: 'template', name: '予約の案内' }, { sourceId: 'tag-source', kind: 'tag', name: '回答済み' }], settings: {
+    name: '店の返事', keyword: '予約', matchType: 'exact', responseType: 'text', responseContent: '', templateId: 'template-source',
+    actions: [{ actionType: 'tag', config: { op: 'add', tagIds: ['tag-source'] }, onFailure: 'stop' }],
+  } }
+  const loaded = { ...detail, template: { ...detail.template, template_type: 'auto_reply' }, definition }
+  calls.list.mockResolvedValue([loaded.template]); calls.detail.mockResolvedValue(loaded); calls.update.mockResolvedValue(loaded)
+  render(<HqDeliveryConsole type="auto_reply" />)
+  fireEvent.click(await screen.findByRole('button', { name: '追加のお礼', exact: true }))
+  expect(await screen.findByText('テンプレート「予約の案内」')).toBeTruthy()
+  expect(screen.getByText('1つ')).toBeTruthy()
+  fireEvent.change(screen.getByLabelText('説明'), { target: { value: '変更した説明' } })
+  fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' }))
+  await waitFor(() => expect(calls.update).toHaveBeenCalled())
+  expect(calls.update).toHaveBeenCalledWith('delivery-1', { name: '追加のお礼', description: '変更した説明', definition, expectedRevision: 2 })
+})
