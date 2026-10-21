@@ -1,7 +1,7 @@
 import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {gapFixture,gapApp,gapCall,gapOwner,seedGapBooking} from '../test-utils/gap1.js';
 import {storeComparison} from './store-comparison.js';
-import {snapshotStoreMetrics,storeNumbers,comparisonPeriod,processStoreComparison} from '../services/store-comparison.js';
+import {snapshotStoreMetrics,storeNumbers,comparisonPeriod,processStoreComparison,comparisonTrend} from '../services/store-comparison.js';
 let d:ReturnType<typeof gapFixture>;
 beforeEach(()=>{d=gapFixture();vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));d.raw.exec("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('a2','cha2','2店','token','secret','t'),('a3','cha3','3店','token','secret','t')");});
 afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
@@ -58,4 +58,20 @@ test('CMP-05/09/10: プールと現在の可視店の交差だけで比較し、
  d.raw.exec("UPDATE hq_store_daily_metrics SET bookings=NULL WHERE account_id='a3'");expect((await read(url+'&poolId=pool&compare=average')).average.bookings).toBeNull();
  expect((await gapCall(gapApp(d,[storeComparison]),url+'&poolId=foreign')).status).toBe(404);expect((await gapCall(gapApp(d,[storeComparison]),url+'&poolId=missing')).status).toBe(404);
  d.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='o'; INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('o','a','now')");data=await read(url+'&poolId=pool',{...gapOwner});expect(data.rows.map((r:any)=>r.accountId)).toEqual(['a']);
+});
+
+test('CMP-06: 日別実値、欠測、失敗、日付と中央値を守る',()=>{
+ const days=comparisonTrend([{date:'2026-10-14',state:'ready',friends_added:1,friends_blocked:4,friends_at_start:20,broadcast_recipients:100,broadcast_clicks:8,bookings:0,visits:4,no_shows:1,first_response_median_minutes:3.5},{date:'2026-10-15',state:'failed',bookings:99}],comparisonPeriod('2026-10-14','2026-10-16'));
+ expect(days.map(d=>d.date)).toEqual(['2026-10-14','2026-10-15','2026-10-16']);expect(days[0].values).toEqual({friendChange:-3,blockRate:20,clickRate:8,bookings:0,visits:4,noShowRate:20,responseMinutes:3.5});
+ expect(days[1].state).toBe('failed');expect(days[2].state).toBe('missing');expect(Object.values(days[1].values).every(value=>value===null)).toBe(true);expect(Object.values(days[2].values).every(value=>value===null)).toBe(true);
+});
+test('CMP-06/08: 詳細は可視店の対応実件数だけを返し閲覧権限を守る',async()=>{
+ snapshot('a',0);seedGapBooking(d,'requested','requested');d.raw.exec("INSERT INTO chats(id,friend_id,line_account_id,status,created_at,updated_at) VALUES('waiting','f','a','unread','now','now'),('foreign','f2','b','unread','now','now')");
+ const detail=await read('/api/hq/store-comparison/a?from=2026-10-15&to=2026-10-16',{...gapOwner,readOnly:true});
+ expect(detail.attention).toMatchObject({status:'ready',counts:{unhandledChats:1,pendingBookings:1,unpaid:0,connections:0}});expect(detail.attention.details).toBeUndefined();expect(detail.trend[1]).toMatchObject({state:'missing',values:{bookings:null}});
+ expect((await gapCall(gapApp(d,[storeComparison]),'/api/hq/store-comparison/b')).status).toBe(404);
+});
+test('CMP-06: 対応の取得失敗を0件と偽らず推移は残す',async()=>{
+ snapshot('a',0);d.raw.exec('ALTER TABLE line_account_connection_checks RENAME TO unavailable_connection_checks');
+ const detail=await read('/api/hq/store-comparison/a?from=2026-10-15&to=2026-10-15');expect(detail.attention).toEqual({status:'unavailable',counts:null});expect(detail.trend[0].values.bookings).toBe(0);
 });

@@ -1,6 +1,6 @@
 import { bookingAdvancedApi } from './booking-advanced'
 import { fetchApi, downloadApiFile } from '../../api'
-import type {MemberCard,AccountAiFeature,AccountAiSetting,SavedSearchConditions,CancellationOptions,InboxRoutingTarget,InboxStrategy,CustomerSegments,RankProgram,RankTier,StoreComparisonResult,AutoLineKind,AutoLineRule,BookingPassPlan,BookingPassPlanSummary,BookingPassPlanWrite,McpConnection,AiAnswerLog,QaEntry} from '@line-crm/shared';
+import type {MemberCard,AccountAiFeature,AccountAiSetting,SavedSearchConditions,CancellationOptions,InboxRoutingTarget,InboxStrategy,CustomerSegments,RankProgram,RankTier,StoreComparisonResult,StoreComparisonDetail,AutoLineKind,AutoLineRule,BookingPassPlan,BookingPassPlanSummary,BookingPassPlanWrite,McpConnection,AiAnswerLog,QaEntry} from '@line-crm/shared';
 type Result<T>={success:true;data:T};
 type Page<T>={items:T[];total:number};
 const e=encodeURIComponent;
@@ -57,7 +57,7 @@ export const storeComparisonApi={
  export:(filters:{from?:string;to?:string;compare?:'average'|'previous';poolId?:string;sort?:string;order?:'asc'|'desc'},key:string)=>fetchApi<Result<{id:string;replayed:boolean}>>('/api/hq/store-comparison/export',json('POST',filters,key)),
  exportStatus:(id:string)=>fetchApi<Result<{id:string;status:'pending'|'completed'|'failed';rowCount:number|null;downloadUrl:string|null;errorCode:string|null}>>(`/api/hq/store-comparison/exports/${e(id)}`),
  get:(filters:{from?:string;to?:string;compare?:'average'|'previous';sort?:string;order?:'asc'|'desc';page?:number;pageSize?:10|20|50;poolId?:string}={})=>fetchApi<Result<StoreComparisonResult>>(query('/api/hq/store-comparison',filters)),
- detail:(id:string,from?:string,to?:string)=>fetchApi<Result<unknown>>(query(`/api/hq/store-comparison/${e(id)}`,{from,to})),
+ detail:(id:string,from?:string,to?:string)=>fetchApi<Result<StoreComparisonDetail>>(query(`/api/hq/store-comparison/${e(id)}`,{from,to})),
 };
 export const ecAutoLineApi={
  send:(a:string,id:string)=>fetchApi<Result<unknown>>(account(`/api/ec/auto-line/sends/${e(id)}`,a)),
