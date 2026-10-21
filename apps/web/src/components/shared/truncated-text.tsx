@@ -3,6 +3,7 @@
 import { createContext, useContext, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { HTMLAttributes } from 'react'
+import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
 import styles from './truncated-text.module.css'
 
 /** 全文を開く操作が別にある群では、同じ文字へのTab停止を重ねない。 */
@@ -34,7 +35,7 @@ export default function TruncatedText({ value, url = false, className, tone, ...
   const open = useCallback(() => {
     clear()
     const node = ref.current
-    if (!node || (!clipped && shown === value && node.scrollWidth <= node.clientWidth)) return
+    if (!node || (shown === value && node.scrollWidth <= node.clientWidth)) return
     const rect = node.getBoundingClientRect()
     const css = getComputedStyle(document.documentElement)
     const edge = Number.parseFloat(css.getPropertyValue('--polish-space-row')) || 8
@@ -42,23 +43,29 @@ export default function TruncatedText({ value, url = false, className, tone, ...
     const gap = Number.parseFloat(css.getPropertyValue('--polish-tooltip-gap')) || 8
     const below = rect.top < width / 2
     setPosition({ left: Math.max(edge, Math.min(rect.left, window.innerWidth - width - edge)), top: below ? rect.bottom + gap : rect.top - gap, below })
-  }, [clear, clipped, shown, value])
+  }, [clear, shown, value])
   const leave = () => { clear(); timer.current = setTimeout(close, 120) }
   useEffect(() => {
     const node = ref.current
     // These permanent, inert samples only supply widths to TagOverflow.
     // Their visible copies own tooltip/focus behavior; measuring both duplicates table layout work.
     if (!node || node.closest?.('[data-tag-overflow-measure]')) return
-    const update = () => setClipped(node.scrollWidth > node.clientWidth || shown !== value)
+    let active = true
+    const key = {}
+    const parent = node.closest?.('a, button, [role="button"], [role="tab"]')
+    const read = () => {
+      if (!active) return () => {}
+      const nextClipped = node.scrollWidth > node.clientWidth || shown !== value
+      return () => { if (active) { setClipped(nextClipped); setNested(Boolean(parent)) } }
+    }
+    const update = () => { if (active) scheduleMeasurement(key, read) }
     update()
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
     observer?.observe(node)
-    const parent = node.closest?.('a, button, [role="button"], [role="tab"]')
-    setNested(Boolean(parent))
     parent?.addEventListener?.('focus', open)
     parent?.addEventListener?.('blur', close)
     window.addEventListener?.('resize', update)
-    return () => { observer?.disconnect(); parent?.removeEventListener?.('focus', open); parent?.removeEventListener?.('blur', close); window.removeEventListener?.('resize', update); clear() }
+    return () => { active = false; cancelMeasurement(key); observer?.disconnect(); parent?.removeEventListener?.('focus', open); parent?.removeEventListener?.('blur', close); window.removeEventListener?.('resize', update); clear() }
   }, [shown, value, open, close, clear])
   useEffect(() => {
     if (!position) return

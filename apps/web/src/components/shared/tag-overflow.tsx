@@ -3,24 +3,8 @@
 import { Children, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import Dialog from './dialog'
 import { TruncatedTextFocus } from './truncated-text'
+import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
 import styles from './tag-overflow.module.css'
-
-// Read all rows before committing fit counts. Updating one row before measuring
-// the next repeatedly forces the browser to lay out the same native table.
-const pendingMeasurements = new Map<object, () => () => void>()
-let measurementQueued = false
-function scheduleMeasurement(key: object, read: () => () => void) {
-  pendingMeasurements.set(key, read)
-  if (measurementQueued) return
-  measurementQueued = true
-  queueMicrotask(() => {
-    measurementQueued = false
-    const reads = [...pendingMeasurements.values()]
-    pendingMeasurements.clear()
-    const commits = reads.map(read => read())
-    for (const commit of commits) commit()
-  })
-}
 
 /** : 横1行に入る数。+N の幅も先に確保する。 */
 export function fittingTagCount(widths: number[], available: number, gap: number, moreWidth: (rest: number) => number): number {
@@ -77,7 +61,7 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
     const fonts = document.fonts
     if (fonts?.status === 'loading') void fonts.ready.then(invalidate)
     fonts?.addEventListener('loadingdone', invalidate)
-    return () => { active = false; pendingMeasurements.delete(key); observer.disconnect(); fonts?.removeEventListener('loadingdone', invalidate) }
+    return () => { active = false; cancelMeasurement(key); observer.disconnect(); fonts?.removeEventListener('loadingdone', invalidate) }
   }, [children, maxVisible, items.length])
   const shown = Math.min(fit, maxVisible ?? items.length, items.length)
   const rest = items.length - shown
