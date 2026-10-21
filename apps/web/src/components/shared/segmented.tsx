@@ -1,4 +1,6 @@
 'use client'
+import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
+import { observeElementResize } from './element-resize-observer'
 
 import type { ReactNode } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
@@ -65,18 +67,43 @@ export default function SegmentedControl<T extends string>({
 
   const selectedIndex = Math.max(0, options.findIndex((o) => o.value === value))
 
-  // 選択中の項目の位置へつまみを合わせる。文字の太さ変化・
-  // フォント読み込みで幅が動くので ResizeObserver で追従する。
+  const thumbRef = useRef(thumb)
+  const queueMeasure = useRef<() => void>(() => {})
+  const optionKeys = JSON.stringify(options.map(option => option.value))
+
+  // Observe option geometry as well as the root: labels/counts can change at fixed root width.
   useLayoutEffect(() => {
-    const measure = () => {
+    if (appearance !== 'track') return
+    let active = true
+    const key = {}
+    const read = () => {
       const item = itemRefs.current[selectedIndex]
-      if (item) setThumb({ left: item.offsetLeft, width: item.offsetWidth })
+      if (!active || !item) return () => {}
+      const next = { left: item.offsetLeft, width: item.offsetWidth }
+      return () => {
+        if (!active || (thumbRef.current.left === next.left && thumbRef.current.width === next.width)) return
+        thumbRef.current = next
+        setThumb(next)
+      }
     }
-    measure()
-    const observer = new ResizeObserver(measure)
-    if (rootRef.current) observer.observe(rootRef.current)
-    return () => observer.disconnect()
-  }, [selectedIndex, options])
+    const update = () => { if (active) scheduleMeasurement(key, read) }
+    queueMeasure.current = update
+    update()
+    const stopObserving = observeElementResize([rootRef.current, ...itemRefs.current].filter((node): node is HTMLDivElement | HTMLButtonElement => node !== null), update)
+    const fonts = document.fonts
+    void fonts?.ready.then(update)
+    fonts?.addEventListener?.('loadingdone', update)
+    return () => {
+      active = false
+      if (queueMeasure.current === update) queueMeasure.current = () => {}
+      cancelMeasurement(key)
+      stopObserving()
+      fonts?.removeEventListener?.('loadingdone', update)
+    }
+  }, [selectedIndex, optionKeys, appearance])
+
+  // New labels/counts or presentation changes queue a read, without rebuilding observers.
+  useLayoutEffect(() => { queueMeasure.current() }, [options, selectedIndex, appearance, size, className, disabled, equalWidth, fit, bad])
 
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
