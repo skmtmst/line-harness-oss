@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test'
 import { waitForOverlayLayout } from '../../../../../scripts/browser/overlay-ready.mjs'
 const mockPort = Number(process.env.TRAIN30_MOCK_PORT ?? 8788)
+// Next can still be prefetching when the last assertion finishes. Drain route
+// handlers before the fixture disposes responses returned by route.fetch().
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'wait' })
+})
 async function openPrimaryAuthenticatedChallenge(page, path, token, method) {
   const nonce = crypto.randomUUID()
   await page.evaluate(({ nonce, path }) => sessionStorage.setItem('lh_login_handoff', JSON.stringify({ nonce, expires: Date.now() + 600000, kind: 'challenge', path })), { nonce, path })
@@ -8,6 +13,37 @@ async function openPrimaryAuthenticatedChallenge(page, path, token, method) {
   await page.goto(`${path}#${fragment}`)
 }
 const codes = ['7K2Q-9FXM','B4TN-6WJP','H8RD-3CVY','M5ZL-2QKA','P9XE-7NHU','T3GW-8BSC','Y6JA-4DRV','C2FN-5MXT']
+for (const width of [1152,1440,1920]) test(`shared list tools and support actions stay usable at ${width}`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 })
+  await page.addInitScript(() => {
+    localStorage.setItem('lh_selected_account', 'visual-qa-account')
+    sessionStorage.setItem('lh_auth_selection_cleared', '1')
+  })
+  await page.route('**/api/**', async route => {
+    const url = new URL(route.request().url())
+    return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
+  })
+  for (const path of ['/auto-replies/runs?id=ar-2', '/friend-add-settings/runs', '/mileage/friends/detail?id=friend-1', '/ops/tenants', '/ops/support']) {
+    await page.goto(path)
+    await expect(page.locator('[data-list-toolbar]').first()).toBeVisible()
+    if (path === '/ops/support') await expect(page.getByRole('button', { name: '返信する', exact: true })).toBeVisible()
+    await expect.poll(() => page.evaluate(() => {
+      const main = document.querySelector('main'), bounds = main.getBoundingClientRect()
+      const controls = [...main.querySelectorAll('[data-list-toolbar] button, [data-list-toolbar] input, [data-dialog-actions] button')]
+        .map(el => ({ el, rect: el.getBoundingClientRect() })).filter(({ rect }) => rect.width > 0 && rect.height > 0)
+      const clipped = controls.filter(({ rect }) => rect.left < bounds.left - 1 || rect.right > bounds.right + 1).length
+      let overlaps = 0
+      for (let a = 0; a < controls.length; a++) for (let b = a + 1; b < controls.length; b++) {
+        const one = controls[a], two = controls[b]
+        if (one.el.contains(two.el) || two.el.contains(one.el)) continue
+        if (Math.min(one.rect.right, two.rect.right) - Math.max(one.rect.left, two.rect.left) > 1
+          && Math.min(one.rect.bottom, two.rect.bottom) - Math.max(one.rect.top, two.rect.top) > 1) overlaps++
+      }
+      return { controls: controls.length > 0, clipped, overlaps, horizontalScroll: main.scrollWidth - main.clientWidth }
+    })).toEqual({ controls: true, clipped: 0, overlaps: 0, horizontalScroll: 0 })
+    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`shared-tools-${path.replace(/\W/g, '-')}-${width}.png`) })
+  }
+})
 async function centered(button) {
   await expect(button).toBeVisible()
   const position = await button.evaluate(el => {

@@ -484,16 +484,16 @@ export default function OpsSupportV8() {
                       </>
                     )}
                   </div>
-                  <div className={styles.actions}>
+                  <DialogActions padding="none" leadingAction={<>
                     {ticket.stage === 'resolved' || ticket.stage === 'closed'
                       ? <Button disabled={busy} onClick={() => changeStage('in_progress')} busy={Boolean(busy)} busyLabel="処理中…">対応中に戻す</Button>
                       : <Button disabled={busy} onClick={() => changeStage('resolved')} busy={Boolean(busy)} busyLabel="処理中…"><Check aria-hidden="true" />解決済みにする</Button>}
                     {closed ? null : <Button disabled={busy} onClick={() => changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
-                    <span className={styles.spacer} />
+                  </>}>
                     <Button onClick={() => saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
                     <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" label="送ったあと" size="content" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} /></SaveErrorField>
                     <Button variant="primary" onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || closed || aiBusy || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
-                  </div>
+                  </DialogActions>
                 </>
               )}
             </>

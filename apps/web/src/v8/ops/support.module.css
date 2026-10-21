@@ -126,8 +126,7 @@
 }
 
 .detailHead svg,
-.draftHead svg,
-.actions svg {
+.draftHead svg {
   width: var(--tpl-op-auth-icon);
   height: var(--tpl-op-auth-icon);
 }
@@ -240,7 +239,6 @@
   font-size: var(--text-nano);
 }
 
-.actions,
 .confirmActions {
   display: flex;
   flex-wrap: wrap;
@@ -330,15 +328,6 @@
   .list {
     width: 100%;
   }
-}
-
-/* 絵 ：返信の操作は1行。返信するは行の右端。間の空きは左寄せの2つと右寄せの3つの境目だけ。 */
-.actions {
-  flex-wrap: nowrap;
-}
-
-.actions > .spacer {
-  margin-inline-end: var(--tpl-op-support-negative-gap);
 }
 
 /* 絵 ：数の帯は白い板の端から端まで。下の注意帯とは間 4。 */

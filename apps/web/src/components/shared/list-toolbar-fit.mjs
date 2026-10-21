@@ -18,7 +18,9 @@ export function toolbarContentFit(toolbar, expandedItem = null, expandedWidth = 
   const css = getComputedStyle(toolbar), gap = parseFloat(css.columnGap) || 0
   const available = toolbar.clientWidth - (parseFloat(css.paddingLeft) || 0) - (parseFloat(css.paddingRight) || 0)
   const required = tools.reduce((sum, tool) => {
-    let width = tool.getBoundingClientRect().width
+    // A flex item can shrink while its controls keep their intrinsic width.
+    // Counting only that smaller box makes an overflowing band look like it fits.
+    let width = Math.max(tool.getBoundingClientRect().width, tool.scrollWidth)
     if (tool.matches('[data-toolbar-search]')) {
       const minimum = parseFloat(getComputedStyle(tool).getPropertyValue('--list-search-content-min'))
       if (minimum > 0) width = Math.min(width, minimum)
