@@ -57,7 +57,7 @@ export default function TemplateDetailV8() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, accounts } = useAccount()
 
   const [template, setTemplate] = useState<TemplateDetailData | null>(null)
   const [versions, setVersions] = useState<TemplateVersionItem[] | null>(null)
@@ -169,6 +169,8 @@ export default function TemplateDetailV8() {
   ).length
   const inUseVersion = (versions ?? []).find((v) => v.status === 'in_use') ?? null
   const draftContent = template?.messageContent ?? ''
+  const senderAccountId = template?.accountId ?? selectedAccountId
+  const senderName = accounts.find((account) => account.id === senderAccountId)?.name ?? '公式アカウント'
   const nextVersionNumber = (template?.publishedVersion ?? 0) + 1
 
   const doPublish = useCallback(async () => {
@@ -381,9 +383,9 @@ export default function TemplateDetailV8() {
         <Notice tone="danger" heading={<> {flexError} </>} >このままでは公開できません。
             {canMutate ? <Link href={editHref} className={styles.inlineLink}>再編集で直してください。</Link> : 'オーナー・管理者に再編集を依頼してください。'}</Notice>
       ) : (
-        <LinePreview title="届き方" accountName="然 - NEN -" note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
+        <LinePreview title="届き方" accountName={senderName} note="受け取る人のLINEでの見え方です。{ } の差し込みは、送るときに受け取る人ごとの値に変わります。">
           {template.messageType === 'flex' ? <FlexPreviewComponent content={draftContent} /> : (
-            <LinePreviewMessage accountName="然 - NEN -" avatar="然" time="18:00">
+            <LinePreviewMessage accountName={senderName} avatar={senderName.slice(0, 1)} time="18:00">
               {buildTemplatePreview(draftContent, EMPTY_TEMPLATE_REFERENCES).content}
             </LinePreviewMessage>
           )}
