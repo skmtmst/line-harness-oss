@@ -148,7 +148,15 @@ const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
 const pad = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
 const TONES = ['green', 'purple', 'blue', 'amber'] as const
 
+/** The API lists full slots too; only explicit null capacity means unlimited. */
+function bookableScheduleSlots(sch: StyleSchedule) {
+  return sch.availability.status === 'available'
+    ? sch.availability.slots.filter(slot => slot.remaining === null || (Number.isFinite(slot.remaining) && slot.remaining > 0))
+    : []
+}
+
 function boardOf(style: IndustryStyle, sch: StyleSchedule, now: Date): StyleBoard {
+  const availableSlots = bookableScheduleSlots(sch)
   const tz = sch.timeZone
   const times = [...sch.entries.flatMap((e) => [hm(e.startsAt, tz), hm(e.endsAt, tz)]), ...sch.availability.slots.flatMap((s) => [hm(s.startsAt, tz), hm(s.endsAt, tz)])]
   // 予約が 0 件でも営業の時間帯が分かるよう、空きだけの日は 10:00〜20:00 を下限にする（b22bbd）。
@@ -158,7 +166,7 @@ function boardOf(style: IndustryStyle, sch: StyleSchedule, now: Date): StyleBoar
   const today = parts(now.toISOString(), tz)
   const showsToday = sch.range === 'today' && sch.from.slice(0, 10) <= today.date && today.date < sch.to.slice(0, 10)
   const nowMin = toMin(today.time)
-  const nextOf = (columnId: string) => sch.availability.slots.filter((s) => s.columnId === columnId && (!showsToday || toMin(hm(s.startsAt, tz)) >= nowMin)).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0]
+  const nextOf = (columnId: string) => availableSlots.filter((s) => s.columnId === columnId && (!showsToday || toMin(hm(s.startsAt, tz)) >= nowMin)).sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0]
   const columns = sch.columns.map((c, i) => {
     const next = nextOf(c.id)
     const closed = sch.closures.find((x) => x.target !== 'store' && x.targetIds.includes(c.id))
@@ -180,7 +188,7 @@ function boardOf(style: IndustryStyle, sch: StyleSchedule, now: Date): StyleBoar
     }
   }
   const seen = new Set<string>()
-  const free = sch.availability.slots.filter((s) => (!showsToday || toMin(hm(s.startsAt, tz)) >= nowMin) && !seen.has(s.columnId) && seen.add(s.columnId)).map((s) => ({ columnId: s.columnId, start: hm(s.startsAt, tz) }))
+  const free = availableSlots.filter((s) => (!showsToday || toMin(hm(s.startsAt, tz)) >= nowMin) && !seen.has(s.columnId) && seen.add(s.columnId)).map((s) => ({ columnId: s.columnId, start: hm(s.startsAt, tz) }))
   return { from: pad(from), to: pad(to), now: showsToday && nowMin >= from && nowMin <= to ? today.time : undefined, next: firstNext ? `${hm(firstNext.s!.startsAt, tz)} ${firstNext.c.name}` : undefined, columns, entries, free }
 }
 
@@ -201,7 +209,7 @@ function weekOf(sch: StyleSchedule, now: Date): StyleWeek {
     })
   }
   const entries = sch.entries.flatMap(e => segments(e.startsAt, e.endsAt).map(slot => ({ id: e.id, ...slot, title: e.title, name: e.booking?.name ?? '' })))
-  const free = sch.availability.slots.flatMap(s => {
+  const free = bookableScheduleSlots(sch).flatMap(s => {
     const original = parts(s.startsAt, tz)
     // A clipped continuation is not a new bookable start. Keep the API candidate's original action.
     return segments(s.startsAt, s.endsAt).map(slot => slot.day === original.date ? slot : { ...slot, bookingDay: original.date, bookingStart: original.time })
@@ -250,7 +258,8 @@ function sideFor(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedule, hre
   if (style === 'restaurant') cards.push(waiting('care', '今日気をつけること', ['アレルギー', '記念日', '無断歴あり'], 'くわしく見る'), waiting('waitlist', '席のキャンセル待ち', ['待っている人'], '空きを知らせる'))
   if (style === 'salon') cards.push(waiting('rebook', '次回予約がまだ', ['今日来た人のうち次の予約がまだ'], 'LINE で次回を案内する'))
   if (style === 'consult') {
-    const byCol = sch.columns.map((c) => { const slots = sch.availability.slots.filter((x) => x.columnId === c.id).sort((a, b) => a.startsAt.localeCompare(b.startsAt)); return slots.length ? { label: c.name, value: `${hm(slots[0].startsAt, tz)}〜${hm(slots.at(-1)!.endsAt, tz)}` } : null }).filter((x): x is { label: string; value: string } => Boolean(x))
+    const availableSlots = bookableScheduleSlots(sch)
+    const byCol = sch.columns.map((c) => { const slots = availableSlots.filter((x) => x.columnId === c.id).sort((a, b) => a.startsAt.localeCompare(b.startsAt)); return slots.length ? { label: c.name, value: `${hm(slots[0].startsAt, tz)}〜${hm(slots.at(-1)!.endsAt, tz)}` } : null }).filter((x): x is { label: string; value: string } => Boolean(x))
     cards.push({ id: 'free', title: '今日の空き', rows: byCol.length ? byCol : [{ label: sch.availability.status === 'available' ? '空きはありません' : '空きを出せません', value: '' }] })
   }
   return cards
