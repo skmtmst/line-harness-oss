@@ -42,7 +42,7 @@ const group = (id: string, name: string, extra: Record<string, unknown> = {}) =>
 
 const items = [
   group('g-default', '通常メニュー', { isDefaultForAll: true, targetingPriority: 0, folderId: 'rmf-normal' }),
-  group('g-autumn', '秋のキャンペーン', { status: 'draft', isDefaultForAll: true, publishingAt: '2026-10-05T00:00:00.000+09:00', targetingPriority: 1 }),
+  group('g-autumn', '秋のキャンペーン', { status: 'draft', isDefaultForAll: true, publishingAt: '2027-10-05T00:00:00.000+09:00', targetingPriority: 1 }),
 ]
 
 vi.mock('@/contexts/account-context', () => ({
@@ -164,6 +164,8 @@ describe('V8 リッチメニュー一覧', () => {
     expect(second.textContent).toContain('10/05 公開')
     expect(second.textContent).toContain('10/05 から既定')
     expect(second.textContent).toContain('—')
+    expect(second.querySelector('[data-design-node="xRvDB"]')?.textContent).toContain('2027/10/05 公開')
+    expect(second.closest('[data-column-sizing]')?.getAttribute('data-column-sizing')).toBe('controls')
   })
 
   test('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は輪）', async () => {
