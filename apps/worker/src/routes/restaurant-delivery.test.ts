@@ -18,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { currentInvocation, withInvocation } from '@line-crm/shared/server';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
+import { stubUberStoresApi, type UberStoresApiOptions } from '../test-utils/uber-stores-api.js';
 
 type MockStaff = {
   id: string;
@@ -1692,45 +1693,8 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
         );
     }
 
-    /**
-     * Uber の口の作り物。一覧と連携の有効化だけを受ける。
-     * beforeEach の既定の受け口を置き換えるので、呼び先と回数をここで数える。
-     */
-    function stubUberApi(
-      options: {
-        stores?: Array<Record<string, unknown>>;
-        listStatus?: number;
-        posStatus?: number;
-      } = {},
-    ): Array<{ url: string; method: string; body: string }> {
-      const calls: Array<{ url: string; method: string; body: string }> = [];
-      vi.stubGlobal(
-        'fetch',
-        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-          const url = typeof input === 'string' ? input : String(input);
-          calls.push({
-            url,
-            method: (init?.method ?? 'GET').toUpperCase(),
-            body: typeof init?.body === 'string' ? init.body : '',
-          });
-          const headers = { 'content-type': 'application/json' };
-          if (url.endsWith('/pos_data')) {
-            const status = options.posStatus ?? 200;
-            if (status === 200) return new Response(null, { status: 204 });
-            // 失敗の本文に業者の生文が混ざっていても、こちらへは残らないこと。
-            return new Response(JSON.stringify({ message: PROVIDER_FREE_TEXT }), { status, headers });
-          }
-          const status = options.listStatus ?? 200;
-          if (status !== 200) {
-            return new Response(JSON.stringify({ message: PROVIDER_FREE_TEXT }), { status, headers });
-          }
-          return new Response(JSON.stringify({ stores: options.stores ?? [uberStore()] }), {
-            status: 200,
-            headers,
-          });
-        }),
-      );
-      return calls;
+    function stubUberApi(options: UberStoresApiOptions = {}): ReturnType<typeof stubUberStoresApi> {
+      return stubUberStoresApi({ store: uberStore, providerFreeText: PROVIDER_FREE_TEXT }, options);
     }
 
     it('候補は加盟店のトークンで取り、選べるように控える', async () => {
@@ -2017,13 +1981,30 @@ describe('Uber Eats のログイン連携（受入条件1・2・3・4・5）', (
       await seedLoggedIn();
       seedCandidate({ uber_store_id: UBER_STORE_ID });
       const calls = stubUberApi();
-      const results = await Promise.all([
-        call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } }),
-        call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } }),
-      ]);
-      expect(results.map((res) => res.status).sort()).toEqual([200, 409]);
+      let markStarted!: () => void;
+      let release!: () => void;
+      const started = new Promise<void>((resolve) => { markStarted = resolve; });
+      const released = new Promise<void>((resolve) => { release = resolve; });
+      const respond = fetch;
+      vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const response = await respond(input, init);
+        if (String(input).endsWith('/pos_data')) { markStarted(); await released; }
+        return response;
+      }));
+      const first = Promise.resolve(call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } }));
+      try {
+        // 外部の応答前に重ね、成功後の候補削除とは別の競合を確かめる。
+        await Promise.race([started, first.then(() => { throw new Error('POS response was not reached'); })]);
+        const second = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+        expect(second.status).toBe(409);
+      } finally { release(); }
+      expect((await first).status).toBe(200);
       expect(calls.filter((entry) => entry.url.endsWith('/pos_data'))).toHaveLength(1);
       expect(connectionRows()[0]).toMatchObject({ status: 'connected', last_error: null });
+      const late = await call(SELECT_PATH, { body: { storeId: UBER_STORE_ID } });
+      expect(late.status).toBe(404);
+      expect(await late.json()).toMatchObject({ code: 'store_not_candidate' });
+      expect(calls.filter((entry) => entry.url.endsWith('/pos_data'))).toHaveLength(1);
     });
 
     it('POSの確定拒否401は期限切れと分かる形で止め、再送しない', async () => {
