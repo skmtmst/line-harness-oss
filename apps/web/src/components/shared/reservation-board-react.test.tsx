@@ -15,7 +15,7 @@ describe('共通盤の操作',()=>{
   fireEvent.click(screen.getByRole('button',{name:entry.customerName}))
   expect(open).toHaveBeenCalledWith(entry.id)
   const note=screen.getByText(allergy)
-  expect(note.getAttribute('aria-label')).toBe(allergy)
+  await waitFor(()=>expect(note.getAttribute('aria-label')).toBe(allergy))
   fireEvent.focus(note)
   expect((await screen.findByRole('tooltip')).textContent).toBe(allergy)
   vi.spyOn(window,'requestAnimationFrame').mockImplementation(cb=>setTimeout(()=>cb(0),0) as unknown as number)
