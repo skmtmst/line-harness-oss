@@ -8,13 +8,13 @@ import { bookingAddons } from '../../features/booking/booking-addons/index.js';
 import { menuAudience } from '../../features/booking/booking-audience/index.js';
 import { cancellationPolicy, requireCancellationTestConnection } from '../../features/booking/booking-cancellation/index.js';
 import { EntitlementError, entitlementUseStatement, validateEntitlementSelection } from '../../features/booking/booking-entitlements/index.js';
-import { defaultBookingPaymentSelection } from '../../features/booking/booking-payment-selection/index.js';
+import { bookingPaymentSelection, defaultBookingPaymentSelection } from '../../features/booking/booking-payment-selection/index.js';
 import { resolveFormBookingAnswer, FormBookingAnswerError } from '../../features/forms/form-booking-answer/index.js';
 import { notifyForBooking } from '../../features/booking/booking-notification/index.js';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from '../../features/booking/booking-confirmed-effects/index.js';
 import { inputError, inputJsonBoundary } from '../../lib/input-errors.js';
 import { BOOKING_PERSON_LIMIT_GUARD_SQL, bookingPersonLimitBindings, bookingPersonLimitError } from '../../features/booking/booking-person-limit/index.js';
-import { getBookingAdminSettings, bookingPaymentInsertStatement, getBookingPaymentByBooking, decidePrepayOnly, prepayNoticeFor, resolveBookingPaymentConfig, resolveBookingPaymentForBooking } from '@line-crm/db';
+import { getBookingAdminSettings, bookingPaymentInsertStatement, getBookingPaymentByBooking, decidePrepayOnly, prepayNoticeFor, resolveBookingPaymentForBooking } from '@line-crm/db';
 import { enrollByTrigger } from '../../services/reminder-trigger.js';
 import { getAccountTimeZone, getStoreCapacitySnapshot } from '../../services/availability.js';
 import { STORE_CAPACITY_GUARD_SQL, STORE_SETTINGS_VERSION_GUARD_SQL } from '../../features/booking/booking-store-capacity/index.js';
@@ -241,15 +241,20 @@ booking.post('/api/liff/booking/requests', inputJsonBoundary({"menu_id":["string
   // 予約のルール「お店が承認してから確定する」が automatic の店は、
   // 未承認を通さずその場で確定にする。設定が読めないときは承認ありに倒す。
   const adminSettings = await getBookingAdminSettings(c.env.DB, accountId);
-  let paymentConfig = await resolveBookingPaymentConfig(c.env.DB, accountId, body.menu_id);
+  const paymentSelection = await bookingPaymentSelection(c.env.DB, accountId, body.menu_id, friendId);
+  let paymentConfig = paymentSelection.config;
   if (body.entitlement_id) {
     try { await validateEntitlementSelection(c.env.DB,accountId,friendId,body.menu_id,body.entitlement_id,startsAt.toISOString()); }
     catch(error) { if(error instanceof EntitlementError)return c.json({error:error.code},error.status); throw error; }
     if(body.payment_method) return inputError(c,{error:'choose_entitlement_or_payment'},400,['entitlement_id','payment_method']);
     paymentConfig={mode:'none',provider:'none',holdMinutes:paymentConfig.holdMinutes};
   } else if(paymentConfig.mode==='customer_choice') {
+    if (body.payment_method && !paymentSelection.allowedMethods.includes(body.payment_method))
+      return inputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
     paymentConfig=body.payment_method
       ? {...paymentConfig,mode:body.payment_method,provider:body.payment_method==='online'?'stripe':'onsite'}
+      : paymentSelection.allowedMethods.length === 1
+      ? {...paymentConfig,mode:'online',provider:'stripe'}
       : await defaultBookingPaymentSelection(c.env.DB, accountId);
   } else if(body.payment_method && body.payment_method!==paymentConfig.mode) {
     return inputError(c,{error:'payment_method_not_allowed'},400,['payment_method']);
