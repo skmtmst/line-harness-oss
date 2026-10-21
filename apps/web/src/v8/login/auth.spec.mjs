@@ -112,6 +112,12 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
       body.data.recoveryCodesRemaining = remaining
       return route.fulfill({ status: response.status(), json: body })
     }
+    if (url.pathname === '/api/dashboard/style') {
+      const body = await response.json()
+      // This case checks the main page after setup, not the first-use dialog.
+      body.data.styleSelected = true
+      return route.fulfill({ status: response.status(), json: body })
+    }
     return route.fulfill({ response })
   })
   for (const path of ['/', '/friends', '/broadcasts', '/templates/new', '/templates/detail?id=template-1', '/chats', '/hq', '/settings']) {

@@ -27,7 +27,8 @@ export async function deleteUnusedConversionDefinition(
       SELECT ?, ?, 'delete', NULL, 0, ?, ?, ? WHERE changes() = 1`)
       .bind(operationId, input.id, input.reason ?? null, input.staffId, now),
   ]);
-  if ((results[0]?.meta.changes ?? 0) !== 1 || (results[1]?.meta.changes ?? 0) !== 1) {
+  // The parent deletion includes cascaded revision rows in D1; the audit insert stays singular.
+  if ((results[0]?.meta.changes ?? 0) < 1 || (results[1]?.meta.changes ?? 0) !== 1) {
     throw new ConversionDefinitionError('version_conflict', '成果地点が更新されています。読み直してください', 409);
   }
   return { id: input.id, deleted: true as const };

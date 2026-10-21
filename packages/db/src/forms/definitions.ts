@@ -152,7 +152,8 @@ export async function deleteFormAtRevision(
         AND NOT EXISTS (SELECT 1 FROM webinar_ctas WHERE form_id = forms.id)
         AND NOT EXISTS (SELECT 1 FROM rich_menu_areas WHERE form_id = forms.id)`,
   ).bind(id, expectedRevision).run();
-  return (result.meta?.changes ?? 0) === 1;
+  // D1 counts cascaded rows too; the primary-key predicate limits the parent to one.
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 export async function createForm(db: D1Database, input: CreateFormInput): Promise<Form> {
