@@ -19,16 +19,16 @@ afterEach(cleanup)
 it('スタイルを選ばず別の質問だけ保存しても、標準を選択済みにしない', async () => {
   const { result } = renderHook(() => useWizard({ accountId: 'new-account', state, initialStep: 1, onClose: calls.close }))
   await act(async () => { await result.current.onNext() })
-  await act(async () => { await result.current.close() })
+  await act(async () => { await result.current.saveAndClose() })
   expect(calls.save).toHaveBeenCalledTimes(1)
   expect(calls.save.mock.calls[0][1]).toMatchObject({ expectedVersion: 1, answers: { image: { mode: 'configured', value: 'keep' } } })
   expect(calls.save.mock.calls[0][1]).not.toHaveProperty('style')
 })
 
-it('本人が標準を選んで次へ進んだら、途中で閉じても選択を保存する', async () => {
+it('本人が標準を選んで次へ進んだら、明示的な途中保存で選択を保存する', async () => {
   const { result } = renderHook(() => useWizard({ accountId: 'new-account', state, onClose: calls.close }))
   await act(async () => { await result.current.onNext() })
-  await act(async () => { await result.current.close() })
+  await act(async () => { await result.current.saveAndClose() })
   expect(calls.save).toHaveBeenCalledWith('new-account', expect.objectContaining({ expectedVersion: 1, style: 'standard' }))
 })
 

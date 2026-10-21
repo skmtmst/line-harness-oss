@@ -231,7 +231,7 @@ const EXEMPTIONS: Record<string, string> = {
   'v8/ec-auto-line/edit-drawer.tsx':
     '③-2 第3波：自動の LINE の編集の引き出し。Drawer に dirty を渡しており、閉じる・Esc・外側押しは共通の離脱の確認（useOverlayDiscard）が止める。画面の遷移は引き出しが開いている間は起きない。',
   'v8/style-dashboard/settings-panels.tsx': '表示を変える引き出し・休みを入れる窓。入力は引き出し・窓の中だけで、閉じると戻る。引き出しは dirty の間、閉じる前に破棄の確認を出す',
-  'v8/onboarding/wizard.tsx': 'はじめの質問の窓（B-313）。答えは途中で閉じても保存してから閉じる（失わない）。どの答えも「あとから変えられます」で、離れる確認で止める物が無い',
+  'v8/onboarding/wizard.tsx': '入力は窓の中だけ。閉じる・Esc・背景は共通Dialogの破棄確認を通り、破棄では保存しない。明示的な途中保存と失敗時の入力保持は実Wizardと実Dialogの操作試験で守る',
   'components/friend-fields/edit-tag-page-v4.tsx':
     '保管済みタグの名前と説明の訂正。元の取消は確認なしで入力を破棄するため、共通作成型も dirty=false で同じ動きを保つ。番兵の要否は削除台帳の司令塔に確認へ記録する',
   'v8/restaurant/google/google.tsx':
