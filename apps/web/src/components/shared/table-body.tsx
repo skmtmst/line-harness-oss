@@ -65,6 +65,7 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
     let frame = 0
     let active = true
     let structureDirty = true
+    let tableWidth: number | undefined
     let scrollParents: HTMLElement[] = []
     const measurementKey = {}
     const widths = new WeakMap<Element, number>()
@@ -84,6 +85,7 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
         }
       }
       const rect = element.getBoundingClientRect()
+      tableWidth = rect.width
       // Capture nested main/dialog scrollers too; their viewport can be shorter than the browser.
       let top = 0
       let bottom = globalThis.window.innerHeight
@@ -137,6 +139,8 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
     const observer = new ResizeObserver((entries) => {
       let changed = false
       let geometryChanged = false
+      let widthChanged = false
+      let unusableSize = entries.length === 0
       for (const entry of entries) {
         const row = entry.target as HTMLTableRowElement
         const index = Number(row.dataset.tableIndex)
@@ -145,9 +149,10 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
         const fallback = box ? null : row.getBoundingClientRect()
         const height = box?.blockSize ?? fallback!.height
         const width = box?.inlineSize ?? fallback!.width
-        const previousWidth = widths.get(row)
+        const previousWidth = widths.get(row) ?? tableWidth
         widths.set(row, width)
-        if (previousWidth !== undefined && previousWidth !== width) structureDirty = true
+        if (previousWidth !== width) { structureDirty = true; widthChanged = true }
+        unusableSize ||= height <= 0 || width <= 0
         const key = model.current.keys[index]
         if (key !== undefined && height > 0 && heights.current.get(key) !== height) {
           geometryChanged ||= (heights.current.get(key) ?? estimate.current) !== height
@@ -162,7 +167,9 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
         estimate.current = nextEstimate
         if (geometryChanged) setRevision((value) => value + 1)
       }
-      schedule()
+      // Newly mounted, estimate-equal rows preserve the computed viewport and offsets.
+      // Keep zero/unknown sizes conservative and remeasure actual geometry or column changes.
+      if (geometryChanged || widthChanged || structureDirty || unusableSize) schedule()
     })
     rowObserver.current = observer
     return () => {

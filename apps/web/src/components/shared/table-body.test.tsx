@@ -26,6 +26,39 @@ const setup = () => {
 }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
+it('同じ初回の実測と途中追加行では再計測を重ねず、実際の高さ・幅の変化では読み直す', async () => {
+  setup()
+  const frames: FrameRequestCallback[] = []
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => { frames.push(callback); return frames.length })
+  vi.stubGlobal('cancelAnimationFrame', vi.fn())
+  const { container } = render(<table><TableBody items={items} itemKey={keys} colSpan={2} renderRow={item => <tr>
+    <td><button>{`行${item}`}</button></td><td>補助</td>
+  </tr>} /></table>)
+  await act(async () => {})
+  const notify = async (target: Element, height: number, width: number) => {
+    await act(async () => callbacks[0]?.([{ target, borderBoxSize: [{ blockSize: height, inlineSize: width }] }] as unknown as ResizeObserverEntry[], {} as ResizeObserver))
+  }
+  const flush = async () => { await act(async () => { for (const frame of frames.splice(0)) frame(0) }) }
+  const first = container.querySelector('[data-table-index="0"]')!
+  await notify(first, 58, 100)
+  expect(frames).toHaveLength(0)
+  await notify(first, 83, 100)
+  expect(frames).toHaveLength(1)
+  await flush()
+  container.querySelectorAll<HTMLTableRowElement>('[data-table-index]').forEach(element => { element.cells[1].style.display = 'none' })
+  await notify(first, 83, 90)
+  expect(frames).toHaveLength(1)
+  await flush()
+  expect(container.querySelector<HTMLTableCellElement>('tr[aria-hidden="true"] td')?.colSpan).toBe(1)
+  top = -1900 * 83
+  fireEvent.scroll(window)
+  await flush()
+  const entered = container.querySelector('[data-table-index="1900"]')!
+  expect(entered).toBeTruthy()
+  await notify(entered, 83, 100)
+  expect(frames).toHaveLength(0)
+})
+
 it('見積もりと同じ初回実測では表を再コミットせず、後の先頭行変更でも測定済みの高さを保つ', async () => {
   setup()
   const committed = vi.fn()
@@ -126,6 +159,18 @@ it('高さが同じ幅だけの実測変更でも、畳まれた列を読み直�
   notify(60)
   await waitFor(() => expect(container.querySelector<HTMLTableCellElement>('tr[aria-hidden="true"] td')?.colSpan).toBe(1))
   expect(observers).toHaveLength(1)
+})
+
+it('初回ROの幅が直前の表幅から変わった場合も列の変化を見落とさない', async () => {
+  setup()
+  const { container } = render(<table><TableBody items={items} itemKey={keys} colSpan={2} estimatedRowHeight={59} renderRow={item => <tr>
+    <td>名前{item}</td><td>補助</td>
+  </tr>} /></table>)
+  await act(async () => {})
+  const first = container.querySelector<HTMLTableRowElement>('[data-table-index="0"]')!
+  first.cells[1].style.display = 'none'
+  act(() => callbacks[0]?.([{ target: first, borderBoxSize: [{ blockSize: 59, inlineSize: 90 }] }] as unknown as ResizeObserverEntry[], {} as ResizeObserver))
+  await waitFor(() => expect(container.querySelector<HTMLTableCellElement>('tr[aria-hidden="true"] td')?.colSpan).toBe(1))
 })
 
 it('高さや窓だけが変わっても残る行を作り直さず、データ・選択の更新は描く', async () => {
