@@ -249,14 +249,14 @@ export default function AutoRepliesListV8() {
   const requestDelete = (r: AutoReply) => { setDeleteError(''); setPendingDelete({ item: r, accountId: selectedAccountId }) }
 
   /* ===== 数の帯 ===== */
-  const hitsAllKnown = rules.length > 0 && rules.every((r) => r.hits !== undefined)
+  const hitsAllKnown = rules.every((r) => r.hits !== undefined)
   const monthlyHits = hitsAllKnown
     ? rules.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)
     : null
   const totalHits = hitsAllKnown
     ? rules.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
     : null
-  const actionExecutionsAllKnown = rules.length > 0 && rules.every((r) => r.actionExecutionCount != null)
+  const actionExecutionsAllKnown = rules.every((r) => r.actionExecutionCount != null)
   const actionExecutionCount = actionExecutionsAllKnown
     ? rules.reduce((sum, r) => sum + (r.actionExecutionCount ?? 0), 0)
     : null
