@@ -45,6 +45,11 @@ function useToolbarFit() {
 /** 一覧型が狭い板の「作る・フォルダ」を検索と同じ段へ渡す。 */
 const LeadingContext = createContext<{ leading: ReactNode; persistent?: boolean; trailingAccessory?: ReactNode }>({ leading: null })
 const FrameContext = createContext(false)
+/** 画面幅で切り替える包みの中にも道具があれば、枠と操作を重ねて作らない。 */
+function containsToolbarLayout(nodes: ReactNode): boolean {
+  return Children.toArray(nodes).some(node => isValidElement<{ children?: ReactNode }>(node)
+    && (node.type === ListToolbar || node.type === ListToolbarFrame || containsToolbarLayout(node.props.children)))
+}
 export function ListToolbarLeading({ children, leading, persistent, accessory, trailingAccessory }: { children: ReactNode; leading: ReactNode; persistent?: boolean; accessory?: ReactNode; trailingAccessory?: ReactNode }) {
   // 旧い断片の道具も、型の口で役目をそろえる。フォームのRowはそのまま保つ。
   const flatten = (items: ReactNode, prefix = ''): ReactNode[] => Children.toArray(items).flatMap((node, index) => {
@@ -53,12 +58,10 @@ export function ListToolbarLeading({ children, leading, persistent, accessory, t
     return node.type === Fragment ? flatten(node.props.children, `${key}/`) : [cloneElement(node, { key })]
   })
   const nodes = flatten(children)
-  const containsLayout = (items: ReactNode[]): boolean => items.some(node => isValidElement<{ children?: ReactNode }>(node)
-    && (node.type === ListToolbar || node.type === ListToolbarFrame || node.type === Fragment && containsLayout(Children.toArray(node.props.children))))
   const containsTool = (node: ReactNode): boolean => isValidElement<{ children?: ReactNode }>(node)
     && ([ListToolbarRow, ListToolbarSearchSlot, SearchField, Select, PageSizeSelect].includes(node.type as typeof ListToolbarRow)
       || Children.toArray(node.props.children).some(containsTool))
-  const needsFrame = nodes.some(containsTool) && !containsLayout(nodes)
+  const needsFrame = nodes.some(containsTool) && !containsToolbarLayout(nodes)
   // 案内文は道具より前の段。作る・フォルダ・検索の間に挟まない。
   const notices = needsFrame ? nodes.filter(node => isValidElement(node) && node.type === 'p') : []
   const tools = needsFrame ? <>{notices}<ListToolbarFrame>{[...nodes.filter(node => !notices.includes(node)), accessory].map((node, index) => {
@@ -168,9 +171,7 @@ export default function ListToolbar({
 export function ListToolbarFrame({ children, layout = 'band', singleRow = false, ...props }: HTMLAttributes<HTMLDivElement> & { layout?: 'band' | 'stacked'; /** 狭い板でも道具を 1 行に並べる（検索は縮み、折り返さない）。既定は狭い板で 2 段。 */ singleRow?: boolean }) {
   const ref = useToolbarFit()
   const { leading, persistent } = useContext(LeadingContext)
-  const containsToolbar = (nodes: ReactNode): boolean => Children.toArray(nodes).some(node => isValidElement<{ children?: ReactNode }>(node)
-    && (node.type === ListToolbar || node.props.children && containsToolbar(node.props.children)))
-  const ownsLeading = !containsToolbar(children)
+  const ownsLeading = !containsToolbarLayout(children)
   return <FrameContext.Provider value><div {...props} ref={ref} className={styles.slots} data-shared-part="list-toolbar" data-list-toolbar data-toolbar-layout={layout === 'stacked' ? 'slots-stacked' : 'slots'} data-toolbar-single-row={singleRow || undefined}>
     {ownsLeading && leading ? <span className={styles.leading} data-toolbar-leading data-toolbar-persistent={persistent || undefined}>{leading}</span> : null}
     {ownsLeading ? <span className={styles.rowBreak} aria-hidden="true" /> : null}{children}

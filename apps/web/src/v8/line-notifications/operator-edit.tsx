@@ -634,7 +634,11 @@ function OperatorEditInner() {
 
               <FormSection id="operator-when-send-heading" title="いつ送るか・重ならないか">
                 <Field id="operator-schedule" label="送る時間" value={schedule} onChange={setSchedule} options={SCHEDULE_OPTIONS} readOnly={!canWrite} />
-                <p className={styles.cardNote}>営業時間外のものは翌朝 10:00 にまとめて送ります。</p>
+                {schedule === 'business_hours' || schedule === 'morning_digest' ? (
+                  <p className={styles.cardNote}>{schedule === 'business_hours'
+                    ? '営業時間外のお知らせは、予約設定の営業時間になってから送ります。'
+                    : '翌朝の、設定されたおまとめ時刻に送ります。'}</p>
+                ) : null}
               </FormSection>
 
               {error ? <Notice tone="danger" className={styles.formErrorNoticePlacement} >{error}</Notice> : null}

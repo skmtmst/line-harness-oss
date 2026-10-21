@@ -138,7 +138,8 @@
 :root .toolbar [role='group'] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 /* 道具の幅は文字と印から決める。親より広い選ぶ欄を残さない。 */
 :root .trailing { flex: none; flex-wrap: nowrap; }
-:root .trailing > * { width: max-content; flex: none; }
+/* ボタンの幅は共通部品に任せ、36pxのアイコンボタンも縮めない。 */
+:root .trailing > :not(button) { width: max-content; flex: none; }
 :root .toolbar :global([data-design-node='rpot9']),
 :root .toolbar :global([data-design-node='Gfsb4']),
 :root .toolbar :global([data-design-node='niGPF']) { width: max-content; min-width: 0; max-width: 100%; }

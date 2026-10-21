@@ -232,3 +232,26 @@ test('お知らせの公開中は窓の×・Esc・戻って直すを止める', 
   expect(document.querySelector('[data-design-node="sDXNy"]')).toBeTruthy()
   await act(async () => resolve(json({ success: true, data: rule })))
 })
+
+
+test('送る時間を切り替えると、案内もその送信条件へ切り替わる', async () => {
+  await render()
+  const oldHint = '営業時間外のものは翌朝 10:00 にまとめて送ります。'
+  expect(host?.textContent).not.toContain(oldHint)
+  expect(host?.textContent).not.toContain('営業時間外のお知らせは、予約設定の営業時間になってから送ります。')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '送る時間' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('option', { name: '営業時間だけ' }).querySelector('button')!) })
+  expect(host?.textContent).toContain('営業時間外のお知らせは、予約設定の営業時間になってから送ります。')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '送る時間' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('option', { name: '翌朝にまとめる' }).querySelector('button')!) })
+  expect(host?.textContent).not.toContain('営業時間外のお知らせは、予約設定の営業時間になってから送ります。')
+  expect(host?.textContent).toContain('翌朝の、設定されたおまとめ時刻に送ります。')
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '送る時間' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'いつでも' }).querySelector('button')!) })
+  expect(host?.textContent).not.toContain('翌朝の、設定されたおまとめ時刻に送ります。')
+  expect((globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.some(([input, init]) => {
+    const path = new URL(String(input), 'http://worker.test').pathname
+    return (path.endsWith('/operator-rules') || path.endsWith('/operator-rules/rule-9'))
+      && ((init as RequestInit | undefined)?.method ?? 'GET') !== 'GET'
+  })).toBe(false)
+})

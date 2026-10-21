@@ -49,6 +49,38 @@ it('nested Frame and Toolbar render the leading actions once and keep their hand
   expect(create).toHaveBeenCalledOnce()
 })
 
+it('a framed toolbar inside a responsive wrapper keeps one set of actions and the entered search', () => {
+  const create = vi.fn(), folder = vi.fn(), search = vi.fn()
+  const view = (className: string) => <ListToolbarLeading leading={<>
+    <button onClick={create}>成果地点を作る</button><button onClick={folder}>フォルダを選ぶ</button>
+  </>}><div className={className}><ListToolbarFrame layout="stacked"><ListToolbarRow>
+    <input aria-label="成果地点を検索" defaultValue="" onChange={search} />
+  </ListToolbarRow></ListToolbarFrame></div></ListToolbarLeading>
+  const { rerender } = render(view('wide-tools'))
+  expect(screen.getAllByRole('button', { name: '成果地点を作る' })).toHaveLength(1)
+  expect(screen.getAllByRole('button', { name: 'フォルダを選ぶ' })).toHaveLength(1)
+  fireEvent.change(screen.getByRole('textbox', { name: '成果地点を検索' }), { target: { value: '購入' } })
+  rerender(view('narrow-tools'))
+  expect(screen.getByRole<HTMLInputElement>('textbox', { name: '成果地点を検索' }).value).toBe('購入')
+  fireEvent.click(screen.getByRole('button', { name: '成果地点を作る' }))
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダを選ぶ' }))
+  expect(create).toHaveBeenCalledOnce()
+  expect(folder).toHaveBeenCalledOnce()
+  expect(search).toHaveBeenCalledOnce()
+})
+
+it('an outer frame leaves the leading actions to a nested existing frame', () => {
+  const create = vi.fn()
+  render(<ListToolbarLeading leading={<button onClick={create}>項目を作る</button>}>
+    <ListToolbarFrame><section><ListToolbarFrame><ListToolbarRow>
+      <input aria-label="項目を検索" />
+    </ListToolbarRow></ListToolbarFrame></section></ListToolbarFrame>
+  </ListToolbarLeading>)
+  expect(screen.getAllByRole('button', { name: '項目を作る' })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: '項目を作る' }))
+  expect(create).toHaveBeenCalledOnce()
+})
+
 it('入れ子の断片の順が変わっても、入力した値を別の操作へ移さない', () => {
   const fields = (order: string[]) => <ListToolbarLeading leading={null}><>{order.map(name => <React.Fragment key={name}>
     <ListToolbarRow><input aria-label={name} defaultValue={name} /></ListToolbarRow>
