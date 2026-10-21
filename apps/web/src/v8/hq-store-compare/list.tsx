@@ -205,12 +205,22 @@ function MetricCell({ def, metric, compare }: { def: MetricDef; metric: StoreCom
   )
 }
 
-const ATTENTION: Array<{key:HqAttentionKind;label:string;href:string}> = [
- {key:'unhandledChats',label:'未対応のトーク',href:'/chats?status=unread'},
- {key:'pendingBookings',label:'承認待ちの予約',href:'/booking/bookings'},
- {key:'unpaid',label:'未払い',href:'/booking/bookings'},
- {key:'connections',label:'接続の異常',href:'/accounts'},
+const ATTENTION: Array<{key:HqAttentionKind;label:string}> = [
+ {key:'unhandledChats',label:'未対応・対応中・保留のトーク'},
+ {key:'pendingBookings',label:'承認待ちの予約'},
+ {key:'unpaid',label:'未払い'},
+ {key:'connections',label:'接続の異常'},
 ]
+
+function attentionTargetLabel(href:string) {
+ const path=new URL(href,'https://qa.invalid');
+ if(path.pathname==='/chats')return {unread:'未対応のトークを開く',in_progress:'対応中のトークを開く',on_hold:'保留のトークを開く'}[path.searchParams.get('status') ?? ''] ?? 'トークを開く';
+ if(path.pathname==='/events/bookings')return 'イベントの申込を開く';
+ if(path.pathname==='/restaurant-test/reservations')return '飲食店の予約台帳を開く';
+ if(path.pathname==='/booking/bookings')return '承認待ちの予約を開く';
+ if(path.pathname==='/booking/menus')return 'お支払いの記録を開く';
+ return '接続の状態を開く';
+}
 
 function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRow | null; period: { from: string; to: string }; compare: 'previous' | 'average'; onClose: () => void }) {
   const router = useRouter()
@@ -302,7 +312,10 @@ function StoreDrawer({ row, period, compare, onClose }: { row: StoreComparisonRo
             <h3 className={styles.cardTitle}>対応が要るもの</h3>
             {current.status === 'loading' ? <p className={styles.mute}>読み込んでいます</p> : null}
             {current.status === 'error' || (current.status === 'ready' && attention?.status !== 'ready') ? <p className={styles.mute}>対応が要るものを読み込めませんでした。</p> : null}
-            {current.status === 'ready' && attention?.status === 'ready' ? ATTENTION.map(item => <Button key={item.key} variant="text" onClick={() => { setSelectedAccountId(row.accountId); router.push(item.href) }}>{item.label} {attention.counts[item.key]}件</Button>) : null}
+            {current.status === 'ready' && attention?.status === 'ready' ? ATTENTION.map(item => <div key={item.key}>
+              <p>{item.label} {attention.counts[item.key]}件</p>
+              {(attention.targets?.[item.key] ?? []).map(target => <Button key={target.href} variant="text" onClick={() => { setSelectedAccountId(row.accountId); router.push(target.href) }}>{attentionTargetLabel(target.href)} {target.count}件</Button>)}
+            </div>) : null}
           </Card>
         </div>
       ) : null}

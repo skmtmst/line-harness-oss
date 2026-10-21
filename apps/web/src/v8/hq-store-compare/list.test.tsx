@@ -119,10 +119,12 @@ describe('店の比較の表', () => {
 
 it('推移7種と対応0件を保ち押した店を切り替えて開く',async()=>{
  const values={friendChange:-3,blockRate:1,clickRate:null,bookings:0,visits:0,noShowRate:null,responseMinutes:2};
- api.detail.mockResolvedValue({success:true,data:{trend:[{date:'2026-10-15',values,state:'partial'}],recentBroadcasts:[],attention:{status:'ready',counts:{unhandledChats:5,pendingBookings:0,unpaid:0,connections:1,stoppedDeliveries:0}}}});
+ api.detail.mockResolvedValue({success:true,data:{trend:[{date:'2026-10-15',values,state:'partial'}],recentBroadcasts:[],attention:{status:'ready',counts:{unhandledChats:5,pendingBookings:3,unpaid:0,connections:1,stoppedDeliveries:0},targets:{unhandledChats:[{href:'/chats?status=unread',count:5}],pendingBookings:[{href:'/booking/bookings?view=list&status=requested',count:1},{href:'/events/bookings?id=definition-a',count:1},{href:'/restaurant-test/reservations?view=list',count:1}]}}}});
  render(<StoreComparisonList/>);fireEvent.click(await screen.findByText('大宮店'));await screen.findByRole('group',{name:'友だちの増減の日ごとの推移'});
- for(const def of METRICS)expect(screen.getByRole('group',{name:`${def.label}の日ごとの推移`})).toBeTruthy();expect(screen.getByRole('button',{name:'承認待ちの予約 0件'})).toBeTruthy();
- fireEvent.click(screen.getByRole('button',{name:'未対応のトーク 5件'}));expect(navigation.select).toHaveBeenCalledWith('s1');expect(navigation.push).toHaveBeenCalledWith('/chats?status=unread');
+ for(const def of METRICS)expect(screen.getByRole('group',{name:`${def.label}の日ごとの推移`})).toBeTruthy();expect(screen.getByText('未払い 0件')).toBeTruthy();expect(screen.queryByRole('button',{name:'お支払いの記録を開く 0件'})).toBeNull();expect(screen.getByText('承認待ちの予約 3件')).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'未対応のトークを開く 5件'}));expect(navigation.select).toHaveBeenCalledWith('s1');expect(navigation.push).toHaveBeenCalledWith('/chats?status=unread');
+ fireEvent.click(screen.getByRole('button',{name:'イベントの申込を開く 1件'}));expect(navigation.push).toHaveBeenLastCalledWith('/events/bookings?id=definition-a');
+ fireEvent.click(screen.getByRole('button',{name:'飲食店の予約台帳を開く 1件'}));expect(navigation.push).toHaveBeenLastCalledWith('/restaurant-test/reservations?view=list');
 });
 it('対応取得失敗時は0件ボタンを作らず配信は残す',async()=>{
  api.detail.mockResolvedValue({success:true,data:{trend:[],recentBroadcasts:[{id:'b',title:'実際の配信',status:'sent',sent_at:null}],attention:{status:'unavailable',counts:null}}});

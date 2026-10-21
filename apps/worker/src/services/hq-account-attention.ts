@@ -1,4 +1,4 @@
-import type { HqAttentionCounts } from '@line-crm/shared';
+import type { HqAttentionCounts, HqAttentionKind } from '@line-crm/shared';
 
 /** Caller must verify this account belongs to the current visible HQ scope. */
 export async function readAccountAttention(db: D1Database, a: string, includeDetails = true) {
@@ -10,6 +10,7 @@ export async function readAccountAttention(db: D1Database, a: string, includeDet
         stoppedDeliveries: `SELECT id,'/broadcasts' href FROM broadcasts WHERE line_account_id=? AND status IN('stopped','failed')`,
   };
 
+    const targets: Partial<Record<HqAttentionKind,Array<{href:string;count:number}>>> = {};
     const counts: Record<string, number> = {},
       details: Record<string, unknown[]> = {};
     for (const [kind, sql] of Object.entries(queries)) {
@@ -23,11 +24,21 @@ export async function readAccountAttention(db: D1Database, a: string, includeDet
         .bind(...bindings)
         .first<{ count: number }>();
       counts[kind] = count?.count ?? 0;
+      if (!includeDetails) {
+        // Keep B312's original details untouched. Only the count destinations are specific.
+        const targetSql = sql
+          .replace("'/chats' href", "'/chats?status='||status href")
+          .replace("'/booking/bookings' href", "'/booking/bookings?view=list&status=requested' href")
+          .replace("'/events/bookings' href", "'/events/bookings?id='||event_id href")
+          .replace("'/restaurant-test/reservations' href", "'/restaurant-test/reservations?view=list' href")
+          .replace('SELECT id FROM booking_payments', "SELECT id,'/booking/menus?tab=payments&view=records' href FROM booking_payments");
+        targets[kind as HqAttentionKind] = (await db.prepare(`SELECT href,COUNT(*) count FROM (${targetSql}) GROUP BY href ORDER BY href`).bind(...bindings).all<{href:string;count:number}>()).results.map(target=>target.href.startsWith('/events/bookings?id=') ? {...target,href:'/events/bookings?id='+encodeURIComponent(target.href.slice('/events/bookings?id='.length))}:target);
+      }
       if (includeDetails) details[kind] = (
         await db.prepare(sql + ' LIMIT 100')
           .bind(...bindings)
           .all()
       ).results;
     }
-  return { counts: counts as HqAttentionCounts, details };
+  return { counts: counts as HqAttentionCounts, details, targets };
 }

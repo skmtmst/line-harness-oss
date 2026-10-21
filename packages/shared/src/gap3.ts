@@ -14,7 +14,7 @@ export interface StoreComparisonDetail {
  accountId:string; style:string|null; computedAt:string|null; values:Record<StoreComparisonKey,number|null>;
  trend:StoreComparisonDay[];
  recentBroadcasts:Array<{id:string;title:string;status:string;sent_at:string|null}>;
- attention:{status:'ready';counts:HqAttentionCounts}|{status:'unavailable';counts:null};
+ attention:{status:'ready';counts:HqAttentionCounts;targets:Partial<Record<HqAttentionKind,Array<{href:string;count:number}>>>}|{status:'unavailable';counts:null};
 }
 export type AutoLineKind='cart'|'browse'|'restock';
 export interface AutoLineRule {kind:AutoLineKind;enabled:boolean;waitMinutes:number;messages:unknown[];version:number;testMode:true}
