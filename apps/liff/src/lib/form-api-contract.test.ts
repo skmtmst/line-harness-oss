@@ -34,6 +34,11 @@ function stubFetch(body: unknown, status = 200) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('回答フォームの応答契約（Worker の形）', () => {
+  test('本人確認書類の非受付は400と理由を保って呼び出し元へ返す', async () => {
+    stubFetch({ success: false, code: 'IDENTITY_DOCUMENT_DISABLED', error: '本人確認書類は受け取れません。画像・PDFの質問を使ってください' }, 400);
+    await expect(api.uploadFormFile('f1', new File(['qa'], 'front.png', { type: 'image/png' }), undefined, 'legacy-file', 'front'))
+      .rejects.toMatchObject({ status: 400, code: 'IDENTITY_DOCUMENT_DISABLED', message: expect.stringContaining('本人確認書類は受け取れません') });
+  });
   test('公開フォームは包みを剥がして layout まで読める', async () => {
     stubFetch({ success: true, data: FORM });
     const form = await api.getForm('f1');
@@ -157,14 +162,26 @@ describe('撮影用の偽 API も同じ契約で読める', () => {
     expect(await api.getMyLatestFormAnswer('qa-form-1')).toBeNull();
   });
 
-  test('書類の撮影口は両面の入力を返し、アップロードの応答へ面とファイル情報を残す', async () => {
+  test('古い本人確認の欄は残っても、表裏の新規アップロードは非受付にする', async () => {
     viaMock();
     const form = await api.getForm('qa-document');
     expect(form.layout.sections[0].blocks[0]).toMatchObject({ type: 'file', fileKind: 'identity', fileBothSides: true, required: true });
-    for (const side of ['front', 'back'] as const) {
-      const response = await api.uploadFormFile('qa-document', new File(['qa'], `${side}.png`, { type: 'image/png' }), undefined, 'qa-document-file', side);
-      expect(response.data.file).toMatchObject({ fileId: `qa-document-${side}`, side, filename: `${side}.png`, mimeType: 'image/png', size: 2, state: 'ready' });
+    for (const side of ['front', 'back', 'single'] as const) {
+      await expect(api.uploadFormFile('qa-document', new File(['qa'], `${side}.png`, { type: 'image/png' }), undefined, 'qa-document-file', side))
+        .rejects.toMatchObject({ status: 400, code: 'IDENTITY_DOCUMENT_DISABLED' });
     }
-    await expect(api.uploadFormFile('qa-document', new File(['qa'], 'qa.png', { type: 'image/png' }), undefined, 'wrong-block', 'front')).rejects.toMatchObject({ status: 400 });
+  });
+
+  test.each([['image/png', 'photo.png', 'image'], ['application/pdf', 'document.pdf', 'pdf']])('一般の%sは通常の添付として受け取る', async (mimeType, filename, kind) => {
+    viaMock();
+    const form = await api.getForm('qa-attachments');
+    expect(form.layout.sections[0].blocks[0]).toMatchObject({ type: 'file', fileKinds: ['image', 'pdf'], required: true });
+    const response = await api.uploadFormFile('qa-attachments', new File(['qa'], filename, { type: mimeType }), undefined, 'qa-attachment-file', 'single');
+    expect(response.data.file).toMatchObject({ kind, side: 'single', filename, mimeType, state: 'ready' });
+    expect(response.data.file?.fileId).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(response.data.scanStatus).toBe('clean');
+    for (const [block, side] of [['wrong-block', 'single'], ['qa-attachment-file', 'front']]) {
+      await expect(api.uploadFormFile('qa-attachments', new File(['qa'], filename, { type: mimeType }), undefined, block, side)).rejects.toMatchObject({ status: 400 });
+    }
   });
 });
