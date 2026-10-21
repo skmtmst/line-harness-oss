@@ -59,7 +59,7 @@ function kpi(spec: KpiSpec, s: StyleSnapshot): StyleKpi {
   const m = s.metrics[spec.key]
   const v = metricValue(m)
   return {
-    id: spec.id, title: spec.title, value: v.value, valueText: v.valueText, unit: spec.unit ?? v.unit,
+    id: spec.id, metricId: spec.key, title: spec.title, value: v.value, valueText: v.valueText, unit: spec.unit ?? v.unit,
     delta: metricDelta(m, s.previous[spec.key], spec.lower),
     detail: v.reason || spec.detail(s), link: spec.link ?? null, help: m?.formula ? `${spec.help}（${m.formula}）` : spec.help,
   }
@@ -69,12 +69,12 @@ const NEW_HELP = '予約が入った日で数えます。来店日・面談日�
 const num = (s: StyleSnapshot, k: string) => s.metrics[k]?.value
 
 function newKpi(s: StyleSnapshot, href: string, range: DashboardRange): StyleKpi {
-  return { id: 'new', title: '新着予約', value: s.newBookings.length, unit: '件', delta: null, detail: `${RANGE_WORD[range]}入った予約`, link: { label: '一覧', href }, help: NEW_HELP }
+  return { id: 'new', metricId: 'newBookings', title: '新着予約', value: s.newBookings.length, unit: '件', delta: null, detail: `${RANGE_WORD[range]}入った予約`, link: { label: '一覧', href }, help: NEW_HELP }
 }
 
 /** 支払いの数は決済の口（API 組3）から。まだ無いので値を作らず、押すと準備中の窓（画面側で開く）。 */
 function paymentKpi(range: DashboardRange): StyleKpi {
-  return { id: 'income', title: `${RANGE_WORD[range]}の入金`, value: null, unit: '', delta: null, detail: `カードの請求は${term('S24')}`, link: { label: 'くわしく', href: '#preparing-payment' }, help: 'オンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。' }
+  return { id: 'income', metricId: 'paidAmount', title: `${RANGE_WORD[range]}の入金`, value: null, unit: '', delta: null, detail: `カードの請求は${term('S24')}`, link: { label: 'くわしく', href: '#preparing-payment' }, help: 'オンライン（Stripe）で受け取った額です。売上（料金×確定数）とは別の数です。' }
 }
 
 export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: DashboardRange): StyleKpi[] {
@@ -345,9 +345,9 @@ const CARD_LABEL: Record<string, string> = {
 }
 const BASE: Record<IndustryStyle, string> = { restaurant: '飲食店', salon: 'サロン', consult: '面談・相談', lesson: '教室・レッスン' }
 
-export function toLayout(style: IndustryStyle, cards: StyleCard[], version: number, defaults?: StyleCard[]): StyleLayout {
+export function toLayout(style: IndustryStyle, cards: StyleCard[], version: number, defaults?: StyleCard[], selection?: Pick<StyleLayout, 'metricIds' | 'metricsCustomized'>): StyleLayout {
   const changed = defaults ? cards.filter((c, i) => defaults[i]?.id !== c.id || defaults[i]?.visible !== c.visible).length : 0
-  return { base: BASE[style], changed, version, cards: cards.map((c) => ({ id: c.id, label: CARD_LABEL[c.id] ?? c.id, on: c.visible, locked: c.id.endsWith('-alert') })) }
+  return { ...(selection ? { metricIds: selection.metricIds, metricsCustomized: selection.metricsCustomized } : {}), base: BASE[style], changed, version, cards: cards.map((c) => ({ id: c.id, label: CARD_LABEL[c.id] ?? c.id, on: c.visible, locked: c.id.endsWith('-alert') })) }
 }
 
 /** 分析の日数 → 口の from/to（to は含まない。選んだ日を最後の日にする）。 */

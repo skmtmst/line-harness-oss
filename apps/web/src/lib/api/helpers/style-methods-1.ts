@@ -37,6 +37,8 @@ export const methods1 = {
         settings: Record<string, number>;
         cards: StyleCard[];
         metricIds: string[];
+        /** Older Workers omit provenance; never infer it from the selected list. */
+        metricsCustomized?: boolean;
         visibleTabs: string[];
         questions: Array<{
           key: string;
@@ -268,6 +270,8 @@ export const methods1 = {
         cards: StyleCard[];
         version: number;
         metricIds: string[];
+        /** Older Workers omit provenance; never infer it from the selected list. */
+        metricsCustomized?: boolean;
         visibleTabs: string[];
       }>
     >(
@@ -285,6 +289,8 @@ export const methods1 = {
         cards: StyleCard[];
         version: number;
         metricIds: string[];
+        /** Older Workers omit provenance; never infer it from the selected list. */
+        metricsCustomized?: boolean;
         visibleTabs: string[];
       }>
     >(url(root + '/cards', accountId), write('DELETE', { expectedVersion })),

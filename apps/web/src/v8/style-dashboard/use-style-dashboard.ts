@@ -11,7 +11,7 @@ import { styleApi } from '@/lib/api/helpers/styles'
 import { formatDate } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { useStaffRole } from '@/lib/staff-role'
-import type { RestaurantClosureKind,RestaurantFloor,StyleCard } from '@line-crm/shared'
+import type { RestaurantClosureKind,RestaurantFloor,StyleCard,StyleSnapshot } from '@line-crm/shared'
 import { usePathname,useRouter,useSearchParams } from 'next/navigation'
 import { useCallback,useEffect,useMemo,useRef,useState,type SetStateAction } from 'react'
 import { canWriteRole } from '@/v8/restaurant/dashboard/public/summarize/index'
@@ -21,6 +21,7 @@ import { STYLE_CONFIG,rangeFromParam,tabFromParam,viewFromParam } from './config
 import { jstToday } from './date-range'
 import type { IndustryStyle,StyleAlertAction,StyleAnalytics,StyleClosureInput,StyleLayout,StyleRoster,StyleRow,StyleToday } from './model'
 import { rowMenuItems } from './parts'
+import { selectedKpis } from './metric-selection'
 import { isLiveLessonBooking, toLessonRosterMember } from './lesson-roster-state'
 import { restaurantAlert,restaurantToday } from './restaurant-today'
 export function useStyleDashboard(style: IndustryStyle) {
@@ -48,11 +49,11 @@ export function useStyleDashboard(style: IndustryStyle) {
   currentScope.current = scope
   const loadSequence = useRef(0)
   const analyticsSequence = useRef(0)
-  const [dataState, setDataState] = useState<{ scope: string; value: StyleToday } | null>(null)
+  const [dataState, setDataState] = useState<{ scope: string; value: StyleToday; snapshot?: StyleSnapshot } | null>(null)
   const data = dataState?.scope === scope ? dataState.value : null
   const setData = (value: SetStateAction<StyleToday | null>) => setDataState((previous) => {
     const next = typeof value === 'function' ? value(previous?.scope === scope ? previous.value : null) : value
-    return next ? { scope, value: next } : null
+    return next ? { scope, value: next, snapshot: previous?.scope === scope ? previous.snapshot : undefined } : null
   })
   const [failed, setFailed] = useState(false)
   const analyticsScope = JSON.stringify([scope, tab, days, subTab])
@@ -65,8 +66,12 @@ export function useStyleDashboard(style: IndustryStyle) {
     return next ? { scope: analyticsScope, value: next } : null
   })
   const [analyticsFailed, setAnalyticsFailed] = useState(false)
-  const [layout, setLayout] = useState<StyleLayout | null>(null)
+  const layoutScope = JSON.stringify([accountId, style])
+  const [layoutState, setLayoutState] = useState<{ scope: string; value: StyleLayout } | null>(null)
+  const layout = layoutState?.scope === layoutScope ? layoutState.value : null
+  const setLayout = useCallback((value: StyleLayout | null) => setLayoutState(value ? { scope: layoutScope, value } : null), [layoutScope])
   const [viewOpen, setViewOpen] = useState(false)
+  useEffect(() => { setViewOpen(false) }, [accountId, style])
   const [closureOpen, setClosureOpen] = useState(false)
   const [phoneOpen, setPhoneOpen] = useState(false)
   const [walkInOpen, setWalkInOpen] = useState(false)
@@ -100,7 +105,7 @@ export function useStyleDashboard(style: IndustryStyle) {
         styleApi.schedule(accountId, { ...query, display: view === 'calendar' ? 'calendar' : view === 'list' ? 'list' : 'board', calendar_view: range === 'month' ? 'month' : range === 'week' ? 'week' : 'day', ...(style === 'restaurant' && view === 'board' ? { axis: 'table' as const } : {}) }),
       ])
       if (sequence !== loadSequence.current || currentScope.current !== scope) return
-      setDataState({ scope, value: toToday(style, summary.data, schedule.data, date, range) }); setFailed(false)
+      setDataState({ scope, value: toToday(style, summary.data, schedule.data, date, range), snapshot: summary.data }); setFailed(false)
       setLoadedAt(new Date())
     } catch {
       if (sequence !== loadSequence.current || currentScope.current !== scope) return
@@ -123,13 +128,36 @@ export function useStyleDashboard(style: IndustryStyle) {
   useEffect(() => { void loadAnalytics(); return () => { analyticsSequence.current += 1 } }, [loadAnalytics])
 
   const [cardDefaults, setCardDefaults] = useState<StyleCard[] | undefined>(undefined)
+  const loadedLayoutScope = useRef<string | null>(null)
+  const currentLayoutScope = useRef(layoutScope)
+  currentLayoutScope.current = layoutScope
+  const [presentationRead, setPresentationRead] = useState(0)
+  const reloadPresentation = () => { loadedLayoutScope.current = null; setPresentationRead(value => value + 1) }
+  const [selectionState, setSelectionState] = useState<{ scope: string; metricIds?: string[]; metricsCustomized?: boolean } | null>(null)
+  const applyPresentation = (next: { cards: StyleCard[]; version: number; metricIds?: string[]; metricsCustomized?: boolean }, reset = false) => {
+    if (currentLayoutScope.current !== layoutScope) return false
+    loadedLayoutScope.current = layoutScope
+    setLayout(toLayout(style, next.cards, next.version, reset ? next.cards : cardDefaults, next))
+    setSelectionState({ scope: layoutScope, metricIds: next.metricIds, metricsCustomized: next.metricsCustomized })
+    return true
+  }
   useEffect(() => {
-    if (!accountId || !viewOpen) return
+    if (!accountId || (!viewOpen && loadedLayoutScope.current === layoutScope)) return
     let active = true
     setLayout(null)
-    void styleApi.get(accountId).then((r) => { if (active) setLayout(toLayout(style, r.data.cards, r.data.version, cardDefaults)) }).catch(() => { if (active) setLayout(null) })
+    const read = async () => {
+      try {
+        const r = await styleApi.get(accountId)
+        if (active) {
+          loadedLayoutScope.current = layoutScope
+          setLayout(toLayout(style, r.data.cards, r.data.version, cardDefaults, r.data))
+          setSelectionState({ scope: layoutScope, metricIds: r.data.metricIds, metricsCustomized: r.data.metricsCustomized })
+        }
+      } catch { if (active) { setLayout(null); setSelectionState({ scope: layoutScope }) } }
+    }
+    void read()
     return () => { active = false }
-  }, [accountId, style, viewOpen, cardDefaults])
+  }, [accountId, style, viewOpen, cardDefaults, layoutScope, setLayout, presentationRead])
 
   // 教室の名簿は今のイベント予約の一覧から読む（API-CONTRACT-4 §9）。
   const [roster, setRoster] = useState<StyleRoster | null>(null)
@@ -163,7 +191,10 @@ export function useStyleDashboard(style: IndustryStyle) {
   const fallback = useMemo(() => (style === 'restaurant' && failed ? restaurantToday(store, tables, Date.now()) : null), [style, failed, store, tables])
   // 異常の帯：飲食は今の「枠を閉じる知らせ」（媒体の知らせは必ず出す）。ほかは口に帯の中身が無いので出さない。
   const restaurantBand = useMemo(() => (style === 'restaurant' ? restaurantAlert(store) : null), [style, store])
-  const today = data ? { ...data, alert: restaurantBand } : fallback
+  const metricSelectionFallback = selectionState?.scope === layoutScope && typeof selectionState.metricsCustomized !== 'boolean'
+  const selected = selectionState?.scope === layoutScope && selectionState.metricsCustomized === true ? selectionState.metricIds : undefined
+  const snapshot = dataState?.scope === scope ? dataState.snapshot : undefined
+  const today = data ? { ...data, alert: restaurantBand, kpis: selected && snapshot ? selectedKpis(style, snapshot, range, selected) : data.kpis } : fallback
   const preparing = usePreparingDialog()
   const openPayment = () => preparing.open('お支払い')
   const reload = async () => { await Promise.all([load(), style === 'restaurant' ? store.reload() : Promise.resolve(), loadAnalytics()]) }
@@ -326,7 +357,7 @@ export function useStyleDashboard(style: IndustryStyle) {
   }
 
 
- return { cfg, router, pathname, params, tab, view, range, subTab, days, selectedAccountId, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, data, setData, failed, setFailed, analytics, setAnalytics, analyticsFailed, setAnalyticsFailed, layout, setLayout, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, setFloor, loadedAt, setLoadedAt, store, tables, setParam, staffId, compareParam, load, loadAnalytics, cardDefaults, setCardDefaults, roster, setRoster, rosterRow, fallback, restaurantBand, today, preparing, openPayment, reload, asOf, hours, subtitle, openRow, version, run, bookingId, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, setTestMode, alertAction, attend, KIND, saveClosure, addNew }
+ return { cfg, router, pathname, params, tab, view, range, subTab, days, selectedAccountId, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, data, setData, failed, setFailed, analytics, setAnalytics, analyticsFailed, setAnalyticsFailed, layout, setLayout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics: data?.kpis ?? fallback?.kpis ?? [], viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, setFloor, loadedAt, setLoadedAt, store, tables, setParam, staffId, compareParam, load, loadAnalytics, cardDefaults, setCardDefaults, roster, setRoster, rosterRow, fallback, restaurantBand, today, preparing, openPayment, reload, asOf, hours, subtitle, openRow, version, run, bookingId, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, setTestMode, alertAction, attend, KIND, saveClosure, addNew }
 }
 
 import { COMPARE } from './dashboard-options'

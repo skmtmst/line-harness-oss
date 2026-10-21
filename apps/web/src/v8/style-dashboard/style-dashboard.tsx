@@ -30,7 +30,6 @@ import type { ReactNode } from 'react'
 import { useMemo,useState } from 'react'
 import { PhoneReservationDrawer } from '@/v8/restaurant/front-desk/public/phone-drawer/index'
 import { WalkInDialog } from '@/v8/restaurant/front-desk/public/walk-in-dialog/index'
-import { toLayout } from './adapter'
 import { StyleAnalyticsView } from './analytics'
 import { DayList,MonthCalendar,WeekCalendar } from './calendar'
 import { RANGES,TAB_KEYS,TAB_PARAM,type DashboardTab,type DashboardView } from './config'
@@ -91,7 +90,7 @@ function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
 }
 
 export default function StyleDashboard({ style }: { style: IndustryStyle }) {
-  const { cfg, router, tab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, setLayout, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, cardDefaults, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, KIND, saveClosure, addNew } = useStyleDashboard(style)
+  const { cfg, router, tab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, KIND, saveClosure, addNew } = useStyleDashboard(style)
 
   const viewErrors = useSaveFormErrors()
   const headActions = (
@@ -201,9 +200,10 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <div className={styles.head}>{filters}</div>
       <div className={styles.inset}>
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
-        <KpiBand layout="link-row" data-style-dashboard={style}>
+        {metricSelectionFallback ? <Notice tone="info" action={<Button onClick={reloadPresentation}>表示設定を読み直す</Button>}>保存した表示設定を確認できないため、業種の初期表示にしています。</Notice> : null}
+        {today && today.kpis.length === 0 ? null : <KpiBand layout="link-row" maxColumns={5} data-style-dashboard={style}>
           {(today?.kpis ?? []).map((kpi) => <Kpi key={kpi.id} kpi={kpi} onPreparing={openPayment} />)}
-        </KpiBand>
+        </KpiBand>}
         {alert ? (
           <Notice tone="warn" role="status" heading={alert.title} className={styles.alert}
             action={alert.actions.some((a) => canWrite || a.icon === 'external') ? <div className={styles.alertActions}>{alert.actions.filter((a) => canWrite || a.icon === 'external').map((a) => (
@@ -225,10 +225,10 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
             onSaved={({ seated }) => { setWalkInOpen(false); notifyToast(seated ? '入店にしました。' : '席は取りました。来店の印は付けられませんでした。表の［来店］を押してください。', seated ? undefined : { tone: 'error' }); void reload() }} />
         </>
       ) : null}
-      <SaveErrorScope errors={viewErrors}><ViewDrawer open={viewOpen} layout={layout} busy={busy === 'layout'} onClose={() => setViewOpen(false)}
+      <SaveErrorScope errors={viewErrors}><ViewDrawer open={viewOpen} layout={layout} industry={style} defaultMetrics={defaultMetrics} busy={busy === 'layout'} onClose={() => setViewOpen(false)}
         onChangeStyle={(next) => { if (!layout) return; setBusy('layout'); void styleApi.save(accountId, { expectedVersion: layout.version, style: next }).then(() => { notifyToast('型を変えました。'); window.location.assign('/') }).catch((e) => { if (!viewErrors.capture(e)) notifyToast(japaneseDetailOf(e) || '型を変えられませんでした。', { tone: 'error' }) }).finally(() => setBusy('')) }}
-        onReset={() => { if (!layout) return; setBusy('layout'); void styleApi.resetCards(accountId, layout.version).then((r) => { setCardDefaults(r.data.cards); setLayout(toLayout(style, r.data.cards, r.data.version, r.data.cards)); notifyToast('型に戻しました。') }).catch((e) => notifyToast(japaneseDetailOf(e) || '型に戻せませんでした。', { tone: 'error' })).finally(() => setBusy('')) }}
-        onSave={(next) => { if (!layout) return; setBusy('layout'); void styleApi.saveCards(accountId, layout.version, next.map((c) => ({ id: c.id, visible: c.on }))).then((r) => { setLayout(toLayout(style, r.data.cards, r.data.version, cardDefaults)); setViewOpen(false); notifyToast('表示を保存しました。'); void load() }).catch((e) => { if (!viewErrors.capture(e)) notifyToast(japaneseDetailOf(e) || '表示を保存できませんでした。', { tone: 'error' }) }).finally(() => setBusy('')) }} /></SaveErrorScope>
+        onReset={() => { if (!layout) return; setBusy('layout'); void styleApi.resetCards(accountId, layout.version).then((r) => { if (!applyPresentation(r.data, true)) return; setCardDefaults(r.data.cards); notifyToast('型に戻しました。') }).catch((e) => notifyToast(japaneseDetailOf(e) || '型に戻せませんでした。', { tone: 'error' })).finally(() => setBusy('')) }}
+        onSave={(next, metricIds) => { if (!layout) return; setBusy('layout'); void styleApi.saveCards(accountId, layout.version, next.map((c) => ({ id: c.id, visible: c.on })), metricIds).then((r) => { if (!applyPresentation(r.data)) return; setViewOpen(false); notifyToast('表示を保存しました。'); void load() }).catch((e) => { if (!viewErrors.capture(e)) notifyToast(japaneseDetailOf(e) || '表示を保存できませんでした。', { tone: 'error' }) }).finally(() => setBusy('')) }} /></SaveErrorScope>
       <ClosureDialog open={closureOpen} date={date} busy={busy === 'closure'} seatNoun={style === 'restaurant' ? '卓' : style === 'lesson' ? '講師' : '担当者'}
         targets={{ staff: style === 'restaurant' ? [] : (today?.staff ?? []), seats: style === 'restaurant' ? (today?.staff ?? []) : [] }}
         affectedNote={style === 'restaurant' ? 'その時間の予約は取り消しません。連絡は次の画面で選べます。' : 'その時間の予約は取り消しません。連絡は次の画面で選べます。'}

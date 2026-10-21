@@ -58,6 +58,7 @@ styles.get(base, async (c) => {
     data: {
       style,
       styleSelected: !!p?.selected_at && p.selection_mode === 'configured',
+      metricsCustomized: p?.metrics_json != null,
       shouldPromptStyleSelection: hasPendingStyleSelection(p),
       styleMode: p?.selection_mode ?? 'later',
       version: p?.version ?? 0,
@@ -197,6 +198,7 @@ styles.put(base + '/cards', async (c) => {
     success: true,
     data: {
       ...dashboardPresentation(p.style, cards, metrics),
+      metricsCustomized: metrics !== null,
       version: p.version + 1,
     },
   });
@@ -219,6 +221,7 @@ styles.delete(base + '/cards', async (c) => {
     success: true,
     data: {
       ...dashboardPresentation(p.style, defaultCards(p.style), null),
+      metricsCustomized: false,
       version: p.version + 1,
     },
   });

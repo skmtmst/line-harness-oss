@@ -8,6 +8,7 @@ export type DashboardRange = 'today' | 'week' | 'month'
 export type Tone = 'neutral' | 'info' | 'warning' | 'success' | 'danger'
 
 export interface StyleKpi {
+  metricId?: string
   id: string
   title: string
   value: number | null
@@ -153,7 +154,7 @@ export interface StyleAnalytics {
 
 export interface StyleLayoutItem { id: string; label: string; on: boolean; locked?: boolean }
 /** ［表示を変える］の中身。口の cards（id・visible、配列の順が上から下）と版を画面の言葉で持つ。 */
-export interface StyleLayout { base: string; changed: number; version: number; cards: StyleLayoutItem[] }
+export interface StyleLayout { base: string; changed: number; version: number; cards: StyleLayoutItem[]; metricIds?: string[]; metricsCustomized?: boolean }
 
 export interface StyleClosureInput {
   date: string
