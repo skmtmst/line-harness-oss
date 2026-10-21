@@ -10,6 +10,7 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
 import { api, ApiError, type AnalyticsCrossAxis, type AnalyticsCrossResult } from '@/lib/api'
 import { formatNumber, formatTime } from '@/lib/format'
@@ -371,15 +372,16 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   return <SaveErrorScope errors={saveErrors}><>
     {kpis}
     <div className={styles.body} data-gap="tab">
-      <div className={styles.controls}>
+      <ListToolbarFrame><ListToolbarRow>
         <Field label="数えるもの"><SaveErrorField names={["measureKind","measure_kind"]}><Select id="cross-measure" value={measureKind} onChange={(value) => setMeasureKind(value as 'unique_friends' | 'events')} aria-label="数えるもの" size="full" options={[{ value: 'unique_friends', label: '友だちの人数（重複なし）' }, { value: 'events', label: 'イベントの回数' }]} /></SaveErrorField></Field>
         {measureKind === 'events' ? <Field label="数えるイベント"><SaveErrorField names={["measureEventType","eventType","measure_event_type"]}><Select id="cross-measure-event" value={measureEventType} onChange={setMeasureEventType} aria-label="数えるイベント" size="full" options={MEASURE_EVENTS} /></SaveErrorField></Field> : null}
         <Field label="たての軸"><SaveErrorField names={["rowAxis","row_axis"]}><EntitySelect aria-label="たての軸" value={rowAxis} onChange={setRowAxis} size="full" options={axisOptions(ROW_AXES)} /></SaveErrorField></Field>
         <Field label="よこの軸"><SaveErrorField names={["columnAxis","column_axis"]}><EntitySelect id="cross-field" aria-label="よこの軸" value={columnAxis} onChange={setColumnAxis} size="full" options={axisOptions(COLUMN_AXES)} /></SaveErrorField></Field>
         <SaveErrorField names={["crossDays","cross_days"]}><PeriodPicker days={crossDays} onChange={setCrossDays} customRange={customRange} onRangeChange={setRange} /></SaveErrorField>
-        <span className={styles.spacer} />
+        <ListToolbarEnd>
         {crossResult && crossResultId && canManage && renderSave ? <span title="条件の定義と、いま表示している結果を別々に固定して残します">{renderSave({ sourceResultId: crossResultId, defaultName: `クロス分析 ${resultAxes?.row ?? ''} × ${resultAxes?.column ?? ''}` })}</span> : null}
-      </div>
+        </ListToolbarEnd>
+      </ListToolbarRow></ListToolbarFrame>
       {sameAxis ? <p className={styles.warnText}>たてとよこに同じ軸は選べません</p> : null}
       <AggregationStatus state={error ? { kind: 'failed', reason: error } : crossRunId || loading ? { kind: 'running', startedAt } : crossResult ? { kind: 'complete', dataAt: crossResult.dataCutoffAt } : { kind: 'empty' }} onRun={() => crossRunId ? recheckCross() : void runCross()} disabled={!crossStorageRestored || sameAxis} />
       {crossResult?.stateReason ? <p className={styles.warnText}>{crossResult.stateReason}</p> : null}

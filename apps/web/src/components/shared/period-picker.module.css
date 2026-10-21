@@ -1,6 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
-.root { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
+.root { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: min-content; max-width: 100%; }
+.root > [data-segmented-control] { flex: none; min-width: max-content; }
 .dates { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 
 }

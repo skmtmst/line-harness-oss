@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import SearchField from '@/components/shared/search-field'
+import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import Select from '@/components/shared/select'
 import { api, type AnalyticsMetric, type AnalyticsUrlClicksOverview } from '@/lib/api'
 import { RangePickerV8, StatePill } from './common'
@@ -70,13 +71,14 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const exportDisabled = !state.data || visibleLinks.length === 0
   useRegisterExport(exportRows, exportDisabled)
 
-  const toolbar = <div className={styles.toolbar}>
-    <div className={styles.searchBox}><SearchField id="url-click-search" aria-label="URL・配信名・リンク名で探す" value={query} onChange={(value) => { setQuery(value); setPage(0) }} onClear={() => { setQuery(''); setPage(0) }} placeholder="URL・配信名・リンク名で探す" loading={state.loading} /></div>
-    <div className={styles.selectBox}><SaveErrorField names={["status"]}><Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></SaveErrorField></div>
+  const toolbar = <ListToolbarFrame><ListToolbarRow>
+    <ListToolbarSearchSlot><SearchField id="url-click-search" aria-label="URL・配信名・リンク名で探す" value={query} onChange={(value) => { setQuery(value); setPage(0) }} onClear={() => { setQuery(''); setPage(0) }} placeholder="URL・配信名・リンク名で探す" loading={state.loading} /></ListToolbarSearchSlot>
+    <SaveErrorField names={["status"]}><Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></SaveErrorField>
     <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
-    <span className={styles.spacer} />
+    <ListToolbarEnd>
     <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={15} aria-hidden="true" />CSVで書き出す</Button>
-  </div>
+    </ListToolbarEnd>
+  </ListToolbarRow></ListToolbarFrame>
 
   if (!state.data) {
     return <div className={styles.body} data-gap="tab">{toolbar}{state.loading ? <ListState kind="loading" title="分析を読み込んでいます" /> : <ListState kind="error" description={state.error} onRetry={state.retry} />}</div>
