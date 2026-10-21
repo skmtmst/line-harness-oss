@@ -1,6 +1,7 @@
 'use client'
 
 import HqMessageBody from '@/components/shared/hq-message-inserts'
+import { replaceHqAutoReplyActions } from './auto-reply-actions-model'
 import HqAutoReplyEditor from './auto-reply-editor'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -26,7 +27,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { OptionalBadge, RequiredBadge } from '@/components/shared/form-controls'
-import { TextArea, TextField } from '@/components/shared/text-field'
+import { TextField } from '@/components/shared/text-field'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import { hqDeliveriesApi, type HqDeliveryTemplate, type HqDeliveryTemplateDetail } from '@/lib/api/helpers/hq-deliveries'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -181,6 +182,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
     canEdit={canEdit} busy={busy} name={selected.template.name} description={selected.template.description ?? ''} settings={settings} references={selected.definition.references}
     onName={(value) => setSelected({ ...selected, template: { ...selected.template, name: value } })}
     onDescription={(value) => setSelected({ ...selected, template: { ...selected.template, description: value } })}
+    onActions={(actions, resources) => { if (canEdit && !busy) setSelected(previous => previous ? { ...previous, definition: replaceHqAutoReplyActions(previous.definition, actions, resources) } : previous) }}
     onSetting={updateSetting} onCancel={back} onSave={() => void save()} /></SaveErrorScope>
   if (view === 'edit' && selected) return <SaveErrorScope errors={saveErrors}><CreatePage dirty={false} busy={busy} boardId="X4JcOf" title={`${titleOf(type)}のひな形を${selected.template.id ? '編集する' : '作る'}`} help="保存した設定は、配布先で下書きとして受け取れます。" notice={notices}
     footerActions={<><Button disabled={busy} onClick={back}>キャンセル</Button>{canEdit && <Button variant="primary" disabled={busy || !selected.template.name.trim()} title={!selected.template.name.trim() ? '統括での名前を入力してください。' : undefined} onClick={()=>void save()} busy={busy} busyLabel="保存中…">下書きを保存する</Button>}</>}>

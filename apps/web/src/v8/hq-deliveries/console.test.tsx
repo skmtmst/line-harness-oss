@@ -4,11 +4,12 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => { process.env.NEXT_PUBLIC_API_URL = 'http://worker.test' })
-const calls = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), update: vi.fn(), create: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), accounts: vi.fn(), folders: vi.fn() }))
+const calls = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), update: vi.fn(), create: vi.fn(), preflight: vi.fn(), distribute: vi.fn(), accounts: vi.fn(), folders: vi.fn(), resources: vi.fn() }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 vi.mock('@/components/shared/hq-account-picker', () => ({ useHqAccountFolders: () => ({ folders:[], membership:new Map([['account-1',{folderId:null,folder:null}]]), failed:false }) }))
 vi.mock('@/lib/api/helpers/hq-deliveries', () => ({ hqDeliveriesApi: calls }))
 vi.mock('@/lib/hq-templates-api', () => ({ hqTemplatesApi: { accounts: calls.accounts, folders: { list: calls.folders } } }))
+vi.mock('@/lib/api/helpers/hq-resource-search', () => ({ searchHqTemplateResources: calls.resources }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (value: string) => value === 'owner' || value === 'admin' }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
@@ -140,4 +141,21 @@ it('保存済みテンプレートと後処理を正しく案内し、他欄の�
   fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' }))
   await waitFor(() => expect(calls.update).toHaveBeenCalled())
   expect(calls.update).toHaveBeenCalledWith('delivery-1', { name: '追加のお礼', description: '変更した説明', definition, expectedRevision: 2 })
+})
+
+
+it('HQ action selection saves canonical actions and references with the original revision and unrelated settings', async () => {
+ const preserved = { actionType: 'notify_staff', config: { notificationRuleId: 'notice', notificationRuleVersion: 7 }, onFailure: 'continue' }
+ const loaded = { ...detail, template: { ...detail.template, template_type: 'auto_reply' }, definition: { schemaVersion: 1, settings: { name: '店の返事', keyword: '予約', matchType: 'exact', responseType: 'text', responseContent: '返答', priority: 42, actions: [preserved] }, references: [{ sourceId: 'notice', kind: 'notification_rule', name: '担当者' }] } }
+ calls.list.mockResolvedValue([loaded.template]); calls.detail.mockResolvedValue(loaded); calls.update.mockResolvedValue(loaded)
+ calls.resources.mockResolvedValue({ success: true, data: { kind: 'tag', items: [{ id: 'tag-a', name: '会員', accountId: 'account-1', accountName: '本店' }], total: 1, nextCursor: null } })
+ render(<HqDeliveryConsole type="auto_reply" />)
+ fireEvent.click(await screen.findByRole('button', { name: '追加のお礼', exact: true }))
+ fireEvent.click(await screen.findByRole('button', { name: '何を返すかに進む' }))
+ fireEvent.click(screen.getByRole('button', { name: '行うことを足す' })); fireEvent.click(screen.getByRole('menuitem', { name: 'タグを付ける' }))
+ fireEvent.click(await screen.findByRole('radio', { name: /会員/ })); fireEvent.click(screen.getByRole('button', { name: '選ぶ', exact: true }))
+ fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' }))
+ await waitFor(() => expect(calls.update).toHaveBeenCalled())
+ expect(calls.update.mock.calls[0][1]).toMatchObject({ expectedRevision: 2, definition: { schemaVersion: 1, settings: { priority: 42, responseContent: '返答', actions: [preserved, { actionType: 'tag', config: { op: 'add', tagIds: ['tag-a'] }, onFailure: 'stop' }] }, references: [{ sourceId: 'notice', kind: 'notification_rule', name: '担当者' }, { sourceId: 'tag-a', kind: 'tag', name: '会員', accountId: 'account-1' }] } })
+ expect(calls.distribute).not.toHaveBeenCalled(); expect(calls.preflight).not.toHaveBeenCalled()
 })

@@ -4,7 +4,7 @@
  * 統括の自動応答のひな形を作る。店の自動応答と同じ手順の段（①基本設定 ②どんなときに動くか ③何を返すか ④優先順位 ⑤確認）。
  * ④優先順位は店ごとの並びで決まるため、統括では選べない（機能待ち：統括に優先順位の口が無い）。段は押せない形で出す。
  * 新しく選べる返し方は「この画面で書く」「返信しない」。保存済みの別種別は共通の見本で確認し、
- * 後処理も保存済み件数を表示する。未接続の候補選択や編集口は増やさず、設定を引き継ぐ。
+ * 後処理は既存の統括候補APIにあるタグ・シナリオだけを編集し、その他の保存済み設定を引き継ぐ。
  */
 import { useState, type ReactNode } from 'react'
 import type { HqDeliveryTemplateDefinition } from '@line-crm/shared'
@@ -25,6 +25,8 @@ import LinePreview, { LinePreviewFlex, LinePreviewMessage } from '@/components/s
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import HqAutoReplyActions from './auto-reply-actions'
+import type { HqActionResource } from './auto-reply-actions-model'
 import HqMessageBody from '@/components/shared/hq-message-inserts'
 import styles from './auto-reply-editor.module.css'
 
@@ -38,11 +40,12 @@ const DELAYS = [{ value: '0', label: 'すぐ返す' }, { value: '30', label: '30
 const SAMPLE_TOKENS: Record<string, string> = { '{{name}}': 'Kenta', '{{account.name}}': '然 -NEN-', '{{var.store_phone}}': '03-1234-5678', '{{var.reservation_url}}': 'https://nen.example/booking' }
 const sample = (text: string) => text.replace(/\{\{[^}]+\}\}/g, (token) => SAMPLE_TOKENS[token] ?? '（友だち情報）')
 
-export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, name, description, settings, references, onName, onDescription, onSetting, onCancel, onSave }: {
+export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, name, description, settings, references, onName, onDescription, onSetting, onActions, onCancel, onSave }: {
   title: string; help: ReactNode; notice: ReactNode; canEdit: boolean; busy: boolean
   name: string; description: string; settings: Record<string, unknown> | undefined
   references?: HqDeliveryTemplateDefinition['references']
   onName: (value: string) => void; onDescription: (value: string) => void; onSetting: (key: string, value: unknown) => void
+  onActions?: (actions: unknown[], resources: HqActionResource[]) => void
   onCancel: () => void; onSave: () => void
 }) {
   const [step, setStep] = useState<StepKey>('basic')
@@ -125,6 +128,7 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
         {preservedReply ? <Notice tone="info">{`${replyLabel}を保存しています。この画面では返信内容を変更できません。ほかの設定を保存しても、その内容は引き継がれます。`}</Notice> : silent ? <p className={styles.note}>返信はしません。キーワードに当たったことだけを店の記録に残します。</p>
           : <SaveErrorField names={['responseContent', 'definition.settings.responseContent']}><HqMessageBody value={text} label="返信内容" onChange={(value) => onSetting('responseContent', value)} readOnly={!canEdit} disabled={busy} /></SaveErrorField>}
       </Card>
+      {onActions ? <HqAutoReplyActions value={s.actions} references={references} canEdit={canEdit} busy={busy} onChange={onActions} /> : null}
       <Card variant="form" gap="normal">
         <CardHeader size="stacked" title="細かい決まり" />
         <div className={styles.rules}>
