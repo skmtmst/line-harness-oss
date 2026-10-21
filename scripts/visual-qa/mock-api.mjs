@@ -32,6 +32,7 @@ import { QA_CLOCK, storeAt, storeYmd } from './qa-clock.mjs'
 import { mockFingerprint } from './mock-fingerprint.mjs'
 import { gap3Respond } from './mock-gap3.mjs'
 import { gap2Respond } from './mock-gap2.mjs'
+import { eventBookingsPage } from './event-bookings-mock.mjs'
 /** fixtures・補助処理・API形の入力も含む、起動時の指紋。 */
 const FINGERPRINT = mockFingerprint()
 import { readArrayGetPaths } from './api-shapes.mjs'
@@ -2689,11 +2690,7 @@ const RAW_PATTERNS = [
   [/^\/api\/events\/admin\/occurrences\/[^/]+\/applicants$/, { success: true, data: EVENT_OCCURRENCE_APPLICANTS }],
   [/^\/api\/events\/admin\/events\/[^/]+\/waitlist$/, { waitlist: EVENT_WAITLIST }],
   [/^\/api\/events\/admin\/events\/notifications\/pending$/, { count: 2 }],
-  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, (url) => ({
-    items: url.searchParams.get('status')
-      ? EVENT_BOOKINGS.filter((booking) => booking.status === url.searchParams.get('status'))
-      : EVENT_BOOKINGS,
-  })],
+  [/^\/api\/events\/admin\/events\/[^/]+\/bookings$/, (url) => eventBookingsPage(url, EVENT_BOOKINGS)],
   /* メニューに就ける担当。器は `{staff}`。包むと選ぶ口が0件になる。 */
   [/^\/api\/booking\/admin\/menus\/[^/]+\/staff$/, { staff: BOOKING_MENU_STAFF }],
   /* スタッフロール本人の予約スタッフ（本人勤務 E3YDK）。器は `{staff}`。包むと `.find` で落ちる。 */

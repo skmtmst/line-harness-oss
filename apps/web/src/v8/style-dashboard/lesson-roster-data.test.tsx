@@ -49,3 +49,38 @@ test('ページ途中の失敗を一部だけの全員名簿として返さな�
   vi.mocked(eventsApi.listBookings).mockResolvedValueOnce({ items: [booking(1)], total: 2, limit: 1, sort: [] }).mockRejectedValueOnce(new Error('失敗'))
   await expect(loadLessonBookings('a', 'e', 's', new AbortController().signal)).rejects.toThrow('失敗')
 })
+
+test.each([undefined, null, NaN, Infinity, -1, 1.5, '2'])('不正な総件数%sは1回の取得で停止し、続きを要求しない', async total => {
+  vi.mocked(eventsApi.listBookings).mockResolvedValue({ items: [booking(1)], total, limit: 50, sort: [] } as never)
+  await expect(loadLessonBookings('a', 'e', 's', new AbortController().signal)).rejects.toThrow('名簿の件数を確認できませんでした')
+  expect(eventsApi.listBookings).toHaveBeenCalledTimes(1)
+})
+
+test('同じページが返り続けても2回で停止し、重複した名簿を返さない', async () => {
+  vi.mocked(eventsApi.listBookings).mockResolvedValue({ items: [booking(1)], total: 100, limit: 50, sort: [] })
+  await expect(loadLessonBookings('a', 'e', 's', new AbortController().signal)).rejects.toThrow('名簿の続きを読み込めませんでした')
+  expect(eventsApi.listBookings).toHaveBeenCalledTimes(2)
+})
+
+test('同一ページ内の重複も正常な全員名簿として返さない', async () => {
+  vi.mocked(eventsApi.listBookings).mockResolvedValue({ items: [booking(1), booking(1)], total: 2, limit: 50, sort: [] })
+  await expect(loadLessonBookings('a', 'e', 's', new AbortController().signal)).rejects.toThrow('名簿の続きを読み込めませんでした')
+  expect(eventsApi.listBookings).toHaveBeenCalledTimes(1)
+})
+
+test('途中の空ページは不完全な名簿として停止する', async () => {
+  vi.mocked(eventsApi.listBookings).mockResolvedValueOnce({ items: [booking(1)], total: 2, limit: 50, sort: [] })
+    .mockResolvedValue({ items: [], total: 2, limit: 50, sort: [] })
+  await expect(loadLessonBookings('a', 'e', 's', new AbortController().signal)).rejects.toThrow('名簿の続きを読み込めませんでした')
+  expect(eventsApi.listBookings).toHaveBeenCalledTimes(2)
+})
+
+test('0件と取得前の中止は余分なページを要求しない', async () => {
+  const controller = new AbortController()
+  controller.abort()
+  await expect(loadLessonBookings('a', 'e', 's', controller.signal)).rejects.toThrow('名簿の読み込みを中止しました')
+  expect(eventsApi.listBookings).not.toHaveBeenCalled()
+  vi.mocked(eventsApi.listBookings).mockResolvedValue({ items: [], total: 0, limit: 50, sort: [] })
+  await expect(loadLessonBookings('a', 'e', 's', new AbortController().signal)).resolves.toEqual([])
+  expect(eventsApi.listBookings).toHaveBeenCalledTimes(1)
+})
