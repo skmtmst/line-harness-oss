@@ -1,5 +1,5 @@
 'use client'
-import type { WizardStep, Props, Pair, SummaryData } from './wizard-types'
+import type { Props, Pair } from './wizard-types'
 export type { WizardStep, Props, Pair, SummaryData } from './wizard-types'
 
 import { Steps } from '@/components/templates/steps'
@@ -36,7 +36,7 @@ const BOOKING_PLACE: Record<AccountStyle, string> = {
 }
 
 export default function StyleSetupWizard({ accountId, state, initialStep = 0, onClose }: Props) {
-  const { style, answers, step, setStep, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, close, activate } = useWizard({ accountId, state, initialStep, onClose })
+  const { style, answers, step, setStep, dirty, busy, error, summary, enabled, setEnabled, resources, resource, setResource, preparing, steps, questions, total, index, question, choice, setChoice, confirm, onNext, discard, saveAndClose, activate } = useWizard({ accountId, state, initialStep, onClose })
 
   const label = styleLabel(style)
   const menu = useStarterMenu(accountId, style)
@@ -61,7 +61,9 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
           ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${onCount}件）`}</Button>
           : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle"><ArrowRight aria-hidden="true" className={styles.buttonIcon} />次へ</Button>}
       </div>
-      <div className={styles.footerSide} aria-hidden="true" />
+      <div className={styles.footerSide}>
+        {step !== 0 && step !== 'summary' ? <Button onClick={() => void saveAndClose()} busy={busy} busyLabel="保存中…">途中保存して閉じる</Button> : null}
+      </div>
     </div></DialogActions>
   )
 
@@ -207,7 +209,8 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         size="wide"
         designTop={step === 'summary' ? 48 : 60}
         fitViewport
-        onCancel={() => void close()}
+        onCancel={discard}
+        dirty={dirty || undefined}
         busy={busy}
         error={error}
         designNode={step === 0 ? 'xxpM9' : step === 1 ? 'RZW83' : step === 'summary' ? 'oKSsG' : 'lS1Gh'}

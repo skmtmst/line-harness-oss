@@ -129,6 +129,26 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
     void go(nextOf(index), nextAnswers, nextChoices)
   }
 
+  const selectedAnswer = async (): Promise<{ key: string; value: SetupAnswer; nextChoices: typeof choices } | null> => {
+    if (step === 1) {
+      if (choice === 'configured') { preparing.open(LOOK_CHOICES.find((c) => c.value === choice)!.label); return null }
+      if (choice === 'later' || choice === 'manual') return { key: 'image', value: { mode: choice }, nextChoices: choices }
+      if (choice === 'existing') {
+        const picked = resources?.find((item) => item.id === resource)
+        if (!picked) { setError('使うリッチメニューか画像を選んでください。'); return null }
+        if (picked.kind === 'image') return { key: 'image', value: { mode: 'configured', resourceId: picked.id }, nextChoices: choices }
+        /* 今あるリッチメニューをそのまま使う：初期セットのリッチメニューの代わりにする（choices）。 */
+        try {
+          const set = await styleApi.starterSet(accountId, style)
+          const menuKey = set.success ? set.data.definition.items.find((item) => item.kind === 'rich_menu')?.key : undefined
+          return { key: 'image', value: { mode: 'configured', value: 'keep' }, nextChoices: menuKey ? { ...choices, [menuKey]: { mode: 'existing', resourceId: picked.id } } : choices }
+        } catch (caught) { setError(describeApiFailure(caught, '読み込み')); return null }
+      }
+      return { key: 'image', value: { mode: 'configured', value: choice }, nextChoices: choices }
+    }
+    return question ? { key: question.key, value: answerOf(choice, question), nextChoices: choices } : null
+  }
+
   const onNext = async () => {
     if (step === 0) {
       /* スタイルの「あとで」「手動」は口の styleMode で保存する（別の人・別の端末でも同じ）。 */
@@ -139,35 +159,31 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
       void go(1)
       return
     }
-    if (step === 1) {
-      if (choice === 'configured') { preparing.open(LOOK_CHOICES.find((c) => c.value === choice)!.label); return }
-      if (choice === 'later') { commitAndNext('image', { mode: 'later' }); return }
-      if (choice === 'manual') { commitAndNext('image', { mode: 'manual' }); return }
-      if (choice === 'existing') {
-        const picked = resources?.find((item) => item.id === resource)
-        if (!picked) { setError('使うリッチメニューか画像を選んでください。'); return }
-        if (picked.kind === 'image') { commitAndNext('image', { mode: 'configured', resourceId: picked.id }); return }
-        /* 今あるリッチメニューをそのまま使う：初期セットのリッチメニューの代わりにする（choices）。 */
-        try {
-          const set = await styleApi.starterSet(accountId, style)
-          const menuKey = set.success ? set.data.definition.items.find((item) => item.kind === 'rich_menu')?.key : undefined
-          commitAndNext('image', { mode: 'configured', value: 'keep' }, menuKey ? { ...choices, [menuKey]: { mode: 'existing', resourceId: picked.id } } : choices)
-        } catch (caught) { setError(describeApiFailure(caught, '読み込み')) }
-        return
-      }
-      commitAndNext('image', { mode: 'configured', value: choice })
-      return
-    }
-    if (question) commitAndNext(question.key, answerOf(choice, question))
+    const selected = await selectedAnswer()
+    if (selected) commitAndNext(selected.key, selected.value, selected.nextChoices)
   }
 
-  const close = async () => {
+  const discard = () => {
+    if (!busy) onClose(version !== state.version)
+  }
+
+  const saveAndClose = async () => {
     if (busy) return
-    if (dirty && step !== 'summary' && step !== 0) {
-      /* 閉じるときは確かめの窓を出さず、予約設定が変わる答えだけは送らない（勝手に予約設定を変えない）。 */
-      try { await save(answers, choices, { skipSettings: true }) } catch { /* 閉じるのは止めない。答えは次に開いたとき聞き直す */ }
+    setBusy(true)
+    setError('')
+    try {
+      /* 途中保存では、予約設定を変更する答えは最後の確認まで送らない。 */
+      if (step !== 'summary' && step !== 0) {
+        const selected = await selectedAnswer()
+        if (!selected) return
+        await save({ ...answers, [selected.key]: selected.value }, selected.nextChoices, { skipSettings: true })
+      }
+      onClose(true)
+    } catch (caught) {
+      setError(describeApiFailure(caught, '保存'))
+    } finally {
+      setBusy(false)
     }
-    onClose(true)
   }
 
   /* スタイルを「あとで」（はじめにやることに残る）・「手動」（スタイルを使わず設定の画面で決める）。 */
@@ -218,7 +234,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
   }
 
 
- return { style, setStyle, answers, setAnswers, choices, setChoices, version, setVersion, step, setStep, dirty, setDirty, busy, setBusy, error, setError, router, summary, setSummary, enabled, setEnabled, resources, setResources, resource, setResource, preparing, steps, questions, total, index, question, current, choice, setChoice, answer, saved, setSaved, confirm, setConfirm, save, confirmThenSave, loadSummary, go, nextOf, commitAndNext, onNext, close, saveStyleMode, activate }
+ return { style, setStyle, answers, setAnswers, choices, setChoices, version, setVersion, step, setStep, dirty, setDirty, busy, setBusy, error, setError, router, summary, setSummary, enabled, setEnabled, resources, setResources, resource, setResource, preparing, steps, questions, total, index, question, current, choice, setChoice, answer, saved, setSaved, confirm, setConfirm, save, confirmThenSave, loadSummary, go, nextOf, commitAndNext, onNext, discard, saveAndClose, saveStyleMode, activate }
 }
 
 import { KIND_WORD } from './wizard-item-kinds'
