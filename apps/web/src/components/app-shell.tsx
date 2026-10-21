@@ -185,6 +185,7 @@ export function Workspace({ children }: { children: React.ReactNode }) {
     <div className={styles.side}>
       <AppTopBar />
       <main id="main-content" tabIndex={-1} className={styles.main}>
+        <RecoveryCodeNotice className={styles.recoveryNotice} />
         {/* V6 共通メニュー J33xq と同じ256pxサイドバーを基準にする。 */}
         <div
           data-design-shell="v6-1920"
@@ -197,7 +198,6 @@ export function Workspace({ children }: { children: React.ReactNode }) {
             （settingsNavInline）が出る・消えるを繰り返し、画面が落ちる。外のメニューだけを出し入れし、
             出さないときの包みは display: contents で並びに影響させない。
           */}
-          <RecoveryCodeNotice />
           {settingsArea ? (
             <div className={withSettingsNav ? styles.settingsSplit : styles.settingsPass} data-settings-split={withSettingsNav ? '' : undefined}>
               {withSettingsNav ? <SettingsInnerNav /> : null}

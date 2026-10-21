@@ -48,6 +48,19 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   await centered(page.getByRole('button', { name: 'パスワードを設定してログインへ' }))
   await openPrimaryAuthenticatedChallenge(page, '/login/two-factor', 'fixture-challenge', 'password')
   await expect(page.getByRole('textbox')).toHaveCount(6)
+  const authLayout = await page.getByRole('group', { name: '認証コード（6桁）' }).evaluate(input => {
+    const card = input.closest('section[data-auth-layout="admin"]')
+    const heading = card.querySelector('h1').getBoundingClientRect()
+    const box = card.getBoundingClientRect()
+    const brand = card.previousElementSibling.getBoundingClientRect()
+    const slots = input.getBoundingClientRect()
+    return { titleInset: heading.x - slots.x, titleGap: slots.top - heading.bottom, brandGap: box.top - brand.bottom, inputRight: slots.right, cardRight: box.right }
+  })
+  expect(Math.abs(authLayout.titleInset)).toBeLessThanOrEqual(1)
+  expect(authLayout.titleGap).toBeGreaterThan(0)
+  expect(authLayout.titleGap).toBeLessThanOrEqual(48)
+  expect(authLayout.brandGap).toBeGreaterThanOrEqual(16)
+  expect(authLayout.inputRight).toBeLessThan(authLayout.cardRight)
   expect(await page.getByRole('group', { name: '認証コード（6桁）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await centered(page.getByRole('button', { name: '確認してログイン', exact: true }))
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`verify-${width}.png`) })
@@ -59,7 +72,7 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   const method = page.getByRole('button', { name: '6桁のコードで入る', exact: true })
   const textStyle = el => { const style = getComputedStyle(el); return { size: style.fontSize, weight: style.fontWeight, color: style.color, background: style.backgroundColor } }
   expect(await back.evaluate(textStyle)).toEqual(await method.evaluate(textStyle))
-  const mark = page.locator('[data-auth-layout="admin"] > div:first-child > span[aria-hidden="true"]')
+  const mark = page.locator('main[data-auth-layout="admin"] > div:first-child > span[aria-hidden="true"]')
   expect(await mark.evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })).toEqual(brandStyle)
   expect(await page.getByRole('group', { name: '回復コード（8文字）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await page.getByRole('textbox', { name: '1文字目' }).evaluate(el => {
@@ -83,6 +96,41 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   expect(await page.evaluate(() => [...Object.values(localStorage), ...Object.values(sessionStorage)].some(value => value.includes('7K2Q-9FXM')))).toBe(false)
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`recovery-${width}.png`) })
   expect(errors).toEqual([])
+})
+for (const width of [1152,1440,1920]) test(`low recovery-code banner is not covered by page content at ${width}`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 1000 })
+  let remaining = 0
+  await page.route('**/api/**', async route => {
+    const url = new URL(route.request().url())
+    const response = await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` })
+    if (url.pathname === '/api/auth/session') {
+      const body = await response.json()
+      body.data.recoveryCodesRemaining = remaining
+      return route.fulfill({ status: response.status(), json: body })
+    }
+    return route.fulfill({ response })
+  })
+  for (const path of ['/friends', '/broadcasts', '/settings']) {
+    await page.goto(path)
+    const notice = page.getByRole('note').filter({ hasText: '回復コードの残りが0個です' })
+    await expect(notice).toBeVisible()
+    const layout = await notice.evaluate(el => {
+      const rect = el.getBoundingClientRect()
+      const content = document.querySelector('[data-design-shell]')
+      const next = content.querySelector('[data-page-template]') ?? content
+      const text = el.querySelector('span:last-child').getBoundingClientRect()
+      const painted = document.elementFromPoint(rect.x + rect.width / 2, rect.bottom - 2)
+      return { gap: next.getBoundingClientRect().top - rect.bottom, textBottom: text.bottom, noticeBottom: rect.bottom, covered: !el.contains(painted), overflow: document.documentElement.scrollWidth - innerWidth }
+    })
+    expect(layout.gap).toBeGreaterThanOrEqual(0)
+    expect(layout.textBottom).toBeLessThan(layout.noticeBottom)
+    expect(layout.covered).toBe(false)
+    expect(layout.overflow).toBe(0)
+    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`notice-${path.slice(1)}-${width}.png`) })
+  }
+  remaining = 8
+  await page.reload()
+  await expect(page.getByRole('note').filter({ hasText: '回復コードの残り' })).toHaveCount(0)
 })
 for (const width of [1152,1440,1920]) test(`policy confirmation and personal recovery counts at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })

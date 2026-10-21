@@ -1554,6 +1554,7 @@
   --tpl-narrow-folder-w: 150px; /* 1152 の一覧の道具の段のフォルダ選び */
   --tpl-row-name-size: var(--polish-text-body); --tpl-row-name-lh: 19px; --tpl-row-sub-gap: 3px; --tpl-row-sub-size: var(--polish-text-support); --tpl-row-sub-lh: 16px;
   /* 作っていない画面の一式（運営 ログイン2段目  ほか）。 */
+  --tpl-auth-admin-card-pad: 28px;
   --tpl-ms-otp-page-pad: 32px 16px; --tpl-ms-otp-card-w: 420px; --tpl-ms-otp-card-pad: var(--polish-space-card); --tpl-ms-otp-card-gap: var(--polish-space-row); --tpl-ms-otp-card-radius: var(--polish-radius-card); --tpl-ms-otp-card-shadow: var(--card-shadow);
   --tpl-ms-otp-title-size: var(--polish-text-section); --tpl-ms-otp-title-lh: 29px; --tpl-ms-otp-desc-size: var(--polish-text-body); --tpl-ms-otp-desc-lh: 19px; --tpl-ms-otp-label-size: var(--polish-text-support); --tpl-ms-otp-label-lh: 20px; --tpl-ms-otp-field-gap: var(--polish-space-field);
   --tpl-ms-otp-btn-h: 36px; --tpl-ms-otp-icon: 15px; --tpl-ms-otp-foot-size: 11px; --tpl-ms-otp-foot-lh: 16px;

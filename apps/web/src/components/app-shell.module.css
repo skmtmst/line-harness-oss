@@ -48,6 +48,12 @@
   max-width: none;
 }
 
+/* Page templates cancel the content wrapper's padding with negative margins.
+   Keep the account-wide notice outside that wrapper so the page cannot cover it. */
+.recoveryNotice {
+  margin: var(--polish-space-card) var(--polish-space-section);
+}
+
 @media (min-width: 640px) {
   .content {
     padding-inline: 24px;
