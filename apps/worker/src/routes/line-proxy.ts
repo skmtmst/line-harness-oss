@@ -505,7 +505,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     // and subscription as the management API, for either accepted credential.
     const featureId = method === 'POST' && BULK_DISPATCH_PATHS.has(path)
       ? 'broadcasts'
-      : /^\/v2\/bot\/richmenu(?:\/|$)/.test(path) ? 'rich_menus' : null;
+      : /^\/v2\/bot\/(?:richmenu(?:\/|$)|user\/[^/]+\/richmenu(?:\/|$))/.test(path) ? 'rich_menus' : null;
     if (featureId && caller.lineAccountId) {
       const availability = await accountFeatureAvailability(c.env.DB, caller.lineAccountId, featureId);
       const retainedRead = ['GET', 'HEAD'].includes(method) && availability.reason === 'contract_unavailable';

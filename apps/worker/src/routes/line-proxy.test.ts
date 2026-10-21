@@ -236,6 +236,39 @@ function pushRequest(
 }
 
 describe('account feature availability', () => {
+  test.each([
+    ['POST', '/v2/bot/richmenu'],
+    ['POST', '/v2/bot/user/all/richmenu/rm-1'],
+    ['DELETE', '/v2/bot/user/all/richmenu'],
+    ['POST', `/v2/bot/user/${USER_A}/richmenu/rm-1`],
+    ['DELETE', `/v2/bot/user/${USER_A}/richmenu`],
+  ])('disabled rich menus reject %s %s before upstream communication', async (method, path) => {
+    const { db, executed } = fakeDb();
+    vi.mocked(accountFeatureAvailability).mockResolvedValue({
+      featureId: 'rich_menus', contractAvailable: true, companyEnabled: false,
+      dependenciesEnabled: true, effectiveEnabled: false, reason: 'company_disabled',
+      message: 'この機能は設定でオフになっています', disabledDependencies: [],
+    });
+    const res = await setupApp().request(`/line-api${path}`, {
+      method, headers: { Authorization: 'Bearer acc-token' },
+    }, env(db));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'FEATURE_DISABLED', featureId: 'rich_menus' });
+    expect(accountFeatureAvailability).toHaveBeenCalledWith(db, 'acc-1', 'rich_menus');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+  });
+
+  test('enabled rich menu assignment forwards the channel request', async () => {
+    const { db } = fakeDb();
+    const res = await setupApp().request(`/line-api/v2/bot/user/${USER_A}/richmenu/rm-1`, {
+      method: 'POST', headers: { Authorization: 'Bearer acc-token' },
+    }, env(db));
+    expect(res.status).toBe(200);
+    expect(accountFeatureAvailability).toHaveBeenCalledWith(db, 'acc-1', 'rich_menus');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   test.each(['broadcast', 'multicast', 'narrowcast'] as const)('disabled %s stops before upstream communication', async endpoint => {
     const { db, executed } = fakeDb();
     vi.mocked(accountFeatureAvailability).mockResolvedValue({
