@@ -25,7 +25,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} }),
 }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: 'テスト統括' }) }))
-vi.mock('@/components/auth/turnstile', () => ({ default: ({ onToken }: { onToken: (token: string) => void }) => {
+vi.mock('@/components/auth/turnstile', () => ({ default: function VerifiedTurnstile({ onToken }: { onToken: (token: string) => void }) {
   React.useEffect(() => { onToken('fixture-turnstile-token') }, [onToken])
   return null
 } }))
