@@ -468,7 +468,7 @@
 - [unreleased.md](release-log/unreleased.md)
 - [1781-kenta-cleanup-U01.md](release-log/unreleased/1781-kenta-cleanup-U01.md)
 - [ログインのロボット確認と中断後の復帰](release-log/unreleased/1782-kenta-login-robot-check.md)
-- [テンプレート詳細の送信元表示](release-log/unreleased/1783-kenta-template-sender-preview.md)
+- [二段階認証・回復コード案内・送信元表示の修正](release-log/unreleased/1784-kenta-staging-layout.md)
 - [1781-kenta-cleanup-a01.md](release-log/unreleased/1781-kenta-cleanup-a01.md)
 - [1781-kenta-cleanup-a02.md](release-log/unreleased/1781-kenta-cleanup-a02.md)
 - [1781-kenta-cleanup-a03.md](release-log/unreleased/1781-kenta-cleanup-a03.md)
