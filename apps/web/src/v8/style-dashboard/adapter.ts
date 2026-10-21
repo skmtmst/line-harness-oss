@@ -1,5 +1,6 @@
 import { formatYen as yen } from '@line-crm/shared';
 import { styleTerm, term } from '@/lib/terms'
+import { paymentAnalytics } from './analytics-payments'
 import type { StyleBooking, StyleCard, StyleMetric, StyleSchedule, StyleScheduleEntry, StyleSnapshot } from '@line-crm/shared'
 import type {
   DashboardRange, IndustryStyle, StyleAnalytics, StyleBadge, StyleBoard, StyleKpi, StyleLayout, StyleMonth, StyleMonthDay, StyleRow, StyleSideCard, StyleToday, StyleWeek,
@@ -284,6 +285,8 @@ const cell = (m?: StyleMetric | number | null) => {
 }
 
 export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics: Record<string, unknown> }, tab: string, names: Record<string, string>): StyleAnalytics {
+  const tabs = TABS[style].map(([id, label]) => ({ id, label }))
+  if (tab === 'payments') return paymentAnalytics(s, tabs)
   const a = s.analytics
   const pm = (a.periodMetrics as Record<string, StyleMetric> | undefined) ?? s.metrics
   const card = (id: string, key: string, title: string, lower = false) => {
@@ -315,7 +318,6 @@ export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics
     { id: 'pay', title: 'お支払い（この期間）', help: '入金・先払い・返金は決済の口（Stripe）から出します。', rows: [{ label: '入金額・先払いの割合・返金', value: '—' }], action: { label: 'お支払いを見る', icon: 'send' }, note: '売上（料金×確定数）と入金額は別の数です。' },
     { id: 'how', title: '数え方', rows: [], note: style === 'consult' ? '面談日で数えます。予約が入った日で数えるのは「新着予約」だけです。' : '来店日・開催日で数えます。予約が入った日で数えるのは「新着予約」だけです。' },
   ]
-  const tabs = TABS[style].map(([id, label]) => ({ id, label }))
   return { tabs, tab: tabs.some((t) => t.id === tab) ? tab : tabs[0].id, cards, chart, table, side }
 }
 
