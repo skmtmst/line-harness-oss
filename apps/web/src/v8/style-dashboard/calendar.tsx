@@ -1,7 +1,7 @@
 'use client'
-import { ChevronLeft, ChevronRight, Info, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import type { CSSProperties } from 'react'
-import { CalendarPerson } from '@/components/shared/calendar-parts'
+import { CalendarPerson, CalendarTimeEntries } from '@/components/shared/calendar-parts'
 import MonthCalendarGrid from '@/components/shared/month-calendar'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
@@ -37,7 +37,6 @@ function Pager({ title, todayLabel, onMove }: { title: string; todayLabel: strin
 export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen }: { week: StyleWeek; canWrite: boolean; onMove: (step: -1 | 0 | 1) => void; onSlot: (day: string, start: string) => void; onOpen: (id: string) => void }) {
   const hours: string[] = []
   for (let h = 10; h <= 19; h += 1) hours.push(`${h}:00`)
-  const index = (day: string) => week.days.findIndex((d) => d.date === day)
   return (
     <section className={styles.calendar} aria-label="1週間のカレンダー">
       <div className={styles.calTools}>
@@ -57,20 +56,7 @@ export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen }: { week:
         <div className={styles.weekGrid}>
           {hours.map((h) => <div key={h} className={styles.boardLine} style={{ insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${toMin(h) / 60 - 10} + var(--tpl-sd-board-top))` }}><span className={styles.boardHour}>{h.padStart(5, '0')}</span></div>)}
           {week.days.map((d, i) => <span key={d.date} className={styles.boardDivider} data-closed={d.closed || undefined} style={{ insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${week.days.length} * ${i})`, inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${week.days.length})` }}>{d.closed ? <span className={styles.closedLabel}>定休日</span> : null}</span>)}
-          {week.entries.map((e) => {
-            const i = index(e.day)
-            return i < 0 ? null : (
-              <button key={e.id} type="button" className={styles.weekEntry} style={box(e.start, e.end, i, week.days.length)} onClick={() => onOpen(e.id)}>
-                <strong>{e.title}</strong><span>{e.name}</span>
-              </button>
-            )
-          })}
-          {canWrite ? week.free.map((f) => {
-            const i = index(f.day)
-            return i < 0 ? null : (
-              <button key={`${f.day}-${f.start}`} type="button" className={styles.weekFree} style={box(f.start, f.end, i, week.days.length)} onClick={() => onSlot(f.day, f.start)}><Plus size={12} aria-hidden="true" />予約を入れる</button>
-            )
-          }) : null}
+          <CalendarTimeEntries days={week.days.map(day => day.date)} entries={week.entries} free={week.free} canWrite={canWrite} position={box} onOpen={onOpen} onSlot={onSlot} />
         </div>
       </div>
     </section>
