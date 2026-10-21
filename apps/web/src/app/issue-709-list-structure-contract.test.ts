@@ -94,9 +94,10 @@ describe('Issue #709: 一覧表は1440pxの初期表示に操作列まで収め�
 describe('Issue #709: リッチメニューの状態表示は共有StatusBadgeに一本化', () => {
   it('共有StatusBadgeをimportし、ローカル札実装を持たない', () => {
     const src = read('rich-menus/page.tsx')
-    expect(src).toContain('styles.pillScheduled')
+    expect(src.match(/import StatusBadge from '@\/components\/shared\/status-badge'|styles\.pill(?:Scheduled|Live|Draft)/g))
+      .toEqual(["import StatusBadge from '@/components/shared/status-badge'"])
     // 平文の公開予定表示は札へ集約したので、行内の直接表示は残さない。
-    expect(src).toContain("g.status === 'published' ? styles.pillLive : styles.pillDraft")
+    expect(src).toMatch(/<StatusBadge tone="info" size="compact">[\s\S]*?<StatusBadge tone=\{g\.status === 'published' \? 'success' : 'neutral'\}/)
     expect(src).toContain('`${shortDay(g.publishingAt)} 公開`')
     expect(src).not.toMatch(/function StatusBadge\(/)
   })

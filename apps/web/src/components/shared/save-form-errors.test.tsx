@@ -197,7 +197,7 @@ function CompositeForm() {
   </SaveErrorScope>
 }
 it('選択ボタン・画像欄・認証コードへ渡し、コードを自動で空にしても理由は残す', async () => {
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   render(<CompositeForm />)
   fireEvent.click(screen.getByText('まとめて試す'))
   await act(async () => { await new Promise((r) => setTimeout(r, 20)) })

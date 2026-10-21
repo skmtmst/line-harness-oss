@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import PeriodPicker, { pastPeriod, validPeriod } from './period-picker'
-vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
 afterEach(cleanup)
 it('決まり5：3期間と指定期間を同じ部品で選び、日付は日本時間の暦日を含める', () => {
  const onChange = vi.fn(), onRangeChange = vi.fn()
