@@ -31,7 +31,7 @@ function show(value: ReturnType<typeof data>) {
 afterEach(cleanup)
 
 describe('日別集計のAPI接続', () => {
-  it.each<[IndustryStyle, number, number]>([['restaurant', 4, 8], ['salon', 4, 8], ['consult', 2, 5], ['lesson', 2, 5]])('%sは日別の正規指標を使い、前期間と0件の日を維持する', (style, current, previous) => {
+  it.each<[IndustryStyle, number, number]>([['restaurant', 4, 8], ['salon', 2, 5], ['consult', 2, 5], ['lesson', 2, 5]])('%sは日別の正規指標を使い、前期間と0件の日を維持する', (style, current, previous) => {
     const value = data(style)
     expect(value.chart?.points).toEqual([
       { label: '2026-10-14', now: current, prev: previous, previousLabel: '2026-10-12' },
@@ -88,4 +88,17 @@ describe('日別集計のAPI接続', () => {
     expect(value.chart?.points.map(p => [p.previousLabel, p.prev])).toEqual([['2025-10-14', 6], [undefined, null]])
     expect(value.chart?.axis).toEqual(['10/14', '10/15'])
   })
+})
+
+it('サロンの来店グラフは予約と異なる実来店・欠測を保ち、予約数へ戻さない', () => {
+  const value = data('salon', {
+    current: [{ date: '2026-10-14', metrics: { bookings: metric(99), visits: metric(null, 'unconfigured') } }, daily.current[1]],
+    previous: [{ date: '2026-10-12', metrics: { bookings: metric(80), visits: metric(5) } }],
+  })
+  expect(value.chart?.title).toBe('日ごとの来店（来店日で数える）')
+  expect(value.chart?.points.map(point => [point.now, point.prev])).toEqual([[null, 5], [0, null]])
+  show(value)
+  const plot = screen.getByRole('img', { name: '日ごとの来店（来店日で数える）のグラフ' })
+  expect(plot.querySelector('[title="2026-10-14：この期間 未取得・比較期間 2026-10-12：5"] i[data-k="now"]')).toBeNull()
+  expect(plot.querySelector('[title="2026-10-15：この期間 0"] i[data-k="now"]')).toBeTruthy()
 })

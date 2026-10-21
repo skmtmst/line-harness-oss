@@ -6,7 +6,7 @@ const count = (metric: StyleMetric | undefined): number | null => metric?.status
 
 /** Pair the same ordinal day of the selected and comparison periods. */
 export function dailyAnalyticsSeries(style: IndustryStyle, comparison: StyleAnalyticsData['dailyComparison']): NonNullable<StyleAnalytics['chart']> {
-  const key = style === 'consult' || style === 'lesson' ? 'visits' : 'bookings'
+  const key = style === 'restaurant' ? 'bookings' : 'visits'
   const points = (comparison?.current ?? []).map((day, index) => {
     const previous = comparison?.previous?.[index]
     return { label: day.date, now: count(day.metrics[key]), prev: count(previous?.metrics[key]), previousLabel: previous?.date }
@@ -19,7 +19,7 @@ export function dailyAnalyticsSeries(style: IndustryStyle, comparison: StyleAnal
     return `${date.getUTCMonth() + 1}/${date.getUTCDate()}`
   })
   return {
-    title: style === 'consult' ? '日ごとの実施した面談（面談日で数える）' : style === 'lesson' ? '日ごとの出席' : '日ごとの予約（来店日で数える）',
+    title: style === 'salon' ? '日ごとの来店（来店日で数える）' : style === 'consult' ? '日ごとの実施した面談（面談日で数える）' : style === 'lesson' ? '日ごとの出席' : '日ごとの予約（来店日で数える）',
     help: '選択した期間と比較期間の同じ順番の日を並べます。取得できていない値は表示しません。',
     ticks: [String(max), String(Math.round(max / 2)), '0'], axis, points, max,
     ...(values.length ? {} : { emptyMessage: '日ごとの集計はまだ取得できていません。' }),
