@@ -47,7 +47,7 @@ it.each([1200, 0])('既存GETの余分な実通数%sを人数や金額で代用�
 it.each([null, undefined])('取得不能・旧Worker省略(%s)を0通へ変換しない', async count => {
   net.stats.mockResolvedValue(stats(count))
   render(<DuplicatesList />)
-  await screen.findByText('配信実績を取得できませんでした')
+  await screen.findByText('配信実績は未取得です')
   expect(within(metric()).getByText('—', { exact: true })).toBeTruthy()
   expect(within(metric()).queryByText('0', { exact: true })).toBeNull()
 })
@@ -55,7 +55,7 @@ it.each([null, undefined])('取得不能・旧Worker省略(%s)を0通へ変換�
 it('集計失敗は実績未取得とし、既存の再試行で実通数を復元する', async () => {
   net.stats.mockRejectedValueOnce({ status: 503 }).mockResolvedValue(stats(7))
   render(<DuplicatesList />)
-  await screen.findByText('配信実績を取得できませんでした')
+  await screen.findByText('配信実績は未取得です')
   expect(within(metric()).getByText('—', { exact: true })).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: 'もう一度', exact: true }))
   await waitFor(() => expect(within(metric()).getByText('7', { exact: true })).toBeTruthy())

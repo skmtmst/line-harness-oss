@@ -87,7 +87,7 @@ export default function DuplicatesListV8() {
       key: 'deliveries', title: '重なって届いた配信',
       valueText: deliveryCount !== null ? formatNumber(deliveryCount) : emptyValue('unknown'),
       unit: '通',
-      detail: isForbidden(d.statsFailure) ? '集計を見る権限がありません' : deliveryCount !== null ? d.statsFailure ? '前回取得した配信実績' : '配信実績から集計' : d.loading ? '読み込んでいます' : '配信実績を取得できませんでした',
+      detail: isForbidden(d.statsFailure) ? '集計を見る権限がありません' : deliveryCount !== null ? d.statsFailure ? '前回取得した配信実績' : '配信実績から集計' : d.loading ? '読み込んでいます' : '配信実績は未取得です',
       help: '同じ配信が統合ユーザーの複数の友だちに届いたとき、1人分を除いた余分な通数です。配信の回数や人数ではありません。',
     },
     {
