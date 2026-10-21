@@ -506,6 +506,12 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     const featureId = method === 'POST' && BULK_DISPATCH_PATHS.has(path)
       ? 'broadcasts'
       : /^\/v2\/bot\/(?:richmenu(?:\/|$)|user\/[^/]+\/richmenu(?:\/|$))/.test(path) ? 'rich_menus' : null;
+    if (featureId && !caller.lineAccountId && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      return c.json({
+        code: 'LINE_ACCOUNT_REQUIRED',
+        message: 'Register this LINE channel before using account-scoped features.',
+      }, 400);
+    }
     if (featureId && caller.lineAccountId) {
       const availability = await accountFeatureAvailability(c.env.DB, caller.lineAccountId, featureId);
       const retainedRead = ['GET', 'HEAD'].includes(method) && availability.reason === 'contract_unavailable';

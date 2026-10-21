@@ -237,6 +237,21 @@ function pushRequest(
 
 describe('account feature availability', () => {
   test.each([
+    '/v2/bot/message/broadcast',
+    `/v2/bot/user/${USER_A}/richmenu/rm-1`,
+  ])('unregistered environment channel cannot update account-scoped feature %s', async path => {
+    vi.mocked(getLineAccounts).mockResolvedValue([]);
+    const { db, executed } = fakeDb();
+    const res = await setupApp().request(`/line-api${path}`, {
+      method: 'POST', headers: { Authorization: 'Bearer env-token' },
+    }, env(db));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'LINE_ACCOUNT_REQUIRED' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
+  });
+
+  test.each([
     ['POST', '/v2/bot/richmenu'],
     ['POST', '/v2/bot/user/all/richmenu/rm-1'],
     ['DELETE', '/v2/bot/user/all/richmenu'],
@@ -874,7 +889,7 @@ describe('broadcast', () => {
     expect(rows[0].deliveryType).toBeNull();
   });
 
-  test('single account install + env token: unscoped (all following friends)', async () => {
+  test('single registered account does not claim an unrelated environment channel', async () => {
     const { db, executed } = fakeDb({ broadcastFriendIds: ['f1', 'f2'] });
     const res = await setupApp().request(
       new Request('http://worker.test/line-api/v2/bot/message/broadcast', {
@@ -885,10 +900,10 @@ describe('broadcast', () => {
       {},
       env(db),
     );
-    expect(res.status).toBe(200);
-    const select = executed.find((e) => e.sql.includes('SELECT id FROM friends'));
-    expect(select!.sql).not.toContain('line_account_id');
-    expect(loggedRows(executed)).toHaveLength(2);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'LINE_ACCOUNT_REQUIRED' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(executed).toEqual([]);
   });
 
   test('multi-account: scoped to the sending account', async () => {
@@ -910,7 +925,7 @@ describe('broadcast', () => {
     expect(loggedRows(executed)).toHaveLength(2);
   });
 
-  test('multi-account + unregistered env token: forwarded but NOT logged (no fabrication)', async () => {
+  test('multi-account + unregistered env token requires a registered channel for broadcast', async () => {
     vi.mocked(getLineAccounts).mockResolvedValue([ACCOUNT, ACCOUNT_2] as never);
     const { db, executed } = fakeDb({ broadcastFriendIds: ['f1', 'f2'] });
     const res = await setupApp().request(
@@ -922,7 +937,9 @@ describe('broadcast', () => {
       {},
       env(db),
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ code: 'LINE_ACCOUNT_REQUIRED' });
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(loggedRows(executed)).toHaveLength(0);
   });
 });
