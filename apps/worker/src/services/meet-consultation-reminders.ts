@@ -161,7 +161,7 @@ export function calculateMeetReminderSchedule(
   return schedules;
 }
 
-export function renderMeetReminderText(kind: MeetReminderKind, startsAt: string, meetUrl: string): string {
+export function renderMeetReminderText(_kind: MeetReminderKind, startsAt: string, meetUrl: string): string {
   const start = normalizeDate(startsAt, 'startsAt');
   const jst = japanCalendar(start);
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
@@ -170,9 +170,9 @@ export function renderMeetReminderText(kind: MeetReminderKind, startsAt: string,
   const day = Number(iso.slice(8, 10));
   const time = iso.slice(11, 16);
   const dateLabel = `${month}月${day}日（${weekdays[jst.getUTCDay()]}）${time}`;
-  const lead = kind === 'day_before'
-    ? `明日${dateLabel}から`
-    : `本日${dateLabel}から（開始約1時間前）`;
+  // 通知種別は送信予定であり、実際の配信日や残り時間を保証しない。
+  // 当日登録・日跨ぎ・遅延でも誤案内しないよう、JSTの日時を直接伝える。
+  const lead = `${dateLabel}から`;
 
   return `【個別相談リマインド】\n${lead}、Google Meetで個別相談を予定しています。\n\nお時間になりましたら、こちらからご参加ください。\n${meetUrl}\n\nよろしくお願いいたします！`;
 }
