@@ -1,7 +1,7 @@
 'use client'
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import type { CSSProperties } from 'react'
-import { CalendarPerson, CalendarTimeEntries } from '@/components/shared/calendar-parts'
+import { CalendarPerson, CalendarTimeEntries, calendarTimeRange, useCalendarTimeScale } from '@/components/shared/calendar-parts'
 import MonthCalendarGrid from '@/components/shared/month-calendar'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
@@ -15,9 +15,8 @@ import styles from './style-dashboard.module.css'
  */
 
 const toMin = (hm: string) => { const [h, m] = hm.split(':').map(Number); return h * 60 + m }
-const FROM = '10:00'
-const box = (start: string, end: string, day: number, days: number): CSSProperties => ({
-  insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${(toMin(start) - toMin(FROM)) / 60} + var(--tpl-sd-board-top))`,
+const box = (start: string, end: string, day: number, days: number, from: number): CSSProperties => ({
+  insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${(toMin(start) - from * 60) / 60} + var(--tpl-sd-board-top))`,
   blockSize: `calc(var(--tpl-sd-week-hour) * ${(toMin(end) - toMin(start)) / 60} - var(--tpl-sd-entry-gap))`,
   insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${days} * ${day})`,
   inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${days})`,
@@ -35,10 +34,13 @@ function Pager({ title, todayLabel, onMove }: { title: string; todayLabel: strin
 }
 
 export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen }: { week: StyleWeek; canWrite: boolean; onMove: (step: -1 | 0 | 1) => void; onSlot: (day: string, start: string) => void; onOpen: (id: string) => void }) {
+  const timeScale = useCalendarTimeScale(week.entries, week.free, canWrite)
+  const axis = calendarTimeRange([...week.entries, ...(canWrite ? week.free : [])])
+  const position = (start: string, end: string, day: number, days: number) => box(start, end, day, days, axis.from)
   const hours: string[] = []
-  for (let h = 10; h <= 19; h += 1) hours.push(`${h}:00`)
+  for (let h = axis.from; h < axis.to; h += 1) hours.push(`${h}:00`)
   return (
-    <section className={styles.calendar} aria-label="1週間のカレンダー">
+    <section ref={timeScale} className={styles.calendar} aria-label="1週間のカレンダー">
       <div className={styles.calTools}>
         <Pager title={week.title} todayLabel="今週" onMove={onMove} />
         <span className={styles.grow} />
@@ -53,11 +55,10 @@ export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen }: { week:
             </div>
           ))}
         </div>
-        <div className={styles.weekGrid}>
-          {hours.map((h) => <div key={h} className={styles.boardLine} style={{ insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${toMin(h) / 60 - 10} + var(--tpl-sd-board-top))` }}><span className={styles.boardHour}>{h.padStart(5, '0')}</span></div>)}
+        <CalendarTimeEntries days={week.days.map(day => day.date)} entries={week.entries} free={week.free} canWrite={canWrite} position={position} onOpen={onOpen} onSlot={onSlot} hourCount={axis.to - axis.from}>
+          {hours.map((h) => <div key={h} className={styles.boardLine} style={{ insetBlockStart: `calc(var(--tpl-sd-week-hour) * ${toMin(h) / 60 - axis.from} + var(--tpl-sd-board-top))` }}><span className={styles.boardHour}>{h.padStart(5, '0')}</span></div>)}
           {week.days.map((d, i) => <span key={d.date} className={styles.boardDivider} data-closed={d.closed || undefined} style={{ insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${week.days.length} * ${i})`, inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${week.days.length})` }}>{d.closed ? <span className={styles.closedLabel}>定休日</span> : null}</span>)}
-          <CalendarTimeEntries days={week.days.map(day => day.date)} entries={week.entries} free={week.free} canWrite={canWrite} position={box} onOpen={onOpen} onSlot={onSlot} />
-        </div>
+        </CalendarTimeEntries>
       </div>
     </section>
   )

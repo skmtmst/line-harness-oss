@@ -189,15 +189,26 @@ function weekOf(sch: StyleSchedule, now: Date): StyleWeek {
   const today = parts(now.toISOString(), tz).date
   const days = sch.days.map((d) => {
     const closed = sch.availability.closedDates.includes(d.date)
-    const freeCount = sch.availability.slots.filter((s) => s.date === d.date).length
-    return { date: d.date, label: dayLabel(d.date), sub: closed ? '定休日' : freeCount ? `空き ${freeCount}` : '満', closed, today: d.date === today }
+    return { date: d.date, label: dayLabel(d.date), sub: closed ? '定休日' : '満', closed, today: d.date === today }
   })
-  const entries = sch.entries.map((e) => ({ id: e.id, day: parts(e.startsAt, tz).date, start: hm(e.startsAt, tz), end: hm(e.endsAt, tz), title: e.title, name: e.booking?.name ?? '' }))
-  const seen = new Set<string>()
-  const free = sch.availability.slots.filter((s) => !seen.has(s.date) && seen.add(s.date)).map((s) => ({ day: s.date, start: hm(s.startsAt, tz), end: hm(s.endsAt, tz) }))
+  const segments = (startsAt: string, endsAt: string) => {
+    if (!Number.isFinite(Date.parse(startsAt)) || !Number.isFinite(Date.parse(endsAt)) || Date.parse(endsAt) <= Date.parse(startsAt)) return []
+    const from = parts(startsAt, tz), to = parts(endsAt, tz)
+    return days.flatMap(day => {
+      if (day.date < from.date || day.date > to.date) return []
+      const start = day.date === from.date ? from.time : '00:00', end = day.date === to.date ? to.time : '24:00'
+      return start < end ? [{ day: day.date, start, end }] : []
+    })
+  }
+  const entries = sch.entries.flatMap(e => segments(e.startsAt, e.endsAt).map(slot => ({ id: e.id, ...slot, title: e.title, name: e.booking?.name ?? '' })))
+  const free = sch.availability.slots.flatMap(s => {
+    const original = parts(s.startsAt, tz)
+    // A clipped continuation is not a new bookable start. Keep the API candidate's original action.
+    return segments(s.startsAt, s.endsAt).map(slot => slot.day === original.date ? slot : { ...slot, bookingDay: original.date, bookingStart: original.time })
+  })
   const first = days[0]?.date ?? sch.from.slice(0, 10), last = days.at(-1)?.date ?? first
   const jp = (d: string) => { const x = new Date(`${d}T00:00:00Z`); return `${x.getUTCMonth() + 1}月${x.getUTCDate()}日（${WEEK[x.getUTCDay()]}）` }
-  return { title: `${jp(first)} 〜 ${jp(last)}`, from: first, to: last, days, entries, free }
+  return { title: `${jp(first)} 〜 ${jp(last)}`, from: first, to: last, days: days.map(day => ({ ...day, sub: day.closed ? '定休日' : free.some(slot => slot.day === day.date) ? `空き ${free.filter(slot => slot.day === day.date).length}` : '満' })), entries, free }
 }
 
 function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow[]): StyleMonth {

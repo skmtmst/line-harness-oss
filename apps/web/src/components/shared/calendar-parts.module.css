@@ -11,6 +11,7 @@
 .legendItem[data-state='star'] svg { color: var(--color-star-on); }
 .dayName { display: flex; flex-direction: column; min-inline-size: 0; }
 .dayName a { color: var(--color-accent-deep); font-size: var(--text-body); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.timeGrid { position: relative; min-inline-size: 0; block-size: calc(var(--tpl-sd-week-hour) * var(--calendar-hour-count) + var(--tpl-sd-board-top)); }
 .calendarPosition { position: absolute; min-inline-size: 0; pointer-events: none; }
 .calendarFree {
   position: absolute;
