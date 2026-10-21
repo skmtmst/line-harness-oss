@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /* 帯（Notice）。★管理画面 共通部品その2 §1 の4種類を1本で出す。 */
 import React from 'react'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Notice from './notice'
 
@@ -51,6 +51,28 @@ describe('帯（Notice）の4種類', () => {
       <Notice tone="warn" message="入力が要ります" action={<a href="/settings">設定を見る</a>} />,
     )
     expect(container.querySelector('a')!.textContent).toBe('設定を見る')
+    expect(container.firstElementChild!.hasAttribute('data-action-layout')).toBe(false)
+  })
+
+  it.each([false, true])('狭幅で操作を下へ置く帯でも本文・操作・閉じる口を保つ（図柄なし=%s）', withoutIcon => {
+    const onClose = vi.fn()
+    const { container } = render(
+      <Notice tone="warn" actionLayout="stack-on-narrow" icon={withoutIcon ? null : undefined}
+        message="いつもと違う端末からのログインです" action={<a href="/staff">端末を確認する</a>} onClose={onClose} />,
+    )
+    const notice = screen.getByRole('note')
+    expect(notice.getAttribute('data-action-layout')).toBe('stack-on-narrow')
+    expect(screen.getByText('いつもと違う端末からのログインです')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '端末を確認する' }).getAttribute('href')).toBe('/staff')
+    expect(container.querySelector('[role="note"] > svg[aria-hidden="true"]') === null).toBe(withoutIcon)
+    expect(notice.children.length).toBe(withoutIcon ? 3 : 4)
+    fireEvent.click(screen.getByRole('button', { name: '通知を閉じる' }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('操作が無い帯は配置を指定しても空の操作行を設けない', () => {
+    render(<Notice tone="info" actionLayout="stack-on-narrow" message="お知らせ" />)
+    expect(screen.getByRole('note').hasAttribute('data-action-layout')).toBe(false)
   })
 
   it('閉じる印は押すと onClose を呼ぶ', () => {

@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { adminSessionHeaders } from '@/lib/admin-session'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
-import NoteBar from '@/components/shared/note-bar'
-import styles from './unfamiliar-login-notice.module.css'
+import Notice from '@/components/shared/notice'
 
 /**
  * V-2: いつもと違う端末・場所からのログイン帯（管理画面-30 §14）。
@@ -40,9 +39,9 @@ export default function UnfamiliarLoginNotice() {
 
   if (!unfamiliarAt) return null
   return (
-    <NoteBar
+    <Notice
       tone="warn"
-      className={styles.notice}
+      actionLayout="stack-on-narrow"
       action={
         <Link href="/staff" className="text-action whitespace-nowrap text-xs font-medium underline underline-offset-2">
           ログイン中の端末を確認する
@@ -50,6 +49,6 @@ export default function UnfamiliarLoginNotice() {
       }
     >
       いつもと違う端末・場所からのログインです。このログイン中は大事な操作の前に毎回の本人確認を求めます。心当たりがなければ、他の端末のログインを終了してパスワードを変更してください。
-    </NoteBar>
+    </Notice>
   )
 }
