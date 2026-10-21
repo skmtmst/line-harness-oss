@@ -91,7 +91,7 @@ function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
 }
 
 export default function StyleDashboard({ style }: { style: IndustryStyle }) {
-  const { cfg, router, tab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, setLayout, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, cardDefaults, setCardDefaults, roster, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, KIND, saveClosure, addNew } = useStyleDashboard(style)
+  const { cfg, router, tab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, setLayout, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, cardDefaults, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, KIND, saveClosure, addNew } = useStyleDashboard(style)
 
   const viewErrors = useSaveFormErrors()
   const headActions = (
@@ -186,7 +186,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
             selectedId={style === 'lesson' ? (shownRoster ? shownRoster.rowId : null) : undefined} onSelect={style === 'lesson' ? (r) => setRosterId(r.id) : undefined} />
         </>
       )
-      if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} onLine={() => router.push('/broadcasts')} onCancelClass={() => router.push('/events')} />
+      if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} onLine={() => router.push('/broadcasts')} onCancelClass={() => { if (canWrite && rosterRow?.id === shownRoster.rowId) setClassRow(rosterRow) }} />
     }
     body = (
       <DetailColumns variant={shownRoster ? 'style-roster' : 'style-dashboard'} aside={aside} asideLabel="今日の動き" expanded={asideOpen} onExpandedChange={setAsideOpen}
