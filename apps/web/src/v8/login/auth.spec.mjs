@@ -99,6 +99,7 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
 })
 for (const width of [1152,1440,1920]) test(`low recovery-code banner is not covered by page content at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
+  await page.addInitScript(() => localStorage.setItem('lh_selected_account', 'visual-qa-account'))
   let remaining = 0
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())
@@ -110,10 +111,11 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
     }
     return route.fulfill({ response })
   })
-  for (const path of ['/friends', '/broadcasts', '/settings']) {
+  for (const path of ['/', '/friends', '/broadcasts', '/templates/new', '/templates/detail?id=template-1', '/chats', '/hq', '/settings']) {
     await page.goto(path)
     const notice = page.getByRole('note').filter({ hasText: '回復コードの残りが0個です' })
     await expect(notice).toBeVisible()
+    await expect(page.locator('[data-design-shell] [data-page-template]').first()).toBeVisible()
     const layout = await notice.evaluate(el => {
       const rect = el.getBoundingClientRect()
       const content = document.querySelector('[data-design-shell]')
@@ -126,7 +128,7 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
     expect(layout.textBottom).toBeLessThan(layout.noticeBottom)
     expect(layout.covered).toBe(false)
     expect(layout.overflow).toBe(0)
-    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`notice-${path.slice(1)}-${width}.png`) })
+    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`notice-${path.replace(/\W/g, '-') || 'home'}-${width}.png`) })
   }
   remaining = 8
   await page.reload()
