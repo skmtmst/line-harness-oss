@@ -37,8 +37,11 @@ function permissionKind(text: string): string | undefined {
 function readmeLicenseSection(source: string): { text: string; startLine: number; endLine: number } | undefined {
   const lines = source.split('\n');
   const title = /^\s*(?:#{1,6}\s+)?Licen[cs]e(?:\s+\([^)]*\))?\s*#*\s*$/i;
-  const start = lines.findIndex((line, index) => title.test(line)
-    && (/^\s*#/.test(line) || /^\s*[-=]{3,}\s*$/.test(lines[index + 1] ?? '')));
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (title.test(lines[i]!)
+      && (/^\s*#/.test(lines[i]!) || /^\s*[-=]{3,}\s*$/.test(lines[i + 1] ?? ''))) { start = i; break; }
+  }
   if (start < 0) return undefined;
   let end = lines.length;
   for (let i = start + 2; i < lines.length; i++) {
