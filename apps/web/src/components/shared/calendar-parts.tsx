@@ -55,7 +55,7 @@ export function CalendarTimeEntries({ days, entries, free, canWrite, position, o
             {visible.map(({ value: entry, lane }, index) => {
               const label = `${entry.start}〜${entry.end} ${entry.title} ${entry.name}`
               return <div key={entry.id} className={styles.calendarPosition} style={position(entry.start, entry.end, dayIndex, days.length)}>
-                <BookingBlock placement="calendar" tone="line" style={laneStyle(group.peak >= 3 ? index : lane, lanes, group.peak === 1 ? bookingLanes : 1)} title={label} aria-label={label} onClick={() => onOpen(entry.id)}>
+                <BookingBlock placement="calendar" tone="confirmed" style={laneStyle(group.peak >= 3 ? index : lane, lanes, group.peak === 1 ? bookingLanes : 1)} title={label} aria-label={label} onClick={() => onOpen(entry.id)}>
                   <TruncatedText value={entry.title} /><TruncatedText value={entry.name} />
                 </BookingBlock>
               </div>
