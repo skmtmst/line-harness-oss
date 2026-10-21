@@ -87,3 +87,40 @@ describe('支払いの分析', () => {
     expect(retry).toHaveBeenCalledOnce()
   })
 })
+
+describe('概要の支払い内訳も同じ正規集計を使う', () => {
+  const overview = (style: IndustryStyle, payments: StyleDashboardPayments | undefined) => toAnalytics(style, { ...snapshot(), payments }, style === 'restaurant' ? 'reservations' : 'overview', {})
+  it.each<IndustryStyle>(['restaurant', 'salon', 'consult', 'lesson'])('%sの概要は実入金・返金・期限切れを出し、未提供の割合と予定額を作らない', style => {
+    const data = overview(style, payment)
+    expect(data.side.find(card => card.id === 'pay')?.rows).toEqual([
+      { label: '入金額（オンライン）', value: '¥12,345' }, { label: '先払いの割合', value: '—' },
+      { label: '店舗払い（予定の額）', value: '—' }, { label: '返金', value: '1件 ¥1,200' }, { label: '期限切れの枠', value: '4件' },
+    ])
+    render(<StyleAnalyticsView data={data} error={false} onTab={() => {}} onRetry={() => {}} onRowOpen={() => {}} />)
+    const side = screen.getByLabelText('お支払い（この期間）')
+    expect(within(side).getByText('¥12,345')).toBeTruthy()
+    expect(within(side).getByText('1件 ¥1,200')).toBeTruthy()
+    expect(within(side).getByText('4件')).toBeTruthy()
+  })
+
+  it.each([
+    ['missing', undefined], ['forbidden', { status: 'forbidden' } as const], ['unavailable', { status: 'unavailable' } as const],
+    ['today-only', { ...payment, period: undefined }], ['wrong-period', { ...payment, period: { ...period, to: '2026-10-16T15:00:00Z' } }],
+    ['wrong-zone', { ...payment, period: { ...period, timeZone: 'UTC' } }],
+  ])('%sの概要は他期間・無権限の値や0を出さない', (_label, value) => {
+    const data = overview('salon', value)
+    const side = data.side.find(card => card.id === 'pay')!
+    expect(side.rows.every(row => row.value === '—')).toBe(true)
+    expect(side.note).toContain(value?.status === 'forbidden' ? '権限がありません' : value?.status === 'unavailable' ? '利用できません' : 'まだ取得できていません')
+    expect(data.cards.find(card => card.id === 'bookings')?.valueText).toBe('17')
+    expect(data.chart).toBeTruthy()
+  })
+
+  it('概要でも実測の0円/0件と個別欠測を分ける', () => {
+    const data = overview('salon', { ...payment, paidAmount: 0, refundedCount: 0, refundedAmount: 0, expiredCount: 0 })
+    const rows = data.side.find(card => card.id === 'pay')!.rows
+    expect(rows.map(row => row.value)).toEqual(['¥0', '—', '—', '0件 ¥0', '0件'])
+    const partial = overview('salon', { ...payment, paidAmount: undefined, refundedAmount: undefined } as unknown as StyleDashboardPayments)
+    expect(partial.side.find(card => card.id === 'pay')!.rows.map(row => row.value)).toEqual(['—', '—', '—', '1件 —', '4件'])
+  })
+})

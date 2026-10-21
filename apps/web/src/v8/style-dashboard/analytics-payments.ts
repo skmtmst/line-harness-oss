@@ -4,7 +4,7 @@ import { formatDate } from '@/lib/format'
 import type { StyleAnalytics } from './model'
 
 /** Payment dates use their own window; a today's-only response cannot fill it. */
-export function paymentAnalytics(snapshot: StyleSnapshot, tabs: StyleAnalytics['tabs']): StyleAnalytics {
+function paymentWindowData(snapshot: StyleSnapshot) {
   const payment = snapshot.payments
   const values = payment?.status === 'available' ? payment : null
   const period = values?.period
@@ -15,6 +15,11 @@ export function paymentAnalytics(snapshot: StyleSnapshot, tabs: StyleAnalytics['
     : payment?.status === 'unavailable'
       ? { kind: 'unavailable', description: 'このアカウントの支払い集計は利用できません。' }
       : !matches ? { kind: 'unmeasured', description: '選択した期間の支払い集計はまだ取得できていません。' } : undefined
+  return { values: availability ? null : values, availability }
+}
+
+export function paymentAnalytics(snapshot: StyleSnapshot, tabs: StyleAnalytics['tabs']): StyleAnalytics {
+  const { values, availability } = paymentWindowData(snapshot)
   const definitions = [
     ['paidAmount', '入金額', '入金した日が期間内の金額です。返金額を差し引く前の金額です。', true],
     ['paidCount', '入金件数', '入金した日が期間内の支払いの件数です。', false],
@@ -35,5 +40,24 @@ export function paymentAnalytics(snapshot: StyleSnapshot, tabs: StyleAnalytics['
       { id: 'period', title: '集計期間', rows: [], note: `${day(snapshot.from)}〜${day(Date.parse(snapshot.to) - 1)}（${snapshot.timeZone}）。` },
       { id: 'how', title: '数え方', rows: [], note: '入金は入金した日、返金は返金した日で数えます。予約日・来店日や見込み売上とは別の数です。' },
     ],
+  }
+}
+
+/** The overview uses the same transaction window and permissions as the payment tab. */
+export function paymentAnalyticsSide(snapshot: StyleSnapshot): StyleAnalytics['side'][number] {
+  const { values, availability } = paymentWindowData(snapshot)
+  const money = (value: number | undefined) => typeof value === 'number' && Number.isFinite(value) ? formatYen(value) : '—'
+  const count = (value: number | undefined) => typeof value === 'number' && Number.isFinite(value) ? `${value.toLocaleString('ja-JP')}件` : '—'
+  return {
+    id: 'pay', title: 'お支払い（この期間）', help: '入金は入金した日、返金は返金した日で数えます。予約日・来店日とは別です。',
+    rows: [
+      { label: '入金額（オンライン）', value: money(values?.paidAmount) },
+      { label: '先払いの割合', value: '—' },
+      { label: '店舗払い（予定の額）', value: '—' },
+      { label: '返金', value: values ? `${count(values.refundedCount)} ${money(values.refundedAmount)}` : '—' },
+      { label: '期限切れの枠', value: count(values?.expiredCount) },
+    ],
+    action: { label: 'お支払いを見る', icon: 'send' },
+    note: [availability?.description, '売上（料金×確定数）と入金額は別の数です。'].filter(Boolean).join(''),
   }
 }

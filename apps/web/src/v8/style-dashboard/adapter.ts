@@ -1,6 +1,6 @@
 import { formatYen as yen } from '@line-crm/shared';
 import { styleTerm, term } from '@/lib/terms'
-import { paymentAnalytics } from './analytics-payments'
+import { paymentAnalytics, paymentAnalyticsSide } from './analytics-payments'
 import { dailyAnalyticsSeries } from './analytics-daily'
 import type { StyleAnalyticsData, StyleBooking, StyleCard, StyleMetric, StyleSchedule, StyleScheduleEntry, StyleSnapshot } from '@line-crm/shared'
 import type {
@@ -331,7 +331,7 @@ export function toAnalytics(style: IndustryStyle, s: StyleSnapshot & { analytics
     table = { title: 'コースごとの予約', help: 'コース（メニュー）ごとの数です。', columns: [{ label: 'コース' }, { label: '予約', align: 'right' }, { label: '来店', align: 'right' }, { label: '取消', align: 'right' }, { label: '無断率', align: 'right' }], rows: mn.map((r) => ({ id: r.menuId, name: names[r.menuId] ?? (r.menuId === 'null' || !r.menuId ? '席のみ' : r.menuId), sub: '', cells: [cell(r.bookings), cell(r.visits), cell(r.cancellations), cell(r.noShowRate)] })) }
   }
   const side: StyleAnalytics['side'] = [
-    { id: 'pay', title: 'お支払い（この期間）', help: '入金・先払い・返金は決済の口（Stripe）から出します。', rows: [{ label: '入金額・先払いの割合・返金', value: '—' }], action: { label: 'お支払いを見る', icon: 'send' }, note: '売上（料金×確定数）と入金額は別の数です。' },
+    paymentAnalyticsSide(s),
     { id: 'how', title: '数え方', rows: [], note: style === 'consult' ? '面談日で数えます。予約が入った日で数えるのは「新着予約」だけです。' : '来店日・開催日で数えます。予約が入った日で数えるのは「新着予約」だけです。' },
   ]
   return { tabs, tab: tabs.some((t) => t.id === tab) ? tab : tabs[0].id, cards, chart, table, side }
