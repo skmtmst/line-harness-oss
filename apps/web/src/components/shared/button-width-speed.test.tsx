@@ -6,10 +6,33 @@ import Button from './button'
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   delete document.documentElement.dataset.theme
 })
 
 describe('保存中・完了のボタン幅', () => {
+  it('非表示で取り付けた操作は、幅が分かるまで固定せず、表示されたときに全文の幅を予約する', () => {
+    let visible = false
+    let notify = () => {}
+    const disconnect = vi.fn()
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { notify = callback }
+      observe() {}
+      disconnect = disconnect
+    })
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(() => visible ? 100 : 0)
+    const create = vi.fn()
+    render(<Button busy={false} busyLabel="下書きを作成中" onClick={create}>フォームを作る</Button>)
+    const button = screen.getByRole('button')
+    expect(button.style.width).toBe('')
+    visible = true
+    act(() => notify())
+    expect(button.style.width).toBe('121px')
+    expect(disconnect).toHaveBeenCalled()
+    fireEvent.click(button)
+    expect(create).toHaveBeenCalledTimes(1)
+  })
+
   it('保存文が短→長→短に変わるたび、前の固定幅を外して全文を測る', () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
       return parseFloat(this.style.width) || (this.textContent?.includes('か所') ? 240 : 100)

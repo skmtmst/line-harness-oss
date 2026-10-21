@@ -120,27 +120,35 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
     }
     return route.fulfill({ response })
   })
-  for (const path of ['/', '/friends', '/broadcasts', '/templates/edit', '/templates/detail?id=template-1', '/chats', '/hq', '/settings']) {
+  for (const path of ['/', '/friends', '/broadcasts', '/form-submissions', '/templates/edit', '/templates/detail?id=template-1', '/chats', '/hq', '/settings']) {
     await page.goto(path)
     const notice = page.getByRole('note').filter({ hasText: '回復コードの残りが0個です' })
     await expect(notice).toBeVisible()
     const frame = page.locator('[data-design-shell] [data-page-template]').first()
     await expect(frame).toBeVisible()
-    // Account/style loading can replace the first frame. Measure the attached
-    // frame itself; an empty content wrapper is not a page-layout measurement.
-    const layout = await frame.evaluate(next => {
+    // Account/style loading can replace the first frame. Resolve both nodes in
+    // the same DOM read, so a detached loading frame cannot produce a zero box.
+    await expect.poll(() => page.evaluate(() => {
       const el = [...document.querySelectorAll('#main-content > [data-design-part="notice"]')].find(node => node.textContent.includes('回復コードの残りが0個です'))
       if (!el) throw new Error('The low-code notice is missing from the main board')
+      const next = [...document.querySelectorAll('#main-content [data-page-template]')].find(node => node.getBoundingClientRect().width > 0)
+      if (!next) return null
       const rect = el.getBoundingClientRect()
       const text = el.querySelector('span:last-child').getBoundingClientRect()
       const painted = document.elementFromPoint(rect.x + rect.width / 2, rect.bottom - 2)
-      return { gap: next.getBoundingClientRect().top - rect.bottom, textBottom: text.bottom, noticeBottom: rect.bottom, covered: !el.contains(painted), overflow: document.documentElement.scrollWidth - innerWidth }
-    })
+      return { separated: next.getBoundingClientRect().top >= rect.bottom, textInside: text.bottom < rect.bottom, uncovered: el.contains(painted), overflow: document.documentElement.scrollWidth - innerWidth }
+    })).toEqual({ separated: true, textInside: true, uncovered: true, overflow: 0 })
     await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`notice-${path.replace(/\W/g, '-') || 'home'}-${width}.png`) })
-    expect(layout.gap).toBeGreaterThanOrEqual(0)
-    expect(layout.textBottom).toBeLessThan(layout.noticeBottom)
-    expect(layout.covered).toBe(false)
-    expect(layout.overflow).toBe(0)
+    if (path === '/form-submissions') {
+      const create = page.getByRole('button', { name: 'フォームを作る', exact: true })
+      await expect(create).toBeVisible()
+      await expect.poll(() => create.evaluate(el => {
+        const text = document.createRange()
+        text.selectNodeContents(el)
+        const label = text.getBoundingClientRect(), button = el.getBoundingClientRect()
+        return label.left >= button.left && label.right <= button.right
+      })).toBe(true)
+    }
   }
   remaining = 8
   await page.reload()
