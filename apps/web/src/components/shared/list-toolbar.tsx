@@ -8,7 +8,7 @@ import SearchField from './search-field'
 import FilterChip from './filter-chip'
 import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
-import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth, fitToolbarOverflowPanel } from './list-toolbar-fit.mjs'
+import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth, fitToolbarOverflowPanel, observeToolbarContent } from './list-toolbar-fit.mjs'
 
 function useToolbarFit() {
   const ref = useRef<HTMLDivElement>(null)
@@ -241,6 +241,8 @@ function InlineOptional({ children }: { children: ReactNode }) {
 
 function OverflowTools({ children, label }: { children: ReactNode; label: string }) {
   const ref = useRef<HTMLDetailsElement>(null), expandedWidth = useRef(0)
+  const contentObserver = useRef<ReturnType<typeof observeToolbarContent> | null>(null)
+  const measuredChildren = useRef(children)
   const [collapsed, setCollapsed] = useState(false)
   useLayoutEffect(() => {
     const item = ref.current
@@ -255,14 +257,12 @@ function OverflowTools({ children, label }: { children: ReactNode; label: string
       if (!item.hasAttribute('data-collapsed')) expandedWidth.current = fitToolbarOptionalWidth(item)
       setCollapsed(!toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100)).fits)
     }
-    let frame = 0
-    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
-    const observer = new ResizeObserver(queue)
-    observer.observe(toolbar)
-    item.addEventListener('toggle', queue)
-    for (const tool of toolbar.querySelectorAll('button,input')) observer.observe(tool)
-    measure(); void document.fonts?.ready.then(measure)
-    return () => { item.removeEventListener('toggle', queue); cancelAnimationFrame(frame); observer.disconnect() }
+    const observer = observeToolbarContent(item, () => [toolbar, ...toolbar.querySelectorAll('button,input')], measure, true)
+    contentObserver.current = observer
+    return () => { contentObserver.current = null; observer.stop() }
+  }, [])
+  useLayoutEffect(() => {
+    if (measuredChildren.current !== children) { measuredChildren.current = children; contentObserver.current?.refresh() }
   }, [children])
   return <details ref={ref} className={styles.optional} data-toolbar-tool data-toolbar-optional data-toolbar-overflow-group data-collapsed={collapsed || undefined} open={collapsed ? undefined : true}
     onKeyDown={event => { if (event.key === 'Escape' && collapsed) { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}>
@@ -316,6 +316,8 @@ function compactFilterGroups(node: ReactNode, preserveChips = false): ReactNode 
 export function ResponsiveFilterChips({ children, label = '状態', preserveChips = false }: { children: ReactNode; label?: string; preserveChips?: boolean }) {
   const ref = useRef<HTMLSpanElement>(null)
   const unfoldedWidth = useRef(0)
+  const contentObserver = useRef<ReturnType<typeof observeToolbarContent> | null>(null)
+  const measuredChildren = useRef(children)
   const [collapsed, setCollapsed] = useState(false)
   useLayoutEffect(() => {
     const choices = ref.current
@@ -327,17 +329,17 @@ export function ResponsiveFilterChips({ children, label = '状態', preserveChip
     const measure = () => {
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
-      choices.dataset.filterWidth = String(unfoldedWidth.current)
+      const width = String(unfoldedWidth.current)
+      if (choices.dataset.filterWidth !== width) choices.dataset.filterWidth = width
       setCollapsed(!toolbarContentFit(toolbar, null, 0, true, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100)).fits)
     }
-    let frame = 0
-    const queue = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure) }
-    const observer = new ResizeObserver(queue)
-    observer.observe(toolbar); observer.observe(choices)
-    measure()
-    void document.fonts?.ready.then(measure)
-    return () => { cancelAnimationFrame(frame); observer.disconnect() }
-  }, [children, preserveChips])
+    const observer = observeToolbarContent(choices, () => [toolbar, choices], measure)
+    contentObserver.current = observer
+    return () => { contentObserver.current = null; observer.stop() }
+  }, [preserveChips])
+  useLayoutEffect(() => {
+    if (measuredChildren.current !== children) { measuredChildren.current = children; contentObserver.current?.refresh() }
+  }, [children])
   const chips = Children.toArray(children).filter(isValidElement<React.ComponentProps<typeof FilterChip>>)
   const text = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<{ children?: ReactNode }>(child) ? text(child.props.children) : String(child)).join('')
   const selected = chips.map((child,index) => child.props.selected ? index : -1).filter(index => index >= 0)
