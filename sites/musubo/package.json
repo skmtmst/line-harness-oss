@@ -2,7 +2,7 @@
   "name": "musubo-service-site",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": { "node": "^22.23.4 || ^24.22.1 || ^26.12.1" },
   "scripts": {
     "build": "node build.mjs",
     "build:production": "node build.mjs --production",
