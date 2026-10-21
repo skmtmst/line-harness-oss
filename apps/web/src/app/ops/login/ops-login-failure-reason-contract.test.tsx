@@ -13,6 +13,14 @@ import OpsLoginPage from './page'
 
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: 'musubo' }) }))
+vi.mock('@/lib/auth-email', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/lib/auth-email')>(),
+  TURNSTILE_SITE_KEY: 'fixture-public-site-key',
+}))
+vi.mock('@/components/auth/turnstile', () => ({ default: function VerifiedTurnstile({ onToken }: { onToken: (token: string) => void }) {
+  React.useEffect(() => { onToken('fixture-turnstile-token') }, [onToken])
+  return null
+} }))
 
 let host: HTMLDivElement
 let root: Root
