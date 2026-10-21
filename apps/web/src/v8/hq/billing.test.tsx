@@ -96,6 +96,16 @@ afterEach(async () => {
 })
 
 describe('V8 統括の請求：いまのプランと変えるボタン', () => {
+  it('集計の項目が届かなければ未取得を出し、欠けた数を文字列や0で表示しない', async () => {
+    metrics.mockResolvedValue({ success: true, data: {} })
+    await render(baseSummary({}))
+    const band = document.querySelector('[data-template-region="stats"]')!
+    expect(band.textContent).toContain('未取得')
+    expect(band.textContent).not.toContain('undefined')
+    expect(band.textContent).not.toContain('NaN')
+    expect(band.textContent).not.toContain('0アカウント')
+  })
+
   it('保存済み集計を表示し、実測0・未取得・統括単位の契約を区別する', async () => {
     metrics.mockResolvedValue({ success: true, data: {
       thisMonthBilledYen: 0, contractCount: 1, activeAccountCount: 5,

@@ -3074,6 +3074,9 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   if (method === 'GET' && pathname === '/api/hq/billing/summary') {
     return { success: true, data: BILLING_SUMMARY }
   }
+  if (method === 'GET' && pathname === '/api/hq/billing/metrics') {
+    return { success: true, data: { period: {}, unavailable: {}, thisMonthBilledYen: 29800, contractCount: 1, contractUnit: 'organization', activeAccountCount: 5, contractAccountCount: null, trialCount: 0, unpaidInvoiceCount: 1, paymentFailureCount: null, nextBillingAt: '2026-11-01T00:00:00+09:00', source: 'stored_invoices', observedInvoiceCount: 3, lastSyncedAt: null } }
+  }
   if (method === 'GET' && pathname === '/api/hq/billing/invoices') {
     return { success: true, data: BILLING_INVOICES }
   }

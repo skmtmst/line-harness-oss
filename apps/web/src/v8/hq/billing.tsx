@@ -211,7 +211,7 @@ function BillingInner() {
       stats={status === 'ready' && canManageRole(role) ? (
         <KpiBand>
           <KpiCard title="今月の請求" value={metrics?.thisMonthBilledYen} valueText={metrics?.thisMonthBilledYen != null ? yen(metrics.thisMonthBilledYen) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.thisMonthBilledYen == null ? '今月の請求は未取得' : '保存済みの請求から集計'} loading={metricsLoading} onRetry={metricsFailed ? () => setMetricsAttempt((attempt) => attempt + 1) : undefined} />
-          <KpiCard title="契約中" value={metrics?.contractCount} unit="契約" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics ? `稼働中 ${metrics.activeAccountCount}アカウント・トライアル ${metrics.trialCount}` : '未取得'} help="統括単位の契約数です。LINEアカウントごとの契約数ではありません。" loading={metricsLoading} />
+          <KpiCard title="契約中" value={metrics?.contractCount} unit="契約" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.activeAccountCount != null && metrics.trialCount != null ? `稼働中 ${metrics.activeAccountCount}アカウント・トライアル ${metrics.trialCount}` : '未取得'} help="統括単位の契約数です。LINEアカウントごとの契約数ではありません。" loading={metricsLoading} />
           <KpiCard title="未払い" value={metrics?.unpaidInvoiceCount} unit="件" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.unpaidInvoiceCount == null ? '請求の記録は未取得' : '保存済みの請求から集計'} loading={metricsLoading} />
           <KpiCard title="次の請求日" value={null} valueText={metrics?.nextBillingAt ? polishFormatDate(metrics.nextBillingAt, { style: 'list-day' }) : undefined} unit="" detail={metricsLoading ? '読み込んでいます' : metricsFailed ? '読み込めませんでした' : metrics?.nextBillingAt ? '現在の契約の更新日' : '予定は未取得'} loading={metricsLoading} />
         </KpiBand>
