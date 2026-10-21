@@ -20,10 +20,13 @@ const INDUSTRY: readonly UsageStyle[] = ['restaurant', 'salon', 'consult', 'less
 
 export default function HomeDashboard() {
   const { selectedAccountId } = useAccount()
-  const qrRequested = useSearchParams().has('qr')
+  const params = useSearchParams()
+  const qrRequested = params.has('qr')
+  const setupParam = params.get('setup')
+  const setupRequested = setupParam === 'summary' || (setupParam !== null && /^\d+$/.test(setupParam))
   const profile = useAccountStyle(selectedAccountId)
-  // 受信の確認から開くQRは、業種に関係なく既存のQR画面へつなぐ。
-  if (qrRequested) return <StandardDashboard usageStyle={profile.data?.style === 'ec' ? 'ec' : 'standard'} />
+  // QR・質問の再開は業種より先に既存の共通画面へ渡す。閉じると業種のホームへ戻る。
+  if (qrRequested || setupRequested) return <StandardDashboard key={selectedAccountId} usageStyle={profile.data?.style === 'ec' ? 'ec' : 'standard'} />
   if (selectedAccountId && !profile.data) return <PageFrame kind="dashboard"><PageHeading title="ダッシュボード" /><PageContent layout="stats">
     {profile.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={profile.error} onRetry={profile.reload} /> : <ListState kind="loading" title="使い方のスタイルを確認しています" />}
   </PageContent></PageFrame>

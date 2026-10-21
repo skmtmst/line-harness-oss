@@ -654,6 +654,17 @@ describe('style setup', () => {
   });
 });
 describe('industry metrics', () => {
+  test('no-show help uses the configured period and keeps the same numerator and denominator', async () => {
+    booking('recent-no-show', '2026-10-14T01:00:00Z', 'no_show');
+    booking('older-confirmed', '2026-10-01T01:00:00Z');
+    await write('', { expectedVersion: 1, style: 'salon', settings: { noShowDays: 7, minimumSample: 1 } });
+    const snapshot = await styleSnapshot(db, 'a', 'salon', {});
+    expect(snapshot.metrics.noShowRate).toMatchObject({
+      value: 1, numerator: 1, denominator: 1,
+      formula: '過去7日の無断 / （予約 − 取消 − 押さえ）',
+    });
+  });
+
   test('visit dates and newly-created dates are different and timezone days are honored', async () => {
     booking('today', '2026-10-15T01:00:00Z');
     booking('tomorrow', '2026-10-16T01:00:00Z', 'confirmed', 'g', 's', {

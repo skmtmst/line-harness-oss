@@ -15,6 +15,19 @@ beforeEach(() => { window.localStorage.clear(); fixture.accountId = 'account-1';
 afterEach(cleanup)
 
 describe('ホームから初期案内のQRを開く', () => {
+  it.each(['standard', 'ec', 'restaurant', 'salon', 'consult', 'lesson'].flatMap((style) => ['0', 'summary'].map((step) => [style, step])))('%sからsetup=%sを開くと既存の質問画面へ進み、閉じると業種へ戻る', async (style, step) => {
+    fixture.get.mockResolvedValue({ success: true, data: { style } })
+    fixture.search = `setup=${step}`
+    const view = render(<HomeDashboard />)
+    expect(await screen.findByRole('region', { name: 'QRを開けるホーム' })).toBeTruthy()
+    expect(screen.queryByRole('region', { name: `${style}のホーム` })).toBeNull()
+    fixture.search = ''
+    view.rerender(<HomeDashboard />)
+    if (style === 'standard' || style === 'ec') {
+      await waitFor(() => expect(screen.getByRole('region', { name: 'QRを開けるホーム' }).getAttribute('data-usage-style')).toBe(style))
+    } else expect(await screen.findByRole('region', { name: `${style}のホーム` })).toBeTruthy()
+  })
+
   it.each(['restaurant', 'salon', 'consult', 'lesson'])('%sを選んだ店でもQRの行き先を優先し、閉じた後は業種の画面へ戻る', async (style) => {
     window.localStorage.setItem('lh_usage_style:account-1', style)
     fixture.get.mockResolvedValue({ success: true, data: { style } })
