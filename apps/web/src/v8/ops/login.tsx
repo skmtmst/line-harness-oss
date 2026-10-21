@@ -3,13 +3,14 @@
 import { beginAdminLoginHandoff, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 import { LogIn, MessageCircle } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import PasswordField from '@/components/auth/password-field'
+import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
-import { authRequest, emailError, internalAuthFailureCopy } from '@/lib/auth-email'
+import { authRequest, emailError, internalAuthFailureCopy, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import styles from './auth.module.css'
 import { Field } from '@/components/shared/form-controls'
@@ -39,8 +40,19 @@ export default function OpsLoginV8() {
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'password' | 'line' | null>(null)
   const [error, setError] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileHandle | null>(null)
+  const setTurnstileHandle = useCallback((handle: TurnstileHandle | null) => {
+    turnstileRef.current = handle
+  }, [])
 
   useEffect(() => {
+    const restore = (event: PageTransitionEvent) => {
+      if (!event.persisted) return
+      setBusy(null)
+      turnstileRef.current?.reset()
+    }
+    window.addEventListener('pageshow', restore)
     const errorCode = new URLSearchParams(window.location.search).get('error')
     if (errorCode === 'not_authorized') {
       setError('このアカウントは運営メンバーに登録されていません。ほかの運営メンバーに追加を依頼してください。')
@@ -51,6 +63,7 @@ export default function OpsLoginV8() {
     } else if (errorCode) {
       setError('ログインを完了できませんでした。もう一度お試しください。')
     }
+    return () => window.removeEventListener('pageshow', restore)
   }, [])
 
   const submit = async (event: FormEvent) => {
@@ -62,13 +75,19 @@ export default function OpsLoginV8() {
       setError('パスワードを入力してください')
       return
     }
+    if (!turnstileToken) {
+      setError('「私はロボットではありません」の確認を済ませてください')
+      return
+    }
     setBusy('password')
     setError('')
     const res = await authRequest<{ twoFactor: boolean; twoFactorSetup?: boolean; challengeToken?: string; sessionToken?: string }>('/api/auth/password/login', {
       email: email.trim(),
       password,
       next: 'ops',
+      turnstileToken,
     })
+    turnstileRef.current?.reset()
     if (!res.ok || !res.data) {
       setError(internalAuthFailureCopy(res.status, res.error) ?? res.error ?? 'ログインできませんでした')
       setBusy(null)
@@ -149,7 +168,8 @@ export default function OpsLoginV8() {
             /></SaveErrorField>
 {emailMessage ? <p id="ops-login-email-error" className={styles.error}>{emailMessage}</p> : null}</Field></div>
           <div className={styles.field}><Field label={<>パスワード</>} htmlFor="ops-login-password" required><PasswordField id="ops-login-password" value={password} onChange={setPassword} autoComplete="current-password" /></Field></div>
-          <Button fullWidth type="submit" variant="primary" disabled={busy !== null} className={styles.wide} busy={busy === 'password'} busyLabel="ログインしています…">
+          <Turnstile onToken={setTurnstileToken} handleRef={setTurnstileHandle} />
+          <Button fullWidth type="submit" variant="primary" disabled={busy !== null || !TURNSTILE_SITE_KEY} className={styles.wide} busy={busy === 'password'} busyLabel="ログインしています…">
             <LogIn aria-hidden="true" />ログイン
           </Button>
         </form>

@@ -4,15 +4,16 @@ import { beginAdminLoginHandoff, twoFactorChallengeHandoffPath } from '@/lib/adm
 
 import { MessageCircle } from 'lucide-react'
 import Link from 'next/link'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
+import Turnstile, { type TurnstileHandle } from '@/components/auth/turnstile'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
-import { authRequest, emailError } from '@/lib/auth-email'
+import { authRequest, emailError, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
@@ -40,6 +41,11 @@ export default function LoginPage() {
   const [emailMessage, setEmailMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'password' | 'line' | null>(null)
   const [error, setError] = useState('')
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileHandle | null>(null)
+  const setTurnstileHandle = useCallback((handle: TurnstileHandle | null) => {
+    turnstileRef.current = handle
+  }, [])
 
   // R613: 空パスワードの案内は入力が始まったら消す。
   // 認証失敗・通信失敗・権限エラーなど別の原因の表示は次の送信まで残す。
@@ -49,6 +55,12 @@ export default function LoginPage() {
   }
 
   useEffect(() => {
+    const restore = (event: PageTransitionEvent) => {
+      if (!event.persisted) return
+      setBusy(null)
+      turnstileRef.current?.reset()
+    }
+    window.addEventListener('pageshow', restore)
     const errorCode = new URLSearchParams(window.location.search).get('error')
     if (errorCode === 'not_authorized') {
       setError('このLINEアカウントには管理者権限がありません。オーナーに追加を依頼してください。')
@@ -57,6 +69,7 @@ export default function LoginPage() {
     } else if (errorCode) {
       setError('ログインを完了できませんでした。もう一度お試しください。')
     }
+    return () => window.removeEventListener('pageshow', restore)
   }, [])
 
   const submit = async (event: FormEvent) => {
@@ -68,13 +81,19 @@ export default function LoginPage() {
       setError(EMPTY_PASSWORD_MESSAGE)
       return
     }
+    if (!turnstileToken) {
+      setError('「私はロボットではありません」の確認を済ませてください')
+      return
+    }
     setBusy('password')
     setError('')
     const res = await authRequest<{ twoFactor: boolean; twoFactorSetup?: boolean; challengeToken?: string; sessionToken?: string }>('/api/auth/password/login', {
       email: email.trim(),
       password,
       remember,
+      turnstileToken,
     })
+    turnstileRef.current?.reset()
     if (!res.ok || !res.data) {
       setError(res.error || 'ログインできませんでした')
       setBusy(null)
@@ -133,6 +152,7 @@ export default function LoginPage() {
         <AuthField label="パスワード" htmlFor="login-password">
           <PasswordField id="login-password" value={password} onChange={handlePasswordChange} autoComplete="current-password" />
         </AuthField>
+        <Turnstile onToken={setTurnstileToken} handleRef={setTurnstileHandle} />
         <Checkbox
           checked={remember}
           onCheckedChange={setRemember}
@@ -142,7 +162,7 @@ export default function LoginPage() {
             パスワードを忘れた方はこちら
           </Link>
         </div>
-        <Button fullWidth type="submit" variant="primary" disabled={busy !== null} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
+        <Button fullWidth type="submit" variant="primary" disabled={busy !== null || !TURNSTILE_SITE_KEY} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
         </Button>
       </form>
 
