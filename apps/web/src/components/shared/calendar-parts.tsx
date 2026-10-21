@@ -88,12 +88,12 @@ export function CalendarTimeEntries({ days, entries, free, canWrite, position, o
   </>
   return <>
     {hourCount ? <div className={styles.timeGrid} style={{ '--calendar-hour-count': hourCount } as CSSProperties}>{grid}</div> : grid}
-    {expanded ? <Dialog open dirty={false} title={`この時間帯の予約（${expanded.length}件）`} onCancel={() => setExpanded(null)}>
+    {expanded ? <Dialog open title={`この時間帯の予約（${expanded.length}件）`} onCancel={() => setExpanded(null)}>
       <div className={styles.calendarList}>{expanded.map(entry => <RowNameButton key={entry.id} title={`${entry.start}〜${entry.end} ${entry.title} ${entry.name}`} onClick={() => { setExpanded(null); onOpen(entry.id) }}>
         <TruncatedText value={`${entry.start}〜${entry.end} ${entry.title} ${entry.name}`} />
       </RowNameButton>)}</div>
     </Dialog> : null}
-    {canWrite && expandedFree ? <Dialog open dirty={false} title={`予約を入れる時刻（${expandedFree.length}件）`} onCancel={() => setExpandedFree(null)}>
+    {canWrite && expandedFree ? <Dialog open title={`予約を入れる時刻（${expandedFree.length}件）`} onCancel={() => setExpandedFree(null)}>
       <div className={styles.calendarList}>{expandedFree.map((slot, index) => <RowNameButton key={`${slot.day}-${slot.start}-${index}`} onClick={() => { setExpandedFree(null); onSlot(slot.bookingDay ?? slot.day, slot.bookingStart ?? slot.start) }}>
         <TruncatedText value={slot.bookingDay ? `${slot.bookingDay} ${slot.bookingStart}からの空きに予約を入れる` : `${slot.day} ${slot.start}〜${slot.end}に予約を入れる`} />
       </RowNameButton>)}</div>
