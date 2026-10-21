@@ -177,6 +177,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [loadFailed, setLoadFailed] = useState(false)
   const [createdId, setCreatedId] = useState<string | null>(null)
   const [saveFailed, setSaveFailed] = useState(false)
+  const editVersion = useRef<{ expectedVersion?: number; expectedDraftRevision?: number }>({})
   const savingRef = useRef(false)
   const [folderId, setFolderId] = useState<string | null>(null)
   const [folders, setFolders] = useState<Folder[]>([])
@@ -217,6 +218,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     void api.templates.get(id)
       .then((res) => {
         if (!res.success) { markLoadFailed(); return }
+        editVersion.current = { expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision }
         setName(res.data.name)
         setTemplateAccountId(res.data.accountId ?? null)
         setFolderId(res.data.folderId ?? null)
@@ -295,15 +297,16 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     setError('')
     setSaveFailed(false)
     try {
-      const res = await saveCarousel({ templateId: id ?? createdId, selectedAccountId, name, panels, folderId, tapLimitMode, tapLimitText, liffId })
+      const res = await saveCarousel({ ...editVersion.current, templateId: id ?? createdId, selectedAccountId, name, panels, folderId, tapLimitMode, tapLimitText, liffId })
       if (!res.ok) {
-        if (res.createdId) setCreatedId(res.createdId)
+        if (res.createdId) { setCreatedId(res.createdId); editVersion.current = { expectedVersion: res.expectedVersion, expectedDraftRevision: res.expectedDraftRevision } }
         if (res.tapExtraError) fields.setServerErrors(Object.fromEntries(panels.flatMap((p, ci) => p.actions.flatMap((a, ai) => a.tapExtras ? [[`card-${ci}-button-${ai}`, res.tapExtraError]] : []))))
         else setError(res.error)
         setSaveFailed(true)
         return null
       }
       /* 作成だけ済んだあとのやり直しが「作り直し」にならないよう覚える。 */
+      editVersion.current = { expectedVersion: res.expectedVersion, expectedDraftRevision: res.expectedDraftRevision }
       if (!id) setCreatedId(res.id)
       setSavedSnapshot(carouselSnapshot({ name, panels, folderId, tapLimitMode, tapLimitText }))
       return res.id
@@ -352,9 +355,10 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     if (inline && !distribute && panels.some((p) => p.actions.some((a) => a.kind === 'action'))) { setError('「動きを実行する」を入れるときは、テンプレートとしても保存してください。'); return }
     if (!hqHost && (distribute || panels.some((p) => p.actions.some((a) => a.kind === 'action')))) {
       savingRef.current = true; setSaving(true)
-      const saved = await saveCarousel({ templateId: createdId, selectedAccountId: folderAccountId, name: panels[0].title.trim() || name, panels, folderId: null, tapLimitMode, tapLimitText, liffId })
+      const saved = await saveCarousel({ ...editVersion.current, templateId: createdId, selectedAccountId: folderAccountId, name: panels[0].title.trim() || name, panels, folderId: null, tapLimitMode, tapLimitText, liffId })
       savingRef.current = false; setSaving(false)
-      if (!saved.ok) { if (saved.createdId) setCreatedId(saved.createdId); setError(saved.error); return }
+      if (!saved.ok) { if (saved.createdId) { setCreatedId(saved.createdId); editVersion.current = { expectedVersion: saved.expectedVersion, expectedDraftRevision: saved.expectedDraftRevision } } setError(saved.error); return }
+      editVersion.current = { expectedVersion: saved.expectedVersion, expectedDraftRevision: saved.expectedDraftRevision }
       backingId = saved.id; setCreatedId(saved.id)
     }
     savingRef.current = true; setSaving(true)

@@ -572,6 +572,8 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
       question?: unknown;
       questionStatus?: 'draft' | 'published';
       folderId?: string | null;
+      expectedVersion?: number;
+      expectedDraftRevision?: number;
     }>();
     const existing = await getTemplateById(c.env.DB, id);
     if (!existing || !await canAccessAllLineAccounts(
@@ -652,6 +654,14 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
       const extrasError = await validateTapExtraReferences(c.env.DB, extraTree, existing.line_account_id);
       if (extrasError) return c.json({ success: false, error: extrasError, code: 'TAP_EXTRA_INVALID', fieldErrors: { tapExtras: extrasError } }, 422);
     }
+    if (hasContentEdit && (!Number.isInteger(body.expectedVersion) || (body.expectedVersion ?? -1) < 0
+      || !Number.isInteger(body.expectedDraftRevision) || (body.expectedDraftRevision ?? -1) < 0)) {
+      return c.json({ success: false, code: 'TEMPLATE_DRAFT_CONFLICT', error: '編集した版を確認できません。入力を控えてから読み直してください' }, 409);
+    }
+    if (hasContentEdit && (body.expectedVersion !== Number(existing.published_version ?? 0)
+      || body.expectedDraftRevision !== Number(existing.draft_revision ?? 0))) {
+      return c.json({ success: false, code: 'TEMPLATE_DRAFT_CONFLICT', error: 'ほかの編集が保存されています。変更内容を確認してから読み直してください' }, 409);
+    }
     const metadataUpdates: {
       name?: string;
       category?: string;
@@ -660,11 +670,15 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
     if (body.name !== undefined) metadataUpdates.name = body.name;
     if (body.category !== undefined) metadataUpdates.category = body.category;
     if (folder.folderId !== undefined) metadataUpdates.folderId = folder.folderId;
-    if (Object.keys(metadataUpdates).length > 0) {
+    if (!hasContentEdit && Object.keys(metadataUpdates).length > 0) {
       await updateTemplate(c.env.DB, id, metadataUpdates);
     }
+    let savedDraft;
     if (hasContentEdit) {
-      await saveTemplateDraft(c.env.DB, id, {
+      savedDraft = await saveTemplateDraft(c.env.DB, id, {
+        ...metadataUpdates,
+        expectedVersion: body.expectedVersion,
+        expectedDraftRevision: body.expectedDraftRevision,
         ...(changesMessage
           ? {
               messageType: baseMessageType,
@@ -680,7 +694,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
         questionStatus: body.questionStatus,
       });
     }
-    const updated = await getTemplateById(c.env.DB, id);
+    const updated = hasContentEdit ? savedDraft : await getTemplateById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -707,7 +721,7 @@ templates.put('/api/templates/:id', requireDeliveryAccess('templates'), inputJso
       return inputError(c, { success: false, error: '別のLINEアカウントのメディアは使用できません' }, 422, ["messageContent"]);
     }
     if (err instanceof Error && err.message === 'TEMPLATE_DRAFT_CONFLICT') {
-      return c.json({ success: false, error: '編集中に公開状態が変わりました。読み直してください' }, 409);
+      return c.json({ success: false, code: 'TEMPLATE_DRAFT_CONFLICT', error: 'ほかの編集が保存されています。変更内容を確認してから読み直してください' }, 409);
     }
     logger.error("routes_templates_failed");
     return c.json({ success: false, error: 'Internal server error' }, 500);

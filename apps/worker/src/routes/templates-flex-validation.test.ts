@@ -147,11 +147,12 @@ describe('R249: カード型の中身検査', () => {
 
   it('更新で正常なバブルは保存する', async () => {
     mocks.getTemplateById.mockResolvedValue(storedRow());
+    mocks.saveTemplateDraft.mockResolvedValue(storedRow());
 
     const response = await app().request('/api/templates/tpl-1', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ messageContent: VALID_BUBBLE }),
+      body: JSON.stringify({ messageContent: VALID_BUBBLE, expectedVersion: 0, expectedDraftRevision: 0 }),
     }, bindings);
 
     expect(response.status).toBe(200);

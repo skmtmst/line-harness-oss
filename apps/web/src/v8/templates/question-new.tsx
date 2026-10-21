@@ -15,7 +15,7 @@ import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { isOwnerOrAdmin } from '@/lib/staff-capability';
 import TapExtrasField from '@/components/shared/tap-extras-field'
 import { useFeatureAccess } from '@/lib/use-feature-access'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -76,6 +76,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     const content = host?.initialContent
     return content?.kind === 'question' && isEditableQuestion(content.question as unknown as ScenarioQuestion) ? { name: content.name, question: content.question as unknown as ScenarioQuestion } : null
   })
+  const editVersion = useRef<{ expectedVersion: number; expectedDraftRevision: number } | null>(null)
   const [name, setName] = useState(hostInitial?.name ?? '')
   const [category, setCategory] = useState('未分類')
   const [folderId, setFolderId] = useState<string | null>(null)
@@ -132,6 +133,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           setError('質問テンプレートを読み込めませんでした。')
           return
         }
+        editVersion.current = { expectedVersion: template.data.publishedVersion, expectedDraftRevision: template.data.draftRevision }
         setName(template.data.name)
         setTemplateAccountId(template.data.accountId ?? null)
         setCategory(template.data.category || '未分類')
@@ -181,8 +183,9 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
       folderId,
     }
     try {
-      const result = id ? await api.templates.update(id, payload) : await api.templates.create(payload)
+      const result = id ? await api.templates.update(id, { ...payload, ...editVersion.current }) : await api.templates.create(payload)
       if (!result.success) { setError(result.error || '保存できませんでした。'); return false }
+      editVersion.current = { expectedVersion: result.data.publishedVersion, expectedDraftRevision: result.data.draftRevision }
       return true
     } catch (caught) {
       const extraError = tapExtraSaveError(caught)

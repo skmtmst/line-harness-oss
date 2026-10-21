@@ -223,6 +223,21 @@ describe('V8 メッセージを作る・編集', () => {
     expect(screen.getByText('8 / 5,000')).toBeTruthy()
   })
 
+  it('読んだ版で保存し、成功後の版を次の保存に使う', async () => {
+    templatesApi.update
+      .mockResolvedValueOnce({ success: true, data: { id: 'template-1', publishedVersion: 3, draftRevision: 3 } })
+      .mockResolvedValueOnce({ success: true, data: { id: 'template-1', publishedVersion: 3, draftRevision: 4 } })
+    await mount('id=template-1')
+    type(screen.getByLabelText('本文'), '最初の変更')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.update).toHaveBeenNthCalledWith(1, 'template-1', expect.objectContaining({ expectedVersion: 3, expectedDraftRevision: 2 }))
+    type(screen.getByLabelText('本文'), '次の変更')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.update).toHaveBeenNthCalledWith(2, 'template-1', expect.objectContaining({ expectedVersion: 3, expectedDraftRevision: 3 }))
+  })
+
   it('編集で保存が 409 なら、競合の帯（NCbYn）を出し、主ボタンは「比べてから保存」、比べると違いが出る', async () => {
     templatesApi.update.mockRejectedValue(new ApiError(409, '下書きが書き換わっています'))
     await mount('id=template-1')

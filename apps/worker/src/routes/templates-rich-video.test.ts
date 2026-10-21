@@ -41,12 +41,12 @@ describe('リッチビデオの保存・公開・送信',()=>{
   it.each([true,false])('ボタン=%s:実DBで保存→読み直し→更新→公開→同じ動画付きimagemapを送る',async(button)=>{
     const response=await create(button);expect(response.status).toBe(201);
     const body=await response.json() as {data:{id:string}};const id=body.data.id;
-    const got=await (await request('GET',`/api/templates/${id}`)).json() as {data:{messageContent:string}};
+    const got=await (await request('GET',`/api/templates/${id}`)).json() as {data:{messageContent:string;publishedVersion:number;draftRevision:number}};
     const saved=JSON.parse(got.data.messageContent);
     expect(saved.baseUrl).toMatch(/^https:\/\/worker.example\/images\/imagemaps\//);
     expect(saved.baseSize).toEqual({width:1040,height:520});expect(transforms.mock.calls.map(c=>c[0].width)).toEqual([240,300,460,700,1040]);
     expect(saved.video.externalLink).toEqual(button?{label:'詳しく見る',linkUri:'https://example.com/menu'}:undefined);
-    expect((await request('PUT',`/api/templates/${id}`,{messageType:'imagemap',messageContent:JSON.stringify({...payload(button),altText:'変更した通知'})})).status).toBe(200);
+    expect((await request('PUT',`/api/templates/${id}`,{expectedVersion:got.data.publishedVersion,expectedDraftRevision:got.data.draftRevision,messageType:'imagemap',messageContent:JSON.stringify({...payload(button),altText:'変更した通知'})})).status).toBe(200);
     const draft=await getTemplateById(store.db,id);expect(draft?.message_content).not.toContain('変更した通知');
     expect((await request('POST',`/api/templates/${id}/publish`,{expectedVersion:0,expectedDraftRevision:2})).status).toBe(200);
     const live=await getTemplateById(store.db,id);const message=buildMessage(live!.message_type,live!.message_content);

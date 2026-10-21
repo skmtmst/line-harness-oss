@@ -68,6 +68,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
   const { leaveTarget,confirmLeave,cancelLeave,disarm,guarded } = useUnsavedGuard({dirty:snapshot !== clean,busy})
   const generation = useRef(0)
   const saveLock = useRef(false)
+  const editVersion = useRef<{ expectedVersion: number; expectedDraftRevision: number } | null>(null)
   const patch = (next: Partial<RichVideoDraft>) => {setIssue(null);setDraft(current=>({...current,...next}))}
 
   useEffect(()=> {
@@ -98,6 +99,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
     void api.templates.get(id).then(res=> {
       if(current !== generation.current)return
       if(!res.success)throw new Error('読み込めませんでした')
+      editVersion.current = { expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision }
       const p=JSON.parse(res.data.messageContent)
       if(res.data.messageType !== 'imagemap' || !p.video || validateImagemapMessage(p))throw new Error('リッチビデオではありません')
       const next: RichVideoDraft={name:res.data.name,folderId:res.data.folderId??'',originalContentUrl:p.video.originalContentUrl,previewImageUrl:p.video.previewImageUrl,height:p.baseSize.height,buttonEnabled:Boolean(p.video.externalLink),actionLabel:p.video.externalLink?.label??'詳しく見る',actionUrl:p.video.externalLink?.linkUri??'',altText:p.altText??''}
@@ -205,9 +207,10 @@ setError('この吹き出しに入れられませんでした。もう一度お�
     saveLock.current=true;setBusy(true);setError('')
     try{
       const data = {category:'general',name:draft.name.trim(),folderId:draft.folderId||null,messageType:'imagemap',messageContent:JSON.stringify(richVideoContent(draft))}
-      const res = savedId ? await api.templates.update(savedId,data) : await api.templates.create({...data,accountId:selectedAccountId!})
+      const res = savedId ? await api.templates.update(savedId,{...data,...editVersion.current}) : await api.templates.create({...data,accountId:selectedAccountId!})
       if(current !== generation.current)return
       if(!res.success)throw new Error(res.error||'保存できませんでした')
+      editVersion.current = { expectedVersion: res.data.publishedVersion, expectedDraftRevision: res.data.draftRevision }
       setSavedId(res.data.id)
       if (host?.composer) {
         const saved = await api.templates.get(res.data.id)

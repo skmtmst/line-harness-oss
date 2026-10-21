@@ -60,7 +60,7 @@ async function createDraftOnDb(content = '下書きの本文'): Promise<string> 
   });
   expect(created.status).toBe(201);
   const id = ((await created.json()) as { data: { id: string } }).data.id;
-  const updated = await json('PUT', `/api/templates/${id}`, { messageContent: content });
+  const updated = await json('PUT', `/api/templates/${id}`, { messageContent: content, expectedVersion: 0, expectedDraftRevision: 1 });
   expect(updated.status).toBe(200);
   return id;
 }
@@ -107,4 +107,56 @@ describe('実DB: 同じ確認キーの同時publishは版を1つだけ進める'
     expect(row?.published_version).toBe(1);
     expect(row?.message_content).toBe('同時の公開');
   });
+});
+
+
+describe('実DB: 古い編集画面からの上書きを防ぐ', () => {
+  it('先に保存した本文と名前を残し、古い画面は409で止める', async () => {
+    const id = await createDraftOnDb();
+    const original = { expectedVersion: 0, expectedDraftRevision: 2 };
+    const first = await json('PUT', `/api/templates/${id}`, { ...original, name: '先に保存した名前', messageContent: '先に保存した本文' });
+    expect(first.status).toBe(200);
+    const second = await json('PUT', `/api/templates/${id}`, { ...original, name: '古い画面の名前', messageContent: '古い画面の本文' });
+    expect(second.status).toBe(409);
+    const row = await getTemplateById(store.db, id);
+    expect(row?.name).toBe('先に保存した名前');
+    expect(row?.draft_message_content).toBe('先に保存した本文');
+    expect(row?.draft_revision).toBe(3);
+    const refreshed = await json('PUT', `/api/templates/${id}`, { expectedVersion: 0, expectedDraftRevision: 3, messageContent: '読み直して確認した本文' });
+    expect(refreshed.status).toBe(200);
+  });
+
+  it('同じ版から同時に保存しても名前と本文が混ざらない', async () => {
+    const id = await createDraftOnDb();
+    const results = await Promise.all(['A', 'B'].map(value => json('PUT', `/api/templates/${id}`, {
+      expectedVersion: 0, expectedDraftRevision: 2, name: value, messageContent: value,
+    })));
+    expect(results.map(response => response.status).sort()).toEqual([200, 409]);
+    const row = await getTemplateById(store.db, id);
+    expect(row?.name).toBe(row?.draft_message_content);
+    expect(row?.draft_revision).toBe(3);
+  });
+
+  it('版のない古いクライアントと、公開前の古い編集を受け付けない', async () => {
+    const id = await createDraftOnDb();
+    expect((await json('PUT', `/api/templates/${id}`, { messageContent: '版なし' })).status).toBe(409);
+    expect((await json('POST', `/api/templates/${id}/publish`, { expectedVersion: 0, expectedDraftRevision: 2 }, 'publish-before-stale-edit')).status).toBe(200);
+    expect((await json('PUT', `/api/templates/${id}`, { expectedVersion: 0, expectedDraftRevision: 2, messageContent: '公開前の編集' })).status).toBe(409);
+    expect((await getTemplateById(store.db, id))?.message_content).toBe('下書きの本文');
+  });
+  it('保存後に別の編集が入っても、応答には自分が保存した版を返す', async () => {
+    const id = await createDraftOnDb();
+    const batch = store.db.batch.bind(store.db);
+    vi.spyOn(store.db, 'batch').mockImplementationOnce(async statements => {
+      const result = await batch(statements);
+      store.raw.prepare("UPDATE templates SET name='次の編集', draft_message_content='次の本文', draft_revision=draft_revision+1 WHERE id=?").run(id);
+      return result;
+    });
+    const response = await json('PUT', `/api/templates/${id}`, { expectedVersion: 0, expectedDraftRevision: 2, name: '自分の編集', messageContent: '自分の本文' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { name: '自分の編集', messageContent: '自分の本文', draftRevision: 3 } });
+    expect((await getTemplateById(store.db, id))?.draft_revision).toBe(4);
+    expect((await json('PUT', `/api/templates/${id}`, { expectedVersion: 0, expectedDraftRevision: 3, messageContent: '古くなった編集' })).status).toBe(409);
+  });
+
 });
