@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test'
 import { waitForOverlayLayout } from '../../../../../scripts/browser/overlay-ready.mjs'
 const mockPort = Number(process.env.TRAIN30_MOCK_PORT ?? 8788)
+// Drain prefetches before removing interception; the build can use an HTTPS API.
+test.afterEach(async ({ page }) => {
+  await page.waitForLoadState('networkidle')
+  await page.unrouteAll({ behavior: 'wait' })
+})
 async function openPrimaryAuthenticatedChallenge(page, path, token, method) {
   const nonce = crypto.randomUUID()
   await page.evaluate(({ nonce, path }) => sessionStorage.setItem('lh_login_handoff', JSON.stringify({ nonce, expires: Date.now() + 600000, kind: 'challenge', path })), { nonce, path })
@@ -16,7 +21,7 @@ for (const width of [1152,1440,1920]) test(`shared list tools and support action
   })
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())
-    return route.continue({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` })
+    return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   for (const path of ['/auto-replies/runs?id=ar-2', '/friend-add-settings/runs', '/mileage/friends/detail?id=friend-1', '/ops/tenants', '/ops/support']) {
     await page.goto(path)
@@ -71,7 +76,7 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
     if (path === '/api/auth/two-factor/verify') { submitted = route.request().postDataJSON(); return route.fulfill({ status: 400, json: { success: false, error: 'コードが違います' } }) }
     if (data) return route.fulfill({ status: 200, json: { success: true, data } })
     // Every remaining API request is redirected to the local fixture server.
-    return route.continue({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` })
+    return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   await page.goto('/login'); await centered(page.getByRole('button', { name: 'ログイン', exact: true }))
   const brandStyle = await page.locator('[aria-hidden="true"]').filter({ hasText: 'm' }).first().evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })
@@ -139,7 +144,7 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
   // in-flight prefetch; fulfilling it after route.fetch() races that cancellation.
   const session = await (await page.request.get(`http://127.0.0.1:${mockPort}/api/auth/session`)).json()
   const style = await (await page.request.get(`http://127.0.0.1:${mockPort}/api/dashboard/style`)).json()
-  await page.route('**/api/**', route => {
+  await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())
     if (url.pathname === '/api/auth/session') {
       return route.fulfill({ json: { ...session, data: { ...session.data, recoveryCodesRemaining: remaining } } })
@@ -147,7 +152,7 @@ for (const width of [1152,1440,1920]) test(`low recovery-code banner is not cove
     if (url.pathname === '/api/dashboard/style') {
       return route.fulfill({ json: { ...style, data: { ...style.data, styleSelected: true } } })
     }
-    return route.continue({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` })
+    return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   for (const path of ['/', '/friends', '/broadcasts', '/form-submissions', '/templates/edit', '/templates/detail?id=template-1', '/chats', '/hq', '/settings']) {
     await page.goto(path)
@@ -197,7 +202,7 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and personal rec
     if (path === '/api/auth/step-up') data = { token: 'fixture-step-up-grant' }
     if (path === '/api/auth/two-factor/recovery') { remaining = 8; data = { recoveryCodes: codes } }
     if (data) return route.fulfill({ status: 200, json: { success: true, data } })
-    return route.continue({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` })
+    return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   await page.goto('/staff')
   await expect(page.getByRole('heading', { name: '自分の二段階認証' })).toBeVisible()
@@ -227,4 +232,53 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and personal rec
   await expect(page.getByText('残り 8 / 8 個', { exact: true })).toBeVisible()
   await expect(page.getByText(/回復コードの残りが2個です/)).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0)
+})
+
+
+test('new style selection opens once, explicit later and legacy later stay deferred', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.addInitScript(() => {
+    localStorage.setItem('lh_selected_account', 'visual-qa-account')
+    sessionStorage.setItem('lh_auth_selection_cleared', '1')
+  })
+  const fixture = await (await page.request.get(`http://127.0.0.1:${mockPort}/api/dashboard/style`)).json()
+  let pending = true, mode = 'later', selected = false, version = 1, writes = 0
+  await page.route('**/api/**', async route => {
+    const url = new URL(route.request().url())
+    if (url.pathname === '/api/dashboard/style') {
+      if (route.request().method() === 'PUT') {
+        const body = route.request().postDataJSON()
+        expect(body).toMatchObject({ expectedVersion: version, styleMode: 'later' })
+        pending = false; version++; writes++
+      }
+      return route.fulfill({ json: { success: true, data: { ...fixture.data, style: 'standard', styleSelected: selected, styleMode: mode, shouldPromptStyleSelection: pending, version, inserted: [], changedAnswers: {}, bookingSettingsChanges: [], answers: { style: { mode } } } } })
+    }
+    return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
+  })
+  const dialog = page.getByRole('dialog', { name: 'はじめに、使い方を教えてください' })
+  await page.goto('/')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('input[name="setup-style"]')).toHaveCount(8)
+  await dialog.getByRole('radio', { name: /あとで設定する/ }).check()
+  await dialog.getByRole('button', { name: '次へ', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(writes).toBe(1)
+  await page.reload()
+  await page.waitForLoadState('networkidle')
+  await expect(dialog).toHaveCount(0)
+  // A separate visit with the explicit entry still permits resuming.
+  await page.goto('/?setup=0')
+  await expect(dialog).toBeVisible()
+  await page.goto('/')
+  for (const state of [
+    { mode: 'later', pending: undefined, selected: false },
+    { mode: 'manual', pending: false, selected: false },
+    { mode: 'configured', pending: false, selected: true },
+  ]) {
+    mode = state.mode; pending = state.pending; selected = state.selected
+    await page.reload()
+    await page.waitForLoadState('networkidle')
+    await expect(dialog).toHaveCount(0)
+  }
+  expect(writes).toBe(1)
 })
