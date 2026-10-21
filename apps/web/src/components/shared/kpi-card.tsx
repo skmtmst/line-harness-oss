@@ -283,7 +283,7 @@ export default function KpiCard({
           </button>
         ) : null}
         {action ? (
-          action.href !== undefined ? <Link href={action.href} className={styles.link}>
+          action.href !== undefined ? <Link href={action.href} prefetch={false} className={styles.link}>
             <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={12} aria-hidden="true" />
           </Link> : <button type="button" className={styles.link} onClick={action.onClick}>
             <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={12} aria-hidden="true" />

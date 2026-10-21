@@ -27,6 +27,8 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
 }) {
   const body = useRef<HTMLTableSectionElement>(null)
   const heights = useRef(new Map<string, number>())
+  const rowObserver = useRef<ResizeObserver | null>(null)
+  const observedRows = useRef(new Set<Element>())
   const estimate = useRef(estimatedRowHeight)
   const [window, setWindow] = useState({ start: 0, end: 20, retained: [] as number[] })
   const [revision, setRevision] = useState(0)
@@ -125,16 +127,29 @@ export function TableBody<T>({ items, itemKey, renderRow, colSpan, children, thr
       }
       schedule()
     })
-    for (const row of element.querySelectorAll('[data-table-index]')) observer.observe(row)
+    rowObserver.current = observer
     return () => {
       if (frame) cancelAnimationFrame(frame)
       observer.disconnect()
+      rowObserver.current = null
+      observedRows.current.clear()
       globalThis.window.removeEventListener('scroll', schedule, { capture: true })
       globalThis.window.removeEventListener('resize', schedule)
       document.removeEventListener('focusin', schedule)
       document.removeEventListener('focusout', schedule)
     }
-  }, [virtual, items.length, keys, offsets, window.start, window.end, window.retained, colSpan])
+  }, [virtual, items.length, keys, offsets, colSpan])
+
+  // A scroll only changes which rows are mounted. Keep listeners and the observer
+  // alive, and subscribe just the entering rows before the browser measures them.
+  useLayoutEffect(() => {
+    const observer = rowObserver.current
+    if (!observer || !body.current) return
+    const mounted = new Set(body.current.querySelectorAll('[data-table-index]'))
+    for (const row of observedRows.current) if (!mounted.has(row)) observer.unobserve(row)
+    for (const row of mounted) if (!observedRows.current.has(row)) observer.observe(row)
+    observedRows.current = mounted
+  })
 
   // Drop measurements for records that have gone away; page/account changes cannot grow this cache.
   useLayoutEffect(() => {
