@@ -53,6 +53,26 @@ beforeEach(() => {
 });
 
 describe('シナリオの並行購読', () => {
+  test('並行OFFの2本が同時に開始しても同じ友だちには1本だけ登録する', async () => {
+    const a = await withStep('同時A', false);
+    const b = await withStep('同時B', false);
+    const results = await Promise.all([
+      enrollFriendInScenario(db, 'f-1', a.id),
+      enrollFriendInScenario(db, 'f-1', b.id),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM friend_scenarios WHERE friend_id='f-1' AND status='active'").get()).toEqual({ n: 1 });
+  });
+
+  test('並行ONの2本を同時に開始する使い方は維持する', async () => {
+    const a = await withStep('同時許可A', true);
+    const b = await withStep('同時許可B', true);
+    const results = await Promise.all([
+      enrollFriendInScenario(db, 'f-1', a.id),
+      enrollFriendInScenario(db, 'f-1', b.id),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(2);
+  });
   test('同じ受信行動の再試行は完了済み購読を再開しない', async () => {
     const scenario = await withStep('webhook-retry');
     const first = await enrollFriendInScenario(db, 'f-1', scenario.id, 'stable-webhook-action');

@@ -93,15 +93,25 @@ export async function enrollFriendInScenario(
   if (!version) return null;
   const pinnedSteps = parseScenarioVersionSteps(version).filter((s) => (s.is_draft ?? 0) === 0);
   const firstStep = pinnedSteps.length > 0 ? pinnedSteps[0] : null;
+  // Check again in the write itself. Two starts can both pass the earlier read.
+  const admissionSql = `EXISTS (
+    SELECT 1 FROM scenarios s WHERE s.id = ? AND s.is_active != 0
+      AND (s.allow_concurrent IS NOT 0 OR NOT EXISTS (
+        SELECT 1 FROM friend_scenarios other
+         WHERE other.friend_id = ? AND other.scenario_id != ? AND other.status = 'active'
+           AND (? IS NULL OR other.scenario_id != ?)
+      ))
+  )`;
+  const admissionBinds = [scenarioId, friendId, scenarioId, options.replacingScenarioId ?? null, options.replacingScenarioId ?? null];
 
   // A scenario with no steps is immediately completed — no stuck active enrollment.
   if (!firstStep) {
     const result = await db
       .prepare(
         `INSERT OR IGNORE INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, published_version_id, updated_at)
-         VALUES (?, ?, ?, 0, 'completed', ?, NULL, ?, ?)`,
+         SELECT ?, ?, ?, 0, 'completed', ?, NULL, ?, ? WHERE ${admissionSql}`,
       )
-      .bind(id, friendId, scenarioId, now, version.id, now)
+      .bind(id, friendId, scenarioId, now, version.id, now, ...admissionBinds)
       .run();
 
     if (!result.meta.changes || result.meta.changes === 0) return null;
@@ -132,9 +142,9 @@ export async function enrollFriendInScenario(
   const result = await db
     .prepare(
       `INSERT OR IGNORE INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at, next_delivery_at, published_version_id, updated_at)
-       VALUES (?, ?, ?, -1, 'active', ?, ?, ?, ?)`,
+       SELECT ?, ?, ?, -1, 'active', ?, ?, ?, ? WHERE ${admissionSql}`,
     )
-    .bind(id, friendId, scenarioId, now, nextDeliveryAt, version.id, now)
+    .bind(id, friendId, scenarioId, now, nextDeliveryAt, version.id, now, ...admissionBinds)
     .run();
 
   if (!result.meta.changes || result.meta.changes === 0) return null;
