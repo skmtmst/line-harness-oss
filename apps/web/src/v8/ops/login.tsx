@@ -47,6 +47,12 @@ export default function OpsLoginV8() {
   }, [])
 
   useEffect(() => {
+    const restore = (event: PageTransitionEvent) => {
+      if (!event.persisted) return
+      setBusy(null)
+      turnstileRef.current?.reset()
+    }
+    window.addEventListener('pageshow', restore)
     const errorCode = new URLSearchParams(window.location.search).get('error')
     if (errorCode === 'not_authorized') {
       setError('このアカウントは運営メンバーに登録されていません。ほかの運営メンバーに追加を依頼してください。')
@@ -57,6 +63,7 @@ export default function OpsLoginV8() {
     } else if (errorCode) {
       setError('ログインを完了できませんでした。もう一度お試しください。')
     }
+    return () => window.removeEventListener('pageshow', restore)
   }, [])
 
   const submit = async (event: FormEvent) => {

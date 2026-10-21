@@ -115,4 +115,24 @@ describe.each([
     await submit()
     expect(fixture.request).not.toHaveBeenCalled()
   })
+
+  it('LINEログインからブラウザで戻るとボタンが再び使え、ロボット確認は取り直す', async () => {
+    await render()
+    await widgetEvent('callback', 'before-navigation-token')
+    const lineButton = Array.from(host.querySelectorAll('button')).find(button => button.textContent === 'LINE でログイン')!
+    await act(async () => { lineButton.click() })
+    expect(lineButton.disabled).toBe(true)
+
+    const restore = new Event('pageshow')
+    Object.defineProperty(restore, 'persisted', { value: true })
+    await act(async () => { window.dispatchEvent(restore) })
+    expect(lineButton.disabled).toBe(false)
+    expect(lineButton.textContent).toBe('LINE でログイン')
+    expect(reset).toHaveBeenCalledWith('widget-qa')
+    await submit()
+    expect(fixture.request).not.toHaveBeenCalled()
+    await widgetEvent('callback', 'after-navigation-token')
+    await submit()
+    expect(fixture.request.mock.calls[0][1].turnstileToken).toBe('after-navigation-token')
+  })
 })

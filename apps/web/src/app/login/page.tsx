@@ -55,6 +55,12 @@ export default function LoginPage() {
   }
 
   useEffect(() => {
+    const restore = (event: PageTransitionEvent) => {
+      if (!event.persisted) return
+      setBusy(null)
+      turnstileRef.current?.reset()
+    }
+    window.addEventListener('pageshow', restore)
     const errorCode = new URLSearchParams(window.location.search).get('error')
     if (errorCode === 'not_authorized') {
       setError('このLINEアカウントには管理者権限がありません。オーナーに追加を依頼してください。')
@@ -63,6 +69,7 @@ export default function LoginPage() {
     } else if (errorCode) {
       setError('ログインを完了できませんでした。もう一度お試しください。')
     }
+    return () => window.removeEventListener('pageshow', restore)
   }, [])
 
   const submit = async (event: FormEvent) => {
