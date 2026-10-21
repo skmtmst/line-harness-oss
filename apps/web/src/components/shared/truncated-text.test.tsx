@@ -83,7 +83,7 @@ describe('省略した文字の全文確認', () => {
 
 it('タグ幅専用の不可視コピーは測らず、表示する文字の全文確認を残す', async () => {
   const observe = vi.fn()
-  vi.stubGlobal('ResizeObserver', class { observe = observe; disconnect() {} })
+  vi.stubGlobal('ResizeObserver', class { observe = observe; unobserve() {} disconnect() {} })
   vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(180)
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(80)
   try {

@@ -4,6 +4,7 @@ import { Children, useLayoutEffect, useRef, useState, type ReactNode } from 'rea
 import Dialog from './dialog'
 import { TruncatedTextFocus } from './truncated-text'
 import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
+import { observeElementResize } from './element-resize-observer'
 import styles from './tag-overflow.module.css'
 
 /** : 横1行に入る数。+N の幅も先に確保する。 */
@@ -52,16 +53,14 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
     const update = () => { if (active) scheduleMeasurement(key, read) }
     const invalidate = () => { widths = null; update() }
     update()
-    const observer = new ResizeObserver((entries) => {
-      if (entries.some((entry) => entry.target === samples)) widths = null
+    const stopObserving = observeElementResize([host, samples], (entries) => {
+      if (!entries.length || entries.some((entry) => entry.target === samples)) widths = null
       update()
     })
-    observer.observe(host)
-    observer.observe(samples)
     const fonts = document.fonts
     if (fonts?.status === 'loading') void fonts.ready.then(invalidate)
     fonts?.addEventListener('loadingdone', invalidate)
-    return () => { active = false; cancelMeasurement(key); observer.disconnect(); fonts?.removeEventListener('loadingdone', invalidate) }
+    return () => { active = false; cancelMeasurement(key); stopObserving(); fonts?.removeEventListener('loadingdone', invalidate) }
   }, [children, maxVisible, items.length])
   const shown = Math.min(fit, maxVisible ?? items.length, items.length)
   const rest = items.length - shown

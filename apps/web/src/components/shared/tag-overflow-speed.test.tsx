@@ -5,12 +5,26 @@ import TagOverflow from './tag-overflow'
 import TagPill from './tag-pill'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
+it('サイズ通知を使えない環境でも、列幅の変更後は全件と+Nを確認できる', async () => {
+  vi.stubGlobal('ResizeObserver', undefined)
+  let available = 220
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => available)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return { width: this.tagName === 'BUTTON' ? 40 : 80, height: 20, top: 0, bottom: 20 } as DOMRect
+  })
+  render(<TagOverflow><TagPill name="VIP" /><TagPill name="会員" /></TagOverflow>)
+  await act(async () => { await Promise.resolve() })
+  expect(screen.queryByRole('button', { name: /すべてのタグ/ })).toBeNull()
+  available = 100
+  await act(async () => { window.dispatchEvent(new Event('resize')); await Promise.resolve() })
+  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか1件）' })).toBeTruthy()
+})
 it('列幅の通知では自然幅を再利用し、タグ変更後の全件と+Nを保つ', async () => {
   let available = 220
   const observers: ResizeObserverCallback[] = []
   vi.stubGlobal('ResizeObserver', class {
     constructor(callback: ResizeObserverCallback) { observers.push(callback) }
-    observe() {} disconnect() {}
+    observe() {} unobserve() {} disconnect() {}
   })
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => available)
   const measured = vi.fn()
@@ -56,6 +70,7 @@ it('見本のサイズ・フォント適用・同数のタグ変更では自然�
     disconnect = vi.fn()
     constructor(callback: ResizeObserverCallback) { observers.push(callback); watched.push(this) }
     observe(target: Element) { this.targets.push(target) }
+    unobserve() {}
   })
   let naturalWidth = 60
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(180)
@@ -102,7 +117,7 @@ it('見本のサイズ・フォント適用・同数のタグ変更では自然�
     unmount()
     await act(async () => { fonts.dispatchEvent(new Event('loadingdone')); notifyTag([], {} as ResizeObserver); await Promise.resolve() })
     expect(measured).not.toHaveBeenCalled()
-    expect(tagObservers).toHaveLength(2)
+    expect(tagObservers).toHaveLength(1)
     for (const observer of tagObservers) expect(observer.disconnect).toHaveBeenCalledOnce()
     expect(removeFontListener).toHaveBeenCalledTimes(2)
   } finally {

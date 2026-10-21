@@ -4,6 +4,7 @@ import { createContext, useContext, useCallback, useEffect, useId, useRef, useSt
 import { createPortal } from 'react-dom'
 import type { HTMLAttributes } from 'react'
 import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
+import { observeElementResize } from './element-resize-observer'
 import styles from './truncated-text.module.css'
 
 /** 全文を開く操作が別にある群では、同じ文字へのTab停止を重ねない。 */
@@ -60,12 +61,11 @@ export default function TruncatedText({ value, url = false, className, tone, ...
     }
     const update = () => { if (active) scheduleMeasurement(key, read) }
     update()
-    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
-    observer?.observe(node)
+    const stopObserving = observeElementResize([node], update)
     parent?.addEventListener?.('focus', open)
     parent?.addEventListener?.('blur', close)
     window.addEventListener?.('resize', update)
-    return () => { active = false; cancelMeasurement(key); observer?.disconnect(); parent?.removeEventListener?.('focus', open); parent?.removeEventListener?.('blur', close); window.removeEventListener?.('resize', update); clear() }
+    return () => { active = false; cancelMeasurement(key); stopObserving(); parent?.removeEventListener?.('focus', open); parent?.removeEventListener?.('blur', close); window.removeEventListener?.('resize', update); clear() }
   }, [shown, value, open, close, clear])
   useEffect(() => {
     if (!position) return
