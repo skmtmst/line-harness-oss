@@ -353,7 +353,7 @@ test('salon keeps existing KPI slots and forwards real staff, time and booking i
 
   await page.goto('/?view=calendar&range=week')
   const week = page.getByRole('region', { name: '1週間のカレンダー' })
-  await week.getByRole('button', { name: '予約を入れる', exact: true }).first().click()
+  await week.getByRole('button', { name: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}に予約を入れる$/ }).first().click()
   await expect(page).toHaveURL(/\/booking\/bookings\/new\?/)
   url = new URL(page.url())
   expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
@@ -381,7 +381,7 @@ test('consult forwards board and weekly booking identity, date, time and staff',
   await expect(page).toHaveURL((url) => url.pathname === '/booking/bookings' && url.searchParams.getAll('booking').length === 1 && url.searchParams.get('booking') === 'm1')
   await page.goto('/?view=calendar&range=week')
   const week = page.getByRole('region', { name: '1週間のカレンダー' })
-  await week.getByRole('button', { name: '予約を入れる', exact: true }).first().click()
+  await week.getByRole('button', { name: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}に予約を入れる$/ }).first().click()
   await expect(page).toHaveURL(/\/booking\/bookings\/new\?/)
   url = new URL(page.url())
   expect(url.searchParams.get('date')).toMatch(/^\d{4}-\d{2}-\d{2}$/)
