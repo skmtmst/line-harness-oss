@@ -8,7 +8,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { DashboardColumns } from '@/components/templates'
 import Button from '@/components/shared/button'
-import StickyBar from '@/components/shared/sticky-bar'
+import { PageFooter } from '@/components/templates/page-footer'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
@@ -327,7 +327,7 @@ function CompareInner() {
         ) : null}
       </div>
       {review.state === 'ready' && detail ? (
-        <StickyBar
+        <PageFooter
           destructive={(
             <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('different')}>
               <UserX size={14} aria-hidden="true" />
