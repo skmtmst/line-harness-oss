@@ -213,7 +213,8 @@ function NativeButton(props: NativeButtonProps & { classes: string }) {
       // Wait for that copy to become visible instead of caching a 21px icon-only width.
       if (el.offsetWidth === 0) return
       measuredLabelRef.current = measurementKey
-      if (widthReserve === 'dynamic') el.style.width = ''
+      // 前のラベル用に予約した幅を外し、今の全文と状態ラベルから測り直す。
+      el.style.width = ''
       el.style.minWidth = ''
       idleWidthRef.current = el.offsetWidth
       if (widthReserve === 'idle') {

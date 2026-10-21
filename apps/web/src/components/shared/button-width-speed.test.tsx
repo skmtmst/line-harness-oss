@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Button from './button'
+import Dialog from './dialog'
 
 afterEach(() => {
   cleanup()
@@ -33,11 +34,11 @@ describe('保存中・完了のボタン幅', () => {
     expect(create).toHaveBeenCalledTimes(1)
   })
 
-  it('保存文が短→長→短に変わるたび、前の固定幅を外して全文を測る', () => {
+  it.each([undefined, 'states', 'dynamic'] as const)('幅の予約%sでも、短→長→短の全文を測り直す', (widthReserve) => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
       return parseFloat(this.style.width) || (this.textContent?.includes('か所') ? 240 : 100)
     })
-    const action = (label: string, busy = false) => <Button widthReserve="dynamic" busy={busy} done={false}>{label}</Button>
+    const action = (label: string, busy = false) => <Button widthReserve={widthReserve} busy={busy} done={false}>{label}</Button>
     const { rerender } = render(action('保存する'))
     const button = screen.getByRole('button')
     expect(button.style.width).toBe('121px')
@@ -114,4 +115,25 @@ it('普通の同期ボタンは状態用の幅を確保しない', () => {
   render(<Button onClick={() => {}}>閉じる</Button>)
   expect(screen.getByRole('button').style.width).toBe('')
   expect(width).not.toHaveBeenCalled()
+})
+
+it('同じ確認窓の次段階で実行文が長くなっても、全文とアイコンを収めて実行できる', () => {
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+    return parseFloat(this.style.width) || (this.textContent?.includes('LINE') ? 260 : 100)
+  })
+  const confirm = vi.fn()
+  const cancel = vi.fn()
+  const dialog = (next: boolean) => <Dialog open title="休みを入れる" busy={false}
+    confirmLabel={next ? '休みを入れて LINE を送る' : '休みを入れる'}
+    confirmIcon={<svg aria-hidden="true" />} onConfirm={confirm} onCancel={cancel} />
+  const { rerender } = render(dialog(false))
+  const button = screen.getByRole('button', { name: '休みを入れる' })
+  expect(button.style.width).toBe('121px')
+  rerender(dialog(true))
+  expect(screen.getByRole('button', { name: '休みを入れて LINE を送る' })).toBe(button)
+  expect(button.style.width).toBe('260px')
+  expect(button.querySelector('svg')).not.toBeNull()
+  fireEvent.click(button)
+  expect(confirm).toHaveBeenCalledTimes(1)
+  expect(cancel).not.toHaveBeenCalled()
 })
