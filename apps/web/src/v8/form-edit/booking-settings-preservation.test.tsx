@@ -11,6 +11,7 @@ it('予約できる期間だけを変えても、保存済みの承認・メニ�
     routing: { enabled: true, rules: [], fallback: { menuId: 'menu-b' } },
   }
   const { onPatchBlock } = mount([{ id: 'visit', kind: 'input', type: 'booking', name: 'visit', label: '予約', booking }])
+  expect(screen.getByText('店が承認します')).toBeTruthy()
   fireEvent.change(screen.getByLabelText('選べる期間'), { target: { value: '30' } })
   expect(onPatchBlock).toHaveBeenLastCalledWith('visit', expect.objectContaining({ booking: { ...booking, daysAhead: 30 } }))
 })
