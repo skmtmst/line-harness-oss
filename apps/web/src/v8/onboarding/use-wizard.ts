@@ -12,6 +12,7 @@ import { type Question } from './question-types'
 import type { Props, SummaryData, WizardStep } from './wizard-types'
 export function useWizard({ accountId, state, initialStep = 0, onClose }: Props) {
   const [style, setStyle] = useState<AccountStyle>(state.style)
+  const [styleChosen, setStyleChosen] = useState(state.styleSelected)
   const [answers, setAnswers] = useState<Record<string, SetupAnswer>>(state.answers ?? {})
   const [choices, setChoices] = useState<Record<string, { mode: 'sample' | 'existing' | 'configured'; resourceId?: string }>>({})
   const [version, setVersion] = useState(state.version)
@@ -62,7 +63,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
   const save = async (next: Record<string, SetupAnswer>, nextChoices = choices, options: { skipSettings?: boolean } = {}) => {
     let changed = changedAnswers(saved, answersForApi(next))
     if (options.skipSettings) changed = Object.fromEntries(Object.entries(changed).filter(([key]) => !SETTINGS_KEYS.includes(key)))
-    const res = await styleApi.save(accountId, { expectedVersion: version, style, answers: changed, choices: Object.keys(nextChoices).length ? nextChoices : undefined })
+    const res = await styleApi.save(accountId, { expectedVersion: version, ...(styleChosen ? { style } : {}), answers: changed, choices: Object.keys(nextChoices).length ? nextChoices : undefined })
     if (!res.success) throw new Error('save failed')
     accountStyleUpdated(accountId)
     setVersion(res.data.version)
@@ -132,7 +133,9 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
     if (step === 0) {
       /* スタイルの「あとで」「手動」は口の styleMode で保存する（別の人・別の端末でも同じ）。 */
       if (choice === 'later' || choice === 'manual') { await saveStyleMode(choice); return }
-      if (choice !== style) { setStyle(choice as AccountStyle); setDirty(true) }
+      setStyleChosen(true)
+      setDirty(true)
+      if (choice !== style) setStyle(choice as AccountStyle)
       void go(1)
       return
     }
