@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => { process.env.NEXT_PUBLIC_API_URL = 'http://worker.test' })
@@ -31,7 +31,8 @@ afterEach(cleanup)
 describe('統括の配信設定を共通の一覧と配布画面で扱う', () => {
   it('名前が空の作成は保存の理由を出し、入力すると解除する', async () => {
     render(<HqDeliveryConsole type="auto_reply" />)
-    fireEvent.click(await screen.findByRole('button', { name: 'ひな形を作る', exact: true }))
+    const search = await screen.findByRole('searchbox', { name: 'ひな形を検索' })
+    fireEvent.click(within(search.closest('[data-template-region="toolbar"]') as HTMLElement).getByRole('button', { name: 'ひな形を作る', exact: true }))
     const save = await screen.findByRole('button', { name: '下書きとして保存' }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(save.title).toBe('統括での名前を入力してください。')

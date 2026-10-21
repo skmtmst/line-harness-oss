@@ -7,6 +7,8 @@ import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, List
 import PageSizeSelect from './page-size-select'
 import Select from './select'
 import HelpTip from './help-tip'
+import SearchField from './search-field'
+import { ListPage } from '@/components/templates/list-page'
 
 afterEach(cleanup)
 
@@ -189,4 +191,27 @@ it('U4：並びの候補が無ければ空の欄を置かない', () => {
   const { container } = render(<ListToolbarSort value="" options={[]} onChange={change} />)
   expect(container.querySelector('button')).toBeNull()
   expect(change).not.toHaveBeenCalled()
+})
+
+
+it.each([false, true])('単独の検索を渡した一覧も、畳む先へフォルダと許可された作成を渡す（閲覧のみ=%s）', readOnly => {
+  const create = vi.fn(), folder = vi.fn(), search = vi.fn()
+  const { container } = render(<ListPage title="自動応答" readOnly={readOnly} folders={<nav>広い画面のフォルダ</nav>}
+    folderNav={{ rows: [{ id: 'all', label: 'すべて' }, { id: 'other', label: '予約' }], activeId: 'all', onSelect: folder,
+      createAction: readOnly ? undefined : <button onClick={create}>ひな形を作る</button> }}
+    toolbar={<SearchField aria-label="ひな形を検索" placeholder="ひな形を探す" value="" updateMode="immediate" onChange={search} />}>一覧の内容</ListPage>)
+  const leading = container.querySelector<HTMLElement>('[data-toolbar-leading]')
+  expect(leading).toBeTruthy()
+  const tools = leading!.closest('[data-list-toolbar]')!
+  expect(tools.contains(screen.getByRole('searchbox', { name: 'ひな形を検索' }))).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダ' }))
+  fireEvent.click(screen.getByRole('option', { name: '予約' }).querySelector('button')!)
+  expect(folder).toHaveBeenCalledWith('other')
+  fireEvent.change(screen.getByRole('searchbox', { name: 'ひな形を検索' }), { target: { value: '来店' } })
+  expect(search).toHaveBeenCalledWith('来店')
+  if (readOnly) expect(screen.queryByRole('button', { name: 'ひな形を作る' })).toBeNull()
+  else {
+    fireEvent.click(screen.getByRole('button', { name: 'ひな形を作る' }))
+    expect(create).toHaveBeenCalledOnce()
+  }
 })

@@ -52,13 +52,13 @@ export function ListToolbarLeading({ children, leading, persistent, accessory, t
     const key = `${prefix}${node.key ?? index}`
     return node.type === Fragment ? flatten(node.props.children, `${key}/`) : [cloneElement(node, { key })]
   })
-  const nodes = isValidElement<{ children?: ReactNode }>(children) && children.type === Fragment ? flatten(children.props.children) : null
+  const nodes = flatten(children)
   const containsLayout = (items: ReactNode[]): boolean => items.some(node => isValidElement<{ children?: ReactNode }>(node)
     && (node.type === ListToolbar || node.type === ListToolbarFrame || node.type === Fragment && containsLayout(Children.toArray(node.props.children))))
   const containsTool = (node: ReactNode): boolean => isValidElement<{ children?: ReactNode }>(node)
     && ([ListToolbarRow, ListToolbarSearchSlot, SearchField, Select, PageSizeSelect].includes(node.type as typeof ListToolbarRow)
       || Children.toArray(node.props.children).some(containsTool))
-  const needsFrame = nodes && nodes.some(containsTool) && !containsLayout(nodes)
+  const needsFrame = nodes.some(containsTool) && !containsLayout(nodes)
   // 案内文は道具より前の段。作る・フォルダ・検索の間に挟まない。
   const notices = needsFrame ? nodes.filter(node => isValidElement(node) && node.type === 'p') : []
   const tools = needsFrame ? <>{notices}<ListToolbarFrame>{[...nodes.filter(node => !notices.includes(node)), accessory].map((node, index) => {
