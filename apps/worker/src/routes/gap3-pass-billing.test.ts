@@ -2,6 +2,7 @@ import {afterEach,beforeEach,expect,test,vi} from 'vitest';
 import {gapFixture,gapApp,gapCall,gapOwner} from '../test-utils/gap1.js';
 import {passCheckout,passBillingEvent,expirePassGrace,type PassBillingEvent} from '../features/booking/booking-pass-billing.js';
 import {bookingPassBilling} from './booking-pass-billing.js';
+import {bookingPassPlans} from './booking-pass-plans.js';
 import {passUnusable} from '../features/booking/booking-pass-plans.js';
 import {isPublicApiBoundary} from '../middleware/public-api-boundary.js';
 vi.mock('./booking.js',async importOriginal=>({...await importOriginal<any>(),resolveAccountIdFromLiff:async(c:any)=>c.req.query('liffId')==='liff-a'?'a':null,verifyCallerLineUserId:async(c:any)=>c.req.header('authorization')==='Bearer customer'?'Uf':null,resolveFriendId:async()=> 'f'}));
@@ -12,6 +13,10 @@ async function buy(kind='ticket'){
  const p=await passCheckout(d.db,'a','f',kind,'buy-'+kind,true,now);
  const event:PassBillingEvent={id:'checkout-'+kind,kind:'checkout.session.completed',checkoutId:String(p.checkoutId),...(kind==='monthly'?{subscriptionId:'sub_test_monthly'}:{}),amount:3000,currency:'jpy',periodStart:now.toISOString(),periodEnd:'2026-11-16T03:00:00Z',occurredAt:now.toISOString(),testMode:true};
  return {p,event};
+}
+async function billingSummary(account='a',staff=gapOwner){
+ const response=await gapCall(gapApp(d,[bookingPassPlans],staff),`/api/booking/admin/pass-plans?account_id=${account}`);
+ expect(response.status).toBe(200);return (await response.json() as any).data.summary;
 }
 test('B2-23: 価格と券はサーバー側の控え、同じ支払い・再送・別IDの重複通知で券は1枚',async()=>{
  const {p,event}=await buy();expect(p).toMatchObject({checkoutUrl:null,checkoutAvailable:false,simulationAvailable:true,amount:3000,testMode:true});expect((await buy()).p.id).toBe(p.id);
@@ -53,4 +58,53 @@ test('B2-24/25: 再試行の失敗で7日を延長しない、同じ周期の支
 test('B2-23: 停止・保管した店と統括では新しい模擬購入も作れない',async()=>{
  d.raw.exec("UPDATE tenants SET status='suspended' WHERE id='t'");await expect(passCheckout(d.db,'a','f','ticket','stopped-tenant',true,now)).rejects.toMatchObject({code:'plan_unavailable'});
  d.raw.exec("UPDATE tenants SET status='active' WHERE id='t';UPDATE line_accounts SET is_active=0 WHERE id='a'");await expect(passCheckout(d.db,'a','f','ticket','stopped-store',true,now)).rejects.toMatchObject({code:'plan_unavailable'});expect(d.raw.prepare('SELECT count(*) n FROM booking_pass_purchases').get()).toEqual({n:0});
+});
+
+test('試験の請求失敗と正常解約を分け、未接続の実課金を失敗や0件にしない',async()=>{
+ const {event}=await buy('monthly');await passBillingEvent(d.db,event,now);
+ const summary=()=>billingSummary();
+ expect(await summary()).toMatchObject({billingFailed:null,billingStatus:'unconfigured',billingSimulationFailed:0,billingSimulationCancelled:0});
+ const failed:PassBillingEvent={id:'summary-failed',kind:'invoice.payment_failed',subscriptionId:'sub_test_monthly',periodStart:'2026-11-16T03:00:00Z',periodEnd:'2026-12-16T03:00:00Z',occurredAt:'2026-11-16T03:00:00Z',testMode:true};
+ await passBillingEvent(d.db,failed,new Date(failed.occurredAt));
+ expect(await summary()).toMatchObject({billingFailed:null,billingSimulationFailed:1,billingSimulationCancelled:0});
+ await expirePassGrace(d.db,new Date('2026-11-24T03:00:00Z'));
+ expect(await summary()).toMatchObject({billingSimulationFailed:1,billingSimulationCancelled:0});
+ await passBillingEvent(d.db,{...failed,id:'summary-cancelled',kind:'customer.subscription.deleted',occurredAt:'2026-11-25T03:00:00Z'},new Date('2026-11-25T03:00:00Z'));
+ expect(await summary()).toMatchObject({billingFailed:null,billingSimulationFailed:0,billingSimulationCancelled:1});
+ expect(d.raw.prepare('SELECT remaining,billing_status FROM booking_entitlements').get()).toEqual({remaining:null,billing_status:'stopped'});
+});
+
+test('払い直しと遅着した失敗通知では、回復した月謝を試験失敗へ戻さない',async()=>{
+ const {event}=await buy('monthly');await passBillingEvent(d.db,event,now);
+ const failed:PassBillingEvent={id:'summary-first-failure',kind:'invoice.payment_failed',subscriptionId:'sub_test_monthly',periodStart:'2026-11-16T03:00:00Z',periodEnd:'2026-12-16T03:00:00Z',occurredAt:'2026-11-16T03:00:00Z',testMode:true};
+ await passBillingEvent(d.db,failed,new Date(failed.occurredAt));
+ await passBillingEvent(d.db,{...failed,id:'summary-retry-failure',occurredAt:'2026-11-21T03:00:00Z'},new Date('2026-11-21T03:00:00Z'));
+ expect(await billingSummary()).toMatchObject({billingSimulationFailed:1,billingSimulationCancelled:0});
+ // 再試行の通知より前の支払い成功が後から届いても、現在の回復を優先する。
+ await passBillingEvent(d.db,{...failed,id:'summary-recovered',kind:'invoice.paid',amount:3000,currency:'jpy',occurredAt:'2026-11-20T03:00:00Z'},new Date('2026-11-21T03:00:00Z'));
+ expect(await billingSummary()).toMatchObject({billingFailed:null,billingSimulationFailed:0,billingSimulationCancelled:0});
+ expect(await passBillingEvent(d.db,{...failed,id:'summary-ignored-future-failure',occurredAt:'2026-11-22T03:00:00Z'},new Date('2026-11-22T03:00:00Z'))).toMatchObject({result:'ignored'});
+ expect(await billingSummary()).toMatchObject({billingSimulationFailed:0,billingSimulationCancelled:0});
+});
+
+test('請求失敗のない正常解約は、重複通知でも試験失敗に数えない',async()=>{
+ const {event}=await buy('monthly');await passBillingEvent(d.db,event,now);
+ const cancelled:PassBillingEvent={id:'summary-normal-cancel',kind:'customer.subscription.deleted',subscriptionId:'sub_test_monthly',periodStart:now.toISOString(),periodEnd:event.periodEnd,occurredAt:'2026-10-20T03:00:00Z',testMode:true};
+ await passBillingEvent(d.db,cancelled,new Date(cancelled.occurredAt));
+ await passBillingEvent(d.db,cancelled,new Date(cancelled.occurredAt));
+ expect(await billingSummary()).toMatchObject({billingFailed:null,billingStatus:'unconfigured',billingSimulationFailed:0,billingSimulationCancelled:1});
+});
+
+test('別店舗の試験失敗と、手で止めた券を課金失敗へ混ぜない',async()=>{
+ d.raw.exec(`INSERT INTO friends(id,line_user_id,line_account_id) VALUES('fb','Ufb','b');
+ INSERT INTO booking_pass_plans(id,line_account_id,kind,name,price,count,monthly_limit,valid_days,status,created_by,created_at,idempotency_key,request_json)
+ SELECT 'monthly-b','b',kind,name,price,count,monthly_limit,valid_days,status,created_by,created_at,'monthly-b',request_json FROM booking_pass_plans WHERE id='monthly'`);
+ const other=await passCheckout(d.db,'b','fb','monthly-b','buy-other',true,now);
+ await passBillingEvent(d.db,{id:'summary-other-checkout',kind:'checkout.session.completed',checkoutId:String(other.checkoutId),subscriptionId:'sub_test_other',amount:3000,currency:'jpy',periodStart:now.toISOString(),periodEnd:'2026-11-16T03:00:00Z',occurredAt:now.toISOString(),testMode:true},now);
+ const failed:PassBillingEvent={id:'summary-other-failure',kind:'invoice.payment_failed',subscriptionId:'sub_test_other',periodStart:'2026-11-16T03:00:00Z',periodEnd:'2026-12-16T03:00:00Z',occurredAt:'2026-11-16T03:00:00Z',testMode:true};
+ await passBillingEvent(d.db,failed,new Date(failed.occurredAt));
+ const {event}=await buy();await passBillingEvent(d.db,event,now);
+ d.raw.exec("UPDATE booking_entitlements SET billing_status='stopped' WHERE line_account_id='a'");
+ expect(await billingSummary()).toMatchObject({billingFailed:null,billingSimulationFailed:0,billingSimulationCancelled:0});
+ expect(await billingSummary('b',{...gapOwner,tenantId:'other'})).toMatchObject({billingSimulationFailed:1,billingSimulationCancelled:0});
 });

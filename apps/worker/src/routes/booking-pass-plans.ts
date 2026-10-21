@@ -10,8 +10,18 @@ bookingPassPlans.get('/api/booking/admin/pass-plans',async c=>{
  const a=await gapAccount(c),q=c.req.query('q')??'',status=c.req.query('status')??'',offset=Number(c.req.query('offset')??0),limit=Number(c.req.query('limit')??20);if(!Number.isSafeInteger(offset)||offset<0||![10,20,50].includes(limit)||q.length>100)throw new GapError('invalid_pagination');
  const where="line_account_id=? AND (?='' OR status=?) AND instr(lower(name),lower(?))>0",binds=[a,status,status,q];
  const total=await c.env.DB.prepare(`SELECT count(*) n FROM booking_pass_plans WHERE ${where}`).bind(...binds).first<{n:number}>(),rows=(await c.env.DB.prepare(`SELECT * FROM booking_pass_plans WHERE ${where} ORDER BY created_at DESC,id LIMIT ? OFFSET ?`).bind(...binds,limit,offset).all<Record<string,unknown>>()).results;
- const summary=await c.env.DB.prepare(`SELECT (SELECT count(*) FROM booking_pass_plans WHERE line_account_id=? AND status='on_sale') onSale,count(DISTINCT CASE WHEN status='active' THEN friend_id END) holders,count(CASE WHEN status='active' AND julianday(expires_at)>=julianday('now') AND julianday(expires_at)<=julianday('now','+30 days') THEN 1 END) expiringIn30d,count(CASE WHEN billing_status!='ok' THEN 1 END) billingFailed FROM booking_entitlements WHERE line_account_id=?`).bind(a,a).first();
- return c.json({success:true,data:{items:rows.map(passPlanView),total:total?.n??0,summary}});
+ const summary=await c.env.DB.prepare(`SELECT (SELECT count(*) FROM booking_pass_plans WHERE line_account_id=? AND status='on_sale') onSale,count(DISTINCT CASE WHEN status='active' THEN friend_id END) holders,count(CASE WHEN status='active' AND julianday(expires_at)>=julianday('now') AND julianday(expires_at)<=julianday('now','+30 days') THEN 1 END) expiringIn30d FROM booking_entitlements WHERE line_account_id=?`).bind(a,a).first();
+ // この購入経路はDB制約も test_mode=1。実課金の失敗は未接続で、0件と断定しない。
+ const simulation=await c.env.DB.prepare(`SELECT
+ count(CASE WHEN b.kind='invoice.payment_failed' THEN 1 END) billingSimulationFailed,
+ count(CASE WHEN b.kind='customer.subscription.deleted' THEN 1 END) billingSimulationCancelled
+ FROM booking_entitlements e JOIN booking_pass_purchases p ON p.entitlement_id=e.id AND p.account_id=e.line_account_id AND p.test_mode=1
+ JOIN booking_pass_billing_events b ON b.purchase_id=p.id AND b.event_id=(
+ SELECT last.event_id FROM booking_pass_billing_events last WHERE last.purchase_id=p.id AND last.result='applied'
+ ORDER BY julianday(last.period_start) DESC,julianday(last.occurred_at) DESC,
+ CASE last.kind WHEN 'customer.subscription.deleted' THEN 3 WHEN 'invoice.paid' THEN 2 ELSE 1 END DESC,last.event_id DESC LIMIT 1)
+ WHERE e.line_account_id=? AND e.billing_status!='ok'`).bind(a).first();
+ return c.json({success:true,data:{items:rows.map(passPlanView),total:total?.n??0,summary:{...summary,...simulation,billingFailed:null,billingStatus:'unconfigured'}}});
 });
 for(const method of ['POST','PUT']as const)bookingPassPlans.on(method,method==='POST'?'/api/booking/admin/pass-plans':'/api/booking/admin/pass-plans/:id',async c=>{
  gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c),p=passPlanInput(b),actor=c.get('staff').id;
