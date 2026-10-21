@@ -125,6 +125,31 @@ function broadcastRow(store: SqliteD1, id: string) {
 }
 
 describe('分析対象者の予約・キュー再確認(N-274)', () => {
+  it.each([1, 2])('送信枠も実際の対象条件に合う%s人だけを数える', async count => {
+    const store = createTestD1();
+    try {
+      seedAccount(store.raw, 'quota-a');
+      seedAccount(store.raw, 'quota-other');
+      for (let index = 0; index < 6; index++) seedFriend(store.raw, `quota-${index}`, 'quota-a');
+      seedFriend(store.raw, 'quota-other-friend', 'quota-other');
+      for (const id of ['quota-hidden', 'quota-unfollowed', 'quota-revoked']) seedFriend(store.raw, id, 'quota-a');
+      store.raw.prepare("UPDATE friends SET is_hidden=1 WHERE id='quota-hidden'").run();
+      store.raw.prepare("UPDATE friends SET is_following=0 WHERE id='quota-unfollowed'").run();
+      store.raw.prepare(`INSERT INTO friend_delivery_consents(line_account_id,friend_id,purpose,state,reason,source)
+        VALUES('quota-a','quota-revoked','marketing','revoked','test','test')`).run();
+      seedAudience(store.raw, 'quota-audience', 'quota-a', {
+        expiresAt: '2026-09-17T00:00:00.000Z',
+        friendIds: [...Array.from({ length: count }, (_, index) => `quota-${index}`), 'quota-hidden', 'quota-unfollowed', 'quota-revoked', 'quota-other-friend'],
+      });
+      seedScheduledSegment(store.raw, 'quota-broadcast', 'quota-a', audienceConditions('quota-audience'));
+      vi.stubGlobal('fetch', vi.fn(async input => new Response(JSON.stringify(
+        String(input).endsWith('/consumption') ? { totalUsage: 0 } : { type: 'limited', value: 1 },
+      ), { status: 200 })));
+      const { guardScheduledBroadcastQuota } = await import('./broadcast.js');
+      const broadcast = store.raw.prepare("SELECT * FROM broadcasts WHERE id='quota-broadcast'").get();
+      expect(await guardScheduledBroadcastQuota(store.db, broadcast as never, 'quota-a')).toMatchObject({ blocked: count > 1 });
+    } finally { store.raw.close(); }
+  });
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-16T02:00:00.000Z'));

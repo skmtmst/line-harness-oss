@@ -590,6 +590,18 @@ async function countScheduledRecipients(
   accountId: string,
 ): Promise<number | null> {
   try {
+    const stored = broadcast.segment_conditions;
+    if (stored) {
+      const conditions = parseStoredConditions(stored);
+      if (!conditions) return null;
+      const query = buildSegmentQuery(conditions);
+      const sql = query.sql.replace('WHERE',
+        `WHERE f.line_account_id = ? AND ${DELIVERY_CONSENT_ALLOWED_SQL} AND`);
+      const row = await db.prepare(`SELECT COUNT(*) AS total FROM (${sql})`)
+        .bind(accountId, ...query.bindings).first<{ total: number }>();
+      const total = Number(row?.total ?? 0);
+      return Number.isFinite(total) ? total : null;
+    }
     const where: string[] = ['f.is_following = 1', 'f.line_account_id = ?', 'COALESCE(f.is_hidden,0)=0', DELIVERY_CONSENT_ALLOWED_SQL];
     const binds: unknown[] = [accountId];
     if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
