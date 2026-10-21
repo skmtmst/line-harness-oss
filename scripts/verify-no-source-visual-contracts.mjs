@@ -76,7 +76,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
   const emit = (ctx, node, actual, expected, reason) => {
     if (!actual.reads.length) return
     const position = ctx.sf.getLineAndCharacterOfPosition(node.getStart(ctx.sf))
-    const hit = { file: ctx.file, entry: ctx.entry ?? ctx.file, line: position.line+1, test: ctx.test || '(module)', reads: [...actual.reads].sort(), expression: node.getText(ctx.sf), expected: [...expected.strings].sort(), reason }
+    const hit = { file: ctx.file, entry: ctx.entry ?? ctx.file, line: position.line+1, test: ctx.test || '(module)', reads: [...actual.reads].sort(), expression: node.getText(ctx.sf), expected: [...expected.strings].sort(), reason, tableRows: ctx.tableRows }
     hit.key = JSON.stringify([hit.entry,hit.file,hit.test,hit.reads,canonical(node,sourceCalls),hit.expected,reason])
     findings.push(hit)
   }
@@ -143,7 +143,7 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
   const invoke = (fn, args, caller, node, depth) => {
     if (!fn.fn || depth > 12 || active.has(fn.fn)) return union(args)
     active.add(fn.fn)
-    const scope = new Scope(fn.scope), ctx = {...fn.ctx, entry:caller.entry??caller.file, test:caller.test}
+    const scope = new Scope(fn.scope), ctx = {...fn.ctx, entry:caller.entry??caller.file, test:caller.test, tableRows:caller.tableRows}
     fn.fn.parameters?.forEach((param,i) => bind(param.name,param.dotDotDotToken?value({items:args.slice(i),collection:true}):(!args[i]||args[i].undefined)?evaluate(param.initializer,scope,ctx,depth+1):args[i],scope))
     const result = ts.isBlock(fn.fn.body) ? statements(fn.fn.body.statements,scope,ctx,depth+1) : evaluate(fn.fn.body,scope,ctx,depth+1)
     active.delete(fn.fn)
@@ -224,6 +224,11 @@ export function analyzeSourceTests(files, entries = [...files.keys()].filter(isT
     if(ts.isIdentifier(harnessCall)&&harness.test(harnessCall.text)){
       const label=args[0]?.strings.join('|')||canonical(node.arguments?.[0]),next={...ctx,test:[ctx.test,label].filter(Boolean).join(' / ')}
       const rows=ts.isCallExpression(call)&&ts.isPropertyAccessExpression(call.expression)&&call.expression.name.text==='each'?evaluate(call.arguments[0],scope,ctx,depth):value()
+      // Keep scalar table rows paired: separate unions cannot distinguish
+      // deleting a case from attaching its pattern to another source path.
+      if(rows.items?.length&&rows.items.every(row=>row.items?.length&&row.items.every(cell=>
+        cell.strings.length===1&&!cell.reads.length&&!cell.items&&!cell.props&&!cell.fn
+      )))next.tableRows=rows.items.map(row=>row.items.map(cell=>cell.strings[0]))
       if(['it','test'].includes(harnessCall.text))for(let current=scope;current;current=current.parent)for(const hook of current.hooks)invoke(hook,[],next,node,depth)
       for(const fn of args.filter(arg=>arg.fn))invoke(fn,fn.fn.parameters.map((_,i)=>union((rows.items??[]).map(row=>row.items?.[i]??row))),next,node,depth)
       return value()
@@ -539,6 +544,22 @@ export function newSourceAssertions(before, after, moves = new Map(), sourceFile
           if(newRoots.length&&newRoots.every(root=>oldRoots.includes(root))){
             const subset=[...oldParts];subset[3]=newRoots
             if(JSON.stringify(subset)===plain)return true
+            // A literal table may lose cases as assertions move to behavior
+            // tests. Require an actual row deletion, preserving each remaining
+            // path/pattern pair and consuming duplicate rows only once.
+            if(newRoots.length<oldRoots.length&&newParts[5].length&&newParts[5].length<oldParts[5].length
+              &&newParts[5].every(text=>oldParts[5].includes(text))
+              &&old.tableRows&&hit.tableRows?.length&&hit.tableRows.length<old.tableRows.length){
+              const priorRows=old.tableRows.map(row=>JSON.stringify(row.map(text=>remapReads?(pathsFor(old.file).get(text)??text):text)))
+              const removedOnly=hit.tableRows.every(row=>{
+                const index=priorRows.indexOf(JSON.stringify(row))
+                if(index<0)return false
+                priorRows.splice(index,1)
+                return true
+              })
+              subset[5]=newParts[5]
+              if(removedOnly&&JSON.stringify(subset)===plain)return true
+            }
           }
           // Extracted code may be read explicitly alongside its old root. Only
           // actual imports of that retained root qualify; unrelated new roots fail.
