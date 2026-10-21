@@ -21,6 +21,7 @@ import { STYLE_CONFIG,rangeFromParam,tabFromParam,viewFromParam } from './config
 import { jstToday } from './date-range'
 import type { IndustryStyle,StyleAlertAction,StyleAnalytics,StyleClosureInput,StyleLayout,StyleRoster,StyleRow,StyleToday } from './model'
 import { rowMenuItems } from './parts'
+import { isLiveLessonBooking, toLessonRosterMember } from './lesson-roster-state'
 import { restaurantAlert,restaurantToday } from './restaurant-today'
 export function useStyleDashboard(style: IndustryStyle) {
   const cfg = STYLE_CONFIG[style]
@@ -140,11 +141,11 @@ export function useStyleDashboard(style: IndustryStyle) {
     void eventsApi.listBookings(accountId, rosterRow.reservationId, { slot_id: slotId, limit: 50 }).then((res) => {
       if (!active) return
       const items = res.items ?? []
-      const live = items.filter((b) => !b.cancelled_at)
+      const live = items.filter(isLiveLessonBooking)
       setRoster({
         rowId: rosterRow.id, head: `${rosterRow.time}${rosterRow.endTime ?? ''}・${rosterRow.sub ?? ''}`, title: rosterRow.name, pay: { label: '払い方は決済をつないでから', tone: 'neutral' },
         meta: `予約 ${live.length}・待ち ${rosterRow.waiting ?? '—'}`, payLinkCount: 0, more: items.length > 7 ? `ほか ${items.length - 7}人` : '',
-        members: items.slice(0, 7).map((b) => ({ name: b.friend_display_name ?? b.friend_name ?? '名前なし', sub: b.is_first_time ? '初めて' : b.status === 'cancelled' ? '取消' : '会員', pay: { label: '—', tone: 'neutral' }, attend: b.cancelled_at ? 'cancel' : b.status === 'attended' ? 'done' : 'button', bookingId: b.id, eventId: b.event_id })),
+        members: items.slice(0, 7).map(toLessonRosterMember),
       })
     }).catch(() => { if (active) setRoster(null) })
     return () => { active = false }
