@@ -37,6 +37,8 @@ export interface StaffItem {
   profile_image_url: string | null;
   bio: string | null;
   is_designation_optional: number;
+  /** 基本/担当別料金とは別に加算する指名料。 */
+  nomination_fee?: number;
   price: number;
   price_mode?: 'fixed' | 'free' | 'inquiry';
   duration_minutes: number;

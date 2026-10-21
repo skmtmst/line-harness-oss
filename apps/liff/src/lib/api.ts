@@ -133,9 +133,10 @@ export const api = {
   storePhotos: () => getData<Array<{ slot: 'exterior' | 'interior' | 'waiting'; url: string }>>('/api/liff/booking/store-photos'),
   staffOf: (menuId: string) =>
     get<{ staff: StaffItem[] }>(`/api/liff/booking/menus/${menuId}/staff`),
-  availability: (menuId: string, staffId: string | undefined, from: string, to: string) => {
+  availability: (menuId: string, staffId: string | undefined, from: string, to: string, addonIds: readonly string[] = []) => {
     const qs = new URLSearchParams({ menu_id: menuId, from, to });
     if (staffId) qs.set('staff_id', staffId);
+    if (addonIds.length) qs.set('addon_ids', JSON.stringify(addonIds));
     return get<AvailabilityResponse>(`/api/liff/booking/availability?${qs}`);
   },
   /** 予約の設定を読む。読めないときは呼び側が既定（リスト・60日）に倒す。 */

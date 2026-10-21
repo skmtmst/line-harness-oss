@@ -134,7 +134,7 @@ it('欠席は振替先を選ぶ前に確定し、同じ本人の残りと期限�
 it('サロンの指名と指名料を保持し、選んだ担当だけで次へ進める', async () => {
   vi.mocked(api.staffOf).mockResolvedValue({ staff: [
     { id: 'auto', display_name: '自動', role: null, profile_image_url: null, bio: null, is_designation_optional: 1, price: 5000, duration_minutes: 60 },
-    { id: 'named', display_name: '人工担当', role: 'スタイリスト', profile_image_url: null, bio: null, is_designation_optional: 0, price: 6000, duration_minutes: 60 },
+    { id: 'named', display_name: '人工担当', role: 'スタイリスト', profile_image_url: null, bio: null, is_designation_optional: 0, price: 5000, nomination_fee: 1000, duration_minutes: 60 },
   ] });
   mount('salon');
   fireEvent.click(await screen.findByRole('button', { name: /人工メニュー/ }));
