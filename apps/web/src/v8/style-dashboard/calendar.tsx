@@ -33,16 +33,16 @@ function Pager({ title, todayLabel, onMove }: { title: string; todayLabel: strin
   )
 }
 
-export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen }: { week: StyleWeek; canWrite: boolean; onMove: (step: -1 | 0 | 1) => void; onSlot: (day: string, start: string) => void; onOpen: (id: string) => void }) {
+export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 'week' }: { period?: 'day' | 'week'; week: StyleWeek; canWrite: boolean; onMove: (step: -1 | 0 | 1) => void; onSlot: (day: string, start: string) => void; onOpen: (id: string) => void }) {
   const timeScale = useCalendarTimeScale(week.entries, week.free, canWrite)
   const axis = calendarTimeRange([...week.entries, ...(canWrite ? week.free : [])])
   const position = (start: string, end: string, day: number, days: number) => box(start, end, day, days, axis.from)
   const hours: string[] = []
   for (let h = axis.from; h < axis.to; h += 1) hours.push(`${h}:00`)
   return (
-    <section ref={timeScale} className={styles.calendar} aria-label="1週間のカレンダー">
+    <section ref={timeScale} className={styles.calendar} aria-label={period === 'day' ? '1日のカレンダー' : '1週間のカレンダー'}>
       <div className={styles.calTools}>
-        <Pager title={week.title} todayLabel="今週" onMove={onMove} />
+        <Pager title={week.title} todayLabel={period === 'day' ? '今日' : '今週'} onMove={onMove} />
         <span className={styles.grow} />
         <span className={styles.calLegend}><i data-k="booked" />予約<i data-k="free" />空き<i data-k="off" />休み</span>
       </div>

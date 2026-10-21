@@ -159,7 +159,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     body = <ListState kind="empty" title={`${cfg.tabs[tab]}は今の画面で見られます`} action={<Button href={tab === 'bookings' ? cfg.links.bookings : cfg.links.people}>{`${cfg.tabs[tab]}を開く`}</Button>} />
   } else {
     const rows = today.rows.filter((r) => !search || r.name.includes(search) || (r.sub ?? '').includes(search) || (r.course ?? '').includes(search))
-    const shownRoster = style === 'lesson' && rosterId !== null ? roster : null
+    const shownRoster = style === 'lesson' && (rosterId === undefined ? view !== 'calendar' : rosterId !== null && roster?.rowId === rosterId) ? roster : null
     let main: ReactNode
     let aside: ReactNode = side.length ? side : null
     if (view === 'calendar') {
@@ -167,7 +167,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         main = <MonthCalendar month={today.month} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, 'month', s))} onDay={(d) => setDate(d)} />
         aside = <DayList month={today.month} href={cfg.links.bookings} />
       } else if (today.week) {
-        main = <WeekCalendar week={today.week} canWrite={canWrite} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, 'week', s))} onSlot={(day, time) => addNew({ date: day, time })} onOpen={(id) => { if (style !== 'salon' && style !== 'consult') { router.push(cfg.links.bookings); return }; const row = today.rows.find((item) => item.id === id); if (row) openRow(row) }} />
+        main = <WeekCalendar week={today.week} period={range === 'today' ? 'day' : 'week'} canWrite={canWrite} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, range === 'today' ? 'today' : 'week', s))} onSlot={(day, time) => addNew({ date: day, time })} onOpen={(id) => { const row = today.rows.find((item) => item.id === id); if (row) openRow(row) }} />
         aside = null
       } else main = <ListState kind="empty" title="カレンダーに出す予約はまだありません" />
     } else if (view === 'floor') {
@@ -186,8 +186,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
             selectedId={style === 'lesson' ? (shownRoster ? shownRoster.rowId : null) : undefined} onSelect={style === 'lesson' ? (r) => setRosterId(r.id) : undefined} />
         </>
       )
-      if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} onLine={() => router.push('/broadcasts')} onCancelClass={() => { if (canWrite && rosterRow?.id === shownRoster.rowId) setClassRow(rosterRow) }} />
     }
+    if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} onLine={() => router.push('/broadcasts')} onCancelClass={() => { if (canWrite && rosterRow?.id === shownRoster.rowId) setClassRow(rosterRow) }} />
     body = (
       <DetailColumns variant={shownRoster ? 'style-roster' : 'style-dashboard'} aside={aside} asideLabel="今日の動き" expanded={asideOpen} onExpandedChange={setAsideOpen}
         toggleLabel={asideOpen ? '右の列を畳む' : roster ? '名簿を見る' : '新着・お支払いを見る'}>{main}</DetailColumns>
