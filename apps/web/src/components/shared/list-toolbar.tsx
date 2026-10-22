@@ -8,7 +8,7 @@ import SearchField from './search-field'
 import FilterChip from './filter-chip'
 import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
-import { toolbarContentFit, fitToolbarWrap, fitToolbarOptionalWidth, fitToolbarOverflowPanel, observeToolbarContent } from './list-toolbar-fit.mjs'
+import { toolbarContentFit, fitToolbarWrap, measureToolbarOptionalWidth, fitToolbarOptionalWidth, fitToolbarOverflowPanel, observeToolbarContent } from './list-toolbar-fit.mjs'
 
 function useToolbarFit() {
   const ref = useRef<HTMLDivElement>(null)
@@ -16,8 +16,13 @@ function useToolbarFit() {
     const toolbar = ref.current
     if (!toolbar || !window.ResizeObserver) return
     const measure = () => {
-      const leading = toolbar.querySelector<HTMLElement>('[data-toolbar-leading]')
-      toolbar.style.setProperty('--toolbar-leading-width', `${Math.ceil(leading?.getBoundingClientRect().width ?? 0)}px`)
+      // この継承値を使うのは、入れ子を含む枠内の検索欄だけ。
+      const slotSearches = toolbar.querySelectorAll(`.${styles.slotTool}[data-toolbar-role="search"]`)
+      if (Array.from(slotSearches).some(slot => slot.closest(`.${styles.slots}`))) {
+        const leading = toolbar.querySelector<HTMLElement>('[data-toolbar-leading]')
+        const width = `${Math.ceil(leading?.getBoundingClientRect().width ?? 0)}px`
+        if (toolbar.style.getPropertyValue('--toolbar-leading-width') !== width) toolbar.style.setProperty('--toolbar-leading-width', width)
+      }
       if (toolbar.dataset.toolbarLayout?.includes('stacked')) {
         for (const row of toolbar.querySelectorAll<HTMLElement>('[data-toolbar-row]')) fitToolbarWrap(row)
       } else fitToolbarWrap(toolbar)
@@ -255,8 +260,15 @@ function OverflowTools({ children, label }: { children: ReactNode; label: string
     const measure = () => {
       if (!item.isConnected) return
       if (item.hasAttribute('data-collapsed') && item.open) fitToolbarOverflowPanel(item, toolbar)
-      if (!item.hasAttribute('data-collapsed')) expandedWidth.current = fitToolbarOptionalWidth(item)
-      setCollapsed(!toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100)).fits)
+      const width = measureToolbarOptionalWidth(item)
+      const growing = width !== null && width > 0 && parseFloat(getComputedStyle(item).flexGrow) > 0
+      if (width !== null) expandedWidth.current = width
+      // A non-growing box's min-width affects geometry; fit after committing that width.
+      if (width !== null && !growing) fitToolbarOptionalWidth(item, width)
+      const snapshot = growing ? { optional: { element: item, width: expandedWidth.current } } : undefined
+      const collapsed = !toolbarContentFit(toolbar, item, expandedWidth.current, false, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100), snapshot).fits
+      if (growing) fitToolbarOptionalWidth(item, width)
+      setCollapsed(collapsed)
     }
     const observer = observeToolbarContent(item, () => [toolbar, ...toolbar.querySelectorAll('button,input')], measure, true)
     contentObserver.current = observer
@@ -331,8 +343,9 @@ export function ResponsiveFilterChips({ children, label = '状態', preserveChip
       const wide = choices.querySelector<HTMLElement>('[data-filter-chips]')!
       if (wide.getBoundingClientRect().width > 0) unfoldedWidth.current = Math.max(wide.scrollWidth, wide.getBoundingClientRect().width)
       const width = String(unfoldedWidth.current)
+      const collapsed = !toolbarContentFit(toolbar, null, 0, true, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100), { filter: { element: choices, width: unfoldedWidth.current } }).fits
       if (choices.dataset.filterWidth !== width) choices.dataset.filterWidth = width
-      setCollapsed(!toolbarContentFit(toolbar, null, 0, true, Boolean(flat && (owner?.closest('[data-page-template]')?.getBoundingClientRect().width ?? Infinity) < 1100)).fits)
+      setCollapsed(collapsed)
     }
     const observer = observeToolbarContent(choices, () => [toolbar, choices], measure)
     contentObserver.current = observer

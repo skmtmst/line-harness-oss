@@ -28,8 +28,6 @@ import { BroadcastScheduleStep } from './broadcast-schedule-step'
 import { saveBroadcast } from './broadcast-send-actions'
 import { testBroadcast } from './broadcast-test-actions'
 
-
-
 import { broadcastSteps,type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { createLoadGeneration,filterSendableTemplates } from '@/components/scenarios/carousel-picker'
 import ActionList,{ ActionAddButton } from '@/components/shared/action-list'
@@ -41,6 +39,7 @@ import { folderById,folderCreator } from '@/components/shared/folder-select'
 import LinePreview from '@/components/shared/line-preview'
 import { MessageComposerPage } from '@/components/shared/message-composer'
 import Notice from '@/components/shared/notice'
+import { useBroadcastStepVisited } from './broadcast-step-mount'
 import { SaveConflictBand,SaveConflictCompareDialog,useSaveConflict } from '@/components/shared/save-conflict'
 import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import StickyBar from '@/components/shared/sticky-bar'
@@ -1201,6 +1200,7 @@ export default function BroadcastForm({
     notice: templateSaveError ? <Notice tone="danger">{templateSaveError}</Notice> : undefined,
   } : undefined
   const saveComposerTemplate = () => saveBroadcastTemplate({ bubbles, composerBusy, saveErrors, selectedAccount, selectedAccountId, selectedAccountIdRef, setComposerBusy, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, templateSaveCreatedId, templateSaveIndex, templateSaveName })
+  const messageVisited = useBroadcastStepVisited(currentStep === null || currentStep === 'message' || showTemplatePicker || inlineComposer !== null)
   const shows = (step: BroadcastStepKey) => currentStep === null || currentStep === step
   const goToStep = (step: BroadcastStepKey) => onStepChange?.(step)
   /*
@@ -1375,7 +1375,7 @@ export default function BroadcastForm({
         ) : null}
         <BroadcastBasicStep {...{ canCreateFolder, createFolder, deliveryMethod, duplicateRecent, folderId, folders, goToStep, internalMemo, recentBroadcasts, recentState, retryRecent, setComposerTemplateIndex, setComposerTemplateKind, setDeliveryMethod, setFolderId, setInternalMemo, setShowTemplatePicker, setTitle, shows, title }} />
         <BroadcastAudienceStep {...{ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }} />
-        <div className={shows('message') ? 'contents' : 'hidden'}>
+        <div className={shows('message') ? 'contents' : 'hidden'}>{messageVisited && <>
         <BroadcastMessageStep {...{ ab, assets, bubbles, composerBusy, fields, moveBubble, selectedAccountId, selectedAccountIdRef, setBubbles, setComposerBusy, setComposerTemplateIndex, setComposerTemplateKind, setInlineComposer, setShowTemplatePicker, setTemplateSaveCreatedId, setTemplateSaveError, setTemplateSaveIndex, setTemplateSaveName, targetMode, title, updateBubble }} />
         {showTemplatePicker && (
           <EntityPickerDialog key={selectedAccountId ?? ''} title="テンプレートを選ぶ" searchPlaceholder="テンプレート名・本文で探す"
@@ -1411,7 +1411,7 @@ export default function BroadcastForm({
         </section>}
         {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <Disclosure size="compact" title="ほかの設定" hint="クリックを数える・ボタン" detailsRef={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></Disclosure> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
-        </div>
+        </>}</div>
         <BroadcastScheduleStep {...{ ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSendMode, setSpreadMinutes, shows, spreadMinutes, targetMode }} />
 
     <div id="broadcast-step-confirm" className={shows('confirm') ? styles.section : 'hidden'}>

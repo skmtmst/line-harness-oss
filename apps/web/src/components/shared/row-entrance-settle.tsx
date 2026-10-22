@@ -60,7 +60,28 @@ export function settleRowEntrance(event: Pick<AnimationEvent, 'animationName' | 
 export default function RowEntranceSettle() {
   useEffect(() => {
     const pending = new Map<HTMLTableSectionElement, AnimationEvent>()
+    const entering = new Set<HTMLTableSectionElement>()
     let frame: number | null = null
+    const onStart = (event: AnimationEvent) => {
+      if (event.animationName !== ROW_ENTRANCE || !(event.target instanceof HTMLTableRowElement)) return
+      const row = event.target, body = row.parentElement
+      if (!(body instanceof HTMLTableSectionElement) || body.tagName !== 'TBODY') return
+      // 仮想表の余白行や読み込み中は、初回の実データではない。
+      if (!body.hasAttribute('data-rows-settled') && row.getAttribute('aria-hidden') !== 'true' && !isPlaceholderRow(row)) entering.add(body)
+    }
+    const onScroll = (event: Event) => {
+      const scroller = event.target === document ? document.documentElement : event.target
+      if (!(scroller instanceof Element)) return
+      for (const body of entering) {
+        if (!body.isConnected) { entering.delete(body); continue }
+        if (!scroller.contains(body)) continue
+        const hasData = Array.from(body.children).some(row => row instanceof HTMLTableRowElement && row.getAttribute('aria-hidden') !== 'true' && !isPlaceholderRow(row))
+        // 読み始めた後の仮想行の載せ替えを、初回の順番出しへ巻き戻さない。
+        if (hasData) body.setAttribute('data-rows-settled', '')
+        entering.delete(body)
+        pending.delete(body)
+      }
+    }
     const onEnd = (event: AnimationEvent) => {
       if (event.animationName !== ROW_ENTRANCE || !(event.target instanceof HTMLTableRowElement)) return
       const body = event.target.parentElement
@@ -71,19 +92,24 @@ export default function RowEntranceSettle() {
       if (frame === null) frame = requestAnimationFrame(() => {
         frame = null
         for (const [body, event] of pending) {
-          if (!body.isConnected || body.children.length === 0) continue
+          if (!body.isConnected || body.children.length === 0) { entering.delete(body); continue }
           const row = event.target as HTMLTableRowElement
           if (isPlaceholderRow(row)) continue
           // 確認までに終わった行が外れても、残った実データの行の動きを確認する。
           if (row.parentElement !== body && Array.from(body.children).every((child) => isPlaceholderRow(child as HTMLTableRowElement))) continue
-          settleBody(body, row)
+          if (settleBody(body, row)) entering.delete(body)
         }
         pending.clear()
       })
     }
+    document.addEventListener('animationstart', onStart, true)
     document.addEventListener('animationend', onEnd, true)
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true })
     return () => {
+      document.removeEventListener('animationstart', onStart, true)
       document.removeEventListener('animationend', onEnd, true)
+      document.removeEventListener('scroll', onScroll, true)
+      entering.clear()
       if (frame !== null) cancelAnimationFrame(frame)
       pending.clear()
     }
