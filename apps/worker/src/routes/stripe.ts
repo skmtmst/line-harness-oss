@@ -54,8 +54,7 @@ stripe.get('/api/integrations/stripe/events', async (c) => {
       })),
     });
   } catch (err) {
-    logger.error("routes_stripe_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -152,7 +151,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
           occurredAt: event.processed_at,
         }).catch((error) => {
           // Stripeイベントは記録済み。派生スコアの失敗で再送を誘発しない。
-          logger.error("routes_stripe_failed");
+          logger.error("stripe.integrations_stripe_webhook_create_failed");
         });
       }
 
@@ -182,8 +181,7 @@ stripe.post('/api/integrations/stripe/webhook', async (c) => {
       data: { id: event.id, stripeEventId: event.stripe_event_id, eventType: event.event_type, processedAt: event.processed_at },
     });
   } catch (err) {
-    logger.error("routes_stripe_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

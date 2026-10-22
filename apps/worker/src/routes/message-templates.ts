@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -33,8 +32,7 @@ messageTemplates.get('/api/message-templates', async (c) => {
     // 同じ中身なら304（list-etag）。
     return listResponse(c, { success: true, data: templates.map(serialize) });
   } catch (err) {
-    logger.error("routes_message_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -45,8 +43,7 @@ messageTemplates.get('/api/message-templates/:id', async (c) => {
     if (!t) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(t) });
   } catch (err) {
-    logger.error("routes_message_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -83,8 +80,7 @@ messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), i
     });
     return c.json({ success: true, data: serialize(t) }, 201);
   } catch (err) {
-    logger.error("routes_message_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -123,8 +119,7 @@ messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin')
     if (!t) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(t) });
   } catch (err) {
-    logger.error("routes_message_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -135,8 +130,7 @@ messageTemplates.delete('/api/message-templates/:id', requireRole('owner', 'admi
     if (!deleted) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true });
   } catch (err) {
-    logger.error("routes_message_templates_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

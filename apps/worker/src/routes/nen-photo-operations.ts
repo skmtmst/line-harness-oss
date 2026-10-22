@@ -101,8 +101,7 @@ nenPhotoOperations.get(
     try {
       return c.json({ success: true, data: await getPhotoReviewMetrics(c.env.DB, accountId) });
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '写真審査の集計を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -134,8 +133,7 @@ nenPhotoOperations.get(
         })),
       });
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '報酬の決まりの版を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -204,8 +202,7 @@ nenPhotoOperations.post(
       if (String(error).includes('PHOTO_REWARD_POLICY_VERSION_CONFLICT')) {
         return c.json({ success: false, error: 'ほかの担当者が先に保存しました。開き直して確認してください', code: 'VERSION_CONFLICT' }, 409);
       }
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '報酬の決まりを保存できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -249,8 +246,7 @@ nenPhotoOperations.post(
       if (String(error).includes('PHOTO_REWARD_POLICY_VERSION_NOT_FOUND')) {
         return c.json({ success: false, error: '戻す版が見つかりません' }, 404);
       }
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '報酬の決まりを戻せませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -284,8 +280,7 @@ nenPhotoOperations.post(
       }
       return queueError(c, result.kind);
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '写真の再評価を受け付けられませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -322,8 +317,7 @@ nenPhotoOperations.post(
       }
       return queueError(c, result.kind);
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '派生画像処理を受け付けられませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -340,8 +334,7 @@ nenPhotoOperations.get(
       const data = await getPhotoAssetStatus(c.env.DB, { photoId, lineAccountId: accountId });
       return data ? c.json({ success: true, data }) : c.json({ success: false, error: '写真が見つかりません' }, 404);
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '派生画像の処理状況を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -358,8 +351,7 @@ nenPhotoOperations.get(
       const data = await getPhotoDerivatives(c.env.DB, { photoId, lineAccountId: accountId });
       return data ? c.json({ success: true, data }) : c.json({ success: false, error: '写真が見つかりません' }, 404);
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '派生画像を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -455,7 +447,7 @@ nenPhotoOperations.post(
                 { now: new Date() },
               );
             } catch (error) {
-              logger.error("routes_nen_photo_operations_failed");
+              logger.error("nen_photo_operations.nen_members_photos_decisions_bulk_create_failed");
             }
           }
         }
@@ -467,8 +459,7 @@ nenPhotoOperations.post(
       }
       return queueError(c, result.kind);
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '写真の一括審査を完了できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -514,8 +505,7 @@ nenPhotoOperations.post(
         data: { downloadUrl, expiresAt: result.expiresAt, oneTime: true },
       }, result.kind === 'created' ? 201 : 200);
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '原本の取得URLを発行できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -546,8 +536,7 @@ nenPhotoOperations.get(
         },
       });
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
-      return c.json({ success: false, error: '原本を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -601,9 +590,9 @@ async function healBulkDecisionReceipt(
         onlyIfPending: true,
       })
       : false;
-    if (!recorded) logger.error("routes_nen_photo_operations_failed");
+    if (!recorded) logger.error("nen_photo_operations.heal_bulk_decision_receipt_failed");
   } catch (error) {
-    logger.error("routes_nen_photo_operations_failed");
+    logger.error("nen_photo_operations.heal_bulk_decision_receipt_failed");
   }
   return data;
 }
@@ -640,7 +629,7 @@ async function notifyOneBulkDecision(
         });
       }
     } catch (error) {
-      logger.error("routes_nen_photo_operations_failed");
+      logger.error("nen_photo_operations.notify_one_bulk_decision_failed");
     }
     return { ...item, notificationStatus: 'failed', notificationError };
   }
@@ -689,7 +678,7 @@ async function notifyBulkPhotoDecisions(
     } catch (error) {
       // 対象1件の想定外の失敗で、後続対象の通知まで止めない（対象単位の分離）。
       // 送達台帳は pending か sending のまま残るが、どちらも再送口の拾い上げ対象。
-      logger.error("routes_nen_photo_operations_failed");
+      logger.error("nen_photo_operations.notify_bulk_photo_decisions_failed");
       outcome = {
         ...item, notificationStatus: 'failed',
         notificationError: '通知を実行できませんでした。再送してください。',
@@ -710,9 +699,9 @@ async function notifyBulkPhotoDecisions(
       actorId: c.get('staff')!.id, idempotencyKey: input.idempotencyKey, result: data,
     });
     // false も握りつぶさない。次の同じ再実行鍵で送達台帳から作り直す。
-    if (!recorded) logger.error("routes_nen_photo_operations_failed");
+    if (!recorded) logger.error("nen_photo_operations.notify_bulk_photo_decisions_failed");
   } catch (error) {
-    logger.error("routes_nen_photo_operations_failed");
+    logger.error("nen_photo_operations.notify_bulk_photo_decisions_failed");
   }
   return data;
 }

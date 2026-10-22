@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import {
@@ -35,8 +34,7 @@ inbox.get('/api/inbox/activity-digest', async (c) => {
     });
     return c.json({ success: true, data });
   } catch (err) {
-    logger.error("routes_inbox_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -62,8 +60,7 @@ inbox.get('/api/inbox/unanswered', async (c) => {
     const result = await computeUnansweredInbox(c.env.DB, opts);
     return c.json({ success: true, data: result });
   } catch (err) {
-    logger.error("routes_inbox_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -76,7 +73,6 @@ inbox.get('/api/inbox/unanswered/count', async (c) => {
     });
     return c.json({ success: true, data: result });
   } catch (err) {
-    logger.error("routes_inbox_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });

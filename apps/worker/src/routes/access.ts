@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { Hono, type Context, type Next } from 'hono';
 import {
   ACCESS_ROLE_BUNDLES,
@@ -127,8 +126,7 @@ access.get(
         },
       });
     } catch (error) {
-      logger.error("routes_access_failed");
-      return c.json({ success: false, error: 'ログインユーザーを取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -159,8 +157,7 @@ access.get(
         },
       });
     } catch (error) {
-      logger.error("routes_access_failed");
-      return c.json({ success: false, error: '権限のかたまりを取得できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -215,8 +212,7 @@ access.get(
         },
       });
     } catch (error) {
-      logger.error("routes_access_failed");
-      return c.json({ success: false, error: '操作記録を取得できませんでした' }, 500);
+      throw error;
     }
   },
 );

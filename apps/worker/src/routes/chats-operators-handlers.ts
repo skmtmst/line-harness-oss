@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError } from '../lib/input-errors.js';
 
@@ -21,8 +20,7 @@ export const get__api_operators_1 = async (c: Context<Env, "/api/operators">) =>
       })),
     });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -33,8 +31,7 @@ export const post__api_operators_2 = async (c: Context<Env, "/api/operators">) =
     const item = await createOperator(c.env.DB, body);
     return c.json({ success: true, data: { id: item.id, name: item.name, email: item.email, role: item.role } }, 201);
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -47,8 +44,7 @@ export const put__api_operators_id_3 = async (c: Context<Env, "/api/operators/:i
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: { id: updated.id, name: updated.name, email: updated.email, role: updated.role, isActive: Boolean(updated.is_active) } });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -57,8 +53,7 @@ export const delete__api_operators_id_4 = async (c: Context<Env, "/api/operators
     await deleteOperator(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -74,8 +69,7 @@ export const get__api_chats_stats_5 = async (c: Context<Env, "/api/chats/stats">
     });
     return c.json({ success: true as const, data: stats });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false as const, error: '受信箱の集計を取得できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -286,8 +280,7 @@ export const get__api_chats_quick_counts_6 = async (c: Context<Env, "/api/chats/
       },
     });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false as const, error: '件数を取得できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -306,7 +299,6 @@ export const get__api_chats_outbound_failures_7 = async (c: Context<Env, "/api/c
     });
     return c.json({ success: true, data: failures });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: '送信失敗履歴を取得できませんでした' }, 500);
+    throw err;
   }
 };

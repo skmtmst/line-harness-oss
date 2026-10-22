@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -92,8 +91,7 @@ async function endpoint<T>(
     return c.json({ success: true, data }, successStatus as 200);
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
-    logger.error("common_action_api_failed");
-    return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
+    throw error;
   }
 }
 
@@ -142,8 +140,7 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
     });
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
-    logger.error("common_action_api_failed");
-    return c.json({ success: false, error: '共通アクションを処理できませんでした' }, 500);
+    throw error;
   }
 });
 

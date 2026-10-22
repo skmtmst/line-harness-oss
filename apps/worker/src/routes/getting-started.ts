@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -245,8 +244,7 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
       },
     });
   } catch (err) {
-    logger.error("routes_getting_started_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -269,8 +267,7 @@ gettingStarted.post('/api/getting-started/dismiss', requireRole('owner', 'admin'
     ).bind(staff.id).run();
     return c.json({ success: true, data: { dismissed: true } });
   } catch (err) {
-    logger.error("routes_getting_started_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

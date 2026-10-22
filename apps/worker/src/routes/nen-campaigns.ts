@@ -97,16 +97,14 @@ function metricsError(c: Context<Env>, error: unknown): Response {
       ...(error.field ? { field: error.field } : {}),
     }, error.status, []);
   }
-  logger.error("nen_campaign_metrics_failed");
-  return c.json({ success: false, error: 'NEN配信の情報を取得できませんでした' }, 500);
+  throw error;
 }
 
 function columnOperationError(c: Context<Env>, error: unknown): Response {
   if (error instanceof NenColumnOperationError) {
     return inputError(c, { success: false, code: error.code, error: error.message }, error.status, []);
   }
-  logger.error("routes_nen_campaigns_failed");
-  return c.json({ success: false, error: 'NENコラムを操作できませんでした' }, 500);
+  throw error;
 }
 
 function cursorOffset(value: string | undefined): number {
@@ -711,8 +709,7 @@ nenCampaigns.post('/api/nen-campaigns/columns', requireDeliveryAccess('nenCampai
     if (isNenColumnSlugConflict(error)) {
       return c.json({ success: false, error: 'column_already_exists' }, 409);
     }
-    logger.error("routes_nen_campaigns_failed");
-    return c.json({ success: false, error: 'column_create_failed' }, 500);
+    throw error;
   }
   auditLog(c, 'nen.column.create', {kind:'nen_column',id}, {lineAccountId:accountId});
   return c.json({ success: true, data: { id, queued: 0 } }, 201);

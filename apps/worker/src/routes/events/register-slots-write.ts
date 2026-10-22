@@ -128,7 +128,7 @@ events.post(
       }
       return c.json({ success: true, data: result });
     } catch (error) {
-      logger.error("routes_events_failed");
+      logger.error("events.admin_occurrences_by_id_waitlist_promote_create_failed");
       return c.json({ error: 'waitlist_notification_failed' }, 503);
     }
   },
@@ -380,7 +380,7 @@ events.put('/api/events/admin/events/:id/slots/:slotId', requireRole('owner', 'a
               startsAtIso: oldStartsAt,
             });
           } catch (compensationError) {
-            logger.error("routes_events_failed");
+            logger.error("events.admin_events_by_id_slots_by_slot_id_update_failed");
           }
         }
         throw error;

@@ -1,5 +1,4 @@
 import { jstMonthStart as japanMonthStart } from '@line-crm/shared';
-import { logger } from '@line-crm/shared/server';
 import type { TenantStatus, TenantListRow } from './ops-tenant-types.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -523,8 +522,7 @@ ops.post('/api/ops/members', requirePlatformAdminWrite(), inputJsonBoundary(), a
       existingAccount: Boolean(inDefault),
     });
   } catch (error) {
-    logger.error("routes_ops_failed");
-    return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
+    throw error;
   }
   await recordPlatformAudit(db, {
     staffId: staff.id, staffName: staff.name, action: 'member.invite',
@@ -553,8 +551,7 @@ ops.post('/api/ops/members/:staffId/resend-invite', requirePlatformAdminWrite(),
       existingAccount: Boolean(target.password_hash),
     });
   } catch (error) {
-    logger.error("routes_ops_failed");
-    return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
+    throw error;
   }
   return c.json({ success: true, data: { staffId: targetId, activationState: 'invited' } });
 });

@@ -164,7 +164,7 @@ export async function processDueFileScans(
       }, target.etag);
       if (next.status === 'pending') stillPending += 1;
     } catch (err) {
-      logger.error("routes_file_scan_failed");
+      logger.error("file_scan.process_due_file_scans_failed");
       if (await markFileScanPendingRetry(env.DB, scan.id, scan.attempts, isPrivateFormDocumentScan(scan) ? FORM_FILE_SCAN_MAX_ATTEMPTS : undefined) === 'pending') stillPending += 1;
     }
   }

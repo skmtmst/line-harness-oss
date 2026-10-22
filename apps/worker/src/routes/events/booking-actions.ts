@@ -94,7 +94,7 @@ export async function notifyBookingFriend(
       },
     });
   } catch (e) {
-    logger.error("routes_events_failed");
+    logger.error("events.notify_booking_friend_failed");
   }
 }
 

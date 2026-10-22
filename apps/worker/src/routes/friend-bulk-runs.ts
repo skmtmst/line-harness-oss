@@ -32,8 +32,7 @@ function errorResponse(c: Context<Env>, error: unknown) {
   if (error instanceof FriendBulkRunError) {
     return fail(c, error.status as ContentfulStatusCode, error.code, { error: error.message }, bulkErrorFields(error.code));
   }
-  logger.error("routes_friend_bulk_runs_failed");
-  return fail(c, 500, 'INTERNAL_SERVER_ERROR', { error: '一括操作を処理できませんでした' });
+  throw error;
 }
 
 function idempotencyKey(c: { req: { header(name: string): string | undefined } }): string {
@@ -48,7 +47,7 @@ function keepRunning(c: { executionCtx: ExecutionContext }, promise: Promise<unk
   try {
     c.executionCtx.waitUntil(promise);
   } catch {
-    void promise.catch((error) => logger.error("routes_friend_bulk_runs_failed"));
+    void promise.catch((error) => logger.error("friend_bulk_runs.keep_running_failed"));
   }
 }
 

@@ -205,7 +205,7 @@ nenRanks.delete('/api/nen/rank-settings/:id', requireRole('owner', 'admin'), asy
         : ecSyncResult.status === 'failed' ? 'ECへの反映に失敗した会員がいます。結果を確認してやり直してください' : data.message } });
   } catch (error) {
     if (error instanceof NenRankDeleteError) return inputError(c, { success: false, error: error.message }, error.status, []);
-    return c.json({ success: false, error: 'ランクを削除できませんでした。読み直してからもう一度お試しください' }, 500);
+    throw error;
   }
 });
 

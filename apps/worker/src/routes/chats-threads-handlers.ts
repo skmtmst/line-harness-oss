@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { slaChatList, enrichSlaChats } from '../services/inbox-sla-list.js';
 import { refreshInboxSla } from '../services/inbox-sla.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -381,8 +380,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
 
     return c.json({ success: true, data: await enrichSlaChats(c.env.DB,data) });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -538,8 +536,7 @@ export const get__api_chats_id_2 = async (c: Context<Env, "/api/chats/:id">) => 
       },
     });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -566,8 +563,7 @@ export const post__api_chats_id_read_3 = async (c: Context<Env, "/api/chats/:id/
     }
     return c.json({ success: true, data: { isUnread: false } });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -602,8 +598,7 @@ export const post__api_chats_read_all_4 = async (c: Context<Env, "/api/chats/rea
       .run();
     return c.json({ success: true, data: { marked: true } });
   } catch (err) {
-    logger.error("routes_chats_failed");
-    return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
+    throw err;
   }
 };
 

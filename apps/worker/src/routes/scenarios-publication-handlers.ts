@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { validateConditionForStorage } from './scenario-condition-validation.js';
 import type { ActionBody } from './scenario-action-input-types.js';
 import { inputError } from '../lib/input-errors.js';
@@ -49,8 +48,7 @@ export const post__api_scenarios_id_publish_1 = async (c: Context<Env, "/api/sce
         : '分岐または完了後の移動が循環しているため公開できません';
       return c.json({ success: false, error: reason, code: 'PUBLISH_CYCLE' }, 409);
     }
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'シナリオを公開できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -66,8 +64,7 @@ export const get__api_scenarios_id_actions_2 = async (c: Context<Env, "/api/scen
       .all<Parameters<typeof serializeAction>[0]>();
     return c.json({ success: true, data: (rows.results ?? []).map(serializeAction) });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -164,8 +161,7 @@ export const post__api_scenarios_id_actions_3 = async (c: Context<Env, "/api/sce
       .first<Parameters<typeof serializeAction>[0]>();
     return c.json({ success: true, data: row ? serializeAction(row) : null });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -237,8 +233,7 @@ export const put__api_scenarios_id_actions_actionId_4 = async (c: Context<Env, "
       .first<Parameters<typeof serializeAction>[0]>();
     return c.json({ success: true, data: row ? serializeAction(row) : null });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -249,8 +244,7 @@ export const delete__api_scenarios_id_actions_actionId_5 = async (c: Context<Env
       .run();
     return c.json({ success: true });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -266,8 +260,7 @@ export const get__api_scenarios_id_triggers_8 = async (c: Context<Env, "/api/sce
       data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),
     });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -310,8 +303,7 @@ export const post__api_scenarios_id_triggers_9 = async (c: Context<Env, "/api/sc
       data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),
     });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -336,8 +328,7 @@ export const delete__api_scenarios_id_triggers_triggerId_11 = async (c: Context<
       await removeScenarioTrigger(c.env.DB, c.req.param('id'), c.req.param('triggerId'));
       return c.json({ success: true });
     } catch (err) {
-      logger.error("routes_scenarios_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -370,8 +361,7 @@ export const post__api_scenario_subscriptions_subscriptionId_pause_12 = async (c
         };
       });
     } catch (err) {
-      logger.error("routes_scenarios_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -406,8 +396,7 @@ export const post__api_scenario_subscriptions_subscriptionId_resume_13 = async (
         return { status: 200, body: { success: true, data: serializeFriendScenario(resumed) } };
       });
     } catch (err) {
-      logger.error("routes_scenarios_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -436,8 +425,7 @@ export const post__api_scenario_subscriptions_subscriptionId_retry_14 = async (c
         return { status: 200, body: { success: true, data: serializeFriendScenario(retried) } };
       });
     } catch (err) {
-      logger.error("routes_scenarios_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -497,7 +485,6 @@ export const post__api_scenario_subscriptions_subscriptionId_move_15 = async (c:
         return { status: 200, body: { success: true, data: serializeFriendScenario(moved) } };
       });
     } catch (err) {
-      logger.error("routes_scenarios_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };

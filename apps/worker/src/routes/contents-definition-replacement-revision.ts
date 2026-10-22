@@ -217,7 +217,7 @@ export async function measureStoredImageMetadata(
     const bytes = new Uint8Array(await object.arrayBuffer());
     return imageDimensions(bytes, media.mime_type);
   } catch (err) {
-    logger.error("routes_contents_failed");
+    logger.error("contents.measure_stored_image_metadata_failed");
     return null;
   }
 }

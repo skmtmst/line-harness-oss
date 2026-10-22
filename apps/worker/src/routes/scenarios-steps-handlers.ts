@@ -1,5 +1,4 @@
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
-import { logger } from '@line-crm/shared/server';
 import { validateConditionForStorage } from './scenario-condition-validation.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -238,8 +237,7 @@ export const put__api_scenarios_id_steps_stepId_1 = async (c: Context<Env, "/api
 
     return c.json({ success: true, data: serializeStep(updated) });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -249,8 +247,7 @@ export const delete__api_scenarios_id_steps_stepId_2 = async (c: Context<Env, "/
     await deleteScenarioStep(c.env.DB, stepId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -323,8 +320,7 @@ export const post__api_scenarios_id_steps_reorder_3 = async (c: Context<Env, "/a
 
     return c.json({ success: true });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -440,8 +436,7 @@ export const get__api_scenarios_id_preview_4 = async (c: Context<Env, "/api/scen
       },
     });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -458,8 +453,7 @@ export const get__api_scenarios_id_stats_5 = async (c: Context<Env, "/api/scenar
     const stats = await computeScenarioStats(c.env.DB, scenarioId);
     return c.json({ success: true, data: stats });
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -616,7 +610,6 @@ export const post__api_scenarios_id_enroll_friendId_10 = async (c: Context<Env, 
     }
     return c.json({ success: true, data: serializeFriendScenario(enrollment) }, 201);
   } catch (err) {
-    logger.error("routes_scenarios_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

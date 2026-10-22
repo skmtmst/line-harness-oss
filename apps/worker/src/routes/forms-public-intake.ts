@@ -106,7 +106,7 @@ export const post__api_forms_id_opened_1 = async (c: Context<Env, "/api/forms/:i
 
     return c.json({ success: true });
   } catch (err) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.forms_id_opened_post_failed");
     return c.json({ success: true }); // non-blocking, always succeed
   }
 };
@@ -296,7 +296,7 @@ export const post__api_forms_id_files_3 = async (c: Context<Env, "/api/forms/:id
     mimeType,
     sizeBytes: formBytes.byteLength,
   }).then((scan) => markFileScanClean(c.env.DB, scan.id))
-    .catch((err) => logger.error("routes_forms_failed"));
+    .catch((err) => logger.error("forms.forms_id_files_post_failed"));
 
   const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
   return c.json(

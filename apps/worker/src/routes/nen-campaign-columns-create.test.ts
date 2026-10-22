@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../worker-env.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 
 const mocks = vi.hoisted(() => ({
   canAccess: vi.fn(),
@@ -49,9 +51,10 @@ function database(state: DbState): D1Database {
 }
 
 function app(state: DbState, role: 'owner' | 'admin' | 'staff' = 'owner') {
-  const instance = new Hono<{ Bindings: { DB: D1Database } }>();
+  const instance = new Hono<Env>();
+  instance.onError(unhandledWorkerError);
   instance.use('*', async (c, next) => {
-    c.env = { DB: database(state) };
+    c.env = { DB: database(state) } as Env['Bindings'];
     c.set('staff' as never, { id: 'staff-1', role, tenantId: 'tenant-a' } as never);
     await next();
   });
@@ -226,8 +229,8 @@ describe('POST /api/nen-campaigns/columns', () => {
       createRequest(VALID),
     );
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ success: false, error: 'column_create_failed' });
-    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('routes_nen_campaigns_failed'));
+    expect(await response.json()).toEqual({ success: false, error: 'Internal Server Error', incidentId: expect.any(String) });
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('unhandled_worker_error'));
     expect(consoleError.mock.calls.flat().join(' ')).not.toContain('no such table');
     consoleError.mockRestore();
   });

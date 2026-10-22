@@ -196,7 +196,7 @@ authEmail.post('/api/auth/register/request', inputJsonBoundary(), async (c) => {
     await sendSignupVerifyMail(c.env, { email, completeUrl: `${base}/register/complete?token=${encodeURIComponent(token)}` });
     return c.json({ success: true, data: { sent: true } });
   } catch (error) {
-    logger.error("routes_auth_email_failed");
+    logger.error("auth_email.auth_register_request_create_failed");
     return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });
@@ -422,7 +422,7 @@ authEmail.post('/api/auth/password/forgot', inputJsonBoundary(), async (c) => {
     }
     return c.json({ success: true, data: { sent: true } });
   } catch (error) {
-    logger.error("routes_auth_email_failed");
+    logger.error("auth_email.auth_password_forgot_create_failed");
     return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });

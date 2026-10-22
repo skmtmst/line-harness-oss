@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { serializeConversionPoint } from './conversion-point-serialization.js';
 import { inputError } from '../lib/input-errors.js';
 import { conversionApprovalCounts } from '../services/tab-counts.js';
@@ -133,8 +132,7 @@ export const get__api_conversions_points_3 = async (c: Context<Env, "/api/conver
       data: items.map(serializeConversionPoint),
     });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -164,8 +162,7 @@ export const post__api_conversions_points_4 = async (c: Context<Env, "/api/conve
     });
     return c.json({ success: true, data: serializeConversionPoint(point) }, 201);
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -239,8 +236,7 @@ export const put__api_conversions_points_id_5 = async (c: Context<Env, "/api/con
     if (!point) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeConversionPoint(point) });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -274,8 +270,7 @@ export const delete__api_conversions_points_id_6 = async (c: Context<Env, "/api/
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -362,8 +357,7 @@ export const post__api_conversions_track_7 = async (c: Context<Env, "/api/conver
     if (err instanceof Error && err.message === 'conversion_excluded') {
       return inputError(c, { success: false, error: '「数えない条件」に当てはまるため記録できません' }, 422, []);
     }
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -405,8 +399,7 @@ export const get__api_conversions_events_8 = async (c: Context<Env, "/api/conver
       })),
     });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -442,8 +435,7 @@ export const get__api_conversions_events_id_reversals_9 = async (c: Context<Env,
         })),
       });
     } catch (err) {
-      logger.error("routes_conversions_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -507,8 +499,7 @@ export const post__api_conversions_events_id_reversals_10 = async (c: Context<En
         throw err;
       }
     } catch (err) {
-      logger.error("routes_conversions_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -578,8 +569,7 @@ export const get__api_conversions_approvals_counts_12 = async (c: Context<Env, "
       allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned,
     }) });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: '件数を取得できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -607,7 +597,6 @@ export const get__api_conversions_approvals_13 = async (c: Context<Env, "/api/co
 
     return c.json({ success: true, data: rows });
   } catch (err) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

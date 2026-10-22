@@ -415,7 +415,7 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
     } catch (segmentError) {
       // 条件が壊れているときは 0 を返す。ここで500にすると、下書きの一覧
       // そのものが開かなくなる。送信を押した時点で理由付きで止まる。
-      logger.error("routes_broadcasts_failed");
+      logger.error("broadcasts.broadcasts_id_preview_count_get_failed");
     }
   } else if (broadcast.target_type === 'all') {
     const accountId = (raw.line_account_id as string | null) || null;
@@ -499,7 +499,7 @@ export const get__api_broadcasts_id_per_account_stats_13 = async (c: Context<Env
             uniqueClick: (overview.uniqueClick as number) ?? null,
           });
         } catch (err) {
-          logger.error("routes_broadcasts_failed");
+          logger.error("broadcasts.broadcasts_id_per_account_stats_get_failed");
         }
       }),
     );

@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getFriendById, getReminderById, createReminder, updateReminder, deleteReminder, restoreReminder, createReminderStep, deleteReminderStep, enrollFriendInReminder, getFriendReminders, listReminderRegistrants, moveReminderRegistrantTargetDate, cancelReminderRegistrant, resumeReminderRegistrant, getReminderRegistrantById, getReminderDeliveryRunById, getReminderDeliveryRunSummary, getReminderDeliveryStepSummaries, listReminderDeliveryRuns, retryReminderDeliveryRun, getReminderPublishedVersion, parseReminderVersionSettings, type ReminderDeliveryRunStatus } from '@line-crm/db';
@@ -127,8 +126,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
       },
     });
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: '実行結果を読み込めませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -178,8 +176,7 @@ export const post__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =
     }
     return c.json({ success: true, data: { id: item.id, name: item.name, createdAt: item.created_at } }, 201);
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -223,8 +220,7 @@ export const put__api_reminders_id_3 = async (c: Context<Env, "/api/reminders/:i
     if (err instanceof Error && err.message === 'REMINDER_NOT_PUBLISHED') {
       return c.json({ success: false, error: 'まだ公開していない下書きは再開できません。先に公開してください' }, 409);
     }
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -233,8 +229,7 @@ export const delete__api_reminders_id_4 = async (c: Context<Env, "/api/reminders
     await deleteReminder(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -249,8 +244,7 @@ export const post__api_reminders_id_restore_5 = async (c: Context<Env, "/api/rem
       data: { id: restored.id, name: restored.name, isActive: Boolean(restored.is_active) },
     });
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'リマインダを元に戻せませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -308,8 +302,7 @@ export const post__api_reminders_id_steps_6 = async (c: Context<Env, "/api/remin
       },
     }, 201);
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -321,8 +314,7 @@ export const delete__api_reminders_id_steps_stepId_7 = async (c: Context<Env, "/
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -350,8 +342,7 @@ export const post__api_reminders_id_enroll_friendId_8 = async (c: Context<Env, "
       data: { id: enrollment.id, friendId: enrollment.friend_id, reminderId: enrollment.reminder_id, targetDate: enrollment.target_date, status: enrollment.status },
     }, 201);
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -372,8 +363,7 @@ export const get__api_reminders_id_registrants_9 = async (c: Context<Env, "/api/
     }
     return c.json({ success: true, data: items.map(publicRegistrant) });
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -392,8 +382,7 @@ export const patch__api_reminders_id_registrants_enrollmentId_10 = async (c: Con
       scope: await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     }));
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -411,8 +400,7 @@ export const post__api_reminders_id_registrants_enrollmentId_cancel_11 = async (
       scope: await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     }));
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -437,8 +425,7 @@ export const post__api_reminders_id_registrants_enrollmentId_resume_12 = async (
       scope: await getVisibleLineAccountScope(c.env.DB, c.get('staff')),
     }));
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -465,8 +452,7 @@ export const get__api_friends_friendId_reminders_13 = async (c: Context<Env, "/a
       })),
     });
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -514,8 +500,7 @@ export const delete__api_friend_reminders_id_14 = async (c: Context<Env, "/api/f
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -565,7 +550,6 @@ export const post__api_reminder_runs_runId_retry_15 = async (c: Context<Env, "/a
       data: { id: retried.run.id, status: retried.run.status, replayed: retried.kind === 'replay' },
     });
   } catch (err) {
-    logger.error("routes_reminders_failed");
-    return c.json({ success: false, error: '再試行を受け付けられませんでした' }, 500);
+    throw err;
   }
 };

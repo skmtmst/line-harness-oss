@@ -167,8 +167,7 @@ supportInbox.get('/api/support/summary', async (c) => {
       },
     });
   } catch (error) {
-    logger.error("support_summary_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 
@@ -354,8 +353,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       },
     });
   } catch (error) {
-    logger.error("support_inbox_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 });
 

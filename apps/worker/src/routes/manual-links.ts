@@ -1,5 +1,4 @@
 import { fail } from '../lib/fail.js';
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import {
@@ -71,8 +70,7 @@ manualLinks.get('/api/manual-links/lookup', async (c) => {
   try {
     return lookup(c, c.req.query('screen') ?? c.req.query('key'));
   } catch (err) {
-    logger.error("routes_manual_links_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -93,8 +91,7 @@ manualLinks.get('/api/manual-links', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_manual_links_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -147,8 +144,7 @@ async function update(c: AppContext, pathKey?: string) {
         code: 'VERSION_CONFLICT',
       }, 409);
     }
-    logger.error("routes_manual_links_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 }
 
@@ -180,8 +176,7 @@ manualLinks.post('/api/manual-links/check', requireRole('owner', 'admin', 'staff
       },
     });
   } catch (err) {
-    logger.error("routes_manual_links_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getFolderById, createFolder, updateFolder, swapFolderOrder, FolderConflictError, deleteFolder, isFolderKind } from '@line-crm/db';
@@ -70,8 +69,7 @@ export const post__api_folders_1 = async (c: Context<Env, "/api/folders">) => {
     return c.json({ success: true, data: serializeFolder(folder) }, 201);
   } catch (err) {
     if (err instanceof FolderConflictError) return c.json({success:false,error:'同じ名前のフォルダがあります'},409);
-    logger.error("routes_friend_attributes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -139,8 +137,7 @@ export const patch__api_folders_id_2 = async (c: Context<Env, "/api/folders/:id"
     return c.json({ success: true, data: serializeFolder(folder!) });
   } catch (err) {
     if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
-    logger.error("routes_friend_attributes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -176,8 +173,7 @@ export const post__api_folders_id_swap_order_3 = async (c: Context<Env, "/api/fo
     return c.json({ success: true, data: { swapped: [id, withId] } });
   } catch (err) {
     if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
-    logger.error("routes_friend_attributes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -204,7 +200,6 @@ export const delete__api_folders_id_4 = async (c: Context<Env, "/api/folders/:id
     return c.json({ success: true, data: null });
   } catch (err) {
     if (err instanceof FolderConflictError) return c.json({success:false,error:'フォルダが更新されました'},409);
-    logger.error("routes_friend_attributes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

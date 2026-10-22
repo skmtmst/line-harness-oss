@@ -121,8 +121,7 @@ trackedLinks.get('/api/tracked-links', async (c) => {
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: items.map((item) => serializeTrackedLink(item, base)) });
   } catch (err) {
-    logger.error("routes_tracked_links_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -149,8 +148,7 @@ trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) 
       },
     });
   } catch (err) {
-    logger.error("routes_tracked_links_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -193,8 +191,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), inputJson
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: serializeTrackedLink(link, base) }, 201);
   } catch (err) {
-    logger.error("routes_tracked_links_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -227,8 +224,7 @@ trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requ
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: serializeTrackedLink(link, base) });
   } catch (err) {
-    logger.error("routes_tracked_links_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -243,8 +239,7 @@ trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), req
     await deleteTrackedLink(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_tracked_links_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

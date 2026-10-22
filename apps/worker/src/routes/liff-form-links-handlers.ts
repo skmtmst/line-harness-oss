@@ -114,8 +114,7 @@ export const get__api_analytics_ref_refCode_orders_1 = async (c: Context<Env, "/
       },
     });
   } catch (err) {
-    logger.error("routes_liff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -143,8 +142,7 @@ export const post__api_links_wrap_2 = async (c: Context<Env, "/api/links/wrap">)
     const wrappedUrl = `${liffUrl}?${params.toString()}`;
     return c.json({ success: true, data: { url: wrappedUrl } });
   } catch (err) {
-    logger.error("routes_liff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -279,7 +277,7 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
         const { setFriendFirstTrackedLinkIfNull } = await import('@line-crm/db');
         await setFriendFirstTrackedLinkIfNull(c.env.DB, friend.id, trackedLink.id);
       } catch {
-        logger.error("routes_liff_failed");
+        logger.error("liff.liff_send_form_link_post_failed");
       }
       if (trackedLink.intro_template_id) {
         introTemplate = await getMessageTemplateById(c.env.DB, trackedLink.intro_template_id);
@@ -305,7 +303,6 @@ export const post__api_liff_send_form_link_3 = async (c: Context<Env, "/api/liff
 
     return c.json({ success: true });
   } catch (err) {
-    logger.error("routes_liff_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

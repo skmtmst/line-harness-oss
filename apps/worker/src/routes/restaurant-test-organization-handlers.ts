@@ -411,8 +411,7 @@ export const post__api_restaurant_test_stores_connect_14 = async (c: Context<Env
     if (/UNIQUE constraint failed.*line_accounts\.channel_id/i.test(message)) {
       return c.json({ success: false, error: 'このLINE公式アカウントは既に登録されています' }, 409);
     }
-    logger.error("restaurant_store_wizard_failed");
-    return c.json({ success: false, error: '店舗を追加できませんでした。時間を置いてもう一度お試しください。' }, 500);
+    throw error;
   }
 };
 

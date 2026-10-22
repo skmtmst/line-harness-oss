@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 
 const dbMocks = {
   getActiveImpersonation: vi.fn(async () => null),
@@ -36,6 +40,7 @@ function app() {
   const instance = new Hono<Env>();
   instance.use('*', authMiddleware);
   instance.route('/', actionScoreRules);
+  instance.onError(unhandledWorkerError);
   return instance;
 }
 
@@ -236,9 +241,16 @@ describe('action score rule API', () => {
     const response = await call('/api/action-scores/rules?accountId=account-1');
 
     expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({
+    const body = await response.json<{ incidentId: string }>();
+    expect(body).toEqual({
       success: false,
-      error: 'スコアのルールを処理できませんでした',
+      error: 'Internal Server Error',
+      incidentId: expect.any(String),
+    });
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(JSON.stringify(body)).not.toContain('D1 internal details');
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+      source: 'worker', message: 'unhandled_worker_error', path: 'GET /api/action-scores/rules', incidentId: body.incidentId,
     });
   });
 

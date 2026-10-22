@@ -194,7 +194,7 @@ export const patch__api_media_id_2 = async (c: Context<Env, "/api/media/:id">) =
       });
     } catch (scanError) {
       // 切替自体は確定済み。記録の更新は次の走査でも追いつく。
-      logger.error("routes_contents_failed");
+      logger.error("contents.media_id_patch_failed");
     }
     const fresh = await getMediaById(c.env.DB, id, accountId);
     const names = await uploaderNameMap(c.env.DB, [fresh ?? existing]);
@@ -279,7 +279,7 @@ export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/me
       versions = await getMediaVersionList(c.env.DB, existing.id, accountId);
     } catch (err) {
       if (!isMissingTableError(err)) throw err;
-      logger.error("routes_contents_failed");
+      logger.error("contents.media_id_delete_impact_get_failed");
       versionsReady = false;
     }
     /*
@@ -329,7 +329,7 @@ export const get__api_media_id_delete_impact_5 = async (c: Context<Env, "/api/me
       },
     });
   } catch (err) {
-    logger.error("routes_contents_failed");
+    logger.error("contents.media_id_delete_impact_get_failed");
     return c.json(
       { success: false, error: '削除したときの影響を確認できませんでした' },
       503,
@@ -354,7 +354,7 @@ export const get__api_media_id_replacement_impact_6 = async (c: Context<Env, "/a
       data: { ...current.impact, previewToken: current.impact.revision },
     });
   } catch (err) {
-    logger.error("routes_contents_failed");
+    logger.error("contents.media_id_replacement_impact_get_failed");
     return c.json({ success: false, error: '差し替えたときの影響を確認できませんでした' }, 503);
   }
 };
@@ -445,7 +445,7 @@ export const post__api_media_id_replace_usages_7 = async (c: Context<Env, "/api/
     } catch (verifyError) {
       // 差し替え自体はD1のbatchで確定済み。ここで500を返すと、利用者が
       // 再実行して二重操作するため「確認できなかった」と成功レスポンスに残す。
-      logger.error("routes_contents_failed");
+      logger.error("contents.media_id_replace_usages_post_failed");
     }
     return c.json({
       success: true,
@@ -464,7 +464,7 @@ export const post__api_media_id_replace_usages_7 = async (c: Context<Env, "/api/
     if (err instanceof RequestBodyError) {
       return inputError(c, { success: false, error: err.message }, err.status, []);
     }
-    logger.error("routes_contents_failed");
+    logger.error("contents.media_id_replace_usages_post_failed");
     return c.json({ success: false, error: '使用先を差し替えられませんでした' }, 503);
   }
 };
@@ -525,7 +525,7 @@ export const delete__api_media_id_8 = async (c: Context<Env, "/api/media/:id">) 
     await deleteMedia(c.env.DB, id, accountId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_contents_failed");
+    logger.error("contents.media_id_delete_failed");
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 };
@@ -607,7 +607,7 @@ export const get__api_common_vars_id_10 = async (c: Context<Env, "/api/common-va
       },
     });
   } catch (err) {
-    logger.error("routes_contents_failed");
+    logger.error("contents.common_vars_id_get_failed");
     return c.json({ success: false, error: '共通情報の詳細を確認できませんでした' }, 503);
   }
 };

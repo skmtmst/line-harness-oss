@@ -106,14 +106,15 @@ describe('タブ件数 API', () => {
   it('DB失敗を0件と偽って返さない', async () => {
     const failing = { prepare: () => { throw new Error('unavailable'); } } as unknown as D1Database;
     for (const path of ['/api/automations/counts?account_id=a', '/api/media/counts?accountId=a', '/api/conversions/approvals/counts']) {
+      report.mockClear();
       const res = await application('admin', failing).request(path);
       expect(res.status, path).toBe(500);
       const body = await res.json<{ success: boolean; incidentId?: string }>();
       expect(body.success).toBe(false);
-      if (path.startsWith('/api/media/')) {
-        expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
-        expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({ incidentId: body.incidentId }));
-      }
+      expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+      expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+        source: 'worker', message: 'unhandled_worker_error', path: `GET ${path.split('?')[0]}`, incidentId: body.incidentId,
+      });
     }
   });
 });

@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -80,8 +79,7 @@ notificationCenter.get('/api/notifications/center', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_notification_center_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -104,8 +102,7 @@ notificationCenter.post(
     });
     return c.json({ success: true, data: { updated } });
   } catch (err) {
-    logger.error("routes_notification_center_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
   },
 );
@@ -128,8 +125,7 @@ notificationCenter.post(
     if (!updated) return c.json({ success: false, error: '通知が見つかりません' }, 404);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_notification_center_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
   },
 );

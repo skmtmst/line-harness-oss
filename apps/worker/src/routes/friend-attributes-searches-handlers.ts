@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
 import { getSupportMarkById, setFriendSupportMarkBulk, getSavedSearches, getSavedSearchById, createSavedSearch, reorderSavedSearches, updateSavedSearchWithRevision, deleteSavedSearch, countSavedSearches, getSavedSearchReferences, getSavedSearchUsageCounts, getSavedSearchReferenceUsageCounts, validateSearchConditions, SAVED_SEARCH_LIMIT, getLoginAudit, getStaffMembers, LOGIN_AUDIT_ACTIONS, type LoginAuditRow, type LoginAuditAction, getFolders, getFolderItemCounts, isFolderKind, getWebinarFolderCounts } from '@line-crm/db';
@@ -33,8 +32,7 @@ export const post__api_friends_support_mark_bulk_1 = async (c: Context<Env, "/ap
       const updated = await setFriendSupportMarkBulk(c.env.DB, friendIds, markId, scope);
       return c.json({ success: true, data: { updated } });
     } catch (err) {
-      logger.error("routes_friend_attributes_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -118,8 +116,7 @@ export const get__api_saved_searches_2 = async (c: Context<Env, "/api/saved-sear
       pagination,
     });
   } catch (err) {
-    logger.error("routes_friend_attributes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -149,8 +146,7 @@ export const get__api_saved_searches_id_3 = async (c: Context<Env, "/api/saved-s
         ),
       });
     } catch (err) {
-      logger.error("routes_friend_attributes_failed");
-      return c.json({ success: false, error: '保存した検索を読み込めませんでした' }, 500);
+      throw err;
     }
   };
 
@@ -232,8 +228,7 @@ export const post__api_saved_searches_preview_4 = async (c: Context<Env, "/api/s
         },
       });
     } catch (err) {
-      logger.error("routes_friend_attributes_failed");
-      return c.json({ success: false, error: '該当人数を確認できませんでした' }, 500);
+      throw err;
     }
   };
 
@@ -290,8 +285,7 @@ export const post__api_saved_searches_5 = async (c: Context<Env, "/api/saved-sea
       data: serializeSearch(saved, insights.get(saved.id), []),
     }, 201);
   } catch (err) {
-    logger.error("routes_friend_attributes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -312,8 +306,7 @@ export const patch__api_saved_searches_reorder_6 = async (c: Context<Env, "/api/
       await reorderSavedSearches(c.env.DB, access, body.ids as string[]);
       return c.json({ success: true, data: { updated: body.ids.length } });
     } catch (err) {
-      logger.error("routes_friend_attributes_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -404,8 +397,7 @@ export const patch__api_saved_searches_id_7 = async (c: Context<Env, "/api/saved
         ),
       });
     } catch (err) {
-      logger.error("routes_friend_attributes_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -438,8 +430,7 @@ export const delete__api_saved_searches_id_8 = async (c: Context<Env, "/api/save
       if (err instanceof Error && /foreign key constraint/i.test(err.message)) {
         return c.json({ success: false, error: 'この検索は使用中のため削除できません' }, 409);
       }
-      logger.error("routes_friend_attributes_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 
@@ -480,8 +471,7 @@ export const get__api_login_audit_9 = async (c: Context<Env, "/api/login-audit">
       })),
     });
   } catch (err) {
-    logger.error("routes_friend_attributes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -551,7 +541,6 @@ export const get__api_folders_10 = async (c: Context<Env, "/api/folders">) => {
       ...(itemCounts === undefined ? {} : { unfiledCount: itemCounts.unfiled }),
     });
   } catch (err) {
-    logger.error("routes_friend_attributes_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

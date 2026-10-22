@@ -1,3 +1,4 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -41,6 +42,7 @@ function app(role: Role = 'owner') {
     await next();
   });
   hono.route('/', nenCampaigns);
+  hono.onError(unhandledWorkerError);
   return hono;
 }
 
@@ -126,7 +128,7 @@ describe('NEN campaign metric routes', () => {
     );
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
-      success: false, error: 'NEN配信の情報を取得できませんでした',
+      success: false, error: 'Internal Server Error', incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/),
     });
   });
 

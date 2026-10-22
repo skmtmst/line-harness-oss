@@ -391,7 +391,7 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
     try {
       await recordConversionIngestionEvent(c.env.DB, { conversionPointId: pointId, ...entry });
     } catch (logError) {
-      logger.error("routes_conversions_failed");
+      logger.error("conversions.record_ingestion_event_failed");
     }
   };
   try {
@@ -585,7 +585,6 @@ export const post__api_conversions_ingest_id_16 = async (c: Context<Env, "/api/c
       throw trackError;
     }
   } catch (error) {
-    logger.error("routes_conversions_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw error;
   }
 };

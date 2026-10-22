@@ -217,7 +217,7 @@ export async function mirrorReviewNotificationStatus(
       input.status, input.now ?? new Date().toISOString(), input.photoId, input.lineAccountId,
     ).run();
   } catch (error) {
-    logger.error("routes_nen_members_failed");
+    logger.error("nen_members.mirror_review_notification_status_failed");
   }
 }
 
@@ -288,7 +288,7 @@ export async function deliverPhotoReviewNotification(
      * そのまま出ていた。他の送信失敗と同じ安全な理由へそろえる（2026-10-02）。
      * 原因を追うための生の本文はログにだけ残す。
      */
-    logger.error("routes_nen_members_failed");
+    logger.error("nen_members.deliver_photo_review_notification_failed");
     sendError = classifyExternalDeliveryError(error).message;
   }
   try {
@@ -304,7 +304,7 @@ export async function deliverPhotoReviewNotification(
       return { notificationStatus: finalStatus, notificationError: sendError, busy: false, relayed };
     }
   } catch (error) {
-    logger.error("routes_nen_members_failed");
+    logger.error("nen_members.deliver_photo_review_notification_failed");
   }
   const state = await getPhotoNotificationState(db, {
     decisionId: input.decisionId, lineAccountId: input.lineAccountId,
@@ -673,7 +673,6 @@ async function handlePhotoRewardAction(c: Context<Env>, action: 'retry' | 'recon
       },
     });
   } catch (error) {
-    logger.error("routes_nen_members_failed");
-    return c.json({ success: false, error: 'ポイントの手続きに失敗しました' }, 500);
+    throw error;
   }
 }

@@ -2,6 +2,10 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { Hono } from 'hono';
 import { Miniflare } from 'miniflare';
 import type { Env } from '../worker-env.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 
 const accountAccess = vi.hoisted(() => ({
   getVisibleLineAccountScope: vi.fn(async () => ({
@@ -36,6 +40,7 @@ function appFor(targetDb: D1Database = db as unknown as D1Database) {
     return next();
   });
   app.route('/', access);
+  app.onError(unhandledWorkerError);
   return { app, env: { DB: targetDb } as Env['Bindings'] };
 }
 
@@ -97,6 +102,7 @@ beforeAll(async () => {
 afterAll(async () => { await mf?.dispose(); });
 
 beforeEach(async () => {
+  report.mockClear();
   accountAccess.getVisibleLineAccountScope.mockClear();
   await db.prepare('DELETE FROM audit_events').run();
   await insertEvent({
@@ -150,8 +156,12 @@ describe('GET /api/audit/events attention filter', () => {
     const response = await request('/api/audit/events?attention=true', brokenDb);
 
     expect(response.status).toBe(500);
-    const text = await response.text();
-    expect(text).toContain('操作記録を取得できませんでした');
-    expect(text).not.toContain('customer@example.com');
+    const body = await response.json<{ success: boolean; error: string; incidentId: string }>();
+    expect(body).toEqual({ success: false, error: 'Internal Server Error', incidentId: expect.any(String) });
+    expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(JSON.stringify(body)).not.toContain('customer@example.com');
+    expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+      source: 'worker', message: 'unhandled_worker_error', path: 'GET /api/audit/events', incidentId: body.incidentId,
+    });
   });
 });

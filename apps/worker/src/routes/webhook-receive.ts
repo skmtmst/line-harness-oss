@@ -81,7 +81,7 @@ export const post__webhook_1 = async (c: Context<Env>) => {
         .bind(japanCalendar().toISOString().slice(0, -1) + '+09:00', matchedAccountId)
         .run();
     } catch (stampError) {
-      logger.error("routes_webhook_failed");
+      logger.error("webhook.webhook_post_failed");
     }
   }
 

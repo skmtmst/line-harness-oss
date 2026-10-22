@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { serializeFriend } from './friend-display.js';
 import { patchFriendMetadata } from '../features/friends/friend-metadata/index.js';
 import { inputError } from '../lib/input-errors.js';
@@ -49,8 +48,7 @@ export const get__api_friends_id_mileage_1 = async (c: Context<Env, "/api/friend
     ]);
     return c.json({ success: true, data: { summary, history, insights, connections } });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -228,8 +226,7 @@ export const get__api_friends_id_upcoming_2 = async (c: Context<Env, "/api/frien
       },
     });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -249,8 +246,7 @@ export const get__api_friends_stats_3 = async (c: Context<Env, "/api/friends/sta
     const stats = await getFriendStats(c.env.DB, statsScope);
     return c.json({ success: true as const, data: stats });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false as const, error: '友だちの集計を取得できませんでした' }, 500);
+    throw err;
   }
 };
 
@@ -260,9 +256,8 @@ export const get__api_friends_id_summary_4 = async (c: Context<Env, "/api/friend
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
     const data = await getFriendSummary(c.env.DB, friend.id, friend.line_account_id ?? null);
     return c.json({ success: true, data });
-  } catch {
-    logger.error("friend_summary_unavailable");
-    return c.json({ success: false, error: '集計を取得できませんでした' }, 500);
+  } catch (error) {
+    throw error;
   }
 };
 
@@ -336,8 +331,7 @@ export const get__api_friends_id_5 = async (c: Context<Env, "/api/friends/:id">)
       },
     });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -359,8 +353,7 @@ export const get__api_friends_id_form_submissions_6 = async (c: Context<Env, "/a
       },
     });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -446,8 +439,7 @@ export const post__api_friends_id_tags_7 = async (c: Context<Env, "/api/friends/
 
     return c.json({ success: true, data: null }, 201);
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -466,8 +458,7 @@ export const delete__api_friends_id_tags_tagId_8 = async (c: Context<Env, "/api/
 
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -522,8 +513,7 @@ export const put__api_friends_id_metadata_9 = async (c: Context<Env, "/api/frien
       },
     });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -546,7 +536,6 @@ export const get__api_friends_id_messages_10 = async (c: Context<Env, "/api/frie
       .all<{ id: string; direction: string; messageType: string; content: string; createdAt: string }>();
     return c.json({ success: true, data: result.results.reverse() });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

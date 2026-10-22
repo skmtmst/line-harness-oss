@@ -381,7 +381,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       eventId: row.id, lineAccountId, status: 'retryable_failed',
       errorCode: 'read_model_failed', errorMessageSafe: '注文情報を取り込めませんでした', now,
     }).catch(() => undefined);
-    logger.error("routes_ec_integrations_failed");
+    logger.error("ec_integrations.integrations_eccube_events_create_failed");
     return c.json({ success: false, error: 'Event processing failed' }, 503);
   }
 
@@ -421,7 +421,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
         logger.log("nen_order_followups_stopped");
       }
     } catch (followUpError) {
-      logger.error("routes_ec_integrations_failed");
+      logger.error("ec_integrations.integrations_eccube_events_create_failed");
     }
   }
 
@@ -440,7 +440,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       });
     } catch (notificationError) {
       // 受注の取り込みは通知の失敗で止めない。送り残しは回収口から拾う。
-      logger.error("routes_ec_integrations_failed");
+      logger.error("ec_integrations.integrations_eccube_events_create_failed");
     }
   }
 

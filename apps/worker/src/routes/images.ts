@@ -1,5 +1,4 @@
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
-import { logger } from '@line-crm/shared/server';
 import { photoImageScanAllowed } from '../services/photo-image-gate.js';
 import { inputError, inputJsonBoundary, readBoundedBytes } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -126,8 +125,7 @@ images.post('/api/images', requireRole('owner', 'admin', 'staff'), async (c, nex
       data: { id, key, url, mimeType, size: data.byteLength },
     }, 201);
   } catch (err) {
-    logger.error("routes_images_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -240,8 +238,7 @@ images.delete('/api/images/:key', requireRole('owner', 'admin', 'staff'), async 
     await c.env.IMAGES.delete(key);
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_images_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

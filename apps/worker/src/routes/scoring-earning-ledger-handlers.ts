@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 
@@ -68,8 +67,7 @@ export const get__api_mileage_overview_2 = async (c: Context<Env, "/api/mileage/
     });
     return c.json({ success: true, data: overview });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -140,8 +138,7 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
     ]);
     return c.json({ success: true, data: { ...history, summary } });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -161,8 +158,7 @@ export const get__api_mileage_adjustment_policy_4 = async (c: Context<Env, "/api
         : { configured: false as const, approvalThreshold: null },
     });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -182,8 +178,7 @@ export const put__api_mileage_adjustment_policy_5 = async (c: Context<Env, "/api
     auditLog(c, 'mileage.adjustment.policy.update', { kind: 'line_account', id: accountId });
     return c.json({ success: true, data: { configured: true, approvalThreshold } });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -402,8 +397,7 @@ export const post__api_mileage_adjustments_6 = async (c: Context<Env, "/api/mile
           return c.json({ success: false, error: 'Friend not found', code: err.code }, 404);
         }
       }
-      logger.error("routes_scoring_failed");
-      return c.json({ success: false, error: 'Internal server error' }, 500);
+      throw err;
     }
   };
 

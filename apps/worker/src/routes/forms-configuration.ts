@@ -597,7 +597,7 @@ export const get__api_forms_id_delete_impact_10 = async (c: Context<Env, "/api/f
     }
     return c.json({ success: true, data: authorized.impact });
   } catch (error) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.forms_id_delete_impact_get_failed");
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 };

@@ -159,7 +159,7 @@ export const get__api_public_nen_gallery_preview_3 = async (c: Context<Env, "/ap
     c.header('Cache-Control', 'public, max-age=300, s-maxage=600');
     return c.json({ success: true, data: images });
   } catch (error) {
-    logger.error("routes_nen_members_failed");
+    logger.error("nen_members.public_nen_gallery_preview_get_failed");
     c.header('Cache-Control', 'public, max-age=30');
     return c.json({ success: true, data: [] });
   }
@@ -222,7 +222,7 @@ export const post__api_liff_nen_pets_4 = async (c: Context<Env, "/api/liff/nen/p
   await refreshStoredFeeding(c.env.DB, id, plan, now);
   await syncNenPetTags(c.env.DB, friend.id);
   const saved = await c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE archived_at IS NULL AND id = ?`).bind(id).first<Record<string, unknown>>();
-  if (saved) c.executionCtx.waitUntil(pushPetCard(c, friend, saved).catch((err: unknown) => logger.error("routes_nen_members_failed")));
+  if (saved) c.executionCtx.waitUntil(pushPetCard(c, friend, saved).catch((err: unknown) => logger.error("nen_members.liff_nen_pets_post_failed")));
   return c.json({ success: true, data: mapPet(saved || { id }, products, catalog.treatLimitPercent) }, 201);
 };
 
@@ -520,7 +520,7 @@ export const post__api_liff_nen_photos_10 = async (c: Context<Env, "/api/liff/ne
     mimeType: body.mimeType,
     sizeBytes: bytes.byteLength,
   }).catch((err) => {
-    logger.error("routes_nen_members_failed");
+    logger.error("nen_members.liff_nen_photos_post_failed");
     return null;
   });
   if (photoScan) {
@@ -530,7 +530,7 @@ export const post__api_liff_nen_photos_10 = async (c: Context<Env, "/api/liff/ne
       sizeBytes: bytes.byteLength,
       width: dimensions.width,
       height: dimensions.height,
-    }).catch((err) => logger.error("routes_nen_members_failed"));
+    }).catch((err) => logger.error("nen_members.liff_nen_photos_post_failed"));
   }
   await syncNenPhotoTags(c.env.DB, friend.id);
   const scanState = await c.env.DB.prepare("SELECT status FROM media_file_scans WHERE subject_kind='photo' AND subject_id=? AND line_account_id=?").bind(id, friend.line_account_id).first<{status: string}>();

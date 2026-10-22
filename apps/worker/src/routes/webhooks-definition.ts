@@ -409,7 +409,7 @@ export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 
           })).id }));
         } catch (logError) {
           // 台帳の一時障害で、署名確認済みの受信処理まで止めない。
-          logger.error("routes_webhooks_failed");
+          logger.error("webhooks.process_incoming_webhook_queue_failed");
         }
       }
       let actionResult: { matchedFriendId: string | null; executed: number; failed: number;
@@ -473,7 +473,7 @@ export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 
               failureReason: 'processing_failed',
             });
           } catch (logError) {
-            logger.error("routes_webhooks_failed");
+            logger.error("webhooks.process_incoming_webhook_queue_failed");
           }
         }
         throw eventError;
@@ -488,7 +488,7 @@ export async function processIncomingWebhookQueue(env: Env['Bindings'], limit = 
           });
         } catch (logError) {
           // 受信処理は完了している。台帳の一時障害だけで送信元へ500を返さない。
-          logger.error("routes_webhooks_failed");
+          logger.error("webhooks.process_incoming_webhook_queue_failed");
         }
       }
 

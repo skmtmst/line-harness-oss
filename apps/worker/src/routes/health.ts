@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -56,8 +55,7 @@ health.get('/api/accounts/health-summary', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_health_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -88,8 +86,7 @@ health.get('/api/accounts/:id/health', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_health_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -117,8 +114,7 @@ health.get('/api/accounts/migrations', async (c) => {
       })),
     });
   } catch (err) {
-    logger.error("routes_health_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -176,8 +172,7 @@ health.post('/api/accounts/:id/migrate', requireRole('owner'), inputJsonBoundary
       },
     }, 201);
   } catch (err) {
-    logger.error("routes_health_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -204,8 +199,7 @@ health.get('/api/accounts/migrations/:migrationId', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_health_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

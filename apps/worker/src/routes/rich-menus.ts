@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { boundedUploadBody, inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
@@ -32,8 +31,7 @@ function richMenuError(c: Context<Env>, prefix: string, err: unknown) {
   if (err instanceof LineAccountRequiredError) {
     return inputError(c, { success: false, error: message }, 400, []);
   }
-  logger.error("routes_rich_menus_failed");
-  return c.json({ success: false, error: `${prefix}: ${message}` }, 500);
+  throw err;
 }
 
 // GET /api/rich-menus — list all rich menus from LINE API
@@ -125,8 +123,7 @@ richMenus.post('/api/friends/:friendId/rich-menu', requireDeliveryAccess('richMe
     return c.json({ success: true, data: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.error("routes_rich_menus_failed");
-    return c.json({ success: false, error: `Failed to link rich menu to friend: ${message}` }, 500);
+    throw err;
   }
 });
 
@@ -167,8 +164,7 @@ richMenus.delete('/api/friends/:friendId/rich-menu', requireDeliveryAccess('rich
     return c.json({ success: true, data: null });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.error("routes_rich_menus_failed");
-    return c.json({ success: false, error: `Failed to unlink rich menu from friend: ${message}` }, 500);
+    throw err;
   }
 });
 
@@ -263,9 +259,7 @@ richMenus.get('/api/friends/:friendId/rich-menu', async (c) => {
     return c.json({ success: true, data });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.error("routes_rich_menus_failed");
-    // 内部文言（`${message}`）をそのまま返すと紛れ込むため、利用者向けの定型文にする (#496-13)。
-    return c.json({ success: false, error: 'リッチメニューを取得できませんでした' }, 500);
+    throw err;
   }
 });
 

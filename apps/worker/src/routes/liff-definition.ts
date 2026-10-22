@@ -130,7 +130,7 @@ async function linkIgIgsid(
       linked = row?.ig_igsid === igParam;
     }
   } catch (err) {
-    logger.error("routes_liff_failed");
+    logger.error("liff.link_ig_igsid_failed");
     return false;
   }
 
@@ -162,11 +162,11 @@ async function linkIgIgsid(
       })
         .then(async (res) => {
           if (!res.ok) {
-            logger.error("routes_liff_failed");
+            logger.error("liff.link_ig_igsid_failed");
           }
           await res.body?.cancel().catch(() => undefined);
         })
-        .catch((err) => logger.error("routes_liff_failed")),
+        .catch((err) => logger.error("liff.link_ig_igsid_failed")),
     );
   }
   return true;
@@ -192,7 +192,7 @@ async function saveIgAccountMeta(
     if (igAccountUsername) patch.ig_account_username = igAccountUsername.replace(/^@/, '');
     await patchFriendMetadata(db, friendId, patch, { firstTouchKeys: ['ig_account_id','ig_account_username'] });
   } catch (err) {
-    logger.error("routes_liff_failed");
+    logger.error("liff.save_ig_account_meta_failed");
   }
 }
 
@@ -264,7 +264,7 @@ async function applyRefAttribution(
             await notifyAffiliateFriendAdd(db, c.env, affiliate.id, offerName);
           }
         } catch (err) {
-          logger.error("routes_liff_failed");
+          logger.error("liff.apply_ref_attribution_failed");
         }
       }
 
@@ -316,7 +316,7 @@ async function applyRefAttribution(
         { mode: 'every-click', targetLineUserId: lineUserId },
       );
     } catch (err) {
-      logger.error("routes_liff_failed");
+      logger.error("liff.apply_ref_attribution_failed");
     }
   }
 }
@@ -482,7 +482,7 @@ async function applyXHarnessActions(
         logger.log("routes_liff_log");
       }
     } catch (err) {
-      logger.error("routes_liff_failed");
+      logger.error("liff.apply_xharness_actions_failed");
     }
   }
 
@@ -493,7 +493,7 @@ async function applyXHarnessActions(
       await enrollFriendInScenario(db, friendId, result.scenarioId);
       logger.log("routes_liff_log");
     } catch (err) {
-      logger.error("routes_liff_failed");
+      logger.error("liff.apply_xharness_actions_failed");
     }
   }
 }

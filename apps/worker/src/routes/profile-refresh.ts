@@ -123,7 +123,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), inputJs
           notFound += 1;
         } else {
           otherErrors += 1;
-          logger.error("routes_profile_refresh_failed");
+          logger.error("profile_refresh.admin_refresh_profiles_create_failed");
         }
       } finally {
         processed += 1;

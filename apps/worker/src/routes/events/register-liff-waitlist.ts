@@ -48,7 +48,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     reminder_hours_before: result.reminderHoursBefore,
   });
   await insertRemindersForBooking(c.env.DB, result.bookingId, reminders)
-    .catch((error) => logger.error("routes_events_failed"));
+    .catch((error) => logger.error("events.liff_events_waitlist_by_token_accept_create_failed"));
   await enrollByTrigger(c.env.DB, {
     triggerType: 'event',
     friendId: result.friendId,
@@ -57,7 +57,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     sourceEventId: result.bookingId,
     eventId: result.eventId,
     lineAccountId: result.lineAccountId,
-  }).catch((error) => logger.error("routes_events_failed"));
+  }).catch((error) => logger.error("events.liff_events_waitlist_by_token_accept_create_failed"));
   await awardActivityMileage(c.env.DB, {
     eventType: 'booking_created',
     source: 'event_booking',
@@ -68,7 +68,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
       eventId: result.eventId, slotId: result.occurrenceId,
     },
     occurredAt: new Date().toISOString(),
-  }).catch((error) => logger.error("routes_events_failed"));
+  }).catch((error) => logger.error("events.liff_events_waitlist_by_token_accept_create_failed"));
   await applyActionScoreEvent(c.env.DB, {
     lineAccountId: result.lineAccountId,
     friendId: result.friendId,
@@ -77,7 +77,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
     sourceEventId: result.bookingId,
     subjectKey: result.eventId,
     occurredAt: new Date().toISOString(),
-  }).catch((error) => logger.error("routes_events_failed"));
+  }).catch((error) => logger.error("events.liff_events_waitlist_by_token_accept_create_failed"));
 
   if (result.newlyConverted) {
     const automation = dispatchAutomationEventWithLogging(c.env.DB, {
@@ -89,7 +89,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
         bookingType: 'event', bookingId: result.bookingId,
         eventId: result.eventId, slotId: result.occurrenceId,
       },
-    }).catch((error) => logger.error("routes_events_failed"));
+    }).catch((error) => logger.error("events.liff_events_waitlist_by_token_accept_create_failed"));
     const executionCtx = optionalExecutionCtx(c);
     if (executionCtx) executionCtx.waitUntil(automation);
     else await automation;
@@ -123,7 +123,7 @@ events.post('/api/liff/events/waitlist/:token/accept', inputJsonBoundary(), asyn
         });
       }
     } catch (error) {
-      logger.error("routes_events_failed");
+      logger.error("events.liff_events_waitlist_by_token_accept_create_failed");
     }
   }
 

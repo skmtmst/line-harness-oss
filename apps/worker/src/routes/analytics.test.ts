@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+
+const report = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../services/codex-slack-relay.js', () => ({ reportHarnessErrorToSlack: report }));
 
 const mocks = {
   ANALYTICS_REPORT_SECTIONS: ['friends', 'reactions', 'routes', 'usage', 'mileage'],
@@ -80,6 +84,7 @@ app.use('*', async (c, next) => {
   return next();
 });
 app.route('/', analytics);
+app.onError(unhandledWorkerError);
 const staffApp = new Hono<Env>();
 staffApp.use('*', async (c, next) => {
   c.set('staff', {
@@ -90,6 +95,7 @@ staffApp.use('*', async (c, next) => {
   return next();
 });
 staffApp.route('/', analytics);
+staffApp.onError(unhandledWorkerError);
 // 実行間隔ガード(点検#508の中4)が読む最小の入れ物。テストごとに中身を変える。
 const guardRows: { crossBusy: { id: string } | null; lastFunnelRunAt: string | null } = {
   crossBusy: null,
@@ -131,6 +137,17 @@ function reqAsStaff(path: string, method = 'GET', body?: unknown) {
     }),
     env,
   );
+}
+
+async function expectUnhandledFailure(response: Response, path: string) {
+  expect(response.status).toBe(500);
+  const body = await response.json() as { incidentId: string };
+  expect(body).toEqual({ success: false, error: 'Internal Server Error', incidentId: expect.any(String) });
+  expect(body.incidentId).toMatch(/^[0-9a-f-]{36}$/);
+  expect(JSON.stringify(body)).not.toMatch(/D1 unavailable|db down/);
+  expect(report).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+    source: 'worker', message: 'unhandled_worker_error', path: `GET ${path}`, incidentId: body.incidentId,
+  });
 }
 
 const FUNNEL = { id: 'fn-1', line_account_id: 'account-a', name: '購入まで', segment_json: null, window_days: 30, created_at: '2026-08-16', status: 'active' };
@@ -383,8 +400,7 @@ describe('分析の概要API', () => {
   it('使われ方の取得自体に失敗したとき正常な空データにせず500を返す', async () => {
     mocks.getAnalyticsUsageOverview.mockRejectedValueOnce(new Error('D1 unavailable'));
     const res = await req(`/api/analytics/usage?${ACCOUNT}`);
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+    await expectUnhandledFailure(res, '/api/analytics/usage');
   });
 
   it('存在しない日付と13か月を超える期間を弾く', async () => {
@@ -720,8 +736,7 @@ describe('ファネルAPI', () => {
 
     const res = await req(`/api/analytics/funnels?${ACCOUNT}`);
 
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ success: false, error: 'Internal server error' });
+    await expectUnhandledFailure(res, '/api/analytics/funnels');
   });
 
   it('作成時に第1版を固定する', async () => {
@@ -1028,8 +1043,7 @@ describe('定期レポートAPI', () => {
   it('読取失敗は500で返し、未取得を空に見せない', async () => {
     mocks.getAnalyticsReportSchedules.mockRejectedValueOnce(new Error('db down'));
     const res = await req(`/api/analytics/report-schedules?${ACCOUNT}`);
-    expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ success: false });
+    await expectUnhandledFailure(res, '/api/analytics/report-schedules');
   });
 
   const existingSchedule = {

@@ -313,7 +313,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       adminPrepayOnly = decision.prepayOnly;
       adminPrepayNotice = await prepayNoticeFor(c.env.DB, accountId, decision);
     } catch (error) {
-      logger.error("routes_booking_failed");
+      logger.error("booking.admin_bookings_create_failed");
     }
   }
   const initialStatus = (adminPrepayOnly ? 'requested' : 'confirmed') satisfies BookingStatus;
@@ -491,7 +491,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
           staffId: body.staff_id,
           startsAt: startsAt.toISOString(),
         },
-      }, accountId).catch((err) => logger.error("routes_booking_failed")),
+      }, accountId).catch((err) => logger.error("booking.admin_bookings_create_failed")),
     );
   }
   const [reminderRows, operationRows, customerContext] = await Promise.all([

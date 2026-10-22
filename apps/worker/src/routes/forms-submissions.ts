@@ -79,7 +79,7 @@ export const post__api_forms_id_archive_1 = async (c: Context<Env, "/api/forms/:
       },
     });
   } catch (error) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.forms_id_archive_post_failed");
     return c.json({ success: false, error: '回答フォームを保管できませんでした' }, 503);
   }
 };
@@ -139,7 +139,7 @@ export const post__api_forms_id_unarchive_2 = async (c: Context<Env, "/api/forms
       },
     });
   } catch (error) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.forms_id_unarchive_post_failed");
     return c.json({ success: false, error: '回答フォームを元に戻せませんでした' }, 503);
   }
 };
@@ -189,7 +189,7 @@ export const delete__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) 
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_forms_failed");
+    logger.error("forms.forms_id_delete_failed");
     return c.json({ success: false, error: '削除したときの影響を確認できませんでした' }, 503);
   }
 };
@@ -430,7 +430,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
           await failFormSubmitClaim(c.env.DB, scope, owner, taken.version);
         }
       } catch (error) {
-        logger.error("routes_forms_failed");
+        logger.error("forms.forms_id_submissions_submission_id_retry_effects_post_failed");
       }
       return missing;
     },
@@ -519,7 +519,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
         } catch (error) {
           if (error instanceof ClaimOwnershipLost) throw error;
           // 届かなくても残りの記録へ進む。未完のまま残して次の再実行に託す。
-          logger.error("routes_forms_failed");
+          logger.error("forms.forms_id_submissions_submission_id_retry_effects_post_failed");
         }
       }
       // 回答行はある(この口は回答idから入る)。記録だけ揃える。
@@ -547,7 +547,7 @@ export const post__api_forms_id_submissions_submissionId_retry_effects_8 = async
           submission.destination_write_failed = 0;
           recorded = true;
         } catch (error) {
-          logger.error("routes_forms_failed");
+          logger.error("forms.forms_id_submissions_submission_id_retry_effects_post_failed");
         }
         if (recorded) await claimHandle.checkpoint('destination_status');
       }

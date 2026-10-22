@@ -126,8 +126,7 @@ friendMigrations.get('/api/friends/migrations', requireRole('owner', 'admin', 's
     const runs = await listUidMigrationRuns(c.env.DB, scope.allowedAccountIds);
     return c.json({ success: true, data: runs.map(runJson) });
   } catch (error) {
-    logger.error("friend_migrations_list_failed");
-    return c.json({ success: false, error: '移行履歴を読み込めませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -182,8 +181,7 @@ friendMigrations.post('/api/friends/migrations', requireRole('owner', 'admin'), 
     });
     return c.json({ success: true, data: runJson(run) }, 201);
   } catch (error) {
-    logger.error("friend_migration_dry_run_failed");
-    return c.json({ success: false, error: 'テスト移行を実行できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -238,8 +236,7 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
       },
     });
   } catch (error) {
-    logger.error("friend_migration_detail_failed");
-    return c.json({ success: false, error: '移行結果を読み込めませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -287,8 +284,7 @@ friendMigrations.patch('/api/friends/migrations/:id/items/:itemId', requireRole(
       .run();
     return c.json({ success: true, data: { ...(runJson((await getUidMigrationRun(c.env.DB, run.id))!)), unresolved: pending?.count ?? null } });
   } catch (error) {
-    logger.error("friend_migration_decision_failed");
-    return c.json({ success: false, error: '判断を保存できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -614,8 +610,7 @@ friendMigrations.post('/api/friends/migrations/:id/execute', requireRole('owner'
     ).run();
     return c.json({ success: true, data: runJson((await getUidMigrationRun(c.env.DB, run.id))!) });
   } catch (error) {
-    logger.error("friend_migration_execute_failed");
-    return c.json({ success: false, error: '本移行を実行できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -788,8 +783,7 @@ friendMigrations.post('/api/friends/migrations/:id/rollback', requireRole('owner
       data: { ...runJson((await getUidMigrationRun(c.env.DB, run.id))!), rolledBack: rolledBack + alreadyRestored },
     });
   } catch (error) {
-    logger.error("friend_migration_rollback_failed");
-    return c.json({ success: false, error: '切り戻しを実行できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -827,8 +821,7 @@ friendMigrations.post('/api/friends/exports', requireRole('owner', 'admin'), inp
     c.set('outputAudit', { count: count?.count ?? null, accountId, targetId: id, phase: 'requested' });
     return c.json({ success: true, data: { id, rowCount: count?.count ?? null, status: 'completed', downloadUrl: `/api/friends/exports/${id}/download` } }, 201);
   } catch (error) {
-    logger.error("friend_export_create_failed");
-    return c.json({ success: false, error: '書き出しを作れませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -984,8 +977,7 @@ friendMigrations.post('/api/friends/imports', requireRole('owner', 'admin'), inp
     ).run();
     return c.json({ success: true, data: { id, status: 'previewed', result: { summary, rows: results }, duplicate: false } }, 201);
   } catch (error) {
-    logger.error("friend_import_preview_failed");
-    return c.json({ success: false, error: '取り込みの確認を実行できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -1059,8 +1051,7 @@ friendMigrations.post('/api/friends/imports/:id/execute', requireRole('owner', '
       .bind(now, job.id).run();
     return c.json({ success: true, data: { id: job.id, status: 'completed', applied, duplicate: false } });
   } catch (error) {
-    logger.error("friend_import_execute_failed");
-    return c.json({ success: false, error: '取り込みを反映できませんでした' }, 500);
+    throw error;
   }
 });
 
@@ -1086,7 +1077,6 @@ friendMigrations.get('/api/friends/migration-jobs', requireRole('owner', 'admin'
       .slice(0, 20)
       .map(({ sortCreatedAt: _sortCreatedAt, ...job }) => job) });
   } catch (error) {
-    logger.error("friend_migration_jobs_list_failed");
-    return c.json({ success: false, error: '書き出し・取り込み履歴を読み込めませんでした' }, 500);
+    throw error;
   }
 });

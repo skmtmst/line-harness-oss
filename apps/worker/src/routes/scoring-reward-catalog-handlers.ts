@@ -60,7 +60,7 @@ export const post__api_mileage_exports_2 = async (c: Context<Env, "/api/mileage/
       targetKind: kind!, targetId: accountId, result: 'success', reason: body.reason.trim() });
     return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="${kind}.csv"`, 'Cache-Control': 'no-store' } });
-  } catch { return c.json({ success: false, error: '書き出しに失敗しました' }, 500); }
+  } catch (error) { throw error; }
 };
 
 export const get__api_mileage_reward_folders_3 = async (c: Context<Env, "/api/mileage/reward-folders">) => {

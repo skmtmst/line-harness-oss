@@ -1,3 +1,4 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -61,6 +62,7 @@ function app(role: Role = 'owner', permissionKeys: string[] = ['/scenarios']) {
     await next();
   });
   hono.route('/', scenarios);
+  hono.onError(unhandledWorkerError);
   return hono;
 }
 
@@ -113,7 +115,7 @@ describe('scenario routes', () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({
       success: false,
-      error: 'シナリオの情報を処理できませんでした',
+      error: 'Internal Server Error', incidentId: expect.stringMatching(/^[0-9a-f-]{36}$/),
     });
   });
 

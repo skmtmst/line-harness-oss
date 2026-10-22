@@ -164,8 +164,7 @@ function errorResponse(c: Context<Env>, error: unknown): Response {
   if (error instanceof MergedPersonError) {
     return fail(c, error.status, error.code, { error: error.message }, mergedPersonErrorFields(c, error.code));
   }
-  logger.error("routes_merged_people_failed");
-  return fail(c, 500, 'INTERNAL_ERROR', { error: '統合ユーザーを処理できませんでした' });
+  throw error;
 }
 
 async function canAccessPerson(c: Context<Env>, id: string): Promise<boolean> {

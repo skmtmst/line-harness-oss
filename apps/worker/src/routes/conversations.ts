@@ -1,4 +1,3 @@
-import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -187,8 +186,7 @@ conversations.get('/api/conversations', async (c) => {
 
     return c.json({ success: true, data: { total: countRow?.total ?? 0, items } });
   } catch (err) {
-    logger.error("routes_conversations_failed");
-    return c.json({ success: false, error: String(err) }, 500);
+    throw err;
   }
 });
 
@@ -295,8 +293,7 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       },
     });
   } catch (err) {
-    logger.error("routes_conversations_failed");
-    return c.json({ success: false, error: String(err) }, 500);
+    throw err;
   }
 });
 

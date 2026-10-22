@@ -1,3 +1,4 @@
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
 import { describe, expect, test, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -74,6 +75,7 @@ function setExternalIntegrations(raw: SqliteD1['raw'], accountId: string, enable
 function publicApp(db: D1Database): Hono<Env> {
   const app = new Hono<Env>();
   app.route('/', publicApi);
+  app.onError(unhandledWorkerError);
   return app;
 }
 

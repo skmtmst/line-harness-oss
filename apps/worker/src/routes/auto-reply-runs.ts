@@ -1,5 +1,4 @@
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
-import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
 
@@ -321,8 +320,7 @@ autoReplyRuns.get(
       };
       return c.json({ success: true, data });
     } catch (error) {
-      logger.error("routes_auto_reply_runs_failed");
-      return c.json({ success: false, error: '自動応答の実行結果を表示できませんでした' }, 500);
+      throw error;
     }
   },
 );
@@ -350,8 +348,7 @@ autoReplyRuns.post(
         const status = error.code === 'not_found' ? 404 : 409;
         return inputError(c, { success: false, error: error.message, code: error.code }, status);
       }
-      logger.error("routes_auto_reply_runs_failed");
-      return c.json({ success: false, error: '失敗した処理をもう一度実行できませんでした' }, 500);
+      throw error;
     }
   },
 );

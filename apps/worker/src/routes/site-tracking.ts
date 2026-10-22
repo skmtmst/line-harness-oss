@@ -142,7 +142,7 @@ siteTracking.post('/api/site/collect', inputJsonBoundary(), async (c) => {
   } catch (err) {
     // 記録に失敗しても 204。外のサイトの画面が、こちらの都合で
     // エラーを出すべきではない。
-    logger.error("routes_site_tracking_failed");
+    logger.error("site_tracking.site_collect_create_failed");
     return c.body(null, 204, corsHeaders());
   }
 });
@@ -324,8 +324,7 @@ siteTracking.post('/api/site/link', requireRole('owner', 'admin', 'staff'), inpu
     // 「結びつかなかった」ことだけ伝える。
     return c.json({ success: true, data: { linked } });
   } catch (err) {
-    logger.error("routes_site_tracking_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -337,8 +336,7 @@ siteTracking.get('/api/site/tracking-key', requireRole('owner', 'admin', 'staff'
     const trackingKey = await getOrCreateSiteTrackingKey(c.env.DB, accountId);
     return c.json({ success: true, data: { accountId, trackingKey } });
   } catch (err) {
-    logger.error("routes_site_tracking_failed");
-    return c.json({ success: false, error: '計測鍵を取得できませんでした' }, 500);
+    throw err;
   }
 });
 
@@ -352,8 +350,7 @@ siteTracking.get('/api/site/summary', requireRole('owner', 'admin', 'staff'), as
     ]);
     return c.json({ success: true, data: { ...summary, consent } });
   } catch (err) {
-    logger.error("routes_site_tracking_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -375,8 +372,7 @@ siteTracking.get('/api/site/pages', requireRole('owner', 'admin', 'staff'), asyn
     });
     return c.json({ success: true, data: items });
   } catch (err) {
-    logger.error("routes_site_tracking_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 
@@ -404,8 +400,7 @@ siteTracking.get('/api/friends/:id/site-events', requireRole('owner', 'admin', '
       })),
     });
   } catch (err) {
-    logger.error("routes_site_tracking_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 });
 

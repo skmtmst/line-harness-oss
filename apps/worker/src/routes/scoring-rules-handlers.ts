@@ -1,5 +1,4 @@
 import { jstDate as japanDate } from '@line-crm/shared';
-import { logger } from '@line-crm/shared/server';
 import { createMileageRuleIdempotent, serializeMileageRule } from './mileage-rule-create.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -108,8 +107,7 @@ export const get__api_mileage_rules_3 = async (c: Context<Env, "/api/mileage/rul
       : scope.allowedAccountIds.includes(rule.line_account_id));
     return c.json({ success: true, data: rules.map(serializeMileageRule) });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -155,8 +153,7 @@ export const get__api_mileage_rules_export_4 = async (c: Context<Env, "/api/mile
       },
     });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -202,8 +199,7 @@ export const post__api_mileage_events_5 = async (c: Context<Env, "/api/mileage/e
     if (err instanceof Error && err.message.startsWith('Mileage friend not found:')) {
       return c.json({ success: false, error: 'friend_not_found' }, 404);
     }
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -276,8 +272,7 @@ export const post__api_mileage_rules_6 = async (c: Context<Env, "/api/mileage/ru
     });
     return c.json({ success: true, data: serializeMileageRule(rule) }, 201);
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -326,8 +321,7 @@ export const put__api_mileage_rules_id_7 = async (c: Context<Env, "/api/mileage/
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serializeMileageRule(updated) });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -351,8 +345,7 @@ export const delete__api_mileage_rules_id_8 = async (c: Context<Env, "/api/milea
     }
     return c.json({ success: true, data: null });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -387,8 +380,7 @@ export const get__api_action_scores_friends_9 = async (c: Context<Env, "/api/act
     });
     return c.json({ success: true, data });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -427,8 +419,7 @@ export const get__api_friends_id_score_10 = async (c: Context<Env, "/api/friends
       },
     });
   } catch (err) {
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -461,7 +452,6 @@ export const post__api_friends_id_score_11 = async (c: Context<Env, "/api/friend
     if (err instanceof Error && err.message === 'score_idempotency_conflict') {
       return c.json({ success: false, error: '同じ操作番号で異なる加点はできません' }, 409);
     }
-    logger.error("routes_scoring_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

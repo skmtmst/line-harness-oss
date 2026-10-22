@@ -466,7 +466,7 @@ async function recordLifecycle(
       detail: detail ?? null,
     });
   } catch (err) {
-    logger.error("routes_broadcasts_failed");
+    logger.error("broadcasts.record_lifecycle_failed");
   }
 }
 
@@ -507,7 +507,7 @@ function kickQueueProcessing(c: Context<Env>, label: string): void {
     const defaultClient = new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
     ctx.waitUntil(
       processQueuedBroadcasts(c.env.DB, defaultClient, c.env.WORKER_URL).catch((err) => {
-        logger.error("routes_broadcasts_failed");
+        logger.error("broadcasts.kick_queue_processing_failed");
       }),
     );
   } catch (kickErr) {
@@ -581,7 +581,7 @@ async function recordBroadcastControlAudit(
       deviceFamily: auditDeviceFamily(c.req.header('user-agent')),
     });
   } catch (err) {
-    logger.error("routes_broadcasts_failed");
+    logger.error("broadcasts.record_broadcast_control_audit_failed");
   }
 }
 

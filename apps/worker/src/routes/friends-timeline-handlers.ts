@@ -164,8 +164,7 @@ export const get__api_friends_id_timeline_1 = async (c: Context<Env, "/api/frien
         },
       });
     } catch (error) {
-      logger.error("routes_friends_failed");
-      return c.json({ success: false, error: '友だちの履歴を読み込めませんでした' }, 500);
+      throw error;
     }
   };
 
@@ -323,7 +322,7 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
         nextRetryAt: null,
         now: failedAt,
       });
-      logger.error("routes_friends_failed");
+      logger.error("friends.friends_id_messages_post_failed");
       return c.json({
         success: false,
         error: '送信の準備に失敗しました',
@@ -398,7 +397,6 @@ export const post__api_friends_id_messages_2 = async (c: Context<Env, "/api/frie
 
     return c.json({ success: true, data: { messageId: logId } });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

@@ -557,7 +557,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
         });
       } catch (error) {
         // 集計台帳の一時失敗で、友だち一覧そのものを表示不能にしない。
-        logger.error("routes_friends_failed");
+        logger.error("friends.friends_get_failed");
       }
     }
 
@@ -574,8 +574,7 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
       },
     });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -596,8 +595,7 @@ export const get__api_friends_add_breakdown_2 = async (c: Context<Env, "/api/fri
     const data = await getFriendAddBreakdown(c.env.DB, safeDays, statsScope);
     return c.json({ success: true, data });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -620,8 +618,7 @@ export const get__api_friends_count_3 = async (c: Context<Env, "/api/friends/cou
     }
     return c.json({ success: true, data: { count } });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -649,7 +646,6 @@ export const get__api_friends_ref_stats_4 = async (c: Context<Env, "/api/friends
       },
     });
   } catch (err) {
-    logger.error("routes_friends_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };

@@ -38,8 +38,7 @@ export const get__api_settings_features_visibility_1 = async (c: Context<Env, "/
       ),
     });
   } catch (err) {
-    logger.error("routes_feature_settings_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -90,8 +89,7 @@ export const get__api_settings_features_2 = async (c: Context<Env, "/api/setting
       },
     });
   } catch (err) {
-    logger.error("routes_feature_settings_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -180,8 +178,7 @@ export const post__api_settings_features_impact_3 = async (c: Context<Env, "/api
       },
     });
   } catch (err) {
-    logger.error("routes_feature_settings_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
 
@@ -533,7 +530,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
           .map((_, index) => index)
           .filter((index) => index !== casIndex && changed(index) > 0);
         if (leaked.length > 0) {
-          logger.error("routes_feature_settings_failed");
+          logger.error("feature_settings.settings_features_put_failed");
         }
         const reread = await loadFeatureSettings(
           c.env.DB,
@@ -601,7 +598,6 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
       data: savedVersion === null ? null : { version: savedVersion },
     });
   } catch (err) {
-    logger.error("routes_feature_settings_failed");
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    throw err;
   }
 };
