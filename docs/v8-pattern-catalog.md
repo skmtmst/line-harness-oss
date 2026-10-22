@@ -1145,3 +1145,11 @@
 - カレンダーの期間移動は `shared/calendar-period.tsx` の `CalendarPeriod`。日付順のキーで方向を決め、transformだけを共通200msで動かす。初回・同期間の再取得・表示方式の切替では動かさず、次の移動で前の動きを中断し、動きを減らす設定では即時表示する。
 - 月の日付は `shared/month-calendar` が今日（文字・aria-current）と選択（枠・aria-selected）を分ける。空き枠は既存 `BookingSlot` の表示を保ち、閲覧のみには変更操作を出さない。
 - 見張り：`log-entry-details.test.tsx`、`calendar-period.test.tsx`、既存の月表示・予約枠・ログの権限と再実行の試験。
+
+## 予約の状態・種類・現在時刻（2026-10-23）
+
+- 持ち主：`shared/booking-controls.tsx` の BookingBlock、`shared/booking-state.ts` と同CSS、`shared/booking-presentation.tsx`。札・一覧の状態・凡例は同じ面を使う。来店中は濃い緑と白字、確定は白と細線、終了は灰、承認待ち／仮押さえは白と点線、要対応は薄赤と赤い点線、注意は薄琥珀。状態は文字でも伝える。
+- 種類の色：BookingCategoryとReservationSourceは既存TagPillのTagColorDotを名前の前へ置く。丸は装飾、名前は文字。経路を札の地色へ混ぜない。BookingNowLineは濃い灰の線と時刻の札。
+- 使用先：ReservationBoard（時間×卓・一覧・月）、ReservationPeopleGrid、CalendarTimeEntries、スタイル別StaffBoard。月の日付の今日／選択と空き枠の操作は既存の口を保つ。
+- 短い札の高さは `shared/use-calendar-time-scale.ts` が時間軸全体の倍率で確保する。CalendarTimeEntriesは既定のカレンダー軸、StaffBoardは `board` の軸を使い、隣の予約へ札を伸ばさない。
+- 見張り：`booking-presentation.test.tsx` と既存の予約の移動・失敗・権限・印刷・日付選択の操作試験。絵との合否は司令塔が判定する。

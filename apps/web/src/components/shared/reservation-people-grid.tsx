@@ -5,11 +5,13 @@ import { jstDate as japanDate } from '@/lib/jst-datetime'
 
 import { Fragment, useRef, type DragEvent } from 'react'
 import type { ReservationBoardEntry, ReservationBoardMove, ReservationBoardResource } from '@line-crm/shared'
-import { MessageCircle, Phone, TriangleAlert } from 'lucide-react'
+import { TriangleAlert } from 'lucide-react'
 import Button from './button'
 import { GridTable } from './grid-table'
 import Avatar from './avatar'
 import { BookingBlock, BookingSlot } from './booking-controls'
+import { reservationBookingState } from './booking-state'
+import { BookingName, BookingTime, BookingDetail, ReservationSource } from './booking-presentation'
 import { formatDay, formatTime } from '@/lib/format'
 import styles from './reservation-people-grid.module.css'
 
@@ -78,12 +80,12 @@ export default function ReservationPeopleGrid({ entries, resources, date, slots 
           {bookings.map(row => {
             const overlapping = rows.filter(other => other.resourceIds.includes(resource.id) && other.startsAt < row.endsAt && other.endsAt > row.startsAt && ['confirmed', 'requested'].includes(other.status)).length
             const over = resource.capacity && overlapping > resource.capacity && ['confirmed', 'requested'].includes(row.status) && rows.filter(other => other.resourceIds.includes(resource.id) && other.startsAt < row.startsAt && other.endsAt > row.startsAt).length >= resource.capacity
-            const line = ['line', 'liff'].includes(row.source), phone = ['phone', 'manual'].includes(row.source)
             const label = `${row.customerName} ${formatTime(row.startsAt)}〜${formatTime(row.endsAt)} ${row.courseName ?? '予約'}の詳細`
-            return <Fragment key={row.id}><BookingBlock placement="cell" tone={over ? 'over' : phone ? 'phone' : line ? 'line' : 'confirmed'} aria-label={label} title={label} draggable={canWrite && !!onMove && !busy} onDragStart={event => startDrag(row, event)} onDragEnd={() => { dragged.current = null }} onClick={() => onOpen(row.id)}>
-              <span className={styles.name}><strong>{row.customerName}</strong>{phone ? <Phone size={14} aria-hidden /> : line ? <MessageCircle size={14} aria-hidden /> : <span>{({ counter: '店頭', operator: '手入力', import: '取り込み' } as Record<string, string>)[row.source] ?? 'その他'}</span>}</span>
-              <span className={styles.meta}>{`${row.courseName ?? '予約'}・${formatTime(row.startsAt)}〜${formatTime(row.endsAt)}`}</span>
-              {row.status !== 'confirmed' ? <span className={styles.meta}>{({ requested: '承認待ち', cancelled: 'キャンセル', rejected: '拒否', expired: '期限切れ', completed: '完了', no_show: '来店なし' } as Record<string, string>)[row.status] ?? row.status}</span> : null}
+            return <Fragment key={row.id}><BookingBlock placement="cell" state={over ? 'attention' : reservationBookingState(row)} aria-label={label} title={label} draggable={canWrite && !!onMove && !busy} onDragStart={event => startDrag(row, event)} onDragEnd={() => { dragged.current = null }} onClick={() => onOpen(row.id)}>
+              <BookingName>{row.customerName}</BookingName>
+              <BookingTime>{formatTime(row.startsAt)}〜{formatTime(row.endsAt)}</BookingTime>
+              <BookingDetail>{row.courseName ?? '予約'}・<ReservationSource value={row.source} note={row.note}/></BookingDetail>
+              <BookingDetail>{over ? '要対応・受付数超過' : ({ confirmed: '確定', requested: '承認待ち', pending: '承認待ち', seated: '来店中', visited: '来店中', cancelled: 'キャンセル', rejected: '拒否', expired: '期限切れ', completed: '完了', no_show: '来店なし' } as Record<string, string>)[row.status] ?? row.status}</BookingDetail>
             </BookingBlock>{over ? <span className={styles.over} role="alert"><TriangleAlert size={13} aria-hidden />受付数を超えています（{overlapping} / {resource.capacity}）</span> : null}</Fragment>
           })}
           {canWrite && !busy ? available.map(slot => <span key={slot.startsAt} className={styles.slot}>{slot.href ? <Button variant="text" href={slot.href} aria-label={`${resource.label} ${formatTime(slot.startsAt)}に予約を入れる`}>＋ 予約を入れる</Button> : onSlot ? <BookingSlot onClick={() => onSlot(resource.id, slot.startsAt)} aria-label={`${resource.label} ${formatTime(slot.startsAt)}に予約を入れる`}>＋ 予約を入れる</BookingSlot> : null}</span>) : null}

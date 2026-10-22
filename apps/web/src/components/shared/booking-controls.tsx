@@ -1,14 +1,16 @@
 'use client'
 
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import styles from './booking-controls.module.css'
+import stateStyles from './booking-state.module.css'
+import { bookingStateLabels, type BookingState } from './booking-state'
 
 type ControlProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'> & { children: ReactNode }
 
 /** 行をまたぐ予約を開く操作。内容・予約元は呼び出し側が渡す。 */
-export function BookingBlock({ tone, placement, children, ...props }: ControlProps & { placement?: 'cell' | 'calendar'; tone: 'line' | 'media' | 'phone' | 'pending' | 'hold' | 'confirmed' | 'seated' | 'departed' | 'over' }) {
-  const tones = { line: styles.blockLine, media: styles.blockMedia, phone: styles.blockPhone, pending: styles.blockPending, hold: styles.blockHold,confirmed:styles.blockConfirmed,seated:styles.blockSeated,departed:styles.blockPhone,over:styles.blockOver }
-  return <button type="button" {...props} data-placement={placement} className={`${styles.block} ${tones[tone]}`}>{children}</button>
+export function BookingBlock({ tone = 'confirmed', state, placement, children, ...props }: ControlProps & { placement?: 'cell' | 'calendar' | 'month' | 'board' | 'timeline'; ref?: Ref<HTMLButtonElement>; state?: BookingState; tone?: 'line' | 'media' | 'phone' | 'pending' | 'hold' | 'confirmed' | 'seated' | 'departed' | 'over' | 'warning' }) {
+  const states: Record<string, BookingState> = { line: 'confirmed', media: 'confirmed', phone: 'confirmed', pending: 'pending', hold: 'pending', confirmed: 'confirmed', seated: 'active', departed: 'completed', over: 'attention', warning: 'warning' }
+  return <button type="button" {...props} data-placement={placement} aria-description={props['aria-description'] ?? bookingStateLabels[state ?? states[tone]]} data-booking-state={state ?? states[tone]} className={`${styles.block} ${stateStyles.surface}`}>{children}</button>
 }
 
 /** 空いている枠に予約を追加する。セルに指を乗せるかキーボードで選ぶと表示する。 */

@@ -119,3 +119,16 @@ it('日表示も実APIの取消記録ID・空き候補を落とさず、週/月�
   expect(toToday('salon', monthly.snapshot, monthly.schedule, '2026-10-01', 'month').week).toBeNull()
   expect(toToday('salon', monthly.snapshot, monthly.schedule, '2026-10-01', 'month').month).toBeTruthy()
 })
+
+it.each([
+  ['confirmed', false, null, 'confirmed'],
+  ['seated', false, null, 'active'],
+  ['confirmed', true, null, 'completed'],
+  ['requested', false, null, 'pending'],
+  ['no_show', false, null, 'attention'],
+] as const)('日週表示も%sの実状態を札へ渡し、予定時刻だけで来店扱いしない', (status, visited, attendance, expected) => {
+  const { snapshot, schedule } = fixture('salon')
+  const entry = schedule.entries[0]
+  const next = { ...schedule, entries: [{ ...entry, booking: { ...entry.booking!, status, visited, attendance } }] }
+  expect(toToday('salon', snapshot, next, '2026-10-21', 'today').week?.entries[0].state).toBe(expected)
+})

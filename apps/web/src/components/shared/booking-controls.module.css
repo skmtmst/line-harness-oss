@@ -13,7 +13,7 @@
   min-height: 0;
   padding: var(--tpl-rs-rsv-block-pad);
   overflow: hidden;
-  border: 0;
+  box-sizing: border-box;
   border-radius: var(--radius-segment);
   text-align: left;
   cursor: pointer;
@@ -27,48 +27,16 @@
   pointer-events: auto;
   padding: var(--polish-space-row);
   gap: 0;
-  color: var(--color-ink);
   font-size: var(--text-micro);
 }
 .block[data-placement='calendar'] > span { max-inline-size: 100%; min-inline-size: 0; }
 
-.blockLine {
-  background: var(--color-accent-soft);
-  box-shadow: var(--tpl-rs-bar-line);
-}
-
-.blockMedia {
-  background: var(--tpl-rs-occupied-bg);
-  box-shadow: var(--tpl-rs-bar-media);
-}
-
-.blockPhone {
-  background: var(--color-status-info-soft);
-  outline: 1px solid var(--color-status-info);
-  outline-offset: -1px;
-}
-
-/* 受付数を超えた予約（赤い地と赤い枠）。 */
-.blockOver {
-  background: var(--color-notice-danger-bg);
-  outline: 1px solid var(--color-menu-danger);
-  outline-offset: -1px;
-}
-
-.blockPending {
-  background: var(--color-status-warn-soft);
-  outline: var(--tpl-rs-inv-cell-line) solid var(--color-warning);
-  outline-offset: calc(var(--tpl-rs-inv-cell-line) * -1);
-}
-
-.blockHold {
-  background: var(--tpl-rs-rsv-hold-bg);
-  outline: 1px solid var(--tpl-rs-rsv-hold-line);
-  outline-offset: -1px;
-}
-
-.blockConfirmed{background:var(--color-status-info-soft);outline:1px solid var(--color-status-info);outline-offset:-1px;}
-.blockSeated{background:var(--color-accent-soft);outline:1px solid var(--color-accent);outline-offset:-1px;}
+.block[data-placement='timeline'] { gap: 0; padding: var(--polish-space-row); line-height: var(--tpl-rs-lh-10); }
+.block[data-placement='board'] { position: static; width: 100%; height: 100%; gap: 0; padding: var(--tpl-sd-entry-pad); }
+.block[data-placement='month'] { position: static; width: 100%; padding: var(--polish-space-row); gap: 0; font-size: var(--text-micro); }
+.block > strong { font-weight: 600; }
+.block > span { font-variant-numeric: tabular-nums; }
+.block[data-selected] { outline: var(--polish-focus-width) solid var(--color-ink); outline-offset: -2px; }
 .slotAdd {
   position: absolute;
   top: var(--tpl-rs-rsv-add-top);

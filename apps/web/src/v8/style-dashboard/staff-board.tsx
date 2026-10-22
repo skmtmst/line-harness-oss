@@ -1,17 +1,20 @@
 'use client'
 import { term, styleTerm } from '@/lib/terms'
-import { CalendarSlotButton, CalendarLegendItem } from '@/components/shared/calendar-parts'
-import { CalendarX2, CircleHelp, Plus, Star } from 'lucide-react'
+import { CalendarSlotButton, CalendarLegendItem, useCalendarTimeScale } from '@/components/shared/calendar-parts'
+import { CircleHelp, Plus, Star } from 'lucide-react'
 import { useRef, useState, type CSSProperties } from 'react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ListToolbar from '@/components/shared/list-toolbar'
+import { BookingBlock } from '@/components/shared/booking-controls'
+import { calendarBookingState } from '@/components/shared/booking-state'
+import { BookingCategory, BookingNowLine, BookingName, BookingSummary, BookingLegend } from '@/components/shared/booking-presentation'
 import StatusBadge from '@/components/shared/status-badge'
 import type { StyleBoard, StyleBoardEntry } from './model'
 import styles from './style-dashboard.module.css'
 
 /*
  * 1枚目のタブの「盤（時間×担当）」（サロンの台帳 mOAX5）。
- * 列＝担当、縦＝時刻（1時間＝--tpl-sd-hour）。過ぎた時間は薄く、今の時刻に赤い線。
+ * 列＝担当、縦＝時刻（1時間＝--tpl-sd-hour）。過ぎた時間は薄く、今の時刻に濃い灰の線。
  * 予約の箱を押すと詳細、空き（＋入れる）を押すと予約を入れる。
  */
 
@@ -36,20 +39,22 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
   const anchor = useRef<HTMLButtonElement | null>(null)
   const opened = board.entries.find((e) => e.id === openId) ?? null
   const shown = board.entries.filter((e) => !search || e.name.includes(search) || e.menu.includes(search))
+  const timeScale = useCalendarTimeScale(shown, [], false, 'board')
   return (
-    <section className={styles.board} aria-label="台帳の盤">
+    <section ref={timeScale} className={styles.board} aria-label="台帳の盤">
       <div className={styles.boardTools}>
         {board.next ? <span className={styles.nextChip}><CircleHelp size={14} aria-hidden="true" />次の空き<strong>{board.next}</strong></span> : null}
         <span className={styles.grow} />
         <div className={styles.search}><ListToolbar search={{ value: search, onChange: onSearch, placeholder: "名前・電話で探す", width: 220 }} /></div>
       </div>
+      <BookingLegend/>
       <div className={styles.boardStaff}>
         <span className={styles.boardTimeHead} />
         {board.columns.map((c) => (
           <div key={c.id} className={styles.boardColumnHead}>
             <span className={styles.face} data-tone={c.tone} aria-hidden="true">{c.initial}</span>
             <span className={styles.faceText}>
-              <span className={styles.faceName}><strong>{c.name}</strong><span className={styles.grow} /><span className={styles.cellMuted}>{c.count}件</span></span>
+              <span className={styles.faceName}><BookingCategory name={c.name} color={({green:'var(--color-accent-deep)',purple:'var(--color-avatar-purple-ink)',blue:'var(--color-avatar-blue-ink)',amber:'var(--color-status-warn-deep)'})[c.tone]}/><span className={styles.grow} /><span className={styles.cellMuted}>{c.count}件</span></span>
               <span className={styles.faceNext} data-off={c.off || undefined}>{c.next}</span>
             </span>
           </div>
@@ -68,17 +73,10 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
           if (i < 0) return null
           return (
             <div key={e.id} className={styles.entryWrap} style={{ ...col(i, count), ...at(e.start, board.from), ...span(e.start, e.end) }}>
-              <button type="button" ref={openId === e.id ? anchor : undefined} className={styles.entry} data-state={e.state} data-selected={e.selected || openId === e.id || undefined} aria-haspopup={e.state === 'off' ? undefined : 'menu'} aria-expanded={e.state === 'off' ? undefined : openId === e.id} onClick={(ev) => { if (e.state === 'off') return; anchor.current = ev.currentTarget; setOpenId(openId === e.id ? null : e.id) }} aria-label={`${e.start}〜${e.end} ${e.name}さん ${e.menu} ${e.stateLabel}`}>
-                <span className={styles.entryTop}>
-                  {e.state === 'off' ? <CalendarX2 size={12} aria-hidden="true" /> : null}
-                  <strong>{e.name}</strong>
-                  {e.nominated ? <Star size={12} className={styles.star} aria-label="指名" /> : null}
-                  <span className={styles.grow} />
-                  {e.unpaid ? <StatusBadge tone="danger" dot={false} size="micro">未払い</StatusBadge> : null}
-                </span>
-                <span className={styles.entryBottom}><span>{e.menu}</span><span className={styles.grow} /><span className={styles.entryState}>{e.stateLabel}</span></span>
-                {toMin(e.end) - toMin(e.start) >= 75 ? <span className={styles.entryTime}>{e.start}〜{e.end}</span> : null}
-              </button>
+              <BookingBlock placement="board" ref={openId === e.id ? anchor : undefined} state={calendarBookingState(e.state)} data-selected={e.selected || openId === e.id || undefined} aria-haspopup={e.state === 'off' ? undefined : 'menu'} aria-expanded={e.state === 'off' ? undefined : openId === e.id} onClick={(ev) => { if (e.state === 'off') return; anchor.current = ev.currentTarget; setOpenId(openId === e.id ? null : e.id) }} aria-label={`${e.start}〜${e.end} ${e.name}さん ${e.menu} ${e.stateLabel}`}>
+                <BookingName>{e.name}{e.nominated ? <Star size={12} className={styles.star} aria-label="指名" /> : null}{e.unpaid ? <StatusBadge tone="danger" dot={false} size="micro">未払い</StatusBadge> : null}</BookingName>
+                <BookingSummary time={`${e.start}〜${e.end}`}>{e.menu} {e.stateLabel}</BookingSummary>
+              </BookingBlock>
             </div>
           )
         })}
@@ -91,7 +89,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
             </div>
           )
         }) : null}
-        {board.now ? <div className={styles.nowLine} style={at(board.now, board.from)} aria-label={`今 ${board.now}`}><span>{board.now}</span></div> : null}
+        {board.now ? <BookingNowLine direction="horizontal" time={board.now} style={at(board.now, board.from)}/> : null}
       </div>
       {opened ? <ActionMenu open items={entryItems(opened)} anchorRef={anchor} ariaLabel={`${opened.name}の操作`} onClose={() => setOpenId(null)} /> : null}
       <div className={styles.boardLegend}>
