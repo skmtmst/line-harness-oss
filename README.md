@@ -1,4 +1,4 @@
-> 文書：LINE Harness｜区分：今の説明｜最終確認：2026-10-19（日本時間）
+> 文書：LINE Harness｜区分：今の説明｜最終確認：2026-10-22（日本時間）
 
 🌐 **日本語** | [English](README.en.md) | [简体中文](README.zh-CN.md) | [한국어](README.ko.md) | [Español](README.es.md)
 
@@ -13,7 +13,9 @@ Cloudflare 無料枠で動く。サーバー代 **0 円**。Claude Code から�
 
 [![クリックで YouTube を再生 — LINE Harness 導入の全手順](https://img.youtube.com/vi/DiRuGaeq1sM/maxresdefault.jpg)](https://youtu.be/DiRuGaeq1sM)
 
-**現バージョン**: v0.14.1 ・ MIT License ・ TypeScript / Cloudflare Workers + D1
+**版と更新履歴**: [反映履歴](docs/release-log/README.md)で管理し、正式な版はリリース時に確定します。未公開の変更は次回反映予定として分けます。
+
+MIT License ・ TypeScript / Cloudflare Workers + D1
 
 ---
 
