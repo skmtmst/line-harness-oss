@@ -15,7 +15,8 @@ import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
-import FilterChip from '@/components/shared/filter-chip'
+import { Tabs } from '@/components/shared/tabs'
+import { LogEntryCopy } from '@/components/shared/log-entry-details'
 import ListState from '@/components/shared/list-state'
 import AccountRequiredState from '@/components/shared/account-required-state'
 import Notice from '@/components/shared/notice'
@@ -313,18 +314,14 @@ export default function WebhooksInteractionsV8() {
   ]
 
   /* 絞り込みの札は文字と数だけ（意味のない印は付けない・絵 ）。 */
-  const chip = (label: string, count: number, on: boolean, select: () => void) => (
-    <FilterChip selected={on} onChange={() => { select(); setPage(1) }}>
-      {loaded ? `${label} ${formatNumber(count)}` : label}
-    </FilterChip>
-  )
+  const chip = (label: string, count: number, current: boolean, select: () => void) => ({ label, count: loaded ? count : undefined, current, onClick: () => { select(); setPage(1) } })
   const chips = (
-    <div role="group" aria-label="向きと結果で絞り込む" className={styles.chips}>
-      {chip('すべて', summary.total, direction === 'all' && status === 'all', () => { setDirection('all'); setStatus('all') })}
-      {chip('送った', summary.outgoing, direction === 'outgoing' && status === 'all', () => { setDirection('outgoing'); setStatus('all') })}
-      {chip('受け取った', summary.incoming, direction === 'incoming' && status === 'all', () => { setDirection('incoming'); setStatus('all') })}
-      {chip('失敗', summary.failed, status === 'failed', () => { setDirection('all'); setStatus('failed') })}
-    </div>
+    <Tabs size="compact" wrap label="向きと結果で絞り込む" items={[
+      chip('すべて', summary.total, direction === 'all' && status === 'all', () => { setDirection('all'); setStatus('all') }),
+      chip('送った', summary.outgoing, direction === 'outgoing' && status === 'all', () => { setDirection('outgoing'); setStatus('all') }),
+      chip('受け取った', summary.incoming, direction === 'incoming' && status === 'all', () => { setDirection('incoming'); setStatus('all') }),
+      chip('失敗', summary.failed, status === 'failed', () => { setDirection('all'); setStatus('failed') }),
+    ]} />
   )
   /* 期間は絵に無い。消さずに、道具の段の右の空いた所へ小さく置く（件数はページ送りの段へ）。 */
   const trailing = (
@@ -472,7 +469,6 @@ export default function WebhooksInteractionsV8() {
         {selected ? (
           <InteractionDialog
             item={selected}
-            accountId={selectedAccountId}
             techOpen={techOpen}
             setTechOpen={setTechOpen}
             canRetry={canRetry}
@@ -510,26 +506,13 @@ function dialogTrigger(item: WebhookInteraction): string {
   return rest.length > 0 ? `${head}（${rest.join('・')}）` : head
 }
 
-/** 送った・届いた中身（伏せ字の本文）。口が「残っていない」と返すときは null。 */
-type PayloadState = { kind: 'loading' } | { kind: 'ready'; text: string } | { kind: 'missing' } | { kind: 'error' }
-
-function payloadText(body: unknown): string {
-  if (typeof body === 'string') return body
-  try {
-    return JSON.stringify(body, null, 2) ?? ''
-  } catch {
-    return String(body)
-  }
-}
-
 /*
  * やり取りの中身の窓（絵 ：幅680・上から110・題 18/700 と状態の札・1行の説明・
  * 8行の項目・送った・届いた中身・伏せている旨・下の段 技術的な記録／閉じる／送り直す）。
- * 本文は F-18 の口（伏せ字にした本文）から読む。URL・鍵は出さない。
+ * 送受信本文・URL・鍵は取得せず、表示用の記録だけを出す。
  */
-function InteractionDialog({ item, accountId, techOpen, setTechOpen, canRetry, retrying, busy, onClose, onRetry }: {
+function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, busy, onClose, onRetry }: {
   item: WebhookInteraction
-  accountId: string | null
   techOpen: boolean
   setTechOpen: (open: boolean) => void
   canRetry: boolean
@@ -538,25 +521,6 @@ function InteractionDialog({ item, accountId, techOpen, setTechOpen, canRetry, r
   onClose: () => void
   onRetry: () => void
 }) {
-  const [payload, setPayload] = useState<PayloadState>({ kind: 'loading' })
-  useEffect(() => {
-    if (!accountId) {
-      setPayload({ kind: 'missing' })
-      return
-    }
-    let active = true
-    setPayload({ kind: 'loading' })
-    api.webhooks.interactions.payload(item.id, accountId)
-      .then((response) => {
-        if (!active) return
-        if (!response.success) setPayload({ kind: 'error' })
-        else if (!response.data.available || response.data.body == null) setPayload({ kind: 'missing' })
-        else setPayload({ kind: 'ready', text: payloadText(response.data.body) })
-      })
-      .catch(() => { if (active) setPayload({ kind: 'error' }) })
-    return () => { active = false }
-  }, [item.id, accountId])
-
   const retryable = canRetryNow(item, canRetry)
   const failed = item.status === 'failed'
   const why = retryabilityText(item, canRetry)
@@ -589,6 +553,7 @@ function InteractionDialog({ item, accountId, techOpen, setTechOpen, canRetry, r
       }
     >
       <div className={styles.dialogBody}>
+        <LogEntryCopy entry={{ occurredAt: item.startedAt, target: item.webhookName, status: item.status === 'failed' ? '失敗' : item.status === 'succeeded' ? '成功' : item.status === 'retried' ? '送り直し済み' : '処理中', reason: item.failureReason ?? item.responseLabel }} />
         <span className={styles.dialogState} data-tone={failed ? 'danger' : item.status === 'succeeded' ? 'active' : 'neutral'}>
           <span className={styles.pillDot} aria-hidden="true" />
           {failed ? '失敗' : item.status === 'succeeded' ? '成功' : '処理中'}
@@ -615,19 +580,7 @@ function InteractionDialog({ item, accountId, techOpen, setTechOpen, canRetry, r
             </dd>
           </div>
         </dl>
-        <h3 className={styles.dialogHeading}>送った・届いた中身</h3>
-        {payload.kind === 'ready' ? (
-          <pre className={styles.payloadBox}>{payload.text}</pre>
-        ) : (
-          <p className={styles.payloadBox}>
-            {payload.kind === 'loading'
-              ? '読み込んでいます…'
-              : payload.kind === 'missing'
-                ? '送った中身は残っていません（古い記録・受け取りの試しなど）。'
-                : '中身を読み込めませんでした。閉じて開き直してください。'}
-          </p>
-        )}
-        <p className={styles.dialogNote}>接続先 URL、シークレット、本文のうち個人が分かる部分は、安全のため伏せています。</p>
+        <p className={styles.dialogNote}>接続先URL、秘密値、送受信の本文は、この記録には表示しません。</p>
       </div>
     </Dialog>
   )

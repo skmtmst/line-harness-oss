@@ -1,6 +1,7 @@
 'use client'
 
 import { canManageRole, isOwnerRole, useStaffRole } from '@/lib/staff-role'
+import { LogEntryCopy } from '@/components/shared/log-entry-details'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { UserX, CircleX, Mail, RotateCcw, RotateCw } from 'lucide-react'
@@ -261,6 +262,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
     >
       {detail ? (
         <div className={styles.runDetail}>
+          <LogEntryCopy entry={{ occurredAt: detail.receivedAt, target: detail.friendName || '名前は未取得', status: STATUS[detail.status].label, reason: reasonWords(detail) }} />
           <p className={styles.minor}>{`状態：${STATUS[detail.status].label}／理由：${reasonWords(detail)}`}</p>
           {detail.resolved ? <p className={styles.minor}>{`対応済み ${shortJst(detail.resolvedAt)}${detail.resolvedBy ? `／${detail.resolvedBy}` : ''}`}</p> : null}
           {(detail.attemptHistory?.length ?? 0) > 0 ? (

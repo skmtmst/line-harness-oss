@@ -404,11 +404,11 @@ function FriendAddRunsInner() {
   const successRate = delivered === null || summary === null || summary.cumulativeDeliveries === 0
     ? '成功率 —'
     : `成功率 ${((delivered / summary.cumulativeDeliveries) * 100).toFixed(1)}%`
-  const chips: Array<{ key: Chip; label: string }> = [
-    { key: 'all', label: data ? `すべて ${formatNumber(data.total)}` : 'すべて' },
-    { key: 'failed', label: summary ? `失敗 ${formatNumber(summary.failed)}` : '失敗' },
-    { key: 'pending', label: 'テスト待ち' },
-    { key: 'returning', label: '再追加' },
+  const chips: Array<{ key: Chip; label: string; count?: number }> = [
+    { key: 'all', label: 'すべて', count: data && activeChip === 'all' ? data.total : undefined },
+    { key: 'failed', label: '失敗', count: summary?.failed },
+    { key: 'pending', label: 'テスト待ち', count: summary?.testPending ?? undefined },
+    { key: 'returning', label: '再追加', count: summary?.returning },
   ]
   const pageCount = cursorPage + (data?.nextCursor ? 1 : 0)
   const changePage = (next: number) => {
@@ -505,7 +505,7 @@ function FriendAddRunsInner() {
               onClear={() => setSearch('')}
             />
 
-          <SegmentedControl aria-label="結果で絞り込む" value={activeChip} onChange={pickChip} options={chips.map(chip=>({value:chip.key,label:chip.label}))} />
+          <SegmentedControl aria-label="結果で絞り込む" value={activeChip} onChange={pickChip} options={chips.map(chip=>({value:chip.key,label:chip.label,count:chip.count}))} />
 
 
             <SaveErrorField names={["perPage","limit","per_page"]}><PageSizeSelect label={null} value={perPage} onChange={(value) => { setPerPage(value); resetCursor() }} /></SaveErrorField>

@@ -30,6 +30,7 @@ import { describeFriendAddFailure } from '@/v8/friend-add/public/failure/index'
 import { MESSAGE_TYPE_LABEL } from '@/v8/friend-add/public/flow/index'
 import { DELIVERY_UNKNOWN_CODE, jstClock, jstShortDateTime, jstTitleDate, routingAction } from './status'
 import styles from './detail.module.css'
+import { LogEntryCopy } from '@/components/shared/log-entry-details'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import Notice from '@/components/shared/notice'
@@ -299,6 +300,7 @@ function FriendAddRunDetailInner() {
           ) : null} </>} >{bandNote}</Notice>
       ) : null}
 
+      <LogEntryCopy entry={{ occurredAt: detail.processedAt ?? detail.receivedAt, target: displayName, status: routingAction(detail.status, detail.errorCode), reason: deliveryUnknown ? '届いたか分からないため、自動では送り直しません。' : runFailed ? safeErrorMessage(detail.errorCode) ?? '処理を完了できませんでした。' : '処理の記録を確認してください。' }} />
       <Card variant="form" contentPadding="var(--polish-space-section)" gap="var(--tpl-rule-row-gap)" aria-labelledby="friend-add-run-steps">
         <div className={styles.cardHead}>
           <h3 id="friend-add-run-steps" className={styles.cardTitle}>行ったこと</h3>

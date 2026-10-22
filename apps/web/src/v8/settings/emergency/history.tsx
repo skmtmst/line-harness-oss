@@ -12,6 +12,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BookOpen, CircleX, GitBranch, RefreshCw } from 'lucide-react'
 import Button from '@/components/shared/button'
+import { RowNameButton } from '@/components/shared/table'
+import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-entry-details'
 import Card from '@/components/shared/card'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import KpiBand from '@/components/shared/kpi-band'
@@ -95,6 +97,7 @@ export function releaseResult(deployment: Deployment | null, historyState: 'load
 }
 
 export default function UpdateHistoryV8() {
+  const [entry, setEntry] = useState<LogEntryFacts | null>(null)
   const [history, setHistory] = useState<OperationHistoryEntry[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
 
@@ -125,6 +128,7 @@ export default function UpdateHistoryV8() {
 
   return (
     <div className={styles.board}>
+      <LogEntryDetails entry={entry} onClose={() => setEntry(null)} />
       <KpiBand aria-label="更新の集計">
         <KpiCard title="いまの版" icon={<GitBranch size={14} />} value={null} valueText={current ? `v${current}` : '—'} unit="" detail={currentAt ? `${shortWhen(currentAt)} に更新` : '更新の記録なし'} />
         <KpiCard title="この30日の更新" icon={<RefreshCw size={14} />} value={ready ? Math.max(recent.length, recentReleases.length) : null} unit="回" detail={ready ? (recent.length > 0 ? `自動 ${auto}・手動 ${recent.length - auto}` : '配備の記録なし（版の記録から）') : '読み込み中'} />
@@ -155,7 +159,7 @@ export default function UpdateHistoryV8() {
               return (
                 <GridRow key={deployment?.deploymentId || `${release.version}|${deployment?.occurredAt ?? release.released}`}>
                   <GridCell role="cell" className={styles.cell}>{shortWhen(deployment?.occurredAt ?? release.released)}</GridCell>
-                  <GridCell role="cell" className={`${styles.cell} ${styles.strong}`} title={title}>{title}</GridCell>
+                  <GridCell role="cell" className={`${styles.cell} ${styles.strong}`} title={title}><RowNameButton onClick={() => setEntry({ occurredAt: deployment?.occurredAt ?? release.released ?? '', target: deployment?.environment ?? '管理画面', status: result.label, reason: deployment?.phase === 'failed' ? '更新に失敗しました。配備の記録で原因を確認してください。' : deployment?.phase === 'rolled_back' ? '前の版へ戻しました。' : deployment ? result.label : '配備の記録がありません。' })}>{title}</RowNameButton></GridCell>
                   <GridCell role="cell" className={styles.cell}>{deployment ? (isAutomatic(deployment) ? '自動' : '手動') : emptyValue('unknown')}</GridCell>
                   <GridCell role="cell" className={`${styles.cell} ${styles.num}`}>—</GridCell>
                   <GridCell role="cell" className={styles.judge}><StatusBadge tone={({ good: 'success', warn: 'warning', danger: 'danger', muted: 'neutral' } as Record<string, StatusBadgeTone>)[result.tone]}>{result.label}</StatusBadge></GridCell>
