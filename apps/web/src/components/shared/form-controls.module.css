@@ -95,7 +95,7 @@
 :root .field { display: flex; flex-direction: column; gap: 6px; }
 :root .field > :is(.required, .optional) { align-self: flex-start; }
 :root .labelRow { margin-bottom: 0; gap: 6px; }
-:root .label { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .label { line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 :root .field[data-field-size='compact'] .label { font-size: var(--text-caption); font-weight: 600; line-height: normal; }
 :root .field[data-field-fill] { flex: 1 1 0; }
 

@@ -323,7 +323,7 @@
 /* 正本 q3DPdz：枠560、頭・手順・中身・下を独立した段にする。 */
 :root .panel {
   width: min(var(--tpl-dialog-width), 100%); padding: 0; gap: 0; overflow: hidden;
-  border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--card-edge); outline-offset: -0.5px;
+  border: 0; border-radius: var(--polish-radius-dialog); outline: 1px solid var(--card-edge); outline-offset: -1px;
   box-shadow: var(--shadow-controls-pop);
   font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif;
 }
@@ -391,7 +391,7 @@
 }
 :root .descriptionBand > .callout { width: 100%; }
 :root .panel[data-design-layout='stacked'] > .descriptionBand { padding: 0; margin: 0; }
-:root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -0.5px; }
+:root .close { border: 0; outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 :root .close svg { width: 16px; height: 16px; }
 :root .content { width: 100%; padding: 24px; }
 :root .panel[data-design-content-padding] > .content { padding: var(--dialog-design-content-padding); }
@@ -407,7 +407,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .panel[data-footer-align='center'] .actions { justify-content: center; }
 :root .footerLead { flex: 1; font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
 :root .designButton { min-width: 0; font-family: inherit; line-height: 20px; }
-:root .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
+:root .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -1px; }
 :root .designButton[data-dialog-action='primary'] { border: 0; }
 :root .buttonIcon svg { width: 15px; height: 15px; }
 :root .steps { width: 100%; flex-shrink: 0; padding: 10px 24px; border-block: 1px solid var(--color-hairline); background: var(--color-surface-pearl); }
@@ -432,7 +432,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .designButton[data-dialog-action='primary'] { box-shadow: var(--v8-parts-primary-shadow); }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .panel { -webkit-font-smoothing: auto; }
+:root .panel { -webkit-font-smoothing: antialiased; }
 
 /* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
 :root .panel[data-design-layout='stacked'] { padding: 24px; gap: 14px; }
