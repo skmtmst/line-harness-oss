@@ -6,7 +6,7 @@ import {
 } from '@line-crm/db';
 
 import { timingDbSpan } from '../lib/server-timing.js';
-import { readAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
+import { readAuthenticatedStaffRecord, rememberAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
@@ -120,6 +120,30 @@ export function getVisibleLineAccountScope(
   });
   byDb.set(db, { signature, pending });
   return pending;
+}
+
+/** 同じ要求で機能の範囲だけを狭める。元の統括・担当範囲を広げない。 */
+export function restrictVisibleLineAccountScope(
+  db: D1Database,
+  staff: AuthenticatedStaff,
+  enabledIds: string[],
+): AuthenticatedStaff {
+  const narrowed = { ...staff, featureEnabledLineAccountIds: [...enabledIds] };
+  const cached = scopeCacheByStaff.get(staff)?.get(db);
+  if (cached?.signature === scopeSignature(staff)) {
+    const byDb = new WeakMap<D1Database, CachedScope>();
+    const enabled = new Set(enabledIds);
+    const pending = cached.pending.then(scope => {
+      const accounts = scope.accounts.filter(account => enabled.has(account.id));
+      const ids = accounts.map(account => account.id);
+      return { ...scope, accounts, ids, allowedAccountIds: ids, canSeeUnassigned: false };
+    }).catch((error: unknown) => { byDb.delete(db); throw error; });
+    byDb.set(db, { signature: scopeSignature(narrowed), pending });
+    scopeCacheByStaff.set(narrowed, byDb);
+  }
+  const record = readAuthenticatedStaffRecord(db, staff);
+  if (record) rememberAuthenticatedStaffRecord(db, narrowed, record);
+  return narrowed;
 }
 
 async function resolveVisibleLineAccountScope(

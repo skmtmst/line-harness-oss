@@ -57,6 +57,10 @@ function request(path: string, extra: Partial<Env['Bindings']> = {}) {
 
 // 実アプリのmiddleware登録からhandlerまで通し、権限付き読取の予算を守る。
 it.each([
+  ['/api/auto-replies', 11],
+  ['/api/scenarios', 8],
+  ['/api/templates', 11],
+  ['/api/tags', 4],
   ['/api/staff/me', 2],
   ['/api/tenants/me', 3],
   ['/api/auth/session', 4],
@@ -103,6 +107,7 @@ async function registerMfa() {
 }
 
 it.each([
+  ['/api/auto-replies', 13], ['/api/scenarios', 10], ['/api/templates', 13], ['/api/tags', 6],
   ['/api/staff/me', 4], ['/api/tenants/me', 5], ['/api/auth/session', 6],
   ['/api/line-accounts', 9], ['/api/hq/style-attention', 7],
   ['/api/inbox/unanswered/count', 6], ['/api/accounts/health-summary', 6],
@@ -130,4 +135,34 @@ it('MFA必須で未登録のセッションは確認の印を読まずに拒否�
   expect((await request('/api/staff/me', { TOTP_ENCRYPTION_KEY: mfaKey })).status).toBe(401);
   // 本人＋方針＋失効batch＋緊急APIキーfallbackの4往復。許可へは進まない。
   expect(trips).toHaveLength(4);
+});
+
+
+it('CORSの事前確認・認証前の拒否・robotsにも計測を付ける', async () => {
+  const origin = 'https://admin.example';
+  const bindings = { DB: db, ADMIN_ORIGIN: origin } as Env['Bindings'];
+  const options = await app.request('/api/staff/me', { method: 'OPTIONS', headers: {
+    Origin: origin, 'Access-Control-Request-Method': 'GET',
+  } }, bindings);
+  expect(options.status).toBe(204);
+  expect(options.headers.get('Timing-Allow-Origin')).toBe(origin);
+  expect(options.headers.get('Server-Timing')).toContain('d1_count;desc="0"');
+  const denied = await app.request('/api/staff/me', { headers: { Origin: origin } }, bindings);
+  expect(denied.status).toBe(401);
+  expect(denied.headers.get('Access-Control-Expose-Headers')).toContain('Server-Timing');
+  expect(denied.headers.get('Server-Timing')).toContain('d1_count;desc="0"');
+  const robots = await app.request('/robots.txt', {}, bindings);
+  expect(robots.status).toBe(200);
+  expect(robots.headers.get('Server-Timing')).toContain('total;dur=');
+});
+
+it('同じenvを使う並行要求でもD1の回数を混ぜず、共有Bindingを変更しない', async () => {
+  const bindings = { DB: db } as Env['Bindings'];
+  const responses = await Promise.all(['/api/staff/me', '/api/scenarios'].map(path => app.request(path, {
+    headers: { Cookie: 'lh_admin_session=fixture-session' },
+  }, bindings)));
+  expect(bindings.DB).toBe(db);
+  expect(responses.map(res => res.status)).toEqual([200, 200]);
+  expect(responses[0].headers.get('Server-Timing')).toContain('d1_count;desc="2"');
+  expect(responses[1].headers.get('Server-Timing')).toContain('d1_count;desc="8"');
 });
