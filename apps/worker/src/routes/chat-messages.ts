@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -121,13 +121,12 @@ chatMessages.get('/api/chats/:friendId/messages/search', async (c) => {
     id: row.id, at: row.at, excerpt: excerpt(row.content, needle),
     before: context(row.before_json), after: context(row.after_json), cursor: point(row),
   }));
+  const responseItems = hits;
   return c.json({
     success: true,
-    data: {
-      total,
-      hits,
-      nextOffset: offset + hits.length < total ? offset + hits.length : null,
-    },
+    data: buildOffsetListResponse({ total,
+      hits: responseItems,
+      nextOffset: offset + hits.length < total ? offset + hits.length : null, items: responseItems, paging: { limit }, sort: [{ field: 'at', direction: 'asc' }, { field: 'id', direction: 'asc' }] }),
   });
 });
 chatMessages.get('/api/chats/:friendId/messages', async (c) => {
@@ -199,11 +198,7 @@ chatMessages.get('/api/chats/:friendId/messages', async (c) => {
     beforeMore = direction === 'before' && result.more;
     afterMore = direction === 'after' && result.more;
   }
-  return c.json({
-    success: true,
-    data: {
-      total,
-      messages: rows.map((r) => ({
+  const responseItems = rows.map((r) => ({
         id: r.id,
         direction: r.direction,
         messageType: r.message_type,
@@ -211,10 +206,13 @@ chatMessages.get('/api/chats/:friendId/messages', async (c) => {
         isUnsent: !!r.unsent_at,
         createdAt: r.created_at,
         eventAt: r.line_event_at,
-      })),
+      }));
+  return c.json({
+    success: true,
+    data: buildOffsetListResponse({ total,
+      messages: responseItems,
       beforeCursor: beforeMore && rows.length ? point(rows[0]!) : null,
       afterCursor:
-        afterMore && rows.length ? point(rows[rows.length - 1]!) : null,
-    },
+        afterMore && rows.length ? point(rows[rows.length - 1]!) : null, items: responseItems, paging: { limit }, sort: [{ field: 'eventAt', direction: 'asc' }, { field: 'id', direction: 'asc' }] }),
   });
 });

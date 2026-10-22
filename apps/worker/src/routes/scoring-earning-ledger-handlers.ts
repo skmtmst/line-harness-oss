@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 
@@ -66,7 +66,7 @@ export const get__api_mileage_overview_2 = async (c: Context<Env, "/api/mileage/
       limit: Number.isFinite(limit) ? limit : 50,
       offset: Number.isFinite(offset) ? offset : 0,
     });
-    return c.json({ success: true, data: overview });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...overview, items: overview.members, total: overview.pagination.total, paging: { limit: overview.pagination.limit }, sort: [] }) });
   } catch (err) {
     throw err;
   }
@@ -137,7 +137,7 @@ export const get__api_mileage_history_3 = async (c: Context<Env, "/api/mileage/h
         to: toValue || undefined,
       }),
     ]);
-    return c.json({ success: true, data: { ...history, summary } });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...history, summary, total: history.pagination.total, paging: { limit: history.pagination.limit }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
   } catch (err) {
     throw err;
   }

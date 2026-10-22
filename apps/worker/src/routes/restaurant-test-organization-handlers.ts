@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { parseReservationFilter } from './restaurant-reservation-filter.js';
 import { deriveStoreLineStatuses, isValidTimezone, uniqueStoreConflict } from './restaurant-store-status.js';
@@ -640,5 +640,6 @@ export const get__api_restaurant_test_inbound_emails_20 = async (c: Context<Env,
     WHERE e.store_id = ? AND e.status = 'quarantined' ORDER BY e.received_at DESC, e.id LIMIT ? OFFSET ?`)
     .bind(storeId, limit, offset).all();
   const count = await dbFor(c.env, storeId).prepare("SELECT COUNT(*) AS total FROM rt_inbound_emails WHERE store_id = ? AND status = 'quarantined'").bind(storeId).first<{ total: number }>();
-  return c.json({ success: true, data: rows.results, total: count!.total });
+  const responseItems = rows.results;
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total: count!.total, items: responseItems, paging: { limit }, sort: [{ field: 'received_at', direction: 'desc' }, { field: 'id', direction: 'asc' }] }));
 };

@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { serializeAffiliate } from './affiliate-serialization.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { FolderAssignmentError } from '@line-crm/db';
@@ -633,7 +633,8 @@ affiliates.get('/api/affiliates/:id/journeys', affiliateReportPermission(), asyn
       beforeAt: c.req.query('beforeAt') || undefined,
       beforeId: c.req.query('beforeId') || undefined,
     });
-    return c.json({ success: true, data: page.items, nextCursor: page.nextCursor });
+    const responseItems = page.items;
+    return c.json(buildCursorListResponse({ success: true, data: responseItems, nextCursor: page.nextCursor, items: responseItems, paging: { limit: Math.min(200, Math.max(1, Number.isFinite(limitParam) ? limitParam : 50)) }, sort: [{ field: 'addedAt', direction: 'desc' }, { field: 'friendId', direction: 'desc' }] }));
   } catch (err) {
     throw err;
   }

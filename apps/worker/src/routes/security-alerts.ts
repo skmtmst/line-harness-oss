@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { recordAuditEvent } from '@line-crm/db';
@@ -33,11 +33,9 @@ async function list(c: Context<Env>, platform: boolean) {
       AND status != 'resolved' ORDER BY last_detected_at DESC, id LIMIT 200 OFFSET ?`).bind(...scope.binds, offset).all<SecurityAlertRow>();
     const monitor = await securityMonitorStatus(c.env.DB);
     const thresholds = securityThresholds(c.env.SECURITY_MONITOR_THRESHOLDS);
-    return c.json({ success: true, data: {
-      items: rows.results.map(row => ({ ...publicSecurityAlert(row), ...(platform ? { scope: { tenantId: row.tenant_id, lineAccountId: row.line_account_id } } : {}) })), monitor,
+    return c.json({ success: true, data: buildOffsetListResponse({ items: rows.results.map(row => ({ ...publicSecurityAlert(row), ...(platform ? { scope: { tenantId: row.tenant_id, lineAccountId: row.line_account_id } } : {}) })), monitor,
       thresholds: thresholds.values, configurationValid: !thresholds.invalid,
-      windowMinutes: SECURITY_WINDOW_MINUTES, limit: 200, offset, total: Number(total?.count ?? 0),
-    } });
+      windowMinutes: SECURITY_WINDOW_MINUTES, limit: 200, offset, total: Number(total?.count ?? 0), paging: { limit: 200 }, sort: [{ field: 'lastDetectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch {
     return c.json({ success: false, error: '安全監視の記録を取得できませんでした', code: 'SECURITY_MONITOR_UNAVAILABLE' }, 503);
   }

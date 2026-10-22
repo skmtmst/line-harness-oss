@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
@@ -983,14 +983,13 @@ restaurantGoogle.get('/api/restaurant-test/google/reviews', async (c) => {
     .bind(...binds, perPage, (page - 1) * perPage)
     .all<ReviewRow>();
   const connection = await connectionFor(c, store.id);
-  return c.json({
-    success: true,
-    reviews: rows.results.map(publicReview),
+  const responseItems = rows.results.map(publicReview);
+  return c.json(buildOffsetListResponse({ success: true,
+    reviews: responseItems,
     page,
     perPage,
     total: total?.n ?? 0,
-    connection: publicConnection(connection),
-  });
+    connection: publicConnection(connection), items: responseItems, paging: { limit: perPage }, sort: [] }));
 });
 
 restaurantGoogle.get('/api/restaurant-test/google/reviews/:id', async (c) => {

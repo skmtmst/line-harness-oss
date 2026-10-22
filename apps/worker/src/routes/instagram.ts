@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -559,16 +559,15 @@ instagram.get('/api/instagram/messages', async (c) => {
   )
     .bind(id)
     .first<{ n: number }>();
-  return c.json({
-    success: true,
-    data: {
-      messages: messages.map((r) => ({
+  const responseItems = messages.map((r) => ({
         ...r,
         attachments: JSON.parse(String(r.attachments_json)),
         attachments_json: undefined,
-      })),
-      total: total!.n,
-    },
+      }));
+  return c.json({
+    success: true,
+    data: buildOffsetListResponse({ messages: responseItems,
+      total: total!.n, items: responseItems, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
   });
 });
 instagram.post('/api/instagram/messages/:id/reply', inputJsonBoundary(), async (c) => {

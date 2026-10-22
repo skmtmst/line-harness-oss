@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import {requirePermission} from '../middleware/role-guard.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
@@ -22,7 +22,7 @@ bookingPassPlans.get('/api/booking/admin/pass-plans',async c=>{
  ORDER BY julianday(last.period_start) DESC,julianday(last.occurred_at) DESC,
  CASE last.kind WHEN 'customer.subscription.deleted' THEN 3 WHEN 'invoice.paid' THEN 2 ELSE 1 END DESC,last.event_id DESC LIMIT 1)
  WHERE e.line_account_id=? AND e.billing_status!='ok'`).bind(a).first();
- return c.json({success:true,data:{items:rows.map(passPlanView),total:total?.n??0,summary:{...summary,...simulation,billingFailed:null,billingStatus:'unconfigured'}}});
+ return c.json({success:true,data:buildOffsetListResponse({ items:rows.map(passPlanView),total:total?.n??0,summary:{...summary,...simulation,billingFailed:null,billingStatus:'unconfigured'}, paging: { limit }, sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});
 });
 for(const method of ['POST','PUT']as const)bookingPassPlans.on(method,method==='POST'?'/api/booking/admin/pass-plans':'/api/booking/admin/pass-plans/:id',async c=>{
  gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c),p=passPlanInput(b),actor=c.get('staff').id;
@@ -46,5 +46,5 @@ bookingPassPlans.get('/api/booking/admin/pass-plans/:id/holders',async c=>{
  const a=await gapAccount(c),id=c.req.param('id'),offset=listQueryNumber(c.req.query('offset'), 0),limit=listQueryNumber(c.req.query('limit'), 20);if(!Number.isSafeInteger(offset)||offset<0||![10,20,50].includes(limit))throw new GapError('invalid_pagination');
  if(!await c.env.DB.prepare('SELECT id FROM booking_pass_plans WHERE id=? AND line_account_id=?').bind(id,a).first())throw new GapError('not_found',404);
  const items=(await c.env.DB.prepare('SELECT e.id,e.friend_id,f.display_name,e.remaining,e.expires_at,e.status FROM booking_entitlements e JOIN friends f ON f.id=e.friend_id AND f.line_account_id=e.line_account_id WHERE e.plan_id=? AND e.line_account_id=? ORDER BY e.expires_at,e.id LIMIT ? OFFSET ?').bind(id,a,limit,offset).all<Record<string,unknown>>()).results;
- const total=await c.env.DB.prepare('SELECT count(*) n FROM booking_entitlements WHERE plan_id=? AND line_account_id=?').bind(id,a).first<{n:number}>();return c.json({success:true,data:{items:items.map(x=>({...x,display_name:c.get('impersonation')?'（非表示）':x.display_name})),total:total?.n??0}});
+ const total=await c.env.DB.prepare('SELECT count(*) n FROM booking_entitlements WHERE plan_id=? AND line_account_id=?').bind(id,a).first<{n:number}>();return c.json({success:true,data:buildOffsetListResponse({ items:items.map(x=>({...x,display_name:c.get('impersonation')?'（非表示）':x.display_name})),total:total?.n??0, paging: { limit }, sort: [{ field: 'expires_at', direction: 'asc' }, { field: 'id', direction: 'asc' }] })});
 });

@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { checkMediaGate } from '../services/file-scan.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import {serializeProject,parseTextLines,parseEmphasisLines,serializeGeneration,serializeMedia,serializeImage} from './hq-banner-serializers.js';
@@ -556,12 +556,11 @@ hqBanners.get('/api/hq/banners/images', async (c) => {
     const counts = c.req.query('withCounts') === '1' ? await countBannerImages(c.env.DB, filter) : undefined;
     const base = workerUrl(c);
     const last = items[items.length - 1];
-    return c.json({
-      success: true,
-      data: items.map((i) => serializeImage(i, base)),
+    const responseItems = items.map((i) => serializeImage(i, base));
+    return c.json(buildCursorListResponse({ success: true,
+      data: responseItems,
       counts,
-      nextBefore: items.length >= filter.limit && last ? JSON.stringify({ at: last.created_at, id: last.id }) : null,
-    });
+      nextBefore: items.length >= filter.limit && last ? JSON.stringify({ at: last.created_at, id: last.id }) : null, items: responseItems, paging: { limit: filter.limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (err) {
     throw err;
   }

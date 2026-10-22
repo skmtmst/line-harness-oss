@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { getPinnedMediaObject } from '../services/media-upload-storage.js';
 import { logger } from '@line-crm/shared/server';
 import { getMediaVersionKeys } from '@line-crm/db';
@@ -558,11 +558,10 @@ export const get__api_common_vars_9 = async (c: Context<Env, "/api/common-vars">
       Object.keys(COMMON_VAR_USAGE_KIND_LABELS).map((kind) => [kind, 0]),
     ) as CommonVar['usage_by_kind'];
   }
-  return c.json({
-    success: true,
-    data: items.map(serializeVar),
-    meta: { total, limited: total > items.length, limit },
-  });
+  const responseItems = items.map(serializeVar);
+  return c.json(buildOffsetListResponse({ success: true,
+    data: responseItems,
+    meta: { total, limited: total > items.length, limit }, items: responseItems, total: total, paging: { limit }, sort: [{ field: 'name', direction: 'asc' }] }));
 };
 
 export const get__api_common_vars_id_10 = async (c: Context<Env, "/api/common-vars/:id">) => {

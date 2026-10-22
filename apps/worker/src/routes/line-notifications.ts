@@ -1,4 +1,4 @@
-import { clampedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { isCalendarDate as isExistingCalendarDate } from '@line-crm/shared';
@@ -426,8 +426,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
     : null;
   return c.json({
     success: true,
-    data: {
-      items: result.items.map((row) => serializeDeliveryItem(row, attemptsByDelivery.get(row.id) ?? [])),
+    data: buildOffsetListResponse({ items: result.items.map((row) => serializeDeliveryItem(row, attemptsByDelivery.get(row.id) ?? [])),
       summary: result.summary,
       coverage: {
         source: 'notification_delivery_ledger',
@@ -435,8 +434,7 @@ export async function notificationDeliveriesResponse(c: Context<Env>): Promise<R
         attemptHistoryAvailable: true,
         retryAvailable: true,
       },
-      ...(quota ? { quota } : {}),
-    },
+      ...(quota ? { quota } : {}), total: result.total, paging: { limit }, sort: [] }),
     pagination: { total: result.total, limit, offset },
   });
 }

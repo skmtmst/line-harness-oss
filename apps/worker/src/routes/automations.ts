@@ -45,7 +45,7 @@ import {
   retryAutomationRun,
 } from '../features/automations/automation-engine/index.js';
 import { accountFeatureAvailability } from '../services/feature-enforcement.js';
-import { listLimit, boundedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listLimit, boundedListInteger } from '../lib/list-paging.js';
 import { automationActionLabel, automationTriggerLabel } from '@line-crm/shared';
 
 const automations = new Hono<Env>();
@@ -613,17 +613,16 @@ automations.get(
       requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       { limit, offset, includeArchived: c.req.query('includeArchived') === '1' },
     );
-    return c.json({
-      success: true,
-      data: await withStyleSampleMetadata(c.env.DB,result.items,'automation'),
+    const responseItems = await withStyleSampleMetadata(c.env.DB,result.items,'automation');
+    return c.json(buildOffsetListResponse({ success: true,
+      data: responseItems,
       summary: result.summary,
       freshness: result.freshness,
       pagination: {
         total: result.total,
         limit: limit ?? null,
         offset: offset ?? 0,
-      },
-    });
+      }, items: responseItems, total: result.total, paging: { limit: limit ?? result.total }, sort: [{ field: 'priority', direction: 'desc' }, { field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (err) {
     throw err;
   }
@@ -762,7 +761,7 @@ automations.get(
       items,
       pagination: { total: result.total, limit, offset },
     };
-    return c.json({ success: true, data: body });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...body, total: result.total, paging: { limit }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
   } catch (err) {
     throw err;
   }

@@ -1,4 +1,4 @@
-import { clampedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
@@ -81,7 +81,7 @@ ecOperations.get(
         lineAccountId: accountId, status: status as EcOrderState | null,
         query: c.req.query('query')?.trim().slice(0, 100) || '', ...page,
       });
-      return c.json({ success: true, data, pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: page.limit }, sort: [{ field: 'orderedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
       throw error;
     }
@@ -145,7 +145,7 @@ ecOperations.get(
         status: status as EcActionExecutionStatus | null,
         statuses: statusGroup ? groupStatuses[statusGroup] : null, ...page,
       });
-      return c.json({ success: true, data, pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: page.limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
       throw error;
     }
@@ -218,7 +218,7 @@ ecOperations.get(
         status: rawStatus as IdentityState,
         ...page,
       });
-      return c.json({ success: true, data, pagination: { total: data.total, ...page } });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: page.limit }, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });
     } catch (error) {
       throw error;
     }

@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -911,7 +911,8 @@ restaurantGoogleProfile.get('/api/restaurant-test/google/changes', async (c) => 
     else if (e.kind === 'profile' || e.kind === 'photo') counts.profile += 1;
     else counts.review_reply += 1;
   }
-  return c.json({ success: true, changes: filtered.slice((page - 1) * perPage, page * perPage), total: filtered.length, page, perPage, counts, days });
+  const responseItems = filtered.slice((page - 1) * perPage, page * perPage);
+  return c.json(buildOffsetListResponse({ success: true, changes: responseItems, total: filtered.length, page, perPage, counts, days, items: responseItems, paging: { limit: perPage }, sort: [] }));
 });
 
 restaurantGoogleProfile.get('/api/restaurant-test/google/changes/:id', async (c) => {

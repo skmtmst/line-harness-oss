@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
@@ -64,7 +64,7 @@ notificationCenter.get('/api/notifications/center', async (c) => {
     ]);
     return c.json({
       success: true,
-      data: {
+      data: buildOffsetListResponse({
         items: items.map((item) => ({
           id: item.id,
           eventType: item.event_type,
@@ -77,7 +77,10 @@ notificationCenter.get('/api/notifications/center', async (c) => {
         })),
         counts,
         unreadCount: counts.unread,
-      },
+        total: category ? counts[category] : counts.all,
+        paging: { limit: rawLimit },
+        sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }],
+      }),
     });
   } catch (err) {
     throw err;

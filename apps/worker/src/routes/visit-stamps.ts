@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { issueStampQr, storefrontQr, stampQrStatus, revokeStampQr, redeemStampQr } from '../services/visit-stamp-qr.js';
@@ -175,7 +175,7 @@ visitStamps.get('/api/visit-stamps/entries',async c=>{
  const args=[a,from??null,from??null,to??null,to??null,friend??null,friend??null,friend??null,a,kind??null,kind??null];
  const total=await db.prepare(`SELECT COUNT(*) AS n FROM visit_stamp_entries e WHERE ${where}`).bind(...args).first<{n:number}>();
  const items=(await db.prepare(`SELECT e.id,e.card_id AS cardId,e.friend_id AS friendId,e.line_account_id AS accountId,e.kind,e.delta,e.actor_id AS actorId,e.reason,e.created_at AS createdAt,e.original_id AS originalId FROM visit_stamp_entries e WHERE ${where} ORDER BY e.created_at DESC,e.id DESC LIMIT ? OFFSET ?`).bind(...args,pageSize,(page-1)*pageSize).all()).results;
- return c.json({success:true,data:{items,total:total!.n,page,pageSize}});
+ return c.json({success:true,data:buildOffsetListResponse({ items,total:total!.n,page,pageSize, paging: { limit: pageSize }, sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'desc' }] })});
 });
 visitStamps.get('/api/liff/visit-stamps/cards/:id/paper-requests',async c=>{
  const x=await customer(c),card=c.req.param('id');await stampCard(x.db,card,x.tenantId);await stampWallet(x.db,card,x.friendId,x.a);

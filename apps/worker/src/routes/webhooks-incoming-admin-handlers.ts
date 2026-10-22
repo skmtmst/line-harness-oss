@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { outgoingEventTypes } from './webhook-event-types.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -382,10 +382,7 @@ export const get__api_webhooks_incoming_id_unmatched_8 = async (c: Context<Env, 
       ).bind(lineAccountId, ...(candidateIds.length ? sqlIdSet(candidateIds).binds : [])).all<{ id: string; display_name: string | null }>();
       for (const row of rows.results ?? []) candidateNames.set(row.id, row.display_name);
     }
-    return c.json({
-      success: true,
-      total,
-      data: items.map((item) => {
+    const responseItems = items.map((item) => {
         const friendIds = item.kind === 'ambiguous'
           ? safeJson<string[]>(item.candidate_friend_ids_json, [])
           : [];
@@ -405,8 +402,10 @@ export const get__api_webhooks_incoming_id_unmatched_8 = async (c: Context<Env, 
           resolvedAt: item.resolved_at,
           receivedAt: item.received_at,
         };
-      }),
-    });
+      });
+    return c.json(buildOffsetListResponse({ success: true,
+      total,
+      data: responseItems, items: responseItems, paging: { limit }, sort: [] }));
   } catch (err) {
     throw err;
   }

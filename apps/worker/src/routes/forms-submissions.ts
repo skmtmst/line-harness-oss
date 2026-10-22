@@ -12,7 +12,7 @@ import { getFormById, type FormSubmitClaimScope, getFormAccountIds, getFormDelet
 
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
-import { parseOffsetPaging } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging } from '../lib/list-paging.js';
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts } from '../services/account-access.js';
@@ -305,14 +305,12 @@ export const get__api_forms_id_submissions_6 = async (c: Context<Env, "/api/form
   const postActions = await describePostActionsForSubmissions(c.env.DB, submissions.items, form);
   return c.json({
     success: true,
-    data: {
-      items: await Promise.all(submissions.items.map(async row => ({ ...serializeSubmission(row, postActions.get(row.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(row.data), c.get('staff')?.role, row.id) }))),
+    data: buildOffsetListResponse({ items: await Promise.all(submissions.items.map(async row => ({ ...serializeSubmission(row, postActions.get(row.id)), data: await hydrateDocumentAnswers(c.env.DB, JSON.parse(row.data), c.get('staff')?.role, row.id) }))),
       total: submissions.total,
       page: submissions.page,
       limit: submissions.limit,
       summary,
-      period,
-    },
+      period, paging: { limit: submissions.limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
   });
 };
 

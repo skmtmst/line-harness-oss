@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -412,14 +412,12 @@ nenRanks.get('/api/nen/members', async (c) => {
   });
   return c.json({
     success: true,
-    data: {
-      items: data,
+    data: buildOffsetListResponse({ items: data,
       total,
       page: options.page,
       pageSize: options.pageSize,
       kpis,
-      ranks: ranks.map((rank) => ({ key: rank.rank_key, name: rank.name, annualThresholdYen: rank.annual_threshold_yen, mileRatePercent: rank.mile_rate_percent })),
-    },
+      ranks: ranks.map((rank) => ({ key: rank.rank_key, name: rank.name, annualThresholdYen: rank.annual_threshold_yen, mileRatePercent: rank.mile_rate_percent })), paging: { limit: options.pageSize ?? 20 }, sort: [] }),
   });
 });
 

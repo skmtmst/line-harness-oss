@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getSupportMarkById, setFriendSupportMarkBulk, getSavedSearches, getSavedSearchById, createSavedSearch, reorderSavedSearches, updateSavedSearchWithRevision, deleteSavedSearch, countSavedSearches, getSavedSearchReferences, getSavedSearchUsageCounts, getSavedSearchReferenceUsageCounts, validateSearchConditions, SAVED_SEARCH_LIMIT, getLoginAudit, getStaffMembers, LOGIN_AUDIT_ACTIONS, type LoginAuditRow, type LoginAuditAction, getFolders, getFolderItemCounts, isFolderKind, getWebinarFolderCounts } from '@line-crm/db';
@@ -108,14 +108,12 @@ export const get__api_saved_searches_2 = async (c: Context<Env, "/api/saved-sear
       cursor: String(offset),
       nextCursor: offset + limit < filtered.length ? String(offset + limit) : null,
     };
-    return c.json({
-      success: true,
+    return c.json(buildOffsetListResponse({ success: true,
       // data は既存画面との互換性のため配列のまま維持する。
       data: page,
       items: page,
       summary,
-      pagination,
-    });
+      pagination, total: filtered.length, paging: { limit }, sort: [] }));
   } catch (err) {
     throw err;
   }

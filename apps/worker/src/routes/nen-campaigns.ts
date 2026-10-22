@@ -59,7 +59,7 @@ import {
 } from '../services/nen-campaign-metrics.js';
 import { auditLog } from '../lib/audit-log.js';
 import { normalizeNenPetBirthday } from '../lib/nen-pet-birthday.js';
-import { listLimit, parseOffsetPaging, listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listLimit, parseOffsetPaging, listQueryNumber } from '../lib/list-paging.js';
 
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
@@ -576,7 +576,7 @@ nenCampaigns.get('/api/nen-campaigns/deliveries', requireRole('owner', 'admin', 
       cursor: cursorOffset(c.req.query('cursor')),
       limit: listLimit(c.req.query('limit'), 50, 100),
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, items: data.deliveries, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [{ field: 'scheduledAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
   } catch (error) {
     return metricsError(c, error);
   }
@@ -629,7 +629,7 @@ nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT * FROM nen_columns WHERE line_account_id = ? ORDER BY published_at DESC, created_at DESC LIMIT ? OFFSET ?`,
   ).bind(accountId, limit, offset).all<Record<string, unknown>>();
-  return c.json({ success: true, data: rows.results.map((row) => ({
+  const responseItems = rows.results.map((row) => ({
     id: row.id, externalId: row.external_id, slug: row.slug, title: row.title, category: row.category,
     excerpt: row.excerpt, introText: typeof row.intro_text === 'string' && row.intro_text.trim()
       ? row.intro_text
@@ -640,9 +640,9 @@ nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
     targetMode: row.target_mode === 'tag' ? 'tag' : 'all', targetTagId: row.target_tag_id ?? null,
     completionEventName: row.completion_event_name ?? null, completionTagId: row.completion_tag_id ?? null,
     sourceColumnId: row.source_column_id ?? null,
-  })),
-  pagination: { total, limit, offset },
-  });
+  }));
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems,
+  pagination: { total, limit, offset }, items: responseItems, total: total, paging: { limit }, sort: [{ field: 'publishedAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }] }));
 });
 
 nenCampaigns.get('/api/nen-campaigns/columns-preview', requireRole('owner', 'admin', 'staff'), async (c) => {

@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
 import { broadcastSendPreview } from '../services/gap-send-preview.js';
@@ -65,9 +65,9 @@ export const get__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">) 
     };
   });
   // 同じ中身なら304（list-etag）。
-  return listResponse(c, {
-    success: true,
-    data,
+  const responseItems = data;
+  return listResponse(c, buildOffsetListResponse({ success: true,
+    data: responseItems,
     kpis: {
       scheduled: stats.scheduled,
       drafts: page.drafts,
@@ -81,8 +81,7 @@ export const get__api_broadcasts_2 = async (c: Context<Env, "/api/broadcasts">) 
       limit,
       cursor,
       nextCursor: cursor + limit < page.total ? String(cursor + limit) : null,
-    },
-  });
+    }, items: responseItems, total: page.total, paging: { limit }, sort: [{field:'createdAt',direction:sort},{field:'id',direction:sort}] }));
 };
 
 export const get__api_broadcasts_stats_3 = async (c: Context<Env, "/api/broadcasts/stats">) => {
@@ -283,10 +282,7 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
     total: totalCount == null ? ledgerRows : Number(totalCount),
     retryableCount: breakdown.temporary,
   };
-  return c.json({
-    success: true,
-    data: {
-      rows: page.map((row) => {
+  const responseItems = page.map((row) => {
         const view = classifyBroadcastRecipient(row.state, row.error_code);
         return {
           friendId: row.friend_id,
@@ -301,15 +297,17 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
           dispatchedAt: row.dispatched_at,
           settledAt: row.settled_at,
         };
-      }),
+      });
+  return c.json({
+    success: true,
+    data: buildOffsetListResponse({ rows: responseItems,
       summary,
       aggregateOnly,
       aggregateReason: aggregateOnly ? (isAll ? 'all' : 'legacy') : null,
       // 旧配信は集約（成功数）だけ分かっているので返す。捏造はしない。
       legacySuccessCount: aggregateOnly && !isAll
         ? Number(raw.success_count ?? 0)
-        : null,
-    },
+        : null, items: responseItems, total: total, paging: { limit }, sort: [{ field: 'displayName', direction: 'asc' }, { field: 'friendId', direction: 'asc' }] }),
     pagination: {
       total,
       limit,
@@ -328,11 +326,10 @@ export const get__api_broadcasts_id_activity_10 = async (c: Context<Env, "/api/b
   const cursor = Math.max(0, listQueryNumber(c.req.query('cursor'), '0', { format: 'integer-prefix' }) || 0);
   const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit'), 50, { format: 'integer-prefix' }) || 50));
   const { entries, nextCursor } = await listBroadcastActivity(c.env.DB, id, { limit, cursor });
-  return c.json({
-    success: true,
-    data: entries,
-    pagination: { limit, cursor, nextCursor },
-  });
+  const responseItems = entries;
+  return c.json(buildCursorListResponse({ success: true,
+    data: responseItems,
+    pagination: { limit, cursor, nextCursor }, items: responseItems, paging: { limit }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'id', direction: 'desc' }], nextCursor: nextCursor }));
 };
 
 export const get__api_broadcasts_id_send_preview_11 = async (c: Context<Env, "/api/broadcasts/:id/send-preview">) => {

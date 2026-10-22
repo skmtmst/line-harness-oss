@@ -1,4 +1,4 @@
-import { boundedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, boundedListInteger } from '../lib/list-paging.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { parseExecutionDateRange, type ExecutionRunStatus } from '@line-crm/shared';
@@ -313,7 +313,7 @@ autoReplyRuns.get(
         )),
         pagination: { total: runs.total, limit, offset },
       };
-      return c.json({ success: true, data });
+      return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: runs.total, paging: { limit }, sort: [{ field: 'evaluatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }) });
     } catch (error) {
       throw error;
     }

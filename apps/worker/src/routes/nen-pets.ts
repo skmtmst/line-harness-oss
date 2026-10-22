@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { jstDate as japanDate, jstDateOffset as japanDateOffset, jstMonthStart as japanMonthStart } from '@line-crm/shared';
 import { inputError } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
@@ -227,7 +227,7 @@ nenPets.get('/api/nen/pets', async (c) => {
     staleWeight: Number(kpiRow?.stale_weight ?? 0),
   };
 
-  return c.json({ success: true, data: { items: views, page, pageSize: wantsAll ? total : pageSize, total, kpis, products: staples.map((p) => ({ id: p.id, name: p.name })), treatLimitPercent } });
+  return c.json({ success: true, data: buildOffsetListResponse({ items: views, page, pageSize: wantsAll ? total : pageSize, total, kpis, products: staples.map((p) => ({ id: p.id, name: p.name })), treatLimitPercent, paging: { limit: wantsAll ? total : pageSize }, sort: [] }) });
 });
 
 // ---------------------------------------------------------------- 健康日記（37-4）
@@ -311,7 +311,7 @@ nenPets.get('/api/nen/health', async (c) => {
   else if (sort === 'recent') filtered = [...filtered].sort((a, b) => (a.daysSinceLast ?? 999) - (b.daysSinceLast ?? 999));
   else if (sort === 'records_desc') filtered = [...filtered].sort((a, b) => b.count30d - a.count30d);
 
-  return c.json({ success: true, data: { ...paginate(filtered, c.req.query('page'), c.req.query('pageSize')), kpis } });
+  return c.json({ success: true, data: buildOffsetListResponse({ ...paginate(filtered, c.req.query('page'), c.req.query('pageSize')), kpis, paging: { limit: paginate(filtered, c.req.query('page'), c.req.query('pageSize')).pageSize }, sort: [] }) });
 });
 
 nenPets.get('/api/nen/health/:petId/summary', async (c) => {

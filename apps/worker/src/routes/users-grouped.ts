@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -31,7 +31,7 @@ usersGrouped.get('/api/users-grouped', requireRole('owner', 'admin', 'staff'), a
     };
 
     const result = await computeUsersGrouped(c.env.DB, opts);
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...result, items: result.rows, paging: { limit: result.pageSize }, sort: [{ field: 'accountCount', direction: 'desc' }, { field: 'lastActivityAt', direction: 'desc' }] }) });
   } catch (err) {
     throw err;
   }

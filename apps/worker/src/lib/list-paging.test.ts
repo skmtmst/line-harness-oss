@@ -95,6 +95,41 @@ describe('共通一覧の入力', () => {
 });
 
 describe('共通一覧の応答', () => {
+  it('旧画面が読む別名・集計・ページ位置を残し、全体件数とページ内件数を分ける', () => {
+    const items = [{ id: 'second-page' }];
+    const response = buildOffsetListResponse({
+      items, requests: items, total: 21, paging: { limit: 20 }, sort: SORT,
+      pagination: { total: 21, limit: 20, offset: 20 }, summary: { active: 7 },
+    });
+    expect(response).toEqual({
+      items, requests: items, total: 21, limit: 20, sort: SORT,
+      pagination: { total: 21, limit: 20, offset: 20 }, summary: { active: 7 },
+    });
+    expect(response.requests).toBe(response.items);
+    expect(response).not.toHaveProperty('paging');
+  });
+
+  it('総件数が不明な履歴は捏造せず、空の続き位置と旧項目を保つ', () => {
+    const response = buildCursorListResponse({
+      items: ['last'], nextCursor: null, nextOffset: null,
+      paging: { limit: 20 }, sort: SORT, summary: { failed: 2 },
+    });
+    expect(response).toEqual({
+      items: ['last'], nextCursor: null, nextOffset: null,
+      limit: 20, sort: SORT, summary: { failed: 2 },
+    });
+    expect(response).not.toHaveProperty('total');
+    expect(response).not.toHaveProperty('paging');
+  });
+
+  it('日時とIDの組で渡す既存の続き位置も、値と型を保つ', () => {
+    const nextCursor = { beforeAt: '2026-10-23T00:00:00Z', beforeId: 'last' };
+    const response = buildCursorListResponse({ items: ['last'], nextCursor, paging: { limit: 20 }, sort: SORT });
+    expect(response.nextCursor).toEqual(nextCursor);
+    expect(response.nextCursor?.beforeId).toBe('last');
+    expect(response).not.toHaveProperty('total');
+  });
+
   it('offset は適用した limit・total・固定 sort を返す', () => {
     const paging = parseOffsetPaging({ page: '2', limit: '2' });
     expect(buildOffsetListResponse({ items: ['c', 'd'], total: 4, paging, sort: SORT })).toEqual({

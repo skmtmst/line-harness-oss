@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
@@ -487,16 +487,15 @@ restaurantGooglePosts.get('/api/restaurant-test/google/posts', async (c) => {
     scheduled: rows.filter((r) => r.status === 'scheduled').length,
   };
   const staff = c.get('staff');
-  return c.json({
-    success: true,
-    posts: filtered.slice((page - 1) * perPage, page * perPage).map(publicPost),
+  const responseItems = filtered.slice((page - 1) * perPage, page * perPage).map(publicPost);
+  return c.json(buildOffsetListResponse({ success: true,
+    posts: responseItems,
     total: filtered.length,
     page,
     perPage,
     counts,
     writeEnabled: writeEnabled(c.env),
-    permissions: { canPublish: staff?.role === 'owner' || staff?.role === 'admin' },
-  });
+    permissions: { canPublish: staff?.role === 'owner' || staff?.role === 'admin' }, items: responseItems, paging: { limit: perPage }, sort: [{ field: 'createdAt', direction: 'desc' }] }));
 });
 
 // ---------- 取り込み（sync） ----------

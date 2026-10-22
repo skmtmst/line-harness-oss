@@ -1,4 +1,4 @@
-import { truncatedListLimit, truncatedListOffset } from '../lib/list-paging.js';
+import { buildOffsetListResponse, truncatedListLimit, truncatedListOffset } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { runJson } from './friend-migration-display.js';
 import { consentRollbackConflicts, suppressionReconciliation } from '@line-crm/db/src/friend-delivery-consents.js';
@@ -221,16 +221,14 @@ friendMigrations.get('/api/friends/migrations/:id', requireRole('owner', 'admin'
     ]);
     return c.json({
       success: true,
-      data: {
-        ...runJson(run),
+      data: buildOffsetListResponse({ ...runJson(run),
         items: items.map(itemJson),
         itemTotal,
         itemLimit: limit,
         itemOffset: offset,
         unresolved,
         decisionCounts,
-        suppressionReconciliation: await suppressionReconciliation(c.env.DB, run.id),
-      },
+        suppressionReconciliation: await suppressionReconciliation(c.env.DB, run.id), total: itemTotal, paging: { limit }, sort: [] }),
     });
   } catch (error) {
     throw error;

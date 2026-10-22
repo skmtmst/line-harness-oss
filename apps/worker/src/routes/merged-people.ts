@@ -1,4 +1,4 @@
-import { listIntegerInRange } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listIntegerInRange } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputJsonBoundary } from '../lib/input-errors.js';
@@ -192,7 +192,7 @@ mergedPeople.get('/api/friends/people', requireRole('owner', 'admin', 'staff'), 
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, getStaff(c));
     const data = await listMergedPeople(c.env.DB, tenantId(c), scope.allowedAccountIds, limit, offset);
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }

@@ -15,7 +15,7 @@ import type { Env } from '../worker-env.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { getScenarioRuns, saveScenarioDraft, simulateFriendPlan, simulateScenario } from '../features/scenarios/scenario-contract/index.js';
-import { listLimit } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listLimit } from '../lib/list-paging.js';
 import { validateStepCondition, validateStepSchedule, validateQuestionForStorage, serializeStep, WEEKDAY_JA, requireScenarioAccountScope, scenarioContractError, serializeFriendScenario } from './scenarios-definition.js';
 import type { Context } from 'hono';
 
@@ -495,7 +495,7 @@ export const get__api_scenarios_id_runs_7 = async (c: Context<Env, "/api/scenari
       cursor: c.req.query('cursor'),
       limit: listLimit(c.req.query('limit'), 50, 100),
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, items: data.subscriptions, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [] }) });
   } catch (error) {
     return scenarioContractError(c, error);
   }

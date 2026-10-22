@@ -1,4 +1,4 @@
-import { boundedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, boundedListInteger } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -170,7 +170,7 @@ identityCandidates.get('/api/identity-candidates', requireRole('owner', 'admin',
       // FRIEND-11: 名前・根拠の検索は全件へかける。
       q: c.req.query('q') ?? undefined,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: { limit: data.limit }, sort: [{ field: 'detectedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }

@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
 
@@ -158,11 +158,9 @@ export const get__api_friends_id_timeline_1 = async (c: Context<Env, "/api/frien
       }));
       return c.json({
         success: true,
-        data: {
-          items,
+        data: buildCursorListResponse({ items,
           limit: limitRaw,
-          nextCursor: hasNextPage ? String(offsetRaw + limitRaw) : null,
-        },
+          nextCursor: hasNextPage ? String(offsetRaw + limitRaw) : null, paging: { limit: limitRaw }, sort: [{ field: 'occurredAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
       });
     } catch (error) {
       throw error;

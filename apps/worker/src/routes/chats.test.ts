@@ -112,7 +112,7 @@ describe('受信箱のアカウント境界', () => {
     } as Env['Bindings']);
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, data: [] });
+    expect(await response.json()).toEqual({ success: true, data: [], items: [], limit: 200, sort: [] });
     expect(mocks.computeUnansweredInbox).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ page: 1, pageSize: 200 }),

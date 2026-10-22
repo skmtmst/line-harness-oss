@@ -4,7 +4,7 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 
 import { getChatById, getFriendById, markInboxConversationRead, jstNow } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
-import { listLimit, listQueryNumber } from '../lib/list-paging.js';
+import { buildCursorListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
 
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveOrCreateChat } from './chats-definition.js';
@@ -49,7 +49,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         allowedAccountIds: visibleScope.allowedAccountIds,
         canSeeUnassigned: visibleScope.canSeeUnassigned,
       });
-      if (unanswered.rows.length === 0) return c.json({ success: true, data: [] });
+      if (unanswered.rows.length === 0) return c.json(buildCursorListResponse({ success: true, data: [], items: [], paging: { limit }, sort: [] }));
 
       // 未対応サービスで確定した最大200人だけの会話メタ情報を取る。
       // json_each へID配列を1 bindで渡すため、D1の100 bind上限にも当たらない。
@@ -92,7 +92,8 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
           updatedAt: chat.updated_at,
         }];
       });
-      return c.json({ success: true, data });
+      const responseItems = data;
+      return c.json(buildCursorListResponse({ success: true, data, items: responseItems, paging: { limit }, sort: [] }));
     }
 
     // List everyone who has any message history (incoming or outgoing — push/broadcast/scenario included)
@@ -378,7 +379,8 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       updatedAt: ch.updated_at,
     }));
 
-    return c.json({ success: true, data: await enrichSlaChats(c.env.DB,data) });
+    const responseItems = await enrichSlaChats(c.env.DB,data);
+    return c.json(buildCursorListResponse({ success: true, data: responseItems, items: responseItems, paging: { limit }, sort: [] }));
   } catch (err) {
     throw err;
   }

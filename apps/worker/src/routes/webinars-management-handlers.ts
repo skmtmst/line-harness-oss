@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { applyVideoMediaSelection } from './webinar-video-selection.js';
 import { inputError } from '../lib/input-errors.js';
 
@@ -406,8 +406,7 @@ export const get__api_webinars_id_participants_10 = async (c: Context<Env, "/api
   const hasNext = rows.length > limit;
   return c.json({
     success: true,
-    data: {
-      items: rows.slice(0, limit).map((row) => ({
+    data: buildCursorListResponse({ items: rows.slice(0, limit).map((row) => ({
         friendId: row.friend_id,
         friendName: row.friend_name,
         pictureUrl: row.picture_url,
@@ -437,8 +436,7 @@ export const get__api_webinars_id_participants_10 = async (c: Context<Env, "/api
       rule: {
         completionThresholdSeconds,
         durationSeconds: webinar.duration_seconds,
-      },
-    },
+      }, paging: { limit }, sort: [] }),
   });
   };
 

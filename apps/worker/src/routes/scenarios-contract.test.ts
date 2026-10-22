@@ -84,6 +84,7 @@ beforeEach(() => {
   contractMocks.getScenarioRuns.mockResolvedValue({
     summary: { active: 0, paused: 0, completed: 0, delivering: 0 },
     subscriptions: [], testSends: [], concurrentBroadcasts: [], steps: [],
+    pagination: { total: 0, limit: 50, cursor: '0', nextCursor: null },
   });
   contractMocks.saveScenarioDraft.mockResolvedValue({ version: 1, afterActions: [] });
   contractMocks.simulateFriendPlan.mockResolvedValue({
@@ -106,7 +107,10 @@ describe('scenario routes', () => {
 
     const runs = await app().request('/api/scenarios/scenario-1/runs?lineAccountId=account-1');
     expect(runs.status).toBe(200);
-    expect(await runs.json()).toMatchObject({ success: true, data: { subscriptions: [] } });
+    expect(await runs.json()).toMatchObject({ success: true, data: {
+      subscriptions: [], items: [], total: 0, limit: 50, sort: [],
+      pagination: { total: 0, limit: 50, cursor: '0', nextCursor: null },
+    } });
   });
 
   it('DB失敗を500で返し、空状態に置き換えない', async () => {

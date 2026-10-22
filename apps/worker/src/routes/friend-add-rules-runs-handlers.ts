@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { deleteFriendAddRuleFolder, ensureFriendAddFallbackRules, listFriendAddRuleOrderIds, listFriendAddRulesPage, reorderFriendAddRulePriorities, reorderFriendAddRulePrioritiesCAS, type FriendAddRuleKind, type FriendAddRuleRow } from '@line-crm/db';
@@ -129,8 +129,7 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
     const items = allRows.slice(0, limit);
     return c.json({
       success: true,
-      data: {
-        items: items.map((row) => ({
+      data: buildOffsetListResponse({ items: items.map((row) => ({
           id: row.id,
           receivedAt: row.occurred_at,
           processedAt: row.processed_at,
@@ -177,8 +176,7 @@ export const get__api_friend_add_runs_1 = async (c: Context<Env, "/api/friend-ad
           failed: summary?.failed_runs ?? 0,
           lastDeliveryAt: summary?.last_delivery_at ?? null,
           staffHandoffs: { value: null, state: 'unavailable', reason: '担当者引き継ぎと実行イベントを結ぶ記録がありません' },
-        },
-      },
+        }, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
     });
   } catch (error) {
     throw error;
@@ -447,8 +445,7 @@ export const get__api_friend_add_rules_7 = async (c: Context<Env, "/api/friend-a
     const scenarioNames = new Map(options.scenarios.map((scenario) => [scenario.id, scenario.name]));
     return c.json({
       success: true,
-      data: {
-        items: rows.map((row) => toRule(row, routeNames, scenarioNames)),
+      data: buildOffsetListResponse({ items: rows.map((row) => toRule(row, routeNames, scenarioNames)),
         total: page.total,
         nextCursor: page.nextCursor,
         orderVersion,
@@ -465,8 +462,7 @@ export const get__api_friend_add_rules_7 = async (c: Context<Env, "/api/friend-a
           delivered: summary?.delivered ?? null,
           failed: summary?.failed ?? null,
         },
-        options,
-      },
+        options, paging: { limit }, sort: [] }),
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'FRIEND_ADD_RULE_CURSOR_INVALID') {

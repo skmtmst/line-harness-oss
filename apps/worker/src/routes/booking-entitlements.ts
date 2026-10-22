@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { validateEventEntitlement } from '../services/event-entitlements.js';
 import { logger } from '@line-crm/shared/server';
 import {passUnusable} from '../features/booking/booking-pass-plans/index.js';
@@ -49,7 +49,8 @@ bookingEntitlements.get('/api/booking/admin/entitlements/:id/history',async c=>{
   if(!Number.isInteger(limit)||!Number.isInteger(offset))return inputError(c,{error:'invalid_pagination'},400,['limit','offset']);
   const result=await c.env.DB.prepare(`SELECT id,entitlement_id,action,reason,actor_type,actor_id,before_json,after_json,request_json,created_at FROM booking_entitlement_events WHERE line_account_id=? AND entitlement_id=? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`)
     .bind(account,id,limit,offset).all();
-  return c.json({success:true,data:result.results,limit,offset});
+  const responseItems = result.results;
+  return c.json(buildCursorListResponse({ success:true,data:responseItems,limit,offset, items: responseItems, paging: { limit }, sort: [{ field: 'created_at', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
 });
 bookingEntitlements.get('/api/liff/booking/entitlements',async c=>{
   c.header('Cache-Control','private, no-store');

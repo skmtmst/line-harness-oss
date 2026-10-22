@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { hasMediaSignature } from './media-signature.js';
 import { inputError } from '../lib/input-errors.js';
@@ -496,7 +496,7 @@ export const get__api_media_7 = async (c: Context<Env, "/api/media">) => {
   const names = await uploaderNameMap(c.env.DB, items);
   return c.json({
     success: true,
-    data: { items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset },
+    data: buildOffsetListResponse({ items: items.map((m) => serializeMedia(m, workerUrl, names)), total, limit, offset, paging: { limit }, sort: sort === 'oldest' ? [{field:'createdAt',direction:'asc'}] : sort === 'name' ? [{field:'filename',direction:'asc'}] : sort === 'size' ? [{field:'sizeBytes',direction:'desc'}] : sort === 'usage' ? [{field:'usageCount',direction:'desc'},{field:'createdAt',direction:'desc'}] : [{field:'createdAt',direction:'desc'}] }),
   });
 };
 

@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { validateNenWebhookHeaders, verifyNenWebhook } from '../lib/hmac.js';
 import { WEBHOOK_BODY_BYTES, isWebhookBodyTooLarge } from '../lib/webhook-body.js';
 import {simulateAttribution,simulationResults} from '../features/ec-commerce/ec-auto-line-attribution/index.js';
@@ -49,7 +49,7 @@ ecAutoLine.get('/api/ec/auto-line/sends',async c=>{
  const a=await gapAccount(c),offset=listQueryNumber(c.req.query('offset'), 0),kind=c.req.query('kind')??'',status=c.req.query('status')??'';if(!Number.isSafeInteger(offset)||offset<0)throw new GapError('invalid_pagination');
  const where="account_id=? AND (?='' OR rule_kind=?) AND (?='' OR status=?)",bindings=[a,kind,kind,status,status];
  const total=await c.env.DB.prepare(`SELECT count(*) n FROM ec_auto_line_sends WHERE ${where}`).bind(...bindings).first<{n:number}>();
- const items=(await c.env.DB.prepare(`SELECT id,rule_kind kind,scheduled_at scheduledAt,status,sent_at simulatedAt,test_mode testMode FROM ec_auto_line_sends WHERE ${where} ORDER BY scheduled_at DESC,id LIMIT 20 OFFSET ?`).bind(...bindings,offset).all()).results;return c.json({success:true,data:{items,total:total?.n??0}});
+ const items=(await c.env.DB.prepare(`SELECT id,rule_kind kind,scheduled_at scheduledAt,status,sent_at simulatedAt,test_mode testMode FROM ec_auto_line_sends WHERE ${where} ORDER BY scheduled_at DESC,id LIMIT 20 OFFSET ?`).bind(...bindings,offset).all()).results;return c.json({success:true,data:buildOffsetListResponse({ items,total:total?.n??0, paging: { limit: 20 }, sort: [{ field: 'scheduledAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});
 });
 ecAutoLine.get('/api/ec/auto-line/stats',async c=>{
  const a=await gapAccount(c),r=await c.env.DB.prepare("SELECT count(*) total,count(CASE WHEN status='simulated' THEN 1 END) simulated,count(CASE WHEN status LIKE 'skipped_%' THEN 1 END) skipped FROM ec_auto_line_sends WHERE account_id=?").bind(a).first();return c.json({success:true,data:{...r,sent:0,clicks:null,purchases:null,simulatedResults:await simulationResults(c.env.DB,a),testMode:true}});

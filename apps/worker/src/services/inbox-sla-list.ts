@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import type {Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {getVisibleLineAccountScope} from './account-access.js';
@@ -22,7 +22,8 @@ export async function slaChatList(c:Context<Env>) {
  const limit=Math.min(200,Math.max(1,listQueryNumber(c.req.query('limit'), Number.NaN)||50));
  const rows=(await c.env.DB.prepare(`SELECT c.*,(SELECT content FROM messages_log WHERE friend_id=c.friend_id ORDER BY created_at DESC LIMIT 1) last_message,f.display_name,f.picture_url,f.line_account_id ${join} WHERE ${clauses.join(' AND ')} ORDER BY julianday(c.sla_due_at),f.id LIMIT ?`).bind(...binds,limit).all<Record<string,unknown>>()).results;
  const data=await enrichSlaChats(c.env.DB,rows.map(r=>({id:String(r.friend_id),friendId:r.friend_id,friendName:r.display_name,friendPictureUrl:r.picture_url,operatorId:r.operator_id,status:r.status,revision:r.revision,lastMessageAt:r.last_message_at,lastMessage:r.last_message,unread:r.status==='unread',conversationId:r.id})));
- return c.json({success:true,data,total:total?.n??0});
+ const responseItems = data;
+ return c.json(buildOffsetListResponse({ success:true,data: responseItems,total:total?.n??0, items: responseItems, paging: { limit }, sort: [{ field: 'sla_due_at', direction: 'asc' }, { field: 'id', direction: 'asc' }] }));
 }
 export async function enrichSlaChats<T extends {id:string;friendId?:unknown}>(db:D1Database,items:T[]) {
  if(!items.length)return items;

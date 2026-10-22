@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import {
@@ -59,7 +59,7 @@ inbox.get('/api/inbox/unanswered', async (c) => {
     };
 
     const result = await computeUnansweredInbox(c.env.DB, opts);
-    return c.json({ success: true, data: result });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...result, items: result.rows, paging: { limit: result.pageSize }, sort: [{ field: 'lastIncomingAt', direction: 'desc' }, { field: 'friendId', direction: 'desc' }] }) });
   } catch (err) {
     throw err;
   }

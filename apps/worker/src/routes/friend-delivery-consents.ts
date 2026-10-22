@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import type { Hono, MiddlewareHandler } from 'hono';
 import { listFriendDeliveryConsents } from '@line-crm/db/src/friend-delivery-consents.js';
 import type { Env } from '../worker-env.js';
@@ -19,7 +19,7 @@ export function registerFriendDeliveryConsents(app: Hono<Env>, visible: Middlewa
       const actor=after?{kind:after.source==='liff_self_service'?'self':after.source==='manual'?'store':'system',id:after.updatedBy??null}:{kind:'unknown',id:null};
       return {id:r.id,purpose:r.purpose,operation:r.operation,before,after,actor,reason:after?.reason??null,createdAt:r.created_at};
     });
-    return c.json({success:true,data:{items,total:total?.n??0,nextCursor:rows.length>limit?String(items.at(-1)!.id):null}});
+    return c.json({success:true,data:buildOffsetListResponse({ items,total:total?.n??0,nextCursor:rows.length>limit?String(items.at(-1)!.id):null, paging: { limit }, sort: [{ field: 'id', direction: 'desc' }] })});
   });
   app.get('/api/friends/:id/delivery-consents', requireRole('owner','admin','staff'), visible, async c => {
     return c.json({success:true,data:await listFriendDeliveryConsents(c.env.DB,c.req.param('id'))});

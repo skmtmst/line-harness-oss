@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { outgoingEventTypes } from './webhook-event-types.js';
@@ -432,13 +432,11 @@ export const get__api_webhooks_interactions_8 = async (c: Context<Env, "/api/web
     });
     return c.json({
       success: true,
-      data: {
-        items: result.items.map(serializeInteraction),
+      data: buildOffsetListResponse({ items: result.items.map(serializeInteraction),
         total: result.total,
         page: result.page,
         limit: result.limit,
-        summary: result.summary,
-      },
+        summary: result.summary, paging: { limit: result.limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
     });
   } catch (err) {
     throw err;

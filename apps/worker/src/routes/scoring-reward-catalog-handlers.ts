@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { recordAuditEvent } from '@line-crm/db';
 import { inputError } from '../lib/input-errors.js';
 
@@ -381,10 +381,8 @@ export const get__api_mileage_redemptions_18 = async (c: Context<Env, "/api/mile
       });
       return c.json({
         success: true,
-        data: {
-          items: listed.items.map((item) => publicMileageRedemption(item)),
-          pagination: listed.pagination,
-        },
+        data: buildOffsetListResponse({ items: listed.items.map((item) => publicMileageRedemption(item)),
+          pagination: listed.pagination, total: listed.pagination.total, paging: { limit: listed.pagination.limit }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }),
       });
     } catch (error) {
       return mileageRewardError(c, error);
@@ -501,7 +499,7 @@ export const get__api_mileage_friends_21 = async (c: Context<Env, "/api/mileage/
       limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
       offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [{ field: 'available', direction: 'desc' }, { field: 'displayName', direction: 'asc' }, { field: 'friendId', direction: 'asc' }] }) });
   } catch (error) {
     return mileageV6Error(c, error);
   }
@@ -520,7 +518,7 @@ export const get__api_mileage_earning_rules_22 = async (c: Context<Env, "/api/mi
       limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
       offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [{ field: 'sortOrder', direction: 'asc' }, { field: 'createdAt', direction: 'asc' }, { field: 'id', direction: 'asc' }] }) });
   } catch (error) {
     return mileageV6Error(c, error);
   }

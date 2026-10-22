@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -340,8 +340,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     }, null);
     return c.json({
       success: true,
-      data: {
-        items: channel === 'email' ? items : paginateSupportInboxItems(items, offset, limit),
+      data: buildCursorListResponse({ items: channel === 'email' ? items : paginateSupportInboxItems(items, offset, limit),
         summary: {
           total: lineTotal + emailTotal,
           line: lineTotal,
@@ -350,8 +349,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           oldestWaitMinutes: oldest
             ? Math.max(0, Math.floor((Date.now() - new Date(oldest).getTime()) / 60_000))
             : null,
-        },
-      },
+        }, paging: { limit }, sort: [] }),
     });
   } catch (error) {
     throw error;
@@ -447,16 +445,15 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
   const total = await c.env.DB.prepare(
     'SELECT COUNT(*) AS c FROM support_email_messages WHERE thread_id = ?',
   ).bind(id).first<{ c: number }>();
+  const responseItems = messages;
   return c.json({
     success: true,
-    data: {
-      thread,
-      messages,
+    data: buildOffsetListResponse({ thread,
+      messages: responseItems,
       total: total?.c ?? messages.length,
       hasMoreOlder,
       oldestCursor: messages.length ? encodeMessageCursor(messages[0].created_at, messages[0].id) : null,
-      newestCursor: messages.length ? encodeMessageCursor(messages[messages.length - 1].created_at, messages[messages.length - 1].id) : null,
-    },
+      newestCursor: messages.length ? encodeMessageCursor(messages[messages.length - 1].created_at, messages[messages.length - 1].id) : null, items: responseItems, paging: { limit }, sort: [{ field: 'created_at', direction: 'asc' }, { field: 'id', direction: 'asc' }] }),
   });
 });
 

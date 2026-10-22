@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapVersion,gapWrite} from '../services/gap-common.js';
@@ -20,7 +20,7 @@ mcpConnections.get('/api/mcp-connections/logs',async c=>{
  const bindings=[a,a,id,id,kind,kind,result,result];
  const total=await c.env.DB.prepare(`SELECT count(*) n ${where}`).bind(...bindings).first<{n:number}>();
  const rows=(await c.env.DB.prepare(`SELECT l.*,c.name connection_name ${where} ORDER BY l.at DESC,l.id LIMIT 20 OFFSET ?`).bind(...bindings,offset).all<Record<string,unknown>>()).results;
- return c.json({success:true,data:{items:rows.map(r=>({id:r.id,at:r.at,connectionId:r.connection_id,connectionName:r.connection_name,kind:r.kind,result:r.result,summary:r.summary,targetType:r.target_type,targetId:r.target_id})),total:total?.n??0,connection}});
+ return c.json({success:true,data:buildOffsetListResponse({ items:rows.map(r=>({id:r.id,at:r.at,connectionId:r.connection_id,connectionName:r.connection_name,kind:r.kind,result:r.result,summary:r.summary,targetType:r.target_type,targetId:r.target_id})),total:total?.n??0,connection, paging: { limit: 20 }, sort: [{ field: 'at', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});
 });
 mcpConnections.post('/api/mcp-connections',async c=>{
  const a=await account(c);gapWrite(c,{admin:true});if(c.get('staff').role!=='owner')throw new GapError('owner_required',403);

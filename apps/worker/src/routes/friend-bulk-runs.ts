@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { logger } from '@line-crm/shared/server';
 import { inputJsonBoundary } from '../lib/input-errors.js';
@@ -109,7 +109,7 @@ friendBulkRuns.get('/api/friends/bulk-runs/:id', requireRole('owner', 'admin'), 
       },
     );
     if (!detail) return c.json({ success: false, error: '一括操作が見つかりません' }, 404);
-    return c.json({ success: true, data: { ...detail, approval: await getBulkMessageApproval(c.env.DB, detail.id) } });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...detail, approval: await getBulkMessageApproval(c.env.DB, detail.id), paging: { limit: detail.limit }, sort: [{ field: 'ordinal', direction: 'asc' }] }) });
   } catch (error) {
     return errorResponse(c, error);
   }

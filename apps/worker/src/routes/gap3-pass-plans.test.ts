@@ -9,6 +9,30 @@ beforeEach(()=>{d=gapFixture();vi.stubGlobal('fetch',vi.fn(()=>{throw new Error(
 afterEach(()=>{d.raw.close();vi.unstubAllGlobals();});
 const app=(s=gapOwner,im=false)=>gapApp(d,[bookingPassPlans,bookingEntitlements],s,im);
 const plan={kind:'ticket',name:'5回券',price:20000,count:5,monthlyLimit:null,validDays:180,menuIds:['menu'],allowWithoutPass:false};
+test('ページを送っても全体件数・順序・店の境界と既存の集計を保つ',async()=>{
+ const insert=d.raw.prepare(`INSERT INTO booking_pass_plans
+   (id,line_account_id,kind,name,price,count,valid_days,created_by,created_at,idempotency_key,request_json)
+   VALUES (?,?,'ticket',?,20000,5,180,'o','2026-10-23T00:00:00Z',?,'{}')`);
+ for(let i=0;i<21;i++){const id=`plan-${String(i).padStart(2,'0')}`;insert.run(id,'a','対象の券',id);}
+ insert.run('foreign','b','他店の券','foreign');
+ insert.run('not-matched','a','別の名前','not-matched');
+ const first=await ok('/api/booking/admin/pass-plans?account_id=a&q=対象&limit=20');
+ const second=await ok('/api/booking/admin/pass-plans?account_id=a&q=対象&limit=20&offset=20');
+ expect(first.items.map((x:{id:string})=>x.id)).toEqual(Array.from({length:20},(_,i)=>`plan-${String(i).padStart(2,'0')}`));
+ expect(second.items.map((x:{id:string})=>x.id)).toEqual(['plan-20']);
+ for(const page of [first,second]){
+   expect(page).toMatchObject({total:21,limit:20,sort:[{field:'created_at',direction:'desc'},{field:'id',direction:'asc'}]});
+   expect(page.summary).toEqual(first.summary);
+   expect(page.items.every((x:{name:string})=>x.name==='対象の券')).toBe(true);
+ }
+ const empty=await ok('/api/booking/admin/pass-plans?account_id=a&q=対象&limit=20&offset=40');
+ expect(empty).toMatchObject({items:[],total:21,limit:20});
+ const noMatches=await ok('/api/booking/admin/pass-plans?account_id=a&q=該当なし&limit=10');
+ expect(noMatches).toMatchObject({items:[],total:0,limit:10});
+ expect((await gapCall(app(),'/api/booking/admin/pass-plans?account_id=b&limit=20&offset=20')).status).toBe(404);
+ expect((await gapCall(app(),'/api/booking/admin/pass-plans?account_id=a&limit=7')).status).toBe(400);
+ expect(fetch).not.toHaveBeenCalled();
+});
 async function ok(path:string,method='GET',b?:unknown,key='same'){const r=await gapCall(app(),path,method,b,key);const body=await r.json() as any;expect(r.status,JSON.stringify(body)).toBeLessThan(300);return body.data;}
 async function issue(kind='ticket'){
  const p=await ok('/api/booking/admin/pass-plans?account_id=a','POST',kind==='ticket'?plan:{...plan,kind:'monthly',count:null,monthlyLimit:2});

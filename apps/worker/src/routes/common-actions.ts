@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -132,13 +132,12 @@ commonActions.get('/api/common-actions', requireRole('owner', 'admin', 'staff'),
         'Content-Disposition': 'attachment; filename="common-actions.csv"',
       });
     }
-    return c.json({
-      success: true,
-      data: result.items,
+    const responseItems = result.items;
+    return c.json(buildOffsetListResponse({ success: true,
+      data: responseItems,
       pagination: { total: result.total, limit: limit ?? null, offset },
       summary,
-      freshness: 'available',
-    });
+      freshness: 'available', items: responseItems, total: result.total, paging: { limit: limit ?? result.total }, sort: [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }));
   } catch (error) {
     if (error instanceof CommonActionValidationError) return validationResponse(c, error);
     throw error;

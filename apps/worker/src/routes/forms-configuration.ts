@@ -14,7 +14,7 @@ import { resolveCustomerFormTheme } from '@line-crm/shared';
 import { getFormsWithStats, getFormById, getFormLatestEdit, getFormAccountIds, getFolderById, formBelongsToLineAccount, createForm, updateForm, setFormFolder, publishFormVersion, type UpdateFormInput, countActiveFormTestTokens, insertFormTestToken, deleteExpiredFormTestTokens, getFriendByLineUserIdForAccount, jstNow, toJstString } from '@line-crm/db';
 
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
-import { parseOffsetPaging } from '../lib/list-paging.js';
+import { buildOffsetListResponse, parseOffsetPaging, type ListSort } from '../lib/list-paging.js';
 import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -73,6 +73,13 @@ export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
      */
     const filter = validFormListFilter(c.req.query('filter'));
     const sort = validFormListSort(c.req.query('sort'));
+    const listSort: ListSort = sort === 'name'
+      ? [{ field: 'name', direction: 'asc' }, { field: 'id', direction: 'asc' }]
+      : sort === 'answers'
+        ? [{ field: 'submitCount', direction: 'desc' }, { field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+        : sort === 'updated'
+          ? [{ field: 'updatedAt', direction: 'desc' }, { field: 'id', direction: 'asc' }]
+          : [{ field: 'lastSubmittedAt', direction: 'desc' }, { field: 'createdAt', direction: 'desc' }];
     const search = c.req.query('q') ?? '';
     const allTotal = data.length;
     let list = data;
@@ -93,12 +100,12 @@ export const get__api_forms_1 = async (c: Context<Env, "/api/forms">) => {
       const items = list.slice(offset, offset + limit);
       return c.json({
         success: true,
-        data: { items, total, all_total: allTotal, page, limit },
+        data: buildOffsetListResponse({ items, total, all_total: allTotal, page, limit, paging: { limit }, sort: listSort }),
       });
     }
     return c.json({
       success: true,
-      data: { items: list, total, all_total: allTotal, page: 1, limit: list.length },
+      data: buildOffsetListResponse({ items: list, total, all_total: allTotal, page: 1, limit: list.length, paging: { limit: list.length }, sort: listSort }),
     });
   }
   return c.json({ success: true, data });

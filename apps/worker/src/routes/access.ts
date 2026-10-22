@@ -1,4 +1,4 @@
-import { listIntegerInRange } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listIntegerInRange } from '../lib/list-paging.js';
 import { Hono, type Context, type Next } from 'hono';
 import {
   ACCESS_ROLE_BUNDLES,
@@ -111,14 +111,12 @@ access.get(
       });
       return c.json({
         success: true,
-        data: {
-          items: result.items.map((item) => ({
+        data: buildOffsetListResponse({ items: result.items.map((item) => ({
             ...item,
             email: emailLevel === 'full' ? item.email : emailLevel === 'masked' ? maskEmail(item.email) : null,
           })),
           summary: result.summary,
-          pagination: { total: result.total, limit: result.limit, offset: result.offset },
-        },
+          pagination: { total: result.total, limit: result.limit, offset: result.offset }, total: result.total, paging: { limit: result.limit }, sort: [{ field: 'last_login_at', direction: 'desc' }, { field: 'created_at', direction: 'asc' }] }),
       });
     } catch (error) {
       throw error;
@@ -200,11 +198,9 @@ access.get(
       });
       return c.json({
         success: true,
-        data: {
-          items: audit.items,
+        data: buildOffsetListResponse({ items: audit.items,
           summary: audit.summary,
-          pagination: { total: audit.total, limit: audit.limit, offset: audit.offset },
-        },
+          pagination: { total: audit.total, limit: audit.limit, offset: audit.offset }, total: audit.total, paging: { limit: audit.limit }, sort: [{field:'created_at',direction:sort ?? 'desc'},{field:'id',direction:sort ?? 'desc'}] }),
       });
     } catch (error) {
       throw error;

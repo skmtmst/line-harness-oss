@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { fail } from '../lib/fail.js';
 import { Hono, type Context } from 'hono';
 import { DEFAULT_TENANT_ID, RESTAURANT_EXTERNAL_PROVIDERS, reservationInstant, type RestaurantExternalLink, type RestaurantExternalProvider } from '@line-crm/shared';
@@ -147,7 +147,8 @@ restaurantExternalLinks.get(path, async (c) => {
     .bind(store.id, reservationId, reservationId, limit, offset).all<LinkRow>();
   const count = await db.prepare(`SELECT count(*) AS total FROM rt_reservation_external_links l WHERE ${filter}`)
     .bind(store.id, reservationId, reservationId).first<{ total: number }>();
-  return c.json({ success: true, data: { links: rows.results.map(publicLink), total: count!.total, limit, offset } });
+  const responseItems = rows.results.map(publicLink);
+  return c.json({ success: true, data: buildOffsetListResponse({ links: responseItems, total: count!.total, limit, offset, items: responseItems, paging: { limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] }) });
 });
 restaurantExternalLinks.get(`${path}/:id`, async (c) => {
   const store = await selectedStore(c); if (store instanceof Response) return store;

@@ -13,7 +13,7 @@ import { hasStaffPermission } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { listResponse } from '../lib/list-etag.js';
 import { compileSavedSearch, friendFieldValueSql } from '../services/saved-search-filter.js';
-import { listLimit, listOffset } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listLimit, listOffset } from '../lib/list-paging.js';
 import { adminAccountScope, escapeLikePattern, serializeFriendListRow, serializeTag } from './friends-definition.js';
 import type { Context } from 'hono';
 
@@ -564,14 +564,12 @@ export const get__api_friends_1 = async (c: Context<Env, "/api/friends">) => {
     // 同じ中身なら304（list-etag）。本文のハッシュだけ見て個人情報は混ぜない。
     return listResponse(c, {
       success: true,
-      data: {
-        items: itemsWithTags,
+      data: buildOffsetListResponse({ items: itemsWithTags,
         ...(cursorMode?{nextCursor:items.length===limit?friendListCursor({createdAt:items.at(-1)!.created_at,id:items.at(-1)!.id,sort}):null}:{}),
         total,
         page: Math.floor(offset / limit) + 1,
         limit,
-        hasNextPage: offset + limit < total,
-      },
+        hasNextPage: offset + limit < total, paging: { limit }, sort: [...(search ? [{ field: 'match_score', direction: 'asc' as const }] : []),{field:'createdAt',direction:createdOrder === 'ASC' ? 'asc' : 'desc'},{field:'id',direction:createdOrder === 'ASC' ? 'asc' : 'desc'}] }),
     });
   } catch (err) {
     throw err;

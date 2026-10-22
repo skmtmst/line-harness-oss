@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { jstDate as japanDate, jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { serializeFunnel, funnelErrorStatus } from './analytics-funnel-display.js';
@@ -994,11 +994,10 @@ analytics.get('/api/analytics/funnels', async (c) => {
       currentVersion: funnel.currentVersion,
       migrationState: funnel.currentVersion ? 'ready' : 'needs_migration',
     }));
-    return c.json({
-      success: true,
-      data: items,
-      pagination: { page: result.page, pageSize: result.pageSize, total: result.total },
-    });
+    const responseItems = items;
+    return c.json(buildOffsetListResponse({ success: true,
+      data: responseItems,
+      pagination: { page: result.page, pageSize: result.pageSize, total: result.total }, items: responseItems, total: result.total, paging: { limit: result.pageSize }, sort: [] }));
   } catch (error) {
     throw error;
   }

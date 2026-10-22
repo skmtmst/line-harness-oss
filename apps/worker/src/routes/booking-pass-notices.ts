@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
 import {requirePermission} from '../middleware/role-guard.js';
@@ -27,7 +27,7 @@ bookingPassNotices.get('/api/booking/admin/pass-notices',async c=>{
  const where='line_account_id=? AND (? IS NULL OR plan_id=?)',binds=[a,plan??null,plan??null];
  const items=(await c.env.DB.prepare(`SELECT id,entitlement_id entitlementId,plan_id planId,kind,purpose,messages_json,scheduled_at scheduledAt,status,processed_at processedAt,test_mode testMode FROM booking_entitlement_notices WHERE ${where} ORDER BY scheduled_at DESC,id LIMIT ? OFFSET ?`).bind(...binds,limit,offset).all<{messages_json:string}>()).results.map(({messages_json,...r})=>({...r,messages:JSON.parse(messages_json)}));
  const total=await c.env.DB.prepare(`SELECT count(*) n FROM booking_entitlement_notices WHERE ${where}`).bind(...binds).first<{n:number}>();
- return c.json({success:true,data:{items,total:total?.n??0,sent:false,testMode:true}});
+ return c.json({success:true,data:buildOffsetListResponse({ items,total:total?.n??0,sent:false,testMode:true, paging: { limit }, sort: [{ field: 'scheduledAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});
 });
 bookingPassNotices.post('/api/booking/admin/pass-notices/simulate',async c=>{
  gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c);if(b.testMode!==true)throw new GapError('test_mode_required');

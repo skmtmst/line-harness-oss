@@ -136,7 +136,9 @@ describe('conversion definition routes', () => {
       '/api/conversions/definitions?from=2026-09-01&to=2026-09-07&lineAccountId=account-a&q=%E8%B3%BC%E5%85%A5&status=active&sourceType=purchase&sort=value_desc',
     );
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, data: LIST_RESULT });
+    expect(await response.json()).toEqual({ success: true, data: {
+      ...LIST_RESULT, total: LIST_RESULT.pagination.total, limit: LIST_RESULT.pagination.limit, sort: [],
+    } });
     expect(dbMocks.listConversionDefinitions).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       lineAccountId: 'account-a', query: '購入', status: 'active', sourceType: 'purchase',
       sort: 'value_desc', cursor: 0, limit: 50,

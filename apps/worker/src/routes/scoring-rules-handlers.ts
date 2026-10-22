@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
 import { createMileageRuleIdempotent, serializeMileageRule } from './mileage-rule-create.js';
 import { inputError } from '../lib/input-errors.js';
@@ -379,7 +379,7 @@ export const get__api_action_scores_friends_9 = async (c: Context<Env, "/api/act
       limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 20,
       offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
     });
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: buildOffsetListResponse({ ...data, total: data.pagination.total, paging: { limit: data.pagination.limit }, sort: [] }) });
   } catch (err) {
     throw err;
   }

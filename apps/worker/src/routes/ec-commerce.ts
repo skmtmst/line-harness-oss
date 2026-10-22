@@ -1,4 +1,4 @@
-import { listQueryNumber, clampedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber, clampedListInteger } from '../lib/list-paging.js';
 import { jstDate } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
@@ -417,8 +417,7 @@ ecCommerce.get(
     }
     return c.json({
       success: true,
-      data: {
-        items: actionRows.results.map((row) => {
+      data: buildOffsetListResponse({ items: actionRows.results.map((row) => {
           const orderId = row.order_id == null ? null : String(row.order_id);
           return {
             id: String(row.id),
@@ -463,8 +462,7 @@ ecCommerce.get(
           };
         }),
         total: Number(actionCount?.count ?? 0),
-        summary: actionSummary,
-      },
+        summary: actionSummary, paging: { limit }, sort: [{field:'receivedAt',direction:sort === 'oldest' ? 'asc' : 'desc'},{field:'createdAt',direction:sort === 'oldest' ? 'asc' : 'desc'}] }),
       pagination: { total: Number(actionCount?.count ?? 0), limit, offset },
     });
   }
@@ -499,9 +497,7 @@ ecCommerce.get(
     c.env.DB.prepare(`SELECT COUNT(*) AS count FROM ec_events e ${where}`).bind(...bindings).first<{ count: number }>(),
   ]);
 
-  return c.json({
-    success: true,
-    data: rows.results.map((row) => ({
+  const responseItems = rows.results.map((row) => ({
       id: row.id,
       externalEventId: row.external_event_id,
       eventType: row.event_type,
@@ -514,9 +510,10 @@ ecCommerce.get(
       errorMessage: row.error_message,
       receivedAt: row.received_at,
       processedAt: row.processed_at,
-    })),
-    pagination: { total: countRow?.count ?? 0, limit, offset },
-  });
+    }));
+  return c.json(buildOffsetListResponse({ success: true,
+    data: responseItems,
+    pagination: { total: countRow?.count ?? 0, limit, offset }, items: responseItems, total: countRow?.count ?? 0, paging: { limit }, sort: [{ field: 'receivedAt', direction: 'desc' }] }));
 });
 
 /**
@@ -726,8 +723,7 @@ ecCommerce.get(
 
   return c.json({
     success: true,
-    data: {
-      items,
+    data: buildOffsetListResponse({ items,
       summary: {
         total,
         active: stateCount('active'),
@@ -754,8 +750,7 @@ ecCommerce.get(
         ruleVersion: 'subscription-payment-status-v1',
         calculatedAt: syncedRow?.synced_at ?? null,
         predictiveScoreAvailable: false,
-      },
-    },
+      }, total: Number(countRow?.count ?? 0), paging: { limit }, sort: [] }),
     pagination: { total: Number(countRow?.count ?? 0), limit, offset },
   });
 });

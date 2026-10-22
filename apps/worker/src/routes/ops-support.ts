@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -178,7 +178,8 @@ opsSupport.get('/api/ops/support/tickets', async (c) => {
   });
   const replies = await countRepliesForRequests(db, rows.map((r) => r.id));
   const base = workerUrl(c);
-  return c.json({ success: true, data: rows.map((r) => serializeTicket(r, base, replies.get(r.id) ?? 0)), total });
+  const responseItems = rows.map((r) => serializeTicket(r, base, replies.get(r.id) ?? 0));
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total, items: responseItems, paging: { limit: Number.isFinite(limit) ? Math.min(200, Math.max(1, limit)) : 50 }, sort: [] }));
 });
 
 // ---------------------------------------------------------------------------

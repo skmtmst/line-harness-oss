@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { jstMonthStart as japanMonthStart } from '@line-crm/shared';
 import type { TenantStatus, TenantListRow } from './ops-tenant-types.js';
 import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
@@ -398,7 +398,8 @@ ops.get('/api/ops/audit', async (c) => {
     limit,
     offset,
   });
-  return c.json({ success: true, data: result.rows, total: result.total });
+  const responseItems = result.rows;
+  return c.json(buildOffsetListResponse({ success: true, data: responseItems, total: result.total, items: responseItems, paging: { limit: Math.min(500, Math.max(1, limit)) }, sort: [{ field: 'created_at', direction: 'desc' }] }));
 });
 
 // ---------------------------------------------------------------------------

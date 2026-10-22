@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../../lib/list-paging.js';
 import { jstDate as japanDate } from '@line-crm/shared';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
@@ -28,7 +28,8 @@ booking.get('/api/booking/admin/requests', async (c) => {
       .bind(...values).first<{ total: number }>(),
   ]);
   // 同じ中身なら304（list-etag）。
-  return listResponse(c, { requests: rows.results, total: Number(count?.total ?? 0), limit, offset });
+  const responseItems = rows.results;
+  return listResponse(c, buildOffsetListResponse({ requests: responseItems, total: Number(count?.total ?? 0), limit, offset, items: responseItems, paging: { limit }, sort: [{ field: 'starts_at', direction: 'asc' }] }));
 });
 
 /**

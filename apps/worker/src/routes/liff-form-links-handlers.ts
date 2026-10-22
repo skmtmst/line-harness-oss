@@ -1,4 +1,4 @@
-import { clampedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
 import { trackedLinkReferralMatchesAccount } from '../services/tracked-link-identity.js';
 import { navigationProof } from '../lib/navigation-proof.js';
 import { storedRedirectTarget } from '../lib/safe-redirect.js';
@@ -87,8 +87,7 @@ export const get__api_analytics_ref_refCode_orders_1 = async (c: Context<Env, "/
 
     return c.json({
       success: true,
-      data: {
-        refCode,
+      data: buildOffsetListResponse({ refCode,
         total: countRes?.count ?? 0,
         // 金額は取れていない注文があると合計が欠ける。0 ではなく null で
         // 「額は未計測」を表す（画面側は「—」を出す）。
@@ -109,8 +108,7 @@ export const get__api_analytics_ref_refCode_orders_1 = async (c: Context<Env, "/
           orderedAt: row.ordered_at,
           detailUrl: row.detail_url,
           friend: { id: row.friend_id, displayName: row.friend_name },
-        })),
-      },
+        })), paging: { limit }, sort: [{ field: 'orderedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
     });
   } catch (err) {
     throw err;

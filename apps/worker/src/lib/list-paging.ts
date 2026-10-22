@@ -3,6 +3,7 @@ export const MAX_LIST_LIMIT = 200;
 export const LIST_CURSOR_MAX_LENGTH = 1024;
 
 export type ListSortDirection = 'asc' | 'desc';
+/** 並び順を公開していない既存一覧は、推測せず空配列で示す。 */
 export type ListSort = ReadonlyArray<Readonly<{
   field: string;
   direction: ListSortDirection;
@@ -150,34 +151,42 @@ export function offsetPageCount(total: number, limit: number): number {
   return Math.max(1, Math.ceil(safeTotal / safeLimit));
 }
 
-export function buildOffsetListResponse<T>({
+/** 集計・別名・ページ位置など、既存の読み手が使う項目も残す。 */
+export function buildOffsetListResponse<T, Details extends object = object>({
   items,
   total,
   paging,
   sort,
+  ...details
 }: {
   items: T[];
   total: number;
-  paging: OffsetPaging;
+  paging: Pick<OffsetPaging, 'limit'>;
   sort: ListSort;
-}) {
-  return { items, total, limit: paging.limit, sort };
+} & Details) {
+  return { ...details, items, total, limit: paging.limit, sort };
 }
 
-export function buildCursorListResponse<T>({
+type ListResponseCursor = string | null | Readonly<Record<string, string>>;
+
+export function buildCursorListResponse<T, Details extends object = object, Cursor extends ListResponseCursor = string | null>({
   items,
   nextCursor,
   paging,
   sort,
+  ...details
 }: {
   items: T[];
-  nextCursor?: string;
+  nextCursor?: Cursor;
   paging: CursorPaging;
   sort: ListSort;
-}) {
+} & Details) {
+  const continuation: { nextCursor?: Cursor } = {};
+  if (nextCursor || nextCursor === null) continuation.nextCursor = nextCursor;
   return {
+    ...details,
     items,
-    ...(nextCursor ? { nextCursor } : {}),
+    ...continuation,
     limit: paging.limit,
     sort,
   };

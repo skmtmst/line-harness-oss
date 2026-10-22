@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { purgeUnsafeFormDocuments } from '../features/forms/form-documents/index.js';
@@ -235,15 +235,13 @@ fileScan.get('/api/file-scans', requireRole('owner', 'admin'), async (c) => {
   }
   return c.json({
     success: true,
-    data: {
-      items: items.map((row) => {
+    data: buildOffsetListResponse({ items: items.map((row) => {
         const uploader = row.subject_kind === 'photo'
           ? uploaders.get(`photo:${row.subject_id}`)
           : row.media_id ? uploaders.get(`media:${row.media_id}`) : undefined;
         return { ...serializeScan(row), uploaderLabel: uploader ?? '—' };
       }),
-      total: Number(total?.n ?? 0), limit, offset,
-    },
+      total: Number(total?.n ?? 0), limit, offset, paging: { limit }, sort: [{ field: 'updatedAt', direction: 'desc' }] }),
   });
 });
 

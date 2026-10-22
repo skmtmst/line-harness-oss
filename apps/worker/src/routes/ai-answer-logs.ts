@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildOffsetListResponse, listQueryNumber } from '../lib/list-paging.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
 import {GapError,gapAccount,gapBody,gapKey,gapWrite} from '../services/gap-common.js';
@@ -15,7 +15,7 @@ aiAnswerLogs.get('/api/ai-answer-logs',async c=>{
  const total=await c.env.DB.prepare(`SELECT count(*) n FROM ai_answer_logs l WHERE ${where}`).bind(...bind).first<{n:number}>();
  const rows=(await c.env.DB.prepare(`SELECT l.*,f.display_name friend_name,json_extract(q.questions_json,'$[0]') qa_title FROM ai_answer_logs l LEFT JOIN friends f ON f.id=l.friend_id AND f.line_account_id=l.account_id LEFT JOIN qa_entries q ON q.id=l.qa_entry_id AND q.account_id=l.account_id WHERE ${where} ORDER BY l.created_at DESC,l.id LIMIT 20 OFFSET ?`).bind(...bind,offset).all<Record<string,unknown>>()).results;
  const summary=await c.env.DB.prepare(`SELECT count(CASE WHEN action='answered' AND id NOT LIKE 'ai-sim:%' THEN 1 END) answered,count(CASE WHEN action='handed_off' AND id NOT LIKE 'ai-sim:%' THEN 1 END) handedOff,count(CASE WHEN action='answered' AND id LIKE 'ai-sim:%' THEN 1 END) simulatedAnswered,count(CASE WHEN action!='answered' AND id LIKE 'ai-sim:%' THEN 1 END) simulatedHandedOff FROM ai_answer_logs WHERE account_id=?`).bind(a).first();
- return c.json({success:true,data:{items:rows.map(r=>view(r,!!c.get('impersonation'))),total:total?.n??0,summary:{...summary,askedAgainRate:null}}});
+ return c.json({success:true,data:buildOffsetListResponse({ items:rows.map(r=>view(r,!!c.get('impersonation'))),total:total?.n??0,summary:{...summary,askedAgainRate:null}, paging: { limit: 20 }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});
 });
 aiAnswerLogs.get('/api/ai-answer-logs/:id',async c=>{
  const a=await gapAccount(c),r=await c.env.DB.prepare('SELECT l.*,f.display_name friend_name FROM ai_answer_logs l LEFT JOIN friends f ON f.id=l.friend_id AND f.line_account_id=l.account_id WHERE l.id=? AND l.account_id=?').bind(c.req.param('id'),a).first<Record<string,unknown>>();if(!r)throw new GapError('not_found',404);

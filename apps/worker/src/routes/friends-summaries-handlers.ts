@@ -12,7 +12,7 @@ import type { Env } from '../worker-env.js';
 
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { resolveRequestBoundaries } from '../services/request-boundary.js';
-import { listLimit, listQueryNumber } from '../lib/list-paging.js';
+import { buildCursorListResponse, listLimit, listQueryNumber } from '../lib/list-paging.js';
 import { serializeTag, serializeFriendFormSubmission } from './friends-definition.js';
 import type { Context } from 'hono';
 
@@ -346,11 +346,9 @@ export const get__api_friends_id_form_submissions_6 = async (c: Context<Env, "/a
     ]);
     return c.json({
       success: true,
-      data: {
-        items: await Promise.all(page.items.map(async row => { const item = serializeFriendFormSubmission(row); return { ...item, data: await hydrateDocumentAnswers(c.env.DB, item.data, c.get('staff')?.role, row.id) }; })),
+      data: buildCursorListResponse({ items: await Promise.all(page.items.map(async row => { const item = serializeFriendFormSubmission(row); return { ...item, data: await hydrateDocumentAnswers(c.env.DB, item.data, c.get('staff')?.role, row.id) }; })),
         total,
-        nextCursor: page.nextCursor,
-      },
+        nextCursor: page.nextCursor, paging: { limit }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }),
     });
   } catch (err) {
     throw err;

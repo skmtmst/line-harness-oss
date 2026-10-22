@@ -1,4 +1,4 @@
-import { clampedListInteger } from '../lib/list-paging.js';
+import { buildOffsetListResponse, clampedListInteger } from '../lib/list-paging.js';
 import { inputError } from '../lib/input-errors.js';
 
 import { getFriendById, getReminderById, createReminder, updateReminder, deleteReminder, restoreReminder, createReminderStep, deleteReminderStep, enrollFriendInReminder, getFriendReminders, listReminderRegistrants, moveReminderRegistrantTargetDate, cancelReminderRegistrant, resumeReminderRegistrant, getReminderRegistrantById, getReminderDeliveryRunById, getReminderDeliveryRunSummary, getReminderDeliveryStepSummaries, listReminderDeliveryRuns, retryReminderDeliveryRun, getReminderPublishedVersion, parseReminderVersionSettings, type ReminderDeliveryRunStatus } from '@line-crm/db';
@@ -63,8 +63,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
     const publishedSettings = publishedVersion ? parseReminderVersionSettings(publishedVersion) : null;
     return c.json({
       success: true,
-      data: {
-        reminder: {
+      data: buildOffsetListResponse({ reminder: {
           id: reminder.id,
           name: reminder.name,
           isActive: Boolean(reminder.is_active),
@@ -121,8 +120,7 @@ export const get__api_reminders_id_runs_1 = async (c: Context<Env, "/api/reminde
           lineRequestId: row.line_request_id,
           messageLogId: row.message_log_id,
         })),
-        pagination: { total: runs.total, limit, offset },
-      },
+        pagination: { total: runs.total, limit, offset }, total: runs.total, paging: { limit }, sort: [] }),
     });
   } catch (err) {
     throw err;

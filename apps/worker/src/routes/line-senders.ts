@@ -1,4 +1,4 @@
-import { listQueryNumber } from '../lib/list-paging.js';
+import { buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { gapAccount,gapBody,gapKey,gapVersion,gapWrite,GapError } from '../services/gap-common.js';
@@ -9,7 +9,7 @@ lineSenders.get('/api/line-accounts/:id/sender-icons',async c=>{
  const a=await gapAccount(c,c.req.param('id')),offset=listQueryNumber(c.req.query('offset'), 0);
  if(!Number.isSafeInteger(offset)||offset<0)throw new GapError('invalid_pagination');
  const items=(await c.env.DB.prepare("SELECT id,public_url url,filename name,width,height FROM media WHERE line_account_id=? AND archived_at IS NULL AND mime_type IN('image/jpeg','image/png') AND size_bytes<=1048576 AND width>0 AND width=height AND public_url LIKE 'https://%' ORDER BY created_at DESC,id LIMIT 20 OFFSET ?").bind(a,offset).all()).results;
- return c.json({success:true,data:{items,nextOffset:items.length===20?offset+20:null}});
+ return c.json({success:true,data:buildCursorListResponse({ items,nextOffset:items.length===20?offset+20:null, paging: { limit: 20 }, sort: [{ field: 'createdAt', direction: 'desc' }, { field: 'id', direction: 'asc' }] })});
 });
 lineSenders.get('/api/line-accounts/:id/senders',async c=>{
  const account=await gapAccount(c,c.req.param('id')),staff=c.get('staff');
