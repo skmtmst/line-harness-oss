@@ -1138,3 +1138,10 @@
 - 固定分類は `shared/category-panel.tsx` の `CategoryPanel`。フォルダ管理の追加・変更・削除を持たず、既存の分類を選ぶ。操作と直前の知らせを本文列の下端に置く場合は `StickyBarRegion`。
 - 友だち一覧の表は `DataTable cellPresentation="friends"`。チェック・注目・操作の端の余白は共通セルの `columnKind`、ひな形の通常セルは `Td presentation="template-plain"`。
 - LIFFの見出し・欄の失敗・切替は `apps/liff/src/components/ui/` の `PageHeading`・`FieldError`・`Button variant="switch"`。監査は実際の読み込み先を照合し、生の手書きと部品の上書きは引き続き止める。
+
+## ログの記録とカレンダーの期間移動
+
+- ログの中身とコピーは `shared/log-entry-details.tsx` の `LogEntryDetails` / `LogEntryCopy`。時刻・相手・結果・表示用の理由だけを渡し、本文・URL・秘密値・生のエラーを渡さない。コピーは既存 `CopyTextButton` の固定幅と失敗時の手動選択を使い、成功の印は1600ms。
+- カレンダーの期間移動は `shared/calendar-period.tsx` の `CalendarPeriod`。日付順のキーで方向を決め、transformだけを共通200msで動かす。初回・同期間の再取得・表示方式の切替では動かさず、次の移動で前の動きを中断し、動きを減らす設定では即時表示する。
+- 月の日付は `shared/month-calendar` が今日（文字・aria-current）と選択（枠・aria-selected）を分ける。空き枠は既存 `BookingSlot` の表示を保ち、閲覧のみには変更操作を出さない。
+- 見張り：`log-entry-details.test.tsx`、`calendar-period.test.tsx`、既存の月表示・予約枠・ログの権限と再実行の試験。

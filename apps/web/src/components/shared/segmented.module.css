@@ -54,6 +54,9 @@
   color: var(--color-ink);
 }
 
+/* 通常の切り替えでは数の左だけが間を持つ。予約用のflex gapとは重ねない。 */
+:root .root:not([data-size='booking']) .count { margin-inline-start: var(--tpl-chip-gap); }
+
 .selected,
 .selected:hover {
   font-weight: 600;

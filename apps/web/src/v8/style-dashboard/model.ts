@@ -105,7 +105,7 @@ export interface StyleWeek {
   entries: { id: string; day: string; start: string; end: string; title: string; name: string }[]
   free: { day: string; start: string; end: string; bookingDay?: string; bookingStart?: string }[]
 }
-export interface StyleMonthDay { date: string; day: string; inMonth: boolean; closed?: boolean; groups?: number; people?: number; empty?: boolean; mark?: StyleBadge | null; today?: boolean }
+export interface StyleMonthDay { date: string; day: string; inMonth: boolean; closed?: boolean; groups?: number; people?: number; empty?: boolean; mark?: StyleBadge | null; today?: boolean; selected?: boolean }
 export interface StyleMonth {
   title: string
   days: StyleMonthDay[]

@@ -233,7 +233,7 @@ function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow
       const inMonth = cursor.getUTCMonth() === month
       const d = sch.days.find((x) => x.date === date)
       const closed = sch.availability.closedDates.includes(date)
-      cells.push({ date, day: cursor.getUTCDate() === 1 ? `${cursor.getUTCMonth() + 1}/1` : String(cursor.getUTCDate()), inMonth, ...(inMonth ? closed ? { closed } : d && d.bookings > 0 ? { groups: d.bookings, people: d.people } : d ? { empty: true } : {} : {}), today: date === today })
+      cells.push({ date, day: cursor.getUTCDate() === 1 ? `${cursor.getUTCMonth() + 1}/1` : String(cursor.getUTCDate()), inMonth, ...(inMonth ? closed ? { closed } : d && d.bookings > 0 ? { groups: d.bookings, people: d.people } : d ? { empty: true } : {} : {}), today: date === today, selected: date === selected })
       cursor.setUTCDate(cursor.getUTCDate() + 1)
     }
   } while (cursor.getUTCMonth() === month)

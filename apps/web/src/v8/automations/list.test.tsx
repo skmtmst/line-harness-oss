@@ -5,6 +5,7 @@
  * 閲覧のみでは、作る・編集・フォルダを追加などの押せないボタンを置かない（隠す）。
  */
 import { act } from 'react'
+import { within } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError } from '@/lib/api'
@@ -262,7 +263,7 @@ describe('V8 オートメーションの動いた記録（g98F9）', () => {
     expect(host.textContent).toContain('失敗ブロック中で送れず')
     expect(host.textContent).toContain('1 つ')
     expect(host.textContent).toContain('0.3 秒')
-    expect(host.textContent).toContain('動いた 2,988')
+    expect(within(host).getByRole('tab', { name: /^動いた\s*2,?988$/ })).toBeTruthy()
     expect(host.textContent).toContain('1件中 1〜1件')
   })
 })

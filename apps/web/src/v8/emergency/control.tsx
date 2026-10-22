@@ -11,6 +11,9 @@ import { formatOperationDate } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Button from '@/components/shared/button'
+import { Tabs } from '@/components/shared/tabs'
+import { RowNameButton } from '@/components/shared/table'
+import LogEntryDetails, { type LogEntryFacts } from '@/components/shared/log-entry-details'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Checkbox from '@/components/shared/checkbox'
@@ -132,6 +135,8 @@ const EmergencyControlV8 = (
   const [blockedCode, setBlockedCode] = useState<string | null>(null)
   const [calculatedAt, setCalculatedAt] = useState<string | null>(null)
 
+  const [recordFilter, setRecordFilter] = useState('all')
+  const [recordEntry, setRecordEntry] = useState<LogEntryFacts | null>(null)
   const [entries, setEntries] = useState<OperationHistoryEntry[]>([])
   const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'error'>('loading')
 
@@ -516,7 +521,7 @@ const EmergencyControlV8 = (
 
 
   const stopIncident = operations.find((item) => item.id === control?.activeIncidentId) ?? null
-  const recordRows = operations
+  const recordRows = operations.filter(entry => recordFilter === 'all' || entry.status === recordFilter)
     .slice()
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, RECORD_LIMIT)
@@ -666,6 +671,7 @@ const EmergencyControlV8 = (
 
       <section aria-labelledby="emergency-records-heading">
         <h2 id="emergency-records-heading" className={styles.cardTitle}>止めた・戻した記録</h2>
+        <Tabs size="compact" wrap label="運用記録の種類（取得した直近の記録）" items={[{ key: 'all', label: 'すべて' }, { key: 'failed', label: '失敗' }, { key: 'stopped', label: '停止中' }, { key: 'resolved', label: '戻した' }].map(item => ({ label: item.label, count: historyState === 'ready' ? operations.filter(entry => item.key === 'all' || entry.status === item.key).length : undefined, current: recordFilter === item.key, onClick: () => setRecordFilter(item.key) }))} />
         {historyState === 'loading' ? (
           <div className={styles.card} style={{ marginTop: 12 }} aria-busy="true" aria-label="止めた・戻した記録を読み込んでいます">
             <DelayedSkeleton
@@ -729,7 +735,7 @@ const EmergencyControlV8 = (
                         {entry.capabilities.length > 3 ? `${entry.capabilities.slice(0, 3).map(capabilityShort).join('・')} ほか${entry.capabilities.length - 3}` : entry.capabilities.map(capabilityShort).join('・')}
                       </td>
                       <td title={entry.detail ? `${entry.reason}（${entry.detail}）` : entry.reason} className={styles.cellTruncate}>
-                        {entry.reason}
+                        <RowNameButton onClick={() => setRecordEntry({ occurredAt: entry.createdAt, target: entry.lineAccountId ?? 'すべてのアカウント', status: entry.status === 'failed' ? '失敗' : entry.status === 'resolved' ? '戻した' : '停止中', reason: entry.reason })}>{entry.reason || '中身を見る'}</RowNameButton>
                       </td>
                       <td>{minutes === null ? emptyValue('unknown') : formatMinutesRough(minutes)}</td>
                       <td>{emptyValue('unknown')}</td>
@@ -741,10 +747,11 @@ const EmergencyControlV8 = (
           </div>
         )}
         <p className={styles.tableNote}>
-          だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。緊急停止はオーナーと許可された人だけが実行できます。
+          {historyState === 'ready' ? `種類の件数は、取得した直近${operations.length}件の記録から数えています。` : ''}だれが、いつ、何を止めたかが残ります。通常の管理者は消せません。緊急停止はオーナーと許可された人だけが実行できます。
         </p>
       </section>
 
+      <LogEntryDetails entry={recordEntry} onClose={() => setRecordEntry(null)} />
       {/* 送る経路の網羅（止めると止まる経路）。絵の外なので記録の下に置く。 */}
       <SendPathCoveragePanel accountId={targetAccountId === 'all' ? null : targetAccountId} revision={control?.version ?? 0} />
 
