@@ -1,4 +1,6 @@
 'use client'
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 
 import { useListUrlValue, useListUrlState } from '@/components/shared/list-url-state';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
@@ -59,7 +61,7 @@ const PAGE_SIZES = STANDARD_PAGE_SIZES
 
 export default function MarksTab({ accountId, canEdit, host, explanation = false }: { accountId: string | null; canEdit: boolean; host?: AttributeListHost<MarkRow>; explanation?: boolean }) {
   const router = useRouter()
-  const [items, setItems] = useState<MarkRow[]>([])
+  const { value: items, setValue: setItems, hasValue: loaded } = useListSnapshot<MarkRow[]>(accountId ?? '', [])
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
   // 並び替え・保管の失敗は読み込み失敗と別に持つ（ATTR-02）。
@@ -130,7 +132,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       if (!gateRef.current.current(token) || accountRef.current !== account) return
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [accountId, host])
+  }, [accountId, host, setItems])
   useEffect(() => { if (!host) void load() }, [load, host])
   useEffect(() => { if (host) { setItems(host.items); setStatus(host.status); setError(host.error ?? '') } }, [host])
 
@@ -171,7 +173,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
   /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（自動応答と同じ動き）。 */
   const liveOrder = useLiveReorder(pageItems, (mark) => mark.id, dragId)
   const bodyRef = useRef<HTMLTableSectionElement>(null)
-  useFlipRows(bodyRef, liveOrder.shown.map((mark) => mark.id).join(','))
+  useFlipRows(bodyRef, liveOrder.shown.map((mark) => mark.id).join(','), JSON.stringify([accountId, query, usage, onlyArchived, page, pageSize]))
   const activeMark = items.find((mark) => mark.id === activeMarkId) ?? null
   const activeMarkIndex = pageItems.findIndex((mark) => mark.id === activeMarkId)
   useEffect(() => setPage(1), [query, usage, pageSize, onlyArchived])
@@ -337,7 +339,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
     }))
 
   /* 帯は4つ。マークの数は一覧そのものから、人数は受信箱の集計から。 */
-  const listReady = status === 'ready'
+  const listReady = loaded && (status === 'ready' || status === 'loading')
   const inUseCount = items.filter(isUsed).length
   const statsReason = statsStatus === 'loading' ? STATE_TEXT.loading
     : statsStatus === 'forbidden' ? STATE_TEXT.forbiddenView
@@ -541,7 +543,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
               <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
             )}</Notice>
         ) : null}
-        {table}
+        <RefreshCover refreshing={status === 'loading' && loaded}>{table}</RefreshCover>
       </ListPageBody>
 
       {/* 行の詳細パネル。名前はその場で直せる。 */}

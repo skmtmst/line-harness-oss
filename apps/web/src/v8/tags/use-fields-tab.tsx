@@ -1,4 +1,5 @@
 'use client'
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ClipboardList, List, Pencil, Plus, Send, Users } from 'lucide-react'
@@ -24,8 +25,8 @@ import { LoadStatus, UNFILED } from './fields-list-model'
 
 export function useFieldsTab({ accountId, canEdit, narrow = false, host, explanation = false }: { accountId: string | null; canEdit: boolean; narrow?: boolean; host?: AttributeListHost<FriendField>; explanation?: boolean }) {
   const router = useRouter()
-  const [items, setItems] = useState<FriendField[]>([])
-  const [summary, setSummary] = useState<FriendFieldListSummary | null>(null)
+  const { value: items, setValue: setItems, hasValue: loaded } = useListSnapshot<FriendField[]>(accountId ?? '', [])
+  const { value: summary, setValue: setSummary } = useListSnapshot<FriendFieldListSummary | null>(accountId ?? '', null)
   const [status, setStatus] = useState<LoadStatus>('loading')
   /* 集計は一覧とは別の要求（片方だけ落ちてももう片方は出す）。 */
   const [statsStatus, setStatsStatus] = useState<LoadStatus>('loading')
@@ -99,7 +100,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
       setStatus(forbidden ? 'forbidden' : 'error')
       setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')
     }
-  }, [accountId, host])
+  }, [accountId, host, setItems, setSummary])
   useEffect(() => { if (!host) void load() }, [load, host])
   useEffect(() => { if (host) { setItems(host.items); setStatus(host.status); setError(host.error ?? ''); setFolders(host.folders ?? []); setFolderError(host.foldersFailed ? 'フォルダを読み込めませんでした。' : '') } }, [host])
 
@@ -132,7 +133,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
   /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（自動応答と同じ動き）。 */
   const liveOrder = useLiveReorder(pageItems, (field) => field.id, dragId)
   const bodyRef = useRef<HTMLTableSectionElement>(null)
-  useFlipRows(bodyRef, liveOrder.shown.map((field) => field.id).join(','))
+  useFlipRows(bodyRef, liveOrder.shown.map((field) => field.id).join(','), JSON.stringify([accountId, query, type, folderFilter, page, pageSize]))
   const activeField = items.find((item) => item.id === activeFieldId) ?? null
   const activeFieldIndex = pageItems.findIndex((item) => item.id === activeFieldId)
   useEffect(() => setPage(1), [query, type, folderFilter, pageSize])
@@ -318,5 +319,5 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
     <Button {...(host ? { onClick: host.onCreate, disabled: host.busy } : { href: '/tags/fields/new' })} variant="primary" className={wide ? styles.createWide : undefined}><Plus size={15} aria-hidden="true" />項目を作る</Button>
   )
 
-  return { accountId, canEdit, narrow, host, explanation, items, status, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, page, setPage, dragId, setDragId, pendingDelete, setPendingDelete, leavingId, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, openMenuId, setOpenMenuId, setActiveFieldId, openFieldDetail, load, loadFolders, visible, pages, currentPage, pageItems, liveOrder, bodyRef, activeField, activeFieldIndex, applyOrder, move, keyboardMove, remove, removeFolder, rowMenuItems, fieldContextItems, kpis, folderRows, folderDotOf, filterActive, createButton }
+  return { accountId, canEdit, narrow, host, explanation, items, loaded, status, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, page, setPage, dragId, setDragId, pendingDelete, setPendingDelete, leavingId, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, openMenuId, setOpenMenuId, setActiveFieldId, openFieldDetail, load, loadFolders, visible, pages, currentPage, pageItems, liveOrder, bodyRef, activeField, activeFieldIndex, applyOrder, move, keyboardMove, remove, removeFolder, rowMenuItems, fieldContextItems, kpis, folderRows, folderDotOf, filterActive, createButton }
 }

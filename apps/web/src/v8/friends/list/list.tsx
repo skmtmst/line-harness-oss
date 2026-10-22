@@ -38,6 +38,9 @@ import FilterChip from '@/components/shared/filter-chip';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { useListUrlState } from '@/components/shared/list-url-state'
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 import ListState from '@/components/shared/list-state';
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
 import Pagination,{ paginationSummary } from '@/components/shared/pagination';
@@ -66,7 +69,7 @@ import { BASIC_FRIEND_FIELDS,type Folder,type FriendField,type Scenario,type Tag
 import { FriendsTabs } from '../shared/head';
 import { hasEditKey } from '../shared/nav';
 import { csvExportLine } from './csv-export';
-import { emptyMessageOf } from './empty';
+import { emptyMessageOf, hasAnyFilter } from './empty';
 import { prefixed } from './list-filter-options';
 import { readFriendsListSnapshot,writeFriendsListSnapshot } from './list-state';
 import styles from './list.module.css';
@@ -89,6 +92,8 @@ type PageSize = (typeof PAGE_SIZE_OPTIONS)[number]
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
 type Notice = { title: string; message: string } | null
+const EMPTY_URL_FILTERS = { q: '', tag: '', advanced: '', responseFilter: 'all', operatorId: '', scenarioId: '', attentionOnly: '', scoreMin: '', scoreMax: '', scoredOnly: '', audienceId: '', savedSearch: '', page: '1' }
+
 type LoadStatus = 'loading' | 'ready' | 'error'
 type Column = string
 
@@ -138,7 +143,6 @@ export default function FriendsListV8() {
   const directTagId = (searchParams.get('tag') ?? '').trim()
   const directQuery = (searchParams.get('q') ?? '').trim()
 
-  const [friends, setFriends] = useState<FriendListItem[]>([])
   const [fieldDefinitions, setFieldDefinitions] = useState<FriendField[]>([])
   const [fieldFolders, setFieldFolders] = useState<Folder[]>([])
   const [fieldsReady, setFieldsReady] = useState(false)
@@ -150,7 +154,6 @@ export default function FriendsListV8() {
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [savedOpen, setSavedOpen] = useState(false)
   const [advanced, setAdvanced] = useListUrlJsonValue<AdvancedSearchResult | null>('advanced', null, validAdvancedSearch)
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useListUrlValue('page', 1)
   const [pageSize, setPageSize] = useListUrlValue<PageSize>('pageSize', 20)
   const [selectedTagId, setSelectedTagId] = useListUrlValue('tag', '')
@@ -161,20 +164,13 @@ export default function FriendsListV8() {
   const [operatorId, setOperatorId] = useListUrlValue('operatorId', '')
   const [scenarioId, setScenarioId] = useListUrlValue('scenarioId', '')
   const [attentionOnly, setAttentionOnly] = useListUrlValue('attentionOnly', false)
-  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [refreshing, setRefreshing] = useState(false)
   const [optionsFailed, setOptionsFailed] = useState(false)
   const [selectionFriends, setSelectionFriends] = useState<FriendListItem[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
   const [bulkOpen, setBulkOpen] = useState(false)
   const [rowAction, setRowAction] = useState<{ friend: FriendListItem; action: FriendAction } | null>(null)
   const [notice, setNotice] = useState<Notice>(null)
-  const hasRowsRef = useRef(false)
   const loadRequestRef = useRef(0)
-  const loadContextRef = useRef({ accountId: selectedAccountId, page, pageSize })
-  loadContextRef.current = { accountId: selectedAccountId, page, pageSize }
-  hasRowsRef.current = friends.length > 0
 
   useEffect(() => { setRowAction(null) }, [selectedAccountId])
 
@@ -208,6 +204,17 @@ export default function FriendsListV8() {
   ], [fieldDefinitions, fieldFolders])
   const displayColumns = useMemo(() => [...visible].map(key => columnItems.find(column => column.key === key)).filter((column): column is typeof columnItems[number] => Boolean(column)).slice(0,maxColumns), [visible, columnItems, maxColumns])
   const requestedFieldColumns = displayColumns.filter(column => column.key.startsWith('fixed:') || column.key.startsWith('field:')).map(column => column.key).join('|')
+  const listScope = JSON.stringify([selectedAccountId, page, pageSize, advanced, selectedTagId, searchSubmitted, responseFilter, operatorId, scenarioId, attentionOnly, scoreMin, scoreMax, scoredOnly, audienceId, requestedFieldColumns, sortMode])
+  const { value: friends, setValue: setFriends } = useListSnapshot<FriendListItem[]>(listScope, [])
+  const { value: total, setValue: setTotal } = useListSnapshot(listScope, 0)
+  const { value: loadStatus, setValue: setLoadStatus } = useListSnapshot<LoadStatus>(listScope, 'loading')
+  const { value: selectedIds, setValue: setSelectedIds } = useListSnapshot<Set<string>>(listScope, new Set())
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [setSelectedIds])
+  const loadContextRef = useRef({ accountId: selectedAccountId, scope: listScope })
+  loadContextRef.current = { accountId: selectedAccountId, scope: listScope }
+  const hasRowsRef = useRef(false)
+  hasRowsRef.current = loadStatus === 'ready'
+
   useEffect(() => {
     if (!fieldsReady) return
     setVisible(current => {
@@ -290,12 +297,16 @@ export default function FriendsListV8() {
   /* 絞り込みは上の控えが戻す。スクロール位置も、戻ったときだけ同じ所へ戻す（動きの点検 5 番）。 */
   useListScrollMemory(restored && loadStatus === 'ready')
 
-  const emptyMessage = emptyMessageOf({
+  const emptyFilters = {
     search: searchSubmitted,
     tagId: selectedTagId,
     advanced: advanced !== null,
-    others: responseFilter !== 'all' || operatorId !== '' || scenarioId !== '' || attentionOnly || hasScoreRange || audienceId !== '',
-  })
+    others: responseFilter !== 'all' || operatorId !== '' || scenarioId !== '' || attentionOnly || hasScoreRange || scoredOnly || audienceId !== '' || Boolean(directSavedSearchId),
+  }
+  const emptyMessage = emptyMessageOf(emptyFilters)
+  const [, setEmptyFilters] = useListUrlState(EMPTY_URL_FILTERS)
+  const clearEmptyFilters = () => setEmptyFilters(EMPTY_URL_FILTERS)
+  const emptyFiltered = hasAnyFilter(emptyFilters)
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   const broadcastHandoff = useMemo(() => buildBroadcastHandoff({
@@ -313,7 +324,7 @@ export default function FriendsListV8() {
       else next.add(id)
       return next
     })
-  }, [])
+  }, [setSelectedIds])
 
   const fieldsEnabled = featureVisibility.enabled('friend_fields')
   useEffect(() => {
@@ -342,6 +353,7 @@ export default function FriendsListV8() {
       if (scenarioResponse.success) setScenarios(scenarioResponse.data)
       setOptionsFailed(false)
     } catch {
+      if (loadContextRef.current.accountId !== requestedAccountId) return
       setOptionsFailed(true)
     }
   }, [selectedAccountId])
@@ -357,6 +369,7 @@ export default function FriendsListV8() {
       if (loadContextRef.current.accountId !== requestedAccountId) return
       if (markResponse.success) setMarks(markResponse.data)
     } catch {
+      if (loadContextRef.current.accountId !== requestedAccountId) return
       setOptionsFailed(true)
     }
   }, [selectedAccountId, marksEnabled])
@@ -386,16 +399,14 @@ export default function FriendsListV8() {
       if (!response.success) throw new Error('読み込めませんでした')
       return response.data
     })
-    if (request !== loadRequestRef.current) return
+    if (request !== loadRequestRef.current || loadContextRef.current.scope !== listScope) return
     setSelectionFriends(all)
     setSelectedIds(new Set(all.map(friend => friend.id)))
   }
 
   const loadFriends = useCallback(async () => {
     const requestId = ++loadRequestRef.current
-    const requestedAccountId = selectedAccountId
-    const requestedPage = page
-    const requestedPageSize = pageSize
+    const requestedScope = listScope
     if (hasRowsRef.current) {
       setRefreshing(true)
     } else {
@@ -403,14 +414,9 @@ export default function FriendsListV8() {
       setFriends([])
       setTotal(0)
     }
-    setBulkOpen(false)
-    setSelectedIds(new Set())
+    if (!hasRowsRef.current) { setRefreshing(false); setBulkOpen(false); setSelectedIds(new Set()) }
     const stale = () => {
-      const context = loadContextRef.current
-      return requestId !== loadRequestRef.current
-        || context.accountId !== requestedAccountId
-        || context.page !== requestedPage
-        || context.pageSize !== requestedPageSize
+      return requestId !== loadRequestRef.current || loadContextRef.current.scope !== requestedScope
     }
     try {
       const response = await api.friends.list({
@@ -442,7 +448,6 @@ export default function FriendsListV8() {
         setTotal(0)
         setLoadStatus('error')
       }
-      setSelectedIds(new Set())
       setRefreshing(false)
     } catch {
       if (stale()) return
@@ -451,7 +456,7 @@ export default function FriendsListV8() {
       setLoadStatus('error')
       setRefreshing(false)
     }
-  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode, requestedFieldColumns])
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, scoredOnly, searchSubmitted, selectedAccountId, selectedTagId, sortMode, requestedFieldColumns, listScope, setFriends, setTotal, setLoadStatus, setSelectedIds])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => void loadMarks(), [loadMarks])
@@ -497,7 +502,7 @@ export default function FriendsListV8() {
     return () => {
       setFriends((current) => current.map((friend) => (friend.id === friendId ? { ...friend, tags: previous } : friend)))
     }
-  }, [friends])
+  }, [friends, setFriends])
 
   const exportCurrentPage = useCallback(() => {
     const header = ['友だち名', '対応', 'シナリオ', '最新メッセージ', '流入元', '登録日']
@@ -544,7 +549,7 @@ export default function FriendsListV8() {
         notifyToast('注目を変えられませんでした。', { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleAttentionRef.current(friend) } })
       }
     }
-  }, [loadFriends])
+  }, [loadFriends, setFriends])
   const toggleAttentionRef = useRef(toggleAttention)
   toggleAttentionRef.current = toggleAttention
 
@@ -709,7 +714,7 @@ export default function FriendsListV8() {
             注目のみ
           </FilterChip>
         </ResponsiveFilterChips></div>
-        <span className={styles.count}>{loadStatus === 'ready' && !refreshing ? `${formatNumber(total)}件` : emptyValue('unknown')}</span>
+        <span className={styles.count}>{loadStatus === 'ready' ? `${formatNumber(total)}件` : emptyValue('unknown')}</span>
         <span className={styles.spacer} />
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog presentation="columns" items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/tags?tab=fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
@@ -857,7 +862,7 @@ export default function FriendsListV8() {
     )
   }, [attentionMotion, selectable, router, selectedIds, toggleSelect, rowCanEdit, toggleAttention, narrow, displayColumns, allowedActions])
   const table = (
-    <div className={refreshing ? `${styles.tableWrap} ${styles.refreshing}` : styles.tableWrap} aria-busy={loadStatus === 'loading' || refreshing || undefined}>
+    <RefreshCover refreshing={refreshing && loadStatus === 'ready'}><div className={styles.tableWrap} aria-busy={loadStatus === 'loading' || refreshing || undefined}>
       <DataTable cellPresentation="friends" data-design="V8FriendTable">
         <colgroup>
           {selectable ? <col className={styles.colCheck} /> : null}
@@ -924,13 +929,13 @@ export default function FriendsListV8() {
           ) : friends.length === 0 ? (
             <tr>
               <td colSpan={colCount} className={styles.stateCell}>
-                <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} />
+                <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} emptyPreset={emptyFiltered ? 'filtered' : 'readonly'} action={emptyFiltered ? <Button onClick={clearEmptyFilters}>条件を外す</Button> : undefined} />
               </td>
             </tr>
           ) : null}
         </TableBody>
       </DataTable>
-    </div>
+    </div></RefreshCover>
   )
 
   const pager = (

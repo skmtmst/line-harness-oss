@@ -1,4 +1,5 @@
 'use client'
+import { RefreshCover } from '@/components/shared/refresh-cover'
 import FolderSelect from '@/components/shared/folder-select'
 
 import ListDateTime from '@/components/shared/list-date-time'
@@ -790,7 +791,7 @@ export default function RemindersListV8() {
   )
 
   const table =
-    reminderList.loading && reminders.length === 0 ? (
+    !reminderList.loaded && !reminderList.error ? (
       <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
         <DelayedSkeleton loading skeleton={loadingSkeleton} />
       </div>
@@ -868,7 +869,7 @@ export default function RemindersListV8() {
                 const nextSend =
                   view.status === 'active' ? <ListDateTime value={row.nextScheduledAt} /> : emptyValue('unknown')
                 return (
-                  <Tr interactive
+                  <Tr selected={selectedIds.has(row.id)} interactive
                     highlighted={duplicateFeedback.highlightedId === row.id}
                     key={row.id}
                     {...reorder.rowProps(row.id)}
@@ -1309,7 +1310,7 @@ export default function RemindersListV8() {
               <button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
           )}
 
-          {table}
+          <RefreshCover refreshing={reminderList.refreshing}>{table}</RefreshCover>
         </ListPageBody>
     </PageFrame></SaveErrorScope>
   )

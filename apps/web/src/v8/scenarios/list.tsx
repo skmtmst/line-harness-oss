@@ -1,4 +1,5 @@
 'use client'
+import { RefreshCover } from '@/components/shared/refresh-cover'
 import FolderSelect from '@/components/shared/folder-select'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { useStaffRole } from '@/lib/staff-role';
@@ -839,7 +840,7 @@ export default function ScenariosListV8() {
   )
 
   const listBody =
-    scenarioList.loading && scenarios.length === 0 ? (
+    !scenarioList.loaded && !scenarioList.error ? (
       <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
         <DelayedSkeleton loading skeleton={loadingSkeleton} />
       </div>
@@ -897,7 +898,7 @@ export default function ScenariosListV8() {
                 const sub = s.description ? `${meta}　${s.description}` : meta
                 const subscribers = s.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(s.subscriberCount)
                 return (
-                  <Tr
+                  <Tr selected={selectedIds.has(s.id)}
                     interactive
                     highlighted={duplicateFeedback.highlightedId === s.id}
                     key={s.id}
@@ -1297,7 +1298,7 @@ export default function ScenariosListV8() {
       {actionError ? (
         <Notice tone="danger" >{actionError}<button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
       ) : null}
-      {listBody}
+      <RefreshCover refreshing={scenarioList.refreshing}>{listBody}</RefreshCover>
     </ListPage></SaveErrorScope>
   )
 }

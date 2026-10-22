@@ -57,6 +57,8 @@ import styles from './list.module.css'
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { RefreshCover } from '@/components/shared/refresh-cover'
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 
@@ -190,10 +192,6 @@ export default function BroadcastListV8() {
    */
   const canEdit = useFeatureAccess('broadcasts')
 
-  const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
-  const [listKpis, setListKpis] = useState<BroadcastListKpis | null | undefined>(undefined)
-  const [statusCounts, setStatusCounts] = useState<Record<string, number> | null>(null)
-  const [quota, setQuota] = useState<{ limit: number | null; used: number | null } | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [loading, setLoading] = useState(true)
@@ -234,7 +232,6 @@ export default function BroadcastListV8() {
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [sortKey, setSortKey] = useListUrlValue<'newest' | 'oldest'>('sortKey', 'newest')
   const [page, setPage] = useListUrlValue('page', 1)
-  const [listTotal, setListTotal] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ApiBroadcast | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -252,6 +249,17 @@ export default function BroadcastListV8() {
   const [savedViewOpen, setSavedViewOpen] = useState(false)
   const [savedViewBusy, setSavedViewBusy] = useState(false)
   const [savedViewError, setSavedViewError] = useState('')
+
+  const listScope = JSON.stringify([selectedAccountId, statusFilter, folderFilter, dateFrom, dateTo, titleQuery, titleQuery.trim() ? null : page, pageSize])
+  const { value: broadcasts, setValue: setBroadcasts, hasValue: listLoaded } = useListSnapshot<ApiBroadcast[]>(listScope, [])
+  const { value: listKpis, setValue: setListKpis } = useListSnapshot<BroadcastListKpis | null | undefined>(listScope, undefined)
+  const { value: statusCounts, setValue: setStatusCounts } = useListSnapshot<Record<string, number> | null>(listScope, null)
+  const { value: listTotal, setValue: setListTotal } = useListSnapshot<number | null>(listScope, null)
+  const [quota, setQuota] = useState<{ limit: number | null; used: number | null } | null>(null)
+
+  const listRequestKey = JSON.stringify([listScope, sortKey])
+  const currentListRequest = useRef(listRequestKey)
+  currentListRequest.current = listRequestKey
 
   /* 一覧同梱の集計が無い送信済みだけ1回ずつ取る（管理画面 と同じ補充）。 */
   const fetchedInsightIdsRef = useRef<Set<string>>(new Set())
@@ -320,6 +328,7 @@ export default function BroadcastListV8() {
   const loadSeqRef = useRef(0)
   const loadList = useCallback(async (cursor = 0) => {
     const seq = ++loadSeqRef.current
+    const stale = () => seq !== loadSeqRef.current || currentListRequest.current !== listRequestKey
     setLoading(true)
     setError('')
     setForbidden(false)
@@ -350,7 +359,7 @@ export default function BroadcastListV8() {
         let nextCursor = res.pagination?.nextCursor
         const seen = new Set<string>()
         while (nextCursor != null) {
-          if (seq !== loadSeqRef.current) return
+          if (stale()) return
           if (seen.has(nextCursor) || rows.length >= SEARCH_LIMIT) stopSearch('検索結果を読み込めませんでした。条件を絞ってから再試行してください。')
           seen.add(nextCursor)
           const next = await api.broadcasts.list({ ...params, cursor: Number(nextCursor) })
@@ -361,7 +370,7 @@ export default function BroadcastListV8() {
         }
         res.data = rows
       }
-      if (seq !== loadSeqRef.current) return
+      if (stale()) return
       if (res.success) {
         setBroadcasts(res.data)
         setListKpis(res.kpis)
@@ -371,7 +380,7 @@ export default function BroadcastListV8() {
         setError(res.error)
       }
     } catch (err) {
-      if (seq !== loadSeqRef.current) return
+      if (stale()) return
       const fieldFailure = saveErrors.capture(err);
 
       if (err instanceof ApiError && err.status === 403) setForbidden(true)
@@ -380,9 +389,9 @@ export default function BroadcastListV8() {
 
  setError(searchError || loadFailureNotice(err, '一斉配信')) }
     } finally {
-      if (seq === loadSeqRef.current) setLoading(false)
+      if (!stale()) setLoading(false)
     }
-  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo, titleQuery, saveErrors])
+  }, [selectedAccountId, pageSize, sortKey, statusFilter, folderFilter, dateFrom, dateTo, titleQuery, saveErrors, listScope, listRequestKey, setBroadcasts, setListKpis, setStatusCounts, setListTotal])
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(!loading)
 
@@ -403,16 +412,16 @@ export default function BroadcastListV8() {
     }
   }, [selectedAccountId, saveErrors])
 
+  const listCursor = titleQuery.trim() ? 0 : (page - 1) * pageSize
   useEffect(() => {
-    setPage(1)
-    void loadList(0)
-  }, [loadList])
+    void loadList(listCursor)
+    return () => { loadSeqRef.current += 1 }
+  }, [loadList, listCursor])
 
   useEffect(() => { void loadCandidates() }, [loadCandidates])
 
   const goPage = (next: number) => {
     setPage(next)
-    if (!titleQuery.trim()) void loadList((next - 1) * pageSize)
   }
 
   /* 今月の送信枠（ダッシュボードの口から quota を借りる）。 */
@@ -974,7 +983,7 @@ export default function BroadcastListV8() {
     <ListState kind={danger ? 'error' : 'empty'} title={title} description={desc ?? undefined} icon={icon} action={action} />
   )
 
-  const listBody = loading ? (
+  const listBody = !listLoaded && !error && !forbidden ? (
     <div aria-busy="true" aria-label="読み込んでいます">
       <DelayedSkeleton loading skeleton={loadingSkeleton} />
     </div>
@@ -998,7 +1007,7 @@ export default function BroadcastListV8() {
   ) : (
     <DataTable className={styles.table}>
       {tableHead}
-      <RovingTbody>
+      <RovingTbody reorderKey={visibleBroadcasts.map(row => row.id).join(',')} reorderScope={JSON.stringify([listScope, page])}>
         {visibleBroadcasts.map((broadcast) => {
           const insight = insights[broadcast.id] ?? summaryInsight(broadcast.insightSummary)
           const audience = audienceSummary(broadcast, getTagName, getScenarioName)
@@ -1020,6 +1029,8 @@ export default function BroadcastListV8() {
           return (
             <Tr
               key={broadcast.id}
+              selected={selection.isSelected(broadcast.id)}
+              data-reorder-id={broadcast.id}
               className={styles.row}
               interactive
               tabIndex={0}
@@ -1288,7 +1299,7 @@ export default function BroadcastListV8() {
           />
         </div>
       ) : null}
-      {listBody}
+      <RefreshCover refreshing={loading && listLoaded}>{listBody}</RefreshCover>
     </ListPage></SaveErrorScope>
   )
 }

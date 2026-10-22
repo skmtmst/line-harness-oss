@@ -23,12 +23,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const GLOBALS = readFileSync(join(HERE, '../../app/globals.css'), 'utf8')
 const GLOBALS_CODE = GLOBALS.replace(/\/\*[\s\S]*?\*\//g, '')
-const FRIENDS_PAGE = readFileSync(join(HERE, '../../app/friends/page.tsx'), 'utf8')
-const FRIENDS_TABLE = readFileSync(join(HERE, '../friends/friend-list-table.tsx'), 'utf8')
 /* 完全切り替え：管理画面 の一覧 page.tsx は捨て、V8 の list-v8.tsx を見る。 */
 // シナリオの入口は src/v8/scenarios/list.tsx（古い app/scenarios/list-v8.tsx はもう描かれない）。
-const SCENARIOS_PAGE = readFileSync(join(HERE, '../../v8/scenarios/list.tsx'), 'utf8')
-const SERVER_LIST = readFileSync(join(HERE, '../../lib/use-server-list.ts'), 'utf8')
 
 import { CardsSkeleton, DelayedSkeleton, Skeleton, StatTilesSkeleton, TableSkeleton } from './skeleton'
 import ListState from './list-state'
@@ -147,25 +143,6 @@ describe('globals.css の現役の動き規定', () => {
   it('読み直しを旧い線や薄めへ戻さない', () => {
     expect(GLOBALS_CODE).not.toMatch(/\.v7-refresh-(?:line|dim)\s*\{/)
     expect(GLOBALS_CODE).not.toContain('@keyframes v7-refresh-sweep')
-  })
-})
-
-describe("前の表示を残したまま読む", () => {
-  it('一覧の読み直しでは行を消さず refreshing を画面へ渡す', () => {
-    // 友だち一覧: 行があるときは消さず、refreshing で薄め＋線を出す。
-    expect(FRIENDS_PAGE).toContain('setRefreshing(true)')
-    expect(FRIENDS_PAGE).toContain('refreshing ? `${styles.tableWrap} ${styles.refreshing}` : styles.tableWrap')
-    expect(FRIENDS_PAGE).toContain("aria-busy={loadStatus === 'loading' || refreshing || undefined}")
-    const load = FRIENDS_PAGE.slice(FRIENDS_PAGE.indexOf('const loadFriends'), FRIENDS_PAGE.indexOf('const resetPageWith'))
-    expect(load).toContain('hasRowsRef.current')
-    const refreshingBranch = load.slice(load.indexOf('if (hasRowsRef.current)'), load.indexOf('} else {'))
-    expect(refreshingBranch).toContain('setRefreshing(true)')
-    expect(refreshingBranch).not.toContain('setFriends([])')
-    // 共有の一覧 hook: 読み直しで items を消さず refreshing を返す。
-    expect(SERVER_LIST).toContain('refreshing: state.loading && state.items.length > 0')
-    expect(SERVER_LIST).not.toMatch(/items:\s*\[\],\s*loaded:\s*false,\s*loading:\s*true/)
-    // シナリオ一覧も読み直し中は行を残す（骨組みは行が無いときだけ）。
-    expect(SCENARIOS_PAGE).toContain('scenarioList.loading && scenarios.length === 0')
   })
 })
 

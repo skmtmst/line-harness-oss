@@ -1,4 +1,5 @@
 'use client'
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 import { api,fetchApi } from '@/lib/api';
 import { inboxRoutingApi } from '@/lib/api/helpers/gap1';
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events';
@@ -22,17 +23,6 @@ type Options = {
 }
 
 export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, statusFilter, assigneeFilter, unreadOnly, quickFilter, setError }: Options) {
-
-  const [chats, setChats] = useState<Chat[]>([])
-
-  /**
-   * メールの問い合わせ。LINEのトークと同じ一覧に混ぜる。
-   *
-   * 設計 `V2 2-1 受信箱` の一覧は「✉ 定期便の解約について」のように
-   * メールも同じ並びに入っている。出どころで場所を分けると、
-   * 返信を待っている人を2か所で探すことになる。
-   */
-  const [emailItems, setEmailItems] = useState<EmailInboxItem[]>([])
 
   /*
    * メール一覧だけの失敗表示。LINE側の `error` とは別にする。
@@ -123,6 +113,9 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   // Compare at render time too: an old request can finish before the next effect runs.
   const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled])
 
+  const { value: chats, setValue: setChats } = useListSnapshot<Chat[]>(listFilterKey, [])
+  const { value: emailItems, setValue: setEmailItems } = useListSnapshot<EmailInboxItem[]>(listFilterKey, [])
+
   const listFilterKeyRef = useRef(listFilterKey)
 
   listFilterKeyRef.current = listFilterKey
@@ -162,7 +155,6 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
       emailMoreLockRef.current = true
       setLoadingMoreEmails(true)
     } else {
-      setEmailItems([])
       setHasMoreEmails(false)
       emailMoreLockRef.current = false
       setLoadingMoreEmails(false)
@@ -218,7 +210,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
         setEmailLoading(false)
       }
     }
-  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey, EMAIL_PAGE_SIZE])
+  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey, EMAIL_PAGE_SIZE, setEmailItems])
 
   useEffect(() => {
     void loadEmails()
@@ -226,7 +218,6 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
 
   const loadChats = useCallback(async () => {
     const requestId = ++chatListRequestRef.current
-    setChats([])
     nextCursorRef.current = null
     extraPagesLoadedRef.current = false
     setHasMoreChats(false)
@@ -260,7 +251,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
         setLoading(false)
       }
     }
-  }, [buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE])
+  }, [buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats])
 
   // 「さらに読み込む」— サーバ由来カーソルの続きを取得して末尾に追加する。
   // 楽観更新との競合に備えて既存 id は除外し、重複表示を防ぐ。
@@ -294,7 +285,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     } finally {
       if (listFilterKeyRef.current === listFilterKey && chatListRequestRef.current === requestId) setLoadingMore(false)
     }
-  }, [loadingMore, buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE])
+  }, [loadingMore, buildListParams, listFilterKey, setError, CHAT_PAGE_SIZE, setChats])
 
   // Keep refs in sync so setChats updater can read the latest filter without stale closure
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
@@ -329,7 +320,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
     } catch {
       return false
     }
-  }, [buildListParams, listFilterKey, CHAT_PAGE_SIZE])
+  }, [buildListParams, listFilterKey, CHAT_PAGE_SIZE, setChats])
 
   useEffect(() => {
     loadChats()

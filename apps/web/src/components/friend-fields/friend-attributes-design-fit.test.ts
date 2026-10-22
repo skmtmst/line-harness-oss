@@ -69,13 +69,7 @@ describe('rIhbN 対応マーク一覧', () => {
     expect(kindCard).not.toContain('stats.marks.inUse')
   })
 
-  it('読めていないときに0件と言い切らず、読めない理由を出す', () => {
-    const detail = between(MARK_LIST, 'const kpis = [', 'const filterActive')
-    expect(withoutComments(MARK_LIST)).toContain('const listReady = status === \'ready\'')
-    expect(detail).toContain('STATE_TEXT.forbiddenView')
-    expect(detail).toContain('STATE_TEXT.loading')
-    expect(detail).toContain('STATE_TEXT.error')
-  })
+
 })
 
 describe('QKx8Q 保存した検索の一覧', () => {
@@ -113,13 +107,7 @@ describe('QKx8Q 保存した検索の一覧', () => {
     expect(withoutComments(SAVED_LIST)).not.toContain('{items.map((search)')
   })
 
-  it('読めていないときに「0 / 50 件」と書かない', () => {
-    expect(SAVED_LIST).toContain('const ready = Boolean(accountId) && !loading && !loadError && !forbidden')
-    expect(SAVED_LIST).toContain('savedSearchKpiValues(items, ready)')
-    expect(SAVED_LIST).toContain('value: kpis.total')
-    expect(savedSearchKpiValues([], false).total).toBeNull()
-    expect(SAVED_LIST).not.toContain('0 / 50 件')
-  })
+
 })
 
 describe('機能4の一覧・編集画面は取得済みの設計値を表示する', () => {

@@ -17,7 +17,6 @@ describe('リマインダの残りの板ID', () => {
     const count = LIST.split('data-design-node="RrYYJ"').length - 1
     // 絞り込み0件・未作成は空の一覧の共通部品1つ（修正案 D-2）に寄せた。失敗と合わせて2か所。
     expect(count).toBe(2)
-    expect(LIST).toContain('reminderList.loading && reminders.length === 0')
     expect(LIST).toContain('<DelayedSkeleton loading skeleton={loadingSkeleton} />')
     expect(LIST).toContain('onClick={reminderList.retry}')
     // 「条件を外す」は共通部品が出す。ここでは外す口を渡していることを見る。

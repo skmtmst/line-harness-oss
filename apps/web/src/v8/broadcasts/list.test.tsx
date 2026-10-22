@@ -516,6 +516,8 @@ it('選んだ配信だけを、確認後にその版のままフォルダへ移�
   act(() => root.render(<BroadcastListV8 />))
   await flush()
   act(() => fireEvent.click(host.querySelector('input[aria-label="8月キャンペーンのお知らせを選ぶ"]')!))
+  expect(host.querySelector('[data-row-id="bc-1"]')?.getAttribute('aria-selected')).toBe('true')
+  expect(host.querySelector('[data-row-id="bc-2"]')?.getAttribute('aria-selected')).toBe('false')
   const move = [...document.querySelectorAll('button')].find(button => button.textContent?.trim() === 'フォルダへ移す')!
   act(() => fireEvent.click(move))
   expect(updateBroadcast).not.toHaveBeenCalled()
@@ -526,4 +528,23 @@ it('選んだ配信だけを、確認後にその版のままフォルダへ移�
   await flush()
   expect(updateBroadcast.mock.calls).toEqual([['bc-1', { folderId: 'campaign', expectedVersion: 7 }]])
   expect(document.querySelector('[role="dialog"]')).toBeNull()
+})
+
+it('並び順の読み直しでは行と件数を残し、状態条件の切替では旧行を隠す', async () => {
+  resetUrl()
+  act(() => root.render(<BroadcastListV8 />))
+  await flush()
+  let resolve!: (value: unknown) => void
+  listBroadcasts.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+  act(() => fireEvent.click(host.querySelector('[aria-label="並び"]')!))
+  act(() => fireEvent.click([...document.querySelectorAll('[role="option"]')].find(el => el.textContent?.includes('古い順'))!.querySelector('button')!))
+  await flush()
+  expect(host.querySelector('[data-row-id="bc-1"]')).not.toBeNull()
+  expect(host.querySelector('[aria-busy="true"]')).not.toBeNull()
+  await act(async () => resolve({ success: true, data: [rowB, base], pagination: { total: 2 } }))
+  await flush()
+  listBroadcasts.mockImplementationOnce(() => new Promise(() => {}))
+  act(() => buttonByText('下書き')?.click())
+  await flush()
+  expect(host.querySelector('[data-row-id="bc-1"]')).toBeNull()
 })

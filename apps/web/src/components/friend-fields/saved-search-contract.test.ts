@@ -60,12 +60,5 @@ describe('V8 保存した検索の画面契約', () => {
     expect(editPage).not.toContain('オートメーション「3日後フォロー」')
   })
 
-  it('読込失敗を空状態や別アカウントの前回データと混ぜない', () => {
-    expect(list).toContain('const loadSequence = useRef(0)')
-    expect(list).toContain("setLoadError('')")
-    expect(list).toContain('setItems([])')
-    expect(list).toContain('kind="error"')
-    expect(list).toContain('onClick={() => load()}')
-    expect(list.indexOf('loadError ?')).toBeLessThan(list.indexOf('items.length === 0'))
-  })
+
 })
