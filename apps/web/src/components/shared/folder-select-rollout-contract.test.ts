@@ -39,11 +39,11 @@ const SCREENS: Array<[string, RegExp]> = [
   ['v8/reminders/new/new.tsx', /onCreate=\{canCreateFolder\s*\?/],
   ['v8/contents/list.tsx', /onCreateFolder=\{canManageMedia\s*\?/],
   ['v8/rich-menus/new/create.tsx', /onCreate=\{!canOperate\s*\?\s*undefined/],
-  ['v8/auto-replies/edit/wizard.tsx', /onCreate=\{canManage\s*\?/],
   ['components/broadcasts/broadcast-form.tsx', /onCreate=\{canCreateFolder \? createFolder : undefined\}/],
 ]
 
 describe('物のフォルダを選ぶ欄は FolderSelect（dLffh）', () => {
+  // 自動応答の権限と読込状態は wizard-folder.test.tsx で実際の作成操作を確認する。
   it.each(SCREENS)('%s は権限があるときだけ作る口を渡す', (path, gate) => {
     expect(read(path)).toMatch(gate)
   })

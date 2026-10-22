@@ -60,6 +60,8 @@ export async function putWorkerScript(opts: {
   compatibilityDate?: string;
   compatibilityFlags?: string[];
   keepAssets?: boolean;
+  assetsJwt?: string;
+  assetsConfig?: { run_worker_first: boolean; _headers?: string; _redirects?: string };
 }): Promise<void> {
   const { creds, scriptName, scriptContent, bindings } = opts;
   const compatibility_date = opts.compatibilityDate ?? DEFAULT_COMPATIBILITY_DATE;
@@ -85,7 +87,9 @@ export async function putWorkerScript(opts: {
   if (opts.compatibilityFlags && opts.compatibilityFlags.length > 0) {
     metadata.compatibility_flags = opts.compatibilityFlags;
   }
-  if (opts.keepAssets) {
+  if (opts.assetsJwt) {
+    metadata.assets = { jwt: opts.assetsJwt, config: opts.assetsConfig ?? { run_worker_first: true } };
+  } else if (opts.keepAssets) {
     metadata.keep_assets = true;
   }
 
@@ -116,6 +120,8 @@ export async function putWorkerScript(opts: {
   if (!res.ok) {
     await throwHttpError('PUT worker script failed', res);
   }
+  const result = await res.json() as { success: boolean };
+  if (!result.success) throw new Error('PUT worker script returned an unsuccessful result');
 }
 
 /**

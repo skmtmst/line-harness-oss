@@ -46,6 +46,21 @@ describe('approved SQL and backup boundaries', () => {
     expect(() => check()).not.toThrow();
     for (const bad of [() => check({ ...policy, approval: '' }), () => check(policy, { enabled: true }), () => check(policy, {}, {}), () => check(policy, { enabled: false }, { domains: [{ enabled: true }] }), () => check(policy, undefined, undefined, { rules: [] }), () => check(policy, undefined, undefined, lifecycle, [policy.bucket]), () => check({ ...policy, retentionDays: 8 })]) expect(bad).toThrow();
   });
+  it('requires a lifecycle prefix that covers the actual backup location', () => {
+    const check = (prefix: string) => assertBackupPolicy(policy, { enabled: false }, { domains: [] }, {
+      rules: [{ ...lifecycle.rules[0], conditions: { prefix } }],
+    }, []);
+    expect(() => check('')).not.toThrow();
+    expect(() => check('approved/')).not.toThrow();
+    expect(() => check('approved/subdirectory/')).toThrow('backup_retention');
+    expect(() => check('other/')).toThrow('backup_retention');
+    expect(() => assertBackupPolicy(policy, { enabled: false }, { domains: [] }, {
+      rules: [...lifecycle.rules, {
+        enabled: true, conditions: { prefix: 'approved/a' },
+        deleteObjectsTransition: { condition: { type: 'Age', maxAge: 86400 } },
+      }],
+    }, [])).toThrow('backup_retention');
+  });
   it('authenticates encrypted exports; tamper, truncation and wrong keys cannot pass readback', () => {
     const key = Buffer.alloc(32, 9), plain = Buffer.from('synthetic SQL and bookmark');
     const encrypted = encryptBackup(plain, key);

@@ -77,7 +77,8 @@
  *   で拾う。`/accounts/new` の専用シェルにはヘッダー自体が無い。
  */
 @media (max-width: 1279.98px) {
-  .side {
+  .shell {
+    /* 警告も本文も固定ヘッダーの下に置く。本文だけを下げると警告が隠れる。 */
     padding-top: var(--mobile-header-height);
   }
 
@@ -187,7 +188,7 @@
 /* v8 の帯は 1280px 未満でも出す（畳んだ左メニューと組む）。モバイルの
    固定ヘッダー分の上余白は 1024px から要らない。 */
 @media (min-width: 1024px) and (max-width: 1279.98px) {
-  :root .side {
+  :root .shell {
     padding-top: 0;
   }
 

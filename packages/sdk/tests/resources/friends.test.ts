@@ -67,6 +67,17 @@ describe('FriendsResource', () => {
     expect(http.post).toHaveBeenCalledWith('/api/friends/friend-1/tags', { tagId: 'tag-1' })
   })
 
+  it('counts the configured account and permits an explicit override', async () => {
+    const http = mockHttp({ get: vi.fn(async (path: string) => ({
+      success: true, data: { count: path.includes('store-b') ? 7 : 3 },
+    })) })
+    const resource = new FriendsResource(http, 'store-a')
+    expect(await resource.count()).toBe(3)
+    expect(http.get).toHaveBeenLastCalledWith('/api/friends/count?lineAccountId=store-a')
+    expect(await resource.count({ accountId: 'store-b' })).toBe(7)
+    expect(http.get).toHaveBeenLastCalledWith('/api/friends/count?lineAccountId=store-b')
+  })
+
   it('removeTag calls DELETE /api/friends/:id/tags/:tagId', async () => {
     const http = mockHttp({ delete: vi.fn().mockResolvedValue({ success: true, data: null }) })
     const resource = new FriendsResource(http)

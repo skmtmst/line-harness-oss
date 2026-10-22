@@ -2,7 +2,7 @@
  * 見本の画像のうち、実装が対応する板の分だけを取り込む。
  *
  * 全部（496枚）は重いので版に入れない。対応表（`v8-design-map.json`）で
- * 画面の場所が決まった板だけを、司令塔の作業フォルダから
+ * 画面の場所が決まった板だけを、V8_DESIGN_DIR で指定した版付き設計アーカイブから
  * `scripts/visual-qa/v8-design-refs/<板ID>.png` へ写す。
  * 写した先は `.gitignore` で版から外す（作り直せるため）。
  *
@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const DESIGN_DIR = process.env.V8_DESIGN_DIR ?? '/Users/kentakenta/lh-work/design/v8'
+const DESIGN_DIR = process.env.V8_DESIGN_DIR ?? join(HERE, 'design-archive')
 const DEST = join(HERE, 'v8-design-refs')
 
 const args = process.argv.slice(2)
@@ -41,7 +41,7 @@ const targets = boards.filter(([id, entry]) => {
 })
 
 if (!existsSync(DESIGN_DIR)) {
-  console.error(`[sync-v8-design-refs] 設計フォルダが無い: ${DESIGN_DIR}`)
+  console.error(`[sync-v8-design-refs] 設計フォルダが無い: ${DESIGN_DIR}。設計アーカイブを取得して V8_DESIGN_DIR を指定してください（docs/transfer-evidence.md）。`)
   process.exit(1)
 }
 mkdirSync(DEST, { recursive: true })

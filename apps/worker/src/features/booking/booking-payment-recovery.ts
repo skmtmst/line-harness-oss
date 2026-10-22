@@ -1,4 +1,5 @@
 import { logger } from '@line-crm/shared/server';
+import { activeTenantLineAccountSql, accountFeatureOffExclusionSql } from '@line-crm/db';
 import { reconcileLateBookingPayment } from './booking-late-payment.js';
 import { confirmationWorkflowStatement, runConfirmedBookingSideEffects } from './booking-confirmed-effects.js';
 import type { GoogleServiceAccountCredentials } from '../../services/google-service-account.js';
@@ -103,14 +104,25 @@ export function paidBookingPaymentStatements(
   return statements;
 }
 
-/** requested の不整合だけを有限数で回収する。承認待ちの支払い済みは期限切れにしない。 */
+/** Recover finite, runnable work. Manual-review terminal rows must not occupy every batch. */
 export async function recoverPaidBookingPayments(db: D1Database, now: Date, credentials: GoogleServiceAccountCredentials = {}): Promise<void> {
   const rows = await db.prepare(`SELECT p.id FROM booking_payments p
     JOIN bookings b ON b.id = p.booking_id AND b.line_account_id = p.line_account_id
-    WHERE p.status = 'paid' AND (b.status IN ('expired','cancelled') OR b.status = 'requested'
-      AND COALESCE((SELECT approval_mode FROM booking_settings
+    LEFT JOIN workflow_steps w ON w.scope_id = 'line:' || p.line_account_id
+      AND w.process_kind = 'booking_late_payment' AND w.subject_id = p.id AND w.step_key = 'resolve'
+    WHERE p.status = 'paid' AND (
+      (b.status = 'requested' AND COALESCE((SELECT approval_mode FROM booking_settings
         WHERE line_account_id = b.line_account_id), 'automatic') = 'automatic')
-    ORDER BY p.id LIMIT 200`).all<{ id: string }>();
+      OR (b.status IN ('expired','cancelled')
+        AND ${activeTenantLineAccountSql('p.line_account_id')}
+        AND NOT ${accountFeatureOffExclusionSql('p.line_account_id', 'booking')}
+        AND (w.subject_id IS NULL OR (
+          w.attempt_count < w.max_attempts AND (w.next_attempt_at IS NULL OR w.next_attempt_at <= ?)
+          AND (w.status IN ('pending','failed') OR (w.status = 'running' AND w.lease_expires_at <= ?))
+        )))
+    )
+    ORDER BY CASE WHEN b.status = 'requested' THEN 0 ELSE 1 END, p.id LIMIT 200`)
+    .bind(now.getTime(), now.getTime()).all<{ id: string }>();
   for (const row of rows.results ?? []) {
     try { await reconcilePaidBookingPayment(db, row.id, now, false, credentials); }
     catch { logger.error("paid_booking_recovery_failed"); }

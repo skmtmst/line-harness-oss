@@ -23,12 +23,16 @@ export interface ParsedBundle {
   liffFiles: Map<string, Buffer>;
   /** filename → SQL content */
   migrations: Map<string, Buffer>;
+  /** Worker Vite client and public assets, separate from liff/ Pages output. */
+  workerAssetsFiles?: Map<string, Buffer>;
 }
 
 export interface BundleHashes {
   worker: string;
   admin: string;
   liff: string;
+  workerAssets?: string;
+  migrations?: string;
 }
 
 /**
@@ -125,6 +129,13 @@ function routeEntry(result: ParsedBundle, name: string, buf: Buffer): void {
     return;
   }
 
+  if (cleaned.startsWith('worker-assets/')) {
+    result.workerAssetsFiles ??= new Map();
+    const path = cleaned.slice('worker-assets/'.length);
+    if (path && !path.endsWith('/')) result.workerAssetsFiles.set(path, buf);
+    return;
+  }
+
   const migPrefix = 'migrations/';
   if (cleaned.startsWith(migPrefix)) {
     const rest = cleaned.slice(migPrefix.length);
@@ -154,6 +165,8 @@ export function verifyBundleHashes(b: ParsedBundle): BundleHashes {
     worker: hashBuffer(b.workerJs),
     admin: hashContentMap(b.adminFiles),
     liff: hashContentMap(b.liffFiles),
+    migrations: hashContentMap(b.migrations),
+    ...(b.workerAssetsFiles ? {workerAssets: hashContentMap(b.workerAssetsFiles)} : {}),
   };
 }
 
@@ -237,11 +250,15 @@ export function verifyBundleIntegrity(
     admin_hash: string;
     liff_hash: string;
     worker_bundle_hash?: string;
+    worker_assets_hash?: string;
+    migrations_hash?: string;
   },
 ): void {
   if (!entry.worker_bundle_hash) {
     throw new BundleNotDeployableError(entry.version);
   }
+  if (!entry.migrations_hash || computed.migrations !== entry.migrations_hash) throw new Error('bundle migrations hash mismatch or missing hash');
+  if (computed.workerAssets !== entry.worker_assets_hash) throw new Error('bundle worker assets hash mismatch or missing hash');
   if (computed.worker !== entry.worker_bundle_hash) {
     throw new Error(
       `bundle worker hash mismatch (tampered? ${computed.worker} vs ${entry.worker_bundle_hash})`,

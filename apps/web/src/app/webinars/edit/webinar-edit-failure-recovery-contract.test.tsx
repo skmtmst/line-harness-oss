@@ -86,7 +86,6 @@ vi.mock('@/components/shared/select', () => ({
     <select value={value} onChange={(event) => onChange?.(event.target.value)} {...props}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
   ),
 }))
-vi.mock('@/components/webinars/webinar-form', () => ({ default: () => <div>基本設定</div> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], loading: false }) }))
 vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => undefined }))
 

@@ -119,11 +119,11 @@ export function metricCardState(
 }
 
 export function formatAnalyticsDateTime(value: string | null): string {
-  return polishFormatDate(value, { style: 'detail', fallback: '—' })
+  return polishFormatDate(value, { style: value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? 'day' : 'detail', fallback: '—' })
 }
 
 export function formatAnalyticsDate(value: string | null): string {
-  return polishFormatDate(value, { style: 'detail', fallback: '—' })
+  return polishFormatDate(value, { style: 'day', fallback: '—' })
 }
 
 const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土'] as const

@@ -20,7 +20,7 @@
     "@line-crm/line-sdk": "workspace:*",
     "@line-crm/shared": "workspace:*",
     "hls.js": "^1.6.16",
-    "hono": "^4.13.7",
+    "hono": "^4.13.12",
     "postal-mime": "^2.7.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -39,7 +39,7 @@
     "tailwindcss": "^4.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^6.4.3",
+    "vite": "^6.4.4",
     "vitest": "4.1.11",
     "workerd": "1.20260903.1",
     "wrangler": "4.77.0"

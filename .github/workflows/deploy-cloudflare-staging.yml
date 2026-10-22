@@ -265,6 +265,18 @@ jobs:
             --remote origin
           pnpm deploy:lock verify staging --sha "$GITHUB_SHA" --remote origin
 
+      # Keep this separate from acquisition so a stale checkout still releases its lock.
+      - name: Require latest development after acquiring the staging lock
+        if: env.DELIVERY_MODE == 'apply'
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_sha=$(git ls-remote --exit-code origin refs/heads/codex/development | awk '{print $1}')
+          if [ -z "$latest_sha" ] || [ "$latest_sha" != "$GITHUB_SHA" ]; then
+            echo "::error::検証配備の開始後に開発版が更新されました。最新版を確認し、dry-runからやり直してください。"
+            exit 1
+          fi
+
       - name: Bind the staging Cloudflare account
         run: |
           worker_root="${{ steps.worker_source.outputs.root }}"

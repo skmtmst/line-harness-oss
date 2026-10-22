@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
-import { getLineAccountScopeEntries } from '../src/line-accounts.js';
+import { getLineAccountScopeEntries, getLineAccountLoginChannels } from '../src/line-accounts.js';
 import { asD1 } from './d1-test-helper.js';
 
 describe('LINE account authorization scope query', () => {
@@ -42,6 +42,11 @@ describe('LINE account authorization scope query', () => {
     expect(rows[0]).not.toHaveProperty('channel_access_token');
     expect(rows[0]).not.toHaveProperty('channel_secret');
     expect(rows[0]).not.toHaveProperty('login_channel_secret');
+    const loginChannels = await getLineAccountLoginChannels(asD1(sqlite), { accountId: 'default-account' });
+    expect(loginChannels).toEqual([{ id: 'default-account', tenant_id: DEFAULT_TENANT_ID, login_channel_id: 'login-id-default' }]);
+    expect(await getLineAccountLoginChannels(asD1(sqlite), { loginChannelId: 'login-id-tenant-b' }))
+      .toEqual([{ id: 'tenant-b-account', tenant_id: 'tenant-b', login_channel_id: 'login-id-tenant-b' }]);
+    expect(await getLineAccountLoginChannels(asD1(sqlite), { accountId: 'missing' })).toEqual([]);
     sqlite.close();
   });
 });

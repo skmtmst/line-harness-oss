@@ -12,7 +12,6 @@ const REVIEW = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/revie
 const ANALYTICS = fs.readFileSync(path.join(__dirname, '../../v8/webinar-edit/analytics.tsx'), 'utf8')
 const PUBLISHED = fs.readFileSync(path.join(__dirname, 'published/page.tsx'), 'utf8')
 const API = readApiSource(path.join(__dirname, '../../lib/api.ts'), 'utf8')
-const FORM = fs.readFileSync(path.join(__dirname, '../../components/webinars/webinar-form.tsx'), 'utf8')
 /** 読み込めなかった理由の文言は、試験しやすいよう別ファイルへ出した。 */
 const FAILURE = fs.readFileSync(path.join(__dirname, '../../v8/webinars/helpers.ts'), 'utf8')
 
@@ -67,7 +66,6 @@ describe('V8 ウェビナー一覧の契約', () => {
     expect(PAGE).toContain('loadedAccountId === selectedAccountId ? items : []')
     expect(PAGE).toContain('folderGeneration.current !== generation')
     expect(PAGE).toContain('<AccountRequiredState hasAccounts={accounts.length > 0}')
-    expect(FORM).toContain("...(!initial ? { accountId: selectedAccountId } : {})")
   })
 
   it('一覧は頁ごとに取り、取った頁を絞り直さない', () => {

@@ -9,6 +9,8 @@
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
 - [最初に読む：製品とコードの入口](START-HERE.md)
+- [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
+- [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
 ## 使う人の手引き
 
@@ -479,6 +481,7 @@
 - [検証反映と独立点検前の引き継ぎ](release-log/unreleased/1786-kenta-staging-handoff.md)
 - [独立点検前の画面接続・承認・集計の修正](release-log/unreleased/1787-kenta-staging-review-fixes.md)
 - [はじめの質問の破棄と途中保存の修正](release-log/unreleased/1788-kenta-style-discard.md)
+- [独立点検からの安全性・予約・表示の修正](release-log/unreleased/1793-masato-independent-audit-fixes.md)
 - [独立点検後の計画と質問の保存・破棄の記録](release-log/unreleased/1790-kenta-after-review-plan.md)
 - [検証環境の最終確認と独立点検の開始準備](release-log/unreleased/1791-kenta-independent-review-ready.md)
 - [画面の先読みと友だち一覧の再計測の改善](release-log/unreleased/1792-kenta-v8-rendering-performance.md)

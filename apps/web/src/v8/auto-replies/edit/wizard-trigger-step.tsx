@@ -89,7 +89,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                             </button>
                           </span>
                         ))}
-                        <SaveErrorField names={["value"]}><KeywordInput
+                        <SaveErrorField names={["value"]}><KeywordInput maxLength={200}
                           id="wiz-keywords" label="反応する言葉を足す" errorId="wiz-keywords-error"
                           error={fieldError('wiz-keywords')}
                           onAdd={(word) => {

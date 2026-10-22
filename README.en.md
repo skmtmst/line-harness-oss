@@ -15,7 +15,7 @@ Runs on Cloudflare's free tier. **$0/month server cost.** Fully operable from Cl
 
 [![Click to play on YouTube — LINE Harness setup guide](https://img.youtube.com/vi/DiRuGaeq1sM/maxresdefault.jpg)](https://youtu.be/DiRuGaeq1sM)
 
-**Current version**: v0.13.2 ・ MIT License ・ TypeScript / Cloudflare Workers + D1
+**Document snapshot**: v0.13.2 (current version: [package.json](package.json)) ・ MIT License ・ TypeScript / Cloudflare Workers + D1
 
 ---
 

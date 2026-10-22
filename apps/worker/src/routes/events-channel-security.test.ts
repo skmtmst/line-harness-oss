@@ -1,3 +1,4 @@
+import { mockLineIdToken } from '../test-utils/liff-oauth.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
@@ -72,12 +73,12 @@ it.each(['GET', 'POST'])('S15 %s waitlist offer verifies its stored account even
   vi.stubGlobal('fetch', verify);
   const app = new Hono<Env>(); app.route('/', events);
   const response = await app.request(`/api/liff/events/waitlist/${token}${method === 'POST' ? '/accept' : ''}`, {
-    method, headers: { Authorization: 'Bearer fixture-wrong-store', 'Content-Type': 'application/json' },
+    method, headers: { Authorization: `Bearer ${mockLineIdToken('login-b')}`, 'Content-Type': 'application/json' },
     ...(method === 'POST' ? { body: '{}' } : {}),
   }, { DB: db.db, LINE_LOGIN_CHANNEL_ID: 'login-b' } as Env['Bindings']);
   expect(response.status).toBe(401);
-  expect(verify).toHaveBeenCalledTimes(2);
-  expect(new URLSearchParams(String(verify.mock.calls[1][1]?.body)).get('client_id')).toBe('login-a');
+  expect(verify).toHaveBeenCalledTimes(1);
+  expect(new URLSearchParams(String(verify.mock.calls[0][1]?.body)).get('client_id')).toBe('login-b');
   expect(db.raw.prepare("SELECT status,version FROM event_waitlist WHERE id='w'").get()).toEqual({status:'offered',version:1});
 });
 
@@ -102,7 +103,7 @@ it('S15 a token-only offer cannot access a suspended tenant', async () => {
   const app = new Hono<Env>(); app.route('/', events);
   for (const method of ['GET','POST']) {
     const response = await app.request(`/api/liff/events/waitlist/${token}${method === 'POST' ? '/accept' : ''}`, {
-      method, headers: { Authorization: 'Bearer fixture-token', 'Content-Type': 'application/json' },
+      method, headers: { Authorization: `Bearer ${mockLineIdToken('login-a')}`, 'Content-Type': 'application/json' },
       ...(method === 'POST' ? { body: '{}' } : {}),
     }, { DB: db.db } as Env['Bindings']);
     expect(response.status).toBe(404);

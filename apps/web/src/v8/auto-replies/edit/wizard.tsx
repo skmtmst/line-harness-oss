@@ -1,10 +1,12 @@
 'use client'
 
+import { readLineImageContent } from '@/lib/line-image-content'
+
 import { WizardBasicStep } from './wizard-basic-step'
 import { WizardConfirmStep } from './wizard-confirm-step'
 import { buildWizardInput } from './wizard-input'
 import { loadWizardDraft } from './wizard-load'
-import { DONE_DESIGN_NODE,EMPTY_FORM,InputIssue,LoadState,MAIN_KINDS,RuleRow,STEP_DESIGN_NODES,STEP_LABELS_V8,STEP_ORDER,WizardForm,WizardStep,formFromSettings,readLineImageContent } from './wizard-model'
+import { DONE_DESIGN_NODE,EMPTY_FORM,InputIssue,LoadState,MAIN_KINDS,RuleRow,STEP_DESIGN_NODES,STEP_LABELS_V8,STEP_ORDER,WizardForm,WizardStep,formFromSettings } from './wizard-model'
 import { renderWizardPreview } from './wizard-preview'
 import { WizardPriorityStep } from './wizard-priority-step'
 import { WizardResponseStep } from './wizard-response-step'
@@ -108,6 +110,8 @@ function AutoReplyWizardV8Inner() {
   const narrow = useNarrowViewport()
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; messageType: string; messageContent: string; folderId?: string | null; updatedAt?: string }>>([])
   const [folders, setFolders] = useState<Array<{ id: string; name: string; color?: string | null }>>([])
+  const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const folderRequest = useRef(0)
   const [rules, setRules] = useState<RuleRow[]>([])
   const [conflicts, setConflicts] = useState<AutoReplyConflict[]>([])
   const [friends, setFriends] = useState<FriendListItem[]>([])
@@ -185,11 +189,31 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 読み込み ===== */
   const creationAccountId = autoReplyId ? null : selectedAccountId ?? accounts[0]?.id ?? null
-  const load = useCallback(() => loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setFolders, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setVersionNumber, setWasPublished }), [autoReplyId, creationAccountId, saveErrors])
+  const load = useCallback(() => loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setVersionNumber, setWasPublished }), [autoReplyId, creationAccountId, saveErrors])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // フォルダだけ再取得して、編集中の本文や所属フォルダを読み直しで失わない。
+  const loadFolders = useCallback(async () => {
+    const request = ++folderRequest.current
+    setFolderState('loading')
+    try {
+      const response = await api.folders.list('auto_reply')
+      if (!response.success || !Array.isArray(response.data)) throw new Error('folders_not_loaded')
+      if (request !== folderRequest.current) return
+      setFolders(response.data.map(folder => ({ id: folder.id, name: folder.name, color: folder.color })))
+      setFolderState('ready')
+    } catch {
+      if (request === folderRequest.current) setFolderState('error')
+    }
+  }, [])
+  useEffect(() => {
+    setFolders([])
+    void loadFolders()
+    return () => { folderRequest.current += 1 }
+  }, [loadFolders, autoReplyId, creationAccountId])
 
   const stepDataRequested = useRef<Set<string>>(new Set())
 
@@ -846,7 +870,7 @@ function AutoReplyWizardV8Inner() {
       ) : null}
 
           {step === 'basic' && (
-            <WizardBasicStep accountId={matchedAccountId ?? selectedAccountId ?? null} {...{ canManage, folders, form, goToStep, patch, setFolders, setForm }} />
+            <WizardBasicStep accountId={matchedAccountId ?? selectedAccountId ?? null} {...{ canManage, folders, folderState, loadFolders, form, goToStep, patch, setFolders, setForm }} />
           )}
 
           {step === 'trigger' && (
