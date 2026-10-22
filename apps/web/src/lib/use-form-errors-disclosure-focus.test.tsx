@@ -201,3 +201,21 @@ it('reveal後の非同期step commitが2frameより遅くても現在の欄へ�
   act(() => show())
   expect(document.activeElement).toBe(screen.getByRole('textbox', { name: '本文' }))
 })
+
+
+it.each(['infinite', 'paused'] as const)('無関係な%s演出を待たず、段の実終了後にfocusする', async kind => {
+  render(<DisclosureForm />)
+  const panel = details(); animate(panel)
+  const openingAnimations = panel.getAnimations.bind(panel)
+  const unrelated = {
+    playState: kind === 'paused' ? 'paused' : 'running',
+    effect: { getComputedTiming: () => ({ endTime: kind === 'infinite' ? Infinity : 200 }) },
+    finished: new Promise<void>(() => {}),
+  }
+  Object.defineProperty(panel, 'getAnimations', { value: () => [...openingAnimations(), unrelated] })
+  act(() => { fields.submit() }); await frame()
+  expect(document.activeElement).not.toBe(name())
+  // transitionendを合成せず、有限な開閉animationの実finishedだけで配送する。
+  await act(async () => finish.get(panel)!())
+  expect(document.activeElement).toBe(name())
+})

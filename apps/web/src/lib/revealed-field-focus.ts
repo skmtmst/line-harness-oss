@@ -30,6 +30,11 @@ export function focusRevealedField(resolve: () => HTMLElement | null | undefined
     owner?.removeEventListener('focusin', onFocus, true)
     owner?.removeEventListener('pointerdown', cancel, true)
     owner?.removeEventListener('keydown', cancel, true)
+    current = null
+    disclosure = null
+    owner = null
+    scope = undefined
+    watched = []
   }
   const onFocus = () => { if (!ownFocus) cancel() }
   const listen = (document: Document) => {
@@ -39,8 +44,11 @@ export function focusRevealedField(resolve: () => HTMLElement | null | undefined
     owner.addEventListener('pointerdown', cancel, true)
     owner.addEventListener('keydown', cancel, true)
   }
+  // 子の無限演出や一時停止は、段が開き終わる契機には使わない。
+  const runningAnimations = () => disclosure?.getAnimations?.({ subtree: true }).filter(animation =>
+    animation.playState === 'running' && animation.effect?.getComputedTiming().endTime !== Infinity) ?? []
   const watchAnimations = () => {
-    const animations = disclosure?.getAnimations?.({ subtree: true }).filter(animation => animation.playState !== 'finished' && animation.playState !== 'idle') ?? []
+    const animations = runningAnimations()
     if (!animations.length || (animations.length === watched.length && animations.every((animation, i) => animation === watched[i]))) return
     watched = animations
     const generation = ++animationGeneration
@@ -83,7 +91,7 @@ export function focusRevealedField(resolve: () => HTMLElement | null | undefined
     if (!active) return
     if (disclosure && !disclosure.open) { cancel(); return }
     attempt()
-    if (active && current?.isConnected && !disclosure?.getAnimations?.({ subtree: true }).some(animation => animation.playState !== 'finished' && animation.playState !== 'idle')) cancel()
+    if (active && current?.isConnected && !runningAnimations().length) cancel()
   }
   attempt()
   return {
