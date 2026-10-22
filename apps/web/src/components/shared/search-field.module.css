@@ -144,7 +144,7 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .search { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -0.5px; }
+:root .search { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -1px; }
 :root .searchIcon { width: 14px; height: 14px; flex-basis: 14px; }
 :root .input { padding: 0; line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 
