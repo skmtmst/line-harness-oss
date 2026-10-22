@@ -16,6 +16,12 @@
  * 外部通信はしない。ソースと文書を読むだけのテスト。
  */
 import { describe, expect, it } from 'vitest';
+import { buildAuthorizeUrl, GOOGLE_BUSINESS_SCOPES } from '../services/google-business.js';
+import { GOOGLE_CONTENT_RETENTION_LIMIT_DAYS, GOOGLE_CONTENT_PURGE_AFTER_DAYS } from '../services/google-business-retention.js';
+
+const authorization = () => new URL(buildAuthorizeUrl({
+  clientId: 'fixture', redirectUri: 'https://example.test/callback', state: 'state', codeChallenge: 'challenge',
+}));
 
 const GOOGLE_SERVICE_FILES = [
   'google-business.ts',
@@ -85,12 +91,9 @@ describe('申請文と本番実装の一致（受入条件11）', () => {
 
   it('使用スコープは business.manage と openid / email だけ', async () => {
     const source = await readServiceFile('google-business.ts');
-    const start = source.indexOf('export const GOOGLE_BUSINESS_SCOPES');
-    expect(start).toBeGreaterThan(-1);
-    const scopeBlock = source.slice(start, source.indexOf('] as const;', start));
-    expect(scopeBlock).toContain('https://www.googleapis.com/auth/business.manage');
-    expect(scopeBlock).toContain("'openid'");
-    expect(scopeBlock).toContain("'email'");
+    const scopes = authorization().searchParams.get('scope')!.split(' ');
+    expect(scopes).toEqual([...GOOGLE_BUSINESS_SCOPES]);
+    expect(scopes).toEqual(['https://www.googleapis.com/auth/business.manage', 'openid', 'email']);
     // 読み取り専用スコープは存在しないため、ほかのGoogleスコープを増やしていないことを固定する。
     const extraScopes = [...source.matchAll(/https:\/\/www\.googleapis\.com\/auth\/[A-Za-z0-9._\-]+/g)]
       .map((match) => match[0])
@@ -99,12 +102,7 @@ describe('申請文と本番実装の一致（受入条件11）', () => {
   });
 
   it('認可URLに include_granted_scopes を付けない', async () => {
-    // Googleビジネス用とSheets用で同じOAuthクライアントを使う環境があるため、
-    // 付けると「以前そのクライアントへ許可した別のスコープ」まで含んだトークンが返り、
-    // 「business.manage / openid / email だけを使う」という申請文と実装が食い違う。
-    // 文中の説明（コメント）は残したいので、実際に付与するときの文字列リテラルだけを見る。
-    const source = await readServiceFile('google-business.ts');
-    expect(source).not.toContain("'include_granted_scopes'");
+    expect(authorization().searchParams.has('include_granted_scopes')).toBe(false);
   });
 
   it('審査対象クライアントにSheetsのコールバックURLを登録させない手順になっている', async () => {
@@ -227,9 +225,8 @@ describe('今回提供しない機能のコードが存在しない（タスク2
 
 describe('保存期間の実装と公開文書が一致している（受入条件7）', () => {
   it('削除は30暦日の上限より手前で動く', async () => {
-    const source = await readServiceFile('google-business-retention.ts');
-    const limit = Number(/GOOGLE_CONTENT_RETENTION_LIMIT_DAYS = (\d+)/.exec(source)?.[1]);
-    const purge = Number(/GOOGLE_CONTENT_PURGE_AFTER_DAYS = (\d+)/.exec(source)?.[1]);
+    const limit = GOOGLE_CONTENT_RETENTION_LIMIT_DAYS;
+    const purge = GOOGLE_CONTENT_PURGE_AFTER_DAYS;
     expect(Number.isInteger(limit)).toBe(true);
     expect(Number.isInteger(purge)).toBe(true);
     expect(limit).toBeLessThanOrEqual(30);

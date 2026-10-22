@@ -8,10 +8,11 @@ import {
 } from './restaurant-email-intake.js';
 
 type StoredObject = { body: string; customMetadata?: Record<string, string> };
+type RawMailPut = (key: string, value: ReadableStream, options?: R2PutOptions) => Promise<R2Object>;
 
 let testDb: SqliteD1;
 let rawObjects: Map<string, StoredObject>;
-let rawPut: ReturnType<typeof vi.fn>;
+let rawPut: ReturnType<typeof vi.fn<RawMailPut>>;
 let rawDelete: ReturnType<typeof vi.fn>;
 let imagePut: ReturnType<typeof vi.fn>;
 let env: Env['Bindings'];
@@ -152,6 +153,42 @@ afterEach(() => {
 });
 
 describe('飲食店向けcatch-all予約メール', () => {
+  it('R2が読み始める前に原文を読み切らず、実際のバイト数付きで保存する', async () => {
+    const chunks = ['From: sender@example.test\r\n\r\n', '予約の原文'];
+    const bytes = chunks.map((chunk) => new TextEncoder().encode(chunk));
+    const lengths: number[] = [];
+    vi.stubGlobal('FixedLengthStream', class extends TestFixedLengthStream {
+      constructor(length: number) {
+        lengths.push(length);
+        super(length);
+      }
+    });
+    let putStarted = false;
+    let index = 0;
+    const raw = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (index > 0 && !putStarted) throw new Error('R2へ渡す前に原文を読み切ろうとした');
+        if (index === bytes.length) controller.close();
+        else controller.enqueue(bytes[index++]!);
+      },
+    }, { highWaterMark: 0 });
+    const message = email('r-unknown@intake.example.test');
+    Object.assign(message, { raw, rawSize: bytes.reduce((sum, chunk) => sum + chunk.byteLength, 0) });
+    const originalPut = rawPut.getMockImplementation()!;
+    rawPut.mockImplementation(async (...args) => {
+      expect(args[1]).toBeInstanceOf(ReadableStream);
+      putStarted = true;
+      return originalPut(...args);
+    });
+
+    await routeInboundEmail(message, env);
+
+    expect(lengths).toEqual([message.rawSize]);
+    expect(rawPut).toHaveBeenCalledOnce();
+    expect([...rawObjects.values()][0]?.body).toBe(chunks.join(''));
+    expect(message.setReject).not.toHaveBeenCalled();
+  });
+
   it('無効な環境では予約メールを取り込まず拒否する', async () => {
     env.RESTAURANT_TEST_ENABLED = 'false';
     const message = email('r-12345678901234567890123456789012@intake.example.test');
