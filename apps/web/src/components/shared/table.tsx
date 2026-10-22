@@ -2,7 +2,7 @@
 
 import { FolderDotName, type FolderDotFolder } from './folder-dot'
 import Avatar from './avatar'
-import React from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 import { recordTableColumns } from './record-table-columns'
 import { useTableActionWidth } from './use-table-action-width'
 import { useListRowDensity } from './use-list-row-density'
@@ -22,6 +22,8 @@ import { DelayedSkeleton, ListSkeleton } from './skeleton'
 import presentationStyles from './table-presentation.module.css'
 import PageLink, { RowNavigation, useListNavigationHref } from './list-navigation'
 import { isRowControl } from './destination-policy'
+const CreatedRowHighlight = createContext('')
+
 /** Pencil V5/管理画面の `tPTMp` を正本にした表見出しセル。 */
 export function Th({
   children,
@@ -131,13 +133,30 @@ export function DataTable({
   columnSizing?: 'content' | 'controls'
 }) {
   const actionWidthRef = useTableActionWidth<HTMLDivElement>()
+  const [urlState, setUrlState] = useListUrlState({ highlight: '' })
+  const [createdId, setCreatedId] = useState('')
+  // 対象行が実際に描かれるまでURLの印を残す。読み込み中には消費しない。
+  useEffect(() => {
+    if (!urlState.highlight || !actionWidthRef.current) return
+    const found = Array.from(actionWidthRef.current.querySelectorAll('[data-row-id]'))
+      .some(row => row.getAttribute('data-row-id') === urlState.highlight)
+    if (!found) return
+    setCreatedId(urlState.highlight)
+    setUrlState({ highlight: '' })
+  })
+  useEffect(() => {
+    if (!createdId) return
+    // 一覧につき1個だけ。行を増やしてもタイマーは増やさない。
+    const timer = setTimeout(() => setCreatedId(''), 200)
+    return () => clearTimeout(timer)
+  }, [createdId])
   useListRowDensity(actionWidthRef)
   useListColumnSizing(actionWidthRef, columnSizing !== undefined)
   const tableDensity = density === 'compact' || density === 'records' ? density : undefined
   columns ??= tableDensity && !grid && !columnLayout ? recordTableColumns(children) : undefined
   const rowDensity = tableDensity ? undefined : density
   return (
-    <div ref={actionWidthRef} data-shared-part="list-table" data-column-sizing={columnSizing} data-cell-presentation={cellPresentation} className={[shell.frame, cellPresentation === 'friends' && cellPresentations.friendList, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
+    <CreatedRowHighlight.Provider value={urlState.highlight || createdId}><div ref={actionWidthRef} data-shared-part="list-table" data-column-sizing={columnSizing} data-cell-presentation={cellPresentation} className={[shell.frame, cellPresentation === 'friends' && cellPresentations.friendList, presentation && (presentationStyles as Record<string, string>)[presentation], className].filter(Boolean).join(' ')} data-density={rowDensity} data-table-density={tableDensity} data-table-presentation={presentation} data-column-layout={columnLayout ? '' : undefined} data-collapse-scope={columnLayout?.collapseScope} data-grid-table={grid ? '' : undefined} style={columns || columnLayout ? ({
       ...(columns ? { '--table-columns': columns } : {}),
       ...(columnLayout ? {
         '--table-head-height': columnLayout.headHeight, '--table-row-height': columnLayout.rowHeight,
@@ -159,7 +178,7 @@ export function DataTable({
         '--table-head-text-size': grid.headTextSize ?? 'var(--tpl-sb-tbl-head)',
         '--table-body-text-size': grid.bodyTextSize ?? 'var(--tpl-sb-tbl-head)',
       } as CSSProperties : undefined}>{columnWeights?.length ? <colgroup>{columnWeights.map((weight, index) => <col key={index} style={{ width: `${(weight / columnWeights.reduce((sum, value) => sum + value, 0)) * 100}%` }} />)}</colgroup> : null}{children}</table>
-    </div>
+    </div></CreatedRowHighlight.Provider>
   )
 }
 export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'className'> & {
@@ -187,8 +206,8 @@ export type TrProps = Omit<HTMLAttributes<HTMLTableRowElement>, 'children' | 'cl
 
 /** 標準一覧の高さ58pxの行。 */
 export function Tr({ children, className, selected, interactive, href, onOpen, detailKey, density, leaving, highlighted, onClick, onKeyDown, ...rowProps }: TrProps) {
-  const [listState] = useListUrlState({ highlight: '' })
-  const createdHighlight = Boolean(listState.highlight && listState.highlight === (rowProps as Record<string, unknown>)['data-row-id'])
+  const createdId = useContext(CreatedRowHighlight)
+  const createdHighlight = Boolean(createdId && createdId === (rowProps as Record<string, unknown>)['data-row-id'])
   const navigationHref = useListNavigationHref()
   const hasLink = (nodes: ReactNode): boolean => React.Children.toArray(nodes).some(node => React.isValidElement<{ href?: string; children?: ReactNode; name?: ReactNode }>(node) && (node.type === RowNameLink || Boolean((node.props as Record<string, unknown>)['data-row-link']) || (node.type === NameCell && hasLink(node.props.name)) || hasLink(node.props.children)))
   const rowId = (rowProps as Record<string, unknown>)['data-row-id']
