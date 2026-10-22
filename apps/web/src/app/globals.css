@@ -2230,7 +2230,7 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  :root [data-part="attention-star"][aria-pressed="true"] svg {
+  :root [data-part="attention-star"][aria-pressed="true"][data-star-pop] svg {
     animation: v8-star-pop var(--motion-base) var(--motion-ease-out);
   }
 }

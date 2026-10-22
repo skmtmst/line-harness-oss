@@ -1,5 +1,7 @@
 'use client'
 
+import { useAttentionStarMotion } from '@/components/shared/use-attention-star-motion'
+
 import Avatar from '@/components/shared/avatar';
 import PageSizeSelect from '@/components/shared/page-size-select';
 import { scoreBoundary,validAdvancedSearch } from './list-search-validation';
@@ -106,6 +108,7 @@ function isPageSize(value: number): value is PageSize {
 }
 
 export default function FriendsListV8() {
+  const attentionMotion = useAttentionStarMotion()
   usePageTitle('友だち')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const featureVisibility = useFeatureVisibility(selectedAccountId)
@@ -776,7 +779,7 @@ export default function FriendsListV8() {
               data-part="attention-star"
               aria-pressed={attention}
               aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
-              onClick={() => void toggleAttention(friend)}
+              onClick={(event) => attentionMotion(event, () => toggleAttention(friend))}
             >
               <Star size={16} aria-hidden="true" />
             </button>
@@ -852,7 +855,7 @@ export default function FriendsListV8() {
         </Td>
       </Tr>
     )
-  }, [selectable, router, selectedIds, toggleSelect, rowCanEdit, toggleAttention, narrow, displayColumns, allowedActions])
+  }, [attentionMotion, selectable, router, selectedIds, toggleSelect, rowCanEdit, toggleAttention, narrow, displayColumns, allowedActions])
   const table = (
     <div className={refreshing ? `${styles.tableWrap} ${styles.refreshing}` : styles.tableWrap} aria-busy={loadStatus === 'loading' || refreshing || undefined}>
       <DataTable cellPresentation="friends" data-design="V8FriendTable">
