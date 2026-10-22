@@ -1,9 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest';
-import { asD1 } from '@line-crm/db/test/d1-test-helper.js';
+import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../worker-env.js';
 import { styles } from './styles.js';
 import {
@@ -92,15 +90,9 @@ function event(id = 'e', slot = 'slot') {
     .run(slot, id);
 }
 beforeEach(async () => {
-  raw = new Database(':memory:');
-  raw.exec(
-    readFileSync(
-      resolve(import.meta.dirname, '../../../../packages/db/bootstrap.sql'),
-      'utf8',
-    ),
-  );
-  raw.pragma('foreign_keys=OFF');
-  db = asD1(raw);
+  const fixture = createTestD1();
+  raw = fixture.raw;
+  db = fixture.db;
   raw.exec(`INSERT INTO tenants(id,name) VALUES('tenant','本部');INSERT INTO line_accounts(id,tenant_id,channel_id,name,channel_access_token,channel_secret) VALUES('a','tenant','a','店A','token','secret'),('b','tenant','b','店B','token','secret');
  INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','店長','owner','key','tenant');
  INSERT INTO friends(id,line_user_id,line_account_id,display_name,is_following) VALUES('f','Uf','a','花子',1),('g','Ug','a','太郎',1),('foreign','Ux','b','別の店',1);
