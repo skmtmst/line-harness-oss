@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { fail } from './fail.js';
 import { inputError, inputJsonBoundary } from './input-errors.js';
 import { apiContractMiddleware, normalizeApiFailure } from '../middleware/api-contract.js';
-import { FAILURE_MESSAGES } from './failure-messages.js';
+import { FAILURE_MESSAGES, failureMessage } from './failure-messages.js';
 
 const requestId = 'ab9daa00-9761-40a9-a9ee-a2c21bbe62c0';
 
@@ -48,6 +48,23 @@ describe('使う人への失敗の理由', () => {
       { field: 'name', message: '名前を入力してください。' },
       { field: 'accountId', message: 'LINE公式アカウントを選んでください。' },
     ]);
+  });
+
+  it.each([
+    ['Authorization failed', 400, 'AUTHORIZATION_FAILED', '本人確認に失敗しました。お手数ですが、リンクを開き直してください。'],
+    ['Token exchange failed', 400, 'TOKEN_EXCHANGE_FAILED', 'LINEとの連携を完了できませんでした。時間をおいて、リンクを開き直してください。'],
+    ['ID token verification failed', 401, 'ID_TOKEN_VERIFICATION_FAILED', '本人確認の情報を確認できませんでした。お手数ですが、リンクを開き直してください。'],
+    ['Internal error', 500, 'INTERNAL_ERROR', '処理を完了できませんでした。時間をおいて、もう一度お試しください。'],
+    ['Invalid liffId', 400, 'INVALID_LIFF_ID', 'お客さま用画面の指定を確認できません。リンクを開き直してください。'],
+  ] as const)('お客さまの画面に出る英語の理由 %s も日本語にする', (reason, status, code, message) => {
+    const result = normalizeApiFailure({ error: reason }, status, requestId);
+    expect(result.error).toMatchObject({ code, message });
+    expect(result.error.message).toMatch(/[ぁ-んァ-ヶ一-龠]/u);
+    expect(failureMessage(reason)).toBe(message);
+  });
+
+  it('対応表にない理由の代わりも日本語で返す', () => {
+    expect(failureMessage('Something unexpected happened')).toMatch(/[ぁ-んァ-ヶ一-龠]/u);
   });
 
   it('共通failも既存コード・フィールド・データ・待機の見出しを保持する', async () => {
