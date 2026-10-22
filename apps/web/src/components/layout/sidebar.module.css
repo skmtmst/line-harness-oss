@@ -410,10 +410,12 @@
   font-family: var(--font-inter), Inter, sans-serif; font-size: 11px;
   font-weight: 700; line-height: 11px; border-radius: 999px; background: var(--color-status-danger);
 }
-:root [data-collapsed] .badge {
-  position: absolute; top: -2px; right: 0; min-width: 0; width: 18px; height: 16px;
-  padding: 0; border: 0; outline: 2px solid var(--color-shell); outline-offset: -1px;
-  font-size: 10px; line-height: 10px;
+:root [data-collapsed] .badge,
+:root .desktop[data-collapsed] .badge {
+  position: absolute; top: 6px; right: 8px; min-width: 0; width: 8px; height: 8px;
+  padding: 0; border: 0; outline: 2px solid var(--color-shell); outline-offset: 0;
+  /* 畳んだ幅では数字がアイコンを潰すので、赤い点だけにする。件数は吹き出しと読み上げに残る（2026-10-23 オーナー指摘）。 */
+  font-size: 0; line-height: 0; color: transparent;
 }
 :root .section + .sectionHeading,
 :root .sectionHeading + .sectionHeading { margin-top: 1px; }
@@ -463,7 +465,7 @@
   gap: 6px;
   padding: 6px 10px;
   border-radius: var(--polish-radius-control);
-  background: var(--color-ink);
+  background: var(--color-ink-secondary); /* 黒より少し灰色（オーナー 2026-10-23） */
   color: var(--color-canvas);
   font-size: var(--text-caption);
   font-weight: 600;
