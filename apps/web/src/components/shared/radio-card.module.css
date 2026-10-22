@@ -263,7 +263,7 @@
 }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .card { -webkit-font-smoothing: auto; }
+:root .card { -webkit-font-smoothing: antialiased; }
 
 /*
  * 変わり形：行（ の素のラジオ行）。箱・選んだ面・上段の印なし。
@@ -291,7 +291,7 @@
 :root .row .body { gap: 2px; }
 :root .row .radio { position: static; width: 18px; height: 18px; margin: 0; }
 :root .row:active { filter: none; }
-:root .row { -webkit-font-smoothing: auto; }
+:root .row { -webkit-font-smoothing: antialiased; }
 
 /* フォームの小さい選択肢（・）。装飾の丸を出さず、印と題を同じ行に置く。 */
 :root .form { min-height: 0; padding: 12px 10px; gap: 4px; border-radius: var(--radius-control); }

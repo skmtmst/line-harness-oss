@@ -419,8 +419,8 @@
 :root .cell { box-shadow: none; outline: 1px solid var(--color-controls-swatch-line); outline-offset: -0.5px; }
 :root .cell[aria-selected='true'] { outline: 2px solid var(--color-accent-deep); outline-offset: -1px; box-shadow: var(--shadow-controls-selected); }
 :root .dropper svg { width: 16px; height: 16px; }
-:root .hexField { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; border-radius: var(--polish-radius-control); }
-:root .hexMark, :root .hexInput { color: var(--color-ink-secondary); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 12px; font-weight: 400; line-height: normal; }
+:root .hexField { border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -1px; border-radius: var(--polish-radius-control); }
+:root .hexMark, :root .hexInput { color: var(--color-ink-secondary); font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 12px; font-weight: 400; line-height: normal; }
 :root .well:focus-visible, :root .cell:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 :root .swatch, :root .cell { gap: 0; }
 :root .cell, :root .dropper { min-height: 0; }

@@ -167,7 +167,7 @@
 :root .undo { padding: 0; min-height: 0; font-weight: 600; text-decoration: none; line-height: 20px; }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .toast { -webkit-font-smoothing: auto; }
+:root .toast { -webkit-font-smoothing: antialiased; }
 
 /* ・・：10-10 に採用した共通の形。 */
 html:root .host { bottom: var(--toast-bottom, var(--space-16)); }

@@ -122,7 +122,7 @@
 :root .note { width: 100%; }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .card { -webkit-font-smoothing: auto; }
+:root .card { -webkit-font-smoothing: antialiased; }
 
 /* 誤りの口を渡した選択欄だけ。フォーカスしても赤い枠を残す。 */
 :root .invalid,

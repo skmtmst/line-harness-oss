@@ -116,7 +116,7 @@
 :root [data-list-state='empty'] .action { --shadow-primary-action: var(--v8-parts-primary-shadow); }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .root { -webkit-font-smoothing: auto; }
+:root .root { -webkit-font-smoothing: antialiased; }
 
 /* ・仕上げ2 */
 :root .title { font-size: var(--polish-text-section); font-weight: var(--polish-weight-title); }

@@ -432,7 +432,7 @@ html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 :root .designButton[data-dialog-action='primary'] { box-shadow: var(--v8-parts-primary-shadow); }
 
 /* 正本HTMLと同じ文字の描画。管理画面 の描画には触れない。 */
-:root .panel { -webkit-font-smoothing: auto; }
+:root .panel { -webkit-font-smoothing: antialiased; }
 
 /* 個別の板が指定した短い確認窓。既定の段の余白は変えない。 */
 :root .panel[data-design-layout='stacked'] { padding: 24px; gap: 14px; }
