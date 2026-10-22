@@ -55,3 +55,13 @@ describe('本人の予約履歴と変更のAPI', () => {
       .rejects.toMatchObject({ status: 409, body: { error: 'version_conflict' } });
   });
 });
+
+test('追加メニューを空き枠検索にも渡し、確定と同じ所要時間で確認する', async () => {
+  vi.stubGlobal('window', { location: { origin: 'https://example.test' } });
+  const fetcher = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ by_staff: [] }));
+  vi.stubGlobal('fetch', fetcher);
+  await api.availability('m', 's', '2026-10-22', '2026-10-25', ['extra']);
+  const url = new URL(String(fetcher.mock.calls[0][0]));
+  expect(JSON.parse(url.searchParams.get('addon_ids')!)).toEqual(['extra']);
+  expect(url.searchParams.get('staff_id')).toBe('s');
+});

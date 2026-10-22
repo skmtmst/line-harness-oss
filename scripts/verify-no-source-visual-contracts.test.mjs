@@ -328,6 +328,25 @@ test('Worker, LIFF and scripts source assertions use the same diff guard as Web'
   }
 }))
 
+test('removing literal table cases preserves old pairs while additions, replacements and copies remain new', () => regressionCase(() => {
+  const run = (rows, expression = 'expect(readFileSync(path)).toMatch(gate)') => analyzeSourceTests(new Map([[entry, `import{readFileSync}from'node:fs';import{it,expect}from'vitest';const SCREENS=[${rows}];it.each(SCREENS)('screen %s',(path,gate)=>${expression})`]]))
+  const first = "['first.tsx',/first/]", second = "['second.tsx',/second/]", third = "['third.tsx',/third/]"
+  const before = run([first, second, third].join(','))
+  const after = run(first)
+  assert.equal(newSourceAssertions(before, run([first, second].join(','))).length, 0)
+  assert.equal(newSourceAssertions(before, after).length, 0)
+  assert.equal(newSourceAssertions(before, [...after, ...after]).length, 1)
+  for (const rows of [
+    [first, "['new.tsx',/new/]"].join(','),
+    "['first.tsx',/changed/]",
+    "['replaced.tsx',/first/]",
+    "['second.tsx',/first/]",
+    "['first.tsx',/second/]",
+    [first, first].join(','),
+  ]) assert.equal(newSourceAssertions(before, run(rows)).length, 1, rows)
+  assert.equal(newSourceAssertions(before, run(first, 'expect(readFileSync(path)).toContain(gate)')).length, 1)
+}))
+
 test('independent entries each retain the same analysis budget and one oversized entry still fails closed', () => regressionCase(() => {
   const body = `import{readFileSync}from'node:fs';import{it,expect}from'vitest';const src=readFileSync('source.ts');it('case',()=>expect(src).toContain('return true'))`
   const files = new Map(Array.from({length: 12}, (_, i) => [`apps/worker/src/example-${i}.test.ts`, body]))

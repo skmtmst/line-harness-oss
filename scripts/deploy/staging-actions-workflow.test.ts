@@ -75,11 +75,42 @@ describe('Deploy Cloudflare Staging workflow', () => {
     expect(workflow).not.toMatch(/if: always\(\)\n\s+run: pnpm deploy:lock release staging/);
     expect(workflow).toContain('pnpm deploy:lock release staging --remote origin');
     expect(workflow.indexOf('pnpm deploy:lock acquire staging')).toBeLessThan(
-      workflow.indexOf('npx wrangler deploy --config apps/worker/wrangler.staging.toml'),
+      workflow.indexOf('Require latest development after acquiring the staging lock'),
+    );
+    expect(workflow.indexOf('Require latest development after acquiring the staging lock')).toBeLessThan(
+      workflow.indexOf('Bind the staging Cloudflare account'),
     );
     expect(workflow.indexOf('pnpm deploy:lock release staging')).toBeGreaterThan(
       workflow.indexOf('npx wrangler pages deploy apps/web/out'),
     );
+  });
+
+  it.each([
+    { name: 'matching development', remoteSha: 'a'.repeat(40), gitExit: 0, succeeds: true },
+    { name: 'development advanced', remoteSha: 'b'.repeat(40), gitExit: 0, succeeds: false },
+    { name: 'empty remote result', remoteSha: '', gitExit: 0, succeeds: false },
+    { name: 'remote lookup failed', remoteSha: 'a'.repeat(40), gitExit: 128, succeeds: false },
+  ])('checks the live branch after locking: $name', ({ remoteSha, gitExit, succeeds }) => {
+    const sandbox = mkdtempSync(resolve(tmpdir(), 'staging-latest-'));
+    try {
+      const step = workflow.split('- name: Require latest development after acquiring the staging lock')[1]
+        .split('- name: Bind the staging Cloudflare account')[0];
+      const script = step.split('run: |\n')[1];
+      writeFileSync(resolve(sandbox, 'git'), [
+        '#!/bin/sh',
+        '[ "$*" = "ls-remote --exit-code origin refs/heads/codex/development" ] || exit 99',
+        '[ -z "$STAGING_TEST_REMOTE_SHA" ] || printf "%s\\trefs/heads/codex/development\\n" "$STAGING_TEST_REMOTE_SHA"',
+        'exit "$STAGING_TEST_GIT_EXIT"',
+        '',
+      ].join('\n'), { mode: 0o755 });
+      const result = spawnSync('bash', ['-e', '-c', script], {
+        encoding: 'utf8', env: { ...process.env, PATH: `${sandbox}:${process.env.PATH}`,
+          GITHUB_SHA: 'a'.repeat(40), STAGING_TEST_REMOTE_SHA: remoteSha, STAGING_TEST_GIT_EXIT: String(gitExit) },
+      });
+      expect(result.status === 0, result.stderr).toBe(succeeds);
+    } finally {
+      rmSync(sandbox, { recursive: true, force: true });
+    }
   });
 
   it('binds the ephemeral config to the staging Environment account', () => {

@@ -1,3 +1,4 @@
+import { migrationApi } from '../support/migration-api.js';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { runApply } from '../../src/phases/apply.js';
@@ -122,6 +123,7 @@ interface RouterRoutes {
 }
 
 function makeRouter(routes: RouterRoutes): ReturnType<typeof vi.fn> {
+  const journal = migrationApi();
   const counters: Record<string, number> = {};
   const next = (key: keyof RouterRoutes): RouteConfig => {
     const spec = routes[key];
@@ -151,7 +153,8 @@ function makeRouter(routes: RouterRoutes): ReturnType<typeof vi.fn> {
 
     // D1 query (per migration call).
     if (url.includes(`/d1/database/${D1_ID}/query`)) {
-      return respond(next('d1'));
+      const internal = journal(init);
+      return internal ?? respond(next('d1'));
     }
 
     // Worker bindings GET vs script PUT — same path prefix, disambiguate by
@@ -355,7 +358,7 @@ describe('runApply', () => {
 
     const { events, emitter } = collectEvents();
     await expect(runApply(ctx, bundle, emitter)).rejects.toThrow(
-      /migration 999_missing\.sql missing in bundle/,
+      /migration_bundle_missing_or_invalid: 999_missing\.sql/,
     );
 
     // No worker/admin/liff steps should have started.

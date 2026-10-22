@@ -102,6 +102,7 @@ describe('ウェビナー作成からの段遷移 (#1002 DETAIL-03)', () => {
     await flush()
 
     expect(fixture.create).toHaveBeenCalledTimes(1)
+    expect(fixture.create).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'account-a', status: 'draft' }))
     expect(fixture.push).toHaveBeenCalledWith('/webinars/edit?id=new-webinar&pane=video')
   })
 

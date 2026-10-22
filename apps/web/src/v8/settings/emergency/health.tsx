@@ -1,4 +1,5 @@
 'use client'
+import { useRunningVersion } from '@/lib/use-running-version'
 
 import { operationFailureText } from './health-error'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -22,7 +23,6 @@ import {
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
 import { onlyWhenVisible } from '@/lib/visible-polling'
-import releaseLog from '@/generated/release-log-summary.json'
 import styles from './screen.module.css'
 import Notice from '@/components/shared/notice'
 import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
@@ -42,7 +42,6 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 // 全文（release-log.json）ではなく要約を読む（V6R-S3-a）。
 
-type ReleaseSummary = { version: string; released: string | null }
 
 const HISTORY_FETCH_LIMIT = 200
 
@@ -267,6 +266,7 @@ export function HealthPanelV8({
   accountCount?: number | null
   canManage: boolean
 }) {
+  const runningVersion = useRunningVersion()
   const blankChecks = useCallback((): HealthCheckItem[] => CHECK_DEFINITIONS.map((item) => ({
     ...item,
     sub: item.id === 'line' ? lineSub(accountCount) : item.sub,
@@ -283,7 +283,7 @@ export function HealthPanelV8({
   const [loginSecurityNotice, setLoginSecurityNotice] = useState<string | null>(null)
   const [snapshotStatus, setSnapshotStatus] = useState<OperationHealthSnapshot['overallStatus']>('unknown')
   const [alerts, setAlerts] = useState<OperationAlert[]>([])
-  const [stats, setStats] = useState<{ stops: number; longest: string; version: string } | null>(null)
+  const [stats, setStats] = useState<{ stops: number; longest: string } | null>(null)
   const [statsNote, setStatsNote] = useState('この30日')
   const [alertsFailed, setAlertsFailed] = useState(false)
   const [alertBusyId, setAlertBusyId] = useState<string | null>(null)
@@ -378,12 +378,7 @@ export function HealthPanelV8({
         if (!item.stoppedAt || !item.resolvedAt) return found
         return Math.max(found, Math.round((Date.parse(item.resolvedAt) - Date.parse(item.stoppedAt)) / 60000))
       }, 0)
-      const deployments = entries.filter((item) => item.historyKind === 'deployment' && item.deployment)
-      const releases = (releaseLog as { releases?: ReleaseSummary[] }).releases ?? []
-      const version = deployments.find((item) => item.deployment?.phase === 'succeeded' && item.deployment.version)?.deployment?.version
-        ?? releases.find((item) => item.released)?.version
-        ?? emptyValue('unknown')
-      setStats({ stops: recent.length, longest: longest > 0 ? formatMinutesRough(longest) : emptyValue('unknown'), version })
+      setStats({ stops: recent.length, longest: longest > 0 ? formatMinutesRough(longest) : emptyValue('unknown') })
       setStatsNote('この30日')
     } catch {
       setStats(null)
@@ -597,7 +592,7 @@ export function HealthPanelV8({
       <KpiBand presentation="band">
         <KpiCard presentation="band" title="止めた回数" value={stats ? stats.stops : null} unit="" detail={statsNote} />
         <KpiCard presentation="band" title="いちばん長かった停止" value={null} valueText={stats?.longest ?? '—'} unit="" detail={statsNote} />
-        <KpiCard presentation="band" title="いまの版" value={null} valueText={stats?.version ?? '—'} unit="" detail={stats ? '反映済み' : statsNote} />
+        <KpiCard presentation="band" title="いまの版" value={null} valueText={runningVersion.detail?.version ?? '—'} unit="" detail={runningVersion.statusText} />
       </KpiBand>
     </>
   )

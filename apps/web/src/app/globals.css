@@ -637,7 +637,7 @@
    */
   --motion-instant: 80ms;
   --motion-fast: 120ms;
-  --motion-base: 200ms;
+  --motion-base: 200ms; --motion-kpi-roll: 500ms; /* 数の帯の数字が回る演出だけ、500msまでの例外。 */
   --motion-slow: 300ms;
   /*
    * ★V8 仕上げ（M10）：閉じる 150ms・引き出し 240ms。

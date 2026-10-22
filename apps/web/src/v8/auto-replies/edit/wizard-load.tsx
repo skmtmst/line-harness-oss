@@ -11,7 +11,6 @@ type LoadWizardDraftContext = {
   savedSnapshotRef: RefObject<string>
   savedVersionRef: RefObject<number | null>
   saveErrors: ReturnType<typeof useSaveFormErrors>
-  setFolders: Dispatch<SetStateAction<{ id: string; name: string; color?: string | null; }[]>>
   setForm: Dispatch<SetStateAction<WizardForm>>
   setInputIssue: Dispatch<SetStateAction<InputIssue | null>>
   setIsActive: Dispatch<SetStateAction<boolean>>
@@ -25,19 +24,15 @@ type LoadWizardDraftContext = {
   setWasPublished: Dispatch<SetStateAction<boolean>>
 }
 
-export async function loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setFolders, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setVersionNumber, setWasPublished }: LoadWizardDraftContext) {
+export async function loadWizardDraft({ autoReplyId, creationAccountId, savedSnapshotRef, savedVersionRef, saveErrors, setForm, setInputIssue, setIsActive, setLifecycleStatus, setLoadError, setLoadState, setMatchedAccountId, setMatchedLast28Days, setTemplates, setVersionNumber, setWasPublished }: LoadWizardDraftContext) {
     setLoadState('loading')
     setLoadError(null)
     setInputIssue(null)
     try {
-      const [draftRes, liveRes, folderRes] = await Promise.all([
+      const [draftRes, liveRes] = await Promise.all([
         autoReplyId ? api.autoReplies.getDraft(autoReplyId) : Promise.resolve(null),
         autoReplyId ? api.autoReplies.get(autoReplyId).catch(() => null) : Promise.resolve(null),
-        api.folders.list('auto_reply').catch(() => null),
       ])
-      if (folderRes?.success && Array.isArray(folderRes.data)) {
-        setFolders(folderRes.data.map((f) => ({ id: f.id, name: f.name, color: f.color })))
-      }
       let accountId: string | null = null
       if (autoReplyId) {
         if (!draftRes?.success || !draftRes.data?.settings) {

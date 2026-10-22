@@ -1,9 +1,10 @@
 import type { UpdateContext } from '../types.js';
 import type { EventEmitter } from '../events.js';
 import type { ParsedBundle } from '../bundle.js';
-import { executeD1Query } from '../cf-api/d1.js';
+import { applyTrackedMigrations } from '../migration-history.js';
 import { listWorkerBindings, putWorkerScript } from '../cf-api/workers.js';
 import { deployPagesProject } from '../cf-api/pages.js';
+import { uploadWorkerAssets, materializeWorkerAssets, workerAssetsConfig } from '../cf-api/worker-assets.js';
 import { materializeAdminFiles } from '../materialize.js';
 
 import { WORKER_COMPATIBILITY_FLAGS } from '../compat-flags.js';
@@ -26,9 +27,8 @@ export interface ApplyResult {
  * Runs the four sub-steps of an update in strict order:
  *
  *   1. Migrations — apply each SQL file from the bundle to D1, one at a
- *      time. Migrations are additive by convention (new tables/columns
- *      only) so existing Workers keep functioning until the new Worker
- *      is uploaded in step 2.
+ *      time with checksum history. Release review must establish compatibility
+ *      with the old Worker until the new Worker is uploaded in step 2.
  *   2. Worker — read existing bindings (CF does NOT preserve them across
  *      script uploads) and re-PUT the new script with the same bindings
  *      attached. By this point the schema already supports the new code.
@@ -48,23 +48,11 @@ export async function runApply(
   bundle: ParsedBundle,
   ev: EventEmitter,
 ): Promise<ApplyResult> {
-  // Step 1: Migrations. Iterate the manifest's declared order (NOT the
-  // bundle's map iteration order) so customers can rely on numeric
-  // prefixes (e.g. 041_x.sql before 042_y.sql) controlling apply order
-  // even if the tarball was built non-deterministically.
-  for (const name of ctx.target.migrations) {
-    const sql = bundle.migrations.get(name);
-    if (!sql) {
-      throw new Error(`migration ${name} missing in bundle`);
-    }
-    await ev.emit({ step: 'migration', status: 'running', name });
-    await executeD1Query({
-      creds: ctx.creds,
-      databaseId: ctx.d1DatabaseId,
-      sql: sql.toString('utf-8'),
-    });
-    await ev.emit({ step: 'migration', status: 'done', name });
-  }
+  const workerAssets = !ctx.liffPagesProject ? materializeWorkerAssets(bundle.workerAssetsFiles, ctx.liffId) : undefined;
+  await applyTrackedMigrations({
+    creds: ctx.creds, databaseId: ctx.d1DatabaseId, names: ctx.target.migrations, files: bundle.migrations,
+    onMigration: async (name, status) => { await ev.emit({ step: 'migration', name, status: status === 'skipped' ? 'done' : status }); },
+  });
 
   // Step 2: Worker. List-then-PUT preserves the customer's secret_text,
   // plain_text, D1, R2 and KV bindings — CF wipes bindings on every
@@ -75,16 +63,17 @@ export async function runApply(
     creds: ctx.creds,
     scriptName: ctx.workerName,
   });
+  const assetsJwt = !ctx.liffPagesProject
+    ? await uploadWorkerAssets({ creds: ctx.creds, scriptName: ctx.workerName, files: workerAssets! }) : undefined;
   await putWorkerScript({
     creds: ctx.creds,
     scriptName: ctx.workerName,
     scriptContent: bundle.workerJs,
     bindings,
     compatibilityFlags: WORKER_COMPATIBILITY_FLAGS,
-    // The release bundle carries no Worker asset files. CLI installs serve
-    // the LIFF SPA from Workers Assets, so the previous version's assets
-    // must survive this script upload. No-op for installs without assets.
-    keepAssets: true,
+    keepAssets: !assetsJwt,
+    assetsJwt,
+    assetsConfig: workerAssets ? workerAssetsConfig(workerAssets) : undefined,
   });
   await ev.emit({
     step: 'worker',
@@ -117,7 +106,7 @@ export async function runApply(
   // (liffPagesProject === ''), where the LIFF SPA is served by the Worker's
   // own assets and there is no Pages project to deploy to.
   if (!ctx.liffPagesProject) {
-    await ev.emit({ step: 'liff', status: 'done', name: 'skipped (worker-assets install)' });
+    await ev.emit({ step: 'liff', status: 'done', name: 'uploaded with worker assets', hash: ctx.target.worker_assets_hash });
     return {
       adminDeploymentId: adminResult.deploymentId,
       liffDeploymentId: '',

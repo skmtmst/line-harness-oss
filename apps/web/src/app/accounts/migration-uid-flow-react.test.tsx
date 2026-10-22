@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, waitFor } from '@testing-library/react'
+import { fireEvent, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AccountMigration from './migration'
 import UidMigrationV8 from '@/v8/friends/migrations/uid'
@@ -206,6 +206,19 @@ function openDialog(): HTMLElement {
 }
 
 const writes = () => net.calls.filter((call) => call.method !== 'GET')
+
+it('照合の帯は各分類の実値と単位を読み、表示だけでは更新しない', async () => {
+  net.runs = [runFixture()]
+  await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
+  await flush()
+  const band = within(host).getByRole('group', { name: '照合の内訳' })
+  expect(band.hasAttribute('data-kpi-strip')).toBe(true)
+  expect(within(band).getByText('自動で一致')).toBeTruthy()
+  expect(within(band).getAllByText('0')).toHaveLength(3)
+  expect(within(band).getByText('1')).toBeTruthy()
+  expect(within(band).getAllByText('人')).toHaveLength(4)
+  expect(writes()).toEqual([])
+})
 
 describe('完了した移行履歴の表示と操作', () => {
   it('完了履歴に選択面を付けず、現在の履歴と切り戻しの確認を残す', async () => {

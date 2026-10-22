@@ -9,6 +9,8 @@
 新しい文書や図を追加・移動したら、この一覧にも一度だけ登録してください。`pnpm exec tsx scripts/docs/check.ts` で未掲載・重複・ローカルリンクの欠落を検査します。コード例・外部URL・アプリの画面URLはファイルリンクと分けます。最初の引き継ぎはSTART-HEREから読みます。存在しない行き先は置きません。
 
 - [最初に読む：製品とコードの入口](START-HERE.md)
+- [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
+- [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
 ## 使う人の手引き
 
@@ -450,6 +452,7 @@
 
 ## 反映履歴
 
+- [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
 - [反映履歴（アップデート履歴）の設計](change-log-design.md)
@@ -460,6 +463,7 @@
 - [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
 - [対応が要るものの速さとお知らせの下の空き](release-log/unreleased/1798-kenta-hq-attention-speed.md)
 - [統括のアカウントの空きと受信箱の見た目](release-log/unreleased/1799-kenta-beui-round1.md)
+- [一覧・数の帯・手順・ログの見た目と速さ](release-log/unreleased/1802-kenta-beui-round2.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
 - [fielderr2.md](release-log/drafts/fielderr2.md)
@@ -477,6 +481,7 @@
 - [検証反映と独立点検前の引き継ぎ](release-log/unreleased/1786-kenta-staging-handoff.md)
 - [独立点検前の画面接続・承認・集計の修正](release-log/unreleased/1787-kenta-staging-review-fixes.md)
 - [はじめの質問の破棄と途中保存の修正](release-log/unreleased/1788-kenta-style-discard.md)
+- [独立点検からの安全性・予約・表示の修正](release-log/unreleased/1793-masato-independent-audit-fixes.md)
 - [独立点検後の計画と質問の保存・破棄の記録](release-log/unreleased/1790-kenta-after-review-plan.md)
 - [検証環境の最終確認と独立点検の開始準備](release-log/unreleased/1791-kenta-independent-review-ready.md)
 - [画面の先読みと友だち一覧の再計測の改善](release-log/unreleased/1792-kenta-v8-rendering-performance.md)
@@ -645,6 +650,7 @@
 
 ## 引き継ぎで加わった文書
 
+- [文字を見る試験18ファイルの判断案](qa/quality-source-test-decisions.md)
 - [account-new のコード案内](../apps/web/src/v8/account-new/README.md)
 - [accounts-detail のコード案内](../apps/web/src/v8/accounts-detail/README.md)
 - [affiliate-offer-new のコード案内](../apps/web/src/v8/affiliate-offer-new/README.md)

@@ -39,6 +39,8 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   children?: ReactNode
   /** 帯の右に置く操作。1つまで。 */
   action?: ReactNode
+  /** 長い本文を持つ帯では、狭幅時だけ操作を本文の下へ置ける。 */
+  actionLayout?: 'stack-on-narrow'
   /** 閉じる印を出す。押すと呼ばれる。 */
   onClose?: () => void
   /**
@@ -75,6 +77,7 @@ export default function Notice({
   message,
   children,
   action,
+  actionLayout,
   onClose,
   className,
   help,
@@ -107,6 +110,7 @@ export default function Notice({
       data-design-part="notice"
       data-density={density}
       data-presentation={presentation}
+      data-action-layout={action ? actionLayout : undefined}
       data-design-node={node}
     >
       {icon === undefined ? (

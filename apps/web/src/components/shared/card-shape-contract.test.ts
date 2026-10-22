@@ -85,7 +85,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/shared/condition-builder.tsx", "className=\"border-hairline bg-canvas rounded-card flex flex-wrap items-start gap-2 border p-3\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["components/shared/version-history.tsx", "className={ active ? 'rounded-card border border-accent bg-canvas' : 'rounded-card border border-hairline bg-canvas' }", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["components/staff/login-audit.tsx", "className=\"overflow-hidden rounded-card border border-hairline bg-canvas\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
-  ["components/staff/login-audit.tsx", "className=\"flex h-28 flex-col gap-1 rounded-card border border-hairline bg-canvas p-4\"", "数の帯のマス。B-153に従い線で区切る。"],
   ["components/templates/message-template-editor.tsx", "className=\"border-hairline rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
   ["v8/affiliates/attribution-view.tsx", "className=\"bg-canvas border-hairline mt-2 overflow-x-auto rounded-card border\"", "表・履歴・一覧の器。内容は行で区切り、影は重ねない。"],
   ["v8/automations/branch-editor.tsx", "className=\"border-hairline bg-canvas-sunken mt-3 rounded-card border p-4\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],

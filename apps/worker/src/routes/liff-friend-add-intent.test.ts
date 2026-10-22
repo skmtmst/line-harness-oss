@@ -1,9 +1,10 @@
+import { mockLineIdToken } from '../test-utils/liff-oauth.js';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
 const db = vi.hoisted(() => ({
-  getLineAccounts: vi.fn(),
+  getLineAccountLoginChannels: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   getEntryRouteByRefCode: vi.fn(),
   recordFriendAddAttributionCandidate: vi.fn(),
@@ -22,7 +23,7 @@ const env = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.getLineAccounts.mockResolvedValue([
+  db.getLineAccountLoginChannels.mockResolvedValue([
     { id: 'account-1', login_channel_id: 'login-channel-1' },
   ]);
   db.getFriendByLineUserIdForAccount.mockResolvedValue({
@@ -56,7 +57,7 @@ describe('POST /api/liff/friend-add-intent', () => {
   });
 
   test('検証した本人とLINEアカウントで今回リンク候補を保存する', async () => {
-    const response = await request('Bearer valid-id-token');
+    const response = await request(`Bearer ${mockLineIdToken('login-channel-1')}`);
     expect(response.status).toBe(200);
     expect(db.getFriendByLineUserIdForAccount).toHaveBeenCalledWith(env.DB, 'U-1', 'account-1');
     expect(db.recordFriendAddAttributionCandidate).toHaveBeenCalledWith(env.DB, {

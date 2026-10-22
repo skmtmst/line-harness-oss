@@ -170,5 +170,6 @@ describe('UnfamiliarLoginNotice（V-2）', () => {
     await act(async () => { render(<UnfamiliarLoginNotice />) })
     await screen.findByText(/いつもと違う端末・場所からのログインです/)
     expect(screen.getByRole('link', { name: 'ログイン中の端末を確認する' }).getAttribute('href')).toBe('/staff')
+    expect(screen.getByRole('note').getAttribute('data-action-layout')).toBe('stack-on-narrow')
   })
 })

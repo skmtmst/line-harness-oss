@@ -18,6 +18,8 @@ type WizardBasicStepContext = {
   accountId: string | null
   canManage: boolean
   folders: { id: string; name: string; color?: string | null; }[]
+  folderState: 'loading' | 'ready' | 'error'
+  loadFolders: () => Promise<void>
   form: WizardForm
   goToStep: (next: WizardStep, ruleId?: string) => void
   patch: (part: Partial<WizardForm>) => void
@@ -25,7 +27,7 @@ type WizardBasicStepContext = {
   setForm: Dispatch<SetStateAction<WizardForm>>
 }
 
-export function WizardBasicStep({ accountId, canManage, folders, form, goToStep, patch, setFolders, setForm }: WizardBasicStepContext) {
+export function WizardBasicStep({ accountId, canManage, folders, folderState, loadFolders, form, goToStep, patch, setFolders, setForm }: WizardBasicStepContext) {
   return (<>
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
@@ -41,15 +43,17 @@ export function WizardBasicStep({ accountId, canManage, folders, form, goToStep,
                       aria-label="フォルダ"
                       size="full"
                       value={form.folderId}
+                      disabled={folderState !== 'ready'}
                       onChange={(value) => patch({ folderId: value })}
                       unfiled={{ value: '', label: '分けない' }}
                       folders={folders.map(folderById)}
                       // 一覧の左の列の「フォルダを追加」と同じ口（自動応答と同じアカウントのフォルダ）。
-                      onCreate={canManage
+                      onCreate={canManage && folderState === 'ready'
                         ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color, accountId }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
                         : undefined}
                     /></SaveErrorField></Field></div>
                 </SettingsFormRow>
+                {folderState === 'error' ? <Notice tone="info" action={<Button onClick={() => void loadFolders()}>フォルダをもう一度読み込む</Button>}>フォルダを読み込めませんでした。選択済みのフォルダは保存時も保持します。</Notice> : null}
                 <div className={styles.field}><Field label="社内メモ" htmlFor="wiz-memo"><SaveErrorField names={["internalMemo","form.internalMemo","internal_memo","form.internal_memo"]}><TextField
                     id="wiz-memo"
                     value={form.internalMemo}

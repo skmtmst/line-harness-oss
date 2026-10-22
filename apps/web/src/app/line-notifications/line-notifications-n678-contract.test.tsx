@@ -1220,7 +1220,7 @@ describe('#678 実DOMへマウントした画面全体', () => {
     expect(numbers).toContain('2')
     for (const value of ['2', '7']) {
       const number = [...document.querySelectorAll('[data-kpi-number]')].find(node => node.textContent === value)!
-      expect(number.nextElementSibling?.textContent).toBe('通')
+      expect(number.closest('[data-design-version="v8"]')?.querySelector('[data-kpi-unit]')?.textContent).toBe('通')
     }
     expect(numbers).not.toContain('5')
     expect(numbers).not.toContain('9')

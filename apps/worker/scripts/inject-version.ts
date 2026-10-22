@@ -29,7 +29,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { argv, exit, stderr, stdout } from 'node:process';
+import { exit, stderr, stdout } from 'node:process';
 
 export interface VersionData {
   version: string;
@@ -116,6 +116,8 @@ interface CliArgs {
   worker?: string;
   admin?: string;
   liff?: string;
+  workerAssets?: string;
+  migrations?: string;
   out?: string;
   releasedAt?: string;
   commit?: string;
@@ -142,6 +144,12 @@ function parseArgs(args: string[]): CliArgs {
         break;
       case 'admin':
         out.admin = value;
+        break;
+      case 'migrations':
+        out.migrations = value;
+        break;
+      case 'worker-assets':
+        out.workerAssets = value;
         break;
       case 'liff':
         out.liff = value;
@@ -212,25 +220,17 @@ function main(rawArgs: string[]): void {
   const workerHash = hashArtifact('worker', workerPath);
   const adminHash = hashArtifact('admin', adminPath);
   const liffHash = hashArtifact('liff', liffPath);
+  const migrationsHash = args.migrations ? hashArtifact('migrations', args.migrations) : undefined;
+  const workerAssetsHash = args.workerAssets ? hashArtifact('worker-assets', args.workerAssets) : undefined;
 
   write(outPath, { version, workerHash, adminHash, liffHash, releasedAt, commit });
 
   stdout.write(
-    JSON.stringify({ version, workerHash, adminHash, liffHash, releasedAt, commit }) + '\n',
+    JSON.stringify({ version, workerHash, adminHash, liffHash, workerAssetsHash, migrationsHash, releasedAt, commit }) + '\n',
   );
 }
 
-// Run when invoked as a script (works whether tsx/ts-node loaders rewrite
-// the URL or not).
-const isCliEntry = (() => {
-  if (!argv[1]) return false;
-  try {
-    return fileURLToPath(import.meta.url) === argv[1];
-  } catch {
-    return false;
-  }
-})();
-
-if (isCliEntry) {
-  main(argv.slice(2));
+// Keep the CLI entry explicit: importing the hashing library must not run it.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main(process.argv.slice(2));
 }

@@ -3,11 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { IndustryStyle, StyleBooking, StyleSchedule, StyleSnapshot } from '@line-crm/shared'
+import type { eventsApi } from '@/lib/api'
 import { toToday } from './adapter'
 import StyleDashboard from './style-dashboard'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 
-const state = vi.hoisted(() => ({ search: 'view=calendar', role: 'admin', push: vi.fn(), replace: vi.fn(), summary: vi.fn(), schedule: vi.fn(), bookings: vi.fn() }))
+const state = vi.hoisted(() => ({ search: 'view=calendar', role: 'admin', push: vi.fn(), replace: vi.fn(), summary: vi.fn(), schedule: vi.fn(), bookings: vi.fn<typeof eventsApi.listBookings>() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: state.push, replace: state.replace }), usePathname: () => '/', useSearchParams: () => new URLSearchParams(state.search) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'calendar-account' }) }))
@@ -38,7 +39,7 @@ beforeEach(() => {
   vi.clearAllMocks(); state.search = 'view=calendar'; state.role = 'admin'
   state.summary.mockImplementation((_account, query) => Promise.resolve({ data: fixture(query.style, query.date, query.range).snapshot }))
   state.schedule.mockImplementation((_account, query) => Promise.resolve({ data: fixture(query.style, query.date, query.range).schedule }))
-  state.bookings.mockResolvedValue({ items: [] })
+  state.bookings.mockResolvedValue({ items: [], total: 0, limit: 50, sort: [] })
 })
 afterEach(cleanup)
 
@@ -80,7 +81,8 @@ it.each<IndustryStyle>(['restaurant', 'salon', 'consult', 'lesson'])('%sの今�
   fireEvent.click(entry)
   if (style === 'lesson') {
     expect(await screen.findByRole('region', { name: '朝の予約の名簿' })).toBeTruthy()
-    expect(state.bookings).toHaveBeenCalledWith('calendar-account', 'event-real', { slot_id: 'slot-real', limit: 50 })
+    expect(state.bookings).toHaveBeenCalledOnce()
+    expect(state.bookings).toHaveBeenCalledWith('calendar-account', 'event-real', { slot_id: 'slot-real', limit: 50, page: 1 }, { signal: expect.any(AbortSignal) })
   } else expect(state.push).toHaveBeenCalledWith(style === 'restaurant' ? '/restaurant-test/reservations?id=real-booking' : '/booking/bookings?booking=real-booking')
 })
 

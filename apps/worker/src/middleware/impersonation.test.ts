@@ -5,12 +5,15 @@ import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { maskPiiDeep, piiMaskMiddleware, toImpersonationContext } from './impersonation.js';
 import { sha256Hex } from './auth.js';
+import { conversations } from '../routes/conversations.js';
 
 let db: SqliteD1;
 let id: string;
 const person = { id: 'friend-1234', realName: 'fixture-real', systemDisplayName: 'fixture-system', display_name: 'fixture-display',
   customer_name: 'fixture-customer', email: 'fixture@example.com', phone_number: 'fixture-phone', lineUserId: 'fixture-line',
-  customer_note: 'fixture-note', internalNote: 'fixture-internal', metadata: { arbitrary: 'fixture-meta', nested: ['fixture-nested'] },
+  customer_note: 'fixture-note', internalNote: 'fixture-internal', lastIncomingPreview: 'fixture-conversation-preview',
+  lastMessageContent: 'fixture-chat-summary', last_incoming_content: 'fixture-incoming-content',
+  metadata: { arbitrary: 'fixture-meta', nested: ['fixture-nested'] },
   answers: { value: 'fixture-answer' }, downloadUrl: '/fixture-file', tags: [{ name: 'Public label' }] };
 beforeEach(async () => {
   db = createTestD1();
@@ -28,12 +31,31 @@ function app(path: string, format: 'json' | 'csv' | 'file') {
     if (active) c.set('impersonation', toImpersonationContext(active));
     return next();
   }); a.use('*', piiMaskMiddleware);
-  a.get(path, c => format === 'json' ? c.json({ data: person }) : c.body('fixture-sensitive-file', 200, { 'Content-Type': format === 'csv' ? 'text/csv' : 'application/pdf' }));
+  if (path === '/api/conversations') a.route('/', conversations);
+  else a.get(path, c => format === 'json' ? c.json({ data: person }) : c.body('fixture-sensitive-file', 200, { 'Content-Type': format === 'csv' ? 'text/csv' : 'application/pdf' }));
   return a;
 }
 function fetch(path: string, format: 'json' | 'csv' | 'file') { return app(path, format).request(path, {}, { DB: db.db } as Env['Bindings']); }
 
 describe('impersonation outputs', () => {
+  it('masks the actual conversation queue response and reveals it only with an audited reason', async () => {
+    db.raw.exec("INSERT INTO line_accounts(id,name,channel_id,channel_secret,channel_access_token,tenant_id) VALUES('conversation-shop','Fixture shop','fixture-channel','unused','unused','target')");
+    db.raw.exec("INSERT INTO friends(id,line_user_id,display_name,line_account_id,is_following) VALUES('conversation-friend','fixture-user','Fixture name','conversation-shop',1)");
+    db.raw.prepare("INSERT INTO messages_log(id,friend_id,direction,message_type,content,created_at) VALUES('conversation-message','conversation-friend','incoming','text',?,'2026-01-01T00:00:00Z')")
+      .run('private conversation fixture');
+    const readQueue = async () => {
+      const res = await fetch('/api/conversations', 'json');
+      expect(res.status).toBe(200);
+      return res.json() as Promise<{ data: { total: number; items: Array<{ lastIncomingPreview: string }> } }>;
+    };
+    const masked = await readQueue();
+    expect(masked.data.total).toBe(1);
+    expect(masked.data.items[0]?.lastIncomingPreview).toBe('（代理ログイン中は伏せています）');
+    expect(JSON.stringify(masked)).not.toContain('private conversation fixture');
+    await reveal();
+    expect((await readQueue()).data.items[0]?.lastIncomingPreview).toBe('private conversation fixture');
+    expect(db.raw.prepare('SELECT COUNT(*) n FROM pii_reveal_logs WHERE impersonation_session_id=?').get(id)).toEqual({ n: 1 });
+  });
   it.each(['/api/friends', '/api/booking/admin/board', '/api/restaurant-test/bookings', '/api/new-customer-route'])('%s classifies PII independent of URL', async path => {
     const res = await fetch(path, 'json'); expect(res.status).toBe(200);
     const data = (await res.json() as { data: typeof person }).data;
@@ -73,6 +95,15 @@ describe('impersonation outputs', () => {
   it('unexamined deeply nested subtrees are suppressed rather than returned', () => {
     let data: unknown = { realName: 'fixture-deep' }; for (let n = 0; n < 80; n++) data = { nested: data };
     expect(JSON.stringify(maskPiiDeep(data))).not.toContain('fixture-deep');
+  });
+  it('masks summary text inside arrays while keeping queue counts, dates and empty values', () => {
+    expect(maskPiiDeep({ data: { total: 2, items: [
+      { lastIncomingPreview: 'private summary', lastIncomingType: 'text', lastIncomingAt: '2026-10-21', hoursSince: 2 },
+      { lastMessageContent: null, preview: '', incomingText: 'private message' },
+    ] } })).toEqual({ data: { total: 2, items: [
+      { lastIncomingPreview: '（代理ログイン中は伏せています）', lastIncomingType: 'text', lastIncomingAt: '2026-10-21', hoursSince: 2 },
+      { lastMessageContent: null, preview: '', incomingText: '（代理ログイン中は伏せています）' },
+    ] } });
   });
   it.each(['logout', 'revoke', 'expire'] as const)('%s ends the associated impersonation', async method => {
     if (method === 'logout') await deleteAdminSession(db.db, await sha256Hex('fixture-session'));

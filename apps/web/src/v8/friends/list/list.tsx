@@ -1,5 +1,7 @@
 'use client'
 
+import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
+import { jstDate } from '@/lib/jst-datetime'
 import { useAttentionStarMotion } from '@/components/shared/use-attention-star-motion'
 
 import Avatar from '@/components/shared/avatar';
@@ -946,6 +948,7 @@ export default function FriendsListV8() {
   )
 
   return (
+    <KpiValueMotionProvider scope={selectedAccountId ? JSON.stringify([selectedAccountId, jstDate().slice(0, 7)]) : null}>
     <ListPage
       heightMode="content"
       skeleton
@@ -1053,5 +1056,6 @@ export default function FriendsListV8() {
     >
       {table}
     </ListPage>
+    </KpiValueMotionProvider>
   )
 }

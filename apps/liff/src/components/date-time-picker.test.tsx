@@ -888,3 +888,11 @@ it.each(['list', 'calendar'] as const)('BUG-03：%sで読めない日は満席�
   expect(await screen.findByRole('button', { name: '10月16日 空きあり' })).toBeTruthy();
   expect(screen.queryByText('読み込めませんでした')).toBeNull();
 });
+
+it('追加メニューは空き枠検索と選択時の終了時刻に含まれる', async () => {
+  mockSettings('list');
+  mockAvailability();
+  render(<DateTimePicker menu={MENU} staff={STAFF} addonIds={['extra']} additionalDurationMinutes={30} selected={{ date: '2026-10-16', start: '10:00' }} onSelect={vi.fn()} onConfirm={vi.fn()} onBackToStaff={vi.fn()} />);
+  await waitFor(() => expect(availability).toHaveBeenCalledWith('m1', 's1', expect.any(String), expect.any(String), ['extra']));
+  expect(await screen.findByText(/10:00〜11:30/)).toBeTruthy();
+});

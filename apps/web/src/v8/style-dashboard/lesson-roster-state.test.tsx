@@ -28,20 +28,20 @@ const bookings: EventBookingItem[] = statuses.map(status => ({
 }))
 const today: StyleToday = { style: 'lesson', asOf: '2026-10-15T00:00:00Z', staff: [], kpis: [], rowsNote: '', side: [], rows: [{ id: 'class:slot-real', reservationId: 'event-real', name: '朝ヨガ', time: '10:00' }] }
 const noop = () => {}
-beforeEach(() => { vi.clearAllMocks(); calls.list.mockResolvedValue({ items: bookings }); calls.update.mockResolvedValue({}) })
+beforeEach(() => { vi.clearAllMocks(); calls.list.mockResolvedValue({ items: bookings, total: bookings.length, limit: 50, sort: [] }); calls.update.mockResolvedValue({}) })
 afterEach(cleanup)
-async function loadRoster() {
+async function loadRoster(memberCount = 7) {
   const hook = renderHook(() => useStyleDashboard('lesson'))
   await act(async () => {})
   act(() => hook.result.current.setData(today))
-  await waitFor(() => expect(hook.result.current.roster?.members).toHaveLength(7))
+  await waitFor(() => expect(hook.result.current.roster?.members).toHaveLength(memberCount))
   return hook
 }
 
 it('正規APIの取消・欠席・非確定を確定の出席操作へ変換せず、人数から取消・拒否・失効を除く', async () => {
   const { result } = await loadRoster()
   const roster = result.current.roster!
-  expect(calls.list).toHaveBeenCalledWith('lesson-account', 'event-real', { slot_id: 'slot-real', limit: 50 })
+  expect(calls.list).toHaveBeenCalledWith('lesson-account', 'event-real', { slot_id: 'slot-real', limit: 50, page: 1 }, { signal: expect.any(AbortSignal) })
   expect(roster.meta).toContain('予約 4')
   expect(roster.members.map(member => member.attend)).toEqual(['button', 'cancel', 'absent', 'unavailable', 'unavailable', 'unavailable', 'done'])
   render(<LessonRoster roster={roster} canWrite onAttend={noop} onAbsent={noop} onClose={noop} onPay={noop} onLine={noop} onCancelClass={noop} />)
@@ -76,3 +76,16 @@ it('古い取消日時がある確定応答と未知状態も出欠の対象に�
   expect(toLessonRosterMember(unknown).attend).toBe('unavailable')
   expect(isLiveLessonBooking(unknown)).toBe(false)
 })
+
+
+it('51件を読み切った全員操作でも、取消を除き2ページ目の確定予約まで更新する', async () => {
+  const items = Array.from({ length: 51 }, (_, index) => ({ ...bookings[0], id: `booking-${index}`, friend_display_name: '同じ名前', status: index === 0 || index === 50 ? 'confirmed' : 'cancelled' }));
+  calls.list.mockImplementation((_accountId, _eventId, query) => Promise.resolve({ items: items.slice((query.page - 1) * 50, query.page * 50), total: items.length, limit: 50, sort: [] }));
+  const { result } = await loadRoster(51);
+  expect(result.current.roster!.meta).toContain('予約 2');
+  render(<LessonRoster roster={result.current.roster!} canWrite onAttend={bookingId => { void result.current.attend(result.current.roster!, bookingId) }} onAbsent={noop} onClose={noop} onPay={noop} onLine={noop} onCancelClass={noop} />);
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '全員出席' })) });
+  expect(calls.update).toHaveBeenCalledTimes(2);
+  expect(calls.update).toHaveBeenNthCalledWith(1, 'lesson-account', 'event-real', 'booking-0', { status: 'attended' });
+  expect(calls.update).toHaveBeenNthCalledWith(2, 'lesson-account', 'event-real', 'booking-50', { status: 'attended' });
+});

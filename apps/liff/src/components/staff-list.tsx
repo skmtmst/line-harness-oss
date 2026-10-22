@@ -1,5 +1,5 @@
 import { formatYen } from '@line-crm/shared';
-import { bookingPriceText } from '../lib/booking-price.js';
+import { bookingPriceText, staffNominationFee } from '../lib/booking-price.js';
 import Button from './ui/button/index.js';
 import { useEffect, useState } from 'react';
 import { api, type MenuItem, type StaffItem } from '../lib/api.js';
@@ -8,10 +8,9 @@ import LoadErrorView from './load-error-view.js';
 import LoadingView from './loading-view.js';
 import Icon from './ui/icon.js';
 
-/** 指名料。指名なし（おまかせ）は 0。指名した担当は、担当の料金が基本の料金より高い分。 */
-export function nominationFee(menu: Pick<MenuItem, 'base_price'>, staff: Pick<StaffItem, 'price' | 'is_designation_optional'>): number {
-  if (staff.is_designation_optional === 1) return 0;
-  return Math.max(0, staff.price - menu.base_price);
+/** 指名料。担当別料金との差ではなく、APIが返した指名料を使う。 */
+export function nominationFee(_menu: Pick<MenuItem, 'base_price'>, staff: Pick<StaffItem, 'price' | 'is_designation_optional' | 'nomination_fee'>): number {
+  return staffNominationFee(staff);
 }
 
 /**
@@ -72,7 +71,7 @@ export default function StaffList({
         {list.map((s) => {
           const selected = s.id === selectedId;
           const optional = s.is_designation_optional === 1;
-          /* 指名料：お客さまが指名したときだけ。指名なし（おまかせ）は掛からない。担当の料金が基本より高い分が指名料。 */
+          /* 指名料：お客さまが指名したときだけ。指名なし（おまかせ）は掛からない。指名料は担当別料金と別に設定される。 */
           const fee = nominationFee(menu, s);
           const name = optional ? '指名なし（指名料なし）' : s.display_name;
           const sub = optional ? 'いちばん早く空いている人' : s.role ?? '';

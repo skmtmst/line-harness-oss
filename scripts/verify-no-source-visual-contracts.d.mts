@@ -6,6 +6,7 @@ export interface SourceAssertion {
   reads: string[];
   expression: string;
   expected: string[];
+  tableRows?: string[][];
   reason: string;
   key: string;
 }

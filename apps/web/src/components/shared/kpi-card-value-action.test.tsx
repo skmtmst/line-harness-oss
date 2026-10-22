@@ -5,6 +5,12 @@ import KpiCard from './kpi-card'
 
 afterEach(cleanup)
 
+it('内訳のない数字には操作を作らず、既存の行き先だけをリンクにする', () => {
+  render(<KpiCard title="友だち" value={12} unit="人" detail="登録済み" action={{ label: '友だちを見る', href: '/friends' }} />)
+  expect(screen.queryByRole('button')).toBeNull()
+  expect(screen.getByRole('link', { name: '友だちを見る' }).getAttribute('href')).toBe('/friends')
+})
+
 it('数から既存の内訳を開閉でき、読み込み中は操作できない', () => {
   const onClick = vi.fn()
   const props = { title: '今日の予約', value: 3, unit: '件', detail: '次の予定 16:00', valueAction: { label: '今日の予約の内訳を見る', expanded: false, onClick } }

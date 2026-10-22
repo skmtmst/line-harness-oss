@@ -63,3 +63,19 @@ it('通常テキストは既存の編集口を保ち、後処理未取得を0件
   fireEvent.change(screen.getByRole('textbox', { name: '返信内容' }), { target: { value: '変更した本文' } })
   expect(onSetting).toHaveBeenCalledWith('responseContent', '変更した本文')
 })
+
+
+it('プレビューURLが省略された保存済み画像は原画像で見せ、保存内容を変更しない', () => {
+  const onSetting = mount({ responseType: 'image', responseContent: JSON.stringify({ originalContentUrl: 'https://example.test/full.png' }) })
+  expect(screen.getByAltText('返信画像のプレビュー').getAttribute('src')).toBe('https://example.test/full.png')
+  expect(screen.queryByRole('textbox', { name: '返信内容' })).toBeNull()
+  expect(onSetting).not.toHaveBeenCalled()
+})
+
+it.each(['画像本文', 'null', '{}'])('壊れた画像保存値%sも本文編集へ変換せず、確認不能を示して保持する', content => {
+  const onSetting = mount({ responseType: 'image', responseContent: content })
+  expect(screen.getByText('保存済みの返信内容の見本を表示できません。')).toBeTruthy()
+  expect(screen.queryByAltText('返信画像のプレビュー')).toBeNull()
+  expect(screen.queryByRole('textbox', { name: '返信内容' })).toBeNull()
+  expect(onSetting).not.toHaveBeenCalled()
+})

@@ -9,9 +9,8 @@ import { authHeader, d1QueryApiUrl, readBodyExcerpt } from './shared.js';
  * against a customer's D1 instance using only their CF API token + account
  * id + database id — no `wrangler` binary required at runtime.
  *
- * Batch / transaction support is intentionally out of scope for v1; migrations
- * are applied one statement at a time so a failure surfaces against the exact
- * SQL that broke.
+ * The provider accepts semicolon-separated SQL as a batch. The migration
+ * journal still treats an unsuccessful or lost response as an unknown outcome.
  */
 
 /**
@@ -50,5 +49,9 @@ export async function executeD1Query(opts: {
     throw new Error(`D1 query failed HTTP ${res.status}: ${excerpt}`);
   }
 
-  return (await res.json()) as { success: boolean; result: any[] };
+  const body = await res.json() as { success: boolean; result: any[] };
+  if (!body.success || !Array.isArray(body.result) || body.result.some(row => row.success === false)) {
+    throw new Error('D1 query returned an unsuccessful result');
+  }
+  return body;
 }

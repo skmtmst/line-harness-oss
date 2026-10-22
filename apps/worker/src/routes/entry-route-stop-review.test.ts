@@ -1,4 +1,4 @@
-import { signedLiffState } from '../test-utils/liff-oauth.js';
+import { signedLiffState, mockLineIdToken } from '../test-utils/liff-oauth.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // N-244 独立レビュー差し戻し: 同じPRで直す4点の直接テスト。
@@ -10,6 +10,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //    fallback しない (実行可能 fallback があっても)。不存在は維持する。
 // 4. 停止判定のDB読取失敗は fail-open せず、安全に受付・帰属・シナリオを止める。
 const dbMocks = {
+  getLineAccountLoginChannels: vi.fn().mockResolvedValue([
+    { id: 'account-main', tenant_id: null, login_channel_id: '2000000000' },
+  ]),
   getLineAccounts: vi.fn().mockResolvedValue([
     { id: 'account-main', login_channel_id: '2000000000' },
   ]),
@@ -182,7 +185,7 @@ function link(ref: string) {
 function intent(ref: string) {
   return call('/api/liff/friend-add-intent', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer [REDACTED]' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mockLineIdToken('2000000000')}` },
     body: JSON.stringify({ ref, source: 'liff' }),
   });
 }
