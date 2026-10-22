@@ -2003,6 +2003,7 @@
   --tpl-inbox-thread-pad: 20px 24px;      /* やりとりの内側 */
   --tpl-inbox-out-column-gap: 4px;   /* 送った文と送り手の間 */
   --tpl-inbox-thread-gap: 12px;           /* 吹き出しの行と行・日付と吹き出しの間 */
+  --tpl-inbox-skeleton-width: 160px;
   --tpl-inbox-bubble-w: 340px;            /* 吹き出しの幅の上限 */
   --tpl-inbox-bubble-pad: 12px 16px;      /* 吹き出しの内側 */
   --tpl-inbox-bubble-radius: var(--polish-radius-card);

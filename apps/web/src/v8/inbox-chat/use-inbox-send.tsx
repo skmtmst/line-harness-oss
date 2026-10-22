@@ -5,7 +5,7 @@ import { UNANSWERED_REFRESH_EVENT } from '@/lib/events';
 import { formatNumber } from '@/lib/format';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { attachmentPreviewLabel, attachmentSendInput } from '@/v8/inbox-chat/attachments';
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import { useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import type { PendingAttachment } from './inbox-model';
 import { MESSAGE_MAX_LENGTH, StatusFilter, draftKeyOf } from './inbox-model';
 import { describeSendFailure } from './send-failure';
@@ -16,7 +16,6 @@ type Options = {
   sending: boolean
   sendLockRef: RefObject<boolean>
   pendingAttachment: PendingAttachment | null
-  setError: Dispatch<SetStateAction<string>>
   messageContent: string
   pendingImage: ImageUploaderValue | null
   selectedAccountId: string | null
@@ -46,14 +45,29 @@ type Options = {
   sendMode: "enter" | "shift-enter"
 }
 
-export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAttachment, setError, messageContent, pendingImage, selectedAccountId, setSending, chatDetail, quotedMessage, senderId, sendKeysRef, dropSentDraft, selectedChatIdRef, detailAccountRef, pendingImageRef, setPendingImage, setPendingImageMeta, setMessageContent, setChatDetail, setChats, statusFilterRef, attachDraftsRef, putAttachment, correctingId, setCorrectingId, setQuotedMessage, setPendingPack, isComposingRef, sendMode }: Options) {
+export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAttachment, messageContent, pendingImage, selectedAccountId, setSending, chatDetail, quotedMessage, senderId, sendKeysRef, dropSentDraft, selectedChatIdRef, detailAccountRef, pendingImageRef, setPendingImage, setPendingImageMeta, setMessageContent, setChatDetail, setChats, statusFilterRef, attachDraftsRef, putAttachment, correctingId, setCorrectingId, setQuotedMessage, setPendingPack, isComposingRef, sendMode }: Options) {
+
+  const [sendFailure, setSendFailure] = useState<{ owner: string; message: string } | null>(null)
+  const owner = draftKeyOf(selectedAccountId, selectedChatId ?? '')
+  const setSendError = (message: string) => setSendFailure({ owner, message })
+  const sendError = sendFailure?.owner === owner ? sendFailure.message : ''
+  const [pendingSend, setPendingSend] = useState<{ chatId: string; accountId: string | null; messages: ChatDetailMessage[] } | null>(null)
+
+  // 通信中の吹き出しは保存済み履歴へ混ぜない。失敗しても下書きと冪等キーを守る。
+  async function previewSend<T>(messages: Array<{ messageType: string; content: string }>, send: () => Promise<T>): Promise<T> {
+    if (!selectedChatId) throw new Error('会話を選んでください。')
+    setPendingSend({ chatId: selectedChatId, accountId: selectedAccountId,
+      messages: messages.map((message) => buildOutgoingMessage({ ...message, sentByStaffName: '自分', sentAt: new Date().toISOString(), quoted: quotedMessage })),
+    })
+    try { return await send() } finally { setPendingSend(null) }
+  }
 
   const handleSendMessage = async () => {
     if (!selectedChatId || sending || sendLockRef.current) return
     // ：動画・ファイルは準備が済んだものだけ送る。準備中・失敗のまま送らない（本文も止める）。
     const sendingAttachment = pendingAttachment
     if (sendingAttachment && sendingAttachment.status !== 'ready') {
-      setError(sendingAttachment.status === 'uploading'
+      setSendError(sendingAttachment.status === 'uploading'
         ? `「${sendingAttachment.name}」の準備が終わってから送れます。`
         : `「${sendingAttachment.name}」を準備できていません。もう一度試すか、外してから送ってください。`)
       return
@@ -61,11 +75,12 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
     if (!messageContent.trim() && !pendingImage && !sendingAttachment) return
     // INBOX-29: 上限を超えた本文は送らない(下書きは消さない)。
     if (messageContent.length > MESSAGE_MAX_LENGTH) {
-      setError(`メッセージは${formatNumber(MESSAGE_MAX_LENGTH)}文字までです。`)
+      setSendError(`メッセージは${formatNumber(MESSAGE_MAX_LENGTH)}文字までです。`)
       return
     }
     const sendingChatId = selectedChatId  // capture the chat id for this send
     const sendingAccountId = selectedAccountId  // 送信開始時のアカウントを固定する
+    setSendError('')
     sendLockRef.current = true
     setSending(true)
     try {
@@ -81,7 +96,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           previewImageUrl: pendingImage.previewImageUrl,
         })
         const signature = JSON.stringify({ chatId: sendingChatId, combined: true, image: imgPayload, content, quotedMessageId: quotedMessage?.id ?? null })
-        const sendResult = await api.chats.sendCombined(sendingChatId,
+        const sendResult = await previewSend([{ messageType: 'image', content: imgPayload }, { messageType: 'text', content }], () => api.chats.sendCombined(sendingChatId,
           {
             image: {
               originalContentUrl: pendingImage.originalContentUrl,
@@ -93,7 +108,8 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
             ...(senderId ? { senderId } : {}),
           } as Parameters<typeof api.chats.sendCombined>[1],
           sendKeysRef.current.get(signature),
-        )
+        ))
+        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。')
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         /*
@@ -141,10 +157,11 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
           previewImageUrl: pendingImage.previewImageUrl,
         })
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'image', content: imgPayload, quotedMessageId: quotedMessage?.id ?? null })
-        const sendResult = await api.chats.send(sendingChatId,
+        const sendResult = await previewSend([{ messageType: 'image', content: imgPayload }], () => api.chats.send(sendingChatId,
           { messageType: 'image', content: imgPayload, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
-        )
+        ))
+        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。')
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         dropSentDraft(sendingChatId, sendingAccountId, { image: pendingImage })
@@ -187,10 +204,11 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       if (sendingAttachment?.attachment && (sendingAttachment.kind === 'video' || sendingAttachment.kind === 'file')) {
         const input = attachmentSendInput(sendingAttachment.attachment)
         const signature = JSON.stringify({ chatId: sendingChatId, ...input, quotedMessageId: useCombined ? null : quotedMessage?.id ?? null })
-        const sendResult = await api.chats.send(sendingChatId,
+        const sendResult = await previewSend([{ messageType: sendingAttachment.kind, content: sendingAttachment.kind === 'file' ? JSON.stringify({ attachmentId: sendingAttachment.attachment.id, ...sendingAttachment.attachment }) : input.content }], () => api.chats.send(sendingChatId,
           { ...input, revision: currentRevision, quotedMessageId: useCombined ? undefined : quotedMessage?.id, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
-        )
+        ))
+        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。')
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         const sentKey = draftKeyOf(sendingAccountId, sendingChatId)
@@ -227,10 +245,11 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       if (!useCombined && messageContent.trim()) {
         const content = messageContent.trim()
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content, quotedMessageId: quotedMessage?.id ?? null })
-        const sendResult = await api.chats.send(sendingChatId,
+        const sendResult = await previewSend([{ messageType: 'text', content }], () => api.chats.send(sendingChatId,
           { content, revision: currentRevision, quotedMessageId: quotedMessage?.id, ...(correctingId ? { correctionOfMessageId: correctingId } : {}), ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.send>[1],
           sendKeysRef.current.get(signature),
-        )
+        ))
+        if (!sendResult.success) throw new Error(sendResult.error || '送信できませんでした。')
         if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         /*
@@ -287,7 +306,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       // 別の会話・アカウントへ切り替えたあとの古い失敗は、
       // 新しい画面へ出さない(A02-04)。
       if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-        setError(describeSendFailure(sendError))
+        setSendError(describeSendFailure(sendError))
       }
     } finally {
       setSending(false)
@@ -306,22 +325,23 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
     if (!selectedChatId || texts.length === 0 || sendLockRef.current) return
     const sendingChatId = selectedChatId
     const sendingAccountId = selectedAccountId
+    setSendError('')
     sendLockRef.current = true
     setSending(true)
     try {
       const now = new Date().toISOString()
       const signature = JSON.stringify({ chatId: sendingChatId, combined: true, texts })
-      const sendResult = await api.chats.sendCombined(sendingChatId,
+      const sendResult = await previewSend(texts.map((content) => ({ messageType: 'text', content })), () => api.chats.sendCombined(sendingChatId,
         { texts, revision: pack.revision, ...(senderId ? { senderId } : {}) } as Parameters<typeof api.chats.sendCombined>[1],
         sendKeysRef.current.get(signature),
-      )
-      sendKeysRef.current.clear(signature)
+      ))
       if (!sendResult.success) {
         if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-          setError(sendResult.error || '送信できませんでした。')
+          setSendError(sendResult.error || '送信できませんでした。')
         }
         return
       }
+      sendKeysRef.current.clear(signature)
       const staffName = sendResult.data.sentByStaffName
       const packMessages = texts.map((content) =>
         buildOutgoingMessage({ messageType: 'text', content, sentByStaffName: staffName, sentAt: now }),
@@ -350,7 +370,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
     } catch (sendError) {
       if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
-        setError(describeSendFailure(sendError))
+        setSendError(describeSendFailure(sendError))
       }
     } finally {
       setSending(false)
@@ -371,5 +391,6 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       handleSendMessage()
     }
   }
-  return { handleSendMessage, handleSendPack, handleKeyDown }
+  const pendingMessages = pendingSend?.chatId === selectedChatId && pendingSend.accountId === selectedAccountId ? pendingSend.messages : undefined
+  return { handleSendMessage, handleSendPack, handleKeyDown, sendError, pendingMessages }
 }

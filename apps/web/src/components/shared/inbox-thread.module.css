@@ -1,5 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
+.loading { flex: 1; min-height: 0; padding: var(--tpl-inbox-thread-gap); background: var(--color-surface-pearl); }
+.loadingBubbles { display: flex; flex-direction: column; gap: var(--tpl-inbox-thread-gap); }
 .day {
   margin: 0 0 var(--tpl-inbox-thread-gap);
   color: var(--color-ink-faint);
@@ -12,7 +14,7 @@
 .rowIn { justify-content: flex-start; }
 .rowOut { justify-content: flex-end; }
 .outCol { display: flex; min-width: 0; flex-direction: column; align-items: flex-end; gap: var(--tpl-inbox-out-column-gap); }
-.outLine { display: flex; min-width: 0; align-items: flex-end; gap: var(--tpl-inbox-chead-gap); }
+.outLine { max-width: 100%; display: flex; min-width: 0; align-items: flex-end; gap: var(--tpl-inbox-chead-gap); }
 .bubbleIn, .bubbleOut {
   min-width: 0;
   max-width: var(--tpl-inbox-bubble-w);
@@ -28,6 +30,7 @@
 .bubbleIn, .bubbleOut, .bubbleIn *, .bubbleOut * { word-break: normal; }
 .bubbleIn { background: var(--color-canvas); outline: 1px solid var(--color-hairline); outline-offset: -1px; }
 .bubbleOut { background: var(--tpl-inbox-bubble-out); }
+.delivery { display: inline-flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
 .meta { position: relative; display: inline-flex; flex: none; align-items: center; gap: var(--tpl-inbox-head-tools-gap); color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-inbox-badge-lh); white-space: nowrap; }
 /*
  * 引用：絵の時刻の横は時刻だけ。引用は時刻の外側に浮かせ、行の幅を取らない

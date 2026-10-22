@@ -244,3 +244,30 @@ describe('会話の一覧の窓分け', () => {
     expect(document.activeElement?.textContent).toBe('会話 1')
   })
 })
+
+function ReorderedList({ order }: { order: string[] }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  return <div ref={ref} data-test-scroller=""><ChatListWindow items={order.map((key) => ({ key, render: () => <button>{key}</button> }))} scrollerRef={ref} hasMore={false} /></div>
+}
+
+test('返信で会話の並びが変わる時だけ滑り、動きを減らす設定では即時に入れ替わる', async () => {
+  stubLayout(false)
+  const original = HTMLElement.prototype.animate
+  const animate = vi.fn()
+  HTMLElement.prototype.animate = animate
+  restore.push(() => { HTMLElement.prototype.animate = original })
+  let reduce = false
+  vi.stubGlobal('matchMedia', () => ({ matches: reduce }))
+  document.documentElement.style.setProperty('--motion-base', '200ms')
+  restore.push(() => document.documentElement.style.removeProperty('--motion-base'))
+  const view = render(<ReorderedList order={['a', 'b']} />)
+  expect(animate).not.toHaveBeenCalled()
+  view.rerender(<ReorderedList order={['b', 'a']} />)
+  expect(animate).toHaveBeenCalledTimes(2)
+  expect(animate.mock.calls[0][0]).toEqual([{ transform: 'translateY(50px)' }, { transform: 'translateY(0)' }])
+  view.rerender(<ReorderedList order={['b', 'a']} />)
+  expect(animate).toHaveBeenCalledTimes(2)
+  reduce = true
+  view.rerender(<ReorderedList order={['a', 'b']} />)
+  expect(animate).toHaveBeenCalledTimes(2)
+})

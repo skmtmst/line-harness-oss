@@ -15,6 +15,7 @@
  *   一覧の上の検索欄で探す（本文まで口側で探す）。
  */
 import { useCallback, useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { useFlipRows } from '@/lib/use-live-reorder'
 import { useVirtualWindow, VIRTUAL_ITEM_ATTR } from './use-virtual-window'
 
 export type ChatListWindowItem = { key: string; render: () => ReactNode }
@@ -29,6 +30,7 @@ type Props = {
 
 export default function ChatListWindow({ items, scrollerRef, hasMore, label = '会話の一覧' }: Props) {
   const contentRef = useRef<HTMLDivElement | null>(null)
+  useFlipRows(contentRef, items.map((item) => item.key).join(','))
   const focusKeyRef = useRef<string | null>(null)
   const getKey = useCallback((index: number) => items[index]?.key ?? String(index), [items])
   const win = useVirtualWindow({ count: items.length, getKey, estimate: 92, overscan: 600, scrollerRef, contentRef })
@@ -72,6 +74,7 @@ export default function ChatListWindow({ items, scrollerRef, hasMore, label = '�
         key={item.key}
         {...{ [VIRTUAL_ITEM_ATTR]: item.key }}
         data-inbox-row=""
+        data-reorder-id={item.key}
         data-index={i}
         role="listitem"
         aria-posinset={i + 1}
