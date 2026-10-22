@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { IndustryStyle, StyleBooking, StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 import { toToday } from './adapter'
 import StyleDashboard from './style-dashboard'
+import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 
 const state = vi.hoisted(() => ({ search: 'view=calendar', role: 'admin', push: vi.fn(), replace: vi.fn(), summary: vi.fn(), schedule: vi.fn(), bookings: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: state.push, replace: state.replace }), usePathname: () => '/', useSearchParams: () => new URLSearchParams(state.search) }))
@@ -40,6 +41,33 @@ beforeEach(() => {
   state.bookings.mockResolvedValue({ items: [] })
 })
 afterEach(cleanup)
+
+it('実画面の月移動は読み込み後に1回だけ滑り、同月の日選択では滑らない', async () => {
+  state.search = 'view=calendar&range=month'
+  setTestReducedMotion(false)
+  document.documentElement.style.setProperty('--motion-base', '200ms')
+  document.documentElement.style.setProperty('--polish-space-card', '20px')
+  const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'animate')
+  const animate = vi.fn((_frames: Keyframe[], _options: KeyframeAnimationOptions) => ({ cancel: vi.fn() }))
+  Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate })
+  try {
+    render(<StyleDashboard style="salon" />)
+    const month = await screen.findByRole('region', { name: '1か月のカレンダー' })
+    expect(animate).not.toHaveBeenCalled()
+    fireEvent.click(within(month).getByRole('button', { name: '次へ', exact: true }))
+    await screen.findByRole('region', { name: '1か月のカレンダー' })
+    await waitFor(() => expect(animate).toHaveBeenCalledOnce())
+    const calendar = screen.getByRole('grid')
+    const day = calendar.querySelector<HTMLButtonElement>('[role="gridcell"]:not([data-out]):not([data-selected])')!
+    fireEvent.click(day)
+    await screen.findByRole('region', { name: '1か月のカレンダー' })
+    expect(animate).toHaveBeenCalledOnce()
+  } finally {
+    if (original) Object.defineProperty(HTMLElement.prototype, 'animate', original)
+    else Reflect.deleteProperty(HTMLElement.prototype, 'animate')
+    document.documentElement.style.cssText = ''
+  }
+})
 
 it.each<IndustryStyle>(['restaurant', 'salon', 'consult', 'lesson'])('%sの今日カレンダーに正規day予約を表示し、実予約・教室の名簿へ接続する', async style => {
   render(<StyleDashboard style={style} />)

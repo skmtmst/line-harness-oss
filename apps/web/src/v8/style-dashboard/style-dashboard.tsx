@@ -1,4 +1,5 @@
 'use client'
+import CalendarPeriod from '@/components/shared/calendar-period'
 import { formatYen } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { CancelClassDialog,CancelReservationDialog,RefundDialog } from '@/components/shared/booking-confirm-dialogs'
@@ -216,7 +217,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <div className={styles.tabRow}>
         <Tabs items={tabItems} label={`${cfg.title}のタブ`} size="compact" actions={viewSwitch} />
       </div>
-      <div className={styles.content}>{body}</div>
+      <div className={styles.content}><CalendarPeriod period={view === 'calendar' && today ? range === 'month' ? date.slice(0, 7) : today.week?.days[0]?.date ?? date : ''} scope={`${accountId}/${style}/${view}/${range}`}>{body}</CalendarPeriod></div>
       {style === 'restaurant' && store.store ? (
         <>
           <PhoneReservationDrawer open={phoneOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setPhoneOpen(false)}

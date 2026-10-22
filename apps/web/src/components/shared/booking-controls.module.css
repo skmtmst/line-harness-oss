@@ -86,7 +86,7 @@
   font-size: var(--text-nano);
   font-weight: 600;
   line-height: var(--tpl-rs-lh-10);
-  opacity: 0;
+  opacity: 1;
   cursor: pointer;
 }
 
