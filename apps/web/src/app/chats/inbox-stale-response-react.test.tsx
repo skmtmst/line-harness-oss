@@ -343,6 +343,15 @@ async function typeDatetime(text: string) {
 }
 import { setTimeControl } from '@/test-utils/time-control'
 
+async function eventually(check: () => void) {
+  for (let attempt = 0; ; attempt++) {
+    try { check(); return } catch (error) {
+      if (attempt >= 100) throw error
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
+    }
+  }
+}
+
 async function click(el: Element | null) {
   if (!el) throw new Error('クリック対象が見つからない')
   await act(async () => {
@@ -369,6 +378,48 @@ async function openSchedulePanel() {
 }
 
 describe('受信箱の遅延応答の対象照合(#962)と予約の冪等キー(#965)', () => {
+  it('会話切替直後から前の本文を隠し、遅い取得だけ骨組みを出す', async () => {
+    const slow = deferred<unknown>()
+    const normal = baseHandler({})
+    net.handler = (path, init) => /^\/api\/chats\/friend-b(\?|$)/.test(path) ? slow.promise : normal(path, init)
+    fixture.params = new URLSearchParams('friend=friend-a')
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(talkPaneText()).toContain('friend-aの会話'))
+    fixture.params = new URLSearchParams('friend=friend-b')
+    await act(async () => root.render(<ChatsPage />))
+    expect(talkPaneText()).not.toContain('friend-aの会話')
+    const loading = host.querySelector('[aria-label="会話を読み込んでいます"]')
+    expect(loading).not.toBeNull()
+    expect(loading?.closest('[data-skeleton-reserve]')).not.toBeNull()
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 330)) })
+    expect(host.querySelector('[aria-label="会話を読み込んでいます"]')?.closest('[data-skeleton-reserve]')).toBeNull()
+    expect(loading?.querySelector('[data-skeleton]')).not.toBeNull()
+    await act(async () => { slow.resolve({ success: true, data: chatDetail('friend-b', 'Bさん', '新しい会話') }) })
+    await eventually(() => expect(talkPaneText()).toContain('新しい会話'))
+    expect(talkPaneText()).not.toContain('friend-aの会話')
+  })
+
+  it('送信待ちの吹き出しは送信中、成功後は送信済みになり連打で増えない', async () => {
+    const slow = deferred<unknown>()
+    net.handler = baseHandler({ send: () => slow.promise })
+    fixture.params = new URLSearchParams('friend=friend-a')
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull())
+    await typeMessage('確認の返信')
+    const send = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '送信する')!
+    await act(async () => { send.click(); send.click() })
+    expect(talkPaneText()).toContain('送信中…')
+    expect(talkPaneText()).toContain('確認の返信')
+    const pending = [...host.querySelectorAll('[role="article"]')].find((article) => article.textContent?.includes('確認の返信'))
+    expect(pending?.querySelector('[data-inbox-v6="quote-reply"]')).toBeNull()
+    expect(pending?.querySelector('[data-inbox-v6="correct-message"]')).toBeNull()
+    expect(net.posts.filter((post) => post.path.endsWith('/send'))).toHaveLength(1)
+    await act(async () => { slow.resolve({ success: true, data: { sent: true, sentByStaffName: '担当者', revision: 2 } }) })
+    await eventually(() => expect(talkPaneText()).toContain('送信済み'))
+    expect(talkPaneText()).not.toContain('送信中…')
+    expect([...host.querySelectorAll('[role="article"]')].filter((article) => article.textContent?.includes('確認の返信'))).toHaveLength(1)
+  })
+
   it('F07: Aの予約一覧応答が遅れてBへ切替後に届いても、Bの予約パネルに混ざらない', async () => {
     const schedA = deferred<unknown>()
     net.handler = baseHandler({

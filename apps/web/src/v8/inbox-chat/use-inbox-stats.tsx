@@ -1,5 +1,6 @@
 'use client'
 import { api, fetchApi, type InboxStats } from '@/lib/api';
+import { UNANSWERED_REFRESH_EVENT } from '@/lib/events';
 import { withRequestTimeout } from '@/lib/request-timeout';
 import { useEffect, useRef, useState } from 'react';
 import { StatusFilter } from './inbox-model';
@@ -35,6 +36,23 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
   } | null>(null)
 
   const quickCountsRequestRef = useRef(0)
+  const [refreshVersion, setRefreshVersion] = useState(0)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const refresh = () => {
+      if (timer !== undefined) return
+      timer = setTimeout(() => {
+        timer = undefined
+        setRefreshVersion((current) => current + 1)
+      }, 120)
+    }
+    window.addEventListener(UNANSWERED_REFRESH_EVENT, refresh)
+    return () => {
+      window.removeEventListener(UNANSWERED_REFRESH_EVENT, refresh)
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }, [])
+
 
   const [assigneeUnreadStatus, setAssigneeUnreadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
@@ -90,7 +108,7 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId])
+  }, [selectedAccountId, refreshVersion])
 
   /*
    * INBOX-09: 「すべて／要返信／1時間以上待ち」の件数は、一覧と同じ条件で
@@ -122,7 +140,8 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
     }).catch(() => {
       if (quickCountsRequestRef.current === requestId) setQuickCounts(null)
     })
-  }, [quickCountsKey, statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
+    return () => { quickCountsRequestRef.current += 1 }
+  }, [refreshVersion, quickCountsKey, statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
 
   /*
    * ★V8 状態の切り替えの件数（未対応 5・対応中 2…）。一覧と同じ条件（アカウント・担当・名前・
@@ -158,7 +177,8 @@ export function useInboxStats({ selectedAccountId, statusFilter, debouncedNameQu
     }).catch(() => {
       if (statusCountsRequestRef.current === requestId) setStatusCounts(null)
     })
-  }, [statusCountsKey, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
+    return () => { statusCountsRequestRef.current += 1 }
+  }, [refreshVersion, statusCountsKey, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, channel])
 
   const statusCountsNow = statusCounts?.key === statusCountsKey ? statusCounts.counts : null
 
