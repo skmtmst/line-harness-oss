@@ -613,7 +613,7 @@ export default function AutomationRunsV8() {
         >
           {run ? (
             <div className={styles.panel}>
-              <LogEntryCopy entry={{ occurredAt: run.occurredAt, target: run.subject ?? '友だち名なし', status: STATUS_LABEL[run.status], reason: resultReason(run) ?? STATUS_LABEL[run.status] }} />
+              <LogEntryCopy canCopy={permissions?.canExport === true} entry={{ occurredAt: run.occurredAt, target: run.subject ?? '友だち名なし', status: STATUS_LABEL[run.status], reason: resultReason(run) ?? STATUS_LABEL[run.status] }} />
               <p className={styles.panelText}>
                 {`版 v${(runDetail ?? run).versionNumber}`}
                 {(runDetail ?? run).isTest ? '・テスト実行' : ''}

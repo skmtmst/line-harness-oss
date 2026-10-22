@@ -230,5 +230,6 @@ test.each([
   expect([...board.querySelectorAll('button')].some(button => button.textContent?.includes('失敗したものをまとめてやり直す'))).toBe(false)
   await openContents(board)
   expect([...document.querySelectorAll('button')].filter(button => button.textContent?.includes('送り直す'))).toHaveLength(0)
+  expect(document.querySelector('[aria-label="この記録をコピー"]')).toBeNull()
   expect(mutationRequests).toBe(0)
 })

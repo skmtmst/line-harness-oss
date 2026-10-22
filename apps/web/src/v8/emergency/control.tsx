@@ -746,7 +746,7 @@ const EmergencyControlV8 = (
         </p>
       </section>
 
-      <LogEntryDetails entry={recordEntry} onClose={() => setRecordEntry(null)} />
+      <LogEntryDetails canCopy={canControl} entry={recordEntry} onClose={() => setRecordEntry(null)} />
       {/* 送る経路の網羅（止めると止まる経路）。絵の外なので記録の下に置く。 */}
       <SendPathCoveragePanel accountId={targetAccountId === 'all' ? null : targetAccountId} revision={control?.version ?? 0} />
 

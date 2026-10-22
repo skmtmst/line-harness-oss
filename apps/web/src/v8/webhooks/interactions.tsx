@@ -553,7 +553,7 @@ function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, bu
       }
     >
       <div className={styles.dialogBody}>
-        <LogEntryCopy entry={{ occurredAt: item.startedAt, target: item.webhookName, status: item.status === 'failed' ? '失敗' : item.status === 'succeeded' ? '成功' : item.status === 'retried' ? '送り直し済み' : '処理中', reason: item.failureReason ?? item.responseLabel }} />
+        <LogEntryCopy canCopy={canRetry} entry={{ occurredAt: item.startedAt, target: item.webhookName, status: item.status === 'failed' ? '失敗' : item.status === 'succeeded' ? '成功' : item.status === 'retried' ? '送り直し済み' : '処理中', reason: item.failureReason ?? item.responseLabel }} />
         <span className={styles.dialogState} data-tone={failed ? 'danger' : item.status === 'succeeded' ? 'active' : 'neutral'}>
           <span className={styles.pillDot} aria-hidden="true" />
           {failed ? '失敗' : item.status === 'succeeded' ? '成功' : '処理中'}
