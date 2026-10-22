@@ -277,7 +277,7 @@ html:root .button.filterActive { outline: 1px solid var(--color-focus-ring); col
 
 /* 副操作は灰色の面。文字・アイコンだけの口と主操作はそれぞれ保つ。 */
 :root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']) {
-  border: 0; outline: none; box-shadow: none;
+  border: 0; box-shadow: none;
   background: var(--polish-control-bg);
   font-size: var(--polish-control-text); font-weight: var(--polish-control-weight);
 }
@@ -291,3 +291,8 @@ html:root .button.filterActive { outline-color: var(--color-control-border); col
 /* 明示された危険・成功の文字色は、文字だけの操作でも保持する。 */
 :root .button.inline.text.textDanger { color: var(--color-danger); }
 :root .button.inline.text.textAccent { color: var(--color-accent-deep); }
+
+/* 灰色の面でもキーボードの焦点だけは輪で示す。 */
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):not(:focus-visible) { outline: none; }
+html:root .button:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+:root .button.secondary:is(:not([data-presentation]), [data-presentation='restaurant']):active:not(:disabled) { background: var(--polish-control-hover); }
