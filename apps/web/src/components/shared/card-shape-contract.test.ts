@@ -48,7 +48,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/booking-menus/menu-form.module.css", ".subSection", "カード内の小箱・入れ子・階層の行。影を重ねない。"],
   ["v8/broadcast-detail/detail.module.css", ".linkList", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/broadcast-detail/detail.module.css", ".approval", "警告・閲覧のみ・状態・待機の帯。線で区別する。"],
-  ["v8/broadcasts/list.module.css", ".datePopover", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["v8/form-edit/edit.module.css", ".blockOpenCard", "カード内の小箱・入れ子・階層の行。影を重ねない。"],
   ["v8/friends/list/list.module.css", ".columnsMenu", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["v8/hq-broadcasts/create.module.css", ".checkEmpty", "未選択の入力欄。破線は空の状態を示す。"],

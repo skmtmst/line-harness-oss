@@ -202,7 +202,7 @@ export function Tr({ children, className, selected, interactive, href, onOpen, d
   }
   return <RowNavigation.Provider value={detailKey && rowId ? { key: detailKey, id: String(rowId) } : null}><tr data-shared-part="list-row" data-row-open={canOpen || undefined} className={classes} aria-selected={selected === undefined ? undefined : selected}
     data-created-highlight={createdHighlight || undefined} data-leaving={leaving || undefined} data-highlighted={highlighted || undefined}
-    {...rowProps} tabIndex={rowProps.tabIndex ?? (canOpen ? 0 : undefined)}
+    {...rowProps} inert={leaving || rowProps.inert || undefined} tabIndex={rowProps.tabIndex ?? (canOpen ? 0 : undefined)}
     onClick={(event) => {
       if (event.defaultPrevented || isRowControl(event.target, event.currentTarget) || window.getSelection()?.toString()) return
       if (href && (event.metaKey || event.ctrlKey || event.shiftKey)) { openLink(true); return }

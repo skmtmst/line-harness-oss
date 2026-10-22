@@ -5,6 +5,7 @@ import Link from '@/components/shared/list-navigation'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { canManageRole } from '@/lib/staff-role'
 import styles from './first-steps.module.css'
+import { ProgressBar } from '@/components/shared/progress'
 
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { doneCount, type StepResult } from '@/v8/settings/public/getting-started-steps/index'
@@ -62,22 +63,12 @@ export function useFirstSteps(accountId: string | null, role: string | null) {
 }
 
 export function FirstStepsCard({ summary, folded, onToggle }: { summary: FirstStepsSummary; folded: boolean; onToggle: () => void }) {
-  const rate = summary.total > 0 ? Math.round((summary.done / summary.total) * 100) : 0
   return (
     <section className={styles.card} aria-labelledby="first-steps-title" data-design-node="r3X34">
       <div className={styles.head}>
         <h2 id="first-steps-title" className={styles.title}>はじめにやること</h2>
         <span className={styles.count}>{`${summary.done} / ${summary.total} 済み`}</span>
-        <span
-          className={styles.track}
-          role="progressbar"
-          aria-label="はじめにやることの進み"
-          aria-valuemin={0}
-          aria-valuemax={summary.total}
-          aria-valuenow={summary.done}
-        >
-          <span className={styles.fill} style={{ width: `${rate}%` }} />
-        </span>
+        <ProgressBar appearance="onboarding" value={summary.done} max={summary.total} label="はじめにやることの進み" />
         <span className={styles.spacer} />
         <button type="button" className={styles.fold} onClick={onToggle} aria-expanded={!folded} aria-controls="first-steps-list">
           {folded ? '開く' : '畳む'}

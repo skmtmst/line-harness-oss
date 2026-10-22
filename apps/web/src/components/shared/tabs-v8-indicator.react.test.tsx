@@ -81,7 +81,7 @@ describe('V8 タブの下線', () => {
     expect(commits).not.toHaveBeenCalled()
   })
 
-  it('未選択・折返しでは計測せず、隠れた欄のゼロ寸法で有効な下線を失わない', async () => {
+  it('未選択では下線を消し、折返しと隠れた欄の再表示にも追従する', async () => {
     const view = render(<Tabs items={ITEMS} />)
     await flush()
     hidden = true; reads = 0
@@ -98,7 +98,8 @@ describe('V8 タブの下線', () => {
     reads = 0
     view.rerender(<Tabs items={ITEMS} wrap />)
     await flush()
-    expect(reads).toBe(0)
+    expect(reads).toBeGreaterThan(0)
+    expect(view.container.querySelector('[aria-hidden="true"]')).not.toBeNull()
   })
 
   it('キーボードはdisabledを飛ばし、選択を変えずフォーカスだけ移す', async () => {
@@ -147,4 +148,16 @@ describe('V8 タブの下線', () => {
       else Reflect.deleteProperty(document, 'fonts')
     }
   })
+})
+
+
+it('折返したタブは選択した段の下へ下線を置く', async () => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    return this.getAttribute('role') === 'tab'
+      ? { left: 20, width: 100, bottom: 36 } as DOMRect
+      : { left: 0, width: 300, bottom: 72 } as DOMRect
+  })
+  const view = render(<Tabs items={ITEMS} wrap />)
+  await flush()
+  expect(view.container.querySelector<HTMLElement>('[aria-hidden="true"]')?.style.transform).toBe('translate(20px, -36px)')
 })
