@@ -104,7 +104,7 @@
   padding: var(--tpl-inbox-badge-pad);
   border: 0;
   outline: 1px solid var(--color-hairline);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
   border-radius: var(--radius-mini);
   background: transparent;
   color: var(--color-ink-secondary);

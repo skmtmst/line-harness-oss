@@ -131,14 +131,14 @@
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .slot { height: 48px; border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -0.5px; background: var(--color-shell); box-shadow: none; font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: auto; font-size: 20px; font-weight: 500; line-height: normal; caret-color: var(--color-ink); }
+:root .slot { height: 48px; border: 0; outline: 1px solid var(--color-toggle-off); outline-offset: -1px; background: var(--color-shell); box-shadow: none; font-family: var(--font-inter), Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-size: 20px; font-weight: 500; line-height: normal; caret-color: var(--color-ink); }
 :root .slot:focus { outline: 1.5px solid var(--color-accent-deep); outline-offset: -0.75px; }
 :root .group[data-state='success'] .slot { outline: 1.5px solid var(--color-success); outline-offset: -0.75px; background: var(--color-shell); box-shadow: none; }
 :root .slot[aria-invalid='true'] { outline-color: var(--color-status-danger); background: var(--color-status-danger-soft); }
 
 .field { display: contents; }
 :root .field:has(.label) { display: inline-flex; flex-direction: column; gap: 6px; }
-:root .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: auto; color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 20px; }
+:root .label { font-family: var(--font-noto-sans-jp), 'Noto Sans JP', system-ui, sans-serif; -webkit-font-smoothing: antialiased; color: var(--color-ink); font-size: 13px; font-weight: 500; line-height: 20px; }
 :root .field:has(.label) { align-items: flex-start; }
 :root .slot { gap: 0; }
 

@@ -70,7 +70,7 @@
   padding: var(--tpl-section-pad);
   border-radius: var(--radius-card);
   outline: 1px solid var(--card-edge);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
   box-shadow: var(--card-shadow);
 }
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); }

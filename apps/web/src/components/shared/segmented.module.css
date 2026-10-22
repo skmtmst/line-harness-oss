@@ -87,7 +87,7 @@
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .root { background: var(--color-shell); box-shadow: none; }
-:root .item { font-size: var(--text-body); line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .item { font-size: var(--text-body); line-height: 20px; font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 
 /*
  * 小型のグラフ／表。器 r8・項目 3/12・文 12/18・
@@ -133,7 +133,7 @@
 }
 /*  の探し方。既定の切り替えの寸法・動きは変えない。 */
 :root .root:is([data-appearance='choices'],[data-appearance='reservation']) { padding: 0; gap: 8px; background: transparent; }
-:root .root:is([data-appearance='choices'],[data-appearance='reservation']) .item { min-height: 0; padding: 6px 12px; border-radius: var(--radius-pill); outline: 1px solid var(--color-hairline); outline-offset: -0.5px; font-size: var(--text-caption); font-weight: 400; line-height: 17px; }
+:root .root:is([data-appearance='choices'],[data-appearance='reservation']) .item { min-height: 0; padding: 6px 12px; border-radius: var(--radius-pill); outline: 1px solid var(--color-hairline); outline-offset: -1px; font-size: var(--text-caption); font-weight: 400; line-height: 17px; }
 :root .root:is([data-appearance='choices'],[data-appearance='reservation']) .selected { outline-color: transparent; background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 600; }
 :root .root:is([data-appearance='choices'],[data-appearance='reservation']) .item:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 /*

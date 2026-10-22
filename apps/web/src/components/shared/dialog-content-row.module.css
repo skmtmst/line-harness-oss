@@ -10,7 +10,7 @@
   padding: var(--space-8) var(--polish-space-field);
   border-radius: var(--radius-primary-action);
   outline: 1px solid var(--color-hairline);
-  outline-offset: -0.5px;
+  outline-offset: -1px;
 }
 
 .row[data-tone='muted'] {

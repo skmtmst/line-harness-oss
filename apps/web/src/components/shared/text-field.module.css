@@ -88,7 +88,7 @@
 }
 
 /* V8の1行欄。高さ・左右の余白・行間は共通値。 */
-:root .single { height: var(--tpl-field-h); border: 0; padding: 0 var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; box-shadow: var(--control-shadow); line-height: var(--tpl-field-lh); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: auto; }
+:root .single { height: var(--tpl-field-h); border: 0; padding: 0 var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); line-height: var(--tpl-field-lh); font-family: var(--font-noto-sans-jp), "Noto Sans JP", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 :root .single[aria-invalid='true'] { outline-color: var(--color-danger); }
 :root .single:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 /* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */
@@ -132,7 +132,7 @@
 :root .multiShort { min-height: var(--tpl-nm-textarea-h); height: var(--tpl-nm-textarea-h); padding: var(--tpl-nm-textarea-pad); font-size: var(--tpl-nm-row-size); line-height: var(--tpl-nm-textarea-lh); }
 
 /* コラムの紹介文。改行を保ち、最初は1行分の高さで表示する。 */
-:root .multiSingleRow { min-height: var(--tpl-field-h); height: var(--tpl-field-h); border: 0; padding: var(--tpl-field-pad-y) var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -0.5px; line-height: var(--tpl-field-lh); box-shadow: var(--control-shadow); }
+:root .multiSingleRow { min-height: var(--tpl-field-h); height: var(--tpl-field-h); border: 0; padding: var(--tpl-field-pad-y) var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -1px; line-height: var(--tpl-field-lh); box-shadow: var(--control-shadow); }
 :root .multiSingleRow[aria-invalid='true'] { outline-color: var(--color-danger); }
 
 /* ・仕上げ7 */
