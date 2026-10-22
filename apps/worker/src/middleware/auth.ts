@@ -1,3 +1,4 @@
+import { rememberAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { logger } from '@line-crm/shared/server';
 /** Public auth facade. Internal auth.ts modules retain the existing manual-review gate. */
 import { bearerToken } from './auth-http.js';
@@ -28,16 +29,19 @@ export async function authenticateAdminSession(
   const tokenHash = await sha256Hex(token);
   const staff = await getStaffByAdminSession(c.env.DB, tokenHash, new Date().toISOString());
   if (!staff) return null;
-  const required = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY) && await getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) !== 'false';
+  const configured = mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY);
   const registered = Boolean(staff.totp_enabled_at && staff.totp_secret_enc);
-  if (required || registered) {
-    const verified = await getPlatformSetting(c.env.DB, `auth.mfa.session:${tokenHash}`);
-    if ((required && !registered) || verified !== staff.id) {
-      await deleteAdminSession(c.env.DB, tokenHash);
-      return null;
-    }
+  // 方針と確認済みの印は独立。未登録者の印は読んでも許可できないので取らない。
+  const [policy, verified] = await Promise.all([
+    configured ? getPlatformSetting(c.env.DB, `auth.mfa.required:${staff.tenant_id ?? DEFAULT_TENANT_ID}`) : null,
+    registered ? getPlatformSetting(c.env.DB, `auth.mfa.session:${tokenHash}`) : null,
+  ]);
+  const required = configured && policy !== 'false';
+  if ((required && !registered) || (registered && verified !== staff.id)) {
+    await deleteAdminSession(c.env.DB, tokenHash);
+    return null;
   }
-  return { ...toAuthenticatedStaff(staff), credential: 'session' };
+  return rememberAuthenticatedStaffRecord(c.env.DB, { ...toAuthenticatedStaff(staff), credential: 'session' }, staff);
 }
 
 async function authenticateCookieToken(
@@ -75,7 +79,7 @@ export async function authenticateApiToken(
     // This endpoint exchanges the primary credential for a challenge, never
     // for an authenticated staff context usable by other APIs.
     if (c.req.path !== '/api/auth/login' && (required || staff.totp_enabled_at)) return null;
-    return { ...toAuthenticatedStaff(staff), credential: 'api-key' };
+    return rememberAuthenticatedStaffRecord(c.env.DB, { ...toAuthenticatedStaff(staff), credential: 'api-key' }, staff);
   }
 
   // Fallback: env API_KEY acts as owner (current rotation slot)

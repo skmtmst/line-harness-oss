@@ -1,3 +1,4 @@
+import { readLineAccountListMetadata } from '../services/line-account-list-metadata.js';
 import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { verifyLineMessagingIdentity } from '../services/line-messaging-identity.js';
@@ -8,11 +9,10 @@ import { ACCOUNT_STYLES, type AccountStyle } from '@line-crm/shared';
 import { initializeAccountStyle } from '../services/style-setup.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
-import { getLineAccountFoldersByAccountIds, getLineAccountTag } from '@line-crm/db';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import { getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountListStats, getLineAccountTagsByAccountIds, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
+import { getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
 import type { LineAccount as DbLineAccount, LineAccountConnectionCheck, LineAccountScopeEntry } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
@@ -80,9 +80,9 @@ lineAccounts.get('/api/line-accounts', async (c) => {
       if(folderId && !await getLineAccountTag(db,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,folderId)) return c.json({success:false,error:'フォルダが見つかりません'},404);
       items=items.filter(item=>(item.folder_id ?? null)===folderId);
     }
-    const tagsByAccount = await getLineAccountTagsByAccountIds(db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map(item => item.id));
-    const foldersByAccount = await getLineAccountFoldersByAccountIds(db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map(item => item.id));
-    const statsByAccount = await getLineAccountListStats(db, items.map((item) => item.id));
+    const { tagsByAccount, foldersByAccount, statsByAccount } = await readLineAccountListMetadata(
+      db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map((item) => item.id),
+    );
     const serializeWithStats = (item: DbLineAccount) => {
       const overview = statsByAccount[item.id];
       return {

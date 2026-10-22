@@ -5,6 +5,7 @@ import {
   type LineAccountScopeEntry,
 } from '@line-crm/db';
 
+import { readAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 
@@ -128,7 +129,9 @@ async function resolveVisibleLineAccountScope(
   // アカウント一覧とスタッフ行は互いに独立。直列だと2往復分待つので同時に投げる。
   const [entries, member] = await Promise.all([
     getLineAccountScopeEntries(db, staffTenant),
-    staff.id && staff.id !== 'env-owner' ? getStaffById(db, staff.id) : Promise.resolve(null),
+    staff.id && staff.id !== 'env-owner'
+      ? readAuthenticatedStaffRecord(db, staff) ?? getStaffById(db, staff.id)
+      : Promise.resolve(null),
   ]);
   const tenantAccounts = filterVisibleLineAccounts(entries, staff);
   const featureScope = staff.featureEnabledLineAccountIds

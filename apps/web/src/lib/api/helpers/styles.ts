@@ -1,5 +1,6 @@
 import type { AccountStyle, StyleTemplateSample } from '@line-crm/shared';
 import { fetchApi } from '../../api';
+import { fetchSharedRead } from '../transport/cache';
 
 import {
   write,
@@ -62,7 +63,7 @@ export const hqStyleApi = {
       write('POST', body),
     ),
   attention: () =>
-    fetchApi<
+    fetchSharedRead<
       Result<{
         asOf: string;
         items: Array<{

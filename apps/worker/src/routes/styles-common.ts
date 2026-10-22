@@ -1,3 +1,4 @@
+import { readAuthenticatedStaffRecord } from '../lib/authenticated-staff-record.js';
 import { type Context } from 'hono';
 import { type IndustryStyle } from '@line-crm/shared';
 import { getStaffById } from '@line-crm/db';
@@ -13,7 +14,7 @@ export async function hq(c: Context<Env>, allowScoped = false) {
   const s = c.get('staff');
   if (!s?.tenantId || (!['GET', 'HEAD'].includes(c.req.method) && s.readOnly))
     throw new StyleError('forbidden', 403);
-  const m = await getStaffById(c.env.DB, s.id);
+  const m = readAuthenticatedStaffRecord(c.env.DB, s) ?? await getStaffById(c.env.DB, s.id);
   if (
     !m ||
     !m.is_active ||

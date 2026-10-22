@@ -739,3 +739,5 @@
 - [LINE連携の権限確認の更新](release-log/unreleased/1781-kenta-proxy-permissions.md)
 - [リンクの本人確認と案内の更新](release-log/unreleased/1781-kenta-link-identity.md)
 - [登録ファイルの確認と公開の更新](release-log/unreleased/1781-kenta-media-delivery.md)
+
+- [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
