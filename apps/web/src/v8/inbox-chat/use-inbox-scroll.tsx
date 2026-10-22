@@ -1,17 +1,20 @@
 'use client'
-import { type ChatDetail as ApiChatDetail } from '@/lib/api';
+import { type ChatDetail as ApiChatDetail, type ChatDetailMessage } from '@/lib/api';
 import type { RefObject } from 'react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TEXTAREA_MAX_HEIGHT_PX } from './inbox-model';
 
 type Options = {
   selectedChatId: string | null
   chatDetail: ApiChatDetail | null
   textareaRef: RefObject<HTMLTextAreaElement | null>
+  pendingMessages?: ChatDetailMessage[]
   messageContent: string
 }
 
-export function useInboxScroll({ selectedChatId, chatDetail, textareaRef, messageContent }: Options) {
+export function useInboxScroll({ selectedChatId, chatDetail, textareaRef, messageContent, pendingMessages }: Options) {
+
+  const messages = useMemo(() => pendingMessages?.length ? [...(chatDetail?.messages ?? []), ...pendingMessages] : chatDetail?.messages, [chatDetail?.messages, pendingMessages])
 
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -46,8 +49,8 @@ export function useInboxScroll({ selectedChatId, chatDetail, textareaRef, messag
    */
   useLayoutEffect(() => {
     const el = messagesScrollRef.current
-    const list = chatDetail?.messages
-    if (!el || !list || list.length === 0) {
+    const list = messages
+    if (!chatDetail || !el || !list || list.length === 0) {
       if (!list || list.length === 0) prevMessageWindowRef.current = null
       return
     }
@@ -71,7 +74,7 @@ export function useInboxScroll({ selectedChatId, chatDetail, textareaRef, messag
     }
     // 上へ足しただけ（前のメッセージ）・取り直しで中身が同じ … 位置は窓分けが守る。
     if (appended) el.scrollTop = el.scrollHeight
-  }, [chatDetail?.messages, chatDetail?.id])
+  }, [messages, chatDetail?.id])
 
   // 画像などの遅れての読み込みで高さが伸びても、読み返し中の位置を崩さない。
   // 2026-10-07：窓分け（ChatThreadWindow）が行の高さの変化を見張って直す。

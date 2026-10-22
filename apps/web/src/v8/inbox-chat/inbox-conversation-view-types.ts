@@ -87,6 +87,8 @@ export type Props = {
   scheduleInput: string
   setScheduleInput: Dispatch<SetStateAction<string>>
   handleScheduleSend: () => Promise<void>
+  sendError?: string
+  pendingMessages?: ChatDetailMessage[]
   error: string
   scheduledSendsFailed: boolean
   loadScheduledSends: (chatId: string) => Promise<void>
