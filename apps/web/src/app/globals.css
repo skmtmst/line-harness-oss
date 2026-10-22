@@ -450,7 +450,7 @@
    * 2枚の影）。照りは緑の上に薄い白の内側線で、ボタンが平らに
    * なりすぎないようにする。
    */
-  --shadow-primary-action: var(--card-shadow);
+  --shadow-primary-action: 0 1px 2px rgba(29, 29, 31, 0.1); /* 主ボタンは薄い1枚の影（カードの二重の影は重く見えた。2026-10-23） */
   /* トグル・オフの地（Pencil V8 トグル/オフ LxHpj の #c9ced6）。 */
   --color-toggle-off: #c9ced6;
   /* 注目の星・オン（Pencil V8 w0R1PQ）：塗りは黄、縁は濃い黄。 */
@@ -793,8 +793,8 @@
   /* controls レーン：書き出しHTMLの線・成功・浮く色選びの値。 */
   --color-controls-swatch-line: #1d1d1f1f;
   --shadow-controls-primary: var(--shadow-primary-action);
-  --shadow-primary-action: var(--card-shadow);
-  --color-primary-border: #06612f;
+  --shadow-primary-action: 0 1px 2px rgba(29, 29, 31, 0.1); /* 主ボタンは薄い1枚の影（カードの二重の影は重く見えた。2026-10-23） */
+  --color-primary-border: var(--color-accent-deep); /* 地と同じ色。濃い縁が下の影と重なって太い枠に見えた（2026-10-23 オーナー指摘） */
   --radius-primary-action: 8px;
   --tpl-folder-create-space-col-h: 45px;
   /* 表の行の下の線を行の内側に描く（線を含めて1行の高さ。data-table）。@theme に置くと CSS Modules だけが読む値は消えるので、ここ。 */

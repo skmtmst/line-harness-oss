@@ -19,9 +19,9 @@ const brightnessOf = (token: string) => Number(globals.match(new RegExp(`${token
  */
 describe('押した感じ（V8 のボタン・絵ボタン）', () => {
   it("主ボタンは高さ36を保ち、墨色の影・濃緑の縁・角丸8を使う", () => {
-    expect(globals).toContain('--shadow-primary-action: var(--card-shadow)')
+    expect(globals).toContain('--shadow-primary-action: 0 1px 2px rgba(29, 29, 31, 0.1)')
     expect(globals).toContain('--card-shadow: 0 1px 1px rgba(29, 29, 31, 0.16), 0 2px 4px rgba(29, 29, 31, 0.08)')
-    expect(globals).toContain('--color-primary-border: #06612f')
+    expect(globals).toContain('--color-primary-border: var(--color-accent-deep)')
     expect(globals).toContain('--radius-primary-action: 8px')
     expect(buttonCss).toMatch(/:root \.primary \{[^}]*border: 0;[^}]*outline: 1px solid var\(--color-primary-border\);[^}]*outline-offset: -1px;[^}]*border-radius: var\(--radius-primary-action\);[^}]*box-shadow: var\(--shadow-primary-action\)/s)
   })

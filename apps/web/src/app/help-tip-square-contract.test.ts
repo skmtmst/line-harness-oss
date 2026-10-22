@@ -25,11 +25,10 @@ const TREND = fs.readFileSync(path.join(DASHBOARD, 'friend-trend-table.tsx'), 'u
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('「？」の正円', () => {
-  it('文字の「？」を専用の円に置き、アイコンへ置き換えない', () => {
-    expect(TSX).not.toContain('lucide')
-    expect(TSX).not.toContain('CircleHelp')
-    expect(TSX).toContain('className={styles.mark}>?</span>')
-    expect(CSS).not.toContain('.button svg')
+  it('「？」は丸の中の「?」の図形（16px）で描く（文字の「?」は真ん中に来なかった。2026-10-23 オーナー指摘で図形へ）', () => {
+    expect(TSX).toContain('<CircleHelp className={styles.markIcon}')
+    expect(TSX).not.toContain('className={styles.mark}>?</span>')
+    expect(CSS).toMatch(/:root \.markIcon \{[^}]*width: 16px;[^}]*height: 16px;/)
     expect(CSS).toMatch(/:root \.button\s*\{[^}]*background:\s*transparent;/)
   })
 
