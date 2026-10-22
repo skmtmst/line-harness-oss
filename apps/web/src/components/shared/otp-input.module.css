@@ -185,9 +185,9 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-/* 6桁のコードは、マスを 48px の正方形にし、両端を下のボタンにそろえて間を均等にあける（右に空きが出ていた・広げると大きすぎた。2026-10-23 オーナー指摘）。 */
+/* 6桁のコードは、マスを 52px の正方形にし、両端を下のボタンにそろえて間を均等にあける（右に空きが出ていた・広げると大きすぎた。2026-10-23 オーナー指摘）。 */
 :root .group[data-format='digits'] { display: flex; justify-content: space-between; width: 100%; }
-:root .group[data-format='digits'] .slot { width: 48px; height: 48px; flex: 0 0 48px; }
+:root .group[data-format='digits'] .slot { width: 52px; height: 52px; flex: 0 0 52px; }
 :root .field:has(.label):has(.group[data-format='digits']) { display: flex; width: 100%; align-items: stretch; }
 /* 確かめている輪と ✓ は、広げたまとまりの外に出ないよう、右下の下に置く。 */
 :root .group[data-format='digits'] :is(.spinner, .check) { top: calc(100% + 8px); left: auto; right: 0; translate: 0 0; }
